@@ -4,41 +4,43 @@ project('vos', 'c',
 v = find_program('v')
 nasm = find_program('nasm')
 
-v_gen = generator(v,
-    output: '@BASENAME@.c',
-    arguments: ['-bare', 'build', '@INPUT@', '-o', '@OUTPUT@'])
-
 nasm_gen = generator(nasm,
     output: '@BASENAME@.o',
-    arguments: ['-f', 'elf64', '@INPUT@', '-o', '@OUTPUT@'])
+    arguments: ['-g', '-F', 'dwarf', '-f', 'elf64', '@INPUT@', '-o', '@OUTPUT@'])
 
-objs = []
+k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-mcmodel=large', '-z', 'max-page-size=0x1000', '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel', '-fno-stack-protector']
+k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', '-T', meson.source_root() + '/arch/amd64/link.ld']
 
+k_objs = []
+k_deps = []
+
+c_src = [
+    'sys/v_runtime.c'
+]
 asm_src = [
-    'arch/amd64/init.asm'
+    'arch/amd64/init.asm',
+    'arch/amd64/io.asm'
 ]
 v_modules = [
-    'init'
+    'sys'
 ]
 
-objs += nasm_gen.process(asm_src)
+k_objs += c_src
+k_objs += nasm_gen.process(asm_src)
 
 foreach mod : v_modules
-    output = meson.current_build_dir() + '/' + mod.underscorify() + '.c'
-    objs += output
-    run_command(
-        v,
-        '-bare',
-        '-o',
-        output,
-        'build',
-        'module',
-        mod
+    name = 'v_' + mod.underscorify()
+    output = name + '.gen.c'
+    k_deps += name
+    k_objs += custom_target(name,
+        command: [v, '-bare', '-o', meson.current_build_dir() + '/meson-out/' + output, 'build', 'module', meson.source_root() + '/' + mod],
+        output: output
     )
 endforeach
 
 shared_library('kernel',
-    objs,
+    k_objs,
+    c_args: k_cflags,
+    link_args: k_ldflags,
     name_prefix: '',
     name_suffix: 'elf')
-

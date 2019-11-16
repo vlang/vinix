@@ -1,7 +1,20 @@
 global _entry
-extern kmain
+extern vrt_main
 extern _start
 extern _end
+
+%macro printaddr32 1
+    push %1
+    call near dump_addr32
+    add esp, 4
+%endmacro
+
+%macro printaddr64 1
+    push %1
+    call near dump_addr64
+    add rsp, 8
+%endmacro
+
 
 ; higher-half virtual memory address
 KERNEL_VMA equ 0xFFFFFFFF80000000
@@ -230,6 +243,91 @@ bits 32
     pop ebp
     ret
 
+dump_addr64:
+bits 64
+    push rbp
+    mov rbp, rsp
+
+    push rax
+
+    mov r9, 16 ; dump 64 bits
+    mov r8, [rsp+24]
+
+    mov al, "0" ; print 0x
+    out 0xe9, al
+    mov al, "x"
+    out 0xe9, al
+
+.loop:
+    mov rax, r8
+    shr rax, 60
+    and rax, 0x0f  ; int a = n & 0x0f
+
+    cmp rax, 0x0a
+    jge near .g10  ; if (a < 0x0a)
+    add rax, 0x30  ;    a += '0'
+    jmp near .end  ; else
+.g10:
+    add rax, 0x41 - 0x0a ; a += 'A' - 0x0a
+.end: 
+    out 0xe9, al
+    shl r8, 4      ; n = n >> 4
+
+    dec r9
+    jnz near .loop
+
+    mov al, 0x0a ; putchar('\n')
+    out 0xe9, al
+
+    pop rax
+    pop rbp
+    ret
+
+dump_addr32:
+bits 32
+    push ebp
+    mov ebp, esp
+
+    push eax
+
+    mov esi, 8 ; dump 32 bits
+    mov edi, [esp+12]
+
+    push ecx
+    push edx
+    
+    mov al, "0" ; print 0x
+    out 0xe9, al
+    mov al, "x"
+    out 0xe9, al
+.loop:
+    mov eax, edi
+    shr eax, 28
+    and eax, 0x0f  ; int a = n & 0x0f
+
+    cmp eax, 0x0a
+    jge near .g10  ; if (a < 0x0a)
+    add eax, 0x30  ;    a += '0'
+    jmp near .end  ; else
+.g10:
+    add eax, 0x41 - 0x0a ; a += 'A' - 0x0a
+.end: 
+    out 0xe9, al
+    shl edi, 4      ; n = n >> 4
+
+    dec esi
+    jnz near .loop
+
+    mov al, 0x0a ; putchar('\n')
+    out 0xe9, al
+
+    pop edx
+    pop ecx
+    pop eax
+    pop ebp
+    ret
+
+
 section .inith
 start_kernel:
 bits 64
@@ -275,7 +373,7 @@ bits 64
     ; anything - even pointing to invalid memory)
     mov rbp, 0 ; terminate stack traces here
     ;mov rsp, qword stack + STACK_SIZE
-    mov rsp, 0xffffeff00000000 | 0xeffff0
+    mov rsp, 0xFFFFFEFF00000000 | 0xeffff0
 
     ; unmap the identity-mapped memory
     mov qword [boot_pml4], 0x0
@@ -287,7 +385,7 @@ bits 64
     push 0x0
     popf
 
-    mov rax, kmain
+    mov rax, vrt_main
     call rax
 
 section .init_data
