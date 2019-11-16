@@ -1,0 +1,92 @@
+*.tmp.c
+/build/
+.mypy_cache/
+.pytest_cache/
+/.project
+/.pydevproject
+/.settings
+/.cproject
+/.idea
+/.vscode
+
+__pycache__
+.coverage
+/install dir
+/work area
+
+/meson-test-run.txt
+/meson-test-run.xml
+/meson-cross-test-run.txt
+/meson-cross-test-run.xml
+
+.DS_Store
+*~
+*.swp
+packagecache
+/MANIFEST
+/build
+/dist
+/meson.egg-info
+
+/docs/built_docs
+/docs/hotdoc-private*
+
+*.pyc
+
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+*.c_shared_lib.c
+*.vh
+*.iso
+*.elf

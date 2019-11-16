@@ -1,15 +1,11 @@
-# Upcoming V OS
+# vOS
 
-Planned key features:
+An attempt to write an Operating System in V.
 
-- Unix-like microkernel
-- V is the primary language
-- Compiles in <1 second
-- Limited POSIX compatibility
-- Running software written in C
-- Stable syscall API
-- x64
-- ELF binary format
-- Official GUI toolkit in V UI
-- pacman package manager
+Goals:
 
+- Microkernel architecture.
+- UEFI support, Multiboot compliant.
+- Written in V as much as possible (including libc), not dependent on external libs written in C.
+- POSIX subsystem for compatibility with lots of software that already exists.
+- Targetted at modern 64-bit architectures (amd64, aarch64, risc-v).
