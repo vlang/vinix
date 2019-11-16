@@ -1,0 +1,21 @@
+module mm
+
+pub const (
+	PAGE_SIZE = 0x1000
+	LARGE_PAGE_SIZE = 0x200000
+	HUGE_PAGE_SIZE = 0x40000000
+
+	PFLAG_PRESENT = (1 << 0)
+	PFLAG_READ_WRITE = (1 << 1)
+	PFLAG_USER = (1 << 2)
+	PFLAG_WRITE_THROUGH = (1 << 3)
+	PFLAG_CACHE_DISABLED = (1 << 4)
+	PFLAG_ACCESSED = (1 << 5)
+	PFLAG_DIRTY = (1 << 6)
+	PFLAG_PAGE_SIZE = (1 << 7)
+	PFLAG_GLOBAL = (1 << 8)
+)
+
+pub fn paging_init() {
+
+}

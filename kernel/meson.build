@@ -12,31 +12,33 @@ k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-mcmod
 k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', '-T', meson.source_root() + '/arch/amd64/link.ld']
 
 k_objs = []
-k_deps = []
+k_mods = []
 
 c_src = [
     'sys/v_runtime.c'
 ]
+
 asm_src = [
     'arch/amd64/init.asm',
     'arch/amd64/io.asm'
 ]
+
 v_modules = [
-    'sys'
+    'sys',
+    'mm',
 ]
 
 k_objs += c_src
 k_objs += nasm_gen.process(asm_src)
 
 foreach mod : v_modules
-    name = 'v_' + mod.underscorify()
-    output = name + '.gen.c'
-    k_deps += name
-    k_objs += custom_target(name,
-        command: [v, '-bare', '-o', meson.current_build_dir() + '/meson-out/' + output, 'build', 'module', meson.source_root() + '/' + mod],
-        output: output
-    )
+    k_mods += meson.source_root() + '/' + mod
 endforeach
+
+k_objs += custom_target('vkernel',
+    command: [v, '-bare', '-o', meson.current_build_dir() + '/meson-out/vkernel.c', 'build', 'module'] + k_mods,
+    output: 'vkernel.c'
+)
 
 shared_library('kernel',
     k_objs,
