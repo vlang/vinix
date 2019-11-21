@@ -4,7 +4,7 @@ set -e
 cd "${0%/*}"
 
 KERNEL=build/meson-out/kernel.elf
-grub-file --is-x86-multiboot $KERNEL || (echo "[!] Not a valid multiboot kernel!" ; exit 1)
+grub-file --is-x86-multiboot2 $KERNEL || (echo "[!] Not a valid multiboot kernel!" ; exit 1)
 
 mkdir -p build/iso
 mkdir -p build/iso/boot/grub
@@ -12,8 +12,16 @@ mkdir -p build/iso/boot/grub
 cp $KERNEL build/iso/kernel.elf
 
 cat > build/iso/boot/grub/grub.cfg << EOF
+loadfont "unicode"
+insmod all_video
+insmod gfxterm
+
+set gfxmode=auto
+set gfxpayload=keep
+terminal_output gfxterm
+
 echo "Booting the vOS kernel"
-multiboot /kernel.elf
+multiboot2 /kernel.elf
 boot
 EOF
 

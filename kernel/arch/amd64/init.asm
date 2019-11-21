@@ -3,19 +3,6 @@ extern vrt_main
 extern _start
 extern _end
 
-%macro printaddr32 1
-    push %1
-    call near dump_addr32
-    add esp, 4
-%endmacro
-
-%macro printaddr64 1
-    push %1
-    call near dump_addr64
-    add rsp, 8
-%endmacro
-
-
 ; higher-half virtual memory address
 KERNEL_VMA equ 0xFFFFFFFF80000000
 
@@ -51,18 +38,28 @@ STACK_SIZE  equ 8192
 STACK_ALIGN equ 16
 
 section .multiboot
-align 4
-%define mb_flags 0x00000003
+align 8
 
 multiboot_header:
-    .magic dd 0x1badb002
-    .flags dd mb_flags
-    .checksum dd -(0x1badb002 + mb_flags)
-    ;.header_addr dd multiboot_header - _kernel_physical_offset
-    ;.load_addr dd _text
-    ;.load_end_addr dd _data_end
-    ;.bss_end_addr dd _bss_end
-    ;.entry_addr dd _entry - _kernel_physical_offset
+    dd 0xE85250D6
+    dd 0
+    dd .hdr_end - multiboot_header
+    dd -(0xE85250D6 + (.hdr_end - multiboot_header)) & 0xFFFFFFFF
+
+.tag_fb
+    dw 5 ; MULTIBOOT_TAG_FRAMEBUFFER
+    dw 1 ; MULTIBOOT_TAG_OPTIONAL
+    dd .tag_fb_end - .tag_fb
+    dd 1024
+    dd 768
+    dd 32
+    dd 0
+.tag_fb_end
+
+    dw 0 ; MULTIBOOT_TAG_END
+    dw 0
+    dd 8
+.hdr_end:
 
 section .initl
 align PAGE_SIZE
@@ -145,14 +142,14 @@ gdtr:
 align 4
 bits 32
 _entry:
-    mov eax, 0x10
-    mov ds, eax
-    mov es, eax
-
-    mov esp, 0xeffff0
+    mov esp, 0xEFFFF0
     xor ebp, ebp
     push ebx
     push eax
+
+    mov eax, 0x10
+    mov ds, eax
+    mov es, eax
 
     ; check for cpuid extensions
     mov eax, 0x80000000
@@ -169,15 +166,13 @@ _entry:
     ;call near setup_page_tables
 
     mov eax, cr4
-    or eax, 1 << 6 ; enable PSE
-    or eax, 1 << 5 ; enable PAE
+    or eax, 1 << 6 | 1 << 5 ; enable PSE and PAE
     mov cr4, eax
 
     ; enable long mode
-    mov ecx, 0xc0000080
+    mov ecx, 0xC0000080
     rdmsr
-    or eax, 1 << 8 ; long mode
-    or eax, 1 << 11 ; NX
+    or eax, 1 << 8 | 1 << 11; long mode and NX
     wrmsr
 
     ; load PML4
@@ -227,12 +222,12 @@ display_error:
 bits 32
     push ebp
     mov ebp, esp
-    mov edi, 0xb8000
-    mov eax, 0x0c000c00
+    mov edi, 0xB8000
+    mov eax, 0x0C000C00
     cld
     mov ecx, 1000
     rep stosd
-    mov edi, 0xb8000
+    mov edi, 0xB8000
     mov esi, [esp + 8]
 .de_l: 
     movsb
@@ -242,91 +237,6 @@ bits 32
     jnz near .de_l
     pop ebp
     ret
-
-dump_addr64:
-bits 64
-    push rbp
-    mov rbp, rsp
-
-    push rax
-
-    mov r9, 16 ; dump 64 bits
-    mov r8, [rsp+24]
-
-    mov al, "0" ; print 0x
-    out 0xe9, al
-    mov al, "x"
-    out 0xe9, al
-
-.loop:
-    mov rax, r8
-    shr rax, 60
-    and rax, 0x0f  ; int a = n & 0x0f
-
-    cmp rax, 0x0a
-    jge near .g10  ; if (a < 0x0a)
-    add rax, 0x30  ;    a += '0'
-    jmp near .end  ; else
-.g10:
-    add rax, 0x41 - 0x0a ; a += 'A' - 0x0a
-.end: 
-    out 0xe9, al
-    shl r8, 4      ; n = n >> 4
-
-    dec r9
-    jnz near .loop
-
-    mov al, 0x0a ; putchar('\n')
-    out 0xe9, al
-
-    pop rax
-    pop rbp
-    ret
-
-dump_addr32:
-bits 32
-    push ebp
-    mov ebp, esp
-
-    push eax
-
-    mov esi, 8 ; dump 32 bits
-    mov edi, [esp+12]
-
-    push ecx
-    push edx
-    
-    mov al, "0" ; print 0x
-    out 0xe9, al
-    mov al, "x"
-    out 0xe9, al
-.loop:
-    mov eax, edi
-    shr eax, 28
-    and eax, 0x0f  ; int a = n & 0x0f
-
-    cmp eax, 0x0a
-    jge near .g10  ; if (a < 0x0a)
-    add eax, 0x30  ;    a += '0'
-    jmp near .end  ; else
-.g10:
-    add eax, 0x41 - 0x0a ; a += 'A' - 0x0a
-.end: 
-    out 0xe9, al
-    shl edi, 4      ; n = n >> 4
-
-    dec esi
-    jnz near .loop
-
-    mov al, 0x0a ; putchar('\n')
-    out 0xe9, al
-
-    pop edx
-    pop ecx
-    pop eax
-    pop ebp
-    ret
-
 
 section .inith
 start_kernel:
@@ -373,7 +283,7 @@ bits 64
     ; anything - even pointing to invalid memory)
     mov rbp, 0 ; terminate stack traces here
     ;mov rsp, qword stack + STACK_SIZE
-    mov rsp, 0xFFFFFEFF00000000 | 0xeffff0
+    mov rsp, 0xFFFFFEFF00000000 | 0xEFFFF0
 
     ; unmap the identity-mapped memory
     mov qword [boot_pml4], 0x0
