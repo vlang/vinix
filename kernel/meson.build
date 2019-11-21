@@ -1,5 +1,4 @@
-project('vos', 'c',
-    license: 'GPL3')
+project('vos', 'c', license: 'GPL3')
 
 v = find_program('v')
 nasm = find_program('nasm')
@@ -8,7 +7,7 @@ nasm_gen = generator(nasm,
     output: '@BASENAME@.o',
     arguments: ['-g', '-F', 'dwarf', '-f', 'elf64', '@INPUT@', '-o', '@OUTPUT@'])
 
-k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-mcmodel=large', '-z', 'max-page-size=0x1000', '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel', '-fno-stack-protector']
+k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-z', 'max-page-size=0x1000', '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel', '-fno-stack-protector', '-std=gnu99']
 k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', '-T', meson.source_root() + '/arch/amd64/link.ld']
 
 k_objs = []
@@ -24,21 +23,28 @@ asm_src = [
 ]
 
 v_modules = [
-    'sys',
-    'mm',
+    ['io', ['io.v']],
+    ['sys', ['debug.v', 'kmain.v']],
+    ['mm', ['paging.v']],
 ]
 
 k_objs += c_src
 k_objs += nasm_gen.process(asm_src)
 
 foreach mod : v_modules
-    k_mods += meson.source_root() + '/' + mod
+    name = 'v_' + mod[0].underscorify()
+    input = []
+    foreach file : mod[1]
+        input += mod[0] + '/' + file
+    endforeach
+    output = name + '.gen.c'
+    #k_deps += name
+    k_objs += custom_target(name,
+        command: [v, '-bare', '-vpath', meson.source_root(), '-o', meson.current_build_dir() + '/meson-out/' + output, 'build', 'module', meson.source_root() + '/' + mod[0]],
+        input: files(input),
+        output: output
+    )
 endforeach
-
-k_objs += custom_target('vkernel',
-    command: [v, '-bare', '-o', meson.current_build_dir() + '/meson-out/vkernel.c', 'build', 'module'] + k_mods,
-    output: 'vkernel.c'
-)
 
 shared_library('kernel',
     k_objs,
