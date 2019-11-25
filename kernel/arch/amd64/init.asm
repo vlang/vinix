@@ -46,16 +46,17 @@ multiboot_header:
     dd .hdr_end - multiboot_header
     dd -(0xE85250D6 + (.hdr_end - multiboot_header)) & 0xFFFFFFFF
 
-.tag_fb
+.tag_fb:
+align 8
     dw 5 ; MULTIBOOT_TAG_FRAMEBUFFER
     dw 1 ; MULTIBOOT_TAG_OPTIONAL
     dd .tag_fb_end - .tag_fb
     dd 1024
     dd 768
     dd 32
-    dd 0
-.tag_fb_end
-
+.tag_fb_end:
+.tag_end:
+align 8
     dw 0 ; MULTIBOOT_TAG_END
     dw 0
     dd 8
@@ -220,8 +221,6 @@ bits 32
 
 display_error:
 bits 32
-    push ebp
-    mov ebp, esp
     mov edi, 0xB8000
     mov eax, 0x0C000C00
     cld
@@ -235,7 +234,6 @@ bits 32
     movzx eax, byte [esi]
     test eax, 0xff
     jnz near .de_l
-    pop ebp
     ret
 
 section .inith
@@ -266,8 +264,7 @@ bits 64
 
     ; write the page table entry
     mov [rcx], rdx
-    invlpg [r8]
-
+    
     ; increment pml2 pointer
     add rcx, 8
 

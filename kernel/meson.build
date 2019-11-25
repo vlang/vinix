@@ -7,14 +7,19 @@ nasm_gen = generator(nasm,
     output: '@BASENAME@.o',
     arguments: ['-g', '-F', 'dwarf', '-f', 'elf64', '@INPUT@', '-o', '@OUTPUT@'])
 
-k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-z', 'max-page-size=0x1000', '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel', '-fno-stack-protector', '-std=gnu99']
-k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', '-T', meson.source_root() + '/arch/amd64/link.ld']
+k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-z', 'max-page-size=0x1000', 
+    '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel',
+    '-fno-stack-protector', '-std=gnu99', '-I' + meson.source_root() + '/../vore']
+
+k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', 
+    '-T', meson.source_root() + '/arch/amd64/link.ld']
 
 k_objs = []
 k_mods = []
 
 c_src = [
-    'sys/v_runtime.c'
+    '../vore/vrt_impl.c',
+    'vrt_main.c',
 ]
 
 asm_src = [
@@ -28,9 +33,6 @@ v_modules = [
     ['mm', ['paging.v']],
 ]
 
-k_objs += c_src
-k_objs += nasm_gen.process(asm_src)
-
 foreach mod : v_modules
     name = 'v_' + mod[0].underscorify()
     input = []
@@ -40,11 +42,14 @@ foreach mod : v_modules
     output = name + '.gen.c'
     #k_deps += name
     k_objs += custom_target(name,
-        command: [v, '-bare', '-vpath', meson.source_root(), '-o', meson.current_build_dir() + '/meson-out/' + output, 'build', 'module', meson.source_root() + '/' + mod[0]],
+        command: [v, '-verbose', '-freestanding', '-vlib-path', meson.source_root() + '/../vore/vlib', '-vpath', meson.source_root(), '-o', meson.current_build_dir() + '/@OUTPUT@', 'build', 'module', meson.source_root() + '/' + mod[0]],
         input: files(input),
         output: output
     )
 endforeach
+
+k_objs += c_src
+k_objs += nasm_gen.process(asm_src)
 
 shared_library('kernel',
     k_objs,

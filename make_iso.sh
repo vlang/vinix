@@ -3,7 +3,7 @@
 set -e
 cd "${0%/*}"
 
-KERNEL=build/meson-out/kernel.elf
+KERNEL=build/kernel.elf
 grub-file --is-x86-multiboot2 $KERNEL || (echo "[!] Not a valid multiboot kernel!" ; exit 1)
 
 mkdir -p build/iso
