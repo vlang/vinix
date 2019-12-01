@@ -24,12 +24,13 @@ c_src = [
 
 asm_src = [
     'arch/amd64/init.asm',
+    'arch/amd64/interrupt.asm',
     'arch/amd64/io.asm'
 ]
 
 v_modules = [
     ['io', ['io.v']],
-    ['sys', ['debug.v', 'kmain.v']],
+    ['sys', ['boot_x64.v', 'debug.v', 'kmain.v', 'panic.v', 'version.v']],
     ['mm', ['paging.v']],
 ]
 

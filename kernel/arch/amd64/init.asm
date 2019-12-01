@@ -145,8 +145,12 @@ bits 32
 _entry:
     mov esp, 0xEFFFF0
     xor ebp, ebp
-    push ebx
-    push eax
+    
+    mov edi, 0xE00000 ; early_bootinfo->magic: u32
+    stosd
+    mov edi, 0xE00004 ; early_bootinfo->bootinfo: u32
+    mov eax, ebx
+    stosd
 
     mov eax, 0x10
     mov ds, eax
@@ -278,9 +282,9 @@ bits 64
 .map_page_end:
     ; set up the new stack (multiboot2 spec says the stack pointer could be
     ; anything - even pointing to invalid memory)
-    mov rbp, 0 ; terminate stack traces here
+    xor rbp, rbp ; terminate stack traces here
     ;mov rsp, qword stack + STACK_SIZE
-    mov rsp, 0xFFFFFEFF00000000 | 0xEFFFF0
+    mov rsp, 0xFFFFFEFF00000000 + 0xEFFFF0
 
     ; unmap the identity-mapped memory
     mov qword [boot_pml4], 0x0

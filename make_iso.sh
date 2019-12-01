@@ -3,7 +3,7 @@
 set -e
 cd "${0%/*}"
 
-KERNEL=build/kernel.elf
+KERNEL=build/meson-out/kernel.elf
 grub-file --is-x86-multiboot2 $KERNEL || (echo "[!] Not a valid multiboot kernel!" ; exit 1)
 
 mkdir -p build/iso
@@ -21,7 +21,7 @@ set gfxpayload=keep
 terminal_output gfxterm
 
 echo "Booting the vOS kernel"
-multiboot2 /kernel.elf
+multiboot2 /kernel.elf cmdlinetest=ok
 boot
 EOF
 
