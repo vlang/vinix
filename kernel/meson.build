@@ -30,7 +30,7 @@ asm_src = [
 
 v_modules = [
     ['io', ['io.v']],
-    ['sys', ['boot_x64.v', 'debug.v', 'kmain.v', 'panic.v', 'version.v']],
+    ['sys', ['boot_x64.v', 'debug.v', 'kmain.v', 'panic.v', 'version.v', 'uefi.v', 'util.v']],
     ['mm', ['paging.v']],
 ]
 
@@ -43,7 +43,11 @@ foreach mod : v_modules
     output = name + '.gen.c'
     #k_deps += name
     k_objs += custom_target(name,
-        command: [v, '-verbose', '-freestanding', '-vlib-path', meson.source_root() + '/../vore/vlib', '-vpath', meson.source_root(), '-o', meson.current_build_dir() + '/@OUTPUT@', 'build', 'module', meson.source_root() + '/' + mod[0]],
+        command: [v, '-verbose', '-freestanding', '--enable-globals', 
+            '-vlib-path', meson.source_root() + '/../vore/vlib', 
+            '-vpath', meson.source_root(), 
+            '-o', meson.current_build_dir() + '/@OUTPUT@', 
+            'build', 'module', meson.source_root() + '/' + mod[0]],
         input: files(input),
         output: output
     )

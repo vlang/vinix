@@ -46,15 +46,15 @@ multiboot_header:
     dd .hdr_end - multiboot_header
     dd -(0xE85250D6 + (.hdr_end - multiboot_header)) & 0xFFFFFFFF
 
-.tag_fb:
-align 8
-    dw 5 ; MULTIBOOT_TAG_FRAMEBUFFER
-    dw 1 ; MULTIBOOT_TAG_OPTIONAL
-    dd .tag_fb_end - .tag_fb
-    dd 1024
-    dd 768
-    dd 32
-.tag_fb_end:
+;.tag_fb:
+;align 8
+;    dw 5 ; MULTIBOOT_TAG_FRAMEBUFFER
+;    dw 1 ; MULTIBOOT_TAG_OPTIONAL
+;    dd .tag_fb_end - .tag_fb
+;    dd 1024
+;    dd 768
+;    dd 32
+;.tag_fb_end:
 .tag_end:
 align 8
     dw 0 ; MULTIBOOT_TAG_END

@@ -13,10 +13,10 @@ cp $KERNEL build/iso/kernel.elf
 
 cat > build/iso/boot/grub/grub.cfg << EOF
 loadfont "unicode"
-insmod all_video
+insmod efi_gop
 insmod gfxterm
 
-set gfxmode=auto
+#set gfxmode=auto
 set gfxpayload=keep
 terminal_output gfxterm
 

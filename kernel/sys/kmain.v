@@ -2,12 +2,19 @@ module sys
 
 import mm
 
+struct VKernel {
+	command_line string
+}
+
+__global kernel VKernel
+
 pub fn kmain() {
-	banner()
-	parse_bootinfo()
+	kernel = VKernel{}
 	
+	banner()
+	kernel.parse_bootinfo()
+
 	mm.paging_init()
-	printk('Paging initialized')
 
 	panic('No init service found.')
 }
