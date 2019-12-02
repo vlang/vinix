@@ -1,5 +1,9 @@
 module sys
 
+struct PtrHack {
+	lol int
+}
+
 pub fn uni_to_ascii(runes voidptr, out byteptr) {
 	mut c := *(&u16(runes))
 	mut idx := 0

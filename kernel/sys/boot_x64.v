@@ -36,6 +36,22 @@ enum MultibootTagType {
 	efi_64
 }
 
+enum MultibootMmapType {
+	unk,
+	available,
+	reserved,
+	acpi_reclaimable,
+	nvs,
+	badram
+}
+
+struct MultibootMmapEntry {
+	addr u64
+	len u64
+	map_type MultibootMmapType
+	zero u32
+}
+
 struct MultibootTag {
 	_type MultibootTagType
 	size u32
@@ -49,7 +65,9 @@ struct MultibootTagCmdline {
 
 struct MultibootTagMemoryMap {
 	_type u32
-	size u32	
+	size u32
+	entry_size u32
+	entry_version u32
 }
 
 struct MultibootTagFramebuffer {
@@ -67,6 +85,25 @@ struct MultibootTagEfi64 {
 	_type u32
 	size u32
 	pointer u64
+}
+
+fn (entry &MultibootMmapEntry) type_str() string {
+	match entry.map_type {
+		.available {
+			return "Available"
+		}
+		.acpi_reclaimable {
+			return "ACPI Reclaimable"
+		}
+		.nvs {
+			return "NVS"
+		}
+		.badram {
+			return "Bad RAM"
+		}
+	}
+
+	return "Reserved"
 }
 
 fn (tag &MultibootTagCmdline) command_line() string {
@@ -148,7 +185,21 @@ pub fn (kernel &VKernel) parse_bootinfo() {
 					printk('EFI Firmware vendor: ${vendor}')
 				}
 				.memory_map {
-					printk('Kernel memory map:')
+					mmap_tag := &MultibootTagMemoryMap(tag)
+					printk('+------------------------')
+					printk('|   System memory map:')
+					mut map_entry := &MultibootMmapEntry(u64(mmap_tag) + u64(16))
+					mut done := false
+					printk('+------------------------')
+					for !done {
+						printk('| ${&PtrHack(map_entry.addr)} - ${&PtrHack(map_entry.addr + map_entry.len)} (${map_entry.len / u64(1024)} KiB) type = ${map_entry.type_str()}')
+						map_entry = &MultibootMmapEntry(u64(map_entry) + u64(mmap_tag.entry_size))
+
+						if (u64(mmap_tag) + u64(mmap_tag.size)) < (u64(map_entry) + u64(mmap_tag.entry_size)) {
+							done = true
+						}
+					}
+					printk('+------------------------')
 				}
 			}
 			ptr = voidptr(u64(ptr) + u64(tag.size + u32(7) & u32(0xfffffff8)))
