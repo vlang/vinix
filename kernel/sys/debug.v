@@ -7,7 +7,7 @@ mut:
 }
 
 pub fn printk(msg string) {
-	outs := &kernel.devices.debug_sinks
+	outs := kernel.devices.debug_sinks
 
 	for i := 0; i < 8; i++ {
 		if outs[i].name.len != 0 && voidptr(outs[i].line_consumer) != nullptr {
@@ -16,15 +16,16 @@ pub fn printk(msg string) {
 	}
 }
 
-fn (kernel VKernel) init_debug() {
+fn (kernel &VKernel) init_debug() {
 
 }
 
 
 pub fn (kernel &VKernel) register_debug_sink(sink DebugSink) {
-	mut sink_list := &kernel.devices.debug_sinks
+	mut sink_list := kernel.devices.debug_sinks
+
 	for i := 0; i < 8; i++ {
-		mut sink_val := &sink_list[i]
+		mut sink_val := sink_list[i]
 
 		if sink_val.name.len == 0 {
 			// V sucks, we need to copy the fields manually...

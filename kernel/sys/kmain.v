@@ -21,16 +21,15 @@ pub fn kmain() {
 	panic('No init service found.')
 }
 
-[inline]
 fn new_vkernel() VKernel {
 	return VKernel{
-		command_line: ''
-		debug_buffer: null
-		debug_buffer_size: 0
+		command_line: '',
+		debug_buffer: null,
+		debug_buffer_size: 0,
 		devices: KernelDevices {
-			framebuffers: [8]Framebuffer
-			fb_mutex: Mutex{}
-			debug_sinks: [8]DebugSink
+			framebuffers: [8]Framebuffer,
+			fb_mutex: Mutex{},
+			debug_sinks: [8]DebugSink,
 		}
 	}
 }

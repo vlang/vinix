@@ -39,7 +39,7 @@ pub fn new_framebuffer(addr_phys voidptr, width u32, height u32, pitch u32, pixe
 pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) {
 	mut fb_list := &kernel.devices.framebuffers
 	for i := 0; i < 8; i++ {
-		mut fb_val := &fb_list[i]
+		mut fb_val := fb_list[i]
 
 		if fb_val.addr_phys == nullptr {
 			// V sucks, we need to copy the fields manually...
