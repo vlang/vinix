@@ -43,6 +43,9 @@ string tos3(char* s);
 void memset(char* addr, char val, int count);
 void memput(byte* addr, int off, byte val);
 
+inline char atomic_load(void* ptr);
+inline void atomic_store(void* ptr, char val);
+
 string v_sprintf(const char* fmt, ...);
 #define _STR(...) v_sprintf(__VA_ARGS__)
 

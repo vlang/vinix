@@ -312,3 +312,11 @@ void memputd(u32 *addr, int off, u32 val)
 {
     addr[off] = val;
 }
+
+inline static char atomic_load(void* ptr) {
+    return __atomic_load_n((char*) ptr, __ATOMIC_RELAXED);
+}
+
+inline static void atomic_store(void* ptr, char val) {
+    __atomic_store_n((char*) ptr, val, __ATOMIC_RELAXED);
+}

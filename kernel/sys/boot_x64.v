@@ -84,7 +84,7 @@ struct MultibootTagFramebuffer {
 struct MultibootTagEfi64 {
 	_type u32
 	size u32
-	pointer u64
+	pointer voidptr
 }
 
 fn (entry &MultibootMmapEntry) type_str() string {
@@ -112,26 +112,27 @@ fn (tag &MultibootTagCmdline) command_line() string {
 
 [inline]
 fn (tag &MultibootTagEfi64) table() &EfiSystemTable {
-	return &EfiSystemTable(voidptr(PHYS_BASE + tag.pointer))
+	return &EfiSystemTable(phys_to_virtual(tag.pointer))
 }
 
-fn (tag &MultibootTagEfi64) firmware_vendor() string {
-	return tos3(voidptr(PHYS_BASE + u64(tag.table().vendor)))
-}
-
-pub fn banner() {
+[inline]
+fn banner() {
 	build_date := v_build_date()
 	v_ver := v_version()
 	printk('vOS/x86_64 [v${KERNEL_VERSION} ${build_date}, V ${v_ver}]')
 }
 
-pub fn (kernel &VKernel) parse_bootinfo() {
-	early_info := &EarlyBootInfo(voidptr(PHYS_BASE + EARLY_BOOTINFO_BASE))
+fn (kernel &VKernel) init_platform() {
+	kernel.register_debug_sink(debug_e9port_new())
+}
+
+fn (kernel &VKernel) parse_bootinfo() {
+	early_info := &EarlyBootInfo(phys_to_virtual(EARLY_BOOTINFO_BASE))
 
 	if early_info.magic == BOOTLOADER_MAGIC_MB2 {
 		printk('Booted using Multiboot2-compliant bootloader.')
 		
-		mut ptr := voidptr(PHYS_BASE + u64(early_info.boot_info))
+		mut ptr := phys_to_virtual(early_info.boot_info)
 		boot_info := &MultibootInfoHeader(ptr)
 		printk('addr: $boot_info')
 		printk('size: $boot_info.total_size')
@@ -153,32 +154,15 @@ pub fn (kernel &VKernel) parse_bootinfo() {
 				}
 				.framebuffer {
 					fb_tag := &MultibootTagFramebuffer(tag)
-					printk('Framebuffer @ ${fb_tag.addr}: ${fb_tag.width}x${fb_tag.height} ${fb_tag.depth}bpp pitch: ${fb_tag.pitch}')
 
-					/*for i := 0; i < 255; i++ {
-						memset(voidptr(PHYS_BASE + u64(fb_tag.addr) + u64(u32(i) * fb_tag.pitch)), byte(i), int(1024 * 4))
-					}*/
-
-					onefifth := int(fb_tag.height) / 5
-
-					for x := 0; x < int(fb_tag.width); x++ {
-						for y := 0; y < int(fb_tag.height); y++ {
-							if y < (onefifth * 3) && y > (onefifth * 2) {
-								memputd(voidptr(PHYS_BASE + u64(fb_tag.addr)), y * int(fb_tag.pitch) / 4 + x, 0xFFFFFF)
-							} else if y < onefifth || y >= (4 * onefifth) {
-								memputd(voidptr(PHYS_BASE + u64(fb_tag.addr)), y * int(fb_tag.pitch) / 4 + x, 0x55CDFC)
-							} else if y < (onefifth * 2) || y < (onefifth * 4) {
-								memputd(voidptr(PHYS_BASE + u64(fb_tag.addr)), y * int(fb_tag.pitch) / 4 + x, 0xF7A8B8)
-							}
-						}
-					}
+					//fb_test(phys_to_virtual(fb_tag.addr), fb_tag.width, fb_tag.height, fb_tag.pitch)
 				}
 				.efi_64 {
 					efi_tag := &MultibootTagEfi64(tag)
 					table := efi_tag.table()
 					
 					ven_bytes := [32]byte
-					uni_to_ascii(voidptr(PHYS_BASE + u64(table.vendor)), byteptr(&ven_bytes))
+					uni_to_ascii(phys_to_virtual(table.vendor), byteptr(&ven_bytes))
 					vendor := tos3(voidptr(&ven_bytes))
 
 					printk('EFI Firmware revision: ${(table.header.revision >> 16) & u32(0xff)}.${(table.header.revision) & u32(0xff)}')
@@ -206,6 +190,22 @@ pub fn (kernel &VKernel) parse_bootinfo() {
 			tag = &MultibootTag(ptr)
 		}
 	} else {
-		panic('Unknown bootloader version!')
+		panic('Unknown bootloader: ${&PtrHack(early_info.magic)}, cannot find any boot tags!')
+	}
+}
+
+fn fb_test(framebuf voidptr, width u32, height u32, pitch u32) {
+	onefifth := int(height) / 5
+
+	for y := 0; y < int(height); y++ {
+		for x := 0; x < int(width); x++ {
+			if y < (onefifth * 3) && y > (onefifth * 2) {
+				memputd(framebuf, y * int(pitch) / 4 + x, 0xFFFFFF)
+			} else if y < onefifth || y >= (4 * onefifth) {
+				memputd(framebuf, y * int(pitch) / 4 + x, 0x55CDFC)
+			} else if y < (onefifth * 2) || y < (onefifth * 4) {
+				memputd(framebuf, y * int(pitch) / 4 + x, 0xF7A8B8)
+			}
+		}
 	}
 }

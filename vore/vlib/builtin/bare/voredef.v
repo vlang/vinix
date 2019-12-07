@@ -2,9 +2,6 @@ module builtin
 
 #include <vore.h>
 
-__global stdout_consumer fn (byte)
-__global stderr_consumer fn (byte)
-
 pub struct C.string {
 pub:
 	str byteptr
@@ -30,3 +27,7 @@ fn C.memset(s voidptr, val byte, len int)
 fn C.memput(s voidptr, off int, val byte)
 
 fn C.memputd(s voidptr, off int, val u32)
+
+fn C.atomic_load(ptr voidptr) byte
+
+fn C.atomic_store(ptr voidptr, val byte)
