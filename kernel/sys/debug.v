@@ -1,5 +1,7 @@
 module sys
 
+import io
+
 struct DebugSink {
 mut:
 	name string
@@ -7,11 +9,15 @@ mut:
 }
 
 pub fn printk(msg string) {
-	outs := kernel.devices.debug_sinks
-
+	// V compiler is broken (no .len for static sized arrays)
 	for i := 0; i < 8; i++ {
-		if outs[i].name.len != 0 && voidptr(outs[i].line_consumer) != nullptr {
-			outs[i].line_consumer(msg)
+		// V compiler is broken (arrays are broken)
+		sink_val := &DebugSink(u64(kernel.devices.debug_sinks) + u64(i) * u64(sizeof(DebugSink)))
+
+		if voidptr(sink_val.line_consumer) != nullptr {
+			// V compiler is broken (trying to call functions from struct members results in some weird C code)
+			hack := sink_val.line_consumer
+			hack(msg)
 		}
 	}
 }
@@ -22,16 +28,15 @@ fn (kernel &VKernel) init_debug() {
 
 
 pub fn (kernel &VKernel) register_debug_sink(sink DebugSink) {
-	mut sink_list := kernel.devices.debug_sinks
-
+	// V compiler is broken
 	for i := 0; i < 8; i++ {
-		mut sink_val := sink_list[i]
-
+		// V compiler is broken
+		mut sink_val := &DebugSink(u64(kernel.devices.debug_sinks) + u64(i) * u64(sizeof(DebugSink)))
+		
 		if sink_val.name.len == 0 {
-			// V sucks, we need to copy the fields manually...
+			// V compiler is broken
 			sink_val.name = sink.name
 			sink_val.line_consumer = sink.line_consumer
-			
 			break
 		}
 	}

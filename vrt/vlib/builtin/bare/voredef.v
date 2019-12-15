@@ -1,6 +1,6 @@
 module builtin
 
-#include <vore.h>
+#include <vrt.h>
 
 pub struct C.string {
 pub:

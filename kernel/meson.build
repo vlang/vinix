@@ -9,7 +9,7 @@ nasm_gen = generator(nasm,
 
 k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-z', 'max-page-size=0x1000', 
     '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel',
-    '-fno-stack-protector', '-std=gnu99', '-I' + meson.source_root() + '/../vore']
+    '-fno-stack-protector', '-std=gnu99', '-I' + meson.source_root() + '/../vrt']
 
 k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', 
     '-T', meson.source_root() + '/arch/amd64/link.ld']
@@ -18,7 +18,7 @@ k_objs = []
 k_mods = []
 
 c_src = [
-    '../vore/vrt_impl.c',
+    '../vrt/vrt_impl.c',
     'vrt_main.c',
 ]
 
@@ -31,7 +31,7 @@ asm_src = [
 v_modules = [
     ['io', ['io.v']],
     ['sys', [
-        'boot_x64.v', 'debug_x64.v', 'debug.v', 'devices.v', 'fbcon.v', 'framebuffer.v', 
+        'boot_x64.v', 'debug_x64.v', 'debug.v', 'fbcon.v', 'framebuffer.v', 'kern_devices.v', 
         'kmain.v', 'mutex.v', 'paging.v', 'panic.v', 'tty.v', 'uefi.v', 'util.v', 'version.v'
     ]],
 ]
@@ -46,7 +46,7 @@ foreach mod : v_modules
     #k_deps += name
     k_objs += custom_target(name,
         command: [v, '-verbose', '-freestanding', '--enable-globals', 
-            '-vlib-path', meson.source_root() + '/../vore/vlib', 
+            '-vlib-path', meson.source_root() + '/../vrt/vlib', 
             '-vpath', meson.source_root(), 
             '-o', meson.current_build_dir() + '/@OUTPUT@', 
             'build', 'module', meson.source_root() + '/' + mod[0]],

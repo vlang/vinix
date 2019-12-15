@@ -1,4 +1,4 @@
-# VORE (vOS Runtime Environment)
+# VRT (V RunTime)
 
 A fork of [vlib](https://github.com/vlang/v/tree/master/vlib) optimized for bare-metal/embedded environments.
 

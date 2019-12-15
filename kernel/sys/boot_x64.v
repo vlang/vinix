@@ -2,6 +2,7 @@ module sys
 
 pub const (
 	PHYS_BASE = u64(0xFFFFFEFF00000000)
+	VMA_BASE = u64(0xFFFFFFFF80000000)
 )
 
 const (
@@ -101,9 +102,10 @@ fn (entry &MultibootMmapEntry) type_str() string {
 		.badram {
 			return "Bad RAM"
 		}
+		else {
+			return "Reserved"
+		}
 	}
-
-	return "Reserved"
 }
 
 fn (tag &MultibootTagCmdline) command_line() string {
@@ -134,8 +136,7 @@ fn (kernel &VKernel) parse_bootinfo() {
 		
 		mut ptr := phys_to_virtual(early_info.boot_info)
 		boot_info := &MultibootInfoHeader(ptr)
-		printk('addr: $boot_info')
-		printk('size: $boot_info.total_size')
+		printk('tags @ $boot_info')
 
 		ptr = voidptr(u64(ptr) + u64(8))
 		mut tag := &MultibootTag(ptr)
@@ -154,6 +155,9 @@ fn (kernel &VKernel) parse_bootinfo() {
 				}
 				.framebuffer {
 					fb_tag := &MultibootTagFramebuffer(tag)
+					fb := kernel.register_framebuffer(new_framebuffer(fb_tag.addr, fb_tag.width, fb_tag.height, fb_tag.pitch, .bgra8888))
+					fbcon_init(fb)
+					fbcon_println('lol')
 
 					//fb_test(phys_to_virtual(fb_tag.addr), fb_tag.width, fb_tag.height, fb_tag.pitch)
 				}
@@ -185,6 +189,7 @@ fn (kernel &VKernel) parse_bootinfo() {
 					}
 					printk('+------------------------')
 				}
+				else {}
 			}
 			ptr = voidptr(u64(ptr) + u64(tag.size + u32(7) & u32(0xfffffff8)))
 			tag = &MultibootTag(ptr)
