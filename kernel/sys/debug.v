@@ -22,7 +22,7 @@ fn (kernel &VKernel) init_debug() {
 
 
 pub fn (kernel &VKernel) register_debug_sink(sink DebugSink) {
-	mut sink_list := kernel.devices.debug_sinks
+	sink_list := kernel.devices.debug_sinks
 
 	for i := 0; i < 8; i++ {
 		mut sink_val := sink_list[i]
@@ -31,7 +31,6 @@ pub fn (kernel &VKernel) register_debug_sink(sink DebugSink) {
 			// V sucks, we need to copy the fields manually...
 			sink_val.name = sink.name
 			sink_val.line_consumer = sink.line_consumer
-			
 			break
 		}
 	}

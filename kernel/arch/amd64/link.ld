@@ -1,4 +1,3 @@
-
 OUTPUT_FORMAT(elf64-x86-64)
 ENTRY(_entry)
 
@@ -24,7 +23,7 @@ SECTIONS
   {
     *(.init_data)
   }
-  
+
   _start = . + KERNEL_VMA;
 
   . += KERNEL_VMA;

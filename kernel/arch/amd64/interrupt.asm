@@ -2,7 +2,9 @@ section .text
 bits 64
 
 %macro pushaq 0
-    push rax ; no pushad in long mode :/
+    ; Pushed all general purpose register into stack
+    ; no pushad in long mode :/
+    push rax
     push rbx
     push rcx
     push rdx
@@ -20,6 +22,8 @@ bits 64
 %endmacro
 
 %macro popaq 0
+    ; Pops all general purpose register from stack
+    ; no popad in long mode :/
     pop r15
     pop r14
     pop r13
@@ -39,8 +43,10 @@ bits 64
 
 global isr_handler:
 isr_handler:
+    ; Interrupt Service Routine handler
     pushaq
+
     cld
-    
+
     popaq
     iret

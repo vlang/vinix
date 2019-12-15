@@ -14,7 +14,7 @@ pub fn kmain() {
 	kernel = new_vkernel()
 	kernel.init_platform()
 	kernel.init_debug()
-	
+
 	banner()
 	kernel.parse_bootinfo()
 
