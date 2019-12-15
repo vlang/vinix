@@ -2,7 +2,7 @@ module sys
 
 import io
 
-fn debug_e9port_new() DebugSink {
+fn new_debug_e9port() DebugSink {
 	return DebugSink {
 		name: 'e9port'
 		line_consumer: debug_e9port_consumer

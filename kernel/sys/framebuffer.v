@@ -37,7 +37,7 @@ pub fn new_framebuffer(addr_phys voidptr, width u32, height u32, pitch u32, pixe
 }
 
 pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) {
-	mut fb_list := &kernel.devices.framebuffers
+	fb_list := &kernel.devices.framebuffers
 	for i := 0; i < 8; i++ {
 		mut fb_val := fb_list[i]
 
@@ -49,7 +49,7 @@ pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) {
 			fb_val.height = framebuffer.height
 			fb_val.pitch = framebuffer.pitch
 			fb_val.pixel_format = framebuffer.pixel_format
-			
+
 			fb_val.init(i)
 			break
 		}
