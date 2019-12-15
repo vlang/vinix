@@ -43,8 +43,8 @@ align 8
 multiboot_header:
     dd 0xE85250D6
     dd 0
-    dd .hdr_end - multiboot_header
-    dd -(0xE85250D6 + (.hdr_end - multiboot_header)) & 0xFFFFFFFF
+    dd .header_end - multiboot_header
+    dd -(0xE85250D6 + (.header_end - multiboot_header)) & 0xFFFFFFFF
 
 ;.tag_fb:
 ;align 8
@@ -60,7 +60,7 @@ align 8
     dw 0 ; MULTIBOOT_TAG_END
     dw 0
     dd 8
-.hdr_end:
+.header_end:
 
 section .initl
 align PAGE_SIZE
