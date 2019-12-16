@@ -32,7 +32,8 @@ v_modules = [
     ['io', ['io.v']],
     ['sys', [
         'boot_x64.v', 'debug_x64.v', 'debug.v', 'devices.v', 'fbcon.v', 'framebuffer.v', 
-        'kmain.v', 'mutex.v', 'paging.v', 'panic.v', 'tty.v', 'uefi.v', 'util.v', 'version.v'
+        'kmain.v', 'multiboot2_x64.v', 'mutex.v', 'paging.v', 'panic.v', 'tty.v', 'uefi.v',
+		'util.v', 'version.v'
     ]],
 ]
 
