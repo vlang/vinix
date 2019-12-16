@@ -21,6 +21,13 @@ mut:
 
 fn (fb mut Framebuffer) init(id int) {
 	fb.addr_virt = phys_to_virtual(fb.addr_phys)
+
+	for y := 0; y < fb.height; y++ {
+		for x := 0; x < fb.width; x++ {
+			fb.plot(u32(x), u32(y), 0x000000)
+		}
+	}
+
 	printk('Initialized framebuffer ${id}: (mapped ${fb.addr_phys} to ${fb.addr_virt}): ${fb.width}x${fb.height} pitch: ${fb.pitch}')
 }
 
@@ -56,7 +63,7 @@ pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) &Framebuf
 			fb_val.height = framebuffer.height
 			fb_val.pitch = framebuffer.pitch
 			fb_val.pixel_format = framebuffer.pixel_format
-			
+
 			fb_val.init(i)
 			return fb_val
 		}

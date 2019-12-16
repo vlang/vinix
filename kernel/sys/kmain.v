@@ -15,7 +15,7 @@ pub fn kmain() {
 
 	kernel.init_platform()
 	kernel.init_debug()
-	
+
 	banner()
 	kernel.parse_bootinfo()
 

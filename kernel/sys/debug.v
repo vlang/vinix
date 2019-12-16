@@ -42,7 +42,7 @@ pub fn (kernel &VKernel) register_debug_sink(sink DebugSink) {
 	}
 }
 
-fn debug_dmesg_ring_new() DebugSink {
+fn new_debug_dmesg_ring() DebugSink {
 	return DebugSink {
 		name: 'dmesg_ring',
 		line_consumer: debug_dmesg_ring_consumer
@@ -50,5 +50,5 @@ fn debug_dmesg_ring_new() DebugSink {
 }
 
 fn debug_dmesg_ring_consumer(msg string) {
-
+	fbcon_println(msg)
 }
