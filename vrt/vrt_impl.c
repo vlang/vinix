@@ -1,4 +1,4 @@
-#include <vore.h>
+#include <vrt.h>
 
 void v_panic(string s)
 {
@@ -144,7 +144,7 @@ string v_sprintf(const char *fmt, ...)
                 goto end;
             case 'd':
             case 'u':
-                idx += v_itoa((long)va_arg(va, unsigned int), 10, false, (c == 'u'), true,
+                idx += v_itoa((long)va_arg(va, unsigned long), 10, false, (c == 'u'), true,
                               strptr + idx, idx, V_STR_SLOT_SIZE - 1);
                 break;
             case 'p':
@@ -152,7 +152,7 @@ string v_sprintf(const char *fmt, ...)
                 V_STR_PUT('x');
             case 'x':
             case 'X':
-                idx += v_itoa((long)va_arg(va, unsigned int), 16, (c == 'X'), false, true,
+                idx += v_itoa((long)va_arg(va, unsigned long), 16, (c == 'X'), false, true,
                               strptr + idx, idx, V_STR_SLOT_SIZE - 1);
                 break;
             case 's':
@@ -303,6 +303,66 @@ void memset(char *s, char c, int sz)
     }
 }
 
+void memcpy(void *desti, void *srci, int length)
+{
+    if (length == 0 || desti == srci) {
+        return desti;
+    }
+
+    if ((u64)desti < (u64)srci)
+    {
+        int n = (length + 7) / 8;
+        char *dest = desti, *src = srci;
+        switch (length % 8)
+        {
+        case 0:
+            do
+            {
+                *(dest++) = *(src++);
+            case 7:
+                *(dest++) = *(src++);
+            case 6:
+                *(dest++) = *(src++);
+            case 5:
+                *(dest++) = *(src++);
+            case 4:
+                *(dest++) = *(src++);
+            case 3:
+                *(dest++) = *(src++);
+            case 2:
+                *(dest++) = *(src++);
+            case 1:
+                *(dest++) = *(src++);
+            } while (--n > 0);
+        }
+    } else {
+        int n = (length + 7) / 8;
+        char *dest = desti + length, *src = srci + length;
+        switch (length % 8)
+        {
+        case 0:
+            do
+            {
+                *(--dest) = *(--src);
+            case 7:
+                *(--dest) = *(--src);
+            case 6:
+                *(--dest) = *(--src);
+            case 5:
+                *(--dest) = *(--src);
+            case 4:
+                *(--dest) = *(--src);
+            case 3:
+                *(--dest) = *(--src);
+            case 2:
+                *(--dest) = *(--src);
+            case 1:
+                *(--dest) = *(--src);
+            } while (--n > 0);
+        }
+    }
+}
+
 void memput(byte *addr, int off, byte val)
 {
     addr[off] = val;
@@ -313,10 +373,12 @@ void memputd(u32 *addr, int off, u32 val)
     addr[off] = val;
 }
 
-inline static char atomic_load(void* ptr) {
-    return __atomic_load_n((char*) ptr, __ATOMIC_RELAXED);
+inline static char atomic_load(void *ptr)
+{
+    return __atomic_load_n((char *)ptr, __ATOMIC_RELAXED);
 }
 
-inline static void atomic_store(void* ptr, char val) {
-    __atomic_store_n((char*) ptr, val, __ATOMIC_RELAXED);
+inline static void atomic_store(void *ptr, char val)
+{
+    __atomic_store_n((char *)ptr, val, __ATOMIC_RELAXED);
 }

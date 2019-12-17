@@ -1,6 +1,6 @@
 module builtin
 
-#include <vore.h>
+#include <vrt.h>
 
 pub struct C.string {
 pub:
@@ -23,6 +23,8 @@ fn C.strlen(s byteptr) int
 fn C.strstr(s byteptr) voidptr
 
 fn C.memset(s voidptr, val byte, len int)
+
+fn C.memcpy(dest, src voidptr, len int)
 
 fn C.memput(s voidptr, off int, val byte)
 

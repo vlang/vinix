@@ -21,7 +21,21 @@ mut:
 
 fn (fb mut Framebuffer) init(id int) {
 	fb.addr_virt = phys_to_virtual(fb.addr_phys)
+
+	for y := 0; y < fb.height; y++ {
+		for x := 0; x < fb.width; x++ {
+			fb.plot(u32(x), u32(y), 0x000000)
+		}
+	}
+
 	printk('Initialized framebuffer ${id}: (mapped ${fb.addr_phys} to ${fb.addr_virt}): ${fb.width}x${fb.height} pitch: ${fb.pitch}')
+}
+
+[inline]
+fn (fb &Framebuffer) plot(x, y, color u32) {
+	if x < fb.width && y < fb.height {
+		memputd(fb.addr_virt, int(y) * int(fb.pitch) / 4 + int(x), color)
+	}
 }
 
 [inline]
@@ -36,13 +50,13 @@ pub fn new_framebuffer(addr_phys voidptr, width u32, height u32, pitch u32, pixe
 	}
 }
 
-pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) {
-	fb_list := &kernel.devices.framebuffers
+pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) &Framebuffer {
+	// V compiler is broken
 	for i := 0; i < 8; i++ {
-		mut fb_val := fb_list[i]
+		mut fb_val := &kernel.devices.framebuffers[i]
 
 		if fb_val.addr_phys == nullptr {
-			// V sucks, we need to copy the fields manually...
+			// V compiler is broken
 			fb_val.addr_phys = framebuffer.addr_phys
 			fb_val.addr_virt = framebuffer.addr_virt
 			fb_val.width = framebuffer.width
@@ -51,7 +65,9 @@ pub fn (kernel &VKernel) register_framebuffer(framebuffer Framebuffer) {
 			fb_val.pixel_format = framebuffer.pixel_format
 
 			fb_val.init(i)
-			break
+			return fb_val
 		}
 	}
+
+	return &Framebuffer(nullptr)
 }

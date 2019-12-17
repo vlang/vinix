@@ -11,7 +11,8 @@ mut:
 __global kernel VKernel
 
 pub fn kmain() {
-	kernel = new_vkernel()
+	memset(voidptr(&kernel), 0, sizeof(VKernel))
+
 	kernel.init_platform()
 	kernel.init_debug()
 
@@ -19,17 +20,4 @@ pub fn kmain() {
 	kernel.parse_bootinfo()
 
 	panic('No init service found.')
-}
-
-fn new_vkernel() VKernel {
-	return VKernel{
-		command_line: '',
-		debug_buffer: null,
-		debug_buffer_size: 0,
-		devices: KernelDevices {
-			framebuffers: [8]Framebuffer,
-			fb_mutex: Mutex{},
-			debug_sinks: [8]DebugSink,
-		}
-	}
 }

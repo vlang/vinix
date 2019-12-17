@@ -3,6 +3,7 @@ module sys
 pub const (
 	// PHYS_BASE is the offset of kernel memory.
 	PHYS_BASE = u64(0xFFFFFEFF00000000)
+	VMA_BASE = u64(0xFFFFFFFF80000000)
 )
 
 const (
@@ -28,6 +29,9 @@ fn banner() {
 
 fn (kernel &VKernel) init_platform() {
 	kernel.register_debug_sink(new_debug_e9port())
+	kernel.register_debug_sink(new_debug_dmesg_ring())
+
+	fbcon_preinit()
 }
 
 fn (kernel &VKernel) parse_bootinfo() {
@@ -36,9 +40,9 @@ fn (kernel &VKernel) parse_bootinfo() {
 		kernel.parse_multiboot2(phys_to_virtual(early_info.boot_info))
 		return
 	}
-
 	printk('Unknown bootloader: ${&PtrHack(early_info.magic)}!')
 	panic('cannot find any boot tags!')
+
 }
 
 fn fb_test(framebuf voidptr, width u32, height u32, pitch u32) {
