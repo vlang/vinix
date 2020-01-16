@@ -5,7 +5,7 @@ nasm = find_program('nasm')
 
 nasm_gen = generator(nasm,
     output: '@BASENAME@.o',
-    arguments: ['-g', '-F', 'dwarf', '-f', 'elf64', '@INPUT@', '-o', '@OUTPUT@'])
+    arguments: ['-f', 'elf64', '@INPUT@', '-o', '@OUTPUT@'])
 
 k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-z', 'max-page-size=0x1000', 
     '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel',
