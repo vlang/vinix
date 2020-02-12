@@ -116,6 +116,8 @@ fn (kernel &VKernel) parse_multiboot2(boot_info_ptr voidptr) {
 			}
 			.framebuffer {
 				fb_tag := &MultibootTagFramebuffer(tag)
+				framebuffer := new_framebuffer(fb_tag.addr, fb_tag.width, fb_tag.height, fb_tag.pitch, .bgra8888)
+				kernel.register_framebuffer(framebuffer)
 				//fb_test(phys_to_virtual(fb_tag.addr), fb_tag.width, fb_tag.height, fb_tag.pitch)
 			}
 			.efi_64 {

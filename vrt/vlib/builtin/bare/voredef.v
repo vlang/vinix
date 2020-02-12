@@ -24,6 +24,10 @@ fn C.strstr(s byteptr) voidptr
 
 fn C.memset(s voidptr, val byte, len int)
 
+fn C.memset16(s voidptr, val u16, len int)
+
+fn C.memset32(s voidptr, val u32, len int)
+
 fn C.memcpy(dest, src voidptr, len int)
 
 fn C.memput(s voidptr, off int, val byte)

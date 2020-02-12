@@ -1,6 +1,6 @@
 module sys
 
-pub const (
+const (
 	// PHYS_BASE is the offset of kernel memory.
 	PHYS_BASE = u64(0xFFFFFEFF00000000)
 	VMA_BASE = u64(0xFFFFFFFF80000000)

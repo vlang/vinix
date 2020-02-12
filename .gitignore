@@ -86,6 +86,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+a.out
 *.c_shared_lib.c
 *.vh
 *.iso

@@ -42,6 +42,8 @@ string tos2(byte *s);
 string tos3(char *s);
 
 void memset(char *addr, char val, int count);
+void memset16(u16 *addr, u16 val, int count);
+void memset32(u32 *addr, u32 val, int count);
 void memcpy(void *desti, void *srci, int length);
 void memput(byte *addr, int off, byte val);
 

@@ -1,4 +1,4 @@
-project('vos', 'c', license: 'GPL3')
+project('kernel', 'c', license: 'GPL3')
 
 v = find_program('v')
 nasm = find_program('nasm')
@@ -25,14 +25,18 @@ c_src = [
 asm_src = [
     'arch/amd64/init.asm',
     'arch/amd64/interrupt.asm',
-    'arch/amd64/io.asm'
+    'arch/amd64/io.asm',
+    'arch/amd64/paging.asm'
 ]
 
 v_modules = [
+    ['acpi', ['acpi.v']],
     ['io', ['io.v']],
+    ['sync', ['mutex.v']],
     ['sys', [
-        'boot_x64.v', 'debug_x64.v', 'debug.v', 'fbcon.v', 'framebuffer.v', 'kern_devices.v', 
-        'kmain.v', 'mutex.v', 'paging.v', 'panic.v', 'tty.v', 'uefi.v', 'util.v', 'version.v'
+        'boot_x64.v', 'callbacks.v', 'debug_x64.v', 'debug.v', 'fbcon.v', 'framebuffer.v', 
+        'kern_devices.v', 'kmain.v', 'multiboot2_x64.v', 'paging.v', 'panic.v', 'tty.v', 
+        'uefi.v', 'util.v', 'version.v'
     ]],
 ]
 

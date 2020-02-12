@@ -5,6 +5,7 @@ mut:
 	command_line string
 	debug_buffer voidptr
 	debug_buffer_size u32
+	callback_pool CallbackPool
 	devices KernelDevices
 }
 

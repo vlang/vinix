@@ -32,6 +32,12 @@ fn fbcon_preinit() {
 
 	fb_con_state.cur_x = 0
 	fb_con_state.cur_y = 0
+
+	register_callback(CALLBACK_FRAMEBUFFER_ATTACH, fb_attach_cb)
+}
+
+fn fb_attach_cb(fb voidptr) {
+	fbcon_init(&Framebuffer(fb))
 }
 
 fn fbcon_init(fb &Framebuffer) {
@@ -40,28 +46,33 @@ fn fbcon_init(fb &Framebuffer) {
 	fb_con_state.char_width = 8
 	fb_con_state.char_height = 16
 
-	fb_con_state.framebuffer = fb
 	fb_con_state.width = u16(fb.width / fb_con_state.char_width)
 	fb_con_state.height = u16(fb.height / fb_con_state.char_height)
+	printk('fbcon init ${fb_con_state.width}x${fb_con_state.height}')
 
 	// copy old buffer contents
 	memcpy(&old_buf, fb_con_state.buf, 80 * 50)
 	memset(fb_con_state.buf, 0, 16384)
 
-	start := if fb_con_state.height < 50 { 50 - fb_con_state.height } else { 0 }
-	for line := 0; line < (50 - start); line++ {
-		memcpy(voidptr(u64(fb_con_state.buf) + u64(line * fb_con_state.width)), voidptr(u64(&old_buf) + u64((line - start) * 80)), 80)
+	last_line := fb_con_state.cur_y
+	fb_con_state.cur_x = 0
+	fb_con_state.cur_y = 0
+	
+	for line := 0; line < last_line; line++ {
+		//memcpy(voidptr(u64(fb_con_state.buf) + u64(line * fb_con_state.width)), voidptr(u64(&old_buf) + u64((line - start) * 80)), 80)
+		fbcon_println(tos(byteptr(u64(&old_buf) + line * 80), 80))
 	}
 
-	if fb_con_state.cur_x >= fb_con_state.width {
+	/*if fb_con_state.cur_x >= fb_con_state.width {
 		fb_con_state.cur_x = 0
 		fb_con_state.cur_y++
 	}
 
 	if fb_con_state.cur_y >= fb_con_state.height {
-		fb_con_state.cur_y = fb_con_state.height - 1
-	}
+		fb_con_state.cur_y = fb_con_state.height
+	}*/
 
+	fb_con_state.framebuffer = fb
 	fb_con_state.draw()
 	printk('fbcon init completed.')
 }
@@ -78,39 +89,49 @@ fn translate_glyph(code byte) byte {
 		return 0
 	}
 }
-
 fn fbcon_println(str string) {
-	for i := 0; i <= str.len; i++ {
-		c := if i != str.len { str.str[i] } else { `\n` }
-		if c == `\n` {
-			fb_con_state.cur_x = 0
-			fb_con_state.cur_y++
-		} else if c == `\r` {
-			fb_con_state.cur_x = 0
-		} else {
-			fb_con_state.draw_glyph(str.str[i], int(fb_con_state.cur_x), int(fb_con_state.cur_y))
-			fb_con_state.buf[(fb_con_state.cur_y * fb_con_state.width) + fb_con_state.cur_x] = str.str[i]
-			fb_con_state.cur_x++
-		}
+	if voidptr(fb_con_state.framebuffer) != nullptr {
+		return
+	}
 
-		if fb_con_state.cur_x >= fb_con_state.width {
-			fb_con_state.cur_x = 0
-			fb_con_state.cur_y++
-		}
+	fbcon_print(str)
+	fbcon_putc(`\n`)
+}
 
-		if fb_con_state.cur_y >= fb_con_state.height {
-			fb_con_state.cur_y--
-			fb_con_state.scroll_up()
-		}
+fn fbcon_print(str string) {
+	for i := 0; i < str.len; i++ {
+		fbcon_putc(str.str[i])
+	}
+}
 
-		//printk('x: $fb_con_state.cur_x y: $fb_con_state.cur_y')
+fn fbcon_putc(c byte) {
+	if c == `\n` {
+		fb_con_state.cur_x = 0
+		fb_con_state.cur_y++
+	} else if c == `\r` {
+		fb_con_state.cur_x = 0
+	} else {
+		fb_con_state.draw_glyph(c, int(fb_con_state.cur_x), int(fb_con_state.cur_y))
+		fb_con_state.buf[(fb_con_state.cur_y * fb_con_state.width) + fb_con_state.cur_x] = c
+		fb_con_state.cur_x++
+	}
+
+	if fb_con_state.cur_x >= fb_con_state.width {
+		fb_con_state.cur_x = 0
+		fb_con_state.cur_y++
+	}
+
+	if fb_con_state.cur_y >= fb_con_state.height {
+		fb_con_state.cur_y--
+		fb_con_state.scroll_up()
 	}
 }
 
 fn (fbcon &FbConState) scroll_up() {
 	memcpy(voidptr(fbcon.buf), voidptr(u64(fbcon.buf) + u64(fbcon.width)), fbcon.width * (fbcon.height - 1))
 	if voidptr(fbcon.framebuffer) != nullptr {
-		memcpy(voidptr(fbcon.framebuffer.addr_virt), voidptr(u64(fbcon.framebuffer.addr_virt) + u64(fbcon.framebuffer.pitch * 16)), fbcon.framebuffer.pitch * 16)
+		memcpy(voidptr(fbcon.framebuffer.addr_virt), voidptr(u64(fbcon.framebuffer.addr_virt) + u64(fbcon.framebuffer.pitch * 16)), fbcon.framebuffer.pitch * 16 * (fbcon.height - 1))
+		memset32(voidptr(u64(fbcon.framebuffer.addr_virt) + u64(fbcon.framebuffer.pitch * 16 * (fbcon.height - 1))), 0x000080, fbcon.framebuffer.width * 16)
 	}
 }
 
@@ -140,6 +161,8 @@ fn (fbcon &FbConState) draw() {
 	if voidptr(fbcon.framebuffer) == nullptr {
 		return
 	}
+
+	memset32(fbcon.framebuffer.addr_virt, 0x000080, fbcon.framebuffer.width * fbcon.framebuffer.height)
 
 	for x := 0; x < fbcon.width; x++ {
 		for y := 0; y < fbcon.height; y++ {

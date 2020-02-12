@@ -1,7 +1,5 @@
 module sys
 
-import io
-
 struct DebugSink {
 mut:
 	name string

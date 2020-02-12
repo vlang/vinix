@@ -9,6 +9,11 @@ enum FramebufferPixelFormat {
 	bgr888
 }
 
+const (
+	CALLBACK_FRAMEBUFFER_ATTACH = 0x2000
+	CALLBACK_FRAMEBUFFER_DETACH = 0x2001
+)
+
 pub struct Framebuffer {
 mut:
 	addr_phys voidptr
@@ -22,13 +27,15 @@ mut:
 fn (fb mut Framebuffer) init(id int) {
 	fb.addr_virt = phys_to_virtual(fb.addr_phys)
 
-	for y := 0; y < fb.height; y++ {
+	/*for y := 0; y < fb.height; y++ {
 		for x := 0; x < fb.width; x++ {
 			fb.plot(u32(x), u32(y), 0x000000)
 		}
-	}
+	}*/
+	memset32(fb.addr_virt, 0, fb.width * fb.height)
 
 	printk('Initialized framebuffer ${id}: (mapped ${fb.addr_phys} to ${fb.addr_virt}): ${fb.width}x${fb.height} pitch: ${fb.pitch}')
+	emit_callback(CALLBACK_FRAMEBUFFER_ATTACH, voidptr(fb))
 }
 
 [inline]
