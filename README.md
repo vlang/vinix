@@ -14,5 +14,5 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel). (PM one of 
 
 - Explore V capabilities in bare metal programming.
 - Break the compiler as much as possible.
-- Build a minimal and useful software platform [especially ones written in V :^)], allowing for better control, isolation and smaller attack surface on VMs.
-- Build a platform for bare metal applications (firmware flashers, disk recovery software and etc.)?
+- Build a minimal and useful platform for software [especially written in V :^)], allowing for better control, isolation and smaller attack surface on VMs.
+- Build a simple OS for low cost ARM/RISC-V boards that usually run Linux.
