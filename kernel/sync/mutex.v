@@ -1,9 +1,12 @@
 module sync
 
 pub struct Mutex {
-	thread_yield fn()
 	state byte
 }
+
+const (
+	SPIN_LIMIT = 40
+)
 
 pub fn (mutex &Mutex) lock() {
 	//TODO Implement mutex

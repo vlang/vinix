@@ -4,8 +4,8 @@ module builtin
 
 pub struct C.string {
 pub:
-	str byteptr
 	len int
+	str byteptr
 }
 
 fn C.v_version() string

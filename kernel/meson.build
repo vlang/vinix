@@ -9,7 +9,8 @@ nasm_gen = generator(nasm,
 
 k_cflags =  ['-g', '-O2', '-std=gnu99', '-masm=intel', '-ffreestanding', '-z', 'max-page-size=0x1000', 
     '-mno-red-zone', '-mno-mmx', '-mno-sse', '-mno-sse2', '-no-pie', '-fno-pic', '-mcmodel=kernel',
-    '-fno-stack-protector', '-std=gnu99', '-I' + meson.source_root() + '/../vrt']
+    '-fno-stack-protector', '-std=gnu99', '-I' + meson.source_root() + '/../vrt',
+    '-I' + meson.source_root() + '/../3rdparty/acpica/include']
 
 k_ldflags = ['-z', 'max-page-size=0x1000', '-no-pie', '-ffreestanding', '-nostdlib', '-lgcc', 
     '-T', meson.source_root() + '/arch/amd64/link.ld']
@@ -31,11 +32,13 @@ asm_src = [
 
 v_modules = [
     ['acpi', ['acpi.v']],
+    ['debug', ['debug.v']],
     ['io', ['io.v']],
+    ['libtinyalloc', ['tiny_alloc.v']],
     ['sync', ['mutex.v']],
     ['sys', [
-        'boot_x64.v', 'callbacks.v', 'debug_x64.v', 'debug.v', 'fbcon.v', 'framebuffer.v', 
-        'kern_devices.v', 'kmain.v', 'multiboot2_x64.v', 'paging.v', 'panic.v', 'tty.v', 
+        'boot_x64.v', 'callbacks.v', 'cmdline.v', 'debug_x64.v', 'fbcon.v', 'framebuffer.v', 
+        'kern_devices.v', 'kmain.v', 'multiboot2_x64.v', 'paging.v', 'panic.v',
         'uefi.v', 'util.v', 'version.v'
     ]],
 ]

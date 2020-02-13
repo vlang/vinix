@@ -1,5 +1,7 @@
 module sys
 
+import debug
+
 struct PtrHack {
 	lol int
 }
@@ -8,6 +10,11 @@ const (
 	null = 0
 	nullptr = voidptr(0)
 )
+
+[inline]
+fn printk(str string) {
+	debug.printk(str)
+}
 
 pub fn uni_to_ascii(runes voidptr, out byteptr) {
 	mut c := *(&u16(runes))

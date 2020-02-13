@@ -1,5 +1,7 @@
 module sys
 
+import libtinyalloc
+
 struct MultibootInfoHeader {
 	total_size u32
 	reserved u32
@@ -149,6 +151,10 @@ fn (kernel &VKernel) parse_multiboot2(boot_info_ptr voidptr) {
 					length := map_entry.len / 1024
 					memory_type := map_entry.type_str()
 
+					if (length >= 1024 * 16) {
+						do_meme(map_entry)
+					}
+
 					printk('| $base_addr - $end_addr ($length KiB) type = $memory_type')
 					map_entry = &MultibootMmapEntry(u64(map_entry) + u64(mmap_tag.entry_size))
 
@@ -165,4 +171,19 @@ fn (kernel &VKernel) parse_multiboot2(boot_info_ptr voidptr) {
 		ptr = voidptr(u64(ptr) + u64(tag.size + u32(7) & u32(0xfffffff8)))
 		tag = &MultibootTagHeader(ptr)
 	}
+}
+
+fn do_meme(entry &MultibootMmapEntry) {
+	printk('Found a >16MiB memory block')
+	base := phys_to_virtual(voidptr(entry.addr))
+	end := phys_to_virtual(voidptr(entry.addr + entry.len))
+
+	mut alloc := libtinyalloc.new_alloc(base, end, 128, 16, 8)
+	
+	printk('allocating 1024 bytes')
+	addr := alloc.alloc(1024)
+	printk('freeing 1024 bytes')
+	alloc.free(addr)
+
+	printk('free blocks: ${alloc.free_blocks_count()}, used blocks: ${alloc.used_blocks_count()}, fresh blocks: ${alloc.fresh_blocks_count()}')
 }

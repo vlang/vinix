@@ -3,8 +3,6 @@ module sys
 struct VKernel {
 mut:
 	command_line string
-	debug_buffer voidptr
-	debug_buffer_size u32
 	callback_pool CallbackPool
 	devices KernelDevices
 }
@@ -15,8 +13,7 @@ pub fn kmain() {
 	memset(voidptr(&kernel), 0, sizeof(VKernel))
 
 	kernel.init_platform()
-	kernel.init_debug()
-
+	
 	banner()
 	kernel.parse_bootinfo()
 
