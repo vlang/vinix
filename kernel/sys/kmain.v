@@ -5,6 +5,7 @@ mut:
 	command_line string
 	callback_pool CallbackPool
 	devices KernelDevices
+	allocator voidptr
 }
 
 __global kernel VKernel

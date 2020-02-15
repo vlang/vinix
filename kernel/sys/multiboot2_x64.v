@@ -28,7 +28,7 @@ enum MultibootMmapType {
 	available,
 	reserved,
 	acpi_reclaimable,
-	nvs,
+	acpi_nvs,
 	badram
 }
 
@@ -74,16 +74,24 @@ struct MultibootTagEfi64 {
 	pointer voidptr
 }
 
+struct Multiboot2ParseResult {
+mut:
+	command_line string
+	efi_system_table &EfiSystemTable
+	framebuffer &MultibootTagFramebuffer
+	mmap_tags_size u32
+	mmap_tags [64]&sys.MultibootMmapEntry
+}
+
 fn (entry &MultibootMmapEntry) type_str() string {
 	return match entry.map_type {
 		.unknown          { 'Unknown' }
 		.available        { 'Available' }
 		.acpi_reclaimable { 'ACPI Reclaimable' }
-		.nvs              { 'NVS' }
+		.acpi_nvs         { 'ACPI Non-volatile storage' }
 		.badram           { 'Bad RAM' }
 		else              { 'Reserved' }
 	}
-
 }
 
 fn (tag &MultibootTagCmdline) command_line() string {
@@ -95,8 +103,46 @@ fn (tag &MultibootTagEfi64) table() &EfiSystemTable {
 	return &EfiSystemTable(phys_to_virtual(tag.pointer))
 }
 
-fn (kernel &VKernel) parse_multiboot2(boot_info_ptr voidptr) {
-	printk('Booted using Multiboot2-compliant bootloader.')
+fn init_multiboot2(kernel &VKernel, early_info &EarlyBootInfo) {
+	printk('Booted using Multiboot2-compliant bootloader, attempting to parse boot tags...')
+	result := parse_multiboot2(phys_to_virtual(early_info.boot_info))
+
+	if result.mmap_tags_size == 0 {
+		panic('No memory map was found, cannot initialize kernel memory manager!')
+	}
+
+	mut heap_addr := voidptr(0)
+	mut heap_size := u64(8 * 1024 * 1024) // 8 MiB
+	for i := 0; i < result.mmap_tags_size; i++ {
+		tag := result.mmap_tags[i]
+		if tag.map_type != .available {
+			continue
+		}
+
+		if tag.len >= heap_size {
+			heap_addr = phys_to_virtual(voidptr(tag.addr))
+			printk('Found ${heap_size} bytes of space for kernel internal heap at ${&PtrHack(heap_addr)}')
+			break
+		}
+	}
+
+	if (heap_addr == nullptr) {
+		panic('Cannot find enough memory space for kernel heap!')
+	}
+
+	printk('Initializing kernel internal heap allocator...')
+	kernel.heap_init(heap_addr, heap_size)
+	printk('Initializing kernel memory manager...')
+
+	if result.framebuffer != nullptr {
+		tag := result.framebuffer
+		framebuffer := new_framebuffer(tag.addr, tag.width, tag.height, tag.pitch, .bgra8888)
+		kernel.register_framebuffer(framebuffer)
+	}
+}
+
+fn parse_multiboot2(boot_info_ptr voidptr) Multiboot2ParseResult {
+	mut result := Multiboot2ParseResult{}
 
 	boot_info := &MultibootInfoHeader(boot_info_ptr)
 	printk('addr: $boot_info')
@@ -109,18 +155,12 @@ fn (kernel &VKernel) parse_multiboot2(boot_info_ptr voidptr) {
 		//printk('[tag] type=$tag._type size=$tag.size')
 
 		match tag._type {
-			.end {
-				break
-			}
 			.command_line {
 				cmdline_tag := &MultibootTagCmdline(tag)
 				printk('Kernel command line: ${cmdline_tag.command_line()}')
 			}
 			.framebuffer {
-				fb_tag := &MultibootTagFramebuffer(tag)
-				framebuffer := new_framebuffer(fb_tag.addr, fb_tag.width, fb_tag.height, fb_tag.pitch, .bgra8888)
-				kernel.register_framebuffer(framebuffer)
-				//fb_test(phys_to_virtual(fb_tag.addr), fb_tag.width, fb_tag.height, fb_tag.pitch)
+				result.framebuffer = &MultibootTagFramebuffer(tag)
 			}
 			.efi_64 {
 				efi_tag := &MultibootTagEfi64(tag)
@@ -141,44 +181,35 @@ fn (kernel &VKernel) parse_multiboot2(boot_info_ptr voidptr) {
 				mut map_entry := &MultibootMmapEntry(u64(mmap_tag) + u64(16))
 				mut done := false
 
-				printk('+------------------------')
-				printk('|   System memory map:')
-				printk('+------------------------')
-
 				for !done {
 					base_addr := &PtrHack(map_entry.addr)
 					end_addr := &PtrHack(map_entry.addr + map_entry.len)
 					length := map_entry.len / 1024
 					memory_type := map_entry.type_str()
 
-					if (length >= 1024 * 16) {
-						do_meme(map_entry)
-					}
-
-					printk('| $base_addr - $end_addr ($length KiB) type = $memory_type')
+					result.mmap_tags[result.mmap_tags_size++] = map_entry
+					printk('PMA: ${base_addr}-${end_addr} (${length} KiB) type = $memory_type')
 					map_entry = &MultibootMmapEntry(u64(map_entry) + u64(mmap_tag.entry_size))
 
 					if (u64(mmap_tag) + u64(mmap_tag.size)) < (u64(map_entry) + u64(mmap_tag.entry_size)) {
 						done = true
 					}
 				}
-				printk('+------------------------')
 			}
-			else {
-				printk('[tag] Received tag type=${tag._type}')
+			.end {
+				break
 			}
+			else {}
 		}
 		ptr = voidptr(u64(ptr) + u64(tag.size + u32(7) & u32(0xfffffff8)))
 		tag = &MultibootTagHeader(ptr)
 	}
+
+	return result
 }
 
 fn do_meme(entry &MultibootMmapEntry) {
-	printk('Found a >16MiB memory block')
-	base := phys_to_virtual(voidptr(entry.addr))
-	end := phys_to_virtual(voidptr(entry.addr + entry.len))
-
-	mut alloc := libtinyalloc.new_alloc(base, end, 128, 16, 8)
+	printk('Found a >16MiB memory block: ${&PtrHack(entry.addr)}')
 	
 	printk('allocating 1024 bytes')
 	addr := alloc.alloc(1024)

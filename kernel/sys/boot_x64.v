@@ -39,9 +39,10 @@ fn (kernel &VKernel) init_platform() {
 fn (kernel &VKernel) parse_bootinfo() {
 	early_info := &EarlyBootInfo(phys_to_virtual(EARLY_BOOTINFO_BASE))
 	if early_info.magic == BOOTLOADER_MAGIC_MB2 {
-		kernel.parse_multiboot2(phys_to_virtual(early_info.boot_info))
+		init_multiboot2(kernel, early_info)
 		return
 	}
+
 	printk('Unknown bootloader: ${&PtrHack(early_info.magic)}!')
 	panic('cannot find any boot tags!')
 }
