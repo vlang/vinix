@@ -1,15 +1,18 @@
 # vOS
 
-An attempt to write an operating system in V.
+An effort to write a modern, non-Unix operating system in V.
 
-Brainstorming started on November 15 2019.
+Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel). (PM one of the moderators if you don't want to verify your phone.)
 
-Join the [Discord chat](https://discordapp.com/invite/n7c74HM) (`#v-os` channel). (PM one of the moderators if you don't want to verify your phone.)
+#### Goals
 
-Goals:
+- Keep it simple and easy to understand.
+- Write it in V as much as possible.
+- Target modern 64-bit architectures (amd64, aarch64, risc-v).
 
-- Hybrid kernel architecture.
-- Unix/POSIX subsystem for compatibility with lots of software that already exists.
-- UEFI support, supports Multiboot2 compliant loaders.
-- Written in V as much as possible (including libc), not dependent on external libs written in C.
-- Targetted at modern 64-bit architectures (amd64, aarch64, risc-v).
+#### Why?
+
+- Explore V capabilities in bare metal programming.
+- Break the compiler as much as possible.
+- Build a minimal and useful platform for software [especially written in V :^)], allowing for better control, isolation and smaller attack surface on VMs.
+- Build a simple OS for low cost ARM/RISC-V boards that usually run Linux.
