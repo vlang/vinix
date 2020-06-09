@@ -2,7 +2,7 @@
 
 An effort to write a modern, non-Unix operating system in V.
 
-Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel). (PM one of the moderators if you don't want to verify your phone.)
+Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 
 #### Goals
 
