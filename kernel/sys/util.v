@@ -30,10 +30,10 @@ pub fn uni_to_ascii(runes voidptr, out byteptr) {
 
 [inline]
 pub fn phys_to_virtual(addr voidptr) voidptr {
-	return voidptr(PHYS_BASE + u64(addr))
+	return voidptr(phys_base + u64(addr))
 }
 
 [inline]
 pub fn phys_virt_offset(addr voidptr, offset i64) voidptr {
-	return voidptr(i64(PHYS_BASE) + i64(addr) + offset)
+	return voidptr(i64(phys_base) + i64(addr) + offset)
 }

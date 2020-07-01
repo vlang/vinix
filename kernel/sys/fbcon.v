@@ -33,7 +33,7 @@ fn fbcon_preinit() {
 	fb_con_state.cur_x = 0
 	fb_con_state.cur_y = 0
 
-	register_callback(CALLBACK_FRAMEBUFFER_ATTACH, fb_attach_cb)
+	register_callback(callback_framebuffer_attach, fb_attach_cb)
 }
 
 fn fb_attach_cb(fb voidptr) {

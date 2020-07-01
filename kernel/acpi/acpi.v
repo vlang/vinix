@@ -1,1 +1,5 @@
 module acpi
+
+fn lol() {
+	
+}

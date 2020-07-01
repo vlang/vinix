@@ -1,5 +1,12 @@
 #include <vrt.h>
 
+struct string
+{
+	byte *str;
+	int len;
+	int is_lit;
+};
+
 void v_panic(string s)
 {
     // to-do
@@ -39,8 +46,7 @@ string tos(byte *s, int len)
 {
     string str = {
         .len = len,
-        .str = s
-    };
+        .str = s};
     return str;
 }
 
@@ -48,8 +54,7 @@ string tos2(byte *s)
 {
     string str = {
         .len = strlen(s),
-        .str = s
-    };
+        .str = s};
     return str;
 }
 
@@ -57,8 +62,7 @@ string tos3(char *s)
 {
     string str = {
         .len = strlen((byte *)s),
-        .str = (byte *)s
-    };
+        .str = (byte *)s};
     return str;
 }
 
@@ -206,8 +210,7 @@ string v_sprintf(const char *fmt, ...)
 end:;
     string str = {
         .len = strlen(strptr),
-        .str = strptr
-    };
+        .str = strptr};
 
     if (str_internal_slot++ == V_STR_SLOT_NUM)
     {
@@ -333,7 +336,8 @@ void memcpy(void *desti, void *srci, int length)
     if ((u64)desti < (u64)srci)
     {
         int n = (length + 7) / 8;
-        char *dest = desti, *src = srci;
+        char *dest = (char *)desti;
+        char *src = (char *)srci;
         switch (length % 8)
         {
         case 0:
@@ -360,7 +364,8 @@ void memcpy(void *desti, void *srci, int length)
     else
     {
         int n = (length + 7) / 8;
-        char *dest = desti + length, *src = srci + length;
+        char *dest = (char *)((u64)desti + length);
+        char *src = (char *)((u64)srci + length);
         switch (length % 8)
         {
         case 0:

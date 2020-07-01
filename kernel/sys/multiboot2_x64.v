@@ -1,34 +1,32 @@
 module sys
 
-import libtinyalloc
-
 struct MultibootInfoHeader {
 	total_size u32
 	reserved u32
 }
 
 enum MultibootTagType {
-	end,
-	command_line,
-	bootloader_name,
-	boot_module,
-	basic_meminfo,
-	boot_device,
-	memory_map,
-	vesa_bios_extension,
-	framebuffer,
-	elf_sections,
-	adv_power_management,
-	efi_32,
+	end
+	command_line
+	bootloader_name
+	boot_module
+	basic_meminfo
+	boot_device
+	memory_map
+	vesa_bios_extension
+	framebuffer
+	elf_sections
+	adv_power_management
+	efi_32
 	efi_64
 }
 
 enum MultibootMmapType {
-	unknown,
-	available,
-	reserved,
-	acpi_reclaimable,
-	acpi_nvs,
+	unknown
+	available
+	reserved
+	acpi_reclaimable
+	acpi_nvs
 	badram
 }
 
@@ -80,7 +78,7 @@ mut:
 	efi_system_table &EfiSystemTable
 	framebuffer &MultibootTagFramebuffer
 	mmap_tags_size u32
-	mmap_tags [64]&sys.MultibootMmapEntry
+	mmap_tags [64]&MultibootMmapEntry
 }
 
 fn (entry &MultibootMmapEntry) type_str() string {
@@ -103,7 +101,7 @@ fn (tag &MultibootTagEfi64) table() &EfiSystemTable {
 	return &EfiSystemTable(phys_to_virtual(tag.pointer))
 }
 
-fn init_multiboot2(kernel &VKernel, early_info &EarlyBootInfo) {
+fn init_multiboot2(mut kernel VKernel, early_info &EarlyBootInfo) {
 	printk('Booted using Multiboot2-compliant bootloader, attempting to parse boot tags...')
 	result := parse_multiboot2(phys_to_virtual(early_info.boot_info))
 
@@ -206,15 +204,4 @@ fn parse_multiboot2(boot_info_ptr voidptr) Multiboot2ParseResult {
 	}
 
 	return result
-}
-
-fn do_meme(entry &MultibootMmapEntry) {
-	printk('Found a >16MiB memory block: ${&PtrHack(entry.addr)}')
-	
-	printk('allocating 1024 bytes')
-	addr := alloc.alloc(1024)
-	printk('freeing 1024 bytes')
-	alloc.free(addr)
-
-	printk('free blocks: ${alloc.free_blocks_count()}, used blocks: ${alloc.used_blocks_count()}, fresh blocks: ${alloc.fresh_blocks_count()}')
 }

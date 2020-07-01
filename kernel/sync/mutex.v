@@ -5,7 +5,7 @@ pub struct Mutex {
 }
 
 const (
-	SPIN_LIMIT = 40
+	spin_limit = 40
 )
 
 pub fn (mutex &Mutex) lock() {

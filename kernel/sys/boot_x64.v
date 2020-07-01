@@ -3,17 +3,17 @@ module sys
 import debug
 
 const (
-	// PHYS_BASE is the offset of kernel memory.
-	PHYS_BASE = 0xFFFFFEFF00000000
-	VMA_BASE = 0xFFFFFFFF80000000
+	// phys_base is the offset of kernel memory.
+	phys_base = 0xFFFFFEFF00000000
+	vma_base = 0xFFFFFFFF80000000
 )
 
 const (
-	// BOOTLOADER_MAGIC_MB2 is the magic number that get passed to the kernel
+	// bootloader_magic_mb2 is the magic number that get passed to the kernel
 	// by MultiBoot2-compatible bootloaders.
-	BOOTLOADER_MAGIC_MB2 = u32(0x36D76289)
-	// EARLY_BOOTINFO_BASE is the offset of EarlyBootInfo passed to the kernel.
-	EARLY_BOOTINFO_BASE = u64(0xE00000)
+	bootloader_magic_mb2 = u32(0x36D76289)
+	// early_bootinfo_base is the offset of EarlyBootInfo passed to the kernel.
+	early_bootinfo_base = u64(0xE00000)
 )
 
 pub struct EarlyBootInfo {
@@ -26,7 +26,7 @@ pub:
 fn banner() {
 	build_date := v_build_date()
 	compiler_version := v_version()
-	printk('vOS/x86_64 [v${KERNEL_VERSION} ${build_date}, V ${compiler_version}]')
+	printk('vOS/x86_64 [v${kernel_version} ${build_date}, V ${compiler_version}]')
 }
 
 fn (kernel &VKernel) init_platform() {
@@ -36,10 +36,10 @@ fn (kernel &VKernel) init_platform() {
 	fbcon_preinit()
 }
 
-fn (kernel &VKernel) parse_bootinfo() {
-	early_info := &EarlyBootInfo(phys_to_virtual(EARLY_BOOTINFO_BASE))
-	if early_info.magic == BOOTLOADER_MAGIC_MB2 {
-		init_multiboot2(kernel, early_info)
+fn (mut kernel VKernel) parse_bootinfo() {
+	early_info := &EarlyBootInfo(phys_to_virtual(early_bootinfo_base))
+	if early_info.magic == bootloader_magic_mb2 {
+		init_multiboot2(mut kernel, early_info)
 		return
 	}
 

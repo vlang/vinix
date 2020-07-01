@@ -1,5 +1,5 @@
 module sys
 
 const (
-	KERNEL_VERSION = "0.1.0"
+	kernel_version = "0.1.0"
 )

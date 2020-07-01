@@ -34,7 +34,6 @@ v_modules = [
     ['acpi', ['acpi.v']],
     ['debug', ['debug.v']],
     ['io', ['io.v']],
-    ['libtinyalloc', ['tiny_alloc.v']],
     ['sync', ['mutex.v']],
     ['sys', [
         'boot_x64.v', 'callbacks.v', 'cmdline.v', 'debug_x64.v', 'fbcon.v', 'framebuffer.v', 
@@ -52,11 +51,15 @@ foreach mod : v_modules
     output = name + '.gen.c'
     #k_deps += name
     k_objs += custom_target(name,
-        command: [v, '-verbose', '-freestanding', '--enable-globals', 
-            '-vlib-path', meson.source_root() + '/../vrt/vlib', 
-            '-vpath', meson.source_root(), 
+        command: [v, 
+            '-freestanding', 
+            '-backend', 'v2', 
+            '-shared',
+            '-custom-prelude', meson.source_root() + '/../vrt/prelude.h', 
+            '--enable-globals',
+            '-path', meson.source_root() + '/../vrt/vlib/', 
             '-o', meson.current_build_dir() + '/@OUTPUT@', 
-            'build', 'module', meson.source_root() + '/' + mod[0]],
+            meson.source_root() + '/' + mod[0]],
         input: files(input),
         output: output
     )

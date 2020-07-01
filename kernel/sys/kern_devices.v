@@ -4,6 +4,6 @@ import sync
 
 struct KernelDevices {
 mut:
-	framebuffers [8]sys.Framebuffer
+	framebuffers [8]Framebuffer
 	fb_mutex sync.Mutex
 }

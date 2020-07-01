@@ -6,7 +6,7 @@ mut:
 	line_consumer fn(string)
 }
 
-__global sinks [32]debug.Sink
+__global sinks [32]Sink = [32]Sink
 
 pub fn printk(msg string) {
 	// V compiler is broken (no .len for static sized arrays)

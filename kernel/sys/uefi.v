@@ -1,7 +1,7 @@
 module sys
 
 pub const (
-	EFI_SYSTEM_TABLE_SIGNATURE = 0x5453595320494249
+	efi_system_table_signature = 0x5453595320494249
 )
 
 pub struct EfiTableHeader {

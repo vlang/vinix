@@ -1,19 +1,19 @@
 module sys
 
 pub const (
-	PAGE_SIZE = 0x1000
-	LARGE_PAGE_SIZE = 0x200000
-	HUGE_PAGE_SIZE = 0x40000000
+	page_size = 0x1000
+	large_page_size = 0x200000
+	huge_page_size = 0x40000000
 
-	PFLAG_PRESENT = (1 << 0)
-	PFLAG_READ_WRITE = (1 << 1)
-	PFLAG_USER = (1 << 2)
-	PFLAG_WRITE_THROUGH = (1 << 3)
-	PFLAG_CACHE_DISABLED = (1 << 4)
-	PFLAG_ACCESSED = (1 << 5)
-	PFLAG_DIRTY = (1 << 6)
-	PFLAG_PAGE_SIZE = (1 << 7)
-	PFLAG_GLOBAL = (1 << 8)
+	pflag_present = (1 << 0)
+	pflag_read_write = (1 << 1)
+	pflag_user = (1 << 2)
+	pflag_write_through = (1 << 3)
+	pflag_cache_disabled = (1 << 4)
+	pflag_accessed = (1 << 5)
+	pflag_dirty = (1 << 6)
+	pflag_page_size = (1 << 7)
+	pflag_global = (1 << 8)
 )
 
 pub fn paging_init() {

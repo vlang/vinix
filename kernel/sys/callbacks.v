@@ -3,7 +3,7 @@ module sys
 import sync
 
 const (
-	CallbackPoolSize = 1024
+	callback_pool_size = 1024
 )
 
 struct Callback {
@@ -15,7 +15,7 @@ mut:
 struct CallbackPool {
 mut:
 	mutex sync.Mutex
-	callbacks [1024]sys.Callback
+	callbacks [1024]Callback
 }
 
 pub fn emit_callback(cb_type int, cb_data voidptr) {

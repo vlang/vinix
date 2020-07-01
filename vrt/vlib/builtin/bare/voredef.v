@@ -2,10 +2,12 @@ module builtin
 
 #include <vrt.h>
 
-pub struct C.string {
+pub struct string {
 pub:
-	len int
 	str byteptr
+	len int
+mut:
+	is_lit int
 }
 
 fn C.v_version() string

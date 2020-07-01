@@ -26,12 +26,6 @@ typedef void *voidptr;
 
 typedef struct string string;
 
-struct string
-{
-	byte *str;
-	int len;
-};
-
 string v_version();
 string v_build_date();
 void v_panic(string s);
@@ -52,7 +46,6 @@ inline void atomic_store(void *ptr, char val);
 
 string v_sprintf(const char *fmt, ...);
 
-#define _STR(...) v_sprintf(__VA_ARGS__)
 #define EMPTY_STRUCT_DECLARATION void *whatever
 
 #endif
