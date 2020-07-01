@@ -38,25 +38,25 @@ struct MultibootMmapEntry {
 }
 
 struct MultibootTagHeader {
-	_type MultibootTagType
+	ttype MultibootTagType
 	size u32
 }
 
 struct MultibootTagCmdline {
-	_type u32
+	ttype u32
 	size u32
 	_cmdline [0]byte
 }
 
 struct MultibootTagMemoryMap {
-	_type u32
+	ttype u32
 	size u32
 	entry_size u32
 	entry_version u32
 }
 
 struct MultibootTagFramebuffer {
-	_type u32
+	ttype u32
 	size u32
 	addr voidptr
 	pitch u32
@@ -67,7 +67,7 @@ struct MultibootTagFramebuffer {
 }
 
 struct MultibootTagEfi64 {
-	_type u32
+	ttype u32
 	size u32
 	pointer voidptr
 }
@@ -150,9 +150,9 @@ fn parse_multiboot2(boot_info_ptr voidptr) Multiboot2ParseResult {
 	mut tag := &MultibootTagHeader(ptr)
 
 	for {
-		//printk('[tag] type=$tag._type size=$tag.size')
+		//printk('[tag] type=$tag.ttype size=$tag.size')
 
-		match tag._type {
+		match tag.ttype {
 			.command_line {
 				cmdline_tag := &MultibootTagCmdline(tag)
 				printk('Kernel command line: ${cmdline_tag.command_line()}')

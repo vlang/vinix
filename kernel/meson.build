@@ -57,7 +57,7 @@ foreach mod : v_modules
             '-shared',
             '-custom-prelude', meson.source_root() + '/../vrt/prelude.h', 
             '--enable-globals',
-            '-path', meson.source_root() + '/../vrt/vlib/', 
+            '-path', meson.source_root() + '/../vrt/vlib/:' + meson.source_root(), 
             '-o', meson.current_build_dir() + '/@OUTPUT@', 
             meson.source_root() + '/' + mod[0]],
         input: files(input),
