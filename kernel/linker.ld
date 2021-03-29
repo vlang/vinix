@@ -29,4 +29,8 @@ SECTIONS
         *(COMMON)
         *(.bss*)
     }
+
+    /DISCARD/ : {
+        *(*)
+    }
 }

@@ -8,6 +8,7 @@ CFLAGS = -Wall -Wextra -O2 -pipe
 LDINTERNALFLAGS :=  \
 	-Tlinker.ld \
 	-nostdlib   \
+	-Wl,-gc-sections \
 	-shared     \
 	-pie -fno-pic -fpie \
 	-z max-page-size=0x1000
@@ -17,6 +18,8 @@ INTERNALCFLAGS  :=       \
 	-ffreestanding       \
 	-fno-stack-protector \
 	-fno-pic -fpie       \
+	-ffunction-sections  \
+	-fdata-sections      \
 	-mno-red-zone
 
 INTERNALVFLAGS := \

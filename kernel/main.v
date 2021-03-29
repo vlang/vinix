@@ -50,7 +50,7 @@ pub fn kmain(stivale2_struct &Stivale2Struct) {
 
     mut framebuffer := &u32(fb_tag.addr)
 
-    for i := 0; i < 50; i++ {
+    for i := 0; i < 500; i++ {
         framebuffer[i + (fb_tag.pitch / 4) * i] = 0xffffff
     }
     for { }
