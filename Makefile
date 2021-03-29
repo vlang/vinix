@@ -28,3 +28,6 @@ $(KERNEL_HDD): limine kernel/vos.elf
 clean:
 	rm -f $(KERNEL_HDD)
 	$(MAKE) -C kernel clean
+
+distclean: clean
+	rm -rf limine

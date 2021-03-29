@@ -44,4 +44,4 @@ blob.C: $(VFILES)
 	mv $(@:.C=.c) $@
 
 clean:
-	rm -rf $(TARGET) $(OBJ)
+	rm -rf $(TARGET) $(OBJ) blob.C
