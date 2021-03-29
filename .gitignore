@@ -1,0 +1,5 @@
+limine
+*.o
+*.C
+*.elf
+*.hdd
