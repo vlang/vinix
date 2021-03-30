@@ -5,7 +5,7 @@ KERNEL_HDD = disk.hdd
 all: $(KERNEL_HDD)
 
 run: $(KERNEL_HDD)
-	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD)
+	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD) -debugcon stdio
 
 limine:
 	git clone https://github.com/limine-bootloader/limine.git --branch=latest-binary --depth=1
