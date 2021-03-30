@@ -3,7 +3,7 @@ TARGET := vos.elf
 CC = cc
 V = v
 
-CFLAGS = -Wall -Wextra -O2 -pipe
+CFLAGS = -O3 -pipe
 
 LDINTERNALFLAGS :=  \
 	-Tlinker.ld \
@@ -23,6 +23,7 @@ INTERNALCFLAGS  :=       \
 	-mno-red-zone
 
 INTERNALVFLAGS := \
+	-shared \
 	--enable-globals
 
 VFILES := $(shell find ./ -type f -name '*.v')
@@ -40,10 +41,10 @@ blob.o: blob.C
 	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -Wall -Wextra $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 blob.C: $(VFILES)
-	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o $(@:.C=.c) $(VFILES)
+	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o $(@:.C=.c) .
 	mv $(@:.C=.c) $@
 
 clean:
