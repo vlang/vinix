@@ -2,3 +2,5 @@
 *.C
 *.elf
 *.hdd
+
+/3rdparty/*

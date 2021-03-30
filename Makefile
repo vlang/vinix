@@ -10,11 +10,15 @@ run: $(KERNEL_HDD)
 3rdparty: 3rdparty/echfs 3rdparty/limine
 
 3rdparty/limine:
-	test -f 3rdparty/limine/Makefile || (echo 'Run git submodule update --init to fetch the dependencies' && exit 1)
+	if [ ! -d 3rdparty/limine/.git ]; then \
+		git clone --branch latest-binary --depth 1 https://github.com/limine-bootloader/limine.git ./3rdparty/limine; \
+	fi
 	make -C 3rdparty/limine
 
 3rdparty/echfs:
-	test -f 3rdparty/echfs/Makefile || (echo 'Run git submodule update --init to fetch the dependencies' && exit 1)
+	if [ ! -d 3rdparty/echfs/.git ]; then \
+		git clone --depth 1 https://github.com/echfs/echfs.git ./3rdparty/echfs; \
+	fi
 	make -C 3rdparty/echfs
 
 kernel/vos.elf:
