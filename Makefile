@@ -25,6 +25,9 @@ $(KERNEL_HDD): limine kernel/vos.elf
 	echfs-utils -g -p0 $(KERNEL_HDD) import limine/limine.sys limine.sys
 	./limine/limine-install $(KERNEL_HDD)
 
+format:
+	v fmt -w . || true
+
 clean:
 	rm -f $(KERNEL_HDD)
 	$(MAKE) -C kernel clean

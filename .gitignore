@@ -3,3 +3,4 @@ limine
 *.C
 *.elf
 *.hdd
+kernel/main
