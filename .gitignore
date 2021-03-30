@@ -1,4 +1,4 @@
-limine
+3rdparty
 *.o
 *.C
 *.elf
