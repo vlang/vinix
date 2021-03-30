@@ -1,0 +1,7 @@
+[submodule "3rdparty/limine"]
+	path = 3rdparty/limine
+	branch = latest-binary
+	url = https://github.com/limine-bootloader/limine.git
+[submodule "3rdparty/echfs"]
+	path = 3rdparty/echfs
+	url = https://github.com/echfs/echfs.git
