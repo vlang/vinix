@@ -7,10 +7,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	mut framebuffer := &u32(fb_tag.addr)
 
 	for i := 0; i < 250; i++ {
-    	unsafe {
+		unsafe {
 			framebuffer[i + (fb_tag.pitch / 4) * 2 * i] = 0xffffff
 			framebuffer[500 - i + (fb_tag.pitch / 4) * 2 * i] = 0xffffff
-		}            
+		}
 	}
 
 	hello := 'hello world'
