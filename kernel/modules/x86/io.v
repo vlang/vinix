@@ -1,19 +1,15 @@
 module x86
 
+#include "modules/x86/io.h"
+
+fn C.inb(u16) byte
+
 pub fn inb(port u16) byte {
-	mut ret := byte(0)
-	asm amd64 {
-		in ret, port
-		; =a (ret)
-		; Nd (port)
-	}
-	return ret
+	return C.inb(port)
 }
 
+fn C.outb(u16, byte)
+
 pub fn outb(port u16, value byte) {
-	asm amd64 {
-		out port, value
-		; ; a (value)
-		  Nd (port)
-	}
+	C.outb(port, value)
 }
