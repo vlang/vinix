@@ -1,8 +1,10 @@
 import stivale2
-import io
+import x86
 
 pub fn kmain(stivale2_struct &stivale2.Struct) {
-	fb_tag := &stivale2.FBTag(stivale2.get_tag(stivale2_struct, 0x506461d2950408fa))
+    x86.gdt_init()
+
+	fb_tag := unsafe { &stivale2.FBTag(stivale2.get_tag(stivale2_struct, 0x506461d2950408fa)) }
 
 	mut framebuffer := &u32(fb_tag.addr)
 
@@ -13,10 +15,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 		}
 	}
 
-	hello := 'hello world'
+	hello := 'hello world\n'
 
-	for i := 0; i < 11; i++ {
-		io.outb(0xe9, hello[i])
+	for i := 0; i < 12; i++ {
+		x86.outb(0xe9, hello[i])
 	}
 
 	for {}

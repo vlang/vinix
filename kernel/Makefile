@@ -27,8 +27,9 @@ INTERNALVFLAGS := \
 	--enable-globals
 
 VFILES := $(shell find ./ -type f -name '*.v')
+ASMFILES := $(shell find ./ -type f -name '*.asm')
 CFILES := $(shell find ./ -type f -name '*.c')
-OBJ    := $(CFILES:.c=.o) blob.o
+OBJ := $(ASMFILES:.asm=.o) $(CFILES:.c=.o) blob.o
 
 .PHONY: all clean
 
@@ -42,6 +43,9 @@ blob.o: blob.C
 
 %.o: %.c
 	$(CC) -Wall -Wextra $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+
+%.o: %.asm
+	nasm $< -felf64 -o $@
 
 blob.C: $(VFILES)
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o $(@:.C=.c) .
