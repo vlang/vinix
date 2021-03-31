@@ -38,7 +38,7 @@ $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	./3rdparty/limine/limine-install $(KERNEL_HDD)
 
 format:
-	v fmt -w . || true
+	v fmt -w kernel || true
 
 clean:
 	rm -f $(KERNEL_HDD)
