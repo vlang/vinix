@@ -45,4 +45,4 @@ clean:
 	$(MAKE) -C kernel clean
 
 distclean: clean
-	rm -rf limine
+	rm -rf 3rdparty
