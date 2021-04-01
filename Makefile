@@ -20,7 +20,7 @@ run: $(KERNEL_HDD)
 3rdparty/v:
 	mkdir -p 3rdparty
 	git clone https://github.com/vlang/v.git 3rdparty/v
-	cd 3rdparty/v && git checkout 205fb88d9081cf9bdabe9f34b8bc947d7a8232b3
+	cd 3rdparty/v && git checkout 043f6420f7433dcc6e4660f7c351b1749bb787e0
 	make -C 3rdparty/v
 
 kernel/vos.elf: 3rdparty/v
