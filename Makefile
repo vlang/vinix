@@ -1,7 +1,8 @@
 KERNEL_HDD = disk.hdd
 
+ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
+    
 .PHONY: clean all run
-
 all: $(KERNEL_HDD)
 
 run: $(KERNEL_HDD)
@@ -23,7 +24,7 @@ run: $(KERNEL_HDD)
 	cd 3rdparty/v && git checkout 043f6420f7433dcc6e4660f7c351b1749bb787e0
 	make -C 3rdparty/v
 
-kernel/vos.elf: 3rdparty/v
+kernel/vos.elf: 3rdparty/v $(ALL_V_FILES)
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`"
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
