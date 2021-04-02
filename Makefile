@@ -1,12 +1,13 @@
 KERNEL_HDD = disk.hdd
 
-ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
-    
 .PHONY: clean all run
 all: $(KERNEL_HDD)
 
 run: $(KERNEL_HDD)
 	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD) -debugcon stdio
+
+%.v:
+ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
 
 3rdparty/limine:
 	mkdir -p 3rdparty
