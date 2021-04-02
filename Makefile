@@ -11,19 +11,19 @@ ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
 
 3rdparty/limine:
 	mkdir -p 3rdparty
-	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
-	make -C 3rdparty/limine
+	git clone https://github.com/limine-bootloader/limine.git --quiet --branch=v2.0-branch-binary --depth=1 3rdparty/limine
+	make --quiet -C 3rdparty/limine 2> /dev/null
 
 3rdparty/echfs:
 	mkdir -p 3rdparty
-	git clone https://github.com/echfs/echfs.git --depth=1 3rdparty/echfs
-	make -C 3rdparty/echfs
+	git clone https://github.com/echfs/echfs.git --quiet --depth=1 3rdparty/echfs
+	make --quiet -C 3rdparty/echfs 2> /dev/null
 
 3rdparty/v:
 	mkdir -p 3rdparty
-	git clone https://github.com/vlang/v.git 3rdparty/v
-	cd 3rdparty/v && git checkout 043f6420f7433dcc6e4660f7c351b1749bb787e0
-	make -C 3rdparty/v
+	git clone https://github.com/vlang/v.git --quiet --depth=200 3rdparty/v
+	cd 3rdparty/v && git checkout --quiet 043f6420f7433dcc6e4660f7c351b1749bb787e0
+	make --quiet -C 3rdparty/v
 
 kernel/vos.elf: 3rdparty/v $(ALL_V_FILES)
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`"
