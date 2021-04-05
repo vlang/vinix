@@ -18,8 +18,7 @@ run: $(KERNEL_HDD)
 
 3rdparty/v:
 	mkdir -p 3rdparty
-	git clone https://github.com/vlang/v.git --quiet 3rdparty/v
-	cd 3rdparty/v && git checkout --quiet 77d8336db97145aa331ae8b1bdb07f8427ca4262
+	git clone https://github.com/vlang/v.git --quiet --depth=1 3rdparty/v
 	make --quiet -C 3rdparty/v 2> /dev/null
 
 .PHONY: kernel/vos.elf
