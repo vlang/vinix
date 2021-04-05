@@ -37,9 +37,20 @@ pub fn (mut fb FB) set(x int, y int, color u32) {
 // rect draws a rectangle on fb. 
 // `x` and `y` are the position of the upper-left corner of the rectangle relative to the upper-left corner of the screen
 pub fn (mut fb FB) rect(x int, y int, width int, height int, color u32) {
+	// if width > 8 {
+	// asm i386 {
+	// 	vpbroadcastd ymm1, color
+	// 	; ; r (color)
+	// 	; ymm1
+	// }
+	// } else {
 	for i := x; i < x + width; i++ {
 		for j := y; j < y + height; j++ {
 			fb.set(i, j, color)
 		}
 	}
+	// }
+}
+
+pub fn (mut fb FB) line(x1 int, y1 int, x2 int, y2 int, color u32) {
 }

@@ -38,9 +38,14 @@ distro:
 update-v: 3rdparty/v
 	cd 3rdparty/v && ( git checkout $(V_COMMIT) || ( git checkout master && git pull && git checkout $(V_COMMIT) && $(MAKE) ) )
 
+<<<<<<< HEAD
 .PHONY: kernel/vos.elf
 kernel/vos.elf: update-v
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`"
+=======
+kernel/vos.elf: 3rdparty/v $(ALL_V_FILES)
+	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`"
+>>>>>>> 0c9ae24... sync Makefile, move dbg to x86
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	rm -f $(KERNEL_HDD)

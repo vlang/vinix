@@ -19,3 +19,18 @@ pub fn outb(port u16, value byte) {
 		; memory
 	}
 }
+
+// dbg writes `s` to the qemu debug port
+pub fn dbg(s string) {
+	for i := 0; i < s.len; i++ {
+		outb(0xe9, s[i]) // 0xe9 is qemu's debug port
+	}
+}
+
+// dbg writes `s` to the qemu debug port, with a newline
+pub fn dbgln(s string) {
+	for i := 0; i < s.len; i++ {
+		outb(0xe9, s[i]) // 0xe9 is qemu's debug port
+	}
+	outb(0xe9, `\n`)
+}
