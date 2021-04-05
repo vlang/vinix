@@ -6,9 +6,6 @@ all: $(KERNEL_HDD)
 run: $(KERNEL_HDD)
 	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD) -debugcon stdio
 
-%.v:
-ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
-
 3rdparty/limine:
 	mkdir -p 3rdparty
 	git clone https://github.com/limine-bootloader/limine.git --quiet --branch=v2.0-branch-binary --depth=1 3rdparty/limine
@@ -21,10 +18,12 @@ ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
 
 3rdparty/v:
 	mkdir -p 3rdparty
-	git clone https://github.com/vlang/v.git --quiet --branch=weekly.2021.13 --depth=1 3rdparty/v
+	git clone https://github.com/vlang/v.git --quiet 3rdparty/v
+	cd 3rdparty/v && git checkout --quiet 77d8336db97145aa331ae8b1bdb07f8427ca4262
 	make --quiet -C 3rdparty/v 2> /dev/null
 
-kernel/vos.elf: 3rdparty/v $(ALL_V_FILES)
+.PHONY: kernel/vos.elf
+kernel/vos.elf: 3rdparty/v
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`"
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
