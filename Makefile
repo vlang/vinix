@@ -21,9 +21,8 @@ ALL_V_FILES = $(shell 3rdparty/v/v -print-v-files kernel/main.v)
 
 3rdparty/v:
 	mkdir -p 3rdparty
-	git clone https://github.com/vlang/v.git --quiet --depth=200 3rdparty/v
-	cd 3rdparty/v && git checkout --quiet 043f6420f7433dcc6e4660f7c351b1749bb787e0
-	make --quiet -C 3rdparty/v
+	git clone https://github.com/vlang/v.git --quiet --branch=weekly.2021.13 --depth=1 3rdparty/v
+	make --quiet -C 3rdparty/v 2> /dev/null
 
 kernel/vos.elf: 3rdparty/v $(ALL_V_FILES)
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`"
@@ -39,8 +38,8 @@ $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import 3rdparty/limine/limine.sys limine.sys
 	./3rdparty/limine/limine-install $(KERNEL_HDD)
 
-format:
-	v fmt -w kernel || true
+format: 3rdparty/v
+	./3rdparty/v/v fmt -w kernel || true
 
 clean:
 	rm -f $(KERNEL_HDD)

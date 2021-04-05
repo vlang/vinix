@@ -1,5 +1,7 @@
 module stivale2
 
+pub const framebuffer_id = 0x506461d2950408fa
+
 struct Tag {
 pub:
 	id   u64
