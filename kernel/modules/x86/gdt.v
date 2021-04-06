@@ -1,19 +1,7 @@
 module x86
 
-// FIXME: Using this 2 globals as const will generate a runtime dependency on
-// vinit, which we cannot call since vinit depends on malloc and other utilities
-// not available in freestanding.
-__global ( kernel_code_seg = u16(0x08))
-
-__global ( kernel_data_seg = u16(0x10))
-
-__global ( gdt_pointer GDTPointer )
-
-__global ( gdt_entries [5]GDTEntry )
-
 [packed]
 struct GDTPointer {
-pub:
 	size    u16
 	address voidptr
 }
@@ -27,6 +15,17 @@ struct GDTEntry {
 	granularity byte
 	base_high8  byte
 }
+
+// FIXME: Using this 2 globals as const will generate a runtime dependency on
+// vinit, which we cannot call since vinit depends on malloc and other utilities
+// not available in freestanding.
+__global ( kernel_code_seg = u16(0x08))
+
+__global ( kernel_data_seg = u16(0x10))
+
+__global ( gdt_pointer GDTPointer )
+
+__global ( gdt_entries [5]GDTEntry )
 
 pub fn gdt_init() {
 	// Initialize all the GDT entries.
