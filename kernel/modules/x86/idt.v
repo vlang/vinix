@@ -24,15 +24,6 @@ __global ( idt_pointer IDTPointer )
 __global ( idt_entries [256]IDTEntry )
 
 pub fn idt_init() {
-	// Load IDT.
-	idt_pointer = IDTPointer{
-		size: u16((sizeof(IDTEntry) * 256) - 1)
-		address: &idt_entries
-	}
-	asm amd64 {
-		lidt [ptr]
-		; ; r (&idt_pointer) as ptr
-	}
 	// Register the common exceptions.
 	idt_register_handler(0x0, &generic_exception, 0)
 	idt_register_handler(0x1, &generic_exception, 0)
@@ -56,6 +47,18 @@ pub fn idt_init() {
 	idt_register_handler(0x13, &generic_exception, 0)
 	idt_register_handler(0x14, &generic_exception, 0)
 	idt_register_handler(0x1e, &generic_exception, 0)
+
+	// Load IDT.
+	idt_pointer = IDTPointer{
+		size: u16((sizeof(IDTEntry) * 256) - 1)
+		address: &idt_entries
+	}
+
+	asm amd64 {
+		lidt ptr
+		; ; m (idt_pointer) as ptr
+		; memory
+	}
 }
 
 pub fn idt_register_handler(num byte, callback voidptr, ist byte) {

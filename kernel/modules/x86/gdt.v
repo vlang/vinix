@@ -101,5 +101,6 @@ pub fn gdt_init() {
 		; ; r (&gdt_pointer) as ptr
 		  rm (kernel_code_seg) as cseg
 		  rm (kernel_data_seg) as dseg
+		; memory
 	}
 }

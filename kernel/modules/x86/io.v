@@ -6,6 +6,7 @@ pub fn inb(port u16) byte {
 		in ret, port
 		; =a (ret)
 		; Nd (port)
+		; memory
 	}
 	return ret
 }
@@ -15,5 +16,6 @@ pub fn outb(port u16, value byte) {
 		out port, value
 		; ; a (value)
 		  Nd (port)
+		; memory
 	}
 }
