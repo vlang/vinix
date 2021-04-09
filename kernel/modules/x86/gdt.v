@@ -88,11 +88,13 @@ pub fn gdt_init() {
 	// Random ASM vomit.
 	asm amd64 {
 		lgdt [ptr]
+		push rax
 		push cseg
 		lea rax, [rip + reentry]
 		push rax
 		.short 0xcb48 // V does not have REX.W + retf, this is the opcode.
 		reentry:
+		pop rax
 		mov ds, dseg
 		mov es, dseg
 		mov fs, dseg
