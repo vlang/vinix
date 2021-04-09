@@ -16,3 +16,13 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 - Break the compiler as much as possible.
 - Build a minimal and useful platform for software [especially written in V :^)], allowing for better control, isolation, and smaller attack surface in VMs.
 - Having fun.
+
+### Build Instructions
+
+#### Prerequisites
+
+The following packages need to be installed on the system in order to build vOS: `make`, `git`, `gcc/clang`, `binutils`, `parted`, `findutils`, `pkg-config`, `libuuid`, `libfuse`.
+
+#### Build commands
+
+The OS can be built with `make` and ran within qemu with `make run`.

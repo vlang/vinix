@@ -39,7 +39,7 @@ $(TARGET): $(OBJ)
 	$(CC) $(LDINTERNALFLAGS) $(OBJ) -o $@
 
 blob.o: blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -Wno-unused-result -c $< -o $@
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.c
 	$(CC) -Wall -Wextra $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
