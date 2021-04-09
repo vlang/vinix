@@ -12,7 +12,7 @@ pub fn bittest(bitmap Bitmap, index u64) bool {
 	}
 }
 
-pub fn bitset(mut bitmap Bitmap, index u64) {
+pub fn bitset(bitmap Bitmap, index u64) {
 	unsafe {
 		mut fbitmap := &u64(bitmap)
 		bits_type := sizeof(u64) * 8
@@ -21,7 +21,7 @@ pub fn bitset(mut bitmap Bitmap, index u64) {
 	}
 }
 
-pub fn bitreset(mut bitmap Bitmap, index u64) {
+pub fn bitreset(bitmap Bitmap, index u64) {
 	unsafe {
 		mut fbitmap := &u64(bitmap)
 		bits_type := sizeof(u64) * 8

@@ -5,7 +5,7 @@ import stivale2
 
 const block_size = 0x1000
 
-__global ( bitmap &u64 )
+__global ( bitmap lib.Bitmap )
 
 __global ( block_count u64 )
 
@@ -46,14 +46,14 @@ pub fn physical_init(memmap &stivale2.MemmapTag) {
 				bitmap_entry = i
 				bitmap_entry_base = entries[i].base + bitmap_size
 				bitmap_entry_size = entries[i].length - bitmap_size
-				bitmap = &u64(entries[i].base)
+				bitmap = lib.Bitmap(entries[i].base)
 				break
 			}
 		}
 
 		// Fill the bitmap by first clearing and then populating with the memmap
 		for i := 0; i < block_count; i++ {
-			lib.bitset(mut bitmap, u64(i))
+			lib.bitset(bitmap, u64(i))
 		}
 
 		for i := 0; i < memmap.entry_count; i++ {
@@ -66,7 +66,7 @@ pub fn physical_init(memmap &stivale2.MemmapTag) {
 				entries[i].base, entries[i].length
 			}
 			for j := u64(0); j < length; j += memory.block_size {
-				lib.bitreset(mut bitmap, (base + j) / memory.block_size)
+				lib.bitreset(bitmap, (base + j) / memory.block_size)
 			}
 		}
 	}
@@ -81,7 +81,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 				p += 1
 				page := last_used_index - count
 				for i := page; page < last_used_index; i++ {
-					lib.bitset(mut bitmap, i)
+					lib.bitset(bitmap, i)
 				}
 				return voidptr(page * memory.block_size)
 			}
@@ -106,6 +106,6 @@ pub fn malloc(count u64) voidptr {
 pub fn free(ptr voidptr, count u64) {
 	page := u64(ptr) / memory.block_size
 	for i := page; i < page + count; i++ {
-		lib.bitreset(mut bitmap, i)
+		lib.bitreset(bitmap, i)
 	}
 }
