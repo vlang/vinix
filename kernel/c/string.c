@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stddef.h>
-#include <stdarg.h>
 
 void *memcpy(void *dest, const void *src, size_t n) {
     uint8_t *pdest = (uint8_t *)dest;
@@ -103,39 +102,3 @@ size_t strlen(const char *str) {
 
     return len;
 }
-
-void free( void* ptr ) {}
-void* malloc( size_t size ) {}
-void* calloc( size_t num, size_t size ) {}
-void *realloc( void *ptr, size_t new_size ) {}
-
-void exit( int exit_code ) {}
-
-typedef struct {
-
-} FILE;
-
-FILE *stdin, *stdout, *stderr;
-
-int printf( const char *format, ... ) {}
-int vsprintf( char *buffer, const char *format, va_list vlist ) {}
-int vsnprintf( char *restrict buffer, size_t bufsz,
-               const char *restrict format, va_list vlist ) {}
-int fflush( FILE *stream ) {}
-int getc( FILE *stream ) {}
-char *fgets( char *str, int count, FILE *stream ) {}
-
-void qsort( void *ptr, size_t count, size_t size,
-            int (*comp)(const void *, const void *) ) {}
-
-typedef signed long long ssize_t;
-ssize_t write(int fd, const void *buf, size_t count) {}
-int isatty(int fd) {}
-
-FILE *popen(const char *command, const char *type) {}
-int pclose(FILE *stream) {}
-
-void *backtrace_symbols, *backtrace;
-
-int32_t **__ctype_tolower_loc(void) {}
-int32_t **__ctype_toupper_loc(void) {}
