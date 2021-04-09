@@ -9,7 +9,7 @@ LDINTERNALFLAGS :=  \
 	-Tlinker.ld \
 	-nostdlib   \
 	-Wl,-gc-sections \
-	-shared     \
+	-static-pie     \
 	-pie -fno-pic -fpie \
 	-z max-page-size=0x1000
 

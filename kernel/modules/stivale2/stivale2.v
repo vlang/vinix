@@ -4,6 +4,8 @@ pub const framebuffer_id = 0x506461d2950408fa
 
 pub const memmap_id = 0x2187f79e8612de07
 
+pub const terminal_id = 0xc2b3f4c3233b0974
+
 [packed]
 struct Tag {
 pub:
@@ -35,6 +37,14 @@ pub:
 	green_mask_shift byte
 	blue_mask_size   byte
 	blue_mask_shift  byte
+}
+
+[packed]
+struct TermTag {
+pub:
+	tag Tag
+	flags u64
+	term_write voidptr
 }
 
 [packed]
@@ -83,4 +93,23 @@ pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
 	}
 
 	return 0
+}
+
+__global ( terminal_print_ptr voidptr )
+
+pub fn terminal_init(stivale2_struct &Struct) {
+	terminal_tag := unsafe { &stivale2.TermTag(get_tag(stivale2_struct, terminal_id)) }
+
+	if terminal_tag == 0 {
+		return
+	}
+
+	terminal_print_ptr = terminal_tag.term_write
+}
+
+
+pub fn terminal_print(s string) {
+	mut ptr := fn(_ voidptr, _ u64) {}
+	ptr = terminal_print_ptr
+	ptr(s.str, u64(s.len))
 }

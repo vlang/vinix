@@ -4,22 +4,23 @@ KERNEL_HDD = disk.hdd
 all: $(KERNEL_HDD)
 
 run: $(KERNEL_HDD)
-	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD) -debugcon stdio
+	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -hda $(KERNEL_HDD) -debugcon stdio
 
 3rdparty/limine:
 	mkdir -p 3rdparty
-	git clone https://github.com/limine-bootloader/limine.git --quiet --branch=v2.0-branch-binary --depth=1 3rdparty/limine
-	make --quiet -C 3rdparty/limine 2> /dev/null
+	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
+	make -C 3rdparty/limine
 
 3rdparty/echfs:
 	mkdir -p 3rdparty
-	git clone https://github.com/echfs/echfs.git --quiet --depth=1 3rdparty/echfs
-	make --quiet -C 3rdparty/echfs 2> /dev/null
+	git clone https://github.com/echfs/echfs.git --depth=1 3rdparty/echfs
+	make -C 3rdparty/echfs
 
 3rdparty/v:
 	mkdir -p 3rdparty
-	git clone https://github.com/vlang/v.git --quiet --depth=1 3rdparty/v
-	make --quiet -C 3rdparty/v 2> /dev/null
+	git clone https://github.com/vlang/v.git --depth=1 3rdparty/v
+	cd 3rdparty/v && git checkout 6c1a43415e4ebda5c34a9ac9418f07591ed9188d
+	make -C 3rdparty/v
 
 .PHONY: kernel/vos.elf
 kernel/vos.elf: 3rdparty/v

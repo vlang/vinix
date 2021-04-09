@@ -10,10 +10,15 @@ section .rodata
 
 framebuffer_hdr_tag:
     .id:            dq 0x3ecc1bc43d0f7971
-    .next:          dq 0
+    .next:          dq terminal_hdr_tag
     .width:         dw 0
     .height:        dw 0
     .bpp:           dw 0
+
+terminal_hdr_tag:
+    .id:            dq 0xa85d499b1823be72
+    .next:          dq 0
+    .flags:         dq 0
 
 section .bss
 

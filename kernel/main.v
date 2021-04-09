@@ -4,6 +4,14 @@ import stivale2
 import x86
 
 pub fn kmain(stivale2_struct &stivale2.Struct) {
+	stivale2.terminal_init(stivale2_struct)
+
+	// This clears the screen
+	stivale2.terminal_print('\e[2J')
+
+	// Hello world!
+	stivale2.terminal_print('Hello world!')
+
 	// Initialize the earliest arch structures.
 	x86.gdt_init()
 	x86.idt_init()
@@ -18,14 +26,9 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the memory allocator.
 	memory.physical_init(memmap_tag)
 
-	mut framebuffer := &u32(fb_tag.addr)
-
-	for i := 0; i < 250; i++ {
-		unsafe {
-			framebuffer[i + (fb_tag.pitch / 4) * 2 * i] = 0xffffff
-			framebuffer[500 - i + (fb_tag.pitch / 4) * 2 * i] = 0xffffff
+	for {
+		asm volatile amd64 {
+			hlt
 		}
 	}
-
-	lib.panic_kernel('End of kernel')
 }
