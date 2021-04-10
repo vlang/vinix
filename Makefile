@@ -7,7 +7,7 @@ run: $(KERNEL_HDD)
 	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -hda $(KERNEL_HDD) -debugcon stdio
 
 .PHONY: distro
-distro: 3rdparty/xbstrap
+distro:
 	mkdir -p build
 	cd build && xbstrap init .. && xbstrap install --all
 
