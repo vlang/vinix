@@ -1,10 +1,15 @@
 KERNEL_HDD = disk.hdd
 
-.PHONY: clean all run
+.PHONY: all
 all: $(KERNEL_HDD)
 
+.PHONY: run
 run: $(KERNEL_HDD)
 	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -hda $(KERNEL_HDD) -debugcon stdio
+
+.PHONY: run-nokvm
+run-nokvm: $(KERNEL_HDD)
+	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD) -debugcon stdio
 
 .PHONY: distro
 distro:
@@ -43,12 +48,15 @@ $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import 3rdparty/limine/limine.sys limine.sys
 	./3rdparty/limine/limine-install $(KERNEL_HDD)
 
+.PHONY: format
 format: 3rdparty/v
 	./3rdparty/v/v fmt -w kernel || true
 
+.PHONY: clean
 clean:
 	rm -f $(KERNEL_HDD)
 	$(MAKE) -C kernel clean
 
+.PHONY: distclean
 distclean: clean
 	rm -rf 3rdparty build ports
