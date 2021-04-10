@@ -38,6 +38,7 @@ $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	parted -s $(KERNEL_HDD) mkpart primary 2048s 100%
 	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) quick-format 512
 	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import kernel/vos.elf vos.elf
+	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import v-logo.bmp v-logo.bmp
 	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import limine.cfg limine.cfg
 	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import 3rdparty/limine/limine.sys limine.sys
 	./3rdparty/limine/limine-install $(KERNEL_HDD)

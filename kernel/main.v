@@ -7,10 +7,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	stivale2.terminal_init(stivale2_struct)
 
 	// This clears the screen
-	stivale2.terminal_print('\e[2J')
+	stivale2.terminal_print('\e[2J\e[H')
 
 	// Hello world!
-	stivale2.terminal_print('Hello world!')
+	stivale2.terminal_print('Hello world! From vOS')
 
 	// Initialize the earliest arch structures.
 	x86.gdt_init()
