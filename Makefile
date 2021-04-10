@@ -23,7 +23,7 @@ distro:
 
 3rdparty/v:
 	mkdir -p 3rdparty
-	git clone https://github.com/vlang/v.git --depth=1 3rdparty/v
+	git clone https://github.com/vlang/v.git 3rdparty/v
 	cd 3rdparty/v && git checkout bf6a2f80ef4d44384c4af7185f8168973e5bfbf2
 	make -C 3rdparty/v
 
