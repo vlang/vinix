@@ -21,7 +21,18 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 
 #### Prerequisites
 
-The following packages need to be installed on the system in order to build vOS: `make`, `git`, `nasm`, `gcc/clang`, `python3`, `pip3`, `parted`, `pkg-config`, `libuuid`, `libfuse`, and `qemu` to test it.
+The following packages need to be installed on the system in order to build vOS: `make`, `git`, `nasm`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `parted`, `wget`, `pkg-config`, `libuuid`, `libfuse`, and `qemu` to test it.
+
+For Ubuntu or Debian based distros, the command is:
+```bash
+sudo apt install build-essential git nasm meson m4 texinfo python3 python3-pip parted wget pkg-config uuid-dev libfuse-dev qemu-system-x86
+```
+
+It is necessary to fetch `xbstrap` from `pip3`, too.
+
+```bash
+sudo pip3 install xbstrap
+```
 
 #### Build commands
 

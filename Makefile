@@ -9,11 +9,7 @@ run: $(KERNEL_HDD)
 .PHONY: distro
 distro: 3rdparty/xbstrap
 	mkdir -p build
-	cd build && ../3rdparty/xbstrap/bin/xbstrap init ..
-	cd build && ../3rdparty/xbstrap/bin/xbstrap install --all
-
-3rdparty/xbstrap:
-	pip3 install -t 3rdparty/xbstrap xbstrap
+	cd build && xbstrap init .. && xbstrap install --all
 
 3rdparty/limine:
 	mkdir -p 3rdparty
@@ -28,7 +24,7 @@ distro: 3rdparty/xbstrap
 3rdparty/v:
 	mkdir -p 3rdparty
 	git clone https://github.com/vlang/v.git --depth=1 3rdparty/v
-	cd 3rdparty/v && git checkout 6c1a43415e4ebda5c34a9ac9418f07591ed9188d
+	cd 3rdparty/v && git checkout bf6a2f80ef4d44384c4af7185f8168973e5bfbf2
 	make -C 3rdparty/v
 
 .PHONY: kernel/vos.elf
