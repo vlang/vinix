@@ -5,11 +5,11 @@ all: $(KERNEL_HDD)
 
 .PHONY: run
 run: $(KERNEL_HDD)
-	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -hda $(KERNEL_HDD) -debugcon stdio
+	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
 
 .PHONY: run-nokvm
 run-nokvm: $(KERNEL_HDD)
-	qemu-system-x86_64 -m 2G -hda $(KERNEL_HDD) -debugcon stdio
+	qemu-system-x86_64 -m 2G -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
 
 .PHONY: distro
 distro:
