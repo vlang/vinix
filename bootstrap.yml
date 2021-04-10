@@ -1,0 +1,185 @@
+sources:
+  - name: binutils
+    subdir: 'ports'
+    url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.36.1.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'binutils-2.36.1'
+    patch-path-strip: 3
+
+  - name: gcc
+    subdir: 'ports'
+    url: 'https://ftp.gnu.org/gnu/gcc/gcc-10.2.0/gcc-10.2.0.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'gcc-10.2.0'
+    patch-path-strip: 3
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    regenerate:
+      # download_prerequisites should probably move to some "post_checkout" step.
+      - args: ['./contrib/download_prerequisites']
+        workdir: '@THIS_SOURCE_DIR@'
+      - args: ['autoconf']
+        workdir: '@THIS_SOURCE_DIR@/gcc'
+      - args: ['autoconf']
+        workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
+      - args: ['sh', '-c', 'patch -p1 < ../../extra-patches/gcc.patch']
+        workdir: '@THIS_SOURCE_DIR@'
+
+  - name: mlibc
+    subdir: 'ports'
+    url: 'https://github.com/managarm/mlibc/archive/2.0.0.tar.gz'
+    format: 'tar.gz'
+    extract_path: 'mlibc-2.0.0'
+    patch-path-strip: 3
+
+tools:
+  - name: host-autoconf-v2.69
+    source:
+      name: autoconf-v2.69
+      subdir: 'ports'
+      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'autoconf-2.69'
+      patch-path-strip: 3
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-automake-v1.15
+    source:
+      name: automake-v1.15
+      subdir: 'ports'
+      url: 'https://ftp.gnu.org/gnu/automake/automake-1.15.1.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'automake-1.15.1'
+      patch-path-strip: 3
+    tools_required:
+      - host-autoconf-v2.69
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-binutils
+    from_source: binutils
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=x86_64-vos'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        # On recent compilers, binutils 2.26 causes implicit-fallthrough warnings, among others.
+        - '--disable-werror'
+        # -g blows up the binary size.
+        - 'CFLAGS=-O2 -pipe'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-gcc
+    from_source: gcc
+    tools_required:
+      - tool: host-binutils
+        recursive: true
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=x86_64-vos'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
+        - '--enable-initfini-array'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2 -pipe'
+        - 'CXXFLAGS=-O2 -pipe'
+    stages:
+      - name: compiler
+        pkgs_required:
+         - mlibc-headers
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-gcc']
+        install:
+          - args: ['make', 'install-gcc']
+          # GCC does *not* look for target-prefixed LD/AS.
+          # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
+          - args: ['mkdir', '-p', '@PREFIX@/x86_64-vos/bin']
+          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vos/bin/as',
+                               '@PREFIX@/x86_64-vos/bin/as']
+          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vos/bin/ld',
+                               '@PREFIX@/x86_64-vos/bin/ld']
+      - name: libgcc
+        tools_required:
+          - tool: host-gcc
+            stage_dependencies: [compiler]
+        pkgs_required:
+         - mlibc
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
+        install:
+          - args: ['make', 'install-target-libgcc']
+      - name: libstdc++
+        tools_required:
+          - tool: host-gcc
+            stage_dependencies: [libgcc]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
+        install:
+          - args: ['make', 'install-target-libstdc++-v3']
+
+packages:
+  - name: mlibc-headers
+    from_source: mlibc
+    implict_package: true
+    configure:
+      - args:
+        - 'meson'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/cross_file.txt'
+        - '--prefix=/usr'
+        - '-Dheaders_only=true'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: mlibc
+    from_source: mlibc
+    tools_required:
+      - tool: host-gcc
+        stage_dependencies: [compiler]
+    implict_package: true
+    pkgs_required:
+      - mlibc-headers
+    configure:
+      - args:
+        - 'meson'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/cross_file.txt'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: dummy
+    from_source: mlibc
+    tools_required:
+      - tool: host-gcc
+    configure:
+      - args: ['true']
+    build:
+      - args: ['true']

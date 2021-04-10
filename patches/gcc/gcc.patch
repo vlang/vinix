@@ -1,0 +1,176 @@
+diff --git a/ports/gcc-orig/config.sub b/ports/gcc-workdir/config.sub
+index a318a46..b4950e0 100755
+--- a/ports/gcc-orig/config.sub
++++ b/ports/gcc-workdir/config.sub
+@@ -135,7 +135,7 @@ case $1 in
+ 			| linux-newlib* | linux-musl* | linux-uclibc* | uclinux-uclibc* \
+ 			| uclinux-gnu* | kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* \
+ 			| netbsd*-eabi* | kopensolaris*-gnu* | cloudabi*-eabi* \
+-			| storm-chaos* | os2-emx* | rtmk-nova*)
++			| storm-chaos* | os2-emx* | rtmk-nova* | vos*)
+ 				basic_machine=$field1
+ 				os=$maybe_os
+ 				;;
+@@ -1366,7 +1366,7 @@ case $os in
+ 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+-	     | nsk* | powerunix)
++	     | nsk* | powerunix | vos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	qnx*)
+diff --git a/ports/gcc-orig/fixincludes/mkfixinc.sh b/ports/gcc-workdir/fixincludes/mkfixinc.sh
+index df90720..484f8bc 100755
+--- a/ports/gcc-orig/fixincludes/mkfixinc.sh
++++ b/ports/gcc-workdir/fixincludes/mkfixinc.sh
+@@ -12,6 +12,7 @@ target=fixinc.sh
+ # Check for special fix rules for particular targets
+ case $machine in
+     i?86-*-cygwin* | \
++    x86_64-*-vos* | \
+     i?86-*-mingw32* | \
+     x86_64-*-mingw32* | \
+     powerpc-*-eabisim* | \
+diff --git a/ports/gcc-workdir/gcc/config/vos.h b/ports/gcc-workdir/gcc/config/vos.h
+new file mode 100644
+index 0000000..1452e59
+--- /dev/null
++++ b/ports/gcc-workdir/gcc/config/vos.h
+@@ -0,0 +1,29 @@
++#undef TARGET_VOS
++#define TARGET_VOS 1
++
++#undef LIB_SPEC
++#define LIB_SPEC "-lc -lm"
++
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared:crtbeginS.o%s;:crtbegin.o%s}"
++
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++#define GNU_USER_LINK_EMULATION32 "elf_i386"
++#define GNU_USER_LINK_EMULATION64 "elf_x86_64"
++#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
++
++#define GNU_USER_DYNAMIC_LINKER32 "/usr/lib/ld_i386.so"
++#define GNU_USER_DYNAMIC_LINKER64 "/usr/lib/ld.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/usr/lib/ld32.so"
++
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()         \
++  do {                                   \
++    builtin_define ("__vos__");    \
++    builtin_define ("__unix__");         \
++    builtin_assert ("system=vos"); \
++    builtin_assert ("system=unix");      \
++    builtin_assert ("system=posix");     \
++  } while (0);
+diff --git a/ports/gcc-orig/gcc/config.gcc b/ports/gcc-workdir/gcc/config.gcc
+index 6a34996..de7f3b0 100644
+--- a/ports/gcc-orig/gcc/config.gcc
++++ b/ports/gcc-workdir/gcc/config.gcc
+@@ -773,6 +773,15 @@ case ${target} in
+   esac
+   use_gcc_stdint=wrap
+   ;;
++*-*-vos*)
++  extra_options="$extra_options gnu-user.opt"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=wrap
++  tmake_file="${tmake_file} t-slibgcc"
++  thread_file='posix'
++  ;;
+ *-*-fuchsia*)
+   native_system_header_dir=/include
+   ;;
+@@ -2202,6 +2211,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
+ 			;;
+ 	esac
+ 	;;
++x86_64-*-vos*)
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h vos.h"
++	;;
+ x86_64-*-fuchsia*)
+ 	tmake_file="${tmake_file} i386/t-x86_64-elf"
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
+diff --git a/ports/gcc-orig/libgcc/config.host b/ports/gcc-workdir/libgcc/config.host
+index c529cc4..9fcb367 100644
+--- a/ports/gcc-orig/libgcc/config.host
++++ b/ports/gcc-workdir/libgcc/config.host
+@@ -248,6 +248,11 @@ case ${host} in
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
+   extra_parts="crtbegin.o crtend.o"
+   ;;
++*-*-vos*)
++  extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
++  tmake_file="$tmake_file t-crtstuff-pic"
++  tmake_file="$tmake_file t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+@@ -711,6 +716,9 @@ x86_64-*-elf* | x86_64-*-rtems*)
+ x86_64-*-fuchsia*)
+ 	tmake_file="$tmake_file t-libgcc-pic"
+ 	;;
++x86_64-*-vos*)
++	tmake_file="$tmake_file i386/t-crtstuff"
++	;;
+ i[34567]86-*-dragonfly*)
+ 	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
+ 	md_unwind_header=i386/dragonfly-unwind.h
+diff --git a/ports/gcc-orig/libstdc++-v3/crossconfig.m4 b/ports/gcc-workdir/libstdc++-v3/crossconfig.m4
+index fe18288..51d20bc 100644
+--- a/ports/gcc-orig/libstdc++-v3/crossconfig.m4
++++ b/ports/gcc-workdir/libstdc++-v3/crossconfig.m4
+@@ -131,6 +131,14 @@ case "${host}" in
+     AC_CHECK_FUNCS(sockatmark)
+     ;;
+ 
++  *-vos*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    ;;
++
+   *-fuchsia*)
+     SECTION_FLAGS='-ffunction-sections -fdata-sections'
+     AC_SUBST(SECTION_FLAGS)
+diff --git a/ports/gcc-orig/libtool.m4 b/ports/gcc-workdir/libtool.m4
+index e194e89..90e0fce 100644
+--- a/ports/gcc-orig/libtool.m4
++++ b/ports/gcc-workdir/libtool.m4
+@@ -2499,6 +2499,16 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
+   dynamic_linker='GNU/Linux ld.so'
+   ;;
+ 
++vos*)
++  version_type=linux
++  need_lib_prefix=no
++  need_version=no
++  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++  soname_spec='${libname}${release}${shared_ext}$major'
++  shlibpath_var=LD_LIBRARY_PATH
++  hardcode_into_libs=yes
++  ;;
++
+ netbsd*)
+   version_type=sunos
+   need_lib_prefix=no
+@@ -3098,6 +3108,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
++vos*)
++  lt_cv_deplibs_check_method=pass_all
++  ;;
++
+ netbsd*)
+   if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
+     lt_cv_deplibs_check_method='match_pattern /lib[[^/]]+(\.so\.[[0-9]]+\.[[0-9]]+|_pic\.a)$'

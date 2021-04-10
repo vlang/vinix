@@ -1,6 +1,9 @@
 3rdparty
+build
+ports
 *.o
 *.C
 *.elf
 *.hdd
 kernel/main
+.vscode

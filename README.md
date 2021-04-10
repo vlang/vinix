@@ -21,8 +21,15 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 
 #### Prerequisites
 
-The following packages need to be installed on the system in order to build vOS: `make`, `git`, `gcc/clang`, `binutils`, `parted`, `findutils`, `pkg-config`, `libuuid`, `libfuse`.
+The following packages need to be installed on the system in order to build vOS: `make`, `git`, `nasm`, `gcc/clang`, `python3`, `pip3`, `parted`, `pkg-config`, `libuuid`, `libfuse`, and `qemu` to test it.
 
 #### Build commands
 
-The OS can be built with `make` and ran within qemu with `make run`.
+To build the distro which includes the cross toolchain necessary
+to build kernel and ports, run:
+
+```bash
+make distro
+```
+
+The OS can then be built with `make` and ran within qemu with `make run`.

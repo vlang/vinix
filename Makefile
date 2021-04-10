@@ -6,6 +6,15 @@ all: $(KERNEL_HDD)
 run: $(KERNEL_HDD)
 	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -hda $(KERNEL_HDD) -debugcon stdio
 
+.PHONY: distro
+distro: 3rdparty/xbstrap
+	mkdir -p build
+	cd build && ../3rdparty/xbstrap/bin/xbstrap init ..
+	cd build && ../3rdparty/xbstrap/bin/xbstrap install --all
+
+3rdparty/xbstrap:
+	pip install -t 3rdparty/xbstrap xbstrap
+
 3rdparty/limine:
 	mkdir -p 3rdparty
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
@@ -24,7 +33,7 @@ run: $(KERNEL_HDD)
 
 .PHONY: kernel/vos.elf
 kernel/vos.elf: 3rdparty/v
-	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`"
+	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`"
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	rm -f $(KERNEL_HDD)

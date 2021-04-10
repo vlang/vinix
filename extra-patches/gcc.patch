@@ -1,0 +1,52 @@
+diff -urN --no-dereference gcc/gmp-6.1.0/configfsf.sub gcc-patched/gmp-6.1.0/configfsf.sub
+--- gcc/gmp-6.1.0/configfsf.sub	2015-11-01 16:19:48.000000000 +0100
++++ gcc-patched/gmp-6.1.0/configfsf.sub	2020-01-12 17:05:30.887799494 +0100
+@@ -1399,7 +1399,8 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
++	      | -vos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -urN --no-dereference gcc/isl-0.18/config.sub gcc-patched/isl-0.18/config.sub
+--- gcc/isl-0.18/config.sub	2016-01-24 21:50:53.000000000 +0100
++++ gcc-patched/isl-0.18/config.sub	2020-01-12 17:06:18.480800646 +0100
+@@ -1385,7 +1385,8 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
++	      | -vos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -urN --no-dereference gcc/mpc-1.0.3/config.sub gcc-patched/mpc-1.0.3/config.sub
+--- gcc/mpc-1.0.3/config.sub	2015-02-16 13:28:25.000000000 +0100
++++ gcc-patched/mpc-1.0.3/config.sub	2020-01-12 17:09:12.181804852 +0100
+@@ -1393,7 +1393,8 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
++	      | -vos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -urN --no-dereference gcc/mpfr-3.1.4/config.sub gcc-patched/mpfr-3.1.4/config.sub
+--- gcc/mpfr-3.1.4/config.sub	2016-03-06 12:33:18.000000000 +0100
++++ gcc-patched/mpfr-3.1.4/config.sub	2020-01-12 17:07:52.696802927 +0100
+@@ -1399,7 +1399,8 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
++	      | -vos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
