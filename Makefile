@@ -13,7 +13,7 @@ distro: 3rdparty/xbstrap
 	cd build && ../3rdparty/xbstrap/bin/xbstrap install --all
 
 3rdparty/xbstrap:
-	pip install -t 3rdparty/xbstrap xbstrap
+	pip3 install -t 3rdparty/xbstrap xbstrap
 
 3rdparty/limine:
 	mkdir -p 3rdparty
@@ -54,4 +54,4 @@ clean:
 	$(MAKE) -C kernel clean
 
 distclean: clean
-	rm -rf 3rdparty
+	rm -rf 3rdparty build ports
