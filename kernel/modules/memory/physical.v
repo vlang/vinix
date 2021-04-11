@@ -106,9 +106,8 @@ pub fn pmm_alloc(count u64) voidptr {
 		mut ptr := &u64(ret)
 		for i := u64(0); i < (count * page_size) / 8; i++ {
 			ptr[i] = 0
-		}		
+		}
 	}
-
 	return ret
 }
 
@@ -122,59 +121,59 @@ pub fn pmm_free(ptr voidptr, count u64) {
 struct MallocMetadata {
 mut:
 	pages u64
-	size u64
+	size  u64
 }
 
 pub fn free(ptr voidptr) {
-    metadata_ptr := unsafe { charptr(ptr) - page_size }
+	metadata_ptr := unsafe { &char(ptr) - page_size }
 	metadata := &MallocMetadata(metadata_ptr)
 
-    pmm_free(unsafe { metadata_ptr - higher_half }, metadata.pages + 1)
+	pmm_free(unsafe { metadata_ptr - higher_half }, metadata.pages + 1)
 }
 
 pub fn malloc(size u64) voidptr {
-    page_count := lib.div_round_up(size, page_size)
+	page_count := lib.div_round_up(size, page_size)
 
-    ptr := pmm_alloc(page_count + 1)
+	ptr := pmm_alloc(page_count + 1)
 
-    if ptr == 0 {
-        return 0
+	if ptr == 0 {
+		return 0
 	}
 
-	metadata_ptr := unsafe { charptr(ptr) + higher_half }
+	metadata_ptr := unsafe { &char(ptr) + higher_half }
 	mut metadata := &MallocMetadata(metadata_ptr)
 
-    metadata.pages = page_count
-    metadata.size = size
+	metadata.pages = page_count
+	metadata.size = size
 
-    return unsafe { charptr(ptr) + higher_half + page_size }
+	return unsafe { &char(ptr) + higher_half + page_size }
 }
 
 pub fn realloc(ptr voidptr, new_size u64) voidptr {
-    if ptr == 0 {
-        return malloc(new_size)
+	if ptr == 0 {
+		return malloc(new_size)
 	}
 
-    metadata_ptr := unsafe { charptr(ptr) - page_size }
+	metadata_ptr := unsafe { &char(ptr) - page_size }
 	mut metadata := &MallocMetadata(metadata_ptr)
 
-    if lib.div_round_up(metadata.size, page_size) == lib.div_round_up(new_size, page_size) {
-        metadata.size = new_size
-        return ptr
-    }
-
-    new_ptr := malloc(new_size)
-    if new_ptr == 0 {
-        return 0
+	if lib.div_round_up(metadata.size, page_size) == lib.div_round_up(new_size, page_size) {
+		metadata.size = new_size
+		return ptr
 	}
 
-    if metadata.size > new_size {
-        c.memcpy(new_ptr, ptr, new_size)
+	new_ptr := malloc(new_size)
+	if new_ptr == 0 {
+		return 0
+	}
+
+	if metadata.size > new_size {
+		c.memcpy(new_ptr, ptr, new_size)
 	} else {
-        c.memcpy(new_ptr, ptr, metadata.size)
+		c.memcpy(new_ptr, ptr, metadata.size)
 	}
 
-    free(ptr)
+	free(ptr)
 
-    return new_ptr
+	return new_ptr
 }

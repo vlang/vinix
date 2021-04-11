@@ -42,8 +42,8 @@ pub:
 [packed]
 struct TermTag {
 pub:
-	tag Tag
-	flags u64
+	tag        Tag
+	flags      u64
 	term_write voidptr
 }
 
@@ -98,7 +98,7 @@ pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
 __global ( terminal_print_ptr voidptr )
 
 pub fn terminal_init(stivale2_struct &Struct) {
-	terminal_tag := unsafe { &stivale2.TermTag(get_tag(stivale2_struct, terminal_id)) }
+	terminal_tag := unsafe { &TermTag(get_tag(stivale2_struct, stivale2.terminal_id)) }
 
 	if terminal_tag == 0 {
 		return
@@ -107,9 +107,8 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_print_ptr = terminal_tag.term_write
 }
 
-
 pub fn terminal_print(s string) {
-	mut ptr := fn(_ voidptr, _ u64) {}
+	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
 	ptr(s.str, u64(s.len))
 }

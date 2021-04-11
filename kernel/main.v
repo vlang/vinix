@@ -29,8 +29,8 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	memory.free(ptr)
 
 	for {
-		asm volatile amd64 {
-			hlt
+		asm amd64 {
+			hlt 
 		}
 	}
 }
