@@ -17,6 +17,9 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 - Build a minimal and useful platform for software [especially written in V :^)], allowing for better control, isolation, and smaller attack surface in VMs.
 - Having fun.
 
+![unknown](https://user-images.githubusercontent.com/687996/114314245-34024e80-9afa-11eb-8107-d156a48ac60b.png)
+
+
 ### Build Instructions
 
 #### Prerequisites
