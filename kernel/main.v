@@ -24,11 +24,14 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	memory.physical_init(memmap_tag)
 
 	// Test pmm
-	mut ptr := memory.pmm_alloc(4)
-	memory.pmm_free(ptr, 4)
+	mut ptr := memory.malloc(40)
+	ptr = memory.realloc(ptr, 8000)
+	memory.free(ptr)
+
 	for {
-		asm amd64 {
-			hlt 
+		asm volatile amd64 {
+			hlt
+			; ; a (ptr)
 		}
 	}
 }

@@ -1,5 +1,7 @@
 KERNEL_HDD = disk.hdd
 
+V_COMMIT = 67d8639917d627a8d9d0a79f1973d495a4035974
+
 .PHONY: all
 all: $(KERNEL_HDD)
 
@@ -19,21 +21,25 @@ distro:
 3rdparty/limine:
 	mkdir -p 3rdparty
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
-	make -C 3rdparty/limine
+	$(MAKE) -C 3rdparty/limine
 
 3rdparty/echfs:
 	mkdir -p 3rdparty
 	git clone https://github.com/echfs/echfs.git --depth=1 3rdparty/echfs
-	make -C 3rdparty/echfs
+	$(MAKE) -C 3rdparty/echfs
 
 3rdparty/v:
 	mkdir -p 3rdparty
 	git clone https://github.com/vlang/v.git 3rdparty/v
-	cd 3rdparty/v && git checkout bf6a2f80ef4d44384c4af7185f8168973e5bfbf2
-	make -C 3rdparty/v
+	cd 3rdparty/v && git checkout $(V_COMMIT)
+	$(MAKE) -C 3rdparty/v
+
+.PHONY: update-v
+update-v: 3rdparty/v
+	cd 3rdparty/v && ( git checkout $(V_COMMIT) || ( git pull && git checkout $(V_COMMIT) && $(MAKE) ) )
 
 .PHONY: kernel/vos.elf
-kernel/vos.elf: 3rdparty/v
+kernel/vos.elf: update-v
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`"
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf

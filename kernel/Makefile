@@ -11,15 +11,18 @@ LDINTERNALFLAGS :=  \
 	-Wl,-gc-sections \
 	-static-pie     \
 	-pie -fno-pic -fpie \
+	-flto \
 	-z max-page-size=0x1000
 
 INTERNALCFLAGS  :=       \
 	-I.                  \
+	-flto                \
 	-ffreestanding       \
 	-fno-stack-protector \
 	-fno-pic -fpie       \
 	-ffunction-sections  \
 	-fdata-sections      \
+	-mgeneral-regs-only  \
 	-mno-red-zone
 
 INTERNALVFLAGS := \
@@ -39,7 +42,7 @@ $(TARGET): $(OBJ)
 	$(CC) $(LDINTERNALFLAGS) $(OBJ) -o $@
 
 blob.o: blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -w -x c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.c
 	$(CC) -Wall -Wextra $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
@@ -49,7 +52,8 @@ blob.o: blob.C
 
 blob.C: $(VFILES)
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o $(@:.C=.c) .
-	mv $(@:.C=.c) $@
+	printf '#define double int\n#define float int\n' | cat - $(@:.C=.c) > $@
+	rm $(@:.C=.c)
 
 clean:
 	rm -rf $(TARGET) $(OBJ) blob.C
