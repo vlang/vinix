@@ -1,5 +1,6 @@
 module memory
 
+import c
 import lib
 import stivale2
 
@@ -91,11 +92,23 @@ fn inner_alloc(count u64, limit u64) voidptr {
 
 pub fn pmm_alloc(count u64) voidptr {
 	last := pmm_last_used_index
-	ret := inner_alloc(count, pmm_avl_page_count)
+	mut ret := inner_alloc(count, pmm_avl_page_count)
 	if ret == 0 {
 		pmm_last_used_index = 0
-		return inner_alloc(count, last)
+		ret = inner_alloc(count, last)
+		if ret == 0 {
+			return 0
+		}
 	}
+
+	// We always zero out memory for security reasons
+	unsafe {
+		mut ptr := &u64(ret)
+		for i := u64(0); i < (count * page_size) / 8; i++ {
+			ptr[i] = 0
+		}		
+	}
+
 	return ret
 }
 
@@ -104,4 +117,64 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	for i := page; i < page + count; i++ {
 		lib.bitreset(pmm_bitmap, i)
 	}
+}
+
+struct MallocMetadata {
+mut:
+	pages u64
+	size u64
+}
+
+pub fn free(ptr voidptr) {
+    metadata_ptr := unsafe { charptr(ptr) - page_size }
+	metadata := &MallocMetadata(metadata_ptr)
+
+    pmm_free(unsafe { metadata_ptr - higher_half }, metadata.pages + 1)
+}
+
+pub fn malloc(size u64) voidptr {
+    page_count := lib.div_round_up(size, page_size)
+
+    ptr := pmm_alloc(page_count + 1)
+
+    if ptr == 0 {
+        return 0
+	}
+
+	metadata_ptr := unsafe { charptr(ptr) + higher_half }
+	mut metadata := &MallocMetadata(metadata_ptr)
+
+    metadata.pages = page_count
+    metadata.size = size
+
+    return unsafe { charptr(ptr) + higher_half + page_size }
+}
+
+pub fn realloc(ptr voidptr, new_size u64) voidptr {
+    if ptr == 0 {
+        return malloc(new_size)
+	}
+
+    metadata_ptr := unsafe { charptr(ptr) - page_size }
+	mut metadata := &MallocMetadata(metadata_ptr)
+
+    if lib.div_round_up(metadata.size, page_size) == lib.div_round_up(new_size, page_size) {
+        metadata.size = new_size
+        return ptr
+    }
+
+    new_ptr := malloc(new_size)
+    if new_ptr == 0 {
+        return 0
+	}
+
+    if metadata.size > new_size {
+        c.memcpy(new_ptr, ptr, new_size)
+	} else {
+        c.memcpy(new_ptr, ptr, metadata.size)
+	}
+
+    free(ptr)
+
+    return new_ptr
 }

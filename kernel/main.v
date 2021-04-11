@@ -6,9 +6,6 @@ import x86
 pub fn kmain(stivale2_struct &stivale2.Struct) {
 	stivale2.terminal_init(stivale2_struct)
 
-	// This clears the screen
-	stivale2.terminal_print('\e[2J\e[H')
-
 	// Hello world!
 	stivale2.terminal_print('Hello world! From vOS')
 
@@ -25,6 +22,11 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	// Initialize the memory allocator.
 	memory.physical_init(memmap_tag)
+
+	// Test pmm
+	mut ptr := memory.malloc(40000)
+	ptr = memory.realloc(ptr, 80000)
+	memory.free(ptr)
 
 	for {
 		asm volatile amd64 {

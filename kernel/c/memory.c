@@ -1,24 +1,22 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void free(void* ptr) {
-    (void)ptr;
-    return;
+void  memory__free(void *ptr);
+void *memory__malloc(size_t size);
+void *memory__realloc(void *ptr, size_t new_size);
+
+void free(void *ptr) {
+    return memory__free(ptr);
 }
 
-void* malloc(size_t size) {
-    (void)size;
-    return NULL;
+void *malloc(size_t size) {
+    return memory__malloc(size);
 }
 
-void* calloc(size_t num, size_t size) {
-    (void)num;
-    (void)size;
-    return NULL;
+void *calloc(size_t num, size_t size) {
+    return memory__malloc(num * size);
 }
 
 void *realloc(void *ptr, size_t new_size) {
-    (void)ptr;
-    (void)new_size;
-    return NULL;
+    return memory__realloc(ptr, new_size);
 }
