@@ -28,7 +28,7 @@ pub fn physical_init(memmap &stivale2.MemmapTag) {
 		}
 
 		// Calculate the needed size for the bitmap in bytes
-		pmm_avl_page_count := highest_address / page_size
+		pmm_avl_page_count = highest_address / page_size
 		bitmap_size := pmm_avl_page_count / 8
 
 		// Find a hole for the bitmap in the memory map.
@@ -77,7 +77,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 			p++
 			if p == count {
 				page := pmm_last_used_index - count
-				for i := page; page < pmm_last_used_index; i++ {
+				for i := page; i < pmm_last_used_index; i++ {
 					lib.bitset(pmm_bitmap, i)
 				}
 				return voidptr(page * page_size)
