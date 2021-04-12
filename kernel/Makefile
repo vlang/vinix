@@ -9,8 +9,8 @@ INTERNALCFLAGS  :=       \
 	-I.                  \
 	-ffreestanding       \
 	-fno-stack-protector \
-	-static-pie          \
-	-pie -fno-pic -fpie  \
+	-pie -static-pie     \
+	-fno-pic -fpie       \
 	-ffunction-sections  \
 	-fdata-sections      \
 	-mgeneral-regs-only  \

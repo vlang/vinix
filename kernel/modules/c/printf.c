@@ -35,6 +35,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+
 void _putchar(char character);
 
 // no floats in kernel
