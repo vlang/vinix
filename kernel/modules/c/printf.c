@@ -32,8 +32,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <stdarg.h>
 
-#include "printf.h"
+void _putchar(char character);
 
 // no floats in kernel
 #define PRINTF_DISABLE_SUPPORT_FLOAT

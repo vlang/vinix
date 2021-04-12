@@ -1,12 +1,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdio.h>
 
-typedef signed long long ssize_t;
-
-typedef struct {
-    int unused;
-} FILE;
+typedef long ssize_t;
 
 FILE *stdin  = NULL;
 FILE *stdout = NULL;
@@ -22,7 +19,7 @@ int getc(FILE *stream) {
     return -1;
 }
 
-char *fgets(char *str, int count, FILE *stream) {
+char *fgets(char *str, size_t count, FILE *stream) {
     (void)str;
     (void)count;
     (void)stream;
