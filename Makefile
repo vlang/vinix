@@ -36,7 +36,7 @@ distro:
 
 .PHONY: update-v
 update-v: 3rdparty/v
-	cd 3rdparty/v && ( git checkout $(V_COMMIT) || ( git pull && git checkout $(V_COMMIT) && $(MAKE) ) )
+	cd 3rdparty/v && ( git checkout $(V_COMMIT) || ( git checkout master && git pull && git checkout $(V_COMMIT) && $(MAKE) ) )
 
 .PHONY: kernel/vos.elf
 kernel/vos.elf: update-v
