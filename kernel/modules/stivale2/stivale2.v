@@ -1,5 +1,7 @@
 module stivale2
 
+import klock
+
 pub const framebuffer_id = 0x506461d2950408fa
 
 pub const memmap_id = 0x2187f79e8612de07
@@ -107,8 +109,12 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_print_ptr = terminal_tag.term_write
 }
 
+__global ( terminal_print_lock klock.Lock )
+
 pub fn terminal_print(s string) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
+	klock.acquire(&terminal_print_lock)
 	ptr(s.str, u64(s.len))
+	klock.release(&terminal_print_lock)
 }
