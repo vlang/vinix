@@ -1,5 +1,5 @@
 diff --git a/ports/gcc-orig/config.sub b/ports/gcc-workdir/config.sub
-index a318a46..b4950e0 100755
+index a318a46..50219de 100755
 --- a/ports/gcc-orig/config.sub
 +++ b/ports/gcc-workdir/config.sub
 @@ -135,7 +135,7 @@ case $1 in
@@ -21,7 +21,7 @@ index a318a46..b4950e0 100755
  		;;
  	qnx*)
 diff --git a/ports/gcc-orig/fixincludes/mkfixinc.sh b/ports/gcc-workdir/fixincludes/mkfixinc.sh
-index df90720..484f8bc 100755
+index df90720..9e645dd 100755
 --- a/ports/gcc-orig/fixincludes/mkfixinc.sh
 +++ b/ports/gcc-workdir/fixincludes/mkfixinc.sh
 @@ -12,6 +12,7 @@ target=fixinc.sh
@@ -34,7 +34,7 @@ index df90720..484f8bc 100755
      powerpc-*-eabisim* | \
 diff --git a/ports/gcc-workdir/gcc/config/vos.h b/ports/gcc-workdir/gcc/config/vos.h
 new file mode 100644
-index 0000000..1452e59
+index 0000000..7946a42
 --- /dev/null
 +++ b/ports/gcc-workdir/gcc/config/vos.h
 @@ -0,0 +1,29 @@
@@ -68,10 +68,10 @@ index 0000000..1452e59
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff --git a/ports/gcc-orig/gcc/config.gcc b/ports/gcc-workdir/gcc/config.gcc
-index 6a34996..de7f3b0 100644
+index 6fcdd77..d724d67 100644
 --- a/ports/gcc-orig/gcc/config.gcc
 +++ b/ports/gcc-workdir/gcc/config.gcc
-@@ -773,6 +773,15 @@ case ${target} in
+@@ -803,6 +803,15 @@ case ${target} in
    esac
    use_gcc_stdint=wrap
    ;;
@@ -87,7 +87,7 @@ index 6a34996..de7f3b0 100644
  *-*-fuchsia*)
    native_system_header_dir=/include
    ;;
-@@ -2202,6 +2211,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
+@@ -2233,6 +2242,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
  			;;
  	esac
  	;;
@@ -98,7 +98,7 @@ index 6a34996..de7f3b0 100644
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
 diff --git a/ports/gcc-orig/libgcc/config.host b/ports/gcc-workdir/libgcc/config.host
-index c529cc4..9fcb367 100644
+index c529cc4..b4e68d6 100644
 --- a/ports/gcc-orig/libgcc/config.host
 +++ b/ports/gcc-workdir/libgcc/config.host
 @@ -248,6 +248,11 @@ case ${host} in
@@ -124,7 +124,7 @@ index c529cc4..9fcb367 100644
  	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
  	md_unwind_header=i386/dragonfly-unwind.h
 diff --git a/ports/gcc-orig/libstdc++-v3/crossconfig.m4 b/ports/gcc-workdir/libstdc++-v3/crossconfig.m4
-index fe18288..51d20bc 100644
+index fe18288..13a62ed 100644
 --- a/ports/gcc-orig/libstdc++-v3/crossconfig.m4
 +++ b/ports/gcc-workdir/libstdc++-v3/crossconfig.m4
 @@ -131,6 +131,14 @@ case "${host}" in
@@ -143,10 +143,10 @@ index fe18288..51d20bc 100644
      SECTION_FLAGS='-ffunction-sections -fdata-sections'
      AC_SUBST(SECTION_FLAGS)
 diff --git a/ports/gcc-orig/libtool.m4 b/ports/gcc-workdir/libtool.m4
-index e194e89..90e0fce 100644
+index 0020654..c814147 100644
 --- a/ports/gcc-orig/libtool.m4
 +++ b/ports/gcc-workdir/libtool.m4
-@@ -2499,6 +2499,16 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
+@@ -2501,6 +2501,16 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
    dynamic_linker='GNU/Linux ld.so'
    ;;
  
@@ -163,7 +163,7 @@ index e194e89..90e0fce 100644
  netbsd*)
    version_type=sunos
    need_lib_prefix=no
-@@ -3098,6 +3108,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
+@@ -3100,6 +3110,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
    lt_cv_deplibs_check_method=pass_all
    ;;
  

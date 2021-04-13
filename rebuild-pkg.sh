@@ -37,7 +37,7 @@ fi
         mkdir -p "$BASE_DIR"/patches/$1
         touch "$BASE_DIR"/patches/$1/$1.patch
     )
-    patch -p3 < "$BASE_DIR"/patches/$1/$1.patch
+    patch -p3 --no-backup-if-mismatch -r /dev/null < "$BASE_DIR"/patches/$1/$1.patch
 )
 
 [ -d ports/$1-orig ] || (
