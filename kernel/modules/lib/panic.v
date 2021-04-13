@@ -3,7 +3,8 @@ module lib
 // One could use the builtin panic, but it again uses runtime
 // services.
 
-pub fn panic_kernel(message string) {
-	printline('PANIC: ', message)
+pub fn kpanic(message string) {
+	kprint('KERNEL PANIC: ')
+	kprint(message)
 	for {}
 }

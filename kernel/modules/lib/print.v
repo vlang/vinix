@@ -1,21 +1,15 @@
 module lib
 
-// One could use the builtin panic, but it again uses runtime
-// services.
+import stivale2
 
-pub fn printline(message ...string) {
-	for m in message {
-		outb_puts(m)
-	}
-	outb_puts('\n')
-}
-
-fn outb_puts(message string) {
+pub fn kprint(message string) {
 	for i := 0; i < message.len; i++ {
-		asm amd64 {
+		asm volatile amd64 {
 			out port, c
 			; ; Nd (0xe9) as port
 			  a (message[i]) as c
 		}
 	}
+
+	stivale2.terminal_print(message)
 }

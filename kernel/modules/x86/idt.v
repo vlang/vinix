@@ -75,5 +75,5 @@ pub fn idt_register_handler(num byte, callback voidptr, ist byte) {
 }
 
 fn generic_exception() {
-	lib.panic_kernel('Exception triggered')
+	lib.kpanic('Unhandled exception triggered')
 }
