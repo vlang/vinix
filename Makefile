@@ -1,6 +1,6 @@
 KERNEL_HDD = disk.hdd
 
-V_COMMIT = a4fb851f3d3c8f45e2b8482b0b82d6cf813e22ad
+V_COMMIT = ada763e0f4cc13cb5f9d902813aa5b46e67b6aa6
 
 .PHONY: all
 all: $(KERNEL_HDD)
