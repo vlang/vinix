@@ -38,8 +38,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 		&stivale2.FBTag(stivale2.get_tag(stivale2_struct, stivale2.framebuffer_id))
 	})
 	step++
-	lib.kprint('[$step/$start_max_step] Drawing test circle\n')
-	fb.circle(200, 450, 75, 0x536b8a)
+	lib.kprint('[$step/$start_max_step] Drawing test circle and lines\n')
+	fb.circle(800, 450, 75, 0x536b8a)
+	fb.line_thick(850, 300, 900, 400, 4, 0x536b8a)
+	fb.line_thick(950, 300, 900, 400, 4, 0x536b8a)
 
 	// We're alive
 	lib.kprint('Welcome to vOS\n\n')

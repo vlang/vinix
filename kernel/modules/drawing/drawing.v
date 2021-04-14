@@ -84,8 +84,15 @@ pub fn (mut fb FB) vertical_line(x int, _y int, y2 int, color u32) {
 	}
 }
 
-pub fn (mut fb FB) line(x1 int, y1 int, x2 int, y2 int, color u32) {
-	lib.kprint('dsadsa\n')
+pub fn (mut fb FB) line_thick(x1 int, y1 int, x2 int, y2 int, thickness int, color u32) {
+	for i in 0 .. thickness {
+		fb.line(x1 + i, y1, x2 + i, y2, color)
+	}
+}
+
+pub fn (mut fb FB) line(_x1 int, _y1 int, x2 int, y2 int, color u32) {
+	mut x1 := _x1
+	mut y1 := _y1
 	if y1 == y2 {
 		fb.horizontal_line(x1, y1, x2, color)
 		return
@@ -94,18 +101,33 @@ pub fn (mut fb FB) line(x1 int, y1 int, x2 int, y2 int, color u32) {
 		fb.vertical_line(x1, y1, y2, color)
 		return
 	}
-	lib.kprint('dsadsa\n')
-	dx := x2 - x1
-	dy := y2 - y1
-	lib.kprint('dsa4$dy\n')
-	step_size := f64(dx) / f64(dy)
-	lib.kprint('dsa3\n')
-	mut x := f64(x1)
-	for iy in y1 .. y2 {
-		x += step_size
-		lib.kprint('dsax: $x y: $iy  \n')
-		fb.horizontal_line(int(x), iy, int(x + step_size), color)
+	dx := abs(x2 - x1)
+	sx := if x1 < x2 { 1 } else { -1 }
+	dy := -abs(y2 - y1)
+	sy := if y1 < y2 { 1 } else { -1 }
+	mut err := dx + dy // error value e_xy
+	for {
+		// loop
+		fb.set(x1, y1, color)
+		if x1 == x2 && y1 == y2 {
+			break
+		}
+		e2 := 2 * err
+		if e2 >= dy {
+			// e_xy+e_x > 0
+			err += dy
+			x1 += sx
+		}
+		if e2 <= dx {
+			// e_xy+e_y < 0
+			err += dx
+			y1 += sy
+		}
 	}
+}
+
+fn abs(x int) int {
+	return if x >= 0 { x } else { -x }
 }
 
 // Function for circle-generation using Bresenham's algorithm
