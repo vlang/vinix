@@ -25,28 +25,28 @@ __global ( idt_entries [256]IDTEntry )
 
 pub fn idt_init() {
 	// Register the common exceptions.
-	idt_register_handler(0x0, &generic_exception, 0)
-	idt_register_handler(0x1, &generic_exception, 0)
+	idt_register_handler(0x0, &de_exception, 0)
+	idt_register_handler(0x1, &db_exception, 0)
 	idt_register_handler(0x2, &generic_exception, 0)
-	idt_register_handler(0x3, &generic_exception, 0)
-	idt_register_handler(0x4, &generic_exception, 0)
-	idt_register_handler(0x5, &generic_exception, 0)
-	idt_register_handler(0x6, &generic_exception, 0)
-	idt_register_handler(0x7, &generic_exception, 0)
-	idt_register_handler(0x8, &generic_exception, 0)
+	idt_register_handler(0x3, &bp_exception, 0)
+	idt_register_handler(0x4, &of_exception, 0)
+	idt_register_handler(0x5, &br_exception, 0)
+	idt_register_handler(0x6, &ud_exception, 0)
+	idt_register_handler(0x7, &nm_exception, 0)
+	idt_register_handler(0x8, &df_exception, 0)
 	idt_register_handler(0x9, &generic_exception, 0)
-	idt_register_handler(0xa, &generic_exception, 0)
-	idt_register_handler(0xb, &generic_exception, 0)
-	idt_register_handler(0xc, &generic_exception, 0)
-	idt_register_handler(0xd, &generic_exception, 0)
-	idt_register_handler(0xe, &generic_exception, 0)
+	idt_register_handler(0xa, &ts_exception, 0)
+	idt_register_handler(0xb, &np_exception, 0)
+	idt_register_handler(0xc, &ss_exception, 0)
+	idt_register_handler(0xd, &gp_exception, 0)
+	idt_register_handler(0xe, &pf_exception, 0)
 
-	idt_register_handler(0x10, &generic_exception, 0)
-	idt_register_handler(0x11, &generic_exception, 0)
-	idt_register_handler(0x12, &generic_exception, 0)
-	idt_register_handler(0x13, &generic_exception, 0)
-	idt_register_handler(0x14, &generic_exception, 0)
-	idt_register_handler(0x1e, &generic_exception, 0)
+	idt_register_handler(0x10, &mf_exception, 0)
+	idt_register_handler(0x11, &ac_exception, 0)
+	idt_register_handler(0x12, &mc_exception, 0)
+	idt_register_handler(0x13, &xm_exception, 0)
+	idt_register_handler(0x14, &ve_exception, 0)
+	idt_register_handler(0x1e, &sx_exception, 0)
 
 	// Load IDT.
 	idt_pointer = IDTPointer{
@@ -76,4 +76,80 @@ pub fn idt_register_handler(num byte, callback voidptr, ist byte) {
 
 fn generic_exception() {
 	lib.kpanic('Unhandled exception triggered')
+}
+
+fn of_exception() {
+	lib.kpanic('Overflow Exception')
+}
+
+fn ud_exception() {
+	lib.kpanic('Invalid Opcode Exception')
+}
+
+fn pf_exception() {
+	lib.kpanic('Page Fault Exception')
+}
+
+fn de_exception() {
+	lib.kpanic('Divide-by-zero Exception')
+}
+
+fn mf_exception() {
+	lib.kpanic('x87 Floating-Point Exception')
+}
+
+fn nm_exception() {
+	lib.kpanic('Device Not Available')
+}
+
+fn df_exception() {
+	lib.kpanic('Double Fault')
+}
+
+fn ts_exception() {
+	lib.kpanic('Invalid TSS')
+}
+
+fn np_exception() {
+	lib.kpanic('Segment Not Present')
+}
+
+fn ss_exception() {
+	lib.kpanic('Stack-Segment Fault')
+}
+
+fn gp_exception() {
+	lib.kpanic('General Protection Fault')
+}
+
+fn ac_exception() {
+	lib.kpanic('Alignment Check')
+}
+
+fn mc_exception() {
+	lib.kpanic('Machine Check')
+}
+
+fn xm_exception() {
+	lib.kpanic('SIMD Floating-Point Exception')
+}
+
+fn ve_exception() {
+	lib.kpanic('Virtualization Exception')
+}
+
+fn sx_exception() {
+	lib.kpanic('Security Exception')
+}
+
+fn db_exception() {
+	lib.kpanic('Debug Exception Triggerred')
+}
+
+fn bp_exception() {
+	lib.kpanic('Breakpoint')
+}
+
+fn br_exception() {
+	lib.kpanic('Bound Range Exceeded')
 }
