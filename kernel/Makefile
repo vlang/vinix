@@ -8,6 +8,7 @@ CFLAGS = -O2 -pipe -w
 INTERNALCFLAGS  :=       \
 	-I.                  \
 	-ffreestanding       \
+	-fno-omit-frame-pointer \
 	-fno-stack-protector \
 	-pie -static-pie     \
 	-fno-pic -fpie       \
