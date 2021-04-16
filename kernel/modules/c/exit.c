@@ -1,5 +1,5 @@
 void exit(int exit_code) {
     (void)exit_code;
-    kpanic("exit is a stub");
-    for (;;);
+    lib__kpanic(char_vstring("exit is a stub"));
+    __builtin_unreachable();
 }

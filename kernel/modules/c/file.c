@@ -16,7 +16,7 @@ int fflush(FILE *stream) {
 
 int getc(FILE *stream) {
     (void)stream;
-    kpanic("getc is a stub");
+    lib__kpanic(char_vstring("getc is a stub"));
     return -1;
 }
 
@@ -24,20 +24,20 @@ char *fgets(char *str, size_t count, FILE *stream) {
     (void)str;
     (void)count;
     (void)stream;
-    kpanic("fgets is a stub");
+    lib__kpanic(char_vstring("fgets is a stub"));
     return NULL;
 }
 
 FILE *popen(const char *command, const char *type) {
     (void)command;
     (void)type;
-    kpanic("popen is a stub");
+    lib__kpanic(char_vstring("popen is a stub"));
     return NULL;
 }
 
 int pclose(FILE *stream) {
     (void)stream;
-    kpanic("pclose is a stub");
+    lib__kpanic(char_vstring("pclose is a stub"));
     return -1;
 }
 
@@ -46,14 +46,14 @@ ssize_t write(int fd, const void *buf, size_t count) {
     (void)buf;
     (void)count;
     if (fd != 1 && fd != 2) {
-        kpanic("write to fd != 1 || fd != 2 is a stub");
+        lib__kpanic(char_vstring("write to fd != 1 || fd != 2 is a stub"));
     }
-    kprint(buf, count);
+    lib__kprint(char_vstring((char *)buf));
     return 0;
 }
 
 int isatty(int fd) {
     (void)fd;
-    kpanic("isatty is a stub");
+    lib__kpanic(char_vstring("isatty is a stub"));
     return -1;
 }

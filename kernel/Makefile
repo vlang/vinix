@@ -3,7 +3,7 @@ TARGET := vos.elf
 CC = cc
 V = v
 
-CFLAGS = -O2 -pipe -w
+CFLAGS = -O2 -pipe
 
 INTERNALCFLAGS  :=       \
 	-I.                  \
@@ -42,7 +42,7 @@ $(TARGET): blob.C
 blob.C: $(VFILES) $(CFILES)
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	printf '#define double int\n#define float int\n' \
-		| cat - $(CFILES) blob.c \
+		| cat - blob.c $(CFILES) \
 		| sed 's/void main__kmain(/__attribute__((externally_visible)) void main__kmain(/g' \
 		> blob.C
 	rm blob.c

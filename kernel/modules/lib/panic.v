@@ -1,7 +1,14 @@
 module lib
 
-fn C.kpanic(message charptr)
-
 pub fn kpanic(message string) {
-	C.kpanic(message.str)
+	asm volatile amd64 {
+		cli
+	}
+	kprint('KERNEL PANIC: ')
+	kprint(message)
+	for {
+		asm volatile amd64 {
+			hlt
+		}
+	}
 }
