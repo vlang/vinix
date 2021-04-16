@@ -27,9 +27,6 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
 
-	x := byte(`h`)
-	println(x.str())
-
 	// Test pmm
 	mut ptr := memory.malloc(40)
 	ptr = memory.realloc(ptr, 8000)

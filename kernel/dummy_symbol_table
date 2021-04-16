@@ -1,0 +1,10 @@
+module lib
+
+struct Symbol {
+	address u64
+	name    string
+}
+
+const symbol_table = [
+	Symbol{0xffffffffffffffff, ''},
+]

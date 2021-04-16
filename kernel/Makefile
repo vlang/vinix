@@ -1,5 +1,6 @@
 TARGET := vos.elf
 
+OBJDUMP = objdump
 CC = cc
 V = v
 
@@ -22,14 +23,14 @@ INTERNALCFLAGS  :=       \
 	-mgeneral-regs-only  \
 	-mno-red-zone        \
 	-fwhole-program      \
-	-Tlinker.ld          \
 	-nostdlib            \
 	-Wl,-gc-sections     \
 	-z max-page-size=0x1000
 
 INTERNALVFLAGS := \
 	-shared \
-	--enable-globals
+	--enable-globals \
+	-d no_backtrace
 
 VFILES := $(shell find ./ -type f -name '*.v')
 CFILES := $(shell find ./ -type f -name '*.c')
@@ -41,9 +42,15 @@ all: $(TARGET)
 clean:
 	rm -rf $(TARGET) $(OBJ) blob.C
 
-$(TARGET): blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) $< -o $@
+$(TARGET):
+	cp dummy_symbol_table modules/lib/symbol.v
+	$(MAKE) blob.C
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -Tlinker.ld blob.C -o $@
+	./gensyms.sh $(OBJDUMP) $@ > modules/lib/symbol.v
+	$(MAKE) blob.C
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -Tlinker.ld blob.C -o $@
 
+.PHONY:
 blob.C: $(VFILES) $(CFILES)
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	printf '#define double int\n#define float int\n' \

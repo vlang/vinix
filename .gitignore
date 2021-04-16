@@ -6,4 +6,5 @@ ports
 *.elf
 *.hdd
 kernel/main
+kernel/modules/lib/symbol.v
 .vscode
