@@ -23,6 +23,7 @@ INTERNALCFLAGS  :=       \
 	-mgeneral-regs-only  \
 	-mno-red-zone        \
 	-fwhole-program      \
+	-Tlinker.ld          \
 	-nostdlib            \
 	-Wl,-gc-sections     \
 	-z max-page-size=0x1000
@@ -45,10 +46,10 @@ clean:
 $(TARGET):
 	cp dummy_symbol_table modules/lib/symbol.v
 	$(MAKE) blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -Tlinker.ld blob.C -o $@
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob.C -o $@
 	./gensyms.sh $(OBJDUMP) $@ > modules/lib/symbol.v
 	$(MAKE) blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) -Tlinker.ld blob.C -o $@
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob.C -o $@
 
 .PHONY:
 blob.C: $(VFILES) $(CFILES)

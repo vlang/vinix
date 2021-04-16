@@ -23,7 +23,6 @@ SECTIONS
 
     .data : {
         *(.data*)
-        *(.symbol_map*)
     }
 
     .bss : {

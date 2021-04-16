@@ -40,7 +40,9 @@ update-v: 3rdparty/v
 
 .PHONY: kernel/vos.elf
 kernel/vos.elf: update-v
-	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`"
+	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" \
+		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`" \
+		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vos-objdump`"
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
 	rm -f $(KERNEL_HDD)

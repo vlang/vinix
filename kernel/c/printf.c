@@ -36,7 +36,10 @@
 #include <stdarg.h>
 
 
-void _putchar(char character);
+void _putchar(char character) {
+  char s[] = { character, 0 };
+  lib__kprint(char_vstring(s));
+}
 
 // no floats in kernel
 #define PRINTF_DISABLE_SUPPORT_FLOAT

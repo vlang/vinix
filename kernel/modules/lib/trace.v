@@ -2,7 +2,7 @@ module lib
 
 pub fn trace_address(addr u64) (u64, Symbol) {
 	mut prev_sym := Symbol{}
-	
+
 	for sym in symbol_table {
 		if sym.address >= addr {
 			offset := addr - prev_sym.address
@@ -22,7 +22,6 @@ pub fn print_stacktrace() {
 		mov base_ptr, rbp
 		; =r (base_ptr)
 	}
-
 	println('Stacktrace:')
 
 	for {
@@ -33,7 +32,7 @@ pub fn print_stacktrace() {
 				break
 			}
 			off, sym := trace_address(ret_addr)
-			println('  [0x${ret_addr:x}] <${sym.name}+0x${off:x}>')
+			C.printf('  [0x%llx] <%s+0x%llx>\n', ret_addr, sym.name.str, off)
 			if old_bp == 0 {
 				break
 			}
