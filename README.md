@@ -19,25 +19,49 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 
 <img src="https://user-images.githubusercontent.com/687996/114314245-34024e80-9afa-11eb-8107-d156a48ac60b.png" width=500>
 
+## Build instructions
 
-### Build Instructions
+### OS-agnostic build prerequisites
 
-#### Prerequisites
+The following is an OS-agnostic list of packages needed to build vOS. Skip to a paragraph for your host OS if there is any.
 
-The following packages need to be installed on the system in order to build vOS: `make`, `git`, `nasm`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `parted`, `wget`, `pkg-config`, `libuuid`, `libfuse`, and `qemu` to test it.
+`GNU make`, `GNU patch`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `util-linux`, `wget`, `dosfstools`, `mtools`, and `qemu` to test it.
 
-For Ubuntu or Debian based distros, the command is:
+### Build prerequisites for macOS
+
+These are the step-by-step instructions to build vOS on macOS:
+
+First of all, it is necessary to have `brew` installed:
 ```bash
-sudo apt install build-essential git nasm meson m4 texinfo python3 python3-pip parted wget pkg-config uuid-dev libfuse-dev qemu-system-x86
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-It is necessary to fetch `xbstrap` from `pip3`, too.
+After `brew` is installed, install the required dependencies:
+```bash
+brew install meson wget util-linux gpatch dosfstools mtools coreutils qemu
+```
+
+Since not all the needed tools are in `PATH`, we will have to export `PATH` to include them, for the session.
+```bash
+export PATH="/usr/local/opt/util-linux/sbin:/usr/local/sbin:$PATH"
+```
+
+### Build prerequisites for Ubuntu, Debian, and derivatives
+
+For Ubuntu or Debian based distros, install the prerequisites with:
+```bash
+sudo apt install build-essential git meson m4 texinfo python3 python3-pip util-linux wget dosfstools mtools qemu-system-x86
+```
+
+### Installing xbstrap
+
+It is necessary to fetch `xbstrap` from `pip3`.
 
 ```bash
 sudo pip3 install xbstrap
 ```
 
-#### Build commands
+### Building the distro
 
 To build the distro which includes the cross toolchain necessary
 to build kernel and ports, run:
@@ -46,4 +70,26 @@ to build kernel and ports, run:
 make distro
 ```
 
-The OS can then be built with `make` and ran within qemu with `make run`.
+### Building the kernel and image
+
+Simply run
+```bash
+make
+```
+
+### To test
+
+In Linux, if KVM is available, run with
+```bash
+make run-kvm
+```
+
+In macOS, if hvf is available, run with
+```bash
+make run-hvf
+```
+
+To run without any acceleration, run with
+```bash
+make run
+```

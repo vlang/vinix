@@ -7,13 +7,19 @@ V_COMMIT = 60bc280ad0da43a88bc4c9cd4ec30e67c9eaae0f
 .PHONY: all
 all: $(KERNEL_HDD)
 
+QEMUFLAGS = -M q35 -m 2G -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
+
+.PHONY: run-kvm
+run-kvm: $(KERNEL_HDD)
+	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS)
+
+.PHONY: run-hvf
+run-hvf: $(KERNEL_HDD)
+	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS)
+
 .PHONY: run
 run: $(KERNEL_HDD)
-	qemu-system-x86_64 -enable-kvm -cpu host -m 2G -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
-
-.PHONY: run-nokvm
-run-nokvm: $(KERNEL_HDD)
-	qemu-system-x86_64 -m 2G -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
+	qemu-system-x86_64 $(QEMUFLAGS)
 
 .PHONY: distro
 distro:
