@@ -111,10 +111,10 @@ pub fn terminal_init(stivale2_struct &Struct) {
 
 __global ( terminal_print_lock klock.Lock )
 
-pub fn terminal_print(s string) {
+pub fn terminal_print(s charptr, len u64) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
 	klock.acquire(&terminal_print_lock)
-	ptr(s.str, u64(s.len))
+	ptr(s, len)
 	klock.release(&terminal_print_lock)
 }

@@ -26,7 +26,8 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	// Initialize the memory allocator.
 	memory.physical_init(memmap_tag)
-
+  
+	// Test pmm
 	mut ptr := memory.malloc(40)
 	ptr = memory.realloc(ptr, 8000)
 	memory.free(ptr)
