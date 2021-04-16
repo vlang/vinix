@@ -3,6 +3,8 @@ import memory
 import stivale2
 import x86
 
+fn C._vinit(argc int, argv voidptr)
+
 pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the earliest arch structures.
 	x86.gdt_init()
@@ -16,24 +18,24 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }
 	if memmap_tag == 0 {
-		lib.kpanic('Could not fetch all the required tags')
+		lib.kpanic('Stivale2 memmap tag missing')
 	}
 
 	// Initialize the memory allocator.
 	memory.physical_init(memmap_tag)
 
-	x := byte(0x65)
-	lib.kprint(x.str())
+	// Call Vinit to initialise the runtime
+	C._vinit(0, 0)
+
+	x := byte(`h`)
+	println(x.str())
 
 	// Test pmm
 	mut ptr := memory.malloc(40)
 	ptr = memory.realloc(ptr, 8000)
 	memory.free(ptr)
 
-	for {
-		asm volatile amd64 {
-			hlt
-			; ; a (ptr)
-		}
-	}
+	println('see? i can use print $x without freestanding')
+
+	panic('End of kmain')
 }

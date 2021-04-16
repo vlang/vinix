@@ -54,6 +54,5 @@ ssize_t write(int fd, const void *buf, size_t count) {
 
 int isatty(int fd) {
     (void)fd;
-    lib__kpanic(char_vstring("isatty is a stub"));
-    return -1;
+    return 1;
 }

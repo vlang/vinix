@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 
-static uint8_t stack[4096];
+static uint8_t stack[32768];
 
 
 struct stivale2_tag {

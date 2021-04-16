@@ -3,7 +3,7 @@ TARGET := vos.elf
 CC = cc
 V = v
 
-CFLAGS = -O2 -pipe
+CFLAGS = -O2 -g -pipe -Wall -Wextra
 
 INTERNALCFLAGS  :=       \
 	-I.                  \
