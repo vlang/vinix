@@ -1,3 +1,5 @@
+SHELL = /bin/bash
+
 KERNEL_HDD = disk.hdd
 
 V_COMMIT = 60bc280ad0da43a88bc4c9cd4ec30e67c9eaae0f
@@ -23,11 +25,6 @@ distro:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
 	$(MAKE) -C 3rdparty/limine
 
-3rdparty/echfs:
-	mkdir -p 3rdparty
-	git clone https://github.com/echfs/echfs.git --depth=1 3rdparty/echfs
-	$(MAKE) -C 3rdparty/echfs
-
 3rdparty/v:
 	mkdir -p 3rdparty
 	git clone https://github.com/vlang/v.git 3rdparty/v
@@ -44,16 +41,13 @@ kernel/vos.elf: update-v
 		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`" \
 		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vos-objdump`"
 
-$(KERNEL_HDD): 3rdparty/limine 3rdparty/echfs kernel/vos.elf
-	rm -f $(KERNEL_HDD)
-	dd if=/dev/zero bs=1M count=0 seek=64 of=$(KERNEL_HDD)
-	parted -s $(KERNEL_HDD) mklabel gpt
-	parted -s $(KERNEL_HDD) mkpart primary 2048s 100%
-	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) quick-format 512
-	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import kernel/vos.elf vos.elf
-	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import v-logo.bmp v-logo.bmp
-	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import limine.cfg limine.cfg
-	./3rdparty/echfs/echfs-utils -g -p0 $(KERNEL_HDD) import 3rdparty/limine/limine.sys limine.sys
+$(KERNEL_HDD): 3rdparty/limine kernel/vos.elf
+	rm -rf pack
+	mkdir -p pack
+	cp kernel/vos.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
+	mkdir -p pack/EFI/BOOT
+	cp 3rdparty/limine/BOOTX64.EFI pack/EFI/BOOT/
+	./dir2fat32.sh -f $(KERNEL_HDD) 64 pack
 	./3rdparty/limine/limine-install $(KERNEL_HDD)
 
 .PHONY: format

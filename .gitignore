@@ -5,6 +5,7 @@ ports
 *.C
 *.elf
 *.hdd
-kernel/main
+kernel/blob
 kernel/modules/lib/symbol.v
+pack
 .vscode

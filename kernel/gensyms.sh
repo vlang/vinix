@@ -21,7 +21,7 @@ struct Symbol {
 const symbol_table = [
 EOF
 
-paste -d'$' "$TMP2" "$TMP3" | sed 's/^/\tSymbol{0x/g' | sed "s/\$/'},/g" | sed "s/\\\$/, '/g" 
+paste -d'$' "$TMP2" "$TMP3" | sed 's/^/	Symbol{0x/g' | sed "s/\$/'},/g" | sed "s/\\\$/, '/g"
 
 cat <<EOF
 	Symbol{0xffffffffffffffff, ''},

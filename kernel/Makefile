@@ -45,17 +45,17 @@ clean:
 
 $(TARGET):
 	cp dummy_symbol_table modules/lib/symbol.v
-	$(MAKE) blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob.C -o $@
+	$(MAKE) blob
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@
 	./gensyms.sh $(OBJDUMP) $@ > modules/lib/symbol.v
-	$(MAKE) blob.C
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob.C -o $@
+	$(MAKE) blob
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@
 
 .PHONY:
-blob.C: $(VFILES) $(CFILES)
-	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
+blob: $(VFILES) $(CFILES)
+	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o vblob.c .
 	printf '#define double int\n#define float int\n' \
-		| cat - blob.c $(CFILES) \
+		| cat - vblob.c $(CFILES) \
 		| sed 's/void main__kmain(/__attribute__((externally_visible)) void main__kmain(/g' \
-		> blob.C
-	rm blob.c
+		> blob
+	rm vblob.c
