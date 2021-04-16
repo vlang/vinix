@@ -35,7 +35,5 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	ptr = memory.realloc(ptr, 8000)
 	memory.free(ptr)
 
-	println('see? i can use print $x without freestanding')
-
 	panic('End of kmain')
 }

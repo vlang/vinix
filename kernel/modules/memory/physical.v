@@ -1,6 +1,5 @@
 module memory
 
-import c
 import lib
 import stivale2
 
@@ -168,9 +167,9 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	}
 
 	if metadata.size > new_size {
-		c.memcpy(new_ptr, ptr, new_size)
+		unsafe { C.memcpy(new_ptr, ptr, new_size) }
 	} else {
-		c.memcpy(new_ptr, ptr, metadata.size)
+		unsafe { C.memcpy(new_ptr, ptr, metadata.size) }
 	}
 
 	free(ptr)

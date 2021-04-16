@@ -17,6 +17,14 @@ struct stivale2_header {
 } __attribute__((__packed__));
 
 
+#define STIVALE2_HEADER_TAG_UNMAP_NULL_ID 0x92919432b16fe7e7
+
+struct stivale2_tag unmap_null_hdr_tag = {
+    .identifier = STIVALE2_HEADER_TAG_UNMAP_NULL_ID,
+    .next = 0
+};
+
+
 #define STIVALE2_HEADER_TAG_TERMINAL_ID 0xa85d499b1823be72
 
 struct stivale2_header_tag_terminal {
@@ -27,7 +35,7 @@ struct stivale2_header_tag_terminal {
 struct stivale2_header_tag_terminal terminal_hdr_tag = {
     .tag = {
         .identifier = STIVALE2_HEADER_TAG_TERMINAL_ID,
-        .next = 0
+        .next = (uint64_t)&unmap_null_hdr_tag
     },
     .flags = 0
 };

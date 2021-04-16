@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stddef.h>
 
 int32_t **__ctype_tolower_loc(void) {
     lib__kpanic(char_vstring("__ctype_tolower_loc is a stub"));
