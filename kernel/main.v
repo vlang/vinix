@@ -32,5 +32,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	ptr = memory.realloc(ptr, 8000)
 	memory.free(ptr)
 
+	// Test vmm
+	pagemap := memory.new_pagemap_from_current()
+	pagemap.map_page(0xcafebabe000, 0xbabecafe000, 1)
+	pagemap.switch_to()
+
 	panic('End of kmain')
 }

@@ -1,6 +1,6 @@
 module klock
 
-struct Lock {
+pub struct Lock {
 	l bool
 }
 
@@ -20,4 +20,8 @@ pub fn release(lock_ptr &Lock) {
 
 pub fn test_and_acquire(lock_ptr &Lock) bool {
 	return C.__sync_bool_compare_and_swap(&lock_ptr.l, false, true)
+}
+
+pub fn new() Lock {
+	return Lock{false}
 }
