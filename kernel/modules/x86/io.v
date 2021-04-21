@@ -19,3 +19,23 @@ pub fn outb(port u16, value byte) {
 		; memory
 	}
 }
+
+pub fn mmind(addr u64) u32 {
+	mut ret := u32(0)
+	asm volatile amd64 {
+		mov ret, [addr]
+		; =r (ret)
+		; r (addr)
+		; memory
+	}
+	return ret
+}
+
+pub fn mmoutd(addr u64, value u32) {
+	asm volatile amd64 {
+		mov [addr], value
+		; ; r (addr)
+		  r (value)
+		; memory
+	}
+}
