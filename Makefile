@@ -7,7 +7,7 @@ V_COMMIT = 51258923d7f97cb1301d76b7dceeecbf5c8e4603
 .PHONY: all
 all: $(KERNEL_HDD)
 
-QEMUFLAGS = -M q35 -m 2G -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
+QEMUFLAGS = -M q35 -m 2G -d int -no-reboot -no-shutdown -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
 
 .PHONY: run-kvm
 run-kvm: $(KERNEL_HDD)
@@ -25,6 +25,10 @@ run: $(KERNEL_HDD)
 distro:
 	mkdir -p build
 	cd build && xbstrap init .. && xbstrap install --all
+
+3rdparty/dir2fat32-esp:
+	wget https://github.com/mintsuki-org/dir2fat32-esp/raw/master/dir2fat32-esp -O 3rdparty/dir2fat32-esp
+	chmod +x 3rdparty/dir2fat32-esp
 
 3rdparty/limine:
 	mkdir -p 3rdparty
@@ -47,13 +51,13 @@ kernel/vos.elf: update-v
 		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`" \
 		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vos-objdump`"
 
-$(KERNEL_HDD): 3rdparty/limine kernel/vos.elf
+$(KERNEL_HDD): 3rdparty/limine 3rdparty/dir2fat32-esp kernel/vos.elf
 	rm -rf pack
 	mkdir -p pack
 	cp kernel/vos.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
 	mkdir -p pack/EFI/BOOT
 	cp 3rdparty/limine/BOOTX64.EFI pack/EFI/BOOT/
-	./dir2fat32.sh -f $(KERNEL_HDD) 64 pack
+	./3rdparty/dir2fat32-esp -f $(KERNEL_HDD) 64 pack
 	./3rdparty/limine/limine-install $(KERNEL_HDD)
 
 .PHONY: format

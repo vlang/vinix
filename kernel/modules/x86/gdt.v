@@ -16,22 +16,10 @@ struct GDTEntry {
 	base_high8  byte
 }
 
-// FIXME: Using this 2 globals as const will generate a runtime dependency on
-// vinit, which we cannot call since vinit depends on malloc and other utilities
-// not available in freestanding.
 __global (
 	kernel_code_seg = u16(0x28)
-)
-
-__global (
 	kernel_data_seg = u16(0x30)
-)
-
-__global (
 	gdt_pointer GDTPointer
-)
-
-__global (
 	gdt_entries [9]GDTEntry
 )
 
@@ -140,10 +128,9 @@ pub fn gdt_init() {
 		lgdt [ptr]
 		push rax
 		push cseg
-		lea rax, [rip + reentry]
+		lea rax, [rip + 0x03]
 		push rax
 		.short 0xcb48 // V does not have REX.W + retf, this is the opcode.
-		reentry:
 		pop rax
 		mov ds, dseg
 		mov es, dseg
@@ -151,8 +138,8 @@ pub fn gdt_init() {
 		mov gs, dseg
 		mov ss, dseg
 		; ; r (&gdt_pointer) as ptr
-		  rm (kernel_code_seg) as cseg
-		  rm (kernel_data_seg) as dseg
+		  rm (u64(kernel_code_seg)) as cseg
+		  rm (u32(kernel_data_seg)) as dseg
 		; memory
 	}
 }
