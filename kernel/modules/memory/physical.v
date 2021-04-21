@@ -3,11 +3,17 @@ module memory
 import lib
 import stivale2
 
-__global ( pmm_bitmap lib.Bitmap )
+__global (
+	pmm_bitmap lib.Bitmap
+)
 
-__global ( pmm_avl_page_count u64 )
+__global (
+	pmm_avl_page_count u64
+)
 
-__global ( pmm_last_used_index u64 )
+__global (
+	pmm_last_used_index u64
+)
 
 pub fn physical_init(memmap &stivale2.MemmapTag) {
 	// Calculate the highest and lowest boundaries.

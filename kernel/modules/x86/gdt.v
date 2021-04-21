@@ -19,13 +19,21 @@ struct GDTEntry {
 // FIXME: Using this 2 globals as const will generate a runtime dependency on
 // vinit, which we cannot call since vinit depends on malloc and other utilities
 // not available in freestanding.
-__global ( kernel_code_seg = u16(0x28))
+__global (
+	kernel_code_seg = u16(0x28)
+)
 
-__global ( kernel_data_seg = u16(0x30))
+__global (
+	kernel_data_seg = u16(0x30)
+)
 
-__global ( gdt_pointer GDTPointer )
+__global (
+	gdt_pointer GDTPointer
+)
 
-__global ( gdt_entries [9]GDTEntry )
+__global (
+	gdt_entries [9]GDTEntry
+)
 
 pub fn gdt_init() {
 	// Initialize all the GDT entries.

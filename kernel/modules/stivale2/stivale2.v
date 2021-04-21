@@ -97,7 +97,9 @@ pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
 	return 0
 }
 
-__global ( terminal_print_ptr voidptr )
+__global (
+	terminal_print_ptr voidptr
+)
 
 pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_tag := unsafe { &TermTag(get_tag(stivale2_struct, stivale2.terminal_id)) }
@@ -109,7 +111,9 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_print_ptr = terminal_tag.term_write
 }
 
-__global ( terminal_print_lock klock.Lock )
+__global (
+	terminal_print_lock klock.Lock
+)
 
 pub fn terminal_print(s string) {
 	mut ptr := fn (_ voidptr, _ u64) {}

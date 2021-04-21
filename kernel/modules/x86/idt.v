@@ -19,9 +19,13 @@ struct IDTEntry {
 	reserved   u32
 }
 
-__global ( idt_pointer IDTPointer )
+__global (
+	idt_pointer IDTPointer
+)
 
-__global ( idt_entries [256]IDTEntry )
+__global (
+	idt_entries [256]IDTEntry
+)
 
 pub fn idt_init() {
 	// Register the common exceptions.
