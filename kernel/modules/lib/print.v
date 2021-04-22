@@ -13,3 +13,5 @@ pub fn kprint(message string) {
 
 	stivale2.terminal_print(message)
 }
+
+fn C.byte_vstring_with_len(byte, int) string

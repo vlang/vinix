@@ -8,6 +8,8 @@ pub const memmap_id = 0x2187f79e8612de07
 
 pub const terminal_id = 0xc2b3f4c3233b0974
 
+pub const rsdp_id = 0x9e1786930a375e78
+
 [packed]
 struct Tag {
 pub:
@@ -47,6 +49,13 @@ pub:
 	tag        Tag
 	flags      u64
 	term_write voidptr
+}
+
+[packed]
+struct RSDPTag {
+pub:
+	tag  Tag
+	rsdp u64
 }
 
 [packed]

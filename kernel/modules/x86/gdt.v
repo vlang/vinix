@@ -19,8 +19,8 @@ struct GDTEntry {
 __global (
 	kernel_code_seg = u16(0x28)
 	kernel_data_seg = u16(0x30)
-	gdt_pointer GDTPointer
-	gdt_entries [9]GDTEntry
+	gdt_pointer     GDTPointer
+	gdt_entries     [9]GDTEntry
 )
 
 pub fn gdt_init() {

@@ -1,6 +1,7 @@
 import lib
 import memory
 import stivale2
+import acpi
 import x86
 
 fn C._vinit(argc int, argv voidptr)
@@ -16,21 +17,24 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// We're alive
 	lib.kprint('Welcome to vOS\n\n')
 
+	// Initialize the memory allocator.
 	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }
 	if memmap_tag == 0 {
 		lib.kpanic('Stivale2 memmap tag missing')
 	}
 
-	// Initialize the memory allocator.
 	memory.physical_init(memmap_tag)
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
 
-	// Test pmm
-	mut ptr := memory.malloc(40)
-	ptr = memory.realloc(ptr, 8000)
-	memory.free(ptr)
+	// ACPI init
+	rsdp_tag := unsafe { &stivale2.RSDPTag(stivale2.get_tag(stivale2_struct, stivale2.rsdp_id)) }
+	if rsdp_tag == 0 {
+		panic('Stivale2 RSDP tag missing')
+	}
+
+	acpi.init(&acpi.RSDP(rsdp_tag.rsdp))
 
 	// Test vmm
 	pagemap := memory.new_pagemap_from_current()
