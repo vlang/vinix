@@ -75,7 +75,7 @@ pub:
 	unused     u32
 }
 
-enum MemmapEntryType {
+pub enum MemmapEntryType {
 	usable = 1
 	reserved = 2
 	acpi_reclaimable = 3
