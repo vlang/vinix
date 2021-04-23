@@ -49,18 +49,20 @@ pub fn init(rsdp_ptr &RSDP) {
 		rsdt = &RSDT(size_t(rsdp.rsdt_addr))
 	}
 
-	println('acpi: Revision: ${rsdp.revision}')
-	println('acpi: OEM ID:   ${oem}')
-	println('acpi: Use XSDT: ${use_xsdt()}')
-	println('acpi: RXSDT at: 0x${voidptr(rsdt):x}')
+	println('acpi: Revision:  ${rsdp.revision}')
+	println('acpi: OEM ID:    ${oem}')
+	println('acpi: Use XSDT:  ${use_xsdt()}')
+	println('acpi: R/XSDT at: 0x${voidptr(rsdt):x}')
 
-	find_sdt('APIC', 0)
+	madt_init()
 }
 
 pub fn find_sdt(signature string, index int) voidptr {
 	mut count := 0
 
-	for i := 0; i < rsdt.header.length - sizeof(SDT); i++ {
+	entry_count := (rsdt.header.length - sizeof(SDT)) / u32(if use_xsdt() { 8 } else { 4 })
+
+	for i := 0; i < entry_count; i++ {
 		ptr := if use_xsdt() == true {
 			unsafe { &SDT(size_t(&u64(&rsdt.ptrs_start)[i])) }
 		} else {
