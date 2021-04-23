@@ -41,5 +41,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	pagemap.map_page(0xcafebabe000, 0xbabecafe000, 1)
 	pagemap.switch_to()
 
+	x86.lapic_enable(0xff)
+	x86.io_apic_set_irq_redirect(0, 0x21, 1, true)
+
+	for { asm volatile amd64 { sti } }
+
 	panic('End of kmain')
 }

@@ -34,13 +34,13 @@ pub fn lapic_send_ipi(lapic_id u8, vector u8) {
 fn io_apic_read(io_apic int, reg u32) u32 {
 	base := madt_io_apics[io_apic].address
 	mmoutd(base, reg)
-	return mmind(base + 4)
+	return mmind(base + 16)
 }
 
 fn io_apic_write(io_apic int, reg u32, value u32) {
 	base := madt_io_apics[io_apic].address
 	mmoutd(base, reg)
-	mmoutd(base + 4, value)
+	mmoutd(base + 16, value)
 }
 
 fn io_apic_gsi_count(io_apic int) u32 {
