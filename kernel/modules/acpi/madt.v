@@ -2,6 +2,7 @@ module acpi
 
 [packed]
 struct MADT {
+pub:
 	header               SDT
 	local_contoller_addr u32
 	flags                u32
@@ -10,12 +11,14 @@ struct MADT {
 
 [packed]
 struct MADTHeader {
+pub:
 	id     u8
 	length u8
 }
 
 [packed]
 struct MADTLocalApic {
+pub:
 	header       MADTHeader
 	processor_id u8
 	apic_id      u8
@@ -24,6 +27,7 @@ struct MADTLocalApic {
 
 [packed]
 struct MADTIoApic {
+pub:
 	header   MADTHeader
 	apic_id  u8
 	reserved u8
@@ -33,6 +37,7 @@ struct MADTIoApic {
 
 [packed]
 struct MADTISO {
+pub:
 	header     MADTHeader
 	bus_source u8
 	irq_source u8
@@ -42,6 +47,7 @@ struct MADTISO {
 
 [packed]
 struct MADTNMI {
+pub:
 	header    MADTHeader
 	processor u8
 	flags     u16
