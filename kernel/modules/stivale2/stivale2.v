@@ -10,6 +10,8 @@ pub const terminal_id = 0xc2b3f4c3233b0974
 
 pub const rsdp_id = 0x9e1786930a375e78
 
+pub const modules_id = 0x4b6fe466aade04ce
+
 [packed]
 struct Tag {
 pub:
@@ -56,6 +58,22 @@ struct RSDPTag {
 pub:
 	tag  Tag
 	rsdp u64
+}
+
+[packed]
+struct ModulesTag {
+pub:
+	tag     Tag
+	count   u64
+	modules Module
+}
+
+[packed]
+struct Module {
+pub:
+	begin u64
+	end   u64
+	str   [128]byte
 }
 
 [packed]

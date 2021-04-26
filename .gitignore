@@ -5,6 +5,7 @@ ports
 *.C
 *.elf
 *.hdd
+*.gz
 kernel/blob
 kernel/modules/lib/symbol.v
 pack

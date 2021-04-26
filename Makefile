@@ -52,9 +52,10 @@ kernel/vos.elf: update-v
 		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vos-objdump`"
 
 $(KERNEL_HDD): 3rdparty/limine 3rdparty/dir2fat32-esp kernel/vos.elf
+	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
 	rm -rf pack
 	mkdir -p pack
-	cp kernel/vos.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
+	cp initramfs.tar.gz kernel/vos.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
 	mkdir -p pack/EFI/BOOT
 	cp 3rdparty/limine/BOOTX64.EFI pack/EFI/BOOT/
 	./3rdparty/dir2fat32-esp -f $(KERNEL_HDD) 64 pack

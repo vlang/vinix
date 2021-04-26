@@ -3,6 +3,7 @@ import memory
 import stivale2
 import acpi
 import x86
+import initramfs
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -35,6 +36,13 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	}
 
 	acpi.init(&acpi.RSDP(rsdp_tag.rsdp))
+
+	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
+	if modules_tag == 0 {
+		panic('Stivale2 modules tag missing')
+	}
+
+	initramfs.init(modules_tag)
 
 	panic('End of kmain')
 }

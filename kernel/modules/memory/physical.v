@@ -138,7 +138,7 @@ pub fn free(ptr voidptr) {
 }
 
 pub fn malloc(size u64) voidptr {
-	page_count := lib.div_round_up(size, page_size)
+	page_count := lib.div_roundup(size, page_size)
 
 	ptr := pmm_alloc(page_count + 1)
 
@@ -163,7 +163,7 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	metadata_ptr := unsafe { &char(ptr) - page_size }
 	mut metadata := &MallocMetadata(metadata_ptr)
 
-	if lib.div_round_up(metadata.size, page_size) == lib.div_round_up(new_size, page_size) {
+	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
 		metadata.size = new_size
 		return ptr
 	}
