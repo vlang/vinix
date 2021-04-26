@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 KERNEL_HDD = disk.hdd
 
-V_COMMIT = 7ec90b0f8960c1934cb7be17c5a22765a184746e
+V_COMMIT = 5e0ff5c5248d65c1e64cc96955092035e7efe2a8
 
 .PHONY: all
 all: $(KERNEL_HDD)

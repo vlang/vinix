@@ -17,9 +17,10 @@ __global (
 
 pub fn physical_init(memmap &stivale2.MemmapTag) {
 	// Calculate the highest and lowest boundaries.
-	mut entries := &memmap.entries
 	mut highest_address := u64(0)
 	unsafe {
+		mut entries := &memmap.entries
+
 		for i := 0; i < memmap.entry_count; i++ {
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable)
 				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable)
