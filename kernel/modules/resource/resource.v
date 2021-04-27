@@ -1,10 +1,10 @@
 module resource
 
-import vfs
+import stat
 import klock
 
 interface Resource {
-	st       vfs.Stat
+	st       stat.Stat
 	refcount int
 	l        klock.Lock
 

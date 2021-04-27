@@ -24,7 +24,7 @@ EOF
 paste -d'$' "$TMP2" "$TMP3" | sed 's/^/	Symbol{0x/g' | sed "s/\$/'},/g" | sed "s/\\\$/, '/g"
 
 cat <<EOF
-	Symbol{0xffffffffffffffff, ''},
+	Symbol{0xffffffffffffffff, ''}
 ]
 EOF
 

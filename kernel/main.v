@@ -4,6 +4,7 @@ import stivale2
 import acpi
 import x86
 import initramfs
+import fs
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -43,6 +44,8 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	}
 
 	initramfs.init(modules_tag)
+
+	fs.vfs_init()
 
 	panic('End of kmain')
 }

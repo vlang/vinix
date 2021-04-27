@@ -6,5 +6,5 @@ struct Symbol {
 }
 
 const symbol_table = [
-	Symbol{0xffffffffffffffff, ''},
+	Symbol{0xffffffffffffffff, ''}
 ]
