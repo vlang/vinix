@@ -44,7 +44,7 @@ all: $(KERNEL)
 
 .PHONY:
 clean:
-	rm -rf $(KERNEL) blob
+	rm -rf $(KERNEL) blob modules/lib/symbol.v
 
 $(KERNEL):
 	cp dummy_symbol_table modules/lib/symbol.v

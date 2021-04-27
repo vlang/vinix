@@ -72,4 +72,4 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf 3rdparty build ports
+	rm -rf 3rdparty build ports initramfs.tar.gz pack
