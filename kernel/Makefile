@@ -33,7 +33,7 @@ INTERNALCFLAGS :=           \
 
 INTERNALVFLAGS :=    \
 	-shared          \
-	--enable-globals \
+	-enable-globals \
 	-d no_backtrace
 
 VFILES := $(shell find ./ -type f -name '*.v')
