@@ -14,14 +14,14 @@ pub const modules_id = 0x4b6fe466aade04ce
 
 [packed]
 struct Tag {
-pub:
+pub mut:
 	id   u64
 	next voidptr
 }
 
 [packed]
 struct Struct {
-pub:
+pub mut:
 	bootloader_brand   [64]byte
 	bootloader_version [64]byte
 	tags               voidptr
@@ -29,7 +29,7 @@ pub:
 
 [packed]
 struct FBTag {
-pub:
+pub mut:
 	tag              Tag
 	addr             u64
 	width            u16
@@ -47,7 +47,7 @@ pub:
 
 [packed]
 struct TermTag {
-pub:
+pub mut:
 	tag        Tag
 	flags      u64
 	term_write voidptr
@@ -55,14 +55,14 @@ pub:
 
 [packed]
 struct RSDPTag {
-pub:
+pub mut:
 	tag  Tag
 	rsdp u64
 }
 
 [packed]
 struct ModulesTag {
-pub:
+pub mut:
 	tag     Tag
 	count   u64
 	modules Module
@@ -70,7 +70,7 @@ pub:
 
 [packed]
 struct Module {
-pub:
+pub mut:
 	begin u64
 	end   u64
 	str   [128]byte
@@ -78,7 +78,7 @@ pub:
 
 [packed]
 struct MemmapTag {
-pub:
+pub mut:
 	tag         Tag
 	entry_count u64
 	entries     MemmapEntry // This is a var length array at the end.
@@ -86,7 +86,7 @@ pub:
 
 [packed]
 struct MemmapEntry {
-pub:
+pub mut:
 	base       u64
 	length     u64
 	entry_type u32

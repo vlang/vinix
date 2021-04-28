@@ -22,17 +22,17 @@ INTERNALCFLAGS :=           \
 	-ffunction-sections     \
 	-fdata-sections         \
 	-fno-inline             \
+	-fwhole-program         \
 	-mgeneral-regs-only     \
 	-mno-red-zone           \
-	-fwhole-program         \
 	-static-pie             \
 	-nostdlib               \
 	-Tlinker.ld             \
 	-Wl,-gc-sections        \
 	-z max-page-size=0x1000
 
-INTERNALVFLAGS :=    \
-	-shared          \
+INTERNALVFLAGS :=   \
+	-shared         \
 	-enable-globals \
 	-d no_backtrace
 

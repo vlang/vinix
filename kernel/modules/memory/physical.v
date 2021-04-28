@@ -16,15 +16,14 @@ __global (
 )
 
 pub fn physical_init(memmap &stivale2.MemmapTag) {
-	// Calculate the highest and lowest boundaries.
-	mut highest_address := u64(0)
 	unsafe {
+		mut highest_address := u64(0)
 		mut entries := &memmap.entries
 
+		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable)
-				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable)
-				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.acpi_reclaimable) {
+			&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable) {
 				continue
 			}
 			top := entries[i].base + entries[i].length
@@ -33,43 +32,36 @@ pub fn physical_init(memmap &stivale2.MemmapTag) {
 			}
 		}
 
-		// Calculate the needed size for the bitmap in bytes
+		// Calculate the needed size for the bitmap in bytes and align it to page size.
 		pmm_avl_page_count = highest_address / page_size
-		bitmap_size := pmm_avl_page_count / 8
+		bitmap_size := lib.align_up(pmm_avl_page_count / 8, page_size)
 
 		// Find a hole for the bitmap in the memory map.
-		mut bitmap_entry := 0
-		mut bitmap_entry_base := u64(0)
-		mut bitmap_entry_size := u64(0)
 		for i := 0; i < memmap.entry_count; i++ {
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable) {
 				continue
 			}
 			if entries[i].length >= bitmap_size {
-				bitmap_entry = i
-				bitmap_entry_base = entries[i].base + bitmap_size
-				bitmap_entry_size = entries[i].length - bitmap_size
-				pmm_bitmap = lib.Bitmap(entries[i].base)
+				pmm_bitmap = lib.Bitmap(entries[i].base + higher_half)
+
+				// Initialise entire bitmap to 1 (non-free)
+				C.memset(pmm_bitmap, 0xff, bitmap_size)
+
+				entries[i].length -= bitmap_size
+				entries[i].base += bitmap_size
+
 				break
 			}
 		}
 
-		// Fill the bitmap by first clearing and then populating with the memmap
-		for i := 0; i < pmm_avl_page_count; i++ {
-			lib.bitset(pmm_bitmap, u64(i))
-		}
-
+		// Populate free bitmap entries according to the memory map.
 		for i := 0; i < memmap.entry_count; i++ {
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable) {
 				continue
 			}
-			base, length := if i == bitmap_entry {
-				bitmap_entry_base, bitmap_entry_size
-			} else {
-				entries[i].base, entries[i].length
-			}
-			for j := u64(0); j < length; j += page_size {
-				lib.bitreset(pmm_bitmap, (base + j) / page_size)
+
+			for j := u64(0); j < entries[i].length; j += page_size {
+				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
 			}
 		}
 	}
