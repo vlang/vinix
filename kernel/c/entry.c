@@ -41,6 +41,22 @@ struct stivale2_header_tag_terminal terminal_hdr_tag = {
 };
 
 
+#define STIVALE2_HEADER_TAG_SMP_ID 0x1ab015085f3273df
+
+struct stivale2_header_tag_smp {
+    struct stivale2_tag tag;
+    uint64_t flags;
+} __attribute__((__packed__));
+
+struct stivale2_header_tag_smp smp_hdr_tag = {
+    .tag = {
+        .identifier = STIVALE2_HEADER_TAG_SMP_ID,
+        .next = (uint64_t)&terminal_hdr_tag
+    },
+    .flags = 0
+};
+
+
 #define STIVALE2_HEADER_TAG_FRAMEBUFFER_ID 0x3ecc1bc43d0f7971
 
 struct stivale2_header_tag_framebuffer {
@@ -53,7 +69,7 @@ struct stivale2_header_tag_framebuffer {
 struct stivale2_header_tag_framebuffer framebuffer_hdr_tag = {
     .tag = {
         .identifier = STIVALE2_HEADER_TAG_FRAMEBUFFER_ID,
-        .next = (uint64_t)&terminal_hdr_tag
+        .next = (uint64_t)&smp_hdr_tag
     },
     .framebuffer_width  = 0,
     .framebuffer_height = 0,

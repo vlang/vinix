@@ -68,10 +68,10 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 
 		match USTARFileType(current_header.filetype) {
 			.directory {
-				println('initramfs: Directory: ${name}')
+				//println('initramfs: Directory: ${name}')
 			}
 			.regular_file {
-				println('initramfs: File:      ${name}')
+				//println('initramfs: File:      ${name}')
 			}
 			else {}
 		}

@@ -38,6 +38,13 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	acpi.init(&acpi.RSDP(rsdp_tag.rsdp))
 
+	smp_tag := unsafe { &stivale2.SMPTag(stivale2.get_tag(stivale2_struct, stivale2.smp_id)) }
+	if smp_tag == 0 {
+		panic('Stivale2 SMP tag missing')
+	}
+
+	x86.smp_init(smp_tag)
+
 	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
 	if modules_tag == 0 {
 		panic('Stivale2 modules tag missing')

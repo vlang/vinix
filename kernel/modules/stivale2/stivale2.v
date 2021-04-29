@@ -12,6 +12,8 @@ pub const rsdp_id = 0x9e1786930a375e78
 
 pub const modules_id = 0x4b6fe466aade04ce
 
+pub const smp_id = 0x34d1d96339647025
+
 [packed]
 struct Tag {
 pub mut:
@@ -74,6 +76,27 @@ pub mut:
 	begin u64
 	end   u64
 	str   [128]byte
+}
+
+[packed]
+struct SMPTag {
+pub mut:
+	tag          Tag
+	flags        u64
+	bsp_lapic_id u32
+	unused       u32
+	cpu_count    u64
+	smp_info     SMPInfo
+}
+
+[packed]
+struct SMPInfo {
+pub mut:
+	processor_id u32
+	lapic_id     u32
+	target_stack u64
+	goto_address u64
+	extra_arg    u64
 }
 
 [packed]

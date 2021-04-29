@@ -7,7 +7,7 @@ V_COMMIT = 626517f5f7c0de6296a876240056a47c99722ec8
 .PHONY: all
 all: $(KERNEL_HDD)
 
-QEMUFLAGS = -M q35 -m 2G -d int -no-reboot -no-shutdown -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
+QEMUFLAGS = -M q35 -m 2G -smp 4 -d int -no-reboot -no-shutdown -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
 
 .PHONY: run-kvm
 run-kvm: $(KERNEL_HDD)
