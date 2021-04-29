@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 KERNEL_HDD = disk.hdd
 
-V_COMMIT = 626517f5f7c0de6296a876240056a47c99722ec8
+V_COMMIT = ea0ac092976b8d654460f18fc286226a6d20a665
 
 .PHONY: all
 all: $(KERNEL_HDD)
@@ -24,7 +24,7 @@ run: $(KERNEL_HDD)
 .PHONY: distro
 distro:
 	mkdir -p build
-	cd build && xbstrap init .. && xbstrap install --all
+	export LC_ALL=C && cd build && xbstrap init .. && xbstrap install --all
 
 3rdparty/dir2fat32-esp:
 	wget https://github.com/mintsuki-org/dir2fat32-esp/raw/master/dir2fat32-esp -O 3rdparty/dir2fat32-esp
