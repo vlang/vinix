@@ -11,22 +11,22 @@ pub fn smp_init(smp_tag &stivale2.SMPTag) {
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
 	println('smp: Total CPU count: ${smp_tag.cpu_count}')
 
-	cpu_locals = []CPULocal{cap: 64}
+	cpu_locals = []&CPULocal{}
 
 	smp_info_array := unsafe { &stivale2.SMPInfo(&smp_tag.smp_info) }
 
 	for i := u64(0); i < smp_tag.cpu_count; i++ {
-		cpu_local := CPULocal{}
+		mut cpu_local := &CPULocal(memory.malloc(sizeof(CPULocal)))
 		cpu_locals << cpu_local
 
 		mut smp_info := unsafe { &smp_info_array[i] }
 
-		smp_info.extra_arg = unsafe { u64(&cpu_locals[i]) }
+		smp_info.extra_arg = u64(cpu_local)
 
 		stack := u64(memory.pmm_alloc(1)) + higher_half
 
-		cpu_locals[i].tss.rsp0 = stack
-		cpu_locals[i].cpu_number = i
+		cpu_local.tss.rsp0 = stack
+		cpu_local.cpu_number = i
 
 		if smp_info.lapic_id == smp_tag.bsp_lapic_id {
 			cpu_init(smp_info)

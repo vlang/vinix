@@ -35,7 +35,7 @@ pub mut:
 }
 
 __global (
-	cpu_locals []CPULocal
+	cpu_locals []&CPULocal
 )
 
 fn cpu_init(smp_info &stivale2.SMPInfo) {
