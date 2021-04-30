@@ -8,7 +8,7 @@ __global (
 )
 
 pub fn kprint(message string) {
-	klock.acquire(kprint_lock)
+	kprint_lock.acquire()
 
 	for i := 0; i < message.len; i++ {
 		asm volatile amd64 {
@@ -20,7 +20,7 @@ pub fn kprint(message string) {
 
 	stivale2.terminal_print(message)
 
-	klock.release(kprint_lock)
+	kprint_lock.release()
 }
 
 fn C.byteptr_vstring(byteptr) string

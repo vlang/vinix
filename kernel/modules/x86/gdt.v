@@ -117,15 +117,17 @@ pub fn gdt_init() {
 		base_high8: 0
 	}
 
-	// Set the GDT pointer for load.
+	gdt_reload()
+}
+
+pub fn gdt_reload() {
 	gdt_pointer = GDTPointer{
 		size: u16(sizeof(GDTPointer) * 9 - 1)
 		address: &gdt_entries
 	}
 
-	// Random ASM vomit.
-	asm amd64 {
-		lgdt [ptr]
+	asm volatile amd64 {
+		lgdt ptr
 		push rax
 		push cseg
 		lea rax, [rip + 0x03]
@@ -137,7 +139,8 @@ pub fn gdt_init() {
 		mov fs, dseg
 		mov gs, dseg
 		mov ss, dseg
-		; ; r (&gdt_pointer) as ptr
+		;
+		; m (gdt_pointer) as ptr
 		  rm (u64(kernel_code_seg)) as cseg
 		  rm (u32(kernel_data_seg)) as dseg
 		; memory

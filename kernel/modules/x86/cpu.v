@@ -38,8 +38,14 @@ __global (
 	cpu_locals []&CPULocal
 )
 
-fn cpu_init(smp_info &stivale2.SMPInfo) {
+pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 	cpu_local := &CPULocal(smp_info.extra_arg)
+
+	gdt_reload()
+	idt_reload()
+
+	set_kernel_gs(u64(voidptr(cpu_local)))
+	set_user_gs(u64(voidptr(cpu_local)))
 
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 
@@ -52,4 +58,12 @@ fn cpu_init(smp_info &stivale2.SMPInfo) {
 			}
 		}
 	}
+}
+
+pub fn set_kernel_gs(ptr u64) {
+	wrmsr(0xc0000101, ptr)
+}
+
+pub fn set_user_gs(ptr u64) {
+	wrmsr(0xc0000102, ptr)
 }

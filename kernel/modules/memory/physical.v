@@ -2,16 +2,12 @@ module memory
 
 import lib
 import stivale2
+import klock
 
 __global (
+	pmm_lock klock.Lock
 	pmm_bitmap lib.Bitmap
-)
-
-__global (
 	pmm_avl_page_count u64
-)
-
-__global (
 	pmm_last_used_index u64
 )
 
@@ -89,12 +85,15 @@ fn inner_alloc(count u64, limit u64) voidptr {
 }
 
 pub fn pmm_alloc(count u64) voidptr {
+	pmm_lock.acquire()
+
 	last := pmm_last_used_index
 	mut ret := inner_alloc(count, pmm_avl_page_count)
 	if ret == 0 {
 		pmm_last_used_index = 0
 		ret = inner_alloc(count, last)
 		if ret == 0 {
+			pmm_lock.release()
 			return 0
 		}
 	}
@@ -106,14 +105,18 @@ pub fn pmm_alloc(count u64) voidptr {
 			ptr[i] = 0
 		}
 	}
+
+	pmm_lock.release()
 	return ret
 }
 
 pub fn pmm_free(ptr voidptr, count u64) {
+	pmm_lock.acquire()
 	page := u64(ptr) / page_size
 	for i := page; i < page + count; i++ {
 		lib.bitreset(pmm_bitmap, i)
 	}
+	pmm_lock.release()
 }
 
 struct MallocMetadata {

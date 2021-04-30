@@ -168,7 +168,7 @@ __global (
 pub fn terminal_print(s string) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
-	klock.acquire(&terminal_print_lock)
+	terminal_print_lock.acquire()
 	ptr(s.str, u64(s.len))
-	klock.release(&terminal_print_lock)
+	terminal_print_lock.release()
 }
