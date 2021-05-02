@@ -1,0 +1,40 @@
+name: vOS nightly build
+
+on: push
+
+jobs:
+  build:
+    name: Build and upload nightly build
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install build-essential git meson m4 texinfo python3 python3-pip util-linux wget mtools qemu-system-x86 && sudo pip3 install xbstrap
+
+      - name: Build distro
+        run: make distro
+
+      - name: Build vOS
+        run: make
+
+      - name: Untag last nightly release
+        run: ( git push --delete origin nightly || true ) && ( git tag --delete nightly || true )
+
+      - name: Tag new nightly release
+        run: git tag nightly && git push --tags
+
+      - name: Rename vos.hdd
+        run: mv vos.hdd vos-nightly.hdd
+
+      - name: Create nightly release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Nightly build
+          tag_name: nightly
+          files: |
+            vos-nightly.hdd
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

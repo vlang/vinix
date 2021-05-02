@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-KERNEL_HDD = disk.hdd
+KERNEL_HDD = vos.hdd
 
 V_COMMIT = 3363c3ef65070046b6b00563cfb1ab90c67d94d1
 
