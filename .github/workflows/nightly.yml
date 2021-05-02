@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install build-essential git meson m4 texinfo python3 python3-pip util-linux wget mtools qemu-system-x86 && sudo pip3 install xbstrap
+        run: sudo apt-get update && sudo apt-get install build-essential git meson m4 texinfo python3 python3-pip util-linux wget mtools zip && sudo pip3 install xbstrap
 
       - name: Build distro
         run: make distro
@@ -29,12 +29,15 @@ jobs:
       - name: Rename vos.hdd
         run: mv vos.hdd vos-nightly.hdd
 
+      - name: Zip up
+        run: zip vos-nightly vos-nightly.hdd
+
       - name: Create nightly release
         uses: softprops/action-gh-release@v1
         with:
           name: Nightly build
           tag_name: nightly
           files: |
-            vos-nightly.hdd
+            vos-nightly.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
