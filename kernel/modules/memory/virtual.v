@@ -4,13 +4,12 @@ import klock
 
 __global (
 	page_size = u64(0x1000)
-)
-
-__global (
 	higher_half = u64(0xffff800000000000)
+	kernel_pagemap Pagemap
 )
 
-pub struct Pagemap {
+struct Pagemap {
+pub mut:
 	l         klock.Lock
 	top_level &u64
 }
@@ -19,16 +18,6 @@ pub fn new_pagemap() Pagemap {
 	top_level := pmm_alloc(1)
 	if top_level == 0 {
 		panic('new_pagemap() allocation failure')
-	}
-	return Pagemap{klock.new(), top_level}
-}
-
-pub fn new_pagemap_from_current() Pagemap {
-	mut top_level := &u64(0)
-	asm volatile amd64 {
-		mov top_level, cr3
-		; =r (top_level)
-		; ; memory
 	}
 	return Pagemap{klock.new(), top_level}
 }
@@ -65,7 +54,9 @@ fn get_next_level(current_level &u64, index u64) &u64 {
 	return ret
 }
 
-pub fn (pagemap Pagemap) map_page(virt u64, phys u64, flags u64) {
+pub fn (pagemap &Pagemap) map_page(virt u64, phys u64, flags u64) {
+	pagemap.l.acquire()
+
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
@@ -79,4 +70,16 @@ pub fn (pagemap Pagemap) map_page(virt u64, phys u64, flags u64) {
 	unsafe {
 		pml1[pml1_entry] = phys | flags
 	}
+
+	pagemap.l.release()
+}
+
+pub fn vmm_init() {
+	mut top_level := &u64(0)
+	asm volatile amd64 {
+		mov top_level, cr3
+		; =r (top_level)
+	}
+	kernel_pagemap.top_level = top_level
+	kernel_pagemap.l = klock.new()
 }

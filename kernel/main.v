@@ -25,7 +25,8 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 		lib.kpanic('Stivale2 memmap tag missing')
 	}
 
-	memory.physical_init(memmap_tag)
+	memory.pmm_init(memmap_tag)
+	memory.vmm_init()
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)

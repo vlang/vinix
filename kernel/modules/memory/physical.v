@@ -11,7 +11,7 @@ __global (
 	pmm_last_used_index u64
 )
 
-pub fn physical_init(memmap &stivale2.MemmapTag) {
+pub fn pmm_init(memmap &stivale2.MemmapTag) {
 	unsafe {
 		mut highest_address := u64(0)
 		mut entries := &memmap.entries

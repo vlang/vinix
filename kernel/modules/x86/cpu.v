@@ -1,6 +1,7 @@
 module x86
 
 import stivale2
+import memory
 
 [packed]
 struct TSS {
@@ -43,6 +44,8 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 
 	gdt_reload()
 	idt_reload()
+
+	kernel_pagemap.switch_to()
 
 	set_kernel_gs(u64(voidptr(cpu_local)))
 	set_user_gs(u64(voidptr(cpu_local)))
