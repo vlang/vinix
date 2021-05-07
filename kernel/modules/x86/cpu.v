@@ -50,6 +50,8 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 	set_kernel_gs(u64(voidptr(cpu_local)))
 	set_user_gs(u64(voidptr(cpu_local)))
 
+	gdt_load_tss(voidptr(&cpu_local.tss))
+
 	// Enable SSE/SSE2
 	mut cr0 := read_cr0()
 	cr0 &= ~(1 << 2)

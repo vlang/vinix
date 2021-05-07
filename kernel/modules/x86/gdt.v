@@ -1,5 +1,7 @@
 module x86
 
+import klock
+
 [packed]
 struct GDTPointer {
 	size    u16
@@ -20,7 +22,11 @@ __global (
 	kernel_code_seg = u16(0x28)
 	kernel_data_seg = u16(0x30)
 	gdt_pointer     GDTPointer
-	gdt_entries     [9]GDTEntry
+	gdt_entries     [11]GDTEntry
+)
+
+__global (
+	gdt_lock klock.Lock
 )
 
 pub fn gdt_init() {
@@ -122,7 +128,7 @@ pub fn gdt_init() {
 
 pub fn gdt_reload() {
 	gdt_pointer = GDTPointer{
-		size: u16(sizeof(GDTPointer) * 9 - 1)
+		size: u16(sizeof(GDTPointer) * 11 - 1)
 		address: &gdt_entries
 	}
 
@@ -145,4 +151,32 @@ pub fn gdt_reload() {
 		  rm (u32(kernel_data_seg)) as dseg
 		; memory
 	}
+}
+
+pub fn gdt_load_tss(addr voidptr) {
+	gdt_lock.acquire()
+
+	gdt_entries[9] = GDTEntry{
+		limit: u16(sizeof(TSS) - 1)
+		base_low16: u16(u64(addr))
+		base_mid8: byte(u64(addr) >> 16)
+		base_high8: byte(u64(addr) >> 24)
+		access: 0b10001001
+		granularity: 0b00000000
+	}
+
+	// High part of the GDT TSS entry, high 32 bits of base
+	gdt_entries[10] = GDTEntry{
+		limit: u16(u64(addr) >> 32)
+		base_low16: u16(u64(addr) >> 48)
+	}
+
+	asm volatile amd64 {
+		ltr offset
+		;
+		; rm (u16(0x48)) as offset
+		; memory
+	}
+
+	gdt_lock.release()
 }
