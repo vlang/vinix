@@ -1,7 +1,6 @@
 module x86
 
 import stivale2
-import memory
 
 [packed]
 struct TSS {
@@ -40,7 +39,8 @@ __global (
 )
 
 pub fn cpu_init(smp_info &stivale2.SMPInfo) {
-	cpu_local := &CPULocal(smp_info.extra_arg)
+	mut cpu_local := &CPULocal(smp_info.extra_arg)
+	cpu_number := cpu_local.cpu_number
 
 	gdt_reload()
 	idt_reload()
@@ -60,11 +60,50 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 	cr4 |= (3 << 9)
 	write_cr4(cr4)
 
+	mut success, _, mut b, mut c, _ := cpuid(1, 0)
+	if success == true && c & cpuid_xsave != 0 {
+		if cpu_number == 0 { println('fpu: xsave supported') }
+
+		// Enable XSAVE and x{get, set}bv
+		cr4 = read_cr4()
+		cr4 |= (1 << 18)
+		write_cr4(cr4)
+
+		mut xcr0 := u64(0)
+		if cpu_number == 0 { println('fpu: Saving x87 state using xsave') }
+		xcr0 |= (1 << 0)
+		if cpu_number == 0 { println('fpu: Saving SSE state using xsave') }
+		xcr0 |= (1 << 1)
+
+		if c & cpuid_avx != 0 {
+			if cpu_number == 0 { println('fpu: Saving AVX state using xsave') }
+			xcr0 |= (1 << 2)
+		}
+
+		success, _, b, c, _ = cpuid(7, 0)
+		if success == true && b & cpuid_avx512 != 0 {
+			if cpu_number == 0 { println('fpu: Saving AVX-512 state using xsave') }
+			xcr0 |= (1 << 5)
+			xcr0 |= (1 << 6)
+			xcr0 |= (1 << 7)
+		}
+
+		wrxcr(0, xcr0)
+
+		cpu_local.fpu_storage_size = size_t(c)
+		cpu_local.fpu_save = xsave
+		cpu_local.fpu_restore = xrstor
+	} else {
+		cpu_local.fpu_storage_size = size_t(512)
+		cpu_local.fpu_save = fxsave
+		cpu_local.fpu_restore = fxrstor
+	}
+
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 
 	atomic_inc(&cpus_online)
 
-	if cpu_local.cpu_number != 0 {
+	if cpu_number != 0 {
 		for {
 			asm volatile amd64 {
 				hlt
@@ -160,6 +199,63 @@ pub fn write_cr4(value u64) {
 		; memory
 	}
 }
+
+pub fn wrxcr(reg u32, value u64) {
+	a := u32(value)
+	d := u32(value >> 32)
+	asm volatile amd64 {
+		xsetbv
+		;
+		; a (a)
+		  d (d)
+		  c (reg)
+		; memory
+	}
+}
+
+fn xsave(region voidptr) {
+	asm volatile amd64 {
+		xsave [region]
+		;
+		; r (region)
+		  a (0xffffffff)
+		  d (0xffffffff)
+		; memory
+	}
+}
+
+fn xrstor(region voidptr) {
+	asm volatile amd64 {
+		xrstor [region]
+		;
+		; r (region)
+		  a (0xffffffff)
+		  d (0xffffffff)
+		; memory
+	}
+}
+
+fn fxsave(region voidptr) {
+	asm volatile amd64 {
+		fxsave [region]
+		;
+		; r (region)
+		; memory
+	}
+}
+
+fn fxrstor(region voidptr) {
+	asm volatile amd64 {
+		fxrstor [region]
+		;
+		; r (region)
+		; memory
+	}
+}
+
+pub const cpuid_xsave = u32(1 << 26)
+pub const cpuid_avx = u32(1 << 28)
+pub const cpuid_avx512 = u32(1 << 16)
 
 pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 	mut cpuid_max := u32(0)
