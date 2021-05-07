@@ -57,7 +57,7 @@ fn path2node(parent &VFSNode, path string, flags Path2NodeFlags) &VFSNode {
 	}
 
 	mut index := u64(0)
-	mut current_node := parent
+	mut current_node := unsafe { parent }
 
 	for {
 		for path[index] == `/` {

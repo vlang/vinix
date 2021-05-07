@@ -39,7 +39,7 @@ fn use_xsdt() bool {
 }
 
 pub fn init(rsdp_ptr &RSDP) {
-	rsdp = rsdp_ptr
+	rsdp = unsafe { rsdp_ptr }
 
 	oem := C.byteptr_vstring_with_len(byteptr(&rsdp.oem_id), 6)
 
