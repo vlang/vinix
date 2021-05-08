@@ -42,6 +42,8 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 	mut cpu_local := &CPULocal(smp_info.extra_arg)
 	cpu_number := cpu_local.cpu_number
 
+	cpu_local.lapic_id = smp_info.lapic_id
+
 	gdt_reload()
 	idt_reload()
 
@@ -96,10 +98,13 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 		cpu_local.fpu_save = xsave
 		cpu_local.fpu_restore = xrstor
 	} else {
+		if cpu_number == 0 { println('fpu: Using legacy fxsave') }
 		cpu_local.fpu_storage_size = size_t(512)
 		cpu_local.fpu_save = fxsave
 		cpu_local.fpu_restore = fxrstor
 	}
+
+	lapic_enable(0xff)
 
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 

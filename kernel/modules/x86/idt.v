@@ -1,6 +1,7 @@
 module x86
 
 import lib
+import klock
 
 [packed]
 struct IDTPointer {
@@ -22,7 +23,16 @@ struct IDTEntry {
 __global (
 	idt_pointer IDTPointer
 	idt_entries [256]IDTEntry
+	idt_free_vector = byte(32)
+	idt_lock klock.Lock
 )
+
+pub fn idt_allocate_vector() byte {
+	idt_lock.acquire()
+	ret := idt_free_vector++
+	idt_lock.release()
+	return ret
+}
 
 pub fn idt_init() {
 	for i := u16(0); i < 256; i++ {

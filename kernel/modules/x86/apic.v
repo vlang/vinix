@@ -57,7 +57,7 @@ fn io_apic_from_gsi(gsi u32) int {
 	panic('Cannot determine IO APIC from GSI')
 }
 
-pub fn io_apic_set_gsi_redirect(lapic_id int, vector u8, gsi u32, flags u16, status bool) {
+pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, status bool) {
 	io_apic := io_apic_from_gsi(gsi)
 
 	mut redirect := u64(vector)
@@ -82,7 +82,7 @@ pub fn io_apic_set_gsi_redirect(lapic_id int, vector u8, gsi u32, flags u16, sta
 	io_apic_write(io_apic, ioredtbl + 1, u32(redirect >> 32))
 }
 
-pub fn io_apic_set_irq_redirect(lapic_id int, vector u8, irq u8, status bool) {
+pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {
 			println('apic: IRQ $irq using override')

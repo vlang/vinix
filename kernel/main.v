@@ -5,6 +5,7 @@ import acpi
 import x86
 import initramfs
 import fs
+import sched
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -45,6 +46,8 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	}
 
 	x86.smp_init(smp_tag)
+
+	sched.initialise()
 
 	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
 	if modules_tag == 0 {
