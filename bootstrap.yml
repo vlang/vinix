@@ -8,9 +8,9 @@ sources:
 
   - name: gcc
     subdir: 'ports'
-    url: 'https://ftp.gnu.org/gnu/gcc/gcc-10.3.0/gcc-10.3.0.tar.xz'
+    url: 'https://ftp.gnu.org/gnu/gcc/gcc-11.1.0/gcc-11.1.0.tar.xz'
     format: 'tar.xz'
-    extract_path: 'gcc-10.3.0'
+    extract_path: 'gcc-11.1.0'
     patch-path-strip: 3
     tools_required:
       - host-autoconf-v2.69

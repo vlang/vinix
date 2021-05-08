@@ -1,27 +1,27 @@
 diff --git a/ports/gcc-orig/config.sub b/ports/gcc-workdir/config.sub
-index a318a46..50219de 100755
+index 63c1f1c..4960c39 100755
 --- a/ports/gcc-orig/config.sub
 +++ b/ports/gcc-workdir/config.sub
-@@ -135,7 +135,7 @@ case $1 in
- 			| linux-newlib* | linux-musl* | linux-uclibc* | uclinux-uclibc* \
+@@ -134,7 +134,7 @@ case $1 in
+ 			nto-qnx* | linux-* | uclinux-uclibc* \
  			| uclinux-gnu* | kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* \
  			| netbsd*-eabi* | kopensolaris*-gnu* | cloudabi*-eabi* \
 -			| storm-chaos* | os2-emx* | rtmk-nova*)
 +			| storm-chaos* | os2-emx* | rtmk-nova* | vix*)
  				basic_machine=$field1
- 				os=$maybe_os
+ 				basic_os=$maybe_os
  				;;
-@@ -1366,7 +1366,7 @@ case $os in
- 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
- 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
- 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
--	     | nsk* | powerunix)
-+	     | nsk* | powerunix | vix*)
- 	# Remember, each alternative MUST END IN *, to match a version number.
- 		;;
- 	qnx*)
+@@ -1700,7 +1700,7 @@ case $os in
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+ 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
+ 	     | hiux* | abug | nacl* | netware* | windows* \
+-	     | os9* | macos* | osx* | ios* \
++	     | os9* | macos* | osx* | ios* | vix* \
+ 	     | mpw* | magic* | mmixware* | mon960* | lnews* \
+ 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
+ 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
 diff --git a/ports/gcc-orig/fixincludes/mkfixinc.sh b/ports/gcc-workdir/fixincludes/mkfixinc.sh
-index df90720..9e645dd 100755
+index df90720..6ae3723 100755
 --- a/ports/gcc-orig/fixincludes/mkfixinc.sh
 +++ b/ports/gcc-workdir/fixincludes/mkfixinc.sh
 @@ -12,6 +12,7 @@ target=fixinc.sh
@@ -34,7 +34,7 @@ index df90720..9e645dd 100755
      powerpc-*-eabisim* | \
 diff --git a/ports/gcc-workdir/gcc/config/vix.h b/ports/gcc-workdir/gcc/config/vix.h
 new file mode 100644
-index 0000000..7946a42
+index 0000000..05828bf
 --- /dev/null
 +++ b/ports/gcc-workdir/gcc/config/vix.h
 @@ -0,0 +1,29 @@
@@ -68,12 +68,12 @@ index 0000000..7946a42
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff --git a/ports/gcc-orig/gcc/config.gcc b/ports/gcc-workdir/gcc/config.gcc
-index 6fcdd77..d724d67 100644
+index 357b0be..0e5cee7 100644
 --- a/ports/gcc-orig/gcc/config.gcc
 +++ b/ports/gcc-workdir/gcc/config.gcc
-@@ -803,6 +803,15 @@ case ${target} in
-   esac
-   use_gcc_stdint=wrap
+@@ -822,6 +822,15 @@ case ${target} in
+   tmake_file="${tmake_file} t-freebsd"
+   target_has_targetdm=yes
    ;;
 +*-*-vix*)
 +  extra_options="$extra_options gnu-user.opt"
@@ -87,7 +87,7 @@ index 6fcdd77..d724d67 100644
  *-*-fuchsia*)
    native_system_header_dir=/include
    ;;
-@@ -2233,6 +2242,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
+@@ -2240,6 +2249,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
  			;;
  	esac
  	;;
@@ -98,10 +98,10 @@ index 6fcdd77..d724d67 100644
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
 diff --git a/ports/gcc-orig/libgcc/config.host b/ports/gcc-workdir/libgcc/config.host
-index c529cc4..b4e68d6 100644
+index f808b61..96f6658 100644
 --- a/ports/gcc-orig/libgcc/config.host
 +++ b/ports/gcc-workdir/libgcc/config.host
-@@ -248,6 +248,11 @@ case ${host} in
+@@ -245,6 +245,11 @@ case ${host} in
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
    extra_parts="crtbegin.o crtend.o"
    ;;
@@ -113,7 +113,7 @@ index c529cc4..b4e68d6 100644
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
-@@ -711,6 +716,9 @@ x86_64-*-elf* | x86_64-*-rtems*)
+@@ -703,6 +708,9 @@ x86_64-*-elf* | x86_64-*-rtems*)
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
@@ -123,14 +123,27 @@ index c529cc4..b4e68d6 100644
  i[34567]86-*-dragonfly*)
  	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
  	md_unwind_header=i386/dragonfly-unwind.h
+diff --git a/ports/gcc-orig/libgcc/libgcov.h b/ports/gcc-workdir/libgcc/libgcov.h
+index 7b0d367..2ba714e 100644
+--- a/ports/gcc-orig/libgcc/libgcov.h
++++ b/ports/gcc-workdir/libgcc/libgcov.h
+@@ -37,6 +37,8 @@
+ /* About the target.  */
+ /* This path will be used by libgcov runtime.  */
+ 
++#include <stdint.h>
++
+ #include "tconfig.h"
+ #include "auto-target.h"
+ #include "tsystem.h"
 diff --git a/ports/gcc-orig/libstdc++-v3/crossconfig.m4 b/ports/gcc-workdir/libstdc++-v3/crossconfig.m4
-index fe18288..13a62ed 100644
+index ff44d5a..3ddd89c 100644
 --- a/ports/gcc-orig/libstdc++-v3/crossconfig.m4
 +++ b/ports/gcc-workdir/libstdc++-v3/crossconfig.m4
-@@ -131,6 +131,14 @@ case "${host}" in
-     AC_CHECK_FUNCS(sockatmark)
+@@ -136,6 +136,14 @@ case "${host}" in
+     AC_CHECK_FUNCS(uselocale)
      ;;
-
+ 
 +  *-vix*)
 +    GLIBCXX_CHECK_COMPILER_FEATURES
 +    GLIBCXX_CHECK_LINKER_FEATURES
@@ -143,13 +156,13 @@ index fe18288..13a62ed 100644
      SECTION_FLAGS='-ffunction-sections -fdata-sections'
      AC_SUBST(SECTION_FLAGS)
 diff --git a/ports/gcc-orig/libtool.m4 b/ports/gcc-workdir/libtool.m4
-index 0020654..c814147 100644
+index 17f8e5f..243bc87 100644
 --- a/ports/gcc-orig/libtool.m4
 +++ b/ports/gcc-workdir/libtool.m4
-@@ -2501,6 +2501,16 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
+@@ -2491,6 +2491,16 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu* | uclinuxfdpiceabi)
    dynamic_linker='GNU/Linux ld.so'
    ;;
-
+ 
 +vix*)
 +  version_type=linux
 +  need_lib_prefix=no
@@ -163,10 +176,10 @@ index 0020654..c814147 100644
  netbsd*)
    version_type=sunos
    need_lib_prefix=no
-@@ -3100,6 +3110,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
+@@ -3090,6 +3100,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
    lt_cv_deplibs_check_method=pass_all
    ;;
-
+ 
 +vix*)
 +  lt_cv_deplibs_check_method=pass_all
 +  ;;
