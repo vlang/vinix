@@ -34,9 +34,19 @@ pub fn idt_allocate_vector() byte {
 	return ret
 }
 
+__global (
+	interrupt_thunks [256]voidptr
+	interrupt_table [256](fn (u32, &CPUGPRState))
+)
+
+fn C.prepare_interrupt_thunks()
+
 pub fn idt_init() {
+	C.prepare_interrupt_thunks()
+
 	for i := u16(0); i < 256; i++ {
-		idt_register_handler(i, &generic_exception, 0)
+		idt_register_handler(i, interrupt_thunks[i], 0)
+		interrupt_table[i] = unhandled_interrupt
 	}
 
 	idt_reload()
@@ -70,6 +80,6 @@ pub fn idt_register_handler(vector u16, handler voidptr, ist byte) {
 	}
 }
 
-fn generic_exception() {
-	lib.kpanic('Unhandled exception triggered')
+fn unhandled_interrupt(num u32, gpr_state &CPUGPRState) {
+	lib.kpanic('Unhandled interrupt (${num})')
 }
