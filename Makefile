@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-KERNEL_HDD = vos.hdd
+KERNEL_HDD = vix.hdd
 
 V_COMMIT = e9d7ff751f7c2a75b0cb805c07ae1e6e01af498b
 
@@ -45,17 +45,17 @@ distro:
 update-v: 3rdparty/v
 	cd 3rdparty/v && ( git checkout $(V_COMMIT) || ( git checkout master && git pull && git checkout $(V_COMMIT) && $(MAKE) ) )
 
-.PHONY: kernel/vos.elf
-kernel/vos.elf: update-v
+.PHONY: kernel/vix.elf
+kernel/vix.elf: update-v
 	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" \
-		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vos-gcc`" \
-		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vos-objdump`"
+		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vix-gcc`" \
+		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vix-objdump`"
 
-$(KERNEL_HDD): 3rdparty/limine 3rdparty/dir2fat32-esp kernel/vos.elf
+$(KERNEL_HDD): 3rdparty/limine 3rdparty/dir2fat32-esp kernel/vix.elf
 	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
 	rm -rf pack
 	mkdir -p pack
-	cp initramfs.tar.gz kernel/vos.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
+	cp initramfs.tar.gz kernel/vix.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
 	mkdir -p pack/EFI/BOOT
 	cp 3rdparty/limine/BOOTX64.EFI pack/EFI/BOOT/
 	./3rdparty/dir2fat32-esp -f $(KERNEL_HDD) 64 pack

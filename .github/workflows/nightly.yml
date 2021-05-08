@@ -1,4 +1,4 @@
-name: vOS nightly build
+name: Vix nightly build
 
 on: push
 
@@ -19,7 +19,7 @@ jobs:
       - name: Build distro
         run: make distro
 
-      - name: Build vOS
+      - name: Build Vix
         run: make
 
       - name: Untag last nightly release
@@ -28,19 +28,19 @@ jobs:
       - name: Tag new nightly release
         run: git tag nightly && git push --tags
 
-      - name: Rename vos.hdd
-        run: mv vos.hdd vos-nightly.hdd
+      - name: Rename vix.hdd
+        run: mv vix.hdd vix-nightly.hdd
 
       - name: Zip up
-        run: zip vos-nightly vos-nightly.hdd
+        run: zip vix-nightly vix-nightly.hdd
 
       - name: Create nightly release
         uses: softprops/action-gh-release@v1
         with:
           name: Nightly build
           tag_name: nightly
-          body: Image of an up to date vOS nightly build.
+          body: Image of an up to date Vix nightly build.
           files: |
-            vos-nightly.zip
+            vix-nightly.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

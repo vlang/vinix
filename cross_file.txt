@@ -1,12 +1,12 @@
 [binaries]
-c = 'x86_64-vos-gcc'
-cpp = 'x86_64-vos-g++'
-ar = 'x86_64-vos-ar'
-strip = 'x86_64-vos-strip'
+c = 'x86_64-vix-gcc'
+cpp = 'x86_64-vix-g++'
+ar = 'x86_64-vix-ar'
+strip = 'x86_64-vix-strip'
 pkgconfig = 'pkg-config'
 
 [host_machine]
-system = 'vos'
+system = 'vix'
 cpu_family = 'x86_64'
 cpu = 'x86_64'
 endian = 'little'

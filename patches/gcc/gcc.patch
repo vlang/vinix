@@ -7,7 +7,7 @@ index a318a46..50219de 100755
  			| uclinux-gnu* | kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* \
  			| netbsd*-eabi* | kopensolaris*-gnu* | cloudabi*-eabi* \
 -			| storm-chaos* | os2-emx* | rtmk-nova*)
-+			| storm-chaos* | os2-emx* | rtmk-nova* | vos*)
++			| storm-chaos* | os2-emx* | rtmk-nova* | vix*)
  				basic_machine=$field1
  				os=$maybe_os
  				;;
@@ -16,7 +16,7 @@ index a318a46..50219de 100755
  	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
  	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
 -	     | nsk* | powerunix)
-+	     | nsk* | powerunix | vos*)
++	     | nsk* | powerunix | vix*)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	qnx*)
@@ -28,18 +28,18 @@ index df90720..9e645dd 100755
  # Check for special fix rules for particular targets
  case $machine in
      i?86-*-cygwin* | \
-+    x86_64-*-vos* | \
++    x86_64-*-vix* | \
      i?86-*-mingw32* | \
      x86_64-*-mingw32* | \
      powerpc-*-eabisim* | \
-diff --git a/ports/gcc-workdir/gcc/config/vos.h b/ports/gcc-workdir/gcc/config/vos.h
+diff --git a/ports/gcc-workdir/gcc/config/vix.h b/ports/gcc-workdir/gcc/config/vix.h
 new file mode 100644
 index 0000000..7946a42
 --- /dev/null
-+++ b/ports/gcc-workdir/gcc/config/vos.h
++++ b/ports/gcc-workdir/gcc/config/vix.h
 @@ -0,0 +1,29 @@
-+#undef TARGET_VOS
-+#define TARGET_VOS 1
++#undef TARGET_VIX
++#define TARGET_VIX 1
 +
 +#undef LIB_SPEC
 +#define LIB_SPEC "-lc -lm"
@@ -61,9 +61,9 @@ index 0000000..7946a42
 +#undef TARGET_OS_CPP_BUILTINS
 +#define TARGET_OS_CPP_BUILTINS()         \
 +  do {                                   \
-+    builtin_define ("__vos__");    \
++    builtin_define ("__vix__");    \
 +    builtin_define ("__unix__");         \
-+    builtin_assert ("system=vos"); \
++    builtin_assert ("system=vix"); \
 +    builtin_assert ("system=unix");      \
 +    builtin_assert ("system=posix");     \
 +  } while (0);
@@ -75,7 +75,7 @@ index 6fcdd77..d724d67 100644
    esac
    use_gcc_stdint=wrap
    ;;
-+*-*-vos*)
++*-*-vix*)
 +  extra_options="$extra_options gnu-user.opt"
 +  gas=yes
 +  gnu_ld=yes
@@ -91,8 +91,8 @@ index 6fcdd77..d724d67 100644
  			;;
  	esac
  	;;
-+x86_64-*-vos*)
-+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h vos.h"
++x86_64-*-vix*)
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h vix.h"
 +	;;
  x86_64-*-fuchsia*)
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
@@ -105,7 +105,7 @@ index c529cc4..b4e68d6 100644
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
    extra_parts="crtbegin.o crtend.o"
    ;;
-+*-*-vos*)
++*-*-vix*)
 +  extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
 +  tmake_file="$tmake_file t-crtstuff-pic"
 +  tmake_file="$tmake_file t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
@@ -117,7 +117,7 @@ index c529cc4..b4e68d6 100644
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
-+x86_64-*-vos*)
++x86_64-*-vix*)
 +	tmake_file="$tmake_file i386/t-crtstuff"
 +	;;
  i[34567]86-*-dragonfly*)
@@ -130,8 +130,8 @@ index fe18288..13a62ed 100644
 @@ -131,6 +131,14 @@ case "${host}" in
      AC_CHECK_FUNCS(sockatmark)
      ;;
- 
-+  *-vos*)
+
++  *-vix*)
 +    GLIBCXX_CHECK_COMPILER_FEATURES
 +    GLIBCXX_CHECK_LINKER_FEATURES
 +    GLIBCXX_CHECK_MATH_SUPPORT
@@ -149,8 +149,8 @@ index 0020654..c814147 100644
 @@ -2501,6 +2501,16 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
    dynamic_linker='GNU/Linux ld.so'
    ;;
- 
-+vos*)
+
++vix*)
 +  version_type=linux
 +  need_lib_prefix=no
 +  need_version=no
@@ -166,8 +166,8 @@ index 0020654..c814147 100644
 @@ -3100,6 +3110,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | uclinuxfdpiceabi)
    lt_cv_deplibs_check_method=pass_all
    ;;
- 
-+vos*)
+
++vix*)
 +  lt_cv_deplibs_check_method=pass_all
 +  ;;
 +

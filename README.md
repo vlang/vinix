@@ -1,4 +1,4 @@
-# vOS
+# Vix
 
 An effort to write a modern, fast, and interesting operating system in V.
 
@@ -23,13 +23,13 @@ Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
 
 ### OS-agnostic build prerequisites
 
-The following is an OS-agnostic list of packages needed to build vOS. Skip to a paragraph for your host OS if there is any.
+The following is an OS-agnostic list of packages needed to build Vix. Skip to a paragraph for your host OS if there is any.
 
 `GNU make`, `GNU patch`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `util-linux`, `wget`, `mtools`, and `qemu` to test it.
 
 ### Build prerequisites for macOS
 
-These are the step-by-step instructions to build vOS on macOS:
+These are the step-by-step instructions to build Vix on macOS:
 
 First of all, it is necessary to have `brew` installed:
 ```bash
