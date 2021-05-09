@@ -18,7 +18,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	stivale2.terminal_init(stivale2_struct)
 
 	// We're alive
-	lib.kprint('Welcome to Vix\n\n')
+	lib.kprint('Welcome to Veenyl\n\n')
 
 	// Initialize the memory allocator.
 	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }

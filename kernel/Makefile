@@ -1,4 +1,4 @@
-KERNEL := vix.elf
+KERNEL := veenyl.elf
 
 OBJDUMP = objdump
 CC = cc
