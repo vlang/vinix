@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 KERNEL_HDD = vinix.hdd
 
-V_COMMIT = e9d7ff751f7c2a75b0cb805c07ae1e6e01af498b
+V_COMMIT = 38d16229efb67d1c06a273bf335f66ba2638d261
 
 .PHONY: all
 all: vinix.iso
@@ -47,12 +47,12 @@ kernel/vinix.elf: update-v
 		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vinix-gcc`" \
 		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vinix-objdump`"
 
-vinix.iso: 3rdparty/limine 3rdparty/dir2fat32-esp kernel/vinix.elf
+vinix.iso: 3rdparty/limine kernel/vinix.elf
 	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
 	rm -rf pack
 	mkdir -p pack/boot
-	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp limine.cfg pack/
-	cp 3rdparty/limine/limine.sys 3rdparty/limine/limine-cd.bin 3rdparty/limine/limine-eltorito-efi.bin pack/boot/
+	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp pack/
+	cp limine.cfg 3rdparty/limine/limine.sys 3rdparty/limine/limine-cd.bin 3rdparty/limine/limine-eltorito-efi.bin pack/boot/
 	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table -part_like_isohybrid -eltorito-alt-boot -e /boot/limine-eltorito-efi.bin -no-emul-boot pack -isohybrid-gpt-basdat -o vinix.iso
 	./3rdparty/limine/limine-install vinix.iso
 
