@@ -1,5 +1,7 @@
 module memory
 
+import lib
+import stivale2
 import klock
 
 __global (
@@ -74,12 +76,26 @@ pub fn (pagemap &Pagemap) map_page(virt u64, phys u64, flags u64) {
 	pagemap.l.release()
 }
 
-pub fn vmm_init() {
-	mut top_level := &u64(0)
-	asm volatile amd64 {
-		mov top_level, cr3
-		; =r (top_level)
+pub fn vmm_init(memmap &stivale2.MemmapTag) {
+	kernel_pagemap = new_pagemap()
+	for i := u64(0x1000); i < 0x100000000; i += page_size {
+		kernel_pagemap.map_page(i, i, 0x03)
+		kernel_pagemap.map_page(i + higher_half, i, 0x03)
 	}
-	kernel_pagemap.top_level = top_level
-	kernel_pagemap.l = klock.new()
+	for i := u64(0); i < 0x80000000; i += page_size {
+		kernel_pagemap.map_page(i + u64(0xffffffff80000000), i, 0x03)
+	}
+	entries := &memmap.entries
+	for i := 0; i < memmap.entry_count; i++ {
+		base := unsafe { lib.align_down(entries[i].base, page_size) }
+		top := unsafe { lib.align_up(entries[i].base + entries[i].length, page_size) }
+		for j := base; j < top; j += page_size {
+			if j < u64(0x100000000) {
+				continue
+			}
+			kernel_pagemap.map_page(j, j, 0x03)
+			kernel_pagemap.map_page(j, j + higher_half, 0x03)
+		}
+	}
+	kernel_pagemap.switch_to()
 }

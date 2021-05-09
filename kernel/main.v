@@ -27,7 +27,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	}
 
 	memory.pmm_init(memmap_tag)
-	memory.vmm_init()
+	memory.vmm_init(memmap_tag)
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
