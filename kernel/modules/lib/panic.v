@@ -14,3 +14,7 @@ pub fn kpanic(message string) {
 		}
 	}
 }
+
+pub fn kpanicc(message charptr) {
+	kpanic(C.char_vstring(message))
+}

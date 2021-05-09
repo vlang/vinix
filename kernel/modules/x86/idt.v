@@ -36,7 +36,7 @@ pub fn idt_allocate_vector() byte {
 
 __global (
 	interrupt_thunks [256]voidptr
-	interrupt_table [256](fn (u32, &CPUGPRState))
+	interrupt_table [256]voidptr
 )
 
 fn C.prepare_interrupt_thunks()
@@ -46,7 +46,7 @@ pub fn idt_init() {
 
 	for i := u16(0); i < 256; i++ {
 		idt_register_handler(i, interrupt_thunks[i], 0)
-		interrupt_table[i] = unhandled_interrupt
+		interrupt_table[i] = voidptr(unhandled_interrupt)
 	}
 
 	idt_reload()

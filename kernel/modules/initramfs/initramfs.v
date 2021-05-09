@@ -64,7 +64,6 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 		}
 
 		size := octal_to_int(C.byteptr_vstring(&current_header.size[0]))
-		name := C.byteptr_vstring(&current_header.name[0])
 
 		match USTARFileType(current_header.filetype) {
 			.directory {

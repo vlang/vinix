@@ -1,8 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void *malloc(size_t size);
-
 __attribute__((naked, used))
 void interrupt_thunk(void) {
     asm (
@@ -55,6 +53,10 @@ extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_stor
 extern uint64_t interrupt_thunk_offset;
 extern uint32_t interrupt_thunk_number;
 extern uint64_t interrupt_thunk_size;
+extern void *interrupt_table[];
+extern void *interrupt_thunks[];
+
+void *memcpy(void *dest, const void *src, size_t n);
 
 void prepare_interrupt_thunks(void) {
     for (size_t i = 0; i < 256; i++) {

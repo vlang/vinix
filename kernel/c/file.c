@@ -3,6 +3,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+void lib__kpanicc(char *message);
+void lib__kprintc(char *str);
+
 typedef long ssize_t;
 
 FILE *stdin  = NULL;
@@ -16,7 +19,7 @@ int fflush(FILE *stream) {
 
 int getc(FILE *stream) {
     (void)stream;
-    lib__kpanic(char_vstring("getc is a stub"));
+    lib__kpanicc("getc is a stub");
     return -1;
 }
 
@@ -24,20 +27,20 @@ char *fgets(char *str, size_t count, FILE *stream) {
     (void)str;
     (void)count;
     (void)stream;
-    lib__kpanic(char_vstring("fgets is a stub"));
+    lib__kpanicc("fgets is a stub");
     return NULL;
 }
 
 FILE *popen(const char *command, const char *type) {
     (void)command;
     (void)type;
-    lib__kpanic(char_vstring("popen is a stub"));
+    lib__kpanicc("popen is a stub");
     return NULL;
 }
 
 int pclose(FILE *stream) {
     (void)stream;
-    lib__kpanic(char_vstring("pclose is a stub"));
+    lib__kpanicc("pclose is a stub");
     return -1;
 }
 
@@ -46,9 +49,9 @@ ssize_t write(int fd, const void *buf, size_t count) {
     (void)buf;
     (void)count;
     if (fd != 1 && fd != 2) {
-        lib__kpanic(char_vstring("write to fd != 1 || fd != 2 is a stub"));
+        lib__kpanicc("write to fd != 1 || fd != 2 is a stub");
     }
-    lib__kprint(char_vstring((char *)buf));
+    lib__kprintc((char *)buf);
     return 0;
 }
 

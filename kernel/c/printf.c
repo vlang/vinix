@@ -36,9 +36,11 @@
 #include <stdarg.h>
 
 
+void lib__kprintc(char *str);
+
 void _putchar(char character) {
   char s[] = { character, 0 };
-  lib__kprint(char_vstring(s));
+  lib__kprintc(s);
 }
 
 // no floats in kernel
