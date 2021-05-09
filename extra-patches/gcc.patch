@@ -7,7 +7,7 @@ diff -urN --no-dereference gcc/gmp-6.1.0/configfsf.sub gcc-patched/gmp-6.1.0/con
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
 -	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
 +	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
-+	      | -veenyl*)
++	      | -vinix*)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
@@ -20,7 +20,7 @@ diff -urN --no-dereference gcc/isl-0.18/config.sub gcc-patched/isl-0.18/config.s
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
 -	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
 +	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
-+	      | -veenyl*)
++	      | -vinix*)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
@@ -33,7 +33,7 @@ diff -urN --no-dereference gcc/mpc-1.0.3/config.sub gcc-patched/mpc-1.0.3/config
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
 -	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
 +	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
-+	      | -veenyl*)
++	      | -vinix*)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
@@ -46,7 +46,7 @@ diff -urN --no-dereference gcc/mpfr-3.1.4/config.sub gcc-patched/mpfr-3.1.4/conf
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
 -	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
 +	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
-+	      | -veenyl*)
++	      | -vinix*)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)

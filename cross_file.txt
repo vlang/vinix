@@ -1,12 +1,12 @@
 [binaries]
-c = 'x86_64-veenyl-gcc'
-cpp = 'x86_64-veenyl-g++'
-ar = 'x86_64-veenyl-ar'
-strip = 'x86_64-veenyl-strip'
+c = 'x86_64-vinix-gcc'
+cpp = 'x86_64-vinix-g++'
+ar = 'x86_64-vinix-ar'
+strip = 'x86_64-vinix-strip'
 pkgconfig = 'pkg-config'
 
 [host_machine]
-system = 'veenyl'
+system = 'vinix'
 cpu_family = 'x86_64'
 cpu = 'x86_64'
 endian = 'little'

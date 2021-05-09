@@ -6,7 +6,7 @@ index e7b55b0..e3d1e2a 100644
      targ_defvec=i386_elf32_vec
      targ_selvecs="iamcu_elf32_vec i386_pe_vec i386_pei_vec"
      ;;
-+  x86_64-*-veenyl*)
++  x86_64-*-vinix*)
 +    targ_defvec=x86_64_elf64_vec
 +    targ_selvecs=i386_elf32_vec
 +    want64=true
@@ -23,7 +23,7 @@ index b0f8492..60f9513 100755
  	     | ptx* | coff* | ecoff* | winnt* | domain* | vsta* \
  	     | udi* | lites* | ieee* | go32* | aux* | hcos* \
 -	     | chorusrdb* | cegcc* | glidix* \
-+	     | chorusrdb* | cegcc* | glidix* | veenyl* \
++	     | chorusrdb* | cegcc* | glidix* | vinix* \
  	     | cygwin* | msys* | pe* | moss* | proelf* | rtems* \
  	     | midipix* | mingw32* | mingw64* | mint* \
  	     | uxpv* | beos* | mpeix* | udk* | moxiebox* \
@@ -35,7 +35,7 @@ index 6f46e0a..23921f1 100644
    i386-*-beos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
    i386-*-elf*)				fmt=elf ;;
-+  i386-*-veenyl*)				fmt=elf ;;
++  i386-*-vinix*)				fmt=elf ;;
    i386-*-fuchsia*)			fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-netbsdpe*)			fmt=coff em=pe ;;
@@ -47,7 +47,7 @@ index 0c780b2..8407607 100644
  i[3-7]86-*-bsdi*)	targ_emul=i386bsd
  			targ_extra_ofiles=
  			;;
-+x86_64-*-veenyl*)
++x86_64-*-vinix*)
 +			targ_emul=elf_x86_64
 +			targ_extra_emuls=elf_i386
 +			;;

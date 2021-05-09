@@ -1,4 +1,4 @@
-name: Veenyl nightly build
+name: Vinix nightly build
 
 on: push
 
@@ -19,7 +19,7 @@ jobs:
       - name: Build distro
         run: make distro
 
-      - name: Build Veenyl
+      - name: Build Vinix
         run: make
 
       - name: Untag last nightly release
@@ -28,19 +28,19 @@ jobs:
       - name: Tag new nightly release
         run: git tag nightly && git push --tags
 
-      - name: Rename veenyl.hdd
-        run: mv veenyl.hdd veenyl-nightly.hdd
+      - name: Rename vinix.hdd
+        run: mv vinix.hdd vinix-nightly.hdd
 
       - name: Zip up
-        run: zip veenyl-nightly veenyl-nightly.hdd
+        run: zip vinix-nightly vinix-nightly.hdd
 
       - name: Create nightly release
         uses: softprops/action-gh-release@v1
         with:
           name: Nightly build
           tag_name: nightly
-          body: Image of an up to date veenyl nightly build.
+          body: Image of an up to date vinix nightly build.
           files: |
-            veenyl-nightly.zip
+            vinix-nightly.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

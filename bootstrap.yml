@@ -72,7 +72,7 @@ tools:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
-        - '--target=x86_64-veenyl'
+        - '--target=x86_64-vinix'
         - '--with-sysroot=@SYSROOT_DIR@'
         # On recent compilers, binutils 2.26 causes implicit-fallthrough warnings, among others.
         - '--disable-werror'
@@ -92,7 +92,7 @@ tools:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
-        - '--target=x86_64-veenyl'
+        - '--target=x86_64-vinix'
         - '--with-sysroot=@SYSROOT_DIR@'
         - '--enable-languages=c,c++'
         - '--disable-multilib'
@@ -110,11 +110,11 @@ tools:
           - args: ['make', 'install-gcc']
           # GCC does *not* look for target-prefixed LD/AS.
           # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
-          - args: ['mkdir', '-p', '@PREFIX@/x86_64-veenyl/bin']
-          - args: ['ln', '-sf', '../../../host-binutils/x86_64-veenyl/bin/as',
-                               '@PREFIX@/x86_64-veenyl/bin/as']
-          - args: ['ln', '-sf', '../../../host-binutils/x86_64-veenyl/bin/ld',
-                               '@PREFIX@/x86_64-veenyl/bin/ld']
+          - args: ['mkdir', '-p', '@PREFIX@/x86_64-vinix/bin']
+          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vinix/bin/as',
+                               '@PREFIX@/x86_64-vinix/bin/as']
+          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vinix/bin/ld',
+                               '@PREFIX@/x86_64-vinix/bin/ld']
       - name: libgcc
         tools_required:
           - tool: host-gcc

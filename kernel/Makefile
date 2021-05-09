@@ -1,4 +1,4 @@
-KERNEL := veenyl.elf
+KERNEL := vinix.elf
 
 OBJDUMP = objdump
 CC = cc
