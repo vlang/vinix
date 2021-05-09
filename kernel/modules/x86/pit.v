@@ -1,9 +1,9 @@
 module x86
 
-pub fn pit_set_freq(freq u16) {
+pub fn pit_set_freq(freq u32) {
 	println('pit: Setting frequency to ${freq} Hz')
 
-	dividend := u16(1193182)
+	dividend := u32(1193182)
 
 	mut ticks := dividend / freq
 	if dividend % freq > freq / 2 {
@@ -11,5 +11,5 @@ pub fn pit_set_freq(freq u16) {
 	}
 
 	outb(0x40, byte(ticks))
-	outb(0x40, byte((ticks >> 8)))
+	outb(0x40, byte(ticks >> 8))
 }
