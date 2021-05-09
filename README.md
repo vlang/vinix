@@ -2,7 +2,7 @@
 
 An effort to write a modern, fast, and interesting operating system in V.
 
-Join the [Discord chat](https://discord.gg/vlang) (`#v-os` channel).
+Join the [Discord chat](https://discord.gg/vlang) (`#veenyl-os` channel).
 
 #### Goals
 
