@@ -54,6 +54,15 @@ pub fn init(rsdp_ptr &RSDP) {
 	println('acpi: Use XSDT:  ${use_xsdt()}')
 	println('acpi: R/XSDT at: 0x${voidptr(rsdt):x}')
 
+	// We won't support HW reduced ACPI systems
+	fadt := find_sdt('FACP', 0)
+	if fadt != 0 && &SDT(fadt).length >= 116 {
+		fadt_flags := unsafe { (&u32(fadt))[28] }
+		if fadt_flags & (1 << 20) != 0 {
+			panic('acpi: OS does not support HW reduced ACPI systems.')
+		}
+	}
+
 	madt_init()
 }
 
