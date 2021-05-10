@@ -39,6 +39,10 @@ fn use_xsdt() bool {
 }
 
 pub fn init(rsdp_ptr &RSDP) {
+	if rsdp_ptr == 0 {
+		panic('acpi: ACPI not supported on this machine.')
+	}
+
 	rsdp = unsafe { rsdp_ptr }
 
 	oem := C.byteptr_vstring_with_len(byteptr(&rsdp.oem_id), 6)

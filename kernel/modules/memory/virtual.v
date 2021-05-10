@@ -17,9 +17,13 @@ pub mut:
 }
 
 pub fn new_pagemap() Pagemap {
-	top_level := pmm_alloc(1)
+	mut top_level := &u64(pmm_alloc(1))
 	if top_level == 0 {
 		panic('new_pagemap() allocation failure')
+	}
+	// Import higher half from kernel pagemap
+	for i := u64(256); i < 512; i++ {
+		unsafe { top_level[i] = kernel_pagemap.top_level[i] }
 	}
 	return Pagemap{klock.new(), top_level}
 }
@@ -77,7 +81,20 @@ pub fn (pagemap &Pagemap) map_page(virt u64, phys u64, flags u64) {
 }
 
 pub fn vmm_init(memmap &stivale2.MemmapTag) {
-	kernel_pagemap = new_pagemap()
+	kernel_pagemap.top_level = pmm_alloc(1)
+	if kernel_pagemap.top_level == 0 {
+		panic('vmm_init() allocation failure')
+	}
+	kernel_pagemap.l = klock.new()
+	
+	// Since the higher half has to be shared amongst all address spaces,
+	// we need to initialise every single higher half PML3 so they can be
+	// shared.
+	for i := u64(256); i < 512; i++ {
+		// get_next_level will allocate the PML3s for us.
+		get_next_level(kernel_pagemap.top_level, i)
+	}
+	
 	for i := u64(0x1000); i < 0x100000000; i += page_size {
 		kernel_pagemap.map_page(i, i, 0x03)
 		kernel_pagemap.map_page(i + higher_half, i, 0x03)
