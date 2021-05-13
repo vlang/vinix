@@ -5,26 +5,30 @@ KERNEL_HDD = vinix.hdd
 V_COMMIT = ebe58dcafa40cc1d4bed147631ef0dd8d2921c3e
 
 .PHONY: all
-all: vinix.iso
+all: $(KERNEL_HDD)
 
-QEMUFLAGS = -M q35 -m 2G -smp 4 -d int -no-reboot -no-shutdown -cdrom vinix.iso -debugcon stdio
+QEMUFLAGS = -M q35 -m 2G -smp 4 -d int -no-reboot -no-shutdown -drive file=$(KERNEL_HDD),format=raw,index=0,media=disk -debugcon stdio
 
 .PHONY: run-kvm
-run-kvm: vinix.iso
+run-kvm: $(KERNEL_HDD)
 	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS)
 
 .PHONY: run-hvf
-run-hvf: vinix.iso
+run-hvf: $(KERNEL_HDD)
 	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS)
 
 .PHONY: run
-run: vinix.iso
+run: $(KERNEL_HDD)
 	qemu-system-x86_64 $(QEMUFLAGS)
 
 .PHONY: distro
 distro:
 	mkdir -p build
 	export LC_ALL=C && cd build && xbstrap init .. && xbstrap install --all
+
+3rdparty/dir2fat32-esp:
+	wget https://github.com/mintsuki-org/dir2fat32-esp/raw/master/dir2fat32-esp -O 3rdparty/dir2fat32-esp
+	chmod +x 3rdparty/dir2fat32-esp
 
 3rdparty/limine:
 	mkdir -p 3rdparty
@@ -47,14 +51,15 @@ kernel/vinix.elf: update-v
 		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vinix-gcc`" \
 		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vinix-objdump`"
 
-vinix.iso: 3rdparty/limine kernel/vinix.elf
+$(KERNEL_HDD): 3rdparty/limine 3rdparty/dir2fat32-esp kernel/vinix.elf
 	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
 	rm -rf pack
-	mkdir -p pack/boot
-	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp pack/
-	cp limine.cfg 3rdparty/limine/limine.sys 3rdparty/limine/limine-cd.bin 3rdparty/limine/limine-eltorito-efi.bin pack/boot/
-	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table -part_like_isohybrid -eltorito-alt-boot -e /boot/limine-eltorito-efi.bin -no-emul-boot pack -isohybrid-gpt-basdat -o vinix.iso
-	./3rdparty/limine/limine-install vinix.iso
+	mkdir -p pack
+	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp limine.cfg 3rdparty/limine/limine.sys pack/
+	mkdir -p pack/EFI/BOOT
+	cp 3rdparty/limine/BOOTX64.EFI pack/EFI/BOOT/
+	./3rdparty/dir2fat32-esp -f $(KERNEL_HDD) 64 pack
+	./3rdparty/limine/limine-install $(KERNEL_HDD)
 
 .PHONY: format
 format: 3rdparty/v
@@ -62,7 +67,7 @@ format: 3rdparty/v
 
 .PHONY: clean
 clean:
-	rm -f vinix.iso
+	rm -f $(KERNEL_HDD)
 	$(MAKE) -C kernel clean
 
 .PHONY: distclean
