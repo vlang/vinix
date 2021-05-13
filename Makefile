@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 KERNEL_HDD = vinix.hdd
 
-V_COMMIT = 4728d102d94e483a4dda951eb104200c9282bd89
+V_COMMIT = ebe58dcafa40cc1d4bed147631ef0dd8d2921c3e
 
 .PHONY: all
 all: vinix.iso
