@@ -1,6 +1,6 @@
 module x86
 
-fn atomic_inc<T>(var &T) {
+pub fn atomic_inc<T>(var &T) {
 	$if T is u64 {
 		asm volatile amd64 {
 			lock
@@ -15,11 +15,38 @@ fn atomic_inc<T>(var &T) {
 	}
 }
 
-fn atomic_store<T>(var &T, value T) {
+pub fn atomic_dec<T>(var &T) bool {
+	mut ret := false
+	$if T is u64 {
+		asm volatile amd64 {
+			lock
+			decq [var]
+			setnz ret
+			; =r (ret)
+			; r (var)
+			; memory
+		}
+	} $else {
+		typestr := unsafe { typeof(var[0]).name }
+		panic('atomic_dec not supported for type ${typestr}')
+	}
+	return ret
+}
+
+pub fn atomic_store<T>(var &T, value T) {
 	$if T is u64 {
 		asm volatile amd64 {
 			lock
 			xchgq [var], value
+			;
+			; r (var)
+			  ri (value)
+			; memory
+		}
+	} $else $if T is u8 {
+		asm volatile amd64 {
+			lock
+			xchgb [var], value
 			;
 			; r (var)
 			  ri (value)
@@ -31,7 +58,7 @@ fn atomic_store<T>(var &T, value T) {
 	}
 }
 
-fn atomic_load<T>(var &T) T {
+pub fn atomic_load<T>(var &T) T {
 	$if T is u64 {
 		mut ret := u64(0)
 		asm volatile amd64 {

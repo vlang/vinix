@@ -32,9 +32,11 @@ pub mut:
 	fpu_storage_size size_t
 	fpu_save         fn (voidptr)
 	fpu_restore      fn (voidptr)
+	current_thread   voidptr
+	last_run_queue_index int
 }
 
-struct CPUGPRState {
+pub struct CPUGPRState {
 pub mut:
 	rax u64
 	rbx u64
@@ -135,10 +137,14 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 	atomic_inc(&cpus_online)
 
 	if cpu_number != 0 {
-		for {
-			asm volatile amd64 {
-				hlt
-			}
+		asm volatile amd64 {
+			sti
+			1:
+			hlt
+			jmp b1
+			;
+			;
+			; memory
 		}
 	}
 }
@@ -149,6 +155,18 @@ pub fn set_kernel_gs(ptr u64) {
 
 pub fn set_user_gs(ptr u64) {
 	wrmsr(0xc0000102, ptr)
+}
+
+pub fn set_user_fs(ptr u64) {
+	wrmsr(0xc0000100, ptr)
+}
+
+pub fn get_user_gs() u64 {
+	return rdmsr(0xc0000102)
+}
+
+pub fn get_user_fs() u64 {
+	return rdmsr(0xc0000100)
 }
 
 pub fn read_cr0() u64 {
@@ -280,6 +298,28 @@ fn fxrstor(region voidptr) {
 		fxrstor [region]
 		;
 		; r (region)
+		; memory
+	}
+}
+
+pub fn current_cpu() &CPULocal {
+	mut index := u64(0)
+	zero := u64(0)
+	asm volatile amd64 {
+		.byte 0x65		// GS override prefix
+		mov index, [zero]
+		; =r (index)
+		; r (zero)
+		; memory
+	}
+	return cpu_locals[index]
+}
+
+pub fn swapgs() {
+	asm volatile amd64 {
+		swapgs
+		;
+		;
 		; memory
 	}
 }

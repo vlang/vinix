@@ -9,6 +9,19 @@ import sched
 
 fn C._vinit(argc int, argv voidptr)
 
+fn kmain_thread(stivale2_struct &stivale2.Struct) {
+	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
+	if modules_tag == 0 {
+		panic('Stivale2 modules tag missing')
+	}
+
+	initramfs.init(modules_tag)
+
+	fs.vfs_init()
+
+	panic('End of kmain')
+}
+
 pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the earliest arch structures.
 	x86.gdt_init()
@@ -48,15 +61,6 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	x86.smp_init(smp_tag)
 
 	sched.initialise()
-
-	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
-	if modules_tag == 0 {
-		panic('Stivale2 modules tag missing')
-	}
-
-	initramfs.init(modules_tag)
-
-	fs.vfs_init()
-
-	panic('End of kmain')
+	sched.new_kernel_thread(voidptr(kmain_thread), voidptr(stivale2_struct), true)
+	sched.await()
 }

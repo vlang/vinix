@@ -11,6 +11,7 @@ struct IDTPointer {
 
 [packed]
 struct IDTEntry {
+pub mut:
 	offset_low u16
 	selector   u16
 	ist        byte
@@ -45,7 +46,7 @@ pub fn idt_init() {
 	C.prepare_interrupt_thunks()
 
 	for i := u16(0); i < 256; i++ {
-		idt_register_handler(i, interrupt_thunks[i], 0)
+		idt_register_handler(i, interrupt_thunks[i])
 		interrupt_table[i] = voidptr(unhandled_interrupt)
 	}
 
@@ -66,13 +67,17 @@ pub fn idt_reload() {
 	}
 }
 
-pub fn idt_register_handler(vector u16, handler voidptr, ist byte) {
+pub fn idt_set_ist(vector u16, ist u8) {
+	idt_entries[vector].ist = ist
+}
+
+fn idt_register_handler(vector u16, handler voidptr) {
 	address := u64(handler)
 
 	idt_entries[vector] = IDTEntry{
 		offset_low: u16(address)
 		selector: kernel_code_seg
-		ist: ist
+		ist: 0
 		flags: 0x8e
 		offset_mid: u16(address >> 16)
 		offset_hi: u32(address >> 32)
@@ -81,5 +86,5 @@ pub fn idt_register_handler(vector u16, handler voidptr, ist byte) {
 }
 
 fn unhandled_interrupt(num u32, gpr_state &CPUGPRState) {
-	lib.kpanic('Unhandled interrupt (${num})')
+	lib.kpanic('Unhandled interrupt (0x${num:x})')
 }
