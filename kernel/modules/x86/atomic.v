@@ -21,8 +21,7 @@ pub fn atomic_dec<T>(var &T) bool {
 		asm volatile amd64 {
 			lock
 			decq [var]
-			setnz ret
-			; =r (ret)
+			; =@ccnz (ret)
 			; r (var)
 			; memory
 		}
