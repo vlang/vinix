@@ -4,10 +4,9 @@ import resource
 import stat
 
 interface FileSystem {
-	device &VFSNode
-
 	populate(&VFSNode)
 	mount(&VFSNode) &VFSNode
+	create(&VFSNode, string, int) &VFSNode
 }
 
 struct VFSNode {
@@ -24,7 +23,7 @@ __global (
 	vfs_root &VFSNode
 )
 
-fn new_node(parent &VFSNode, filesystem &FileSystem) &VFSNode {
+fn create_node(filesystem &FileSystem) &VFSNode {
 	node := &VFSNode{
 				mountpoint: 0
 				children: map[string]&VFSNode{}
@@ -35,13 +34,13 @@ fn new_node(parent &VFSNode, filesystem &FileSystem) &VFSNode {
 }
 
 pub fn initialise() {
-	vfs_root = new_node(&VFSNode(0), &TmpFS(0))
+	vfs_root = create_node(&TmpFS(0))
 
 	filesystems = map[string]FileSystem{}
 	fs_instances = []FileSystem{}
 
 	// Install filesystems by name string
-	filesystems['tmpfs'] = TmpFS{0}
+	filesystems['tmpfs'] = TmpFS{0, 0}
 }
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode) {

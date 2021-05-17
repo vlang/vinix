@@ -1,7 +1,7 @@
 module stat
 
 struct TimeSpec {
-pub:
+pub mut:
 	tv_sec  i64
 	tv_nsec i64
 }
@@ -25,7 +25,7 @@ pub fn islnk(mode int) bool { return (mode & ifmt) == iflnk }
 pub fn issock(mode int) bool { return (mode & ifmt) == ifsock }
 
 struct Stat {
-pub:
+pub mut:
 	dev     u64
 	ino     u64
 	mode    int
@@ -33,10 +33,10 @@ pub:
 	uid     int
 	gid     int
 	rdev    u64
-	size    i64
+	size    u64
 	atim    TimeSpec
 	mtim    TimeSpec
 	ctim    TimeSpec
-	blksize i64
-	blocks  i64
+	blksize u64
+	blocks  u64
 }
