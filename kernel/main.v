@@ -10,14 +10,14 @@ import sched
 fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
+	fs.initialise()
+
 	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
 	if modules_tag == 0 {
 		panic('Stivale2 modules tag missing')
 	}
 
 	initramfs.init(modules_tag)
-
-	fs.vfs_init()
 
 	panic('End of kmain')
 }

@@ -6,6 +6,6 @@ struct TmpFS {
 
 fn (this &TmpFS) populate(node &VFSNode) {}
 
-fn (this &TmpFS) mount(node &VFSNode, source string, target string) bool {
-	return true
+fn (this &TmpFS) mount(source &VFSNode) &VFSNode {
+	return 0
 }
