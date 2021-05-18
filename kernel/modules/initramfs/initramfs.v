@@ -48,8 +48,6 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 		panic('No initramfs')
 	}
 
-	fs.mount(vfs_root, '', '/', 'tmpfs')
-
 	mut modules := &stivale2.Module(0)
 	unsafe { modules = &stivale2.Module(&modules_tag.modules) }
 

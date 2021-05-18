@@ -41,6 +41,7 @@ pub fn initialise() {
 
 	// Install filesystems by name string
 	filesystems['tmpfs'] = TmpFS{0, 0}
+	filesystems['devtmpfs'] = DevTmpFS{}
 }
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {

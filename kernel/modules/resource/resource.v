@@ -29,7 +29,7 @@ fn (this Dummy) write(buf voidptr, loc u64, count u64) i64 {
 }
 
 __global (
-	dev_id_counter u64
+	dev_id_counter = u64(1)
 )
 
 pub fn create_dev_id() u64 {
