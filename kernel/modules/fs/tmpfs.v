@@ -71,13 +71,13 @@ fn (mut this TmpFS) populate(node &VFSNode) {}
 
 fn (mut this TmpFS) mount(source &VFSNode) &VFSNode {
 	this.dev_id = resource.create_dev_id()
-	return 0
+	return this.create(&VFSNode(0), '', 0644 | stat.ifdir)
 }
 
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	mut new_node := create_node(this)
 
-	mut new_resource := unsafe { &TmpFSResource(new_node.resource) }
+	mut new_resource := &TmpFSResource(memory.malloc(sizeof(TmpFSResource)))
 
 	if stat.isreg(mode) {
 		new_resource.capacity = 4096
@@ -91,6 +91,8 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	new_resource.stat.ino = this.inode_counter++
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = 1
+
+	new_node.resource = new_resource
 
 	return new_node
 }

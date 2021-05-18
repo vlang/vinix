@@ -2,6 +2,8 @@ module initramfs
 
 import lib
 import stivale2
+import fs
+import stat
 
 struct USTARHeader {
 	name       [100]byte
@@ -46,6 +48,8 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 		panic('No initramfs')
 	}
 
+	fs.mount(vfs_root, '', '/', 'tmpfs')
+
 	mut modules := &stivale2.Module(0)
 	unsafe { modules = &stivale2.Module(&modules_tag.modules) }
 
@@ -63,14 +67,19 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 			break
 		}
 
+		name := C.byteptr_vstring(&current_header.name[0])
 		size := octal_to_int(C.byteptr_vstring(&current_header.size[0]))
+		mode := octal_to_int(C.byteptr_vstring(&current_header.mode[0]))
 
 		match USTARFileType(current_header.filetype) {
 			.directory {
-				//println('initramfs: Directory: ${name}')
+				fs.create(vfs_root, name, int(mode) | stat.ifdir)
 			}
 			.regular_file {
-				//println('initramfs: File:      ${name}')
+				new_node := fs.create(vfs_root, name, int(mode) | stat.ifreg)
+				mut new_resource := new_node.resource
+				buf := voidptr(u64(current_header) + 512)
+				new_resource.write(buf, 0, size)
 			}
 			else {}
 		}

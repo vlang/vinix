@@ -43,9 +43,9 @@ pub fn initialise() {
 	filesystems['tmpfs'] = TmpFS{0, 0}
 }
 
-fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode) {
+fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	if path.len == 0 {
-		return 0, unsafe { parent }
+		return 0, unsafe { parent }, ''
 	}
 
 	mut index := u64(0)
@@ -53,7 +53,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode) {
 
 	for path[index] == `/` {
 		if index == path.len - 1 {
-			return 0, current_node
+			return 0, current_node, ''
 		}
 		index++
 	}
@@ -80,25 +80,25 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode) {
 
 		if elem_str !in current_node.children {
 			if last == true {
-				return current_node, 0
+				return current_node, 0, elem_str
 			}
-			return 0, 0
+			return 0, 0, ''
 		}
 
 		new_node := current_node.children[elem_str]
 
 		if last == true {
-			return 0, new_node
+			return 0, new_node, elem_str
 		}
 
 		current_node = new_node
 
 		if !stat.isdir(current_node.resource.stat.mode) {
-			return 0, 0
+			return 0, 0, ''
 		}
 	}
 
-	return 0, 0
+	return 0, 0, ''
 }
 
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) bool {
@@ -108,16 +108,16 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) b
 
 	mut source_node := &VFSNode(0)
 	if source.len != 0 {
-		_, source_node = path2node(parent, source)
+		_, source_node, _ = path2node(parent, source)
 		if source_node == 0
 		|| !stat.isreg(source_node.resource.stat.mode) {
 			return false
 		}
 	}
 
-	_, mut target_node := path2node(parent, target)
+	_, mut target_node, _ := path2node(parent, target)
 	if target_node == 0
-	|| !stat.isdir(target_node.resource.stat.mode)
+	|| (target_node != vfs_root && !stat.isdir(target_node.resource.stat.mode))
 	|| target_node.mountpoint != 0 {
 		return false
 	}
@@ -134,5 +134,25 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) b
 
 	target_node.mountpoint = mount_node
 
+	if source.len > 0 {
+		print('vfs: Mounted `${source}` to `${target}` with filesystem `${filesystem}`\n')
+	} else {
+		print('vfs: Mounted ${filesystem} to `${target}`\n')
+	}
+
 	return true
+}
+
+pub fn create(parent &VFSNode, name string, mode int) &VFSNode {
+	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
+
+	if target_node != 0 {
+		return 0
+	}
+
+	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, name, mode)
+
+	parent_of_tgt_node.children[basename] = target_node
+
+	return target_node
 }
