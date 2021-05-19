@@ -7,4 +7,3 @@ RUN apt install -yq build-essential git meson m4 texinfo python3 python3-pip uti
 RUN pip3 install xbstrap
 COPY . .
 RUN make distro
-CMD ["/bin/bash"]
