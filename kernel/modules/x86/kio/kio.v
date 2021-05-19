@@ -1,4 +1,4 @@
-module x86
+module kio
 
 pub fn inb(port u16) byte {
 	mut ret := byte(0)

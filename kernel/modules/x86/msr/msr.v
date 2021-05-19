@@ -1,4 +1,4 @@
-module x86
+module msr
 
 pub fn rdmsr(msr u32) u64 {
 	mut eax := u32(0)

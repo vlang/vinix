@@ -1,6 +1,8 @@
-module x86
+module pit
 
-pub fn pit_set_freq(freq u32) {
+import kio
+
+pub fn set_freq(freq u32) {
 	println('pit: Setting frequency to ${freq} Hz')
 
 	dividend := u32(1193182)
@@ -10,6 +12,6 @@ pub fn pit_set_freq(freq u32) {
 		ticks++
 	}
 
-	outb(0x40, byte(ticks))
-	outb(0x40, byte(ticks >> 8))
+	kio.outb(0x40, byte(ticks))
+	kio.outb(0x40, byte(ticks >> 8))
 }

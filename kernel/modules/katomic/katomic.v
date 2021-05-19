@@ -1,6 +1,6 @@
-module x86
+module katomic
 
-pub fn atomic_inc<T>(var &T) {
+pub fn inc<T>(var &T) {
 	$if T is u64 {
 		asm volatile amd64 {
 			lock
@@ -15,7 +15,7 @@ pub fn atomic_inc<T>(var &T) {
 	}
 }
 
-pub fn atomic_dec<T>(var &T) bool {
+pub fn dec<T>(var &T) bool {
 	mut ret := false
 	$if T is u64 {
 		asm volatile amd64 {
@@ -32,7 +32,7 @@ pub fn atomic_dec<T>(var &T) bool {
 	return ret
 }
 
-pub fn atomic_store<T>(var &T, value T) {
+pub fn store<T>(var &T, value T) {
 	$if T is u64 {
 		asm volatile amd64 {
 			lock
@@ -57,7 +57,7 @@ pub fn atomic_store<T>(var &T, value T) {
 	}
 }
 
-pub fn atomic_load<T>(var &T) T {
+pub fn load<T>(var &T) T {
 	$if T is u64 {
 		mut ret := u64(0)
 		asm volatile amd64 {

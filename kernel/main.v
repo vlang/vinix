@@ -2,7 +2,9 @@ import lib
 import memory
 import stivale2
 import acpi
-import x86
+import x86.gdt
+import x86.idt
+import x86.smp
 import initramfs
 import fs
 import sched
@@ -29,8 +31,8 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 
 pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the earliest arch structures.
-	x86.gdt_init()
-	x86.idt_init()
+	gdt.initialise()
+	idt.initialise()
 
 	// Init terminal
 	stivale2.terminal_init(stivale2_struct)
@@ -63,7 +65,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 		panic('Stivale2 SMP tag missing')
 	}
 
-	x86.smp_init(smp_tag)
+	smp.initialise(smp_tag)
 
 	sched.initialise()
 	sched.new_kernel_thread(voidptr(kmain_thread), voidptr(stivale2_struct), true)

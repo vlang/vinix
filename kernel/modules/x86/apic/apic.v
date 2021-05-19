@@ -1,21 +1,21 @@
-module x86
+module apic
+
+import kio
+import msr
 
 const lapic_reg_icr0 = 0x300
-
 const lapic_reg_icr1 = 0x310
-
 const lapic_reg_spurious = 0x0f0
-
 const lapic_reg_eoi = 0x0b0
 
 fn lapic_read(reg u32) u32 {
-	lapic_base := u64(rdmsr(0x1b) & 0xfffff000) + higher_half
-	return mmind(lapic_base + reg)
+	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	return kio.mmind(lapic_base + reg)
 }
 
 fn lapic_write(reg u32, val u32) {
-	lapic_base := u64(rdmsr(0x1b) & 0xfffff000) + higher_half
-	mmoutd(lapic_base + reg, val)
+	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	kio.mmoutd(lapic_base + reg, val)
 }
 
 pub fn lapic_enable(spurious_vect u8) {
@@ -33,14 +33,14 @@ pub fn lapic_send_ipi(lapic_id u8, vector u8) {
 
 fn io_apic_read(io_apic int, reg u32) u32 {
 	base := u64(madt_io_apics[io_apic].address) + higher_half
-	mmoutd(base, reg)
-	return mmind(base + 16)
+	kio.mmoutd(base, reg)
+	return kio.mmind(base + 16)
 }
 
 fn io_apic_write(io_apic int, reg u32, value u32) {
 	base := u64(madt_io_apics[io_apic].address) + higher_half
-	mmoutd(base, reg)
-	mmoutd(base + 16, value)
+	kio.mmoutd(base, reg)
+	kio.mmoutd(base + 16, value)
 }
 
 fn io_apic_gsi_count(io_apic int) u32 {

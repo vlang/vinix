@@ -1,6 +1,11 @@
-module x86
+module cpu
 
+import apic
 import stivale2
+import katomic
+import gdt
+import idt
+import msr
 
 [packed]
 struct TSS {
@@ -21,7 +26,7 @@ pub mut:
 	iopb    u32
 }
 
-struct CPULocal {
+struct Local {
 pub mut:
 	cpu_number       u64
 	kernel_stack     u64
@@ -36,7 +41,7 @@ pub mut:
 	last_run_queue_index int
 }
 
-pub struct CPUGPRState {
+pub struct GPRState {
 pub mut:
 	rax u64
 	rbx u64
@@ -61,24 +66,24 @@ pub mut:
 }
 
 __global (
-	cpu_locals []&CPULocal
+	cpu_locals []&Local
 )
 
-pub fn cpu_init(smp_info &stivale2.SMPInfo) {
-	mut cpu_local := &CPULocal(smp_info.extra_arg)
+pub fn initialise(smp_info &stivale2.SMPInfo) {
+	mut cpu_local := &Local(smp_info.extra_arg)
 	cpu_number := cpu_local.cpu_number
 
 	cpu_local.lapic_id = smp_info.lapic_id
 
-	gdt_reload()
-	idt_reload()
+	gdt.reload()
+	idt.reload()
 
 	kernel_pagemap.switch_to()
 
 	set_kernel_gs(u64(voidptr(cpu_local)))
 	set_user_gs(u64(voidptr(cpu_local)))
 
-	gdt_load_tss(voidptr(&cpu_local.tss))
+	gdt.load_tss(voidptr(&cpu_local.tss))
 
 	// Enable SSE/SSE2
 	mut cr0 := read_cr0()
@@ -130,11 +135,11 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 		cpu_local.fpu_restore = fxrstor
 	}
 
-	lapic_enable(0xff)
+	apic.lapic_enable(0xff)
 
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 
-	atomic_inc(&cpus_online)
+	katomic.inc(&cpus_online)
 
 	if cpu_number != 0 {
 		asm volatile amd64 {
@@ -150,23 +155,23 @@ pub fn cpu_init(smp_info &stivale2.SMPInfo) {
 }
 
 pub fn set_kernel_gs(ptr u64) {
-	wrmsr(0xc0000101, ptr)
+	msr.wrmsr(0xc0000101, ptr)
 }
 
 pub fn set_user_gs(ptr u64) {
-	wrmsr(0xc0000102, ptr)
+	msr.wrmsr(0xc0000102, ptr)
 }
 
 pub fn set_user_fs(ptr u64) {
-	wrmsr(0xc0000100, ptr)
+	msr.wrmsr(0xc0000100, ptr)
 }
 
 pub fn get_user_gs() u64 {
-	return rdmsr(0xc0000102)
+	return msr.rdmsr(0xc0000102)
 }
 
 pub fn get_user_fs() u64 {
-	return rdmsr(0xc0000100)
+	return msr.rdmsr(0xc0000100)
 }
 
 pub fn read_cr0() u64 {
@@ -302,7 +307,7 @@ fn fxrstor(region voidptr) {
 	}
 }
 
-pub fn current_cpu() &CPULocal {
+pub fn current() &Local {
 	mut index := u64(0)
 	zero := u64(0)
 	asm volatile amd64 {

@@ -1,4 +1,4 @@
-module x86
+module gdt
 
 import klock
 
@@ -29,7 +29,7 @@ __global (
 	gdt_lock klock.Lock
 )
 
-pub fn gdt_init() {
+pub fn initialise() {
 	// Initialize all the GDT entries.
 	// Null descriptor.
 	gdt_entries[0] = GDTEntry{
@@ -123,10 +123,10 @@ pub fn gdt_init() {
 		base_high8: 0
 	}
 
-	gdt_reload()
+	reload()
 }
 
-pub fn gdt_reload() {
+pub fn reload() {
 	gdt_pointer = GDTPointer{
 		size: u16(sizeof(GDTPointer) * 11 - 1)
 		address: &gdt_entries
@@ -153,11 +153,11 @@ pub fn gdt_reload() {
 	}
 }
 
-pub fn gdt_load_tss(addr voidptr) {
+pub fn load_tss(addr voidptr) {
 	gdt_lock.acquire()
 
 	gdt_entries[9] = GDTEntry{
-		limit: u16(sizeof(TSS) - 1)
+		limit: u16(103)
 		base_low16: u16(u64(addr))
 		base_mid8: byte(u64(addr) >> 16)
 		base_high8: byte(u64(addr) >> 24)

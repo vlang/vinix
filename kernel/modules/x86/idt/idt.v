@@ -1,7 +1,8 @@
-module x86
+module idt
 
-import lib
+//import kevent
 import klock
+import apic
 
 [packed]
 struct IDTPointer {
@@ -28,7 +29,7 @@ __global (
 	idt_lock klock.Lock
 )
 
-pub fn idt_allocate_vector() byte {
+pub fn allocate_vector() byte {
 	idt_lock.acquire()
 	ret := idt_free_vector++
 	idt_lock.release()
@@ -42,18 +43,18 @@ __global (
 
 fn C.prepare_interrupt_thunks()
 
-pub fn idt_init() {
+pub fn initialise() {
 	C.prepare_interrupt_thunks()
 
 	for i := u16(0); i < 256; i++ {
-		idt_register_handler(i, interrupt_thunks[i])
+		register_handler(i, interrupt_thunks[i])
 		interrupt_table[i] = voidptr(unhandled_interrupt)
 	}
 
-	idt_reload()
+	reload()
 }
 
-pub fn idt_reload() {
+pub fn reload() {
 	idt_pointer = IDTPointer{
 		size: u16((sizeof(IDTEntry) * 256) - 1)
 		address: &idt_entries
@@ -67,11 +68,11 @@ pub fn idt_reload() {
 	}
 }
 
-pub fn idt_set_ist(vector u16, ist u8) {
+pub fn set_ist(vector u16, ist u8) {
 	idt_entries[vector].ist = ist
 }
 
-fn idt_register_handler(vector u16, handler voidptr) {
+fn register_handler(vector u16, handler voidptr) {
 	address := u64(handler)
 
 	idt_entries[vector] = IDTEntry{
@@ -85,6 +86,11 @@ fn idt_register_handler(vector u16, handler voidptr) {
 	}
 }
 
-fn unhandled_interrupt(num u32, gpr_state &CPUGPRState) {
-	lib.kpanic('Unhandled interrupt (0x${num:x})')
+__global (
+	//int_events [256]kevent.Event
+)
+
+fn unhandled_interrupt(num u32, _ voidptr) {
+	apic.lapic_eoi()
+	//kevent.trigger(&int_event[num])
 }

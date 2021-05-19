@@ -1,25 +1,27 @@
-module x86
+module smp
 
 import stivale2
 import memory
+import katomic
+import cpu
 
 __global (
 	cpus_online = u64(0)
 	bsp_lapic_id = u32(0)
 )
 
-pub fn smp_init(smp_tag &stivale2.SMPTag) {
+pub fn initialise(smp_tag &stivale2.SMPTag) {
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
 	println('smp: Total CPU count: ${smp_tag.cpu_count}')
 
-	cpu_locals = []&CPULocal{}
+	cpu_locals = []&cpu.Local{}
 
 	smp_info_array := unsafe { &stivale2.SMPInfo(&smp_tag.smp_info) }
 
 	bsp_lapic_id = smp_tag.bsp_lapic_id
 
 	for i := u64(0); i < smp_tag.cpu_count; i++ {
-		mut cpu_local := &CPULocal(memory.malloc(sizeof(CPULocal)))
+		mut cpu_local := &cpu.Local(memory.malloc(sizeof(cpu.Local)))
 		cpu_locals << cpu_local
 
 		mut smp_info := unsafe { &smp_info_array[i] }
@@ -36,15 +38,15 @@ pub fn smp_init(smp_tag &stivale2.SMPTag) {
 		cpu_local.cpu_number = i
 
 		if smp_info.lapic_id == smp_tag.bsp_lapic_id {
-			cpu_init(smp_info)
+			cpu.initialise(smp_info)
 			continue
 		}
 
-		atomic_store(smp_info.target_stack, cpu_local.tss.rsp0)
-		atomic_store(smp_info.goto_address, u64(&cpu_init))
+		katomic.store(smp_info.target_stack, cpu_local.tss.rsp0)
+		katomic.store(smp_info.goto_address, u64(&cpu.initialise))
 	}
 
-	for atomic_load(cpus_online) != smp_tag.cpu_count {}
+	for katomic.load(cpus_online) != smp_tag.cpu_count {}
 
 	print('smp: All CPUs online!\n')
 }
