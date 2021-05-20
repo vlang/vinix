@@ -7,6 +7,8 @@ import proc
 import sched
 import katomic
 
+type PEventListener = &EventListener
+
 struct Event {
 pub mut:
 	pending   u64
@@ -42,7 +44,7 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 	thread.event_block_dequeue.release()
 	thread.event_occurred.release()
 
-	//mut listeners := [16]&EventListener{}
+	mut listeners := [16]PEventListener{}
 	mut listeners_armed := u64(0)
 
 	for i := u64(0); i < events.len; i++ {
@@ -70,7 +72,7 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 		listener.index  = i
 		listener.ready.acquire()
 
-		//listeners[i] = listener
+		listeners[i] = listener
 		listeners_armed = i + 1
 	}
 
@@ -85,8 +87,9 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 
 unarm_listeners:
 	for i := u64(0); i < listeners_armed; i++ {
-		//listeners[i].ready.release()
-		//listeners[i].l.release()
+		listener := &EventListener(listeners[i])
+		listener.ready.release()
+		listener.l.release()
 	}
 
 	return true
