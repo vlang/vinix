@@ -4,6 +4,7 @@ import stivale2
 import acpi
 import x86.gdt
 import x86.idt
+import x86.isr
 import x86.smp
 import initramfs
 import fs
@@ -33,6 +34,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the earliest arch structures.
 	gdt.initialise()
 	idt.initialise()
+	isr.initialise()
 
 	// Init terminal
 	stivale2.terminal_init(stivale2_struct)

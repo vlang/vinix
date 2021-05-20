@@ -1,48 +1,29 @@
 module sched
 
 import x86.cpu
+import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
 import x86.pit
 import klock
-import memory
 import katomic
+import proc
 
 __global (
 	scheduler_lock klock.Lock
 	scheduler_vector byte
 	scheduler_ap_vector byte
-	scheduler_running_queue []&Thread
+	scheduler_running_queue []&proc.Thread
 	scheduling_cpus u64
-	kernel_process &Process
+	kernel_process &proc.Process
 )
 
 const max_running_threads = int(65536)
 
-struct Process {
-pub mut:
-	pagemap memory.Pagemap
-}
-
-struct Thread {
-pub mut:
-	is_in_queue bool
-	l klock.Lock
-	process &Process
-	gpr_state cpu.GPRState
-	user_gs u64
-	user_fs u64
-	user_stack u64
-	kernel_stack u64
-	event_block_dequeue klock.Lock
-	event_occurred klock.Lock
-	yield_await klock.Lock
-}
-
 pub fn initialise() {
-	scheduler_running_queue = []&Thread{cap: max_running_threads,
-										len: 0,
-							  			init: 0}
+	scheduler_running_queue = []&proc.Thread{cap: max_running_threads,
+											 len: 0,
+							  				 init: 0}
 
 	// Set PIT tick to 250Hz
 	pit.set_freq(250)
@@ -59,12 +40,12 @@ pub fn initialise() {
 	idt.set_ist(scheduler_vector, 1)
 	idt.set_ist(scheduler_ap_vector, 1)
 
-	kernel_process = &Process{pagemap: kernel_pagemap}
+	kernel_process = &proc.Process{pagemap: kernel_pagemap}
 
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, scheduler_vector, 0, true)
 }
 
-fn scheduler_isr(num u32, gpr_state &cpu.GPRState) {
+fn scheduler_isr(num u32, gpr_state &cpulocal.GPRState) {
 	if scheduler_lock.test_and_acquire() == false {
 		return
 	}
@@ -82,11 +63,11 @@ fn scheduler_isr(num u32, gpr_state &cpu.GPRState) {
 	scheduler_common(gpr_state)
 }
 
-fn scheduler_ap_isr(num u32, gpr_state &cpu.GPRState) {
+fn scheduler_ap_isr(num u32, gpr_state &cpulocal.GPRState) {
 	scheduler_common(gpr_state)
 }
 
-fn get_next_thread(orig_i int) (int, &Thread) {
+fn get_next_thread(orig_i int) (int, &proc.Thread) {
 	mut index := orig_i + 1
 
 	for i := 0; i < scheduler_running_queue.len; i++ {
@@ -110,13 +91,13 @@ fn get_next_thread(orig_i int) (int, &Thread) {
 	return -1, 0
 }
 
-fn scheduler_common(gpr_state &cpu.GPRState) {
+fn scheduler_common(gpr_state &cpulocal.GPRState) {
 	if gpr_state.cs & 0x03 != 0 {
 		cpu.swapgs()
 	}
 
-	mut cpu_local := cpu.current()
-	mut current_thread := &Thread(cpu_local.current_thread)
+	mut cpu_local := cpulocal.current()
+	mut current_thread := &proc.Thread(cpu_local.current_thread)
 
 	if current_thread != 0 {
 		current_thread.yield_await.release()
@@ -197,7 +178,7 @@ fn scheduler_common(gpr_state &cpu.GPRState) {
 	panic('We really should not get here')
 }
 
-pub fn enqueue_thread(_thread &Thread) bool {
+pub fn enqueue_thread(_thread &proc.Thread) bool {
 	mut thread := unsafe { _thread }
 
 	if thread.is_in_queue == true {
@@ -215,7 +196,7 @@ pub fn enqueue_thread(_thread &Thread) bool {
 	return true
 }
 
-pub fn dequeue_thread(_thread &Thread) bool {
+pub fn dequeue_thread(_thread &proc.Thread) bool {
 	mut thread := unsafe { _thread }
 
 	if thread.is_in_queue == false {
@@ -236,11 +217,11 @@ pub fn dequeue_thread(_thread &Thread) bool {
 pub fn yield() {
 	asm volatile amd64 { cli }
 
-	mut current_thread := &Thread(cpu.current().current_thread)
+	mut current_thread := &proc.Thread(cpulocal.current().current_thread)
 
 	current_thread.yield_await.acquire()
 
-	apic.lapic_send_ipi(cpu.current().lapic_id, scheduler_ap_vector)
+	apic.lapic_send_ipi(cpulocal.current().lapic_id, scheduler_ap_vector)
 
 	asm volatile amd64 { sti }
 
@@ -249,16 +230,16 @@ pub fn yield() {
 
 pub fn dequeue_and_yield() {
 	asm volatile amd64 { cli }
-	dequeue_thread(cpu.current().current_thread)
+	dequeue_thread(cpulocal.current().current_thread)
 	yield()
 }
 
-pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &Thread {
+pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
 	stack_size := 8192
 
 	stack := &[]u8{cap: stack_size, len: stack_size, init: 0}
 
-	gpr_state := cpu.GPRState {
+	gpr_state := cpulocal.GPRState {
 		cs: kernel_code_seg
 		ss: kernel_data_seg
 		rflags: 0x202
@@ -267,7 +248,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &Thread {
 		rsp: unsafe { u64(&stack[0]) + u64(stack_size - 8) }
 	}
 
-	thread := &Thread{
+	thread := &proc.Thread{
 		process: kernel_process
 		gpr_state: gpr_state
 	}

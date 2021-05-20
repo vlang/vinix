@@ -32,7 +32,7 @@ pub fn print_stacktrace() {
 				break
 			}
 			off, sym := trace_address(ret_addr)
-			C.printf('  [0x%llx] <%s+0x%llx>\n', ret_addr, sym.name.str, off)
+			C.printf(c'  [0x%llx] <%s+0x%llx>\n', ret_addr, sym.name.str, off)
 			if old_bp == 0 {
 				break
 			}

@@ -1,7 +1,9 @@
 module kevent
 
 import x86.cpu
+import x86.cpu.local as cpulocal
 import klock
+import proc
 import sched
 import katomic
 
@@ -15,7 +17,7 @@ struct EventListener {
 pub mut:
 	l      klock.Lock
 	ready  klock.Lock
-	thread &sched.Thread
+	thread &proc.Thread
 	index  u64
 	which  &u64
 }
@@ -35,12 +37,12 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 		return false
 	}
 
-	mut thread := &sched.Thread(cpu.current().current_thread)
+	mut thread := &proc.Thread(cpulocal.current().current_thread)
 
 	thread.event_block_dequeue.release()
 	thread.event_occurred.release()
 
-	mut listeners := [16]&EventListener{}
+	//mut listeners := [16]&EventListener{}
 	mut listeners_armed := u64(0)
 
 	for i := u64(0); i < events.len; i++ {
@@ -68,7 +70,7 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 		listener.index  = i
 		listener.ready.acquire()
 
-		listeners[i] = listener
+		//listeners[i] = listener
 		listeners_armed = i + 1
 	}
 
@@ -83,8 +85,8 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 
 unarm_listeners:
 	for i := u64(0); i < listeners_armed; i++ {
-		listeners[i].ready.release()
-		listeners[i].l.release()
+		//listeners[i].ready.release()
+		//listeners[i].l.release()
 	}
 
 	return true

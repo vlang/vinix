@@ -1,8 +1,6 @@
 module idt
 
-//import kevent
 import klock
-import apic
 
 [packed]
 struct IDTPointer {
@@ -46,11 +44,6 @@ fn C.prepare_interrupt_thunks()
 pub fn initialise() {
 	C.prepare_interrupt_thunks()
 
-	for i := u16(0); i < 256; i++ {
-		register_handler(i, interrupt_thunks[i])
-		interrupt_table[i] = voidptr(unhandled_interrupt)
-	}
-
 	reload()
 }
 
@@ -72,7 +65,7 @@ pub fn set_ist(vector u16, ist u8) {
 	idt_entries[vector].ist = ist
 }
 
-fn register_handler(vector u16, handler voidptr) {
+pub fn register_handler(vector u16, handler voidptr) {
 	address := u64(handler)
 
 	idt_entries[vector] = IDTEntry{
@@ -84,13 +77,4 @@ fn register_handler(vector u16, handler voidptr) {
 		offset_hi: u32(address >> 32)
 		reserved: 0
 	}
-}
-
-__global (
-	//int_events [256]kevent.Event
-)
-
-fn unhandled_interrupt(num u32, _ voidptr) {
-	apic.lapic_eoi()
-	//kevent.trigger(&int_event[num])
 }
