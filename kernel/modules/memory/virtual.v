@@ -25,10 +25,10 @@ pub fn new_pagemap() Pagemap {
 	for i := u64(256); i < 512; i++ {
 		unsafe { top_level[i] = kernel_pagemap.top_level[i] }
 	}
-	return Pagemap{klock.new(), top_level}
+	return Pagemap{top_level: top_level}
 }
 
-pub fn (pagemap Pagemap) switch_to() {
+pub fn (mut pagemap Pagemap) switch_to() {
 	top_level := pagemap.top_level
 
 	asm volatile amd64 {
@@ -60,7 +60,7 @@ fn get_next_level(current_level &u64, index u64) &u64 {
 	return ret
 }
 
-pub fn (pagemap &Pagemap) map_page(virt u64, phys u64, flags u64) {
+pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) {
 	pagemap.l.acquire()
 
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
@@ -85,8 +85,8 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 	if kernel_pagemap.top_level == 0 {
 		panic('vmm_init() allocation failure')
 	}
-	kernel_pagemap.l = klock.new()
-	
+	kernel_pagemap.l = klock.Lock{false, 0}
+
 	// Since the higher half has to be shared amongst all address spaces,
 	// we need to initialise every single higher half PML3 so they can be
 	// shared.
@@ -94,7 +94,7 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 		// get_next_level will allocate the PML3s for us.
 		get_next_level(kernel_pagemap.top_level, i)
 	}
-	
+
 	for i := u64(0x1000); i < 0x100000000; i += page_size {
 		kernel_pagemap.map_page(i, i, 0x03)
 		kernel_pagemap.map_page(i + higher_half, i, 0x03)

@@ -64,12 +64,12 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 		cpu.wrxcr(0, xcr0)
 
-		cpu_local.fpu_storage_size = size_t(c)
+		cpu_local.fpu_storage_size = u64(c)
 		cpu_local.fpu_save = cpu.xsave
 		cpu_local.fpu_restore = cpu.xrstor
 	} else {
 		if cpu_number == 0 { println('fpu: Using legacy fxsave') }
-		cpu_local.fpu_storage_size = size_t(512)
+		cpu_local.fpu_storage_size = u64(512)
 		cpu_local.fpu_save = cpu.fxsave
 		cpu_local.fpu_restore = cpu.fxrstor
 	}

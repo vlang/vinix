@@ -6,10 +6,13 @@ import x86.gdt
 import x86.idt
 import x86.isr
 import x86.smp
+import x86.apic
+import x86.kio
 import initramfs
 import fs
 import sched
 import stat
+import kevent
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -26,6 +29,15 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	}
 
 	initramfs.init(modules_tag)
+
+	kbd_vect := idt.allocate_vector()
+	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, kbd_vect, 1, true)
+	for {
+		which := u64(0)
+		kevent.await([&int_events[kbd_vect]], &which, true)
+		c := kio.inb(0x60)
+		print('${c:c}')
+	}
 
 	panic('End of kmain')
 }

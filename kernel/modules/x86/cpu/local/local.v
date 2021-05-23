@@ -21,40 +21,40 @@ pub mut:
 
 pub struct GPRState {
 pub mut:
-	rax u64
-	rbx u64
-	rcx u64
-	rdx u64
-	rsi u64
-	rdi u64
-	rbp u64
-	r8 u64
-	r9 u64
-	r10 u64
-	r11 u64
-	r12 u64
-	r13 u64
-	r14 u64
-	r15 u64
-	rip u64
-	cs u64
+	rax    u64
+	rbx    u64
+	rcx    u64
+	rdx    u64
+	rsi    u64
+	rdi    u64
+	rbp    u64
+	r8     u64
+	r9     u64
+	r10    u64
+	r11    u64
+	r12    u64
+	r13    u64
+	r14    u64
+	r15    u64
+	rip    u64
+	cs     u64
 	rflags u64
-	rsp u64
-	ss u64
+	rsp    u64
+	ss     u64
 }
 
 struct Local {
 pub mut:
-	cpu_number       u64
-	kernel_stack     u64
-	user_stack       u64
-	errno            i64
-	tss              TSS
-	lapic_id         u32
-	fpu_storage_size size_t
-	fpu_save         fn (voidptr)
-	fpu_restore      fn (voidptr)
-	current_thread   voidptr
+	cpu_number           u64
+	kernel_stack         u64
+	user_stack           u64
+	errno                i64
+	tss                  TSS
+	lapic_id             u32
+	fpu_storage_size     u64
+	fpu_save             fn (voidptr)
+	fpu_restore          fn (voidptr)
+	current_thread       voidptr
 	last_run_queue_index int
 }
 

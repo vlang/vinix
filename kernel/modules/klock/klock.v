@@ -1,27 +1,38 @@
 module klock
 
 pub struct Lock {
+pub mut:
 	l bool
+	caller voidptr
 }
 
 fn C.__sync_bool_compare_and_swap(ptr &bool, old bool, new bool) bool
+fn C.__builtin_return_address(level u32) voidptr
 
-pub fn (l &Lock) acquire() {
+pub fn (mut l Lock) acquire() {
+	caller := C.__builtin_return_address(0)
 	for {
-		if C.__sync_bool_compare_and_swap(&l.l, false, true) == true {
-			break
+		for i := u64(0); i < u64(500000000); i++ {
+			if C.__sync_bool_compare_and_swap(&l.l, false, true) == true {
+				l.caller = caller
+				return
+			}
 		}
+		C.printf(c'POTENTIAL DEADLOCK!!!\n')
+		C.printf(c'Lock address:   0x%llx\n', l)
+		C.printf(c'Current caller: 0x%llx\n', caller)
+		C.printf(c'Last caller:    0x%llx\n', l.caller)
 	}
 }
 
-pub fn (l &Lock) release() {
+pub fn (mut l Lock) release() {
 	C.__sync_bool_compare_and_swap(&l.l, true, false)
 }
 
-pub fn (l &Lock) test_and_acquire() bool {
-	return C.__sync_bool_compare_and_swap(&l.l, false, true)
-}
-
-pub fn new() Lock {
-	return Lock{false}
+pub fn (mut l Lock) test_and_acquire() bool {
+	ret := C.__sync_bool_compare_and_swap(&l.l, false, true)
+	if ret == true {
+		l.caller = C.__builtin_return_address(0)
+	}
+	return ret
 }

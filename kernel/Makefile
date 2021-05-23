@@ -10,6 +10,7 @@ CFLAGS =                          \
 	-Wno-unused-function          \
 	-Wno-unused-variable          \
 	-Wno-unused-but-set-variable  \
+	-Wno-unused-label             \
 	-Wno-div-by-zero              \
 	-Wno-missing-braces           \
 	-Wno-address-of-packed-member

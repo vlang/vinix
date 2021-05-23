@@ -12,7 +12,7 @@ type PEventListener = &EventListener
 struct Event {
 pub mut:
 	pending   u64
-	listeners []EventListener
+	listeners [16]EventListener
 }
 
 struct EventListener {
@@ -25,15 +25,15 @@ pub mut:
 }
 
 fn (mut this Event) get_listener() &EventListener {
-	for listener in this.listeners {
-		if listener.l.test_and_acquire() == true {
-			return unsafe { &listener }
+	for i := u64(0); i < this.listeners.len; i++ {
+		if this.listeners[i].l.test_and_acquire() == true {
+			return unsafe { &this.listeners[i] }
 		}
 	}
 	return 0
 }
 
-pub fn events_await(events []&Event, which &u64, block bool) bool {
+pub fn await(events []&Event, which &u64, block bool) bool {
 	if events.len > 16 {
 		print('events: Too many events!\n')
 		return false
@@ -87,10 +87,51 @@ pub fn events_await(events []&Event, which &u64, block bool) bool {
 
 unarm_listeners:
 	for i := u64(0); i < listeners_armed; i++ {
-		listener := &EventListener(listeners[i])
+		mut listener := &EventListener(listeners[i])
 		listener.ready.release()
 		listener.l.release()
 	}
 
 	return true
+}
+
+pub fn trigger(event &Event) {
+	if katomic.load(event.pending) > 0 {
+		katomic.inc(event.pending)
+		return
+	}
+
+	mut pending := true
+
+	for mut listener in event.listeners {
+		if listener.l.test_and_acquire() == true {
+			listener.l.release()
+			continue
+		}
+
+		if listener.ready.test_and_acquire() == true {
+			listener.ready.release()
+			continue
+		}
+
+		if listener.thread.event_occurred.test_and_acquire() == false {
+			continue
+		}
+
+		pending = false
+
+		unsafe { listener.which[0] = listener.index }
+
+		mut thread := listener.thread
+
+		thread.event_block_dequeue.test_and_acquire()
+		sched.enqueue_thread(thread)
+
+		listener.l.release()
+		listener.ready.release()
+	}
+
+	if pending == true {
+		katomic.inc(event.pending)
+	}
 }

@@ -22,8 +22,8 @@ const max_running_threads = int(65536)
 
 pub fn initialise() {
 	scheduler_running_queue = []&proc.Thread{cap: max_running_threads,
-											 len: 0,
-							  				 init: 0}
+											 len: max_running_threads,
+											 init: voidptr(-1)}
 
 	// Set PIT tick to 250Hz
 	pit.set_freq(250)
@@ -70,15 +70,20 @@ fn scheduler_ap_isr(num u32, gpr_state &cpulocal.GPRState) {
 fn get_next_thread(orig_i int) (int, &proc.Thread) {
 	mut index := orig_i + 1
 
-	for i := 0; i < scheduler_running_queue.len; i++ {
-		if index >= scheduler_running_queue.len {
+	for {
+		if voidptr(scheduler_running_queue[index]) == voidptr(-1)
+		|| index >= scheduler_running_queue.len {
 			index = 0
+			if voidptr(scheduler_running_queue[index]) == voidptr(-1)
+			|| index >= scheduler_running_queue.len {
+				break
+			}
 		}
 
-		thread := scheduler_running_queue[index]
+		mut thread := scheduler_running_queue[index]
 
 		if thread != 0 && thread.l.test_and_acquire() == true {
-			return i, thread
+			return index, thread
 		}
 
 		if index == orig_i {
@@ -105,28 +110,37 @@ fn scheduler_common(gpr_state &cpulocal.GPRState) {
 
 	new_index, new_thread := get_next_thread(cpu_local.last_run_queue_index)
 
-	if new_index == -1 {
-		if gpr_state.cs & 0x03 != 0 {
-			cpu.swapgs()
-		}
-		apic.lapic_eoi()
-		if katomic.dec(scheduling_cpus) == false {
-			scheduler_lock.release()
-		}
-		if current_thread != 0 {
-			return
-		} else {
-			// Idle
-			await()
-		}
-	}
-
-	if current_thread != 0 {
+	if current_thread != 0 && voidptr(new_thread) != voidptr(current_thread) {
 		unsafe { current_thread.gpr_state = gpr_state[0] }
 		current_thread.user_gs = cpu.get_user_gs()
 		current_thread.user_fs = cpu.get_user_fs()
 		current_thread.user_stack = cpu_local.user_stack
 		current_thread.l.release()
+	}
+
+	if current_thread != 0 && voidptr(new_thread) == voidptr(current_thread) {
+		if gpr_state.cs & 0x03 != 0 {
+			cpu.swapgs()
+		}
+		apic.lapic_eoi()
+		cpu_local.last_run_queue_index = new_index
+		if katomic.dec(scheduling_cpus) == false {
+			scheduler_lock.release()
+		}
+		return
+	}
+
+	if new_index == -1 {
+		if gpr_state.cs & 0x03 != 0 {
+			cpu.swapgs()
+		}
+		apic.lapic_eoi()
+		cpu_local.current_thread = voidptr(0)
+		cpu_local.last_run_queue_index = 0
+		if katomic.dec(scheduling_cpus) == false {
+			scheduler_lock.release()
+		}
+		await()
 	}
 
 	current_thread = new_thread
@@ -187,7 +201,13 @@ pub fn enqueue_thread(_thread &proc.Thread) bool {
 
 	scheduler_lock.acquire()
 
-	scheduler_running_queue << thread
+	for i := u64(0); i < scheduler_running_queue.len; i++ {
+		if voidptr(scheduler_running_queue[i]) == voidptr(0)
+		|| voidptr(scheduler_running_queue[i]) == voidptr(-1) {
+			scheduler_running_queue[i] = thread
+			break
+		}
+	}
 
 	thread.is_in_queue = true
 
@@ -205,7 +225,17 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 
 	scheduler_lock.acquire()
 
-	//scheduler_running_queue = scheduler_running_queue.filter(it != _thread)
+	for i := u64(0); i < scheduler_running_queue.len; i++ {
+		if voidptr(scheduler_running_queue[i]) == voidptr(_thread) {
+			if i < scheduler_running_queue.len - 1
+			&& voidptr(scheduler_running_queue[i + 1]) == voidptr(-1) {
+				scheduler_running_queue[i] = voidptr(-1)
+			} else {
+				scheduler_running_queue[i] = voidptr(0)
+			}
+			break
+		}
+	}
 
 	thread.is_in_queue = false
 
@@ -219,6 +249,10 @@ pub fn yield() {
 
 	mut current_thread := &proc.Thread(cpulocal.current().current_thread)
 
+	scheduler_lock.acquire()
+
+	katomic.store(scheduling_cpus, u64(1))
+
 	current_thread.yield_await.acquire()
 
 	apic.lapic_send_ipi(cpulocal.current().lapic_id, scheduler_ap_vector)
@@ -226,6 +260,7 @@ pub fn yield() {
 	asm volatile amd64 { sti }
 
 	current_thread.yield_await.acquire()
+	current_thread.yield_await.release()
 }
 
 pub fn dequeue_and_yield() {
