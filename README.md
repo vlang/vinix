@@ -25,7 +25,7 @@ Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
 
 The following is an OS-agnostic list of packages needed to build Vinix. Skip to a paragraph for your host OS if there is any.
 
-`GNU make`, `GNU patch`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `util-linux`, `wget`, `mtools`, and `qemu` to test it.
+`GNU make`, `GNU patch`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `wget`, `xorriso`, and `qemu` to test it.
 
 ### Build prerequisites for macOS
 
@@ -38,19 +38,14 @@ First of all, it is necessary to have `brew` installed:
 
 After `brew` is installed, install the required dependencies:
 ```bash
-brew install meson wget util-linux gpatch mtools coreutils qemu
-```
-
-Since not all the needed tools are in `PATH`, we will have to export `PATH` to include them, for the session.
-```bash
-export PATH="/usr/local/opt/util-linux/sbin:$PATH"
+brew install meson wget gpatch xorriso coreutils qemu
 ```
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 
 For Ubuntu or Debian based distros, install the prerequisites with:
 ```bash
-sudo apt install build-essential git meson m4 texinfo python3 python3-pip util-linux wget mtools qemu-system-x86
+sudo apt install build-essential git meson m4 texinfo python3 python3-pip wget xorriso qemu-system-x86
 ```
 
 ### Installing xbstrap
