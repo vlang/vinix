@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 KERNEL_HDD = vinix.hdd
 
-V_COMMIT = 4217f05146881e958b5261960c622d7f269909a9
+V_COMMIT = 14d09aa7c2f02c3590e1b8a87ee0484a34d6e5b4
 
 .PHONY: all
 all: vinix.iso
@@ -53,7 +53,7 @@ vinix.iso: 3rdparty/limine kernel/vinix.elf
 	mkdir -p pack/boot
 	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp pack/
 	cp limine.cfg 3rdparty/limine/limine.sys 3rdparty/limine/limine-cd.bin 3rdparty/limine/limine-eltorito-efi.bin pack/boot/
-	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table -part_like_isohybrid -eltorito-alt-boot -e /boot/limine-eltorito-efi.bin -no-emul-boot pack -isohybrid-gpt-basdat -o vinix.iso
+	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot /boot/limine-eltorito-efi.bin -efi-boot-part --efi-boot-image --protective-msdos-label pack -o vinix.iso
 	./3rdparty/limine/limine-install vinix.iso
 
 .PHONY: format
