@@ -3,43 +3,6 @@ module apic
 import kio
 import msr
 import cpu.local as cpulocal
-import katomic
-import idt
-
-__global (
-	x86_pit_ticks = u64(0)
-	x86_pit_vector = byte(0)
-)
-
-fn handler(_ u32, _ voidptr) {
-	katomic.inc(x86_pit_ticks)
-}
-
-pub fn pit_initialise() {
-	if x86_pit_vector == 0 {
-		x86_pit_vector = idt.allocate_vector()
-		interrupt_table[x86_pit_vector] = voidptr(handler)
-		println('pit: Using vector $x86_pit_vector')
-	}
-
-	apic.io_apic_set_irq_redirect(cpulocal.current().lapic_id, x86_pit_vector, 0, true)
-}
-
-pub fn pit_mask() {
-	apic.io_apic_set_irq_redirect(0, 0, 0, false)
-}
-
-pub fn pit_set_freq(freq u32) {
-	dividend := u32(1193182)
-
-	mut ticks := dividend / freq
-	if dividend % freq > freq / 2 {
-		ticks++
-	}
-
-	kio.outb(0x40, byte(ticks))
-	kio.outb(0x40, byte(ticks >> 8))
-}
 
 const lapic_reg_icr0 = 0x300
 const lapic_reg_icr1 = 0x310
@@ -60,35 +23,39 @@ fn lapic_write(reg u32, val u32) {
 	kio.mmoutd(lapic_base + reg, val)
 }
 
-pub fn lapic_timer_calibrate() {
-	pit_initialise()
+fn pit_current_count() u16 {
+	kio.outb(0x43, 0)
+	lo := kio.inb(0x40)
+	hi := kio.inb(0x40)
+	return (hi << 8) | lo
+}
 
+pub fn lapic_timer_calibrate() {
 	lapic_write(lapic_reg_timer_initcnt, 0)
 	lapic_write(lapic_reg_timer, (1 << 16))
 
+	samples := u64(0xfffff)
+
 	lapic_write(lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
 	lapic_write(lapic_reg_timer_div, 0)
-	lapic_write(lapic_reg_timer_initcnt, 0xfffff)
+	lapic_write(lapic_reg_timer_initcnt, u32(samples))
 
-	pit_freq := u64(47727)
+	pit_freq := u64(1193182)
 
-	pit_set_freq(u32(pit_freq))
+	kio.outb(0x40, 0x0)
+	kio.outb(0x40, 0x0)
 
-	initial_pit_tick := katomic.load(x86_pit_ticks)
+	initial_pit_tick := u64(pit_current_count())
 
 	for lapic_read(lapic_reg_timer_curcnt) != 0 {}
 
-	final_pit_tick := katomic.load(x86_pit_ticks)
+	final_pit_tick := u64(pit_current_count())
 
-	pit_mask()
-
-	pit_ticks := final_pit_tick - initial_pit_tick
+	pit_ticks := initial_pit_tick - final_pit_tick
 
 	mut cpu_local := cpulocal.current()
 
-	cpu_local.lapic_timer_freq = (0xfffff / pit_ticks) * pit_freq
-
-	print('apic: Local APIC timer frequency is ${cpu_local.lapic_timer_freq} Hz\n')
+	cpu_local.lapic_timer_freq = (samples / pit_ticks) * pit_freq
 }
 
 pub fn lapic_timer_oneshot(vec u8, us u64) {
