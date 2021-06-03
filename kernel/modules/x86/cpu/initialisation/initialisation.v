@@ -76,13 +76,16 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	apic.lapic_enable(0xff)
 
+	asm volatile amd64 { sti }
+
+	apic.lapic_timer_calibrate()
+
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 
-	katomic.inc(&cpus_online)
+	katomic.inc(cpu_local.online)
 
 	if cpu_number != 0 {
 		asm volatile amd64 {
-			sti
 			1:
 			hlt
 			jmp b1

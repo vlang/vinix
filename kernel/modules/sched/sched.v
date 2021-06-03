@@ -4,7 +4,6 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
-import x86.pit
 import klock
 import katomic
 import proc
@@ -25,9 +24,6 @@ pub fn initialise() {
 											 len: max_running_threads,
 											 init: voidptr(-1)}
 
-	// Set PIT tick to 250Hz
-	pit.set_freq(250)
-
 	scheduler_vector = idt.allocate_vector()
 	println('sched: Scheduler interrupt vector (BSP) is 0x${scheduler_vector:x}')
 
@@ -41,16 +37,12 @@ pub fn initialise() {
 	idt.set_ist(scheduler_ap_vector, 1)
 
 	kernel_process = &proc.Process{pagemap: kernel_pagemap}
-
-	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, scheduler_vector, 0, true)
 }
 
 fn scheduler_isr(num u32, gpr_state &cpulocal.GPRState) {
 	if scheduler_lock.test_and_acquire() == false {
 		return
 	}
-
-	katomic.store(scheduling_cpus, cpus_online)
 
 	// Trigger scheduler_ap_isr on APs
 	for cpu_local in cpu_locals {

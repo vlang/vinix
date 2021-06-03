@@ -51,6 +51,8 @@ pub mut:
 	errno                i64
 	tss                  TSS
 	lapic_id             u32
+	lapic_timer_freq     u64
+	online				 u64
 	fpu_storage_size     u64
 	fpu_save             fn (voidptr)
 	fpu_restore          fn (voidptr)

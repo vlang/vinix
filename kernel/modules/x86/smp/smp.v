@@ -7,7 +7,6 @@ import cpu.local as cpulocal
 import cpu.initialisation as cpuinit
 
 __global (
-	cpus_online = u64(0)
 	bsp_lapic_id = u32(0)
 )
 
@@ -45,9 +44,9 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 
 		katomic.store(smp_info.target_stack, cpu_local.tss.rsp0)
 		katomic.store(smp_info.goto_address, u64(&cpuinit.initialise))
-	}
 
-	for katomic.load(cpus_online) != smp_tag.cpu_count {}
+		for katomic.load(cpu_local.online) == 0 {}
+	}
 
 	print('smp: All CPUs online!\n')
 }
