@@ -58,7 +58,7 @@ pub fn store<T>(var &T, value T) {
 			  ri (value)
 			; memory
 		}
-	} $else $if T is u8 {
+	} $else $if T is byte {
 		asm volatile amd64 {
 			lock
 			xchgb [var], value
@@ -79,6 +79,16 @@ pub fn load<T>(var &T) T {
 		asm volatile amd64 {
 			lock
 			xaddq [var], ret
+			; +r (ret)
+			; r (var)
+			; memory
+		}
+		return ret
+	} $else $if T is byte {
+		mut ret := byte(0)
+		asm volatile amd64 {
+			lock
+			xaddb [var], ret
 			; +r (ret)
 			; r (var)
 			; memory

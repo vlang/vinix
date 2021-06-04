@@ -7,6 +7,7 @@ import local as cpulocal
 import stivale2
 import apic
 import katomic
+import sched
 
 pub fn initialise(smp_info &stivale2.SMPInfo) {
 	mut cpu_local := &cpulocal.Local(smp_info.extra_arg)
@@ -85,13 +86,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	katomic.inc(cpu_local.online)
 
 	if cpu_number != 0 {
-		asm volatile amd64 {
-			1:
-			hlt
-			jmp b1
-			;
-			;
-			; memory
-		}
+		for katomic.load(scheduler_vector) == 0 {}
+		sched.await()
 	}
 }

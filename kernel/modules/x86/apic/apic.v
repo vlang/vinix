@@ -38,7 +38,6 @@ pub fn lapic_timer_calibrate() {
 
 	lapic_write(lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
 	lapic_write(lapic_reg_timer_div, 0)
-	lapic_write(lapic_reg_timer_initcnt, u32(samples))
 
 	pit_freq := u64(1193182)
 
@@ -46,6 +45,8 @@ pub fn lapic_timer_calibrate() {
 	kio.outb(0x40, 0x0)
 
 	initial_pit_tick := u64(pit_current_count())
+
+	lapic_write(lapic_reg_timer_initcnt, u32(samples))
 
 	for lapic_read(lapic_reg_timer_curcnt) != 0 {}
 
