@@ -5,15 +5,12 @@ import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
 import klock
-import katomic
 import proc
 
 __global (
 	scheduler_lock klock.Lock
 	scheduler_vector byte
-	scheduler_ap_vector byte
 	scheduler_running_queue []&proc.Thread
-	scheduling_cpus u64
 	kernel_process &proc.Process
 )
 
@@ -25,38 +22,13 @@ pub fn initialise() {
 											 init: voidptr(-1)}
 
 	scheduler_vector = idt.allocate_vector()
-	println('sched: Scheduler interrupt vector (BSP) is 0x${scheduler_vector:x}')
-
-	scheduler_ap_vector = idt.allocate_vector()
-	println('sched: Scheduler interrupt vector (AP) is 0x${scheduler_ap_vector:x}')
+	println('sched: Scheduler interrupt vector is 0x${scheduler_vector:x}')
 
 	interrupt_table[scheduler_vector] = voidptr(scheduler_isr)
-	interrupt_table[scheduler_ap_vector] = voidptr(scheduler_ap_isr)
 
 	idt.set_ist(scheduler_vector, 1)
-	idt.set_ist(scheduler_ap_vector, 1)
 
 	kernel_process = &proc.Process{pagemap: kernel_pagemap}
-}
-
-fn scheduler_isr(num u32, gpr_state &cpulocal.GPRState) {
-	if scheduler_lock.test_and_acquire() == false {
-		return
-	}
-
-	// Trigger scheduler_ap_isr on APs
-	for cpu_local in cpu_locals {
-		if cpu_local.lapic_id == bsp_lapic_id {
-			continue
-		}
-		apic.lapic_send_ipi(cpu_local.lapic_id, scheduler_ap_vector)
-	}
-
-	scheduler_common(gpr_state)
-}
-
-fn scheduler_ap_isr(num u32, gpr_state &cpulocal.GPRState) {
-	scheduler_common(gpr_state)
 }
 
 fn get_next_thread(orig_i int) (int, &proc.Thread) {
@@ -88,9 +60,18 @@ fn get_next_thread(orig_i int) (int, &proc.Thread) {
 	return -1, 0
 }
 
-fn scheduler_common(gpr_state &cpulocal.GPRState) {
+fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if gpr_state.cs & 0x03 != 0 {
 		cpu.swapgs()
+	}
+
+	if scheduler_lock.test_and_acquire() == false {
+		apic.lapic_eoi()
+		apic.lapic_timer_oneshot(scheduler_vector, 10)
+		if gpr_state.cs & 0x03 != 0 {
+			cpu.swapgs()
+		}
+		return
 	}
 
 	mut cpu_local := cpulocal.current()
@@ -115,10 +96,9 @@ fn scheduler_common(gpr_state &cpulocal.GPRState) {
 			cpu.swapgs()
 		}
 		apic.lapic_eoi()
+		apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
 		cpu_local.last_run_queue_index = new_index
-		if katomic.dec(scheduling_cpus) == false {
-			scheduler_lock.release()
-		}
+		scheduler_lock.release()
 		return
 	}
 
@@ -129,9 +109,7 @@ fn scheduler_common(gpr_state &cpulocal.GPRState) {
 		apic.lapic_eoi()
 		cpu_local.current_thread = voidptr(0)
 		cpu_local.last_run_queue_index = 0
-		if katomic.dec(scheduling_cpus) == false {
-			scheduler_lock.release()
-		}
+		scheduler_lock.release()
 		await()
 	}
 
@@ -152,9 +130,8 @@ fn scheduler_common(gpr_state &cpulocal.GPRState) {
 	current_thread.process.pagemap.switch_to()
 
 	apic.lapic_eoi()
-	if katomic.dec(scheduling_cpus) == false {
-		scheduler_lock.release()
-	}
+	apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
+	scheduler_lock.release()
 
 	new_gpr_state := &current_thread.gpr_state
 
@@ -197,15 +174,15 @@ pub fn enqueue_thread(_thread &proc.Thread) bool {
 		if voidptr(scheduler_running_queue[i]) == voidptr(0)
 		|| voidptr(scheduler_running_queue[i]) == voidptr(-1) {
 			scheduler_running_queue[i] = thread
-			break
+			thread.is_in_queue = true
+			scheduler_lock.release()
+			return true
 		}
 	}
 
-	thread.is_in_queue = true
-
 	scheduler_lock.release()
 
-	return true
+	return false
 }
 
 pub fn dequeue_thread(_thread &proc.Thread) bool {
@@ -225,15 +202,15 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 			} else {
 				scheduler_running_queue[i] = voidptr(0)
 			}
-			break
+			thread.is_in_queue = false
+			scheduler_lock.release()
+			return true
 		}
 	}
 
-	thread.is_in_queue = false
-
 	scheduler_lock.release()
 
-	return true
+	return false
 }
 
 pub fn yield() {
@@ -241,13 +218,9 @@ pub fn yield() {
 
 	mut current_thread := &proc.Thread(cpulocal.current().current_thread)
 
-	scheduler_lock.acquire()
-
-	katomic.store(scheduling_cpus, u64(1))
-
 	current_thread.yield_await.acquire()
 
-	apic.lapic_send_ipi(cpulocal.current().lapic_id, scheduler_ap_vector)
+	apic.lapic_timer_oneshot(scheduler_vector, 1)
 
 	asm volatile amd64 { sti }
 
@@ -278,6 +251,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	thread := &proc.Thread{
 		process: kernel_process
 		gpr_state: gpr_state
+		timeslice: 5000
 	}
 
 	if autoenqueue == true {
@@ -288,6 +262,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 }
 
 pub fn await() {
+	apic.lapic_timer_oneshot(scheduler_vector, 20000)
 	asm volatile amd64 {
 		sti
 		1:

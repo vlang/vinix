@@ -22,4 +22,5 @@ pub mut:
 	event_block_dequeue klock.Lock
 	event_occurred klock.Lock
 	yield_await klock.Lock
+	timeslice u64
 }
