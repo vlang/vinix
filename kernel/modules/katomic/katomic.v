@@ -1,5 +1,21 @@
 module katomic
 
+pub fn cas<T>(here voidptr, ifthis T, writethis T) bool {
+	mut ret := false
+	asm volatile amd64 {
+		push rax
+		lock
+		cmpxchg [here], writethis
+		pop rax
+		; =@ccz (ret)
+		; r (here)
+		  a (ifthis)
+		  r (writethis)
+		; memory
+	}
+	return ret
+}
+
 pub fn inc<T>(var &T) {
 	$if T is u64 {
 		asm volatile amd64 {

@@ -4,22 +4,21 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
-import klock
+import katomic
 import proc
 
 __global (
-	scheduler_lock klock.Lock
 	scheduler_vector byte
 	scheduler_running_queue []&proc.Thread
 	kernel_process &proc.Process
 )
 
-const max_running_threads = int(65536)
+const max_running_threads = int(512)
 
 pub fn initialise() {
 	scheduler_running_queue = []&proc.Thread{cap: max_running_threads,
 											 len: max_running_threads,
-											 init: voidptr(-1)}
+											 init: voidptr(0)}
 
 	scheduler_vector = idt.allocate_vector()
 	println('sched: Scheduler interrupt vector is 0x${scheduler_vector:x}')
@@ -35,13 +34,8 @@ fn get_next_thread(orig_i int) (int, &proc.Thread) {
 	mut index := orig_i + 1
 
 	for {
-		if voidptr(scheduler_running_queue[index]) == voidptr(-1)
-		|| index >= scheduler_running_queue.len {
+		if index >= scheduler_running_queue.len {
 			index = 0
-			if voidptr(scheduler_running_queue[index]) == voidptr(-1)
-			|| index >= scheduler_running_queue.len {
-				break
-			}
 		}
 
 		mut thread := scheduler_running_queue[index]
@@ -63,15 +57,6 @@ fn get_next_thread(orig_i int) (int, &proc.Thread) {
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if gpr_state.cs & 0x03 != 0 {
 		cpu.swapgs()
-	}
-
-	if scheduler_lock.test_and_acquire() == false {
-		apic.lapic_eoi()
-		apic.lapic_timer_oneshot(scheduler_vector, 10)
-		if gpr_state.cs & 0x03 != 0 {
-			cpu.swapgs()
-		}
-		return
 	}
 
 	mut cpu_local := cpulocal.current()
@@ -98,7 +83,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		apic.lapic_eoi()
 		apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
 		cpu_local.last_run_queue_index = new_index
-		scheduler_lock.release()
 		return
 	}
 
@@ -109,7 +93,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		apic.lapic_eoi()
 		cpu_local.current_thread = voidptr(0)
 		cpu_local.last_run_queue_index = 0
-		scheduler_lock.release()
 		await()
 	}
 
@@ -131,7 +114,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	apic.lapic_eoi()
 	apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
-	scheduler_lock.release()
 
 	new_gpr_state := &current_thread.gpr_state
 
@@ -168,19 +150,12 @@ pub fn enqueue_thread(_thread &proc.Thread) bool {
 		return true
 	}
 
-	scheduler_lock.acquire()
-
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
-		if voidptr(scheduler_running_queue[i]) == voidptr(0)
-		|| voidptr(scheduler_running_queue[i]) == voidptr(-1) {
-			scheduler_running_queue[i] = thread
+		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(0), u64(thread)) {
 			thread.is_in_queue = true
-			scheduler_lock.release()
 			return true
 		}
 	}
-
-	scheduler_lock.release()
 
 	return false
 }
@@ -192,23 +167,12 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 		return true
 	}
 
-	scheduler_lock.acquire()
-
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
-		if voidptr(scheduler_running_queue[i]) == voidptr(_thread) {
-			if i < scheduler_running_queue.len - 1
-			&& voidptr(scheduler_running_queue[i + 1]) == voidptr(-1) {
-				scheduler_running_queue[i] = voidptr(-1)
-			} else {
-				scheduler_running_queue[i] = voidptr(0)
-			}
+		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(thread), u64(0)) {
 			thread.is_in_queue = false
-			scheduler_lock.release()
 			return true
 		}
 	}
-
-	scheduler_lock.release()
 
 	return false
 }
