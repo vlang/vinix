@@ -39,8 +39,7 @@
 void lib__kprintc(char *str);
 
 void _putchar(char character) {
-  char s[] = { character, 0 };
-  lib__kprintc(s);
+  asm volatile ("outb %%al, %%dx" :: "a"(character), "d"(0xe9));
 }
 
 // no floats in kernel

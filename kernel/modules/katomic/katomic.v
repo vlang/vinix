@@ -1,16 +1,16 @@
 module katomic
 
-pub fn cas<T>(here voidptr, ifthis T, writethis T) bool {
+pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 	mut ret := false
+	mut here := unsafe { _here }
+	mut ifthis := _ifthis
 	asm volatile amd64 {
-		push rax
 		lock
-		cmpxchg [here], writethis
-		pop rax
-		; =@ccz (ret)
-		; r (here)
-		  a (ifthis)
-		  r (writethis)
+		cmpxchg here, writethis
+		; +a (ifthis)
+		  +m (here[0]) as here
+		  =@ccz (ret)
+		; r (writethis)
 		; memory
 	}
 	return ret
