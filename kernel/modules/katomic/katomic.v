@@ -4,7 +4,7 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 	mut ret := false
 	mut here := unsafe { _here }
 	mut ifthis := _ifthis
-	asm volatile amd64 {
+	unsafe { asm volatile amd64 {
 		lock
 		cmpxchg here, writethis
 		; +a (ifthis)
@@ -12,7 +12,7 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 		  =@ccz (ret)
 		; r (writethis)
 		; memory
-	}
+	} }
 	return ret
 }
 

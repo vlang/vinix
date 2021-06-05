@@ -120,6 +120,10 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	asm volatile amd64 {
 		mov rsp, new_gpr_state
 		pop rax
+		mov ds, eax
+		pop rax
+		mov es, eax
+		pop rax
 		pop rbx
 		pop rcx
 		pop rdx
