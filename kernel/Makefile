@@ -4,16 +4,7 @@ OBJDUMP = objdump
 CC = cc
 V = v
 
-CFLAGS =                          \
-	-O2 -g -pipe -Wall -Wextra    \
-	-Wno-unused-parameter         \
-	-Wno-unused-function          \
-	-Wno-unused-variable          \
-	-Wno-unused-but-set-variable  \
-	-Wno-unused-label             \
-	-Wno-div-by-zero              \
-	-Wno-missing-braces           \
-	-Wno-address-of-packed-member
+CFLAGS = -O2 -g -pipe -w
 
 INTERNALCFLAGS :=           \
 	-I.                     \
