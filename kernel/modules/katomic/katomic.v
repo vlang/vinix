@@ -94,6 +94,16 @@ pub fn load<T>(var &T) T {
 			; memory
 		}
 		return ret
+	} $else $if T is bool {
+		mut ret := false
+		asm volatile amd64 {
+			lock
+			xaddb [var], ret
+			; +r (ret)
+			; r (var)
+			; memory
+		}
+		return ret
 	} $else {
 		typestr := unsafe { typeof(var[0]).name }
 		panic('atomic_load not supported for type ${typestr}')

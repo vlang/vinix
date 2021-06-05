@@ -7,8 +7,6 @@ import proc
 import sched
 import katomic
 
-type PEventListener = &EventListener
-
 struct Event {
 pub mut:
 	pending   u64
@@ -35,8 +33,7 @@ fn (mut this Event) get_listener() &EventListener {
 
 pub fn await(events []&Event, which &u64, block bool) bool {
 	if events.len > 16 {
-		print('events: Too many events!\n')
-		return false
+		panic('kevent: Too many events!')
 	}
 
 	mut thread := &proc.Thread(cpulocal.current().current_thread)
@@ -44,7 +41,7 @@ pub fn await(events []&Event, which &u64, block bool) bool {
 	thread.event_block_dequeue.release()
 	thread.event_occurred.release()
 
-	mut listeners := [16]PEventListener{}
+	mut listeners := [16]&EventListener{}
 	mut listeners_armed := u64(0)
 
 	for i := u64(0); i < events.len; i++ {
@@ -53,8 +50,10 @@ pub fn await(events []&Event, which &u64, block bool) bool {
 		if katomic.load(event.pending) > 0
 		&& thread.event_occurred.test_and_acquire() == true {
 			katomic.dec(event.pending)
-			unsafe { which[0] = i }
-			unsafe { goto unarm_listeners }
+			unsafe {
+				which[0] = i
+				goto unarm_listeners
+			}
 		}
 
 		if thread.event_occurred.test_and_acquire() == false {
@@ -77,8 +76,10 @@ pub fn await(events []&Event, which &u64, block bool) bool {
 	}
 
 	if block == false && thread.event_occurred.test_and_acquire() == true {
-		unsafe { which[0] = -1 }
-		unsafe { goto unarm_listeners }
+		unsafe {
+			which[0] = -1
+			goto unarm_listeners
+		}
 	}
 
 	if thread.event_block_dequeue.test_and_acquire() == true {
@@ -87,7 +88,7 @@ pub fn await(events []&Event, which &u64, block bool) bool {
 
 unarm_listeners:
 	for i := u64(0); i < listeners_armed; i++ {
-		mut listener := &EventListener(listeners[i])
+		mut listener := listeners[i]
 		listener.ready.release()
 		listener.l.release()
 	}
@@ -103,7 +104,9 @@ pub fn trigger(event &Event) {
 
 	mut pending := true
 
-	for mut listener in event.listeners {
+	for i := u64(0); i < event.listeners.len; i++ {
+		mut listener := &event.listeners[i]
+
 		if listener.l.test_and_acquire() == true {
 			listener.l.release()
 			continue
@@ -124,7 +127,10 @@ pub fn trigger(event &Event) {
 
 		mut thread := listener.thread
 
-		thread.event_block_dequeue.test_and_acquire()
+		if thread.event_block_dequeue.test_and_acquire() == false {
+			for katomic.load(thread.is_in_queue) == true {}
+		}
+
 		sched.enqueue_thread(thread)
 
 		listener.l.release()
