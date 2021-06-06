@@ -30,9 +30,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 
 	console.initialise()
 
-	for {}
-
-	panic('End of kmain')
+	sched.dequeue_and_yield()
 }
 
 pub fn kmain(stivale2_struct &stivale2.Struct) {
