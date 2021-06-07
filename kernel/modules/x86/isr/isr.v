@@ -1,17 +1,17 @@
 module isr
 
 import idt
-import kevent
+import event
 import apic
 import cpu.local as cpulocal
 
 __global (
-	int_events [256]kevent.Event
+	int_events [256]event.Event
 )
 
 fn generic_isr(num u32, _ voidptr) {
 	apic.lapic_eoi()
-	kevent.trigger(&int_events[num])
+	event.trigger(&int_events[num])
 }
 
 const exception_names = [

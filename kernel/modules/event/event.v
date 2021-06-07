@@ -1,4 +1,4 @@
-module kevent
+module event
 
 import x86.cpu
 import x86.cpu.local as cpulocal

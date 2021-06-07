@@ -3,7 +3,7 @@ module console
 import x86.idt
 import x86.apic
 import x86.kio
-import kevent
+import event
 import klock
 import sched
 
@@ -23,7 +23,7 @@ const console_bigbuf_size = 4096
 
 __global (
 	console_read_lock klock.Lock
-	console_event kevent.Event
+	console_event event.Event
 	console_capslock_active = bool(false)
 	console_shift_active = bool(false)
 	console_ctrl_active = bool(false)
@@ -130,7 +130,7 @@ fn add_to_buf(ptr &byte, count u64) {
 	for i := u64(0); i < count; i++ {
 		unsafe { add_to_buf_char(ptr[i]) }
 	}
-	kevent.trigger(&console_event)
+	event.trigger(&console_event)
 }
 
 fn keyboard_handler() {
@@ -142,7 +142,7 @@ fn keyboard_handler() {
 
 	for {
 		mut which := u64(0)
-		kevent.await([&int_events[vect]], &which, true)
+		event.await([&int_events[vect]], &which, true)
 		input_byte := kio.inb(0x60)
 
 		if input_byte == 0xe0 {
