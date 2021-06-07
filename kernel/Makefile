@@ -29,8 +29,8 @@ INTERNALVFLAGS :=   \
 	-enable-globals \
 	-d no_backtrace
 
-VFILES := $(shell find ./ -type f -name '*.v')
-CFILES := $(shell find ./ -type f -name '*.c')
+VFILES := $(shell find ./ -type f -name '*.v' | sort)
+CFILES := $(shell find ./ -type f -name '*.c' | sort)
 
 .PHONY: all
 all: $(KERNEL)

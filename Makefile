@@ -43,7 +43,7 @@ update-v: 3rdparty/v
 
 .PHONY: kernel/vinix.elf
 kernel/vinix.elf: update-v
-	$(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" \
+	export LC_ALL=C && $(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" \
 		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vinix-gcc`" \
 		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vinix-objdump`"
 
