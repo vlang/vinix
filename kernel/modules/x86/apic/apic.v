@@ -30,9 +30,13 @@ fn pit_current_count() u16 {
 	return (hi << 8) | lo
 }
 
-pub fn lapic_timer_calibrate() {
+pub fn lapic_timer_stop() {
 	lapic_write(lapic_reg_timer_initcnt, 0)
 	lapic_write(lapic_reg_timer, (1 << 16))
+}
+
+pub fn lapic_timer_calibrate() {
+	lapic_timer_stop()
 
 	samples := u64(0xfffff)
 
@@ -57,11 +61,12 @@ pub fn lapic_timer_calibrate() {
 	mut cpu_local := cpulocal.current()
 
 	cpu_local.lapic_timer_freq = (samples / pit_ticks) * pit_freq
+
+	lapic_timer_stop()
 }
 
 pub fn lapic_timer_oneshot(vec u8, us u64) {
-	lapic_write(lapic_reg_timer_initcnt, 0)
-	lapic_write(lapic_reg_timer, (1 << 16))
+	lapic_timer_stop()
 
 	cpu_local := cpulocal.current()
 

@@ -55,11 +55,16 @@ fn get_next_thread(orig_i int) (int, &proc.Thread) {
 }
 
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
+	apic.lapic_timer_stop()
+
 	if gpr_state.cs & 0x03 != 0 {
 		cpu.swapgs()
 	}
 
 	mut cpu_local := cpulocal.current()
+
+	katomic.store(cpu_local.is_idle, false)
+
 	mut current_thread := &proc.Thread(cpu_local.current_thread)
 
 	if current_thread != 0 {
@@ -93,6 +98,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		apic.lapic_eoi()
 		cpu_local.current_thread = voidptr(0)
 		cpu_local.last_run_queue_index = 0
+		katomic.store(cpu_local.is_idle, true)
 		await()
 	}
 
@@ -157,6 +163,15 @@ pub fn enqueue_thread(_thread &proc.Thread) bool {
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
 		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(0), u64(thread)) {
 			thread.is_in_queue = true
+
+			// Check if any CPU is idle and wake it up
+			for cpu in cpu_locals {
+				if katomic.load(cpu.is_idle) == true {
+					apic.lapic_send_ipi(cpu.lapic_id, scheduler_vector)
+					break
+				}
+			}
+
 			return true
 		}
 	}

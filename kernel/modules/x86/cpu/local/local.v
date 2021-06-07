@@ -82,6 +82,7 @@ pub mut:
 	lapic_id             u32
 	lapic_timer_freq     u64
 	online				 u64
+	is_idle              bool
 	fpu_storage_size     u64
 	fpu_save             fn (voidptr)
 	fpu_restore          fn (voidptr)
