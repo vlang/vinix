@@ -11,6 +11,7 @@ import fs
 import sched
 import stat
 import dev.console
+import elf
 
 fn C._vinit(argc int, argv voidptr)
 
