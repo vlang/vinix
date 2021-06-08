@@ -33,6 +33,10 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	sched.dequeue_and_yield()
 }
 
+pub fn main() {
+	kmain(voidptr(0))
+}
+
 pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the earliest arch structures.
 	gdt.initialise()

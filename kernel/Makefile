@@ -25,7 +25,6 @@ INTERNALCFLAGS :=           \
 	-z max-page-size=0x1000
 
 INTERNALVFLAGS :=   \
-	-shared         \
 	-enable-globals \
 	-d no_backtrace
 
