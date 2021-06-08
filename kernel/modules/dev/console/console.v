@@ -130,7 +130,7 @@ fn add_to_buf(ptr &byte, count u64) {
 	for i := u64(0); i < count; i++ {
 		unsafe { add_to_buf_char(ptr[i]) }
 	}
-	event.trigger(&console_event)
+	console_event.trigger()
 }
 
 fn keyboard_handler() {

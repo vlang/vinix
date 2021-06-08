@@ -96,16 +96,16 @@ unarm_listeners:
 	return true
 }
 
-pub fn trigger(event &Event) {
-	if katomic.load(event.pending) > 0 {
-		katomic.inc(event.pending)
+pub fn (mut this Event) trigger() {
+	if katomic.load(this.pending) > 0 {
+		katomic.inc(this.pending)
 		return
 	}
 
 	mut pending := true
 
-	for i := u64(0); i < event.listeners.len; i++ {
-		mut listener := &event.listeners[i]
+	for i := u64(0); i < this.listeners.len; i++ {
+		mut listener := &this.listeners[i]
 
 		if listener.l.test_and_acquire() == true {
 			listener.l.release()
@@ -138,6 +138,6 @@ pub fn trigger(event &Event) {
 	}
 
 	if pending == true {
-		katomic.inc(event.pending)
+		katomic.inc(this.pending)
 	}
 }

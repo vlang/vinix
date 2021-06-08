@@ -11,7 +11,7 @@ __global (
 
 fn generic_isr(num u32, _ voidptr) {
 	apic.lapic_eoi()
-	event.trigger(&int_events[num])
+	int_events[num].trigger()
 }
 
 const exception_names = [
