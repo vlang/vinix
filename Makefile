@@ -29,8 +29,8 @@ distro:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
 	$(MAKE) -C 3rdparty/limine
 
-V_COMMIT  = 7c2265e00af449192d9624abb838f96ef8415945
-VC_COMMIT = 3137126427e745f1cda5a8d9bcefcea79181a974
+V_COMMIT  = 811a3e1d38301a2365c362a6cab05e7268f0f5ab
+VC_COMMIT = fd4cd9ed87a2187391ff5840e728d7374b8cdc1d
 VC_BUILD_COMMAND = cc -g -std=gnu99 -w -o ./v ./vc/v.c -lm -lpthread
 
 .PHONY: 3rdparty/v
@@ -50,15 +50,15 @@ update-v:
 	[ -d 3rdparty/v ] || $(MAKE) 3rdparty/v
 	[ -d 3rdparty/v/vc ] || $(MAKE) 3rdparty/v/vc
 	cd 3rdparty/v && git checkout $(V_COMMIT) || ( \
-		git checkout master \
-		git pull \
+		git checkout master && \
+		git pull && \
 		git checkout $(V_COMMIT) \
 	)
 	cd 3rdparty/v/vc && git checkout $(VC_COMMIT) || ( \
-		git checkout master \
-		git pull \
-		git checkout $(VC_COMMIT) \
-		cd .. \
+		git checkout master && \
+		git pull && \
+		git checkout $(VC_COMMIT) && \
+		cd .. && \
 		$(VC_BUILD_COMMAND) \
 	)
 
