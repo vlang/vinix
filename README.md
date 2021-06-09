@@ -1,6 +1,6 @@
 # Vinix
 
-An effort to write a modern, fast, and interesting operating system in V.
+An effort to write a modern, fast, and interesting operating system in [the V language](https://vlang.io).
 
 Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
 
