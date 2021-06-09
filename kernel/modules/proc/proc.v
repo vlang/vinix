@@ -3,10 +3,15 @@ module proc
 import klock
 import x86.cpu.local as cpulocal
 import memory
+import file
 
 pub struct Process {
 pub mut:
 	pagemap memory.Pagemap
+	thread_stack_top u64
+	threads []&Thread
+	fds []&file.FD
+	children []&Process
 }
 
 pub struct Thread {

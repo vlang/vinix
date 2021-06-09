@@ -102,6 +102,14 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	return 0, 0, ''
 }
 
+pub fn get_node(parent &VFSNode, path string) &VFSNode {
+	_, node, _ := path2node(parent, path)
+	if node == 0 {
+		return 0
+	}
+	return node
+}
+
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) bool {
 	if filesystem !in filesystems {
 		return false

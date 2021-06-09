@@ -11,7 +11,7 @@ import fs
 import sched
 import stat
 import dev.console
-import elf
+import userland
 
 fn C._vinit(argc int, argv voidptr)
 

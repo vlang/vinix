@@ -6,6 +6,9 @@ import x86.idt
 import x86.apic
 import katomic
 import proc
+import memory
+import file
+import elf
 
 __global (
 	scheduler_vector byte
@@ -222,8 +225,10 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 
 	stack := &[]u8{cap: stack_size, len: stack_size, init: 0}
 
-	gpr_state := cpulocal.GPRState {
+	gpr_state := cpulocal.GPRState{
 		cs: kernel_code_seg
+		ds: kernel_data_seg
+		es: kernel_data_seg
 		ss: kernel_data_seg
 		rflags: 0x202
 		rip: u64(pc)
@@ -242,6 +247,134 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	}
 
 	return thread
+}
+
+pub fn new_user_thread(_process &proc.Process, want_elf bool,
+					   pc voidptr, arg voidptr,
+					   argv []string, envp []string, auxval &elf.Auxval,
+					   autoenqueue bool) &proc.Thread {
+	mut process := unsafe { _process }
+
+	stack_size := u64(65536)
+
+	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	mut stack := &u64(u64(stack_phys) + higher_half)
+
+	stack_vma := process.thread_stack_top
+	process.thread_stack_top -= stack_size
+	stack_bottom_vma := process.thread_stack_top
+	process.thread_stack_top -= page_size
+
+	for i := u64(0); i < stack_size / page_size; i++ {
+		process.pagemap.map_page(stack_bottom_vma + i * page_size,
+								 u64(stack_phys) + i * page_size,
+								 0x07)
+	}
+
+	kernel_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+
+	gpr_state := cpulocal.GPRState{
+		cs: user_code_seg
+		ds: user_data_seg
+		es: user_data_seg
+		ss: user_data_seg
+		rflags: 0x202
+		rip: u64(pc)
+		rdi: u64(arg)
+		rsp: u64(stack_vma)
+	}
+
+	mut thread := &proc.Thread{
+		process: process
+		gpr_state: gpr_state
+		timeslice: 5000
+		kernel_stack: kernel_stack
+	}
+
+	if want_elf == true {
+		unsafe {
+			stack_top := stack
+			mut orig_stack_vma := stack_vma
+
+			for elem in envp {
+				stack = &u64(u64(stack) - u64(elem.len + 1))
+				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
+			}
+			for elem in argv {
+				stack = &u64(u64(stack) - u64(elem.len + 1))
+				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
+			}
+
+			stack = &u64(u64(stack) - (u64(stack) & 0x0f))
+
+			// Ensure final stack pointer is 16 byte aligned
+			if (argv.len + envp.len + 1) & 1 != 0 {
+				stack = &stack[-1]
+			}
+
+			// Zero auxiliary vector entry
+			stack[-1] = 0
+			stack = &stack[-1]
+			stack[-1] = 0
+			stack = &stack[-1]
+
+			stack = &stack[-2]
+			stack[0] = elf.at_entry
+			stack[1] = auxval.at_entry
+			stack = &stack[-2]
+			stack[0] = elf.at_phdr
+			stack[1] = auxval.at_phdr
+			stack = &stack[-2]
+			stack[0] = elf.at_phent
+			stack[1] = auxval.at_phent
+			stack = &stack[-2]
+			stack[0] = elf.at_phnum
+			stack[1] = auxval.at_phnum
+
+			stack[-1] = 0
+			stack = &stack[-1]
+			stack = &stack[-envp.len]
+			for i := u64(0); i < envp.len; i++ {
+				orig_stack_vma -= u64(envp[i].len) + 1
+				stack[i] = orig_stack_vma
+			}
+
+			stack[-1] = 0
+			stack = &stack[-1]
+			stack = &stack[-argv.len]
+			for i := u64(0); i < argv.len; i++ {
+				orig_stack_vma -= u64(argv[i].len) + 1
+				stack[i] = orig_stack_vma
+			}
+
+			stack[-1] = u64(argv.len)
+			stack = &stack[-1]
+
+			thread.gpr_state.rsp -= u64(stack_top) - u64(stack)
+		}
+	}
+
+	if autoenqueue == true {
+		enqueue_thread(thread)
+	}
+
+	return thread
+}
+
+pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) &proc.Process {
+	if old_process != 0 {
+		panic('old_process')
+	}
+
+	new_process := &proc.Process{
+		pagemap: pagemap
+		threads: []&proc.Thread{}
+		fds: []&file.FD{}
+		children: []&proc.Process{}
+		thread_stack_top: u64(0x70000000000)
+	}
+
+	return new_process
 }
 
 pub fn await() {
