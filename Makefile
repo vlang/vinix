@@ -2,8 +2,6 @@ SHELL = /bin/bash
 
 KERNEL_HDD = vinix.hdd
 
-V_COMMIT = d2bc9ee7bce4d814bc07f32259ae1ce4dce4acc5
-
 .PHONY: all
 all: vinix.iso
 
@@ -31,15 +29,38 @@ distro:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
 	$(MAKE) -C 3rdparty/limine
 
+V_COMMIT  = 7c2265e00af449192d9624abb838f96ef8415945
+VC_COMMIT = 3137126427e745f1cda5a8d9bcefcea79181a974
+VC_BUILD_COMMAND = cc -g -std=gnu99 -w -o ./v ./vc/v.c -lm -lpthread
+
+.PHONY: 3rdparty/v
 3rdparty/v:
 	mkdir -p 3rdparty
 	git clone https://github.com/vlang/v.git 3rdparty/v
 	cd 3rdparty/v && git checkout $(V_COMMIT)
-	$(MAKE) -C 3rdparty/v
+
+.PHONY: 3rdparty/v/vc
+3rdparty/v/vc:
+	git clone https://github.com/vlang/vc.git 3rdparty/v/vc
+	cd 3rdparty/v/vc && git checkout $(VC_COMMIT)
+	cd 3rdparty/v && $(VC_BUILD_COMMAND)
 
 .PHONY: update-v
-update-v: 3rdparty/v
-	cd 3rdparty/v && ( git checkout $(V_COMMIT) || ( git checkout master && git pull && git checkout $(V_COMMIT) && $(MAKE) ) )
+update-v:
+	[ -d 3rdparty/v ] || $(MAKE) 3rdparty/v
+	[ -d 3rdparty/v/vc ] || $(MAKE) 3rdparty/v/vc
+	cd 3rdparty/v && git checkout $(V_COMMIT) || ( \
+		git checkout master \
+		git pull \
+		git checkout $(V_COMMIT) \
+	)
+	cd 3rdparty/v/vc && git checkout $(VC_COMMIT) || ( \
+		git checkout master \
+		git pull \
+		git checkout $(VC_COMMIT) \
+		cd .. \
+		$(VC_BUILD_COMMAND) \
+	)
 
 .PHONY: kernel/vinix.elf
 kernel/vinix.elf: update-v
