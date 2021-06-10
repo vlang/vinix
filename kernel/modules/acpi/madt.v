@@ -69,14 +69,14 @@ fn madt_init() {
 	madt_nmis = []&MADTNMI{}
 
 	madt := &MADT(find_sdt('APIC', 0))
-	mut current := u32(0)
+	mut current := u64(0)
 
 	for {
-		if current >= madt.header.length {
+		if current + (sizeof(MADT) - 1) >= madt.header.length {
 			break
 		}
 
-		header := unsafe { &MADTHeader(byteptr(&madt.entries_begin) + current) }
+		header := &MADTHeader(u64(&madt.entries_begin) + current)
 
 		match header.id {
 			0 {
@@ -98,6 +98,6 @@ fn madt_init() {
 			else {}
 		}
 
-		current += u32(header.length)
+		current += u64(header.length)
 	}
 }
