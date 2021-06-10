@@ -1,5 +1,7 @@
 module local
 
+import cpu
+
 [packed]
 struct TSS {
 pub mut:
@@ -95,14 +97,5 @@ __global (
 )
 
 pub fn current() &Local {
-	mut index := u64(0)
-	zero := u64(0)
-	asm volatile amd64 {
-		.byte 0x65		// GS override prefix
-		mov index, [zero]
-		; =r (index)
-		; r (zero)
-		; memory
-	}
-	return cpu_locals[index]
+	return cpu_locals[cpu.get_id()]
 }

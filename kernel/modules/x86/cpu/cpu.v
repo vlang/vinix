@@ -2,12 +2,8 @@ module cpu
 
 import msr
 
-pub fn set_kernel_gs(ptr u64) {
-	msr.wrmsr(0xc0000101, ptr)
-}
-
 pub fn set_user_gs(ptr u64) {
-	msr.wrmsr(0xc0000102, ptr)
+	msr.wrmsr(0xc0000101, ptr)
 }
 
 pub fn set_user_fs(ptr u64) {
@@ -155,15 +151,6 @@ fn fxrstor(region voidptr) {
 	}
 }
 
-pub fn swapgs() {
-	asm volatile amd64 {
-		swapgs
-		;
-		;
-		; memory
-	}
-}
-
 pub const cpuid_xsave = u32(1 << 26)
 pub const cpuid_avx = u32(1 << 28)
 pub const cpuid_avx512 = u32(1 << 16)
@@ -195,4 +182,12 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 		  c (subleaf)
 	}
 	return true, a, b, c, d
+}
+
+pub fn set_id(id u64) {
+	msr.wrmsr(0xc0000103, id)
+}
+
+pub fn get_id() u64 {
+	return msr.rdmsr(0xc0000103)
 }

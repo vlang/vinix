@@ -8,6 +8,7 @@ import stivale2
 import apic
 import katomic
 import sched
+import memory
 
 pub fn initialise(smp_info &stivale2.SMPInfo) {
 	mut cpu_local := &cpulocal.Local(smp_info.extra_arg)
@@ -18,10 +19,24 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	gdt.reload()
 	idt.reload()
 
+	mut success, _, mut b, mut c, mut d := cpu.cpuid(0x80000001, 0)
+	if success == false || d & (1 << 27) == 0 {
+		panic('This CPU does not support RDTSCP. Vinix requires RDTSCP to run.')
+	}
+
+	cpu.set_id(cpu_local.cpu_number)
+
 	kernel_pagemap.switch_to()
 
-	cpu.set_kernel_gs(u64(voidptr(cpu_local)))
-	cpu.set_user_gs(u64(voidptr(cpu_local)))
+	unsafe {
+		stack_size := u64(8192)
+
+		sched_stack_phys := memory.pmm_alloc(stack_size / page_size)
+		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
+		sched_stack[-1] = u64(cpu_local)
+
+		cpu_local.tss.ist1 = u64(&sched_stack[-1])
+	}
 
 	gdt.load_tss(voidptr(&cpu_local.tss))
 
@@ -35,7 +50,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	cr4 |= (3 << 9)
 	cpu.write_cr4(cr4)
 
-	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
+	success, _, b, c, _ = cpu.cpuid(1, 0)
 	if success == true && c & cpu.cpuid_xsave != 0 {
 		if cpu_number == 0 { println('fpu: xsave supported') }
 

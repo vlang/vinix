@@ -60,10 +60,6 @@ fn get_next_thread(orig_i int) (int, &proc.Thread) {
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_stop()
 
-	if gpr_state.cs & 0x03 != 0 {
-		cpu.swapgs()
-	}
-
 	mut cpu_local := cpulocal.current()
 
 	katomic.store(cpu_local.is_idle, false)
@@ -85,9 +81,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	if current_thread != 0 && voidptr(new_thread) == voidptr(current_thread) {
-		if gpr_state.cs & 0x03 != 0 {
-			cpu.swapgs()
-		}
 		apic.lapic_eoi()
 		apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
 		cpu_local.last_run_queue_index = new_index
@@ -95,9 +88,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	if new_index == -1 {
-		if gpr_state.cs & 0x03 != 0 {
-			cpu.swapgs()
-		}
 		apic.lapic_eoi()
 		cpu_local.current_thread = voidptr(0)
 		cpu_local.last_run_queue_index = 0
@@ -114,10 +104,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	cpu_local.user_stack = current_thread.user_stack
 	cpu_local.kernel_stack = current_thread.kernel_stack
-
-	if current_thread.gpr_state.cs & 0x03 != 0 {
-		cpu.swapgs()
-	}
 
 	current_thread.process.pagemap.switch_to()
 
@@ -258,7 +244,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 	stack_size := u64(65536)
 
 	stack_phys := memory.pmm_alloc(stack_size / page_size)
-	mut stack := &u64(u64(stack_phys) + higher_half)
+	mut stack := &u64(u64(stack_phys) + stack_size + higher_half)
 
 	stack_vma := process.thread_stack_top
 	process.thread_stack_top -= stack_size
@@ -357,6 +343,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 	if autoenqueue == true {
 		enqueue_thread(thread)
 	}
+
+	process.threads << thread
 
 	return thread
 }

@@ -105,6 +105,24 @@ pub fn initialise() {
 		base_high8: 0
 	}
 
+	// Dummy entries
+	gdt_entries[7] = GDTEntry{
+		limit: 0
+		base_low16: 0
+		base_mid8: 0
+		access: 0
+		granularity: 0
+		base_high8: 0
+	}
+	gdt_entries[8] = GDTEntry{
+		limit: 0
+		base_low16: 0
+		base_mid8: 0
+		access: 0
+		granularity: 0
+		base_high8: 0
+	}
+
 	// User 64 bit code.
 	gdt_entries[9] = GDTEntry{
 		limit: 0

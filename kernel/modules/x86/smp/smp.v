@@ -28,13 +28,6 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 
 		smp_info.extra_arg = u64(cpu_local)
 
-		stack_size := 8192
-
-		stack := &[]u8{cap: stack_size, len: stack_size, init: 0}
-		sched_stack := &[]u8{cap: stack_size, len: stack_size, init: 0}
-
-		cpu_local.tss.rsp0 = unsafe { u64(&stack[0]) + u64(stack_size) }
-		cpu_local.tss.ist1 = unsafe { u64(&sched_stack[0]) + u64(stack_size) }
 		cpu_local.cpu_number = i
 
 		if smp_info.lapic_id == smp_tag.bsp_lapic_id {
@@ -42,7 +35,10 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 			continue
 		}
 
-		katomic.store(smp_info.target_stack, cpu_local.tss.rsp0)
+		stack_size := u64(4192)
+
+		boot_stack := memory.pmm_alloc(stack_size / page_size)
+		katomic.store(smp_info.target_stack, u64(boot_stack) + stack_size + higher_half)
 		katomic.store(smp_info.goto_address, u64(&cpuinit.initialise))
 
 		for katomic.load(cpu_local.online) == 0 {}
