@@ -10,6 +10,8 @@ __attribute__((used)) void *syscall_table[] = {
 __attribute__((naked, used))
 void sysenter_entry(void) {
     asm (
+        "hlt\n\t"
+
         "push $0x53\n\t"
         "push $0\n\t"
         "pushfq\n\t"

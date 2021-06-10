@@ -4,6 +4,7 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
+import x86.msr
 import katomic
 import proc
 import memory
@@ -100,6 +101,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	cpu.set_user_gs(current_thread.user_gs)
 	cpu.set_user_fs(current_thread.user_fs)
+
+	msr.wrmsr(0x175, current_thread.kernel_stack)
 
 	current_thread.process.pagemap.switch_to()
 
