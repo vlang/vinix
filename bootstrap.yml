@@ -183,3 +183,23 @@ packages:
       - args: ['true']
     build:
       - args: ['true']
+
+  - name: bash
+    source:
+      subdir: 'ports'
+      url: 'https://ftp.gnu.org/gnu/bash/bash-5.1.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'bash-5.1'
+      patch-path-strip: 3
+    tools_required:
+      - host-gcc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--without-bash-malloc'
+        - '--disable-nls'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']

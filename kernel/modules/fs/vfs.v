@@ -102,10 +102,10 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	return 0, 0, ''
 }
 
-pub fn get_node(parent &VFSNode, path string) &VFSNode {
+pub fn get_node(parent &VFSNode, path string) ?&VFSNode {
 	_, node, _ := path2node(parent, path)
 	if node == 0 {
-		return 0
+		return error('File not found')
 	}
 	return node
 }

@@ -111,7 +111,9 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 
 		match phdr.p_type {
 			pt_interp {
-				ld_path = C.byteptr_vstring_with_len(&phdr.p_offset, phdr.p_filesz)
+				mut p := memory.malloc(phdr.p_filesz + 1)
+				res.read(p, phdr.p_offset, phdr.p_filesz)
+				ld_path = unsafe { cstring_to_vstring(p) }
 			}
 			pt_phdr {
 				auxval.at_phdr = base + phdr.p_vaddr

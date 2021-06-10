@@ -1,5 +1,5 @@
 diff --git a/ports/mlibc-orig/meson.build b/ports/mlibc-workdir/meson.build
-index b781895..5560a17 100644
+index b781895..0b40b32 100644
 --- a/ports/mlibc-orig/meson.build
 +++ b/ports/mlibc-workdir/meson.build
 @@ -44,7 +44,7 @@ if not headers_only
@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..45cb069
+index 0000000..03e1de2
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,108 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -95,7 +95,9 @@ index 0000000..45cb069
 +
 +void sys_libc_log(const char *message) STUB_ONLY
 +
-+void sys_libc_panic() STUB_ONLY
++void sys_libc_panic() {
++    for (;;);
++}
 +
 +void sys_exit(int status) STUB_ONLY
 +
