@@ -16,7 +16,6 @@ void sysenter_entry(void) {
         "push $0x4b\n\t"
         "push $0\n\t"
 
-        "cld\n\t"
         "push %r15\n\t"
         "push %r14\n\t"
         "push %r13\n\t"
@@ -34,6 +33,9 @@ void sysenter_entry(void) {
         "push %rax\n\t"
         "push $0x4b\n\t"
         "push $0x4b\n\t"
+
+        "cld\n\t"
+        "sti\n\t"
 
         "mov %rax, %rbx\n\t"
 
@@ -87,7 +89,6 @@ __attribute__((naked, used))
 void interrupt_thunk(void) {
     asm (
         "interrupt_thunk_begin:"
-        "cld\n\t"
         "push %r15\n\t"
         "push %r14\n\t"
         "push %r13\n\t"
@@ -107,6 +108,7 @@ void interrupt_thunk(void) {
         "push %rax\n\t"
         "mov %ds, %eax\n\t"
         "push %rax\n\t"
+        "cld\n\t"
         "mov $0x30, %eax\n\t"
         "mov %eax, %ds\n\t"
         "mov %eax, %es\n\t"
