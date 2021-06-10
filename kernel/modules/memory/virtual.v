@@ -8,6 +8,7 @@ __global (
 	page_size = u64(0x1000)
 	higher_half = u64(0xffff800000000000)
 	kernel_pagemap Pagemap
+	vmm_initialised = bool(false)
 )
 
 struct Pagemap {
@@ -115,4 +116,6 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 		}
 	}
 	kernel_pagemap.switch_to()
+
+	vmm_initialised = true
 }

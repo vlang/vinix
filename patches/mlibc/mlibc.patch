@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..03e1de2
+index 0000000..8b62ab3
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,132 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -91,11 +91,35 @@ index 0000000..03e1de2
 +
 +#define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
 +
++struct syscall_ret {
++    uint64_t ret;
++    uint64_t errno;
++};
++
++#define SYSCALL1(NUM, ARG0) ({             \
++    uint64_t rax = NUM;                    \
++    register uint64_t r12 asm("r12") = 0;  \
++    asm volatile (                         \
++        "mov %%rsp, %%r14\n\t"             \
++        "lea 1f(%%rip), %%r15\n\t"         \
++        "sysenter\n\t"                     \
++        "1:\n\t"                           \
++        : "+a" (rax), "=r" (r12)           \
++        : "D" (ARG0)                       \
++        : "rcx", "rdx", "r14", "r15"       \
++    );                                     \
++    struct syscall_ret ret = { rax, r12 }; \
++    ret;                                   \
++})
++
 +namespace mlibc {
 +
-+void sys_libc_log(const char *message) STUB_ONLY
++void sys_libc_log(const char *message) {
++    SYSCALL1(0, message);
++}
 +
 +void sys_libc_panic() {
++    sys_libc_log("\nMLIBC PANIC\n");
 +    for (;;);
 +}
 +

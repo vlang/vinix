@@ -22,7 +22,6 @@ pub mut:
 	gpr_state cpulocal.GPRState
 	user_gs u64
 	user_fs u64
-	user_stack u64
 	kernel_stack u64
 	event_block_dequeue klock.Lock
 	event_occurred klock.Lock

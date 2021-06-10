@@ -9,6 +9,9 @@ import apic
 import katomic
 import sched
 import memory
+import msr
+
+fn C.sysenter_entry()
 
 pub fn initialise(smp_info &stivale2.SMPInfo) {
 	mut cpu_local := &cpulocal.Local(smp_info.extra_arg)
@@ -27,6 +30,15 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	cpu.set_id(cpu_local.cpu_number)
 
 	kernel_pagemap.switch_to()
+
+	success, _, _, _, d = cpu.cpuid(1, 0)
+	if success == true && d & (1 << 11) != 0 {
+		if cpu_number == 0 { print('cpu: Using SYSENTER for fast system calls\n') }
+		msr.wrmsr(0x174, kernel_code_seg)
+		msr.wrmsr(0x176, voidptr(C.sysenter_entry))
+	} else {
+		if cpu_number == 0 { print('cpu: SYSENTER not available\n') }
+	}
 
 	unsafe {
 		stack_size := u64(8192)

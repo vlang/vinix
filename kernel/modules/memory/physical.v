@@ -100,7 +100,7 @@ pub fn pmm_alloc(count u64) voidptr {
 
 	// We always zero out memory for security reasons
 	unsafe {
-		mut ptr := &u64(ret)
+		mut ptr := &u64(u64(ret) + higher_half)
 		for i := u64(0); i < (count * page_size) / 8; i++ {
 			ptr[i] = 0
 		}

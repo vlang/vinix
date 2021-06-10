@@ -7,6 +7,12 @@ __global (
 	kprint_lock klock.Lock
 )
 
+pub fn syscall_kprint(message charptr) {
+	vstr := unsafe { cstring_to_vstring(message) }
+	local_vstr := vstr.clone()
+	kprint(local_vstr)
+}
+
 pub fn kprint(message string) {
 	kprint_lock.acquire()
 
@@ -24,7 +30,7 @@ pub fn kprint(message string) {
 }
 
 pub fn kprintc(message charptr) {
-	kprint(C.char_vstring(message))
+	kprint(unsafe { cstring_to_vstring(message) })
 }
 
 fn C.byteptr_vstring(byteptr) string

@@ -1,10 +1,93 @@
 #include <stdint.h>
 #include <stddef.h>
 
+void lib__syscall_kprint(char *message);
+
+__attribute__((used)) void *syscall_table[] = {
+    lib__syscall_kprint
+};
+
+__attribute__((naked, used))
+void sysenter_entry(void) {
+    asm (
+        "push $0x53\n\t"
+        "push $0\n\t"
+        "pushfq\n\t"
+        "push $0x4b\n\t"
+        "push $0\n\t"
+
+        "cld\n\t"
+        "push %r15\n\t"
+        "push %r14\n\t"
+        "push %r13\n\t"
+        "push %r12\n\t"
+        "push %r11\n\t"
+        "push %r10\n\t"
+        "push %r9\n\t"
+        "push %r8\n\t"
+        "push %rbp\n\t"
+        "push %rdi\n\t"
+        "push %rsi\n\t"
+        "push %rdx\n\t"
+        "push %rcx\n\t"
+        "push %rbx\n\t"
+        "push %rax\n\t"
+        "push $0x4b\n\t"
+        "push $0x4b\n\t"
+
+        "mov %rax, %rbx\n\t"
+
+        "mov %rsp, %r12\n\t"
+        "push %rdi\n\t"
+        "push %rsi\n\t"
+        "push %rdx\n\t"
+        "push %rcx\n\t"
+        "push %r8\n\t"
+        "push %r9\n\t"
+        "call x86__cpu__local__current\n\t"
+        "mov %rax, %r13\n\t"
+        "mov %r12, 8(%rax)\n\t"
+        "pop %r9\n\t"
+        "pop %r8\n\t"
+        "pop %rcx\n\t"
+        "pop %rdx\n\t"
+        "pop %rsi\n\t"
+        "pop %rdi\n\t"
+
+        "lea syscall_table(%rip), %rax\n\t"
+        "call *(%rax, %rbx, 8)\n\t"
+
+        // Discard saved RAX, DS, and ES
+        "add $24, %rsp\n\t"
+        "pop %rbx\n\t"
+        "pop %rcx\n\t"
+        "pop %rdx\n\t"
+        "pop %rsi\n\t"
+        "pop %rdi\n\t"
+        "pop %rbp\n\t"
+        "pop %r8\n\t"
+        "pop %r9\n\t"
+        "pop %r10\n\t"
+        "pop %r11\n\t"
+        // Return errno
+        "add $8, %rsp\n\t"
+        "mov 16(%r13), %r12\n\t"
+        "pop %r13\n\t"
+        "pop %r14\n\t"
+        "pop %r15\n\t"
+
+        "mov %r14, %rcx\n\t"
+        "mov %r15, %rdx\n\t"
+
+        "rex.w sysexit\n\t"
+    );
+}
+
 __attribute__((naked, used))
 void interrupt_thunk(void) {
     asm (
         "interrupt_thunk_begin:"
+        "cld\n\t"
         "push %r15\n\t"
         "push %r14\n\t"
         "push %r13\n\t"

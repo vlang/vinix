@@ -76,7 +76,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		unsafe { current_thread.gpr_state = gpr_state[0] }
 		current_thread.user_gs = cpu.get_user_gs()
 		current_thread.user_fs = cpu.get_user_fs()
-		current_thread.user_stack = cpu_local.user_stack
 		current_thread.l.release()
 	}
 
@@ -101,9 +100,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	cpu.set_user_gs(current_thread.user_gs)
 	cpu.set_user_fs(current_thread.user_fs)
-
-	cpu_local.user_stack = current_thread.user_stack
-	cpu_local.kernel_stack = current_thread.kernel_stack
 
 	current_thread.process.pagemap.switch_to()
 

@@ -1,6 +1,7 @@
 module stivale2
 
 import klock
+import x86.cpu
 
 pub const framebuffer_id = 0x506461d2950408fa
 
@@ -168,7 +169,14 @@ __global (
 pub fn terminal_print(s string) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
+	current_cr3 := &u64(cpu.read_cr3())
+	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
+		kernel_pagemap.switch_to()
+	}
 	terminal_print_lock.acquire()
 	ptr(s.str, u64(s.len))
 	terminal_print_lock.release()
+	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
+		cpu.write_cr3(u64(current_cr3))
+	}
 }

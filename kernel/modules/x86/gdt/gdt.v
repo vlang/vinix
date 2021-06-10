@@ -162,13 +162,14 @@ pub fn reload() {
 		pop rax
 		mov ds, dseg
 		mov es, dseg
-		mov fs, dseg
-		mov gs, dseg
 		mov ss, dseg
+		mov fs, udseg
+		mov gs, udseg
 		;
 		; m (gdt_pointer) as ptr
 		  rm (u64(kernel_code_seg)) as cseg
 		  rm (u32(kernel_data_seg)) as dseg
+		  rm (u32(user_data_seg)) as udseg
 		; memory
 	}
 }

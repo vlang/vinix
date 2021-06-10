@@ -77,8 +77,7 @@ pub mut:
 struct Local {
 pub mut:
 	cpu_number           u64
-	kernel_stack         u64
-	user_stack           u64
+	syscall_context      &GPRState
 	errno                i64
 	tss                  TSS
 	lapic_id             u32

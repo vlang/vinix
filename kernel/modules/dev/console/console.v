@@ -3,7 +3,6 @@ module console
 import x86.idt
 import x86.apic
 import x86.kio
-import x86.cpu
 import event
 import klock
 import sched
@@ -286,13 +285,6 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
 }
 
 fn (mut this Console) write(buf voidptr, loc u64, count u64) i64 {
-	current_cr3 := cpu.read_cr3()
-	if current_cr3 != kernel_pagemap.top_level {
-		kernel_pagemap.switch_to()
-	}
 	stivale2.terminal_print(C.byteptr_vstring_with_len(buf, count))
-	if current_cr3 != kernel_pagemap.top_level {
-		cpu.write_cr3(current_cr3)
-	}
 	return i64(count)
 }
