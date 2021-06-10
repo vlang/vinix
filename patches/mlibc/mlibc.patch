@@ -77,7 +77,7 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..8b62ab3
+index 0000000..7852a40
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,132 @@
@@ -91,25 +91,25 @@ index 0000000..8b62ab3
 +
 +#define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
 +
-+struct syscall_ret {
++struct __syscall_ret {
 +    uint64_t ret;
 +    uint64_t errno;
 +};
 +
-+#define SYSCALL1(NUM, ARG0) ({             \
-+    uint64_t rax = NUM;                    \
-+    register uint64_t r12 asm("r12") = 0;  \
-+    asm volatile (                         \
-+        "mov %%rsp, %%r14\n\t"             \
-+        "lea 1f(%%rip), %%r15\n\t"         \
-+        "sysenter\n\t"                     \
-+        "1:\n\t"                           \
-+        : "+a" (rax), "=r" (r12)           \
-+        : "D" (ARG0)                       \
-+        : "rcx", "rdx", "r14", "r15"       \
-+    );                                     \
-+    struct syscall_ret ret = { rax, r12 }; \
-+    ret;                                   \
++#define SYSCALL1(NUM, ARG0) ({            \
++    uint64_t rax = NUM;                   \
++    register uint64_t r12 asm("r12") = 0; \
++    asm volatile (                        \
++        "mov %%rsp, %%r14\n\t"            \
++        "lea 1f(%%rip), %%r15\n\t"        \
++        "sysenter\n\t"                    \
++        "1:"                              \
++        : "+a" (rax), "=r" (r12)          \
++        : "D" (ARG0)                      \
++        : "rcx", "rdx", "r14", "r15"      \
++    );                                    \
++    __syscall_ret ret = { rax, r12 };     \
++    ret;                                  \
 +})
 +
 +namespace mlibc {

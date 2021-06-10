@@ -175,15 +175,6 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
-  - name: dummy
-    from_source: mlibc
-    tools_required:
-      - tool: host-gcc
-    configure:
-      - args: ['true']
-    build:
-      - args: ['true']
-
   - name: bash
     source:
       subdir: 'ports'
