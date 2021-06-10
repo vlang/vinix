@@ -3,9 +3,13 @@ module console
 import x86.idt
 import x86.apic
 import x86.kio
+import x86.cpu
 import event
 import klock
 import sched
+import stat
+import stivale2
+import fs
 
 const max_scancode = 0x57
 const capslock = 0x3a
@@ -224,4 +228,71 @@ fn keyboard_handler() {
 
 pub fn initialise() {
 	sched.new_kernel_thread(voidptr(keyboard_handler), voidptr(0), true)
+	console_res := &Console{}
+	fs.devtmpfs_add_device(console_res, 'console')
+}
+
+struct Console {
+pub mut:
+	stat     stat.Stat
+	refcount int
+	l        klock.Lock
+}
+
+fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
+	mut buf := &byte(void_buf)
+
+	for console_read_lock.test_and_acquire() == false {
+		mut which := u64(0)
+		if event.await([&console_event], &which, true) {
+			// errno = EINTR
+			return -1
+		}
+	}
+
+	mut wait := true
+
+	for i := u64(0); i < count; {
+		if console_bigbuf_i != 0 {
+			unsafe { buf[i] = console_bigbuf[0] }
+			i++
+			console_bigbuf_i--
+			for j := u64(0); j < console_bigbuf_i; j++ {
+				console_bigbuf[j] = console_bigbuf[j + 1]
+			}
+			wait = false
+		} else {
+			if wait == true {
+				console_read_lock.release()
+				for {
+					mut which := u64(0)
+					if event.await([&console_event], &which, true) {
+						// errno = EINTR
+						return -1
+					}
+					if console_read_lock.test_and_acquire() == true {
+						break
+					}
+				}
+			} else {
+				console_read_lock.release()
+				return i64(i)
+			}
+		}
+	}
+
+	console_read_lock.release()
+	return i64(count)
+}
+
+fn (mut this Console) write(buf voidptr, loc u64, count u64) i64 {
+	current_cr3 := cpu.read_cr3()
+	if current_cr3 != kernel_pagemap.top_level {
+		kernel_pagemap.switch_to()
+	}
+	stivale2.terminal_print(C.byteptr_vstring_with_len(buf, count))
+	if current_cr3 != kernel_pagemap.top_level {
+		cpu.write_cr3(current_cr3)
+	}
+	return i64(count)
 }
