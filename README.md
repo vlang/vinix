@@ -1,20 +1,20 @@
 # Vinix
 
-An effort to write a modern, fast, and interesting operating system in [the V language](https://vlang.io).
+Vinix is an effort to write a modern, fast, and useful operating system in [the V programming language](https://vlang.io).
 
 Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
 
 #### Goals
 
-- Keep it simple and easy to understand.
-- Write it in V as much as possible.
+- Keep the code as simple and easy to understand as possible.
+- Write in V as much as possible.
 - Target modern 64-bit architectures and CPU features.
+- Maintain good source-level compatibility with Linux to allow to easily port programs over.
 
 #### Why?
 
 - Explore V capabilities in bare metal programming.
-- Break the compiler as much as possible.
-- Build a minimal and useful platform for software [especially written in V :^)], allowing for better control, isolation, and smaller attack surface in VMs.
+- Improve the compiler by providing feedback in response to the uncommon needs of bare metal programming.
 - Having fun.
 
 ![Reference screenshot](/screenshot.png?raw=true "Reference screenshot")
