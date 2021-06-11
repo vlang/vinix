@@ -22,7 +22,7 @@ pub fn print_stacktrace() {
 		mov base_ptr, rbp
 		; =r (base_ptr)
 	}
-	println('Stacktrace:')
+	C.printf(c'Stacktrace:')
 
 	for {
 		unsafe {

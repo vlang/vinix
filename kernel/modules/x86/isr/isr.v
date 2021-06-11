@@ -76,6 +76,7 @@ fn unhandled_exception(num u32, gpr_state &cpulocal.GPRStateErr) {
 pub fn initialise() {
 	for i := u16(0); i < 32; i++ {
 		idt.register_handler(i, interrupt_thunks[i])
+		idt.set_ist(i, 2)
 		interrupt_table[i] = voidptr(unhandled_exception)
 	}
 

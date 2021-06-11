@@ -45,9 +45,11 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 		sched_stack_phys := memory.pmm_alloc(stack_size / page_size)
 		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
-		sched_stack[-1] = u64(cpu_local)
+		cpu_local.tss.ist1 = u64(sched_stack)
 
-		cpu_local.tss.ist1 = u64(&sched_stack[-1])
+		except_stack_phys := memory.pmm_alloc(stack_size / page_size)
+		mut except_stack := &u64(u64(except_stack_phys) + stack_size + higher_half)
+		cpu_local.tss.ist2 = u64(except_stack)
 	}
 
 	gdt.load_tss(voidptr(&cpu_local.tss))

@@ -11,19 +11,15 @@ import memory
 import file
 import elf
 
+const max_running_threads = int(512)
+
 __global (
 	scheduler_vector byte
-	scheduler_running_queue []&proc.Thread
+	scheduler_running_queue [512]&proc.Thread
 	kernel_process &proc.Process
 )
 
-const max_running_threads = int(512)
-
 pub fn initialise() {
-	scheduler_running_queue = []&proc.Thread{cap: max_running_threads,
-											 len: max_running_threads,
-											 init: voidptr(0)}
-
 	scheduler_vector = idt.allocate_vector()
 	println('sched: Scheduler interrupt vector is 0x${scheduler_vector:x}')
 
@@ -82,6 +78,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			unsafe { current_thread.gpr_state = gpr_state[0] }
 			current_thread.user_gs = cpu.get_user_gs()
 			current_thread.user_fs = cpu.get_user_fs()
+			current_thread.cr3 = cpu.read_cr3()
 			current_thread.l.release()
 		} else {
 			apic.lapic_eoi()
@@ -107,7 +104,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	msr.wrmsr(0x175, current_thread.kernel_stack)
 
-	current_thread.process.pagemap.switch_to()
+	if cpu.read_cr3() != current_thread.cr3 {
+		cpu.write_cr3(current_thread.cr3)
+	}
 
 	apic.lapic_eoi()
 	apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
@@ -190,13 +189,17 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 pub fn yield() {
 	asm volatile amd64 { cli }
 
-	mut current_thread := &proc.Thread(cpulocal.current().current_thread)
+	apic.lapic_timer_stop()
+
+	cpu_local := cpulocal.current()
+
+	mut current_thread := &proc.Thread(cpu_local.current_thread)
 
 	current_thread.yield_await.acquire()
 
-	apic.lapic_timer_oneshot(scheduler_vector, 1)
-
 	asm volatile amd64 { sti }
+
+	apic.lapic_send_ipi(cpu_local.lapic_id, scheduler_vector)
 
 	current_thread.yield_await.acquire()
 	current_thread.yield_await.release()
@@ -226,6 +229,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 
 	thread := &proc.Thread{
 		process: kernel_process
+		cr3: u64(kernel_process.pagemap.top_level)
 		gpr_state: gpr_state
 		timeslice: 5000
 	}
@@ -274,6 +278,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 
 	mut thread := &proc.Thread{
 		process: process
+		cr3: u64(process.pagemap.top_level)
 		gpr_state: gpr_state
 		timeslice: 5000
 		kernel_stack: kernel_stack
