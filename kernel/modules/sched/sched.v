@@ -34,7 +34,7 @@ pub fn initialise() {
 	kernel_process = &proc.Process{pagemap: kernel_pagemap}
 }
 
-fn get_next_thread(orig_i int) (int, &proc.Thread) {
+fn get_next_thread(orig_i int) int {
 	mut index := orig_i + 1
 
 	for {
@@ -44,18 +44,22 @@ fn get_next_thread(orig_i int) (int, &proc.Thread) {
 
 		mut thread := scheduler_running_queue[index]
 
-		if thread != 0 && thread.l.test_and_acquire() == true {
-			return index, thread
+		if index == orig_i {
+			if thread != 0 {
+				return index
+			} else {
+				break
+			}
 		}
 
-		if index == orig_i {
-			break
+		if thread != 0 && thread.l.test_and_acquire() == true {
+			return index
 		}
 
 		index++
 	}
 
-	return -1, 0
+	return -1
 }
 
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
@@ -71,20 +75,19 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		current_thread.yield_await.release()
 	}
 
-	new_index, new_thread := get_next_thread(cpu_local.last_run_queue_index)
+	new_index := get_next_thread(cpu_local.last_run_queue_index)
 
-	if current_thread != 0 && voidptr(new_thread) != voidptr(current_thread) {
-		unsafe { current_thread.gpr_state = gpr_state[0] }
-		current_thread.user_gs = cpu.get_user_gs()
-		current_thread.user_fs = cpu.get_user_fs()
-		current_thread.l.release()
-	}
-
-	if current_thread != 0 && voidptr(new_thread) == voidptr(current_thread) {
-		apic.lapic_eoi()
-		apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
-		cpu_local.last_run_queue_index = new_index
-		return
+	if current_thread != 0 {
+		if new_index != cpu_local.last_run_queue_index && new_index != -1 {
+			unsafe { current_thread.gpr_state = gpr_state[0] }
+			current_thread.user_gs = cpu.get_user_gs()
+			current_thread.user_fs = cpu.get_user_fs()
+			current_thread.l.release()
+		} else {
+			apic.lapic_eoi()
+			apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
+			return
+		}
 	}
 
 	if new_index == -1 {
@@ -95,7 +98,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		await()
 	}
 
-	current_thread = new_thread
+	current_thread = scheduler_running_queue[new_index]
 	cpu_local.last_run_queue_index = new_index
 	cpu_local.current_thread = current_thread
 
