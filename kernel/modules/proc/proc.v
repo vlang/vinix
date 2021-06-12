@@ -17,6 +17,7 @@ pub mut:
 pub struct Thread {
 pub mut:
 	is_in_queue bool
+	running_on u64
 	l klock.Lock
 	process &Process
 	gpr_state cpulocal.GPRState

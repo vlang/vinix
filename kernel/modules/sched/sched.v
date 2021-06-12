@@ -31,6 +31,8 @@ pub fn initialise() {
 }
 
 fn get_next_thread(orig_i int) int {
+	cpu_number := cpulocal.current().cpu_number
+
 	mut index := orig_i + 1
 
 	for {
@@ -40,16 +42,15 @@ fn get_next_thread(orig_i int) int {
 
 		mut thread := scheduler_running_queue[index]
 
-		if index == orig_i {
-			if thread != 0 {
+		if thread != 0 {
+			if katomic.load(thread.running_on) == cpu_number
+			|| thread.l.test_and_acquire() == true {
 				return index
-			} else {
-				break
 			}
 		}
 
-		if thread != 0 && thread.l.test_and_acquire() == true {
-			return index
+		if index == orig_i {
+			break
 		}
 
 		index++
@@ -74,17 +75,17 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	new_index := get_next_thread(cpu_local.last_run_queue_index)
 
 	if current_thread != 0 {
-		if new_index != cpu_local.last_run_queue_index && new_index != -1 {
-			unsafe { current_thread.gpr_state = gpr_state[0] }
-			current_thread.user_gs = cpu.get_user_gs()
-			current_thread.user_fs = cpu.get_user_fs()
-			current_thread.cr3 = cpu.read_cr3()
-			current_thread.l.release()
-		} else {
+		if new_index == cpu_local.last_run_queue_index {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
 			return
 		}
+		unsafe { current_thread.gpr_state = gpr_state[0] }
+		current_thread.user_gs = cpu.get_user_gs()
+		current_thread.user_fs = cpu.get_user_fs()
+		current_thread.cr3 = cpu.read_cr3()
+		katomic.store(current_thread.running_on, u64(-1))
+		current_thread.l.release()
 	}
 
 	if new_index == -1 {
@@ -107,6 +108,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
 	}
+
+	katomic.store(current_thread.running_on, cpu_local.cpu_number)
 
 	apic.lapic_eoi()
 	apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
@@ -232,6 +235,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		cr3: u64(kernel_process.pagemap.top_level)
 		gpr_state: gpr_state
 		timeslice: 5000
+		running_on: u64(-1)
 	}
 
 	if autoenqueue == true {
@@ -281,6 +285,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		cr3: u64(process.pagemap.top_level)
 		gpr_state: gpr_state
 		timeslice: 5000
+		running_on: u64(-1)
 		kernel_stack: kernel_stack
 	}
 
