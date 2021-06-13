@@ -7,7 +7,7 @@ __global (
 	kprint_lock klock.Lock
 )
 
-pub fn syscall_kprint(message charptr) {
+pub fn syscall_kprint(_ voidptr, message charptr) {
 	vstr := unsafe { cstring_to_vstring(message) }
 	local_vstr := vstr.clone()
 	kprint(local_vstr)

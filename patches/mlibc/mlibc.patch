@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..7852a40
+index 0000000..d8e0586
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,126 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -96,26 +96,20 @@ index 0000000..7852a40
 +    uint64_t errno;
 +};
 +
-+#define SYSCALL1(NUM, ARG0) ({            \
-+    uint64_t rax = NUM;                   \
-+    register uint64_t r12 asm("r12") = 0; \
-+    asm volatile (                        \
-+        "mov %%rsp, %%r14\n\t"            \
-+        "lea 1f(%%rip), %%r15\n\t"        \
-+        "sysenter\n\t"                    \
-+        "1:"                              \
-+        : "+a" (rax), "=r" (r12)          \
-+        : "D" (ARG0)                      \
-+        : "rcx", "rdx", "r14", "r15"      \
-+    );                                    \
-+    __syscall_ret ret = { rax, r12 };     \
-+    ret;                                  \
-+})
++__attribute__((naked))
++static __syscall_ret SYSCALL(int number, ...) {
++    asm (
++        "mov %rsp, %r10\n\t"
++        "lea 1f(%rip), %r11\n\t"
++        "sysenter\n\t"
++        "1: ret"
++    );
++}
 +
 +namespace mlibc {
 +
 +void sys_libc_log(const char *message) {
-+    SYSCALL1(0, message);
++    SYSCALL(0, message);
 +}
 +
 +void sys_libc_panic() {
