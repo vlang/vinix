@@ -104,6 +104,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu.set_user_fs(current_thread.user_fs)
 
 	msr.wrmsr(0x175, current_thread.kernel_stack)
+	cpu_local.tss.ist3 = current_thread.kernel_stack
 
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)

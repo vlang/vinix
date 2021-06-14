@@ -4,6 +4,7 @@ import idt
 import event
 import apic
 import cpu.local as cpulocal
+import syscall
 
 __global (
 	int_events [256]event.Event
@@ -48,7 +49,19 @@ const exception_names = [
     c'Security'
 ]
 
-fn unhandled_exception(num u32, gpr_state &cpulocal.GPRState) {
+fn ud_handler(num u32, _gpr_state &cpulocal.GPRState) {
+	mut gpr_state := unsafe { _gpr_state }
+	insn := &u16(gpr_state.rip)
+	if unsafe { insn[0] } == 0x340f {
+		// This is sysenter
+		gpr_state.rip += 2
+		syscall.ud_entry(gpr_state)
+	} else {
+		exception_handler(num, gpr_state)
+	}
+}
+
+fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 	C.printf(c'\nException occurred (%s) on CPU %d\n',
 			 exception_names[num], cpulocal.current().cpu_number)
 	C.printf(c'Error code: 0x%016llx\n', gpr_state.err)
@@ -76,8 +89,16 @@ fn unhandled_exception(num u32, gpr_state &cpulocal.GPRState) {
 pub fn initialise() {
 	for i := u16(0); i < 32; i++ {
 		idt.register_handler(i, interrupt_thunks[i])
-		idt.set_ist(i, 2)
-		interrupt_table[i] = voidptr(unhandled_exception)
+		match i {
+			6 {
+				idt.set_ist(i, 3)
+				interrupt_table[i] = voidptr(ud_handler)
+			}
+			else {
+				idt.set_ist(i, 2)
+				interrupt_table[i] = voidptr(exception_handler)
+			}
+		}
 	}
 
 	for i := u16(32); i < 256; i++ {

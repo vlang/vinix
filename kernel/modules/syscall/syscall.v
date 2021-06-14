@@ -1,5 +1,51 @@
 module syscall
 
+import x86.cpu.local as cpulocal
+
+[_naked]
+pub fn ud_entry(gpr_state &cpulocal.GPRState) {
+	asm amd64 {
+		cld
+		sti
+
+		mov rax, [rdi + 56]
+		mov rsp, rdi
+
+		mov rsi, [rdi + 48]
+		mov rdx, [rdi + 40]
+		mov rcx, [rdi + 32]
+		mov r8,  [rdi + 72]
+		mov r9,  [rdi + 80]
+
+		lea rbx, [rip + syscall_table]
+		call [rbx + rax * 8 + 0]
+
+		pop rax
+		mov ds, eax
+		pop rax
+		mov es, eax
+		// Discard saved RAX
+		add rsp, 8
+		pop rbx
+		pop rcx
+		// Discard saved RDX
+		add rsp, 8
+		pop rsi
+		pop rdi
+		pop rbp
+		pop r8
+		pop r9
+		pop r10
+		pop r11
+		pop r12
+		pop r13
+		pop r14
+		pop r15
+		add rsp, 8
+		iretq
+	}
+}
+
 [_naked]
 fn sysenter_entry() {
 	asm amd64 {
@@ -12,6 +58,9 @@ fn sysenter_entry() {
 		.byte 0x6a
 		.byte 0x4b
 		push 0
+
+		cld
+		sti
 
 		push r15
 		push r14
@@ -35,20 +84,21 @@ fn sysenter_entry() {
 		.byte 0x6a
 		.byte 0x4b
 
-		cld
-		sti
-
 		mov rax, rdi
 		mov rdi, rsp
 
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]
 
-		// Discard saved RAX, DS, and ES
-		add rsp, 24
+		pop rax
+		mov ds, eax
+		pop rax
+		mov es, eax
+		// Discard saved RAX
+		add rsp, 8
 		pop rbx
 		pop rcx
-		// Discard saved errno
+		// Discard saved RDX
 		add rsp, 8
 		pop rsi
 		pop rdi
