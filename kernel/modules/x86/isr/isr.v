@@ -48,10 +48,10 @@ const exception_names = [
     c'Security'
 ]
 
-fn unhandled_exception(num u32, gpr_state &cpulocal.GPRStateErr) {
+fn unhandled_exception(num u32, gpr_state &cpulocal.GPRState) {
 	C.printf(c'\nException occurred (%s) on CPU %d\n',
 			 exception_names[num], cpulocal.current().cpu_number)
-	C.printf(c'Error code: 0x%016llx\n', gpr_state.error_code)
+	C.printf(c'Error code: 0x%016llx\n', gpr_state.err)
 	C.printf(c'Register dump:\n')
 	C.printf(c'RIP: 0x%016llx\n', gpr_state.rip)
 	C.printf(c'CS:  0x%016llx\n', gpr_state.cs)

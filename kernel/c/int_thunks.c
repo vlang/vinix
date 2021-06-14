@@ -11,6 +11,7 @@ __attribute__((naked, used))
 void interrupt_thunk(void) {
     asm (
         "interrupt_thunk_begin:"
+        "push $0\n\t"
         "push %r15\n\t"
         "push %r14\n\t"
         "push %r13\n\t"
@@ -61,6 +62,7 @@ void interrupt_thunk(void) {
         "pop %r13\n\t"
         "pop %r14\n\t"
         "pop %r15\n\t"
+        "add $8, %rsp\n\t"
         "iretq\n\t"
         "interrupt_thunk_end:\n\t"
         "interrupt_thunk_size: .quad interrupt_thunk_end - interrupt_thunk_begin\n\t"
@@ -83,6 +85,13 @@ void prepare_interrupt_thunks(void) {
         interrupt_thunk_number = i;
         void *ptr = interrupt_thunk_storage + i * interrupt_thunk_size;
         memcpy(ptr, interrupt_thunk_begin, interrupt_thunk_size);
-        interrupt_thunks[i] = ptr;
+        uint64_t shift = 0;
+        switch (i) {
+            case 8: case 10: case 11: case 12: case 13: case 14:
+            case 17: case 30:
+                shift = 2;
+                break;
+        }
+        interrupt_thunks[i] = ptr + shift;
     }
 }

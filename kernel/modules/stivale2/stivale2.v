@@ -167,6 +167,10 @@ __global (
 )
 
 pub fn terminal_print(s string) {
+	terminal_printc(s.str, u64(s.len))
+}
+
+pub fn terminal_printc(s charptr, len u64) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
 	current_cr3 := &u64(cpu.read_cr3())
@@ -174,7 +178,7 @@ pub fn terminal_print(s string) {
 		kernel_pagemap.switch_to()
 	}
 	terminal_print_lock.acquire()
-	ptr(s.str, u64(s.len))
+	ptr(s, len)
 	terminal_print_lock.release()
 	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
 		cpu.write_cr3(u64(current_cr3))

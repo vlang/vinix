@@ -36,10 +36,11 @@
 #include <stdarg.h>
 
 
-void lib__kprintc(char *str);
+void stivale2__terminal_printc(char *s, uint64_t len);
 
 void _putchar(char character) {
   asm volatile ("outb %%al, %%dx" :: "a"(character), "d"(0xe9));
+  stivale2__terminal_printc(&character, 1);
 }
 
 // no floats in kernel

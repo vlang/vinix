@@ -32,11 +32,10 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	success, _, _, _, d = cpu.cpuid(1, 0)
 	if success == true && d & (1 << 11) != 0 {
-		if cpu_number == 0 { print('cpu: Using SYSENTER for fast system calls\n') }
 		msr.wrmsr(0x174, kernel_code_seg)
 		msr.wrmsr(0x176, voidptr(syscall.sysenter_entry))
 	} else {
-		if cpu_number == 0 { print('cpu: SYSENTER not available\n') }
+		panic('This CPU does not support SEP. Vinix requires SEP to run.')
 	}
 
 	unsafe {
