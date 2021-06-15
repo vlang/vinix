@@ -4,10 +4,15 @@ Vinix is an effort to write a modern, fast, and useful operating system in [the 
 
 Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
 
+#### Download the nightly image!
+
+You can get a nightly continuously updated ISO of Vinix [here](https://github.com/vlang/vinix/releases/download/nightly/vinix-nightly.iso).
+
 #### Goals
 
 - Keep the code as simple and easy to understand as possible.
 - Write in V as much as possible.
+- Make a *usable* OS which can *run on real hardware*, not just on emulators.
 - Target modern 64-bit architectures and CPU features.
 - Maintain good source-level compatibility with Linux to allow to easily port programs over.
 
