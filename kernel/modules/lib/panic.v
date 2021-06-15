@@ -4,17 +4,16 @@ pub fn kpanic(message string) {
 	asm volatile amd64 {
 		cli
 	}
-	kprint('KERNEL PANIC: ')
-	kprint(message)
-	kprint('\n')
+	C.printf(c'KERNEL PANIC: %s\n', message.str)
 	print_stacktrace()
 	for {
 		asm volatile amd64 {
+			cli
 			hlt
 		}
 	}
 }
 
 pub fn kpanicc(message charptr) {
-	kpanic(C.char_vstring(message))
+	kpanic(unsafe { cstring_to_vstring(message) })
 }

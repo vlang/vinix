@@ -86,7 +86,6 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 	if kernel_pagemap.top_level == 0 {
 		panic('vmm_init() allocation failure')
 	}
-	kernel_pagemap.l = klock.Lock{false, 0}
 
 	// Since the higher half has to be shared amongst all address spaces,
 	// we need to initialise every single higher half PML3 so they can be
@@ -107,14 +106,18 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 	for i := 0; i < memmap.entry_count; i++ {
 		base := unsafe { lib.align_down(entries[i].base, page_size) }
 		top := unsafe { lib.align_up(entries[i].base + entries[i].length, page_size) }
+		if top <= u64(0x100000000) {
+			continue
+		}
 		for j := base; j < top; j += page_size {
 			if j < u64(0x100000000) {
 				continue
 			}
 			kernel_pagemap.map_page(j, j, 0x03)
-			kernel_pagemap.map_page(j, j + higher_half, 0x03)
+			kernel_pagemap.map_page(j + higher_half, j, 0x03)
 		}
 	}
+
 	kernel_pagemap.switch_to()
 
 	vmm_initialised = true

@@ -1,5 +1,7 @@
 module klock
 
+import katomic
+
 pub struct Lock {
 pub mut:
 	l bool
@@ -13,7 +15,7 @@ pub fn (mut l Lock) acquire() {
 	caller := C.__builtin_return_address(0)
 	for {
 		for i := u64(0); i < u64(500000000); i++ {
-			if C.__sync_bool_compare_and_swap(&l.l, false, true) == true {
+			if katomic.cas(&l.l, false, true) == true {
 				l.caller = caller
 				return
 			}
@@ -26,11 +28,11 @@ pub fn (mut l Lock) acquire() {
 }
 
 pub fn (mut l Lock) release() {
-	C.__sync_bool_compare_and_swap(&l.l, true, false)
+	katomic.cas(&l.l, true, false)
 }
 
 pub fn (mut l Lock) test_and_acquire() bool {
-	ret := C.__sync_bool_compare_and_swap(&l.l, false, true)
+	ret := katomic.cas(&l.l, false, true)
 	if ret == true {
 		l.caller = C.__builtin_return_address(0)
 	}

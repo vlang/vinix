@@ -93,7 +93,7 @@ pub fn pmm_alloc(count u64) voidptr {
 		pmm_last_used_index = 0
 		ret = inner_alloc(count, last)
 		if ret == 0 {
-			panic('OOM')
+			lib.kpanic('OOM')
 		}
 	}
 
