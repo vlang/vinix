@@ -13,8 +13,9 @@ __global (
 
 struct Pagemap {
 pub mut:
-	l         klock.Lock
-	top_level &u64
+	l           klock.Lock
+	top_level   &u64
+	mmap_ranges []voidptr
 }
 
 pub fn new_pagemap() Pagemap {
@@ -26,7 +27,7 @@ pub fn new_pagemap() Pagemap {
 	for i := u64(256); i < 512; i++ {
 		unsafe { top_level[i] = kernel_pagemap.top_level[i] }
 	}
-	return Pagemap{top_level: top_level}
+	return Pagemap{top_level: top_level, mmap_ranges: []voidptr{}}
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {

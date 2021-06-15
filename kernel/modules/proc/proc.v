@@ -12,6 +12,7 @@ pub mut:
 	threads []&Thread
 	fds []&file.FD
 	children []&Process
+	mmap_anon_non_fixed_base u64
 }
 
 pub struct Thread {

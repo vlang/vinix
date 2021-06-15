@@ -374,6 +374,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) &proc.Pro
 		fds: []&file.FD{}
 		children: []&proc.Process{}
 		thread_stack_top: u64(0x70000000000)
+		mmap_anon_non_fixed_base: u64(0x80000000000)
 	}
 
 	return new_process
@@ -390,4 +391,12 @@ pub fn await() {
 		;
 		; memory
 	}
+}
+
+pub fn current_thread() &proc.Thread {
+	asm volatile amd64 { cli }
+	cpu_local := cpulocal.current()
+	ret := &proc.Thread(cpu_local.current_thread)
+	asm volatile amd64 { sti }
+	return ret
 }

@@ -13,6 +13,8 @@ import stat
 import dev.console
 import userland
 
+import memory.mmap
+
 fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
