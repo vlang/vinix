@@ -31,3 +31,11 @@ pub mut:
 	yield_await klock.Lock
 	timeslice u64
 }
+
+pub fn current_thread() &Thread {
+	asm volatile amd64 { cli }
+	cpu_local := cpulocal.current()
+	ret := &Thread(cpu_local.current_thread)
+	asm volatile amd64 { sti }
+	return ret
+}

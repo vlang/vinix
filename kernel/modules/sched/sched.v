@@ -8,6 +8,7 @@ import x86.msr
 import katomic
 import proc
 import memory
+import memory.mmap
 import file
 import elf
 
@@ -263,11 +264,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 	stack_bottom_vma := process.thread_stack_top
 	process.thread_stack_top -= page_size
 
-	for i := u64(0); i < stack_size / page_size; i++ {
-		process.pagemap.map_page(stack_bottom_vma + i * page_size,
-								 u64(stack_phys) + i * page_size,
-								 0x07)
-	}
+	mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys),
+				   stack_size, mmap.prot_read | mmap.prot_write,
+				   mmap.map_anonymous)
 
 	kernel_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
 
@@ -391,12 +390,4 @@ pub fn await() {
 		;
 		; memory
 	}
-}
-
-pub fn current_thread() &proc.Thread {
-	asm volatile amd64 { cli }
-	cpu_local := cpulocal.current()
-	ret := &proc.Thread(cpu_local.current_thread)
-	asm volatile amd64 { sti }
-	return ret
 }

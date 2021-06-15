@@ -77,12 +77,8 @@ fn sysenter_entry() {
 		push rcx
 		push rbx
 		push rax
-		//push 0x4b
-		.byte 0x6a
-		.byte 0x4b
-		//push 0x4b
-		.byte 0x6a
-		.byte 0x4b
+		push 0x53
+		push 0x53
 
 		mov rax, rdi
 		mov rdi, rsp

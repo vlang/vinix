@@ -2,7 +2,7 @@ module mmap
 
 import memory
 import resource
-import sched
+import proc
 
 const pte_present  = u64(1 << 0)
 const pte_writable = u64(1 << 1)
@@ -32,12 +32,73 @@ pub mut:
 
 pub struct MmapRangeGlobal {
 pub mut:
-	shadow_pagemap &memory.Pagemap
+	shadow_pagemap memory.Pagemap
 	locals         []&MmapRangeLocal
 	resource       &resource.Resource
 	base           u64
 	length         u64
 	offset         i64
+}
+
+fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
+	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
+		r := &MmapRangeLocal(pagemap.mmap_ranges[i])
+		if addr >= r.base && addr < r.base + r.length {
+			memory_page := addr / page_size
+			file_page := u64(r.offset) / page_size + (memory_page - r.base / page_size)
+			return r, memory_page, file_page
+		}
+	}
+	return error('')
+}
+
+pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) {
+	mut g := unsafe { _g }
+
+	pt_flags := pte_present | pte_user
+		| if prot & prot_write != 0 { pte_writable } else { 0 }
+
+	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags)
+
+	for i := u64(0); i < g.locals.len; i++ {
+		mut l := g.locals[i]
+		if virt_addr < l.base || virt_addr >= l.base + l.length {
+			continue
+		}
+		l.pagemap.map_page(virt_addr, phys_addr, pt_flags)
+	}
+}
+
+pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
+				  length u64, prot int, _flags int) {
+	mut pagemap  := unsafe { _pagemap }
+	flags := _flags | map_anonymous
+
+	pool := unsafe { C.malloc(sizeof(MmapRangeLocal) + sizeof(MmapRangeGlobal)) }
+	mut range_local  := unsafe { &MmapRangeLocal(pool) }
+	mut range_global := unsafe { &MmapRangeGlobal(u64(pool) + sizeof(MmapRangeLocal)) }
+
+	range_local.pagemap = pagemap
+	range_local.global  = range_global
+	range_local.base    = virt_addr
+	range_local.length  = length
+	range_local.prot    = prot
+	range_local.flags   = flags
+
+	range_global.locals = []&MmapRangeLocal{}
+	range_global.locals << range_local
+	range_global.base   = virt_addr
+	range_global.length = length
+
+	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+
+	pagemap.l.acquire()
+	pagemap.mmap_ranges << voidptr(range_local)
+	pagemap.l.release()
+
+	for i := u64(0); i < length; i += page_size {
+		map_page_in_range(range_global, virt_addr + i, phys_addr + i, prot)
+	}
 }
 
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
@@ -51,7 +112,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 		return voidptr(-1)
 	}
 
-	mut current_thread := sched.current_thread()
+	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
 	mut base := u64(0)

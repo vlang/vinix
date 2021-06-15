@@ -2,6 +2,7 @@ module elf
 
 import lib
 import memory
+import memory.mmap
 import resource
 
 pub struct Auxval {
@@ -133,11 +134,15 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 			return error('elf: Allocation failure')
 		}
 
+		pf := mmap.prot_read | mmap.prot_exec
+		| if phdr.p_flags & pf_w != 0 { mmap.prot_write } else { 0 }
+
 		virt := base + phdr.p_vaddr
 		phys := u64(addr)
 
 		for j := u64(0); j < page_count; j++ {
-			pagemap.map_page(virt + j * page_size, phys + j * page_size, 0x07)
+			mmap.map_range(pagemap, virt, phys, page_count * page_size, pf,
+						   mmap.map_anonymous)
 		}
 
 		buf := unsafe { byteptr(addr) + misalign + higher_half }

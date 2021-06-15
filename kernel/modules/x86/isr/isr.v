@@ -4,6 +4,7 @@ import idt
 import event
 import apic
 import cpu.local as cpulocal
+import cpu
 import syscall
 
 __global (
@@ -66,17 +67,16 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 			 exception_names[num], cpulocal.current().cpu_number)
 	C.printf(c'Error code: 0x%016llx\n', gpr_state.err)
 	C.printf(c'Register dump:\n')
-	C.printf(c'RIP: 0x%016llx\n', gpr_state.rip)
-	C.printf(c'CS:  0x%016llx\n', gpr_state.cs)
-	C.printf(c'RSP: 0x%016llx\n', gpr_state.rsp)
-	C.printf(c'SS:  0x%016llx\n', gpr_state.ss)
-	C.printf(c'RAX: 0x%016llx  RBX: 0x%016llx  RCX: 0x%016llx  RDX: 0x%016llx\n',
+	C.printf(c'CS:RIP=%04llx:%016llx\n', gpr_state.cs, gpr_state.rip)
+	C.printf(c'SS:RSP=%04llx:%016llx\n', gpr_state.ss, gpr_state.rsp)
+	C.printf(c'RFLAGS=%08llx       CR2=%016llx\n', gpr_state.rflags, cpu.read_cr2())
+	C.printf(c'RAX=%016llx  RBX=%016llx  RCX=%016llx  RDX=%016llx\n',
 			 gpr_state.rax, gpr_state.rbx, gpr_state.rcx, gpr_state.rdx)
-	C.printf(c'RSI: 0x%016llx  RDI: 0x%016llx  RBP: 0x%016llx\n',
-			 gpr_state.rsi, gpr_state.rdi, gpr_state.rbp)
-	C.printf(c'R8:  0x%016llx  R9:  0x%016llx  R10: 0x%016llx  R11: 0x%016llx\n',
+	C.printf(c'RSI=%016llx  RDI=%016llx  RBP=%016llx  RSP=%016llx\n',
+			 gpr_state.rsi, gpr_state.rdi, gpr_state.rbp, gpr_state.rsp)
+	C.printf(c'R08=%016llx  R09=%016llx  R10=%016llx  R11=%016llx\n',
 			 gpr_state.r8, gpr_state.r9, gpr_state.r10, gpr_state.r11)
-	C.printf(c'R12: 0x%016llx  R13: 0x%016llx  R14: 0x%016llx  R15: 0x%016llx\n',
+	C.printf(c'R12=%016llx  R13=%016llx  R14=%016llx  R15=%016llx\n',
 			 gpr_state.r12, gpr_state.r13, gpr_state.r14, gpr_state.r15)
 	for {
 		asm volatile amd64 {
@@ -93,7 +93,11 @@ pub fn initialise() {
 			6 {
 				idt.set_ist(i, 3)
 				interrupt_table[i] = voidptr(ud_handler)
-			}
+			}/*
+			14 {
+				idt.set_ist(i, 4)
+				interrupt_table[i] = voidptr(pf_handler)
+			}*/
 			else {
 				idt.set_ist(i, 2)
 				interrupt_table[i] = voidptr(exception_handler)
