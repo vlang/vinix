@@ -115,7 +115,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) bool {
 
 	pagemap.l.acquire()
 
-	range_local, memory_page, file_page := addr2range(pagemap, addr) or {
+	range_local, memory_page, _ := addr2range(pagemap, addr) or {
 		pagemap.l.release()
 		asm volatile amd64 { cli }
 		return false
@@ -131,12 +131,13 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) bool {
 		panic('Non anon mmap not supported yet')
 	}
 
+	asm volatile amd64 { cli }
 	return true
 }
 
 pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
 					prot_and_flags u64, fd int, offset i64) (u64, u64) {
-	mut resource := resource.null()
+	mut resource := &resource.Resource(voidptr(0))
 
 	prot  := int((prot_and_flags >> 32) & 0xffffffff)
 	flags := int(prot_and_flags & 0xffffffff)
@@ -199,7 +200,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	pagemap.mmap_ranges << voidptr(range_local)
 	pagemap.l.release()
 
-	if !resource.null {
+	if voidptr(resource) != voidptr(0) {
 		resource.refcount++
 	}
 

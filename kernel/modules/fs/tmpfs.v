@@ -7,7 +7,6 @@ import resource
 
 struct TmpFSResource {
 pub mut:
-	null     bool
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
