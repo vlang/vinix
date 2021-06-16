@@ -191,6 +191,7 @@ packages:
         - '--prefix=/usr'
         - '--without-bash-malloc'
         - '--disable-nls'
+        - 'CFLAGS=-O2 -pipe'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
