@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..d8e0586
+index 0000000..f1ca4c7
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,139 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -97,19 +97,21 @@ index 0000000..d8e0586
 +};
 +
 +__attribute__((naked))
-+static __syscall_ret SYSCALL(int number, ...) {
++static __syscall_ret __syscall(int number, ...) {
 +    asm (
 +        "mov %rsp, %r10\n\t"
 +        "lea 1f(%rip), %r11\n\t"
 +        "sysenter\n\t"
-+        "1: ret"
++        "1:\n\t"
++        "mov %r8, %rdx\n\t"
++        "ret"
 +    );
 +}
 +
 +namespace mlibc {
 +
 +void sys_libc_log(const char *message) {
-+    SYSCALL(0, message);
++    __syscall(0, message);
 +}
 +
 +void sys_libc_panic() {
@@ -145,11 +147,22 @@ index 0000000..d8e0586
 +int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) STUB_ONLY
 +
 +int sys_vm_map(void *hint, size_t size, int prot, int flags,
-+               int fd, off_t offset, void **window) STUB_ONLY
++               int fd, off_t offset, void **window) {
++    __syscall_ret ret = __syscall(1, hint, size,
++                                  (uint64_t)prot << 32 | (uint64_t)flags, fd, offset);
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *window = (void *)ret.ret;
++    return 0;
++}
 +
 +int sys_vm_unmap(void *pointer, size_t size) STUB_ONLY
 +
-+int sys_anon_allocate(size_t size, void **pointer) STUB_ONLY
++int sys_anon_allocate(size_t size, void **pointer) {
++    return sys_vm_map(NULL, size, PROT_EXEC | PROT_READ | PROT_WRITE,
++                      MAP_ANONYMOUS, -1, 0, pointer);
++}
 +
 +int sys_anon_free(void *pointer, size_t size) STUB_ONLY
 +

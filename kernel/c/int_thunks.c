@@ -1,10 +1,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void lib__syscall_kprint(void *, char *message);
-
 __attribute__((used)) void *syscall_table[] = {
-    lib__syscall_kprint
+    lib__syscall_kprint,
+    memory__mmap__syscall_mmap
 };
 
 __attribute__((naked, used))

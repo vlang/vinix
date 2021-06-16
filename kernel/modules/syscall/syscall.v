@@ -20,20 +20,22 @@ pub fn ud_entry(gpr_state &cpulocal.GPRState) {
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]
 
-		pop rax
-		mov ds, eax
-		pop rax
-		mov es, eax
+		mov r8, rdx
+
+		pop rbx
+		mov ds, ebx
+		pop rbx
+		mov es, ebx
 		// Discard saved RAX
 		add rsp, 8
 		pop rbx
 		pop rcx
-		// Discard saved RDX
-		add rsp, 8
+		pop rdx
 		pop rsi
 		pop rdi
 		pop rbp
-		pop r8
+		// Discard saved R8
+		add rsp, 8
 		pop r9
 		pop r10
 		pop r11
@@ -86,20 +88,22 @@ fn sysenter_entry() {
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]
 
-		pop rax
-		mov ds, eax
-		pop rax
-		mov es, eax
+		mov r8, rdx
+
+		pop rbx
+		mov ds, ebx
+		pop rbx
+		mov es, ebx
 		// Discard saved RAX
 		add rsp, 8
 		pop rbx
 		pop rcx
-		// Discard saved RDX
-		add rsp, 8
+		pop rdx
 		pop rsi
 		pop rdi
 		pop rbp
-		pop r8
+		// Discard saved R8
+		add rsp, 8
 		pop r9
 		pop rcx
 		pop rdx

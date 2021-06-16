@@ -1,7 +1,5 @@
 #include <stdint.h>
 
-void lib__kpanicc(char *message);
-
 int32_t **__ctype_tolower_loc(void) {
     lib__kpanicc("__ctype_tolower_loc is a stub");
     return NULL;

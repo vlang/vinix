@@ -3,11 +3,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-void lib__kpanicc(char *message);
-void lib__kprintc(char *str);
-
-typedef long ssize_t;
-
 FILE *stdin  = NULL;
 FILE *stdout = NULL;
 FILE *stderr = NULL;

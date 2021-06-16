@@ -3,6 +3,7 @@ module mmap
 import memory
 import resource
 import proc
+import errno
 
 const pte_present  = u64(1 << 0)
 const pte_writable = u64(1 << 1)
@@ -101,6 +102,24 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 	}
 }
 
+pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
+					prot_and_flags u64, fd int, offset i64) (u64, u64) {
+	mut resource := resource.null()
+
+	prot  := int((prot_and_flags >> 32) & 0xffffffff)
+	flags := int(prot_and_flags & 0xffffffff)
+
+	if flags & map_anonymous == 0 {
+		panic('Non anon mmap not supported yet')
+	}
+
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	return u64(mmap(process.pagemap, addr, length, prot, flags, resource, offset)),
+		   errno.get()
+}
+
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 			prot int, flags int, _resource &resource.Resource, offset i64) voidptr {
 	mut pagemap  := unsafe { _pagemap }
@@ -148,7 +167,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	pagemap.mmap_ranges << voidptr(range_local)
 	pagemap.l.release()
 
-	if voidptr(resource) != 0 {
+	if !resource.null {
 		resource.refcount++
 	}
 

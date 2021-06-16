@@ -5,6 +5,7 @@ import klock
 
 interface Resource {
 mut:
+	null     bool
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -15,6 +16,7 @@ mut:
 
 pub struct Dummy {
 pub mut:
+	null     bool
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -26,6 +28,15 @@ fn (this Dummy) read(buf voidptr, loc u64, count u64) i64 {
 
 fn (this Dummy) write(buf voidptr, loc u64, count u64) i64 {
 	return -1
+}
+
+__global (
+	null_resource Dummy
+)
+
+pub fn null() &Resource {
+	null_resource.null = true
+	return &null_resource
 }
 
 __global (
