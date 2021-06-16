@@ -4,6 +4,8 @@ import memory
 import resource
 import proc
 import errno
+import x86.cpu
+import x86.cpu.local as cpulocal
 
 const pte_present  = u64(1 << 0)
 const pte_writable = u64(1 << 1)
@@ -100,6 +102,36 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 	for i := u64(0); i < length; i += page_size {
 		map_page_in_range(range_global, virt_addr + i, phys_addr + i, prot)
 	}
+}
+
+pub fn pf_handler(gpr_state &cpulocal.GPRState) bool {
+	asm volatile amd64 { sti }
+
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+	mut pagemap := process.pagemap
+
+	addr := cpu.read_cr2()
+
+	pagemap.l.acquire()
+
+	range_local, memory_page, file_page := addr2range(pagemap, addr) or {
+		pagemap.l.release()
+		asm volatile amd64 { cli }
+		return false
+	}
+
+	pagemap.l.release()
+
+	if range_local.flags & map_anonymous != 0 {
+		page := memory.pmm_alloc(1)
+		map_page_in_range(range_local.global, memory_page * page_size, u64(page),
+						  range_local.prot)
+	} else {
+		panic('Non anon mmap not supported yet')
+	}
+
+	return true
 }
 
 pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,

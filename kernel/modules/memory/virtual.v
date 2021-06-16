@@ -44,7 +44,7 @@ fn get_next_level(current_level &u64, index u64) &u64 {
 	mut ret := &u64(0)
 
 	unsafe {
-		mut entry := &current_level[index]
+		mut entry := &u64(u64(current_level) + higher_half + index * 8)
 
 		// Check if entry is present
 		if entry[0] & 0x01 != 0 {
@@ -76,7 +76,8 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) {
 	mut pml1 := get_next_level(pml2, pml2_entry)
 
 	unsafe {
-		pml1[pml1_entry] = phys | flags
+		entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)
+		entry[0] = phys | flags
 	}
 
 	pagemap.l.release()

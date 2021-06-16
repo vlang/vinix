@@ -6,6 +6,7 @@ import apic
 import cpu.local as cpulocal
 import cpu
 import syscall
+import memory.mmap
 
 __global (
 	int_events [256]event.Event
@@ -62,6 +63,12 @@ fn ud_handler(num u32, _gpr_state &cpulocal.GPRState) {
 	}
 }
 
+fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
+	if mmap.pf_handler(gpr_state) == false {
+		exception_handler(num, gpr_state)
+	}
+}
+
 fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 	C.printf(c'\nException occurred (%s) on CPU %d\n',
 			 exception_names[num], cpulocal.current().cpu_number)
@@ -89,17 +96,15 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 pub fn initialise() {
 	for i := u16(0); i < 32; i++ {
 		idt.register_handler(i, interrupt_thunks[i])
+		idt.set_ist(i, 2)
 		match i {
-			6 {
-				idt.set_ist(i, 3)
+			6 { // Invalid opcode
 				interrupt_table[i] = voidptr(ud_handler)
-			}/*
-			14 {
-				idt.set_ist(i, 4)
+			}
+			14 { // Page fault
 				interrupt_table[i] = voidptr(pf_handler)
-			}*/
+			}
 			else {
-				idt.set_ist(i, 2)
 				interrupt_table[i] = voidptr(exception_handler)
 			}
 		}
