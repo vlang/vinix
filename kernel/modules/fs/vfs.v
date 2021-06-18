@@ -41,7 +41,7 @@ pub fn initialise() {
 	filesystems = map[string]&FileSystem{}
 
 	// Install filesystems by name string
-	filesystems['tmpfs'] = &TmpFS{0, 0}
+	filesystems['tmpfs'] = &TmpFS{}
 	filesystems['devtmpfs'] = &DevTmpFS{}
 }
 

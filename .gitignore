@@ -8,6 +8,6 @@ ports
 *.iso
 *.gz
 kernel/blob
-kernel/modules/lib/symbol.v
+kernel/modules/trace/symbol.v
 pack
 .vscode
