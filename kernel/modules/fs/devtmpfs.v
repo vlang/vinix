@@ -69,6 +69,11 @@ __global (
 	devtmpfs_root &VFSNode
 )
 
+fn (mut this DevTmpFS) instantiate() &FileSystem {
+	new := &DevTmpFS{}
+	return new
+}
+
 fn (mut this DevTmpFS) populate(node &VFSNode) {}
 
 fn (mut this DevTmpFS) mount(source &VFSNode) &VFSNode {

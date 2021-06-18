@@ -11,7 +11,7 @@ grep "\.text" < "$TMP1" | cut -d' ' -f1 > "$TMP2"
 grep "\.text" < "$TMP1" | awk 'NF{ print $NF }' > "$TMP3"
 
 cat <<EOF
-module lib
+module trace
 
 struct Symbol {
 	address u64

@@ -33,9 +33,17 @@ pub mut:
 }
 
 pub fn current_thread() &Thread {
-	asm volatile amd64 { cli }
+	mut f := u64(0)
+	asm volatile amd64 {
+		pushfq
+		pop f
+		cli
+		; =rm (f)
+	}
 	cpu_local := cpulocal.current()
 	ret := &Thread(cpu_local.current_thread)
-	asm volatile amd64 { sti }
+	if f & (1 << 9) != 0 {
+		asm volatile amd64 { sti }
+	}
 	return ret
 }

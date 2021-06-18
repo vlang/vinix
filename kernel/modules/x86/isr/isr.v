@@ -7,6 +7,7 @@ import cpu.local as cpulocal
 import cpu
 import syscall
 import memory.mmap
+import trace
 
 __global (
 	int_events [256]event.Event
@@ -18,7 +19,7 @@ fn generic_isr(num u32, _ voidptr) {
 }
 
 const exception_names = [
-    c'Division by 0',
+    charptr(c'Division by 0'),
     c'Debug',
     c'NMI',
     c'Breakpoint',
@@ -85,6 +86,7 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 			 gpr_state.r8, gpr_state.r9, gpr_state.r10, gpr_state.r11)
 	C.printf(c'R12=%016llx  R13=%016llx  R14=%016llx  R15=%016llx\n',
 			 gpr_state.r12, gpr_state.r13, gpr_state.r14, gpr_state.r15)
+	trace.stacktrace(voidptr(gpr_state.rbp))
 	for {
 		asm volatile amd64 {
 			cli

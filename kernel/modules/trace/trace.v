@@ -1,6 +1,6 @@
-module lib
+module trace
 
-pub fn trace_address(addr u64) (u64, Symbol) {
+pub fn address(addr u64) (u64, Symbol) {
 	mut prev_sym := Symbol{}
 
 	for sym in symbol_table {
@@ -15,13 +15,21 @@ pub fn trace_address(addr u64) (u64, Symbol) {
 	return 0, prev_sym
 }
 
-pub fn print_stacktrace() {
-	mut base_ptr := &u64(0)
+pub fn address_print(addr u64) {
+	off, sym := address(addr)
+	C.printf(c'  [0x%llx] <%s+0x%llx>\n', addr, sym.name.str, off)
+}
 
-	asm volatile amd64 {
-		mov base_ptr, rbp
-		; =r (base_ptr)
+pub fn stacktrace(_base_ptr voidptr) {
+	mut base_ptr := &u64(_base_ptr)
+
+	if voidptr(base_ptr) == voidptr(0) {
+		asm volatile amd64 {
+			mov base_ptr, rbp
+			; =r (base_ptr)
+		}
 	}
+
 	C.printf(c'Stacktrace:\n')
 
 	for {
@@ -31,8 +39,7 @@ pub fn print_stacktrace() {
 			if ret_addr == 0 {
 				break
 			}
-			off, sym := trace_address(ret_addr)
-			C.printf(c'  [0x%llx] <%s+0x%llx>\n', ret_addr, sym.name.str, off)
+			address_print(ret_addr)
 			if old_bp == 0 {
 				break
 			}

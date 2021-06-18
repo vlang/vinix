@@ -1,4 +1,4 @@
-module lib
+module trace
 
 struct Symbol {
 	address u64

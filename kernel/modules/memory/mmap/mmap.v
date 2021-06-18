@@ -169,7 +169,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 
 	mut base := u64(0)
 	if flags & map_fixed != 0 {
-		base = addr
+		base = u64(addr)
 	} else {
 		base = process.mmap_anon_non_fixed_base
 		process.mmap_anon_non_fixed_base += length + page_size

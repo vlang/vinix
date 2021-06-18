@@ -167,7 +167,7 @@ __global (
 )
 
 pub fn terminal_print(s string) {
-	terminal_printc(s.str, u64(s.len))
+	terminal_printc(charptr(s.str), u64(s.len))
 }
 
 pub fn terminal_printc(s charptr, len u64) {

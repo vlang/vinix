@@ -203,9 +203,9 @@ pub fn yield() {
 
 	current_thread.yield_await.acquire()
 
-	asm volatile amd64 { sti }
-
 	apic.lapic_send_ipi(cpu_local.lapic_id, scheduler_vector)
+
+	asm volatile amd64 { sti }
 
 	current_thread.yield_await.acquire()
 	current_thread.yield_await.release()
@@ -380,6 +380,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) &proc.Pro
 }
 
 pub fn await() {
+	asm volatile amd64 { cli }
 	apic.lapic_timer_oneshot(scheduler_vector, 20000)
 	asm volatile amd64 {
 		sti

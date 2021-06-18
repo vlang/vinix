@@ -33,7 +33,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	success, _, _, _, d = cpu.cpuid(1, 0)
 	if success == true && d & (1 << 11) != 0 {
 		msr.wrmsr(0x174, kernel_code_seg)
-		msr.wrmsr(0x176, voidptr(syscall.sysenter_entry))
+		msr.wrmsr(0x176, u64(voidptr(syscall.sysenter_entry)))
 	} else {
 		panic('This CPU does not support SEP. Vinix requires SEP to run.')
 	}

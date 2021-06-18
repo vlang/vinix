@@ -4,7 +4,7 @@ OBJDUMP = objdump
 CC = cc
 V = v
 
-CFLAGS = -O2 -g -pipe -w
+CFLAGS = -O2 -Wall -Wextra -g -pipe -w
 
 INTERNALCFLAGS :=           \
 	-I.                     \
@@ -16,11 +16,20 @@ INTERNALCFLAGS :=           \
 	-fdata-sections         \
 	-fno-inline             \
 	-fwhole-program         \
-	-mgeneral-regs-only     \
+	-mno-80387              \
+	-mno-mmx                \
+	-mno-3dnow              \
+	-mno-sse                \
+	-mno-sse2               \
 	-mno-red-zone           \
 	-static-pie             \
 	-nostdlib               \
 	-Tlinker.ld             \
+	-Wno-address-of-packed-member \
+	-Wno-unused-label       \
+	-Wno-unused-function    \
+	-Wno-unused-variable    \
+	-Wno-unused-parameter   \
 	-Wl,-gc-sections        \
 	-z max-page-size=0x1000
 
@@ -36,13 +45,13 @@ all: $(KERNEL)
 
 .PHONY:
 clean:
-	rm -rf $(KERNEL) blob modules/lib/symbol.v
+	rm -rf $(KERNEL) blob modules/trace/symbol.v
 
 $(KERNEL):
-	cp dummy_symbol_table modules/lib/symbol.v
+	cp dummy_symbol_table modules/trace/symbol.v
 	$(MAKE) blob
 	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@
-	./gensyms.sh $(OBJDUMP) $@ > modules/lib/symbol.v
+	./gensyms.sh $(OBJDUMP) $@ > modules/trace/symbol.v
 	$(MAKE) blob
 	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@
 

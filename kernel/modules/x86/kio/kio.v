@@ -2,7 +2,7 @@ module kio
 
 pub fn inb(port u16) byte {
 	mut ret := byte(0)
-	asm amd64 {
+	asm volatile amd64 {
 		in ret, port
 		; =a (ret)
 		; Nd (port)
@@ -12,9 +12,10 @@ pub fn inb(port u16) byte {
 }
 
 pub fn outb(port u16, value byte) {
-	asm amd64 {
+	asm volatile amd64 {
 		out port, value
-		; ; a (value)
+		;
+		; a (value)
 		  Nd (port)
 		; memory
 	}
@@ -34,7 +35,8 @@ pub fn mmind(addr u64) u32 {
 pub fn mmoutd(addr u64, value u32) {
 	asm volatile amd64 {
 		mov [addr], value
-		; ; r (addr)
+		;
+		; r (addr)
 		  r (value)
 		; memory
 	}

@@ -53,7 +53,7 @@ pub fn reload() {
 		address: &idt_entries
 	}
 
-	asm amd64 {
+	asm volatile amd64 {
 		lidt ptr
 		;
 		; m (idt_pointer) as ptr

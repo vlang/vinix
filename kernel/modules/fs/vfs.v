@@ -2,8 +2,10 @@ module fs
 
 import resource
 import stat
+import klock
 
 interface FileSystem {
+	instantiate() &FileSystem
 	populate(&VFSNode)
 	mount(&VFSNode) &VFSNode
 	create(&VFSNode, string, int) &VFSNode
@@ -18,9 +20,9 @@ pub mut:
 }
 
 __global (
-	filesystems map[string]FileSystem
-	fs_instances []FileSystem
+	vfs_lock klock.Lock
 	vfs_root &VFSNode
+	filesystems map[string]&FileSystem
 )
 
 fn create_node(filesystem &FileSystem) &VFSNode {
@@ -36,12 +38,11 @@ fn create_node(filesystem &FileSystem) &VFSNode {
 pub fn initialise() {
 	vfs_root = create_node(&TmpFS(0))
 
-	filesystems = map[string]FileSystem{}
-	fs_instances = []FileSystem{}
+	filesystems = map[string]&FileSystem{}
 
 	// Install filesystems by name string
-	filesystems['tmpfs'] = TmpFS{0, 0}
-	filesystems['devtmpfs'] = DevTmpFS{}
+	filesystems['tmpfs'] = &TmpFS{0, 0}
+	filesystems['devtmpfs'] = &DevTmpFS{}
 }
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
@@ -131,15 +132,13 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) b
 		return false
 	}
 
-	fs := filesystems[filesystem]
+	fs := filesystems[filesystem].instantiate()
 
 	mount_node := fs.mount(source_node)
 
 	if mount_node == 0 {
 		return false
 	}
-
-	fs_instances << fs
 
 	target_node.mountpoint = mount_node
 
@@ -153,6 +152,13 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) b
 }
 
 pub fn create(parent &VFSNode, name string, mode int) &VFSNode {
+	vfs_lock.acquire()
+	ret := internal_create(parent, name, mode)
+	vfs_lock.release()
+	return ret
+}
+
+pub fn internal_create(parent &VFSNode, name string, mode int) &VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
 	if target_node != 0 {

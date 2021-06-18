@@ -1,7 +1,5 @@
 module event
 
-import x86.cpu
-import x86.cpu.local as cpulocal
 import klock
 import proc
 import sched
@@ -36,7 +34,7 @@ pub fn await(events []&Event, which &u64, block bool) bool {
 		panic('kevent: Too many events!')
 	}
 
-	mut thread := &proc.Thread(cpulocal.current().current_thread)
+	mut thread := proc.current_thread()
 
 	thread.event_block_dequeue.release()
 	thread.event_occurred.release()

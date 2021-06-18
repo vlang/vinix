@@ -67,6 +67,11 @@ pub mut:
 	inode_counter u64
 }
 
+fn (mut this TmpFS) instantiate() &FileSystem {
+	new := &TmpFS{}
+	return new
+}
+
 fn (mut this TmpFS) populate(node &VFSNode) {}
 
 fn (mut this TmpFS) mount(source &VFSNode) &VFSNode {
