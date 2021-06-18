@@ -9,7 +9,6 @@ import katomic
 import proc
 import memory
 import memory.mmap
-import file
 import elf
 
 const max_running_threads = int(512)
@@ -370,10 +369,10 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) &proc.Pro
 	new_process := &proc.Process{
 		pagemap: pagemap
 		threads: []&proc.Thread{}
-		fds: []&file.FD{}
 		children: []&proc.Process{}
 		thread_stack_top: u64(0x70000000000)
 		mmap_anon_non_fixed_base: u64(0x80000000000)
+		current_directory: voidptr(vfs_root)
 	}
 
 	return new_process

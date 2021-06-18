@@ -46,25 +46,31 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 			return error('stdin not found')
 		}
 		stdin_handle := &file.Handle{resource: stdin_node.resource
-									 node: stdin_node}
-		stdin_fd := &file.FD{handle: stdin_handle}
-		new_process.fds << stdin_fd
+									 node: stdin_node
+									 refcount: 1}
+		stdin_fd := &file.FD{handle: stdin_handle
+							 refcount: 1}
+		new_process.fds[0] = voidptr(stdin_fd)
 
 		stdout_node := fs.get_node(vfs_root, stdout) or {
 			return error('stdout not found')
 		}
 		stdout_handle := &file.Handle{resource: stdout_node.resource
-									  node: stdout_node}
-		stdout_fd := &file.FD{handle: stdout_handle}
-		new_process.fds << stdout_fd
+									  node: stdout_node
+									  refcount: 1}
+		stdout_fd := &file.FD{handle: stdout_handle
+							  refcount: 1}
+		new_process.fds[1] = voidptr(stdout_fd)
 
 		stderr_node := fs.get_node(vfs_root, stderr) or {
 			return error('stderr not found')
 		}
 		stderr_handle := &file.Handle{resource: stderr_node.resource
-									  node: stderr_node}
-		stderr_fd := &file.FD{handle: stderr_handle}
-		new_process.fds << stderr_fd
+									  node: stderr_node
+									  refcount: 1}
+		stderr_fd := &file.FD{handle: stderr_handle
+							  refcount: 1}
+		new_process.fds[2] = voidptr(stderr_fd)
 
 		sched.new_user_thread(new_process, true,
 							  entry_point, voidptr(0),

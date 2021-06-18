@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..f1ca4c7
+index 0000000..3eb2be3
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,139 @@
+@@ -0,0 +1,151 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -130,11 +130,23 @@ index 0000000..f1ca4c7
 +
 +int sys_isatty(int fd) STUB_ONLY
 +
-+int sys_openat(int dirfd, const char *path, int flags, int *fd) STUB_ONLY
++int sys_openat(int dirfd, const char *path, int flags, int *fd) {
++    __syscall_ret ret = __syscall(2, dirfd, path, flags, 0);
 +
-+int sys_open(const char *path, int flags, int *fd) STUB_ONLY
++    if (ret.errno != 0)
++        return ret.errno;
 +
-+int sys_open_dir(const char *path, int *handle) STUB_ONLY
++    *fd = (int)ret.ret;
++    return 0;
++}
++
++int sys_open(const char *path, int flags, int *fd) {
++    return sys_openat(AT_FDCWD, path, flags, fd);
++}
++
++int sys_open_dir(const char *path, int *handle) {
++    return sys_open(path, 0, handle);
++}
 +
 +int sys_read_entries(int fd, void *buffer, size_t max_size, size_t *bytes_read) STUB_ONLY
 +

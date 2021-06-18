@@ -3,16 +3,19 @@ module proc
 import klock
 import x86.cpu.local as cpulocal
 import memory
-import file
+
+pub const max_fds = 256
 
 pub struct Process {
 pub mut:
 	pagemap memory.Pagemap
 	thread_stack_top u64
 	threads []&Thread
-	fds []&file.FD
+	fds_lock klock.Lock
+	fds [max_fds]voidptr
 	children []&Process
 	mmap_anon_non_fixed_base u64
+	current_directory voidptr
 }
 
 pub struct Thread {
@@ -41,7 +44,7 @@ pub fn current_thread() &Thread {
 		; =rm (f)
 	}
 	cpu_local := cpulocal.current()
-	ret := &Thread(cpu_local.current_thread)
+	ret := cpu_local.current_thread
 	if f & (1 << 9) != 0 {
 		asm volatile amd64 { sti }
 	}

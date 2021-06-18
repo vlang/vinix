@@ -3,7 +3,8 @@
 
 __attribute__((used)) void *syscall_table[] = {
     lib__syscall_kprint,
-    memory__mmap__syscall_mmap
+    memory__mmap__syscall_mmap,
+    fs__syscall_openat
 };
 
 __attribute__((naked, used))

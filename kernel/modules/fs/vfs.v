@@ -3,6 +3,11 @@ module fs
 import resource
 import stat
 import klock
+import proc
+import file
+import errno
+
+pub const at_fdcwd = -100
 
 interface FileSystem {
 	instantiate() &FileSystem
@@ -103,6 +108,33 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	return 0, 0, ''
 }
 
+fn get_parent_dir(dirfd int, path string) ?&VFSNode {
+	is_absolute := path[0] == `/`
+
+	current_process := proc.current_thread().process
+
+	mut parent := &VFSNode(0)
+
+	if is_absolute == false {
+		parent = vfs_root
+	} else {
+		if dirfd == at_fdcwd {
+			parent = &VFSNode(current_process.current_directory)
+		} else {
+			dir_handle := file.handle_from_fdnum(current_process, dirfd) or {
+				return none
+			}
+			if stat.isdir(dir_handle.resource.stat.mode) == false {
+				// errno = enotdir
+				return none
+			}
+			parent = &VFSNode(dir_handle.node)
+		}
+	}
+
+	return parent
+}
+
 pub fn get_node(parent &VFSNode, path string) ?&VFSNode {
 	_, node, _ := path2node(parent, path)
 	if node == 0 {
@@ -170,4 +202,34 @@ pub fn internal_create(parent &VFSNode, name string, mode int) &VFSNode {
 	parent_of_tgt_node.children[basename] = target_node
 
 	return target_node
+}
+
+fn fdnum_create_from_node(node &VFSNode, flags int, oldfd int, specific bool) ?int {
+	current_process := proc.current_thread().process
+	mut fd := file.fd_create(node.resource, flags) or {
+		return none
+	}
+	fd.handle.node = voidptr(node)
+	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific)
+}
+
+pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+
+	parent := get_parent_dir(dirfd, path) or {
+		return -1, errno.get()
+	}
+
+	//creat_flags := flags & resource.file_creation_flags_mask
+
+	node := get_node(parent, path) or {
+		// handle creation
+		return -1, errno.get()
+	}
+
+	fdnum := fdnum_create_from_node(node, flags, 0, false) or {
+		return -1, errno.get()
+	}
+
+	return u64(fdnum), 0
 }
