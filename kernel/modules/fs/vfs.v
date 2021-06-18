@@ -206,7 +206,7 @@ pub fn internal_create(parent &VFSNode, name string, mode int) &VFSNode {
 
 fn fdnum_create_from_node(node &VFSNode, flags int, oldfd int, specific bool) ?int {
 	current_process := proc.current_thread().process
-	mut fd := file.fd_create(node.resource, flags) or {
+	mut fd := file.fd_create_from_resource(node.resource, flags) or {
 		return none
 	}
 	fd.handle.node = voidptr(node)
@@ -232,4 +232,12 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	}
 
 	return u64(fdnum), 0
+}
+
+pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, errno.get()
+	}
+	ret := fd.handle.read(buf, count)
+	return u64(ret), errno.get()
 }

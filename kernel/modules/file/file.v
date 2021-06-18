@@ -2,14 +2,28 @@ module file
 
 import resource
 import proc
+import klock
 
 pub struct Handle {
 pub mut:
+	l klock.Lock
 	resource &resource.Resource
 	node voidptr
 	refcount int
 	loc u64
 	flags int
+}
+
+pub fn (mut this Handle) read(buf voidptr, count u64) i64 {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	ret := this.resource.read(buf, this.loc, count)
+	if ret > 0 {
+		this.loc += u64(ret)
+	}
+	return ret
 }
 
 pub struct FD {
@@ -47,7 +61,7 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 	}
 }
 
-pub fn fd_create(res &resource.Resource, flags int) ?&FD {
+pub fn fd_create_from_resource(res &resource.Resource, flags int) ?&FD {
 	mut new_handle := unsafe { &Handle(C.malloc(sizeof(Handle))) }
 	new_handle.resource = unsafe { res }
 	new_handle.refcount = 1
@@ -63,7 +77,7 @@ pub fn fd_create(res &resource.Resource, flags int) ?&FD {
 
 pub fn fdnum_create_from_resource(_process &proc.Process, res &resource.Resource,
 								  flags int, oldfd int, specific bool) ?int {
-	new_fd := fd_create(res, flags) or {
+	new_fd := fd_create_from_resource(res, flags) or {
 		return none
 	}
 	return fdnum_create_from_fd(_process, new_fd, oldfd, specific)
