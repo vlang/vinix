@@ -17,10 +17,12 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 }
 
 pub fn inc<T>(var &T) {
+	mut diff := T(1)
 	unsafe { asm volatile amd64 {
 		lock
-		inc var
+		xadd var, diff
 		; +m (var[0]) as var
+		  +r (diff)
 		;
 		; memory
 	} }
@@ -28,10 +30,12 @@ pub fn inc<T>(var &T) {
 
 pub fn dec<T>(var &T) bool {
 	mut ret := false
+	mut diff := T(-1)
 	unsafe { asm volatile amd64 {
 		lock
-		dec var
+		xadd var, diff
 		; +m (var[0]) as var
+		  +r (diff)
 		  =@ccnz (ret)
 		;
 		; memory
