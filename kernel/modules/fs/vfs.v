@@ -222,18 +222,18 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	path := unsafe { cstring_to_vstring(_path) }
 
 	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
+		return -1, -1
 	}
 
 	//creat_flags := flags & resource.file_creation_flags_mask
 
 	node := get_node(parent, path) or {
 		// handle creation
-		return -1, errno.get()
+		return -1, -1
 	}
 
 	fdnum := fdnum_create_from_node(node, flags, 0, false) or {
-		return -1, errno.get()
+		return -1, -1
 	}
 
 	return u64(fdnum), 0
@@ -241,7 +241,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
+		return -1, -1
 	}
 	defer {
 		fd.unref()
@@ -252,14 +252,14 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 
 pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 	file.fdnum_close(voidptr(0), fdnum) or {
-		return -1, errno.get()
+		return -1, -1
 	}
 	return 0, 0
 }
 
 pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
+		return -1, -1
 	}
 	defer {
 		fd.unref()
@@ -270,7 +270,7 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
+		return -1, -1
 	}
 	defer {
 		fd.unref()

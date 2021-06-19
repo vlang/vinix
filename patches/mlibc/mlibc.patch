@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..7d31d9b
+index 0000000..8ec785e
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,213 @@
+@@ -0,0 +1,228 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -256,7 +256,16 @@ index 0000000..7d31d9b
 +    return 0;
 +}
 +
-+int sys_gethostname(char *buffer, size_t bufsize) STUB_ONLY
++int sys_gethostname(char *buffer, size_t bufsize) {
++    const char *hostname = "vinix";
++    for (size_t i = 0; i < bufsize; i++) {
++        buffer[i] = hostname[i];
++        if (hostname[i] == 0)
++            break;
++    }
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
 +
 +int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) STUB_ONLY
 +
@@ -284,9 +293,15 @@ index 0000000..7d31d9b
 +
 +int sys_dup2(int fd, int flags, int newfd) STUB_ONLY
 +
-+int sys_sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict retrieve) STUB_ONLY
++int sys_sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict retrieve) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return ENOSYS;
++}
 +
-+int sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) STUB_ONLY
++int sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
 +
 +int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
 +		const struct timespec *timeout, const sigset_t *sigmask, int *num_events) STUB_ONLY
