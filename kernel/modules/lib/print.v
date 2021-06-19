@@ -8,9 +8,27 @@ __global (
 )
 
 pub fn syscall_kprint(_ voidptr, message charptr) {
-	vstr := unsafe { cstring_to_vstring(message) }
-	local_vstr := vstr.clone()
-	kprint(local_vstr)
+	msglen := unsafe { C.strlen(message) }
+	local_str := unsafe { C.malloc(msglen + 1) }
+	unsafe { C.memcpy(local_str, message, msglen + 1) }
+
+	kprint_lock.acquire()
+
+	unsafe {
+		for i := 0; i < msglen; i++ {
+			asm volatile amd64 {
+				out port, c
+				;
+				; Nd (0xe9) as port
+				  a (local_str[i]) as c
+				; memory
+			}
+		}
+	}
+
+	kprint_lock.release()
+
+	unsafe { C.free(local_str) }
 }
 
 pub fn kprint(message string) {
