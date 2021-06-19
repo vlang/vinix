@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..385351a
+index 0000000..d026d0d
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,180 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -216,7 +216,10 @@ index 0000000..385351a
 +
 +gid_t sys_getegid() STUB_ONLY
 +
-+int sys_ttyname(int fd, char *buf, size_t size) STUB_ONLY
++int sys_ttyname(int fd, char *buf, size_t size) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return ENOSYS;
++}
 +
 +int sys_clock_get(int clock, time_t *secs, long *nanos) STUB_ONLY
 +
