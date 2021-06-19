@@ -29,13 +29,53 @@ pub fn (mut this Handle) read(buf voidptr, count u64) i64 {
 pub struct FD {
 pub mut:
 	handle &Handle
-	refcount int
 	flags int
 }
 
 pub fn (mut this FD) unref() {
-	this.refcount--
 	this.handle.refcount--
+}
+
+pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
+	mut process := &proc.Process(0)
+	if voidptr(_process) == voidptr(0) {
+		process = proc.current_thread().process
+	} else {
+		process = unsafe { _process }
+	}
+
+	if fdnum >= proc.max_fds {
+		// errno = ebadf
+		return error('')
+	}
+
+	process.fds_lock.acquire()
+	defer {
+		process.fds_lock.release()
+	}
+
+	mut fd := &FD(process.fds[fdnum])
+	if voidptr(fd) == voidptr(0) {
+		// errno = ebadf
+		return error('')
+	}
+
+	mut handle := fd.handle
+	mut res := handle.resource
+
+	res.refcount--
+	if res.refcount == 0 {
+		// res.cleanup()
+	}
+
+	handle.refcount--
+	if handle.refcount == 0 {
+		C.free(voidptr(handle))
+	}
+
+	C.free(voidptr(fd))
+
+	process.fds[fdnum] = voidptr(0)
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
@@ -66,15 +106,17 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 	}
 }
 
-pub fn fd_create_from_resource(res &resource.Resource, flags int) ?&FD {
+pub fn fd_create_from_resource(_res &resource.Resource, flags int) ?&FD {
+	mut res := unsafe { _res }
+	res.refcount++
+
 	mut new_handle := unsafe { &Handle(C.malloc(sizeof(Handle))) }
-	new_handle.resource = unsafe { res }
+	new_handle.resource = res
 	new_handle.refcount = 1
 	new_handle.flags = flags & resource.file_status_flags_mask
 
 	mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
 	new_fd.handle = new_handle
-	new_fd.refcount = 1
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
 
 	return new_fd
@@ -112,8 +154,8 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 		return none
 	}
 
+	ret.handle.resource.refcount++
 	ret.handle.refcount++
-	ret.refcount++
 
 	return ret
 }
