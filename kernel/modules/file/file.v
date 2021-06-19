@@ -186,6 +186,29 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	return ret
 }
 
+pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64) {
+	if oldfdnum == newfdnum {
+		// errno = einval
+		return -1, -1
+	}
+
+	mut oldfd := file.fd_from_fdnum(voidptr(0), oldfdnum) or {
+		return -1, -1
+	}
+
+	mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
+	unsafe { C.memcpy(new_fd, oldfd, sizeof(FD)) }
+
+	mut new_fdnum := fdnum_create_from_fd(voidptr(0), new_fd, newfdnum, true) or {
+		oldfd.unref()
+		return -1, -1
+	}
+
+	new_fd.flags = flags & resource.file_descriptor_flags_mask
+
+	return u64(new_fdnum), 0
+}
+
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, -1
@@ -197,7 +220,9 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 
 	match cmd {
 		f_dupfd {
-			ret = u64(fdnum_create_from_fd(voidptr(0), fd, int(arg), false) or {
+			mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
+			unsafe { C.memcpy(new_fd, fd, sizeof(FD)) }
+			ret = u64(fdnum_create_from_fd(voidptr(0), new_fd, int(arg), false) or {
 				fd.unref()
 				return -1, -1
 			})

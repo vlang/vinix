@@ -324,7 +324,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 		handle.l.release()
 	}
 
-	match handle.resource.stat.mode {
+	match handle.resource.stat.mode & stat.ifmt {
 		stat.ifchr, stat.ififo, stat.ifpipe, stat.ifsock {
 			// errno = espipe
 			return -1, -1

@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..cf54e91
+index 0000000..15da48e
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,284 @@
+@@ -0,0 +1,298 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -181,8 +181,10 @@ index 0000000..cf54e91
 +int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
 +    __syscall_ret ret = __syscall(5, fd, offset, whence);
 +
-+    if (ret.errno != 0)
-+        return ret.errno;
++    if (ret.errno != 0) {
++        // TODO
++        return ESPIPE;
++    }
 +
 +    *new_offset = (off_t)ret.ret;
 +    return 0;
@@ -191,8 +193,9 @@ index 0000000..cf54e91
 +int sys_read(int fd, void *buf, size_t count, ssize_t *bytes_read) {
 +    __syscall_ret ret = __syscall(3, fd, buf, count);
 +
-+    if (ret.errno != 0)
++    if (ret.errno != 0) {
 +        return ret.errno;
++    }
 +
 +    *bytes_read = (ssize_t)ret.ret;
 +    return 0;
@@ -201,8 +204,9 @@ index 0000000..cf54e91
 +int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
 +    __syscall_ret ret = __syscall(4, fd, buf, count);
 +
-+    if (ret.errno != 0)
++    if (ret.errno != 0) {
 +        return ret.errno;
++    }
 +
 +    *bytes_written = (ssize_t)ret.ret;
 +    return 0;
@@ -347,7 +351,14 @@ index 0000000..cf54e91
 +    return 0;
 +}
 +
-+int sys_dup2(int fd, int flags, int newfd) STUB_ONLY
++int sys_dup2(int fd, int flags, int newfd) {
++    __syscall_ret ret = __syscall(13, fd, newfd, flags);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
 +
 +int sys_sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict retrieve) {
 +    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
@@ -360,7 +371,10 @@ index 0000000..cf54e91
 +}
 +
 +int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
-+		const struct timespec *timeout, const sigset_t *sigmask, int *num_events) STUB_ONLY
++		const struct timespec *timeout, const sigset_t *sigmask, int *num_events) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
 +
 +int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) STUB_ONLY
 +

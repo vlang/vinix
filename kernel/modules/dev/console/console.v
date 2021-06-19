@@ -229,7 +229,14 @@ fn keyboard_handler() {
 
 pub fn initialise() {
 	sched.new_kernel_thread(voidptr(keyboard_handler), voidptr(0), true)
-	console_res := &Console{}
+
+	mut console_res := &Console{}
+	console_res.stat.size = 0
+	console_res.stat.blocks = 0
+	console_res.stat.blksize = 512
+	console_res.stat.rdev = resource.create_dev_id()
+	console_res.stat.mode = 0644 | stat.ifchr
+
 	fs.devtmpfs_add_device(console_res, 'console')
 }
 
@@ -245,7 +252,7 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
 
 	for console_read_lock.test_and_acquire() == false {
 		mut which := u64(0)
-		if event.await([&console_event], &which, true) {
+		if event.await([&console_event], &which, true) == false {
 			// errno = EINTR
 			return -1
 		}
@@ -267,7 +274,7 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
 				console_read_lock.release()
 				for {
 					mut which := u64(0)
-					if event.await([&console_event], &which, true) {
+					if event.await([&console_event], &which, true) == false {
 						// errno = EINTR
 						return -1
 					}

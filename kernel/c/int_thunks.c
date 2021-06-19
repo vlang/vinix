@@ -14,7 +14,8 @@ __attribute__((used)) void *syscall_table[] = {
     fs__syscall_ioctl,
     fs__syscall_fstat,
     fs__syscall_fstatat,
-    file__syscall_fcntl
+    file__syscall_fcntl,
+    file__syscall_dup3
 };
 
 __attribute__((naked, used))
