@@ -9,6 +9,10 @@ import errno
 
 pub const at_fdcwd = -100
 
+pub const seek_cur = 1
+pub const seek_end = 2
+pub const seek_set = 3
+
 interface FileSystem {
 	instantiate() &FileSystem
 	populate(&VFSNode)
@@ -121,9 +125,10 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 		if dirfd == at_fdcwd {
 			parent = &VFSNode(current_process.current_directory)
 		} else {
-			dir_handle := file.handle_from_fdnum(current_process, dirfd) or {
+			dir_fd := file.fd_from_fdnum(current_process, dirfd) or {
 				return none
 			}
+			dir_handle := dir_fd.handle
 			if stat.isdir(dir_handle.resource.stat.mode) == false {
 				// errno = enotdir
 				return none
@@ -240,4 +245,58 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	}
 	ret := fd.handle.read(buf, count)
 	return u64(ret), errno.get()
+}
+
+pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, errno.get()
+	}
+	defer {
+		fd.unref()
+	}
+
+	mut handle := fd.handle
+
+	handle.l.acquire()
+	defer {
+		handle.l.release()
+	}
+
+	match handle.resource.stat.mode {
+		stat.ifchr, stat.ififo, stat.ifpipe, stat.ifsock {
+			// errno = espipe
+			return -1, -1
+		}
+		else {}
+	}
+
+	mut base := i64(0)
+	match whence {
+		seek_set {
+			base = offset
+		}
+		seek_cur {
+			base = handle.loc + offset
+		}
+		seek_end {
+			base = i64(handle.resource.stat.size) + offset
+		}
+		else {
+			// errno = einval
+			return -1, -1
+		}
+	}
+
+	if base < 0 {
+		// errno = einval
+		return -1, -1
+	}
+
+	if base > handle.resource.stat.size {
+		// TODO: grow
+		return -1, -1
+	}
+
+	handle.loc = base
+	return u64(base), 0
 }

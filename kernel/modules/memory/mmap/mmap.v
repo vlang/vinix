@@ -158,7 +158,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	mut pagemap  := unsafe { _pagemap }
 	mut resource := unsafe { _resource }
 
-	if length & page_size != 0 || length == 0 {
+	if length % page_size != 0 || length == 0 {
 		print('mmap: length is not a multiple of page size or is 0\n')
 		//errno = einval
 		return voidptr(-1)

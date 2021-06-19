@@ -28,6 +28,7 @@ pub mut:
 	user_gs u64
 	user_fs u64
 	kernel_stack u64
+	pf_stack u64
 	cr3 u64
 	event_block_dequeue klock.Lock
 	event_occurred klock.Lock

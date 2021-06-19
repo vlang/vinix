@@ -41,6 +41,10 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	unsafe {
 		stack_size := u64(8192)
 
+		common_int_stack_phys := memory.pmm_alloc(stack_size / page_size)
+		mut common_int_stack := &u64(u64(common_int_stack_phys) + stack_size + higher_half)
+		cpu_local.tss.rsp0 = u64(common_int_stack)
+
 		sched_stack_phys := memory.pmm_alloc(stack_size / page_size)
 		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
 		cpu_local.tss.ist1 = u64(sched_stack)

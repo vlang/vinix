@@ -10,7 +10,7 @@ pub mut:
 	resource &resource.Resource
 	node voidptr
 	refcount int
-	loc u64
+	loc i64
 	flags int
 }
 
@@ -19,9 +19,9 @@ pub fn (mut this Handle) read(buf voidptr, count u64) i64 {
 	defer {
 		this.l.release()
 	}
-	ret := this.resource.read(buf, this.loc, count)
+	ret := this.resource.read(buf, u64(this.loc), count)
 	if ret > 0 {
-		this.loc += u64(ret)
+		this.loc += ret
 	}
 	return ret
 }
@@ -31,6 +31,11 @@ pub mut:
 	handle &Handle
 	refcount int
 	flags int
+}
+
+pub fn (mut this FD) unref() {
+	this.refcount--
+	this.handle.refcount--
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
@@ -111,17 +116,4 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	ret.refcount++
 
 	return ret
-}
-
-pub fn handle_from_fdnum(_process &proc.Process, fdnum int) ?&Handle {
-	mut process := &proc.Process(0)
-	if voidptr(_process) == voidptr(0) {
-		process = proc.current_thread().process
-	} else {
-		process = unsafe { _process }
-	}
-	fd := fd_from_fdnum(process, fdnum) or {
-		return none
-	}
-	return fd.handle
 }

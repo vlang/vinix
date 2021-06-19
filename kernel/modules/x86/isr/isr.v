@@ -98,13 +98,14 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 pub fn initialise() {
 	for i := u16(0); i < 32; i++ {
 		idt.register_handler(i, interrupt_thunks[i])
-		idt.set_ist(i, 2)
 		match i {
 			6 { // Invalid opcode
 				interrupt_table[i] = voidptr(ud_handler)
+				idt.set_ist(i, 2)
 			}
 			14 { // Page fault
 				interrupt_table[i] = voidptr(pf_handler)
+				idt.set_ist(i, 3)
 			}
 			else {
 				interrupt_table[i] = voidptr(exception_handler)

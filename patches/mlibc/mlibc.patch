@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..f5d412e
+index 0000000..7339b09
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,167 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -152,7 +152,15 @@ index 0000000..f5d412e
 +
 +int sys_close(int fd) STUB_ONLY
 +
-+int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) STUB_ONLY
++int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
++    __syscall_ret ret = __syscall(5, fd, offset, whence);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *new_offset = (off_t)ret.ret;
++    return 0;
++}
 +
 +int sys_read(int fd, void *buf, size_t count, ssize_t *bytes_read) {
 +    __syscall_ret ret = __syscall(3, fd, buf, count);

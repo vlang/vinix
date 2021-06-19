@@ -32,7 +32,7 @@ pub fn stacktrace(_base_ptr voidptr) {
 
 	C.printf(c'Stacktrace:\n')
 
-	for {
+	for i := 0; i < 50; i++ {
 		unsafe {
 			old_bp := base_ptr[0]
 			ret_addr := base_ptr[1]

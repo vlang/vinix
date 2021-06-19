@@ -105,6 +105,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	msr.wrmsr(0x175, current_thread.kernel_stack)
 	cpu_local.tss.ist2 = current_thread.kernel_stack
+	cpu_local.tss.ist3 = current_thread.pf_stack
 
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
@@ -269,6 +270,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 
 	kernel_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
 
+	pf_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+
 	gpr_state := cpulocal.GPRState{
 		cs: user_code_seg
 		ds: user_data_seg
@@ -287,6 +290,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		timeslice: 5000
 		running_on: u64(-1)
 		kernel_stack: kernel_stack
+		pf_stack: pf_stack
 	}
 
 	if want_elf == true {
