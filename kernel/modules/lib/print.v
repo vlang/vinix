@@ -9,8 +9,6 @@ __global (
 
 pub fn syscall_kprint(_ voidptr, message charptr) {
 	msglen := unsafe { C.strlen(message) }
-	local_str := unsafe { C.malloc(msglen + 1) }
-	unsafe { C.memcpy(local_str, message, msglen + 1) }
 
 	kprint_lock.acquire()
 
@@ -20,15 +18,13 @@ pub fn syscall_kprint(_ voidptr, message charptr) {
 				out port, c
 				;
 				; Nd (0xe9) as port
-				  a (local_str[i]) as c
+				  a (message[i]) as c
 				; memory
 			}
 		}
 	}
 
 	kprint_lock.release()
-
-	unsafe { C.free(local_str) }
 }
 
 pub fn kprint(message string) {

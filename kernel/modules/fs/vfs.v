@@ -38,7 +38,7 @@ fn create_node(filesystem &FileSystem) &VFSNode {
 	node := &VFSNode{
 				mountpoint: 0
 				children: map[string]&VFSNode{}
-				resource: &resource.Dummy(0)
+				resource: &resource.Resource(voidptr(0))
 				filesystem: unsafe { filesystem }
 			}
 	return node
@@ -243,6 +243,9 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
+	defer {
+		fd.unref()
+	}
 	ret := fd.handle.read(buf, count)
 	return u64(ret), errno.get()
 }
@@ -252,6 +255,17 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 		return -1, errno.get()
 	}
 	return 0, 0
+}
+
+pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64) {
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, errno.get()
+	}
+	defer {
+		fd.unref()
+	}
+	ret := fd.handle.resource.ioctl(request, argp)
+	return u64(ret), errno.get()
 }
 
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {

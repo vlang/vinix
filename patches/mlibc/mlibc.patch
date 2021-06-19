@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..777556d
+index 0000000..7d31d9b
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,213 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -129,9 +129,25 @@ index 0000000..777556d
 +int sys_futex_wait(int *pointer, int expected) STUB_ONLY
 +int sys_futex_wake(int *pointer) STUB_ONLY
 +
-+int sys_ioctl(int fd, unsigned long request, void *arg, int *result) STUB_ONLY
++int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
++    __syscall_ret ret = __syscall(9, fd, request, arg);
 +
-+int sys_isatty(int fd) STUB_ONLY
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *result = (int)ret.ret;
++    return 0;
++}
++
++int sys_isatty(int fd) {
++    struct winsize ws;
++    int ret;
++
++    if (!sys_ioctl(fd, TIOCGWINSZ, &ws, &ret))
++        return 0;
++
++    return ENOTTY;
++}
 +
 +int sys_openat(int dirfd, const char *path, int flags, int *fd) {
 +    __syscall_ret ret = __syscall(2, dirfd, path, flags, 0);

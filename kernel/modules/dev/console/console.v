@@ -9,6 +9,8 @@ import sched
 import stat
 import stivale2
 import fs
+import ioctl
+import resource
 
 const max_scancode = 0x57
 const capslock = 0x3a
@@ -287,4 +289,21 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
 fn (mut this Console) write(buf voidptr, loc u64, count u64) i64 {
 	stivale2.terminal_print(C.byteptr_vstring_with_len(buf, count))
 	return i64(count)
+}
+
+fn (mut this Console) ioctl(request u64, argp voidptr) int {
+	match request {
+		ioctl.tiocgwinsz {
+			mut w := &ioctl.WinSize(argp)
+			// TODO: get actual console size
+			w.ws_row = 25
+			w.ws_col = 80
+			w.ws_xpixel = w.ws_row * 8
+			w.ws_ypixel = w.ws_row * 16
+			return 0
+		}
+		else {
+			return resource.default_ioctl(request, argp)
+		}
+	}
 }

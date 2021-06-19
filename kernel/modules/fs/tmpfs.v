@@ -61,6 +61,10 @@ fn (mut this TmpFSResource) write(buf voidptr, loc u64, count u64) i64 {
 	return i64(count)
 }
 
+fn (mut this TmpFSResource) ioctl(request u64, argp voidptr) int {
+	return resource.default_ioctl(request, argp)
+}
+
 struct TmpFS {
 pub mut:
 	dev_id u64

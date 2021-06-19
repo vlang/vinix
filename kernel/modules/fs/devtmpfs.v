@@ -61,6 +61,10 @@ fn (mut this DevTmpFSResource) write(buf voidptr, loc u64, count u64) i64 {
 	return i64(count)
 }
 
+fn (mut this DevTmpFSResource) ioctl(request u64, argp voidptr) int {
+	return resource.default_ioctl(request, argp)
+}
+
 struct DevTmpFS {}
 
 __global (

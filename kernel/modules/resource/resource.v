@@ -2,6 +2,7 @@ module resource
 
 import stat
 import klock
+import ioctl
 
 pub const o_accmode = 0x0007
 pub const o_exec    = 1
@@ -38,21 +39,7 @@ mut:
 
 	read(buf voidptr, loc u64, count u64) i64
 	write(buf voidptr, loc u64, count u64) i64
-}
-
-pub struct Dummy {
-pub mut:
-	stat     stat.Stat
-	refcount int
-	l        klock.Lock
-}
-
-fn (this Dummy) read(buf voidptr, loc u64, count u64) i64 {
-	return -1
-}
-
-fn (this Dummy) write(buf voidptr, loc u64, count u64) i64 {
-	return -1
+	ioctl(request u64, argp voidptr) int
 }
 
 __global (
@@ -61,4 +48,17 @@ __global (
 
 pub fn create_dev_id() u64 {
 	return dev_id_counter++
+}
+
+pub fn default_ioctl(request u64, _ voidptr) int {
+	match request {
+		ioctl.tcgets, ioctl.tcsets, ioctl.tiocsctty, ioctl.tiocgwinsz {
+			// errno = enotty
+			return -1
+		}
+		else {
+			// errno = einval
+			return -1
+		}
+	}
 }
