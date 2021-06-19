@@ -13,7 +13,8 @@ __attribute__((used)) void *syscall_table[] = {
     x86__cpu__syscall_set_gs_base,
     fs__syscall_ioctl,
     fs__syscall_fstat,
-    fs__syscall_fstatat
+    fs__syscall_fstatat,
+    file__syscall_fcntl
 };
 
 __attribute__((naked, used))

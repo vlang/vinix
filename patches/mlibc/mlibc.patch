@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..7762dcf
+index 0000000..cf54e91
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,262 @@
+@@ -0,0 +1,284 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -228,9 +228,15 @@ index 0000000..7762dcf
 +
 +int sys_anon_free(void *pointer, size_t size) STUB_ONLY
 +
-+pid_t sys_getpid() STUB_ONLY
++pid_t sys_getpid() {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 1;
++}
 +
-+pid_t sys_getppid() STUB_ONLY
++pid_t sys_getppid() {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
 +
 +uid_t sys_getuid() {
 +    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
@@ -321,9 +327,25 @@ index 0000000..7762dcf
 +
 +int sys_execve(const char *path, char *const argv[], char *const envp[]) STUB_ONLY
 +
-+int sys_fcntl(int fd, int request, va_list args, int *result) STUB_ONLY
++int sys_fcntl(int fd, int request, va_list args, int *result) {
++    __syscall_ret ret = __syscall(12, fd, request, va_arg(args, uint64_t));
 +
-+int sys_dup(int fd, int flags, int *newfd) STUB_ONLY
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *result = (ssize_t)ret.ret;
++    return 0;
++}
++
++int sys_dup(int fd, int flags, int *newfd) {
++    __syscall_ret ret = __syscall(12, fd, F_DUPFD, 0);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *newfd = (ssize_t)ret.ret;
++    return 0;
++}
 +
 +int sys_dup2(int fd, int flags, int newfd) STUB_ONLY
 +
