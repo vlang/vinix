@@ -11,7 +11,9 @@ __attribute__((used)) void *syscall_table[] = {
     fs__syscall_close,
     x86__cpu__syscall_set_fs_base,
     x86__cpu__syscall_set_gs_base,
-    fs__syscall_ioctl
+    fs__syscall_ioctl,
+    fs__syscall_fstat,
+    fs__syscall_fstatat
 };
 
 __attribute__((naked, used))

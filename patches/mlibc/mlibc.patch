@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..8ec785e
+index 0000000..d6b7d34
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,254 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -267,7 +267,33 @@ index 0000000..8ec785e
 +    return 0;
 +}
 +
-+int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) STUB_ONLY
++int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
++	switch (fsfdt) {
++        case fsfd_target::fd: {
++            __syscall_ret ret = __syscall(10, fd, statbuf);
++            if (ret.errno != 0)
++                return ret.errno;
++            return ret.ret;
++        }
++        case fsfd_target::path: {
++            __syscall_ret ret = __syscall(11, AT_FDCWD, path, statbuf, flags);
++            if (ret.errno != 0)
++                return ret.errno;
++            return ret.ret;
++        }
++        case fsfd_target::fd_path: {
++            __syscall_ret ret = __syscall(11, fd, path, statbuf, flags);
++            if (ret.errno != 0)
++                return ret.errno;
++            return ret.ret;
++        }
++        default: {
++            __ensure(!"stat: Invalid fsfdt");
++            __builtin_unreachable();
++        }
++    }
++    return 0;
++}
 +
 +int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) STUB_ONLY
 +

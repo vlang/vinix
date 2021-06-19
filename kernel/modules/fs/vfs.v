@@ -268,6 +268,36 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 	return u64(ret), errno.get()
 }
 
+pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
+					   flags int) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+
+	parent := get_parent_dir(dirfd, path) or {
+		return -1, -1
+	}
+
+	node := get_node(parent, path) or {
+		return -1, -1
+	}
+
+	unsafe { statbuf[0] = node.resource.stat }
+
+	return 0, 0
+}
+
+pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, -1
+	}
+	defer {
+		fd.unref()
+	}
+
+	unsafe { statbuf[0] = fd.handle.resource.stat }
+
+	return 0, 0
+}
+
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, -1
