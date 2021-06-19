@@ -81,8 +81,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			return
 		}
 		unsafe { current_thread.gpr_state = gpr_state[0] }
-		current_thread.user_gs = cpu.get_user_gs()
-		current_thread.user_fs = cpu.get_user_fs()
+		current_thread.gs_base = cpu.get_gs_base()
+		current_thread.fs_base = cpu.get_fs_base()
 		current_thread.cr3 = cpu.read_cr3()
 		katomic.store(current_thread.running_on, u64(-1))
 		current_thread.l.release()
@@ -100,8 +100,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu_local.last_run_queue_index = new_index
 	cpu_local.current_thread = current_thread
 
-	cpu.set_user_gs(current_thread.user_gs)
-	cpu.set_user_fs(current_thread.user_fs)
+	cpu.set_gs_base(current_thread.gs_base)
+	cpu.set_fs_base(current_thread.fs_base)
 
 	msr.wrmsr(0x175, current_thread.kernel_stack)
 	cpu_local.tss.ist2 = current_thread.kernel_stack

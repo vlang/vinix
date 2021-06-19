@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..05e4d27
+index 0000000..385351a
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,177 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -121,7 +121,10 @@ index 0000000..05e4d27
 +
 +void sys_exit(int status) STUB_ONLY
 +
-+int sys_tcb_set(void *pointer) STUB_ONLY
++int sys_tcb_set(void *pointer) {
++    __syscall(7, pointer);
++    return 0;
++}
 +
 +int sys_futex_wait(int *pointer, int expected) STUB_ONLY
 +int sys_futex_wake(int *pointer) STUB_ONLY

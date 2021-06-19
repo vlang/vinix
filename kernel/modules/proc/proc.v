@@ -25,8 +25,8 @@ pub mut:
 	l klock.Lock
 	process &Process
 	gpr_state cpulocal.GPRState
-	user_gs u64
-	user_fs u64
+	gs_base u64
+	fs_base u64
 	kernel_stack u64
 	pf_stack u64
 	cr3 u64

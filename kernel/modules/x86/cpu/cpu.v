@@ -2,20 +2,30 @@ module cpu
 
 import msr
 
-pub fn set_user_gs(ptr u64) {
+pub fn set_gs_base(ptr u64) {
 	msr.wrmsr(0xc0000101, ptr)
 }
 
-pub fn set_user_fs(ptr u64) {
+pub fn set_fs_base(ptr u64) {
 	msr.wrmsr(0xc0000100, ptr)
 }
 
-pub fn get_user_gs() u64 {
-	return msr.rdmsr(0xc0000102)
+pub fn get_gs_base() u64 {
+	return msr.rdmsr(0xc0000101)
 }
 
-pub fn get_user_fs() u64 {
+pub fn get_fs_base() u64 {
 	return msr.rdmsr(0xc0000100)
+}
+
+pub fn syscall_set_fs_base(_ voidptr, base voidptr) (u64, u64) {
+	set_fs_base(u64(base))
+	return 0, 0
+}
+
+pub fn syscall_set_gs_base(_ voidptr, base voidptr) (u64, u64) {
+	set_gs_base(u64(base))
+	return 0, 0
 }
 
 pub fn read_cr0() u64 {
