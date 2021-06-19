@@ -4,7 +4,7 @@ import x86.cpu.local as cpulocal
 
 [_naked]
 pub fn ud_entry(gpr_state &cpulocal.GPRState) {
-	asm amd64 {
+	asm volatile amd64 {
 		cld
 		sti
 
@@ -45,20 +45,17 @@ pub fn ud_entry(gpr_state &cpulocal.GPRState) {
 		pop r15
 		add rsp, 8
 		iretq
+		;;;memory
 	}
 }
 
 [_naked]
 fn sysenter_entry() {
-	asm amd64 {
+	asm volatile amd64 {
 		push 0x53
 		push 0
 		pushfq
-		// workaround
-		mov rax, rax
-		//push 0x4b
-		.byte 0x6a
-		.byte 0x4b
+		push 0x4b
 		push 0
 
 		cld
@@ -112,9 +109,7 @@ fn sysenter_entry() {
 		pop r14
 		pop r15
 
-		//rex.w sysexit
-		.byte 0x48
-		.byte 0x0f
-		.byte 0x35
+		rex.w sysexit
+		;;;memory
 	}
 }

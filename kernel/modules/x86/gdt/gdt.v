@@ -148,7 +148,7 @@ pub fn initialise() {
 
 pub fn reload() {
 	gdt_pointer = GDTPointer{
-		size: u16(sizeof(GDTPointer) * 13 - 1)
+		size: u16(sizeof(GDTEntry) * 13 - 1)
 		address: &gdt_entries
 	}
 
@@ -158,7 +158,7 @@ pub fn reload() {
 		push cseg
 		lea rax, [rip + 0x03]
 		push rax
-		.short 0xcb48 // V does not have REX.W + retf, this is the opcode.
+		retfq
 		pop rax
 		mov ds, dseg
 		mov es, dseg
