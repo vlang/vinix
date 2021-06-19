@@ -250,6 +250,17 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	return u64(ret), errno.get()
 }
 
+pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, -1
+	}
+	defer {
+		fd.unref()
+	}
+	ret := fd.handle.write(buf, count)
+	return u64(ret), errno.get()
+}
+
 pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 	file.fdnum_close(voidptr(0), fdnum) or {
 		return -1, -1

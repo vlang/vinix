@@ -6,7 +6,7 @@ __attribute__((used)) void *syscall_table[] = {
     memory__mmap__syscall_mmap,
     fs__syscall_openat,
     fs__syscall_read,
-    NULL,
+    fs__syscall_write,
     fs__syscall_seek,
     fs__syscall_close,
     x86__cpu__syscall_set_fs_base,

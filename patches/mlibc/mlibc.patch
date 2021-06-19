@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..d6b7d34
+index 0000000..7762dcf
 --- /dev/null
 +++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,262 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -198,7 +198,15 @@ index 0000000..d6b7d34
 +    return 0;
 +}
 +
-+int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) STUB_ONLY
++int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
++    __syscall_ret ret = __syscall(4, fd, buf, count);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *bytes_written = (ssize_t)ret.ret;
++    return 0;
++}
 +
 +int sys_vm_map(void *hint, size_t size, int prot, int flags,
 +               int fd, off_t offset, void **window) {

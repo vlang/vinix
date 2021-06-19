@@ -26,6 +26,18 @@ pub fn (mut this Handle) read(buf voidptr, count u64) i64 {
 	return ret
 }
 
+pub fn (mut this Handle) write(buf voidptr, count u64) i64 {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	ret := this.resource.write(buf, u64(this.loc), count)
+	if ret > 0 {
+		this.loc += ret
+	}
+	return ret
+}
+
 pub struct FD {
 pub mut:
 	handle &Handle
