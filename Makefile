@@ -22,7 +22,7 @@ run: vinix.iso
 .PHONY: distro
 distro:
 	mkdir -p build 3rdparty
-	docker build -t vinix_buildenv --build-arg=USER=$(id -u) docker
+	docker build -t vinix_buildenv --build-arg=USER=`id -u` docker
 	cp bootstrap-site.yml build/
 	$(MAKE) 3rdparty/v
 	$(MAKE) 3rdparty/vc
