@@ -21,52 +21,47 @@ run: vinix.iso
 
 .PHONY: distro
 distro:
-	mkdir -p build
-	export LC_ALL=C && cd build && xbstrap init .. && xbstrap install --all
+	mkdir -p build 3rdparty
+	docker build -t vinix_buildenv --build-arg=USER=$(id -u) docker
+	cp bootstrap-site.yml build/
+	$(MAKE) 3rdparty/v
+	$(MAKE) 3rdparty/vc
+	cd build && xbstrap init .. && xbstrap install --all
 
 3rdparty/limine:
 	mkdir -p 3rdparty
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
 	$(MAKE) -C 3rdparty/limine
 
-V_COMMIT  = 6171e12f9fb2603f2c9cb076f85808c257273453
-VC_COMMIT = aec0ac8a79285d9dae2fa104434e949cf4e48d71
-VC_BUILD_COMMAND = cc -g -std=gnu99 -w -o ./v ./vc/v.c -lm -lpthread
+V_COMMIT  = f32a76b268b91ab558b7fca6f1eb5c22bf0bbf9b
+VC_COMMIT = dee8a7660acfecb69d1aa539f7321dbfa0f8718f
 
-.PHONY: 3rdparty/v
 3rdparty/v:
-	mkdir -p 3rdparty
 	git clone https://github.com/vlang/v.git 3rdparty/v
 	cd 3rdparty/v && git checkout $(V_COMMIT)
 
-.PHONY: 3rdparty/v/vc
-3rdparty/v/vc:
-	git clone https://github.com/vlang/vc.git 3rdparty/v/vc
-	cd 3rdparty/v/vc && git checkout $(VC_COMMIT)
-	cd 3rdparty/v && $(VC_BUILD_COMMAND)
+3rdparty/vc:
+	git clone https://github.com/vlang/vc.git 3rdparty/vc
+	cd 3rdparty/vc && git checkout $(VC_COMMIT)
 
 .PHONY: update-v
 update-v:
-	[ -d 3rdparty/v ] || $(MAKE) 3rdparty/v
-	[ -d 3rdparty/v/vc ] || $(MAKE) 3rdparty/v/vc
-	cd 3rdparty/v && git checkout $(V_COMMIT) || ( \
+	cd 3rdparty/v && [ `git rev-parse HEAD` = $(V_COMMIT) ] || ( \
 		git checkout master && \
 		git pull && \
 		git checkout $(V_COMMIT) \
 	)
-	cd 3rdparty/v/vc && git checkout $(VC_COMMIT) || ( \
+	cd 3rdparty/vc && [ `git rev-parse HEAD` = $(VC_COMMIT) ] || ( \
 		git checkout master && \
 		git pull && \
 		git checkout $(VC_COMMIT) && \
-		cd .. && \
-		$(VC_BUILD_COMMAND) \
+		cd ../../build && \
+		xbstrap install-tool --reconfigure host-v \
 	)
 
 .PHONY: kernel/vinix.elf
 kernel/vinix.elf: update-v
-	export LC_ALL=C && $(MAKE) -C kernel V="`realpath ./3rdparty/v/v`" \
-		CC="`realpath ./build/tools/host-gcc/bin/x86_64-vinix-gcc`" \
-		OBJDUMP="`realpath ./build/tools/host-binutils/bin/x86_64-vinix-objdump`"
+	cd build && xbstrap install --rebuild kernel
 
 vinix.iso: 3rdparty/limine kernel/vinix.elf
 	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
@@ -88,4 +83,4 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf 3rdparty build ports initramfs.tar.gz pack
+	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap

@@ -1,13 +1,13 @@
 sources:
   - name: binutils
-    subdir: 'ports'
+    subdir: '3rdparty'
     url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.36.1.tar.xz'
     format: 'tar.xz'
     extract_path: 'binutils-2.36.1'
     patch-path-strip: 3
 
   - name: gcc
-    subdir: 'ports'
+    subdir: '3rdparty'
     url: 'https://ftp.gnu.org/gnu/gcc/gcc-11.1.0/gcc-11.1.0.tar.xz'
     format: 'tar.xz'
     extract_path: 'gcc-11.1.0'
@@ -27,7 +27,7 @@ sources:
         workdir: '@THIS_SOURCE_DIR@'
 
   - name: mlibc
-    subdir: 'ports'
+    subdir: '3rdparty'
     url: 'https://github.com/managarm/mlibc/archive/2.0.0.tar.gz'
     format: 'tar.gz'
     extract_path: 'mlibc-2.0.0'
@@ -37,7 +37,7 @@ tools:
   - name: host-autoconf-v2.69
     source:
       name: autoconf-v2.69
-      subdir: 'ports'
+      subdir: '3rdparty'
       url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.xz'
       format: 'tar.xz'
       extract_path: 'autoconf-2.69'
@@ -52,7 +52,7 @@ tools:
   - name: host-automake-v1.15
     source:
       name: automake-v1.15
-      subdir: 'ports'
+      subdir: '3rdparty'
       url: 'https://ftp.gnu.org/gnu/automake/automake-1.15.1.tar.xz'
       format: 'tar.xz'
       extract_path: 'automake-1.15.1'
@@ -65,6 +65,16 @@ tools:
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install']
+
+  - name: host-v
+    source:
+      name: vc
+      subdir: '3rdparty'
+    compile:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cd "@THIS_SOURCE_DIR@" && cc -std=gnu99 -w -o ../v/v ./v.c -lm'
 
   - name: host-binutils
     from_source: binutils
@@ -177,7 +187,7 @@ packages:
 
   - name: bash
     source:
-      subdir: 'ports'
+      subdir: '3rdparty'
       url: 'https://ftp.gnu.org/gnu/bash/bash-5.1.tar.gz'
       format: 'tar.gz'
       extract_path: 'bash-5.1'
@@ -195,3 +205,15 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
+
+  - name: kernel
+    source:
+      subdir: ''
+    tools_required:
+      - host-v
+      - host-gcc
+    build:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cd "@THIS_SOURCE_DIR@" && pwd && make V="@SOURCE_ROOT@/3rdparty/v/v" CC=x86_64-vinix-gcc OBJDUMP=x86_64-vinix-objdump'

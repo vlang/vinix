@@ -24,15 +24,15 @@ if [ "$3" = "--tool" ]; then
     IS_TOOL="-tool"
 fi
 
-[ -f ports/$1.tar.gz ] || [ -f ports/$1.tar.xz ] || (
+[ -f 3rdparty/$1.tar.gz ] || [ -f 3rdparty/$1.tar.xz ] || (
     cd build
     xbstrap install$IS_TOOL -u $PKG_NAME
 )
 
-[ -d ports/$1-workdir ] || (
-    mkdir ports/$1-workdir
-    tar -xf ports/$1.tar.* -C ports/$1-workdir --strip-components=1
-    cd ports/$1-workdir
+[ -d 3rdparty/$1-workdir ] || (
+    mkdir 3rdparty/$1-workdir
+    tar -xf 3rdparty/$1.tar.* -C 3rdparty/$1-workdir --strip-components=1
+    cd 3rdparty/$1-workdir
     [ ! -f "$BASE_DIR"/patches/$1/$1.patch ] && (
         mkdir -p "$BASE_DIR"/patches/$1
         touch "$BASE_DIR"/patches/$1/$1.patch
@@ -40,15 +40,15 @@ fi
     patch -p3 --no-backup-if-mismatch -r /dev/null < "$BASE_DIR"/patches/$1/$1.patch
 )
 
-[ -d ports/$1-orig ] || (
-    mkdir ports/$1-orig
-    tar -xf ports/$1.tar.* -C ports/$1-orig --strip-components=1
+[ -d 3rdparty/$1-orig ] || (
+    mkdir 3rdparty/$1-orig
+    tar -xf 3rdparty/$1.tar.* -C 3rdparty/$1-orig --strip-components=1
 )
 
-git diff --no-index ports/$1-orig ports/$1-workdir > patches/$1/$1.patch || true
+git diff --no-index 3rdparty/$1-orig 3rdparty/$1-workdir > patches/$1/$1.patch || true
 
-[ "$1" = "mlibc" ] && [ -d ports/mlibc ] && mv ports/mlibc/subprojects ./mlibc-subprojects
-rm -rf ports/$1
-[ "$1" = "mlibc" ] && mkdir ports/mlibc && mv ./mlibc-subprojects ports/mlibc/subprojects || true
+[ "$1" = "mlibc" ] && [ -d 3rdparty/mlibc ] && mv 3rdparty/mlibc/subprojects ./mlibc-subprojects
+rm -rf 3rdparty/$1
+[ "$1" = "mlibc" ] && mkdir 3rdparty/mlibc && mv ./mlibc-subprojects 3rdparty/mlibc/subprojects || true
 cd build
 xbstrap install$IS_TOOL -u $PKG_NAME

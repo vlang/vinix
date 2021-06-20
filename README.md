@@ -30,11 +30,43 @@ You can get a nightly continuously updated ISO of Vinix [here](https://github.co
 
 The following is an OS-agnostic list of packages needed to build Vinix. Skip to a paragraph for your host OS if there is any.
 
-`GNU make`, `GNU patch`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `wget`, `xorriso`, and `qemu` to test it.
+`docker`, `GNU make`, `GNU patch`, `git`, `gcc/clang`, `python3`, `pip3`, `xorriso`, and `qemu` to test it.
+
+### Docker
+
+It is necessary to have Docker installed and functional in order to build Vinix.
+Read [the Docker get started guide](https://docs.docker.com/get-started/) if
+you're new to it.
+
+Generally speaking, it needs to be possible to use `docker` without `sudo` or any
+other means, which usually involves adding your user to the `docker` group on
+most Linux distros.
+
+If Docker is correctly installed, running:
+```bash
+docker run hello-world
+```
+should contain the following output:
+```bash
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+```
+
+Ensure Docker works before moving onto the next steps.
+
+### Build prerequisites for Ubuntu, Debian, and derivatives
+
+```bash
+sudo apt install build-essential git python3 python3-pip xorriso qemu-system-x86
+```
+
+### Build prerequisites for Arch Linux and derivatives
+
+```bash
+sudo pacman -S base-devel git python python-pip xorriso qemu-arch-extra
+```
 
 ### Build prerequisites for macOS
-
-These are the step-by-step instructions to build Vinix on macOS:
 
 First of all, it is necessary to have `brew` installed:
 ```bash
@@ -43,14 +75,7 @@ First of all, it is necessary to have `brew` installed:
 
 After `brew` is installed, install the required dependencies:
 ```bash
-brew install meson wget gpatch xorriso coreutils qemu
-```
-
-### Build prerequisites for Ubuntu, Debian, and derivatives
-
-For Ubuntu or Debian based distros, install the prerequisites with:
-```bash
-sudo apt install build-essential git meson m4 texinfo python3 python3-pip wget xorriso qemu-system-x86
+brew install gpatch xorriso qemu
 ```
 
 ### Installing xbstrap
@@ -63,12 +88,14 @@ sudo pip3 install xbstrap
 
 ### Building the distro
 
-To build the distro which includes the cross toolchain necessary
-to build kernel and ports, run:
+To build the distro, which includes the cross toolchain necessary to build kernel
+and ports, run:
 
 ```bash
 make distro
 ```
+
+This step may take a long while.
 
 ### Building the kernel and image
 
