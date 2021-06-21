@@ -69,7 +69,7 @@ fn madt_init() {
 	madt_nmis = []&MADTNMI{}
 
 	madt := &MADT(find_sdt('APIC', 0) or {
-		return
+		panic('System does not have a MADT')
 	})
 
 	mut current := u64(0)
