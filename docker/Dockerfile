@@ -1,4 +1,4 @@
-FROM ubuntu:20.04 AS base
+FROM amd64/ubuntu:20.04 AS base
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install \
     build-essential git curl meson m4 texinfo python3 python3-pip
