@@ -1,4 +1,4 @@
-module acpi
+[manualfree] module acpi
 
 pub struct SDT {
 	signature        [4]byte

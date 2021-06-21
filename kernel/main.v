@@ -1,3 +1,5 @@
+[manualfree] module main
+
 import lib
 import memory
 import stivale2

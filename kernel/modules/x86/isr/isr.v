@@ -1,4 +1,4 @@
-module isr
+[manualfree] module isr
 
 import idt
 import event

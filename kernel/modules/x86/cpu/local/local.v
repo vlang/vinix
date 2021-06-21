@@ -1,4 +1,4 @@
-module local
+[manualfree] module local
 
 import cpu
 

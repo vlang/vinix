@@ -1,4 +1,4 @@
-module fs
+[manualfree] module fs
 
 import stat
 import klock

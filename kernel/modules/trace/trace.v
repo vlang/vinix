@@ -1,4 +1,4 @@
-module trace
+[manualfree] module trace
 
 pub fn address(addr u64) (u64, Symbol) {
 	mut prev_sym := Symbol{}

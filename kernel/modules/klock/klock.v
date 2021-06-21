@@ -1,4 +1,4 @@
-module klock
+[manualfree] module klock
 
 import katomic
 import trace

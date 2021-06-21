@@ -1,4 +1,4 @@
-module lib
+[manualfree] module lib
 
 pub fn div_roundup<T>(a T, b T) T {
 	return (a + (b - 1)) / b

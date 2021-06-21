@@ -1,4 +1,4 @@
-module smp
+[manualfree] module smp
 
 import stivale2
 import memory

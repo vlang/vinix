@@ -1,4 +1,4 @@
-module mmap
+[manualfree] module mmap
 
 import memory
 import resource

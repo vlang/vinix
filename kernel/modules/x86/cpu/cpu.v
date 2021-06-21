@@ -1,4 +1,4 @@
-module cpu
+[manualfree] module cpu
 
 import msr
 

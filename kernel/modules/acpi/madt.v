@@ -1,4 +1,4 @@
-module acpi
+[manualfree] module acpi
 
 [packed]
 struct MADT {

@@ -1,4 +1,4 @@
-module stat
+[manualfree] module stat
 
 struct TimeSpec {
 pub mut:

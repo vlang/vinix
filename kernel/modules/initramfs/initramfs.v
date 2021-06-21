@@ -1,4 +1,4 @@
-module initramfs
+[manualfree] module initramfs
 
 import lib
 import stivale2

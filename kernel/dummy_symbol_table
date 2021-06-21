@@ -1,4 +1,4 @@
-module trace
+[manualfree] module trace
 
 struct Symbol {
 	address u64

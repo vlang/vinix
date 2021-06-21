@@ -1,4 +1,4 @@
-module elf
+[manualfree] module elf
 
 import lib
 import memory

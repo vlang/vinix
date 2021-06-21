@@ -1,4 +1,4 @@
-module lib
+[manualfree] module lib
 
 import trace
 

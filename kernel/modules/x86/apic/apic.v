@@ -1,4 +1,4 @@
-module apic
+[manualfree] module apic
 
 import kio
 import msr

@@ -1,4 +1,4 @@
-module file
+[manualfree] module file
 
 import resource
 import proc

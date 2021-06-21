@@ -1,4 +1,4 @@
-module event
+[manualfree] module event
 
 import klock
 import proc

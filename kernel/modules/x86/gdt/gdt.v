@@ -1,4 +1,4 @@
-module gdt
+[manualfree] module gdt
 
 import klock
 

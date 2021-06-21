@@ -1,4 +1,4 @@
-module memory
+[manualfree] module memory
 
 import lib
 import stivale2
