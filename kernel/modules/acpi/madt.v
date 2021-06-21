@@ -68,7 +68,10 @@ fn madt_init() {
 	madt_isos = []&MADTISO{}
 	madt_nmis = []&MADTNMI{}
 
-	madt := &MADT(find_sdt('APIC', 0))
+	madt := &MADT(find_sdt('APIC', 0) or {
+		return
+	})
+
 	mut current := u64(0)
 
 	for {

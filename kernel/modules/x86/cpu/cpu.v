@@ -195,9 +195,19 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 }
 
 pub fn set_id(id u64) {
-	msr.wrmsr(0xc0000103, id)
+	success, _, _, _, d := cpuid(1, 0)
+	if success == false || d & (1 << 27) == 0 {
+		return
+	} else {
+		msr.wrmsr(0xc0000103, id)
+	}
 }
 
 pub fn get_id() u64 {
-	return msr.rdmsr(0xc0000103)
+	success, _, _, _, d := cpuid(1, 0)
+	if success == false || d & (1 << 27) == 0 {
+		return 0
+	} else {
+		return msr.rdmsr(0xc0000103)
+	}
 }

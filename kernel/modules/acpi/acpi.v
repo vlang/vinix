@@ -59,18 +59,19 @@ pub fn init(rsdp_ptr &RSDP) {
 	println('acpi: R/XSDT at: 0x${voidptr(rsdt):x}')
 
 	// We won't support HW reduced ACPI systems
-	fadt := find_sdt('FACP', 0)
-	if fadt != 0 && &SDT(fadt).length >= 116 {
-		fadt_flags := unsafe { (&u32(fadt))[28] }
-		if fadt_flags & (1 << 20) != 0 {
-			panic('acpi: OS does not support HW reduced ACPI systems.')
+	if fadt := find_sdt('FACP', 0) {
+		if &SDT(fadt).length >= 116 {
+			fadt_flags := unsafe { (&u32(fadt))[28] }
+			if fadt_flags & (1 << 20) != 0 {
+				panic('acpi: OS does not support HW reduced ACPI systems.')
+			}
 		}
 	}
 
 	madt_init()
 }
 
-pub fn find_sdt(signature string, index int) voidptr {
+pub fn find_sdt(signature string, index int) ?voidptr {
 	mut count := 0
 
 	entry_count := (rsdt.header.length - sizeof(SDT)) / u32(if use_xsdt() { 8 } else { 4 })
@@ -91,6 +92,5 @@ pub fn find_sdt(signature string, index int) voidptr {
 		}
 	}
 
-	println('acpi: "${signature}" not found')
-	return 0
+	return error('acpi: "${signature}" not found')
 }
