@@ -1,5 +1,0 @@
-container:
-    runtime: docker
-    image: vinix_buildenv
-    src_mount: /var/vinix_repo
-    build_mount: /var/vinix_build
