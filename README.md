@@ -30,11 +30,9 @@ You can get a nightly continuously updated ISO of Vinix [here](https://github.co
 
 The following is an OS-agnostic list of packages needed to build Vinix. Skip to a paragraph for your host OS if there is any.
 
-`GNU make`, `GNU patch`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `wget`, `xorriso`, and `qemu` to test it.
+`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `wget`, `xorriso`, and `qemu` to test it.
 
 ### Build prerequisites for macOS
-
-These are the step-by-step instructions to build Vinix on macOS:
 
 First of all, it is necessary to have `brew` installed:
 ```bash
@@ -43,20 +41,22 @@ First of all, it is necessary to have `brew` installed:
 
 After `brew` is installed, install the required dependencies:
 ```bash
-brew install meson wget gpatch xorriso coreutils qemu
+brew install meson wget gpatch gnu-tar gzip coreutils xorriso qemu
 ```
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
-
-For Ubuntu or Debian based distros, install the prerequisites with:
 ```bash
 sudo apt install build-essential git meson m4 texinfo python3 python3-pip wget xorriso qemu-system-x86
 ```
 
+### Build prerequisites for Arch Linux and derivatives
+```bash
+sudo pacman -S base-devel git meson python python-pip wget xorriso qemu-arch-extra
+```
+
 ### Installing xbstrap
 
-It is necessary to fetch `xbstrap` from `pip3`.
-
+It is necessary to fetch `xbstrap` from `pip3`:
 ```bash
 sudo pip3 install xbstrap
 ```
@@ -69,6 +69,8 @@ to build kernel and ports, run:
 ```bash
 make distro
 ```
+
+This step will take a while.
 
 ### Building the kernel and image
 
