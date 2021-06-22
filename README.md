@@ -32,18 +32,6 @@ The following is an OS-agnostic list of packages needed to build Vinix. Skip to 
 
 `GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `python3`, `pip3`, `wget`, `xorriso`, and `qemu` to test it.
 
-### Build prerequisites for macOS
-
-First of all, it is necessary to have `brew` installed:
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-After `brew` is installed, install the required dependencies:
-```bash
-brew install meson wget gpatch gnu-tar gzip coreutils xorriso qemu
-```
-
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
 sudo apt install build-essential git meson m4 texinfo python3 python3-pip wget xorriso qemu-system-x86
@@ -53,6 +41,11 @@ sudo apt install build-essential git meson m4 texinfo python3 python3-pip wget x
 ```bash
 sudo pacman -S base-devel git meson python python-pip wget xorriso qemu-arch-extra
 ```
+
+### Building Vinix on macOS
+
+This build system does not officially support macOS. Run this in an x86_64 Linux VM
+or real hardware.
 
 ### Installing xbstrap
 
