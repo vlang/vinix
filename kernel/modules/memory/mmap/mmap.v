@@ -55,25 +55,107 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	return error('')
 }
 
-pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) {
+pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
+	mut old_pagemap := unsafe { _old_pagemap }
+	mut new_pagemap := memory.new_pagemap()
+
+	old_pagemap.l.acquire()
+	defer {
+		old_pagemap.l.release()
+	}
+
+	for ptr in old_pagemap.mmap_ranges {
+		local_range := &MmapRangeLocal(ptr)
+		mut global_range := local_range.global
+
+		mut new_local_range := &MmapRangeLocal{pagemap: voidptr(0),
+											   global: voidptr(0)}
+		unsafe { new_local_range[0] = local_range[0] }
+
+		if voidptr(global_range.resource) != voidptr(0) {
+			global_range.resource.refcount++
+		}
+
+		if local_range.flags & map_shared != 0{
+			new_local_range.global = global_range
+			global_range.locals << new_local_range
+			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
+				old_pte := old_pagemap.virt2pte(i, false) or {
+					continue
+				}
+				new_pte := new_pagemap.virt2pte(i, true) or {
+					return none
+				}
+				unsafe { new_pte[0] = old_pte[0] }
+			}
+		} else {
+			mut new_global_range := &MmapRangeGlobal{resource: voidptr(0)}
+
+			new_global_range.resource = global_range.resource
+			new_global_range.base = global_range.base
+			new_global_range.length = global_range.length
+			new_global_range.offset = global_range.offset
+
+			new_global_range.locals << new_local_range
+
+			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+
+			if local_range.flags & map_anonymous != 0 {
+				for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
+					old_pte := old_pagemap.virt2pte(i, false) or {
+						continue
+					}
+					new_pte := new_pagemap.virt2pte(i, true) or {
+						return none
+					}
+					new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or {
+						return none
+					}
+					page := memory.pmm_alloc(1)
+					unsafe {
+						C.memcpy(
+							voidptr(u64(page) + higher_half),
+							voidptr((old_pte[0] & ~(u64(0xfff))) + higher_half),
+							page_size
+						)
+						new_pte[0] = (old_pte[0] & u64(0xfff)) | u64(page)
+						new_spte[0] = new_pte[0]
+					}
+				}
+			} else {
+				panic('non anon fork')
+			}
+		}
+
+		new_pagemap.mmap_ranges << voidptr(new_local_range)
+	}
+
+	return &new_pagemap
+}
+
+pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {
 	mut g := unsafe { _g }
 
 	pt_flags := pte_present | pte_user
 		| if prot & prot_write != 0 { pte_writable } else { 0 }
 
-	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags)
+	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
+		return error('')
+	}
 
 	for i := u64(0); i < g.locals.len; i++ {
 		mut l := g.locals[i]
 		if virt_addr < l.base || virt_addr >= l.base + l.length {
 			continue
 		}
-		l.pagemap.map_page(virt_addr, phys_addr, pt_flags)
+		l.pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
+			return error('')
+		}
 	}
 }
 
 pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
-				  length u64, prot int, _flags int) {
+				  length u64, prot int, _flags int) ? {
 	mut pagemap  := unsafe { _pagemap }
 	flags := _flags | map_anonymous
 
@@ -100,12 +182,17 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 	pagemap.l.release()
 
 	for i := u64(0); i < length; i += page_size {
-		map_page_in_range(range_global, virt_addr + i, phys_addr + i, prot)
+		map_page_in_range(range_global, virt_addr + i, phys_addr + i, prot) or {
+			return error('')
+		}
 	}
 }
 
-pub fn pf_handler(gpr_state &cpulocal.GPRState) bool {
+pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	asm volatile amd64 { sti }
+	defer {
+		asm volatile amd64 { cli }
+	}
 
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -114,25 +201,23 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) bool {
 	addr := cpu.read_cr2()
 
 	pagemap.l.acquire()
-
-	range_local, memory_page, _ := addr2range(pagemap, addr) or {
+	defer {
 		pagemap.l.release()
-		asm volatile amd64 { cli }
-		return false
 	}
 
-	pagemap.l.release()
+	range_local, memory_page, _ := addr2range(pagemap, addr) or {
+		return error('')
+	}
 
 	if range_local.flags & map_anonymous != 0 {
 		page := memory.pmm_alloc(1)
 		map_page_in_range(range_local.global, memory_page * page_size, u64(page),
-						  range_local.prot)
+						  range_local.prot) or {
+			return error('')
+		}
 	} else {
 		panic('Non anon mmap not supported yet')
 	}
-
-	asm volatile amd64 { cli }
-	return true
 }
 
 pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,

@@ -8,6 +8,7 @@ pub const max_fds = 256
 
 pub struct Process {
 pub mut:
+	ppid int
 	pagemap memory.Pagemap
 	thread_stack_top u64
 	threads []&Thread

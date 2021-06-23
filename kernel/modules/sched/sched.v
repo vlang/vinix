@@ -10,6 +10,7 @@ import proc
 import memory
 import memory.mmap
 import elf
+import file
 
 const max_running_threads = int(512)
 
@@ -251,7 +252,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 pub fn new_user_thread(_process &proc.Process, want_elf bool,
 					   pc voidptr, arg voidptr,
 					   argv []string, envp []string, auxval &elf.Auxval,
-					   autoenqueue bool) &proc.Thread {
+					   autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 
 	stack_size := u64(65536)
@@ -266,7 +267,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 
 	mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys),
 				   stack_size, mmap.prot_read | mmap.prot_write,
-				   mmap.map_anonymous)
+				   mmap.map_anonymous) or {
+		return none
+	}
 
 	kernel_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
 
@@ -365,18 +368,38 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 	return thread
 }
 
-pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) &proc.Process {
-	if old_process != 0 {
-		panic('old_process')
-	}
+pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
+	mut new_process := &proc.Process{}
 
-	new_process := &proc.Process{
-		pagemap: pagemap
-		threads: []&proc.Thread{}
-		children: []&proc.Process{}
-		thread_stack_top: u64(0x70000000000)
-		mmap_anon_non_fixed_base: u64(0x80000000000)
-		current_directory: voidptr(vfs_root)
+	if old_process != 0 {
+		new_process.ppid = old_process.ppid
+		new_process.pagemap = mmap.fork_pagemap(old_process.pagemap) or {
+			return none
+		}
+		new_process.threads = []&proc.Thread{}
+		new_process.children = []&proc.Process{}
+		new_process.thread_stack_top = old_process.thread_stack_top
+		new_process.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
+		new_process.current_directory = old_process.current_directory
+		for i := 0; i < proc.max_fds; i++ {
+			if old_process.fds[i] == voidptr(0) {
+				new_process.fds[i] = voidptr(0)
+				continue
+			}
+			old_fd := &file.FD(old_process.fds[i])
+			mut new_fd := &file.FD{handle: voidptr(0)}
+			unsafe { new_fd[0] = old_fd[0] }
+			new_fd.handle.refcount++
+			new_process.fds[i] = new_fd
+		}
+	} else {
+		new_process.ppid = 0
+		new_process.pagemap = pagemap
+		new_process.threads = []&proc.Thread{}
+		new_process.children = []&proc.Process{}
+		new_process.thread_stack_top = u64(0x70000000000)
+		new_process.mmap_anon_non_fixed_base = u64(0x80000000000)
+		new_process.current_directory = voidptr(vfs_root)
 	}
 
 	return new_process

@@ -65,7 +65,7 @@ fn ud_handler(num u32, _gpr_state &cpulocal.GPRState) {
 }
 
 fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
-	if mmap.pf_handler(gpr_state) == false {
+	mmap.pf_handler(gpr_state) or {
 		exception_handler(num, gpr_state)
 	}
 }

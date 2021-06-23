@@ -30,6 +30,26 @@ pub fn new_pagemap() Pagemap {
 	return Pagemap{top_level: top_level, mmap_ranges: []voidptr{}}
 }
 
+pub fn (mut pagemap Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
+	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
+	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
+	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
+	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
+
+	pml4 := pagemap.top_level
+	pml3 := get_next_level(pml4, pml4_entry, allocate) or {
+		return none
+	}
+	pml2 := get_next_level(pml3, pml3_entry, allocate) or {
+		return none
+	}
+	pml1 := get_next_level(pml2, pml2_entry, allocate) or {
+		return none
+	}
+
+	return unsafe { &pml1[pml1_entry] }
+}
+
 pub fn (mut pagemap Pagemap) switch_to() {
 	top_level := pagemap.top_level
 
@@ -40,7 +60,7 @@ pub fn (mut pagemap Pagemap) switch_to() {
 	}
 }
 
-fn get_next_level(current_level &u64, index u64) &u64 {
+fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 	mut ret := &u64(0)
 
 	unsafe {
@@ -51,10 +71,14 @@ fn get_next_level(current_level &u64, index u64) &u64 {
 			// If present, return pointer to it
 			ret = &u64(entry[0] & ~u64(0xfff))
 		} else {
+			if allocate == false {
+				return none
+			}
+
 			// Else, allocate the page table
 			ret = pmm_alloc(1)
 			if ret == 0 {
-				return 0
+				return none
 			}
 			entry[0] = u64(ret) | 0b111
 		}
@@ -62,8 +86,11 @@ fn get_next_level(current_level &u64, index u64) &u64 {
 	return ret
 }
 
-pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) {
+pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	pagemap.l.acquire()
+	defer {
+		pagemap.l.release()
+	}
 
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
@@ -71,16 +98,20 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) {
 	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
 	pml4 := pagemap.top_level
-	pml3 := get_next_level(pml4, pml4_entry)
-	pml2 := get_next_level(pml3, pml3_entry)
-	mut pml1 := get_next_level(pml2, pml2_entry)
+	pml3 := get_next_level(pml4, pml4_entry, true) or {
+		return error('')
+	}
+	pml2 := get_next_level(pml3, pml3_entry, true) or {
+		return error('')
+	}
+	mut pml1 := get_next_level(pml2, pml2_entry, true) or {
+		return error('')
+	}
 
 	unsafe {
 		entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)
 		entry[0] = phys | flags
 	}
-
-	pagemap.l.release()
 }
 
 pub fn vmm_init(memmap &stivale2.MemmapTag) {
@@ -94,15 +125,23 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 	// shared.
 	for i := u64(256); i < 512; i++ {
 		// get_next_level will allocate the PML3s for us.
-		get_next_level(kernel_pagemap.top_level, i)
+		get_next_level(kernel_pagemap.top_level, i, true) or {
+			panic('pmm init failure')
+		}
 	}
 
 	for i := u64(0x1000); i < 0x100000000; i += page_size {
-		kernel_pagemap.map_page(i, i, 0x03)
-		kernel_pagemap.map_page(i + higher_half, i, 0x03)
+		kernel_pagemap.map_page(i, i, 0x03) or {
+			panic('pmm init failure')
+		}
+		kernel_pagemap.map_page(i + higher_half, i, 0x03) or {
+			panic('pmm init failure')
+		}
 	}
 	for i := u64(0); i < 0x80000000; i += page_size {
-		kernel_pagemap.map_page(i + u64(0xffffffff80000000), i, 0x03)
+		kernel_pagemap.map_page(i + u64(0xffffffff80000000), i, 0x03) or {
+			panic('pmm init failure')
+		}
 	}
 	entries := &memmap.entries
 	for i := 0; i < memmap.entry_count; i++ {
@@ -115,8 +154,12 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 			if j < u64(0x100000000) {
 				continue
 			}
-			kernel_pagemap.map_page(j, j, 0x03)
-			kernel_pagemap.map_page(j + higher_half, j, 0x03)
+			kernel_pagemap.map_page(j, j, 0x03) or {
+				panic('pmm init failure')
+			}
+			kernel_pagemap.map_page(j + higher_half, j, 0x03) or {
+				panic('pmm init failure')
+			}
 		}
 	}
 

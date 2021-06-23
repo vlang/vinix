@@ -6,6 +6,14 @@ import elf
 import sched
 import file
 import proc
+import x86.cpu.local as cpulocal
+
+pub fn syscall_fork(context &cpulocal.GPRState) {
+	old_process := proc.current_thread().process
+	new_process := sched.new_process(old_process, voidptr(0)) or {
+		panic('fork failure')
+	}
+}
 
 pub fn start_program(execve bool, path string, argv []string, envp []string,
 					 stdin string, stdout string, stderr string) ?&proc.Process {
@@ -40,7 +48,9 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 	mut new_process := &proc.Process(0)
 
 	if execve == false {
-		new_process = sched.new_process(voidptr(0), new_pagemap)
+		new_process = sched.new_process(voidptr(0), new_pagemap) or {
+			return none
+		}
 
 		stdin_node := fs.get_node(vfs_root, stdin) or {
 			return error('stdin not found')
@@ -71,7 +81,9 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 
 		sched.new_user_thread(new_process, true,
 							  entry_point, voidptr(0),
-							  argv, envp, auxval, true)
+							  argv, envp, auxval, true) or {
+			return none
+		}
 	} else {
 		panic('TODO: execve')
 	}
