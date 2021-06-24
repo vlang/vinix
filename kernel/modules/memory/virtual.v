@@ -24,8 +24,10 @@ pub fn new_pagemap() Pagemap {
 		panic('new_pagemap() allocation failure')
 	}
 	// Import higher half from kernel pagemap
+	mut p1 := &u64(u64(top_level) + higher_half)
+	p2 := &u64(u64(kernel_pagemap.top_level) + higher_half)
 	for i := u64(256); i < 512; i++ {
-		unsafe { top_level[i] = kernel_pagemap.top_level[i] }
+		unsafe { p1[i] = p2[i] }
 	}
 	return Pagemap{top_level: top_level, mmap_ranges: []voidptr{}}
 }
@@ -47,7 +49,7 @@ pub fn (mut pagemap Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 		return none
 	}
 
-	return unsafe { &pml1[pml1_entry] }
+	return unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {

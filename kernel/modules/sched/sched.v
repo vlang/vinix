@@ -231,7 +231,8 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		rflags: 0x202
 		rip: u64(pc)
 		rdi: u64(arg)
-		rsp: unsafe { u64(&stack[0]) + u64(stack_size - 8) }
+		rbp: u64(0)
+		rsp: unsafe { u64(&stack[stack_size - 1]) }
 	}
 
 	thread := &proc.Thread{
@@ -371,13 +372,18 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
 	mut new_process := &proc.Process{}
 
+	new_process.pid = proc.allocate_pid(new_process) or {
+		return none
+	}
+
+	new_process.threads = []&proc.Thread{}
+	new_process.children = []&proc.Process{}
+
 	if old_process != 0 {
-		new_process.ppid = old_process.ppid
+		new_process.ppid = old_process.pid
 		new_process.pagemap = mmap.fork_pagemap(old_process.pagemap) or {
 			return none
 		}
-		new_process.threads = []&proc.Thread{}
-		new_process.children = []&proc.Process{}
 		new_process.thread_stack_top = old_process.thread_stack_top
 		new_process.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_process.current_directory = old_process.current_directory
@@ -395,8 +401,6 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	} else {
 		new_process.ppid = 0
 		new_process.pagemap = pagemap
-		new_process.threads = []&proc.Thread{}
-		new_process.children = []&proc.Process{}
 		new_process.thread_stack_top = u64(0x70000000000)
 		new_process.mmap_anon_non_fixed_base = u64(0x80000000000)
 		new_process.current_directory = voidptr(vfs_root)

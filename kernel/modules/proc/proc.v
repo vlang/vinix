@@ -3,11 +3,13 @@
 import klock
 import x86.cpu.local as cpulocal
 import memory
+import katomic
 
 pub const max_fds = 256
 
 pub struct Process {
 pub mut:
+	pid int
 	ppid int
 	pagemap memory.Pagemap
 	thread_stack_top u64
@@ -51,4 +53,21 @@ pub fn current_thread() &Thread {
 		asm volatile amd64 { sti }
 	}
 	return ret
+}
+
+__global (
+	processes [65536]&Process
+)
+
+pub fn allocate_pid(process &Process) ?int {
+	for i := int(1); i < 65536; i++ {
+		if katomic.cas(voidptr(&processes[i]), u64(0), u64(process)) {
+			return i
+		}
+	}
+	return none
+}
+
+pub fn free_pid(pid int) {
+	katomic.store(voidptr(&processes[pid]), u64(0))
 }

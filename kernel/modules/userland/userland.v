@@ -8,11 +8,37 @@ import file
 import proc
 import x86.cpu.local as cpulocal
 
-pub fn syscall_fork(context &cpulocal.GPRState) {
-	old_process := proc.current_thread().process
-	new_process := sched.new_process(old_process, voidptr(0)) or {
+pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
+	old_thread := proc.current_thread()
+	mut old_process := old_thread.process
+
+	mut new_process := sched.new_process(old_process, voidptr(0)) or {
 		panic('fork failure')
 	}
+
+	stack_size := u64(65536)
+
+	mut new_thread := &proc.Thread{
+		gpr_state: gpr_state
+		process: new_process
+		timeslice: old_thread.timeslice
+		gs_base: old_thread.gs_base
+		fs_base: old_thread.fs_base
+		kernel_stack: u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+		pf_stack: u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+		running_on: u64(-1)
+		cr3: u64(new_process.pagemap.top_level)
+	}
+
+	new_thread.gpr_state.rax = u64(0)
+	new_thread.gpr_state.r8 = u64(0)
+
+	old_process.children << new_process
+	new_process.threads << new_thread
+
+	sched.enqueue_thread(new_thread)
+
+	return u64(new_process.pid), u64(0)
 }
 
 pub fn start_program(execve bool, path string, argv []string, envp []string,

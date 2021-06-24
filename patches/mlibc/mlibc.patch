@@ -1,7 +1,7 @@
-diff --git a/ports/mlibc-orig/meson.build b/ports/mlibc-workdir/meson.build
+diff --git a/3rdparty/mlibc-orig/meson.build b/3rdparty/mlibc-workdir/meson.build
 index b781895..0b40b32 100644
---- a/ports/mlibc-orig/meson.build
-+++ b/ports/mlibc-workdir/meson.build
+--- a/3rdparty/mlibc-orig/meson.build
++++ b/3rdparty/mlibc-workdir/meson.build
 @@ -44,7 +44,7 @@ if not headers_only
  	c_compiler = meson.get_compiler('c')
  
@@ -22,11 +22,11 @@ index b781895..0b40b32 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/ports/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..0a0a4a0
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 @@ -0,0 +1,7 @@
 +
 +.section .text
@@ -35,11 +35,11 @@ index 0000000..0a0a4a0
 +    mov $main, %rdi
 +    call __mlibc_entry
 +
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
 index 0000000..ee7a794
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 @@ -0,0 +1,34 @@
 +
 +#include <stdint.h>
@@ -75,12 +75,12 @@ index 0000000..ee7a794
 +	exit(result);
 +}
 +
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..15da48e
+index 0000000..b646cb4
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,298 @@
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
+@@ -0,0 +1,307 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -327,7 +327,16 @@ index 0000000..15da48e
 +
 +int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) STUB_ONLY
 +
-+int sys_fork(pid_t *child) STUB_ONLY
++int sys_fork(pid_t *child) {
++    __syscall_ret ret = __syscall(14);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *child = (pid_t)ret.ret;
++    return 0;
++}
 +
 +int sys_execve(const char *path, char *const argv[], char *const envp[]) STUB_ONLY
 +
@@ -379,195 +388,195 @@ index 0000000..15da48e
 +int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) STUB_ONLY
 +
 +} // namespace mlibc
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h
 new file mode 120000
 index 0000000..c945860
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/abi.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h
 new file mode 120000
 index 0000000..b7bb109
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h
 @@ -0,0 +1 @@
 +../../../../abis/qword/auxv.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h
 new file mode 120000
 index 0000000..e9d9f1b
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/blkcnt_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h
 new file mode 120000
 index 0000000..c6dfb6e
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/blksize_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h
 new file mode 120000
 index 0000000..0c1143b
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/dev_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h
 new file mode 120000
 index 0000000..589859f
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/errno.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h
 new file mode 120000
 index 0000000..ea5323a
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/fcntl.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h
 new file mode 120000
 index 0000000..6a77218
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/gid_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h
 new file mode 120000
 index 0000000..b58c683
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/in.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h
 new file mode 120000
 index 0000000..10d644e
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/ino_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
 new file mode 120000
 index 0000000..29d7733
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/mode_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h
 new file mode 120000
 index 0000000..7618c27
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/nlink_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h
 new file mode 120000
 index 0000000..3fd26a7
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/pid_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h
 new file mode 120000
 index 0000000..ecc3ddb
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/x86_64/reboot.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h
 new file mode 120000
 index 0000000..3e59c75
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/resource.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h
 new file mode 120000
 index 0000000..3bd41ef
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/seek-whence.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/signal.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/signal.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/signal.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/signal.h
 new file mode 120000
 index 0000000..b20e511
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/signal.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/signal.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/signal.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h
 new file mode 120000
 index 0000000..0e1d6be
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/socket.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h
 new file mode 120000
 index 0000000..82642c3
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/stat.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h
 new file mode 120000
 index 0000000..cfcfe76
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/termios.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h
 new file mode 120000
 index 0000000..97f3d52
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/time.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h
 new file mode 120000
 index 0000000..1113eba
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/uid_t.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h
 new file mode 120000
 index 0000000..f1a985e
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/vm-flags.h
 \ No newline at end of file
-diff --git a/ports/mlibc-workdir/sysdeps/vinix/meson.build b/ports/mlibc-workdir/sysdeps/vinix/meson.build
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build b/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build
 new file mode 100644
 index 0000000..0169278
 --- /dev/null
-+++ b/ports/mlibc-workdir/sysdeps/vinix/meson.build
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build
 @@ -0,0 +1,49 @@
 +
 +rtdl_sources += files(

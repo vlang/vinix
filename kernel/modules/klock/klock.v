@@ -9,15 +9,10 @@ pub mut:
 	caller u64
 }
 
+fn C.__builtin_return_address(int)
+
 pub fn (mut l Lock) acquire() {
-	mut base_ptr := &u64(0)
-
-	asm volatile amd64 {
-		mov base_ptr, rbp
-		; =r (base_ptr)
-	}
-
-	caller := unsafe { base_ptr[1] }
+	caller := u64(C.__builtin_return_address(0))
 
 	for {
 		for i := u64(0); i < u64(100000000); i++ {
@@ -28,9 +23,9 @@ pub fn (mut l Lock) acquire() {
 			asm volatile amd64 { pause ;;; memory }
 		}
 		C.printf(c'POTENTIAL DEADLOCK!!!\n')
-		C.printf(c'Lock address:     0x%llx\n', voidptr(l))
-		C.printf(c'Current caller:') trace.address_print(caller)
-		C.printf(c'Last caller:   ') trace.address_print(l.caller)
+		C.printf(c'Lock address:   0x%llx\n', voidptr(l))
+		C.printf(c'Current caller: 0x%llx\n', caller)
+		C.printf(c'Last caller:    0x%llx\n', l.caller)
 		trace.stacktrace(voidptr(0))
 	}
 }
@@ -40,14 +35,7 @@ pub fn (mut l Lock) release() {
 }
 
 pub fn (mut l Lock) test_and_acquire() bool {
-	mut base_ptr := &u64(0)
-
-	asm volatile amd64 {
-		mov base_ptr, rbp
-		; =r (base_ptr)
-	}
-
-	caller := unsafe { base_ptr[1] }
+	caller := u64(C.__builtin_return_address(0))
 
 	ret := katomic.cas(l.l, false, true)
 	if ret == true {

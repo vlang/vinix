@@ -1,6 +1,5 @@
 KERNEL := vinix.elf
 
-OBJDUMP = objdump
 CC = cc
 V = v
 
@@ -45,21 +44,13 @@ all: $(KERNEL)
 
 .PHONY:
 clean:
-	rm -rf $(KERNEL) blob modules/trace/symbol.v
+	rm -rf $(KERNEL) blob
 
-$(KERNEL):
-	cp dummy_symbol_table modules/trace/symbol.v
-	$(MAKE) blob
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@
-	./gensyms.sh $(OBJDUMP) $@ > modules/trace/symbol.v
-	$(MAKE) blob
-	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@
-
-.PHONY:
-blob: $(VFILES) $(CFILES)
+$(KERNEL): $(VFILES) $(CFILES)
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o vblob.c .
 	printf '#define double int\n#define float int\n' \
 		| cat - vblob.c $(CFILES) \
 		| sed 's/void main__kmain(/__attribute__((externally_visible)) void main__kmain(/g' \
 		> blob
 	rm vblob.c
+	$(CC) -x c $(CFLAGS) $(INTERNALCFLAGS) blob -o $@

@@ -105,6 +105,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					old_pte := old_pagemap.virt2pte(i, false) or {
 						continue
 					}
+					if unsafe { old_pte[0] & ~(u64(0xfff)) } == 0 {
+						continue
+					}
 					new_pte := new_pagemap.virt2pte(i, true) or {
 						return none
 					}
@@ -244,7 +247,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	mut resource := unsafe { _resource }
 
 	if length % page_size != 0 || length == 0 {
-		print('mmap: length is not a multiple of page size or is 0\n')
+		C.printf(c'mmap: length is not a multiple of page size or is 0\n')
 		//errno = einval
 		return voidptr(-1)
 	}

@@ -17,6 +17,7 @@ pub fn ud_entry(gpr_state &cpulocal.GPRState) {
 		mov r8,  [rdi + 72]
 		mov r9,  [rdi + 80]
 
+		xor rbp, rbp
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]
 
@@ -52,14 +53,16 @@ pub fn ud_entry(gpr_state &cpulocal.GPRState) {
 [_naked]
 fn sysenter_entry() {
 	asm volatile amd64 {
+		sti
+
 		push 0x53
-		push 0
+		push r10
 		pushfq
 		push 0x4b
+		push r11
 		push 0
 
 		cld
-		sti
 
 		push r15
 		push r14
@@ -82,6 +85,7 @@ fn sysenter_entry() {
 		mov rax, rdi
 		mov rdi, rsp
 
+		xor rbp, rbp
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]
 
