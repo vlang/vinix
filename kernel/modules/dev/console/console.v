@@ -307,11 +307,10 @@ fn (mut this Console) ioctl(request u64, argp voidptr) int {
 	match request {
 		ioctl.tiocgwinsz {
 			mut w := &ioctl.WinSize(argp)
-			// TODO: get actual console size
-			w.ws_row = 25
-			w.ws_col = 80
-			w.ws_xpixel = w.ws_row * 8
-			w.ws_ypixel = w.ws_row * 16
+			w.ws_row = terminal_rows
+			w.ws_col = terminal_cols
+			w.ws_xpixel = framebuffer_width
+			w.ws_ypixel = framebuffer_height
 			return 0
 		}
 		else {

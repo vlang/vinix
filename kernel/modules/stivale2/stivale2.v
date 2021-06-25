@@ -4,15 +4,10 @@ import klock
 import x86.cpu
 
 pub const framebuffer_id = 0x506461d2950408fa
-
 pub const memmap_id = 0x2187f79e8612de07
-
 pub const terminal_id = 0xc2b3f4c3233b0974
-
 pub const rsdp_id = 0x9e1786930a375e78
-
 pub const modules_id = 0x4b6fe466aade04ce
-
 pub const smp_id = 0x34d1d96339647025
 
 [packed]
@@ -52,7 +47,9 @@ pub mut:
 struct TermTag {
 pub mut:
 	tag        Tag
-	flags      u64
+	flags      u32
+	cols       u16
+	rows       u16
 	term_write voidptr
 }
 
@@ -149,22 +146,36 @@ pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
 }
 
 __global (
+	terminal_print_lock klock.Lock
 	terminal_print_ptr voidptr
+	terminal_rows u16
+	terminal_cols u16
+	framebuffer_width u16
+	framebuffer_height u16
 )
 
 pub fn terminal_init(stivale2_struct &Struct) {
+	framebuffer_tag := unsafe { &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id)) }
+	if framebuffer_tag == 0 {
+		panic('Bootloader does not provide framebuffer')
+		framebuffer_width = framebuffer_tag.width
+		framebuffer_height = framebuffer_tag.height
+	}
+
 	terminal_tag := unsafe { &TermTag(get_tag(stivale2_struct, stivale2.terminal_id)) }
 
 	if terminal_tag == 0 {
-		return
+		panic('Bootloader does not provide terminal')
+	}
+
+	if terminal_tag.flags & (1 << 0) == 0 {
+		panic('Bootloader does not provide enough terminal info')
 	}
 
 	terminal_print_ptr = terminal_tag.term_write
+	terminal_rows = terminal_tag.rows
+	terminal_cols = terminal_tag.cols
 }
-
-__global (
-	terminal_print_lock klock.Lock
-)
 
 pub fn terminal_print(s charptr, len u64) {
 	mut ptr := fn (_ voidptr, _ u64) {}
