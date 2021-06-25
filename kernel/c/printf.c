@@ -37,7 +37,7 @@
 
 
 void _putchar(char character) {
-  asm volatile ("outb %%al, %%dx" :: "a"(character), "d"(0xe9));
+  serial__out(character);
   stivale2__terminal_printc(&character, 1);
 }
 
@@ -562,7 +562,9 @@ int printf(const char* format, ...)
   va_list va;
   va_start(va, format);
   char buffer[1];
+  klock__Lock_acquire(&kprint_lock);
   const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  klock__Lock_release(&kprint_lock);
   va_end(va);
   return ret;
 }
@@ -591,7 +593,10 @@ int snprintf(char* buffer, size_t count, const char* format, ...)
 int vprintf(const char* format, va_list va)
 {
   char buffer[1];
-  return _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  klock__Lock_acquire(&kprint_lock);
+  const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  klock__Lock_release(&kprint_lock);
+  return ret;
 }
 
 

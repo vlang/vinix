@@ -86,6 +86,9 @@ fn inner_alloc(count u64, limit u64) voidptr {
 
 pub fn pmm_alloc(count u64) voidptr {
 	pmm_lock.acquire()
+	defer {
+		pmm_lock.release()
+	}
 
 	last := pmm_last_used_index
 	mut ret := inner_alloc(count, pmm_avl_page_count)
@@ -93,7 +96,7 @@ pub fn pmm_alloc(count u64) voidptr {
 		pmm_last_used_index = 0
 		ret = inner_alloc(count, last)
 		if ret == 0 {
-			lib.kpanic('OOM')
+			lib.kpanic(c'Out of memory')
 		}
 	}
 
@@ -105,7 +108,6 @@ pub fn pmm_alloc(count u64) voidptr {
 		}
 	}
 
-	pmm_lock.release()
 	return ret
 }
 

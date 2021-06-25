@@ -299,7 +299,7 @@ fn (mut this Console) write(buf voidptr, loc u64, count u64) i64 {
 		unsafe { C.free(copy) }
 	}
 	unsafe { C.memcpy(copy, buf, count) }
-	stivale2.terminal_print(C.byteptr_vstring_with_len(copy, count))
+	stivale2.terminal_print(copy, count)
 	return i64(count)
 }
 

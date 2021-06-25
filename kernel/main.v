@@ -58,12 +58,12 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	stivale2.terminal_init(stivale2_struct)
 
 	// We're alive
-	lib.kprint('Welcome to Vinix\n\n')
+	lib.kprint(c'Welcome to Vinix\n\n')
 
 	// Initialize the memory allocator.
 	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }
 	if memmap_tag == 0 {
-		lib.kpanic('Stivale2 memmap tag missing')
+		lib.kpanic(c'Stivale2 memmap tag missing')
 	}
 
 	memory.pmm_init(memmap_tag)

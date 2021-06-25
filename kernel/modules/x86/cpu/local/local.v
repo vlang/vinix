@@ -48,6 +48,8 @@ pub mut:
 	ss     u64
 }
 
+pub const abort_stack_size = 128
+
 struct Local {
 pub mut:
 	cpu_number           u64
@@ -62,6 +64,8 @@ pub mut:
 	fpu_restore          fn (voidptr)
 	current_thread       voidptr
 	last_run_queue_index int
+	abort_stack          [abort_stack_size]u64
+	aborted              bool
 }
 
 __global (

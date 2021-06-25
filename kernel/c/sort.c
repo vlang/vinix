@@ -5,5 +5,5 @@ void qsort(void *ptr, size_t count, size_t size, int (*comp)(const void *, const
     (void)count;
     (void)size;
     (void)comp;
-    lib__kpanicc("qsort is a stub");
+    lib__kpanic("qsort is a stub");
 }

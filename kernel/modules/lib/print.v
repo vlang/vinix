@@ -2,49 +2,40 @@
 
 import stivale2
 import klock
+import serial
 
 __global (
 	kprint_lock klock.Lock
 )
 
 pub fn syscall_kprint(_ voidptr, message charptr) {
-	msglen := unsafe { C.strlen(message) }
+	msglen := unsafe { u64(C.strlen(message)) }
 
 	kprint_lock.acquire()
 
 	unsafe {
 		for i := 0; i < msglen; i++ {
-			asm volatile amd64 {
-				out port, c
-				;
-				; Nd (0xe9) as port
-				  a (message[i]) as c
-				; memory
-			}
+			serial.out(message[i])
 		}
 	}
 
 	kprint_lock.release()
 }
 
-pub fn kprint(message string) {
+pub fn kprint(message charptr) {
+	msglen := unsafe { u64(C.strlen(message)) }
+
 	kprint_lock.acquire()
 
-	for i := 0; i < message.len; i++ {
-		asm volatile amd64 {
-			out port, c
-			; ; Nd (0xe9) as port
-			  a (message[i]) as c
+	unsafe {
+		for i := 0; i < msglen; i++ {
+			serial.out(message[i])
 		}
 	}
 
-	stivale2.terminal_print(message)
+	stivale2.terminal_print(message, msglen)
 
 	kprint_lock.release()
-}
-
-pub fn kprintc(message charptr) {
-	kprint(unsafe { cstring_to_vstring(message) })
 }
 
 fn C.byteptr_vstring(byteptr) string

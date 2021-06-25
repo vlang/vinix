@@ -1,21 +1,26 @@
 [manualfree] module lib
 
 import trace
+import x86.apic
+import x86.cpu.local as cpulocal
+import katomic
 
-pub fn kpanic(message string) {
+pub fn kpanic(message charptr) {
 	asm volatile amd64 {
 		cli
 	}
-	C.printf(c'KERNEL PANIC: %s\n', message.str)
+	for cpu_local in cpu_locals {
+		if cpulocal.current().lapic_id == cpu_local.lapic_id {
+			continue
+		}
+		apic.lapic_send_ipi(cpu_local.lapic_id, abort_vector)
+		for katomic.load(cpu_local.aborted) == false {}
+	}
+	C.printf(c'KERNEL PANIC: %s\n', message)
 	trace.stacktrace(voidptr(0))
 	for {
 		asm volatile amd64 {
-			cli
 			hlt
 		}
 	}
-}
-
-pub fn kpanicc(message charptr) {
-	kpanic(unsafe { cstring_to_vstring(message) })
 }

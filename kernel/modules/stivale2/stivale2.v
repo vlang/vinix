@@ -166,11 +166,7 @@ __global (
 	terminal_print_lock klock.Lock
 )
 
-pub fn terminal_print(s string) {
-	terminal_printc(charptr(s.str), u64(s.len))
-}
-
-pub fn terminal_printc(s charptr, len u64) {
+pub fn terminal_print(s charptr, len u64) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
 	current_cr3 := &u64(cpu.read_cr3())

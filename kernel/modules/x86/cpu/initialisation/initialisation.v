@@ -21,6 +21,10 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	gdt.reload()
 	idt.reload()
 
+	gdt.load_tss(voidptr(&cpu_local.tss))
+
+	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
+
 	mut success, _, mut b, mut c, mut d := cpu.cpuid(0x80000001, 0)
 	if success == false || d & (1 << 27) == 0 {
 		if cpu_number > 0 {
@@ -51,8 +55,6 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
 		cpu_local.tss.ist1 = u64(sched_stack)
 	}
-
-	gdt.load_tss(voidptr(&cpu_local.tss))
 
 	// Enable SSE/SSE2
 	mut cr0 := cpu.read_cr0()

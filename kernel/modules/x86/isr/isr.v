@@ -7,7 +7,8 @@ import cpu.local as cpulocal
 import cpu
 import syscall
 import memory.mmap
-import trace
+import katomic
+import lib
 
 __global (
 	int_events [256]event.Event
@@ -70,8 +71,15 @@ fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
 	}
 }
 
+fn abort_handler() {
+	katomic.store(cpulocal.current().aborted, true)
+	for {
+		asm volatile amd64 { hlt }
+	}
+}
+
 fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
-	C.printf(c'\nException occurred (%s) on CPU %d\n',
+	C.printf(c'\n%s on CPU %d\n',
 			 exception_names[num], cpulocal.current().cpu_number)
 	C.printf(c'Error code: 0x%016llx\n', gpr_state.err)
 	C.printf(c'Register dump:\n')
@@ -86,14 +94,12 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 			 gpr_state.r8, gpr_state.r9, gpr_state.r10, gpr_state.r11)
 	C.printf(c'R12=%016llx  R13=%016llx  R14=%016llx  R15=%016llx\n',
 			 gpr_state.r12, gpr_state.r13, gpr_state.r14, gpr_state.r15)
-	trace.stacktrace(voidptr(gpr_state.rbp))
-	for {
-		asm volatile amd64 {
-			cli
-			hlt
-		}
-	}
+	lib.kpanic(c'Unhandled exception')
 }
+
+__global (
+	abort_vector = u8(0)
+)
 
 pub fn initialise() {
 	for i := u16(0); i < 32; i++ {
@@ -117,4 +123,8 @@ pub fn initialise() {
 		idt.register_handler(i, interrupt_thunks[i])
 		interrupt_table[i] = voidptr(generic_isr)
 	}
+
+	abort_vector = idt.allocate_vector()
+	idt.register_handler(abort_vector, voidptr(abort_handler))
+	idt.set_ist(abort_vector, 4)
 }
