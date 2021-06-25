@@ -25,18 +25,14 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
 
-	mut success, _, mut b, mut c, mut d := cpu.cpuid(0x80000001, 0)
-	if success == false || d & (1 << 27) == 0 {
-		if cpu_number > 0 {
-			panic('This CPU does not support RDTSCP. Vinix requires RDTSCP to run.')
-		}
-	} else {
-		cpu.set_id(cpu_local.cpu_number)
+	cpu.set_id(cpu_local.cpu_number)
+	if cpu.get_id() != cpu_local.cpu_number {
+		panic('Failed to set CPU ID register.')
 	}
 
 	kernel_pagemap.switch_to()
 
-	success, _, _, _, d = cpu.cpuid(1, 0)
+	mut success, _, mut b, mut c, mut d := cpu.cpuid(1, 0)
 	if success == true && d & (1 << 11) != 0 {
 		msr.wrmsr(0x174, kernel_code_seg)
 		msr.wrmsr(0x176, u64(voidptr(syscall.sysenter_entry)))
