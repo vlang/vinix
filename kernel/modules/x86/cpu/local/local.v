@@ -1,7 +1,5 @@
 [manualfree] module local
 
-import cpu
-
 [packed]
 struct TSS {
 pub mut:
@@ -73,5 +71,5 @@ __global (
 )
 
 pub fn current() &Local {
-	return cpu_locals[cpu.get_id()]
+	return cpu_locals[cpu_get_id()]
 }

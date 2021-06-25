@@ -194,20 +194,22 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 	return true, a, b, c, d
 }
 
-pub fn set_id(id u64) {
-	success, _, _, _, d := cpuid(0x80000001, 0)
-	if success == false || d & (1 << 27) == 0 {
-		return
-	} else {
-		msr.wrmsr(0xc0000103, id)
-	}
+__global (
+	cpu_get_id fn () u64
+	cpu_set_id fn (u64)
+)
+
+pub fn set_id_zero(_ u64) {
 }
 
-pub fn get_id() u64 {
-	success, _, _, _, d := cpuid(0x80000001, 0)
-	if success == false || d & (1 << 27) == 0 {
-		return 0
-	} else {
-		return msr.rdmsr(0xc0000103)
-	}
+pub fn get_id_zero() u64 {
+	return 0
+}
+
+pub fn set_id_rdtscp(id u64) {
+	msr.wrmsr(0xc0000103, id)
+}
+
+pub fn get_id_rdtscp() u64 {
+	return msr.rdmsr(0xc0000103)
 }
