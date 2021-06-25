@@ -195,7 +195,7 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 }
 
 pub fn set_id(id u64) {
-	success, _, _, _, d := cpuid(1, 0)
+	success, _, _, _, d := cpuid(0x80000001, 0)
 	if success == false || d & (1 << 27) == 0 {
 		return
 	} else {
@@ -204,7 +204,7 @@ pub fn set_id(id u64) {
 }
 
 pub fn get_id() u64 {
-	success, _, _, _, d := cpuid(1, 0)
+	success, _, _, _, d := cpuid(0x80000001, 0)
 	if success == false || d & (1 << 27) == 0 {
 		return 0
 	} else {
