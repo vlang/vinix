@@ -31,8 +31,8 @@ distro:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
 	$(MAKE) -C 3rdparty/limine
 
-V_COMMIT  = e797547d6d313380c00f1ea46d1c989b672f65e4
-VC_COMMIT = db52ea7ffbad0db52866f1e90abdf231d8039c7c
+V_COMMIT  = 19dca026a9b6f10ae91e902fa1233aa90ba43aae
+VC_COMMIT = 3201d2dd2faadfa370da0bad2a749a664ad5ade3
 
 3rdparty/v:
 	git clone https://github.com/vlang/v.git 3rdparty/v
