@@ -38,7 +38,7 @@
 
 void _putchar(char character) {
   serial__out(character);
-  stivale2__terminal_printc(&character, 1);
+  stivale2__terminal_print(&character, 1);
 }
 
 // no floats in kernel
