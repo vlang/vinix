@@ -30,8 +30,13 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 		if cpu_number > 0 {
 			panic('This CPU does not support RDTSCP. Vinix requires RDTSCP to run.')
 		}
+		cpu_set_id = cpu.set_id_zero
+		cpu_get_id = cpu.get_id_zero
 	} else {
-		cpu.set_id(cpu_local.cpu_number)
+		cpu_set_id = cpu.set_id_rdtscp
+		cpu_get_id = cpu.get_id_rdtscp
+
+		cpu_set_id(cpu_local.cpu_number)
 	}
 
 	kernel_pagemap.switch_to()
