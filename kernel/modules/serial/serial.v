@@ -22,10 +22,8 @@ pub fn initialise() {
 pub fn out(value u8) {
 	serial_lock.acquire()
 	if value == `\n` {
-		for kio.inb(0x3f8 + 5) & 0x20 == 0 {}
 		kio.outb(0x3f8, `\r`)
 	}
-	for kio.inb(0x3f8 + 5) & 0x20 == 0 {}
 	kio.outb(0x3f8, value)
 	serial_lock.release()
 }

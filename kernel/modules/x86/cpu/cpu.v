@@ -18,14 +18,6 @@ pub fn get_fs_base() u64 {
 	return msr.rdmsr(0xc0000100)
 }
 
-pub fn set_id(id u64) {
-	msr.wrmsr(0xc0000102, id)
-}
-
-pub fn get_id() u64 {
-	return msr.rdmsr(0xc0000102)
-}
-
 pub fn syscall_set_fs_base(_ voidptr, base voidptr) (u64, u64) {
 	set_fs_base(u64(base))
 	return 0, 0
@@ -200,4 +192,22 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 		  c (subleaf)
 	}
 	return true, a, b, c, d
+}
+
+pub fn set_id(id u64) {
+	success, _, _, _, d := cpuid(1, 0)
+	if success == false || d & (1 << 27) == 0 {
+		return
+	} else {
+		msr.wrmsr(0xc0000103, id)
+	}
+}
+
+pub fn get_id() u64 {
+	success, _, _, _, d := cpuid(1, 0)
+	if success == false || d & (1 << 27) == 0 {
+		return 0
+	} else {
+		return msr.rdmsr(0xc0000103)
+	}
 }

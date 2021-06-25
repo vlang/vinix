@@ -192,12 +192,12 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 }
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
-	mut current_thread := proc.current_thread()
-
-	if voidptr(current_thread) == voidptr(0) {
-		return error('')
+	asm volatile amd64 { sti }
+	defer {
+		asm volatile amd64 { cli }
 	}
 
+	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
 
@@ -210,11 +210,6 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	range_local, memory_page, _ := addr2range(pagemap, addr) or {
 		return error('')
-	}
-
-	asm volatile amd64 { sti }
-	defer {
-		asm volatile amd64 { cli }
 	}
 
 	if range_local.flags & map_anonymous != 0 {
