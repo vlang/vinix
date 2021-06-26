@@ -33,6 +33,21 @@ sources:
     extract_path: 'mlibc-2.0.0'
     patch-path-strip: 3
 
+  - name: v
+    subdir: '3rdparty'
+    url: 'https://example.com'
+    format: 'tar.gz'
+    extract_path: 'v'
+    patch-path-strip: 3
+
+  - name: vc
+    subdir: '3rdparty'
+    sources_required: ['v']
+    url: 'https://example.com'
+    format: 'tar.gz'
+    extract_path: 'vc'
+    patch-path-strip: 3
+
 tools:
   - name: host-autoconf-v2.69
     source:
@@ -67,9 +82,7 @@ tools:
       - args: ['make', 'install']
 
   - name: host-v
-    source:
-      name: vc
-      subdir: '3rdparty'
+    from_source: vc
     compile:
       - args:
         - 'bash'

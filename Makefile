@@ -22,9 +22,9 @@ run: vinix.iso
 .PHONY: distro
 distro:
 	mkdir -p build 3rdparty
-	$(MAKE) 3rdparty/v
-	$(MAKE) 3rdparty/vc
-	cd build && xbstrap init .. && xbstrap install --all
+	cd build && xbstrap init ..
+	$(MAKE) update-v
+	cd build && xbstrap install --all
 
 3rdparty/limine:
 	mkdir -p 3rdparty
@@ -34,27 +34,25 @@ distro:
 V_COMMIT  = 19dca026a9b6f10ae91e902fa1233aa90ba43aae
 VC_COMMIT = 3201d2dd2faadfa370da0bad2a749a664ad5ade3
 
-3rdparty/v:
-	git clone https://github.com/vlang/v.git 3rdparty/v
-	cd 3rdparty/v && git checkout $(V_COMMIT)
-
-3rdparty/vc:
-	git clone https://github.com/vlang/vc.git 3rdparty/vc
-	cd 3rdparty/vc && git checkout $(VC_COMMIT)
-
 .PHONY: update-v
 update-v:
-	cd 3rdparty/v && [ `git rev-parse HEAD` = $(V_COMMIT) ] || ( \
-		git checkout master && \
-		git pull && \
-		git checkout $(V_COMMIT) \
+	mkdir -p 3rdparty/v-archives
+	[ -f 3rdparty/v-archives/$(V_COMMIT).tar.gz ] || ( \
+		cd 3rdparty/v-archives && \
+		wget https://github.com/vlang/v/archive/$(V_COMMIT).tar.gz && \
+		rm -rf v v-$(V_COMMIT) && \
+		tar -xf $(V_COMMIT).tar.gz && \
+		mv v-$(V_COMMIT) v && \
+		tar -zcf ../v.tar.gz v \
 	)
-	cd 3rdparty/vc && [ `git rev-parse HEAD` = $(VC_COMMIT) ] || ( \
-		git checkout master && \
-		git pull && \
-		git checkout $(VC_COMMIT) && \
-		cd ../../build && \
-		xbstrap install-tool --reconfigure host-v \
+	[ -f 3rdparty/v-archives/$(VC_COMMIT).tar.gz ] || ( \
+		cd 3rdparty/v-archives && \
+		wget https://github.com/vlang/vc/archive/$(VC_COMMIT).tar.gz && \
+		rm -rf vc vc-$(VC_COMMIT) && \
+		tar -xf $(VC_COMMIT).tar.gz && \
+		mv vc-$(VC_COMMIT) vc && \
+		tar -zcf ../vc.tar.gz vc && \
+		cd ../.. && ./rebuild-pkg.sh vc host-v --tool \
 	)
 
 .PHONY: kernel/vinix.elf
