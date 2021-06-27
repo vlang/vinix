@@ -4,6 +4,7 @@ import lib
 import stivale2
 import fs
 import stat
+import memory
 
 struct USTARHeader {
 	name       [100]byte
@@ -84,5 +85,7 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 
 		current_header = &USTARHeader(size_t(current_header) + size_t(512) + size_t(lib.align_up(size, 512)))
 	}
+
+	memory.pmm_free(voidptr(initramfs_begin - higher_half), initramfs_size / page_size)
 }
 
