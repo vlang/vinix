@@ -4,6 +4,7 @@ import klock
 import x86.cpu.local as cpulocal
 import memory
 import katomic
+import event
 
 pub const max_fds = 256
 
@@ -37,6 +38,8 @@ pub mut:
 	event_occurred klock.Lock
 	yield_await klock.Lock
 	timeslice u64
+	exit_value voidptr
+	exited event.Event
 }
 
 pub fn current_thread() &Thread {
