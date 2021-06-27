@@ -4,6 +4,7 @@ import x86.idt
 import x86.apic
 import x86.kio
 import event
+import event.eventstruct
 import klock
 import sched
 import stat
@@ -28,7 +29,7 @@ const console_bigbuf_size = 4096
 
 __global (
 	console_read_lock klock.Lock
-	console_event event.Event
+	console_event eventstruct.Event
 	console_capslock_active = bool(false)
 	console_shift_active = bool(false)
 	console_ctrl_active = bool(false)
@@ -135,7 +136,7 @@ fn add_to_buf(ptr &byte, count u64) {
 	for i := u64(0); i < count; i++ {
 		unsafe { add_to_buf_char(ptr[i]) }
 	}
-	console_event.trigger()
+	event.trigger(console_event)
 }
 
 fn keyboard_handler() {

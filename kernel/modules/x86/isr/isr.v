@@ -2,6 +2,7 @@
 
 import idt
 import event
+import event.eventstruct
 import apic
 import cpu.local as cpulocal
 import cpu
@@ -11,12 +12,12 @@ import katomic
 import lib
 
 __global (
-	int_events [256]event.Event
+	int_events [256]eventstruct.Event
 )
 
 fn generic_isr(num u32, _ voidptr) {
 	apic.lapic_eoi()
-	int_events[num].trigger()
+	event.trigger(int_events[num])
 }
 
 const exception_names = [

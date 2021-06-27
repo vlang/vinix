@@ -11,7 +11,6 @@ import memory
 import memory.mmap
 import elf
 import file
-import event
 
 const max_running_threads = int(512)
 
@@ -217,29 +216,6 @@ pub fn dequeue_and_yield() {
 	asm volatile amd64 { cli }
 	dequeue_thread(cpulocal.current().current_thread)
 	yield()
-}
-
-pub fn thread_exit(ret voidptr) {
-	asm volatile amd64 { cli }
-
-	mut current_thread := proc.current_thread()
-
-	dequeue_thread(current_thread)
-
-	current_thread = voidptr(0)
-
-	current_thread.exit_value = ret
-	current_thread.exited.trigger()
-
-	yield()
-}
-
-pub fn thread_wait(thread &proc.Thread) voidptr {
-	mut which := u64(0)
-	event.await([&thread.exited], &which, true)
-	exit_value := thread.exit_value
-	unsafe { free(thread) }
-	return exit_value
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {

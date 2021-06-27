@@ -1,35 +1,11 @@
 [manualfree] module event
 
-import klock
 import proc
 import sched
 import katomic
+import eventstruct
 
-struct Event {
-pub mut:
-	pending   u64
-	listeners [16]EventListener
-}
-
-struct EventListener {
-pub mut:
-	l      klock.Lock
-	ready  klock.Lock
-	thread &proc.Thread
-	index  u64
-	which  &u64
-}
-
-fn (mut this Event) get_listener() &EventListener {
-	for i := u64(0); i < this.listeners.len; i++ {
-		if this.listeners[i].l.test_and_acquire() == true {
-			return unsafe { &this.listeners[i] }
-		}
-	}
-	return 0
-}
-
-pub fn await(events []&Event, which &u64, block bool) bool {
+pub fn await(events []&eventstruct.Event, which &u64, block bool) bool {
 	if events.len > 16 {
 		panic('kevent: Too many events!')
 	}
@@ -39,7 +15,7 @@ pub fn await(events []&Event, which &u64, block bool) bool {
 	thread.event_block_dequeue.release()
 	thread.event_occurred.release()
 
-	mut listeners := [16]&EventListener{}
+	mut listeners := [16]&eventstruct.EventListener{}
 	mut listeners_armed := u64(0)
 
 	for i := u64(0); i < events.len; i++ {
@@ -94,7 +70,9 @@ unarm_listeners:
 	return true
 }
 
-pub fn (mut this Event) trigger() {
+pub fn trigger(event &eventstruct.Event) {
+	mut this := unsafe { event }
+
 	if katomic.load(this.pending) > 0 {
 		katomic.inc(this.pending)
 		return
@@ -115,15 +93,15 @@ pub fn (mut this Event) trigger() {
 			continue
 		}
 
-		if listener.thread.event_occurred.test_and_acquire() == false {
+		mut thread := &proc.Thread(listener.thread)
+
+		if thread.event_occurred.test_and_acquire() == false {
 			continue
 		}
 
 		pending = false
 
 		unsafe { listener.which[0] = listener.index }
-
-		mut thread := listener.thread
 
 		if thread.event_block_dequeue.test_and_acquire() == false {
 			for katomic.load(thread.is_in_queue) == true {}
@@ -138,4 +116,27 @@ pub fn (mut this Event) trigger() {
 	if pending == true {
 		katomic.inc(this.pending)
 	}
+}
+
+pub fn pthread_exit(ret voidptr) {
+	asm volatile amd64 { cli }
+
+	mut current_thread := proc.current_thread()
+
+	sched.dequeue_thread(current_thread)
+
+	current_thread = voidptr(0)
+
+	current_thread.exit_value = ret
+	trigger(current_thread.exited)
+
+	sched.yield()
+}
+
+pub fn pthread_wait(thread &proc.Thread) voidptr {
+	mut which := u64(0)
+	await([&thread.exited], &which, true)
+	exit_value := thread.exit_value
+	unsafe { free(thread) }
+	return exit_value
 }
