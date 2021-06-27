@@ -52,7 +52,7 @@ update-v:
 		tar -xf $(VC_COMMIT).tar.gz && \
 		mv vc-$(VC_COMMIT) vc && \
 		tar -zcf ../vc.tar.gz vc && \
-		cd ../.. && ./rebuild-pkg.sh vc host-v --tool \
+		cd ../.. && ./rebuild-pkg.sh v host-v --tool \
 	)
 
 .PHONY: kernel/vinix.elf

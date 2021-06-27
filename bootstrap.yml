@@ -35,6 +35,7 @@ sources:
 
   - name: v
     subdir: '3rdparty'
+    sources_required: ['vc']
     url: 'https://example.com'
     format: 'tar.gz'
     extract_path: 'v'
@@ -42,7 +43,6 @@ sources:
 
   - name: vc
     subdir: '3rdparty'
-    sources_required: ['v']
     url: 'https://example.com'
     format: 'tar.gz'
     extract_path: 'vc'
@@ -82,12 +82,12 @@ tools:
       - args: ['make', 'install']
 
   - name: host-v
-    from_source: vc
+    from_source: v
     compile:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && cc -std=gnu99 -w -o ../v/v ./v.c -lm'
+        - 'cd "@THIS_SOURCE_DIR@" && cc -std=gnu99 -w -o ./v ../vc/v.c -lm && ./v self'
 
   - name: host-binutils
     from_source: binutils
