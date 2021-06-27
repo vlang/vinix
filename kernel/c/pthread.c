@@ -20,10 +20,10 @@ int pthread_detach(pthread_t thread) {
 }
 
 int pthread_join(pthread_t thread, void **retval) {
-    *retval = sched__thread_wait((void *)thread);
+    *retval = event__pthread_wait((void *)thread);
     return 0;
 }
 
 int pthread_exit(void *retval) {
-    sched__thread_exit(retval);
+    event__pthread_exit(retval);
 }

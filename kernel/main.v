@@ -89,6 +89,8 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	smp.initialise(smp_tag)
 
 	sched.initialise()
-	sched.new_kernel_thread(voidptr(kmain_thread), voidptr(stivale2_struct), true)
+	
+	go kmain_thread(stivale2_struct)
+
 	sched.await()
 }
