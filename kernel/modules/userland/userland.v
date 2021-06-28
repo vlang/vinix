@@ -13,6 +13,33 @@ import event.eventstruct
 
 pub const wnohang = 2
 
+pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+	mut argv := []string{}
+	for i := 0; ; i++ {
+		unsafe {
+			if voidptr(_argv[i]) == voidptr(0) {
+				break
+			}
+			argv << cstring_to_vstring(_argv[i])
+		}
+	}
+	mut envp := []string{}
+	for i := 0; ; i++ {
+		unsafe {
+			if voidptr(_envp[i]) == voidptr(0) {
+				break
+			}
+			envp << cstring_to_vstring(_envp[i])
+		}
+	}
+
+	start_program(true, path, argv, envp, '', '', '') or {
+		return -1, -1
+	}
+	return -1, -1
+}
+
 pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
 	mut status := unsafe { _status }
 	mut current_thread := proc.current_thread()
@@ -162,10 +189,8 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 		entry_point = voidptr(ld_auxval.at_entry)
 	}
 
-	mut new_process := &proc.Process(0)
-
 	if execve == false {
-		new_process = sched.new_process(voidptr(0), new_pagemap) or {
+		mut new_process := sched.new_process(voidptr(0), new_pagemap) or {
 			return none
 		}
 
@@ -201,9 +226,31 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 							  argv, envp, auxval, true) or {
 			return none
 		}
-	} else {
-		panic('TODO: execve')
-	}
 
-	return new_process
+		return new_process
+	} else {
+		mut thread := proc.current_thread()
+		mut process := thread.process
+		//mut old_pagemap := process.pagemap
+
+		process.thread_stack_top = u64(0x70000000000)
+		process.mmap_anon_non_fixed_base = u64(0x80000000000)
+
+		process.pagemap = new_pagemap
+
+		kernel_pagemap.switch_to()
+		thread.process = kernel_process
+
+		//old_threads := process.threads
+		process.threads = []&proc.Thread{}
+
+		sched.new_user_thread(process, true, entry_point, voidptr(0),
+							  argv, envp, auxval, true) or {
+			return none
+		}
+
+		sched.dequeue_and_yield()
+
+		return none
+	}
 }

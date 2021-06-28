@@ -80,7 +80,8 @@ __attribute__((used)) void *syscall_table[] = {
     file__syscall_dup3,
     userland__syscall_fork,
     userland__syscall_exit,
-    userland__syscall_waitpid
+    userland__syscall_waitpid,
+    userland__syscall_execve
 };
 
 extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_storage[];

@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..5a58f1b
+index 0000000..57e1b7b
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,318 @@
+@@ -0,0 +1,322 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -341,7 +341,11 @@ index 0000000..5a58f1b
 +    return 0;
 +}
 +
-+int sys_execve(const char *path, char *const argv[], char *const envp[]) STUB_ONLY
++int sys_execve(const char *path, char *const argv[], char *const envp[]) {
++    __syscall_ret ret = __syscall(17, path, argv, envp);
++
++    return ret.errno;
++}
 +
 +int sys_fcntl(int fd, int request, va_list args, int *result) {
 +    __syscall_ret ret = __syscall(12, fd, request, va_arg(args, uint64_t));

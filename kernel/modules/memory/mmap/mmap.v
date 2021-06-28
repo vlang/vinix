@@ -133,7 +133,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 		new_pagemap.mmap_ranges << voidptr(new_local_range)
 	}
 
-	return &new_pagemap
+	return new_pagemap
 }
 
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {

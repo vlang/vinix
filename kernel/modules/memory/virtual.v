@@ -18,7 +18,7 @@ pub mut:
 	mmap_ranges []voidptr
 }
 
-pub fn new_pagemap() Pagemap {
+pub fn new_pagemap() &Pagemap {
 	mut top_level := &u64(pmm_alloc(1))
 	if top_level == 0 {
 		panic('new_pagemap() allocation failure')
@@ -29,7 +29,7 @@ pub fn new_pagemap() Pagemap {
 	for i := u64(256); i < 512; i++ {
 		unsafe { p1[i] = p2[i] }
 	}
-	return Pagemap{top_level: top_level, mmap_ranges: []voidptr{}}
+	return &Pagemap{top_level: top_level, mmap_ranges: []voidptr{}}
 }
 
 pub fn (mut pagemap Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
