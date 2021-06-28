@@ -28,7 +28,7 @@ pub fn initialise() {
 
 	idt.set_ist(scheduler_vector, 1)
 
-	kernel_process = &proc.Process{pagemap: kernel_pagemap}
+	kernel_process = &proc.Process{pagemap: &kernel_pagemap}
 }
 
 fn get_next_thread(orig_i int) int {
@@ -370,7 +370,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
-	mut new_process := &proc.Process{}
+	mut new_process := &proc.Process{pagemap: 0}
 
 	new_process.pid = proc.allocate_pid(new_process) or {
 		return none
@@ -400,7 +400,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		}
 	} else {
 		new_process.ppid = 0
-		new_process.pagemap = pagemap
+		new_process.pagemap = unsafe { pagemap }
 		new_process.thread_stack_top = u64(0x70000000000)
 		new_process.mmap_anon_non_fixed_base = u64(0x80000000000)
 		new_process.current_directory = voidptr(vfs_root)

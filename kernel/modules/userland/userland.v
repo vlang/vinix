@@ -7,6 +7,45 @@ import sched
 import file
 import proc
 import x86.cpu.local as cpulocal
+import katomic
+import event
+
+pub fn syscall_exit(_ voidptr, status int) {
+	mut current_thread := proc.current_thread()
+	mut current_process := current_thread.process
+
+	//old_pagemap := current_process.pagemap
+
+	kernel_pagemap.switch_to()
+
+	// Close all FDs
+	for i := 0; i < proc.max_fds; i++ {
+		if current_process.fds[i] == voidptr(0) {
+			continue
+		}
+
+		file.fdnum_close(current_process, i) or {
+			panic('')
+		}
+	}
+
+	// PID 1 inherits children
+	if current_process.pid != 1 {
+		for child in current_process.children {
+			processes[1].children << child
+		}
+	}
+
+	// TODO
+	//memory.delete_pagemap(old_pagemap)
+
+	katomic.store(current_process.status, status | 0x200)
+	event.trigger(current_process.event)
+
+	// TODO
+	//sched.dequeue_and_die()
+	sched.dequeue_and_yield()
+}
 
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	old_thread := proc.current_thread()

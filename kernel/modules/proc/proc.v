@@ -12,7 +12,7 @@ pub struct Process {
 pub mut:
 	pid int
 	ppid int
-	pagemap memory.Pagemap
+	pagemap &memory.Pagemap
 	thread_stack_top u64
 	threads []&Thread
 	fds_lock klock.Lock
@@ -20,6 +20,8 @@ pub mut:
 	children []&Process
 	mmap_anon_non_fixed_base u64
 	current_directory voidptr
+	event eventstruct.Event
+	status int
 }
 
 pub struct Thread {

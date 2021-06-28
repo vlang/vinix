@@ -204,13 +204,13 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	addr := cpu.read_cr2()
 
 	pagemap.l.acquire()
-	defer {
-		pagemap.l.release()
-	}
 
 	range_local, memory_page, _ := addr2range(pagemap, addr) or {
+		pagemap.l.release()
 		return error('')
 	}
+
+	pagemap.l.release()
 
 	if range_local.flags & map_anonymous != 0 {
 		page := memory.pmm_alloc(1)

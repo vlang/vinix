@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..b646cb4
+index 0000000..93f2dcd
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,310 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -116,10 +116,13 @@ index 0000000..b646cb4
 +
 +void sys_libc_panic() {
 +    sys_libc_log("\nMLIBC PANIC\n");
-+    for (;;);
++    sys_exit(1);
 +}
 +
-+void sys_exit(int status) STUB_ONLY
++void sys_exit(int status) {
++    __syscall(15, status);
++    __builtin_unreachable();
++}
 +
 +int sys_tcb_set(void *pointer) {
 +    __syscall(7, pointer);
