@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..93f2dcd
+index 0000000..5a58f1b
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,318 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -388,7 +388,15 @@ index 0000000..93f2dcd
 +    return 0;
 +}
 +
-+int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) STUB_ONLY
++int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) {
++    __syscall_ret ret = __syscall(16, pid, status, flags);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *ret_pid = (pid_t)ret.ret;
++    return 0;
++}
 +
 +} // namespace mlibc
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/abi.h

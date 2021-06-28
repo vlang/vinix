@@ -9,6 +9,58 @@ import proc
 import x86.cpu.local as cpulocal
 import katomic
 import event
+import event.eventstruct
+
+pub const wnohang = 2
+
+pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
+	mut status := unsafe { _status }
+	mut current_thread := proc.current_thread()
+	mut current_process := current_thread.process
+
+	mut events := []&eventstruct.Event{}
+	mut child := &proc.Process(0)
+
+	if pid == -1 {
+		for c in current_process.children {
+			events << &c.event
+		}
+	} else if pid < -1 || pid == 0 {
+		print('\nwaitpid: value of pid not supported\n')
+		return -1, -1
+	} else {
+		child = processes[pid]
+		if voidptr(child) == voidptr(0) || child.ppid != current_process.pid {
+			//errno = ECHILD
+			return -1, -1
+		}
+		events << &child.event
+	}
+
+	mut which := u64(0)
+	block := options & wnohang != 0
+	event.await(events, &which, block)
+
+	unsafe { events.free() }
+
+	if which == -1 {
+		return 0, 0
+	}
+
+	if voidptr(child) == voidptr(0) {
+		child = current_process.children[which]
+	}
+
+	unsafe { status[0] = child.status }
+
+	ret := child.pid
+
+	proc.free_pid(ret)
+
+	current_process.children.delete(current_process.children.index(child))
+
+	return u64(ret), 0
+}
 
 pub fn syscall_exit(_ voidptr, status int) {
 	mut current_thread := proc.current_thread()
