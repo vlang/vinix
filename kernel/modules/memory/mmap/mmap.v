@@ -237,19 +237,22 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	return u64(mmap(process.pagemap, addr, length, prot, flags, resource, offset)),
-		   errno.get()
+	ret := mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
+		return -1, errno.get()
+	}
+
+	return u64(ret), 0
 }
 
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
-			prot int, flags int, _resource &resource.Resource, offset i64) voidptr {
+			prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
 	mut pagemap  := unsafe { _pagemap }
 	mut resource := unsafe { _resource }
 
 	if length % page_size != 0 || length == 0 {
 		C.printf(c'mmap: length is not a multiple of page size or is 0\n')
-		//errno = einval
-		return voidptr(-1)
+		errno.set(errno.einval)
+		return none
 	}
 
 	mut current_thread := proc.current_thread()

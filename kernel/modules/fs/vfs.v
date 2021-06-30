@@ -130,7 +130,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 			}
 			dir_handle := dir_fd.handle
 			if stat.isdir(dir_handle.resource.stat.mode) == false {
-				// errno = enotdir
+				errno.set(errno.enotdir)
 				return none
 			}
 			parent = &VFSNode(dir_handle.node)
@@ -246,8 +246,10 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.read(buf, count)
-	return u64(ret), errno.get()
+	ret := fd.handle.read(buf, count) or {
+		return -1, errno.get()
+	}
+	return u64(ret), 0
 }
 
 pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
@@ -257,13 +259,15 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.write(buf, count)
-	return u64(ret), errno.get()
+	ret := fd.handle.write(buf, count) or {
+		return -1, errno.get()
+	}
+	return u64(ret), 0
 }
 
 pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 	file.fdnum_close(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 	return 0, 0
 }
@@ -275,8 +279,10 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.resource.ioctl(request, argp)
-	return u64(ret), errno.get()
+	ret := fd.handle.resource.ioctl(request, argp) or {
+		return -1, errno.get()
+	}
+	return u64(ret), 0
 }
 
 pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
@@ -326,8 +332,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 
 	match handle.resource.stat.mode & stat.ifmt {
 		stat.ifchr, stat.ififo, stat.ifpipe, stat.ifsock {
-			// errno = espipe
-			return -1, -1
+			return -1, errno.espipe
 		}
 		else {}
 	}
@@ -344,19 +349,17 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 			base = i64(handle.resource.stat.size) + offset
 		}
 		else {
-			// errno = einval
-			return -1, -1
+			return -1, errno.einval
 		}
 	}
 
 	if base < 0 {
-		// errno = einval
-		return -1, -1
+		return -1, errno.einval
 	}
 
 	if base > handle.resource.stat.size {
 		// TODO: grow
-		return -1, -1
+		return -1, errno.einval
 	}
 
 	handle.loc = base

@@ -3,6 +3,7 @@
 import resource
 import proc
 import klock
+import errno
 
 pub const f_dupfd = 1
 pub const f_dupfd_cloexec = 2
@@ -28,24 +29,28 @@ pub mut:
 	flags int
 }
 
-pub fn (mut this Handle) read(buf voidptr, count u64) i64 {
+pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
-	ret := this.resource.read(buf, u64(this.loc), count)
+	ret := this.resource.read(buf, u64(this.loc), count) or {
+		return none
+	}
 	if ret > 0 {
 		this.loc += ret
 	}
 	return ret
 }
 
-pub fn (mut this Handle) write(buf voidptr, count u64) i64 {
+pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
-	ret := this.resource.write(buf, u64(this.loc), count)
+	ret := this.resource.write(buf, u64(this.loc), count) or {
+		return none
+	}
 	if ret > 0 {
 		this.loc += ret
 	}
@@ -71,7 +76,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 	}
 
 	if fdnum >= proc.max_fds {
-		// errno = ebadf
+		errno.set(errno.ebadf)
 		return error('')
 	}
 
@@ -82,7 +87,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 
 	mut fd := &FD(process.fds[fdnum])
 	if voidptr(fd) == voidptr(0) {
-		// errno = ebadf
+		errno.set(errno.ebadf)
 		return error('')
 	}
 
@@ -165,7 +170,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	}
 
 	if fdnum >= proc.max_fds {
-		// errno = ebadf
+		errno.set(errno.ebadf)
 		return none
 	}
 
@@ -176,7 +181,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 
 	mut ret := &FD(process.fds[fdnum])
 	if voidptr(ret) == voidptr(0) {
-		// errno = ebadf
+		errno.set(errno.ebadf)
 		return none
 	}
 
@@ -188,12 +193,11 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 
 pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64) {
 	if oldfdnum == newfdnum {
-		// errno = einval
-		return -1, -1
+		return -1, errno.einval
 	}
 
 	mut oldfd := file.fd_from_fdnum(voidptr(0), oldfdnum) or {
-		return -1, -1
+		return -1, errno.ebadf
 	}
 
 	mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
@@ -211,7 +215,7 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.ebadf
 	}
 
 	mut handle := fd.handle
@@ -254,7 +258,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		else {
 			print('\nfcntl: Unhandled command: $cmd\n')
 			fd.unref()
-			return -1, -1
+			return -1, errno.einval
 		}
 	}
 

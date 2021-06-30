@@ -3,6 +3,7 @@
 import stat
 import klock
 import ioctl
+import errno
 
 pub const o_accmode = 0x0007
 pub const o_exec    = 1
@@ -37,9 +38,9 @@ mut:
 	refcount int
 	l        klock.Lock
 
-	read(buf voidptr, loc u64, count u64) i64
-	write(buf voidptr, loc u64, count u64) i64
-	ioctl(request u64, argp voidptr) int
+	read(buf voidptr, loc u64, count u64) ?i64
+	write(buf voidptr, loc u64, count u64) ?i64
+	ioctl(request u64, argp voidptr) ?int
 }
 
 __global (
@@ -50,15 +51,15 @@ pub fn create_dev_id() u64 {
 	return dev_id_counter++
 }
 
-pub fn default_ioctl(request u64, _ voidptr) int {
+pub fn default_ioctl(request u64, _ voidptr) ?int {
 	match request {
 		ioctl.tcgets, ioctl.tcsets, ioctl.tiocsctty, ioctl.tiocgwinsz {
-			// errno = enotty
-			return -1
+			errno.set(errno.enotty)
+			return none
 		}
 		else {
-			// errno = einval
-			return -1
+			errno.set(errno.einval)
+			return none
 		}
 	}
 }

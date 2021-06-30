@@ -12,6 +12,7 @@ import stivale2
 import fs
 import ioctl
 import resource
+import errno
 
 const max_scancode = 0x57
 const capslock = 0x3a
@@ -248,14 +249,14 @@ pub mut:
 	l        klock.Lock
 }
 
-fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
+fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
 	mut buf := &byte(void_buf)
 
 	for console_read_lock.test_and_acquire() == false {
 		mut which := u64(0)
 		if event.await([&console_event], &which, true) == false {
-			// errno = EINTR
-			return -1
+			errno.set(errno.eintr)
+			return none
 		}
 	}
 
@@ -276,8 +277,8 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
 				for {
 					mut which := u64(0)
 					if event.await([&console_event], &which, true) == false {
-						// errno = EINTR
-						return -1
+						errno.set(errno.eintr)
+						return none
 					}
 					if console_read_lock.test_and_acquire() == true {
 						break
@@ -294,7 +295,7 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) i64 {
 	return i64(count)
 }
 
-fn (mut this Console) write(buf voidptr, loc u64, count u64) i64 {
+fn (mut this Console) write(buf voidptr, loc u64, count u64) ?i64 {
 	copy := unsafe { C.malloc(count) }
 	defer {
 		unsafe { C.free(copy) }
@@ -304,7 +305,7 @@ fn (mut this Console) write(buf voidptr, loc u64, count u64) i64 {
 	return i64(count)
 }
 
-fn (mut this Console) ioctl(request u64, argp voidptr) int {
+fn (mut this Console) ioctl(request u64, argp voidptr) ?int {
 	match request {
 		ioctl.tiocgwinsz {
 			mut w := &ioctl.WinSize(argp)

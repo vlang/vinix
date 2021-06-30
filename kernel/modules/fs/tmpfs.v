@@ -15,7 +15,7 @@ pub mut:
 	capacity u64
 }
 
-fn (mut this TmpFSResource) read(buf voidptr, loc u64, count u64) i64 {
+fn (mut this TmpFSResource) read(buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
 	mut actual_count := u64(count)
@@ -30,7 +30,7 @@ fn (mut this TmpFSResource) read(buf voidptr, loc u64, count u64) i64 {
 	return i64(count)
 }
 
-fn (mut this TmpFSResource) write(buf voidptr, loc u64, count u64) i64 {
+fn (mut this TmpFSResource) write(buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
 	if loc + count > this.capacity {
@@ -43,7 +43,7 @@ fn (mut this TmpFSResource) write(buf voidptr, loc u64, count u64) i64 {
 		new_storage := memory.realloc(this.storage, new_capacity)
 
 		if new_storage == 0 {
-			return -1
+			return none
 		}
 
 		this.storage = new_storage
@@ -61,7 +61,7 @@ fn (mut this TmpFSResource) write(buf voidptr, loc u64, count u64) i64 {
 	return i64(count)
 }
 
-fn (mut this TmpFSResource) ioctl(request u64, argp voidptr) int {
+fn (mut this TmpFSResource) ioctl(request u64, argp voidptr) ?int {
 	return resource.default_ioctl(request, argp)
 }
 

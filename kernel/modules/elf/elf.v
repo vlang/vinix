@@ -85,7 +85,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 
 	mut header := &Header{}
 
-	res.read(header, 0, sizeof(Header))
+	res.read(header, 0, sizeof(Header)) ?
 
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
@@ -108,12 +108,12 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 	for i := u64(0); i < header.ph_num; i++ {
 		mut phdr := &ProgramHdr{}
 
-		res.read(phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr))
+		res.read(phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) ?
 
 		match phdr.p_type {
 			pt_interp {
 				mut p := memory.malloc(phdr.p_filesz + 1)
-				res.read(p, phdr.p_offset, phdr.p_filesz)
+				res.read(p, phdr.p_offset, phdr.p_filesz) ?
 				ld_path = unsafe { cstring_to_vstring(p) }
 			}
 			pt_phdr {
@@ -149,7 +149,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 
 		buf := unsafe { byteptr(addr) + misalign + higher_half }
 
-		res.read(buf, phdr.p_offset, phdr.p_filesz)
+		res.read(buf, phdr.p_offset, phdr.p_filesz) ?
 	}
 
 	return auxval, ld_path

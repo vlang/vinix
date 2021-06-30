@@ -42,6 +42,7 @@ pub mut:
 	timeslice u64
 	exit_value voidptr
 	exited eventstruct.Event
+	errno u64
 }
 
 pub fn current_thread() &Thread {

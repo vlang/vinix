@@ -10,6 +10,7 @@ import x86.cpu.local as cpulocal
 import katomic
 import event
 import event.eventstruct
+import errno
 
 pub const wnohang = 2
 
@@ -35,9 +36,10 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 
 	start_program(true, path, argv, envp, '', '', '') or {
-		return -1, -1
+		return -1, errno.get()
 	}
-	return -1, -1
+
+	return -1, errno.get()
 }
 
 pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
@@ -58,8 +60,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	} else {
 		child = processes[pid]
 		if voidptr(child) == voidptr(0) || child.ppid != current_process.pid {
-			//errno = ECHILD
-			return -1, -1
+			return -1, errno.echild
 		}
 		events << &child.event
 	}
@@ -247,6 +248,18 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 		sched.new_user_thread(process, true, entry_point, voidptr(0),
 							  argv, envp, auxval, true) or {
 			return none
+		}
+
+		unsafe {
+			for s in argv {
+				s.free()
+			}
+			argv.free()
+
+			for s in envp {
+				s.free()
+			}
+			envp.free()
 		}
 
 		sched.dequeue_and_yield()
