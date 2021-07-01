@@ -1,4 +1,4 @@
-[manualfree] module serial
+module serial
 
 import x86.kio
 import klock

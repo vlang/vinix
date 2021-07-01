@@ -1,4 +1,4 @@
-[manualfree] module memory
+module memory
 
 import lib
 import stivale2
@@ -127,6 +127,10 @@ mut:
 }
 
 pub fn free(ptr voidptr) {
+	if ptr == voidptr(0) {
+		return
+	}
+
 	metadata_ptr := unsafe { &char(ptr) - page_size }
 	metadata := &MallocMetadata(metadata_ptr)
 

@@ -1,4 +1,4 @@
-[manualfree] module ioctl
+module ioctl
 
 pub const tcgets = 0x5401
 pub const tcsets = 0x5402

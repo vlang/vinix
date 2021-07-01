@@ -1,4 +1,4 @@
-[manualfree] module main
+module main
 
 import lib
 import memory
@@ -89,7 +89,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	smp.initialise(smp_tag)
 
 	sched.initialise()
-	
+
 	go kmain_thread(stivale2_struct)
 
 	sched.await()

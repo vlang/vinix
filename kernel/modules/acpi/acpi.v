@@ -1,4 +1,4 @@
-[manualfree] module acpi
+module acpi
 
 pub struct SDT {
 	signature        [4]byte
@@ -45,8 +45,6 @@ pub fn init(rsdp_ptr &RSDP) {
 
 	rsdp = unsafe { rsdp_ptr }
 
-	oem := C.byteptr_vstring_with_len(byteptr(&rsdp.oem_id), 6)
-
 	if use_xsdt() == true {
 		rsdt = unsafe { &RSDT(byteptr(size_t(rsdp.xsdt_addr)) + higher_half) }
 	} else {
@@ -54,7 +52,6 @@ pub fn init(rsdp_ptr &RSDP) {
 	}
 
 	println('acpi: Revision:  ${rsdp.revision}')
-	println('acpi: OEM ID:    ${oem}')
 	println('acpi: Use XSDT:  ${use_xsdt()}')
 	println('acpi: R/XSDT at: 0x${voidptr(rsdt):x}')
 

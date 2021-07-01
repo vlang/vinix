@@ -1,4 +1,4 @@
-[manualfree] module syscall
+module syscall
 
 import x86.cpu.local as cpulocal
 

@@ -1,4 +1,4 @@
-[manualfree] module katomic
+module katomic
 
 pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 	mut ret := false

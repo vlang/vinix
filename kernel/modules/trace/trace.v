@@ -1,4 +1,4 @@
-[manualfree] module trace
+module trace
 
 pub fn stacktrace(_base_ptr voidptr) {
 	mut base_ptr := &u64(_base_ptr)

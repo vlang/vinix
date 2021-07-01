@@ -1,4 +1,4 @@
-[manualfree] module lib
+module lib
 
 type Bitmap = &u64
 

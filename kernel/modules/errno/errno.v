@@ -1,4 +1,4 @@
-[manualfree] module errno
+module errno
 
 import proc
 

@@ -1,4 +1,4 @@
-[manualfree] module initramfs
+module initramfs
 
 import lib
 import stivale2
@@ -66,9 +66,9 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 			break
 		}
 
-		name := C.byteptr_vstring(&current_header.name[0])
-		size := octal_to_int(C.byteptr_vstring(&current_header.size[0]))
-		mode := octal_to_int(C.byteptr_vstring(&current_header.mode[0]))
+		name := unsafe { cstring_to_vstring(&current_header.name[0]) }
+		size := octal_to_int(unsafe { cstring_to_vstring(&current_header.size[0]) })
+		mode := octal_to_int(unsafe { cstring_to_vstring(&current_header.mode[0]) })
 
 		match USTARFileType(current_header.filetype) {
 			.directory {

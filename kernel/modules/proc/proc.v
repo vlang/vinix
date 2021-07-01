@@ -1,4 +1,4 @@
-[manualfree] module proc
+module proc
 
 import klock
 import x86.cpu.local as cpulocal

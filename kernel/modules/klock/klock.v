@@ -1,4 +1,4 @@
-[manualfree] module klock
+module klock
 
 import katomic
 
@@ -8,7 +8,7 @@ pub mut:
 	caller u64
 }
 
-fn C.__builtin_return_address(int)
+fn C.__builtin_return_address(int) voidptr
 
 pub fn (mut l Lock) acquire() {
 	caller := u64(C.__builtin_return_address(0))

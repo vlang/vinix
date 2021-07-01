@@ -1,4 +1,4 @@
-[manualfree] module console
+module console
 
 import x86.idt
 import x86.apic

@@ -1,4 +1,4 @@
-[manualfree] module lib
+module lib
 
 import stivale2
 import klock

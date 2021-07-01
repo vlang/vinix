@@ -1,4 +1,4 @@
-[manualfree] module stivale2
+module stivale2
 
 import klock
 import x86.cpu

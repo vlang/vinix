@@ -1,4 +1,4 @@
-[manualfree] module idt
+module idt
 
 import klock
 

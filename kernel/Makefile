@@ -34,7 +34,8 @@ INTERNALCFLAGS :=           \
 
 INTERNALVFLAGS :=   \
 	-enable-globals \
-	-d no_backtrace
+	-d no_backtrace \
+	-autofree
 
 VFILES := $(shell find ./ -type f -name '*.v' | sort)
 CFILES := $(shell find ./ -type f -name '*.c' | sort)

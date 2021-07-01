@@ -1,4 +1,4 @@
-[manualfree] module userland
+module userland
 
 import fs
 import memory

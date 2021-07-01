@@ -229,4 +229,4 @@ packages:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && pwd && make V="@SOURCE_ROOT@/3rdparty/v/v" CC=x86_64-vinix-gcc OBJDUMP=x86_64-vinix-objdump'
+        - 'cd "@THIS_SOURCE_DIR@" && make V="@SOURCE_ROOT@/3rdparty/v/v" CC=x86_64-vinix-gcc'

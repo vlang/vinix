@@ -1,4 +1,4 @@
-[manualfree] module resource
+module resource
 
 import stat
 import klock

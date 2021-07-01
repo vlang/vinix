@@ -1,4 +1,4 @@
-[manualfree] module event
+module event
 
 import proc
 import sched

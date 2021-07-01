@@ -1,4 +1,4 @@
-[manualfree] module initialisation
+module initialisation
 
 import gdt
 import idt

@@ -1,4 +1,4 @@
-[manualfree] module lib
+module lib
 
 import trace
 import x86.apic

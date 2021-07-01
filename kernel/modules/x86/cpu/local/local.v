@@ -1,4 +1,4 @@
-[manualfree] module local
+module local
 
 [packed]
 struct TSS {
