@@ -52,6 +52,18 @@ pub fn (mut pagemap Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	return unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
 }
 
+pub fn (mut pagemap Pagemap) virt2phys(virt u64) ?u64 {
+	pte_p := pagemap.virt2pte(virt, false) or {
+		return none
+	}
+	unsafe {
+		if pte_p[0] & 1 == 0 {
+			return none
+		}
+		return pte_p[0] & ~u64(0xfff)
+	}
+}
+
 pub fn (mut pagemap Pagemap) switch_to() {
 	top_level := pagemap.top_level
 
@@ -86,6 +98,14 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 		}
 	}
 	return ret
+}
+
+pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
+	pte_p := pagemap.virt2pte(virt, false) or {
+		return error('')
+	}
+
+	unsafe { pte_p[0] = 0 }
 }
 
 pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {

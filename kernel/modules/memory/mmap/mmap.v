@@ -55,6 +55,22 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	return error('')
 }
 
+pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
+	mut pagemap := unsafe { _pagemap }
+
+	pagemap.l.acquire()
+
+	for ptr in pagemap.mmap_ranges {
+		local_range := &MmapRangeLocal(ptr)
+
+		munmap(pagemap, voidptr(local_range.base), local_range.length) or {
+			return error('')
+		}
+	}
+
+	unsafe { free(pagemap) }
+}
+
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
@@ -296,4 +312,70 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	}
 
 	return voidptr(base)
+}
+
+pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
+	mut pagemap := unsafe { _pagemap }
+
+	if length % page_size != 0 || length == 0 {
+		print('\nmunmap: length is not a multiple of page size or it is 0\n')
+		return error('')
+	}
+
+	for i := u64(addr); i < u64(addr) + length; i += page_size {
+		mut local_range, _, _ := addr2range(pagemap, i) or {
+			continue
+		}
+
+		mut global_range := local_range.global
+
+		snip_begin := i
+		for {
+			i += page_size
+			if i >= local_range.base + local_range.length || i >= u64(addr) + length {
+				break
+			}
+		}
+		snip_end := i
+		snip_size := snip_end - snip_begin
+
+		if snip_begin > local_range.base && snip_end < local_range.base + local_range.length {
+			print('\nmunmap: range splits not supported\n')
+			return error('')
+		}
+
+		for j := snip_begin; j < snip_end; j += page_size {
+			pagemap.unmap_page(j) or {
+				return error('')
+			}
+		}
+
+		if snip_size == local_range.length {
+			pagemap.mmap_ranges.delete(pagemap.mmap_ranges.index(local_range))
+		}
+
+		if snip_size == local_range.length && global_range.locals.len == 1 {
+			if local_range.flags & map_anonymous != 0 {
+				for j := global_range.base;
+				  j < global_range.base + global_range.length;
+				  j += page_size {
+					phys := global_range.shadow_pagemap.virt2phys(j) or {
+						continue
+					}
+					global_range.shadow_pagemap.unmap_page(j) or {
+						return error('')
+					}
+					memory.pmm_free(voidptr(phys), 1)
+				}
+			} else {
+				//global_range.resource.munmap(i)
+			}
+		} else {
+			if snip_begin == local_range.base {
+				local_range.base = snip_end
+			} else {
+				local_range.length -= snip_size
+			}
+		}
+	}
 }

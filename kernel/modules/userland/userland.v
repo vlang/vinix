@@ -2,6 +2,7 @@
 
 import fs
 import memory
+import memory.mmap
 import elf
 import sched
 import file
@@ -116,8 +117,12 @@ pub fn syscall_exit(_ voidptr, status int) {
 		}
 	}
 
-	// TODO
-	//memory.delete_pagemap(old_pagemap)
+	mut old_pagemap := current_process.pagemap
+
+	kernel_pagemap.switch_to()
+	current_thread.process = kernel_process
+
+	mmap.delete_pagemap(old_pagemap) or {}
 
 	katomic.store(current_process.status, status | 0x200)
 	event.trigger(current_process.event)
@@ -232,18 +237,25 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 	} else {
 		mut thread := proc.current_thread()
 		mut process := thread.process
-		//mut old_pagemap := process.pagemap
 
-		process.thread_stack_top = u64(0x70000000000)
-		process.mmap_anon_non_fixed_base = u64(0x80000000000)
+		mut old_pagemap := process.pagemap
 
 		process.pagemap = new_pagemap
 
 		kernel_pagemap.switch_to()
 		thread.process = kernel_process
 
-		//old_threads := process.threads
+		mmap.delete_pagemap(old_pagemap) or {
+			return none
+		}
+
+		process.thread_stack_top = u64(0x70000000000)
+		process.mmap_anon_non_fixed_base = u64(0x80000000000)
+
+		old_threads := process.threads
 		process.threads = []&proc.Thread{}
+
+		unsafe { old_threads.free() }
 
 		sched.new_user_thread(process, true, entry_point, voidptr(0),
 							  argv, envp, auxval, true) or {
