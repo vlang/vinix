@@ -93,6 +93,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			if last == true {
 				return current_node, 0, elem_str
 			}
+			errno.set(errno.enoent)
 			return 0, 0, ''
 		}
 
@@ -105,6 +106,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 		current_node = new_node
 
 		if !stat.isdir(current_node.resource.stat.mode) {
+			errno.set(errno.enotdir)
 			return 0, 0, ''
 		}
 	}
