@@ -242,7 +242,7 @@ pub fn dequeue_and_die() {
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
-	mut stacks := &[]voidptr{}
+	mut stacks := []voidptr{}
 
 	stack_phys := memory.pmm_alloc(stack_size / page_size)
 	stacks << stack_phys
@@ -282,10 +282,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 					   autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 
-	mut stacks := &[]voidptr{}
+	mut stacks := []voidptr{}
 
 	stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << stack_phys
 	mut stack := &u64(u64(stack_phys) + stack_size + higher_half)
 
 	stack_vma := process.thread_stack_top

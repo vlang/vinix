@@ -52,7 +52,7 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 			return r, memory_page, file_page
 		}
 	}
-	return error('')
+	return none
 }
 
 pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
@@ -178,22 +178,25 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 	mut pagemap  := unsafe { _pagemap }
 	flags := _flags | map_anonymous
 
-	pool := unsafe { C.malloc(sizeof(MmapRangeLocal) + sizeof(MmapRangeGlobal)) }
-	mut range_local  := unsafe { &MmapRangeLocal(pool) }
-	mut range_global := unsafe { &MmapRangeGlobal(u64(pool) + sizeof(MmapRangeLocal)) }
+	mut range_local := &MmapRangeLocal{
+		pagemap: pagemap
+		base: virt_addr
+		length: length
+		prot: prot
+		flags: flags
+		global: voidptr(0)
+	}
 
-	range_local.pagemap = pagemap
-	range_local.global  = range_global
-	range_local.base    = virt_addr
-	range_local.length  = length
-	range_local.prot    = prot
-	range_local.flags   = flags
+	mut range_global := &MmapRangeGlobal{
+		locals: []&MmapRangeLocal{}
+		base: virt_addr
+		length: length
+		resource: voidptr(0)
+	}
 
-	range_global.locals = []&MmapRangeLocal{}
+	range_local.global = range_global
+
 	range_global.locals << range_local
-	range_global.base   = virt_addr
-	range_global.length = length
-
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	pagemap.l.acquire()
@@ -282,25 +285,27 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 		process.mmap_anon_non_fixed_base += length + page_size
 	}
 
-	pool := unsafe { C.malloc(sizeof(MmapRangeLocal) + sizeof(MmapRangeGlobal)) }
-	mut range_local  := unsafe { &MmapRangeLocal(pool) }
-	mut range_global := unsafe { &MmapRangeGlobal(u64(pool) + sizeof(MmapRangeLocal)) }
+	mut range_local := &MmapRangeLocal{
+		pagemap: pagemap
+		base: base
+		length: length
+		offset: offset
+		prot: prot
+		flags: flags
+		global: voidptr(0)
+	}
 
-	range_local.pagemap = pagemap
-	range_local.global  = range_global
-	range_local.base    = base
-	range_local.length  = length
-	range_local.offset  = offset
-	range_local.prot    = prot
-	range_local.flags   = flags
+	mut range_global := &MmapRangeGlobal{
+		locals: []&MmapRangeLocal{}
+		base: base
+		length: length
+		resource: resource
+		offset: offset
+	}
 
-	range_global.locals = []&MmapRangeLocal{}
+	range_local.global = range_global
+
 	range_global.locals << range_local
-	range_global.base     = base
-	range_global.length   = length
-	range_global.resource = resource
-	range_global.offset   = offset
-
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	pagemap.l.acquire()
@@ -370,6 +375,7 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 			} else {
 				//global_range.resource.munmap(i)
 			}
+			unsafe { free(local_range) }
 		} else {
 			if snip_begin == local_range.base {
 				local_range.base = snip_end
