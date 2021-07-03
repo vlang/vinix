@@ -41,7 +41,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 		panic('Could not start init process')
 	}
 
-	sched.dequeue_and_yield()
+	sched.dequeue_and_die()
 }
 
 pub fn main() {

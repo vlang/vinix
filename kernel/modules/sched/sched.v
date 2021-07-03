@@ -193,7 +193,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 	return false
 }
 
-pub fn yield() {
+pub fn yield(save_ctx bool) {
 	asm volatile amd64 { cli }
 
 	apic.lapic_timer_stop()
@@ -202,20 +202,35 @@ pub fn yield() {
 
 	mut current_thread := &proc.Thread(cpu_local.current_thread)
 
-	current_thread.yield_await.acquire()
+	if save_ctx == true {
+		current_thread.yield_await.acquire()
+	}
 
 	apic.lapic_send_ipi(cpu_local.lapic_id, scheduler_vector)
 
 	asm volatile amd64 { sti }
 
-	current_thread.yield_await.acquire()
-	current_thread.yield_await.release()
+	if save_ctx == true {
+		current_thread.yield_await.acquire()
+		current_thread.yield_await.release()
+	} else {
+		for { asm volatile amd64 { hlt } }
+	}
 }
 
 pub fn dequeue_and_yield() {
 	asm volatile amd64 { cli }
 	dequeue_thread(cpulocal.current().current_thread)
-	yield()
+	yield(true)
+}
+
+pub fn dequeue_and_die() {
+	asm volatile amd64 { cli }
+	mut thread := &proc.Thread(cpulocal.current().current_thread)
+	dequeue_thread(thread)
+	unsafe { free(thread) }
+	cpulocal.current().current_thread = voidptr(0)
+	yield(false)
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {

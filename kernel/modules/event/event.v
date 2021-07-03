@@ -4,6 +4,7 @@ import proc
 import sched
 import katomic
 import eventstruct
+import x86.cpu.local as cpulocal
 
 pub fn await(events []&eventstruct.Event, which &u64, block bool) bool {
 	if events.len > 16 {
@@ -121,16 +122,16 @@ pub fn trigger(event &eventstruct.Event) {
 pub fn pthread_exit(ret voidptr) {
 	asm volatile amd64 { cli }
 
-	mut current_thread := proc.current_thread()
+	mut current_thread := &proc.Thread(cpulocal.current().current_thread)
 
 	sched.dequeue_thread(current_thread)
 
-	current_thread = voidptr(0)
+	cpulocal.current().current_thread = voidptr(0)
 
 	current_thread.exit_value = ret
 	trigger(current_thread.exited)
 
-	sched.yield()
+	sched.yield(false)
 }
 
 pub fn pthread_wait(thread &proc.Thread) voidptr {

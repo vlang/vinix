@@ -95,8 +95,6 @@ pub fn syscall_exit(_ voidptr, status int) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
-	//old_pagemap := current_process.pagemap
-
 	kernel_pagemap.switch_to()
 
 	// Close all FDs
@@ -127,9 +125,7 @@ pub fn syscall_exit(_ voidptr, status int) {
 	katomic.store(current_process.status, status | 0x200)
 	event.trigger(current_process.event)
 
-	// TODO
-	//sched.dequeue_and_die()
-	sched.dequeue_and_yield()
+	sched.dequeue_and_die()
 }
 
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
