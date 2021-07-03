@@ -130,7 +130,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or {
 						return none
 					}
-					page := memory.pmm_alloc(1)
+					page := memory.pmm_alloc_nozero(1)
 					unsafe {
 						C.memcpy(
 							voidptr(u64(page) + higher_half),

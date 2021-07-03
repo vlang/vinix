@@ -12,6 +12,7 @@ import memory.mmap
 import elf
 import file
 
+const stack_size = u64(65536)
 const max_running_threads = int(512)
 
 __global (
@@ -228,15 +229,24 @@ pub fn dequeue_and_die() {
 	asm volatile amd64 { cli }
 	mut thread := &proc.Thread(cpulocal.current().current_thread)
 	dequeue_thread(thread)
-	unsafe { free(thread) }
+	for ptr in thread.stacks {
+		memory.pmm_free(ptr, stack_size / page_size)
+	}
+	unsafe {
+		thread.stacks.free()
+		free(thread.stacks)
+		free(thread)
+	}
 	cpulocal.current().current_thread = voidptr(0)
 	yield(false)
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
-	stack_size := 8192
+	mut stacks := &[]voidptr{}
 
-	stack := &[]u8{cap: stack_size, len: stack_size, init: 0}
+	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stacks << stack_phys
+	stack := u64(stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		cs: kernel_code_seg
@@ -247,7 +257,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		rip: u64(pc)
 		rdi: u64(arg)
 		rbp: u64(0)
-		rsp: unsafe { u64(&stack[stack_size - 1]) }
+		rsp: stack
 	}
 
 	thread := &proc.Thread{
@@ -256,6 +266,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
+		stacks: stacks
 	}
 
 	if autoenqueue == true {
@@ -271,9 +282,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 					   autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 
-	stack_size := u64(65536)
+	mut stacks := &[]voidptr{}
 
 	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stacks << stack_phys
 	mut stack := &u64(u64(stack_phys) + stack_size + higher_half)
 
 	stack_vma := process.thread_stack_top
@@ -287,9 +299,13 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		return none
 	}
 
-	kernel_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stacks << kernel_stack_phys
+	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
 
-	pf_stack := u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stacks << pf_stack_phys
+	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		cs: user_code_seg
@@ -310,6 +326,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		running_on: u64(-1)
 		kernel_stack: kernel_stack
 		pf_stack: pf_stack
+		stacks: stacks
 	}
 
 	if want_elf == true {

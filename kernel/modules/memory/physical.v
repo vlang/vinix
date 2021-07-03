@@ -84,7 +84,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 	return 0
 }
 
-pub fn pmm_alloc(count u64) voidptr {
+pub fn pmm_alloc_nozero(count u64) voidptr {
 	pmm_lock.acquire()
 	defer {
 		pmm_lock.release()
@@ -99,6 +99,12 @@ pub fn pmm_alloc(count u64) voidptr {
 			lib.kpanic(c'Out of memory')
 		}
 	}
+
+	return ret
+}
+
+pub fn pmm_alloc(count u64) voidptr {
+	ret := pmm_alloc_nozero(count)
 
 	// We always zero out memory for security reasons
 	unsafe {

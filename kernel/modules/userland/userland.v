@@ -57,7 +57,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 		}
 	} else if pid < -1 || pid == 0 {
 		print('\nwaitpid: value of pid not supported\n')
-		return -1, -1
+		return -1, errno.einval
 	} else {
 		child = processes[pid]
 		if voidptr(child) == voidptr(0) || child.ppid != current_process.pid {
@@ -69,8 +69,6 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	mut which := u64(0)
 	block := options & wnohang != 0
 	event.await(events, &which, block)
-
-	unsafe { events.free() }
 
 	if which == -1 {
 		return 0, 0
@@ -95,7 +93,10 @@ pub fn syscall_exit(_ voidptr, status int) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
+	mut old_pagemap := current_process.pagemap
+
 	kernel_pagemap.switch_to()
+	current_thread.process = kernel_process
 
 	// Close all FDs
 	for i := 0; i < proc.max_fds; i++ {
@@ -103,9 +104,7 @@ pub fn syscall_exit(_ voidptr, status int) {
 			continue
 		}
 
-		file.fdnum_close(current_process, i) or {
-			panic('')
-		}
+		file.fdnum_close(current_process, i) or {}
 	}
 
 	// PID 1 inherits children
@@ -114,11 +113,6 @@ pub fn syscall_exit(_ voidptr, status int) {
 			processes[1].children << child
 		}
 	}
-
-	mut old_pagemap := current_process.pagemap
-
-	kernel_pagemap.switch_to()
-	current_thread.process = kernel_process
 
 	mmap.delete_pagemap(old_pagemap) or {}
 
@@ -133,7 +127,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	mut old_process := old_thread.process
 
 	mut new_process := sched.new_process(old_process, voidptr(0)) or {
-		panic('fork failure')
+		return -1, errno.get()
 	}
 
 	stack_size := u64(65536)
@@ -163,60 +157,44 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 
 pub fn start_program(execve bool, path string, argv []string, envp []string,
 					 stdin string, stdout string, stderr string) ?&proc.Process {
-	prog_node := fs.get_node(vfs_root, path) or {
-		return error('Program not found')
-	}
+	prog_node := fs.get_node(vfs_root, path) ?
 	prog := prog_node.resource
 
 	mut new_pagemap := memory.new_pagemap()
 
-	auxval, ld_path := elf.load(new_pagemap, prog, 0) or {
-		return error('elf load failed')
-	}
+	auxval, ld_path := elf.load(new_pagemap, prog, 0) ?
 
 	mut entry_point := voidptr(0)
 
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
 	} else {
-		ld_node := fs.get_node(vfs_root, ld_path) or {
-			return error('Program interpreter not found')
-		}
+		ld_node := fs.get_node(vfs_root, ld_path) ?
 		ld := ld_node.resource
 
-		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) or {
-			return error('elf load (ld) failed')
-		}
+		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) ?
 
 		entry_point = voidptr(ld_auxval.at_entry)
 	}
 
 	if execve == false {
-		mut new_process := sched.new_process(voidptr(0), new_pagemap) or {
-			return none
-		}
+		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
 
-		stdin_node := fs.get_node(vfs_root, stdin) or {
-			return error('stdin not found')
-		}
+		stdin_node := fs.get_node(vfs_root, stdin) ?
 		stdin_handle := &file.Handle{resource: stdin_node.resource
 									 node: stdin_node
 									 refcount: 1}
 		stdin_fd := &file.FD{handle: stdin_handle}
 		new_process.fds[0] = voidptr(stdin_fd)
 
-		stdout_node := fs.get_node(vfs_root, stdout) or {
-			return error('stdout not found')
-		}
+		stdout_node := fs.get_node(vfs_root, stdout) ?
 		stdout_handle := &file.Handle{resource: stdout_node.resource
 									  node: stdout_node
 									  refcount: 1}
 		stdout_fd := &file.FD{handle: stdout_handle}
 		new_process.fds[1] = voidptr(stdout_fd)
 
-		stderr_node := fs.get_node(vfs_root, stderr) or {
-			return error('stderr not found')
-		}
+		stderr_node := fs.get_node(vfs_root, stderr) ?
 		stderr_handle := &file.Handle{resource: stderr_node.resource
 									  node: stderr_node
 									  refcount: 1}
@@ -225,9 +203,7 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 
 		sched.new_user_thread(new_process, true,
 							  entry_point, voidptr(0),
-							  argv, envp, auxval, true) or {
-			return none
-		}
+							  argv, envp, auxval, true) ?
 
 		return new_process
 	} else {
@@ -241,22 +217,17 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 		kernel_pagemap.switch_to()
 		thread.process = kernel_process
 
-		mmap.delete_pagemap(old_pagemap) or {
-			return none
-		}
+		mmap.delete_pagemap(old_pagemap) ?
 
 		process.thread_stack_top = u64(0x70000000000)
 		process.mmap_anon_non_fixed_base = u64(0x80000000000)
 
-		old_threads := process.threads
+		// TODO: Kill old threads
+		//old_threads := process.threads
 		process.threads = []&proc.Thread{}
 
-		unsafe { old_threads.free() }
-
 		sched.new_user_thread(process, true, entry_point, voidptr(0),
-							  argv, envp, auxval, true) or {
-			return none
-		}
+							  argv, envp, auxval, true) ?
 
 		unsafe {
 			for s in argv {
@@ -270,7 +241,7 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 			envp.free()
 		}
 
-		sched.dequeue_and_yield()
+		sched.dequeue_and_die()
 
 		return none
 	}

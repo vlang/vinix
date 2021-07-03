@@ -43,6 +43,7 @@ pub mut:
 	exit_value voidptr
 	exited eventstruct.Event
 	errno u64
+	stacks []voidptr
 }
 
 pub fn current_thread() &Thread {
