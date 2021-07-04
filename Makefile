@@ -22,7 +22,7 @@ run: vinix.iso
 .PHONY: distro
 distro:
 	mkdir -p build 3rdparty
-	cd build && xbstrap init ..
+	cd build && ln -s ../sysroot system-root && xbstrap init ..
 	$(MAKE) update-v
 	cd build && xbstrap install --all
 
@@ -55,7 +55,7 @@ kernel/vinix.elf: update-v
 	cd build && xbstrap install --rebuild kernel
 
 vinix.iso: kernel/vinix.elf
-	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
+	( cd sysroot && tar -zcf ../initramfs.tar.gz * )
 	rm -rf pack
 	mkdir -p pack/boot
 	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp pack/
