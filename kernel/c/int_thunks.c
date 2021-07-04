@@ -82,6 +82,7 @@ __attribute__((used)) void *syscall_table[] = {
     userland__syscall_exit, // 15
     userland__syscall_waitpid, // 16
     userland__syscall_execve, // 17
+    fs__syscall_chdir, // 18
 };
 
 extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_storage[];

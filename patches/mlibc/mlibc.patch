@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..57e1b7b
+index 0000000..97a1e81
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,330 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -320,7 +320,15 @@ index 0000000..57e1b7b
 +
 +int sys_access(const char *path, int mode) STUB_ONLY
 +
-+int sys_chdir(const char *path) STUB_ONLY
++int sys_chdir(const char *path) {
++    __syscall_ret ret = __syscall(18, path);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    return 0;
++}
 +
 +int sys_mkdir(const char *path) STUB_ONLY
 +

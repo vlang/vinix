@@ -56,11 +56,19 @@ pub fn initialise() {
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	if path.len == 0 {
-		return 0, unsafe { parent }, ''
+		errno.set(errno.enoent)
+		return 0, 0, ''
 	}
 
 	mut index := u64(0)
 	mut current_node := unsafe { parent }
+
+	if path[index] == `/` {
+		current_node = vfs_root
+		for voidptr(current_node.mountpoint) != voidptr(0) {
+			current_node = current_node.mountpoint
+		}
+	}
 
 	for path[index] == `/` {
 		if index == path.len - 1 {
@@ -77,23 +85,25 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			index++
 		}
 
+		elem << 0
+
 		for index < path.len && path[index] == `/` {
 			index++
 		}
 
 		last := index == path.len
 
-		elem_str := unsafe { C.byteptr_vstring_with_len(&elem[0], elem.len) }
+		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
 		for current_node.mountpoint != 0 {
 			current_node = current_node.mountpoint
 		}
 
 		if elem_str !in current_node.children {
+			errno.set(errno.enoent)
 			if last == true {
 				return current_node, 0, elem_str
 			}
-			errno.set(errno.enoent)
 			return 0, 0, ''
 		}
 
@@ -111,6 +121,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 		}
 	}
 
+	errno.set(errno.enoent)
 	return 0, 0, ''
 }
 
@@ -166,7 +177,8 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) b
 
 	_, mut target_node, _ := path2node(parent, target)
 	if target_node == 0
-	|| (target_node != vfs_root && !stat.isdir(target_node.resource.stat.mode))
+	|| (voidptr(target_node) != voidptr(vfs_root)
+		&& !stat.isdir(target_node.resource.stat.mode))
 	|| target_node.mountpoint != 0 {
 		return false
 	}
@@ -313,6 +325,25 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	}
 
 	unsafe { statbuf[0] = fd.handle.resource.stat }
+
+	return 0, 0
+}
+
+pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+
+	mut process := proc.current_thread().process
+
+	_, node, _ := path2node(process.current_directory, path)
+	if voidptr(node) == voidptr(0) {
+		return -1, errno.get()
+	}
+
+	if !stat.isdir(node.resource.stat.mode) {
+		return -1, errno.enotdir
+	}
+
+	process.current_directory = node
 
 	return 0, 0
 }
