@@ -140,11 +140,9 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 		virt := base + phdr.p_vaddr
 		phys := u64(addr)
 
-		for j := u64(0); j < page_count; j++ {
-			mmap.map_range(pagemap, virt, phys, page_count * page_size, pf,
-						   mmap.map_anonymous) or {
-				return none
-			}
+		mmap.map_range(pagemap, virt, phys, page_count * page_size, pf,
+					   mmap.map_anonymous) or {
+			return none
 		}
 
 		buf := unsafe { byteptr(addr) + misalign + higher_half }

@@ -9,7 +9,16 @@ __global (
 	pmm_bitmap lib.Bitmap
 	pmm_avl_page_count u64
 	pmm_last_used_index u64
+	free_pages u64
 )
+
+pub fn print_free() {
+	pmm_lock.acquire()
+	defer {
+		pmm_lock.release()
+	}
+	C.printf(c'pmm: Free pages: %llu\n', free_pages)
+}
 
 pub fn pmm_init(memmap &stivale2.MemmapTag) {
 	unsafe {
@@ -57,10 +66,13 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 			}
 
 			for j := u64(0); j < entries[i].length; j += page_size {
+				free_pages++
 				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
 			}
 		}
 	}
+
+	print_free()
 }
 
 fn inner_alloc(count u64, limit u64) voidptr {
@@ -100,6 +112,8 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 		}
 	}
 
+	free_pages -= count
+
 	return ret
 }
 
@@ -119,11 +133,14 @@ pub fn pmm_alloc(count u64) voidptr {
 
 pub fn pmm_free(ptr voidptr, count u64) {
 	pmm_lock.acquire()
+	defer {
+		pmm_lock.release()
+	}
 	page := u64(ptr) / page_size
 	for i := page; i < page + count; i++ {
 		lib.bitreset(pmm_bitmap, i)
 	}
-	pmm_lock.release()
+	free_pages += count
 }
 
 struct MallocMetadata {
@@ -137,10 +154,9 @@ pub fn free(ptr voidptr) {
 		return
 	}
 
-	metadata_ptr := unsafe { &char(ptr) - page_size }
-	metadata := &MallocMetadata(metadata_ptr)
+	metadata := &MallocMetadata(u64(ptr) - page_size)
 
-	pmm_free(unsafe { metadata_ptr - higher_half }, metadata.pages + 1)
+	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
 
 pub fn malloc(size u64) voidptr {
@@ -152,13 +168,12 @@ pub fn malloc(size u64) voidptr {
 		return 0
 	}
 
-	metadata_ptr := unsafe { &char(ptr) + higher_half }
-	mut metadata := &MallocMetadata(metadata_ptr)
+	mut metadata := &MallocMetadata(u64(ptr) + higher_half)
 
 	metadata.pages = page_count
 	metadata.size = size
 
-	return unsafe { &char(ptr) + higher_half + page_size }
+	return voidptr(u64(ptr) + higher_half + page_size)
 }
 
 pub fn realloc(ptr voidptr, new_size u64) voidptr {
@@ -166,15 +181,14 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 		return malloc(new_size)
 	}
 
-	metadata_ptr := unsafe { &char(ptr) - page_size }
-	mut metadata := &MallocMetadata(metadata_ptr)
+	mut metadata := &MallocMetadata(u64(ptr) - page_size)
 
 	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
 		metadata.size = new_size
 		return ptr
 	}
 
-	new_ptr := malloc(new_size)
+	new_ptr := unsafe { C.malloc(new_size) }
 	if new_ptr == 0 {
 		return 0
 	}
@@ -185,7 +199,7 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 		unsafe { C.memcpy(new_ptr, ptr, metadata.size) }
 	}
 
-	free(ptr)
+	C.free(ptr)
 
 	return new_ptr
 }

@@ -92,8 +92,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			global_range.resource.refcount++
 		}
 
-		if local_range.flags & map_shared != 0{
-			new_local_range.global = global_range
+		if local_range.flags & map_shared != 0 {
 			global_range.locals << new_local_range
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 				old_pte := old_pagemap.virt2pte(i, false) or {
@@ -112,6 +111,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			new_global_range.length = global_range.length
 			new_global_range.offset = global_range.offset
 
+			new_global_range.locals = []&MmapRangeLocal{}
 			new_global_range.locals << new_local_range
 
 			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
@@ -121,7 +121,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					old_pte := old_pagemap.virt2pte(i, false) or {
 						continue
 					}
-					if unsafe { old_pte[0] & ~(u64(0xfff)) } == 0 {
+					if unsafe { old_pte[0] & 1 } == 0 {
 						continue
 					}
 					new_pte := new_pagemap.virt2pte(i, true) or {

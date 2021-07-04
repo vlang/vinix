@@ -64,24 +64,24 @@ asm (
 );
 
 __attribute__((used)) void *syscall_table[] = {
-    lib__syscall_kprint,
-    memory__mmap__syscall_mmap,
-    fs__syscall_openat,
-    fs__syscall_read,
-    fs__syscall_write,
-    fs__syscall_seek,
-    fs__syscall_close,
-    x86__cpu__syscall_set_fs_base,
-    x86__cpu__syscall_set_gs_base,
-    fs__syscall_ioctl,
-    fs__syscall_fstat,
-    fs__syscall_fstatat,
-    file__syscall_fcntl,
-    file__syscall_dup3,
-    userland__syscall_fork,
-    userland__syscall_exit,
-    userland__syscall_waitpid,
-    userland__syscall_execve
+    lib__syscall_kprint, // 0
+    memory__mmap__syscall_mmap, // 1
+    fs__syscall_openat, // 2
+    fs__syscall_read, // 3
+    fs__syscall_write, // 4
+    fs__syscall_seek, // 5
+    fs__syscall_close, // 6
+    x86__cpu__syscall_set_fs_base, // 7
+    x86__cpu__syscall_set_gs_base, // 8
+    fs__syscall_ioctl, // 9
+    fs__syscall_fstat, // 10
+    fs__syscall_fstatat, // 11
+    file__syscall_fcntl, // 12
+    file__syscall_dup3, // 13
+    userland__syscall_fork, // 14
+    userland__syscall_exit, // 15
+    userland__syscall_waitpid, // 16
+    userland__syscall_execve, // 17
 };
 
 extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_storage[];
