@@ -1,7 +1,7 @@
-diff --git a/ports/bash-orig/builtins/psize.c b/ports/bash-workdir/builtins/psize.c
+diff --git a/3rdparty/bash-orig/builtins/psize.c b/3rdparty/bash-workdir/builtins/psize.c
 index 30881fb..be9c84b 100644
---- a/ports/bash-orig/builtins/psize.c
-+++ b/ports/bash-workdir/builtins/psize.c
+--- a/3rdparty/bash-orig/builtins/psize.c
++++ b/3rdparty/bash-workdir/builtins/psize.c
 @@ -21,25 +21,12 @@
  /*  Write output in 128-byte chunks until we get a sigpipe or write gets an
      EPIPE.  Then report how many bytes we wrote.  We assume that this is the
@@ -39,10 +39,10 @@ index 30881fb..be9c84b 100644
  sigpipe (sig)
       int sig;
  {
-diff --git a/ports/bash-orig/lib/readline/terminal.c b/ports/bash-workdir/lib/readline/terminal.c
+diff --git a/3rdparty/bash-orig/lib/readline/terminal.c b/3rdparty/bash-workdir/lib/readline/terminal.c
 index 05415dc..2f0c770 100644
---- a/ports/bash-orig/lib/readline/terminal.c
-+++ b/ports/bash-workdir/lib/readline/terminal.c
+--- a/3rdparty/bash-orig/lib/readline/terminal.c
++++ b/3rdparty/bash-workdir/lib/readline/terminal.c
 @@ -103,7 +103,7 @@ static char *term_string_buffer = (char *)NULL;
  static int tcap_initialized;
  
@@ -52,10 +52,10 @@ index 05415dc..2f0c770 100644
  extern 
  #  endif /* __EMX__ || NEED_EXTERN_PC */
  char PC, *BC, *UP;
-diff --git a/ports/bash-orig/lib/termcap/termcap.c b/ports/bash-workdir/lib/termcap/termcap.c
+diff --git a/3rdparty/bash-orig/lib/termcap/termcap.c b/3rdparty/bash-workdir/lib/termcap/termcap.c
 index ba3dab2..2882f0c 100644
---- a/ports/bash-orig/lib/termcap/termcap.c
-+++ b/ports/bash-workdir/lib/termcap/termcap.c
+--- a/3rdparty/bash-orig/lib/termcap/termcap.c
++++ b/3rdparty/bash-workdir/lib/termcap/termcap.c
 @@ -627,7 +627,7 @@ scan_file (str, fd, bufp)
    bufp->ateof = 0;
    *bufp->ptr = '\0';
@@ -65,10 +65,10 @@ index ba3dab2..2882f0c 100644
  
    while (!bufp->ateof)
      {
-diff --git a/ports/bash-orig/mksyntax.c b/ports/bash-workdir/mksyntax.c
+diff --git a/3rdparty/bash-orig/mksyntax.c b/3rdparty/bash-workdir/mksyntax.c
 index 0385686..1a73eca 100644
---- a/ports/bash-orig/mksyntax.c
-+++ b/ports/bash-workdir/mksyntax.c
+--- a/3rdparty/bash-orig/mksyntax.c
++++ b/3rdparty/bash-workdir/mksyntax.c
 @@ -20,16 +20,12 @@
     along with Bash.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -140,10 +140,10 @@ index 0385686..1a73eca 100644
 -    }
 -}
 -#endif /* HAVE_STRERROR */
-diff --git a/ports/bash-orig/shell.c b/ports/bash-workdir/shell.c
+diff --git a/3rdparty/bash-orig/shell.c b/3rdparty/bash-workdir/shell.c
 index ce8087f..b7475dd 100644
---- a/ports/bash-orig/shell.c
-+++ b/ports/bash-workdir/shell.c
+--- a/3rdparty/bash-orig/shell.c
++++ b/3rdparty/bash-workdir/shell.c
 @@ -1614,7 +1614,7 @@ open_shell_script (script_name)
  #endif
  
@@ -162,10 +162,10 @@ index ce8087f..b7475dd 100644
      }
  
    /* Open the script.  But try to move the file descriptor to a randomly
-diff --git a/ports/bash-orig/support/bashversion.c b/ports/bash-workdir/support/bashversion.c
+diff --git a/3rdparty/bash-orig/support/bashversion.c b/3rdparty/bash-workdir/support/bashversion.c
 index 4f86b13..64779de 100644
---- a/ports/bash-orig/support/bashversion.c
-+++ b/ports/bash-workdir/support/bashversion.c
+--- a/3rdparty/bash-orig/support/bashversion.c
++++ b/3rdparty/bash-workdir/support/bashversion.c
 @@ -18,15 +18,12 @@
     along with Bash.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -184,10 +184,10 @@ index 4f86b13..64779de 100644
  
  #include "bashansi.h"
  
-diff --git a/ports/bash-orig/support/config.sub b/ports/bash-workdir/support/config.sub
+diff --git a/3rdparty/bash-orig/support/config.sub b/3rdparty/bash-workdir/support/config.sub
 index c874b7a..b6f5162 100755
---- a/ports/bash-orig/support/config.sub
-+++ b/ports/bash-workdir/support/config.sub
+--- a/3rdparty/bash-orig/support/config.sub
++++ b/3rdparty/bash-workdir/support/config.sub
 @@ -1707,7 +1707,7 @@ case $os in
  	     | bosx* | nextstep* | cxux* | aout* | elf* | oabi* \
  	     | ptx* | coff* | ecoff* | winnt* | domain* | vsta* \
@@ -197,10 +197,10 @@ index c874b7a..b6f5162 100755
  	     | cygwin* | msys* | pe* | moss* | proelf* | rtems* \
  	     | midipix* | mingw32* | mingw64* | mint* \
  	     | uxpv* | beos* | mpeix* | udk* | moxiebox* \
-diff --git a/ports/bash-orig/support/man2html.c b/ports/bash-workdir/support/man2html.c
+diff --git a/3rdparty/bash-orig/support/man2html.c b/3rdparty/bash-workdir/support/man2html.c
 index e6f441b..f02453d 100644
---- a/ports/bash-orig/support/man2html.c
-+++ b/ports/bash-workdir/support/man2html.c
+--- a/3rdparty/bash-orig/support/man2html.c
++++ b/3rdparty/bash-workdir/support/man2html.c
 @@ -63,7 +63,7 @@
   *    time to look through all the available manpages.)
   */
@@ -220,10 +220,10 @@ index e6f441b..f02453d 100644
  static char *
  strerror(int e)
  {
-diff --git a/ports/bash-orig/support/mksignames.c b/ports/bash-workdir/support/mksignames.c
+diff --git a/3rdparty/bash-orig/support/mksignames.c b/3rdparty/bash-workdir/support/mksignames.c
 index ba87ae8..4b39787 100644
---- a/ports/bash-orig/support/mksignames.c
-+++ b/ports/bash-workdir/support/mksignames.c
+--- a/3rdparty/bash-orig/support/mksignames.c
++++ b/3rdparty/bash-workdir/support/mksignames.c
 @@ -19,8 +19,6 @@
     along with Bash.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -233,10 +233,10 @@ index ba87ae8..4b39787 100644
  #include <sys/types.h>
  #include <signal.h>
  
-diff --git a/ports/bash-orig/support/signames.c b/ports/bash-workdir/support/signames.c
+diff --git a/3rdparty/bash-orig/support/signames.c b/3rdparty/bash-workdir/support/signames.c
 index aba4842..b4bbdc6 100644
---- a/ports/bash-orig/support/signames.c
-+++ b/ports/bash-workdir/support/signames.c
+--- a/3rdparty/bash-orig/support/signames.c
++++ b/3rdparty/bash-workdir/support/signames.c
 @@ -18,8 +18,6 @@
     along with Bash.  If not, see <http://www.gnu.org/licenses/>.
  */
