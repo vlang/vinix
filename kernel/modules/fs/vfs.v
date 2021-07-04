@@ -236,18 +236,18 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	path := unsafe { cstring_to_vstring(_path) }
 
 	parent := get_parent_dir(dirfd, path) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 
 	//creat_flags := flags & resource.file_creation_flags_mask
 
 	node := get_node(parent, path) or {
 		// handle creation
-		return -1, -1
+		return -1, errno.get()
 	}
 
 	fdnum := fdnum_create_from_node(node, flags, 0, false) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 
 	return u64(fdnum), 0
@@ -255,7 +255,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 	defer {
 		fd.unref()
@@ -268,7 +268,7 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 
 pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 	defer {
 		fd.unref()
@@ -288,7 +288,7 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 
 pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 	defer {
 		fd.unref()
@@ -304,11 +304,11 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 	path := unsafe { cstring_to_vstring(_path) }
 
 	parent := get_parent_dir(dirfd, path) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 
 	node := get_node(parent, path) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 
 	unsafe { statbuf[0] = node.resource.stat }
@@ -318,7 +318,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 	defer {
 		fd.unref()
@@ -350,7 +350,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, -1
+		return -1, errno.get()
 	}
 	defer {
 		fd.unref()
