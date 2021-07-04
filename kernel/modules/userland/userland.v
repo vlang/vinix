@@ -67,7 +67,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	}
 
 	mut which := u64(0)
-	block := options & wnohang != 0
+	block := options & wnohang == 0
 	event.await(events, &which, block)
 
 	if which == -1 {
