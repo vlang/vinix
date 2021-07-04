@@ -75,3 +75,4 @@ clean:
 .PHONY: distclean
 distclean: clean
 	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap
+	rm -rf sysroot/usr sysroot/etc/xbstrap
