@@ -26,11 +26,6 @@ distro:
 	$(MAKE) update-v
 	cd build && xbstrap install --all
 
-3rdparty/limine:
-	mkdir -p 3rdparty
-	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1 3rdparty/limine
-	$(MAKE) -C 3rdparty/limine
-
 V_COMMIT  = 6a6425952747cc5716531a9fa0320afca95a6950
 VC_COMMIT = 85bd19fb014c21e008e947b294c0354b534b4948
 
@@ -59,14 +54,14 @@ update-v:
 kernel/vinix.elf: update-v
 	cd build && xbstrap install --rebuild kernel
 
-vinix.iso: 3rdparty/limine kernel/vinix.elf
+vinix.iso: kernel/vinix.elf
 	( cd build/system-root && tar -zcf ../../initramfs.tar.gz * )
 	rm -rf pack
 	mkdir -p pack/boot
 	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp pack/
-	cp limine.cfg 3rdparty/limine/limine.sys 3rdparty/limine/limine-cd.bin 3rdparty/limine/limine-eltorito-efi.bin pack/boot/
+	cp limine.cfg ./build/tools/host-limine/share/limine/limine.sys ./build/tools/host-limine/share/limine/limine-cd.bin ./build/tools/host-limine/share/limine/limine-eltorito-efi.bin pack/boot/
 	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot /boot/limine-eltorito-efi.bin -efi-boot-part --efi-boot-image --protective-msdos-label pack -o vinix.iso
-	./3rdparty/limine/limine-install vinix.iso
+	./build/tools/host-limine/bin/limine-install vinix.iso
 
 .PHONY: format
 format: 3rdparty/v

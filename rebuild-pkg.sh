@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
 BASE_DIR="$(pwd)"
 
@@ -8,6 +8,8 @@ if [ -z "$1" ]; then
     echo "Usage: $0 <package dir> [<package name>] [--tool]"
     exit 1
 fi
+
+set -x
 
 if [ -z "$2" ]; then
     PKG_NAME="$1"

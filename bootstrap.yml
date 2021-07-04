@@ -48,6 +48,13 @@ sources:
     extract_path: 'vc'
     patch-path-strip: 3
 
+  - name: limine
+    subdir: '3rdparty'
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.27/limine-v2.27.tar.xz
+    format: 'tar.xz'
+    extract_path: 'limine-v2.27'
+    patch-path-strip: 3
+
 tools:
   - name: host-autoconf-v2.69
     source:
@@ -88,6 +95,19 @@ tools:
         - 'bash'
         - '-c'
         - 'cd "@THIS_SOURCE_DIR@" && cc -std=gnu99 -w -o ./v ../vc/v.c -lm && ./v self'
+
+  - name: host-limine
+    from_source: limine
+    compile:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cd "@THIS_SOURCE_DIR@" && make -j@PARALLELISM@'
+    install:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cd "@THIS_SOURCE_DIR@" && make install PREFIX="@PREFIX@"'
 
   - name: host-binutils
     from_source: binutils
@@ -225,6 +245,7 @@ packages:
     tools_required:
       - host-v
       - host-gcc
+      - host-limine
     build:
       - args:
         - 'bash'
