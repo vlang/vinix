@@ -26,8 +26,8 @@ distro:
 	$(MAKE) update-v
 	cd build && xbstrap install --all
 
-V_COMMIT  = 6a6425952747cc5716531a9fa0320afca95a6950
-VC_COMMIT = 85bd19fb014c21e008e947b294c0354b534b4948
+V_COMMIT  = 806d6172cb61f9a413f05434c34bbcb213774704
+VC_COMMIT = 702cd2810aa992b44c67497feb0be61a0a0d0d89
 
 .PHONY: update-v
 update-v:
@@ -47,6 +47,7 @@ update-v:
 		tar -xf $(VC_COMMIT).tar.gz && \
 		mv vc-$(VC_COMMIT) vc && \
 		tar -zcf ../vc.tar.gz vc && \
+		cd ../.. && ./rebuild-pkg.sh vc host-vc --tool \
 		cd ../.. && ./rebuild-pkg.sh v host-v --tool \
 	)
 

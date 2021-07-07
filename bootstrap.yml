@@ -96,6 +96,12 @@ tools:
         - '-c'
         - 'cd "@THIS_SOURCE_DIR@" && cc -std=gnu99 -w -o ./v ../vc/v.c -lm && ./v self'
 
+  - name: host-vc
+    from_source: vc
+    compile:
+      - args:
+        - 'true'
+
   - name: host-limine
     from_source: limine
     compile:
