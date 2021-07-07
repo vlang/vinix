@@ -16,16 +16,17 @@ pub const seek_set = 3
 interface FileSystem {
 	instantiate() &FileSystem
 	populate(&VFSNode)
-	mount(&VFSNode) &VFSNode
+	mount(&VFSNode) ?&VFSNode
 	create(&VFSNode, string, int) &VFSNode
 }
 
-struct VFSNode {
+pub struct VFSNode {
 pub mut:
-	mountpoint    &VFSNode
-	resource      &resource.Resource
-	filesystem    &FileSystem
-	children      map[string]&VFSNode
+	mountpoint &VFSNode
+	redir      &VFSNode
+	resource   &resource.Resource
+	filesystem &FileSystem
+	children   map[string]&VFSNode
 }
 
 __global (
@@ -36,7 +37,8 @@ __global (
 
 fn create_node(filesystem &FileSystem) &VFSNode {
 	node := &VFSNode{
-				mountpoint: 0
+				mountpoint: voidptr(0)
+				redir: voidptr(0)
 				children: map[string]&VFSNode{}
 				resource: &resource.Resource(voidptr(0))
 				filesystem: unsafe { filesystem }
@@ -54,6 +56,17 @@ pub fn initialise() {
 	filesystems['devtmpfs'] = &DevTmpFS{}
 }
 
+fn reduce_node(node &VFSNode) &VFSNode {
+	mut ret := unsafe { node }
+	for voidptr(ret.redir) != voidptr(0) {
+		ret = ret.redir
+	}
+	for voidptr(ret.mountpoint) != voidptr(0) {
+		ret = ret.mountpoint
+	}
+	return ret
+}
+
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	if path.len == 0 {
 		errno.set(errno.enoent)
@@ -61,20 +74,16 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	}
 
 	mut index := u64(0)
-	mut current_node := unsafe { parent }
+	mut current_node := reduce_node(parent)
 
 	if path[index] == `/` {
-		current_node = vfs_root
-		for voidptr(current_node.mountpoint) != voidptr(0) {
-			current_node = current_node.mountpoint
+		current_node = reduce_node(vfs_root)
+		for path[index] == `/` {
+			if index == path.len - 1 {
+				return 0, current_node, ''
+			}
+			index++
 		}
-	}
-
-	for path[index] == `/` {
-		if index == path.len - 1 {
-			return 0, current_node, ''
-		}
-		index++
 	}
 
 	for {
@@ -95,9 +104,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 
 		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
-		for current_node.mountpoint != 0 {
-			current_node = current_node.mountpoint
-		}
+		current_node = reduce_node(current_node)
 
 		if elem_str !in current_node.children {
 			errno.set(errno.enoent)
@@ -107,7 +114,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			return 0, 0, ''
 		}
 
-		new_node := current_node.children[elem_str]
+		new_node := reduce_node(current_node.children[elem_str])
 
 		if last == true {
 			return 0, new_node, elem_str
@@ -132,7 +139,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 
 	mut parent := &VFSNode(0)
 
-	if is_absolute == false {
+	if is_absolute == true {
 		parent = vfs_root
 	} else {
 		if dirfd == at_fdcwd {
@@ -155,51 +162,58 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 
 pub fn get_node(parent &VFSNode, path string) ?&VFSNode {
 	_, node, _ := path2node(parent, path)
-	if node == 0 {
-		return error('File not found')
+	if voidptr(node) == voidptr(0) {
+		return none
 	}
 	return node
 }
 
-pub fn mount(parent &VFSNode, source string, target string, filesystem string) bool {
+pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
 	if filesystem !in filesystems {
-		return false
+		return error('')
 	}
 
 	mut source_node := &VFSNode(0)
 	if source.len != 0 {
 		_, source_node, _ = path2node(parent, source)
-		if source_node == 0
-		|| !stat.isreg(source_node.resource.stat.mode) {
-			return false
+		if voidptr(source_node) == voidptr(0)
+		|| stat.isdir(source_node.resource.stat.mode) {
+			return error('')
 		}
 	}
 
-	_, mut target_node, _ := path2node(parent, target)
-	if target_node == 0
-	|| (voidptr(target_node) != voidptr(vfs_root)
-		&& !stat.isdir(target_node.resource.stat.mode))
-	|| target_node.mountpoint != 0 {
-		return false
+	parent_of_tgt_node, mut target_node, _ := path2node(parent, target)
+
+	mounting_root := voidptr(target_node) == voidptr(vfs_root)
+
+	if target_node == voidptr(0)
+	|| (!mounting_root && !stat.isdir(target_node.resource.stat.mode)) {
+		return error('')
 	}
 
 	fs := filesystems[filesystem].instantiate()
 
-	mount_node := fs.mount(source_node)
-
-	if mount_node == 0 {
-		return false
-	}
+	mut mount_node := fs.mount(source_node) ?
 
 	target_node.mountpoint = mount_node
+
+	mount_node.create_dotentries(parent_of_tgt_node)
 
 	if source.len > 0 {
 		print('vfs: Mounted `${source}` to `${target}` with filesystem `${filesystem}`\n')
 	} else {
 		print('vfs: Mounted ${filesystem} to `${target}`\n')
 	}
+}
 
-	return true
+fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
+	// Create . and .. entries
+	mut dot := create_node(node.filesystem)
+	mut dotdot := create_node(node.filesystem)
+	dot.redir = unsafe { node }
+	dotdot.redir = unsafe { parent }
+	node.children['.'] = dot
+	node.children['..'] = dotdot
 }
 
 pub fn create(parent &VFSNode, name string, mode int) &VFSNode {
@@ -219,6 +233,10 @@ pub fn internal_create(parent &VFSNode, name string, mode int) &VFSNode {
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, name, mode)
 
 	parent_of_tgt_node.children[basename] = target_node
+
+	if stat.isdir(target_node.resource.stat.mode) {
+		target_node.create_dotentries(parent_of_tgt_node)
+	}
 
 	return target_node
 }

@@ -78,7 +78,7 @@ fn (mut this TmpFS) instantiate() &FileSystem {
 
 fn (mut this TmpFS) populate(node &VFSNode) {}
 
-fn (mut this TmpFS) mount(source &VFSNode) &VFSNode {
+fn (mut this TmpFS) mount(source &VFSNode) ?&VFSNode {
 	this.dev_id = resource.create_dev_id()
 	return this.create(&VFSNode(0), '', 0644 | stat.ifdir)
 }

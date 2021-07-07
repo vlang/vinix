@@ -80,7 +80,7 @@ fn (mut this DevTmpFS) instantiate() &FileSystem {
 
 fn (mut this DevTmpFS) populate(node &VFSNode) {}
 
-fn (mut this DevTmpFS) mount(source &VFSNode) &VFSNode {
+fn (mut this DevTmpFS) mount(source &VFSNode) ?&VFSNode {
 	if devtmpfs_dev_id == 0 {
 		devtmpfs_dev_id = resource.create_dev_id()
 	}
