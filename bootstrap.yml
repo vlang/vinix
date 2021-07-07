@@ -104,11 +104,13 @@ tools:
 
   - name: host-limine
     from_source: limine
+    tools_required:
+      - host-gcc
     compile:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make -j@PARALLELISM@'
+        - 'cd "@THIS_SOURCE_DIR@" && make -j@PARALLELISM@ limine-bios limine-uefi TOOLCHAIN=x86_64-vinix && make bin/limine-install'
     install:
       - args:
         - 'bash'
@@ -125,6 +127,7 @@ tools:
         - '--with-sysroot=@SYSROOT_DIR@'
         # On recent compilers, binutils 2.26 causes implicit-fallthrough warnings, among others.
         - '--disable-werror'
+        - '--enable-targets=x86_64-elf,x86_64-pe'
         # -g blows up the binary size.
         - 'CFLAGS=-O2 -pipe'
     compile:

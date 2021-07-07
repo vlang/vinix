@@ -1,7 +1,7 @@
-diff --git a/ports/binutils-orig/bfd/config.bfd b/ports/binutils-workdir/bfd/config.bfd
-index e7b55b0..e3d1e2a 100644
---- a/ports/binutils-orig/bfd/config.bfd
-+++ b/ports/binutils-workdir/bfd/config.bfd
+diff --git a/3rdparty/binutils-orig/bfd/config.bfd b/3rdparty/binutils-workdir/bfd/config.bfd
+index e7b55b0..6ebf379 100644
+--- a/3rdparty/binutils-orig/bfd/config.bfd
++++ b/3rdparty/binutils-workdir/bfd/config.bfd
 @@ -724,6 +724,11 @@ case "${targ}" in
      targ_defvec=i386_elf32_vec
      targ_selvecs="iamcu_elf32_vec i386_pe_vec i386_pei_vec"
@@ -14,10 +14,10 @@ index e7b55b0..e3d1e2a 100644
    i[3-7]86-*-interix*)
      targ_defvec=i386_pei_vec
      targ_selvecs="i386_pe_vec"
-diff --git a/ports/binutils-orig/config.sub b/ports/binutils-workdir/config.sub
-index b0f8492..60f9513 100755
---- a/ports/binutils-orig/config.sub
-+++ b/ports/binutils-workdir/config.sub
+diff --git a/3rdparty/binutils-orig/config.sub b/3rdparty/binutils-workdir/config.sub
+index b0f8492..2384aec 100755
+--- a/3rdparty/binutils-orig/config.sub
++++ b/3rdparty/binutils-workdir/config.sub
 @@ -1709,7 +1709,7 @@ case $os in
  	     | bosx* | nextstep* | cxux* | aout* | elf* | oabi* \
  	     | ptx* | coff* | ecoff* | winnt* | domain* | vsta* \
@@ -27,10 +27,10 @@ index b0f8492..60f9513 100755
  	     | cygwin* | msys* | pe* | moss* | proelf* | rtems* \
  	     | midipix* | mingw32* | mingw64* | mint* \
  	     | uxpv* | beos* | mpeix* | udk* | moxiebox* \
-diff --git a/ports/binutils-orig/gas/configure.tgt b/ports/binutils-workdir/gas/configure.tgt
-index 6f46e0a..23921f1 100644
---- a/ports/binutils-orig/gas/configure.tgt
-+++ b/ports/binutils-workdir/gas/configure.tgt
+diff --git a/3rdparty/binutils-orig/gas/configure.tgt b/3rdparty/binutils-workdir/gas/configure.tgt
+index 6f46e0a..b323506 100644
+--- a/3rdparty/binutils-orig/gas/configure.tgt
++++ b/3rdparty/binutils-workdir/gas/configure.tgt
 @@ -221,6 +221,7 @@ case ${generic_target} in
    i386-*-beos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
@@ -39,10 +39,10 @@ index 6f46e0a..23921f1 100644
    i386-*-fuchsia*)			fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-netbsdpe*)			fmt=coff em=pe ;;
-diff --git a/ports/binutils-orig/ld/configure.tgt b/ports/binutils-workdir/ld/configure.tgt
-index 0c780b2..8407607 100644
---- a/ports/binutils-orig/ld/configure.tgt
-+++ b/ports/binutils-workdir/ld/configure.tgt
+diff --git a/3rdparty/binutils-orig/ld/configure.tgt b/3rdparty/binutils-workdir/ld/configure.tgt
+index 0c780b2..facdd12 100644
+--- a/3rdparty/binutils-orig/ld/configure.tgt
++++ b/3rdparty/binutils-workdir/ld/configure.tgt
 @@ -319,6 +319,10 @@ i[3-7]86-*-bsd386)	targ_emul=i386bsd
  i[3-7]86-*-bsdi*)	targ_emul=i386bsd
  			targ_extra_ofiles=
