@@ -50,7 +50,9 @@ fi
 git diff --no-index 3rdparty/$1-orig 3rdparty/$1-workdir > patches/$1/$1.patch || true
 
 [ "$1" = "mlibc" ] && [ -d 3rdparty/mlibc ] && mv 3rdparty/mlibc/subprojects ./mlibc-subprojects
+[ "$1" = "limine" ] && [ -d 3rdparty/limine ] && mv 3rdparty/limine/gnu-efi 3rdparty/limine/stivale ./
 rm -rf 3rdparty/$1
 [ "$1" = "mlibc" ] && mkdir 3rdparty/mlibc && mv ./mlibc-subprojects 3rdparty/mlibc/subprojects || true
+[ "$1" = "limine" ] && mkdir 3rdparty/limine && mv ./gnu-efi ./stivale 3rdparty/limine/ || true
 cd build
 xbstrap install$IS_TOOL -u $PKG_NAME
