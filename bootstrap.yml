@@ -50,9 +50,9 @@ sources:
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.29/limine-v2.29.tar.xz
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.30/limine-v2.30.tar.xz
     format: 'tar.xz'
-    extract_path: 'limine-v2.29'
+    extract_path: 'limine-v2.30'
     patch-path-strip: 3
 
 tools:
