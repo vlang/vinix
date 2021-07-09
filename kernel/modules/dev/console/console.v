@@ -6,7 +6,7 @@ import x86.kio
 import event
 import event.eventstruct
 import klock
-import sched
+import acpi
 import stat
 import stivale2
 import fs
@@ -150,7 +150,7 @@ fn keyboard_handler() {
 	for {
 		mut which := u64(0)
 		event.await([&int_events[vect]], &which, true)
-		input_byte := kio.inb(0x60)
+		input_byte := read_ps2()
 
 		if input_byte == 0xe0 {
 			console_extra_scancodes = true
@@ -229,9 +229,27 @@ fn keyboard_handler() {
 	}
 }
 
-pub fn initialise() {
-	sched.new_kernel_thread(voidptr(keyboard_handler), voidptr(0), true)
+fn read_ps2() byte {
+	for kio.inb(0x64) & 1 == 0 {}
+	return kio.inb(0x60)
+}
 
+fn write_ps2(port u16, value byte) {
+	for kio.inb(0x64) & 2 != 0 {}
+	kio.outb(port, value)
+}
+
+fn read_ps2_config() byte {
+	write_ps2(0x64, 0x20)
+	return read_ps2()
+}
+
+fn write_ps2_config(value byte) {
+	write_ps2(0x64, 0x60)
+	write_ps2(0x60, value)
+}
+
+pub fn initialise() {
 	mut console_res := &Console{}
 	console_res.stat.size = 0
 	console_res.stat.blocks = 0
@@ -240,6 +258,37 @@ pub fn initialise() {
 	console_res.stat.mode = 0644 | stat.ifchr
 
 	fs.devtmpfs_add_device(console_res, 'console')
+
+	print('console: PS/2 controller present\n')
+
+	// Disable primary and secondary PS/2 ports
+	write_ps2(0x64, 0xad)
+	write_ps2(0x64, 0xa7)
+
+	// Read from port 0x60 to flush the PS/2 controller buffer
+	for kio.inb(0x64) & 1 != 0 {
+		kio.inb(0x60)
+	}
+
+	mut ps2_config := read_ps2_config()
+
+	// Enable keyboard interrupt and keyboard scancode translation
+	ps2_config |= (1 << 0) | (1 << 6)
+	// Enable mouse interrupt if any
+	if ps2_config & (1 << 5) != 0 {
+		ps2_config |= (1 << 1)
+	}
+
+	write_ps2_config(ps2_config)
+
+	// Enable keyboard port
+	write_ps2(0x64, 0xae)
+	// Enable mouse port if any
+	if ps2_config & (1 << 5) != 0 {
+		write_ps2(0x64, 0xa8)
+	}
+
+	go keyboard_handler()
 }
 
 struct Console {
