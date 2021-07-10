@@ -244,6 +244,12 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
 					prot_and_flags u64, fd int, offset i64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n',
+			 addr, length, prot_and_flags, fd, offset)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut resource := &resource.Resource(voidptr(0))
 
 	prot  := int((prot_and_flags >> 32) & 0xffffffff)

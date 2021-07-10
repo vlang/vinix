@@ -16,6 +16,11 @@ import errno
 pub const wnohang = 2
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: execve(%s, [omit], [omit])\n', _path)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	path := unsafe { cstring_to_vstring(_path) }
 	mut argv := []string{}
 	for i := 0; ; i++ {
@@ -44,6 +49,11 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 }
 
 pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: waitpid(%d, 0x%llx, %d)\n', pid, _status, options)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut status := unsafe { _status }
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
@@ -90,6 +100,11 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 }
 
 pub fn syscall_exit(_ voidptr, status int) {
+	C.printf(c'\n\e[32mstrace\e[m: exit(%d)\n', status)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
@@ -123,6 +138,11 @@ pub fn syscall_exit(_ voidptr, status int) {
 }
 
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: fork()\n')
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 

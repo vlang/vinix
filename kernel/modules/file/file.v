@@ -197,6 +197,11 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 }
 
 pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: dup3(%d, %d, %d)\n', oldfdnum, newfdnum, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	if oldfdnum == newfdnum {
 		return -1, errno.einval
 	}
@@ -219,6 +224,11 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 }
 
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: fcntl(%d, %d, %lld)\n', fdnum, cmd, arg)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.ebadf
 	}

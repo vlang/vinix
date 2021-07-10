@@ -274,6 +274,11 @@ fn fdnum_create_from_node(node &VFSNode, flags int, oldfd int, specific bool) ?i
 }
 
 pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags, mode)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	path := unsafe { cstring_to_vstring(_path) }
 
 	parent := get_parent_dir(dirfd, path) or {
@@ -305,6 +310,11 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 }
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: read(%d, 0x%llx, %lld)\n', fdnum, buf, count)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
@@ -318,6 +328,11 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 }
 
 pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: write(%d, 0x%llx, %lld)\n', fdnum, buf, count)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
@@ -331,6 +346,11 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 }
 
 pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: close(%d)\n', fdnum)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	file.fdnum_close(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
@@ -338,6 +358,11 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 }
 
 pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: ioctl(%d, 0x%llx, 0x%llx)\n', fdnum, request, argp)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
@@ -352,6 +377,12 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 
 pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 					   flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', dirfd, _path,
+			 statbuf, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	path := unsafe { cstring_to_vstring(_path) }
 
 	parent := get_parent_dir(dirfd, path) or {
@@ -368,6 +399,11 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 }
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: fstat(%d, 0x%llx)\n', fdnum, statbuf)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
@@ -381,6 +417,11 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 }
 
 pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: chdir(%s)\n', _path)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	path := unsafe { cstring_to_vstring(_path) }
 
 	mut process := proc.current_thread().process
@@ -402,6 +443,11 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 fn C.strcpy(charptr, charptr) charptr
 
 pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: readdir(%d, 0x%llx)\n', fdnum, _buf)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut buf := unsafe { _buf }
 
 	mut dir_fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
@@ -475,6 +521,11 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 }
 
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: seek(%d, %lld, %d)\n', fdnum, offset, whence)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()
 	}
