@@ -27,16 +27,16 @@ virtual machines.
 
 The following is an OS-agnostic list of packages needed to build Vinix. Skip to a paragraph for your host OS if there is any.
 
-`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `mtools`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `nasm`, `python3`, `pip3`, `wget`, `xorriso`, and `qemu` to test it.
+`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `mtools`, `meson`, `ninja`, `m4`, `texinfo`, `gcc/clang`, `nasm`, `python3`, `pip3`, `zic`, `wget`, `xorriso`, and `qemu` to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install build-essential nasm git mtools meson m4 texinfo python3 python3-pip wget xorriso qemu-system-x86
+sudo apt install build-essential nasm git mtools meson m4 texinfo python3 python3-pip manpages wget xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S base-devel nasm git mtools meson python python-pip wget xorriso qemu-arch-extra
+sudo pacman -S base-devel nasm git mtools meson python python-pip tzdata wget xorriso qemu-arch-extra
 ```
 
 ### Building Vinix on macOS

@@ -14,7 +14,7 @@ jobs:
           fetch-depth: '0'
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install build-essential nasm git mtools meson m4 texinfo python3 python3-pip zic xorriso wget zip && sudo pip3 install xbstrap
+        run: sudo apt-get update && sudo apt-get install build-essential nasm git mtools meson m4 texinfo python3 python3-pip manpages xorriso wget zip && sudo pip3 install xbstrap
 
       - name: Build distro
         run: make distro
