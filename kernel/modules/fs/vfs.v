@@ -88,7 +88,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 		current_node = reduce_node(vfs_root, false)
 		for path[index] == `/` {
 			if index == path.len - 1 {
-				return 0, current_node, ''
+				return current_node, current_node, ''
 			}
 			index++
 		}
@@ -125,7 +125,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 		new_node := reduce_node(current_node.children[elem_str], false)
 
 		if last == true {
-			return 0, new_node, elem_str
+			return current_node, new_node, elem_str
 		}
 
 		current_node = new_node
