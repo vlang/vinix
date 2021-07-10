@@ -77,10 +77,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..97a1e81
+index 0000000..0a7507a
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,330 @@
+@@ -0,0 +1,342 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -170,7 +170,20 @@ index 0000000..97a1e81
 +    return sys_open(path, 0, handle);
 +}
 +
-+int sys_read_entries(int fd, void *buffer, size_t max_size, size_t *bytes_read) STUB_ONLY
++int sys_read_entries(int fd, void *buffer, size_t max_size, size_t *bytes_read) {
++    __syscall_ret ret = __syscall(19, fd, buffer);
++
++    if (ret.ret == (uint64_t)-1 && ret.errno == 0) {
++        // End of directory.
++        *bytes_read = 0;
++        return 0;
++    } else if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *bytes_read = sizeof(struct dirent);
++    return 0;
++}
 +
 +int sys_close(int fd) {
 +    __syscall_ret ret = __syscall(6, fd);
@@ -185,8 +198,7 @@ index 0000000..97a1e81
 +    __syscall_ret ret = __syscall(5, fd, offset, whence);
 +
 +    if (ret.errno != 0) {
-+        // TODO
-+        return ESPIPE;
++        return ret.errno;
 +    }
 +
 +    *new_offset = (off_t)ret.ret;

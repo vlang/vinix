@@ -4,6 +4,7 @@ import resource
 import proc
 import klock
 import errno
+import stat
 
 pub const f_dupfd = 1
 pub const f_dupfd_cloexec = 2
@@ -27,6 +28,9 @@ pub mut:
 	refcount int
 	loc i64
 	flags int
+	dirlist_valid bool
+	dirlist []stat.Dirent
+	dirlist_index u64
 }
 
 pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
@@ -145,6 +149,7 @@ pub fn fd_create_from_resource(_res &resource.Resource, flags int) ?&FD {
 	new_handle.resource = res
 	new_handle.refcount = 1
 	new_handle.flags = flags & resource.file_status_flags_mask
+	new_handle.dirlist = []stat.Dirent{}
 
 	mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
 	new_fd.handle = new_handle

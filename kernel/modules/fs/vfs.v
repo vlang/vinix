@@ -366,6 +366,81 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	return 0, 0
 }
 
+fn C.strcpy(charptr, charptr) charptr
+
+pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
+	mut buf := unsafe { _buf }
+
+	mut dir_fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, errno.get()
+	}
+	defer {
+		dir_fd.unref()
+	}
+
+	mut dir_handle := dir_fd.handle
+	dir_resource := dir_handle.resource
+
+	if stat.isdir(dir_resource.stat.mode) == false {
+		return -1, errno.enotdir
+	}
+
+	dir_node := &VFSNode(dir_handle.node)
+
+	if dir_handle.dirlist_valid == false {
+		dir_handle.dirlist.clear()
+		mut i := u64(0)
+		for name, orig_node in dir_node.children {
+			node := reduce_node(orig_node)
+			t := match node.resource.stat.mode & stat.ifmt {
+				stat.ifchr {
+					stat.dt_chr
+				}
+				stat.ifblk {
+					stat.dt_blk
+				}
+				stat.ifdir {
+					stat.dt_dir
+				}
+				stat.iflnk {
+					stat.dt_lnk
+				}
+				stat.ififo {
+					stat.dt_fifo
+				}
+				stat.ifreg {
+					stat.dt_reg
+				}
+				stat.ifsock {
+					stat.dt_sock
+				}
+				else {
+					stat.dt_unknown
+				}
+			}
+			mut new_dirent := stat.Dirent{
+				ino: node.resource.stat.ino
+				off: i++
+				reclen: u16(sizeof(stat.Dirent))
+				@type: t
+			}
+			C.strcpy(&new_dirent.name[0], name.str)
+			dir_handle.dirlist << new_dirent
+		}
+		dir_handle.dirlist_valid = true
+	}
+
+	if dir_handle.dirlist_index >= dir_handle.dirlist.len {
+		// End of dir.
+		return -1, 0
+	}
+
+	unsafe { buf[0] = dir_handle.dirlist[dir_handle.dirlist_index] }
+	dir_handle.dirlist_index++
+
+	return 0, 0
+}
+
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
 		return -1, errno.get()

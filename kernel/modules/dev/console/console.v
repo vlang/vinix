@@ -258,8 +258,6 @@ pub fn initialise() {
 
 	fs.devtmpfs_add_device(console_res, 'console')
 
-	print('console: PS/2 controller present\n')
-
 	// Disable primary and secondary PS/2 ports
 	write_ps2(0x64, 0xad)
 	write_ps2(0x64, 0xa7)

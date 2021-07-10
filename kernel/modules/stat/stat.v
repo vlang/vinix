@@ -24,7 +24,7 @@ pub fn isdir(mode int) bool { return (mode & ifmt) == ifdir }
 pub fn islnk(mode int) bool { return (mode & ifmt) == iflnk }
 pub fn issock(mode int) bool { return (mode & ifmt) == ifsock }
 
-struct Stat {
+pub struct Stat {
 pub mut:
 	dev     u64
 	ino     u64
@@ -39,4 +39,23 @@ pub mut:
 	ctim    TimeSpec
 	blksize u64
 	blocks  u64
+}
+
+pub const dt_unknown = 0
+pub const dt_fifo = 1
+pub const dt_chr = 2
+pub const dt_dir = 4
+pub const dt_blk = 6
+pub const dt_reg = 8
+pub const dt_lnk = 10
+pub const dt_sock = 12
+pub const dt_wht = 14
+
+pub struct Dirent {
+pub mut:
+	ino    u64
+	off    u64
+	reclen u16
+	@type  u8
+	name   [1024]byte
 }
