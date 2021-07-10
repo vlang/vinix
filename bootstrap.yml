@@ -110,7 +110,7 @@ tools:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make -j@PARALLELISM@ limine-bios limine-uefi TOOLCHAIN=x86_64-vinix && make bin/limine-install'
+        - 'cd "@THIS_SOURCE_DIR@" && make limine-bios limine-uefi TOOLCHAIN=x86_64-vinix && make bin/limine-install'
     install:
       - args:
         - 'bash'

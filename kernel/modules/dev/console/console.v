@@ -6,7 +6,6 @@ import x86.kio
 import event
 import event.eventstruct
 import klock
-import acpi
 import stat
 import stivale2
 import fs
