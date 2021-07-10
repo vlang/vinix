@@ -18,7 +18,7 @@ pub mut:
 fn (mut this DevTmpFSResource) read(buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
-	mut actual_count := u64(count)
+	mut actual_count := count
 	if loc + count > this.stat.size {
 		actual_count = count - ((loc + count) - this.stat.size)
 	}
@@ -27,7 +27,7 @@ fn (mut this DevTmpFSResource) read(buf voidptr, loc u64, count u64) ?i64 {
 
 	this.l.release()
 
-	return i64(count)
+	return i64(actual_count)
 }
 
 fn (mut this DevTmpFSResource) write(buf voidptr, loc u64, count u64) ?i64 {

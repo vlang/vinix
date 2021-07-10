@@ -41,9 +41,7 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	ret := this.resource.read(buf, u64(this.loc), count) or {
 		return none
 	}
-	if ret > 0 {
-		this.loc += ret
-	}
+	this.loc += ret
 	return ret
 }
 
@@ -55,9 +53,7 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	ret := this.resource.write(buf, u64(this.loc), count) or {
 		return none
 	}
-	if ret > 0 {
-		this.loc += ret
-	}
+	this.loc += ret
 	return ret
 }
 

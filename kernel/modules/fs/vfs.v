@@ -310,7 +310,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 }
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: read(%d, 0x%llx, %lld)\n', fdnum, buf, count)
+	C.printf(c'\n\e[32mstrace\e[m: read(%d, 0x%llx, 0x%llx)\n', fdnum, buf, count)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -328,7 +328,7 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 }
 
 pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: write(%d, 0x%llx, %lld)\n', fdnum, buf, count)
+	C.printf(c'\n\e[32mstrace\e[m: write(%d, 0x%llx, 0x%llx)\n', fdnum, buf, count)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
