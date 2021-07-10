@@ -128,7 +128,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 
 	new_node.resource = new_resource
 
-	new_node.symlink_target = target
+	new_node.symlink_target = dest
 
 	return new_node
 }

@@ -282,8 +282,18 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 
 	//creat_flags := flags & resource.file_creation_flags_mask
 
-	node := get_node(parent, path) or {
+	mut node := get_node(parent, path) or {
 		// handle creation
+		return -1, errno.get()
+	}
+
+	if stat.islnk(node.resource.stat.mode) && flags & resource.o_nofollow != 0 {
+		return -1, errno.eloop
+	}
+
+	// Follow symlinks
+	node = reduce_node(node, true)
+	if node == 0 {
 		return -1, errno.get()
 	}
 
