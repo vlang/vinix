@@ -80,7 +80,7 @@ fn (mut this TmpFS) populate(node &VFSNode) {}
 
 fn (mut this TmpFS) mount(source &VFSNode) ?&VFSNode {
 	this.dev_id = resource.create_dev_id()
-	return this.create(&VFSNode(0), '', 0644 | stat.ifdir)
+	return this.create(&VFSNode(0), '', 0o644 | stat.ifdir)
 }
 
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {

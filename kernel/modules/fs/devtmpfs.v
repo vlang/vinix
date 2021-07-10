@@ -85,7 +85,7 @@ fn (mut this DevTmpFS) mount(source &VFSNode) ?&VFSNode {
 		devtmpfs_dev_id = resource.create_dev_id()
 	}
 	if devtmpfs_root == 0 {
-		devtmpfs_root = this.create(&VFSNode(0), '', 0644 | stat.ifdir)
+		devtmpfs_root = this.create(&VFSNode(0), '', 0o644 | stat.ifdir)
 	}
 	return devtmpfs_root
 }

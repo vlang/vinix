@@ -254,7 +254,7 @@ pub fn initialise() {
 	console_res.stat.blocks = 0
 	console_res.stat.blksize = 512
 	console_res.stat.rdev = resource.create_dev_id()
-	console_res.stat.mode = 0644 | stat.ifchr
+	console_res.stat.mode = 0o644 | stat.ifchr
 
 	fs.devtmpfs_add_device(console_res, 'console')
 
