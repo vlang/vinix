@@ -67,6 +67,7 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 		}
 
 		name := unsafe { cstring_to_vstring(&current_header.name[0]) }
+		link_name := unsafe { cstring_to_vstring(&current_header.link_name[0]) }
 		size := octal_to_int(unsafe { cstring_to_vstring(&current_header.size[0]) })
 		mode := octal_to_int(unsafe { cstring_to_vstring(&current_header.mode[0]) })
 
@@ -79,6 +80,11 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 				mut new_resource := new_node.resource
 				buf := voidptr(u64(current_header) + 512)
 				new_resource.write(buf, 0, size) or {
+					panic('initramfs')
+				}
+			}
+			.sym_link {
+				fs.symlink(vfs_root, link_name, name) or {
 					panic('initramfs')
 				}
 			}

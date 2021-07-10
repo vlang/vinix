@@ -105,3 +105,23 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 
 	return new_node
 }
+
+fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
+	mut new_node := create_node(this)
+
+	mut new_resource := &TmpFSResource(memory.malloc(sizeof(TmpFSResource)))
+
+	new_resource.stat.size = u64(target.len)
+	new_resource.stat.blocks = 0
+	new_resource.stat.blksize = 512
+	new_resource.stat.dev = this.dev_id
+	new_resource.stat.ino = this.inode_counter++
+	new_resource.stat.mode = stat.iflnk | 0o777
+	new_resource.stat.nlink = 1
+
+	new_node.resource = new_resource
+
+	new_node.symlink_target = target
+
+	return new_node
+}

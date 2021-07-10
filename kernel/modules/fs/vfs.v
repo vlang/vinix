@@ -18,15 +18,17 @@ interface FileSystem {
 	populate(&VFSNode)
 	mount(&VFSNode) ?&VFSNode
 	create(&VFSNode, string, int) &VFSNode
+	symlink(&VFSNode, string, string) &VFSNode
 }
 
 pub struct VFSNode {
 pub mut:
-	mountpoint &VFSNode
-	redir      &VFSNode
-	resource   &resource.Resource
-	filesystem &FileSystem
-	children   map[string]&VFSNode
+	mountpoint     &VFSNode
+	redir          &VFSNode
+	resource       &resource.Resource
+	filesystem     &FileSystem
+	children       map[string]&VFSNode
+	symlink_target string
 }
 
 __global (
@@ -56,15 +58,21 @@ pub fn initialise() {
 	filesystems['devtmpfs'] = &DevTmpFS{}
 }
 
-fn reduce_node(node &VFSNode) &VFSNode {
-	mut ret := unsafe { node }
-	for voidptr(ret.redir) != voidptr(0) {
-		ret = ret.redir
+fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
+	if node.redir != 0 {
+		return reduce_node(node.redir, follow_symlinks)
 	}
-	for voidptr(ret.mountpoint) != voidptr(0) {
-		ret = ret.mountpoint
+	if node.mountpoint != 0 {
+		return reduce_node(node.mountpoint, follow_symlinks)
 	}
-	return ret
+	if node.symlink_target.len != 0 && follow_symlinks == true {
+		_, next_node, _ := path2node(node, node.symlink_target)
+		if next_node == 0 {
+			return 0
+		}
+		return reduce_node(next_node, follow_symlinks)
+	}
+	return unsafe { node }
 }
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
@@ -74,10 +82,10 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	}
 
 	mut index := u64(0)
-	mut current_node := reduce_node(parent)
+	mut current_node := reduce_node(parent, false)
 
 	if path[index] == `/` {
-		current_node = reduce_node(vfs_root)
+		current_node = reduce_node(vfs_root, false)
 		for path[index] == `/` {
 			if index == path.len - 1 {
 				return 0, current_node, ''
@@ -104,7 +112,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 
 		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
-		current_node = reduce_node(current_node)
+		current_node = reduce_node(current_node, false)
 
 		if elem_str !in current_node.children {
 			errno.set(errno.enoent)
@@ -114,7 +122,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			return 0, 0, ''
 		}
 
-		new_node := reduce_node(current_node.children[elem_str])
+		new_node := reduce_node(current_node.children[elem_str], false)
 
 		if last == true {
 			return 0, new_node, elem_str
@@ -214,6 +222,21 @@ fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	dotdot.redir = unsafe { parent }
 	node.children['.'] = dot
 	node.children['..'] = dotdot
+}
+
+pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
+	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
+
+	if target_node != 0 {
+		errno.set(errno.eexist)
+		return none
+	}
+
+	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, target)
+
+	parent_of_tgt_node.children[basename] = target_node
+
+	return target_node
 }
 
 pub fn create(parent &VFSNode, name string, mode int) &VFSNode {
@@ -391,7 +414,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 		dir_handle.dirlist.clear()
 		mut i := u64(0)
 		for name, orig_node in dir_node.children {
-			node := reduce_node(orig_node)
+			node := reduce_node(orig_node, false)
 			t := match node.resource.stat.mode & stat.ifmt {
 				stat.ifchr {
 					stat.dt_chr
