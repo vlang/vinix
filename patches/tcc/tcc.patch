@@ -1,0 +1,113 @@
+diff --git a/3rdparty/tcc-orig/configure b/3rdparty/tcc-workdir/configure
+index 1ee3acb..133e21a 100755
+--- a/3rdparty/tcc-orig/configure
++++ b/3rdparty/tcc-workdir/configure
+@@ -49,7 +49,7 @@ gcc_major=0
+ gcc_minor=0
+ 
+ # OS specific
+-targetos=`uname`
++targetos=Vinix
+ case $targetos in
+   Darwin)
+     confvars="$confvars OSX"
+diff --git a/3rdparty/tcc-orig/lib/Makefile b/3rdparty/tcc-workdir/lib/Makefile
+index 0c1ec54..c546dff 100644
+--- a/3rdparty/tcc-orig/lib/Makefile
++++ b/3rdparty/tcc-workdir/lib/Makefile
+@@ -20,18 +20,18 @@ XCFG = $(or $(findstring -win,$T),-unx)
+ # in order to use gcc, tyoe: make <target>-libtcc1-usegcc=yes
+ arm-libtcc1-usegcc ?= no
+ 
+-ifeq "$($(T)-libtcc1-usegcc)" "yes"
++#ifeq "$($(T)-libtcc1-usegcc)" "yes"
+  XCC = $(CC)
+  XAR = $(AR)
+  XFLAGS = $(CFLAGS) -fPIC
+-endif
++#endif
+ 
+ # only for native compiler
+ $(X)BCHECK_O = bcheck.o
+ 
+-ifeq ($(CONFIG_musl)$(CONFIG_uClibc),yes)
++#ifeq ($(CONFIG_musl)$(CONFIG_uClibc),yes)
+  BCHECK_O =
+-endif
++#endif
+ 
+ ifdef CONFIG_OSX
+  XFLAGS += -D_ANSI_SOURCE
+diff --git a/3rdparty/tcc-orig/libtcc.c b/3rdparty/tcc-workdir/libtcc.c
+index 1e9dd97..30d27f0 100644
+--- a/3rdparty/tcc-orig/libtcc.c
++++ b/3rdparty/tcc-workdir/libtcc.c
+@@ -975,8 +975,8 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
+     if ((output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) &&
+         !s->nostdlib) {
+         if (output_type != TCC_OUTPUT_DLL)
+-            tcc_add_crt(s, "crt1.o");
+-        tcc_add_crt(s, "crti.o");
++            tcc_add_crt(s, "crt0.o");
++        //tcc_add_crt(s, "crti.o");
+     }
+ #endif
+     return 0;
+diff --git a/3rdparty/tcc-orig/tcc.c b/3rdparty/tcc-workdir/tcc.c
+index cd887d1..26c0ab8 100644
+--- a/3rdparty/tcc-orig/tcc.c
++++ b/3rdparty/tcc-workdir/tcc.c
+@@ -1,6 +1,6 @@
+ /*
+  *  TCC - Tiny C Compiler
+- * 
++ *
+  *  Copyright (c) 2001-2004 Fabrice Bellard
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -162,6 +162,8 @@ static const char version[] =
+         " Darwin"
+ #elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+         " FreeBSD"
++#elif defined(__vinix__)
++        " Vinix"
+ #else
+         " Linux"
+ #endif
+diff --git a/3rdparty/tcc-orig/tcc.h b/3rdparty/tcc-workdir/tcc.h
+index cd67973..e42f5fe 100644
+--- a/3rdparty/tcc-orig/tcc.h
++++ b/3rdparty/tcc-workdir/tcc.h
+@@ -162,6 +162,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
+ # endif
+ #endif
+ 
++#if 0
++
+ #if defined TCC_IS_NATIVE && !defined CONFIG_TCCBOOT
+ # define CONFIG_TCC_BACKTRACE
+ # if (defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64) \
+@@ -170,6 +172,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
+ # endif
+ #endif
+ 
++#endif
++
+ /* ------------ path configuration ------------ */
+ 
+ #ifndef CONFIG_SYSROOT
+diff --git a/3rdparty/tcc-orig/tccelf.c b/3rdparty/tcc-workdir/tccelf.c
+index 70d47e1..994ee59 100644
+--- a/3rdparty/tcc-orig/tccelf.c
++++ b/3rdparty/tcc-workdir/tccelf.c
+@@ -1202,8 +1202,10 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
+ #endif
+         tcc_add_support(s1, TCC_LIBTCC1);
+         /* add crt end if not memory output */
++        /*
+         if (s1->output_type != TCC_OUTPUT_MEMORY)
+             tcc_add_crt(s1, "crtn.o");
++        */
+     }
+ }
+ 
