@@ -251,7 +251,7 @@ packages:
   - name: tcc
     source:
       subdir: '3rdparty'
-      url: 'http://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2'
+      url: 'https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2'
       format: 'tar.bz2'
       extract_path: 'tcc-0.9.27'
       patch-path-strip: 3
