@@ -21,7 +21,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	fs.initialise()
 
 	fs.mount(vfs_root, '', '/', 'tmpfs') or {}
-	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir)
+	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
 
 	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }

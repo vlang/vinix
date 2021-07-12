@@ -73,10 +73,14 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 
 		match USTARFileType(current_header.filetype) {
 			.directory {
-				fs.create(vfs_root, name, int(mode) | stat.ifdir)
+				fs.create(vfs_root, name, int(mode) | stat.ifdir) or {
+					panic('initramfs')
+				}
 			}
 			.regular_file {
-				new_node := fs.create(vfs_root, name, int(mode) | stat.ifreg)
+				new_node := fs.create(vfs_root, name, int(mode) | stat.ifreg) or {
+					panic('initramfs')
+				}
 				mut new_resource := new_node.resource
 				buf := voidptr(u64(current_header) + 512)
 				new_resource.write(buf, 0, size) or {

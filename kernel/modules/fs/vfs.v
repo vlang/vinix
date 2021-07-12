@@ -239,18 +239,18 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	return target_node
 }
 
-pub fn create(parent &VFSNode, name string, mode int) &VFSNode {
+pub fn create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	vfs_lock.acquire()
-	ret := internal_create(parent, name, mode)
+	ret := internal_create(parent, name, mode) ?
 	vfs_lock.release()
 	return ret
 }
 
-pub fn internal_create(parent &VFSNode, name string, mode int) &VFSNode {
+pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
 	if target_node != 0 {
-		return 0
+		return none
 	}
 
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, name, mode)
@@ -285,10 +285,23 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return -1, errno.get()
 	}
 
-	//creat_flags := flags & resource.file_creation_flags_mask
+	creat_flags := flags & resource.file_creation_flags_mask
 
 	mut node := get_node(parent, path) or {
-		// handle creation
+		if creat_flags & resource.o_creat != 0 {
+			// XXX: mlibc does not pass mode? OK... force regular file with 644
+			new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
+				return -1, errno.get()
+			}
+			new_node
+		} else {
+			// return -1, errno.get()
+			// ^ V compiler doesn't like that, return 0 and catch it afterwards
+			0
+		}
+	}
+
+	if node == 0 {
 		return -1, errno.get()
 	}
 
@@ -569,6 +582,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 
 	if base > handle.resource.stat.size {
 		// TODO: grow
+		panic('vfs: Grow not yet supported')
 		return -1, errno.einval
 	}
 
