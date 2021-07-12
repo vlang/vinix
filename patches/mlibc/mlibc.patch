@@ -22,6 +22,23 @@ index b781895..0b40b32 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
+diff --git a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
+index 1177624..00c3ca3 100644
+--- a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp
++++ b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
+@@ -1144,6 +1144,12 @@ void Loader::_processRela(SharedObject *object, Elf64_Rela *reloc) {
+ 		uint64_t symbol_addr = p ? p->virtualAddress() : 0;
+ 		*((uint64_t *)rel_addr) = symbol_addr;
+ 	} break;
++	case R_X86_64_JUMP_SLOT: {
++		__ensure(symbol_index);
++		__ensure(!reloc->r_addend);
++		uint64_t symbol_addr = p ? p->virtualAddress() : 0;
++		*((uint64_t *)rel_addr) = symbol_addr;
++	} break;
+ 	case R_X86_64_RELATIVE: {
+ 		__ensure(!symbol_index);
+ 		*((uint64_t *)rel_addr) = object->baseAddress + reloc->r_addend;
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..0a0a4a0
