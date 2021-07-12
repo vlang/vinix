@@ -26,9 +26,9 @@ if [ "$3" = "--tool" ]; then
     IS_TOOL="-tool"
 fi
 
-[ -f 3rdparty/$1.tar.gz ] || [ -f 3rdparty/$1.tar.xz ] || (
+[ -f 3rdparty/$1.tar.gz ] || [ -f 3rdparty/$1.tar.xz ] || [ -f 3rdparty/$1.tar.bz2 ] || (
     cd build
-    xbstrap install$IS_TOOL -u $PKG_NAME
+    xbstrap install$IS_TOOL -u $PKG_NAME || true
 )
 
 [ -d 3rdparty/$1-workdir ] || (
@@ -52,6 +52,8 @@ git diff --no-index 3rdparty/$1-orig 3rdparty/$1-workdir > patches/$1/$1.patch |
 [ "$1" = "mlibc" ] && [ -d 3rdparty/mlibc ] && mv 3rdparty/mlibc/subprojects ./mlibc-subprojects
 [ "$1" = "limine" ] && [ -d 3rdparty/limine ] && mv 3rdparty/limine/gnu-efi 3rdparty/limine/stivale ./
 rm -rf 3rdparty/$1
+[ -z "$IS_TOOL" ] && rm -rf build/pkg-builds/$1
+[ -z "$IS_TOOL" ] || rm -rf build/tool-builds/$PKG_NAME
 [ "$1" = "mlibc" ] && mkdir 3rdparty/mlibc && mv ./mlibc-subprojects 3rdparty/mlibc/subprojects || true
 [ "$1" = "limine" ] && mkdir 3rdparty/limine && mv ./gnu-efi ./stivale 3rdparty/limine/ || true
 cd build
