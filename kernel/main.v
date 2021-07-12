@@ -14,6 +14,7 @@ import sched
 import stat
 import dev.console
 import userland
+import kprint
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -58,7 +59,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	stivale2.terminal_init(stivale2_struct)
 
 	// We're alive
-	lib.kprint(c'Welcome to Vinix\n\n')
+	kprint.kprint(c'Welcome to Vinix\n\n')
 
 	// Initialize the memory allocator.
 	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }

@@ -1,8 +1,8 @@
-module lib
+module kprint
 
-import stivale2
 import klock
 import serial
+import stivale2
 
 __global (
 	kprint_lock klock.Lock

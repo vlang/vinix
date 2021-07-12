@@ -46,7 +46,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
     if (fd != 1 && fd != 2) {
         lib__kpanic("write to fd != 1 && fd != 2 is a stub");
     }
-    lib__kprint((char *)buf);
+    kprint__kprint((char *)buf);
     return count;
 }
 

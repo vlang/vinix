@@ -64,7 +64,7 @@ asm (
 );
 
 __attribute__((used)) void *syscall_table[] = {
-    lib__syscall_kprint, // 0
+    kprint__syscall_kprint, // 0
     memory__mmap__syscall_mmap, // 1
     fs__syscall_openat, // 2
     fs__syscall_read, // 3
