@@ -11,6 +11,28 @@ index 1ee3acb..133e21a 100755
  case $targetos in
    Darwin)
      confvars="$confvars OSX"
+diff --git a/3rdparty/tcc-orig/include/stdarg.h b/3rdparty/tcc-workdir/include/stdarg.h
+index 10ce733..405ac68 100644
+--- a/3rdparty/tcc-orig/include/stdarg.h
++++ b/3rdparty/tcc-workdir/include/stdarg.h
+@@ -1,6 +1,10 @@
+ #ifndef _STDARG_H
+ #define _STDARG_H
+ 
++#ifdef __need___va_list
++typedef char *__gnuc_va_list;
++#else
++
+ #ifdef __x86_64__
+ #ifndef _WIN64
+ 
+@@ -76,4 +80,6 @@ typedef char *va_list;
+ typedef va_list __gnuc_va_list;
+ #define _VA_LIST_DEFINED
+ 
++#endif
++
+ #endif /* _STDARG_H */
 diff --git a/3rdparty/tcc-orig/lib/Makefile b/3rdparty/tcc-workdir/lib/Makefile
 index 0c1ec54..c546dff 100644
 --- a/3rdparty/tcc-orig/lib/Makefile

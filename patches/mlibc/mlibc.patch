@@ -22,6 +22,19 @@ index b781895..0b40b32 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
+diff --git a/3rdparty/mlibc-orig/options/ansi/include/stdio.h b/3rdparty/mlibc-workdir/options/ansi/include/stdio.h
+index 0096afb..2d6f720 100644
+--- a/3rdparty/mlibc-orig/options/ansi/include/stdio.h
++++ b/3rdparty/mlibc-workdir/options/ansi/include/stdio.h
+@@ -185,7 +185,7 @@ int fputs_unlocked(const char *, FILE *);
+ }
+ #endif
+ 
+-#if __MLIBC_POSIX_OPTION
++#ifdef __MLIBC_POSIX_OPTION
+ #	include <bits/posix/posix_stdio.h>
+ #endif
+ 
 diff --git a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
 index 1177624..00c3ca3 100644
 --- a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp

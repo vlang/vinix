@@ -263,7 +263,7 @@ packages:
         - '--tccdir=/usr/lib/tcc'
         - '--elfinterp=/usr/lib/ld.so'
         - '--libpaths=/usr/lib'
-        - '--sysincludepaths=/usr/include'
+        - '--sysincludepaths=/usr/lib/tcc/include:/usr/include'
         - '--cross-prefix=x86_64-vinix-'
         - '--cc=gcc'
         - '--ar=ar'
