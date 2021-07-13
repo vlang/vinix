@@ -388,6 +388,26 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 	return u64(ret), 0
 }
 
+pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: faccessat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path,
+			 mode, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	parent := get_parent_dir(dirfd, path) or {
+		return -1, errno.get()
+	}
+
+	node := get_node(parent, path) or {
+		return -1, errno.get()
+	}
+
+	return 0, 0
+}
+
 pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 					   flags int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', dirfd, _path,
