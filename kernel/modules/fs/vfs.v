@@ -227,7 +227,7 @@ fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
 
-	if target_node != 0 {
+	if target_node != 0 || parent_of_tgt_node == 0 {
 		errno.set(errno.eexist)
 		return none
 	}
@@ -249,7 +249,7 @@ pub fn create(parent &VFSNode, name string, mode int) ?&VFSNode {
 pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
-	if target_node != 0 {
+	if target_node != 0 || parent_of_tgt_node == 0 {
 		return none
 	}
 
