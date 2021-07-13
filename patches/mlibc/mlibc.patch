@@ -1,17 +1,8 @@
 diff --git a/3rdparty/mlibc-orig/meson.build b/3rdparty/mlibc-workdir/meson.build
-index b781895..0b40b32 100644
+index edcd230..18ec107 100644
 --- a/3rdparty/mlibc-orig/meson.build
 +++ b/3rdparty/mlibc-workdir/meson.build
-@@ -44,7 +44,7 @@ if not headers_only
- 	c_compiler = meson.get_compiler('c')
- 
- 	add_project_arguments('-nostdinc', '-fno-builtin', language: ['c', 'cpp'])
--	add_project_arguments('-std=c++17', language: 'cpp')
-+	add_project_arguments('-std=gnu++17', language: 'cpp')
- 	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
- 	add_project_link_arguments('-nostdlib', language: ['c', 'cpp'])
- 
-@@ -89,6 +89,10 @@ elif host_machine.system() == 'qword'
+@@ -102,6 +102,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -23,10 +14,10 @@ index b781895..0b40b32 100644
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
 diff --git a/3rdparty/mlibc-orig/options/ansi/include/stdio.h b/3rdparty/mlibc-workdir/options/ansi/include/stdio.h
-index 0096afb..2d6f720 100644
+index 4eb59e5..bc44412 100644
 --- a/3rdparty/mlibc-orig/options/ansi/include/stdio.h
 +++ b/3rdparty/mlibc-workdir/options/ansi/include/stdio.h
-@@ -185,7 +185,7 @@ int fputs_unlocked(const char *, FILE *);
+@@ -186,7 +186,7 @@ int fputs_unlocked(const char *, FILE *);
  }
  #endif
  
@@ -36,10 +27,10 @@ index 0096afb..2d6f720 100644
  #endif
  
 diff --git a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
-index 1177624..00c3ca3 100644
+index 01a93bc..ce95354 100644
 --- a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp
 +++ b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
-@@ -1144,6 +1144,12 @@ void Loader::_processRela(SharedObject *object, Elf64_Rela *reloc) {
+@@ -1227,6 +1227,12 @@ void Loader::_processRela(SharedObject *object, Elf64_Rela *reloc) {
  		uint64_t symbol_addr = p ? p->virtualAddress() : 0;
  		*((uint64_t *)rel_addr) = symbol_addr;
  	} break;
@@ -107,10 +98,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..0a7507a
+index 0000000..77433ad
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,342 @@
+@@ -0,0 +1,348 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -299,6 +290,12 @@ index 0000000..0a7507a
 +
 +gid_t sys_getgid() {
 +    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
++
++pid_t sys_getpgid(pid_t pid, pid_t *pgid) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    *pgid = 0;
 +    return 0;
 +}
 +
@@ -637,12 +634,20 @@ index 0000000..f1a985e
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/vm-flags.h
 \ No newline at end of file
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/wait.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/wait.h
+new file mode 120000
+index 0000000..6d911c7
+--- /dev/null
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/wait.h
+@@ -0,0 +1 @@
++../../../../abis/mlibc/wait.h
+\ No newline at end of file
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build b/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build
 new file mode 100644
-index 0000000..0169278
+index 0000000..4c3b59c
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,50 @@
 +
 +rtdl_sources += files(
 +	'generic/generic.cpp'
@@ -677,6 +682,7 @@ index 0000000..0169278
 +		'include/abi-bits/nlink_t.h',
 +		'include/abi-bits/pid_t.h',
 +		'include/abi-bits/uid_t.h',
++		'include/abi-bits/wait.h',
 +		subdir: 'abi-bits'
 +	)
 +endif
