@@ -156,6 +156,17 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		return -1, errno.get()
 	}
 
+	// Dup all FDs
+	for i := 0; i < proc.max_fds; i++ {
+		if old_process.fds[i] == voidptr(0) {
+			continue
+		}
+
+		file.fdnum_dup(old_process, i, new_process, i, 0, true) or {
+			panic('')
+		}
+	}
+
 	stack_size := u64(65536)
 
 	mut new_thread := &proc.Thread{

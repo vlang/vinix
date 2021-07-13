@@ -15,6 +15,7 @@ import stat
 import dev.console
 import userland
 import kprint
+import pipe
 
 fn C._vinit(argc int, argv voidptr)
 

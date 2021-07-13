@@ -10,7 +10,6 @@ import proc
 import memory
 import memory.mmap
 import elf
-import file
 
 const stack_size = u64(65536)
 const max_running_threads = int(512)
@@ -418,17 +417,6 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_process.thread_stack_top = old_process.thread_stack_top
 		new_process.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_process.current_directory = old_process.current_directory
-		for i := 0; i < proc.max_fds; i++ {
-			if old_process.fds[i] == voidptr(0) {
-				new_process.fds[i] = voidptr(0)
-				continue
-			}
-			old_fd := &file.FD(old_process.fds[i])
-			mut new_fd := &file.FD{handle: voidptr(0)}
-			unsafe { new_fd[0] = old_fd[0] }
-			new_fd.handle.refcount++
-			new_process.fds[i] = new_fd
-		}
 	} else {
 		new_process.ppid = 0
 		new_process.pagemap = unsafe { pagemap }
