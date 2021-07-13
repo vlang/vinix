@@ -418,6 +418,10 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 
 	path := unsafe { cstring_to_vstring(_path) }
 
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
+
 	parent := get_parent_dir(dirfd, path) or {
 		return -1, errno.get()
 	}

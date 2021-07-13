@@ -26,8 +26,8 @@ distro:
 	$(MAKE) update-v
 	cd build && xbstrap install --all
 
-V_COMMIT  = ba9b53cc4d43cb185a0408a9766c06689f88953f
-VC_COMMIT = f2adc02342faca441ea9e51011ee684712a68383
+V_COMMIT  = 1bf6743987fdd991591e6d0b766d8a065d34de66
+VC_COMMIT = c0b1553672b59643116e89155845368c92ca5d00
 
 .PHONY: update-v
 update-v:

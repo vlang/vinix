@@ -1,5 +1,5 @@
 diff --git a/3rdparty/vc-orig/v.c b/3rdparty/vc-workdir/v.c
-index 205f836..89c30e0 100644
+index 192ee6c..a3a50da 100644
 --- a/3rdparty/vc-orig/v.c
 +++ b/3rdparty/vc-workdir/v.c
 @@ -625,6 +625,7 @@ typedef int (*qsort_callback_func)(const void*, const void*);

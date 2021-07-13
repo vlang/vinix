@@ -94,7 +94,7 @@ tools:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && cc -std=gnu99 -w -o ./v ../vc/v.c -lm && ./v self'
+        - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
 
   - name: host-vc
     from_source: vc
@@ -248,6 +248,18 @@ packages:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
+  - name: v
+    from_source: v
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - tcc
+    build:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm'
+
   - name: tcc
     source:
       subdir: '3rdparty'
@@ -285,7 +297,7 @@ packages:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make V="@SOURCE_ROOT@/3rdparty/v/v" CC=x86_64-vinix-gcc'
+        - 'cd "@THIS_SOURCE_DIR@" && make CC=x86_64-vinix-gcc'
 
   - name: coreutils
     source:
