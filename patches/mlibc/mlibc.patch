@@ -13,19 +13,22 @@ index edcd230..18ec107 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
-diff --git a/3rdparty/mlibc-orig/options/ansi/include/stdio.h b/3rdparty/mlibc-workdir/options/ansi/include/stdio.h
-index 4eb59e5..bc44412 100644
---- a/3rdparty/mlibc-orig/options/ansi/include/stdio.h
-+++ b/3rdparty/mlibc-workdir/options/ansi/include/stdio.h
-@@ -186,7 +186,7 @@ int fputs_unlocked(const char *, FILE *);
- }
- #endif
+diff --git a/3rdparty/mlibc-orig/options/internal/include/bits/feature.h b/3rdparty/mlibc-workdir/options/internal/include/bits/feature.h
+index 5784c4d..f42475a 100644
+--- a/3rdparty/mlibc-orig/options/internal/include/bits/feature.h
++++ b/3rdparty/mlibc-workdir/options/internal/include/bits/feature.h
+@@ -3,8 +3,8 @@
  
--#if __MLIBC_POSIX_OPTION
-+#ifdef __MLIBC_POSIX_OPTION
- #	include <bits/posix/posix_stdio.h>
- #endif
+ // TODO: The files for this macro are chosen somewhat arbitrarily.
+ // TODO: Choose canonical files (like a bits/posix/alltypes.h)
+-#define __MLIBC_ANSI_OPTION __has_include(<stdlib.h>)
+-#define __MLIBC_POSIX_OPTION __has_include(<unistd.h>)
+-#define __MLIBC_LINUX_OPTION __has_include(<linux/types.h>)
++#define __MLIBC_ANSI_OPTION 1
++#define __MLIBC_POSIX_OPTION 1
++#define __MLIBC_LINUX_OPTION 1
  
+ #endif // _BITS_FEATURE_H
 diff --git a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
 index 01a93bc..ce95354 100644
 --- a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp
@@ -98,10 +101,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..feccb05
+index 0000000..ae214cc
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,358 @@
+@@ -0,0 +1,370 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -266,7 +269,9 @@ index 0000000..feccb05
 +                      MAP_ANONYMOUS, -1, 0, pointer);
 +}
 +
-+int sys_anon_free(void *pointer, size_t size) STUB_ONLY
++int sys_anon_free(void *pointer, size_t size) {
++    return 0;
++}
 +
 +pid_t sys_getpid() {
 +    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
@@ -367,6 +372,16 @@ index 0000000..feccb05
 +
 +int sys_access(const char *path, int mode) {
 +    return sys_faccessat(AT_FDCWD, path, mode, 0);
++}
++
++int sys_pipe(int *fds, int flags) {
++    __syscall_ret ret = __syscall(21, fds, flags);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    return 0;
 +}
 +
 +int sys_chdir(const char *path) {
