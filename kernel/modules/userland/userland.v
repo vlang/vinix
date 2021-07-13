@@ -62,6 +62,9 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	mut child := &proc.Process(0)
 
 	if pid == -1 {
+		if current_process.children.len == 0 {
+			return -1, errno.echild
+		}
 		for c in current_process.children {
 			events << &c.event
 		}
@@ -69,6 +72,9 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 		print('\nwaitpid: value of pid not supported\n')
 		return -1, errno.einval
 	} else {
+		if current_process.children.len == 0 {
+			return -1, errno.echild
+		}
 		child = processes[pid]
 		if voidptr(child) == voidptr(0) || child.ppid != current_process.pid {
 			return -1, errno.echild
