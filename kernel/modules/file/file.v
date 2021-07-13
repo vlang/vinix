@@ -169,7 +169,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 		process = unsafe { _process }
 	}
 
-	if fdnum >= proc.max_fds {
+	if fdnum >= proc.max_fds || fdnum < 0 {
 		errno.set(errno.ebadf)
 		return none
 	}

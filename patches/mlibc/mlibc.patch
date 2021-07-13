@@ -29,6 +29,77 @@ index 5784c4d..f42475a 100644
 +#define __MLIBC_LINUX_OPTION 1
  
  #endif // _BITS_FEATURE_H
+diff --git a/3rdparty/mlibc-orig/options/posix/generic/posix_stdio.cpp b/3rdparty/mlibc-workdir/options/posix/generic/posix_stdio.cpp
+index 72d6043..377dce7 100644
+--- a/3rdparty/mlibc-orig/options/posix/generic/posix_stdio.cpp
++++ b/3rdparty/mlibc-workdir/options/posix/generic/posix_stdio.cpp
+@@ -2,6 +2,7 @@
+ #include <errno.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <unistd.h>
+ 
+ #include <bits/ensure.h>
+ #include <mlibc/debug.hpp>
+@@ -18,9 +19,55 @@ int pclose(FILE *) {
+ 	__builtin_unreachable();
+ }
+ 
+-FILE *popen(const char*, const char *) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++FILE *popen(const char *command, const char *typestr) {
++	bool write;
++	if (strstr(typestr, "w") != NULL) {
++		write = true;
++	} else if (strstr(typestr, "r") != NULL) {
++		write = false;
++	}
++
++	if (strstr(typestr, "e") != NULL) {
++		__ensure(!"\"e\" type is not supported for popen()");
++	}
++
++	int fds[2];
++	pipe(fds);
++	int child = fork();
++	if (child == 0) {
++		// For the child
++		if (write) {
++			close(fds[1]); // Close the write end
++			fclose(stdin);
++			if (dup2(fds[0], 0) == -1) {
++				__ensure(!"dup2() failed in popen()");
++			}
++			close(fds[0]);
++			stdin = fdopen(0, "r");
++		} else {
++			close(fds[0]); // Close the read end
++			fclose(stdout);
++			if (dup2(fds[1], 1) == -1) {
++				__ensure(!"dup2() failed in popen()");
++			}
++			close(fds[1]);
++			stdout = fdopen(1, "r");
++		}
++
++		execl("/usr/bin/bash", "sh", "-c", command, (char *)NULL);
++	} else {
++		// For the parent
++		FILE *ret;
++		if (write) {
++			ret = fdopen(fds[1], "w");
++			close(fds[0]); // Close the read end
++		} else {
++			ret = fdopen(fds[0], "r");
++			close(fds[1]); // Close the write end
++		}
++
++		return ret;
++	}
+ }
+ 
+ FILE *open_memstream(char **buf, size_t *sizeloc) {
 diff --git a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp b/3rdparty/mlibc-workdir/options/rtdl/generic/linker.cpp
 index 01a93bc..ce95354 100644
 --- a/3rdparty/mlibc-orig/options/rtdl/generic/linker.cpp
