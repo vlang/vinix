@@ -30,10 +30,10 @@ index 5784c4d..f42475a 100644
  
  #endif // _BITS_FEATURE_H
 diff --git a/3rdparty/mlibc-orig/options/posix/generic/posix_stdio.cpp b/3rdparty/mlibc-workdir/options/posix/generic/posix_stdio.cpp
-index 72d6043..26c9053 100644
+index 72d6043..1ce8706 100644
 --- a/3rdparty/mlibc-orig/options/posix/generic/posix_stdio.cpp
 +++ b/3rdparty/mlibc-workdir/options/posix/generic/posix_stdio.cpp
-@@ -2,6 +2,7 @@
+@@ -2,11 +2,17 @@
  #include <errno.h>
  #include <stdio.h>
  #include <stdlib.h>
@@ -41,7 +41,17 @@ index 72d6043..26c9053 100644
  
  #include <bits/ensure.h>
  #include <mlibc/debug.hpp>
-@@ -18,9 +19,55 @@ int pclose(FILE *) {
+ #include <mlibc/file-io.hpp>
+ #include <mlibc/posix-file-io.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#if __MLIBC_POSIX_OPTION
++#include <pthread.h>
++#endif // __MLIBC_POSIX_OPTION
+ 
+ FILE *fmemopen(void *__restrict, size_t, const char *__restrict) {
+ 	__ensure(!"Not implemented");
+@@ -18,9 +24,107 @@ int pclose(FILE *) {
  	__builtin_unreachable();
  }
  
@@ -49,11 +59,29 @@ index 72d6043..26c9053 100644
 -	__ensure(!"Not implemented");
 -	__builtin_unreachable();
 +FILE *popen(const char *command, const char *typestr) {
-+	bool write;
++	bool is_write;
++	pid_t child;
++    FILE *ret = nullptr;
++
++	if (!mlibc::sys_fork || !mlibc::sys_execve
++	    	|| !mlibc::sys_sigprocmask || !mlibc::sys_sigaction || !mlibc::sys_pipe) {
++		MLIBC_MISSING_SYSDEP();
++		errno = ENOSYS;
++		return nullptr;
++	}
++
++#if __MLIBC_POSIX_OPTION
++	pthread_testcancel();
++#endif // __MLIBC_POSIX_OPTION
++
++	if (!command) {
++		return nullptr;
++	}
++
 +	if (strstr(typestr, "w") != NULL) {
-+		write = true;
++		is_write = true;
 +	} else if (strstr(typestr, "r") != NULL) {
-+		write = false;
++		is_write = false;
 +	}
 +
 +	if (strstr(typestr, "e") != NULL) {
@@ -61,11 +89,33 @@ index 72d6043..26c9053 100644
 +	}
 +
 +	int fds[2];
-+	pipe(fds);
-+	int child = fork();
-+	if (child == 0) {
++	if (int e = mlibc::sys_pipe(fds, 0)) {
++	    errno = e;
++	    return nullptr;
++	}
++
++	struct sigaction new_sa, old_int, old_quit;
++	sigset_t new_mask, old_mask;
++
++	new_sa.sa_handler = SIG_IGN;
++	new_sa.sa_flags = 0;
++	sigemptyset(&new_sa.sa_mask);
++	mlibc::sys_sigaction(SIGINT, &new_sa, &old_int);
++	mlibc::sys_sigaction(SIGQUIT, &new_sa, &old_quit);
++
++	sigemptyset(&new_mask);
++	sigaddset(&new_mask, SIGCHLD);
++	mlibc::sys_sigprocmask(SIG_BLOCK, &new_mask, &old_mask);
++
++	if (int e = mlibc::sys_fork(&child)) {
++		errno = e;
++	} else if (!child) {
 +		// For the child
-+		if (write) {
++		mlibc::sys_sigaction(SIGINT, &old_int, nullptr);
++		mlibc::sys_sigaction(SIGQUIT, &old_quit, nullptr);
++		mlibc::sys_sigprocmask(SIG_SETMASK, &old_mask, nullptr);
++
++		if (is_write) {
 +			close(fds[1]); // Close the write end
 +			fclose(stdin);
 +			if (dup2(fds[0], 0) == -1) {
@@ -73,6 +123,7 @@ index 72d6043..26c9053 100644
 +			}
 +			close(fds[0]);
 +			stdin = fdopen(0, "r");
++			__ensure(stdin);
 +		} else {
 +			close(fds[0]); // Close the read end
 +			fclose(stdout);
@@ -80,23 +131,34 @@ index 72d6043..26c9053 100644
 +				__ensure(!"dup2() failed in popen()");
 +			}
 +			close(fds[1]);
-+			stdout = fdopen(1, "r");
++			stdout = fdopen(1, "w");
++			__ensure(stdout);
 +		}
 +
-+		execl("/bin/sh", "sh", "-c", command, (char *)NULL);
++		const char *args[] = {
++			"sh", "-c", command, nullptr
++		};
++
++		mlibc::sys_execve("/bin/sh", const_cast<char **>(args), environ);
++		_Exit(127);
 +	} else {
 +		// For the parent
-+		FILE *ret;
-+		if (write) {
-+			ret = fdopen(fds[1], "w");
++		if (is_write) {
 +			close(fds[0]); // Close the read end
++			ret = fdopen(fds[1], "w");
++			__ensure(ret);
 +		} else {
-+			ret = fdopen(fds[0], "r");
 +			close(fds[1]); // Close the write end
++			ret = fdopen(fds[0], "r");
++			__ensure(ret);
 +		}
-+
-+		return ret;
 +	}
++
++	mlibc::sys_sigaction(SIGINT, &old_int, nullptr);
++	mlibc::sys_sigaction(SIGQUIT, &old_quit, nullptr);
++	mlibc::sys_sigprocmask(SIG_SETMASK, &old_mask, nullptr);
++
++	return ret;
  }
  
  FILE *open_memstream(char **buf, size_t *sizeloc) {
