@@ -33,6 +33,8 @@ pub mut:
 	redir          &VFSNode
 	resource       &resource.Resource
 	filesystem     &FileSystem
+	name           string
+	parent         &VFSNode
 	children       map[string]&VFSNode
 	symlink_target string
 }
@@ -43,8 +45,10 @@ __global (
 	filesystems map[string]&FileSystem
 )
 
-fn create_node(filesystem &FileSystem) &VFSNode {
+fn create_node(filesystem &FileSystem, parent &VFSNode, name string) &VFSNode {
 	node := &VFSNode{
+				name: name
+				parent: unsafe { parent }
 				mountpoint: voidptr(0)
 				redir: voidptr(0)
 				children: map[string]&VFSNode{}
@@ -55,7 +59,7 @@ fn create_node(filesystem &FileSystem) &VFSNode {
 }
 
 pub fn initialise() {
-	vfs_root = create_node(&TmpFS(0))
+	vfs_root = create_node(&TmpFS(0), &VFSNode(0), '')
 
 	filesystems = map[string]&FileSystem{}
 
@@ -225,8 +229,8 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 
 fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	// Create . and .. entries
-	mut dot := create_node(node.filesystem)
-	mut dotdot := create_node(node.filesystem)
+	mut dot := create_node(node.filesystem, node, '.')
+	mut dotdot := create_node(node.filesystem, node, '..')
 	dot.redir = unsafe { node }
 	dotdot.redir = unsafe { parent }
 	node.children['.'] = dot
@@ -241,7 +245,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, target)
+	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 
 	parent_of_tgt_node.children[basename] = target_node
 
@@ -262,7 +266,7 @@ pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 		return none
 	}
 
-	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, name, mode)
+	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 
 	parent_of_tgt_node.children[basename] = target_node
 

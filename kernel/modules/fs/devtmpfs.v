@@ -91,7 +91,7 @@ fn (mut this DevTmpFS) mount(source &VFSNode) ?&VFSNode {
 }
 
 fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
-	mut new_node := create_node(this)
+	mut new_node := create_node(this, parent, name)
 
 	mut new_resource := &DevTmpFSResource(memory.malloc(sizeof(DevTmpFSResource)))
 
@@ -114,7 +114,7 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 }
 
 fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
-	mut new_node := create_node(this)
+	mut new_node := create_node(this, parent, target)
 
 	mut new_resource := &DevTmpFSResource(memory.malloc(sizeof(DevTmpFSResource)))
 
@@ -134,7 +134,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 }
 
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
-	mut new_node := create_node(&(filesystems['devtmpfs']))
+	mut new_node := create_node(&(filesystems['devtmpfs']), devtmpfs_root, name)
 
 	new_node.resource = unsafe { device }
 	new_node.resource.stat.dev = devtmpfs_dev_id
