@@ -30,7 +30,7 @@ index 5784c4d..f42475a 100644
  
  #endif // _BITS_FEATURE_H
 diff --git a/3rdparty/mlibc-orig/options/posix/generic/posix_stdio.cpp b/3rdparty/mlibc-workdir/options/posix/generic/posix_stdio.cpp
-index 72d6043..377dce7 100644
+index 72d6043..26c9053 100644
 --- a/3rdparty/mlibc-orig/options/posix/generic/posix_stdio.cpp
 +++ b/3rdparty/mlibc-workdir/options/posix/generic/posix_stdio.cpp
 @@ -2,6 +2,7 @@
@@ -83,7 +83,7 @@ index 72d6043..377dce7 100644
 +			stdout = fdopen(1, "r");
 +		}
 +
-+		execl("/usr/bin/bash", "sh", "-c", command, (char *)NULL);
++		execl("/bin/sh", "sh", "-c", command, (char *)NULL);
 +	} else {
 +		// For the parent
 +		FILE *ret;

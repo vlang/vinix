@@ -9,6 +9,12 @@ import errno
 
 pub const at_fdcwd = -100
 
+pub const at_empty_path = 1
+pub const at_symlink_follow = 2
+pub const at_symlink_nofollow = 4
+pub const at_removedir = 8
+pub const at_eaccess = 512
+
 pub const seek_cur = 1
 pub const seek_end = 2
 pub const seek_set = 3
@@ -168,10 +174,13 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	return parent
 }
 
-pub fn get_node(parent &VFSNode, path string) ?&VFSNode {
+pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 	_, node, _ := path2node(parent, path)
 	if voidptr(node) == voidptr(0) {
 		return none
+	}
+	if follow_links == true {
+		return reduce_node(node, true)
 	}
 	return node
 }
@@ -286,8 +295,9 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	}
 
 	creat_flags := flags & resource.file_creation_flags_mask
+	follow_links := flags & resource.o_nofollow == 0
 
-	mut node := get_node(parent, path) or {
+	mut node := get_node(parent, path, follow_links) or {
 		if creat_flags & resource.o_creat != 0 {
 			// XXX: mlibc does not pass mode? OK... force regular file with 644
 			new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
@@ -305,7 +315,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return -1, errno.get()
 	}
 
-	if stat.islnk(node.resource.stat.mode) && flags & resource.o_nofollow != 0 {
+	if stat.islnk(node.resource.stat.mode) {
 		return -1, errno.eloop
 	}
 
@@ -401,7 +411,9 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags in
 		return -1, errno.get()
 	}
 
-	node := get_node(parent, path) or {
+	follow_links := flags & at_symlink_nofollow == 0
+
+	node := get_node(parent, path, follow_links) or {
 		return -1, errno.get()
 	}
 
@@ -426,7 +438,9 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 		return -1, errno.get()
 	}
 
-	node := get_node(parent, path) or {
+	follow_links := flags & at_symlink_nofollow == 0
+
+	node := get_node(parent, path, follow_links) or {
 		return -1, errno.get()
 	}
 

@@ -194,7 +194,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 
 pub fn start_program(execve bool, path string, argv []string, envp []string,
 					 stdin string, stdout string, stderr string) ?&proc.Process {
-	prog_node := fs.get_node(vfs_root, path) ?
+	prog_node := fs.get_node(vfs_root, path, true) ?
 	prog := prog_node.resource
 
 	mut new_pagemap := memory.new_pagemap()
@@ -206,7 +206,7 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
 	} else {
-		ld_node := fs.get_node(vfs_root, ld_path) ?
+		ld_node := fs.get_node(vfs_root, ld_path, true) ?
 		ld := ld_node.resource
 
 		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) ?
@@ -217,21 +217,21 @@ pub fn start_program(execve bool, path string, argv []string, envp []string,
 	if execve == false {
 		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
 
-		stdin_node := fs.get_node(vfs_root, stdin) ?
+		stdin_node := fs.get_node(vfs_root, stdin, true) ?
 		stdin_handle := &file.Handle{resource: stdin_node.resource
 									 node: stdin_node
 									 refcount: 1}
 		stdin_fd := &file.FD{handle: stdin_handle}
 		new_process.fds[0] = voidptr(stdin_fd)
 
-		stdout_node := fs.get_node(vfs_root, stdout) ?
+		stdout_node := fs.get_node(vfs_root, stdout, true) ?
 		stdout_handle := &file.Handle{resource: stdout_node.resource
 									  node: stdout_node
 									  refcount: 1}
 		stdout_fd := &file.FD{handle: stdout_handle}
 		new_process.fds[1] = voidptr(stdout_fd)
 
-		stderr_node := fs.get_node(vfs_root, stderr) ?
+		stderr_node := fs.get_node(vfs_root, stderr, true) ?
 		stderr_handle := &file.Handle{resource: stderr_node.resource
 									  node: stderr_node
 									  refcount: 1}
