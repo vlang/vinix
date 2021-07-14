@@ -282,6 +282,39 @@ fn fdnum_create_from_node(node &VFSNode, flags int, oldfd int, specific bool) ?i
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific)
 }
 
+pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: mkdirat(%d, %s, 0x%x)\n', dirfd, _path, mode)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
+
+	parent := get_parent_dir(dirfd, path) or {
+		return -1, errno.get()
+	}
+
+	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, path)
+
+	if parent_of_tgt_node == 0 {
+		return -1, errno.enoent
+	}
+
+	if target_node != 0 {
+		return -1, errno.eexist
+	}
+
+	internal_create(parent, path, mode | stat.ifdir) or {
+		return -1, errno.get()
+	}
+
+	return 0, 0
+}
+
 pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags, mode)
 	defer {
@@ -289,6 +322,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	}
 
 	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
 
 	parent := get_parent_dir(dirfd, path) or {
 		return -1, errno.get()
@@ -407,6 +444,10 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags in
 
 	path := unsafe { cstring_to_vstring(_path) }
 
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
+
 	parent := get_parent_dir(dirfd, path) or {
 		return -1, errno.get()
 	}
@@ -474,6 +515,10 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	}
 
 	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
 
 	mut process := proc.current_thread().process
 

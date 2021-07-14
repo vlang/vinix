@@ -230,10 +230,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..ae214cc
+index 0000000..931d593
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,370 @@
+@@ -0,0 +1,380 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -523,9 +523,19 @@ index 0000000..ae214cc
 +    return 0;
 +}
 +
-+int sys_mkdir(const char *path) STUB_ONLY
++int sys_mkdir(const char *path) {
++    return sys_mkdirat(AT_FDCWD, path, 0755);
++}
 +
-+int sys_mkdirat(int dirfd, const char *path, mode_t mode) STUB_ONLY
++int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
++    __syscall_ret ret = __syscall(22, dirfd, path, mode);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    return 0;
++}
 +
 +int sys_socket(int domain, int type_and_flags, int proto, int *fd) STUB_ONLY
 +
