@@ -308,7 +308,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64)
 		return -1, errno.eexist
 	}
 
-	internal_create(parent, path, mode | stat.ifdir) or {
+	internal_create(parent_of_tgt_node, basename, mode | stat.ifdir) or {
 		return -1, errno.get()
 	}
 

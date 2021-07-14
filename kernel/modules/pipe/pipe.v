@@ -112,7 +112,7 @@ fn (mut this Pipe) read(buf voidptr, loc u64, _count u64) ?i64 {
 	this.read_ptr = new_ptr_loc
 	this.used -= count
 
-	event.trigger(this.event)
+	event.trigger(this.event, true)
 
 	return i64(count)
 }
@@ -163,7 +163,7 @@ fn (mut this Pipe) write(buf voidptr, loc u64, _count u64) ?i64 {
 	this.write_ptr = new_ptr_loc
 	this.used += count
 
-	event.trigger(this.event)
+	event.trigger(this.event, true)
 
 	return i64(count)
 }

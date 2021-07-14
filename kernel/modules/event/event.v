@@ -71,12 +71,15 @@ unarm_listeners:
 	return true
 }
 
-pub fn trigger(event &eventstruct.Event) {
+pub fn trigger(event &eventstruct.Event, enqueue bool) u64 {
 	mut this := unsafe { event }
+	mut ret := u64(0)
 
 	if katomic.load(this.pending) > 0 {
-		katomic.inc(this.pending)
-		return
+		if enqueue == true {
+			katomic.inc(this.pending)
+		}
+		return 0
 	}
 
 	mut pending := true
@@ -109,14 +112,17 @@ pub fn trigger(event &eventstruct.Event) {
 		}
 
 		sched.enqueue_thread(thread)
+		ret++
 
 		listener.l.release()
 		listener.ready.release()
 	}
 
-	if pending == true {
+	if pending == true && enqueue == true {
 		katomic.inc(this.pending)
 	}
+
+	return ret
 }
 
 pub fn pthread_exit(ret voidptr) {
@@ -129,7 +135,7 @@ pub fn pthread_exit(ret voidptr) {
 	cpulocal.current().current_thread = voidptr(0)
 
 	current_thread.exit_value = ret
-	trigger(current_thread.exited)
+	trigger(current_thread.exited, true)
 
 	sched.yield(false)
 }

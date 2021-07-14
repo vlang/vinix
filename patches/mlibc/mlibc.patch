@@ -230,10 +230,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..931d593
+index 0000000..3e7b819
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,380 @@
+@@ -0,0 +1,398 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -282,8 +282,26 @@ index 0000000..931d593
 +    return 0;
 +}
 +
-+int sys_futex_wait(int *pointer, int expected) STUB_ONLY
-+int sys_futex_wake(int *pointer) STUB_ONLY
++int sys_futex_wait(int *pointer, int expected) {
++    __syscall_ret ret = __syscall(23, pointer, expected);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
++int sys_futex_wake(int *pointer) {
++    __syscall_ret ret = __syscall(24, pointer);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    int num_woken = ret.ret;
++
++	__ensure(num_woken >= 0 && num_woken <= 1);
++	return num_woken;
++}
 +
 +int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
 +    __syscall_ret ret = __syscall(9, fd, request, arg);
