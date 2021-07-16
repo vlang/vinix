@@ -36,6 +36,8 @@
 #include <stdarg.h>
 
 
+void serial__out(char);
+
 void _putchar(char character) {
   serial__out(character);
 }
@@ -555,6 +557,10 @@ static int _vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const
 
 
 ///////////////////////////////////////////////////////////////////////////////
+
+void klock__Lock_acquire(void *);
+void klock__Lock_release(void *);
+extern char kprint_lock;
 
 int printf(const char* format, ...)
 {

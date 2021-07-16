@@ -1,5 +1,10 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
+
+void memory__free(void *);
+void *memory__malloc(size_t);
+void *memory__realloc(void *, size_t);
 
 void free(void *ptr) {
     return memory__free(ptr);

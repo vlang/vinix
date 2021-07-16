@@ -8,24 +8,24 @@ SECTIONS
 
     /* We place the .stivalehdr section containing the header in its own section, */
     /* and we use the KEEP directive on it to make sure it doesn't get discarded. */
-    .stivale2hdr : {
+    .stivale2hdr ALIGN(4K) : {
         KEEP(*(.stivale2hdr))
     }
 
     /* Then let's place all the other traditional executable sections afterwards. */
-    .text : {
+    .text ALIGN(4K) : {
         *(.text*)
     }
 
-    .rodata : {
+    .rodata ALIGN(4K) : {
         *(.rodata*)
     }
 
-    .data : {
+    .data ALIGN(4K) : {
         *(.data*)
     }
 
-    .bss : {
+    .bss ALIGN(4K) : {
         *(COMMON)
         *(.bss*)
     }

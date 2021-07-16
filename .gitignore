@@ -10,7 +10,8 @@ sysroot/etc/xbstrap
 *.iso
 *.gz
 kernel/*.xbstrap
-kernel/blob
+kernel/blob.c
+kernel/blob.c.unpatched
 kernel/modules/trace/symbol.v
 pack
 .vscode

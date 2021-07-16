@@ -3,6 +3,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+__attribute__((noreturn)) void lib__kpanic(const char *);
+void kprint__kprint(const char *);
+
 FILE *stdin  = NULL;
 FILE *stdout = NULL;
 FILE *stderr = NULL;
@@ -12,10 +15,13 @@ int fflush(FILE *stream) {
     return 0;
 }
 
+int getchar(void) {
+    lib__kpanic("getchar is a stub");
+}
+
 int getc(FILE *stream) {
     (void)stream;
     lib__kpanic("getc is a stub");
-    return -1;
 }
 
 char *fgets(char *str, size_t count, FILE *stream) {
@@ -23,20 +29,17 @@ char *fgets(char *str, size_t count, FILE *stream) {
     (void)count;
     (void)stream;
     lib__kpanic("fgets is a stub");
-    return NULL;
 }
 
 FILE *popen(const char *command, const char *type) {
     (void)command;
     (void)type;
     lib__kpanic("popen is a stub");
-    return NULL;
 }
 
 int pclose(FILE *stream) {
     (void)stream;
     lib__kpanic("pclose is a stub");
-    return -1;
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {

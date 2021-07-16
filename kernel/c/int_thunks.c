@@ -1,67 +1,32 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
-asm (
-    ".section .data\n\t"
-    "interrupt_thunk_begin:\n\t"
-    "push $0\n\t"
-    "push %r15\n\t"
-    "push %r14\n\t"
-    "push %r13\n\t"
-    "push %r12\n\t"
-    "push %r11\n\t"
-    "push %r10\n\t"
-    "push %r9\n\t"
-    "push %r8\n\t"
-    "push %rbp\n\t"
-    "push %rdi\n\t"
-    "push %rsi\n\t"
-    "push %rdx\n\t"
-    "push %rcx\n\t"
-    "push %rbx\n\t"
-    "push %rax\n\t"
-    "mov %es, %eax\n\t"
-    "push %rax\n\t"
-    "mov %ds, %eax\n\t"
-    "push %rax\n\t"
-    "cld\n\t"
-    "mov $0x30, %eax\n\t"
-    "mov %eax, %ds\n\t"
-    "mov %eax, %es\n\t"
-    "mov %eax, %ss\n\t"
-    "mov %rsp, %rsi\n\t"
-    ".byte 0xbf\n\t"
-    "interrupt_thunk_number: .long 0\n\t"
-    ".byte 0x48\n\t"
-    ".byte 0xbb\n\t"
-    "interrupt_thunk_offset: .quad 0\n\t"
-    "xor %rbp, %rbp\n\t"
-    "call *(%rbx)\n\t"
-    "pop %rax\n\t"
-    "mov %eax, %ds\n\t"
-    "pop %rax\n\t"
-    "mov %eax, %es\n\t"
-    "pop %rax\n\t"
-    "pop %rbx\n\t"
-    "pop %rcx\n\t"
-    "pop %rdx\n\t"
-    "pop %rsi\n\t"
-    "pop %rdi\n\t"
-    "pop %rbp\n\t"
-    "pop %r8\n\t"
-    "pop %r9\n\t"
-    "pop %r10\n\t"
-    "pop %r11\n\t"
-    "pop %r12\n\t"
-    "pop %r13\n\t"
-    "pop %r14\n\t"
-    "pop %r15\n\t"
-    "add $8, %rsp\n\t"
-    "iretq\n\t"
-    "interrupt_thunk_end:\n\t"
-    "interrupt_thunk_size: .quad interrupt_thunk_end - interrupt_thunk_begin\n\t"
-    "interrupt_thunk_storage: .space (interrupt_thunk_end - interrupt_thunk_begin) * 256\n\t"
-);
+extern char kprint__syscall_kprint[];
+extern char memory__mmap__syscall_mmap[];
+extern char fs__syscall_openat[];
+extern char fs__syscall_read[];
+extern char fs__syscall_write[];
+extern char fs__syscall_seek[];
+extern char fs__syscall_close[];
+extern char x86__cpu__syscall_set_fs_base[];
+extern char x86__cpu__syscall_set_gs_base[];
+extern char fs__syscall_ioctl[];
+extern char fs__syscall_fstat[];
+extern char fs__syscall_fstatat[];
+extern char file__syscall_fcntl[];
+extern char file__syscall_dup3[];
+extern char userland__syscall_fork[];
+extern char userland__syscall_exit[];
+extern char userland__syscall_waitpid[];
+extern char userland__syscall_execve[];
+extern char fs__syscall_chdir[];
+extern char fs__syscall_readdir[];
+extern char fs__syscall_faccessat[];
+extern char pipe__syscall_pipe[];
+extern char fs__syscall_mkdirat[];
+extern char futex__syscall_futex_wait[];
+extern char futex__syscall_futex_wake[];
 
 __attribute__((used)) void *syscall_table[] = {
     kprint__syscall_kprint, // 0
@@ -97,8 +62,6 @@ extern uint32_t interrupt_thunk_number;
 extern uint64_t interrupt_thunk_size;
 extern void *interrupt_table[];
 extern void *interrupt_thunks[];
-
-void *memcpy(void *dest, const void *src, size_t n);
 
 void prepare_interrupt_thunks(void) {
     for (size_t i = 0; i < 256; i++) {

@@ -297,7 +297,7 @@ packages:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make CC=x86_64-vinix-gcc'
+        - 'cd "@THIS_SOURCE_DIR@" && make CC=x86_64-vinix-gcc LD=x86_64-vinix-ld'
 
   - name: coreutils
     source:

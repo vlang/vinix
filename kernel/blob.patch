@@ -1,0 +1,1203 @@
+3467,3532d3466
+< f32 strings__levenshtein_distance_percentage(string a, string b) {
+< 	int d = strings__levenshtein_distance(a, b);
+< 	int _t1; /* if prepend */
+< 	if (a.len >= b.len) {
+< 		_t1 = a.len;
+< 	} else {
+< 		_t1 = b.len;
+< 	}
+< 	int l =  _t1;
+< 	return (1.00 - ((f32)(d)) / ((f32)(l))) * 100.00;
+< }
+< 
+< f32 strings__dice_coefficient(string s1, string s2) {
+< 	if (s1.len == 0 || s2.len == 0) {
+< 		return 0.0;
+< 	}
+< 	if (string__eq(s1, s2)) {
+< 		return 1.0;
+< 	}
+< 	if (s1.len < 2 || s2.len < 2) {
+< 		return 0.0;
+< 	}
+< 	string _t4; /* if prepend */
+< 	if (s1.len > s2.len) {
+< 		_t4 = s1;
+< 	} else {
+< 		_t4 = s2;
+< 	}
+< 	string a =  _t4;
+< 	string _t5; /* if prepend */
+< 	if (string__eq(a, s1)) {
+< 		_t5 = s2;
+< 	} else {
+< 		_t5 = s1;
+< 	}
+< 	string b =  _t5;
+< 	Map_string_int first_bigrams = new_map(sizeof(string), sizeof(int), &map_hash_string, &map_eq_string, &map_clone_string, &map_free_string);
+< 	for (int i = 0; i < a.len - 1; ++i) {
+< 		string bigram = string_substr(a, i, i + 2);
+< 		int _t6; /* if prepend */
+< 		if (_IN_MAP(ADDR(string, bigram), ADDR(map, first_bigrams))) {
+< 			_t6 = (*(int*)map_get(ADDR(map, first_bigrams), &(string[]){bigram}, &(int[]){ 0 })) + 1;
+< 		} else {
+< 			_t6 = 1;
+< 		}
+< 		int q =  _t6;
+< 		map_set(&first_bigrams, &(string[]){bigram}, &(int[]) { q });
+< 	}
+< 	int intersection_size = 0;
+< 	for (int i = 0; i < b.len - 1; ++i) {
+< 		string bigram = string_substr(b, i, i + 2);
+< 		int _t7; /* if prepend */
+< 		if (_IN_MAP(ADDR(string, bigram), ADDR(map, first_bigrams))) {
+< 			_t7 = (*(int*)map_get(ADDR(map, first_bigrams), &(string[]){bigram}, &(int[]){ 0 }));
+< 		} else {
+< 			_t7 = 0;
+< 		}
+< 		int count =  _t7;
+< 		if (count > 0) {
+< 			map_set(&first_bigrams, &(string[]){bigram}, &(int[]) { count - 1 });
+< 			intersection_size++;
+< 		}
+< 	}
+< 	return (2.0 * ((f32)(intersection_size))) / (((f32)(a.len)) + ((f32)(b.len)) - 2);
+< }
+< 
+4184,4316d4117
+< f64 strconv__atof64(string s) {
+< 	strconv__PrepNumber pn = (strconv__PrepNumber){.negative = 0,.exponent = 0,.mantissa = 0,};
+< 	int res_parsing = 0;
+< 	strconv__Float64u res = (strconv__Float64u){0};
+< 	multi_return_int_strconv__PrepNumber mr_9338 = strconv__parser(s);
+< 	res_parsing = mr_9338.arg0;
+< 	pn = mr_9338.arg1;
+< 
+< 	if (res_parsing == (_const_strconv__parser_ok)) {
+< 		res.u = strconv__converter((voidptr)&/*qq*/pn);
+< 	}
+< 	else if (res_parsing == (_const_strconv__parser_pzero)) {
+< 		res.u = _const_strconv__double_plus_zero;
+< 	}
+< 	else if (res_parsing == (_const_strconv__parser_mzero)) {
+< 		res.u = _const_strconv__double_minus_zero;
+< 	}
+< 	else if (res_parsing == (_const_strconv__parser_pinf)) {
+< 		res.u = _const_strconv__double_plus_infinity;
+< 	}
+< 	else if (res_parsing == (_const_strconv__parser_minf)) {
+< 		res.u = _const_strconv__double_minus_infinity;
+< 	}
+< 	else {
+< 	};
+< 	return res.f;
+< }
+< 
+< f64 strconv__atof_quick(string s) {
+< 	strconv__Float64u f = (strconv__Float64u){0};
+< 	f64 sign = ((f64)(1.0));
+< 	int i = 0;
+< 	for (;;) {
+< 		if (!(i < s.len && string_at(s, i) == ' ')) break;
+< 		i++;
+< 	}
+< 	if (i < s.len) {
+< 		if (string_at(s, i) == '-') {
+< 			sign = -1.0;
+< 			i++;
+< 		} else if (string_at(s, i) == '+') {
+< 			i++;
+< 		}
+< 	}
+< 	if (string_at(s, i) == 'i' && i + 2 < s.len && string_at(s, i + 1) == 'n' && string_at(s, i + 2) == 'f') {
+< 		if (sign > 0.0) {
+< 			f.u = _const_strconv__double_plus_infinity;
+< 		} else {
+< 			f.u = _const_strconv__double_minus_infinity;
+< 		}
+< 		return f.f;
+< 	}
+< 	for (;;) {
+< 		if (!(i < s.len && string_at(s, i) == '0')) break;
+< 		i++;
+< 		if (i >= s.len) {
+< 			if (sign > 0.0) {
+< 				f.u = _const_strconv__double_plus_zero;
+< 			} else {
+< 				f.u = _const_strconv__double_minus_zero;
+< 			}
+< 			return f.f;
+< 		}
+< 	}
+< 	for (;;) {
+< 		if (!(i < s.len && (string_at(s, i) >= '0' && string_at(s, i) <= '9'))) break;
+< 		f.f *= ((f64)(10.0));
+< 		f.f += ((f64)(string_at(s, i) - '0'));
+< 		i++;
+< 	}
+< 	if (i < s.len && string_at(s, i) == '.') {
+< 		i++;
+< 		f64 frac_mul = ((f64)(0.1));
+< 		for (;;) {
+< 			if (!(i < s.len && (string_at(s, i) >= '0' && string_at(s, i) <= '9'))) break;
+< 			f.f += ((f64)(string_at(s, i) - '0')) * frac_mul;
+< 			frac_mul *= ((f64)(0.1));
+< 			i++;
+< 		}
+< 	}
+< 	if (i < s.len && (string_at(s, i) == 'e' || string_at(s, i) == 'E')) {
+< 		i++;
+< 		int exp = 0;
+< 		int exp_sign = 1;
+< 		if (i < s.len) {
+< 			if (string_at(s, i) == '-') {
+< 				exp_sign = -1;
+< 				i++;
+< 			} else if (string_at(s, i) == '+') {
+< 				i++;
+< 			}
+< 		}
+< 		for (;;) {
+< 			if (!(i < s.len && string_at(s, i) == '0')) break;
+< 			i++;
+< 		}
+< 		for (;;) {
+< 			if (!(i < s.len && (string_at(s, i) >= '0' && string_at(s, i) <= '9'))) break;
+< 			exp *= 10;
+< 			exp += ((int)(string_at(s, i) - '0'));
+< 			i++;
+< 		}
+< 		if (exp_sign == 1) {
+< 			if (exp > _const_strconv__pos_exp.len) {
+< 				if (sign > 0) {
+< 					f.u = _const_strconv__double_plus_infinity;
+< 				} else {
+< 					f.u = _const_strconv__double_minus_infinity;
+< 				}
+< 				return f.f;
+< 			}
+< 			strconv__Float64u tmp_mul = (strconv__Float64u){.u = (*(u64*)/*ee elem_typ */array_get(_const_strconv__pos_exp, exp)),};
+< 			f.f = f.f * tmp_mul.f;
+< 		} else {
+< 			if (exp > _const_strconv__neg_exp.len) {
+< 				if (sign > 0) {
+< 					f.u = _const_strconv__double_plus_zero;
+< 				} else {
+< 					f.u = _const_strconv__double_minus_zero;
+< 				}
+< 				return f.f;
+< 			}
+< 			strconv__Float64u tmp_mul = (strconv__Float64u){.u = (*(u64*)/*ee elem_typ */array_get(_const_strconv__neg_exp, exp)),};
+< 			f.f = f.f * tmp_mul.f;
+< 		}
+< 	}
+< 	{ // Unsafe block
+< 		f.f = f.f * sign;
+< 		return f.f;
+< 	}
+< 	return 0;
+< }
+< 
+5195,5469d4995
+< // Attr: [manualfree]
+< string strconv__f64_to_str_lnd1(f64 f, int dec_digit) {
+< 	{ // Unsafe block
+< 		string s = strconv__f64_to_str(f + ((f64*)_const_strconv__dec_round.data)[dec_digit], 18);
+< 		if (s.len > 2 && (s.str[ 0] == 'n' || s.str[ 1] == 'i')) {
+< 			return s;
+< 		}
+< 		bool m_sgn_flag = false;
+< 		int sgn = 1;
+< 		Array_fixed_byte_26 b = {0};
+< 		int d_pos = 1;
+< 		int i = 0;
+< 		int i1 = 0;
+< 		int exp = 0;
+< 		int exp_sgn = 1;
+< 		int dot_res_sp = -1;
+< 		for (int _t2 = 0; _t2 < s.len; ++_t2) {
+< 			byte c = s.str[_t2];
+< 			if (c == '-') {
+< 				sgn = -1;
+< 				i++;
+< 			} else if (c == '+') {
+< 				sgn = 1;
+< 				i++;
+< 			} else if (c >= '0' && c <= '9') {
+< 				b[i1] = c;
+< 				i1++;
+< 				i++;
+< 			} else if (c == '.') {
+< 				if (sgn > 0) {
+< 					d_pos = i;
+< 				} else {
+< 					d_pos = i - 1;
+< 				}
+< 				i++;
+< 			} else if (c == 'e') {
+< 				i++;
+< 				break;
+< 			} else {
+< 				string_free(&s);
+< 				return _SLIT("[Float conversion error!!]");
+< 			}
+< 		}
+< 		b[i1] = 0;
+< 		if (s.str[ i] == '-') {
+< 			exp_sgn = -1;
+< 			i++;
+< 		} else if (s.str[ i] == '+') {
+< 			exp_sgn = 1;
+< 			i++;
+< 		}
+< 		int c = i;
+< 		for (;;) {
+< 			if (!(c < s.len)) break;
+< 			exp = exp * 10 + ((int)(s.str[ c] - '0'));
+< 			c++;
+< 		}
+< 		Array_byte res = __new_array_with_default(exp + 32, 0, sizeof(byte), &(byte[]){0});
+< 		int r_i = 0;
+< 		string_free(&s);
+< 		if (sgn == 1) {
+< 			if (m_sgn_flag) {
+< 				((byte*)res.data)[r_i] = '+';
+< 				r_i++;
+< 			}
+< 		} else {
+< 			((byte*)res.data)[r_i] = '-';
+< 			r_i++;
+< 		}
+< 		i = 0;
+< 		if (exp_sgn >= 0) {
+< 			for (;;) {
+< 				if (!(b[i] != 0)) break;
+< 				((byte*)res.data)[r_i] = b[i];
+< 				r_i++;
+< 				i++;
+< 				if (i >= d_pos && exp >= 0) {
+< 					if (exp == 0) {
+< 						dot_res_sp = r_i;
+< 						((byte*)res.data)[r_i] = '.';
+< 						r_i++;
+< 					}
+< 					exp--;
+< 				}
+< 			}
+< 			for (;;) {
+< 				if (!(exp >= 0)) break;
+< 				((byte*)res.data)[r_i] = '0';
+< 				r_i++;
+< 				exp--;
+< 			}
+< 		} else {
+< 			bool dot_p = true;
+< 			for (;;) {
+< 				if (!(exp > 0)) break;
+< 				((byte*)res.data)[r_i] = '0';
+< 				r_i++;
+< 				exp--;
+< 				if (dot_p) {
+< 					dot_res_sp = r_i;
+< 					((byte*)res.data)[r_i] = '.';
+< 					r_i++;
+< 					dot_p = false;
+< 				}
+< 			}
+< 			for (;;) {
+< 				if (!(b[i] != 0)) break;
+< 				((byte*)res.data)[r_i] = b[i];
+< 				r_i++;
+< 				i++;
+< 			}
+< 		}
+< 		if (dec_digit <= 0) {
+< 			string tmp_res = string_clone(tos(res.data, dot_res_sp));
+< 			array_free(&res);
+< 			return tmp_res;
+< 		}
+< 		if (dot_res_sp >= 0) {
+< 			if ((r_i - dot_res_sp) > dec_digit) {
+< 				r_i = dot_res_sp + dec_digit + 1;
+< 			}
+< 			((byte*)res.data)[r_i] = 0;
+< 			string tmp_res = string_clone(tos(res.data, r_i));
+< 			array_free(&res);
+< 			return tmp_res;
+< 		} else {
+< 			if (dec_digit > 0) {
+< 				int c1 = 0;
+< 				((byte*)res.data)[r_i] = '.';
+< 				r_i++;
+< 				for (;;) {
+< 					if (!(c1 < dec_digit)) break;
+< 					((byte*)res.data)[r_i] = '0';
+< 					r_i++;
+< 					c1++;
+< 				}
+< 				((byte*)res.data)[r_i] = 0;
+< 			}
+< 			string tmp_res = string_clone(tos(res.data, r_i));
+< 			array_free(&res);
+< 			return tmp_res;
+< 		}
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [manualfree]
+< string strconv__format_fl(f64 f, strconv__BF_param p) {
+< 	{ // Unsafe block
+< 		string s = _SLIT("");
+< 		string fs = strconv__f64_to_str_lnd1((f >= 0.0 ? (f) : (-f)), p.len1);
+< 		if (string_at(fs, 0) == '[') {
+< 			string_free(&s);
+< 			return fs;
+< 		}
+< 		if (p.rm_tail_zero) {
+< 			string tmp = fs;
+< 			fs = strconv__remove_tail_zeros(fs);
+< 			string_free(&tmp);
+< 		}
+< 		strings__Builder res = strings__new_builder((p.len0 > fs.len ? (p.len0) : (fs.len)));
+< 		int sign_len_diff = 0;
+< 		if (p.pad_ch == '0') {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					strings__Builder_write_b(&res, '+');
+< 					sign_len_diff = -1;
+< 				}
+< 			} else {
+< 				strings__Builder_write_b(&res, '-');
+< 				sign_len_diff = -1;
+< 			}
+< 			string tmp = s;
+< 			s = string_clone(fs);
+< 			string_free(&tmp);
+< 		} else {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					string tmp = s;
+< 					s = string__plus(_SLIT("+"), fs);
+< 					string_free(&tmp);
+< 				} else {
+< 					string tmp = s;
+< 					s = string_clone(fs);
+< 					string_free(&tmp);
+< 				}
+< 			} else {
+< 				string tmp = s;
+< 				s = string__plus(_SLIT("-"), fs);
+< 				string_free(&tmp);
+< 			}
+< 		}
+< 		int dif = p.len0 - s.len + sign_len_diff;
+< 		if (p.allign == strconv__Align_text__right) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		strings__Builder_write_string(&res, s);
+< 		if (p.allign == strconv__Align_text__left) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		string_free(&s);
+< 		string_free(&fs);
+< 		string tmp_res = strings__Builder_str(&res);
+< 		strings__Builder_free(&res);
+< 		return tmp_res;
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [manualfree]
+< string strconv__format_es(f64 f, strconv__BF_param p) {
+< 	{ // Unsafe block
+< 		string s = _SLIT("");
+< 		string fs = strconv__f64_to_str_pad((f > 0 ? (f) : (-f)), p.len1);
+< 		if (p.rm_tail_zero) {
+< 			fs = strconv__remove_tail_zeros(fs);
+< 		}
+< 		strings__Builder res = strings__new_builder((p.len0 > fs.len ? (p.len0) : (fs.len)));
+< 		int sign_len_diff = 0;
+< 		if (p.pad_ch == '0') {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					strings__Builder_write_b(&res, '+');
+< 					sign_len_diff = -1;
+< 				}
+< 			} else {
+< 				strings__Builder_write_b(&res, '-');
+< 				sign_len_diff = -1;
+< 			}
+< 			string tmp = s;
+< 			s = string_clone(fs);
+< 			string_free(&tmp);
+< 		} else {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					string tmp = s;
+< 					s = string__plus(_SLIT("+"), fs);
+< 					string_free(&tmp);
+< 				} else {
+< 					string tmp = s;
+< 					s = string_clone(fs);
+< 					string_free(&tmp);
+< 				}
+< 			} else {
+< 				string tmp = s;
+< 				s = string__plus(_SLIT("-"), fs);
+< 				string_free(&tmp);
+< 			}
+< 		}
+< 		int dif = p.len0 - s.len + sign_len_diff;
+< 		if (p.allign == strconv__Align_text__right) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		strings__Builder_write_string(&res, s);
+< 		if (p.allign == strconv__Align_text__left) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		string_free(&s);
+< 		string_free(&fs);
+< 		string tmp_res = strings__Builder_str(&res);
+< 		strings__Builder_free(&res);
+< 		return tmp_res;
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [direct_array_access]
+6444,6558c5970
+< 			if ((ch == 'f' || ch == 'F')) {
+< 				strconv__v_sprintf_panic(p_index, pt.len);
+< 				f64 x = *(((f64*)((*(voidptr*)/*ee elem_typ */array_get(pt, p_index)))));
+< 				bool positive = x >= ((f64)(0.0));
+< 				int _t9; /* if prepend */
+< 				if (len1 >= 0) {
+< 					_t9 = len1;
+< 				} else {
+< 					_t9 = def_len1;
+< 				}
+< 				len1 =  _t9;
+< 				string s = strconv__format_fl_old(((f64)(x)), (strconv__BF_param){
+< 					.pad_ch = pad_ch,
+< 					.len0 = len0,
+< 					.len1 = len1,
+< 					.positive = positive,
+< 					.sign_flag = sign,
+< 					.allign = allign,
+< 					.rm_tail_zero = 0,
+< 				});
+< 				string _t10; /* if prepend */
+< 				if (ch == 'F') {
+< 					_t10 = string_to_upper(s);
+< 				} else {
+< 					_t10 = s;
+< 				}
+< 				strings__Builder_write_string(&res,  _t10);
+< 				status = strconv__Char_parse_state__reset_params;
+< 				p_index++;
+< 				i++;
+< 				continue;
+< 			} else if ((ch == 'e' || ch == 'E')) {
+< 				strconv__v_sprintf_panic(p_index, pt.len);
+< 				f64 x = *(((f64*)((*(voidptr*)/*ee elem_typ */array_get(pt, p_index)))));
+< 				bool positive = x >= ((f64)(0.0));
+< 				int _t11; /* if prepend */
+< 				if (len1 >= 0) {
+< 					_t11 = len1;
+< 				} else {
+< 					_t11 = def_len1;
+< 				}
+< 				len1 =  _t11;
+< 				string s = strconv__format_es_old(((f64)(x)), (strconv__BF_param){
+< 					.pad_ch = pad_ch,
+< 					.len0 = len0,
+< 					.len1 = len1,
+< 					.positive = positive,
+< 					.sign_flag = sign,
+< 					.allign = allign,
+< 					.rm_tail_zero = 0,
+< 				});
+< 				string _t12; /* if prepend */
+< 				if (ch == 'E') {
+< 					_t12 = string_to_upper(s);
+< 				} else {
+< 					_t12 = s;
+< 				}
+< 				strings__Builder_write_string(&res,  _t12);
+< 				status = strconv__Char_parse_state__reset_params;
+< 				p_index++;
+< 				i++;
+< 				continue;
+< 			} else if ((ch == 'g' || ch == 'G')) {
+< 				strconv__v_sprintf_panic(p_index, pt.len);
+< 				f64 x = *(((f64*)((*(voidptr*)/*ee elem_typ */array_get(pt, p_index)))));
+< 				bool positive = x >= ((f64)(0.0));
+< 				string s = _SLIT("");
+< 				f64 tx = strconv__fabs(x);
+< 				if (tx < 999999.0 && tx >= 0.00001) {
+< 					int _t13; /* if prepend */
+< 					if (len1 >= 0) {
+< 						_t13 = len1 + 1;
+< 					} else {
+< 						_t13 = def_len1;
+< 					}
+< 					len1 =  _t13;
+< 					s = strconv__format_fl_old(x, (strconv__BF_param){
+< 						.pad_ch = pad_ch,
+< 						.len0 = len0,
+< 						.len1 = len1,
+< 						.positive = positive,
+< 						.sign_flag = sign,
+< 						.allign = allign,
+< 						.rm_tail_zero = true,
+< 					});
+< 				} else {
+< 					int _t14; /* if prepend */
+< 					if (len1 >= 0) {
+< 						_t14 = len1 + 1;
+< 					} else {
+< 						_t14 = def_len1;
+< 					}
+< 					len1 =  _t14;
+< 					s = strconv__format_es_old(x, (strconv__BF_param){
+< 						.pad_ch = pad_ch,
+< 						.len0 = len0,
+< 						.len1 = len1,
+< 						.positive = positive,
+< 						.sign_flag = sign,
+< 						.allign = allign,
+< 						.rm_tail_zero = true,
+< 					});
+< 				}
+< 				string _t15; /* if prepend */
+< 				if (ch == 'G') {
+< 					_t15 = string_to_upper(s);
+< 				} else {
+< 					_t15 = s;
+< 				}
+< 				strings__Builder_write_string(&res,  _t15);
+< 				status = strconv__Char_parse_state__reset_params;
+< 				p_index++;
+< 				i++;
+< 				continue;
+< 			} else if (ch == 's') {
+---
+> 			if (ch == 's') {
+6596,6730d6007
+< VV_LOCAL_SYMBOL f64 strconv__fabs(f64 x) {
+< 	if (x < 0.0) {
+< 		return -x;
+< 	}
+< 	return x;
+< }
+< 
+< // Attr: [manualfree]
+< string strconv__format_fl_old(f64 f, strconv__BF_param p) {
+< 	{ // Unsafe block
+< 		string s = _SLIT("");
+< 		string fs = strconv__f64_to_str_lnd1((f >= 0.0 ? (f) : (-f)), p.len1);
+< 		if (string_at(fs, 0) == '[') {
+< 			string_free(&s);
+< 			return fs;
+< 		}
+< 		if (p.rm_tail_zero) {
+< 			string tmp = fs;
+< 			fs = strconv__remove_tail_zeros_old(fs);
+< 			string_free(&tmp);
+< 		}
+< 		strings__Builder res = strings__new_builder((p.len0 > fs.len ? (p.len0) : (fs.len)));
+< 		int sign_len_diff = 0;
+< 		if (p.pad_ch == '0') {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					strings__Builder_write_b(&res, '+');
+< 					sign_len_diff = -1;
+< 				}
+< 			} else {
+< 				strings__Builder_write_b(&res, '-');
+< 				sign_len_diff = -1;
+< 			}
+< 			string tmp = s;
+< 			s = string_clone(fs);
+< 			string_free(&tmp);
+< 		} else {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					string tmp = s;
+< 					s = string__plus(_SLIT("+"), fs);
+< 					string_free(&tmp);
+< 				} else {
+< 					string tmp = s;
+< 					s = string_clone(fs);
+< 					string_free(&tmp);
+< 				}
+< 			} else {
+< 				string tmp = s;
+< 				s = string__plus(_SLIT("-"), fs);
+< 				string_free(&tmp);
+< 			}
+< 		}
+< 		int dif = p.len0 - s.len + sign_len_diff;
+< 		if (p.allign == strconv__Align_text__right) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		strings__Builder_write_string(&res, s);
+< 		if (p.allign == strconv__Align_text__left) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		string_free(&s);
+< 		string_free(&fs);
+< 		string tmp_res = strings__Builder_str(&res);
+< 		strings__Builder_free(&res);
+< 		return tmp_res;
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [manualfree]
+< string strconv__format_es_old(f64 f, strconv__BF_param p) {
+< 	{ // Unsafe block
+< 		string s = _SLIT("");
+< 		string fs = strconv__f64_to_str_pad((f > 0 ? (f) : (-f)), p.len1);
+< 		if (p.rm_tail_zero) {
+< 			fs = strconv__remove_tail_zeros_old(fs);
+< 		}
+< 		strings__Builder res = strings__new_builder((p.len0 > fs.len ? (p.len0) : (fs.len)));
+< 		int sign_len_diff = 0;
+< 		if (p.pad_ch == '0') {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					strings__Builder_write_b(&res, '+');
+< 					sign_len_diff = -1;
+< 				}
+< 			} else {
+< 				strings__Builder_write_b(&res, '-');
+< 				sign_len_diff = -1;
+< 			}
+< 			string tmp = s;
+< 			s = string_clone(fs);
+< 			string_free(&tmp);
+< 		} else {
+< 			if (p.positive) {
+< 				if (p.sign_flag) {
+< 					string tmp = s;
+< 					s = string__plus(_SLIT("+"), fs);
+< 					string_free(&tmp);
+< 				} else {
+< 					string tmp = s;
+< 					s = string_clone(fs);
+< 					string_free(&tmp);
+< 				}
+< 			} else {
+< 				string tmp = s;
+< 				s = string__plus(_SLIT("-"), fs);
+< 				string_free(&tmp);
+< 			}
+< 		}
+< 		int dif = p.len0 - s.len + sign_len_diff;
+< 		if (p.allign == strconv__Align_text__right) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		strings__Builder_write_string(&res, s);
+< 		if (p.allign == strconv__Align_text__left) {
+< 			for (int i1 = 0; i1 < dif; i1++) {
+< 				strings__Builder_write_b(&res, p.pad_ch);
+< 			}
+< 		}
+< 		string_free(&s);
+< 		string_free(&fs);
+< 		string tmp_res = strings__Builder_str(&res);
+< 		strings__Builder_free(&res);
+< 		return tmp_res;
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+7917,8111d7193
+< // Attr: [inline]
+< inline string f64_str(f64 x) {
+< 	{ // Unsafe block
+< 		strconv__Float64u f = (strconv__Float64u){.f = x,};
+< 		if (f.u == _const_strconv__double_minus_zero) {
+< 			return _SLIT("-0");
+< 		}
+< 		if (f.u == _const_strconv__double_plus_zero) {
+< 			return _SLIT("0");
+< 		}
+< 	}
+< 	f64 abs_x = f64_abs(x);
+< 	if (abs_x >= 0.0001 && abs_x < 1.0e6) {
+< 		return strconv__f64_to_str_l(x);
+< 	} else {
+< 		return strconv__ftoa_64(x);
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [inline]
+< inline string f64_strg(f64 x) {
+< 	if (x == 0) {
+< 		return _SLIT("0");
+< 	}
+< 	f64 abs_x = f64_abs(x);
+< 	if (abs_x >= 0.0001 && abs_x < 1.0e6) {
+< 		return strconv__f64_to_str_l_no_dot(x);
+< 	} else {
+< 		return strconv__ftoa_64(x);
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [inline]
+< inline string float_literal_str(float_literal d) {
+< 	return f64_str(((f64)(d)));
+< }
+< 
+< // Attr: [inline]
+< inline string f64_strsci(f64 x, int digit_num) {
+< 	int n_digit = digit_num;
+< 	if (n_digit < 1) {
+< 		n_digit = 1;
+< 	} else if (n_digit > 17) {
+< 		n_digit = 17;
+< 	}
+< 	return strconv__f64_to_str(x, n_digit);
+< }
+< 
+< // Attr: [inline]
+< inline string f64_strlong(f64 x) {
+< 	return strconv__f64_to_str_l(x);
+< }
+< 
+< // Attr: [inline]
+< inline string f32_str(f32 x) {
+< 	{ // Unsafe block
+< 		strconv__Float32u f = (strconv__Float32u){.f = x,};
+< 		if (f.u == _const_strconv__single_minus_zero) {
+< 			return _SLIT("-0");
+< 		}
+< 		if (f.u == _const_strconv__single_plus_zero) {
+< 			return _SLIT("0");
+< 		}
+< 	}
+< 	f32 abs_x = f32_abs(x);
+< 	if (abs_x >= 0.0001 && abs_x < 1.0e6) {
+< 		return strconv__f32_to_str_l(x);
+< 	} else {
+< 		return strconv__ftoa_32(x);
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [inline]
+< inline string f32_strg(f32 x) {
+< 	if (x == 0) {
+< 		return _SLIT("0");
+< 	}
+< 	f32 abs_x = f32_abs(x);
+< 	if (abs_x >= 0.0001 && abs_x < 1.0e6) {
+< 		return strconv__f32_to_str_l_no_dot(x);
+< 	} else {
+< 		return strconv__ftoa_32(x);
+< 	}
+< 	return (string){.str=(byteptr)"", .is_lit=1};
+< }
+< 
+< // Attr: [inline]
+< inline string f32_strsci(f32 x, int digit_num) {
+< 	int n_digit = digit_num;
+< 	if (n_digit < 1) {
+< 		n_digit = 1;
+< 	} else if (n_digit > 8) {
+< 		n_digit = 8;
+< 	}
+< 	return strconv__f32_to_str(x, n_digit);
+< }
+< 
+< // Attr: [inline]
+< inline string f32_strlong(f32 x) {
+< 	return strconv__f32_to_str_l(x);
+< }
+< 
+< // Attr: [inline]
+< inline f32 f32_abs(f32 a) {
+< 	f32 _t2; /* if prepend */
+< 	if (a < 0) {
+< 		_t2 = -a;
+< 	} else {
+< 		_t2 = a;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline VV_LOCAL_SYMBOL f64 f64_abs(f64 a) {
+< 	f64 _t2; /* if prepend */
+< 	if (a < 0) {
+< 		_t2 = -a;
+< 	} else {
+< 		_t2 = a;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline f32 f32_max(f32 a, f32 b) {
+< 	f32 _t2; /* if prepend */
+< 	if (a > b) {
+< 		_t2 = a;
+< 	} else {
+< 		_t2 = b;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline f32 f32_min(f32 a, f32 b) {
+< 	f32 _t2; /* if prepend */
+< 	if (a < b) {
+< 		_t2 = a;
+< 	} else {
+< 		_t2 = b;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline f64 f64_max(f64 a, f64 b) {
+< 	f64 _t2; /* if prepend */
+< 	if (a > b) {
+< 		_t2 = a;
+< 	} else {
+< 		_t2 = b;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline VV_LOCAL_SYMBOL f64 f64_min(f64 a, f64 b) {
+< 	f64 _t2; /* if prepend */
+< 	if (a < b) {
+< 		_t2 = a;
+< 	} else {
+< 		_t2 = b;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline bool f32_eq_epsilon(f32 a, f32 b) {
+< 	f32 hi = f32_max(f32_abs(a), f32_abs(b));
+< 	f32 delta = f32_abs(a - b);
+< 	if (hi > ((f32)(1.0))) {
+< 		return delta <= hi * (4 * ((f32)(FLT_EPSILON)));
+< 	} else {
+< 		return (1 / (4 * ((f32)(FLT_EPSILON)))) * delta <= hi;
+< 	}
+< 	return 0;
+< }
+< 
+< // Attr: [inline]
+< inline bool f64_eq_epsilon(f64 a, f64 b) {
+< 	f64 hi = f64_max(f64_abs(a), f64_abs(b));
+< 	f64 delta = f64_abs(a - b);
+< 	if (hi > 1.0) {
+< 		return delta <= hi * (4 * ((f64)(DBL_EPSILON)));
+< 	} else {
+< 		return (1 / (4 * ((f64)(DBL_EPSILON)))) * delta <= hi;
+< 	}
+< 	return 0;
+< }
+< 
+8781c7863
+< 	f32 load_factor = ((f32)(m->len << 1)) / ((f32)(m->even_index));
+---
+> 	u32 load_factor = (m->len << 1) / m->even_index;
+9227,9231d8308
+< 		#if !defined(_VFREESTANDING)
+< 		{
+< 			atexit((voidptr)prealloc_vcleanup);
+< 		}
+< 		#endif
+10040,10047d9116
+< f32 string_f32(string s) {
+< 	return ((f32)(strconv__atof64(s)));
+< }
+< 
+< f64 string_f64(string s) {
+< 	return strconv__atof64(s);
+< }
+< 
+11229,11250d10297
+< inline VV_LOCAL_SYMBOL f32 fabs32(f32 x) {
+< 	f32 _t2; /* if prepend */
+< 	if (x < 0) {
+< 		_t2 = -x;
+< 	} else {
+< 		_t2 = x;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+< inline VV_LOCAL_SYMBOL f64 fabs64(f64 x) {
+< 	f64 _t2; /* if prepend */
+< 	if (x < 0) {
+< 		_t2 = -x;
+< 	} else {
+< 		_t2 = x;
+< 	}
+< 	return  _t2;
+< }
+< 
+< // Attr: [inline]
+11526,11756c10573
+< 		if (typ == (StrIntpType__si_f32)) {
+< 			if (use_default_str) {
+< 				string f = f32_str(data.d.d_f32);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			} else {
+< 				if (data.d.d_f32 < 0) {
+< 					bf.positive = false;
+< 				}
+< 				string f = strconv__format_fl(data.d.d_f32, bf);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			}
+< 		}
+< 		else if (typ == (StrIntpType__si_f64)) {
+< 			if (use_default_str) {
+< 				string f = f64_str(data.d.d_f64);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			} else {
+< 				if (data.d.d_f64 < 0) {
+< 					bf.positive = false;
+< 				}
+< 				strconv__Float64u f_union = (strconv__Float64u){.f = data.d.d_f64,};
+< 				if (f_union.u == _const_strconv__double_minus_zero) {
+< 					bf.positive = false;
+< 				}
+< 				string f = strconv__format_fl(data.d.d_f64, bf);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			}
+< 		}
+< 		else if (typ == (StrIntpType__si_g32)) {
+< 			if (use_default_str) {
+< 				string f = f32_strg(data.d.d_f32);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			} else {
+< 				if (data.d.d_f32 == _const_strconv__single_plus_zero) {
+< 					string tmp_str = _SLIT("0");
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 					return;
+< 				}
+< 				if (data.d.d_f32 == _const_strconv__single_minus_zero) {
+< 					string tmp_str = _SLIT("-0");
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 					return;
+< 				}
+< 				if (data.d.d_f32 == _const_strconv__single_plus_infinity) {
+< 					string tmp_str = _SLIT("+inf");
+< 					if (upper_case) {
+< 						tmp_str = _SLIT("+INF");
+< 					}
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 				}
+< 				if (data.d.d_f32 == _const_strconv__single_minus_infinity) {
+< 					string tmp_str = _SLIT("-inf");
+< 					if (upper_case) {
+< 						tmp_str = _SLIT("-INF");
+< 					}
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 				}
+< 				if (data.d.d_f32 < 0) {
+< 					bf.positive = false;
+< 				}
+< 				f32 d = fabs32(data.d.d_f32);
+< 				if (d < 999999.0 && d >= 0.00001) {
+< 					string f = strconv__format_fl(data.d.d_f32, bf);
+< 					if (upper_case) {
+< 						string tmp = f;
+< 						f = string_to_upper(f);
+< 						string_free(&tmp);
+< 					}
+< 					strings__Builder_write_string(sb, f);
+< 					string_free(&f);
+< 					return;
+< 				}
+< 				string f = strconv__format_es(data.d.d_f32, bf);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			}
+< 		}
+< 		else if (typ == (StrIntpType__si_g64)) {
+< 			if (use_default_str) {
+< 				string f = f64_strg(data.d.d_f64);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			} else {
+< 				if (data.d.d_f64 == _const_strconv__double_plus_zero) {
+< 					string tmp_str = _SLIT("0");
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 					return;
+< 				}
+< 				if (data.d.d_f64 == _const_strconv__double_minus_zero) {
+< 					string tmp_str = _SLIT("-0");
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 					return;
+< 				}
+< 				if (data.d.d_f64 == _const_strconv__double_plus_infinity) {
+< 					string tmp_str = _SLIT("+inf");
+< 					if (upper_case) {
+< 						tmp_str = _SLIT("+INF");
+< 					}
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 				}
+< 				if (data.d.d_f64 == _const_strconv__double_minus_infinity) {
+< 					string tmp_str = _SLIT("-inf");
+< 					if (upper_case) {
+< 						tmp_str = _SLIT("-INF");
+< 					}
+< 					strconv__format_str_sb(tmp_str, bf, sb);
+< 					string_free(&tmp_str);
+< 				}
+< 				if (data.d.d_f64 < 0) {
+< 					bf.positive = false;
+< 				}
+< 				f64 d = fabs64(data.d.d_f64);
+< 				if (d < 999999.0 && d >= 0.00001) {
+< 					string f = strconv__format_fl(data.d.d_f64, bf);
+< 					if (upper_case) {
+< 						string tmp = f;
+< 						f = string_to_upper(f);
+< 						string_free(&tmp);
+< 					}
+< 					strings__Builder_write_string(sb, f);
+< 					string_free(&f);
+< 					return;
+< 				}
+< 				string f = strconv__format_es(data.d.d_f64, bf);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			}
+< 		}
+< 		else if (typ == (StrIntpType__si_e32)) {
+< 			bf.len1 = 6;
+< 			if (use_default_str) {
+< 				string f = f32_str(data.d.d_f32);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			} else {
+< 				if (data.d.d_f32 < 0) {
+< 					bf.positive = false;
+< 				}
+< 				string f = strconv__format_es(data.d.d_f32, bf);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			}
+< 		}
+< 		else if (typ == (StrIntpType__si_e64)) {
+< 			bf.len1 = 6;
+< 			if (use_default_str) {
+< 				string f = f64_str(data.d.d_f64);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			} else {
+< 				if (data.d.d_f64 < 0) {
+< 					bf.positive = false;
+< 				}
+< 				string f = strconv__format_es(data.d.d_f64, bf);
+< 				if (upper_case) {
+< 					string tmp = f;
+< 					f = string_to_upper(f);
+< 					string_free(&tmp);
+< 				}
+< 				strings__Builder_write_string(sb, f);
+< 				string_free(&f);
+< 			}
+< 		}
+< 		else if (typ == (StrIntpType__si_c)) {
+---
+> 		if (typ == (StrIntpType__si_c)) {
