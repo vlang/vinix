@@ -28,9 +28,9 @@ sources:
 
   - name: mlibc
     subdir: '3rdparty'
-    url: 'https://github.com/managarm/mlibc/archive/63cbc613eea2714b7871e10788a5fa7ad239c25b.tar.gz'
+    url: 'https://github.com/managarm/mlibc/archive/f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a.tar.gz'
     format: 'tar.gz'
-    extract_path: 'mlibc-63cbc613eea2714b7871e10788a5fa7ad239c25b'
+    extract_path: 'mlibc-f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a'
     patch-path-strip: 3
 
   - name: v
