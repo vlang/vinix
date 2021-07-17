@@ -19,7 +19,7 @@ pub fn initialise() {
 	serial_lock.release()
 }
 
-pub fn out(value u8) {
+pub fn out(value byte) {
 	serial_lock.acquire()
 	if value == `\n` {
 		for kio.inb(0x3f8 + 5) & 0x20 == 0 {}
