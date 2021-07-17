@@ -1,0 +1,9 @@
+jobs:
+  - name: system-toolchain
+    tools:
+      - host-gcc
+    packages:
+      - mlibc
+      - mlibc-headers
+
+# vim: et sw=2 :

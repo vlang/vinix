@@ -33,20 +33,22 @@ sources:
     extract_path: 'mlibc-f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a'
     patch-path-strip: 3
 
+# V_COMMIT  = 1bf6743987fdd991591e6d0b766d8a065d34de66
+# VC_COMMIT = c0b1553672b59643116e89155845368c92ca5d00
+
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://example.com'
-    format: 'tar.gz'
-    extract_path: 'v'
-    patch-path-strip: 3
+    git: 'https://github.com/vlang/v.git'
+    branch: 'master'
+    commit: '1bf6743987fdd991591e6d0b766d8a065d34de66'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://example.com'
-    format: 'tar.gz'
-    extract_path: 'vc'
-    patch-path-strip: 3
+    git: 'https://github.com/vlang/vc.git'
+    branch: 'master'
+    commit: 'c0b1553672b59643116e89155845368c92ca5d00'
+
 
   - name: limine
     subdir: '3rdparty'
@@ -188,6 +190,7 @@ tools:
 
 packages:
   - name: mlibc-headers
+    revision: 2
     from_source: mlibc
     implict_package: true
     configure:
@@ -220,6 +223,7 @@ packages:
         - '--prefix=/usr'
         - '--libdir=lib'
         - '--buildtype=debugoptimized'
+        - '-Dmlibc_no_headers=true'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
