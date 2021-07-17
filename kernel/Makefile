@@ -49,7 +49,7 @@ all: $(KERNEL)
 
 .PHONY: clean
 clean:
-	rm -rf $(KERNEL) $(COBJ) blob.o
+	rm -rf $(KERNEL) $(COBJ) blob.o blob.c blob.c.unpatched
 
 blob.o:
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
