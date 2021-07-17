@@ -18,7 +18,7 @@ index 5784c4d..f42475a 100644
 --- a/3rdparty/mlibc-orig/options/internal/include/bits/feature.h
 +++ b/3rdparty/mlibc-workdir/options/internal/include/bits/feature.h
 @@ -3,8 +3,8 @@
-
+ 
  // TODO: The files for this macro are chosen somewhat arbitrarily.
  // TODO: Choose canonical files (like a bits/posix/alltypes.h)
 -#define __MLIBC_ANSI_OPTION __has_include(<stdlib.h>)
@@ -27,8 +27,89 @@ index 5784c4d..f42475a 100644
 +#define __MLIBC_ANSI_OPTION 1
 +#define __MLIBC_POSIX_OPTION 1
 +#define __MLIBC_LINUX_OPTION 1
-
+ 
  #endif // _BITS_FEATURE_H
+diff --git a/3rdparty/mlibc-orig/options/internal/include/bits/types.h b/3rdparty/mlibc-workdir/options/internal/include/bits/types.h
+index 0488309..a9c8177 100644
+--- a/3rdparty/mlibc-orig/options/internal/include/bits/types.h
++++ b/3rdparty/mlibc-workdir/options/internal/include/bits/types.h
+@@ -1,6 +1,17 @@
+ #ifndef _MLIBC_INTERNAL_TYPES_H
+ #define _MLIBC_INTERNAL_TYPES_H
+ 
++#ifdef __TINYC__
++typedef unsigned char __mlibc_uint8;
++typedef unsigned short __mlibc_uint16;
++typedef unsigned int __mlibc_uint32;
++typedef unsigned long __mlibc_uint64;
++
++typedef signed char __mlibc_int8;
++typedef signed short __mlibc_int16;
++typedef signed int __mlibc_int32;
++typedef signed long __mlibc_int64;
++#else
+ typedef __UINT8_TYPE__  __mlibc_uint8;
+ typedef __UINT16_TYPE__ __mlibc_uint16;
+ typedef __UINT32_TYPE__ __mlibc_uint32;
+@@ -10,6 +21,7 @@ typedef __INT8_TYPE__  __mlibc_int8;
+ typedef __INT16_TYPE__ __mlibc_int16;
+ typedef __INT32_TYPE__ __mlibc_int32;
+ typedef __INT64_TYPE__ __mlibc_int64;
++#endif
+ 
+ // Clang and GCC have different mechanisms for INT32_C and friends.
+ #ifdef __clang__
+@@ -198,9 +210,24 @@ typedef __mlibc_uint64 __mlibc_uint_fast64;
+ 
+ // Special types.
+ 
++#ifdef __TINYC__
++typedef signed long __mlibc_intmax;
++typedef signed long __mlibc_intptr;
++typedef signed long __mlibc_ptrdiff;
++
++typedef unsigned long __mlibc_uintmax;
++typedef unsigned long __mlibc_uintptr;
++typedef unsigned long __mlibc_size;
++#else
+ typedef __INTMAX_TYPE__  __mlibc_intmax;
+ typedef __INTPTR_TYPE__  __mlibc_intptr;
+ typedef __PTRDIFF_TYPE__ __mlibc_ptrdiff;
++
++typedef __UINTMAX_TYPE__ __mlibc_uintmax;
++typedef __UINTPTR_TYPE__ __mlibc_uintptr;
++typedef __SIZE_TYPE__    __mlibc_size;
++#endif
++
+ #define __MLIBC_INTMAX_MAX __INTMAX_MAX__
+ #define __MLIBC_INTMAX_MIN (-__INTMAX_MAX__ - 1)
+ #define __MLIBC_INTPTR_MAX __INTPTR_MAX__
+@@ -208,9 +235,6 @@ typedef __PTRDIFF_TYPE__ __mlibc_ptrdiff;
+ #define __MLIBC_PTRDIFF_MAX __PTRDIFF_MAX__
+ #define __MLIBC_PTRDIFF_MIN (-__PTRDIFF_MAX__ - 1)
+ 
+-typedef __UINTMAX_TYPE__ __mlibc_uintmax;
+-typedef __UINTPTR_TYPE__ __mlibc_uintptr;
+-typedef __SIZE_TYPE__    __mlibc_size;
+ #define __MLIBC_UINTMAX_MAX __UINTMAX_MAX__
+ #define __MLIBC_UINTPTR_MAX __UINTPTR_MAX__
+ #define __MLIBC_SIZE_MAX __SIZE_MAX__
+@@ -230,6 +254,8 @@ typedef __SIZE_TYPE__    __mlibc_size;
+ // Sanity checking. Make sure that we agree with the compiler's ABI.
+ // ----------------------------------------------------------------------------
+ 
++#ifndef __TINYC__
++
+ #if defined(__cpp_static_assert)
+ #	define __MLIBC_STATIC_ASSERT(c, text) static_assert(c, text)
+ #elif !defined(__cplusplus)
+@@ -266,4 +292,6 @@ __MLIBC_CHECK_TYPE(__mlibc_uint64, __UINT_LEAST64_TYPE__);
+ 	__MLIBC_CHECK_TYPE(__mlibc_uint_fast64, __UINT_FAST64_TYPE__);
+ #endif
+ 
++#endif
++
+ #endif // _MLIBC_INTERNAL_TYPES_H
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..0a0a4a0
@@ -84,10 +165,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..3e7b819
+index 0000000..9595bcf
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,398 @@
+@@ -0,0 +1,407 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -175,6 +256,15 @@ index 0000000..3e7b819
 +        return 0;
 +
 +    return ENOTTY;
++}
++
++int sys_getcwd(char *buffer, size_t size) {
++    __syscall_ret ret = __syscall(25, buffer, size);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
 +}
 +
 +int sys_openat(int dirfd, const char *path, int flags, int *fd) {
