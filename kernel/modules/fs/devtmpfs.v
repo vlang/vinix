@@ -80,12 +80,13 @@ fn (mut this DevTmpFS) instantiate() &FileSystem {
 
 fn (mut this DevTmpFS) populate(node &VFSNode) {}
 
-fn (mut this DevTmpFS) mount(source &VFSNode) ?&VFSNode {
+fn (mut this DevTmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
 	if devtmpfs_dev_id == 0 {
 		devtmpfs_dev_id = resource.create_dev_id()
 	}
 	if devtmpfs_root == 0 {
-		devtmpfs_root = this.create(&VFSNode(0), '', 0o644 | stat.ifdir)
+		// XXX this will break if devtmpfs is mounted more than once
+		devtmpfs_root = this.create(parent, name, 0o644 | stat.ifdir)
 	}
 	return devtmpfs_root
 }

@@ -22,7 +22,7 @@ pub const seek_set = 3
 interface FileSystem {
 	instantiate() &FileSystem
 	populate(&VFSNode)
-	mount(&VFSNode) ?&VFSNode
+	mount(&VFSNode, string, &VFSNode) ?&VFSNode
 	create(&VFSNode, string, int) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
 }
@@ -203,7 +203,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 		}
 	}
 
-	parent_of_tgt_node, mut target_node, _ := path2node(parent, target)
+	parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
 
 	mounting_root := voidptr(target_node) == voidptr(vfs_root)
 
@@ -214,7 +214,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 
 	fs := filesystems[filesystem].instantiate()
 
-	mut mount_node := fs.mount(source_node) ?
+	mut mount_node := fs.mount(parent_of_tgt_node, basename, source_node) ?
 
 	target_node.mountpoint = mount_node
 
@@ -235,6 +235,31 @@ fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	dotdot.redir = unsafe { parent }
 	node.children['.'] = dot
 	node.children['..'] = dotdot
+}
+
+pub fn pathname(node &VFSNode) string {
+	mut components := []string{}
+
+	mut current_node := unsafe { node }
+
+	for {
+		if current_node.name == '' {
+			break
+		}
+		components << current_node.name
+		current_node = current_node.parent
+	}
+
+	if components.len == 0 {
+		return '/'
+	}
+
+	mut ret := ''
+	for i := components.len - 1; i >= 0; i-- {
+		ret += '/${components[i]}'
+	}
+
+	return ret
 }
 
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
@@ -439,6 +464,22 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 	return u64(ret), 0
 }
 
+pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: getcwd(0x%llx, %llu)\n', buf, len)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	cwd := pathname(proc.current_thread().process.current_directory)
+
+	if cwd.len >= len {
+		return -1, errno.erange
+	}
+
+	C.strcpy(buf, cwd.str)
+	return 0, 0
+}
+
 pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: faccessat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path,
 			 mode, flags)
@@ -526,8 +567,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 
 	mut process := proc.current_thread().process
 
-	_, node, _ := path2node(process.current_directory, path)
-	if voidptr(node) == voidptr(0) {
+	mut node := get_node(process.current_directory, path, true) or {
 		return -1, errno.get()
 	}
 
