@@ -13,6 +13,8 @@ INTERNALCFLAGS :=                 \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
 	-fno-pic -fpie                \
+	-ffunction-sections           \
+	-fdata-sections               \
 	-mno-80387                    \
 	-mno-mmx                      \
 	-mno-3dnow                    \
@@ -32,7 +34,8 @@ INTERNALLDFLAGS :=         \
 	-static                \
 	-pie                   \
 	--no-dynamic-linker    \
-	-ztext
+	-ztext                 \
+	-gc-sections
 
 INTERNALVFLAGS :=   \
 	-enable-globals \
