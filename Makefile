@@ -46,4 +46,4 @@ clean:
 .PHONY: distclean
 distclean: clean
 	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap
-	rm -rf sysroot/usr sysroot/etc/xbstrap
+	rm -rf sysroot/boot/vinix.elf sysroot/usr sysroot/etc/xbstrap
