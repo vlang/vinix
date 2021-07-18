@@ -22,37 +22,11 @@ run: vinix.iso
 .PHONY: distro
 distro:
 	mkdir -p build 3rdparty
-	cd build && ln -s ../sysroot system-root && xbstrap init ..
-	$(MAKE) update-v
-	cd build && xbstrap install --all
-
-V_COMMIT  = 1bf6743987fdd991591e6d0b766d8a065d34de66
-VC_COMMIT = c0b1553672b59643116e89155845368c92ca5d00
-
-.PHONY: update-v
-update-v:
-	mkdir -p 3rdparty/v-archives
-	[ -f 3rdparty/v-archives/$(V_COMMIT).tar.gz ] || ( \
-		cd 3rdparty/v-archives && \
-		wget https://github.com/vlang/v/archive/$(V_COMMIT).tar.gz && \
-		rm -rf v v-$(V_COMMIT) && \
-		tar -xf $(V_COMMIT).tar.gz && \
-		mv v-$(V_COMMIT) v && \
-		tar -zcf ../v.tar.gz v \
-	)
-	[ -f 3rdparty/v-archives/$(VC_COMMIT).tar.gz ] || ( \
-		cd 3rdparty/v-archives && \
-		wget https://github.com/vlang/vc/archive/$(VC_COMMIT).tar.gz && \
-		rm -rf vc vc-$(VC_COMMIT) && \
-		tar -xf $(VC_COMMIT).tar.gz && \
-		mv vc-$(VC_COMMIT) vc && \
-		tar -zcf ../vc.tar.gz vc && \
-		cd ../.. && ./rebuild-pkg.sh vc host-vc --tool \
-		cd ../.. && ./rebuild-pkg.sh v host-v --tool \
-	)
+	cd build && [ -f bootstrap.link ] || ( ln -s ../sysroot system-root && xbstrap init .. )
+	cd build && xbstrap install -u --all
 
 .PHONY: kernel/vinix.elf
-kernel/vinix.elf: update-v
+kernel/vinix.elf: distro
 	cd build && xbstrap install --rebuild kernel
 
 vinix.iso: kernel/vinix.elf
@@ -63,10 +37,6 @@ vinix.iso: kernel/vinix.elf
 	cp limine.cfg ./build/tools/host-limine/share/limine/limine.sys ./build/tools/host-limine/share/limine/limine-cd.bin ./build/tools/host-limine/share/limine/limine-eltorito-efi.bin pack/boot/
 	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot /boot/limine-eltorito-efi.bin -efi-boot-part --efi-boot-image --protective-msdos-label pack -o vinix.iso
 	./build/tools/host-limine/bin/limine-install vinix.iso
-
-.PHONY: format
-format: 3rdparty/v
-	./3rdparty/v/v fmt -w kernel || true
 
 .PHONY: clean
 clean:

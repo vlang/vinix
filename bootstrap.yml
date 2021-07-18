@@ -5,6 +5,7 @@ sources:
     format: 'tar.xz'
     extract_path: 'binutils-2.36.1'
     patch-path-strip: 3
+    version: '2.36.1'
 
   - name: gcc
     subdir: '3rdparty'
@@ -12,6 +13,7 @@ sources:
     format: 'tar.xz'
     extract_path: 'gcc-11.1.0'
     patch-path-strip: 3
+    version: '11.1.0'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.15
@@ -32,23 +34,24 @@ sources:
     format: 'tar.gz'
     extract_path: 'mlibc-f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a'
     patch-path-strip: 3
-
-# V_COMMIT  = 1bf6743987fdd991591e6d0b766d8a065d34de66
-# VC_COMMIT = c0b1553672b59643116e89155845368c92ca5d00
+    version: '0.0'
 
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    git: 'https://github.com/vlang/v.git'
-    branch: 'master'
-    commit: '1bf6743987fdd991591e6d0b766d8a065d34de66'
+    url: 'https://github.com/vlang/v/archive/1bf6743987fdd991591e6d0b766d8a065d34de66.tar.gz'
+    format: 'tar.gz'
+    extract_path: 'v-1bf6743987fdd991591e6d0b766d8a065d34de66'
+    patch-path-strip: 3
+    version: '0.0'
 
   - name: vc
     subdir: '3rdparty'
-    git: 'https://github.com/vlang/vc.git'
-    branch: 'master'
-    commit: 'c0b1553672b59643116e89155845368c92ca5d00'
-
+    url: 'https://github.com/vlang/vc/archive/c0b1553672b59643116e89155845368c92ca5d00.tar.gz'
+    format: 'tar.gz'
+    extract_path: 'vc-c0b1553672b59643116e89155845368c92ca5d00'
+    patch-path-strip: 3
+    version: '0.0'
 
   - name: limine
     subdir: '3rdparty'
@@ -56,6 +59,7 @@ sources:
     format: 'tar.xz'
     extract_path: 'limine-v2.36'
     patch-path-strip: 3
+    version: '2.36'
 
 tools:
   - name: host-autoconf-v2.69
@@ -66,6 +70,7 @@ tools:
       format: 'tar.xz'
       extract_path: 'autoconf-2.69'
       patch-path-strip: 3
+      version: '2.69'
     configure:
       - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
     compile:
@@ -81,6 +86,7 @@ tools:
       format: 'tar.xz'
       extract_path: 'automake-1.15.1'
       patch-path-strip: 3
+      version: '1.15.1'
     tools_required:
       - host-autoconf-v2.69
     configure:
@@ -97,12 +103,6 @@ tools:
         - 'bash'
         - '-c'
         - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
-
-  - name: host-vc
-    from_source: vc
-    compile:
-      - args:
-        - 'true'
 
   - name: host-limine
     from_source: limine
@@ -190,7 +190,6 @@ tools:
 
 packages:
   - name: mlibc-headers
-    revision: 2
     from_source: mlibc
     implict_package: true
     configure:
@@ -238,6 +237,7 @@ packages:
       format: 'tar.gz'
       extract_path: 'bash-5.1.8'
       patch-path-strip: 3
+      version: '5.1.8'
     tools_required:
       - host-gcc
     configure:
@@ -271,6 +271,7 @@ packages:
       format: 'tar.bz2'
       extract_path: 'tcc-0.9.27'
       patch-path-strip: 3
+      version: '0.9.27'
     tools_required:
       - host-gcc
     configure:
@@ -287,12 +288,13 @@ packages:
         - '--strip-binaries'
         - '--prefix=/usr'
     build:
-      - args: ['make']
+      - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
   - name: kernel
     source:
       subdir: ''
+      version: '0.0'
     tools_required:
       - host-v
       - host-gcc
@@ -301,7 +303,7 @@ packages:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make CC=x86_64-vinix-gcc LD=x86_64-vinix-ld'
+        - 'cd "@THIS_SOURCE_DIR@" && make CC=x86_64-vinix-gcc LD=x86_64-vinix-ld && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
 
   - name: coreutils
     source:
@@ -310,6 +312,7 @@ packages:
       format: 'tar.xz'
       extract_path: 'coreutils-8.32'
       patch-path-strip: 3
+      version: '8.32'
     tools_required:
       - host-gcc
     configure:
@@ -339,6 +342,7 @@ packages:
       url: 'https://data.iana.org/time-zones/releases/tzdata2021a.tar.gz'
       format: 'tar.gz'
       patch-path-strip: 3
+      version: '2021a'
     tools_required:
       - host-gcc
     configure:

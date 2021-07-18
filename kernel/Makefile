@@ -54,6 +54,11 @@ all: $(KERNEL)
 clean:
 	rm -rf $(KERNEL) $(COBJ) blob.o blob.c blob.c.unpatched
 
+.PHONY: install
+install:
+	install -d "$(DESTDIR)$(PREFIX)"
+	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
+
 blob.o:
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	cp blob.c blob.c.unpatched
