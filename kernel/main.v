@@ -38,7 +38,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 
 	console.initialise()
 
-	userland.start_program(false, '/usr/bin/bash', ['/usr/bin/bash'],
+	userland.start_program(false, vfs_root, '/usr/bin/bash', ['/usr/bin/bash'],
 							['HOME=/root',
 							'TERM=linux',
 							'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'],

@@ -41,7 +41,8 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		}
 	}
 
-	start_program(true, path, argv, envp, '', '', '') or {
+	start_program(true, proc.current_thread().process.current_directory, path,
+				  argv, envp, '', '', '') or {
 		return -1, errno.get()
 	}
 
@@ -192,9 +193,10 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return u64(new_process.pid), u64(0)
 }
 
-pub fn start_program(execve bool, path string, argv []string, envp []string,
+pub fn start_program(execve bool, dir &fs.VFSNode, path string,
+					 argv []string, envp []string,
 					 stdin string, stdout string, stderr string) ?&proc.Process {
-	prog_node := fs.get_node(vfs_root, path, true) ?
+	prog_node := fs.get_node(dir, path, true) ?
 	prog := prog_node.resource
 
 	mut new_pagemap := memory.new_pagemap()
