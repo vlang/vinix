@@ -102,7 +102,7 @@ tools:
       - args:
         - 'bash'
         - '-c'
-        - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
+        - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && VMODULES=/tmp/.vmodules ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
 
   - name: host-limine
     from_source: limine

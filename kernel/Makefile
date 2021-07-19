@@ -42,6 +42,7 @@ INTERNALLDFLAGS :=         \
 
 INTERNALVFLAGS :=   \
 	-os vinix       \
+	-path @vlib     \
 	-enable-globals \
 	-d no_backtrace \
 	-autofree
@@ -69,7 +70,7 @@ install:
 	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
 
 blob.o:
-	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
+	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	cp blob.c blob.c.unpatched
 	patch blob.c blob.patch --no-backup-if-mismatch -r /dev/null
 	( diff blob.c.unpatched blob.c || true ) > blob.patch
