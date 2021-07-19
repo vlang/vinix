@@ -39,7 +39,9 @@
 void serial__out(char);
 
 void _putchar(char character) {
+#ifndef PROD
   serial__out(character);
+#endif
 }
 
 // no floats in kernel

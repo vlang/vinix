@@ -9,17 +9,19 @@ __global (
 )
 
 pub fn syscall_kprint(_ voidptr, message charptr) {
-	msglen := unsafe { u64(C.strlen(message)) }
+	$if !prod {
+		msglen := unsafe { u64(C.strlen(message)) }
 
-	kprint_lock.acquire()
+		kprint_lock.acquire()
 
-	unsafe {
-		for i := 0; i < msglen; i++ {
-			serial.out(message[i])
+		unsafe {
+			for i := 0; i < msglen; i++ {
+				serial.out(message[i])
+			}
 		}
-	}
 
-	kprint_lock.release()
+		kprint_lock.release()
+	}
 }
 
 pub fn kprint(message charptr) {
@@ -27,9 +29,11 @@ pub fn kprint(message charptr) {
 
 	kprint_lock.acquire()
 
-	unsafe {
-		for i := 0; i < msglen; i++ {
-			serial.out(message[i])
+	$if !prod {
+		unsafe {
+			for i := 0; i < msglen; i++ {
+				serial.out(message[i])
+			}
 		}
 	}
 

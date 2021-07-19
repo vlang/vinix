@@ -1,11 +1,14 @@
 KERNEL := vinix.elf
 
+PROD = false
+
 CC = cc
 LD = ld
 V = v
 
 CFLAGS = -O2 -Wall -Wextra -g -pipe
 LDFLAGS =
+VFLAGS =
 
 INTERNALCFLAGS :=                 \
 	-I.                           \
@@ -38,11 +41,15 @@ INTERNALLDFLAGS :=         \
 	-gc-sections
 
 INTERNALVFLAGS :=   \
-	-prod           \
 	-os vinix       \
 	-enable-globals \
 	-d no_backtrace \
 	-autofree
+
+ifeq ($(PROD), true)
+	INTERNALVFLAGS += -prod
+	INTERNALCFLAGS += -DPROD
+endif
 
 VFILES := $(shell find ./ -type f -name '*.v')
 CFILES := $(shell find ./ -type f -name '*.c')

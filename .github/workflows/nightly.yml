@@ -20,7 +20,7 @@ jobs:
         run: make distro
 
       - name: Build Vinix
-        run: make
+        run: make PROD=true
 
       - name: Untag last nightly release
         run: ( git push --delete origin nightly || true ) && ( git tag --delete nightly || true )
