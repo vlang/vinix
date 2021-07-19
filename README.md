@@ -4,9 +4,9 @@ Vinix is an effort to write a modern, fast, and useful operating system in [the 
 
 Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
 
-## Download the nightly image
+## Download the ISO
 
-You can get a nightly continuously updated ISO of Vinix [here](https://github.com/vlang/vinix/releases/download/nightly/vinix-nightly.iso).
+You can get a continuously updated ISO of Vinix [here](https://builds.vinix-os.org/repos/files/vinix/latest/vinix.iso).
 
 ## What is Vinix all about?
 
