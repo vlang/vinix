@@ -62,7 +62,7 @@ install:
 blob.o:
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	cp blob.c blob.c.unpatched
-	patch blob.c blob.patch
+	patch blob.c blob.patch --no-backup-if-mismatch -r /dev/null
 	( diff blob.c.unpatched blob.c || true ) > blob.patch
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 

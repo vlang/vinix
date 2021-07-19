@@ -39,17 +39,17 @@ sources:
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://github.com/vlang/v/archive/1bf6743987fdd991591e6d0b766d8a065d34de66.tar.gz'
+    url: 'https://github.com/vlang/v/archive/fdba3607af266730bde863db9c5d4c310ed2513f.tar.gz'
     format: 'tar.gz'
-    extract_path: 'v-1bf6743987fdd991591e6d0b766d8a065d34de66'
+    extract_path: 'v-fdba3607af266730bde863db9c5d4c310ed2513f'
     patch-path-strip: 3
     version: '0.0'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://github.com/vlang/vc/archive/c0b1553672b59643116e89155845368c92ca5d00.tar.gz'
+    url: 'https://github.com/vlang/vc/archive/cc767e5d78dc143172c5c50c22b845d2adf186a6.tar.gz'
     format: 'tar.gz'
-    extract_path: 'vc-c0b1553672b59643116e89155845368c92ca5d00'
+    extract_path: 'vc-cc767e5d78dc143172c5c50c22b845d2adf186a6'
     patch-path-strip: 3
     version: '0.0'
 

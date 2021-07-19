@@ -32,7 +32,7 @@ pub fn new_pagemap() &Pagemap {
 	return &Pagemap{top_level: top_level, mmap_ranges: []voidptr{}}
 }
 
-pub fn (mut pagemap Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
+pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
@@ -52,7 +52,7 @@ pub fn (mut pagemap Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	return unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
 }
 
-pub fn (mut pagemap Pagemap) virt2phys(virt u64) ?u64 {
+pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 	pte_p := pagemap.virt2pte(virt, false) or {
 		return none
 	}
