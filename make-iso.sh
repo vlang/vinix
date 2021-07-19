@@ -6,6 +6,7 @@ BUILD_DIR="$1"
 SOURCE_DIR="$2"
 SYSROOT="$3"
 
+( cd "$SYSROOT" && tar -zcf "$BUILD_DIR"/initramfs.tar.gz * )
 rm -rf pack
 mkdir -p pack/boot
 cp "$BUILD_DIR"/initramfs.tar.gz "$SYSROOT"/boot/vinix.elf "$SOURCE_DIR"/v-logo.bmp pack/

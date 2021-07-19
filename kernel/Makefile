@@ -42,7 +42,6 @@ INTERNALLDFLAGS :=         \
 
 INTERNALVFLAGS :=   \
 	-os vinix       \
-	-path @vlib     \
 	-enable-globals \
 	-d no_backtrace \
 	-autofree

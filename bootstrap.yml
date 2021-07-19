@@ -200,12 +200,6 @@ tasks:
       - tzdata
       - kernel
     args:
-      - 'tar'
-      - '-zcf'
-      - '@BUILD_ROOT@/initramfs.tar.gz'
-      - '.'
-    workdir: '@SYSROOT_DIR@'
-    args:
       - '@SOURCE_ROOT@/make-iso.sh'
       - '@BUILD_ROOT@'
       - '@SOURCE_ROOT@'
