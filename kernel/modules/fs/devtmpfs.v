@@ -4,6 +4,7 @@ import stat
 import klock
 import memory
 import resource
+import lib
 
 struct DevTmpFSResource {
 pub mut:
@@ -54,6 +55,7 @@ fn (mut this DevTmpFSResource) write(buf voidptr, loc u64, count u64) ?i64 {
 
 	if loc + count > this.stat.size {
 		this.stat.size = loc + count
+		this.stat.blocks = lib.div_roundup(this.stat.size, this.stat.blksize)
 	}
 
 	this.l.release()
