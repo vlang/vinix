@@ -199,6 +199,9 @@ tasks:
       - v
       - tzdata
       - kernel
+    artifact_files:
+      - name: vinix.iso
+        path: '@BUILD_ROOT@'
     args:
       - '@SOURCE_ROOT@/make-iso.sh'
       - '@BUILD_ROOT@'
