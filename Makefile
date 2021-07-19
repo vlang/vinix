@@ -30,13 +30,8 @@ kernel/vinix.elf: distro
 	cd build && xbstrap install --rebuild kernel
 
 vinix.iso: kernel/vinix.elf
-	( cd sysroot && tar -zcf ../initramfs.tar.gz * )
-	rm -rf pack
-	mkdir -p pack/boot
-	cp initramfs.tar.gz kernel/vinix.elf v-logo.bmp pack/
-	cp limine.cfg ./build/tools/host-limine/share/limine/limine.sys ./build/tools/host-limine/share/limine/limine-cd.bin ./build/tools/host-limine/share/limine/limine-eltorito-efi.bin pack/boot/
-	xorriso -as mkisofs -b /boot/limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot /boot/limine-eltorito-efi.bin -efi-boot-part --efi-boot-image --protective-msdos-label pack -o vinix.iso
-	./build/tools/host-limine/bin/limine-install vinix.iso
+	cd build && xbstrap run make-iso
+	mv build/vinix.iso ./
 
 .PHONY: clean
 clean:

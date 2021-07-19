@@ -71,6 +71,10 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 		size := octal_to_int(unsafe { cstring_to_vstring(&current_header.size[0]) })
 		mode := octal_to_int(unsafe { cstring_to_vstring(&current_header.mode[0]) })
 
+		if name == './' {
+			unsafe { goto next }
+		}
+
 		match USTARFileType(current_header.filetype) {
 			.directory {
 				fs.create(vfs_root, name, int(mode) | stat.ifdir) or {
@@ -95,6 +99,7 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 			else {}
 		}
 
+next:
 		current_header = &USTARHeader(size_t(current_header) + size_t(512) + size_t(lib.align_up(size, 512)))
 	}
 

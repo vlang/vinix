@@ -6,4 +6,6 @@ jobs:
       - mlibc
       - mlibc-headers
 
-# vim: et sw=2 :
+  - name: iso
+    tasks:
+      - make-iso
