@@ -499,7 +499,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags in
 
 	follow_links := flags & at_symlink_nofollow == 0
 
-	node := get_node(parent, path, follow_links) or {
+	get_node(parent, path, follow_links) or {
 		return -1, errno.get()
 	}
 

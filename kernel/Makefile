@@ -38,6 +38,8 @@ INTERNALLDFLAGS :=         \
 	-gc-sections
 
 INTERNALVFLAGS :=   \
+	-prod           \
+	-os vinix       \
 	-enable-globals \
 	-d no_backtrace \
 	-autofree
