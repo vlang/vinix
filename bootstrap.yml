@@ -38,7 +38,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'mlibc-f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a'
     patch-path-strip: 3
-    version: '1.rolling'
+    version: '2.rolling'
 
   - name: v
     subdir: '3rdparty'
@@ -319,7 +319,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '2.rolling'
+      version: '3.rolling'
     tools_required:
       - host-v
       - host-gcc

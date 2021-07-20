@@ -110,6 +110,19 @@ index 0488309..a9c8177 100644
 +#endif
 +
  #endif // _MLIBC_INTERNAL_TYPES_H
+diff --git a/3rdparty/mlibc-orig/options/linux/include/asm/ioctls.h b/3rdparty/mlibc-workdir/options/linux/include/asm/ioctls.h
+index 41d4248..f246d1d 100644
+--- a/3rdparty/mlibc-orig/options/linux/include/asm/ioctls.h
++++ b/3rdparty/mlibc-workdir/options/linux/include/asm/ioctls.h
+@@ -5,6 +5,8 @@
+ 
+ #define TCGETS 0x5401
+ #define TCSETS 0x5402
++#define TCSETSW 0x5403
++#define TCSETSF 0x5404
+ #define TIOCSCTTY 0x540E
+ #define TIOCSTI 0x5412
+ #define TIOCGWINSZ 0x5413
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..0a0a4a0
@@ -165,10 +178,10 @@ index 0000000..ee7a794
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..9595bcf
+index 0000000..9d62be6
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,407 @@
+@@ -0,0 +1,439 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -176,6 +189,7 @@ index 0000000..9595bcf
 +#include <dirent.h>
 +#include <fcntl.h>
 +#include <limits.h>
++#include <asm/ioctls.h>
 +
 +#define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
 +
@@ -210,6 +224,37 @@ index 0000000..9595bcf
 +void sys_exit(int status) {
 +    __syscall(15, status);
 +    __builtin_unreachable();
++}
++
++int sys_tcgetattr(int fd, struct termios *attr) {
++    int ret;
++
++    if (int r = sys_ioctl(fd, TCGETS, attr, &ret) != 0) {
++        return r;
++    }
++
++    return 0;
++}
++
++int sys_tcsetattr(int fd, int optional_action, const struct termios *attr) {
++    int ret;
++
++    switch (optional_action) {
++        case TCSANOW:
++            optional_action = TCSETS; break;
++        case TCSADRAIN:
++            optional_action = TCSETSW; break;
++        case TCSAFLUSH:
++            optional_action = TCSETSF; break;
++        default:
++            __ensure(!"Unsupported tcsetattr");
++    }
++
++    if (int r = sys_ioctl(fd, optional_action, (void *)attr, &ret) != 0) {
++        return r;
++    }
++
++    return 0;
 +}
 +
 +int sys_tcb_set(void *pointer) {

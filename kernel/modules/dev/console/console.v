@@ -12,6 +12,7 @@ import fs
 import ioctl
 import resource
 import errno
+import termios
 
 const max_scancode = 0x57
 const capslock = 0x3a
@@ -39,6 +40,7 @@ __global (
 	console_buffer_i = u64(0)
 	console_bigbuf [console_bigbuf_size]byte
 	console_bigbuf_i = u64(0)
+	console_termios = &termios.Termios(0)
 )
 
 const convtab_capslock = [
@@ -75,65 +77,66 @@ fn is_printable(c byte) bool {
 
 fn add_to_buf_char(c byte) {
 	console_read_lock.acquire()
-
-	match c {
-		`\n` {
-			if console_buffer_i == console_buffer_size {
-				console_read_lock.release()
-				return
-			}
-			console_buffer[console_buffer_i] = c
-			console_buffer_i++
-			//if console_termios.c_lflag & ECHO != 0 {
-				print('${c:c}')
-			//}
-			for i := u64(0); i < console_buffer_i; i++ {
-				if console_bigbuf_i == console_bigbuf_size {
-					console_read_lock.release()
-					return
-				}
-				console_bigbuf[console_bigbuf_i] = console_buffer[i]
-				console_bigbuf_i++
-			}
-			console_buffer_i = 0
-			console_read_lock.release()
-			return
-		}
-		`\b` {
-			if console_buffer_i == 0 {
-				console_read_lock.release()
-				return
-			}
-			console_buffer_i--
-			console_buffer[console_buffer_i] = 0
-			//if console_termios.c_lflag & ECHO != 0 {
-				print('\b \b')
-			//}
-			console_read_lock.release()
-			return
-		}
-		else {}
+	defer {
+		console_read_lock.release()
 	}
 
-	//if console_termios.c_lflag & ICANON != 0 {
+	if console_termios.c_lflag & termios.icanon != 0 {
+		match c {
+			`\n` {
+				if console_buffer_i == console_buffer_size {
+					return
+				}
+				console_buffer[console_buffer_i] = c
+				console_buffer_i++
+				if console_termios.c_lflag & termios.echo != 0 {
+					print('${c:c}')
+				}
+				for i := u64(0); i < console_buffer_i; i++ {
+					if console_bigbuf_i == console_bigbuf_size {
+						return
+					}
+					console_bigbuf[console_bigbuf_i] = console_buffer[i]
+					console_bigbuf_i++
+				}
+				console_buffer_i = 0
+				return
+			}
+			`\b` {
+				if console_buffer_i == 0 {
+					return
+				}
+				console_buffer_i--
+				console_buffer[console_buffer_i] = 0
+				if console_termios.c_lflag & termios.echo != 0 {
+					print('\b \b')
+				}
+				return
+			}
+			else {}
+		}
+
 		if console_buffer_i == console_buffer_size {
-			console_read_lock.release()
 			return
 		}
 		console_buffer[console_buffer_i] = c
 		console_buffer_i++
-	//}
-
-	if is_printable(c) /* && console_termios.c_lflag & ECHO != 0 */ {
-		print('${c:c}')
+	} else {
+		if console_bigbuf_i == console_bigbuf_size {
+			return
+		}
+		console_bigbuf[console_bigbuf_i] = c
+		console_bigbuf_i++
 	}
 
-	console_read_lock.release()
-	return
+	if is_printable(c) && console_termios.c_lflag & termios.echo != 0 {
+		print('${c:c}')
+	}
 }
 
 fn add_to_buf(ptr &byte, count u64) {
 	for i := u64(0); i < count; i++ {
+		// TODO: Accept signal characters
 		unsafe { add_to_buf_char(ptr[i]) }
 	}
 	event.trigger(console_event, true)
@@ -256,6 +259,12 @@ pub fn initialise() {
 	console_res.stat.rdev = resource.create_dev_id()
 	console_res.stat.mode = 0o644 | stat.ifchr
 
+	// Initialise termios
+	console_res.termios.c_lflag = termios.isig | termios.icanon | termios.echo
+	console_res.termios.c_cc[termios.vintr] = 0x03
+
+	console_termios = &console_res.termios
+
 	fs.devtmpfs_add_device(console_res, 'console')
 
 	// Disable primary and secondary PS/2 ports
@@ -293,6 +302,8 @@ pub mut:
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
+
+	termios termios.Termios
 }
 
 fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
@@ -359,6 +370,17 @@ fn (mut this Console) ioctl(request u64, argp voidptr) ?int {
 			w.ws_col = terminal_cols
 			w.ws_xpixel = framebuffer_width
 			w.ws_ypixel = framebuffer_height
+			return 0
+		}
+		ioctl.tcgets {
+			mut t := &termios.Termios(argp)
+			unsafe { t[0] = this.termios }
+			return 0
+		}
+		// TODO: handle these differently
+		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
+			mut t := &termios.Termios(argp)
+			unsafe { this.termios = t[0] }
 			return 0
 		}
 		else {
