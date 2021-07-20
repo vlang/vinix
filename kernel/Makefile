@@ -72,7 +72,7 @@ blob.o:
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	cp blob.c blob.c.unpatched
 	patch blob.c blob.patch --no-backup-if-mismatch -r /dev/null
-	( diff blob.c.unpatched blob.c || true ) > blob.patch
+	[ "$(PROD)" = "false" ] && ( diff blob.c.unpatched blob.c || true ) > blob.patch || true
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c
