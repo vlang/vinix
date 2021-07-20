@@ -1,6 +1,9 @@
 pkg_management:
     format: xbps
 
+define_options:
+    prod: 'true'
+
 container:
     runtime: cbuildrt
     rootfs: /var/lib/cbuildrt/vinix-buildenv

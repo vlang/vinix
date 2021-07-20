@@ -1,6 +1,6 @@
 declare_options:
   - name: prod
-    default: 'true'
+    default: 'false'
 
 sources:
   - name: binutils
