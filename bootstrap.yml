@@ -319,7 +319,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '1.rolling'
+      version: '2.rolling'
     tools_required:
       - host-v
       - host-gcc

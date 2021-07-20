@@ -21,8 +21,8 @@ import futex
 fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
+	pipe.initialise()
 	futex.initialise()
-
 	fs.initialise()
 
 	fs.mount(vfs_root, '', '/', 'tmpfs') or {}

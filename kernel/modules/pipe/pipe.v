@@ -26,7 +26,9 @@ pub mut:
 	event     eventstruct.Event
 }
 
-pub fn pipe_create() ?&Pipe {
+pub fn initialise() {}
+
+pub fn create() ?&Pipe {
 	mut pipe := &Pipe{
 		data: unsafe { C.malloc(pipe_buf) }
 		capacity: pipe_buf
@@ -42,7 +44,7 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	new_pipe := pipe_create() or {
+	new_pipe := create() or {
 		return -1, errno.get()
 	}
 
