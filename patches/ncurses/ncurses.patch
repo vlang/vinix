@@ -1,0 +1,28 @@
+diff --git a/3rdparty/ncurses-orig/config.sub b/3rdparty/ncurses-workdir/config.sub
+index 0f2234c..edf5a16 100755
+--- a/3rdparty/ncurses-orig/config.sub
++++ b/3rdparty/ncurses-workdir/config.sub
+@@ -1341,7 +1341,7 @@ case $os in
+ 	gnu* | bsd* | mach* | minix* | genix* | ultrix* | irix* \
+ 	     | *vms* | esix* | aix* | cnk* | sunos | sunos[34]*\
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+-	     | sym* | kopensolaris* | plan9* \
++	     | sym* | kopensolaris* | plan9* | vinix* \
+ 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
+ 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
+ 	     | nindy* | vxsim* | vxworks* | ebmon* | hms* | mvs* \
+diff --git a/3rdparty/ncurses-orig/configure b/3rdparty/ncurses-workdir/configure
+index 06f344f..495ac4a 100755
+--- a/3rdparty/ncurses-orig/configure
++++ b/3rdparty/ncurses-workdir/configure
+@@ -5961,6 +5961,10 @@ echo "${ECHO_T}$cf_cv_ldflags_search_paths_first" >&6
+ 
+ 		MK_SHARED_LIB='${CC} ${LDFLAGS} ${CFLAGS} -shared -Wl,-soname,'$cf_cv_shared_soname',-stats,-lc -o $@'
+ 		;;
++    (vinix*)
++        CC_SHARED_OPTS='-fPIC'
++        MK_SHARED_LIB='${CC} -shared -o $@'
++        ;;
+ 	(mingw*)
+ 		cf_cv_shlib_version=mingw
+ 		cf_cv_shlib_version_infix=mingw
