@@ -59,11 +59,11 @@ sources:
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.36/limine-v2.36.tar.xz
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.37/limine-v2.37.tar.xz
     format: 'tar.xz'
-    extract_path: 'limine-v2.36'
+    extract_path: 'limine-v2.37'
     patch-path-strip: 3
-    version: '2.36'
+    version: '2.37'
 
 tools:
   - name: host-autoconf-v2.69
@@ -116,7 +116,7 @@ tools:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make limine-bios limine-uefi TOOLCHAIN=x86_64-vinix && make bin/limine-install'
+        - 'cd "@THIS_SOURCE_DIR@" && make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix && make bin/limine-install'
     install:
       - args:
         - 'bash'
