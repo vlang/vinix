@@ -1,3 +1,7 @@
+declare_options:
+  - name: prod
+    default: 'true'
+
 sources:
   - name: binutils
     subdir: '3rdparty'
@@ -316,15 +320,15 @@ packages:
     source:
       subdir: ''
       version: '0.0'
+    revision: 2
     tools_required:
       - host-v
       - host-gcc
-      - host-limine
     build:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make CC=x86_64-vinix-gcc LD=x86_64-vinix-ld && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
+        - 'cd "@THIS_SOURCE_DIR@" && make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
 
   - name: coreutils
     source:

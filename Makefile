@@ -1,5 +1,3 @@
-SHELL = /bin/bash
-
 KERNEL_HDD = vinix.hdd
 
 .PHONY: all
