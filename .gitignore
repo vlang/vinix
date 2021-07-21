@@ -9,6 +9,7 @@ sysroot/etc/xbstrap
 *.hdd
 *.iso
 *.gz
+!v-logo.bmp.gz
 kernel/*.xbstrap
 kernel/blob.c
 kernel/blob.c.unpatched
