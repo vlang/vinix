@@ -44,6 +44,8 @@ fn octal_to_int(s string) u64 {
 	return ret
 }
 
+fn C.byteptr_vstring_with_len(byteptr, int) string
+
 pub fn init(modules_tag stivale2.ModulesTag) {
 	if modules_tag.count < 1 {
 		panic('No initramfs')

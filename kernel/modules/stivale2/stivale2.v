@@ -178,6 +178,10 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_cols = terminal_tag.cols
 }
 
+__global (
+	stivale2_term_buf [1024]byte
+)
+
 pub fn terminal_print(s charptr, len u64) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
@@ -192,8 +196,11 @@ pub fn terminal_print(s charptr, len u64) {
 		} else {
 			u64(1024)
 		}
+		unsafe { C.memcpy(&stivale2_term_buf[0],
+						  voidptr(u64(s) + i * u64(1024)),
+						  actual_len) }
 		terminal_print_lock.acquire()
-		ptr(charptr(u64(s) + i * u64(1024)), actual_len)
+		ptr(&stivale2_term_buf[0], actual_len)
 		terminal_print_lock.release()
 	}
 	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
