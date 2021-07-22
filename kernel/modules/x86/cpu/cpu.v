@@ -171,6 +171,15 @@ fn fxrstor(region voidptr) {
 	}
 }
 
+pub fn invlpg(addr u64) {
+	asm volatile amd64 {
+		invlpg [addr]
+		;
+		; r (addr)
+		; memory
+	}
+}
+
 pub const cpuid_xsave = u32(1 << 26)
 pub const cpuid_avx = u32(1 << 28)
 pub const cpuid_avx512 = u32(1 << 16)

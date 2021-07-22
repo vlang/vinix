@@ -7,6 +7,7 @@ import apic
 import cpu.local as cpulocal
 import cpu
 import syscall
+import memory
 import memory.mmap
 import katomic
 import lib
@@ -99,7 +100,8 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 }
 
 __global (
-	abort_vector = u8(0)
+	abort_vector = byte(0)
+	tlb_shootdown_vector = byte(0)
 )
 
 pub fn initialise() {
@@ -128,4 +130,7 @@ pub fn initialise() {
 	abort_vector = idt.allocate_vector()
 	idt.register_handler(abort_vector, voidptr(abort_handler))
 	idt.set_ist(abort_vector, 4)
+
+	tlb_shootdown_vector = idt.allocate_vector()
+	interrupt_table[tlb_shootdown_vector] = voidptr(memory.tlb_shootdown_handler)
 }

@@ -203,9 +203,9 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 			phys := (unsafe { pte[0] } & ~u64(0xfff)) & ~(u64(1) << 63)
 			pmm_free(voidptr(phys), 1)
 			unsafe { pte[0] = 0 }
-			//x86.cpu.invlpg(cur_page)
 			cur_page -= page_size
 		}
+		tlb_shootdown()
 	} else if pages_diff > 0 {
 		// Allocate pages_diff amount of pages starting by the end of this mapping
 		mut cur_page := virt_base + old_page_count * page_size
