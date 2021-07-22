@@ -6,7 +6,6 @@ import klock
 import proc
 import file
 import errno
-import memory
 
 pub const at_fdcwd = -100
 
@@ -136,7 +135,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			return 0, 0, ''
 		}
 
-		new_node := reduce_node(current_node.children[elem_str], false)
+		new_node := reduce_node(unsafe { current_node.children[elem_str] }, false)
 
 		if last == true {
 			return current_node, new_node, elem_str
@@ -235,10 +234,12 @@ fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	// Create . and .. entries
 	mut dot := create_node(node.filesystem, node, '.', false)
 	mut dotdot := create_node(node.filesystem, node, '..', false)
-	dot.redir = unsafe { node }
-	dotdot.redir = unsafe { parent }
-	node.children['.'] = dot
-	node.children['..'] = dotdot
+	unsafe {
+		dot.redir = node
+		dotdot.redir = parent
+		node.children['.'] = dot
+		node.children['..'] = dotdot
+	}
 }
 
 pub fn pathname(node &VFSNode) string {
@@ -276,7 +277,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 
-	parent_of_tgt_node.children[basename] = target_node
+	unsafe { parent_of_tgt_node.children[basename] = target_node }
 
 	return target_node
 }
@@ -297,7 +298,7 @@ pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 
-	parent_of_tgt_node.children[basename] = target_node
+	unsafe { parent_of_tgt_node.children[basename] = target_node }
 
 	if stat.isdir(target_node.resource.stat.mode) {
 		target_node.create_dotentries(parent_of_tgt_node)

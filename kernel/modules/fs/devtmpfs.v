@@ -119,7 +119,7 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
 	mut new_node := create_node(this, parent, target, false)
 
-	mut new_resource := &DevTmpFSResource(memory.malloc(sizeof(DevTmpFSResource)))
+	mut new_resource := &DevTmpFSResource{storage: 0}
 
 	new_resource.stat.size = u64(target.len)
 	new_resource.stat.blocks = 0
@@ -144,5 +144,5 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	new_node.resource.stat.ino = devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1
 
-	devtmpfs_root.children[name] = new_node
+	unsafe { devtmpfs_root.children[name] = new_node }
 }
