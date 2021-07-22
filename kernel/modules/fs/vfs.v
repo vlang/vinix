@@ -6,6 +6,7 @@ import klock
 import proc
 import file
 import errno
+import memory
 
 pub const at_fdcwd = -100
 
@@ -35,7 +36,7 @@ pub mut:
 	filesystem     &FileSystem
 	name           string
 	parent         &VFSNode
-	children       map[string]&VFSNode
+	children       &map[string]&VFSNode
 	symlink_target string
 }
 
@@ -45,21 +46,24 @@ __global (
 	filesystems map[string]&FileSystem
 )
 
-fn create_node(filesystem &FileSystem, parent &VFSNode, name string) &VFSNode {
-	node := &VFSNode{
+fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
+	mut node := &VFSNode{
 				name: name
 				parent: unsafe { parent }
 				mountpoint: voidptr(0)
 				redir: voidptr(0)
-				children: map[string]&VFSNode{}
+				children: 0
 				resource: &resource.Resource(voidptr(0))
 				filesystem: unsafe { filesystem }
 			}
+	if dir {
+		node.children = &map[string]&VFSNode{}
+	}
 	return node
 }
 
 pub fn initialise() {
-	vfs_root = create_node(&TmpFS(0), &VFSNode(0), '')
+	vfs_root = create_node(&TmpFS(0), &VFSNode(0), '', false)
 
 	filesystems = map[string]&FileSystem{}
 
@@ -229,8 +233,8 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 
 fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	// Create . and .. entries
-	mut dot := create_node(node.filesystem, node, '.')
-	mut dotdot := create_node(node.filesystem, node, '..')
+	mut dot := create_node(node.filesystem, node, '.', false)
+	mut dotdot := create_node(node.filesystem, node, '..', false)
 	dot.redir = unsafe { node }
 	dotdot.redir = unsafe { parent }
 	node.children['.'] = dot

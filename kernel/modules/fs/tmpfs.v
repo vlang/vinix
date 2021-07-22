@@ -87,9 +87,9 @@ fn (mut this TmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNo
 }
 
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
-	mut new_node := create_node(this, parent, name)
+	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
-	mut new_resource := &TmpFSResource(memory.malloc(sizeof(TmpFSResource)))
+	mut new_resource := &TmpFSResource{storage: 0}
 
 	if stat.isreg(mode) {
 		new_resource.capacity = 4096
@@ -110,7 +110,7 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 }
 
 fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
-	mut new_node := create_node(this, parent, target)
+	mut new_node := create_node(this, parent, target, false)
 
 	mut new_resource := &TmpFSResource(memory.malloc(sizeof(TmpFSResource)))
 

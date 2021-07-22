@@ -72,11 +72,10 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	}
 
 	memory.pmm_init(memmap_tag)
+	memory.vmm_init(memmap_tag)
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
-
-	memory.vmm_init(memmap_tag)
 
 	// ACPI init
 	rsdp_tag := unsafe { &stivale2.RSDPTag(stivale2.get_tag(stivale2_struct, stivale2.rsdp_id)) }
