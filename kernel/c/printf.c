@@ -37,11 +37,13 @@
 
 
 void serial__out(char);
+void stivale2__terminal_print(const char *, uint64_t);
 
 void _putchar(char character) {
 #ifndef PROD
   serial__out(character);
 #endif
+  stivale2__terminal_print(&character, 1);
 }
 
 // no floats in kernel
