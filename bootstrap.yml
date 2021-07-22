@@ -370,7 +370,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '5.rolling'
+      version: '4.rolling'
     tools_required:
       - host-v
       - host-gcc

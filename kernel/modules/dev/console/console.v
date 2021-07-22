@@ -352,8 +352,13 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
-fn (mut this Console) write(buf voidptr, _ u64, count u64) ?i64 {
-	stivale2.terminal_print(buf, count)
+fn (mut this Console) write(buf voidptr, loc u64, count u64) ?i64 {
+	copy := unsafe { C.malloc(count) }
+	defer {
+		unsafe { C.free(copy) }
+	}
+	unsafe { C.memcpy(copy, buf, count) }
+	stivale2.terminal_print(copy, count)
 	return i64(count)
 }
 

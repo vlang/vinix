@@ -41,3 +41,7 @@ pub fn kprint(message charptr) {
 
 	kprint_lock.release()
 }
+
+fn C.byteptr_vstring(byteptr) string
+fn C.byteptr_vstring_with_len(byteptr, int) string
+fn C.char_vstring(charptr) string
