@@ -43,6 +43,12 @@ void _putchar(char character) {
 #ifndef PROD
   serial__out(character);
 #endif
+}
+
+void _putchar_panic(char character) {
+#ifndef PROD
+  serial__out(character);
+#endif
   stivale2__terminal_print(&character, 1);
 }
 
@@ -123,6 +129,14 @@ static inline void _out_char(char character, void* buffer, size_t idx, size_t ma
   }
 }
 
+// internal _putchar wrapper
+static inline void _out_char_panic(char character, void* buffer, size_t idx, size_t maxlen)
+{
+  (void)buffer; (void)idx; (void)maxlen;
+  if (character) {
+    _putchar_panic(character);
+  }
+}
 
 // internal output function wrapper
 static inline void _out_fct(char character, void* buffer, size_t idx, size_t maxlen)
@@ -574,6 +588,16 @@ int printf(const char* format, ...)
   klock__Lock_acquire(&kprint_lock);
   const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
   klock__Lock_release(&kprint_lock);
+  va_end(va);
+  return ret;
+}
+
+int printf_panic(const char* format, ...)
+{
+  va_list va;
+  va_start(va, format);
+  char buffer[1];
+  const int ret = _vsnprintf(_out_char_panic, buffer, (size_t)-1, format, va);
   va_end(va);
   return ret;
 }

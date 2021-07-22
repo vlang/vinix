@@ -1,5 +1,7 @@
 module trace
 
+fn C.printf_panic(charptr, ...voidptr)
+
 pub fn stacktrace(_base_ptr voidptr) {
 	mut base_ptr := &u64(_base_ptr)
 
@@ -10,7 +12,7 @@ pub fn stacktrace(_base_ptr voidptr) {
 		}
 	}
 
-	C.printf(c'Stacktrace:\n')
+	C.printf_panic(c'Stacktrace:\n')
 
 	for {
 		unsafe {
@@ -19,7 +21,7 @@ pub fn stacktrace(_base_ptr voidptr) {
 			if ret_addr == 0 {
 				break
 			}
-			C.printf(c'\t0x%llx\n', ret_addr)
+			C.printf_panic(c'\t0x%llx\n', voidptr(ret_addr))
 			if old_bp == 0 {
 				break
 			}
