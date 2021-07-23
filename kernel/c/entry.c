@@ -30,14 +30,18 @@ struct stivale2_tag unmap_null_hdr_tag = {
 struct stivale2_header_tag_terminal {
     struct stivale2_tag tag;
     uint64_t flags;
+    uint64_t callback;
 } __attribute__((__packed__));
+
+extern char dev__console__stivale2_term_callback[];
 
 struct stivale2_header_tag_terminal terminal_hdr_tag = {
     .tag = {
         .identifier = STIVALE2_HEADER_TAG_TERMINAL_ID,
         .next = (uint64_t)&unmap_null_hdr_tag
     },
-    .flags = 0
+    .flags = (1 << 0),
+    .callback = (uint64_t)dev__console__stivale2_term_callback
 };
 
 

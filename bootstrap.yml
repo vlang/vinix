@@ -118,6 +118,7 @@ tools:
 
   - name: host-limine
     from_source: limine
+    revision: 2
     tools_required:
       - host-gcc
     compile:
@@ -370,7 +371,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '9.rolling'
+      version: '10.rolling'
     tools_required:
       - host-v
       - host-gcc

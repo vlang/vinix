@@ -1,0 +1,319 @@
+diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
+index c2bb198..12d6d18 100644
+--- a/3rdparty/limine-orig/stage23/lib/term.h
++++ b/3rdparty/limine-workdir/stage23/lib/term.h
+@@ -19,6 +19,10 @@ extern void (*scroll_enable)(void);
+ extern void (*term_double_buffer)(bool status);
+ extern void (*term_double_buffer_flush)(void);
+ 
++#define TERM_CB_DEC 10
++
++extern void (*term_callback)(uint64_t type, uint64_t extra, uint64_t esc_val_count, uint64_t esc_values);
++
+ void term_vbe(int width, int height);
+ void term_textmode(void);
+ void term_write(const char *buf, size_t count);
+diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
+index 9ba2ebf..d8e46da 100644
+--- a/3rdparty/limine-orig/stage23/lib/term.s2.c
++++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
+@@ -6,6 +6,7 @@
+ #include <lib/image.h>
+ #include <lib/blib.h>
+ #include <drivers/vga_textmode.h>
++#include <lib/print.h>
+ 
+ // Tries to implement this standard for terminfo
+ // https://man7.org/linux/man-pages/man4/console_codes.4.html
+@@ -33,6 +34,8 @@ void (*term_double_buffer_flush)(void);
+ 
+ int term_rows, term_cols;
+ 
++void (*term_callback)(uint64_t type, uint64_t extra, uint64_t esc_val_count, uint64_t esc_values) = NULL;
++
+ #if bios == 1
+ void term_textmode(void) {
+     term_backend = NOT_READY;
+@@ -88,12 +91,13 @@ static int get_cursor_pos_y(void) {
+ static bool control_sequence = false;
+ static bool escape = false;
+ static bool rrr = false;
+-static int esc_values[MAX_ESC_VALUES];
+-static int esc_values_i = 0;
++static bool dec_private = false;
++static int32_t esc_values[MAX_ESC_VALUES];
++static size_t esc_values_i = 0;
+ static int saved_cursor_x = 0, saved_cursor_y = 0;
+ 
+ static void sgr(void) {
+-    int i = 0;
++    size_t i = 0;
+ 
+     if (!esc_values_i)
+         goto def;
+@@ -118,7 +122,19 @@ def:
+     }
+ }
+ 
++static void dec_private_parse(uint8_t c) {
++    if (term_callback != NULL)
++        term_callback(TERM_CB_DEC, c, esc_values_i, (uintptr_t)esc_values);
++
++    dec_private = false;
++}
++
+ static void control_sequence_parse(uint8_t c) {
++    if (c == '?') {
++        dec_private = true;
++        return;
++    }
++
+     if (c >= '0' && c <= '9') {
+         rrr = true;
+         esc_values[esc_values_i] *= 10;
+@@ -141,6 +157,11 @@ static void control_sequence_parse(uint8_t c) {
+     for (int i = esc_values_i; i < MAX_ESC_VALUES; i++)
+         esc_values[i] = 1;
+ 
++    if (dec_private == true) {
++        dec_private_parse(c);
++        goto cleanup;
++    }
++
+     switch (c) {
+         case 'A':
+             if (esc_values[0] > get_cursor_pos_y())
+@@ -197,6 +218,43 @@ static void control_sequence_parse(uint8_t c) {
+             break;
+         case 'J':
+             switch (esc_values[0]) {
++                case 0: {
++                    int x, y;
++                    get_cursor_pos(&x, &y);
++                    int rows_remaining = term_rows - (y + 1);
++                    int cols_diff = term_cols - (x + 1);
++                    size_t to_clear = rows_remaining * term_cols + cols_diff;
++                    bool r = scroll_disable();
++                    for (size_t i = 0; i < to_clear; i++) {
++                        raw_putchar(' ');
++                    }
++                    set_cursor_pos(x, y);
++                    if (r)
++                        scroll_enable();
++                    break;
++                }
++                case 1: {
++                    int x, y;
++                    get_cursor_pos(&x, &y);
++                    bool r = scroll_disable();
++                    set_cursor_pos(0, 0);
++                    bool b = false;
++                    for (int yc = 0; yc < term_rows; yc++) {
++                        for (int xc = 0; xc < term_cols; xc++) {
++                            raw_putchar(' ');
++                            if (xc == x && yc == y) {
++                                raw_putchar('\b');
++                                b = true;
++                                break;
++                            }
++                        }
++                        if (b == true)
++                            break;
++                    }
++                    if (r)
++                        scroll_enable();
++                    break;
++                }
+                 case 2:
+                     clear(false);
+                     break;
+@@ -222,16 +280,18 @@ static void control_sequence_parse(uint8_t c) {
+                     bool r = scroll_disable();
+                     for (int i = 0; i < term_cols; i++)
+                         raw_putchar(' ');
++                    set_cursor_pos(x, y);
+                     if (r)
+                         scroll_enable();
+-                    set_cursor_pos(x, y);
+                     break;
+                 }
+             }
++            break;
+         default:
+             break;
+     }
+ 
++cleanup:
+     control_sequence = false;
+     escape = false;
+ }
+diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
+index 9483403..26f5dd6 100644
+--- a/3rdparty/limine-orig/stage23/protos/stivale2.c
++++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
+@@ -58,6 +58,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
+ extern symbol stivale2_term_write_entry;
+ void *stivale2_rt_stack = NULL;
+ void *stivale2_term_buf = NULL;
++uint64_t stivale2_term_callback_ptr = 0;
++void stivale2_term_callback(uint64_t, uint64_t, uint64_t, uint64_t);
+ #endif
+ 
+ void stivale2_load(char *config, char *cmdline, bool pxe, void *efi_system_table) {
+@@ -384,6 +386,17 @@ failed_to_load_header_section:
+         struct stivale2_struct_tag_terminal *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_terminal));
+         tag->tag.identifier = STIVALE2_STRUCT_TAG_TERMINAL_ID;
+ 
++        if (terminal_hdr_tag->flags & (1 << 0)) {
++            // We provide callback
++            tag->flags |= (1 << 2);
++#if defined (__i386__)
++            term_callback = stivale2_term_callback;
++            stivale2_term_callback_ptr = terminal_hdr_tag->callback;
++#elif defined (__x86_64__)
++            term_callback = (void *)terminal_hdr_tag->callback;
++#endif
++        }
++
+         // We provide max allowed string length
+         tag->flags |= (1 << 1);
+ 
+diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
+index fb09085..069701b 100644
+--- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm
++++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
+@@ -15,10 +15,60 @@ section .text
+ extern term_write
+ extern stivale2_term_buf
+ extern stivale2_rt_stack
++extern stivale2_term_callback_ptr
+ 
++global stivale2_term_callback
++stivale2_term_callback:
++bits 32
++    push ebp
++    mov ebp, esp
++
++    push ebx
++    push esi
++    push edi
++
++    ; Go 64
++    push 0x28
++    push .mode64
++    retfd
+ bits 64
++  .mode64:
++    mov eax, 0x30
++    mov ds, ax
++    mov es, ax
++    mov ss, ax
++
++    mov edi, [rbp + 8]
++    mov esi, [rbp + 12]
++    mov edx, [rbp + 16]
++    mov ecx, [rbp + 20]
++
++    mov rbx, rsp
++    mov rsp, [user_stack]
++    call [stivale2_term_callback_ptr]
++    mov rsp, rbx
++
++    ; Go 32
++    push 0x18
++    push .mode32
++    retfq
++bits 32
++  .mode32:
++    mov eax, 0x20
++    mov ds, ax
++    mov es, ax
++    mov ss, ax
++
++    pop edi
++    pop esi
++    pop ebx
++    pop ebp
++
++    ret
++
+ global stivale2_term_write_entry
+ stivale2_term_write_entry:
++bits 64
+     push rbx
+     push rbp
+     push r12
+diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32 b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
+index 2529b34..e752682 100644
+--- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32
++++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
+@@ -17,6 +17,69 @@ section .text
+ extern term_write
+ extern stivale2_term_buf
+ extern stivale2_rt_stack
++extern stivale2_term_callback_ptr
++
++global stivale2_term_callback
++stivale2_term_callback:
++bits 32
++    push ebp
++    mov ebp, esp
++
++    push ebx
++    push esi
++    push edi
++
++    ; Go 64
++    push 0x28
++    call .p1
++  .p1:
++    pop eax
++    add eax, 6
++    push eax
++    retfd
++bits 64
++  .mode64:
++    mov eax, 0x30
++    mov ds, ax
++    mov es, ax
++    mov ss, ax
++
++    mov edi, [rbp + 8]
++    mov esi, [rbp + 12]
++    mov edx, [rbp + 16]
++    mov ecx, [rbp + 20]
++
++    call .get_got
++  .get_got:
++    pop rax
++    add rax, _GLOBAL_OFFSET_TABLE_ + $$ - .get_got wrt ..gotpc
++
++    mov rbx, rsp
++    mov rsp, [rax + user_stack wrt ..gotoff]
++    call [rax + stivale2_term_callback_ptr wrt ..gotoff]
++    mov rsp, rbx
++
++    ; Go 32
++    push 0x18
++    call .p2
++  .p2:
++    pop rax
++    add rax, 8
++    push rax
++    retfq
++bits 32
++  .mode32:
++    mov eax, 0x20
++    mov ds, ax
++    mov es, ax
++    mov ss, ax
++
++    pop edi
++    pop esi
++    pop ebx
++    pop ebp
++
++    ret
+ 
+ bits 64
+ global stivale2_term_write_entry

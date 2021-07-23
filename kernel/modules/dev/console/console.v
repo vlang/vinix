@@ -251,6 +251,10 @@ fn write_ps2_config(value byte) {
 	write_ps2(0x60, value)
 }
 
+pub fn stivale2_term_callback(t u64, extra u64, esc_val_count u64, esc_values u64) {
+	C.printf(c'stivale2 terminal callback called\n')
+}
+
 pub fn initialise() {
 	mut console_res := &Console{}
 	console_res.stat.size = 0
