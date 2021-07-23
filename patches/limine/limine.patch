@@ -1,12 +1,13 @@
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index c2bb198..12d6d18 100644
+index c2bb198..11d6bca 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -19,6 +19,10 @@ extern void (*scroll_enable)(void);
+@@ -19,6 +19,11 @@ extern void (*scroll_enable)(void);
  extern void (*term_double_buffer)(bool status);
  extern void (*term_double_buffer_flush)(void);
  
 +#define TERM_CB_DEC 10
++#define TERM_CB_BELL 20
 +
 +extern void (*term_callback)(uint64_t type, uint64_t extra, uint64_t esc_val_count, uint64_t esc_values);
 +
@@ -14,7 +15,7 @@ index c2bb198..12d6d18 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index 9ba2ebf..d8e46da 100644
+index 9ba2ebf..71ccb5b 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -147,6 +148,17 @@ index 9ba2ebf..d8e46da 100644
      control_sequence = false;
      escape = false;
  }
+@@ -277,6 +337,10 @@ static void term_putchar(uint8_t c) {
+                 break;
+             set_cursor_pos((get_cursor_pos_x() / TERM_TABSIZE + 1) * TERM_TABSIZE, get_cursor_pos_y());
+             break;
++        case '\a':
++            // The bell is handled by the kernel
++            term_callback(TERM_CB_BELL, 0, 0, 0);
++            break;
+         default:
+             raw_putchar(c);
+             break;
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 index 9483403..26f5dd6 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
