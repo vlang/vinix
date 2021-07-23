@@ -315,8 +315,12 @@ packages:
       extract_path: 'bash-5.1.8'
       patch-path-strip: 3
       version: '5.1.8'
+    revision: 2
     tools_required:
       - host-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
