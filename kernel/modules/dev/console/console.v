@@ -171,6 +171,51 @@ fn keyboard_handler() {
 					console_ctrl_active = false
 					continue
 				}
+				0x47 {
+					// Home
+					add_to_buf(c'\e[H', 3)
+					continue
+				}
+				0x4f {
+					// End
+					add_to_buf(c'\e[F', 3)
+					continue
+				}
+				0x48 {
+					// Up arrow
+					add_to_buf(c'\e[A', 3)
+					continue
+				}
+				0x4b {
+					// Left arrow
+					add_to_buf(c'\e[D', 3)
+					continue
+				}
+				0x50 {
+					// Down arrow
+					add_to_buf(c'\e[B', 3)
+					continue
+				}
+				0x4d {
+					// Right arrow
+					add_to_buf(c'\e[C', 3)
+					continue
+				}
+				0x49 {
+					// PG UP
+					add_to_buf(c'\e[5~', 4)
+					continue
+				}
+				0x51 {
+					// PG DOWN
+					add_to_buf(c'\e[6~', 4)
+					continue
+				}
+				0x53 {
+					// Delete
+					add_to_buf(c'\e[3~', 4)
+					continue
+				}
 				else {}
 			}
 		}
