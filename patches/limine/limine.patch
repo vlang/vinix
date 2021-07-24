@@ -1,8 +1,87 @@
+diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.h b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.h
+index 31c0ce7..cd78d43 100644
+--- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.h
++++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.h
+@@ -15,6 +15,7 @@ void text_set_text_fg(int fg);
+ void text_set_text_bg(int bg);
+ bool text_scroll_disable(void);
+ void text_scroll_enable(void);
++void text_move_character(int new_x, int new_y, int old_x, int old_y);
+ 
+ void text_double_buffer(bool state);
+ void text_double_buffer_flush(void);
+diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
+index 18048f7..80d4970 100644
+--- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c
++++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
+@@ -174,6 +174,13 @@ void text_get_cursor_pos(int *x, int *y) {
+     *y = cursor_offset / VD_COLS;
+ }
+ 
++void text_move_character(int new_x, int new_y, int old_x, int old_y) {
++    current_buffer[new_y * VD_COLS + new_x * 2] = current_buffer[old_y * VD_COLS + old_x * 2];
++    if (current_buffer == front_buffer) {
++        video_mem[new_y * VD_COLS + new_x * 2] = current_buffer[old_y * VD_COLS + old_x * 2];
++    }
++}
++
+ void text_set_cursor_pos(int x, int y) {
+     clear_cursor();
+     if (x < 0) {
+diff --git a/3rdparty/limine-orig/stage23/lib/gterm.c b/3rdparty/limine-workdir/stage23/lib/gterm.c
+index 6aca3a8..8fc8913 100644
+--- a/3rdparty/limine-orig/stage23/lib/gterm.c
++++ b/3rdparty/limine-workdir/stage23/lib/gterm.c
+@@ -376,6 +376,15 @@ void gterm_get_cursor_pos(int *x, int *y) {
+     *y = cursor_y;
+ }
+ 
++void gterm_move_character(int new_x, int new_y, int old_x, int old_y) {
++    if (!double_buffer_enabled) {
++        gterm_plot_char(&grid[old_x + old_y * cols],
++                        frame_width + new_x * VGA_FONT_WIDTH,
++                        frame_height + new_y * VGA_FONT_HEIGHT);
++    }
++    grid[new_x + new_y * cols] = grid[old_x + old_y * cols];
++}
++
+ static int text_fg = 9, text_bg = 8;
+ 
+ void gterm_set_text_fg(int fg) {
+diff --git a/3rdparty/limine-orig/stage23/lib/gterm.h b/3rdparty/limine-workdir/stage23/lib/gterm.h
+index 43ce660..9e92379 100644
+--- a/3rdparty/limine-orig/stage23/lib/gterm.h
++++ b/3rdparty/limine-workdir/stage23/lib/gterm.h
+@@ -20,6 +20,7 @@ void gterm_set_text_fg(int fg);
+ void gterm_set_text_bg(int bg);
+ bool gterm_scroll_disable(void);
+ void gterm_scroll_enable(void);
++void gterm_move_character(int new_x, int new_y, int old_x, int old_y);
+ 
+ void gterm_double_buffer_flush(void);
+ void gterm_double_buffer(bool state);
+diff --git a/3rdparty/limine-orig/stage23/lib/term.c b/3rdparty/limine-workdir/stage23/lib/term.c
+index 4c3e982..8232305 100644
+--- a/3rdparty/limine-orig/stage23/lib/term.c
++++ b/3rdparty/limine-workdir/stage23/lib/term.c
+@@ -29,6 +29,7 @@ void term_vbe(int width, int height) {
+     set_text_bg    = gterm_set_text_bg;
+     scroll_disable = gterm_scroll_disable;
+     scroll_enable  = gterm_scroll_enable;
++    term_move_character = gterm_move_character;
+ 
+     term_double_buffer       = gterm_double_buffer;
+     term_double_buffer_flush = gterm_double_buffer_flush;
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index c2bb198..11d6bca 100644
+index c2bb198..6146a70 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -19,6 +19,11 @@ extern void (*scroll_enable)(void);
+@@ -15,10 +15,16 @@ extern void (*set_text_fg)(int fg);
+ extern void (*set_text_bg)(int bg);
+ extern bool (*scroll_disable)(void);
+ extern void (*scroll_enable)(void);
++extern void (*term_move_character)(int new_x, int new_y, int old_x, int old_y);
+ 
  extern void (*term_double_buffer)(bool status);
  extern void (*term_double_buffer_flush)(void);
  
@@ -15,7 +94,7 @@ index c2bb198..11d6bca 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index 9ba2ebf..71ccb5b 100644
+index 9ba2ebf..44308a0 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -26,7 +105,14 @@ index 9ba2ebf..71ccb5b 100644
  
  // Tries to implement this standard for terminfo
  // https://man7.org/linux/man-pages/man4/console_codes.4.html
-@@ -33,6 +34,8 @@ void (*term_double_buffer_flush)(void);
+@@ -27,12 +28,15 @@ void (*set_text_fg)(int fg);
+ void (*set_text_bg)(int bg);
+ bool (*scroll_disable)(void);
+ void (*scroll_enable)(void);
++void (*term_move_character)(int new_x, int new_y, int old_x, int old_y);
+ 
+ void (*term_double_buffer)(bool status);
+ void (*term_double_buffer_flush)(void);
  
  int term_rows, term_cols;
  
@@ -35,7 +121,15 @@ index 9ba2ebf..71ccb5b 100644
  #if bios == 1
  void term_textmode(void) {
      term_backend = NOT_READY;
-@@ -88,12 +91,13 @@ static int get_cursor_pos_y(void) {
+@@ -49,6 +53,7 @@ void term_textmode(void) {
+     set_text_bg    = text_set_text_bg;
+     scroll_disable = text_scroll_disable;
+     scroll_enable  = text_scroll_enable;
++    term_move_character = text_move_character;
+ 
+     term_double_buffer       = text_double_buffer;
+     term_double_buffer_flush = text_double_buffer_flush;
+@@ -88,12 +93,13 @@ static int get_cursor_pos_y(void) {
  static bool control_sequence = false;
  static bool escape = false;
  static bool rrr = false;
@@ -52,7 +146,7 @@ index 9ba2ebf..71ccb5b 100644
  
      if (!esc_values_i)
          goto def;
-@@ -118,7 +122,19 @@ def:
+@@ -118,7 +124,19 @@ def:
      }
  }
  
@@ -72,7 +166,7 @@ index 9ba2ebf..71ccb5b 100644
      if (c >= '0' && c <= '9') {
          rrr = true;
          esc_values[esc_values_i] *= 10;
-@@ -141,6 +157,11 @@ static void control_sequence_parse(uint8_t c) {
+@@ -141,6 +159,18 @@ static void control_sequence_parse(uint8_t c) {
      for (int i = esc_values_i; i < MAX_ESC_VALUES; i++)
          esc_values[i] = 1;
  
@@ -81,10 +175,17 @@ index 9ba2ebf..71ccb5b 100644
 +        goto cleanup;
 +    }
 +
++{
++int x, y;
++get_cursor_pos(&x, &y);
++set_cursor_pos(0, 0);
++raw_putchar(c);
++set_cursor_pos(x, y);
++}
      switch (c) {
          case 'A':
              if (esc_values[0] > get_cursor_pos_y())
-@@ -197,6 +218,43 @@ static void control_sequence_parse(uint8_t c) {
+@@ -197,6 +227,43 @@ static void control_sequence_parse(uint8_t c) {
              break;
          case 'J':
              switch (esc_values[0]) {
@@ -128,18 +229,69 @@ index 9ba2ebf..71ccb5b 100644
                  case 2:
                      clear(false);
                      break;
-@@ -222,16 +280,18 @@ static void control_sequence_parse(uint8_t c) {
-                     bool r = scroll_disable();
+@@ -204,6 +271,20 @@ static void control_sequence_parse(uint8_t c) {
+                     break;
+             }
+             break;
++        case 'P': {
++            bool r = scroll_disable();
++            int x, y;
++            get_cursor_pos(&x, &y);
++            for (int i = x + esc_values[0]; i < term_cols; i++)
++                term_move_character(i - esc_values[0], y, i, y);
++            set_cursor_pos(term_cols - esc_values[0], y);
++            for (int i = 0; i < esc_values[0]; i++)
++                raw_putchar(' ');
++            set_cursor_pos(x, y);
++            if (r)
++                scroll_enable();
++            break;
++        }
+         case 'm':
+             sgr();
+             break;
+@@ -213,25 +294,43 @@ static void control_sequence_parse(uint8_t c) {
+         case 'u':
+             set_cursor_pos(saved_cursor_x, saved_cursor_y);
+             break;
+-        case 'K':
++        case 'K': {
++            bool r = scroll_disable();
++            int x, y;
++            get_cursor_pos(&x, &y);
++            if (esc_values_i == 0) {
++                esc_values[0] = 0;
++            }
+             switch (esc_values[0]) {
++                case 0: {
++                    for (int i = x; i < term_cols; i++)
++                        raw_putchar(' ');
++                    set_cursor_pos(x, y);
++                    break;
++                }
++                case 1: {
++                    set_cursor_pos(0, y);
++                    for (int i = 0; i < x; i++)
++                        raw_putchar(' ');
++                    break;
++                }
+                 case 2: {
+-                    int x, y;
+-                    get_cursor_pos(&x, &y);
+                     set_cursor_pos(0, y);
+-                    bool r = scroll_disable();
                      for (int i = 0; i < term_cols; i++)
                          raw_putchar(' ');
-+                    set_cursor_pos(x, y);
-                     if (r)
-                         scroll_enable();
--                    set_cursor_pos(x, y);
+-                    if (r)
+-                        scroll_enable();
+                     set_cursor_pos(x, y);
                      break;
                  }
              }
++            if (r)
++                scroll_enable();
 +            break;
++        }
          default:
              break;
      }
@@ -148,13 +300,14 @@ index 9ba2ebf..71ccb5b 100644
      control_sequence = false;
      escape = false;
  }
-@@ -277,6 +337,10 @@ static void term_putchar(uint8_t c) {
+@@ -277,6 +376,11 @@ static void term_putchar(uint8_t c) {
                  break;
              set_cursor_pos((get_cursor_pos_x() / TERM_TABSIZE + 1) * TERM_TABSIZE, get_cursor_pos_y());
              break;
 +        case '\a':
 +            // The bell is handled by the kernel
-+            term_callback(TERM_CB_BELL, 0, 0, 0);
++            if (term_callback != NULL)
++                term_callback(TERM_CB_BELL, 0, 0, 0);
 +            break;
          default:
              raw_putchar(c);
