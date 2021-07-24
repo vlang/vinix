@@ -94,7 +94,7 @@ index c2bb198..6146a70 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index 9ba2ebf..44308a0 100644
+index 9ba2ebf..5cbbe26 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -166,7 +166,7 @@ index 9ba2ebf..44308a0 100644
      if (c >= '0' && c <= '9') {
          rrr = true;
          esc_values[esc_values_i] *= 10;
-@@ -141,6 +159,18 @@ static void control_sequence_parse(uint8_t c) {
+@@ -141,6 +159,11 @@ static void control_sequence_parse(uint8_t c) {
      for (int i = esc_values_i; i < MAX_ESC_VALUES; i++)
          esc_values[i] = 1;
  
@@ -175,17 +175,10 @@ index 9ba2ebf..44308a0 100644
 +        goto cleanup;
 +    }
 +
-+{
-+int x, y;
-+get_cursor_pos(&x, &y);
-+set_cursor_pos(0, 0);
-+raw_putchar(c);
-+set_cursor_pos(x, y);
-+}
      switch (c) {
          case 'A':
              if (esc_values[0] > get_cursor_pos_y())
-@@ -197,6 +227,43 @@ static void control_sequence_parse(uint8_t c) {
+@@ -197,6 +220,43 @@ static void control_sequence_parse(uint8_t c) {
              break;
          case 'J':
              switch (esc_values[0]) {
@@ -229,7 +222,7 @@ index 9ba2ebf..44308a0 100644
                  case 2:
                      clear(false);
                      break;
-@@ -204,6 +271,20 @@ static void control_sequence_parse(uint8_t c) {
+@@ -204,6 +264,20 @@ static void control_sequence_parse(uint8_t c) {
                      break;
              }
              break;
@@ -250,7 +243,7 @@ index 9ba2ebf..44308a0 100644
          case 'm':
              sgr();
              break;
-@@ -213,25 +294,43 @@ static void control_sequence_parse(uint8_t c) {
+@@ -213,25 +287,43 @@ static void control_sequence_parse(uint8_t c) {
          case 'u':
              set_cursor_pos(saved_cursor_x, saved_cursor_y);
              break;
@@ -300,7 +293,7 @@ index 9ba2ebf..44308a0 100644
      control_sequence = false;
      escape = false;
  }
-@@ -277,6 +376,11 @@ static void term_putchar(uint8_t c) {
+@@ -277,6 +369,11 @@ static void term_putchar(uint8_t c) {
                  break;
              set_cursor_pos((get_cursor_pos_x() / TERM_TABSIZE + 1) * TERM_TABSIZE, get_cursor_pos_y());
              break;
