@@ -375,7 +375,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '13.rolling'
+      version: '14.rolling'
     tools_required:
       - host-v
       - host-gcc
@@ -383,7 +383,7 @@ packages:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
+        - 'cd "@THIS_SOURCE_DIR@" && make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
 
   - name: coreutils
     source:
