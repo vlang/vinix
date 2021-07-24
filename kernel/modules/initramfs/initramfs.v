@@ -58,6 +58,8 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 	println('initramfs: Address: 0x${voidptr(initramfs_begin):x}')
 	println('initramfs: Size:    ${u32(initramfs_size):u}')
 
+	print('initramfs: Unpacking...')
+
 	mut current_header := &USTARHeader(0)
 	unsafe { current_header = &USTARHeader(initramfs_begin) }
 
@@ -104,5 +106,7 @@ next:
 	}
 
 	memory.pmm_free(voidptr(initramfs_begin - higher_half), lib.div_roundup(initramfs_size, page_size))
+
+	print('\ninitramfs: Done.\n')
 }
 
