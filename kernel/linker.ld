@@ -6,8 +6,8 @@ ENTRY(main__kmain)
 PHDRS
 {
     null    PT_NULL    FLAGS(0) ;
-    rodata  PT_LOAD    FLAGS(1 << 2) ;
     text    PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ;
+    rodata  PT_LOAD    FLAGS(1 << 2) ;
     data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ;
     dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ;
 }
@@ -16,6 +16,10 @@ SECTIONS
 {
     /* We wanna be placed in the higher half, 2MiB above 0 in physical memory. */
     . = 0xffffffff80200000;
+
+    .text ALIGN(4K) : {
+        *(.text*)
+    } : text
 
     /* We place the .stivalehdr section containing the header in its own section, */
     /* and we use the KEEP directive on it to make sure it doesn't get discarded. */
@@ -28,9 +32,9 @@ SECTIONS
         *(.rodata*)
     } : rodata
 
-    .text ALIGN(4K) : {
-        *(.text*)
-    } : text
+    .symbol_table ALIGN(4K) : {
+        *(.symbol_table*)
+    } : rodata
 
     .data ALIGN(4K) : {
         *(.data*)

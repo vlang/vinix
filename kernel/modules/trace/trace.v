@@ -1,31 +1,70 @@
 module trace
 
+pub struct Symbol {
+pub mut:
+	address u64
+	name    charptr
+}
+
+fn C.get_symbol_table() &Symbol
+
 fn C.printf_panic(charptr, ...voidptr)
 
-pub fn stacktrace(_base_ptr voidptr) {
-	mut base_ptr := &u64(_base_ptr)
+pub fn address(addr u64) ?(u64, &Symbol) {
+	mut prev_sym := &Symbol(0)
 
-	if voidptr(base_ptr) == voidptr(0) {
+	symbol_table := C.get_symbol_table()
+
+	for i := u64(0); ; i++ {
+		if unsafe { symbol_table[i].address } == 0xffffffffffffffff {
+			return none
+		}
+
+		if unsafe { symbol_table[i].address } >= addr {
+			offset := addr - prev_sym.address
+			return offset, prev_sym
+		}
+
+		prev_sym = unsafe { &symbol_table[i] }
+	}
+
+	return none
+}
+
+pub fn address_print(addr u64) {
+	off, sym := address(addr) or {
+		C.printf_panic(c'  <invalid>\n')
+		return
+	}
+	C.printf_panic(c'  [0x%llx] <%s+0x%llx>\n', addr, sym.name, off)
+}
+
+pub fn stacktrace(_base_ptr u64) {
+	mut base_ptr := _base_ptr
+
+	if base_ptr == 0 {
 		asm volatile amd64 {
 			mov base_ptr, rbp
-			; =rm (base_ptr)
+			; =g (base_ptr)
+			;; memory
 		}
+	}
+
+	if base_ptr == 0 {
+		return
 	}
 
 	C.printf_panic(c'Stacktrace:\n')
 
 	for {
 		unsafe {
-			old_bp := base_ptr[0]
-			ret_addr := base_ptr[1]
-			if ret_addr == 0 {
+			old_bp := (&u64(base_ptr))[0]
+			ret_addr := (&u64(base_ptr))[1]
+			if ret_addr == 0 || old_bp == 0 {
 				break
 			}
-			C.printf_panic(c'\t0x%llx\n', voidptr(ret_addr))
-			if old_bp == 0 {
-				break
-			}
-			base_ptr = &u64(old_bp)
+			address_print(ret_addr)
+			base_ptr = old_bp
 		}
 	}
 }

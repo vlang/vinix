@@ -4,6 +4,7 @@ PROD = false
 
 CC = cc
 LD = ld
+OBJDUMP = objdump
 V = v
 
 CFLAGS = -O2 -Wall -Wextra -g -pipe
@@ -83,3 +84,8 @@ blob.o:
 
 $(KERNEL): blob.o $(COBJ)
 	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+	mv c/symbol_table.c symbol_table.c.tmp
+	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
+	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+	mv symbol_table.c.tmp c/symbol_table.c
