@@ -29,7 +29,7 @@ index 18048f7..80d4970 100644
      clear_cursor();
      if (x < 0) {
 diff --git a/3rdparty/limine-orig/stage23/lib/gterm.c b/3rdparty/limine-workdir/stage23/lib/gterm.c
-index 6aca3a8..8fc8913 100644
+index 6aca3a8..b638ecc 100644
 --- a/3rdparty/limine-orig/stage23/lib/gterm.c
 +++ b/3rdparty/limine-workdir/stage23/lib/gterm.c
 @@ -376,6 +376,15 @@ void gterm_get_cursor_pos(int *x, int *y) {
@@ -48,6 +48,25 @@ index 6aca3a8..8fc8913 100644
  static int text_fg = 9, text_bg = 8;
  
  void gterm_set_text_fg(int fg) {
+@@ -499,12 +508,12 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
+     margin_gradient = 4;
+ 
+     ansi_colours[0] = 0x00000000; // black
+-    ansi_colours[1] = 0x00aa0000; // red
+-    ansi_colours[2] = 0x0000aa00; // green
+-    ansi_colours[3] = 0x00aa5500; // brown
+-    ansi_colours[4] = 0x000000aa; // blue
+-    ansi_colours[5] = 0x00aa00aa; // magenta
+-    ansi_colours[6] = 0x0000aaaa; // cyan
++    ansi_colours[1] = 0x00cc0000; // red
++    ansi_colours[2] = 0x002fb417; // green
++    ansi_colours[3] = 0x00c38022; // brown
++    ansi_colours[4] = 0x002b7fec; // blue
++    ansi_colours[5] = 0x00ce4dde; // magenta
++    ansi_colours[6] = 0x001ec5cc; // cyan
+     ansi_colours[7] = 0x00aaaaaa; // grey
+     ansi_colours[8] = 0x00000000; // background (black)
+     ansi_colours[9] = 0x00aaaaaa; // foreground (grey)
 diff --git a/3rdparty/limine-orig/stage23/lib/gterm.h b/3rdparty/limine-workdir/stage23/lib/gterm.h
 index 43ce660..9e92379 100644
 --- a/3rdparty/limine-orig/stage23/lib/gterm.h
