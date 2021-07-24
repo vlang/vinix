@@ -1,0 +1,13 @@
+diff --git a/3rdparty/nano-orig/config.sub b/3rdparty/nano-workdir/config.sub
+index 63c1f1c..6f6e987 100755
+--- a/3rdparty/nano-orig/config.sub
++++ b/3rdparty/nano-workdir/config.sub
+@@ -1700,7 +1700,7 @@ case $os in
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+ 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
+ 	     | hiux* | abug | nacl* | netware* | windows* \
+-	     | os9* | macos* | osx* | ios* \
++	     | os9* | macos* | osx* | ios* | vinix* \
+ 	     | mpw* | magic* | mmixware* | mon960* | lnews* \
+ 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
+ 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \

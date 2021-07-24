@@ -416,6 +416,38 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: nano
+    source:
+      subdir: '3rdparty'
+      url: 'https://www.nano-editor.org/dist/v5/nano-5.8.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'nano-5.8'
+      patch-path-strip: 3
+      version: '5.8'
+    tools_required:
+      - host-gcc
+      - host-pkg-config
+    pkgs_required:
+      - mlibc
+      - ncurses
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - 'CFLAGS=-DSLOW_BUT_NO_HACKS -ltinfo'
+        environ:
+          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
+          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
+          gl_cv_type_wctype_t: 'yes'
+          gl_cv_type_wctrans_t: 'yes'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: tzdata
     source:
       subdir: '3rdparty'
