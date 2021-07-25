@@ -1,3 +1,6 @@
+OUTPUT_FORMAT(elf64-x86-64)
+OUTPUT_ARCH(i386:x86-64)
+
 /* Tell the linker that we want the symbol main__kmain to be our entry point */
 ENTRY(main__kmain)
 
@@ -17,34 +20,38 @@ SECTIONS
     /* We wanna be placed in the higher half, 2MiB above 0 in physical memory. */
     . = 0xffffffff80200000;
 
-    .text ALIGN(4K) : {
+    .text : {
         *(.text*)
     } : text
 
+    . += 0x1000;
+
     /* We place the .stivalehdr section containing the header in its own section, */
     /* and we use the KEEP directive on it to make sure it doesn't get discarded. */
-    .stivale2hdr ALIGN(4K) : {
+    .stivale2hdr : {
         KEEP(*(.stivale2hdr))
     } : rodata
 
     /* Then let's place all the other traditional executable sections afterwards. */
-    .rodata ALIGN(4K) : {
+    .rodata : {
         *(.rodata*)
     } : rodata
 
-    .symbol_table ALIGN(4K) : {
+    .symbol_table : {
         *(.symbol_table*)
     } : rodata
 
-    .data ALIGN(4K) : {
+    . += 0x1000;
+
+    .data : {
         *(.data*)
     } : data
 
-    .dynamic ALIGN(4K) : {
+    .dynamic : {
         *(.dynamic)
     } : data : dynamic
 
-    .bss ALIGN(4K) : {
+    .bss : {
         *(COMMON)
         *(.bss*)
     } : data
