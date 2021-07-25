@@ -1,7 +1,7 @@
 module kio
 
-pub fn inb(port u16) byte {
-	mut ret := byte(0)
+pub fn port_in<T>(port u16) T {
+	mut ret := T(0)
 	asm volatile amd64 {
 		in ret, port
 		; =a (ret)
@@ -11,7 +11,7 @@ pub fn inb(port u16) byte {
 	return ret
 }
 
-pub fn outb(port u16, value byte) {
+pub fn port_out<T>(port u16, value T) {
 	asm volatile amd64 {
 		out port, value
 		;

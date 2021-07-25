@@ -277,13 +277,13 @@ fn keyboard_handler() {
 }
 
 fn read_ps2() byte {
-	for kio.inb(0x64) & 1 == 0 {}
-	return kio.inb(0x60)
+	for kio.port_in<byte>(0x64) & 1 == 0 {}
+	return kio.port_in<byte>(0x60)
 }
 
 fn write_ps2(port u16, value byte) {
-	for kio.inb(0x64) & 2 != 0 {}
-	kio.outb(port, value)
+	for kio.port_in<byte>(0x64) & 2 != 0 {}
+	kio.port_out<byte>(port, value)
 }
 
 fn read_ps2_config() byte {
@@ -321,8 +321,8 @@ pub fn initialise() {
 	write_ps2(0x64, 0xa7)
 
 	// Read from port 0x60 to flush the PS/2 controller buffer
-	for kio.inb(0x64) & 1 != 0 {
-		kio.inb(0x60)
+	for kio.port_in<byte>(0x64) & 1 != 0 {
+		kio.port_in<byte>(0x60)
 	}
 
 	mut ps2_config := read_ps2_config()
