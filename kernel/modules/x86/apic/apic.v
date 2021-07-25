@@ -24,9 +24,9 @@ fn lapic_write(reg u32, val u32) {
 }
 
 fn pit_current_count() u16 {
-	kio.outb(0x43, 0)
-	lo := kio.inb(0x40)
-	hi := kio.inb(0x40)
+	kio.port_out<byte>(0x43, 0)
+	lo := kio.port_in<byte>(0x40)
+	hi := kio.port_in<byte>(0x40)
 	return (hi << 8) | lo
 }
 
@@ -45,8 +45,8 @@ pub fn lapic_timer_calibrate() {
 
 	pit_freq := u64(1193182)
 
-	kio.outb(0x40, 0x0)
-	kio.outb(0x40, 0x0)
+	kio.port_out<byte>(0x40, 0x0)
+	kio.port_out<byte>(0x40, 0x0)
 
 	initial_pit_tick := u64(pit_current_count())
 

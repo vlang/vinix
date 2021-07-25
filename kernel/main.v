@@ -17,6 +17,7 @@ import userland
 import kprint
 import pipe
 import futex
+import pci
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -24,6 +25,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	pipe.initialise()
 	futex.initialise()
 	fs.initialise()
+	pci.initialise()
 
 	fs.mount(vfs_root, '', '/', 'tmpfs') or {}
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
