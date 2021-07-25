@@ -356,7 +356,7 @@ index 9483403..26f5dd6 100644
          tag->flags |= (1 << 1);
  
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
-index fb09085..069701b 100644
+index 26517ca..873a8c4 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
 @@ -15,10 +15,60 @@ section .text
@@ -421,7 +421,7 @@ index fb09085..069701b 100644
      push rbp
      push r12
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32 b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
-index 2529b34..e752682 100644
+index d39e5a3..ac17c0f 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
 @@ -17,6 +17,69 @@ section .text
