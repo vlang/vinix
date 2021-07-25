@@ -145,9 +145,8 @@ pub fn pmm_free(ptr voidptr, count u64) {
 
 __global (
 	kernel_alloc_base = u64(0xfffff00000000000)
+	kernel_alloc_spacing = u64(0x1000000)
 )
-
-const kernel_alloc_spacing = u64(0x1000000)
 
 pub fn free(ptr voidptr) {
 	realloc(ptr, 0)

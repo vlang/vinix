@@ -25,9 +25,6 @@ __global (
 	user_data_seg = u16(0x53)
 	gdt_pointer     GDTPointer
 	gdt_entries     [13]GDTEntry
-)
-
-__global (
 	gdt_lock klock.Lock
 )
 
