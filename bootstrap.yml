@@ -34,11 +34,11 @@ sources:
 
   - name: mlibc
     subdir: '3rdparty'
-    url: 'https://github.com/managarm/mlibc/archive/f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a.tar.gz'
+    url: 'https://github.com/managarm/mlibc/archive/fb85f87c72820bd9266f18692e168583c892b94f.tar.gz'
     format: 'tar.gz'
-    extract_path: 'mlibc-f2c6b8cd7fe67b89d12b23ba0a82e174ba2b7c0a'
+    extract_path: 'mlibc-fb85f87c72820bd9266f18692e168583c892b94f'
     patch-path-strip: 3
-    version: '2.rolling'
+    version: '3.rolling'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -337,6 +337,7 @@ packages:
     tools_required:
       - host-gcc
     pkgs_required:
+      - mlibc
       - tcc
     build:
       - args:
@@ -354,6 +355,8 @@ packages:
       version: '0.9.27'
     tools_required:
       - host-gcc
+    pkgs_required:
+      - mlibc
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -378,6 +381,8 @@ packages:
     tools_required:
       - host-v
       - host-gcc
+    pkgs_required:
+      - mlibc
     build:
       - args:
         - 'bash'
@@ -394,6 +399,8 @@ packages:
       version: '8.32'
     tools_required:
       - host-gcc
+    pkgs_required:
+      - mlibc
     configure:
       # Huge hack: coreutils does not compile the build-machine binary make-prime-list
       # using the build-machine compiler. Hence, build and invoke the binary manually here.
