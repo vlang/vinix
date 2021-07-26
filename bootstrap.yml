@@ -5,11 +5,11 @@ declare_options:
 sources:
   - name: binutils
     subdir: '3rdparty'
-    url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.36.1.tar.xz'
+    url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.37.tar.xz'
     format: 'tar.xz'
-    extract_path: 'binutils-2.36.1'
+    extract_path: 'binutils-2.37'
     patch-path-strip: 3
-    version: '2.36.1'
+    version: '2.37'
 
   - name: gcc
     subdir: '3rdparty'
@@ -67,11 +67,11 @@ sources:
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.39/limine-v2.39.tar.xz
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.40/limine-v2.40.tar.xz
     format: 'tar.xz'
-    extract_path: 'limine-v2.39'
+    extract_path: 'limine-v2.40'
     patch-path-strip: 3
-    version: '2.39'
+    version: '2.40'
 
 tools:
   - name: host-autoconf-v2.69

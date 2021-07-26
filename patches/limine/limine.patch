@@ -325,7 +325,7 @@ index 9ba2ebf..5cbbe26 100644
              raw_putchar(c);
              break;
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-index 9483403..26f5dd6 100644
+index b20f61c..90b3e67 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 @@ -58,6 +58,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
@@ -337,7 +337,7 @@ index 9483403..26f5dd6 100644
  #endif
  
  void stivale2_load(char *config, char *cmdline, bool pxe, void *efi_system_table) {
-@@ -384,6 +386,17 @@ failed_to_load_header_section:
+@@ -394,6 +396,17 @@ failed_to_load_header_section:
          struct stivale2_struct_tag_terminal *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_terminal));
          tag->tag.identifier = STIVALE2_STRUCT_TAG_TERMINAL_ID;
  

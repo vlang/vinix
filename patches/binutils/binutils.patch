@@ -1,8 +1,8 @@
 diff --git a/3rdparty/binutils-orig/bfd/config.bfd b/3rdparty/binutils-workdir/bfd/config.bfd
-index e7b55b0..6ebf379 100644
+index 30087e3..9ca3863 100644
 --- a/3rdparty/binutils-orig/bfd/config.bfd
 +++ b/3rdparty/binutils-workdir/bfd/config.bfd
-@@ -724,6 +724,11 @@ case "${targ}" in
+@@ -719,6 +719,11 @@ case "${targ}" in
      targ_defvec=i386_elf32_vec
      targ_selvecs="iamcu_elf32_vec i386_pe_vec i386_pei_vec"
      ;;
@@ -15,20 +15,20 @@ index e7b55b0..6ebf379 100644
      targ_defvec=i386_pei_vec
      targ_selvecs="i386_pe_vec"
 diff --git a/3rdparty/binutils-orig/config.sub b/3rdparty/binutils-workdir/config.sub
-index b0f8492..2384aec 100755
+index 7384e91..6905e3f 100755
 --- a/3rdparty/binutils-orig/config.sub
 +++ b/3rdparty/binutils-workdir/config.sub
-@@ -1709,7 +1709,7 @@ case $os in
- 	     | bosx* | nextstep* | cxux* | aout* | elf* | oabi* \
- 	     | ptx* | coff* | ecoff* | winnt* | domain* | vsta* \
- 	     | udi* | lites* | ieee* | go32* | aux* | hcos* \
--	     | chorusrdb* | cegcc* | glidix* \
-+	     | chorusrdb* | cegcc* | glidix* | vinix* \
- 	     | cygwin* | msys* | pe* | moss* | proelf* | rtems* \
- 	     | midipix* | mingw32* | mingw64* | mint* \
- 	     | uxpv* | beos* | mpeix* | udk* | moxiebox* \
+@@ -1704,7 +1704,7 @@ case $os in
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+ 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
+ 	     | hiux* | abug | nacl* | netware* | windows* \
+-	     | os9* | macos* | osx* | ios* \
++	     | os9* | macos* | osx* | ios* | vinix* \
+ 	     | mpw* | magic* | mmixware* | mon960* | lnews* \
+ 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
+ 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
 diff --git a/3rdparty/binutils-orig/gas/configure.tgt b/3rdparty/binutils-workdir/gas/configure.tgt
-index 6f46e0a..b323506 100644
+index 338892a..0623579 100644
 --- a/3rdparty/binutils-orig/gas/configure.tgt
 +++ b/3rdparty/binutils-workdir/gas/configure.tgt
 @@ -221,6 +221,7 @@ case ${generic_target} in
@@ -37,13 +37,13 @@ index 6f46e0a..b323506 100644
    i386-*-elf*)				fmt=elf ;;
 +  i386-*-vinix*)				fmt=elf ;;
    i386-*-fuchsia*)			fmt=elf ;;
+   i386-*-genode*)			fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
-   i386-*-netbsdpe*)			fmt=coff em=pe ;;
 diff --git a/3rdparty/binutils-orig/ld/configure.tgt b/3rdparty/binutils-workdir/ld/configure.tgt
-index 0c780b2..facdd12 100644
+index 6205d7c..dba5702 100644
 --- a/3rdparty/binutils-orig/ld/configure.tgt
 +++ b/3rdparty/binutils-workdir/ld/configure.tgt
-@@ -319,6 +319,10 @@ i[3-7]86-*-bsd386)	targ_emul=i386bsd
+@@ -318,6 +318,10 @@ i[3-7]86-*-bsd386)	targ_emul=i386bsd
  i[3-7]86-*-bsdi*)	targ_emul=i386bsd
  			targ_extra_ofiles=
  			;;
