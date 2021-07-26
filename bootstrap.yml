@@ -514,6 +514,7 @@ packages:
       extract_path: 'grep-3.6'
       patch-path-strip: 3
       version: '3.6'
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
@@ -523,8 +524,7 @@ packages:
         - '@THIS_SOURCE_DIR@/configure'
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
-        - '--sysconfdir=/etc'
-        - 'CFLAGS=-DSLOW_BUT_NO_HACKS'
+        - '--disable-nls'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
@@ -539,6 +539,7 @@ packages:
       extract_path: 'diffutils-3.7'
       patch-path-strip: 3
       version: '3.7'
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
@@ -548,8 +549,7 @@ packages:
         - '@THIS_SOURCE_DIR@/configure'
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
-        - '--sysconfdir=/etc'
-        - 'CFLAGS=-DSLOW_BUT_NO_HACKS'
+        - '--disable-nls'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
@@ -564,6 +564,7 @@ packages:
       extract_path: 'sed-4.8'
       patch-path-strip: 3
       version: '4.8'
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
@@ -573,8 +574,7 @@ packages:
         - '@THIS_SOURCE_DIR@/configure'
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
-        - '--sysconfdir=/etc'
-        - 'CFLAGS=-DSLOW_BUT_NO_HACKS'
+        - '--disable-nls'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
