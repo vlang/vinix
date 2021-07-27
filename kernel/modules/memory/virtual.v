@@ -3,10 +3,6 @@ module memory
 import lib
 import stivale2
 import klock
-import x86.apic
-import x86.cpu
-import x86.cpu.local as cpulocal
-import katomic
 
 __global (
 	page_size = u64(0x1000)
@@ -102,41 +98,6 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 		}
 	}
 	return ret
-}
-
-__global (
-	tlb_shootdown_lock klock.Lock
-	tlb_shootdown_cpucount u64
-)
-
-pub fn tlb_shootdown() {
-	tlb_shootdown_lock.acquire()
-	defer {
-		tlb_shootdown_lock.release()
-	}
-
-	katomic.store(tlb_shootdown_cpucount, u64(1))
-
-	cpu.write_cr3(cpu.read_cr3())
-
-	if cpu_locals.len == 0 {
-		return
-	}
-
-	for cpu_local in cpu_locals {
-		if cpulocal.current().lapic_id == cpu_local.lapic_id {
-			continue
-		}
-		apic.lapic_send_ipi(cpu_local.lapic_id, tlb_shootdown_vector)
-	}
-
-	for katomic.load(tlb_shootdown_cpucount) != cpu_locals.len {}
-}
-
-pub fn tlb_shootdown_handler() {
-	cpu.write_cr3(cpu.read_cr3())
-	katomic.inc(tlb_shootdown_cpucount)
-	apic.lapic_eoi()
 }
 
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
