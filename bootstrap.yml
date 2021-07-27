@@ -382,7 +382,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '22.rolling'
+      version: '23.rolling'
     tools_required:
       - host-v
       - host-gcc

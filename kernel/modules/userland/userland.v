@@ -82,11 +82,14 @@ pub fn sendsig(cur_context &cpulocal.GPRState, process &proc.Process, signal int
 
 		mut return_context := &cpulocal.GPRState{}
 
-		sched.intercept_thread(thread) or {}
-
 		if voidptr(thread) == voidptr(proc.current_thread()) {
-			unsafe { return_context[0] = cur_context[0] }
+			asm volatile amd64 { cli }
+			unsafe {
+				return_context[0] = cur_context[0]
+				thread.gpr_state = cur_context[0]
+			}
 		} else {
+			sched.intercept_thread(thread) or {}
 			unsafe { return_context[0] = thread.gpr_state }
 		}
 

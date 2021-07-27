@@ -201,7 +201,7 @@ index 0000000..95e9b50
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..280a34b
+index 0000000..b51c47f
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,486 @@
@@ -225,9 +225,9 @@ index 0000000..280a34b
 +
 +    mlibc::infoLogger() << "mlibc: signal dispatch stub (signal: " << signal << ")\n" << frg::endlog;
 +
-+    mlibc::sys_unblock_signals();
++    //mlibc::sys_unblock_signals();
 +
-+    for (;;);
++    return true;
 +}
 +
 +struct __syscall_ret {

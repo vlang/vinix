@@ -193,9 +193,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 	return false
 }
 
-// This function halts execution of a thread if it is being executed on a core.
-// It also ensures the caller of this function is now the lock helder for the
-// given thread. Execution can be resumed by releasing the lock.
+// Like dequeue_thread(), but it stops it immediately
 pub fn intercept_thread(_thread &proc.Thread) ? {
 	mut thread := unsafe { _thread }
 
@@ -222,12 +220,14 @@ pub fn yield(save_ctx bool) {
 
 	apic.lapic_timer_stop()
 
-	cpu_local := cpulocal.current()
+	mut cpu_local := cpulocal.current()
 
 	mut current_thread := &proc.Thread(cpu_local.current_thread)
 
 	if save_ctx == true {
 		current_thread.yield_await.acquire()
+	} else {
+		cpu_local.current_thread = voidptr(0)
 	}
 
 	apic.lapic_send_ipi(cpu_local.lapic_id, scheduler_vector)
@@ -260,7 +260,6 @@ pub fn dequeue_and_die() {
 		free(thread.stacks)
 		free(thread)
 	}
-	cpulocal.current().current_thread = voidptr(0)
 	yield(false)
 }
 
