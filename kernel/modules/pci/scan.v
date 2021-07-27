@@ -11,7 +11,7 @@ const max_bus = 256
 pub fn initialise() {
 	scanned_devices = []&PCIDevice{}
 
-	print('pci: Building device scan')
+	print('pci: Building device scan\n')
 	mut root_bus := PCIDevice{}
 	configc  := root_bus.read<u32>(0xc)
 

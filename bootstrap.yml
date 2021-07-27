@@ -223,7 +223,11 @@ tasks:
       - coreutils
       - tcc
       - v
+      - sed
+      - diffutils
+      - grep
       - tzdata
+      - nano
       - kernel
     artifact_files:
       - name: vinix.iso
@@ -378,7 +382,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '18.rolling'
+      version: '19.rolling'
     tools_required:
       - host-v
       - host-gcc
