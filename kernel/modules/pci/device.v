@@ -12,8 +12,8 @@ pub mut:
 	device_id u16
 	vendor_id u16
 	revision_id u16
+	class byte
 	subclass byte
-	device_class byte
 	prog_if byte
 	multifunction bool
 	irq_pin byte
@@ -37,8 +37,8 @@ pub fn (mut dev PCIDevice) read_info() {
 	dev.vendor_id = u16(config0)
 	dev.revision_id = byte(config8)
 	dev.subclass = byte(config8 >> 16)
-	dev.device_class = byte(config8 >> 24)
-	dev.prog_if = byte(config0 >> 8)
+	dev.class = byte(config8 >> 24)
+	dev.prog_if = byte(config8 >> 8)
 	dev.multifunction = if configc & 0x800000 != 0 { true } else { false }
 	dev.irq_pin = byte(config3c >> 8)
 }

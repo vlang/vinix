@@ -78,3 +78,14 @@ pub fn get_device_by_coordinates(bus byte, slot byte, function byte) ?&PCIDevice
 	}
 	return none
 }
+
+pub fn get_device_by_class(class byte, subclass byte, progif byte) ?&PCIDevice {
+	for device in scanned_devices {
+		if device.class == class
+		&& device.subclass == subclass
+		&& device.prog_if == progif {
+			return unsafe { device }
+		}
+	}
+	return none
+}
