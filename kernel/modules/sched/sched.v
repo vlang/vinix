@@ -193,6 +193,30 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 	return false
 }
 
+// This function halts execution of a thread if it is being executed on a core.
+// It also ensures the caller of this function is now the lock helder for the
+// given thread. Execution can be resumed by releasing the lock.
+pub fn intercept_thread(_thread &proc.Thread) ? {
+	mut thread := unsafe { _thread }
+
+	if voidptr(thread) == voidptr(proc.current_thread()) {
+		return error('')
+	}
+
+	dequeue_thread(thread)
+
+	running_on := thread.running_on
+
+	if running_on == -1 {
+		return
+	}
+
+	apic.lapic_send_ipi(cpu_locals[running_on].lapic_id, scheduler_vector)
+
+	thread.l.acquire()
+	thread.l.release()
+}
+
 pub fn yield(save_ctx bool) {
 	asm volatile amd64 { cli }
 

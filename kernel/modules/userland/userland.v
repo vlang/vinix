@@ -12,8 +12,120 @@ import katomic
 import event
 import event.eventstruct
 import errno
+import lib
 
 pub const wnohang = 2
+
+pub const sighup = 1
+pub const sigint = 2
+pub const sigquit = 3
+pub const sigill = 4
+pub const sigtrap = 5
+pub const sigabrt = 6
+pub const sigbus = 7
+pub const sigfpe = 8
+pub const sigkill = 9
+pub const sigusr1 = 10
+pub const sigsegv = 11
+pub const sigusr2 = 12
+pub const sigpipe = 13
+pub const sigalrm = 14
+pub const sigterm = 15
+pub const sigstkflt = 16
+pub const sigchld = 17
+pub const sigcont = 18
+pub const sigstop = 19
+pub const sigtstp = 20
+pub const sigttin = 21
+pub const sigttou = 22
+pub const sigurg = 23
+pub const sigxcpu = 24
+pub const sigxfsz = 25
+pub const sigvtalrm = 26
+pub const sigprof = 27
+pub const sigwinch = 28
+pub const sigio = 29
+pub const sigpoll = sigio
+pub const sigpwr = 30
+pub const sigsys = 31
+pub const sigrtmin = 32
+pub const sigrtmax = 33
+pub const sigcancel = 34
+
+pub fn syscall_set_sigentry(_ voidptr, sigentry u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: set_sigentry(0x%llx)\n', sigentry)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut thread := proc.current_thread()
+
+	thread.sigentry = sigentry
+
+	return 0, 0
+}
+
+pub fn syscall_unblock_signals(_ voidptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: unblock_signals()\n')
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	katomic.store(proc.current_thread().pending_signal, 0)
+
+	return 0, 0
+}
+
+pub fn sendsig(cur_context &cpulocal.GPRState, process &proc.Process, signal int) {
+	if signal > 0 {
+		mut thread := process.threads[0]
+
+		mut return_context := &cpulocal.GPRState{}
+
+		sched.intercept_thread(thread) or {}
+
+		if voidptr(thread) == voidptr(proc.current_thread()) {
+			unsafe { return_context[0] = cur_context[0] }
+		} else {
+			unsafe { return_context[0] = thread.gpr_state }
+		}
+
+		if thread.gpr_state.rsp & (u64(1) << 63) == 0 {
+			for katomic.load(thread.pending_signal) != 0 {}
+
+			thread.gpr_state.rip = thread.sigentry
+
+			// Respect the redzone
+			thread.gpr_state.rsp -= 128 + 16
+			thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
+			thread.gpr_state.rsp += 8
+
+			thread.gpr_state.rdi = u64(return_context)
+			thread.gpr_state.rsi = u64(signal)
+		} else {
+			for katomic.cas(thread.pending_signal, 0, signal) == false {}
+		}
+
+		if voidptr(thread) == voidptr(proc.current_thread()) {
+			sched.yield(false)
+		} else {
+			sched.enqueue_thread(thread)
+		}
+	} else {
+		panic('sendsig: Values of signal <= 0 not supported')
+	}
+}
+
+pub fn syscall_kill(cur_context &cpulocal.GPRState, pid int, signal int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: kill(%d, %d)\n', pid, signal)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	sendsig(cur_context, processes[pid], signal)
+
+	return 0, 0
+}
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: execve(%s, [omit], [omit])\n', _path)
@@ -85,7 +197,12 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 
 	mut which := u64(0)
 	block := options & wnohang == 0
+	katomic.store(current_thread.pending_signal, 0)
 	event.await(events, &which, block)
+
+	if katomic.load(current_thread.pending_signal) != 0 {
+		return 0, (u64(katomic.load(current_thread.pending_signal)) << 32) | errno.eintr
+	}
 
 	if which == -1 {
 		return 0, 0

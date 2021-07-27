@@ -28,6 +28,9 @@ extern char fs__syscall_mkdirat[];
 extern char futex__syscall_futex_wait[];
 extern char futex__syscall_futex_wake[];
 extern char fs__syscall_getcwd[];
+extern char userland__syscall_kill[];
+extern char userland__syscall_set_sigentry[];
+extern char userland__syscall_unblock_signals[];
 
 __attribute__((used)) void *syscall_table[] = {
     kprint__syscall_kprint, // 0
@@ -56,6 +59,9 @@ __attribute__((used)) void *syscall_table[] = {
     futex__syscall_futex_wait, // 23
     futex__syscall_futex_wake, // 24
     fs__syscall_getcwd, // 25
+    userland__syscall_kill, // 26
+    userland__syscall_set_sigentry, // 27
+    userland__syscall_unblock_signals, // 28
 };
 
 extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_storage[];

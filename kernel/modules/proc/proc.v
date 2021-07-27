@@ -43,6 +43,8 @@ pub mut:
 	exit_value voidptr
 	exited eventstruct.Event
 	errno u64
+	sigentry u64
+	pending_signal int
 	stacks []voidptr
 }
 

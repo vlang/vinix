@@ -110,6 +110,20 @@ index 0488309..a9c8177 100644
 +#endif
 +
  #endif // _MLIBC_INTERNAL_TYPES_H
+diff --git a/3rdparty/mlibc-orig/options/internal/include/mlibc/internal-sysdeps.hpp b/3rdparty/mlibc-workdir/options/internal/include/mlibc/internal-sysdeps.hpp
+index 0bd4a05..46dbff5 100644
+--- a/3rdparty/mlibc-orig/options/internal/include/mlibc/internal-sysdeps.hpp
++++ b/3rdparty/mlibc-workdir/options/internal/include/mlibc/internal-sysdeps.hpp
+@@ -35,6 +35,9 @@ int sys_close(int fd);
+ int sys_vm_map(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window);
+ int sys_vm_unmap(void *pointer, size_t size);
+ 
++int sys_set_sigentry(void *pointer);
++int sys_unblock_signals();
++
+ } //namespace mlibc
+ 
+ #endif // MLIBC_INTERNAL_SYSDEPS
 diff --git a/3rdparty/mlibc-orig/options/linux/include/asm/ioctls.h b/3rdparty/mlibc-workdir/options/linux/include/asm/ioctls.h
 index 41d4248..f246d1d 100644
 --- a/3rdparty/mlibc-orig/options/linux/include/asm/ioctls.h
@@ -138,15 +152,17 @@ index 0000000..0a0a4a0
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..ee7a794
+index 0000000..95e9b50
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,43 @@
 +
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
++#include <mlibc/debug.hpp>
 +#include <mlibc/elf/startup.h>
++#include <mlibc/all-sysdeps.hpp>
 +
 +// defined by the POSIX library
 +void __mlibc_initLocale();
@@ -171,17 +187,24 @@ index 0000000..ee7a794
 +			__mlibc_stack_data.envp);
 +}
 +
++static void __mlibc_sigentry(uint64_t opaque_ret, int signal) {
++    mlibc::infoLogger() << "mlibc: " << opaque_ret << " " << signal << "\n" << frg::endlog;
++    for (;;);
++}
++
 +extern "C" void __mlibc_entry(int (*main_fn)(int argc, char *argv[], char *env[])) {
++    mlibc::sys_set_sigentry((void *)__mlibc_sigentry);
++
 +	auto result = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
 +	exit(result);
 +}
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..9d62be6
+index 0000000..280a34b
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,439 @@
+@@ -0,0 +1,486 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -192,6 +215,20 @@ index 0000000..9d62be6
 +#include <asm/ioctls.h>
 +
 +#define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
++
++static bool __mlibc_eintr_handler(uint64_t errno) {
++    if ((int)errno != EINTR) {
++        return false;
++    }
++
++    int signal = errno >> 32;
++
++    mlibc::infoLogger() << "mlibc: signal dispatch stub (signal: " << signal << ")\n" << frg::endlog;
++
++    mlibc::sys_unblock_signals();
++
++    for (;;);
++}
 +
 +struct __syscall_ret {
 +    uint64_t ret;
@@ -224,6 +261,33 @@ index 0000000..9d62be6
 +void sys_exit(int status) {
 +    __syscall(15, status);
 +    __builtin_unreachable();
++}
++
++int sys_kill(pid_t pid, int signal) {
++    __syscall_ret ret = __syscall(26, pid, signal);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
++int sys_set_sigentry(void *sigentry) {
++    __syscall_ret ret = __syscall(27, sigentry);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
++int sys_unblock_signals() {
++    __syscall_ret ret = __syscall(28);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
 +}
 +
 +int sys_tcgetattr(int fd, struct termios *attr) {
@@ -611,10 +675,16 @@ index 0000000..9d62be6
 +}
 +
 +int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) {
++again:
 +    __syscall_ret ret = __syscall(16, pid, status, flags);
 +
-+    if (ret.errno != 0)
++    if (ret.errno != 0) {
++        if (__mlibc_eintr_handler(ret.errno)) {
++            goto again;
++        }
++
 +        return ret.errno;
++    }
 +
 +    *ret_pid = (pid_t)ret.ret;
 +    return 0;
