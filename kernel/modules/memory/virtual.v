@@ -64,7 +64,7 @@ pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 		if pte_p[0] & 1 == 0 {
 			return none
 		}
-		return (pte_p[0] & ~u64(0xfff)) & ~(u64(1) << 63)
+		return pte_p[0] & ~u64(0xfff)
 	}
 }
 

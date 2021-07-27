@@ -5,7 +5,6 @@ import memory
 import katomic
 import cpu.local as cpulocal
 import cpu.initialisation as cpuinit
-import lib
 
 __global (
 	bsp_lapic_id = u32(0)
@@ -22,7 +21,7 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 	bsp_lapic_id = smp_tag.bsp_lapic_id
 
 	for i := u64(0); i < smp_tag.cpu_count; i++ {
-		mut cpu_local := &cpulocal.Local(u64(memory.pmm_alloc(lib.div_roundup(sizeof(cpulocal.Local), page_size))) + higher_half)
+		mut cpu_local := &cpulocal.Local(memory.malloc(sizeof(cpulocal.Local)))
 		cpu_locals << cpu_local
 
 		mut smp_info := unsafe { &smp_info_array[i] }

@@ -7,7 +7,6 @@ import katomic
 
 fn C.printf_panic(charptr, ...voidptr)
 
-[noreturn]
 pub fn kpanic(message charptr) {
 	asm volatile amd64 {
 		cli
@@ -26,5 +25,4 @@ pub fn kpanic(message charptr) {
 			hlt
 		}
 	}
-	for {}
 }

@@ -12,12 +12,12 @@ __global (
 	free_pages u64
 )
 
-pub fn print_free(s charptr) {
+pub fn print_free() {
 	pmm_lock.acquire()
 	defer {
 		pmm_lock.release()
 	}
-	C.printf(c'pmm: Free pages: %llu (%s)\n', free_pages, s)
+	C.printf(c'pmm: Free pages: %llu\n', free_pages)
 }
 
 pub fn pmm_init(memmap &stivale2.MemmapTag) {
@@ -72,7 +72,7 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 		}
 	}
 
-	print_free(c'')
+	print_free()
 }
 
 fn inner_alloc(count u64, limit u64) voidptr {
@@ -143,84 +143,63 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	free_pages += count
 }
 
-__global (
-	kernel_alloc_base = u64(0xfffff00000000000)
-	kernel_alloc_spacing = u64(0x1000000)
-)
+struct MallocMetadata {
+mut:
+	pages u64
+	size  u64
+}
 
 pub fn free(ptr voidptr) {
-	realloc(ptr, 0)
+	if ptr == voidptr(0) {
+		return
+	}
+
+	metadata := &MallocMetadata(u64(ptr) - page_size)
+
+	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
 
 pub fn malloc(size u64) voidptr {
-	return realloc(voidptr(0), size)
-}
+	page_count := lib.div_roundup(size, page_size)
 
-pub fn realloc(ptr voidptr, new_size u64) voidptr {
-	if vmm_initialised == false {
-		lib.kpanic(c'realloc: No realloc() before VMM')
-	}
+	ptr := pmm_alloc(page_count + 1)
 
-	if new_size > (kernel_alloc_spacing - page_size) {
-		lib.kpanic(c'realloc: Allocation too large')
-	}
-
-	new_page_count := lib.div_roundup(new_size, page_size)
-
-	virt_base := if ptr == 0 {
-		if new_size == 0 {
-			return 0
-		}
-		new_virt_base := kernel_alloc_base
-		kernel_alloc_base += kernel_alloc_spacing
-		new_virt_base
-	} else {
-		u64(ptr)
-	}
-
-	mut old_page_count := u64(0)
-	for p := virt_base; ; old_page_count++ {
-		kernel_pagemap.virt2phys(p) or {
-			break
-		}
-		p += page_size
-	}
-
-	mut pages_diff := i64(new_page_count) - i64(old_page_count)
-
-	if pages_diff < 0 {
-		// Free pages_diff amount of pages starting by the end of this mapping
-		pages_diff = -pages_diff
-		mut cur_page := (virt_base + old_page_count * page_size) - page_size
-		for i := i64(0); i < pages_diff; i++ {
-			mut pte := kernel_pagemap.virt2pte(cur_page, false) or {
-				lib.kpanic(c'realloc: virt2pte() failure (2)')
-			}
-			if unsafe { pte[0] } & 1 == 0 {
-				lib.kpanic(c'realloc: A page that should be mapped is not')
-			}
-			phys := (unsafe { pte[0] } & ~u64(0xfff)) & ~(u64(1) << 63)
-			pmm_free(voidptr(phys), 1)
-			unsafe { pte[0] = 0 }
-			cur_page -= page_size
-		}
-		tlb_shootdown()
-	} else if pages_diff > 0 {
-		// Allocate pages_diff amount of pages starting by the end of this mapping
-		mut cur_page := virt_base + old_page_count * page_size
-		for i := i64(0); i < pages_diff; i++ {
-			phys := pmm_alloc(1)
-			kernel_pagemap.map_page(cur_page, phys, 0x03) or {
-				lib.kpanic(c'realloc: map_page() failure')
-			}
-			cur_page += page_size
-		}
-	}
-
-	// Check if we acted as free()
-	if new_size == 0 {
+	if ptr == 0 {
 		return 0
 	}
 
-	return voidptr(virt_base)
+	mut metadata := &MallocMetadata(u64(ptr) + higher_half)
+
+	metadata.pages = page_count
+	metadata.size = size
+
+	return voidptr(u64(ptr) + higher_half + page_size)
+}
+
+pub fn realloc(ptr voidptr, new_size u64) voidptr {
+	if ptr == 0 {
+		return malloc(new_size)
+	}
+
+	mut metadata := &MallocMetadata(u64(ptr) - page_size)
+
+	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
+		metadata.size = new_size
+		return ptr
+	}
+
+	new_ptr := unsafe { C.malloc(new_size) }
+	if new_ptr == 0 {
+		return 0
+	}
+
+	if metadata.size > new_size {
+		unsafe { C.memcpy(new_ptr, ptr, new_size) }
+	} else {
+		unsafe { C.memcpy(new_ptr, ptr, metadata.size) }
+	}
+
+	C.free(ptr)
+
+	return new_ptr
 }
