@@ -56,6 +56,35 @@ pub const sigrtmin = 32
 pub const sigrtmax = 33
 pub const sigcancel = 34
 
+pub const sig_err = voidptr(-1)
+pub const sig_dfl = voidptr(-2)
+pub const sig_ign = voidptr(-3)
+
+pub const sa_nocldstop = 1 << 0
+pub const sa_onstack = 1 << 1
+pub const sa_resethand = 1 << 2
+pub const sa_restart = 1 << 3
+pub const sa_siginfo = 1 << 4
+pub const sa_nocldwait = 1 << 5
+pub const sa_nodefer = 1 << 6
+
+union SigVal {
+	sival_int int
+	sival_ptr voidptr
+}
+
+pub struct SigInfo {
+pub mut:
+	si_signo int
+	si_code int
+	si_errno int
+	si_pid int
+	si_uid int
+	si_addr voidptr
+	si_status int
+	si_value SigVal
+}
+
 pub fn syscall_set_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: set_sigentry(0x%llx)\n', sigentry)
 	defer {
@@ -69,30 +98,52 @@ pub fn syscall_set_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
-	mut thread := unsafe { proc.current_thread() }
+pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: sigaction(%d, 0x%llx, 0x%llx)\n',
+			 signum, voidptr(act), voidptr(oldact))
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
 
-	mut s := katomic.load(thread.masked_signals)
+	mut thread := proc.current_thread()
+
+	if voidptr(oldact) != voidptr(0) {
+		unsafe { oldact[0] = thread.sigactions[signum] }
+	}
+
+	if voidptr(act) != voidptr(0) {
+		unsafe { thread.sigactions[signum] = act[0]	}
+	}
+
+	return 0, 0
+}
+
+pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n',
+			 how, voidptr(set), voidptr(oldset))
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut thread := proc.current_thread()
 
 	if voidptr(oldset) != voidptr(0) {
-		unsafe { oldset[0] = s }
+		unsafe { oldset[0] = thread.masked_signals }
 	}
 
 	if voidptr(set) != voidptr(0) {
 		match how {
 			sig_block {
-				s |= unsafe { set[0] }
+				thread.masked_signals |= unsafe { set[0] }
 			}
 			sig_unblock {
-				s &= ~(unsafe { set[0] })
+				thread.masked_signals &= ~(unsafe { set[0] })
 			}
 			sig_setmask {
-				s = unsafe { set[0] }
+				thread.masked_signals = unsafe { set[0] }
 			}
 			else {}
 		}
-
-		katomic.store(thread.masked_signals, s)
 	}
 
 	return 0, 0
@@ -110,36 +161,61 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	mut which := -1
 
 	for i := byte(0); i < 64; i++ {
-		if katomic.bts(thread.masked_signals, i) == true {
+		if thread.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}
 		if katomic.btr(thread.pending_signals, i) == true {
 			which = i
 			break
 		}
-		katomic.btr(thread.masked_signals, i)
 	}
 
 	if which == -1 {
 		return
 	}
 
-	mut return_context := &cpulocal.GPRState{}
+	sigaction := thread.sigactions[which]
+
+	previous_mask := thread.masked_signals
+
+	thread.masked_signals |= sigaction.sa_mask
+	if sigaction.sa_flags & sa_nodefer == 0 {
+		thread.masked_signals |= u64(1) << which
+	}
+
+	// Respect the redzone
+	thread.gpr_state.rsp -= 128
+	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
+
+	// Return context
+	thread.gpr_state.rsp -= sizeof(cpulocal.GPRState)
+	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
+	mut return_context := &cpulocal.GPRState(thread.gpr_state.rsp)
 
 	unsafe {
 		return_context[0] = context[0]
 		thread.gpr_state = context[0]
 	}
 
+	// Siginfo
+	thread.gpr_state.rsp -= sizeof(SigInfo)
+	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
+	mut siginfo := &SigInfo(thread.gpr_state.rsp)
+
+	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
+	siginfo.si_signo = which
+
+	// Alignment
+	thread.gpr_state.rsp -= 8
+
+	// Common handler will take (which, siginfo, sigaction, ret_context, prev_mask)
 	thread.gpr_state.rip = thread.sigentry
 
-	// Respect the redzone
-	thread.gpr_state.rsp -= 128 + 16
-	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
-	thread.gpr_state.rsp += 8
-
-	thread.gpr_state.rdi = u64(return_context)
-	thread.gpr_state.rsi = u64(which)
+	thread.gpr_state.rdi = u64(which)
+	thread.gpr_state.rsi = u64(siginfo)
+	thread.gpr_state.rdx = sigaction.sa_sigaction
+	thread.gpr_state.rcx = u64(return_context)
+	thread.gpr_state.r8  = previous_mask
 
 	sched.yield(false)
 }

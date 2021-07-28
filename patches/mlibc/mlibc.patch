@@ -1,3 +1,22 @@
+diff --git a/3rdparty/mlibc-orig/abis/mlibc/signal.h b/3rdparty/mlibc-workdir/abis/mlibc/signal.h
+index e1afc76..c9d3226 100644
+--- a/3rdparty/mlibc-orig/abis/mlibc/signal.h
++++ b/3rdparty/mlibc-workdir/abis/mlibc/signal.h
+@@ -105,10 +105,12 @@ struct sigevent {
+ };
+ 
+ struct sigaction {
+-	void (*sa_handler)(int);
++    union {
++    	void (*sa_handler)(int);
++	    void (*sa_sigaction)(int, siginfo_t *, void *);
++	};
+ 	sigset_t sa_mask;
+ 	int sa_flags;
+-	void (*sa_sigaction)(int, siginfo_t *, void *);
+ };
+ 
+ // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/3rdparty/mlibc-orig/meson.build b/3rdparty/mlibc-workdir/meson.build
 index edcd230..18ec107 100644
 --- a/3rdparty/mlibc-orig/meson.build
@@ -149,10 +168,10 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..81bf9ca
+index 0000000..3a67d98
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,56 @@
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
@@ -183,8 +202,22 @@ index 0000000..81bf9ca
 +			__mlibc_stack_data.envp);
 +}
 +
-+static void __mlibc_sigentry(uint64_t opaque_ret, int signal) {
-+    mlibc::infoLogger() << "mlibc: " << opaque_ret << " " << signal << "\n" << frg::endlog;
++static void __mlibc_sigentry(int which, siginfo_t *siginfo,
++                             void (*sa)(int, siginfo_t *, void *),
++                             void *ret_context, sigset_t prev_mask) {
++    switch ((uintptr_t)sa) {
++        // DFL
++        case (uintptr_t)(-2):
++            mlibc::infoLogger() << "mlibc: Unhandled signal " << which << "\n" << frg::endlog;
++            mlibc::sys_libc_panic();
++        // IGN
++        case (uintptr_t)(-3):
++            break;
++        default:
++            sa(which, siginfo, NULL);
++            break;
++    }
++
 +    for (;;);
 +}
 +
@@ -197,10 +230,10 @@ index 0000000..81bf9ca
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..885019d
+index 0000000..0cbd604
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,467 @@
+@@ -0,0 +1,471 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -641,7 +674,11 @@ index 0000000..885019d
 +}
 +
 +int sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    __syscall_ret ret = __syscall(29, signum, act, oldact);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
 +    return 0;
 +}
 +

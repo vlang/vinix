@@ -24,6 +24,13 @@ pub mut:
 	status int
 }
 
+pub struct SigAction {
+pub mut:
+	sa_sigaction voidptr
+	sa_mask u64
+	sa_flags int
+}
+
 pub struct Thread {
 pub mut:
 	is_in_queue bool
@@ -44,6 +51,7 @@ pub mut:
 	exited eventstruct.Event
 	errno u64
 	sigentry u64
+	sigactions [256]SigAction
 	pending_signals u64
 	masked_signals u64
 	enqueued_by_signal bool

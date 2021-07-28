@@ -354,6 +354,11 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		stacks: stacks
 	}
 
+	// Set all sigactions to default
+	for mut sa in thread.sigactions {
+		sa.sa_sigaction = voidptr(-2)
+	}
+
 	if want_elf == true {
 		unsafe {
 			stack_top := stack
