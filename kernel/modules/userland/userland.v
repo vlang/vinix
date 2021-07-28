@@ -98,6 +98,20 @@ pub fn syscall_set_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
+[noreturn]
+pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
+	mut thread := unsafe { proc.current_thread() }
+
+	asm volatile amd64 { cli }
+
+	thread.gpr_state = unsafe { context[0] }
+	thread.masked_signals = old_mask
+
+	sched.yield(false)
+
+	for {}
+}
+
 pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: sigaction(%d, 0x%llx, 0x%llx)\n',
 			 signum, voidptr(act), voidptr(oldact))
@@ -112,7 +126,7 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 	}
 
 	if voidptr(act) != voidptr(0) {
-		unsafe { thread.sigactions[signum] = act[0]	}
+		unsafe { thread.sigactions[signum] = act[0] }
 	}
 
 	return 0, 0

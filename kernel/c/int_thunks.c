@@ -32,6 +32,7 @@ extern char userland__syscall_kill[];
 extern char userland__syscall_set_sigentry[];
 extern char userland__syscall_sigprocmask[];
 extern char userland__syscall_sigaction[];
+extern char userland__syscall_sigreturn[];
 
 __attribute__((used)) void *syscall_table[] = {
     kprint__syscall_kprint, // 0
@@ -64,6 +65,7 @@ __attribute__((used)) void *syscall_table[] = {
     userland__syscall_set_sigentry, // 27
     userland__syscall_sigprocmask, // 28
     userland__syscall_sigaction, // 29
+    userland__syscall_sigreturn, // 30
 };
 
 extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_storage[];

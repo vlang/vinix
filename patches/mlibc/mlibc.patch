@@ -130,14 +130,23 @@ index 0488309..a9c8177 100644
 +
  #endif // _MLIBC_INTERNAL_TYPES_H
 diff --git a/3rdparty/mlibc-orig/options/internal/include/mlibc/internal-sysdeps.hpp b/3rdparty/mlibc-workdir/options/internal/include/mlibc/internal-sysdeps.hpp
-index 0bd4a05..7f86b7e 100644
+index 0bd4a05..d2a1e9a 100644
 --- a/3rdparty/mlibc-orig/options/internal/include/mlibc/internal-sysdeps.hpp
 +++ b/3rdparty/mlibc-workdir/options/internal/include/mlibc/internal-sysdeps.hpp
-@@ -35,6 +35,8 @@ int sys_close(int fd);
+@@ -9,6 +9,7 @@
+ #include <bits/ssize_t.h>
+ #include <abi-bits/stat.h>
+ #include <mlibc/fsfd_target.hpp>
++#include <bits/posix/posix_signal.h>
+ 
+ namespace [[gnu::visibility("hidden")]] mlibc {
+ 
+@@ -35,6 +36,9 @@ int sys_close(int fd);
  int sys_vm_map(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window);
  int sys_vm_unmap(void *pointer, size_t size);
  
-+int sys_set_sigentry(void *pointer);
++int sys_sigentry(void *pointer);
++[[noreturn]] int sys_sigreturn(void *context, sigset_t old_mask);
 +
  } //namespace mlibc
  
@@ -168,10 +177,10 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..3a67d98
+index 0000000..ebfa71d
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,58 @@
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
@@ -218,11 +227,13 @@ index 0000000..3a67d98
 +            break;
 +    }
 +
-+    for (;;);
++    mlibc::sys_sigreturn(ret_context, prev_mask);
++
++    __builtin_unreachable();
 +}
 +
 +extern "C" void __mlibc_entry(int (*main_fn)(int argc, char *argv[], char *env[])) {
-+    mlibc::sys_set_sigentry((void *)__mlibc_sigentry);
++    mlibc::sys_sigentry((void *)__mlibc_sigentry);
 +
 +	auto result = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
 +	exit(result);
@@ -230,10 +241,10 @@ index 0000000..3a67d98
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..0cbd604
+index 0000000..6587465
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,471 @@
+@@ -0,0 +1,478 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -271,6 +282,7 @@ index 0000000..0cbd604
 +void sys_libc_panic() {
 +    sys_libc_log("\nMLIBC PANIC\n");
 +    sys_exit(1);
++    __builtin_unreachable();
 +}
 +
 +void sys_exit(int status) {
@@ -280,15 +292,6 @@ index 0000000..0cbd604
 +
 +int sys_kill(pid_t pid, int signal) {
 +    __syscall_ret ret = __syscall(26, pid, signal);
-+
-+    if (ret.errno != 0)
-+        return ret.errno;
-+
-+    return 0;
-+}
-+
-+int sys_set_sigentry(void *sigentry) {
-+    __syscall_ret ret = __syscall(27, sigentry);
 +
 +    if (ret.errno != 0)
 +        return ret.errno;
@@ -664,6 +667,15 @@ index 0000000..0cbd604
 +    return 0;
 +}
 +
++int sys_sigentry(void *sigentry) {
++    __syscall_ret ret = __syscall(27, sigentry);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
 +int sys_sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict retrieve) {
 +    __syscall_ret ret = __syscall(28, how, set, retrieve);
 +
@@ -680,6 +692,12 @@ index 0000000..0cbd604
 +        return ret.errno;
 +
 +    return 0;
++}
++
++int sys_sigreturn(void *context, sigset_t old_mask) {
++    __syscall_ret ret = __syscall(30, context, old_mask);
++
++    __builtin_unreachable();
 +}
 +
 +int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
