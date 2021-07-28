@@ -111,15 +111,14 @@ index 0488309..a9c8177 100644
 +
  #endif // _MLIBC_INTERNAL_TYPES_H
 diff --git a/3rdparty/mlibc-orig/options/internal/include/mlibc/internal-sysdeps.hpp b/3rdparty/mlibc-workdir/options/internal/include/mlibc/internal-sysdeps.hpp
-index 0bd4a05..46dbff5 100644
+index 0bd4a05..7f86b7e 100644
 --- a/3rdparty/mlibc-orig/options/internal/include/mlibc/internal-sysdeps.hpp
 +++ b/3rdparty/mlibc-workdir/options/internal/include/mlibc/internal-sysdeps.hpp
-@@ -35,6 +35,9 @@ int sys_close(int fd);
+@@ -35,6 +35,8 @@ int sys_close(int fd);
  int sys_vm_map(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window);
  int sys_vm_unmap(void *pointer, size_t size);
  
 +int sys_set_sigentry(void *pointer);
-+int sys_unblock_signals();
 +
  } //namespace mlibc
  
@@ -139,24 +138,21 @@ index 41d4248..f246d1d 100644
  #define TIOCGWINSZ 0x5413
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
-index 0000000..0a0a4a0
+index 0000000..06ab8a7
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
-@@ -0,0 +1,7 @@
-+
+@@ -0,0 +1,5 @@
 +.section .text
 +.global _start
 +_start:
 +    mov $main, %rdi
 +    call __mlibc_entry
-+
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..95e9b50
+index 0000000..81bf9ca
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,43 @@
-+
+@@ -0,0 +1,42 @@
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
@@ -201,10 +197,10 @@ index 0000000..95e9b50
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..f5e7b80
+index 0000000..885019d
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,472 @@
+@@ -0,0 +1,467 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -260,15 +256,6 @@ index 0000000..f5e7b80
 +
 +int sys_set_sigentry(void *sigentry) {
 +    __syscall_ret ret = __syscall(27, sigentry);
-+
-+    if (ret.errno != 0)
-+        return ret.errno;
-+
-+    return 0;
-+}
-+
-+int sys_unblock_signals() {
-+    __syscall_ret ret = __syscall(28);
 +
 +    if (ret.errno != 0)
 +        return ret.errno;
@@ -645,8 +632,12 @@ index 0000000..f5e7b80
 +}
 +
 +int sys_sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict retrieve) {
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+    return ENOSYS;
++    __syscall_ret ret = __syscall(28, how, set, retrieve);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
 +}
 +
 +int sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {

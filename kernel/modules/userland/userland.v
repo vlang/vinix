@@ -16,6 +16,10 @@ import lib
 
 pub const wnohang = 2
 
+pub const sig_block = 1
+pub const sig_unblock = 2
+pub const sig_setmask = 3
+
 pub const sighup = 1
 pub const sigint = 2
 pub const sigquit = 3
@@ -65,13 +69,31 @@ pub fn syscall_set_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_unblock_signals(_ voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: unblock_signals()\n')
-	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
+	mut thread := unsafe { proc.current_thread() }
+
+	mut s := katomic.load(thread.masked_signals)
+
+	if voidptr(oldset) != voidptr(0) {
+		unsafe { oldset[0] = s }
 	}
 
-	//katomic.store(proc.current_thread().pending_signal, u64(0))
+	if voidptr(set) != voidptr(0) {
+		match how {
+			sig_block {
+				s |= unsafe { set[0] }
+			}
+			sig_unblock {
+				s &= ~(unsafe { set[0] })
+			}
+			sig_setmask {
+				s = unsafe { set[0] }
+			}
+			else {}
+		}
+
+		katomic.store(thread.masked_signals, s)
+	}
 
 	return 0, 0
 }
@@ -217,7 +239,6 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	mut which := u64(0)
 	block := options & wnohang == 0
 	event.await(events, &which, block) or {
-		C.printf(c'\nwaitpid interrupted\n')
 		return -1, errno.eintr
 	}
 
