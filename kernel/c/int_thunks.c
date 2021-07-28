@@ -29,7 +29,7 @@ extern char futex__syscall_futex_wait[];
 extern char futex__syscall_futex_wake[];
 extern char fs__syscall_getcwd[];
 extern char userland__syscall_kill[];
-extern char userland__syscall_set_sigentry[];
+extern char userland__syscall_sigentry[];
 extern char userland__syscall_sigprocmask[];
 extern char userland__syscall_sigaction[];
 extern char userland__syscall_sigreturn[];
@@ -62,7 +62,7 @@ __attribute__((used)) void *syscall_table[] = {
     futex__syscall_futex_wake, // 24
     fs__syscall_getcwd, // 25
     userland__syscall_kill, // 26
-    userland__syscall_set_sigentry, // 27
+    userland__syscall_sigentry, // 27
     userland__syscall_sigprocmask, // 28
     userland__syscall_sigaction, // 29
     userland__syscall_sigreturn, // 30

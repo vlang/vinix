@@ -85,7 +85,7 @@ pub mut:
 	si_value SigVal
 }
 
-pub fn syscall_set_sigentry(_ voidptr, sigentry u64) (u64, u64) {
+pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: set_sigentry(0x%llx)\n', sigentry)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
