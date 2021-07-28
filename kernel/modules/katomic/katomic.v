@@ -1,5 +1,31 @@
 module katomic
 
+pub fn bts<T>(var &T, bit byte) bool {
+	mut ret := false
+	unsafe { asm volatile amd64 {
+		lock
+		bts var, bit
+		; +m (var[0]) as var
+		  =@ccc (ret)
+		; r (u16(bit)) as bit
+		; memory
+	} }
+	return ret
+}
+
+pub fn btr<T>(var &T, bit byte) bool {
+	mut ret := false
+	unsafe { asm volatile amd64 {
+		lock
+		btr var, bit
+		; +m (var[0]) as var
+		  =@ccc (ret)
+		; r (u16(bit)) as bit
+		; memory
+	} }
+	return ret
+}
+
 pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 	mut ret := false
 	mut here := unsafe { _here }

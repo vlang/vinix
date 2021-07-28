@@ -81,7 +81,10 @@ fn (mut this Pipe) read(buf voidptr, loc u64, _count u64) ?i64 {
 		// We don't do nonblock yet
 		this.l.release()
 		mut which := u64(0)
-		event.await([&this.event], &which, true)
+		event.await([&this.event], &which, true) or {
+			errno.set(errno.eintr)
+			return none
+		}
 		this.l.acquire()
 	}
 
@@ -132,7 +135,10 @@ fn (mut this Pipe) write(buf voidptr, loc u64, _count u64) ?i64 {
 		// We don't do nonblock yet
 		this.l.release()
 		mut which := u64(0)
-		event.await([&this.event], &which, true)
+		event.await([&this.event], &which, true) or {
+			errno.set(errno.eintr)
+			return none
+		}
 		this.l.acquire()
 	}
 

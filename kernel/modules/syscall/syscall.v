@@ -1,6 +1,17 @@
 module syscall
 
 import x86.cpu.local as cpulocal
+import userland
+
+pub fn leave(context &cpulocal.GPRState) {
+	asm volatile amd64 { cli }
+
+	userland.dispatch_a_signal(context)
+}
+
+pub fn enter() {
+	asm volatile amd64 { sti }
+}
 
 [_naked]
 pub fn ud_entry(gpr_state &cpulocal.GPRState) {
@@ -53,8 +64,6 @@ pub fn ud_entry(gpr_state &cpulocal.GPRState) {
 [_naked]
 fn sysenter_entry() {
 	asm volatile amd64 {
-		sti
-
 		push 0x53
 		push r10
 		pushfq
@@ -63,6 +72,22 @@ fn sysenter_entry() {
 		push 0
 
 		cld
+
+		push rdi
+		push rsi
+		push rdx
+		push rcx
+		push r8
+		push r9
+
+		call syscall__enter
+
+		pop r9
+		pop r8
+		pop rcx
+		pop rdx
+		pop rsi
+		pop rdi
 
 		push r15
 		push r14
@@ -89,22 +114,25 @@ fn sysenter_entry() {
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]
 
-		mov r8, rdx
+		mov [rsp + 16], rax
+		mov [rsp + 72], rdx
+
+		mov rdi, rsp
+
+		call syscall__leave
 
 		pop rbx
 		mov ds, ebx
 		pop rbx
 		mov es, ebx
-		// Discard saved RAX
-		add rsp, 8
+		pop rax
 		pop rbx
 		pop rcx
 		pop rdx
 		pop rsi
 		pop rdi
 		pop rbp
-		// Discard saved R8
-		add rsp, 8
+		pop r8
 		pop r9
 		pop rcx
 		pop rdx

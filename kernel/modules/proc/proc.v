@@ -44,7 +44,9 @@ pub mut:
 	exited eventstruct.Event
 	errno u64
 	sigentry u64
-	pending_signal int
+	pending_signals u64
+	masked_signals u64
+	enqueued_by_signal bool
 	stacks []voidptr
 }
 

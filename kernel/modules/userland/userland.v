@@ -71,52 +71,64 @@ pub fn syscall_unblock_signals(_ voidptr) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	katomic.store(proc.current_thread().pending_signal, 0)
+	//katomic.store(proc.current_thread().pending_signal, u64(0))
 
 	return 0, 0
 }
 
-pub fn sendsig(cur_context &cpulocal.GPRState, process &proc.Process, signal int) {
-	if signal > 0 {
-		mut thread := process.threads[0]
+// Dispatch a signal to _self_, this is called from the scheduler, at the
+// end of syscalls, or from exception handlers.
+pub fn dispatch_a_signal(context &cpulocal.GPRState) {
+	mut thread := unsafe { proc.current_thread() }
 
-		mut return_context := &cpulocal.GPRState{}
-
-		if voidptr(thread) == voidptr(proc.current_thread()) {
-			asm volatile amd64 { cli }
-			unsafe {
-				return_context[0] = cur_context[0]
-				thread.gpr_state = cur_context[0]
-			}
-		} else {
-			sched.intercept_thread(thread) or {}
-			unsafe { return_context[0] = thread.gpr_state }
-		}
-
-		if thread.gpr_state.rsp & (u64(1) << 63) == 0 {
-			for katomic.load(thread.pending_signal) != 0 {}
-
-			thread.gpr_state.rip = thread.sigentry
-
-			// Respect the redzone
-			thread.gpr_state.rsp -= 128 + 16
-			thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
-			thread.gpr_state.rsp += 8
-
-			thread.gpr_state.rdi = u64(return_context)
-			thread.gpr_state.rsi = u64(signal)
-		} else {
-			for katomic.cas(thread.pending_signal, 0, signal) == false {}
-		}
-
-		if voidptr(thread) == voidptr(proc.current_thread()) {
-			sched.yield(false)
-		} else {
-			sched.enqueue_thread(thread)
-		}
-	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
+	if context.cs != 0x4b {
+		return
 	}
+
+	mut which := -1
+
+	for i := byte(0); i < 64; i++ {
+		if katomic.bts(thread.masked_signals, i) == true {
+			continue
+		}
+		if katomic.btr(thread.pending_signals, i) == true {
+			which = i
+			break
+		}
+		katomic.btr(thread.masked_signals, i)
+	}
+
+	if which == -1 {
+		return
+	}
+
+	mut return_context := &cpulocal.GPRState{}
+
+	unsafe {
+		return_context[0] = context[0]
+		thread.gpr_state = context[0]
+	}
+
+	thread.gpr_state.rip = thread.sigentry
+
+	// Respect the redzone
+	thread.gpr_state.rsp -= 128 + 16
+	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
+	thread.gpr_state.rsp += 8
+
+	thread.gpr_state.rdi = u64(return_context)
+	thread.gpr_state.rsi = u64(which)
+
+	sched.yield(false)
+}
+
+pub fn sendsig(context &cpulocal.GPRState, _thread &proc.Thread, signal byte) {
+	mut thread := unsafe { _thread }
+
+	katomic.bts(thread.pending_signals, signal)
+
+	// Try to stop an event_await()
+	sched.enqueue_thread(thread, true)
 }
 
 pub fn syscall_kill(cur_context &cpulocal.GPRState, pid int, signal int) (u64, u64) {
@@ -125,7 +137,11 @@ pub fn syscall_kill(cur_context &cpulocal.GPRState, pid int, signal int) (u64, u
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	sendsig(cur_context, processes[pid], signal)
+	if signal > 0 {
+		sendsig(cur_context, processes[pid].threads[0], byte(signal))
+	} else {
+		panic('sendsig: Values of signal <= 0 not supported')
+	}
 
 	return 0, 0
 }
@@ -200,11 +216,9 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 
 	mut which := u64(0)
 	block := options & wnohang == 0
-	katomic.store(current_thread.pending_signal, 0)
-	event.await(events, &which, block)
-
-	if katomic.load(current_thread.pending_signal) != 0 {
-		return 0, (u64(katomic.load(current_thread.pending_signal)) << 32) | errno.eintr
+	event.await(events, &which, block) or {
+		C.printf(c'\nwaitpid interrupted\n')
+		return -1, errno.eintr
 	}
 
 	if which == -1 {
@@ -308,7 +322,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	old_process.children << new_process
 	new_process.threads << new_thread
 
-	sched.enqueue_thread(new_thread)
+	sched.enqueue_thread(new_thread, false)
 
 	return u64(new_process.pid), u64(0)
 }

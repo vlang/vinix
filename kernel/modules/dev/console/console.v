@@ -151,7 +151,7 @@ fn keyboard_handler() {
 
 	for {
 		mut which := u64(0)
-		event.await([&int_events[vect]], &which, true)
+		event.await([&int_events[vect]], &which, true) or {}
 		input_byte := read_ps2()
 
 		if input_byte == 0xe0 {
@@ -360,7 +360,7 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
 
 	for console_read_lock.test_and_acquire() == false {
 		mut which := u64(0)
-		if event.await([&console_event], &which, true) == false {
+		event.await([&console_event], &which, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
@@ -382,7 +382,7 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
 				console_read_lock.release()
 				for {
 					mut which := u64(0)
-					if event.await([&console_event], &which, true) == false {
+					event.await([&console_event], &which, true) or {
 						errno.set(errno.eintr)
 						return none
 					}

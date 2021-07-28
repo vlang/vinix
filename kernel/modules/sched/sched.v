@@ -120,6 +120,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	new_gpr_state := &current_thread.gpr_state
 
 	asm volatile amd64 {
+		mov rdi, new_gpr_state
+		call userland__dispatch_a_signal
 		mov rsp, new_gpr_state
 		pop rax
 		mov ds, eax
@@ -150,12 +152,14 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	panic('We really should not get here')
 }
 
-pub fn enqueue_thread(_thread &proc.Thread) bool {
+pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut thread := unsafe { _thread }
 
 	if thread.is_in_queue == true {
 		return true
 	}
+
+	katomic.store(thread.enqueued_by_signal, by_signal)
 
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
 		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(0), u64(thread)) {
@@ -292,7 +296,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	}
 
 	if autoenqueue == true {
-		enqueue_thread(thread)
+		enqueue_thread(thread, false)
 	}
 
 	return thread
@@ -414,7 +418,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 	}
 
 	if autoenqueue == true {
-		enqueue_thread(thread)
+		enqueue_thread(thread, false)
 	}
 
 	process.threads << thread

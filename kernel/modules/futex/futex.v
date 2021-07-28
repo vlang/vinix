@@ -43,7 +43,9 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 	futex_lock.release()
 
 	mut which := u64(0)
-	event.await([e], &which, true)
+	event.await([e], &which, true) or {
+		return -1, errno.eintr
+	}
 
 	return 0, 0
 }

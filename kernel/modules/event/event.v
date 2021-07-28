@@ -6,10 +6,12 @@ import katomic
 import eventstruct
 import x86.cpu.local as cpulocal
 
-pub fn await(events []&eventstruct.Event, which &u64, block bool) bool {
+pub fn await(events []&eventstruct.Event, which &u64, block bool) ? {
 	if events.len > 16 {
 		panic('kevent: Too many events!')
 	}
+
+	mut ret := true
 
 	mut thread := proc.current_thread()
 
@@ -38,7 +40,7 @@ pub fn await(events []&eventstruct.Event, which &u64, block bool) bool {
 
 		mut listener := event.get_listener()
 		if listener == 0 {
-			return false
+			panic('listeners exhausted')
 		}
 
 		listener.thread = thread
@@ -59,6 +61,9 @@ pub fn await(events []&eventstruct.Event, which &u64, block bool) bool {
 
 	if thread.event_block_dequeue.test_and_acquire() == true {
 		sched.dequeue_and_yield()
+		if katomic.load(thread.enqueued_by_signal) == true {
+			ret = false
+		}
 	}
 
 unarm_listeners:
@@ -68,7 +73,9 @@ unarm_listeners:
 		listener.l.release()
 	}
 
-	return true
+	if ret == false {
+		return error('')
+	}
 }
 
 pub fn trigger(event &eventstruct.Event, enqueue bool) u64 {
@@ -111,7 +118,7 @@ pub fn trigger(event &eventstruct.Event, enqueue bool) u64 {
 			for katomic.load(thread.is_in_queue) == true {}
 		}
 
-		sched.enqueue_thread(thread)
+		sched.enqueue_thread(thread, false)
 		ret++
 
 		listener.l.release()
@@ -142,7 +149,7 @@ pub fn pthread_exit(ret voidptr) {
 
 pub fn pthread_wait(thread &proc.Thread) voidptr {
 	mut which := u64(0)
-	await([&thread.exited], &which, true)
+	await([&thread.exited], &which, true) or {}
 	exit_value := thread.exit_value
 	unsafe { free(thread) }
 	return exit_value
