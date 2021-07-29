@@ -349,6 +349,40 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64)
 	return 0, 0
 }
 
+pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limit u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: readlinkat(%d, %s, 0x%llx 0x%llx)\n', dirfd, _path, buf, limit)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
+
+	parent := get_parent_dir(dirfd, path) or {
+		return -1, errno.get()
+	}
+
+	node := get_node(parent, path, false) or {
+		return -1, errno.get()
+	}
+
+	if stat.islnk(node.resource.stat.mode) == false {
+		return -1, errno.einval
+	}
+
+	mut to_copy := u64(node.symlink_target.len)
+	if to_copy > limit {
+		to_copy = limit
+	}
+
+	unsafe { C.memcpy(buf, node.symlink_target.str, to_copy) }
+
+	return to_copy, 0
+}
+
 pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags, mode)
 	defer {

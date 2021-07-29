@@ -250,10 +250,10 @@ index 0000000..53ea0e9
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..cae73f7
+index 0000000..925eae0
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,476 @@
+@@ -0,0 +1,487 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -462,6 +462,17 @@ index 0000000..cae73f7
 +    }
 +
 +    *bytes_written = (ssize_t)ret.ret;
++    return 0;
++}
++
++int sys_readlink(const char *path, void *data, size_t max_size, ssize_t *length) {
++    __syscall_ret ret = __syscall(33, AT_FDCWD, path, data, max_size);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *length = (ssize_t)ret.ret;
 +    return 0;
 +}
 +

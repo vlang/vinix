@@ -356,9 +356,7 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
-			pagemap.unmap_page(j) or {
-				return error('')
-			}
+			pagemap.unmap_page(j) or {}
 		}
 
 		if snip_size == local_range.length {
