@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-__attribute__((noreturn)) void lib__kpanic(const char *);
+__attribute__((noreturn)) void lib__kpanic(void *, const char *);
 void *sched__new_kernel_thread(void *, void *, bool);
 void *event__pthread_wait(void *);
 __attribute__((noreturn)) void event__pthread_exit(void *);
@@ -11,7 +11,7 @@ int pthread_create(pthread_t *restrict thread,
                    void *(*start_routine)(void *),
                    void *restrict arg) {
     if (attr != NULL) {
-        lib__kpanic("pthread_create() called with non-NULL attr");
+        lib__kpanic(NULL, "pthread_create() called with non-NULL attr");
     }
 
     void **ptr = (void **)thread;

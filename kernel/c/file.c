@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-__attribute__((noreturn)) void lib__kpanic(const char *);
+__attribute__((noreturn)) void lib__kpanic(void *, const char *);
 void kprint__kprint(const char *);
 
 FILE *stdin  = NULL;
@@ -16,30 +16,30 @@ int fflush(FILE *stream) {
 }
 
 int getchar(void) {
-    lib__kpanic("getchar is a stub");
+    lib__kpanic(NULL, "getchar is a stub");
 }
 
 int getc(FILE *stream) {
     (void)stream;
-    lib__kpanic("getc is a stub");
+    lib__kpanic(NULL, "getc is a stub");
 }
 
 char *fgets(char *str, size_t count, FILE *stream) {
     (void)str;
     (void)count;
     (void)stream;
-    lib__kpanic("fgets is a stub");
+    lib__kpanic(NULL, "fgets is a stub");
 }
 
 FILE *popen(const char *command, const char *type) {
     (void)command;
     (void)type;
-    lib__kpanic("popen is a stub");
+    lib__kpanic(NULL, "popen is a stub");
 }
 
 int pclose(FILE *stream) {
     (void)stream;
-    lib__kpanic("pclose is a stub");
+    lib__kpanic(NULL, "pclose is a stub");
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
@@ -47,7 +47,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
     (void)buf;
     (void)count;
     if (fd != 1 && fd != 2) {
-        lib__kpanic("write to fd != 1 && fd != 2 is a stub");
+        lib__kpanic(NULL, "write to fd != 1 && fd != 2 is a stub");
     }
     kprint__kprint((char *)buf);
     return count;
