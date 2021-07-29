@@ -5,11 +5,12 @@ import event
 import event.eventstruct
 import apic
 import cpu.local as cpulocal
-import cpu
 import syscall
 import memory.mmap
 import katomic
 import lib
+import userland
+import proc
 
 __global (
 	int_events [256]eventstruct.Event
@@ -80,26 +81,28 @@ fn abort_handler() {
 }
 
 fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
-	C.printf_panic(c'\n%s on CPU %d\n',
-			 exception_names[num], cpulocal.current().cpu_number)
-	C.printf_panic(c'Error code: 0x%016llx\n', gpr_state.err)
-	C.printf_panic(c'Register dump:\n')
-	C.printf_panic(c'CS:RIP=%04llx:%016llx\n', gpr_state.cs, gpr_state.rip)
-	C.printf_panic(c'SS:RSP=%04llx:%016llx\n', gpr_state.ss, gpr_state.rsp)
-	C.printf_panic(c'RFLAGS=%08llx       CR2=%016llx\n', gpr_state.rflags, cpu.read_cr2())
-	C.printf_panic(c'RAX=%016llx  RBX=%016llx  RCX=%016llx  RDX=%016llx\n',
-			 gpr_state.rax, gpr_state.rbx, gpr_state.rcx, gpr_state.rdx)
-	C.printf_panic(c'RSI=%016llx  RDI=%016llx  RBP=%016llx  RSP=%016llx\n',
-			 gpr_state.rsi, gpr_state.rdi, gpr_state.rbp, gpr_state.rsp)
-	C.printf_panic(c'R08=%016llx  R09=%016llx  R10=%016llx  R11=%016llx\n',
-			 gpr_state.r8, gpr_state.r9, gpr_state.r10, gpr_state.r11)
-	C.printf_panic(c'R12=%016llx  R13=%016llx  R14=%016llx  R15=%016llx\n',
-			 gpr_state.r12, gpr_state.r13, gpr_state.r14, gpr_state.r15)
-	lib.kpanic(c'Unhandled exception')
+	if gpr_state.cs == 0x4b {
+		mut signal := byte(0)
+
+		match num {
+			13, 14 {
+				signal = userland.sigsegv
+			}
+			else {
+				lib.kpanic(gpr_state, exception_names[num])
+			}
+		}
+
+		userland.sendsig(proc.current_thread(), signal)
+		userland.dispatch_a_signal(gpr_state)
+		userland.syscall_exit(voidptr(0), 128 + signal)
+	} else {
+		lib.kpanic(gpr_state, exception_names[num])
+	}
 }
 
 __global (
-	abort_vector = u8(0)
+	abort_vector = byte(0)
 )
 
 pub fn initialise() {

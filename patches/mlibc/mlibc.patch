@@ -18,9 +18,18 @@ index e1afc76..c9d3226 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/3rdparty/mlibc-orig/meson.build b/3rdparty/mlibc-workdir/meson.build
-index edcd230..18ec107 100644
+index edcd230..8d03d32 100644
 --- a/3rdparty/mlibc-orig/meson.build
 +++ b/3rdparty/mlibc-workdir/meson.build
+@@ -44,7 +44,7 @@ if not headers_only
+ 	add_languages('c', 'cpp')
+ 	c_compiler = meson.get_compiler('c')
+ 
+-	add_project_arguments('-nostdinc', '-fno-builtin', language: ['c', 'cpp'])
++	add_project_arguments('-nostdinc', '-fno-builtin', '-fno-omit-frame-pointer', language: ['c', 'cpp'])
+ 	add_project_arguments('-std=c++20', language: 'cpp')
+ 	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
+ 	add_project_link_arguments('-nostdlib', language: ['c', 'cpp'])
 @@ -102,6 +102,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
@@ -177,7 +186,7 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..ebfa71d
+index 0000000..53ea0e9
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 @@ -0,0 +1,58 @@
@@ -218,7 +227,7 @@ index 0000000..ebfa71d
 +        // DFL
 +        case (uintptr_t)(-2):
 +            mlibc::infoLogger() << "mlibc: Unhandled signal " << which << "\n" << frg::endlog;
-+            mlibc::sys_libc_panic();
++            mlibc::sys_exit(128 + which);
 +        // IGN
 +        case (uintptr_t)(-3):
 +            break;
@@ -241,10 +250,10 @@ index 0000000..ebfa71d
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..6587465
+index 0000000..15c001f
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,478 @@
+@@ -0,0 +1,480 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -483,13 +492,15 @@ index 0000000..6587465
 +}
 +
 +pid_t sys_getpid() {
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+    return 1;
++    __syscall_ret ret = __syscall(31);
++
++    return ret.ret;
 +}
 +
 +pid_t sys_getppid() {
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+    return 0;
++    __syscall_ret ret = __syscall(32);
++
++    return ret.ret;
 +}
 +
 +uid_t sys_getuid() {

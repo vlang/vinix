@@ -108,7 +108,7 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 		pmm_last_used_index = 0
 		ret = inner_alloc(count, last)
 		if ret == 0 {
-			lib.kpanic(c'Out of memory')
+			lib.kpanic(0, c'Out of memory')
 		}
 	}
 

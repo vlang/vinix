@@ -70,7 +70,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// Initialize the memory allocator.
 	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }
 	if memmap_tag == 0 {
-		lib.kpanic(c'Stivale2 memmap tag missing')
+		lib.kpanic(voidptr(0), c'Stivale2 memmap tag missing')
 	}
 
 	memory.pmm_init(memmap_tag)

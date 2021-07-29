@@ -85,8 +85,30 @@ pub mut:
 	si_value SigVal
 }
 
+pub fn syscall_getpid(_ voidptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: getpid()\n')
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut thread := unsafe { proc.current_thread() }
+
+	return u64(thread.process.pid), 0
+}
+
+pub fn syscall_getppid(_ voidptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: getppid()\n')
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut thread := unsafe { proc.current_thread() }
+
+	return u64(thread.process.ppid), 0
+}
+
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: set_sigentry(0x%llx)\n', sigentry)
+	C.printf(c'\n\e[32mstrace\e[m: sigentry(0x%llx)\n', sigentry)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -117,6 +139,10 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 			 signum, voidptr(act), voidptr(oldact))
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
+		return -1, errno.einval
 	}
 
 	mut thread := proc.current_thread()
@@ -169,6 +195,10 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	mut thread := unsafe { proc.current_thread() }
 
 	if context.cs != 0x4b {
+		return
+	}
+
+	if thread.sigentry == 0 {
 		return
 	}
 
@@ -234,7 +264,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	sched.yield(false)
 }
 
-pub fn sendsig(context &cpulocal.GPRState, _thread &proc.Thread, signal byte) {
+pub fn sendsig(_thread &proc.Thread, signal byte) {
 	mut thread := unsafe { _thread }
 
 	katomic.bts(thread.pending_signals, signal)
@@ -243,14 +273,14 @@ pub fn sendsig(context &cpulocal.GPRState, _thread &proc.Thread, signal byte) {
 	sched.enqueue_thread(thread, true)
 }
 
-pub fn syscall_kill(cur_context &cpulocal.GPRState, pid int, signal int) (u64, u64) {
+pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: kill(%d, %d)\n', pid, signal)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
 	if signal > 0 {
-		sendsig(cur_context, processes[pid].threads[0], byte(signal))
+		sendsig(processes[pid].threads[0], byte(signal))
 	} else {
 		panic('sendsig: Values of signal <= 0 not supported')
 	}
@@ -351,6 +381,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	return u64(ret), 0
 }
 
+[noreturn]
 pub fn syscall_exit(_ voidptr, status int) {
 	C.printf(c'\n\e[32mstrace\e[m: exit(%d)\n', status)
 	defer {

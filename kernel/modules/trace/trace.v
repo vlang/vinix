@@ -54,8 +54,6 @@ pub fn stacktrace(_base_ptr u64) {
 		return
 	}
 
-	C.printf_panic(c'Stacktrace:\n')
-
 	for {
 		unsafe {
 			old_bp := (&u64(base_ptr))[0]

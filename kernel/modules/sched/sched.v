@@ -252,6 +252,7 @@ pub fn dequeue_and_yield() {
 	yield(true)
 }
 
+[noreturn]
 pub fn dequeue_and_die() {
 	asm volatile amd64 { cli }
 	mut thread := &proc.Thread(cpulocal.current().current_thread)
@@ -265,6 +266,7 @@ pub fn dequeue_and_die() {
 		free(thread)
 	}
 	yield(false)
+	for {}
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
