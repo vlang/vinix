@@ -61,7 +61,7 @@ pub fn reload() {
 	}
 }
 
-pub fn set_ist(vector u16, ist u8) {
+pub fn set_ist(vector u16, ist byte) {
 	idt_entries[vector].ist = ist
 }
 

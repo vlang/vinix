@@ -56,6 +56,6 @@ pub mut:
 	ino    u64
 	off    u64
 	reclen u16
-	@type  u8
+	@type  byte
 	name   [1024]byte
 }

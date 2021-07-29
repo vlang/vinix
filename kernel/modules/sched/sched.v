@@ -168,7 +168,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 			// Check if any CPU is idle and wake it up
 			for cpu in cpu_locals {
 				if katomic.load(cpu.is_idle) == true {
-					apic.lapic_send_ipi(cpu.lapic_id, scheduler_vector)
+					apic.lapic_send_ipi(byte(cpu.lapic_id), scheduler_vector)
 					break
 				}
 			}
@@ -213,7 +213,7 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 		return
 	}
 
-	apic.lapic_send_ipi(cpu_locals[running_on].lapic_id, scheduler_vector)
+	apic.lapic_send_ipi(byte(cpu_locals[running_on].lapic_id), scheduler_vector)
 
 	thread.l.acquire()
 	thread.l.release()
@@ -234,7 +234,7 @@ pub fn yield(save_ctx bool) {
 		cpu_local.current_thread = voidptr(0)
 	}
 
-	apic.lapic_send_ipi(cpu_local.lapic_id, scheduler_vector)
+	apic.lapic_send_ipi(byte(cpu_local.lapic_id), scheduler_vector)
 
 	asm volatile amd64 { sti }
 

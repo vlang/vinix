@@ -12,16 +12,16 @@ pub:
 [packed]
 struct MADTHeader {
 pub:
-	id     u8
-	length u8
+	id     byte
+	length byte
 }
 
 [packed]
 struct MADTLocalApic {
 pub:
 	header       MADTHeader
-	processor_id u8
-	apic_id      u8
+	processor_id byte
+	apic_id      byte
 	flags        u32
 }
 
@@ -29,8 +29,8 @@ pub:
 struct MADTIoApic {
 pub:
 	header   MADTHeader
-	apic_id  u8
-	reserved u8
+	apic_id  byte
+	reserved byte
 	address  u32
 	gsib     u32
 }
@@ -39,8 +39,8 @@ pub:
 struct MADTISO {
 pub:
 	header     MADTHeader
-	bus_source u8
-	irq_source u8
+	bus_source byte
+	irq_source byte
 	gsi        u32
 	flags      u16
 }
@@ -49,9 +49,9 @@ pub:
 struct MADTNMI {
 pub:
 	header    MADTHeader
-	processor u8
+	processor byte
 	flags     u16
-	lint      u8
+	lint      byte
 }
 
 __global (

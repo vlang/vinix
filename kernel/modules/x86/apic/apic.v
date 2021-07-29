@@ -65,7 +65,7 @@ pub fn lapic_timer_calibrate() {
 	lapic_timer_stop()
 }
 
-pub fn lapic_timer_oneshot(vec u8, us u64) {
+pub fn lapic_timer_oneshot(vec byte, us u64) {
 	lapic_timer_stop()
 
 	cpu_local := cpulocal.current()
@@ -77,7 +77,7 @@ pub fn lapic_timer_oneshot(vec u8, us u64) {
 	lapic_write(lapic_reg_timer_initcnt, u32(ticks))
 }
 
-pub fn lapic_enable(spurious_vect u8) {
+pub fn lapic_enable(spurious_vect byte) {
 	lapic_write(lapic_reg_spurious, lapic_read(lapic_reg_spurious) | (1 << 8) | spurious_vect)
 }
 
@@ -85,7 +85,7 @@ pub fn lapic_eoi() {
 	lapic_write(lapic_reg_eoi, 0)
 }
 
-pub fn lapic_send_ipi(lapic_id u8, vector u8) {
+pub fn lapic_send_ipi(lapic_id byte, vector byte) {
 	lapic_write(lapic_reg_icr1, u32(lapic_id) << 24)
 	lapic_write(lapic_reg_icr0, vector)
 }
@@ -116,7 +116,7 @@ fn io_apic_from_gsi(gsi u32) int {
 	panic('Cannot determine IO APIC from GSI')
 }
 
-pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, status bool) {
+pub fn io_apic_set_gsi_redirect(lapic_id u32, vector byte, gsi u32, flags u16, status bool) {
 	io_apic := io_apic_from_gsi(gsi)
 
 	mut redirect := u64(vector)
@@ -141,7 +141,7 @@ pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, sta
 	io_apic_write(io_apic, ioredtbl + 1, u32(redirect >> 32))
 }
 
-pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
+pub fn io_apic_set_irq_redirect(lapic_id u32, vector byte, irq byte, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {
 			if status { print('apic: IRQ $irq using override\n') }

@@ -646,7 +646,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 				ino: node.resource.stat.ino
 				off: i++
 				reclen: u16(sizeof(stat.Dirent))
-				@type: t
+				@type: byte(t)
 			}
 			C.strcpy(&new_dirent.name[0], name.str)
 			dir_handle.dirlist << new_dirent
