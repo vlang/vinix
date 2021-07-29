@@ -55,18 +55,6 @@ const exception_names = [
     c'Security'
 ]
 
-fn ud_handler(num u32, _gpr_state &cpulocal.GPRState) {
-	mut gpr_state := unsafe { _gpr_state }
-	insn := &u16(gpr_state.rip)
-	if unsafe { insn[0] } == 0x340f {
-		// This is sysenter
-		gpr_state.rip += 2
-		syscall.ud_entry(gpr_state)
-	} else {
-		exception_handler(num, gpr_state)
-	}
-}
-
 fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
 	mmap.pf_handler(gpr_state) or {
 		exception_handler(num, gpr_state)
@@ -103,32 +91,30 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 
 __global (
 	abort_vector = byte(0)
+	syscall_vector = byte(0xf0)
 )
 
 pub fn initialise() {
 	for i := u16(0); i < 32; i++ {
-		idt.register_handler(i, interrupt_thunks[i])
 		match i {
-			6 { // Invalid opcode
-				interrupt_table[i] = voidptr(ud_handler)
-				idt.set_ist(i, 2)
-			}
 			14 { // Page fault
+				idt.register_handler(i, interrupt_thunks[i], 3, 0x8e)
 				interrupt_table[i] = voidptr(pf_handler)
-				idt.set_ist(i, 3)
 			}
 			else {
+				idt.register_handler(i, interrupt_thunks[i], 0, 0x8e)
 				interrupt_table[i] = voidptr(exception_handler)
 			}
 		}
 	}
 
 	for i := u16(32); i < 256; i++ {
-		idt.register_handler(i, interrupt_thunks[i])
+		idt.register_handler(i, interrupt_thunks[i], 0, 0x8e)
 		interrupt_table[i] = voidptr(generic_isr)
 	}
 
 	abort_vector = idt.allocate_vector()
-	idt.register_handler(abort_vector, voidptr(abort_handler))
-	idt.set_ist(abort_vector, 4)
+	idt.register_handler(abort_vector, voidptr(abort_handler), 4, 0x8e)
+
+	idt.register_handler(syscall_vector, voidptr(syscall.syscall_entry), 2, 0xee)
 }

@@ -19,6 +19,15 @@ pub fn initialise() {
 	serial_lock.release()
 }
 
+pub fn panic_out(value byte) {
+	if value == `\n` {
+		for kio.port_in<byte>(0x3f8 + 5) & 0x20 == 0 {}
+		kio.port_out<byte>(0x3f8, `\r`)
+	}
+	for kio.port_in<byte>(0x3f8 + 5) & 0x20 == 0 {}
+	kio.port_out<byte>(0x3f8, value)
+}
+
 pub fn out(value byte) {
 	serial_lock.acquire()
 	if value == `\n` {

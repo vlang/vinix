@@ -250,10 +250,10 @@ index 0000000..53ea0e9
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..15c001f
+index 0000000..cae73f7
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,480 @@
+@@ -0,0 +1,476 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -273,11 +273,7 @@ index 0000000..15c001f
 +__attribute__((naked))
 +static __syscall_ret __syscall(int number, ...) {
 +    asm (
-+        "mov %rsp, %r10\n\t"
-+        "lea 1f(%rip), %r11\n\t"
-+        "sysenter\n\t"
-+        "1:\n\t"
-+        "mov %r8, %rdx\n\t"
++        "int $0xf0\n\t"
 +        "ret"
 +    );
 +}

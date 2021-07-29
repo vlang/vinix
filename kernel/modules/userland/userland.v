@@ -446,20 +446,34 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 
 	stack_size := u64(65536)
 
+	mut stacks := []voidptr{}
+
+	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stacks << kernel_stack_phys
+	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
+
+	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stacks << pf_stack_phys
+	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
+
 	mut new_thread := &proc.Thread{
 		gpr_state: gpr_state
 		process: new_process
 		timeslice: old_thread.timeslice
 		gs_base: old_thread.gs_base
 		fs_base: old_thread.fs_base
-		kernel_stack: u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
-		pf_stack: u64(memory.pmm_alloc(stack_size / page_size)) + stack_size + higher_half
+		kernel_stack: kernel_stack
+		pf_stack: pf_stack
 		running_on: u64(-1)
 		cr3: u64(new_process.pagemap.top_level)
+		sigentry: old_thread.sigentry
+		sigactions: old_thread.sigactions
+		masked_signals: old_thread.masked_signals
+		stacks: stacks
 	}
 
 	new_thread.gpr_state.rax = u64(0)
-	new_thread.gpr_state.r8 = u64(0)
+	new_thread.gpr_state.rdx = u64(0)
 
 	old_process.children << new_process
 	new_process.threads << new_thread

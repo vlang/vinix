@@ -25,7 +25,6 @@ pub fn initialise() {
 	println('sched: Scheduler interrupt vector is 0x${scheduler_vector:x}')
 
 	interrupt_table[scheduler_vector] = voidptr(scheduler_isr)
-
 	idt.set_ist(scheduler_vector, 1)
 
 	kernel_process = &proc.Process{pagemap: &kernel_pagemap}

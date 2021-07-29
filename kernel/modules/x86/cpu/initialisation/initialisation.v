@@ -2,7 +2,6 @@ module initialisation
 
 import gdt
 import idt
-import syscall
 import cpu
 import local as cpulocal
 import stivale2
@@ -10,7 +9,6 @@ import apic
 import katomic
 import sched
 import memory
-import msr
 
 pub fn initialise(smp_info &stivale2.SMPInfo) {
 	mut cpu_local := &cpulocal.Local(smp_info.extra_arg)
@@ -40,14 +38,6 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	}
 
 	kernel_pagemap.switch_to()
-
-	success, _, _, _, d = cpu.cpuid(1, 0)
-	if success == true && d & (1 << 11) != 0 {
-		msr.wrmsr(0x174, kernel_code_seg)
-		msr.wrmsr(0x176, u64(voidptr(syscall.sysenter_entry)))
-	} else {
-		panic('This CPU does not support SEP. Vinix requires SEP to run.')
-	}
 
 	unsafe {
 		stack_size := u64(8192)

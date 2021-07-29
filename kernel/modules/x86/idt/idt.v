@@ -29,6 +29,9 @@ __global (
 
 pub fn allocate_vector() byte {
 	idt_lock.acquire()
+	if idt_free_vector == 0xf0 {
+		panic('IDT exhausted')
+	}
 	ret := idt_free_vector++
 	idt_lock.release()
 	return ret
@@ -65,14 +68,14 @@ pub fn set_ist(vector u16, ist byte) {
 	idt_entries[vector].ist = ist
 }
 
-pub fn register_handler(vector u16, handler voidptr) {
+pub fn register_handler(vector u16, handler voidptr, ist byte, flags byte) {
 	address := u64(handler)
 
 	idt_entries[vector] = IDTEntry{
 		offset_low: u16(address)
 		selector: kernel_code_seg
-		ist: 0
-		flags: 0x8e
+		ist: ist
+		flags: flags
 		offset_mid: u16(address >> 16)
 		offset_hi: u32(address >> 32)
 		reserved: 0

@@ -37,6 +37,7 @@
 
 
 void serial__out(char);
+void serial__panic_out(char);
 void stivale2__terminal_print(const char *, uint64_t);
 
 void _putchar(char character) {
@@ -47,7 +48,7 @@ void _putchar(char character) {
 
 void _putchar_panic(char character) {
 #ifndef PROD
-  serial__out(character);
+  serial__panic_out(character);
 #endif
   stivale2__terminal_print(&character, 1);
 }

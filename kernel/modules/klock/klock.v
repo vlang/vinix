@@ -21,9 +21,9 @@ pub fn (mut l Lock) acquire() {
 		asm volatile amd64 { pause ;;; memory }
 	}
 
-	C.printf(c'Lock address:   0x%llx\n', voidptr(l))
-	C.printf(c'Current caller: 0x%llx\n', caller)
-	C.printf(c'Last caller:    0x%llx\n', l.caller)
+	C.printf_panic(c'Lock address:   0x%llx\n', voidptr(l))
+	C.printf_panic(c'Current caller: 0x%llx\n', caller)
+	C.printf_panic(c'Last caller:    0x%llx\n', l.caller)
 	panic('Deadlock detected')
 }
 
