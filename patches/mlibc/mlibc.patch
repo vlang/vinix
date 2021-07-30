@@ -250,10 +250,10 @@ index 0000000..53ea0e9
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..925eae0
+index 0000000..85bc1cd
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,487 @@
+@@ -0,0 +1,497 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -473,6 +473,16 @@ index 0000000..925eae0
 +    }
 +
 +    *length = (ssize_t)ret.ret;
++    return 0;
++}
++
++int sys_unlinkat(int fd, const char *path, int flags) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
++
++int sys_rmdir(const char *path) {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
 +    return 0;
 +}
 +

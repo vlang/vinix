@@ -38,7 +38,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'mlibc-fb85f87c72820bd9266f18692e168583c892b94f'
     patch-path-strip: 3
-    version: '3.rolling'
+    version: '4.rolling'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -51,19 +51,19 @@ sources:
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://github.com/vlang/v/archive/cb7be87d4e38b41620e8952d19ec9cde51303acb.tar.gz'
+    url: 'https://github.com/vlang/v/archive/7d5b6d2b48c693b59f0a6b9f02fcb545621b7beb.tar.gz'
     format: 'tar.gz'
-    extract_path: 'v-cb7be87d4e38b41620e8952d19ec9cde51303acb'
+    extract_path: 'v-7d5b6d2b48c693b59f0a6b9f02fcb545621b7beb'
     patch-path-strip: 3
-    version: '2.rolling'
+    version: '3.rolling'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://github.com/vlang/vc/archive/bee5e18046d0449260f981aec2de7ee849c3d6c0.tar.gz'
+    url: 'https://github.com/vlang/vc/archive/d5acc4527c0f996a0d4ea38569ea6126e83bb74d.tar.gz'
     format: 'tar.gz'
-    extract_path: 'vc-bee5e18046d0449260f981aec2de7ee849c3d6c0'
+    extract_path: 'vc-d5acc4527c0f996a0d4ea38569ea6126e83bb74d'
     patch-path-strip: 3
-    version: '2.rolling'
+    version: '3.rolling'
 
   - name: limine
     subdir: '3rdparty'
@@ -381,7 +381,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '24.rolling'
+      version: '25.rolling'
     tools_required:
       - host-v
       - host-gcc

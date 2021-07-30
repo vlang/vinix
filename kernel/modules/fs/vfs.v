@@ -350,7 +350,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64)
 }
 
 pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limit u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: readlinkat(%d, %s, 0x%llx 0x%llx)\n', dirfd, _path, buf, limit)
+	C.printf(c'\n\e[32mstrace\e[m: readlinkat(%d, %s, 0x%llx, 0x%llx)\n', dirfd, _path, buf, limit)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}

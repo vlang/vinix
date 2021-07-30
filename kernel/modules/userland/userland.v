@@ -217,7 +217,6 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	if which == -1 {
 		return
 	}
-C.printf(c'%d\n', which)
 
 	sigaction := thread.sigactions[which]
 
@@ -317,11 +316,9 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 
 	start_program(true, proc.current_thread().process.current_directory, path,
 				  argv, envp, '', '', '') or {
-		panic('a')
 		return -1, errno.get()
 	}
 
-		panic('b')
 	return -1, errno.get()
 }
 
