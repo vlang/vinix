@@ -1,6 +1,7 @@
 module klock
 
 import katomic
+import trace
 
 pub struct Lock {
 pub mut:
@@ -22,8 +23,10 @@ pub fn (mut l Lock) acquire() {
 	}
 
 	C.printf_panic(c'Lock address:   0x%llx\n', voidptr(l))
-	C.printf_panic(c'Current caller: 0x%llx\n', caller)
-	C.printf_panic(c'Last caller:    0x%llx\n', l.caller)
+	mut offset, mut symbol := trace.address(caller) or { return }
+	C.printf_panic(c'Current caller: 0x%llx  <%s+0x%llx>\n', caller, symbol.name, offset)
+	offset, symbol = trace.address(l.caller) or { return }
+	C.printf_panic(c'Last caller:    0x%llx  <%s+0x%llx>\n', l.caller, symbol.name, offset)
 	panic('Deadlock detected')
 }
 
