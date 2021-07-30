@@ -220,13 +220,14 @@ tasks:
     pkgs_required:
       - bash
       - coreutils
-      - tcc
       - v
       - sed
       - diffutils
       - grep
       - tzdata
       - nano
+      - binutils
+      - gcc
       - kernel
     artifact_files:
       - name: vinix.iso
@@ -342,41 +343,12 @@ packages:
       - host-gcc
     pkgs_required:
       - mlibc
-      - tcc
+      - gcc
     build:
       - args:
         - 'bash'
         - '-c'
         - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr/bin" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"'
-
-  - name: tcc
-    source:
-      subdir: '3rdparty'
-      url: 'https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2'
-      format: 'tar.bz2'
-      extract_path: 'tcc-0.9.27'
-      patch-path-strip: 3
-      version: '0.9.27'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--tccdir=/usr/lib/tcc'
-        - '--elfinterp=/usr/lib/ld.so'
-        - '--libpaths=/usr/lib'
-        - '--sysincludepaths=/usr/lib/tcc/include:/usr/include'
-        - '--cross-prefix=x86_64-vinix-'
-        - '--cc=gcc'
-        - '--ar=ar'
-        - '--with-selinux'
-        - '--strip-binaries'
-        - '--prefix=/usr'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
   - name: kernel
     source:
@@ -582,5 +554,55 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: binutils
+    from_source: binutils
+    tools_required:
+      - host-gcc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--target=x86_64-vinix'
+        - '--with-sysroot=/'
+        - '--disable-nls'
+        # On recent compilers, binutils 2.26 causes implicit-fallthrough warnings, among others.
+        - '--disable-werror'
+        # -g blows up the binary size.
+        - 'CFLAGS=-O2 -pipe'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: gcc
+    from_source: gcc
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - binutils
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--target=x86_64-vinix'
+        - '--with-sysroot=/'
+        - '--with-build-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--enable-initfini-array'
+        - '--disable-multilib'
+        - '--disable-nls'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2 -pipe'
+        - 'CXXFLAGS=-O2 -pipe'
+    build:
+      - args: ['make', '-j@PARALLELISM@', 'all-gcc', 'all-target-libgcc'] #, 'all-target-libstdc++-v3']
+      - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc'] #, 'install-strip-target-libstdc++-v3']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
