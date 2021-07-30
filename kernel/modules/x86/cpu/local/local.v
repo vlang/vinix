@@ -57,9 +57,6 @@ pub mut:
 	lapic_timer_freq     u64
 	online				 u64
 	is_idle              bool
-	fpu_storage_size     u64
-	fpu_save             fn (voidptr)
-	fpu_restore          fn (voidptr)
 	current_thread       voidptr
 	last_run_queue_index int
 	abort_stack          [abort_stack_size]u64

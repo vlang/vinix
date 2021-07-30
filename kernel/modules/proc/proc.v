@@ -43,6 +43,7 @@ pub mut:
 	kernel_stack u64
 	pf_stack u64
 	cr3 u64
+	fpu_storage voidptr
 	event_block_dequeue klock.Lock
 	event_occurred klock.Lock
 	yield_await klock.Lock

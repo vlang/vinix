@@ -91,14 +91,14 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 		cpu.wrxcr(0, xcr0)
 
-		cpu_local.fpu_storage_size = u64(c)
-		cpu_local.fpu_save = cpu.xsave
-		cpu_local.fpu_restore = cpu.xrstor
+		fpu_storage_size = u64(c)
+		fpu_save = cpu.xsave
+		fpu_restore = cpu.xrstor
 	} else {
 		if cpu_number == 0 { println('fpu: Using legacy fxsave') }
-		cpu_local.fpu_storage_size = u64(512)
-		cpu_local.fpu_save = cpu.fxsave
-		cpu_local.fpu_restore = cpu.fxrstor
+		fpu_storage_size = u64(512)
+		fpu_save = cpu.fxsave
+		fpu_restore = cpu.fxrstor
 	}
 
 	apic.lapic_enable(0xff)

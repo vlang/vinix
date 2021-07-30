@@ -84,6 +84,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		current_thread.gs_base = cpu.get_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
 		current_thread.cr3 = cpu.read_cr3()
+		fpu_save(current_thread.fpu_storage)
 		katomic.store(current_thread.running_on, u64(-1))
 		current_thread.l.release()
 	}
@@ -110,6 +111,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
 	}
+
+	fpu_restore(current_thread.fpu_storage)
 
 	katomic.store(current_thread.running_on, cpu_local.cpu_number)
 
@@ -294,6 +297,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		timeslice: 5000
 		running_on: u64(-1)
 		stacks: stacks
+		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
 	}
 
 	if autoenqueue == true {
@@ -353,7 +357,32 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		kernel_stack: kernel_stack
 		pf_stack: pf_stack
 		stacks: stacks
+		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
 	}
+
+	// Set up FPU control word and MXCSR as defined in the sysv ABI
+
+	fpu_restore(thread.fpu_storage)
+
+	default_fcw := u16(0b1100111111)
+
+	asm volatile amd64 {
+		fldcw default_fcw
+		;
+		; m (default_fcw)
+		; memory
+	}
+
+	default_mxcsr := u32(0b1111110000000)
+
+	asm volatile amd64 {
+		ldmxcsr default_mxcsr
+		;
+		; m (default_mxcsr)
+		; memory
+	}
+
+	fpu_save(thread.fpu_storage)
 
 	// Set all sigactions to default
 	for mut sa in thread.sigactions {

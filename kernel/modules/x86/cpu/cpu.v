@@ -207,6 +207,9 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 __global (
 	cpu_get_id fn () u64
 	cpu_set_id fn (u64)
+	fpu_storage_size u64
+	fpu_save         fn (voidptr)
+	fpu_restore      fn (voidptr)
 )
 
 pub fn set_id_zero(_ u64) {
