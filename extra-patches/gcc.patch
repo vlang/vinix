@@ -37,16 +37,15 @@ diff -urN --no-dereference gcc/mpc-1.0.3/config.sub gcc-patched/mpc-1.0.3/config
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
-diff -urN --no-dereference gcc/mpfr-3.1.4/config.sub gcc-patched/mpfr-3.1.4/config.sub
---- gcc/mpfr-3.1.4/config.sub	2016-03-06 12:33:18.000000000 +0100
-+++ gcc-patched/mpfr-3.1.4/config.sub	2020-01-12 17:07:52.696802927 +0100
-@@ -1399,7 +1399,8 @@
- 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+diff '--color=auto' -urN gcc/mpfr-3.1.6/config.sub gcc/mpfr-3.1.6-patched/config.sub
+--- gcc/mpfr-3.1.6/config.sub	2017-09-07 13:47:07.000000000 +0200
++++ gcc/mpfr-3.1.6-patched/config.sub	2021-07-31 06:48:16.683995456 +0200
+@@ -1409,7 +1409,7 @@
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
--	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
-+	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos* \
-+	      | -vinix*)
+ 	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
+-	      | -onefs* | -tirtos* | -phoenix* | -fuchsia*)
++	      | -onefs* | -tirtos* | -phoenix* | -fuchsia* | -vinix*)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)

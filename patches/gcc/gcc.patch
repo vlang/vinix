@@ -98,7 +98,7 @@ index 357b0be..de98ca8 100644
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
 diff --git a/3rdparty/gcc-orig/libgcc/config.host b/3rdparty/gcc-workdir/libgcc/config.host
-index f808b61..a0eaf98 100644
+index 50f0006..42da25f 100644
 --- a/3rdparty/gcc-orig/libgcc/config.host
 +++ b/3rdparty/gcc-workdir/libgcc/config.host
 @@ -245,6 +245,11 @@ case ${host} in
