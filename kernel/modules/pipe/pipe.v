@@ -64,7 +64,7 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	return 0, 0
 }
 
-fn (mut this Pipe) read(buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this Pipe) read(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	this.l.acquire()
@@ -122,7 +122,7 @@ fn (mut this Pipe) read(buf voidptr, loc u64, _count u64) ?i64 {
 	return i64(count)
 }
 
-fn (mut this Pipe) write(buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	this.l.acquire()
@@ -176,6 +176,6 @@ fn (mut this Pipe) write(buf voidptr, loc u64, _count u64) ?i64 {
 	return i64(count)
 }
 
-fn (mut this Pipe) ioctl(request u64, argp voidptr) ?int {
-	return resource.default_ioctl(request, argp)
+fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	return resource.default_ioctl(handle, request, argp)
 }

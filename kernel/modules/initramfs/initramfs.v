@@ -89,7 +89,7 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 				}
 				mut new_resource := new_node.resource
 				buf := voidptr(u64(current_header) + 512)
-				new_resource.write(buf, 0, size) or {
+				new_resource.write(0, buf, 0, size) or {
 					panic('initramfs')
 				}
 			}

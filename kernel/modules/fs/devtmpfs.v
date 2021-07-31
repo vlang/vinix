@@ -16,7 +16,7 @@ pub mut:
 	capacity u64
 }
 
-fn (mut this DevTmpFSResource) read(buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevTmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
 	mut actual_count := count
@@ -31,7 +31,7 @@ fn (mut this DevTmpFSResource) read(buf voidptr, loc u64, count u64) ?i64 {
 	return i64(actual_count)
 }
 
-fn (mut this DevTmpFSResource) write(buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevTmpFSResource) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
 	if loc + count > this.capacity {
@@ -63,8 +63,8 @@ fn (mut this DevTmpFSResource) write(buf voidptr, loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
-fn (mut this DevTmpFSResource) ioctl(request u64, argp voidptr) ?int {
-	return resource.default_ioctl(request, argp)
+fn (mut this DevTmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	return resource.default_ioctl(handle, request, argp)
 }
 
 struct DevTmpFS {}

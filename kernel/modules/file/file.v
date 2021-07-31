@@ -38,7 +38,7 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	defer {
 		this.l.release()
 	}
-	ret := this.resource.read(buf, u64(this.loc), count) or {
+	ret := this.resource.read(voidptr(this), buf, u64(this.loc), count) or {
 		return none
 	}
 	this.loc += ret
@@ -50,11 +50,15 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	defer {
 		this.l.release()
 	}
-	ret := this.resource.write(buf, u64(this.loc), count) or {
+	ret := this.resource.write(voidptr(this), buf, u64(this.loc), count) or {
 		return none
 	}
 	this.loc += ret
 	return ret
+}
+
+pub fn (mut this Handle) ioctl(request u64, argp voidptr) ?int {
+	return this.resource.ioctl(voidptr(this), request, argp)
 }
 
 pub struct FD {

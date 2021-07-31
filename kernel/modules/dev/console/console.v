@@ -355,7 +355,7 @@ pub mut:
 	termios termios.Termios
 }
 
-fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
 	mut buf := &byte(void_buf)
 
 	for console_read_lock.test_and_acquire() == false {
@@ -401,7 +401,7 @@ fn (mut this Console) read(void_buf voidptr, loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
-fn (mut this Console) write(buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	copy := unsafe { C.malloc(count) }
 	defer {
 		unsafe { C.free(copy) }
@@ -411,7 +411,7 @@ fn (mut this Console) write(buf voidptr, loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
-fn (mut this Console) ioctl(request u64, argp voidptr) ?int {
+fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
 		ioctl.tiocgwinsz {
 			mut w := &ioctl.WinSize(argp)
@@ -433,7 +433,7 @@ fn (mut this Console) ioctl(request u64, argp voidptr) ?int {
 			return 0
 		}
 		else {
-			return resource.default_ioctl(request, argp)
+			return resource.default_ioctl(handle, request, argp)
 		}
 	}
 }

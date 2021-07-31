@@ -497,7 +497,7 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.resource.ioctl(request, argp) or {
+	ret := fd.handle.ioctl(request, argp) or {
 		return -1, errno.get()
 	}
 	return u64(ret), 0
