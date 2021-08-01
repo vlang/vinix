@@ -15,7 +15,7 @@ index d95f350..f74b0ef 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index e42cc44..d1fe878 100644
+index e42cc44..05dc328 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -35,7 +35,7 @@ index e42cc44..d1fe878 100644
  #if bios == 1
  void term_textmode(void) {
      term_backend = NOT_READY;
-@@ -99,6 +102,7 @@ static bool control_sequence = false;
+@@ -99,9 +102,11 @@ static bool control_sequence = false;
  static bool escape = false;
  static bool rrr = false;
  static bool dec_private = false;
@@ -43,7 +43,11 @@ index e42cc44..d1fe878 100644
  static int32_t esc_values[MAX_ESC_VALUES];
  static size_t esc_values_i = 0;
  static int saved_cursor_x = 0, saved_cursor_y = 0;
-@@ -110,15 +114,30 @@ static void sgr(void) {
++static int current_fg = -1;
+ 
+ static void sgr(void) {
+     size_t i = 0;
+@@ -110,15 +115,38 @@ static void sgr(void) {
          goto def;
  
      for (; i < esc_values_i; i++) {
@@ -51,6 +55,7 @@ index e42cc44..d1fe878 100644
 +        if (esc_values[i] == 0) {
  def:
 +            bold = false;
++            current_fg = -1;
              set_text_bg_default();
              set_text_fg_default();
              continue;
@@ -58,16 +63,23 @@ index e42cc44..d1fe878 100644
  
 +        if (esc_values[i] == 1) {
 +            bold = true;
++            if (current_fg != -1) {
++                set_text_fg_bright(current_fg);
++            }
 +            continue;
 +        }
 +
 +        if (esc_values[i] == 22) {
 +            bold = false;
++            if (current_fg != -1) {
++                set_text_fg(current_fg);
++            }
 +            continue;
 +        }
 +
          if (esc_values[i] >= 30 && esc_values[i] <= 37) {
 -            set_text_fg(esc_values[i] - 30);
++            current_fg = esc_values[i] - 30;
 +            if (bold) {
 +                set_text_fg_bright(esc_values[i] - 30);
 +            } else {
@@ -76,7 +88,23 @@ index e42cc44..d1fe878 100644
              continue;
          }
  
-@@ -150,7 +169,9 @@ def:
+@@ -128,6 +156,7 @@ def:
+         }
+ 
+         if (esc_values[i] >= 90 && esc_values[i] <= 97) {
++            current_fg = esc_values[i] - 90;
+             set_text_fg_bright(esc_values[i] - 90);
+             continue;
+         }
+@@ -138,6 +167,7 @@ def:
+         }
+ 
+         if (esc_values[i] == 39) {
++            current_fg = -1;
+             set_text_fg_default();
+             continue;
+         }
+@@ -150,7 +180,9 @@ def:
  }
  
  static void dec_private_parse(uint8_t c) {
@@ -87,7 +115,7 @@ index e42cc44..d1fe878 100644
      dec_private = false;
  }
  
-@@ -193,6 +214,11 @@ static void control_sequence_parse(uint8_t c) {
+@@ -193,6 +225,11 @@ static void control_sequence_parse(uint8_t c) {
          goto cleanup;
      }
  
@@ -99,7 +127,7 @@ index e42cc44..d1fe878 100644
      switch (c) {
          case 'A':
              if (esc_values[0] > get_cursor_pos_y())
-@@ -372,6 +398,11 @@ static void escape_parse(uint8_t c) {
+@@ -372,6 +409,11 @@ static void escape_parse(uint8_t c) {
              rrr = false;
              control_sequence = true;
              break;
