@@ -6,10 +6,10 @@ import klock
 
 __global (
 	pmm_lock klock.Lock
-	pmm_bitmap lib.Bitmap
-	pmm_avl_page_count u64
-	pmm_last_used_index u64
-	free_pages u64
+	pmm_bitmap = voidptr(0)
+	pmm_avl_page_count = u64(0)
+	pmm_last_used_index = u64(0)
+	free_pages = u64(0)
 )
 
 pub fn print_free() {
@@ -47,7 +47,7 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 				continue
 			}
 			if entries[i].length >= bitmap_size {
-				pmm_bitmap = lib.Bitmap(entries[i].base + higher_half)
+				pmm_bitmap = voidptr(entries[i].base + higher_half)
 
 				// Initialise entire bitmap to 1 (non-free)
 				C.memset(pmm_bitmap, 0xff, bitmap_size)

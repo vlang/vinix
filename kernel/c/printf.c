@@ -579,16 +579,16 @@ static int _vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const
 
 void klock__Lock_acquire(void *);
 void klock__Lock_release(void *);
-extern char kprint_lock;
+extern char printf_lock;
 
 int printf(const char* format, ...)
 {
   va_list va;
   va_start(va, format);
   char buffer[1];
-  klock__Lock_acquire(&kprint_lock);
+  klock__Lock_acquire(&printf_lock);
   const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
-  klock__Lock_release(&kprint_lock);
+  klock__Lock_release(&printf_lock);
   va_end(va);
   return ret;
 }
@@ -627,9 +627,9 @@ int snprintf(char* buffer, size_t count, const char* format, ...)
 int vprintf(const char* format, va_list va)
 {
   char buffer[1];
-  klock__Lock_acquire(&kprint_lock);
+  klock__Lock_acquire(&printf_lock);
   const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
-  klock__Lock_release(&kprint_lock);
+  klock__Lock_release(&printf_lock);
   return ret;
 }
 

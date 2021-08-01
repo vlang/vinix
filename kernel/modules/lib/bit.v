@@ -1,8 +1,6 @@
 module lib
 
-type Bitmap = &u64
-
-pub fn bittest(bitmap Bitmap, index u64) bool {
+pub fn bittest(bitmap voidptr, index u64) bool {
 	unsafe {
 		mut fbitmap := &u64(bitmap)
 		bits_type := sizeof(u64) * 8
@@ -12,7 +10,7 @@ pub fn bittest(bitmap Bitmap, index u64) bool {
 	}
 }
 
-pub fn bitset(bitmap Bitmap, index u64) {
+pub fn bitset(bitmap voidptr, index u64) {
 	unsafe {
 		mut fbitmap := &u64(bitmap)
 		bits_type := sizeof(u64) * 8
@@ -21,7 +19,7 @@ pub fn bitset(bitmap Bitmap, index u64) {
 	}
 }
 
-pub fn bitreset(bitmap Bitmap, index u64) {
+pub fn bitreset(bitmap voidptr, index u64) {
 	unsafe {
 		mut fbitmap := &u64(bitmap)
 		bits_type := sizeof(u64) * 8

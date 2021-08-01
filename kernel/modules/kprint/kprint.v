@@ -5,6 +5,7 @@ import serial
 import stivale2
 
 __global (
+	printf_lock klock.Lock
 	kprint_lock klock.Lock
 )
 

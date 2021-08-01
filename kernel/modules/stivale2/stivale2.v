@@ -148,11 +148,11 @@ pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
 
 __global (
 	terminal_print_lock klock.Lock
-	terminal_print_ptr voidptr
-	terminal_rows u16
-	terminal_cols u16
-	framebuffer_width u16
-	framebuffer_height u16
+	terminal_print_ptr = voidptr(0)
+	terminal_rows = u16(0)
+	terminal_cols = u16(0)
+	framebuffer_width = u16(0)
+	framebuffer_height = u16(0)
 )
 
 pub fn terminal_init(stivale2_struct &Struct) {
