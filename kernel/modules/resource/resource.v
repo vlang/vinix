@@ -38,6 +38,7 @@ mut:
 	refcount int
 	l        klock.Lock
 
+	grow(handle voidptr, new_size u64) ?
 	read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	write(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	ioctl(handle voidptr, request u64, argp voidptr) ?int

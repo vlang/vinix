@@ -747,9 +747,9 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	}
 
 	if base > handle.resource.stat.size {
-		// TODO: grow
-		panic('vfs: Grow not yet supported')
-		return -1, errno.einval
+		handle.resource.grow(voidptr(handle), u64(base)) or {
+			return -1, errno.einval
+		}
 	}
 
 	handle.loc = base

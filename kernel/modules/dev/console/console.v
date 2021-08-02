@@ -441,3 +441,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 fn (mut this Console) close(handle voidptr) ? {
 	this.refcount--
 }
+
+fn (mut this Console) grow(handle voidptr, new_size u64) ? {
+	return error('')
+}

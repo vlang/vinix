@@ -189,3 +189,7 @@ fn (mut this Pipe) close(handle voidptr) ? {
 	this.refcount--
 	event.trigger(this.event, true)
 }
+
+fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {
+	return error('')
+}

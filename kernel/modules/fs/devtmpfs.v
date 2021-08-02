@@ -71,6 +71,30 @@ fn (mut this DevTmpFSResource) close(handle voidptr) ? {
 	this.refcount--
 }
 
+fn (mut this DevTmpFSResource) grow(handle voidptr, new_size u64) ? {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+
+	mut new_capacity := this.capacity
+	for new_size > new_capacity {
+		new_capacity *= 2
+	}
+
+	new_storage := memory.realloc(this.storage, new_capacity)
+
+	if new_storage == 0 {
+		return error('')
+	}
+
+	this.storage = new_storage
+	this.capacity = new_capacity
+
+	this.stat.size = new_size
+	this.stat.blocks = lib.div_roundup(new_size, this.stat.blksize)
+}
+
 struct DevTmpFS {}
 
 __global (
