@@ -7,6 +7,7 @@ import event
 import event.eventstruct
 import errno
 import file
+import katomic
 
 // A pipe is a circular buffer
 
@@ -64,7 +65,7 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	return 0, 0
 }
 
-fn (mut this Pipe) read(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	this.l.acquire()
@@ -72,13 +73,17 @@ fn (mut this Pipe) read(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
 		this.l.release()
 	}
 
+	handle := &file.Handle(_handle)
+
 	// If pipe is empty, block or return if nonblock
-	for this.used == 0 {
+	for katomic.load(this.used) == 0 {
 		// Return EOF if the pipe was closed
-		if this.refcount == 1 {
+		if this.refcount <= 1 {
 			return 0
 		}
-		// We don't do nonblock yet
+		if handle.flags & resource.o_nonblock != 0 {
+			return 0
+		}
 		this.l.release()
 		mut which := u64(0)
 		event.await([&this.event], &which, true) or {
@@ -131,7 +136,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	}
 
 	// If pipe is full, block or return if nonblock
-	for this.used == this.capacity {
+	for katomic.load(this.used) == this.capacity {
 		// We don't do nonblock yet
 		this.l.release()
 		mut which := u64(0)
@@ -178,4 +183,9 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 
 fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
+}
+
+fn (mut this Pipe) close(handle voidptr) ? {
+	this.refcount--
+	event.trigger(this.event, true)
 }

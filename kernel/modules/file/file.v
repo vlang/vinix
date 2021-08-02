@@ -98,12 +98,10 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 	mut handle := fd.handle
 	mut res := handle.resource
 
+	res.close(voidptr(handle)) ?
+
 	handle.refcount--
 	if handle.refcount == 0 {
-		res.refcount--
-		if res.refcount == 0 {
-			// res.cleanup()
-		}
 		C.free(voidptr(handle))
 	}
 
@@ -134,7 +132,7 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 		}
 		return none
 	} else {
-		//fd_close(oldfd)
+		//fdnum_close(process, oldfd) or {}
 		process.fds[oldfd] = voidptr(fd)
 		return oldfd
 	}
@@ -229,6 +227,9 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int,
 	}
 
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
+
+	oldfd.handle.refcount++
+	oldfd.handle.resource.refcount++
 
 	return new_fdnum
 }

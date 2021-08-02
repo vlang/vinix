@@ -68,6 +68,10 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 	return resource.default_ioctl(handle, request, argp)
 }
 
+fn (mut this TmpFSResource) close(handle voidptr) ? {
+	this.refcount--
+}
+
 struct TmpFS {
 pub mut:
 	dev_id u64

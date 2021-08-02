@@ -67,6 +67,10 @@ fn (mut this DevTmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) 
 	return resource.default_ioctl(handle, request, argp)
 }
 
+fn (mut this DevTmpFSResource) close(handle voidptr) ? {
+	this.refcount--
+}
+
 struct DevTmpFS {}
 
 __global (
