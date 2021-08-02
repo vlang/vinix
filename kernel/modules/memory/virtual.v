@@ -11,7 +11,7 @@ __global (
 	vmm_initialised = bool(false)
 )
 
-struct Pagemap {
+pub struct Pagemap {
 pub mut:
 	l           klock.Lock
 	top_level   &u64
