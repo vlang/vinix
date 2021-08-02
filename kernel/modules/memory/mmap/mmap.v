@@ -104,7 +104,10 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				unsafe { new_pte[0] = old_pte[0] }
 			}
 		} else {
-			mut new_global_range := &MmapRangeGlobal{resource: voidptr(0)}
+			mut new_global_range := &MmapRangeGlobal{
+				resource: voidptr(0)
+				shadow_pagemap: memory.Pagemap{top_level: &u64(0)}
+			}
 
 			new_global_range.resource = global_range.resource
 			new_global_range.base = global_range.base
@@ -192,6 +195,7 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 		base: virt_addr
 		length: length
 		resource: voidptr(0)
+		shadow_pagemap: memory.Pagemap{top_level: &u64(0)}
 	}
 
 	range_local.global = range_global
@@ -307,6 +311,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 		length: length
 		resource: resource
 		offset: offset
+		shadow_pagemap: memory.Pagemap{top_level: &u64(0)}
 	}
 
 	range_local.global = range_global
