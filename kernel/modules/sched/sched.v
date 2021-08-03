@@ -11,7 +11,7 @@ import memory
 import memory.mmap
 import elf
 
-const stack_size = u64(65536)
+const stack_size = u64(0x200000)
 const max_running_threads = int(512)
 
 __global (

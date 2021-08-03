@@ -444,7 +444,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		}
 	}
 
-	stack_size := u64(65536)
+	stack_size := u64(0x200000)
 
 	mut stacks := []voidptr{}
 
