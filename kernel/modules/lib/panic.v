@@ -38,6 +38,9 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 
 	C.printf_panic(c'Stacktrace:\n')
 	trace.stacktrace(0)
+	if voidptr(gpr_state) != voidptr(0) && gpr_state.cs == 0x28 {
+		trace.stacktrace(gpr_state.rbp)
+	}
 
 	for {
 		asm volatile amd64 {

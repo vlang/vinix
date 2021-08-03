@@ -79,7 +79,7 @@ fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
 		return reduce_node(node.mountpoint, follow_symlinks)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
-		_, next_node, _ := path2node(node, node.symlink_target)
+		_, next_node, _ := path2node(node.parent, node.symlink_target)
 		if next_node == 0 {
 			return 0
 		}
