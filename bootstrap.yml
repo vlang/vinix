@@ -34,11 +34,11 @@ sources:
 
   - name: mlibc
     subdir: '3rdparty'
-    url: 'https://github.com/managarm/mlibc/archive/79aa65e37375d09dc51520a22fb43868156ec3a5.tar.gz'
+    url: 'https://github.com/managarm/mlibc/archive/2278c41ecee75d605dcfaa1181e2ebe4fa92f75f.tar.gz'
     format: 'tar.gz'
-    extract_path: 'mlibc-79aa65e37375d09dc51520a22fb43868156ec3a5'
+    extract_path: 'mlibc-2278c41ecee75d605dcfaa1181e2ebe4fa92f75f'
     patch-path-strip: 3
-    version: '5.rolling'
+    version: '6.rolling'
 
   - name: pkg-config
     subdir: '3rdparty'
