@@ -117,7 +117,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			new_global_range.locals = []&MmapRangeLocal{}
 			new_global_range.locals << new_local_range
 
-			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(page_size / memory.bitmap_granularity, page_size))
 
 			if local_range.flags & map_anonymous != 0 {
 				for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
@@ -133,7 +133,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or {
 						return none
 					}
-					page := memory.pmm_alloc_nozero(1)
+					page := memory.pmm_alloc_nozero(page_size / memory.bitmap_granularity, page_size)
 					unsafe {
 						C.memcpy(
 							voidptr(u64(page) + higher_half),
@@ -201,7 +201,7 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 	range_local.global = range_global
 
 	range_global.locals << range_local
-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(page_size / memory.bitmap_granularity, page_size))
 
 	pagemap.l.acquire()
 	pagemap.mmap_ranges << voidptr(range_local)
@@ -236,7 +236,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	pagemap.l.release()
 
 	if range_local.flags & map_anonymous != 0 {
-		page := memory.pmm_alloc(1)
+		page := memory.pmm_alloc(page_size / memory.bitmap_granularity, page_size)
 		map_page_in_range(range_local.global, memory_page * page_size, u64(page),
 						  range_local.prot) or {
 			return error('')
@@ -317,7 +317,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	range_local.global = range_global
 
 	range_global.locals << range_local
-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(page_size / memory.bitmap_granularity, page_size))
 
 	pagemap.l.acquire()
 	pagemap.mmap_ranges << voidptr(range_local)
@@ -379,7 +379,7 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 					global_range.shadow_pagemap.unmap_page(j) or {
 						return error('')
 					}
-					memory.pmm_free(voidptr(phys), 1)
+					memory.pmm_free(voidptr(phys), page_size / memory.bitmap_granularity)
 				}
 			} else {
 				//global_range.resource.munmap(i)

@@ -63,11 +63,6 @@ __global (
 )
 
 fn madt_init() {
-	madt_local_apics = []&MADTLocalApic{}
-	madt_io_apics = []&MADTIoApic{}
-	madt_isos = []&MADTISO{}
-	madt_nmis = []&MADTNMI{}
-
 	madt := &MADT(find_sdt('APIC', 0) or {
 		panic('System does not have a MADT')
 	})

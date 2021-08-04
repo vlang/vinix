@@ -102,10 +102,11 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 		}
 
 next:
+		memory.pmm_free(voidptr(u64(current_header) - higher_half),
+						(u64(512) + lib.align_up(size, 512)) / memory.bitmap_granularity)
+
 		current_header = &USTARHeader(size_t(current_header) + size_t(512) + size_t(lib.align_up(size, 512)))
 	}
-
-	memory.pmm_free(voidptr(initramfs_begin - higher_half), lib.div_roundup(initramfs_size, page_size))
 
 	print('\ninitramfs: Done.\n')
 }

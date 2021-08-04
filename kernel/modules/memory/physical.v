@@ -4,6 +4,8 @@ import lib
 import stivale2
 import klock
 
+pub const bitmap_granularity = u64(64)
+
 __global (
 	pmm_lock klock.Lock
 	pmm_bitmap = voidptr(0)
@@ -38,8 +40,10 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 		}
 
 		// Calculate the needed size for the bitmap in bytes and align it to page size.
-		pmm_avl_page_count = highest_address / page_size
-		bitmap_size := lib.align_up(pmm_avl_page_count / 8, page_size)
+		pmm_avl_page_count = highest_address / bitmap_granularity
+		bitmap_size := lib.align_up(pmm_avl_page_count / 8, bitmap_granularity)
+
+		C.printf(c'pmm: Bitmap size: %llu\n', bitmap_size)
 
 		// Find a hole for the bitmap in the memory map.
 		for i := 0; i < memmap.entry_count; i++ {
@@ -65,9 +69,9 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 				continue
 			}
 
-			for j := u64(0); j < entries[i].length; j += page_size {
+			for j := u64(0); j < entries[i].length; j += bitmap_granularity {
 				free_pages++
-				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
+				lib.bitreset(pmm_bitmap, (entries[i].base + j) / bitmap_granularity)
 			}
 		}
 	}
@@ -75,9 +79,13 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 	print_free()
 }
 
-fn inner_alloc(count u64, limit u64) voidptr {
+fn inner_alloc(count u64, limit u64, alignment u64) voidptr {
 	mut p := 0
 	for pmm_last_used_index < limit {
+		if p == 0 && (pmm_last_used_index * bitmap_granularity) % alignment != 0 {
+			pmm_last_used_index++
+			continue
+		}
 		if !lib.bittest(pmm_bitmap, pmm_last_used_index) {
 			pmm_last_used_index++
 			p++
@@ -86,7 +94,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 				for i := page; i < pmm_last_used_index; i++ {
 					lib.bitset(pmm_bitmap, i)
 				}
-				return voidptr(page * page_size)
+				return voidptr(page * bitmap_granularity)
 			}
 		} else {
 			pmm_last_used_index++
@@ -96,19 +104,19 @@ fn inner_alloc(count u64, limit u64) voidptr {
 	return 0
 }
 
-pub fn pmm_alloc_nozero(count u64) voidptr {
+pub fn pmm_alloc_nozero(count u64, alignment u64) voidptr {
 	pmm_lock.acquire()
 	defer {
 		pmm_lock.release()
 	}
 
 	last := pmm_last_used_index
-	mut ret := inner_alloc(count, pmm_avl_page_count)
+	mut ret := inner_alloc(count, pmm_avl_page_count, alignment)
 	if ret == 0 {
 		pmm_last_used_index = 0
-		ret = inner_alloc(count, last)
+		ret = inner_alloc(count, last, alignment)
 		if ret == 0 {
-			lib.kpanic(0, c'Out of memory')
+			lib.kpanic(voidptr(0), c'Out of memory')
 		}
 	}
 
@@ -117,13 +125,13 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 	return ret
 }
 
-pub fn pmm_alloc(count u64) voidptr {
-	ret := pmm_alloc_nozero(count)
+pub fn pmm_alloc(count u64, alignment u64) voidptr {
+	ret := pmm_alloc_nozero(count, alignment)
 
 	// We always zero out memory for security reasons
 	unsafe {
 		mut ptr := &u64(u64(ret) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
+		for i := u64(0); i < (count * bitmap_granularity) / 8; i++ {
 			ptr[i] = 0
 		}
 	}
@@ -136,7 +144,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	defer {
 		pmm_lock.release()
 	}
-	page := u64(ptr) / page_size
+	page := u64(ptr) / bitmap_granularity
 	for i := page; i < page + count; i++ {
 		lib.bitreset(pmm_bitmap, i)
 	}
@@ -149,20 +157,22 @@ mut:
 	size  u64
 }
 
+[export: 'free']
 pub fn free(ptr voidptr) {
 	if ptr == voidptr(0) {
 		return
 	}
 
-	metadata := &MallocMetadata(u64(ptr) - page_size)
+	metadata := &MallocMetadata(u64(ptr) - bitmap_granularity)
 
 	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
 
+[export: 'malloc']
 pub fn malloc(size u64) voidptr {
-	page_count := lib.div_roundup(size, page_size)
+	page_count := lib.div_roundup(size, bitmap_granularity)
 
-	ptr := pmm_alloc(page_count + 1)
+	ptr := pmm_alloc(page_count + 1, 16)
 
 	if ptr == 0 {
 		return 0
@@ -173,17 +183,18 @@ pub fn malloc(size u64) voidptr {
 	metadata.pages = page_count
 	metadata.size = size
 
-	return voidptr(u64(ptr) + higher_half + page_size)
+	return voidptr(u64(ptr) + higher_half + bitmap_granularity)
 }
 
+[export: 'realloc']
 pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	if ptr == 0 {
 		return malloc(new_size)
 	}
 
-	mut metadata := &MallocMetadata(u64(ptr) - page_size)
+	mut metadata := &MallocMetadata(u64(ptr) - bitmap_granularity)
 
-	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
+	if lib.div_roundup(metadata.size, bitmap_granularity) == lib.div_roundup(new_size, bitmap_granularity) {
 		metadata.size = new_size
 		return ptr
 	}
@@ -202,4 +213,9 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	C.free(ptr)
 
 	return new_ptr
+}
+
+[export: 'calloc']
+pub fn calloc(a u64, b u64) voidptr {
+	return unsafe { C.malloc(a * b) }
 }

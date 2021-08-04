@@ -448,11 +448,11 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 
 	mut stacks := []voidptr{}
 
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	kernel_stack_phys := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
 	stacks << kernel_stack_phys
 	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
 
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	pf_stack_phys := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
 	stacks << pf_stack_phys
 	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 

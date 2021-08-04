@@ -10,6 +10,7 @@ import proc
 import memory
 import memory.mmap
 import elf
+import lib
 
 const stack_size = u64(0x200000)
 const max_running_threads = int(512)
@@ -260,7 +261,7 @@ pub fn dequeue_and_die() {
 	mut thread := &proc.Thread(cpulocal.current().current_thread)
 	dequeue_thread(thread)
 	for ptr in thread.stacks {
-		memory.pmm_free(ptr, stack_size / page_size)
+		memory.pmm_free(ptr, stack_size / memory.bitmap_granularity)
 	}
 	unsafe {
 		thread.stacks.free()
@@ -274,7 +275,7 @@ pub fn dequeue_and_die() {
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stack_phys := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
 	stacks << stack_phys
 	stack := u64(stack_phys) + stack_size + higher_half
 
@@ -297,7 +298,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		timeslice: 5000
 		running_on: u64(-1)
 		stacks: stacks
-		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
+		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, memory.bitmap_granularity), 64)) + higher_half)
 	}
 
 	if autoenqueue == true {
@@ -315,7 +316,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stack_phys := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
 	mut stack := &u64(u64(stack_phys) + stack_size + higher_half)
 
 	stack_vma := process.thread_stack_top
@@ -329,11 +330,11 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		return none
 	}
 
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	kernel_stack_phys := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
 	stacks << kernel_stack_phys
 	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
 
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	pf_stack_phys := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
 	stacks << pf_stack_phys
 	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 
@@ -357,7 +358,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		kernel_stack: kernel_stack
 		pf_stack: pf_stack
 		stacks: stacks
-		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
+		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, memory.bitmap_granularity), 64)) + higher_half)
 	}
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
