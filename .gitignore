@@ -1,8 +1,7 @@
 3rdparty
 build
 ports
-sysroot/usr
-sysroot/etc/xbstrap
+sysroot
 *.o
 *.C
 *.elf

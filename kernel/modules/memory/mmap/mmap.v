@@ -330,11 +330,29 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	return voidptr(base)
 }
 
+pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: munmap(0x%llx, 0x%llx)\n',
+			 addr, length)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	munmap(process.pagemap, addr, length) or {
+		return -1, errno.get()
+	}
+
+	return 0, 0
+}
+
 pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 	mut pagemap := unsafe { _pagemap }
 
 	if length % page_size != 0 || length == 0 {
 		print('\nmunmap: length is not a multiple of page size or it is 0\n')
+		errno.set(errno.einval)
 		return error('')
 	}
 
@@ -356,7 +374,8 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 		snip_size := snip_end - snip_begin
 
 		if snip_begin > local_range.base && snip_end < local_range.base + local_range.length {
-			print('\nmunmap: range splits not supported\n')
+			C.printf(c'munmap: range splits not supported\n')
+			errno.set(errno.einval)
 			return error('')
 		}
 
@@ -377,6 +396,7 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 						continue
 					}
 					global_range.shadow_pagemap.unmap_page(j) or {
+						errno.set(errno.einval)
 						return error('')
 					}
 					memory.pmm_free(voidptr(phys), page_size / memory.bitmap_granularity)

@@ -3,7 +3,7 @@ KERNEL_HDD = vinix.hdd
 .PHONY: all
 all: vinix.iso
 
-QEMUFLAGS = -M q35,smm=off -m 1G -smp 4 -no-reboot -no-shutdown -cdrom vinix.iso -serial stdio
+QEMUFLAGS = -M q35,smm=off -m 2G -smp 4 -no-reboot -no-shutdown -cdrom vinix.iso -serial stdio
 
 .PHONY: run-kvm
 run-kvm: vinix.iso
@@ -15,7 +15,7 @@ run-hvf: vinix.iso
 
 .PHONY: run
 run: vinix.iso
-	qemu-system-x86_64 -cpu qemu64,level=11,+rdtscp,+sep $(QEMUFLAGS)
+	qemu-system-x86_64 -cpu qemu64,level=11,+rdtscp $(QEMUFLAGS)
 
 .PHONY: distro
 distro:

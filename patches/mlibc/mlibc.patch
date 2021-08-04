@@ -76,6 +76,25 @@ index 41d4248..f246d1d 100644
  #define TIOCSCTTY 0x540E
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
+diff --git a/3rdparty/mlibc-orig/options/posix/generic/unistd-stubs.cpp b/3rdparty/mlibc-workdir/options/posix/generic/unistd-stubs.cpp
+index f145e4a..8221f78 100644
+--- a/3rdparty/mlibc-orig/options/posix/generic/unistd-stubs.cpp
++++ b/3rdparty/mlibc-workdir/options/posix/generic/unistd-stubs.cpp
+@@ -743,12 +743,12 @@ int ttyname_r(int, char *, size_t) {
+ 	__builtin_unreachable();
+ }
+ int unlink(const char *path) {
+-	if(!mlibc::sys_unlink) {
++	if(!mlibc::sys_unlinkat) {
+ 		MLIBC_MISSING_SYSDEP();
+ 		errno = ENOSYS;
+ 		return -1;
+ 	}
+-	if(int e = mlibc::sys_unlink(path); e) {
++	if(int e = mlibc::sys_unlinkat(AT_FDCWD, path, 0); e) {
+ 		errno = e;
+ 		return -1;
+ 	}
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S b/3rdparty/mlibc-workdir/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..06ab8a7
@@ -153,10 +172,10 @@ index 0000000..53ea0e9
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..85bc1cd
+index 0000000..21f6048
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,497 @@
+@@ -0,0 +1,504 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -400,7 +419,14 @@ index 0000000..85bc1cd
 +    return 0;
 +}
 +
-+int sys_vm_unmap(void *pointer, size_t size) STUB_ONLY
++int sys_vm_unmap(void *pointer, size_t size) {
++    __syscall_ret ret = __syscall(34, pointer, size);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
 +
 +int sys_anon_allocate(size_t size, void **pointer) {
 +    return sys_vm_map(NULL, size, PROT_EXEC | PROT_READ | PROT_WRITE,
