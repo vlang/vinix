@@ -265,7 +265,6 @@ pub fn dequeue_and_die() {
 	}
 	unsafe {
 		thread.stacks.free()
-		free(thread.stacks)
 		free(thread)
 	}
 	yield(false)

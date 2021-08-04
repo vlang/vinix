@@ -1,10 +1,11 @@
+[manualfree]
 module memory
 
 import lib
 import stivale2
 import klock
 
-pub const bitmap_granularity = u64(64)
+pub const bitmap_granularity = u64(4096)
 
 __global (
 	pmm_lock klock.Lock
@@ -77,6 +78,18 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 	}
 
 	print_free()
+
+	// Initialise slabs
+	slabs[0].init(8)
+	slabs[1].init(16)
+	slabs[2].init(24)
+	slabs[3].init(32)
+	slabs[4].init(48)
+	slabs[5].init(64)
+	slabs[6].init(128)
+	slabs[7].init(256)
+	slabs[8].init(512)
+	slabs[9].init(1024)
 }
 
 fn inner_alloc(count u64, limit u64, alignment u64) voidptr {
@@ -151,6 +164,80 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	free_pages += count
 }
 
+
+
+pub struct Slab {
+mut:
+	@lock klock.Lock
+	first_free u64
+	ent_size u64
+}
+
+struct SlabHeader {
+mut:
+	slab &Slab
+}
+
+pub fn (mut this Slab) init(ent_size u64) {
+	this.ent_size = ent_size
+	this.first_free = u64(pmm_alloc_nozero(page_size / bitmap_granularity, page_size))
+	this.first_free += higher_half
+
+	avl_size := page_size - lib.align_up(sizeof(SlabHeader), ent_size)
+	mut slabptr := &SlabHeader(this.first_free)
+	unsafe { slabptr[0].slab = this }
+	this.first_free += lib.align_up(sizeof(SlabHeader), ent_size)
+
+	mut arr := &u64(this.first_free)
+	max := avl_size / ent_size - 1
+	fact := ent_size / 8
+	for i := u64(0); i < max; i++ {
+		unsafe { arr[i * fact] = u64(&arr[(i + 1) * fact]) }
+	}
+
+	unsafe { arr[max * fact] = u64(0) }
+}
+
+pub fn (mut this Slab) alloc() voidptr {
+	this.@lock.acquire()
+	defer {
+		this.@lock.release()
+	}
+
+	if this.first_free == 0 {
+		this.init(this.ent_size)
+	}
+
+	mut old_free := &u64(this.first_free)
+	this.first_free = unsafe { old_free[0] }
+
+	unsafe { C.memset(voidptr(old_free), 0, this.ent_size) }
+
+	return voidptr(old_free)
+}
+
+pub fn (mut this Slab) sfree(ptr voidptr) {
+	this.@lock.acquire()
+	defer {
+		this.@lock.release()
+	}
+
+	if ptr == voidptr(0) {
+		return
+	}
+
+	mut new_head := &u64(ptr)
+	unsafe { new_head[0] = this.first_free }
+
+	this.first_free = u64(new_head)
+}
+
+
+__global (
+	slabs [10]Slab
+)
+
+
 struct MallocMetadata {
 mut:
 	pages u64
@@ -163,16 +250,45 @@ pub fn free(ptr voidptr) {
 		return
 	}
 
+	if u64(ptr) & u64(0xfff) == 0 {
+		big_free(ptr)
+		return
+	}
+
+	mut slab_hdr := &SlabHeader(u64(ptr) & ~u64(0xfff))
+
+	slab_hdr.slab.sfree(ptr)
+}
+
+fn big_free(ptr voidptr) {
 	metadata := &MallocMetadata(u64(ptr) - bitmap_granularity)
 
 	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
 
+fn slab_for(size u64) ?&Slab {
+	for mut s in slabs {
+		if s.ent_size >= size {
+			return unsafe { s }
+		}
+	}
+
+	return none
+}
+
 [export: 'malloc']
 pub fn malloc(size u64) voidptr {
+	mut slab := slab_for(8 + size) or {
+		return big_alloc(size)
+	}
+
+	return slab.alloc()
+}
+
+fn big_alloc(size u64) voidptr {
 	page_count := lib.div_roundup(size, bitmap_granularity)
 
-	ptr := pmm_alloc(page_count + 1, 16)
+	ptr := pmm_alloc(page_count + 1, page_size)
 
 	if ptr == 0 {
 		return 0
@@ -192,6 +308,24 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 		return malloc(new_size)
 	}
 
+	if u64(ptr) & u64(0xfff) == 0 {
+		return big_realloc(ptr, new_size)
+	}
+
+	slab_hdr := &SlabHeader(u64(ptr) & ~u64(0xfff))
+	mut slab := slab_hdr.slab
+
+	if new_size > slab.ent_size {
+		mut new_ptr := malloc(new_size)
+		unsafe { C.memcpy(new_ptr, ptr, slab.ent_size) }
+		slab.sfree(ptr)
+		return new_ptr
+	}
+
+	return ptr
+}
+
+fn big_realloc(ptr voidptr, new_size u64) voidptr {
 	mut metadata := &MallocMetadata(u64(ptr) - bitmap_granularity)
 
 	if lib.div_roundup(metadata.size, bitmap_granularity) == lib.div_roundup(new_size, bitmap_granularity) {
