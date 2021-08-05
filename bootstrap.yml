@@ -55,7 +55,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'v-11784279ba5132a7e44c588105479a61dbd8ecae'
     patch-path-strip: 3
-    version: '6.rolling'
+    version: '7.rolling'
 
   - name: vc
     subdir: '3rdparty'
@@ -63,7 +63,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'vc-1b2f58c6936b92db87f5e208cae011512be21b74'
     patch-path-strip: 3
-    version: '6.rolling'
+    version: '7.rolling'
 
   - name: limine
     subdir: '3rdparty'
