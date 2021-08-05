@@ -18,6 +18,7 @@ import kprint
 import pipe
 import futex
 import pci
+import dev.ata
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -39,6 +40,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	initramfs.init(modules_tag)
 
 	console.initialise()
+	ata.initialise()
 
 	userland.start_program(false, vfs_root, '/usr/bin/bash', ['/usr/bin/bash'],
 							['HOME=/root',

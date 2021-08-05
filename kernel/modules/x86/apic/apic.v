@@ -15,12 +15,12 @@ const lapic_reg_timer_div = 0x3e0
 
 fn lapic_read(reg u32) u32 {
 	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
-	return kio.mmind(lapic_base + reg)
+	return kio.mmin(&u32(lapic_base + reg))
 }
 
 fn lapic_write(reg u32, val u32) {
 	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
-	kio.mmoutd(lapic_base + reg, val)
+	kio.mmout(&u32(lapic_base + reg), val)
 }
 
 fn pit_current_count() u16 {
@@ -92,14 +92,14 @@ pub fn lapic_send_ipi(lapic_id byte, vector byte) {
 
 fn io_apic_read(io_apic int, reg u32) u32 {
 	base := u64(madt_io_apics[io_apic].address) + higher_half
-	kio.mmoutd(base, reg)
-	return kio.mmind(base + 16)
+	kio.mmout(&u32(base), reg)
+	return kio.mmin(&u32(base + 16))
 }
 
 fn io_apic_write(io_apic int, reg u32, value u32) {
 	base := u64(madt_io_apics[io_apic].address) + higher_half
-	kio.mmoutd(base, reg)
-	kio.mmoutd(base + 16, value)
+	kio.mmout(&u32(base), reg)
+	kio.mmout(&u32(base + 16), value)
 }
 
 fn io_apic_gsi_count(io_apic int) u32 {

@@ -23,6 +23,16 @@ void *memset(void *s, int c, size_t n) {
     return s;
 }
 
+void *memset64(void *s, int c, size_t n) {
+    uint64_t *p = (uint64_t *)s;
+
+    for (size_t i = 0; i < n; i++) {
+        p[i] = (uint64_t)c;
+    }
+
+    return s;
+}
+
 void *memmove(void *dest, const void *src, size_t n) {
     uint8_t *pdest = (uint8_t *)dest;
     const uint8_t *psrc = (const uint8_t *)src;
