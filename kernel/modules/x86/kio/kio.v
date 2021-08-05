@@ -21,8 +21,8 @@ pub fn port_out<T>(port u16, value T) {
 	}
 }
 
-pub fn mmind(addr u64) u32 {
-	mut ret := u32(0)
+pub fn mmin<T>(addr &T) T {
+	mut ret := T(0)
 	asm volatile amd64 {
 		mov ret, [addr]
 		; =r (ret)
@@ -32,7 +32,7 @@ pub fn mmind(addr u64) u32 {
 	return ret
 }
 
-pub fn mmoutd(addr u64, value u32) {
+pub fn mmout<T>(addr &T, value T) {
 	asm volatile amd64 {
 		mov [addr], value
 		;
