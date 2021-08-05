@@ -320,7 +320,7 @@ packages:
       extract_path: 'bash-5.1.8'
       patch-path-strip: 3
       version: '5.1.8'
-    revision: 2
+    revision: 3
     tools_required:
       - host-gcc
     pkgs_required:
@@ -337,6 +337,9 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/bin']
+      - args: ['ln', '-s', '/usr/bin/bash', '@THIS_COLLECT_DIR@/bin/bash']
+      - args: ['ln', '-s', '/usr/bin/bash', '@THIS_COLLECT_DIR@/bin/sh']
 
   - name: v
     from_source: v
@@ -354,7 +357,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '34.rolling'
+      version: '35.rolling'
     tools_required:
       - host-v
       - host-gcc
@@ -582,6 +585,7 @@ packages:
 
   - name: gcc
     from_source: gcc
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
@@ -607,3 +611,4 @@ packages:
       - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc'] #, 'install-strip-target-libstdc++-v3']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
