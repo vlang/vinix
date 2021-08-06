@@ -51,7 +51,7 @@ fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &
 				parent: unsafe { parent }
 				mountpoint: voidptr(0)
 				redir: voidptr(0)
-				children: 0
+				children: voidptr(0)
 				resource: &resource.Resource(voidptr(0))
 				filesystem: unsafe { filesystem }
 			}
@@ -648,8 +648,8 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 	if dir_handle.dirlist_valid == false {
 		dir_handle.dirlist.clear()
 		mut i := u64(0)
-		for name, orig_node in dir_node.children {
-			node := reduce_node(orig_node, false)
+		for name, mut orig_node in dir_node.children {
+			node := reduce_node(unsafe { orig_node[0] }, false)
 			t := match node.resource.stat.mode & stat.ifmt {
 				stat.ifchr {
 					stat.dt_chr
