@@ -1,0 +1,13 @@
+diff --git a/3rdparty/gawk-orig/config.sub b/3rdparty/gawk-workdir/config.sub
+index f02d43a..3866d45 100755
+--- a/3rdparty/gawk-orig/config.sub
++++ b/3rdparty/gawk-workdir/config.sub
+@@ -1366,7 +1366,7 @@ case $os in
+ 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+-	     | nsk* | powerunix)
++	     | nsk* | powerunix | vinix*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	qnx*)
