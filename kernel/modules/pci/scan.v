@@ -52,37 +52,58 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 	if device.device_id == 0xffff && device.vendor_id == 0xffff {
 		return
 	}
-	scanned_devices << device
-	print('pci: Found [${device.bus:x}:${device.slot:x}:${device.function:x}:${device.parent:x}]\n')
-	// TODO: Support bridges.
+
+	// Handle PCI to PCI bridges, and we are done.
+	if device.class == 0x6 && device.subclass == 0x4 {
+		config := device.read<u32>(0x18)
+		check_bus(byte(config >> 8), 1)
+	} else {
+		scanned_devices << device
+		print('pci: Found [${device.bus:x}:${device.slot:x}:${device.function:x}:${device.parent:x}]\n')
+	}
 }
 
-pub fn get_device_by_vendor(vendor_id u16, device_id u16) ?&PCIDevice {
+pub fn get_device_by_vendor(vendor_id u16, device_id u16, index u32) ?&PCIDevice {
+	mut count := 0
 	for device in scanned_devices {
 		if device.vendor_id == vendor_id && device.device_id == device_id {
-			return unsafe { device }
+			if count == index {
+				return unsafe { device }
+			} else {
+				count += 1
+			}
 		}
 	}
 	return none
 }
 
-pub fn get_device_by_coordinates(bus byte, slot byte, function byte) ?&PCIDevice {
+pub fn get_device_by_coordinates(bus byte, slot byte, function byte, index u32) ?&PCIDevice {
+	mut count := 0
 	for device in scanned_devices {
 		if device.bus == bus
 		&& device.slot == slot
 		&& device.function == function {
-			return unsafe { device }
+			if count == index {
+				return unsafe { device }
+			} else {
+				count += 1
+			}
 		}
 	}
 	return none
 }
 
-pub fn get_device_by_class(class byte, subclass byte, progif byte) ?&PCIDevice {
+pub fn get_device_by_class(class byte, subclass byte, progif byte, index u32) ?&PCIDevice {
+	mut count := 0
 	for device in scanned_devices {
 		if device.class == class
 		&& device.subclass == subclass
 		&& device.prog_if == progif {
-			return unsafe { device }
+			if count == index {
+				return unsafe { device }
+			} else {
+				count += 1
+			}
 		}
 	}
 	return none

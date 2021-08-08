@@ -53,7 +53,7 @@ pub mut:
 
 pub fn initialise() {
 	// Fetch and setup the PCI device.
-	mut dev := pci.get_device_by_class(pci_class, pci_subclass, pci_progif) or {
+	mut dev := pci.get_device_by_class(pci_class, pci_subclass, pci_progif, 0) or {
 		print('ata: No suitable PCI devices found\n')
 		return
 	}
