@@ -139,7 +139,7 @@ fn add_to_buf(ptr &byte, count u64) {
 		// TODO: Accept signal characters
 		unsafe { add_to_buf_char(ptr[i]) }
 	}
-	event.trigger(console_event, true)
+	event.trigger(mut console_event, false)
 }
 
 fn keyboard_handler() {
@@ -150,8 +150,8 @@ fn keyboard_handler() {
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
 	for {
-		mut which := u64(0)
-		event.await([&int_events[vect]], &which, true) or {}
+		mut events := [&int_events[vect]]
+		event.await(mut events, true) or {}
 		input_byte := read_ps2()
 
 		if input_byte == 0xe0 {
@@ -359,8 +359,8 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 	mut buf := &byte(void_buf)
 
 	for console_read_lock.test_and_acquire() == false {
-		mut which := u64(0)
-		event.await([&console_event], &which, true) or {
+		mut events := [&console_event]
+		event.await(mut events, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
@@ -381,8 +381,8 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 			if wait == true {
 				console_read_lock.release()
 				for {
-					mut which := u64(0)
-					event.await([&console_event], &which, true) or {
+					mut events := [&console_event]
+					event.await(mut events, true) or {
 						errno.set(errno.eintr)
 						return none
 					}

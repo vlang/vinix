@@ -42,7 +42,7 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 	return ret
 }
 
-pub fn inc<T>(var &T) {
+pub fn inc<T>(var &T) T {
 	mut diff := T(1)
 	unsafe { asm volatile amd64 {
 		lock
@@ -52,6 +52,7 @@ pub fn inc<T>(var &T) {
 		;
 		; memory
 	} }
+	return diff
 }
 
 pub fn dec<T>(var &T) bool {

@@ -356,14 +356,9 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 		events << &child.event
 	}
 
-	mut which := u64(0)
 	block := options & wnohang == 0
-	event.await(events, &which, block) or {
+	which := event.await(mut events, block) or {
 		return -1, errno.eintr
-	}
-
-	if which == -1 {
-		return 0, 0
 	}
 
 	if voidptr(child) == voidptr(0) {
@@ -415,7 +410,7 @@ pub fn syscall_exit(_ voidptr, status int) {
 	mmap.delete_pagemap(old_pagemap) or {}
 
 	katomic.store(current_process.status, status | 0x200)
-	event.trigger(current_process.event, true)
+	event.trigger(mut current_process.event, false)
 
 	sched.dequeue_and_die()
 }

@@ -2,134 +2,122 @@ module event
 
 import proc
 import sched
-import katomic
 import eventstruct
 import x86.cpu.local as cpulocal
 
-pub fn await(events []&eventstruct.Event, which &u64, block bool) ? {
-	if events.len > 16 {
-		panic('kevent: Too many events!')
-	}
-
-	mut ret := true
-
-	mut thread := proc.current_thread()
-
-	thread.event_block_dequeue.release()
-	thread.event_occurred.release()
-
-	mut listeners := [16]&eventstruct.EventListener{}
-	mut listeners_armed := u64(0)
-
+fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	for i := u64(0); i < events.len; i++ {
-		mut event := events[i]
+		events[i].@lock.acquire()
 
-		if katomic.load(event.pending) > 0
-		&& thread.event_occurred.test_and_acquire() == true {
-			katomic.dec(event.pending)
-			unsafe {
-				which[0] = i
-				goto unarm_listeners
-			}
+		if events[i].pending > 0 {
+			events[i].pending--
+			events[i].@lock.release()
+			return i
 		}
 
-		if thread.event_occurred.test_and_acquire() == false {
-			unsafe { goto unarm_listeners }
-		}
-		thread.event_occurred.release()
-
-		mut listener := event.get_listener()
-		if listener == 0 {
-			panic('listeners exhausted')
-		}
-
-		listener.thread = thread
-		listener.which  = unsafe { which }
-		listener.index  = i
-		listener.ready.acquire()
-
-		listeners[i] = listener
-		listeners_armed = i + 1
+		events[i].@lock.release()
 	}
 
-	if block == false && thread.event_occurred.test_and_acquire() == true {
-		unsafe {
-			which[0] = -1
-			goto unarm_listeners
+	return none
+}
+
+fn attach_listeners(mut events []&eventstruct.Event, thread voidptr) {
+	for mut e in events {
+		e.@lock.acquire()
+
+		if e.listeners_i == eventstruct.max_listeners {
+			panic('event listeners exhausted')
 		}
-	}
 
-	if thread.event_block_dequeue.test_and_acquire() == true {
-		sched.dequeue_and_yield()
-		if katomic.load(thread.enqueued_by_signal) == true {
-			ret = false
-		}
-	}
+		e.listeners[e.listeners_i] = voidptr(thread)
 
-unarm_listeners:
-	for i := u64(0); i < listeners_armed; i++ {
-		mut listener := listeners[i]
-		listener.ready.release()
-		listener.l.release()
-	}
+		e.listeners_i++
 
-	if ret == false {
-		return error('')
+		e.@lock.release()
 	}
 }
 
-pub fn trigger(event &eventstruct.Event, enqueue bool) u64 {
-	mut this := unsafe { event }
-	mut ret := u64(0)
+fn detach_listeners(mut events []&eventstruct.Event, thread voidptr) {
+	for mut e in events {
+		e.@lock.acquire()
 
-	if katomic.load(this.pending) > 0 {
-		if enqueue == true {
-			katomic.inc(this.pending)
+		for i := u64(0); i < e.listeners_i; i++ {
+			if e.listeners[i] == thread {
+				e.listeners_i--
+				for j := i; j < e.listeners_i; j++ {
+					e.listeners[j] = e.listeners[j + 1]
+				}
+
+				break
+			}
 		}
+
+		e.@lock.release()
+	}
+}
+
+pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
+	mut thread := proc.current_thread()
+	mut sig := false
+
+	for {
+		if i := check_for_pending(mut events) {
+			return i
+		}
+
+		if sig == true {
+			return none
+		}
+
+		if block == false {
+			return none
+		}
+
+		thread.event_lock.acquire()
+
+		attach_listeners(mut events, voidptr(thread))
+
+		asm volatile amd64 { cli }
+
+		sched.dequeue_thread(cpulocal.current().current_thread)
+
+		thread.event_lock.release()
+
+		sched.yield(true)
+
+		if thread.enqueued_by_signal {
+			sig = true
+		}
+
+		detach_listeners(mut events, voidptr(thread))
+	}
+
+	return none
+}
+
+pub fn trigger(mut event &eventstruct.Event, drop bool) u64 {
+	event.@lock.acquire()
+	defer {
+		event.@lock.release()
+	}
+
+	if event.listeners_i == 0 && drop {
 		return 0
 	}
 
-	mut pending := true
+	for i := u64(0); i < event.listeners_i; i++ {
+		mut thread := &proc.Thread(event.listeners[i])
 
-	for i := u64(0); i < this.listeners.len; i++ {
-		mut listener := &this.listeners[i]
-
-		if listener.l.test_and_acquire() == true {
-			listener.l.release()
-			continue
-		}
-
-		if listener.ready.test_and_acquire() == true {
-			listener.ready.release()
-			continue
-		}
-
-		mut thread := &proc.Thread(listener.thread)
-
-		if thread.event_occurred.test_and_acquire() == false {
-			continue
-		}
-
-		pending = false
-
-		unsafe { listener.which[0] = listener.index }
-
-		if thread.event_block_dequeue.test_and_acquire() == false {
-			for katomic.load(thread.is_in_queue) == true {}
-		}
+		thread.event_lock.acquire()
 
 		sched.enqueue_thread(thread, false)
-		ret++
 
-		listener.l.release()
-		listener.ready.release()
+		thread.event_lock.release()
 	}
 
-	if pending == true && enqueue == true {
-		katomic.inc(this.pending)
-	}
+	event.pending++
 
-	return ret
+	return event.listeners_i
 }
 
 pub fn pthread_exit(ret voidptr) {
@@ -142,14 +130,14 @@ pub fn pthread_exit(ret voidptr) {
 	cpulocal.current().current_thread = voidptr(0)
 
 	current_thread.exit_value = ret
-	trigger(current_thread.exited, true)
+	trigger(mut current_thread.exited, false)
 
 	sched.yield(false)
 }
 
 pub fn pthread_wait(thread &proc.Thread) voidptr {
-	mut which := u64(0)
-	await([&thread.exited], &which, true) or {}
+	mut events := [&thread.exited]
+	await(mut events, true) or {}
 	exit_value := thread.exit_value
 	unsafe { free(thread) }
 	return exit_value

@@ -85,8 +85,8 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 			return 0
 		}
 		this.l.release()
-		mut which := u64(0)
-		event.await([&this.event], &which, true) or {
+		mut events := [&this.event]
+		event.await(mut events, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
@@ -122,7 +122,7 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	this.read_ptr = new_ptr_loc
 	this.used -= count
 
-	event.trigger(this.event, true)
+	event.trigger(mut this.event, false)
 
 	return i64(count)
 }
@@ -139,8 +139,8 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	for katomic.load(this.used) == this.capacity {
 		// We don't do nonblock yet
 		this.l.release()
-		mut which := u64(0)
-		event.await([&this.event], &which, true) or {
+		mut events := [&this.event]
+		event.await(mut events, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
@@ -176,7 +176,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	this.write_ptr = new_ptr_loc
 	this.used += count
 
-	event.trigger(this.event, true)
+	event.trigger(mut this.event, false)
 
 	return i64(count)
 }
@@ -187,7 +187,7 @@ fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 
 fn (mut this Pipe) close(handle voidptr) ? {
 	this.refcount--
-	event.trigger(this.event, true)
+	event.trigger(mut this.event, false)
 }
 
 fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {

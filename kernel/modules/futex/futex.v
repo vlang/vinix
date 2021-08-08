@@ -42,8 +42,8 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 
 	futex_lock.release()
 
-	mut which := u64(0)
-	event.await([e], &which, true) or {
+	mut events := [e]
+	event.await(mut events, true) or {
 		return -1, errno.eintr
 	}
 
@@ -72,7 +72,7 @@ pub fn syscall_futex_wake(_ voidptr, ptr &int) (u64, u64) {
 		return 0, 0
 	}
 
-	ret := event.trigger(futexes[phys], false)
+	ret := event.trigger(mut futexes[phys], true)
 
 	return ret, 0
 }
