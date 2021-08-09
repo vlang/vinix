@@ -91,6 +91,11 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 		cpu.wrxcr(0, xcr0)
 
+		success, _, _, c, _ = cpu.cpuid(0xd, 0)
+		if success == false {
+			panic('CPUID failure')
+		}
+
 		fpu_storage_size = u64(c)
 		fpu_save = cpu.xsave
 		fpu_restore = cpu.xrstor
