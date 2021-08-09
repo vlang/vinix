@@ -44,7 +44,6 @@ pub mut:
 	pf_stack u64
 	cr3 u64
 	fpu_storage voidptr
-	event_lock klock.Lock
 	yield_await klock.Lock
 	timeslice u64
 	exit_value voidptr

@@ -2,6 +2,16 @@ module cpu
 
 import msr
 
+pub fn interrupt_state() bool {
+	mut f := u64(0)
+	asm volatile amd64 {
+		pushfq
+		pop f
+		; =rm (f)
+	}
+	return f & (1 << 9) != 0
+}
+
 pub fn set_gs_base(ptr u64) {
 	msr.wrmsr(0xc0000101, ptr)
 }
