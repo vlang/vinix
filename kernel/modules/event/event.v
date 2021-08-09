@@ -18,14 +18,19 @@ fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 }
 
 fn attach_listeners(mut events []&eventstruct.Event, thread voidptr) {
-	for mut e in events {
-		if e.listeners_i == eventstruct.max_listeners {
+	for i := u64(0); i < events.len; i++ {
+		mut event := events[i]
+
+		if event.listeners_i == eventstruct.max_listeners {
 			panic('event listeners exhausted')
 		}
 
-		e.listeners[e.listeners_i] = voidptr(thread)
+		mut listener := &event.listeners[event.listeners_i]
 
-		e.listeners_i++
+		listener.thread = voidptr(thread)
+		listener.which = i
+
+		event.listeners_i++
 	}
 }
 
@@ -43,36 +48,34 @@ fn unlock_events(mut events []&eventstruct.Event) {
 
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	mut thread := proc.current_thread()
-	mut sig := false
 
-	for {
-		asm volatile amd64 { cli }
+	asm volatile amd64 { cli }
 
-		lock_events(mut events)
+	lock_events(mut events)
 
-		if i := check_for_pending(mut events) {
-			unlock_events(mut events)
-			return i
-		}
-
-		if block == false || sig == true {
-			return none
-		}
-
-		attach_listeners(mut events, voidptr(thread))
-
-		sched.dequeue_thread(cpulocal.current().current_thread)
-
+	if i := check_for_pending(mut events) {
 		unlock_events(mut events)
-
-		sched.yield(true)
-
-		if thread.enqueued_by_signal {
-			sig = true
-		}
+		return i
 	}
 
-	return none
+	if block == false {
+		unlock_events(mut events)
+		return none
+	}
+
+	attach_listeners(mut events, voidptr(thread))
+
+	sched.dequeue_thread(cpulocal.current().current_thread)
+
+	unlock_events(mut events)
+
+	sched.yield(true)
+
+	if thread.enqueued_by_signal {
+		return none
+	}
+
+	return thread.which_event
 }
 
 pub fn trigger(mut event &eventstruct.Event, drop bool) u64 {
@@ -90,19 +93,23 @@ pub fn trigger(mut event &eventstruct.Event, drop bool) u64 {
 		event.@lock.release()
 	}
 
-	if event.listeners_i == 0 && drop == true {
+	if event.listeners_i == 0 {
+		if drop == false {
+			event.pending++
+		}
 		return 0
 	}
 
 	for i := u64(0); i < event.listeners_i; i++ {
-		mut thread := &proc.Thread(event.listeners[i])
+		mut thread := &proc.Thread(event.listeners[i].thread)
+
+		thread.which_event = event.listeners[i].which
 
 		sched.enqueue_thread(thread, false)
 	}
 
 	ret := event.listeners_i
 
-	event.pending++
 	event.listeners_i = 0
 
 	return ret

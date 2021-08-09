@@ -46,6 +46,7 @@ pub mut:
 	fpu_storage voidptr
 	yield_await klock.Lock
 	timeslice u64
+	which_event u64
 	exit_value voidptr
 	exited eventstruct.Event
 	errno u64
