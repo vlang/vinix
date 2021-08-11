@@ -1,5 +1,7 @@
 KERNEL_HDD = vinix.hdd
 
+export PATH := $(PATH):/usr/sbin
+
 .PHONY: all
 all: vinix.iso
 
