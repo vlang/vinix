@@ -356,7 +356,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '38.rolling'
+      version: '39.rolling'
     tools_required:
       - host-v
       - host-gcc

@@ -319,7 +319,7 @@ fn (mut dev ATADrive) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut dev ATADrive) close(handle voidptr) ? {
+fn (mut dev ATADrive) unref(handle voidptr) ? {
 	dev.l.acquire()
 	dev.refcount--
 	dev.l.release()

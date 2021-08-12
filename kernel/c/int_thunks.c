@@ -37,6 +37,7 @@ extern char userland__syscall_getpid[];
 extern char userland__syscall_getppid[];
 extern char fs__syscall_readlinkat[];
 extern char memory__mmap__syscall_munmap[];
+extern char fs__syscall_unlinkat[];
 
 __attribute__((used)) void *syscall_table[] = {
     kprint__syscall_kprint, // 0
@@ -74,6 +75,7 @@ __attribute__((used)) void *syscall_table[] = {
     userland__syscall_getppid, // 32
     fs__syscall_readlinkat, // 33
     memory__mmap__syscall_munmap, // 34
+    fs__syscall_unlinkat, // 35
 };
 
 extern char interrupt_thunk_begin[], interrupt_thunk_end[], interrupt_thunk_storage[];

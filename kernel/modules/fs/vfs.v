@@ -282,6 +282,19 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	return target_node
 }
 
+pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
+	mut parent_of_tgt, mut node, basename := path2node(parent, name)
+
+	if stat.isdir(node.resource.stat.mode) && remove_dir == false {
+		errno.set(errno.eisdir)
+		return error('')
+	}
+
+	parent_of_tgt.children.delete(basename)
+
+	node.resource.unref(voidptr(0)) ?
+}
+
 pub fn create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	vfs_lock.acquire()
 	ret := internal_create(parent, name, mode) ?
@@ -314,6 +327,31 @@ fn fdnum_create_from_node(node &VFSNode, flags int, oldfd int, specific bool) ?i
 	}
 	fd.handle.node = voidptr(node)
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific)
+}
+
+pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: unlinkat(%d, %s, 0x%x)\n', dirfd, _path, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return -1, errno.enoent
+	}
+
+	parent := get_parent_dir(dirfd, path) or {
+		return -1, errno.get()
+	}
+
+	remove_dir := flags & at_removedir != 0
+
+	unlink(parent, path, remove_dir) or {
+		return -1, errno.get()
+	}
+
+	return 0, 0
 }
 
 pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64) {

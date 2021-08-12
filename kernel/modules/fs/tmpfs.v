@@ -68,8 +68,13 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this TmpFSResource) close(handle voidptr) ? {
+fn (mut this TmpFSResource) unref(handle voidptr) ? {
 	this.refcount--
+
+	if this.refcount == 0 && stat.isreg(this.stat.mode) {
+		memory.free(this.storage)
+		unsafe { free(this) }
+	}
 }
 
 fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
@@ -117,7 +122,10 @@ fn (mut this TmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNo
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
-	mut new_resource := &TmpFSResource{storage: 0}
+	mut new_resource := &TmpFSResource{
+		storage: 0
+		refcount: 1
+	}
 
 	if stat.isreg(mode) {
 		new_resource.capacity = 4096
@@ -140,7 +148,10 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
 	mut new_node := create_node(this, parent, target, false)
 
-	mut new_resource := &TmpFSResource(memory.malloc(sizeof(TmpFSResource)))
+	mut new_resource := &TmpFSResource{
+		storage: 0
+		refcount: 1
+	}
 
 	new_resource.stat.size = u64(target.len)
 	new_resource.stat.blocks = 0

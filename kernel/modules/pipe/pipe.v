@@ -185,7 +185,7 @@ fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this Pipe) close(handle voidptr) ? {
+fn (mut this Pipe) unref(handle voidptr) ? {
 	this.refcount--
 	event.trigger(mut this.event, false)
 }

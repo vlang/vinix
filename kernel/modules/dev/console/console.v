@@ -438,7 +438,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 }
 
-fn (mut this Console) close(handle voidptr) ? {
+fn (mut this Console) unref(handle voidptr) ? {
 	this.refcount--
 }
 

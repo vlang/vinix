@@ -98,7 +98,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 	mut handle := fd.handle
 	mut res := handle.resource
 
-	res.close(voidptr(handle)) ?
+	res.unref(voidptr(handle)) ?
 
 	handle.refcount--
 	if handle.refcount == 0 {
