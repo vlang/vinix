@@ -51,19 +51,19 @@ sources:
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://github.com/vlang/v/archive/11784279ba5132a7e44c588105479a61dbd8ecae.tar.gz'
+    url: 'https://github.com/vlang/v/archive/9c74fb0449ebe23daf3122d1e949d0baafe7867c.tar.gz'
     format: 'tar.gz'
-    extract_path: 'v-11784279ba5132a7e44c588105479a61dbd8ecae'
+    extract_path: 'v-9c74fb0449ebe23daf3122d1e949d0baafe7867c'
     patch-path-strip: 3
-    version: '7.rolling'
+    version: '8.rolling'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://github.com/vlang/vc/archive/1b2f58c6936b92db87f5e208cae011512be21b74.tar.gz'
+    url: 'https://github.com/vlang/vc/archive/00229977a2c8f1f7e3465c943751d50cdb03cdf9.tar.gz'
     format: 'tar.gz'
-    extract_path: 'vc-1b2f58c6936b92db87f5e208cae011512be21b74'
+    extract_path: 'vc-00229977a2c8f1f7e3465c943751d50cdb03cdf9'
     patch-path-strip: 3
-    version: '7.rolling'
+    version: '8.rolling'
 
   - name: limine
     subdir: '3rdparty'
