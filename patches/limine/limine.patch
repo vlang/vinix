@@ -1,3 +1,39 @@
+diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
+index 61784ed..457f9c9 100644
+--- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c
++++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
+@@ -175,6 +175,13 @@ void text_get_cursor_pos(int *x, int *y) {
+ }
+ 
+ void text_move_character(int new_x, int new_y, int old_x, int old_y) {
++    if (old_x >= VD_COLS / 2 || old_x < 0
++     || old_y >= VD_ROWS || old_y < 0
++     || new_x >= VD_COLS / 2 || new_x < 0
++     || new_y >= VD_ROWS || new_y < 0) {
++        return;
++    }
++
+     current_buffer[new_y * VD_COLS + new_x * 2] = current_buffer[old_y * VD_COLS + old_x * 2];
+     if (current_buffer == front_buffer) {
+         video_mem[new_y * VD_COLS + new_x * 2] = current_buffer[old_y * VD_COLS + old_x * 2];
+diff --git a/3rdparty/limine-orig/stage23/lib/gterm.c b/3rdparty/limine-workdir/stage23/lib/gterm.c
+index 56ea1e2..ab19d04 100644
+--- a/3rdparty/limine-orig/stage23/lib/gterm.c
++++ b/3rdparty/limine-workdir/stage23/lib/gterm.c
+@@ -377,6 +377,13 @@ void gterm_get_cursor_pos(int *x, int *y) {
+ }
+ 
+ void gterm_move_character(int new_x, int new_y, int old_x, int old_y) {
++    if (old_x >= cols || old_x < 0
++     || old_y >= rows || old_y < 0
++     || new_x >= cols || new_x < 0
++     || new_y >= rows || new_y < 0) {
++        return;
++    }
++
+     if (!double_buffer_enabled) {
+         gterm_plot_char(&grid[old_x + old_y * cols],
+                         frame_width + new_x * VGA_FONT_WIDTH,
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
 index d95f350..f74b0ef 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
@@ -15,7 +51,7 @@ index d95f350..f74b0ef 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..60f27f4 100644
+index a89e4ea..21ff39e 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -45,6 +81,27 @@ index a89e4ea..60f27f4 100644
  }
  
  static void control_sequence_parse(uint8_t c) {
+@@ -332,6 +338,20 @@ static void control_sequence_parse(uint8_t c) {
+                     break;
+             }
+             break;
++        case '@': {
++            bool r = scroll_disable();
++            int x, y;
++            get_cursor_pos(&x, &y);
++            for (size_t i = term_cols - 1; i >= (size_t)x; i--) {
++                term_move_character(i + esc_values[0], y, i, y);
++                set_cursor_pos(i, y);
++                raw_putchar(' ');
++            }
++            set_cursor_pos(x, y);
++            if (r)
++                scroll_enable();
++            break;
++        }
+         case 'P': {
+             bool r = scroll_disable();
+             int x, y;
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 index 945f962..47ff1c4 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
