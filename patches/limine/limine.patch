@@ -15,7 +15,7 @@ index d95f350..f74b0ef 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index 3fa809b..3181e46 100644
+index a89e4ea..60f27f4 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -35,76 +35,7 @@ index 3fa809b..3181e46 100644
  #if bios == 1
  void term_textmode(void) {
      term_backend = NOT_READY;
-@@ -101,9 +104,11 @@ static bool control_sequence = false;
- static bool escape = false;
- static bool rrr = false;
- static bool dec_private = false;
-+static bool bold = false;
- static int32_t esc_values[MAX_ESC_VALUES];
- static size_t esc_values_i = 0;
- static int saved_cursor_x = 0, saved_cursor_y = 0;
-+static int current_fg = -1;
- 
- static void sgr(void) {
-     size_t i = 0;
-@@ -112,15 +117,38 @@ static void sgr(void) {
-         goto def;
- 
-     for (; i < esc_values_i; i++) {
--        if (!esc_values[i]) {
-+        if (esc_values[i] == 0) {
- def:
-+            bold = false;
-+            current_fg = -1;
-             set_text_bg_default();
-             set_text_fg_default();
-             continue;
-         }
- 
-+        if (esc_values[i] == 1) {
-+            bold = true;
-+            if (current_fg != -1) {
-+                set_text_fg_bright(current_fg);
-+            }
-+            continue;
-+        }
-+
-+        if (esc_values[i] == 22) {
-+            bold = false;
-+            if (current_fg != -1) {
-+                set_text_fg(current_fg);
-+            }
-+            continue;
-+        }
-+
-         if (esc_values[i] >= 30 && esc_values[i] <= 37) {
--            set_text_fg(esc_values[i] - 30);
-+            current_fg = esc_values[i] - 30;
-+            if (bold) {
-+                set_text_fg_bright(esc_values[i] - 30);
-+            } else {
-+                set_text_fg(esc_values[i] - 30);
-+            }
-             continue;
-         }
- 
-@@ -130,6 +158,7 @@ def:
-         }
- 
-         if (esc_values[i] >= 90 && esc_values[i] <= 97) {
-+            current_fg = esc_values[i] - 90;
-             set_text_fg_bright(esc_values[i] - 90);
-             continue;
-         }
-@@ -140,6 +169,7 @@ def:
-         }
- 
-         if (esc_values[i] == 39) {
-+            current_fg = -1;
-             set_text_fg_default();
-             continue;
-         }
-@@ -164,6 +194,9 @@ static void dec_private_parse(uint8_t c) {
+@@ -191,6 +194,9 @@ static void dec_private_parse(uint8_t c) {
              }
          }
      }
@@ -114,32 +45,8 @@ index 3fa809b..3181e46 100644
  }
  
  static void control_sequence_parse(uint8_t c) {
-@@ -205,6 +238,11 @@ static void control_sequence_parse(uint8_t c) {
-         goto cleanup;
-     }
- 
-+    if (dec_private == true) {
-+        dec_private_parse(c);
-+        goto cleanup;
-+    }
-+
-     switch (c) {
-         case 'A':
-             if (esc_values[0] > get_cursor_pos_y())
-@@ -384,6 +422,11 @@ static void escape_parse(uint8_t c) {
-             rrr = false;
-             control_sequence = true;
-             break;
-+        case '\a':
-+            // The bell is handled by the kernel
-+            if (term_callback != NULL)
-+                term_callback(TERM_CB_BELL, 0, 0, 0);
-+            break;
-         default:
-             escape = false;
-             break;
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-index bc6d459..04f2c05 100644
+index 945f962..fbf5588 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 @@ -58,6 +58,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
@@ -151,7 +58,7 @@ index bc6d459..04f2c05 100644
  #endif
  
  void stivale2_load(char *config, char *cmdline, bool pxe, void *efi_system_table) {
-@@ -394,6 +396,17 @@ failed_to_load_header_section:
+@@ -407,6 +409,17 @@ failed_to_load_header_section:
          struct stivale2_struct_tag_terminal *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_terminal));
          tag->tag.identifier = STIVALE2_STRUCT_TAG_TERMINAL_ID;
  

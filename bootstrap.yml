@@ -67,11 +67,11 @@ sources:
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.43/limine-v2.43.tar.xz
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.44/limine-v2.44.tar.xz
     format: 'tar.xz'
-    extract_path: 'limine-v2.43'
+    extract_path: 'limine-v2.44'
     patch-path-strip: 3
-    version: '2.43'
+    version: '2.44'
 
 tools:
   - name: host-autoconf-v2.69
@@ -118,7 +118,6 @@ tools:
 
   - name: host-limine
     from_source: limine
-    revision: 2
     tools_required:
       - host-gcc
     compile:
