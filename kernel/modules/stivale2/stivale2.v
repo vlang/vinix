@@ -156,13 +156,6 @@ __global (
 )
 
 pub fn terminal_init(stivale2_struct &Struct) {
-	framebuffer_tag := unsafe { &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id)) }
-	if framebuffer_tag == 0 {
-		panic('Bootloader does not provide framebuffer')
-		framebuffer_width = framebuffer_tag.width
-		framebuffer_height = framebuffer_tag.height
-	}
-
 	terminal_tag := unsafe { &TermTag(get_tag(stivale2_struct, stivale2.terminal_id)) }
 
 	if terminal_tag == 0 {
@@ -176,6 +169,16 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_print_ptr = terminal_tag.term_write
 	terminal_rows = terminal_tag.rows
 	terminal_cols = terminal_tag.cols
+
+	framebuffer_tag := unsafe { &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id)) }
+	if framebuffer_tag == 0 {
+		print('Bootloader does not provide framebuffer')
+		framebuffer_width = terminal_rows * 16
+		framebuffer_height = terminal_cols * 8
+	} else {
+		framebuffer_width = framebuffer_tag.width
+		framebuffer_height = framebuffer_tag.height
+	}
 }
 
 pub fn terminal_print(s charptr, len u64) {

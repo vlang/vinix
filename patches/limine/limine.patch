@@ -46,7 +46,7 @@ index a89e4ea..60f27f4 100644
  
  static void control_sequence_parse(uint8_t c) {
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-index 945f962..fbf5588 100644
+index 945f962..47ff1c4 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 @@ -58,6 +58,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
@@ -58,7 +58,38 @@ index 945f962..fbf5588 100644
  #endif
  
  void stivale2_load(char *config, char *cmdline, bool pxe, void *efi_system_table) {
-@@ -407,6 +409,17 @@ failed_to_load_header_section:
+@@ -393,20 +395,42 @@ failed_to_load_header_section:
+             parse_resolution(&req_width, &req_height, &req_bpp, resolution);
+     }
+ 
++    char *textmode_str = config_get_value(config, 0, "TEXTMODE");
++    bool textmode = textmode_str != NULL && strcmp(textmode_str, "yes") == 0;
++
+     struct stivale2_header_tag_terminal *terminal_hdr_tag = get_tag(&stivale2_hdr, STIVALE2_HEADER_TAG_TERMINAL_ID);
+ 
+-    if (bits == 64 && terminal_hdr_tag != NULL && hdrtag != NULL) {
+-        term_vbe(req_width, req_height);
++    if (bits == 64 && terminal_hdr_tag != NULL && (hdrtag != NULL || textmode)) {
++        if (textmode) {
++#if bios == 1
++            term_textmode();
++#elif uefi == 1
++            panic("stivale2: Text mode not supported on UEFI");
++#endif
++        } else {
++            term_vbe(req_width, req_height);
++
++            if (current_video_mode < 0) {
++                panic("stivale2: Failed to initialise terminal");
++            }
+ 
+-        if (current_video_mode < 0) {
+-            panic("stivale2: Failed to initialise terminal");
++            fb = &fbinfo;
+         }
+ 
+-        fb = &fbinfo;
+-
          struct stivale2_struct_tag_terminal *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_terminal));
          tag->tag.identifier = STIVALE2_STRUCT_TAG_TERMINAL_ID;
  
@@ -75,6 +106,38 @@ index 945f962..fbf5588 100644
 +
          // We provide max allowed string length
          tag->flags |= (1 << 1);
+ 
+@@ -431,7 +455,13 @@ failed_to_load_header_section:
+ 
+         append_tag(&stivale2_struct, (struct stivale2_tag *)tag);
+ 
+-        goto skip_modeset;
++        if (textmode) {
++#if bios == 1
++            goto have_tm_tag;
++#endif
++        } else {
++            goto have_fb_tag;
++        }
+     } else {
+         fb = &_fb;
+     }
+@@ -441,7 +471,7 @@ failed_to_load_header_section:
+         term_deinit();
+ 
+         if (fb_init(fb, req_width, req_height, req_bpp)) {
+-skip_modeset:;
++have_fb_tag:;
+             struct stivale2_struct_tag_framebuffer *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_framebuffer));
+             tag->tag.identifier = STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID;
+ 
+@@ -471,6 +501,7 @@ skip_modeset:;
+         int rows, cols;
+         init_vga_textmode(&rows, &cols, false);
+ 
++have_tm_tag:;
+         struct stivale2_struct_tag_textmode *tmtag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_textmode));
+         tmtag->tag.identifier = STIVALE2_STRUCT_TAG_TEXTMODE_ID;
  
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
 index 26517ca..873a8c4 100644
