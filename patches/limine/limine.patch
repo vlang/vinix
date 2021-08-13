@@ -35,10 +35,19 @@ index 56ea1e2..ab19d04 100644
          gterm_plot_char(&grid[old_x + old_y * cols],
                          frame_width + new_x * VGA_FONT_WIDTH,
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index d95f350..f74b0ef 100644
+index d95f350..29f3b68 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -24,6 +24,11 @@ extern void (*term_move_character)(int new_x, int new_y, int old_x, int old_y);
+@@ -5,6 +5,8 @@
+ #include <stdbool.h>
+ #include <lib/image.h>
+ 
++extern bool cp437_off;
++
+ extern void (*raw_putchar)(uint8_t c);
+ extern void (*clear)(bool move);
+ extern void (*enable_cursor)(void);
+@@ -24,6 +26,11 @@ extern void (*term_move_character)(int new_x, int new_y, int old_x, int old_y);
  extern void (*term_double_buffer)(bool status);
  extern void (*term_double_buffer_flush)(void);
  
@@ -51,7 +60,7 @@ index d95f350..f74b0ef 100644
  void term_textmode(void);
  void term_write(const char *buf, size_t count);
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..21ff39e 100644
+index a89e4ea..fafffd7 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -71,7 +80,44 @@ index a89e4ea..21ff39e 100644
  #if bios == 1
  void term_textmode(void) {
      term_backend = NOT_READY;
-@@ -191,6 +194,9 @@ static void dec_private_parse(uint8_t c) {
+@@ -85,19 +88,10 @@ void term_write(const char *buf, size_t count) {
+         enable_cursor();
+ }
+ 
+-static int get_cursor_pos_x(void) {
+-    int x, y;
+-    get_cursor_pos(&x, &y);
+-    return x;
+-}
+-
+-static int get_cursor_pos_y(void) {
+-    int x, y;
+-    get_cursor_pos(&x, &y);
+-    return y;
+-}
++bool cp437_off = false;
+ 
+ static bool control_sequence = false;
++static bool csi = false;
+ static bool escape = false;
+ static bool rrr = false;
+ static bool bold = false;
+@@ -182,7 +176,13 @@ static void dec_private_parse(uint8_t c) {
+     dec_private = false;
+ 
+     if (esc_values_i > 0) {
+-        switch (esc_values[0]) {
++        switch (esc_values[0]) {/*
++            case 7: {
++                switch (c) {
++                    case 'h': autowrap = true; return;
++                    case 'l': autowrap = false; return;
++                }
++            }*/
+             case 25: {
+                 switch (c) {
+                     case 'h': old_cur_stat = true; return;
+@@ -191,6 +191,9 @@ static void dec_private_parse(uint8_t c) {
              }
          }
      }
@@ -81,29 +127,271 @@ index a89e4ea..21ff39e 100644
  }
  
  static void control_sequence_parse(uint8_t c) {
-@@ -332,6 +338,20 @@ static void control_sequence_parse(uint8_t c) {
+@@ -232,52 +235,56 @@ static void control_sequence_parse(uint8_t c) {
+         goto cleanup;
+     }
+ 
++    bool r = scroll_disable();
++    int x, y;
++    get_cursor_pos(&x, &y);
++
+     switch (c) {
+         case 'A':
+-            if (esc_values[0] > get_cursor_pos_y())
+-                esc_values[0] = get_cursor_pos_y();
+-            set_cursor_pos(get_cursor_pos_x(), get_cursor_pos_y() - esc_values[0]);
++            if (esc_values[0] > y)
++                esc_values[0] = y;
++            set_cursor_pos(x, y - esc_values[0]);
+             break;
+         case 'B':
+-            if ((get_cursor_pos_y() + esc_values[0]) > (term_rows - 1))
+-                esc_values[0] = (term_rows - 1) - get_cursor_pos_y();
+-            set_cursor_pos(get_cursor_pos_x(), get_cursor_pos_y() + esc_values[0]);
++            if (y + esc_values[0] > term_rows - 1)
++                esc_values[0] = (term_rows - 1) - y;
++            set_cursor_pos(x, y + esc_values[0]);
+             break;
+         case 'C':
+-            if ((get_cursor_pos_x() + esc_values[0]) > (term_cols - 1))
+-                esc_values[0] = (term_cols - 1) - get_cursor_pos_x();
+-            set_cursor_pos(get_cursor_pos_x() + esc_values[0], get_cursor_pos_y());
++            if (x + esc_values[0] > term_cols - 1)
++                esc_values[0] = (term_cols - 1) - x;
++            set_cursor_pos(x + esc_values[0], y);
+             break;
+         case 'D':
+-            if (esc_values[0] > get_cursor_pos_x())
+-                esc_values[0] = get_cursor_pos_x();
+-            set_cursor_pos(get_cursor_pos_x() - esc_values[0], get_cursor_pos_y());
++            if (esc_values[0] > x)
++                esc_values[0] = x;
++            set_cursor_pos(x - esc_values[0], y);
+             break;
+         case 'E':
+-            if (get_cursor_pos_y() + esc_values[0] >= term_rows)
+-                set_cursor_pos(0, term_rows - 1);
+-            else
+-                set_cursor_pos(0, get_cursor_pos_y() + esc_values[0]);
++            if (y + esc_values[0] > term_rows - 1)
++                esc_values[0] = (term_rows - 1) - y;
++            set_cursor_pos(0, y + esc_values[0]);
+             break;
+         case 'F':
+-            if (get_cursor_pos_y() - esc_values[0] < 0)
+-                set_cursor_pos(0, 0);
+-            else
+-                set_cursor_pos(0, get_cursor_pos_y() - esc_values[0]);
++            if (esc_values[0] > y)
++                esc_values[0] = y;
++            set_cursor_pos(0, y - esc_values[0]);
+             break;
+         case 'd':
++            esc_values[0] -= 1;
+             if (esc_values[0] >= term_rows)
+-                break;
+-            set_cursor_pos(get_cursor_pos_x(), esc_values[0]);
++                esc_values[0] = term_rows - 1;
++            set_cursor_pos(x, esc_values[0]);
+             break;
+         case 'G':
+         case '`':
++            esc_values[0] -= 1;
+             if (esc_values[0] >= term_cols)
+-                break;
+-            set_cursor_pos(esc_values[0], get_cursor_pos_y());
++                esc_values[0] = term_cols - 1;
++            set_cursor_pos(esc_values[0], y);
+             break;
+         case 'H':
+-        case 'f':
++        case 'f': {
+             esc_values[0] -= 1;
+             esc_values[1] -= 1;
+             if (esc_values[1] >= term_cols)
+@@ -286,27 +293,20 @@ static void control_sequence_parse(uint8_t c) {
+                 esc_values[0] = term_rows - 1;
+             set_cursor_pos(esc_values[1], esc_values[0]);
+             break;
++        }
+         case 'J':
+             switch (esc_values[0]) {
+                 case 0: {
+-                    int x, y;
+-                    get_cursor_pos(&x, &y);
+                     int rows_remaining = term_rows - (y + 1);
+                     int cols_diff = term_cols - (x + 1);
+                     size_t to_clear = rows_remaining * term_cols + cols_diff;
+-                    bool r = scroll_disable();
+                     for (size_t i = 0; i < to_clear; i++) {
+                         raw_putchar(' ');
+                     }
+                     set_cursor_pos(x, y);
+-                    if (r)
+-                        scroll_enable();
+                     break;
+                 }
+                 case 1: {
+-                    int x, y;
+-                    get_cursor_pos(&x, &y);
+-                    bool r = scroll_disable();
+                     set_cursor_pos(0, 0);
+                     bool b = false;
+                     for (int yc = 0; yc < term_rows; yc++) {
+@@ -321,8 +321,6 @@ static void control_sequence_parse(uint8_t c) {
+                         if (b == true)
+                             break;
+                     }
+-                    if (r)
+-                        scroll_enable();
+                     break;
+                 }
+                 case 2:
+@@ -332,18 +330,22 @@ static void control_sequence_parse(uint8_t c) {
                      break;
              }
              break;
 +        case '@': {
-+            bool r = scroll_disable();
-+            int x, y;
-+            get_cursor_pos(&x, &y);
 +            for (size_t i = term_cols - 1; i >= (size_t)x; i--) {
 +                term_move_character(i + esc_values[0], y, i, y);
 +                set_cursor_pos(i, y);
 +                raw_putchar(' ');
 +            }
 +            set_cursor_pos(x, y);
-+            if (r)
-+                scroll_enable();
 +            break;
 +        }
          case 'P': {
-             bool r = scroll_disable();
-             int x, y;
+-            bool r = scroll_disable();
+-            int x, y;
+-            get_cursor_pos(&x, &y);
+             for (int i = x + esc_values[0]; i < term_cols; i++)
+                 term_move_character(i - esc_values[0], y, i, y);
+             set_cursor_pos(term_cols - esc_values[0], y);
+             for (int i = 0; i < esc_values[0]; i++)
+                 raw_putchar(' ');
+             set_cursor_pos(x, y);
+-            if (r)
+-                scroll_enable();
+             break;
+         }
+         case 'm':
+@@ -356,9 +358,6 @@ static void control_sequence_parse(uint8_t c) {
+             set_cursor_pos(saved_cursor_x, saved_cursor_y);
+             break;
+         case 'K': {
+-            bool r = scroll_disable();
+-            int x, y;
+-            get_cursor_pos(&x, &y);
+             switch (esc_values[0]) {
+                 case 0: {
+                     for (int i = x; i < term_cols; i++)
+@@ -380,14 +379,13 @@ static void control_sequence_parse(uint8_t c) {
+                     break;
+                 }
+             }
+-            if (r)
+-                scroll_enable();
+             break;
+         }
+-        default:
+-            break;
+     }
+ 
++    if (r)
++        scroll_enable();
++
+ cleanup:
+     control_sequence = false;
+     escape = false;
+@@ -399,12 +397,18 @@ static void escape_parse(uint8_t c) {
+         return;
+     }
+ 
++    if (csi == true) {
++        csi = false;
++        goto is_csi;
++    }
++
+     switch (c) {
+         case '\e':
+             escape = false;
+             raw_putchar(c);
+             break;
+         case '[':
++is_csi:
+             for (int i = 0; i < MAX_ESC_VALUES; i++)
+                 esc_values[i] = 0;
+             esc_values_i = 0;
+@@ -424,20 +428,53 @@ static void term_putchar(uint8_t c) {
+     }
+ 
+     switch (c) {
+-        case '\0':
+-            break;
+-        case '\e':
+-            escape = 1;
++        case 0x9b: {
++            csi = true;
++        }
++        // FALLTHRU
++        case '\e': {
++            escape = true;
+             return;
+-        case '\t':
+-            if ((get_cursor_pos_x() / TERM_TABSIZE + 1) >= term_cols)
+-                break;
+-            set_cursor_pos((get_cursor_pos_x() / TERM_TABSIZE + 1) * TERM_TABSIZE, get_cursor_pos_y());
+-            break;
+-        case '\a':
+-            break;
+-        default:
+-            raw_putchar(c);
+-            break;
++        }
++        case '\t': {
++            int x, y;
++            get_cursor_pos(&x, &y);
++            if ((x / TERM_TABSIZE + 1) >= term_cols) {
++                set_cursor_pos(term_cols - 1, y);
++                return;
++            }
++            set_cursor_pos((x / TERM_TABSIZE + 1) * TERM_TABSIZE, y);
++            return;
++        }
++        case '\b': {
++            int x, y;
++            get_cursor_pos(&x, &y);
++            set_cursor_pos(x - 1, y);
++            return;
++        }
++        case '\r': {
++            int x, y;
++            get_cursor_pos(&x, &y);
++            set_cursor_pos(0, y);
++            return;
++        }
++        case '\a': {
++            // The bell is handled by the kernel
++            if (term_callback != NULL)
++                term_callback(TERM_CB_BELL, 0, 0, 0);
++            return;
++        }
++        case '\n':
++        case 0x0b:
++        case 0x0c: {
++            raw_putchar('\n');
++            return;
++        }
+     }
++
++    if (cp437_off == true && (c < 0x20 || c > 0x7f)) {
++        return;
++    }
++
++    raw_putchar(c);
+ }
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-index 945f962..47ff1c4 100644
+index 945f962..c77c564 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 @@ -58,6 +58,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
@@ -115,7 +403,7 @@ index 945f962..47ff1c4 100644
  #endif
  
  void stivale2_load(char *config, char *cmdline, bool pxe, void *efi_system_table) {
-@@ -393,20 +395,42 @@ failed_to_load_header_section:
+@@ -393,20 +395,44 @@ failed_to_load_header_section:
              parse_resolution(&req_width, &req_height, &req_bpp, resolution);
      }
  
@@ -135,21 +423,23 @@ index 945f962..47ff1c4 100644
 +#endif
 +        } else {
 +            term_vbe(req_width, req_height);
-+
+ 
+-        if (current_video_mode < 0) {
+-            panic("stivale2: Failed to initialise terminal");
+-        }
 +            if (current_video_mode < 0) {
 +                panic("stivale2: Failed to initialise terminal");
 +            }
  
--        if (current_video_mode < 0) {
--            panic("stivale2: Failed to initialise terminal");
-+            fb = &fbinfo;
-         }
- 
 -        fb = &fbinfo;
--
++            fb = &fbinfo;
++        }
+ 
          struct stivale2_struct_tag_terminal *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_terminal));
          tag->tag.identifier = STIVALE2_STRUCT_TAG_TERMINAL_ID;
  
++        cp437_off = true;
++
 +        if (terminal_hdr_tag->flags & (1 << 0)) {
 +            // We provide callback
 +            tag->flags |= (1 << 2);
@@ -164,7 +454,7 @@ index 945f962..47ff1c4 100644
          // We provide max allowed string length
          tag->flags |= (1 << 1);
  
-@@ -431,7 +455,13 @@ failed_to_load_header_section:
+@@ -431,7 +457,13 @@ failed_to_load_header_section:
  
          append_tag(&stivale2_struct, (struct stivale2_tag *)tag);
  
@@ -179,7 +469,7 @@ index 945f962..47ff1c4 100644
      } else {
          fb = &_fb;
      }
-@@ -441,7 +471,7 @@ failed_to_load_header_section:
+@@ -441,7 +473,7 @@ failed_to_load_header_section:
          term_deinit();
  
          if (fb_init(fb, req_width, req_height, req_bpp)) {
@@ -188,7 +478,7 @@ index 945f962..47ff1c4 100644
              struct stivale2_struct_tag_framebuffer *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_framebuffer));
              tag->tag.identifier = STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID;
  
-@@ -471,6 +501,7 @@ skip_modeset:;
+@@ -471,6 +503,7 @@ skip_modeset:;
          int rows, cols;
          init_vga_textmode(&rows, &cols, false);
  
@@ -197,7 +487,7 @@ index 945f962..47ff1c4 100644
          tmtag->tag.identifier = STIVALE2_STRUCT_TAG_TEXTMODE_ID;
  
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
-index 26517ca..873a8c4 100644
+index 26517ca..d0bf3fc 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
 @@ -15,10 +15,60 @@ section .text
@@ -227,10 +517,10 @@ index 26517ca..873a8c4 100644
 +    mov es, ax
 +    mov ss, ax
 +
-+    mov edi, [rbp + 8]
-+    mov esi, [rbp + 12]
-+    mov edx, [rbp + 16]
-+    mov ecx, [rbp + 20]
++    mov rdi, [rbp + 8]
++    mov rsi, [rbp + 16]
++    mov rdx, [rbp + 24]
++    mov rcx, [rbp + 32]
 +
 +    mov rbx, rsp
 +    mov rsp, [user_stack]
@@ -262,7 +552,7 @@ index 26517ca..873a8c4 100644
      push rbp
      push r12
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32 b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
-index d39e5a3..ac17c0f 100644
+index d39e5a3..4442bf7 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
 @@ -17,6 +17,69 @@ section .text
@@ -297,9 +587,9 @@ index d39e5a3..ac17c0f 100644
 +    mov ss, ax
 +
 +    mov edi, [rbp + 8]
-+    mov esi, [rbp + 12]
-+    mov edx, [rbp + 16]
-+    mov ecx, [rbp + 20]
++    mov esi, [rbp + 16]
++    mov edx, [rbp + 24]
++    mov ecx, [rbp + 32]
 +
 +    call .get_got
 +  .get_got:
