@@ -118,7 +118,7 @@ tools:
 
   - name: host-limine
     from_source: limine
-    revision: 5
+    revision: 6
     tools_required:
       - host-gcc
     compile:
