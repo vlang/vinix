@@ -11,10 +11,10 @@ index 02c936d..95114a4 100644
  	-Wshadow \
  	-mno-80387 \
 diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.h b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.h
-index 41ef5c1..cd619a3 100644
+index 41ef5c1..53703c0 100644
 --- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.h
 +++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.h
-@@ -3,21 +3,23 @@
+@@ -3,21 +3,24 @@
  
  #include <stdbool.h>
  
@@ -41,14 +41,15 @@ index 41ef5c1..cd619a3 100644
 -void text_move_character(int new_x, int new_y, int old_x, int old_y);
 +void text_move_character(size_t new_x, size_t new_y, size_t old_x, size_t old_y);
 +void text_scroll(void);
++void text_swap_palette(void);
  
  void text_double_buffer(bool state);
  void text_double_buffer_flush(void);
 diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
-index 61784ed..df69d1e 100644
+index 61784ed..b485929 100644
 --- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c
 +++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
-@@ -21,7 +21,7 @@ static uint8_t *video_mem = (uint8_t *)0xb8000;
+@@ -21,10 +21,12 @@ static uint8_t *video_mem = (uint8_t *)0xb8000;
  static uint8_t *current_buffer;
  
  static size_t cursor_offset;
@@ -57,7 +58,23 @@ index 61784ed..df69d1e 100644
  static uint8_t text_palette;
  static uint8_t cursor_palette;
  
-@@ -49,20 +49,22 @@ void text_scroll_enable(void) {
++static bool scroll_enabled;
++
+ static void clear_cursor(void) {
+     if (cursor_status) {
+         video_mem[cursor_offset + 1] = current_buffer[cursor_offset + 1];
+@@ -37,7 +39,9 @@ static void draw_cursor(void) {
+     }
+ }
+ 
+-static bool scroll_enabled = true;
++void text_swap_palette(void) {
++    text_palette = (text_palette << 4) | (text_palette >> 4);
++}
+ 
+ bool text_scroll_disable(void) {
+     bool ret = scroll_enabled;
+@@ -49,20 +53,22 @@ void text_scroll_enable(void) {
      scroll_enabled = true;
  }
  
@@ -87,7 +104,7 @@ index 61784ed..df69d1e 100644
          }
      }
  }
-@@ -84,19 +86,19 @@ void text_clear(bool move) {
+@@ -84,19 +90,19 @@ void text_clear(bool move) {
  }
  
  void text_enable_cursor(void) {
@@ -111,7 +128,7 @@ index 61784ed..df69d1e 100644
      if (current_video_mode != -1) {
          struct rm_regs r = {0};
          r.eax = 0x0003;
-@@ -109,7 +111,7 @@ void init_vga_textmode(int *_rows, int *_cols, bool managed) {
+@@ -109,10 +115,12 @@ void init_vga_textmode(int *_rows, int *_cols, bool managed) {
      front_buffer = ext_mem_alloc(VD_ROWS * VD_COLS);
  
      cursor_offset = 0;
@@ -120,7 +137,12 @@ index 61784ed..df69d1e 100644
      text_palette = 0x07;
      cursor_palette = 0x70;
  
-@@ -165,48 +167,49 @@ void text_double_buffer_flush(void) {
++    scroll_enabled = true;
++
+     text_double_buffer(false);
+ 
+     text_clear(false);
+@@ -165,48 +173,49 @@ void text_double_buffer_flush(void) {
      draw_cursor();
  }
  
@@ -186,7 +208,7 @@ index 61784ed..df69d1e 100644
  void text_set_text_fg_default(void) {
      text_palette = (text_palette & 0xf0) | 7;
  }
-@@ -216,46 +219,25 @@ void text_set_text_bg_default(void) {
+@@ -216,46 +225,25 @@ void text_set_text_bg_default(void) {
  }
  
  void text_putchar(uint8_t c) {
@@ -287,7 +309,7 @@ index da7de34..c5bcae7 100644
  uint64_t sqrt(uint64_t a_nInput);
  size_t get_trailing_zeros(uint64_t val);
 diff --git a/3rdparty/limine-orig/stage23/lib/gterm.c b/3rdparty/limine-workdir/stage23/lib/gterm.c
-index 56ea1e2..fd15a63 100644
+index 56ea1e2..6bf4bc0 100644
 --- a/3rdparty/limine-orig/stage23/lib/gterm.c
 +++ b/3rdparty/limine-workdir/stage23/lib/gterm.c
 @@ -31,7 +31,7 @@ static uint32_t ansi_colours[8];
@@ -299,7 +321,7 @@ index 56ea1e2..fd15a63 100644
  
  static struct image *background;
  
-@@ -49,12 +49,12 @@ static uint32_t text_fg, text_bg;
+@@ -49,12 +49,22 @@ static uint32_t text_fg, text_bg;
  
  static bool cursor_status = true;
  
@@ -314,10 +336,20 @@ index 56ea1e2..fd15a63 100644
 +static size_t rows;
 +static size_t cols;
 +static size_t margin_gradient;
++
++void gterm_swap_palette(void) {
++    uint32_t tmp = text_bg;
++    text_bg = text_fg;
++    if (tmp == 0xffffffff) {
++        text_fg = default_bg;
++    } else {
++        text_fg = tmp;
++    }
++}
  
  #define A(rgb) (uint8_t)(rgb >> 24)
  #define R(rgb) (uint8_t)(rgb >> 16)
-@@ -73,14 +73,14 @@ static inline uint32_t colour_blend(uint32_t fg, uint32_t bg) {
+@@ -73,14 +83,14 @@ static inline uint32_t colour_blend(uint32_t fg, uint32_t bg) {
      return ARGB(0, r, g, b);
  }
  
@@ -335,7 +367,7 @@ index 56ea1e2..fd15a63 100644
  
      if (x < frame_width)
          x_distance = frame_width - x;
-@@ -110,22 +110,22 @@ static uint32_t blend_gradient_from_box(int x, int y, uint32_t bg_px, uint32_t h
+@@ -110,22 +120,22 @@ static uint32_t blend_gradient_from_box(int x, int y, uint32_t bg_px, uint32_t h
      return colour_blend((hex & 0xffffff) | (new_alpha << 24), bg_px);
  }
  
@@ -367,7 +399,7 @@ index 56ea1e2..fd15a63 100644
                  uint32_t img_pixel = *(uint32_t*)(img + image_x * colsize + off);
                  uint32_t i = blend(x, y, img_pixel);
                  bg_canvas[canvas_off + x] = i; gterm_framebuffer[fb_off + x] = i;
-@@ -135,20 +135,20 @@ __attribute__((always_inline)) static inline void genloop(int xstart, int xend,
+@@ -135,20 +145,20 @@ __attribute__((always_inline)) static inline void genloop(int xstart, int xend,
          break;
  
      case IMAGE_CENTERED:
@@ -396,7 +428,7 @@ index 56ea1e2..fd15a63 100644
                      uint32_t img_pixel = *(uint32_t*)(img + image_x * colsize + off);
                      uint32_t i = blend(x, y, x_external ? background->back_colour : img_pixel);
                      bg_canvas[canvas_off + x] = i; gterm_framebuffer[fb_off + x] = i;
-@@ -160,14 +160,14 @@ __attribute__((always_inline)) static inline void genloop(int xstart, int xend,
+@@ -160,14 +170,14 @@ __attribute__((always_inline)) static inline void genloop(int xstart, int xend,
      // hence x = xstart * ratio + i * ratio
      // so you can set x = xstart * ratio, and increment by ratio at each iteration
      case IMAGE_STRETCHED:
@@ -416,7 +448,7 @@ index 56ea1e2..fd15a63 100644
                  uint32_t img_pixel = *(uint32_t*)(img + fixedp6_to_int(img_x) * colsize + off);
                  uint32_t i = blend(x, y, img_pixel);
                  bg_canvas[canvas_off + x] = i; gterm_framebuffer[fb_off + x] = i;
-@@ -177,18 +177,18 @@ __attribute__((always_inline)) static inline void genloop(int xstart, int xend,
+@@ -177,18 +187,18 @@ __attribute__((always_inline)) static inline void genloop(int xstart, int xend,
          break;
      }
  }
@@ -443,7 +475,7 @@ index 56ea1e2..fd15a63 100644
              fwidth = frame_width - margin_gradient, fwidth_end = frame_width_end + margin_gradient;
  
          loop_external(0, gterm_width, 0, fheight);
-@@ -205,8 +205,8 @@ void gterm_generate_canvas(void) {
+@@ -205,8 +215,8 @@ void gterm_generate_canvas(void) {
  
          loop_internal(frame_width, frame_width_end, frame_height, frame_height_end);
      } else {
@@ -454,7 +486,7 @@ index 56ea1e2..fd15a63 100644
                  bg_canvas[y * gterm_width + x] = default_bg;
                  gterm_plot_px(x, y, default_bg);
              }
-@@ -220,12 +220,12 @@ struct gterm_char {
+@@ -220,12 +230,12 @@ struct gterm_char {
      uint32_t bg;
  };
  
@@ -470,7 +502,7 @@ index 56ea1e2..fd15a63 100644
              uint32_t bg = c->bg == 0xffffffff ? canvas_line[j] : c->bg;
              bool draw = glyph[i * VGA_FONT_WIDTH + j];
              fb_line[j] = draw ? c->fg : bg;
-@@ -233,13 +233,13 @@ void gterm_plot_char(struct gterm_char *c, int x, int y) {
+@@ -233,13 +243,13 @@ void gterm_plot_char(struct gterm_char *c, int x, int y) {
      }
  }
  
@@ -487,7 +519,7 @@ index 56ea1e2..fd15a63 100644
              uint32_t bg = c->bg == 0xffffffff ? canvas_line[j] : c->bg;
              bool old_draw = old_glyph[i * VGA_FONT_WIDTH + j];
              bool new_draw = new_glyph[i * VGA_FONT_WIDTH + j];
-@@ -250,11 +250,11 @@ void gterm_plot_char_fast(struct gterm_char *old, struct gterm_char *c, int x, i
+@@ -250,11 +260,11 @@ void gterm_plot_char_fast(struct gterm_char *old, struct gterm_char *c, int x, i
      }
  }
  
@@ -501,7 +533,7 @@ index 56ea1e2..fd15a63 100644
      if (!double_buffer_enabled) {
          struct gterm_char *old = &grid[x + y * cols];
  
-@@ -302,10 +302,11 @@ void gterm_scroll_enable(void) {
+@@ -302,10 +312,11 @@ void gterm_scroll_enable(void) {
      scroll_enabled = true;
  }
  
@@ -515,7 +547,7 @@ index 56ea1e2..fd15a63 100644
          if (!compare_char(&grid[i], &grid[i - cols]))
              plot_char_grid(&grid[i], (i - cols) % cols, (i - cols) / cols);
      }
-@@ -315,7 +316,8 @@ static void scroll(void) {
+@@ -315,7 +326,8 @@ static void scroll(void) {
      empty.c  = ' ';
      empty.fg = text_fg;
      empty.bg = text_bg;
@@ -525,7 +557,7 @@ index 56ea1e2..fd15a63 100644
          if (!compare_char(&grid[i], &empty))
              plot_char_grid(&empty, i % cols, i / cols);
      }
-@@ -330,7 +332,7 @@ void gterm_clear(bool move) {
+@@ -330,7 +342,7 @@ void gterm_clear(bool move) {
      empty.c  = ' ';
      empty.fg = text_fg;
      empty.bg = text_bg;
@@ -534,7 +566,7 @@ index 56ea1e2..fd15a63 100644
          plot_char_grid(&empty, i % cols, i / cols);
      }
  
-@@ -354,16 +356,12 @@ bool gterm_disable_cursor(void) {
+@@ -354,16 +366,12 @@ bool gterm_disable_cursor(void) {
      return ret;
  }
  
@@ -554,7 +586,7 @@ index 56ea1e2..fd15a63 100644
          y = rows - 1;
      }
      cursor_x = x;
-@@ -371,12 +369,17 @@ void gterm_set_cursor_pos(int x, int y) {
+@@ -371,12 +379,17 @@ void gterm_set_cursor_pos(int x, int y) {
      draw_cursor();
  }
  
@@ -574,7 +606,7 @@ index 56ea1e2..fd15a63 100644
      if (!double_buffer_enabled) {
          gterm_plot_char(&grid[old_x + old_y * cols],
                          frame_width + new_x * VGA_FONT_WIDTH,
-@@ -385,19 +388,19 @@ void gterm_move_character(int new_x, int new_y, int old_x, int old_y) {
+@@ -385,19 +398,19 @@ void gterm_move_character(int new_x, int new_y, int old_x, int old_y) {
      grid[new_x + new_y * cols] = grid[old_x + old_y * cols];
  }
  
@@ -598,7 +630,7 @@ index 56ea1e2..fd15a63 100644
      text_bg = ansi_bright_colours[bg];
  }
  
-@@ -416,8 +419,8 @@ void gterm_double_buffer_flush(void) {
+@@ -416,8 +429,8 @@ void gterm_double_buffer_flush(void) {
  
          front_grid[i] = grid[i];
  
@@ -609,7 +641,7 @@ index 56ea1e2..fd15a63 100644
  
          gterm_plot_char(&grid[i], x * VGA_FONT_WIDTH + frame_width,
                                  y * VGA_FONT_HEIGHT + frame_height);
-@@ -440,54 +443,24 @@ void gterm_double_buffer(bool state) {
+@@ -440,54 +453,24 @@ void gterm_double_buffer(bool state) {
  }
  
  void gterm_putchar(uint8_t c) {
@@ -666,11 +698,11 @@ index 56ea1e2..fd15a63 100644
 +    if (cursor_x == cols && ((size_t)cursor_y < scroll_bottom_margin - 1 || scroll_enabled)) {
 +        cursor_x = 0;
 +        cursor_y++;
-+    }
+     }
 +    if ((size_t)cursor_y == scroll_bottom_margin) {
 +        cursor_y--;
 +        gterm_scroll();
-     }
++    }
 +    draw_cursor();
  }
  
@@ -679,7 +711,7 @@ index 56ea1e2..fd15a63 100644
      if (current_video_mode >= 0
       && fbinfo.default_res == true
       && width == 0
-@@ -518,7 +491,7 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
+@@ -518,7 +501,7 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
          return false;
  
      // default scheme
@@ -688,7 +720,7 @@ index 56ea1e2..fd15a63 100644
      margin_gradient = 4;
  
      default_bg = 0x00000000; // background (black)
-@@ -538,7 +511,7 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
+@@ -538,7 +521,7 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
          colours = config_get_value(NULL, 0, "THEME_COLORS");
      if (colours != NULL) {
          const char *first = colours;
@@ -697,7 +729,7 @@ index 56ea1e2..fd15a63 100644
          for (i = 0; i < 10; i++) {
              const char *last;
              uint32_t col = strtoui(first, &last, 16);
-@@ -571,7 +544,7 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
+@@ -571,7 +554,7 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
          bright_colours = config_get_value(NULL, 0, "THEME_BRIGHT_COLORS");
      if (bright_colours != NULL) {
          const char *first = bright_colours;
@@ -706,7 +738,7 @@ index 56ea1e2..fd15a63 100644
          for (i = 0; i < 8; i++) {
              const char *last;
              uint32_t col = strtoui(first, &last, 16);
-@@ -672,8 +645,8 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
+@@ -672,8 +655,8 @@ bool gterm_init(int *_rows, int *_cols, int width, int height) {
          for (size_t i = 0; i < VGA_FONT_GLYPHS; i++) {
              uint8_t *glyph = &vga_font_bits[i * VGA_FONT_HEIGHT];
  
@@ -718,10 +750,10 @@ index 56ea1e2..fd15a63 100644
                      if ((glyph[y] & (0x80 >> x))) {
                          vga_font_bool[offset] = true;
 diff --git a/3rdparty/limine-orig/stage23/lib/gterm.h b/3rdparty/limine-workdir/stage23/lib/gterm.h
-index 9859f49..be446c6 100644
+index 9859f49..56a6bb5 100644
 --- a/3rdparty/limine-orig/stage23/lib/gterm.h
 +++ b/3rdparty/limine-workdir/stage23/lib/gterm.h
-@@ -8,23 +8,24 @@
+@@ -8,23 +8,25 @@
  
  extern struct fb_info fbinfo;
  
@@ -751,6 +783,7 @@ index 9859f49..be446c6 100644
 -void gterm_move_character(int new_x, int new_y, int old_x, int old_y);
 +void gterm_move_character(size_t new_x, size_t new_y, size_t old_x, size_t old_y);
 +void gterm_scroll(void);
++void gterm_swap_palette(void);
  
  void gterm_double_buffer_flush(void);
  void gterm_double_buffer(bool state);
@@ -885,7 +918,7 @@ index 7b58729..bd4a552 100644
 -    }
 -}
 diff --git a/3rdparty/limine-orig/stage23/lib/term.c b/3rdparty/limine-workdir/stage23/lib/term.c
-index b5124a3..5e7d47b 100644
+index b5124a3..28c33df 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.c
 @@ -8,7 +8,7 @@
@@ -907,19 +940,20 @@ index b5124a3..5e7d47b 100644
      raw_putchar    = gterm_putchar;
      clear          = gterm_clear;
      enable_cursor  = gterm_enable_cursor;
-@@ -34,6 +37,7 @@ void term_vbe(int width, int height) {
+@@ -34,6 +37,8 @@ void term_vbe(int width, int height) {
      scroll_disable = gterm_scroll_disable;
      scroll_enable  = gterm_scroll_enable;
      term_move_character = gterm_move_character;
 +    term_scroll = gterm_scroll;
++    term_swap_palette = gterm_swap_palette;
  
      term_double_buffer       = gterm_double_buffer;
      term_double_buffer_flush = gterm_double_buffer_flush;
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index d95f350..ac2c24b 100644
+index d95f350..bfc2dd1 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -5,32 +5,42 @@
+@@ -5,32 +5,43 @@
  #include <stdbool.h>
  #include <lib/image.h>
  
@@ -950,6 +984,7 @@ index d95f350..ac2c24b 100644
 -extern void (*term_move_character)(int new_x, int new_y, int old_x, int old_y);
 +extern void (*term_move_character)(size_t new_x, size_t new_y, size_t old_x, size_t old_y);
 +extern void (*term_scroll)(void);
++extern void (*term_swap_palette)(void);
  
  extern void (*term_double_buffer)(bool status);
  extern void (*term_double_buffer_flush)(void);
@@ -972,7 +1007,7 @@ index d95f350..ac2c24b 100644
  enum {
      NOT_READY,
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..7758ec7 100644
+index a89e4ea..c57f980 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
 @@ -6,6 +6,7 @@
@@ -983,7 +1018,7 @@ index a89e4ea..7758ec7 100644
  
  // Tries to implement this standard for terminfo
  // https://man7.org/linux/man-pages/man4/console_codes.4.html
-@@ -21,22 +22,25 @@ void (*raw_putchar)(uint8_t c);
+@@ -21,22 +22,26 @@ void (*raw_putchar)(uint8_t c);
  void (*clear)(bool move);
  void (*enable_cursor)(void);
  bool (*disable_cursor)(void);
@@ -1006,6 +1041,7 @@ index a89e4ea..7758ec7 100644
 -void (*term_move_character)(int new_x, int new_y, int old_x, int old_y);
 +void (*term_move_character)(size_t new_x, size_t new_y, size_t old_x, size_t old_y);
 +void (*term_scroll)(void);
++void (*term_swap_palette)(void);
  
  void (*term_double_buffer)(bool status);
  void (*term_double_buffer_flush)(void);
@@ -1017,7 +1053,7 @@ index a89e4ea..7758ec7 100644
  
  #if bios == 1
  void term_textmode(void) {
-@@ -44,6 +48,9 @@ void term_textmode(void) {
+@@ -44,6 +49,9 @@ void term_textmode(void) {
  
      init_vga_textmode(&term_rows, &term_cols, true);
  
@@ -1027,7 +1063,7 @@ index a89e4ea..7758ec7 100644
      raw_putchar    = text_putchar;
      clear          = text_clear;
      enable_cursor  = text_enable_cursor;
-@@ -52,13 +59,14 @@ void term_textmode(void) {
+@@ -52,13 +60,15 @@ void term_textmode(void) {
      get_cursor_pos = text_get_cursor_pos;
      set_text_fg    = text_set_text_fg;
      set_text_bg    = text_set_text_bg;
@@ -1040,10 +1076,11 @@ index a89e4ea..7758ec7 100644
      scroll_enable  = text_scroll_enable;
      term_move_character = text_move_character;
 +    term_scroll = text_scroll;
++    term_swap_palette = text_swap_palette;
  
      term_double_buffer       = text_double_buffer;
      term_double_buffer_flush = text_double_buffer_flush;
-@@ -85,27 +93,21 @@ void term_write(const char *buf, size_t count) {
+@@ -85,27 +95,22 @@ void term_write(const char *buf, size_t count) {
          enable_cursor();
  }
  
@@ -1067,6 +1104,7 @@ index a89e4ea..7758ec7 100644
  static bool escape = false;
  static bool rrr = false;
  static bool bold = false;
++static bool reverse_video = false;
  static bool dec_private = false;
 -static int32_t esc_values[MAX_ESC_VALUES];
 +static uint32_t esc_values[MAX_ESC_VALUES];
@@ -1074,30 +1112,179 @@ index a89e4ea..7758ec7 100644
 -static int saved_cursor_x = 0, saved_cursor_y = 0;
 -static int current_fg = -1;
 +static size_t saved_cursor_x = 0, saved_cursor_y = 0;
-+static size_t current_fg = (size_t)-1;
++static size_t current_primary = (size_t)-1;
 +static bool insert_mode = false;
  
  static void sgr(void) {
      size_t i = 0;
-@@ -125,7 +127,7 @@ def:
+@@ -114,65 +119,144 @@ static void sgr(void) {
+         goto def;
  
-         if (esc_values[i] == 1) {
+     for (; i < esc_values_i; i++) {
++        size_t offset;
++
+         if (esc_values[i] == 0) {
+ def:
++            if (reverse_video) {
++                reverse_video = false;
++                term_swap_palette();
++            }
+             bold = false;
+-            current_fg = -1;
++            current_primary = (size_t)-1;
+             set_text_bg_default();
+             set_text_fg_default();
+             continue;
+         }
+ 
+-        if (esc_values[i] == 1) {
++        else if (esc_values[i] == 1) {
              bold = true;
 -            if (current_fg != -1) {
-+            if (current_fg != (size_t)-1) {
-                 set_text_fg_bright(current_fg);
+-                set_text_fg_bright(current_fg);
++            if (current_primary != (size_t)-1) {
++                if (!reverse_video) {
++                    set_text_fg_bright(current_primary);
++                } else {
++                    set_text_bg_bright(current_primary);
++                }
              }
              continue;
-@@ -133,7 +135,7 @@ def:
+         }
  
-         if (esc_values[i] == 22) {
+-        if (esc_values[i] == 22) {
++        else if (esc_values[i] == 22) {
              bold = false;
 -            if (current_fg != -1) {
-+            if (current_fg != (size_t)-1) {
-                 set_text_fg(current_fg);
+-                set_text_fg(current_fg);
++            if (current_primary != (size_t)-1) {
++                if (!reverse_video) {
++                    set_text_fg(current_primary);
++                } else {
++                    set_text_bg(current_primary);
++                }
              }
              continue;
-@@ -181,15 +183,49 @@ def:
+         }
+ 
+-        if (esc_values[i] >= 30 && esc_values[i] <= 37) {
+-            current_fg = esc_values[i] - 30;
+-            if (bold) {
+-                set_text_fg_bright(esc_values[i] - 30);
++        else if (esc_values[i] >= 30 && esc_values[i] <= 37) {
++            offset = 30;
++            current_primary = esc_values[i] - offset;
++
++            if (reverse_video) {
++                goto set_bg;
++            }
++
++set_fg:
++            if (bold && !reverse_video) {
++                set_text_fg_bright(esc_values[i] - offset);
+             } else {
+-                set_text_fg(esc_values[i] - 30);
++                set_text_fg(esc_values[i] - offset);
+             }
+             continue;
+         }
+ 
+-        if (esc_values[i] >= 40 && esc_values[i] <= 47) {
+-            set_text_bg(esc_values[i] - 40);
++        else if (esc_values[i] >= 40 && esc_values[i] <= 47) {
++            offset = 40;
++            if (reverse_video) {
++                goto set_fg;
++            }
++
++set_bg:
++            if (bold && reverse_video) {
++                set_text_bg_bright(esc_values[i] - offset);
++            } else {
++                set_text_bg(esc_values[i] - offset);
++            }
+             continue;
+         }
+ 
+-        if (esc_values[i] >= 90 && esc_values[i] <= 97) {
+-            current_fg = esc_values[i] - 90;
+-            set_text_fg_bright(esc_values[i] - 90);
++        else if (esc_values[i] >= 90 && esc_values[i] <= 97) {
++            offset = 90;
++            current_primary = esc_values[i] - offset;
++
++            if (reverse_video) {
++                goto set_bg_bright;
++            }
++
++set_fg_bright:
++            set_text_fg_bright(esc_values[i] - offset);
+             continue;
+         }
+ 
+-        if (esc_values[i] >= 100 && esc_values[i] <= 107) {
+-            set_text_bg_bright(esc_values[i] - 100);
++        else if (esc_values[i] >= 100 && esc_values[i] <= 107) {
++            offset = 100;
++            if (reverse_video) {
++                goto set_fg_bright;
++            }
++
++set_bg_bright:
++            set_text_bg_bright(esc_values[i] - offset);
+             continue;
+         }
+ 
+-        if (esc_values[i] == 39) {
+-            current_fg = -1;
++        else if (esc_values[i] == 39) {
++            current_primary = (size_t)-1;
++
++            if (reverse_video) {
++                term_swap_palette();
++            }
++
+             set_text_fg_default();
++
++            if (reverse_video) {
++                term_swap_palette();
++            }
++
+             continue;
+         }
+ 
+-        if (esc_values[i] == 49) {
++        else if (esc_values[i] == 49) {
++            if (reverse_video) {
++                term_swap_palette();
++            }
++
+             set_text_bg_default();
++
++            if (reverse_video) {
++                term_swap_palette();
++            }
++
++            continue;
++        }
++
++        else if (esc_values[i] == 7) {
++            if (!reverse_video) {
++                reverse_video = true;
++                term_swap_palette();
++            }
++            continue;
++        }
++
++        else if (esc_values[i] == 27) {
++            if (reverse_video) {
++                reverse_video = false;
++                term_swap_palette();
++            }
+             continue;
+         }
+     }
+@@ -181,15 +265,49 @@ def:
  static void dec_private_parse(uint8_t c) {
      dec_private = false;
  
@@ -1156,7 +1343,7 @@ index a89e4ea..7758ec7 100644
      }
  }
  
-@@ -217,14 +253,14 @@ static void control_sequence_parse(uint8_t c) {
+@@ -217,14 +335,14 @@ static void control_sequence_parse(uint8_t c) {
          }
      }
  
@@ -1173,7 +1360,7 @@ index a89e4ea..7758ec7 100644
          esc_values[i] = esc_default;
  
      if (dec_private == true) {
-@@ -232,49 +268,71 @@ static void control_sequence_parse(uint8_t c) {
+@@ -232,49 +350,71 @@ static void control_sequence_parse(uint8_t c) {
          goto cleanup;
      }
  
@@ -1275,7 +1462,7 @@ index a89e4ea..7758ec7 100644
              break;
          case 'H':
          case 'f':
-@@ -289,28 +347,21 @@ static void control_sequence_parse(uint8_t c) {
+@@ -289,28 +429,21 @@ static void control_sequence_parse(uint8_t c) {
          case 'J':
              switch (esc_values[0]) {
                  case 0: {
@@ -1309,7 +1496,7 @@ index a89e4ea..7758ec7 100644
                              raw_putchar(' ');
                              if (xc == x && yc == y) {
                                  raw_putchar('\b');
-@@ -321,31 +372,33 @@ static void control_sequence_parse(uint8_t c) {
+@@ -321,31 +454,33 @@ static void control_sequence_parse(uint8_t c) {
                          if (b == true)
                              break;
                      }
@@ -1355,7 +1542,7 @@ index a89e4ea..7758ec7 100644
          case 'm':
              sgr();
              break;
-@@ -355,39 +408,53 @@ static void control_sequence_parse(uint8_t c) {
+@@ -355,39 +490,53 @@ static void control_sequence_parse(uint8_t c) {
          case 'u':
              set_cursor_pos(saved_cursor_x, saved_cursor_y);
              break;
@@ -1420,7 +1607,7 @@ index a89e4ea..7758ec7 100644
  cleanup:
      control_sequence = false;
      escape = false;
-@@ -399,22 +466,28 @@ static void escape_parse(uint8_t c) {
+@@ -399,22 +548,28 @@ static void escape_parse(uint8_t c) {
          return;
      }
  
@@ -1457,7 +1644,7 @@ index a89e4ea..7758ec7 100644
  }
  
  static void term_putchar(uint8_t c) {
-@@ -423,21 +496,58 @@ static void term_putchar(uint8_t c) {
+@@ -423,21 +578,58 @@ static void term_putchar(uint8_t c) {
          return;
      }
  
@@ -1510,11 +1697,11 @@ index a89e4ea..7758ec7 100644
 +            if (term_callback != NULL)
 +                term_callback(TERM_CB_BELL, 0, 0, 0);
 +            return;
-+    }
+     }
 +
 +    if (cp437_off == true && (c < 0x20 || c > 0x7f)) {
 +        return;
-     }
++    }
 +
 +    if (insert_mode == true) {
 +        for (size_t i = term_cols - 1; ; i--) {
