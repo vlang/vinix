@@ -1007,10 +1007,10 @@ index d95f350..bfc2dd1 100644
  enum {
      NOT_READY,
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..c57f980 100644
+index a89e4ea..50ef424 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-@@ -6,6 +6,7 @@
+@@ -6,12 +6,13 @@
  #include <lib/image.h>
  #include <lib/blib.h>
  #include <drivers/vga_textmode.h>
@@ -1018,6 +1018,13 @@ index a89e4ea..c57f980 100644
  
  // Tries to implement this standard for terminfo
  // https://man7.org/linux/man-pages/man4/console_codes.4.html
+ 
+ #define TERM_TABSIZE (8)
+-#define MAX_ESC_VALUES (256)
++#define MAX_ESC_VALUES (16)
+ 
+ int current_video_mode = -1;
+ 
 @@ -21,22 +22,26 @@ void (*raw_putchar)(uint8_t c);
  void (*clear)(bool move);
  void (*enable_cursor)(void);
@@ -1080,7 +1087,7 @@ index a89e4ea..c57f980 100644
  
      term_double_buffer       = text_double_buffer;
      term_double_buffer_flush = text_double_buffer_flush;
-@@ -85,27 +95,22 @@ void term_write(const char *buf, size_t count) {
+@@ -85,27 +95,25 @@ void term_write(const char *buf, size_t count) {
          enable_cursor();
  }
  
@@ -1089,20 +1096,22 @@ index a89e4ea..c57f980 100644
 -    get_cursor_pos(&x, &y);
 -    return x;
 -}
--
++bool cp437_off = false;
++size_t scroll_top_margin;
++size_t scroll_bottom_margin;
+ 
 -static int get_cursor_pos_y(void) {
 -    int x, y;
 -    get_cursor_pos(&x, &y);
 -    return y;
 -}
-+bool cp437_off = false;
-+size_t scroll_top_margin;
-+size_t scroll_bottom_margin;
++static size_t escape_offset = 0;
  
  static bool control_sequence = false;
 +static bool csi = false;
  static bool escape = false;
  static bool rrr = false;
++static bool discard_next = false;
  static bool bold = false;
 +static bool reverse_video = false;
  static bool dec_private = false;
@@ -1117,7 +1126,7 @@ index a89e4ea..c57f980 100644
  
  static void sgr(void) {
      size_t i = 0;
-@@ -114,65 +119,144 @@ static void sgr(void) {
+@@ -114,65 +122,144 @@ static void sgr(void) {
          goto def;
  
      for (; i < esc_values_i; i++) {
@@ -1284,7 +1293,7 @@ index a89e4ea..c57f980 100644
              continue;
          }
      }
-@@ -181,15 +265,49 @@ def:
+@@ -181,100 +268,169 @@ def:
  static void dec_private_parse(uint8_t c) {
      dec_private = false;
  
@@ -1299,7 +1308,7 @@ index a89e4ea..c57f980 100644
 -        }
 +    if (esc_values_i == 0) {
 +        return;
-+    }
+     }
 +
 +    bool set;
 +
@@ -1319,13 +1328,16 @@ index a89e4ea..c57f980 100644
 +
 +    if (term_callback != NULL)
 +        term_callback(TERM_CB_DEC, c, esc_values_i, (uintptr_t)esc_values);
-+}
-+
+ }
+ 
+-static void control_sequence_parse(uint8_t c) {
+-    if (c == '?') {
+-        dec_private = true;
 +static void mode_toggle(uint8_t c) {
 +    if (esc_values_i == 0) {
-+        return;
-+    }
-+
+         return;
+     }
+ 
 +    bool set;
 +
 +    switch (c) {
@@ -1340,11 +1352,52 @@ index a89e4ea..c57f980 100644
 +    switch (esc_values[0]) {
 +        case 4:
 +            insert_mode = set; return;
-     }
- }
- 
-@@ -217,14 +335,14 @@ static void control_sequence_parse(uint8_t c) {
++    }
++}
++
++static void control_sequence_parse(uint8_t c) {
++    if (escape_offset == 2) {
++        switch (c) {
++            case '[':
++                discard_next = true;
++                goto cleanup;
++            case '?':
++                dec_private = true;
++                return;
++        }
++    }
++
+     if (c >= '0' && c <= '9') {
++        if (esc_values_i == MAX_ESC_VALUES) {
++            return;
++        }
+         rrr = true;
+         esc_values[esc_values_i] *= 10;
+         esc_values[esc_values_i] += c - '0';
+         return;
+-    } else {
+-        if (rrr == true) {
+-            esc_values_i++;
+-            rrr = false;
+-            if (c == ';')
+-                return;
+-        } else if (c == ';') {
+-            esc_values[esc_values_i] = 1;
+-            esc_values_i++;
++    }
++
++    if (rrr == true) {
++        esc_values_i++;
++        rrr = false;
++        if (c == ';')
++            return;
++    } else if (c == ';') {
++        if (esc_values_i == MAX_ESC_VALUES) {
+             return;
          }
++        esc_values[esc_values_i] = 0;
++        esc_values_i++;
++        return;
      }
  
 -    int esc_default;
@@ -1356,11 +1409,12 @@ index a89e4ea..c57f980 100644
      }
  
 -    for (int i = esc_values_i; i < MAX_ESC_VALUES; i++)
-+    for (size_t i = esc_values_i; i < MAX_ESC_VALUES; i++)
++    for (size_t i = esc_values_i; i < MAX_ESC_VALUES; i++) {
          esc_values[i] = esc_default;
++    }
  
      if (dec_private == true) {
-@@ -232,49 +350,71 @@ static void control_sequence_parse(uint8_t c) {
+         dec_private_parse(c);
          goto cleanup;
      }
  
@@ -1462,7 +1516,7 @@ index a89e4ea..c57f980 100644
              break;
          case 'H':
          case 'f':
-@@ -289,28 +429,21 @@ static void control_sequence_parse(uint8_t c) {
+@@ -289,31 +445,23 @@ static void control_sequence_parse(uint8_t c) {
          case 'J':
              switch (esc_values[0]) {
                  case 0: {
@@ -1486,7 +1540,6 @@ index a89e4ea..c57f980 100644
 -                    int x, y;
 -                    get_cursor_pos(&x, &y);
 -                    bool r = scroll_disable();
-+                // TODO
                      set_cursor_pos(0, 0);
                      bool b = false;
 -                    for (int yc = 0; yc < term_rows; yc++) {
@@ -1495,8 +1548,12 @@ index a89e4ea..c57f980 100644
 +                        for (size_t xc = 0; xc < term_cols; xc++) {
                              raw_putchar(' ');
                              if (xc == x && yc == y) {
-                                 raw_putchar('\b');
-@@ -321,31 +454,33 @@ static void control_sequence_parse(uint8_t c) {
+-                                raw_putchar('\b');
++                                set_cursor_pos(x, y);
+                                 b = true;
+                                 break;
+                             }
+@@ -321,31 +469,33 @@ static void control_sequence_parse(uint8_t c) {
                          if (b == true)
                              break;
                      }
@@ -1542,7 +1599,7 @@ index a89e4ea..c57f980 100644
          case 'm':
              sgr();
              break;
-@@ -355,39 +490,53 @@ static void control_sequence_parse(uint8_t c) {
+@@ -355,89 +505,154 @@ static void control_sequence_parse(uint8_t c) {
          case 'u':
              set_cursor_pos(saved_cursor_x, saved_cursor_y);
              break;
@@ -1607,7 +1664,13 @@ index a89e4ea..c57f980 100644
  cleanup:
      control_sequence = false;
      escape = false;
-@@ -399,22 +548,28 @@ static void escape_parse(uint8_t c) {
+ }
+ 
+ static void escape_parse(uint8_t c) {
++    escape_offset++;
++
+     if (control_sequence == true) {
+         control_sequence_parse(c);
          return;
      }
  
@@ -1644,7 +1707,13 @@ index a89e4ea..c57f980 100644
  }
  
  static void term_putchar(uint8_t c) {
-@@ -423,21 +578,58 @@ static void term_putchar(uint8_t c) {
++    if (discard_next) {
++        discard_next = false;
++        return;
++    }
++
+     if (escape == true) {
+         escape_parse(c);
          return;
      }
  
@@ -1659,6 +1728,7 @@ index a89e4ea..c57f980 100644
 +            // FALLTHRU
          case '\e':
 -            escape = 1;
++            escape_offset = 0;
 +            escape = true;
              return;
          case '\t':
