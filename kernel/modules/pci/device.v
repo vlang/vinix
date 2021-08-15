@@ -17,6 +17,10 @@ pub mut:
 	prog_if byte
 	multifunction bool
 	irq_pin byte
+    msi_offset u16
+    msix_offset u16
+    msi_support bool
+    msix_support bool
 }
 
 pub struct PCIBar {

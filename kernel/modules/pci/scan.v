@@ -59,6 +59,33 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 		check_bus(byte(config >> 8), 1)
 	} else {
 		scanned_devices << device
+
+        status := device.read<u16>(0x6)
+
+        if (status & (1 << 4)) == (1 << 4) { // parse capabilities list
+            mut off := device.read<byte>(0x34)
+
+            for off > 0 { 
+                id := device.read<byte>(off)
+
+                match id {
+                    0x5 {
+                        device.msi_support = true
+                        device.msi_offset = off
+                    }
+                    0x11 {
+                        device.msix_support = true
+                        device.msix_offset = off
+                    }
+                    else {
+                        
+                    }
+                }
+
+                off = device.read<byte>(off + 1)
+            }
+        }
+
 		print('pci: Found [${device.bus:x}:${device.slot:x}:${device.function:x}:${device.parent:x}]\n')
 	}
 }
