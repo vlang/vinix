@@ -17,10 +17,10 @@ pub mut:
 	prog_if byte
 	multifunction bool
 	irq_pin byte
-    msi_offset u16
-    msix_offset u16
-    msi_support bool
-    msix_support bool
+	msi_offset u16
+	msix_offset u16
+	msi_support bool
+	msix_support bool
 }
 
 pub struct PCIBar {
@@ -94,6 +94,28 @@ pub fn (dev &PCIDevice) get_bar(bar byte) PCIBar {
 	size = ~size + 1
 
 	return PCIBar{base, size, is_mmio, is_prefetchable}
+}
+
+pub fn (dev &PCIDevice) set_msi(vector byte) {
+	mut message_control := dev.read<u16>(dev.msi_offset + 2)
+
+	mut reg0 := 0x4
+	mut reg1 := 0x8
+
+	if ((message_control << 7) & 1) == 1 { // 64 bit support
+		reg1 = 0xc
+	}
+
+	address := (0xfee << 20) | (bsp_lapic_id << 12)
+	data := vector
+
+	dev.write<u32>(u32(dev.msi_offset + reg0), address)
+	dev.write<u32>(u32(dev.msi_offset + reg1), data)
+
+	message_control |= 1 // enable=1
+	message_control &= ~(0b111 << 4) // mme=0
+
+	dev.write<u16>(dev.msi_offset + 2, message_control)
 }
 
 pub fn (dev &PCIDevice) enable_bus_mastering() {
