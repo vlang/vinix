@@ -41,6 +41,7 @@ __global (
 	console_bigbuf [console_bigbuf_size]byte
 	console_bigbuf_i = u64(0)
 	console_termios = &termios.Termios(0)
+	console_decckm = false
 )
 
 const convtab_capslock = [
@@ -75,7 +76,7 @@ fn is_printable(c byte) bool {
 	return (c >= 0x20 && c <= 0x7e)
 }
 
-fn add_to_buf_char(c byte) {
+fn add_to_buf_char(c byte, echo bool) {
 	console_read_lock.acquire()
 	defer {
 		console_read_lock.release()
@@ -89,7 +90,7 @@ fn add_to_buf_char(c byte) {
 				}
 				console_buffer[console_buffer_i] = c
 				console_buffer_i++
-				if console_termios.c_lflag & termios.echo != 0 {
+				if echo && console_termios.c_lflag & termios.echo != 0 {
 					print('${c:c}')
 				}
 				for i := u64(0); i < console_buffer_i; i++ {
@@ -108,7 +109,7 @@ fn add_to_buf_char(c byte) {
 				}
 				console_buffer_i--
 				console_buffer[console_buffer_i] = 0
-				if console_termios.c_lflag & termios.echo != 0 {
+				if echo && console_termios.c_lflag & termios.echo != 0 {
 					print('\b \b')
 				}
 				return
@@ -129,15 +130,15 @@ fn add_to_buf_char(c byte) {
 		console_bigbuf_i++
 	}
 
-	if is_printable(c) && console_termios.c_lflag & termios.echo != 0 {
+	if echo && is_printable(c) && console_termios.c_lflag & termios.echo != 0 {
 		print('${c:c}')
 	}
 }
 
-fn add_to_buf(ptr &byte, count u64) {
+fn add_to_buf(ptr &byte, count u64, echo bool) {
 	for i := u64(0); i < count; i++ {
 		// TODO: Accept signal characters
-		unsafe { add_to_buf_char(ptr[i]) }
+		unsafe { add_to_buf_char(ptr[i], echo) }
 	}
 	event.trigger(mut console_event, false)
 }
@@ -173,47 +174,83 @@ fn keyboard_handler() {
 				}
 				0x47 {
 					// Home
-					add_to_buf(c'\e[H', 3)
+					if console_decckm == false {
+						add_to_buf(c'\e[H', 3, false)
+					} else {
+						add_to_buf(c'\eOH', 3, false)
+					}
 					continue
 				}
 				0x4f {
 					// End
-					add_to_buf(c'\e[F', 3)
+					if console_decckm == false {
+						add_to_buf(c'\e[F', 3, false)
+					} else {
+						add_to_buf(c'\eOF', 3, false)
+					}
 					continue
 				}
 				0x48 {
 					// Up arrow
-					add_to_buf(c'\e[A', 3)
+					if console_decckm == false {
+						add_to_buf(c'\e[A', 3, false)
+					} else {
+						add_to_buf(c'\eOA', 3, false)
+					}
 					continue
 				}
 				0x4b {
 					// Left arrow
-					add_to_buf(c'\e[D', 3)
+					if console_decckm == false {
+						add_to_buf(c'\e[D', 3, false)
+					} else {
+						add_to_buf(c'\eOD', 3, false)
+					}
 					continue
 				}
 				0x50 {
 					// Down arrow
-					add_to_buf(c'\e[B', 3)
+					if console_decckm == false {
+						add_to_buf(c'\e[B', 3, false)
+					} else {
+						add_to_buf(c'\eOB', 3, false)
+					}
 					continue
 				}
 				0x4d {
 					// Right arrow
-					add_to_buf(c'\e[C', 3)
+					if console_decckm == false {
+						add_to_buf(c'\e[C', 3, false)
+					} else {
+						add_to_buf(c'\eOC', 3, false)
+					}
 					continue
 				}
 				0x49 {
 					// PG UP
-					add_to_buf(c'\e[5~', 4)
+					if console_decckm == false {
+						add_to_buf(c'\e[5~', 4, false)
+					} else {
+						add_to_buf(c'\eO5~', 4, false)
+					}
 					continue
 				}
 				0x51 {
 					// PG DOWN
-					add_to_buf(c'\e[6~', 4)
+					if console_decckm == false {
+						add_to_buf(c'\e[6~', 4, false)
+					} else {
+						add_to_buf(c'\eO6~', 4, false)
+					}
 					continue
 				}
 				0x53 {
 					// Delete
-					add_to_buf(c'\e[3~', 4)
+					if console_decckm == false {
+						add_to_buf(c'\e[3~', 4, false)
+					} else {
+						add_to_buf(c'\eO3~', 4, false)
+					}
 					continue
 				}
 				else {}
@@ -272,7 +309,7 @@ fn keyboard_handler() {
 			continue
 		}
 
-		add_to_buf(&c, 1)
+		add_to_buf(&c, 1, true)
 	}
 }
 
@@ -296,8 +333,32 @@ fn write_ps2_config(value byte) {
 	write_ps2(0x60, value)
 }
 
+fn dec_private(extra u64, esc_val_count u64, esc_values &u32) {
+	C.printf(c'dec private: ? %llu %c\n', unsafe { esc_values[0] }, extra)
+	match unsafe { esc_values[0] } {
+		1 {
+			match extra {
+				u64(`h`) {
+					console_decckm = true
+				}
+				u64(`l`) {
+					console_decckm = false
+				}
+				else {}
+			}
+		}
+		else {}
+	}
+}
+
 pub fn stivale2_term_callback(t u64, extra u64, esc_val_count u64, esc_values u64) {
 	C.printf(c'stivale2 terminal callback called\n')
+	match t {
+		10 {
+			dec_private(extra, esc_val_count, &u32(esc_values))
+		}
+		else {}
+	}
 }
 
 pub fn initialise() {
