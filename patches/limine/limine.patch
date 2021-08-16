@@ -11,12 +11,15 @@ index 02c936d..95114a4 100644
  	-Wshadow \
  	-mno-80387 \
 diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.h b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.h
-index 41ef5c1..53703c0 100644
+index 41ef5c1..8ad55d6 100644
 --- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.h
 +++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.h
-@@ -3,21 +3,24 @@
+@@ -2,24 +2,33 @@
+ #define __DRIVERS__VGA_TEXTMODE_H__
  
  #include <stdbool.h>
++#include <stdint.h>
++#include <stddef.h>
  
 -void init_vga_textmode(int *rows, int *cols, bool managed);
 +void init_vga_textmode(size_t *rows, size_t *cols, bool managed);
@@ -45,25 +48,58 @@ index 41ef5c1..53703c0 100644
  
  void text_double_buffer(bool state);
  void text_double_buffer_flush(void);
+ 
++uint64_t text_context_size(void);
++void text_context_save(uint64_t ptr);
++void text_context_restore(uint64_t ptr);
++
+ #endif
 diff --git a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
-index 61784ed..b485929 100644
+index 61784ed..2ae6832 100644
 --- a/3rdparty/limine-orig/stage23/drivers/vga_textmode.s2.c
 +++ b/3rdparty/limine-workdir/stage23/drivers/vga_textmode.s2.c
-@@ -21,10 +21,12 @@ static uint8_t *video_mem = (uint8_t *)0xb8000;
- static uint8_t *current_buffer;
+@@ -7,6 +7,7 @@
+ #include <sys/cpu.h>
+ #include <lib/real.h>
+ #include <lib/libc.h>
++#include <lib/blib.h>
+ #include <lib/term.h>
+ #include <mm/pmm.h>
  
- static size_t cursor_offset;
+@@ -14,16 +15,25 @@
+ #define VD_COLS (80 * 2)
+ #define VD_ROWS 25
+ 
+-static uint8_t *back_buffer = NULL;
+-static uint8_t *front_buffer = NULL;
+ static uint8_t *video_mem = (uint8_t *)0xb8000;
+ 
+-static uint8_t *current_buffer;
++static uint8_t *back_buffer = NULL;
++static uint8_t *front_buffer = NULL;
+ 
+-static size_t cursor_offset;
 -static int cursor_status;
-+static bool cursor_status;
- static uint8_t text_palette;
- static uint8_t cursor_palette;
+-static uint8_t text_palette;
+-static uint8_t cursor_palette;
++static struct context {
++    uint8_t *current_buffer;
++#define current_buffer context.current_buffer
++    size_t cursor_offset;
++#define cursor_offset context.cursor_offset
++    bool cursor_status;
++#define cursor_status context.cursor_status
++    uint8_t text_palette;
++#define text_palette context.text_palette
++    uint8_t cursor_palette;
++#define cursor_palette context.cursor_palette
++    bool scroll_enabled;
++#define scroll_enabled context.scroll_enabled
++} context;
  
-+static bool scroll_enabled;
-+
  static void clear_cursor(void) {
      if (cursor_status) {
-         video_mem[cursor_offset + 1] = current_buffer[cursor_offset + 1];
-@@ -37,7 +39,9 @@ static void draw_cursor(void) {
+@@ -37,7 +47,9 @@ static void draw_cursor(void) {
      }
  }
  
@@ -74,7 +110,7 @@ index 61784ed..b485929 100644
  
  bool text_scroll_disable(void) {
      bool ret = scroll_enabled;
-@@ -49,20 +53,22 @@ void text_scroll_enable(void) {
+@@ -49,20 +61,22 @@ void text_scroll_enable(void) {
      scroll_enabled = true;
  }
  
@@ -82,8 +118,8 @@ index 61784ed..b485929 100644
 +void text_scroll(void) {
      // move the text up by one row
 -    for (size_t i = 0; i <= VIDEO_BOTTOM - VD_COLS; i++) {
-+    for (size_t i = scroll_top_margin * VD_COLS;
-+         i < (scroll_bottom_margin - 1) * VD_COLS; i++) {
++    for (size_t i = term_context.scroll_top_margin * VD_COLS;
++         i < (term_context.scroll_bottom_margin - 1) * VD_COLS; i++) {
          current_buffer[i] = current_buffer[i + VD_COLS];
          if (current_buffer == front_buffer)
              video_mem[i] = current_buffer[i + VD_COLS];
@@ -92,8 +128,8 @@ index 61784ed..b485929 100644
 -    for (size_t i = VIDEO_BOTTOM; i > VIDEO_BOTTOM - VD_COLS; i -= 2) {
 -        current_buffer[i] = text_palette;
 -        current_buffer[i - 1] = ' ';
-+    for (size_t i = (scroll_bottom_margin - 1) * VD_COLS;
-+         i < scroll_bottom_margin * VD_COLS; i += 2) {
++    for (size_t i = (term_context.scroll_bottom_margin - 1) * VD_COLS;
++         i < term_context.scroll_bottom_margin * VD_COLS; i += 2) {
 +        current_buffer[i] = ' ';
 +        current_buffer[i + 1] = text_palette;
          if (current_buffer == front_buffer) {
@@ -104,7 +140,7 @@ index 61784ed..b485929 100644
          }
      }
  }
-@@ -84,19 +90,19 @@ void text_clear(bool move) {
+@@ -84,19 +98,55 @@ void text_clear(bool move) {
  }
  
  void text_enable_cursor(void) {
@@ -124,25 +160,70 @@ index 61784ed..b485929 100644
  }
  
 -void init_vga_textmode(int *_rows, int *_cols, bool managed) {
++uint64_t text_context_size(void) {
++    uint64_t ret = 0;
++
++    ret += sizeof(struct context);
++    ret += VD_ROWS * VD_COLS; // back buffer
++    ret += VD_ROWS * VD_COLS; // front buffer
++
++    return ret;
++}
++
++void text_context_save(uint64_t ptr) {
++    memcpy32to64(ptr, (uint64_t)(uintptr_t)&context, sizeof(struct context));
++    ptr += sizeof(struct context);
++
++    memcpy32to64(ptr, (uint64_t)(uintptr_t)back_buffer, VD_ROWS * VD_COLS);
++    ptr += VD_ROWS * VD_COLS;
++
++    memcpy32to64(ptr, (uint64_t)(uintptr_t)front_buffer, VD_ROWS * VD_COLS);
++}
++
++void text_context_restore(uint64_t ptr) {
++    memcpy32to64((uint64_t)(uintptr_t)&context, ptr, sizeof(struct context));
++    ptr += sizeof(struct context);
++
++    memcpy32to64((uint64_t)(uintptr_t)back_buffer, ptr, VD_ROWS * VD_COLS);
++    ptr += VD_ROWS * VD_COLS;
++
++    memcpy32to64((uint64_t)(uintptr_t)front_buffer, ptr, VD_ROWS * VD_COLS);
++
++    for (size_t i = 0; i < VD_ROWS * VD_COLS; i++) {
++        video_mem[i] = current_buffer[i];
++    }
++
++    draw_cursor();
++}
++
 +void init_vga_textmode(size_t *_rows, size_t *_cols, bool managed) {
      if (current_video_mode != -1) {
          struct rm_regs r = {0};
          r.eax = 0x0003;
-@@ -109,10 +115,12 @@ void init_vga_textmode(int *_rows, int *_cols, bool managed) {
-     front_buffer = ext_mem_alloc(VD_ROWS * VD_COLS);
+@@ -105,15 +155,17 @@ void init_vga_textmode(int *_rows, int *_cols, bool managed) {
+         current_video_mode = -1;
+     }
  
+-    back_buffer = ext_mem_alloc(VD_ROWS * VD_COLS);
+-    front_buffer = ext_mem_alloc(VD_ROWS * VD_COLS);
++    if (back_buffer == NULL)
++        back_buffer = ext_mem_alloc(VD_ROWS * VD_COLS);
++    if (front_buffer == NULL)
++        front_buffer = ext_mem_alloc(VD_ROWS * VD_COLS);
+ 
++    current_buffer = front_buffer;
      cursor_offset = 0;
 -    cursor_status = 1;
 +    cursor_status = true;
      text_palette = 0x07;
      cursor_palette = 0x70;
- 
+-
+-    text_double_buffer(false);
 +    scroll_enabled = true;
-+
-     text_double_buffer(false);
  
      text_clear(false);
-@@ -165,48 +173,49 @@ void text_double_buffer_flush(void) {
+ 
+@@ -165,48 +217,49 @@ void text_double_buffer_flush(void) {
      draw_cursor();
  }
  
@@ -208,7 +289,7 @@ index 61784ed..b485929 100644
  void text_set_text_fg_default(void) {
      text_palette = (text_palette & 0xf0) | 7;
  }
-@@ -216,46 +225,25 @@ void text_set_text_bg_default(void) {
+@@ -216,46 +269,25 @@ void text_set_text_bg_default(void) {
  }
  
  void text_putchar(uint8_t c) {
@@ -258,7 +339,7 @@ index 61784ed..b485929 100644
 +        video_mem[cursor_offset] = c;
 +        video_mem[cursor_offset + 1] = text_palette;
      }
-+    if (cursor_offset / VD_COLS == scroll_bottom_margin - 1
++    if (cursor_offset / VD_COLS == term_context.scroll_bottom_margin - 1
 +     && cursor_offset % VD_COLS == VD_COLS - 2) {
 +        if (scroll_enabled) {
 +            text_scroll();
@@ -296,10 +377,18 @@ index 97bbda4..44745ec 100644
              break;
          res[i] = x;
 diff --git a/3rdparty/limine-orig/stage23/lib/blib.h b/3rdparty/limine-workdir/stage23/lib/blib.h
-index da7de34..c5bcae7 100644
+index da7de34..d9ce48a 100644
 --- a/3rdparty/limine-orig/stage23/lib/blib.h
 +++ b/3rdparty/limine-workdir/stage23/lib/blib.h
-@@ -30,7 +30,7 @@ extern bool stage3_loaded;
+@@ -6,6 +6,7 @@
+ #include <stdbool.h>
+ #include <fs/file.h>
+ #include <lib/part.h>
++#include <lib/libc.h>
+ #if uefi == 1
+ #  include <efi.h>
+ #endif
+@@ -30,7 +31,7 @@ extern bool stage3_loaded;
  
  extern bool verbose;
  
@@ -308,8 +397,21 @@ index da7de34..c5bcae7 100644
  
  uint64_t sqrt(uint64_t a_nInput);
  size_t get_trailing_zeros(uint64_t val);
+@@ -44,6 +45,12 @@ int pit_sleep_and_quit_on_keypress(int seconds);
+ 
+ uint64_t strtoui(const char *s, const char **end, int base);
+ 
++#if defined (__i386__)
++void memcpy32to64(uint64_t, uint64_t, uint64_t);
++#elif defined (__x86_64__)
++#  define memcpy32to64(X, Y, Z) memcpy((void *)(uintptr_t)(X), (void *)(uintptr_t)(Y), Z)
++#endif
++
+ #define DIV_ROUNDUP(a, b) (((a) + ((b) - 1)) / (b))
+ 
+ #define ALIGN_UP(x, a) ({ \
 diff --git a/3rdparty/limine-orig/stage23/lib/gterm.c b/3rdparty/limine-workdir/stage23/lib/gterm.c
-index 56ea1e2..6bf4bc0 100644
+index 56ea1e2..d11bc6b 100644
 --- a/3rdparty/limine-orig/stage23/lib/gterm.c
 +++ b/3rdparty/limine-workdir/stage23/lib/gterm.c
 @@ -31,7 +31,7 @@ static uint32_t ansi_colours[8];
@@ -542,8 +644,8 @@ index 56ea1e2..6bf4bc0 100644
      clear_cursor();
  
 -    for (int i = cols; i < rows * cols; i++) {
-+    for (size_t i = (scroll_top_margin + 1) * cols;
-+         i < scroll_bottom_margin * cols; i++) {
++    for (size_t i = (term_context.scroll_top_margin + 1) * cols;
++         i < term_context.scroll_bottom_margin * cols; i++) {
          if (!compare_char(&grid[i], &grid[i - cols]))
              plot_char_grid(&grid[i], (i - cols) % cols, (i - cols) / cols);
      }
@@ -552,8 +654,8 @@ index 56ea1e2..6bf4bc0 100644
      empty.fg = text_fg;
      empty.bg = text_bg;
 -    for (int i = rows * cols - cols; i < rows * cols; i++) {
-+    for (size_t i = (scroll_bottom_margin - 1) * cols;
-+         i < scroll_bottom_margin * cols; i++) {
++    for (size_t i = (term_context.scroll_bottom_margin - 1) * cols;
++         i < term_context.scroll_bottom_margin * cols; i++) {
          if (!compare_char(&grid[i], &empty))
              plot_char_grid(&empty, i % cols, i / cols);
      }
@@ -695,11 +797,11 @@ index 56ea1e2..6bf4bc0 100644
 +    ch.fg = text_fg;
 +    ch.bg = text_bg;
 +    plot_char_grid(&ch, cursor_x++, cursor_y);
-+    if (cursor_x == cols && ((size_t)cursor_y < scroll_bottom_margin - 1 || scroll_enabled)) {
++    if (cursor_x == cols && ((size_t)cursor_y < term_context.scroll_bottom_margin - 1 || scroll_enabled)) {
 +        cursor_x = 0;
 +        cursor_y++;
      }
-+    if ((size_t)cursor_y == scroll_bottom_margin) {
++    if ((size_t)cursor_y == term_context.scroll_bottom_margin) {
 +        cursor_y--;
 +        gterm_scroll();
 +    }
@@ -814,6 +916,62 @@ index 4731c90..8c7a506 100644
      uint32_t back_colour;
  };
  
+diff --git a/3rdparty/limine-orig/stage23/lib/libgcc.s2.asm b/3rdparty/limine-workdir/stage23/lib/libgcc.s2.asm
+index 743f11f..a9496aa 100644
+--- a/3rdparty/limine-orig/stage23/lib/libgcc.s2.asm
++++ b/3rdparty/limine-workdir/stage23/lib/libgcc.s2.asm
+@@ -55,3 +55,38 @@ __divmoddi4:
+     mov dword [ecx+4], 0
+     xor edx, edx
+     ret
++
++global memcpy32to64
++memcpy32to64:
++bits 32
++    push ebp
++    mov ebp, esp
++
++    push esi
++    push edi
++
++    push 0x28
++    call .p1
++  .p1:
++    add dword [esp], .mode64 - .p1
++    retfd
++
++bits 64
++  .mode64:
++    mov rdi, [rbp + 8]
++    mov rsi, [rbp + 16]
++    mov rcx, [rbp + 24]
++    rep movsb
++
++    push 0x18
++    call .p2
++  .p2:
++    add qword [rsp], .mode32 - .p2
++    retfq
++
++bits 32
++  .mode32:
++    pop edi
++    pop esi
++    pop ebp
++    ret
+diff --git a/3rdparty/limine-orig/stage23/lib/print.s2.c b/3rdparty/limine-workdir/stage23/lib/print.s2.c
+index 05c8cd4..8f83e83 100644
+--- a/3rdparty/limine-orig/stage23/lib/print.s2.c
++++ b/3rdparty/limine-workdir/stage23/lib/print.s2.c
+@@ -184,7 +184,7 @@ void vprint(const char *fmt, va_list args) {
+     }
+ 
+ out:
+-    term_write(print_buf, print_buf_i);
++    term_write((uint64_t)(uintptr_t)print_buf, print_buf_i);
+ 
+     for (size_t i = 0; i < print_buf_i; i++) {
+         if (E9_OUTPUT) {
 diff --git a/3rdparty/limine-orig/stage23/lib/readline.c b/3rdparty/limine-workdir/stage23/lib/readline.c
 index 7b58729..bd4a552 100644
 --- a/3rdparty/limine-orig/stage23/lib/readline.c
@@ -918,7 +1076,7 @@ index 7b58729..bd4a552 100644
 -    }
 -}
 diff --git a/3rdparty/limine-orig/stage23/lib/term.c b/3rdparty/limine-workdir/stage23/lib/term.c
-index b5124a3..28c33df 100644
+index b5124a3..2ed68b6 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.c
 @@ -8,7 +8,7 @@
@@ -930,17 +1088,16 @@ index b5124a3..28c33df 100644
      term_backend = NOT_READY;
  
      if (!gterm_init(&term_rows, &term_cols, width, height)) {
-@@ -19,6 +19,9 @@ void term_vbe(int width, int height) {
+@@ -19,6 +19,8 @@ void term_vbe(int width, int height) {
          return;
      }
  
-+    scroll_top_margin = 0;
-+    scroll_bottom_margin = term_rows;
++    term_reinit();
 +
      raw_putchar    = gterm_putchar;
      clear          = gterm_clear;
      enable_cursor  = gterm_enable_cursor;
-@@ -34,6 +37,8 @@ void term_vbe(int width, int height) {
+@@ -34,6 +36,8 @@ void term_vbe(int width, int height) {
      scroll_disable = gterm_scroll_disable;
      scroll_enable  = gterm_scroll_enable;
      term_move_character = gterm_move_character;
@@ -950,16 +1107,40 @@ index b5124a3..28c33df 100644
      term_double_buffer       = gterm_double_buffer;
      term_double_buffer_flush = gterm_double_buffer_flush;
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index d95f350..bfc2dd1 100644
+index d95f350..ab3db12 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -5,32 +5,43 @@
+@@ -5,32 +5,76 @@
  #include <stdbool.h>
  #include <lib/image.h>
  
++#define TERM_TABSIZE (8)
++#define MAX_ESC_VALUES (16)
++
++void term_reinit(void);
++
++extern struct term_context {
++    size_t escape_offset;
++    bool control_sequence;
++    bool csi;
++    bool escape;
++    bool rrr;
++    bool discard_next;
++    bool bold;
++    bool reverse_video;
++    bool dec_private;
++    uint32_t esc_values[MAX_ESC_VALUES];
++    size_t esc_values_i;
++    size_t saved_cursor_x;
++    size_t saved_cursor_y;
++    size_t current_primary;
++    bool insert_mode;
++    size_t scroll_top_margin;
++    size_t scroll_bottom_margin;
++} term_context;
++
 +extern bool cp437_off;
-+extern size_t scroll_top_margin;
-+extern size_t scroll_bottom_margin;
++extern bool term_runtime;
 +
  extern void (*raw_putchar)(uint8_t c);
  extern void (*clear)(bool move);
@@ -990,14 +1171,24 @@ index d95f350..bfc2dd1 100644
  extern void (*term_double_buffer_flush)(void);
  
 -void term_vbe(int width, int height);
++extern uint64_t (*term_context_size)(void);
++extern void (*term_context_save)(uint64_t ptr);
++extern void (*term_context_restore)(uint64_t ptr);
++
 +#define TERM_CB_DEC 10
 +#define TERM_CB_BELL 20
++
++#define TERM_CTX_SIZE ((uint64_t)(-1))
++#define TERM_CTX_SAVE ((uint64_t)(-2))
++#define TERM_CTX_RESTORE ((uint64_t)(-3))
 +
 +extern void (*term_callback)(uint64_t type, uint64_t extra, uint64_t esc_val_count, uint64_t esc_values);
 +
 +void term_vbe(size_t width, size_t height);
  void term_textmode(void);
- void term_write(const char *buf, size_t count);
+-void term_write(const char *buf, size_t count);
++void term_putchar(uint8_t c);
++void term_write(uint64_t buf, uint64_t count);
  
  void term_deinit(void);
  
@@ -1007,10 +1198,10 @@ index d95f350..bfc2dd1 100644
  enum {
      NOT_READY,
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..50ef424 100644
+index a89e4ea..e06ae05 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-@@ -6,12 +6,13 @@
+@@ -6,37 +6,84 @@
  #include <lib/image.h>
  #include <lib/blib.h>
  #include <drivers/vga_textmode.h>
@@ -1019,13 +1210,18 @@ index a89e4ea..50ef424 100644
  // Tries to implement this standard for terminfo
  // https://man7.org/linux/man-pages/man4/console_codes.4.html
  
- #define TERM_TABSIZE (8)
+-#define TERM_TABSIZE (8)
 -#define MAX_ESC_VALUES (256)
-+#define MAX_ESC_VALUES (16)
- 
+-
  int current_video_mode = -1;
  
-@@ -21,22 +22,26 @@ void (*raw_putchar)(uint8_t c);
+ int term_backend = NOT_READY;
++size_t term_rows, term_cols;
++bool cp437_off = false;
++bool term_runtime = false;
++static bool old_cur_stat;
+ 
+ void (*raw_putchar)(uint8_t c);
  void (*clear)(bool move);
  void (*enable_cursor)(void);
  bool (*disable_cursor)(void);
@@ -1054,23 +1250,63 @@ index a89e4ea..50ef424 100644
  void (*term_double_buffer_flush)(void);
  
 -int term_rows, term_cols;
-+size_t term_rows, term_cols;
++uint64_t (*term_context_size)(void);
++void (*term_context_save)(uint64_t ptr);
++void (*term_context_restore)(uint64_t ptr);
 +
 +void (*term_callback)(uint64_t type, uint64_t extra, uint64_t esc_val_count, uint64_t esc_values) = NULL;
++
++struct term_context term_context;
++
++#define escape_offset term_context.escape_offset
++#define control_sequence term_context.control_sequence
++#define csi term_context.csi
++#define escape term_context.escape
++#define rrr term_context.rrr
++#define discard_next term_context.discard_next
++#define bold term_context.bold
++#define reverse_video term_context.reverse_video
++#define dec_private term_context.dec_private
++#define esc_values term_context.esc_values
++#define esc_values_i term_context.esc_values_i
++#define saved_cursor_x term_context.saved_cursor_x
++#define saved_cursor_y term_context.saved_cursor_y
++#define current_primary term_context.current_primary
++#define insert_mode term_context.insert_mode
++#define scroll_top_margin term_context.scroll_top_margin
++#define scroll_bottom_margin term_context.scroll_bottom_margin
++
++void term_reinit(void) {
++    escape_offset = 0;
++    control_sequence = false;
++    csi = false;
++    escape = false;
++    rrr = false;
++    discard_next = false;
++    bold = false;
++    reverse_video = false;
++    dec_private = false;
++    esc_values_i = 0;
++    saved_cursor_x = 0;
++    saved_cursor_y = 0;
++    current_primary = (size_t)-1;
++    insert_mode = false;
++    scroll_top_margin = 0;
++    scroll_bottom_margin = term_rows;
++}
  
  #if bios == 1
  void term_textmode(void) {
-@@ -44,6 +49,9 @@ void term_textmode(void) {
+@@ -44,6 +91,8 @@ void term_textmode(void) {
  
      init_vga_textmode(&term_rows, &term_cols, true);
  
-+    scroll_top_margin = 0;
-+    scroll_bottom_margin = term_rows;
++    term_reinit();
 +
      raw_putchar    = text_putchar;
      clear          = text_clear;
      enable_cursor  = text_enable_cursor;
-@@ -52,13 +60,15 @@ void term_textmode(void) {
+@@ -52,17 +101,23 @@ void term_textmode(void) {
      get_cursor_pos = text_get_cursor_pos;
      set_text_fg    = text_set_text_fg;
      set_text_bg    = text_set_text_bg;
@@ -1087,46 +1323,129 @@ index a89e4ea..50ef424 100644
  
      term_double_buffer       = text_double_buffer;
      term_double_buffer_flush = text_double_buffer_flush;
-@@ -85,27 +95,25 @@ void term_write(const char *buf, size_t count) {
-         enable_cursor();
+ 
++    term_context_size = text_context_size;
++    term_context_save = text_context_save;
++    term_context_restore = text_context_restore;
++
+     term_backend = TEXTMODE;
+ }
+ #endif
+@@ -71,41 +126,86 @@ void term_deinit(void) {
+     term_backend = NOT_READY;
+ }
+ 
+-static void term_putchar(uint8_t c);
++static uint64_t context_size(void) {
++    uint64_t ret = 0;
+ 
+-static bool old_cur_stat;
++    ret += sizeof(struct term_context);
++    ret += term_context_size();
+ 
+-void term_write(const char *buf, size_t count) {
+-    if (term_backend == NOT_READY)
+-        return;
+-    old_cur_stat = disable_cursor();
+-    for (size_t i = 0; i < count; i++)
+-        term_putchar(buf[i]);
+-    if (old_cur_stat)
+-        enable_cursor();
++    return ret;
  }
  
 -static int get_cursor_pos_x(void) {
 -    int x, y;
 -    get_cursor_pos(&x, &y);
 -    return x;
--}
-+bool cp437_off = false;
-+size_t scroll_top_margin;
-+size_t scroll_bottom_margin;
++static void context_save(uint64_t ptr) {
++    memcpy32to64(ptr, (uint64_t)(uintptr_t)&term_context, sizeof(struct term_context));
++    ptr += sizeof(struct term_context);
++
++    term_context_save(ptr);
+ }
  
 -static int get_cursor_pos_y(void) {
 -    int x, y;
 -    get_cursor_pos(&x, &y);
 -    return y;
--}
-+static size_t escape_offset = 0;
++static void context_restore(uint64_t ptr) {
++    memcpy32to64((uint64_t)(uintptr_t)&term_context, ptr, sizeof(struct term_context));
++    ptr += sizeof(struct term_context);
++
++    term_context_restore(ptr);
+ }
  
- static bool control_sequence = false;
-+static bool csi = false;
- static bool escape = false;
- static bool rrr = false;
-+static bool discard_next = false;
- static bool bold = false;
-+static bool reverse_video = false;
- static bool dec_private = false;
+-static bool control_sequence = false;
+-static bool escape = false;
+-static bool rrr = false;
+-static bool bold = false;
+-static bool dec_private = false;
 -static int32_t esc_values[MAX_ESC_VALUES];
-+static uint32_t esc_values[MAX_ESC_VALUES];
- static size_t esc_values_i = 0;
+-static size_t esc_values_i = 0;
 -static int saved_cursor_x = 0, saved_cursor_y = 0;
 -static int current_fg = -1;
-+static size_t saved_cursor_x = 0, saved_cursor_y = 0;
-+static size_t current_primary = (size_t)-1;
-+static bool insert_mode = false;
++#if defined (__i386__)
++#define TERM_XFER_CHUNK 8192
++
++static char xfer_buf[TERM_XFER_CHUNK];
++#endif
++
++void term_write(uint64_t buf, uint64_t count) {
++    if (term_backend == NOT_READY)
++        return;
++
++    switch (count) {
++        case TERM_CTX_SIZE: {
++            uint64_t ret = context_size();
++            memcpy32to64(buf, (uint64_t)(uintptr_t)&ret, sizeof(uint64_t));
++            return;
++        }
++        case TERM_CTX_SAVE: {
++            context_save(buf);
++            return;
++        }
++        case TERM_CTX_RESTORE: {
++            context_restore(buf);
++            return;
++        }
++    }
++
++    bool native = false;
++#if defined (__x86_64__)
++    native = true;
++#endif
++
++    if (!term_runtime || native) {
++        const char *s = (const char *)(uintptr_t)buf;
++
++        old_cur_stat = disable_cursor();
++        for (size_t i = 0; i < count; i++)
++            term_putchar(s[i]);
++        if (old_cur_stat)
++            enable_cursor();
++    } else {
++#if defined (__i386__)
++        while (count != 0) {
++            uint64_t chunk = count % TERM_XFER_CHUNK;
++            memcpy32to64((uint64_t)(uintptr_t)xfer_buf, buf, chunk);
++
++            old_cur_stat = disable_cursor();
++            for (size_t i = 0; i < chunk; i++)
++                term_putchar(xfer_buf[i]);
++            if (old_cur_stat)
++                enable_cursor();
++
++            count -= chunk;
++            buf += chunk;
++        }
++#endif
++    }
++}
  
  static void sgr(void) {
      size_t i = 0;
-@@ -114,65 +122,144 @@ static void sgr(void) {
+@@ -114,65 +214,144 @@ static void sgr(void) {
          goto def;
  
      for (; i < esc_values_i; i++) {
@@ -1293,7 +1612,7 @@ index a89e4ea..50ef424 100644
              continue;
          }
      }
-@@ -181,100 +268,169 @@ def:
+@@ -181,100 +360,169 @@ def:
  static void dec_private_parse(uint8_t c) {
      dec_private = false;
  
@@ -1516,7 +1835,7 @@ index a89e4ea..50ef424 100644
              break;
          case 'H':
          case 'f':
-@@ -289,31 +445,23 @@ static void control_sequence_parse(uint8_t c) {
+@@ -289,31 +537,23 @@ static void control_sequence_parse(uint8_t c) {
          case 'J':
              switch (esc_values[0]) {
                  case 0: {
@@ -1553,7 +1872,7 @@ index a89e4ea..50ef424 100644
                                  b = true;
                                  break;
                              }
-@@ -321,31 +469,33 @@ static void control_sequence_parse(uint8_t c) {
+@@ -321,31 +561,33 @@ static void control_sequence_parse(uint8_t c) {
                          if (b == true)
                              break;
                      }
@@ -1599,7 +1918,7 @@ index a89e4ea..50ef424 100644
          case 'm':
              sgr();
              break;
-@@ -355,89 +505,154 @@ static void control_sequence_parse(uint8_t c) {
+@@ -355,89 +597,154 @@ static void control_sequence_parse(uint8_t c) {
          case 'u':
              set_cursor_pos(saved_cursor_x, saved_cursor_y);
              break;
@@ -1706,7 +2025,8 @@ index a89e4ea..50ef424 100644
 +    escape = false;
  }
  
- static void term_putchar(uint8_t c) {
+-static void term_putchar(uint8_t c) {
++void term_putchar(uint8_t c) {
 +    if (discard_next) {
 +        discard_next = false;
 +        return;
@@ -1767,11 +2087,11 @@ index a89e4ea..50ef424 100644
 +            if (term_callback != NULL)
 +                term_callback(TERM_CB_BELL, 0, 0, 0);
 +            return;
-     }
++    }
 +
 +    if (cp437_off == true && (c < 0x20 || c > 0x7f)) {
 +        return;
-+    }
+     }
 +
 +    if (insert_mode == true) {
 +        for (size_t i = term_cols - 1; ; i--) {
@@ -2100,19 +2420,20 @@ index 0f6224d..03b0e7b 100644
  #endif
      }
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-index 945f962..24d8831 100644
+index 945f962..3a17aec 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-@@ -58,6 +58,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
+@@ -57,7 +57,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
+ #if defined (__i386__)
  extern symbol stivale2_term_write_entry;
  void *stivale2_rt_stack = NULL;
- void *stivale2_term_buf = NULL;
+-void *stivale2_term_buf = NULL;
 +uint64_t stivale2_term_callback_ptr = 0;
 +void stivale2_term_callback(uint64_t, uint64_t, uint64_t, uint64_t);
  #endif
  
  void stivale2_load(char *config, char *cmdline, bool pxe, void *efi_system_table) {
-@@ -381,7 +383,7 @@ failed_to_load_header_section:
+@@ -381,7 +382,7 @@ failed_to_load_header_section:
  
      struct stivale2_header_tag_framebuffer *hdrtag = get_tag(&stivale2_hdr, STIVALE2_HEADER_TAG_FRAMEBUFFER_ID);
  
@@ -2121,7 +2442,7 @@ index 945f962..24d8831 100644
  
      if (hdrtag != NULL) {
          req_width  = hdrtag->framebuffer_width;
-@@ -393,20 +395,44 @@ failed_to_load_header_section:
+@@ -393,20 +394,44 @@ failed_to_load_header_section:
              parse_resolution(&req_width, &req_height, &req_bpp, resolution);
      }
  
@@ -2172,7 +2493,25 @@ index 945f962..24d8831 100644
          // We provide max allowed string length
          tag->flags |= (1 << 1);
  
-@@ -431,7 +457,13 @@ failed_to_load_header_section:
+@@ -415,15 +440,13 @@ failed_to_load_header_section:
+             stivale2_rt_stack = ext_mem_alloc(8192);
+         }
+ 
+-        stivale2_term_buf = ext_mem_alloc(8192);
+-
+         tag->term_write = (uintptr_t)(void *)stivale2_term_write_entry;
+-        tag->max_length = 8192;
+ #elif defined (__x86_64__)
+         tag->term_write = (uintptr_t)term_write;
+-        tag->max_length = 0;
+ #endif
+ 
++        tag->max_length = 0;
++
+         // We provide rows and cols
+         tag->flags |= (1 << 0);
+         tag->cols = term_cols;
+@@ -431,7 +454,13 @@ failed_to_load_header_section:
  
          append_tag(&stivale2_struct, (struct stivale2_tag *)tag);
  
@@ -2187,7 +2526,7 @@ index 945f962..24d8831 100644
      } else {
          fb = &_fb;
      }
-@@ -441,7 +473,7 @@ failed_to_load_header_section:
+@@ -441,7 +470,7 @@ failed_to_load_header_section:
          term_deinit();
  
          if (fb_init(fb, req_width, req_height, req_bpp)) {
@@ -2196,7 +2535,7 @@ index 945f962..24d8831 100644
              struct stivale2_struct_tag_framebuffer *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_framebuffer));
              tag->tag.identifier = STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID;
  
-@@ -468,9 +500,10 @@ skip_modeset:;
+@@ -468,9 +497,10 @@ skip_modeset:;
  #if uefi == 1
          panic("stivale2: Cannot use text mode with UEFI.");
  #elif bios == 1
@@ -2208,16 +2547,34 @@ index 945f962..24d8831 100644
          struct stivale2_struct_tag_textmode *tmtag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_textmode));
          tmtag->tag.identifier = STIVALE2_STRUCT_TAG_TEXTMODE_ID;
  
+@@ -628,7 +658,9 @@ skip_modeset:;
+     }
+ 
+     // Clear terminal for kernels that will use the stivale2 terminal
+-    term_write("\e[2J\e[H", 7);
++    term_write((uint64_t)(uintptr_t)("\e[2J\e[H"), 7);
++
++    term_runtime = true;
+ 
+     stivale_spinup(bits, want_5lv, &pagemap, entry_point,
+                    REPORTED_ADDR((uint64_t)(uintptr_t)&stivale2_struct),
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
-index 26517ca..d0bf3fc 100644
+index 26517ca..b5c05e8 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm
-@@ -15,10 +15,60 @@ section .text
+@@ -8,17 +8,64 @@ user_ds: resq 1
+ user_es: resq 1
+ user_ss: resq 1
+ 
+-%define MAX_TERM_BUF 8192
+-
+ section .text
+ 
  extern term_write
- extern stivale2_term_buf
+-extern stivale2_term_buf
  extern stivale2_rt_stack
 +extern stivale2_term_callback_ptr
- 
++
 +global stivale2_term_callback
 +stivale2_term_callback:
 +bits 32
@@ -2227,7 +2584,7 @@ index 26517ca..d0bf3fc 100644
 +    push ebx
 +    push esi
 +    push edi
-+
+ 
 +    ; Go 64
 +    push 0x28
 +    push .mode64
@@ -2273,13 +2630,50 @@ index 26517ca..d0bf3fc 100644
      push rbx
      push rbp
      push r12
+@@ -35,14 +82,7 @@ stivale2_term_write_entry:
+     mov word [user_ss], ss
+ 
+     push rsi
+-    mov rcx, rsi
+-    mov rax, MAX_TERM_BUF
+-    cmp rcx, rax
+-    cmovg rcx, rax
+-    mov rsi, rdi
+-    mov edi, [stivale2_term_buf]
+-    rep movsb
+-    pop rsi
++    push rdi
+ 
+     push 0x18
+     push .mode32
+@@ -53,10 +93,10 @@ bits 32
+     mov ds, ax
+     mov es, ax
+     mov ss, ax
+-    push esi
+-    push dword [stivale2_term_buf]
++
+     call term_write
+-    add esp, 8
++    add esp, 16
++
+     push dword [user_cs]
+     push .mode64
+     retfd
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32 b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
-index d39e5a3..c18075c 100644
+index d39e5a3..723a92a 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2_rt.asm32
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2_rt.asm32
-@@ -17,6 +17,69 @@ section .text
+@@ -10,13 +10,69 @@ user_ds: resq 1
+ user_es: resq 1
+ user_ss: resq 1
+ 
+-%define MAX_TERM_BUF 8192
+-
+ section .text
+ 
  extern term_write
- extern stivale2_term_buf
+-extern stivale2_term_buf
  extern stivale2_rt_stack
 +extern stivale2_term_callback_ptr
 +
@@ -2297,9 +2691,7 @@ index d39e5a3..c18075c 100644
 +    push 0x28
 +    call .p1
 +  .p1:
-+    pop eax
-+    add eax, 6
-+    push eax
++    add dword [esp], .mode64 - .p1
 +    retfd
 +bits 64
 +  .mode64:
@@ -2327,9 +2719,7 @@ index d39e5a3..c18075c 100644
 +    push 0x18
 +    call .p2
 +  .p2:
-+    pop rax
-+    add rax, 8
-+    push rax
++    add qword [rsp], .mode32 - .p2
 +    retfq
 +bits 32
 +  .mode32:
@@ -2347,3 +2737,48 @@ index d39e5a3..c18075c 100644
  
  bits 64
  global stivale2_term_write_entry
+@@ -42,21 +98,12 @@ stivale2_term_write_entry:
+     mov word [rbx + user_ss wrt ..gotoff], ss
+ 
+     push rsi
+-    mov rcx, rsi
+-    mov rax, MAX_TERM_BUF
+-    cmp rcx, rax
+-    cmovg rcx, rax
+-    mov rsi, rdi
+-    mov edi, [rbx + stivale2_term_buf wrt ..gotoff]
+-    rep movsb
+-    pop rsi
++    push rdi
+ 
+     push 0x18
+     call .p1
+   .p1:
+-    pop rax
+-    add rax, 8
+-    push rax
++    add qword [rsp], .mode32 - .p1
+     retfq
+ bits 32
+   .mode32:
+@@ -64,16 +111,14 @@ bits 32
+     mov ds, ax
+     mov es, ax
+     mov ss, ax
+-    push esi
+-    push dword [ebx + stivale2_term_buf wrt ..gotoff]
++
+     call term_write
+-    add esp, 8
++    add esp, 16
++
+     push dword [ebx + user_cs wrt ..gotoff]
+     call .p2
+   .p2:
+-    pop eax
+-    add eax, 6
+-    push eax
++    add dword [esp], .mode64 - .p2
+     retfd
+ bits 64
+   .mode64:
