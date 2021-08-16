@@ -1107,10 +1107,10 @@ index b5124a3..2ed68b6 100644
      term_double_buffer       = gterm_double_buffer;
      term_double_buffer_flush = gterm_double_buffer_flush;
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index d95f350..0713762 100644
+index d95f350..ea8dd2d 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -2,45 +2,86 @@
+@@ -2,45 +2,88 @@
  #define __LIB__TERM_H__
  
  #include <stddef.h>
@@ -1131,6 +1131,7 @@ index d95f350..0713762 100644
 +    bool reverse_video;
 +    bool dec_private;
 +    bool insert_mode;
++    uint8_t g_select;
 +    uint8_t charsets[2];
 +    size_t current_charset;
 +    size_t escape_offset;
@@ -1200,6 +1201,7 @@ index d95f350..0713762 100644
 -void term_deinit(void);
 +#define TERM_CB_DEC 10
 +#define TERM_CB_BELL 20
++#define TERM_CB_PRIVATE_ID 30
  
 -extern int term_rows, term_cols;
 +#define TERM_CTX_SIZE ((uint64_t)(-1))
@@ -1220,10 +1222,10 @@ index d95f350..0713762 100644
  
  #endif
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..9d2c46d 100644
+index a89e4ea..26a8f9d 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-@@ -6,37 +6,91 @@
+@@ -6,37 +6,93 @@
  #include <lib/image.h>
  #include <lib/blib.h>
  #include <drivers/vga_textmode.h>
@@ -1299,6 +1301,7 @@ index a89e4ea..9d2c46d 100644
 +#define scroll_bottom_margin term_context.scroll_bottom_margin
 +#define current_charset term_context.current_charset
 +#define charsets term_context.charsets
++#define g_select term_context.g_select
 +
 +#define CHARSET_DEFAULT 0
 +#define CHARSET_DEC_SPECIAL 1
@@ -1321,13 +1324,14 @@ index a89e4ea..9d2c46d 100644
 +    scroll_top_margin = 0;
 +    scroll_bottom_margin = term_rows;
 +    current_charset = 0;
++    g_select = 0;
 +    charsets[0] = CHARSET_DEFAULT;
 +    charsets[1] = CHARSET_DEC_SPECIAL;
 +}
  
  #if bios == 1
  void term_textmode(void) {
-@@ -44,6 +98,8 @@ void term_textmode(void) {
+@@ -44,6 +100,8 @@ void term_textmode(void) {
  
      init_vga_textmode(&term_rows, &term_cols, true);
  
@@ -1336,7 +1340,7 @@ index a89e4ea..9d2c46d 100644
      raw_putchar    = text_putchar;
      clear          = text_clear;
      enable_cursor  = text_enable_cursor;
-@@ -52,17 +108,23 @@ void term_textmode(void) {
+@@ -52,17 +110,23 @@ void term_textmode(void) {
      get_cursor_pos = text_get_cursor_pos;
      set_text_fg    = text_set_text_fg;
      set_text_bg    = text_set_text_bg;
@@ -1361,7 +1365,7 @@ index a89e4ea..9d2c46d 100644
      term_backend = TEXTMODE;
  }
  #endif
-@@ -71,41 +133,86 @@ void term_deinit(void) {
+@@ -71,41 +135,86 @@ void term_deinit(void) {
      term_backend = NOT_READY;
  }
  
@@ -1475,7 +1479,7 @@ index a89e4ea..9d2c46d 100644
  
  static void sgr(void) {
      size_t i = 0;
-@@ -114,65 +221,144 @@ static void sgr(void) {
+@@ -114,65 +223,144 @@ static void sgr(void) {
          goto def;
  
      for (; i < esc_values_i; i++) {
@@ -1642,7 +1646,7 @@ index a89e4ea..9d2c46d 100644
              continue;
          }
      }
-@@ -181,100 +367,169 @@ def:
+@@ -181,100 +369,169 @@ def:
  static void dec_private_parse(uint8_t c) {
      dec_private = false;
  
@@ -1657,7 +1661,7 @@ index a89e4ea..9d2c46d 100644
 -        }
 +    if (esc_values_i == 0) {
 +        return;
-+    }
+     }
 +
 +    bool set;
 +
@@ -1668,7 +1672,7 @@ index a89e4ea..9d2c46d 100644
 +            set = false; break;
 +        default:
 +            return;
-     }
++    }
 +
 +    switch (esc_values[0]) {
 +        case 25:
@@ -1865,7 +1869,7 @@ index a89e4ea..9d2c46d 100644
              break;
          case 'H':
          case 'f':
-@@ -289,31 +544,23 @@ static void control_sequence_parse(uint8_t c) {
+@@ -289,31 +546,23 @@ static void control_sequence_parse(uint8_t c) {
          case 'J':
              switch (esc_values[0]) {
                  case 0: {
@@ -1902,7 +1906,7 @@ index a89e4ea..9d2c46d 100644
                                  b = true;
                                  break;
                              }
-@@ -321,31 +568,33 @@ static void control_sequence_parse(uint8_t c) {
+@@ -321,31 +570,33 @@ static void control_sequence_parse(uint8_t c) {
                          if (b == true)
                              break;
                      }
@@ -1948,7 +1952,7 @@ index a89e4ea..9d2c46d 100644
          case 'm':
              sgr();
              break;
-@@ -355,89 +604,201 @@ static void control_sequence_parse(uint8_t c) {
+@@ -355,89 +606,253 @@ static void control_sequence_parse(uint8_t c) {
          case 'u':
              set_cursor_pos(saved_cursor_x, saved_cursor_y);
              break;
@@ -2028,6 +2032,9 @@ index a89e4ea..9d2c46d 100644
 +        goto is_csi;
 +    }
 +
++    size_t x, y;
++    get_cursor_pos(&x, &y);
++
      switch (c) {
 -        case '\e':
 -            escape = false;
@@ -2042,15 +2049,45 @@ index a89e4ea..9d2c46d 100644
              rrr = false;
              control_sequence = true;
 +            return;
++        case 'c':
++            term_reinit();
++            clear(true);
+             break;
+-        default:
+-            escape = false;
++        case 'D':
++            if (y == scroll_bottom_margin - 1) {
++                term_scroll();
++                set_cursor_pos(x, y);
++            } else {
++                set_cursor_pos(x, y + 1);
++            }
+             break;
++        case 'E':
++            if (y == scroll_bottom_margin - 1) {
++                term_scroll();
++                set_cursor_pos(0, y);
++            } else {
++                set_cursor_pos(0, y + 1);
++            }
++            break;
++        case 'M':
++            // "Reverse linefeed"
++            set_cursor_pos(x, y - 1);
++            break;
++        case 'Z':
++            term_callback(TERM_CB_PRIVATE_ID, 0, 0, 0);
++            break;
++        case '(':
++        case ')':
++            g_select = c - '\'';
++            break;
 +        case '\e':
 +            if (term_runtime == false) {
 +                raw_putchar(c);
 +            }
-             break;
--        default:
--            escape = false;
--            break;
-     }
++            break;
++    }
 +
 +    escape = false;
 +}
@@ -2085,15 +2122,19 @@ index a89e4ea..9d2c46d 100644
 +        case '+': return 0x1a;
 +        case '{': return 0xe3;
 +        case '}': return 0x9c;
-+    }
+     }
 +
 +    return c;
  }
  
 -static void term_putchar(uint8_t c) {
 +void term_putchar(uint8_t c) {
-+    if (discard_next) {
++    if (discard_next || c == 0x18 || c == 0x1a) {
 +        discard_next = false;
++        escape = false;
++        csi = false;
++        control_sequence = false;
++        g_select = 0;
 +        return;
 +    }
 +
@@ -2102,12 +2143,26 @@ index a89e4ea..9d2c46d 100644
          return;
      }
  
++    if (g_select) {
++        g_select--;
++        switch (c) {
++            case 'B':
++                charsets[g_select] = CHARSET_DEFAULT; break;
++            case '0':
++                charsets[g_select] = CHARSET_DEC_SPECIAL; break;
++        }
++        g_select = 0;
++        return;
++    }
++
 +    size_t x, y;
 +    get_cursor_pos(&x, &y);
 +
      switch (c) {
 -        case '\0':
 -            break;
++        case 0x7f:
++            return;
 +        case 0x9b:
 +            csi = true;
 +            // FALLTHRU
