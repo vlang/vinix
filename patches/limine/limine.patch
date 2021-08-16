@@ -1107,20 +1107,21 @@ index b5124a3..2ed68b6 100644
      term_double_buffer       = gterm_double_buffer;
      term_double_buffer_flush = gterm_double_buffer_flush;
 diff --git a/3rdparty/limine-orig/stage23/lib/term.h b/3rdparty/limine-workdir/stage23/lib/term.h
-index d95f350..ab3db12 100644
+index d95f350..0713762 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.h
 +++ b/3rdparty/limine-workdir/stage23/lib/term.h
-@@ -5,32 +5,76 @@
+@@ -2,45 +2,86 @@
+ #define __LIB__TERM_H__
+ 
+ #include <stddef.h>
++#include <stdint.h>
  #include <stdbool.h>
  #include <lib/image.h>
  
 +#define TERM_TABSIZE (8)
 +#define MAX_ESC_VALUES (16)
 +
-+void term_reinit(void);
-+
 +extern struct term_context {
-+    size_t escape_offset;
 +    bool control_sequence;
 +    bool csi;
 +    bool escape;
@@ -1129,18 +1130,37 @@ index d95f350..ab3db12 100644
 +    bool bold;
 +    bool reverse_video;
 +    bool dec_private;
-+    uint32_t esc_values[MAX_ESC_VALUES];
++    bool insert_mode;
++    uint8_t charsets[2];
++    size_t current_charset;
++    size_t escape_offset;
 +    size_t esc_values_i;
 +    size_t saved_cursor_x;
 +    size_t saved_cursor_y;
 +    size_t current_primary;
-+    bool insert_mode;
 +    size_t scroll_top_margin;
 +    size_t scroll_bottom_margin;
++    uint32_t esc_values[MAX_ESC_VALUES];
 +} term_context;
 +
-+extern bool cp437_off;
++enum {
++    NOT_READY,
++    VBE,
++    TEXTMODE
++};
++
++extern int current_video_mode;
++extern int term_backend;
++extern size_t term_rows, term_cols;
 +extern bool term_runtime;
++extern bool early_term;
++
++void term_reinit(void);
++void term_deinit(void);
++void term_vbe(size_t width, size_t height);
++void term_textmode(void);
++void term_putchar(uint8_t c);
++void term_write(uint64_t buf, uint64_t count);
 +
  extern void (*raw_putchar)(uint8_t c);
  extern void (*clear)(bool move);
@@ -1171,37 +1191,39 @@ index d95f350..ab3db12 100644
  extern void (*term_double_buffer_flush)(void);
  
 -void term_vbe(int width, int height);
+-void term_textmode(void);
+-void term_write(const char *buf, size_t count);
 +extern uint64_t (*term_context_size)(void);
 +extern void (*term_context_save)(uint64_t ptr);
 +extern void (*term_context_restore)(uint64_t ptr);
-+
+ 
+-void term_deinit(void);
 +#define TERM_CB_DEC 10
 +#define TERM_CB_BELL 20
-+
+ 
+-extern int term_rows, term_cols;
 +#define TERM_CTX_SIZE ((uint64_t)(-1))
 +#define TERM_CTX_SAVE ((uint64_t)(-2))
 +#define TERM_CTX_RESTORE ((uint64_t)(-3))
-+
+ 
+-enum {
+-    NOT_READY,
+-    VBE,
+-    TEXTMODE
+-};
+-
+-extern int term_backend;
+-extern int current_video_mode;
+-
+-extern bool early_term;
 +extern void (*term_callback)(uint64_t type, uint64_t extra, uint64_t esc_val_count, uint64_t esc_values);
-+
-+void term_vbe(size_t width, size_t height);
- void term_textmode(void);
--void term_write(const char *buf, size_t count);
-+void term_putchar(uint8_t c);
-+void term_write(uint64_t buf, uint64_t count);
  
- void term_deinit(void);
- 
--extern int term_rows, term_cols;
-+extern size_t term_rows, term_cols;
- 
- enum {
-     NOT_READY,
+ #endif
 diff --git a/3rdparty/limine-orig/stage23/lib/term.s2.c b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-index a89e4ea..e06ae05 100644
+index a89e4ea..9d2c46d 100644
 --- a/3rdparty/limine-orig/stage23/lib/term.s2.c
 +++ b/3rdparty/limine-workdir/stage23/lib/term.s2.c
-@@ -6,37 +6,84 @@
+@@ -6,37 +6,91 @@
  #include <lib/image.h>
  #include <lib/blib.h>
  #include <drivers/vga_textmode.h>
@@ -1214,11 +1236,11 @@ index a89e4ea..e06ae05 100644
 -#define MAX_ESC_VALUES (256)
 -
  int current_video_mode = -1;
- 
+-
  int term_backend = NOT_READY;
 +size_t term_rows, term_cols;
-+bool cp437_off = false;
 +bool term_runtime = false;
++
 +static bool old_cur_stat;
  
  void (*raw_putchar)(uint8_t c);
@@ -1275,6 +1297,11 @@ index a89e4ea..e06ae05 100644
 +#define insert_mode term_context.insert_mode
 +#define scroll_top_margin term_context.scroll_top_margin
 +#define scroll_bottom_margin term_context.scroll_bottom_margin
++#define current_charset term_context.current_charset
++#define charsets term_context.charsets
++
++#define CHARSET_DEFAULT 0
++#define CHARSET_DEC_SPECIAL 1
 +
 +void term_reinit(void) {
 +    escape_offset = 0;
@@ -1293,11 +1320,14 @@ index a89e4ea..e06ae05 100644
 +    insert_mode = false;
 +    scroll_top_margin = 0;
 +    scroll_bottom_margin = term_rows;
++    current_charset = 0;
++    charsets[0] = CHARSET_DEFAULT;
++    charsets[1] = CHARSET_DEC_SPECIAL;
 +}
  
  #if bios == 1
  void term_textmode(void) {
-@@ -44,6 +91,8 @@ void term_textmode(void) {
+@@ -44,6 +98,8 @@ void term_textmode(void) {
  
      init_vga_textmode(&term_rows, &term_cols, true);
  
@@ -1306,7 +1336,7 @@ index a89e4ea..e06ae05 100644
      raw_putchar    = text_putchar;
      clear          = text_clear;
      enable_cursor  = text_enable_cursor;
-@@ -52,17 +101,23 @@ void term_textmode(void) {
+@@ -52,17 +108,23 @@ void term_textmode(void) {
      get_cursor_pos = text_get_cursor_pos;
      set_text_fg    = text_set_text_fg;
      set_text_bg    = text_set_text_bg;
@@ -1331,7 +1361,7 @@ index a89e4ea..e06ae05 100644
      term_backend = TEXTMODE;
  }
  #endif
-@@ -71,41 +126,86 @@ void term_deinit(void) {
+@@ -71,41 +133,86 @@ void term_deinit(void) {
      term_backend = NOT_READY;
  }
  
@@ -1445,7 +1475,7 @@ index a89e4ea..e06ae05 100644
  
  static void sgr(void) {
      size_t i = 0;
-@@ -114,65 +214,144 @@ static void sgr(void) {
+@@ -114,65 +221,144 @@ static void sgr(void) {
          goto def;
  
      for (; i < esc_values_i; i++) {
@@ -1612,7 +1642,7 @@ index a89e4ea..e06ae05 100644
              continue;
          }
      }
-@@ -181,100 +360,169 @@ def:
+@@ -181,100 +367,169 @@ def:
  static void dec_private_parse(uint8_t c) {
      dec_private = false;
  
@@ -1627,7 +1657,7 @@ index a89e4ea..e06ae05 100644
 -        }
 +    if (esc_values_i == 0) {
 +        return;
-     }
++    }
 +
 +    bool set;
 +
@@ -1638,7 +1668,7 @@ index a89e4ea..e06ae05 100644
 +            set = false; break;
 +        default:
 +            return;
-+    }
+     }
 +
 +    switch (esc_values[0]) {
 +        case 25:
@@ -1835,7 +1865,7 @@ index a89e4ea..e06ae05 100644
              break;
          case 'H':
          case 'f':
-@@ -289,31 +537,23 @@ static void control_sequence_parse(uint8_t c) {
+@@ -289,31 +544,23 @@ static void control_sequence_parse(uint8_t c) {
          case 'J':
              switch (esc_values[0]) {
                  case 0: {
@@ -1872,7 +1902,7 @@ index a89e4ea..e06ae05 100644
                                  b = true;
                                  break;
                              }
-@@ -321,31 +561,33 @@ static void control_sequence_parse(uint8_t c) {
+@@ -321,31 +568,33 @@ static void control_sequence_parse(uint8_t c) {
                          if (b == true)
                              break;
                      }
@@ -1918,7 +1948,7 @@ index a89e4ea..e06ae05 100644
          case 'm':
              sgr();
              break;
-@@ -355,89 +597,154 @@ static void control_sequence_parse(uint8_t c) {
+@@ -355,89 +604,201 @@ static void control_sequence_parse(uint8_t c) {
          case 'u':
              set_cursor_pos(saved_cursor_x, saved_cursor_y);
              break;
@@ -2011,18 +2041,53 @@ index a89e4ea..e06ae05 100644
              esc_values_i = 0;
              rrr = false;
              control_sequence = true;
--            break;
--        default:
--            escape = false;
 +            return;
 +        case '\e':
-+            if (cp437_off == false) {
++            if (term_runtime == false) {
 +                raw_putchar(c);
 +            }
              break;
+-        default:
+-            escape = false;
+-            break;
      }
 +
 +    escape = false;
++}
++
++static uint8_t dec_special_to_cp437(uint8_t c) {
++    switch (c) {
++        case '`': return 0x04;
++        case '0': return 0xdb;
++        case '-': return 0x18;
++        case ',': return 0x1b;
++        case '.': return 0x19;
++        case 'a': return 0xb1;
++        case 'f': return 0xf8;
++        case 'g': return 0xf1;
++        case 'h': return 0xb0;
++        case 'j': return 0xd9;
++        case 'k': return 0xbf;
++        case 'l': return 0xda;
++        case 'm': return 0xc0;
++        case 'n': return 0xc5;
++        case 'q': return 0xc4;
++        case 's': return 0x5f;
++        case 't': return 0xc3;
++        case 'u': return 0xb4;
++        case 'v': return 0xc1;
++        case 'w': return 0xc2;
++        case 'x': return 0xb3;
++        case 'y': return 0xf3;
++        case 'z': return 0xf2;
++        case '~': return 0xfa;
++        case '_': return 0xff;
++        case '+': return 0x1a;
++        case '{': return 0xe3;
++        case '}': return 0x9c;
++    }
++
++    return c;
  }
  
 -static void term_putchar(uint8_t c) {
@@ -2079,19 +2144,19 @@ index a89e4ea..e06ae05 100644
 +            set_cursor_pos(0, y);
 +            return;
          case '\a':
--            break;
--        default:
--            raw_putchar(c);
--            break;
 +            // The bell is handled by the kernel
 +            if (term_callback != NULL)
 +                term_callback(TERM_CB_BELL, 0, 0, 0);
 +            return;
++        case 14:
++            // Move to G1 set
++            current_charset = 1;
++            return;
++        case 15:
++            // Move to G0 set
++            current_charset = 0;
++            return;
 +    }
-+
-+    if (cp437_off == true && (c < 0x20 || c > 0x7f)) {
-+        return;
-     }
 +
 +    if (insert_mode == true) {
 +        for (size_t i = term_cols - 1; ; i--) {
@@ -2101,6 +2166,17 @@ index a89e4ea..e06ae05 100644
 +            }
 +        }
 +    }
++
++    // Translate character set
++    switch (charsets[current_charset]) {
++        case CHARSET_DEFAULT:
+             break;
+-        default:
+-            raw_putchar(c);
+-            break;
++        case CHARSET_DEC_SPECIAL:
++            c = dec_special_to_cp437(c);
+     }
 +
 +    raw_putchar(c);
  }
@@ -2420,7 +2496,7 @@ index 0f6224d..03b0e7b 100644
  #endif
      }
 diff --git a/3rdparty/limine-orig/stage23/protos/stivale2.c b/3rdparty/limine-workdir/stage23/protos/stivale2.c
-index 945f962..3a17aec 100644
+index 945f962..414906d 100644
 --- a/3rdparty/limine-orig/stage23/protos/stivale2.c
 +++ b/3rdparty/limine-workdir/stage23/protos/stivale2.c
 @@ -57,7 +57,8 @@ static void *get_tag(struct stivale2_header *s, uint64_t id) {
@@ -2442,7 +2518,7 @@ index 945f962..3a17aec 100644
  
      if (hdrtag != NULL) {
          req_width  = hdrtag->framebuffer_width;
-@@ -393,20 +394,44 @@ failed_to_load_header_section:
+@@ -393,20 +394,42 @@ failed_to_load_header_section:
              parse_resolution(&req_width, &req_height, &req_bpp, resolution);
      }
  
@@ -2477,8 +2553,6 @@ index 945f962..3a17aec 100644
          struct stivale2_struct_tag_terminal *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_terminal));
          tag->tag.identifier = STIVALE2_STRUCT_TAG_TERMINAL_ID;
  
-+        cp437_off = true;
-+
 +        if (terminal_hdr_tag->flags & (1 << 0)) {
 +            // We provide callback
 +            tag->flags |= (1 << 2);
@@ -2493,7 +2567,7 @@ index 945f962..3a17aec 100644
          // We provide max allowed string length
          tag->flags |= (1 << 1);
  
-@@ -415,15 +440,13 @@ failed_to_load_header_section:
+@@ -415,15 +438,13 @@ failed_to_load_header_section:
              stivale2_rt_stack = ext_mem_alloc(8192);
          }
  
@@ -2511,7 +2585,7 @@ index 945f962..3a17aec 100644
          // We provide rows and cols
          tag->flags |= (1 << 0);
          tag->cols = term_cols;
-@@ -431,7 +454,13 @@ failed_to_load_header_section:
+@@ -431,7 +452,13 @@ failed_to_load_header_section:
  
          append_tag(&stivale2_struct, (struct stivale2_tag *)tag);
  
@@ -2526,7 +2600,7 @@ index 945f962..3a17aec 100644
      } else {
          fb = &_fb;
      }
-@@ -441,7 +470,7 @@ failed_to_load_header_section:
+@@ -441,7 +468,7 @@ failed_to_load_header_section:
          term_deinit();
  
          if (fb_init(fb, req_width, req_height, req_bpp)) {
@@ -2535,7 +2609,7 @@ index 945f962..3a17aec 100644
              struct stivale2_struct_tag_framebuffer *tag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_framebuffer));
              tag->tag.identifier = STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID;
  
-@@ -468,9 +497,10 @@ skip_modeset:;
+@@ -468,9 +495,10 @@ skip_modeset:;
  #if uefi == 1
          panic("stivale2: Cannot use text mode with UEFI.");
  #elif bios == 1
@@ -2547,7 +2621,7 @@ index 945f962..3a17aec 100644
          struct stivale2_struct_tag_textmode *tmtag = ext_mem_alloc(sizeof(struct stivale2_struct_tag_textmode));
          tmtag->tag.identifier = STIVALE2_STRUCT_TAG_TEXTMODE_ID;
  
-@@ -628,7 +658,9 @@ skip_modeset:;
+@@ -628,7 +656,9 @@ skip_modeset:;
      }
  
      // Clear terminal for kernels that will use the stivale2 terminal
