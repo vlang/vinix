@@ -333,11 +333,11 @@ fn write_ps2_config(value byte) {
 	write_ps2(0x60, value)
 }
 
-fn dec_private(extra u64, esc_val_count u64, esc_values &u32) {
-	C.printf(c'dec private: ? %llu %c\n', unsafe { esc_values[0] }, extra)
+fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
+	C.printf(c'dec private: ? %llu %c\n', unsafe { esc_values[0] }, final)
 	match unsafe { esc_values[0] } {
 		1 {
-			match extra {
+			match final {
 				u64(`h`) {
 					console_decckm = true
 				}
@@ -351,11 +351,12 @@ fn dec_private(extra u64, esc_val_count u64, esc_values &u32) {
 	}
 }
 
-pub fn stivale2_term_callback(t u64, extra u64, esc_val_count u64, esc_values u64) {
+pub fn stivale2_term_callback(t u64, a u64, b u64, c u64) {
 	C.printf(c'stivale2 terminal callback called\n')
+
 	match t {
 		10 {
-			dec_private(extra, esc_val_count, &u32(esc_values))
+			dec_private(a, &u32(b), c)
 		}
 		else {}
 	}
