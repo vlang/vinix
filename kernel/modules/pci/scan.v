@@ -13,36 +13,36 @@ pub fn initialise() {
 	mut root_bus := PCIDevice{}
 	configc  := root_bus.read<u32>(0xc)
 
-    if (configc & 0x800000) == 0 {
-        check_bus(0, -1)
-    } else {
-        for function := byte(0); function < max_function; function++ {
-            host_bridge := PCIDevice{
+	if (configc & 0x800000) == 0 {
+		check_bus(0, -1)
+	} else {
+		for function := byte(0); function < max_function; function++ {
+			host_bridge := PCIDevice{
 				bus: 0,
 				slot: 0,
 				function: function,
 				parent: 0
 			}
-            config0 := host_bridge.read<u32>(0)
-            if config0 == 0xffffffff {
-                continue
-            }
+			config0 := host_bridge.read<u32>(0)
+			if config0 == 0xffffffff {
+				continue
+			}
 
-            check_bus(function, -1)
-        }
-    }
+			check_bus(function, -1)
+		}
+	}
 }
 
 fn check_bus(bus byte, parent i64) {
     for dev := byte(0); dev < max_device; dev++ {
-        for func := byte(0); func < max_function; func++ {
-            check_function(bus, dev, func, parent)
-        }
-    }
+		for func := byte(0); func < max_function; func++ {
+			check_function(bus, dev, func, parent)
+		}
+	}
 }
 
 fn check_function(bus byte, slot byte, function byte, parent i64) {
-    mut device := &PCIDevice{
+	mut device := &PCIDevice{
 		bus: bus,
 		slot: slot,
 		function: function,
@@ -59,6 +59,33 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 		check_bus(byte(config >> 8), 1)
 	} else {
 		scanned_devices << device
+
+		status := device.read<u16>(0x6)
+
+		if (status & (1 << 4)) != 0 { // parse capabilities list
+			mut off := device.read<byte>(0x34)
+
+			for off > 0 { 
+				id := device.read<byte>(off)
+
+				match id {
+					0x5 {
+						device.msi_support = true
+						device.msi_offset = off
+					}
+					0x11 {
+						device.msix_support = true
+						device.msix_offset = off
+					}
+					else {
+						
+					}
+				}
+
+				off = device.read<byte>(off + 1)
+			}
+		}
+
 		print('pci: Found [${device.bus:x}:${device.slot:x}:${device.function:x}:${device.parent:x}]\n')
 	}
 }
