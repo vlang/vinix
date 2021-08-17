@@ -199,11 +199,12 @@ tools:
           - tool: host-gcc
             stage_dependencies: [compiler]
         pkgs_required:
-         - mlibc
+          - mlibc
         compile:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
         install:
-          - args: ['make', 'install-target-libgcc']
+          - args: ['make', 'install-strip-target-libgcc']
+
       - name: libstdc++
         tools_required:
           - tool: host-gcc
@@ -211,7 +212,7 @@ tools:
         compile:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
         install:
-          - args: ['make', 'install-target-libstdc++-v3']
+          - args: ['make', 'install-strip-target-libstdc++-v3']
 
 tasks:
   - name: make-iso
@@ -606,10 +607,12 @@ packages:
         - 'CFLAGS=-O2 -pipe'
         - 'CXXFLAGS=-O2 -pipe'
     build:
-      - args: ['make', '-j@PARALLELISM@', 'all-gcc', 'all-target-libgcc'] #, 'all-target-libstdc++-v3']
-      - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc'] #, 'install-strip-target-libstdc++-v3']
+      - args: ['make', '-j@PARALLELISM@', 'all-gcc', 'all-target-libgcc']
+      - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['sh', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
+      - args: ['sh', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
       - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
 
   - name: gawk
