@@ -2,7 +2,6 @@ module stivale2
 
 import klock
 import x86.cpu
-import lib
 
 pub const framebuffer_id = 0x506461d2950408fa
 pub const memmap_id = 0x2187f79e8612de07
@@ -181,24 +180,16 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	}
 }
 
-pub fn terminal_print(s charptr, len u64) {
+pub fn terminal_print(s voidptr, len u64) {
 	mut ptr := fn (_ voidptr, _ u64) {}
 	ptr = terminal_print_ptr
 	current_cr3 := &u64(cpu.read_cr3())
 	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
 		kernel_pagemap.switch_to()
 	}
-	count := lib.div_roundup(len, u64(1024))
-	for i in 0..count {
-		mut actual_len := if i == count - 1 {
-			len % u64(1024)
-		} else {
-			u64(1024)
-		}
-		terminal_print_lock.acquire()
-		ptr(charptr(u64(s) + i * u64(1024)), actual_len)
-		terminal_print_lock.release()
-	}
+	terminal_print_lock.acquire()
+	ptr(s, len)
+	terminal_print_lock.release()
 	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
 		cpu.write_cr3(u64(current_cr3))
 	}

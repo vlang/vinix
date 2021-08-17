@@ -108,9 +108,19 @@ fn add_to_buf_char(c byte, echo bool) {
 					return
 				}
 				console_buffer_i--
+				to_backspace := match console_buffer[console_buffer_i] {
+					`\e` {
+						2
+					}
+					else {
+						1
+					}
+				}
 				console_buffer[console_buffer_i] = 0
 				if echo && console_termios.c_lflag & termios.echo != 0 {
-					print('\b \b')
+					for i := 0; i < to_backspace; i++ {
+						print('\b \b')
+					}
 				}
 				return
 			}
@@ -130,8 +140,18 @@ fn add_to_buf_char(c byte, echo bool) {
 		console_bigbuf_i++
 	}
 
-	if echo && is_printable(c) && console_termios.c_lflag & termios.echo != 0 {
-		print('${c:c}')
+	if echo && console_termios.c_lflag & termios.echo != 0 {
+		if is_printable(c) {
+			print('${c:c}')
+			return
+		}
+
+		match c {
+			`\e` {
+				print('^[')
+			}
+			else {}
+		}
 	}
 }
 
@@ -172,85 +192,65 @@ fn keyboard_handler() {
 					console_ctrl_active = false
 					continue
 				}
-				0x47 {
-					// Home
-					if console_decckm == false {
-						add_to_buf(c'\e[H', 3, false)
-					} else {
-						add_to_buf(c'\eOH', 3, false)
-					}
-					continue
-				}
-				0x4f {
-					// End
-					if console_decckm == false {
-						add_to_buf(c'\e[F', 3, false)
-					} else {
-						add_to_buf(c'\eOF', 3, false)
-					}
-					continue
-				}
 				0x48 {
 					// Up arrow
 					if console_decckm == false {
-						add_to_buf(c'\e[A', 3, false)
+						add_to_buf(c'\e[A', 3, true)
 					} else {
-						add_to_buf(c'\eOA', 3, false)
+						add_to_buf(c'\eOA', 3, true)
 					}
 					continue
 				}
 				0x4b {
 					// Left arrow
 					if console_decckm == false {
-						add_to_buf(c'\e[D', 3, false)
+						add_to_buf(c'\e[D', 3, true)
 					} else {
-						add_to_buf(c'\eOD', 3, false)
+						add_to_buf(c'\eOD', 3, true)
 					}
 					continue
 				}
 				0x50 {
 					// Down arrow
 					if console_decckm == false {
-						add_to_buf(c'\e[B', 3, false)
+						add_to_buf(c'\e[B', 3, true)
 					} else {
-						add_to_buf(c'\eOB', 3, false)
+						add_to_buf(c'\eOB', 3, true)
 					}
 					continue
 				}
 				0x4d {
 					// Right arrow
 					if console_decckm == false {
-						add_to_buf(c'\e[C', 3, false)
+						add_to_buf(c'\e[C', 3, true)
 					} else {
-						add_to_buf(c'\eOC', 3, false)
+						add_to_buf(c'\eOC', 3, true)
 					}
+					continue
+				}
+				0x47 {
+					// Home
+					add_to_buf(c'\e[1~', 4, true)
+					continue
+				}
+				0x4f {
+					// End
+					add_to_buf(c'\e[4~', 4, true)
 					continue
 				}
 				0x49 {
 					// PG UP
-					if console_decckm == false {
-						add_to_buf(c'\e[5~', 4, false)
-					} else {
-						add_to_buf(c'\eO5~', 4, false)
-					}
+					add_to_buf(c'\e[5~', 4, true)
 					continue
 				}
 				0x51 {
 					// PG DOWN
-					if console_decckm == false {
-						add_to_buf(c'\e[6~', 4, false)
-					} else {
-						add_to_buf(c'\eO6~', 4, false)
-					}
+					add_to_buf(c'\e[6~', 4, true)
 					continue
 				}
 				0x53 {
 					// Delete
-					if console_decckm == false {
-						add_to_buf(c'\e[3~', 4, false)
-					} else {
-						add_to_buf(c'\eO3~', 4, false)
-					}
+					add_to_buf(c'\e[3~', 4, true)
 					continue
 				}
 				else {}
@@ -377,6 +377,10 @@ pub fn initialise() {
 	console_termios = &console_res.termios
 
 	fs.devtmpfs_add_device(console_res, 'console')
+
+	mut terminal_context_size := u64(0)
+	stivale2.terminal_print(voidptr(&terminal_context_size), u64(-1))
+	print('console: Terminal context size: ${terminal_context_size}\n')
 
 	// Disable primary and secondary PS/2 ports
 	write_ps2(0x64, 0xad)
