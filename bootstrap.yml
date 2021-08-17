@@ -164,6 +164,7 @@ tools:
 
   - name: host-gcc
     from_source: gcc
+    revision: 2
     tools_required:
       - tool: host-binutils
         recursive: true
@@ -585,7 +586,7 @@ packages:
 
   - name: gcc
     from_source: gcc
-    revision: 2
+    revision: 3
     tools_required:
       - host-gcc
     pkgs_required:
