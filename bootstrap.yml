@@ -793,7 +793,7 @@ packages:
 
   - name: vim
     source:
-      subdir: 'ports'
+      subdir: '3rdparty'
       url: 'https://github.com/vim/vim/archive/refs/tags/v8.2.3358.tar.gz'
       format: 'tar.gz'
       extract_path: 'vim-8.2.3358'
