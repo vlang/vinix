@@ -612,8 +612,8 @@ packages:
       - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['bash', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
-      - args: ['bash', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
+      - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
+      - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
       - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
 
   - name: gawk
@@ -697,7 +697,6 @@ packages:
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-        quiet: true
 
   - name: openssl
     source:
@@ -762,5 +761,91 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libiconv
+    source:
+      subdir: '3rdparty'
+      url: 'https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'libiconv-1.16'
+      patch-path-strip: 3
+      version: '1.16'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--disable-nls'
+        - '--enable-shared'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: vim
+    source:
+      subdir: 'ports'
+      url: 'https://github.com/vim/vim/archive/refs/tags/v8.2.3358.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'vim-8.2.3358'
+      patch-path-strip: 3
+      version: '8.2.3358'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+      - libiconv
+    configure:
+      # vim does not seem to support out-of-tree builds, so we just copy
+      # the source tree into the build directory instead
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      - args:
+        - './configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--disable-gtktest'
+        - '--disable-icon-cache-update'
+        - '--disable-desktop-database-update'
+        - '--disable-canberra'
+        - '--disable-selinux'
+        - '--disable-xsmp'
+        - '--disable-channel'
+        - '--disable-netbeans'
+        - '--enable-multibyte'
+        - '--disable-acl'
+        - '--disable-gpm'
+        - '--disable-sysmouse'
+        - '--disable-nls'
+        - '--with-tlib=tinfo'
+        - '--enable-gui=no'
+        - '--without-x'
+        environ:
+          ac_cv_small_wchar_t: 'no'
+          ac_cv_func_sigsetjmp: 'no'
+          vim_cv_toupper_broken: 'no'
+          vim_cv_terminfo: 'yes'
+          vim_cv_tgetent: 'zero'
+          vim_cv_tty_group: ''
+          vim_cv_tty_mode: '0620'
+          vim_cv_getcwd_broken: 'no'
+          vim_cv_stat_ignores_slash: 'no'
+          vim_cv_memmove_handles_overlap: 'yes'
+          vim_cv_bcopy_handles_overlap: 'yes'
+          vim_cv_memcpy_handles_overlap: 'yes'
+          STRIP: 'x86_64-vinix-strip'
+        workdir: '@THIS_BUILD_DIR@/src/'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
