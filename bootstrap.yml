@@ -276,6 +276,7 @@ packages:
         - '--libdir=lib'
         - '--buildtype=debugoptimized'
         - '-Dmlibc_no_headers=true'
+        - '-Ddisable_iconv_option=true'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
