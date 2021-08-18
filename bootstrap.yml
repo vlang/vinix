@@ -38,7 +38,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'mlibc-f7b538c88702c190218ec0d6a7103d2d51937ff9'
     patch-path-strip: 3
-    version: '7.rolling'
+    version: '8.rolling'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -244,7 +244,6 @@ tasks:
 packages:
   - name: mlibc-headers
     from_source: mlibc
-    revision: 2
     implict_package: true
     configure:
       - args:
@@ -253,6 +252,7 @@ packages:
         - '@SOURCE_ROOT@/cross_file.txt'
         - '--prefix=/usr'
         - '-Dheaders_only=true'
+        - '-Ddisable_iconv_option=true'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
@@ -262,7 +262,6 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 2
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]
