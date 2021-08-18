@@ -612,8 +612,8 @@ packages:
       - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['sh', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
-      - args: ['sh', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
+      - args: ['bash', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
+      - args: ['bash', '-c', 'cp -rv @SOURCE_ROOT@/build/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
       - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
 
   - name: gawk
@@ -674,5 +674,93 @@ packages:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
+  - name: zlib
+    source:
+      subdir: '3rdparty'
+      url: 'https://zlib.net/zlib-1.2.11.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'zlib-1.2.11'
+      patch-path-strip: 3
+      version: '1.2.11'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        environ:
+          CHOST: 'x86_64-vinix'
+          prefix: '/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
 
+  - name: openssl
+    source:
+      subdir: '3rdparty'
+      url: 'https://www.openssl.org/source/openssl-1.1.1k.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'openssl-1.1.1k'
+      patch-path-strip: 3
+      version: '1.1.1k'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - zlib
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/Configure'
+        - '--prefix=/usr'
+        - '--openssldir=/etc/ssl'
+        - '--libdir=lib'
+        - 'x86_64-vinix'
+        - 'shared'
+        - 'zlib-dynamic'
+        - 'no-afalgeng'
+        environ:
+          CC: 'x86_64-vinix-gcc'
+          CXX: 'x86_64-vinix-g++'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      # Disable installing static libraries
+      - args: ['sed', '-i', '/INSTALL_LIBS/s/libcrypto.a libssl.a//', '@THIS_BUILD_DIR@/Makefile']
+      # Suffix all man pages with ssl
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'MANSUFFIX=ssl', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      # Move the doc dir to a versioned directory
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1k']
 
+  - name: wget
+    source:
+      subdir: '3rdparty'
+      url: 'https://ftp.gnu.org/gnu/wget/wget-1.21.1.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'wget-1.21.1'
+      patch-path-strip: 3
+      version: '1.21.1'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - pcre
+      - openssl
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--disable-nls'
+        - '--with-ssl=openssl'
+        - '--with-openssl'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'

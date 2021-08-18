@@ -1,0 +1,13 @@
+diff --git a/3rdparty/zlib-orig/configure b/3rdparty/zlib-workdir/configure
+index e974d1f..a95dba1 100755
+--- a/3rdparty/zlib-orig/configure
++++ b/3rdparty/zlib-workdir/configure
+@@ -207,7 +207,7 @@ if test "$gcc" -eq 1 && ($cc -c $test.c) >> configure.log 2>&1; then
+     uname=`(uname -s || echo unknown) 2>/dev/null`
+   fi
+   case "$uname" in
+-  Linux* | linux* | GNU | GNU/* | solaris*)
++  Linux* | linux* | GNU | GNU/* | solaris* | vinix*)
+         LDSHARED=${LDSHARED-"$cc -shared -Wl,-soname,libz.so.1,--version-script,${SRCDIR}zlib.map"} ;;
+   *BSD | *bsd* | DragonFly)
+         LDSHARED=${LDSHARED-"$cc -shared -Wl,-soname,libz.so.1,--version-script,${SRCDIR}zlib.map"}
