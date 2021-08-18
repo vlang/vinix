@@ -800,6 +800,7 @@ packages:
       extract_path: 'vim-8.2.3358'
       patch-path-strip: 3
       version: '8.2.3358'
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
