@@ -224,6 +224,11 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
 
+	if gpr_state.err & 1 != 0 {
+		// It was a protection violation, crash
+		return error('')
+	}
+
 	addr := cpu.read_cr2()
 
 	pagemap.l.acquire()
