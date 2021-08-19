@@ -413,6 +413,7 @@ packages:
       extract_path: 'nano-5.8'
       patch-path-strip: 3
       version: '5.8'
+    revision: 2
     tools_required:
       - host-gcc
       - host-pkg-config
@@ -436,6 +437,8 @@ packages:
       - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/nano/nanorc', '@THIS_COLLECT_DIR@/etc/']
 
   - name: tzdata
     source:
