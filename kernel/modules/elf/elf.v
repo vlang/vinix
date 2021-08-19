@@ -129,7 +129,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 		misalign := phdr.p_vaddr & (page_size - 1)
 		page_count := lib.div_roundup(misalign + phdr.p_memsz, page_size)
 
-		addr := memory.pmm_alloc((page_count * page_size) / memory.bitmap_granularity, page_size)
+		addr := memory.pmm_alloc(page_count)
 		if addr == 0 {
 			return error('elf: Allocation failure')
 		}

@@ -19,7 +19,7 @@ pub mut:
 }
 
 pub fn new_pagemap() &Pagemap {
-	mut top_level := &u64(pmm_alloc(page_size / bitmap_granularity, page_size))
+	mut top_level := &u64(pmm_alloc(1))
 	if top_level == 0 {
 		panic('new_pagemap() allocation failure')
 	}
@@ -90,7 +90,7 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 			}
 
 			// Else, allocate the page table
-			ret = pmm_alloc(page_size / bitmap_granularity, page_size)
+			ret = pmm_alloc(1)
 			if ret == 0 {
 				return none
 			}
@@ -137,7 +137,7 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 }
 
 pub fn vmm_init(memmap &stivale2.MemmapTag) {
-	kernel_pagemap.top_level = pmm_alloc(page_size / bitmap_granularity, page_size)
+	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
 		panic('vmm_init() allocation failure')
 	}

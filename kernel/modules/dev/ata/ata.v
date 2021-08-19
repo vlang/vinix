@@ -164,9 +164,9 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	dev.stat.size = dev.stat.blocks * dev.stat.blksize
 	dev.stat.rdev = resource.create_dev_id()
 	dev.stat.mode = 0o644 | stat.ifblk
-	dev.prdt_phys = u32(u64(memory.pmm_alloc(1, 4096)))
+	dev.prdt_phys = u32(u64(memory.pmm_alloc(1)))
 	dev.prdt = &PRDT(dev.prdt_phys + higher_half)
-	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup<u64>(ata_bytes_per_prdt, page_size), 4096)))
+	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup<u64>(ata_bytes_per_prdt, page_size))))
 	dev.prdt.transfer_size = ata_bytes_per_prdt
 	dev.prdt.mark_end = 0x8000
 	dev.prdt_cache = &byte(u64(dev.prdt.buffer_phys) + higher_half)

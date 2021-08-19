@@ -35,7 +35,7 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 
 		stack_size := u64(4192)
 
-		boot_stack := memory.pmm_alloc(stack_size / memory.bitmap_granularity, page_size)
+		boot_stack := memory.pmm_alloc(stack_size / page_size)
 		katomic.store(smp_info.target_stack, u64(boot_stack) + stack_size + higher_half)
 		katomic.store(smp_info.goto_address, u64(&cpuinit.initialise))
 
