@@ -20,6 +20,10 @@ You can get a continuously updated ISO of Vinix [here](https://builds.vinix-os.o
 - [x] builds.vinix-os.org 
 - [ ] storage drivers
 - [ ] ext2
+- [ ] V
+- [ ] V-UI
+- [ ] compositor
+- [ ] network
 - [ ] Intel HD graphics driver (linux port)   
 
 ## What is Vinix all about?
