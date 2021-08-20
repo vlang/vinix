@@ -8,6 +8,20 @@ Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
 
 You can get a continuously updated ISO of Vinix [here](https://builds.vinix-os.org/repos/files/vinix/latest/vinix.iso).
 
+## Roadmap
+
+- [x] mlibc 
+- [x] bash
+- [x] text mode
+- [x] gcc
+- [x] g++  
+- [x] nano
+- [x] vim
+- [x] builds.vinix-os.org 
+- [ ] storage drivers
+- [ ] ext2
+- [ ] Intel HD graphics driver (linux port)   
+
 ## What is Vinix all about?
 
 - Keeping the code as simple and easy to understand as possible, while not sacrificing
