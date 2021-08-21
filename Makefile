@@ -5,7 +5,7 @@ export PATH := $(PATH):/usr/sbin
 .PHONY: all
 all: vinix.iso
 
-QEMUFLAGS = -M q35,smm=off -m 2G -smp 4 -no-reboot -no-shutdown -cdrom vinix.iso -serial stdio
+QEMUFLAGS = -M q35,smm=off -m 2G -smp 4 -cdrom vinix.iso -serial stdio
 
 .PHONY: run-kvm
 run-kvm: vinix.iso

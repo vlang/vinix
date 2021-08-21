@@ -18,7 +18,7 @@ index e1afc76..c9d3226 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/3rdparty/mlibc-orig/meson.build b/3rdparty/mlibc-workdir/meson.build
-index edcd230..8d03d32 100644
+index ae0e7cf..c6c0304 100644
 --- a/3rdparty/mlibc-orig/meson.build
 +++ b/3rdparty/mlibc-workdir/meson.build
 @@ -44,7 +44,7 @@ if not headers_only
@@ -29,8 +29,8 @@ index edcd230..8d03d32 100644
 +	add_project_arguments('-nostdinc', '-fno-builtin', '-fno-omit-frame-pointer', language: ['c', 'cpp'])
  	add_project_arguments('-std=c++20', language: 'cpp')
  	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
- 	add_project_link_arguments('-nostdlib', language: ['c', 'cpp'])
-@@ -102,6 +102,10 @@ elif host_machine.system() == 'qword'
+ 	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
+@@ -103,6 +103,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -77,12 +77,12 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/3rdparty/mlibc-orig/options/posix/generic/unistd-stubs.cpp b/3rdparty/mlibc-workdir/options/posix/generic/unistd-stubs.cpp
-index f145e4a..8221f78 100644
+index 2d07bba..1813b6a 100644
 --- a/3rdparty/mlibc-orig/options/posix/generic/unistd-stubs.cpp
 +++ b/3rdparty/mlibc-workdir/options/posix/generic/unistd-stubs.cpp
-@@ -743,12 +743,12 @@ int ttyname_r(int, char *, size_t) {
- 	__builtin_unreachable();
+@@ -811,12 +811,12 @@ int ttyname_r(int, char *, size_t) {
  }
+ 
  int unlink(const char *path) {
 -	if(!mlibc::sys_unlink) {
 +	if(!mlibc::sys_unlinkat) {
@@ -172,10 +172,10 @@ index 0000000..53ea0e9
 +
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..3cd1377
+index 0000000..fac6904
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,509 @@
+@@ -0,0 +1,586 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -184,6 +184,7 @@ index 0000000..3cd1377
 +#include <fcntl.h>
 +#include <limits.h>
 +#include <asm/ioctls.h>
++#include <stdlib.h>
 +
 +#define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
 +
@@ -261,6 +262,88 @@ index 0000000..3cd1377
 +    __syscall(7, pointer);
 +    return 0;
 +}
++
++int sys_ppoll(struct pollfd *fds, int nfds, const struct timespec *timeout,
++		const sigset_t *sigmask, int *num_events) {
++    __syscall_ret ret = __syscall(36, fds, nfds, timeout, sigmask);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *num_events = (int)ret.ret;
++    return 0;
++}
++
++#ifndef MLIBC_BUILDING_RTDL
++int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set,
++		fd_set *except_set, const struct timespec *timeout,
++		const sigset_t *sigmask, int *num_events) {
++    struct pollfd *fds = (struct pollfd *)malloc(nfds * sizeof(struct pollfd));
++
++	for (int i = 0; i < nfds; i++) {
++		struct pollfd *fd = &fds[i];
++		memset(fd, 0, sizeof(struct pollfd));
++
++		if (read_set && FD_ISSET(i, read_set))
++			fd->events |= POLLIN; // TODO: Additional events.
++		if (write_set && FD_ISSET(i, write_set))
++			fd->events |= POLLOUT; // TODO: Additional events.
++		if (except_set && FD_ISSET(i, except_set))
++			fd->events |= POLLPRI;
++
++		if (!fd->events) {
++		    fd->fd = -1;
++			continue;
++		}
++
++		fd->fd = i;
++	}
++
++	int e = sys_ppoll(fds, nfds, timeout, sigmask, num_events);
++
++	if (e != 0) {
++	    free(fds);
++	    return e;
++	}
++
++	fd_set res_read_set;
++	fd_set res_write_set;
++	fd_set res_except_set;
++	FD_ZERO(&res_read_set);
++	FD_ZERO(&res_write_set);
++	FD_ZERO(&res_except_set);
++
++	for (int i = 0; i < nfds; i++) {
++		struct pollfd *fd = &fds[i];
++
++		if (read_set && FD_ISSET(i, read_set)
++				&& fd->revents & (POLLIN | POLLERR | POLLHUP)) {
++			FD_SET(i, &res_read_set);
++		}
++
++		if (write_set && FD_ISSET(i, write_set)
++				&& fd->revents & (POLLOUT | POLLERR | POLLHUP)) {
++			FD_SET(i, &res_write_set);
++		}
++
++		if (except_set && FD_ISSET(i, except_set)
++				&& fd->revents & POLLPRI) {
++			FD_SET(i, &res_except_set);
++		}
++	}
++
++	free(fds);
++
++	if (read_set)
++		memcpy(read_set, &res_read_set, sizeof(fd_set));
++	if (write_set)
++		memcpy(write_set, &res_write_set, sizeof(fd_set));
++	if (except_set)
++		memcpy(except_set, &res_except_set, sizeof(fd_set));
++
++    return 0;
++}
++#endif
 +
 +int sys_futex_wait(int *pointer, int expected) {
 +    __syscall_ret ret = __syscall(23, pointer, expected);
@@ -660,12 +743,6 @@ index 0000000..3cd1377
 +    __syscall_ret ret = __syscall(30, context, old_mask);
 +
 +    __builtin_unreachable();
-+}
-+
-+int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
-+		const struct timespec *timeout, const sigset_t *sigmask, int *num_events) {
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+    return 0;
 +}
 +
 +int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) {

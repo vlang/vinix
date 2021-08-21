@@ -5,12 +5,16 @@ import klock
 import memory
 import resource
 import lib
+import event
+import event.eventstruct
 
 struct DevTmpFSResource {
 pub mut:
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
+	event    eventstruct.Event
+	status   int
 
 	storage  &byte
 	capacity u64

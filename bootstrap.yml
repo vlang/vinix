@@ -38,7 +38,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'mlibc-f7b538c88702c190218ec0d6a7103d2d51937ff9'
     patch-path-strip: 3
-    version: '8.rolling'
+    version: '9.rolling'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -360,7 +360,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '45.rolling'
+      version: '46.rolling'
     tools_required:
       - host-v
       - host-gcc

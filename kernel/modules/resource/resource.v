@@ -4,6 +4,7 @@ import stat
 import klock
 import ioctl
 import errno
+import event.eventstruct
 
 pub const o_accmode = 0x0007
 pub const o_exec    = 1
@@ -37,6 +38,8 @@ mut:
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
+	event    eventstruct.Event
+	status   int
 
 	grow(handle voidptr, new_size u64) ?
 	read(handle voidptr, buf voidptr, loc u64, count u64) ?i64

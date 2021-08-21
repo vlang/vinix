@@ -18,6 +18,7 @@ pub mut:
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
+	status   int
 
 	data      &byte
 	read_ptr  u64

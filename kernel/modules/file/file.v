@@ -5,6 +5,8 @@ import proc
 import klock
 import errno
 import stat
+import event
+import event.eventstruct
 
 pub const f_dupfd = 1
 pub const f_dupfd_cloexec = 2
@@ -31,6 +33,111 @@ pub mut:
 	dirlist_valid bool
 	dirlist []stat.Dirent
 	dirlist_index u64
+}
+
+struct PollFD {
+mut:
+	fd int
+	events i16
+	revents i16
+}
+
+pub const pollin = 0x01
+pub const pollout = 0x02
+pub const pollpri = 0x04
+pub const pollhup = 0x08
+pub const pollerr = 0x10
+pub const pollrdhup = 0x20
+pub const pollnval = 0x40
+pub const pollwrnorm = 0x80
+
+pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &stat.TimeSpec, sigmask &u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n',
+			voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	// TODO: Implement timeout
+	if voidptr(tmo_p) != voidptr(0) {
+		return 0, 0
+	}
+
+	mut ret := u64(0)
+
+	mut thread := proc.current_thread()
+
+	oldmask := thread.masked_signals
+	if voidptr(sigmask) != voidptr(0) {
+		thread.masked_signals = unsafe { sigmask[0] }
+	}
+	defer {
+		thread.masked_signals = oldmask
+	}
+
+	mut fdlist := []&FD{}
+	mut fdnums := []u64{}
+	mut events := []&eventstruct.Event{}
+
+	defer {
+		for mut f in fdlist {
+			f.unref()
+		}
+	}
+
+	for i := u64(0); i < nfds; i++ {
+		mut fdd := unsafe { &fds[i] }
+
+		if fdd.fd < 0 {
+			fdd.revents = 0
+			continue
+		}
+
+		mut fd := file.fd_from_fdnum(voidptr(0), fdd.fd) or {
+			fdd.revents = pollnval
+			ret++
+			continue
+		}
+
+		mut resource := fd.handle.resource
+
+		status := resource.status
+
+		if i16(status) & fdd.events != 0 {
+			fdd.revents = 0
+			fdd.revents = i16(status) & fdd.events
+			ret++
+			fd.unref()
+			continue
+		}
+
+		fdlist << fd
+		fdnums << i
+		events << &resource.event
+	}
+
+	if events.len == 0 {
+		return ret, 0
+	}
+
+	for {
+		which := event.await(mut events, true) or {
+			return -1, errno.eintr
+		}
+
+		status := fdlist[which].handle.resource.status
+
+		mut fdd := unsafe { &fds[fdnums[which]] }
+
+		if i16(status) & fdd.events != 0 {
+			fdd.revents = 0
+			fdd.revents = i16(status) & fdd.events
+			ret++
+			break
+		}
+	}
+
+	return ret, 0
 }
 
 pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {

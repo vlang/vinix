@@ -9,6 +9,8 @@ import fs
 import x86.kio
 import lib
 import errno
+import event
+import event.eventstruct
 
 const pci_class = 0x1
 const pci_subclass = 0x1
@@ -31,6 +33,8 @@ pub mut:
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
+	event    eventstruct.Event
+	status   int
 
 	// ATA specific stuff.
 	is_master bool

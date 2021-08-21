@@ -13,6 +13,7 @@ import ioctl
 import resource
 import errno
 import termios
+import file
 
 const max_scancode = 0x57
 const capslock = 0x3a
@@ -29,6 +30,7 @@ const console_buffer_size = 1024
 const console_bigbuf_size = 4096
 
 __global (
+	console_res = &Console(0)
 	console_read_lock klock.Lock
 	console_event eventstruct.Event
 	console_capslock_active = bool(false)
@@ -77,11 +79,6 @@ fn is_printable(c byte) bool {
 }
 
 fn add_to_buf_char(c byte, echo bool) {
-	console_read_lock.acquire()
-	defer {
-		console_read_lock.release()
-	}
-
 	if console_termios.c_lflag & termios.icanon != 0 {
 		match c {
 			`\n` {
@@ -94,6 +91,10 @@ fn add_to_buf_char(c byte, echo bool) {
 					print('${c:c}')
 				}
 				for i := u64(0); i < console_buffer_i; i++ {
+					if console_res.status & file.pollin == 0 {
+						console_res.status |= file.pollin
+						event.trigger(mut console_res.event, false)
+					}
 					if console_bigbuf_i == console_bigbuf_size {
 						return
 					}
@@ -133,6 +134,10 @@ fn add_to_buf_char(c byte, echo bool) {
 		console_buffer[console_buffer_i] = c
 		console_buffer_i++
 	} else {
+		if console_res.status & file.pollin == 0 {
+			console_res.status |= file.pollin
+			event.trigger(mut console_res.event, false)
+		}
 		if console_bigbuf_i == console_bigbuf_size {
 			return
 		}
@@ -156,10 +161,16 @@ fn add_to_buf_char(c byte, echo bool) {
 }
 
 fn add_to_buf(ptr &byte, count u64, echo bool) {
+	console_read_lock.acquire()
+	defer {
+		console_read_lock.release()
+	}
+
 	for i := u64(0); i < count; i++ {
 		// TODO: Accept signal characters
 		unsafe { add_to_buf_char(ptr[i], echo) }
 	}
+
 	event.trigger(mut console_event, false)
 }
 
@@ -363,7 +374,7 @@ pub fn stivale2_term_callback(t u64, a u64, b u64, c u64) {
 }
 
 pub fn initialise() {
-	mut console_res := &Console{}
+	console_res = &Console{}
 	console_res.stat.size = 0
 	console_res.stat.blocks = 0
 	console_res.stat.blksize = 512
@@ -375,6 +386,8 @@ pub fn initialise() {
 	console_res.termios.c_cc[termios.vintr] = 0x03
 
 	console_termios = &console_res.termios
+
+	console_res.status |= file.pollout
 
 	fs.devtmpfs_add_device(console_res, 'console')
 
@@ -417,6 +430,8 @@ pub mut:
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
+	event    eventstruct.Event
+	status   int
 
 	termios termios.Termios
 }
@@ -441,6 +456,10 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 			console_bigbuf_i--
 			for j := u64(0); j < console_bigbuf_i; j++ {
 				console_bigbuf[j] = console_bigbuf[j + 1]
+			}
+			if console_bigbuf_i == 0 && (console_res.status & file.pollin != 0) {
+				console_res.status &= ~file.pollin
+				event.trigger(mut console_res.event, false)
 			}
 			wait = false
 		} else {
