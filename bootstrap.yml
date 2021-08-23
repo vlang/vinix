@@ -360,7 +360,7 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '46.rolling'
+      version: '47.rolling'
     tools_required:
       - host-v
       - host-gcc

@@ -234,49 +234,25 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	pagemap.l.acquire()
 
-	range_local, memory_page, _ := addr2range(pagemap, addr) or {
+	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
 		pagemap.l.release()
 		return error('')
 	}
 
 	pagemap.l.release()
 
+	mut page := voidptr(0)
+
 	if range_local.flags & map_anonymous != 0 {
-		page := memory.pmm_alloc(1)
-		map_page_in_range(range_local.global, memory_page * page_size, u64(page),
-						  range_local.prot) or {
-			return error('')
-		}
+		page = memory.pmm_alloc(1)
 	} else {
-		panic('Non anon mmap not supported yet')
-	}
-}
-
-pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
-					prot_and_flags u64, fd int, offset i64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n',
-			 addr, length, prot_and_flags, fd, offset)
-	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		page = range_local.global.resource.mmap(file_page, range_local.flags)
 	}
 
-	mut resource := &resource.Resource(voidptr(0))
-
-	prot  := int((prot_and_flags >> 32) & 0xffffffff)
-	flags := int(prot_and_flags & 0xffffffff)
-
-	if flags & map_anonymous == 0 {
-		panic('Non anon mmap not supported yet')
+	map_page_in_range(range_local.global, memory_page * page_size, u64(page),
+					  range_local.prot) or {
+		return error('')
 	}
-
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	ret := mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
-		return -1, errno.get()
-	}
-
-	return u64(ret), 0
 }
 
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
@@ -287,6 +263,11 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	if length % page_size != 0 || length == 0 {
 		C.printf(c'mmap: length is not a multiple of page size or is 0\n')
 		errno.set(errno.einval)
+		return none
+	}
+
+	if flags & map_anonymous == 0 && resource.can_mmap == false {
+		errno.set(errno.enodev)
 		return none
 	}
 

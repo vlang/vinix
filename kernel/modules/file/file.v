@@ -7,6 +7,7 @@ import errno
 import stat
 import event
 import event.eventstruct
+import memory.mmap
 
 pub const f_dupfd = 1
 pub const f_dupfd_cloexec = 2
@@ -406,4 +407,45 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	}
 
 	return ret, 0
+}
+
+pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
+					prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n',
+			 addr, length, prot_and_flags, fdnum, offset)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut resource := &resource.Resource(voidptr(0))
+	mut fd := &FD(voidptr(0))
+
+	if fdnum != -1 {
+		fd = file.fd_from_fdnum(voidptr(0), fdnum) or {
+			return -1, errno.get()
+		}
+		resource = fd.handle.resource
+	}
+
+	defer {
+		if fdnum != -1 {
+			fd.unref()
+		}
+	}
+
+	prot  := int((prot_and_flags >> 32) & 0xffffffff)
+	flags := int(prot_and_flags & 0xffffffff)
+
+	if flags & mmap.map_anonymous == 0 && voidptr(resource) == voidptr(0) {
+		return -1, errno.ebadf
+	}
+
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
+		return -1, errno.get()
+	}
+
+	return u64(ret), 0
 }

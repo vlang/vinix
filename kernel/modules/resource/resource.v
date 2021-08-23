@@ -40,12 +40,14 @@ mut:
 	l        klock.Lock
 	event    eventstruct.Event
 	status   int
+	can_mmap bool
 
 	grow(handle voidptr, new_size u64) ?
 	read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	write(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	ioctl(handle voidptr, request u64, argp voidptr) ?int
 	unref(handle voidptr) ?
+	mmap(page u64, flags int) voidptr
 }
 
 __global (

@@ -19,6 +19,7 @@ pub mut:
 	refcount int
 	l        klock.Lock
 	status   int
+	can_mmap bool
 
 	data      &byte
 	read_ptr  u64
@@ -64,6 +65,10 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	}
 
 	return 0, 0
+}
+
+fn (mut this Pipe) mmap(page u64, flags int) voidptr {
+	return 0
 }
 
 fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {

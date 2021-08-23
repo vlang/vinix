@@ -432,8 +432,13 @@ pub mut:
 	l        klock.Lock
 	event    eventstruct.Event
 	status   int
+	can_mmap bool
 
 	termios termios.Termios
+}
+
+fn (mut this Console) mmap(page u64, flags int) voidptr {
+	return 0
 }
 
 fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {

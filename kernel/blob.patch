@@ -1,4 +1,4 @@
-3950,4015d3949
+3974,4039d3973
 < f32 strings__levenshtein_distance_percentage(string a, string b) {
 < 	int d = strings__levenshtein_distance(a, b);
 < 	int _t1; /* if prepend */
@@ -65,7 +65,7 @@
 < 	return (2.0 * ((f32)(intersection_size))) / (((f32)(a.len)) + ((f32)(b.len)) - 2);
 < }
 < 
-4668,4800d4601
+4692,4824d4625
 < f64 strconv__atof64(string s) {
 < 	strconv__PrepNumber pn = (strconv__PrepNumber){.negative = 0,.exponent = 0,.mantissa = 0,};
 < 	int res_parsing = 0;
@@ -199,7 +199,7 @@
 < 	return 0;
 < }
 < 
-5681,5955d5481
+5705,5979d5505
 < // Attr: [manualfree]
 < string strconv__f64_to_str_lnd1(f64 f, int dec_digit) {
 < 	{ // Unsafe block
@@ -475,7 +475,7 @@
 < }
 < 
 < // Attr: [direct_array_access]
-6892,7006c6418
+6916,7030c6442
 < 			if ((ch == 'f' || ch == 'F')) {
 < 				strconv__v_sprintf_panic(p_index, pt.len);
 < 				f64 x = *(((f64*)((*(voidptr*)/*ee elem_typ */array_get(pt, p_index)))));
@@ -593,7 +593,7 @@
 < 			} else if (ch == 's') {
 ---
 > 			if (ch == 's') {
-7044,7178d6455
+7068,7202d6479
 < VV_LOCAL_SYMBOL f64 strconv__fabs(f64 x) {
 < 	if (x < 0.0) {
 < 		return -x;
@@ -729,7 +729,7 @@
 < 	return (string){.str=(byteptr)"", .is_lit=1};
 < }
 < 
-8382,8576d7658
+8406,8600d7682
 < // Attr: [inline]
 < inline string f64_str(f64 x) {
 < 	{ // Unsafe block
@@ -925,17 +925,17 @@
 < 	return 0;
 < }
 < 
-9282c8364
+9306c8388
 < 	f32 load_factor = ((f32)(m->len << 1)) / ((f32)(m->even_index));
 ---
 > 	u32 load_factor = (m->len << 1) / m->even_index;
-9723,9727d8804
+9747,9751d8828
 < 		#if !defined(_VFREESTANDING)
 < 		{
 < 			atexit((voidptr)prealloc_vcleanup);
 < 		}
 < 		#endif
-10517,10524d9593
+10541,10548d9617
 < f32 string_f32(string s) {
 < 	return ((f32)(strconv__atof64(s)));
 < }
@@ -944,7 +944,7 @@
 < 	return strconv__atof64(s);
 < }
 < 
-11692,11713d10760
+11716,11737d10784
 < inline VV_LOCAL_SYMBOL f32 fabs32(f32 x) {
 < 	f32 _t2; /* if prepend */
 < 	if (x < 0) {
@@ -967,7 +967,7 @@
 < }
 < 
 < // Attr: [inline]
-11989,12219c11036
+12013,12243c11060
 < 		if (typ == (StrIntpType__si_f32)) {
 < 			if (use_default_str) {
 < 				string f = f32_str(data.d.d_f32);

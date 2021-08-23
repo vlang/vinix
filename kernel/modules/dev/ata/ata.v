@@ -35,6 +35,7 @@ pub mut:
 	l        klock.Lock
 	event    eventstruct.Event
 	status   int
+	can_mmap bool
 
 	// ATA specific stuff.
 	is_master bool
@@ -175,6 +176,10 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	dev.prdt.mark_end = 0x8000
 	dev.prdt_cache = &byte(u64(dev.prdt.buffer_phys) + higher_half)
 	return dev
+}
+
+fn (mut this ATADrive) mmap(page u64, flags int) voidptr {
+	return 0
 }
 
 fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {

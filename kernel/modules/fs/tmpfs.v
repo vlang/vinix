@@ -3,6 +3,7 @@ module fs
 import stat
 import klock
 import memory
+import memory.mmap
 import resource
 import lib
 import event
@@ -15,9 +16,32 @@ pub mut:
 	l        klock.Lock
 	event    eventstruct.Event
 	status   int
+	can_mmap bool
 
 	storage  &byte
 	capacity u64
+}
+
+fn (mut this TmpFSResource) mmap(page u64, flags int) voidptr {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+
+	if flags & mmap.map_shared != 0 {
+		unsafe {
+			return voidptr(u64(&this.storage[page * page_size]) - higher_half)
+		}
+	}
+
+	copy_page := memory.pmm_alloc(1)
+
+	unsafe {
+		C.memcpy(voidptr(u64(copy_page) + higher_half),
+				 &this.storage[page * page_size], page_size)
+	}
+
+	return copy_page
 }
 
 fn (mut this TmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -143,6 +167,8 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	new_resource.stat.ino = this.inode_counter++
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = 1
+
+	new_resource.can_mmap = true
 
 	new_node.resource = new_resource
 

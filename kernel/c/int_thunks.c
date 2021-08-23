@@ -3,7 +3,7 @@
 #include <string.h>
 
 extern char kprint__syscall_kprint[];
-extern char memory__mmap__syscall_mmap[];
+extern char file__syscall_mmap[];
 extern char fs__syscall_openat[];
 extern char fs__syscall_read[];
 extern char fs__syscall_write[];
@@ -42,7 +42,7 @@ extern char file__syscall_ppoll[];
 
 __attribute__((used)) void *syscall_table[] = {
     kprint__syscall_kprint, // 0
-    memory__mmap__syscall_mmap, // 1
+    file__syscall_mmap, // 1
     fs__syscall_openat, // 2
     fs__syscall_read, // 3
     fs__syscall_write, // 4
