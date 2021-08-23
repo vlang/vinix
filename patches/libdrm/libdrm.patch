@@ -1,0 +1,143 @@
+diff --git a/3rdparty/libdrm-orig/include/drm/drm.h b/3rdparty/libdrm-workdir/include/drm/drm.h
+index c7fd2a3..710e65c 100644
+--- a/3rdparty/libdrm-orig/include/drm/drm.h
++++ b/3rdparty/libdrm-workdir/include/drm/drm.h
+@@ -36,10 +36,11 @@
+ #ifndef _DRM_H_
+ #define _DRM_H_
+ 
+-#if   defined(__linux__)
++#if   defined(__linux__) || defined(__vinix__)
+ 
++#include <sys/ioctl.h>
+ #include <linux/types.h>
+-#include <asm/ioctl.h>
++//#include <asm/ioctl.h>
+ typedef unsigned int drm_handle_t;
+ 
+ #else /* One of the BSDs */
+diff --git a/3rdparty/libdrm-orig/xf86drm.c b/3rdparty/libdrm-workdir/xf86drm.c
+index 1f0b847..0afdf52 100644
+--- a/3rdparty/libdrm-orig/xf86drm.c
++++ b/3rdparty/libdrm-workdir/xf86drm.c
+@@ -3273,7 +3273,7 @@ drm_public int drmPrimeFDToHandle(int fd, int prime_fd, uint32_t *handle)
+ 
+ static char *drmGetMinorNameForFD(int fd, int type)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     DIR *sysdir;
+     struct dirent *ent;
+     struct stat sbuf;
+@@ -3394,7 +3394,7 @@ drm_public char *drmGetRenderDeviceNameFromFd(int fd)
+     return drmGetMinorNameForFD(fd, DRM_NODE_RENDER);
+ }
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+ static char * DRM_PRINTFLIKE(2, 3)
+ sysfs_uevent_get(const char *path, const char *fmt, ...)
+ {
+@@ -3441,7 +3441,7 @@ sysfs_uevent_get(const char *path, const char *fmt, ...)
+ /* Little white lie to avoid major rework of the existing code */
+ #define DRM_BUS_VIRTIO 0x10
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+ static int get_subsystem_type(const char *device_path)
+ {
+     char path[PATH_MAX + 1] = "";
+@@ -3480,7 +3480,7 @@ static int get_subsystem_type(const char *device_path)
+ 
+ static int drmParseSubsystemType(int maj, int min)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     char path[PATH_MAX + 1] = "";
+     char real_path[PATH_MAX + 1] = "";
+     int subsystem_type;
+@@ -3507,7 +3507,7 @@ static int drmParseSubsystemType(int maj, int min)
+ #endif
+ }
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+ static void
+ get_pci_path(int maj, int min, char *pci_path)
+ {
+@@ -3587,7 +3587,7 @@ static int get_sysctl_pci_bus_info(int maj, int min, drmPciBusInfoPtr info)
+ 
+ static int drmParsePciBusInfo(int maj, int min, drmPciBusInfoPtr info)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     unsigned int domain, bus, dev, func;
+     char pci_path[PATH_MAX + 1], *value;
+     int num;
+@@ -3696,7 +3696,7 @@ static int drmGetMaxNodeName(void)
+            3 /* length of the node number */;
+ }
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+ static int parse_separate_sysfs_files(int maj, int min,
+                                       drmPciDeviceInfoPtr device,
+                                       bool ignore_revision)
+@@ -3770,7 +3770,7 @@ static int drmParsePciDeviceInfo(int maj, int min,
+                                  drmPciDeviceInfoPtr device,
+                                  uint32_t flags)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     if (!(flags & DRM_DEVICE_GET_PCI_REVISION))
+         return parse_separate_sysfs_files(maj, min, device, true);
+ 
+@@ -3994,7 +3994,7 @@ free_device:
+     return ret;
+ }
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+ static int drm_usb_dev_path(int maj, int min, char *path, size_t len)
+ {
+     char *value, *tmp_path, *slash;
+@@ -4036,7 +4036,7 @@ static int drm_usb_dev_path(int maj, int min, char *path, size_t len)
+ 
+ static int drmParseUsbBusInfo(int maj, int min, drmUsbBusInfoPtr info)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     char path[PATH_MAX + 1], *value;
+     unsigned int bus, dev;
+     int ret;
+@@ -4077,7 +4077,7 @@ static int drmParseUsbBusInfo(int maj, int min, drmUsbBusInfoPtr info)
+ 
+ static int drmParseUsbDeviceInfo(int maj, int min, drmUsbDeviceInfoPtr info)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     char path[PATH_MAX + 1], *value;
+     unsigned int vendor, product;
+     int ret;
+@@ -4661,7 +4661,7 @@ drm_public int drmGetDevices(drmDevicePtr devices[], int max_devices)
+ 
+ drm_public char *drmGetDeviceNameFromFd2(int fd)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+     struct stat sbuf;
+     char path[PATH_MAX + 1], *value;
+     unsigned int maj, min;
+diff --git a/3rdparty/libdrm-orig/xf86drm.h b/3rdparty/libdrm-workdir/xf86drm.h
+index 930d2f4..db7d2a2 100644
+--- a/3rdparty/libdrm-orig/xf86drm.h
++++ b/3rdparty/libdrm-workdir/xf86drm.h
+@@ -47,7 +47,7 @@ extern "C" {
+ #define DRM_MAX_MINOR   16
+ #endif
+ 
+-#if defined(__linux__)
++#if defined(__linux__) || defined(__vinix__)
+ 
+ #define DRM_IOCTL_NR(n)		_IOC_NR(n)
+ #define DRM_IOC_VOID		_IOC_NONE

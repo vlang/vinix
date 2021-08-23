@@ -855,3 +855,38 @@ packages:
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libdrm
+    source:
+      subdir: '3rdparty'
+      url: 'https://dri.freedesktop.org/libdrm/libdrm-2.4.107.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'libdrm-2.4.107'
+      patch-path-strip: 3
+      version: '2.4.107'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - 'meson'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/cross_file.txt'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=release'
+        - '-Dintel=false'
+        - '-Dvmwgfx=false'
+        - '-Dradeon=false'
+        - '-Damdgpu=false'
+        - '-Dnouveau=false'
+        # We might want to build cairo with OpenGL support.
+        # Doing so would introduce a circular dependency here.
+        - '-Dcairo-tests=false'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
