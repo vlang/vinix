@@ -1,5 +1,8 @@
 module pci
 
+import memory
+import lib
+
 __global (
 	scanned_devices []&PCIDevice
 )
@@ -76,6 +79,11 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 					0x11 {
 						device.msix_support = true
 						device.msix_offset = off
+
+                        message_control := device.read<u16>(off + 2)
+
+                        device.msix_table_size = message_control & 0x7FF
+                        device.msix_table_bitmap = memory.calloc(u64(lib.div_roundup(device.msix_table_size, 8)), 1)
 					}
 					else {
 						
