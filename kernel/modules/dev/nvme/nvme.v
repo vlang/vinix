@@ -3,6 +3,7 @@ module nvme
 import pci
 import memory
 import lib
+import x86.idt
 
 const (
 	nvme_class = 0x1
@@ -275,11 +276,82 @@ mut:
 	max_transfer_shift u64
 	max_prps u64
 	strides u64
+	qid_bitmap voidptr
+
+	admin_queue &NVMEQueuePair
+}
+
+struct NVMEQueuePair {
+pub mut:
+	qid u64
+	entry_cnt u64
+	sq_head u64
+	sq_tail u64
+	cq_head u64
+	cq_tail u64
+	phase u64
+	vector u64
+	irq u64
+	admin bool
+
+	parent_controller &NVMEController
+
+	submission_queue &NVMECommand
+	completion_queue &NVMECompletion
+	submission_doorbell &u32
+	completion_doorbell &u32
+
+	cid_bitmap voidptr
 }
 
 __global (
 	controller_list []&NVMEController
 )
+
+pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, vector u64, irq u64, admin bool) bool {
+	alloc_qid := fn (controller &NVMEController) ?u64 {
+		for i := u64(0); i < controller.queue_entries; i++ {
+			if lib.bittest(controller.qid_bitmap, i) == false {
+				lib.bitset(controller.qid_bitmap, i)
+				return i
+			}
+		}
+		return none
+	}
+
+	qid := alloc_qid(parent_controller) or {
+		print('nvme: no available qid\n')
+		return false
+	}
+
+	if qid != 0 && admin == true {
+		print('nvme: cannot create admin queue with non-zero qid\n')
+		return false
+	}
+
+	pair.parent_controller = unsafe { parent_controller }
+	pair.vector = vector
+	pair.irq = irq
+	pair.admin = admin
+	pair.entry_cnt = parent_controller.queue_entries
+
+	pair.submission_queue = &NVMECommand(u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECommand), page_size))) + higher_half)
+	pair.completion_queue = &NVMECompletion(u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECompletion), page_size))) + higher_half)
+
+	submission_offset := page_size + 2 * qid * (4 << parent_controller.strides)
+	pair.submission_doorbell = &u32(u64(parent_controller.regs) + submission_offset)
+
+	completion_offset := page_size + ((2 * qid + 1) * (4 << parent_controller.strides))
+	pair.completion_doorbell = &u32(u64(parent_controller.regs) + completion_offset)
+
+	pair.cid_bitmap = memory.calloc(u64(lib.div_roundup(pair.entry_cnt, u64(8))), 1)
+
+	if admin == true {
+		return true
+	}
+
+	return false
+}
 
 pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
 	pci_device.enable_bus_mastering()
@@ -307,22 +379,61 @@ pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
 	c.max_page_size = lib.power(2, 12 + ((c.regs.cap >> 52) & 0xf))
 	c.min_page_size = lib.power(2, 12 + ((c.regs.cap >> 48) & 0xf))
 
-	cc := c.regs.cc
-
-	if (cc & (1 << 0)) != 0 {
-		c.regs.cc = cc & ~(1 << 0) // disable controller
+	if (c.regs.cc & (1 << 0)) != 0 {
+		c.regs.cc = c.regs.cc & ~(1 << 0) // disable controller
 	}
 
 	for c.regs.csts & (1 << 0) != 0 { }
 
+	mut vect := byte(0)
+
 	if pci_device.msi_support == true {
 		print('nvme: device is msi capable\n')
+
+		vect = idt.allocate_vector()
+		pci_device.set_msi(vect)
 	} else if pci_device.msix_support == true {
 		print('nvme: device is msix capable\n')
+
+		vect = idt.allocate_vector()
+		pci_device.set_msix(vect)
 	} else {
 		print('nvme: device is not msi or msix capable\n')
 		return false
 	}
+
+	c.queue_entries = c.regs.cap & 0xffff
+	c.strides = c.regs.cap >> 32 & 0xf
+
+	c.qid_bitmap = memory.calloc(u64(lib.div_roundup(0xffff, 8)), 1)
+
+	c.admin_queue = &NVMEQueuePair(memory.calloc(sizeof(NVMEQueuePair), 1))
+	if c.admin_queue.initialise(c, vect, 0, true) == false {
+		print('nvme: failed to create an admin queue\n')
+		return false
+	}
+
+	c.regs.aqa = u32((c.queue_entries - 1) << 16 | (c.queue_entries - 1))
+	c.regs.asq = u64(c.admin_queue.submission_queue) - higher_half
+	c.regs.acq = u64(c.admin_queue.completion_queue) - higher_half
+
+	c.regs.cc |=	(0 << 4) | // nvme command set
+					(0 << 11) | // ams = round robin
+					(0 << 14) | // no shutdown notifications
+					(6 << 16) | // io submission queue size 16 bytes
+					(4 << 20) | // io completion queue size 64 bytes
+					(1 << 0) // enable	
+
+	for {
+		if c.regs.csts & (1 << 0) != 0 {
+			break
+		} else if c.regs.csts & (1 << 1) != 0 {
+			print('nvme: controller fatal status\n')
+			return false
+		}
+	}
+
+	print('nvme: controller restart\n')
 
 	return true
 }
