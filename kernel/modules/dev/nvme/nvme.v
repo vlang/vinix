@@ -5,9 +5,9 @@ import memory
 import lib
 
 const (
-	pci_class = 0x1
-	pci_subclass = 0x8
-	pci_progif = 0x2
+	nvme_class = 0x1
+	nvme_subclass = 0x8
+	nvme_progif = 0x2
 )
 
 const (
@@ -328,14 +328,13 @@ pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
 }
 
 pub fn initialise() {
-	mut dev := pci.get_device_by_class(pci_class, pci_subclass, pci_progif, 0) or {
-		print('nvme: No suitable PCI devices found\n')
-		return
-	}
+	for device in scanned_devices {
+		if device.class == nvme_class && device.subclass == nvme_subclass && device.prog_if == nvme_progif {
+			mut nvme_device := &NVMEController(memory.calloc(sizeof(NVMEController), 1))
 
-	mut nvme_device := &NVMEController(memory.malloc(sizeof(NVMEController)))
-
-	if nvme_device.initialise(dev) == true {
-		controller_list << nvme_device
+			if nvme_device.initialise(device) == true {
+				controller_list << nvme_device
+			}
+		}
 	}
 }
