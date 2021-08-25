@@ -364,15 +364,15 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	return 0
 }
 
-pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, vector u64, irq u64, admin bool) bool {
+pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller &NVMEController, vector u64, irq u64, admin bool) int {
 	qid := parent_controller.qid_bitmap.alloc() or {
 		print('nvme: no available qid\n')
-		return false
+		return -1
 	}
 
 	if qid != 0 && admin == true {
 		print('nvme: cannot create admin queue with non-zero qid\n')
-		return false
+		return -1
 	}
 
 	pair.parent_controller = unsafe { parent_controller }
@@ -393,10 +393,44 @@ pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, ve
 	pair.cid_bitmap.initialise(pair.entry_cnt)
 
 	if admin == true {
-		return true
+		return 0
 	}
 
-	return false
+	mut create_cq_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+
+	unsafe {
+		create_cq_command.opcode = opcode_create_cq
+		create_cq_command.private.create_cq.prp1 = u64(pair.completion_queue) - higher_half
+		create_cq_command.private.create_cq.cqid = u16(qid)
+		create_cq_command.private.create_cq.qsize = u16(pair.entry_cnt - 1)
+		create_cq_command.private.create_cq.irq_vector = u16(irq)
+		create_cq_command.private.create_cq.cq_flags = (1 << 0) | (1 << 1)
+	}
+
+	if parent_controller.admin_queue.send_cmd_and_wait(mut create_cq_command, -1) == 0xffff {
+		print('nvme: unable to create completion queue\n')
+		return -1
+	}
+
+	mut create_sq_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+
+	unsafe {
+		create_sq_command.opcode = opcode_create_sq
+		create_sq_command.private.create_sq.prp1 = u64(pair.submission_queue) - higher_half
+		create_sq_command.private.create_sq.cqid = u16(qid)
+		create_sq_command.private.create_sq.sqid = u16(qid)
+		create_sq_command.private.create_sq.qsize = u16(pair.entry_cnt - 1)
+		create_sq_command.private.create_sq.sq_flags = (1 << 0) | (1 << 1)
+	}
+
+	if parent_controller.admin_queue.send_cmd_and_wait(mut create_sq_command, -1) == 0xffff {
+		print('nvme: unable to create submission queue\n')
+		return -1
+	}
+
+	print('nvme: created io queue pair with qid ${qid:x}\n')
+
+	return 0
 }
 
 pub fn (mut pair NVMEQueuePair) send_cmd(mut submission &NVMECommand, cid int) int {
@@ -530,7 +564,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	c.qid_bitmap.initialise(0xffff)
 
 	c.admin_queue = &NVMEQueuePair(memory.calloc(sizeof(NVMEQueuePair), 1))
-	if c.admin_queue.initialise(c, vect, 0, true) == false {
+	if c.admin_queue.initialise(mut c, vect, 0, true) != 0  {
 		print('nvme: failed to create an admin queue\n')
 		return -1
 	}
@@ -596,6 +630,22 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 			c.namespace_list << new_namespace
 		}
+	}
+
+	mut irq_count := u64(0)
+
+	for mut cpu_local in cpu_locals {
+		mut new_io_queue := &NVMEQueuePair(memory.calloc(sizeof(NVMEQueuePair), 1))
+
+		if pci_device.msix_support == true {
+			vect = idt.allocate_vector()
+			pci_device.set_msix(vect)
+			irq_count++
+		}
+
+		new_io_queue.initialise(mut c, vect, irq_count, false)
+
+		cpu_local.nvme_io_queue_pair = new_io_queue
 	}
 
 	return 0
