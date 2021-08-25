@@ -282,6 +282,7 @@ pub mut:
 	qid_bitmap bitmap.GenericBitmap
 
 	admin_queue &NVMEQueuePair
+	namespace_list []&NVMENamespace
 }
 
 struct NVMEQueuePair {
@@ -340,6 +341,25 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 		print('nvme: nsid ${nsid:x} : unable to read namespace identity\n')
 		return -1
 	}
+
+	calcuate_max_prps := fn (mut c &NVMEController, identity &NVMENamespaceID) u64 {
+		lba_shift := identity.lbaf_list[identity.flbas & 0xf].ds
+
+		shift := 12 + (c.regs.cap >> 48 & 0xf)
+		mut max_transfer_shift := u64(20)
+
+		if c.controller_id.mdts != 0 {
+			max_transfer_shift = u64(shift + c.controller_id.mdts)
+		}
+
+		max_lbas := 1 << (max_transfer_shift - lba_shift)
+
+		return (u64(max_lbas) * (1 << u64(lba_shift))) / 0x1000
+	}
+
+	namespace.max_prps = calcuate_max_prps(mut parent_controller, namespace.identity)
+	namespace.lba_cnt = namespace.identity.nsze
+	namespace.lba_size = 1 << u64(namespace.identity.lbaf_list[namespace.identity.flbas & 0b11111].ds)
 	
 	return 0
 }
@@ -558,6 +578,24 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	if c.admin_queue.send_cmd_and_wait(mut new_command, -1) == 0xffff {
 		print('nvme: unable to read nsid list\n')
 		return -1
+	}
+
+	for i := u64(0); i < c.controller_id.nn; i++ {
+		if unsafe { nsid_list[i] != 0 } {
+			mut new_namespace := &NVMENamespace(memory.calloc(sizeof(NVMENamespace), 1))
+
+			if new_namespace.initialise(mut c, unsafe { nsid_list[i] }) != 0 {
+				print('nvme: fatel error\n')
+				return -1
+			}
+
+			print('nvme: namespace id: ${new_namespace.nsid:x}\n')
+			print('nvme: lba cnt: ${new_namespace.lba_cnt:x}\n')
+			print('nvme: lba size: ${new_namespace.lba_size:x}\n')
+			print('nvme: max prps: ${new_namespace.max_prps:x}\n')
+
+			c.namespace_list << new_namespace
+		}
 	}
 
 	return 0
