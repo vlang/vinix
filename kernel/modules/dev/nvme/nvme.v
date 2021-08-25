@@ -266,7 +266,7 @@ pub mut:
 }
 
 struct NVMEController { 
-mut:
+pub mut:
 	pci_bar pci.PCIBar
 
 	regs &NVMERegisters
@@ -307,22 +307,45 @@ pub mut:
 	cid_bitmap bitmap.GenericBitmap
 }
 
+struct NVMENamespace {
+pub mut:
+	lba_cnt u64
+	lba_size u64
+	max_prps u64
+	nsid u64
+
+	parent_controller &NVMEController
+	identity &NVMENamespaceID
+}
+
 __global (
 	controller_list []&NVMEController
 )
 
-pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, vector u64, irq u64, admin bool) bool {
-	alloc_qid := fn (controller &NVMEController) ?u64 {
-		for i := u64(0); i < controller.queue_entries; i++ {
-			if lib.bittest(controller.qid_bitmap, i) == false {
-				lib.bitset(controller.qid_bitmap, i)
-				return i
-			}
-		}
-		return none
+pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEController, nsid u64) int {
+	unsafe { namespace.parent_controller = parent_controller }
+	namespace.nsid = nsid
+	namespace.identity = &NVMENamespaceID(u64(memory.pmm_alloc(lib.div_roundup(sizeof(NVMENamespaceID), page_size))) + higher_half)
+
+	mut new_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+
+	unsafe {
+		new_command.opcode = opcode_identify 
+		new_command.private.identify.cns = 0
+		new_command.private.identify.nsid = u32(nsid)
+		new_command.private.identify.prp1 = u64(namespace.identity) - higher_half
 	}
 
-	qid := alloc_qid(parent_controller) or {
+	if parent_controller.admin_queue.send_cmd_and_wait(mut new_command, -1) == 0xffff {
+		print('nvme: nsid ${nsid:x} : unable to read namespace identity\n')
+		return -1
+	}
+	
+	return 0
+}
+
+pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, vector u64, irq u64, admin bool) bool {
+	qid := parent_controller.qid_bitmap.alloc() or {
 		print('nvme: no available qid\n')
 		return false
 	}
@@ -337,8 +360,6 @@ pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, ve
 	pair.irq = irq
 	pair.admin = admin
 	pair.entry_cnt = parent_controller.queue_entries
-
-	print('entry cnt ${pair.entry_cnt:x}\n')
 
 	pair.submission_queue = &NVMECommand(u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECommand), page_size))) + higher_half)
 	pair.completion_queue = &NVMECompletion(u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECompletion), page_size))) + higher_half)
@@ -359,9 +380,13 @@ pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, ve
 }
 
 pub fn (mut pair NVMEQueuePair) send_cmd(mut submission &NVMECommand, cid int) int {
-	mut command_cid := pair.cid_bitmap.alloc() or {
-		print('nvme: no available cids on qid ${pair.qid:x}\n')
-		return -1
+	mut command_cid := cid
+
+	if cid == -1 {
+		command_cid = int(pair.cid_bitmap.alloc() or {
+			print('nvme: no available cids on qid ${pair.qid:x}\n')
+			return -1
+		})
 	}
 
 	submission.cid = u16(command_cid)
@@ -388,9 +413,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	}
 
 	mut events := [&int_events[pair.vector]]
-	event.await(mut events, true) or { 
-		print('here I pray I am not\n')	
-	}
+	event.await(mut events, true) or { }
 
 	mut completion_entry := unsafe { pair.completion_queue[pair.cq_head] }
 
@@ -405,6 +428,8 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 		pair.cq_head = 0
 		pair.phase = !pair.phase
 	}
+
+	pair.cid_bitmap.free(u64(cid))
 
 	kio.mmout( unsafe { &u64(pair.submission_doorbell) }, pair.cq_head)
 
@@ -519,6 +544,21 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
 	print('nvme: subsystem vendor ID: ${c.controller_id.ssvid}\n')
+
+	nsid_list := &u32(u64(memory.pmm_alloc(lib.div_roundup(c.controller_id.nn * 4, page_size))) + higher_half)
+
+	mut new_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+
+	unsafe {
+		new_command.opcode = opcode_identify 
+		new_command.private.identify.cns = 2
+		new_command.private.identify.prp1 = u64(nsid_list) - higher_half
+	}
+
+	if c.admin_queue.send_cmd_and_wait(mut new_command, -1) == 0xffff {
+		print('nvme: unable to read nsid list\n')
+		return -1
+	}
 
 	return 0
 }
