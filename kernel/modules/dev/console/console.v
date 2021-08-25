@@ -320,6 +320,10 @@ fn keyboard_handler() {
 			continue
 		}
 
+		if console_ctrl_active {
+			c = byte(C.toupper(c) - 0x40)
+		}
+
 		add_to_buf(&c, 1, true)
 	}
 }
