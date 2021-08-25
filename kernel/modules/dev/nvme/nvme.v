@@ -4,6 +4,9 @@ import pci
 import memory
 import lib
 import x86.idt
+import x86.kio
+import event
+import bitmap
 
 const (
 	nvme_class = 0x1
@@ -276,7 +279,7 @@ mut:
 	max_transfer_shift u64
 	max_prps u64
 	strides u64
-	qid_bitmap voidptr
+	qid_bitmap bitmap.GenericBitmap
 
 	admin_queue &NVMEQueuePair
 }
@@ -289,7 +292,7 @@ pub mut:
 	sq_tail u64
 	cq_head u64
 	cq_tail u64
-	phase u64
+	phase bool
 	vector u64
 	irq u64
 	admin bool
@@ -301,7 +304,7 @@ pub mut:
 	submission_doorbell &u32
 	completion_doorbell &u32
 
-	cid_bitmap voidptr
+	cid_bitmap bitmap.GenericBitmap
 }
 
 __global (
@@ -335,6 +338,8 @@ pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, ve
 	pair.admin = admin
 	pair.entry_cnt = parent_controller.queue_entries
 
+	print('entry cnt ${pair.entry_cnt:x}\n')
+
 	pair.submission_queue = &NVMECommand(u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECommand), page_size))) + higher_half)
 	pair.completion_queue = &NVMECompletion(u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECompletion), page_size))) + higher_half)
 
@@ -344,7 +349,7 @@ pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, ve
 	completion_offset := page_size + ((2 * qid + 1) * (4 << parent_controller.strides))
 	pair.completion_doorbell = &u32(u64(parent_controller.regs) + completion_offset)
 
-	pair.cid_bitmap = memory.calloc(u64(lib.div_roundup(pair.entry_cnt, u64(8))), 1)
+	pair.cid_bitmap.initialise(pair.entry_cnt)
 
 	if admin == true {
 		return true
@@ -353,12 +358,84 @@ pub fn (mut pair NVMEQueuePair) initialise(parent_controller &NVMEController, ve
 	return false
 }
 
-pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
+pub fn (mut pair NVMEQueuePair) send_cmd(mut submission &NVMECommand, cid int) int {
+	mut command_cid := pair.cid_bitmap.alloc() or {
+		print('nvme: no available cids on qid ${pair.qid:x}\n')
+		return -1
+	}
+
+	submission.cid = u16(command_cid)
+
+	unsafe {
+		pair.submission_queue[pair.sq_tail] = submission
+	}
+
+	pair.sq_tail++
+
+	if pair.sq_tail == pair.entry_cnt {
+		pair.sq_tail = 0
+	}
+
+	kio.mmout(unsafe { &u64(pair.submission_doorbell) }, pair.sq_tail)
+
+	return 0
+}
+
+pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, cid int) u16 {
+	if pair.send_cmd(mut submission, cid) == -1 {
+		print('nvme: unable to send a command to qid ${pair.qid:x}\n')
+		return 0xffff
+	}
+
+	mut events := [&int_events[pair.vector]]
+	event.await(mut events, true) or { 
+		print('here I pray I am not\n')	
+	}
+
+	mut completion_entry := unsafe { pair.completion_queue[pair.cq_head] }
+
+	if (completion_entry.status >> 1) != 0 {
+		print('nvme: command error: status ${completion_entry.status:x}\n')
+		return completion_entry.status
+	}
+
+	pair.cq_head++
+
+	if pair.cq_head == pair.entry_cnt {
+		pair.cq_head = 0
+		pair.phase = !pair.phase
+	}
+
+	kio.mmout( unsafe { &u64(pair.submission_doorbell) }, pair.cq_head)
+
+	return completion_entry.status 
+}
+
+fn (mut c NVMEController) get_controller_id() int {
+	c.controller_id = &NVMEControllerID(u64(memory.pmm_alloc(lib.div_roundup(sizeof(NVMEControllerID), page_size))) + higher_half)
+
+	mut new_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+
+	unsafe {
+		new_command.opcode = opcode_identify
+		new_command.private.identify.cns = 1
+		new_command.private.identify.prp1 = u64(c.controller_id) - higher_half
+	}
+
+	if c.admin_queue.send_cmd_and_wait(mut new_command, -1) == 0xffff {
+		print('nvme: unable to read controller id\n')
+		return -1
+	}
+
+	return 0
+}
+
+pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	pci_device.enable_bus_mastering()
 
 	if pci_device.is_bar_present(0x0) == false {
 		print('nvme: unable to locate BAR0\n')
-		return false
+		return -1
 	}
 
 	c.pci_bar = pci_device.get_bar(0x0)
@@ -373,7 +450,7 @@ pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
 
 	if (u64(c.regs.cap) & (u64(1) << 37)) == 0 {
 		print('nvme: NVME command set not supported\n')
-		return false
+		return -1
 	}
 
 	c.max_page_size = lib.power(2, 12 + ((c.regs.cap >> 52) & 0xf))
@@ -399,25 +476,25 @@ pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
 		pci_device.set_msix(vect)
 	} else {
 		print('nvme: device is not msi or msix capable\n')
-		return false
+		return -1
 	}
 
 	c.queue_entries = c.regs.cap & 0xffff
 	c.strides = c.regs.cap >> 32 & 0xf
 
-	c.qid_bitmap = memory.calloc(u64(lib.div_roundup(0xffff, 8)), 1)
+	c.qid_bitmap.initialise(0xffff)
 
 	c.admin_queue = &NVMEQueuePair(memory.calloc(sizeof(NVMEQueuePair), 1))
 	if c.admin_queue.initialise(c, vect, 0, true) == false {
 		print('nvme: failed to create an admin queue\n')
-		return false
+		return -1
 	}
 
 	c.regs.aqa = u32((c.queue_entries - 1) << 16 | (c.queue_entries - 1))
 	c.regs.asq = u64(c.admin_queue.submission_queue) - higher_half
 	c.regs.acq = u64(c.admin_queue.completion_queue) - higher_half
 
-	c.regs.cc |=	(0 << 4) | // nvme command set
+	c.regs.cc =		(0 << 4) | // nvme command set
 					(0 << 11) | // ams = round robin
 					(0 << 14) | // no shutdown notifications
 					(6 << 16) | // io submission queue size 16 bytes
@@ -429,13 +506,21 @@ pub fn (mut c NVMEController) initialise(pci_device pci.PCIDevice) bool {
 			break
 		} else if c.regs.csts & (1 << 1) != 0 {
 			print('nvme: controller fatal status\n')
-			return false
+			return -1
 		}
 	}
 
 	print('nvme: controller restart\n')
 
-	return true
+	if c.get_controller_id() == -1 {
+		print('nvme: fatal error\n')
+		return -1
+	}
+
+	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
+	print('nvme: subsystem vendor ID: ${c.controller_id.ssvid}\n')
+
+	return 0
 }
 
 pub fn initialise() {
@@ -443,7 +528,7 @@ pub fn initialise() {
 		if device.class == nvme_class && device.subclass == nvme_subclass && device.prog_if == nvme_progif {
 			mut nvme_device := &NVMEController(memory.calloc(sizeof(NVMEController), 1))
 
-			if nvme_device.initialise(device) == true {
+			if nvme_device.initialise(device) != -1 {
 				controller_list << nvme_device
 			}
 		}
