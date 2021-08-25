@@ -1,7 +1,7 @@
 module pci
 
 import x86.kio
-import lib
+import bitmap
 
 pub struct PCIDevice {
 pub:
@@ -22,7 +22,7 @@ pub mut:
 	msix_offset u16
 	msi_support bool
 	msix_support bool
-    msix_table_bitmap voidptr
+	msix_table_bitmap bitmap.GenericBitmap
     msix_table_size u16
 }
 
@@ -122,27 +122,16 @@ pub fn (dev &PCIDevice) set_msi(vector byte) {
 }
 
 pub fn (dev &PCIDevice) set_msix(vector byte) bool {
-    alloc_msix_vector := fn (dev &PCIDevice) int {
-        for i := u64(0); i < dev.msix_table_size; i++ {
-            if lib.bittest(dev.msix_table_bitmap, i) == false {
-                lib.bitset(dev.msix_table_bitmap, i)
-                return int(i)
-            }
-        }
-        return -1
-    }
-
-    msix_vector := alloc_msix_vector(dev)
-    
-    if msix_vector == -1 { 
+    msix_vector := dev.msix_table_bitmap.alloc() or {
         print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix no free vectors\n')
         return false
     }
 
     table_ptr := dev.read<u32>(dev.msix_offset + 4)
+	dev.read<u32>(dev.msix_offset + 8)
 
     bar_index := table_ptr & 0b111
-    bar_offset := table_ptr >> 3
+    bar_offset := (table_ptr >> 3) << 3
 
     if dev.is_bar_present(byte(bar_index)) == false {
         print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix table bar not present\n')
@@ -150,20 +139,20 @@ pub fn (dev &PCIDevice) set_msix(vector byte) bool {
     }
 
     table_bar := dev.get_bar(byte(bar_index))
-    bar_base := table_bar.base + bar_offset
+    bar_base := table_bar.base + bar_offset + u64(msix_vector * 16)
 
     address := (0xfee << 20) | (bsp_lapic_id << 12)
     data := vector
 
-    kio.mmout(bar_base, address) // address low
-    kio.mmout(bar_base + 4, u32(0)) // address high
-    kio.mmout(bar_base + 8, data) // data
-    kio.mmout(bar_base + 12, u32(0)) // vector control 
+    kio.mmout(&u32(bar_base), address) // address low
+    kio.mmout(&u32(bar_base + 4), u32(0)) // address high
+    kio.mmout(&u32(bar_base + 8), data) // data
+    kio.mmout(&u32(bar_base + 12), u32(0)) // vector control 
 
     mut message_control := dev.read<u16>(dev.msix_offset + 2)
 
     message_control |= (1 << 15) // enable=1
-    message_control |= (1 << 14) // mask=0
+    message_control &= ~(1 << 14) // mask=0
 
     dev.write<u16>(dev.msix_offset + 2, message_control)
 

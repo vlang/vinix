@@ -1,8 +1,5 @@
 module pci
 
-import memory
-import lib
-
 __global (
 	scanned_devices []&PCIDevice
 )
@@ -13,7 +10,7 @@ const max_bus = 256
 
 pub fn initialise() {
 	print('pci: Building device scan\n')
-	mut root_bus := PCIDevice{}
+	mut root_bus := PCIDevice{ }
 	configc  := root_bus.read<u32>(0xc)
 
 	if (configc & 0x800000) == 0 {
@@ -83,7 +80,7 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
                         message_control := device.read<u16>(off + 2)
 
                         device.msix_table_size = message_control & 0x7FF
-                        device.msix_table_bitmap = memory.calloc(u64(lib.div_roundup(device.msix_table_size, 8)), 1)
+						device.msix_table_bitmap.initialise(device.msix_table_size)
 					}
 					else {
 						
