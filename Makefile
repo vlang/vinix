@@ -25,11 +25,15 @@ distro:
 	cd build && [ -f bootstrap.link ] || ( ln -s ../sysroot system-root && xbstrap init .. )
 	cd build && xbstrap install -u --all
 
-.PHONY: kernel/vinix.elf
-kernel/vinix.elf:
+.PHONY: kernel
+kernel:
 	cd build && xbstrap install --rebuild kernel
 
-vinix.iso: kernel/vinix.elf
+.PHONY: init
+init:
+	cd build && xbstrap install --rebuild init
+
+vinix.iso: kernel init
 	cd build && xbstrap run make-iso
 	mv build/vinix.iso ./
 
@@ -40,5 +44,5 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap
+	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap init/*.xbstrap
 	rm -rf sysroot/boot sysroot/bin sysroot/usr sysroot/etc sysroot/share
