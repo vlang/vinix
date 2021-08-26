@@ -411,7 +411,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		return -1, errno.einval
 	}
 
-	mut to_copy := u64(node.symlink_target.len)
+	mut to_copy := u64(node.symlink_target.len + 1)
 	if to_copy > limit {
 		to_copy = limit
 	}
