@@ -19,6 +19,7 @@ __global (
 	scheduler_vector byte
 	scheduler_running_queue [512]&proc.Thread
 	kernel_process &proc.Process
+	working_cpus = u64(0)
 )
 
 pub fn initialise() {
@@ -69,13 +70,11 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	mut current_thread := &proc.Thread(cpu_local.current_thread)
 
-	if current_thread != 0 {
-		current_thread.yield_await.release()
-	}
-
 	new_index := get_next_thread(cpu_local.last_run_queue_index)
 
 	if current_thread != 0 {
+		current_thread.yield_await.release()
+
 		if new_index == cpu_local.last_run_queue_index {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
@@ -88,6 +87,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(current_thread.running_on, u64(-1))
 		current_thread.l.release()
+
+		katomic.dec(working_cpus)
 	}
 
 	if new_index == -1 {
@@ -95,8 +96,13 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		cpu_local.current_thread = voidptr(0)
 		cpu_local.last_run_queue_index = 0
 		katomic.store(cpu_local.is_idle, true)
+		if katomic.load(waiting_event_count) == 0 && katomic.load(working_cpus) == 0 {
+			panic('Event heartbeat has flatlined :(')
+		}
 		await()
 	}
+
+	katomic.inc(working_cpus)
 
 	current_thread = scheduler_running_queue[new_index]
 	cpu_local.last_run_queue_index = new_index
