@@ -6,8 +6,13 @@ import lib
 import x86.idt
 import x86.kio
 import x86.cpu.local as cpulocal
-import event
 import bitmap
+import stat
+import klock
+import event
+import event.eventstruct
+import resource
+import errno
 
 const (
 	nvme_class = 0x1
@@ -298,7 +303,8 @@ pub mut:
 	vector u64
 	irq u64
 	admin bool
-
+	l klock.Lock
+	
 	parent_controller &NVMEController
 
 	submission_queue &NVMECommand
@@ -311,8 +317,13 @@ pub mut:
 
 struct NVMENamespace {
 pub mut:
-	lba_cnt u64
-	lba_size u64
+	stat stat.Stat
+	refcount int
+	l klock.Lock
+	event eventstruct.Event
+	status int
+	can_mmap bool
+
 	max_prps u64
 	nsid u64
 
@@ -323,6 +334,70 @@ pub mut:
 __global (
 	controller_list []&NVMEController
 )
+
+fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
+		errno.set(errno.eio)
+		return none
+	}
+
+	start_blk := loc / dev.stat.blksize
+	page_cnt := count / dev.stat.blksize
+
+	aligned_buffer := voidptr(u64(memory.pmm_alloc(page_cnt)) + higher_half)
+
+	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, 0) == -1 {
+		errno.set(errno.eio)
+		return none
+	}
+
+	unsafe { C.memcpy(buffer, aligned_buffer, count) }
+
+	memory.pmm_free(aligned_buffer, page_cnt)
+
+	return i64(count)
+}
+
+fn (mut dev NVMENamespace) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
+		errno.set(errno.eio)
+		return none
+	}
+
+	start_blk := loc / dev.stat.blksize
+	page_cnt := count / dev.stat.blksize
+
+	aligned_buffer := voidptr(u64(memory.pmm_alloc(page_cnt)) + higher_half)
+
+	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, 1) == -1 {
+		errno.set(errno.eio)
+		return none
+	}
+
+	unsafe { C.memcpy(buffer, aligned_buffer, count) }
+
+	memory.pmm_free(aligned_buffer, page_cnt)
+
+	return i64(count)
+}
+
+fn (mut dev NVMENamespace) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	return resource.default_ioctl(handle, request, argp)
+}
+
+fn (mut dev NVMENamespace) unref(handle voidptr) ? {
+	dev.l.acquire()
+	dev.refcount--
+	dev.l.release()
+}
+
+fn (mut dev NVMENamespace) grow(handle voidptr, new_size u64) ? {
+	return error('')
+}
+
+fn (mut dev NVMENamespace) mmap(page u64, flags int) voidptr {
+	return 0
+}
 
 pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEController, nsid u64) int {
 	unsafe { namespace.parent_controller = parent_controller }
@@ -359,8 +434,8 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	}
 
 	namespace.max_prps = calcuate_max_prps(mut parent_controller, namespace.identity)
-	namespace.lba_cnt = namespace.identity.nsze
-	namespace.lba_size = 1 << u64(namespace.identity.lbaf_list[namespace.identity.flbas & 0b11111].ds)
+	namespace.stat.blocks = namespace.identity.nsze
+	namespace.stat.blksize = 1 << u64(namespace.identity.lbaf_list[namespace.identity.flbas & 0b11111].ds)
 	
 	return 0
 }
@@ -462,8 +537,11 @@ pub fn (mut pair NVMEQueuePair) send_cmd(mut submission &NVMECommand, cid int) i
 }
 
 pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, cid int) u16 {
+	pair.l.acquire()
+
 	if pair.send_cmd(mut submission, cid) == -1 {
 		print('nvme: unable to send a command to qid ${pair.qid:x}\n')
+		pair.l.release()
 		return 0xffff
 	}
 
@@ -474,6 +552,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 
 	if (completion_entry.status >> 1) != 0 {
 		print('nvme: command error: status ${completion_entry.status:x}\n')
+		pair.l.release()
 		return completion_entry.status
 	}
 
@@ -487,6 +566,8 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	pair.cid_bitmap.free(u64(cid))
 
 	kio.mmout( unsafe { &u64(pair.submission_doorbell) }, pair.cq_head)
+
+	pair.l.release()
 
 	return completion_entry.status 
 }
@@ -503,9 +584,9 @@ pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw int) 
 
 	mut prp_list := &u64(u64(memory.pmm_alloc(lib.div_roundup(ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) + higher_half)
 
-	if (cnt * ns.lba_size) > page_size {
-		if (cnt * ns.lba_size) > (page_size * 2) {
-			prp_cnt := (cnt - 1) * ns.lba_size / page_size
+	if (cnt * ns.stat.blksize) > page_size {
+		if (cnt * ns.stat.blksize) > (page_size * 2) {
+			prp_cnt := (cnt - 1) * ns.stat.blksize / page_size
 			
 			if prp_cnt > ns.max_prps {
 				print('nvme: max prps exceeded\n')
@@ -686,8 +767,8 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 			}
 
 			print('nvme: namespace id: ${new_namespace.nsid:x}\n')
-			print('nvme: lba cnt: ${new_namespace.lba_cnt:x}\n')
-			print('nvme: lba size: ${new_namespace.lba_size:x}\n')
+			print('nvme: lba cnt: ${new_namespace.stat.blocks:x}\n')
+			print('nvme: lba size: ${new_namespace.stat.blksize:x}\n')
 			print('nvme: max prps: ${new_namespace.max_prps:x}\n')
 
 			c.namespace_list << new_namespace
