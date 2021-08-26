@@ -74,6 +74,9 @@ blob.o:
 	cp blob.c blob.c.unpatched
 	patch blob.c blob.patch --no-backup-if-mismatch -r /dev/null
 	[ "$(PROD)" = "false" ] && ( diff blob.c.unpatched blob.c || true ) > blob.patch || true
+	sed -i 's/dev__nvme__NVMERegisters\*/volatile dev__nvme__NVMERegisters\*/g' blob.c
+	sed -i 's/dev__nvme__NVMECommand\*/volatile dev__nvme__NVMECommand\*/g' blob.c
+	sed -i 's/dev__nvme__NVMECompletion\*/volatile dev__nvme__NVMECompletion\*/g' blob.c
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c

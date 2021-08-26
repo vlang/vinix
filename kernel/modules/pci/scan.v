@@ -34,7 +34,7 @@ pub fn initialise() {
 }
 
 fn check_bus(bus byte, parent i64) {
-    for dev := byte(0); dev < max_device; dev++ {
+	for dev := byte(0); dev < max_device; dev++ {
 		for func := byte(0); func < max_function; func++ {
 			check_function(bus, dev, func, parent)
 		}
@@ -76,6 +76,11 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 					0x11 {
 						device.msix_support = true
 						device.msix_offset = off
+
+						message_control := device.read<u16>(off + 2)
+
+						device.msix_table_size = message_control & 0x7FF
+						device.msix_table_bitmap.initialise(device.msix_table_size)
 					}
 					else {
 						

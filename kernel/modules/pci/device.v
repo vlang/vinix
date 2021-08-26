@@ -1,6 +1,7 @@
 module pci
 
 import x86.kio
+import bitmap
 
 pub struct PCIDevice {
 pub:
@@ -21,6 +22,8 @@ pub mut:
 	msix_offset u16
 	msi_support bool
 	msix_support bool
+	msix_table_bitmap bitmap.GenericBitmap
+	msix_table_size u16
 }
 
 pub struct PCIBar {
@@ -116,6 +119,44 @@ pub fn (dev &PCIDevice) set_msi(vector byte) {
 	message_control &= ~(0b111 << 4) // mme=0
 
 	dev.write<u16>(dev.msi_offset + 2, message_control)
+}
+
+pub fn (dev &PCIDevice) set_msix(vector byte) bool {
+	msix_vector := dev.msix_table_bitmap.alloc() or {
+		print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix no free vectors\n')
+		return false
+	}
+
+	table_ptr := dev.read<u32>(dev.msix_offset + 4)
+	dev.read<u32>(dev.msix_offset + 8)
+
+	bar_index := table_ptr & 0b111
+	bar_offset := (table_ptr >> 3) << 3
+
+	if dev.is_bar_present(byte(bar_index)) == false {
+		print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix table bar not present\n')
+		return false
+	}
+
+	table_bar := dev.get_bar(byte(bar_index))
+	bar_base := table_bar.base + bar_offset + u64(msix_vector * 16)
+
+	address := (0xfee << 20) | (bsp_lapic_id << 12)
+	data := vector
+
+	kio.mmout(&u32(bar_base), address) // address low
+	kio.mmout(&u32(bar_base + 4), u32(0)) // address high
+	kio.mmout(&u32(bar_base + 8), data) // data
+	kio.mmout(&u32(bar_base + 12), u32(0)) // vector control 
+
+	mut message_control := dev.read<u16>(dev.msix_offset + 2)
+
+	message_control |= (1 << 15) // enable=1
+	message_control &= ~(1 << 14) // mask=0
+
+	dev.write<u16>(dev.msix_offset + 2, message_control)
+
+	return true
 }
 
 pub fn (dev &PCIDevice) enable_bus_mastering() {
