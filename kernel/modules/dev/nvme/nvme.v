@@ -5,6 +5,7 @@ import memory
 import lib
 import x86.idt
 import x86.kio
+import x86.cpu.local as cpulocal
 import event
 import bitmap
 
@@ -328,7 +329,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	namespace.nsid = nsid
 	namespace.identity = &NVMENamespaceID(u64(memory.pmm_alloc(lib.div_roundup(sizeof(NVMENamespaceID), page_size))) + higher_half)
 
-	mut new_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+	mut new_command := &NVMECommand { }
 
 	unsafe {
 		new_command.opcode = opcode_identify 
@@ -396,7 +397,7 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller &NVMEController
 		return 0
 	}
 
-	mut create_cq_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+	mut create_cq_command := &NVMECommand { }
 
 	unsafe {
 		create_cq_command.opcode = opcode_create_cq
@@ -412,7 +413,7 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller &NVMEController
 		return -1
 	}
 
-	mut create_sq_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+	mut create_sq_command := &NVMECommand { }
 
 	unsafe {
 		create_sq_command.opcode = opcode_create_sq
@@ -490,10 +491,63 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	return completion_entry.status 
 }
 
+pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw int) int {
+	mut new_command := NVMECommand { }
+
+	mut queue_pair := &NVMEQueuePair(cpulocal.current().nvme_io_queue_pair)
+
+	cid := queue_pair.cid_bitmap.alloc() or {
+		print('nvme: no available cids\n')
+		return -1
+	}
+
+	mut prp_list := &u64(u64(memory.pmm_alloc(lib.div_roundup(ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) + higher_half)
+
+	if (cnt * ns.lba_size) > page_size {
+		if (cnt * ns.lba_size) > (page_size * 2) {
+			prp_cnt := (cnt - 1) * ns.lba_size / page_size
+			
+			if prp_cnt > ns.max_prps {
+				print('nvme: max prps exceeded\n')
+				return -1
+			}
+
+			for i := u64(0); i < prp_cnt; i++ {
+				unsafe { prp_list[i + cid * ns.max_prps] = (u64(buffer) - higher_half) + page_size + i * page_size }
+			}
+
+			unsafe { new_command.private.rw.prp2 = u64(&prp_list[cid * ns.max_prps]) - higher_half }
+		} else {
+			unsafe { new_command.private.rw.prp2 = u64(buffer) + page_size - higher_half }
+		}
+	}
+
+	new_command.opcode = 2
+	if rw != 0 {
+		new_command.opcode = 1
+	}
+	
+	new_command.cid = u16(cid)
+
+	unsafe {
+		new_command.private.rw.nsid = u32(ns.nsid)
+		new_command.private.rw.slba = start
+		new_command.private.rw.length = u16(cnt - 1)
+		new_command.private.rw.prp1 = u64(buffer) - higher_half
+	}
+
+	if queue_pair.send_cmd_and_wait(mut new_command, int(cid)) == 0xffff {
+		print('nvme: rw fail\n')
+		return -1
+	}
+
+	return 0
+}
+
 fn (mut c NVMEController) get_controller_id() int {
 	c.controller_id = &NVMEControllerID(u64(memory.pmm_alloc(lib.div_roundup(sizeof(NVMEControllerID), page_size))) + higher_half)
 
-	mut new_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+	mut new_command := &NVMECommand { }
 
 	unsafe {
 		new_command.opcode = opcode_identify
@@ -563,7 +617,13 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	c.qid_bitmap.initialise(0xffff)
 
-	c.admin_queue = &NVMEQueuePair(memory.calloc(sizeof(NVMEQueuePair), 1))
+	c.admin_queue = &NVMEQueuePair {	parent_controller: 0,
+										submission_queue: 0,
+										completion_queue: 0,
+										completion_doorbell: 0,
+										submission_doorbell: 0
+								   }
+
 	if c.admin_queue.initialise(mut c, vect, 0, true) != 0  {
 		print('nvme: failed to create an admin queue\n')
 		return -1
@@ -601,7 +661,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	nsid_list := &u32(u64(memory.pmm_alloc(lib.div_roundup(c.controller_id.nn * 4, page_size))) + higher_half)
 
-	mut new_command := &NVMECommand(memory.calloc(sizeof(NVMECommand), 1))
+	mut new_command := &NVMECommand { }
 
 	unsafe {
 		new_command.opcode = opcode_identify 
@@ -616,7 +676,9 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	for i := u64(0); i < c.controller_id.nn; i++ {
 		if unsafe { nsid_list[i] != 0 } {
-			mut new_namespace := &NVMENamespace(memory.calloc(sizeof(NVMENamespace), 1))
+			mut new_namespace := &NVMENamespace {	parent_controller: 0,
+													identity: 0
+												}
 
 			if new_namespace.initialise(mut c, unsafe { nsid_list[i] }) != 0 {
 				print('nvme: fatel error\n')
@@ -635,7 +697,12 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	mut irq_count := u64(0)
 
 	for mut cpu_local in cpu_locals {
-		mut new_io_queue := &NVMEQueuePair(memory.calloc(sizeof(NVMEQueuePair), 1))
+		mut new_io_queue := &NVMEQueuePair {	parent_controller: 0,
+												submission_queue: 0,
+												completion_queue: 0,
+												submission_doorbell: 0,
+												completion_doorbell: 0
+										   }
 
 		if pci_device.msix_support == true {
 			vect = idt.allocate_vector()
@@ -654,7 +721,10 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 pub fn initialise() {
 	for device in scanned_devices {
 		if device.class == nvme_class && device.subclass == nvme_subclass && device.prog_if == nvme_progif {
-			mut nvme_device := &NVMEController(memory.calloc(sizeof(NVMEController), 1))
+			mut nvme_device := &NVMEController {	regs: 0,
+													controller_id: 0,
+													admin_queue: 0
+											   }
 
 			if nvme_device.initialise(device) != -1 {
 				controller_list << nvme_device
