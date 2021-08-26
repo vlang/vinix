@@ -19,6 +19,7 @@ import pipe
 import futex
 import pci
 import dev.ata
+import dev.streams
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -39,6 +40,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 
 	initramfs.init(modules_tag)
 
+	streams.initialise()
 	console.initialise()
 	ata.initialise()
 
