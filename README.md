@@ -2,29 +2,11 @@
 
 Vinix is an effort to write a modern, fast, and useful operating system in [the V programming language](https://vlang.io).
 
-Join the [Discord chat](https://discord.gg/vlang) (`#vinix-os` channel).
+Join the [Discord chat](https://discord.gg/qV9G4cVJpb).
 
 ## Download the ISO
 
 You can get a continuously updated ISO of Vinix [here](https://builds.vinix-os.org/repos/files/vinix/latest/vinix.iso).
-
-## Roadmap
-
-- [x] mlibc 
-- [x] bash
-- [x] text mode
-- [x] gcc
-- [x] g++  
-- [x] nano
-- [x] vim
-- [x] builds.vinix-os.org 
-- [ ] storage drivers
-- [ ] ext2
-- [ ] V
-- [ ] V-UI
-- [ ] compositor
-- [ ] network
-- [ ] Intel HD graphics driver (linux port)   
 
 ## What is Vinix all about?
 
@@ -38,6 +20,22 @@ virtual machines.
 - Having fun.
 
 ![Reference screenshot](/screenshot.png?raw=true "Reference screenshot")
+
+## Roadmap
+
+- [x] mlibc
+- [x] bash
+- [x] builds.vinix-os.org
+- [x] gcc
+- [x] g++
+- [X] V
+- [x] nano
+- [ ] storage drivers
+- [ ] ext2
+- [ ] Wayland compositor
+- [ ] V-UI
+- [ ] network
+- [ ] Intel HD graphics driver (linux port)
 
 ## Build instructions
 
@@ -66,7 +64,7 @@ or real hardware.
 
 It is necessary to fetch `xbstrap` from `pip3`:
 ```bash
-sudo pip3 install xbstrap
+pip3 install --user xbstrap
 ```
 
 ### Building the distro

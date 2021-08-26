@@ -26,7 +26,7 @@ distro:
 	cd build && xbstrap install -u --all
 
 .PHONY: kernel/vinix.elf
-kernel/vinix.elf: distro
+kernel/vinix.elf:
 	cd build && xbstrap install --rebuild kernel
 
 vinix.iso: kernel/vinix.elf
