@@ -346,8 +346,9 @@ fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u
 
 	aligned_buffer := voidptr(u64(memory.pmm_alloc(page_cnt)) + higher_half)
 
-	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, 0) == -1 {
+	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, false) == -1 {
 		errno.set(errno.eio)
+		memory.pmm_free(aligned_buffer, page_cnt)
 		return none
 	}
 
@@ -368,13 +369,13 @@ fn (mut dev NVMENamespace) write(handle voidptr, buffer voidptr, loc u64, count 
 	page_cnt := count / dev.stat.blksize
 
 	aligned_buffer := voidptr(u64(memory.pmm_alloc(page_cnt)) + higher_half)
+	unsafe { C.memcpy(aligned_buffer, buffer, count) }
 
-	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, 1) == -1 {
+	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, true) == -1 {
 		errno.set(errno.eio)
+		memory.pmm_free(aligned_buffer, page_cnt)
 		return none
 	}
-
-	unsafe { C.memcpy(buffer, aligned_buffer, count) }
 
 	memory.pmm_free(aligned_buffer, page_cnt)
 
@@ -572,7 +573,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	return completion_entry.status 
 }
 
-pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw int) int {
+pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	mut new_command := NVMECommand { }
 
 	mut queue_pair := &NVMEQueuePair(cpulocal.current().nvme_io_queue_pair)
@@ -602,10 +603,11 @@ pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw int) 
 			unsafe { new_command.private.rw.prp2 = u64(buffer) + page_size - higher_half }
 		}
 	}
-
-	new_command.opcode = 2
-	if rw != 0 {
+	
+	if rw == true {
 		new_command.opcode = 1
+	} else {
+		new_command.opcode = 2
 	}
 	
 	new_command.cid = u16(cid)
