@@ -14,6 +14,8 @@ import resource
 import errno
 import termios
 import file
+import userland
+import proc
 
 const max_scancode = 0x57
 const capslock = 0x3a
@@ -44,6 +46,9 @@ __global (
 	console_bigbuf_i = u64(0)
 	console_termios = &termios.Termios(0)
 	console_decckm = false
+	// XXX this is a massive hack to allow ctrl-c and friends without process
+	// groups
+	latest_thread = &proc.Thread(0)
 )
 
 const convtab_capslock = [
@@ -109,13 +114,11 @@ fn add_to_buf_char(c byte, echo bool) {
 					return
 				}
 				console_buffer_i--
-				to_backspace := match console_buffer[console_buffer_i] {
-					`\e` {
-						2
-					}
-					else {
-						1
-					}
+				to_backspace := if console_buffer[console_buffer_i] >= 0x01
+					&& console_buffer[console_buffer_i] <= 0x1a {
+					2
+				} else {
+					1
 				}
 				console_buffer[console_buffer_i] = 0
 				if echo && console_termios.c_lflag & termios.echo != 0 {
@@ -148,14 +151,8 @@ fn add_to_buf_char(c byte, echo bool) {
 	if echo && console_termios.c_lflag & termios.echo != 0 {
 		if is_printable(c) {
 			print('${c:c}')
-			return
-		}
-
-		match c {
-			`\e` {
-				print('^[')
-			}
-			else {}
+		} else if c >= 0x01 && c <= 0x1a {
+			print('^${c + 0x40:c}')
 		}
 	}
 }
@@ -167,8 +164,13 @@ fn add_to_buf(ptr &byte, count u64, echo bool) {
 	}
 
 	for i := u64(0); i < count; i++ {
-		// TODO: Accept signal characters
-		unsafe { add_to_buf_char(ptr[i], echo) }
+		c := unsafe { ptr[i] }
+		if console_termios.c_lflag & termios.isig != 0 {
+			if c == console_termios.c_cc[termios.vintr] {
+				userland.sendsig(latest_thread, userland.sigint)
+			}
+		}
+		add_to_buf_char(c, echo)
 	}
 
 	event.trigger(mut console_event, false)
@@ -320,6 +322,10 @@ fn keyboard_handler() {
 			continue
 		}
 
+		if console_ctrl_active {
+			c = byte(C.toupper(c) - 0x40)
+		}
+
 		add_to_buf(&c, 1, true)
 	}
 }
@@ -384,6 +390,8 @@ pub fn initialise() {
 	// Initialise termios
 	console_res.termios.c_lflag = termios.isig | termios.icanon | termios.echo
 	console_res.termios.c_cc[termios.vintr] = 0x03
+	console_res.termios.ibaud = 38400
+	console_res.termios.obaud = 38400
 
 	console_termios = &console_res.termios
 
@@ -442,6 +450,8 @@ fn (mut this Console) mmap(page u64, flags int) voidptr {
 }
 
 fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
+	latest_thread = proc.current_thread()
+
 	mut buf := &byte(void_buf)
 
 	for console_read_lock.test_and_acquire() == false {
@@ -492,6 +502,8 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 }
 
 fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	latest_thread = proc.current_thread()
+
 	copy := unsafe { C.malloc(count) }
 	defer {
 		unsafe { C.free(copy) }
@@ -502,6 +514,8 @@ fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i6
 }
 
 fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	latest_thread = proc.current_thread()
+
 	match request {
 		ioctl.tiocgwinsz {
 			mut w := &ioctl.WinSize(argp)

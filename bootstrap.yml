@@ -38,7 +38,7 @@ sources:
     format: 'tar.gz'
     extract_path: 'mlibc-f7b538c88702c190218ec0d6a7103d2d51937ff9'
     patch-path-strip: 3
-    version: '9.rolling'
+    version: '10.rolling'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -51,27 +51,27 @@ sources:
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://github.com/vlang/v/archive/9c74fb0449ebe23daf3122d1e949d0baafe7867c.tar.gz'
+    url: 'https://github.com/vlang/v/archive/714fa3215c7306b908968b55e2548b56affd4e94.tar.gz'
     format: 'tar.gz'
-    extract_path: 'v-9c74fb0449ebe23daf3122d1e949d0baafe7867c'
+    extract_path: 'v-714fa3215c7306b908968b55e2548b56affd4e94'
     patch-path-strip: 3
-    version: '8.rolling'
+    version: '9.rolling'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://github.com/vlang/vc/archive/00229977a2c8f1f7e3465c943751d50cdb03cdf9.tar.gz'
+    url: 'https://github.com/vlang/vc/archive/2296b2a48963db3ecc7f70e11631ad55342fa660.tar.gz'
     format: 'tar.gz'
-    extract_path: 'vc-00229977a2c8f1f7e3465c943751d50cdb03cdf9'
+    extract_path: 'vc-2296b2a48963db3ecc7f70e11631ad55342fa660'
     patch-path-strip: 3
-    version: '8.rolling'
+    version: '9.rolling'
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.48.1/limine-v2.48.1.tar.xz
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.49.1/limine-v2.49.1.tar.xz
     format: 'tar.xz'
-    extract_path: 'limine-v2.48.1'
+    extract_path: 'limine-v2.49.1'
     patch-path-strip: 3
-    version: '2.48.1'
+    version: '2.49.1'
 
 tools:
   - name: host-autoconf-v2.69
@@ -231,6 +231,7 @@ tasks:
       - binutils
       - gcc
       - kernel
+      - init
     artifact_files:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
@@ -242,6 +243,36 @@ tasks:
     workdir: '@BUILD_ROOT@'
 
 packages:
+  - name: kernel
+    source:
+      subdir: ''
+      version: '51.rolling'
+    tools_required:
+      - host-v
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cd "@THIS_SOURCE_DIR@" && make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
+
+  - name: init
+    source:
+      subdir: ''
+      version: '1.rolling'
+    tools_required:
+      - host-v
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cd "@THIS_SOURCE_DIR@" && v -cc x86_64-vinix-gcc -os vinix . && mkdir -p @THIS_COLLECT_DIR@/sbin && cp init @THIS_COLLECT_DIR@/sbin/'
+
   - name: mlibc-headers
     from_source: mlibc
     implict_package: true
@@ -356,21 +387,6 @@ packages:
         - 'bash'
         - '-c'
         - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr/bin" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"'
-
-  - name: kernel
-    source:
-      subdir: ''
-      version: '47.rolling'
-    tools_required:
-      - host-v
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    build:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
 
   - name: coreutils
     source:

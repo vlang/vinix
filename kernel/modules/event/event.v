@@ -5,6 +5,11 @@ import sched
 import eventstruct
 import x86.cpu
 import x86.cpu.local as cpulocal
+import katomic
+
+__global (
+	waiting_event_count = u64(0)
+)
 
 fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	for i := u64(0); i < events.len; i++ {
@@ -63,6 +68,8 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 		return none
 	}
 
+	katomic.inc(waiting_event_count)
+
 	attach_listeners(mut events, voidptr(thread))
 
 	sched.dequeue_thread(cpulocal.current().current_thread)
@@ -70,6 +77,8 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	unlock_events(mut events)
 
 	sched.yield(true)
+
+	katomic.dec(waiting_event_count)
 
 	if thread.enqueued_by_signal {
 		return none
