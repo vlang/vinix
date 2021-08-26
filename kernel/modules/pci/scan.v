@@ -10,7 +10,7 @@ const max_bus = 256
 
 pub fn initialise() {
 	print('pci: Building device scan\n')
-	mut root_bus := PCIDevice{ }
+	mut root_bus := PCIDevice{}
 	configc  := root_bus.read<u32>(0xc)
 
 	if (configc & 0x800000) == 0 {
@@ -34,7 +34,7 @@ pub fn initialise() {
 }
 
 fn check_bus(bus byte, parent i64) {
-    for dev := byte(0); dev < max_device; dev++ {
+	for dev := byte(0); dev < max_device; dev++ {
 		for func := byte(0); func < max_function; func++ {
 			check_function(bus, dev, func, parent)
 		}
@@ -77,9 +77,9 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 						device.msix_support = true
 						device.msix_offset = off
 
-                        message_control := device.read<u16>(off + 2)
+						message_control := device.read<u16>(off + 2)
 
-                        device.msix_table_size = message_control & 0x7FF
+						device.msix_table_size = message_control & 0x7FF
 						device.msix_table_bitmap.initialise(device.msix_table_size)
 					}
 					else {
