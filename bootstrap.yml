@@ -118,6 +118,7 @@ tools:
 
   - name: host-limine
     from_source: limine
+    revision: 2
     tools_required:
       - host-gcc
     compile:
@@ -261,7 +262,7 @@ packages:
   - name: init
     source:
       subdir: ''
-      version: '1.rolling'
+      version: '2.rolling'
     tools_required:
       - host-v
       - host-gcc
@@ -271,7 +272,7 @@ packages:
       - args:
         - 'bash'
         - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && v -cc x86_64-vinix-gcc -os vinix . && mkdir -p @THIS_COLLECT_DIR@/sbin && cp init @THIS_COLLECT_DIR@/sbin/'
+        - 'cd "@THIS_SOURCE_DIR@" && VMODULES=/tmp/.vmodules v -cc x86_64-vinix-gcc -os vinix . && mkdir -p @THIS_COLLECT_DIR@/sbin && cp init @THIS_COLLECT_DIR@/sbin/'
 
   - name: mlibc-headers
     from_source: mlibc

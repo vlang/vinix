@@ -41,8 +41,9 @@ vinix.iso: kernel init
 clean:
 	rm -f vinix.iso
 	$(MAKE) -C kernel clean
+	rm -f init/init
 
 .PHONY: distclean
 distclean: clean
 	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap init/*.xbstrap
-	rm -rf sysroot/boot sysroot/bin sysroot/usr sysroot/etc sysroot/share
+	rm -rf sysroot/boot sysroot/bin sysroot/sbin sysroot/usr sysroot/etc sysroot/share
