@@ -707,7 +707,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 										submission_doorbell: 0
 								   }
 
-	if c.admin_queue.initialise(mut c, vect, 0, true) != 0  {
+	if c.admin_queue.initialise(mut c, vect, 0, true) != 0	{
 		print('nvme: failed to create an admin queue\n')
 		return -1
 	}
