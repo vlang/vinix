@@ -723,11 +723,11 @@ packages:
   - name: openssl
     source:
       subdir: '3rdparty'
-      url: 'https://www.openssl.org/source/openssl-1.1.1k.tar.gz'
+      url: 'https://www.openssl.org/source/openssl-1.1.1l.tar.gz'
       format: 'tar.gz'
-      extract_path: 'openssl-1.1.1k'
+      extract_path: 'openssl-1.1.1l'
       patch-path-strip: 3
-      version: '1.1.1k'
+      version: '1.1.1l'
     tools_required:
       - host-gcc
     pkgs_required:
@@ -755,7 +755,7 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       # Move the doc dir to a versioned directory
-      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1k']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1l']
 
   - name: wget
     source:

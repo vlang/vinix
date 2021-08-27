@@ -1,8 +1,8 @@
 diff --git a/3rdparty/openssl-orig/Configurations/10-main.conf b/3rdparty/openssl-workdir/Configurations/10-main.conf
-index 8dc3e85..03f1bc1 100644
+index 61c6689..188b208 100644
 --- a/3rdparty/openssl-orig/Configurations/10-main.conf
 +++ b/3rdparty/openssl-workdir/Configurations/10-main.conf
-@@ -911,6 +911,39 @@ my %targets = (
+@@ -918,6 +918,39 @@ my %targets = (
          ranlib           => "true",
      },
  
