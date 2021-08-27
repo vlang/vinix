@@ -1,8 +1,8 @@
 diff --git a/3rdparty/mlibc-orig/abis/mlibc/signal.h b/3rdparty/mlibc-workdir/abis/mlibc/signal.h
-index e1afc76..c9d3226 100644
+index d6d1a70..24d5dbc 100644
 --- a/3rdparty/mlibc-orig/abis/mlibc/signal.h
 +++ b/3rdparty/mlibc-workdir/abis/mlibc/signal.h
-@@ -105,10 +105,12 @@ struct sigevent {
+@@ -122,10 +122,12 @@ struct sigevent {
  };
  
  struct sigaction {
@@ -77,10 +77,10 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/3rdparty/mlibc-orig/options/posix/generic/unistd-stubs.cpp b/3rdparty/mlibc-workdir/options/posix/generic/unistd-stubs.cpp
-index 2d07bba..1813b6a 100644
+index 4725736..d5636a8 100644
 --- a/3rdparty/mlibc-orig/options/posix/generic/unistd-stubs.cpp
 +++ b/3rdparty/mlibc-workdir/options/posix/generic/unistd-stubs.cpp
-@@ -811,12 +811,12 @@ int ttyname_r(int, char *, size_t) {
+@@ -812,12 +812,12 @@ int ttyname_r(int, char *, size_t) {
  }
  
  int unlink(const char *path) {
@@ -847,6 +847,14 @@ index 0000000..10d644e
 @@ -0,0 +1 @@
 +../../../../abis/mlibc/ino_t.h
 \ No newline at end of file
+diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/limits.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/limits.h
+new file mode 120000
+index 0000000..1aa5894
+--- /dev/null
++++ b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/limits.h
+@@ -0,0 +1 @@
++../../../../abis/mlibc/limits.h
+\ No newline at end of file
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h b/3rdparty/mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
 new file mode 120000
 index 0000000..29d7733
@@ -961,10 +969,10 @@ index 0000000..6d911c7
 \ No newline at end of file
 diff --git a/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build b/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build
 new file mode 100644
-index 0000000..4c3b59c
+index 0000000..1207fe0
 --- /dev/null
 +++ b/3rdparty/mlibc-workdir/sysdeps/vinix/meson.build
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,51 @@
 +
 +rtdl_sources += files(
 +	'generic/generic.cpp'
@@ -1000,6 +1008,7 @@ index 0000000..4c3b59c
 +		'include/abi-bits/pid_t.h',
 +		'include/abi-bits/uid_t.h',
 +		'include/abi-bits/wait.h',
++		'include/abi-bits/limits.h',
 +		subdir: 'abi-bits'
 +	)
 +endif
