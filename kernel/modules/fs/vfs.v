@@ -468,6 +468,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return -1, errno.get()
 	}
 
+	if !stat.isdir(node.resource.stat.mode) && (flags & resource.o_directory != 0) {
+		return -1, errno.enotdir
+	}
+
 	fdnum := fdnum_create_from_node(node, flags, 0, false) or {
 		return -1, errno.get()
 	}
