@@ -1,0 +1,194 @@
+diff --git a/3rdparty/eudev-orig/config.sub b/3rdparty/eudev-workdir/config.sub
+index 47515cc..94e8cdf 100755
+--- a/3rdparty/eudev-orig/config.sub
++++ b/3rdparty/eudev-workdir/config.sub
+@@ -1411,7 +1411,7 @@ case $os in
+ 	-gnu* | -bsd* | -mach* | -minix* | -genix* | -ultrix* | -irix* \
+ 	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -cnk* | -sunos | -sunos[34]*\
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+-	      | -sym* | -kopensolaris* | -plan9* \
++	      | -sym* | -kopensolaris* | -plan9* | -vinix* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+ 	      | -aos* | -aros* | -cloudabi* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+diff --git a/3rdparty/eudev-orig/configure b/3rdparty/eudev-workdir/configure
+index 055940b..8a446c9 100755
+--- a/3rdparty/eudev-orig/configure
++++ b/3rdparty/eudev-workdir/configure
+@@ -17180,8 +17180,6 @@ if test "x$ac_cv_header_mtd_mtd_user_h" = xyes; then :
+ #define HAVE_MTD_MTD_USER_H 1
+ _ACEOF
+ 
+-else
+-  as_fn_error $? "*** KERNEL header not found" "$LINENO" 5
+ 
+ fi
+ 
+@@ -17328,7 +17326,7 @@ else
+ fi
+ 
+ cat >>confdefs.h <<_ACEOF
+-#define HAVE_DECL_GETRANDOM $ac_have_decl
++#define HAVE_DECL_GETRANDOM 1
+ _ACEOF
+ ac_fn_c_check_decl "$LINENO" "gettid" "ac_cv_have_decl_gettid" "#include <fcntl.h>
+ #include <linux/random.h>
+@@ -17348,7 +17346,7 @@ else
+ fi
+ 
+ cat >>confdefs.h <<_ACEOF
+-#define HAVE_DECL_GETTID $ac_have_decl
++#define HAVE_DECL_GETTID 1
+ _ACEOF
+ ac_fn_c_check_decl "$LINENO" "name_to_handle_at" "ac_cv_have_decl_name_to_handle_at" "#include <fcntl.h>
+ #include <linux/random.h>
+@@ -17368,7 +17366,7 @@ else
+ fi
+ 
+ cat >>confdefs.h <<_ACEOF
+-#define HAVE_DECL_NAME_TO_HANDLE_AT $ac_have_decl
++#define HAVE_DECL_NAME_TO_HANDLE_AT 1
+ _ACEOF
+ ac_fn_c_check_decl "$LINENO" "accept4" "ac_cv_have_decl_accept4" "#include <fcntl.h>
+ #include <linux/random.h>
+diff --git a/3rdparty/eudev-orig/src/shared/conf-files.c b/3rdparty/eudev-workdir/src/shared/conf-files.c
+index b4c2f71..438de24 100644
+--- a/3rdparty/eudev-orig/src/shared/conf-files.c
++++ b/3rdparty/eudev-workdir/src/shared/conf-files.c
+@@ -21,6 +21,7 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <errno.h>
++#include <libgen.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <sys/stat.h>
+diff --git a/3rdparty/eudev-orig/src/shared/missing.h b/3rdparty/eudev-workdir/src/shared/missing.h
+index 3a83c91..e49c3a1 100644
+--- a/3rdparty/eudev-orig/src/shared/missing.h
++++ b/3rdparty/eudev-workdir/src/shared/missing.h
+@@ -21,15 +21,19 @@
+ 
+ /* Missing glibc definitions to access certain kernel APIs */
+ 
++#include "config.h"
++
+ #include <sys/resource.h>
++
++#if !HAVE_DECL_GETRANDOM || !HAVE_DECL_GETTID || !HAVE_DECL_NAME_TO_HANDLE_AT
+ #include <sys/syscall.h>
++#endif
++
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <unistd.h>
+-#include <linux/oom.h>
+ 
+ #include "macro.h"
+-#include "config.h"
+ 
+ #ifdef ARCH_MIPS
+ #include <asm/sgidefs.h>
+diff --git a/3rdparty/eudev-orig/src/shared/random-util.c b/3rdparty/eudev-workdir/src/shared/random-util.c
+index 01a28c8..370d237 100644
+--- a/3rdparty/eudev-orig/src/shared/random-util.c
++++ b/3rdparty/eudev-workdir/src/shared/random-util.c
+@@ -23,7 +23,7 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <time.h>
+-#include <linux/random.h>
++#include <sys/random.h>
+ 
+ #include "random-util.h"
+ #include "time-util.h"
+diff --git a/3rdparty/eudev-orig/src/shared/socket-util.h b/3rdparty/eudev-workdir/src/shared/socket-util.h
+index 52b8dff..a3bfc58 100644
+--- a/3rdparty/eudev-orig/src/shared/socket-util.h
++++ b/3rdparty/eudev-workdir/src/shared/socket-util.h
+@@ -23,9 +23,7 @@
+ #include <netinet/in.h>
+ #include <sys/un.h>
+ #include <net/if.h>
+-#include <asm/types.h>
+ #include <linux/netlink.h>
+-#include <linux/if_packet.h>
+ 
+ union sockaddr_union {
+         struct sockaddr sa;
+@@ -33,6 +31,4 @@ union sockaddr_union {
+         struct sockaddr_in6 in6;
+         struct sockaddr_un un;
+         struct sockaddr_nl nl;
+-        struct sockaddr_storage storage;
+-        struct sockaddr_ll ll;
+ };
+diff --git a/3rdparty/eudev-orig/src/shared/terminal-util.c b/3rdparty/eudev-workdir/src/shared/terminal-util.c
+index 04c871a..a9df1cf 100644
+--- a/3rdparty/eudev-orig/src/shared/terminal-util.c
++++ b/3rdparty/eudev-workdir/src/shared/terminal-util.c
+@@ -27,9 +27,6 @@
+ #include <time.h>
+ #include <assert.h>
+ #include <poll.h>
+-#include <linux/vt.h>
+-#include <linux/tiocl.h>
+-#include <linux/kd.h>
+ 
+ #include "terminal-util.h"
+ #include "time-util.h"
+diff --git a/3rdparty/eudev-orig/src/udev/udev-builtin-input_id.c b/3rdparty/eudev-workdir/src/udev/udev-builtin-input_id.c
+index 3c769e3..704464f 100644
+--- a/3rdparty/eudev-orig/src/udev/udev-builtin-input_id.c
++++ b/3rdparty/eudev-workdir/src/udev/udev-builtin-input_id.c
+@@ -27,7 +27,7 @@
+ #include <unistd.h>
+ #include <string.h>
+ #include <errno.h>
+-#include <linux/limits.h>
++#include <limits.h>
+ #include <linux/input.h>
+ 
+ #include "udev.h"
+@@ -42,6 +42,16 @@
+ #define LONG(x) ((x)/BITS_PER_LONG)
+ #define test_bit(bit, array)    ((array[LONG(bit)] >> OFF(bit)) & 1)
+ 
++#define BTN_JOYSTICK 0
++#define ABS_MT_POSITION_X 0
++#define ABS_MT_POSITION_Y 0
++#define ABS_MT_SLOT 0
++#define INPUT_PROP_DIRECT 0
++#define BTN_DIGI 0
++#define BTN_TRIGGER_HAPPY1 0
++#define BTN_TRIGGER_HAPPY40 0
++#define EV_SW 0
++
+ struct range {
+         unsigned start;
+         unsigned end;
+diff --git a/3rdparty/eudev-orig/src/udev/udev-builtin-keyboard.c b/3rdparty/eudev-workdir/src/udev/udev-builtin-keyboard.c
+index fad3520..e847ad2 100644
+--- a/3rdparty/eudev-orig/src/udev/udev-builtin-keyboard.c
++++ b/3rdparty/eudev-workdir/src/udev/udev-builtin-keyboard.c
+@@ -23,7 +23,7 @@
+ #include <stdlib.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+-#include <linux/limits.h>
++#include <limits.h>
+ #include <linux/input.h>
+ 
+ #include "udev.h"
+diff --git a/3rdparty/eudev-orig/src/udev/udevd.c b/3rdparty/eudev-workdir/src/udev/udevd.c
+index cf826c6..2b81f4e 100644
+--- a/3rdparty/eudev-orig/src/udev/udevd.c
++++ b/3rdparty/eudev-workdir/src/udev/udevd.c
+@@ -28,6 +28,7 @@
+ #include <string.h>
+ #include <ctype.h>
+ #include <fcntl.h>
++#include <linux/fs.h>
+ #include <time.h>
+ #include <getopt.h>
+ #include <dirent.h>
