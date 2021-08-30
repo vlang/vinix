@@ -1,5 +1,3 @@
-KERNEL_HDD = vinix.hdd
-
 export PATH := $(PATH):/usr/sbin
 unexport CC
 unexport CXX
