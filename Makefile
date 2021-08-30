@@ -1,6 +1,12 @@
 KERNEL_HDD = vinix.hdd
 
 export PATH := $(PATH):/usr/sbin
+unexport CC
+unexport CXX
+unexport CFLAGS
+unexport CXXFLAGS
+unexport LDFLAGS
+unexport MAKEFLAGS
 
 .PHONY: all
 all: vinix.iso

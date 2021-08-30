@@ -6,7 +6,6 @@ BUILD_DIR="$1"
 SOURCE_DIR="$2"
 SYSROOT="$3"
 
-cp -rf "$SOURCE_DIR"/sysroot/. "$SYSROOT"/ || true
 ( cd "$SYSROOT" && tar -cf "$BUILD_DIR"/initramfs.tar . )
 rm -rf pack
 mkdir -p pack/boot
