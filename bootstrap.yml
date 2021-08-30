@@ -375,6 +375,9 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/bin']
       - args: ['ln', '-s', '/usr/bin/bash', '@THIS_COLLECT_DIR@/bin/bash']
       - args: ['ln', '-s', '/usr/bin/bash', '@THIS_COLLECT_DIR@/bin/sh']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc/bash']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/profile', '@THIS_COLLECT_DIR@/etc/']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/bashrc', '@THIS_COLLECT_DIR@/etc/bash/']
 
   - name: v
     from_source: v
@@ -388,6 +391,7 @@ packages:
         - 'bash'
         - '-c'
         - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr/bin" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"'
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
 
   - name: coreutils
     source:
@@ -637,6 +641,8 @@ packages:
       - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
       - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
       - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/gcc/hello.c', '@THIS_COLLECT_DIR@/']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/gcc/hello.cc', '@THIS_COLLECT_DIR@/']
 
   - name: gawk
     source:

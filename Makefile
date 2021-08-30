@@ -22,7 +22,7 @@ run: vinix.iso
 .PHONY: distro
 distro:
 	mkdir -p build 3rdparty
-	cd build && [ -f bootstrap.link ] || ( ln -s ../sysroot system-root && xbstrap init .. )
+	cd build && [ -f bootstrap.link ] || xbstrap init ..
 	cd build && xbstrap install -u --all
 
 .PHONY: kernel
@@ -46,4 +46,3 @@ clean:
 .PHONY: distclean
 distclean: clean
 	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap init/*.xbstrap
-	rm -rf sysroot/boot sysroot/bin sysroot/sbin sysroot/usr sysroot/etc sysroot/share
