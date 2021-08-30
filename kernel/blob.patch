@@ -1,4 +1,22 @@
-4146,4211d4145
+3039,3044c3039,3044
+< Array_fixed_voidptr_1 interrupt_thunk_begin = {0}; // global
+< Array_fixed_voidptr_1 interrupt_thunk_end = {0}; // global
+< Array_fixed_voidptr_1 interrupt_thunk_storage = {0}; // global
+< u64 interrupt_thunk_offset; // global
+< u64 interrupt_thunk_size; // global
+< u32 interrupt_thunk_number; // global
+---
+> extern voidptr interrupt_thunk_begin[]; // global
+> extern voidptr interrupt_thunk_end[]; // global
+> extern voidptr interrupt_thunk_storage[]; // global
+> extern u64 interrupt_thunk_offset; // global
+> extern u64 interrupt_thunk_size; // global
+> extern u32 interrupt_thunk_number; // global
+3344c3344
+< VV_EXPORTED_SYMBOL voidptr memcpy(voidptr dest, const voidptr const_src, u64 size); // exported fn lib.stubs.memcpy
+---
+> VV_EXPORTED_SYMBOL voidptr memcpy(void* __restrict dest, const void* __restrict const_src, u64 size); // exported fn lib.stubs.memcpy
+4155,4220d4154
 < f32 strings__levenshtein_distance_percentage(string a, string b) {
 < 	int d = strings__levenshtein_distance(a, b);
 < 	int _t1; /* if prepend */
@@ -65,7 +83,7 @@
 < 	return (2.0 * ((f32)(intersection_size))) / (((f32)(a.len)) + ((f32)(b.len)) - 2);
 < }
 < 
-4864,4996d4797
+4873,5005d4806
 < f64 strconv__atof64(string s) {
 < 	strconv__PrepNumber pn = (strconv__PrepNumber){.negative = 0,.exponent = 0,.mantissa = 0,};
 < 	int res_parsing = 0;
@@ -199,7 +217,7 @@
 < 	return 0;
 < }
 < 
-5877,6151d5677
+5886,6160d5686
 < // Attr: [manualfree]
 < string strconv__f64_to_str_lnd1(f64 f, int dec_digit) {
 < 	{ // Unsafe block
@@ -475,7 +493,7 @@
 < }
 < 
 < // Attr: [direct_array_access]
-7088,7202c6614
+7097,7211c6623
 < 			if ((ch == 'f' || ch == 'F')) {
 < 				strconv__v_sprintf_panic(p_index, pt.len);
 < 				f64 x = *(((f64*)((*(voidptr*)/*ee elem_typ */array_get(pt, p_index)))));
@@ -593,7 +611,7 @@
 < 			} else if (ch == 's') {
 ---
 > 			if (ch == 's') {
-7240,7374d6651
+7249,7383d6660
 < VV_LOCAL_SYMBOL f64 strconv__fabs(f64 x) {
 < 	if (x < 0.0) {
 < 		return -x;
@@ -729,7 +747,7 @@
 < 	return (string){.str=(byteptr)"", .is_lit=1};
 < }
 < 
-8648,8842d7924
+8587,8781d7863
 < // Attr: [inline]
 < inline string f64_str(f64 x) {
 < 	{ // Unsafe block
@@ -925,17 +943,17 @@
 < 	return 0;
 < }
 < 
-9549c8631
+9487c8569
 < 	f32 load_factor = ((f32)(m->len << 1)) / ((f32)(m->even_index));
 ---
 > 	u32 load_factor = (m->len << 1) / m->even_index;
-9990,9994d9071
+9928,9932d9009
 < 		#if !defined(_VFREESTANDING)
 < 		{
 < 			atexit((voidptr)prealloc_vcleanup);
 < 		}
 < 		#endif
-10779,10786d9855
+10722,10729d9798
 < f32 string_f32(string s) {
 < 	return ((f32)(strconv__atof64(s)));
 < }
@@ -944,7 +962,7 @@
 < 	return strconv__atof64(s);
 < }
 < 
-11954,11975d11022
+11897,11918d10965
 < inline VV_LOCAL_SYMBOL f32 fabs32(f32 x) {
 < 	f32 _t2; /* if prepend */
 < 	if (x < 0) {
@@ -967,7 +985,7 @@
 < }
 < 
 < // Attr: [inline]
-12251,12481c11298
+12194,12424c11241
 < 		if (typ == (StrIntpType__si_f32)) {
 < 			if (use_default_str) {
 < 				string f = f32_str(data.d.d_f32);
@@ -1201,3 +1219,11 @@
 < 		else if (typ == (StrIntpType__si_c)) {
 ---
 > 		if (typ == (StrIntpType__si_c)) {
+16561c15378
+< voidptr memcpy(voidptr dest, const voidptr const_src, u64 size) {
+---
+> voidptr memcpy(void* __restrict dest, const void* __restrict const_src, u64 size) {
+21622,21624d20438
+< 	interrupt_thunk_offset = *(u64*)&((u64[]){0}[0]); // global
+< 	interrupt_thunk_size = *(u64*)&((u64[]){0}[0]); // global
+< 	interrupt_thunk_number = *(u32*)&((u32[]){0}[0]); // global

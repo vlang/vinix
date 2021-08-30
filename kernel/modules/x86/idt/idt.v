@@ -40,12 +40,42 @@ pub fn allocate_vector() byte {
 __global (
 	interrupt_thunks [256]voidptr
 	interrupt_table [256]voidptr
+	interrupt_thunk_begin [1]voidptr
+	interrupt_thunk_end [1]voidptr
+	interrupt_thunk_storage [1]voidptr
+	interrupt_thunk_offset u64
+	interrupt_thunk_size u64
+	interrupt_thunk_number u32
 )
 
-fn C.prepare_interrupt_thunks()
+fn prepare_interrupt_thunks() {
+	unsafe {
+		for i in 0..interrupt_table.len {
+			interrupt_thunk_offset = u64(&interrupt_table[i])
+			interrupt_thunk_number = u32(i)
+			ptr := &byte(u64(&interrupt_thunk_storage[0]) + u64(interrupt_thunk_size * u64(i)))
+
+			C.memcpy(ptr, voidptr(&interrupt_thunk_begin[0]), interrupt_thunk_size)
+			shift := match i {
+				8 { 2 }
+				10 { 2 }
+				11 { 2 }
+				12 { 2 }
+				13 { 2 }
+				14 { 2 }
+				17 { 2 }
+				30 { 2 }
+				
+				else { 0 }
+			}
+
+			interrupt_thunks[i] = ptr + u64(shift)
+		}
+	}
+}
 
 pub fn initialise() {
-	C.prepare_interrupt_thunks()
+	prepare_interrupt_thunks()
 
 	reload()
 }
