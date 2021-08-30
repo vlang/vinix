@@ -101,40 +101,6 @@ fn (mut this Partition) mmap(page u64, flags int) voidptr {
 
 pub fn scan_partitions(mut parent_device &resource.Resource, prefix string) int {
 	lba_buffer := memory.malloc(parent_device.stat.blksize)
-	parent_device.read(0, lba_buffer, 0, parent_device.stat.blksize) or {
-		print('block: unable to read from device\n')
-		return -1
-	}
-
-	mbr_signature := unsafe { &u16(lba_buffer)[255] }
-
-	if mbr_signature == 0xaa55 {
-		partitions := &MBRPartition(u64(lba_buffer) + 0x1be)
-
-		for i := 0; i < 4; i++ {
-			if unsafe { partitions[i].partition_type } == 0 || unsafe { partitions[i].partition_type } == 0xee {
-				continue
-			}
-
-			partition_entry := unsafe { &MBRPartition(&partitions[i]) }
-
-			mut partition := &Partition {
-				device_offset: partition_entry.starting_lba * parent_device.stat.blksize
-				sector_cnt: partition_entry.sector_cnt
-				parent_device: unsafe { parent_device }
-			}
-
-			partition.stat.blocks = partition.sector_cnt
-			partition.stat.blksize = parent_device.stat.blksize
-			partition.stat.size = partition.sector_cnt * partition.stat.blksize
-			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o644 | stat.ifblk
-
-			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
-
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
-		}
-	}
 
 	parent_device.read(0, lba_buffer, parent_device.stat.blksize, parent_device.stat.blksize) or {
 		print('block: unable to read from device\n')
@@ -185,7 +151,46 @@ pub fn scan_partitions(mut parent_device &resource.Resource, prefix string) int 
 
 			fs.devtmpfs_add_device(partition, '${prefix}${i}')
 		}
+
+		return 0
 	}
 
-	return 0
+	parent_device.read(0, lba_buffer, 0, parent_device.stat.blksize) or {
+		print('block: unable to read from device\n')
+		return -1
+	}
+
+	mbr_signature := unsafe { &u16(lba_buffer)[255] }
+
+	if mbr_signature == 0xaa55 {
+		partitions := &MBRPartition(u64(lba_buffer) + 0x1be)
+
+		for i := 0; i < 4; i++ {
+			if unsafe { partitions[i].partition_type } == 0 || unsafe { partitions[i].partition_type } == 0xee {
+				continue
+			}
+
+			partition_entry := unsafe { &MBRPartition(&partitions[i]) }
+
+			mut partition := &Partition {
+				device_offset: partition_entry.starting_lba * parent_device.stat.blksize
+				sector_cnt: partition_entry.sector_cnt
+				parent_device: unsafe { parent_device }
+			}
+
+			partition.stat.blocks = partition.sector_cnt
+			partition.stat.blksize = parent_device.stat.blksize
+			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.stat.rdev = resource.create_dev_id()
+			partition.stat.mode = 0o644 | stat.ifblk
+
+			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+
+			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+		}
+
+		return 0
+	}
+
+	return -1
 }
