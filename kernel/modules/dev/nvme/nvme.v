@@ -13,6 +13,8 @@ import event
 import event.eventstruct
 import resource
 import errno
+import block.partition
+import fs
 
 const (
 	nvme_class = 0x1
@@ -317,11 +319,11 @@ pub mut:
 
 struct NVMENamespace {
 pub mut:
-	stat stat.Stat
+	stat	 stat.Stat
 	refcount int
-	l klock.Lock
-	event eventstruct.Event
-	status int
+	l		 klock.Lock
+	event	 eventstruct.Event
+	status	 int
 	can_mmap bool
 
 	max_prps u64
@@ -354,7 +356,7 @@ fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u
 
 	unsafe { C.memcpy(buffer, aligned_buffer, count) }
 
-	memory.pmm_free(aligned_buffer, page_cnt)
+	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), page_cnt)
 
 	return i64(count)
 }
@@ -377,7 +379,7 @@ fn (mut dev NVMENamespace) write(handle voidptr, buffer voidptr, loc u64, count 
 		return none
 	}
 
-	memory.pmm_free(aligned_buffer, page_cnt)
+	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), page_cnt)
 
 	return i64(count)
 }
@@ -437,6 +439,9 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	namespace.max_prps = calcuate_max_prps(mut parent_controller, namespace.identity)
 	namespace.stat.blocks = namespace.identity.nsze
 	namespace.stat.blksize = 1 << u64(namespace.identity.lbaf_list[namespace.identity.flbas & 0b11111].ds)
+	namespace.stat.size = namespace.stat.blocks * namespace.stat.blksize
+	namespace.stat.rdev = resource.create_dev_id()
+	namespace.stat.mode = 0o644 | stat.ifblk
 	
 	return 0
 }
@@ -757,26 +762,6 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		return -1
 	}
 
-	for i := u64(0); i < c.controller_id.nn; i++ {
-		if unsafe { nsid_list[i] != 0 } {
-			mut new_namespace := &NVMENamespace {	parent_controller: 0,
-													identity: 0
-												}
-
-			if new_namespace.initialise(mut c, unsafe { nsid_list[i] }) != 0 {
-				print('nvme: fatel error\n')
-				return -1
-			}
-
-			print('nvme: namespace id: ${new_namespace.nsid:x}\n')
-			print('nvme: lba cnt: ${new_namespace.stat.blocks:x}\n')
-			print('nvme: lba size: ${new_namespace.stat.blksize:x}\n')
-			print('nvme: max prps: ${new_namespace.max_prps:x}\n')
-
-			c.namespace_list << new_namespace
-		}
-	}
-
 	mut irq_count := u64(0)
 
 	for mut cpu_local in cpu_locals {
@@ -796,6 +781,29 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		new_io_queue.initialise(mut c, vect, irq_count, false)
 
 		cpu_local.nvme_io_queue_pair = new_io_queue
+	}
+
+	for i := u64(0); i < c.controller_id.nn; i++ {
+		if unsafe { nsid_list[i] != 0 } {
+			mut new_namespace := &NVMENamespace {	parent_controller: 0,
+													identity: 0
+												}
+
+			if new_namespace.initialise(mut c, unsafe { nsid_list[i] }) != 0 {
+				print('nvme: fatel error\n')
+				return -1
+			}
+
+			print('nvme: namespace id: ${new_namespace.nsid:x}\n')
+			print('nvme: lba cnt: ${new_namespace.stat.blocks:x}\n')
+			print('nvme: lba size: ${new_namespace.stat.blksize:x}\n')
+			print('nvme: max prps: ${new_namespace.max_prps:x}\n')
+
+			fs.devtmpfs_add_device(new_namespace, 'nvme${controller_list.len}n${i}')
+			partition.scan_partitions(mut new_namespace, 'nvme${controller_list.len}n${i}p')
+
+			c.namespace_list << new_namespace
+		}
 	}
 
 	return 0
