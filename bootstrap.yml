@@ -262,7 +262,7 @@ packages:
   - name: init
     source:
       subdir: ''
-      version: '2.rolling'
+      version: '3.rolling'
     tools_required:
       - host-v
       - host-gcc
@@ -355,7 +355,7 @@ packages:
       extract_path: 'bash-5.1.8'
       patch-path-strip: 3
       version: '5.1.8'
-    revision: 3
+    revision: 4
     tools_required:
       - host-gcc
     pkgs_required:
@@ -381,6 +381,7 @@ packages:
 
   - name: v
     from_source: v
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
@@ -612,7 +613,7 @@ packages:
 
   - name: gcc
     from_source: gcc
-    revision: 3
+    revision: 4
     tools_required:
       - host-gcc
     pkgs_required:
