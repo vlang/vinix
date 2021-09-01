@@ -224,6 +224,7 @@ tasks:
       - bash
       - coreutils
       - v
+      - wayland
       - sed
       - diffutils
       - grep
@@ -393,6 +394,22 @@ packages:
         - '-c'
         - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr/bin" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"'
       - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
+
+  - name: wayland
+    source:
+        subdir: '3rdparty'
+        url: 'https://wayland.freedesktop.org/releases/wayland-1.19.0.tar.xz'
+        format: 'tar.xz'
+        extract_path: 'wayland-1.19.0'
+        patch-path-strip: 3
+        version: '1.19.0'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/server.v', '@THIS_COLLECT_DIR@/']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/client.v', '@THIS_COLLECT_DIR@/']
 
   - name: coreutils
     source:
