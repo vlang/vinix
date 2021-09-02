@@ -37,7 +37,11 @@ kernel:
 init:
 	cd build && xbstrap install --rebuild init
 
-vinix.iso: kernel init
+.PHONY: base-files
+base-files:
+	cd build && xbstrap install --rebuild base-files
+
+vinix.iso: kernel init base-files
 	cd build && xbstrap run make-iso
 	mv build/vinix.iso ./
 

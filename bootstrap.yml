@@ -103,10 +103,15 @@ tools:
   - name: host-v
     from_source: v
     compile:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm $([ $(uname) = FreeBSD ] && echo -lexecinfo) && VMODULES=/tmp/.vmodules ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
+      - args: |
+          set -e
+          rm -rf "@PREFIX@/v"
+          cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/"
+          cd "@PREFIX@/v"
+          cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm $([ $(uname) = FreeBSD ] && echo -lexecinfo)
+          VMODULES=/tmp/.vmodules ./v self
+          mkdir -p "@PREFIX@/bin"
+          ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"
 
   - name: host-limine
     from_source: limine
@@ -114,15 +119,16 @@ tools:
     tools_required:
       - host-gcc
     compile:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix && make bin/limine-install'
+      - args: |
+          set -e
+          cd "@THIS_SOURCE_DIR@"
+          make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix
+          make bin/limine-install
     install:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make install PREFIX="@PREFIX@"'
+      - args: |
+          set -e
+          cd "@THIS_SOURCE_DIR@"
+          make install PREFIX="@PREFIX@"
 
   - name: host-binutils
     from_source: binutils
@@ -200,6 +206,7 @@ tasks:
     tools_required:
       - host-limine
     pkgs_required:
+      - base-files
       - bash
       - coreutils
       - v
@@ -224,35 +231,48 @@ tasks:
     workdir: '@BUILD_ROOT@'
 
 packages:
+  - name: base-files
+    source:
+      subdir: ''
+      version: '1.rolling'
+    build:
+      - args: |
+          set -e
+          cp -rv "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/"
+          rm -v "@THIS_COLLECT_DIR@/"*.xbstrap
+
   - name: kernel
     source:
       subdir: ''
-      version: '53.rolling'
+      version: '54.rolling'
     tools_required:
       - host-v
       - host-gcc
     pkgs_required:
       - mlibc
     build:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump && make install PREFIX=/boot DESTDIR=@THIS_COLLECT_DIR@'
+      - args: |
+          set -e
+          cd "@THIS_SOURCE_DIR@"
+          make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
+          make install PREFIX=/boot DESTDIR="@THIS_COLLECT_DIR@"
 
   - name: init
     source:
       subdir: ''
-      version: '3.rolling'
+      version: '4.rolling'
     tools_required:
       - host-v
       - host-gcc
     pkgs_required:
       - mlibc
     build:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'cd "@THIS_SOURCE_DIR@" && VMODULES=/tmp/.vmodules v -cc x86_64-vinix-gcc -os vinix . && mkdir -p @THIS_COLLECT_DIR@/sbin && cp init @THIS_COLLECT_DIR@/sbin/'
+      - args: |
+          set -e
+          cd "@THIS_SOURCE_DIR@"
+          VMODULES=/tmp/.vmodules v -cc x86_64-vinix-gcc -os vinix .
+          mkdir -p "@THIS_COLLECT_DIR@/sbin"
+          cp init "@THIS_COLLECT_DIR@/sbin/"
 
   - name: mlibc-headers
     from_source: mlibc
@@ -368,10 +388,13 @@ packages:
       - mlibc
       - gcc
     build:
-      - args:
-        - 'bash'
-        - '-c'
-        - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr/bin" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"'
+      - args: |
+          set -e
+          cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/"
+          cd "@THIS_COLLECT_DIR@/usr/v"
+          x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm
+          mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
+          ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
       - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
 
   - name: wayland
@@ -409,6 +432,7 @@ packages:
         - '@THIS_SOURCE_DIR@/configure'
       - args: ['make', 'src/make-prime-list']
       - args: |
+          set -e
           ./src/make-prime-list 5000 > "@THIS_SOURCE_DIR@/src/primes.h"
       - args: ['make', 'clean']
       # Now compile coreutils for the correct target.
