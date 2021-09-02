@@ -45,7 +45,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	ata.initialise()
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'],
-							['HOME=/root',
+							['HOME=/',
 							'TERM=linux',
 							'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'],
 							'/dev/console', '/dev/console', '/dev/console') or {
