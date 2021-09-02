@@ -38,8 +38,11 @@ interrupt_thunk_begin:
 
     mov %rsp, %rsi
 
-    .byte 0xbf
+    // those get filled in for each copy of the thunk template in prepare_interrupt_thunks()
+    // mov {interrupt_thunk_number}, %edi
+    .byte 0xbf 
 interrupt_thunk_number: .long 0
+    // movabs {interrupt_thunk_offset}, %rbx
     .byte 0x48
     .byte 0xbb
 interrupt_thunk_offset: .quad 0

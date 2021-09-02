@@ -1,6 +1,7 @@
 module main
 
 import lib
+import lib.stubs // unused, but needed for C function stubs
 import memory
 import stivale2
 import acpi
@@ -21,10 +22,12 @@ import pci
 import dev.ata
 import dev.streams
 import dev.random
+import syscall.table
 
 fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
+	table.init_syscall_table()
 	pipe.initialise()
 	futex.initialise()
 	fs.initialise()
