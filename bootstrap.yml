@@ -34,44 +34,36 @@ sources:
 
   - name: mlibc
     subdir: '3rdparty'
-    url: 'https://github.com/managarm/mlibc/archive/8050f6a698e261e4f9440bb2f80752e9678d04be.tar.gz'
+    url: 'https://github.com/managarm/mlibc/archive/5e323f6c9ff4be80e20aa477c43965661ba13eff.tar.gz'
     format: 'tar.gz'
-    extract_path: 'mlibc-8050f6a698e261e4f9440bb2f80752e9678d04be'
+    extract_path: 'mlibc-5e323f6c9ff4be80e20aa477c43965661ba13eff'
     patch-path-strip: 3
-    version: '12.rolling'
-
-  - name: pkg-config
-    subdir: '3rdparty'
-    url: 'https://pkgconfig.freedesktop.org/releases/pkg-config-0.29.2.tar.gz'
-    format: 'tar.gz'
-    extract_path: 'pkg-config-0.29.2'
-    patch-path-strip: 3
-    version: '0.29.2'
+    version: '13.rolling'
 
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://github.com/vlang/v/archive/714fa3215c7306b908968b55e2548b56affd4e94.tar.gz'
+    url: 'https://github.com/vlang/v/archive/bd33eaa3b89d5ddb73032f4b388643ab723a0b9b.tar.gz'
     format: 'tar.gz'
-    extract_path: 'v-714fa3215c7306b908968b55e2548b56affd4e94'
+    extract_path: 'v-bd33eaa3b89d5ddb73032f4b388643ab723a0b9b'
     patch-path-strip: 3
-    version: '9.rolling'
+    version: '11.rolling'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://github.com/vlang/vc/archive/2296b2a48963db3ecc7f70e11631ad55342fa660.tar.gz'
+    url: 'https://github.com/vlang/vc/archive/5c86e0911d232d30e76154335a8a1ad01053d37a.tar.gz'
     format: 'tar.gz'
-    extract_path: 'vc-2296b2a48963db3ecc7f70e11631ad55342fa660'
+    extract_path: 'vc-5c86e0911d232d30e76154335a8a1ad01053d37a'
     patch-path-strip: 3
-    version: '9.rolling'
+    version: '11.rolling'
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.49.1/limine-v2.49.1.tar.xz
+    url: https://github.com/limine-bootloader/limine/releases/download/v2.50/limine-v2.50.tar.xz
     format: 'tar.xz'
-    extract_path: 'limine-v2.49.1'
+    extract_path: 'limine-v2.50'
     patch-path-strip: 3
-    version: '2.49.1'
+    version: '2.50'
 
 tools:
   - name: host-autoconf-v2.69
@@ -114,7 +106,7 @@ tools:
       - args:
         - 'bash'
         - '-c'
-        - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && VMODULES=/tmp/.vmodules ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
+        - 'rm -rf "@PREFIX@/v" && mkdir -p "@PREFIX@/bin" && cp -r "@THIS_SOURCE_DIR@" "@PREFIX@/" && cd "@PREFIX@/v" && cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm $([ $(uname) = FreeBSD ] && echo -lexecinfo) && VMODULES=/tmp/.vmodules ./v self && ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"'
 
   - name: host-limine
     from_source: limine
@@ -131,19 +123,6 @@ tools:
         - 'bash'
         - '-c'
         - 'cd "@THIS_SOURCE_DIR@" && make install PREFIX="@PREFIX@"'
-
-  - name: host-pkg-config
-    exports_aclocal: true
-    from_source: pkg-config
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-        - '--with-internal-glib'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
 
   - name: host-binutils
     from_source: binutils
@@ -224,6 +203,7 @@ tasks:
       - bash
       - coreutils
       - v
+      - wayland
       - sed
       - diffutils
       - grep
@@ -262,7 +242,7 @@ packages:
   - name: init
     source:
       subdir: ''
-      version: '2.rolling'
+      version: '3.rolling'
     tools_required:
       - host-v
       - host-gcc
@@ -355,7 +335,7 @@ packages:
       extract_path: 'bash-5.1.8'
       patch-path-strip: 3
       version: '5.1.8'
-    revision: 3
+    revision: 4
     tools_required:
       - host-gcc
     pkgs_required:
@@ -375,9 +355,13 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/bin']
       - args: ['ln', '-s', '/usr/bin/bash', '@THIS_COLLECT_DIR@/bin/bash']
       - args: ['ln', '-s', '/usr/bin/bash', '@THIS_COLLECT_DIR@/bin/sh']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc/bash']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/profile', '@THIS_COLLECT_DIR@/etc/']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/bashrc', '@THIS_COLLECT_DIR@/etc/bash/']
 
   - name: v
     from_source: v
+    revision: 2
     tools_required:
       - host-gcc
     pkgs_required:
@@ -388,6 +372,23 @@ packages:
         - 'bash'
         - '-c'
         - 'rm -rf "@THIS_COLLECT_DIR@/usr/v" && mkdir -p "@THIS_COLLECT_DIR@/usr/bin" && cp -r "@THIS_SOURCE_DIR@" "@THIS_COLLECT_DIR@/usr/" && cd "@THIS_COLLECT_DIR@/usr/v" && x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm && ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"'
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
+
+  - name: wayland
+    source:
+        subdir: '3rdparty'
+        url: 'https://wayland.freedesktop.org/releases/wayland-1.19.0.tar.xz'
+        format: 'tar.xz'
+        extract_path: 'wayland-1.19.0'
+        patch-path-strip: 3
+        version: '1.19.0'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/server.v', '@THIS_COLLECT_DIR@/']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/client.v', '@THIS_COLLECT_DIR@/']
 
   - name: coreutils
     source:
@@ -433,7 +434,6 @@ packages:
     revision: 2
     tools_required:
       - host-gcc
-      - host-pkg-config
     pkgs_required:
       - mlibc
       - ncurses
@@ -608,7 +608,7 @@ packages:
 
   - name: gcc
     from_source: gcc
-    revision: 3
+    revision: 4
     tools_required:
       - host-gcc
     pkgs_required:
@@ -637,6 +637,8 @@ packages:
       - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
       - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
       - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/gcc/hello.c', '@THIS_COLLECT_DIR@/']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/gcc/hello.cc', '@THIS_COLLECT_DIR@/']
 
   - name: gawk
     source:
@@ -905,5 +907,33 @@ packages:
     build:
       - args: ['ninja']
       - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: eudev
+    source:
+      subdir: '3rdparty'
+      url: 'https://dev.gentoo.org/~blueness/eudev/eudev-3.2.9.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'eudev-3.2.9'
+      patch-path-strip: 3
+      version: '3.2.9'
+    tools_required:
+      - host-gcc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--disable-blkid'
+        - '--disable-selinux'
+        - '--disable-kmod'
+        - '--disable-mtd-probe'
+        - '--disable-rule-generator'
+        - '--disable-manpages'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'

@@ -1,6 +1,5 @@
 3rdparty
 build
-sysroot
 *.o
 *.elf
 *.iso

@@ -26,13 +26,14 @@ struct USTARHeader {
 }
 
 enum USTARFileType {
-	regular_file = 0x30
-	hard_link    = 0x31
-	sym_link     = 0x32
-	char_dev     = 0x33
-	block_dev    = 0x34
-	directory    = 0x35
-	fifo         = 0x36
+	regular_file  = 0x30
+	hard_link     = 0x31
+	sym_link      = 0x32
+	char_dev      = 0x33
+	block_dev     = 0x34
+	directory     = 0x35
+	fifo          = 0x36
+	gnu_long_path = 0x4c
 }
 
 fn octal_to_int(s string) u64 {
@@ -44,13 +45,15 @@ fn octal_to_int(s string) u64 {
 	return ret
 }
 
+fn C.string_free(&string)
+
+[manualfree]
 pub fn init(modules_tag stivale2.ModulesTag) {
 	if modules_tag.count < 1 {
 		panic('No initramfs')
 	}
 
-	mut modules := &stivale2.Module(0)
-	unsafe { modules = &stivale2.Module(&modules_tag.modules) }
+	mut modules := unsafe { &stivale2.Module(&modules_tag.modules) }
 
 	initramfs_begin := unsafe { modules[0].begin }
 	initramfs_size  := unsafe { modules[0].end - modules[0].begin }
@@ -60,42 +63,57 @@ pub fn init(modules_tag stivale2.ModulesTag) {
 
 	print('initramfs: Unpacking...')
 
+	mut name_override := ''
 	mut current_header := &USTARHeader(0)
 	unsafe { current_header = &USTARHeader(initramfs_begin) }
 
 	for {
-		if C.byteptr_vstring_with_len(&current_header.signature[0], 5) != 'ustar' {
+		sig := unsafe { tos(&current_header.signature[0], 5) }
+		if sig != 'ustar' {
 			break
 		}
 
-		name := unsafe { cstring_to_vstring(&current_header.name[0]) }
-		link_name := unsafe { cstring_to_vstring(&current_header.link_name[0]) }
-		size := octal_to_int(unsafe { cstring_to_vstring(&current_header.size[0]) })
-		mode := octal_to_int(unsafe { cstring_to_vstring(&current_header.mode[0]) })
-
+		name := if name_override == '' {
+			unsafe { tos2(&current_header.name[0]) }
+		} else { 
+			name_override
+		}
+		link_name := unsafe { tos2(&current_header.link_name[0]) }
+		size := unsafe { octal_to_int(tos2(&current_header.size[0])) }
+		mode := unsafe { octal_to_int(tos2(&current_header.mode[0])) }
+		
+		name_override = ''
 		if name == './' {
 			unsafe { goto next }
 		}
 
 		match USTARFileType(current_header.filetype) {
+			.gnu_long_path {
+				// limit for safety
+				if size >= 65536 {
+					panic('initramfs: long file name exceeds 65536 characters.')
+				}
+
+				name_override = unsafe { tos(voidptr(u64(current_header) + 512), int(size)) }
+			}
 			.directory {
 				fs.create(vfs_root, name, int(mode) | stat.ifdir) or {
-					panic('initramfs')
+					panic('initramfs: failed to create directory ${name}')
 				}
 			}
 			.regular_file {
 				new_node := fs.create(vfs_root, name, int(mode) | stat.ifreg) or {
-					panic('initramfs')
+					panic('initramfs: failed to create file ${name}')
 				}
 				mut new_resource := new_node.resource
 				buf := voidptr(u64(current_header) + 512)
 				new_resource.write(0, buf, 0, size) or {
-					panic('initramfs')
+					panic('initramfs: failed to write file ${name}')
 				}
 			}
 			.sym_link {
 				fs.symlink(vfs_root, link_name, name) or {
-					panic('initramfs')
+					panic('initramfs: failed to create symlink ${name}')
 				}
 			}
 			else {}
