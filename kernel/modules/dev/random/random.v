@@ -8,17 +8,23 @@ import event.eventstruct
 import memory
 import x86.cpu
 
+__global (
+	ur_initialized = false
+	ur_rdrand = false
+)
+
 struct URandom {
 mut:
-	stat     stat.Stat
-	refcount int
-	l        klock.Lock
-	event    eventstruct.Event
-	status   int
-	can_mmap bool
-	rng_lock klock.Lock
-	key      [16]u32
-	buffer   [16]u32
+	stat       stat.Stat
+	refcount   int
+	l          klock.Lock
+	event      eventstruct.Event
+	status     int
+	can_mmap   bool
+	rng_lock   klock.Lock
+	buffer     [16]u32
+	key        [16]u32
+	reseed_ctr u64
 }
 
 [inline]
@@ -79,6 +85,12 @@ fn (mut this URandom) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	mut out := [16]u32{}
 	mut cbuf := buf
 
+	this.reseed_ctr += cnt
+	if this.reseed_ctr >= 2048 {
+		this.reseed_ctr = 0
+		this.reseed()
+	}
+
 	for {
 		unsafe {
 			if cnt > 64 {
@@ -114,7 +126,22 @@ fn (mut this URandom) unref(handle voidptr) ? {
 fn (mut this URandom) grow(handle voidptr, new_size u64) ? {
 }
 
+fn (mut this URandom) reseed() {
+	if ur_rdrand {
+		for i in 0..this.key.len {
+			this.key[i] ^= cpu.rdrand32()
+		}
+	}
+}
+
 fn init_urandom() {
+	success, _, _, c, _ := cpu.cpuid(1, 0)
+	if success && (c & (1 << 30)) != 0 {
+		println('urandom: rdrand available')
+		ur_rdrand = true
+	}
+
+	// todo improve entropy via interrupts and other random events
 	mut rng := &URandom{}
 
 	rng.stat.size = 0
@@ -131,6 +158,8 @@ fn init_urandom() {
 	seed = cpu.rdtsc()
 	rng.buffer[0] = u32(seed)
 	rng.buffer[2] = u32(seed >> 32)
+
+	rng.reseed()
 
 	fs.devtmpfs_add_device(rng, 'urandom')
 }
