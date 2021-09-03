@@ -1,0 +1,58 @@
+diff --git a/3rdparty/wayland-orig/config.sub b/3rdparty/wayland-workdir/config.sub
+index 19c9553..98acebb 100755
+--- a/3rdparty/wayland-orig/config.sub
++++ b/3rdparty/wayland-workdir/config.sub
+@@ -1696,7 +1696,7 @@ case $os in
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+ 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
+ 	     | hiux* | abug | nacl* | netware* | windows* \
+-	     | os9* | macos* | osx* | ios* \
++	     | os9* | macos* | osx* | ios* | vinix* \
+ 	     | mpw* | magic* | mmixware* | mon960* | lnews* \
+ 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
+ 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
+diff --git a/3rdparty/wayland-orig/src/wayland-os.c b/3rdparty/wayland-workdir/src/wayland-os.c
+index 93b6f5f..fbb3dff 100644
+--- a/3rdparty/wayland-orig/src/wayland-os.c
++++ b/3rdparty/wayland-workdir/src/wayland-os.c
+@@ -25,6 +25,7 @@
+ 
+ #define _GNU_SOURCE
+ 
++#include <stddef.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <unistd.h>
+diff --git a/3rdparty/wayland-orig/src/wayland-server.c b/3rdparty/wayland-workdir/src/wayland-server.c
+index d83bdec..360a068 100644
+--- a/3rdparty/wayland-orig/src/wayland-server.c
++++ b/3rdparty/wayland-workdir/src/wayland-server.c
+@@ -1433,6 +1433,8 @@ wl_socket_lock(struct wl_socket *socket)
+ {
+ 	struct stat socket_stat;
+ 
++	// Do not use lockfiles for now.
++/*
+ 	snprintf(socket->lock_addr, sizeof socket->lock_addr,
+ 		 "%s%s", socket->addr.sun_path, LOCK_SUFFIX);
+ 
+@@ -1461,6 +1463,7 @@ wl_socket_lock(struct wl_socket *socket)
+ 		   socket_stat.st_mode & S_IWGRP) {
+ 		unlink(socket->addr.sun_path);
+ 	}
++*/
+ 
+ 	return 0;
+ err_fd:
+diff --git a/3rdparty/wayland-orig/tests/test-runner.c b/3rdparty/wayland-workdir/tests/test-runner.c
+index 8f08445..ba94c39 100644
+--- a/3rdparty/wayland-orig/tests/test-runner.c
++++ b/3rdparty/wayland-workdir/tests/test-runner.c
+@@ -26,6 +26,7 @@
+ #define _GNU_SOURCE
+ 
+ #include <unistd.h>
++#include <signal.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <sys/types.h>

@@ -65,6 +65,14 @@ sources:
     patch-path-strip: 3
     version: '2.51'
 
+  - name: wayland
+    subdir: '3rdparty'
+    url: 'https://wayland.freedesktop.org/releases/wayland-1.19.0.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'wayland-1.19.0'
+    patch-path-strip: 3
+    version: '1.19.0'
+
 tools:
   - name: host-autoconf-v2.69
     source:
@@ -201,6 +209,20 @@ tools:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
         install:
           - args: ['make', 'install-strip-target-libstdc++-v3']
+
+  - name: host-wayland-scanner
+    from_source: wayland
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--disable-libraries'
+        - '--disable-dtd-validation'
+        - '--disable-documentation'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
 
 tasks:
   - name: make-iso
@@ -450,18 +472,31 @@ packages:
       - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
 
   - name: wayland
-    source:
-        subdir: '3rdparty'
-        url: 'https://wayland.freedesktop.org/releases/wayland-1.19.0.tar.xz'
-        format: 'tar.xz'
-        extract_path: 'wayland-1.19.0'
-        patch-path-strip: 3
-        version: '1.19.0'
+    from_source: wayland
     tools_required:
       - host-gcc
+      - host-wayland-scanner
     pkgs_required:
       - mlibc
+      - libexpat
+      - libffi
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-host-scanner'
+        - '--disable-dtd-validation'
+        - '--disable-documentation'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        environ:
+          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
+          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
     build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
       - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/server.v', '@THIS_COLLECT_DIR@/']
       - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/client.v', '@THIS_COLLECT_DIR@/']
 
