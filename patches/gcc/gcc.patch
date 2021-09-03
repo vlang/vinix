@@ -34,7 +34,7 @@ index df90720..da6408a 100755
      powerpc-*-eabisim* | \
 diff --git a/3rdparty/gcc-workdir/gcc/config/vinix.h b/3rdparty/gcc-workdir/gcc/config/vinix.h
 new file mode 100644
-index 0000000..8cc5cb9
+index 0000000..be79aae
 --- /dev/null
 +++ b/3rdparty/gcc-workdir/gcc/config/vinix.h
 @@ -0,0 +1,29 @@
@@ -42,7 +42,7 @@ index 0000000..8cc5cb9
 +#define TARGET_VINIX 1
 +
 +#undef LIB_SPEC
-+#define LIB_SPEC "-lc -lm"
++#define LIB_SPEC "-lc"
 +
 +#undef STARTFILE_SPEC
 +#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared:crtbeginS.o%s;:crtbegin.o%s}"
@@ -98,7 +98,7 @@ index 357b0be..de98ca8 100644
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
 diff --git a/3rdparty/gcc-orig/libgcc/config.host b/3rdparty/gcc-workdir/libgcc/config.host
-index 50f0006..42da25f 100644
+index 50f0006..de1bb09 100644
 --- a/3rdparty/gcc-orig/libgcc/config.host
 +++ b/3rdparty/gcc-workdir/libgcc/config.host
 @@ -245,6 +245,11 @@ case ${host} in
@@ -113,12 +113,13 @@ index 50f0006..42da25f 100644
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
-@@ -703,6 +708,9 @@ x86_64-*-elf* | x86_64-*-rtems*)
+@@ -703,6 +708,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
 +x86_64-*-vinix*)
-+	tmake_file="$tmake_file i386/t-crtstuff"
++	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
++	tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
 +	;;
  i[34567]86-*-dragonfly*)
  	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
@@ -137,10 +138,10 @@ index 7b0d367..2ba714e 100644
  #include "auto-target.h"
  #include "tsystem.h"
 diff --git a/3rdparty/gcc-orig/libstdc++-v3/crossconfig.m4 b/3rdparty/gcc-workdir/libstdc++-v3/crossconfig.m4
-index ff44d5a..f24eea3 100644
+index ff44d5a..38cb087 100644
 --- a/3rdparty/gcc-orig/libstdc++-v3/crossconfig.m4
 +++ b/3rdparty/gcc-workdir/libstdc++-v3/crossconfig.m4
-@@ -136,6 +136,14 @@ case "${host}" in
+@@ -136,6 +136,18 @@ case "${host}" in
      AC_CHECK_FUNCS(uselocale)
      ;;
  
@@ -149,7 +150,11 @@ index ff44d5a..f24eea3 100644
 +    GLIBCXX_CHECK_LINKER_FEATURES
 +    GLIBCXX_CHECK_MATH_SUPPORT
 +    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_DEFINE(_GLIBCXX_USE_DEV_RANDOM)
++    AC_DEFINE(_GLIBCXX_USE_RANDOM_TR1)
++    GCC_CHECK_TLS
 +    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    AC_CHECK_FUNCS(timespec_get)
 +    ;;
 +
    *-fuchsia*)

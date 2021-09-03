@@ -224,6 +224,33 @@ tools:
     install:
       - args: ['make', 'install']
 
+  - name: host-libtool
+    exports_aclocal: true
+    source:
+      name: libtool
+      subdir: '3rdparty'
+      git: 'https://git.savannah.gnu.org/git/libtool.git'
+      tag: 'v2.4.6'
+      version: '2.4.6'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+      regenerate:
+        # libtool's ./bootstrap does a shallow clone with insufficient depth.
+        - args: ['git', 'submodule', 'update', '--init']
+        - args: ['./bootstrap']
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install-strip']
+
 tasks:
   - name: make-iso
     tools_required:
@@ -380,6 +407,7 @@ packages:
       version: '3.4.2'
     tools_required:
       - host-gcc
+      - host-libtool
     pkgs_required:
       - mlibc
     configure:
@@ -486,6 +514,7 @@ packages:
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
         - '--with-host-scanner'
+        - '--enable-shared'
         - '--disable-dtd-validation'
         - '--disable-documentation'
         - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
@@ -494,7 +523,7 @@ packages:
           PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/server.v', '@THIS_COLLECT_DIR@/']
