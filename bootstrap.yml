@@ -372,6 +372,32 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: libexpat
+    source:
+      subdir: '3rdparty'
+      url: 'https://github.com/libexpat/libexpat/releases/download/R_2_4_1/expat-2.4.1.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'expat-2.4.1'
+      patch-path-strip: 3
+      version: '2.4.1'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        # We disable xmlwf to avoid building its documentation.
+        - '--without-xmlwf'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: bash
     source:
       subdir: '3rdparty'
