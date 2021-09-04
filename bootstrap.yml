@@ -3,7 +3,7 @@ declare_options:
     default: 'false'
 
 sources:
-  - name: 'pkg-config'
+  - name: pkg-config
     subdir: '3rdparty'
     git: 'https://gitlab.freedesktop.org/pkg-config/pkg-config.git'
     tag: 'pkg-config-0.29.2'
@@ -125,6 +125,17 @@ tools:
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install']
+
+  - name: host-autoconf-archive
+    exports_aclocal: true
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/autoconf-archive/autoconf-archive.git'
+      tag: 'v2019.01.06'
+      version: '2019.01.06'
+    install:
+      - args: ['mkdir', '-p', '@BUILD_ROOT@/tools/host-autoconf-archive/share/']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@BUILD_ROOT@/tools/host-autoconf-archive/share/aclocal']
 
   - name: host-automake-v1.15
     source:
@@ -974,12 +985,22 @@ packages:
   - name: wget
     source:
       subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/wget/wget-1.21.1.tar.gz'
-      format: 'tar.gz'
-      extract_path: 'wget-1.21.1'
-      patch-path-strip: 3
+      git: 'https://git.savannah.gnu.org/git/wget.git'
+      tag: 'v1.21.1'
       version: '1.21.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-autoconf-archive
+        - host-pkg-config
+      regenerate:
+        - args: ['./bootstrap']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
