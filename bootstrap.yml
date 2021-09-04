@@ -1109,10 +1109,8 @@ packages:
   - name: libdrm
     source:
       subdir: '3rdparty'
-      url: 'https://dri.freedesktop.org/libdrm/libdrm-2.4.107.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'libdrm-2.4.107'
-      patch-path-strip: 3
+      git: 'https://gitlab.freedesktop.org/mesa/drm.git'
+      tag: 'libdrm-2.4.107'
       version: '2.4.107'
     tools_required:
       - host-gcc

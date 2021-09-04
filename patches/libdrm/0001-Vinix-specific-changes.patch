@@ -1,7 +1,18 @@
-diff --git a/3rdparty/libdrm-orig/include/drm/drm.h b/3rdparty/libdrm-workdir/include/drm/drm.h
+From 0d7843a2b9af2270c8ebd1330be5b18810e41da5 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sat, 4 Sep 2021 06:01:13 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ include/drm/drm.h |  5 +++--
+ xf86drm.c         | 24 ++++++++++++------------
+ xf86drm.h         |  2 +-
+ 3 files changed, 16 insertions(+), 15 deletions(-)
+
+diff --git a/include/drm/drm.h b/include/drm/drm.h
 index c7fd2a3..710e65c 100644
---- a/3rdparty/libdrm-orig/include/drm/drm.h
-+++ b/3rdparty/libdrm-workdir/include/drm/drm.h
+--- a/include/drm/drm.h
++++ b/include/drm/drm.h
 @@ -36,10 +36,11 @@
  #ifndef _DRM_H_
  #define _DRM_H_
@@ -16,10 +27,10 @@ index c7fd2a3..710e65c 100644
  typedef unsigned int drm_handle_t;
  
  #else /* One of the BSDs */
-diff --git a/3rdparty/libdrm-orig/xf86drm.c b/3rdparty/libdrm-workdir/xf86drm.c
+diff --git a/xf86drm.c b/xf86drm.c
 index 1f0b847..0afdf52 100644
---- a/3rdparty/libdrm-orig/xf86drm.c
-+++ b/3rdparty/libdrm-workdir/xf86drm.c
+--- a/xf86drm.c
++++ b/xf86drm.c
 @@ -3273,7 +3273,7 @@ drm_public int drmPrimeFDToHandle(int fd, int prime_fd, uint32_t *handle)
  
  static char *drmGetMinorNameForFD(int fd, int type)
@@ -128,10 +139,10 @@ index 1f0b847..0afdf52 100644
      struct stat sbuf;
      char path[PATH_MAX + 1], *value;
      unsigned int maj, min;
-diff --git a/3rdparty/libdrm-orig/xf86drm.h b/3rdparty/libdrm-workdir/xf86drm.h
+diff --git a/xf86drm.h b/xf86drm.h
 index 930d2f4..db7d2a2 100644
---- a/3rdparty/libdrm-orig/xf86drm.h
-+++ b/3rdparty/libdrm-workdir/xf86drm.h
+--- a/xf86drm.h
++++ b/xf86drm.h
 @@ -47,7 +47,7 @@ extern "C" {
  #define DRM_MAX_MINOR   16
  #endif
@@ -141,3 +152,6 @@ index 930d2f4..db7d2a2 100644
  
  #define DRM_IOCTL_NR(n)		_IOC_NR(n)
  #define DRM_IOC_VOID		_IOC_NONE
+-- 
+2.33.0
+
