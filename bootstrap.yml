@@ -917,10 +917,8 @@ packages:
   - name: zlib
     source:
       subdir: '3rdparty'
-      url: 'https://zlib.net/zlib-1.2.11.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'zlib-1.2.11'
-      patch-path-strip: 3
+      git: 'https://github.com/madler/zlib.git'
+      tag: 'v1.2.11'
       version: '1.2.11'
     tools_required:
       - host-gcc

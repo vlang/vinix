@@ -1,7 +1,16 @@
-diff --git a/3rdparty/zlib-orig/configure b/3rdparty/zlib-workdir/configure
+From 667e15a6e52c2427cfcf2e47f0c29c6c1346326b Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sat, 4 Sep 2021 05:29:31 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ configure | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure b/configure
 index e974d1f..a95dba1 100755
---- a/3rdparty/zlib-orig/configure
-+++ b/3rdparty/zlib-workdir/configure
+--- a/configure
++++ b/configure
 @@ -207,7 +207,7 @@ if test "$gcc" -eq 1 && ($cc -c $test.c) >> configure.log 2>&1; then
      uname=`(uname -s || echo unknown) 2>/dev/null`
    fi
@@ -11,3 +20,6 @@ index e974d1f..a95dba1 100755
          LDSHARED=${LDSHARED-"$cc -shared -Wl,-soname,libz.so.1,--version-script,${SRCDIR}zlib.map"} ;;
    *BSD | *bsd* | DragonFly)
          LDSHARED=${LDSHARED-"$cc -shared -Wl,-soname,libz.so.1,--version-script,${SRCDIR}zlib.map"}
+-- 
+2.33.0
+
