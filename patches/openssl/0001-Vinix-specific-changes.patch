@@ -1,7 +1,19 @@
-diff --git a/3rdparty/openssl-orig/Configurations/10-main.conf b/3rdparty/openssl-workdir/Configurations/10-main.conf
-index 61c6689..188b208 100644
---- a/3rdparty/openssl-orig/Configurations/10-main.conf
-+++ b/3rdparty/openssl-workdir/Configurations/10-main.conf
+From 6a31558ef1cf93c46a3beaeb1c1241617a39596c Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sat, 4 Sep 2021 05:35:32 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ Configurations/10-main.conf | 33 +++++++++++++++++++++++++++++++++
+ Configure                   | 15 +--------------
+ apps/speed.c                |  2 ++
+ test/rsa_complex.c          |  4 +++-
+ 4 files changed, 39 insertions(+), 15 deletions(-)
+
+diff --git a/Configurations/10-main.conf b/Configurations/10-main.conf
+index 61c6689a..188b208f 100644
+--- a/Configurations/10-main.conf
++++ b/Configurations/10-main.conf
 @@ -918,6 +918,39 @@ my %targets = (
          ranlib           => "true",
      },
@@ -42,10 +54,10 @@ index 61c6689..188b208 100644
  #### *BSD
      "BSD-generic32" => {
          # As for thread cflag. Idea is to maintain "collective" set of
-diff --git a/3rdparty/openssl-orig/Configure b/3rdparty/openssl-workdir/Configure
-index b286dd0..b9faa33 100755
---- a/3rdparty/openssl-orig/Configure
-+++ b/3rdparty/openssl-workdir/Configure
+diff --git a/Configure b/Configure
+index b286dd06..b9faa339 100755
+--- a/Configure
++++ b/Configure
 @@ -1546,20 +1546,7 @@ unless ($disabled{"crypto-mdebug-backtrace"})
  unless ($disabled{afalgeng}) {
      $config{afalgeng}="";
@@ -68,10 +80,10 @@ index b286dd0..b9faa33 100755
      } else {
          disable('not-linux', 'afalgeng');
      }
-diff --git a/3rdparty/openssl-orig/apps/speed.c b/3rdparty/openssl-workdir/apps/speed.c
-index d4ae7ab..db2db31 100644
---- a/3rdparty/openssl-orig/apps/speed.c
-+++ b/3rdparty/openssl-workdir/apps/speed.c
+diff --git a/apps/speed.c b/apps/speed.c
+index d4ae7ab7..db2db31b 100644
+--- a/apps/speed.c
++++ b/apps/speed.c
 @@ -113,6 +113,8 @@
  # define NO_FORK
  #endif
@@ -81,10 +93,10 @@ index d4ae7ab..db2db31 100644
  #define MAX_MISALIGNMENT 63
  #define MAX_ECDH_SIZE   256
  #define MISALIGN        64
-diff --git a/3rdparty/openssl-orig/test/rsa_complex.c b/3rdparty/openssl-workdir/test/rsa_complex.c
-index fac5812..a36efaa 100644
---- a/3rdparty/openssl-orig/test/rsa_complex.c
-+++ b/3rdparty/openssl-workdir/test/rsa_complex.c
+diff --git a/test/rsa_complex.c b/test/rsa_complex.c
+index fac58125..a36efaa5 100644
+--- a/test/rsa_complex.c
++++ b/test/rsa_complex.c
 @@ -14,7 +14,9 @@
   */
  #if defined(__STDC_VERSION__)
@@ -96,3 +108,6 @@ index fac5812..a36efaa 100644
  # endif
  #endif
  #include <openssl/rsa.h>
+-- 
+2.33.0
+

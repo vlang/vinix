@@ -939,10 +939,8 @@ packages:
   - name: openssl
     source:
       subdir: '3rdparty'
-      url: 'https://www.openssl.org/source/openssl-1.1.1l.tar.gz'
-      format: 'tar.gz'
-      extract_path: 'openssl-1.1.1l'
-      patch-path-strip: 3
+      git: 'https://github.com/openssl/openssl.git'
+      tag: 'OpenSSL_1_1_1l'
       version: '1.1.1l'
     tools_required:
       - host-gcc
