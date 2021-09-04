@@ -6,6 +6,6 @@ fn main() {
 	println('Vinix Init started')
 
 	for {
-		os.system('bash --login')
+		os.system('cd ~ && bash --login')
 	}
 }
