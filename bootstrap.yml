@@ -19,7 +19,7 @@ sources:
 
   - name: binutils
     subdir: '3rdparty'
-    git: 'git://sourceware.org/git/binutils-gdb.git'
+    git: 'https://sourceware.org/git/binutils-gdb.git'
     tag: 'binutils-2_37'
     version: '2.37'
     tools_required:
@@ -32,24 +32,34 @@ sources:
 
   - name: gcc
     subdir: '3rdparty'
-    url: 'https://ftp.gnu.org/gnu/gcc/gcc-11.2.0/gcc-11.2.0.tar.xz'
-    format: 'tar.xz'
-    extract_path: 'gcc-11.2.0'
-    patch-path-strip: 3
+    git: 'https://gcc.gnu.org/git/gcc.git'
+    tag: 'releases/gcc-11.2.0'
     version: '11.2.0'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.15
     regenerate:
-      # download_prerequisites should probably move to some "post_checkout" step.
       - args: ['./contrib/download_prerequisites']
         workdir: '@THIS_SOURCE_DIR@'
+      - args: ['cp',
+          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@THIS_SOURCE_DIR@/']
+      - args: ['cp',
+          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@THIS_SOURCE_DIR@/gmp-6.1.0/configfsf.sub']
+      - args: ['cp',
+          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@THIS_SOURCE_DIR@/isl-0.18/config.sub']
+      - args: ['cp', '-f',
+          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@THIS_SOURCE_DIR@/mpc-1.0.3/config.sub']
+      - args: ['cp',
+          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@THIS_SOURCE_DIR@/mpfr-3.1.6/config.sub']
       - args: ['autoconf']
         workdir: '@THIS_SOURCE_DIR@/gcc'
       - args: ['autoconf']
         workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
-      - args: ['sh', '-c', 'patch -p1 < ../../extra-patches/gcc.patch']
-        workdir: '@THIS_SOURCE_DIR@'
 
   - name: mlibc
     subdir: '3rdparty'
@@ -203,7 +213,6 @@ tools:
 
   - name: host-gcc
     from_source: gcc
-    revision: 2
     tools_required:
       - tool: host-binutils
         recursive: true
@@ -222,7 +231,7 @@ tools:
     stages:
       - name: compiler
         pkgs_required:
-         - mlibc-headers
+          - mlibc-headers
         compile:
           - args: ['make', '-j@PARALLELISM@', 'all-gcc']
         install:
@@ -816,7 +825,6 @@ packages:
 
   - name: gcc
     from_source: gcc
-    revision: 4
     tools_required:
       - host-gcc
     pkgs_required:
