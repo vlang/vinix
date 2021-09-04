@@ -3,6 +3,20 @@ declare_options:
     default: 'false'
 
 sources:
+  - name: 'pkg-config'
+    subdir: '3rdparty'
+    git: 'https://gitlab.freedesktop.org/pkg-config/pkg-config.git'
+    tag: 'pkg-config-0.29.2'
+    version: '0.29.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']
+        environ:
+          'NOCONFIGURE': 'yes'
+
   - name: binutils
     subdir: '3rdparty'
     url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.37.tar.xz'
@@ -67,11 +81,18 @@ sources:
 
   - name: wayland
     subdir: '3rdparty'
-    url: 'https://wayland.freedesktop.org/releases/wayland-1.19.0.tar.xz'
-    format: 'tar.xz'
-    extract_path: 'wayland-1.19.0'
-    patch-path-strip: 3
+    git: 'https://github.com/wayland-project/wayland.git'
+    tag: '1.19.0'
     version: '1.19.0'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+    regenerate:
+      - args: ['./autogen.sh']
+        environ:
+          'NOCONFIGURE': 'yes'
 
 tools:
   - name: host-autoconf-v2.69
@@ -112,6 +133,19 @@ tools:
     install:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
+
+  - name: host-pkg-config
+    exports_aclocal: true
+    from_source: pkg-config
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--with-internal-glib'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install-strip']
 
   - name: host-v
     from_source: v
@@ -526,6 +560,10 @@ packages:
   - name: wayland
     from_source: wayland
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
       - host-gcc
       - host-wayland-scanner
     pkgs_required:
@@ -538,7 +576,6 @@ packages:
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
         - '--with-host-scanner'
-        - '--enable-shared'
         - '--disable-dtd-validation'
         - '--disable-documentation'
         - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
