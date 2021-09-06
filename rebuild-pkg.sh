@@ -26,7 +26,8 @@ if [ "$3" = "--tool" ]; then
     IS_TOOL="-tool"
 fi
 
-mkdir -p "$BASE_DIR"/patches/$1
+[ -z "$IS_TOOL" ] && rm -rf "$BASE_DIR"/build/pkg-builds/$1
+[ -z "$IS_TOOL" ] || rm -rf "$BASE_DIR"/build/tool-builds/$PKG_NAME
 
 [ -d 3rdparty/$1 ] || (
     cd build
@@ -35,11 +36,17 @@ mkdir -p "$BASE_DIR"/patches/$1
     xbstrap patch $1
 )
 
-cd 3rdparty/$1
+[ -d 3rdparty/$1-workdir ] || (
+    cp -r "$BASE_DIR"/3rdparty/$1 "$BASE_DIR"/3rdparty/$1-workdir
+    rm -f "$BASE_DIR"/3rdparty/$1-workdir/*.xbstrap
+)
+
+cd 3rdparty/$1-workdir
 [ -f "$BASE_DIR"/patches/$1/0001-Vinix-specific-changes.patch ] && (
     git reset HEAD~1
+    ( cd ../$1 && git reset HEAD~1 )
 )
-rm -f *.xbstrap
+( cd ../$1 && git checkout . && git clean -ffd && touch checkedout.xbstrap fetched.xbstrap )
 git add .
 git commit --allow-empty -m "Vinix specific changes"
 git format-patch -1
@@ -47,14 +54,12 @@ if [ "`cat 0001-Vinix-specific-changes.patch`" = "" ]; then
     rm 0001-Vinix-specific-changes.patch
     git reset HEAD~1
 else
+    mkdir -p "$BASE_DIR"/patches/$1
     mv 0001-Vinix-specific-changes.patch "$BASE_DIR"/patches/$1/
 fi
-touch checkedout.xbstrap fetched.xbstrap patched.xbstrap
 
 cd "$BASE_DIR"/build
+xbstrap patch $1
 xbstrap regenerate $1
-
-[ -z "$IS_TOOL" ] && rm -rf pkg-builds/$1
-[ -z "$IS_TOOL" ] || rm -rf tool-builds/$PKG_NAME
 
 xbstrap install$IS_TOOL --reconfigure $PKG_NAME
