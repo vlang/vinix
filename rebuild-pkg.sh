@@ -43,9 +43,13 @@ rm -f *.xbstrap
 git add .
 git commit --allow-empty -m "Vinix specific changes"
 git format-patch -1
-[ "`cat 0001-Vinix-specific-changes.patch`" = "" ] || \
-    cp 0001-Vinix-specific-changes.patch "$BASE_DIR"/patches/$1/
-rm 0001-Vinix-specific-changes.patch
+if [ "`cat 0001-Vinix-specific-changes.patch`" = "" ]; then
+    rm 0001-Vinix-specific-changes.patch
+    git reset HEAD~1
+else
+    mv 0001-Vinix-specific-changes.patch "$BASE_DIR"/patches/$1/
+fi
+touch checkedout.xbstrap fetched.xbstrap patched.xbstrap
 
 cd "$BASE_DIR"/build
 xbstrap regenerate $1
@@ -53,4 +57,4 @@ xbstrap regenerate $1
 [ -z "$IS_TOOL" ] && rm -rf pkg-builds/$1
 [ -z "$IS_TOOL" ] || rm -rf tool-builds/$PKG_NAME
 
-xbstrap install$IS_TOOL -u $PKG_NAME
+xbstrap install$IS_TOOL --reconfigure $PKG_NAME
