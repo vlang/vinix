@@ -39,7 +39,9 @@ cd 3rdparty/$1
 [ -f "$BASE_DIR"/patches/$1/0001-Vinix-specific-changes.patch ] && (
     git reset HEAD~1
 )
-git commit --allow-empty -am "Vinix specific changes"
+rm -f *.xbstrap
+git add .
+git commit --allow-empty -m "Vinix specific changes"
 git format-patch -1
 [ "`cat 0001-Vinix-specific-changes.patch`" = "" ] || \
     cp 0001-Vinix-specific-changes.patch "$BASE_DIR"/patches/$1/
