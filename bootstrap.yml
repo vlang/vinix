@@ -69,11 +69,11 @@ sources:
 
   - name: mlibc
     subdir: '3rdparty'
-    url: 'https://github.com/managarm/mlibc/archive/5e323f6c9ff4be80e20aa477c43965661ba13eff.tar.gz'
-    format: 'tar.gz'
-    extract_path: 'mlibc-5e323f6c9ff4be80e20aa477c43965661ba13eff'
-    patch-path-strip: 3
-    version: '13.rolling'
+    git: 'https://github.com/managarm/mlibc.git'
+    branch: 'master'
+    commit: '5e323f6c9ff4be80e20aa477c43965661ba13eff'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
 
   - name: v
     subdir: '3rdparty'

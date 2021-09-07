@@ -1,4 +1,4 @@
-#flag linux -lwayland-server
+#flag -lwayland-server
 
 #include <wayland-server-core.h>
 
@@ -16,7 +16,7 @@ fn main() {
 	}
 	defer { C.wl_display_destroy(dsp) }
 	println('created display')
-	
+
 	sock := C.wl_display_add_socket_auto(dsp)
 	if sock == voidptr(0) {
 		println('couldn\'t create socket')

@@ -1,4 +1,4 @@
-#flag linux -lwayland-client
+#flag -lwayland-client
 
 #include <wayland-client-core.h>
 
