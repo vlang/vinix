@@ -1,6 +1,6 @@
-From cc047dc3046b50ef208e7c938902c4d13c994acc Mon Sep 17 00:00:00 2001
+From bc1c8e1cbf54f007c8240a468796bb51f9762f18 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Tue, 7 Sep 2021 02:48:19 +0200
+Date: Tue, 7 Sep 2021 02:59:47 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/unistd-stubs.cpp        |   4 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 591 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 601 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -38,7 +38,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 34 files changed, 747 insertions(+), 5 deletions(-)
+ 34 files changed, 757 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -243,10 +243,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..c1cf381
+index 0000000..08d589e
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,591 @@
+@@ -0,0 +1,601 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -342,6 +342,16 @@ index 0000000..c1cf381
 +        return ret.errno;
 +
 +    *num_events = (int)ret.ret;
++    return 0;
++}
++
++int sys_epoll_create(int flags, int *fd) {
++    __syscall_ret ret = __syscall(37, flags);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *fd = (int)ret.ret;
 +    return 0;
 +}
 +
