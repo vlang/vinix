@@ -78,19 +78,19 @@ sources:
   - name: v
     subdir: '3rdparty'
     sources_required: ['vc']
-    url: 'https://github.com/vlang/v/archive/bd33eaa3b89d5ddb73032f4b388643ab723a0b9b.tar.gz'
-    format: 'tar.gz'
-    extract_path: 'v-bd33eaa3b89d5ddb73032f4b388643ab723a0b9b'
-    patch-path-strip: 3
-    version: '11.rolling'
+    git: 'https://github.com/vlang/v.git'
+    branch: 'master'
+    commit: '00433ba460ca666b3a5587ef45fe97956210c879'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
 
   - name: vc
     subdir: '3rdparty'
-    url: 'https://github.com/vlang/vc/archive/5c86e0911d232d30e76154335a8a1ad01053d37a.tar.gz'
-    format: 'tar.gz'
-    extract_path: 'vc-5c86e0911d232d30e76154335a8a1ad01053d37a'
-    patch-path-strip: 3
-    version: '11.rolling'
+    git: 'https://github.com/vlang/vc.git'
+    branch: 'master'
+    commit: '0196adb700b6705d7cafe65794a61e30083b409c'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
 
   - name: limine
     subdir: '3rdparty'

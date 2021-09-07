@@ -962,7 +962,7 @@
 < 	return strconv__atof64(s);
 < }
 < 
-12118,12139d11186
+12119,12140d11187
 < inline VV_LOCAL_SYMBOL f32 fabs32(f32 x) {
 < 	f32 _t2; /* if prepend */
 < 	if (x < 0) {
@@ -985,7 +985,7 @@
 < }
 < 
 < // Attr: [inline]
-12415,12645c11462
+12422,12652c11469
 < 		if (typ == (StrIntpType__si_f32)) {
 < 			if (use_default_str) {
 < 				string f = f32_str(data.d.d_f32);
@@ -1219,11 +1219,11 @@
 < 		else if (typ == (StrIntpType__si_c)) {
 ---
 > 		if (typ == (StrIntpType__si_c)) {
-16785c15602
+16792c15609
 < voidptr memcpy(voidptr dest, const voidptr const_src, u64 size) {
 ---
 > voidptr memcpy(void* __restrict dest, const void* __restrict const_src, u64 size) {
-21933,21935c20750,20752
+21940,21942c20757,20759
 < 	interrupt_thunk_offset = *(u64*)&((u64[]){0}[0]); // global
 < 	interrupt_thunk_size = *(u64*)&((u64[]){0}[0]); // global
 < 	interrupt_thunk_number = *(u32*)&((u32[]){0}[0]); // global
