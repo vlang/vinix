@@ -1,17 +1,18 @@
-From ef4cfca48121651a061830e6e25391cddb78a94c Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Tue, 7 Sep 2021 03:25:26 +0200
+From 4f7c308d5b0a7d7e8f2a3dd40af298b189edaba2 Mon Sep 17 00:00:00 2001
+From: streaksu <assemblyislaw@gmail.com>
+Date: Wed, 8 Sep 2021 11:03:44 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
  abis/mlibc/signal.h                           |   6 +-
  meson.build                                   |   6 +-
+ options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux/include/asm/ioctls.h            |   2 +
- options/posix/generic/unistd-stubs.cpp        |   4 +-
+ options/posix/generic/unistd-stubs.cpp        |  19 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 601 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 611 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -38,7 +39,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 34 files changed, 757 insertions(+), 5 deletions(-)
+ 35 files changed, 781 insertions(+), 8 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -112,6 +113,26 @@ index ae0e7cf..c6c0304 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
+diff --git a/options/ansi/include/mlibc/ansi-sysdeps.hpp b/options/ansi/include/mlibc/ansi-sysdeps.hpp
+index f758a9c..aee351e 100644
+--- a/options/ansi/include/mlibc/ansi-sysdeps.hpp
++++ b/options/ansi/include/mlibc/ansi-sysdeps.hpp
+@@ -6,6 +6,7 @@
+ #include <abi-bits/seek-whence.h>
+ #include <abi-bits/vm-flags.h>
+ #include <abi-bits/pid_t.h>
++#include <abi-bits/gid_t.h>
+ #include <bits/off_t.h>
+ #include <bits/ssize_t.h>
+ #include <bits/ansi/time_t.h>
+@@ -52,6 +53,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos);
+ [[gnu::weak]] int sys_execve(const char *path, char *const argv[], char *const envp[]);
+ 
+ [[gnu::weak]] pid_t sys_getpid();
++[[gnu::weak]] int sys_getgroups(size_t size, const gid_t *list, int *ret);
+ [[gnu::weak]] int sys_kill(int, int);
+ 
+ } //namespace mlibc
 diff --git a/options/internal/include/mlibc/internal-sysdeps.hpp b/options/internal/include/mlibc/internal-sysdeps.hpp
 index 0bd4a05..d2a1e9a 100644
 --- a/options/internal/include/mlibc/internal-sysdeps.hpp
@@ -148,10 +169,39 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
-index 4725736..d5636a8 100644
+index 4725736..72797ba 100644
 --- a/options/posix/generic/unistd-stubs.cpp
 +++ b/options/posix/generic/unistd-stubs.cpp
-@@ -812,12 +812,12 @@ int ttyname_r(int, char *, size_t) {
+@@ -13,6 +13,7 @@
+ #include <mlibc/arch-defs.hpp>
+ #include <mlibc/debug.hpp>
+ #include <mlibc/posix-sysdeps.hpp>
++#include <mlibc/ansi-sysdeps.hpp>
+ #include <mlibc/thread.hpp>
+ 
+ unsigned int alarm(unsigned int) {
+@@ -310,9 +311,17 @@ char *getcwd(char *buffer, size_t size) {
+ 	return buffer;
+ }
+ 
+-int getgroups(int, gid_t []) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int getgroups(int size, gid_t list[]) {
++	if(!mlibc::sys_getgroups) {
++		MLIBC_MISSING_SYSDEP();
++		__ensure(!"Cannot continue without sys_getgroups()");
++	}
++	int ret;
++	if(int e = mlibc::sys_getgroups(size, list, &ret); e) {
++		errno = e;
++		return -1;
++	}
++	return ret;
+ }
+ 
+ long gethostid(void) {
+@@ -812,12 +821,12 @@ int ttyname_r(int, char *, size_t) {
  }
  
  int unlink(const char *path) {
@@ -243,10 +293,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..08d589e
+index 0000000..465ad51
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,601 @@
+@@ -0,0 +1,611 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -844,6 +894,16 @@ index 0000000..08d589e
 +    }
 +
 +    *ret_pid = (pid_t)ret.ret;
++    return 0;
++}
++
++int sys_getgroups(size_t size, const gid_t *list, int *_ret) {
++    __syscall_ret ret = __syscall(38, size, list);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *_ret = (int)ret.ret;
 +    return 0;
 +}
 +

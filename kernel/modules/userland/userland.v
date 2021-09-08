@@ -107,6 +107,15 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 	return u64(thread.process.ppid), 0
 }
 
+pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: getgroups(%d, 0x%llx)\n', size, voidptr(list))
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	return 0, 0
+}
+
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: sigentry(0x%llx)\n', sigentry)
 	defer {

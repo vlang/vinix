@@ -1042,13 +1042,19 @@ packages:
   - name: gawk
     source:
       subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/gawk/gawk-5.1.0.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'gawk-5.1.0'
-      patch-path-strip: 3
+      git: 'https://git.savannah.gnu.org/git/gawk.git'
+      tag: 'gawk-5.1.0'
       version: '5.1.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
       regenerate:
         - args: sed -i 's/extras//' @THIS_SOURCE_DIR@/Makefile.in
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/']
     tools_required:
       - host-gcc
     pkgs_required:

@@ -10,7 +10,7 @@ import pipe
 import memory.mmap
 
 __global (
-	syscall_table [38]voidptr
+	syscall_table [39]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -52,4 +52,5 @@ pub fn init_syscall_table() {
 	syscall_table[35] = voidptr(fs.syscall_unlinkat)
 	syscall_table[36] = voidptr(file.syscall_ppoll)
 	syscall_table[37] = voidptr(file.syscall_epoll_create)
+	syscall_table[38] = voidptr(userland.syscall_getgroups)
 }
