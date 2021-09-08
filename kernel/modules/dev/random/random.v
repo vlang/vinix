@@ -11,6 +11,7 @@ import x86.cpu
 __global (
 	ur_initialized = false
 	ur_rdrand = false
+	ur_rdseed = false
 )
 
 struct URandom {
@@ -127,7 +128,11 @@ fn (mut this URandom) grow(handle voidptr, new_size u64) ? {
 }
 
 fn (mut this URandom) reseed() {
-	if ur_rdrand {
+	if ur_rdseed {
+		for i in 0..this.key.len {
+			this.key[i] ^= cpu.rdseed32()
+		}
+	} else if ur_rdrand {
 		for i in 0..this.key.len {
 			this.key[i] ^= cpu.rdrand32()
 		}
@@ -135,10 +140,16 @@ fn (mut this URandom) reseed() {
 }
 
 fn init_urandom() {
-	success, _, _, c, _ := cpu.cpuid(1, 0)
+	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
 	if success && (c & (1 << 30)) != 0 {
 		println('urandom: rdrand available')
 		ur_rdrand = true
+	}
+
+	success, _, b, _, _ = cpu.cpuid(0, 7)
+	if success && (b & (1 << 18)) != 0 {
+		println('urandom: rdseed available')
+		ur_rdseed = true
 	}
 
 	// todo improve entropy via interrupts and other random events

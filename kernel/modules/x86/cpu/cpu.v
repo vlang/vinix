@@ -173,6 +173,16 @@ pub fn rdrand32() u32 {
 	return a
 }
 
+pub fn rdseed32() u32 {
+	mut a := u32(0)
+	asm volatile amd64 {
+		rdseed eax
+		; =a (a)
+	}
+
+	return a
+}
+
 fn xsave(region voidptr) {
 	asm volatile amd64 {
 		xsave [region]
