@@ -863,9 +863,15 @@ packages:
     from_source: tzdata
     tools_required:
       - host-zic
+      - host-gcc
+    pkgs_required:
+      - mlibc
     configure:
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@/']
     build:
+      # Build and install support programs
+      - args: ['make', 'CC=x86_64-vinix-gcc', 'AR=x86_64-vinix-ar']
+      - args: ['make', 'install', 'DESTDIR=@THIS_COLLECT_DIR@', 'ZIC=zic']
       # Create the required directories
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/share/zoneinfo/posix']
@@ -874,36 +880,33 @@ packages:
       # After that. create time time zone files with leap seconds
       - args: |
           set -e
-          which zic
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/etcetera
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/etcetera
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/etcetera
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/southamerica
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/southamerica
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/southamerica
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/northamerica
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/northamerica
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/northamerica
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/europe
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/europe
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/europe
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/africa
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/africa
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/africa
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/antarctica
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/antarctica
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/antarctica
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/asia
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/asia
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/asia
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/australasia
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/australasia
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/australasia
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo @THIS_BUILD_DIR@/backward
-          zic -L /dev/null -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/posix @THIS_BUILD_DIR@/backward
-          zic -L @THIS_SOURCE_DIR@/leapseconds -d @THIS_COLLECT_DIR@/usr/share/zoneinfo/right @THIS_BUILD_DIR@/backward
-      # Copy some needed files to their location
-      - args: ['cp', '@THIS_BUILD_DIR@/zone.tab', '@THIS_BUILD_DIR@/zone1970.tab', '@THIS_BUILD_DIR@/iso3166.tab', '@THIS_COLLECT_DIR@/usr/share/zoneinfo']
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/etcetera
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/etcetera
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/etcetera
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/southamerica
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/southamerica
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/southamerica
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/northamerica
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/northamerica
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/northamerica
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/europe
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/europe
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/europe
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/africa
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/africa
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/africa
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/antarctica
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/antarctica
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/antarctica
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/asia
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/asia
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/asia
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/australasia
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/australasia
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/australasia
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/backward
+          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/backward
+          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/backward
       # Create the posixrules file, POSIX requires daylight saving rules to be in accordance with US rules, thus use New York
       - args: ['zic', '-d', '@THIS_COLLECT_DIR@/usr/share/zoneinfo', '-p', 'America/New_York']
       # Default to UTC for localtime, this should be fixed, but that is pending xbstrap support.

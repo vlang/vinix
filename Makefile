@@ -1,4 +1,3 @@
-export PATH := $(PATH):/usr/sbin
 unexport CC
 unexport CXX
 unexport CFLAGS
