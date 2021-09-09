@@ -5,10 +5,4 @@ define_options:
     prod: 'true'
 
 container:
-    runtime: cbuildrt
-    rootfs: /var/lib/cbuildrt/vinix-buildenv
-    uid: 1000
-    gid: 1000
-    src_mount: /var/lib/vinix-buildenv/src
-    build_mount: /var/lib/vinix-buildenv/build
     allow_containerless: true
