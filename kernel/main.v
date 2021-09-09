@@ -88,6 +88,9 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
+	
+	// a dummy call to avoid V warning about an unused `stubs` module
+	_ := stubs.toupper(0)
 
 	memory.vmm_init(memmap_tag)
 
