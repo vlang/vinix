@@ -71,18 +71,13 @@ install:
 
 blob.o:
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	mv blob.c blob.c.unpatched
-	[ -f blob.c.working ] || ( \
-		cp blob.c.unpatched blob.c.working && \
-		patch blob.c.working blob.patch --no-backup-if-mismatch -r /dev/null \
-	)
-	[ "$(PROD)" = "false" ] && ( \
-		diff blob.c.unpatched blob.c.working; \
+	[ "$(PROD)" = "false" ] && [ -f blob.c.working ] && [ -f blob.c.old ] && ( \
+		diff blob.c.old blob.c.working \
 	) > blob.patch || true
-	cp blob.c.working blob.c
-	sed -i 's/dev__nvme__NVMERegisters\*/volatile dev__nvme__NVMERegisters\*/g' blob.c
-	sed -i 's/dev__nvme__NVMECommand\*/volatile dev__nvme__NVMECommand\*/g' blob.c
-	sed -i 's/dev__nvme__NVMECompletion\*/volatile dev__nvme__NVMECompletion\*/g' blob.c
+	cp blob.c blob.c.old
+	patch blob.c blob.patch --no-backup-if-mismatch -r /dev/null
+	cp blob.c blob.c.working
+	( diff blob.c.old blob.c.working ) > blob.patch || true
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c
