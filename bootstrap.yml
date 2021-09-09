@@ -189,6 +189,29 @@ tools:
       - args: ['mkdir', '-p', '@BUILD_ROOT@/tools/host-autoconf-archive/share/']
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@BUILD_ROOT@/tools/host-autoconf-archive/share/aclocal']
 
+  - name: host-automake-v1.16
+    source:
+      name: automake-v1.16
+      subdir: '3rdparty'
+      git: 'https://git.savannah.gnu.org/git/automake.git'
+      tag: 'v1.16.4'
+      version: '1.16.4'
+      tools_required:
+        - host-autoconf-v2.69
+      regenerate:
+        - args: ['./bootstrap']
+    tools_required:
+      - host-autoconf-v2.69
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install-strip']
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
+
   - name: host-automake-v1.15
     source:
       name: automake-v1.15
@@ -1088,16 +1111,17 @@ packages:
       version: '5.1.0'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: sed -i 's/extras//' @THIS_SOURCE_DIR@/Makefile.in
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/']
+    revision: 2
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     pkgs_required:
       - mlibc
     configure:

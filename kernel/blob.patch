@@ -2145,7 +2145,7 @@
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-23326,23328c22143,22145
+23327,23329c22144,22146
 < 	interrupt_thunk_offset = *(u64*)&((u64[]){0}[0]); // global
 < 	interrupt_thunk_size = *(u64*)&((u64[]){0}[0]); // global
 < 	interrupt_thunk_number = *(u32*)&((u32[]){0}[0]); // global
