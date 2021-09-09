@@ -141,6 +141,48 @@ pub fn wrxcr(reg u32, value u64) {
 	}
 }
 
+pub fn rdtsc() u64 {
+	mut a := u32(0)
+	mut d := u32(0)
+	asm volatile amd64 {
+		rdtsc
+		; =a (a)
+		  =d (d)
+	}
+
+	return u64(a) | (u64(d) << 32)
+}
+
+pub fn rdrand64() u64 {
+	mut a := u64(0)
+	asm volatile amd64 {
+		rdrand rax
+		; =a (a)
+	}
+
+	return a
+}
+
+pub fn rdrand32() u32 {
+	mut a := u32(0)
+	asm volatile amd64 {
+		rdrand eax
+		; =a (a)
+	}
+
+	return a
+}
+
+pub fn rdseed32() u32 {
+	mut a := u32(0)
+	asm volatile amd64 {
+		rdseed eax
+		; =a (a)
+	}
+
+	return a
+}
+
 fn xsave(region voidptr) {
 	asm volatile amd64 {
 		xsave [region]

@@ -21,6 +21,7 @@ import futex
 import pci
 import dev.ata
 import dev.streams
+import dev.random
 import syscall.table
 
 fn C._vinit(argc int, argv voidptr)
@@ -46,7 +47,8 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	streams.initialise()
 	console.initialise()
 	ata.initialise()
-
+	random.initialise()
+	
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'],
 							['HOME=/root',
 							'TERM=linux',
