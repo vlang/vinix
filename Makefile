@@ -46,10 +46,12 @@ vinix.iso: kernel init base-files
 
 .PHONY: clean
 clean:
-	rm -f vinix.iso
 	$(MAKE) -C kernel clean
 	rm -f init/init
+	rm -f vinix.iso
 
 .PHONY: distclean
 distclean: clean
-	rm -rf 3rdparty build initramfs.tar.gz pack kernel/*.xbstrap init/*.xbstrap base-files/*.xbstrap
+	$(MAKE) -C kernel distclean
+	rm -rf 3rdparty build initramfs.tar.gz pack
+	rm -f kernel/*.xbstrap init/*.xbstrap base-files/*.xbstrap

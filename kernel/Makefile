@@ -16,7 +16,7 @@ INTERNALCFLAGS :=                 \
 	-ffreestanding                \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
-	-fno-pic -fpie                \
+	-fpie                         \
 	-ffunction-sections           \
 	-fdata-sections               \
 	-mno-80387                    \
@@ -62,14 +62,22 @@ all: $(KERNEL)
 
 .PHONY: clean
 clean:
-	rm -rf $(KERNEL) $(COBJ) blob.o blob.c blob.c.unpatched
+	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
+
+.PHONY: distclean
+distclean: clean
+	rm -rf blob.c.old blob.c.working
 
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)"
 	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
 
-blob.o:
+blob.c.working:
+	touch blob.c.working
+
+blob.o: $(VFILES) blob.c.working
+	[ -s blob.c.working ] || rm blob.c.working
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	[ "$(PROD)" = "false" ] && [ -f blob.c.working ] && [ -f blob.c.old ] && ( \
 		diff blob.c.old blob.c.working \

@@ -60,16 +60,16 @@ cd 3rdparty/$1-workdir
 git add .
 git commit --allow-empty -m "Vinix specific changes"
 git format-patch -1
-if [ "`cat 0001-Vinix-specific-changes.patch`" = "" ]; then
-    rm 0001-Vinix-specific-changes.patch
-    git reset HEAD~1
-else
+if [ -s 0001-Vinix-specific-changes.patch ]; then
     mkdir -p "$BASE_DIR"/patches/$1
     mv 0001-Vinix-specific-changes.patch "$BASE_DIR"/patches/$1/
+else
+    rm 0001-Vinix-specific-changes.patch
+    git reset HEAD~1
 fi
 
 cd "$BASE_DIR"/build
 xbstrap patch $1
 xbstrap regenerate $1
 
-xbstrap install$IS_TOOL -u --reconfigure $PKG_NAME
+xbstrap install$IS_TOOL -u $PKG_NAME

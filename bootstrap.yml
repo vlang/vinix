@@ -412,19 +412,20 @@ tasks:
       - host-limine
     pkgs_required:
       - base-files
-      - bash
-      - coreutils
-      - v
-      - wayland
-      - sed
-      - diffutils
-      - grep
-      - tzdata
-      - nano
-      - binutils
-      - gcc
       - kernel
       - init
+      - bash
+      - v
+      - coreutils
+      - nano
+      - tzdata
+      - grep
+      - diffutils
+      - sed
+      - binutils
+      - gcc
+      - gawk
+      - vim
     artifact_files:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
@@ -448,6 +449,7 @@ packages:
           set -e
           cp -rv "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/"
           rm -v "@THIS_COLLECT_DIR@/"*.xbstrap
+          for f in $(find @THIS_COLLECT_DIR@ -name KEEP); do rm -v "$f"; done
 
   - name: kernel
     source:
@@ -748,7 +750,6 @@ packages:
           x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm
           mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
           ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
-      - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
 
   - name: vc
     from_source: vc
@@ -1078,8 +1079,6 @@ packages:
       - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
       - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
       - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
-      - args: ['cp', '@SOURCE_ROOT@/extra-files/gcc/hello.c', '@THIS_COLLECT_DIR@/']
-      - args: ['cp', '@SOURCE_ROOT@/extra-files/gcc/hello.cc', '@THIS_COLLECT_DIR@/']
 
   - name: gawk
     source:
@@ -1090,8 +1089,6 @@ packages:
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.15
-        - host-libtool
-        - host-pkg-config
       regenerate:
         - args: sed -i 's/extras//' @THIS_SOURCE_DIR@/Makefile.in
         - args: ['cp',
@@ -1099,6 +1096,8 @@ packages:
             '@THIS_SOURCE_DIR@/']
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.15
     pkgs_required:
       - mlibc
     configure:
