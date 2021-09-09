@@ -207,7 +207,11 @@ tools:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
     compile:
-      - args: ['make', '-j@PARALLELISM@']
+      - args: |
+          set -e
+          export PATH="`pwd`/bin:$PATH"
+          make bin/aclocal-1.16 -j@PARALLELISM@
+          make -j@PARALLELISM@
     install:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
@@ -230,7 +234,11 @@ tools:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
     compile:
-      - args: ['make', '-j@PARALLELISM@']
+      - args: |
+          set -e
+          export PATH="`pwd`/bin:$PATH"
+          make bin/aclocal-1.15 -j@PARALLELISM@
+          make -j@PARALLELISM@
     install:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
@@ -1117,7 +1125,6 @@ packages:
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/']
-    revision: 2
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
