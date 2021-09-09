@@ -234,11 +234,7 @@ tools:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
     compile:
-      - args: |
-          set -e
-          export PATH="`pwd`/bin:$PATH"
-          make bin/aclocal-1.15 -j@PARALLELISM@
-          make -j@PARALLELISM@
+      - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
