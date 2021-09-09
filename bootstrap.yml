@@ -207,10 +207,11 @@ tools:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
     compile:
+      - args: ['mkdir', '-p', '@PREFIX@/share']
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install-strip']
-      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
 
   - name: host-automake-v1.15
     source:
@@ -230,10 +231,11 @@ tools:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
     compile:
+      - args: ['mkdir', '-p', '@PREFIX@/share']
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install-strip']
-      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
 
   - name: host-zic
     from_source: tzdata
@@ -1117,7 +1119,6 @@ packages:
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/']
-    revision: 2
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
