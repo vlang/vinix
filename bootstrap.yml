@@ -949,13 +949,21 @@ packages:
   - name: diffutils
     source:
       subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/diffutils/diffutils-3.7.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'diffutils-3.7'
-      patch-path-strip: 3
+      git: 'https://git.savannah.gnu.org/git/diffutils.git'
+      tag: 'v3.7'
       version: '3.7'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+      regenerate:
+        - args: ['./bootstrap']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.15
     pkgs_required:
       - mlibc
     configure:
@@ -964,6 +972,9 @@ packages:
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
         - '--disable-nls'
+        - '--disable-werror'
+      - args: 'sed -i s/-Werror//g @THIS_BUILD_DIR@/lib/Makefile'
+      - args: 'sed -i s/-Werror//g @THIS_BUILD_DIR@/src/Makefile'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
