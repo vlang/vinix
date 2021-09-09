@@ -109,11 +109,9 @@ sources:
 
   - name: limine
     subdir: '3rdparty'
-    url: https://github.com/limine-bootloader/limine/releases/download/v2.51.1/limine-v2.51.1.tar.xz
-    format: 'tar.xz'
-    extract_path: 'limine-v2.51.1'
-    patch-path-strip: 3
-    version: '2.51.1'
+    git: 'https://github.com/limine-bootloader/limine.git'
+    tag: 'v2.53'
+    version: '2.53'
 
   - name: wayland
     subdir: '3rdparty'
