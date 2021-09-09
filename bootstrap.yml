@@ -441,7 +441,10 @@ packages:
   - name: base-files
     source:
       subdir: ''
-      version: '1.rolling'
+      git: 'https://github.com/vlang/vinix.git'
+      branch: 'main'
+      rolling_version: true
+      version: '0.0pl@ROLLING_ID@'
     build:
       - args: |
           set -e
@@ -451,7 +454,10 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      version: '54.rolling'
+      git: 'https://github.com/vlang/vinix.git'
+      branch: 'main'
+      rolling_version: true
+      version: '0.0pl@ROLLING_ID@'
     tools_required:
       - host-v
       - host-gcc
@@ -467,7 +473,10 @@ packages:
   - name: init
     source:
       subdir: ''
-      version: '4.rolling'
+      git: 'https://github.com/vlang/vinix.git'
+      branch: 'main'
+      rolling_version: true
+      version: '0.0pl@ROLLING_ID@'
     tools_required:
       - host-v
       - host-gcc
