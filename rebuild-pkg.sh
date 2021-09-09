@@ -72,4 +72,4 @@ cd "$BASE_DIR"/build
 xbstrap patch $1
 xbstrap regenerate $1
 
-xbstrap install$IS_TOOL --reconfigure $PKG_NAME
+xbstrap install$IS_TOOL -u --reconfigure $PKG_NAME

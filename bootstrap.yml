@@ -95,7 +95,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '00433ba460ca666b3a5587ef45fe97956210c879'
+    commit: '72089c4feb3de45503de9937b8f75e0b79590c34'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -103,7 +103,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '0196adb700b6705d7cafe65794a61e30083b409c'
+    commit: '96d5e2f4ade9a01ea2e14e08eb102bc6ebcf07f7'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -742,6 +742,9 @@ packages:
           mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
           ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
       - args: ['cp', '@SOURCE_ROOT@/extra-files/v/hello.v', '@THIS_COLLECT_DIR@/']
+
+  - name: vc
+    from_source: vc
 
   - name: wayland
     from_source: wayland

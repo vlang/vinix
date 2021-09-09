@@ -1,3 +1,4 @@
 blob.c
 blob.c.unpatched
+blob.c.working
 modules/trace/symbol.v
