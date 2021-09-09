@@ -24,7 +24,7 @@ pub fn (bitmap GenericBitmap) alloc() ?u64 {
 	return none
 }
 
-pub fn (bitmap GenericBitmap) free(index u64) {
+pub fn (bitmap GenericBitmap) free_entry(index u64) {
 	if index < bitmap.entry_cnt { 
 		lib.bitreset(bitmap.raw_bitmap, index)
 	}

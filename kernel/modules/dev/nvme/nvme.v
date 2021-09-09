@@ -569,7 +569,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 		pair.phase = !pair.phase
 	}
 
-	pair.cid_bitmap.free(u64(cid))
+	pair.cid_bitmap.free_entry(u64(cid))
 
 	kio.mmout( unsafe { &u64(pair.submission_doorbell) }, pair.cq_head)
 
