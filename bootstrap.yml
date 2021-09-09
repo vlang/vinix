@@ -5,7 +5,7 @@ declare_options:
 sources:
   - name: glib
     subdir: '3rdparty'
-    git: 'https://gitlab.gnome.org/GNOME/glib'
+    git: 'https://gitlab.gnome.org/GNOME/glib.git'
     tag: '2.68.3'
     version: '2.68.3'
 
@@ -273,8 +273,9 @@ tools:
           rm -rf "@PREFIX@/v"
           mkdir -p "@PREFIX@/v/"
           cp -rv "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
+          rm *.xbstrap
           cd "@PREFIX@/v"
-          cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm $([ $(uname) = FreeBSD ] && echo -lexecinfo)
+          cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm $([ $(uname) = Linux ] || echo -lexecinfo)
           VMODULES=/tmp/.vmodules ./v self
           mkdir -p "@PREFIX@/bin"
           ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"
@@ -747,7 +748,8 @@ packages:
           mkdir -p "@THIS_COLLECT_DIR@/usr/v"
           cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
           cd "@THIS_COLLECT_DIR@/usr/v"
-          x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm
+          rm *.xbstrap
+          x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c"
           mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
           ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
 
@@ -784,8 +786,6 @@ packages:
       - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/server.v', '@THIS_COLLECT_DIR@/']
-      - args: ['cp', '@SOURCE_ROOT@/extra-files/wayland/client.v', '@THIS_COLLECT_DIR@/']
 
   - name: coreutils
     source:
