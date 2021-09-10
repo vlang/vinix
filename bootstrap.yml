@@ -82,6 +82,12 @@ sources:
       - args: ['autoconf']
         workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
 
+  - name: llvm
+    subdir: '3rdparty'
+    git: 'https://github.com/llvm/llvm-project.git'
+    tag: 'llvmorg-10.0.0'
+    version: '10.0.0'
+
   - name: mlibc
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
@@ -160,6 +166,12 @@ sources:
       - args: ['./autogen.sh']
         environ:
           NOCONFIGURE: 'yes'
+
+  - name: cmake
+    subdir: '3rdparty'
+    git: 'https://gitlab.kitware.com/cmake/cmake.git'
+    tag: 'v3.20.5'
+    version: '3.20.5'
 
 tools:
   - name: host-autoconf-v2.69
@@ -434,6 +446,21 @@ tools:
     install:
       - args: ['make', 'install-strip']
 
+  - name: host-cmake
+    from_source: cmake
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/bootstrap'
+        - '--prefix=@PREFIX@'
+        - '--parallel=@PARALLELISM@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      - args: |
+          set -e
+          echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.20/Modules/Platform/Vinix.cmake"
+
 tasks:
   - name: make-iso
     tools_required:
@@ -608,6 +635,39 @@ packages:
         - '-Ddisable_iconv_option=true'
         - '-Ddisable_intl_option=true'
         - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: llvm
+    from_source: llvm
+    tools_required:
+      - host-cmake
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - zlib
+    configure:
+      - args:
+        - 'cmake'
+        - '-GNinja'
+        - '-DCMAKE_TOOLCHAIN_FILE=@SOURCE_ROOT@/CMakeToolchain-x86_64-vinix.txt'
+        - '-DCMAKE_INSTALL_PREFIX=/usr'
+        # We really have to build LLVM in Release mode.
+        # Building it in debug mode produces tens of GiB of debugging info.
+        - '-DCMAKE_BUILD_TYPE=Release'
+        - '-DLLVM_LINK_LLVM_DYLIB=ON'
+        # RTTI affects the ABI. Hence, we enable it.
+        - '-DLLVM_ENABLE_RTTI=ON'
+        - '-DLLVM_TARGETS_TO_BUILD=X86'
+        - '-DLLVM_TARGET_ARCH=x86_64'
+        - '-DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-vinix'
+        - '-DLLVM_HOST_TRIPLE=x86_64-vinix'
+        # Disable linking against ncurses, which we do not build with -fPIC.
+        - '-DLLVM_ENABLE_TERMINFO=OFF'
+        - '@THIS_SOURCE_DIR@/llvm'
     build:
       - args: ['ninja']
       - args: ['ninja', 'install']

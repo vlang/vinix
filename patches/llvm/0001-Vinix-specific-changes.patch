@@ -1,0 +1,775 @@
+From e4f91b4ae8669a40842056a1f78a15769b7d06e6 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Fri, 10 Sep 2021 09:09:46 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ clang/lib/Basic/Targets.cpp                   |   2 +
+ clang/lib/Basic/Targets/OSTargets.h           |  30 +-
+ clang/lib/Driver/CMakeLists.txt               |   1 +
+ clang/lib/Driver/Driver.cpp                   |   4 +
+ clang/lib/Driver/ToolChains/Gnu.cpp           |   3 +-
+ clang/lib/Driver/ToolChains/Vinix.cpp         | 427 ++++++++++++++++++
+ clang/lib/Driver/ToolChains/Vinix.h           |  49 ++
+ llvm/cmake/modules/CrossCompile.cmake         |   4 +-
+ llvm/include/llvm/ADT/Triple.h                |   1 +
+ llvm/include/llvm/Support/SwapByteOrder.h     |   2 +-
+ llvm/lib/Support/Triple.cpp                   |   2 +
+ llvm/lib/Support/Unix/Path.inc                |   6 +-
+ llvm/lib/Support/Unix/Program.inc             |   1 +
+ llvm/tools/llvm-dwarfdump/Statistics.cpp      |   1 +
+ llvm/tools/llvm-shlib/CMakeLists.txt          |   5 +-
+ llvm/utils/benchmark/src/benchmark_register.h |   1 +
+ 16 files changed, 529 insertions(+), 10 deletions(-)
+ create mode 100644 clang/lib/Driver/ToolChains/Vinix.cpp
+ create mode 100644 clang/lib/Driver/ToolChains/Vinix.h
+
+diff --git a/clang/lib/Basic/Targets.cpp b/clang/lib/Basic/Targets.cpp
+index c063f8ca4..1ae185672 100644
+--- a/clang/lib/Basic/Targets.cpp
++++ b/clang/lib/Basic/Targets.cpp
+@@ -553,6 +553,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+     }
+     case llvm::Triple::Haiku:
+       return new HaikuTargetInfo<X86_64TargetInfo>(Triple, Opts);
++    case llvm::Triple::Vinix:
++      return new VinixTargetInfo<X86_64TargetInfo>(Triple, Opts);
+     case llvm::Triple::NaCl:
+       return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
+     case llvm::Triple::PS4:
+diff --git a/clang/lib/Basic/Targets/OSTargets.h b/clang/lib/Basic/Targets/OSTargets.h
+index 70fac030b..63b5a0072 100644
+--- a/clang/lib/Basic/Targets/OSTargets.h
++++ b/clang/lib/Basic/Targets/OSTargets.h
+@@ -296,7 +296,7 @@ protected:
+     Builder.defineMacro("__HAIKU__");
+     Builder.defineMacro("__ELF__");
+     DefineStd(Builder, "unix", Opts);
+-    if (this->HasFloat128) 
++    if (this->HasFloat128)
+       Builder.defineMacro("__FLOAT128__");
+   }
+ 
+@@ -342,6 +342,34 @@ public:
+       : OSTargetInfo<Target>(Triple, Opts) {}
+ };
+ 
++// Vinix Target
++template <typename Target>
++class LLVM_LIBRARY_VISIBILITY VinixTargetInfo : public OSTargetInfo<Target> {
++protected:
++  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
++                    MacroBuilder &Builder) const override {
++    Builder.defineMacro("__vinix__");
++    Builder.defineMacro("__ELF__");
++    if (Opts.POSIXThreads)
++      Builder.defineMacro("_REENTRANT");
++    if (Opts.CPlusPlus)
++      Builder.defineMacro("_GNU_SOURCE");
++  }
++
++public:
++  VinixTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
++      : OSTargetInfo<Target>(Triple, Opts) {
++    switch (Triple.getArch()) {
++    default:
++      break;
++    case llvm::Triple::x86:
++    case llvm::Triple::x86_64:
++      this->HasFloat128 = true;
++      break;
++    }
++  }
++};
++
+ // Minix Target
+ template <typename Target>
+ class LLVM_LIBRARY_VISIBILITY MinixTargetInfo : public OSTargetInfo<Target> {
+diff --git a/clang/lib/Driver/CMakeLists.txt b/clang/lib/Driver/CMakeLists.txt
+index 6f25d3588..c5c7ea119 100644
+--- a/clang/lib/Driver/CMakeLists.txt
++++ b/clang/lib/Driver/CMakeLists.txt
+@@ -54,6 +54,7 @@ add_clang_library(clangDriver
+   ToolChains/Hexagon.cpp
+   ToolChains/Hurd.cpp
+   ToolChains/Linux.cpp
++  ToolChains/Vinix.cpp
+   ToolChains/MipsLinux.cpp
+   ToolChains/MinGW.cpp
+   ToolChains/Minix.cpp
+diff --git a/clang/lib/Driver/Driver.cpp b/clang/lib/Driver/Driver.cpp
+index fb8335a36..600fe54f0 100644
+--- a/clang/lib/Driver/Driver.cpp
++++ b/clang/lib/Driver/Driver.cpp
+@@ -29,6 +29,7 @@
+ #include "ToolChains/Hurd.h"
+ #include "ToolChains/Lanai.h"
+ #include "ToolChains/Linux.h"
++#include "ToolChains/Vinix.h"
+ #include "ToolChains/MSP430.h"
+ #include "ToolChains/MSVC.h"
+ #include "ToolChains/MinGW.h"
+@@ -4853,6 +4854,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
+     case llvm::Triple::Fuchsia:
+       TC = std::make_unique<toolchains::Fuchsia>(*this, Target, Args);
+       break;
++    case llvm::Triple::Vinix:
++      TC = std::make_unique<toolchains::Vinix>(*this, Target, Args);
++      break;
+     case llvm::Triple::Solaris:
+       TC = std::make_unique<toolchains::Solaris>(*this, Target, Args);
+       break;
+diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
+index da197e476..666215aa3 100644
+--- a/clang/lib/Driver/ToolChains/Gnu.cpp
++++ b/clang/lib/Driver/ToolChains/Gnu.cpp
+@@ -2025,7 +2025,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
+       "x86_64-redhat-linux",    "x86_64-suse-linux",
+       "x86_64-manbo-linux-gnu", "x86_64-linux-gnu",
+       "x86_64-slackware-linux", "x86_64-unknown-linux",
+-      "x86_64-amazon-linux",    "x86_64-linux-android"};
++      "x86_64-amazon-linux",    "x86_64-linux-android",
++      "x86_64-vinix"};
+   static const char *const X32LibDirs[] = {"/libx32"};
+   static const char *const X86LibDirs[] = {"/lib32", "/lib"};
+   static const char *const X86Triples[] = {
+diff --git a/clang/lib/Driver/ToolChains/Vinix.cpp b/clang/lib/Driver/ToolChains/Vinix.cpp
+new file mode 100644
+index 000000000..30e48105e
+--- /dev/null
++++ b/clang/lib/Driver/ToolChains/Vinix.cpp
+@@ -0,0 +1,427 @@
++//===------- Vinix.cpp - Vinix ToolChain Implementations --------*- C++ -*-===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#include "Vinix.h"
++#include "Arch/ARM.h"
++#include "Arch/Mips.h"
++#include "Arch/PPC.h"
++#include "CommonArgs.h"
++#include "clang/Config/config.h"
++#include "clang/Driver/Distro.h"
++#include "clang/Driver/Driver.h"
++#include "clang/Driver/Options.h"
++#include "clang/Driver/SanitizerArgs.h"
++#include "llvm/Option/ArgList.h"
++#include "llvm/ProfileData/InstrProf.h"
++#include "llvm/Support/Path.h"
++#include <system_error>
++
++using namespace clang::driver;
++using namespace clang::driver::toolchains;
++using namespace clang;
++using namespace llvm::opt;
++
++using tools::addPathIfExists;
++
++/// \brief Get our best guess at the multiarch triple for a target.
++static std::string getMultiarchTriple(const Driver &D,
++                                      const llvm::Triple &TargetTriple,
++                                      StringRef SysRoot) {
++  // For most architectures, just use whatever we have rather than trying to be
++  // clever.
++  switch (TargetTriple.getArch()) {
++  default:
++    break;
++
++  case llvm::Triple::x86_64:
++    // We don't want this for x32, otherwise it will match x86_64 libs
++    return "x86_64-vinix";
++  }
++  return TargetTriple.str();
++}
++
++static StringRef getOSLibDir(const llvm::Triple &Triple, const ArgList &Args) {
++  // It happens that only x86 and PPC use the 'lib32' variant of oslibdir, and
++  // using that variant while targeting other architectures causes problems
++  // because the libraries are laid out in shared system roots that can't cope
++  // with a 'lib32' library search path being considered. So we only enable
++  // them when we know we may need it.
++  //
++  // FIXME: This is a bit of a hack. We should really unify this code for
++  // reasoning about oslibdir spellings with the lib dir spellings in the
++  // GCCInstallationDetector, but that is a more significant refactoring.
++  if (Triple.getArch() == llvm::Triple::x86 ||
++      Triple.getArch() == llvm::Triple::ppc)
++    return "lib32";
++
++  if (Triple.getArch() == llvm::Triple::x86_64 &&
++      Triple.getEnvironment() == llvm::Triple::GNUX32)
++    return "libx32";
++
++  return Triple.isArch32Bit() ? "lib" : "lib64";
++}
++
++static void addMultilibsFilePaths(const Driver &D, const MultilibSet &Multilibs,
++                                  const Multilib &Multilib,
++                                  StringRef InstallPath,
++                                  ToolChain::path_list &Paths) {
++  if (const auto &PathsCallback = Multilibs.filePathsCallback())
++    for (const auto &Path : PathsCallback(Multilib))
++      addPathIfExists(D, InstallPath + Path, Paths);
++}
++
++Vinix::Vinix(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
++    : Generic_ELF(D, Triple, Args) {
++  GCCInstallation.init(Triple, Args);
++  Multilibs = GCCInstallation.getMultilibs();
++  std::string SysRoot = computeSysRoot();
++
++  // Cross-compiling binutils and GCC installations (vanilla and openSUSE at
++  // least) put various tools in a triple-prefixed directory off of the parent
++  // of the GCC installation. We use the GCC triple here to ensure that we end
++  // up with tools that support the same amount of cross compiling as the
++  // detected GCC installation. For example, if we find a GCC installation
++  // targeting x86_64, but it is a bi-arch GCC installation, it can also be
++  // used to target i386.
++  // FIXME: This seems unlikely to be Linux/Vinix-specific.
++  ToolChain::path_list &PPaths = getProgramPaths();
++  PPaths.push_back(Twine(GCCInstallation.getParentLibPath() + "/../" +
++                         GCCInstallation.getTriple().str() + "/bin")
++                       .str());
++
++#ifdef ENABLE_LINKER_BUILD_ID
++  ExtraOpts.push_back("--build-id");
++#endif
++
++  // The selection of paths to try here is designed to match the patterns which
++  // the GCC driver itself uses, as this is part of the GCC-compatible driver.
++  // This was determined by running GCC in a fake filesystem, creating all
++  // possible permutations of these directories, and seeing which ones it added
++  // to the link paths.
++  path_list &Paths = getFilePaths();
++
++  const std::string OSLibDir = getOSLibDir(Triple, Args);
++  const std::string MultiarchTriple = getMultiarchTriple(D, Triple, SysRoot);
++
++  // Add the multilib suffixed paths where they are available.
++  if (GCCInstallation.isValid()) {
++    const llvm::Triple &GCCTriple = GCCInstallation.getTriple();
++    const std::string &LibPath = GCCInstallation.getParentLibPath();
++    const Multilib &Multilib = GCCInstallation.getMultilib();
++    const MultilibSet &Multilibs = GCCInstallation.getMultilibs();
++
++    // Add toolchain / multilib specific file paths.
++    addMultilibsFilePaths(D, Multilibs, Multilib,
++                          GCCInstallation.getInstallPath(), Paths);
++
++    // Sourcery CodeBench MIPS toolchain holds some libraries under
++    // a biarch-like suffix of the GCC installation.
++    addPathIfExists(D, GCCInstallation.getInstallPath() + Multilib.gccSuffix(),
++                    Paths);
++
++    // GCC cross compiling toolchains will install target libraries which ship
++    // as part of the toolchain under <prefix>/<triple>/<libdir> rather than as
++    // any part of the GCC installation in
++    // <prefix>/<libdir>/gcc/<triple>/<version>. This decision is somewhat
++    // debatable, but is the reality today. We need to search this tree even
++    // when we have a sysroot somewhere else. It is the responsibility of
++    // whomever is doing the cross build targeting a sysroot using a GCC
++    // installation that is *not* within the system root to ensure two things:
++    //
++    //  1) Any DSOs that are linked in from this tree or from the install path
++    //     above must be present on the system root and found via an
++    //     appropriate rpath.
++    //  2) There must not be libraries installed into
++    //     <prefix>/<triple>/<libdir> unless they should be preferred over
++    //     those within the system root.
++    //
++    // Note that this matches the GCC behavior. See the below comment for where
++    // Clang diverges from GCC's behavior.
++    addPathIfExists(D, LibPath + "/../" + GCCTriple.str() + "/lib/../" +
++                           OSLibDir + Multilib.osSuffix(),
++                    Paths);
++
++    // If the GCC installation we found is inside of the sysroot, we want to
++    // prefer libraries installed in the parent prefix of the GCC installation.
++    // It is important to *not* use these paths when the GCC installation is
++    // outside of the system root as that can pick up unintended libraries.
++    // This usually happens when there is an external cross compiler on the
++    // host system, and a more minimal sysroot available that is the target of
++    // the cross. Note that GCC does include some of these directories in some
++    // configurations but this seems somewhere between questionable and simply
++    // a bug.
++    if (StringRef(LibPath).startswith(SysRoot)) {
++      addPathIfExists(D, LibPath + "/" + MultiarchTriple, Paths);
++      addPathIfExists(D, LibPath + "/../" + OSLibDir, Paths);
++    }
++  }
++
++  // Similar to the logic for GCC above, if we currently running Clang inside
++  // of the requested system root, add its parent library paths to
++  // those searched.
++  // FIXME: It's not clear whether we should use the driver's installed
++  // directory ('Dir' below) or the ResourceDir.
++  if (StringRef(D.Dir).startswith(SysRoot)) {
++    addPathIfExists(D, D.Dir + "/../lib/" + MultiarchTriple, Paths);
++    addPathIfExists(D, D.Dir + "/../" + OSLibDir, Paths);
++  }
++
++  addPathIfExists(D, SysRoot + "/lib/" + MultiarchTriple, Paths);
++  addPathIfExists(D, SysRoot + "/lib/../" + OSLibDir, Paths);
++  addPathIfExists(D, SysRoot + "/usr/lib/" + MultiarchTriple, Paths);
++  addPathIfExists(D, SysRoot + "/usr/lib/../" + OSLibDir, Paths);
++
++  // Try walking via the GCC triple path in case of biarch or multiarch GCC
++  // installations with strange symlinks.
++  if (GCCInstallation.isValid()) {
++    addPathIfExists(D,
++                    SysRoot + "/usr/lib/" + GCCInstallation.getTriple().str() +
++                        "/../../" + OSLibDir,
++                    Paths);
++
++    // Add the 'other' biarch variant path
++    Multilib BiarchSibling;
++    if (GCCInstallation.getBiarchSibling(BiarchSibling)) {
++      addPathIfExists(D, GCCInstallation.getInstallPath() +
++                             BiarchSibling.gccSuffix(),
++                      Paths);
++    }
++
++    // See comments above on the multilib variant for details of why this is
++    // included even from outside the sysroot.
++    const std::string &LibPath = GCCInstallation.getParentLibPath();
++    const llvm::Triple &GCCTriple = GCCInstallation.getTriple();
++    const Multilib &Multilib = GCCInstallation.getMultilib();
++    addPathIfExists(D, LibPath + "/../" + GCCTriple.str() + "/lib" +
++                           Multilib.osSuffix(),
++                    Paths);
++
++    // See comments above on the multilib variant for details of why this is
++    // only included from within the sysroot.
++    if (StringRef(LibPath).startswith(SysRoot))
++      addPathIfExists(D, LibPath, Paths);
++  }
++
++  // Similar to the logic for GCC above, if we are currently running Clang
++  // inside of the requested system root, add its parent library path to those
++  // searched.
++  // FIXME: It's not clear whether we should use the driver's installed
++  // directory ('Dir' below) or the ResourceDir.
++  if (StringRef(D.Dir).startswith(SysRoot))
++    addPathIfExists(D, D.Dir + "/../lib", Paths);
++
++  addPathIfExists(D, SysRoot + "/lib", Paths);
++  addPathIfExists(D, SysRoot + "/usr/lib", Paths);
++}
++
++bool Vinix::HasNativeLLVMSupport() const { return true; }
++
++Tool *Vinix::buildLinker() const {
++    return new tools::gnutools::Linker(*this);
++}
++
++Tool *Vinix::buildAssembler() const {
++  return new tools::gnutools::Assembler(*this);
++}
++
++std::string Vinix::computeSysRoot() const {
++  if (!getDriver().SysRoot.empty())
++    return getDriver().SysRoot;
++  return std::string();
++}
++
++std::string Vinix::getDynamicLinker(const ArgList &Args) const {
++  switch (getTriple().getArch()) {
++  case llvm::Triple::x86_64:
++    return "/usr/lib/ld.so";
++  default:
++    return std::string();
++  }
++}
++
++void Vinix::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
++                                      ArgStringList &CC1Args) const {
++  const Driver &D = getDriver();
++  std::string SysRoot = computeSysRoot();
++
++  if (DriverArgs.hasArg(clang::driver::options::OPT_nostdinc))
++    return;
++
++  if (!DriverArgs.hasArg(options::OPT_nostdlibinc))
++    addSystemInclude(DriverArgs, CC1Args, SysRoot + "/usr/local/include");
++
++  if (!DriverArgs.hasArg(options::OPT_nobuiltininc)) {
++    SmallString<128> P(D.ResourceDir);
++    llvm::sys::path::append(P, "include");
++    addSystemInclude(DriverArgs, CC1Args, P);
++  }
++
++  if (DriverArgs.hasArg(options::OPT_nostdlibinc))
++    return;
++
++  // Check for configure-time C include directories.
++  StringRef CIncludeDirs(C_INCLUDE_DIRS);
++  if (CIncludeDirs != "") {
++    SmallVector<StringRef, 5> dirs;
++    CIncludeDirs.split(dirs, ":");
++    for (StringRef dir : dirs) {
++      StringRef Prefix =
++          llvm::sys::path::is_absolute(dir) ? StringRef(SysRoot) : "";
++      addExternCSystemInclude(DriverArgs, CC1Args, Prefix + dir);
++    }
++    return;
++  }
++
++  // Lacking those, try to detect the correct set of system includes for the
++  // target triple.
++
++  // Add include directories specific to the selected multilib set and multilib.
++  if (GCCInstallation.isValid()) {
++    const auto &Callback = Multilibs.includeDirsCallback();
++    if (Callback) {
++      for (const auto &Path : Callback(GCCInstallation.getMultilib())) {
++        addExternCSystemIncludeIfExists(
++            DriverArgs, CC1Args, GCCInstallation.getInstallPath() + Path);
++      }
++    }
++  }
++
++  // Implement generic Debian multiarch support.
++  const StringRef AArch64MultiarchIncludeDirs[] = {
++      "/usr/include/aarch64-vinix-gnu"};
++  const StringRef X86_64MultiarchIncludeDirs[] = {
++      "/usr/include/x86_64-vinix-gnu"};
++  const StringRef X86MultiarchIncludeDirs[] = {
++      "/usr/include/i386-vinix-gnu"};
++  ArrayRef<StringRef> MultiarchIncludeDirs;
++  switch (getTriple().getArch()) {
++  case llvm::Triple::aarch64:
++    MultiarchIncludeDirs = AArch64MultiarchIncludeDirs;
++    break;
++  case llvm::Triple::x86_64:
++    MultiarchIncludeDirs = X86_64MultiarchIncludeDirs;
++    break;
++  case llvm::Triple::x86:
++    MultiarchIncludeDirs = X86MultiarchIncludeDirs;
++    break;
++  default:
++    break;
++  }
++  for (StringRef Dir : MultiarchIncludeDirs) {
++    if (D.getVFS().exists(SysRoot + Dir)) {
++      addExternCSystemInclude(DriverArgs, CC1Args, SysRoot + Dir);
++      break;
++    }
++  }
++
++  // Add an include of '/include' directly. This isn't provided by default by
++  // system GCCs, but is often used with cross-compiling GCCs, and harmless to
++  // add even when Clang is acting as-if it were a system compiler.
++  addExternCSystemInclude(DriverArgs, CC1Args, SysRoot + "/include");
++
++  addExternCSystemInclude(DriverArgs, CC1Args, SysRoot + "/usr/include");
++}
++
++void Vinix::addLibStdCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
++                                     llvm::opt::ArgStringList &CC1Args) const {
++  // We need a detected GCC installation on Vinix to provide libstdc++'s
++  // headers.
++  if (!GCCInstallation.isValid())
++    return;
++
++  // By default, look for the C++ headers in an include directory adjacent to
++  // the lib directory of the GCC installation. Note that this is expect to be
++  // equivalent to '/usr/include/c++/X.Y' in almost all cases.
++  StringRef LibDir = GCCInstallation.getParentLibPath();
++  StringRef InstallDir = GCCInstallation.getInstallPath();
++  StringRef TripleStr = GCCInstallation.getTriple().str();
++  const Multilib &Multilib = GCCInstallation.getMultilib();
++  const std::string GCCMultiarchTriple = getMultiarchTriple(
++      getDriver(), GCCInstallation.getTriple(), getDriver().SysRoot);
++  const std::string TargetMultiarchTriple =
++      getMultiarchTriple(getDriver(), getTriple(), getDriver().SysRoot);
++  const GCCVersion &Version = GCCInstallation.getVersion();
++
++  // The primary search for libstdc++ supports multiarch variants.
++  if (addLibStdCXXIncludePaths(LibDir.str() + "/../include",
++                               "/c++/" + Version.Text, TripleStr,
++                               GCCMultiarchTriple, TargetMultiarchTriple,
++                               Multilib.includeSuffix(), DriverArgs, CC1Args))
++    return;
++
++  // Otherwise, fall back on a bunch of options which don't use multiarch
++  // layouts for simplicity.
++  const std::string LibStdCXXIncludePathCandidates[] = {
++      // Gentoo is weird and places its headers inside the GCC install,
++      // so if the first attempt to find the headers fails, try these patterns.
++      InstallDir.str() + "/include/g++-v" + Version.Text,
++      InstallDir.str() + "/include/g++-v" + Version.MajorStr + "." +
++          Version.MinorStr,
++      InstallDir.str() + "/include/g++-v" + Version.MajorStr,
++      // Android standalone toolchain has C++ headers in yet another place.
++      LibDir.str() + "/../" + TripleStr.str() + "/include/c++/" + Version.Text,
++      // Freescale SDK C++ headers are directly in <sysroot>/usr/include/c++,
++      // without a subdirectory corresponding to the gcc version.
++      LibDir.str() + "/../include/c++",
++  };
++
++  for (const auto &IncludePath : LibStdCXXIncludePathCandidates) {
++    if (addLibStdCXXIncludePaths(IncludePath, /*Suffix*/ "", TripleStr,
++                                 /*GCCMultiarchTriple*/ "",
++                                 /*TargetMultiarchTriple*/ "",
++                                 Multilib.includeSuffix(), DriverArgs, CC1Args))
++      break;
++  }
++}
++
++SanitizerMask Vinix::getSupportedSanitizers() const {
++  const bool IsX86 = getTriple().getArch() == llvm::Triple::x86;
++  const bool IsX86_64 = getTriple().getArch() == llvm::Triple::x86_64;
++  const bool IsMIPS = getTriple().isMIPS32();
++  const bool IsMIPS64 = getTriple().isMIPS64();
++  const bool IsPowerPC64 = getTriple().getArch() == llvm::Triple::ppc64 ||
++                           getTriple().getArch() == llvm::Triple::ppc64le;
++  const bool IsAArch64 = getTriple().getArch() == llvm::Triple::aarch64 ||
++                         getTriple().getArch() == llvm::Triple::aarch64_be;
++  const bool IsArmArch = getTriple().getArch() == llvm::Triple::arm ||
++                         getTriple().getArch() == llvm::Triple::thumb ||
++                         getTriple().getArch() == llvm::Triple::armeb ||
++                         getTriple().getArch() == llvm::Triple::thumbeb;
++  SanitizerMask Res = ToolChain::getSupportedSanitizers();
++  Res |= SanitizerKind::Address;
++  Res |= SanitizerKind::PointerCompare;
++  Res |= SanitizerKind::PointerSubtract;
++  Res |= SanitizerKind::Fuzzer;
++  Res |= SanitizerKind::FuzzerNoLink;
++  Res |= SanitizerKind::KernelAddress;
++  Res |= SanitizerKind::Memory;
++  Res |= SanitizerKind::Vptr;
++  Res |= SanitizerKind::SafeStack;
++  if (IsX86_64 || IsMIPS64 || IsAArch64)
++    Res |= SanitizerKind::DataFlow;
++  if (IsX86_64 || IsMIPS64 || IsAArch64 || IsX86 || IsArmArch || IsPowerPC64)
++    Res |= SanitizerKind::Leak;
++  if (IsX86_64 || IsMIPS64 || IsAArch64 || IsPowerPC64)
++    Res |= SanitizerKind::Thread;
++  if (IsX86_64)
++    Res |= SanitizerKind::KernelMemory;
++  if (IsX86 || IsX86_64)
++    Res |= SanitizerKind::Function;
++  if (IsX86_64 || IsMIPS64 || IsAArch64 || IsX86 || IsMIPS || IsArmArch ||
++      IsPowerPC64)
++    Res |= SanitizerKind::Scudo;
++  if (IsX86_64 || IsAArch64) {
++    Res |= SanitizerKind::HWAddress;
++    Res |= SanitizerKind::KernelHWAddress;
++  }
++  if (IsAArch64)
++    Res |= SanitizerKind::MemTag;
++  return Res;
++}
++
+diff --git a/clang/lib/Driver/ToolChains/Vinix.h b/clang/lib/Driver/ToolChains/Vinix.h
+new file mode 100644
+index 000000000..2428e411a
+--- /dev/null
++++ b/clang/lib/Driver/ToolChains/Vinix.h
+@@ -0,0 +1,49 @@
++//===------- Vinix.h - Vinix ToolChain Implementations ----------*- C++ -*-===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
++#define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
++
++#include "Gnu.h"
++#include "clang/Driver/ToolChain.h"
++
++namespace clang {
++namespace driver {
++namespace toolchains {
++
++class LLVM_LIBRARY_VISIBILITY Vinix : public Generic_ELF {
++public:
++  Vinix(const Driver &D, const llvm::Triple &Triple,
++        const llvm::opt::ArgList &Args);
++
++  bool HasNativeLLVMSupport() const override;
++
++  void
++  AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
++                            llvm::opt::ArgStringList &CC1Args) const override;
++  void addLibStdCxxIncludePaths(
++      const llvm::opt::ArgList &DriverArgs,
++      llvm::opt::ArgStringList &CC1Args) const override;
++  SanitizerMask getSupportedSanitizers() const override;
++  virtual std::string computeSysRoot() const;
++
++  virtual std::string getDynamicLinker(const llvm::opt::ArgList &Args) const;
++
++  std::vector<std::string> ExtraOpts;
++
++protected:
++  Tool *buildAssembler() const override;
++  Tool *buildLinker() const override;
++};
++
++} // end namespace toolchains
++} // end namespace driver
++} // end namespace clang
++
++#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
+diff --git a/llvm/cmake/modules/CrossCompile.cmake b/llvm/cmake/modules/CrossCompile.cmake
+index 8a6e880c4..fb86a7c17 100644
+--- a/llvm/cmake/modules/CrossCompile.cmake
++++ b/llvm/cmake/modules/CrossCompile.cmake
+@@ -17,8 +17,8 @@ function(llvm_create_cross_target project_name target_name toolchain buildtype)
+       -DCMAKE_TOOLCHAIN_FILE=\"${LLVM_MAIN_SRC_DIR}/cmake/platforms/${toolchain}.cmake\")
+   else()
+     set(CROSS_TOOLCHAIN_FLAGS_INIT
+-      -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+-      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
++      -DCMAKE_C_COMPILER=gcc
++      -DCMAKE_CXX_COMPILER=g++
+       )
+   endif()
+   set(CROSS_TOOLCHAIN_FLAGS_${target_name} ${CROSS_TOOLCHAIN_FLAGS_INIT}
+diff --git a/llvm/include/llvm/ADT/Triple.h b/llvm/include/llvm/ADT/Triple.h
+index 76a754d67..a95f91f36 100644
+--- a/llvm/include/llvm/ADT/Triple.h
++++ b/llvm/include/llvm/ADT/Triple.h
+@@ -168,6 +168,7 @@ public:
+     Linux,
+     Lv2,        // PS3
+     MacOSX,
++    Vinix,
+     NetBSD,
+     OpenBSD,
+     Solaris,
+diff --git a/llvm/include/llvm/Support/SwapByteOrder.h b/llvm/include/llvm/Support/SwapByteOrder.h
+index 6cec87006..1b83c586f 100644
+--- a/llvm/include/llvm/Support/SwapByteOrder.h
++++ b/llvm/include/llvm/Support/SwapByteOrder.h
+@@ -22,7 +22,7 @@
+ #include <stdlib.h>
+ #endif
+ 
+-#if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__)
++#if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) || defined(__vinix__)
+ #include <endian.h>
+ #elif defined(_AIX)
+ #include <sys/machine.h>
+diff --git a/llvm/lib/Support/Triple.cpp b/llvm/lib/Support/Triple.cpp
+index 2c480c109..d51a47aad 100644
+--- a/llvm/lib/Support/Triple.cpp
++++ b/llvm/lib/Support/Triple.cpp
+@@ -201,6 +201,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+   case Linux: return "linux";
+   case Lv2: return "lv2";
+   case MacOSX: return "macosx";
++  case Vinix: return "vinix";
+   case Mesa3D: return "mesa3d";
+   case Minix: return "minix";
+   case NVCL: return "nvcl";
+@@ -495,6 +496,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+     .StartsWith("linux", Triple::Linux)
+     .StartsWith("lv2", Triple::Lv2)
+     .StartsWith("macos", Triple::MacOSX)
++    .StartsWith("vinix", Triple::Vinix)
+     .StartsWith("netbsd", Triple::NetBSD)
+     .StartsWith("openbsd", Triple::OpenBSD)
+     .StartsWith("solaris", Triple::Solaris)
+diff --git a/llvm/lib/Support/Unix/Path.inc b/llvm/lib/Support/Unix/Path.inc
+index 2a03dc682..9f41a4f70 100644
+--- a/llvm/lib/Support/Unix/Path.inc
++++ b/llvm/lib/Support/Unix/Path.inc
+@@ -64,7 +64,7 @@ extern char **environ;
+ 
+ #include <sys/types.h>
+ #if !defined(__APPLE__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) &&   \
+-    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX)
++    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX) && !defined(__vinix__)
+ #include <sys/statvfs.h>
+ #define STATVFS statvfs
+ #define FSTATVFS fstatvfs
+@@ -73,7 +73,7 @@ extern char **environ;
+ #if defined(__OpenBSD__) || defined(__FreeBSD__)
+ #include <sys/mount.h>
+ #include <sys/param.h>
+-#elif defined(__linux__)
++#elif defined(__linux__) || defined(__vinix__)
+ #if defined(HAVE_LINUX_MAGIC_H)
+ #include <linux/magic.h>
+ #else
+@@ -431,7 +431,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
+ }
+ 
+ static bool is_local_impl(struct STATVFS &Vfs) {
+-#if defined(__linux__) || defined(__GNU__)
++#if defined(__linux__) || defined(__GNU__) || defined(__vinix__)
+ #ifndef NFS_SUPER_MAGIC
+ #define NFS_SUPER_MAGIC 0x6969
+ #endif
+diff --git a/llvm/lib/Support/Unix/Program.inc b/llvm/lib/Support/Unix/Program.inc
+index 520685a0e..e6c2ddf20 100644
+--- a/llvm/lib/Support/Unix/Program.inc
++++ b/llvm/lib/Support/Unix/Program.inc
+@@ -39,6 +39,7 @@
+ #if HAVE_UNISTD_H
+ #include <unistd.h>
+ #endif
++#undef HAVE_POSIX_SPAWN
+ #ifdef HAVE_POSIX_SPAWN
+ #include <spawn.h>
+ 
+diff --git a/llvm/tools/llvm-dwarfdump/Statistics.cpp b/llvm/tools/llvm-dwarfdump/Statistics.cpp
+index 5bef4d514..2a237ef59 100644
+--- a/llvm/tools/llvm-dwarfdump/Statistics.cpp
++++ b/llvm/tools/llvm-dwarfdump/Statistics.cpp
+@@ -1,3 +1,4 @@
++#include <cmath>
+ #include "llvm/ADT/DenseMap.h"
+ #include "llvm/ADT/StringExtras.h"
+ #include "llvm/ADT/StringSet.h"
+diff --git a/llvm/tools/llvm-shlib/CMakeLists.txt b/llvm/tools/llvm-shlib/CMakeLists.txt
+index 3eb6db33a..07c15d046 100644
+--- a/llvm/tools/llvm-shlib/CMakeLists.txt
++++ b/llvm/tools/llvm-shlib/CMakeLists.txt
+@@ -36,6 +36,7 @@ if(LLVM_BUILD_LLVM_DYLIB)
+   if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux") OR (MINGW) OR (HAIKU)
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "GNU")
++     OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Vinix")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Fuchsia")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "DragonFly")
+@@ -97,10 +98,10 @@ if(LLVM_BUILD_LLVM_C_DYLIB AND NOT MSVC)
+   add_custom_target(libLLVMCExports DEPENDS ${LLVM_EXPORTED_SYMBOL_FILE})
+ 
+   add_llvm_library(LLVM-C SHARED ${SOURCES} INSTALL_WITH_TOOLCHAIN)
+-  
++
+   target_link_libraries(LLVM-C PUBLIC LLVM)
+   add_dependencies(LLVM-C libLLVMCExports)
+-  
++
+   set_property(TARGET LLVM-C APPEND_STRING PROPERTY
+               LINK_FLAGS
+               " -compatibility_version 1 -current_version ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH} -Wl,-reexport_library ${LIB_PATH}")
+diff --git a/llvm/utils/benchmark/src/benchmark_register.h b/llvm/utils/benchmark/src/benchmark_register.h
+index 0705e219f..6001fb8e0 100644
+--- a/llvm/utils/benchmark/src/benchmark_register.h
++++ b/llvm/utils/benchmark/src/benchmark_register.h
+@@ -2,6 +2,7 @@
+ #define BENCHMARK_REGISTER_H
+ 
+ #include <vector>
++#include <limits>
+ 
+ #include "check.h"
+ 
+-- 
+2.33.0
+
