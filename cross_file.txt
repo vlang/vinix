@@ -3,7 +3,8 @@ c = 'x86_64-vinix-gcc'
 cpp = 'x86_64-vinix-g++'
 ar = 'x86_64-vinix-ar'
 strip = 'x86_64-vinix-strip'
-pkgconfig = 'pkg-config'
+pkgconfig = 'x86_64-vinix-pkg-config'
+# sed adds binaries here.
 
 [host_machine]
 system = 'vinix'

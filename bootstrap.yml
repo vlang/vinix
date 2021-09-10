@@ -874,6 +874,89 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: wayland-protocols
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/wayland-project/wayland-protocols.git'
+      tag: '1.21'
+      version: '1.21'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+      - host-wayland-scanner
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: mesa
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/mesa/mesa.git'
+      tag: 'mesa-21.1.4'
+      version: '21.1.4'
+    tools_required:
+      - host-pkg-config
+      - host-gcc
+      - host-wayland-scanner
+      - virtual: pkgconfig-for-target
+        triple: "x86_64-vinix"
+      - virtual: pkgconfig-for-host
+        program_name: host-pkg-config
+    pkgs_required:
+      - mlibc
+      - libdrm
+      - llvm
+      - wayland
+      - wayland-protocols
+      - zlib
+    configure:
+      - args: ['cp', '@SOURCE_ROOT@/cross_file.txt', 'meson.cross-file']
+      - args:
+        - 'sed'
+        - '-i'
+        - "/^# sed adds binaries here.$/a llvm-config = '@SOURCE_ROOT@/cross-llvm-config'"
+        - 'meson.cross-file'
+      - args:
+        - 'meson'
+        - '--native-file'
+        - '@SOURCE_ROOT@/native_file.txt'
+        - '--cross-file'
+        - 'meson.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        # The debug build type enables some additional output from Mesa.
+        - '--buildtype=debugoptimized'
+        - '-Dglx=disabled'
+        - '-Dplatforms=wayland'
+        # The Gallium swrast driver seems to be preferred over dri-swrast.
+        - '-Ddri-drivers='
+        - '-Dgallium-drivers=swrast'
+        - '-Dvulkan-drivers='
+        # Force Mesa to build with LLVM.
+        - '-Dllvm=true'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: coreutils
     source:
       subdir: '3rdparty'

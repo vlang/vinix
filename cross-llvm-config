@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+
+# This file was taken from Managarm and I have no clue what it does.
+
+import argparse
+import sys
+import os
+
+our_version = 10
+
+def do_version():
+	return '{}.0.0'.format(our_version)
+
+def do_components():
+	return 'all all-targets analysis asmparser asmprinter binaryformat bitreader bitwriter codegen core coroutines coverage debuginfocodeview debuginfodwarf debuginfomsf debuginfopdb demangle dlltooldriver engine executionengine fuzzmutate globalisel gtest gtest_main instcombine instrumentation interpreter ipo irreader libdriver lineeditor linker lto mc mcdisassembler mcjit mcparser mirparser native nativecodegen objcarcopts object objectyaml option orcjit passes profiledata runtimedyld scalaropts selectiondag support symbolize tablegen target testingsupport transformutils vectorize windowsmanifest x86 x86asmparser x86asmprinter x86codegen x86desc x86disassembler x86info x86utils'
+
+def do_targets_built():
+	return 'X86'
+
+def get_includedir():
+	sysroot = os.environ['XBSTRAP_SYSROOT_DIR']
+	return sysroot + '/usr/include'
+
+def get_libdir():
+	sysroot = os.environ['XBSTRAP_SYSROOT_DIR']
+	return sysroot + '/usr/lib'
+
+def do_has_rtti():
+	return 'YES'
+
+def do_shared_mode():
+	return 'shared'
+
+def do_libs():
+	return '-lLLVM-{}'.format(our_version)
+
+def do_system_libs():
+	return '-lLLVM-{}'.format(our_version)
+
+def do_cppflags():
+	return ''
+
+def do_cxxflags():
+	return ''
+
+def do_ldflags():
+	return '-L' + get_libdir()
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--version', action='append_const', dest='command', const=do_version)
+parser.add_argument('--targets-built', action='append_const', dest='command', const=do_targets_built)
+parser.add_argument('--components', action='append_const', dest='command', const=do_components)
+parser.add_argument('--includedir', action='append_const', dest='command', const=get_includedir)
+parser.add_argument('--libdir', action='append_const', dest='command', const=get_libdir)
+parser.add_argument('--has-rtti', action='append_const', dest='command', const=do_has_rtti)
+parser.add_argument('--shared-mode', action='append_const', dest='command', const=do_shared_mode)
+parser.add_argument('--link-shared', action='store_const', dest='link', const='shared')
+parser.add_argument('--cppflags', action='append_const', dest='command', const=do_cppflags)
+parser.add_argument('--cxxflags', action='append_const', dest='command', const=do_cxxflags)
+parser.add_argument('--ldflags', action='append_const', dest='command', const=do_ldflags)
+parser.add_argument('--libs', action='append_const', dest='command', const=do_libs)
+parser.add_argument('--system-libs', action='append_const', dest='command', const=do_system_libs)
+parser.add_argument('components', type=str, nargs='*')
+
+print("cross-llvm-config:", sys.argv, file=sys.stderr)
+
+args = parser.parse_args()
+for command in args.command:
+	result = command()
+	print("cross-llvm-config yields:", result, file=sys.stderr)
+	print(result)
+
