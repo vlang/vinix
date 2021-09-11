@@ -1604,6 +1604,44 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: libxml
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.gnome.org/GNOME/libxml2.git'
+      tag: 'v2.9.12'
+      version: '2.9.12'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+      - host-python
+    pkgs_required:
+      - mlibc
+      - zlib
+      - python
+      - libiconv
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-python=@SYSROOT_DIR@/usr/bin/python3.8'
+        - '--disable-static'
+        - '--with-threads'
+        - '--disable-ipv6'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: python
     from_source: python
     tools_required:
