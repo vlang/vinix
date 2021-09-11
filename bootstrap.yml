@@ -551,6 +551,7 @@ tasks:
       - diffutils
       - sed
       - binutils
+      - radare2
       - gcc
       - gawk
       - vim
@@ -1681,6 +1682,27 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: radare2
+    source:
+      subdir: '3rdparty'
+      url: 'https://codeload.github.com/radareorg/radare2/tar.gz/refs/tags/5.4.0'
+      format: 'tar.gz'
+      extract_path: 'radare2-5.4.0'
+      version: '5.4.0'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - 'bash'
+        - '-c'
+        - 'cp -rf @THIS_SOURCE_DIR@/* . ; cp dist/plugins/plugins.vinix.cfg plugins.cfg ; ./configure --disable-debugger --host=x86_64-vinix --with-ostype=gnulinux --prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install', 'DESTDIR=@THIS_COLLECT_DIR@']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
   - name: libevdev
     source:
       subdir: '3rdparty'
