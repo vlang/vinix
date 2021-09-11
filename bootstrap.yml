@@ -1604,6 +1604,52 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: fontconfig
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig'
+      tag: '2.13.92'
+      version: '2.13.92'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+        # Make sure we regenerate this file
+        - args: ['rm', '-f', 'src/fcobjshash.h']
+    pkgs_required:
+      - mlibc
+      - freetype
+      - libxml
+      - libiconv
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-gcc
+      - host-libtool
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "x86_64-vinix"
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-docs'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--enable-libxml2'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: libxml
     source:
       subdir: '3rdparty'
