@@ -1,0 +1,39 @@
+From 26fdce8f3b41a247cece90c2daa29f3e9ab51ae0 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sat, 11 Sep 2021 07:26:39 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ automake.in    | 2 +-
+ lib/config.sub | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/automake.in b/automake.in
+index 921a6ae..003ce31 100644
+--- a/automake.in
++++ b/automake.in
+@@ -4156,7 +4156,7 @@ sub substitute_ac_subst_variables_worker($)
+ sub substitute_ac_subst_variables ($)
+ {
+   my ($text) = @_;
+-  $text =~ s/\${([^ \t=:+{}]+)}/&substitute_ac_subst_variables_worker ($1)/ge;
++  $text =~ s/\$\{([^ \t=:+{}]+)\}/&substitute_ac_subst_variables_worker ($1)/ge;
+   return $text;
+ }
+ 
+diff --git a/lib/config.sub b/lib/config.sub
+index c894da4..fd81f89 100755
+--- a/lib/config.sub
++++ b/lib/config.sub
+@@ -1340,7 +1340,7 @@ case $os in
+ 	-gnu* | -bsd* | -mach* | -minix* | -genix* | -ultrix* | -irix* \
+ 	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -cnk* | -sunos | -sunos[34]*\
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+-	      | -sym* | -kopensolaris* \
++	      | -sym* | -kopensolaris* | -vinix* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+ 	      | -aos* | -aros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+-- 
+2.33.0
+
