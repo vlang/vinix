@@ -1321,6 +1321,32 @@ packages:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
+  - name: bzip2
+    source:
+      subdir: '3rdparty'
+      url: 'https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'bzip2-1.0.8'
+      version: '1.0.8'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      # Remove the test directory from the Makefile, as it tries to run (and fail on) the tests
+      - args: 'sed -i s/"all: libbz2.a bzip2 bzip2recover test"/"all: libbz2.a bzip2 bzip2recover"/ @THIS_BUILD_DIR@/Makefile'
+    build:
+      # Building Makefile-libbz2_so first makes all programs link agains libbz2.so
+      - args: ['make', 'CC=x86_64-vinix-gcc', 'CFLAGS=-fPIC', '-f', 'Makefile-libbz2_so']
+      - args: ['make', 'clean']
+      - args: ['make', 'CC=x86_64-vinix-gcc', 'CFLAGS=-fPIC', '-j@PARALLELISM@']
+      - args: ['make', 'PREFIX=@THIS_COLLECT_DIR@/usr', 'install']
+      - args: ['ln', '-sf', 'bzdiff', '@THIS_COLLECT_DIR@/usr/bin/bzcmp']
+      - args: ['ln', '-sf', 'bzgrep', '@THIS_COLLECT_DIR@/usr/bin/bzegrep']
+      - args: ['ln', '-sf', 'bzgrep', '@THIS_COLLECT_DIR@/usr/bin/bzfgrep']
+      - args: ['ln', '-sf', 'bzmore', '@THIS_COLLECT_DIR@/usr/bin/bzless']
+
   - name: zlib
     source:
       subdir: '3rdparty'
