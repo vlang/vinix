@@ -1,0 +1,66 @@
+From b85292471d672032c6be5e93f52f1694bb914f2c Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sat, 11 Sep 2021 06:49:58 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ configure.ac | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index e57ef7c..20ddf65 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -379,6 +379,9 @@ then
+ 	*-*-cygwin*)
+ 		ac_sys_system=Cygwin
+ 		;;
++	*-*-vinix*)
++	    ac_sys_system=Vinix
++	    ;;
+ 	*-*-vxworks*)
+ 	    ac_sys_system=VxWorks
+ 	    ;;
+@@ -431,6 +434,9 @@ if test "$cross_compiling" = yes; then
+ 	*-*-vxworks*)
+ 		_host_cpu=$host_cpu
+ 		;;
++	*-*-vinix*)
++		_host_cpu=$host_cpu
++		;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"
+@@ -2641,6 +2647,9 @@ then
+ 	CYGWIN*)
+ 		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
+ 		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
++	Vinix*)
++		LDSHARED='$(CC) -shared'
++		LDCXXSHARED='$(CXX) -shared';;
+ 	*)	LDSHARED="ld";;
+ 	esac
+ fi
+@@ -2677,7 +2686,9 @@ then
+ 		else CCSHARED="-Kpic -belf"
+ 		fi;;
+ 	VxWorks*)
+-		CCSHARED="-fpic -D__SO_PICABILINUX__  -ftls-model=global-dynamic"
++		CCSHARED="-fpic -D__SO_PICABILINUX__  -ftls-model=global-dynamic";;
++	Vinix*)
++		CCSHARED="-fPIC";;
+ 	esac
+ fi
+ AC_MSG_RESULT($CCSHARED)
+@@ -2738,6 +2749,8 @@ then
+ 		LINKFORSHARED='-Wl,-E -N 2048K';;
+ 	VxWorks*)
+ 		LINKFORSHARED='--export-dynamic';;
++	Vinix*)
++		LINKFORSHARED='-export-dynamic';;
+ 	esac
+ fi
+ AC_MSG_RESULT($LINKFORSHARED)
+-- 
+2.33.0
+
