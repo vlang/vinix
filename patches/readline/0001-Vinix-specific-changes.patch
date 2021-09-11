@@ -1,0 +1,34 @@
+From 36e62c91271208fc3a0c065f39dec27c449af9a5 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sat, 11 Sep 2021 06:31:31 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ support/shlib-install | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/support/shlib-install b/support/shlib-install
+index 661355d..010c651 100755
+--- a/support/shlib-install
++++ b/support/shlib-install
+@@ -71,7 +71,7 @@ fi
+ # Cygwin installs both a dll (which must go in $BINDIR) and an implicit
+ # link library (in $libdir)
+ case "$host_os" in
+-hpux*|darwin*|macosx*|linux*|solaris2*)
++hpux*|darwin*|macosx*|linux*|solaris2*|*vinix*)
+ 	if [ -z "$uninstall" ]; then
+ 		chmod 755 ${INSTALLDIR}/${LIBNAME}
+ 	fi ;;
+@@ -146,7 +146,7 @@ bsdi4*|*gnu*|darwin*|macosx*|netbsd*|mirbsd*)
+ 	fi
+ 	;;
+ 
+-solaris2*|aix4.[2-9]*|aix[5-9]*|osf*|irix[56]*|sysv[45]*|dgux*|interix*)
++solaris2*|aix4.[2-9]*|aix[5-9]*|osf*|irix[56]*|sysv[45]*|dgux*|interix*|*vinix*)
+ 	# libname.so -> libname.so.M
+ 	${echo} ${RM} ${INSTALLDIR}/$LINK1
+ 	if [ -z "$uninstall" ]; then
+-- 
+2.33.0
+

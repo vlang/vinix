@@ -23,6 +23,19 @@ sources:
         environ:
           'NOCONFIGURE': 'yes'
 
+  - name: python
+    subdir: '3rdparty'
+    git: 'https://github.com/python/cpython.git'
+    tag: 'v3.8.2'
+    version: '3.8.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+    regenerate:
+      - args: ['autoreconf', '-f', '-i']
+
   - name: tzdata
     subdir: '3rdparty'
     sources_required: ['tzcode']
@@ -1509,6 +1522,37 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: readline
+    source:
+      subdir: '3rdparty'
+      git: 'https://git.savannah.gnu.org/git/readline.git'
+      tag: 'readline-8.1'
+      version: '8.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+      regenerate:
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/support/']
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--disable-static'
+        - '--enable-multibyte'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
