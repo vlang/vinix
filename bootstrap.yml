@@ -1321,6 +1321,36 @@ packages:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
+  - name: libpng
+    source:
+      subdir: '3rdparty'
+      git: 'https://git.code.sf.net/p/libpng/code'
+      tag: 'v1.6.37'
+      version: '1.6.37'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+      regenerate:
+        - args: ['git', 'clean', '-xf', '-e', '*.xbstrap']
+        - args: ['autoreconf', '-fvi']
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - zlib
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: bzip2
     source:
       subdir: '3rdparty'
