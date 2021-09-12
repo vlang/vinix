@@ -20,7 +20,7 @@
 < 	ChanState__success, // 
 ---
 > 	ChanState__success, //
-3517,3522c3517,3522
+3518,3523c3518,3523
 < Array_fixed_voidptr_1 interrupt_thunk_begin = {0}; // global
 < Array_fixed_voidptr_1 interrupt_thunk_end = {0}; // global
 < Array_fixed_voidptr_1 interrupt_thunk_storage = {0}; // global
@@ -34,43 +34,43 @@
 > extern u64 interrupt_thunk_offset; // global
 > extern u64 interrupt_thunk_size; // global
 > extern u32 interrupt_thunk_number; // global
-3822c3822
+3823c3823
 < VV_EXPORTED_SYMBOL voidptr memcpy(voidptr dest, const voidptr const_src, u64 size); // exported fn lib.stubs.memcpy
 ---
 > VV_EXPORTED_SYMBOL voidptr memcpy(void* __restrict dest, const void* __restrict const_src, u64 size); // exported fn lib.stubs.memcpy
-4647c4647
+4648c4648
 < 	
 ---
 > 
-4660c4660
+4661c4661
 < 	
 ---
 > 
-4666c4666
+4667c4667
 < static char * v_typeof_interface_IError(int sidx) { /* IError */ 
 ---
 > static char * v_typeof_interface_IError(int sidx) { /* IError */
-4672c4672
+4673c4673
 < static int v_typeof_interface_idx_IError(int sidx) { /* IError */ 
 ---
 > static int v_typeof_interface_idx_IError(int sidx) { /* IError */
-4677c4677
+4678c4678
 < static char * v_typeof_interface_fs__FileSystem(int sidx) { /* fs.FileSystem */ 
 ---
 > static char * v_typeof_interface_fs__FileSystem(int sidx) { /* fs.FileSystem */
-4683c4683
+4684c4684
 < static int v_typeof_interface_idx_fs__FileSystem(int sidx) { /* fs.FileSystem */ 
 ---
 > static int v_typeof_interface_idx_fs__FileSystem(int sidx) { /* fs.FileSystem */
-4688c4688
+4689c4689
 < static char * v_typeof_interface_resource__Resource(int sidx) { /* resource.Resource */ 
 ---
 > static char * v_typeof_interface_resource__Resource(int sidx) { /* resource.Resource */
-4705c4705
+4706c4706
 < static int v_typeof_interface_idx_resource__Resource(int sidx) { /* resource.Resource */ 
 ---
 > static int v_typeof_interface_idx_resource__Resource(int sidx) { /* resource.Resource */
-4891,4956d4890
+4892,4957d4891
 < f32 strings__levenshtein_distance_percentage(string a, string b) {
 < 	int d = strings__levenshtein_distance(a, b);
 < 	int _t1; /* if prepend */
@@ -137,7 +137,7 @@
 < 	return (2.0 * ((f32)(intersection_size))) / (((f32)(a.len)) + ((f32)(b.len)) - 2);
 < }
 < 
-5609,5741d5542
+5610,5742d5543
 < f64 strconv__atof64(string s) {
 < 	strconv__PrepNumber pn = (strconv__PrepNumber){.negative = 0,.exponent = 0,.mantissa = 0,};
 < 	int res_parsing = 0;
@@ -271,23 +271,23 @@
 < 	return 0;
 < }
 < 
-5865c5666
+5866c5667
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-5870c5671
+5871c5672
 < 	
 ---
 > 
-5933c5734
+5934c5735
 < 	if (_t6.state != 0) { /*or block*/ 
 ---
 > 	if (_t6.state != 0) { /*or block*/
-5938c5739
+5939c5740
 < 	
 ---
 > 
-6622,6896d6422
+6623,6897d6423
 < // Attr: [manualfree]
 < string strconv__f64_to_str_lnd1(f64 f, int dec_digit) {
 < 	{ // Unsafe block
@@ -563,7 +563,7 @@
 < }
 < 
 < // Attr: [direct_array_access]
-7833,7947c7359
+7834,7948c7360
 < 			if ((ch == 'f' || ch == 'F')) {
 < 				strconv__v_sprintf_panic(p_index, pt.len);
 < 				f64 x = *(((f64*)((*(voidptr*)/*ee elem_typ */array_get(pt, p_index)))));
@@ -681,7 +681,7 @@
 < 			} else if (ch == 's') {
 ---
 > 			if (ch == 's') {
-7985,8119d7396
+7986,8120d7397
 < VV_LOCAL_SYMBOL f64 strconv__fabs(f64 x) {
 < 	if (x < 0.0) {
 < 		return -x;
@@ -817,7 +817,7 @@
 < 	return (string){.str=(byteptr)"", .is_lit=1};
 < }
 < 
-9393,9587d8669
+9392,9586d8668
 < // Attr: [inline]
 < inline string f64_str(f64 x) {
 < 	{ // Unsafe block
@@ -1013,49 +1013,49 @@
 < 	return 0;
 < }
 < 
-9963c9045
+9966c9048
 < 	
 ---
 > 
-10299c9381
+10302c9384
 < 	f32 load_factor = ((f32)(m->len << 1)) / ((f32)(m->even_index));
 ---
 > 	u32 load_factor = (m->len << 1) / m->even_index;
-10740,10744d9821
+10743,10747d9824
 < 		#if !defined(_VFREESTANDING)
 < 		{
 < 			atexit((voidptr)prealloc_vcleanup);
 < 		}
 < 		#endif
-11491c10568
+11494c10571
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11495c10572
+11498c10575
 < 	
 ---
 > 
-11501c10578
+11504c10581
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11505c10582
+11508c10585
 < 	
 ---
 > 
-11511c10588
+11514c10591
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11515c10592
+11518c10595
 < 	
 ---
 > 
-11521c10598
+11524c10601
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11525,11531d10601
+11528,11534d10604
 < 	
 <  	return ((i16)( (*(i64*)_t2.data)));
 < }
@@ -1063,36 +1063,36 @@
 < f32 string_f32(string s) {
 < 	return ((f32)(strconv__atof64(s)));
 < }
-11533,11534c10603
+11536,11537c10606
 < f64 string_f64(string s) {
 < 	return strconv__atof64(s);
 ---
 >  	return ((i16)( (*(i64*)_t2.data)));
-11539c10608
+11542c10611
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11543c10612
+11546c10615
 < 	
 ---
 > 
-11549c10618
+11552c10621
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11553c10622
+11556c10625
 < 	
 ---
 > 
-11559c10628
+11562c10631
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-11563c10632
+11566c10635
 < 	
 ---
 > 
-12705,12726d11773
+12708,12729d11776
 < inline VV_LOCAL_SYMBOL f32 fabs32(f32 x) {
 < 	f32 _t2; /* if prepend */
 < 	if (x < 0) {
@@ -1115,7 +1115,7 @@
 < }
 < 
 < // Attr: [inline]
-13008,13238c12055
+13011,13241c12058
 < 		if (typ == (StrIntpType__si_f32)) {
 < 			if (use_default_str) {
 < 				string f = f32_str(data.d.d_f32);
@@ -1349,803 +1349,803 @@
 < 		else if (typ == (StrIntpType__si_c)) {
 ---
 > 		if (typ == (StrIntpType__si_c)) {
-13299c12116
+13302c12119
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-13306c12123
+13309c12126
 < 	
 ---
 > 
-13605c12422
+13608c12425
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-13611c12428
+13614c12431
 < 	
 ---
 > 
-13707c12524
+13710c12527
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-13712c12529
+13715c12532
 < 	
 ---
 > 
-14478c13295
+14481c13298
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-14482c13299
+14485c13302
 < 	
 ---
 > 
-14488c13305
+14491c13308
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-14492c13309
+14495c13312
 < 	
 ---
 > 
-15148c13965
+15151c13968
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-15153c13970
+15156c13973
 < 	
 ---
 > 
-15260c14077
+15263c14080
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-15264c14081
-< 	
----
-> 
 15267c14084
-< 	if (_t3.state != 0) { /*or block*/ 
----
-> 	if (_t3.state != 0) { /*or block*/
-15271c14088
 < 	
 ---
 > 
+15270c14087
+< 	if (_t3.state != 0) { /*or block*/ 
+---
+> 	if (_t3.state != 0) { /*or block*/
 15274c14091
+< 	
+---
+> 
+15277c14094
 < 	if (_t5.state != 0) { /*or block*/ 
 ---
 > 	if (_t5.state != 0) { /*or block*/
-15278c14095
+15281c14098
 < 	
 ---
 > 
-15287c14104
+15290c14107
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-15291c14108
+15294c14111
 < 	
 ---
 > 
-15337c14154
+15340c14157
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-15341c14158
+15344c14161
 < 	
 ---
 > 
-15359c14176
+15362c14179
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-15369c14186
-< 	
----
-> 
 15372c14189
+< 	
+---
+> 
+15375c14192
 < 	if (_t3.state != 0) { /*or block*/ 
 ---
 > 	if (_t3.state != 0) { /*or block*/
-15382c14199
+15385c14202
 < 	
 ---
 > 
-15385c14202
+15388c14205
 < 	if (_t5.state != 0) { /*or block*/ 
 ---
 > 	if (_t5.state != 0) { /*or block*/
-15395c14212
+15398c14215
 < 	
 ---
 > 
-15417c14234
+15420c14237
 < 		if (_t1.state != 0) { /*or block*/ 
 ---
 > 		if (_t1.state != 0) { /*or block*/
-15737c14554
+15740c14557
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-15746c14563
+15749c14566
 < 	
 ---
 > 
-15984c14801
+15987c14804
 < 				if (_t3.state != 0) { /*or block*/ 
 ---
 > 				if (_t3.state != 0) { /*or block*/
-15988c14805
+15991c14808
 < 				
 ---
 > 
-15991c14808
+15994c14811
 < 				if (_t4.state != 0) { /*or block*/ 
 ---
 > 				if (_t4.state != 0) { /*or block*/
-16001c14818
+16004c14821
 < 				
 ---
 > 
-16021c14838
+16024c14841
 < 					if (_t7.state != 0) { /*or block*/ 
 ---
 > 					if (_t7.state != 0) { /*or block*/
-16025c14842
+16028c14845
 < 					
 ---
 > 
-16031c14848
+16034c14851
 < 					if (_t8.state != 0) { /*or block*/ 
 ---
 > 					if (_t8.state != 0) { /*or block*/
-16041c14858
+16044c14861
 < 					
 ---
 > 
-16044c14861
+16047c14864
 < 					if (_t10.state != 0) { /*or block*/ 
 ---
 > 					if (_t10.state != 0) { /*or block*/
-16054c14871
+16057c14874
 < 					
 ---
 > 
-16154c14971
+16157c14974
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-16167c14984
+16170c14987
 < 	
 ---
 > 
-16289c15106
+16292c15109
 < 		if (_t2.state != 0) { /*or block*/ 
 ---
 > 		if (_t2.state != 0) { /*or block*/
-16293c15110
+16296c15113
 < 		
 ---
 > 
-16325c15142
+16328c15145
 < 					if (_t5.state != 0) { /*or block*/ 
 ---
 > 					if (_t5.state != 0) { /*or block*/
-16329c15146
+16332c15149
 < 					
 ---
 > 
-16359c15176
+16362c15179
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-16376c15193
+16379c15196
 < 		if (_t5.state != 0) { /*or block*/ 
 ---
 > 		if (_t5.state != 0) { /*or block*/
-16386c15203
+16389c15206
 < 			if (_t7.state != 0) { /*or block*/ 
 ---
 > 			if (_t7.state != 0) { /*or block*/
-16427c15244
+16430c15247
 < 		if (_t13.state != 0) { /*or block*/ 
 ---
 > 		if (_t13.state != 0) { /*or block*/
-16890c15707
+16893c15710
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-16894c15711
+16897c15714
 < 	
 ---
 > 
-16905c15722
+16908c15725
 < 		if (_t3.state != 0) { /*or block*/ 
 ---
 > 		if (_t3.state != 0) { /*or block*/
-16909c15726
+16912c15729
 < 		
 ---
 > 
-17084c15901
+17087c15904
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-17428c16245
+17431c16248
 < voidptr memcpy(voidptr dest, const voidptr const_src, u64 size) {
 ---
 > voidptr memcpy(void* __restrict dest, const void* __restrict const_src, u64 size) {
-17694c16511
+17697c16514
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-17704c16521
+17707c16524
 < 	
 ---
 > 
-17716c16533
+17719c16536
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-17744c16561
+17747c16564
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-17754c16571
+17757c16574
 < 	
 ---
 > 
-17823c16640
+17826c16643
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-17827c16644
+17830c16647
 < 	
 ---
 > 
-17869c16686
+17872c16689
 < 		if (_t2.state != 0) { /*or block*/ 
 ---
 > 		if (_t2.state != 0) { /*or block*/
-17875c16692
+17878c16695
 < 		
 ---
 > 
-17914c16731
+17917c16734
 < 		if (_t8.state != 0) { /*or block*/ 
 ---
 > 		if (_t8.state != 0) { /*or block*/
-17937c16754
+17940c16757
 < 		
 ---
 > 
-17978c16795
+17981c16798
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-17988c16805
+17991c16808
 < 	
 ---
 > 
-18006c16823
+18009c16826
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-18016c16833
+18019c16836
 < 	
 ---
 > 
-18158c16975
+18161c16978
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-18162c16979
+18165c16982
 < 	
 ---
 > 
-18223c17040
+18226c17043
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-18227c17044
+18230c17047
 < 	
 ---
 > 
-18232c17049
+18235c17052
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-18237c17054
+18240c17057
 < 	
 ---
 > 
-18252c17069
+18255c17072
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-18262c17079
+18265c17082
 < 	
 ---
 > 
-18278c17095
+18281c17098
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-18288c17105
+18291c17108
 < 	
 ---
 > 
-18295c17112
+18298c17115
 < 		if (_t3.state != 0) { /*or block*/ 
 ---
 > 		if (_t3.state != 0) { /*or block*/
-18305c17122
+18308c17125
 < 		
 ---
 > 
-18368c17185
+18371c17188
 < 		if (_t1.state != 0) { /*or block*/ 
 ---
 > 		if (_t1.state != 0) { /*or block*/
-18378c17195
+18381c17198
 < 		
 ---
 > 
-18404c17221
+18407c17224
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-18421c17238
+18424c17241
 < 	
 ---
 > 
-18892c17709
+18895c17712
 < 			if (_t1.state != 0) { /*or block*/ 
 ---
 > 			if (_t1.state != 0) { /*or block*/
-18896c17713
+18899c17716
 < 			
 ---
 > 
-18949c17766
+18952c17769
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-18954c17771
+18957c17774
 < 	
 ---
 > 
-19051c17868
+19054c17871
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19056c17873
+19059c17876
 < 	
 ---
 > 
-19089c17906
+19092c17909
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19093c17910
+19096c17913
 < 	
 ---
 > 
-19115c17932
+19118c17935
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19125c17942
+19128c17945
 < 	
 ---
 > 
-19165c17982
+19168c17985
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19175c17992
+19178c17995
 < 	
 ---
 > 
-19200c18017
+19203c18020
 < 	if (_t6.state != 0) { /*or block*/ 
 ---
 > 	if (_t6.state != 0) { /*or block*/
-19237c18054
+19240c18057
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19247c18064
-< 	
----
-> 
 19250c18067
-< 	if (_t4.state != 0) { /*or block*/ 
----
-> 	if (_t4.state != 0) { /*or block*/
-19260c18077
 < 	
 ---
 > 
-19301c18118
+19253c18070
+< 	if (_t4.state != 0) { /*or block*/ 
+---
+> 	if (_t4.state != 0) { /*or block*/
+19263c18080
+< 	
+---
+> 
+19304c18121
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19311c18128
+19314c18131
 < 	
 ---
 > 
-19316c18133
+19319c18136
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-19321c18138
+19324c18141
 < 			if (_t6.state != 0) { /*or block*/ 
 ---
 > 			if (_t6.state != 0) { /*or block*/
-19331c18148
+19334c18151
 < 			
 ---
 > 
-19339c18156
+19342c18159
 < 	
 ---
 > 
-19379c18196
+19382c18199
 < 	if (_t12.state != 0) { /*or block*/ 
 ---
 > 	if (_t12.state != 0) { /*or block*/
-19389c18206
+19392c18209
 < 	
 ---
 > 
-19408c18225
+19411c18228
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19418c18235
+19421c18238
 < 	
 ---
 > 
-19422c18239
+19425c18242
 < 	if (_t3.state != 0) { /*or block*/ 
 ---
 > 	if (_t3.state != 0) { /*or block*/
-19437c18254
+19440c18257
 < 	
 ---
 > 
-19460c18277
+19463c18280
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19470c18287
+19473c18290
 < 	
 ---
 > 
-19474c18291
+19477c18294
 < 	if (_t3.state != 0) { /*or block*/ 
 ---
 > 	if (_t3.state != 0) { /*or block*/
-19489c18306
+19492c18309
 < 	
 ---
 > 
-19537c18354
+19540c18357
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19547c18364
+19550c18367
 < 	
 ---
 > 
-19551c18368
+19554c18371
 < 	if (_t3.state != 0) { /*or block*/ 
 ---
 > 	if (_t3.state != 0) { /*or block*/
-19566c18383
+19569c18386
 < 	
 ---
 > 
-19622c18439
+19625c18442
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19632c18449
+19635c18452
 < 	
 ---
 > 
-19636c18453
+19639c18456
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-19672c18489
+19675c18492
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19682c18499
+19685c18502
 < 	
 ---
 > 
-19686c18503
+19689c18506
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-19696c18513
+19699c18516
 < 	
 ---
 > 
-19718c18535
+19721c18538
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19728c18545
+19731c18548
 < 	
 ---
 > 
-19764c18581
+19767c18584
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-19774c18591
+19777c18594
 < 	
 ---
 > 
-19804c18621
+19807c18624
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19814c18631
+19817c18634
 < 	
 ---
 > 
-19900c18717
+19903c18720
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-19910c18727
+19913c18730
 < 	
 ---
 > 
-19917c18734
+19920c18737
 < 	
 ---
 > 
-20048c18865
+20051c18868
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-20058c18875
-< 	
----
-> 
 20061c18878
-< 	if (_t3.state != 0) { /*or block*/ 
----
-> 	if (_t3.state != 0) { /*or block*/
-20071c18888
 < 	
 ---
 > 
+20064c18881
+< 	if (_t3.state != 0) { /*or block*/ 
+---
+> 	if (_t3.state != 0) { /*or block*/
 20074c18891
+< 	
+---
+> 
+20077c18894
 < 	if (_t5.state != 0) { /*or block*/ 
 ---
 > 	if (_t5.state != 0) { /*or block*/
-20084c18901
+20087c18904
 < 	
 ---
 > 
-20135c18952
+20138c18955
 < 		if (_t3.state != 0) { /*or block*/ 
 ---
 > 		if (_t3.state != 0) { /*or block*/
-20195c19012
+20198c19015
 < 		if (_t1.state != 0) { /*or block*/ 
 ---
 > 		if (_t1.state != 0) { /*or block*/
-20304c19121
+20307c19124
 < 		
 ---
 > 
-20314c19131
+20317c19134
 < 			if (_t2.state != 0) { /*or block*/ 
 ---
 > 			if (_t2.state != 0) { /*or block*/
-20324c19141
+20327c19144
 < 			if (_t3.state != 0) { /*or block*/ 
 ---
 > 			if (_t3.state != 0) { /*or block*/
-20330c19147
+20333c19150
 < 			
 ---
 > 
-20335c19152
+20338c19155
 < 			if (_t4.state != 0) { /*or block*/ 
 ---
 > 			if (_t4.state != 0) { /*or block*/
-20345c19162
+20348c19165
 < 			if (_t5.state != 0) { /*or block*/ 
 ---
 > 			if (_t5.state != 0) { /*or block*/
-20598c19415
+20601c19418
 < 	if (_t3.state != 0) { /*or block*/ 
 ---
 > 	if (_t3.state != 0) { /*or block*/
-20677c19494
+20680c19497
 < 	if (_t8.state != 0) { /*or block*/ 
 ---
 > 	if (_t8.state != 0) { /*or block*/
-20687c19504
+20690c19507
 < 	
 ---
 > 
-20753c19570
+20756c19573
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-20763c19580
+20766c19583
 < 	
 ---
 > 
-20770c19587
+20773c19590
 < 		if (_t3.state != 0) { /*or block*/ 
 ---
 > 		if (_t3.state != 0) { /*or block*/
-20828c19645
+20831c19648
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-20833c19650
+20836c19653
 < 	
 ---
 > 
-20838c19655
+20841c19658
 < 	if (_t3.state != 0) { /*or block*/ 
 ---
 > 	if (_t3.state != 0) { /*or block*/
-20843c19660
+20846c19663
 < 	
 ---
 > 
-20852c19669
+20855c19672
 < 		if (_t5.state != 0) { /*or block*/ 
 ---
 > 		if (_t5.state != 0) { /*or block*/
-20857c19674
+20860c19677
 < 		
 ---
 > 
-20861c19678
+20864c19681
 < 		if (_t7.state != 0) { /*or block*/ 
 ---
 > 		if (_t7.state != 0) { /*or block*/
-20866c19683
+20869c19686
 < 		
 ---
 > 
-20873c19690
+20876c19693
 < 		if (_t9.state != 0) { /*or block*/ 
 ---
 > 		if (_t9.state != 0) { /*or block*/
-20878c19695
+20881c19698
 < 		
 ---
 > 
-20881c19698
+20884c19701
 < 		if (_t11.state != 0) { /*or block*/ 
 ---
 > 		if (_t11.state != 0) { /*or block*/
-20886c19703
+20889c19706
 < 		
 ---
 > 
-20892c19709
+20895c19712
 < 		if (_t13.state != 0) { /*or block*/ 
 ---
 > 		if (_t13.state != 0) { /*or block*/
-20897c19714
+20900c19717
 < 		
 ---
 > 
-20903c19720
+20906c19723
 < 		if (_t15.state != 0) { /*or block*/ 
 ---
 > 		if (_t15.state != 0) { /*or block*/
-20908c19725
+20911c19728
 < 		
 ---
 > 
-20914c19731
+20917c19734
 < 		if (_t17.state != 0) { /*or block*/ 
 ---
 > 		if (_t17.state != 0) { /*or block*/
-20944c19761
+20947c19764
 < 		if (_t22.state != 0) { /*or block*/ 
 ---
 > 		if (_t22.state != 0) { /*or block*/
-20971c19788
+20974c19791
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-20976c19793
+20979c19796
 < 	
 ---
 > 
-20982c19799
+20985c19802
 < 		if (_t2.state != 0) { /*or block*/ 
 ---
 > 		if (_t2.state != 0) { /*or block*/
-20986c19803
+20989c19806
 < 		
 ---
 > 
-21630c20447
+21633c20450
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-21649c20466
+21652c20469
 < 		if (_t4.state != 0) { /*or block*/ 
 ---
 > 		if (_t4.state != 0) { /*or block*/
-21679c20496
+21682c20499
 < 	if (_t7.state != 0) { /*or block*/ 
 ---
 > 	if (_t7.state != 0) { /*or block*/
-21827c20644
+21830c20647
 < 		if (_t1.state != 0) { /*or block*/ 
 ---
 > 		if (_t1.state != 0) { /*or block*/
-22008c20825
+22011c20828
 < 	
 ---
 > 
-22092c20909
+22095c20912
 < 		if (_t1.state != 0) { /*or block*/ 
 ---
 > 		if (_t1.state != 0) { /*or block*/
-22122c20939
+22125c20942
 < 					if (_t3.state != 0) { /*or block*/ 
 ---
 > 					if (_t3.state != 0) { /*or block*/
-22308c21125
+22311c21128
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-22314c21131
+22317c21134
 < 	
 ---
 > 
-22377c21194
+22380c21197
 < 		if (_t1.state != 0) { /*or block*/ 
 ---
 > 		if (_t1.state != 0) { /*or block*/
-22386c21203
+22389c21206
 < 		
 ---
 > 
-22415c21232
+22418c21235
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-22448c21265
+22451c21268
 < 	if (_t1.state != 0) { /*or block*/ 
 ---
 > 	if (_t1.state != 0) { /*or block*/
-22454c21271
+22457c21274
 < 	
 ---
 > 
-22869c21686
+22872c21689
 < 	if (_t2.state != 0) { /*or block*/ 
 ---
 > 	if (_t2.state != 0) { /*or block*/
-22890c21707
+22893c21710
 < 	if (_t4.state != 0) { /*or block*/ 
 ---
 > 	if (_t4.state != 0) { /*or block*/
-23327,23329c22144,22146
+23330,23332c22147,22149
 < 	interrupt_thunk_offset = *(u64*)&((u64[]){0}[0]); // global
 < 	interrupt_thunk_size = *(u64*)&((u64[]){0}[0]); // global
 < 	interrupt_thunk_number = *(u32*)&((u32[]){0}[0]); // global
