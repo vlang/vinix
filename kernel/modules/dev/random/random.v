@@ -81,7 +81,7 @@ fn (mut this URandom) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	}
 
 	this.rng_lock.acquire()
-	
+
 	mut cnt := count
 	mut out := [16]u32{}
 	mut cbuf := buf
@@ -139,14 +139,14 @@ fn (mut this URandom) reseed() {
 	}
 }
 
-fn init_urandom() {
+pub fn initialise() {
 	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
 	if success && (c & (1 << 30)) != 0 {
 		println('urandom: rdrand available')
 		ur_rdrand = true
 	}
 
-	success, _, b, _, _ = cpu.cpuid(0, 7)
+	success, _, b, _, _ = cpu.cpuid(7, 0)
 	if success && (b & (1 << 18)) != 0 {
 		println('urandom: rdseed available')
 		ur_rdseed = true
@@ -173,8 +173,4 @@ fn init_urandom() {
 	rng.reseed()
 
 	fs.devtmpfs_add_device(rng, 'urandom')
-}
-
-pub fn initialise() {
-	init_urandom()
 }
