@@ -190,28 +190,6 @@ sources:
     version: '3.20.5'
 
 tools:
-  - name: host-autoconf-v2.64
-    source:
-      name: autoconf-v2.64
-      subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.64.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'autoconf-2.64'
-      version: '2.64'
-    configure:
-      # Despite its efforts to be POSIX-compatible, autoconf 2.64 fails to configure on dash
-      # (as it assumes that echo does not evaluate backslash escapes).
-      # It *also* fails when setting CONFIG_SHELL to /bin/bash.
-      # The manual (in section "Defining Variables") mentions this bug and the following
-      # workaround: We set *both* CONFIG_SHELL *and* execute the script using /bin/bash.
-      - args: ['/bin/bash', '@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
-        environ:
-          CONFIG_SHELL: '/bin/bash'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
-
   - name: host-autoconf-v2.69
     source:
       name: autoconf-v2.69
@@ -288,30 +266,6 @@ tools:
     install:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
-
-  - name: host-automake-v1.11
-    source:
-      name: automake-v1.11
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/automake.git'
-      tag: 'v1.11.6'
-      version: '1.11.6'
-      tools_required:
-        - host-autoconf-v2.69
-      regenerate:
-        - args: ['./bootstrap']
-    tools_required:
-      - host-autoconf-v2.69
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-        - 'MAKEINFO=/bin/true'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install-strip']
-      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.11', '@PREFIX@/share/aclocal']
 
   - name: host-zic
     from_source: tzdata
@@ -1689,7 +1643,7 @@ packages:
       version: '1.9.1'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.11
+        - host-automake-v1.15
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1789,8 +1743,8 @@ packages:
       tag: '1.17.4'
       version: '1.17.4'
       tools_required:
-        - host-autoconf-v2.64
-        - host-automake-v1.11
+        - host-autoconf-v2.69
+        - host-automake-v1.15
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1799,8 +1753,8 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
-      - host-autoconf-v2.64
-      - host-automake-v1.11
+      - host-autoconf-v2.69
+      - host-automake-v1.15
       - host-libtool
       - host-pkg-config
     pkgs_required:
