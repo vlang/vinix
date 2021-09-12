@@ -43,11 +43,11 @@ virtual machines.
 
 The following is an OS-agnostic list of packages needed to build Vinix. Skip to a paragraph for your host OS if there is any.
 
-`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `subversion`, `mtools`, `meson`, `ninja`, `m4`, `texinfo`, `pkg-config`, `groff`, `gettext`, `autopoint`, `bison`, `flex`, `help2man`, `gperf`, `rsync`, `xsltproc`, `gcc`, `nasm`, `python3`, `pip3`, `python3-mako`, `wget`, `xorriso`, and `qemu` to test it.
+`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `subversion`, `mtools`, `meson`, `ninja`, `m4`, `texinfo`, `pkg-config`, `groff`, `gettext`, `autopoint`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `gcc`, `nasm`, `python3`, `pip3`, `python3-mako`, `wget`, `xorriso`, and `qemu` to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install build-essential nasm git subversion mtools meson m4 texinfo pkg-config groff gettext autopoint bison flex help2man gperf rsync xsltproc python3 python3-pip python3-mako wget xorriso qemu-system-x86
+sudo apt install build-essential nasm git subversion mtools meson m4 texinfo pkg-config groff gettext autopoint bison flex help2man libssl-dev gperf rsync xsltproc python3 python3-pip python3-mako wget xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives

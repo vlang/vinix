@@ -828,6 +828,8 @@ packages:
             '@THIS_SOURCE_DIR@/support/']
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.15
     pkgs_required:
       - mlibc
       - ncurses
