@@ -284,6 +284,9 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
+	if voidptr(node) == voidptr(0) {
+		return error('')
+	}
 
 	if stat.isdir(node.resource.stat.mode) && remove_dir == false {
 		errno.set(errno.eisdir)
