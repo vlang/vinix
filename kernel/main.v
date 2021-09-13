@@ -25,6 +25,8 @@ import dev.streams
 import dev.random
 import syscall.table
 
+import socket
+
 fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
@@ -88,7 +90,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
-	
+
 	// a dummy call to avoid V warning about an unused `stubs` module
 	_ := stubs.toupper(0)
 

@@ -7,10 +7,11 @@ import x86.cpu
 import userland
 import futex
 import pipe
+import socket
 import memory.mmap
 
 __global (
-	syscall_table [39]voidptr
+	syscall_table [40]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -53,4 +54,5 @@ pub fn init_syscall_table() {
 	syscall_table[36] = voidptr(file.syscall_ppoll)
 	syscall_table[37] = voidptr(file.syscall_epoll_create)
 	syscall_table[38] = voidptr(userland.syscall_getgroups)
+	syscall_table[39] = voidptr(socket.syscall_socket)
 }
