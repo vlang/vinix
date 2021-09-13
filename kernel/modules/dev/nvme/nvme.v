@@ -234,7 +234,7 @@ pub mut:
 }
 
 [packed]
-struct NVMELbaf { 
+struct NVMELbaf {
 pub mut:
 	ms u16
 	ds u8
@@ -250,13 +250,13 @@ pub mut:
 	nsfeat u8
 	nlbaf u8
 	flbas u8
-	mc u8 
+	mc u8
 	dpc u8
-	dps u8 
-	nmic u8 
-	rescap u8 
-	fpi u8 
-	rsvd1 u8 
+	dps u8
+	nmic u8
+	rescap u8
+	fpi u8
+	rsvd1 u8
 	nawun u16
 	nawupf u16
 	nacwu u16
@@ -273,7 +273,7 @@ pub mut:
 	vs[3712] u8
 }
 
-struct NVMEController { 
+struct NVMEController {
 pub mut:
 	pci_bar pci.PCIBar
 
@@ -306,7 +306,7 @@ pub mut:
 	irq u64
 	admin bool
 	l klock.Lock
-	
+
 	parent_controller &NVMEController
 
 	submission_queue &NVMECommand
@@ -336,6 +336,10 @@ pub mut:
 __global (
 	controller_list []&NVMEController
 )
+
+fn (mut this NVMENamespace) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
+}
 
 fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
@@ -410,7 +414,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	mut new_command := &NVMECommand { }
 
 	unsafe {
-		new_command.opcode = opcode_identify 
+		new_command.opcode = opcode_identify
 		new_command.private.identify.cns = 0
 		new_command.private.identify.nsid = u32(nsid)
 		new_command.private.identify.prp1 = u64(namespace.identity) - higher_half
@@ -442,7 +446,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	namespace.stat.size = namespace.stat.blocks * namespace.stat.blksize
 	namespace.stat.rdev = resource.create_dev_id()
 	namespace.stat.mode = 0o644 | stat.ifblk
-	
+
 	return 0
 }
 
@@ -575,7 +579,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 
 	pair.l.release()
 
-	return completion_entry.status 
+	return completion_entry.status
 }
 
 pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
@@ -593,7 +597,7 @@ pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool)
 	if (cnt * ns.stat.blksize) > page_size {
 		if (cnt * ns.stat.blksize) > (page_size * 2) {
 			prp_cnt := (cnt - 1) * ns.stat.blksize / page_size
-			
+
 			if prp_cnt > ns.max_prps {
 				print('nvme: max prps exceeded\n')
 				return -1
@@ -608,13 +612,13 @@ pub fn(mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool)
 			unsafe { new_command.private.rw.prp2 = u64(buffer) + page_size - higher_half }
 		}
 	}
-	
+
 	if rw == true {
 		new_command.opcode = 1
 	} else {
 		new_command.opcode = 2
 	}
-	
+
 	new_command.cid = u16(cid)
 
 	unsafe {
@@ -726,7 +730,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 					(0 << 14) | // no shutdown notifications
 					(6 << 16) | // io submission queue size 16 bytes
 					(4 << 20) | // io completion queue size 64 bytes
-					(1 << 0) // enable	
+					(1 << 0) // enable
 
 	for {
 		if c.regs.csts & (1 << 0) != 0 {
@@ -752,7 +756,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	mut new_command := &NVMECommand { }
 
 	unsafe {
-		new_command.opcode = opcode_identify 
+		new_command.opcode = opcode_identify
 		new_command.private.identify.cns = 2
 		new_command.private.identify.prp1 = u64(nsid_list) - higher_half
 	}

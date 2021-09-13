@@ -84,7 +84,7 @@ fn (mut this Partition) read(handle voidptr, buffer voidptr, loc u64, count u64)
 }
 
 fn (mut this Partition) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	return this.parent_device.ioctl(handle, request, argp) 
+	return this.parent_device.ioctl(handle, request, argp)
 }
 
 fn (mut this Partition) unref(handle voidptr) ? {
@@ -93,6 +93,10 @@ fn (mut this Partition) unref(handle voidptr) ? {
 
 fn (mut this Partition) grow(handle voidptr, new_size u64) ? {
 	return this.parent_device.grow(handle, new_size)
+}
+
+fn (mut this Partition) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
 }
 
 fn (mut this Partition) mmap(page u64, flags int) voidptr {
@@ -135,7 +139,7 @@ pub fn scan_partitions(mut parent_device &resource.Resource, prefix string) int 
 				continue
 			}
 
-			mut partition := &Partition {	
+			mut partition := &Partition {
 				device_offset: partition_entry.starting_lba * parent_device.stat.blksize
 				sector_cnt: partition_entry.last_lba - partition_entry.starting_lba
 				parent_device: unsafe { parent_device }

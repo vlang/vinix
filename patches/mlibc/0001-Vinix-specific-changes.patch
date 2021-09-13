@@ -1,6 +1,6 @@
-From 0f8c4a0126dec0e90a85b54bcefa043e1c20d4fb Mon Sep 17 00:00:00 2001
+From 12f48687ab99ce971e3bd6b5ad9cad8c1128b9d8 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 13 Sep 2021 11:48:46 +0200
+Date: Mon, 13 Sep 2021 14:13:13 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -293,7 +293,7 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..36a42e5
+index 0000000..bb92d94
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,619 @@
@@ -791,11 +791,7 @@ index 0000000..36a42e5
 +int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
 +    __syscall_ret ret = __syscall(22, dirfd, path, mode);
 +
-+    if (ret.errno != 0) {
-+        return ret.errno;
-+    }
-+
-+    return 0;
++    return ret.errno;
 +}
 +
 +int sys_socket(int domain, int type_and_flags, int proto, int *fd) {
@@ -808,7 +804,11 @@ index 0000000..36a42e5
 +    return 0;
 +}
 +
-+int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) STUB_ONLY
++int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
++    __syscall_ret ret = __syscall(40, fd, addr_ptr, addr_length);
++
++    return ret.errno;
++}
 +
 +int sys_fork(pid_t *child) {
 +    __syscall_ret ret = __syscall(14);

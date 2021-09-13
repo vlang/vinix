@@ -549,3 +549,7 @@ fn (mut this Console) unref(handle voidptr) ? {
 fn (mut this Console) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
+
+fn (mut this Console) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
+}

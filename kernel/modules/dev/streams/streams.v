@@ -45,6 +45,10 @@ fn (mut this DevNull) unref(handle voidptr) ? {
 fn (mut this DevNull) grow(handle voidptr, new_size u64) ? {
 }
 
+fn (mut this DevNull) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
+}
+
 fn init_null() {
 	mut devnull := &DevNull{}
 
@@ -93,6 +97,10 @@ fn (mut this DevZero) unref(handle voidptr) ? {
 }
 
 fn (mut this DevZero) grow(handle voidptr, new_size u64) ? {
+}
+
+fn (mut this DevZero) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
 }
 
 fn init_zero() {
@@ -146,6 +154,10 @@ fn (mut this DevFull) unref(handle voidptr) ? {
 }
 
 fn (mut this DevFull) grow(handle voidptr, new_size u64) ? {
+}
+
+fn (mut this DevFull) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
 }
 
 fn init_full() {

@@ -43,6 +43,10 @@ fn (mut this EPoll) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
+fn (mut this EPoll) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
+}
+
 pub fn syscall_epoll_create(_ voidptr, flags int) (u64, u64) {
 	cloexec := if flags & epoll_cloexec != 0 {
 		resource.o_cloexec

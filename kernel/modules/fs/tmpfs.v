@@ -129,6 +129,10 @@ fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
 	this.stat.blocks = lib.div_roundup(new_size, this.stat.blksize)
 }
 
+fn (mut this TmpFSResource) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	return resource.default_bind(handle, _addr, addrlen)
+}
+
 struct TmpFS {
 pub mut:
 	dev_id u64

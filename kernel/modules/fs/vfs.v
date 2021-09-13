@@ -308,8 +308,20 @@ pub fn create(parent &VFSNode, name string, mode int) ?&VFSNode {
 pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
-	if target_node != 0 || parent_of_tgt_node == 0 {
+	if target_node != 0 {
+		errno.set(errno.eexist)
 		return none
+	}
+
+	if parent_of_tgt_node == 0 {
+		errno.set(errno.enoent)
+		return none
+	}
+
+	if stat.issock(mode) {
+		target_node = create_node(parent_of_tgt_node.filesystem, parent_of_tgt_node,
+								  name, false)
+		return target_node
 	}
 
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
