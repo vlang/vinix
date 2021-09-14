@@ -11,7 +11,7 @@ import socket
 import memory.mmap
 
 __global (
-	syscall_table [41]voidptr
+	syscall_table [42]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -56,4 +56,5 @@ pub fn init_syscall_table() {
 	syscall_table[38] = voidptr(userland.syscall_getgroups)
 	syscall_table[39] = voidptr(socket.syscall_socket)
 	syscall_table[40] = voidptr(socket.syscall_bind)
+	syscall_table[41] = voidptr(socket.syscall_listen)
 }

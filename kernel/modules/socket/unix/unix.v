@@ -8,6 +8,11 @@ import proc
 import fs
 import socket.public as sock_pub
 
+struct SockaddrUn {
+	sun_family u32
+	sun_path   [108]byte
+}
+
 struct UnixSocket {
 mut:
 	stat     stat.Stat
@@ -16,6 +21,10 @@ mut:
 	status   int
 	can_mmap bool
 	event    eventstruct.Event
+
+	name SockaddrUn
+	listening bool
+	backlog []&UnixSocket
 }
 
 fn (mut this UnixSocket) mmap(page u64, flags int) voidptr {
@@ -42,11 +51,6 @@ fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
-struct SockaddrUn {
-	sun_family u32
-	sun_path   [108]byte
-}
-
 fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 	addr := &SockaddrUn(_addr)
 
@@ -65,7 +69,12 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	node.resource = unsafe { this }
 
-	return error('')
+	this.name = *addr
+}
+
+fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
+	this.backlog = []&UnixSocket{cap: backlog}
+	this.listening = true
 }
 
 pub fn create(@type int) ?&UnixSocket {

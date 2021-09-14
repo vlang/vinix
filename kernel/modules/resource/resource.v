@@ -49,6 +49,7 @@ mut:
 	unref(handle voidptr) ?
 	mmap(page u64, flags int) voidptr
 	bind(handle voidptr, _addr voidptr, addrlen u64) ?
+	listen(handle voidptr, backlog int) ?
 }
 
 __global (
@@ -73,6 +74,11 @@ pub fn default_ioctl(handle voidptr, request u64, _ voidptr) ?int {
 }
 
 pub fn default_bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+	errno.set(errno.enotsock)
+	return error('')
+}
+
+pub fn default_listen(handle voidptr, backlog int) ? {
 	errno.set(errno.enotsock)
 	return error('')
 }

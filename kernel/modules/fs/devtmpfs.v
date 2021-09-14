@@ -127,6 +127,10 @@ fn (mut this DevTmpFSResource) bind(handle voidptr, _addr voidptr, addrlen u64) 
 	return resource.default_bind(handle, _addr, addrlen)
 }
 
+fn (mut this DevTmpFSResource) listen(handle voidptr, backlog int) ? {
+	return resource.default_listen(handle, backlog)
+}
+
 struct DevTmpFS {}
 
 __global (

@@ -3,7 +3,21 @@ module netlink
 import stat
 import klock
 import event.eventstruct
+import errno
 import socket.public as sock_pub
+
+pub const netlink_route = 0
+pub const netlink_usersock = 2
+pub const netlink_firewall = 3
+pub const netlink_ip6_fw = 13
+pub const netlink_kobject_uevent = 15
+
+struct SockaddrNL {
+	nl_family u32
+	nl_pad u16
+	nl_pid u32
+	nl_groups u32
+}
 
 struct NetlinkSocket {
 mut:
@@ -13,6 +27,10 @@ mut:
 	status   int
 	can_mmap bool
 	event    eventstruct.Event
+
+	name SockaddrNL
+	listening bool
+	backlog []&NetlinkSocket
 }
 
 fn (mut this NetlinkSocket) mmap(page u64, flags int) voidptr {
@@ -40,7 +58,19 @@ fn (mut this NetlinkSocket) grow(handle voidptr, new_size u64) ? {
 }
 
 fn (mut this NetlinkSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	return error('')
+	addr := &SockaddrNL(_addr)
+
+	if addr.nl_family != sock_pub.af_netlink {
+		errno.set(errno.einval)
+		return error('')
+	}
+
+	this.name = *addr
+}
+
+fn (mut this NetlinkSocket) listen(handle voidptr, backlog int) ? {
+	this.backlog = []&NetlinkSocket{cap: backlog}
+	this.listening = true
 }
 
 pub fn create(@type int, protocol int) ?&NetlinkSocket {

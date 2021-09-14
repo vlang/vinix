@@ -1,6 +1,6 @@
-From 12f48687ab99ce971e3bd6b5ad9cad8c1128b9d8 Mon Sep 17 00:00:00 2001
+From 83877e49142f0dbe08fc21244fa7ad2815a66fee Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 13 Sep 2021 14:13:13 +0200
+Date: Tue, 14 Sep 2021 10:07:05 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/unistd-stubs.cpp        |  19 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 619 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 625 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -39,7 +39,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 35 files changed, 789 insertions(+), 8 deletions(-)
+ 35 files changed, 795 insertions(+), 8 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -293,10 +293,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..bb92d94
+index 0000000..a262b02
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,619 @@
+@@ -0,0 +1,625 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -806,6 +806,12 @@ index 0000000..bb92d94
 +
 +int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
 +    __syscall_ret ret = __syscall(40, fd, addr_ptr, addr_length);
++
++    return ret.errno;
++}
++
++int sys_listen(int fd, int backlog) {
++    __syscall_ret ret = __syscall(41, fd, backlog);
 +
 +    return ret.errno;
 +}

@@ -68,3 +68,23 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64)
 
 	return 0, 0
 }
+
+pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: listen(%d, %d)\n', fdnum, backlog)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -1, errno.get()
+	}
+	defer {
+		fd.unref()
+	}
+
+	fd.handle.resource.listen(fd.handle, backlog) or {
+		return -1, errno.get()
+	}
+
+	return 0, 0
+}

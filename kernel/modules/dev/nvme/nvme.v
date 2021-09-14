@@ -341,6 +341,10 @@ fn (mut this NVMENamespace) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 	return resource.default_bind(handle, _addr, addrlen)
 }
 
+fn (mut this NVMENamespace) listen(handle voidptr, backlog int) ? {
+	return resource.default_listen(handle, backlog)
+}
+
 fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
 		errno.set(errno.eio)
