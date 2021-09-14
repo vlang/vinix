@@ -192,6 +192,25 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 	return node
 }
 
+pub fn syscall_mount(src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: mount(%s, %s, %s, 0x%x, %x)\n', src, tgt, fs_type, mountflags, data)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	source := unsafe { cstring_to_vstring(src) }
+	target := unsafe { cstring_to_vstring(tgt) }
+	fstype := unsafe { cstring_to_vstring(fs_type) }
+
+	// TODO: Not ignore mountflags and data once the current system supports it.
+	curr_dir := proc.current_thread().process.current_directory
+	mount(curr_dir, source, target, fstype) or {
+		return -1, errno.get()
+	}
+
+	return 0, 0
+}
+
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
 	if filesystem !in filesystems {
 		return error('')
