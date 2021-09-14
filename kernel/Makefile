@@ -12,7 +12,7 @@ LDFLAGS =
 VFLAGS =
 
 INTERNALCFLAGS :=                 \
-	-I.                           \
+	-I./c                         \
 	-ffreestanding                \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
@@ -44,6 +44,7 @@ INTERNALLDFLAGS :=         \
 INTERNALVFLAGS :=   \
 	-os vinix       \
 	-enable-globals \
+	-nofloat        \
 	-d no_backtrace \
 	-autofree
 
@@ -73,19 +74,8 @@ install:
 	install -d "$(DESTDIR)$(PREFIX)"
 	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
 
-blob.c.working:
-	touch blob.c.working
-
-blob.o: $(VFILES) blob.c.working
-	[ -s blob.c.working ] || rm blob.c.working
+blob.o: $(VFILES)
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	[ "$(PROD)" = "false" ] && [ -f blob.c.working ] && [ -f blob.c.old ] && ( \
-		diff blob.c.old blob.c.working \
-	) > blob.patch || true
-	cp blob.c blob.c.old
-	patch blob.c blob.patch --no-backup-if-mismatch -r /dev/null
-	cp blob.c blob.c.working
-	( diff blob.c.old blob.c.working ) > blob.patch || true
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c

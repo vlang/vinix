@@ -40,22 +40,30 @@ pub fn allocate_vector() byte {
 __global (
 	interrupt_thunks [256]voidptr
 	interrupt_table [256]voidptr
-	interrupt_thunk_begin [1]voidptr
-	interrupt_thunk_end [1]voidptr
-	interrupt_thunk_storage [1]voidptr
-	interrupt_thunk_offset u64
-	interrupt_thunk_size u64
-	interrupt_thunk_number u32
 )
 
-fn prepare_interrupt_thunks() {
-	unsafe {
-		for i in 0..interrupt_table.len {
-			interrupt_thunk_offset = u64(&interrupt_table[i])
-			interrupt_thunk_number = u32(i)
-			ptr := &byte(u64(&interrupt_thunk_storage[0]) + u64(interrupt_thunk_size * u64(i)))
+#include <symbols.h>
 
-			C.memcpy(ptr, voidptr(&interrupt_thunk_begin[0]), interrupt_thunk_size)
+fn C.interrupt_thunk_begin()
+fn C.interrupt_thunk_storage()
+fn C.interrupt_thunk_offset()
+fn C.interrupt_thunk_size()
+fn C.interrupt_thunk_number()
+
+fn prepare_interrupt_thunks() {
+	v_interrupt_thunk_begin := voidptr(C.interrupt_thunk_begin)
+	v_interrupt_thunk_storage := u64(C.interrupt_thunk_storage)
+	v_interrupt_thunk_offset := &u64(C.interrupt_thunk_offset)
+	v_interrupt_thunk_size := u64(C.interrupt_thunk_size)
+	v_interrupt_thunk_number := &u32(C.interrupt_thunk_number)
+
+	unsafe {
+		for i := u64(0); i < interrupt_table.len; i++ {
+			*v_interrupt_thunk_offset = u64(&interrupt_table[i])
+			*v_interrupt_thunk_number = u32(i)
+			ptr := &byte(v_interrupt_thunk_storage + v_interrupt_thunk_size * i)
+
+			C.memcpy(ptr, v_interrupt_thunk_begin, v_interrupt_thunk_size)
 			shift := match i {
 				8 { 2 }
 				10 { 2 }
@@ -65,7 +73,7 @@ fn prepare_interrupt_thunks() {
 				14 { 2 }
 				17 { 2 }
 				30 { 2 }
-				
+
 				else { 0 }
 			}
 

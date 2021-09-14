@@ -3,7 +3,6 @@
 .globl interrupt_thunk_begin
 .globl interrupt_thunk_number
 .globl interrupt_thunk_offset
-.globl interrupt_thunk_end
 .globl interrupt_thunk_size
 .globl interrupt_thunk_storage
 
@@ -40,7 +39,7 @@ interrupt_thunk_begin:
 
     // those get filled in for each copy of the thunk template in prepare_interrupt_thunks()
     // mov {interrupt_thunk_number}, %edi
-    .byte 0xbf 
+    .byte 0xbf
 interrupt_thunk_number: .long 0
     // movabs {interrupt_thunk_offset}, %rbx
     .byte 0x48
@@ -73,5 +72,5 @@ interrupt_thunk_offset: .quad 0
     iretq
 
 interrupt_thunk_end:
-interrupt_thunk_size: .quad interrupt_thunk_end - interrupt_thunk_begin
+.equ interrupt_thunk_size, interrupt_thunk_end - interrupt_thunk_begin
 interrupt_thunk_storage: .space (interrupt_thunk_end - interrupt_thunk_begin) * 256
