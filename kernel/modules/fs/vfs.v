@@ -192,7 +192,7 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 	return node
 }
 
-pub fn syscall_mount(src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
+pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: mount(%s, %s, %s, 0x%x, %x)\n', src, tgt, fs_type, mountflags, data)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
@@ -209,6 +209,17 @@ pub fn syscall_mount(src charptr, tgt charptr, fs_type charptr, mountflags u64, 
 	}
 
 	return 0, 0
+}
+
+pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: umount(%s, 0x%x)\n', tgt, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	// TODO: Implement this once the FS supports it.
+
+	return -1, errno.enosys
 }
 
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
