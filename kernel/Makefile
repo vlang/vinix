@@ -12,7 +12,6 @@ LDFLAGS =
 VFLAGS =
 
 INTERNALCFLAGS :=                 \
-	-I./c                         \
 	-ffreestanding                \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
@@ -76,13 +75,13 @@ install:
 
 blob.o: $(VFILES)
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
+	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.S
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ)
 	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
