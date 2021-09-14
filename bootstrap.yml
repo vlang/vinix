@@ -238,7 +238,7 @@ tools:
       - args: |
           set -e
           export PATH="`pwd`/bin:$PATH"
-          make bin/aclocal-1.16 -j@PARALLELISM@
+          make bin/aclocal-1.16 bin/automake-1.16 -j@PARALLELISM@
           make -j@PARALLELISM@
     install:
       - args: ['make', 'install-strip']
