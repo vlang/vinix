@@ -189,6 +189,21 @@ sources:
     tag: 'v3.20.5'
     version: '3.20.5'
 
+  - name: xorg-util-macros
+    subdir: '3rdparty'
+    git: 'https://gitlab.freedesktop.org/xorg/util/macros.git'
+    tag: 'util-macros-1.19.3'
+    version: '1.19.3'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+    regenerate:
+      - args: ['./autogen.sh']
+        environ:
+          NOCONFIGURE: 'yes'
+
 tools:
   - name: host-autoconf-v2.69
     source:
@@ -487,6 +502,18 @@ tools:
       - args: |
           set -e
           echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.20/Modules/Platform/Vinix.cmake"
+
+  - name: host-xorg-macros
+    exports_aclocal: true
+    from_source: xorg-util-macros
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
 
 tasks:
   - name: make-iso
@@ -1783,6 +1810,94 @@ packages:
         environ:
           # freetype-config does not support cross-compilation.
           FREETYPE_CONFIG: 'no'
+          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
+          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libxkbcommon
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/xkbcommon/libxkbcommon.git'
+      tag: 'xkbcommon-1.3.0'
+      version: '1.3.0'
+    tools_required:
+      - host-pkg-config
+      - host-gcc
+      - host-wayland-scanner
+      - virtual: pkgconfig-for-host
+        program_name: host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "x86_64-vinix"
+    pkgs_required:
+      - mlibc
+      - wayland
+      - wayland-protocols
+      - libxml
+    configure:
+      - args:
+        - 'meson'
+        - '--native-file'
+        - '@SOURCE_ROOT@/native_file.txt'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/cross_file.txt'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=release'
+        - '-Denable-docs=false'
+        - '-Denable-x11=false'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: weston
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/wayland-project/weston.git'
+      tag: '4.0.0'
+      version: '4.0.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+      - host-gcc
+      - host-wayland-scanner
+    pkgs_required:
+      - mlibc
+      - cairo
+      - libinput
+      - libxkbcommon
+      - mesa
+      - wayland
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--disable-xwayland'
+        - '--disable-x11-compositor'
+        - '--disable-weston-launch'
+        - '--disable-fbdev-compositor'
+        - '--disable-simple-dmabuf-drm-client'
+        - '--disable-simple-dmabuf-v4l-client'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        environ:
           PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
           PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
     build:
