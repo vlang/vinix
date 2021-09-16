@@ -56,6 +56,8 @@ pub mut:
 	masked_signals u64
 	enqueued_by_signal bool
 	stacks []voidptr
+	signalfds_lock klock.Lock
+	signalfds []voidptr
 }
 
 pub fn current_thread() &Thread {

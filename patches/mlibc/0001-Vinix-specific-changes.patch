@@ -1,6 +1,6 @@
-From 76b4c00a7f5332a3e36a4f1d7625983bf3be9261 Mon Sep 17 00:00:00 2001
+From 1f91cb434fd0300548c5c944fdc7b772580e3895 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Tue, 14 Sep 2021 10:44:31 +0200
+Date: Thu, 16 Sep 2021 12:50:03 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/unistd-stubs.cpp        |  19 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 636 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 646 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -39,7 +39,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 35 files changed, 806 insertions(+), 8 deletions(-)
+ 35 files changed, 816 insertions(+), 8 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -293,10 +293,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..29f52e3
+index 0000000..629e38d
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,636 @@
+@@ -0,0 +1,646 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -904,6 +904,16 @@ index 0000000..29f52e3
 +    __syscall_ret ret = __syscall(30, context, old_mask);
 +
 +    __builtin_unreachable();
++}
++
++int sys_signalfd_create(sigset_t mask, int flags, int *fd) {
++    __syscall_ret ret = __syscall(45, *fd, mask, flags);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *fd = (int)ret.ret;
++    return 0;
 +}
 +
 +int sys_waitpid(pid_t pid, int *status, int flags, pid_t *ret_pid) {
