@@ -429,22 +429,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 		return -1
 	}
 
-	calcuate_max_prps := fn (mut c &NVMEController, identity &NVMENamespaceID) u64 {
-		lba_shift := identity.lbaf_list[identity.flbas & 0xf].ds
-
-		shift := 12 + (c.regs.cap >> 48 & 0xf)
-		mut max_transfer_shift := u64(20)
-
-		if c.controller_id.mdts != 0 {
-			max_transfer_shift = u64(shift + c.controller_id.mdts)
-		}
-
-		max_lbas := 1 << (max_transfer_shift - lba_shift)
-
-		return (u64(max_lbas) * (1 << u64(lba_shift))) / 0x1000
-	}
-
-	namespace.max_prps = calcuate_max_prps(mut parent_controller, namespace.identity)
+	namespace.max_prps = calculate_max_prps(mut parent_controller, namespace.identity)
 	namespace.stat.blocks = namespace.identity.nsze
 	namespace.stat.blksize = 1 << u64(namespace.identity.lbaf_list[namespace.identity.flbas & 0b11111].ds)
 	namespace.stat.size = namespace.stat.blocks * namespace.stat.blksize
@@ -452,6 +437,20 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller &NVMEContr
 	namespace.stat.mode = 0o644 | stat.ifblk
 
 	return 0
+}
+
+fn calculate_max_prps(mut c &NVMEController, identity &NVMENamespaceID) u64 {
+	lba_shift := identity.lbaf_list[identity.flbas & 0xf].ds
+
+	shift := 12 + (c.regs.cap >> 48 & 0xf)
+	mut max_transfer_shift := u64(20)
+
+	if c.controller_id.mdts != 0 {
+		max_transfer_shift = u64(shift + c.controller_id.mdts)
+	}
+
+	max_lbas := 1 << (max_transfer_shift - lba_shift)
+	return (u64(max_lbas) * (1 << u64(lba_shift))) / 0x1000
 }
 
 pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller &NVMEController, vector u64, irq u64, admin bool) int {
