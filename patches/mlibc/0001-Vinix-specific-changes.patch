@@ -1,6 +1,6 @@
-From 1f91cb434fd0300548c5c944fdc7b772580e3895 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 16 Sep 2021 12:50:03 +0200
+From c34ae7192934f81e46a695a9d9994ef5661f2a1a Mon Sep 17 00:00:00 2001
+From: streaksu <assemblyislaw@gmail.com>
+Date: Sun, 19 Sep 2021 17:57:37 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/unistd-stubs.cpp        |  19 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 646 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 666 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -39,7 +39,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 35 files changed, 816 insertions(+), 8 deletions(-)
+ 35 files changed, 836 insertions(+), 8 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -293,10 +293,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..629e38d
+index 0000000..450df4d
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,646 @@
+@@ -0,0 +1,666 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -934,6 +934,26 @@ index 0000000..629e38d
 +
 +int sys_getgroups(size_t size, const gid_t *list, int *_ret) {
 +    __syscall_ret ret = __syscall(38, size, list);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *_ret = (int)ret.ret;
++    return 0;
++}
++
++int sys_mount(const char *source, const char *target, const char *fstype, unsigned long flags, const void *data, int *_ret) {
++    __syscall_ret ret = __syscall(43, source, target, fstype, flags, data);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *_ret = (int)ret.ret;
++    return 0;
++}
++
++int sys_umount2(const char *target, int flags, int *_ret) {
++    __syscall_ret ret = __syscall(44, target, flags);
 +
 +    if (ret.errno != 0)
 +        return ret.errno;
