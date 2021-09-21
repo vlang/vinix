@@ -40,10 +40,9 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
 
-	modules_tag := unsafe { &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id)) }
-	if modules_tag == 0 {
+	modules_tag := &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id) or {
 		panic('Stivale2 modules tag missing')
-	}
+	})
 
 	initramfs.init(modules_tag)
 
@@ -81,10 +80,9 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	kprint.kprint(c'Welcome to Vinix\n\n')
 
 	// Initialize the memory allocator.
-	memmap_tag := unsafe { &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id)) }
-	if memmap_tag == 0 {
+	memmap_tag := &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id) or {
 		lib.kpanic(voidptr(0), c'Stivale2 memmap tag missing')
-	}
+	})
 
 	memory.pmm_init(memmap_tag)
 
@@ -97,17 +95,15 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	memory.vmm_init(memmap_tag)
 
 	// ACPI init
-	rsdp_tag := unsafe { &stivale2.RSDPTag(stivale2.get_tag(stivale2_struct, stivale2.rsdp_id)) }
-	if rsdp_tag == 0 {
+	rsdp_tag := &stivale2.RSDPTag(stivale2.get_tag(stivale2_struct, stivale2.rsdp_id) or {
 		panic('Stivale2 RSDP tag missing')
-	}
+	})
 
 	acpi.init(&acpi.RSDP(rsdp_tag.rsdp))
 
-	smp_tag := unsafe { &stivale2.SMPTag(stivale2.get_tag(stivale2_struct, stivale2.smp_id)) }
-	if smp_tag == 0 {
+	smp_tag := &stivale2.SMPTag(stivale2.get_tag(stivale2_struct, stivale2.smp_id) or {
 		panic('Stivale2 SMP tag missing')
-	}
+	})
 
 	smp.initialise(smp_tag)
 

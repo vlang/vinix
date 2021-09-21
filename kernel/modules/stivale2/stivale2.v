@@ -125,7 +125,7 @@ pub enum MemmapEntryType {
 	framebuffer = 0x1002
 }
 
-pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
+pub fn get_tag(stivale2_struct &Struct, id u64) ?voidptr {
 	mut current_tag_ptr := stivale2_struct.tags
 
 	for {
@@ -136,13 +136,13 @@ pub fn get_tag(stivale2_struct &Struct, id u64) &Tag {
 		current_tag := &Tag(current_tag_ptr)
 
 		if current_tag.id == id {
-			return current_tag
+			return current_tag_ptr
 		}
 
 		current_tag_ptr = current_tag.next
 	}
 
-	return 0
+	return none
 }
 
 __global (
@@ -155,11 +155,9 @@ __global (
 )
 
 pub fn terminal_init(stivale2_struct &Struct) {
-	terminal_tag := unsafe { &TermTag(get_tag(stivale2_struct, stivale2.terminal_id)) }
-
-	if terminal_tag == 0 {
+	terminal_tag := &TermTag(get_tag(stivale2_struct, stivale2.terminal_id) or {
 		panic('Bootloader does not provide terminal')
-	}
+	})
 
 	if terminal_tag.flags & (1 << 0) == 0 {
 		panic('Bootloader does not provide enough terminal info')
@@ -169,15 +167,15 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_rows = terminal_tag.rows
 	terminal_cols = terminal_tag.cols
 
-	framebuffer_tag := unsafe { &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id)) }
-	if framebuffer_tag == 0 {
+	framebuffer_tag := &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id) or {
 		print('Bootloader does not provide framebuffer')
 		framebuffer_width = terminal_rows * 16
 		framebuffer_height = terminal_cols * 8
-	} else {
-		framebuffer_width = framebuffer_tag.width
-		framebuffer_height = framebuffer_tag.height
-	}
+		return
+	})
+
+	framebuffer_width = framebuffer_tag.width
+	framebuffer_height = framebuffer_tag.height
 }
 
 pub fn terminal_print(s voidptr, len u64) {

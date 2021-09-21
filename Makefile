@@ -20,7 +20,7 @@ run-hvf: vinix.iso
 
 .PHONY: run
 run: vinix.iso
-	qemu-system-x86_64 -cpu qemu64,level=11,+rdtscp $(QEMUFLAGS)
+	qemu-system-x86_64 -cpu qemu64,level=11,+rdtscp $(QEMUFLAGS) -no-shutdown -no-reboot -d int
 
 .PHONY: distro
 distro:
