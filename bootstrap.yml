@@ -132,8 +132,8 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.57'
-    version: '2.57'
+    tag: 'v2.57.2'
+    version: '2.57.2'
 
   - name: wayland
     subdir: '3rdparty'
