@@ -17,17 +17,15 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install build-essential meson -y
-      - name: Build V
-        run: make
-      - name: Clone current Vinix
-        run: git clone https://github.com/vlang/vinix.git --depth=1
+      - name: Clone and build current V
+        run: git clone https://github.com/vlang/v.git --depth=1 && cd v && make
       - name: Clone current mlibc
         run: git clone https://github.com/managarm/mlibc.git --depth=1
       - name: Patch mlibc for Vinix
-        run: cd mlibc && patch -p1 < ../vinix/patches/mlibc/0001-Vinix-specific-changes.patch || true
+        run: cd mlibc && patch -p1 < ../patches/mlibc/0001-Vinix-specific-changes.patch || true
       - name: Install mlibc headers
-        run: mkdir mlibc-build && cd mlibc-build && meson --cross-file ../vinix/cross_file.txt --prefix=/ -Dheaders_only=true ../mlibc && ninja && mkdir ../mlibc-headers && DESTDIR=`realpath ../mlibc-headers` ninja install
+        run: mkdir mlibc-build && cd mlibc-build && meson --cross-file ../cross_file.txt --prefix=/ -Dheaders_only=true ../mlibc && ninja && mkdir ../mlibc-headers && DESTDIR=`realpath ../mlibc-headers` ninja install
       - name: Attempt to build the Vinix kernel (debug)
-        run: cd vinix/kernel && make PROD=false CFLAGS="-D__vinix__ -O2 -g -pipe -I../../mlibc-headers/include" V="../../v" && make clean
+        run: cd kernel && make PROD=false CFLAGS="-D__vinix__ -O2 -g -pipe -I../mlibc-headers/include" V="../v/v" && make clean
       - name: Attempt to build the Vinix kernel (prod)
-        run: cd vinix/kernel && make PROD=true  CFLAGS="-D__vinix__ -O2 -g -pipe -I../../mlibc-headers/include" V="../../v" && make clean
+        run: cd kernel && make PROD=true  CFLAGS="-D__vinix__ -O2 -g -pipe -I../mlibc-headers/include" V="../v/v" && make clean
