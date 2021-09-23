@@ -1,6 +1,6 @@
-From 98da759d780dfa89555cab4b72ca87e0e3756d03 Mon Sep 17 00:00:00 2001
-From: streaksu <assemblyislaw@gmail.com>
-Date: Sun, 19 Sep 2021 18:20:14 +0200
+From 83d0853363ea764dc309701ce2df7ba2d85863d7 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Thu, 23 Sep 2021 13:05:25 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -9,10 +9,10 @@ Subject: [PATCH] Vinix specific changes
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux/include/asm/ioctls.h            |   2 +
- options/posix/generic/unistd-stubs.cpp        |  19 +-
+ options/posix/generic/unistd-stubs.cpp        |   4 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 664 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 646 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -39,7 +39,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 35 files changed, 834 insertions(+), 8 deletions(-)
+ 35 files changed, 804 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -169,39 +169,10 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
-index 4725736..72797ba 100644
+index 456bf0d..230254a 100644
 --- a/options/posix/generic/unistd-stubs.cpp
 +++ b/options/posix/generic/unistd-stubs.cpp
-@@ -13,6 +13,7 @@
- #include <mlibc/arch-defs.hpp>
- #include <mlibc/debug.hpp>
- #include <mlibc/posix-sysdeps.hpp>
-+#include <mlibc/ansi-sysdeps.hpp>
- #include <mlibc/thread.hpp>
- 
- unsigned int alarm(unsigned int) {
-@@ -310,9 +311,17 @@ char *getcwd(char *buffer, size_t size) {
- 	return buffer;
- }
- 
--int getgroups(int, gid_t []) {
--	__ensure(!"Not implemented");
--	__builtin_unreachable();
-+int getgroups(int size, gid_t list[]) {
-+	if(!mlibc::sys_getgroups) {
-+		MLIBC_MISSING_SYSDEP();
-+		__ensure(!"Cannot continue without sys_getgroups()");
-+	}
-+	int ret;
-+	if(int e = mlibc::sys_getgroups(size, list, &ret); e) {
-+		errno = e;
-+		return -1;
-+	}
-+	return ret;
- }
- 
- long gethostid(void) {
-@@ -812,12 +821,12 @@ int ttyname_r(int, char *, size_t) {
+@@ -821,12 +821,12 @@ int ttyname_r(int, char *, size_t) {
  }
  
  int unlink(const char *path) {
@@ -293,10 +264,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..e941baa
+index 0000000..629e38d
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,664 @@
+@@ -0,0 +1,646 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -939,24 +910,6 @@ index 0000000..e941baa
 +        return ret.errno;
 +
 +    *_ret = (int)ret.ret;
-+    return 0;
-+}
-+
-+int sys_mount(const char *source, const char *target, const char *fstype, unsigned long flags, const void *data) {
-+    __syscall_ret ret = __syscall(43, source, target, fstype, flags, data);
-+
-+    if (ret.errno != 0)
-+        return ret.errno;
-+
-+    return 0;
-+}
-+
-+int sys_umount2(const char *target, int flags) {
-+    __syscall_ret ret = __syscall(44, target, flags);
-+
-+    if (ret.errno != 0)
-+        return ret.errno;
-+
 +    return 0;
 +}
 +
