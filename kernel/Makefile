@@ -44,6 +44,7 @@ INTERNALVFLAGS :=   \
 	-os vinix       \
 	-enable-globals \
 	-nofloat        \
+	-autofree       \
 	-d no_backtrace
 
 ifeq ($(PROD), true)
