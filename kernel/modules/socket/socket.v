@@ -9,6 +9,8 @@ import socket.public as sock_pub
 import socket.unix as sock_unix
 import socket.netlink as sock_netlink
 
+pub fn initialise() {}
+
 fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	match domain {
 		sock_pub.af_unix {

@@ -31,6 +31,7 @@ fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	table.init_syscall_table()
+	socket.initialise()
 	pipe.initialise()
 	futex.initialise()
 	fs.initialise()
