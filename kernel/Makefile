@@ -64,10 +64,6 @@ all: $(KERNEL)
 clean:
 	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
 
-.PHONY: distclean
-distclean: clean
-	rm -rf blob.c.old blob.c.working
-
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)"

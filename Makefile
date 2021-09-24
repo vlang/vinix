@@ -52,6 +52,5 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	$(MAKE) -C kernel distclean
 	rm -rf 3rdparty build initramfs.tar.gz pack
 	rm -f kernel/*.xbstrap init/*.xbstrap base-files/*.xbstrap

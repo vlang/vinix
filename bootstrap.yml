@@ -16,7 +16,7 @@ sources:
     version: '0.29.2'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
     regenerate:
       - args: ['./autogen.sh']
@@ -30,13 +30,13 @@ sources:
     version: '3.8.2'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
     regenerate:
       - args: ['autoreconf', '-f', '-i']
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/']
 
   - name: tzdata
@@ -61,10 +61,10 @@ sources:
     version: '2.37'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     regenerate:
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/']
 
   - name: gcc
@@ -74,24 +74,24 @@ sources:
     version: '11.2.0'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     regenerate:
       - args: ['./contrib/download_prerequisites']
         workdir: '@THIS_SOURCE_DIR@'
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/']
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/gmp-6.1.0/configfsf.sub']
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/isl-0.18/config.sub']
       - args: ['cp', '-f',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/mpc-1.0.3/config.sub']
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/mpfr-3.1.6/config.sub']
       - args: ['autoconf']
         workdir: '@THIS_SOURCE_DIR@/gcc'
@@ -142,7 +142,7 @@ sources:
     version: '1.19.0'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
     regenerate:
@@ -157,13 +157,13 @@ sources:
     version: '3.6.2'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
     regenerate:
       - args: ['git', 'submodule', 'update', '--init']
       - args: ['./bootstrap']
       - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
           '@THIS_SOURCE_DIR@/build-aux/']
 
   - name: gettext
@@ -173,7 +173,7 @@ sources:
     version: '0.19.8'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
     regenerate:
@@ -196,7 +196,7 @@ sources:
     version: '1.19.3'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
     regenerate:
@@ -296,7 +296,7 @@ tools:
     from_source: bison
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -312,7 +312,7 @@ tools:
     tools_required:
       - host-bison
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -471,14 +471,14 @@ tools:
       version: '2.4.6'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         # libtool's ./bootstrap does a shallow clone with insufficient depth.
         - args: ['git', 'submodule', 'update', '--init']
         - args: ['./bootstrap']
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -740,10 +740,10 @@ packages:
       version: '6.2'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/']
     tools_required:
       - host-gcc
@@ -786,12 +786,12 @@ packages:
       version: '3.4.2'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
       regenerate:
         - args: ['./autogen.sh']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/']
     tools_required:
       - host-gcc
@@ -817,7 +817,7 @@ packages:
       version: '2.4.1'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
       regenerate:
         - args: ['./buildconf.sh']
@@ -850,15 +850,15 @@ packages:
       version: '5.1.8'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/support/']
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     pkgs_required:
       - mlibc
       - ncurses
@@ -907,7 +907,7 @@ packages:
     from_source: wayland
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
       - host-gcc
@@ -942,7 +942,7 @@ packages:
       version: '1.21'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-pkg-config
       regenerate:
         - args: ['./autogen.sh']
@@ -1025,11 +1025,11 @@ packages:
       version: '8.32'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['./bootstrap']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - host-bison
@@ -1066,7 +1066,7 @@ packages:
       version: '5.8'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-pkg-config
       regenerate:
         - args: |
@@ -1079,7 +1079,7 @@ packages:
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-pkg-config
     pkgs_required:
       - mlibc
@@ -1166,11 +1166,11 @@ packages:
       version: '3.6'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['./bootstrap']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - host-gcc
@@ -1198,16 +1198,16 @@ packages:
       version: '3.7'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['./bootstrap']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     pkgs_required:
       - mlibc
     configure:
@@ -1233,11 +1233,11 @@ packages:
       version: '4.8'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['./bootstrap']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - host-gcc
@@ -1352,7 +1352,7 @@ packages:
       version: '8.45'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1360,7 +1360,7 @@ packages:
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
     pkgs_required:
       - mlibc
     configure:
@@ -1389,7 +1389,7 @@ packages:
       version: '2.10.2'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1397,7 +1397,7 @@ packages:
           environ:
             NOCONFIGURE: '1'
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/builds/unix/']
     tools_required:
       - host-gcc
@@ -1427,7 +1427,7 @@ packages:
       version: '1.6.37'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
       regenerate:
         - args: ['git', 'clean', '-xf', '-e', '*.xbstrap']
@@ -1458,13 +1458,13 @@ packages:
       disable_shallow_fetch: true
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
       regenerate:
         - args: ['./autogen.sh', '--no-po4a']
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-gcc
     pkgs_required:
@@ -1574,7 +1574,7 @@ packages:
       version: '1.21.1'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-autoconf-archive
         - host-pkg-config
@@ -1582,7 +1582,7 @@ packages:
       regenerate:
         - args: ['./bootstrap']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - host-pkg-config
@@ -1614,10 +1614,10 @@ packages:
       version: '8.1'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
       regenerate:
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/support/']
     tools_required:
       - host-gcc
@@ -1646,13 +1646,13 @@ packages:
       version: '1.1.6'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
       regenerate:
         - args: ['./autogen.sh']
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-gcc
     pkgs_required:
       - mlibc
@@ -1676,7 +1676,7 @@ packages:
       version: '1.9.1'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1707,7 +1707,7 @@ packages:
       version: '3.2.10'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1777,7 +1777,7 @@ packages:
       version: '1.17.4'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1787,7 +1787,7 @@ packages:
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
     pkgs_required:
@@ -1864,7 +1864,7 @@ packages:
       version: '4.0.0'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1873,7 +1873,7 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
       - host-gcc
@@ -1914,7 +1914,7 @@ packages:
       version: '0.40.0'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1923,7 +1923,7 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-libtool
       - host-pkg-config
       - host-gcc
@@ -1950,7 +1950,7 @@ packages:
       version: '2.13.92'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -1966,7 +1966,7 @@ packages:
       - libiconv
     tools_required:
       - host-autoconf-v2.69
-      - host-automake-v1.15
+      - host-automake-v1.16
       - host-gcc
       - host-libtool
       - host-pkg-config
@@ -1996,7 +1996,7 @@ packages:
       version: '2.9.12'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
       regenerate:
@@ -2077,7 +2077,7 @@ packages:
       version: '1.16'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
         - host-pkg-config
         - host-autoconf-archive
@@ -2089,10 +2089,10 @@ packages:
           environ:
             'NOCONFIGURE': 'yes'
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
         - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/libcharset/build-aux/']
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
