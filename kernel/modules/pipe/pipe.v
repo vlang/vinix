@@ -48,15 +48,15 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	new_pipe := create() or {
+	mut new_pipe := create() or {
 		return -1, errno.get()
 	}
 
-	rd_fd := file.fdnum_create_from_resource(voidptr(0), new_pipe, flags, 0, false) or {
+	rd_fd := file.fdnum_create_from_resource(voidptr(0), mut new_pipe, flags, 0, false) or {
 		return -1, errno.get()
 	}
 
-	wr_fd := file.fdnum_create_from_resource(voidptr(0), new_pipe, flags, 0, false) or {
+	wr_fd := file.fdnum_create_from_resource(voidptr(0), mut new_pipe, flags, 0, false) or {
 		return -1, errno.get()
 	}
 

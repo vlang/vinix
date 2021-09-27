@@ -93,7 +93,7 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 	if fdnum == -1 {
 		signalfd = &SignalFD{refcount: 1}
 
-		newfd = file.fdnum_create_from_resource(voidptr(0), signalfd, flags, 0, false) or {
+		newfd = file.fdnum_create_from_resource(voidptr(0), mut signalfd, flags, 0, false) or {
 			return -1, errno.get()
 		}
 

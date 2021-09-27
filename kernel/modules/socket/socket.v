@@ -11,6 +11,24 @@ import socket.netlink as sock_netlink
 
 pub fn initialise() {}
 
+fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, &resource.Resource) {
+	match domain {
+		sock_pub.af_unix {
+			socket0, socket1 := sock_unix.create_pair(@type) ?
+			return &resource.Resource(*socket0), &resource.Resource(*socket1)
+		}
+		/*sock_pub.af_netlink {
+			socket0, socket1 := sock_netlink.create_pair(@type, protocol) ?
+			return socket0, socket1
+		}*/
+		else {
+			C.printf(c'socket: Unknown domain: %d\n', domain)
+			errno.set(errno.einval)
+			return error('')
+		}
+	}
+}
+
 fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	match domain {
 		sock_pub.af_unix {
@@ -29,13 +47,13 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	}
 }
 
-pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: socket(%d, 0x%x, %d)\n', domain, @type, protocol)
+pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', domain, @type, protocol, voidptr(ret))
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	socket := socket_create(domain, @type, protocol) or {
+	mut socket0, mut socket1 := socketpair_create(domain, @type, protocol) or {
 		return -1, errno.get()
 	}
 
@@ -44,7 +62,35 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		flags |= resource.o_cloexec
 	}
 
-	ret := file.fdnum_create_from_resource(voidptr(0), socket, flags, 0, false) or {
+	unsafe {
+		ret[0] = file.fdnum_create_from_resource(voidptr(0), mut socket0, flags, 0, false) or {
+			return -1, errno.get()
+		}
+
+		ret[1] = file.fdnum_create_from_resource(voidptr(0), mut socket1, flags, 0, false) or {
+			return -1, errno.get()
+		}
+	}
+
+	return 0, 0
+}
+
+pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: socket(%d, 0x%x, %d)\n', domain, @type, protocol)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut socket := socket_create(domain, @type, protocol) or {
+		return -1, errno.get()
+	}
+
+	mut flags := int(0)
+	if @type & sock_pub.sock_cloexec != 0 {
+		flags |= resource.o_cloexec
+	}
+
+	ret := file.fdnum_create_from_resource(voidptr(0), mut socket, flags, 0, false) or {
 		return -1, errno.get()
 	}
 

@@ -3,6 +3,7 @@ module file
 import resource
 import proc
 import klock
+import katomic
 import errno
 import stat
 import event
@@ -246,12 +247,11 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 	}
 }
 
-pub fn fd_create_from_resource(_res &resource.Resource, flags int) ?&FD {
-	mut res := unsafe { _res }
-	res.refcount++
+pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
+	katomic.inc(res.refcount)
 
 	mut new_handle := unsafe { &Handle(C.malloc(sizeof(Handle))) }
-	new_handle.resource = res
+	new_handle.resource = unsafe { res }
 	new_handle.refcount = 1
 	new_handle.flags = flags & resource.file_status_flags_mask
 	new_handle.dirlist = []stat.Dirent{}
@@ -263,9 +263,9 @@ pub fn fd_create_from_resource(_res &resource.Resource, flags int) ?&FD {
 	return new_fd
 }
 
-pub fn fdnum_create_from_resource(_process &proc.Process, res &resource.Resource,
+pub fn fdnum_create_from_resource(_process &proc.Process, mut res &resource.Resource,
 								  flags int, oldfd int, specific bool) ?int {
-	new_fd := fd_create_from_resource(res, flags) or {
+	new_fd := fd_create_from_resource(mut res, flags) or {
 		return none
 	}
 	return fdnum_create_from_fd(_process, new_fd, oldfd, specific)

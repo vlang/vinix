@@ -80,3 +80,9 @@ fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
 pub fn create(@type int) ?&UnixSocket {
 	return &UnixSocket{refcount: 1}
 }
+
+pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
+	mut a := &UnixSocket{refcount: 1}
+	mut b := &UnixSocket{refcount: 1}
+	return a, b
+}

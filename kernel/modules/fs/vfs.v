@@ -365,9 +365,9 @@ pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	return target_node
 }
 
-fn fdnum_create_from_node(node &VFSNode, flags int, oldfd int, specific bool) ?int {
+fn fdnum_create_from_node(mut node &VFSNode, flags int, oldfd int, specific bool) ?int {
 	current_process := proc.current_thread().process
-	mut fd := file.fd_create_from_resource(node.resource, flags) or {
+	mut fd := file.fd_create_from_resource(mut node.resource, flags) or {
 		return none
 	}
 	fd.handle.node = voidptr(node)
@@ -517,7 +517,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return -1, errno.enotdir
 	}
 
-	fdnum := fdnum_create_from_node(node, flags, 0, false) or {
+	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or {
 		return -1, errno.get()
 	}
 

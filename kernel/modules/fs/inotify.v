@@ -57,9 +57,9 @@ pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	inotify := &INotify{refcount: 1}
+	mut inotify := &INotify{refcount: 1}
 
-	fdnum := file.fdnum_create_from_resource(voidptr(0), inotify, 0, 0, false) or {
+	fdnum := file.fdnum_create_from_resource(voidptr(0), mut inotify, 0, 0, false) or {
 		return -1, errno.get()
 	}
 

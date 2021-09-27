@@ -58,11 +58,11 @@ pub fn syscall_epoll_create(_ voidptr, flags int) (u64, u64) {
 		0
 	}
 
-	e := &EPoll{
+	mut e := &EPoll{
 		refcount: 1
 	}
 
-	epoll_fdnum := file.fdnum_create_from_resource(voidptr(0), e, cloexec, 0, false) or {
+	epoll_fdnum := file.fdnum_create_from_resource(voidptr(0), mut e, cloexec, 0, false) or {
 		return -1, errno.get()
 	}
 
