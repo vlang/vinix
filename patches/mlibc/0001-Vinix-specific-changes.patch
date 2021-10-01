@@ -1,6 +1,6 @@
-From 563aab781087d4b76b8a12858184308b666b550d Mon Sep 17 00:00:00 2001
+From c9a2811864f4a0943fed44c796d88ed238c44e73 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 27 Sep 2021 17:18:14 +0200
+Date: Fri, 1 Oct 2021 01:15:20 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/unistd-stubs.cpp        |   4 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 670 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 676 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -39,7 +39,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 35 files changed, 828 insertions(+), 5 deletions(-)
+ 35 files changed, 834 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -264,10 +264,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..92c0412
+index 0000000..876ea1c
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,670 @@
+@@ -0,0 +1,676 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -374,6 +374,12 @@ index 0000000..92c0412
 +
 +    *fd = (int)ret.ret;
 +    return 0;
++}
++
++int sys_epoll_ctl(int epfd, int mode, int fd, struct epoll_event *ev) {
++    __syscall_ret ret = __syscall(47, epfd, mode, fd, ev);
++
++    return ret.errno;
 +}
 +
 +#ifndef MLIBC_BUILDING_RTDL
