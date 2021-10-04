@@ -102,7 +102,6 @@ tools:
     install:
       - args: ['make', 'install-strip-binutils', 'install-strip-gas', 'install-strip-ld']
 
-
   - name: host-gcc
     from_source: gcc
     tools_required:
@@ -218,8 +217,6 @@ tools:
         compile:
           - args: |
               set -e
-              ln -sf usr/lib "@SYSROOT_DIR@"/lib64
-              ln -sf usr/lib "@SYSROOT_DIR@"/lib
               "@THIS_SOURCE_DIR@/configure" \
                   --prefix=/usr \
                   --host=x86_64-vinix-linux-gnu \
@@ -325,6 +322,8 @@ packages:
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+      - args: ['ln', '-sf', 'usr/lib', '@THIS_COLLECT_DIR@/lib64']
+      - args: ['ln', '-sf', 'usr/lib', '@THIS_COLLECT_DIR@/lib']
 
   - name: linux-headers
     implict_package: true
@@ -348,7 +347,6 @@ packages:
           rm usr/include/Makefile
           mkdir -p @THIS_COLLECT_DIR@/usr/include
           cp -rv usr/include/. @THIS_COLLECT_DIR@/usr/include/
-
 
   - name: bash
     source:
@@ -408,10 +406,9 @@ packages:
         - '@THIS_SOURCE_DIR@/configure'
         - '--host=x86_64-vinix-linux-gnu'
         - '--prefix=/usr'
-        - 'CFLAGS=-DSLOW_BUT_NO_HACKS -Wno-error -O2 -pipe'
+        - 'CFLAGS=-Wno-error -O2 -pipe'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-
