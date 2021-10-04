@@ -3,114 +3,32 @@ declare_options:
     default: 'false'
 
 sources:
-  - name: glib
-    subdir: '3rdparty'
-    git: 'https://gitlab.gnome.org/GNOME/glib.git'
-    tag: '2.68.3'
-    version: '2.68.3'
-
-  - name: pkg-config
-    subdir: '3rdparty'
-    git: 'https://gitlab.freedesktop.org/pkg-config/pkg-config.git'
-    tag: 'pkg-config-0.29.2'
-    version: '0.29.2'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-    regenerate:
-      - args: ['./autogen.sh']
-        environ:
-          'NOCONFIGURE': 'yes'
-
-  - name: python
-    subdir: '3rdparty'
-    git: 'https://github.com/python/cpython.git'
-    tag: 'v3.8.2'
-    version: '3.8.2'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-    regenerate:
-      - args: ['autoreconf', '-f', '-i']
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/']
-
-  - name: tzdata
-    subdir: '3rdparty'
-    sources_required: ['tzcode']
-    url: 'https://data.iana.org/time-zones/releases/tzdata2021a.tar.gz'
-    format: 'tar.gz'
-    version: '2021a'
-    regenerate:
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/../tzcode/.', '@THIS_SOURCE_DIR@/']
-
-  - name: tzcode
-    subdir: '3rdparty'
-    url: 'https://data.iana.org/time-zones/releases/tzcode2021a.tar.gz'
-    format: 'tar.gz'
-    version: '2021a'
-
   - name: binutils
     subdir: '3rdparty'
-    git: 'https://sourceware.org/git/binutils-gdb.git'
-    tag: 'binutils-2_37'
+    url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.37.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'binutils-2.37'
+    patch-path-strip: 1
     version: '2.37'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    regenerate:
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/']
 
   - name: gcc
     subdir: '3rdparty'
-    git: 'https://gcc.gnu.org/git/gcc.git'
-    tag: 'releases/gcc-11.2.0'
+    url: 'https://ftp.gnu.org/gnu/gcc/gcc-11.2.0/gcc-11.2.0.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'gcc-11.2.0'
+    patch-path-strip: 1
     version: '11.2.0'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
     regenerate:
       - args: ['./contrib/download_prerequisites']
         workdir: '@THIS_SOURCE_DIR@'
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/']
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/gmp-6.1.0/configfsf.sub']
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/isl-0.18/config.sub']
-      - args: ['cp', '-f',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/mpc-1.0.3/config.sub']
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/mpfr-3.1.6/config.sub']
-      - args: ['autoconf']
-        workdir: '@THIS_SOURCE_DIR@/gcc'
-      - args: ['autoconf']
-        workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
 
-  - name: llvm
+  - name: glibc
     subdir: '3rdparty'
-    git: 'https://github.com/llvm/llvm-project.git'
-    tag: 'llvmorg-10.0.0'
-    version: '10.0.0'
-
-  - name: mlibc
-    subdir: '3rdparty'
-    git: 'https://github.com/managarm/mlibc.git'
-    branch: 'master'
-    commit: '79a15621913b3c3c8d5ad3f59dbde3984d07fc2c'
-    rolling_version: true
-    version: '0.0pl@ROLLING_ID@'
+    url: 'https://ftp.gnu.org/gnu/glibc/glibc-2.34.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'glibc-2.34'
+    patch-path-strip: 1
+    version: '2.34'
 
   - name: v
     subdir: '3rdparty'
@@ -132,220 +50,10 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.58.1'
-    version: '2.58.1'
-
-  - name: wayland
-    subdir: '3rdparty'
-    git: 'https://github.com/wayland-project/wayland.git'
-    tag: '1.19.0'
-    version: '1.19.0'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-    regenerate:
-      - args: ['./autogen.sh']
-        environ:
-          NOCONFIGURE: 'yes'
-
-  - name: bison
-    subdir: '3rdparty'
-    git: 'https://git.savannah.gnu.org/git/bison.git'
-    tag: 'v3.6.2'
-    version: '3.6.2'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-    regenerate:
-      - args: ['git', 'submodule', 'update', '--init']
-      - args: ['./bootstrap']
-      - args: ['cp',
-          '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-          '@THIS_SOURCE_DIR@/build-aux/']
-
-  - name: gettext
-    subdir: '3rdparty'
-    git: 'https://git.savannah.gnu.org/git/gettext.git'
-    tag: 'v0.19.8'
-    version: '0.19.8'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-    regenerate:
-      - args: 'sed -i s/"SUBDIRS = doc intl intl-java intl-csharp gnulib-lib \$(SUBDIR_libasprintf)\ src po man m4 tests"/"SUBDIRS = intl intl-java intl-csharp gnulib-lib \$(SUBDIR_libasprintf)\ src po m4 tests"/ @THIS_SOURCE_DIR@/gettext-runtime/Makefile.am'
-      - args: 'sed -i s/"SUBDIRS = doc intl gnulib-lib libgrep src libgettextpo po projects styles misc man m4 tests gnulib-tests examples its"/"SUBDIRS = intl gnulib-lib libgrep src libgettextpo po projects styles misc m4 tests gnulib-tests examples its"/ @THIS_SOURCE_DIR@/gettext-tools/Makefile.am'
-      - args: ['./autogen.sh']
-        environ:
-          NOCONFIGURE: 'yes'
-
-  - name: cmake
-    subdir: '3rdparty'
-    git: 'https://gitlab.kitware.com/cmake/cmake.git'
-    tag: 'v3.20.5'
-    version: '3.20.5'
-
-  - name: xorg-util-macros
-    subdir: '3rdparty'
-    git: 'https://gitlab.freedesktop.org/xorg/util/macros.git'
-    tag: 'util-macros-1.19.3'
-    version: '1.19.3'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-    regenerate:
-      - args: ['./autogen.sh']
-        environ:
-          NOCONFIGURE: 'yes'
+    tag: 'v2.58.2'
+    version: '2.58.2'
 
 tools:
-  - name: host-autoconf-v2.69
-    source:
-      name: autoconf-v2.69
-      subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'autoconf-2.69'
-      patch-path-strip: 3
-      version: '2.69'
-    configure:
-      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
-
-  - name: host-autoconf-archive
-    exports_aclocal: true
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/autoconf-archive/autoconf-archive.git'
-      tag: 'v2019.01.06'
-      version: '2019.01.06'
-    install:
-      - args: ['mkdir', '-p', '@BUILD_ROOT@/tools/host-autoconf-archive/share/']
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@BUILD_ROOT@/tools/host-autoconf-archive/share/aclocal']
-
-  - name: host-automake-v1.16
-    source:
-      name: automake-v1.16
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/automake.git'
-      tag: 'v1.16.4'
-      version: '1.16.4'
-      tools_required:
-        - host-autoconf-v2.69
-      regenerate:
-        - args: ['./bootstrap']
-    tools_required:
-      - host-autoconf-v2.69
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: |
-          set -e
-          export PATH="`pwd`/bin:$PATH"
-          make bin/aclocal-1.16 bin/automake-1.16 -j@PARALLELISM@
-          make -j@PARALLELISM@
-    install:
-      - args: ['make', 'install-strip']
-      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
-
-  - name: host-automake-v1.15
-    source:
-      name: automake-v1.15
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/automake.git'
-      tag: 'v1.15.1'
-      version: '1.15.1'
-      tools_required:
-        - host-autoconf-v2.69
-      regenerate:
-        - args: ['./bootstrap']
-    tools_required:
-      - host-autoconf-v2.69
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install-strip']
-      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
-
-  - name: host-zic
-    from_source: tzdata
-    configure:
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
-    compile:
-      - args: ['make', 'zic']
-    install:
-      - args: ['mkdir', '-p', '@PREFIX@/bin']
-      - args: ['cp', 'zic', '@PREFIX@/bin/']
-
-  - name: host-bison
-    from_source: bison
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install-strip']
-
-  - name: host-gettext
-    from_source: gettext
-    exports_aclocal: true
-    tools_required:
-      - host-bison
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make']
-    install:
-      - args: ['make', 'install-strip']
-
-  - name: host-pkg-config
-    exports_aclocal: true
-    from_source: pkg-config
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-        - '--with-internal-glib'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install-strip']
-
-  - name: host-python
-    from_source: python
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
-
   - name: host-v
     from_source: v
     compile:
@@ -369,7 +77,7 @@ tools:
       - args: |
           set -e
           cd "@THIS_SOURCE_DIR@"
-          make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix
+          make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix-linux-gnu
           make bin/limine-install
     install:
       - args: |
@@ -383,56 +91,105 @@ tools:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
-        - '--target=x86_64-vinix'
+        - '--target=x86_64-vinix-linux-gnu'
         - '--with-sysroot=@SYSROOT_DIR@'
-        # On recent compilers, binutils 2.26 causes implicit-fallthrough warnings, among others.
         - '--disable-werror'
+        - '--disable-nls'
         - '--enable-targets=x86_64-elf,x86_64-pe'
-        # -g blows up the binary size.
         - 'CFLAGS=-O2 -pipe'
     compile:
       - args: ['make', '-j@PARALLELISM@', 'all-binutils', 'all-gas', 'all-ld']
     install:
       - args: ['make', 'install-strip-binutils', 'install-strip-gas', 'install-strip-ld']
 
+
   - name: host-gcc
     from_source: gcc
     tools_required:
       - tool: host-binutils
         recursive: true
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-        - '--target=x86_64-vinix'
-        - '--with-sysroot=@SYSROOT_DIR@'
-        - '--enable-languages=c,c++'
-        - '--disable-multilib'
-        - '--enable-initfini-array'
-        # -g blows up GCC's binary size.
-        - 'CFLAGS=-O2 -pipe'
-        - 'CXXFLAGS=-O2 -pipe'
+
     stages:
-      - name: compiler
-        pkgs_required:
-          - mlibc-headers
+      - name: bootstrap-compiler
         compile:
+          - args:
+            - '@THIS_SOURCE_DIR@/configure'
+            - '--prefix=@PREFIX@'
+            - '--target=x86_64-vinix-linux-gnu'
+            - '--with-sysroot=@SYSROOT_DIR@'
+            - '--with-newlib'
+            - '--without-headers'
+            - '--disable-shared'
+            - '--disable-nls'
+            - '--enable-languages=c,c++'
+            - '--disable-multilib'
+            - '--enable-initfini-array'
+            - '--disable-decimal-float'
+            - '--disable-threads'
+            - '--disable-libatomic'
+            - '--disable-libgomp'
+            - '--disable-libquadmath'
+            - '--disable-libssp'
+            - '--disable-libvtv'
+            - '--disable-libstdcxx'
+            - '--disable-gcov'
+            - 'CFLAGS=-O2 -pipe'
+            - 'CXXFLAGS=-O2 -pipe'
           - args: ['make', '-j@PARALLELISM@', 'all-gcc']
         install:
           - args: ['make', 'install-gcc']
           # GCC does *not* look for target-prefixed LD/AS.
           # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
-          - args: ['mkdir', '-p', '@PREFIX@/x86_64-vinix/bin']
-          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vinix/bin/as',
-                               '@PREFIX@/x86_64-vinix/bin/as']
-          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vinix/bin/ld',
-                               '@PREFIX@/x86_64-vinix/bin/ld']
+          - args: ['mkdir', '-p', '@PREFIX@/x86_64-vinix-linux-gnu/bin']
+          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vinix-linux-gnu/bin/as',
+                               '@PREFIX@/x86_64-vinix-linux-gnu/bin/as']
+          - args: ['ln', '-sf', '../../../host-binutils/x86_64-vinix-linux-gnu/bin/ld',
+                               '@PREFIX@/x86_64-vinix-linux-gnu/bin/ld']
+
+      - name: bootstrap-libgcc
+        tools_required:
+          - tool: host-gcc
+            stage_dependencies: [bootstrap-compiler]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
+        install:
+          - args: ['make', 'install-strip-target-libgcc']
+
+      - name: compiler
+        tools_required:
+          - bootstrap-glibc
+        compile:
+          - args: |
+              set -e
+              rm -rf *
+          - args:
+            - '@THIS_SOURCE_DIR@/configure'
+            - '--prefix=@PREFIX@'
+            - '--target=x86_64-vinix-linux-gnu'
+            - '--with-sysroot=@SYSROOT_DIR@'
+            - '--disable-nls'
+            - '--enable-languages=c,c++'
+            - '--disable-multilib'
+            - '--enable-initfini-array'
+            - '--disable-decimal-float'
+            - '--disable-libatomic'
+            - '--disable-libgomp'
+            - '--disable-libquadmath'
+            - '--disable-libssp'
+            - '--disable-libvtv'
+            - '--disable-libstdcxx'
+            - '--disable-gcov'
+            - 'CFLAGS=-O2 -pipe'
+            - 'CXXFLAGS=-O2 -pipe'
+          - args: ['make', '-j@PARALLELISM@', 'all-gcc']
+        install:
+          - args: ['make', 'install-gcc']
+
       - name: libgcc
         tools_required:
           - tool: host-gcc
             stage_dependencies: [compiler]
-        pkgs_required:
-          - mlibc
+          - bootstrap-glibc
         compile:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
         install:
@@ -442,78 +199,39 @@ tools:
         tools_required:
           - tool: host-gcc
             stage_dependencies: [libgcc]
+        pkgs_required:
+          - glibc
         compile:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
         install:
           - args: ['make', 'install-strip-target-libstdc++-v3']
 
-  - name: host-wayland-scanner
-    from_source: wayland
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-        - '--disable-libraries'
-        - '--disable-dtd-validation'
-        - '--disable-documentation'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
-
-  - name: host-libtool
-    exports_aclocal: true
-    source:
-      name: libtool
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/libtool.git'
-      tag: 'v2.4.6'
-      version: '2.4.6'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        # libtool's ./bootstrap does a shallow clone with insufficient depth.
-        - args: ['git', 'submodule', 'update', '--init']
-        - args: ['./bootstrap']
+  - name: bootstrap-glibc
+    from_source: glibc
     tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install-strip']
-
-  - name: host-cmake
-    from_source: cmake
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/bootstrap'
-        - '--prefix=@PREFIX@'
-        - '--parallel=@PARALLELISM@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
-      - args: |
-          set -e
-          echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.20/Modules/Platform/Vinix.cmake"
-
-  - name: host-xorg-macros
-    exports_aclocal: true
-    from_source: xorg-util-macros
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
+      - tool: host-gcc
+        stage_dependencies: [bootstrap-libgcc]
+    stages:
+      - name: glibc
+        pkgs_required:
+          - linux-headers
+        compile:
+          - args: |
+              set -e
+              ln -sf usr/lib "@SYSROOT_DIR@"/lib64
+              ln -sf usr/lib "@SYSROOT_DIR@"/lib
+              "@THIS_SOURCE_DIR@/configure" \
+                  --prefix=/usr \
+                  --host=x86_64-vinix-linux-gnu \
+                  --build="$("@SOURCE_ROOT@/3rdparty/gcc/config.guess")" \
+                  --enable-kernel=3.2 \
+                  --with-headers=@SYSROOT_DIR@/usr/include \
+                  libc_cv_slibdir=/usr/lib
+            environ:
+              CFLAGS: '-O2 -pipe'
+          - args: ['make', '-j@PARALLELISM@']
+        install:
+          - args: ['make', 'DESTDIR=@SYSROOT_DIR@', 'install']
 
 tasks:
   - name: make-iso
@@ -524,17 +242,7 @@ tasks:
       - kernel
       - init
       - bash
-      - v
       - coreutils
-      - nano
-      - tzdata
-      - grep
-      - diffutils
-      - sed
-      - binutils
-      - gcc
-      - gawk
-      - vim
     artifact_files:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
@@ -546,13 +254,12 @@ tasks:
     workdir: '@BUILD_ROOT@'
 
 packages:
+  - name: vc
+    from_source: vc
+
   - name: base-files
     source:
       subdir: ''
-      git: 'https://github.com/vlang/vinix.git'
-      branch: 'main'
-      rolling_version: true
-      version: '0.0pl@ROLLING_ID@'
     build:
       - args: |
           set -e
@@ -563,315 +270,107 @@ packages:
   - name: kernel
     source:
       subdir: ''
-      git: 'https://github.com/vlang/vinix.git'
-      branch: 'main'
-      rolling_version: true
-      version: '0.0pl@ROLLING_ID@'
     tools_required:
       - host-v
       - host-gcc
     pkgs_required:
-      - mlibc
+      - glibc
     build:
       - args: |
           set -e
           cd "@THIS_SOURCE_DIR@"
-          make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
+          make PROD=@OPTION:prod@ CC=x86_64-vinix-linux-gnu-gcc LD=x86_64-vinix-linux-gnu-ld OBJDUMP=x86_64-vinix-linux-gnu-objdump
           make install PREFIX=/boot DESTDIR="@THIS_COLLECT_DIR@"
 
   - name: init
     source:
       subdir: ''
-      git: 'https://github.com/vlang/vinix.git'
-      branch: 'main'
-      rolling_version: true
-      version: '0.0pl@ROLLING_ID@'
     tools_required:
       - host-v
       - host-gcc
     pkgs_required:
-      - mlibc
+      - glibc
     build:
       - args: |
           set -e
           cd "@THIS_SOURCE_DIR@"
-          VMODULES=/tmp/.vmodules v -cc x86_64-vinix-gcc -os vinix .
+          VMODULES=/tmp/.vmodules v -cc x86_64-vinix-linux-gnu-gcc -os vinix .
           mkdir -p "@THIS_COLLECT_DIR@/sbin"
           cp init "@THIS_COLLECT_DIR@/sbin/"
 
-  - name: glib
-    from_source: glib
-    tools_required:
-      - host-gcc
-      - host-libtool
-      - host-pkg-config
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
-    pkgs_required:
-      - mlibc
-      - pcre
-      - libffi
-      - zlib
-      - libiconv
-      - libintl
-    configure:
-      - args:
-        - 'meson'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
-        - '--prefix=/usr'
-        - '--libdir=lib'
-        - '--buildtype=release'
-        - '-Dxattr=false'
-        - '@THIS_SOURCE_DIR@'
-        environ:
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: pkg-config
-    from_source: pkg-config
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - glib
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-static'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: mlibc-headers
-    from_source: mlibc
-    revision: 2
+  - name: glibc
     implict_package: true
-    configure:
-      - args:
-        - 'meson'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
-        - '--prefix=/usr'
-        - '-Dheaders_only=true'
-        - '-Ddisable_iconv_option=true'
-        - '-Ddisable_intl_option=true'
-        - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: mlibc
-    from_source: mlibc
-    revision: 2
+    from_source: glibc
     tools_required:
       - tool: host-gcc
-        stage_dependencies: [compiler]
-    implict_package: true
+        stage_dependencies: [libgcc]
     pkgs_required:
-      - mlibc-headers
+      - linux-headers
     configure:
-      - args:
-        - 'meson'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
-        - '--prefix=/usr'
-        - '--libdir=lib'
-        - '--buildtype=debugoptimized'
-        - '-Dmlibc_no_headers=true'
-        - '-Ddisable_iconv_option=true'
-        - '-Ddisable_intl_option=true'
-        - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: llvm
-    from_source: llvm
-    tools_required:
-      - host-cmake
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - zlib
-    configure:
-      - args:
-        - 'cmake'
-        - '-GNinja'
-        - '-DCMAKE_TOOLCHAIN_FILE=@SOURCE_ROOT@/CMakeToolchain-x86_64-vinix.txt'
-        - '-DCMAKE_INSTALL_PREFIX=/usr'
-        # We really have to build LLVM in Release mode.
-        # Building it in debug mode produces tens of GiB of debugging info.
-        - '-DCMAKE_BUILD_TYPE=Release'
-        - '-DLLVM_LINK_LLVM_DYLIB=ON'
-        # RTTI affects the ABI. Hence, we enable it.
-        - '-DLLVM_ENABLE_RTTI=ON'
-        - '-DLLVM_TARGETS_TO_BUILD=X86'
-        - '-DLLVM_TARGET_ARCH=x86_64'
-        - '-DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-vinix'
-        - '-DLLVM_HOST_TRIPLE=x86_64-vinix'
-        # Disable linking against ncurses, which we do not build with -fPIC.
-        - '-DLLVM_ENABLE_TERMINFO=OFF'
-        - '@THIS_SOURCE_DIR@/llvm'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: ncurses
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/ThomasDickey/ncurses-snapshots.git'
-      tag: 'v6_2'
-      version: '6.2'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--without-ada'
-        - '--enable-pc-files'
-        - '--with-shared'
-        - '--without-normal'
-        - '--with-manpage-format=normal'
-        - '--with-pkg-config-libdir=/usr/lib/pkgconfig'
-        - '--with-termlib'
-        - '--enable-widec'
-        environ:
-          cf_cv_func_nanosleep: 'yes'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
-      # As we build ncurses with wide character support, make some compatibility links
       - args: |
-          for lib in ncurses form panel menu tinfo ; do
-              rm -vf                    @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
-              echo "INPUT(-l${lib}w)" > @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
-              ln -sfv ${lib}w.pc        @THIS_COLLECT_DIR@/usr/lib/pkgconfig/${lib}.pc
-          done
-          rm -vf                     @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
-          echo "INPUT(-lncursesw)" > @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
-          ln -sfv libncurses.so      @THIS_COLLECT_DIR@/usr/lib/libcurses.so
-
-  - name: libffi
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/libffi/libffi.git'
-      tag: 'v3.4.2'
-      version: '3.4.2'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-      regenerate:
-        - args: ['./autogen.sh']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+          set -e
+          rm -rf *
+      - args: |
+          set -e
+          "@THIS_SOURCE_DIR@/configure" \
+              --prefix=/usr \
+              --host=x86_64-vinix-linux-gnu \
+              --build="$("@SOURCE_ROOT@/3rdparty/gcc/config.guess")" \
+              --enable-kernel=3.2 \
+              --with-headers=@SYSROOT_DIR@/usr/include \
+              libc_cv_slibdir=/usr/lib
+        environ:
+          CFLAGS: '-O2 -pipe'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
+    install:
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
 
-  - name: libexpat
+  - name: linux-headers
+    implict_package: true
+    tools_required:
+      - tool: host-gcc
+        stage_dependencies: [bootstrap-libgcc]
     source:
       subdir: '3rdparty'
-      git: 'https://github.com/libexpat/libexpat.git'
-      tag: 'R_2_4_1'
-      version: '2.4.1'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-      regenerate:
-        - args: ['./buildconf.sh']
-          workdir: '@THIS_SOURCE_DIR@/expat'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/expat/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        # We disable xmlwf to avoid building its documentation.
-        - '--without-xmlwf'
+      url: 'https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.14.9.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'linux-5.14.9'
+      patch-path-strip: 1
+      version: '5.14.9'
     build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: |
+          set -e
+          cp -rv "@THIS_SOURCE_DIR@/." "./"
+          make mrproper
+          make headers
+          find usr/include -name '.*' -delete
+          rm usr/include/Makefile
+          mkdir -p @THIS_COLLECT_DIR@/usr/include
+          cp -rv usr/include/. @THIS_COLLECT_DIR@/usr/include/
+
 
   - name: bash
     source:
       subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/bash.git'
-      # Checkout bash 5.1 patch 8
-      branch: 'master'
-      commit: 'ce23728687ce9e584333367075c9deef413553fa'
+      url: 'https://ftp.gnu.org/gnu/bash/bash-5.1.8.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'bash-5.1.8'
+      patch-path-strip: 1
       version: '5.1.8'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/support/']
+    revision: 4
     tools_required:
       - host-gcc
-      - host-autoconf-v2.69
-      - host-automake-v1.16
     pkgs_required:
-      - mlibc
-      - ncurses
-      - libiconv
+      - glibc
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
+        - '--host=x86_64-vinix-linux-gnu'
         - '--prefix=/usr'
         - '--without-bash-malloc'
         - '--disable-nls'
-        environ:
-          ac_cv_func_wcswidth: 'no'
+        - 'CFLAGS=-O2 -pipe'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
@@ -882,160 +381,18 @@ packages:
       - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/profile', '@THIS_COLLECT_DIR@/etc/']
       - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/bashrc', '@THIS_COLLECT_DIR@/etc/bash/']
 
-  - name: v
-    from_source: v
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - gcc
-    build:
-      - args: |
-          set -e
-          mkdir -p "@THIS_COLLECT_DIR@/usr/v"
-          cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
-          cd "@THIS_COLLECT_DIR@/usr/v"
-          rm -v *.xbstrap
-          x86_64-vinix-gcc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c"
-          mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
-          ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
-
-  - name: vc
-    from_source: vc
-
-  - name: wayland
-    from_source: wayland
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-      - host-gcc
-      - host-wayland-scanner
-    pkgs_required:
-      - mlibc
-      - libexpat
-      - libffi
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-host-scanner'
-        - '--disable-dtd-validation'
-        - '--disable-documentation'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        environ:
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: wayland-protocols
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/wayland-project/wayland-protocols.git'
-      tag: '1.21'
-      version: '1.21'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-gcc
-      - host-wayland-scanner
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: mesa
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/mesa/mesa.git'
-      tag: 'mesa-21.1.4'
-      version: '21.1.4'
-    tools_required:
-      - host-pkg-config
-      - host-gcc
-      - host-wayland-scanner
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
-      - virtual: pkgconfig-for-host
-        program_name: host-pkg-config
-    pkgs_required:
-      - mlibc
-      - libdrm
-      - llvm
-      - wayland
-      - wayland-protocols
-      - zlib
-    configure:
-      - args: ['cp', '@SOURCE_ROOT@/cross_file.txt', 'meson.cross-file']
-      - args:
-        - 'sed'
-        - '-i'
-        - "/^# sed adds binaries here.$/a llvm-config = '@SOURCE_ROOT@/cross-llvm-config'"
-        - 'meson.cross-file'
-      - args:
-        - 'meson'
-        - '--native-file'
-        - '@SOURCE_ROOT@/native_file.txt'
-        - '--cross-file'
-        - 'meson.cross-file'
-        - '--prefix=/usr'
-        - '--libdir=lib'
-        # The debug build type enables some additional output from Mesa.
-        - '--buildtype=debugoptimized'
-        - '-Dglx=disabled'
-        - '-Dplatforms=wayland'
-        # The Gallium swrast driver seems to be preferred over dri-swrast.
-        - '-Ddri-drivers='
-        - '-Dgallium-drivers=swrast'
-        - '-Dvulkan-drivers='
-        # Force Mesa to build with LLVM.
-        - '-Dllvm=true'
-        - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
   - name: coreutils
     source:
       subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/coreutils.git'
-      tag: 'v8.32'
+      url: 'https://ftp.gnu.org/gnu/coreutils/coreutils-8.32.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'coreutils-8.32'
+      patch-path-strip: 1
       version: '8.32'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['./bootstrap']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
-      - host-bison
       - host-gcc
     pkgs_required:
-      - mlibc
+      - glibc
     configure:
       # Huge hack: coreutils does not compile the build-machine binary make-prime-list
       # using the build-machine compiler. Hence, build and invoke the binary manually here.
@@ -1049,7 +406,7 @@ packages:
       # Now compile coreutils for the correct target.
       - args:
         - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
+        - '--host=x86_64-vinix-linux-gnu'
         - '--prefix=/usr'
         - 'CFLAGS=-DSLOW_BUT_NO_HACKS -Wno-error -O2 -pipe'
     build:
@@ -1058,1215 +415,3 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
-  - name: nano
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/nano.git'
-      tag: 'v5.8'
-      version: '5.8'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-pkg-config
-      regenerate:
-        - args: |
-              if ! [ -d gnulib ]; then
-                  git clone git://git.sv.gnu.org/gnulib.git gnulib
-              else
-                  git -C gnulib pull --unshallow || true
-              fi
-        - args: ['./autogen.sh']
-    tools_required:
-      - host-gcc
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-pkg-config
-    pkgs_required:
-      - mlibc
-      - ncurses
-      - zlib
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--sysconfdir=/etc'
-        - 'CFLAGS=-DSLOW_BUT_NO_HACKS -ltinfo'
-        environ:
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-          gl_cv_type_wctype_t: 'yes'
-          gl_cv_type_wctrans_t: 'yes'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc']
-      - args: ['cp', '@SOURCE_ROOT@/extra-files/nano/nanorc', '@THIS_COLLECT_DIR@/etc/']
-
-  - name: tzdata
-    from_source: tzdata
-    tools_required:
-      - host-zic
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@/']
-    build:
-      # Build and install support programs
-      - args: ['make', 'CC=x86_64-vinix-gcc', 'AR=x86_64-vinix-ar']
-      - args: ['make', 'install', 'DESTDIR=@THIS_COLLECT_DIR@', 'ZIC=zic']
-      # Create the required directories
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc']
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/share/zoneinfo/posix']
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/share/zoneinfo/right']
-      # Create the time zone files without leap seconds, convention puts these in both zoneinfo and zoneinfo/posix.
-      # After that. create time time zone files with leap seconds
-      - args: |
-          set -e
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/etcetera
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/etcetera
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/etcetera
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/southamerica
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/southamerica
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/southamerica
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/northamerica
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/northamerica
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/northamerica
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/europe
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/europe
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/europe
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/africa
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/africa
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/africa
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/antarctica
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/antarctica
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/antarctica
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/asia
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/asia
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/asia
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/australasia
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/australasia
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/australasia
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo "@THIS_BUILD_DIR@"/backward
-          zic -L /dev/null -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/posix "@THIS_BUILD_DIR@"/backward
-          zic -L "@THIS_SOURCE_DIR@"/leapseconds -d "@THIS_COLLECT_DIR@"/usr/share/zoneinfo/right "@THIS_BUILD_DIR@"/backward
-      # Create the posixrules file, POSIX requires daylight saving rules to be in accordance with US rules, thus use New York
-      - args: ['zic', '-d', '@THIS_COLLECT_DIR@/usr/share/zoneinfo', '-p', 'America/New_York']
-      # Default to UTC for localtime, this should be fixed, but that is pending xbstrap support.
-      - args: ['ln', '-sf', '/usr/share/zoneinfo/UTC', '@THIS_COLLECT_DIR@/etc/localtime']
-
-  - name: grep
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/grep.git'
-      tag: 'v3.6'
-      version: '3.6'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['./bootstrap']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/build-aux/']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - pcre
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-nls'
-      - args: 'sed -i s/-Werror//g @THIS_BUILD_DIR@/lib/Makefile'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: diffutils
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/diffutils.git'
-      tag: 'v3.7'
-      version: '3.7'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['./bootstrap']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/build-aux/']
-    tools_required:
-      - host-gcc
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-nls'
-        - '--disable-werror'
-      - args: 'sed -i s/-Werror//g @THIS_BUILD_DIR@/lib/Makefile'
-      - args: 'sed -i s/-Werror//g @THIS_BUILD_DIR@/src/Makefile'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: sed
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/sed.git'
-      tag: 'v4.8'
-      version: '4.8'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['./bootstrap']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/build-aux/']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-nls'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: binutils
-    from_source: binutils
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--target=x86_64-vinix'
-        - '--with-sysroot=/'
-        - '--disable-nls'
-        # On recent compilers, binutils 2.26 causes implicit-fallthrough warnings, among others.
-        - '--disable-werror'
-        # -g blows up the binary size.
-        - 'CFLAGS=-O2 -pipe'
-    build:
-      - args: ['make', '-j@PARALLELISM@', 'all-binutils', 'all-gas', 'all-ld']
-      - args: ['make', 'install-strip-binutils', 'install-strip-gas', 'install-strip-ld']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: gcc
-    from_source: gcc
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - binutils
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--target=x86_64-vinix'
-        - '--with-sysroot=/'
-        - '--with-build-sysroot=@SYSROOT_DIR@'
-        - '--enable-languages=c,c++'
-        - '--enable-initfini-array'
-        - '--disable-multilib'
-        - '--disable-nls'
-        # -g blows up GCC's binary size.
-        - 'CFLAGS=-O2 -pipe'
-        - 'CXXFLAGS=-O2 -pipe'
-    build:
-      - args: ['make', '-j@PARALLELISM@', 'all-gcc', 'all-target-libgcc']
-      - args: ['make', 'install-strip-gcc', 'install-strip-target-libgcc']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/lib/* @THIS_COLLECT_DIR@/usr/lib/']
-      - args: ['sh', '-c', 'cp -rv @BUILD_ROOT@/tools/host-gcc/x86_64-vinix/include/* @THIS_COLLECT_DIR@/usr/include/']
-      - args: ['ln', '-s', '/usr/bin/gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
-
-  - name: gawk
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/gawk.git'
-      tag: 'gawk-5.1.0'
-      version: '5.1.0'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: sed -i 's/extras//' @THIS_SOURCE_DIR@/Makefile.in
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/']
-    tools_required:
-      - host-gcc
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-nls'
-        - '--disable-extensions'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: pcre
-    source:
-      subdir: '3rdparty'
-      svn: 'svn://vcs.pcre.org/pcre/code/trunk'
-      rev: '1767'
-      # Seems to be 8.45?
-      version: '8.45'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-    tools_required:
-      - host-gcc
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        - '--enable-unicode-properties'
-        - '--enable-pcre8'
-        - '--enable-pcre16'
-        - '--enable-pcre32'
-        - '--disable-static'
-        environ:
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
-
-  - name: freetype
-    source:
-      subdir: '3rdparty'
-      git: 'git://git.sv.nongnu.org/freetype/freetype2.git'
-      tag: 'VER-2-10-2'
-      version: '2.10.2'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: '1'
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/builds/unix/']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - bzip2
-      - libpng
-      - zlib
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-static'
-        - '--with-harfbuzz=no'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libpng
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.code.sf.net/p/libpng/code'
-      tag: 'v1.6.37'
-      version: '1.6.37'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-      regenerate:
-        - args: ['git', 'clean', '-xf', '-e', '*.xbstrap']
-        - args: ['autoreconf', '-fvi']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - zlib
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: xz-utils
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.tukaani.org/xz.git'
-      branch: 'v5.2'
-      version: '5.2'
-      disable_shallow_fetch: true
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-      regenerate:
-        - args: ['./autogen.sh', '--no-po4a']
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - zlib
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-static'
-        - '--disable-nls'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: bzip2
-    source:
-      subdir: '3rdparty'
-      url: 'https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz'
-      format: 'tar.gz'
-      extract_path: 'bzip2-1.0.8'
-      version: '1.0.8'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
-      # Remove the test directory from the Makefile, as it tries to run (and fail on) the tests
-      - args: 'sed -i s/"all: libbz2.a bzip2 bzip2recover test"/"all: libbz2.a bzip2 bzip2recover"/ @THIS_BUILD_DIR@/Makefile'
-    build:
-      # Building Makefile-libbz2_so first makes all programs link agains libbz2.so
-      - args: ['make', 'CC=x86_64-vinix-gcc', 'CFLAGS=-fPIC', '-f', 'Makefile-libbz2_so']
-      - args: ['make', 'clean']
-      - args: ['make', 'CC=x86_64-vinix-gcc', 'CFLAGS=-fPIC', '-j@PARALLELISM@']
-      - args: ['make', 'PREFIX=@THIS_COLLECT_DIR@/usr', 'install']
-      - args: ['ln', '-sf', 'bzdiff', '@THIS_COLLECT_DIR@/usr/bin/bzcmp']
-      - args: ['ln', '-sf', 'bzgrep', '@THIS_COLLECT_DIR@/usr/bin/bzegrep']
-      - args: ['ln', '-sf', 'bzgrep', '@THIS_COLLECT_DIR@/usr/bin/bzfgrep']
-      - args: ['ln', '-sf', 'bzmore', '@THIS_COLLECT_DIR@/usr/bin/bzless']
-
-  - name: zlib
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/madler/zlib.git'
-      tag: 'v1.2.11'
-      version: '1.2.11'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        environ:
-          CHOST: 'x86_64-vinix'
-          prefix: '/usr'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: openssl
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/openssl/openssl.git'
-      tag: 'OpenSSL_1_1_1l'
-      version: '1.1.1l'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - zlib
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/Configure'
-        - '--prefix=/usr'
-        - '--openssldir=/etc/ssl'
-        - '--libdir=lib'
-        - 'x86_64-vinix'
-        - 'shared'
-        - 'zlib-dynamic'
-        - 'no-afalgeng'
-        environ:
-          CC: 'x86_64-vinix-gcc'
-          CXX: 'x86_64-vinix-g++'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      # Disable installing static libraries
-      - args: ['sed', '-i', '/INSTALL_LIBS/s/libcrypto.a libssl.a//', '@THIS_BUILD_DIR@/Makefile']
-      # Suffix all man pages with ssl
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'MANSUFFIX=ssl', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-      # Move the doc dir to a versioned directory
-      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1l']
-
-  - name: wget
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/wget.git'
-      tag: 'v1.21.1'
-      version: '1.21.1'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-autoconf-archive
-        - host-pkg-config
-        - host-gettext
-      regenerate:
-        - args: ['./bootstrap']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/build-aux/']
-    tools_required:
-      - host-pkg-config
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - pcre
-      - openssl
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--sysconfdir=/etc'
-        - '--disable-nls'
-        - '--with-ssl=openssl'
-        - '--with-openssl'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: readline
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/readline.git'
-      tag: 'readline-8.1'
-      version: '8.1'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-      regenerate:
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/support/']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - ncurses
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-static'
-        - '--enable-multibyte'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: mtdev
-    source:
-      subdir: '3rdparty'
-      git: 'https://bitmath.org/git/mtdev.git'
-      disable_shallow_fetch: true
-      tag: 'v1.1.6'
-      version: '1.1.6'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-      regenerate:
-        - args: ['./autogen.sh']
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libevdev
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/libevdev/libevdev.git'
-      tag: 'libevdev-1.9.1'
-      version: '1.9.1'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: eudev
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/gentoo/eudev.git'
-      tag: 'v3.2.10'
-      version: '3.2.10'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        - '--disable-blkid'
-        - '--disable-selinux'
-        - '--disable-kmod'
-        - '--disable-mtd-probe'
-        - '--disable-rule-generator'
-        - '--enable-introspection=no'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libinput
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/wayland-project/libinput.git'
-      tag: '1.16.4'
-      version: '1.16.4'
-    tools_required:
-      - host-pkg-config
-      - host-gcc
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
-    pkgs_required:
-      - mlibc
-      - eudev
-      - libevdev
-      - mtdev
-    configure:
-      - args:
-          - 'meson'
-          - '--cross-file'
-          - '@SOURCE_ROOT@/cross_file.txt'
-          - '--prefix=/usr'
-          - '--libdir=lib'
-          - '--buildtype=debugoptimized'
-          - '-Dlibwacom=false'
-          - '-Ddebug-gui=false'
-          - '-Dtests=false'
-          - '-Ddocumentation=false'
-          - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: cairo
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/cairo/cairo.git'
-      tag: '1.17.4'
-      version: '1.17.4'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-gcc
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-    pkgs_required:
-      - mlibc
-      - freetype
-      - fontconfig
-      - libpng
-      - pixman
-      - mesa
-    configure:
-      - args:
-        # For now, we build without glesv2 backend as Weston prefers the image backend.
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        - '--disable-xlib'
-        - '--enable-xml'
-        - '--enable-tee'
-        environ:
-          # freetype-config does not support cross-compilation.
-          FREETYPE_CONFIG: 'no'
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libxkbcommon
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/xkbcommon/libxkbcommon.git'
-      tag: 'xkbcommon-1.3.0'
-      version: '1.3.0'
-    tools_required:
-      - host-pkg-config
-      - host-gcc
-      - host-wayland-scanner
-      - virtual: pkgconfig-for-host
-        program_name: host-pkg-config
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
-    pkgs_required:
-      - mlibc
-      - wayland
-      - wayland-protocols
-      - libxml
-    configure:
-      - args:
-        - 'meson'
-        - '--native-file'
-        - '@SOURCE_ROOT@/native_file.txt'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
-        - '--prefix=/usr'
-        - '--libdir=lib'
-        - '--buildtype=release'
-        - '-Denable-docs=false'
-        - '-Denable-x11=false'
-        - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: weston
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/wayland-project/weston.git'
-      tag: '4.0.0'
-      version: '4.0.0'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-      - host-gcc
-      - host-wayland-scanner
-    pkgs_required:
-      - mlibc
-      - cairo
-      - libinput
-      - libxkbcommon
-      - mesa
-      - wayland
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-xwayland'
-        - '--disable-x11-compositor'
-        - '--disable-weston-launch'
-        - '--disable-fbdev-compositor'
-        - '--disable-simple-dmabuf-drm-client'
-        - '--disable-simple-dmabuf-v4l-client'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        environ:
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: pixman
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/pixman/pixman.git'
-      tag: 'pixman-0.40.0'
-      version: '0.40.0'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - libpng
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: fontconfig
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig'
-      tag: '2.13.92'
-      version: '2.13.92'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-        # Make sure we regenerate this file
-        - args: ['rm', '-f', 'src/fcobjshash.h']
-    pkgs_required:
-      - mlibc
-      - freetype
-      - libxml
-      - libiconv
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-gcc
-      - host-libtool
-      - host-pkg-config
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--sysconfdir=/etc'
-        - '--localstatedir=/var'
-        - '--disable-docs'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        - '--enable-libxml2'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libxml
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.gnome.org/GNOME/libxml2.git'
-      tag: 'v2.9.12'
-      version: '2.9.12'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-gcc
-      - host-python
-    pkgs_required:
-      - mlibc
-      - zlib
-      - python
-      - libiconv
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-python=@SYSROOT_DIR@/usr/bin/python3.8'
-        - '--disable-static'
-        - '--with-threads'
-        - '--disable-ipv6'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: python
-    from_source: python
-    tools_required:
-      - host-pkg-config
-      - host-python
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - zlib
-      - libexpat
-      - libffi
-      - ncurses
-      - readline
-      - bzip2
-      - openssl
-      - xz-utils
-      - libintl
-    revision: 2
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--build=x86_64-linux-gnu'
-        - '--prefix=/usr'
-        - '--enable-shared'
-        - '--with-system-ffi'
-        - '--with-system-expat'
-        - '--disable-ipv6'
-        - '--without-ensurepip'
-        environ:
-          CONFIG_SITE: '@SOURCE_ROOT@/scripts/python-config-site'
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-          ac_cv_file__dev_ptmx: 'no'
-          ac_cv_file__dev_ptc: 'no'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libiconv
-    source:
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/libiconv.git'
-      # Last release tag is broken for us, use current master (07-12-2020)
-      branch: 'master'
-      commit: '0eb1068ceb77ba383c3ce2fc391ab40ef686c491'
-      version: '1.16'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-        - host-autoconf-archive
-        - host-gettext
-      regenerate:
-        - args: ['rm', '-rf', 'gnulib']
-        - args: ['./gitsub.sh', 'pull']
-        - args: ['./autogen.sh']
-          environ:
-            'NOCONFIGURE': 'yes'
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/build-aux/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
-            '@THIS_SOURCE_DIR@/libcharset/build-aux/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
-            '@THIS_SOURCE_DIR@/m4/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
-            '@THIS_SOURCE_DIR@/libcharset/m4/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-libtool/share/libtool/build-aux/ltmain.sh',
-            '@THIS_SOURCE_DIR@/libcharset/build-aux/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-libtool/share/libtool/build-aux/ltmain.sh',
-            '@THIS_SOURCE_DIR@/build-aux/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/ltversion.m4',
-            '@THIS_SOURCE_DIR@/m4/']
-        - args: ['cp',
-            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/ltversion.m4',
-            '@THIS_SOURCE_DIR@/libcharset/m4/']
-        - args: ['autoreconf', '-fvi', '-I@THIS_SOURCE_DIR@/m4', '-I@THIS_SOURCE_DIR@/srcm4']
-    tools_required:
-      - host-gcc
-      - host-libtool
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        - '--disable-nls'
-        - '--enable-shared'
-        - '--disable-static'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libintl
-    source:
-      subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/gettext/gettext-0.21.tar.xz'
-      format: 'tar.xz'
-      extract_path: 'gettext-0.21'
-      version: '0.21'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.15
-        - host-libtool
-      regenerate:
-        - args: ['autoreconf', '-fvi']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - libiconv
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--without-emacs'
-        - '--without-lispdir'
-        # Normally this controls nls behavior in general, but the libintl
-        # subdir is skipped unless this is explicitly set.
-        - '--enable-nls'
-        # This magic flag enables libintl.
-        - '--with-included-gettext'
-        - '--disable-c++'
-        - '--disable-libasprintf'
-        - '--disable-java'
-        - '--enable-shared'
-        - '--disable-static'
-        - '--enable-threads=posix'
-        - '--disable-curses'
-        - '--without-git'
-        - '--without-cvs'
-        - '--without-bzip2'
-        - '--without-xz'
-    build:
-      - args: ['make', '-C', 'gettext-runtime/intl', '-j@PARALLELISM@']
-      - args: ['make', '-C', 'gettext-runtime/intl', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: vim
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/vim/vim.git'
-      tag: 'v8.2.3358'
-      version: '8.2.3358'
-    tools_required:
-      - host-pkg-config
-      - host-gcc
-    pkgs_required:
-      - mlibc
-      - ncurses
-      - libiconv
-    configure:
-      # vim does not seem to support out-of-tree builds, so we just copy
-      # the source tree into the build directory instead
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
-      - args:
-        - './configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--disable-gtktest'
-        - '--disable-icon-cache-update'
-        - '--disable-desktop-database-update'
-        - '--disable-canberra'
-        - '--disable-selinux'
-        - '--disable-xsmp'
-        - '--disable-channel'
-        - '--disable-netbeans'
-        - '--enable-multibyte'
-        - '--disable-acl'
-        - '--disable-gpm'
-        - '--disable-sysmouse'
-        - '--disable-nls'
-        - '--with-tlib=tinfo'
-        - '--enable-gui=no'
-        - '--without-x'
-        environ:
-          ac_cv_small_wchar_t: 'no'
-          ac_cv_func_sigsetjmp: 'no'
-          vim_cv_toupper_broken: 'no'
-          vim_cv_terminfo: 'yes'
-          vim_cv_tgetent: 'zero'
-          vim_cv_tty_group: ''
-          vim_cv_tty_mode: '0620'
-          vim_cv_getcwd_broken: 'no'
-          vim_cv_stat_ignores_slash: 'no'
-          vim_cv_memmove_handles_overlap: 'yes'
-          vim_cv_bcopy_handles_overlap: 'yes'
-          vim_cv_memcpy_handles_overlap: 'yes'
-          STRIP: 'x86_64-vinix-strip'
-        workdir: '@THIS_BUILD_DIR@/src/'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libdrm
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/mesa/drm.git'
-      tag: 'libdrm-2.4.107'
-      version: '2.4.107'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - 'meson'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
-        - '--prefix=/usr'
-        - '--libdir=lib'
-        - '--buildtype=release'
-        - '-Dintel=false'
-        - '-Dvmwgfx=false'
-        - '-Dradeon=false'
-        - '-Damdgpu=false'
-        - '-Dnouveau=false'
-        # We might want to build cairo with OpenGL support.
-        # Doing so would introduce a circular dependency here.
-        - '-Dcairo-tests=false'
-        - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'

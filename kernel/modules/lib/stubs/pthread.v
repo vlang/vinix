@@ -5,11 +5,8 @@ import sched
 import event
 import proc
 
-struct C.__mlibc_thread_data {}
-struct C.__mlibc_threadattr {}
-
 [export: 'pthread_create']
-pub fn pthread_create(thread &&C.__mlibc_thread_data, const_attr &C.__mlibc_threadattr, start_routine fn(voidptr) voidptr, arg voidptr) int {
+pub fn pthread_create(thread &C.pthread_t, const_attr &C.pthread_attr_t, start_routine fn(voidptr) voidptr, arg voidptr) int {
 	if voidptr(const_attr) != voidptr(0) {
 		lib.kpanic(voidptr(0), c'pthread_create() called with non-NULL attr')
 	}
@@ -23,12 +20,12 @@ pub fn pthread_create(thread &&C.__mlibc_thread_data, const_attr &C.__mlibc_thre
 }
 
 [export: 'pthread_detach']
-pub fn pthread_detach(thread &C.__mlibc_thread_data) int {
+pub fn pthread_detach(thread &C.pthread_t) int {
 	return 0
 }
 
 [export: 'pthread_join']
-pub fn pthread_join(thread &C.__mlibc_thread_data, mut retval voidptr) int {
+pub fn pthread_join(thread &C.pthread_t, mut retval voidptr) int {
 	unsafe {
 		*retval = event.pthread_wait(&proc.Thread(thread))
 	}

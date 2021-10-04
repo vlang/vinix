@@ -3,9 +3,7 @@ module stubs
 import lib
 import kprint
 
-struct C.__mlibc_file_base {}
-
-type FILE = C.__mlibc_file_base
+type FILE = voidptr
 
 __global (
 	stdin = &FILE(voidptr(0))
@@ -14,7 +12,7 @@ __global (
 )
 
 [export: 'fflush']
-pub fn fflush(stream &FILE) int {
+pub fn fflush(stream &C.FILE) int {
 	return 0
 }
 
@@ -24,22 +22,22 @@ pub fn getchar() int {
 }
 
 [export: 'getc']
-pub fn getc(stream &FILE) int {
+pub fn getc(stream &C.FILE) int {
 	lib.kpanic(voidptr(0), c'getc is a stub')
 }
 
 [export: 'fgets']
-pub fn fgets(str charptr, count u64, stream &FILE) charptr {
+pub fn fgets(str charptr, count u64, stream &C.FILE) charptr {
 	lib.kpanic(voidptr(0), c'fgets is a stub')
 }
 
 [export: 'popen']
-pub fn popen(const_command &C.char, const_typ &C.char) &FILE {
+pub fn popen(const_command &C.char, const_typ &C.char) &C.FILE {
 	lib.kpanic(voidptr(0), c'popen is a stub')
 }
 
 [export: 'pclose']
-pub fn pclose(stream &FILE) int {
+pub fn pclose(stream &C.FILE) int {
 	lib.kpanic(voidptr(0), c'pclose is a stub')
 }
 

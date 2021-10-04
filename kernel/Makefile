@@ -71,13 +71,13 @@ install:
 
 blob.o: $(VFILES)
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
+	$(CC) -nostdinc -I./c $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c
-	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -nostdinc -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.S
-	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -nostdinc -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ)
 	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@

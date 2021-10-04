@@ -54,16 +54,16 @@ fn prepare_interrupt_thunks() {
 	v_interrupt_thunk_begin := voidptr(C.interrupt_thunk_begin)
 	v_interrupt_thunk_storage := u64(C.interrupt_thunk_storage)
 	v_interrupt_thunk_offset := &u64(C.interrupt_thunk_offset)
-	v_interrupt_thunk_size := u64(C.interrupt_thunk_size)
+	v_interrupt_thunk_size := &u64(C.interrupt_thunk_size)
 	v_interrupt_thunk_number := &u32(C.interrupt_thunk_number)
 
 	unsafe {
 		for i := u64(0); i < interrupt_table.len; i++ {
 			*v_interrupt_thunk_offset = u64(&interrupt_table[i])
 			*v_interrupt_thunk_number = u32(i)
-			ptr := &byte(v_interrupt_thunk_storage + v_interrupt_thunk_size * i)
+			ptr := &byte(v_interrupt_thunk_storage + *v_interrupt_thunk_size * i)
 
-			C.memcpy(ptr, v_interrupt_thunk_begin, v_interrupt_thunk_size)
+			C.memcpy(ptr, v_interrupt_thunk_begin, *v_interrupt_thunk_size)
 			shift := match i {
 				8 { 2 }
 				10 { 2 }

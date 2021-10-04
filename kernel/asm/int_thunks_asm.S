@@ -72,5 +72,5 @@ interrupt_thunk_offset: .quad 0
     iretq
 
 interrupt_thunk_end:
-.equ interrupt_thunk_size, interrupt_thunk_end - interrupt_thunk_begin
+interrupt_thunk_size: .quad interrupt_thunk_end - interrupt_thunk_begin
 interrupt_thunk_storage: .space (interrupt_thunk_end - interrupt_thunk_begin) * 256
