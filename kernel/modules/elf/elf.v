@@ -93,7 +93,6 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 
 	if header.ident[ei_class] != 0x02
 	|| header.ident[ei_data]  != bits_le
-	|| header.ident[ei_osabi] != abi_sysv
 	|| header.machine != arch_x86_64 {
 		return error('elf: Unsupported ELF file')
 	}

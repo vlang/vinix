@@ -203,7 +203,7 @@ tools:
       - tool: host-gcc
         stage_dependencies: [bootstrap-libgcc]
     stages:
-      - name: glibc
+      - name: bootstrap-glibc-stage
         pkgs_required:
           - linux-headers
         compile:
@@ -312,7 +312,6 @@ packages:
           CFLAGS: '-O2 -pipe'
     build:
       - args: ['make', '-j@PARALLELISM@']
-    install:
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
       - args: ['ln', '-sf', 'usr/lib', '@THIS_COLLECT_DIR@/lib64']
       - args: ['ln', '-sf', 'usr/lib', '@THIS_COLLECT_DIR@/lib']

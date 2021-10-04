@@ -143,6 +143,14 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 
 		current_node = new_node
 
+		if stat.islnk(current_node.resource.stat.mode) {
+			_, current_node, _ = path2node(current_node.parent, current_node.symlink_target)
+			if voidptr(current_node) == voidptr(0) {
+				return 0, 0, ''
+			}
+			continue
+		}
+
 		if !stat.isdir(current_node.resource.stat.mode) {
 			errno.set(errno.enotdir)
 			return 0, 0, ''
