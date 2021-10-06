@@ -617,16 +617,16 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	return u64(ret), 0
 }
 
-pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
+pub fn syscall_close(fdnum int) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: close(%d)\n', fdnum)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
 	file.fdnum_close(voidptr(0), fdnum) or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
-	return 0, 0
+	return 0
 }
 
 pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64) {

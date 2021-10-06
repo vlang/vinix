@@ -532,6 +532,31 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return u64(new_process.pid), u64(0)
 }
 
+struct UTSName {
+	sysname [65]byte
+	nodename [65]byte
+	release [65]byte
+	version [65]byte
+	machine [65]byte
+}
+
+pub fn syscall_uname(buf &UTSName) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: uname(0x%llx)\n', voidptr(buf))
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	unsafe {
+		C.memset(&buf.sysname[0], 0, sizeof(buf))
+		C.strcpy(&buf.sysname[0], c'Linux')
+		C.strcpy(&buf.nodename[0], c'')
+		C.strcpy(&buf.release[0], c'5.14')
+		C.strcpy(&buf.version[0], c'5.14')
+		C.strcpy(&buf.machine[0], c'x86_64')
+	}
+	return 0
+}
+
 pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 					 argv []string, envp []string,
 					 stdin string, stdout string, stderr string) ?&proc.Process {
