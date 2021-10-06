@@ -549,12 +549,10 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
 	} else {
-		ld_node := fs.get_node(vfs_root, ld_path, true) ?
-		ld := ld_node.resource
+		mut new_argv := [ld_path, path]
+		new_argv << argv
 
-		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000, &brk) ?
-
-		entry_point = voidptr(ld_auxval.at_entry)
+		return start_program(execve, dir, ld_path, new_argv, envp, stdin, stdout, stderr)
 	}
 
 	if execve == false {

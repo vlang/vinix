@@ -474,7 +474,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	return to_copy, 0
 }
 
-pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
+pub fn syscall_openat(dirfd int, _path charptr, flags int, mode int) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags, mode)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
@@ -483,11 +483,11 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	path := unsafe { cstring_to_vstring(_path) }
 
 	if path.len == 0 {
-		return -1, errno.enoent
+		return -errno.enoent
 	}
 
 	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 
 	creat_flags := flags & resource.file_creation_flags_mask
@@ -497,7 +497,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		if creat_flags & resource.o_creat != 0 {
 			// XXX: mlibc does not pass mode? OK... force regular file with 644
 			new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
-				return -1, errno.get()
+				return -i64(errno.get())
 			}
 			new_node
 		} else {
@@ -508,46 +508,46 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	}
 
 	if node == 0 {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 
 	if stat.islnk(node.resource.stat.mode) {
-		return -1, errno.eloop
+		return -errno.eloop
 	}
 
 	// Follow symlinks
 	node = reduce_node(node, true)
 	if node == 0 {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 
 	if !stat.isdir(node.resource.stat.mode) && (flags & resource.o_directory != 0) {
-		return -1, errno.enotdir
+		return -errno.enotdir
 	}
 
 	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 
-	return u64(fdnum), 0
+	return i64(fdnum)
 }
 
-pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+pub fn syscall_read(fdnum int, buf voidptr, count u64) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: read(%d, 0x%llx, 0x%llx)\n', fdnum, buf, count)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 	defer {
 		fd.unref()
 	}
 	ret := fd.handle.read(buf, count) or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
-	return u64(ret), 0
+	return i64(ret)
 }
 
 struct IOVec {

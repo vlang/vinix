@@ -27,6 +27,8 @@ pub fn init_syscall_table() {
 		syscall_table[i] = voidptr(syscall_enosys)
 	}
 
+	syscall_table[0] = voidptr(fs.syscall_read)
 	syscall_table[12] = voidptr(userland.syscall_brk)
 	syscall_table[20] = voidptr(fs.syscall_writev)
+	syscall_table[257] = voidptr(fs.syscall_openat)
 }
