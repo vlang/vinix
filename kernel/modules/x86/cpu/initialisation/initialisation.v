@@ -63,10 +63,6 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))
 
-	// CPU local in gsbase
-	cpu.set_gs_base(u64(voidptr(cpu_local)))
-	cpu.set_kernel_gs_base(u64(voidptr(cpu_local)))
-
 	// Enable SSE/SSE2
 	mut cr0 := cpu.read_cr0()
 	cr0 &= ~(1 << 2)

@@ -3,6 +3,7 @@ module table
 import userland
 import errno
 import proc
+import fs
 
 const table_size = 333
 
@@ -26,5 +27,6 @@ pub fn init_syscall_table() {
 		syscall_table[i] = voidptr(syscall_enosys)
 	}
 
-	syscall_table[0x0c] = voidptr(userland.syscall_brk)
+	syscall_table[12] = voidptr(userland.syscall_brk)
+	syscall_table[20] = voidptr(fs.syscall_writev)
 }

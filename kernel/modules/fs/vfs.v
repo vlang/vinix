@@ -550,6 +550,37 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	return u64(ret), 0
 }
 
+struct IOVec {
+	base voidptr
+	len u64
+}
+
+pub fn syscall_writev(fdnum int, iovecs &IOVec, iovcnt u64) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: writev(%d, 0x%llx, 0x%llx)\n', fdnum, voidptr(iovecs), iovcnt)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -i64(errno.get())
+	}
+	defer {
+		fd.unref()
+	}
+
+	mut bytes := i64(0)
+
+	for i := u64(0); i < iovcnt; i++ {
+		iov := unsafe { &iovecs[i] }
+		ret := fd.handle.write(iov.base, iov.len) or {
+			return -i64(errno.get())
+		}
+		bytes += ret
+	}
+
+	return bytes
+}
+
 pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: write(%d, 0x%llx, 0x%llx)\n', fdnum, buf, count)
 	defer {
