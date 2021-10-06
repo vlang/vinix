@@ -4,7 +4,6 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
-import x86.msr
 import katomic
 import proc
 import memory
@@ -111,8 +110,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu.set_gs_base(current_thread.gs_base)
 	cpu.set_fs_base(current_thread.fs_base)
 
-	msr.wrmsr(0x175, current_thread.kernel_stack)
-	cpu_local.tss.ist2 = current_thread.kernel_stack
+	cpu_local.kernel_stack = current_thread.kernel_stack
 	cpu_local.tss.ist3 = current_thread.pf_stack
 
 	if cpu.read_cr3() != current_thread.cr3 {
@@ -152,6 +150,10 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		pop r14
 		pop r15
 		add rsp, 8
+    	cmp [rsp + 8], 0x43 // if user
+    	jne f1
+	    swapgs
+	1:
 		iretq
 		;
 		; rm (new_gpr_state)

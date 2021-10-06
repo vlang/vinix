@@ -203,7 +203,7 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	mut thread := unsafe { proc.current_thread() }
 
-	if context.cs != 0x4b {
+	if context.cs != user_code_seg {
 		return
 	}
 

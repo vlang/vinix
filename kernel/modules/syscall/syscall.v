@@ -16,9 +16,18 @@ pub fn enter() {
 [_naked]
 fn syscall_entry() {
 	asm volatile amd64 {
-		cld
+		swapgs
 
-		push 0
+		// Save user stack
+		mov gs:[16], rsp
+		// Switch to kernel stack
+		mov rsp, gs:[8]
+
+		push 0x3b
+		push gs:[16]
+		push r11
+		push 0x43
+		push rcx
 
 		push r15
 		push r14
@@ -40,18 +49,16 @@ fn syscall_entry() {
 		mov eax, ds
 		push rax
 
-		mov rbx, rdi
+		// Save syscall context
+		mov gs:[24], rsp
+
+		sti
+
 		xor rbp, rbp
-
-		mov rdi, rsp
-		call syscall__enter
-
-		mov rdi, rsp
-		lea rax, [rip + syscall_table]
-		call [rax + rbx * 8 + 0]
+		lea rbx, [rip + syscall_table]
+		call [rbx + rax * 8 + 0]
 
 		mov [rsp + 16], rax
-		mov [rsp + 40], rdx
 
 		mov rdi, rsp
 		call syscall__leave
@@ -76,9 +83,14 @@ fn syscall_entry() {
 		pop r14
 		pop r15
 
-		add rsp, 8
+		cli
 
-		iretq
+		// Restore user stack
+		mov rsp, gs:[16]
+
+		swapgs
+
+		rex.w sysret
 
 		;
 		;

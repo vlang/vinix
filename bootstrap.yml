@@ -35,7 +35,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: 'c151e075e190ac8d4929fbcae9ce7d4254d800a9'
+    commit: '6d2c1f7e2c9eb0f97ad256017fc80d502af417f0'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -43,7 +43,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '31cb3f3d146200c8ec010ecd63d3bcb2d75e2611'
+    commit: '8119c980b2ad34e069c1650d42501f1b1044015a'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -64,7 +64,7 @@ tools:
           cp -rv "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
           cd "@PREFIX@/v"
           rm -v *.xbstrap
-          cc -std=gnu99 -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm $([ $(uname) = Linux ] || echo -lexecinfo)
+          cc -std=gnu11 -I ./thirdparty/stdatomic/nix -w -o ./v "@SOURCE_ROOT@/3rdparty/vc/v.c" -lm -lpthread $([ $(uname) = Linux ] || echo -lexecinfo)
           VMODULES=/tmp/.vmodules ./v self
           mkdir -p "@PREFIX@/bin"
           ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"

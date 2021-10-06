@@ -8,7 +8,7 @@ unexport MAKEFLAGS
 .PHONY: all
 all: vinix.iso
 
-QEMUFLAGS = -M q35,smm=off -m 8G -smp 4 -cdrom vinix.iso -serial stdio
+QEMUFLAGS = -M q35,smm=off -m 8G -smp 1 -cdrom vinix.iso -serial stdio
 
 .PHONY: run-kvm
 run-kvm: vinix.iso
