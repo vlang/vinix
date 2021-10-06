@@ -550,6 +550,24 @@ pub fn syscall_read(fdnum int, buf voidptr, count u64) i64 {
 	return i64(ret)
 }
 
+pub fn syscall_pread(fdnum int, buf voidptr, count u64, pos u64) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: pread(%d, 0x%llx, 0x%llx, 0x%llx)\n', fdnum, buf, count, pos)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
+		return -i64(errno.get())
+	}
+	defer {
+		fd.unref()
+	}
+	ret := fd.handle.resource.read(&fd.handle, buf, pos, count) or {
+		return -i64(errno.get())
+	}
+	return i64(ret)
+}
+
 struct IOVec {
 	base voidptr
 	len u64

@@ -16,11 +16,11 @@ pub const prot_read  = 0x01
 pub const prot_write = 0x02
 pub const prot_exec  = 0x04
 
-pub const map_private   = 0x01
-pub const map_shared    = 0x02
-pub const map_fixed     = 0x04
-pub const map_anon      = 0x08
-pub const map_anonymous = 0x08
+pub const map_private   = 0x02
+pub const map_shared    = 0x01
+pub const map_fixed     = 0x10
+pub const map_anon      = 0x20
+pub const map_anonymous = 0x20
 
 pub struct MmapRangeLocal {
 pub mut:

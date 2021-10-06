@@ -409,10 +409,10 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	return ret, 0
 }
 
-pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
-					prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n',
-			 addr, length, prot_and_flags, fdnum, offset)
+pub fn syscall_mmap(addr voidptr, length u64,
+					prot int, flags int, fdnum int, offset i64) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: mmap(0x%llx, 0x%llx, 0x%x, 0x%x, %d, %lld)\n',
+			 addr, length, prot, flags, fdnum, offset)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -422,7 +422,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
 
 	if fdnum != -1 {
 		fd = file.fd_from_fdnum(voidptr(0), fdnum) or {
-			return -1, errno.get()
+			return -i64(errno.get())
 		}
 		resource = fd.handle.resource
 	}
@@ -433,19 +433,16 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64,
 		}
 	}
 
-	prot  := int((prot_and_flags >> 32) & 0xffffffff)
-	flags := int(prot_and_flags & 0xffffffff)
-
 	if flags & mmap.map_anonymous == 0 && voidptr(resource) == voidptr(0) {
-		return -1, errno.ebadf
+		return -errno.ebadf
 	}
 
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
 	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 
-	return u64(ret), 0
+	return i64(ret)
 }

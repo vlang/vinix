@@ -57,7 +57,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	mut efer := msr.rdmsr(0xc0000080)
 	efer |= 1
 	msr.wrmsr(0xc0000080, efer)
-	msr.wrmsr(0xc0000081, 0x0043002800000000)
+	msr.wrmsr(0xc0000081, 0x0033002800000000)
 	// Entry address
 	msr.wrmsr(0xc0000082, u64(voidptr(syscall.syscall_entry)))
 	// Flags mask

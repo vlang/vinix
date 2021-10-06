@@ -90,7 +90,6 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 
 __global (
 	abort_vector = byte(0)
-	syscall_vector = byte(0xf0)
 )
 
 pub fn initialise() {

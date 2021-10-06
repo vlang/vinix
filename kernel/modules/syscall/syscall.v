@@ -56,6 +56,8 @@ fn syscall_entry() {
 
 		sti
 
+		mov rcx, r10
+
 		xor rbp, rbp
 		lea rbx, [rip + syscall_table]
 		call [rbx + rax * 8 + 0]

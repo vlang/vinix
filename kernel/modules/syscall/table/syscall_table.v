@@ -4,6 +4,7 @@ import userland
 import errno
 import proc
 import fs
+import file
 
 const table_size = 333
 
@@ -28,6 +29,8 @@ pub fn init_syscall_table() {
 	}
 
 	syscall_table[0] = voidptr(fs.syscall_read)
+	syscall_table[9] = voidptr(file.syscall_mmap)
+	syscall_table[17] = voidptr(fs.syscall_pread)
 	syscall_table[12] = voidptr(userland.syscall_brk)
 	syscall_table[20] = voidptr(fs.syscall_writev)
 	syscall_table[257] = voidptr(fs.syscall_openat)
