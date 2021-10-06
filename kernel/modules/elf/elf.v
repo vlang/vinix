@@ -79,9 +79,10 @@ pub mut:
 	sh_entsize    u64
 }
 
-pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxval, string) {
+pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64, _prev_brk &u64) ?(Auxval, string) {
 	mut res := unsafe { _res }
 	mut pagemap := unsafe { _pagemap }
+	mut prev_brk := unsafe { _prev_brk }
 
 	mut header := &Header{}
 
@@ -147,6 +148,10 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 		buf := unsafe { byteptr(addr) + misalign + higher_half }
 
 		res.read(0, buf, phdr.p_offset, phdr.p_filesz) ?
+
+		if *prev_brk <= virt + page_count {
+			unsafe { *prev_brk = virt + page_count }
+		}
 	}
 
 	return auxval, ld_path

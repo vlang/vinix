@@ -44,13 +44,15 @@ fn syscall_entry() {
 		push rcx
 		push rbx
 		push rax
-		mov eax, es
-		push rax
-		mov eax, ds
-		push rax
+		mov ebx, es
+		push rbx
+		mov ebx, ds
+		push rbx
 
 		// Save syscall context
 		mov gs:[24], rsp
+		// Save syscall number
+		mov gs:[32], rax
 
 		sti
 

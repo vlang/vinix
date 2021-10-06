@@ -79,9 +79,10 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
 			return
 		}
-		unsafe { current_thread.gpr_state = gpr_state[0] }
+		unsafe { current_thread.gpr_state = *gpr_state }
 		current_thread.gs_base = cpu.get_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
+
 		current_thread.cr3 = cpu.read_cr3()
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(current_thread.running_on, u64(-1))
@@ -110,7 +111,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu.set_gs_base(current_thread.gs_base)
 	cpu.set_fs_base(current_thread.fs_base)
 
-	cpu_local.kernel_stack = current_thread.kernel_stack
+	cpu.set_kernel_gs_base(u64(voidptr(current_thread)))
+
 	cpu_local.tss.ist3 = current_thread.pf_stack
 
 	if cpu.read_cr3() != current_thread.cr3 {
@@ -150,9 +152,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		pop r14
 		pop r15
 		add rsp, 8
-    	cmp [rsp + 8], 0x43 // if user
-    	jne f1
-	    swapgs
+		cmp [rsp + 8], 0x43 // if user
+		jne f1
+		swapgs
 	1:
 		iretq
 		;
@@ -306,6 +308,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		running_on: u64(-1)
 		stacks: stacks
 		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		syscall_context: voidptr(0)
 	}
 
 	if autoenqueue == true {
@@ -366,6 +369,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		pf_stack: pf_stack
 		stacks: stacks
 		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		syscall_context: voidptr(0)
 	}
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI

@@ -24,6 +24,10 @@ pub fn set_fs_base(ptr u64) {
 	msr.wrmsr(0xc0000100, ptr)
 }
 
+pub fn get_kernel_gs_base() u64 {
+	return msr.rdmsr(0xc0000101)
+}
+
 pub fn get_gs_base() u64 {
 	return msr.rdmsr(0xc0000102)
 }

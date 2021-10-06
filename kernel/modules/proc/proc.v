@@ -5,6 +5,7 @@ import x86.cpu.local as cpulocal
 import memory
 import katomic
 import event.eventstruct
+import x86.cpu
 
 pub const max_fds = 256
 
@@ -19,6 +20,8 @@ pub mut:
 	fds [max_fds]voidptr
 	children []&Process
 	mmap_anon_non_fixed_base u64
+	brk u64
+	brk_base u64
 	current_directory voidptr
 	event eventstruct.Event
 	status int
@@ -33,6 +36,11 @@ pub mut:
 
 pub struct Thread {
 pub mut:
+	errno u64
+	kernel_stack u64
+	user_stack u64
+	syscall_context &cpulocal.GPRState
+	syscall_num u64
 	is_in_queue bool
 	running_on u64
 	l klock.Lock
@@ -40,7 +48,6 @@ pub mut:
 	gpr_state cpulocal.GPRState
 	gs_base u64
 	fs_base u64
-	kernel_stack u64
 	pf_stack u64
 	cr3 u64
 	fpu_storage voidptr
@@ -49,7 +56,6 @@ pub mut:
 	which_event u64
 	exit_value voidptr
 	exited eventstruct.Event
-	errno u64
 	sigentry u64
 	sigactions [256]SigAction
 	pending_signals u64
@@ -61,19 +67,7 @@ pub mut:
 }
 
 pub fn current_thread() &Thread {
-	mut f := u64(0)
-	asm volatile amd64 {
-		pushfq
-		pop f
-		cli
-		; =rm (f)
-	}
-	cpu_local := cpulocal.current()
-	ret := cpu_local.current_thread
-	if f & (1 << 9) != 0 {
-		asm volatile amd64 { sti }
-	}
-	return ret
+	return &Thread(voidptr(cpu.get_kernel_gs_base()))
 }
 
 __global (

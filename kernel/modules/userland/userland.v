@@ -297,7 +297,48 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
+pub fn syscall_brk(new_brk_raw u64) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: brk(0x%llx)\n', new_brk_raw)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut current_thread := proc.current_thread()
+	mut current_process := current_thread.process
+
+	cur_brk := current_process.brk
+	new_brk := lib.align_up(new_brk_raw, 4096)
+
+	if new_brk < current_process.brk_base {
+		return i64(cur_brk)
+	}
+
+	if new_brk < cur_brk {
+		diff := cur_brk - new_brk
+
+		mmap.munmap(current_process.pagemap, new_brk, diff) or {
+			return i64(cur_brk)
+		}
+
+		current_process.brk = new_brk
+		return i64(new_brk)
+	} else if new_brk > cur_brk {
+		diff := new_brk - cur_brk
+
+		mmap.mmap(current_process.pagemap, cur_brk, diff,
+			 mmap.prot_read | mmap.prot_exec | mmap.prot_write,
+			 mmap.map_anonymous | mmap.map_fixed, voidptr(0), 0) or {
+			return i64(cur_brk)
+		}
+
+		current_process.brk = new_brk
+		return i64(new_brk)
+	} else {
+		return i64(cur_brk)
+	}
+}
+
+pub fn syscall_execve(_path charptr, _argv &charptr, _envp &charptr) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: execve(%s, [omit], [omit])\n', _path)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
@@ -325,10 +366,10 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 
 	start_program(true, proc.current_thread().process.current_directory, path,
 				  argv, envp, '', '', '') or {
-		return -1, errno.get()
+		return -i64(errno.get())
 	}
 
-	return -1, errno.get()
+	return -i64(errno.get())
 }
 
 pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
@@ -475,6 +516,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		masked_signals: old_thread.masked_signals
 		stacks: stacks
 		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
+		syscall_context: voidptr(0)
 	}
 
 	unsafe { C.memcpy(new_thread.fpu_storage, old_thread.fpu_storage, fpu_storage_size) }
@@ -498,7 +540,9 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 
 	mut new_pagemap := memory.new_pagemap()
 
-	auxval, ld_path := elf.load(new_pagemap, prog, 0) ?
+	mut brk := u64(0)
+
+	auxval, ld_path := elf.load(new_pagemap, prog, 0, &brk) ?
 
 	mut entry_point := voidptr(0)
 
@@ -508,13 +552,16 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 		ld_node := fs.get_node(vfs_root, ld_path, true) ?
 		ld := ld_node.resource
 
-		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) ?
+		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000, &brk) ?
 
 		entry_point = voidptr(ld_auxval.at_entry)
 	}
 
 	if execve == false {
 		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
+
+		new_process.brk = brk
+		new_process.brk_base = brk
 
 		stdin_node := fs.get_node(vfs_root, stdin, true) ?
 		stdin_handle := &file.Handle{resource: stdin_node.resource
@@ -555,6 +602,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 
 		mmap.delete_pagemap(old_pagemap) ?
 
+		process.brk = brk
+		process.brk_base = brk
 		process.thread_stack_top = u64(0x70000000000)
 		process.mmap_anon_non_fixed_base = u64(0x80000000000)
 
