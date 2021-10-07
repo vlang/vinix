@@ -9,15 +9,15 @@ import errno
 
 pub const at_fdcwd = -100
 
-pub const at_empty_path = 1
-pub const at_symlink_follow = 2
-pub const at_symlink_nofollow = 4
-pub const at_removedir = 8
-pub const at_eaccess = 512
+pub const at_empty_path = 0x1000
+pub const at_symlink_follow = 0x400
+pub const at_symlink_nofollow = 0x100
+pub const at_removedir = 0x200
+pub const at_eaccess = 0x200
 
+pub const seek_set = 0
 pub const seek_cur = 1
 pub const seek_end = 2
-pub const seek_set = 3
 
 interface FileSystem {
 	instantiate() &FileSystem
@@ -474,6 +474,32 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	return to_copy, 0
 }
 
+// Really bare access() implementation, for now.
+pub fn syscall_access(_path charptr, flags int) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: access(%s, 0x%x)\n', _path, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return -errno.enoent
+	}
+
+	parent := get_parent_dir(at_fdcwd, path) or {
+		return -i64(errno.get())
+	}
+
+	follow_links := flags & resource.o_nofollow == 0
+
+	get_node(parent, path, follow_links) or {
+		return -i64(errno.get())
+	}
+
+	return 0
+}
+
 pub fn syscall_openat(dirfd int, _path charptr, flags int, mode int) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags, mode)
 	defer {
@@ -689,33 +715,50 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags in
 	return 0, 0
 }
 
-pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
-					   flags int) (u64, u64) {
+pub fn syscall_fstatat(dirfd int, _path charptr, statbuf &stat.Stat, flags int) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', dirfd, _path,
 			 statbuf, flags)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
+	current_process := proc.current_thread().process
+
 	path := unsafe { cstring_to_vstring(_path) }
 
+	mut statsrc := &stat.Stat(0)
+
 	if path.len == 0 {
-		return -1, errno.enoent
+		if flags & at_empty_path == 0 {
+			return -errno.enoent
+		}
+
+		if dirfd == at_fdcwd {
+			node := &VFSNode(current_process.current_directory)
+			statsrc = &node.resource.stat
+		} else {
+			fd := file.fd_from_fdnum(current_process, dirfd) or {
+				return -i64(errno.get())
+			}
+			statsrc = &fd.handle.resource.stat
+		}
+	} else {
+		parent := get_parent_dir(dirfd, path) or {
+			return -i64(errno.get())
+		}
+
+		follow_links := flags & at_symlink_nofollow == 0
+
+		node := get_node(parent, path, follow_links) or {
+			return -i64(errno.get())
+		}
+
+		statsrc = &node.resource.stat
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
-	}
+	unsafe { *statbuf = *statsrc }
 
-	follow_links := flags & at_symlink_nofollow == 0
-
-	node := get_node(parent, path, follow_links) or {
-		return -1, errno.get()
-	}
-
-	unsafe { statbuf[0] = node.resource.stat }
-
-	return 0, 0
+	return 0
 }
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
