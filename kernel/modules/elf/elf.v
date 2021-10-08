@@ -79,7 +79,40 @@ pub mut:
 	sh_entsize    u64
 }
 
-pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64, _prev_brk &u64) ?(Auxval, string) {
+pub fn interp(_res &resource.Resource) ?string {
+	mut res := unsafe { _res }
+	mut header := &Header{}
+
+	res.read(0, header, 0, sizeof(Header)) ?
+
+	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
+		return error('elf: Invalid magic')
+	}
+
+	if header.ident[ei_class] != 0x02
+	|| header.ident[ei_data]  != bits_le
+	|| header.machine != arch_x86_64 {
+		return error('elf: Unsupported ELF file')
+	}
+
+	for i := u64(0); i < header.ph_num; i++ {
+		mut phdr := &ProgramHdr{}
+
+		res.read(0, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) ?
+
+		if phdr.p_type != pt_interp {
+			continue
+		}
+
+		mut p := []byte{len: int(phdr.p_filesz + 1)}
+		res.read(0, unsafe { &p[0] }, phdr.p_offset, phdr.p_filesz) ?
+		return unsafe { cstring_to_vstring(&p[0]) }
+	}
+
+	return none
+}
+
+pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64, _prev_brk &u64) ?Auxval {
 	mut res := unsafe { _res }
 	mut pagemap := unsafe { _pagemap }
 	mut prev_brk := unsafe { _prev_brk }
@@ -103,19 +136,12 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64, _prev_b
 						 at_phent: sizeof(ProgramHdr),
 						 at_phnum: header.ph_num}
 
-	mut ld_path := ''
-
 	for i := u64(0); i < header.ph_num; i++ {
 		mut phdr := &ProgramHdr{}
 
 		res.read(0, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) ?
 
 		match phdr.p_type {
-			pt_interp {
-				mut p := memory.malloc(phdr.p_filesz + 1)
-				res.read(0, p, phdr.p_offset, phdr.p_filesz) ?
-				ld_path = unsafe { cstring_to_vstring(p) }
-			}
 			pt_phdr {
 				auxval.at_phdr = base + phdr.p_vaddr
 			}
@@ -154,5 +180,5 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64, _prev_b
 		}
 	}
 
-	return auxval, ld_path
+	return auxval
 }

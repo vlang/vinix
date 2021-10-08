@@ -567,18 +567,16 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 
 	mut brk := u64(0)
 
-	auxval, ld_path := elf.load(new_pagemap, prog, 0, &brk) ?
-
-	mut entry_point := voidptr(0)
-
-	if ld_path == '' {
-		entry_point = voidptr(auxval.at_entry)
-	} else {
+	if ld_path := elf.interp(prog) {
 		mut new_argv := [ld_path, path]
 		new_argv << argv
 
 		return start_program(execve, dir, ld_path, new_argv, envp, stdin, stdout, stderr)
 	}
+
+	auxval := elf.load(new_pagemap, prog, 0, &brk) ?
+
+	entry_point := voidptr(auxval.at_entry)
 
 	if execve == false {
 		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
