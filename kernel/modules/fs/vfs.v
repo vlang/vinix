@@ -22,6 +22,7 @@ pub const seek_set = 3
 interface FileSystem {
 	instantiate() &FileSystem
 	populate(&VFSNode)
+mut:
 	mount(&VFSNode, string, &VFSNode) ?&VFSNode
 	create(&VFSNode, string, int) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
@@ -245,7 +246,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 		return error('')
 	}
 
-	fs := filesystems[filesystem].instantiate()
+	mut fs := filesystems[filesystem].instantiate()
 
 	mut mount_node := fs.mount(parent_of_tgt_node, basename, source_node) ?
 
