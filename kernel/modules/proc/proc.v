@@ -36,11 +36,14 @@ pub mut:
 
 pub struct Thread {
 pub mut:
+	// XXX don't move
 	errno u64
 	kernel_stack u64
 	user_stack u64
 	syscall_context &cpulocal.GPRState
 	syscall_num u64
+
+	tid int
 	is_in_queue bool
 	running_on u64
 	l klock.Lock

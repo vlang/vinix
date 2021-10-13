@@ -38,6 +38,8 @@ pub fn init_syscall_table() {
 	syscall_table[21] = voidptr(fs.syscall_access)
 	syscall_table[63] = voidptr(userland.syscall_uname)
 	syscall_table[158] = voidptr(cpu.syscall_arch_prctl)
+	syscall_table[218] = voidptr(userland.syscall_set_tid_address)
 	syscall_table[257] = voidptr(fs.syscall_openat)
 	syscall_table[262] = voidptr(fs.syscall_fstatat)
+	syscall_table[273] = voidptr(userland.syscall_set_robust_list)
 }

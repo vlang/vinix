@@ -54,7 +54,7 @@ const (
 )
 
 pub fn syscall_arch_prctl(code int, addr voidptr) i64 {
-	C.printf(c'\n\e[32mstrace\e[m: arch_prctl(%d, 0x%llx)\n', code, addr)
+	C.printf(c'\n\e[32mstrace\e[m: arch_prctl(0x%x, 0x%llx)\n', code, addr)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}

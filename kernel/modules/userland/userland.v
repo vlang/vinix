@@ -557,6 +557,28 @@ pub fn syscall_uname(buf &UTSName) i64 {
 	return 0
 }
 
+pub fn syscall_set_tid_address(tidptr &int) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: set_tid_address(0x%llx)\n', voidptr(tidptr))
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	C.printf(c'set_tid_address() is a no-op\n')
+
+	return proc.current_thread().tid
+}
+
+pub fn syscall_set_robust_list(head voidptr, len u64) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: set_robust_list(0x%llx, 0x%llx)\n', head, len)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	C.printf(c'set_robust_list() is a stub\n')
+
+	return 0
+}
+
 pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 					 argv []string, envp []string,
 					 stdin string, stdout string, stderr string) ?&proc.Process {

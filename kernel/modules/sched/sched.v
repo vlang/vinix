@@ -468,6 +468,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		enqueue_thread(thread, false)
 	}
 
+	thread.tid = process.threads.len
 	process.threads << thread
 
 	return thread
