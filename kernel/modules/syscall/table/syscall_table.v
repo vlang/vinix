@@ -5,6 +5,7 @@ import errno
 import proc
 import fs
 import file
+import x86.cpu
 
 const table_size = 333
 
@@ -36,6 +37,7 @@ pub fn init_syscall_table() {
 	syscall_table[20] = voidptr(fs.syscall_writev)
 	syscall_table[21] = voidptr(fs.syscall_access)
 	syscall_table[63] = voidptr(userland.syscall_uname)
+	syscall_table[158] = voidptr(cpu.syscall_arch_prctl)
 	syscall_table[257] = voidptr(fs.syscall_openat)
 	syscall_table[262] = voidptr(fs.syscall_fstatat)
 }

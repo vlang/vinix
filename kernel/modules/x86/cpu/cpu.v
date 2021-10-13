@@ -46,14 +46,44 @@ pub fn syscall_set_fs_base(_ voidptr, base voidptr) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_set_gs_base(_ voidptr, base voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: set_gs_base(0x%llx)\n', base)
+const (
+	arch_set_gs = 0x1001
+	arch_set_fs = 0x1002
+	arch_get_gs = 0x1004
+	arch_get_fs = 0x1003
+)
+
+pub fn syscall_arch_prctl(code int, addr voidptr) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: arch_prctl(%d, 0x%llx)\n', code, addr)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	set_gs_base(u64(base))
-	return 0, 0
+	match code {
+		arch_set_gs {
+			set_gs_base(u64(addr))
+		}
+		arch_set_fs {
+			set_fs_base(u64(addr))
+		}
+		arch_get_gs {
+			unsafe {
+				mut ptr := &u64(addr)
+				*ptr = get_gs_base()
+			}
+		}
+		arch_get_fs {
+			unsafe {
+				mut ptr := &u64(addr)
+				*ptr = get_fs_base()
+			}
+		}
+		else {
+			return -22 // einval
+		}
+	}
+
+	return 0
 }
 
 pub fn read_cr0() u64 {
