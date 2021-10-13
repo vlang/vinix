@@ -6,6 +6,7 @@ import proc
 import errno
 import x86.cpu
 import x86.cpu.local as cpulocal
+import lib
 
 const pte_present = u64(1 << 0)
 
@@ -159,10 +160,13 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {
 	mut g := unsafe { _g }
 
-	pt_flags := mmap.pte_present | mmap.pte_user | if prot & mmap.prot_write != 0 {
-		mmap.pte_writable
-	} else {
-		0
+	mut pt_flags := pte_present | pte_user
+	if prot & prot_write != 0 {
+		pt_flags |= pte_writable
+	}
+
+	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
+		return error('')
 	}
 
 	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return error('') }
@@ -257,17 +261,20 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	}
 }
 
-pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64, prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
-	mut pagemap := unsafe { _pagemap }
+pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
+			prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
+	mut pagemap  := unsafe { _pagemap }
 	mut resource := unsafe { _resource }
 
-	if length % page_size != 0 || length == 0 {
-		C.printf(c'mmap: length is not a multiple of page size or is 0\n')
+	if _length == 0 {
+		C.printf(c'mmap: length is 0\n')
 		errno.set(errno.einval)
 		return none
 	}
 
-	if flags & mmap.map_anonymous == 0 && resource.can_mmap == false {
+	length := lib.align_up(_length, page_size)
+
+	if flags & map_anonymous == 0 && resource.can_mmap == false {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -278,6 +285,8 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64, prot int, flags 
 	mut base := u64(0)
 	if flags & mmap.map_fixed != 0 {
 		base = u64(addr)
+
+		munmap(pagemap, voidptr(base), length) ?
 	} else {
 		base = process.mmap_anon_non_fixed_base
 		process.mmap_anon_non_fixed_base += length + page_size
@@ -334,14 +343,16 @@ pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
+pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, _length u64) ? {
 	mut pagemap := unsafe { _pagemap }
 
-	if length % page_size != 0 || length == 0 {
-		print('\nmunmap: length is not a multiple of page size or it is 0\n')
+	if _length == 0 {
+		C.printf(c'munmap: length is 0\n')
 		errno.set(errno.einval)
 		return error('')
 	}
+
+	length := lib.align_up(_length, page_size)
 
 	for i := u64(addr); i < u64(addr) + length; i += page_size {
 		mut local_range, _, _ := addr2range(pagemap, i) or { continue }
@@ -359,9 +370,18 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 		snip_size := snip_end - snip_begin
 
 		if snip_begin > local_range.base && snip_end < local_range.base + local_range.length {
-			C.printf(c'munmap: range splits not supported\n')
-			errno.set(errno.einval)
-			return error('')
+			// Create new range for portion after snip
+			mut postsplit_range := &MmapRangeLocal{
+				pagemap: local_range.pagemap
+				base: snip_end
+				length: (local_range.base + local_range.length) - snip_end
+				offset: local_range.offset + i64(snip_end - local_range.base)
+				prot: local_range.prot
+				flags: local_range.flags
+				global: local_range.global
+			}
+			pagemap.mmap_ranges << postsplit_range
+			local_range.length -= postsplit_range.length
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
@@ -389,9 +409,8 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 		} else {
 			if snip_begin == local_range.base {
 				local_range.base = snip_end
-			} else {
-				local_range.length -= snip_size
 			}
+			local_range.length -= snip_size
 		}
 	}
 }
