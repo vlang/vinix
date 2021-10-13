@@ -21,7 +21,7 @@ fn generic_isr(num u32, _ voidptr) {
 }
 
 const exception_names = [
-    charptr(c'Division by 0'),
+    c'Division by 0',
     c'Debug',
     c'NMI',
     c'Breakpoint',
