@@ -143,12 +143,12 @@ pub mut:
 	inode_counter u64
 }
 
-fn (mut this TmpFS) instantiate() &FileSystem {
+fn (this TmpFS) instantiate() &FileSystem {
 	new := &TmpFS{}
 	return new
 }
 
-fn (mut this TmpFS) populate(node &VFSNode) {}
+fn (this TmpFS) populate(node &VFSNode) {}
 
 fn (mut this TmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
 	this.dev_id = resource.create_dev_id()

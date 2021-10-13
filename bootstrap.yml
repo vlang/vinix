@@ -35,7 +35,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '6d2c1f7e2c9eb0f97ad256017fc80d502af417f0'
+    commit: 'd373eba79bf166aeb0226c7ac811db504a8d98a9'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -43,15 +43,15 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '8119c980b2ad34e069c1650d42501f1b1044015a'
+    commit: '2d26151d223ef676ea964caeaa7074ac49247b0f'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.58.2'
-    version: '2.58.2'
+    tag: 'v2.59.1'
+    version: '2.59.1'
 
 tools:
   - name: host-v
@@ -347,7 +347,6 @@ packages:
       extract_path: 'bash-5.1.8'
       patch-path-strip: 1
       version: '5.1.8'
-    revision: 4
     tools_required:
       - host-gcc
     pkgs_required:
@@ -373,11 +372,11 @@ packages:
   - name: coreutils
     source:
       subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/coreutils/coreutils-8.32.tar.xz'
+      url: 'https://ftp.gnu.org/gnu/coreutils/coreutils-9.0.tar.xz'
       format: 'tar.xz'
-      extract_path: 'coreutils-8.32'
+      extract_path: 'coreutils-9.0'
       patch-path-strip: 1
-      version: '8.32'
+      version: '9.0'
     tools_required:
       - host-gcc
     pkgs_required:
@@ -391,7 +390,7 @@ packages:
       - args: |
           set -e
           ./src/make-prime-list 5000 > "@THIS_SOURCE_DIR@/src/primes.h"
-      - args: ['make', 'clean']
+          rm -rf *
       # Now compile coreutils for the correct target.
       - args:
         - '@THIS_SOURCE_DIR@/configure'
