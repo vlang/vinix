@@ -7,6 +7,7 @@ import klock
 import event.eventstruct
 import memory
 import x86.cpu
+import errno
 
 __global (
 	ur_initialized = false
@@ -73,6 +74,22 @@ fn (mut this URandom) do_salsa20_block(mut out [16]u32) {
 
 fn (mut this URandom) mmap(page u64, flags int) voidptr {
 	return memory.pmm_alloc(1)
+}
+
+pub fn syscall_get_random(buf voidptr, buflen u64, flags int) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: get_random(0x%llx, 0x%llx, %d)\n',
+			 buf, buflen, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut source := &URandom{}
+
+	source.read(0, buf, 0, buflen) or {
+		return -i64(errno.get())
+	}
+
+	return 0
 }
 
 fn (mut this URandom) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {

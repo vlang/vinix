@@ -7,6 +7,7 @@ import fs
 import file
 import x86.cpu
 import memory.mmap
+import dev.random
 
 const table_size = 333
 
@@ -46,4 +47,5 @@ pub fn init_syscall_table() {
 	syscall_table[262] = voidptr(fs.syscall_fstatat)
 	syscall_table[273] = voidptr(userland.syscall_set_robust_list)
 	syscall_table[302] = voidptr(userland.syscall_prlimit)
+	syscall_table[318] = voidptr(random.syscall_get_random)
 }
