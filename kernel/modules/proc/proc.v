@@ -30,8 +30,9 @@ pub mut:
 pub struct SigAction {
 pub mut:
 	sa_sigaction voidptr
-	sa_mask u64
 	sa_flags int
+	sa_restorer voidptr
+	sa_mask u64
 }
 
 pub struct Thread {

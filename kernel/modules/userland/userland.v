@@ -14,11 +14,11 @@ import event.eventstruct
 import errno
 import lib
 
-pub const wnohang = 2
+pub const wnohang = 1
 
-pub const sig_block = 1
-pub const sig_unblock = 2
-pub const sig_setmask = 3
+pub const sig_block = 0
+pub const sig_unblock = 1
+pub const sig_setmask = 2
 
 pub const sighup = 1
 pub const sigint = 2
@@ -57,16 +57,18 @@ pub const sigrtmax = 33
 pub const sigcancel = 34
 
 pub const sig_err = voidptr(-1)
-pub const sig_dfl = voidptr(-2)
-pub const sig_ign = voidptr(-3)
+pub const sig_dfl = voidptr(0)
+pub const sig_ign = voidptr(1)
 
-pub const sa_nocldstop = 1 << 0
-pub const sa_onstack = 1 << 1
-pub const sa_resethand = 1 << 2
-pub const sa_restart = 1 << 3
-pub const sa_siginfo = 1 << 4
-pub const sa_nocldwait = 1 << 5
-pub const sa_nodefer = 1 << 6
+pub const sa_nocldstop = 1
+pub const sa_nocldwait = 2
+pub const sa_siginfo = 4
+
+pub const sa_onstack = 0x08000000
+pub const sa_restart = 0x10000000
+pub const sa_interrupt = 0x20000000
+pub const sa_nodefer = 0x40000000
+pub const sa_resethand = 0x80000000
 
 union SigVal {
 	sival_int int
@@ -143,7 +145,7 @@ pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
 	for {}
 }
 
-pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
+pub fn syscall_sigaction(signum int, act &proc.SigAction, oldact &proc.SigAction) i64 {
 	C.printf(c'\n\e[32mstrace\e[m: sigaction(%d, 0x%llx, 0x%llx)\n',
 			 signum, voidptr(act), voidptr(oldact))
 	defer {
@@ -151,20 +153,20 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 	}
 
 	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
-		return -1, errno.einval
+		return -i64(errno.einval)
 	}
 
 	mut thread := proc.current_thread()
 
 	if voidptr(oldact) != voidptr(0) {
-		unsafe { oldact[0] = thread.sigactions[signum] }
+		unsafe { *oldact = thread.sigactions[signum] }
 	}
 
 	if voidptr(act) != voidptr(0) {
-		unsafe { thread.sigactions[signum] = act[0] }
+		unsafe { thread.sigactions[signum] = *act }
 	}
 
-	return 0, 0
+	return 0
 }
 
 pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
@@ -555,6 +557,18 @@ pub fn syscall_uname(buf &UTSName) i64 {
 		C.strcpy(&buf.machine[0], c'x86_64')
 	}
 	return 0
+}
+
+pub fn syscall_prlimit(pid int, res int, new_limit voidptr, old_limit voidptr) i64 {
+	C.printf(c'\n\e[32mstrace\e[m: prlimit(%d, %d, 0x%llx, 0x%llx)\n',
+			 pid, res, new_limit, old_limit)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	C.printf(c'prlimit() is a stub\n')
+
+	return -i64(errno.einval)
 }
 
 pub fn syscall_set_tid_address(tidptr &int) i64 {
