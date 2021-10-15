@@ -35,7 +35,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: 'd373eba79bf166aeb0226c7ac811db504a8d98a9'
+    commit: 'd3887c15683818449b6fd532d1cb46c3255992cb'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -43,15 +43,15 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '2d26151d223ef676ea964caeaa7074ac49247b0f'
+    commit: 'b25b116e837007d1aa50b3459071d8887ae6f93b'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.59.1'
-    version: '2.59.1'
+    tag: 'v2.59.2'
+    version: '2.59.2'
 
 tools:
   - name: host-v
