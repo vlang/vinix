@@ -731,7 +731,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 		return -1, errno.enotdir
 	}
 
-	dir_node := &VFSNode(dir_handle.node)
+	mut dir_node := &VFSNode(dir_handle.node)
 
 	if dir_handle.dirlist_valid == false {
 		dir_handle.dirlist.clear()
