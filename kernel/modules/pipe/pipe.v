@@ -36,7 +36,7 @@ pub fn create() ?&Pipe {
 		data: unsafe { C.malloc(pipe_buf) }
 		capacity: pipe_buf
 	}
-	pipe.stat.mode = stat.ifpipe
+	pipe.stat.mode = stat.ififo
 
 	return pipe
 }

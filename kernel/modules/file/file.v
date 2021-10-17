@@ -1,5 +1,6 @@
 module file
 
+import time
 import resource
 import proc
 import klock
@@ -53,7 +54,7 @@ pub const pollrdhup = 0x20
 pub const pollnval = 0x40
 pub const pollwrnorm = 0x80
 
-pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &stat.TimeSpec, sigmask &u64) (u64, u64) {
+pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n',
 			voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
 	defer {

@@ -1,24 +1,20 @@
 module stat
 
-struct TimeSpec {
-pub mut:
-	tv_sec  i64
-	tv_nsec i64
-}
+import time
 
-pub const ifmt   = 0xf000
-pub const ifblk  = 0x6000
-pub const ifchr  = 0x2000
-pub const ififo  = 0x1000
-pub const ifreg  = 0x8000
-pub const ifdir  = 0x4000
-pub const iflnk  = 0xa000
-pub const ifsock = 0xc000
-pub const ifpipe = 0x3000
+pub const ifmt   = 0o170000
+
+pub const ifblk  = 0o060000
+pub const ifchr  = 0o020000
+pub const ififo  = 0o010000
+pub const ifreg  = 0o100000
+pub const ifdir  = 0o040000
+pub const iflnk  = 0o120000
+pub const ifsock = 0o140000
 
 pub fn isblk(mode int) bool { return (mode & ifmt) == ifblk }
 pub fn ischr(mode int) bool { return (mode & ifmt) == ifchr }
-pub fn isifo(mode int) bool { return (mode & ifmt) == ififo }
+pub fn isfifo(mode int) bool { return (mode & ifmt) == ififo }
 pub fn isreg(mode int) bool { return (mode & ifmt) == ifreg }
 pub fn isdir(mode int) bool { return (mode & ifmt) == ifdir }
 pub fn islnk(mode int) bool { return (mode & ifmt) == iflnk }
@@ -37,9 +33,9 @@ pub mut:
 	size    u64
 	blksize u64
 	blocks  u64
-	atim    TimeSpec
-	mtim    TimeSpec
-	ctim    TimeSpec
+	atim    time.TimeSpec
+	mtim    time.TimeSpec
+	ctim    time.TimeSpec
 	pad2    int
 	pad3    int
 }

@@ -908,7 +908,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	}
 
 	match handle.resource.stat.mode & stat.ifmt {
-		stat.ifchr, stat.ififo, stat.ifpipe, stat.ifsock {
+		stat.ifchr, stat.ififo, stat.ifsock {
 			return -1, errno.espipe
 		}
 		else {}
