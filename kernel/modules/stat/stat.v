@@ -33,12 +33,15 @@ pub mut:
 	uid     int
 	gid     int
 	rdev    u64
+	pad1    u64
 	size    u64
+	blksize u64
+	blocks  u64
 	atim    TimeSpec
 	mtim    TimeSpec
 	ctim    TimeSpec
-	blksize u64
-	blocks  u64
+	pad2    int
+	pad3    int
 }
 
 pub const dt_unknown = 0
