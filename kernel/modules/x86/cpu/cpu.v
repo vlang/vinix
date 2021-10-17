@@ -2,6 +2,15 @@ module cpu
 
 import msr
 
+pub fn invlpg(addr u64) {
+	asm volatile amd64 {
+		invlpg [addr]
+		;
+		; r (addr)
+		; memory
+	}
+}
+
 pub fn interrupt_state() bool {
 	mut f := u64(0)
 	asm volatile amd64 {

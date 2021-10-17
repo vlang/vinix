@@ -318,7 +318,7 @@ pub fn syscall_brk(new_brk_raw u64) i64 {
 	if new_brk < cur_brk {
 		diff := cur_brk - new_brk
 
-		mmap.munmap(current_process.pagemap, new_brk, diff) or {
+		mmap.munmap(current_process.pagemap, voidptr(new_brk), diff) or {
 			return i64(cur_brk)
 		}
 
@@ -327,7 +327,7 @@ pub fn syscall_brk(new_brk_raw u64) i64 {
 	} else if new_brk > cur_brk {
 		diff := new_brk - cur_brk
 
-		mmap.mmap(current_process.pagemap, cur_brk, diff,
+		mmap.mmap(current_process.pagemap, voidptr(cur_brk), diff,
 			 mmap.prot_read | mmap.prot_exec | mmap.prot_write,
 			 mmap.map_anonymous | mmap.map_fixed, voidptr(0), 0) or {
 			return i64(cur_brk)
@@ -611,6 +611,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 	}
 
 	auxval := elf.load(new_pagemap, prog, 0, &brk) ?
+
+	brk = lib.align_up(brk, 4096)
 
 	entry_point := voidptr(auxval.at_entry)
 
