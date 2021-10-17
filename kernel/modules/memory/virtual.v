@@ -3,6 +3,7 @@ module memory
 import lib
 import stivale2
 import klock
+import x86.cpu
 
 __global (
 	page_size       = u64(0x1000)
@@ -101,8 +102,25 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 	pte_p := pagemap.virt2pte(virt, false) or { return error('') }
 
-	unsafe {
-		pte_p[0] = 0
+	unsafe { *pte_p = 0 }
+
+	current_cr3 := cpu.read_cr3()
+	if current_cr3 == u64(pagemap.top_level) {
+		cpu.invlpg(virt)
+	}
+}
+
+pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
+	pte_p := pagemap.virt2pte(virt, false) or {
+		return error('')
+	}
+
+	unsafe { *pte_p &= ~u64(0xfff) }
+	unsafe { *pte_p |= flags }
+
+	current_cr3 := cpu.read_cr3()
+	if current_cr3 == u64(pagemap.top_level) {
+		cpu.invlpg(virt)
 	}
 }
 

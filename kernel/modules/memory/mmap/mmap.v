@@ -53,6 +53,14 @@ pub mut:
 	offset         i64
 }
 
+pub fn list_ranges(pagemap &memory.Pagemap) {
+	C.printf(c'Ranges for %llx:\n', voidptr(pagemap))
+	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
+		r := &MmapRangeLocal(pagemap.mmap_ranges[i])
+		C.printf(c'\tBase: 0x%llx\tLength: 0x%llx\tOffset: 0x%llx\n', r.base, r.length, r.offset)
+	}
+}
+
 fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
 		r := &MmapRangeLocal(pagemap.mmap_ranges[i])
@@ -180,9 +188,13 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 	}
 }
 
-pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64, length u64, prot int, _flags int) ? {
-	mut pagemap := unsafe { _pagemap }
-	flags := _flags | mmap.map_anonymous
+pub fn map_range(_pagemap &memory.Pagemap, _virt_addr u64, phys_addr u64,
+				 _length u64, prot int, _flags int) ? {
+	mut pagemap  := unsafe { _pagemap }
+	flags := _flags | map_anonymous
+
+	virt_addr := lib.align_down(_virt_addr, page_size)
+	length := lib.align_up(_length + (_virt_addr - virt_addr), page_size)
 
 	mut range_local := &MmapRangeLocal{
 		pagemap: pagemap
@@ -406,7 +418,11 @@ pub fn mprotect(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int) ?
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
-			pagemap.unmap_page(j) or {}
+			mut pt_flags := pte_present | pte_user
+			if prot & prot_write != 0 {
+				pt_flags |= pte_writable
+			}
+			pagemap.flag_page(j, pt_flags) or {}
 		}
 
 		new_offset := local_range.offset + i64(snip_begin - local_range.base)
