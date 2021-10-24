@@ -1,6 +1,6 @@
-From b93c21e537770cb151a0b94a84721bdabf66f28f Mon Sep 17 00:00:00 2001
+From 9fb455de1c6c6c4f30c63ca8661b7d58af80b684 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 25 Oct 2021 00:16:46 +0200
+Date: Mon, 25 Oct 2021 00:38:31 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -92,7 +92,7 @@ index d6d1a70..24d5dbc 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index ae0e7cf..c6c0304 100644
+index 5745daf..28115ad 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -44,7 +44,7 @@ if not headers_only
