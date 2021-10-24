@@ -1,6 +1,6 @@
-From c9a2811864f4a0943fed44c796d88ed238c44e73 Mon Sep 17 00:00:00 2001
+From b93c21e537770cb151a0b94a84721bdabf66f28f Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 1 Oct 2021 01:15:20 +0200
+Date: Mon, 25 Oct 2021 00:16:46 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -9,7 +9,9 @@ Subject: [PATCH] Vinix specific changes
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux/include/asm/ioctls.h            |   2 +
+ options/posix/generic/pthread-stubs.cpp       |  10 +
  options/posix/generic/unistd-stubs.cpp        |   4 +-
+ options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
  sysdeps/vinix/generic/generic.cpp             | 676 ++++++++++++++++++
@@ -39,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 35 files changed, 834 insertions(+), 5 deletions(-)
+ 37 files changed, 847 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -168,6 +170,27 @@ index 41d4248..f246d1d 100644
  #define TIOCSCTTY 0x540E
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
+diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
+index bc58c1b..4219583 100644
+--- a/options/posix/generic/pthread-stubs.cpp
++++ b/options/posix/generic/pthread-stubs.cpp
+@@ -67,6 +67,16 @@ static constexpr unsigned int rc_waiters_bit = static_cast<uint32_t>(1) << 31;
+ // pthread_attr and pthread functions.
+ // ----------------------------------------------------------------------------
+ 
++int pthread_rwlockattr_init(pthread_rwlockattr_t *) {
++	__ensure(!"Not implemented");
++	__builtin_unreachable();
++}
++
++int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *, int) {
++	__ensure(!"Not implemented");
++	__builtin_unreachable();
++}
++
+ // pthread_attr functions.
+ int pthread_attr_init(pthread_attr_t *) {
+ 	return 0;
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
 index 456bf0d..230254a 100644
 --- a/options/posix/generic/unistd-stubs.cpp
@@ -187,6 +210,20 @@ index 456bf0d..230254a 100644
  		errno = e;
  		return -1;
  	}
+diff --git a/options/posix/include/pthread.h b/options/posix/include/pthread.h
+index 015ea32..9f4cf62 100644
+--- a/options/posix/include/pthread.h
++++ b/options/posix/include/pthread.h
+@@ -123,6 +123,9 @@ typedef struct __mlibc_rwlockattr pthread_rwlockattr_t;
+ // pthread_attr and pthread functions.
+ // ----------------------------------------------------------------------------
+ 
++int pthread_rwlockattr_init(pthread_rwlockattr_t *);
++int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *, int);
++
+ // pthread_attr functions.
+ int pthread_attr_init(pthread_attr_t *);
+ int pthread_attr_destroy(pthread_attr_t *);
 diff --git a/sysdeps/vinix/crt-x86_64/crt0.S b/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..06ab8a7
@@ -1202,5 +1239,5 @@ index 0000000..1207fe0
 +endif
 +
 -- 
-2.33.0
+2.33.1
 
