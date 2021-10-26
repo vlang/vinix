@@ -31,10 +31,9 @@ pub fn address(addr u64) ?(u64, &Symbol) {
 	return none
 }
 
-pub fn address_print(addr u64) {
+pub fn address_print(addr u64) ? {
 	off, sym := address(addr) or {
-		C.printf_panic(c'  <invalid>\n')
-		return
+		return error('')
 	}
 	C.printf_panic(c'  [0x%llx] <%s+0x%llx>\n', addr, sym.name, off)
 }
@@ -61,7 +60,9 @@ pub fn stacktrace(_base_ptr u64) {
 			if ret_addr == 0 || old_bp == 0 {
 				break
 			}
-			address_print(ret_addr)
+			address_print(ret_addr) or {
+				break
+			}
 			base_ptr = old_bp
 		}
 	}

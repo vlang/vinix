@@ -51,7 +51,6 @@ pub const abort_stack_size = 128
 struct Local {
 pub mut:
 	cpu_number           u64
-	errno                i64
 	tss                  TSS
 	lapic_id             u32
 	lapic_timer_freq     u64

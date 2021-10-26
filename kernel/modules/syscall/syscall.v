@@ -3,20 +3,27 @@ module syscall
 import x86.cpu.local as cpulocal
 import userland
 
-pub fn leave(context &cpulocal.GPRState) {
+fn leave(context &cpulocal.GPRState) {
 	asm volatile amd64 { cli }
 
 	userland.dispatch_a_signal(context)
 }
 
-pub fn enter() {
-	asm volatile amd64 { sti }
-}
-
 [_naked]
 fn syscall_entry() {
 	asm volatile amd64 {
-		cld
+		swapgs
+
+		// Save user stack
+		mov gs:[24], rsp
+		// Switch to kernel stack
+		mov rsp, gs:[16]
+
+		push 0x3b
+		push gs:[24]
+		push r11
+		push 0x43
+		push rcx
 
 		push 0
 
@@ -40,12 +47,14 @@ fn syscall_entry() {
 		mov eax, ds
 		push rax
 
-		mov rbx, rdi
+		sti
+
+		// syscall num
+		mov gs:[32], rdi
+
 		xor rbp, rbp
-
-		mov rdi, rsp
-		call syscall__enter
-
+		mov rbx, rdi
+		mov rcx, r10
 		mov rdi, rsp
 		lea rax, [rip + syscall_table]
 		call [rax + rbx * 8 + 0]
@@ -76,9 +85,12 @@ fn syscall_entry() {
 		pop r14
 		pop r15
 
-		add rsp, 8
+		// Restore user stack
+		mov rsp, gs:[24]
 
-		iretq
+		swapgs
+
+		rex.w sysret
 
 		;
 		;

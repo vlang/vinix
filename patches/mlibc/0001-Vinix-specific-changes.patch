@@ -1,6 +1,6 @@
-From 9fb455de1c6c6c4f30c63ca8661b7d58af80b684 Mon Sep 17 00:00:00 2001
+From bc80297243f3b4968f1fb84466e215baea19852f Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 25 Oct 2021 00:38:31 +0200
+Date: Mon, 25 Oct 2021 02:03:56 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -14,7 +14,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 676 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 680 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 37 files changed, 847 insertions(+), 5 deletions(-)
+ 37 files changed, 851 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -301,10 +301,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..876ea1c
+index 0000000..a844255
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,676 @@
+@@ -0,0 +1,680 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -315,7 +315,10 @@ index 0000000..876ea1c
 +#include <asm/ioctls.h>
 +#include <stdlib.h>
 +
-+#define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
++#define STUB_ONLY {                             \
++    __ensure(!"STUB_ONLY function was called"); \
++    __builtin_unreachable();                    \
++}
 +
 +struct __syscall_ret {
 +    uint64_t ret;
@@ -325,7 +328,8 @@ index 0000000..876ea1c
 +__attribute__((naked))
 +static __syscall_ret __syscall(int number, ...) {
 +    asm (
-+        "int $0xf0\n\t"
++        "mov %rcx, %r10\n\t"
++        "syscall\n\t"
 +        "ret"
 +    );
 +}

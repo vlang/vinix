@@ -21,10 +21,10 @@ struct GDTEntry {
 __global (
 	kernel_code_seg = u16(0x28)
 	kernel_data_seg = u16(0x30)
-	user_code_seg = u16(0x4b)
-	user_data_seg = u16(0x53)
+	user_code_seg = u16(0x43)
+	user_data_seg = u16(0x3b)
 	gdt_pointer     GDTPointer
-	gdt_entries     [13]GDTEntry
+	gdt_entries     [11]GDTEntry
 	gdt_lock klock.Lock
 )
 
@@ -102,41 +102,23 @@ pub fn initialise() {
 		base_high8: 0
 	}
 
-	// Dummy entries
-	gdt_entries[7] = GDTEntry{
-		limit: 0
-		base_low16: 0
-		base_mid8: 0
-		access: 0
-		granularity: 0
-		base_high8: 0
-	}
-	gdt_entries[8] = GDTEntry{
-		limit: 0
-		base_low16: 0
-		base_mid8: 0
-		access: 0
-		granularity: 0
-		base_high8: 0
-	}
-
-	// User 64 bit code.
-	gdt_entries[9] = GDTEntry{
-		limit: 0
-		base_low16: 0
-		base_mid8: 0
-		access: 0b11111010
-		granularity: 0b00100000
-		base_high8: 0
-	}
-
 	// User 64 bit data.
-	gdt_entries[10] = GDTEntry{
+	gdt_entries[7] = GDTEntry{
 		limit: 0
 		base_low16: 0
 		base_mid8: 0
 		access: 0b11110010
 		granularity: 0
+		base_high8: 0
+	}
+
+	// User 64 bit code.
+	gdt_entries[8] = GDTEntry{
+		limit: 0
+		base_low16: 0
+		base_mid8: 0
+		access: 0b11111010
+		granularity: 0b00100000
 		base_high8: 0
 	}
 
@@ -174,7 +156,7 @@ pub fn reload() {
 pub fn load_tss(addr voidptr) {
 	gdt_lock.acquire()
 
-	gdt_entries[11] = GDTEntry{
+	gdt_entries[9] = GDTEntry{
 		limit: u16(103)
 		base_low16: u16(u64(addr))
 		base_mid8: byte(u64(addr) >> 16)
@@ -184,7 +166,7 @@ pub fn load_tss(addr voidptr) {
 	}
 
 	// High part of the GDT TSS entry, high 32 bits of base
-	gdt_entries[12] = GDTEntry{
+	gdt_entries[10] = GDTEntry{
 		limit: u16(u64(addr) >> 32)
 		base_low16: u16(u64(addr) >> 48)
 	}
@@ -192,7 +174,7 @@ pub fn load_tss(addr voidptr) {
 	asm volatile amd64 {
 		ltr offset
 		;
-		; rm (u16(0x58)) as offset
+		; rm (u16(0x48)) as offset
 		; memory
 	}
 

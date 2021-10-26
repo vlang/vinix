@@ -4,7 +4,6 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
 import x86.apic
-import x86.msr
 import katomic
 import proc
 import memory
@@ -80,7 +79,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
 			return
 		}
-		unsafe { current_thread.gpr_state = gpr_state[0] }
+		unsafe { current_thread.gpr_state = *gpr_state }
+		current_thread.kernel_gs_base = cpu.get_kernel_gs_base()
 		current_thread.gs_base = cpu.get_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
 		current_thread.cr3 = cpu.read_cr3()
@@ -108,11 +108,10 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu_local.last_run_queue_index = new_index
 	cpu_local.current_thread = current_thread
 
+	cpu.set_kernel_gs_base(current_thread.kernel_gs_base)
 	cpu.set_gs_base(current_thread.gs_base)
 	cpu.set_fs_base(current_thread.fs_base)
 
-	msr.wrmsr(0x175, current_thread.kernel_stack)
-	cpu_local.tss.ist2 = current_thread.kernel_stack
 	cpu_local.tss.ist3 = current_thread.pf_stack
 
 	if cpu.read_cr3() != current_thread.cr3 {
@@ -129,8 +128,13 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	new_gpr_state := &current_thread.gpr_state
 
 	asm volatile amd64 {
+		cmp [rsp + 8], 0x43 // if user
+		jne f1
 		mov rdi, new_gpr_state
+		swapgs
 		call userland__dispatch_a_signal
+		swapgs
+1:
 		mov rsp, new_gpr_state
 		pop rax
 		mov ds, eax
@@ -152,13 +156,14 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		pop r14
 		pop r15
 		add rsp, 8
+
 		iretq
 		;
 		; rm (new_gpr_state)
 		; memory
 	}
 
-	panic('We really should not get here')
+	for {}
 }
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
@@ -296,7 +301,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		rsp: stack
 	}
 
-	thread := &proc.Thread{
+	mut thread := &proc.Thread{
 		process: kernel_process
 		cr3: u64(kernel_process.pagemap.top_level)
 		gpr_state: gpr_state
@@ -305,6 +310,10 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		stacks: stacks
 		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
+
+	thread.self = voidptr(thread)
+	thread.gs_base = u64(voidptr(thread))
+	thread.kernel_gs_base = u64(voidptr(thread))
 
 	if autoenqueue == true {
 		enqueue_thread(thread, false)
@@ -365,6 +374,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		stacks: stacks
 		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
+
+	thread.self = voidptr(thread)
+	thread.gs_base = u64(0)
+	thread.kernel_gs_base = u64(voidptr(thread))
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
 

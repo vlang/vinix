@@ -33,14 +33,19 @@ pub mut:
 
 pub struct Thread {
 pub mut:
+	self voidptr
+	errno u64
+	kernel_stack u64
+	user_stack u64
+	syscall_num u64
 	is_in_queue bool
 	running_on u64
 	l klock.Lock
 	process &Process
 	gpr_state cpulocal.GPRState
+	kernel_gs_base u64
 	gs_base u64
 	fs_base u64
-	kernel_stack u64
 	pf_stack u64
 	cr3 u64
 	fpu_storage voidptr
@@ -49,7 +54,6 @@ pub mut:
 	which_event u64
 	exit_value voidptr
 	exited eventstruct.Event
-	errno u64
 	sigentry u64
 	sigactions [256]SigAction
 	pending_signals u64
@@ -61,18 +65,13 @@ pub mut:
 }
 
 pub fn current_thread() &Thread {
-	mut f := u64(0)
+	mut ret := &Thread(0)
+
 	asm volatile amd64 {
-		pushfq
-		pop f
-		cli
-		; =rm (f)
+		mov ret, gs:[0] // get self
+		; =r (ret)
 	}
-	cpu_local := cpulocal.current()
-	ret := cpu_local.current_thread
-	if f & (1 << 9) != 0 {
-		asm volatile amd64 { sti }
-	}
+
 	return ret
 }
 

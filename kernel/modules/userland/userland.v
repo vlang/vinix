@@ -203,10 +203,6 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	mut thread := unsafe { proc.current_thread() }
 
-	if context.cs != 0x4b {
-		return
-	}
-
 	if thread.sigentry == 0 {
 		return
 	}
@@ -476,6 +472,9 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		stacks: stacks
 		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
 	}
+
+	new_thread.self = voidptr(new_thread)
+	new_thread.kernel_gs_base = u64(voidptr(new_thread))
 
 	unsafe { C.memcpy(new_thread.fpu_storage, old_thread.fpu_storage, fpu_storage_size) }
 

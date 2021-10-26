@@ -8,6 +8,12 @@
 
 interrupt_thunk_begin:
     push $0
+
+    cmpq $0x43, 16(%rsp) // if user
+    jne 1f
+    swapgs
+
+1:
     push %r15
     push %r14
     push %r13
@@ -69,6 +75,12 @@ interrupt_thunk_offset: .quad 0
     pop %r14
     pop %r15
     add $8, %rsp
+
+    cmpq $0x43, 8(%rsp) // if user
+    jne 1f
+    swapgs
+
+1:
     iretq
 
 interrupt_thunk_end:

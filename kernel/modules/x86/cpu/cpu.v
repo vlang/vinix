@@ -12,12 +12,20 @@ pub fn interrupt_state() bool {
 	return f & (1 << 9) != 0
 }
 
+pub fn set_kernel_gs_base(ptr u64) {
+	msr.wrmsr(0xc0000102, ptr)
+}
+
 pub fn set_gs_base(ptr u64) {
 	msr.wrmsr(0xc0000101, ptr)
 }
 
 pub fn set_fs_base(ptr u64) {
 	msr.wrmsr(0xc0000100, ptr)
+}
+
+pub fn get_kernel_gs_base() u64 {
+	return msr.rdmsr(0xc0000102)
 }
 
 pub fn get_gs_base() u64 {
@@ -44,7 +52,7 @@ pub fn syscall_set_gs_base(_ voidptr, base voidptr) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	set_gs_base(u64(base))
+	set_kernel_gs_base(u64(base))
 	return 0, 0
 }
 

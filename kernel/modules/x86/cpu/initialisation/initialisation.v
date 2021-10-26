@@ -3,6 +3,8 @@ module initialisation
 import gdt
 import idt
 import cpu
+import x86.msr
+import syscall
 import local as cpulocal
 import stivale2
 import apic
@@ -50,6 +52,16 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
 		cpu_local.tss.ist1 = u64(sched_stack)
 	}
+
+	// Enable syscall
+	mut efer := msr.rdmsr(0xc0000080)
+	efer |= 1
+	msr.wrmsr(0xc0000080, efer)
+	msr.wrmsr(0xc0000081, 0x0033002800000000)
+	// Entry address
+	msr.wrmsr(0xc0000082, u64(voidptr(syscall.syscall_entry)))
+	// Flags mask
+	msr.wrmsr(0xc0000084, u64(~u32(0x002)))
 
 	// Enable SSE/SSE2
 	mut cr0 := cpu.read_cr0()

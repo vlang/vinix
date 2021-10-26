@@ -5,7 +5,6 @@ import event
 import event.eventstruct
 import apic
 import cpu.local as cpulocal
-import syscall
 import memory.mmap
 import katomic
 import lib
@@ -22,7 +21,7 @@ fn generic_isr(num u32, _ voidptr) {
 }
 
 const exception_names = [
-    charptr(c'Division by 0'),
+    c'Division by 0',
     c'Debug',
     c'NMI',
     c'Breakpoint',
@@ -69,7 +68,7 @@ fn abort_handler() {
 }
 
 fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
-	if gpr_state.cs == 0x4b {
+	if gpr_state.cs == user_code_seg {
 		mut signal := byte(0)
 
 		match num {
@@ -91,7 +90,6 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 
 __global (
 	abort_vector = byte(0)
-	syscall_vector = byte(0xf0)
 )
 
 pub fn initialise() {
@@ -115,6 +113,4 @@ pub fn initialise() {
 
 	abort_vector = idt.allocate_vector()
 	idt.register_handler(abort_vector, voidptr(abort_handler), 4, 0x8e)
-
-	idt.register_handler(syscall_vector, voidptr(syscall.syscall_entry), 2, 0xee)
 }
