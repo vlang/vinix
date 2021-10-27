@@ -1,11 +1,11 @@
-From 0fd3588a7fa5d5a7cf6232b662d226e972e271e5 Mon Sep 17 00:00:00 2001
+From bc80297243f3b4968f1fb84466e215baea19852f Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Wed, 27 Oct 2021 03:11:06 +0200
+Date: Mon, 25 Oct 2021 02:03:56 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
  abis/mlibc/signal.h                           |   6 +-
- meson.build                                   |   9 +-
+ meson.build                                   |   6 +-
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux/include/asm/ioctls.h            |   2 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 37 files changed, 852 insertions(+), 7 deletions(-)
+ 37 files changed, 851 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -92,7 +92,7 @@ index d6d1a70..24d5dbc 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 5745daf..7f4535b 100644
+index 5745daf..28115ad 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -44,7 +44,7 @@ if not headers_only
@@ -115,16 +115,6 @@ index 5745daf..7f4535b 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
-@@ -258,8 +262,7 @@ if not headers_only
- 				dependencies: libc_deps,
- 				link_with: [ldso_lib],
- 				link_whole: libc_sublibs,
--				install: true,
--				pic: true)
-+				install: true)
- 
- 		shared_library('dl', 'libdl/src/dummy.cpp', install: true)
- 		shared_library('pthread', 'libpthread/src/dummy.cpp', install: true)
 diff --git a/options/ansi/include/mlibc/ansi-sysdeps.hpp b/options/ansi/include/mlibc/ansi-sysdeps.hpp
 index f758a9c..aee351e 100644
 --- a/options/ansi/include/mlibc/ansi-sysdeps.hpp
