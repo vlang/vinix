@@ -25,20 +25,6 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
 
-	mut success, _, mut b, mut c, mut d := cpu.cpuid(0x80000001, 0)
-	if success == false || d & (1 << 27) == 0 {
-		if cpu_number > 0 {
-			panic('This CPU does not support RDTSCP. Vinix requires RDTSCP to run.')
-		}
-		cpu_set_id = cpu.set_id_zero
-		cpu_get_id = cpu.get_id_zero
-	} else {
-		cpu_set_id = cpu.set_id_rdtscp
-		cpu_get_id = cpu.get_id_rdtscp
-
-		cpu_set_id(cpu_local.cpu_number)
-	}
-
 	kernel_pagemap.switch_to()
 
 	unsafe {
@@ -63,6 +49,9 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))
 
+	cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
+	cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
+
 	// Enable SSE/SSE2
 	mut cr0 := cpu.read_cr0()
 	cr0 &= ~(1 << 2)
@@ -73,7 +62,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	cr4 |= (3 << 9)
 	cpu.write_cr4(cr4)
 
-	success, _, b, c, _ = cpu.cpuid(1, 0)
+	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
 	if success == true && c & cpu.cpuid_xsave != 0 {
 		if cpu_number == 0 { println('fpu: xsave supported') }
 
@@ -122,7 +111,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	asm volatile amd64 { sti }
 
-	apic.lapic_timer_calibrate()
+	apic.lapic_timer_calibrate(mut cpu_local)
 
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 

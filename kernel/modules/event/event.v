@@ -72,7 +72,7 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 
 	attach_listeners(mut events, voidptr(thread))
 
-	sched.dequeue_thread(cpulocal.current().current_thread)
+	sched.dequeue_thread(thread)
 
 	unlock_events(mut events)
 
@@ -127,11 +127,14 @@ pub fn trigger(mut event &eventstruct.Event, drop bool) u64 {
 pub fn pthread_exit(ret voidptr) {
 	asm volatile amd64 { cli }
 
-	mut current_thread := &proc.Thread(cpulocal.current().current_thread)
+	mut cpu_local := cpulocal.current()
+
+	mut current_thread := proc.current_thread()
 
 	sched.dequeue_thread(current_thread)
 
-	cpulocal.current().current_thread = voidptr(0)
+	cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
+	cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
 
 	current_thread.exit_value = ret
 	trigger(mut current_thread.exited, false)

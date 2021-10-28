@@ -35,7 +35,7 @@ pub fn lapic_timer_stop() {
 	lapic_write(lapic_reg_timer, (1 << 16))
 }
 
-pub fn lapic_timer_calibrate() {
+pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 	lapic_timer_stop()
 
 	samples := u64(0xfffff)
@@ -58,17 +58,13 @@ pub fn lapic_timer_calibrate() {
 
 	pit_ticks := initial_pit_tick - final_pit_tick
 
-	mut cpu_local := cpulocal.current()
-
 	cpu_local.lapic_timer_freq = (samples / pit_ticks) * pit_freq
 
 	lapic_timer_stop()
 }
 
-pub fn lapic_timer_oneshot(vec byte, us u64) {
+pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec byte, us u64) {
 	lapic_timer_stop()
-
-	cpu_local := cpulocal.current()
 
 	ticks := us * (cpu_local.lapic_timer_freq / 1000000)
 

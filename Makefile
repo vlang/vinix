@@ -8,19 +8,19 @@ unexport MAKEFLAGS
 .PHONY: all
 all: vinix.iso
 
-QEMUFLAGS = -M q35,smm=off -m 8G -smp 4 -cdrom vinix.iso -serial stdio
+QEMUFLAGS = -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: run-kvm
 run-kvm: vinix.iso
-	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS)
+	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS) -smp 4
 
 .PHONY: run-hvf
 run-hvf: vinix.iso
-	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS)
+	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS) -smp 4
 
 .PHONY: run
 run: vinix.iso
-	qemu-system-x86_64 -cpu qemu64,level=11,+rdtscp $(QEMUFLAGS) -no-shutdown -no-reboot -d int
+	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -d int -smp 1
 
 .PHONY: distro
 distro:

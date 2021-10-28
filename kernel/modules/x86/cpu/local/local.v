@@ -1,5 +1,8 @@
 module local
 
+import x86.cpu
+import trace
+
 [packed]
 struct TSS {
 pub mut:
@@ -51,12 +54,12 @@ pub const abort_stack_size = 128
 struct Local {
 pub mut:
 	cpu_number           u64
+	zero                 u64
 	tss                  TSS
 	lapic_id             u32
 	lapic_timer_freq     u64
 	online				 u64
 	is_idle              bool
-	current_thread       voidptr
 	nvme_io_queue_pair   voidptr
 	last_run_queue_index int
 	abort_stack          [abort_stack_size]u64
@@ -68,5 +71,17 @@ __global (
 )
 
 pub fn current() &Local {
-	return cpu_locals[cpu_get_id()]
+	ints := cpu.interrupt_state()
+	if ints != false {
+		print('Attempted to get current CPU struct without disabling ints\n')
+		trace.stacktrace(0)
+		panic('')
+	}
+
+	mut cpu_number := u64(0)
+	asm volatile amd64 {
+		mov cpu_number, gs:[0]
+		; =r (cpu_number)
+	}
+	return cpu_locals[cpu_number]
 }

@@ -67,7 +67,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	katomic.store(cpu_local.is_idle, false)
 
-	mut current_thread := &proc.Thread(cpu_local.current_thread)
+	mut current_thread := proc.current_thread()
 
 	new_index := get_next_thread(cpu_local.last_run_queue_index)
 
@@ -76,7 +76,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 		if new_index == cpu_local.last_run_queue_index {
 			apic.lapic_eoi()
-			apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
+			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
 			return
 		}
 		unsafe { current_thread.gpr_state = *gpr_state }
@@ -93,7 +93,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	if new_index == -1 {
 		apic.lapic_eoi()
-		cpu_local.current_thread = voidptr(0)
+		cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
+		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
 		cpu_local.last_run_queue_index = 0
 		katomic.store(cpu_local.is_idle, true)
 		if katomic.load(waiting_event_count) == 0 && katomic.load(working_cpus) == 0 {
@@ -106,7 +107,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	current_thread = scheduler_running_queue[new_index]
 	cpu_local.last_run_queue_index = new_index
-	cpu_local.current_thread = current_thread
 
 	cpu.set_kernel_gs_base(current_thread.kernel_gs_base)
 	cpu.set_gs_base(current_thread.gs_base)
@@ -123,7 +123,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	katomic.store(current_thread.running_on, cpu_local.cpu_number)
 
 	apic.lapic_eoi()
-	apic.lapic_timer_oneshot(scheduler_vector, current_thread.timeslice)
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
 
 	new_gpr_state := &current_thread.gpr_state
 
@@ -240,12 +240,13 @@ pub fn yield(save_ctx bool) {
 
 	mut cpu_local := cpulocal.current()
 
-	mut current_thread := &proc.Thread(cpu_local.current_thread)
+	mut current_thread := proc.current_thread()
 
 	if save_ctx == true {
 		current_thread.yield_await.acquire()
 	} else {
-		cpu_local.current_thread = voidptr(0)
+		cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
+		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
 	}
 
 	apic.lapic_send_ipi(byte(cpu_local.lapic_id), scheduler_vector)
@@ -262,14 +263,14 @@ pub fn yield(save_ctx bool) {
 
 pub fn dequeue_and_yield() {
 	asm volatile amd64 { cli }
-	dequeue_thread(cpulocal.current().current_thread)
+	dequeue_thread(proc.current_thread())
 	yield(true)
 }
 
 [noreturn]
 pub fn dequeue_and_die() {
 	asm volatile amd64 { cli }
-	mut thread := &proc.Thread(cpulocal.current().current_thread)
+	mut thread := proc.current_thread()
 	dequeue_thread(thread)
 	for ptr in thread.stacks {
 		memory.pmm_free(ptr, stack_size / page_size)
@@ -511,7 +512,8 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 
 pub fn await() {
 	asm volatile amd64 { cli }
-	apic.lapic_timer_oneshot(scheduler_vector, 20000)
+	mut cpu_local := cpulocal.current()
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, 20000)
 	asm volatile amd64 {
 		sti
 		1:

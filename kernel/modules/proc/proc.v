@@ -33,13 +33,16 @@ pub mut:
 
 pub struct Thread {
 pub mut:
+	// Fixed members, DO NOT MOVE
+	running_on u64
 	self voidptr
 	errno u64
 	kernel_stack u64
 	user_stack u64
 	syscall_num u64
+
+	// Movable members
 	is_in_queue bool
-	running_on u64
 	l klock.Lock
 	process &Process
 	gpr_state cpulocal.GPRState
@@ -68,7 +71,7 @@ pub fn current_thread() &Thread {
 	mut ret := &Thread(0)
 
 	asm volatile amd64 {
-		mov ret, gs:[0] // get self
+		mov ret, gs:[8] // get self
 		; =r (ret)
 	}
 

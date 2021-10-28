@@ -12,6 +12,16 @@ pub fn interrupt_state() bool {
 	return f & (1 << 9) != 0
 }
 
+pub fn interrupt_toggle(state bool) bool {
+	ret := interrupt_state()
+	if state == false {
+		asm volatile amd64 { cli ;;; memory }
+	} else {
+		asm volatile amd64 { sti ;;; memory }
+	}
+	return ret
+}
+
 pub fn set_kernel_gs_base(ptr u64) {
 	msr.wrmsr(0xc0000102, ptr)
 }
@@ -265,24 +275,7 @@ pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {
 }
 
 __global (
-	cpu_get_id fn () u64
-	cpu_set_id fn (u64)
 	fpu_storage_size u64
 	fpu_save         fn (voidptr)
 	fpu_restore      fn (voidptr)
 )
-
-pub fn set_id_zero(_ u64) {
-}
-
-pub fn get_id_zero() u64 {
-	return 0
-}
-
-pub fn set_id_rdtscp(id u64) {
-	msr.wrmsr(0xc0000103, id)
-}
-
-pub fn get_id_rdtscp() u64 {
-	return msr.rdmsr(0xc0000103)
-}

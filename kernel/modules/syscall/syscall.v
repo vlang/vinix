@@ -15,12 +15,12 @@ fn syscall_entry() {
 		swapgs
 
 		// Save user stack
-		mov gs:[24], rsp
+		mov gs:[32], rsp
 		// Switch to kernel stack
-		mov rsp, gs:[16]
+		mov rsp, gs:[24]
 
 		push 0x3b
-		push gs:[24]
+		push gs:[32]
 		push r11
 		push 0x43
 		push rcx
@@ -50,7 +50,7 @@ fn syscall_entry() {
 		sti
 
 		// syscall num
-		mov gs:[32], rdi
+		mov gs:[40], rdi
 
 		xor rbp, rbp
 		mov rbx, rdi
@@ -86,7 +86,7 @@ fn syscall_entry() {
 		pop r15
 
 		// Restore user stack
-		mov rsp, gs:[24]
+		mov rsp, gs:[32]
 
 		swapgs
 
