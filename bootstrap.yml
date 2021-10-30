@@ -1021,8 +1021,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/coreutils.git'
-      tag: 'v8.32'
-      version: '8.32'
+      tag: 'v9.0'
+      version: '9.0'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -1045,7 +1045,7 @@ packages:
       - args: |
           set -e
           ./src/make-prime-list 5000 > "@THIS_SOURCE_DIR@/src/primes.h"
-      - args: ['make', 'clean']
+          rm -rf *
       # Now compile coreutils for the correct target.
       - args:
         - '@THIS_SOURCE_DIR@/configure'
