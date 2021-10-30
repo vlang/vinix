@@ -91,7 +91,15 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	// a dummy call to avoid V warning about an unused `stubs` module
 	_ := stubs.toupper(0)
 
-	memory.vmm_init(memmap_tag)
+	kernel_base_addr_tag := &stivale2.KernelBaseAddrTag(stivale2.get_tag(stivale2_struct, stivale2.kernel_base_addr_id) or {
+		lib.kpanic(voidptr(0), c'Stivale2 kernel base address tag missing')
+	})
+
+	pmr_tag := &stivale2.PMRTag(stivale2.get_tag(stivale2_struct, stivale2.pmr_id) or {
+		lib.kpanic(voidptr(0), c'Stivale2 PMR tag missing')
+	})
+
+	memory.vmm_init(memmap_tag, kernel_base_addr_tag, pmr_tag)
 
 	// ACPI init
 	rsdp_tag := &stivale2.RSDPTag(stivale2.get_tag(stivale2_struct, stivale2.rsdp_id) or {

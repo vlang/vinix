@@ -33,7 +33,7 @@ INTERNALCFLAGS :=                 \
 INTERNALLDFLAGS :=         \
 	-Tlinker.ld            \
 	-nostdlib              \
-	-zmax-page-size=0x1000 \
+	-zmax-page-size=0x200000 \
 	-static                \
 	-pie                   \
 	--no-dynamic-linker    \

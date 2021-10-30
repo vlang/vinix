@@ -8,29 +8,17 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import lib
 
-const pte_present = u64(1 << 0)
-
-const pte_writable = u64(1 << 1)
-
-const pte_user = u64(1 << 2)
-
-pub const prot_none = 0x00
-
-pub const prot_read = 0x01
-
-pub const prot_write = 0x02
-
-pub const prot_exec = 0x04
-
-pub const map_private = 0x01
-
-pub const map_shared = 0x02
-
-pub const map_fixed = 0x04
-
-pub const map_anon = 0x08
-
-pub const map_anonymous = 0x08
+pub const (
+	prot_none = 0x00
+	prot_read = 0x01
+	prot_write = 0x02
+	prot_exec = 0x04
+	map_private = 0x01
+	map_shared = 0x02
+	map_fixed = 0x04
+	map_anon = 0x08
+	map_anonymous = 0x08
+)
 
 pub struct MmapRangeLocal {
 pub mut:
@@ -168,9 +156,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {
 	mut g := unsafe { _g }
 
-	mut pt_flags := pte_present | pte_user
+	mut pt_flags := memory.pte_present | memory.pte_user
 	if prot & prot_write != 0 {
-		pt_flags |= pte_writable
+		pt_flags |= memory.pte_writable
 	}
 
 	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
@@ -418,9 +406,9 @@ pub fn mprotect(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int) ?
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
-			mut pt_flags := pte_present | pte_user
+			mut pt_flags := memory.pte_present | memory.pte_user
 			if prot & prot_write != 0 {
-				pt_flags |= pte_writable
+				pt_flags |= memory.pte_writable
 			}
 			pagemap.flag_page(j, pt_flags) or {}
 		}

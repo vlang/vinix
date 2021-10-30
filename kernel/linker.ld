@@ -18,13 +18,13 @@ PHDRS
 SECTIONS
 {
     /* We wanna be placed in the higher half, 2MiB above 0 in physical memory. */
-    . = 0xffffffff80200000;
+    . = 0xffffffff80000000;
 
     .text : {
         *(.text*)
     } : text
 
-    . += 0x1000;
+    . += CONSTANT(MAXPAGESIZE);
 
     /* We place the .stivalehdr section containing the header in its own section, */
     /* and we use the KEEP directive on it to make sure it doesn't get discarded. */
@@ -41,7 +41,7 @@ SECTIONS
         *(.symbol_table*)
     } : rodata
 
-    . += 0x1000;
+    . += CONSTANT(MAXPAGESIZE);
 
     .data : {
         *(.data*)

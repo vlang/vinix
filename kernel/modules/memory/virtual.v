@@ -5,6 +5,12 @@ import stivale2
 import klock
 import x86.cpu
 
+pub const (
+	pte_present = u64(1 << 0)
+	pte_writable = u64(1 << 1)
+	pte_user = u64(1 << 2)
+)
+
 __global (
 	page_size       = u64(0x1000)
 	higher_half     = u64(0xffff800000000000)
@@ -146,7 +152,10 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	}
 }
 
-pub fn vmm_init(memmap &stivale2.MemmapTag) {
+pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.KernelBaseAddrTag, pmr_tag &stivale2.PMRTag) {
+	print('vmm: Kernel physical base: 0x${kernel_base_addr_tag.physical_base_addr:x}\n')
+	print('vmm: Kernel virtual base: 0x${kernel_base_addr_tag.virtual_base_addr:x}\n')
+
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
 		panic('vmm_init() allocation failure')
@@ -160,15 +169,28 @@ pub fn vmm_init(memmap &stivale2.MemmapTag) {
 		get_next_level(kernel_pagemap.top_level, i, true) or { panic('pmm init failure') }
 	}
 
+	// Map kernel according to PMRs
+	for i := u64(0); i < pmr_tag.entries; i++ {
+		pmr := &stivale2.PMR(u64(&pmr_tag.pmrs) + sizeof(stivale2.PMR) * i)
+
+		virt := pmr.base
+		phys := kernel_base_addr_tag.physical_base_addr + (pmr.base - kernel_base_addr_tag.virtual_base_addr)
+		len := pmr.length
+
+		print('vmm: PMRs: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${len:x}\n')
+
+		for j := u64(0); j < len; j += page_size {
+			kernel_pagemap.map_page(virt + j, phys + j, 0x03) or {
+				panic('pmm init failure')
+			}
+		}
+	}
+
 	for i := u64(0x1000); i < 0x100000000; i += page_size {
 		kernel_pagemap.map_page(i, i, 0x03) or { panic('pmm init failure') }
 		kernel_pagemap.map_page(i + higher_half, i, 0x03) or { panic('pmm init failure') }
 	}
-	for i := u64(0); i < 0x80000000; i += page_size {
-		kernel_pagemap.map_page(i + u64(0xffffffff80000000), i, 0x03) or {
-			panic('pmm init failure')
-		}
-	}
+
 	entries := &memmap.entries
 	for i := 0; i < memmap.entry_count; i++ {
 		base := unsafe { lib.align_down(entries[i].base, page_size) }

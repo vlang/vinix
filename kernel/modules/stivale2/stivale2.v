@@ -3,17 +3,16 @@ module stivale2
 import klock
 import x86.cpu
 
-pub const framebuffer_id = 0x506461d2950408fa
-
-pub const memmap_id = 0x2187f79e8612de07
-
-pub const terminal_id = 0xc2b3f4c3233b0974
-
-pub const rsdp_id = 0x9e1786930a375e78
-
-pub const modules_id = 0x4b6fe466aade04ce
-
-pub const smp_id = 0x34d1d96339647025
+pub const (
+	framebuffer_id = 0x506461d2950408fa
+	memmap_id = 0x2187f79e8612de07
+	terminal_id = 0xc2b3f4c3233b0974
+	rsdp_id = 0x9e1786930a375e78
+	modules_id = 0x4b6fe466aade04ce
+	smp_id = 0x34d1d96339647025
+	pmr_id = 0x5df266a64047b6bd
+	kernel_base_addr_id = 0x060d78874a2a8af0
+)
 
 [packed]
 struct Tag {
@@ -46,6 +45,28 @@ pub mut:
 	green_mask_shift byte
 	blue_mask_size   byte
 	blue_mask_shift  byte
+}
+
+struct PMRTag {
+pub mut:
+	tag Tag
+	entries u64
+	pmrs PMR
+	// This is a var length array at the end.
+}
+
+struct PMR {
+pub mut:
+	base u64
+	length u64
+	perms u64
+}
+
+struct KernelBaseAddrTag {
+pub mut:
+	tag Tag
+	physical_base_addr u64
+	virtual_base_addr u64
 }
 
 [packed]
