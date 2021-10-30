@@ -70,7 +70,7 @@ pub fn current_thread() &Thread {
 	mut ret := &Thread(0)
 
 	asm volatile amd64 {
-		mov ret, [8] // get self
+		mov ret, gs:[8] // get self
 		; =r (ret)
 	}
 

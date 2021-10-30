@@ -80,7 +80,7 @@ pub fn current() &Local {
 
 	mut cpu_number := u64(0)
 	asm volatile amd64 {
-		mov cpu_number, [0]
+		mov cpu_number, gs:[0]
 		; =r (cpu_number)
 	}
 	return cpu_locals[cpu_number]

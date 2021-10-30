@@ -15,10 +15,10 @@ fn leave(context &cpulocal.GPRState) {
 fn syscall_entry() {
 	asm volatile amd64 {
 		swapgs // Save user stack
-		mov [32], rsp // Switch to kernel stack
-		mov rsp, [24]
+		mov gs:[32], rsp // Switch to kernel stack
+		mov rsp, gs:[24]
 		push 0x3b
-		push [32]
+		push gs:[32]
 		push r11
 		push 0x43
 		push rcx
@@ -43,7 +43,7 @@ fn syscall_entry() {
 		mov eax, ds
 		push rax
 		sti // syscall num
-		mov [40], rdi
+		mov gs:[40], rdi
 		xor rbp, rbp
 		mov rbx, rdi
 		mov rcx, r10
@@ -73,7 +73,7 @@ fn syscall_entry() {
 		pop r13
 		pop r14
 		pop r15 // Restore user stack
-		mov rsp, [32]
+		mov rsp, gs:[32]
 		swapgs
 		rex.w sysret
 		; ; ; memory
