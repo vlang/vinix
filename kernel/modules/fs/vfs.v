@@ -616,21 +616,42 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
+	current_process := proc.current_thread().process
+
 	path := unsafe { cstring_to_vstring(_path) }
 
+	mut statsrc := &stat.Stat(0)
+
 	if path.len == 0 {
-		return -1, errno.enoent
+		if flags & at_empty_path == 0 {
+			return -1, errno.enoent
+		}
+
+		if dirfd == at_fdcwd {
+			node := &VFSNode(current_process.current_directory)
+			statsrc = &node.resource.stat
+		} else {
+			fd := file.fd_from_fdnum(current_process, dirfd) or {
+				return -1, errno.get()
+			}
+			statsrc = &fd.handle.resource.stat
+		}
+	} else {
+		parent := get_parent_dir(dirfd, path) or {
+			return -1, errno.get()
+		}
+
+		follow_links := flags & fs.at_symlink_nofollow == 0
+
+		node := get_node(parent, path, follow_links) or {
+			return -1, errno.get()
+		}
+
+		statsrc = &node.resource.stat
 	}
 
-	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
+	unsafe { *statbuf = *statsrc }
 
-	follow_links := flags & fs.at_symlink_nofollow == 0
-
-	node := get_node(parent, path, follow_links) or { return -1, errno.get() }
-
-	unsafe {
-		statbuf[0] = node.resource.stat
-	}
 	return 0, 0
 }
 
