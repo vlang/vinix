@@ -4,5 +4,6 @@ build
 *.elf
 *.iso
 *.xbstrap
+ovmf
 pack
 .vscode

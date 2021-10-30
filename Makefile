@@ -18,6 +18,14 @@ run-kvm: vinix.iso
 run-hvf: vinix.iso
 	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS) -smp 4
 
+ovmf:
+	mkdir -p ovmf
+	cd ovmf && curl -o OVMF-X64.zip https://efi.akeo.ie/OVMF/OVMF-X64.zip && 7z x OVMF-X64.zip
+
+.PHONY: run-uefi
+run-uefi: ovmf
+	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS) -smp 4 -bios ovmf/OVMF.fd
+
 .PHONY: run
 run: vinix.iso
 	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -d int -smp 1
