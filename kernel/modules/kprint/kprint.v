@@ -20,7 +20,6 @@ pub fn syscall_kprint(_ voidptr, message charptr) {
 				serial.out(message[i])
 			}
 		}
-
 		kprint_lock.release()
 	}
 }

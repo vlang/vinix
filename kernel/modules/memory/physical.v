@@ -6,11 +6,11 @@ import stivale2
 import klock
 
 __global (
-	pmm_lock klock.Lock
-	pmm_bitmap = voidptr(0)
-	pmm_avl_page_count = u64(0)
+	pmm_lock            klock.Lock
+	pmm_bitmap          = voidptr(0)
+	pmm_avl_page_count  = u64(0)
 	pmm_last_used_index = u64(0)
-	free_pages = u64(0)
+	free_pages          = u64(0)
 )
 
 pub fn print_free() {
@@ -29,7 +29,7 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable)
-			&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable) {
+				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable) {
 				continue
 			}
 			top := entries[i].base + entries[i].length
@@ -74,7 +74,6 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 			}
 		}
 	}
-
 	print_free()
 
 	// Initialise slabs
@@ -142,7 +141,6 @@ pub fn pmm_alloc(count u64) voidptr {
 			ptr[i] = 0
 		}
 	}
-
 	return ret
 }
 
@@ -158,13 +156,11 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	free_pages += count
 }
 
-
-
 pub struct Slab {
 mut:
-	@lock klock.Lock
+	@lock      klock.Lock
 	first_free u64
-	ent_size u64
+	ent_size   u64
 }
 
 struct SlabHeader {
@@ -179,17 +175,23 @@ pub fn (mut this Slab) init(ent_size u64) {
 
 	avl_size := page_size - lib.align_up(sizeof(SlabHeader), ent_size)
 	mut slabptr := &SlabHeader(this.first_free)
-	unsafe { slabptr[0].slab = this }
+	unsafe {
+		slabptr[0].slab = this
+	}
 	this.first_free += lib.align_up(sizeof(SlabHeader), ent_size)
 
 	mut arr := &u64(this.first_free)
 	max := avl_size / ent_size - 1
 	fact := ent_size / 8
 	for i := u64(0); i < max; i++ {
-		unsafe { arr[i * fact] = u64(&arr[(i + 1) * fact]) }
+		unsafe {
+			arr[i * fact] = u64(&arr[(i + 1) * fact])
+		}
 	}
 
-	unsafe { arr[max * fact] = u64(0) }
+	unsafe {
+		arr[max * fact] = u64(0)
+	}
 }
 
 pub fn (mut this Slab) alloc() voidptr {
@@ -221,16 +223,15 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	}
 
 	mut new_head := &u64(ptr)
-	unsafe { new_head[0] = this.first_free }
-
+	unsafe {
+		new_head[0] = this.first_free
+	}
 	this.first_free = u64(new_head)
 }
-
 
 __global (
 	slabs [10]Slab
 )
-
 
 struct MallocMetadata {
 mut:
@@ -272,9 +273,7 @@ fn slab_for(size u64) ?&Slab {
 
 [export: 'malloc']
 pub fn malloc(size u64) voidptr {
-	mut slab := slab_for(8 + size) or {
-		return big_alloc(size)
-	}
+	mut slab := slab_for(8 + size) or { return big_alloc(size) }
 
 	return slab.alloc()
 }

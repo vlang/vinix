@@ -21,11 +21,11 @@ struct GDTEntry {
 __global (
 	kernel_code_seg = u16(0x28)
 	kernel_data_seg = u16(0x30)
-	user_code_seg = u16(0x43)
-	user_data_seg = u16(0x3b)
+	user_code_seg   = u16(0x43)
+	user_data_seg   = u16(0x3b)
 	gdt_pointer     GDTPointer
 	gdt_entries     [11]GDTEntry
-	gdt_lock klock.Lock
+	gdt_lock        klock.Lock
 )
 
 pub fn initialise() {
@@ -144,8 +144,7 @@ pub fn reload() {
 		mov ss, dseg
 		mov fs, udseg
 		mov gs, udseg
-		;
-		; m (gdt_pointer) as ptr
+		; ; m (gdt_pointer) as ptr
 		  rm (u64(kernel_code_seg)) as cseg
 		  rm (u32(kernel_data_seg)) as dseg
 		  rm (u32(user_data_seg)) as udseg
@@ -173,8 +172,7 @@ pub fn load_tss(addr voidptr) {
 
 	asm volatile amd64 {
 		ltr offset
-		;
-		; rm (u16(0x48)) as offset
+		; ; rm (u16(0x48)) as offset
 		; memory
 	}
 

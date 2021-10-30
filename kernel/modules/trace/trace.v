@@ -15,7 +15,7 @@ pub fn address(addr u64) ?(u64, &Symbol) {
 
 	symbol_table := C.get_symbol_table()
 
-	for i := u64(0); ; i++ {
+	for i := u64(0); true; i++ {
 		if unsafe { symbol_table[i].address } == 0xffffffffffffffff {
 			return none
 		}
@@ -32,9 +32,7 @@ pub fn address(addr u64) ?(u64, &Symbol) {
 }
 
 pub fn address_print(addr u64) ? {
-	off, sym := address(addr) or {
-		return error('')
-	}
+	off, sym := address(addr) or { return error('') }
 	C.printf_panic(c'  [0x%llx] <%s+0x%llx>\n', addr, sym.name, off)
 }
 
@@ -45,7 +43,7 @@ pub fn stacktrace(_base_ptr u64) {
 		asm volatile amd64 {
 			mov base_ptr, rbp
 			; =g (base_ptr)
-			;; memory
+			; ; memory
 		}
 	}
 
@@ -60,9 +58,7 @@ pub fn stacktrace(_base_ptr u64) {
 			if ret_addr == 0 || old_bp == 0 {
 				break
 			}
-			address_print(ret_addr) or {
-				break
-			}
+			address_print(ret_addr) or { break }
 			base_ptr = old_bp
 		}
 	}

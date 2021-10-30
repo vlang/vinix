@@ -5,32 +5,32 @@ import bitmap
 
 pub struct PCIDevice {
 pub:
-	bus byte
-	slot byte
+	bus      byte
+	slot     byte
 	function byte
-	parent i64
+	parent   i64
 pub mut:
-	device_id u16
-	vendor_id u16
-	revision_id u16
-	class byte
-	subclass byte
-	prog_if byte
-	multifunction bool
-	irq_pin byte
-	msi_offset u16
-	msix_offset u16
-	msi_support bool
-	msix_support bool
+	device_id         u16
+	vendor_id         u16
+	revision_id       u16
+	class             byte
+	subclass          byte
+	prog_if           byte
+	multifunction     bool
+	irq_pin           byte
+	msi_offset        u16
+	msix_offset       u16
+	msi_support       bool
+	msix_support      bool
 	msix_table_bitmap bitmap.GenericBitmap
-	msix_table_size u16
+	msix_table_size   u16
 }
 
 pub struct PCIBar {
 pub:
-	base u64
-	size u64
-	is_mmio bool
+	base            u64
+	size            u64
+	is_mmio         bool
 	is_prefetchable bool
 }
 
@@ -117,7 +117,6 @@ pub fn (dev &PCIDevice) set_msi(vector byte) {
 
 	message_control |= 1 // enable=1
 	message_control &= ~(0b111 << 4) // mme=0
-
 	dev.write<u16>(dev.msi_offset + 2, message_control)
 }
 
@@ -147,13 +146,11 @@ pub fn (dev &PCIDevice) set_msix(vector byte) bool {
 	kio.mmout(&u32(bar_base), address) // address low
 	kio.mmout(&u32(bar_base + 4), u32(0)) // address high
 	kio.mmout(&u32(bar_base + 8), data) // data
-	kio.mmout(&u32(bar_base + 12), u32(0)) // vector control 
-
+	kio.mmout(&u32(bar_base + 12), u32(0)) // vector control
 	mut message_control := dev.read<u16>(dev.msix_offset + 2)
 
 	message_control |= (1 << 15) // enable=1
 	message_control &= ~(1 << 14) // mask=0
-
 	dev.write<u16>(dev.msix_offset + 2, message_control)
 
 	return true
@@ -166,7 +163,6 @@ pub fn (dev &PCIDevice) enable_bus_mastering() {
 }
 
 fn (dev &PCIDevice) get_address(offset u32) {
-	address := (dev.bus << 16) | (dev.slot << 11) | (dev.function << 8)
-		| (offset & ~(u32(3))) | 0x80000000
+	address := (dev.bus << 16) | (dev.slot << 11) | (dev.function << 8) | (offset & ~(u32(3))) | 0x80000000
 	kio.port_out<u32>(0xcf8, address)
 }

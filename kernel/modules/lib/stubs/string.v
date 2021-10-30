@@ -2,11 +2,7 @@ module stubs
 
 [export: 'toupper']
 pub fn toupper(c int) int {
-	return if c >= int(`a`) && c <= int(`z`) {
-		c - 0x20
-	} else { 
-		c
-	}
+	return if c >= int(`a`) && c <= int(`z`) { c - 0x20 } else { c }
 }
 
 [export: 'memcpy']
@@ -19,7 +15,6 @@ pub fn memcpy(dest voidptr, const_src voidptr, size u64) voidptr {
 			destm[i] = srcm[i]
 		}
 	}
-
 	return dest
 }
 
@@ -32,7 +27,6 @@ pub fn memset(dest voidptr, c int, size u64) voidptr {
 			destm[i] = byte(c)
 		}
 	}
-
 	return dest
 }
 
@@ -45,10 +39,8 @@ pub fn memset64(dest voidptr, c int, size u64) voidptr {
 			destm[i] = u64(c)
 		}
 	}
-
 	return dest
 }
-
 
 [export: 'memmove']
 pub fn memmove(dest &C.void, const_src &C.void, size u64) &C.void {
@@ -82,7 +74,6 @@ pub fn memcmp(const_s1 &C.void, const_s2 &C.void, size u64) int {
 			}
 		}
 	}
-
 	return 0
 }
 
@@ -93,7 +84,7 @@ pub fn strcpy(dest &C.char, const_src &C.char) &C.char {
 	unsafe {
 		mut destm := &byte(voidptr(dest))
 		srcm := &byte(voidptr(const_src))
-		
+
 		for {
 			if srcm[i] != 0 {
 				destm[i] = srcm[i]
@@ -116,7 +107,7 @@ pub fn strncpy(dest &C.char, const_src &C.char, n u64) &C.char {
 	unsafe {
 		mut destm := &byte(voidptr(dest))
 		srcm := &byte(voidptr(const_src))
-		
+
 		for {
 			if i >= n {
 				return dest
@@ -145,7 +136,7 @@ pub fn strcmp(const_s1 &C.char, const_s2 &C.char) int {
 		mut i := u64(0)
 		s1 := &byte(const_s1)
 		s2 := &byte(const_s2)
-		
+
 		for {
 			c1 := s1[i]
 			c2 := s2[i]
@@ -161,7 +152,6 @@ pub fn strcmp(const_s1 &C.char, const_s2 &C.char) int {
 			i++
 		}
 	}
-
 	return 0
 }
 
@@ -184,7 +174,6 @@ pub fn strncmp(const_s1 &C.char, const_s2 &C.char, size u64) int {
 			}
 		}
 	}
-
 	return 0
 }
 
@@ -202,6 +191,5 @@ pub fn strlen(const_ptr &C.char) u64 {
 			i++
 		}
 	}
-
 	return i
 }

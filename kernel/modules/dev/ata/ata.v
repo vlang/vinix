@@ -13,19 +13,25 @@ import event
 import event.eventstruct
 
 const pci_class = 0x1
+
 const pci_subclass = 0x1
+
 const pci_progif = 0x80
+
 const ata_ports = [0x1f0, 0x1f0, 0x170, 0x170]
+
 const ata_bytes_per_sector = 512
+
 const ata_sectors_per_prdt = 16
+
 const ata_bytes_per_prdt = ata_bytes_per_sector * ata_sectors_per_prdt
 
 [packed]
 struct PRDT {
 pub mut:
-	buffer_phys u32
+	buffer_phys   u32
 	transfer_size u16
-	mark_end u16
+	mark_end      u16
 }
 
 struct ATADrive {
@@ -36,29 +42,29 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
-
 	// ATA specific stuff.
-	is_master bool
-	data_port u16
-	error_port u16
+	is_master         bool
+	data_port         u16
+	error_port        u16
 	sector_count_port u16
-	lba_low_port u16
-	lba_mid_port u16
-	lba_hi_port u16
-	device_port u16
-	cmd_port u16
-	bar4 u16
-	bmr_command u16
-	bmr_status u16
-	bmr_prdt u16
-	prdt &PRDT
-	prdt_phys u32
-	prdt_cache &byte
+	lba_low_port      u16
+	lba_mid_port      u16
+	lba_hi_port       u16
+	device_port       u16
+	cmd_port          u16
+	bar4              u16
+	bmr_command       u16
+	bmr_status        u16
+	bmr_prdt          u16
+	prdt              &PRDT
+	prdt_phys         u32
+	prdt_cache        &byte
 }
 
 pub fn initialise() {
 	// Fetch and setup the PCI device.
-	mut dev := pci.get_device_by_class(pci_class, pci_subclass, pci_progif, 0) or {
+	mut dev := pci.get_device_by_class(ata.pci_class, ata.pci_subclass, ata.pci_progif,
+		0) or {
 		print('ata: No suitable PCI devices found\n')
 		return
 	}
@@ -66,22 +72,20 @@ pub fn initialise() {
 
 	// Probe ports and add devices.
 	mut index := 0
-	for i in 0 .. ata_ports.len {
-		drive := init_ata_drive(i, mut dev) or {
-			continue
-		}
-		name := 'ata${index}'
+	for i in 0 .. ata.ata_ports.len {
+		drive := init_ata_drive(i, mut dev) or { continue }
+		name := 'ata$index'
 		fs.devtmpfs_add_device(drive, name)
-		print("ata: Port ${i} initialised as ${name} (${drive.stat.size} bytes)\n")
+		print('ata: Port $i initialised as $name ($drive.stat.size bytes)\n')
 		index += 1
 	}
 }
 
 fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
-	assert port_index < ata_ports.len
+	assert port_index < ata.ata_ports.len
 
 	// Fetch the IO ports and comm addresses of the drive.
-	port := u16(ata_ports[port_index])
+	port := u16(ata.ata_ports[port_index])
 	mut bar4 := u16(pci_device.read<u32>(0x20))
 	if bar4 & 1 != 0 {
 		bar4 &= 0xfffffffc
@@ -100,9 +104,12 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		bmr_command: bar4
 		bmr_status: bar4 + 2
 		bmr_prdt: bar4 + 4
-		prdt: &PRDT(0) // To be filled later.
-		prdt_phys: 0 // To be filled later.
-		prdt_cache: &byte(0) // To be filled later.
+		prdt: &PRDT(0)
+		// To be filled later.
+		prdt_phys: 0
+		// To be filled later.
+		prdt_cache: &byte(0)
+		// To be filled later.
 	}
 
 	// Identify the drive.
@@ -115,13 +122,13 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	kio.port_out<byte>(dev.cmd_port, 0xec)
 
 	if kio.port_in<byte>(dev.cmd_port) == 0 {
-		print('ata: Port ${port_index} is not connected\n')
+		print('ata: Port $port_index is not connected\n')
 		return none
 	} else {
 		mut timeout := 0
 		for kio.port_in<byte>(dev.cmd_port) & 0b10000000 != 0 {
 			if timeout == 100000 {
-				print('ata: Port ${port_index} is not answering\n')
+				print('ata: Port $port_index is not answering\n')
 				return none
 			}
 			timeout += 1
@@ -130,7 +137,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 
 	// Check for non-standard ATAPI.
 	if kio.port_in<byte>(dev.lba_mid_port) != 0 || kio.port_in<byte>(dev.lba_hi_port) != 0 {
-		print("ata: Port ${port_index} is non-standard ATAPI\n")
+		print('ata: Port $port_index is non-standard ATAPI\n')
 		return none
 	}
 
@@ -138,14 +145,14 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	for {
 		status := kio.port_in<byte>(dev.cmd_port)
 		if status & 0b00000001 != 0 {
-			print("ata: Port ${port_index} errored out\n")
+			print('ata: Port $port_index errored out\n')
 			return none
 		}
 		if status & 0b00001000 != 0 {
 			break
 		}
 		if timeout == 100000 {
-			print("ata: Port ${port_index} hanged\n")
+			print('ata: Port $port_index hanged\n')
 			return none
 		}
 	}
@@ -171,8 +178,9 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	dev.stat.mode = 0o644 | stat.ifblk
 	dev.prdt_phys = u32(u64(memory.pmm_alloc(1)))
 	dev.prdt = &PRDT(dev.prdt_phys + higher_half)
-	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup<u64>(ata_bytes_per_prdt, page_size))))
-	dev.prdt.transfer_size = ata_bytes_per_prdt
+	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup<u64>(ata.ata_bytes_per_prdt,
+		page_size))))
+	dev.prdt.transfer_size = ata.ata_bytes_per_prdt
 	dev.prdt.mark_end = 0x8000
 	dev.prdt_cache = &byte(u64(dev.prdt.buffer_phys) + higher_half)
 	return dev
@@ -184,21 +192,21 @@ fn (mut this ATADrive) mmap(page u64, flags int) voidptr {
 
 fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
-	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
+	if loc % ata.ata_bytes_per_sector != 0 || count % ata.ata_bytes_per_sector != 0 {
 		errno.set(errno.eio)
 		return none
 	}
 
 	// Actually read.
-	sector_start := loc / ata_bytes_per_sector
-	sector_count := count / ata_bytes_per_sector
+	sector_start := loc / ata.ata_bytes_per_sector
+	sector_count := count / ata.ata_bytes_per_sector
 
 	dev.l.acquire()
 	defer {
 		dev.l.release()
 	}
 
-	for i := u64(0); i < sector_count; i += ata_sectors_per_prdt {
+	for i := u64(0); i < sector_count; i += ata.ata_sectors_per_prdt {
 		sector_loc := sector_start + i
 		kio.port_out<byte>(dev.bmr_command, 0)
 		kio.port_out<u32>(dev.bmr_prdt, dev.prdt_phys)
@@ -208,10 +216,10 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 		val := if dev.is_master { 0x40 } else { 0x50 }
 		kio.port_out<byte>(dev.device_port, byte(val))
 
-		actual_count := if i + ata_sectors_per_prdt > sector_count {
-			sector_count % ata_sectors_per_prdt
+		actual_count := if i + ata.ata_sectors_per_prdt > sector_count {
+			sector_count % ata.ata_sectors_per_prdt
 		} else {
-			ata_sectors_per_prdt
+			ata.ata_sectors_per_prdt
 		}
 
 		kio.port_out<byte>(dev.sector_count_port, byte(actual_count >> 8))
@@ -232,36 +240,35 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 				break
 			}
 			if status & 0x01 != 0 {
-				print("ata: Error reading sector ${sector_loc} on drive")
+				print('ata: Error reading sector $sector_loc on drive')
 				return none
 			}
 		}
 		kio.port_out<byte>(dev.bmr_command, 0)
 
-		buffer_final := voidptr(u64(buffer) + i * ata_bytes_per_sector)
-		unsafe { C.memcpy(buffer_final, dev.prdt_cache, actual_count * ata_bytes_per_sector) }
-
+		buffer_final := voidptr(u64(buffer) + i * ata.ata_bytes_per_sector)
+		unsafe { C.memcpy(buffer_final, dev.prdt_cache, actual_count * ata.ata_bytes_per_sector) }
 	}
 	return i64(count)
 }
 
 fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
-	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
+	if loc % ata.ata_bytes_per_sector != 0 || count % ata.ata_bytes_per_sector != 0 {
 		errno.set(errno.eio)
 		return none
 	}
 
 	// Actually write.
-	sector_start := loc / ata_bytes_per_sector
-	sector_count := count / ata_bytes_per_sector
+	sector_start := loc / ata.ata_bytes_per_sector
+	sector_count := count / ata.ata_bytes_per_sector
 
 	dev.l.acquire()
 	defer {
 		dev.l.release()
 	}
 
-	for i := u64(0); i < sector_count; i += ata_sectors_per_prdt {
+	for i := u64(0); i < sector_count; i += ata.ata_sectors_per_prdt {
 		sector_loc := sector_start + i
 
 		kio.port_out<byte>(dev.bmr_command, 0)
@@ -269,18 +276,18 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 		bmr_status := kio.port_in<byte>(dev.bmr_status)
 		kio.port_out<byte>(dev.bmr_status, bmr_status | 0x4 | 0x2)
 
-		val :=  if dev.is_master { 0x40 } else { 0x50 }
+		val := if dev.is_master { 0x40 } else { 0x50 }
 		kio.port_out<byte>(dev.device_port, byte(val))
 
-		actual_count := if i + ata_sectors_per_prdt > sector_count {
-			sector_count % ata_sectors_per_prdt
+		actual_count := if i + ata.ata_sectors_per_prdt > sector_count {
+			sector_count % ata.ata_sectors_per_prdt
 		} else {
-			ata_sectors_per_prdt
+			ata.ata_sectors_per_prdt
 		}
 
 		// Copy buffer to DMA area.
-		buffer_final := voidptr(u64(buffer) + i * ata_bytes_per_sector)
-		unsafe { C.memcpy(dev.prdt_cache, buffer_final, actual_count * ata_bytes_per_sector) }
+		buffer_final := voidptr(u64(buffer) + i * ata.ata_bytes_per_sector)
+		unsafe { C.memcpy(dev.prdt_cache, buffer_final, actual_count * ata.ata_bytes_per_sector) }
 
 		kio.port_out<byte>(dev.sector_count_port, byte(actual_count >> 8))
 		kio.port_out<byte>(dev.lba_low_port, byte((sector_loc & 0x000000FF000000) >> 24))
@@ -300,7 +307,7 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 				break
 			}
 			if status & 0x01 != 0 {
-				print("ata: Error reading sector ${sector_loc} on drive")
+				print('ata: Error reading sector $sector_loc on drive')
 				return none
 			}
 		}
@@ -308,14 +315,13 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 
 		kio.port_out<byte>(dev.device_port, byte(val))
 		kio.port_out<byte>(dev.cmd_port, 0xea) // Cache flush EXT command.
-
 		for {
 			status := kio.port_in<byte>(dev.cmd_port)
 			if status & 0x80 == 0 {
 				break
 			}
 			if status & 0x01 != 0 {
-				print("ata: Error reading sector ${sector_loc} on drive")
+				print('ata: Error reading sector $sector_loc on drive')
 				return none
 			}
 		}

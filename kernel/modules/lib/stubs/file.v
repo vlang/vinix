@@ -8,7 +8,7 @@ struct C.__mlibc_file_base {}
 type FILE = C.__mlibc_file_base
 
 __global (
-	stdin = &FILE(voidptr(0))
+	stdin  = &FILE(voidptr(0))
 	stdout = &FILE(voidptr(0))
 	stderr = &FILE(voidptr(0))
 )

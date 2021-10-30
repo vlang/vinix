@@ -3,6 +3,7 @@
 #include <wayland-client-core.h>
 
 struct C.wl_display {}
+
 fn C.wl_display_connect(voidptr) &C.wl_display
 fn C.wl_display_disconnect(&C.wl_display)
 
@@ -13,6 +14,8 @@ fn main() {
 		return
 	}
 
-	defer { C.wl_display_disconnect(dsp) }
-	println("connected to display")
+	defer {
+		C.wl_display_disconnect(dsp)
+	}
+	println('connected to display')
 }

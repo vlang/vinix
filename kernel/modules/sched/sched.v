@@ -12,13 +12,14 @@ import elf
 import lib
 
 const stack_size = u64(0x200000)
+
 const max_running_threads = int(512)
 
 __global (
-	scheduler_vector byte
+	scheduler_vector        byte
 	scheduler_running_queue [512]&proc.Thread
-	kernel_process &proc.Process
-	working_cpus = u64(0)
+	kernel_process          &proc.Process
+	working_cpus            = u64(0)
 )
 
 pub fn initialise() {
@@ -28,7 +29,9 @@ pub fn initialise() {
 	interrupt_table[scheduler_vector] = voidptr(scheduler_isr)
 	idt.set_ist(scheduler_vector, 1)
 
-	kernel_process = &proc.Process{pagemap: &kernel_pagemap}
+	kernel_process = &proc.Process{
+		pagemap: &kernel_pagemap
+	}
 }
 
 fn get_next_thread(orig_i int) int {
@@ -44,8 +47,7 @@ fn get_next_thread(orig_i int) int {
 		mut thread := scheduler_running_queue[index]
 
 		if thread != 0 {
-			if katomic.load(thread.running_on) == cpu_number
-			|| thread.l.test_and_acquire() == true {
+			if katomic.load(thread.running_on) == cpu_number || thread.l.test_and_acquire() == true {
 				return index
 			}
 		}
@@ -79,7 +81,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
 			return
 		}
-		unsafe { current_thread.gpr_state = *gpr_state }
+		unsafe {
+			current_thread.gpr_state = *gpr_state
+		}
 		current_thread.kernel_gs_base = cpu.get_kernel_gs_base()
 		current_thread.gs_base = cpu.get_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
@@ -134,7 +138,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		swapgs
 		call userland__dispatch_a_signal
 		swapgs
-1:
+		1:
 		mov rsp, new_gpr_state
 		pop rax
 		mov ds, eax
@@ -156,10 +160,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		pop r14
 		pop r15
 		add rsp, 8
-
 		iretq
-		;
-		; rm (new_gpr_state)
+		; ; rm (new_gpr_state)
 		; memory
 	}
 
@@ -234,7 +236,9 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 }
 
 pub fn yield(save_ctx bool) {
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 
 	apic.lapic_timer_stop()
 
@@ -251,29 +255,39 @@ pub fn yield(save_ctx bool) {
 
 	apic.lapic_send_ipi(byte(cpu_local.lapic_id), scheduler_vector)
 
-	asm volatile amd64 { sti }
+	asm volatile amd64 {
+		sti
+	}
 
 	if save_ctx == true {
 		current_thread.yield_await.acquire()
 		current_thread.yield_await.release()
 	} else {
-		for { asm volatile amd64 { hlt } }
+		for {
+			asm volatile amd64 {
+				hlt
+			}
+		}
 	}
 }
 
 pub fn dequeue_and_yield() {
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 	dequeue_thread(proc.current_thread())
 	yield(true)
 }
 
 [noreturn]
 pub fn dequeue_and_die() {
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 	mut thread := proc.current_thread()
 	dequeue_thread(thread)
 	for ptr in thread.stacks {
-		memory.pmm_free(ptr, stack_size / page_size)
+		memory.pmm_free(ptr, sched.stack_size / page_size)
 	}
 	unsafe {
 		thread.stacks.free()
@@ -286,9 +300,9 @@ pub fn dequeue_and_die() {
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
 	stacks << stack_phys
-	stack := u64(stack_phys) + stack_size + higher_half
+	stack := u64(stack_phys) + sched.stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		cs: kernel_code_seg
@@ -309,7 +323,8 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		timeslice: 5000
 		running_on: u64(-1)
 		stacks: stacks
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
+			higher_half)
 	}
 
 	thread.self = voidptr(thread)
@@ -323,35 +338,29 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	return thread
 }
 
-pub fn new_user_thread(_process &proc.Process, want_elf bool,
-					   pc voidptr, arg voidptr,
-					   argv []string, envp []string, auxval &elf.Auxval,
-					   autoenqueue bool) ?&proc.Thread {
+pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(stack_size / page_size)
-	mut stack := &u64(u64(stack_phys) + stack_size + higher_half)
+	stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
+	mut stack := &u64(u64(stack_phys) + sched.stack_size + higher_half)
 
 	stack_vma := process.thread_stack_top
-	process.thread_stack_top -= stack_size
+	process.thread_stack_top -= sched.stack_size
 	stack_bottom_vma := process.thread_stack_top
 	process.thread_stack_top -= page_size
 
-	mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys),
-				   stack_size, mmap.prot_read | mmap.prot_write,
-				   mmap.map_anonymous) or {
-		return none
-	}
+	mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys), sched.stack_size,
+		mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
 
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	kernel_stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
 	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
+	kernel_stack := u64(kernel_stack_phys) + sched.stack_size + higher_half
 
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	pf_stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
 	stacks << pf_stack_phys
-	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
+	pf_stack := u64(pf_stack_phys) + sched.stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		cs: user_code_seg
@@ -373,7 +382,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 		kernel_stack: kernel_stack
 		pf_stack: pf_stack
 		stacks: stacks
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
+			higher_half)
 	}
 
 	thread.self = voidptr(thread)
@@ -381,15 +391,13 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 	thread.kernel_gs_base = u64(voidptr(thread))
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
-
 	fpu_restore(thread.fpu_storage)
 
 	default_fcw := u16(0b1100111111)
 
 	asm volatile amd64 {
 		fldcw default_fcw
-		;
-		; m (default_fcw)
+		; ; m (default_fcw)
 		; memory
 	}
 
@@ -397,8 +405,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 
 	asm volatile amd64 {
 		ldmxcsr default_mxcsr
-		;
-		; m (default_mxcsr)
+		; ; m (default_mxcsr)
 		; memory
 	}
 
@@ -482,20 +489,18 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool,
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
-	mut new_process := &proc.Process{pagemap: 0}
-
-	new_process.pid = proc.allocate_pid(new_process) or {
-		return none
+	mut new_process := &proc.Process{
+		pagemap: 0
 	}
+
+	new_process.pid = proc.allocate_pid(new_process) or { return none }
 
 	new_process.threads = []&proc.Thread{}
 	new_process.children = []&proc.Process{}
 
 	if old_process != 0 {
 		new_process.ppid = old_process.pid
-		new_process.pagemap = mmap.fork_pagemap(old_process.pagemap) or {
-			return none
-		}
+		new_process.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_process.thread_stack_top = old_process.thread_stack_top
 		new_process.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_process.current_directory = old_process.current_directory
@@ -511,7 +516,9 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 }
 
 pub fn await() {
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 	mut cpu_local := cpulocal.current()
 	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, 20000)
 	asm volatile amd64 {
@@ -519,8 +526,6 @@ pub fn await() {
 		1:
 		hlt
 		jmp b1
-		;
-		;
-		; memory
+		; ; ; memory
 	}
 }

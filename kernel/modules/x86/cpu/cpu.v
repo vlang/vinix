@@ -1,6 +1,6 @@
 module cpu
 
-import msr
+import x86.msr
 
 pub fn interrupt_state() bool {
 	mut f := u64(0)
@@ -15,9 +15,15 @@ pub fn interrupt_state() bool {
 pub fn interrupt_toggle(state bool) bool {
 	ret := interrupt_state()
 	if state == false {
-		asm volatile amd64 { cli ;;; memory }
+		asm volatile amd64 {
+			cli
+			; ; ; memory
+		}
 	} else {
-		asm volatile amd64 { sti ;;; memory }
+		asm volatile amd64 {
+			sti
+			; ; ; memory
+		}
 	}
 	return ret
 }
@@ -71,8 +77,7 @@ pub fn read_cr0() u64 {
 	asm volatile amd64 {
 		mov ret, cr0
 		; =r (ret)
-		;
-		; memory
+		; ; memory
 	}
 	return ret
 }
@@ -80,8 +85,7 @@ pub fn read_cr0() u64 {
 pub fn write_cr0(value u64) {
 	asm volatile amd64 {
 		mov cr0, value
-		;
-		; r (value)
+		; ; r (value)
 		; memory
 	}
 }
@@ -91,8 +95,7 @@ pub fn read_cr2() u64 {
 	asm volatile amd64 {
 		mov ret, cr2
 		; =r (ret)
-		;
-		; memory
+		; ; memory
 	}
 	return ret
 }
@@ -100,8 +103,7 @@ pub fn read_cr2() u64 {
 pub fn write_cr2(value u64) {
 	asm volatile amd64 {
 		mov cr2, value
-		;
-		; r (value)
+		; ; r (value)
 		; memory
 	}
 }
@@ -111,8 +113,7 @@ pub fn read_cr3() u64 {
 	asm volatile amd64 {
 		mov ret, cr3
 		; =r (ret)
-		;
-		; memory
+		; ; memory
 	}
 	return ret
 }
@@ -120,8 +121,7 @@ pub fn read_cr3() u64 {
 pub fn write_cr3(value u64) {
 	asm volatile amd64 {
 		mov cr3, value
-		;
-		; r (value)
+		; ; r (value)
 		; memory
 	}
 }
@@ -131,8 +131,7 @@ pub fn read_cr4() u64 {
 	asm volatile amd64 {
 		mov ret, cr4
 		; =r (ret)
-		;
-		; memory
+		; ; memory
 	}
 	return ret
 }
@@ -140,8 +139,7 @@ pub fn read_cr4() u64 {
 pub fn write_cr4(value u64) {
 	asm volatile amd64 {
 		mov cr4, value
-		;
-		; r (value)
+		; ; r (value)
 		; memory
 	}
 }
@@ -151,8 +149,7 @@ pub fn wrxcr(reg u32, value u64) {
 	d := u32(value >> 32)
 	asm volatile amd64 {
 		xsetbv
-		;
-		; a (a)
+		; ; a (a)
 		  d (d)
 		  c (reg)
 		; memory
@@ -204,8 +201,7 @@ pub fn rdseed32() u32 {
 fn xsave(region voidptr) {
 	asm volatile amd64 {
 		xsave [region]
-		;
-		; r (region)
+		; ; r (region)
 		  a (0xffffffff)
 		  d (0xffffffff)
 		; memory
@@ -215,8 +211,7 @@ fn xsave(region voidptr) {
 fn xrstor(region voidptr) {
 	asm volatile amd64 {
 		xrstor [region]
-		;
-		; r (region)
+		; ; r (region)
 		  a (0xffffffff)
 		  d (0xffffffff)
 		; memory
@@ -226,8 +221,7 @@ fn xrstor(region voidptr) {
 fn fxsave(region voidptr) {
 	asm volatile amd64 {
 		fxsave [region]
-		;
-		; r (region)
+		; ; r (region)
 		; memory
 	}
 }
@@ -235,14 +229,15 @@ fn fxsave(region voidptr) {
 fn fxrstor(region voidptr) {
 	asm volatile amd64 {
 		fxrstor [region]
-		;
-		; r (region)
+		; ; r (region)
 		; memory
 	}
 }
 
 pub const cpuid_xsave = u32(1 << 26)
+
 pub const cpuid_avx = u32(1 << 28)
+
 pub const cpuid_avx512 = u32(1 << 16)
 
 pub fn cpuid(leaf u32, subleaf u32) (bool, u32, u32, u32, u32) {

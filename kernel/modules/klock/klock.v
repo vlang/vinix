@@ -5,7 +5,7 @@ import trace
 
 pub struct Lock {
 pub mut:
-	l bool
+	l      bool
 	caller u64
 }
 
@@ -19,7 +19,10 @@ pub fn (mut l Lock) acquire() {
 			l.caller = caller
 			return
 		}
-		asm volatile amd64 { pause ;;; memory }
+		asm volatile amd64 {
+			pause
+			; ; ; memory
+		}
 	}
 
 	C.printf_panic(c'Lock address:   0x%llx\n', voidptr(l))

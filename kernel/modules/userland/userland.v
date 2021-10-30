@@ -17,55 +17,99 @@ import lib
 pub const wnohang = 2
 
 pub const sig_block = 1
+
 pub const sig_unblock = 2
+
 pub const sig_setmask = 3
 
 pub const sighup = 1
+
 pub const sigint = 2
+
 pub const sigquit = 3
+
 pub const sigill = 4
+
 pub const sigtrap = 5
+
 pub const sigabrt = 6
+
 pub const sigbus = 7
+
 pub const sigfpe = 8
+
 pub const sigkill = 9
+
 pub const sigusr1 = 10
+
 pub const sigsegv = 11
+
 pub const sigusr2 = 12
+
 pub const sigpipe = 13
+
 pub const sigalrm = 14
+
 pub const sigterm = 15
+
 pub const sigstkflt = 16
+
 pub const sigchld = 17
+
 pub const sigcont = 18
+
 pub const sigstop = 19
+
 pub const sigtstp = 20
+
 pub const sigttin = 21
+
 pub const sigttou = 22
+
 pub const sigurg = 23
+
 pub const sigxcpu = 24
+
 pub const sigxfsz = 25
+
 pub const sigvtalrm = 26
+
 pub const sigprof = 27
+
 pub const sigwinch = 28
+
 pub const sigio = 29
+
 pub const sigpoll = sigio
+
 pub const sigpwr = 30
+
 pub const sigsys = 31
+
 pub const sigrtmin = 32
+
 pub const sigrtmax = 33
+
 pub const sigcancel = 34
 
 pub const sig_err = voidptr(-1)
+
 pub const sig_dfl = voidptr(-2)
+
 pub const sig_ign = voidptr(-3)
 
 pub const sa_nocldstop = 1 << 0
+
 pub const sa_onstack = 1 << 1
+
 pub const sa_resethand = 1 << 2
+
 pub const sa_restart = 1 << 3
+
 pub const sa_siginfo = 1 << 4
+
 pub const sa_nocldwait = 1 << 5
+
 pub const sa_nodefer = 1 << 6
 
 union SigVal {
@@ -75,14 +119,14 @@ union SigVal {
 
 pub struct SigInfo {
 pub mut:
-	si_signo int
-	si_code int
-	si_errno int
-	si_pid int
-	si_uid int
-	si_addr voidptr
+	si_signo  int
+	si_code   int
+	si_errno  int
+	si_pid    int
+	si_uid    int
+	si_addr   voidptr
 	si_status int
-	si_value SigVal
+	si_value  SigVal
 }
 
 pub fn syscall_getpid(_ voidptr) (u64, u64) {
@@ -133,7 +177,9 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
 	mut thread := unsafe { proc.current_thread() }
 
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 
 	thread.gpr_state = unsafe { context[0] }
 	thread.masked_signals = old_mask
@@ -144,32 +190,36 @@ pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
 }
 
 pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: sigaction(%d, 0x%llx, 0x%llx)\n',
-			 signum, voidptr(act), voidptr(oldact))
+	C.printf(c'\n\e[32mstrace\e[m: sigaction(%d, 0x%llx, 0x%llx)\n', signum, voidptr(act),
+		voidptr(oldact))
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
+	if signum < 0 || signum > 34 || signum == userland.sigkill || signum == userland.sigstop {
 		return -1, errno.einval
 	}
 
 	mut thread := proc.current_thread()
 
 	if voidptr(oldact) != voidptr(0) {
-		unsafe { oldact[0] = thread.sigactions[signum] }
+		unsafe {
+			oldact[0] = thread.sigactions[signum]
+		}
 	}
 
 	if voidptr(act) != voidptr(0) {
-		unsafe { thread.sigactions[signum] = act[0] }
+		unsafe {
+			thread.sigactions[signum] = act[0]
+		}
 	}
 
 	return 0, 0
 }
 
 pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n',
-			 how, voidptr(set), voidptr(oldset))
+	C.printf(c'\n\e[32mstrace\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n', how, voidptr(set),
+		voidptr(oldset))
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -177,18 +227,20 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 	mut thread := proc.current_thread()
 
 	if voidptr(oldset) != voidptr(0) {
-		unsafe { oldset[0] = thread.masked_signals }
+		unsafe {
+			oldset[0] = thread.masked_signals
+		}
 	}
 
 	if voidptr(set) != voidptr(0) {
 		match how {
-			sig_block {
+			userland.sig_block {
 				thread.masked_signals |= unsafe { set[0] }
 			}
-			sig_unblock {
+			userland.sig_unblock {
 				thread.masked_signals &= ~(unsafe { set[0] })
 			}
-			sig_setmask {
+			userland.sig_setmask {
 				thread.masked_signals = unsafe { set[0] }
 			}
 			else {}
@@ -228,7 +280,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	previous_mask := thread.masked_signals
 
 	thread.masked_signals |= sigaction.sa_mask
-	if sigaction.sa_flags & sa_nodefer == 0 {
+	if sigaction.sa_flags & userland.sa_nodefer == 0 {
 		thread.masked_signals |= u64(1) << which
 	}
 
@@ -245,7 +297,6 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		return_context[0] = context[0]
 		thread.gpr_state = context[0]
 	}
-
 	// Siginfo
 	thread.gpr_state.rsp -= sizeof(SigInfo)
 	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
@@ -264,7 +315,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	thread.gpr_state.rsi = u64(siginfo)
 	thread.gpr_state.rdx = sigaction.sa_sigaction
 	thread.gpr_state.rcx = u64(return_context)
-	thread.gpr_state.r8  = previous_mask
+	thread.gpr_state.r8 = previous_mask
 
 	sched.yield(false)
 }
@@ -301,7 +352,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 
 	path := unsafe { cstring_to_vstring(_path) }
 	mut argv := []string{}
-	for i := 0; ; i++ {
+	for i := 0; true; i++ {
 		unsafe {
 			if voidptr(_argv[i]) == voidptr(0) {
 				break
@@ -310,7 +361,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		}
 	}
 	mut envp := []string{}
-	for i := 0; ; i++ {
+	for i := 0; true; i++ {
 		unsafe {
 			if voidptr(_envp[i]) == voidptr(0) {
 				break
@@ -319,10 +370,8 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		}
 	}
 
-	start_program(true, proc.current_thread().process.current_directory, path,
-				  argv, envp, '', '', '') or {
-		return -1, errno.get()
-	}
+	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
+		'', '', '') or { return -1, errno.get() }
 
 	return -1, errno.get()
 }
@@ -361,17 +410,16 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 		events << &child.event
 	}
 
-	block := options & wnohang == 0
-	which := event.await(mut events, block) or {
-		return -1, errno.eintr
-	}
+	block := options & userland.wnohang == 0
+	which := event.await(mut events, block) or { return -1, errno.eintr }
 
 	if voidptr(child) == voidptr(0) {
 		child = current_process.children[which]
 	}
 
-	unsafe { status[0] = child.status }
-
+	unsafe {
+		status[0] = child.status
+	}
 	ret := child.pid
 
 	proc.free_pid(ret)
@@ -429,9 +477,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
-	mut new_process := sched.new_process(old_process, voidptr(0)) or {
-		return -1, errno.get()
-	}
+	mut new_process := sched.new_process(old_process, voidptr(0)) or { return -1, errno.get() }
 
 	// Dup all FDs
 	for i := 0; i < proc.max_fds; i++ {
@@ -439,9 +485,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 			continue
 		}
 
-		file.fdnum_dup(old_process, i, new_process, i, 0, true) or {
-			panic('')
-		}
+		file.fdnum_dup(old_process, i, new_process, i, 0, true) or { panic('') }
 	}
 
 	stack_size := u64(0x200000)
@@ -489,9 +533,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return u64(new_process.pid), u64(0)
 }
 
-pub fn start_program(execve bool, dir &fs.VFSNode, path string,
-					 argv []string, envp []string,
-					 stdin string, stdout string, stderr string) ?&proc.Process {
+pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
 	prog_node := fs.get_node(dir, path, true) ?
 	prog := prog_node.resource
 
@@ -516,29 +558,40 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
 
 		stdin_node := fs.get_node(vfs_root, stdin, true) ?
-		stdin_handle := &file.Handle{resource: stdin_node.resource
-									 node: stdin_node
-									 refcount: 1}
-		stdin_fd := &file.FD{handle: stdin_handle}
+		stdin_handle := &file.Handle{
+			resource: stdin_node.resource
+			node: stdin_node
+			refcount: 1
+		}
+		stdin_fd := &file.FD{
+			handle: stdin_handle
+		}
 		new_process.fds[0] = voidptr(stdin_fd)
 
 		stdout_node := fs.get_node(vfs_root, stdout, true) ?
-		stdout_handle := &file.Handle{resource: stdout_node.resource
-									  node: stdout_node
-									  refcount: 1}
-		stdout_fd := &file.FD{handle: stdout_handle}
+		stdout_handle := &file.Handle{
+			resource: stdout_node.resource
+			node: stdout_node
+			refcount: 1
+		}
+		stdout_fd := &file.FD{
+			handle: stdout_handle
+		}
 		new_process.fds[1] = voidptr(stdout_fd)
 
 		stderr_node := fs.get_node(vfs_root, stderr, true) ?
-		stderr_handle := &file.Handle{resource: stderr_node.resource
-									  node: stderr_node
-									  refcount: 1}
-		stderr_fd := &file.FD{handle: stderr_handle}
+		stderr_handle := &file.Handle{
+			resource: stderr_node.resource
+			node: stderr_node
+			refcount: 1
+		}
+		stderr_fd := &file.FD{
+			handle: stderr_handle
+		}
 		new_process.fds[2] = voidptr(stderr_fd)
 
-		sched.new_user_thread(new_process, true,
-							  entry_point, voidptr(0),
-							  argv, envp, auxval, true) ?
+		sched.new_user_thread(new_process, true, entry_point, voidptr(0), argv, envp,
+			auxval, true) ?
 
 		return new_process
 	} else {
@@ -558,11 +611,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 		process.mmap_anon_non_fixed_base = u64(0x80000000000)
 
 		// TODO: Kill old threads
-		//old_threads := process.threads
+		// old_threads := process.threads
 		process.threads = []&proc.Thread{}
 
-		sched.new_user_thread(process, true, entry_point, voidptr(0),
-							  argv, envp, auxval, true) ?
+		sched.new_user_thread(process, true, entry_point, voidptr(0), argv, envp, auxval,
+			true) ?
 
 		unsafe {
 			for s in argv {
@@ -575,7 +628,6 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string,
 			}
 			envp.free()
 		}
-
 		sched.dequeue_and_die()
 	}
 }

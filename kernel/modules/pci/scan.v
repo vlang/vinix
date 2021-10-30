@@ -5,22 +5,24 @@ __global (
 )
 
 const max_function = 8
+
 const max_device = 32
+
 const max_bus = 256
 
 pub fn initialise() {
 	print('pci: Building device scan\n')
 	mut root_bus := PCIDevice{}
-	configc  := root_bus.read<u32>(0xc)
+	configc := root_bus.read<u32>(0xc)
 
 	if (configc & 0x800000) == 0 {
 		check_bus(0, -1)
 	} else {
-		for function := byte(0); function < max_function; function++ {
+		for function := byte(0); function < pci.max_function; function++ {
 			host_bridge := PCIDevice{
-				bus: 0,
-				slot: 0,
-				function: function,
+				bus: 0
+				slot: 0
+				function: function
 				parent: 0
 			}
 			config0 := host_bridge.read<u32>(0)
@@ -34,8 +36,8 @@ pub fn initialise() {
 }
 
 fn check_bus(bus byte, parent i64) {
-	for dev := byte(0); dev < max_device; dev++ {
-		for func := byte(0); func < max_function; func++ {
+	for dev := byte(0); dev < pci.max_device; dev++ {
+		for func := byte(0); func < pci.max_function; func++ {
 			check_function(bus, dev, func, parent)
 		}
 	}
@@ -43,9 +45,9 @@ fn check_bus(bus byte, parent i64) {
 
 fn check_function(bus byte, slot byte, function byte, parent i64) {
 	mut device := &PCIDevice{
-		bus: bus,
-		slot: slot,
-		function: function,
+		bus: bus
+		slot: slot
+		function: function
 		parent: parent
 	}
 	device.read_info()
@@ -65,7 +67,7 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 		if (status & (1 << 4)) != 0 { // parse capabilities list
 			mut off := device.read<byte>(0x34)
 
-			for off > 0 { 
+			for off > 0 {
 				id := device.read<byte>(off)
 
 				match id {
@@ -82,9 +84,7 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 						device.msix_table_size = message_control & 0x7FF
 						device.msix_table_bitmap.initialise(device.msix_table_size)
 					}
-					else {
-						
-					}
+					else {}
 				}
 
 				off = device.read<byte>(off + 1)
@@ -112,9 +112,7 @@ pub fn get_device_by_vendor(vendor_id u16, device_id u16, index u32) ?&PCIDevice
 pub fn get_device_by_coordinates(bus byte, slot byte, function byte, index u32) ?&PCIDevice {
 	mut count := 0
 	for device in scanned_devices {
-		if device.bus == bus
-		&& device.slot == slot
-		&& device.function == function {
+		if device.bus == bus && device.slot == slot && device.function == function {
 			if count == index {
 				return unsafe { device }
 			} else {
@@ -128,9 +126,7 @@ pub fn get_device_by_coordinates(bus byte, slot byte, function byte, index u32) 
 pub fn get_device_by_class(class byte, subclass byte, progif byte, index u32) ?&PCIDevice {
 	mut count := 0
 	for device in scanned_devices {
-		if device.class == class
-		&& device.subclass == subclass
-		&& device.prog_if == progif {
+		if device.class == class && device.subclass == subclass && device.prog_if == progif {
 			if count == index {
 				return unsafe { device }
 			} else {

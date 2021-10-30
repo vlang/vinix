@@ -10,13 +10,19 @@ import errno
 pub const at_fdcwd = -100
 
 pub const at_empty_path = 1
+
 pub const at_symlink_follow = 2
+
 pub const at_symlink_nofollow = 4
+
 pub const at_removedir = 8
+
 pub const at_eaccess = 512
 
 pub const seek_cur = 1
+
 pub const seek_end = 2
+
 pub const seek_set = 3
 
 interface FileSystem {
@@ -41,21 +47,21 @@ pub mut:
 }
 
 __global (
-	vfs_lock klock.Lock
-	vfs_root &VFSNode
+	vfs_lock    klock.Lock
+	vfs_root    &VFSNode
 	filesystems map[string]&FileSystem
 )
 
 fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
 	mut node := &VFSNode{
-				name: name
-				parent: unsafe { parent }
-				mountpoint: voidptr(0)
-				redir: voidptr(0)
-				children: voidptr(0)
-				resource: &resource.Resource(voidptr(0))
-				filesystem: unsafe { filesystem }
-			}
+		name: name
+		parent: unsafe { parent }
+		mountpoint: voidptr(0)
+		redir: voidptr(0)
+		children: voidptr(0)
+		resource: &resource.Resource(voidptr(0))
+		filesystem: unsafe { filesystem }
+	}
 	if dir {
 		node.children = &map[string]&VFSNode{}
 	}
@@ -172,12 +178,10 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	if is_absolute == true {
 		parent = vfs_root
 	} else {
-		if dirfd == at_fdcwd {
+		if dirfd == fs.at_fdcwd {
 			parent = &VFSNode(current_process.current_directory)
 		} else {
-			dir_fd := file.fd_from_fdnum(current_process, dirfd) or {
-				return none
-			}
+			dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
 			dir_handle := dir_fd.handle
 			if stat.isdir(dir_handle.resource.stat.mode) == false {
 				errno.set(errno.enotdir)
@@ -202,7 +206,8 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 }
 
 pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: mount(%s, %s, %s, 0x%x, %x)\n', src, tgt, fs_type, mountflags, data)
+	C.printf(c'\n\e[32mstrace\e[m: mount(%s, %s, %s, 0x%x, %x)\n', src, tgt, fs_type,
+		mountflags, data)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -213,9 +218,7 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 
 	// TODO: Not ignore mountflags and data once the current system supports it.
 	curr_dir := proc.current_thread().process.current_directory
-	mount(curr_dir, source, target, fstype) or {
-		return -1, errno.get()
-	}
+	mount(curr_dir, source, target, fstype) or { return -1, errno.get() }
 
 	return 0, 0
 }
@@ -227,7 +230,6 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 	}
 
 	// TODO: Implement this once the FS supports it.
-
 	return -1, errno.enosys
 }
 
@@ -239,8 +241,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 	mut source_node := &VFSNode(0)
 	if source.len != 0 {
 		_, source_node, _ = path2node(parent, source)
-		if voidptr(source_node) == voidptr(0)
-		|| stat.isdir(source_node.resource.stat.mode) {
+		if voidptr(source_node) == voidptr(0) || stat.isdir(source_node.resource.stat.mode) {
 			return error('')
 		}
 	}
@@ -249,8 +250,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 
 	mounting_root := voidptr(target_node) == voidptr(vfs_root)
 
-	if target_node == voidptr(0)
-	|| (!mounting_root && !stat.isdir(target_node.resource.stat.mode)) {
+	if target_node == voidptr(0) || (!mounting_root && !stat.isdir(target_node.resource.stat.mode)) {
 		return error('')
 	}
 
@@ -263,9 +263,9 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 	mount_node.create_dotentries(parent_of_tgt_node)
 
 	if source.len > 0 {
-		print('vfs: Mounted `${source}` to `${target}` with filesystem `${filesystem}`\n')
+		print('vfs: Mounted `$source` to `$target` with filesystem `$filesystem`\n')
 	} else {
-		print('vfs: Mounted ${filesystem} to `${target}`\n')
+		print('vfs: Mounted $filesystem to `$target`\n')
 	}
 }
 
@@ -316,8 +316,9 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 
-	unsafe { parent_of_tgt_node.children[basename] = target_node }
-
+	unsafe {
+		parent_of_tgt_node.children[basename] = target_node
+	}
 	return target_node
 }
 
@@ -358,15 +359,16 @@ pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	}
 
 	if stat.issock(mode) {
-		target_node = create_node(parent_of_tgt_node.filesystem, parent_of_tgt_node,
-								  name, false)
+		target_node = create_node(parent_of_tgt_node.filesystem, parent_of_tgt_node, name,
+			false)
 		return target_node
 	}
 
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 
-	unsafe { parent_of_tgt_node.children[basename] = target_node }
-
+	unsafe {
+		parent_of_tgt_node.children[basename] = target_node
+	}
 	if stat.isdir(target_node.resource.stat.mode) {
 		target_node.create_dotentries(parent_of_tgt_node)
 	}
@@ -374,11 +376,9 @@ pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	return target_node
 }
 
-fn fdnum_create_from_node(mut node &VFSNode, flags int, oldfd int, specific bool) ?int {
+fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool) ?int {
 	current_process := proc.current_thread().process
-	mut fd := file.fd_create_from_resource(mut node.resource, flags) or {
-		return none
-	}
+	mut fd := file.fd_create_from_resource(mut node.resource, flags) or { return none }
 	fd.handle.node = voidptr(node)
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific)
 }
@@ -395,15 +395,11 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 		return -1, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
-	}
+	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
 
-	remove_dir := flags & at_removedir != 0
+	remove_dir := flags & fs.at_removedir != 0
 
-	unlink(parent, path, remove_dir) or {
-		return -1, errno.get()
-	}
+	unlink(parent, path, remove_dir) or { return -1, errno.get() }
 
 	return 0, 0
 }
@@ -420,9 +416,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64)
 		return -1, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
-	}
+	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
 
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, path)
 
@@ -434,15 +428,14 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64)
 		return -1, errno.eexist
 	}
 
-	internal_create(parent_of_tgt_node, basename, mode | stat.ifdir) or {
-		return -1, errno.get()
-	}
+	internal_create(parent_of_tgt_node, basename, mode | stat.ifdir) or { return -1, errno.get() }
 
 	return 0, 0
 }
 
 pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limit u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: readlinkat(%d, %s, 0x%llx, 0x%llx)\n', dirfd, _path, buf, limit)
+	C.printf(c'\n\e[32mstrace\e[m: readlinkat(%d, %s, 0x%llx, 0x%llx)\n', dirfd, _path,
+		buf, limit)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -453,13 +446,9 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		return -1, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
-	}
+	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
 
-	node := get_node(parent, path, false) or {
-		return -1, errno.get()
-	}
+	node := get_node(parent, path, false) or { return -1, errno.get() }
 
 	if stat.islnk(node.resource.stat.mode) == false {
 		return -1, errno.einval
@@ -476,7 +465,8 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 }
 
 pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags, mode)
+	C.printf(c'\n\e[32mstrace\e[m: openat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, flags,
+		mode)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -487,9 +477,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return -1, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
-	}
+	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
 
 	creat_flags := flags & resource.file_creation_flags_mask
 	follow_links := flags & resource.o_nofollow == 0
@@ -526,9 +514,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return -1, errno.enotdir
 	}
 
-	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or {
-		return -1, errno.get()
-	}
+	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or { return -1, errno.get() }
 
 	return u64(fdnum), 0
 }
@@ -539,15 +525,11 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.read(buf, count) or {
-		return -1, errno.get()
-	}
+	ret := fd.handle.read(buf, count) or { return -1, errno.get() }
 	return u64(ret), 0
 }
 
@@ -557,15 +539,11 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.write(buf, count) or {
-		return -1, errno.get()
-	}
+	ret := fd.handle.write(buf, count) or { return -1, errno.get() }
 	return u64(ret), 0
 }
 
@@ -575,9 +553,7 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	file.fdnum_close(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	file.fdnum_close(voidptr(0), fdnum) or { return -1, errno.get() }
 	return 0, 0
 }
 
@@ -587,15 +563,11 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
-	ret := fd.handle.ioctl(request, argp) or {
-		return -1, errno.get()
-	}
+	ret := fd.handle.ioctl(request, argp) or { return -1, errno.get() }
 	return u64(ret), 0
 }
 
@@ -616,8 +588,8 @@ pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
 }
 
 pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: faccessat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path,
-			 mode, flags)
+	C.printf(c'\n\e[32mstrace\e[m: faccessat(%d, %s, 0x%x, 0x%x)\n', dirfd, _path, mode,
+		flags)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -628,23 +600,18 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags in
 		return -1, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
-	}
+	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
 
-	follow_links := flags & at_symlink_nofollow == 0
+	follow_links := flags & fs.at_symlink_nofollow == 0
 
-	get_node(parent, path, follow_links) or {
-		return -1, errno.get()
-	}
+	get_node(parent, path, follow_links) or { return -1, errno.get() }
 
 	return 0, 0
 }
 
-pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
-					   flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', dirfd, _path,
-			 statbuf, flags)
+pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', dirfd, _path, statbuf,
+		flags)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -655,18 +622,15 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat,
 		return -1, errno.enoent
 	}
 
-	parent := get_parent_dir(dirfd, path) or {
-		return -1, errno.get()
+	parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
+
+	follow_links := flags & fs.at_symlink_nofollow == 0
+
+	node := get_node(parent, path, follow_links) or { return -1, errno.get() }
+
+	unsafe {
+		statbuf[0] = node.resource.stat
 	}
-
-	follow_links := flags & at_symlink_nofollow == 0
-
-	node := get_node(parent, path, follow_links) or {
-		return -1, errno.get()
-	}
-
-	unsafe { statbuf[0] = node.resource.stat }
-
 	return 0, 0
 }
 
@@ -676,15 +640,14 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
 
-	unsafe { statbuf[0] = fd.handle.resource.stat }
-
+	unsafe {
+		statbuf[0] = fd.handle.resource.stat
+	}
 	return 0, 0
 }
 
@@ -702,9 +665,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 
 	mut process := proc.current_thread().process
 
-	mut node := get_node(process.current_directory, path, true) or {
-		return -1, errno.get()
-	}
+	mut node := get_node(process.current_directory, path, true) or { return -1, errno.get() }
 
 	if !stat.isdir(node.resource.stat.mode) {
 		return -1, errno.enotdir
@@ -725,9 +686,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 
 	mut buf := unsafe { _buf }
 
-	mut dir_fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut dir_fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		dir_fd.unref()
 	}
@@ -789,7 +748,9 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 		return -1, 0
 	}
 
-	unsafe { buf[0] = dir_handle.dirlist[dir_handle.dirlist_index] }
+	unsafe {
+		buf[0] = dir_handle.dirlist[dir_handle.dirlist_index]
+	}
 	dir_handle.dirlist_index++
 
 	return 0, 0
@@ -801,9 +762,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
@@ -824,13 +783,13 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 
 	mut base := i64(0)
 	match whence {
-		seek_set {
+		fs.seek_set {
 			base = offset
 		}
-		seek_cur {
+		fs.seek_cur {
 			base = handle.loc + offset
 		}
-		seek_end {
+		fs.seek_end {
 			base = i64(handle.resource.stat.size) + offset
 		}
 		else {
@@ -843,9 +802,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	}
 
 	if base > handle.resource.stat.size {
-		handle.resource.grow(voidptr(handle), u64(base)) or {
-			return -1, errno.einval
-		}
+		handle.resource.grow(voidptr(handle), u64(base)) or { return -1, errno.einval }
 	}
 
 	handle.loc = base

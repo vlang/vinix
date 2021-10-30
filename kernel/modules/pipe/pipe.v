@@ -10,7 +10,6 @@ import file
 import katomic
 
 // A pipe is a circular buffer
-
 pub const pipe_buf = 4096
 
 pub struct Pipe {
@@ -33,8 +32,8 @@ pub fn initialise() {}
 
 pub fn create() ?&Pipe {
 	mut pipe := &Pipe{
-		data: unsafe { C.malloc(pipe_buf) }
-		capacity: pipe_buf
+		data: unsafe { C.malloc(pipe.pipe_buf) }
+		capacity: pipe.pipe_buf
 	}
 	pipe.stat.mode = stat.ifpipe
 
@@ -47,9 +46,7 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut new_pipe := create() or {
-		return -1, errno.get()
-	}
+	mut new_pipe := create() or { return -1, errno.get() }
 
 	rd_fd := file.fdnum_create_from_resource(voidptr(0), mut new_pipe, flags, 0, false) or {
 		return -1, errno.get()
@@ -63,7 +60,6 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 		pipefds[0] = rd_fd
 		pipefds[1] = wr_fd
 	}
-
 	return 0, 0
 }
 

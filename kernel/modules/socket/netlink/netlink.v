@@ -7,15 +7,19 @@ import errno
 import socket.public as sock_pub
 
 pub const netlink_route = 0
+
 pub const netlink_usersock = 2
+
 pub const netlink_firewall = 3
+
 pub const netlink_ip6_fw = 13
+
 pub const netlink_kobject_uevent = 15
 
 struct SockaddrNL {
 	nl_family u32
-	nl_pad u16
-	nl_pid u32
+	nl_pad    u16
+	nl_pid    u32
 	nl_groups u32
 }
 
@@ -28,9 +32,9 @@ mut:
 	can_mmap bool
 	event    eventstruct.Event
 
-	name SockaddrNL
+	name      SockaddrNL
 	listening bool
-	backlog []&NetlinkSocket
+	backlog   []&NetlinkSocket
 }
 
 fn (mut this NetlinkSocket) mmap(page u64, flags int) voidptr {
@@ -74,5 +78,7 @@ fn (mut this NetlinkSocket) listen(handle voidptr, backlog int) ? {
 }
 
 pub fn create(@type int, protocol int) ?&NetlinkSocket {
-	return &NetlinkSocket{refcount: 1}
+	return &NetlinkSocket{
+		refcount: 1
+	}
 }

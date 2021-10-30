@@ -3,8 +3,8 @@ module smp
 import stivale2
 import memory
 import katomic
-import cpu.local as cpulocal
-import cpu.initialisation as cpuinit
+import x86.cpu.local as cpulocal
+import x86.cpu.initialisation as cpuinit
 
 __global (
 	bsp_lapic_id = u32(0)
@@ -12,7 +12,7 @@ __global (
 
 pub fn initialise(smp_tag &stivale2.SMPTag) {
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
-	println('smp: Total CPU count: ${smp_tag.cpu_count}')
+	println('smp: Total CPU count: $smp_tag.cpu_count')
 
 	smp_info_array := unsafe { &stivale2.SMPInfo(&smp_tag.smp_info) }
 

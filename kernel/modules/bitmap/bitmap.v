@@ -6,7 +6,7 @@ import lib
 struct GenericBitmap {
 mut:
 	raw_bitmap voidptr
-	entry_cnt u64
+	entry_cnt  u64
 }
 
 pub fn (mut bitmap GenericBitmap) initialise(entry_cnt u64) {
@@ -25,7 +25,7 @@ pub fn (bitmap GenericBitmap) alloc() ?u64 {
 }
 
 pub fn (bitmap GenericBitmap) free_entry(index u64) {
-	if index < bitmap.entry_cnt { 
+	if index < bitmap.entry_cnt {
 		lib.bitreset(bitmap.raw_bitmap, index)
 	}
 }

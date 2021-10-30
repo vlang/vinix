@@ -11,7 +11,6 @@ import errno
 // ***************
 // ** /dev/null **
 // ***************
-
 struct DevNull {
 mut:
 	stat     stat.Stat
@@ -68,7 +67,6 @@ fn init_null() {
 // ***************
 // ** /dev/zero **
 // ***************
-
 struct DevZero {
 mut:
 	stat     stat.Stat
@@ -128,7 +126,6 @@ fn init_zero() {
 // ***************
 // ** /dev/full **
 // ***************
-
 struct DevFull {
 mut:
 	stat     stat.Stat

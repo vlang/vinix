@@ -8,25 +8,41 @@ import event.eventstruct
 import errno
 
 pub const epollin = 0x001
+
 pub const epollpri = 0x002
+
 pub const epollout = 0x004
+
 pub const epollrdnorm = 0x040
+
 pub const epollrdband = 0x080
+
 pub const epollwrnorm = 0x100
+
 pub const epollwrband = 0x200
+
 pub const epollmsg = 0x400
+
 pub const epollerr = 0x008
+
 pub const epollhup = 0x010
+
 pub const epollrdhup = 0x2000
+
 pub const epollexclusive = u32(1) << 28
+
 pub const epollwakeup = u32(1) << 29
+
 pub const epolloneshot = u32(1) << 30
+
 pub const epollet = u32(1) << 31
 
 pub const epoll_cloexec = 1
 
 pub const epoll_ctl_add = 1
+
 pub const epoll_ctl_del = 2
+
 pub const epoll_ctl_mod = 3
 
 union EPollData {
@@ -38,7 +54,7 @@ union EPollData {
 
 struct EPollEvent {
 	events u32
-	data EPollData
+	data   EPollData
 }
 
 struct EPoll {
@@ -86,14 +102,13 @@ fn (mut this EPoll) listen(handle voidptr, backlog int) ? {
 }
 
 pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPollEvent) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', epfdnum, op, fdnum, voidptr(event))
+	C.printf(c'\n\e[32mstrace\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', epfdnum, op, fdnum,
+		voidptr(event))
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut epoll_fd := file.fd_from_fdnum(voidptr(0), epfdnum) or {
-		return -1, errno.get()
-	}
+	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return -1, errno.get() }
 	defer {
 		epoll_fd.unref()
 	}
@@ -109,25 +124,29 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 	}
 
 	match op {
-		epoll_ctl_add {
+		file.epoll_ctl_add {
 			if fdnum in epoll.table {
 				return -1, errno.eexist
 			}
 
 			mut event_copy := &EPollEvent{}
-			unsafe { *event_copy = *event }
+			unsafe {
+				*event_copy = *event
+			}
 			epoll.table[fdnum] = event_copy
 		}
-		epoll_ctl_mod {
+		file.epoll_ctl_mod {
 			if fdnum !in epoll.table {
 				return -1, errno.enoent
 			}
 
 			mut event_copy := &EPollEvent{}
-			unsafe { *event_copy = *event }
+			unsafe {
+				*event_copy = *event
+			}
 			epoll.table[fdnum] = event_copy
 		}
-		epoll_ctl_del {
+		file.epoll_ctl_del {
 			if fdnum !in epoll.table {
 				return -1, errno.enoent
 			}
@@ -148,17 +167,13 @@ pub fn syscall_epoll_create(_ voidptr, flags int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	cloexec := if flags & epoll_cloexec != 0 {
-		resource.o_cloexec
-	} else {
-		0
-	}
+	cloexec := if flags & file.epoll_cloexec != 0 { resource.o_cloexec } else { 0 }
 
 	mut e := &EPoll{
 		refcount: 1
 	}
 
-	epoll_fdnum := file.fdnum_create_from_resource(voidptr(0), mut e, cloexec, 0, false) or {
+	epoll_fdnum := fdnum_create_from_resource(voidptr(0), mut e, cloexec, 0, false) or {
 		return -1, errno.get()
 	}
 

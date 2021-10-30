@@ -14,26 +14,36 @@ pub mut:
 }
 
 pub const at_entry = 10
-pub const at_phdr  = 20
+
+pub const at_phdr = 20
+
 pub const at_phent = 21
+
 pub const at_phnum = 22
 
-pub const pt_load   = 0x00000001
+pub const pt_load = 0x00000001
+
 pub const pt_interp = 0x00000003
-pub const pt_phdr   = 0x00000006
 
-pub const abi_sysv    = 0x00
+pub const pt_phdr = 0x00000006
+
+pub const abi_sysv = 0x00
+
 pub const arch_x86_64 = 0x3e
-pub const bits_le     = 0x01
 
-pub const ei_class   = 4
-pub const ei_data    = 5
+pub const bits_le = 0x01
+
+pub const ei_class = 4
+
+pub const ei_data = 5
+
 pub const ei_version = 6
-pub const ei_osabi   = 7
+
+pub const ei_osabi = 7
 
 pub struct Header {
 pub mut:
-	ident [16]byte
+	ident     [16]byte
 	@type     u16
 	machine   u16
 	version   u32
@@ -50,7 +60,9 @@ pub mut:
 }
 
 pub const pf_x = 1
+
 pub const pf_w = 2
+
 pub const pf_r = 4
 
 pub struct ProgramHdr {
@@ -91,17 +103,17 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 		return error('elf: Invalid magic')
 	}
 
-	if header.ident[ei_class] != 0x02
-	|| header.ident[ei_data]  != bits_le
-	|| header.ident[ei_osabi] != abi_sysv
-	|| header.machine != arch_x86_64 {
+	if header.ident[elf.ei_class] != 0x02 || header.ident[elf.ei_data] != elf.bits_le
+		|| header.ident[elf.ei_osabi] != elf.abi_sysv || header.machine != elf.arch_x86_64 {
 		return error('elf: Unsupported ELF file')
 	}
 
-	mut auxval := Auxval{at_entry: base + header.entry,
-						 at_phdr: 0,
-						 at_phent: sizeof(ProgramHdr),
-						 at_phnum: header.ph_num}
+	mut auxval := Auxval{
+		at_entry: base + header.entry
+		at_phdr: 0
+		at_phent: sizeof(ProgramHdr)
+		at_phnum: header.ph_num
+	}
 
 	mut ld_path := ''
 
@@ -111,18 +123,18 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 		res.read(0, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) ?
 
 		match phdr.p_type {
-			pt_interp {
+			elf.pt_interp {
 				mut p := memory.malloc(phdr.p_filesz + 1)
 				res.read(0, p, phdr.p_offset, phdr.p_filesz) ?
 				ld_path = unsafe { cstring_to_vstring(p) }
 			}
-			pt_phdr {
+			elf.pt_phdr {
 				auxval.at_phdr = base + phdr.p_vaddr
 			}
 			else {}
 		}
 
-		if phdr.p_type != pt_load {
+		if phdr.p_type != elf.pt_load {
 			continue
 		}
 
@@ -134,14 +146,16 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) ?(Auxva
 			return error('elf: Allocation failure')
 		}
 
-		pf := mmap.prot_read | mmap.prot_exec
-		| if phdr.p_flags & pf_w != 0 { mmap.prot_write } else { 0 }
+		pf := mmap.prot_read | mmap.prot_exec | if phdr.p_flags & elf.pf_w != 0 {
+			mmap.prot_write
+		} else {
+			0
+		}
 
 		virt := base + phdr.p_vaddr
 		phys := u64(addr)
 
-		mmap.map_range(pagemap, virt, phys, page_count * page_size, pf,
-					   mmap.map_anonymous) or {
+		mmap.map_range(pagemap, virt, phys, page_count * page_size, pf, mmap.map_anonymous) or {
 			return none
 		}
 

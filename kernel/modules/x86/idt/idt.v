@@ -21,10 +21,10 @@ pub mut:
 }
 
 __global (
-	idt_pointer IDTPointer
-	idt_entries [256]IDTEntry
+	idt_pointer     IDTPointer
+	idt_entries     [256]IDTEntry
 	idt_free_vector = byte(32)
-	idt_lock klock.Lock
+	idt_lock        klock.Lock
 )
 
 pub fn allocate_vector() byte {
@@ -39,7 +39,7 @@ pub fn allocate_vector() byte {
 
 __global (
 	interrupt_thunks [256]voidptr
-	interrupt_table [256]voidptr
+	interrupt_table  [256]voidptr
 )
 
 #include <symbols.h>
@@ -73,7 +73,6 @@ fn prepare_interrupt_thunks() {
 				14 { 2 }
 				17 { 2 }
 				30 { 2 }
-
 				else { 0 }
 			}
 
@@ -96,8 +95,7 @@ pub fn reload() {
 
 	asm volatile amd64 {
 		lidt ptr
-		;
-		; m (idt_pointer) as ptr
+		; ; m (idt_pointer) as ptr
 		; memory
 	}
 }

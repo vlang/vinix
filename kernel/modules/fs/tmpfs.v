@@ -37,8 +37,8 @@ fn (mut this TmpFSResource) mmap(page u64, flags int) voidptr {
 	copy_page := memory.pmm_alloc(1)
 
 	unsafe {
-		C.memcpy(voidptr(u64(copy_page) + higher_half),
-				 &this.storage[page * page_size], page_size)
+		C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[page * page_size],
+			page_size)
 	}
 
 	return copy_page
@@ -139,7 +139,7 @@ fn (mut this TmpFSResource) listen(handle voidptr, backlog int) ? {
 
 struct TmpFS {
 pub mut:
-	dev_id u64
+	dev_id        u64
 	inode_counter u64
 }
 
@@ -165,7 +165,7 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 
 	if stat.isreg(mode) {
 		new_resource.capacity = 4096
-		new_resource.storage  = memory.malloc(new_resource.capacity)
+		new_resource.storage = memory.malloc(new_resource.capacity)
 	}
 
 	new_resource.stat.size = 0

@@ -10,8 +10,8 @@ import x86.cpu
 
 __global (
 	ur_initialized = false
-	ur_rdrand = false
-	ur_rdseed = false
+	ur_rdrand      = false
+	ur_rdseed      = false
 )
 
 struct URandom {
@@ -30,7 +30,7 @@ mut:
 
 [inline]
 fn rotl32(a u32, shift u32) u32 {
-	return ((a) << (shift)) | ((a) >> (32 - (shift)))
+	return (a << shift) | (a >> (32 - shift))
 }
 
 [inline]
@@ -137,11 +137,11 @@ fn (mut this URandom) listen(handle voidptr, backlog int) ? {
 
 fn (mut this URandom) reseed() {
 	if ur_rdseed {
-		for i in 0..this.key.len {
+		for i in 0 .. this.key.len {
 			this.key[i] ^= cpu.rdseed32()
 		}
 	} else if ur_rdrand {
-		for i in 0..this.key.len {
+		for i in 0 .. this.key.len {
 			this.key[i] ^= cpu.rdrand32()
 		}
 	}
