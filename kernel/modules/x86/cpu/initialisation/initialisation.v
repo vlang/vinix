@@ -1,13 +1,13 @@
 module initialisation
 
-import gdt
-import idt
-import cpu
+import x86.gdt
+import x86.idt
+import x86.cpu
 import x86.msr
 import syscall
-import local as cpulocal
+import x86.cpu.local as cpulocal
 import stivale2
-import apic
+import x86.apic
 import katomic
 import sched
 import memory
@@ -38,14 +38,15 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
 		cpu_local.tss.ist1 = u64(sched_stack)
 	}
-
 	// Enable syscall
 	mut efer := msr.rdmsr(0xc0000080)
 	efer |= 1
 	msr.wrmsr(0xc0000080, efer)
 	msr.wrmsr(0xc0000081, 0x0033002800000000)
+
 	// Entry address
 	msr.wrmsr(0xc0000082, u64(voidptr(syscall.syscall_entry)))
+
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))
 
@@ -55,7 +56,7 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 	// Enable SSE/SSE2
 	mut cr0 := cpu.read_cr0()
 	cr0 &= ~(1 << 2)
-	cr0 |=  (1 << 1)
+	cr0 |= (1 << 1)
 	cpu.write_cr0(cr0)
 
 	mut cr4 := cpu.read_cr4()
@@ -64,7 +65,9 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
 	if success == true && c & cpu.cpuid_xsave != 0 {
-		if cpu_number == 0 { println('fpu: xsave supported') }
+		if cpu_number == 0 {
+			println('fpu: xsave supported')
+		}
 
 		// Enable XSAVE and x{get, set}bv
 		cr4 = cpu.read_cr4()
@@ -72,19 +75,27 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 		cpu.write_cr4(cr4)
 
 		mut xcr0 := u64(0)
-		if cpu_number == 0 { println('fpu: Saving x87 state using xsave') }
+		if cpu_number == 0 {
+			println('fpu: Saving x87 state using xsave')
+		}
 		xcr0 |= (1 << 0)
-		if cpu_number == 0 { println('fpu: Saving SSE state using xsave') }
+		if cpu_number == 0 {
+			println('fpu: Saving SSE state using xsave')
+		}
 		xcr0 |= (1 << 1)
 
 		if c & cpu.cpuid_avx != 0 {
-			if cpu_number == 0 { println('fpu: Saving AVX state using xsave') }
+			if cpu_number == 0 {
+				println('fpu: Saving AVX state using xsave')
+			}
 			xcr0 |= (1 << 2)
 		}
 
 		success, _, b, c, _ = cpu.cpuid(7, 0)
 		if success == true && b & cpu.cpuid_avx512 != 0 {
-			if cpu_number == 0 { println('fpu: Saving AVX-512 state using xsave') }
+			if cpu_number == 0 {
+				println('fpu: Saving AVX-512 state using xsave')
+			}
 			xcr0 |= (1 << 5)
 			xcr0 |= (1 << 6)
 			xcr0 |= (1 << 7)
@@ -101,7 +112,9 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 		fpu_save = cpu.xsave
 		fpu_restore = cpu.xrstor
 	} else {
-		if cpu_number == 0 { println('fpu: Using legacy fxsave') }
+		if cpu_number == 0 {
+			println('fpu: Using legacy fxsave')
+		}
 		fpu_storage_size = u64(512)
 		fpu_save = cpu.fxsave
 		fpu_restore = cpu.fxrstor
@@ -109,11 +122,13 @@ pub fn initialise(smp_info &stivale2.SMPInfo) {
 
 	apic.lapic_enable(0xff)
 
-	asm volatile amd64 { sti }
+	asm volatile amd64 {
+		sti
+	}
 
 	apic.lapic_timer_calibrate(mut cpu_local)
 
-	print('smp: CPU ${cpu_local.cpu_number} online!\n')
+	print('smp: CPU $cpu_local.cpu_number online!\n')
 
 	katomic.inc(cpu_local.online)
 

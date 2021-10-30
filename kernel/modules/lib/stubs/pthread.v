@@ -6,10 +6,11 @@ import event
 import proc
 
 struct C.__mlibc_thread_data {}
+
 struct C.__mlibc_threadattr {}
 
 [export: 'pthread_create']
-pub fn pthread_create(thread &&C.__mlibc_thread_data, const_attr &C.__mlibc_threadattr, start_routine fn(voidptr) voidptr, arg voidptr) int {
+pub fn pthread_create(thread &&C.__mlibc_thread_data, const_attr &C.__mlibc_threadattr, start_routine fn (voidptr) voidptr, arg voidptr) int {
 	if voidptr(const_attr) != voidptr(0) {
 		lib.kpanic(voidptr(0), c'pthread_create() called with non-NULL attr')
 	}
@@ -18,7 +19,6 @@ pub fn pthread_create(thread &&C.__mlibc_thread_data, const_attr &C.__mlibc_thre
 		mut ptr := &voidptr(thread)
 		*ptr = sched.new_kernel_thread(voidptr(start_routine), arg, true)
 	}
-
 	return 0
 }
 

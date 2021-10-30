@@ -4,10 +4,15 @@ import klock
 import x86.cpu
 
 pub const framebuffer_id = 0x506461d2950408fa
+
 pub const memmap_id = 0x2187f79e8612de07
+
 pub const terminal_id = 0xc2b3f4c3233b0974
+
 pub const rsdp_id = 0x9e1786930a375e78
+
 pub const modules_id = 0x4b6fe466aade04ce
+
 pub const smp_id = 0x34d1d96339647025
 
 [packed]
@@ -102,7 +107,8 @@ struct MemmapTag {
 pub mut:
 	tag         Tag
 	entry_count u64
-	entries     MemmapEntry // This is a var length array at the end.
+	entries     MemmapEntry
+	// This is a var length array at the end.
 }
 
 [packed]
@@ -147,11 +153,11 @@ pub fn get_tag(stivale2_struct &Struct, id u64) ?voidptr {
 
 __global (
 	terminal_print_lock klock.Lock
-	terminal_print_ptr = voidptr(0)
-	terminal_rows = u16(0)
-	terminal_cols = u16(0)
-	framebuffer_width = u16(0)
-	framebuffer_height = u16(0)
+	terminal_print_ptr  = voidptr(0)
+	terminal_rows       = u16(0)
+	terminal_cols       = u16(0)
+	framebuffer_width   = u16(0)
+	framebuffer_height  = u16(0)
 )
 
 pub fn terminal_init(stivale2_struct &Struct) {

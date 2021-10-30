@@ -22,9 +22,9 @@ mut:
 	can_mmap bool
 	event    eventstruct.Event
 
-	name SockaddrUn
+	name      SockaddrUn
 	listening bool
-	backlog []&UnixSocket
+	backlog   []&UnixSocket
 }
 
 fn (mut this UnixSocket) mmap(page u64, flags int) voidptr {
@@ -78,11 +78,17 @@ fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
 }
 
 pub fn create(@type int) ?&UnixSocket {
-	return &UnixSocket{refcount: 1}
+	return &UnixSocket{
+		refcount: 1
+	}
 }
 
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
-	mut a := &UnixSocket{refcount: 1}
-	mut b := &UnixSocket{refcount: 1}
+	mut a := &UnixSocket{
+		refcount: 1
+	}
+	mut b := &UnixSocket{
+		refcount: 1
+	}
 	return a, b
 }

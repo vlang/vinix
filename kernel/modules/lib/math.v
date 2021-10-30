@@ -12,7 +12,7 @@ pub fn align_down(value u64, alignment u64) u64 {
 	return (value / alignment) * alignment
 }
 
-pub fn power(base u64, exp u64) u64 { 
+pub fn power(base u64, exp u64) u64 {
 	mut result := u64(1)
 	mut tmp_base := base
 	mut tmp_exp := exp

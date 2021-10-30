@@ -7,19 +7,28 @@ import errno
 import x86.cpu
 import x86.cpu.local as cpulocal
 
-const pte_present  = u64(1 << 0)
+const pte_present = u64(1 << 0)
+
 const pte_writable = u64(1 << 1)
-const pte_user     = u64(1 << 2)
 
-pub const prot_none  = 0x00
-pub const prot_read  = 0x01
+const pte_user = u64(1 << 2)
+
+pub const prot_none = 0x00
+
+pub const prot_read = 0x01
+
 pub const prot_write = 0x02
-pub const prot_exec  = 0x04
 
-pub const map_private   = 0x01
-pub const map_shared    = 0x02
-pub const map_fixed     = 0x04
-pub const map_anon      = 0x08
+pub const prot_exec = 0x04
+
+pub const map_private = 0x01
+
+pub const map_shared = 0x02
+
+pub const map_fixed = 0x04
+
+pub const map_anon = 0x08
+
 pub const map_anonymous = 0x08
 
 pub struct MmapRangeLocal {
@@ -63,9 +72,7 @@ pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
 	for ptr in pagemap.mmap_ranges {
 		local_range := &MmapRangeLocal(ptr)
 
-		munmap(pagemap, voidptr(local_range.base), local_range.length) or {
-			return error('')
-		}
+		munmap(pagemap, voidptr(local_range.base), local_range.length) or { return error('') }
 	}
 
 	unsafe { free(pagemap) }
@@ -84,29 +91,32 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 		local_range := &MmapRangeLocal(ptr)
 		mut global_range := local_range.global
 
-		mut new_local_range := &MmapRangeLocal{pagemap: voidptr(0),
-											   global: voidptr(0)}
-		unsafe { new_local_range[0] = local_range[0] }
-
+		mut new_local_range := &MmapRangeLocal{
+			pagemap: voidptr(0)
+			global: voidptr(0)
+		}
+		unsafe {
+			new_local_range[0] = local_range[0]
+		}
 		if voidptr(global_range.resource) != voidptr(0) {
 			global_range.resource.refcount++
 		}
 
-		if local_range.flags & map_shared != 0 {
+		if local_range.flags & mmap.map_shared != 0 {
 			global_range.locals << new_local_range
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
-				old_pte := old_pagemap.virt2pte(i, false) or {
-					continue
+				old_pte := old_pagemap.virt2pte(i, false) or { continue }
+				new_pte := new_pagemap.virt2pte(i, true) or { return none }
+				unsafe {
+					new_pte[0] = old_pte[0]
 				}
-				new_pte := new_pagemap.virt2pte(i, true) or {
-					return none
-				}
-				unsafe { new_pte[0] = old_pte[0] }
 			}
 		} else {
 			mut new_global_range := &MmapRangeGlobal{
 				resource: voidptr(0)
-				shadow_pagemap: memory.Pagemap{top_level: &u64(0)}
+				shadow_pagemap: memory.Pagemap{
+					top_level: &u64(0)
+				}
 			}
 
 			new_global_range.resource = global_range.resource
@@ -119,27 +129,18 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 
 			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
-			if local_range.flags & map_anonymous != 0 {
+			if local_range.flags & mmap.map_anonymous != 0 {
 				for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
-					old_pte := old_pagemap.virt2pte(i, false) or {
-						continue
-					}
+					old_pte := old_pagemap.virt2pte(i, false) or { continue }
 					if unsafe { old_pte[0] & 1 } == 0 {
 						continue
 					}
-					new_pte := new_pagemap.virt2pte(i, true) or {
-						return none
-					}
-					new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or {
-						return none
-					}
+					new_pte := new_pagemap.virt2pte(i, true) or { return none }
+					new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or { return none }
 					page := memory.pmm_alloc_nozero(1)
 					unsafe {
-						C.memcpy(
-							voidptr(u64(page) + higher_half),
-							voidptr((old_pte[0] & ~(u64(0xfff))) + higher_half),
-							page_size
-						)
+						C.memcpy(voidptr(u64(page) + higher_half), voidptr(
+							(old_pte[0] & ~(u64(0xfff))) + higher_half), page_size)
 						new_pte[0] = (old_pte[0] & u64(0xfff)) | u64(page)
 						new_spte[0] = new_pte[0]
 					}
@@ -158,28 +159,26 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {
 	mut g := unsafe { _g }
 
-	pt_flags := pte_present | pte_user
-		| if prot & prot_write != 0 { pte_writable } else { 0 }
-
-	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
-		return error('')
+	pt_flags := mmap.pte_present | mmap.pte_user | if prot & mmap.prot_write != 0 {
+		mmap.pte_writable
+	} else {
+		0
 	}
+
+	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return error('') }
 
 	for i := u64(0); i < g.locals.len; i++ {
 		mut l := g.locals[i]
 		if virt_addr < l.base || virt_addr >= l.base + l.length {
 			continue
 		}
-		l.pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
-			return error('')
-		}
+		l.pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return error('') }
 	}
 }
 
-pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
-				  length u64, prot int, _flags int) ? {
-	mut pagemap  := unsafe { _pagemap }
-	flags := _flags | map_anonymous
+pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64, length u64, prot int, _flags int) ? {
+	mut pagemap := unsafe { _pagemap }
+	flags := _flags | mmap.map_anonymous
 
 	mut range_local := &MmapRangeLocal{
 		pagemap: pagemap
@@ -195,7 +194,9 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 		base: virt_addr
 		length: length
 		resource: voidptr(0)
-		shadow_pagemap: memory.Pagemap{top_level: &u64(0)}
+		shadow_pagemap: memory.Pagemap{
+			top_level: &u64(0)
+		}
 	}
 
 	range_local.global = range_global
@@ -208,9 +209,7 @@ pub fn map_range(_pagemap &memory.Pagemap, virt_addr u64, phys_addr u64,
 	pagemap.l.release()
 
 	for i := u64(0); i < length; i += page_size {
-		map_page_in_range(range_global, virt_addr + i, phys_addr + i, prot) or {
-			return error('')
-		}
+		map_page_in_range(range_global, virt_addr + i, phys_addr + i, prot) or { return error('') }
 	}
 }
 
@@ -222,9 +221,13 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut current_thread := proc.current_thread()
 
-	asm volatile amd64 { sti }
+	asm volatile amd64 {
+		sti
+	}
 	defer {
-		asm volatile amd64 { cli }
+		asm volatile amd64 {
+			cli
+		}
 	}
 
 	mut process := current_thread.process
@@ -243,21 +246,19 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut page := voidptr(0)
 
-	if range_local.flags & map_anonymous != 0 {
+	if range_local.flags & mmap.map_anonymous != 0 {
 		page = memory.pmm_alloc(1)
 	} else {
 		page = range_local.global.resource.mmap(file_page, range_local.flags)
 	}
 
-	map_page_in_range(range_local.global, memory_page * page_size, u64(page),
-					  range_local.prot) or {
+	map_page_in_range(range_local.global, memory_page * page_size, u64(page), range_local.prot) or {
 		return error('')
 	}
 }
 
-pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
-			prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
-	mut pagemap  := unsafe { _pagemap }
+pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64, prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
+	mut pagemap := unsafe { _pagemap }
 	mut resource := unsafe { _resource }
 
 	if length % page_size != 0 || length == 0 {
@@ -266,7 +267,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 		return none
 	}
 
-	if flags & map_anonymous == 0 && resource.can_mmap == false {
+	if flags & mmap.map_anonymous == 0 && resource.can_mmap == false {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -275,7 +276,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 	mut process := current_thread.process
 
 	mut base := u64(0)
-	if flags & map_fixed != 0 {
+	if flags & mmap.map_fixed != 0 {
 		base = u64(addr)
 	} else {
 		base = process.mmap_anon_non_fixed_base
@@ -298,7 +299,9 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 		length: length
 		resource: resource
 		offset: offset
-		shadow_pagemap: memory.Pagemap{top_level: &u64(0)}
+		shadow_pagemap: memory.Pagemap{
+			top_level: &u64(0)
+		}
 	}
 
 	range_local.global = range_global
@@ -318,8 +321,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, length u64,
 }
 
 pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: munmap(0x%llx, 0x%llx)\n',
-			 addr, length)
+	C.printf(c'\n\e[32mstrace\e[m: munmap(0x%llx, 0x%llx)\n', addr, length)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -327,9 +329,7 @@ pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	munmap(process.pagemap, addr, length) or {
-		return -1, errno.get()
-	}
+	munmap(process.pagemap, addr, length) or { return -1, errno.get() }
 
 	return 0, 0
 }
@@ -344,9 +344,7 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 	}
 
 	for i := u64(addr); i < u64(addr) + length; i += page_size {
-		mut local_range, _, _ := addr2range(pagemap, i) or {
-			continue
-		}
+		mut local_range, _, _ := addr2range(pagemap, i) or { continue }
 
 		mut global_range := local_range.global
 
@@ -375,13 +373,9 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 		}
 
 		if snip_size == local_range.length && global_range.locals.len == 1 {
-			if local_range.flags & map_anonymous != 0 {
-				for j := global_range.base;
-				  j < global_range.base + global_range.length;
-				  j += page_size {
-					phys := global_range.shadow_pagemap.virt2phys(j) or {
-						continue
-					}
+			if local_range.flags & mmap.map_anonymous != 0 {
+				for j := global_range.base; j < global_range.base + global_range.length; j += page_size {
+					phys := global_range.shadow_pagemap.virt2phys(j) or { continue }
 					global_range.shadow_pagemap.unmap_page(j) or {
 						errno.set(errno.einval)
 						return error('')
@@ -389,7 +383,7 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, length u64) ? {
 					memory.pmm_free(voidptr(phys), 1)
 				}
 			} else {
-				//global_range.resource.munmap(i)
+				// global_range.resource.munmap(i)
 			}
 			unsafe { free(local_range) }
 		} else {

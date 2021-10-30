@@ -1,10 +1,10 @@
 module isr
 
-import idt
+import x86.idt
 import event
 import event.eventstruct
-import apic
-import cpu.local as cpulocal
+import x86.apic
+import x86.cpu.local as cpulocal
 import memory.mmap
 import katomic
 import lib
@@ -21,49 +21,49 @@ fn generic_isr(num u32, _ voidptr) {
 }
 
 const exception_names = [
-    c'Division by 0',
-    c'Debug',
-    c'NMI',
-    c'Breakpoint',
-    c'Overflow',
-    c'Bound range exceeded',
-    c'Invalid opcode',
-    c'Device not available',
-    c'Double fault',
-    c'???',
-    c'Invalid TSS',
-    c'Segment not present',
-    c'Stack-segment fault',
-    c'General protection fault',
-    c'Page fault',
-    c'???',
-    c'x87 exception',
-    c'Alignment check',
-    c'Machine check',
-    c'SIMD exception',
-    c'Virtualisation',
-    c'???',
-    c'???',
-    c'???',
-    c'???',
-    c'???',
-    c'???',
-    c'???',
-    c'???',
-    c'???',
-    c'Security'
+	c'Division by 0',
+	c'Debug',
+	c'NMI',
+	c'Breakpoint',
+	c'Overflow',
+	c'Bound range exceeded',
+	c'Invalid opcode',
+	c'Device not available',
+	c'Double fault',
+	c'???',
+	c'Invalid TSS',
+	c'Segment not present',
+	c'Stack-segment fault',
+	c'General protection fault',
+	c'Page fault',
+	c'???',
+	c'x87 exception',
+	c'Alignment check',
+	c'Machine check',
+	c'SIMD exception',
+	c'Virtualisation',
+	c'???',
+	c'???',
+	c'???',
+	c'???',
+	c'???',
+	c'???',
+	c'???',
+	c'???',
+	c'???',
+	c'Security',
 ]
 
 fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
-	mmap.pf_handler(gpr_state) or {
-		exception_handler(num, gpr_state)
-	}
+	mmap.pf_handler(gpr_state) or { exception_handler(num, gpr_state) }
 }
 
 fn abort_handler() {
 	katomic.store(cpulocal.current().aborted, true)
 	for {
-		asm volatile amd64 { hlt }
+		asm volatile amd64 {
+			hlt
+		}
 	}
 }
 
@@ -76,7 +76,7 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 				signal = userland.sigsegv
 			}
 			else {
-				lib.kpanic(gpr_state, exception_names[num])
+				lib.kpanic(gpr_state, isr.exception_names[num])
 			}
 		}
 
@@ -84,7 +84,7 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 		userland.dispatch_a_signal(gpr_state)
 		userland.syscall_exit(voidptr(0), 128 + signal)
 	} else {
-		lib.kpanic(gpr_state, exception_names[num])
+		lib.kpanic(gpr_state, isr.exception_names[num])
 	}
 }
 

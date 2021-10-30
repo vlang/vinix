@@ -18,8 +18,7 @@ pub fn wrmsr(msr u32, value u64) {
 	edx := value >> 32
 	asm volatile amd64 {
 		wrmsr
-		;
-		; a (eax)
+		; ; a (eax)
 		  d (edx)
 		  c (msr)
 		; memory

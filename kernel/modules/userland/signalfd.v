@@ -9,24 +9,24 @@ import file
 import errno
 
 struct SFDSiginfo {
-	ssi_signo u32
-	ssi_errno i32
-	ssi_code i32
-	ssi_pid u32
-	ssi_uid u32
-	ssi_fd i32
-	ssi_tid u32
-	ssi_band u32
-	ssi_overrun u32
-	ssi_trapno u32
-	ssi_status i32
-	ssi_int i32
-	ssi_ptr u64
-	ssi_utime u64
-	ssi_stime u64
-	ssi_addr u64
+	ssi_signo    u32
+	ssi_errno    i32
+	ssi_code     i32
+	ssi_pid      u32
+	ssi_uid      u32
+	ssi_fd       i32
+	ssi_tid      u32
+	ssi_band     u32
+	ssi_overrun  u32
+	ssi_trapno   u32
+	ssi_status   i32
+	ssi_int      i32
+	ssi_ptr      u64
+	ssi_utime    u64
+	ssi_stime    u64
+	ssi_addr     u64
 	ssi_addr_lsb u16
-	pad [46]u8
+	pad          [46]u8
 }
 
 struct SignalFD {
@@ -38,7 +38,7 @@ pub mut:
 	can_mmap bool
 	event    eventstruct.Event
 
-	mask u64
+	mask  u64
 	queue []&SFDSiginfo
 }
 
@@ -91,7 +91,9 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 	}
 
 	if fdnum == -1 {
-		signalfd = &SignalFD{refcount: 1}
+		signalfd = &SignalFD{
+			refcount: 1
+		}
 
 		newfd = file.fdnum_create_from_resource(voidptr(0), mut signalfd, flags, 0, false) or {
 			return -1, errno.get()
@@ -99,9 +101,7 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 
 		thread.signalfds << voidptr(signalfd)
 	} else {
-		mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-			return -1, errno.get()
-		}
+		mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 
 		signalfd = unsafe { &SignalFD(fd.handle.resource) }
 

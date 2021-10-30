@@ -58,7 +58,7 @@ pub mut:
 	tss                  TSS
 	lapic_id             u32
 	lapic_timer_freq     u64
-	online				 u64
+	online               u64
 	is_idle              bool
 	nvme_io_queue_pair   voidptr
 	last_run_queue_index int
@@ -80,7 +80,7 @@ pub fn current() &Local {
 
 	mut cpu_number := u64(0)
 	asm volatile amd64 {
-		mov cpu_number, gs:[0]
+		mov cpu_number, [0]
 		; =r (cpu_number)
 	}
 	return cpu_locals[cpu_number]

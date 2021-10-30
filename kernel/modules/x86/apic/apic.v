@@ -1,16 +1,23 @@
 module apic
 
-import kio
-import msr
-import cpu.local as cpulocal
+import x86.kio
+import x86.msr
+import x86.cpu.local as cpulocal
 
 const lapic_reg_icr0 = 0x300
+
 const lapic_reg_icr1 = 0x310
+
 const lapic_reg_spurious = 0x0f0
+
 const lapic_reg_eoi = 0x0b0
+
 const lapic_reg_timer = 0x320
+
 const lapic_reg_timer_initcnt = 0x380
+
 const lapic_reg_timer_curcnt = 0x390
+
 const lapic_reg_timer_div = 0x3e0
 
 fn lapic_read(reg u32) u32 {
@@ -31,8 +38,8 @@ fn pit_current_count() u16 {
 }
 
 pub fn lapic_timer_stop() {
-	lapic_write(lapic_reg_timer_initcnt, 0)
-	lapic_write(lapic_reg_timer, (1 << 16))
+	lapic_write(apic.lapic_reg_timer_initcnt, 0)
+	lapic_write(apic.lapic_reg_timer, (1 << 16))
 }
 
 pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
@@ -40,8 +47,8 @@ pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 
 	samples := u64(0xfffff)
 
-	lapic_write(lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
-	lapic_write(lapic_reg_timer_div, 0)
+	lapic_write(apic.lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
+	lapic_write(apic.lapic_reg_timer_div, 0)
 
 	pit_freq := u64(1193182)
 
@@ -50,9 +57,9 @@ pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 
 	initial_pit_tick := u64(pit_current_count())
 
-	lapic_write(lapic_reg_timer_initcnt, u32(samples))
+	lapic_write(apic.lapic_reg_timer_initcnt, u32(samples))
 
-	for lapic_read(lapic_reg_timer_curcnt) != 0 {}
+	for lapic_read(apic.lapic_reg_timer_curcnt) != 0 {}
 
 	final_pit_tick := u64(pit_current_count())
 
@@ -68,22 +75,22 @@ pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec byte, us u64) {
 
 	ticks := us * (cpu_local.lapic_timer_freq / 1000000)
 
-	lapic_write(lapic_reg_timer, vec)
-	lapic_write(lapic_reg_timer_div, 0)
-	lapic_write(lapic_reg_timer_initcnt, u32(ticks))
+	lapic_write(apic.lapic_reg_timer, vec)
+	lapic_write(apic.lapic_reg_timer_div, 0)
+	lapic_write(apic.lapic_reg_timer_initcnt, u32(ticks))
 }
 
 pub fn lapic_enable(spurious_vect byte) {
-	lapic_write(lapic_reg_spurious, lapic_read(lapic_reg_spurious) | (1 << 8) | spurious_vect)
+	lapic_write(apic.lapic_reg_spurious, lapic_read(apic.lapic_reg_spurious) | (1 << 8) | spurious_vect)
 }
 
 pub fn lapic_eoi() {
-	lapic_write(lapic_reg_eoi, 0)
+	lapic_write(apic.lapic_reg_eoi, 0)
 }
 
 pub fn lapic_send_ipi(lapic_id byte, vector byte) {
-	lapic_write(lapic_reg_icr1, u32(lapic_id) << 24)
-	lapic_write(lapic_reg_icr0, vector)
+	lapic_write(apic.lapic_reg_icr1, u32(lapic_id) << 24)
+	lapic_write(apic.lapic_reg_icr0, vector)
 }
 
 fn io_apic_read(io_apic int, reg u32) u32 {
@@ -140,8 +147,11 @@ pub fn io_apic_set_gsi_redirect(lapic_id u32, vector byte, gsi u32, flags u16, s
 pub fn io_apic_set_irq_redirect(lapic_id u32, vector byte, irq byte, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {
-			if status { print('apic: IRQ $irq using override\n') }
-			io_apic_set_gsi_redirect(lapic_id, vector, madt_isos[i].gsi, madt_isos[i].flags, status)
+			if status {
+				print('apic: IRQ $irq using override\n')
+			}
+			io_apic_set_gsi_redirect(lapic_id, vector, madt_isos[i].gsi, madt_isos[i].flags,
+				status)
 			return
 		}
 	}

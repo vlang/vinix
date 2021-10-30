@@ -2,7 +2,7 @@ module event
 
 import proc
 import sched
-import eventstruct
+import event.eventstruct
 import x86.cpu
 import x86.cpu.local as cpulocal
 import katomic
@@ -54,7 +54,9 @@ fn unlock_events(mut events []&eventstruct.Event) {
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	mut thread := proc.current_thread()
 
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 
 	lock_events(mut events)
 
@@ -87,13 +89,17 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	return thread.which_event
 }
 
-pub fn trigger(mut event &eventstruct.Event, drop bool) u64 {
+pub fn trigger(mut event eventstruct.Event, drop bool) u64 {
 	ints := cpu.interrupt_state()
 
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 	defer {
 		if ints == true {
-			asm volatile amd64 { sti }
+			asm volatile amd64 {
+				sti
+			}
 		}
 	}
 
@@ -125,7 +131,9 @@ pub fn trigger(mut event &eventstruct.Event, drop bool) u64 {
 }
 
 pub fn pthread_exit(ret voidptr) {
-	asm volatile amd64 { cli }
+	asm volatile amd64 {
+		cli
+	}
 
 	mut cpu_local := cpulocal.current()
 

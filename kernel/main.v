@@ -1,7 +1,8 @@
 module main
 
 import lib
-import lib.stubs // unused, but needed for C function stubs
+import lib.stubs
+// unused, but needed for C function stubs
 import memory
 import stivale2
 import acpi
@@ -24,7 +25,6 @@ import dev.nvme
 import dev.streams
 import dev.random
 import syscall.table
-
 import socket
 
 fn C._vinit(argc int, argv voidptr)
@@ -53,13 +53,11 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	nvme.initialise()
 	random.initialise()
 
-	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'],
-							['HOME=/root',
-							'TERM=linux',
-							'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'],
-							'/dev/console', '/dev/console', '/dev/console') or {
-		panic('Could not start init process')
-	}
+	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [
+		'HOME=/root',
+		'TERM=linux',
+		'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+	], '/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
 
 	sched.dequeue_and_die()
 }

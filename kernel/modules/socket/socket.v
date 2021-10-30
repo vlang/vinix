@@ -3,9 +3,7 @@ module socket
 import resource
 import file
 import errno
-
 import socket.public as sock_pub
-
 import socket.unix as sock_unix
 import socket.netlink as sock_netlink
 
@@ -17,7 +15,8 @@ fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, 
 			socket0, socket1 := sock_unix.create_pair(@type) ?
 			return &resource.Resource(*socket0), &resource.Resource(*socket1)
 		}
-		/*sock_pub.af_netlink {
+		/*
+		sock_pub.af_netlink {
 			socket0, socket1 := sock_netlink.create_pair(@type, protocol) ?
 			return socket0, socket1
 		}*/
@@ -48,7 +47,8 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 }
 
 pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', domain, @type, protocol, voidptr(ret))
+	C.printf(c'\n\e[32mstrace\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', domain, @type,
+		protocol, voidptr(ret))
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -71,7 +71,6 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 			return -1, errno.get()
 		}
 	}
-
 	return 0, 0
 }
 
@@ -81,9 +80,7 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut socket := socket_create(domain, @type, protocol) or {
-		return -1, errno.get()
-	}
+	mut socket := socket_create(domain, @type, protocol) or { return -1, errno.get() }
 
 	mut flags := int(0)
 	if @type & sock_pub.sock_cloexec != 0 {
@@ -103,16 +100,12 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64)
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
 
-	fd.handle.resource.bind(fd.handle, _addr, addrlen) or {
-		return -1, errno.get()
-	}
+	fd.handle.resource.bind(fd.handle, _addr, addrlen) or { return -1, errno.get() }
 
 	return 0, 0
 }
@@ -123,16 +116,12 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or {
-		return -1, errno.get()
-	}
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
 	defer {
 		fd.unref()
 	}
 
-	fd.handle.resource.listen(fd.handle, backlog) or {
-		return -1, errno.get()
-	}
+	fd.handle.resource.listen(fd.handle, backlog) or { return -1, errno.get() }
 
 	return 0, 0
 }

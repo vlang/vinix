@@ -18,76 +18,302 @@ import userland
 import proc
 
 const max_scancode = 0x57
+
 const capslock = 0x3a
+
 const left_alt = 0x38
+
 const left_alt_rel = 0xb8
+
 const right_shift = 0x36
+
 const left_shift = 0x2a
+
 const right_shift_rel = 0xb6
+
 const left_shift_rel = 0xaa
+
 const ctrl = 0x1d
+
 const ctrl_rel = 0x9d
 
 const console_buffer_size = 1024
+
 const console_bigbuf_size = 4096
 
 __global (
-	console_res = &Console(0)
-	console_read_lock klock.Lock
-	console_event eventstruct.Event
+	console_res             = &Console(0)
+	console_read_lock       klock.Lock
+	console_event           eventstruct.Event
 	console_capslock_active = bool(false)
-	console_shift_active = bool(false)
-	console_ctrl_active = bool(false)
-	console_alt_active = bool(false)
+	console_shift_active    = bool(false)
+	console_ctrl_active     = bool(false)
+	console_alt_active      = bool(false)
 	console_extra_scancodes = bool(false)
-	console_buffer [console_buffer_size]byte
-	console_buffer_i = u64(0)
-	console_bigbuf [console_bigbuf_size]byte
-	console_bigbuf_i = u64(0)
-	console_termios = &termios.Termios(0)
-	console_decckm = false
+	console_buffer          [console_buffer_size]byte
+	console_buffer_i        = u64(0)
+	console_bigbuf          [console_bigbuf_size]byte
+	console_bigbuf_i        = u64(0)
+	console_termios         = &termios.Termios(0)
+	console_decckm          = false
 	// XXX this is a massive hack to allow ctrl-c and friends without process
 	// groups
-	latest_thread = &proc.Thread(0)
+	latest_thread           = &proc.Thread(0)
 )
 
 const convtab_capslock = [
-	`\0`, `\e`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `0`, `-`, `=`, `\b`, `\t`,
-	`Q`, `W`, `E`, `R`, `T`, `Y`, `U`, `I`, `O`, `P`, `[`, `]`, `\n`, `\0`, `A`, `S`,
-	`D`, `F`, `G`, `H`, `J`, `K`, `L`, `;`, `'`, `\``, `\0`, `\\`, `Z`, `X`, `C`, `V`,
-	`B`, `N`, `M`, `,`, `.`, `/`, `\0`, `\0`, `\0`, ` `
+	`\0`,
+	`\e`,
+	`1`,
+	`2`,
+	`3`,
+	`4`,
+	`5`,
+	`6`,
+	`7`,
+	`8`,
+	`9`,
+	`0`,
+	`-`,
+	`=`,
+	`\b`,
+	`\t`,
+	`Q`,
+	`W`,
+	`E`,
+	`R`,
+	`T`,
+	`Y`,
+	`U`,
+	`I`,
+	`O`,
+	`P`,
+	`[`,
+	`]`,
+	`\n`,
+	`\0`,
+	`A`,
+	`S`,
+	`D`,
+	`F`,
+	`G`,
+	`H`,
+	`J`,
+	`K`,
+	`L`,
+	`;`,
+	`'`,
+	`\``,
+	`\0`,
+	`\\`,
+	`Z`,
+	`X`,
+	`C`,
+	`V`,
+	`B`,
+	`N`,
+	`M`,
+	`,`,
+	`.`,
+	`/`,
+	`\0`,
+	`\0`,
+	`\0`,
+	` `,
 ]
 
 const convtab_shift = [
-	`\0`, `\e`, `!`, `@`, `#`, `$`, `%`, `^`, `&`, `*`, `(`, `)`, `_`, `+`, `\b`, `\t`,
-	`Q`, `W`, `E`, `R`, `T`, `Y`, `U`, `I`, `O`, `P`, `{`, `}`, `\n`, `\0`, `A`, `S`,
-	`D`, `F`, `G`, `H`, `J`, `K`, `L`, `:`, `"`, `~`, `\0`, `|`, `Z`, `X`, `C`, `V`,
-	`B`, `N`, `M`, `<`, `>`, `?`, `\0`, `\0`, `\0`, ` `
+	`\0`,
+	`\e`,
+	`!`,
+	`@`,
+	`#`,
+	`$`,
+	`%`,
+	`^`,
+	`&`,
+	`*`,
+	`(`,
+	`)`,
+	`_`,
+	`+`,
+	`\b`,
+	`\t`,
+	`Q`,
+	`W`,
+	`E`,
+	`R`,
+	`T`,
+	`Y`,
+	`U`,
+	`I`,
+	`O`,
+	`P`,
+	`{`,
+	`}`,
+	`\n`,
+	`\0`,
+	`A`,
+	`S`,
+	`D`,
+	`F`,
+	`G`,
+	`H`,
+	`J`,
+	`K`,
+	`L`,
+	`:`,
+	`"`,
+	`~`,
+	`\0`,
+	`|`,
+	`Z`,
+	`X`,
+	`C`,
+	`V`,
+	`B`,
+	`N`,
+	`M`,
+	`<`,
+	`>`,
+	`?`,
+	`\0`,
+	`\0`,
+	`\0`,
+	` `,
 ]
 
 const convtab_shift_capslock = [
-	`\0`, `\e`, `!`, `@`, `#`, `$`, `%`, `^`, `&`, `*`, `(`, `)`, `_`, `+`, `\b`, `\t`,
-	`q`, `w`, `e`, `r`, `t`, `y`, `u`, `i`, `o`, `p`, `{`, `}`, `\n`, `\0`, `a`, `s`,
-	`d`, `f`, `g`, `h`, `j`, `k`, `l`, `:`, `"`, `~`, `\0`, `|`, `z`, `x`, `c`, `v`,
-	`b`, `n`, `m`, `<`, `>`, `?`, `\0`, `\0`, `\0`, ` `
+	`\0`,
+	`\e`,
+	`!`,
+	`@`,
+	`#`,
+	`$`,
+	`%`,
+	`^`,
+	`&`,
+	`*`,
+	`(`,
+	`)`,
+	`_`,
+	`+`,
+	`\b`,
+	`\t`,
+	`q`,
+	`w`,
+	`e`,
+	`r`,
+	`t`,
+	`y`,
+	`u`,
+	`i`,
+	`o`,
+	`p`,
+	`{`,
+	`}`,
+	`\n`,
+	`\0`,
+	`a`,
+	`s`,
+	`d`,
+	`f`,
+	`g`,
+	`h`,
+	`j`,
+	`k`,
+	`l`,
+	`:`,
+	`"`,
+	`~`,
+	`\0`,
+	`|`,
+	`z`,
+	`x`,
+	`c`,
+	`v`,
+	`b`,
+	`n`,
+	`m`,
+	`<`,
+	`>`,
+	`?`,
+	`\0`,
+	`\0`,
+	`\0`,
+	` `,
 ]
 
 const convtab_nomod = [
-	`\0`, `\e`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `0`, `-`, `=`, `\b`, `\t`,
-	`q`, `w`, `e`, `r`, `t`, `y`, `u`, `i`, `o`, `p`, `[`, `]`, `\n`, `\0`, `a`, `s`,
-	`d`, `f`, `g`, `h`, `j`, `k`, `l`, `;`, `'`, `\``, `\0`, `\\`, `z`, `x`, `c`, `v`,
-	`b`, `n`, `m`, `,`, `.`, `/`, `\0`, `\0`, `\0`, ` `
+	`\0`,
+	`\e`,
+	`1`,
+	`2`,
+	`3`,
+	`4`,
+	`5`,
+	`6`,
+	`7`,
+	`8`,
+	`9`,
+	`0`,
+	`-`,
+	`=`,
+	`\b`,
+	`\t`,
+	`q`,
+	`w`,
+	`e`,
+	`r`,
+	`t`,
+	`y`,
+	`u`,
+	`i`,
+	`o`,
+	`p`,
+	`[`,
+	`]`,
+	`\n`,
+	`\0`,
+	`a`,
+	`s`,
+	`d`,
+	`f`,
+	`g`,
+	`h`,
+	`j`,
+	`k`,
+	`l`,
+	`;`,
+	`'`,
+	`\``,
+	`\0`,
+	`\\`,
+	`z`,
+	`x`,
+	`c`,
+	`v`,
+	`b`,
+	`n`,
+	`m`,
+	`,`,
+	`.`,
+	`/`,
+	`\0`,
+	`\0`,
+	`\0`,
+	` `,
 ]
 
 fn is_printable(c byte) bool {
-	return (c >= 0x20 && c <= 0x7e)
+	return c >= 0x20 && c <= 0x7e
 }
 
 fn add_to_buf_char(c byte, echo bool) {
 	if console_termios.c_lflag & termios.icanon != 0 {
 		match c {
 			`\n` {
-				if console_buffer_i == console_buffer_size {
+				if console_buffer_i == console.console_buffer_size {
 					return
 				}
 				console_buffer[console_buffer_i] = c
@@ -100,7 +326,7 @@ fn add_to_buf_char(c byte, echo bool) {
 						console_res.status |= file.pollin
 						event.trigger(mut console_res.event, false)
 					}
-					if console_bigbuf_i == console_bigbuf_size {
+					if console_bigbuf_i == console.console_bigbuf_size {
 						return
 					}
 					console_bigbuf[console_bigbuf_i] = console_buffer[i]
@@ -131,7 +357,7 @@ fn add_to_buf_char(c byte, echo bool) {
 			else {}
 		}
 
-		if console_buffer_i == console_buffer_size {
+		if console_buffer_i == console.console_buffer_size {
 			return
 		}
 		console_buffer[console_buffer_i] = c
@@ -141,7 +367,7 @@ fn add_to_buf_char(c byte, echo bool) {
 			console_res.status |= file.pollin
 			event.trigger(mut console_res.event, false)
 		}
-		if console_bigbuf_i == console_bigbuf_size {
+		if console_bigbuf_i == console.console_bigbuf_size {
 			return
 		}
 		console_bigbuf[console_bigbuf_i] = c
@@ -197,11 +423,11 @@ fn keyboard_handler() {
 			console_extra_scancodes = false
 
 			match input_byte {
-				ctrl {
+				console.ctrl {
 					console_ctrl_active = true
 					continue
 				}
-				ctrl_rel {
+				console.ctrl_rel {
 					console_ctrl_active = false
 					continue
 				}
@@ -271,33 +497,31 @@ fn keyboard_handler() {
 		}
 
 		match input_byte {
-			left_alt {
+			console.left_alt {
 				console_alt_active = true
 				continue
 			}
-			left_alt_rel {
+			console.left_alt_rel {
 				console_alt_active = false
 				continue
 			}
-			left_shift,
-			right_shift {
+			console.left_shift, console.right_shift {
 				console_shift_active = true
 				continue
 			}
-			left_shift_rel,
-			right_shift_rel {
+			console.left_shift_rel, console.right_shift_rel {
 				console_shift_active = false
 				continue
 			}
-			ctrl {
+			console.ctrl {
 				console_ctrl_active = true
 				continue
 			}
-			ctrl_rel {
+			console.ctrl_rel {
 				console_ctrl_active = false
 				continue
 			}
-			capslock {
+			console.capslock {
 				console_capslock_active = !console_capslock_active
 				continue
 			}
@@ -305,18 +529,18 @@ fn keyboard_handler() {
 		}
 
 		mut c := byte(0)
-		if input_byte < max_scancode {
+		if input_byte < console.max_scancode {
 			if console_capslock_active == false && console_shift_active == false {
-				c = convtab_nomod[input_byte]
+				c = console.convtab_nomod[input_byte]
 			}
 			if console_capslock_active == false && console_shift_active == true {
-				c = convtab_shift[input_byte]
+				c = console.convtab_shift[input_byte]
 			}
 			if console_capslock_active == true && console_shift_active == false {
-				c = convtab_capslock[input_byte]
+				c = console.convtab_capslock[input_byte]
 			}
 			if console_capslock_active == true && console_shift_active == true {
-				c = convtab_shift_capslock[input_byte]
+				c = console.convtab_shift_capslock[input_byte]
 			}
 		} else {
 			continue
@@ -401,7 +625,7 @@ pub fn initialise() {
 
 	mut terminal_context_size := u64(0)
 	stivale2.terminal_print(voidptr(&terminal_context_size), u64(-1))
-	print('console: Terminal context size: ${terminal_context_size}\n')
+	print('console: Terminal context size: $terminal_context_size\n')
 
 	// Disable primary and secondary PS/2 ports
 	write_ps2(0x64, 0xad)
@@ -416,6 +640,7 @@ pub fn initialise() {
 
 	// Enable keyboard interrupt and keyboard scancode translation
 	ps2_config |= (1 << 0) | (1 << 6)
+
 	// Enable mouse interrupt if any
 	if ps2_config & (1 << 5) != 0 {
 		ps2_config |= (1 << 1)
@@ -425,6 +650,7 @@ pub fn initialise() {
 
 	// Enable keyboard port
 	write_ps2(0x64, 0xae)
+
 	// Enable mouse port if any
 	if ps2_config & (1 << 5) != 0 {
 		write_ps2(0x64, 0xa8)
@@ -466,7 +692,9 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 
 	for i := u64(0); i < count; {
 		if console_bigbuf_i != 0 {
-			unsafe { buf[i] = console_bigbuf[0] }
+			unsafe {
+				buf[i] = console_bigbuf[0]
+			}
 			i++
 			console_bigbuf_i--
 			for j := u64(0); j < console_bigbuf_i; j++ {
@@ -527,13 +755,17 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		}
 		ioctl.tcgets {
 			mut t := &termios.Termios(argp)
-			unsafe { t[0] = this.termios }
+			unsafe {
+				t[0] = this.termios
+			}
 			return 0
 		}
 		// TODO: handle these differently
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
 			mut t := &termios.Termios(argp)
-			unsafe { this.termios = t[0] }
+			unsafe {
+				this.termios = t[0]
+			}
 			return 0
 		}
 		else {

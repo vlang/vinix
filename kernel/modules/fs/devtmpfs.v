@@ -37,8 +37,8 @@ fn (mut this DevTmpFSResource) mmap(page u64, flags int) voidptr {
 	copy_page := memory.pmm_alloc(1)
 
 	unsafe {
-		C.memcpy(voidptr(u64(copy_page) + higher_half),
-				 &this.storage[page * page_size], page_size)
+		C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[page * page_size],
+			page_size)
 	}
 
 	return copy_page
@@ -134,9 +134,9 @@ fn (mut this DevTmpFSResource) listen(handle voidptr, backlog int) ? {
 struct DevTmpFS {}
 
 __global (
-	devtmpfs_dev_id u64
+	devtmpfs_dev_id        u64
 	devtmpfs_inode_counter u64
-	devtmpfs_root &VFSNode
+	devtmpfs_root          &VFSNode
 )
 
 fn (this DevTmpFS) instantiate() &FileSystem {
@@ -157,7 +157,6 @@ fn (mut this DevTmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VF
 	return devtmpfs_root
 }
 
-
 // TODO	should it be maybe `mut parent`? doesn't `create_node` mutate `parent` in `unsafe`(passing it to `mut` field)?
 fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
@@ -169,7 +168,7 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 
 	if stat.isreg(mode) {
 		new_resource.capacity = 4096
-		new_resource.storage  = memory.malloc(new_resource.capacity)
+		new_resource.storage = memory.malloc(new_resource.capacity)
 	}
 
 	new_resource.stat.size = 0
@@ -218,5 +217,7 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	new_node.resource.stat.ino = devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1
 
-	unsafe { devtmpfs_root.children[name] = new_node }
+	unsafe {
+		devtmpfs_root.children[name] = new_node
+	}
 }

@@ -14,8 +14,7 @@ pub fn port_in<T>(port u16) T {
 pub fn port_out<T>(port u16, value T) {
 	asm volatile amd64 {
 		out port, value
-		;
-		; a (value)
+		; ; a (value)
 		  Nd (port)
 		; memory
 	}
@@ -35,8 +34,7 @@ pub fn mmin<T>(addr &T) T {
 pub fn mmout<T>(addr &T, value T) {
 	asm volatile amd64 {
 		mov [addr], value
-		;
-		; r (addr)
+		; ; r (addr)
 		  r (value)
 		; memory
 	}
