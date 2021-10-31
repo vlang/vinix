@@ -13,14 +13,19 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 	asm volatile amd64 {
 		cli
 	}
-	for cpu_local in cpu_locals {
-		if cpulocal.current().lapic_id == cpu_local.lapic_id {
-			continue
+	if smp_ready {
+		for cpu_local in cpu_locals {
+			if cpulocal.current().lapic_id == cpu_local.lapic_id {
+				continue
+			}
+			apic.lapic_send_ipi(byte(cpu_local.lapic_id), abort_vector)
+			for katomic.load(cpu_local.aborted) == false {}
 		}
-		apic.lapic_send_ipi(byte(cpu_local.lapic_id), abort_vector)
-		for katomic.load(cpu_local.aborted) == false {}
 	}
-	C.printf_panic(c'KERNEL PANIC: "%s" on CPU %d\n', message, cpulocal.current().cpu_number)
+
+	cpu_number := if smp_ready { cpulocal.current().cpu_number } else { 0 }
+
+	C.printf_panic(c'KERNEL PANIC: "%s" on CPU %d\n', message, cpu_number)
 	if voidptr(gpr_state) != voidptr(0) {
 		C.printf_panic(c'Error code: 0x%016llx\n', gpr_state.err)
 		C.printf_panic(c'Register dump:\n')

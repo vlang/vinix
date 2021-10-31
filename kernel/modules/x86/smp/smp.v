@@ -8,6 +8,7 @@ import x86.cpu.initialisation as cpuinit
 
 __global (
 	bsp_lapic_id = u32(0)
+	smp_ready = false
 )
 
 pub fn initialise(smp_tag &stivale2.SMPTag) {
@@ -41,6 +42,8 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 
 		for katomic.load(cpu_local.online) == 0 {}
 	}
+
+	smp_ready = true
 
 	print('smp: All CPUs online!\n')
 }

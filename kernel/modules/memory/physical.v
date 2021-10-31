@@ -28,6 +28,9 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 
 		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
+			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n',
+					 i, entries[i].base, entries[i].length, entries[i].entry_type)
+
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable)
 				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable) {
 				continue
@@ -91,6 +94,7 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 
 fn inner_alloc(count u64, limit u64) voidptr {
 	mut p := 0
+
 	for pmm_last_used_index < limit {
 		if !lib.bittest(pmm_bitmap, pmm_last_used_index) {
 			pmm_last_used_index++
@@ -118,8 +122,10 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 
 	last := pmm_last_used_index
 	mut ret := inner_alloc(count, pmm_avl_page_count)
+
 	if ret == 0 {
 		pmm_last_used_index = 0
+
 		ret = inner_alloc(count, last)
 		if ret == 0 {
 			lib.kpanic(voidptr(0), c'Out of memory')
