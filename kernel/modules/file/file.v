@@ -135,7 +135,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &stat.TimeSpec, sig
 		events << &resource.event
 	}
 
-	if events.len == 0 {
+	if ret != 0 || events.len == 0 {
 		return ret, 0
 	}
 

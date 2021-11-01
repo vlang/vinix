@@ -1,6 +1,6 @@
-From bc80297243f3b4968f1fb84466e215baea19852f Mon Sep 17 00:00:00 2001
+From 83e30ba02ab128b930c05c6e692b45394ee15d12 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 25 Oct 2021 02:03:56 +0200
+Date: Mon, 1 Nov 2021 01:41:37 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,13 +8,13 @@ Subject: [PATCH] Vinix specific changes
  meson.build                                   |   6 +-
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
- options/linux/include/asm/ioctls.h            |   2 +
+ options/linux-headers/include/asm/ioctls.h    |   2 +
  options/posix/generic/pthread-stubs.cpp       |  10 +
  options/posix/generic/unistd-stubs.cpp        |   4 +-
  options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 680 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 691 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  51 ++
- 37 files changed, 851 insertions(+), 5 deletions(-)
+ 37 files changed, 862 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -73,10 +73,10 @@ Subject: [PATCH] Vinix specific changes
  create mode 100644 sysdeps/vinix/meson.build
 
 diff --git a/abis/mlibc/signal.h b/abis/mlibc/signal.h
-index d6d1a70..24d5dbc 100644
+index 68146c4..bbd222a 100644
 --- a/abis/mlibc/signal.h
 +++ b/abis/mlibc/signal.h
-@@ -122,10 +122,12 @@ struct sigevent {
+@@ -120,10 +120,12 @@ struct sigevent {
  };
  
  struct sigaction {
@@ -92,10 +92,10 @@ index d6d1a70..24d5dbc 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 5745daf..28115ad 100644
+index da4ebf3..765ff1b 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -44,7 +44,7 @@ if not headers_only
+@@ -46,7 +46,7 @@ if not headers_only
  	add_languages('c', 'cpp')
  	c_compiler = meson.get_compiler('c')
  
@@ -104,7 +104,7 @@ index 5745daf..28115ad 100644
  	add_project_arguments('-std=c++20', language: 'cpp')
  	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
  	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
-@@ -103,6 +103,10 @@ elif host_machine.system() == 'qword'
+@@ -105,6 +105,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -157,10 +157,10 @@ index 0bd4a05..d2a1e9a 100644
  } //namespace mlibc
  
  #endif // MLIBC_INTERNAL_SYSDEPS
-diff --git a/options/linux/include/asm/ioctls.h b/options/linux/include/asm/ioctls.h
+diff --git a/options/linux-headers/include/asm/ioctls.h b/options/linux-headers/include/asm/ioctls.h
 index 41d4248..f246d1d 100644
---- a/options/linux/include/asm/ioctls.h
-+++ b/options/linux/include/asm/ioctls.h
+--- a/options/linux-headers/include/asm/ioctls.h
++++ b/options/linux-headers/include/asm/ioctls.h
 @@ -5,6 +5,8 @@
  
  #define TCGETS 0x5401
@@ -301,10 +301,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..a844255
+index 0000000..6f8d913
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,680 @@
+@@ -0,0 +1,691 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -404,6 +404,17 @@ index 0000000..a844255
 +        return ret.errno;
 +
 +    *num_events = (int)ret.ret;
++    return 0;
++}
++
++int sys_epoll_pwait(int epfd, struct epoll_event *ev, int n,
++                    int timeout, const sigset_t *sigmask, int *raised) {
++    __syscall_ret ret = __syscall(49, epfd, ev, n, timeout, sigmask);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *raised = (int)ret.ret;
 +    return 0;
 +}
 +

@@ -654,7 +654,7 @@ packages:
 
   - name: mlibc-headers
     from_source: mlibc
-    revision: 2
+    revision: 3
     implict_package: true
     configure:
       - args:
@@ -674,7 +674,7 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 2
+    revision: 3
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]
