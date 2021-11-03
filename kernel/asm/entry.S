@@ -40,5 +40,5 @@ stack_top:
 stivale_hdr:
 .quad 0                     // entry_point
 .quad stack_top             // stack
-.quad (1 << 1) | (1 << 2) | (1 << 3)  // flags
+.quad (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) // flags
 .quad any_video_hdr_tag     // next
