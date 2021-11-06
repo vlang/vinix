@@ -17,34 +17,29 @@ import file
 import userland
 import proc
 
-const max_scancode = 0x57
-
-const capslock = 0x3a
-
-const left_alt = 0x38
-
-const left_alt_rel = 0xb8
-
-const right_shift = 0x36
-
-const left_shift = 0x2a
-
-const right_shift_rel = 0xb6
-
-const left_shift_rel = 0xaa
-
-const ctrl = 0x1d
-
-const ctrl_rel = 0x9d
-
-const console_buffer_size = 1024
-
-const console_bigbuf_size = 4096
+const (
+	max_scancode = 0x57
+	capslock = 0x3a
+	numlock = 0x45
+	left_alt = 0x38
+	left_alt_rel = 0xb8
+	right_shift = 0x36
+	left_shift = 0x2a
+	right_shift_rel = 0xb6
+	left_shift_rel = 0xaa
+	ctrl = 0x1d
+	ctrl_rel = 0x9d
+	console_buffer_size = 1024
+	console_bigbuf_size = 4096
+)
 
 __global (
+	console_convtab_numpad_numlock map[byte]byte
+
 	console_res             = &Console(0)
 	console_read_lock       klock.Lock
 	console_event           eventstruct.Event
+	console_numlock_active  = bool(false)
 	console_capslock_active = bool(false)
 	console_shift_active    = bool(false)
 	console_ctrl_active     = bool(false)
@@ -409,6 +404,23 @@ fn keyboard_handler() {
 
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
+	console_convtab_numpad_numlock = {
+		byte(0x37): byte(`*`)
+		byte(0x4a): byte(`-`)
+		byte(0x4e): byte(`+`)
+		byte(0x47): byte(`7`)
+		byte(0x48): byte(`8`)
+		byte(0x49): byte(`9`)
+		byte(0x4b): byte(`4`)
+		byte(0x4c): byte(`5`)
+		byte(0x4d): byte(`6`)
+		byte(0x4f): byte(`1`)
+		byte(0x50): byte(`2`)
+		byte(0x51): byte(`3`)
+		byte(0x52): byte(`0`)
+		byte(0x53): byte(`.`)
+	}
+
 	for {
 		mut events := [&int_events[vect]]
 		event.await(mut events, true) or {}
@@ -429,6 +441,14 @@ fn keyboard_handler() {
 				}
 				console.ctrl_rel {
 					console_ctrl_active = false
+					continue
+				}
+				0x1c {
+					add_to_buf(c'\n', 1, true)
+					continue
+				}
+				0x35 {
+					add_to_buf(c'/', 1, true)
 					continue
 				}
 				0x48 {
@@ -497,6 +517,10 @@ fn keyboard_handler() {
 		}
 
 		match input_byte {
+			console.numlock {
+				console_numlock_active = true
+				continue
+			}
 			console.left_alt {
 				console_alt_active = true
 				continue
@@ -529,21 +553,26 @@ fn keyboard_handler() {
 		}
 
 		mut c := byte(0)
-		if input_byte < console.max_scancode {
-			if console_capslock_active == false && console_shift_active == false {
-				c = console.convtab_nomod[input_byte]
-			}
-			if console_capslock_active == false && console_shift_active == true {
-				c = console.convtab_shift[input_byte]
-			}
-			if console_capslock_active == true && console_shift_active == false {
-				c = console.convtab_capslock[input_byte]
-			}
-			if console_capslock_active == true && console_shift_active == true {
-				c = console.convtab_shift_capslock[input_byte]
-			}
+
+		if input_byte in console_convtab_numpad_numlock {
+			c = console_convtab_numpad_numlock[input_byte]
 		} else {
-			continue
+			if input_byte < console.max_scancode {
+				if console_capslock_active == false && console_shift_active == false {
+					c = console.convtab_nomod[input_byte]
+				}
+				if console_capslock_active == false && console_shift_active == true {
+					c = console.convtab_shift[input_byte]
+				}
+				if console_capslock_active == true && console_shift_active == false {
+					c = console.convtab_capslock[input_byte]
+				}
+				if console_capslock_active == true && console_shift_active == true {
+					c = console.convtab_shift_capslock[input_byte]
+				}
+			} else {
+				continue
+			}
 		}
 
 		if console_ctrl_active {
