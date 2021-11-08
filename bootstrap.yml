@@ -1346,8 +1346,8 @@ packages:
   - name: pcre
     source:
       subdir: '3rdparty'
-      svn: 'svn://vcs.pcre.org/pcre/code/trunk'
-      rev: '1767'
+      git: 'https://github.com/vinix-os/pcre.git'
+      tag: '1767'
       # Seems to be 8.45?
       version: '8.45'
       tools_required:
@@ -1355,6 +1355,7 @@ packages:
         - host-automake-v1.16
         - host-libtool
         - host-pkg-config
+        - host-autoconf-archive
       regenerate:
         - args: ['./autogen.sh']
     tools_required:
@@ -1363,6 +1364,7 @@ packages:
       - host-automake-v1.16
     pkgs_required:
       - mlibc
+    revision: 2
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
