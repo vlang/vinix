@@ -15,7 +15,7 @@ INTERNALCFLAGS :=                 \
 	-ffreestanding                \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
-	-fpie                         \
+	-fno-pic                      \
 	-ffunction-sections           \
 	-fdata-sections               \
 	-mno-80387                    \
@@ -24,6 +24,7 @@ INTERNALCFLAGS :=                 \
 	-mno-sse                      \
 	-mno-sse2                     \
 	-mno-red-zone                 \
+	-mcmodel=kernel               \
 	-Wno-address-of-packed-member \
 	-Wno-unused-label             \
 	-Wno-unused-function          \
@@ -35,9 +36,6 @@ INTERNALLDFLAGS :=         \
 	-nostdlib              \
 	-zmax-page-size=0x200000 \
 	-static                \
-	-pie                   \
-	--no-dynamic-linker    \
-	-ztext                 \
 	-gc-sections
 
 INTERNALVFLAGS :=   \
