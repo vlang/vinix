@@ -42,17 +42,17 @@ sources:
   - name: tzdata
     subdir: '3rdparty'
     sources_required: ['tzcode']
-    url: 'https://data.iana.org/time-zones/releases/tzdata2021a.tar.gz'
+    url: 'https://data.iana.org/time-zones/releases/tzdata2021e.tar.gz'
     format: 'tar.gz'
-    version: '2021a'
+    version: '2021e'
     regenerate:
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/../tzcode/.', '@THIS_SOURCE_DIR@/']
 
   - name: tzcode
     subdir: '3rdparty'
-    url: 'https://data.iana.org/time-zones/releases/tzcode2021a.tar.gz'
+    url: 'https://data.iana.org/time-zones/releases/tzcode2021e.tar.gz'
     format: 'tar.gz'
-    version: '2021a'
+    version: '2021e'
 
   - name: binutils
     subdir: '3rdparty'
