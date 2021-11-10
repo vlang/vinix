@@ -1,6 +1,6 @@
-From c9e6a12e2e262713b6d6192782105a348882f1eb Mon Sep 17 00:00:00 2001
+From 5d88982bb932597b8baf1e4a2441fcc925437ea3 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 6 Sep 2021 22:53:49 +0200
+Date: Thu, 11 Nov 2021 00:30:59 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,12 +8,12 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 4 insertions(+)
 
 diff --git a/configure b/configure
-index 06f344f..e28583e 100755
+index 421cf85..f7570a6 100755
 --- a/configure
 +++ b/configure
-@@ -5961,6 +5961,10 @@ echo "${ECHO_T}$cf_cv_ldflags_search_paths_first" >&6
- 
- 		MK_SHARED_LIB='${CC} ${LDFLAGS} ${CFLAGS} -shared -Wl,-soname,'$cf_cv_shared_soname',-stats,-lc -o $@'
+@@ -6423,6 +6423,10 @@ CF_EOF
+ 		LINK_PROGS="$SHELL ${rel_builddir}/mk_prog.sh"
+ 		LINK_TESTS="$SHELL ${rel_builddir}/mk_prog.sh"
  		;;
 +	(vinix*)
 +		CC_SHARED_OPTS='-fPIC'
@@ -23,5 +23,5 @@ index 06f344f..e28583e 100755
  		cf_cv_shlib_version=mingw
  		cf_cv_shlib_version_infix=mingw
 -- 
-2.33.0
+2.33.1
 

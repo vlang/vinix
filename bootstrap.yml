@@ -736,8 +736,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/ThomasDickey/ncurses-snapshots.git'
-      tag: 'v6_2'
-      version: '6.2'
+      tag: 'v6_3'
+      version: '6.3'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
