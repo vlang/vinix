@@ -237,8 +237,8 @@ tools:
       name: automake-v1.16
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/automake.git'
-      tag: 'v1.16.4'
-      version: '1.16.4'
+      tag: 'v1.16.5'
+      version: '1.16.5'
       tools_required:
         - host-autoconf-v2.69
       regenerate:
