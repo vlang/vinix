@@ -226,8 +226,8 @@ tools:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/autoconf-archive/autoconf-archive.git'
-      tag: 'v2019.01.06'
-      version: '2019.01.06'
+      tag: 'v2021.02.19'
+      version: '2021.02.19'
     install:
       - args: ['mkdir', '-p', '@BUILD_ROOT@/tools/host-autoconf-archive/share/']
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@BUILD_ROOT@/tools/host-autoconf-archive/share/aclocal']
