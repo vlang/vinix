@@ -1,6 +1,6 @@
-From 83e30ba02ab128b930c05c6e692b45394ee15d12 Mon Sep 17 00:00:00 2001
+From 9df51ce0b458bd0705a9b2a3530daad71d8e83e7 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 1 Nov 2021 01:41:37 +0100
+Date: Thu, 11 Nov 2021 00:06:31 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -92,10 +92,10 @@ index 68146c4..bbd222a 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index da4ebf3..765ff1b 100644
+index 55e9070..450e16f 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -46,7 +46,7 @@ if not headers_only
+@@ -47,7 +47,7 @@ if not headers_only
  	add_languages('c', 'cpp')
  	c_compiler = meson.get_compiler('c')
  
@@ -104,7 +104,7 @@ index da4ebf3..765ff1b 100644
  	add_project_arguments('-std=c++20', language: 'cpp')
  	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
  	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
-@@ -105,6 +105,10 @@ elif host_machine.system() == 'qword'
+@@ -106,6 +106,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -192,10 +192,10 @@ index bc58c1b..4219583 100644
  int pthread_attr_init(pthread_attr_t *) {
  	return 0;
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
-index 456bf0d..230254a 100644
+index 7380d07..3d1b6b3 100644
 --- a/options/posix/generic/unistd-stubs.cpp
 +++ b/options/posix/generic/unistd-stubs.cpp
-@@ -821,12 +821,12 @@ int ttyname_r(int, char *, size_t) {
+@@ -822,12 +822,12 @@ int ttyname_r(int, char *, size_t) {
  }
  
  int unlink(const char *path) {
