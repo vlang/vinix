@@ -1162,8 +1162,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/grep.git'
-      tag: 'v3.6'
-      version: '3.6'
+      tag: 'v3.7'
+      version: '3.7'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
