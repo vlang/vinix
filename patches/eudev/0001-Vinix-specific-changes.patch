@@ -1,6 +1,6 @@
-From 2021d91dc3fe9c99bb4f88a4647b3feeb27eab84 Mon Sep 17 00:00:00 2001
+From 0211defb51f0a95a5f5db0ee43d745970bd25c57 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 11 Sep 2021 08:12:01 +0200
+Date: Thu, 11 Nov 2021 04:02:19 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -228,5 +228,5 @@ index cf826c6..3537fd3 100644
                  fprintf(f, "<30>udevd[%u]: starting eudev-" VERSION "\n", getpid());
                  fclose(f);
 -- 
-2.33.0
+2.33.1
 

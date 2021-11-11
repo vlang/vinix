@@ -1704,7 +1704,7 @@ packages:
   - name: eudev
     source:
       subdir: '3rdparty'
-      git: 'https://github.com/gentoo/eudev.git'
+      git: 'https://github.com/eudev-project/eudev.git'
       tag: 'v3.2.10'
       version: '3.2.10'
       tools_required:
