@@ -1,6 +1,6 @@
-From a8bc1170e15f54c6b76e658d582065d74222edf2 Mon Sep 17 00:00:00 2001
+From 06d0415700517dd307e133db4a12d838b3c34cf7 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 9 Sep 2021 06:18:11 +0200
+Date: Thu, 11 Nov 2021 00:51:34 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,7 +8,7 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Makefile.am b/Makefile.am
-index 5041753..5da919b 100644
+index 8e96ebe..3df5468 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -19,7 +19,7 @@
@@ -21,5 +21,5 @@ index 5041753..5da919b 100644
  ACLOCAL_AMFLAGS = -I m4
  AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 -- 
-2.33.0
+2.33.1
 

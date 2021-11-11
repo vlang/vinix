@@ -1194,8 +1194,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/diffutils.git'
-      tag: 'v3.7'
-      version: '3.7'
+      tag: 'v3.8'
+      version: '3.8'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
