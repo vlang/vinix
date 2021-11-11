@@ -654,7 +654,6 @@ packages:
 
   - name: mlibc-headers
     from_source: mlibc
-    revision: 3
     implict_package: true
     configure:
       - args:
@@ -674,7 +673,6 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 3
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]
@@ -1364,7 +1362,6 @@ packages:
       - host-automake-v1.16
     pkgs_required:
       - mlibc
-    revision: 2
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -2045,7 +2042,6 @@ packages:
       - openssl
       - xz-utils
       - libintl
-    revision: 2
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
