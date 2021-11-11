@@ -574,6 +574,9 @@ tasks:
       - gcc
       - gawk
       - vim
+      - grep
+      - file
+      - util-linux
     artifact_files:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
@@ -2325,7 +2328,7 @@ packages:
         - '--disable-xzlib'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
@@ -2464,7 +2467,7 @@ packages:
         - '--disable-makeinstall-chown'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/bin']
@@ -2559,7 +2562,7 @@ packages:
         - '--disable-makeinstall-chown'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/include']
