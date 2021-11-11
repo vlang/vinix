@@ -204,6 +204,31 @@ sources:
         environ:
           NOCONFIGURE: 'yes'
 
+  - name: file
+    subdir: 3rdparty
+    git: 'https://github.com/file/file.git'
+    tag: 'FILE5_40'
+    version: '5.40'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-libtool
+    regenerate:
+      - args: ['autoreconf', '-f', '-i']
+
+  - name: util-linux
+    subdir: 3rdparty
+    git: 'https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git'
+    tag: 'v2.36.2'
+    version: '2.36.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']
+
 tools:
   - name: host-autoconf-v2.69
     source:
@@ -515,6 +540,21 @@ tools:
     install:
       - args: ['make', 'install']
 
+  - name: host-file
+    from_source: file
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-libtool
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
 tasks:
   - name: make-iso
     tools_required:
@@ -528,7 +568,6 @@ tasks:
       - coreutils
       - nano
       - tzdata
-      - grep
       - diffutils
       - sed
       - binutils
@@ -2268,3 +2307,262 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: file
+    from_source: file
+    tools_required:
+      - host-gcc
+      - host-file
+    pkgs_required:
+      - mlibc
+      - zlib
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--disable-bzlib'
+        - '--disable-xzlib'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: util-linux-libs
+    from_source: util-linux
+    tools_required:
+      - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+    pkgs_required:
+      - readline
+      - ncurses
+      - zlib
+      - libiconv
+      - file
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--exec-prefix=/usr'
+        - '--libdir=/usr/lib'
+        - '--bindir=/usr/bin'
+        - '--sbindir=/usr/sbin'
+        - '--without-udev'
+        - '--disable-nls'
+        - '--disable-static'
+        - '--without-python'
+        - '--without-systemd'
+        - '--without-systemdsystemunitdir'
+        - '--disable-fdisks'
+        - '--disable-mount'
+        - '--disable-losetup'
+        - '--disable-zramctl'
+        - '--disable-fsck'
+        - '--disable-partx'
+        - '--disable-uuidd'
+        - '--disable-wipefs'
+        - '--disable-mountpoint'
+        - '--disable-fallocate'
+        - '--disable-unshare'
+        - '--disable-nsenter'
+        - '--disable-setpriv'
+        - '--disable-hardlink'
+        - '--disable-eject'
+        - '--disable-agetty'
+        - '--disable-plymouth_support'
+        - '--disable-cramfs'
+        - '--disable-bfs'
+        - '--disable-minix'
+        - '--disable-fdformat'
+        - '--disable-hwclock'
+        - '--disable-hwclock-cmos'
+        - '--disable-hwclock-gplv3'
+        - '--disable-mkfs'
+        - '--disable-isosize'
+        - '--disable-lsblk'
+        - '--disable-lslogins'
+        - '--disable-wdctl'
+        - '--disable-swaplabel'
+        - '--disable-mkswap'
+        - '--disable-cal'
+        - '--disable-logger'
+        - '--disable-look'
+        - '--disable-mcookie'
+        - '--disable-namei'
+        - '--disable-getopt'
+        - '--disable-blockdev'
+        - '--disable-lslocks'
+        - '--disable-switch_root'
+        - '--disable-pivot_root'
+        - '--disable-flock'
+        - '--disable-lsmem'
+        - '--disable-chmem'
+        - '--disable-ipcmk'
+        - '--disable-ipcrm'
+        - '--disable-ipcs'
+        - '--disable-irqtop'
+        - '--disable-lsirq'
+        - '--disable-choom'
+        - '--disable-renice'
+        - '--disable-rfkill'
+        - '--disable-setsid'
+        - '--disable-ctrlaltdel'
+        - '--disable-script'
+        - '--disable-scriptreplay'
+        - '--disable-scriptlive'
+        - '--disable-col'
+        - '--disable-colcrt'
+        - '--disable-colrm'
+        - '--disable-column'
+        - '--disable-hexdump'
+        - '--disable-rev'
+        - '--disable-kill'
+        - '--disable-last'
+        - '--disable-utmpdump'
+        - '--disable-mesg'
+        - '--disable-raw'
+        - '--disable-rename'
+        - '--disable-chfn-chsh'
+        - '--disable-login'
+        - '--disable-nologin'
+        - '--disable-sulogin'
+        - '--disable-su'
+        - '--disable-runuser'
+        - '--disable-ul'
+        - '--disable-more'
+        - '--disable-setterm'
+        - '--disable-schedutils'
+        - '--disable-pg-bell'
+        - '--disable-fstrim'
+        - '--disable-swapon'
+        - '--disable-lscpu'
+        - '--disable-chcpu'
+        - '--disable-blockdev'
+        - '--disable-prlimit'
+        - '--disable-lsipc'
+        - '--disable-lsns'
+        - '--disable-readprofile'
+        - '--disable-dmesg'
+        - '--disable-fincore'
+        - '--disable-fsfreeze'
+        - '--disable-blkdiscard'
+        - '--disable-blkzone'
+        - '--disable-ldattach'
+        - '--disable-rtcwake'
+        - '--disable-setarch'
+        - '--disable-tunelp'
+        - '--disable-wall'
+        - '--disable-bash-completion'
+        - '--without-cap-ng'
+        - '--without-btrfs'
+        - '--without-selinux'
+        - '--without-audit'
+        - '--enable-usrdir-path'
+        - '--disable-makeinstall-chown'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/bin']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/sbin']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/bash-completion']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man1']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man8']
+
+  - name: util-linux
+    from_source: util-linux
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - eudev
+      - util-linux-libs
+      - readline
+      - ncurses
+      - zlib
+      - libiconv
+      - file
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--exec-prefix=/usr'
+        - '--libdir=/usr/lib'
+        - '--bindir=/usr/bin'
+        - '--sbindir=/usr/sbin'
+        - '--with-udev'
+        - '--disable-nls'
+        - '--disable-static'
+        - '--without-python'
+        - '--without-systemd'
+        - '--without-systemdsystemunitdir'
+        - '--disable-partx'
+        - '--disable-fallocate'
+        - '--disable-unshare'
+        - '--disable-nsenter'
+        - '--disable-setpriv'
+        - '--disable-eject'
+        - '--disable-plymouth_support'
+        - '--disable-fdformat'
+        - '--disable-hwclock'
+        - '--disable-hwclock-cmos'
+        - '--disable-hwclock-gplv3'
+        - '--disable-wdctl'
+        - '--disable-logger'
+        - '--disable-switch_root'
+        - '--disable-pivot_root'
+        - '--disable-chmem'
+        - '--disable-ipcrm'
+        - '--disable-ipcs'
+        - '--disable-irqtop'
+        - '--disable-rfkill'
+        - '--disable-utmpdump'
+        - '--disable-raw'
+        - '--disable-chfn-chsh'
+        - '--disable-login'
+        - '--disable-nologin'
+        - '--disable-sulogin'
+        - '--disable-su'
+        - '--disable-runuser'
+        - '--disable-setterm'
+        - '--disable-schedutils'
+        - '--disable-pg-bell'
+        - '--disable-fstrim'
+        - '--disable-swapon'
+        - '--disable-lscpu'
+        - '--disable-chcpu'
+        - '--disable-blockdev'
+        - '--disable-prlimit'
+        - '--disable-lsipc'
+        - '--disable-lsns'
+        - '--disable-readprofile'
+        - '--disable-dmesg'
+        - '--disable-fincore'
+        - '--disable-fsfreeze'
+        - '--disable-blkdiscard'
+        - '--disable-blkzone'
+        - '--disable-ldattach'
+        - '--disable-rtcwake'
+        - '--disable-setarch'
+        - '--disable-tunelp'
+        - '--enable-write'
+        - '--without-cap-ng'
+        - '--without-btrfs'
+        - '--without-selinux'
+        - '--without-audit'
+        - '--enable-usrdir-path'
+        - '--disable-makeinstall-chown'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/include']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/lib']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man3']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man5/terminal-colors.d.5']

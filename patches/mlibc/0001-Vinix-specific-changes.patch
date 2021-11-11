@@ -1,6 +1,6 @@
-From 9df51ce0b458bd0705a9b2a3530daad71d8e83e7 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 11 Nov 2021 00:06:31 +0100
+From 7fce684f5d157e868838c484a16076bff6a813a8 Mon Sep 17 00:00:00 2001
+From: streaksu <assemblyislaw@gmail.com>
+Date: Thu, 11 Nov 2021 11:27:57 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -40,8 +40,8 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/uid_t.h        |   1 +
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
- sysdeps/vinix/meson.build                     |  51 ++
- 37 files changed, 862 insertions(+), 5 deletions(-)
+ sysdeps/vinix/meson.build                     |  52 ++
+ 37 files changed, 863 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -1118,11 +1118,11 @@ index 0000000..ecc3ddb
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/resource.h b/sysdeps/vinix/include/abi-bits/resource.h
 new file mode 120000
-index 0000000..3e59c75
+index 0000000..260b022
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/resource.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/resource.h
++../../../../abis/linux/x86_64/resource.h
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/seek-whence.h b/sysdeps/vinix/include/abi-bits/seek-whence.h
 new file mode 120000
@@ -1158,11 +1158,11 @@ index 0000000..82642c3
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/termios.h b/sysdeps/vinix/include/abi-bits/termios.h
 new file mode 120000
-index 0000000..cfcfe76
+index 0000000..6a7d94e
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/termios.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/termios.h
++../../../../abis/linux/x86_64/termios.h
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/time.h b/sysdeps/vinix/include/abi-bits/time.h
 new file mode 120000
@@ -1198,10 +1198,10 @@ index 0000000..6d911c7
 \ No newline at end of file
 diff --git a/sysdeps/vinix/meson.build b/sysdeps/vinix/meson.build
 new file mode 100644
-index 0000000..1207fe0
+index 0000000..b9e4372
 --- /dev/null
 +++ b/sysdeps/vinix/meson.build
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,52 @@
 +
 +rtdl_sources += files(
 +	'generic/generic.cpp'
@@ -1221,6 +1221,7 @@ index 0000000..1207fe0
 +		'include/abi-bits/errno.h',
 +		'include/abi-bits/fcntl.h',
 +		'include/abi-bits/in.h',
++		'include/abi-bits/reboot.h',
 +		'include/abi-bits/resource.h',
 +		'include/abi-bits/stat.h',
 +		'include/abi-bits/signal.h',
