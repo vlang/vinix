@@ -1948,8 +1948,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig'
-      tag: '2.13.92'
-      version: '2.13.92'
+      tag: '2.13.94'
+      version: '2.13.94'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
