@@ -696,7 +696,7 @@ packages:
   - name: mlibc-headers
     from_source: mlibc
     implict_package: true
-    revision: 2
+    revision: 3
     configure:
       - args:
         - 'meson'
@@ -715,7 +715,7 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 2
+    revision: 3
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]
