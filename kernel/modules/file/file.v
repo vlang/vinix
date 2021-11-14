@@ -9,6 +9,7 @@ import stat
 import event
 import event.eventstruct
 import memory.mmap
+import time
 
 pub const f_dupfd = 1
 
@@ -70,7 +71,7 @@ pub const pollnval = 0x40
 
 pub const pollwrnorm = 0x80
 
-pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &stat.TimeSpec, sigmask &u64) (u64, u64) {
+pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', voidptr(fds),
 		nfds, voidptr(tmo_p), voidptr(sigmask))
 	defer {
