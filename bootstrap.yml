@@ -576,7 +576,6 @@ tasks:
       - vim
       - grep
       - file
-      - util-linux
     artifact_files:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
