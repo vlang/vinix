@@ -26,6 +26,7 @@ import dev.streams
 import dev.random
 import syscall.table
 import socket
+import time
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -113,6 +114,12 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 	})
 
 	smp.initialise(smp_tag)
+
+	epoch_tag := &stivale2.EpochTag(stivale2.get_tag(stivale2_struct, stivale2.epoch_id) or {
+		panic('Stivale2 epoch tag missing')
+	})
+
+	time.initialise(epoch_tag.epoch)
 
 	sched.initialise()
 

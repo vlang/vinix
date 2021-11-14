@@ -1,6 +1,6 @@
-From 7fce684f5d157e868838c484a16076bff6a813a8 Mon Sep 17 00:00:00 2001
-From: streaksu <assemblyislaw@gmail.com>
-Date: Thu, 11 Nov 2021 11:27:57 +0100
+From 90cb8b1951ab7df232be6b9bfa8cd6342cb7504c Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Sun, 14 Nov 2021 09:38:46 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -14,7 +14,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 691 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 698 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 37 files changed, 863 insertions(+), 5 deletions(-)
+ 37 files changed, 870 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -301,10 +301,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..6f8d913
+index 0000000..cb1dda9
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,691 @@
+@@ -0,0 +1,698 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -734,9 +734,16 @@ index 0000000..6f8d913
 +}
 +
 +int sys_clock_get(int clock, time_t *secs, long *nanos) {
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+    *secs  = 0;
-+    *nanos = 0;
++    struct timespec ts;
++    __syscall_ret ret = __syscall(50, clock, &ts);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *secs = ts.tv_sec;
++    *nanos = ts.tv_nsec;
++
 +    return 0;
 +}
 +

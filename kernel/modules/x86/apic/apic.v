@@ -3,22 +3,18 @@ module apic
 import x86.kio
 import x86.msr
 import x86.cpu.local as cpulocal
+import time
 
-const lapic_reg_icr0 = 0x300
-
-const lapic_reg_icr1 = 0x310
-
-const lapic_reg_spurious = 0x0f0
-
-const lapic_reg_eoi = 0x0b0
-
-const lapic_reg_timer = 0x320
-
-const lapic_reg_timer_initcnt = 0x380
-
-const lapic_reg_timer_curcnt = 0x390
-
-const lapic_reg_timer_div = 0x3e0
+const (
+	lapic_reg_icr0 = 0x300
+	lapic_reg_icr1 = 0x310
+	lapic_reg_spurious = 0x0f0
+	lapic_reg_eoi = 0x0b0
+	lapic_reg_timer = 0x320
+	lapic_reg_timer_initcnt = 0x380
+	lapic_reg_timer_curcnt = 0x390
+	lapic_reg_timer_div = 0x3e0
+)
 
 fn lapic_read(reg u32) u32 {
 	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
@@ -28,13 +24,6 @@ fn lapic_read(reg u32) u32 {
 fn lapic_write(reg u32, val u32) {
 	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
 	kio.mmout(&u32(lapic_base + reg), val)
-}
-
-fn pit_current_count() u16 {
-	kio.port_out<byte>(0x43, 0)
-	lo := kio.port_in<byte>(0x40)
-	hi := kio.port_in<byte>(0x40)
-	return (hi << 8) | lo
 }
 
 pub fn lapic_timer_stop() {
@@ -50,22 +39,19 @@ pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 	lapic_write(apic.lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
 	lapic_write(apic.lapic_reg_timer_div, 0)
 
-	pit_freq := u64(1193182)
+	time.pit_set_current_count(0)
 
-	kio.port_out<byte>(0x40, 0x0)
-	kio.port_out<byte>(0x40, 0x0)
-
-	initial_pit_tick := u64(pit_current_count())
+	initial_pit_tick := u64(time.pit_get_current_count())
 
 	lapic_write(apic.lapic_reg_timer_initcnt, u32(samples))
 
 	for lapic_read(apic.lapic_reg_timer_curcnt) != 0 {}
 
-	final_pit_tick := u64(pit_current_count())
+	final_pit_tick := u64(time.pit_get_current_count())
 
 	pit_ticks := initial_pit_tick - final_pit_tick
 
-	cpu_local.lapic_timer_freq = (samples / pit_ticks) * pit_freq
+	cpu_local.lapic_timer_freq = (samples / pit_ticks) * time.pit_dividend
 
 	lapic_timer_stop()
 }

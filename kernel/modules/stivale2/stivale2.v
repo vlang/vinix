@@ -12,6 +12,7 @@ pub const (
 	smp_id = 0x34d1d96339647025
 	pmr_id = 0x5df266a64047b6bd
 	kernel_base_addr_id = 0x060d78874a2a8af0
+	epoch_id = 0x566a7bed888e1407
 )
 
 [packed]
@@ -121,6 +122,13 @@ pub mut:
 	target_stack u64
 	goto_address u64
 	extra_arg    u64
+}
+
+[packed]
+struct EpochTag {
+pub mut:
+	tag   Tag
+	epoch u64
 }
 
 [packed]

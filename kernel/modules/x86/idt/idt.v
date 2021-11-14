@@ -65,14 +65,7 @@ fn prepare_interrupt_thunks() {
 
 			C.memcpy(ptr, v_interrupt_thunk_begin, v_interrupt_thunk_size)
 			shift := match i {
-				8 { 2 }
-				10 { 2 }
-				11 { 2 }
-				12 { 2 }
-				13 { 2 }
-				14 { 2 }
-				17 { 2 }
-				30 { 2 }
+				8, 10, 11, 12, 13, 14, 17, 30 { 2 }
 				else { 0 }
 			}
 
