@@ -1,6 +1,5 @@
 module userland
 
-import resource
 import stat
 import klock
 import event.eventstruct
@@ -64,14 +63,6 @@ fn (mut this SignalFD) unref(handle voidptr) ? {
 
 fn (mut this SignalFD) grow(handle voidptr, new_size u64) ? {
 	return error('')
-}
-
-fn (mut this SignalFD) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	return resource.default_bind(handle, _addr, addrlen)
-}
-
-fn (mut this SignalFD) listen(handle voidptr, backlog int) ? {
-	return resource.default_listen(handle, backlog)
 }
 
 pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {

@@ -80,14 +80,6 @@ fn (mut this EPoll) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
-fn (mut this EPoll) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	return resource.default_bind(handle, _addr, addrlen)
-}
-
-fn (mut this EPoll) listen(handle voidptr, backlog int) ? {
-	return resource.default_listen(handle, backlog)
-}
-
 pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPollEvent) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', epfdnum, op, fdnum,
 		voidptr(event))

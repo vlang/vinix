@@ -1,11 +1,19 @@
 module socket
 
-import resource
+import resource { Resource }
 import file
 import errno
 import socket.public as sock_pub
 import socket.unix as sock_unix
 import socket.netlink as sock_netlink
+
+pub interface Socket {
+	Resource
+
+mut:
+	bind(handle voidptr, _addr voidptr, addrlen u64) ?
+	listen(handle voidptr, backlog int) ?
+}
 
 pub fn initialise() {}
 
@@ -105,7 +113,19 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64)
 		fd.unref()
 	}
 
-	fd.handle.resource.bind(fd.handle, _addr, addrlen) or { return -1, errno.get() }
+	res := fd.handle.resource
+
+	mut socket := &Socket(voidptr(0))
+
+	if res is sock_unix.UnixSocket {
+		socket = res
+	} else if res is sock_netlink.NetlinkSocket {
+		socket = res
+	} else {
+		return -1, errno.einval
+	}
+
+	socket.bind(fd.handle, _addr, addrlen) or { return -1, errno.get() }
 
 	return 0, 0
 }
@@ -121,7 +141,19 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		fd.unref()
 	}
 
-	fd.handle.resource.listen(fd.handle, backlog) or { return -1, errno.get() }
+	res := fd.handle.resource
+
+	mut socket := &Socket(voidptr(0))
+
+	if res is sock_unix.UnixSocket {
+		socket = res
+	} else if res is sock_netlink.NetlinkSocket {
+		socket = res
+	} else {
+		return -1, errno.einval
+	}
+
+	socket.listen(fd.handle, backlog) or { return -1, errno.get() }
 
 	return 0, 0
 }

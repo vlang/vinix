@@ -95,14 +95,6 @@ fn (mut this Partition) grow(handle voidptr, new_size u64) ? {
 	return this.parent_device.grow(handle, new_size)
 }
 
-fn (mut this Partition) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	return resource.default_bind(handle, _addr, addrlen)
-}
-
-fn (mut this Partition) listen(handle voidptr, backlog int) ? {
-	return resource.default_listen(handle, backlog)
-}
-
 fn (mut this Partition) mmap(page u64, flags int) voidptr {
 	return this.parent_device.mmap(page, flags)
 }

@@ -195,11 +195,3 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
-
-fn (mut this Pipe) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	return resource.default_bind(handle, _addr, addrlen)
-}
-
-fn (mut this Pipe) listen(handle voidptr, backlog int) ? {
-	return resource.default_listen(handle, backlog)
-}

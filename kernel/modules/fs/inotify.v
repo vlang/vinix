@@ -42,14 +42,6 @@ fn (mut this INotify) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
-fn (mut this INotify) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	return resource.default_bind(handle, _addr, addrlen)
-}
-
-fn (mut this INotify) listen(handle voidptr, backlog int) ? {
-	return resource.default_listen(handle, backlog)
-}
-
 pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: inotify_init(%d)\n', flags)
 	defer {
