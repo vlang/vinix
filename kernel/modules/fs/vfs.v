@@ -7,23 +7,17 @@ import proc
 import file
 import errno
 
-pub const at_fdcwd = -100
-
-pub const at_empty_path = 1
-
-pub const at_symlink_follow = 2
-
-pub const at_symlink_nofollow = 4
-
-pub const at_removedir = 8
-
-pub const at_eaccess = 512
-
-pub const seek_cur = 1
-
-pub const seek_end = 2
-
-pub const seek_set = 3
+pub const (
+	at_fdcwd = -100
+	at_empty_path = 1
+	at_symlink_follow = 2
+	at_symlink_nofollow = 4
+	at_removedir = 8
+	at_eaccess = 512
+	seek_cur = 1
+	seek_end = 2
+	seek_set = 3
+)
 
 interface FileSystem {
 	instantiate() &FileSystem

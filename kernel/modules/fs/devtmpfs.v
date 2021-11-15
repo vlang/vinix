@@ -179,6 +179,10 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = 1
 
+	new_resource.stat.atim = realtime_clock
+	new_resource.stat.ctim = realtime_clock
+	new_resource.stat.mtim = realtime_clock
+
 	new_resource.can_mmap = true
 
 	new_node.resource = new_resource
@@ -202,6 +206,10 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	new_resource.stat.mode = stat.iflnk | 0o777
 	new_resource.stat.nlink = 1
 
+	new_resource.stat.atim = realtime_clock
+	new_resource.stat.ctim = realtime_clock
+	new_resource.stat.mtim = realtime_clock
+
 	new_node.resource = new_resource
 
 	new_node.symlink_target = dest
@@ -216,6 +224,10 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	new_node.resource.stat.dev = devtmpfs_dev_id
 	new_node.resource.stat.ino = devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1
+
+	new_node.resource.stat.atim = realtime_clock
+	new_node.resource.stat.ctim = realtime_clock
+	new_node.resource.stat.mtim = realtime_clock
 
 	unsafe {
 		devtmpfs_root.children[name] = new_node

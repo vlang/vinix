@@ -176,6 +176,10 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = 1
 
+	new_resource.stat.atim = realtime_clock
+	new_resource.stat.ctim = realtime_clock
+	new_resource.stat.mtim = realtime_clock
+
 	new_resource.can_mmap = true
 
 	new_node.resource = new_resource
@@ -198,6 +202,10 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 	new_resource.stat.ino = this.inode_counter++
 	new_resource.stat.mode = stat.iflnk | 0o777
 	new_resource.stat.nlink = 1
+
+	new_resource.stat.atim = realtime_clock
+	new_resource.stat.ctim = realtime_clock
+	new_resource.stat.mtim = realtime_clock
 
 	new_node.resource = new_resource
 
