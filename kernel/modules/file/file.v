@@ -11,29 +11,21 @@ import event.eventstruct
 import memory.mmap
 import time
 
-pub const f_dupfd = 1
+pub const (
+	f_dupfd = 1
+	f_dupfd_cloexec = 2
+	f_getfd = 3
+	f_setfd = 4
+	f_getfl = 5
+	f_setfl = 6
+	f_getlk = 7
+	f_setlk = 8
+	f_setlkw = 9
+	f_getown = 10
+	f_setown = 11
 
-pub const f_dupfd_cloexec = 2
-
-pub const f_getfd = 3
-
-pub const f_setfd = 4
-
-pub const f_getfl = 5
-
-pub const f_setfl = 6
-
-pub const f_getlk = 7
-
-pub const f_setlk = 8
-
-pub const f_setlkw = 9
-
-pub const f_getown = 10
-
-pub const f_setown = 11
-
-pub const fd_cloexec = 1
+	fd_cloexec = 1
+)
 
 pub struct Handle {
 pub mut:
@@ -55,21 +47,16 @@ mut:
 	revents i16
 }
 
-pub const pollin = 0x01
-
-pub const pollout = 0x02
-
-pub const pollpri = 0x04
-
-pub const pollhup = 0x08
-
-pub const pollerr = 0x10
-
-pub const pollrdhup = 0x20
-
-pub const pollnval = 0x40
-
-pub const pollwrnorm = 0x80
+pub const (
+	pollin = 0x01
+	pollout = 0x02
+	pollpri = 0x04
+	pollhup = 0x08
+	pollerr = 0x10
+	pollrdhup = 0x20
+	pollnval = 0x40
+	pollwrnorm = 0x80
+)
 
 pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', voidptr(fds),
@@ -324,7 +311,7 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 		new_process = unsafe { _new_process }
 	}
 
-	if oldfdnum == newfdnum && voidptr(old_process) == voidptr(new_process) {
+	if specific && oldfdnum == newfdnum && voidptr(old_process) == voidptr(new_process) {
 		errno.set(errno.einval)
 		return none
 	}
