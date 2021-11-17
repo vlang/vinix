@@ -65,12 +65,9 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	// TODO: Implement timeout
-	if voidptr(tmo_p) != voidptr(0) {
+	if nfds == 0 {
 		return 0, 0
 	}
-
-	mut ret := u64(0)
 
 	mut thread := proc.current_thread()
 
@@ -91,6 +88,8 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 			f.unref()
 		}
 	}
+
+	mut ret := u64(0)
 
 	for i := u64(0); i < nfds; i++ {
 		mut fdd := unsafe { &fds[i] }
@@ -123,12 +122,35 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		events << &resource.event
 	}
 
-	if ret != 0 || events.len == 0 {
+	if ret != 0 {
 		return ret, 0
+	}
+
+	mut timer := &time.Timer(0)
+
+	if voidptr(tmo_p) != voidptr(0) {
+		mut target_time := *tmo_p
+		target_time.add(monotonic_clock)
+
+		timer = time.new_timer(target_time)
+
+		events << &timer.event
+	}
+
+	defer {
+		if voidptr(timer) != voidptr(0) {
+			timer.delete()
+		}
 	}
 
 	for {
 		which := event.await(mut events, true) or { return -1, errno.eintr }
+
+		if voidptr(timer) != voidptr(0) {
+			if which == events.len - 1 {
+				return 0, 0
+			}
+		}
 
 		status := fdlist[which].handle.resource.status
 
