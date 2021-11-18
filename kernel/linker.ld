@@ -20,7 +20,7 @@ SECTIONS
     . = 0xffffffff80000000;
 
     .text : {
-        *(.text*)
+        *(.text .text.*)
     } : text
 
     . += CONSTANT(MAXPAGESIZE);
@@ -33,21 +33,21 @@ SECTIONS
 
     /* Then let's place all the other traditional executable sections afterwards. */
     .rodata : {
-        *(.rodata*)
+        *(.rodata .rodata.*)
     } : rodata
 
     .symbol_table : {
-        *(.symbol_table*)
+        *(.symbol_table)
     } : rodata
 
     . += CONSTANT(MAXPAGESIZE);
 
     .data : {
-        *(.data*)
+        *(.data .data.*)
     } : data
 
     .bss : {
         *(COMMON)
-        *(.bss*)
+        *(.bss .bss.*)
     } : data
 }
