@@ -1,6 +1,6 @@
-From ea50723e685bd77e20968bf577c8d66e8acceb7c Mon Sep 17 00:00:00 2001
+From c8a8b3249d4dc5990b8922c7e4b9e0056582b908 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 18 Nov 2021 09:35:29 +0100
+Date: Thu, 18 Nov 2021 17:05:01 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -171,7 +171,7 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
-index bc58c1b..4219583 100644
+index bc58c1b..a6bbd3e 100644
 --- a/options/posix/generic/pthread-stubs.cpp
 +++ b/options/posix/generic/pthread-stubs.cpp
 @@ -67,6 +67,16 @@ static constexpr unsigned int rc_waiters_bit = static_cast<uint32_t>(1) << 31;
@@ -179,13 +179,13 @@ index bc58c1b..4219583 100644
  // ----------------------------------------------------------------------------
  
 +int pthread_rwlockattr_init(pthread_rwlockattr_t *) {
-+	__ensure(!"Not implemented");
-+	__builtin_unreachable();
++	mlibc::infoLogger() << "mlibc: pthread_rwlockattr_init() is a stub\n" << frg::endlog;
++	return 0;
 +}
 +
 +int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *, int) {
-+	__ensure(!"Not implemented");
-+	__builtin_unreachable();
++	mlibc::infoLogger() << "mlibc: pthread_rwlockattr_setpshared() is a stub\n" << frg::endlog;
++	return 0;
 +}
 +
  // pthread_attr functions.
