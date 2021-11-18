@@ -108,7 +108,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: '73b86f569e7575fcafdf5f26c3fd81312611dd0d'
+    commit: 'e1ad8865fd7b6823a8287880e5fa5dea4738eedf'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -696,7 +696,6 @@ packages:
   - name: mlibc-headers
     from_source: mlibc
     implict_package: true
-    revision: 3
     configure:
       - args:
         - 'meson'
@@ -715,7 +714,6 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 3
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]
