@@ -132,8 +132,8 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.64'
-    version: '2.64'
+    tag: 'v2.66.3'
+    version: '2.66.3'
 
   - name: wayland
     subdir: '3rdparty'
@@ -395,7 +395,7 @@ tools:
           set -e
           cd "@THIS_SOURCE_DIR@"
           make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix
-          make bin/limine-install
+          make limine-install
     install:
       - args: |
           set -e
