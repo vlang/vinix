@@ -54,12 +54,8 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	nvme.initialise()
 	random.initialise()
 
-	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [
-		'HOME=/root',
-		'TERM=linux',
-		'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
-		'XDG_RUNTIME_DIR=/run'
-	], '/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
+	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
+	'/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
 
 	sched.dequeue_and_die()
 }

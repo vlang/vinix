@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# ufetch-vinix - tiny system info for vinix
+
+
+# Based on the work of the ufetch project, under the following copyright
+# Copyright (c) 2018, 2019, 2020 Joe Schillinger <me@schil.li>
+
+## INFO
+
+# user is already defined
+host="$(hostname)"
+os='Vinix'
+kernel="$(uname -srm)"
+shell="$(basename "$SHELL")"
+
+## DEFINE COLORS
+
+# probably don't change these
+if [ -x "$(command -v tput)" ]; then
+    bold="$(tput bold)"
+    black="$(tput setaf 0)"
+    red="$(tput setaf 1)"
+    green="$(tput setaf 2)"
+    yellow="$(tput setaf 3)"
+    blue="$(tput setaf 4)"
+    magenta="$(tput setaf 5)"
+    cyan="$(tput setaf 6)"
+    white="$(tput setaf 7)"
+    reset="$(tput sgr0)"
+fi
+
+# you can change these
+lc="${reset}${bold}${blue}"         # labels
+nc="${reset}${bold}${blue}"         # user and hostname
+ic="${reset}"                       # info
+c0="${reset}${blue}"                # first color
+
+## OUTPUT
+
+cat <<EOF
+${lc} __          __ 
+${lc} \\ \\        / //    ${nc}${USER}${ic}@${nc}${host}${reset}
+${lc}  \\ \\      / //     ${lc}OS:        ${ic}${os}${reset}
+${lc}   \\ \\    / //      ${lc}KERNEL:    ${ic}${kernel}${reset}
+${lc}    \\ \\  / //       ${lc}SHELL:     ${ic}${shell}${reset}
+${lc}     \\ \\/ //
+${lc}      \\/_//${reset}
+
+EOF
