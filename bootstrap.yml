@@ -694,7 +694,7 @@ packages:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: mlibc-headers
-    revision: 2
+    revision: 3
     from_source: mlibc
     implict_package: true
     configure:
@@ -715,7 +715,7 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 2
+    revision: 3
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]

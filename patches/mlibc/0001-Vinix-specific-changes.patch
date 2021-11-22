@@ -1,6 +1,6 @@
-From c8a8b3249d4dc5990b8922c7e4b9e0056582b908 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 18 Nov 2021 17:05:01 +0100
+From 50e9f509e36562812db826d1f52dcd5e8bdcb313 Mon Sep 17 00:00:00 2001
+From: streaksu <assemblyislaw@gmail.com>
+Date: Tue, 23 Nov 2021 00:04:41 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -14,7 +14,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 698 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 705 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 37 files changed, 870 insertions(+), 5 deletions(-)
+ 37 files changed, 877 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -301,10 +301,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..cb1dda9
+index 0000000..968440e
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,698 @@
+@@ -0,0 +1,705 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -747,17 +747,6 @@ index 0000000..cb1dda9
 +    return 0;
 +}
 +
-+int sys_gethostname(char *buffer, size_t bufsize) {
-+    const char *hostname = "vinix";
-+    for (size_t i = 0; i < bufsize; i++) {
-+        buffer[i] = hostname[i];
-+        if (hostname[i] == 0)
-+            break;
-+    }
-+    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+    return 0;
-+}
-+
 +int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
 +	switch (fsfdt) {
 +        case fsfd_target::fd: {
@@ -995,6 +984,24 @@ index 0000000..cb1dda9
 +
 +int sys_umount2(const char *target, int flags) {
 +    __syscall_ret ret = __syscall(44, target, flags);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
++int sys_gethostname(char *buffer, size_t bufsize) {
++    __syscall_ret ret = __syscall(51, buffer, bufsize);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
++int sys_sethostname(char *buffer, size_t bufsize) {
++    __syscall_ret ret = __syscall(52, buffer, bufsize);
 +
 +    if (ret.errno != 0)
 +        return ret.errno;

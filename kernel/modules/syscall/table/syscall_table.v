@@ -10,9 +10,10 @@ import pipe
 import socket
 import memory.mmap
 import time
+import net
 
 __global (
-	syscall_table [51]voidptr
+	syscall_table [53]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -67,4 +68,6 @@ pub fn init_syscall_table() {
 	syscall_table[48] = voidptr(mmap.syscall_mprotect)
 	syscall_table[49] = voidptr(file.syscall_epoll_pwait)
 	syscall_table[50] = voidptr(time.syscall_clock_get)
+	syscall_table[51] = voidptr(net.syscall_gethostname)
+	syscall_table[52] = voidptr(net.syscall_sethostname)
 }
