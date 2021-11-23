@@ -9,7 +9,7 @@
 ## INFO
 
 # user is already defined
-host="$(hostname)"
+host="$HOSTNAME"
 os="$(uname -s)"
 kernel="$(uname -srm)"
 shell="$(basename "$SHELL")"
