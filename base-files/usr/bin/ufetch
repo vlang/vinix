@@ -10,7 +10,7 @@
 
 # user is already defined
 host="$(hostname)"
-os='Vinix'
+os="$(uname -s)"
 kernel="$(uname -srm)"
 shell="$(basename "$SHELL")"
 
@@ -41,9 +41,9 @@ c0="${reset}${blue}"                # first color
 cat <<EOF
 ${lc} __          __ 
 ${lc} \\ \\        / //    ${nc}${USER}${ic}@${nc}${host}${reset}
-${lc}  \\ \\      / //     ${lc}OS:        ${ic}${os}${reset}
-${lc}   \\ \\    / //      ${lc}KERNEL:    ${ic}${kernel}${reset}
-${lc}    \\ \\  / //       ${lc}SHELL:     ${ic}${shell}${reset}
+${lc}  \\ \\      / //     OS:        ${ic}${os}${reset}
+${lc}   \\ \\    / //      KERNEL:    ${ic}${kernel}${reset}
+${lc}    \\ \\  / //       SHELL:     ${ic}${shell}${reset}
 ${lc}     \\ \\/ //
 ${lc}      \\/_//${reset}
 
