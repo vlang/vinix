@@ -108,7 +108,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: 'e1ad8865fd7b6823a8287880e5fa5dea4738eedf'
+    commit: 'ed90860155f8a523874a563ee4033b11cd3301cc'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -694,7 +694,6 @@ packages:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: mlibc-headers
-    revision: 3
     from_source: mlibc
     implict_package: true
     configure:
@@ -715,7 +714,6 @@ packages:
 
   - name: mlibc
     from_source: mlibc
-    revision: 3
     tools_required:
       - tool: host-gcc
         stage_dependencies: [compiler]

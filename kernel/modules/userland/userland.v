@@ -13,6 +13,8 @@ import event
 import event.eventstruct
 import errno
 import lib
+import strings
+import resource
 
 pub const wnohang = 2
 
@@ -535,9 +537,31 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 
 pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
 	prog_node := fs.get_node(dir, path, true) ?
-	prog := prog_node.resource
+	mut prog := prog_node.resource
 
 	mut new_pagemap := memory.new_pagemap()
+
+	// Check for shebang before proceeding as if it was an ELF.
+	mut shebang := [2]char{}
+	prog.read(0, &shebang[0], 0, 2) ?
+	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
+		real_path, arg := parse_shebang(mut prog) ?
+		mut final_argv := [real_path]
+		if arg != '' { final_argv << arg }
+		final_argv << path
+		final_argv << argv[1..]
+
+		return start_program(
+			execve,
+			dir,
+			real_path,
+			final_argv,
+			envp,
+			stdin,
+			stdout,
+			stderr
+		)
+	}
 
 	auxval, ld_path := elf.load(new_pagemap, prog, 0) ?
 
@@ -630,4 +654,48 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		}
 		sched.dequeue_and_die()
 	}
+}
+
+pub fn parse_shebang(mut res &resource.Resource) ?(string, string) {
+	// Parse the shebang that we already know is there.
+	// Syntax: #![whitespace]interpreter [single arg]new line
+	mut index := u64(2)
+	mut build_path := strings.new_builder(512)
+	mut build_arg  := strings.new_builder(512)
+
+	mut c := char(0)
+	res.read(0, &c, index, 1) ?
+	if c == char(` `) {
+		index++
+	}
+
+	for {
+		res.read(0, &c, index, 1) ?
+		index++
+		if c == char(` `) {
+			break
+		}
+		if c == char(`\n`) {
+			unsafe { goto ret }
+		}
+		build_path.write_rune(rune(c))
+	}
+
+	for {
+		res.read(0, &c, index, 1) ?
+		index++
+		if c == char(` `) || c == char(`\n`) {
+			break
+		}
+		build_arg.write_rune(rune(c))
+	}
+
+ret:
+	final_path := build_path.str()
+	final_arg  := build_arg.str()
+	unsafe {
+		build_path.free()
+		build_arg.free()
+	}
+	return final_path, final_arg
 }

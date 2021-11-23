@@ -62,6 +62,8 @@ fn get_next_thread(orig_i int) int {
 	return -1
 }
 
+fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
+
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_stop()
 
@@ -131,14 +133,13 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	new_gpr_state := &current_thread.gpr_state
 
+	if new_gpr_state.cs == user_code_seg {
+		asm volatile amd64 { swapgs }
+		C.userland__dispatch_a_signal(new_gpr_state)
+		asm volatile amd64 { swapgs }
+	}
+
 	asm volatile amd64 {
-		cmp [rsp + 8], 0x43 // if user
-		jne f1
-		mov rdi, new_gpr_state
-		swapgs
-		call userland__dispatch_a_signal
-		swapgs
-		1:
 		mov rsp, new_gpr_state
 		pop rax
 		mov ds, eax
