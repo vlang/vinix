@@ -1,6 +1,6 @@
-From 50e9f509e36562812db826d1f52dcd5e8bdcb313 Mon Sep 17 00:00:00 2001
+From bd910e73d6e4b2f85bb2c8cae15fce5619a98c2a Mon Sep 17 00:00:00 2001
 From: streaksu <assemblyislaw@gmail.com>
-Date: Tue, 23 Nov 2021 00:04:41 +0100
+Date: Tue, 23 Nov 2021 20:34:53 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -192,10 +192,10 @@ index bc58c1b..a6bbd3e 100644
  int pthread_attr_init(pthread_attr_t *) {
  	return 0;
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
-index 7380d07..3d1b6b3 100644
+index 21aa04e..e1a8bcd 100644
 --- a/options/posix/generic/unistd-stubs.cpp
 +++ b/options/posix/generic/unistd-stubs.cpp
-@@ -822,12 +822,12 @@ int ttyname_r(int, char *, size_t) {
+@@ -835,12 +835,12 @@ int ttyname_r(int, char *, size_t) {
  }
  
  int unlink(const char *path) {
@@ -301,7 +301,7 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..968440e
+index 0000000..d215f91
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,705 @@
@@ -1000,7 +1000,7 @@ index 0000000..968440e
 +    return 0;
 +}
 +
-+int sys_sethostname(char *buffer, size_t bufsize) {
++int sys_sethostname(const char *buffer, size_t bufsize) {
 +    __syscall_ret ret = __syscall(52, buffer, bufsize);
 +
 +    if (ret.errno != 0)
