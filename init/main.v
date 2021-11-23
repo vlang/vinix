@@ -20,7 +20,7 @@ fn main() {
 	// os.chdir('/root') or { panic('Could not move to root') }
 
 	for {
-		excode := os.system('cd ~ && bash --login')
+		excode := os.system('cd ~ &> /dev/null && bash --login || (echo "Init: Could not move to root!" && exit 1)')
 		if ! excode == 0 { panic('Init returned an error!') }
 	}
 }
