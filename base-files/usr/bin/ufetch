@@ -10,7 +10,7 @@
 
 # user is already defined
 host="$HOSTNAME"
-os="$(uname -s)"
+os="Vinix"
 kernel="$(uname -srm)"
 shell="$(basename "$SHELL")"
 
