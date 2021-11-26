@@ -1,6 +1,6 @@
-From bd910e73d6e4b2f85bb2c8cae15fce5619a98c2a Mon Sep 17 00:00:00 2001
-From: streaksu <assemblyislaw@gmail.com>
-Date: Tue, 23 Nov 2021 20:34:53 +0100
+From 53c954ff934ef5822423a3037d3cdbc641d4b59c Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Fri, 26 Nov 2021 14:04:24 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -1269,5 +1269,5 @@ index 0000000..b9e4372
 +endif
 +
 -- 
-2.34.0
+2.34.1
 
