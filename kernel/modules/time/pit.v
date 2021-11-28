@@ -12,7 +12,7 @@ pub fn pit_get_current_count() u16 {
 	kio.port_out<byte>(0x43, 0)
 	lo := kio.port_in<byte>(0x40)
 	hi := kio.port_in<byte>(0x40)
-	return (hi << 8) | lo
+	return (u16(hi) << 8) | lo
 }
 
 pub fn pit_set_current_count(new_count u16) {
