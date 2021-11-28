@@ -1,6 +1,6 @@
-From 2f7deac0b30ec20a41c1d65bf64f7fc663c6dffa Mon Sep 17 00:00:00 2001
+From 43f41cab10346db4628d17a34bdc67796e77202f Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 6 Sep 2021 23:05:27 +0200
+Date: Sun, 28 Nov 2021 21:22:38 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -282,5 +282,5 @@ index aba4842..e369a73 100644
  #if !defined (NSIG)
  #  define NSIG 64
 -- 
-2.33.0
+2.34.1
 

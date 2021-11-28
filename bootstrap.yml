@@ -883,10 +883,10 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/bash.git'
-      # Checkout bash 5.1 patch 8
+      # Checkout bash 5.1 patch 12
       branch: 'master'
-      commit: 'ce23728687ce9e584333367075c9deef413553fa'
-      version: '5.1.8'
+      commit: '15409324f1974d41c183904ad575da7188058c1c'
+      version: '5.1.12'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
