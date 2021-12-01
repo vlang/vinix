@@ -108,7 +108,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: 'ed90860155f8a523874a563ee4033b11cd3301cc'
+    commit: '0d7c7b613a66444b73d2d3ec74aaa5acb576c349'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -117,7 +117,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: 'fe48380e85deecd05f5880b6a21cf0e2634b729a'
+    commit: '6d6a23a1c960191be6e45486ea75d47aa5da1c10'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -125,15 +125,15 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '9f98ba29ea7be40b190faf9c1ff7a5140c1d1a17'
+    commit: '9e850f220f42aacf9396f7910dcee6182cdcaaeb'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.66.3'
-    version: '2.66.3'
+    tag: 'v2.67.3'
+    version: '2.67.3'
 
   - name: wayland
     subdir: '3rdparty'
@@ -883,10 +883,10 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/bash.git'
-      # Checkout bash 5.1 patch 8
+      # Checkout bash 5.1 patch 12
       branch: 'master'
-      commit: 'ce23728687ce9e584333367075c9deef413553fa'
-      version: '5.1.8'
+      commit: '15409324f1974d41c183904ad575da7188058c1c'
+      version: '5.1.12'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -923,7 +923,6 @@ packages:
 
   - name: v
     from_source: v
-    revision: 3
     tools_required:
       - host-v
       - host-gcc
