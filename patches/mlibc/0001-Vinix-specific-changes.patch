@@ -1,6 +1,6 @@
-From 53c954ff934ef5822423a3037d3cdbc641d4b59c Mon Sep 17 00:00:00 2001
+From a85b5bed850c4e322bc0837628b6eed038824cf9 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 26 Nov 2021 14:04:24 +0100
+Date: Fri, 3 Dec 2021 23:12:36 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -116,7 +116,7 @@ index 55e9070..450e16f 100644
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
 diff --git a/options/ansi/include/mlibc/ansi-sysdeps.hpp b/options/ansi/include/mlibc/ansi-sysdeps.hpp
-index f758a9c..aee351e 100644
+index fe81c4e..a54b513 100644
 --- a/options/ansi/include/mlibc/ansi-sysdeps.hpp
 +++ b/options/ansi/include/mlibc/ansi-sysdeps.hpp
 @@ -6,6 +6,7 @@
@@ -127,7 +127,7 @@ index f758a9c..aee351e 100644
  #include <bits/off_t.h>
  #include <bits/ssize_t.h>
  #include <bits/ansi/time_t.h>
-@@ -52,6 +53,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos);
+@@ -53,6 +54,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos);
  [[gnu::weak]] int sys_execve(const char *path, char *const argv[], char *const envp[]);
  
  [[gnu::weak]] pid_t sys_getpid();
@@ -136,7 +136,7 @@ index f758a9c..aee351e 100644
  
  } //namespace mlibc
 diff --git a/options/internal/include/mlibc/internal-sysdeps.hpp b/options/internal/include/mlibc/internal-sysdeps.hpp
-index 0bd4a05..d2a1e9a 100644
+index d5f5a00..e56e30c 100644
 --- a/options/internal/include/mlibc/internal-sysdeps.hpp
 +++ b/options/internal/include/mlibc/internal-sysdeps.hpp
 @@ -9,6 +9,7 @@
@@ -171,7 +171,7 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
-index bc58c1b..a6bbd3e 100644
+index 90ba98c..b16b81b 100644
 --- a/options/posix/generic/pthread-stubs.cpp
 +++ b/options/posix/generic/pthread-stubs.cpp
 @@ -67,6 +67,16 @@ static constexpr unsigned int rc_waiters_bit = static_cast<uint32_t>(1) << 31;
@@ -211,10 +211,10 @@ index 21aa04e..e1a8bcd 100644
  		return -1;
  	}
 diff --git a/options/posix/include/pthread.h b/options/posix/include/pthread.h
-index 015ea32..9f4cf62 100644
+index 2f2e2f7..8482539 100644
 --- a/options/posix/include/pthread.h
 +++ b/options/posix/include/pthread.h
-@@ -123,6 +123,9 @@ typedef struct __mlibc_rwlockattr pthread_rwlockattr_t;
+@@ -126,6 +126,9 @@ typedef struct __mlibc_rwlockattr pthread_rwlockattr_t;
  // pthread_attr and pthread functions.
  // ----------------------------------------------------------------------------
  
@@ -301,7 +301,7 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..d215f91
+index 0000000..9e00538
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,705 @@
@@ -505,8 +505,8 @@ index 0000000..d215f91
 +}
 +#endif
 +
-+int sys_futex_wait(int *pointer, int expected) {
-+    __syscall_ret ret = __syscall(23, pointer, expected);
++int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
++    __syscall_ret ret = __syscall(23, pointer, expected, time);
 +
 +    if (ret.errno != 0)
 +        return ret.errno;
