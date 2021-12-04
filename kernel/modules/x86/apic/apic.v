@@ -16,13 +16,21 @@ const (
 	lapic_reg_timer_div = 0x3e0
 )
 
+__global (
+	lapic_base = u64(0)
+)
+
 fn lapic_read(reg u32) u32 {
-	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	if lapic_base == u64(0) {
+		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	}
 	return kio.mmin(&u32(lapic_base + reg))
 }
 
 fn lapic_write(reg u32, val u32) {
-	lapic_base := u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	if lapic_base == u64(0) {
+		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	}
 	kio.mmout(&u32(lapic_base + reg), val)
 }
 
@@ -39,7 +47,7 @@ pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 	lapic_write(apic.lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
 	lapic_write(apic.lapic_reg_timer_div, 0)
 
-	time.pit_set_current_count(0)
+	time.pit_set_reload_value(0xffff)
 
 	initial_pit_tick := u64(time.pit_get_current_count())
 
