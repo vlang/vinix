@@ -93,7 +93,7 @@ pub fn (dev &PCIDevice) get_bar(bar byte) PCIBar {
 		0xFFFFFFFF
 	}
 
-	mut size := ((bar_size_high << 32) | bar_size_low) & ~u32(if is_mmio { 0b1111 } else { 0b11 })
+	mut size := ((u64(bar_size_high) << 32) | bar_size_low) & ~u64(if is_mmio { 0b1111 } else { 0b11 })
 	size = ~size + 1
 
 	return PCIBar{base, size, is_mmio, is_prefetchable}
@@ -163,6 +163,6 @@ pub fn (dev &PCIDevice) enable_bus_mastering() {
 }
 
 fn (dev &PCIDevice) get_address(offset u32) {
-	address := (dev.bus << 16) | (dev.slot << 11) | (dev.function << 8) | (offset & ~(u32(3))) | 0x80000000
+	address := (u32(dev.bus) << 16) | (u32(dev.slot) << 11) | (u32(dev.function) << 8) | (offset & ~(u32(3))) | 0x80000000
 	kio.port_out<u32>(0xcf8, address)
 }

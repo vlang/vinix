@@ -12,7 +12,7 @@ pub fn pit_get_current_count() u16 {
 	kio.port_out<byte>(0x43, 0)
 	lo := kio.port_in<byte>(0x40)
 	hi := kio.port_in<byte>(0x40)
-	return (hi << 8) | lo
+	return (u16(hi) << 8) | lo
 }
 
 pub fn pit_set_current_count(new_count u16) {
@@ -32,6 +32,9 @@ pub fn pit_set_frequency(frequency u64) {
 fn C.x86__apic__io_apic_set_irq_redirect(lapic_id u32, vector byte, irq byte, status bool)
 
 pub fn pit_initialise() {
+	// Channel 0, lo/hi access mode, mode 2 (rate generator)
+	kio.port_out<byte>(0x43, 0x34)
+
 	pit_set_frequency(timer_frequency)
 
 	vect := idt.allocate_vector()
