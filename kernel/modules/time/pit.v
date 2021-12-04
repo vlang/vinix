@@ -32,6 +32,9 @@ pub fn pit_set_frequency(frequency u64) {
 fn C.x86__apic__io_apic_set_irq_redirect(lapic_id u32, vector byte, irq byte, status bool)
 
 pub fn pit_initialise() {
+	// Channel 0, lo/hi access mode, mode 2 (rate generator)
+	kio.port_out<byte>(0x43, 0x34)
+
 	pit_set_frequency(timer_frequency)
 
 	vect := idt.allocate_vector()
