@@ -8,6 +8,13 @@ unexport MAKEFLAGS
 .PHONY: all
 all: vinix.iso
 
+.PHONY: prod-all
+prod-all:
+	cp bootstrap.yml bootstrap.yml.tmp
+	sed -i "s/default: 'false' # prod/default: 'true' # prod/g" bootstrap.yml
+	$(MAKE) all || true
+	mv bootstrap.yml.tmp bootstrap.yml
+
 QEMUFLAGS = -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: run-kvm

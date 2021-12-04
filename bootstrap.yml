@@ -1,6 +1,6 @@
 declare_options:
   - name: prod
-    default: 'false'
+    default: 'false' # prod
 
 sources:
   - name: glib

@@ -49,10 +49,13 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	initramfs.init(modules_tag)
 
 	streams.initialise()
-	console.initialise()
-	ata.initialise()
-	nvme.initialise()
 	random.initialise()
+	console.initialise()
+
+	$if !prod {
+		ata.initialise()
+		nvme.initialise()
+	}
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
 	'/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
