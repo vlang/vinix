@@ -108,7 +108,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: '0d7c7b613a66444b73d2d3ec74aaa5acb576c349'
+    commit: 'b9e7b6a76ebbe3c0fee41141a80b2a4db88a8540'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -117,7 +117,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '6d6a23a1c960191be6e45486ea75d47aa5da1c10'
+    commit: '7e6d4ebfe1ec89103d7f4d27df876ec4c7150d1a'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -125,15 +125,15 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '9e850f220f42aacf9396f7910dcee6182cdcaaeb'
+    commit: '388a1c7c5c65a6016a1d9f1bcfa95c733a211102'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.67.3'
-    version: '2.67.3'
+    tag: 'v2.68.1'
+    version: '2.68.1'
 
   - name: wayland
     subdir: '3rdparty'
