@@ -58,7 +58,7 @@ fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
 	mmap.pf_handler(gpr_state) or { exception_handler(num, gpr_state) }
 }
 
-fn abort_handler() {
+fn abort_handler(num u32, gpr_state &cpulocal.GPRState) {
 	katomic.store(cpulocal.current().aborted, true)
 	for {
 		asm volatile amd64 {
@@ -112,5 +112,6 @@ pub fn initialise() {
 	}
 
 	abort_vector = idt.allocate_vector()
-	idt.register_handler(abort_vector, voidptr(abort_handler), 4, 0x8e)
+	idt.register_handler(abort_vector, interrupt_thunks[abort_vector], 4, 0x8e)
+	interrupt_table[abort_vector] = voidptr(abort_handler)
 }
