@@ -1,6 +1,6 @@
-From a85b5bed850c4e322bc0837628b6eed038824cf9 Mon Sep 17 00:00:00 2001
+From c1832310d6bb489f11a62d6ab4faffec13a02f19 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 3 Dec 2021 23:12:36 +0100
+Date: Thu, 16 Dec 2021 20:59:13 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -92,7 +92,7 @@ index 68146c4..bbd222a 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 55e9070..450e16f 100644
+index 4027c99..f0b7a02 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -47,7 +47,7 @@ if not headers_only
@@ -104,7 +104,7 @@ index 55e9070..450e16f 100644
  	add_project_arguments('-std=c++20', language: 'cpp')
  	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
  	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
-@@ -106,6 +106,10 @@ elif host_machine.system() == 'qword'
+@@ -110,6 +110,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')

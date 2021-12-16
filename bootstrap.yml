@@ -108,7 +108,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: 'b9e7b6a76ebbe3c0fee41141a80b2a4db88a8540'
+    commit: '045f937dd0cce6442379df83bad64ac90ceeb96d'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
