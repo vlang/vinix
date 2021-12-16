@@ -117,7 +117,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '2a5356670b81e5f8f66baa2cef6a896ffe2cc581'
+    commit: 'f87f8ec3f7cfc7334e5c5b3d063bbfb9512ec5e1'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -125,7 +125,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '1cfde7fdc8ca496ae5a234fcadae37ea4265ae9c'
+    commit: '50b5a887bfb050b488a9a27572d776e2235bb143'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -378,7 +378,7 @@ tools:
           set -e
           rm -rf "@PREFIX@/v"
           mkdir -p "@PREFIX@/v"
-          cp -rv "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
+          cp -r "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
           cd "@PREFIX@/v"
           rm -v *.xbstrap
           cc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v -lm -lpthread $([ $(uname) = Linux ] || echo -lexecinfo)
