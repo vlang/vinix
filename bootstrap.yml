@@ -2124,6 +2124,9 @@ packages:
       regenerate:
         - args: ['rm', '-rf', 'gnulib']
         - args: ['./gitsub.sh', 'pull']
+        # Gnulib broke on commit e3174b6d1fdbe6ea2297bf8c8333f65f9d9d9588, so check out the one before that.
+        - args: ['git', 'checkout', '766ec17a90f67e8cda78394e58a7fffb00f5a4b7']
+          workdir: '@THIS_SOURCE_DIR@/gnulib'
         - args: ['./autogen.sh']
           environ:
             'NOCONFIGURE': 'yes'
@@ -2157,6 +2160,7 @@ packages:
       - host-libtool
     pkgs_required:
       - mlibc
+    revision: 2
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
