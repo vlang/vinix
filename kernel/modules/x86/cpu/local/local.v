@@ -60,7 +60,6 @@ pub mut:
 	lapic_timer_freq     u64
 	online               u64
 	is_idle              bool
-	nvme_io_queue_pair   voidptr
 	last_run_queue_index int
 	abort_stack          [abort_stack_size]u64
 	aborted              bool
