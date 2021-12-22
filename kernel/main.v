@@ -23,6 +23,7 @@ import pci
 import dev.ata
 import dev.nvme
 import dev.streams
+import dev.ahci
 import dev.random
 import syscall.table
 import socket
@@ -55,6 +56,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	$if !prod {
 		ata.initialise()
 		nvme.initialise()
+		ahci.initialise()
 	}
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
