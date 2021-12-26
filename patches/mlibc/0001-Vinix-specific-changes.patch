@@ -1,14 +1,16 @@
-From c1832310d6bb489f11a62d6ab4faffec13a02f19 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 16 Dec 2021 20:59:13 +0100
+From a81400688f417344cb6238e84cc36bd058edf19b Mon Sep 17 00:00:00 2001
+From: Alula <6276139+alula@users.noreply.github.com>
+Date: Sun, 26 Dec 2021 05:57:19 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  abis/mlibc/signal.h                           |   6 +-
- meson.build                                   |   6 +-
+ meson.build                                   |  54 +-
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux-headers/include/asm/ioctls.h    |   2 +
+ options/linux-headers/include/linux/fb.h      | 253 +++++++
+ options/linux-headers/meson.build             |   1 +
  options/posix/generic/pthread-stubs.cpp       |  10 +
  options/posix/generic/unistd-stubs.cpp        |   4 +-
  options/posix/include/pthread.h               |   3 +
@@ -41,7 +43,8 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 37 files changed, 877 insertions(+), 5 deletions(-)
+ 39 files changed, 1157 insertions(+), 27 deletions(-)
+ create mode 100644 options/linux-headers/include/linux/fb.h
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -92,10 +95,10 @@ index 68146c4..bbd222a 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 4027c99..f0b7a02 100644
+index 55e9070..f0b7a02 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -47,7 +47,7 @@ if not headers_only
+@@ -47,36 +47,40 @@ if not headers_only
  	add_languages('c', 'cpp')
  	c_compiler = meson.get_compiler('c')
  
@@ -104,7 +107,62 @@ index 4027c99..f0b7a02 100644
  	add_project_arguments('-std=c++20', language: 'cpp')
  	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
  	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
-@@ -110,6 +110,10 @@ elif host_machine.system() == 'qword'
+ 	add_project_link_arguments('-nostdlib', language: ['c', 'cpp'])
+ 
+-	if c_compiler.get_id() == 'gcc'
+-		gccdir = run_command('/bin/sh', '-c',
+-			' '.join(c_compiler.cmd_array())
+-					+ ' -print-search-dirs | sed -n -e "s/install: \(.*\)/\\1/p"',
+-			env: ['LANG=C'],
+-			check: true).stdout().strip()
+-
+-		rtdl_include_dirs += include_directories(gccdir / 'include')
+-		libc_include_dirs += include_directories(gccdir / 'include')
+-		# Ubuntu seems to patch out include-fixed/ (the files are in include/ instead).
+-		if fs.exists(gccdir / 'include-fixed')
+-			rtdl_include_dirs += include_directories(gccdir / 'include-fixed')
+-			libc_include_dirs += include_directories(gccdir / 'include-fixed')
++	searchdirs = run_command(c_compiler.cmd_array(), '-print-search-dirs',
++				check: true).stdout()
++	searchdirs_arr = searchdirs.split('\n')
++	searchline = 'install: '
++	ccdir = ''
++	if c_compiler.get_id() == 'clang'
++		searchline = 'libraries: ='
++	endif
++
++	foreach line : searchdirs_arr
++		if line.startswith(searchline)
++			ccdir = line.strip(searchline)
++			ccdir = ccdir.split(':')[0]
++			break
+ 		endif
+-	elif c_compiler.get_id() == 'clang'
+-		clangdir = run_command('/bin/sh', '-c',
+-			' '.join(c_compiler.cmd_array())
+-					+ ' -print-search-dirs | sed -ne "s/libraries: =\([^:]*\).*/\\1/p"',
+-			env: ['LANG=C'],
+-			check: true).stdout().strip()
+-
+-		rtdl_include_dirs += include_directories(clangdir / 'include')
+-		libc_include_dirs += include_directories(clangdir / 'include')
++	endforeach
++
++	if ccdir == ''
++		error('could not find compiler-specific header directory')
+ 	endif
++
++	if c_compiler.get_id() == 'gcc' and fs.exists(ccdir / 'include-fixed')
++		rtdl_include_dirs += include_directories(ccdir / 'include-fixed')
++		libc_include_dirs += include_directories(ccdir / 'include-fixed')
++	endif
++
++	rtdl_include_dirs += include_directories(ccdir / 'include')
++	libc_include_dirs += include_directories(ccdir / 'include')
+ endif
+ 
+ internal_conf.set_quoted('MLIBC_SYSTEM_NAME', host_machine.system())
+@@ -106,6 +110,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -170,6 +228,277 @@ index 41d4248..f246d1d 100644
  #define TIOCSCTTY 0x540E
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
+diff --git a/options/linux-headers/include/linux/fb.h b/options/linux-headers/include/linux/fb.h
+new file mode 100644
+index 0000000..65ac6d6
+--- /dev/null
++++ b/options/linux-headers/include/linux/fb.h
+@@ -0,0 +1,253 @@
++
++#ifndef _LINUX_FB_H
++#define _LINUX_FB_H
++
++#include <linux/types.h>
++#include <sys/ioctl.h>
++
++#define FB_MAX 32
++
++#define FBIOGET_VSCREENINFO 0x4600
++#define FBIOPUT_VSCREENINFO 0x4601
++#define FBIOGET_FSCREENINFO 0x4602
++#define FBIOGETCMAP 0x4604
++#define FBIOPUTCMAP 0x4605
++#define FBIOPAN_DISPLAY 0x4606
++#define FBIO_CURSOR _IOWR('F', 0x08, struct fb_cursor)
++
++#define FBIOGET_CON2FBMAP 0x460F
++#define FBIOPUT_CON2FBMAP 0x4610
++#define FBIOBLANK 0x4611
++#define FBIOGET_VBLANK _IOWR('F', 0x12, struct fb_vblank)
++#define FBIO_ALLOC 0x4613
++#define FBIO_FREE 0x4614
++#define FBIOGET_GLYPH 0x4615
++#define FBIOGET_HWCINFO 0x4616
++#define FBIOPUT_MODEINFO 0x4617
++#define FBIOGET_DISPINFO 0x4618
++#define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
++
++#define FB_TYPE_PACKED_PIXELS 0
++#define FB_TYPE_PLANES 1
++#define FB_TYPE_INTERLEAVED_PLANES 2
++#define FB_TYPE_TEXT 3
++#define FB_TYPE_VGA_PLANES 4
++#define FB_TYPE_FOURCC 5
++
++#define FB_VISUAL_MONO01 0
++#define FB_VISUAL_MONO10 1
++#define FB_VISUAL_TRUECOLOR 2
++#define FB_VISUAL_PSEUDOCOLOR 3
++#define FB_VISUAL_DIRECTCOLOR 4
++#define FB_VISUAL_STATIC_PSEUDOCOLOR 5
++#define FB_VISUAL_FOURCC 6
++
++#define FB_ACCEL_NONE 0
++
++#define FB_NONSTD_HAM 1
++#define FB_NONSTD_REV_PIX_IN_B 2
++
++#define FB_ACTIVATE_NOW 0
++#define FB_ACTIVATE_NXTOPEN 1
++#define FB_ACTIVATE_TEST 2
++#define FB_ACTIVATE_MASK 15
++
++#define FB_ACTIVATE_VBL 16
++#define FB_CHANGE_CMAP 32
++#define FB_ACTIVATE_ALL 64
++#define FB_ACTIVATE_FORCE 128
++#define FB_ACTIVATE_INV_MODE 256
++#define FB_ACTIVATE_INV_ALL 512
++
++#define FB_ACCELF_TEXT 0x1
++
++#define FB_SYNC_HOR_HIGH_ACT 0x1
++#define FB_SYNC_VERT_HIGH_ACT 0x2
++#define FB_SYNC_EXT 0x4
++#define FB_SYNC_COMP_HIGH_ACT 0x8
++#define FB_SYNC_BROADCAST 0x10
++#define FB_SYNC_ON_GREEN 0x20
++
++#define FB_VMODE_NONINTERLACED 0
++#define FB_VMODE_INTERLACED 1
++#define FB_VMODE_DOUBLE 2
++#define FB_VMODE_ODD_FLD_FIRST 4
++#define FB_VMODE_MASK 255
++
++#define FB_VMODE_YWRAP 256
++#define FB_VMODE_SMOOTH_XPAN 512
++#define FB_VMODE_CONUPDATE 512
++
++#define FB_ROTATE_UR 0
++#define FB_ROTATE_CW 1
++#define FB_ROTATE_UD 2
++#define FB_ROTATE_CCW 3
++
++#define PICOS2KHZ(a) (1000000000UL/(a))
++#define KHZ2PICOS(a) (1000000000UL/(a))
++
++#define VESA_NO_BLANKING 0
++#define VESA_VSYNC_SUSPEND 1
++#define VESA_HSYNC_SUSPEND 2
++#define VESA_POWERDOWN 3
++
++enum {
++    FB_BLANK_UNBLANK = VESA_NO_BLANKING,
++    FB_BLANK_NORMAL = VESA_NO_BLANKING + 1,
++    FB_BLANK_VSYNC_SUSPEND = VESA_VSYNC_SUSPEND + 1,
++    FB_BLANK_HSYNC_SUSPEND = VESA_HSYNC_SUSPEND + 1,
++    FB_BLANK_POWERDOWN = VESA_POWERDOWN + 1,
++};
++
++#define FB_VBLANK_VBLANKING 0x001
++#define FB_VBLANK_HBLANKING 0x002
++#define FB_VBLANK_HAVE_VBLANK 0x004
++#define FB_VBLANK_HAVE_HBLANK 0x008
++#define FB_VBLANK_HAVE_COUNT 0x010
++#define FB_VBLANK_HAVE_VCOUNT 0x020
++#define FB_VBLANK_HAVE_HCOUNT 0x040
++#define FB_VBLANK_VSYNCING 0x080
++#define FB_VBLANK_HAVE_VSYNC 0x100
++
++#define ROP_COPY 0
++#define ROP_XOR 1
++
++#define FB_CUR_SETIMAGE 0x01
++#define FB_CUR_SETPOS 0x02
++#define FB_CUR_SETHOT 0x04
++#define FB_CUR_SETCMAP 0x08
++#define FB_CUR_SETSHAPE 0x10
++#define FB_CUR_SETSIZE 0x20
++#define FB_CUR_SETALL 0xFF
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++struct fb_fix_screeninfo {
++    char id[16];
++    unsigned long smem_start;
++    __u32 smem_len;
++    __u32 type;
++    __u32 type_aux;
++    __u32 visual;
++    __u16 xpanstep;
++    __u16 ypanstep;
++    __u16 ywrapstep;
++    __u32 line_length;
++    unsigned long mmio_start;
++    __u32 mmio_len;
++    __u32 accel;
++    __u16 capabilities;
++    __u16 reserved[2];
++};
++
++struct fb_bitfield {
++    __u32 offset;
++    __u32 length;
++    __u32 msb_right;
++};
++
++struct fb_var_screeninfo {
++    __u32 xres;
++    __u32 yres;
++    __u32 xres_virtual;
++    __u32 yres_virtual;
++    __u32 xoffset;
++    __u32 yoffset;
++    __u32 bits_per_pixel;
++    __u32 grayscale;
++    struct fb_bitfield red;
++    struct fb_bitfield green;
++    struct fb_bitfield blue;
++    struct fb_bitfield transp;
++    __u32 nonstd;
++    __u32 activate;
++    __u32 height;
++    __u32 width;
++    __u32 accel_flags;
++    __u32 pixclock;
++    __u32 left_margin;
++    __u32 right_margin;
++    __u32 upper_margin;
++    __u32 lower_margin;
++    __u32 hsync_len;
++    __u32 vsync_len;
++    __u32 sync;
++    __u32 vmode;
++    __u32 rotate;
++    __u32 colorspace;
++    __u32 reserved[4];
++};
++
++struct fb_cmap {
++    __u32 start;
++    __u32 len;
++    __u16 *red;
++    __u16 *green;
++    __u16 *blue;
++    __u16 *transp;
++};
++
++struct fb_con2fbmap {
++    __u32 console;
++    __u32 framebuffer;
++};
++
++struct fb_vblank {
++    __u32 flags;
++    __u32 count;
++    __u32 vcount;
++    __u32 hcount;
++    __u32 reserved[4];
++};
++
++struct fb_copyarea {
++    __u32 dx;
++    __u32 dy;
++    __u32 width;
++    __u32 height;
++    __u32 sx;
++    __u32 sy;
++};
++
++struct fb_fillrect {
++    __u32 dx;
++    __u32 dy;
++    __u32 width;
++    __u32 height;
++    __u32 color;
++    __u32 rop;
++};
++
++struct fb_image {
++    __u32 dx;
++    __u32 dy;
++    __u32 width;
++    __u32 height;
++    __u32 fg_color;
++    __u32 bg_color;
++    __u8 depth;
++    const char *data;
++    struct fb_cmap cmap;
++};
++
++struct fbcurpos {
++    __u16 x, y;
++};
++
++struct fb_cursor {
++    __u16 set;
++    __u16 enable;
++    __u16 rop;
++    const char *mask;
++    struct fbcurpos hot;
++    struct fb_image image;
++};
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _LINUX_FS_H
++
+diff --git a/options/linux-headers/meson.build b/options/linux-headers/meson.build
+index 98d1b1f..9baf212 100644
+--- a/options/linux-headers/meson.build
++++ b/options/linux-headers/meson.build
+@@ -13,6 +13,7 @@ if not no_headers
+ 		'include/linux/bpf_common.h',
+ 		'include/linux/bsg.h',
+ 		'include/linux/cdrom.h',
++		'include/linux/fb.h',
+ 		'include/linux/filter.h',
+ 		'include/linux/fs.h',
+ 		'include/linux/hdreg.h',
 diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
 index 90ba98c..b16b81b 100644
 --- a/options/posix/generic/pthread-stubs.cpp

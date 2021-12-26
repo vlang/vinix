@@ -21,6 +21,8 @@ import pipe
 import futex
 import pci
 import dev.ata
+import dev.fbdev
+import dev.fbdev.simple
 import dev.nvme
 import dev.streams
 import dev.ahci
@@ -32,6 +34,8 @@ import time
 fn C._vinit(argc int, argv voidptr)
 
 fn kmain_thread(stivale2_struct &stivale2.Struct) {
+	stivale2.framebuffer_init(stivale2_struct)
+
 	table.init_syscall_table()
 	socket.initialise()
 	pipe.initialise()
@@ -51,6 +55,8 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 
 	streams.initialise()
 	random.initialise()
+	fbdev.initialise()
+	fbdev.register_driver(simple.get_driver())
 	console.initialise()
 
 	$if !prod {

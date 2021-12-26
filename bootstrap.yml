@@ -216,6 +216,14 @@ sources:
     regenerate:
       - args: ['autoreconf', '-f', '-i']
 
+  - name: doomgeneric
+    subdir: 3rdparty
+    git: 'https://github.com/ozkl/doomgeneric.git'
+    branch: 'master'
+    commit: '2d9b24f07c78c36becf41d89db30fa99863463e5'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
+
   - name: util-linux
     subdir: 3rdparty
     git: 'https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git'
@@ -1933,7 +1941,7 @@ packages:
         - '--disable-xwayland'
         - '--disable-x11-compositor'
         - '--disable-weston-launch'
-        - '--disable-fbdev-compositor'
+        #- '--disable-fbdev-compositor'
         - '--disable-simple-dmabuf-drm-client'
         - '--disable-simple-dmabuf-v4l-client'
         - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
@@ -2334,6 +2342,17 @@ packages:
       - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+  
+  - name: doomgeneric
+    from_source: doomgeneric
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args: ['make', '-C', '@THIS_SOURCE_DIR@/doomgeneric', '-f', 'Makefile.vinix', '-j@PARALLELISM@']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/bin']
+      - args: ['cp', '@THIS_SOURCE_DIR@/doomgeneric/doomgeneric', '@THIS_COLLECT_DIR@/usr/bin/doomgeneric']
 
   - name: util-linux-libs
     from_source: util-linux

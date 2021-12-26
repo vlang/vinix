@@ -2,6 +2,8 @@ module stivale2
 
 import klock
 import x86.cpu
+import dev.fbdev.api
+import dev.fbdev.simple
 
 pub const (
 	framebuffer_id = 0x506461d2950408fa
@@ -185,6 +187,7 @@ __global (
 	terminal_print_ptr  = voidptr(0)
 	terminal_rows       = u16(0)
 	terminal_cols       = u16(0)
+	framebuffer_tag     = &FBTag(0)
 	framebuffer_width   = u16(0)
 	framebuffer_height  = u16(0)
 )
@@ -202,7 +205,7 @@ pub fn terminal_init(stivale2_struct &Struct) {
 	terminal_rows = terminal_tag.rows
 	terminal_cols = terminal_tag.cols
 
-	framebuffer_tag := &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id) or {
+	framebuffer_tag = &FBTag(get_tag(stivale2_struct, stivale2.framebuffer_id) or {
 		print('Bootloader does not provide framebuffer')
 		framebuffer_width = terminal_rows * 16
 		framebuffer_height = terminal_cols * 8
@@ -211,6 +214,42 @@ pub fn terminal_init(stivale2_struct &Struct) {
 
 	framebuffer_width = framebuffer_tag.width
 	framebuffer_height = framebuffer_tag.height
+}
+
+pub fn framebuffer_init(stivale2_struct &Struct) {
+	if voidptr(framebuffer_tag) == voidptr(0) {
+		return
+	}
+
+	sfb_config := simple.SimpleFBConfig {
+		physical_address: framebuffer_tag.addr,
+		width: u32(framebuffer_width),
+		height: u32(framebuffer_height),
+		stride: u32(framebuffer_tag.pitch),
+		bits_per_pixel: u32(framebuffer_tag.bpp),
+		red: api.FBBitfield {
+			offset: framebuffer_tag.red_mask_shift,
+			length: framebuffer_tag.red_mask_size,
+			msb_right: 0,
+		},
+		green: api.FBBitfield {
+			offset: framebuffer_tag.green_mask_shift,
+			length: framebuffer_tag.green_mask_size,
+			msb_right: 0,
+		},
+		blue: api.FBBitfield {
+			offset: framebuffer_tag.blue_mask_shift,
+			length: framebuffer_tag.blue_mask_size,
+			msb_right: 0,
+		},
+		transp: api.FBBitfield {
+			offset: 0,
+			length: 0,
+			msb_right: 0,
+		},
+	}
+
+	simple.register_simple_framebuffer(sfb_config)
 }
 
 pub fn terminal_print(s voidptr, len u64) {
