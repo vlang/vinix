@@ -20,9 +20,9 @@ pub const (
 )
 
 interface FileSystem {
+mut:
 	instantiate() &FileSystem
 	populate(&VFSNode)
-mut:
 	mount(&VFSNode, string, &VFSNode) ?&VFSNode
 	create(&VFSNode, string, int) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
@@ -46,7 +46,7 @@ __global (
 	filesystems map[string]&FileSystem
 )
 
-fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
+pub fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
 	mut node := &VFSNode{
 		name: name
 		parent: unsafe { parent }
@@ -60,6 +60,10 @@ fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &
 		node.children = &map[string]&VFSNode{}
 	}
 	return node
+}
+
+pub fn add_filesystem(filesystem &FileSystem, identifier string) {
+	unsafe { filesystems[identifier] = filesystem }
 }
 
 pub fn initialise() {
