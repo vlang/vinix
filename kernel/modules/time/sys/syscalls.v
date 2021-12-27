@@ -27,7 +27,7 @@ pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u6
 	return 0, 0
 }
 
-pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, rem mut time.TimeSpec) (u64, u64) {
+pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: nanosleep(0x%llx, 0x%llx)\n', voidptr(req), voidptr(rem))
 
 	defer {
