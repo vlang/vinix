@@ -1,13 +1,11 @@
 module fbdev
 
-import errno
 import ioctl
 import resource
 import fs
 import stat
 import klock
 import event.eventstruct
-import memory
 import dev.fbdev.api
 
 pub struct FramebufferNode {
@@ -32,10 +30,14 @@ __global (
 )
 
 fn (mut this FramebufferNode) mmap(page u64, flags int) voidptr {
-	C.printf(c'base: %#lx page: %#lx, flags: %#x\n', this.info.base, page, flags)
+	offset := page * page_size
+
+	if offset >= this.info.size {
+		return voidptr(0)
+	}
 
 	unsafe {
-		return voidptr(u64(this.info.base) + page * page_size - higher_half)
+		return voidptr(u64(this.info.base) + offset - higher_half)
 	}
 }
 
