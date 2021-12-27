@@ -108,25 +108,3 @@ pub fn new_timer(when TimeSpec) &Timer {
 
 	return timer
 }
-
-pub fn syscall_clock_get(_ voidptr, clock_type int, ret &TimeSpec) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: clock_get(%d, 0x%llx)\n', clock_type, voidptr(ret))
-	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
-	}
-
-	match clock_type {
-		clock_type_monotonic {
-			unsafe { *ret = monotonic_clock }
-		}
-		clock_type_realtime {
-			unsafe { *ret = realtime_clock }
-		}
-		else {
-			C.printf(c'clock_get: Unknown clock type\n')
-			return -1, 1026 // errno.einval
-		}
-	}
-
-	return 0, 0
-}
