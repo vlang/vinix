@@ -295,7 +295,7 @@ pub mut:
 	namespace_list []&NVMENamespace
 
 	io_queue_bitmap bitmap.GenericBitmap
-	queue_list []NVMEQueuePair
+	queue_list []&NVMEQueuePair
 }
 
 struct NVMEQueuePair {
@@ -586,23 +586,18 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	return completion_entry.status
 }
 
-fn (mut dev NVMEController) allocate_queue() NVMEQueuePair {
-	mut queue_index := dev.io_queue_bitmap.alloc() or {
-		return dev.queue_list[0]
-	}
-	return dev.queue_list[queue_index]
-}
-
 pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	mut new_command := NVMECommand{}
 
-	mut queue_pair := ns.parent_controller.allocate_queue()
+	mut queue_pair_index := ns.parent_controller.io_queue_bitmap.alloc() or { 0 }
+	mut queue_pair := ns.parent_controller.queue_list[queue_pair_index]
 
 	queue_pair.l.acquire()
 
 	cid := queue_pair.cid_bitmap.alloc() or {
 		print('nvme: no available cids\n')
 		queue_pair.l.release()
+		ns.parent_controller.io_queue_bitmap.free_entry(queue_pair_index)
 		return -1
 	}
 
@@ -617,6 +612,7 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 			if prp_cnt > ns.max_prps {
 				print('nvme: max prps exceeded\n')
 				queue_pair.l.release()
+				ns.parent_controller.io_queue_bitmap.free_entry(queue_pair_index)
 				return -1
 			}
 
@@ -653,6 +649,7 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 	}
 
 	queue_pair.l.release()
+	ns.parent_controller.io_queue_bitmap.free_entry(queue_pair_index)
 
 	if queue_pair.send_cmd_and_wait(mut new_command, int(cid)) == 0xffff {
 		print('nvme: rw fail\n')
