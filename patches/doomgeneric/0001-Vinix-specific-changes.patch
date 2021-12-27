@@ -1,18 +1,18 @@
-From 84fc44ea39700d8590bd8b16ca636c72ebca9f1e Mon Sep 17 00:00:00 2001
+From b6c444b0f894af552e429de3d2649d5371c00c5f Mon Sep 17 00:00:00 2001
 From: Alula <6276139+alula@users.noreply.github.com>
-Date: Sun, 26 Dec 2021 17:47:53 +0100
+Date: Mon, 27 Dec 2021 00:01:59 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  doomgeneric/Makefile.vinix      |  54 ++++++++
- doomgeneric/doomgeneric_vinix.c | 227 ++++++++++++++++++++++++++++++++
- 2 files changed, 281 insertions(+)
+ doomgeneric/doomgeneric_vinix.c | 224 ++++++++++++++++++++++++++++++++
+ 2 files changed, 278 insertions(+)
  create mode 100644 doomgeneric/Makefile.vinix
  create mode 100644 doomgeneric/doomgeneric_vinix.c
 
 diff --git a/doomgeneric/Makefile.vinix b/doomgeneric/Makefile.vinix
 new file mode 100644
-index 0000000..b2f33a4
+index 0000000..f9fd1d3
 --- /dev/null
 +++ b/doomgeneric/Makefile.vinix
 @@ -0,0 +1,54 @@
@@ -31,7 +31,7 @@ index 0000000..b2f33a4
 +
 +
 +CC=x86_64-vinix-gcc
-+CFLAGS+=-Os
++CFLAGS+=-O3
 +LDFLAGS+=-Wl,--gc-sections
 +CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV -D_DEFAULT_SOURCE # -DUSEASM
 +LIBS+=-lm -lc
@@ -72,10 +72,10 @@ index 0000000..b2f33a4
 +
 diff --git a/doomgeneric/doomgeneric_vinix.c b/doomgeneric/doomgeneric_vinix.c
 new file mode 100644
-index 0000000..6eda4a7
+index 0000000..5149e51
 --- /dev/null
 +++ b/doomgeneric/doomgeneric_vinix.c
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,224 @@
 +// doomgeneric for soso os
 +
 +#include "doomgeneric.h"
@@ -221,10 +221,7 @@ index 0000000..6eda4a7
 +//     exit(1);
 +//   }
 +
-+  for (int i = 0; i < (s_ScreenWidth * s_ScreenHeight); i++) {
-+    fb[i] = 0x00000000;
-+  }
-+
++  memset(fb, 0, size);
 +  enableRawMode();
 +
 +  //   int argPosX = 0;

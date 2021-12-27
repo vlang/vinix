@@ -13,5 +13,7 @@ pub struct FramebufferDriver {
 pub mut:
 	name string
 	init fn()
+
+	// those below are filled in during registration, must be null.
 	register_device fn(FramebufferInfo)?
 }
