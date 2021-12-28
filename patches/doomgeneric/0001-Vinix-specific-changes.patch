@@ -1,12 +1,12 @@
-From b6c444b0f894af552e429de3d2649d5371c00c5f Mon Sep 17 00:00:00 2001
+From de8bb3843b4f2da6a8edf937565f8cffea147a72 Mon Sep 17 00:00:00 2001
 From: Alula <6276139+alula@users.noreply.github.com>
-Date: Mon, 27 Dec 2021 00:01:59 +0100
+Date: Tue, 28 Dec 2021 08:47:16 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  doomgeneric/Makefile.vinix      |  54 ++++++++
- doomgeneric/doomgeneric_vinix.c | 224 ++++++++++++++++++++++++++++++++
- 2 files changed, 278 insertions(+)
+ doomgeneric/doomgeneric_vinix.c | 214 ++++++++++++++++++++++++++++++++
+ 2 files changed, 268 insertions(+)
  create mode 100644 doomgeneric/Makefile.vinix
  create mode 100644 doomgeneric/doomgeneric_vinix.c
 
@@ -72,10 +72,10 @@ index 0000000..f9fd1d3
 +
 diff --git a/doomgeneric/doomgeneric_vinix.c b/doomgeneric/doomgeneric_vinix.c
 new file mode 100644
-index 0000000..5149e51
+index 0000000..ba84c2d
 --- /dev/null
 +++ b/doomgeneric/doomgeneric_vinix.c
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,214 @@
 +// doomgeneric for soso os
 +
 +#include "doomgeneric.h"
@@ -224,18 +224,8 @@ index 0000000..5149e51
 +  memset(fb, 0, size);
 +  enableRawMode();
 +
-+  //   int argPosX = 0;
-+  //   int argPosY = 0;
-+
-+  //   argPosX = M_CheckParmWithArgs("-posx", 1);
-+  //   if (argPosX > 0) {
-+  //     sscanf(myargv[argPosX + 1], "%d", &s_PositionX);
-+  //   }
-+
-+  //   argPosY = M_CheckParmWithArgs("-posy", 1);
-+  //   if (argPosY > 0) {
-+  //     sscanf(myargv[argPosY + 1], "%d", &s_PositionY);
-+  //   }
++  s_PositionX = (s_ScreenWidth - DOOMGENERIC_RESX) / 2;
++  s_PositionY = (s_ScreenHeight - DOOMGENERIC_RESY) / 2;
 +}
 +
 +static void handleKeyInput() {
