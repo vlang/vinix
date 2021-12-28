@@ -14,7 +14,7 @@ pub mut:
 pub struct FBFixScreenInfo {
 pub mut:
 	id [16]byte
-	smem_start u32
+	smem_start u64
 	smem_len u32
 	@type u32
 	type_aux u32
@@ -23,7 +23,7 @@ pub mut:
 	ypanstep u16
 	ywrapstep u16
 	line_length u32
-	mmio_start u32
+	mmio_start u64
 	mmio_len u32
 	accel u32
 	capabilities u16
