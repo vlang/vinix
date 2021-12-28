@@ -1,11 +1,11 @@
-From 25923dc4f0e3293973e272fb07ba97591239fa9f Mon Sep 17 00:00:00 2001
+From eb60e443d5c67d49306ee8f2d183562e7b91e612 Mon Sep 17 00:00:00 2001
 From: Alula <6276139+alula@users.noreply.github.com>
-Date: Sun, 26 Dec 2021 19:17:58 +0100
+Date: Tue, 28 Dec 2021 07:04:18 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  abis/mlibc/signal.h                           |   6 +-
- meson.build                                   |  54 +-
+ meson.build                                   |   6 +-
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux-headers/include/asm/ioctls.h    |   2 +
@@ -43,7 +43,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 39 files changed, 1174 insertions(+), 27 deletions(-)
+ 39 files changed, 1148 insertions(+), 5 deletions(-)
  create mode 100644 options/linux-headers/include/linux/fb.h
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
@@ -95,10 +95,10 @@ index 68146c4..bbd222a 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 55e9070..f0b7a02 100644
+index 4027c99..f0b7a02 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -47,36 +47,40 @@ if not headers_only
+@@ -47,7 +47,7 @@ if not headers_only
  	add_languages('c', 'cpp')
  	c_compiler = meson.get_compiler('c')
  
@@ -107,62 +107,7 @@ index 55e9070..f0b7a02 100644
  	add_project_arguments('-std=c++20', language: 'cpp')
  	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
  	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
- 	add_project_link_arguments('-nostdlib', language: ['c', 'cpp'])
- 
--	if c_compiler.get_id() == 'gcc'
--		gccdir = run_command('/bin/sh', '-c',
--			' '.join(c_compiler.cmd_array())
--					+ ' -print-search-dirs | sed -n -e "s/install: \(.*\)/\\1/p"',
--			env: ['LANG=C'],
--			check: true).stdout().strip()
--
--		rtdl_include_dirs += include_directories(gccdir / 'include')
--		libc_include_dirs += include_directories(gccdir / 'include')
--		# Ubuntu seems to patch out include-fixed/ (the files are in include/ instead).
--		if fs.exists(gccdir / 'include-fixed')
--			rtdl_include_dirs += include_directories(gccdir / 'include-fixed')
--			libc_include_dirs += include_directories(gccdir / 'include-fixed')
-+	searchdirs = run_command(c_compiler.cmd_array(), '-print-search-dirs',
-+				check: true).stdout()
-+	searchdirs_arr = searchdirs.split('\n')
-+	searchline = 'install: '
-+	ccdir = ''
-+	if c_compiler.get_id() == 'clang'
-+		searchline = 'libraries: ='
-+	endif
-+
-+	foreach line : searchdirs_arr
-+		if line.startswith(searchline)
-+			ccdir = line.strip(searchline)
-+			ccdir = ccdir.split(':')[0]
-+			break
- 		endif
--	elif c_compiler.get_id() == 'clang'
--		clangdir = run_command('/bin/sh', '-c',
--			' '.join(c_compiler.cmd_array())
--					+ ' -print-search-dirs | sed -ne "s/libraries: =\([^:]*\).*/\\1/p"',
--			env: ['LANG=C'],
--			check: true).stdout().strip()
--
--		rtdl_include_dirs += include_directories(clangdir / 'include')
--		libc_include_dirs += include_directories(clangdir / 'include')
-+	endforeach
-+
-+	if ccdir == ''
-+		error('could not find compiler-specific header directory')
- 	endif
-+
-+	if c_compiler.get_id() == 'gcc' and fs.exists(ccdir / 'include-fixed')
-+		rtdl_include_dirs += include_directories(ccdir / 'include-fixed')
-+		libc_include_dirs += include_directories(ccdir / 'include-fixed')
-+	endif
-+
-+	rtdl_include_dirs += include_directories(ccdir / 'include')
-+	libc_include_dirs += include_directories(ccdir / 'include')
- endif
- 
- internal_conf.set_quoted('MLIBC_SYSTEM_NAME', host_machine.system())
-@@ -106,6 +110,10 @@ elif host_machine.system() == 'qword'
+@@ -110,6 +110,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -521,10 +466,10 @@ index 90ba98c..b16b81b 100644
  int pthread_attr_init(pthread_attr_t *) {
  	return 0;
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
-index 21aa04e..e1a8bcd 100644
+index 4917a15..c134e42 100644
 --- a/options/posix/generic/unistd-stubs.cpp
 +++ b/options/posix/generic/unistd-stubs.cpp
-@@ -835,12 +835,12 @@ int ttyname_r(int, char *, size_t) {
+@@ -848,12 +848,12 @@ int ttyname_r(int, char *, size_t) {
  }
  
  int unlink(const char *path) {

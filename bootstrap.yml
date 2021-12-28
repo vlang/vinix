@@ -108,7 +108,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: '045f937dd0cce6442379df83bad64ac90ceeb96d'
+    commit: '4ac29d952e27f8aefc6def6dfcd113c427eeb391'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -1993,7 +1993,7 @@ packages:
   - name: fontconfig
     source:
       subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig'
+      git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig.git'
       tag: '2.13.94'
       version: '2.13.94'
       tools_required:
