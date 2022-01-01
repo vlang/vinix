@@ -1,17 +1,17 @@
-KERNEL := vinix.elf
+ifeq ($(origin CC), default)
+	CC := cc
+endif
+ifeq ($(origin LD), default)
+	LD := ld
+endif
+OBJDUMP ?= objdump
+V       ?= v
+CFLAGS  ?= -O2 -Wall -Wextra -g -pipe
+LDFLAGS ?=
+VFLAGS  ?=
+PROD    ?= false
 
-PROD = false
-
-CC = cc
-LD = ld
-OBJDUMP = objdump
-V = v
-
-CFLAGS = -O2 -Wall -Wextra -g -pipe
-LDFLAGS =
-VFLAGS =
-
-INTERNALCFLAGS :=                 \
+override INTERNALCFLAGS :=        \
 	-ffreestanding                \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
@@ -31,29 +31,30 @@ INTERNALCFLAGS :=                 \
 	-Wno-unused-variable          \
 	-Wno-unused-parameter
 
-INTERNALLDFLAGS :=         \
-	-Tlinker.ld            \
-	-nostdlib              \
+override INTERNALLDFLAGS :=  \
+	-Tlinker.ld              \
+	-nostdlib                \
 	-zmax-page-size=0x200000 \
-	-static                \
+	-static                  \
 	-gc-sections
 
-INTERNALVFLAGS :=   \
-	-os vinix       \
-	-enable-globals \
-	-nofloat        \
-	-autofree       \
+override INTERNALVFLAGS := \
+	-os vinix              \
+	-enable-globals        \
+	-nofloat               \
+	-autofree              \
 	-d no_backtrace
 
 ifeq ($(PROD), true)
-	INTERNALVFLAGS += -prod
-	INTERNALCFLAGS += -DPROD
+	override INTERNALVFLAGS += -prod
+	override INTERNALCFLAGS += -DPROD
 endif
 
-VFILES := $(shell find ./ -type f -name '*.v')
-CFILES := $(shell find ./ -type f -name '*.c')
-SFILES := $(shell find ./ -type f -name '*.S')
-COBJ   := $(CFILES:.c=.o) $(SFILES:.S=.o)
+override KERNEL := vinix.elf
+override VFILES := $(shell find ./ -type f -name '*.v')
+override CFILES := $(shell find ./ -type f -name '*.c')
+override SFILES := $(shell find ./ -type f -name '*.S')
+override COBJ   := $(CFILES:.c=.o) $(SFILES:.S=.o)
 
 .PHONY: all
 all: $(KERNEL)
