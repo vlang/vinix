@@ -22,10 +22,10 @@ override SHARED_DIR   := $(realpath shared_utils)
 
 all: $(FETCH_TARGET) $(MOUNT_TARGET)
 
-$(FETCH_TARGET):
+$(FETCH_TARGET): $(FETCH_DIR)/* $(SHARED_DIR)/*
 	cd $(FETCH_DIR) && VMODULES=$(SHARED_DIR) $(V) $(VFLAGS) -cc $(CC) -os vinix .
 
-$(MOUNT_TARGET):
+$(MOUNT_TARGET): $(MOUNT_DIR)/* $(SHARED_DIR)/*
 	cd $(MOUNT_DIR) && VMODULES=$(SHARED_DIR) $(V) $(VFLAGS) -cc $(CC) -os vinix .
 
 clean:
