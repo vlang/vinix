@@ -51,6 +51,10 @@ kernel:
 init:
 	cd build && xbstrap install --rebuild init
 
+.PHONY: util-vinix
+util-vinix:
+	cd build && xbstrap install --rebuild util-vinix
+
 .PHONY: base-files
 base-files:
 	cd build && xbstrap install --rebuild base-files
@@ -62,6 +66,7 @@ vinix.iso: kernel init base-files
 .PHONY: clean
 clean:
 	$(MAKE) -C kernel clean
+	$(MAKE) -C util-vinix clean
 	rm -f init/init
 	rm -f vinix.iso
 
