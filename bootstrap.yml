@@ -117,7 +117,7 @@ sources:
     sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: 'f87f8ec3f7cfc7334e5c5b3d063bbfb9512ec5e1'
+    commit: '41e763f79ce0897286a64640ddb11cae0670efc7'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -125,7 +125,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '50b5a887bfb050b488a9a27572d776e2235bb143'
+    commit: 'd73fe1ab17564824a28d48ac54a4b389cfab0ebf'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
