@@ -1,0 +1,295 @@
+From de8bb3843b4f2da6a8edf937565f8cffea147a72 Mon Sep 17 00:00:00 2001
+From: Alula <6276139+alula@users.noreply.github.com>
+Date: Tue, 28 Dec 2021 08:47:16 +0100
+Subject: [PATCH] Vinix specific changes
+
+---
+ doomgeneric/Makefile.vinix      |  54 ++++++++
+ doomgeneric/doomgeneric_vinix.c | 214 ++++++++++++++++++++++++++++++++
+ 2 files changed, 268 insertions(+)
+ create mode 100644 doomgeneric/Makefile.vinix
+ create mode 100644 doomgeneric/doomgeneric_vinix.c
+
+diff --git a/doomgeneric/Makefile.vinix b/doomgeneric/Makefile.vinix
+new file mode 100644
+index 0000000..f9fd1d3
+--- /dev/null
++++ b/doomgeneric/Makefile.vinix
+@@ -0,0 +1,54 @@
++################################################################
++#
++# $Id:$
++#
++# $Log:$
++#
++
++ifeq ($(V),1)
++	VB=''
++else
++	VB=@
++endif
++
++
++CC=x86_64-vinix-gcc
++CFLAGS+=-O3
++LDFLAGS+=-Wl,--gc-sections
++CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV -D_DEFAULT_SOURCE # -DUSEASM
++LIBS+=-lm -lc
++
++# subdirectory for objects
++OBJDIR=build
++OUTPUT=doomgeneric
++
++SRC_DOOM = i_main.o dummy.o am_map.o doomdef.o doomstat.o dstrings.o d_event.o d_items.o d_iwad.o d_loop.o d_main.o d_mode.o d_net.o f_finale.o f_wipe.o g_game.o hu_lib.o hu_stuff.o info.o i_cdmus.o i_endoom.o i_joystick.o i_scale.o i_sound.o i_system.o i_timer.o memio.o m_argv.o m_bbox.o m_cheat.o m_config.o m_controls.o m_fixed.o m_menu.o m_misc.o m_random.o p_ceilng.o p_doors.o p_enemy.o p_floor.o p_inter.o p_lights.o p_map.o p_maputl.o p_mobj.o p_plats.o p_pspr.o p_saveg.o p_setup.o p_sight.o p_spec.o p_switch.o p_telept.o p_tick.o p_user.o r_bsp.o r_data.o r_draw.o r_main.o r_plane.o r_segs.o r_sky.o r_things.o sha1.o sounds.o statdump.o st_lib.o st_stuff.o s_sound.o tables.o v_video.o wi_stuff.o w_checksum.o w_file.o w_main.o w_wad.o z_zone.o w_file_stdc.o i_input.o i_video.o doomgeneric.o doomgeneric_vinix.o
++OBJS += $(addprefix $(OBJDIR)/, $(SRC_DOOM))
++
++all:	 $(OUTPUT)
++
++clean:
++	rm -rf $(OBJDIR)
++	rm -f $(OUTPUT)
++	rm -f $(OUTPUT).gdb
++	rm -f $(OUTPUT).map
++
++$(OUTPUT):	$(OBJS)
++	@echo [Linking $@]
++	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) \
++	-o $(OUTPUT) $(LIBS) -Wl,-Map,$(OUTPUT).map
++	@echo [Size]
++	-$(CROSS_COMPILE)size $(OUTPUT)
++
++$(OBJS): | $(OBJDIR)
++
++$(OBJDIR):
++	mkdir -p $(OBJDIR)
++
++$(OBJDIR)/%.o:	%.c
++	@echo [Compiling $<]
++	$(VB)$(CC) $(CFLAGS) -c $< -o $@
++
++print:
++	@echo OBJS: $(OBJS)
++
+diff --git a/doomgeneric/doomgeneric_vinix.c b/doomgeneric/doomgeneric_vinix.c
+new file mode 100644
+index 0000000..ba84c2d
+--- /dev/null
++++ b/doomgeneric/doomgeneric_vinix.c
+@@ -0,0 +1,214 @@
++// doomgeneric for soso os
++
++#include "doomgeneric.h"
++#include "doomkeys.h"
++#include "m_argv.h"
++
++#include <fcntl.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++
++#include <linux/fb.h>
++#include <sys/ioctl.h>
++#include <sys/mman.h>
++#include <sys/time.h>
++#include <termios.h>
++
++static int fd_framebuffer = -1;
++static unsigned int *fb = NULL;
++
++static int KeyboardFd = -1;
++
++#define KEYQUEUE_SIZE 16
++
++static unsigned short s_KeyQueue[KEYQUEUE_SIZE];
++static unsigned int s_KeyQueueWriteIndex = 0;
++static unsigned int s_KeyQueueReadIndex = 0;
++
++static unsigned int s_PositionX = 0;
++static unsigned int s_PositionY = 0;
++
++static unsigned int s_ScreenWidth = 0;
++static unsigned int s_ScreenHeight = 0;
++
++static unsigned char convertToDoomKey(unsigned char scancode) {
++  unsigned char key = 0;
++
++  switch (scancode) {
++  case 0x9C:
++  case 0x1C:
++    key = KEY_ENTER;
++    break;
++  case 0x01:
++    key = KEY_ESCAPE;
++    break;
++  case 0xCB:
++  case 0x4B:
++    key = KEY_LEFTARROW;
++    break;
++  case 0xCD:
++  case 0x4D:
++    key = KEY_RIGHTARROW;
++    break;
++  case 0xC8:
++  case 0x48:
++    key = KEY_UPARROW;
++    break;
++  case 0xD0:
++  case 0x50:
++    key = KEY_DOWNARROW;
++    break;
++  case 0x1D:
++    key = KEY_FIRE;
++    break;
++  case 0x39:
++    key = KEY_USE;
++    break;
++  case 0x2A:
++  case 0x36:
++    key = KEY_RSHIFT;
++    break;
++  case 0x15:
++    key = 'y';
++    break;
++  default:
++    break;
++  }
++
++  return key;
++}
++
++static void addKeyToQueue(int pressed, unsigned char keyCode) {
++  unsigned char key = convertToDoomKey(keyCode);
++
++  unsigned short keyData = (pressed << 8) | key;
++
++  s_KeyQueue[s_KeyQueueWriteIndex] = keyData;
++  s_KeyQueueWriteIndex++;
++  s_KeyQueueWriteIndex %= KEYQUEUE_SIZE;
++}
++
++struct termios orig_termios;
++
++void disableRawMode() {
++  // printf("returning original termios\n");
++  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
++}
++
++void enableRawMode() {
++  tcgetattr(STDIN_FILENO, &orig_termios);
++  atexit(disableRawMode);
++  struct termios raw = orig_termios;
++  raw.c_lflag &= ~(ECHO);
++  raw.c_cc[VMIN] = 0;
++  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
++}
++
++void DG_Init() {
++  struct fb_var_screeninfo vinfo;
++  struct fb_fix_screeninfo finfo;
++  fd_framebuffer = open("/dev/fb0", O_RDWR);
++
++  if (!fd_framebuffer) {
++    printf("Opening FrameBuffer device failed!\n");
++    fflush(stdout);
++    exit(1);
++  }
++
++  if (ioctl(fd_framebuffer, FBIOGET_VSCREENINFO, &vinfo)) {
++    printf("FBIOGET_VSCREENINFO failed.\n");
++    fflush(stdout);
++    exit(1);
++  }
++
++  if (ioctl(fd_framebuffer, FBIOGET_FSCREENINFO, &finfo)) {
++    printf("FBIOGET_FSCREENINFO failed.\n");
++    fflush(stdout);
++    exit(1);
++  }
++
++  s_ScreenWidth = vinfo.xres;
++  s_ScreenHeight = vinfo.yres;
++  int size = s_ScreenWidth * s_ScreenHeight * vinfo.bits_per_pixel / 8;
++
++  fb = (unsigned int *)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED,
++                            fd_framebuffer, 0);
++
++    printf("framebuffer mapped to %p\n", fb);
++
++//   if (fb == (unsigned int *)-1u) {
++//     printf("FrameBuffer mmap failed\n");
++//     fflush(stdout);
++//     exit(1);
++//   }
++
++  memset(fb, 0, size);
++  enableRawMode();
++
++  s_PositionX = (s_ScreenWidth - DOOMGENERIC_RESX) / 2;
++  s_PositionY = (s_ScreenHeight - DOOMGENERIC_RESY) / 2;
++}
++
++static void handleKeyInput() {
++  if (KeyboardFd < 0) {
++    return;
++  }
++
++  unsigned char scancode = 0;
++
++  if (read(KeyboardFd, &scancode, 1) > 0) {
++    unsigned char keyRelease = (0x80 & scancode);
++
++    scancode = (0x7F & scancode);
++
++    // printf("scancode:%x pressed:%d\n", scancode, 0 == keyRelease);
++
++    if (0 == keyRelease) {
++      addKeyToQueue(1, scancode);
++    } else {
++      addKeyToQueue(0, scancode);
++    }
++  }
++}
++
++void DG_DrawFrame() {
++  if (fb) {
++    for (int i = 0; i < DOOMGENERIC_RESY; ++i) {
++      memcpy(&fb[s_PositionX + (i + s_PositionY) * s_ScreenWidth],
++             DG_ScreenBuffer + i * DOOMGENERIC_RESX, DOOMGENERIC_RESX * 4);
++    }
++  }
++
++  handleKeyInput();
++}
++
++void DG_SleepMs(uint32_t ms) { usleep(ms * 1000000); }
++
++uint32_t DG_GetTicksMs() {
++  struct timeval tp;
++  struct timezone tzp;
++
++  gettimeofday(&tp, &tzp);
++
++  return (tp.tv_sec * 1000) + (tp.tv_usec / 1000);
++}
++
++int DG_GetKey(int *pressed, unsigned char *doomKey) {
++  if (s_KeyQueueReadIndex == s_KeyQueueWriteIndex) {
++    // key queue is empty
++
++    return 0;
++  } else {
++    unsigned short keyData = s_KeyQueue[s_KeyQueueReadIndex];
++    s_KeyQueueReadIndex++;
++    s_KeyQueueReadIndex %= KEYQUEUE_SIZE;
++
++    *pressed = keyData >> 8;
++    *doomKey = keyData & 0xFF;
++
++    return 1;
++  }
++}
++
++void DG_SetWindowTitle(const char *title) {}
+-- 
+2.34.1
+

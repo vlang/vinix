@@ -1,6 +1,6 @@
-From 90b953ca7943bffc08608678bc068045085b3421 Mon Sep 17 00:00:00 2001
+From 9078afc7275d4887b4de98d6d91495519b9eed51 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 2 Jan 2022 15:41:52 +0100
+Date: Mon, 3 Jan 2022 12:42:36 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -14,7 +14,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 705 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 722 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 37 files changed, 877 insertions(+), 5 deletions(-)
+ 37 files changed, 894 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -301,10 +301,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..9e00538
+index 0000000..eb925ef
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,705 @@
+@@ -0,0 +1,722 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -1007,6 +1007,23 @@ index 0000000..9e00538
 +        return ret.errno;
 +
 +    return 0;
++}
++
++int sys_sleep(time_t *secs, long *nanos) {
++	struct timespec req = {
++		.tv_sec = *secs,
++		.tv_nsec = *nanos
++	};
++	struct timespec rem = {0};
++
++	__syscall_ret ret = __syscall(53, &req, &rem);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++	*secs = rem.tv_sec;
++	*nanos = rem.tv_nsec;
++	return 0;
 +}
 +
 +} // namespace mlibc
