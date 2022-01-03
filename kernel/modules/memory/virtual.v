@@ -166,7 +166,7 @@ pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.Kerne
 	// shared.
 	for i := u64(256); i < 512; i++ {
 		// get_next_level will allocate the PML3s for us.
-		get_next_level(kernel_pagemap.top_level, i, true) or { panic('pmm init failure') }
+		get_next_level(kernel_pagemap.top_level, i, true) or { panic('vmm init failure') }
 	}
 
 	// Map kernel according to PMRs
@@ -187,8 +187,8 @@ pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.Kerne
 	}
 
 	for i := u64(0x1000); i < 0x100000000; i += page_size {
-		kernel_pagemap.map_page(i, i, 0x03) or { panic('pmm init failure') }
-		kernel_pagemap.map_page(i + higher_half, i, 0x03) or { panic('pmm init failure') }
+		kernel_pagemap.map_page(i, i, 0x03) or { panic('vmm init failure') }
+		kernel_pagemap.map_page(i + higher_half, i, 0x03) or { panic('vmm init failure') }
 	}
 
 	entries := &memmap.entries
@@ -202,8 +202,8 @@ pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.Kerne
 			if j < u64(0x100000000) {
 				continue
 			}
-			kernel_pagemap.map_page(j, j, 0x03) or { panic('pmm init failure') }
-			kernel_pagemap.map_page(j + higher_half, j, 0x03) or { panic('pmm init failure') }
+			kernel_pagemap.map_page(j, j, 0x03) or { panic('vmm init failure') }
+			kernel_pagemap.map_page(j + higher_half, j, 0x03) or { panic('vmm init failure') }
 		}
 	}
 
