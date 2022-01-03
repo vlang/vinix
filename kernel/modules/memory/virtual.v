@@ -181,7 +181,7 @@ pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.Kerne
 
 		for j := u64(0); j < len; j += page_size {
 			kernel_pagemap.map_page(virt + j, phys + j, 0x03) or {
-				panic('pmm init failure')
+				panic('vmm init failure')
 			}
 		}
 	}
