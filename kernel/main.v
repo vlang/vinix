@@ -21,6 +21,7 @@ import pipe
 import futex
 import pci
 import dev.ata
+import dev.bga
 import dev.fbdev
 import dev.fbdev.simple
 import dev.nvme
@@ -63,6 +64,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 		ata.initialise()
 		nvme.initialise()
 		ahci.initialise()
+		bga.initialise()
 	}
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
