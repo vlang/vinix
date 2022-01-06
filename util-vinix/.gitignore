@@ -1,5 +1,0 @@
-*.o
-*.c
-shared_utils/cache
-fetch/fetch
-mount/mount

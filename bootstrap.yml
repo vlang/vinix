@@ -135,6 +135,13 @@ sources:
     tag: 'v2.74.2'
     version: '2.74.2'
 
+  - name: util-vinix
+    subdir: '3rdparty'
+    git: 'https://github.com/vinix-os/util-vinix.git'
+    branch: 'main'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
+
   - name: wayland
     subdir: '3rdparty'
     git: 'https://github.com/wayland-project/wayland.git'
@@ -656,12 +663,7 @@ packages:
           cp init "@THIS_COLLECT_DIR@/sbin/"
 
   - name: util-vinix
-    source:
-      subdir: ''
-      git: 'https://github.com/vlang/vinix.git'
-      branch: 'main'
-      rolling_version: true
-      version: '0.0pl@ROLLING_ID@'
+    from_source: util-vinix
     tools_required:
       - host-v
       - host-gcc
