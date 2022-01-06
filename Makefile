@@ -37,30 +37,32 @@ run-uefi: ovmf
 run: vinix.iso
 	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -d int -smp 1
 
-.PHONY: distro
-distro:
-	mkdir -p build 3rdparty
+build:
+	mkdir -p build
 	cd build && [ -f bootstrap.link ] || xbstrap init ..
+
+.PHONY: distro
+distro: build
 	cd build && xbstrap install -u --all
 
 .PHONY: kernel
-kernel:
+kernel: build
 	cd build && xbstrap install --rebuild kernel
 
 .PHONY: init
-init:
+init: build
 	cd build && xbstrap install --rebuild init
 
 .PHONY: util-vinix
-util-vinix:
+util-vinix: build
 	cd build && xbstrap install --rebuild util-vinix
 
 .PHONY: base-files
-base-files:
+base-files: build
 	cd build && xbstrap install --rebuild base-files
 
-vinix.iso: kernel init base-files
-	cd build && xbstrap run make-iso
+vinix.iso: build kernel init base-files
+	cd build && xbstrap run make-basic-iso
 	mv build/vinix.iso ./
 
 .PHONY: clean

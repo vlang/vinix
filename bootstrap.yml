@@ -550,6 +550,26 @@ tools:
       - args: ['make', 'install']
 
 tasks:
+  - name: make-basic-iso
+    tools_required:
+      - host-limine
+    pkgs_required:
+      - base-files
+      - kernel
+      - init
+      - util-vinix
+      - bash
+      - coreutils
+    args:
+      - name: vinix.iso
+        path: '@BUILD_ROOT@'
+    args:
+      - '@SOURCE_ROOT@/make-iso.sh'
+      - '@BUILD_ROOT@'
+      - '@SOURCE_ROOT@'
+      - '@SYSROOT_DIR@'
+    workdir: '@BUILD_ROOT@'
+
   - name: make-iso
     tools_required:
       - host-limine
