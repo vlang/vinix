@@ -11,8 +11,8 @@ sources:
 
   - name: pkg-config
     subdir: '3rdparty'
-    git: 'https://gitlab.freedesktop.org/pkg-config/pkg-config.git'
-    tag: 'pkg-config-0.29.2'
+    git: 'https://github.com/vinix-os/pkg-config.git'
+    tag: 'v0.29.2'
     version: '0.29.2'
     tools_required:
       - host-autoconf-v2.69
@@ -2347,7 +2347,7 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-  
+
   - name: doomgeneric
     from_source: doomgeneric
     tools_required:
