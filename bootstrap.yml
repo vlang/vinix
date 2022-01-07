@@ -286,29 +286,6 @@ tools:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
 
-  - name: host-automake-v1.15
-    source:
-      name: automake-v1.15
-      subdir: '3rdparty'
-      git: 'https://git.savannah.gnu.org/git/automake.git'
-      tag: 'v1.15.1'
-      version: '1.15.1'
-      tools_required:
-        - host-autoconf-v2.69
-      regenerate:
-        - args: ['./bootstrap']
-    tools_required:
-      - host-autoconf-v2.69
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install-strip']
-      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
-
   - name: host-zic
     from_source: tzdata
     configure:
@@ -2221,9 +2198,14 @@ packages:
       version: '0.21'
       tools_required:
         - host-autoconf-v2.69
-        - host-automake-v1.15
+        - host-automake-v1.16
         - host-libtool
       regenerate:
+        - args: |
+            set -e
+            sed -i 's|. $srcdir/version.sh|dnl . $srcdir/version.sh|g' libtextstyle/configure.ac
+            sed -i 's|AC_INIT|. $srcdir/version.sh\nAC_INIT([libtextstyle], [$VERSION_NUMBER], [bug-gettext@gnu.org])|g' libtextstyle/configure.ac
+            sed -i 's|gl_INIT_PACKAGE|dnl gl_INIT_PACKAGE|g' libtextstyle/configure.ac
         - args: ['autoreconf', '-fvi']
     tools_required:
       - host-gcc
