@@ -371,8 +371,6 @@ tools:
     from_source: limine
     tools_required:
       - host-gcc
-    pkgs_required:
-      - mlibc
     compile:
       - args: |
           set -e
