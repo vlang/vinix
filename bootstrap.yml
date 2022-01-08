@@ -251,17 +251,6 @@ tools:
     install:
       - args: ['make', 'install']
 
-  - name: host-autoconf-archive
-    exports_aclocal: true
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/autoconf-archive/autoconf-archive.git'
-      tag: 'v2021.02.19'
-      version: '2021.02.19'
-    install:
-      - args: ['mkdir', '-p', '@PREFIX@/share']
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@PREFIX@/share/aclocal']
-
   - name: host-automake-v1.16
     source:
       name: automake-v1.16
@@ -273,6 +262,9 @@ tools:
         - host-autoconf-v2.69
       regenerate:
         - args: ['./bootstrap']
+        - args: |
+            set -e
+            git clone https://github.com/autoconf-archive/autoconf-archive.git --branch=v2021.02.19 --depth=1
     tools_required:
       - host-autoconf-v2.69
     configure:
@@ -288,6 +280,7 @@ tools:
     install:
       - args: ['make', 'install-strip']
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/autoconf-archive/m4/.', '@PREFIX@/share/aclocal-1.16/']
 
   - name: host-zic
     from_source: tzdata
@@ -1408,7 +1401,6 @@ packages:
         - host-automake-v1.16
         - host-libtool
         - host-pkg-config
-        - host-autoconf-archive
       regenerate:
         - args: ['./autogen.sh']
     tools_required:
@@ -1630,7 +1622,6 @@ packages:
         - host-autoconf-v2.69
         - host-automake-v1.16
         - host-libtool
-        - host-autoconf-archive
         - host-pkg-config
         - host-gettext
       regenerate:
@@ -2137,7 +2128,6 @@ packages:
         - host-automake-v1.16
         - host-libtool
         - host-pkg-config
-        - host-autoconf-archive
         - host-gettext
       regenerate:
         - args: ['rm', '-rf', 'gnulib']
