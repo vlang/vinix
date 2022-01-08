@@ -200,8 +200,9 @@ sources:
 
   - name: xorg-util-macros
     subdir: '3rdparty'
-    git: 'https://gitlab.freedesktop.org/xorg/util/macros.git'
-    tag: 'util-macros-1.19.3'
+    url: 'https://gitlab.freedesktop.org/xorg/util/macros/-/archive/util-macros-1.19.3/macros-util-macros-1.19.3.tar.gz'
+    format: 'tar.gz'
+    extract_path: 'macros-util-macros-1.19.3'
     version: '1.19.3'
     tools_required:
       - host-autoconf-v2.69
@@ -1726,8 +1727,9 @@ packages:
   - name: libevdev
     source:
       subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/libevdev/libevdev.git'
-      tag: 'libevdev-1.9.1'
+      url: 'https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.9.1/libevdev-libevdev-1.9.1.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'libevdev-libevdev-1.9.1'
       version: '1.9.1'
       tools_required:
         - host-autoconf-v2.69
@@ -1827,8 +1829,9 @@ packages:
   - name: cairo
     source:
       subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/cairo/cairo.git'
-      tag: '1.17.4'
+      url: 'https://gitlab.freedesktop.org/cairo/cairo/-/archive/1.17.4/cairo-1.17.4.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'cairo-1.17.4'
       version: '1.17.4'
       tools_required:
         - host-autoconf-v2.69
@@ -1964,8 +1967,9 @@ packages:
   - name: pixman
     source:
       subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/pixman/pixman.git'
-      tag: 'pixman-0.40.0'
+      url: 'https://gitlab.freedesktop.org/pixman/pixman/-/archive/pixman-0.40.0/pixman-pixman-0.40.0.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'pixman-pixman-0.40.0'
       version: '0.40.0'
       tools_required:
         - host-autoconf-v2.69
@@ -2000,8 +2004,9 @@ packages:
   - name: fontconfig
     source:
       subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig.git'
-      tag: '2.13.94'
+      url: 'https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.13.94/fontconfig-2.13.94.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'fontconfig-2.13.94'
       version: '2.13.94'
       tools_required:
         - host-autoconf-v2.69
