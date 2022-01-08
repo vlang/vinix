@@ -134,6 +134,8 @@ sources:
     git: 'https://github.com/limine-bootloader/limine.git'
     tag: 'v2.74.2'
     version: '2.74.2'
+    regenerate:
+      - args: ['make', 'regenerate']
 
   - name: util-vinix
     subdir: '3rdparty'
@@ -256,8 +258,8 @@ tools:
       tag: 'v2021.02.19'
       version: '2021.02.19'
     install:
-      - args: ['mkdir', '-p', '@BUILD_ROOT@/tools/host-autoconf-archive/share/']
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@BUILD_ROOT@/tools/host-autoconf-archive/share/aclocal']
+      - args: ['mkdir', '-p', '@PREFIX@/share']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@PREFIX@/share/aclocal']
 
   - name: host-automake-v1.16
     source:
@@ -368,17 +370,16 @@ tools:
     from_source: limine
     tools_required:
       - host-gcc
+    pkgs_required:
+      - mlibc
     compile:
       - args: |
           set -e
-          cd "@THIS_SOURCE_DIR@"
-          make limine-bios limine-uefi limine-uefi32 TOOLCHAIN=x86_64-vinix
-          make limine-install
+          make -C "@THIS_SOURCE_DIR@" BUILDDIR="@THIS_BUILD_DIR@" TOOLCHAIN=x86_64-vinix
     install:
       - args: |
           set -e
-          cd "@THIS_SOURCE_DIR@"
-          make install PREFIX="@PREFIX@"
+          make -C "@THIS_SOURCE_DIR@" BUILDDIR="@THIS_BUILD_DIR@" PREFIX="@PREFIX@" install
 
   - name: host-binutils
     from_source: binutils
