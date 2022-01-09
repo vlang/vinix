@@ -132,8 +132,8 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.74.3'
-    version: '2.74.3'
+    tag: 'v2.74.4'
+    version: '2.74.4'
     regenerate:
       - args: ['make', 'regenerate']
 
