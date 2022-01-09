@@ -296,6 +296,9 @@ tools:
 
   - name: host-nasm
     from_source: nasm
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
     configure:
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
       - args:
@@ -769,6 +772,23 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: nasm
+    from_source: nasm
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-gcc
+    configure:
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      - args:
+        - './configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'strip']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
 
   - name: llvm
     from_source: llvm
