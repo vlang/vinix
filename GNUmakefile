@@ -15,7 +15,7 @@ prod-all:
 	$(MAKE) all || true
 	mv bootstrap.yml.tmp bootstrap.yml
 
-QEMUFLAGS = -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
+QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: run-kvm
 run-kvm: vinix.iso

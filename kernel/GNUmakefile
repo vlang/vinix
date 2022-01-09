@@ -1,7 +1,3 @@
-ifneq (,)
-We only support GNU make.
-endif
-
 ifeq ($(origin CC), default)
 	CC := cc
 endif
