@@ -137,6 +137,18 @@ sources:
     regenerate:
       - args: ['make', 'regenerate']
 
+  - name: nasm
+    subdir: '3rdparty'
+    git: 'https://github.com/netwide-assembler/nasm.git'
+    tag: 'nasm-2.15.05'
+    version: '2.15.05'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']
+
   - name: util-vinix
     subdir: '3rdparty'
     git: 'https://github.com/vinix-os/util-vinix.git'
@@ -282,6 +294,19 @@ tools:
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/autoconf-archive/m4/.', '@PREFIX@/share/aclocal-1.16/']
 
+  - name: host-nasm
+    from_source: nasm
+    configure:
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      - args:
+        - './configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'strip']
+      - args: ['make', 'install']
+
   - name: host-zic
     from_source: tzdata
     configure:
@@ -364,6 +389,7 @@ tools:
     from_source: limine
     tools_required:
       - host-gcc
+      - host-nasm
     compile:
       - args: |
           set -e
