@@ -663,6 +663,7 @@ packages:
 
   - name: util-vinix
     from_source: util-vinix
+    revision: 2
     tools_required:
       - host-v
       - host-gcc
