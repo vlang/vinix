@@ -1,6 +1,6 @@
-From ec8ca22b011b2737c08758bd4498f300e4197107 Mon Sep 17 00:00:00 2001
+From 17f479429cad4791e849387a772ebef7e2ed7f57 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 12 Sep 2021 04:15:55 +0200
+Date: Tue, 11 Jan 2022 18:20:36 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -104,7 +104,7 @@ index b6ff60f..b41ad13 100644
   */
  
 diff --git a/meson.build b/meson.build
-index e2eba18..f73b691 100644
+index a0223ce..b4941b9 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -438,7 +438,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
@@ -116,5 +116,5 @@ index e2eba18..f73b691 100644
      '-Werror=init-self',
      '-Werror=missing-include-dirs',
 -- 
-2.33.0
+2.34.1
 
