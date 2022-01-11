@@ -3,6 +3,13 @@ declare_options:
     default: 'false' # prod
 
 sources:
+  - name: gnulib
+    subdir: '3rdparty'
+    git: 'https://git.savannah.gnu.org/git/gnulib.git'
+    branch: 'master'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
+
   - name: glib
     subdir: '3rdparty'
     git: 'https://gitlab.gnome.org/GNOME/glib.git'
@@ -21,7 +28,7 @@ sources:
     regenerate:
       - args: ['./autogen.sh']
         environ:
-          'NOCONFIGURE': 'yes'
+          NOCONFIGURE: 'yes'
 
   - name: python
     subdir: '3rdparty'
@@ -176,11 +183,14 @@ sources:
     git: 'https://git.savannah.gnu.org/git/bison.git'
     tag: 'v3.6.2'
     version: '3.6.2'
+    sources_required: ['gnulib']
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
       - host-libtool
     regenerate:
+      - args: ['rm', '-rf', 'gnulib']
+      - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
       - args: ['git', 'submodule', 'update', '--init']
       - args: ['./bootstrap']
       - args: ['cp',
@@ -192,6 +202,7 @@ sources:
     git: 'https://git.savannah.gnu.org/git/gettext.git'
     tag: 'v0.19.8'
     version: '0.19.8'
+    sources_required: ['gnulib']
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
@@ -200,6 +211,8 @@ sources:
     regenerate:
       - args: 'sed -i s/"SUBDIRS = doc intl intl-java intl-csharp gnulib-lib \$(SUBDIR_libasprintf)\ src po man m4 tests"/"SUBDIRS = intl intl-java intl-csharp gnulib-lib \$(SUBDIR_libasprintf)\ src po m4 tests"/ @THIS_SOURCE_DIR@/gettext-runtime/Makefile.am'
       - args: 'sed -i s/"SUBDIRS = doc intl gnulib-lib libgrep src libgettextpo po projects styles misc man m4 tests gnulib-tests examples its"/"SUBDIRS = intl gnulib-lib libgrep src libgettextpo po projects styles misc m4 tests gnulib-tests examples its"/ @THIS_SOURCE_DIR@/gettext-tools/Makefile.am'
+      - args: ['rm', '-rf', 'gnulib']
+      - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
       - args: ['./autogen.sh']
         environ:
           NOCONFIGURE: 'yes'
@@ -251,8 +264,8 @@ tools:
     source:
       name: autoconf-v2.69
       subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.xz'
-      format: 'tar.xz'
+      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz'
+      format: 'tar.gz'
       extract_path: 'autoconf-2.69'
       patch-path-strip: 3
       version: '2.69'
@@ -494,10 +507,13 @@ tools:
       git: 'https://git.savannah.gnu.org/git/libtool.git'
       tag: 'v2.4.6'
       version: '2.4.6'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
       regenerate:
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         # libtool's ./bootstrap does a shallow clone with insufficient depth.
         - args: ['git', 'submodule', 'update', '--init']
         - args: ['./bootstrap']
@@ -1116,10 +1132,13 @@ packages:
       git: 'https://git.savannah.gnu.org/git/coreutils.git'
       tag: 'v9.0'
       version: '9.0'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
       regenerate:
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         - args: ['./bootstrap']
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
@@ -1157,17 +1176,14 @@ packages:
       git: 'https://git.savannah.gnu.org/git/nano.git'
       tag: 'v5.9'
       version: '5.9'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
         - host-pkg-config
       regenerate:
-        - args: |
-              if ! [ -d gnulib ]; then
-                  git clone git://git.sv.gnu.org/gnulib.git gnulib
-              else
-                  git -C gnulib pull --unshallow || true
-              fi
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         - args: ['./autogen.sh']
     tools_required:
       - host-gcc
@@ -1257,10 +1273,13 @@ packages:
       git: 'https://git.savannah.gnu.org/git/grep.git'
       tag: 'v3.7'
       version: '3.7'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
       regenerate:
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         - args: ['./bootstrap']
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
@@ -1289,10 +1308,13 @@ packages:
       git: 'https://git.savannah.gnu.org/git/diffutils.git'
       tag: 'v3.8'
       version: '3.8'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
       regenerate:
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         - args: ['./bootstrap']
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
@@ -1324,10 +1346,13 @@ packages:
       git: 'https://git.savannah.gnu.org/git/sed.git'
       tag: 'v4.8'
       version: '4.8'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
       regenerate:
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         - args: ['./bootstrap']
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
@@ -1665,6 +1690,7 @@ packages:
       git: 'https://git.savannah.gnu.org/git/wget.git'
       tag: 'v1.21.2'
       version: '1.21.2'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -1672,6 +1698,8 @@ packages:
         - host-pkg-config
         - host-gettext
       regenerate:
+        - args: ['rm', '-rf', 'gnulib']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         - args: ['./bootstrap']
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
@@ -2170,6 +2198,7 @@ packages:
       branch: 'master'
       commit: '0eb1068ceb77ba383c3ce2fc391ab40ef686c491'
       version: '1.16'
+      sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -2178,13 +2207,13 @@ packages:
         - host-gettext
       regenerate:
         - args: ['rm', '-rf', 'gnulib']
-        - args: ['./gitsub.sh', 'pull']
+        - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
         # Gnulib broke on commit e3174b6d1fdbe6ea2297bf8c8333f65f9d9d9588, so check out the one before that.
         - args: ['git', 'checkout', '766ec17a90f67e8cda78394e58a7fffb00f5a4b7']
           workdir: '@THIS_SOURCE_DIR@/gnulib'
         - args: ['./autogen.sh']
           environ:
-            'NOCONFIGURE': 'yes'
+            NOCONFIGURE: 'yes'
         - args: ['cp',
             '@BUILD_ROOT@/tools/host-automake-v1.16/share/automake-1.16/config.sub',
             '@THIS_SOURCE_DIR@/build-aux/']
@@ -2233,8 +2262,8 @@ packages:
   - name: libintl
     source:
       subdir: '3rdparty'
-      url: 'https://ftp.gnu.org/gnu/gettext/gettext-0.21.tar.xz'
-      format: 'tar.xz'
+      url: 'https://ftp.gnu.org/gnu/gettext/gettext-0.21.tar.gz'
+      format: 'tar.gz'
       extract_path: 'gettext-0.21'
       version: '0.21'
       tools_required:

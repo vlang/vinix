@@ -43,7 +43,7 @@ virtual machines.
 
 The following is an OS-agnostic list of packages needed to build Vinix. Skip to a paragraph for your host OS if there is any.
 
-`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `git`, `subversion`, `mtools`, `meson`, `ninja`, `m4`, `texinfo`, `pkg-config`, `groff`, `gettext`, `autopoint`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `gcc`, `python3`, `pip3`, `python3-mako`, `wget`, `xorriso`, and `qemu` to test it.
+`GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU coreutils`, `GCC`, `git`, `subversion`, `mtools`, `meson`, `ninja`, `m4`, `texinfo`, `pkg-config`, `groff`, `gettext`, `autopoint`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `python3`, `pip3`, `python3-mako`, `wget`, `xorriso`, and `qemu` to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
@@ -77,6 +77,8 @@ make distro
 ```
 
 This step will take a while.
+
+It is possible to skip this step. Running the next step, in that case, will build a minimal set of packages to create a minimal usable system only.
 
 ### Building the kernel and image
 
