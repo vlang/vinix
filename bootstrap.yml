@@ -952,10 +952,10 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/bash.git'
-      # Checkout bash 5.1 patch 12
+      # Checkout bash 5.1 patch 16
       branch: 'master'
-      commit: '15409324f1974d41c183904ad575da7188058c1c'
-      version: '5.1.12'
+      commit: '9439ce094c9aa7557a9d53ac7b412a23aa66e36b'
+      version: '5.1.16'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
