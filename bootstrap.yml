@@ -1174,8 +1174,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/nano.git'
-      tag: 'v5.9'
-      version: '5.9'
+      tag: 'v6.0'
+      version: '6.0'
       sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69

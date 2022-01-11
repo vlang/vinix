@@ -1,6 +1,6 @@
-From d408e015422f957f21479b161ff1a08d52cf2dd5 Mon Sep 17 00:00:00 2001
+From 9be22854af5de0a1f7cf3a5388f6070a97bd6c65 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 11 Nov 2021 00:37:33 +0100
+Date: Tue, 11 Jan 2022 04:53:16 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,7 +8,7 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index 23dd03c..cae6759 100644
+index 7c7624a..130088d 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -71,12 +71,12 @@ AM_CONDITIONAL(BUILDING_FROM_GIT, test x$from_git = xyes)
@@ -31,5 +31,5 @@ index 23dd03c..cae6759 100644
  		AC_MSG_ERROR([
    *** The msgfmt program is missing.
 -- 
-2.33.1
+2.34.1
 
