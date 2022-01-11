@@ -1,0 +1,25 @@
+From 321c5560e5a302160ea4f5bba9924a6dc1cf3d7b Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Tue, 11 Jan 2022 18:47:29 +0100
+Subject: [PATCH] Vinix specific changes
+
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 7f6133e..f6f5aa6 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -15,7 +15,7 @@
+ # You should have received a copy of the GNU General Public License
+ # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ 
+-AC_PREREQ([2.71])
++AC_PREREQ([2.69])
+ m4_pattern_forbid([^_?(gl_[A-Z]|AX_|BISON_)])
+ m4_pattern_allow([^BISON_USE_NLS$])
+ 
+-- 
+2.34.1
+

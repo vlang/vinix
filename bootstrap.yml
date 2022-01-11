@@ -181,8 +181,8 @@ sources:
   - name: bison
     subdir: '3rdparty'
     git: 'https://git.savannah.gnu.org/git/bison.git'
-    tag: 'v3.6.2'
-    version: '3.6.2'
+    tag: 'v3.8.2'
+    version: '3.8.2'
     sources_required: ['gnulib']
     tools_required:
       - host-autoconf-v2.69
