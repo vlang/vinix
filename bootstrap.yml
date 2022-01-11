@@ -121,10 +121,9 @@ sources:
 
   - name: v
     subdir: '3rdparty'
-    sources_required: ['vc']
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '5e85d4cb39063f9ae47d3b836557679324b42a63'
+    commit: 'f54ad5194666ca2af089280c7d80d126c063403e'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -132,7 +131,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '926393c1c1cfe53ed0c39e7cd0f92c2a769ca5bb'
+    commit: '43224a1e4e9b3d42774b57e8a0d884051f892515'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -389,6 +388,7 @@ tools:
 
   - name: host-v
     from_source: v
+    sources_required: ['vc']
     compile:
       - args: |
           set -e
@@ -992,12 +992,11 @@ packages:
 
   - name: v
     from_source: v
+    sources_required: ['vc']
     tools_required:
-      - host-v
       - host-gcc
     pkgs_required:
       - mlibc
-      - gcc
     build:
       - args: |
           set -e
@@ -1008,9 +1007,6 @@ packages:
           x86_64-vinix-gcc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v
           mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
           ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
-
-  - name: vc
-    from_source: vc
 
   - name: wayland
     from_source: wayland
