@@ -1,17 +1,25 @@
-From b85292471d672032c6be5e93f52f1694bb914f2c Mon Sep 17 00:00:00 2001
+From 0c989a2d2dded035035e3f3b7c2b306d6ef82dbf Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 11 Sep 2021 06:49:58 +0200
+Date: Wed, 12 Jan 2022 07:25:24 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- configure.ac | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ configure.ac | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/configure.ac b/configure.ac
-index e57ef7c..20ddf65 100644
+index e57ef7c..6be9840 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -379,6 +379,9 @@ then
+@@ -71,6 +71,7 @@ if test "$cross_compiling" = yes; then
+ 	    fi
+             interp=
+ 	done
++        interp=python3
+         if test x$interp = x; then
+ 	    AC_MSG_ERROR([python$PACKAGE_VERSION interpreter not found])
+ 	fi
+@@ -379,6 +380,9 @@ then
  	*-*-cygwin*)
  		ac_sys_system=Cygwin
  		;;
@@ -21,7 +29,7 @@ index e57ef7c..20ddf65 100644
  	*-*-vxworks*)
  	    ac_sys_system=VxWorks
  	    ;;
-@@ -431,6 +434,9 @@ if test "$cross_compiling" = yes; then
+@@ -431,6 +435,9 @@ if test "$cross_compiling" = yes; then
  	*-*-vxworks*)
  		_host_cpu=$host_cpu
  		;;
@@ -31,7 +39,7 @@ index e57ef7c..20ddf65 100644
  	*)
  		# for now, limit cross builds to known configurations
  		MACHDEP="unknown"
-@@ -2641,6 +2647,9 @@ then
+@@ -2641,6 +2648,9 @@ then
  	CYGWIN*)
  		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
  		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
@@ -41,7 +49,7 @@ index e57ef7c..20ddf65 100644
  	*)	LDSHARED="ld";;
  	esac
  fi
-@@ -2677,7 +2686,9 @@ then
+@@ -2677,7 +2687,9 @@ then
  		else CCSHARED="-Kpic -belf"
  		fi;;
  	VxWorks*)
@@ -52,7 +60,7 @@ index e57ef7c..20ddf65 100644
  	esac
  fi
  AC_MSG_RESULT($CCSHARED)
-@@ -2738,6 +2749,8 @@ then
+@@ -2738,6 +2750,8 @@ then
  		LINKFORSHARED='-Wl,-E -N 2048K';;
  	VxWorks*)
  		LINKFORSHARED='--export-dynamic';;
@@ -62,5 +70,5 @@ index e57ef7c..20ddf65 100644
  fi
  AC_MSG_RESULT($LINKFORSHARED)
 -- 
-2.33.0
+2.34.1
 

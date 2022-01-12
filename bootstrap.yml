@@ -2118,7 +2118,6 @@ packages:
         - '--disable-ipv6'
         - '--without-ensurepip'
         environ:
-          CONFIG_SITE: '@SOURCE_ROOT@/scripts/python-config-site'
           PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
           PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
           ac_cv_file__dev_ptmx: 'no'
