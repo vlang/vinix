@@ -819,6 +819,7 @@ packages:
       # As we build ncurses with wide character support, make some compatibility links
       - args: |
           set -e
+          mkdir -p "@THIS_COLLECT_DIR@/usr/lib/pkgconfig"
           for lib in ncurses form panel menu tinfo ; do
               rm -vf                    @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
               echo "INPUT(-l${lib}w)" > @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
