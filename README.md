@@ -51,7 +51,7 @@ Skip to a paragraph for your host OS if there is any.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install make patch tar gzip binutils gcc g++ git subversion curl wget xz-utils mtools meson perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python3-pip python3-mako python-is-python3 xorriso qemu-system-x86
+sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subversion curl wget xz-utils mtools meson perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python3-pip python3-mako xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
