@@ -53,21 +53,26 @@ kernel: build
 init: build
 	cd build && xbstrap install --rebuild init
 
+.PHONY: util-vinix
+util-vinix: build
+	cd build && xbstrap install --rebuild util-vinix
+
 .PHONY: base-files
 base-files: build
 	cd build && xbstrap install --rebuild base-files
 
-vinix.iso: build kernel init base-files
+vinix.iso: build kernel init base-files util-vinix
 	cd build && xbstrap run make-basic-iso
 	mv build/vinix.iso ./
 
 .PHONY: clean
 clean:
 	$(MAKE) -C kernel clean
+	$(MAKE) -C util-vinix clean
 	rm -f init/init
 	rm -f vinix.iso
 
 .PHONY: distclean
 distclean: clean
 	rm -rf 3rdparty build initramfs.tar.gz pack ovmf
-	rm -f kernel/*.xbstrap init/*.xbstrap base-files/*.xbstrap
+	rm -f kernel/*.xbstrap init/*.xbstrap base-files/*.xbstrap util-vinix/*.xbstrap

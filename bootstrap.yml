@@ -156,13 +156,6 @@ sources:
     regenerate:
       - args: ['./autogen.sh']
 
-  - name: util-vinix
-    subdir: '3rdparty'
-    git: 'https://github.com/vinix-os/util-vinix.git'
-    branch: 'main'
-    rolling_version: true
-    version: '0.0pl@ROLLING_ID@'
-
   - name: wayland
     subdir: '3rdparty'
     git: 'https://github.com/wayland-project/wayland.git'
@@ -648,7 +641,12 @@ packages:
           cp init "@THIS_COLLECT_DIR@/sbin/"
 
   - name: util-vinix
-    from_source: util-vinix
+    source:
+      subdir: ''
+      git: 'https://github.com/vlang/vinix.git'
+      branch: 'main'
+      rolling_version: true
+      version: '0.0pl@ROLLING_ID@'
     revision: 2
     tools_required:
       - host-v
