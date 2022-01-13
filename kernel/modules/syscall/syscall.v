@@ -1,3 +1,7 @@
+// syscall.v: Syscall ASM snippets.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module syscall
 
 import x86.cpu.local as cpulocal

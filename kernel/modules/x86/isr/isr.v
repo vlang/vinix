@@ -1,3 +1,7 @@
+// isr.v: ISR and exception handlers.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module isr
 
 import x86.idt

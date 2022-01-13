@@ -1,3 +1,7 @@
+// linux_uapi.v: Linux framebuffer device API fields.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module api
 
 // Field names and layout of those structures match Linux usermode API.

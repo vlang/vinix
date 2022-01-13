@@ -1,3 +1,7 @@
+// random.v: Driver for the random devices like /dev/urandom.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module random
 
 import resource

@@ -1,3 +1,7 @@
+# GNUmakefile: Main makefile of the project.
+# Code is governed by the GPL-2.0 license.
+# Copyright (C) 2021-2022 The Vinix authors.
+
 unexport CC
 unexport CXX
 unexport CFLAGS

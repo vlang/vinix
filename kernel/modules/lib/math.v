@@ -1,3 +1,7 @@
+// math.v: Basic math library.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module lib
 
 pub fn div_roundup<T>(a T, b T) T {

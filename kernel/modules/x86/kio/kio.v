@@ -1,3 +1,7 @@
+// kio.v: MMIO and Port IO.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module kio
 
 pub fn port_in<T>(port u16) T {

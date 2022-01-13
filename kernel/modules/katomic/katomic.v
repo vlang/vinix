@@ -1,3 +1,7 @@
+// katomic.v: library of atomic operations.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module katomic
 
 pub fn bts<T>(var &T, bit byte) bool {

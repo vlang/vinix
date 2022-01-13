@@ -1,3 +1,7 @@
+// cpu.v: Wrappers and functions for handling CPU state.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module cpu
 
 import x86.msr

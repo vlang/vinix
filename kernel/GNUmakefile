@@ -1,3 +1,7 @@
+# GNUmakefile: Makefile of the kernel.
+# Code is governed by the GPL-2.0 license.
+# Copyright (C) 2021-2022 The Vinix authors.
+
 ifeq ($(origin CC), default)
 	CC := cc
 endif

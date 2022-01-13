@@ -1,3 +1,7 @@
+// trace.v: Stack tracing for debug prints.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 module trace
 
 pub struct Symbol {

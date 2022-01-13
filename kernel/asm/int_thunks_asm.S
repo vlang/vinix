@@ -1,3 +1,7 @@
+// int_thunks_asm.S: Thunks used for IRQ bodies.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 .section .data
 
 .globl interrupt_thunk_begin

@@ -1,3 +1,9 @@
+/*
+ * linker.ld: Linker script of the kernel.
+ * Code is governed by the GPL-2.0 license.
+ * Copyright (C) 2021-2022 The Vinix authors.
+ */
+
 OUTPUT_FORMAT(elf64-x86-64)
 OUTPUT_ARCH(i386:x86-64)
 

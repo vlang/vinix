@@ -1,3 +1,7 @@
+// entry.S: Stivale2 header information.
+// Code is governed by the GPL-2.0 license.
+// Copyright (C) 2021-2022 The Vinix authors.
+
 .section .data
 
 .set STIVALE2_HEADER_TAG_UNMAP_NULL_ID, 0x92919432b16fe7e7
