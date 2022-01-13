@@ -1920,6 +1920,7 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['mkdir', '-p', "@THIS_COLLECT_DIR@/usr/share/X11/xkb"]
 
   - name: weston
     source:

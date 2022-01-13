@@ -1,6 +1,6 @@
-From 9078afc7275d4887b4de98d6d91495519b9eed51 Mon Sep 17 00:00:00 2001
+From 7b2598e4f912b3b80b563b77c28a676fa21e9c16 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 3 Jan 2022 12:42:36 +0100
+Date: Thu, 13 Jan 2022 01:14:33 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -14,7 +14,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/include/pthread.h               |   3 +
  sysdeps/vinix/crt-x86_64/crt0.S               |   5 +
  sysdeps/vinix/generic/entry.cpp               |  58 ++
- sysdeps/vinix/generic/generic.cpp             | 722 ++++++++++++++++++
+ sysdeps/vinix/generic/generic.cpp             | 732 ++++++++++++++++++
  sysdeps/vinix/include/abi-bits/abi.h          |   1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |   1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |   1 +
@@ -41,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 37 files changed, 894 insertions(+), 5 deletions(-)
+ 37 files changed, 904 insertions(+), 5 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -301,10 +301,10 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..eb925ef
+index 0000000..3be7179
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,722 @@
+@@ -0,0 +1,732 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -524,6 +524,16 @@ index 0000000..eb925ef
 +
 +	__ensure(num_woken >= 0 && num_woken <= 1);
 +	return num_woken;
++}
++
++int sys_timerfd_create(int flags, int *fd) {
++    __syscall_ret ret = __syscall(54, 0, flags);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *fd = (int)ret.ret;
++    return 0;
 +}
 +
 +int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {

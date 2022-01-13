@@ -14,10 +14,11 @@ import pipe
 import socket
 import memory.mmap
 import time.sys
+import time.timerfd
 import net
 
 __global (
-	syscall_table [54]voidptr
+	syscall_table [57]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -75,4 +76,7 @@ pub fn init_syscall_table() {
 	syscall_table[51] = voidptr(net.syscall_gethostname)
 	syscall_table[52] = voidptr(net.syscall_sethostname)
 	syscall_table[53] = voidptr(sys.syscall_nanosleep)
+	syscall_table[54] = voidptr(timerfd.syscall_timerfd_create)
+	syscall_table[55] = voidptr(timerfd.syscall_timerfd_settime)
+	syscall_table[56] = voidptr(timerfd.syscall_timerfd_gettime)
 }
