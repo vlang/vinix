@@ -1,6 +1,6 @@
-From 344392b15c32aab2fb4251d3306c7928b6e3937f Mon Sep 17 00:00:00 2001
+From 162703e3484a2cb481c354e388b41d57ee583e8c Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 14 Jan 2022 22:23:10 +0100
+Date: Fri, 14 Jan 2022 22:29:59 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -301,7 +301,7 @@ index 0000000..53ea0e9
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..b5ebde8
+index 0000000..4051e22
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,756 @@
@@ -397,7 +397,7 @@ index 0000000..b5ebde8
 +}
 +
 +int sys_ppoll(struct pollfd *fds, int nfds, const struct timespec *timeout,
-+		const sigset_t *sigmask, int *num_events) {
++        const sigset_t *sigmask, int *num_events) {
 +    __syscall_ret ret = __syscall(36, fds, nfds, timeout, sigmask);
 +
 +    if (ret.errno != 0)
@@ -436,70 +436,70 @@ index 0000000..b5ebde8
 +
 +#ifndef MLIBC_BUILDING_RTDL
 +int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set,
-+		fd_set *except_set, const struct timespec *timeout,
-+		const sigset_t *sigmask, int *num_events) {
++        fd_set *except_set, const struct timespec *timeout,
++        const sigset_t *sigmask, int *num_events) {
 +    struct pollfd *fds = (struct pollfd *)malloc(nfds * sizeof(struct pollfd));
 +
-+	for (int i = 0; i < nfds; i++) {
-+		struct pollfd *fd = &fds[i];
-+		memset(fd, 0, sizeof(struct pollfd));
++    for (int i = 0; i < nfds; i++) {
++        struct pollfd *fd = &fds[i];
++        memset(fd, 0, sizeof(struct pollfd));
 +
-+		if (read_set && FD_ISSET(i, read_set))
-+			fd->events |= POLLIN; // TODO: Additional events.
-+		if (write_set && FD_ISSET(i, write_set))
-+			fd->events |= POLLOUT; // TODO: Additional events.
-+		if (except_set && FD_ISSET(i, except_set))
-+			fd->events |= POLLPRI;
++        if (read_set && FD_ISSET(i, read_set))
++            fd->events |= POLLIN; // TODO: Additional events.
++        if (write_set && FD_ISSET(i, write_set))
++            fd->events |= POLLOUT; // TODO: Additional events.
++        if (except_set && FD_ISSET(i, except_set))
++            fd->events |= POLLPRI;
 +
-+		if (!fd->events) {
-+		    fd->fd = -1;
-+			continue;
-+		}
++        if (!fd->events) {
++            fd->fd = -1;
++            continue;
++        }
 +
-+		fd->fd = i;
-+	}
++        fd->fd = i;
++    }
 +
-+	int e = sys_ppoll(fds, nfds, timeout, sigmask, num_events);
++    int e = sys_ppoll(fds, nfds, timeout, sigmask, num_events);
 +
-+	if (e != 0) {
-+	    free(fds);
-+	    return e;
-+	}
++    if (e != 0) {
++        free(fds);
++        return e;
++    }
 +
-+	fd_set res_read_set;
-+	fd_set res_write_set;
-+	fd_set res_except_set;
-+	FD_ZERO(&res_read_set);
-+	FD_ZERO(&res_write_set);
-+	FD_ZERO(&res_except_set);
++    fd_set res_read_set;
++    fd_set res_write_set;
++    fd_set res_except_set;
++    FD_ZERO(&res_read_set);
++    FD_ZERO(&res_write_set);
++    FD_ZERO(&res_except_set);
 +
-+	for (int i = 0; i < nfds; i++) {
-+		struct pollfd *fd = &fds[i];
++    for (int i = 0; i < nfds; i++) {
++        struct pollfd *fd = &fds[i];
 +
-+		if (read_set && FD_ISSET(i, read_set)
-+				&& fd->revents & (POLLIN | POLLERR | POLLHUP)) {
-+			FD_SET(i, &res_read_set);
-+		}
++        if (read_set && FD_ISSET(i, read_set)
++                && fd->revents & (POLLIN | POLLERR | POLLHUP)) {
++            FD_SET(i, &res_read_set);
++        }
 +
-+		if (write_set && FD_ISSET(i, write_set)
-+				&& fd->revents & (POLLOUT | POLLERR | POLLHUP)) {
-+			FD_SET(i, &res_write_set);
-+		}
++        if (write_set && FD_ISSET(i, write_set)
++                && fd->revents & (POLLOUT | POLLERR | POLLHUP)) {
++            FD_SET(i, &res_write_set);
++        }
 +
-+		if (except_set && FD_ISSET(i, except_set)
-+				&& fd->revents & POLLPRI) {
-+			FD_SET(i, &res_except_set);
-+		}
-+	}
++        if (except_set && FD_ISSET(i, except_set)
++                && fd->revents & POLLPRI) {
++            FD_SET(i, &res_except_set);
++        }
++    }
 +
-+	free(fds);
++    free(fds);
 +
-+	if (read_set)
-+		memcpy(read_set, &res_read_set, sizeof(fd_set));
-+	if (write_set)
-+		memcpy(write_set, &res_write_set, sizeof(fd_set));
-+	if (except_set)
-+		memcpy(except_set, &res_except_set, sizeof(fd_set));
++    if (read_set)
++        memcpy(read_set, &res_read_set, sizeof(fd_set));
++    if (write_set)
++        memcpy(write_set, &res_write_set, sizeof(fd_set));
++    if (except_set)
++        memcpy(except_set, &res_except_set, sizeof(fd_set));
 +
 +    return 0;
 +}
@@ -522,8 +522,8 @@ index 0000000..b5ebde8
 +
 +    int num_woken = ret.ret;
 +
-+	__ensure(num_woken >= 0 && num_woken <= 1);
-+	return num_woken;
++    __ensure(num_woken >= 0 && num_woken <= 1);
++    return num_woken;
 +}
 +
 +int sys_timerfd_create(int flags, int *fd) {
@@ -782,7 +782,7 @@ index 0000000..b5ebde8
 +}
 +
 +int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
-+	switch (fsfdt) {
++    switch (fsfdt) {
 +        case fsfd_target::fd: {
 +            __syscall_ret ret = __syscall(10, fd, statbuf);
 +            if (ret.errno != 0)
@@ -1044,20 +1044,20 @@ index 0000000..b5ebde8
 +}
 +
 +int sys_sleep(time_t *secs, long *nanos) {
-+	struct timespec req = {
-+		.tv_sec = *secs,
-+		.tv_nsec = *nanos
-+	};
-+	struct timespec rem = {0};
++    struct timespec req = {
++        .tv_sec = *secs,
++        .tv_nsec = *nanos
++    };
++    struct timespec rem = {0, 0};
 +
-+	__syscall_ret ret = __syscall(53, &req, &rem);
++    __syscall_ret ret = __syscall(53, &req, &rem);
 +
 +    if (ret.errno != 0)
 +        return ret.errno;
 +
-+	*secs = rem.tv_sec;
-+	*nanos = rem.tv_nsec;
-+	return 0;
++    *secs = rem.tv_sec;
++    *nanos = rem.tv_nsec;
++    return 0;
 +}
 +
 +} // namespace mlibc
