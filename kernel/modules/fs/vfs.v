@@ -674,6 +674,21 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	return 0, 0
 }
 
+pub fn syscall_fchmod(_ voidptr, fdnum int, mode int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: fchmod(%d, 0x%x)\n', fdnum, mode)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	fd.handle.resource.stat.mode = mode
+	return 0, 0
+}
+
 pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: chdir(%s)\n', _path)
 	defer {

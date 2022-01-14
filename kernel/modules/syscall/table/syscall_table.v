@@ -18,7 +18,7 @@ import time.timerfd
 import net
 
 __global (
-	syscall_table [57]voidptr
+	syscall_table [58]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -79,4 +79,5 @@ pub fn init_syscall_table() {
 	syscall_table[54] = voidptr(timerfd.syscall_timerfd_create)
 	syscall_table[55] = voidptr(timerfd.syscall_timerfd_settime)
 	syscall_table[56] = voidptr(timerfd.syscall_timerfd_gettime)
+	syscall_table[57] = voidptr(fs.syscall_fchmod)
 }
