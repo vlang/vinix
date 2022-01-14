@@ -1,0 +1,80 @@
+From afc98af14f8eaba32e7f6febd5e06a0625c102bf Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Fri, 14 Jan 2022 08:25:44 +0100
+Subject: [PATCH] Vinix specific changes
+
+---
+ include/meson.build | 2 +-
+ include/os.h        | 1 +
+ mi/mibitblt.c       | 2 ++
+ os/access.c         | 2 +-
+ os/utils.c          | 2 +-
+ 5 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/include/meson.build b/include/meson.build
+index ac24153..82b0934 100644
+--- a/include/meson.build
++++ b/include/meson.build
+@@ -132,7 +132,7 @@ conf_data.set('HAVE_POSIX_FALLOCATE', cc.has_function('posix_fallocate'))
+ conf_data.set('HAVE_PORT_CREATE', cc.has_function('port_create'))
+ conf_data.set('HAVE_REALLOCARRAY', cc.has_function('reallocarray', dependencies: libbsd_dep))
+ conf_data.set('HAVE_SETEUID', cc.has_function('seteuid'))
+-conf_data.set('HAVE_SETITIMER', cc.has_function('setitimer'))
++conf_data.set('HAVE_SETITIMER', false)
+ conf_data.set('HAVE_SHMCTL64', cc.has_function('shmctl64'))
+ conf_data.set('HAVE_SIGACTION', cc.has_function('sigaction'))
+ conf_data.set('HAVE_STRCASECMP', cc.has_function('strcasecmp'))
+diff --git a/include/os.h b/include/os.h
+index 2a1c29e..2a7fc76 100644
+--- a/include/os.h
++++ b/include/os.h
+@@ -51,6 +51,7 @@ SOFTWARE.
+ #include <stdarg.h>
+ #include <stdint.h>
+ #include <string.h>
++#include <strings.h>
+ #ifdef MONOTONIC_CLOCK
+ #include <time.h>
+ #endif
+diff --git a/mi/mibitblt.c b/mi/mibitblt.c
+index 43d9bd9..740c0d2 100644
+--- a/mi/mibitblt.c
++++ b/mi/mibitblt.c
+@@ -49,6 +49,8 @@ SOFTWARE.
+ #include <dix-config.h>
+ #endif
+ 
++#include <strings.h>
++
+ #include <X11/X.h>
+ #include <X11/Xprotostr.h>
+ 
+diff --git a/os/access.c b/os/access.c
+index 9724616..3c4376a 100644
+--- a/os/access.c
++++ b/os/access.c
+@@ -117,7 +117,7 @@ SOFTWARE.
+ #endif
+ #endif
+ 
+-#if defined(SVR4) ||  (defined(SYSV) && defined(__i386__)) || defined(__GNU__)
++#if defined(SVR4) ||  (defined(SYSV) && defined(__i386__)) || defined(__GNU__) || defined(__vinix__)
+ #include <sys/utsname.h>
+ #endif
+ #if defined(SYSV) &&  defined(__i386__)
+diff --git a/os/utils.c b/os/utils.c
+index 2ba1c80..0156b20 100644
+--- a/os/utils.c
++++ b/os/utils.c
+@@ -1632,7 +1632,7 @@ Pclose(void *iop)
+     }
+ #endif
+ 
+-    return pid == -1 ? -1 : pstat;
++    return pid == -1 ? -1 : !WIFEXITED(pstat) || WEXITSTATUS(pstat);
+ }
+ 
+ int
+-- 
+2.34.1
+
