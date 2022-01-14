@@ -25,7 +25,7 @@ fn main() {
 	for idx < os.args.len {
 		match os.args[idx] {
 			'--help' {
-				println('Usage: chsh [options] [username]')
+				println('Usage: ${os.args[0]} [options] [username]')
 				println('')
 				println('Change the login shell of a user')
 				println('')
@@ -46,7 +46,7 @@ fn main() {
 					new_shell = os.args[idx]
 				} else {
 					println('-s/--shell argument needs an argument')
-					exit(0)
+					exit(1)
 				}
 			}
 			'-l' {
@@ -98,7 +98,7 @@ fn main() {
 	old_shell := os.getenv('SHELL')
 	mut passwd_lines := os.read_lines(passwd_file) or {
 		println('$passwd_file could not be read')
-		exit(0)
+		exit(1)
 	}
 	for i, pswd in passwd_lines {
 		if pswd.starts_with(username) {
@@ -107,12 +107,12 @@ fn main() {
 	}
 	mut new_passwd_file := os.create(passwd_file) or {
 		println('$passwd_file could not be created')
-		exit(0)
+		exit(1)
 	}
 	for ln in passwd_lines {
 		new_passwd_file.writeln(ln) or {
 			println('$passwd_file could not be written')
-			exit(0)
+			exit(1)
 		}
 	}
 	new_passwd_file.close()

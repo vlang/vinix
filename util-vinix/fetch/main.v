@@ -17,6 +17,29 @@ const (
 )
 
 fn main() {
+	mut idx := 1
+	for idx < os.args.len {
+		match os.args[idx] {
+			'--help' {
+				println('Usage: ${os.args[0]}')
+				println('')
+				println('List system information in a user-friendly format')
+				println('')
+				println('No options are available for this program')
+				exit(0)
+			}
+			'--version' {
+				println('fetch from util-vinix')
+				exit(0)
+			}
+			else {
+				println("Unexpected argument '${os.args[idx]}'")
+				exit(1)
+			}
+		}
+		idx++
+	}
+
 	mut hostname_buffer := [256]byte{}
 	if unsafe { C.gethostname(&hostname_buffer[0], 256) } != 0 {
 		panic("gethostname() failed!")
