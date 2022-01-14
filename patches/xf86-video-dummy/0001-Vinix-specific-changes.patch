@@ -1,0 +1,33 @@
+From ac68692a0737dbd2657dfd4718fa082dc25fa65d Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Fri, 14 Jan 2022 12:13:09 +0100
+Subject: [PATCH] Vinix specific changes
+
+---
+ configure.ac | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 4eb7fae..b5fd8ce 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -54,12 +54,12 @@ AC_SUBST(moduledir)
+ 
+ 
+ # Store the list of server defined optional extensions in REQUIRED_MODULES
+-XORG_DRIVER_CHECK_EXT(RANDR, randrproto)
+-XORG_DRIVER_CHECK_EXT(RENDER, renderproto)
+-XORG_DRIVER_CHECK_EXT(XV, videoproto)
++#XORG_DRIVER_CHECK_EXT(RANDR, randrproto)
++#XORG_DRIVER_CHECK_EXT(RENDER, renderproto)
++#XORG_DRIVER_CHECK_EXT(XV, videoproto)
+ 
+ if test "x$DGA" = xyes; then
+-	XORG_DRIVER_CHECK_EXT(XFreeXDGA, xf86dgaproto)
++	#XORG_DRIVER_CHECK_EXT(XFreeXDGA, xf86dgaproto)
+ 	AC_DEFINE(USE_DGA, 1, [Support DGA extension])
+ fi
+ AC_SUBST([DGA])
+-- 
+2.34.1
+

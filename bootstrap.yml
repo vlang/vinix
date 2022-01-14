@@ -1779,7 +1779,6 @@ packages:
       - xcb-proto
       - xorg-proto
       - libdrm
-      - eudev
       - libxshmfence
       - libx11
       - libxxf86vm
@@ -1804,7 +1803,7 @@ packages:
         - '--cross-file'
         - '@SOURCE_ROOT@/cross_file.txt'
         - '--prefix=/usr'
-        - '-Dxorg=false'
+        - '-Dxorg=true'
         - '-Dxephyr=false'
         - '-Dxwayland=false'
         - '-Dxnest=false'
@@ -1824,10 +1823,53 @@ packages:
         - '-Dxvmc=false'
         - '-Dsystemd_logind=false'
         - '-Dsecure-rpc=false'
+        - '-Dudev=false'
+        - '-Ddri1=false'
+        - '-Ddri2=false'
+        - '-Ddri3=false'
+        - '-Dvbe=false'
+        - '-Dint10=false'
+        - '-Dvgahw=false'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
       - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: xf86-video-dummy
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/Xpra-org/xf86-video-dummy.git'
+      tag: 'xf86-video-dummy-0.3.8'
+      version: '0.3.8'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+      - host-pkg-config
+      - host-xorg-macros
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-server
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 

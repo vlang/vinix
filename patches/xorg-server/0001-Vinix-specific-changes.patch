@@ -1,16 +1,117 @@
-From afc98af14f8eaba32e7f6febd5e06a0625c102bf Mon Sep 17 00:00:00 2001
+From 50cf792507d64b1cbf63e4d158cf8cc2756d491b Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 14 Jan 2022 08:25:44 +0100
+Date: Fri, 14 Jan 2022 12:07:09 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- include/meson.build | 2 +-
- include/os.h        | 1 +
- mi/mibitblt.c       | 2 ++
- os/access.c         | 2 +-
- os/utils.c          | 2 +-
- 5 files changed, 6 insertions(+), 3 deletions(-)
+ hw/xfree86/common/xf86Config.c           | 2 ++
+ hw/xfree86/common/xf86Configure.c        | 2 ++
+ hw/xfree86/common/xf86Events.c           | 2 ++
+ hw/xfree86/common/xf86Helper.c           | 2 ++
+ hw/xfree86/common/xf86Init.c             | 2 ++
+ hw/xfree86/os-support/shared/posix_tty.c | 3 +++
+ hw/xfree86/os-support/shared/sigio.c     | 3 +++
+ include/meson.build                      | 2 +-
+ include/os.h                             | 1 +
+ meson.build                              | 2 +-
+ mi/mibitblt.c                            | 2 ++
+ os/access.c                              | 2 +-
+ os/utils.c                               | 2 +-
+ 13 files changed, 23 insertions(+), 4 deletions(-)
 
+diff --git a/hw/xfree86/common/xf86Config.c b/hw/xfree86/common/xf86Config.c
+index 09d27ec..83be062 100644
+--- a/hw/xfree86/common/xf86Config.c
++++ b/hw/xfree86/common/xf86Config.c
+@@ -49,6 +49,8 @@
+ #include <sys/types.h>
+ #include <grp.h>
+ 
++#include <sys/stat.h>
++
+ #include "xf86.h"
+ #include "xf86Modes.h"
+ #include "xf86Parser.h"
+diff --git a/hw/xfree86/common/xf86Configure.c b/hw/xfree86/common/xf86Configure.c
+index 44e7591..86d48d5 100644
+--- a/hw/xfree86/common/xf86Configure.c
++++ b/hw/xfree86/common/xf86Configure.c
+@@ -27,6 +27,8 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <errno.h>
++
+ #include "xf86.h"
+ #include "xf86Config.h"
+ #include "xf86_OSlib.h"
+diff --git a/hw/xfree86/common/xf86Events.c b/hw/xfree86/common/xf86Events.c
+index 8a800bd..ec5d33d 100644
+--- a/hw/xfree86/common/xf86Events.c
++++ b/hw/xfree86/common/xf86Events.c
+@@ -53,6 +53,8 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <errno.h>
++
+ #include <X11/X.h>
+ #include <X11/Xproto.h>
+ #include <X11/Xatom.h>
+diff --git a/hw/xfree86/common/xf86Helper.c b/hw/xfree86/common/xf86Helper.c
+index 42a51dd..64af1dc 100644
+--- a/hw/xfree86/common/xf86Helper.c
++++ b/hw/xfree86/common/xf86Helper.c
+@@ -38,6 +38,8 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <sys/stat.h>
++
+ #include <X11/X.h>
+ #include "os.h"
+ #include "servermd.h"
+diff --git a/hw/xfree86/common/xf86Init.c b/hw/xfree86/common/xf86Init.c
+index 2ec6b2f..c1d9c24 100644
+--- a/hw/xfree86/common/xf86Init.c
++++ b/hw/xfree86/common/xf86Init.c
+@@ -37,6 +37,8 @@
+ #include <stdlib.h>
+ #include <errno.h>
+ 
++#include <sys/stat.h>
++
+ #undef HAS_UTSNAME
+ #if !defined(WIN32)
+ #define HAS_UTSNAME 1
+diff --git a/hw/xfree86/os-support/shared/posix_tty.c b/hw/xfree86/os-support/shared/posix_tty.c
+index 0cb9788..e8cac5d 100644
+--- a/hw/xfree86/os-support/shared/posix_tty.c
++++ b/hw/xfree86/os-support/shared/posix_tty.c
+@@ -56,6 +56,9 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <termios.h>
++#include <errno.h>
++
+ #include <X11/X.h>
+ #include <xserver_poll.h>
+ #include "xf86.h"
+diff --git a/hw/xfree86/os-support/shared/sigio.c b/hw/xfree86/os-support/shared/sigio.c
+index 247bec7..216e8cd 100644
+--- a/hw/xfree86/os-support/shared/sigio.c
++++ b/hw/xfree86/os-support/shared/sigio.c
+@@ -56,6 +56,9 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <sys/stat.h>
++#include <errno.h>
++
+ #include <X11/X.h>
+ #include <xserver_poll.h>
+ #include "xf86.h"
 diff --git a/include/meson.build b/include/meson.build
 index ac24153..82b0934 100644
 --- a/include/meson.build
@@ -36,6 +137,19 @@ index 2a1c29e..2a7fc76 100644
  #ifdef MONOTONIC_CLOCK
  #include <time.h>
  #endif
+diff --git a/meson.build b/meson.build
+index c74135a..4c04571 100644
+--- a/meson.build
++++ b/meson.build
+@@ -348,7 +348,7 @@ if not libdrm_dep.found() and libdrm_required
+     error('DRI requested, but LIBDRM not found')
+ endif
+ 
+-build_modesetting = libdrm_dep.found() and dri2proto_dep.found()
++build_modesetting = false
+ 
+ build_vbe = false
+ if get_option('vbe') == 'auto'
 diff --git a/mi/mibitblt.c b/mi/mibitblt.c
 index 43d9bd9..740c0d2 100644
 --- a/mi/mibitblt.c
