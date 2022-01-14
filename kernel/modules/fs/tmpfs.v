@@ -12,6 +12,7 @@ import resource
 import lib
 import event
 import event.eventstruct
+import katomic
 
 struct TmpFSResource {
 pub mut:
@@ -179,6 +180,18 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	new_resource.can_mmap = true
 
 	new_node.resource = new_resource
+
+	return new_node
+}
+
+fn (mut this TmpFS) link(parent &VFSNode, path string, old_node &VFSNode) ?&VFSNode {
+	mut new_node := create_node(this, parent, path, false)
+
+	katomic.inc(old_node.resource.refcount)
+	katomic.inc(old_node.resource.stat.nlink)
+
+	new_node.resource = old_node.resource
+	new_node.children = old_node.children
 
 	return new_node
 }

@@ -30,6 +30,7 @@ mut:
 	mount(&VFSNode, string, &VFSNode) ?&VFSNode
 	create(&VFSNode, string, int) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
+	link(&VFSNode, string, &VFSNode) ?&VFSNode
 }
 
 pub struct VFSNode {
@@ -674,6 +675,50 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	return 0, 0
 }
 
+pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr,
+                                 newdirfd int, _newpath charptr,
+                                 flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: linkat(%d, %s, %d, %s, 0x%x)\n', olddirfd, _oldpath, newdirfd, _newpath, flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	oldpath := unsafe { cstring_to_vstring(_oldpath) }
+	// TODO handle AT_ENPTY_PATH?
+	if oldpath.len == 0 {
+		return -1, errno.enoent
+	}
+
+	newpath := unsafe { cstring_to_vstring(_newpath) }
+
+	mut oldparent := get_parent_dir(olddirfd, oldpath) or { return -1, errno.get() }
+	mut newparent := get_parent_dir(newdirfd, newpath) or { return -1, errno.get() }
+
+	mut basename := ''
+
+	oldparent, _, _ = path2node(oldparent, oldpath)
+	newparent, _, basename = path2node(newparent, newpath)
+
+	// Old and new must be on the same filesystem
+	if voidptr(oldparent.filesystem) != voidptr(newparent.filesystem) {
+		return -1, errno.exdev
+	}
+
+	follow_links := flags & fs.at_symlink_nofollow == 0
+
+	old_node := get_node(oldparent, oldpath, follow_links) or { return -1, errno.get() }
+
+	new_node := newparent.filesystem.link(newparent, newpath, old_node) or {
+		return -1, errno.get()
+	}
+
+	unsafe {
+		newparent.children[basename] = new_node
+	}
+
+	return 0, 0
+}
+
 pub fn syscall_fchmod(_ voidptr, fdnum int, mode int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: fchmod(%d, 0x%x)\n', fdnum, mode)
 	defer {
@@ -685,6 +730,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode int) (u64, u64) {
 		fd.unref()
 	}
 
+	// XXX this wont work for !tmpfs, fix that
 	fd.handle.resource.stat.mode = mode
 	return 0, 0
 }
