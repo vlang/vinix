@@ -10,6 +10,7 @@ import klock
 import proc
 import file
 import errno
+import katomic
 
 pub const (
 	at_fdcwd = -100
@@ -337,6 +338,8 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	}
 
 	parent_of_tgt.children.delete(basename)
+
+	katomic.dec(node.resource.stat.nlink)
 
 	node.resource.unref(voidptr(0)) ?
 }
@@ -711,6 +714,8 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr,
 	new_node := newparent.filesystem.link(newparent, newpath, old_node) or {
 		return -1, errno.get()
 	}
+
+	katomic.inc(new_node.resource.stat.nlink)
 
 	unsafe {
 		newparent.children[basename] = new_node
