@@ -152,7 +152,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
-    commit: 'afd11daf4565943f8265b2c1ed2a9116e7a4ba4f'
+    commit: '9d94d0e67c9fc7c1403841ed3a0571ffaf0f4653'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -344,7 +344,7 @@ tools:
         - './configure'
         - '--prefix=@PREFIX@'
     compile:
-      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make']
     install:
       - args: ['make', 'strip']
       - args: ['make', 'install']
@@ -811,7 +811,7 @@ packages:
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
     build:
-      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make']
       - args: ['make', 'strip']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
 

@@ -1,6 +1,6 @@
-From 162703e3484a2cb481c354e388b41d57ee583e8c Mon Sep 17 00:00:00 2001
+From c7b1aa03e927d3b5419b07d7b5fb76a0e77073e4 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 14 Jan 2022 22:29:59 +0100
+Date: Sat, 15 Jan 2022 21:36:55 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -73,10 +73,10 @@ Subject: [PATCH] Vinix specific changes
  create mode 100644 sysdeps/vinix/meson.build
 
 diff --git a/abis/mlibc/signal.h b/abis/mlibc/signal.h
-index 68146c4..bbd222a 100644
+index 5c63bca..eaf115b 100644
 --- a/abis/mlibc/signal.h
 +++ b/abis/mlibc/signal.h
-@@ -120,10 +120,12 @@ struct sigevent {
+@@ -127,10 +127,12 @@ struct sigevent {
  };
  
  struct sigaction {
