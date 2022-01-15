@@ -2896,6 +2896,7 @@ packages:
         - host-libtool
         - host-pkg-config
       regenerate:
+        - args: ['sed', '-i', 's/boilerplate test perf/boilerplate/g', 'Makefile.am']
         - args: ['./autogen.sh']
           environ:
             NOCONFIGURE: 'yes'
