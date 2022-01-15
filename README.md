@@ -47,16 +47,16 @@ Keep in mind that the following packages should be relatively up to date, so old
 
 Skip to a paragraph for your host OS if there is any.
 
-`GNU bash`, `GNU coreutils`, `GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU binutils`, `GCC`, `G++`, `git`, `subversion`, `curl`, `wget`, `xz-utils`, `mtools`, `meson`, `ninja`, `perl`, `m4`, `texinfo`, `groff`, `gettext`, `autopoint`, `expat`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `python3`, `python3-pip`, `python3-mako`, `xorriso`, and `qemu` to test it.
+`GNU bash`, `GNU coreutils`, `GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU binutils`, `GCC`, `G++`, `git`, `subversion`, `mercurial`, `curl`, `wget`, `xz-utils`, `mtools`, `meson`, `ninja`, `perl`, `m4`, `texinfo`, `groff`, `gettext`, `autopoint`, `expat`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `python3`, `python3-pip`, `python3-mako`, `python3-xcbgen`, `xorriso`, and `qemu` to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subversion curl wget xz-utils mtools meson perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python3-pip python3-mako xorriso qemu-system-x86
+sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subversion mercurial curl wget xz-utils mtools meson perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python3-pip python3-mako python3-xcbgen xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed bash coreutils make patch tar gzip binutils gcc git subversion curl wget xz mtools meson perl m4 texinfo groff gettext expat bison flex help2man openssl gperf rsync libxslt python python-pip python-mako xorriso qemu-arch-extra
+sudo pacman -S --needed bash coreutils make patch tar gzip binutils gcc git subversion mercurial curl wget xz mtools meson perl m4 texinfo groff gettext expat bison flex help2man openssl gperf rsync libxslt python python-pip python-mako xcb-proto xorriso qemu-arch-extra
 ```
 
 ### Building Vinix on macOS

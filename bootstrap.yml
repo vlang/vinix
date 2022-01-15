@@ -960,6 +960,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -996,6 +999,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1046,12 +1052,12 @@ packages:
         - '--prefix=/usr'
         - '--sysconfdir=/etc'
         - '--localstatedir=/var'
-        - '--disable-static'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['sed', '-i', 's|${pc_sysrootdir}${PYTHON_PREFIX}|/usr|g', '@THIS_COLLECT_DIR@/usr/lib/pkgconfig/xcb-proto.pc']
 
   - name: libxcb
     source:
@@ -1071,6 +1077,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1136,6 +1145,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1177,6 +1189,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1216,6 +1231,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1255,6 +1273,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1296,6 +1317,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1334,6 +1358,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1374,6 +1401,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1434,6 +1464,9 @@ packages:
       - host-gcc
       - virtual: pkgconfig-for-target
         triple: "x86_64-vinix"
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1475,6 +1508,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-xtrans
       - virtual: pkgconfig-for-target
         triple: "x86_64-vinix"
@@ -1555,6 +1591,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1593,6 +1632,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1632,6 +1674,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1742,6 +1787,9 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1768,6 +1816,9 @@ packages:
       version: '1.20.12'
     tools_required:
       - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-wayland-scanner
       - virtual: pkgconfig-for-target
         triple: "x86_64-vinix"
