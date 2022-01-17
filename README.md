@@ -26,13 +26,13 @@ virtual machines.
 - [x] mlibc
 - [x] bash
 - [x] builds.vinix-os.org
-- [x] gcc
-- [x] g++
-- [X] V
+- [x] gcc/g++
+- [x] V
 - [x] nano
-- [ ] storage drivers
-- [ ] ext2
-- [ ] Wayland compositor
+- [x] storage drivers
+- [x] ext2
+- [ ] X.org
+- [ ] X window manager
 - [ ] V-UI
 - [ ] network
 - [ ] Intel HD graphics driver (linux port)
