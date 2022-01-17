@@ -1,12 +1,11 @@
-From 0b07a917a06230332f45ed88b96154cea97118c2 Mon Sep 17 00:00:00 2001
+From 74fadf9a8e27a752cddc6a7ab612a9db5ff4c54c Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 17 Jan 2022 02:40:51 +0100
+Date: Mon, 17 Jan 2022 23:37:58 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  abis/mlibc/signal.h                           |   6 +-
- meson.build                                   |   6 +-
- options/ansi/generic/time-stubs.cpp           |  39 +-
+ meson.build                                   |   4 +
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |   2 +
  .../include/mlibc/internal-sysdeps.hpp        |   4 +
  options/linux-headers/include/asm/ioctls.h    |   2 +
@@ -42,7 +41,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |   1 +
  sysdeps/vinix/include/abi-bits/wait.h         |   1 +
  sysdeps/vinix/meson.build                     |  52 ++
- 38 files changed, 962 insertions(+), 10 deletions(-)
+ 37 files changed, 927 insertions(+), 4 deletions(-)
  create mode 100644 sysdeps/vinix/crt-x86_64/crt0.S
  create mode 100644 sysdeps/vinix/generic/entry.cpp
  create mode 100644 sysdeps/vinix/generic/generic.cpp
@@ -93,18 +92,9 @@ index 5c63bca..eaf115b 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 4027c99..f0b7a02 100644
+index 4027c99..3675409 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -47,7 +47,7 @@ if not headers_only
- 	add_languages('c', 'cpp')
- 	c_compiler = meson.get_compiler('c')
- 
--	add_project_arguments('-nostdinc', '-fno-builtin', language: ['c', 'cpp'])
-+	add_project_arguments('-nostdinc', '-fno-builtin', '-fno-omit-frame-pointer', language: ['c', 'cpp'])
- 	add_project_arguments('-std=c++20', language: 'cpp')
- 	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
- 	add_project_arguments('-Wall', '-Wextra', language: ['c', 'cpp'])
 @@ -110,6 +110,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
@@ -116,70 +106,6 @@ index 4027c99..f0b7a02 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
-diff --git a/options/ansi/generic/time-stubs.cpp b/options/ansi/generic/time-stubs.cpp
-index 0cf66fe..96320ef 100644
---- a/options/ansi/generic/time-stubs.cpp
-+++ b/options/ansi/generic/time-stubs.cpp
-@@ -177,9 +177,38 @@ size_t strftime(char *__restrict dest, size_t max_size,
- 				return 0;
- 			p += chunk;
- 			c += 2;
--		}else if (*(c + 1) == 'b') {
--			const char *strmons[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
--					"Aug", "Sep", "Oct", "Nov", "Dec" };
-+		}else if (*(c + 1) == 'b' || *(c + 1) == 'B') {
-+			const char *strmons[12];
-+			switch (*(c + 1)) {
-+				case 'b':
-+					strmons[0] = "Jan";
-+					strmons[1] = "Feb";
-+					strmons[2] = "Mar";
-+					strmons[3] = "Apr";
-+					strmons[4] = "May";
-+					strmons[5] = "Jun";
-+					strmons[6] = "Jul";
-+					strmons[7] = "Aug";
-+					strmons[8] = "Sep";
-+					strmons[9] = "Oct";
-+					strmons[10] = "Nov";
-+					strmons[11] = "Dec";
-+					break;
-+				case 'B':
-+					strmons[0] = "January";
-+					strmons[1] = "February";
-+					strmons[2] = "March";
-+					strmons[3] = "April";
-+					strmons[4] = "May";
-+					strmons[5] = "June";
-+					strmons[6] = "July";
-+					strmons[7] = "August";
-+					strmons[8] = "September";
-+					strmons[9] = "October";
-+					strmons[10] = "November";
-+					strmons[11] = "December";
-+					break;
-+			}
- 			int mon = tm->tm_mon;
- 			if(mon < 0 || mon > 11)
- 				__ensure(!"Month not in bounds.");
-@@ -688,7 +717,7 @@ char *strptime_internal(const char *__restrict input, const char *__restrict for
- 	struct tm *__restrict tm, struct strptime_internal_state *__restrict state) {
- 	while(isspace(input[state->input_index]))
- 		state->input_index++;
--	
-+
- 	if(input[state->input_index] == '\0')
- 		return NULL;
- 
-@@ -887,7 +916,7 @@ char *strptime_internal(const char *__restrict input, const char *__restrict for
- 				state->has_year = true;
- 				break;
- 			}
--			case 'Y': {                     
-+			case 'Y': {
- 				int product = 0, n = 0;
- 				sscanf(&input[state->input_index], "%d%n", &product, &n);
- 				if(n == 0 || 4 < n)
 diff --git a/options/ansi/include/mlibc/ansi-sysdeps.hpp b/options/ansi/include/mlibc/ansi-sysdeps.hpp
 index fe81c4e..a54b513 100644
 --- a/options/ansi/include/mlibc/ansi-sysdeps.hpp
