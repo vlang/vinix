@@ -17,6 +17,7 @@ import resource
 import errno
 import block.partition
 import fs
+import katomic
 
 const (
 	nvme_class    = 0x1
@@ -398,9 +399,15 @@ fn (mut dev NVMENamespace) ioctl(handle voidptr, request u64, argp voidptr) ?int
 }
 
 fn (mut dev NVMENamespace) unref(handle voidptr) ? {
-	dev.l.acquire()
-	dev.refcount--
-	dev.l.release()
+	katomic.dec(dev.refcount)
+}
+
+fn (mut dev NVMENamespace) link(handle voidptr) ? {
+	katomic.inc(dev.stat.nlink)
+}
+
+fn (mut dev NVMENamespace) unlink(handle voidptr) ? {
+	katomic.dec(dev.stat.nlink)
 }
 
 fn (mut dev NVMENamespace) grow(handle voidptr, new_size u64) ? {

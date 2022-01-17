@@ -65,6 +65,14 @@ fn (mut this SignalFD) unref(handle voidptr) ? {
 	return error('')
 }
 
+fn (mut this SignalFD) link(handle voidptr) ? {
+	return error('')
+}
+
+fn (mut this SignalFD) unlink(handle voidptr) ? {
+	return error('')
+}
+
 fn (mut this SignalFD) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }

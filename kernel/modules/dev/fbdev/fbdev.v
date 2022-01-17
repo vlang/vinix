@@ -11,6 +11,7 @@ import stat
 import klock
 import event.eventstruct
 import dev.fbdev.api
+import katomic
 
 pub struct FramebufferNode {
 pub mut:
@@ -96,7 +97,15 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 }
 
 fn (mut this FramebufferNode) unref(handle voidptr) ? {
-	this.refcount--
+	katomic.dec(this.refcount)
+}
+
+fn (mut this FramebufferNode) link(handle voidptr) ? {
+	katomic.inc(this.stat.nlink)
+}
+
+fn (mut this FramebufferNode) unlink(handle voidptr) ? {
+	katomic.dec(this.stat.nlink)
 }
 
 fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {

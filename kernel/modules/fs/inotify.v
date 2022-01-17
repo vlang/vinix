@@ -42,6 +42,14 @@ fn (mut this INotify) unref(handle voidptr) ? {
 	return error('')
 }
 
+fn (mut this INotify) link(handle voidptr) ? {
+	return error('')
+}
+
+fn (mut this INotify) unlink(handle voidptr) ? {
+	return error('')
+}
+
 fn (mut this INotify) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }

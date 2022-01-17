@@ -102,12 +102,20 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 }
 
 fn (mut this TmpFSResource) unref(handle voidptr) ? {
-	this.refcount--
+	katomic.dec(this.refcount)
 
 	if this.refcount == 0 && stat.isreg(this.stat.mode) {
 		memory.free(this.storage)
 		unsafe { free(this) }
 	}
+}
+
+fn (mut this TmpFSResource) link(handle voidptr) ? {
+	katomic.inc(this.stat.nlink)
+}
+
+fn (mut this TmpFSResource) unlink(handle voidptr) ? {
+	katomic.dec(this.stat.nlink)
 }
 
 fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {

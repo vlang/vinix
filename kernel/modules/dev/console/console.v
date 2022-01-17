@@ -20,6 +20,7 @@ import termios
 import file
 import userland
 import proc
+import katomic
 
 const (
 	max_scancode = 0x57
@@ -808,7 +809,15 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this Console) unref(handle voidptr) ? {
-	this.refcount--
+	katomic.dec(this.refcount)
+}
+
+fn (mut this Console) link(handle voidptr) ? {
+	katomic.inc(this.stat.nlink)
+}
+
+fn (mut this Console) unlink(handle voidptr) ? {
+	katomic.dec(this.stat.nlink)
 }
 
 fn (mut this Console) grow(handle voidptr, new_size u64) ? {

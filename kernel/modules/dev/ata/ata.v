@@ -15,6 +15,7 @@ import lib
 import errno
 import event
 import event.eventstruct
+import katomic
 
 const pci_class = 0x1
 
@@ -339,9 +340,15 @@ fn (mut dev ATADrive) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut dev ATADrive) unref(handle voidptr) ? {
-	dev.l.acquire()
-	dev.refcount--
-	dev.l.release()
+	katomic.dec(dev.refcount)
+}
+
+fn (mut dev ATADrive) link(handle voidptr) ? {
+	katomic.inc(dev.stat.nlink)
+}
+
+fn (mut dev ATADrive) unlink(handle voidptr) ? {
+	katomic.dec(dev.stat.nlink)
 }
 
 fn (mut dev ATADrive) grow(handle voidptr, new_size u64) ? {

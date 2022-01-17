@@ -11,6 +11,7 @@ import klock
 import event.eventstruct
 import memory
 import x86.cpu
+import katomic
 
 __global (
 	ur_initialized = false
@@ -125,7 +126,15 @@ fn (mut this URandom) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this URandom) unref(handle voidptr) ? {
-	this.refcount--
+	katomic.dec(this.refcount)
+}
+
+fn (mut this URandom) link(handle voidptr) ? {
+	katomic.inc(this.stat.nlink)
+}
+
+fn (mut this URandom) unlink(handle voidptr) ? {
+	katomic.dec(this.stat.nlink)
 }
 
 fn (mut this URandom) grow(handle voidptr, new_size u64) ? {

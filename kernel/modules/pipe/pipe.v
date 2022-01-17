@@ -192,8 +192,16 @@ fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this Pipe) unref(handle voidptr) ? {
-	this.refcount--
+	katomic.dec(this.refcount)
 	event.trigger(mut this.event, false)
+}
+
+fn (mut this Pipe) unlink(handle voidptr) ? {
+	katomic.dec(this.stat.nlink)
+}
+
+fn (mut this Pipe) link(handle voidptr) ? {
+	katomic.inc(this.stat.nlink)
 }
 
 fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {

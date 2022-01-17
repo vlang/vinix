@@ -61,6 +61,14 @@ fn (mut this NetlinkSocket) unref(handle voidptr) ? {
 	return error('')
 }
 
+fn (mut this NetlinkSocket) link(handle voidptr) ? {
+	return error('')
+}
+
+fn (mut this NetlinkSocket) unlink(handle voidptr) ? {
+	return error('')
+}
+
 fn (mut this NetlinkSocket) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }

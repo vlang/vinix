@@ -14,6 +14,7 @@ import resource
 import errno
 import block.partition
 import fs
+import katomic
 
 const (
 	ahci_class = 0x1
@@ -138,7 +139,7 @@ struct AHCIFISd2h {
 	flags u8
 	status u8
 	error u8
-	lba0 u8 
+	lba0 u8
 	lba1 u8
 	lba2 u8
 	device u8
@@ -236,9 +237,15 @@ fn (mut dev AHCIDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut dev AHCIDevice) unref(handle voidptr) ? {
-	dev.l.acquire()
-	dev.refcount--
-	dev.l.release()
+	katomic.dec(dev.refcount)
+}
+
+fn (mut dev AHCIDevice) link(handle voidptr) ? {
+	katomic.inc(dev.stat.nlink)
+}
+
+fn (mut dev AHCIDevice) unlink(handle voidptr) ? {
+	katomic.dec(dev.stat.nlink)
 }
 
 fn (mut dev AHCIDevice) grow(handle voidptr, new_size u64) ? {
@@ -447,7 +454,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 					c.device_list << device
 				}
 				sata_atapi {
-					print('ahci: enclosure management bridge found on port ${i}\n')	
+					print('ahci: enclosure management bridge found on port ${i}\n')
 				}
 				sata_pm {
 					print('ahci: port multipler found on port ${i}\n')

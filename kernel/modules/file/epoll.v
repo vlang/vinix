@@ -80,6 +80,14 @@ fn (mut this EPoll) unref(handle voidptr) ? {
 	return error('')
 }
 
+fn (mut this EPoll) link(handle voidptr) ? {
+	return error('')
+}
+
+fn (mut this EPoll) unlink(handle voidptr) ? {
+	return error('')
+}
+
 fn (mut this EPoll) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }

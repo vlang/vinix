@@ -51,6 +51,14 @@ fn (mut this UnixSocket) unref(handle voidptr) ? {
 	return error('')
 }
 
+fn (mut this UnixSocket) link(handle voidptr) ? {
+	return error('')
+}
+
+fn (mut this UnixSocket) unlink(handle voidptr) ? {
+	return error('')
+}
+
 fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }

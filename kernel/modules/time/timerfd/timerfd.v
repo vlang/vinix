@@ -49,6 +49,14 @@ fn (mut this TimerFD) unref(handle voidptr) ? {
 	return error('')
 }
 
+fn (mut this TimerFD) link(handle voidptr) ? {
+	return error('')
+}
+
+fn (mut this TimerFD) unlink(handle voidptr) ? {
+	return error('')
+}
+
 fn (mut this TimerFD) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }

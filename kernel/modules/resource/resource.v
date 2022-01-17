@@ -48,6 +48,8 @@ mut:
 	write(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	ioctl(handle voidptr, request u64, argp voidptr) ?int
 	unref(handle voidptr) ?
+	link(handle voidptr) ?
+	unlink(handle voidptr) ?
 	mmap(page u64, flags int) voidptr
 }
 

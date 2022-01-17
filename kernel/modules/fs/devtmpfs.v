@@ -101,7 +101,15 @@ fn (mut this DevTmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) 
 }
 
 fn (mut this DevTmpFSResource) unref(handle voidptr) ? {
-	this.refcount--
+	katomic.dec(this.refcount)
+}
+
+fn (mut this DevTmpFSResource) link(handle voidptr) ? {
+	katomic.inc(this.stat.nlink)
+}
+
+fn (mut this DevTmpFSResource) unlink(handle voidptr) ? {
+	katomic.dec(this.stat.nlink)
 }
 
 fn (mut this DevTmpFSResource) grow(handle voidptr, new_size u64) ? {
