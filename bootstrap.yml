@@ -175,10 +175,15 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.74.6'
-    version: '2.74.6'
+    tag: 'v2.75.1'
+    version: '2.75.1'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
     regenerate:
-      - args: ['make', 'regenerate']
+      - args: ['./autogen.sh']
+        environ:
+          NOCONFIGURE: 'yes'
 
   - name: nasm
     subdir: '3rdparty'
@@ -403,14 +408,15 @@ tools:
     tools_required:
       - host-gcc
       - host-nasm
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - 'TOOLCHAIN=x86_64-vinix'
     compile:
-      - args: |
-          set -e
-          make -C "@THIS_SOURCE_DIR@" BUILDDIR="@THIS_BUILD_DIR@" TOOLCHAIN=x86_64-vinix
+      - args: ['make', '-j@PARALLELISM@']
     install:
-      - args: |
-          set -e
-          make -C "@THIS_SOURCE_DIR@" BUILDDIR="@THIS_BUILD_DIR@" PREFIX="@PREFIX@" install
+      - args: ['make', 'install']
 
   - name: host-binutils
     from_source: binutils
