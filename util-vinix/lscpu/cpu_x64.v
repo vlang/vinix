@@ -41,7 +41,7 @@ pub:
 	cpu_family u32
 	model_number u32
 	stepping u32
-	features []string
+	flags []string
 }
 
 pub fn (info CPUInfo) print() {
@@ -55,7 +55,7 @@ pub fn (info CPUInfo) print() {
 	println("CPU family:       ${info.cpu_family}")
 	println("Model number:     ${info.model_number}")
 	println("Stepping:         ${info.stepping}")
-	println("Features:         ${info.features.join(', ')}")
+	println("Flags:            ${info.flags.join(', ')}")
 }
 
 pub fn get_cpu_info() ?CPUInfo {
@@ -84,67 +84,68 @@ pub fn get_cpu_info() ?CPUInfo {
 		family_id
 	}
 
-	// Fetch features (all of them in EAX=1 for now).
-	mut features := []string{}
-	if c1 & cpuid_feature_ecx_sse3       != 0 { features << "sse2" }
-	if c1 & cpuid_feature_ecx_pclmul     != 0 { features << "pclmul" }
-	if c1 & cpuid_feature_ecx_dtes64     != 0 { features << "dtes64" }
-	if c1 & cpuid_feature_ecx_monitor    != 0 { features << "monitor" }
-	if c1 & cpuid_feature_ecx_ds_cpl     != 0 { features << "dscpl" }
-	if c1 & cpuid_feature_ecx_vmx        != 0 { features << "vmx" }
-	if c1 & cpuid_feature_ecx_smx        != 0 { features << "smx" }
-	if c1 & cpuid_feature_ecx_est        != 0 { features << "est" }
-	if c1 & cpuid_feature_ecx_tm2        != 0 { features << "tm2" }
-	if c1 & cpuid_feature_ecx_ssse3      != 0 { features << "ssse3" }
-	if c1 & cpuid_feature_ecx_cid        != 0 { features << "cid" }
-	if c1 & cpuid_feature_ecx_sdbg       != 0 { features << "sdbg" }
-	if c1 & cpuid_feature_ecx_fma        != 0 { features << "fma" }
-	if c1 & cpuid_feature_ecx_cx16       != 0 { features << "cx16" }
-	if c1 & cpuid_feature_ecx_xtpr       != 0 { features << "xtpr" }
-	if c1 & cpuid_feature_ecx_pdcm       != 0 { features << "pdcm" }
-	if c1 & cpuid_feature_ecx_pdid       != 0 { features << "pdid" }
-	if c1 & cpuid_feature_ecx_dca        != 0 { features << "dca" }
-	if c1 & cpuid_feature_ecx_sse4_1     != 0 { features << "sse4_1" }
-	if c1 & cpuid_feature_ecx_sse4_2     != 0 { features << "sse4_2" }
-	if c1 & cpuid_feature_ecx_x2apic     != 0 { features << "x2apic" }
-	if c1 & cpuid_feature_ecx_movbe      != 0 { features << "movbe" }
-	if c1 & cpuid_feature_ecx_popcnt     != 0 { features << "popcnt" }
-	if c1 & cpuid_feature_ecx_tsc        != 0 { features << "tsc" }
-	if c1 & cpuid_feature_ecx_aes        != 0 { features << "aes" }
-	if c1 & cpuid_feature_ecx_xsave      != 0 { features << "xsave" }
-	if c1 & cpuid_feature_ecx_osxsave    != 0 { features << "osxsave" }
-	if c1 & cpuid_feature_ecx_avx        != 0 { features << "avx" }
-	if c1 & cpuid_feature_ecx_f16c       != 0 { features << "f16c" }
-	if c1 & cpuid_feature_ecx_rdrand     != 0 { features << "rdrand" }
-	if c1 & cpuid_feature_ecx_hypervisor != 0 { features << "hypervisor" }
-	if d1 & cpuid_feature_edx_fpu        != 0 { features << "fpu" }
-	if d1 & cpuid_feature_edx_vme        != 0 { features << "vme" }
-	if d1 & cpuid_feature_edx_de         != 0 { features << "de" }
-	if d1 & cpuid_feature_edx_pse        != 0 { features << "pse" }
-	if d1 & cpuid_feature_edx_msr        != 0 { features << "msr" }
-	if d1 & cpuid_feature_edx_pae        != 0 { features << "pae" }
-	if d1 & cpuid_feature_edx_mce        != 0 { features << "mce" }
-	if d1 & cpuid_feature_edx_cx8        != 0 { features << "cx8" }
-	if d1 & cpuid_feature_edx_apic       != 0 { features << "apic" }
-	if d1 & cpuid_feature_edx_sep        != 0 { features << "sep" }
-	if d1 & cpuid_feature_edx_mtrr       != 0 { features << "mtrr" }
-	if d1 & cpuid_feature_edx_pge        != 0 { features << "pge" }
-	if d1 & cpuid_feature_edx_mca        != 0 { features << "mca" }
-	if d1 & cpuid_feature_edx_cmov       != 0 { features << "cmov" }
-	if d1 & cpuid_feature_edx_pse36      != 0 { features << "pse36" }
-	if d1 & cpuid_feature_edx_psn        != 0 { features << "psn" }
-	if d1 & cpuid_feature_edx_clflush    != 0 { features << "clflush" }
-	if d1 & cpuid_feature_edx_ds         != 0 { features << "ds" }
-	if d1 & cpuid_feature_edx_acpi       != 0 { features << "acpi" }
-	if d1 & cpuid_feature_edx_mmx        != 0 { features << "mmx" }
-	if d1 & cpuid_feature_edx_fxmsr      != 0 { features << "fxmsr" }
-	if d1 & cpuid_feature_edx_sse        != 0 { features << "sse" }
-	if d1 & cpuid_feature_edx_sse2       != 0 { features << "sse2" }
-	if d1 & cpuid_feature_edx_ss         != 0 { features << "ss" }
-	if d1 & cpuid_feature_edx_htt        != 0 { features << "htt" }
-	if d1 & cpuid_feature_edx_tm         != 0 { features << "tm" }
-	if d1 & cpuid_feature_edx_ia64       != 0 { features << "ia64" }
-	if d1 & cpuid_feature_edx_pbe        != 0 { features << "pbe" }
+	// Fetch flags (all of them in EAX=1 for now).
+	mut flags := []string{}
+	if c1 & cpuid_feature_ecx_sse3       != 0 { flags << "sse3" }
+	if c1 & cpuid_feature_ecx_pclmul     != 0 { flags << "pclmul" }
+	if c1 & cpuid_feature_ecx_dtes64     != 0 { flags << "dtes64" }
+	if c1 & cpuid_feature_ecx_monitor    != 0 { flags << "monitor" }
+	if c1 & cpuid_feature_ecx_ds_cpl     != 0 { flags << "dscpl" }
+	if c1 & cpuid_feature_ecx_vmx        != 0 { flags << "vmx" }
+	if c1 & cpuid_feature_ecx_smx        != 0 { flags << "smx" }
+	if c1 & cpuid_feature_ecx_est        != 0 { flags << "est" }
+	if c1 & cpuid_feature_ecx_tm2        != 0 { flags << "tm2" }
+	if c1 & cpuid_feature_ecx_ssse3      != 0 { flags << "ssse3" }
+	if c1 & cpuid_feature_ecx_cid        != 0 { flags << "cid" }
+	if c1 & cpuid_feature_ecx_sdbg       != 0 { flags << "sdbg" }
+	if c1 & cpuid_feature_ecx_fma        != 0 { flags << "fma" }
+	if c1 & cpuid_feature_ecx_cx16       != 0 { flags << "cx16" }
+	if c1 & cpuid_feature_ecx_xtpr       != 0 { flags << "xtpr" }
+	if c1 & cpuid_feature_ecx_pdcm       != 0 { flags << "pdcm" }
+	if c1 & cpuid_feature_ecx_pdid       != 0 { flags << "pdid" }
+	if c1 & cpuid_feature_ecx_dca        != 0 { flags << "dca" }
+	if c1 & cpuid_feature_ecx_sse4_1     != 0 { flags << "sse4_1" }
+	if c1 & cpuid_feature_ecx_sse4_2     != 0 { flags << "sse4_2" }
+	if c1 & cpuid_feature_ecx_x2apic     != 0 { flags << "x2apic" }
+	if c1 & cpuid_feature_ecx_movbe      != 0 { flags << "movbe" }
+	if c1 & cpuid_feature_ecx_popcnt     != 0 { flags << "popcnt" }
+	if c1 & cpuid_feature_ecx_tsc        != 0 { flags << "tsc" }
+	if c1 & cpuid_feature_ecx_aes        != 0 { flags << "aes" }
+	if c1 & cpuid_feature_ecx_xsave      != 0 { flags << "xsave" }
+	if c1 & cpuid_feature_ecx_osxsave    != 0 { flags << "osxsave" }
+	if c1 & cpuid_feature_ecx_avx        != 0 { flags << "avx" }
+	if c1 & cpuid_feature_ecx_f16c       != 0 { flags << "f16c" }
+	if c1 & cpuid_feature_ecx_rdrand     != 0 { flags << "rdrand" }
+	if c1 & cpuid_feature_ecx_hypervisor != 0 { flags << "hypervisor" }
+	if d1 & cpuid_feature_edx_fpu        != 0 { flags << "fpu" }
+	if d1 & cpuid_feature_edx_vme        != 0 { flags << "vme" }
+	if d1 & cpuid_feature_edx_de         != 0 { flags << "de" }
+	if d1 & cpuid_feature_edx_pse        != 0 { flags << "pse" }
+	if d1 & cpuid_feature_edx_msr        != 0 { flags << "msr" }
+	if d1 & cpuid_feature_edx_pae        != 0 { flags << "pae" }
+	if d1 & cpuid_feature_edx_mce        != 0 { flags << "mce" }
+	if d1 & cpuid_feature_edx_cx8        != 0 { flags << "cx8" }
+	if d1 & cpuid_feature_edx_apic       != 0 { flags << "apic" }
+	if d1 & cpuid_feature_edx_sep        != 0 { flags << "sep" }
+	if d1 & cpuid_feature_edx_mtrr       != 0 { flags << "mtrr" }
+	if d1 & cpuid_feature_edx_pge        != 0 { flags << "pge" }
+	if d1 & cpuid_feature_edx_mca        != 0 { flags << "mca" }
+	if d1 & cpuid_feature_edx_cmov       != 0 { flags << "cmov" }
+	if d1 & cpuid_feature_edx_pse36      != 0 { flags << "pse36" }
+	if d1 & cpuid_feature_edx_psn        != 0 { flags << "psn" }
+	if d1 & cpuid_feature_edx_clflush    != 0 { flags << "clflush" }
+	if d1 & cpuid_feature_edx_ds         != 0 { flags << "ds" }
+	if d1 & cpuid_feature_edx_acpi       != 0 { flags << "acpi" }
+	if d1 & cpuid_feature_edx_mmx        != 0 { flags << "mmx" }
+	if d1 & cpuid_feature_edx_fxmsr      != 0 { flags << "fxmsr" }
+	if d1 & cpuid_feature_edx_sse        != 0 { flags << "sse" }
+	if d1 & cpuid_feature_edx_sse2       != 0 { flags << "sse2" }
+	if d1 & cpuid_feature_edx_ss         != 0 { flags << "ss" }
+	if d1 & cpuid_feature_edx_htt        != 0 { flags << "htt" }
+	if d1 & cpuid_feature_edx_tm         != 0 { flags << "tm" }
+	if d1 & cpuid_feature_edx_ia64       != 0 { flags << "ia64" }
+	if d1 & cpuid_feature_edx_pbe        != 0 { flags << "pbe" }
+	flags.sort()
 
 	// Fetch address sizes.
 	_, a2, _, c2, _ := cpuid(0x80000008, 0)
@@ -168,7 +169,7 @@ pub fn get_cpu_info() ?CPUInfo {
 		cpu_family: cpu_family
 		model_number: model_number
 		stepping: stepping_id
-		features: features
+		flags: flags
 	}
 }
 
