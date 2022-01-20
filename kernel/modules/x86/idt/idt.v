@@ -42,45 +42,10 @@ pub fn allocate_vector() byte {
 }
 
 __global (
-	interrupt_thunks [256]voidptr
-	interrupt_table  [256]voidptr
+	interrupt_table [256]voidptr
 )
 
-#include <symbols.h>
-
-fn C.interrupt_thunk_begin()
-fn C.interrupt_thunk_storage()
-fn C.interrupt_thunk_offset()
-fn C.interrupt_thunk_size()
-fn C.interrupt_thunk_number()
-
-fn prepare_interrupt_thunks() {
-	v_interrupt_thunk_begin := voidptr(C.interrupt_thunk_begin)
-	v_interrupt_thunk_storage := u64(C.interrupt_thunk_storage)
-	v_interrupt_thunk_offset := &u64(C.interrupt_thunk_offset)
-	v_interrupt_thunk_size := u64(C.interrupt_thunk_size)
-	v_interrupt_thunk_number := &u32(C.interrupt_thunk_number)
-
-	unsafe {
-		for i := u64(0); i < interrupt_table.len; i++ {
-			*v_interrupt_thunk_offset = u64(&interrupt_table[i])
-			*v_interrupt_thunk_number = u32(i)
-			ptr := &byte(v_interrupt_thunk_storage + v_interrupt_thunk_size * i)
-
-			C.memcpy(ptr, v_interrupt_thunk_begin, v_interrupt_thunk_size)
-			shift := match i {
-				8, 10, 11, 12, 13, 14, 17, 30 { 2 }
-				else { 0 }
-			}
-
-			interrupt_thunks[i] = ptr + u64(shift)
-		}
-	}
-}
-
 pub fn initialise() {
-	prepare_interrupt_thunks()
-
 	reload()
 }
 

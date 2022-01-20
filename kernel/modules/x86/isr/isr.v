@@ -96,26 +96,31 @@ __global (
 	abort_vector = byte(0)
 )
 
+#include <symbols.h>
+fn C.interrupt_thunks()
+
 pub fn initialise() {
+	thunks := &u64(voidptr(C.interrupt_thunks))
+
 	for i := u16(0); i < 32; i++ {
 		match i {
 			14 { // Page fault
-				idt.register_handler(i, interrupt_thunks[i], 3, 0x8e)
+				unsafe { idt.register_handler(i, voidptr(thunks[i]), 3, 0x8e) }
 				interrupt_table[i] = voidptr(pf_handler)
 			}
 			else {
-				idt.register_handler(i, interrupt_thunks[i], 0, 0x8e)
+				unsafe { idt.register_handler(i, voidptr(thunks[i]), 0, 0x8e) }
 				interrupt_table[i] = voidptr(exception_handler)
 			}
 		}
 	}
 
 	for i := u16(32); i < 256; i++ {
-		idt.register_handler(i, interrupt_thunks[i], 0, 0x8e)
+		unsafe { idt.register_handler(i, voidptr(thunks[i]), 0, 0x8e) }
 		interrupt_table[i] = voidptr(generic_isr)
 	}
 
 	abort_vector = idt.allocate_vector()
-	idt.register_handler(abort_vector, interrupt_thunks[abort_vector], 4, 0x8e)
+	unsafe { idt.register_handler(abort_vector, voidptr(thunks[abort_vector]), 4, 0x8e) }
 	interrupt_table[abort_vector] = voidptr(abort_handler)
 }

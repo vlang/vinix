@@ -2,16 +2,14 @@
 // Code is governed by the GPL-2.0 license.
 // Copyright (C) 2021-2022 The Vinix authors.
 
-.section .data
+.altmacro
 
-.globl interrupt_thunk_begin
-.globl interrupt_thunk_number
-.globl interrupt_thunk_offset
-.globl interrupt_thunk_size
-.globl interrupt_thunk_storage
-
-interrupt_thunk_begin:
+.macro THUNK num
+.global interrupt_thunk_\num
+interrupt_thunk_\num:
+.if \num != 8 && \num != 10 && \num != 11 && \num != 12 && \num != 13 && \num != 14 && \num != 17 && \num != 30
     push $0
+.endif
 
     cmpq $0x43, 16(%rsp) // if user
     jne 1f
@@ -45,17 +43,11 @@ interrupt_thunk_begin:
     mov %eax, %es
     mov %eax, %ss
 
+    mov $\num, %rdi
+    mov $(\num * 8), %rax
+    lea interrupt_table(%rip), %rbx
+    add %rax, %rbx
     mov %rsp, %rsi
-
-    // those get filled in for each copy of the thunk template in prepare_interrupt_thunks()
-    // mov {interrupt_thunk_number}, %edi
-    .byte 0xbf
-interrupt_thunk_number: .long 0
-    // movabs {interrupt_thunk_offset}, %rbx
-    .byte 0x48
-    .byte 0xbb
-interrupt_thunk_offset: .quad 0
-
     xor %rbp, %rbp
     call *(%rbx)
 
@@ -86,7 +78,26 @@ interrupt_thunk_offset: .quad 0
 
 1:
     iretq
+.endm
 
-interrupt_thunk_end:
-.equ interrupt_thunk_size, interrupt_thunk_end - interrupt_thunk_begin
-interrupt_thunk_storage: .space (interrupt_thunk_end - interrupt_thunk_begin) * 256
+.macro thunkaddr num
+    .quad interrupt_thunk_\num
+.endm
+
+.section .data
+
+.global interrupt_thunks
+interrupt_thunks:
+.set i,0
+.rept 256
+    thunkaddr %i
+    .set i,i+1
+.endr
+
+.section .text
+
+.set i,0
+.rept 256
+    THUNK %i
+    .set i,i+1
+.endr
