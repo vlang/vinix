@@ -7,3 +7,5 @@ build
 ovmf
 pack
 .vscode
+bochsout.txt
+bx_enh_dbg.ini
