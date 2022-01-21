@@ -160,7 +160,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '7a2705d8ce756dff19f080216311b946c95f5567'
+    commit: '295156e0543f1da36791bd034bd576f2b1724aac'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -168,7 +168,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '126997df908d7856b13f4886a25d25b6068465f2'
+    commit: 'e60d95171a6e5ab62bbc0826aa479dc640b8e565'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
