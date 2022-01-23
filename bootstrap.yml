@@ -804,7 +804,6 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['ln', '-s', 'libc.so', '@THIS_COLLECT_DIR@/usr/lib/libc.so.6']
 
   - name: less
     source:
@@ -1130,6 +1129,7 @@ packages:
         - '--localstatedir=/var'
         - '--disable-static'
         - '--without-doxygen'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
@@ -1761,6 +1761,7 @@ packages:
         - '--enable-cxx'
         - '--disable-static'
         - '--docdir=/usr/share/doc/gmp-6.2.0'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
@@ -2982,7 +2983,6 @@ packages:
         - host-libtool
         - host-pkg-config
       regenerate:
-        - args: ['sed', '-i', 's/boilerplate test perf/boilerplate/g', 'Makefile.am']
         - args: ['./autogen.sh']
           environ:
             NOCONFIGURE: 'yes'
@@ -3050,7 +3050,7 @@ packages:
         - '--libdir=lib'
         - '--buildtype=release'
         - '-Denable-docs=false'
-        - '-Denable-x11=false'
+        - '-Denable-x11=true'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
