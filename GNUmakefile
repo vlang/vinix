@@ -78,5 +78,5 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf 3rdparty build initramfs.tar.gz pack ovmf
+	rm -rf 3rdparty build initramfs.tar.gz pack ovmf bochsout.txt bx_enh_dbg.ini
 	rm -f kernel/*.xbstrap init/*.xbstrap base-files/*.xbstrap util-vinix/*.xbstrap
