@@ -804,6 +804,7 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['ln', '-s', 'libc.so', '@THIS_COLLECT_DIR@/usr/lib/libc.so.6']
 
   - name: less
     source:
