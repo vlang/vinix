@@ -1737,7 +1737,7 @@ packages:
   - name: nettle
     source:
       subdir: '3rdparty'
-      git: 'https://git.lysator.liu.se/nettle/nettle.git'
+      git: 'https://github.com/gnutls/nettle.git'
       tag: 'nettle_3.7.3_release_20210606'
       version: '3.7.3'
       tools_required:
@@ -2817,6 +2817,7 @@ packages:
         - '--buildtype=release'
         - '-Denable-docs=false'
         - '-Denable-x11=true'
+        - '-Denable-wayland=false'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
