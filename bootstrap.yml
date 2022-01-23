@@ -2074,6 +2074,7 @@ packages:
       - libx11
       - libxext
       - libxcb
+      - libexpat
     configure:
       - args: ['cp', '@SOURCE_ROOT@/cross_file.txt', 'meson.cross-file']
       - args:
