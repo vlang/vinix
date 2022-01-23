@@ -1,6 +1,6 @@
-From 4b4e5243bb53bb80f02cf2471fc0eed0e383ef18 Mon Sep 17 00:00:00 2001
+From 80e285851355699a01d87a7e5103a4176cfe1557 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Wed, 19 Jan 2022 02:25:49 +0100
+Date: Sun, 23 Jan 2022 02:52:35 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -17,15 +17,16 @@ Subject: [PATCH] Vinix specific changes
  .../glob.cpp => generic/regex/glob.c}         |   35 +-
  options/posix/generic/regex/regcomp.c         | 2953 +++++++++++++++++
  options/posix/generic/regex/regerror.c        |   35 +
- options/posix/generic/regex/regexec.c         | 1028 ++++++
+ options/posix/generic/regex/regexec.c         | 1026 ++++++
  options/posix/generic/regex/tre-mem.c         |  158 +
  options/posix/generic/regex/tre.h             |  233 ++
  options/posix/generic/unistd-stubs.cpp        |    4 +-
  options/posix/include/pthread.h               |    3 +
  options/posix/include/regex.h                 |    4 +-
  options/posix/meson.build                     |   11 +-
+ options/rtdl/generic/linker.cpp               |    4 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
- sysdeps/vinix/generic/entry.cpp               |   58 +
+ sysdeps/vinix/generic/entry.cpp               |   98 +
  sysdeps/vinix/generic/generic.cpp             |  756 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
@@ -53,7 +54,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |    1 +
  sysdeps/vinix/include/abi-bits/wait.h         |    1 +
  sysdeps/vinix/meson.build                     |   52 +
- 49 files changed, 5376 insertions(+), 53 deletions(-)
+ 50 files changed, 5416 insertions(+), 55 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -3428,10 +3429,10 @@ index 0000000..df4afa4
 +}
 diff --git a/options/posix/generic/regex/regexec.c b/options/posix/generic/regex/regexec.c
 new file mode 100644
-index 0000000..253b0e1
+index 0000000..8c572e7
 --- /dev/null
 +++ b/options/posix/generic/regex/regexec.c
-@@ -0,0 +1,1028 @@
+@@ -0,0 +1,1026 @@
 +/*
 +  regexec.c - TRE POSIX compatible matching functions (and more).
 +
@@ -3486,10 +3487,8 @@ index 0000000..253b0e1
 +
 +#define GET_NEXT_WCHAR() do {                                                 \
 +    prev_c = next_c; pos += pos_add_next;                                     \
-+    if ((pos_add_next = mbtowc(&next_c, str_byte, MB_LEN_MAX)) <= 0) {        \
-+        if (pos_add_next < 0) { ret = REG_NOMATCH; goto error_exit; }         \
-+        else pos_add_next++;                                                  \
-+    }                                                                         \
++    next_c = *str_byte;                                                       \
++    pos_add_next = 1;                                                         \
 +    str_byte += pos_add_next;                                                 \
 +  } while (0)
 +
@@ -4626,7 +4625,7 @@ index 0000000..86f809d
 +}
 diff --git a/options/posix/generic/regex/tre.h b/options/posix/generic/regex/tre.h
 new file mode 100644
-index 0000000..40434d9
+index 0000000..5b4e802
 --- /dev/null
 +++ b/options/posix/generic/regex/tre.h
 @@ -0,0 +1,233 @@
@@ -4678,7 +4677,7 @@ index 0000000..40434d9
 +
 +#define elementsof(x)	( sizeof(x) / sizeof(x[0]) )
 +
-+#define tre_mbrtowc(pwc, s, n, ps) (mbtowc((pwc), (s), (n)))
++#define tre_mbrtowc(pwc, s, n, ps) ({ *pwc = s; 1; })
 +
 +/* Wide characters. */
 +typedef wint_t tre_cint_t;
@@ -4940,6 +4939,21 @@ index 285e07c..e3941e2 100644
  )
  
  if not no_headers
+diff --git a/options/rtdl/generic/linker.cpp b/options/rtdl/generic/linker.cpp
+index 1720d4f..4c0aeb4 100644
+--- a/options/rtdl/generic/linker.cpp
++++ b/options/rtdl/generic/linker.cpp
+@@ -13,8 +13,8 @@
+ uintptr_t libraryBase = 0x41000000;
+ 
+ bool verbose = false;
+-bool stillSlightlyVerbose = false;
+-bool logBaseAddresses = false;
++bool stillSlightlyVerbose = true;
++bool logBaseAddresses = true;
+ bool eagerBinding = true;
+ 
+ #if defined(__x86_64__)
 diff --git a/sysdeps/vinix/crt-x86_64/crt0.S b/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..06ab8a7
@@ -4953,10 +4967,10 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/sysdeps/vinix/generic/entry.cpp b/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..53ea0e9
+index 0000000..2398fd5
 --- /dev/null
 +++ b/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,98 @@
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
@@ -4987,13 +5001,53 @@ index 0000000..53ea0e9
 +			__mlibc_stack_data.envp);
 +}
 +
++struct GPRState {
++	uint64_t ds;
++	uint64_t es;
++	uint64_t rax;
++	uint64_t rbx;
++	uint64_t rcx;
++	uint64_t rdx;
++	uint64_t rsi;
++	uint64_t rdi;
++	uint64_t rbp;
++	uint64_t r8;
++	uint64_t r9;
++	uint64_t r10;
++	uint64_t r11;
++	uint64_t r12;
++	uint64_t r13;
++	uint64_t r14;
++	uint64_t r15;
++	uint64_t err;
++	uint64_t rip;
++	uint64_t cs;
++	uint64_t rflags;
++	uint64_t rsp;
++	uint64_t ss;
++};
++
 +static void __mlibc_sigentry(int which, siginfo_t *siginfo,
 +                             void (*sa)(int, siginfo_t *, void *),
-+                             void *ret_context, sigset_t prev_mask) {
++                             GPRState *ret_context, sigset_t prev_mask) {
++    size_t *base_ptr = (size_t *)ret_context->rbp;
++    mlibc::infoLogger() << "Stacktrace:" << frg::endlog;
++    for (;;) {
++        size_t old_bp = base_ptr[0];
++        size_t ret_addr = base_ptr[1];
++        if (!ret_addr)
++            break;
++        size_t off;
++        mlibc::infoLogger() << "  [" << (void *)ret_addr << "]" << frg::endlog;
++        if (!old_bp)
++            break;
++        base_ptr = (size_t *)old_bp;
++    }
++
 +    switch ((uintptr_t)sa) {
 +        // DFL
 +        case (uintptr_t)(-2):
-+            mlibc::infoLogger() << "mlibc: Unhandled signal " << which << "\n" << frg::endlog;
++            mlibc::infoLogger() << "mlibc: Unhandled signal " << which << frg::endlog;
 +            mlibc::sys_exit(128 + which);
 +        // IGN
 +        case (uintptr_t)(-3):

@@ -23,6 +23,7 @@ pub fn syscall_kprint(_ voidptr, message charptr) {
 			for i := 0; i < msglen; i++ {
 				serial.out(message[i])
 			}
+			serial.out(`\n`)
 		}
 		kprint_lock.release()
 	}
