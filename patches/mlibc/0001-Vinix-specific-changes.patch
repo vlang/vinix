@@ -1,6 +1,6 @@
-From 80e285851355699a01d87a7e5103a4176cfe1557 Mon Sep 17 00:00:00 2001
+From cba3a5aa3ec0d3aee05627d8ff22ee03535a7335 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 23 Jan 2022 02:52:35 +0100
+Date: Sun, 23 Jan 2022 03:38:17 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -26,7 +26,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/meson.build                     |   11 +-
  options/rtdl/generic/linker.cpp               |    4 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
- sysdeps/vinix/generic/entry.cpp               |   98 +
+ sysdeps/vinix/generic/entry.cpp               |   99 +
  sysdeps/vinix/generic/generic.cpp             |  756 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
@@ -54,7 +54,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |    1 +
  sysdeps/vinix/include/abi-bits/wait.h         |    1 +
  sysdeps/vinix/meson.build                     |   52 +
- 50 files changed, 5416 insertions(+), 55 deletions(-)
+ 50 files changed, 5417 insertions(+), 55 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -4967,10 +4967,10 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/sysdeps/vinix/generic/entry.cpp b/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..2398fd5
+index 0000000..e7c792b
 --- /dev/null
 +++ b/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,99 @@
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
@@ -5032,6 +5032,7 @@ index 0000000..2398fd5
 +                             GPRState *ret_context, sigset_t prev_mask) {
 +    size_t *base_ptr = (size_t *)ret_context->rbp;
 +    mlibc::infoLogger() << "Stacktrace:" << frg::endlog;
++    mlibc::infoLogger() << "  [" << (void *)ret_context->rip << "]" << frg::endlog;
 +    for (;;) {
 +        size_t old_bp = base_ptr[0];
 +        size_t ret_addr = base_ptr[1];

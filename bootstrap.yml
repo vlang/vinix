@@ -1920,6 +1920,8 @@ packages:
       - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc/X11']
+      - args: ['cp', '@SOURCE_ROOT@/extra-files/xorg/xorg.conf', '@THIS_COLLECT_DIR@/etc/X11/']
 
   - name: xf86-video-dummy
     source:
@@ -1952,8 +1954,8 @@ packages:
         - '--prefix=/usr'
         - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
     build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
+      - args: ['make', 'SYSROOT=@SYSROOT_DIR@', '-j@PARALLELISM@']
+      - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 

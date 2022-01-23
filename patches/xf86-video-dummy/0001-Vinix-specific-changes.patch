@@ -1,11 +1,12 @@
-From ac68692a0737dbd2657dfd4718fa082dc25fa65d Mon Sep 17 00:00:00 2001
+From 9d99a635c00c20d30f44ccb63f564ad574eb057b Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 14 Jan 2022 12:13:09 +0100
+Date: Sun, 23 Jan 2022 04:23:08 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- configure.ac | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ configure.ac    | 8 ++++----
+ src/Makefile.am | 2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
 index 4eb7fae..b5fd8ce 100644
@@ -28,6 +29,19 @@ index 4eb7fae..b5fd8ce 100644
  	AC_DEFINE(USE_DGA, 1, [Support DGA extension])
  fi
  AC_SUBST([DGA])
+diff --git a/src/Makefile.am b/src/Makefile.am
+index da1dd9a..0516a04 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -28,7 +28,7 @@
+ AM_CFLAGS = $(XORG_CFLAGS) $(PCIACCESS_CFLAGS)
+ 
+ dummy_drv_la_LTLIBRARIES = dummy_drv.la
+-dummy_drv_la_LDFLAGS = -module -avoid-version
++dummy_drv_la_LDFLAGS = -module -avoid-version -R@moduledir@ -L$(SYSROOT)@moduledir@ -lfb
+ dummy_drv_la_LIBADD = $(XORG_LIBS)
+ dummy_drv_ladir = @moduledir@/drivers
+ 
 -- 
 2.34.1
 
