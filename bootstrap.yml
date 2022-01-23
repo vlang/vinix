@@ -197,24 +197,6 @@ sources:
     regenerate:
       - args: ['./autogen.sh']
 
-  - name: wayland
-    subdir: '3rdparty'
-    git: 'https://github.com/wayland-project/wayland.git'
-    tag: '1.19.0'
-    version: '1.19.0'
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-    regenerate:
-      - args: |
-          set -e
-          sed -i 's/$(EXPAT_LIBS)/-lexpat/g' Makefile.am
-      - args: ['./autogen.sh']
-        environ:
-          NOCONFIGURE: 'yes'
-
   - name: gettext
     subdir: '3rdparty'
     git: 'https://git.savannah.gnu.org/git/gettext.git'
@@ -487,22 +469,6 @@ tools:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
         install:
           - args: ['make', 'install-strip-target-libstdc++-v3']
-
-  - name: host-wayland-scanner
-    tools_required:
-      - host-pkg-config
-    from_source: wayland
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--prefix=@PREFIX@'
-        - '--disable-libraries'
-        - '--disable-dtd-validation'
-        - '--disable-documentation'
-    compile:
-      - args: ['make', '-j@PARALLELISM@']
-    install:
-      - args: ['make', 'install']
 
   - name: host-libtool
     exports_aclocal: true
@@ -1853,7 +1819,6 @@ packages:
       - host-autoconf-v2.69
       - host-automake-v1.16
       - host-pkg-config
-      - host-wayland-scanner
       - virtual: pkgconfig-for-target
         triple: "x86_64-vinix"
       - virtual: pkgconfig-for-host
@@ -2045,6 +2010,7 @@ packages:
       - mlibc
       - ncurses
       - libiconv
+      - readline
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -2082,67 +2048,6 @@ packages:
           mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
           ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
 
-  - name: wayland
-    from_source: wayland
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-      - host-libtool
-      - host-pkg-config
-      - host-gcc
-      - host-wayland-scanner
-    pkgs_required:
-      - mlibc
-      - libexpat
-      - libffi
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-host-scanner'
-        - '--disable-dtd-validation'
-        - '--disable-documentation'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-        environ:
-          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
-          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: wayland-protocols
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/wayland-project/wayland-protocols.git'
-      tag: '1.21'
-      version: '1.21'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-pkg-config
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-gcc
-      - host-wayland-scanner
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
   - name: mesa
     source:
       subdir: '3rdparty'
@@ -2152,7 +2057,6 @@ packages:
     tools_required:
       - host-pkg-config
       - host-gcc
-      - host-wayland-scanner
       - virtual: pkgconfig-for-target
         triple: "x86_64-vinix"
       - virtual: pkgconfig-for-host
@@ -2161,8 +2065,6 @@ packages:
       - mlibc
       - libdrm
       - llvm
-      - wayland
-      - wayland-protocols
       - zlib
       - libxshmfence
       - libxrandr
@@ -2190,7 +2092,7 @@ packages:
         # The debug build type enables some additional output from Mesa.
         - '--buildtype=debugoptimized'
         - '-Dglx=dri'
-        - '-Dplatforms=wayland,x11'
+        - '-Dplatforms=x11'
         # The Gallium swrast driver seems to be preferred over dri-swrast.
         - '-Ddri-drivers='
         - '-Dgallium-drivers=swrast'
@@ -2896,15 +2798,12 @@ packages:
     tools_required:
       - host-pkg-config
       - host-gcc
-      - host-wayland-scanner
       - virtual: pkgconfig-for-host
         program_name: host-pkg-config
       - virtual: pkgconfig-for-target
         triple: "x86_64-vinix"
     pkgs_required:
       - mlibc
-      - wayland
-      - wayland-protocols
       - libxml
     configure:
       - args:
