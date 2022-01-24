@@ -1,10 +1,9 @@
-From e5763cd621153bc1f2664a4d2824e3f63fb75bdf Mon Sep 17 00:00:00 2001
+From 3044a0e65af0104bce934ffcbb2740ead1cd9496 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 6 Sep 2021 22:45:24 +0200
+Date: Mon, 24 Jan 2022 05:15:46 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- config.sub                  |  4 ++--
  fixincludes/mkfixinc.sh     |  1 +
  gcc/config.gcc              | 12 ++++++++++++
  gcc/config/vinix.h          | 29 +++++++++++++++++++++++++++++
@@ -12,31 +11,9 @@ Subject: [PATCH] Vinix specific changes
  libgcc/libgcov.h            |  2 ++
  libstdc++-v3/crossconfig.m4 | 12 ++++++++++++
  libtool.m4                  | 14 ++++++++++++++
- 8 files changed, 81 insertions(+), 2 deletions(-)
+ 7 files changed, 79 insertions(+)
  create mode 100644 gcc/config/vinix.h
 
-diff --git a/config.sub b/config.sub
-index 63c1f1c8b..4a4311cfb 100755
---- a/config.sub
-+++ b/config.sub
-@@ -134,7 +134,7 @@ case $1 in
- 			nto-qnx* | linux-* | uclinux-uclibc* \
- 			| uclinux-gnu* | kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* \
- 			| netbsd*-eabi* | kopensolaris*-gnu* | cloudabi*-eabi* \
--			| storm-chaos* | os2-emx* | rtmk-nova*)
-+			| storm-chaos* | os2-emx* | rtmk-nova* | vinix*)
- 				basic_machine=$field1
- 				basic_os=$maybe_os
- 				;;
-@@ -1700,7 +1700,7 @@ case $os in
- 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
- 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
- 	     | hiux* | abug | nacl* | netware* | windows* \
--	     | os9* | macos* | osx* | ios* \
-+	     | os9* | macos* | osx* | ios* | vinix* \
- 	     | mpw* | magic* | mmixware* | mon960* | lnews* \
- 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
- 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
 diff --git a/fixincludes/mkfixinc.sh b/fixincludes/mkfixinc.sh
 index df90720b7..da6408af2 100755
 --- a/fixincludes/mkfixinc.sh
@@ -210,5 +187,5 @@ index 17f8e5f30..f6daabc68 100644
    if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
      lt_cv_deplibs_check_method='match_pattern /lib[[^/]]+(\.so\.[[0-9]]+\.[[0-9]]+|_pic\.a)$'
 -- 
-2.33.0
+2.34.1
 
