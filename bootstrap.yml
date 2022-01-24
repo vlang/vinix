@@ -2805,7 +2805,9 @@ packages:
         triple: "x86_64-vinix"
     pkgs_required:
       - mlibc
+      - libxcb
       - libxml
+      - xkeyboard-config
     configure:
       - args:
         - 'meson'
@@ -2826,6 +2828,329 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       - args: ['mkdir', '-p', "@THIS_COLLECT_DIR@/usr/share/X11/xkb"]
+
+  - name: libice
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libice.git'
+      tag: 'libICE-1.0.10'
+      version: '1.0.10'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+        - host-xtrans
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxtrans
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libsm
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libsm.git'
+      tag: 'libSM-1.2.3'
+      version: '1.2.3'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+        - host-xtrans
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxtrans
+      - libice
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libxt
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libxt.git'
+      tag: 'libXt-1.2.1'
+      version: '1.2.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxtrans
+      - libsm
+      - libice
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+        - '--disable-malloc0returnsnull'
+        - '--with-appdefaultdir=/etc/X11/app-defaults'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libxpm
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libxpm.git'
+      tag: 'libXpm-3.5.13'
+      version: '3.5.13'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxext
+      - libxt
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libxmu
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libxmu.git'
+      tag: 'libXmu-1.1.3'
+      version: '1.1.3'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+        - host-xtrans
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxext
+      - libxtrans
+      - libxt
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libxaw
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libxaw.git'
+      tag: 'libXaw-1.0.14'
+      version: '1.0.14'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxext
+      - libxt
+      - libxmu
+      - libxpm
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: xkbutils
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/app/xkbutils.git'
+      tag: 'xkbutils-1.0.4'
+      version: '1.0.4'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['autoreconf', '-vfi']
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-libtool
+      - host-pkg-config
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxt
+      - libxaw
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: xkeyboard-config
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config.git'
+      tag: 'xkeyboard-config-2.33'
+      version: '2.33'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-libtool
+      - host-pkg-config
+      - host-xorg-macros
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - libx11
+      - xorg-proto
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--with-xkb-rules-symlink=xorg'
+        - '--disable-nls'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: pixman
     source:
