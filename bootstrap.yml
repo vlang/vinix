@@ -219,7 +219,7 @@ sources:
 
   - name: cmake
     subdir: '3rdparty'
-    git: 'https://gitlab.kitware.com/cmake/cmake.git'
+    git: 'https://github.com/Kitware/CMake.git'
     tag: 'v3.20.5'
     version: '3.20.5'
 
