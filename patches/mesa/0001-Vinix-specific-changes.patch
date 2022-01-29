@@ -1,6 +1,6 @@
-From e0ccd5b1df51f70f370a04ec25a1be0961a2bb63 Mon Sep 17 00:00:00 2001
+From 63be823384ee36462467b7415c6872a59267723f Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 10 Sep 2021 10:26:02 +0200
+Date: Sat, 29 Jan 2022 16:00:01 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -224,5 +224,5 @@ index a4c73cc..0f2edd9 100644
     clockid_t cid;
  
 -- 
-2.33.0
+2.35.0
 
