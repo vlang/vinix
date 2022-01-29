@@ -1,6 +1,6 @@
-From e4f91b4ae8669a40842056a1f78a15769b7d06e6 Mon Sep 17 00:00:00 2001
+From e2128fe38318f1adcf3e76765430455b58619c77 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 10 Sep 2021 09:09:46 +0200
+Date: Sat, 29 Jan 2022 08:42:53 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -17,18 +17,18 @@ Subject: [PATCH] Vinix specific changes
  llvm/lib/Support/Triple.cpp                   |   2 +
  llvm/lib/Support/Unix/Path.inc                |   6 +-
  llvm/lib/Support/Unix/Program.inc             |   1 +
- llvm/tools/llvm-dwarfdump/Statistics.cpp      |   1 +
- llvm/tools/llvm-shlib/CMakeLists.txt          |   5 +-
+ llvm/tools/llvm-dwarfdump/Statistics.cpp      |   2 +
+ llvm/tools/llvm-shlib/CMakeLists.txt          |   1 +
  llvm/utils/benchmark/src/benchmark_register.h |   1 +
- 16 files changed, 529 insertions(+), 10 deletions(-)
+ 16 files changed, 528 insertions(+), 8 deletions(-)
  create mode 100644 clang/lib/Driver/ToolChains/Vinix.cpp
  create mode 100644 clang/lib/Driver/ToolChains/Vinix.h
 
 diff --git a/clang/lib/Basic/Targets.cpp b/clang/lib/Basic/Targets.cpp
-index c063f8ca4..1ae185672 100644
+index ba91d0439..930fa30fd 100644
 --- a/clang/lib/Basic/Targets.cpp
 +++ b/clang/lib/Basic/Targets.cpp
-@@ -553,6 +553,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+@@ -586,6 +586,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
      }
      case llvm::Triple::Haiku:
        return new HaikuTargetInfo<X86_64TargetInfo>(Triple, Opts);
@@ -38,10 +38,10 @@ index c063f8ca4..1ae185672 100644
        return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
      case llvm::Triple::PS4:
 diff --git a/clang/lib/Basic/Targets/OSTargets.h b/clang/lib/Basic/Targets/OSTargets.h
-index 70fac030b..63b5a0072 100644
+index 3fe39ed64..903f58ad9 100644
 --- a/clang/lib/Basic/Targets/OSTargets.h
 +++ b/clang/lib/Basic/Targets/OSTargets.h
-@@ -296,7 +296,7 @@ protected:
+@@ -291,7 +291,7 @@ protected:
      Builder.defineMacro("__HAIKU__");
      Builder.defineMacro("__ELF__");
      DefineStd(Builder, "unix", Opts);
@@ -50,7 +50,7 @@ index 70fac030b..63b5a0072 100644
        Builder.defineMacro("__FLOAT128__");
    }
  
-@@ -342,6 +342,34 @@ public:
+@@ -337,6 +337,34 @@ public:
        : OSTargetInfo<Target>(Triple, Opts) {}
  };
  
@@ -86,10 +86,10 @@ index 70fac030b..63b5a0072 100644
  template <typename Target>
  class LLVM_LIBRARY_VISIBILITY MinixTargetInfo : public OSTargetInfo<Target> {
 diff --git a/clang/lib/Driver/CMakeLists.txt b/clang/lib/Driver/CMakeLists.txt
-index 6f25d3588..c5c7ea119 100644
+index 08be9f011..8154a01d1 100644
 --- a/clang/lib/Driver/CMakeLists.txt
 +++ b/clang/lib/Driver/CMakeLists.txt
-@@ -54,6 +54,7 @@ add_clang_library(clangDriver
+@@ -56,6 +56,7 @@ add_clang_library(clangDriver
    ToolChains/Hexagon.cpp
    ToolChains/Hurd.cpp
    ToolChains/Linux.cpp
@@ -98,7 +98,7 @@ index 6f25d3588..c5c7ea119 100644
    ToolChains/MinGW.cpp
    ToolChains/Minix.cpp
 diff --git a/clang/lib/Driver/Driver.cpp b/clang/lib/Driver/Driver.cpp
-index fb8335a36..600fe54f0 100644
+index 94a7553e2..2fa008e76 100644
 --- a/clang/lib/Driver/Driver.cpp
 +++ b/clang/lib/Driver/Driver.cpp
 @@ -29,6 +29,7 @@
@@ -109,7 +109,7 @@ index fb8335a36..600fe54f0 100644
  #include "ToolChains/MSP430.h"
  #include "ToolChains/MSVC.h"
  #include "ToolChains/MinGW.h"
-@@ -4853,6 +4854,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
+@@ -5299,6 +5300,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
      case llvm::Triple::Fuchsia:
        TC = std::make_unique<toolchains::Fuchsia>(*this, Target, Args);
        break;
@@ -120,19 +120,19 @@ index fb8335a36..600fe54f0 100644
        TC = std::make_unique<toolchains::Solaris>(*this, Target, Args);
        break;
 diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
-index da197e476..666215aa3 100644
+index da39f29e4..ce6fa6aa9 100644
 --- a/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ b/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -2025,7 +2025,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
+@@ -2105,7 +2105,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
        "x86_64-redhat-linux",    "x86_64-suse-linux",
        "x86_64-manbo-linux-gnu", "x86_64-linux-gnu",
        "x86_64-slackware-linux", "x86_64-unknown-linux",
 -      "x86_64-amazon-linux",    "x86_64-linux-android"};
 +      "x86_64-amazon-linux",    "x86_64-linux-android",
 +      "x86_64-vinix"};
-   static const char *const X32LibDirs[] = {"/libx32"};
-   static const char *const X86LibDirs[] = {"/lib32", "/lib"};
-   static const char *const X86Triples[] = {
+   static const char *const X32Triples[] = {"x86_64-linux-gnux32",
+                                            "x86_64-pc-linux-gnux32"};
+   static const char *const X32LibDirs[] = {"/libx32", "/lib"};
 diff --git a/clang/lib/Driver/ToolChains/Vinix.cpp b/clang/lib/Driver/ToolChains/Vinix.cpp
 new file mode 100644
 index 000000000..30e48105e
@@ -622,7 +622,7 @@ index 000000000..2428e411a
 +
 +#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
 diff --git a/llvm/cmake/modules/CrossCompile.cmake b/llvm/cmake/modules/CrossCompile.cmake
-index 8a6e880c4..fb86a7c17 100644
+index 01cd37124..5d55ac110 100644
 --- a/llvm/cmake/modules/CrossCompile.cmake
 +++ b/llvm/cmake/modules/CrossCompile.cmake
 @@ -17,8 +17,8 @@ function(llvm_create_cross_target project_name target_name toolchain buildtype)
@@ -637,10 +637,10 @@ index 8a6e880c4..fb86a7c17 100644
    endif()
    set(CROSS_TOOLCHAIN_FLAGS_${target_name} ${CROSS_TOOLCHAIN_FLAGS_INIT}
 diff --git a/llvm/include/llvm/ADT/Triple.h b/llvm/include/llvm/ADT/Triple.h
-index 76a754d67..a95f91f36 100644
+index 76f351405..b40c5b997 100644
 --- a/llvm/include/llvm/ADT/Triple.h
 +++ b/llvm/include/llvm/ADT/Triple.h
-@@ -168,6 +168,7 @@ public:
+@@ -175,6 +175,7 @@ public:
      Linux,
      Lv2,        // PS3
      MacOSX,
@@ -649,23 +649,23 @@ index 76a754d67..a95f91f36 100644
      OpenBSD,
      Solaris,
 diff --git a/llvm/include/llvm/Support/SwapByteOrder.h b/llvm/include/llvm/Support/SwapByteOrder.h
-index 6cec87006..1b83c586f 100644
+index e8612ba66..5195e720f 100644
 --- a/llvm/include/llvm/Support/SwapByteOrder.h
 +++ b/llvm/include/llvm/Support/SwapByteOrder.h
 @@ -22,7 +22,7 @@
- #include <stdlib.h>
  #endif
  
--#if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__)
-+#if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) || defined(__vinix__)
+ #if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) ||            \
+-    defined(__Fuchsia__) || defined(__EMSCRIPTEN__)
++    defined(__Fuchsia__) || defined(__EMSCRIPTEN__) || defined(__vinix__)
  #include <endian.h>
  #elif defined(_AIX)
  #include <sys/machine.h>
 diff --git a/llvm/lib/Support/Triple.cpp b/llvm/lib/Support/Triple.cpp
-index 2c480c109..d51a47aad 100644
+index 883115463..d0820c733 100644
 --- a/llvm/lib/Support/Triple.cpp
 +++ b/llvm/lib/Support/Triple.cpp
-@@ -201,6 +201,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+@@ -209,6 +209,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
    case Linux: return "linux";
    case Lv2: return "lv2";
    case MacOSX: return "macosx";
@@ -673,7 +673,7 @@ index 2c480c109..d51a47aad 100644
    case Mesa3D: return "mesa3d";
    case Minix: return "minix";
    case NVCL: return "nvcl";
-@@ -495,6 +496,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+@@ -513,6 +514,7 @@ static Triple::OSType parseOS(StringRef OSName) {
      .StartsWith("linux", Triple::Linux)
      .StartsWith("lv2", Triple::Lv2)
      .StartsWith("macos", Triple::MacOSX)
@@ -682,10 +682,10 @@ index 2c480c109..d51a47aad 100644
      .StartsWith("openbsd", Triple::OpenBSD)
      .StartsWith("solaris", Triple::Solaris)
 diff --git a/llvm/lib/Support/Unix/Path.inc b/llvm/lib/Support/Unix/Path.inc
-index 2a03dc682..9f41a4f70 100644
+index c37b3a546..daaedc16f 100644
 --- a/llvm/lib/Support/Unix/Path.inc
 +++ b/llvm/lib/Support/Unix/Path.inc
-@@ -64,7 +64,7 @@ extern char **environ;
+@@ -71,7 +71,7 @@ extern char **environ;
  
  #include <sys/types.h>
  #if !defined(__APPLE__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) &&   \
@@ -694,7 +694,7 @@ index 2a03dc682..9f41a4f70 100644
  #include <sys/statvfs.h>
  #define STATVFS statvfs
  #define FSTATVFS fstatvfs
-@@ -73,7 +73,7 @@ extern char **environ;
+@@ -80,7 +80,7 @@ extern char **environ;
  #if defined(__OpenBSD__) || defined(__FreeBSD__)
  #include <sys/mount.h>
  #include <sys/param.h>
@@ -703,7 +703,7 @@ index 2a03dc682..9f41a4f70 100644
  #if defined(HAVE_LINUX_MAGIC_H)
  #include <linux/magic.h>
  #else
-@@ -431,7 +431,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
+@@ -458,7 +458,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
  }
  
  static bool is_local_impl(struct STATVFS &Vfs) {
@@ -713,10 +713,10 @@ index 2a03dc682..9f41a4f70 100644
  #define NFS_SUPER_MAGIC 0x6969
  #endif
 diff --git a/llvm/lib/Support/Unix/Program.inc b/llvm/lib/Support/Unix/Program.inc
-index 520685a0e..e6c2ddf20 100644
+index be59bb023..d2da16b65 100644
 --- a/llvm/lib/Support/Unix/Program.inc
 +++ b/llvm/lib/Support/Unix/Program.inc
-@@ -39,6 +39,7 @@
+@@ -41,6 +41,7 @@
  #if HAVE_UNISTD_H
  #include <unistd.h>
  #endif
@@ -725,16 +725,20 @@ index 520685a0e..e6c2ddf20 100644
  #include <spawn.h>
  
 diff --git a/llvm/tools/llvm-dwarfdump/Statistics.cpp b/llvm/tools/llvm-dwarfdump/Statistics.cpp
-index 5bef4d514..2a237ef59 100644
+index 19a971afa..929184bfc 100644
 --- a/llvm/tools/llvm-dwarfdump/Statistics.cpp
 +++ b/llvm/tools/llvm-dwarfdump/Statistics.cpp
-@@ -1,3 +1,4 @@
+@@ -6,6 +6,8 @@
+ //
+ //===----------------------------------------------------------------------===//
+ 
 +#include <cmath>
++
+ #include "llvm-dwarfdump.h"
  #include "llvm/ADT/DenseMap.h"
- #include "llvm/ADT/StringExtras.h"
  #include "llvm/ADT/StringSet.h"
 diff --git a/llvm/tools/llvm-shlib/CMakeLists.txt b/llvm/tools/llvm-shlib/CMakeLists.txt
-index 3eb6db33a..07c15d046 100644
+index 76b9a25cb..c956ed4ce 100644
 --- a/llvm/tools/llvm-shlib/CMakeLists.txt
 +++ b/llvm/tools/llvm-shlib/CMakeLists.txt
 @@ -36,6 +36,7 @@ if(LLVM_BUILD_LLVM_DYLIB)
@@ -745,31 +749,18 @@ index 3eb6db33a..07c15d046 100644
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Fuchsia")
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "DragonFly")
-@@ -97,10 +98,10 @@ if(LLVM_BUILD_LLVM_C_DYLIB AND NOT MSVC)
-   add_custom_target(libLLVMCExports DEPENDS ${LLVM_EXPORTED_SYMBOL_FILE})
- 
-   add_llvm_library(LLVM-C SHARED ${SOURCES} INSTALL_WITH_TOOLCHAIN)
--  
-+
-   target_link_libraries(LLVM-C PUBLIC LLVM)
-   add_dependencies(LLVM-C libLLVMCExports)
--  
-+
-   set_property(TARGET LLVM-C APPEND_STRING PROPERTY
-               LINK_FLAGS
-               " -compatibility_version 1 -current_version ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH} -Wl,-reexport_library ${LIB_PATH}")
 diff --git a/llvm/utils/benchmark/src/benchmark_register.h b/llvm/utils/benchmark/src/benchmark_register.h
-index 0705e219f..6001fb8e0 100644
+index 4caa5ad4d..11258aa98 100644
 --- a/llvm/utils/benchmark/src/benchmark_register.h
 +++ b/llvm/utils/benchmark/src/benchmark_register.h
-@@ -2,6 +2,7 @@
- #define BENCHMARK_REGISTER_H
+@@ -3,6 +3,7 @@
  
+ #include <limits>
  #include <vector>
 +#include <limits>
  
  #include "check.h"
  
 -- 
-2.33.0
+2.35.0
 
