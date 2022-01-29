@@ -175,8 +175,8 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.80.1'
-    version: '2.80.1'
+    tag: 'v2.80.2'
+    version: '2.80.2'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
@@ -398,7 +398,7 @@ tools:
     compile:
       - args: ['make', '-j@PARALLELISM@']
     install:
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
 
   - name: host-binutils
     from_source: binutils
