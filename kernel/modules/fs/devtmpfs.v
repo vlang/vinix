@@ -234,7 +234,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 }
 
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
-	mut new_node := create_node(&(filesystems['devtmpfs']), devtmpfs_root, name, false)
+	mut new_node := create_node(filesystems['devtmpfs'], devtmpfs_root, name, false)
 
 	new_node.resource = unsafe { device }
 	new_node.resource.stat.dev = devtmpfs_dev_id

@@ -230,7 +230,7 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 
 	running_on := thread.running_on
 
-	if running_on == -1 {
+	if running_on == u64(-1) {
 		return
 	}
 

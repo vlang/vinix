@@ -22,6 +22,7 @@ override INTERNALCFLAGS :=        \
 	-fno-pic                      \
 	-ffunction-sections           \
 	-fdata-sections               \
+	-fno-strict-aliasing          \
 	-mno-80387                    \
 	-mno-mmx                      \
 	-mno-3dnow                    \
