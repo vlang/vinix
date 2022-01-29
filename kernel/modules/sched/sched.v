@@ -90,8 +90,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		unsafe {
 			current_thread.gpr_state = *gpr_state
 		}
-		current_thread.kernel_gs_base = cpu.get_kernel_gs_base()
-		current_thread.gs_base = cpu.get_gs_base()
+		current_thread.gs_base = cpu.get_kernel_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
 		current_thread.cr3 = cpu.read_cr3()
 		fpu_save(current_thread.fpu_storage)
@@ -118,8 +117,12 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	current_thread = scheduler_running_queue[new_index]
 	cpu_local.last_run_queue_index = new_index
 
-	cpu.set_kernel_gs_base(current_thread.kernel_gs_base)
-	cpu.set_gs_base(current_thread.gs_base)
+	cpu.set_gs_base(voidptr(current_thread))
+	if current_thread.gpr_state.cs == 0x43 {
+		cpu.set_kernel_gs_base(current_thread.gs_base)
+	} else {
+		cpu.set_kernel_gs_base(voidptr(current_thread))
+	}
 	cpu.set_fs_base(current_thread.fs_base)
 
 	cpu_local.tss.ist3 = current_thread.pf_stack
@@ -138,9 +141,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	new_gpr_state := &current_thread.gpr_state
 
 	if new_gpr_state.cs == user_code_seg {
-		asm volatile amd64 { swapgs }
 		C.userland__dispatch_a_signal(new_gpr_state)
-		asm volatile amd64 { swapgs }
 	}
 
 	asm volatile amd64 {
@@ -165,6 +166,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		pop r14
 		pop r15
 		add rsp, 8
+		swapgs
 		iretq
 		; ; rm (new_gpr_state)
 		; memory
@@ -334,7 +336,6 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 
 	thread.self = voidptr(thread)
 	thread.gs_base = u64(voidptr(thread))
-	thread.kernel_gs_base = u64(voidptr(thread))
 
 	if autoenqueue == true {
 		enqueue_thread(thread, false)
@@ -393,7 +394,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	thread.self = voidptr(thread)
 	thread.gs_base = u64(0)
-	thread.kernel_gs_base = u64(voidptr(thread))
+	thread.fs_base = u64(0)
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
 	fpu_restore(thread.fpu_storage)

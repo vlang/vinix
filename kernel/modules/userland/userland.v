@@ -524,7 +524,6 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	}
 
 	new_thread.self = voidptr(new_thread)
-	new_thread.kernel_gs_base = u64(voidptr(new_thread))
 
 	unsafe { C.memcpy(new_thread.fpu_storage, old_thread.fpu_storage, fpu_storage_size) }
 

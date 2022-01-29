@@ -49,7 +49,6 @@ pub mut:
 	l                  klock.Lock
 	process            &Process
 	gpr_state          cpulocal.GPRState
-	kernel_gs_base     u64
 	gs_base            u64
 	fs_base            u64
 	pf_stack           u64

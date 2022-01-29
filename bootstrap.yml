@@ -175,8 +175,8 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.80'
-    version: '2.80'
+    tag: 'v2.80.1'
+    version: '2.80.1'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
@@ -2128,6 +2128,7 @@ packages:
       - host-gcc
     pkgs_required:
       - mlibc
+      - tzdata
     configure:
       # Huge hack: coreutils does not compile the build-machine binary make-prime-list
       # using the build-machine compiler. Hence, build and invoke the binary manually here.

@@ -146,7 +146,7 @@ pub fn pthread_exit(ret voidptr) {
 	sched.dequeue_thread(current_thread)
 
 	cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
-	cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
+	cpu.set_kernel_gs_base(voidptr(current_thread))
 
 	current_thread.exit_value = ret
 	trigger(mut current_thread.exited, false)
