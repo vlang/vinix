@@ -1,6 +1,6 @@
-From cba3a5aa3ec0d3aee05627d8ff22ee03535a7335 Mon Sep 17 00:00:00 2001
+From 2fbe1276d78aea4d0855728c8c3f3c27f27edddc Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 23 Jan 2022 03:38:17 +0100
+Date: Sat, 29 Jan 2022 05:30:11 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -20,6 +20,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/regex/regexec.c         | 1026 ++++++
  options/posix/generic/regex/tre-mem.c         |  158 +
  options/posix/generic/regex/tre.h             |  233 ++
+ options/posix/generic/resolv_conf.cpp         |    2 +-
  options/posix/generic/unistd-stubs.cpp        |    4 +-
  options/posix/include/pthread.h               |    3 +
  options/posix/include/regex.h                 |    4 +-
@@ -54,7 +55,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |    1 +
  sysdeps/vinix/include/abi-bits/wait.h         |    1 +
  sysdeps/vinix/meson.build                     |   52 +
- 50 files changed, 5417 insertions(+), 55 deletions(-)
+ 51 files changed, 5418 insertions(+), 56 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -4862,6 +4863,19 @@ index 0000000..5b4e802
 +#define xfree free
 +#define xrealloc realloc
 +
+diff --git a/options/posix/generic/resolv_conf.cpp b/options/posix/generic/resolv_conf.cpp
+index bd3fe73..9ffefb5 100644
+--- a/options/posix/generic/resolv_conf.cpp
++++ b/options/posix/generic/resolv_conf.cpp
+@@ -34,7 +34,7 @@ frg::optional<struct nameserver_data> get_nameserver() {
+ 	}
+ 
+ 	fclose(file);
+-	if(ret.name == "")
++	if(ret.name.size() == 0)
+ 		return frg::null_opt;
+ 	return ret;
+ }
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
 index 4917a15..c134e42 100644
 --- a/options/posix/generic/unistd-stubs.cpp
@@ -6091,5 +6105,5 @@ index 0000000..b9e4372
 +endif
 +
 -- 
-2.34.1
+2.35.0
 
