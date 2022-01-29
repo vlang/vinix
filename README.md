@@ -51,7 +51,7 @@ The tested distributions are: Ubuntu, Debian, and Arch Linux.
 ### Building Vinix on macOS, *BSD, or other non-Linux OSes
 
 This build system does not support OSes other than Linux, due to how various packages
-interact with the host distro when their build process. Pull requests making the build
+interact with the host distro during their build process. Pull requests making the build
 capable of successfully working on non-Linux OSes are welcome, alternatively,
 run the build in an x86_64 Linux VM or real hardware.
 
