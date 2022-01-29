@@ -39,13 +39,31 @@ virtual machines.
 
 ## Build instructions
 
-### OS-agnostic build prerequisites
+It is *highly* recommended to just download an ISO from:
+https://builds.vinix-os.org/repos/files/vinix/latest/vinix.iso
 
-The following is an OS-agnostic list of packages needed to build Vinix.
+These instructions are for building Vinix, which may take a long time and
+require some debugging on Linux distros that weren't properly tested
+for build.
 
-Keep in mind that the following packages should be relatively up to date, so older distros may not work despite the following packages being installed.
+The tested distributions are: Ubuntu, Debian, and Arch Linux.
 
-Skip to a paragraph for your host OS if there is any.
+### Building Vinix on macOS, *BSD, or other non-Linux OSes
+
+This build system does not support OSes other than Linux, due to how various packages
+interact with the host distro when their build process. Pull requests making the build
+capable of successfully working on non-Linux OSes are welcome, alternatively,
+run the build in an x86_64 Linux VM or real hardware.
+
+### Distro-agnostic build prerequisites
+
+The following is a distro-agnostic list of packages needed to build Vinix.
+
+Keep in mind that the following packages should be relatively up to date, so
+older distros may not work despite the following packages having been
+installed.
+
+Skip to a paragraph for your host distro if there is any.
 
 `GNU bash`, `GNU coreutils`, `GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU binutils`, `GCC`, `G++`, `git`, `subversion`, `mercurial`, `curl`, `wget`, `xz-utils`, `mtools`, `meson`, `ninja`, `perl`, `m4`, `texinfo`, `groff`, `gettext`, `autopoint`, `expat`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `python3`, `python3-pip`, `python3-mako`, `python3-xcbgen`, `xorriso`, and `qemu` to test it.
 
@@ -58,11 +76,6 @@ sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subvers
 ```bash
 sudo pacman -S --needed bash coreutils make patch tar gzip binutils gcc git subversion mercurial curl wget xz mtools meson perl m4 texinfo groff gettext expat bison flex help2man openssl gperf rsync libxslt python python-pip python-mako xcb-proto xorriso qemu-arch-extra
 ```
-
-### Building Vinix on macOS
-
-This build system does not officially support macOS. Run this in an x86_64 Linux VM
-or real hardware.
 
 ### Installing xbstrap
 
