@@ -1833,6 +1833,7 @@ packages:
       - host-pkg-config
     pkgs_required:
       - mlibc
+      - xorg-server
       - xorg-util-macros
       - libx11
       - libxrandr
@@ -1877,6 +1878,7 @@ packages:
       - host-pkg-config
     pkgs_required:
       - mlibc
+      - xorg-server
       - xorg-util-macros
       - libx11
     configure:
