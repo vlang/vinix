@@ -1652,6 +1652,50 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: libxv
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/lib/libxv.git'
+      tag: 'libXv-1.0.11'
+      version: '1.0.11'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - xorg-proto
+      - libx11
+      - libxext
+      - libxfixes
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+        - '--disable-malloc0returnsnull'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: libxi
     source:
       subdir: '3rdparty'
@@ -1766,6 +1810,90 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: xf86-video-fbdev
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/driver/xf86-video-fbdev.git'
+      tag: 'xf86-video-fbdev-0.5.0'
+      version: '0.5.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - libx11
+      - libxrandr
+      - libxrender
+      - libxv
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--disable-pciaccess'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: xf86-input-keyboard
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/driver/xf86-input-keyboard.git'
+      tag: 'xf86-input-keyboard-1.9.0'
+      version: '1.9.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
+    pkgs_required:
+      - mlibc
+      - xorg-util-macros
+      - libx11
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: xkbcomp
     source:
       subdir: '3rdparty'
@@ -1811,15 +1939,23 @@ packages:
       git: 'https://gitlab.freedesktop.org/xorg/xserver.git'
       tag: 'xorg-server-1.20.12'
       version: '1.20.12'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+        - host-xorg-font-util
+        - host-xtrans
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
       - host-autoconf-v2.69
       - host-automake-v1.16
       - host-pkg-config
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
-      - virtual: pkgconfig-for-host
-        program_name: host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -1833,6 +1969,7 @@ packages:
       - libxfont2
       - libepoxy
       - libxi
+      - libxv
       - libxdamage
       - libxrender
       - libxrandr
@@ -1844,83 +1981,45 @@ packages:
       - pixman
     configure:
       - args:
-        - 'meson'
-        - '--native-file'
-        - '@SOURCE_ROOT@/native_file.txt'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
         - '--prefix=/usr'
-        - '-Dxorg=true'
-        - '-Dxephyr=false'
-        - '-Dxwayland=false'
-        - '-Dxnest=false'
-        - '-Ddmx=false'
-        - '-Dxvfb=false'
-        - '-Dxkb_output_dir=/var/lib/xkb'
-        - '-Dos_vendor="The Vinix Project"'
-        - '-Dvendor_name="The Vinix Project"'
-        - '-Dvendor_name_short="Vinix"'
-        - '-Dsuid_wrapper=false'
-        - '-Dpciaccess=false'
-        - '-Ddpms=false'
-        - '-Dscreensaver=false'
-        - '-Dxres=false'
-        - '-Dxinerama=false'
-        - '-Dxv=false'
-        - '-Dxvmc=false'
-        - '-Dsystemd_logind=false'
-        - '-Dsecure-rpc=false'
-        - '-Dudev=false'
-        - '-Ddri1=false'
-        - '-Ddri2=false'
-        - '-Ddri3=false'
-        - '-Dvbe=false'
-        - '-Dint10=false'
-        - '-Dvgahw=false'
-        - '@THIS_SOURCE_DIR@'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-static'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--enable-xorg'
+        - '--disable-xephyr'
+        - '--disable-xwayland'
+        - '--disable-xnest'
+        - '--disable-dmx'
+        - '--enable-xvfb'
+        - '--with-xkb-output=/var/lib/xkb'
+        - '--disable-suid-wrapper'
+        - '--disable-pciaccess'
+        - '--disable-dpms'
+        - '--disable-screensaver'
+        - '--disable-xres'
+        - '--disable-xinerama'
+        - '--enable-xv'
+        - '--enable-xvfb'
+        - '--disable-xvmc'
+        - '--disable-systemd-logind'
+        - '--disable-secure-rpc'
+        - '--disable-config-udev'
+        - '--disable-dri1'
+        - '--disable-dri2'
+        - '--disable-dri3'
+        - '--disable-vbe'
+        - '--disable-int10-module'
+        - '--disable-vgahw'
     build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc/X11']
       - args: ['cp', '@SOURCE_ROOT@/extra-files/xorg/xorg.conf', '@THIS_COLLECT_DIR@/etc/X11/']
-
-  - name: xf86-video-dummy
-    source:
-      subdir: '3rdparty'
-      git: 'https://github.com/Xpra-org/xf86-video-dummy.git'
-      tag: 'xf86-video-dummy-0.3.8'
-      version: '0.3.8'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.16
-        - host-libtool
-        - host-pkg-config
-        - host-xorg-macros
-      regenerate:
-        - args: ['./autogen.sh']
-          environ:
-            NOCONFIGURE: 'yes'
-    tools_required:
-      - host-gcc
-      - host-pkg-config
-      - host-xorg-macros
-    pkgs_required:
-      - mlibc
-      - xorg-util-macros
-      - xorg-server
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=x86_64-vinix'
-        - '--prefix=/usr'
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
-    build:
-      - args: ['make', 'SYSROOT=@SYSROOT_DIR@', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: libffi
     source:

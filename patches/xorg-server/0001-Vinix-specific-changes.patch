@@ -1,24 +1,40 @@
-From 50cf792507d64b1cbf63e4d158cf8cc2756d491b Mon Sep 17 00:00:00 2001
+From e733e0286da8e9e6e95bc3cbf7be285cf4e50337 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 14 Jan 2022 12:07:09 +0100
+Date: Sun, 30 Jan 2022 12:44:41 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- hw/xfree86/common/xf86Config.c           | 2 ++
- hw/xfree86/common/xf86Configure.c        | 2 ++
- hw/xfree86/common/xf86Events.c           | 2 ++
- hw/xfree86/common/xf86Helper.c           | 2 ++
- hw/xfree86/common/xf86Init.c             | 2 ++
- hw/xfree86/os-support/shared/posix_tty.c | 3 +++
- hw/xfree86/os-support/shared/sigio.c     | 3 +++
- include/meson.build                      | 2 +-
- include/os.h                             | 1 +
- meson.build                              | 2 +-
- mi/mibitblt.c                            | 2 ++
- os/access.c                              | 2 +-
- os/utils.c                               | 2 +-
- 13 files changed, 23 insertions(+), 4 deletions(-)
+ configure.ac                             |  2 ++
+ hw/xfree86/common/xf86Config.c           |  2 ++
+ hw/xfree86/common/xf86Configure.c        |  2 ++
+ hw/xfree86/common/xf86Events.c           |  2 ++
+ hw/xfree86/common/xf86Helper.c           |  2 ++
+ hw/xfree86/common/xf86Init.c             |  2 ++
+ hw/xfree86/fbdevhw/fbdevhw.c             | 24 ++++++++++--------------
+ hw/xfree86/fbdevhw/fbdevhw.h             |  4 ++--
+ hw/xfree86/os-support/shared/posix_tty.c |  3 +++
+ hw/xfree86/os-support/shared/sigio.c     |  3 +++
+ include/meson.build                      |  2 +-
+ include/os.h                             |  1 +
+ meson.build                              |  2 +-
+ mi/mibitblt.c                            |  2 ++
+ os/access.c                              |  2 +-
+ os/utils.c                               |  2 +-
+ 16 files changed, 37 insertions(+), 20 deletions(-)
 
+diff --git a/configure.ac b/configure.ac
+index ae44437..79b67a9 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1966,6 +1966,8 @@ if test "x$XORG" = xyes; then
+ 	if test "x$DRM" = xyes; then
+ 		XORG_DRIVER_MODESETTING=yes
+ 	fi
++	
++	XORG_DRIVER_MODESETTING=no
+ 
+ 	AC_SUBST([XORG_LIBS])
+ 	AC_SUBST([XORG_SYS_LIBS])
 diff --git a/hw/xfree86/common/xf86Config.c b/hw/xfree86/common/xf86Config.c
 index 09d27ec..83be062 100644
 --- a/hw/xfree86/common/xf86Config.c
@@ -84,6 +100,113 @@ index 2ec6b2f..c1d9c24 100644
  #undef HAS_UTSNAME
  #if !defined(WIN32)
  #define HAS_UTSNAME 1
+diff --git a/hw/xfree86/fbdevhw/fbdevhw.c b/hw/xfree86/fbdevhw/fbdevhw.c
+index 9508951..fff3b52 100644
+--- a/hw/xfree86/fbdevhw/fbdevhw.c
++++ b/hw/xfree86/fbdevhw/fbdevhw.c
+@@ -10,12 +10,12 @@
+ #include "xf86_OSproc.h"
+ 
+ /* pci stuff */
+-#include "xf86Pci.h"
++//#include "xf86Pci.h"
+ 
+ #include "xf86cmap.h"
+ 
+ #include "fbdevhw.h"
+-#include "fbpriv.h"
++#include <linux/fb.h>
+ #include "globals.h"
+ #include <X11/extensions/dpmsconst.h>
+ 
+@@ -259,6 +259,7 @@ fbdev2xfree_timing(struct fb_var_screeninfo *var, DisplayModePtr mode)
+ /**
+  * Try to find the framebuffer device for a given PCI device
+  */
++/*
+ static int
+ fbdev_open_pci(struct pci_device *pPci, char **namep)
+ {
+@@ -303,6 +304,7 @@ fbdev_open_pci(struct pci_device *pPci, char **namep)
+     xf86DrvMsg(-1, X_ERROR, "Unable to find a valid framebuffer device\n");
+     return -1;
+ }
++*/
+ 
+ static int
+ fbdev_open(int scrnIndex, const char *dev, char **namep)
+@@ -363,14 +365,11 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+ /* -------------------------------------------------------------------- */
+ 
+ Bool
+-fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
++fbdevHWProbe(void *pPci, char *device, char **namep)
+ {
+     int fd;
+ 
+-    if (pPci)
+-        fd = fbdev_open_pci(pPci, namep);
+-    else
+-        fd = fbdev_open(-1, device, namep);
++    fd = fbdev_open(-1, device, namep);
+ 
+     if (-1 == fd)
+         return FALSE;
+@@ -379,7 +378,7 @@ fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
+ }
+ 
+ Bool
+-fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
++fbdevHWInit(ScrnInfoPtr pScrn, void *pPci, char *device)
+ {
+     fbdevHWPtr fPtr;
+ 
+@@ -387,10 +386,7 @@ fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
+     fPtr = FBDEVHWPTR(pScrn);
+ 
+     /* open device */
+-    if (pPci)
+-        fPtr->fd = fbdev_open_pci(pPci, NULL);
+-    else
+-        fPtr->fd = fbdev_open(pScrn->scrnIndex, device, NULL);
++    fPtr->fd = fbdev_open(pScrn->scrnIndex, device, NULL);
+     if (-1 == fPtr->fd) {
+         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                    "Failed to open framebuffer device, consult warnings"
+@@ -881,7 +877,7 @@ RETRY:
+                        "FBIOBLANK: %s\n", strerror(errno));
+ 	    break;
+         case EINTR:
+-        case ERESTART:
++        // case ERESTART:
+             goto RETRY;
+         default:
+             fPtr->unsupported_ioctls |= (1 << FBIOBLANK_UNSUPPORTED);
+@@ -915,7 +911,7 @@ RETRY:
+                        "FBIOBLANK: %s\n", strerror(errno));
+             break;
+         case EINTR:
+-        case ERESTART:
++        // case ERESTART:
+             goto RETRY;
+         default:
+             fPtr->unsupported_ioctls |= (1 << FBIOBLANK_UNSUPPORTED);
+diff --git a/hw/xfree86/fbdevhw/fbdevhw.h b/hw/xfree86/fbdevhw/fbdevhw.h
+index 4984ccf..bb3e2f8 100644
+--- a/hw/xfree86/fbdevhw/fbdevhw.h
++++ b/hw/xfree86/fbdevhw/fbdevhw.h
+@@ -16,9 +16,9 @@ extern _X_EXPORT void fbdevHWFreeRec(ScrnInfoPtr pScrn);
+ 
+ extern _X_EXPORT int fbdevHWGetFD(ScrnInfoPtr pScrn);
+ 
+-extern _X_EXPORT Bool fbdevHWProbe(struct pci_device *pPci, char *device,
++extern _X_EXPORT Bool fbdevHWProbe(void *pPci, char *device,
+                                    char **namep);
+-extern _X_EXPORT Bool fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci,
++extern _X_EXPORT Bool fbdevHWInit(ScrnInfoPtr pScrn, void *pPci,
+                                   char *device);
+ 
+ extern _X_EXPORT char *fbdevHWGetName(ScrnInfoPtr pScrn);
 diff --git a/hw/xfree86/os-support/shared/posix_tty.c b/hw/xfree86/os-support/shared/posix_tty.c
 index 0cb9788..e8cac5d 100644
 --- a/hw/xfree86/os-support/shared/posix_tty.c
@@ -190,5 +313,5 @@ index 2ba1c80..0156b20 100644
  
  int
 -- 
-2.34.1
+2.35.0
 
