@@ -10,3 +10,4 @@ pub const fbioget_fscreeninfo = 0x4602
 pub const fbiogetcmap = 0x4604
 pub const fbioputcmap = 0x4605
 pub const fbiopan_display = 0x4606
+pub const fbioblank = 0x4611

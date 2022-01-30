@@ -8,6 +8,16 @@ module api
 // See the following file for details:
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/fb.h
 
+pub struct FBCMap {
+pub mut:
+	start u32
+	len u32
+	red &u16
+	green &u16
+	blue &u16
+	transp &u16
+}
+
 pub struct FBBitfield {
 pub mut:
 	offset u32

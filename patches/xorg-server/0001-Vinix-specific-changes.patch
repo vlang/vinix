@@ -1,16 +1,17 @@
-From e733e0286da8e9e6e95bc3cbf7be285cf4e50337 Mon Sep 17 00:00:00 2001
+From 62462f994b3794ad13161db2712a9e8b23b75e41 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 30 Jan 2022 12:44:41 +0100
+Date: Sun, 30 Jan 2022 14:50:25 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  configure.ac                             |  2 ++
+ hw/xfree86/common/xf86Bus.c              |  2 ++
  hw/xfree86/common/xf86Config.c           |  2 ++
  hw/xfree86/common/xf86Configure.c        |  2 ++
  hw/xfree86/common/xf86Events.c           |  2 ++
  hw/xfree86/common/xf86Helper.c           |  2 ++
  hw/xfree86/common/xf86Init.c             |  2 ++
- hw/xfree86/fbdevhw/fbdevhw.c             | 24 ++++++++++--------------
+ hw/xfree86/fbdevhw/fbdevhw.c             | 26 +++++++++++-------------
  hw/xfree86/fbdevhw/fbdevhw.h             |  4 ++--
  hw/xfree86/os-support/shared/posix_tty.c |  3 +++
  hw/xfree86/os-support/shared/sigio.c     |  3 +++
@@ -20,7 +21,7 @@ Subject: [PATCH] Vinix specific changes
  mi/mibitblt.c                            |  2 ++
  os/access.c                              |  2 +-
  os/utils.c                               |  2 +-
- 16 files changed, 37 insertions(+), 20 deletions(-)
+ 17 files changed, 41 insertions(+), 20 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
 index ae44437..79b67a9 100644
@@ -35,6 +36,26 @@ index ae44437..79b67a9 100644
  
  	AC_SUBST([XORG_LIBS])
  	AC_SUBST([XORG_SYS_LIBS])
+diff --git a/hw/xfree86/common/xf86Bus.c b/hw/xfree86/common/xf86Bus.c
+index a8f1073..1b1120a 100644
+--- a/hw/xfree86/common/xf86Bus.c
++++ b/hw/xfree86/common/xf86Bus.c
+@@ -536,6 +536,7 @@ xf86GetDevFromEntity(int entityIndex, int instance)
+ void
+ xf86PostProbe(void)
+ {
++/*
+     if (fbSlotClaimed && (
+ #if (defined(__sparc__) || defined(__sparc)) && !defined(__OpenBSD__)
+                              sbusSlotClaimed ||
+@@ -551,6 +552,7 @@ xf86PostProbe(void)
+         ))
+         FatalError("Cannot run in framebuffer mode. Please specify busIDs "
+                    "       for all framebuffer devices\n");
++*/
+ }
+ 
+ int
 diff --git a/hw/xfree86/common/xf86Config.c b/hw/xfree86/common/xf86Config.c
 index 09d27ec..83be062 100644
 --- a/hw/xfree86/common/xf86Config.c
@@ -101,7 +122,7 @@ index 2ec6b2f..c1d9c24 100644
  #if !defined(WIN32)
  #define HAS_UTSNAME 1
 diff --git a/hw/xfree86/fbdevhw/fbdevhw.c b/hw/xfree86/fbdevhw/fbdevhw.c
-index 9508951..fff3b52 100644
+index 9508951..bce130c 100644
 --- a/hw/xfree86/fbdevhw/fbdevhw.c
 +++ b/hw/xfree86/fbdevhw/fbdevhw.c
 @@ -10,12 +10,12 @@
@@ -135,7 +156,23 @@ index 9508951..fff3b52 100644
  
  static int
  fbdev_open(int scrnIndex, const char *dev, char **namep)
-@@ -363,14 +365,11 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+@@ -330,6 +332,7 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+     }
+ 
+     /* only touch non-PCI devices on this path */
++/*
+     {
+         char buf[PATH_MAX];
+         char *sysfs_path = NULL;
+@@ -344,6 +347,7 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+         }
+         free(sysfs_path);
+     }
++*/
+ 
+     if (namep) {
+         if (-1 == ioctl(fd, FBIOGET_FSCREENINFO, (void *) (&fix))) {
+@@ -363,14 +367,11 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
  /* -------------------------------------------------------------------- */
  
  Bool
@@ -152,7 +189,7 @@ index 9508951..fff3b52 100644
  
      if (-1 == fd)
          return FALSE;
-@@ -379,7 +378,7 @@ fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
+@@ -379,7 +380,7 @@ fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
  }
  
  Bool
@@ -161,7 +198,7 @@ index 9508951..fff3b52 100644
  {
      fbdevHWPtr fPtr;
  
-@@ -387,10 +386,7 @@ fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
+@@ -387,10 +388,7 @@ fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
      fPtr = FBDEVHWPTR(pScrn);
  
      /* open device */
@@ -173,7 +210,7 @@ index 9508951..fff3b52 100644
      if (-1 == fPtr->fd) {
          xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
                     "Failed to open framebuffer device, consult warnings"
-@@ -881,7 +877,7 @@ RETRY:
+@@ -881,7 +879,7 @@ RETRY:
                         "FBIOBLANK: %s\n", strerror(errno));
  	    break;
          case EINTR:
@@ -182,7 +219,7 @@ index 9508951..fff3b52 100644
              goto RETRY;
          default:
              fPtr->unsupported_ioctls |= (1 << FBIOBLANK_UNSUPPORTED);
-@@ -915,7 +911,7 @@ RETRY:
+@@ -915,7 +913,7 @@ RETRY:
                         "FBIOBLANK: %s\n", strerror(errno));
              break;
          case EINTR:

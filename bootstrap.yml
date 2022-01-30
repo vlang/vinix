@@ -1849,6 +1849,8 @@ packages:
         - '--disable-static'
         - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
         - '--disable-pciaccess'
+        environ:
+          SYSROOT: '@SYSROOT_DIR@'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']

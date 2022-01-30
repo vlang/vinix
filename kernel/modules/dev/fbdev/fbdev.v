@@ -12,6 +12,7 @@ import klock
 import event.eventstruct
 import dev.fbdev.api
 import katomic
+import errno
 
 pub struct FramebufferNode {
 pub mut:
@@ -86,11 +87,27 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 			unsafe { C.memcpy(argp, &this.info.variable, sizeof(api.FBVarScreenInfo)) }
 			return 0
 		}
+		ioctl.fbioput_vscreeninfo {
+			unsafe { C.memcpy(&this.info.variable, argp,  sizeof(api.FBVarScreenInfo)) }
+			return 0
+		}
 		ioctl.fbioget_fscreeninfo {
 			unsafe { C.memcpy(argp, &this.info.fixed, sizeof(api.FBFixScreenInfo)) }
 			return 0
 		}
+		ioctl.fbioblank {
+			return 0
+		}
+		ioctl.fbiopan_display {
+			errno.set(errno.einval)
+			return none
+		}
+		ioctl.fbioputcmap {
+			errno.set(errno.einval)
+			return none
+		}
 		else {
+			panic('$request')
 			return resource.default_ioctl(handle, request, argp)
 		}
 	}
