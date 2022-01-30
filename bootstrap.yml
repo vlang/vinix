@@ -280,7 +280,6 @@ tools:
       url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz'
       format: 'tar.gz'
       extract_path: 'autoconf-2.69'
-      patch-path-strip: 3
       version: '2.69'
     configure:
       - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
@@ -485,8 +484,6 @@ tools:
       regenerate:
         - args: ['rm', '-rf', 'gnulib']
         - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
-        # libtool's ./bootstrap does a shallow clone with insufficient depth.
-        - args: ['git', 'submodule', 'update', '--init']
         - args: ['./bootstrap']
     tools_required:
       - host-autoconf-v2.69
@@ -2638,8 +2635,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/openssl/openssl.git'
-      tag: 'OpenSSL_1_1_1l'
-      version: '1.1.1l'
+      tag: 'OpenSSL_1_1_1m'
+      version: '1.1.1m'
     tools_required:
       - host-gcc
     pkgs_required:
@@ -2667,7 +2664,7 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       # Move the doc dir to a versioned directory
-      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1l']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1m']
 
   - name: wget
     source:
