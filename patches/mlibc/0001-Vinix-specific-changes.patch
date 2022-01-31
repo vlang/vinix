@@ -1,6 +1,6 @@
-From 7e1d4775004a5a20c880fd6d3aa2e0fc459369b4 Mon Sep 17 00:00:00 2001
+From ecc8c027223936b4d67b788a06732f97af5247a4 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 31 Jan 2022 08:43:00 +0100
+Date: Mon, 31 Jan 2022 13:16:19 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -43,7 +43,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  761 +++++
+ sysdeps/vinix/generic/generic.cpp             |  767 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -73,7 +73,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5915 insertions(+), 187 deletions(-)
+ 69 files changed, 5921 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5853,10 +5853,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..037f84d
+index 0000000..f3aeb2c
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,761 @@
+@@ -0,0 +1,767 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -6428,6 +6428,12 @@ index 0000000..037f84d
 +
 +int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
 +    __syscall_ret ret = __syscall(40, fd, addr_ptr, addr_length);
++
++    return ret.errno;
++}
++
++int sys_connect(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
++    __syscall_ret ret = __syscall(59, fd, addr_ptr, addr_length);
 +
 +    return ret.errno;
 +}

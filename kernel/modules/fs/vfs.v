@@ -362,12 +362,6 @@ pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 		return none
 	}
 
-	if stat.issock(mode) {
-		target_node = create_node(parent_of_tgt_node.filesystem, parent_of_tgt_node, name,
-			false)
-		return target_node
-	}
-
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 
 	unsafe {

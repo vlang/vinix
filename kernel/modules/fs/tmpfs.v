@@ -171,6 +171,7 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	if stat.isreg(mode) {
 		new_resource.capacity = 4096
 		new_resource.storage = memory.malloc(new_resource.capacity)
+		new_resource.can_mmap = true
 	}
 
 	new_resource.stat.size = 0
@@ -184,8 +185,6 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
 	new_resource.stat.atim = realtime_clock
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
-
-	new_resource.can_mmap = true
 
 	new_node.resource = new_resource
 

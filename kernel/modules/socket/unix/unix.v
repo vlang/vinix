@@ -63,6 +63,49 @@ fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
+fn (mut this UnixSocket) enqueue(mut sock UnixSocket) ? {
+	if this.listening == false {
+		errno.set(errno.econnrefused)
+		return error('')
+	}
+	
+	this.backlog << sock
+}
+
+fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
+	addr := &SockaddrUn(_addr)
+
+	if addr.sun_family != sock_pub.af_unix {
+		errno.set(errno.einval)
+		return error('')
+	}
+
+	mut thread := proc.current_thread()
+
+	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
+	
+	C.printf(c'Wants to connect to %s\n', path.str)
+	
+	mut target := fs.get_node(thread.process.current_directory, path, true) or {
+		return error('')
+	}
+
+	target_res := target.resource
+
+	mut socket := &UnixSocket(voidptr(0))
+
+	if target_res is UnixSocket {
+		socket = target_res
+	} else {
+		errno.set(errno.einval)
+		return error('')
+	}
+	
+	socket.enqueue(mut this) or {
+		return error('')
+	}
+}
+
 fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 	addr := &SockaddrUn(_addr)
 
@@ -79,6 +122,7 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 		return error('')
 	}
 
+	this.stat = node.resource.stat
 	node.resource = unsafe { this }
 
 	this.name = *addr
