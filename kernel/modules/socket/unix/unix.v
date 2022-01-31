@@ -11,6 +11,8 @@ import errno
 import proc
 import fs
 import socket.public as sock_pub
+import event
+import file
 
 struct SockaddrUn {
 	sun_family u32
@@ -29,6 +31,9 @@ mut:
 	name      SockaddrUn
 	listening bool
 	backlog   []&UnixSocket
+
+	connected bool
+	peer      &UnixSocket
 }
 
 fn (mut this UnixSocket) mmap(page u64, flags int) voidptr {
@@ -63,13 +68,34 @@ fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
+fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u64) ? {
+	if this.connected == false {
+		errno.set(errno.enotconn)
+		return error('')
+	}
+
+	mut actual_size := unsafe { *addrlen }
+	if actual_size < sizeof(SockaddrUn) {
+		actual_size = sizeof(SockaddrUn)
+	}
+
+	unsafe { C.memcpy(_addr, voidptr(&this.peer.name), actual_size) }
+	unsafe { *addrlen = actual_size }
+}
+
 fn (mut this UnixSocket) enqueue(mut sock UnixSocket) ? {
 	if this.listening == false {
 		errno.set(errno.econnrefused)
 		return error('')
 	}
-	
+
 	this.backlog << sock
+
+	sock.connected = true
+	unsafe { sock.peer = this }
+
+	this.status |= file.pollin
+	event.trigger(mut this.event, false)
 }
 
 fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
@@ -83,9 +109,9 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 	mut thread := proc.current_thread()
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
-	
+
 	C.printf(c'Wants to connect to %s\n', path.str)
-	
+
 	mut target := fs.get_node(thread.process.current_directory, path, true) or {
 		return error('')
 	}
@@ -100,7 +126,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 		errno.set(errno.einval)
 		return error('')
 	}
-	
+
 	socket.enqueue(mut this) or {
 		return error('')
 	}
@@ -136,15 +162,18 @@ fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
 pub fn create(@type int) ?&UnixSocket {
 	return &UnixSocket{
 		refcount: 1
+		peer: voidptr(0)
 	}
 }
 
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount: 1
+		peer: voidptr(0)
 	}
 	mut b := &UnixSocket{
 		refcount: 1
+		peer: voidptr(0)
 	}
 	return a, b
 }

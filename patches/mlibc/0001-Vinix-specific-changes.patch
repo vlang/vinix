@@ -1,6 +1,6 @@
-From ecc8c027223936b4d67b788a06732f97af5247a4 Mon Sep 17 00:00:00 2001
+From d27e4e79251a6f4de2f0308c99a77def948954d0 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 31 Jan 2022 13:16:19 +0100
+Date: Mon, 31 Jan 2022 15:25:10 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -43,7 +43,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  767 +++++
+ sysdeps/vinix/generic/generic.cpp             |  785 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -73,7 +73,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5921 insertions(+), 187 deletions(-)
+ 69 files changed, 5939 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5853,10 +5853,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..f3aeb2c
+index 0000000..dc37489
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,767 @@
+@@ -0,0 +1,785 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -5957,6 +5957,13 @@ index 0000000..f3aeb2c
 +
 +    *num_events = (int)ret.ret;
 +    return 0;
++}
++
++int sys_poll(struct pollfd *fds, nfds_t count, int timeout, int *num_events) {
++    struct timespec ts;
++    ts.tv_sec = timeout / 1000;
++    ts.tv_nsec = (timeout % 1000) * 1000000;
++    return sys_ppoll(fds, count, &ts, NULL, num_events);
 +}
 +
 +int sys_epoll_pwait(int epfd, struct epoll_event *ev, int n,
@@ -6436,6 +6443,17 @@ index 0000000..f3aeb2c
 +    __syscall_ret ret = __syscall(59, fd, addr_ptr, addr_length);
 +
 +    return ret.errno;
++}
++
++int sys_peername(int fd, struct sockaddr *addr_ptr, socklen_t max_addr_length, socklen_t *actual_length) {
++    __syscall_ret ret = __syscall(60, fd, addr_ptr, &max_addr_length);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *actual_length = max_addr_length;
++    return 0;
 +}
 +
 +int sys_listen(int fd, int backlog) {

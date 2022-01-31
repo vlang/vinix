@@ -16,6 +16,7 @@ pub interface Socket {
 mut:
 	bind(handle voidptr, _addr voidptr, addrlen u64) ?
 	connect(handle voidptr, _addr voidptr, addrlen u64) ?
+	peername(handle voidptr, _addr voidptr, addrlen &u64) ?
 	listen(handle voidptr, backlog int) ?
 }
 
@@ -171,6 +172,32 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u
 	}
 
 	socket.connect(fd.handle, _addr, addrlen) or { return -1, errno.get() }
+
+	return 0, 0
+}
+
+pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: getpeername(%d, 0x%llx, 0x%llx)\n', fdnum, _addr, addrlen)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	res := fd.handle.resource
+
+	mut socket := &Socket(voidptr(0))
+
+	if res is sock_unix.UnixSocket {
+		socket = res
+	} else {
+		return -1, errno.einval
+	}
+
+	socket.peername(fd.handle, _addr, addrlen) or { return -1, errno.get() }
 
 	return 0, 0
 }
