@@ -1,17 +1,23 @@
-From a3131561aa0b3161cdc1cc8849f9f5ebe2706971 Mon Sep 17 00:00:00 2001
+From 7e1d4775004a5a20c880fd6d3aa2e0fc459369b4 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 29 Jan 2022 15:29:16 +0100
+Date: Mon, 31 Jan 2022 08:43:00 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
+ abis/dripos/errno.h                           |    1 +
  abis/mlibc/signal.h                           |    6 +-
  meson.build                                   |    4 +
+ options/ansi/generic/stdio-stubs.cpp          |    8 +-
  options/ansi/generic/stdlib-stubs.cpp         |    2 +-
+ options/ansi/include/inttypes.h               |    1 +
  options/ansi/include/limits.h                 |    3 +
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |    2 +
  .../include/mlibc/internal-sysdeps.hpp        |    4 +
+ options/internal/include/mlibc/tcb.hpp        |    3 +
+ options/internal/include/mlibc/thread.hpp     |    2 +
+ options/internal/x86_64/thread.cpp            |    6 +
  options/linux-headers/include/asm/ioctls.h    |    2 +
- options/posix/generic/pthread-stubs.cpp       |   10 +
+ options/posix/generic/pthread-stubs.cpp       |  220 +-
  options/posix/generic/regex.cpp               |   23 -
  .../fnmatch.cpp => generic/regex/fnmatch.c}   |   13 +-
  .../glob.cpp => generic/regex/glob.c}         |   35 +-
@@ -21,13 +27,23 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/regex/tre-mem.c         |  158 +
  options/posix/generic/regex/tre.h             |  233 ++
  options/posix/generic/unistd-stubs.cpp        |    4 +-
- options/posix/include/pthread.h               |    3 +
+ options/posix/include/mlibc/posix-sysdeps.hpp |    3 +-
+ options/posix/include/pthread.h               |   41 +-
  options/posix/include/regex.h                 |    4 +-
  options/posix/meson.build                     |   11 +-
  options/rtdl/generic/linker.cpp               |    4 +-
+ sysdeps/dripos/generic/generic.cpp            |    5 +-
+ sysdeps/dripos/generic/thread.cpp             |   26 +-
+ sysdeps/lemon/generic/lemon.cpp               |    5 +-
+ sysdeps/lemon/generic/thread.cpp              |   26 +-
+ sysdeps/linux/generic/sysdeps.cpp             |    4 +-
+ sysdeps/linux/x86_64/thread.cpp               |   46 +-
+ sysdeps/managarm/aarch64/thread.cpp           |   26 +-
+ sysdeps/managarm/generic/fork-exec.cpp        |    7 +-
+ sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  756 +++++
+ sysdeps/vinix/generic/generic.cpp             |  761 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -54,7 +70,10 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/vinix/include/abi-bits/vm-flags.h     |    1 +
  sysdeps/vinix/include/abi-bits/wait.h         |    1 +
  sysdeps/vinix/meson.build                     |   52 +
- 50 files changed, 5417 insertions(+), 55 deletions(-)
+ tests/ansi/sscanf.c                           |    7 +
+ tests/meson.build                             |    1 +
+ tests/posix/pthread_attr.c                    |  174 +
+ 69 files changed, 5915 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -92,7 +111,19 @@ Subject: [PATCH] Vinix specific changes
  create mode 120000 sysdeps/vinix/include/abi-bits/vm-flags.h
  create mode 120000 sysdeps/vinix/include/abi-bits/wait.h
  create mode 100644 sysdeps/vinix/meson.build
+ create mode 100644 tests/posix/pthread_attr.c
 
+diff --git a/abis/dripos/errno.h b/abis/dripos/errno.h
+index 700c1d2..44f56f3 100644
+--- a/abis/dripos/errno.h
++++ b/abis/dripos/errno.h
+@@ -109,5 +109,6 @@
+ #define	EFTYPE		79		/* Inappropriate file type or format */
+ #define EOVERFLOW   80
+ #define EILSEQ      81
++#define ENOTSUP		82
+ 
+ #endif
 diff --git a/abis/mlibc/signal.h b/abis/mlibc/signal.h
 index 5c63bca..eaf115b 100644
 --- a/abis/mlibc/signal.h
@@ -127,6 +158,36 @@ index 4027c99..3675409 100644
  elif host_machine.system() == 'sigma'
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
+diff --git a/options/ansi/generic/stdio-stubs.cpp b/options/ansi/generic/stdio-stubs.cpp
+index eb80feb..9c65f8b 100644
+--- a/options/ansi/generic/stdio-stubs.cpp
++++ b/options/ansi/generic/stdio-stubs.cpp
+@@ -497,10 +497,10 @@ static int do_scanf(H &handler, const char *fmt, __gnuc_va_list args) {
+                                 res = res * 16 + (c - '0');
+                             } else if (c >= 'a' && c <= 'f') {
+                                 handler.consume();
+-                                res = res * 16 + (c - 'a');
++                                res = res * 16 + (c - 'a' + 10);
+                             } else if (c >= 'A' && c <= 'F') {
+                                 handler.consume();
+-                                res = res * 16 + (c - 'A');
++                                res = res * 16 + (c - 'A' + 10);
+                             } else {
+                                 break;
+                             }
+@@ -549,10 +549,10 @@ static int do_scanf(H &handler, const char *fmt, __gnuc_va_list args) {
+                         res = res * 16 + (c - '0');
+                     } else if (c >= 'a' && c <= 'f') {
+                         handler.consume();
+-                        res = res * 16 + (c - 'a');
++                        res = res * 16 + (c - 'a' + 10);
+                     } else if (c >= 'A' && c <= 'F') {
+                         handler.consume();
+-                        res = res * 16 + (c - 'A');
++                        res = res * 16 + (c - 'A' + 10);
+                     } else {
+                         break;
+                     }
 diff --git a/options/ansi/generic/stdlib-stubs.cpp b/options/ansi/generic/stdlib-stubs.cpp
 index 347c659..e150d33 100644
 --- a/options/ansi/generic/stdlib-stubs.cpp
@@ -140,6 +201,18 @@ index 347c659..e150d33 100644
  	__ensure(max_size);
  
  	if(wc && mbs){
+diff --git a/options/ansi/include/inttypes.h b/options/ansi/include/inttypes.h
+index be9b874..968a849 100644
+--- a/options/ansi/include/inttypes.h
++++ b/options/ansi/include/inttypes.h
+@@ -95,6 +95,7 @@
+ #define SCNx32 "x"
+ #define SCNx64 "lx"
+ #define SCNxMAX "lx"
++#define SCNxPTR "lx"
+ 
+ #define SCNd64 "ld"
+ 
 diff --git a/options/ansi/include/limits.h b/options/ansi/include/limits.h
 index 300c436..a2883b0 100644
 --- a/options/ansi/include/limits.h
@@ -196,6 +269,50 @@ index d5f5a00..e56e30c 100644
  } //namespace mlibc
  
  #endif // MLIBC_INTERNAL_SYSDEPS
+diff --git a/options/internal/include/mlibc/tcb.hpp b/options/internal/include/mlibc/tcb.hpp
+index f8a3fe8..962a1c9 100644
+--- a/options/internal/include/mlibc/tcb.hpp
++++ b/options/internal/include/mlibc/tcb.hpp
+@@ -107,5 +107,8 @@ struct Tcb {
+ 	CleanupHandler *cleanupBegin;
+ 	CleanupHandler *cleanupEnd;
+ 	int isJoinable;
++	size_t stackSize;
++	void *stackAddr;
++	size_t guardSize;
+ };
+ 
+diff --git a/options/internal/include/mlibc/thread.hpp b/options/internal/include/mlibc/thread.hpp
+index 0781966..0909e18 100644
+--- a/options/internal/include/mlibc/thread.hpp
++++ b/options/internal/include/mlibc/thread.hpp
+@@ -1,9 +1,11 @@
+ #pragma once
+ 
+ #include <mlibc/tcb.hpp>
++#include <stdint.h>
+ 
+ namespace mlibc {
+ 
+ Tcb *get_current_tcb();
++uintptr_t get_sp();
+ 
+ } // namespace mlibc
+diff --git a/options/internal/x86_64/thread.cpp b/options/internal/x86_64/thread.cpp
+index ae0b023..6b320cd 100644
+--- a/options/internal/x86_64/thread.cpp
++++ b/options/internal/x86_64/thread.cpp
+@@ -10,4 +10,10 @@ Tcb *get_current_tcb() {
+ 	return reinterpret_cast<Tcb *>(ptr);
+ }
+ 
++uintptr_t get_sp() {
++	uintptr_t rsp;
++	asm ("mov %%rsp, %0" : "=r"(rsp));
++	return rsp;
++}
++
+ } // namespace mlibc
 diff --git a/options/linux-headers/include/asm/ioctls.h b/options/linux-headers/include/asm/ioctls.h
 index 41d4248..f246d1d 100644
 --- a/options/linux-headers/include/asm/ioctls.h
@@ -210,26 +327,300 @@ index 41d4248..f246d1d 100644
  #define TIOCSTI 0x5412
  #define TIOCGWINSZ 0x5413
 diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
-index 90ba98c..b16b81b 100644
+index 90ba98c..8a79be7 100644
 --- a/options/posix/generic/pthread-stubs.cpp
 +++ b/options/posix/generic/pthread-stubs.cpp
-@@ -67,6 +67,16 @@ static constexpr unsigned int rc_waiters_bit = static_cast<uint32_t>(1) << 31;
+@@ -1,10 +1,12 @@
+ 
+ #include <stddef.h>
+ #include <stdint.h>
++#include <stdio.h>
+ #include <string.h>
+ #include <pthread.h>
+ #include <unistd.h>
+ #include <errno.h>
++#include <inttypes.h>
+ 
+ #include <bits/ensure.h>
+ #include <frg/allocation.hpp>
+@@ -63,12 +65,19 @@ static constexpr unsigned int mutex_excl_bit = static_cast<uint32_t>(1) << 30;
+ static constexpr unsigned int rc_count_mask = (static_cast<uint32_t>(1) << 31) - 1;
+ static constexpr unsigned int rc_waiters_bit = static_cast<uint32_t>(1) << 31;
+ 
++static constexpr size_t default_stacksize = 0x200000;
++static constexpr size_t default_guardsize = 4096;
++
+ // ----------------------------------------------------------------------------
  // pthread_attr and pthread functions.
  // ----------------------------------------------------------------------------
  
-+int pthread_rwlockattr_init(pthread_rwlockattr_t *) {
-+	mlibc::infoLogger() << "mlibc: pthread_rwlockattr_init() is a stub\n" << frg::endlog;
-+	return 0;
-+}
-+
-+int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *, int) {
-+	mlibc::infoLogger() << "mlibc: pthread_rwlockattr_setpshared() is a stub\n" << frg::endlog;
-+	return 0;
-+}
-+
  // pthread_attr functions.
- int pthread_attr_init(pthread_attr_t *) {
+-int pthread_attr_init(pthread_attr_t *) {
++int pthread_attr_init(pthread_attr_t *attr) {
++	*attr = pthread_attr_t{};
++	attr->__mlibc_stacksize = default_stacksize;
++	attr->__mlibc_guardsize = default_guardsize;
++	attr->__mlibc_detachstate = PTHREAD_CREATE_JOINABLE;
  	return 0;
+ }
+ 
+@@ -76,84 +85,190 @@ int pthread_attr_destroy(pthread_attr_t *) {
+ 	return 0;
+ }
+ 
+-int pthread_attr_getdetachstate(const pthread_attr_t *, int *) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate) {
++	*detachstate = attr->__mlibc_detachstate;
++	return 0;
+ }
++int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate) {
++	if (detachstate != PTHREAD_CREATE_DETACHED &&
++			detachstate != PTHREAD_CREATE_JOINABLE)
++		return EINVAL;
+ 
+-int pthread_attr_setdetachstate(pthread_attr_t *, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++	attr->__mlibc_detachstate = detachstate;
++	return 0;
+ }
+ 
+-int pthread_attr_getstacksize(const pthread_attr_t *__restrict, size_t *__restrict) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getstacksize(const pthread_attr_t *__restrict attr, size_t *__restrict stacksize) {
++	*stacksize = attr->__mlibc_stacksize;
++	return 0;
+ }
+ 
+-int pthread_attr_setstacksize(pthread_attr_t *, size_t) {
+-	mlibc::infoLogger() << "mlibc: pthread_attr_setstacksize() is not implemented correctly" << frg::endlog;
++int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize) {
++	if (stacksize < PTHREAD_STACK_MIN)
++		return EINVAL;
++	attr->__mlibc_stacksize = stacksize;
+ 	return 0;
+ }
+ 
+-int pthread_attr_getguardsize(const pthread_attr_t *__restrict, size_t *__restrict) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr) {
++	*stackaddr = attr->__mlibc_stackaddr;
++	return 0;
+ }
+-
+-int pthread_attr_setguardsize(pthread_attr_t *, size_t) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr) {
++	attr->__mlibc_stackaddr = stackaddr;
++	return 0;
+ }
+ 
+-int pthread_attr_getscope(const pthread_attr_t *, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stacksize) {
++	*stackaddr = attr->__mlibc_stackaddr;
++	*stacksize = attr->__mlibc_stacksize;
++	return 0;
++}
++int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize) {
++	if (stacksize < PTHREAD_STACK_MIN)
++		return EINVAL;
++	attr->__mlibc_stacksize = stacksize;
++	attr->__mlibc_stackaddr = stackaddr;
++	return 0;
+ }
+ 
+-int pthread_attr_setscope(pthread_attr_t *, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getguardsize(const pthread_attr_t *__restrict attr, size_t *__restrict guardsize) {
++	*guardsize = attr->__mlibc_guardsize;
++	return 0;
++}
++int pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize) {
++	attr->__mlibc_guardsize = guardsize;
++	return 0;
+ }
+ 
+-int pthread_attr_getschedpolicy(const pthread_attr_t *__restrict, int *__restrict) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getscope(const pthread_attr_t *attr, int *scope) {
++	*scope = attr->__mlibc_scope;
++	return 0;
++}
++int pthread_attr_setscope(pthread_attr_t *attr, int scope) {
++	if (scope != PTHREAD_SCOPE_SYSTEM &&
++			scope != PTHREAD_SCOPE_PROCESS)
++		return EINVAL;
++	if (scope == PTHREAD_SCOPE_PROCESS)
++		return ENOTSUP;
++	attr->__mlibc_scope = scope;
++	return 0;
+ }
+ 
+-int pthread_attr_setschedpolicy(pthread_attr_t *, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inheritsched) {
++	*inheritsched = attr->__mlibc_inheritsched;
++	return 0;
++}
++int pthread_attr_setinheritsched(pthread_attr_t *attr, int inheritsched) {
++	if (inheritsched != PTHREAD_INHERIT_SCHED &&
++			inheritsched != PTHREAD_EXPLICIT_SCHED)
++		return EINVAL;
++	attr->__mlibc_inheritsched = inheritsched;
++	return 0;
+ }
+ 
+-int pthread_attr_getschedparam(const pthread_attr_t *__restrict, struct sched_param *__restrict) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getschedparam(const pthread_attr_t *__restrict attr, struct sched_param *__restrict schedparam) {
++	*schedparam = attr->__mlibc_schedparam;
++	return 0;
++}
++int pthread_attr_setschedparam(pthread_attr_t *__restrict attr, const struct sched_param *__restrict schedparam) {
++	// TODO: this is supposed to return EINVAL for when the schedparam doesn't make sense
++	// for the given schedpolicy.
++	attr->__mlibc_schedparam = *schedparam;
++	return 0;
+ }
+ 
+-int pthread_attr_setschedparam(pthread_attr_t *__restrict, const struct sched_param *__restrict) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_attr_getschedpolicy(const pthread_attr_t *__restrict attr, int *__restrict policy) {
++	*policy = attr->__mlibc_schedpolicy;
++	return 0;
++}
++int pthread_attr_setschedpolicy(pthread_attr_t *__restrict attr, int policy) {
++	if (policy != SCHED_FIFO && policy != SCHED_RR &&
++			policy != SCHED_OTHER)
++		return EINVAL;
++	attr->__mlibc_schedpolicy = policy;
++	return 0;
+ }
+ 
+-int pthread_attr_getinheritsched(const pthread_attr_t *__restrict, int *__restrict) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++namespace {
++	void get_own_stackinfo(void **stack_addr, size_t *stack_size) {
++		auto fp = fopen("/proc/self/maps", "r");
++		if (!fp) {
++			mlibc::infoLogger() << "mlibc pthreads: /proc/self/maps does not exist! Producing incorrect"
++				" stack results!" << frg::endlog;
++			return;
++		}
++
++		char line[256];
++		auto sp = mlibc::get_sp();
++		while (fgets(line, 128, fp)) {
++			uintptr_t from, to;
++			if(sscanf(line, "%lx-%lx", &from, &to) != 2)
++				continue;
++			if (sp < to && sp > from) {
++				// We need to return the lowest byte of the stack.
++				*stack_addr = reinterpret_cast<void*>(from);
++				*stack_size = to - from;
++				fclose(fp);
++				return;
++			}
++		}
++
++		fclose(fp);
++	}
+ }
+ 
+-int pthread_attr_setinheritsched(pthread_attr_t *, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int pthread_getattr_np(pthread_t thread, pthread_attr_t *attr) {
++	auto tcb = reinterpret_cast<Tcb*>(thread);
++	*attr = pthread_attr_t{};
++
++	if (!tcb->stackAddr || !tcb->stackSize) {
++		get_own_stackinfo(&attr->__mlibc_stackaddr, &attr->__mlibc_stacksize);
++	} else {
++		attr->__mlibc_stacksize = tcb->stackSize;
++		attr->__mlibc_stackaddr = tcb->stackAddr;
++	}
++
++	attr->__mlibc_guardsize = tcb->guardSize;
++	attr->__mlibc_detachstate = tcb->isJoinable ? PTHREAD_CREATE_JOINABLE : PTHREAD_CREATE_DETACHED;
++	mlibc::infoLogger() << "pthread_getattr_np(): Implementation is incomplete!" << frg::endlog;
++	return 0;
+ }
+ 
+ extern "C" Tcb *__rtdl_allocateTcb();
+ 
+ // pthread functions.
+-int pthread_create(pthread_t *__restrict thread, const pthread_attr_t *__restrict,
++int pthread_create(pthread_t *__restrict thread, const pthread_attr_t *__restrict attrp,
+ 		void *(*entry) (void *), void *__restrict user_arg) {
+ 	auto new_tcb = __rtdl_allocateTcb();
+ 	pid_t tid;
+-	mlibc::sys_clone(reinterpret_cast<void *>(entry), user_arg, new_tcb, &tid);
++	pthread_attr_t attr = {};
++	if (!attrp)
++		pthread_attr_init(&attr);
++	else
++		attr = *attrp;
++
++	// TODO: due to alignment guarantees, the stackaddr and stacksize might change
++	// when the stack is allocated. Currently this isn't propagated to the TCB,
++	// but it should be.
++	void *stack = attr.__mlibc_stackaddr;
++	if (!mlibc::sys_prepare_stack) {
++		MLIBC_MISSING_SYSDEP();
++		return ENOSYS;
++	}
++	int ret = mlibc::sys_prepare_stack(&stack, reinterpret_cast<void*>(entry),
++			user_arg, new_tcb, &attr.__mlibc_stacksize, &attr.__mlibc_guardsize);
++	if (ret)
++		return ret;
++
++	if (!mlibc::sys_clone) {
++		MLIBC_MISSING_SYSDEP();
++		return ENOSYS;
++	}
++	new_tcb->stackSize = attr.__mlibc_stacksize;
++	new_tcb->guardSize = attr.__mlibc_guardsize;
++	new_tcb->stackAddr = stack - attr.__mlibc_stacksize - attr.__mlibc_guardsize;
++	mlibc::sys_clone(new_tcb, &tid, stack);
+ 	*thread = reinterpret_cast<pthread_t>(new_tcb);
+ 
+ 	__atomic_store_n(&new_tcb->tid, tid, __ATOMIC_RELAXED);
+@@ -312,21 +427,6 @@ int pthread_getname_np(pthread_t, char *, size_t) {
+ 	__builtin_unreachable();
+ }
+ 
+-int pthread_attr_setstack(pthread_attr_t *, void *, size_t) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
+-}
+-
+-int pthread_attr_getstack(const pthread_attr_t *, void **, size_t *) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
+-}
+-
+-int pthread_getattr_np(pthread_t, pthread_attr_t *) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
+-}
+-
+ int pthread_setschedparam(pthread_t, int, const struct sched_param *) {
+ 	__ensure(!"Not implemented");
+ 	__builtin_unreachable();
 diff --git a/options/posix/generic/regex.cpp b/options/posix/generic/regex.cpp
 deleted file mode 100644
 index c937162..0000000
@@ -4881,11 +5272,58 @@ index 4917a15..c134e42 100644
  		errno = e;
  		return -1;
  	}
+diff --git a/options/posix/include/mlibc/posix-sysdeps.hpp b/options/posix/include/mlibc/posix-sysdeps.hpp
+index 0025f8f..a94f26b 100644
+--- a/options/posix/include/mlibc/posix-sysdeps.hpp
++++ b/options/posix/include/mlibc/posix-sysdeps.hpp
+@@ -91,7 +91,8 @@ int sys_close(int fd);
+ [[gnu::weak]] void sys_yield();
+ [[gnu::weak]] int sys_sleep(time_t *secs, long *nanos);
+ [[gnu::weak]] int sys_fork(pid_t *child);
+-[[gnu::weak]] int sys_clone(void *entry, void *user_arg, void *tcb, pid_t *pid_out);
++[[gnu::weak]] int sys_clone(void *tcb, pid_t *pid_out, void *stack);
++[[gnu::weak]] int sys_prepare_stack(void **stack, void *entry, void *user_arg, void* tcb, size_t *stack_size, size_t *guard_size);
+ [[gnu::weak]] int sys_execve(const char *path, char *const argv[], char *const envp[]);
+ [[gnu::weak]] int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set,
+ 		fd_set *except_set, const struct timespec *timeout, const sigset_t *sigmask, int *num_events);
 diff --git a/options/posix/include/pthread.h b/options/posix/include/pthread.h
-index 2f2e2f7..8482539 100644
+index 2f2e2f7..c05808e 100644
 --- a/options/posix/include/pthread.h
 +++ b/options/posix/include/pthread.h
-@@ -126,6 +126,9 @@ typedef struct __mlibc_rwlockattr pthread_rwlockattr_t;
+@@ -25,6 +25,10 @@ extern "C" {
+ #define PTHREAD_SCOPE_SYSTEM 0
+ #define PTHREAD_SCOPE_PROCESS 1
+ 
++// Values for pthread_attr_{get,set}inheritsched
++#define PTHREAD_INHERIT_SCHED 0
++#define PTHREAD_EXPLICIT_SCHED 1
++
+ // values for pthread_{get,set}canceltype().
+ #define PTHREAD_CANCEL_DEFERRED 0
+ #define PTHREAD_CANCEL_ASYNCHRONOUS 1
+@@ -61,11 +65,18 @@ extern "C" {
+ #define PTHREAD_INHERIT_SCHED 0
+ #define PTHREAD_EXPLICIT_SCHED 1
+ 
++#define PTHREAD_STACK_MIN 16384
++
+ // TODO: move to own file and include in sys/types.h
+ struct __mlibc_threadattr {
+-	// TODO: the guardsize attribute needs to be supported here.
+-
+-	int __mlibc_deatchstate;
++	size_t __mlibc_guardsize;
++	size_t __mlibc_stacksize;
++	void *__mlibc_stackaddr;
++	int __mlibc_detachstate;
++	int __mlibc_scope;
++	int __mlibc_inheritsched;
++	struct sched_param __mlibc_schedparam;
++	int __mlibc_schedpolicy;
+ };
+ typedef struct __mlibc_threadattr pthread_attr_t;
+ 
+@@ -126,6 +137,9 @@ typedef struct __mlibc_rwlockattr pthread_rwlockattr_t;
  // pthread_attr and pthread functions.
  // ----------------------------------------------------------------------------
  
@@ -4895,6 +5333,44 @@ index 2f2e2f7..8482539 100644
  // pthread_attr functions.
  int pthread_attr_init(pthread_attr_t *);
  int pthread_attr_destroy(pthread_attr_t *);
+@@ -136,20 +150,33 @@ int pthread_attr_setdetachstate(pthread_attr_t *, int);
+ int pthread_attr_getstacksize(const pthread_attr_t *__restrict, size_t *__restrict);
+ int pthread_attr_setstacksize(pthread_attr_t *, size_t);
+ 
++int pthread_attr_getstackaddr(const pthread_attr_t *, void **);
++int pthread_attr_setstackaddr(pthread_attr_t *, void *);
++
++int pthread_attr_getstack(const pthread_attr_t *, void **, size_t*);
++int pthread_attr_setstack(pthread_attr_t *, void *, size_t);
++
+ int pthread_attr_getguardsize(const pthread_attr_t *__restrict, size_t *__restrict);
+ int pthread_attr_setguardsize(pthread_attr_t *, size_t);
+ 
+-int pthread_attr_getscope(const pthread_attr_t *, int);
++int pthread_attr_getscope(const pthread_attr_t *, int*);
+ int pthread_attr_setscope(pthread_attr_t *, int);
+ 
++int pthread_attr_getschedparam(const pthread_attr_t *__restrict, struct sched_param *__restrict);
++int pthread_attr_setschedparam(pthread_attr_t *__restrict, const struct sched_param *__restrict);
++
+ int pthread_attr_getschedpolicy(const pthread_attr_t *__restrict, int *__restrict);
+-int pthread_attr_setschedpolicy(pthread_attr_t *, int);
++int pthread_attr_setschedpolicy(pthread_attr_t *__restrict, int);
++
++int pthread_attr_getinheritsched(const pthread_attr_t *__restrict, int *__restrict);
++int pthread_attr_setinheritsched(pthread_attr_t *__restrict, int);
+ 
+ int pthread_attr_getschedparam(const pthread_attr_t *__restrict, struct sched_param *__restrict);
+ int pthread_attr_setschedparam(pthread_attr_t *__restrict, const struct sched_param *__restrict);
+ 
+-int pthread_attr_getinheritsched(const pthread_attr_t *__restrict, int *__restrict);
+-int pthread_attr_setinheritsched(pthread_attr_t *, int);
++int pthread_getattr_np(pthread_t, pthread_attr_t *);
++
++int pthread_getattr_np(pthread_t, pthread_attr_t *);
+ 
+ // pthread functions.
+ int pthread_create(pthread_t *__restrict, const pthread_attr_t *__restrict,
 diff --git a/options/posix/include/regex.h b/options/posix/include/regex.h
 index 1579c95..c1034c6 100644
 --- a/options/posix/include/regex.h
@@ -4954,6 +5430,311 @@ index 9620645..dbc619d 100644
  bool eagerBinding = true;
  
  #if defined(__x86_64__)
+diff --git a/sysdeps/dripos/generic/generic.cpp b/sysdeps/dripos/generic/generic.cpp
+index 0a85169..ba1f536 100644
+--- a/sysdeps/dripos/generic/generic.cpp
++++ b/sysdeps/dripos/generic/generic.cpp
+@@ -214,13 +214,12 @@ int sys_futex_wake(int *pointer) {
+ // All remaining functions are disabled in ldso.
+ #ifndef MLIBC_BUILDING_RTDL
+ 
+-int sys_clone(void *entry, void *user_arg, void *tcb, pid_t *tid_out) {
+-	void *sp = prepare_stack(entry, user_arg, tcb);
++int sys_clone(void *tcb, pid_t *tid_out, void *stack) {
+     int tid;
+ 
+     asm volatile ("syscall"
+         : "=a"(tid)
+-        : "a"(67), "D"(__mlibc_start_thread), "S"(sp), "d"(tcb)
++        : "a"(67), "D"(__mlibc_start_thread), "S"(stack), "d"(tcb)
+         : "rcx", "r11");
+ 
+ 	if (tid_out)
+diff --git a/sysdeps/dripos/generic/thread.cpp b/sysdeps/dripos/generic/thread.cpp
+index 35e7a9b..1e0cedf 100644
+--- a/sysdeps/dripos/generic/thread.cpp
++++ b/sysdeps/dripos/generic/thread.cpp
+@@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
+ 
+ namespace mlibc {
+ 
+-void *prepare_stack(void *entry, void *user_arg, void *tcb) {
+-	uintptr_t *sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
+-			mmap(nullptr, 0x200000,
+-				PROT_READ | PROT_WRITE,
+-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+-			) + 0x200000);
++static constexpr size_t default_stacksize = 0x200000;
++
++int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb, size_t *stack_size, size_t *guard_size) {
++	uintptr_t *sp;
++	if (!*stack_size)
++		*stack_size = default_stacksize;
++	*guard_size = 0;
++
++	if (*stack) {
++		sp = reinterpret_cast<uintptr_t *>(*stack);
++	} else {
++		sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
++					mmap(nullptr, *stack_size,
++						PROT_READ | PROT_WRITE,
++						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
++					) + *stack_size);
++	}
+ 
+ 	*--sp = reinterpret_cast<uintptr_t>(tcb);
+ 	*--sp = reinterpret_cast<uintptr_t>(user_arg);
+ 	*--sp = reinterpret_cast<uintptr_t>(entry);
+-	return sp;
++	*stack = reinterpret_cast<void*>(sp);
++	return 0;
+ }
+ 
+ } //namespace mlibc
+diff --git a/sysdeps/lemon/generic/lemon.cpp b/sysdeps/lemon/generic/lemon.cpp
+index fd94b7d..795f9b6 100644
+--- a/sysdeps/lemon/generic/lemon.cpp
++++ b/sysdeps/lemon/generic/lemon.cpp
+@@ -140,8 +140,7 @@ void sys_yield(){
+ 	syscall(SYS_YIELD);
+ }
+ 
+-int sys_clone(void *entry, void *user_arg, void *tcb, pid_t *tid_out){
+-	auto stack = prepare_stack(entry, user_arg, tcb);
++int sys_clone(void *tcb, pid_t *tid_out, void *stack){
+ 	pid_t tid = syscall(SYS_SPAWN_THREAD, __mlibc_start_thread, stack);
+ 
+ 	if(tid < 0){
+@@ -192,4 +191,4 @@ int sys_getentropy(void *buffer, size_t length){
+ }
+ #endif
+ 
+-} 
++}
+diff --git a/sysdeps/lemon/generic/thread.cpp b/sysdeps/lemon/generic/thread.cpp
+index 574b98d..d0d00ba 100644
+--- a/sysdeps/lemon/generic/thread.cpp
++++ b/sysdeps/lemon/generic/thread.cpp
+@@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
+ 
+ namespace mlibc {
+ 
+-void* prepare_stack(void *entry, void *user_arg, void *tcb) {
+-	uintptr_t *sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
+-			mmap(nullptr, 0x1000000, 
+-				PROT_READ | PROT_WRITE, 
+-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+-			) + 0x1000000);
++static constexpr size_t default_stacksize = 0x200000;
++
++int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb, size_t *stack_size, size_t *guard_size) {
++	if (!*stack_size)
++		*stack_size = default_stacksize;
++	*guard_size = 0;
++
++	uintptr_t *sp;
++	if (*stack) {
++		sp = reinterpret_cast<uintptr_t *>(*stack);
++	} else {
++		sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
++					mmap(nullptr, *stack_size,
++						PROT_READ | PROT_WRITE,
++						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
++					) + *stack_size);
++	}
+ 
+ 	*--sp = reinterpret_cast<uintptr_t>(tcb);
+ 	*--sp = reinterpret_cast<uintptr_t>(user_arg);
+ 	*--sp = reinterpret_cast<uintptr_t>(entry);
+-	return sp;
++	*stack = reinterpret_cast<void*>(sp);
++	return 0;
+ }
+ 
+ } //namespace mlibc
+diff --git a/sysdeps/linux/generic/sysdeps.cpp b/sysdeps/linux/generic/sysdeps.cpp
+index 582115a..5e98472 100644
+--- a/sysdeps/linux/generic/sysdeps.cpp
++++ b/sysdeps/linux/generic/sysdeps.cpp
+@@ -366,9 +366,7 @@ int sys_sigprocmask(int how, const sigset_t *set, sigset_t *old) {
+ 	return 0;
+ }
+ 
+-int sys_clone(void *entry, void *user_arg, void *tcb, pid_t *pid_out) {
+-        void *stack = prepare_stack(entry, user_arg);
+-
++int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
+ 	unsigned long flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+ 		| CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_SETTLS
+ 		| CLONE_PARENT_SETTID;
+diff --git a/sysdeps/linux/x86_64/thread.cpp b/sysdeps/linux/x86_64/thread.cpp
+index 94d03b6..ed2ec5a 100644
+--- a/sysdeps/linux/x86_64/thread.cpp
++++ b/sysdeps/linux/x86_64/thread.cpp
+@@ -5,11 +5,7 @@
+ #include <sys/mman.h>
+ #include <stdint.h>
+ #include <stddef.h>
+-
+-namespace {
+-	constexpr unsigned int STACK_SIZE = 0x200000;
+-	constexpr unsigned int GUARD_SIZE = 0x2000;
+-}
++#include <errno.h>
+ 
+ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg) {
+ 	// The linux kernel already sets the TCB in sys_clone().
+@@ -31,20 +27,34 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg) {
+ 
+ namespace mlibc {
+ 
+-void *prepare_stack(void *entry, void *user_arg) {
+-	uintptr_t map = reinterpret_cast<uintptr_t>(
+-			mmap(nullptr, STACK_SIZE + GUARD_SIZE,
+-				PROT_NONE,
+-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+-			);
+-	__ensure(reinterpret_cast<void*>(map) != MAP_FAILED);
+-	int ret = mprotect(reinterpret_cast<void*>(map + GUARD_SIZE), STACK_SIZE,
+-			PROT_READ | PROT_WRITE);
+-	__ensure(!ret);
+-
+-	auto sp = reinterpret_cast<uintptr_t*>(map + STACK_SIZE + GUARD_SIZE);
++static constexpr size_t default_stacksize = 0x200000;
++
++int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb, size_t *stack_size, size_t *guard_size) {
++	(void)tcb;
++	if (!*stack_size)
++		*stack_size = default_stacksize;
++
++	uintptr_t map;
++	if (*stack) {
++		map = reinterpret_cast<uintptr_t>(*stack);
++	} else {
++		map = reinterpret_cast<uintptr_t>(
++				mmap(nullptr, *stack_size + *guard_size,
++					PROT_NONE,
++					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
++				);
++		if (reinterpret_cast<void*>(map) == MAP_FAILED)
++			return EAGAIN;
++		int ret = mprotect(reinterpret_cast<void*>(map + *guard_size), *stack_size,
++				PROT_READ | PROT_WRITE);
++		if(ret)
++			return EAGAIN;
++	}
++
++	auto sp = reinterpret_cast<uintptr_t*>(map + *stack_size + *guard_size);
+ 	*--sp = reinterpret_cast<uintptr_t>(user_arg);
+ 	*--sp = reinterpret_cast<uintptr_t>(entry);
+-	return sp;
++	*stack = reinterpret_cast<void*>(sp);
++	return 0;
+ }
+ } // namespace mlibc
+diff --git a/sysdeps/managarm/aarch64/thread.cpp b/sysdeps/managarm/aarch64/thread.cpp
+index 48029b5..d0d00ba 100644
+--- a/sysdeps/managarm/aarch64/thread.cpp
++++ b/sysdeps/managarm/aarch64/thread.cpp
+@@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
+ 
+ namespace mlibc {
+ 
+-void *prepare_stack(void *entry, void *user_arg, void *tcb) {
+-	uintptr_t *sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
+-			mmap(nullptr, 0x1000000,
+-				PROT_READ | PROT_WRITE,
+-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+-			) + 0x1000000);
++static constexpr size_t default_stacksize = 0x200000;
++
++int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb, size_t *stack_size, size_t *guard_size) {
++	if (!*stack_size)
++		*stack_size = default_stacksize;
++	*guard_size = 0;
++
++	uintptr_t *sp;
++	if (*stack) {
++		sp = reinterpret_cast<uintptr_t *>(*stack);
++	} else {
++		sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
++					mmap(nullptr, *stack_size,
++						PROT_READ | PROT_WRITE,
++						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
++					) + *stack_size);
++	}
+ 
+ 	*--sp = reinterpret_cast<uintptr_t>(tcb);
+ 	*--sp = reinterpret_cast<uintptr_t>(user_arg);
+ 	*--sp = reinterpret_cast<uintptr_t>(entry);
+-	return sp;
++	*stack = reinterpret_cast<void*>(sp);
++	return 0;
+ }
+ 
+ } //namespace mlibc
+diff --git a/sysdeps/managarm/generic/fork-exec.cpp b/sysdeps/managarm/generic/fork-exec.cpp
+index 88ca04a..80db6ce 100644
+--- a/sysdeps/managarm/generic/fork-exec.cpp
++++ b/sysdeps/managarm/generic/fork-exec.cpp
+@@ -618,14 +618,11 @@ int sys_getrusage(int scope, struct rusage *usage) {
+ 	return 0;
+ }
+ 
+-int sys_clone(void *entry, void *user_arg, void *tcb, pid_t *pid_out) {
++int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
+ 	HelWord pid = 0;
+-
+-	void *sp = prepare_stack(entry, user_arg, tcb);
+-
+ 	HEL_CHECK(helSyscall2_1(kHelCallSuper + 9,
+ 				reinterpret_cast<HelWord>(__mlibc_start_thread),
+-				reinterpret_cast<HelWord>(sp),
++				reinterpret_cast<HelWord>(stack),
+ 				&pid));
+ 
+ 	if (pid_out)
+diff --git a/sysdeps/managarm/x86_64/thread.cpp b/sysdeps/managarm/x86_64/thread.cpp
+index 48029b5..d0d00ba 100644
+--- a/sysdeps/managarm/x86_64/thread.cpp
++++ b/sysdeps/managarm/x86_64/thread.cpp
+@@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
+ 
+ namespace mlibc {
+ 
+-void *prepare_stack(void *entry, void *user_arg, void *tcb) {
+-	uintptr_t *sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
+-			mmap(nullptr, 0x1000000,
+-				PROT_READ | PROT_WRITE,
+-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+-			) + 0x1000000);
++static constexpr size_t default_stacksize = 0x200000;
++
++int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb, size_t *stack_size, size_t *guard_size) {
++	if (!*stack_size)
++		*stack_size = default_stacksize;
++	*guard_size = 0;
++
++	uintptr_t *sp;
++	if (*stack) {
++		sp = reinterpret_cast<uintptr_t *>(*stack);
++	} else {
++		sp = reinterpret_cast<uintptr_t *>(reinterpret_cast<uintptr_t>(
++					mmap(nullptr, *stack_size,
++						PROT_READ | PROT_WRITE,
++						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
++					) + *stack_size);
++	}
+ 
+ 	*--sp = reinterpret_cast<uintptr_t>(tcb);
+ 	*--sp = reinterpret_cast<uintptr_t>(user_arg);
+ 	*--sp = reinterpret_cast<uintptr_t>(entry);
+-	return sp;
++	*stack = reinterpret_cast<void*>(sp);
++	return 0;
+ }
+ 
+ } //namespace mlibc
 diff --git a/sysdeps/vinix/crt-x86_64/crt0.S b/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
 index 0000000..06ab8a7
@@ -5072,10 +5853,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..4051e22
+index 0000000..037f84d
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,756 @@
+@@ -0,0 +1,761 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -5513,6 +6294,11 @@ index 0000000..4051e22
 +}
 +
 +gid_t sys_getgid() {
++    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
++    return 0;
++}
++
++int sys_setgid(gid_t gid) {
 +    mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
 +    return 0;
 +}
@@ -6090,6 +6876,215 @@ index 0000000..b9e4372
 +	)
 +endif
 +
+diff --git a/tests/ansi/sscanf.c b/tests/ansi/sscanf.c
+index 8576e93..0253552 100644
+--- a/tests/ansi/sscanf.c
++++ b/tests/ansi/sscanf.c
+@@ -17,5 +17,12 @@ int main() {
+ 	assert(!strcmp(def, "process_priority"));
+ 	assert(!strcmp(strparm, "0"));
+ 
++	char buf3[] = "fffffffff100";
++	unsigned long y = 0;
++	sscanf(buf3, "%lx", &y);
++	assert(y == 0xfffffffff100);
++	char buf4[] = "410dc000";
++	sscanf(buf4, "%lx", &y);
++	assert(y == 0x410dc000);
+ 	return 0;
+ }
+diff --git a/tests/meson.build b/tests/meson.build
+index 24a5b86..84c9114 100644
+--- a/tests/meson.build
++++ b/tests/meson.build
+@@ -25,6 +25,7 @@ posix_test_cases = [
+ 	'pthread_cleanup',
+ 	'pthread_kill',
+ 	'pthread_key',
++	'pthread_attr',
+ 	'pwd',
+ 	'getaddrinfo',
+ 	'getdelim',
+diff --git a/tests/posix/pthread_attr.c b/tests/posix/pthread_attr.c
+new file mode 100644
+index 0000000..c7bf327
+--- /dev/null
++++ b/tests/posix/pthread_attr.c
+@@ -0,0 +1,174 @@
++#include <pthread.h>
++#include <assert.h>
++#include <errno.h>
++#include <alloca.h>
++#include <sys/mman.h>
++
++static void test_detachstate() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED));
++	int detachstate;
++	assert(!pthread_attr_getdetachstate(&attr, &detachstate));
++	assert(detachstate == PTHREAD_CREATE_DETACHED);
++	assert(pthread_attr_setdetachstate(&attr, 2* (PTHREAD_CREATE_DETACHED +
++				PTHREAD_CREATE_JOINABLE)) == EINVAL);
++}
++
++static void *stacksize_worker(void *arg) {
++	size_t default_stacksize = (*(size_t*)arg);
++	size_t alloc_size = default_stacksize + default_stacksize/2;
++	void *area = alloca(alloc_size);
++	// If the allocated stack was not enough this will crash.
++	*(volatile int*)(area + alloc_size) = 1;
++	return NULL;
++}
++
++static void test_stacksize() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_init(&attr));
++	size_t stacksize;
++	assert(!pthread_attr_getstacksize(&attr, &stacksize));
++	assert(!pthread_attr_setstacksize(&attr, stacksize * 2));
++	pthread_t thread;
++	assert(!pthread_create(&thread, &attr, stacksize_worker, &stacksize));
++	assert(!pthread_join(thread, NULL));
++}
++
++static void test_guardsize() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_init(&attr));
++	assert(!pthread_attr_setguardsize(&attr, 0));
++	size_t guardsize;
++	assert(!pthread_attr_getguardsize(&attr, &guardsize));
++	assert(!guardsize);
++}
++
++static void test_scope() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM));
++	int scope;
++	assert(!pthread_attr_getscope(&attr, &scope));
++	assert(scope == PTHREAD_SCOPE_SYSTEM);
++	assert(pthread_attr_setscope(&attr, 2* (PTHREAD_SCOPE_SYSTEM +
++				PTHREAD_SCOPE_PROCESS)) == EINVAL);
++}
++
++static void test_inheritsched() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_setinheritsched(&attr, PTHREAD_INHERIT_SCHED));
++	int inheritsched;
++	assert(!pthread_attr_getinheritsched(&attr, &inheritsched));
++	assert(inheritsched == PTHREAD_INHERIT_SCHED);
++	assert(pthread_attr_setinheritsched(&attr, 2* (PTHREAD_INHERIT_SCHED +
++				PTHREAD_EXPLICIT_SCHED)) == EINVAL);
++}
++
++static void test_schedparam() {
++	pthread_attr_t attr;
++	struct sched_param init_param = {0};
++	assert(!pthread_attr_setschedparam(&attr, &init_param));
++	struct sched_param param = {1};
++	assert(!pthread_attr_getschedparam(&attr, &param));
++	assert(param.sched_priority == init_param.sched_priority);
++}
++
++static void test_schedpolicy() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_setschedpolicy(&attr, SCHED_FIFO));
++	int policy;
++	assert(!pthread_attr_getschedpolicy(&attr, &policy));
++	assert(policy == SCHED_FIFO);
++	assert(pthread_attr_setinheritsched(&attr, 2* (SCHED_FIFO + SCHED_RR +
++				SCHED_OTHER)) == EINVAL);
++}
++
++static void *stackaddr_worker(void *arg) {
++	void *addr = *(void**)arg;
++
++	void *sp;
++#if defined(__x86_64__)
++	asm volatile ("mov %%rsp, %0" : "=r"(sp));
++#elif defined(__aarch64__)
++	asm volatile ("mov %0, sp" : "=r"(sp));
++#else
++#	error Unknown architecture
++#endif
++
++	// Check if our stack pointer is in a sane range.
++	assert(addr < sp);
++	return NULL;
++}
++
++static void test_stackaddr() {
++	pthread_attr_t attr;
++	assert(!pthread_attr_init(&attr));
++	size_t size;
++	assert(!pthread_attr_getstacksize(&attr, &size));
++	void *addr = mmap(NULL, size, PROT_READ | PROT_WRITE,
++				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++	assert(!pthread_attr_setstackaddr(&attr, addr));
++	assert(!pthread_attr_setguardsize(&attr, 0));
++	void *new_addr;
++	assert(!pthread_attr_getstackaddr(&attr, &new_addr));
++	assert(new_addr == addr);
++
++	pthread_t thread;
++	assert(!pthread_create(&thread, &attr, stackaddr_worker, &addr));
++	assert(!pthread_join(thread, NULL));
++}
++
++static void test_stack() {
++	pthread_attr_t attr;
++	void *stackaddr = (void*)1;
++	size_t stacksize = PTHREAD_STACK_MIN;
++
++	assert(!pthread_attr_setstack(&attr, stackaddr, stacksize));
++	void *new_addr;
++	size_t new_size;
++	assert(!pthread_attr_getstack(&attr, &new_addr, &new_size));
++	assert(new_addr == stackaddr);
++	assert(new_size == stacksize);
++}
++
++static void *getattr_worker(void *arg) {
++	return NULL;
++}
++
++static void test_getattrnp() {
++	pthread_attr_t attr;
++	size_t stacksize = PTHREAD_STACK_MIN;
++	assert(!pthread_attr_init(&attr));
++	assert(!pthread_attr_setstacksize(&attr, stacksize));
++
++	pthread_t thread;
++	assert(!pthread_create(&thread, &attr, getattr_worker, NULL));
++	assert(!pthread_getattr_np(thread, &attr));
++	size_t other_stacksize;
++	assert(!pthread_attr_getstacksize(&attr, &other_stacksize));
++	assert(other_stacksize == stacksize);
++	assert(!pthread_join(thread, NULL));
++
++	pthread_t own_thread = pthread_self();
++	void *stack;
++	assert(!pthread_getattr_np(own_thread, &attr));
++	assert(!pthread_attr_getstack(&attr, &stack, &other_stacksize));
++	assert(stack);
++	assert(other_stacksize);
++	// Check that we can read from the highest byte returned.
++	// pthread_getattr_np() should return the lowest byte
++	// of the stack.
++	assert(!*(char*)(stack + other_stacksize - 1));
++}
++
++int main() {
++	test_detachstate();
++	test_stacksize();
++	test_guardsize();
++	test_scope();
++	test_inheritsched();
++	test_schedparam();
++	test_schedpolicy();
++	test_stackaddr();
++	test_stack();
++	test_getattrnp();
++}
 -- 
 2.35.0
 

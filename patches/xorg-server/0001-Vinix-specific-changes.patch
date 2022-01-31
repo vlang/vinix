@@ -1,6 +1,6 @@
-From 62462f994b3794ad13161db2712a9e8b23b75e41 Mon Sep 17 00:00:00 2001
+From 687a20553c668e2713b7a15dc33472d5d459babd Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 30 Jan 2022 14:50:25 +0100
+Date: Sun, 30 Jan 2022 16:11:38 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -20,8 +20,8 @@ Subject: [PATCH] Vinix specific changes
  meson.build                              |  2 +-
  mi/mibitblt.c                            |  2 ++
  os/access.c                              |  2 +-
- os/utils.c                               |  2 +-
- 17 files changed, 41 insertions(+), 20 deletions(-)
+ os/utils.c                               |  4 ++--
+ 17 files changed, 42 insertions(+), 21 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
 index ae44437..79b67a9 100644
@@ -337,9 +337,18 @@ index 9724616..3c4376a 100644
  #endif
  #if defined(SYSV) &&  defined(__i386__)
 diff --git a/os/utils.c b/os/utils.c
-index 2ba1c80..0156b20 100644
+index 2ba1c80..63dedc6 100644
 --- a/os/utils.c
 +++ b/os/utils.c
+@@ -1402,7 +1402,7 @@ System(const char *command)
+         return -1;
+     }
+ 
+-    return p == -1 ? -1 : status;
++    return p == -1 ? -1 : !WIFEXITED(status) || WEXITSTATUS(status);
+ }
+ 
+ static struct pid {
 @@ -1632,7 +1632,7 @@ Pclose(void *iop)
      }
  #endif
