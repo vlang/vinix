@@ -2130,23 +2130,23 @@ packages:
       - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/profile', '@THIS_COLLECT_DIR@/etc/']
       - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/bashrc', '@THIS_COLLECT_DIR@/etc/bash/']
 
-  - name: v
-    from_source: v
-    sources_required: ['vc']
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    build:
-      - args: |
-          set -e
-          mkdir -p "@THIS_COLLECT_DIR@/usr/v"
-          cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
-          cd "@THIS_COLLECT_DIR@/usr/v"
-          rm -v *.xbstrap
-          x86_64-vinix-gcc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v
-          mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
-          ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
+#  - name: v
+#    from_source: v
+#    sources_required: ['vc']
+#    tools_required:
+#      - host-gcc
+#    pkgs_required:
+#      - mlibc
+#    build:
+#      - args: |
+#          set -e
+#          mkdir -p "@THIS_COLLECT_DIR@/usr/v"
+#          cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
+#          cd "@THIS_COLLECT_DIR@/usr/v"
+#          rm -v *.xbstrap
+#          x86_64-vinix-gcc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v
+#          mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
+#          ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
 
   - name: mesa
     source:
