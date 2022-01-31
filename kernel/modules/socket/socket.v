@@ -4,21 +4,11 @@
 
 module socket
 
-import resource { Resource }
+import resource
 import file
 import errno
 import socket.public as sock_pub
 import socket.unix as sock_unix
-
-pub interface Socket {
-	Resource
-
-mut:
-	bind(handle voidptr, _addr voidptr, addrlen u64) ?
-	connect(handle voidptr, _addr voidptr, addrlen u64) ?
-	peername(handle voidptr, _addr voidptr, addrlen &u64) ?
-	listen(handle voidptr, backlog int) ?
-}
 
 pub fn initialise() {}
 
@@ -98,6 +88,38 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 	return u64(ret), 0
 }
 
+pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: accept(%d)\n', fdnum)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	res := fd.handle.resource
+
+	mut socket := &sock_pub.Socket(voidptr(0))
+
+	if res is sock_unix.UnixSocket {
+		socket = res
+	} else {
+		return -1, errno.einval
+	}
+
+	mut connection_socket := socket.accept(fd.handle) or {
+		return -1, errno.get()
+	}
+
+	ret := file.fdnum_create_from_resource(voidptr(0), mut connection_socket, 0, 0, false) or {
+		return -1, errno.get()
+	}
+
+	return u64(ret), 0
+}
+
 pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: bind(%d, 0x%llx, 0x%llx)\n', fdnum, _addr, addrlen)
 	defer {
@@ -111,7 +133,7 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64)
 
 	res := fd.handle.resource
 
-	mut socket := &Socket(voidptr(0))
+	mut socket := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
 		socket = res
@@ -137,7 +159,7 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 
 	res := fd.handle.resource
 
-	mut socket := &Socket(voidptr(0))
+	mut socket := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
 		socket = res
@@ -163,7 +185,7 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u
 
 	res := fd.handle.resource
 
-	mut socket := &Socket(voidptr(0))
+	mut socket := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
 		socket = res
@@ -189,7 +211,7 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u64) (u
 
 	res := fd.handle.resource
 
-	mut socket := &Socket(voidptr(0))
+	mut socket := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
 		socket = res

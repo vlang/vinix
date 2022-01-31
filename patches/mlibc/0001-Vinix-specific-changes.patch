@@ -1,6 +1,6 @@
-From d27e4e79251a6f4de2f0308c99a77def948954d0 Mon Sep 17 00:00:00 2001
+From e5ba2c8febddcb5428121f6b3188b40f65438606 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 31 Jan 2022 15:25:10 +0100
+Date: Mon, 31 Jan 2022 16:52:19 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -43,7 +43,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  785 +++++
+ sysdeps/vinix/generic/generic.cpp             |  796 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -73,7 +73,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5939 insertions(+), 187 deletions(-)
+ 69 files changed, 5950 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5853,10 +5853,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..dc37489
+index 0000000..049cd21
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,785 @@
+@@ -0,0 +1,796 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -6443,6 +6443,17 @@ index 0000000..dc37489
 +    __syscall_ret ret = __syscall(59, fd, addr_ptr, addr_length);
 +
 +    return ret.errno;
++}
++
++int sys_accept(int fd, int *newfd) {
++    __syscall_ret ret = __syscall(61, fd);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *newfd = ret.ret;
++    return 0;
 +}
 +
 +int sys_peername(int fd, struct sockaddr *addr_ptr, socklen_t max_addr_length, socklen_t *actual_length) {

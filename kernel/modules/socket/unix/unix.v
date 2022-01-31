@@ -13,6 +13,7 @@ import fs
 import socket.public as sock_pub
 import event
 import file
+import resource
 
 struct SockaddrUn {
 	sun_family u32
@@ -32,6 +33,7 @@ mut:
 	listening bool
 	backlog   []&UnixSocket
 
+	connection_event eventstruct.Event
 	connected bool
 	peer      &UnixSocket
 }
@@ -83,19 +85,38 @@ fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u64) ?
 	unsafe { *addrlen = actual_size }
 }
 
-fn (mut this UnixSocket) enqueue(mut sock UnixSocket) ? {
-	if this.listening == false {
-		errno.set(errno.econnrefused)
-		return error('')
+fn (mut this UnixSocket) accept(handle voidptr) ?&resource.Resource {
+	this.l.acquire()
+	defer {
+		this.l.release()
 	}
 
-	this.backlog << sock
+	for this.backlog.len == 0 {
+		this.l.release()
+		mut events := [&this.event]
+		event.await(mut events, true) or {
+			errno.set(errno.eintr)
+			return none
+		}
+		this.l.acquire()
+	}
 
-	sock.connected = true
-	unsafe { sock.peer = this }
+	mut peer := this.backlog.pop()
 
-	this.status |= file.pollin
-	event.trigger(mut this.event, false)
+	connection_socket := &UnixSocket{
+		refcount: 1
+		peer: peer
+		connected: true
+		name: this.name
+	}
+
+	peer.refcount++
+	peer.peer = connection_socket
+	peer.connected = true
+
+	event.trigger(mut peer.connection_event, false)
+
+	return connection_socket
 }
 
 fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
@@ -110,7 +131,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-	C.printf(c'Wants to connect to %s\n', path.str)
+	C.printf(c'UNIX socket: Wants to connect to %s\n', path.str)
 
 	mut target := fs.get_node(thread.process.current_directory, path, true) or {
 		return error('')
@@ -127,9 +148,32 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 		return error('')
 	}
 
-	socket.enqueue(mut this) or {
+	// ----
+
+	if socket.listening == false {
+		errno.set(errno.econnrefused)
 		return error('')
 	}
+
+	socket.l.acquire()
+
+	socket.backlog << this
+
+	socket.status |= file.pollin
+	event.trigger(mut socket.event, false)
+
+	socket.l.release()
+
+	mut events := [&this.connection_event]
+	event.await(mut events, true) or {
+		errno.set(errno.eintr)
+		return error('')
+	}
+
+	C.printf(c'UNIX socket: Connected!\n')
+
+	this.status |= file.pollin
+	event.trigger(mut this.event, false)
 }
 
 fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
