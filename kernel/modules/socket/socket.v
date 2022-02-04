@@ -172,6 +172,32 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 	return 0, 0
 }
 
+pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: recvmsg(%d, 0x%llx, 0x%x)\n', fdnum, voidptr(msg), flags)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	res := fd.handle.resource
+
+	mut socket := &sock_pub.Socket(voidptr(0))
+
+	if res is sock_unix.UnixSocket {
+		socket = res
+	} else {
+		return -1, errno.einval
+	}
+
+	ret := socket.recvmsg(fd.handle, msg, flags) or { return -1, errno.get() }
+
+	return ret, 0
+}
+
 pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: connect(%d, 0x%llx, 0x%llx)\n', fdnum, _addr, addrlen)
 	defer {

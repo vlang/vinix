@@ -1,6 +1,6 @@
-From e5ba2c8febddcb5428121f6b3188b40f65438606 Mon Sep 17 00:00:00 2001
+From 2eca8fdc436340934244e4c00a5e57759d3c96ec Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 31 Jan 2022 16:52:19 +0100
+Date: Fri, 4 Feb 2022 09:42:19 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -43,7 +43,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  796 +++++
+ sysdeps/vinix/generic/generic.cpp             |  820 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -73,7 +73,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5950 insertions(+), 187 deletions(-)
+ 69 files changed, 5974 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5853,10 +5853,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..049cd21
+index 0000000..ccbac75
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,796 @@
+@@ -0,0 +1,820 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -6453,6 +6453,30 @@ index 0000000..049cd21
 +    }
 +
 +    *newfd = ret.ret;
++    return 0;
++}
++
++int sys_getsockopt(int fd, int layer, int number,
++		void *__restrict buffer, socklen_t *__restrict size) {
++	if(layer == SOL_SOCKET && number == SO_SNDBUF) {
++		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_SNDBUF is unimplemented\e[39m" << frg::endlog;
++		return 4096;
++	}else{
++		mlibc::panicLogger() << "\e[31mmlibc: Unexpected getsockopt() call, layer: " << layer << " number: " << number << "\e[39m" << frg::endlog;
++		__builtin_unreachable();
++	}
++
++    return 0;
++}
++
++int sys_msg_recv(int sockfd, struct msghdr *hdr, int flags, ssize_t *length) {
++    __syscall_ret ret = __syscall(62, sockfd, hdr, flags);
++
++    if (ret.errno != 0) {
++        return ret.errno;
++    }
++
++    *length = (ssize_t)ret.ret;
 +    return 0;
 +}
 +
@@ -7121,5 +7145,5 @@ index 0000000..c7bf327
 +	test_getattrnp();
 +}
 -- 
-2.35.0
+2.35.1
 

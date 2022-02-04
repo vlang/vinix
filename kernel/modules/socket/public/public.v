@@ -27,4 +27,20 @@ mut:
 	peername(handle voidptr, _addr voidptr, addrlen &u64) ?
 	listen(handle voidptr, backlog int) ?
 	accept(handle voidptr) ?&Resource
+	recvmsg(handle voidptr, msg &MsgHdr, flags int) ?u64
+}
+
+struct IoVec {
+	iov_base voidptr
+	iov_len u64
+}
+
+struct MsgHdr {
+	msg_name voidptr
+	msg_namelen u64
+	msg_iov &IoVec
+	msg_iovlen int
+	msg_control voidptr
+	msg_controllen u64
+	msg_flags int
 }
