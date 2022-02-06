@@ -16,9 +16,10 @@ import memory.mmap
 import time.sys
 import time.timerfd
 import net
+import time.itimer
 
 __global (
-	syscall_table [63]voidptr
+	syscall_table [65]voidptr
 )
 
 pub fn init_syscall_table() {
@@ -85,4 +86,6 @@ pub fn init_syscall_table() {
 	syscall_table[60] = voidptr(socket.syscall_getpeername)
 	syscall_table[61] = voidptr(socket.syscall_accept)
 	syscall_table[62] = voidptr(socket.syscall_recvmsg)
+	syscall_table[63] = voidptr(itimer.syscall_getitimer)
+	syscall_table[64] = voidptr(itimer.syscall_setitimer)
 }

@@ -1,6 +1,6 @@
-From d11318950766f5d4a3019a363adbc189b9216541 Mon Sep 17 00:00:00 2001
+From a5121d1a820ba11fc57a5deb09cf46dca09cd5e6 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 6 Feb 2022 05:46:29 +0100
+Date: Sun, 6 Feb 2022 06:27:03 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -26,8 +26,9 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/regex/regexec.c         | 1026 ++++++
  options/posix/generic/regex/tre-mem.c         |  158 +
  options/posix/generic/regex/tre.h             |  233 ++
+ options/posix/generic/sys-time-stubs.cpp      |   16 +-
  options/posix/generic/unistd-stubs.cpp        |    4 +-
- options/posix/include/mlibc/posix-sysdeps.hpp |    3 +-
+ options/posix/include/mlibc/posix-sysdeps.hpp |    7 +-
  options/posix/include/pthread.h               |   41 +-
  options/posix/include/regex.h                 |    4 +-
  options/posix/meson.build                     |   11 +-
@@ -43,7 +44,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  821 +++++
+ sysdeps/vinix/generic/generic.cpp             |  884 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -73,7 +74,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5974 insertions(+), 187 deletions(-)
+ 70 files changed, 6051 insertions(+), 193 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5253,6 +5254,32 @@ index 0000000..5b4e802
 +#define xfree free
 +#define xrealloc realloc
 +
+diff --git a/options/posix/generic/sys-time-stubs.cpp b/options/posix/generic/sys-time-stubs.cpp
+index 49fd3bf..2d17b58 100644
+--- a/options/posix/generic/sys-time-stubs.cpp
++++ b/options/posix/generic/sys-time-stubs.cpp
+@@ -41,11 +41,15 @@ int timerisset(struct timeval *) {
+ 	__builtin_unreachable();
+ }
+ 
+-int getitimer(int, struct itimerval *) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int getitimer(int which, struct itimerval *curr_value) {
++	if(int e = mlibc::sys_getitimer(which, curr_value); e) {
++		errno = e;
++		return -1;
++	}
+ }
+-int setitimer(int, const struct itimerval *, struct itimerval *) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value) {
++	if(int e = mlibc::sys_setitimer(which, new_value, old_value); e) {
++		errno = e;
++		return -1;
++	}
+ }
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
 index 4917a15..c134e42 100644
 --- a/options/posix/generic/unistd-stubs.cpp
@@ -5273,10 +5300,18 @@ index 4917a15..c134e42 100644
  		return -1;
  	}
 diff --git a/options/posix/include/mlibc/posix-sysdeps.hpp b/options/posix/include/mlibc/posix-sysdeps.hpp
-index 0025f8f..a94f26b 100644
+index 0025f8f..2c31b01 100644
 --- a/options/posix/include/mlibc/posix-sysdeps.hpp
 +++ b/options/posix/include/mlibc/posix-sysdeps.hpp
-@@ -91,7 +91,8 @@ int sys_close(int fd);
+@@ -21,6 +21,7 @@
+ #include <sys/select.h>
+ #include <sys/statvfs.h>
+ #include <sys/statfs.h>
++#include <sys/time.h>
+ #include <termios.h>
+ #include <time.h>
+ #include <ucontext.h>
+@@ -91,7 +92,8 @@ int sys_close(int fd);
  [[gnu::weak]] void sys_yield();
  [[gnu::weak]] int sys_sleep(time_t *secs, long *nanos);
  [[gnu::weak]] int sys_fork(pid_t *child);
@@ -5286,6 +5321,16 @@ index 0025f8f..a94f26b 100644
  [[gnu::weak]] int sys_execve(const char *path, char *const argv[], char *const envp[]);
  [[gnu::weak]] int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set,
  		fd_set *except_set, const struct timespec *timeout, const sigset_t *sigmask, int *num_events);
+@@ -169,6 +171,9 @@ int sys_vm_unmap(void *pointer, size_t size);
+ [[gnu::weak]] int sys_setgroups(size_t size, const gid_t *list);
+ [[gnu::weak]] int sys_statfs(const char *path, struct statfs *buf);
+ 
++[[gnu::weak]] int sys_getitimer(int which, struct itimerval *curr_value);
++[[gnu::weak]] int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
++
+ } //namespace mlibc
+ 
+ #endif // MLIBC_POSIX_SYSDEPS
 diff --git a/options/posix/include/pthread.h b/options/posix/include/pthread.h
 index 2f2e2f7..c05808e 100644
 --- a/options/posix/include/pthread.h
@@ -5853,10 +5898,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..bb7dc8e
+index 0000000..de5306f
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,821 @@
+@@ -0,0 +1,884 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -6458,9 +6503,25 @@ index 0000000..bb7dc8e
 +
 +int sys_getsockopt(int fd, int layer, int number,
 +		void *__restrict buffer, socklen_t *__restrict size) {
-+	if(layer == SOL_SOCKET && number == SO_SNDBUF) {
++	if(layer == SOL_SOCKET && number == SO_PEERCRED) {
++		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_PEERCRED is unimplemented\e[39m" << frg::endlog;
++		*(int *)buffer = 0;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_SNDBUF) {
 +		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_SNDBUF is unimplemented\e[39m" << frg::endlog;
 +		*(int *)buffer = 4096;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_TYPE) {
++		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_TYPE is unimplemented, hardcoding SOCK_STREAM\e[39m" << frg::endlog;
++		*(int *)buffer = SOCK_STREAM;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_ERROR) {
++		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_ERROR is unimplemented, hardcoding 0\e[39m" << frg::endlog;
++		*(int *)buffer = 0;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_KEEPALIVE) {
++		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_KEEPALIVE is unimplemented, hardcoding 0\e[39m" << frg::endlog;
++		*(int *)buffer = 0;
 +		return 0;
 +	}else{
 +		mlibc::panicLogger() << "\e[31mmlibc: Unexpected getsockopt() call, layer: " << layer << " number: " << number << "\e[39m" << frg::endlog;
@@ -6468,6 +6529,39 @@ index 0000000..bb7dc8e
 +	}
 +
 +    return 0;
++}
++
++
++int sys_setsockopt(int fd, int layer, int number,
++		const void *buffer, socklen_t size) {
++	if(layer == SOL_SOCKET && number == SO_PASSCRED) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt(SO_PASSCRED) is not implemented"
++				" correctly\e[39m" << frg::endlog;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_ATTACH_FILTER) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt(SO_ATTACH_FILTER) is not implemented"
++				" correctly\e[39m" << frg::endlog;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_RCVBUFFORCE) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt(SO_RCVBUFFORCE) is not implemented"
++				" correctly\e[39m" << frg::endlog;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_SNDBUF) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt() call with SOL_SOCKET and SO_SNDBUF is unimplemented\e[39m" << frg::endlog;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_KEEPALIVE) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt() call with SOL_SOCKET and SO_KEEPALIVE is unimplemented\e[39m" << frg::endlog;
++		return 0;
++	}else if(layer == SOL_SOCKET && number == SO_REUSEADDR) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt() call with SOL_SOCKET and SO_REUSEADDR is unimplemented\e[39m" << frg::endlog;
++		return 0;
++	}else if(layer == AF_NETLINK && number == SO_ACCEPTCONN) {
++		mlibc::infoLogger() << "\e[31mmlibc: setsockopt() call with AF_NETLINK and SO_ACCEPTCONN is unimplemented\e[39m" << frg::endlog;
++		return 0;
++	}else{
++		mlibc::panicLogger() << "\e[31mmlibc: Unexpected setsockopt() call, layer: " << layer << " number: " << number << "\e[39m" << frg::endlog;
++		__builtin_unreachable();
++	}
 +}
 +
 +int sys_msg_recv(int sockfd, struct msghdr *hdr, int flags, ssize_t *length) {
@@ -6675,6 +6769,20 @@ index 0000000..bb7dc8e
 +    *secs = rem.tv_sec;
 +    *nanos = rem.tv_nsec;
 +    return 0;
++}
++
++
++int sys_getitimer(int which, struct itimerval *curr_value) {
++    __syscall_ret ret = __syscall(63, which, curr_value);
++
++    return ret.errno;
++}
++
++
++int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value) {
++    __syscall_ret ret = __syscall(64, which, new_value, old_value);
++
++    return ret.errno;
 +}
 +
 +} // namespace mlibc
