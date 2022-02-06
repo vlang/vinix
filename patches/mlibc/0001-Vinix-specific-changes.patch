@@ -1,6 +1,6 @@
-From ddb1c8397814b6d7529647b8e74239df56a31040 Mon Sep 17 00:00:00 2001
+From d11318950766f5d4a3019a363adbc189b9216541 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 6 Feb 2022 05:37:33 +0100
+Date: Sun, 6 Feb 2022 05:46:29 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -43,7 +43,7 @@ Subject: [PATCH] Vinix specific changes
  sysdeps/managarm/x86_64/thread.cpp            |   26 +-
  sysdeps/vinix/crt-x86_64/crt0.S               |    5 +
  sysdeps/vinix/generic/entry.cpp               |   99 +
- sysdeps/vinix/generic/generic.cpp             |  820 +++++
+ sysdeps/vinix/generic/generic.cpp             |  821 +++++
  sysdeps/vinix/include/abi-bits/abi.h          |    1 +
  sysdeps/vinix/include/abi-bits/auxv.h         |    1 +
  sysdeps/vinix/include/abi-bits/blkcnt_t.h     |    1 +
@@ -73,7 +73,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5973 insertions(+), 187 deletions(-)
+ 69 files changed, 5974 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5853,10 +5853,10 @@ index 0000000..e7c792b
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..ccbac75
+index 0000000..bb7dc8e
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,820 @@
+@@ -0,0 +1,821 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -6460,7 +6460,8 @@ index 0000000..ccbac75
 +		void *__restrict buffer, socklen_t *__restrict size) {
 +	if(layer == SOL_SOCKET && number == SO_SNDBUF) {
 +		mlibc::infoLogger() << "\e[31mmlibc: getsockopt() call with SOL_SOCKET and SO_SNDBUF is unimplemented\e[39m" << frg::endlog;
-+		return 4096;
++		*(int *)buffer = 4096;
++		return 0;
 +	}else{
 +		mlibc::panicLogger() << "\e[31mmlibc: Unexpected getsockopt() call, layer: " << layer << " number: " << number << "\e[39m" << frg::endlog;
 +		__builtin_unreachable();
