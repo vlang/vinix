@@ -1,6 +1,6 @@
-From 2eca8fdc436340934244e4c00a5e57759d3c96ec Mon Sep 17 00:00:00 2001
+From ddb1c8397814b6d7529647b8e74239df56a31040 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 4 Feb 2022 09:42:19 +0100
+Date: Sun, 6 Feb 2022 05:37:33 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -16,7 +16,7 @@ Subject: [PATCH] Vinix specific changes
  options/internal/include/mlibc/tcb.hpp        |    3 +
  options/internal/include/mlibc/thread.hpp     |    2 +
  options/internal/x86_64/thread.cpp            |    6 +
- options/linux-headers/include/asm/ioctls.h    |    2 +
+ options/linux-headers/include/asm/ioctls.h    |    1 +
  options/posix/generic/pthread-stubs.cpp       |  220 +-
  options/posix/generic/regex.cpp               |   23 -
  .../fnmatch.cpp => generic/regex/fnmatch.c}   |   13 +-
@@ -73,7 +73,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 69 files changed, 5974 insertions(+), 187 deletions(-)
+ 69 files changed, 5973 insertions(+), 187 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -114,16 +114,17 @@ Subject: [PATCH] Vinix specific changes
  create mode 100644 tests/posix/pthread_attr.c
 
 diff --git a/abis/dripos/errno.h b/abis/dripos/errno.h
-index 700c1d2..44f56f3 100644
+index 68cb386..f9e7c2b 100644
 --- a/abis/dripos/errno.h
 +++ b/abis/dripos/errno.h
-@@ -109,5 +109,6 @@
+@@ -109,6 +109,7 @@
  #define	EFTYPE		79		/* Inappropriate file type or format */
  #define EOVERFLOW   80
  #define EILSEQ      81
 +#define ENOTSUP		82
  
- #endif
+ #define EBADMSG			82
+ #define ECANCELED		83
 diff --git a/abis/mlibc/signal.h b/abis/mlibc/signal.h
 index 5c63bca..eaf115b 100644
 --- a/abis/mlibc/signal.h
@@ -144,10 +145,10 @@ index 5c63bca..eaf115b 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 4027c99..3675409 100644
+index 6c7b407..00f616e 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -110,6 +110,10 @@ elif host_machine.system() == 'qword'
+@@ -115,6 +115,10 @@ elif host_machine.system() == 'qword'
  	rtdl_include_dirs += include_directories('sysdeps/qword/include')
  	libc_include_dirs += include_directories('sysdeps/qword/include')
  	subdir('sysdeps/qword')
@@ -159,7 +160,7 @@ index 4027c99..3675409 100644
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
 diff --git a/options/ansi/generic/stdio-stubs.cpp b/options/ansi/generic/stdio-stubs.cpp
-index eb80feb..9c65f8b 100644
+index c21696c..c34d447 100644
 --- a/options/ansi/generic/stdio-stubs.cpp
 +++ b/options/ansi/generic/stdio-stubs.cpp
 @@ -497,10 +497,10 @@ static int do_scanf(H &handler, const char *fmt, __gnuc_va_list args) {
@@ -314,18 +315,17 @@ index ae0b023..6b320cd 100644
 +
  } // namespace mlibc
 diff --git a/options/linux-headers/include/asm/ioctls.h b/options/linux-headers/include/asm/ioctls.h
-index 41d4248..f246d1d 100644
+index 24535e6..f246d1d 100644
 --- a/options/linux-headers/include/asm/ioctls.h
 +++ b/options/linux-headers/include/asm/ioctls.h
-@@ -5,6 +5,8 @@
+@@ -5,6 +5,7 @@
  
  #define TCGETS 0x5401
  #define TCSETS 0x5402
 +#define TCSETSW 0x5403
-+#define TCSETSF 0x5404
+ #define TCSETSF 0x5404
  #define TIOCSCTTY 0x540E
  #define TIOCSTI 0x5412
- #define TIOCGWINSZ 0x5413
 diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
 index 90ba98c..8a79be7 100644
 --- a/options/posix/generic/pthread-stubs.cpp
@@ -5416,7 +5416,7 @@ index 285e07c..e3941e2 100644
  
  if not no_headers
 diff --git a/options/rtdl/generic/linker.cpp b/options/rtdl/generic/linker.cpp
-index 9620645..dbc619d 100644
+index 5326417..039982f 100644
 --- a/options/rtdl/generic/linker.cpp
 +++ b/options/rtdl/generic/linker.cpp
 @@ -13,8 +13,8 @@
@@ -6953,10 +6953,10 @@ index 8576e93..0253552 100644
  	return 0;
  }
 diff --git a/tests/meson.build b/tests/meson.build
-index 24a5b86..84c9114 100644
+index 36c223d..52d4f18 100644
 --- a/tests/meson.build
 +++ b/tests/meson.build
-@@ -25,6 +25,7 @@ posix_test_cases = [
+@@ -29,6 +29,7 @@ posix_test_cases = [
  	'pthread_cleanup',
  	'pthread_kill',
  	'pthread_key',
