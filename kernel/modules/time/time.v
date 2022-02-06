@@ -31,6 +31,31 @@ pub fn (mut this TimeSpec) add(interval TimeSpec) {
 	this.tv_sec += interval.tv_sec
 }
 
+pub fn (mut this TimeSpec) sub(interval TimeSpec) bool {
+	if interval.tv_nsec > this.tv_nsec {
+		diff := interval.tv_nsec - this.tv_nsec
+		this.tv_nsec = 999999999 - diff
+		if this.tv_sec == 0 {
+			this.tv_sec = 0
+			this.tv_nsec = 0
+			return true
+		}
+		this.tv_sec--
+	} else {
+		this.tv_nsec -= interval.tv_nsec
+	}
+	if interval.tv_sec > this.tv_sec {
+		this.tv_sec = 0
+		this.tv_nsec = 0
+		return true
+	}
+	this.tv_sec -= interval.tv_sec
+	if this.tv_sec == 0 && this.tv_nsec == 0 {
+		return true
+	}
+	return false
+}
+
 __global (
 	monotonic_clock TimeSpec
 	realtime_clock TimeSpec
@@ -52,21 +77,15 @@ fn timer_handler() {
 	realtime_clock.add(interval)
 
 	if timers_lock.test_and_acquire() == true {
-		mt := monotonic_clock
-
 		for i := 0; i < armed_timers.len; i++ {
 			mut timer := armed_timers[i]
 			if timer.fired == true {
 				continue
 			}
-			if timer.when.tv_sec > mt.tv_sec {
-				continue
+			if timer.when.sub(interval) {
+				C.event__trigger(mut &timer.event, false)
+				timer.fired = true
 			}
-			if timer.when.tv_sec == mt.tv_sec && timer.when.tv_nsec > mt.tv_nsec {
-				continue
-			}
-			C.event__trigger(mut &timer.event, false)
-			timer.fired = true
 		}
 
 		timers_lock.release()
@@ -75,7 +94,7 @@ fn timer_handler() {
 
 pub struct Timer {
 pub mut:
-	when TimeSpec
+	when  TimeSpec
 	event eventstruct.Event
 	index int
 	fired bool
@@ -86,29 +105,38 @@ __global (
 	armed_timers []&Timer
 )
 
-pub fn (mut this Timer) delete() {
+pub fn (mut this Timer) disarm() {
+	if armed_timers.len == 0 || this.index == -1 {
+		return
+	}
+
 	timers_lock.acquire()
 
 	armed_timers[this.index] = armed_timers[armed_timers.len - 1]
 	armed_timers.delete_last()
+	this.index = -1
 
 	timers_lock.release()
+}
 
-	unsafe { free(this) }
+pub fn (mut this Timer) arm() {
+	timers_lock.acquire()
+
+	this.fired = false
+	this.index = armed_timers.len
+	armed_timers << this
+
+	timers_lock.release()
 }
 
 pub fn new_timer(when TimeSpec) &Timer {
 	mut timer := &Timer{
 		when: when
 		fired: false
+		index: -1
 	}
 
-	timers_lock.acquire()
-
-	timer.index = armed_timers.len
-	armed_timers << timer
-
-	timers_lock.release()
+	timer.arm()
 
 	return timer
 }

@@ -26,7 +26,7 @@ pub mut:
 	current_directory        voidptr
 	event                    eventstruct.Event
 	status                   int
-	itimers                  [256]byte
+	itimers                  [4096]byte
 }
 
 pub struct SigAction {

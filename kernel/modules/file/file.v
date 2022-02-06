@@ -134,7 +134,6 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 	if voidptr(tmo_p) != voidptr(0) {
 		mut target_time := *tmo_p
-		target_time.add(monotonic_clock)
 
 		timer = time.new_timer(target_time)
 
@@ -143,7 +142,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 	defer {
 		if voidptr(timer) != voidptr(0) {
-			timer.delete()
+			timer.disarm()
 		}
 	}
 

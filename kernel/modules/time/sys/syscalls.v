@@ -49,13 +49,12 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 	mut events := []&eventstruct.Event{}
 
 	mut target_time := *req
-	target_time.add(monotonic_clock)
 
 	mut timer := time.new_timer(target_time)
 	events << &timer.event
 
 	defer {
-		timer.delete()
+		timer.disarm()
 	}
 
 	event.await(mut events, true) or {
