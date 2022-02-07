@@ -53,7 +53,66 @@ fn (mut this UnixSocket) mmap(page u64, flags int) voidptr {
 }
 
 fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
-	return error('')
+	mut count := _count
+
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+
+	handle := &file.Handle(_handle)
+
+	// If pipe is empty, block or return if nonblock
+	for katomic.load(this.used) == 0 {
+		// Return EOF if the pipe was closed
+		if this.refcount <= 1 {
+			return 0
+		}
+		if handle.flags & resource.o_nonblock != 0 {
+			return 0
+		}
+		this.l.release()
+		mut events := [&this.event]
+		event.await(mut events, true) or {
+			errno.set(errno.eintr)
+			return none
+		}
+		this.l.acquire()
+	}
+
+	if this.used < count {
+		count = this.used
+	}
+
+	// Calculate sizes before and after wrap-around and new ptr location
+	mut before_wrap := u64(0)
+	mut after_wrap := u64(0)
+	mut new_ptr_loc := u64(0)
+	if this.read_ptr + count > this.capacity {
+		before_wrap = this.capacity - this.read_ptr
+		after_wrap = count - before_wrap
+		new_ptr_loc = after_wrap
+	} else {
+		before_wrap = count
+		after_wrap = 0
+		new_ptr_loc = this.read_ptr + count
+		if new_ptr_loc == this.capacity {
+			new_ptr_loc = 0
+		}
+	}
+
+	unsafe { C.memcpy(buf, &this.data[this.read_ptr], before_wrap) }
+	if after_wrap != 0 {
+		unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), &this.data[0], after_wrap) }
+	}
+
+	this.read_ptr = new_ptr_loc
+	this.used -= count
+
+	this.peer.status |= file.epollout
+	event.trigger(mut this.peer.event, false)
+
+	return i64(count)
 }
 
 fn (mut this UnixSocket) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
@@ -290,11 +349,11 @@ fn (mut this UnixSocket) recvmsg(handle voidptr, msg &sock_pub.MsgHdr, flags int
 		return error('')
 	}
 
-	this.status = 0
-	this.status |= file.pollout
-	event.trigger(mut this.event, true)
+	this.peer.status |= file.pollout
+	event.trigger(mut this.peer.event, true)
 
 	for {}
+
 
 	return 0
 }

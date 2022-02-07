@@ -55,6 +55,9 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 	if @type & sock_pub.sock_cloexec != 0 {
 		flags |= resource.o_cloexec
 	}
+	if @type & sock_pub.sock_nonblock != 0 {
+		flags |= resource.o_nonblock
+	}
 
 	unsafe {
 		ret[0] = file.fdnum_create_from_resource(voidptr(0), mut socket0, flags, 0, false) or {
@@ -79,6 +82,9 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 	mut flags := int(0)
 	if @type & sock_pub.sock_cloexec != 0 {
 		flags |= resource.o_cloexec
+	}
+	if @type & sock_pub.sock_nonblock != 0 {
+		flags |= resource.o_nonblock
 	}
 
 	ret := file.fdnum_create_from_resource(voidptr(0), mut socket, flags, 0, false) or {

@@ -41,7 +41,7 @@ fn itimer_handler(mut itimer ITimer, mut process proc.Process) {
 
 		C.printf(c'itimer triggered\n')
 
-		userland.sendsig(process.threads[0], userland.sigabrt)
+		userland.sendsig(process.threads[0], userland.sigalrm)
 	}
 
 	for {}
