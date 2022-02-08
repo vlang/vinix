@@ -30,12 +30,14 @@ mut:
 	recvmsg(handle voidptr, msg &MsgHdr, flags int) ?u64
 }
 
-struct IoVec {
+pub struct IoVec {
+pub mut:
 	iov_base voidptr
 	iov_len u64
 }
 
-struct MsgHdr {
+pub struct MsgHdr {
+pub mut:
 	msg_name voidptr
 	msg_namelen u64
 	msg_iov &IoVec

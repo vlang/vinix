@@ -1,6 +1,6 @@
-From a5121d1a820ba11fc57a5deb09cf46dca09cd5e6 Mon Sep 17 00:00:00 2001
+From 77281fc680d37a8f8f2cb037953038cdb9313cc4 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 6 Feb 2022 06:27:03 +0100
+Date: Mon, 7 Feb 2022 21:31:55 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -26,6 +26,7 @@ Subject: [PATCH] Vinix specific changes
  options/posix/generic/regex/regexec.c         | 1026 ++++++
  options/posix/generic/regex/tre-mem.c         |  158 +
  options/posix/generic/regex/tre.h             |  233 ++
+ options/posix/generic/sys-socket-stubs.cpp    |    7 +-
  options/posix/generic/sys-time-stubs.cpp      |   16 +-
  options/posix/generic/unistd-stubs.cpp        |    4 +-
  options/posix/include/mlibc/posix-sysdeps.hpp |    7 +-
@@ -74,7 +75,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 70 files changed, 6051 insertions(+), 193 deletions(-)
+ 71 files changed, 6055 insertions(+), 196 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -5254,6 +5255,31 @@ index 0000000..5b4e802
 +#define xfree free
 +#define xrealloc realloc
 +
+diff --git a/options/posix/generic/sys-socket-stubs.cpp b/options/posix/generic/sys-socket-stubs.cpp
+index b612302..909d7e5 100644
+--- a/options/posix/generic/sys-socket-stubs.cpp
++++ b/options/posix/generic/sys-socket-stubs.cpp
+@@ -7,9 +7,6 @@
+ #include <mlibc/posix-sysdeps.hpp>
+ 
+ int accept(int fd, struct sockaddr *__restrict addr_ptr, socklen_t *__restrict addr_length) {
+-	if(addr_ptr || addr_length)
+-		mlibc::infoLogger() << "\e[35mmlibc: accept() does not fill struct sockaddr\e[39m"
+-				<< frg::endlog;
+ 	int newfd;
+ 	if(!mlibc::sys_accept) {
+ 		MLIBC_MISSING_SYSDEP();
+@@ -20,6 +17,10 @@ int accept(int fd, struct sockaddr *__restrict addr_ptr, socklen_t *__restrict a
+ 		errno = e;
+ 		return -1;
+ 	}
++	if(int e = mlibc::sys_peername(newfd, addr_ptr, *addr_length, addr_length); e) {
++		errno = e;
++		return -1;
++	}
+ 	return newfd;
+ }
+ 
 diff --git a/options/posix/generic/sys-time-stubs.cpp b/options/posix/generic/sys-time-stubs.cpp
 index 49fd3bf..2d17b58 100644
 --- a/options/posix/generic/sys-time-stubs.cpp
@@ -5793,7 +5819,7 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/sysdeps/vinix/generic/entry.cpp b/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..e7c792b
+index 0000000..2396b99
 --- /dev/null
 +++ b/sysdeps/vinix/generic/entry.cpp
 @@ -0,0 +1,99 @@
@@ -5856,7 +5882,7 @@ index 0000000..e7c792b
 +static void __mlibc_sigentry(int which, siginfo_t *siginfo,
 +                             void (*sa)(int, siginfo_t *, void *),
 +                             GPRState *ret_context, sigset_t prev_mask) {
-+    size_t *base_ptr = (size_t *)ret_context->rbp;
++    size_t *base_ptr = (size_t *)ret_context->rbp;/*
 +    mlibc::infoLogger() << "Stacktrace:" << frg::endlog;
 +    mlibc::infoLogger() << "  [" << (void *)ret_context->rip << "]" << frg::endlog;
 +    for (;;) {
@@ -5869,7 +5895,7 @@ index 0000000..e7c792b
 +        if (!old_bp)
 +            break;
 +        base_ptr = (size_t *)old_bp;
-+    }
++    }*/
 +
 +    switch ((uintptr_t)sa) {
 +        // DFL

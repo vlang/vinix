@@ -106,17 +106,21 @@ __global (
 )
 
 pub fn (mut this Timer) disarm() {
+	timers_lock.acquire()
+	defer {
+		timers_lock.release()
+	}
+
 	if armed_timers.len == 0 || this.index == -1 {
 		return
 	}
-
-	timers_lock.acquire()
+	if this.index >= armed_timers.len {
+		return
+	}
 
 	armed_timers[this.index] = armed_timers[armed_timers.len - 1]
 	armed_timers.delete_last()
 	this.index = -1
-
-	timers_lock.release()
 }
 
 pub fn (mut this Timer) arm() {
