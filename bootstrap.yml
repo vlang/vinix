@@ -641,7 +641,7 @@ tasks:
       - init
       - util-vinix
       - bash
-      - v
+#      - v
       - coreutils
       - less
       - nano
