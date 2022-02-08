@@ -49,8 +49,8 @@ sources:
   - name: glib
     subdir: '3rdparty'
     git: 'https://gitlab.gnome.org/GNOME/glib.git'
-    tag: '2.70.1'
-    version: '2.70.1'
+    tag: '2.70.3'
+    version: '2.70.3'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -202,6 +202,7 @@ sources:
     git: 'https://git.savannah.gnu.org/git/bison.git'
     tag: 'v3.6.2'
     version: '3.6.2'
+    sources_required: ['gnulib']
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
