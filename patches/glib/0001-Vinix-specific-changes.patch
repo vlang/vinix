@@ -1,66 +1,14 @@
-From 17f479429cad4791e849387a772ebef7e2ed7f57 Mon Sep 17 00:00:00 2001
+From 293fc578b13da4c77b490df9fdbc5fdf6e539e39 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Tue, 11 Jan 2022 18:20:36 +0100
+Date: Tue, 8 Feb 2022 22:52:50 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- gio/gnetworking.h.in    | 2 ++
- gio/gthreadedresolver.c | 2 +-
- gio/meson.build         | 4 ++--
- glib/glib-init.c        | 1 +
- glib/gstrfuncs.c        | 5 +++--
- meson.build             | 1 -
- 6 files changed, 9 insertions(+), 6 deletions(-)
+ glib/glib-init.c | 1 +
+ glib/gstrfuncs.c | 1 +
+ meson.build      | 1 -
+ 3 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/gio/gnetworking.h.in b/gio/gnetworking.h.in
-index 2fa95ff..1536318 100644
---- a/gio/gnetworking.h.in
-+++ b/gio/gnetworking.h.in
-@@ -43,7 +43,9 @@
- #include <net/if.h>
- 
- #include <arpa/inet.h>
-+#if __has_include(<arpa/nameser.h>)
- #include <arpa/nameser.h>
-+#endif
- @NAMESER_COMPAT_INCLUDE@
- 
- #ifndef T_SRV
-diff --git a/gio/gthreadedresolver.c b/gio/gthreadedresolver.c
-index 93794b5..fd968e0 100644
---- a/gio/gthreadedresolver.c
-+++ b/gio/gthreadedresolver.c
-@@ -394,7 +394,7 @@ lookup_by_address_finish (GResolver     *resolver,
- 
- #if defined(G_OS_UNIX)
- 
--#if defined __BIONIC__ && !defined BIND_4_COMPAT
-+#if (defined __BIONIC__ || defined (__vinix__)) && !defined BIND_4_COMPAT
- /* Copy from bionic/libc/private/arpa_nameser_compat.h
-  * and bionic/libc/private/arpa_nameser.h */
- typedef struct {
-diff --git a/gio/meson.build b/gio/meson.build
-index 49a37a7..38dfbac 100644
---- a/gio/meson.build
-+++ b/gio/meson.build
-@@ -27,7 +27,7 @@ if host_system not in ['windows', 'android']
-                    name : 'arpa/nameser_compat.h needed for C_IN')
-       gnetworking_h_nameser_compat_include = '#include <arpa/nameser_compat.h>'
-     else
--      error('Could not find required includes for ARPA C_IN')
-+      warning('Could not find required includes for ARPA C_IN')
-     endif
-   endif
- endif
-@@ -55,7 +55,7 @@ if host_system != 'windows'
-       network_libs += [ cc.find_library('socket') ]
-       network_args += [ '-lsocket' ]
-     else
--      error('Could not find res_query()')
-+      warning('Could not find res_query()')
-     endif
-   endif
- 
 diff --git a/glib/glib-init.c b/glib/glib-init.c
 index 2958fb5..e602738 100644
 --- a/glib/glib-init.c
@@ -74,7 +22,7 @@ index 2958fb5..e602738 100644
  #include <stdio.h>
  #include <ctype.h>
 diff --git a/glib/gstrfuncs.c b/glib/gstrfuncs.c
-index b6ff60f..b41ad13 100644
+index ef69206..ef13019 100644
 --- a/glib/gstrfuncs.c
 +++ b/glib/gstrfuncs.c
 @@ -33,6 +33,7 @@
@@ -85,29 +33,11 @@ index b6ff60f..b41ad13 100644
  #include <locale.h>
  #include <errno.h>
  #include <garray.h>
-@@ -272,7 +273,7 @@
-  * on systems with 64bit IEEE-compatible doubles.
-  *
-  * The typical usage would be something like:
-- * |[<!-- language="C" --> 
-+ * |[<!-- language="C" -->
-  *   char buf[G_ASCII_DTOSTR_BUF_SIZE];
-  *
-  *   fprintf (out, "value=%s\n", g_ascii_dtostr (buf, sizeof (buf), value));
-@@ -1400,7 +1401,7 @@ g_strsignal (gint signum)
- 
- /* Functions g_strlcpy and g_strlcat were originally developed by
-  * Todd C. Miller <Todd.Miller@courtesan.com> to simplify writing secure code.
-- * See http://www.openbsd.org/cgi-bin/man.cgi?query=strlcpy 
-+ * See http://www.openbsd.org/cgi-bin/man.cgi?query=strlcpy
-  * for more information.
-  */
- 
 diff --git a/meson.build b/meson.build
-index a0223ce..b4941b9 100644
+index 2b08f56..6590028 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -438,7 +438,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
+@@ -443,7 +443,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
      # A zero-length format string shouldn't be considered an issue.
      '-Wno-format-zero-length',
      '-Werror=declaration-after-statement',
@@ -116,5 +46,5 @@ index a0223ce..b4941b9 100644
      '-Werror=init-self',
      '-Werror=missing-include-dirs',
 -- 
-2.34.1
+2.35.1
 
