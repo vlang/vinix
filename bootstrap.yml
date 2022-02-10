@@ -101,8 +101,8 @@ sources:
   - name: binutils
     subdir: '3rdparty'
     git: 'https://sourceware.org/git/binutils-gdb.git'
-    tag: 'binutils-2_37'
-    version: '2.37'
+    tag: 'binutils-2_38'
+    version: '2.38'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
