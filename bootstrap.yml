@@ -160,7 +160,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '054c8b1f1321bf8327b0b65e2a9f24602eeead20'
+    commit: '7178367de0161a6eaba8d1227b534e52b9592703'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -168,7 +168,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/vc.git'
     branch: 'master'
-    commit: '5407ef195c4b695dbcd4e11e1db07fcd126da773'
+    commit: 'b457d639b4a45f49c2f6a4d8e50b0f2c02f91868'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -429,7 +429,7 @@ tools:
           cp -r "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
           cd "@PREFIX@/v"
           rm -v *.xbstrap
-          cc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v -lm -lpthread
+          cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v -lm -lpthread
           mkdir -p "@PREFIX@/bin"
           ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"
 
