@@ -1,6 +1,6 @@
-From 77281fc680d37a8f8f2cb037953038cdb9313cc4 Mon Sep 17 00:00:00 2001
+From cf8ca9b0eb367cbf827279c865c3998d79d28b2a Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 7 Feb 2022 21:31:55 +0100
+Date: Fri, 11 Feb 2022 21:54:33 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -116,7 +116,7 @@ Subject: [PATCH] Vinix specific changes
  create mode 100644 tests/posix/pthread_attr.c
 
 diff --git a/abis/dripos/errno.h b/abis/dripos/errno.h
-index 68cb386..f9e7c2b 100644
+index 68cb3869..f9e7c2b1 100644
 --- a/abis/dripos/errno.h
 +++ b/abis/dripos/errno.h
 @@ -109,6 +109,7 @@
@@ -128,7 +128,7 @@ index 68cb386..f9e7c2b 100644
  #define EBADMSG			82
  #define ECANCELED		83
 diff --git a/abis/mlibc/signal.h b/abis/mlibc/signal.h
-index 5c63bca..eaf115b 100644
+index 5c63bca3..eaf115ba 100644
 --- a/abis/mlibc/signal.h
 +++ b/abis/mlibc/signal.h
 @@ -127,10 +127,12 @@ struct sigevent {
@@ -147,7 +147,7 @@ index 5c63bca..eaf115b 100644
  
  // TODO: this struct won't work on all arches (for example aarch64) but
 diff --git a/meson.build b/meson.build
-index 6c7b407..00f616e 100644
+index 6c7b4073..00f616e0 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -115,6 +115,10 @@ elif host_machine.system() == 'qword'
@@ -162,7 +162,7 @@ index 6c7b407..00f616e 100644
  	#disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/sigma/include')
 diff --git a/options/ansi/generic/stdio-stubs.cpp b/options/ansi/generic/stdio-stubs.cpp
-index c21696c..c34d447 100644
+index c21696c7..c34d4472 100644
 --- a/options/ansi/generic/stdio-stubs.cpp
 +++ b/options/ansi/generic/stdio-stubs.cpp
 @@ -497,10 +497,10 @@ static int do_scanf(H &handler, const char *fmt, __gnuc_va_list args) {
@@ -192,10 +192,10 @@ index c21696c..c34d447 100644
                          break;
                      }
 diff --git a/options/ansi/generic/stdlib-stubs.cpp b/options/ansi/generic/stdlib-stubs.cpp
-index 347c659..e150d33 100644
+index fd8f5b14..fd630022 100644
 --- a/options/ansi/generic/stdlib-stubs.cpp
 +++ b/options/ansi/generic/stdlib-stubs.cpp
-@@ -428,7 +428,7 @@ int mblen(const char *mbs, size_t mb_limit) {
+@@ -435,7 +435,7 @@ int mblen(const char *mbs, size_t mb_limit) {
  }
  
  int mbtowc(wchar_t *__restrict wc, const char *__restrict mbs, size_t max_size) {
@@ -205,7 +205,7 @@ index 347c659..e150d33 100644
  
  	if(wc && mbs){
 diff --git a/options/ansi/include/inttypes.h b/options/ansi/include/inttypes.h
-index be9b874..968a849 100644
+index be9b8742..968a849a 100644
 --- a/options/ansi/include/inttypes.h
 +++ b/options/ansi/include/inttypes.h
 @@ -95,6 +95,7 @@
@@ -217,7 +217,7 @@ index be9b874..968a849 100644
  #define SCNd64 "ld"
  
 diff --git a/options/ansi/include/limits.h b/options/ansi/include/limits.h
-index 300c436..a2883b0 100644
+index 300c436b..a2883b05 100644
 --- a/options/ansi/include/limits.h
 +++ b/options/ansi/include/limits.h
 @@ -32,6 +32,9 @@
@@ -231,7 +231,7 @@ index 300c436..a2883b0 100644
  #define NGROUPS_MAX 8
  // POSIX states 9 is the minimum for NL_ARGMAX
 diff --git a/options/ansi/include/mlibc/ansi-sysdeps.hpp b/options/ansi/include/mlibc/ansi-sysdeps.hpp
-index fe81c4e..a54b513 100644
+index fe81c4ea..a54b5136 100644
 --- a/options/ansi/include/mlibc/ansi-sysdeps.hpp
 +++ b/options/ansi/include/mlibc/ansi-sysdeps.hpp
 @@ -6,6 +6,7 @@
@@ -251,7 +251,7 @@ index fe81c4e..a54b513 100644
  
  } //namespace mlibc
 diff --git a/options/internal/include/mlibc/internal-sysdeps.hpp b/options/internal/include/mlibc/internal-sysdeps.hpp
-index d5f5a00..e56e30c 100644
+index d5f5a00e..e56e30cf 100644
 --- a/options/internal/include/mlibc/internal-sysdeps.hpp
 +++ b/options/internal/include/mlibc/internal-sysdeps.hpp
 @@ -9,6 +9,7 @@
@@ -273,7 +273,7 @@ index d5f5a00..e56e30c 100644
  
  #endif // MLIBC_INTERNAL_SYSDEPS
 diff --git a/options/internal/include/mlibc/tcb.hpp b/options/internal/include/mlibc/tcb.hpp
-index f8a3fe8..962a1c9 100644
+index f8a3fe8e..962a1c97 100644
 --- a/options/internal/include/mlibc/tcb.hpp
 +++ b/options/internal/include/mlibc/tcb.hpp
 @@ -107,5 +107,8 @@ struct Tcb {
@@ -286,7 +286,7 @@ index f8a3fe8..962a1c9 100644
  };
  
 diff --git a/options/internal/include/mlibc/thread.hpp b/options/internal/include/mlibc/thread.hpp
-index 0781966..0909e18 100644
+index 0781966f..0909e18c 100644
 --- a/options/internal/include/mlibc/thread.hpp
 +++ b/options/internal/include/mlibc/thread.hpp
 @@ -1,9 +1,11 @@
@@ -302,7 +302,7 @@ index 0781966..0909e18 100644
  
  } // namespace mlibc
 diff --git a/options/internal/x86_64/thread.cpp b/options/internal/x86_64/thread.cpp
-index ae0b023..6b320cd 100644
+index ae0b0230..6b320cd0 100644
 --- a/options/internal/x86_64/thread.cpp
 +++ b/options/internal/x86_64/thread.cpp
 @@ -10,4 +10,10 @@ Tcb *get_current_tcb() {
@@ -317,7 +317,7 @@ index ae0b023..6b320cd 100644
 +
  } // namespace mlibc
 diff --git a/options/linux-headers/include/asm/ioctls.h b/options/linux-headers/include/asm/ioctls.h
-index 24535e6..f246d1d 100644
+index 24535e6f..f246d1d2 100644
 --- a/options/linux-headers/include/asm/ioctls.h
 +++ b/options/linux-headers/include/asm/ioctls.h
 @@ -5,6 +5,7 @@
@@ -329,7 +329,7 @@ index 24535e6..f246d1d 100644
  #define TIOCSCTTY 0x540E
  #define TIOCSTI 0x5412
 diff --git a/options/posix/generic/pthread-stubs.cpp b/options/posix/generic/pthread-stubs.cpp
-index 90ba98c..8a79be7 100644
+index 90ba98c6..8a79be72 100644
 --- a/options/posix/generic/pthread-stubs.cpp
 +++ b/options/posix/generic/pthread-stubs.cpp
 @@ -1,10 +1,12 @@
@@ -625,7 +625,7 @@ index 90ba98c..8a79be7 100644
  	__builtin_unreachable();
 diff --git a/options/posix/generic/regex.cpp b/options/posix/generic/regex.cpp
 deleted file mode 100644
-index c937162..0000000
+index c937162d..00000000
 --- a/options/posix/generic/regex.cpp
 +++ /dev/null
 @@ -1,23 +0,0 @@
@@ -656,7 +656,7 @@ diff --git a/options/posix/musl-generic/fnmatch.cpp b/options/posix/generic/rege
 similarity index 96%
 rename from options/posix/musl-generic/fnmatch.cpp
 rename to options/posix/generic/regex/fnmatch.c
-index 402225e..9e90852 100644
+index 402225e0..9e908520 100644
 --- a/options/posix/musl-generic/fnmatch.cpp
 +++ b/options/posix/generic/regex/fnmatch.c
 @@ -18,7 +18,6 @@
@@ -718,7 +718,7 @@ diff --git a/options/posix/musl-generic/glob.cpp b/options/posix/generic/regex/g
 similarity index 89%
 rename from options/posix/musl-generic/glob.cpp
 rename to options/posix/generic/regex/glob.c
-index cd35234..fdedbfa 100644
+index cd35234a..fdedbfa0 100644
 --- a/options/posix/musl-generic/glob.cpp
 +++ b/options/posix/generic/regex/glob.c
 @@ -1,3 +1,4 @@
@@ -822,7 +822,7 @@ index cd35234..fdedbfa 100644
 +weak_alias(globfree, globfree64);
 diff --git a/options/posix/generic/regex/regcomp.c b/options/posix/generic/regex/regcomp.c
 new file mode 100644
-index 0000000..fb24556
+index 00000000..fb24556e
 --- /dev/null
 +++ b/options/posix/generic/regex/regcomp.c
 @@ -0,0 +1,2953 @@
@@ -3781,7 +3781,7 @@ index 0000000..fb24556
 +}
 diff --git a/options/posix/generic/regex/regerror.c b/options/posix/generic/regex/regerror.c
 new file mode 100644
-index 0000000..df4afa4
+index 00000000..df4afa4f
 --- /dev/null
 +++ b/options/posix/generic/regex/regerror.c
 @@ -0,0 +1,35 @@
@@ -3822,7 +3822,7 @@ index 0000000..df4afa4
 +}
 diff --git a/options/posix/generic/regex/regexec.c b/options/posix/generic/regex/regexec.c
 new file mode 100644
-index 0000000..8c572e7
+index 00000000..8c572e75
 --- /dev/null
 +++ b/options/posix/generic/regex/regexec.c
 @@ -0,0 +1,1026 @@
@@ -4854,7 +4854,7 @@ index 0000000..8c572e7
 +}
 diff --git a/options/posix/generic/regex/tre-mem.c b/options/posix/generic/regex/tre-mem.c
 new file mode 100644
-index 0000000..86f809d
+index 00000000..86f809d4
 --- /dev/null
 +++ b/options/posix/generic/regex/tre-mem.c
 @@ -0,0 +1,158 @@
@@ -5018,7 +5018,7 @@ index 0000000..86f809d
 +}
 diff --git a/options/posix/generic/regex/tre.h b/options/posix/generic/regex/tre.h
 new file mode 100644
-index 0000000..5b4e802
+index 00000000..5b4e8021
 --- /dev/null
 +++ b/options/posix/generic/regex/tre.h
 @@ -0,0 +1,233 @@
@@ -5256,7 +5256,7 @@ index 0000000..5b4e802
 +#define xrealloc realloc
 +
 diff --git a/options/posix/generic/sys-socket-stubs.cpp b/options/posix/generic/sys-socket-stubs.cpp
-index b612302..909d7e5 100644
+index b6123020..909d7e5d 100644
 --- a/options/posix/generic/sys-socket-stubs.cpp
 +++ b/options/posix/generic/sys-socket-stubs.cpp
 @@ -7,9 +7,6 @@
@@ -5281,7 +5281,7 @@ index b612302..909d7e5 100644
  }
  
 diff --git a/options/posix/generic/sys-time-stubs.cpp b/options/posix/generic/sys-time-stubs.cpp
-index 49fd3bf..2d17b58 100644
+index 49fd3bfc..2d17b587 100644
 --- a/options/posix/generic/sys-time-stubs.cpp
 +++ b/options/posix/generic/sys-time-stubs.cpp
 @@ -41,11 +41,15 @@ int timerisset(struct timeval *) {
@@ -5307,7 +5307,7 @@ index 49fd3bf..2d17b58 100644
 +	}
  }
 diff --git a/options/posix/generic/unistd-stubs.cpp b/options/posix/generic/unistd-stubs.cpp
-index 4917a15..c134e42 100644
+index 4917a153..c134e420 100644
 --- a/options/posix/generic/unistd-stubs.cpp
 +++ b/options/posix/generic/unistd-stubs.cpp
 @@ -848,12 +848,12 @@ int ttyname_r(int, char *, size_t) {
@@ -5326,7 +5326,7 @@ index 4917a15..c134e42 100644
  		return -1;
  	}
 diff --git a/options/posix/include/mlibc/posix-sysdeps.hpp b/options/posix/include/mlibc/posix-sysdeps.hpp
-index 0025f8f..2c31b01 100644
+index 0025f8f1..2c31b016 100644
 --- a/options/posix/include/mlibc/posix-sysdeps.hpp
 +++ b/options/posix/include/mlibc/posix-sysdeps.hpp
 @@ -21,6 +21,7 @@
@@ -5358,7 +5358,7 @@ index 0025f8f..2c31b01 100644
  
  #endif // MLIBC_POSIX_SYSDEPS
 diff --git a/options/posix/include/pthread.h b/options/posix/include/pthread.h
-index 2f2e2f7..c05808e 100644
+index 2f2e2f7e..c05808e8 100644
 --- a/options/posix/include/pthread.h
 +++ b/options/posix/include/pthread.h
 @@ -25,6 +25,10 @@ extern "C" {
@@ -5443,7 +5443,7 @@ index 2f2e2f7..c05808e 100644
  // pthread functions.
  int pthread_create(pthread_t *__restrict, const pthread_attr_t *__restrict,
 diff --git a/options/posix/include/regex.h b/options/posix/include/regex.h
-index 1579c95..c1034c6 100644
+index 1579c951..c1034c61 100644
 --- a/options/posix/include/regex.h
 +++ b/options/posix/include/regex.h
 @@ -11,7 +11,9 @@ typedef ptrdiff_t regoff_t;
@@ -5458,7 +5458,7 @@ index 1579c95..c1034c6 100644
  
  typedef struct {
 diff --git a/options/posix/meson.build b/options/posix/meson.build
-index 285e07c..e3941e2 100644
+index 285e07c7..e3941e2a 100644
 --- a/options/posix/meson.build
 +++ b/options/posix/meson.build
 @@ -24,7 +24,14 @@ libc_sources += files(
@@ -5487,7 +5487,7 @@ index 285e07c..e3941e2 100644
  
  if not no_headers
 diff --git a/options/rtdl/generic/linker.cpp b/options/rtdl/generic/linker.cpp
-index 5326417..039982f 100644
+index 53264175..039982f7 100644
 --- a/options/rtdl/generic/linker.cpp
 +++ b/options/rtdl/generic/linker.cpp
 @@ -13,8 +13,8 @@
@@ -5502,7 +5502,7 @@ index 5326417..039982f 100644
  
  #if defined(__x86_64__)
 diff --git a/sysdeps/dripos/generic/generic.cpp b/sysdeps/dripos/generic/generic.cpp
-index 0a85169..ba1f536 100644
+index 0a851691..ba1f5369 100644
 --- a/sysdeps/dripos/generic/generic.cpp
 +++ b/sysdeps/dripos/generic/generic.cpp
 @@ -214,13 +214,12 @@ int sys_futex_wake(int *pointer) {
@@ -5522,7 +5522,7 @@ index 0a85169..ba1f536 100644
  
  	if (tid_out)
 diff --git a/sysdeps/dripos/generic/thread.cpp b/sysdeps/dripos/generic/thread.cpp
-index 35e7a9b..1e0cedf 100644
+index 35e7a9be..1e0cedf2 100644
 --- a/sysdeps/dripos/generic/thread.cpp
 +++ b/sysdeps/dripos/generic/thread.cpp
 @@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
@@ -5563,7 +5563,7 @@ index 35e7a9b..1e0cedf 100644
  
  } //namespace mlibc
 diff --git a/sysdeps/lemon/generic/lemon.cpp b/sysdeps/lemon/generic/lemon.cpp
-index fd94b7d..795f9b6 100644
+index fd94b7df..795f9b67 100644
 --- a/sysdeps/lemon/generic/lemon.cpp
 +++ b/sysdeps/lemon/generic/lemon.cpp
 @@ -140,8 +140,7 @@ void sys_yield(){
@@ -5583,7 +5583,7 @@ index fd94b7d..795f9b6 100644
 -} 
 +}
 diff --git a/sysdeps/lemon/generic/thread.cpp b/sysdeps/lemon/generic/thread.cpp
-index 574b98d..d0d00ba 100644
+index 574b98d2..d0d00bab 100644
 --- a/sysdeps/lemon/generic/thread.cpp
 +++ b/sysdeps/lemon/generic/thread.cpp
 @@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
@@ -5624,7 +5624,7 @@ index 574b98d..d0d00ba 100644
  
  } //namespace mlibc
 diff --git a/sysdeps/linux/generic/sysdeps.cpp b/sysdeps/linux/generic/sysdeps.cpp
-index 582115a..5e98472 100644
+index 582115a4..5e984724 100644
 --- a/sysdeps/linux/generic/sysdeps.cpp
 +++ b/sysdeps/linux/generic/sysdeps.cpp
 @@ -366,9 +366,7 @@ int sys_sigprocmask(int how, const sigset_t *set, sigset_t *old) {
@@ -5639,7 +5639,7 @@ index 582115a..5e98472 100644
  		| CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_SETTLS
  		| CLONE_PARENT_SETTID;
 diff --git a/sysdeps/linux/x86_64/thread.cpp b/sysdeps/linux/x86_64/thread.cpp
-index 94d03b6..ed2ec5a 100644
+index 94d03b6e..ed2ec5a6 100644
 --- a/sysdeps/linux/x86_64/thread.cpp
 +++ b/sysdeps/linux/x86_64/thread.cpp
 @@ -5,11 +5,7 @@
@@ -5704,7 +5704,7 @@ index 94d03b6..ed2ec5a 100644
  }
  } // namespace mlibc
 diff --git a/sysdeps/managarm/aarch64/thread.cpp b/sysdeps/managarm/aarch64/thread.cpp
-index 48029b5..d0d00ba 100644
+index 48029b54..d0d00bab 100644
 --- a/sysdeps/managarm/aarch64/thread.cpp
 +++ b/sysdeps/managarm/aarch64/thread.cpp
 @@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
@@ -5745,7 +5745,7 @@ index 48029b5..d0d00ba 100644
  
  } //namespace mlibc
 diff --git a/sysdeps/managarm/generic/fork-exec.cpp b/sysdeps/managarm/generic/fork-exec.cpp
-index 88ca04a..80db6ce 100644
+index 88ca04a0..80db6ce5 100644
 --- a/sysdeps/managarm/generic/fork-exec.cpp
 +++ b/sysdeps/managarm/generic/fork-exec.cpp
 @@ -618,14 +618,11 @@ int sys_getrusage(int scope, struct rusage *usage) {
@@ -5766,7 +5766,7 @@ index 88ca04a..80db6ce 100644
  
  	if (pid_out)
 diff --git a/sysdeps/managarm/x86_64/thread.cpp b/sysdeps/managarm/x86_64/thread.cpp
-index 48029b5..d0d00ba 100644
+index 48029b54..d0d00bab 100644
 --- a/sysdeps/managarm/x86_64/thread.cpp
 +++ b/sysdeps/managarm/x86_64/thread.cpp
 @@ -28,17 +28,29 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg, Tcb *tcb) {
@@ -5808,7 +5808,7 @@ index 48029b5..d0d00ba 100644
  } //namespace mlibc
 diff --git a/sysdeps/vinix/crt-x86_64/crt0.S b/sysdeps/vinix/crt-x86_64/crt0.S
 new file mode 100644
-index 0000000..06ab8a7
+index 00000000..06ab8a70
 --- /dev/null
 +++ b/sysdeps/vinix/crt-x86_64/crt0.S
 @@ -0,0 +1,5 @@
@@ -5819,7 +5819,7 @@ index 0000000..06ab8a7
 +    call __mlibc_entry
 diff --git a/sysdeps/vinix/generic/entry.cpp b/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..2396b99
+index 00000000..2396b99f
 --- /dev/null
 +++ b/sysdeps/vinix/generic/entry.cpp
 @@ -0,0 +1,99 @@
@@ -5924,7 +5924,7 @@ index 0000000..2396b99
 +
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..de5306f
+index 00000000..de5306ff
 --- /dev/null
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -0,0 +1,884 @@
@@ -6814,7 +6814,7 @@ index 0000000..de5306f
 +} // namespace mlibc
 diff --git a/sysdeps/vinix/include/abi-bits/abi.h b/sysdeps/vinix/include/abi-bits/abi.h
 new file mode 120000
-index 0000000..c945860
+index 00000000..c9458601
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/abi.h
 @@ -0,0 +1 @@
@@ -6822,7 +6822,7 @@ index 0000000..c945860
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/auxv.h b/sysdeps/vinix/include/abi-bits/auxv.h
 new file mode 120000
-index 0000000..b7bb109
+index 00000000..b7bb1093
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/auxv.h
 @@ -0,0 +1 @@
@@ -6830,7 +6830,7 @@ index 0000000..b7bb109
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/blkcnt_t.h b/sysdeps/vinix/include/abi-bits/blkcnt_t.h
 new file mode 120000
-index 0000000..e9d9f1b
+index 00000000..e9d9f1b4
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/blkcnt_t.h
 @@ -0,0 +1 @@
@@ -6838,7 +6838,7 @@ index 0000000..e9d9f1b
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/blksize_t.h b/sysdeps/vinix/include/abi-bits/blksize_t.h
 new file mode 120000
-index 0000000..c6dfb6e
+index 00000000..c6dfb6e0
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/blksize_t.h
 @@ -0,0 +1 @@
@@ -6846,7 +6846,7 @@ index 0000000..c6dfb6e
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/dev_t.h b/sysdeps/vinix/include/abi-bits/dev_t.h
 new file mode 120000
-index 0000000..0c1143b
+index 00000000..0c1143b9
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/dev_t.h
 @@ -0,0 +1 @@
@@ -6854,7 +6854,7 @@ index 0000000..0c1143b
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/errno.h b/sysdeps/vinix/include/abi-bits/errno.h
 new file mode 120000
-index 0000000..589859f
+index 00000000..589859fb
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/errno.h
 @@ -0,0 +1 @@
@@ -6862,7 +6862,7 @@ index 0000000..589859f
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/fcntl.h b/sysdeps/vinix/include/abi-bits/fcntl.h
 new file mode 120000
-index 0000000..ea5323a
+index 00000000..ea5323ad
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/fcntl.h
 @@ -0,0 +1 @@
@@ -6870,7 +6870,7 @@ index 0000000..ea5323a
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/gid_t.h b/sysdeps/vinix/include/abi-bits/gid_t.h
 new file mode 120000
-index 0000000..6a77218
+index 00000000..6a772180
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/gid_t.h
 @@ -0,0 +1 @@
@@ -6878,7 +6878,7 @@ index 0000000..6a77218
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/in.h b/sysdeps/vinix/include/abi-bits/in.h
 new file mode 120000
-index 0000000..b58c683
+index 00000000..b58c683f
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/in.h
 @@ -0,0 +1 @@
@@ -6886,7 +6886,7 @@ index 0000000..b58c683
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/ino_t.h b/sysdeps/vinix/include/abi-bits/ino_t.h
 new file mode 120000
-index 0000000..10d644e
+index 00000000..10d644e7
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/ino_t.h
 @@ -0,0 +1 @@
@@ -6894,7 +6894,7 @@ index 0000000..10d644e
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/limits.h b/sysdeps/vinix/include/abi-bits/limits.h
 new file mode 120000
-index 0000000..1aa5894
+index 00000000..1aa58942
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/limits.h
 @@ -0,0 +1 @@
@@ -6902,7 +6902,7 @@ index 0000000..1aa5894
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/mode_t.h b/sysdeps/vinix/include/abi-bits/mode_t.h
 new file mode 120000
-index 0000000..29d7733
+index 00000000..29d77331
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/mode_t.h
 @@ -0,0 +1 @@
@@ -6910,7 +6910,7 @@ index 0000000..29d7733
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/nlink_t.h b/sysdeps/vinix/include/abi-bits/nlink_t.h
 new file mode 120000
-index 0000000..7618c27
+index 00000000..7618c27f
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/nlink_t.h
 @@ -0,0 +1 @@
@@ -6918,7 +6918,7 @@ index 0000000..7618c27
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/pid_t.h b/sysdeps/vinix/include/abi-bits/pid_t.h
 new file mode 120000
-index 0000000..3fd26a7
+index 00000000..3fd26a7f
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/pid_t.h
 @@ -0,0 +1 @@
@@ -6926,7 +6926,7 @@ index 0000000..3fd26a7
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/reboot.h b/sysdeps/vinix/include/abi-bits/reboot.h
 new file mode 120000
-index 0000000..ecc3ddb
+index 00000000..ecc3ddb9
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/reboot.h
 @@ -0,0 +1 @@
@@ -6934,7 +6934,7 @@ index 0000000..ecc3ddb
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/resource.h b/sysdeps/vinix/include/abi-bits/resource.h
 new file mode 120000
-index 0000000..260b022
+index 00000000..260b0227
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/resource.h
 @@ -0,0 +1 @@
@@ -6942,7 +6942,7 @@ index 0000000..260b022
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/seek-whence.h b/sysdeps/vinix/include/abi-bits/seek-whence.h
 new file mode 120000
-index 0000000..3bd41ef
+index 00000000..3bd41efd
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/seek-whence.h
 @@ -0,0 +1 @@
@@ -6950,7 +6950,7 @@ index 0000000..3bd41ef
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/signal.h b/sysdeps/vinix/include/abi-bits/signal.h
 new file mode 120000
-index 0000000..b20e511
+index 00000000..b20e5119
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/signal.h
 @@ -0,0 +1 @@
@@ -6958,7 +6958,7 @@ index 0000000..b20e511
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/socket.h b/sysdeps/vinix/include/abi-bits/socket.h
 new file mode 120000
-index 0000000..0e1d6be
+index 00000000..0e1d6be9
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/socket.h
 @@ -0,0 +1 @@
@@ -6966,7 +6966,7 @@ index 0000000..0e1d6be
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/stat.h b/sysdeps/vinix/include/abi-bits/stat.h
 new file mode 120000
-index 0000000..82642c3
+index 00000000..82642c3c
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/stat.h
 @@ -0,0 +1 @@
@@ -6974,7 +6974,7 @@ index 0000000..82642c3
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/termios.h b/sysdeps/vinix/include/abi-bits/termios.h
 new file mode 120000
-index 0000000..6a7d94e
+index 00000000..6a7d94e7
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/termios.h
 @@ -0,0 +1 @@
@@ -6982,7 +6982,7 @@ index 0000000..6a7d94e
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/time.h b/sysdeps/vinix/include/abi-bits/time.h
 new file mode 120000
-index 0000000..97f3d52
+index 00000000..97f3d52d
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/time.h
 @@ -0,0 +1 @@
@@ -6990,7 +6990,7 @@ index 0000000..97f3d52
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/uid_t.h b/sysdeps/vinix/include/abi-bits/uid_t.h
 new file mode 120000
-index 0000000..1113eba
+index 00000000..1113eba6
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/uid_t.h
 @@ -0,0 +1 @@
@@ -6998,7 +6998,7 @@ index 0000000..1113eba
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/vm-flags.h b/sysdeps/vinix/include/abi-bits/vm-flags.h
 new file mode 120000
-index 0000000..f1a985e
+index 00000000..f1a985e6
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/vm-flags.h
 @@ -0,0 +1 @@
@@ -7006,7 +7006,7 @@ index 0000000..f1a985e
 \ No newline at end of file
 diff --git a/sysdeps/vinix/include/abi-bits/wait.h b/sysdeps/vinix/include/abi-bits/wait.h
 new file mode 120000
-index 0000000..6d911c7
+index 00000000..6d911c7f
 --- /dev/null
 +++ b/sysdeps/vinix/include/abi-bits/wait.h
 @@ -0,0 +1 @@
@@ -7014,7 +7014,7 @@ index 0000000..6d911c7
 \ No newline at end of file
 diff --git a/sysdeps/vinix/meson.build b/sysdeps/vinix/meson.build
 new file mode 100644
-index 0000000..b9e4372
+index 00000000..b9e4372d
 --- /dev/null
 +++ b/sysdeps/vinix/meson.build
 @@ -0,0 +1,52 @@
@@ -7071,7 +7071,7 @@ index 0000000..b9e4372
 +endif
 +
 diff --git a/tests/ansi/sscanf.c b/tests/ansi/sscanf.c
-index 8576e93..0253552 100644
+index 8576e93b..0253552a 100644
 --- a/tests/ansi/sscanf.c
 +++ b/tests/ansi/sscanf.c
 @@ -17,5 +17,12 @@ int main() {
@@ -7088,7 +7088,7 @@ index 8576e93..0253552 100644
  	return 0;
  }
 diff --git a/tests/meson.build b/tests/meson.build
-index 36c223d..52d4f18 100644
+index 36c223dd..52d4f182 100644
 --- a/tests/meson.build
 +++ b/tests/meson.build
 @@ -29,6 +29,7 @@ posix_test_cases = [
@@ -7101,7 +7101,7 @@ index 36c223d..52d4f18 100644
  	'getdelim',
 diff --git a/tests/posix/pthread_attr.c b/tests/posix/pthread_attr.c
 new file mode 100644
-index 0000000..c7bf327
+index 00000000..c7bf327a
 --- /dev/null
 +++ b/tests/posix/pthread_attr.c
 @@ -0,0 +1,174 @@
