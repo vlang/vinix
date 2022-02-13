@@ -1,11 +1,11 @@
-From e2128fe38318f1adcf3e76765430455b58619c77 Mon Sep 17 00:00:00 2001
+From 257467e252f0fe04780acf219b044deff26ee2d5 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 29 Jan 2022 08:42:53 +0100
+Date: Sun, 13 Feb 2022 18:29:05 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  clang/lib/Basic/Targets.cpp                   |   2 +
- clang/lib/Basic/Targets/OSTargets.h           |  30 +-
+ clang/lib/Basic/Targets/OSTargets.h           |  28 ++
  clang/lib/Driver/CMakeLists.txt               |   1 +
  clang/lib/Driver/Driver.cpp                   |   4 +
  clang/lib/Driver/ToolChains/Gnu.cpp           |   3 +-
@@ -20,7 +20,7 @@ Subject: [PATCH] Vinix specific changes
  llvm/tools/llvm-dwarfdump/Statistics.cpp      |   2 +
  llvm/tools/llvm-shlib/CMakeLists.txt          |   1 +
  llvm/utils/benchmark/src/benchmark_register.h |   1 +
- 16 files changed, 528 insertions(+), 8 deletions(-)
+ 16 files changed, 527 insertions(+), 7 deletions(-)
  create mode 100644 clang/lib/Driver/ToolChains/Vinix.cpp
  create mode 100644 clang/lib/Driver/ToolChains/Vinix.h
 
@@ -38,18 +38,9 @@ index ba91d0439..930fa30fd 100644
        return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
      case llvm::Triple::PS4:
 diff --git a/clang/lib/Basic/Targets/OSTargets.h b/clang/lib/Basic/Targets/OSTargets.h
-index 3fe39ed64..903f58ad9 100644
+index 12df95c19..d7654fd5a 100644
 --- a/clang/lib/Basic/Targets/OSTargets.h
 +++ b/clang/lib/Basic/Targets/OSTargets.h
-@@ -291,7 +291,7 @@ protected:
-     Builder.defineMacro("__HAIKU__");
-     Builder.defineMacro("__ELF__");
-     DefineStd(Builder, "unix", Opts);
--    if (this->HasFloat128) 
-+    if (this->HasFloat128)
-       Builder.defineMacro("__FLOAT128__");
-   }
- 
 @@ -337,6 +337,34 @@ public:
        : OSTargetInfo<Target>(Triple, Opts) {}
  };
@@ -762,5 +753,5 @@ index 4caa5ad4d..11258aa98 100644
  #include "check.h"
  
 -- 
-2.35.0
+2.35.1
 

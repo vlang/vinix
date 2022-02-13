@@ -145,8 +145,8 @@ sources:
   - name: llvm
     subdir: '3rdparty'
     git: 'https://github.com/llvm/llvm-project.git'
-    tag: 'llvmorg-13.0.0'
-    version: '13.0.0'
+    tag: 'llvmorg-13.0.1'
+    version: '13.0.1'
 
   - name: mlibc
     subdir: '3rdparty'
