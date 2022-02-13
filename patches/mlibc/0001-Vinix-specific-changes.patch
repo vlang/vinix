@@ -1,6 +1,6 @@
-From d6c7bb31be1b462635c17a749e6310ad70f45721 Mon Sep 17 00:00:00 2001
+From c066de2832d084c4a523855601e73da8de4ee8c7 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 13 Feb 2022 17:46:58 +0100
+Date: Sun, 13 Feb 2022 17:57:40 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,7 +8,6 @@ Subject: [PATCH] Vinix specific changes
  abis/mlibc/signal.h                           |    6 +-
  meson.build                                   |    4 +
  options/ansi/generic/stdio-stubs.cpp          |    8 +-
- options/ansi/generic/stdlib-stubs.cpp         |    2 +-
  options/ansi/include/inttypes.h               |    1 +
  options/ansi/include/limits.h                 |    3 +
  options/ansi/include/mlibc/ansi-sysdeps.hpp   |    2 +
@@ -75,7 +74,7 @@ Subject: [PATCH] Vinix specific changes
  tests/ansi/sscanf.c                           |    7 +
  tests/meson.build                             |    1 +
  tests/posix/pthread_attr.c                    |  174 +
- 71 files changed, 6055 insertions(+), 196 deletions(-)
+ 70 files changed, 6054 insertions(+), 195 deletions(-)
  delete mode 100644 options/posix/generic/regex.cpp
  rename options/posix/{musl-generic/fnmatch.cpp => generic/regex/fnmatch.c} (96%)
  rename options/posix/{musl-generic/glob.cpp => generic/regex/glob.c} (89%)
@@ -191,19 +190,6 @@ index c21696c7..c34d4472 100644
                      } else {
                          break;
                      }
-diff --git a/options/ansi/generic/stdlib-stubs.cpp b/options/ansi/generic/stdlib-stubs.cpp
-index fd8f5b14..fd630022 100644
---- a/options/ansi/generic/stdlib-stubs.cpp
-+++ b/options/ansi/generic/stdlib-stubs.cpp
-@@ -435,7 +435,7 @@ int mblen(const char *mbs, size_t mb_limit) {
- }
- 
- int mbtowc(wchar_t *__restrict wc, const char *__restrict mbs, size_t max_size) {
--	mlibc::infoLogger() << "mlibc: Broken mbtowc() called" << frg::endlog;
-+	//mlibc::infoLogger() << "mlibc: Broken mbtowc() called" << frg::endlog;
- 	__ensure(max_size);
- 
- 	if(wc && mbs){
 diff --git a/options/ansi/include/inttypes.h b/options/ansi/include/inttypes.h
 index be9b8742..968a849a 100644
 --- a/options/ansi/include/inttypes.h
