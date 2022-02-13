@@ -848,6 +848,8 @@ packages:
       - host-autoconf-v2.69
       - host-automake-v1.16
       - host-gcc
+    pkgs_required:
+      - mlibc
     configure:
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
       - args:
@@ -2055,7 +2057,6 @@ packages:
       - xorg-util-macros
       - xcb-proto
       - xorg-proto
-      - libdrm
       - libxshmfence
       - libx11
       - libxxf86vm

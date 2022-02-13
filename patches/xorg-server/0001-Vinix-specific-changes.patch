@@ -1,7 +1,7 @@
-From 34329a4fb858952d863f548b86f3ed653689a55e Mon Sep 17 00:00:00 2001
+From 234625eb53b61653bd7aa0a0f13a78b36f76b807 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 31 Jan 2022 15:55:12 +0100
-Subject: [PATCH xserver] Vinix specific changes
+Date: Sun, 13 Feb 2022 19:06:37 +0100
+Subject: [PATCH] Vinix specific changes
 
 ---
  configure.ac                             |  2 ++
@@ -15,14 +15,12 @@ Subject: [PATCH xserver] Vinix specific changes
  hw/xfree86/fbdevhw/fbdevhw.h             |  4 ++--
  hw/xfree86/os-support/shared/posix_tty.c |  3 +++
  hw/xfree86/os-support/shared/sigio.c     |  3 +++
- include/meson.build                      |  2 +-
  include/os.h                             |  1 +
- meson.build                              |  2 +-
  mi/mibitblt.c                            |  2 ++
  os/access.c                              |  2 +-
  os/ospoll.c                              |  2 ++
  os/utils.c                               |  4 ++--
- 18 files changed, 44 insertions(+), 21 deletions(-)
+ 16 files changed, 42 insertions(+), 19 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
 index ae44437..79b67a9 100644
@@ -273,19 +271,6 @@ index 247bec7..216e8cd 100644
  #include <X11/X.h>
  #include <xserver_poll.h>
  #include "xf86.h"
-diff --git a/include/meson.build b/include/meson.build
-index ac24153..82b0934 100644
---- a/include/meson.build
-+++ b/include/meson.build
-@@ -132,7 +132,7 @@ conf_data.set('HAVE_POSIX_FALLOCATE', cc.has_function('posix_fallocate'))
- conf_data.set('HAVE_PORT_CREATE', cc.has_function('port_create'))
- conf_data.set('HAVE_REALLOCARRAY', cc.has_function('reallocarray', dependencies: libbsd_dep))
- conf_data.set('HAVE_SETEUID', cc.has_function('seteuid'))
--conf_data.set('HAVE_SETITIMER', cc.has_function('setitimer'))
-+conf_data.set('HAVE_SETITIMER', false)
- conf_data.set('HAVE_SHMCTL64', cc.has_function('shmctl64'))
- conf_data.set('HAVE_SIGACTION', cc.has_function('sigaction'))
- conf_data.set('HAVE_STRCASECMP', cc.has_function('strcasecmp'))
 diff --git a/include/os.h b/include/os.h
 index 2a1c29e..2a7fc76 100644
 --- a/include/os.h
@@ -298,19 +283,6 @@ index 2a1c29e..2a7fc76 100644
  #ifdef MONOTONIC_CLOCK
  #include <time.h>
  #endif
-diff --git a/meson.build b/meson.build
-index c74135a..4c04571 100644
---- a/meson.build
-+++ b/meson.build
-@@ -348,7 +348,7 @@ if not libdrm_dep.found() and libdrm_required
-     error('DRI requested, but LIBDRM not found')
- endif
- 
--build_modesetting = libdrm_dep.found() and dri2proto_dep.found()
-+build_modesetting = false
- 
- build_vbe = false
- if get_option('vbe') == 'auto'
 diff --git a/mi/mibitblt.c b/mi/mibitblt.c
 index 43d9bd9..740c0d2 100644
 --- a/mi/mibitblt.c
@@ -378,5 +350,5 @@ index 2ba1c80..63dedc6 100644
  
  int
 -- 
-2.35.0
+2.35.1
 
