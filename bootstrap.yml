@@ -2242,8 +2242,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/mesa/mesa.git'
-      tag: 'mesa-21.1.4'
-      version: '21.1.4'
+      tag: 'mesa-21.3.5'
+      version: '21.3.5'
     tools_required:
       - host-pkg-config
       - host-gcc
@@ -2253,7 +2253,6 @@ packages:
         program_name: host-pkg-config
     pkgs_required:
       - mlibc
-      - libdrm
       - llvm
       - zlib
       - libxshmfence
@@ -2289,7 +2288,7 @@ packages:
         - '-Dgallium-drivers=swrast'
         - '-Dvulkan-drivers='
         # Force Mesa to build with LLVM.
-        - '-Dllvm=true'
+        - '-Dllvm=enabled'
         - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
@@ -3721,39 +3720,6 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
-
-  - name: libdrm
-    source:
-      subdir: '3rdparty'
-      git: 'https://gitlab.freedesktop.org/mesa/drm.git'
-      tag: 'libdrm-2.4.107'
-      version: '2.4.107'
-    tools_required:
-      - host-gcc
-    pkgs_required:
-      - mlibc
-    configure:
-      - args:
-        - 'meson'
-        - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
-        - '--prefix=/usr'
-        - '--libdir=lib'
-        - '--buildtype=release'
-        - '-Dintel=false'
-        - '-Dvmwgfx=false'
-        - '-Dradeon=false'
-        - '-Damdgpu=false'
-        - '-Dnouveau=false'
-        # We might want to build cairo with OpenGL support.
-        # Doing so would introduce a circular dependency here.
-        - '-Dcairo-tests=false'
-        - '@THIS_SOURCE_DIR@'
-    build:
-      - args: ['ninja']
-      - args: ['ninja', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 

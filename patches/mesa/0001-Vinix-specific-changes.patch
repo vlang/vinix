@@ -1,24 +1,27 @@
-From 63be823384ee36462467b7415c6872a59267723f Mon Sep 17 00:00:00 2001
+From 4198e5148ac096f5a890407715ecc40a35cb8ea8 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 29 Jan 2022 16:00:01 +0100
+Date: Sun, 13 Feb 2022 18:19:49 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
- include/drm-uapi/drm.h                    |  4 ++--
- meson.build                               |  4 ++--
- src/gallium/drivers/llvmpipe/lp_texture.c | 11 +++++------
- src/util/debug.c                          |  1 +
- src/util/detect_os.h                      |  8 ++++++++
- src/util/os_misc.c                        |  4 ++--
- src/util/os_time.c                        |  6 +++---
- src/util/u_thread.h                       |  8 ++++----
- 8 files changed, 27 insertions(+), 19 deletions(-)
+ include/drm-uapi/drm.h                    | 5 +++--
+ meson.build                               | 2 +-
+ src/compiler/spirv/spirv_to_nir.c         | 1 +
+ src/egl/main/egllog.c                     | 1 +
+ src/gallium/drivers/llvmpipe/lp_texture.c | 1 -
+ src/util/debug.c                          | 1 +
+ src/util/detect_os.h                      | 8 ++++++++
+ src/util/os_misc.c                        | 4 ++--
+ src/util/os_time.c                        | 4 ++--
+ src/util/u_printf.h                       | 2 ++
+ src/util/u_thread.h                       | 4 ++--
+ 11 files changed, 23 insertions(+), 10 deletions(-)
 
 diff --git a/include/drm-uapi/drm.h b/include/drm-uapi/drm.h
-index c7fd2a3..89ca9f1 100644
+index 5e54c3a..09dda3f 100644
 --- a/include/drm-uapi/drm.h
 +++ b/include/drm-uapi/drm.h
-@@ -36,10 +36,10 @@
+@@ -35,10 +35,11 @@
  #ifndef _DRM_H_
  #define _DRM_H_
  
@@ -28,14 +31,15 @@ index c7fd2a3..89ca9f1 100644
 +#include <sys/ioctl.h>
  #include <linux/types.h>
 -#include <asm/ioctl.h>
++//#include <asm/ioctl.h>
  typedef unsigned int drm_handle_t;
  
  #else /* One of the BSDs */
 diff --git a/meson.build b/meson.build
-index e1e94e7..1786ee5 100644
+index 0aea312..afbcc54 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -154,7 +154,7 @@ with_any_opengl = with_opengl or with_gles1 or with_gles2
+@@ -164,7 +164,7 @@ with_any_opengl = with_opengl or with_gles1 or with_gles2
  # Only build shared_glapi if at least one OpenGL API is enabled
  with_shared_glapi = with_shared_glapi and with_any_opengl
  
@@ -44,54 +48,35 @@ index e1e94e7..1786ee5 100644
  
  dri_drivers = get_option('dri-drivers')
  if dri_drivers.contains('auto')
-@@ -575,7 +575,7 @@ dep_dxheaders = null_dep
- if with_gallium_d3d12 or with_microsoft_clc
-   dep_dxheaders = dependency('DirectX-Headers', fallback : ['DirectX-Headers', 'dep_dxheaders'],
-     required : with_gallium_d3d12
--  ) 
-+  )
- endif
+diff --git a/src/compiler/spirv/spirv_to_nir.c b/src/compiler/spirv/spirv_to_nir.c
+index 71cdc83..3d26705 100644
+--- a/src/compiler/spirv/spirv_to_nir.c
++++ b/src/compiler/spirv/spirv_to_nir.c
+@@ -37,6 +37,7 @@
+ #include "util/u_string.h"
  
- if with_vulkan_overlay_layer or with_aco_tests
+ #include <stdio.h>
++#include <strings.h>
+ 
+ #ifndef NDEBUG
+ static enum nir_spirv_debug_level
+diff --git a/src/egl/main/egllog.c b/src/egl/main/egllog.c
+index 984dd5b..6a91952 100644
+--- a/src/egl/main/egllog.c
++++ b/src/egl/main/egllog.c
+@@ -39,6 +39,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <strings.h>
+ #include "c11/threads.h"
+ #include "util/macros.h"
+ #include "util/u_string.h"
 diff --git a/src/gallium/drivers/llvmpipe/lp_texture.c b/src/gallium/drivers/llvmpipe/lp_texture.c
-index 5e8f15d..57a1e5e 100644
+index 5bfc8db..d2b31e1 100644
 --- a/src/gallium/drivers/llvmpipe/lp_texture.c
 +++ b/src/gallium/drivers/llvmpipe/lp_texture.c
-@@ -1,8 +1,8 @@
- /**************************************************************************
-- * 
-+ *
-  * Copyright 2006 VMware, Inc.
-  * All Rights Reserved.
-- * 
-+ *
-  * Permission is hereby granted, free of charge, to any person obtaining a
-  * copy of this software and associated documentation files (the
-  * "Software"), to deal in the Software without restriction, including
-@@ -10,11 +10,11 @@
-  * distribute, sub license, and/or sell copies of the Software, and to
-  * permit persons to whom the Software is furnished to do so, subject to
-  * the following conditions:
-- * 
-+ *
-  * The above copyright notice and this permission notice (including the
-  * next paragraph) shall be included in all copies or substantial portions
-  * of the Software.
-- * 
-+ *
-  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
-@@ -22,7 +22,7 @@
-  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-- * 
-+ *
-  **************************************************************************/
-  /*
-   * Authors:
-@@ -962,7 +962,6 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
+@@ -1102,7 +1102,6 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
     default:
        break;
     }
@@ -137,7 +122,7 @@ index 6506948..2f8d099 100644
  
  #endif /* DETECT_OS_H */
 diff --git a/src/util/os_misc.c b/src/util/os_misc.c
-index 9f1ee83..22f6575 100644
+index 31f1c55..d16f1ce 100644
 --- a/src/util/os_misc.c
 +++ b/src/util/os_misc.c
 @@ -57,7 +57,7 @@
@@ -149,7 +134,7 @@ index 9f1ee83..22f6575 100644
  #  include <unistd.h>
  #elif DETECT_OS_OPENBSD || DETECT_OS_FREEBSD
  #  include <sys/resource.h>
-@@ -224,7 +224,7 @@ os_get_option(const char *name)
+@@ -223,7 +223,7 @@ os_get_option(const char *name)
  bool
  os_get_total_physical_memory(uint64_t *size)
  {
@@ -159,18 +144,9 @@ index 9f1ee83..22f6575 100644
     const long page_size = sysconf(_SC_PAGE_SIZE);
  
 diff --git a/src/util/os_time.c b/src/util/os_time.c
-index d2edd88..a7452bd 100644
+index d2edd88..337c00b 100644
 --- a/src/util/os_time.c
 +++ b/src/util/os_time.c
-@@ -28,7 +28,7 @@
- /**
-  * @file
-  * OS independent time-manipulation functions.
-- * 
-+ *
-  * @author Jose Fonseca <jfonseca@vmware.com>
-  */
- 
 @@ -53,7 +53,7 @@
  int64_t
  os_time_get_nano(void)
@@ -189,32 +165,33 @@ index d2edd88..a7452bd 100644
     struct timespec time;
     time.tv_sec = usecs / 1000000;
     time.tv_nsec = (usecs % 1000000) * 1000;
+diff --git a/src/util/u_printf.h b/src/util/u_printf.h
+index 44dcce5..e9e23ba 100644
+--- a/src/util/u_printf.h
++++ b/src/util/u_printf.h
+@@ -22,6 +22,8 @@
+ #ifndef U_PRINTF_H
+ #define U_PRINTF_H
+ 
++#include <stdarg.h>
++
+ #ifdef __cplusplus
+ 
+ #include <string>
 diff --git a/src/util/u_thread.h b/src/util/u_thread.h
-index a4c73cc..0f2edd9 100644
+index 013e8be..98d8256 100644
 --- a/src/util/u_thread.h
 +++ b/src/util/u_thread.h
-@@ -1,9 +1,9 @@
- /**************************************************************************
-- * 
-+ *
-  * Copyright 1999-2006 Brian Paul
-  * Copyright 2008 VMware, Inc.
-  * All Rights Reserved.
-- * 
-+ *
-  * Permission is hereby granted, free of charge, to any person obtaining a
-  * copy of this software and associated documentation files (the "Software"),
-  * to deal in the Software without restriction, including without limitation
-@@ -103,7 +103,7 @@ static inline thrd_t u_thread_create(int (*routine)(void *), void *param)
+@@ -129,7 +129,7 @@ static inline thrd_t u_thread_create(int (*routine)(void *), void *param)
  static inline void u_thread_setname( const char *name )
  {
  #if defined(HAVE_PTHREAD)
 -#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS
 +#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_VINIX
-    pthread_setname_np(pthread_self(), name);
- #elif DETECT_OS_FREEBSD || DETECT_OS_OPENBSD
-    pthread_set_name_np(pthread_self(), name);
-@@ -209,7 +209,7 @@ util_set_current_thread_affinity(const uint32_t *mask,
+    int ret = pthread_setname_np(pthread_self(), name);
+    if (ret == ERANGE) {
+       char buf[16];
+@@ -242,7 +242,7 @@ util_set_current_thread_affinity(const uint32_t *mask,
  static inline int64_t
  util_thread_get_time_nano(thrd_t thread)
  {
@@ -224,5 +201,5 @@ index a4c73cc..0f2edd9 100644
     clockid_t cid;
  
 -- 
-2.35.0
+2.35.1
 
