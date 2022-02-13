@@ -1,6 +1,6 @@
-From cf8ca9b0eb367cbf827279c865c3998d79d28b2a Mon Sep 17 00:00:00 2001
+From d6c7bb31be1b462635c17a749e6310ad70f45721 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 11 Feb 2022 21:54:33 +0100
+Date: Sun, 13 Feb 2022 17:46:58 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -5326,7 +5326,7 @@ index 4917a153..c134e420 100644
  		return -1;
  	}
 diff --git a/options/posix/include/mlibc/posix-sysdeps.hpp b/options/posix/include/mlibc/posix-sysdeps.hpp
-index 0025f8f1..2c31b016 100644
+index 09945e2b..e19fcc94 100644
 --- a/options/posix/include/mlibc/posix-sysdeps.hpp
 +++ b/options/posix/include/mlibc/posix-sysdeps.hpp
 @@ -21,6 +21,7 @@
@@ -5347,9 +5347,9 @@ index 0025f8f1..2c31b016 100644
  [[gnu::weak]] int sys_execve(const char *path, char *const argv[], char *const envp[]);
  [[gnu::weak]] int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set,
  		fd_set *except_set, const struct timespec *timeout, const sigset_t *sigmask, int *num_events);
-@@ -169,6 +171,9 @@ int sys_vm_unmap(void *pointer, size_t size);
- [[gnu::weak]] int sys_setgroups(size_t size, const gid_t *list);
+@@ -170,6 +172,9 @@ int sys_vm_unmap(void *pointer, size_t size);
  [[gnu::weak]] int sys_statfs(const char *path, struct statfs *buf);
+ [[gnu::weak]] int sys_memfd_create(const char *name, int flags, int *fd);
  
 +[[gnu::weak]] int sys_getitimer(int which, struct itimerval *curr_value);
 +[[gnu::weak]] int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
@@ -7088,10 +7088,10 @@ index 8576e93b..0253552a 100644
  	return 0;
  }
 diff --git a/tests/meson.build b/tests/meson.build
-index 36c223dd..52d4f182 100644
+index 362ce356..6067dd4a 100644
 --- a/tests/meson.build
 +++ b/tests/meson.build
-@@ -29,6 +29,7 @@ posix_test_cases = [
+@@ -31,6 +31,7 @@ posix_test_cases = [
  	'pthread_cleanup',
  	'pthread_kill',
  	'pthread_key',
