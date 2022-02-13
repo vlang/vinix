@@ -1,16 +1,15 @@
-From 68971ceffe27eb4e2783662b9a746a38e222c1af Mon Sep 17 00:00:00 2001
+From 8d6400103f5e2040772e37a3268b6cd4536d0ad9 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Thu, 10 Feb 2022 18:55:02 +0100
+Date: Sun, 13 Feb 2022 18:40:00 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
  bfd/config.bfd              | 5 +++++
- config.sub                  | 2 +-
  gas/configure.tgt           | 1 +
  ld/configure.tgt            | 4 ++++
  ld/emulparams/elf_x86_64.sh | 2 +-
  libiberty/rust-demangle.c   | 4 ++++
- 6 files changed, 16 insertions(+), 2 deletions(-)
+ 5 files changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/bfd/config.bfd b/bfd/config.bfd
 index cfe58247..39fcfdff 100644
@@ -28,19 +27,6 @@ index cfe58247..39fcfdff 100644
    i[3-7]86-*-interix*)
      targ_defvec=i386_pei_vec
      targ_selvecs="i386_pe_vec"
-diff --git a/config.sub b/config.sub
-index dba16e84..7a85ec31 100755
---- a/config.sub
-+++ b/config.sub
-@@ -1728,7 +1728,7 @@ case $os in
- 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
- 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
- 	     | hiux* | abug | nacl* | netware* | windows* \
--	     | os9* | macos* | osx* | ios* \
-+	     | os9* | macos* | osx* | ios* | vinix* \
- 	     | mpw* | magic* | mmixware* | mon960* | lnews* \
- 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
- 	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
 diff --git a/gas/configure.tgt b/gas/configure.tgt
 index 62f806bd..2d34c232 100644
 --- a/gas/configure.tgt
