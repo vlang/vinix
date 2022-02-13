@@ -1633,8 +1633,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/anholt/libepoxy.git'
-      tag: '1.5.8'
-      version: '1.5.8'
+      tag: '1.5.9'
+      version: '1.5.9'
     tools_required:
       - host-pkg-config
       - host-gcc
@@ -1651,8 +1651,9 @@ packages:
           - '--cross-file'
           - '@SOURCE_ROOT@/cross_file.txt'
           - '--prefix=/usr'
-          - '@THIS_SOURCE_DIR@'
+          - '-Degl=no'
           - '-Dtests=false'
+          - '@THIS_SOURCE_DIR@'
     build:
       - args: ['ninja']
       - args: ['ninja', 'install']
