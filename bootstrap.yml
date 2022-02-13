@@ -1550,8 +1550,6 @@ packages:
             NOCONFIGURE: 'yes'
     tools_required:
       - host-gcc
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
       - host-autoconf-v2.69
       - host-automake-v1.16
       - host-pkg-config
@@ -3382,7 +3380,6 @@ packages:
         - '--sysconfdir=/etc'
         - '--localstatedir=/var'
         - '--disable-selective-werror' # strncasecmp
-        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
