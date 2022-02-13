@@ -1,6 +1,6 @@
-From 9be22854af5de0a1f7cf3a5388f6070a97bd6c65 Mon Sep 17 00:00:00 2001
+From 7d6ea4e372756be2fdb9726a611e13d7e3f7721a Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Tue, 11 Jan 2022 04:53:16 +0100
+Date: Sun, 13 Feb 2022 18:54:15 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -31,5 +31,5 @@ index 7c7624a..130088d 100644
  		AC_MSG_ERROR([
    *** The msgfmt program is missing.
 -- 
-2.34.1
+2.35.1
 

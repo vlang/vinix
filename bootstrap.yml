@@ -2362,7 +2362,9 @@ packages:
       - host-pkg-config
     pkgs_required:
       - mlibc
+      - file
       - ncurses
+      - libintl
       - zlib
     configure:
       - args:
@@ -2370,7 +2372,7 @@ packages:
         - '--host=x86_64-vinix'
         - '--prefix=/usr'
         - '--sysconfdir=/etc'
-        - 'CFLAGS=-DSLOW_BUT_NO_HACKS -ltinfo'
+        - 'CFLAGS=-DSLOW_BUT_NO_HACKS'
         environ:
           PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
           PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
