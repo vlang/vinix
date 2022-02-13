@@ -2280,7 +2280,7 @@ packages:
         - '--libdir=lib'
         # The debug build type enables some additional output from Mesa.
         - '--buildtype=debugoptimized'
-        - '-Dglx=dri'
+        - '-Dglx=gallium-xlib'
         - '-Dplatforms=x11'
         # The Gallium swrast driver seems to be preferred over dri-swrast.
         - '-Ddri-drivers='
