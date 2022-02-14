@@ -150,9 +150,9 @@ sources:
 
   - name: mlibc
     subdir: '3rdparty'
-    git: 'https://github.com/managarm/mlibc.git'
+    git: 'https://github.com/vinix-os/mlibc.git'
     branch: 'master'
-    commit: 'adec935f4e0b4b6a9a8af44040988f464675e4b7'
+    commit: '2667c3b5cb3e297d3a50161f3d157200ff2940a7'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
