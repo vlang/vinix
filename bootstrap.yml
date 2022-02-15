@@ -627,7 +627,7 @@ tasks:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
     args:
-      - '@SOURCE_ROOT@/make-iso.sh'
+      - '@SOURCE_ROOT@/build-support/make-iso.sh'
       - '@BUILD_ROOT@'
       - '@SOURCE_ROOT@'
       - '@SYSROOT_DIR@'
@@ -659,7 +659,7 @@ tasks:
       - name: vinix.iso
         path: '@BUILD_ROOT@'
     args:
-      - '@SOURCE_ROOT@/make-iso.sh'
+      - '@SOURCE_ROOT@/build-support/make-iso.sh'
       - '@BUILD_ROOT@'
       - '@SOURCE_ROOT@'
       - '@SYSROOT_DIR@'
@@ -757,7 +757,7 @@ packages:
       - args:
         - 'meson'
         - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
+        - '@SOURCE_ROOT@/build-support/cross_file.txt'
         - '--prefix=/usr'
         - '--libdir=lib'
         - '--buildtype=release'
@@ -779,7 +779,7 @@ packages:
       - args:
         - 'meson'
         - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
+        - '@SOURCE_ROOT@/build-support/cross_file.txt'
         - '--prefix=/usr'
         - '-Dheaders_only=true'
         - '-Ddisable_iconv_option=true'
@@ -803,7 +803,7 @@ packages:
       - args:
         - 'meson'
         - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
+        - '@SOURCE_ROOT@/build-support/cross_file.txt'
         - '--prefix=/usr'
         - '--libdir=lib'
         - '--buildtype=debugoptimized'
@@ -873,7 +873,7 @@ packages:
       - args:
         - 'cmake'
         - '-GNinja'
-        - '-DCMAKE_TOOLCHAIN_FILE=@SOURCE_ROOT@/CMakeToolchain-x86_64-vinix.txt'
+        - '-DCMAKE_TOOLCHAIN_FILE=@SOURCE_ROOT@/build-support/CMakeToolchain.txt'
         - '-DCMAKE_INSTALL_PREFIX=/usr'
         # We really have to build LLVM in Release mode.
         # Building it in debug mode produces tens of GiB of debugging info.
@@ -1649,7 +1649,7 @@ packages:
       - args:
           - 'meson'
           - '--cross-file'
-          - '@SOURCE_ROOT@/cross_file.txt'
+          - '@SOURCE_ROOT@/build-support/cross_file.txt'
           - '--prefix=/usr'
           - '-Degl=no'
           - '-Dtests=false'
@@ -2267,16 +2267,16 @@ packages:
       - libxcb
       - libexpat
     configure:
-      - args: ['cp', '@SOURCE_ROOT@/cross_file.txt', 'meson.cross-file']
+      - args: ['cp', '@SOURCE_ROOT@/build-support/cross_file.txt', 'meson.cross-file']
       - args:
         - 'sed'
         - '-i'
-        - "/^# sed adds binaries here.$/a llvm-config = '@SOURCE_ROOT@/cross-llvm-config'"
+        - "/^# sed adds binaries here.$/a llvm-config = '@SOURCE_ROOT@/build-support/cross-llvm-config'"
         - 'meson.cross-file'
       - args:
         - 'meson'
         - '--native-file'
-        - '@SOURCE_ROOT@/native_file.txt'
+        - '@SOURCE_ROOT@/build-support/native_file.txt'
         - '--cross-file'
         - 'meson.cross-file'
         - '--prefix=/usr'
@@ -3006,9 +3006,9 @@ packages:
       - args:
         - 'meson'
         - '--native-file'
-        - '@SOURCE_ROOT@/native_file.txt'
+        - '@SOURCE_ROOT@/build-support/native_file.txt'
         - '--cross-file'
-        - '@SOURCE_ROOT@/cross_file.txt'
+        - '@SOURCE_ROOT@/build-support/cross_file.txt'
         - '--prefix=/usr'
         - '--libdir=lib'
         - '--buildtype=release'
