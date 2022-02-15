@@ -23,6 +23,6 @@ pub fn kexit(code int) {
 }
 
 [export: 'qsort']
-pub fn qsort(ptr voidptr, count u64, size u64, comp fn (const_a &C.void, const_b &C.void) int) {
+pub fn qsort(ptr voidptr, count u64, size u64, comp fn (a &C.void, b &C.void) int) {
 	lib.kpanic(voidptr(0), c'qsort is a stub')
 }

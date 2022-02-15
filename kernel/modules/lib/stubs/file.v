@@ -7,9 +7,9 @@ module stubs
 import lib
 import kprint
 
-struct C.__mlibc_file_base {}
+struct C.__file {}
 
-type FILE = C.__mlibc_file_base
+type FILE = C.__file
 
 __global (
 	stdin  = &FILE(voidptr(0))
@@ -38,7 +38,7 @@ pub fn fgets(str charptr, count u64, stream &FILE) charptr {
 }
 
 [export: 'popen']
-pub fn popen(const_command &C.char, const_typ &C.char) &FILE {
+pub fn popen(command &C.char, typ &C.char) &FILE {
 	lib.kpanic(voidptr(0), c'popen is a stub')
 }
 
@@ -48,12 +48,12 @@ pub fn pclose(stream &FILE) int {
 }
 
 [export: 'write']
-pub fn write(fd int, const_buf &C.void, count u64) i64 {
+pub fn write(fd int, buf &C.void, count u64) i64 {
 	if fd != 1 && fd != 2 {
 		lib.kpanic(voidptr(0), c'write to fd != 1 && fd != 2 is a stub')
 	}
 
-	kprint.kprint(charptr(const_buf))
+	kprint.kprint(charptr(buf))
 
 	return i64(count)
 }

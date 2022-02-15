@@ -17,6 +17,7 @@ PROD    ?= false
 
 override INTERNALCFLAGS :=        \
 	-ffreestanding                \
+	-nostdinc                     \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
 	-fno-pic                      \
@@ -31,6 +32,7 @@ override INTERNALCFLAGS :=        \
 	-mno-red-zone                 \
 	-mcmodel=kernel               \
 	-Wno-address-of-packed-member \
+	-Wno-unused-value             \
 	-Wno-unused-label             \
 	-Wno-unused-function          \
 	-Wno-unused-variable          \
@@ -75,18 +77,18 @@ install:
 
 blob.o: $(VFILES)
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
+	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c
-	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.S
-	$(CC) -I./c $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ)
 	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv c/symbol_table.c symbol_table.c.tmp
 	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
+	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
 	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c

@@ -3,11 +3,7 @@
 // Copyright (C) 2021-2022 The Vinix authors.
 
 #include <stdint.h>
-
-struct symbol {
-	uint64_t address;
-	char *string;
-};
+#include <symbols.h>
 
 __attribute__((section(".symbol_table")))
 struct symbol symbol_table[] = {

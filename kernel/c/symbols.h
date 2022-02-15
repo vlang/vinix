@@ -5,6 +5,15 @@
 #ifndef _SYMBOLS_H
 #define _SYMBOLS_H
 
+#include <stdint.h>
+
 extern char interrupt_thunks[];
+
+struct symbol {
+	uint64_t address;
+	char *string;
+};
+
+struct symbol *get_symbol_table(void);
 
 #endif

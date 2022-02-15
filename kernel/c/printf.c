@@ -40,13 +40,13 @@ void serial__out(char);
 void serial__panic_out(char);
 void stivale2__terminal_print(const char *, uint64_t);
 
-void _putchar(char character) {
+static void _putchar(char character) {
 #ifndef PROD
   serial__out(character);
 #endif
 }
 
-void _putchar_panic(char character) {
+static void _putchar_panic(char character) {
 #ifndef PROD
   serial__panic_out(character);
 #endif
