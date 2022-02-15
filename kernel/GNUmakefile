@@ -66,6 +66,9 @@ override COBJ   := $(CFILES:.c=.o) $(SFILES:.S=.o)
 .PHONY: all
 all: $(KERNEL)
 
+freestanding_headers:
+	git clone https://github.com/mintsuki/freestanding_headers.git
+
 .PHONY: clean
 clean:
 	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
@@ -75,20 +78,20 @@ install:
 	install -d "$(DESTDIR)$(PREFIX)"
 	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
 
-blob.o: $(VFILES)
+blob.o: $(VFILES) freestanding_headers
 	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
-%.o: %.c
+%.o: %.c freestanding_headers
 	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-%.o: %.S
+%.o: %.S freestanding_headers
 	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-$(KERNEL): blob.o $(COBJ)
-	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+$(KERNEL): blob.o $(COBJ) freestanding_headers
+	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv c/symbol_table.c symbol_table.c.tmp
 	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
 	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
-	$(LD) $^ $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c

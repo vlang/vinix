@@ -1,4 +1,3 @@
-blob.c
-blob.c.old
-blob.c.working
-modules/trace/symbol.v
+/blob.c
+/modules/trace/symbol.v
+/freestanding_headers
