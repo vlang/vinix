@@ -1,6 +1,25 @@
-#!/usr/bin/env bash
+#! /bin/sh
 
-set -e -o pipefail
+set -e
+
+LC_ALL=C
+export LC_ALL
+
+TMP0=$(mktemp)
+
+cat >"$TMP0" <<EOF
+#! /bin/sh
+
+set -e
+
+set -o pipefail 2>/dev/null
+EOF
+
+chmod +x "$TMP0"
+
+"$TMP0" && set -o pipefail
+
+rm "$TMP0"
 
 TMP1=$(mktemp)
 TMP2=$(mktemp)
