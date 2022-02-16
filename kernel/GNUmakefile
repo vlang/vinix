@@ -36,7 +36,9 @@ override INTERNALCFLAGS :=        \
 	-Wno-unused-label             \
 	-Wno-unused-function          \
 	-Wno-unused-variable          \
-	-Wno-unused-parameter
+	-Wno-unused-parameter         \
+	-Ifreestanding_headers        \
+	-Ic
 
 override INTERNALLDFLAGS :=  \
 	-Tlinker.ld              \
@@ -73,25 +75,29 @@ freestanding_headers:
 clean:
 	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
 
+.PHONY: distclean
+distclean:
+	rm -rf freestanding_headers
+
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)"
 	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
 
 blob.o: $(VFILES) freestanding_headers
-	VMODULES=/tmp/.vmodules $(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
+	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
 %.o: %.c freestanding_headers
-	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 %.o: %.S freestanding_headers
-	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ) freestanding_headers
 	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv c/symbol_table.c symbol_table.c.tmp
 	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
-	$(CC) -Ifreestanding_headers -Ic $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
 	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c

@@ -11,7 +11,7 @@ VFLAGS  ?=
 PREFIX  ?= /usr/local
 
 ifeq ($(PROD), true)
-	VFLAGS += -prod
+	override VFLAGS += -prod
 endif
 
 # Targets and their rules.
@@ -21,7 +21,7 @@ override FETCH_DIR    := fetch
 override FETCH_TARGET := $(FETCH_DIR)/fetch
 override LSCPU_DIR    := lscpu
 override LSCPU_TARGET := $(LSCPU_DIR)/lscpu
-override SHARED_DIR   := $(realpath shared_utils)
+override SHARED_DIR   := $(shell pwd -P)/shared_utils
 
 .PHONY: all clean install
 
@@ -41,6 +41,6 @@ clean:
 
 install:
 	install -d "$(DESTDIR)$(PREFIX)/bin"
-	install -s $(CHSH_TARGET)  "$(DESTDIR)$(PREFIX)/bin/"
+	install -s $(CHSH_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
 	install -s $(FETCH_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
 	install -s $(LSCPU_TARGET) "$(DESTDIR)$(PREFIX)/bin/"

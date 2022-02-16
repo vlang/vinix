@@ -160,17 +160,13 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '6ea4f361a1c4347da4c3dacd1328ce3236b62b89'
+    commit: 'f68144774d11b73609b89d9b3f89795aa0e4e4dd'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
-
-  - name: vc
-    subdir: '3rdparty'
-    git: 'https://github.com/vlang/vc.git'
-    branch: 'master'
-    commit: '0467141a8caf8e2be3e6bcac2fb62c8c532a9da1'
-    rolling_version: true
-    version: '0.0pl@ROLLING_ID@'
+    regenerate:
+      - args: |
+          set -e
+          curl -o v.c https://raw.githubusercontent.com/vlang/vc/a40f31c6c885aa5ea9fd1ec55904bca51c2c4842/v.c
 
   - name: limine
     subdir: '3rdparty'
@@ -420,7 +416,6 @@ tools:
 
   - name: host-v
     from_source: v
-    sources_required: ['vc']
     compile:
       - args: |
           set -e
@@ -429,7 +424,7 @@ tools:
           cp -r "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
           cd "@PREFIX@/v"
           rm -v *.xbstrap
-          cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v -lm -lpthread
+          cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing -I ./thirdparty/stdatomic/nix v.c -o v -lm -lpthread
           mkdir -p "@PREFIX@/bin"
           ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"
 
@@ -715,7 +710,7 @@ packages:
       - args: |
           set -e
           cd "@THIS_SOURCE_DIR@"
-          VMODULES=/tmp/.vmodules v -cc x86_64-vinix-gcc -os vinix .
+          v -cc x86_64-vinix-gcc -os vinix .
           mkdir -p "@THIS_COLLECT_DIR@/sbin"
           cp init "@THIS_COLLECT_DIR@/sbin/"
 
@@ -2222,23 +2217,22 @@ packages:
       - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/profile', '@THIS_COLLECT_DIR@/etc/']
       - args: ['cp', '@SOURCE_ROOT@/extra-files/bash/bashrc', '@THIS_COLLECT_DIR@/etc/bash/']
 
-#  - name: v
-#    from_source: v
-#    sources_required: ['vc']
-#    tools_required:
-#      - host-gcc
-#    pkgs_required:
-#      - mlibc
-#    build:
-#      - args: |
-#          set -e
-#          mkdir -p "@THIS_COLLECT_DIR@/usr/v"
-#          cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
-#          cd "@THIS_COLLECT_DIR@/usr/v"
-#          rm -v *.xbstrap
-#          x86_64-vinix-gcc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix "@SOURCE_ROOT@/3rdparty/vc/v.c" -o v
-#          mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
-#          ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
+  - name: v
+    from_source: v
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args: |
+          set -e
+          mkdir -p "@THIS_COLLECT_DIR@/usr/v"
+          cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
+          cd "@THIS_COLLECT_DIR@/usr/v"
+          rm -v *.xbstrap
+          x86_64-vinix-gcc -O2 -pipe -w -std=gnu11 -I ./thirdparty/stdatomic/nix v.c -o v
+          mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
+          ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
 
   - name: mesa
     source:
