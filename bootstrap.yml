@@ -673,7 +673,6 @@ packages:
           set -e
           cp -rv "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/"
           rm -v "@THIS_COLLECT_DIR@/"*.xbstrap
-          for f in $(find @THIS_COLLECT_DIR@ -name KEEP); do rm -v "$f"; done
 
   - name: kernel
     source:
