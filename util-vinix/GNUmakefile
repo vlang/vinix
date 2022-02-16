@@ -21,7 +21,7 @@ override FETCH_DIR    := fetch
 override FETCH_TARGET := $(FETCH_DIR)/fetch
 override LSCPU_DIR    := lscpu
 override LSCPU_TARGET := $(LSCPU_DIR)/lscpu
-override SHARED_DIR   := $(shell pwd -P)/shared_utils
+override SHARED_DIR   := $(shell pwd -P)/shared
 
 .PHONY: all clean install
 
