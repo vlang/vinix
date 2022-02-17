@@ -119,6 +119,7 @@ pub fn (mut this Timer) disarm() {
 	}
 
 	armed_timers[this.index] = armed_timers[armed_timers.len - 1]
+	armed_timers[this.index].index = this.index
 	armed_timers.delete_last()
 	this.index = -1
 }

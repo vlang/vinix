@@ -15,7 +15,6 @@ import resource
 import file
 import x86.idt
 import x86.apic
-import termios
 
 // This are the IO ports where the serial COMs usually appear, this is not
 // guaranteed tho, especially beyond the first 2, so we gotta check them all.
