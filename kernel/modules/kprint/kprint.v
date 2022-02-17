@@ -5,7 +5,7 @@
 module kprint
 
 import klock
-import serial
+import dev.serial
 import stivale2
 
 __global (

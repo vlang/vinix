@@ -36,19 +36,19 @@
 #include <stdarg.h>
 
 
-void serial__out(char);
-void serial__panic_out(char);
+void dev__serial__out(char);
+void dev__serial__panic_out(char);
 void stivale2__terminal_print(const char *, uint64_t);
 
 static void _putchar(char character) {
 #ifndef PROD
-  serial__out(character);
+  dev__serial__out(character);
 #endif
 }
 
 static void _putchar_panic(char character) {
 #ifndef PROD
-  serial__panic_out(character);
+  dev__serial__panic_out(character);
 #endif
   stivale2__terminal_print(&character, 1);
 }

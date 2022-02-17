@@ -17,7 +17,6 @@ import x86.smp
 import initramfs
 import fs
 import sched
-import serial
 import stat
 import dev.console
 import userland
@@ -29,6 +28,7 @@ import dev.ata
 import dev.fbdev
 import dev.fbdev.simple
 import dev.nvme
+import dev.serial
 import dev.streams
 import dev.ahci
 import dev.random

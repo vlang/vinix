@@ -1,4 +1,4 @@
-// serial.v: COM1 serial driver.
+// serial.v: COM serial driver.
 // Code is governed by the GPL-2.0 license.
 // Copyright (C) 2021-2022 The Vinix authors.
 
@@ -15,6 +15,7 @@ import resource
 import file
 import x86.idt
 import x86.apic
+import termios
 
 // This are the IO ports where the serial COMs usually appear, this is not
 // guaranteed tho, especially beyond the first 2, so we gotta check them all.
@@ -24,21 +25,6 @@ const com_ports = [com1_port, 0x2f8, 0x3e8, 0x2e8]
 // Serial devices share IRQs in pairs, COM1/3 use IRQ 4, COM2/4 use IRQ3
 const com1_3_irq = 4
 const com2_4_irq = 3
-
-// COM port structure for adding to the devtmpfs.
-struct COMPort {
-pub mut:
-	stat     stat.Stat
-	refcount int
-	l        klock.Lock
-	event    eventstruct.Event
-	status   int
-	can_mmap bool
-
-	port        u16
-	port_lock   klock.Lock
-	port_vector int
-}
 
 __global (
 	com1_lock klock.Lock // Lock for COM1 kernel debug reporting.
@@ -143,15 +129,27 @@ fn is_data_received(port u16) bool {
 }
 
 // Resource functions for serial COMPort s
+struct COMPort {
+pub mut:
+	stat     stat.Stat
+	refcount int
+	l        klock.Lock
+	event    eventstruct.Event
+	status   int
+	can_mmap bool
+
+	port        u16
+	port_vector int
+}
 
 fn (mut this COMPort) mmap(page u64, flags int) voidptr {
 	return 0
 }
 
 fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
-	this.port_lock.acquire()
+	this.l.acquire()
 	defer {
-		this.port_lock.release()
+		this.l.release()
 	}
 
 	// Wait on the event of the port's IRQ.
@@ -171,9 +169,9 @@ fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 }
 
 fn (mut this COMPort) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	this.port_lock.acquire()
+	this.l.acquire()
 	defer {
-		this.port_lock.release()
+		this.l.release()
 	}
 	mut data := &u8(buf)
 	for i in 0 .. count {
