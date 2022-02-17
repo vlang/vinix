@@ -152,7 +152,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vinix-os/mlibc.git'
     branch: 'master'
-    commit: '172383d4ca84bc0f8690af6c09290e5f01e13235'
+    commit: 'd9a0a4b43c4b6502af7d35bddb9e192ddd6a4062'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -160,13 +160,13 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: 'f68144774d11b73609b89d9b3f89795aa0e4e4dd'
+    commit: '89b99ad4c35182572b3192fb448c3c22029d2217'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
     regenerate:
       - args: |
           set -e
-          curl -o v.c https://raw.githubusercontent.com/vlang/vc/a40f31c6c885aa5ea9fd1ec55904bca51c2c4842/v.c
+          curl -o v.c https://raw.githubusercontent.com/vlang/vc/901c17b9d8ceb0c608cd76b408d7d912c432abf5/v.c
 
   - name: limine
     subdir: '3rdparty'
@@ -364,22 +364,6 @@ tools:
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/autoconf-archive/m4/.', '@PREFIX@/share/aclocal-1.16/']
 
-  - name: host-nasm
-    from_source: nasm
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.16
-    configure:
-      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
-      - args:
-        - './configure'
-        - '--prefix=@PREFIX@'
-    compile:
-      - args: ['make']
-    install:
-      - args: ['make', 'strip']
-      - args: ['make', 'install']
-
   - name: host-tic
     from_source: ncurses
     configure:
@@ -432,7 +416,6 @@ tools:
     from_source: limine
     tools_required:
       - host-gcc
-      - host-nasm
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
