@@ -27,6 +27,7 @@ __global (
 	kernel_data_seg = u16(0x30)
 	user_code_seg   = u16(0x43)
 	user_data_seg   = u16(0x3b)
+	tss_segment     = u16(0x48)
 	gdt_pointer     GDTPointer
 	gdt_entries     [11]GDTEntry
 	gdt_lock        klock.Lock
@@ -176,7 +177,7 @@ pub fn load_tss(addr voidptr) {
 
 	asm volatile amd64 {
 		ltr offset
-		; ; rm (u16(0x48)) as offset
+		; ; rm (tss_segment) as offset
 		; memory
 	}
 

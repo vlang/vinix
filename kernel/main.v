@@ -17,6 +17,7 @@ import x86.smp
 import initramfs
 import fs
 import sched
+import serial
 import stat
 import dev.console
 import userland
@@ -62,6 +63,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())
 	console.initialise()
+	serial.initialise()
 
 	$if !prod {
 		ata.initialise()
@@ -87,6 +89,7 @@ pub fn kmain(stivale2_struct &stivale2.Struct) {
 
 	// Init terminal
 	stivale2.terminal_init(stivale2_struct)
+	serial.early_initialise()
 
 	// We're alive
 	kprint.kprint(c'Welcome to Vinix\n\n')
