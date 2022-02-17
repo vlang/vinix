@@ -1,6 +1,3 @@
-*.o
-*.c
-shared_utils/cache
 chsh/chsh
 fetch/fetch
 lscpu/lscpu
