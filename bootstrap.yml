@@ -2006,8 +2006,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/xserver.git'
-      tag: 'xorg-server-1.20.12'
-      version: '1.20.12'
+      tag: 'xorg-server-1.20.14'
+      version: '1.20.14'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16

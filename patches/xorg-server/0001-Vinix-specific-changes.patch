@@ -1,6 +1,6 @@
-From 234625eb53b61653bd7aa0a0f13a78b36f76b807 Mon Sep 17 00:00:00 2001
+From 6f785e20e4034b9016aa7e6cebc204f95b7808d6 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 13 Feb 2022 19:06:37 +0100
+Date: Sun, 20 Feb 2022 06:19:57 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -23,7 +23,7 @@ Subject: [PATCH] Vinix specific changes
  16 files changed, 42 insertions(+), 19 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index ae44437..79b67a9 100644
+index 0909cc5..f551571 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -1966,6 +1966,8 @@ if test "x$XORG" = xyes; then
