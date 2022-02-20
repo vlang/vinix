@@ -1,6 +1,6 @@
-From 293fc578b13da4c77b490df9fdbc5fdf6e539e39 Mon Sep 17 00:00:00 2001
+From 0ae324bcb42893afa0ea08e2c7336dfe16570184 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Tue, 8 Feb 2022 22:52:50 +0100
+Date: Sun, 20 Feb 2022 05:09:55 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -34,10 +34,10 @@ index ef69206..ef13019 100644
  #include <errno.h>
  #include <garray.h>
 diff --git a/meson.build b/meson.build
-index 2b08f56..6590028 100644
+index 0019671..65a2472 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -443,7 +443,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
+@@ -442,7 +442,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
      # A zero-length format string shouldn't be considered an issue.
      '-Wno-format-zero-length',
      '-Werror=declaration-after-statement',

@@ -49,8 +49,8 @@ sources:
   - name: glib
     subdir: '3rdparty'
     git: 'https://gitlab.gnome.org/GNOME/glib.git'
-    tag: '2.70.3'
-    version: '2.70.3'
+    tag: '2.70.4'
+    version: '2.70.4'
 
   - name: pkg-config
     subdir: '3rdparty'
