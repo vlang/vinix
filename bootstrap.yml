@@ -54,9 +54,8 @@ sources:
 
   - name: pkg-config
     subdir: '3rdparty'
-    url: 'https://gitlab.freedesktop.org/pkg-config/pkg-config/-/archive/pkg-config-0.29.2/pkg-config-pkg-config-0.29.2.tar.gz'
-    format: 'tar.gz'
-    extract_path: 'pkg-config-pkg-config-0.29.2'
+    git: 'https://gitlab.freedesktop.org/pkg-config/pkg-config.git'
+    tag: 'pkg-config-0.29.2'
     version: '0.29.2'
     tools_required:
       - host-autoconf-v2.69
