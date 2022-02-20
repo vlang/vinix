@@ -152,7 +152,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vinix-os/mlibc.git'
     branch: 'master'
-    commit: 'd9a0a4b43c4b6502af7d35bddb9e192ddd6a4062'
+    commit: '0b4d73a5edb2d31b85dc5baa9eba7e80d6731b42'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
