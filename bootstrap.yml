@@ -2217,8 +2217,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/mesa/mesa.git'
-      tag: 'mesa-21.3.5'
-      version: '21.3.5'
+      tag: 'mesa-21.3.6'
+      version: '21.3.6'
     tools_required:
       - host-pkg-config
       - host-gcc
