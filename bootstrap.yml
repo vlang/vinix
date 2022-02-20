@@ -255,8 +255,8 @@ sources:
   - name: file
     subdir: 3rdparty
     git: 'https://github.com/file/file.git'
-    tag: 'FILE5_40'
-    version: '5.40'
+    tag: 'FILE5_41'
+    version: '5.41'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
