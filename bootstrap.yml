@@ -815,7 +815,7 @@ packages:
         - '--sysconfdir=/etc'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install-strip']
 
   - name: nasm
     from_source: nasm
