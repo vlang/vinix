@@ -3280,8 +3280,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config.git'
-      tag: 'xkeyboard-config-2.33'
-      version: '2.33'
+      tag: 'xkeyboard-config-2.34'
+      version: '2.34'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
