@@ -3364,9 +3364,8 @@ packages:
   - name: pixman
     source:
       subdir: '3rdparty'
-      url: 'https://gitlab.freedesktop.org/pixman/pixman/-/archive/pixman-0.40.0/pixman-pixman-0.40.0.tar.gz'
-      format: 'tar.gz'
-      extract_path: 'pixman-pixman-0.40.0'
+      git: 'https://gitlab.freedesktop.org/pixman/pixman.git'
+      tag: 'pixman-0.40.0'
       version: '0.40.0'
       tools_required:
         - host-autoconf-v2.69
