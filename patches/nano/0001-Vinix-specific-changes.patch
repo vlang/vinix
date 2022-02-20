@@ -1,6 +1,6 @@
-From 7d6ea4e372756be2fdb9726a611e13d7e3f7721a Mon Sep 17 00:00:00 2001
+From 7152363d5ae749a67fb333d944cdb5f5344f3de7 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 13 Feb 2022 18:54:15 +0100
+Date: Sun, 20 Feb 2022 06:37:46 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,7 +8,7 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index 7c7624a..130088d 100644
+index f80be59..89735d2 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -71,12 +71,12 @@ AM_CONDITIONAL(BUILDING_FROM_GIT, test x$from_git = xyes)
