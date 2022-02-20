@@ -344,7 +344,7 @@ tools:
         - args: ['./bootstrap']
         - args: |
             set -e
-            git clone https://github.com/autoconf-archive/autoconf-archive.git --branch=v2021.02.19 --depth=1
+            git clone https://github.com/autoconf-archive/autoconf-archive.git --branch=v2022.02.11 --depth=1
     tools_required:
       - host-autoconf-v2.69
     configure:

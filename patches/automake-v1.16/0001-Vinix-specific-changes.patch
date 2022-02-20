@@ -1,6 +1,6 @@
-From 42ee22d460fff5772ea40075bf2b71c829dbde78 Mon Sep 17 00:00:00 2001
+From 328fdab89833e6876de0cd15d30cc0e2fec4d6d1 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 8 Jan 2022 14:37:02 +0100
+Date: Sun, 20 Feb 2022 05:35:53 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -21,5 +21,5 @@ index d74fb6d..ae4f8a3 100755
  	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
  	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
 -- 
-2.34.1
+2.35.1
 
