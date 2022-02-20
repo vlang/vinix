@@ -1765,8 +1765,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/lib/libxi.git'
-      tag: 'libXi-1.7.10'
-      version: '1.7.10'
+      tag: 'libXi-1.8'
+      version: '1.8'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
