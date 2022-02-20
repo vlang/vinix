@@ -586,7 +586,7 @@ tools:
     compile:
       - args: ['make', '-j@PARALLELISM@']
     install:
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
 
 tasks:
   - name: make-basic-iso
