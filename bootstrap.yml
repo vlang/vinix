@@ -1046,8 +1046,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/proto/xcbproto.git'
-      tag: 'xcb-proto-1.14'
-      version: '1.14'
+      tag: 'xcb-proto-1.14.1'
+      version: '1.14.1'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
