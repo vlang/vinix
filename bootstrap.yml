@@ -2654,8 +2654,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'git://git.sv.nongnu.org/freetype/freetype2.git'
-      tag: 'VER-2-11-0'
-      version: '2.11.0'
+      tag: 'VER-2-11-1'
+      version: '2.11.1'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
