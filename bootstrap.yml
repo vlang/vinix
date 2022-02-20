@@ -1197,8 +1197,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/lib/libxft.git'
-      tag: 'libXft-2.3.3'
-      version: '2.3.3'
+      tag: 'libXft-2.3.4'
+      version: '2.3.4'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
