@@ -1809,8 +1809,8 @@ packages:
     source:
       subdir: '3rdparty'
       hg: 'https://gmplib.org/repo/gmp-6.2/'
-      tag: 'tip'
-      version: '6.2'
+      tag: 'gmp-6.2.1'
+      version: '6.2.1'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
