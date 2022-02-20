@@ -2722,8 +2722,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.tukaani.org/xz.git'
-      branch: 'v5.2'
-      version: '5.2'
+      tag: 'v5.2.5'
+      version: '5.2.5'
       disable_shallow_fetch: true
       tools_required:
         - host-autoconf-v2.69
