@@ -2126,8 +2126,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/libexpat/libexpat.git'
-      tag: 'R_2_4_1'
-      version: '2.4.1'
+      tag: 'R_2_4_5'
+      version: '2.4.5'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
