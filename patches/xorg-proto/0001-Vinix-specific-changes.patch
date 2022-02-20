@@ -1,6 +1,6 @@
-From f14f3c53f093fc3d89f65ced47fb19ec9d755da0 Mon Sep 17 00:00:00 2001
+From c4a25e9038256ff5a5f4d76ced6942b6f3785469 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Fri, 14 Jan 2022 05:17:57 +0100
+Date: Sun, 20 Feb 2022 05:47:49 +0100
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -35,5 +35,5 @@ index f963b64..5ade17b 100644
  typedef struct {
    struct passwd pws;
 -- 
-2.34.1
+2.35.1
 

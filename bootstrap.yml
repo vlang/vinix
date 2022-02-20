@@ -932,8 +932,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/proto/xorgproto.git'
-      tag: 'xorgproto-2021.4'
-      version: '2021.4'
+      tag: 'xorgproto-2021.5'
+      version: '2021.5'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
