@@ -1624,6 +1624,7 @@ packages:
           - '--cross-file'
           - '@SOURCE_ROOT@/build-support/cross_file.txt'
           - '--prefix=/usr'
+          - '--buildtype=release'
           - '-Degl=no'
           - '-Dtests=false'
           - '@THIS_SOURCE_DIR@'
