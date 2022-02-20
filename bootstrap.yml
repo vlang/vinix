@@ -2714,7 +2714,7 @@ packages:
         - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
+      - args: ['make', 'install-strip']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
