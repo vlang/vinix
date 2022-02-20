@@ -1554,8 +1554,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/lib/libxfont.git'
-      tag: 'libXfont2-2.0.4'
-      version: '2.0.4'
+      tag: 'libXfont2-2.0.5'
+      version: '2.0.5'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -1573,8 +1573,6 @@ packages:
       - host-automake-v1.16
       - host-pkg-config
       - host-xtrans
-      - virtual: pkgconfig-for-target
-        triple: "x86_64-vinix"
     pkgs_required:
       - mlibc
       - xorg-util-macros
