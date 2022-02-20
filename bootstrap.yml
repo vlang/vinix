@@ -234,8 +234,8 @@ sources:
   - name: cmake
     subdir: '3rdparty'
     git: 'https://github.com/Kitware/CMake.git'
-    tag: 'v3.20.5'
-    version: '3.20.5'
+    tag: 'v3.22.2'
+    version: '3.22.2'
 
   - name: xorg-util-macros
     subdir: '3rdparty'
@@ -536,7 +536,7 @@ tools:
       - args: ['make', 'install']
       - args: |
           set -e
-          echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.20/Modules/Platform/Vinix.cmake"
+          echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.22/Modules/Platform/Vinix.cmake"
 
   - name: host-xorg-macros
     exports_aclocal: true
