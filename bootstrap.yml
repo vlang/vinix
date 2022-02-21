@@ -170,8 +170,8 @@ sources:
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v2.85.2'
-    version: '2.85.2'
+    tag: 'v2.85.3'
+    version: '2.85.3'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
