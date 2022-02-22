@@ -21,11 +21,13 @@ fn main() {
 	for idx < os.args.len {
 		match os.args[idx] {
 			'--help' {
-				println('Usage: ${os.args[0]}')
+				println('Usage: ${os.args[0]} [options]')
 				println('')
 				println('List system information in a user-friendly format')
 				println('')
-				println('No options are available for this program')
+				println('Options:')
+				println('--help    display this help')
+				println('--version display version information')
 				exit(0)
 			}
 			'--version' {

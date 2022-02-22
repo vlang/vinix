@@ -32,8 +32,8 @@ fn main() {
 				println('Options:')
 				println('-s, --shell <shell>  specify login shell')
 				println('-l, --list-shells    print list of shells and exit')
-				println('-u, --help           display this help')
-				println('-v, --version        display version information')
+				println('--help               display this help')
+				println('--version            display version information')
 				exit(0)
 			}
 			'--version' {

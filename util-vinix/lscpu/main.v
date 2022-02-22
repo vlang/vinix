@@ -16,7 +16,9 @@ fn main() {
 				println('')
 				println('List CPU architecture information')
 				println('')
-				println('No options are available for this program')
+				println('Options:')
+				println('--help    display this help')
+				println('--version display version information')
 				exit(0)
 			}
 			'--version' {
