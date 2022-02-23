@@ -6,6 +6,7 @@ import time
 import event
 import userland
 import event.eventstruct
+import sched
 
 pub const itimer_real = 0
 pub const itimer_virtual = 1
@@ -64,6 +65,8 @@ fn itimer_handler(mut itimer ITimer, mut process proc.Process) {
 	}
 
 	itimer.handler_started = false
+
+	sched.dequeue_and_die()
 }
 
 pub fn syscall_getitimer(_ voidptr, which int, mut curr_value ITimerVal) (u64, u64) {
