@@ -11,6 +11,7 @@ import katomic
 import event.eventstruct
 
 pub const max_fds = 256
+pub const max_events = 32
 
 pub struct Process {
 pub mut:
@@ -68,6 +69,8 @@ pub mut:
 	stacks             []voidptr
 	signalfds_lock     klock.Lock
 	signalfds          []voidptr
+	attached_events    [max_events]&eventstruct.Event
+	attached_events_i  u64
 }
 
 pub fn current_thread() &Thread {

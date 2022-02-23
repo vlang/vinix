@@ -26,7 +26,9 @@ fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	return none
 }
 
-fn attach_listeners(mut events []&eventstruct.Event, thread voidptr) {
+fn attach_listeners(mut events []&eventstruct.Event, mut thread proc.Thread) {
+	thread.attached_events_i = 0
+
 	for i := u64(0); i < events.len; i++ {
 		mut event := events[i]
 
@@ -40,7 +42,35 @@ fn attach_listeners(mut events []&eventstruct.Event, thread voidptr) {
 		listener.which = i
 
 		event.listeners_i++
+
+		if thread.attached_events_i == proc.max_events {
+			panic('listening on too many events')
+		}
+
+		thread.attached_events[thread.attached_events_i] = event
+		thread.attached_events_i++
 	}
+}
+
+fn detach_listeners(mut thread proc.Thread) {
+	for i := u64(0); i < thread.attached_events_i; i++ {
+		mut event := thread.attached_events[i]
+
+		for j := u64(0); j < event.listeners_i; j++ {
+			mut listener := &event.listeners[j]
+
+			if listener.thread != voidptr(thread) {
+				continue
+			}
+
+			event.listeners[j] = event.listeners[event.listeners_i - 1]
+			event.listeners_i--
+
+			break
+		}
+	}
+
+	thread.attached_events_i = 0
 }
 
 fn lock_events(mut events []&eventstruct.Event) {
@@ -61,6 +91,11 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	asm volatile amd64 {
 		cli
 	}
+	defer {
+		asm volatile amd64 {
+			sti
+		}
+	}
 
 	lock_events(mut events)
 
@@ -76,7 +111,18 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 
 	katomic.inc(waiting_event_count)
 
-	attach_listeners(mut events, voidptr(thread))
+	attach_listeners(mut events, mut thread)
+	defer {
+		asm volatile amd64 {
+			cli
+		}
+		lock_events(mut events)
+		detach_listeners(mut thread)
+		unlock_events(mut events)
+		asm volatile amd64 {
+			sti
+		}
+	}
 
 	sched.dequeue_thread(thread)
 
