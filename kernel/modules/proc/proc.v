@@ -47,6 +47,7 @@ pub mut:
 	user_stack   u64
 	syscall_num  u64
 	// Movable members
+	tid                int
 	is_in_queue        bool
 	l                  klock.Lock
 	process            &Process

@@ -617,7 +617,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
 
-		sched.new_user_thread(new_process, true, entry_point, voidptr(0), argv, envp,
+		sched.new_user_thread(new_process, true, entry_point, voidptr(0), 0, argv, envp,
 			auxval, true) ?
 
 		return new_process
@@ -641,7 +641,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		// old_threads := process.threads
 		process.threads = []&proc.Thread{}
 
-		sched.new_user_thread(process, true, entry_point, voidptr(0), argv, envp, auxval,
+		sched.new_user_thread(process, true, entry_point, voidptr(0), 0, argv, envp, auxval,
 			true) ?
 
 		unsafe {

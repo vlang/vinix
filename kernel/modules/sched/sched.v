@@ -14,6 +14,7 @@ import memory
 import memory.mmap
 import elf
 import lib
+import errno
 
 const stack_size = u64(0x200000)
 
@@ -344,21 +345,48 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	return thread
 }
 
-pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
+pub fn syscall_new_thread(_ voidptr, pc voidptr, arg voidptr, stack u64, fs u64) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: new_thread(0x%llx, 0x%llx, 0x%llx, 0x%llx)\n', pc, arg, stack, fs)
+	defer {
+		C.printf(c'\e[32mstrace\e[m: returning\n')
+	}
+
+	mut process := proc.current_thread().process
+
+	mut new_thread := new_user_thread(process, false, pc, arg, stack, [], [], 0, false) or {
+		return -1, errno.get()
+	}
+
+	new_thread.fs_base = fs
+
+	enqueue_thread(new_thread, false)
+
+	return u64(new_thread.tid), 0
+}
+
+pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
-	mut stack := &u64(u64(stack_phys) + sched.stack_size + higher_half)
+	mut stack := &u64(0)
+	mut stack_vma := u64(0)
 
-	stack_vma := process.thread_stack_top
-	process.thread_stack_top -= sched.stack_size
-	stack_bottom_vma := process.thread_stack_top
-	process.thread_stack_top -= page_size
+	if _stack == 0 {
+		stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
+		stack = &u64(u64(stack_phys) + sched.stack_size + higher_half)
 
-	mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys), sched.stack_size,
-		mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		stack_vma = process.thread_stack_top
+		process.thread_stack_top -= sched.stack_size
+		stack_bottom_vma := process.thread_stack_top
+		process.thread_stack_top -= page_size
+
+		mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys), sched.stack_size,
+			mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+	} else {
+		stack = &u64(voidptr(_stack))
+		stack_vma = _stack
+	}
 
 	kernel_stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
 	stacks << kernel_stack_phys
@@ -489,6 +517,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		enqueue_thread(thread, false)
 	}
 
+	thread.tid = process.threads.len
 	process.threads << thread
 
 	return thread

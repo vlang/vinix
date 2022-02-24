@@ -1,0 +1,93 @@
+From 9bba006d536521df5499e8c1e526ae3332bac7a7 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Thu, 24 Feb 2022 02:07:25 +0100
+Subject: [PATCH] Vinix specific changes
+
+---
+ sysdeps/vinix/generic/generic.cpp | 56 +++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+
+diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
+index de5306ff..85035edd 100644
+--- a/sysdeps/vinix/generic/generic.cpp
++++ b/sysdeps/vinix/generic/generic.cpp
+@@ -7,6 +7,7 @@
+ #include <limits.h>
+ #include <asm/ioctls.h>
+ #include <stdlib.h>
++#include <sys/mman.h>
+ 
+ #define STUB_ONLY {                             \
+     __ensure(!"STUB_ONLY function was called"); \
+@@ -44,6 +45,52 @@ void sys_exit(int status) {
+     __builtin_unreachable();
+ }
+ 
++#ifndef MLIBC_BUILDING_RTDL
++static constexpr size_t default_stacksize = 0x200000;
++
++int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb, size_t *stack_size, size_t *guard_size) {
++	(void)tcb;
++	if (!*stack_size)
++		*stack_size = default_stacksize;
++
++	uintptr_t map;
++	if (*stack) {
++		map = reinterpret_cast<uintptr_t>(*stack);
++	} else {
++		map = reinterpret_cast<uintptr_t>(
++				mmap(nullptr, *stack_size + *guard_size,
++					PROT_READ | PROT_WRITE,
++					// PROT_NONE,
++					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
++				);
++		if (reinterpret_cast<void*>(map) == MAP_FAILED)
++			return EAGAIN;
++		//int ret = mprotect(reinterpret_cast<void*>(map + *guard_size), *stack_size,
++		//		PROT_READ | PROT_WRITE);
++		//if(ret)
++		//	return EAGAIN;
++	}
++
++	auto sp = reinterpret_cast<uintptr_t*>(map + *stack_size + *guard_size);
++	*--sp = reinterpret_cast<uintptr_t>(user_arg);
++	*--sp = reinterpret_cast<uintptr_t>(entry);
++	*stack = reinterpret_cast<void*>(sp);
++	return 0;
++}
++
++int sys_clone(void *tcb, pid_t *tid_out, void *stack) {
++    auto s = reinterpret_cast<uint64_t *>(stack);
++
++    __syscall_ret ret = __syscall(65, s[0], s[1], stack, tcb);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    *tid_out = (pid_t)ret.ret;
++    return 0;
++}
++#endif
++
+ int sys_kill(pid_t pid, int signal) {
+     __syscall_ret ret = __syscall(26, pid, signal);
+ 
+@@ -410,6 +457,15 @@ int sys_vm_unmap(void *pointer, size_t size) {
+     return 0;
+ }
+ 
++int sys_vm_protect(void *pointer, size_t size, int prot) {
++    __syscall_ret ret = __syscall(48, pointer, size, prot);
++
++    if (ret.errno != 0)
++        return ret.errno;
++
++    return 0;
++}
++
+ int sys_anon_allocate(size_t size, void **pointer) {
+     return sys_vm_map(NULL, size, PROT_EXEC | PROT_READ | PROT_WRITE,
+                       MAP_ANONYMOUS, -1, 0, pointer);
+-- 
+2.35.1
+

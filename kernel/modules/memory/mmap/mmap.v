@@ -347,7 +347,7 @@ pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_mprotect(addr voidptr, length u64, prot int) i64 {
+pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64) {
 	C.printf(c'\n\e[32mstrace\e[m: mprotect(0x%llx, 0x%llx, 0x%x)\n',
 			 addr, length, prot)
 	defer {
@@ -358,10 +358,10 @@ pub fn syscall_mprotect(addr voidptr, length u64, prot int) i64 {
 	mut process := current_thread.process
 
 	mprotect(process.pagemap, addr, length, prot) or {
-		return -i64(errno.get())
+		return -1, errno.get()
 	}
 
-	return 0
+	return 0, 0
 }
 
 pub fn mprotect(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int) ? {
