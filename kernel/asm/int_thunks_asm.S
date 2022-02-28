@@ -87,6 +87,7 @@ interrupt_thunk_\num:
 .section .data
 
 .global interrupt_thunks
+.align 8
 interrupt_thunks:
 .set i,0
 .rept 256
