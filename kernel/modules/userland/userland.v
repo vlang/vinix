@@ -491,7 +491,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 			continue
 		}
 
-		file.fdnum_dup(old_process, i, new_process, i, 0, true) or { panic('') }
+		file.fdnum_dup(old_process, i, new_process, i, 0, true, false) or { panic('') }
 	}
 
 	stack_size := u64(0x200000)

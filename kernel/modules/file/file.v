@@ -321,7 +321,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	return ret
 }
 
-pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Process, newfdnum int, flags int, specific bool) ?int {
+pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Process, newfdnum int, flags int, specific bool, cloexec bool) ?int {
 	mut old_process := &proc.Process(0)
 	if voidptr(_old_process) == voidptr(0) {
 		old_process = proc.current_thread().process
@@ -352,6 +352,9 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 	}
 
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
+	if cloexec {
+		new_fd.flags &= resource.o_cloexec
+	}
 
 	oldfd.handle.refcount++
 	oldfd.handle.resource.refcount++
@@ -365,7 +368,7 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
 
-	new_fdnum := fdnum_dup(voidptr(0), oldfdnum, voidptr(0), newfdnum, flags, true) or {
+	new_fdnum := fdnum_dup(voidptr(0), oldfdnum, voidptr(0), newfdnum, flags, true, false) or {
 		return -1, errno.get()
 	}
 
@@ -386,7 +389,12 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 
 	match cmd {
 		file.f_dupfd {
-			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false) or {
+			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false, false) or {
+				return -1, errno.get()
+			})
+		}
+		file.f_dupfd_cloexec {
+			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false, true) or {
 				return -1, errno.get()
 			})
 		}
