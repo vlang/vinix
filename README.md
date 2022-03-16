@@ -116,7 +116,14 @@ In macOS, if hvf is available, run with
 make run-hvf
 ```
 
+for FreeBSD, you can use HVF, it works flawlessly.
+```bash
+make run-hvf
+```
+
 To run without any acceleration, run with
 ```bash
 make run
 ```
+
+
