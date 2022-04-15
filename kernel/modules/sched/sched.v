@@ -67,9 +67,9 @@ fn get_next_thread(orig_i int) int {
 	return -1
 }
 
-fn C.userland__dispatch_a_signal(context &cpu.local.GPRState)
+fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
 
-fn scheduler_isr(_ u32, gpr_state &cpu.local.GPRState) {
+fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_stop()
 
 	mut cpu_local := cpulocal.current()
