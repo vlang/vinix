@@ -12,8 +12,8 @@ pub fn toupper(c int) int {
 [export: 'memcpy']
 pub fn memcpy(dest voidptr, src voidptr, size u64) voidptr {
 	unsafe {
-		mut destm := &byte(dest)
-		srcm := &byte(src)
+		mut destm := &u8(dest)
+		srcm := &u8(src)
 
 		for i := 0; i < size; i++ {
 			destm[i] = srcm[i]
@@ -25,7 +25,7 @@ pub fn memcpy(dest voidptr, src voidptr, size u64) voidptr {
 [export: 'memset']
 pub fn memset(dest voidptr, c int, size u64) voidptr {
 	unsafe {
-		mut destm := &byte(dest)
+		mut destm := &u8(dest)
 
 		for i := 0; i < size; i++ {
 			destm[i] = byte(c)
@@ -49,8 +49,8 @@ pub fn memset64(dest voidptr, c int, size u64) voidptr {
 [export: 'memmove']
 pub fn memmove(dest &C.void, src &C.void, size u64) &C.void {
 	unsafe {
-		mut destm := &byte(dest)
-		srcm := &byte(src)
+		mut destm := &u8(dest)
+		srcm := &u8(src)
 
 		if src > dest {
 			for i := 0; i < size; i++ {
@@ -69,8 +69,8 @@ pub fn memmove(dest &C.void, src &C.void, size u64) &C.void {
 [export: 'memcmp']
 pub fn memcmp(_s1 &C.void, _s2 &C.void, size u64) int {
 	unsafe {
-		s1 := &byte(_s1)
-		s2 := &byte(_s2)
+		s1 := &u8(_s1)
+		s2 := &u8(_s2)
 
 		for i := 0; i < size; i++ {
 			if s1[i] != s2[i] {
@@ -86,8 +86,8 @@ pub fn strcpy(dest &C.char, src &C.char) &C.char {
 	mut i := u64(0)
 
 	unsafe {
-		mut destm := &byte(voidptr(dest))
-		srcm := &byte(voidptr(src))
+		mut destm := &u8(voidptr(dest))
+		srcm := &u8(voidptr(src))
 
 		for {
 			if srcm[i] != 0 {
@@ -109,8 +109,8 @@ pub fn strncpy(dest &C.char, src &C.char, n u64) &C.char {
 	mut i := u64(0)
 
 	unsafe {
-		mut destm := &byte(voidptr(dest))
-		srcm := &byte(voidptr(src))
+		mut destm := &u8(voidptr(dest))
+		srcm := &u8(voidptr(src))
 
 		for {
 			if i >= n {
@@ -138,8 +138,8 @@ pub fn strncpy(dest &C.char, src &C.char, n u64) &C.char {
 pub fn strcmp(_s1 &C.char, _s2 &C.char) int {
 	unsafe {
 		mut i := u64(0)
-		s1 := &byte(_s1)
-		s2 := &byte(_s2)
+		s1 := &u8(_s1)
+		s2 := &u8(_s2)
 
 		for {
 			c1 := s1[i]
@@ -162,8 +162,8 @@ pub fn strcmp(_s1 &C.char, _s2 &C.char) int {
 [export: 'strncmp']
 pub fn strncmp(_s1 &C.char, _s2 &C.char, size u64) int {
 	unsafe {
-		s1 := &byte(_s1)
-		s2 := &byte(_s2)
+		s1 := &u8(_s1)
+		s2 := &u8(_s2)
 
 		for i := 0; i < size; i++ {
 			c1 := s1[i]
@@ -186,7 +186,7 @@ pub fn strlen(_ptr &C.char) u64 {
 	mut i := u64(0)
 
 	unsafe {
-		ptr := &byte(voidptr(_ptr))
+		ptr := &u8(voidptr(_ptr))
 		for {
 			if ptr[i] == 0 {
 				break

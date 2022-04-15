@@ -368,7 +368,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 	mut model_number := &char(memory.malloc(41))
 
 	unsafe {
-		C.memcpy(serial_number, &byte(identity) + 20, 20)
+		C.memcpy(serial_number, &u8(identity) + 20, 20)
 
 		for i := 0; i < 20; i += 2 { // swap endianess
 			tmp := serial_number[i]
@@ -376,7 +376,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 			serial_number[i + 1] = tmp
 		}
 
-		C.memcpy(firmware_revision, &byte(identity) + 46, 8)
+		C.memcpy(firmware_revision, &u8(identity) + 46, 8)
 
 		for i := 0; i < 8; i += 2 { // swap endianess
 			tmp := firmware_revision[i]
@@ -384,7 +384,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 			firmware_revision[i + 1] = tmp
 		}
 
-		C.memcpy(model_number, &byte(identity) + 54, 40)
+		C.memcpy(model_number, &u8(identity) + 54, 40)
 
 		for i := 0; i < 40; i += 2 { // swap endianess
 			tmp := model_number[i]
