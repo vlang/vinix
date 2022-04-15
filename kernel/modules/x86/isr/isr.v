@@ -73,7 +73,7 @@ fn abort_handler(num u32, gpr_state &cpulocal.GPRState) {
 
 fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 	if gpr_state.cs == user_code_seg {
-		mut signal := byte(0)
+		mut signal := u8(0)
 
 		match num {
 			13, 14 {
@@ -93,7 +93,7 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 }
 
 __global (
-	abort_vector = byte(0)
+	abort_vector = u8(0)
 )
 
 #include <symbols.h>

@@ -267,7 +267,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 
 	mut which := -1
 
-	for i := byte(0); i < 64; i++ {
+	for i := u8(0); i < 64; i++ {
 		if thread.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}

@@ -721,7 +721,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	for c.regs.csts & (1 << 0) != 0 {}
 
-	mut vect := byte(0)
+	mut vect := u8(0)
 
 	if pci_device.msi_support == true {
 		print('nvme: device is msi capable\n')

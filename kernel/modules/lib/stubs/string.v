@@ -28,7 +28,7 @@ pub fn memset(dest voidptr, c int, size u64) voidptr {
 		mut destm := &u8(dest)
 
 		for i := 0; i < size; i++ {
-			destm[i] = byte(c)
+			destm[i] = u8(c)
 		}
 	}
 	return dest
@@ -93,7 +93,7 @@ pub fn strcpy(dest &C.char, src &C.char) &C.char {
 			if srcm[i] != 0 {
 				destm[i] = srcm[i]
 			} else {
-				destm[i] = byte(0)
+				destm[i] = u8(0)
 				return dest
 			}
 

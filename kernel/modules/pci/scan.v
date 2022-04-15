@@ -22,7 +22,7 @@ pub fn initialise() {
 	if (configc & 0x800000) == 0 {
 		check_bus(0, -1)
 	} else {
-		for function := byte(0); function < pci.max_function; function++ {
+		for function := u8(0); function < pci.max_function; function++ {
 			host_bridge := PCIDevice{
 				bus: 0
 				slot: 0
