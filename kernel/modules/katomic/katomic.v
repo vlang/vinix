@@ -4,7 +4,7 @@
 
 module katomic
 
-pub fn bts<T>(var &T, bit byte) bool {
+pub fn bts<T>(var &T, bit u8) bool {
 	mut ret := false
 	unsafe {
 		asm volatile amd64 {
@@ -19,7 +19,7 @@ pub fn bts<T>(var &T, bit byte) bool {
 	return ret
 }
 
-pub fn btr<T>(var &T, bit byte) bool {
+pub fn btr<T>(var &T, bit u8) bool {
 	mut ret := false
 	unsafe {
 		asm volatile amd64 {

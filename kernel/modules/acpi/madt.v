@@ -10,22 +10,22 @@ pub:
 	header               SDT
 	local_contoller_addr u32
 	flags                u32
-	entries_begin        byte
+	entries_begin        u8
 }
 
 [packed]
 struct MADTHeader {
 pub:
-	id     byte
-	length byte
+	id     u8
+	length u8
 }
 
 [packed]
 struct MADTLocalApic {
 pub:
 	header       MADTHeader
-	processor_id byte
-	apic_id      byte
+	processor_id u8
+	apic_id      u8
 	flags        u32
 }
 
@@ -33,8 +33,8 @@ pub:
 struct MADTIoApic {
 pub:
 	header   MADTHeader
-	apic_id  byte
-	reserved byte
+	apic_id  u8
+	reserved u8
 	address  u32
 	gsib     u32
 }
@@ -43,8 +43,8 @@ pub:
 struct MADTISO {
 pub:
 	header     MADTHeader
-	bus_source byte
-	irq_source byte
+	bus_source u8
+	irq_source u8
 	gsi        u32
 	flags      u16
 }
@@ -53,9 +53,9 @@ pub:
 struct MADTNMI {
 pub:
 	header    MADTHeader
-	processor byte
+	processor u8
 	flags     u16
-	lint      byte
+	lint      u8
 }
 
 __global (

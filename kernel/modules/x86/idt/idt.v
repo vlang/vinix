@@ -17,8 +17,8 @@ struct IDTEntry {
 pub mut:
 	offset_low u16
 	selector   u16
-	ist        byte
-	flags      byte
+	ist        u8
+	flags      u8
 	offset_mid u16
 	offset_hi  u32
 	reserved   u32
@@ -27,11 +27,11 @@ pub mut:
 __global (
 	idt_pointer     IDTPointer
 	idt_entries     [256]IDTEntry
-	idt_free_vector = byte(32)
+	idt_free_vector = u8(32)
 	idt_lock        klock.Lock
 )
 
-pub fn allocate_vector() byte {
+pub fn allocate_vector() u8 {
 	idt_lock.acquire()
 	if idt_free_vector == 0xf0 {
 		panic('IDT exhausted')
@@ -62,11 +62,11 @@ pub fn reload() {
 	}
 }
 
-pub fn set_ist(vector u16, ist byte) {
+pub fn set_ist(vector u16, ist u8) {
 	idt_entries[vector].ist = ist
 }
 
-pub fn register_handler(vector u16, handler voidptr, ist byte, flags byte) {
+pub fn register_handler(vector u16, handler voidptr, ist u8, flags u8) {
 	address := u64(handler)
 
 	idt_entries[vector] = IDTEntry{

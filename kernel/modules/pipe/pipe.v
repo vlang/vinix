@@ -24,7 +24,7 @@ pub mut:
 	status   int
 	can_mmap bool
 
-	data      &byte
+	data      &u8
 	read_ptr  u64
 	write_ptr u64
 	capacity  u64

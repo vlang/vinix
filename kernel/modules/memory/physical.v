@@ -32,8 +32,8 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 
 		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
-			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n',
-					 i, entries[i].base, entries[i].length, entries[i].entry_type)
+			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n', i, entries[i].base,
+				entries[i].length, entries[i].entry_type)
 
 			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable)
 				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable) {

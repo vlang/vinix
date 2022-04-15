@@ -39,15 +39,15 @@ pub fn initialise() {
 	}
 }
 
-fn check_bus(bus byte, parent i64) {
-	for dev := byte(0); dev < pci.max_device; dev++ {
-		for func := byte(0); func < pci.max_function; func++ {
+fn check_bus(bus u8, parent i64) {
+	for dev := u8(0); dev < pci.max_device; dev++ {
+		for func := u8(0); func < pci.max_function; func++ {
 			check_function(bus, dev, func, parent)
 		}
 	}
 }
 
-fn check_function(bus byte, slot byte, function byte, parent i64) {
+fn check_function(bus u8, slot u8, function u8, parent i64) {
 	mut device := &PCIDevice{
 		bus: bus
 		slot: slot
@@ -62,17 +62,17 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 	// Handle PCI to PCI bridges, and we are done.
 	if device.class == 0x6 && device.subclass == 0x4 {
 		config := device.read<u32>(0x18)
-		check_bus(byte(config >> 8), 1)
+		check_bus(u8(config >> 8), 1)
 	} else {
 		scanned_devices << device
 
 		status := device.read<u16>(0x6)
 
 		if (status & (1 << 4)) != 0 { // parse capabilities list
-			mut off := device.read<byte>(0x34)
+			mut off := device.read<u8>(0x34)
 
 			for off > 0 {
-				id := device.read<byte>(off)
+				id := device.read<u8>(off)
 
 				match id {
 					0x5 {
@@ -91,7 +91,7 @@ fn check_function(bus byte, slot byte, function byte, parent i64) {
 					else {}
 				}
 
-				off = device.read<byte>(off + 1)
+				off = device.read<u8>(off + 1)
 			}
 		}
 
@@ -113,7 +113,7 @@ pub fn get_device_by_vendor(vendor_id u16, device_id u16, index u32) ?&PCIDevice
 	return none
 }
 
-pub fn get_device_by_coordinates(bus byte, slot byte, function byte, index u32) ?&PCIDevice {
+pub fn get_device_by_coordinates(bus u8, slot u8, function u8, index u32) ?&PCIDevice {
 	mut count := 0
 	for device in scanned_devices {
 		if device.bus == bus && device.slot == slot && device.function == function {
@@ -127,7 +127,7 @@ pub fn get_device_by_coordinates(bus byte, slot byte, function byte, index u32) 
 	return none
 }
 
-pub fn get_device_by_class(class byte, subclass byte, progif byte, index u32) ?&PCIDevice {
+pub fn get_device_by_class(class u8, subclass u8, progif u8, index u32) ?&PCIDevice {
 	mut count := 0
 	for device in scanned_devices {
 		if device.class == class && device.subclass == subclass && device.prog_if == progif {

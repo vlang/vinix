@@ -21,7 +21,7 @@ const stack_size = u64(0x200000)
 const max_running_threads = int(512)
 
 __global (
-	scheduler_vector        byte
+	scheduler_vector        u8
 	scheduler_running_queue [512]&proc.Thread
 	kernel_process          &proc.Process
 	working_cpus            = u64(0)
@@ -67,9 +67,9 @@ fn get_next_thread(orig_i int) int {
 	return -1
 }
 
-fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
+fn C.userland__dispatch_a_signal(context &cpu.local.GPRState)
 
-fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
+fn scheduler_isr(_ u32, gpr_state &cpu.local.GPRState) {
 	apic.lapic_timer_stop()
 
 	mut cpu_local := cpulocal.current()
@@ -192,7 +192,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 			// Check if any CPU is idle and wake it up
 			for cpu in cpu_locals {
 				if katomic.load(cpu.is_idle) == true {
-					apic.lapic_send_ipi(byte(cpu.lapic_id), scheduler_vector)
+					apic.lapic_send_ipi(u8(cpu.lapic_id), scheduler_vector)
 					break
 				}
 			}
@@ -237,7 +237,7 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 		return
 	}
 
-	apic.lapic_send_ipi(byte(cpu_locals[running_on].lapic_id), scheduler_vector)
+	apic.lapic_send_ipi(u8(cpu_locals[running_on].lapic_id), scheduler_vector)
 
 	thread.l.acquire()
 	thread.l.release()
@@ -261,7 +261,7 @@ pub fn yield(save_ctx bool) {
 		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
 	}
 
-	apic.lapic_send_ipi(byte(cpu_local.lapic_id), scheduler_vector)
+	apic.lapic_send_ipi(u8(cpu_local.lapic_id), scheduler_vector)
 
 	asm volatile amd64 {
 		sti
@@ -346,7 +346,8 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 }
 
 pub fn syscall_new_thread(_ voidptr, pc voidptr, arg voidptr, stack u64, fs u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: new_thread(0x%llx, 0x%llx, 0x%llx, 0x%llx)\n', pc, arg, stack, fs)
+	C.printf(c'\n\e[32mstrace\e[m: new_thread(0x%llx, 0x%llx, 0x%llx, 0x%llx)\n', pc,
+		arg, stack, fs)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}

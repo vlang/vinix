@@ -17,138 +17,138 @@ import fs
 import katomic
 
 const (
-	ahci_class = 0x1
-	ahci_subclass = 0x6
-	ahci_progif = 0x1
-	sata_ata = 0x101
-	sata_atapi = 0xeb140101
-	sata_semb = 0xc33C0101
-	sata_pm = 0x96690101
-	hba_cmd_st = 0x1
-	hba_cmd_fre = 0x10
-	hba_cmd_fr = 0x4000
-	hba_cmd_cr = 0x8000
-	fis_reg_h2d = 0x27
-	fis_reg_d2h = 0x34
-	fis_dma_enable = 0x39
-	fis_dma_setup = 0x41
-	fis_data = 0x46
-	fis_bist = 0x58
-	fis_pio_setup = 0x5f
+	ahci_class      = 0x1
+	ahci_subclass   = 0x6
+	ahci_progif     = 0x1
+	sata_ata        = 0x101
+	sata_atapi      = 0xeb140101
+	sata_semb       = 0xc33C0101
+	sata_pm         = 0x96690101
+	hba_cmd_st      = 0x1
+	hba_cmd_fre     = 0x10
+	hba_cmd_fr      = 0x4000
+	hba_cmd_cr      = 0x8000
+	fis_reg_h2d     = 0x27
+	fis_reg_d2h     = 0x34
+	fis_dma_enable  = 0x39
+	fis_dma_setup   = 0x41
+	fis_data        = 0x46
+	fis_bist        = 0x58
+	fis_pio_setup   = 0x5f
 	fis_device_bits = 0xa1
-	sector_size = 0x200
+	sector_size     = 0x200
 )
 
 [packed]
 struct AHCIRegisters {
 pub mut:
-	cap u32
-	ghc u32
-	ints u32
-	pi u32
-	vs u32
-	ccc_ctl u32
+	cap       u32
+	ghc       u32
+	ints      u32
+	pi        u32
+	vs        u32
+	ccc_ctl   u32
 	ccc_ports u32
-	em_lock u32
-	em_ctl u32
-	cap2 u32
-	bohc u32
-	reserved[29] u32
-	vendor[24] u32
+	em_lock   u32
+	em_ctl    u32
+	cap2      u32
+	bohc      u32
+	reserved  [29]u32
+	vendor    [24]u32
 }
 
 [packed]
 struct AHCIPortRegisters {
 pub mut:
-	clb u32
-	clbu u32
-	fb u32
-	fbu u32
-	ints u32
-	ie u32
-	cmd u32
+	clb       u32
+	clbu      u32
+	fb        u32
+	fbu       u32
+	ints      u32
+	ie        u32
+	cmd       u32
 	reserved0 u32
-	tfd u32
-	sig u32
-	ssts u32
-	sstl u32
-	serr u32
-	sact u32
-	ci u32
-	sntf u32
-	fbs u32
-	devslp u32
-	reserved1[11] u32
-	vs[10] u32
+	tfd       u32
+	sig       u32
+	ssts      u32
+	sstl      u32
+	serr      u32
+	sact      u32
+	ci        u32
+	sntf      u32
+	fbs       u32
+	devslp    u32
+	reserved1 [11]u32
+	vs        [10]u32
 }
 
 [packed]
 struct AHCIHBACommand {
 pub mut:
-	flags u16
-	prdtl u16
-	prdbc u32
-	ctba u32
-	ctbau u32
-	reserved[4] u32
+	flags    u16
+	prdtl    u16
+	prdbc    u32
+	ctba     u32
+	ctbau    u32
+	reserved [4]u32
 }
 
 [packed]
 struct AHCIHBAPrdt {
 pub mut:
-	dba u32
-	dbau u32
+	dba      u32
+	dbau     u32
 	reserved u32
-	dbc u32
+	dbc      u32
 }
 
 [packed]
 struct AHCIHBACommandTable {
 pub mut:
-	cfis[64] u8
-	acmd[16] u8
-	reserved[48] u8
-	prdt[1] AHCIHBAPrdt
+	cfis     [64]u8
+	acmd     [16]u8
+	reserved [48]u8
+	prdt     [1]AHCIHBAPrdt
 }
 
 [packed]
 struct AHCIFISh2d {
 pub mut:
 	fis_type u8
-	flags u8
-	command u8
+	flags    u8
+	command  u8
 	featurel u8
-	lba0 u8
-	lba1 u8
-	lba2 u8
-	device u8
-	lba3 u8
-	lba4 u8
-	lba5 u8
+	lba0     u8
+	lba1     u8
+	lba2     u8
+	device   u8
+	lba3     u8
+	lba4     u8
+	lba5     u8
 	featureh u8
-	countl u8
-	counth u8
-	icc u8
-	control u8
+	countl   u8
+	counth   u8
+	icc      u8
+	control  u8
 	reserved u32
 }
 
 [packed]
 struct AHCIFISd2h {
-	fis_type u8
-	flags u8
-	status u8
-	error u8
-	lba0 u8
-	lba1 u8
-	lba2 u8
-	device u8
-	lba3 u8
-	lba4 u8
-	lba5 u8
+	fis_type  u8
+	flags     u8
+	status    u8
+	error     u8
+	lba0      u8
+	lba1      u8
+	lba2      u8
+	device    u8
+	lba3      u8
+	lba4      u8
+	lba5      u8
 	reserved2 u8
-	countl u8
-	counth u8
+	countl    u8
+	counth    u8
 	reserved3 u8
 	reserved4 u8
 }
@@ -162,7 +162,7 @@ pub mut:
 	version_min u32
 	version_maj u32
 
-	port_cnt u32
+	port_cnt  u32
 	cmd_slots u32
 
 	device_list []&AHCIDevice
@@ -178,7 +178,7 @@ pub mut:
 	can_mmap bool
 
 	parent_controller &AHCIController
-	volatile regs &AHCIPortRegisters
+	volatile regs              &AHCIPortRegisters
 }
 
 __global (
@@ -276,20 +276,20 @@ fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u3
 }
 
 fn (mut d AHCIDevice) send_cmd(slot u32) {
-	for (d.regs.tfd & (0x88)) != 0 { }
+	for (d.regs.tfd & (0x88)) != 0 {}
 
-	d.regs.cmd &= ~hba_cmd_st
+	d.regs.cmd &= ~ahci.hba_cmd_st
 
-	for (d.regs.cmd & hba_cmd_cr) != 0 { }
+	for (d.regs.cmd & ahci.hba_cmd_cr) != 0 {}
 
-	d.regs.cmd |= hba_cmd_fr | hba_cmd_st
+	d.regs.cmd |= ahci.hba_cmd_fr | ahci.hba_cmd_st
 	d.regs.ci = 1 << slot
 
-	for d.regs.ci & (1 << slot) != 0 { }
+	for d.regs.ci & (1 << slot) != 0 {}
 
-	d.regs.cmd &= ~hba_cmd_st
-	for (d.regs.cmd & hba_cmd_st) != 0 { }
-	d.regs.cmd &= ~hba_cmd_fre
+	d.regs.cmd &= ~ahci.hba_cmd_st
+	for (d.regs.cmd & ahci.hba_cmd_st) != 0 {}
+	d.regs.cmd &= ~ahci.hba_cmd_fre
 }
 
 fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
@@ -298,13 +298,14 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		return -1
 	}
 
-	mut volatile cmd_hdr := &AHCIHBACommand(d.regs.clb + higher_half + cmd_slot * sizeof(AHCIHBACommand))
+	mut volatile cmd_hdr := &AHCIHBACommand(d.regs.clb + higher_half +
+		cmd_slot * sizeof(AHCIHBACommand))
 
 	cmd_hdr.flags &= ~(0b11111 | (1 << 6))
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
 	cmd_hdr.prdtl = 1
 
-	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(buffer) - higher_half, 1, u32(cnt * sector_size - 1))
+	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(buffer) - higher_half, 1, u32(cnt * ahci.sector_size - 1))
 
 	mut volatile cmd_ptr := unsafe { &AHCIFISh2d(&cmd_table.cfis) }
 	unsafe { C.memset(cmd_ptr, 0, sizeof(AHCIFISh2d)) }
@@ -315,7 +316,7 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		cmd_ptr.command = 0x25
 	}
 
-	cmd_ptr.fis_type = fis_reg_h2d
+	cmd_ptr.fis_type = ahci.fis_reg_h2d
 	cmd_ptr.flags = (1 << 7)
 	cmd_ptr.device = 1 << 6
 
@@ -340,7 +341,8 @@ fn (mut d AHCIDevice) initialise() ?int {
 		return none
 	}
 
-	mut volatile cmd_hdr := &AHCIHBACommand(d.regs.clb + higher_half + cmd_slot * sizeof(AHCIHBACommand))
+	mut volatile cmd_hdr := &AHCIHBACommand(d.regs.clb + higher_half +
+		cmd_slot * sizeof(AHCIHBACommand))
 
 	cmd_hdr.flags &= ~0b11111 | (1 << 7)
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
@@ -355,7 +357,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 
 	cmd_ptr.command = 0xec
 	cmd_ptr.flags = (1 << 7)
-	cmd_ptr.fis_type = fis_reg_h2d
+	cmd_ptr.fis_type = ahci.fis_reg_h2d
 
 	d.send_cmd(cmd_slot)
 
@@ -390,16 +392,15 @@ fn (mut d AHCIDevice) initialise() ?int {
 			model_number[i + 1] = tmp
 		}
 
-		print("ahci: device: serial number: ${cstring_to_vstring(serial_number)}\n")
-		print("ahci: device: firmware revision: ${cstring_to_vstring(firmware_revision)}\n")
-		print("ahci: device: model number: ${cstring_to_vstring(model_number)}\n")
+		print('ahci: device: serial number: ${cstring_to_vstring(serial_number)}\n')
+		print('ahci: device: firmware revision: ${cstring_to_vstring(firmware_revision)}\n')
+		print('ahci: device: model number: ${cstring_to_vstring(model_number)}\n')
 	}
-
-	print("ahci: device: sector count: ${sector_cnt}\n")
+	print('ahci: device: sector count: $sector_cnt\n')
 
 	d.stat.blocks = sector_cnt
-	d.stat.blksize = sector_size
-	d.stat.size = sector_cnt * sector_size
+	d.stat.blksize = ahci.sector_size
+	d.stat.size = sector_cnt * ahci.sector_size
 	d.stat.rdev = resource.create_dev_id()
 	d.stat.mode = 0o644 | stat.ifblk
 
@@ -432,13 +433,14 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 	for i := u64(0); i < c.port_cnt; i++ {
 		if c.regs.pi & (1 << i) != 0 {
-			mut volatile port := &AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) + i * sizeof(AHCIPortRegisters) + higher_half)
+			mut volatile port := &AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) +
+				i * sizeof(AHCIPortRegisters) + higher_half)
 
 			match port.sig {
-				sata_ata {
-					print('ahci: sata drive found on port ${i}\n')
+				ahci.sata_ata {
+					print('ahci: sata drive found on port $i\n')
 
-					mut device := &AHCIDevice {
+					mut device := &AHCIDevice{
 						parent_controller: unsafe { c }
 						regs: port
 					}
@@ -448,18 +450,18 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 						continue
 					}
 
-					fs.devtmpfs_add_device(device, 'sd${c.device_list.len}')
-					partition.scan_partitions(mut device, 'sd${c.device_list.len}-')
+					fs.devtmpfs_add_device(device, 'sd$c.device_list.len')
+					partition.scan_partitions(mut device, 'sd$c.device_list.len-')
 
 					c.device_list << device
 				}
-				sata_atapi {
-					print('ahci: enclosure management bridge found on port ${i}\n')
+				ahci.sata_atapi {
+					print('ahci: enclosure management bridge found on port $i\n')
 				}
-				sata_pm {
-					print('ahci: port multipler found on port ${i}\n')
+				ahci.sata_pm {
+					print('ahci: port multipler found on port $i\n')
 				}
-				else { }
+				else {}
 			}
 		}
 	}
@@ -469,8 +471,11 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 pub fn initialise() {
 	for device in scanned_devices {
-		if device.class == ahci_class && device.subclass == ahci_subclass && device.prog_if == ahci_progif {
-			mut ahci_device := &AHCIController { regs: 0 }
+		if device.class == ahci.ahci_class && device.subclass == ahci.ahci_subclass
+			&& device.prog_if == ahci.ahci_progif {
+			mut ahci_device := &AHCIController{
+				regs: 0
+			}
 
 			if ahci_device.initialise(device) != -1 {
 				ahci_controller_list << ahci_device

@@ -21,7 +21,7 @@ pub const sock_buf = 0x100000
 pub struct SockaddrUn {
 pub mut:
 	sun_family u32
-	sun_path   [108]byte
+	sun_path   [108]u8
 }
 
 pub struct UnixSocket {
@@ -38,11 +38,10 @@ pub mut:
 	backlog   []&UnixSocket
 
 	connection_event eventstruct.Event
-	connected bool
-	peer      &UnixSocket
+	connected        bool
+	peer             &UnixSocket
 
-
-	data      &byte
+	data      &u8
 	read_ptr  u64
 	write_ptr u64
 	capacity  u64
@@ -66,9 +65,9 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(this.used) == 0 {
 		// Return EOF if the pipe was closed
-//		if this.refcount <= 1 {
-//			return 0
-//		}
+		//		if this.refcount <= 1 {
+		//			return 0
+		//		}
 		if handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.ewouldblock)
 			return none
@@ -114,7 +113,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)
 
-	this.status &= ~(file.pollin)
+	this.status &= ~file.pollin
 
 	return i64(count)
 }
@@ -208,7 +207,9 @@ fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u64) ?
 	}
 
 	unsafe { C.memcpy(_addr, voidptr(&this.peer.name), actual_size) }
-	unsafe { *addrlen = actual_size }
+	unsafe {
+		*addrlen = actual_size
+	}
 }
 
 fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
@@ -225,7 +226,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	handle := &file.Handle(_handle)
 
 	for this.backlog.len == 0 {
-		this.status &= ~(file.pollin)
+		this.status &= ~file.pollin
 		if handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.ewouldblock)
 			return none
@@ -246,8 +247,8 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		peer: peer
 		connected: true
 		name: peer.name
-		data: unsafe { C.malloc(sock_buf) }
-		capacity: sock_buf
+		data: unsafe { C.malloc(unix.sock_buf) }
+		capacity: unix.sock_buf
 	}
 
 	peer.refcount++
@@ -263,7 +264,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	}
 
 	if this.backlog.len == 0 {
-		this.status &= ~(file.pollin)
+		this.status &= ~file.pollin
 	}
 
 	return connection_socket
@@ -283,9 +284,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	C.printf(c'UNIX socket: Wants to connect to %s\n', path.str)
 
-	mut target := fs.get_node(thread.process.current_directory, path, true) or {
-		return error('')
-	}
+	mut target := fs.get_node(thread.process.current_directory, path, true) or { return error('') }
 
 	target_res := target.resource
 
@@ -377,9 +376,9 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(this.used) == 0 {
 		// Return EOF if the pipe was closed
-//		if this.refcount <= 1 {
-//			return 0
-//		}
+		//		if this.refcount <= 1 {
+		//			return 0
+		//		}
 		this.peer.status |= file.pollout
 		event.trigger(mut this.peer.event, false)
 		if handle.flags & resource.o_nonblock != 0 {
@@ -427,14 +426,11 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	for i := u64(0); i < msg.msg_iovlen; i++ {
 		iov := unsafe { &msg.msg_iov[i] }
 
-		to_transfer := if iov.iov_len < left {
-			iov.iov_len
-		} else {
-			left
-		}
+		to_transfer := if iov.iov_len < left { iov.iov_len } else { left }
 
-		unsafe { C.memcpy(iov.iov_base,
-						  voidptr(u64(tmpbuf) + transferred), to_transfer) }
+		unsafe {
+			C.memcpy(iov.iov_base, voidptr(u64(tmpbuf) + transferred), to_transfer)
+		}
 
 		transferred += to_transfer
 		left -= to_transfer
@@ -450,7 +446,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	C.printf(c'Successfully received %llu bytes\n', transferred)
 
-	this.status &= ~(file.pollin)
+	this.status &= ~file.pollin
 
 	return transferred
 }
@@ -459,8 +455,8 @@ pub fn create(@type int) ?&UnixSocket {
 	mut ret := &UnixSocket{
 		refcount: 1
 		peer: voidptr(0)
-		data: unsafe { C.malloc(sock_buf) }
-		capacity: sock_buf
+		data: unsafe { C.malloc(unix.sock_buf) }
+		capacity: unix.sock_buf
 	}
 	ret.name.sun_family = sock_pub.af_unix
 	return ret
@@ -470,15 +466,15 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount: 1
 		peer: voidptr(0)
-		data: unsafe { C.malloc(sock_buf) }
-		capacity: sock_buf
+		data: unsafe { C.malloc(unix.sock_buf) }
+		capacity: unix.sock_buf
 	}
 	a.name.sun_family = sock_pub.af_unix
 	mut b := &UnixSocket{
 		refcount: 1
 		peer: voidptr(0)
-		data: unsafe { C.malloc(sock_buf) }
-		capacity: sock_buf
+		data: unsafe { C.malloc(unix.sock_buf) }
+		capacity: unix.sock_buf
 	}
 	b.name.sun_family = sock_pub.af_unix
 	return a, b

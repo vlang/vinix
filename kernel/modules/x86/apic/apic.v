@@ -10,14 +10,14 @@ import x86.cpu.local as cpulocal
 import time
 
 const (
-	lapic_reg_icr0 = 0x300
-	lapic_reg_icr1 = 0x310
-	lapic_reg_spurious = 0x0f0
-	lapic_reg_eoi = 0x0b0
-	lapic_reg_timer = 0x320
+	lapic_reg_icr0          = 0x300
+	lapic_reg_icr1          = 0x310
+	lapic_reg_spurious      = 0x0f0
+	lapic_reg_eoi           = 0x0b0
+	lapic_reg_timer         = 0x320
 	lapic_reg_timer_initcnt = 0x380
-	lapic_reg_timer_curcnt = 0x390
-	lapic_reg_timer_div = 0x3e0
+	lapic_reg_timer_curcnt  = 0x390
+	lapic_reg_timer_div     = 0x3e0
 )
 
 __global (
@@ -68,7 +68,7 @@ pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 	lapic_timer_stop()
 }
 
-pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec byte, us u64) {
+pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec u8, us u64) {
 	lapic_timer_stop()
 
 	ticks := us * (cpu_local.lapic_timer_freq / 1000000)
@@ -78,7 +78,7 @@ pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec byte, us u64) {
 	lapic_write(apic.lapic_reg_timer_initcnt, u32(ticks))
 }
 
-pub fn lapic_enable(spurious_vect byte) {
+pub fn lapic_enable(spurious_vect u8) {
 	lapic_write(apic.lapic_reg_spurious, lapic_read(apic.lapic_reg_spurious) | (1 << 8) | spurious_vect)
 }
 
@@ -86,7 +86,7 @@ pub fn lapic_eoi() {
 	lapic_write(apic.lapic_reg_eoi, 0)
 }
 
-pub fn lapic_send_ipi(lapic_id byte, vector byte) {
+pub fn lapic_send_ipi(lapic_id u8, vector u8) {
 	lapic_write(apic.lapic_reg_icr1, u32(lapic_id) << 24)
 	lapic_write(apic.lapic_reg_icr0, vector)
 }
@@ -117,7 +117,7 @@ fn io_apic_from_gsi(gsi u32) int {
 	panic('Cannot determine IO APIC from GSI')
 }
 
-pub fn io_apic_set_gsi_redirect(lapic_id u32, vector byte, gsi u32, flags u16, status bool) {
+pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, status bool) {
 	io_apic := io_apic_from_gsi(gsi)
 
 	mut redirect := u64(vector)
@@ -142,7 +142,7 @@ pub fn io_apic_set_gsi_redirect(lapic_id u32, vector byte, gsi u32, flags u16, s
 	io_apic_write(io_apic, ioredtbl + 1, u32(redirect >> 32))
 }
 
-pub fn io_apic_set_irq_redirect(lapic_id u32, vector byte, irq byte, status bool) {
+pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {
 			if status {

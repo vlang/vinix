@@ -13,29 +13,29 @@ pub const (
 )
 
 pub fn pit_get_current_count() u16 {
-	kio.port_out<byte>(0x43, 0)
-	lo := kio.port_in<byte>(0x40)
-	hi := kio.port_in<byte>(0x40)
+	kio.port_out<u8>(0x43, 0)
+	lo := kio.port_in<u8>(0x40)
+	hi := kio.port_in<u8>(0x40)
 	return (u16(hi) << 8) | lo
 }
 
 pub fn pit_set_reload_value(new_count u16) {
 	// Channel 0, lo/hi access mode, mode 2 (rate generator)
-	kio.port_out<byte>(0x43, 0x34)
-	kio.port_out<byte>(0x40, byte(new_count))
-	kio.port_out<byte>(0x40, byte(new_count >> 8))
+	kio.port_out<u8>(0x43, 0x34)
+	kio.port_out<u8>(0x40, u8(new_count))
+	kio.port_out<u8>(0x40, u8(new_count >> 8))
 }
 
 pub fn pit_set_frequency(frequency u64) {
-	mut new_divisor := pit_dividend / frequency
-	if pit_dividend % frequency > frequency / 2 {
+	mut new_divisor := time.pit_dividend / frequency
+	if time.pit_dividend % frequency > frequency / 2 {
 		new_divisor++
 	}
 
 	pit_set_reload_value(u16(new_divisor))
 }
 
-fn C.x86__apic__io_apic_set_irq_redirect(lapic_id u32, vector byte, irq byte, status bool)
+fn C.x86__apic__io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool)
 
 pub fn pit_initialise() {
 	pit_set_frequency(timer_frequency)

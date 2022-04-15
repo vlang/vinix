@@ -16,10 +16,10 @@ struct GDTPointer {
 struct GDTEntry {
 	limit       u16
 	base_low16  u16
-	base_mid8   byte
-	access      byte
-	granularity byte
-	base_high8  byte
+	base_mid8   u8
+	access      u8
+	granularity u8
+	base_high8  u8
 }
 
 __global (
@@ -163,8 +163,8 @@ pub fn load_tss(addr voidptr) {
 	gdt_entries[9] = GDTEntry{
 		limit: u16(103)
 		base_low16: u16(u64(addr))
-		base_mid8: byte(u64(addr) >> 16)
-		base_high8: byte(u64(addr) >> 24)
+		base_mid8: u8(u64(addr) >> 16)
+		base_high8: u8(u64(addr) >> 24)
 		access: 0b10001001
 		granularity: 0b00000000
 	}

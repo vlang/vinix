@@ -11,22 +11,22 @@ import stat
 import memory
 
 struct USTARHeader {
-	name       [100]byte
-	mode       [8]byte
-	uid        [8]byte
-	gid        [8]byte
-	size       [12]byte
-	mtime      [12]byte
-	checksum   [8]byte
-	filetype   byte
-	link_name  [100]byte
-	signature  [6]byte
-	version    [2]byte
-	owner      [32]byte
-	group      [32]byte
-	device_maj [8]byte
-	device_min [8]byte
-	prefix     [155]byte
+	name       [100]u8
+	mode       [8]u8
+	uid        [8]u8
+	gid        [8]u8
+	size       [12]u8
+	mtime      [12]u8
+	checksum   [8]u8
+	filetype   u8
+	link_name  [100]u8
+	signature  [6]u8
+	version    [2]u8
+	owner      [32]u8
+	group      [32]u8
+	device_maj [8]u8
+	device_min [8]u8
+	prefix     [155]u8
 }
 
 enum USTARFileType {

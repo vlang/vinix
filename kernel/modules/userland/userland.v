@@ -326,7 +326,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	sched.yield(false)
 }
 
-pub fn sendsig(_thread &proc.Thread, signal byte) {
+pub fn sendsig(_thread &proc.Thread, signal u8) {
 	mut thread := unsafe { _thread }
 
 	katomic.bts(thread.pending_signals, signal)
@@ -342,7 +342,7 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	}
 
 	if signal > 0 {
-		sendsig(processes[pid].threads[0], byte(signal))
+		sendsig(processes[pid].threads[0], u8(signal))
 	} else {
 		panic('sendsig: Values of signal <= 0 not supported')
 	}
@@ -550,20 +550,14 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		real_path, arg := parse_shebang(mut prog) ?
 		mut final_argv := [real_path]
-		if arg != '' { final_argv << arg }
+		if arg != '' {
+			final_argv << arg
+		}
 		final_argv << path
 		final_argv << argv[1..]
 
-		return start_program(
-			execve,
-			dir,
-			real_path,
-			final_argv,
-			envp,
-			stdin,
-			stdout,
-			stderr
-		)
+		return start_program(execve, dir, real_path, final_argv, envp, stdin, stdout,
+			stderr)
 	}
 
 	auxval, ld_path := elf.load(new_pagemap, prog, 0) ?
@@ -659,12 +653,12 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	}
 }
 
-pub fn parse_shebang(mut res &resource.Resource) ?(string, string) {
+pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 	// Parse the shebang that we already know is there.
 	// Syntax: #![whitespace]interpreter [single arg]new line
 	mut index := u64(2)
 	mut build_path := strings.new_builder(512)
-	mut build_arg  := strings.new_builder(512)
+	mut build_arg := strings.new_builder(512)
 
 	mut c := char(0)
 	res.read(0, &c, index, 1) ?
@@ -679,7 +673,9 @@ pub fn parse_shebang(mut res &resource.Resource) ?(string, string) {
 			break
 		}
 		if c == char(`\n`) {
-			unsafe { goto ret }
+			unsafe {
+				goto ret
+			}
 		}
 		build_path.write_rune(rune(c))
 	}
@@ -693,9 +689,9 @@ pub fn parse_shebang(mut res &resource.Resource) ?(string, string) {
 		build_arg.write_rune(rune(c))
 	}
 
-ret:
+	ret:
 	final_path := build_path.str()
-	final_arg  := build_arg.str()
+	final_arg := build_arg.str()
 	unsafe {
 		build_path.free()
 		build_arg.free()

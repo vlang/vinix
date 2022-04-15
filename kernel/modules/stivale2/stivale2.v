@@ -10,15 +10,15 @@ import dev.fbdev.api
 import dev.fbdev.simple
 
 pub const (
-	framebuffer_id = 0x506461d2950408fa
-	memmap_id = 0x2187f79e8612de07
-	terminal_id = 0xc2b3f4c3233b0974
-	rsdp_id = 0x9e1786930a375e78
-	modules_id = 0x4b6fe466aade04ce
-	smp_id = 0x34d1d96339647025
-	pmr_id = 0x5df266a64047b6bd
+	framebuffer_id      = 0x506461d2950408fa
+	memmap_id           = 0x2187f79e8612de07
+	terminal_id         = 0xc2b3f4c3233b0974
+	rsdp_id             = 0x9e1786930a375e78
+	modules_id          = 0x4b6fe466aade04ce
+	smp_id              = 0x34d1d96339647025
+	pmr_id              = 0x5df266a64047b6bd
 	kernel_base_addr_id = 0x060d78874a2a8af0
-	epoch_id = 0x566a7bed888e1407
+	epoch_id            = 0x566a7bed888e1407
 )
 
 [packed]
@@ -31,8 +31,8 @@ pub mut:
 [packed]
 struct Struct {
 pub mut:
-	bootloader_brand   [64]byte
-	bootloader_version [64]byte
+	bootloader_brand   [64]u8
+	bootloader_version [64]u8
 	tags               voidptr
 }
 
@@ -45,35 +45,35 @@ pub mut:
 	height           u16
 	pitch            u16
 	bpp              u16
-	memory_model     byte
-	red_mask_size    byte
-	red_mask_shift   byte
-	green_mask_size  byte
-	green_mask_shift byte
-	blue_mask_size   byte
-	blue_mask_shift  byte
+	memory_model     u8
+	red_mask_size    u8
+	red_mask_shift   u8
+	green_mask_size  u8
+	green_mask_shift u8
+	blue_mask_size   u8
+	blue_mask_shift  u8
 }
 
 struct PMRTag {
 pub mut:
-	tag Tag
+	tag     Tag
 	entries u64
-	pmrs PMR
+	pmrs    PMR
 	// This is a var length array at the end.
 }
 
 struct PMR {
 pub mut:
-	base u64
+	base   u64
 	length u64
-	perms u64
+	perms  u64
 }
 
 struct KernelBaseAddrTag {
 pub mut:
-	tag Tag
+	tag                Tag
 	physical_base_addr u64
-	virtual_base_addr u64
+	virtual_base_addr  u64
 }
 
 [packed]
@@ -106,7 +106,7 @@ struct Module {
 pub mut:
 	begin u64
 	end   u64
-	str   [128]byte
+	str   [128]u8
 }
 
 [packed]
@@ -225,32 +225,32 @@ pub fn framebuffer_init(stivale2_struct &Struct) {
 		return
 	}
 
-	sfb_config := simple.SimpleFBConfig {
-		physical_address: framebuffer_tag.addr,
-		width: u32(framebuffer_width),
-		height: u32(framebuffer_height),
-		stride: u32(framebuffer_tag.pitch),
-		bits_per_pixel: u32(framebuffer_tag.bpp),
-		red: api.FBBitfield {
-			offset: framebuffer_tag.red_mask_shift,
-			length: framebuffer_tag.red_mask_size,
-			msb_right: 0,
-		},
-		green: api.FBBitfield {
-			offset: framebuffer_tag.green_mask_shift,
-			length: framebuffer_tag.green_mask_size,
-			msb_right: 0,
-		},
-		blue: api.FBBitfield {
-			offset: framebuffer_tag.blue_mask_shift,
-			length: framebuffer_tag.blue_mask_size,
-			msb_right: 0,
-		},
-		transp: api.FBBitfield {
-			offset: 0,
-			length: 0,
-			msb_right: 0,
-		},
+	sfb_config := simple.SimpleFBConfig{
+		physical_address: framebuffer_tag.addr
+		width: u32(framebuffer_width)
+		height: u32(framebuffer_height)
+		stride: u32(framebuffer_tag.pitch)
+		bits_per_pixel: u32(framebuffer_tag.bpp)
+		red: api.FBBitfield{
+			offset: framebuffer_tag.red_mask_shift
+			length: framebuffer_tag.red_mask_size
+			msb_right: 0
+		}
+		green: api.FBBitfield{
+			offset: framebuffer_tag.green_mask_shift
+			length: framebuffer_tag.green_mask_size
+			msb_right: 0
+		}
+		blue: api.FBBitfield{
+			offset: framebuffer_tag.blue_mask_shift
+			length: framebuffer_tag.blue_mask_size
+			msb_right: 0
+		}
+		transp: api.FBBitfield{
+			offset: 0
+			length: 0
+			msb_right: 0
+		}
 	}
 
 	simple.register_simple_framebuffer(sfb_config)

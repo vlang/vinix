@@ -7,13 +7,13 @@ module stat
 import time
 
 pub const (
-	ifmt = 0xf000
-	ifblk = 0x6000
-	ifchr = 0x2000
-	ififo = 0x1000
-	ifreg = 0x8000
-	ifdir = 0x4000
-	iflnk = 0xa000
+	ifmt   = 0xf000
+	ifblk  = 0x6000
+	ifchr  = 0x2000
+	ififo  = 0x1000
+	ifreg  = 0x8000
+	ifdir  = 0x4000
+	iflnk  = 0xa000
 	ifsock = 0xc000
 	ifpipe = 0x3000
 )
@@ -65,14 +65,14 @@ pub mut:
 
 pub const (
 	dt_unknown = 0
-	dt_fifo = 1
-	dt_chr = 2
-	dt_dir = 4
-	dt_blk = 6
-	dt_reg = 8
-	dt_lnk = 10
-	dt_sock = 12
-	dt_wht = 14
+	dt_fifo    = 1
+	dt_chr     = 2
+	dt_dir     = 4
+	dt_blk     = 6
+	dt_reg     = 8
+	dt_lnk     = 10
+	dt_sock    = 12
+	dt_wht     = 14
 )
 
 pub struct Dirent {
@@ -80,6 +80,6 @@ pub mut:
 	ino    u64
 	off    u64
 	reclen u16
-	@type  byte
-	name   [1024]byte
+	@type  u8
+	name   [1024]u8
 }

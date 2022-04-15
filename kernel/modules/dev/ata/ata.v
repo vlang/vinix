@@ -63,7 +63,7 @@ pub mut:
 	bmr_prdt          u16
 	prdt              &PRDT
 	prdt_phys         u32
-	prdt_cache        &byte
+	prdt_cache        &u8
 }
 
 pub fn initialise() {
@@ -113,25 +113,25 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		// To be filled later.
 		prdt_phys: 0
 		// To be filled later.
-		prdt_cache: &byte(0)
+		prdt_cache: &u8(0)
 		// To be filled later.
 	}
 
 	// Identify the drive.
 	val := if dev.is_master { 0xa0 } else { 0xb0 }
-	kio.port_out<byte>(dev.device_port, byte(val))
-	kio.port_out<byte>(dev.sector_count_port, 0)
-	kio.port_out<byte>(dev.lba_low_port, 0)
-	kio.port_out<byte>(dev.lba_mid_port, 0)
-	kio.port_out<byte>(dev.lba_hi_port, 0)
-	kio.port_out<byte>(dev.cmd_port, 0xec)
+	kio.port_out<u8>(dev.device_port, u8(val))
+	kio.port_out<u8>(dev.sector_count_port, 0)
+	kio.port_out<u8>(dev.lba_low_port, 0)
+	kio.port_out<u8>(dev.lba_mid_port, 0)
+	kio.port_out<u8>(dev.lba_hi_port, 0)
+	kio.port_out<u8>(dev.cmd_port, 0xec)
 
-	if kio.port_in<byte>(dev.cmd_port) == 0 {
+	if kio.port_in<u8>(dev.cmd_port) == 0 {
 		print('ata: Port $port_index is not connected\n')
 		return none
 	} else {
 		mut timeout := 0
-		for kio.port_in<byte>(dev.cmd_port) & 0b10000000 != 0 {
+		for kio.port_in<u8>(dev.cmd_port) & 0b10000000 != 0 {
 			if timeout == 100000 {
 				print('ata: Port $port_index is not answering\n')
 				return none
@@ -141,14 +141,14 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	}
 
 	// Check for non-standard ATAPI.
-	if kio.port_in<byte>(dev.lba_mid_port) != 0 || kio.port_in<byte>(dev.lba_hi_port) != 0 {
+	if kio.port_in<u8>(dev.lba_mid_port) != 0 || kio.port_in<u8>(dev.lba_hi_port) != 0 {
 		print('ata: Port $port_index is non-standard ATAPI\n')
 		return none
 	}
 
 	mut timeout := 0
 	for {
-		status := kio.port_in<byte>(dev.cmd_port)
+		status := kio.port_in<u8>(dev.cmd_port)
 		if status & 0b00000001 != 0 {
 			print('ata: Port $port_index errored out\n')
 			return none
@@ -187,7 +187,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		page_size))))
 	dev.prdt.transfer_size = ata.ata_bytes_per_prdt
 	dev.prdt.mark_end = 0x8000
-	dev.prdt_cache = &byte(u64(dev.prdt.buffer_phys) + higher_half)
+	dev.prdt_cache = &u8(u64(dev.prdt.buffer_phys) + higher_half)
 	return dev
 }
 
@@ -213,13 +213,13 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 
 	for i := u64(0); i < sector_count; i += ata.ata_sectors_per_prdt {
 		sector_loc := sector_start + i
-		kio.port_out<byte>(dev.bmr_command, 0)
+		kio.port_out<u8>(dev.bmr_command, 0)
 		kio.port_out<u32>(dev.bmr_prdt, dev.prdt_phys)
-		bmr_status := kio.port_in<byte>(dev.bmr_status)
-		kio.port_out<byte>(dev.bmr_status, bmr_status | 0x4 | 0x2)
+		bmr_status := kio.port_in<u8>(dev.bmr_status)
+		kio.port_out<u8>(dev.bmr_status, bmr_status | 0x4 | 0x2)
 
 		val := if dev.is_master { 0x40 } else { 0x50 }
-		kio.port_out<byte>(dev.device_port, byte(val))
+		kio.port_out<u8>(dev.device_port, u8(val))
 
 		actual_count := if i + ata.ata_sectors_per_prdt > sector_count {
 			sector_count % ata.ata_sectors_per_prdt
@@ -227,20 +227,20 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 			ata.ata_sectors_per_prdt
 		}
 
-		kio.port_out<byte>(dev.sector_count_port, byte(actual_count >> 8))
-		kio.port_out<byte>(dev.lba_low_port, byte((sector_loc & 0x000000FF000000) >> 24))
-		kio.port_out<byte>(dev.lba_mid_port, byte((sector_loc & 0x0000FF00000000) >> 32))
-		kio.port_out<byte>(dev.lba_hi_port, byte((sector_loc & 0x00FF0000000000) >> 40))
-		kio.port_out<byte>(dev.sector_count_port, byte(actual_count & 0xff))
-		kio.port_out<byte>(dev.lba_low_port, byte(sector_loc & 0x000000000000FF))
-		kio.port_out<byte>(dev.lba_mid_port, byte((sector_loc & 0x0000000000FF00) >> 8))
-		kio.port_out<byte>(dev.lba_hi_port, byte((sector_loc & 0x00000000FF0000) >> 16))
+		kio.port_out<u8>(dev.sector_count_port, u8(actual_count >> 8))
+		kio.port_out<u8>(dev.lba_low_port, u8((sector_loc & 0x000000FF000000) >> 24))
+		kio.port_out<u8>(dev.lba_mid_port, u8((sector_loc & 0x0000FF00000000) >> 32))
+		kio.port_out<u8>(dev.lba_hi_port, u8((sector_loc & 0x00FF0000000000) >> 40))
+		kio.port_out<u8>(dev.sector_count_port, u8(actual_count & 0xff))
+		kio.port_out<u8>(dev.lba_low_port, u8(sector_loc & 0x000000000000FF))
+		kio.port_out<u8>(dev.lba_mid_port, u8((sector_loc & 0x0000000000FF00) >> 8))
+		kio.port_out<u8>(dev.lba_hi_port, u8((sector_loc & 0x00000000FF0000) >> 16))
 
-		kio.port_out<byte>(dev.cmd_port, 0x25) // READ_DMA command
-		kio.port_out<byte>(dev.bmr_command, 0x8 | 0x1)
+		kio.port_out<u8>(dev.cmd_port, 0x25) // READ_DMA command
+		kio.port_out<u8>(dev.bmr_command, 0x8 | 0x1)
 
 		for {
-			status := kio.port_in<byte>(dev.cmd_port)
+			status := kio.port_in<u8>(dev.cmd_port)
 			if status & 0x80 == 0 {
 				break
 			}
@@ -249,7 +249,7 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 				return none
 			}
 		}
-		kio.port_out<byte>(dev.bmr_command, 0)
+		kio.port_out<u8>(dev.bmr_command, 0)
 
 		buffer_final := voidptr(u64(buffer) + i * ata.ata_bytes_per_sector)
 		unsafe { C.memcpy(buffer_final, dev.prdt_cache, actual_count * ata.ata_bytes_per_sector) }
@@ -276,13 +276,13 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 	for i := u64(0); i < sector_count; i += ata.ata_sectors_per_prdt {
 		sector_loc := sector_start + i
 
-		kio.port_out<byte>(dev.bmr_command, 0)
+		kio.port_out<u8>(dev.bmr_command, 0)
 		kio.port_out<u32>(dev.bmr_prdt, dev.prdt_phys)
-		bmr_status := kio.port_in<byte>(dev.bmr_status)
-		kio.port_out<byte>(dev.bmr_status, bmr_status | 0x4 | 0x2)
+		bmr_status := kio.port_in<u8>(dev.bmr_status)
+		kio.port_out<u8>(dev.bmr_status, bmr_status | 0x4 | 0x2)
 
 		val := if dev.is_master { 0x40 } else { 0x50 }
-		kio.port_out<byte>(dev.device_port, byte(val))
+		kio.port_out<u8>(dev.device_port, u8(val))
 
 		actual_count := if i + ata.ata_sectors_per_prdt > sector_count {
 			sector_count % ata.ata_sectors_per_prdt
@@ -294,20 +294,20 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 		buffer_final := voidptr(u64(buffer) + i * ata.ata_bytes_per_sector)
 		unsafe { C.memcpy(dev.prdt_cache, buffer_final, actual_count * ata.ata_bytes_per_sector) }
 
-		kio.port_out<byte>(dev.sector_count_port, byte(actual_count >> 8))
-		kio.port_out<byte>(dev.lba_low_port, byte((sector_loc & 0x000000FF000000) >> 24))
-		kio.port_out<byte>(dev.lba_mid_port, byte((sector_loc & 0x0000FF00000000) >> 32))
-		kio.port_out<byte>(dev.lba_hi_port, byte((sector_loc & 0x00FF0000000000) >> 40))
-		kio.port_out<byte>(dev.sector_count_port, byte(actual_count & 0xff))
-		kio.port_out<byte>(dev.lba_low_port, byte(sector_loc & 0x000000000000FF))
-		kio.port_out<byte>(dev.lba_mid_port, byte((sector_loc & 0x0000000000FF00) >> 8))
-		kio.port_out<byte>(dev.lba_hi_port, byte((sector_loc & 0x00000000FF0000) >> 16))
+		kio.port_out<u8>(dev.sector_count_port, u8(actual_count >> 8))
+		kio.port_out<u8>(dev.lba_low_port, u8((sector_loc & 0x000000FF000000) >> 24))
+		kio.port_out<u8>(dev.lba_mid_port, u8((sector_loc & 0x0000FF00000000) >> 32))
+		kio.port_out<u8>(dev.lba_hi_port, u8((sector_loc & 0x00FF0000000000) >> 40))
+		kio.port_out<u8>(dev.sector_count_port, u8(actual_count & 0xff))
+		kio.port_out<u8>(dev.lba_low_port, u8(sector_loc & 0x000000000000FF))
+		kio.port_out<u8>(dev.lba_mid_port, u8((sector_loc & 0x0000000000FF00) >> 8))
+		kio.port_out<u8>(dev.lba_hi_port, u8((sector_loc & 0x00000000FF0000) >> 16))
 
-		kio.port_out<byte>(dev.cmd_port, 0x35) // WRITE_DMA command
-		kio.port_out<byte>(dev.bmr_command, 0x1)
+		kio.port_out<u8>(dev.cmd_port, 0x35) // WRITE_DMA command
+		kio.port_out<u8>(dev.bmr_command, 0x1)
 
 		for {
-			status := kio.port_in<byte>(dev.cmd_port)
+			status := kio.port_in<u8>(dev.cmd_port)
 			if status & 0x80 == 0 {
 				break
 			}
@@ -316,12 +316,12 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 				return none
 			}
 		}
-		kio.port_out<byte>(dev.bmr_command, 0)
+		kio.port_out<u8>(dev.bmr_command, 0)
 
-		kio.port_out<byte>(dev.device_port, byte(val))
-		kio.port_out<byte>(dev.cmd_port, 0xea) // Cache flush EXT command.
+		kio.port_out<u8>(dev.device_port, u8(val))
+		kio.port_out<u8>(dev.cmd_port, 0xea) // Cache flush EXT command.
 		for {
-			status := kio.port_in<byte>(dev.cmd_port)
+			status := kio.port_in<u8>(dev.cmd_port)
 			if status & 0x80 == 0 {
 				break
 			}

@@ -18,28 +18,28 @@ pub mut:
 }
 
 pub const (
-	at_entry = 9
-	at_phdr = 3
-	at_phent = 4
-	at_phnum = 5
+	at_entry    = 9
+	at_phdr     = 3
+	at_phent    = 4
+	at_phnum    = 5
 
-	pt_load = 0x00000001
-	pt_interp = 0x00000003
-	pt_phdr = 0x00000006
+	pt_load     = 0x00000001
+	pt_interp   = 0x00000003
+	pt_phdr     = 0x00000006
 
-	abi_sysv = 0x00
+	abi_sysv    = 0x00
 	arch_x86_64 = 0x3e
-	bits_le = 0x01
+	bits_le     = 0x01
 
-	ei_class = 4
-	ei_data = 5
-	ei_version = 6
-	ei_osabi = 7
+	ei_class    = 4
+	ei_data     = 5
+	ei_version  = 6
+	ei_osabi    = 7
 )
 
 pub struct Header {
 pub mut:
-	ident     [16]byte
+	ident     [16]u8
 	@type     u16
 	machine   u16
 	version   u32

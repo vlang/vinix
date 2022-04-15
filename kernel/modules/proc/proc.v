@@ -11,6 +11,7 @@ import katomic
 import event.eventstruct
 
 pub const max_fds = 256
+
 pub const max_events = 32
 
 pub struct Process {
@@ -27,7 +28,7 @@ pub mut:
 	current_directory        voidptr
 	event                    eventstruct.Event
 	status                   int
-	itimers                  [4096]byte
+	itimers                  [4096]u8
 }
 
 pub struct SigAction {

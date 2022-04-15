@@ -12,15 +12,15 @@ import file
 import errno
 
 pub const (
-	at_fdcwd = -100
-	at_empty_path = 1
-	at_symlink_follow = 2
+	at_fdcwd            = -100
+	at_empty_path       = 1
+	at_symlink_follow   = 2
 	at_symlink_nofollow = 4
-	at_removedir = 8
-	at_eaccess = 512
-	seek_cur = 1
-	seek_end = 2
-	seek_set = 3
+	at_removedir        = 8
+	at_eaccess          = 512
+	seek_cur            = 1
+	seek_end            = 2
+	seek_set            = 3
 )
 
 interface FileSystem {
@@ -68,7 +68,9 @@ pub fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir boo
 }
 
 pub fn add_filesystem(filesystem &FileSystem, identifier string) {
-	unsafe { filesystems[identifier] = filesystem }
+	unsafe {
+		filesystems[identifier] = filesystem
+	}
 }
 
 pub fn initialise() {
@@ -118,7 +120,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	}
 
 	for {
-		mut elem := []byte{}
+		mut elem := []u8{}
 
 		for index < path.len && path[index] != `/` {
 			elem << path[index]
@@ -621,35 +623,30 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	mut statsrc := &stat.Stat(0)
 
 	if path.len == 0 {
-		if flags & at_empty_path == 0 {
+		if flags & fs.at_empty_path == 0 {
 			return -1, errno.enoent
 		}
 
-		if dirfd == at_fdcwd {
+		if dirfd == fs.at_fdcwd {
 			node := &VFSNode(current_process.current_directory)
 			statsrc = &node.resource.stat
 		} else {
-			fd := file.fd_from_fdnum(current_process, dirfd) or {
-				return -1, errno.get()
-			}
+			fd := file.fd_from_fdnum(current_process, dirfd) or { return -1, errno.get() }
 			statsrc = &fd.handle.resource.stat
 		}
 	} else {
-		parent := get_parent_dir(dirfd, path) or {
-			return -1, errno.get()
-		}
+		parent := get_parent_dir(dirfd, path) or { return -1, errno.get() }
 
 		follow_links := flags & fs.at_symlink_nofollow == 0
 
-		node := get_node(parent, path, follow_links) or {
-			return -1, errno.get()
-		}
+		node := get_node(parent, path, follow_links) or { return -1, errno.get() }
 
 		statsrc = &node.resource.stat
 	}
 
-	unsafe { *statbuf = *statsrc }
-
+	unsafe {
+		*statbuf = *statsrc
+	}
 	return 0, 0
 }
 
@@ -670,10 +667,9 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr,
-                                 newdirfd int, _newpath charptr,
-                                 flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: linkat(%d, %s, %d, %s, 0x%x)\n', olddirfd, _oldpath, newdirfd, _newpath, flags)
+pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {
+	C.printf(c'\n\e[32mstrace\e[m: linkat(%d, %s, %d, %s, 0x%x)\n', olddirfd, _oldpath,
+		newdirfd, _newpath, flags)
 	defer {
 		C.printf(c'\e[32mstrace\e[m: returning\n')
 	}
@@ -707,14 +703,11 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr,
 		return -1, errno.get()
 	}
 
-	new_node.resource.link(voidptr(0)) or {
-		return -1, errno.get()
-	}
+	new_node.resource.link(voidptr(0)) or { return -1, errno.get() }
 
 	unsafe {
 		newparent.children[basename] = new_node
 	}
-
 	return 0, 0
 }
 
@@ -818,7 +811,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 				ino: node.resource.stat.ino
 				off: i++
 				reclen: u16(sizeof(stat.Dirent))
-				@type: byte(t)
+				@type: u8(t)
 			}
 			C.strcpy(&new_dirent.name[0], name.str)
 			dir_handle.dirlist << new_dirent

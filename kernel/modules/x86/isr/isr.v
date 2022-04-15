@@ -97,6 +97,7 @@ __global (
 )
 
 #include <symbols.h>
+
 fn C.interrupt_thunks()
 
 pub fn initialise() {

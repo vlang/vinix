@@ -5,32 +5,32 @@
 module acpi
 
 pub struct SDT {
-	signature        [4]byte
+	signature        [4]u8
 	length           u32
-	revision         byte
-	checksum         byte
-	oem_id           [6]byte
-	oem_table_id     [8]byte
+	revision         u8
+	checksum         u8
+	oem_id           [6]u8
+	oem_table_id     [8]u8
 	oem_revision     u32
 	creator_id       u32
 	creator_revision u32
 }
 
 pub struct RSDP {
-	signature    [8]byte
-	checksum     byte
-	oem_id       [6]byte
-	revision     byte
+	signature    [8]u8
+	checksum     u8
+	oem_id       [6]u8
+	revision     u8
 	rsdt_addr    u32
 	length       u32
 	xsdt_addr    u64
-	ext_checksum byte
-	reserved     [3]byte
+	ext_checksum u8
+	reserved     [3]u8
 }
 
 struct RSDT {
 	header     SDT
-	ptrs_start byte
+	ptrs_start u8
 }
 
 __global (

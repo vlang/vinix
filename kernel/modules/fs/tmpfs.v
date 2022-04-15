@@ -23,7 +23,7 @@ pub mut:
 	status   int
 	can_mmap bool
 
-	storage  &byte
+	storage  &u8
 	capacity u64
 }
 

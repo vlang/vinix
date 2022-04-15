@@ -9,19 +9,19 @@ import bitmap
 
 pub struct PCIDevice {
 pub:
-	bus      byte
-	slot     byte
-	function byte
+	bus      u8
+	slot     u8
+	function u8
 	parent   i64
 pub mut:
 	device_id         u16
 	vendor_id         u16
 	revision_id       u16
-	class             byte
-	subclass          byte
-	prog_if           byte
+	class             u8
+	subclass          u8
+	prog_if           u8
 	multifunction     bool
-	irq_pin           byte
+	irq_pin           u8
 	msi_offset        u16
 	msix_offset       u16
 	msi_support       bool
@@ -46,12 +46,12 @@ pub fn (mut dev PCIDevice) read_info() {
 
 	dev.device_id = u16(config0 >> 16)
 	dev.vendor_id = u16(config0)
-	dev.revision_id = byte(config8)
-	dev.subclass = byte(config8 >> 16)
-	dev.class = byte(config8 >> 24)
-	dev.prog_if = byte(config8 >> 8)
+	dev.revision_id = u8(config8)
+	dev.subclass = u8(config8 >> 16)
+	dev.class = u8(config8 >> 24)
+	dev.prog_if = u8(config8 >> 8)
 	dev.multifunction = if configc & 0x800000 != 0 { true } else { false }
-	dev.irq_pin = byte(config3c >> 8)
+	dev.irq_pin = u8(config3c >> 8)
 }
 
 pub fn (dev &PCIDevice) read<T>(offset u32) T {
@@ -64,13 +64,13 @@ pub fn (dev &PCIDevice) write<T>(offset u32, value T) {
 	kio.port_out<T>(u16(0xcfc + (offset & 3)), value)
 }
 
-pub fn (dev &PCIDevice) is_bar_present(bar byte) bool {
+pub fn (dev &PCIDevice) is_bar_present(bar u8) bool {
 	assert bar <= 5
 	reg_index := 0x10 + bar * 4
 	return if dev.read<u32>(reg_index) != 0 { true } else { false }
 }
 
-pub fn (dev &PCIDevice) get_bar(bar byte) PCIBar {
+pub fn (dev &PCIDevice) get_bar(bar u8) PCIBar {
 	assert bar <= 5
 
 	reg_index := 0x10 + bar * 4
@@ -97,13 +97,17 @@ pub fn (dev &PCIDevice) get_bar(bar byte) PCIBar {
 		0xFFFFFFFF
 	}
 
-	mut size := ((u64(bar_size_high) << 32) | bar_size_low) & ~u64(if is_mmio { 0b1111 } else { 0b11 })
+	mut size := ((u64(bar_size_high) << 32) | bar_size_low) & ~u64(if is_mmio {
+		0b1111
+	} else {
+		0b11
+	})
 	size = ~size + 1
 
 	return PCIBar{base, size, is_mmio, is_prefetchable}
 }
 
-pub fn (dev &PCIDevice) set_msi(vector byte) {
+pub fn (dev &PCIDevice) set_msi(vector u8) {
 	mut message_control := dev.read<u16>(dev.msi_offset + 2)
 
 	mut reg0 := 0x4
@@ -124,7 +128,7 @@ pub fn (dev &PCIDevice) set_msi(vector byte) {
 	dev.write<u16>(dev.msi_offset + 2, message_control)
 }
 
-pub fn (dev &PCIDevice) set_msix(vector byte) bool {
+pub fn (dev &PCIDevice) set_msix(vector u8) bool {
 	msix_vector := dev.msix_table_bitmap.alloc() or {
 		print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix no free vectors\n')
 		return false
@@ -136,12 +140,12 @@ pub fn (dev &PCIDevice) set_msix(vector byte) bool {
 	bar_index := table_ptr & 0b111
 	bar_offset := (table_ptr >> 3) << 3
 
-	if dev.is_bar_present(byte(bar_index)) == false {
+	if dev.is_bar_present(u8(bar_index)) == false {
 		print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix table bar not present\n')
 		return false
 	}
 
-	table_bar := dev.get_bar(byte(bar_index))
+	table_bar := dev.get_bar(u8(bar_index))
 	bar_base := table_bar.base + bar_offset + u64(msix_vector * 16)
 
 	address := (0xfee << 20) | (bsp_lapic_id << 12)

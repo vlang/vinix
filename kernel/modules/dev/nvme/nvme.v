@@ -39,7 +39,7 @@ const (
 )
 
 const (
-	nvme_io_queue_cnt	= 0x4
+	nvme_io_queue_cnt = 0x4
 )
 
 [packed]
@@ -300,7 +300,7 @@ pub mut:
 	namespace_list []&NVMENamespace
 
 	io_queue_bitmap bitmap.GenericBitmap
-	queue_list []&NVMEQueuePair
+	queue_list      []&NVMEQueuePair
 }
 
 struct NVMEQueuePair {
@@ -340,7 +340,7 @@ pub mut:
 	nsid     u64
 
 	parent_controller &NVMEController
-	volatile identity &NVMENamespaceID
+	volatile identity          &NVMENamespaceID
 }
 
 __global (
@@ -549,15 +549,15 @@ pub fn (mut pair NVMEQueuePair) send_cmd(mut submission NVMECommand, cid int) in
 	unsafe {
 		pair.submission_queue[pair.sq_tail] = submission
 	}
-
 	pair.sq_tail++
 
 	if pair.sq_tail == pair.entry_cnt {
 		pair.sq_tail = 0
 	}
 
-	unsafe { *pair.submission_doorbell = u32(pair.sq_tail) }
-
+	unsafe {
+		*pair.submission_doorbell = u32(pair.sq_tail)
+	}
 	return 0
 }
 
@@ -590,8 +590,9 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 
 	pair.cid_bitmap.free_entry(u64(cid))
 
-	unsafe { *pair.submission_doorbell = u32(pair.cq_head) }
-
+	unsafe {
+		*pair.submission_doorbell = u32(pair.cq_head)
+	}
 	pair.l.release()
 
 	return completion_entry.status
@@ -658,7 +659,6 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 		new_command.private.rw.length = u16(cnt - 1)
 		new_command.private.rw.prp1 = u64(buffer) - higher_half
 	}
-
 	queue_pair.l.release()
 	ns.parent_controller.io_queue_bitmap.free_entry(queue_pair_index)
 
@@ -802,9 +802,9 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	mut irq_count := u64(0)
 
-	c.io_queue_bitmap.initialise(nvme_io_queue_cnt)
+	c.io_queue_bitmap.initialise(nvme.nvme_io_queue_cnt)
 
-	for i := 0; i < nvme_io_queue_cnt; i++ {
+	for i := 0; i < nvme.nvme_io_queue_cnt; i++ {
 		mut new_io_queue := &NVMEQueuePair{
 			parent_controller: 0
 			submission_queue: 0

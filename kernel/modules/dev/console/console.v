@@ -23,42 +23,41 @@ import proc
 import katomic
 
 const (
-	max_scancode = 0x57
-	capslock = 0x3a
-	numlock = 0x45
-	left_alt = 0x38
-	left_alt_rel = 0xb8
-	right_shift = 0x36
-	left_shift = 0x2a
-	right_shift_rel = 0xb6
-	left_shift_rel = 0xaa
-	ctrl = 0x1d
-	ctrl_rel = 0x9d
+	max_scancode        = 0x57
+	capslock            = 0x3a
+	numlock             = 0x45
+	left_alt            = 0x38
+	left_alt_rel        = 0xb8
+	right_shift         = 0x36
+	left_shift          = 0x2a
+	right_shift_rel     = 0xb6
+	left_shift_rel      = 0xaa
+	ctrl                = 0x1d
+	ctrl_rel            = 0x9d
 	console_buffer_size = 1024
 	console_bigbuf_size = 4096
 )
 
 __global (
-	console_convtab_numpad_numlock map[byte]byte
-
-	console_res             = &Console(0)
-	console_read_lock       klock.Lock
-	console_event           eventstruct.Event
-	console_numlock_active  = bool(false)
-	console_capslock_active = bool(false)
-	console_shift_active    = bool(false)
-	console_ctrl_active     = bool(false)
-	console_alt_active      = bool(false)
-	console_extra_scancodes = bool(false)
-	console_buffer          [console_buffer_size]byte
-	console_buffer_i        = u64(0)
-	console_bigbuf          [console_bigbuf_size]byte
-	console_bigbuf_i        = u64(0)
-	console_termios         = &termios.Termios(0)
-	console_decckm          = false
+	console_convtab_numpad_numlock map[u8]u8
+	console_res                    = &Console(0)
+	console_read_lock              klock.Lock
+	console_event                  eventstruct.Event
+	console_numlock_active         = bool(false)
+	console_capslock_active        = bool(false)
+	console_shift_active           = bool(false)
+	console_ctrl_active            = bool(false)
+	console_alt_active             = bool(false)
+	console_extra_scancodes        = bool(false)
+	console_buffer                 [console_buffer_size]u8
+	console_buffer_i               = u64(0)
+	console_bigbuf                 [console_bigbuf_size]u8
+	console_bigbuf_i               = u64(0)
+	console_termios                = &termios.Termios(0)
+	console_decckm                 = false
 	// XXX this is a massive hack to allow ctrl-c and friends without process
 	// groups
-	latest_thread           = &proc.Thread(0)
+	latest_thread                  = &proc.Thread(0)
 )
 
 const convtab_capslock = [
@@ -305,11 +304,11 @@ const convtab_nomod = [
 	` `,
 ]
 
-fn is_printable(c byte) bool {
+fn is_printable(c u8) bool {
 	return c >= 0x20 && c <= 0x7e
 }
 
-fn add_to_buf_char(c byte, echo bool) {
+fn add_to_buf_char(c u8, echo bool) {
 	if console_termios.c_lflag & termios.icanon != 0 {
 		match c {
 			`\n` {
@@ -383,7 +382,7 @@ fn add_to_buf_char(c byte, echo bool) {
 	}
 }
 
-fn add_to_buf(ptr &byte, count u64, echo bool) {
+fn add_to_buf(ptr &u8, count u64, echo bool) {
 	console_read_lock.acquire()
 	defer {
 		console_read_lock.release()
@@ -410,20 +409,20 @@ fn keyboard_handler() {
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
 	console_convtab_numpad_numlock = {
-		byte(0x37): byte(`*`)
-		byte(0x4a): byte(`-`)
-		byte(0x4e): byte(`+`)
-		byte(0x47): byte(`7`)
-		byte(0x48): byte(`8`)
-		byte(0x49): byte(`9`)
-		byte(0x4b): byte(`4`)
-		byte(0x4c): byte(`5`)
-		byte(0x4d): byte(`6`)
-		byte(0x4f): byte(`1`)
-		byte(0x50): byte(`2`)
-		byte(0x51): byte(`3`)
-		byte(0x52): byte(`0`)
-		byte(0x53): byte(`.`)
+		u8(0x37): u8(`*`)
+		u8(0x4a): u8(`-`)
+		u8(0x4e): u8(`+`)
+		u8(0x47): u8(`7`)
+		u8(0x48): u8(`8`)
+		u8(0x49): u8(`9`)
+		u8(0x4b): u8(`4`)
+		u8(0x4c): u8(`5`)
+		u8(0x4d): u8(`6`)
+		u8(0x4f): u8(`1`)
+		u8(0x50): u8(`2`)
+		u8(0x51): u8(`3`)
+		u8(0x52): u8(`0`)
+		u8(0x53): u8(`.`)
 	}
 
 	for {
@@ -557,7 +556,7 @@ fn keyboard_handler() {
 			else {}
 		}
 
-		mut c := byte(0)
+		mut c := u8(0)
 
 		if input_byte in console_convtab_numpad_numlock {
 			c = console_convtab_numpad_numlock[input_byte]
@@ -581,29 +580,29 @@ fn keyboard_handler() {
 		}
 
 		if console_ctrl_active {
-			c = byte(C.toupper(c) - 0x40)
+			c = u8(C.toupper(c) - 0x40)
 		}
 
 		add_to_buf(&c, 1, true)
 	}
 }
 
-fn read_ps2() byte {
-	for kio.port_in<byte>(0x64) & 1 == 0 {}
-	return kio.port_in<byte>(0x60)
+fn read_ps2() u8 {
+	for kio.port_in<u8>(0x64) & 1 == 0 {}
+	return kio.port_in<u8>(0x60)
 }
 
-fn write_ps2(port u16, value byte) {
-	for kio.port_in<byte>(0x64) & 2 != 0 {}
-	kio.port_out<byte>(port, value)
+fn write_ps2(port u16, value u8) {
+	for kio.port_in<u8>(0x64) & 2 != 0 {}
+	kio.port_out<u8>(port, value)
 }
 
-fn read_ps2_config() byte {
+fn read_ps2_config() u8 {
 	write_ps2(0x64, 0x20)
 	return read_ps2()
 }
 
-fn write_ps2_config(value byte) {
+fn write_ps2_config(value u8) {
 	write_ps2(0x64, 0x60)
 	write_ps2(0x60, value)
 }
@@ -666,8 +665,8 @@ pub fn initialise() {
 	write_ps2(0x64, 0xa7)
 
 	// Read from port 0x60 to flush the PS/2 controller buffer
-	for kio.port_in<byte>(0x64) & 1 != 0 {
-		kio.port_in<byte>(0x60)
+	for kio.port_in<u8>(0x64) & 1 != 0 {
+		kio.port_in<u8>(0x60)
 	}
 
 	mut ps2_config := read_ps2_config()
@@ -712,7 +711,7 @@ fn (mut this Console) mmap(page u64, flags int) voidptr {
 fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
 
-	mut buf := &byte(void_buf)
+	mut buf := &u8(void_buf)
 
 	for console_read_lock.test_and_acquire() == false {
 		mut events := [&console_event]
