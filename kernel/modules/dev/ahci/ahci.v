@@ -320,15 +320,15 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	cmd_ptr.flags = (1 << 7)
 	cmd_ptr.device = 1 << 6
 
-	cmd_ptr.lba0 = start & 0xff
-	cmd_ptr.lba1 = start >> 8 & 0xff
-	cmd_ptr.lba2 = start >> 16 & 0xff
-	cmd_ptr.lba3 = start >> 24 & 0xff
-	cmd_ptr.lba4 = start >> 32 & 0xff
-	cmd_ptr.lba5 = start >> 40 & 0xff
+	cmd_ptr.lba0 = u8(start & 0xff)
+	cmd_ptr.lba1 = u8(start >> 8 & 0xff)
+	cmd_ptr.lba2 = u8(start >> 16 & 0xff)
+	cmd_ptr.lba3 = u8(start >> 24 & 0xff)
+	cmd_ptr.lba4 = u8(start >> 32 & 0xff)
+	cmd_ptr.lba5 = u8(start >> 40 & 0xff)
 
-	cmd_ptr.countl = cnt & 0xff
-	cmd_ptr.counth = cnt >> 8 & 0xff
+	cmd_ptr.countl = u8(cnt & 0xff)
+	cmd_ptr.counth = u8(cnt >> 8 & 0xff)
 
 	d.send_cmd(cmd_slot)
 
