@@ -6,8 +6,8 @@
 module memory
 
 import lib
-import stivale2
 import klock
+import limine
 
 __global (
 	pmm_lock            klock.Lock
@@ -25,18 +25,20 @@ pub fn print_free() {
 	C.printf(c'pmm: Free pages: %llu\n', free_pages)
 }
 
-pub fn pmm_init(memmap &stivale2.MemmapTag) {
+pub fn pmm_init() {
+	memmap := memmap_req.response
+
 	unsafe {
 		mut highest_address := u64(0)
-		mut entries := &memmap.entries
+		mut entries := memmap.entries
 
 		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
-			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n', i, entries[i].base,
-				entries[i].length, entries[i].entry_type)
+			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n',
+					 i, entries[i].base, entries[i].length, entries[i].@type)
 
-			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable)
-				&& entries[i].entry_type != u32(stivale2.MemmapEntryType.bootloader_reclaimable) {
+			if entries[i].@type != u32(limine.limine_memmap_usable)
+				&& entries[i].@type != u32(limine.limine_memmap_bootloader_reclaimable) {
 				continue
 			}
 			top := entries[i].base + entries[i].length
@@ -53,7 +55,7 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 
 		// Find a hole for the bitmap in the memory map.
 		for i := 0; i < memmap.entry_count; i++ {
-			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable) {
+			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
 			if entries[i].length >= bitmap_size {
@@ -71,7 +73,7 @@ pub fn pmm_init(memmap &stivale2.MemmapTag) {
 
 		// Populate free bitmap entries according to the memory map.
 		for i := 0; i < memmap.entry_count; i++ {
-			if entries[i].entry_type != u32(stivale2.MemmapEntryType.usable) {
+			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
 

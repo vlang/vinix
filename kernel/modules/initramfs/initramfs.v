@@ -5,7 +5,7 @@
 module initramfs
 
 import lib
-import stivale2
+import limine
 import fs
 import stat
 import memory
@@ -51,16 +51,21 @@ fn octal_to_int(s string) u64 {
 
 fn C.string_free(&string)
 
+[cinit]
+__global (
+	volatile module_req = limine.LimineModuleRequest{response: 0}
+)
+
 [manualfree]
-pub fn init(modules_tag stivale2.ModulesTag) {
-	if modules_tag.count < 1 {
+pub fn initialise() {
+	if module_req.response.module_count < 1 {
 		panic('No initramfs')
 	}
 
-	mut modules := unsafe { &stivale2.Module(&modules_tag.modules) }
+	mut modules := module_req.response.modules
 
-	initramfs_begin := unsafe { modules[0].begin }
-	initramfs_size := unsafe { modules[0].end - modules[0].begin }
+	initramfs_begin := unsafe { modules[0].address }
+	initramfs_size := unsafe { modules[0].size }
 
 	println('initramfs: Address: 0x${voidptr(initramfs_begin):x}')
 	println('initramfs: Size:    ${u32(initramfs_size):u}')

@@ -5,7 +5,7 @@
 module memory
 
 import lib
-import stivale2
+import limine
 import klock
 import x86.cpu
 
@@ -156,9 +156,15 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	}
 }
 
-pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.KernelBaseAddrTag, pmr_tag &stivale2.PMRTag) {
-	print('vmm: Kernel physical base: 0x${kernel_base_addr_tag.physical_base_addr:x}\n')
-	print('vmm: Kernel virtual base: 0x${kernel_base_addr_tag.virtual_base_addr:x}\n')
+[cinit]
+__global (
+	volatile kaddr_req = limine.LimineKernelAddressRequest{response: 0}
+	volatile memmap_req = limine.LimineMemmapRequest{response: 0}
+)
+
+pub fn vmm_init() {
+	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
+	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
 
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
@@ -173,20 +179,16 @@ pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.Kerne
 		get_next_level(kernel_pagemap.top_level, i, true) or { panic('vmm init failure') }
 	}
 
-	// Map kernel according to PMRs
-	for i := u64(0); i < pmr_tag.entries; i++ {
-		pmr := &stivale2.PMR(u64(&pmr_tag.pmrs) + sizeof(stivale2.PMR) * i)
+	// Map kernel
+	virt := kaddr_req.response.virtual_base
+	phys := kaddr_req.response.physical_base
+	len := 0x10000000
 
-		virt := pmr.base
-		phys := kernel_base_addr_tag.physical_base_addr + (pmr.base - kernel_base_addr_tag.virtual_base_addr)
-		len := pmr.length
+	print('vmm: PMRs: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${len:x}\n')
 
-		print('vmm: PMRs: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${len:x}\n')
-
-		for j := u64(0); j < len; j += page_size {
-			kernel_pagemap.map_page(virt + j, phys + j, 0x03) or {
-				panic('vmm init failure')
-			}
+	for j := u64(0); j < len; j += page_size {
+		kernel_pagemap.map_page(virt + j, phys + j, 0x03) or {
+			panic('vmm init failure')
 		}
 	}
 
@@ -195,7 +197,9 @@ pub fn vmm_init(memmap &stivale2.MemmapTag, kernel_base_addr_tag &stivale2.Kerne
 		kernel_pagemap.map_page(i + higher_half, i, 0x03) or { panic('vmm init failure') }
 	}
 
-	entries := &memmap.entries
+	memmap := memmap_req.response
+
+	entries := memmap.entries
 	for i := 0; i < memmap.entry_count; i++ {
 		base := unsafe { lib.align_down(entries[i].base, page_size) }
 		top := unsafe { lib.align_up(entries[i].base + entries[i].length, page_size) }

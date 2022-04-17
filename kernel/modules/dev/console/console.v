@@ -11,7 +11,8 @@ import event
 import event.eventstruct
 import klock
 import stat
-import stivale2
+import limine
+import term
 import fs
 import ioctl
 import resource
@@ -625,8 +626,8 @@ fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
 	}
 }
 
-pub fn stivale2_term_callback(t u64, a u64, b u64, c u64) {
-	C.printf(c'stivale2 terminal callback called\n')
+pub fn limine_term_callback(p &limine.LimineTerminal, t u64, a u64, b u64, c u64) {
+	C.printf(c'Limine terminal callback called\n')
 
 	match t {
 		10 {
@@ -635,6 +636,14 @@ pub fn stivale2_term_callback(t u64, a u64, b u64, c u64) {
 		else {}
 	}
 }
+
+[cinit]
+__global (
+	volatile term_req = limine.LimineTerminalRequest{
+		response: 0
+		callback: &limine_term_callback
+	}
+)
 
 pub fn initialise() {
 	console_res = &Console{}
@@ -657,7 +666,7 @@ pub fn initialise() {
 	fs.devtmpfs_add_device(console_res, 'console')
 
 	mut terminal_context_size := u64(0)
-	stivale2.terminal_print(voidptr(&terminal_context_size), u64(-1))
+	term.print(voidptr(&terminal_context_size), u64(-1))
 	print('console: Terminal context size: $terminal_context_size\n')
 
 	// Disable primary and secondary PS/2 ports
@@ -770,7 +779,7 @@ fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i6
 		unsafe { C.free(copy) }
 	}
 	unsafe { C.memcpy(copy, buf, count) }
-	stivale2.terminal_print(copy, count)
+	term.print(copy, count)
 	return i64(count)
 }
 
@@ -780,8 +789,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
 		ioctl.tiocgwinsz {
 			mut w := &ioctl.WinSize(argp)
-			w.ws_row = terminal_rows
-			w.ws_col = terminal_cols
+			w.ws_row = u16(terminal_rows)
+			w.ws_col = u16(terminal_cols)
 			w.ws_xpixel = framebuffer_width
 			w.ws_ypixel = framebuffer_height
 			return 0

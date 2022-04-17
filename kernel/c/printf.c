@@ -38,7 +38,7 @@
 
 void dev__serial__out(char);
 void dev__serial__panic_out(char);
-void stivale2__terminal_print(const char *, uint64_t);
+void term__print(const char *, uint64_t);
 
 static void _putchar(char character) {
 #ifndef PROD
@@ -50,7 +50,7 @@ static void _putchar_panic(char character) {
 #ifndef PROD
   dev__serial__panic_out(character);
 #endif
-  stivale2__terminal_print(&character, 1);
+  term__print(&character, 1);
 }
 
 // no floats in kernel

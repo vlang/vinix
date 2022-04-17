@@ -10,14 +10,14 @@ import x86.cpu
 import x86.msr
 import syscall
 import x86.cpu.local as cpulocal
-import stivale2
+import limine
 import x86.apic
 import katomic
 import sched
 import memory
 
-pub fn initialise(smp_info &stivale2.SMPInfo) {
-	mut cpu_local := &cpulocal.Local(smp_info.extra_arg)
+pub fn initialise(smp_info &limine.LimineSMPInfo) {
+	mut cpu_local := &cpulocal.Local(smp_info.extra_argument)
 	cpu_number := cpu_local.cpu_number
 
 	cpu_local.lapic_id = smp_info.lapic_id

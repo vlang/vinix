@@ -45,7 +45,7 @@ pub fn initialise() {
 		base_high8: 0
 	}
 
-	// The following entries allow us to use the stivale2 terminal
+	// The following entries allow us to use the Limine terminal
 
 	// Ring 0 16 bit code.
 	gdt_entries[1] = GDTEntry{

@@ -31,12 +31,6 @@ SECTIONS
 
     . += CONSTANT(MAXPAGESIZE);
 
-    /* We place the .stivalehdr section containing the header in its own section, */
-    /* and we use the KEEP directive on it to make sure it doesn't get discarded. */
-    .stivale2hdr : {
-        KEEP(*(.stivale2hdr))
-    } : rodata
-
     /* Then let's place all the other traditional executable sections afterwards. */
     .rodata : {
         *(.rodata .rodata.*)

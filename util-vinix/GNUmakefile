@@ -30,16 +30,16 @@ override MOUNT_TARGET := $(MOUNT_DIR)/mount
 all: $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)
 
 $(CHSH_TARGET): $(CHSH_DIR)/*
-	cd $(CHSH_DIR) && $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -os vinix .
+	cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
 
 $(FETCH_TARGET): $(FETCH_DIR)/*
-	cd $(FETCH_DIR) && $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -os vinix .
+	cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
 
 $(LSCPU_TARGET): $(LSCPU_DIR)/*
-	cd $(LSCPU_DIR) && $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -os vinix .
+	cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
 
 $(MOUNT_TARGET): $(MOUNT_DIR)/*
-	cd $(MOUNT_DIR) && $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -os vinix .
+	cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
 
 clean:
 	rm -rf $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)

@@ -6,7 +6,7 @@ module kprint
 
 import klock
 import dev.serial
-import stivale2
+import term
 
 __global (
 	printf_lock klock.Lock
@@ -42,7 +42,7 @@ pub fn kprint(message charptr) {
 		}
 	}
 
-	stivale2.terminal_print(message, msglen)
+	term.print(message, msglen)
 
 	kprint_lock.release()
 }

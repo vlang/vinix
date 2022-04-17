@@ -6,6 +6,7 @@ module time
 
 import event.eventstruct
 import klock
+import limine
 
 pub const (
 	timer_frequency = u64(1000)
@@ -61,7 +62,14 @@ __global (
 	realtime_clock TimeSpec
 )
 
-pub fn initialise(epoch u64) {
+[cinit]
+__global (
+	volatile boottime_req = limine.LimineBootTimeRequest{response: 0}
+)
+
+pub fn initialise() {
+	epoch := boottime_req.response.boot_time
+
 	monotonic_clock = TimeSpec{i64(epoch), 0}
 	realtime_clock = TimeSpec{i64(epoch), 0}
 

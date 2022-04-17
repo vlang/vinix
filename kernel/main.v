@@ -8,7 +8,7 @@ import lib
 import lib.stubs
 // unused, but needed for C function stubs
 import memory
-import stivale2
+import term
 import acpi
 import x86.gdt
 import x86.idt
@@ -38,8 +38,8 @@ import time
 
 fn C._vinit(argc int, argv voidptr)
 
-fn kmain_thread(stivale2_struct &stivale2.Struct) {
-	stivale2.framebuffer_init(stivale2_struct)
+fn kmain_thread() {
+	term.framebuffer_init()
 
 	table.init_syscall_table()
 	socket.initialise()
@@ -52,11 +52,7 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
 
-	modules_tag := &stivale2.ModulesTag(stivale2.get_tag(stivale2_struct, stivale2.modules_id) or {
-		panic('Stivale2 modules tag missing')
-	})
-
-	initramfs.init(modules_tag)
+	initramfs.initialise()
 
 	streams.initialise()
 	random.initialise()
@@ -78,67 +74,43 @@ fn kmain_thread(stivale2_struct &stivale2.Struct) {
 }
 
 pub fn main() {
-	kmain(voidptr(0))
+	kmain()
 }
 
-pub fn kmain(stivale2_struct &stivale2.Struct) {
+pub fn kmain() {
+	// Initialize the memory allocator.
+	memory.pmm_init()
+
+	// Call Vinit to initialise the runtime
+	C._vinit(0, 0)
+
 	// Initialize the earliest arch structures.
 	gdt.initialise()
 	idt.initialise()
 	isr.initialise()
 
 	// Init terminal
-	stivale2.terminal_init(stivale2_struct)
+	term.initialise()
 	serial.early_initialise()
 
 	// We're alive
 	kprint.kprint(c'Welcome to Vinix\n\n')
 
-	// Initialize the memory allocator.
-	memmap_tag := &stivale2.MemmapTag(stivale2.get_tag(stivale2_struct, stivale2.memmap_id) or {
-		lib.kpanic(voidptr(0), c'Stivale2 memmap tag missing')
-	})
-
-	memory.pmm_init(memmap_tag)
-
-	// Call Vinit to initialise the runtime
-	C._vinit(0, 0)
-
 	// a dummy call to avoid V warning about an unused `stubs` module
 	_ := stubs.toupper(0)
 
-	kernel_base_addr_tag := &stivale2.KernelBaseAddrTag(stivale2.get_tag(stivale2_struct, stivale2.kernel_base_addr_id) or {
-		lib.kpanic(voidptr(0), c'Stivale2 kernel base address tag missing')
-	})
-
-	pmr_tag := &stivale2.PMRTag(stivale2.get_tag(stivale2_struct, stivale2.pmr_id) or {
-		lib.kpanic(voidptr(0), c'Stivale2 PMR tag missing')
-	})
-
-	memory.vmm_init(memmap_tag, kernel_base_addr_tag, pmr_tag)
+	memory.vmm_init()
 
 	// ACPI init
-	rsdp_tag := &stivale2.RSDPTag(stivale2.get_tag(stivale2_struct, stivale2.rsdp_id) or {
-		panic('Stivale2 RSDP tag missing')
-	})
+	acpi.initialise()
 
-	acpi.init(&acpi.RSDP(rsdp_tag.rsdp))
+	smp.initialise()
 
-	smp_tag := &stivale2.SMPTag(stivale2.get_tag(stivale2_struct, stivale2.smp_id) or {
-		panic('Stivale2 SMP tag missing')
-	})
-
-	smp.initialise(smp_tag)
-
-	epoch_tag := &stivale2.EpochTag(stivale2.get_tag(stivale2_struct, stivale2.epoch_id) or {
-		panic('Stivale2 epoch tag missing')
-	})
-
-	time.initialise(epoch_tag.epoch)
+	time.initialise()
 
 	sched.initialise()
 
-	go kmain_thread(stivale2_struct)
+	go kmain_thread()
 
 	sched.await()
 }

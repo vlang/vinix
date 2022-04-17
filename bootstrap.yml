@@ -159,19 +159,19 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '473bc0254d9997daa5824e70a8ea4e7642ecbee3'
+    commit: '48486e1afb6683d9caabe2d44920ae4df964dfd4'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
     regenerate:
       - args: |
           set -e
-          curl -o v.c https://raw.githubusercontent.com/vlang/vc/da0ceed054e91917604ecc98b91e0ae8c6792662/v.c
+          curl -o v.c https://raw.githubusercontent.com/vlang/vc/f5fa0f26ab154b70571088cdc882e0e1709ff192/v.c
 
   - name: limine
     subdir: '3rdparty'
     git: 'https://github.com/limine-bootloader/limine.git'
-    tag: 'v3.0'
-    version: '3.0'
+    tag: 'v3.3'
+    version: '3.3'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
@@ -690,7 +690,7 @@ packages:
       - args: |
           set -e
           cd "@THIS_SOURCE_DIR@"
-          v -cc x86_64-vinix-gcc -os vinix .
+          VCROSS_COMPILER_NAME=x86_64-vinix-gcc v -os vinix .
           mkdir -p "@THIS_COLLECT_DIR@/sbin"
           cp init "@THIS_COLLECT_DIR@/sbin/"
 

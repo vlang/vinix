@@ -4,7 +4,7 @@
 
 module smp
 
-import stivale2
+import limine
 import memory
 import katomic
 import x86.cpu.local as cpulocal
@@ -15,11 +15,18 @@ __global (
 	smp_ready = false
 )
 
-pub fn initialise(smp_tag &stivale2.SMPTag) {
+[cinit]
+__global (
+	volatile smp_req = limine.LimineSMPRequest{response: 0}
+)
+
+pub fn initialise() {
+	smp_tag := smp_req.response
+
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
 	println('smp: Total CPU count: $smp_tag.cpu_count')
 
-	smp_info_array := unsafe { &stivale2.SMPInfo(&smp_tag.smp_info) }
+	smp_info_array := smp_tag.cpus
 
 	bsp_lapic_id = smp_tag.bsp_lapic_id
 
@@ -27,9 +34,9 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 		mut cpu_local := &cpulocal.Local(memory.malloc(sizeof(cpulocal.Local)))
 		cpu_locals << cpu_local
 
-		mut smp_info := unsafe { &smp_info_array[i] }
+		mut smp_info := unsafe { smp_info_array[i] }
 
-		smp_info.extra_arg = u64(cpu_local)
+		smp_info.extra_argument = u64(cpu_local)
 
 		cpu_local.cpu_number = i
 
@@ -38,11 +45,7 @@ pub fn initialise(smp_tag &stivale2.SMPTag) {
 			continue
 		}
 
-		stack_size := u64(4192)
-
-		boot_stack := memory.pmm_alloc(stack_size / page_size)
-		katomic.store(smp_info.target_stack, u64(boot_stack) + stack_size + higher_half)
-		katomic.store(smp_info.goto_address, u64(&cpuinit.initialise))
+		smp_info.goto_address = cpuinit.initialise
 
 		for katomic.load(cpu_local.online) == 0 {}
 	}
