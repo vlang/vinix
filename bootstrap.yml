@@ -159,13 +159,13 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: '48486e1afb6683d9caabe2d44920ae4df964dfd4'
+    commit: '56a3539ea914e6514d47e138027757366f1077b6'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
     regenerate:
       - args: |
           set -e
-          curl -o v.c https://raw.githubusercontent.com/vlang/vc/f5fa0f26ab154b70571088cdc882e0e1709ff192/v.c
+          curl -o v.c https://raw.githubusercontent.com/vlang/vc/c7001dfbbec4dcc97e2e61e79fce9a3fa0824d01/v.c
 
   - name: limine
     subdir: '3rdparty'

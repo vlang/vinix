@@ -2,13 +2,19 @@
 # Code is governed by the GPL-2.0 license.
 # Copyright (C) 2021-2022 The Vinix authors.
 
-ifeq ($(origin CC), default)
-	CC := cc
-endif
-ifeq ($(origin LD), default)
-	LD := ld
-endif
-OBJDUMP ?= objdump
+define DEFAULT_VAR =
+    ifeq ($(origin $1), default)
+        override $(1) := $(2)
+    endif
+    ifeq ($(origin $1), undefined)
+        override $(1) := $(2)
+    endif
+endef
+
+$(eval $(call DEFAULT_VAR,CC,cc))
+$(eval $(call DEFAULT_VAR,LD,ld))
+$(eval $(call DEFAULT_VAR,OBJDUMP,objdump))
+
 V       ?= v
 CFLAGS  ?= -O2 -Wall -Wextra -g -pipe
 LDFLAGS ?=
@@ -17,13 +23,17 @@ PROD    ?= false
 
 override INTERNALCFLAGS :=        \
 	-ffreestanding                \
+	-std=gnu99                    \
 	-nostdinc                     \
 	-fno-omit-frame-pointer       \
 	-fno-stack-protector          \
+	-fno-stack-check              \
 	-fno-pic                      \
+	-fno-pie                      \
 	-ffunction-sections           \
 	-fdata-sections               \
 	-fno-strict-aliasing          \
+	-mabi=sysv                    \
 	-mno-80387                    \
 	-mno-mmx                      \
 	-mno-3dnow                    \
@@ -94,7 +104,7 @@ blob.o: $(VFILES) freestanding_headers
 %.o: %.S freestanding_headers
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-$(KERNEL): blob.o $(COBJ) freestanding_headers
+$(KERNEL): blob.o $(COBJ)
 	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 	mv c/symbol_table.c symbol_table.c.tmp
 	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
