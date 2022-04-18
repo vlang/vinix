@@ -150,7 +150,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		which := event.await(mut events, true) or { return -1, errno.eintr }
 
 		if voidptr(timer) != voidptr(0) {
-			if which == events.len - 1 {
+			if which == u64(events.len) - 1 {
 				return 0, 0
 			}
 		}

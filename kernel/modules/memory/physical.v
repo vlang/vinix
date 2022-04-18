@@ -105,7 +105,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 		if !lib.bittest(pmm_bitmap, pmm_last_used_index) {
 			pmm_last_used_index++
 			p++
-			if p == count {
+			if u64(p) == count {
 				page := pmm_last_used_index - count
 				for i := page; i < pmm_last_used_index; i++ {
 					lib.bitset(pmm_bitmap, i)
