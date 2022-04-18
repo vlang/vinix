@@ -49,8 +49,8 @@ sources:
   - name: glib
     subdir: '3rdparty'
     git: 'https://gitlab.gnome.org/GNOME/glib.git'
-    tag: '2.70.4'
-    version: '2.70.4'
+    tag: '2.72.1'
+    version: '2.72.1'
 
   - name: pkg-config
     subdir: '3rdparty'
@@ -69,8 +69,8 @@ sources:
   - name: python
     subdir: '3rdparty'
     git: 'https://github.com/python/cpython.git'
-    tag: 'v3.8.2'
-    version: '3.8.2'
+    tag: 'v3.8.13'
+    version: '3.8.13'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
@@ -85,17 +85,17 @@ sources:
   - name: tzdata
     subdir: '3rdparty'
     sources_required: ['tzcode']
-    url: 'https://data.iana.org/time-zones/releases/tzdata2021e.tar.gz'
+    url: 'https://data.iana.org/time-zones/releases/tzdata2022a.tar.gz'
     format: 'tar.gz'
-    version: '2021e'
+    version: '2022a'
     regenerate:
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/../tzcode/.', '@THIS_SOURCE_DIR@/']
 
   - name: tzcode
     subdir: '3rdparty'
-    url: 'https://data.iana.org/time-zones/releases/tzcode2021e.tar.gz'
+    url: 'https://data.iana.org/time-zones/releases/tzcode2022a.tar.gz'
     format: 'tar.gz'
-    version: '2021e'
+    version: '2022a'
 
   - name: binutils
     subdir: '3rdparty'
@@ -234,8 +234,8 @@ sources:
   - name: cmake
     subdir: '3rdparty'
     git: 'https://github.com/Kitware/CMake.git'
-    tag: 'v3.22.2'
-    version: '3.22.2'
+    tag: 'v3.23.1'
+    version: '3.23.1'
 
   - name: xorg-util-macros
     subdir: '3rdparty'
@@ -500,8 +500,8 @@ tools:
       name: libtool
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/libtool.git'
-      tag: 'v2.4.6'
-      version: '2.4.6'
+      tag: 'v2.4.7'
+      version: '2.4.7'
       sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
@@ -535,7 +535,7 @@ tools:
       - args: ['make', 'install']
       - args: |
           set -e
-          echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.22/Modules/Platform/Vinix.cmake"
+          echo 'include(Platform/UnixPaths)' > "@PREFIX@/share/cmake-3.23/Modules/Platform/Vinix.cmake"
 
   - name: host-xorg-macros
     exports_aclocal: true
@@ -1152,8 +1152,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/lib/libx11.git'
-      tag: 'libX11-1.7.3.1'
-      version: '1.7.3.1'
+      tag: 'libX11-1.7.5'
+      version: '1.7.5'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -1606,8 +1606,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/anholt/libepoxy.git'
-      tag: '1.5.9'
-      version: '1.5.9'
+      tag: '1.5.10'
+      version: '1.5.10'
     tools_required:
       - host-pkg-config
       - host-gcc
@@ -2126,8 +2126,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/libexpat/libexpat.git'
-      tag: 'R_2_4_5'
-      version: '2.4.5'
+      tag: 'R_2_4_8'
+      version: '2.4.8'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -2217,8 +2217,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/mesa/mesa.git'
-      tag: 'mesa-21.3.6'
-      version: '21.3.6'
+      tag: 'mesa-21.3.8'
+      version: '21.3.8'
     tools_required:
       - host-pkg-config
       - host-gcc
@@ -2275,8 +2275,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/coreutils.git'
-      tag: 'v9.0'
-      version: '9.0'
+      tag: 'v9.1'
+      version: '9.1'
       sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
@@ -2654,8 +2654,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'git://git.sv.nongnu.org/freetype/freetype2.git'
-      tag: 'VER-2-11-1'
-      version: '2.11.1'
+      tag: 'VER-2-12-0'
+      version: '2.12.0'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -2755,9 +2755,8 @@ packages:
   - name: bzip2
     source:
       subdir: '3rdparty'
-      url: 'https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz'
-      format: 'tar.gz'
-      extract_path: 'bzip2-1.0.8'
+      git: 'https://sourceware.org/git/bzip2.git'
+      tag: 'bzip2-1.0.8'
       version: '1.0.8'
     tools_required:
       - host-gcc
@@ -2782,8 +2781,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/madler/zlib.git'
-      tag: 'v1.2.11'
-      version: '1.2.11'
+      tag: 'v1.2.12'
+      version: '1.2.12'
     tools_required:
       - host-gcc
     pkgs_required:
@@ -2804,8 +2803,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/openssl/openssl.git'
-      tag: 'OpenSSL_1_1_1m'
-      version: '1.1.1m'
+      tag: 'OpenSSL_1_1_1n'
+      version: '1.1.1n'
     tools_required:
       - host-gcc
     pkgs_required:
@@ -2833,14 +2832,14 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       # Move the doc dir to a versioned directory
-      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1m']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1n']
 
   - name: wget
     source:
       subdir: '3rdparty'
       git: 'https://git.savannah.gnu.org/git/wget.git'
-      tag: 'v1.21.2'
-      version: '1.21.2'
+      tag: 'v1.21.3'
+      version: '1.21.3'
       sources_required: ['gnulib']
       tools_required:
         - host-autoconf-v2.69
@@ -3322,8 +3321,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/app/xclock.git'
-      tag: 'xclock-1.0.9'
-      version: '1.0.9'
+      tag: 'xclock-1.1.1'
+      version: '1.1.1'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -3401,8 +3400,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/fontconfig/fontconfig.git'
-      tag: '2.13.94'
-      version: '2.13.94'
+      tag: '2.14.0'
+      version: '2.14.0'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -3445,8 +3444,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.gnome.org/GNOME/libxml2.git'
-      tag: 'v2.9.12'
-      version: '2.9.12'
+      tag: 'v2.9.13'
+      version: '2.9.13'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
@@ -3640,8 +3639,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/vim/vim.git'
-      tag: 'v8.2.4328'
-      version: '8.2.4328'
+      tag: 'v8.2.4779'
+      version: '8.2.4779'
     tools_required:
       - host-pkg-config
       - host-gcc

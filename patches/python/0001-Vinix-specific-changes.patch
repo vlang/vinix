@@ -1,6 +1,6 @@
-From 0c989a2d2dded035035e3f3b7c2b306d6ef82dbf Mon Sep 17 00:00:00 2001
+From 2d9fdb5d2aee96f34ad6799d7a7f6da82b526256 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Wed, 12 Jan 2022 07:25:24 +0100
+Date: Mon, 18 Apr 2022 05:08:43 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,10 +8,10 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/configure.ac b/configure.ac
-index e57ef7c..6be9840 100644
+index de83332..72a5141 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -71,6 +71,7 @@ if test "$cross_compiling" = yes; then
+@@ -78,6 +78,7 @@ if test "$cross_compiling" = yes; then
  	    fi
              interp=
  	done
@@ -19,7 +19,7 @@ index e57ef7c..6be9840 100644
          if test x$interp = x; then
  	    AC_MSG_ERROR([python$PACKAGE_VERSION interpreter not found])
  	fi
-@@ -379,6 +380,9 @@ then
+@@ -392,6 +393,9 @@ then
  	*-*-cygwin*)
  		ac_sys_system=Cygwin
  		;;
@@ -29,7 +29,7 @@ index e57ef7c..6be9840 100644
  	*-*-vxworks*)
  	    ac_sys_system=VxWorks
  	    ;;
-@@ -431,6 +435,9 @@ if test "$cross_compiling" = yes; then
+@@ -444,6 +448,9 @@ if test "$cross_compiling" = yes; then
  	*-*-vxworks*)
  		_host_cpu=$host_cpu
  		;;
@@ -39,7 +39,7 @@ index e57ef7c..6be9840 100644
  	*)
  		# for now, limit cross builds to known configurations
  		MACHDEP="unknown"
-@@ -2641,6 +2648,9 @@ then
+@@ -2673,6 +2680,9 @@ then
  	CYGWIN*)
  		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
  		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
@@ -49,7 +49,7 @@ index e57ef7c..6be9840 100644
  	*)	LDSHARED="ld";;
  	esac
  fi
-@@ -2677,7 +2687,9 @@ then
+@@ -2709,7 +2719,9 @@ then
  		else CCSHARED="-Kpic -belf"
  		fi;;
  	VxWorks*)
@@ -60,7 +60,7 @@ index e57ef7c..6be9840 100644
  	esac
  fi
  AC_MSG_RESULT($CCSHARED)
-@@ -2738,6 +2750,8 @@ then
+@@ -2770,6 +2782,8 @@ then
  		LINKFORSHARED='-Wl,-E -N 2048K';;
  	VxWorks*)
  		LINKFORSHARED='--export-dynamic';;
@@ -70,5 +70,5 @@ index e57ef7c..6be9840 100644
  fi
  AC_MSG_RESULT($LINKFORSHARED)
 -- 
-2.34.1
+2.35.3
 

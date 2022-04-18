@@ -1,6 +1,6 @@
-From 49190892a3357aaa6b865c34938c88f96599aaf4 Mon Sep 17 00:00:00 2001
+From cceab301e69fd447413b79a240cc69e21b83dda0 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 20 Feb 2022 06:35:33 +0100
+Date: Mon, 18 Apr 2022 04:06:55 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -36,10 +36,10 @@ index 5e54c3a..09dda3f 100644
  
  #else /* One of the BSDs */
 diff --git a/meson.build b/meson.build
-index 0aea312..afbcc54 100644
+index 07c77e1..9b0cea0 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -164,7 +164,7 @@ with_any_opengl = with_opengl or with_gles1 or with_gles2
+@@ -176,7 +176,7 @@ with_any_opengl = with_opengl or with_gles1 or with_gles2
  # Only build shared_glapi if at least one OpenGL API is enabled
  with_shared_glapi = with_shared_glapi and with_any_opengl
  
@@ -201,5 +201,5 @@ index 013e8be..98d8256 100644
     clockid_t cid;
  
 -- 
-2.35.1
+2.35.3
 

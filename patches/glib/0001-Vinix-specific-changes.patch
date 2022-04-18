@@ -1,6 +1,6 @@
-From 0ae324bcb42893afa0ea08e2c7336dfe16570184 Mon Sep 17 00:00:00 2001
+From 5183fca911f1c5c3e548d2c581daefdbd3066f68 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 20 Feb 2022 05:09:55 +0100
+Date: Mon, 18 Apr 2022 05:10:33 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -10,7 +10,7 @@ Subject: [PATCH] Vinix specific changes
  3 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/glib/glib-init.c b/glib/glib-init.c
-index 2958fb5..e602738 100644
+index e7b4984..2e38538 100644
 --- a/glib/glib-init.c
 +++ b/glib/glib-init.c
 @@ -27,6 +27,7 @@
@@ -22,7 +22,7 @@ index 2958fb5..e602738 100644
  #include <stdio.h>
  #include <ctype.h>
 diff --git a/glib/gstrfuncs.c b/glib/gstrfuncs.c
-index ef69206..ef13019 100644
+index 9273533..2e3b9b2 100644
 --- a/glib/gstrfuncs.c
 +++ b/glib/gstrfuncs.c
 @@ -33,6 +33,7 @@
@@ -34,17 +34,17 @@ index ef69206..ef13019 100644
  #include <errno.h>
  #include <garray.h>
 diff --git a/meson.build b/meson.build
-index 0019671..65a2472 100644
+index a330b7b..7cf27c9 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -442,7 +442,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
-     # A zero-length format string shouldn't be considered an issue.
+@@ -464,7 +464,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
      '-Wno-format-zero-length',
-     '-Werror=declaration-after-statement',
+     # We explicitly require variadic macros
+     '-Wno-variadic-macros',
 -    '-Werror=format=2',
-     '-Werror=implicit-function-declaration',
      '-Werror=init-self',
      '-Werror=missing-include-dirs',
+     '-Werror=pointer-arith',
 -- 
-2.35.1
+2.35.3
 

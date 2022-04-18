@@ -1,6 +1,6 @@
-From 2a954aeab7d2383cb7355a60b84b061e66d72409 Mon Sep 17 00:00:00 2001
+From f84d02911a400f08ed6f455814d16c9494fb63c2 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 4 Sep 2021 01:34:52 +0200
+Date: Mon, 18 Apr 2022 05:13:42 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -9,10 +9,10 @@ Subject: [PATCH] Vinix specific changes
  2 files changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/build-aux/ltmain.in b/build-aux/ltmain.in
-index d5cf07a..ce97a5f 100644
+index a5f21a1..c06d55c 100644
 --- a/build-aux/ltmain.in
 +++ b/build-aux/ltmain.in
-@@ -6449,7 +6449,7 @@ func_mode_link ()
+@@ -6497,7 +6497,7 @@ func_mode_link ()
  	      fi
  	    else
  	      # We cannot seem to hardcode it, guess we'll fake it.
@@ -22,10 +22,10 @@ index d5cf07a..ce97a5f 100644
  	      if test -n "$inst_prefix_dir"; then
  		case $libdir in
 diff --git a/m4/libtool.m4 b/m4/libtool.m4
-index a3bc337..f676be6 100644
+index 79a2451..7e05c34 100644
 --- a/m4/libtool.m4
 +++ b/m4/libtool.m4
-@@ -2905,6 +2905,17 @@ netbsd*)
+@@ -2925,6 +2925,17 @@ netbsd*)
    hardcode_into_libs=yes
    ;;
  
@@ -43,7 +43,7 @@ index a3bc337..f676be6 100644
  newsos6)
    version_type=linux # correct to gnu/linux during the next big refactor
    library_names_spec='$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'
-@@ -3546,6 +3557,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
+@@ -3566,6 +3577,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
    lt_cv_deplibs_check_method=pass_all
    ;;
  
@@ -55,5 +55,5 @@ index a3bc337..f676be6 100644
    if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
      lt_cv_deplibs_check_method='match_pattern /lib[[^/]]+(\.so\.[[0-9]]+\.[[0-9]]+|_pic\.a)$'
 -- 
-2.33.0
+2.35.3
 

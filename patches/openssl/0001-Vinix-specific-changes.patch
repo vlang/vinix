@@ -1,6 +1,6 @@
-From 6a31558ef1cf93c46a3beaeb1c1241617a39596c Mon Sep 17 00:00:00 2001
+From 35b3dbf604441dcad2316f9ee025f7ec1cf6893d Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 4 Sep 2021 05:35:32 +0200
+Date: Mon, 18 Apr 2022 05:15:52 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH] Vinix specific changes
  4 files changed, 39 insertions(+), 15 deletions(-)
 
 diff --git a/Configurations/10-main.conf b/Configurations/10-main.conf
-index 61c6689a..188b208f 100644
+index 8ca8235e..55826bbc 100644
 --- a/Configurations/10-main.conf
 +++ b/Configurations/10-main.conf
 @@ -918,6 +918,39 @@ my %targets = (
@@ -55,10 +55,10 @@ index 61c6689a..188b208f 100644
      "BSD-generic32" => {
          # As for thread cflag. Idea is to maintain "collective" set of
 diff --git a/Configure b/Configure
-index b286dd06..b9faa339 100755
+index 4bea49d7..964793fe 100755
 --- a/Configure
 +++ b/Configure
-@@ -1546,20 +1546,7 @@ unless ($disabled{"crypto-mdebug-backtrace"})
+@@ -1549,20 +1549,7 @@ unless ($disabled{"crypto-mdebug-backtrace"})
  unless ($disabled{afalgeng}) {
      $config{afalgeng}="";
      if (grep { $_ eq 'afalgeng' } @{$target{enable}}) {
@@ -81,7 +81,7 @@ index b286dd06..b9faa339 100755
          disable('not-linux', 'afalgeng');
      }
 diff --git a/apps/speed.c b/apps/speed.c
-index d4ae7ab7..db2db31b 100644
+index 89bf1848..74322241 100644
 --- a/apps/speed.c
 +++ b/apps/speed.c
 @@ -113,6 +113,8 @@
@@ -109,5 +109,5 @@ index fac58125..a36efaa5 100644
  #endif
  #include <openssl/rsa.h>
 -- 
-2.33.0
+2.35.3
 
