@@ -112,7 +112,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 	if path[index] == `/` {
 		current_node = reduce_node(vfs_root, false)
 		for path[index] == `/` {
-			if index == path.len - 1 {
+			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
 			}
 			index++
@@ -133,7 +133,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			index++
 		}
 
-		last := index == path.len
+		last := index == u64(path.len)
 
 		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
