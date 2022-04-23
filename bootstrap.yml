@@ -113,8 +113,8 @@ sources:
   - name: gcc
     subdir: '3rdparty'
     git: 'https://gcc.gnu.org/git/gcc.git'
-    tag: 'releases/gcc-11.2.0'
-    version: '11.2.0'
+    tag: 'releases/gcc-11.3.0'
+    version: '11.3.0'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16

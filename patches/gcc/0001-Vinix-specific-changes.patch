@@ -1,6 +1,6 @@
-From 3044a0e65af0104bce934ffcbb2740ead1cd9496 Mon Sep 17 00:00:00 2001
+From 393c793c916c3dde8a10d0155d530604d7746704 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 24 Jan 2022 05:15:46 +0100
+Date: Sat, 23 Apr 2022 05:47:42 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -27,10 +27,10 @@ index df90720b7..da6408af2 100755
      x86_64-*-mingw32* | \
      powerpc-*-eabisim* | \
 diff --git a/gcc/config.gcc b/gcc/config.gcc
-index 357b0bed0..de98ca8b5 100644
+index 5636acc22..d6c1fa219 100644
 --- a/gcc/config.gcc
 +++ b/gcc/config.gcc
-@@ -822,6 +822,15 @@ case ${target} in
+@@ -824,6 +824,15 @@ case ${target} in
    tmake_file="${tmake_file} t-freebsd"
    target_has_targetdm=yes
    ;;
@@ -46,7 +46,7 @@ index 357b0bed0..de98ca8b5 100644
  *-*-fuchsia*)
    native_system_header_dir=/include
    ;;
-@@ -2240,6 +2249,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
+@@ -2242,6 +2251,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
  			;;
  	esac
  	;;
@@ -92,10 +92,10 @@ index 000000000..be79aae12
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff --git a/libgcc/config.host b/libgcc/config.host
-index 50f000622..de1bb0919 100644
+index f2dc7e266..0d7656ed3 100644
 --- a/libgcc/config.host
 +++ b/libgcc/config.host
-@@ -245,6 +245,11 @@ case ${host} in
+@@ -255,6 +255,11 @@ case ${host} in
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
    extra_parts="crtbegin.o crtend.o"
    ;;
@@ -107,7 +107,7 @@ index 50f000622..de1bb0919 100644
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
-@@ -703,6 +708,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
+@@ -716,6 +721,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
@@ -187,5 +187,5 @@ index 17f8e5f30..f6daabc68 100644
    if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
      lt_cv_deplibs_check_method='match_pattern /lib[[^/]]+(\.so\.[[0-9]]+\.[[0-9]]+|_pic\.a)$'
 -- 
-2.34.1
+2.36.0
 
