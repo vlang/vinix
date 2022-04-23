@@ -32,7 +32,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	kernel_pagemap.switch_to()
 
 	unsafe {
-		stack_size := u64(8192)
+		stack_size := u64(0x200000)
 
 		common_int_stack_phys := memory.pmm_alloc(stack_size / page_size)
 		mut common_int_stack := &u64(u64(common_int_stack_phys) + stack_size + higher_half)
