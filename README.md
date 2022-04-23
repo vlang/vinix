@@ -69,7 +69,12 @@ Skip to a paragraph for your host distro if there is any.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subversion mercurial curl wget xz-utils nasm mtools meson perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python3-pip python3-mako python3-xcbgen xorriso qemu-system-x86
+sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subversion mercurial curl wget xz-utils nasm mtools ninja-build perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python-is-python3 python3-pip python3-mako python3-xcbgen xorriso qemu-system-x86
+```
+
+Since the `meson` version from the repositories may be outdated, install it from `pip3`:
+```bash
+pip3 install --user meson
 ```
 
 ### Build prerequisites for Arch Linux and derivatives

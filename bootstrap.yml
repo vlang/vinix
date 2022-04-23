@@ -1210,6 +1210,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
@@ -2348,6 +2351,7 @@ packages:
         - '--prefix=/usr'
         - '--sysconfdir=/etc'
         - 'CFLAGS=-DSLOW_BUT_NO_HACKS'
+        - 'LDFLAGS=-Wl,--copy-dt-needed-entries'
         environ:
           PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
           PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
@@ -3012,6 +3016,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
@@ -3051,7 +3058,10 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
       - host-gcc
+      - host-pkg-config
     pkgs_required:
       - mlibc
       - xorg-util-macros
@@ -3090,6 +3100,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
@@ -3132,6 +3145,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
@@ -3172,6 +3188,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
@@ -3212,6 +3231,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
@@ -3335,6 +3357,9 @@ packages:
           environ:
             NOCONFIGURE: 'yes'
     tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
       - host-gcc
     pkgs_required:
       - mlibc
