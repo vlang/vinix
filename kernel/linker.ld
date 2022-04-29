@@ -50,4 +50,14 @@ SECTIONS
         *(COMMON)
         *(.bss .bss.*)
     } : data
+    
+    /DISCARD/ : {
+        *(.comment)
+        *(.discard)
+        *(.discard.*)
+        *(.dynamic)
+        *(.eh_frame)
+        *(.note.GNU-stack)
+        *(.note.gnu.build-id)
+     }     
 }
