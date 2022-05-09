@@ -275,8 +275,8 @@ sources:
   - name: ncurses
     subdir: '3rdparty'
     git: 'https://github.com/ThomasDickey/ncurses-snapshots.git'
-    tag: 'v6_3'
-    version: '6.3'
+    tag: 'v6_3_20220507'
+    version: '6.3.20220507'
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.16
@@ -874,6 +874,9 @@ packages:
     tools_required:
       - host-gcc
       - host-tic
+      - host-automake-v1.16
+      - host-autoconf-v2.69
+      - host-pkg-config
     pkgs_required:
       - mlibc
     configure:
@@ -886,14 +889,15 @@ packages:
         - '--with-shared'
         - '--without-normal'
         - '--with-manpage-format=normal'
-        - '--with-pkg-config-libdir=/usr/lib/pkgconfig'
         - '--with-termlib'
         - '--enable-widec'
         environ:
           cf_cv_func_nanosleep: 'yes'
+          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
+          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install', 'PKG_CONFIG_LIBDIR=/usr/share/pkgconfig']
       # As we build ncurses with wide character support, make some compatibility links
       - args: |
           set -e
