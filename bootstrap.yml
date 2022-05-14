@@ -7,6 +7,22 @@ declare_options:
     default: 'false' # prod
 
 sources:
+  - name: tar
+    subdir: '3rdparty'
+    git: 'https://git.savannah.gnu.org/git/tar.git'
+    tag: 'release_1_34'
+    version: '1.34'
+    sources_required: ['gnulib']
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-libtool
+      - host-pkg-config
+    regenerate:
+      - args: ['rm', '-rf', 'gnulib']
+      - args: ['cp', '-r', '@SOURCE_ROOT@/3rdparty/gnulib', './']
+      - args: ['./bootstrap']
+
   - name: xorg-font-util
     subdir: '3rdparty'
     git: 'https://gitlab.freedesktop.org/xorg/font/util.git'
@@ -316,6 +332,22 @@ tools:
     install:
       - args: ['make', 'install-strip']
 
+  - name: host-tar
+    from_source: tar
+    tools_required:
+      - host-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
+        environ:
+          CFLAGS: '-Wno-error -O2 -pipe'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install-strip']
+
   - name: host-autoconf-v2.69
     source:
       name: autoconf-v2.69
@@ -592,6 +624,7 @@ tasks:
   - name: make-basic-iso
     tools_required:
       - host-limine
+      - host-tar
     pkgs_required:
       - base-files
       - kernel
@@ -612,6 +645,7 @@ tasks:
   - name: make-iso
     tools_required:
       - host-limine
+      - host-tar
     pkgs_required:
       - base-files
       - kernel
