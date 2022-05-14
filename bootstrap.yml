@@ -3702,8 +3702,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/vim/vim.git'
-      tag: 'v8.2.4779'
-      version: '8.2.4779'
+      tag: 'v8.2.4953'
+      version: '8.2.4953'
     tools_required:
       - host-pkg-config
       - host-gcc
