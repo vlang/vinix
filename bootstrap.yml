@@ -160,8 +160,8 @@ sources:
   - name: llvm
     subdir: '3rdparty'
     git: 'https://github.com/llvm/llvm-project.git'
-    tag: 'llvmorg-13.0.1'
-    version: '13.0.1'
+    tag: 'llvmorg-14.0.3'
+    version: '14.0.3'
 
   - name: mlibc
     subdir: '3rdparty'
@@ -896,6 +896,8 @@ packages:
         - '-DLLVM_HOST_TRIPLE=x86_64-vinix'
         # Disable linking against ncurses, which we do not build with -fPIC.
         - '-DLLVM_ENABLE_TERMINFO=OFF'
+        # Suppress developer warnings
+        - '-Wno-dev'
         - '@THIS_SOURCE_DIR@/llvm'
     build:
       - args: ['ninja']

@@ -1,31 +1,30 @@
-From 257467e252f0fe04780acf219b044deff26ee2d5 Mon Sep 17 00:00:00 2001
+From a4743f639e7ab17b5ad19e0fa7c9e5343e18e207 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 13 Feb 2022 18:29:05 +0100
+Date: Sat, 14 May 2022 19:25:43 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
- clang/lib/Basic/Targets.cpp                   |   2 +
- clang/lib/Basic/Targets/OSTargets.h           |  28 ++
- clang/lib/Driver/CMakeLists.txt               |   1 +
- clang/lib/Driver/Driver.cpp                   |   4 +
- clang/lib/Driver/ToolChains/Gnu.cpp           |   3 +-
- clang/lib/Driver/ToolChains/Vinix.cpp         | 427 ++++++++++++++++++
- clang/lib/Driver/ToolChains/Vinix.h           |  49 ++
- llvm/cmake/modules/CrossCompile.cmake         |   4 +-
- llvm/include/llvm/ADT/Triple.h                |   1 +
- llvm/include/llvm/Support/SwapByteOrder.h     |   2 +-
- llvm/lib/Support/Triple.cpp                   |   2 +
- llvm/lib/Support/Unix/Path.inc                |   6 +-
- llvm/lib/Support/Unix/Program.inc             |   1 +
- llvm/tools/llvm-dwarfdump/Statistics.cpp      |   2 +
- llvm/tools/llvm-shlib/CMakeLists.txt          |   1 +
- llvm/utils/benchmark/src/benchmark_register.h |   1 +
- 16 files changed, 527 insertions(+), 7 deletions(-)
+ clang/lib/Basic/Targets.cpp               |   2 +
+ clang/lib/Basic/Targets/OSTargets.h       |  28 ++
+ clang/lib/Driver/CMakeLists.txt           |   1 +
+ clang/lib/Driver/Driver.cpp               |   4 +
+ clang/lib/Driver/ToolChains/Gnu.cpp       |   3 +-
+ clang/lib/Driver/ToolChains/Vinix.cpp     | 427 ++++++++++++++++++++++
+ clang/lib/Driver/ToolChains/Vinix.h       |  49 +++
+ llvm/cmake/modules/CrossCompile.cmake     |   4 +-
+ llvm/include/llvm/ADT/Triple.h            |   1 +
+ llvm/include/llvm/Support/SwapByteOrder.h |   2 +-
+ llvm/lib/Support/Triple.cpp               |   2 +
+ llvm/lib/Support/Unix/Path.inc            |   6 +-
+ llvm/lib/Support/Unix/Program.inc         |   1 +
+ llvm/tools/llvm-dwarfdump/Statistics.cpp  |   2 +
+ llvm/tools/llvm-shlib/CMakeLists.txt      |   1 +
+ 15 files changed, 526 insertions(+), 7 deletions(-)
  create mode 100644 clang/lib/Driver/ToolChains/Vinix.cpp
  create mode 100644 clang/lib/Driver/ToolChains/Vinix.h
 
 diff --git a/clang/lib/Basic/Targets.cpp b/clang/lib/Basic/Targets.cpp
-index ba91d0439..930fa30fd 100644
+index 994a491cd..64864a6df 100644
 --- a/clang/lib/Basic/Targets.cpp
 +++ b/clang/lib/Basic/Targets.cpp
 @@ -586,6 +586,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
@@ -38,10 +37,10 @@ index ba91d0439..930fa30fd 100644
        return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
      case llvm::Triple::PS4:
 diff --git a/clang/lib/Basic/Targets/OSTargets.h b/clang/lib/Basic/Targets/OSTargets.h
-index 12df95c19..d7654fd5a 100644
+index 3c1830d5f..2bc8378fd 100644
 --- a/clang/lib/Basic/Targets/OSTargets.h
 +++ b/clang/lib/Basic/Targets/OSTargets.h
-@@ -337,6 +337,34 @@ public:
+@@ -338,6 +338,34 @@ public:
        : OSTargetInfo<Target>(Triple, Opts) {}
  };
  
@@ -77,10 +76,10 @@ index 12df95c19..d7654fd5a 100644
  template <typename Target>
  class LLVM_LIBRARY_VISIBILITY MinixTargetInfo : public OSTargetInfo<Target> {
 diff --git a/clang/lib/Driver/CMakeLists.txt b/clang/lib/Driver/CMakeLists.txt
-index 08be9f011..8154a01d1 100644
+index 78e8fd185..8f91f211d 100644
 --- a/clang/lib/Driver/CMakeLists.txt
 +++ b/clang/lib/Driver/CMakeLists.txt
-@@ -56,6 +56,7 @@ add_clang_library(clangDriver
+@@ -59,6 +59,7 @@ add_clang_library(clangDriver
    ToolChains/Hexagon.cpp
    ToolChains/Hurd.cpp
    ToolChains/Linux.cpp
@@ -89,10 +88,10 @@ index 08be9f011..8154a01d1 100644
    ToolChains/MinGW.cpp
    ToolChains/Minix.cpp
 diff --git a/clang/lib/Driver/Driver.cpp b/clang/lib/Driver/Driver.cpp
-index 94a7553e2..2fa008e76 100644
+index 3bfddeefc..434f3cc20 100644
 --- a/clang/lib/Driver/Driver.cpp
 +++ b/clang/lib/Driver/Driver.cpp
-@@ -29,6 +29,7 @@
+@@ -30,6 +30,7 @@
  #include "ToolChains/Hurd.h"
  #include "ToolChains/Lanai.h"
  #include "ToolChains/Linux.h"
@@ -100,7 +99,7 @@ index 94a7553e2..2fa008e76 100644
  #include "ToolChains/MSP430.h"
  #include "ToolChains/MSVC.h"
  #include "ToolChains/MinGW.h"
-@@ -5299,6 +5300,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
+@@ -5564,6 +5565,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
      case llvm::Triple::Fuchsia:
        TC = std::make_unique<toolchains::Fuchsia>(*this, Target, Args);
        break;
@@ -111,15 +110,15 @@ index 94a7553e2..2fa008e76 100644
        TC = std::make_unique<toolchains::Solaris>(*this, Target, Args);
        break;
 diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
-index da39f29e4..ce6fa6aa9 100644
+index 7a9570a68..926867909 100644
 --- a/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ b/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -2105,7 +2105,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
+@@ -2099,7 +2099,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
        "x86_64-redhat-linux",    "x86_64-suse-linux",
        "x86_64-manbo-linux-gnu", "x86_64-linux-gnu",
        "x86_64-slackware-linux", "x86_64-unknown-linux",
--      "x86_64-amazon-linux",    "x86_64-linux-android"};
-+      "x86_64-amazon-linux",    "x86_64-linux-android",
+-      "x86_64-amazon-linux"};
++      "x86_64-amazon-linux",
 +      "x86_64-vinix"};
    static const char *const X32Triples[] = {"x86_64-linux-gnux32",
                                             "x86_64-pc-linux-gnux32"};
@@ -613,7 +612,7 @@ index 000000000..2428e411a
 +
 +#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
 diff --git a/llvm/cmake/modules/CrossCompile.cmake b/llvm/cmake/modules/CrossCompile.cmake
-index 01cd37124..5d55ac110 100644
+index 2a39b6a40..ceceb2aab 100644
 --- a/llvm/cmake/modules/CrossCompile.cmake
 +++ b/llvm/cmake/modules/CrossCompile.cmake
 @@ -17,8 +17,8 @@ function(llvm_create_cross_target project_name target_name toolchain buildtype)
@@ -628,10 +627,10 @@ index 01cd37124..5d55ac110 100644
    endif()
    set(CROSS_TOOLCHAIN_FLAGS_${target_name} ${CROSS_TOOLCHAIN_FLAGS_INIT}
 diff --git a/llvm/include/llvm/ADT/Triple.h b/llvm/include/llvm/ADT/Triple.h
-index 76f351405..b40c5b997 100644
+index 42277c013..a0606238c 100644
 --- a/llvm/include/llvm/ADT/Triple.h
 +++ b/llvm/include/llvm/ADT/Triple.h
-@@ -175,6 +175,7 @@ public:
+@@ -181,6 +181,7 @@ public:
      Linux,
      Lv2,        // PS3
      MacOSX,
@@ -653,10 +652,10 @@ index e8612ba66..5195e720f 100644
  #elif defined(_AIX)
  #include <sys/machine.h>
 diff --git a/llvm/lib/Support/Triple.cpp b/llvm/lib/Support/Triple.cpp
-index 883115463..d0820c733 100644
+index a9afcc9db..7c9e98966 100644
 --- a/llvm/lib/Support/Triple.cpp
 +++ b/llvm/lib/Support/Triple.cpp
-@@ -209,6 +209,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+@@ -215,6 +215,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
    case Linux: return "linux";
    case Lv2: return "lv2";
    case MacOSX: return "macosx";
@@ -664,7 +663,7 @@ index 883115463..d0820c733 100644
    case Mesa3D: return "mesa3d";
    case Minix: return "minix";
    case NVCL: return "nvcl";
-@@ -513,6 +514,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+@@ -523,6 +524,7 @@ static Triple::OSType parseOS(StringRef OSName) {
      .StartsWith("linux", Triple::Linux)
      .StartsWith("lv2", Triple::Lv2)
      .StartsWith("macos", Triple::MacOSX)
@@ -673,10 +672,10 @@ index 883115463..d0820c733 100644
      .StartsWith("openbsd", Triple::OpenBSD)
      .StartsWith("solaris", Triple::Solaris)
 diff --git a/llvm/lib/Support/Unix/Path.inc b/llvm/lib/Support/Unix/Path.inc
-index c37b3a546..daaedc16f 100644
+index 788460d65..ea3a973ab 100644
 --- a/llvm/lib/Support/Unix/Path.inc
 +++ b/llvm/lib/Support/Unix/Path.inc
-@@ -71,7 +71,7 @@ extern char **environ;
+@@ -74,7 +74,7 @@ extern char **environ;
  
  #include <sys/types.h>
  #if !defined(__APPLE__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) &&   \
@@ -685,7 +684,7 @@ index c37b3a546..daaedc16f 100644
  #include <sys/statvfs.h>
  #define STATVFS statvfs
  #define FSTATVFS fstatvfs
-@@ -80,7 +80,7 @@ extern char **environ;
+@@ -83,7 +83,7 @@ extern char **environ;
  #if defined(__OpenBSD__) || defined(__FreeBSD__)
  #include <sys/mount.h>
  #include <sys/param.h>
@@ -694,7 +693,7 @@ index c37b3a546..daaedc16f 100644
  #if defined(HAVE_LINUX_MAGIC_H)
  #include <linux/magic.h>
  #else
-@@ -458,7 +458,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
+@@ -478,7 +478,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
  }
  
  static bool is_local_impl(struct STATVFS &Vfs) {
@@ -704,7 +703,7 @@ index c37b3a546..daaedc16f 100644
  #define NFS_SUPER_MAGIC 0x6969
  #endif
 diff --git a/llvm/lib/Support/Unix/Program.inc b/llvm/lib/Support/Unix/Program.inc
-index be59bb023..d2da16b65 100644
+index 089342030..061609654 100644
 --- a/llvm/lib/Support/Unix/Program.inc
 +++ b/llvm/lib/Support/Unix/Program.inc
 @@ -41,6 +41,7 @@
@@ -716,7 +715,7 @@ index be59bb023..d2da16b65 100644
  #include <spawn.h>
  
 diff --git a/llvm/tools/llvm-dwarfdump/Statistics.cpp b/llvm/tools/llvm-dwarfdump/Statistics.cpp
-index 19a971afa..929184bfc 100644
+index 5c08e43b4..a19c74e82 100644
 --- a/llvm/tools/llvm-dwarfdump/Statistics.cpp
 +++ b/llvm/tools/llvm-dwarfdump/Statistics.cpp
 @@ -6,6 +6,8 @@
@@ -729,7 +728,7 @@ index 19a971afa..929184bfc 100644
  #include "llvm/ADT/DenseMap.h"
  #include "llvm/ADT/StringSet.h"
 diff --git a/llvm/tools/llvm-shlib/CMakeLists.txt b/llvm/tools/llvm-shlib/CMakeLists.txt
-index 76b9a25cb..c956ed4ce 100644
+index 8e2b78f1b..4321986f8 100644
 --- a/llvm/tools/llvm-shlib/CMakeLists.txt
 +++ b/llvm/tools/llvm-shlib/CMakeLists.txt
 @@ -36,6 +36,7 @@ if(LLVM_BUILD_LLVM_DYLIB)
@@ -740,18 +739,6 @@ index 76b9a25cb..c956ed4ce 100644
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Fuchsia")
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "DragonFly")
-diff --git a/llvm/utils/benchmark/src/benchmark_register.h b/llvm/utils/benchmark/src/benchmark_register.h
-index 4caa5ad4d..11258aa98 100644
---- a/llvm/utils/benchmark/src/benchmark_register.h
-+++ b/llvm/utils/benchmark/src/benchmark_register.h
-@@ -3,6 +3,7 @@
- 
- #include <limits>
- #include <vector>
-+#include <limits>
- 
- #include "check.h"
- 
 -- 
 2.35.1
 
