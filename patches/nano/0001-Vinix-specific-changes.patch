@@ -1,6 +1,6 @@
-From 7152363d5ae749a67fb333d944cdb5f5344f3de7 Mon Sep 17 00:00:00 2001
+From 957cf55cacc1bf60c82f78b9064c158f0eb9b4a3 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 20 Feb 2022 06:37:46 +0100
+Date: Sat, 14 May 2022 18:44:44 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,10 +8,10 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index f80be59..89735d2 100644
+index 7c63ed7..6ab1502 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -71,12 +71,12 @@ AM_CONDITIONAL(BUILDING_FROM_GIT, test x$from_git = xyes)
+@@ -72,12 +72,12 @@ AM_CONDITIONAL(BUILDING_FROM_GIT, test x$from_git = xyes)
  dnl Checks for pkg-config and gettext when building from git.
  
  if test x$from_git = xyes; then
