@@ -2126,6 +2126,8 @@ packages:
         - '--disable-libdrm'
         - '--disable-glamor'
         - '--disable-glx'
+        environ:
+          CFLAGS: '-Wno-error=array-bounds -O2 -pipe'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install-strip']
