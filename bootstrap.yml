@@ -2845,8 +2845,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://github.com/openssl/openssl.git'
-      tag: 'OpenSSL_1_1_1n'
-      version: '1.1.1n'
+      tag: 'OpenSSL_1_1_1o'
+      version: '1.1.1o'
     tools_required:
       - host-gcc
     pkgs_required:
@@ -2874,7 +2874,7 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
       # Move the doc dir to a versioned directory
-      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1n']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1o']
 
   - name: wget
     source:

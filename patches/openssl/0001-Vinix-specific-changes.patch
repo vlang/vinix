@@ -1,6 +1,6 @@
-From 35b3dbf604441dcad2316f9ee025f7ec1cf6893d Mon Sep 17 00:00:00 2001
+From 6efb4f81cd943a8bc63e1deb7ef3ac0fe60d06c8 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 18 Apr 2022 05:15:52 +0200
+Date: Sat, 14 May 2022 18:19:27 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -109,5 +109,5 @@ index fac58125..a36efaa5 100644
  #endif
  #include <openssl/rsa.h>
 -- 
-2.35.3
+2.35.1
 
