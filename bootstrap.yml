@@ -1122,8 +1122,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.freedesktop.org/xorg/lib/libxcb.git'
-      tag: 'libxcb-1.14'
-      version: '1.14'
+      tag: 'libxcb-1.15'
+      version: '1.15'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16
