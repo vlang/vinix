@@ -3507,8 +3507,8 @@ packages:
     source:
       subdir: '3rdparty'
       git: 'https://gitlab.gnome.org/GNOME/libxml2.git'
-      tag: 'v2.9.13'
-      version: '2.9.13'
+      tag: 'v2.9.14'
+      version: '2.9.14'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.16

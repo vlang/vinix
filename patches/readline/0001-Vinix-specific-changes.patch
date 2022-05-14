@@ -1,6 +1,6 @@
-From 36e62c91271208fc3a0c065f39dec27c449af9a5 Mon Sep 17 00:00:00 2001
+From 4297ee2026f61e7e55b2fa9278492d3b559bd692 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 11 Sep 2021 06:31:31 +0200
+Date: Sat, 14 May 2022 18:23:54 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -30,5 +30,5 @@ index 661355d..010c651 100755
  	${echo} ${RM} ${INSTALLDIR}/$LINK1
  	if [ -z "$uninstall" ]; then
 -- 
-2.33.0
+2.35.1
 
