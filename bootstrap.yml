@@ -175,13 +175,13 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vlang/v.git'
     branch: 'master'
-    commit: 'fe9f97074bf0ad936d981940d6a734af1b7a20a8'
+    commit: '8d141878ce06e39a1d8a5ef988c7c3502ce84511'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
     regenerate:
       - args: |
           set -e
-          curl -o v.c https://raw.githubusercontent.com/vlang/vc/66fd12b0b863b953b89d135279163d8fa06a671c/v.c
+          curl -o v.c https://raw.githubusercontent.com/vlang/vc/6e67754b68a8bf9f7d1ace8246f2aa7ee5b01907/v.c
 
   - name: limine
     subdir: '3rdparty'
@@ -438,7 +438,7 @@ tools:
           cp -r "@THIS_SOURCE_DIR@/." "@PREFIX@/v/"
           cd "@PREFIX@/v"
           rm -v *.xbstrap
-          cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing -I ./thirdparty/stdatomic/nix v.c -o v -lm -lpthread
+          cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v -lm -lpthread
           mkdir -p "@PREFIX@/bin"
           ln -sf "@PREFIX@/v/v" "@PREFIX@/bin/v"
 
@@ -2254,7 +2254,7 @@ packages:
           cp -r "@THIS_SOURCE_DIR@/." "@THIS_COLLECT_DIR@/usr/v/"
           cd "@THIS_COLLECT_DIR@/usr/v"
           rm -v *.xbstrap
-          x86_64-vinix-gcc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing -I ./thirdparty/stdatomic/nix v.c -o v
+          x86_64-vinix-gcc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v
           mkdir -p "@THIS_COLLECT_DIR@/usr/bin"
           ln -sf /usr/v/v "@THIS_COLLECT_DIR@/usr/bin/v"
 
