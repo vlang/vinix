@@ -744,7 +744,7 @@ packages:
       - args: |
           set -e
           cd "@THIS_SOURCE_DIR@"
-          make PROD=@OPTION:prod@ CC=x86_64-vinix-gcc
+          make -j@PARALLELISM@ PROD=@OPTION:prod@ CC=x86_64-vinix-gcc
           make install PREFIX="/usr" DESTDIR="@THIS_COLLECT_DIR@"
 
   - name: glib
