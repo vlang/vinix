@@ -1,17 +1,14 @@
-From 19833d6491fe51fea8848357a4bca47bf30f7c33 Mon Sep 17 00:00:00 2001
+From cf150e10a35400ae00a7b5411dd896fdfa90114e Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 14 May 2022 20:38:10 +0200
+Date: Mon, 16 May 2022 05:49:40 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
- sysdeps/vinix/generic/generic.cpp        | 56 ++++++++++++++++++++++++
- sysdeps/vinix/include/abi-bits/utsname.h |  1 +
- sysdeps/vinix/meson.build                |  1 +
- 3 files changed, 58 insertions(+)
- create mode 120000 sysdeps/vinix/include/abi-bits/utsname.h
+ sysdeps/vinix/generic/generic.cpp | 47 +++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
-index de5306ff..85035edd 100644
+index 8c565cf4..85035edd 100644
 --- a/sysdeps/vinix/generic/generic.cpp
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -7,6 +7,7 @@
@@ -75,42 +72,6 @@ index de5306ff..85035edd 100644
  int sys_kill(pid_t pid, int signal) {
      __syscall_ret ret = __syscall(26, pid, signal);
  
-@@ -410,6 +457,15 @@ int sys_vm_unmap(void *pointer, size_t size) {
-     return 0;
- }
- 
-+int sys_vm_protect(void *pointer, size_t size, int prot) {
-+    __syscall_ret ret = __syscall(48, pointer, size, prot);
-+
-+    if (ret.errno != 0)
-+        return ret.errno;
-+
-+    return 0;
-+}
-+
- int sys_anon_allocate(size_t size, void **pointer) {
-     return sys_vm_map(NULL, size, PROT_EXEC | PROT_READ | PROT_WRITE,
-                       MAP_ANONYMOUS, -1, 0, pointer);
-diff --git a/sysdeps/vinix/include/abi-bits/utsname.h b/sysdeps/vinix/include/abi-bits/utsname.h
-new file mode 120000
-index 00000000..17b993fe
---- /dev/null
-+++ b/sysdeps/vinix/include/abi-bits/utsname.h
-@@ -0,0 +1 @@
-+../../../../abis/mlibc/utsname.h
-\ No newline at end of file
-diff --git a/sysdeps/vinix/meson.build b/sysdeps/vinix/meson.build
-index b9e4372d..0c176901 100644
---- a/sysdeps/vinix/meson.build
-+++ b/sysdeps/vinix/meson.build
-@@ -35,6 +35,7 @@ if not no_headers
- 		'include/abi-bits/uid_t.h',
- 		'include/abi-bits/wait.h',
- 		'include/abi-bits/limits.h',
-+		'include/abi-bits/utsname.h',
- 		subdir: 'abi-bits'
- 	)
- endif
 -- 
 2.35.1
 
