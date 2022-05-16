@@ -167,7 +167,7 @@ sources:
     subdir: '3rdparty'
     git: 'https://github.com/vinix-os/mlibc.git'
     branch: 'master'
-    commit: '47335e394ca9d21e0f212a6fc2a868f11ec9d526'
+    commit: '42dab9368b4d4453dc7941f878b3ec74b4252d0d'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
@@ -651,6 +651,7 @@ tasks:
       - kernel
       - init
       - util-vinix
+      - socket-test
       - bash
       - v
       - coreutils
@@ -745,6 +746,24 @@ packages:
           set -e
           cd "@THIS_SOURCE_DIR@"
           make -j@PARALLELISM@ PROD=@OPTION:prod@ CC=x86_64-vinix-gcc
+          make install PREFIX="/usr" DESTDIR="@THIS_COLLECT_DIR@"
+
+  - name: socket-test
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/streaksu/socket_test.git'
+      branch: 'main'
+      rolling_version: true
+      version: '0.0pl@ROLLING_ID@'
+    tools_required:
+      - host-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args: |
+          set -e
+          cd "@THIS_SOURCE_DIR@"
+          make -j@PARALLELISM@ CC=x86_64-vinix-gcc
           make install PREFIX="/usr" DESTDIR="@THIS_COLLECT_DIR@"
 
   - name: glib
