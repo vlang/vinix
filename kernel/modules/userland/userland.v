@@ -12,6 +12,7 @@ import sched
 import file
 import proc
 import x86.cpu.local as cpulocal
+import x86.cpu
 import katomic
 import event
 import event.eventstruct
@@ -510,8 +511,8 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		gpr_state: gpr_state
 		process: new_process
 		timeslice: old_thread.timeslice
-		gs_base: old_thread.gs_base
-		fs_base: old_thread.fs_base
+		gs_base: cpu.get_kernel_gs_base()
+		fs_base: cpu.get_fs_base()
 		kernel_stack: kernel_stack
 		pf_stack: pf_stack
 		running_on: u64(-1)
