@@ -84,15 +84,15 @@ pub fn initialise() {
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
-	if node.redir != 0 {
+	if unsafe { node.redir != 0 } {
 		return reduce_node(node.redir, follow_symlinks)
 	}
-	if node.mountpoint != 0 {
+	if unsafe { node.mountpoint != 0 } {
 		return reduce_node(node.mountpoint, follow_symlinks)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
 		_, next_node, _ := path2node(node.parent, node.symlink_target)
-		if next_node == 0 {
+		if unsafe { next_node == 0 } {
 			return 0
 		}
 		return reduce_node(next_node, follow_symlinks)
@@ -314,7 +314,7 @@ pub fn pathname(node &VFSNode) string {
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
 
-	if target_node != 0 || parent_of_tgt_node == 0 {
+	if unsafe { target_node != 0 } || parent_of_tgt_node == 0 {
 		errno.set(errno.eexist)
 		return none
 	}
@@ -354,12 +354,12 @@ pub fn create(parent &VFSNode, name string, mode int) ?&VFSNode {
 pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
-	if target_node != 0 {
+	if unsafe { target_node != 0 } {
 		errno.set(errno.eexist)
 		return none
 	}
 
-	if parent_of_tgt_node == 0 {
+	if unsafe { parent_of_tgt_node == 0 } {
 		errno.set(errno.enoent)
 		return none
 	}
@@ -420,11 +420,11 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64)
 
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, path)
 
-	if parent_of_tgt_node == 0 {
+	if unsafe { parent_of_tgt_node == 0 } {
 		return -1, errno.enoent
 	}
 
-	if target_node != 0 {
+	if unsafe { target_node != 0 } {
 		return -1, errno.eexist
 	}
 
@@ -496,7 +496,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		}
 	}
 
-	if node == 0 {
+	if unsafe { node == 0 } {
 		return -1, errno.get()
 	}
 

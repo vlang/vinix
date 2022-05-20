@@ -155,7 +155,7 @@ fn (mut this DevTmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VF
 	if devtmpfs_dev_id == 0 {
 		devtmpfs_dev_id = resource.create_dev_id()
 	}
-	if devtmpfs_root == 0 {
+	if unsafe { devtmpfs_root == 0 } {
 		// XXX this will break if devtmpfs is mounted more than once
 		devtmpfs_root = this.create(parent, name, 0o644 | stat.ifdir)
 	}
