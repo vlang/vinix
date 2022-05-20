@@ -314,7 +314,7 @@ pub fn pathname(node &VFSNode) string {
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
 
-	if unsafe { target_node != 0 } || parent_of_tgt_node == 0 {
+	if unsafe { target_node != 0 } || unsafe { parent_of_tgt_node == 0 } {
 		errno.set(errno.eexist)
 		return none
 	}
@@ -506,7 +506,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 
 	// Follow symlinks
 	node = reduce_node(node, true)
-	if node == 0 {
+	if unsafe { node == 0 } {
 		return -1, errno.get()
 	}
 
