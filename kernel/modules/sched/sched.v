@@ -51,7 +51,7 @@ fn get_next_thread(orig_i int) int {
 
 		mut thread := scheduler_running_queue[index]
 
-		if thread != 0 {
+		if unsafe { thread != 0 } {
 			if katomic.load(thread.running_on) == cpu_number || thread.l.test_and_acquire() == true {
 				return index
 			}
@@ -80,7 +80,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	new_index := get_next_thread(cpu_local.last_run_queue_index)
 
-	if current_thread != 0 {
+	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
 		if new_index == cpu_local.last_run_queue_index {
@@ -534,7 +534,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	new_process.threads = []&proc.Thread{}
 	new_process.children = []&proc.Process{}
 
-	if old_process != 0 {
+	if unsafe { old_process != 0 } {
 		new_process.ppid = old_process.pid
 		new_process.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_process.thread_stack_top = old_process.thread_stack_top
