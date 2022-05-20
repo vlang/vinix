@@ -54,6 +54,12 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))
 
+	// Enable PAT (write-combining/write-protect)
+	mut pat_msr := msr.rdmsr(0x277)
+	pat_msr &= 0xffffffff
+	pat_msr |= u64(0x0105) << 32
+	msr.wrmsr(0x277, pat_msr)
+
 	cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
 	cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
 

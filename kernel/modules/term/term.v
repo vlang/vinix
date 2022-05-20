@@ -38,6 +38,14 @@ pub fn initialise() {
 }
 
 pub fn framebuffer_init() {
+   	// Map the framebuffer both in the higher half and the lower half for the
+	// kernel, which we use for calling the stivale2 terminal.
+	int_addr := u64(framebuffer_tag.address)
+	for i := u64(0); i < framebuffer_width * 4 * framebuffer_tag.pitch; i += page_size {
+		kernel_pagemap.flag_page(int_addr + i,               (1 << 7) | (1 << 3) | 3) or {}
+		kernel_pagemap.flag_page(int_addr - higher_half + i, (1 << 7) | (1 << 3) | 3) or {}
+	}
+
 	sfb_config := simple.SimpleFBConfig {
 		physical_address: framebuffer_tag.address,
 		width: u32(framebuffer_width),
