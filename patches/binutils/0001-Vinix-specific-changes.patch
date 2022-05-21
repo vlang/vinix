@@ -1,6 +1,6 @@
-From 8d6400103f5e2040772e37a3268b6cd4536d0ad9 Mon Sep 17 00:00:00 2001
+From 7fe5545b8bc52381a66c48286f23fac1359c4d35 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 13 Feb 2022 18:40:00 +0100
+Date: Sat, 21 May 2022 23:59:02 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,8 +8,7 @@ Subject: [PATCH] Vinix specific changes
  gas/configure.tgt           | 1 +
  ld/configure.tgt            | 4 ++++
  ld/emulparams/elf_x86_64.sh | 2 +-
- libiberty/rust-demangle.c   | 4 ++++
- 5 files changed, 15 insertions(+), 1 deletion(-)
+ 4 files changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/bfd/config.bfd b/bfd/config.bfd
 index cfe58247..39fcfdff 100644
@@ -67,21 +66,6 @@ index 5f2743ed..3a34a01a 100644
      case "$EMULATION_NAME" in
        *64*)
  	LIBPATH_SUFFIX=64
-diff --git a/libiberty/rust-demangle.c b/libiberty/rust-demangle.c
-index 3b24d638..fb26971b 100644
---- a/libiberty/rust-demangle.c
-+++ b/libiberty/rust-demangle.c
-@@ -32,6 +32,10 @@ If not, see <http://www.gnu.org/licenses/>.  */
- #include "config.h"
- #endif
- 
-+#if defined (__vinix__)
-+#define uint unsigned int
-+#endif
-+
- #include "safe-ctype.h"
- 
- #include <inttypes.h>
 -- 
 2.35.1
 
