@@ -29,6 +29,7 @@ pub mut:
 	event                    eventstruct.Event
 	status                   int
 	itimers                  [4096]u8
+	name                     string
 }
 
 pub struct SigAction {

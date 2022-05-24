@@ -70,16 +70,17 @@ fn itimer_handler(mut itimer ITimer, mut process proc.Process) {
 }
 
 pub fn syscall_getitimer(_ voidptr, which int, mut curr_value ITimerVal) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: getitimer(%d, 0x%llx)\n', which, voidptr(curr_value))
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: getitimer(%d, 0x%llx)\n', process.name.str, which, voidptr(curr_value))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	if which > 2 {
 		return -1, errno.einval
 	}
-
-	mut process := proc.current_thread().process
 
 	mut itimers := &ITimer(voidptr(&process.itimers[0]))
 
@@ -95,16 +96,17 @@ pub fn syscall_getitimer(_ voidptr, which int, mut curr_value ITimerVal) (u64, u
 }
 
 pub fn syscall_setitimer(_ voidptr, which int, mut new_value ITimerVal, mut old_value ITimerVal) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: setitimer(%d, 0x%llx, 0x%llx)\n', which, voidptr(new_value), voidptr(old_value))
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: setitimer(%d, 0x%llx, 0x%llx)\n', process.name.str, which, voidptr(new_value), voidptr(old_value))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	if which > 2 {
 		return -1, errno.einval
 	}
-
-	mut process := proc.current_thread().process
 
 	mut itimers := &ITimer(voidptr(&process.itimers[0]))
 

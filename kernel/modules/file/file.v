@@ -63,17 +63,18 @@ pub const (
 )
 
 pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', voidptr(fds),
+	mut thread := proc.current_thread()
+	mut process := thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str, voidptr(fds),
 		nfds, voidptr(tmo_p), voidptr(sigmask))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	if nfds == 0 {
 		return 0, 0
 	}
-
-	mut thread := proc.current_thread()
 
 	oldmask := thread.masked_signals
 	if voidptr(sigmask) != voidptr(0) {
@@ -363,9 +364,12 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 }
 
 pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: dup3(%d, %d, %d)\n', oldfdnum, newfdnum, flags)
+	mut thread := proc.current_thread()
+	mut process := thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: dup3(%d, %d, %d)\n', process.name.str, oldfdnum, newfdnum, flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	new_fdnum := fdnum_dup(voidptr(0), oldfdnum, voidptr(0), newfdnum, flags, true, false) or {
@@ -376,9 +380,12 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 }
 
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: fcntl(%d, %d, %lld)\n', fdnum, cmd, arg)
+	mut thread := proc.current_thread()
+	mut process := thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: fcntl(%d, %d, %lld)\n', process.name.str, fdnum, cmd, arg)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.ebadf }
@@ -425,10 +432,13 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 }
 
 pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', addr, length,
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str, addr, length,
 		prot_and_flags, fdnum, offset)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut resource := &resource.Resource(voidptr(0))
@@ -451,9 +461,6 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	if flags & mmap.map_anonymous == 0 && voidptr(resource) == voidptr(0) {
 		return -1, errno.ebadf
 	}
-
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
 
 	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
 		return -1, errno.get()

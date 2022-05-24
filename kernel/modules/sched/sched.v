@@ -346,13 +346,14 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 }
 
 pub fn syscall_new_thread(_ voidptr, pc voidptr, arg voidptr, stack u64, fs u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: new_thread(0x%llx, 0x%llx, 0x%llx, 0x%llx)\n', pc,
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: new_thread(0x%llx, 0x%llx, 0x%llx, 0x%llx)\n', process.name.str, pc,
 		arg, stack, fs)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
-
-	mut process := proc.current_thread().process
 
 	mut new_thread := new_user_thread(process, false, pc, arg, stack, [], [], 0, false) or {
 		return -1, errno.get()

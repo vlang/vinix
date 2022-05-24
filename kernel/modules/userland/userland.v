@@ -137,9 +137,12 @@ pub mut:
 }
 
 pub fn syscall_getpid(_ voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: getpid()\n')
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: getpid()\n', process.name.str)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut thread := unsafe { proc.current_thread() }
@@ -148,9 +151,12 @@ pub fn syscall_getpid(_ voidptr) (u64, u64) {
 }
 
 pub fn syscall_getppid(_ voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: getppid()\n')
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: getppid()\n', process.name.str)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut thread := unsafe { proc.current_thread() }
@@ -159,18 +165,24 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 }
 
 pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: getgroups(%d, 0x%llx)\n', size, voidptr(list))
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: getgroups(%d, 0x%llx)\n', process.name.str, size, voidptr(list))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	return 0, 0
 }
 
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: sigentry(0x%llx)\n', sigentry)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: sigentry(0x%llx)\n', process.name.str, sigentry)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut thread := proc.current_thread()
@@ -197,10 +209,13 @@ pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
 }
 
 pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: sigaction(%d, 0x%llx, 0x%llx)\n', signum, voidptr(act),
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: sigaction(%d, 0x%llx, 0x%llx)\n', process.name.str, signum, voidptr(act),
 		voidptr(oldact))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	if signum < 0 || signum > 34 || signum == userland.sigkill || signum == userland.sigstop {
@@ -225,10 +240,13 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 }
 
 pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n', how, voidptr(set),
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n', process.name.str, how, voidptr(set),
 		voidptr(oldset))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut thread := proc.current_thread()
@@ -337,9 +355,12 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 }
 
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: kill(%d, %d)\n', pid, signal)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: kill(%d, %d)\n', process.name.str, pid, signal)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	if signal > 0 {
@@ -352,9 +373,12 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 }
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: execve(%s, [omit], [omit])\n', _path)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: execve(%s, [omit], [omit])\n', process.name.str, _path)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	path := unsafe { cstring_to_vstring(_path) }
@@ -384,14 +408,15 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 }
 
 pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: waitpid(%d, 0x%llx, %d)\n', pid, _status, options)
+	mut current_thread := proc.current_thread()
+	mut current_process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: waitpid(%d, 0x%llx, %d)\n', current_process.name.str, pid, _status, options)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
 	}
 
 	mut status := unsafe { _status }
-	mut current_thread := proc.current_thread()
-	mut current_process := current_thread.process
 
 	mut events := []&eventstruct.Event{}
 	mut child := &proc.Process(0)
@@ -438,13 +463,13 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 
 [noreturn]
 pub fn syscall_exit(_ voidptr, status int) {
-	C.printf(c'\n\e[32mstrace\e[m: exit(%d)\n', status)
-	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
-	}
-
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: exit(%d)\n', current_process.name.str, status)
+	defer {
+		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
+	}
 
 	mut old_pagemap := current_process.pagemap
 
@@ -476,15 +501,20 @@ pub fn syscall_exit(_ voidptr, status int) {
 }
 
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: fork()\n')
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: fork()\n', process.name.str)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
 	mut new_process := sched.new_process(old_process, voidptr(0)) or { return -1, errno.get() }
+
+	new_process.name = '${old_process.name}[${new_process.pid}]'
 
 	// Dup all FDs
 	for i := 0; i < proc.max_fds; i++ {
@@ -579,6 +609,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	if execve == false {
 		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
 
+		new_process.name = '${path}[${new_process.pid}]'
+
 		stdin_node := fs.get_node(vfs_root, stdin, true) ?
 		stdin_handle := &file.Handle{
 			resource: stdin_node.resource
@@ -623,6 +655,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		mut old_pagemap := process.pagemap
 
 		process.pagemap = new_pagemap
+
+		process.name = '${path}[${process.pid}]'
 
 		kernel_pagemap.switch_to()
 		thread.process = kernel_process

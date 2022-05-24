@@ -12,6 +12,7 @@ import event.eventstruct
 import errno
 import file
 import katomic
+import proc
 
 // A pipe is a circular buffer
 pub const pipe_buf = 4096
@@ -45,9 +46,12 @@ pub fn create() ?&Pipe {
 }
 
 pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: pipe(0x%llx, 0x%x)\n', voidptr(pipefds), flags)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: pipe(0x%llx, 0x%x)\n', process.name.str, voidptr(pipefds), flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut new_pipe := create() or { return -1, errno.get() }

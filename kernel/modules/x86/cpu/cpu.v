@@ -66,9 +66,9 @@ pub fn get_fs_base() u64 {
 }
 
 pub fn syscall_set_fs_base(_ voidptr, base voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: set_fs_base(0x%llx)\n', base)
+	C.printf(c'\n\e[32m[]\e[m: set_fs_base(0x%llx)\n', base)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m[]\e[m: returning\n')
 	}
 
 	set_fs_base(u64(base))
@@ -76,9 +76,9 @@ pub fn syscall_set_fs_base(_ voidptr, base voidptr) (u64, u64) {
 }
 
 pub fn syscall_set_gs_base(_ voidptr, base voidptr) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: set_gs_base(0x%llx)\n', base)
+	C.printf(c'\n\e[32m[]\e[m: set_gs_base(0x%llx)\n', base)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m[]\e[m: returning\n')
 	}
 
 	set_kernel_gs_base(u64(base))

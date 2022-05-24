@@ -93,10 +93,13 @@ fn (mut this EPoll) grow(handle voidptr, new_size u64) ? {
 }
 
 pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPollEvent) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', epfdnum, op, fdnum,
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', process.name.str, epfdnum, op, fdnum,
 		voidptr(event))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return -1, errno.get() }
@@ -154,10 +157,13 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 
 pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 						   maxevents int, timeout int, sigmask &u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: epoll_pwait(%d, 0x%llx, %d, %d, 0x%llx)\n',
-			 epfdnum, voidptr(ret_events), maxevents, timeout, voidptr(sigmask))
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: epoll_pwait(%d, 0x%llx, %d, %d, 0x%llx)\n',
+			 process.name.str, epfdnum, voidptr(ret_events), maxevents, timeout, voidptr(sigmask))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return -1, errno.get() }
@@ -251,9 +257,12 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 }
 
 pub fn syscall_epoll_create(_ voidptr, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: epoll_create(%d)\n', flags)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: epoll_create(%d)\n', process.name.str, flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	cloexec := if flags & file.epoll_cloexec != 0 { resource.o_cloexec } else { 0 }

@@ -334,13 +334,13 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
 }
 
 pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: munmap(0x%llx, 0x%llx)\n', addr, length)
-	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
-	}
-
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: munmap(0x%llx, 0x%llx)\n', process.name.str, addr, length)
+	defer {
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	}
 
 	munmap(process.pagemap, addr, length) or { return -1, errno.get() }
 
@@ -348,14 +348,14 @@ pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
 }
 
 pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: mprotect(0x%llx, 0x%llx, 0x%x)\n',
-			 addr, length, prot)
-	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
-	}
-
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: mprotect(0x%llx, 0x%llx, 0x%x)\n',
+			 process.name.str, addr, length, prot)
+	defer {
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	}
 
 	mprotect(process.pagemap, addr, length, prot) or {
 		return -1, errno.get()

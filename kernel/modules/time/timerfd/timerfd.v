@@ -11,6 +11,7 @@ import time
 import resource
 import file
 import errno
+import proc
 
 struct ITimerSpec {
 	it_interval time.TimeSpec
@@ -63,9 +64,12 @@ fn (mut this TimerFD) grow(handle voidptr, new_size u64) ? {
 
 
 fn syscall_timerfd_create(_ voidptr, clockid int, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: timerfd_create(0x%x, 0x%x)\n', clockid, flags)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: timerfd_create(0x%x, 0x%x)\n', process.name.str, clockid, flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut timerfd := &TimerFD{

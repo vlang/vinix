@@ -11,6 +11,7 @@ import klock
 import file
 import errno
 import event.eventstruct
+import proc
 
 struct INotify {
 mut:
@@ -55,9 +56,12 @@ fn (mut this INotify) grow(handle voidptr, new_size u64) ? {
 }
 
 pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: inotify_init(%d)\n', flags)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: inotify_init(%d)\n', process.name.str, flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut inotify := &INotify{

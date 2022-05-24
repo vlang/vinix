@@ -9,6 +9,7 @@ import file
 import errno
 import socket.public as sock_pub
 import socket.unix as sock_unix
+import proc
 
 pub fn initialise() {}
 
@@ -41,10 +42,13 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 }
 
 pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', domain, @type,
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', process.name.str, domain, @type,
 		protocol, voidptr(ret))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut socket0, mut socket1 := socketpair_create(domain, @type, protocol) or {
@@ -72,9 +76,12 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 }
 
 pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: socket(%d, 0x%x, %d)\n', domain, @type, protocol)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: socket(%d, 0x%x, %d)\n', process.name.str, domain, @type, protocol)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut socket := socket_create(domain, @type, protocol) or { return -1, errno.get() }
@@ -95,9 +102,12 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 }
 
 pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: accept(%d)\n', fdnum)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: accept(%d)\n', process.name.str, fdnum)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
@@ -127,9 +137,12 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 }
 
 pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: bind(%d, 0x%llx, 0x%llx)\n', fdnum, _addr, addrlen)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: bind(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr, addrlen)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
@@ -153,9 +166,12 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64)
 }
 
 pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: listen(%d, %d)\n', fdnum, backlog)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: listen(%d, %d)\n', process.name.str, fdnum, backlog)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
@@ -179,9 +195,12 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 }
 
 pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: recvmsg(%d, 0x%llx, 0x%x)\n', fdnum, voidptr(msg), flags)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: recvmsg(%d, 0x%llx, 0x%x)\n', process.name.str, fdnum, voidptr(msg), flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
@@ -205,9 +224,12 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 }
 
 pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: connect(%d, 0x%llx, 0x%llx)\n', fdnum, _addr, addrlen)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: connect(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr, addrlen)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
@@ -231,9 +253,12 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u
 }
 
 pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u64) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: getpeername(%d, 0x%llx, 0x%llx)\n', fdnum, _addr, addrlen)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: getpeername(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr, addrlen)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }

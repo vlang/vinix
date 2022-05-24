@@ -8,11 +8,15 @@ import time
 import errno
 import event
 import event.eventstruct
+import proc
 
 pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: clock_get(%d, 0x%llx)\n', clock_type, voidptr(ret))
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: clock_get(%d, 0x%llx)\n', process.name.str, clock_type, voidptr(ret))
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	match clock_type {
@@ -32,10 +36,13 @@ pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u6
 }
 
 pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: nanosleep(0x%llx, 0x%llx)\n', voidptr(req), voidptr(rem))
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: nanosleep(0x%llx, 0x%llx)\n', process.name.str, voidptr(req), voidptr(rem))
 
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	if req.tv_sec == 0 && req.tv_nsec == 0 {

@@ -78,9 +78,12 @@ fn (mut this SignalFD) grow(handle voidptr, new_size u64) ? {
 }
 
 pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
-	C.printf(c'\n\e[32mstrace\e[m: signalfd(%d, 0x%llx, 0x%x)\n', fdnum, mask, flags)
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: signalfd(%d, 0x%llx, 0x%x)\n', process.name.str, fdnum, mask, flags)
 	defer {
-		C.printf(c'\e[32mstrace\e[m: returning\n')
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut signalfd := &SignalFD(0)
