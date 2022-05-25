@@ -179,6 +179,10 @@ fn (mut this UnixSocket) write(handle voidptr, buf voidptr, loc u64, _count u64)
 fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
 		ioctl.fionread {
+			if this.listening {
+				errno.set(errno.einval)
+				return error('')
+			}
 			mut retp := &u64(argp)
 			unsafe { *retp = this.used }
 			return 0
@@ -453,6 +457,18 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)
+
+	if msg.msg_name != voidptr(0) && this.connected {
+		mut actual_size := msg.msg_namelen
+		if actual_size < sizeof(SockaddrUn) {
+			actual_size = sizeof(SockaddrUn)
+		}
+
+		unsafe { C.memcpy(msg.msg_name, voidptr(&this.peer.name), actual_size) }
+		unsafe {
+			msg.msg_namelen = actual_size
+		}
+	}
 
 	C.printf(c'Successfully received %llu bytes\n', transferred)
 
