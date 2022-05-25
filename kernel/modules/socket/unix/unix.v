@@ -269,16 +269,16 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	peer.peer = connection_socket
 	peer.connected = true
 
+	if this.backlog.len == 0 {
+		this.status &= ~file.pollin
+	}
+
 	event.trigger(mut peer.connection_event, false)
 
 	mut events := [&this.connection_event]
 	event.await(mut events, true) or {
 		errno.set(errno.eintr)
 		return error('')
-	}
-
-	if this.backlog.len == 0 {
-		this.status &= ~file.pollin
 	}
 
 	return connection_socket

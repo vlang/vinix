@@ -96,11 +96,16 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 	mut ret := u64(0)
 
+	C.printf(c'Polling on %d FDs\n', nfds)
+
 	for i := u64(0); i < nfds; i++ {
 		mut fdd := unsafe { &fds[i] }
 
+		fdd.revents = 0
+
+		C.printf(c'fdnum %d, events %llx\n', fdd.fd, fdd.events)
+
 		if fdd.fd < 0 {
-			fdd.revents = 0
 			continue
 		}
 
@@ -115,8 +120,8 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		status := resource.status
 
 		if i16(status) & fdd.events != 0 {
-			fdd.revents = 0
 			fdd.revents = i16(status) & fdd.events
+			C.printf(c'Poll detected event on fdnum %d, events %llx\n', fdd.fd, fdd.events)
 			ret++
 			fd.unref()
 			continue
@@ -161,6 +166,8 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		mut fdd := unsafe { &fds[fdnums[which]] }
 
 		if i16(status) & fdd.events != 0 {
+			C.printf(c'Poll exiting on fdnum %d, events %llx\n', fdd.fd, fdd.events)
+
 			fdd.revents = 0
 			fdd.revents = i16(status) & fdd.events
 			ret++
