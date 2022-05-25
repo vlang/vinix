@@ -3442,7 +3442,53 @@ packages:
         - '--disable-selective-werror' # strncasecmp
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install-strip']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: xeyes
+    source:
+      subdir: '3rdparty'
+      git: 'https://gitlab.freedesktop.org/xorg/app/xeyes.git'
+      tag: 'xeyes-1.2.0'
+      version: '1.2.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.16
+        - host-libtool
+        - host-pkg-config
+        - host-xorg-macros
+        - host-gettext
+      regenerate:
+        - args: ['./autogen.sh']
+          environ:
+            NOCONFIGURE: 'yes'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.16
+      - host-pkg-config
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - libx11
+      - libxmu
+      - libxaw
+      - libxrender
+      - libxft
+      - libxt
+      - libxkbfile
+      - libiconv
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=x86_64-vinix'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--localstatedir=/var'
+        - '--disable-selective-werror' # strncasecmp
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 

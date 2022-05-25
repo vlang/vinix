@@ -1,0 +1,25 @@
+From 4f4d339daef64abac1362cd3ce4111ed43201788 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Wed, 25 May 2022 03:37:12 +0200
+Subject: [PATCH app/xclock] Vinix specific changes
+
+---
+ Clock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Clock.c b/Clock.c
+index de6beb6..629b068 100644
+--- a/Clock.c
++++ b/Clock.c
+@@ -1281,7 +1281,7 @@ time_millis(struct tm *tm, struct timeval *tv)
+ static unsigned long
+ time_intervals(unsigned long millis, unsigned long interval)
+ {
+-    return (millis + interval / 2) / interval;
++    return (millis + interval / 2) / 10;
+ }
+ 
+ /*
+-- 
+2.36.1
+

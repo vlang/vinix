@@ -1,0 +1,32 @@
+From c506765f0a4f18728f8498d5b9d20d10b60173f3 Mon Sep 17 00:00:00 2001
+From: mintsuki <mintsuki@protonmail.com>
+Date: Wed, 25 May 2022 03:32:03 +0200
+Subject: [PATCH] Vinix specific changes
+
+---
+ sysdeps/vinix/generic/generic.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
+index 580766bb..b99b7ae1 100644
+--- a/sysdeps/vinix/generic/generic.cpp
++++ b/sysdeps/vinix/generic/generic.cpp
+@@ -883,7 +883,7 @@ int sys_sleep(time_t *secs, long *nanos) {
+     return 0;
+ }
+ 
+-
++/*
+ int sys_getitimer(int which, struct itimerval *curr_value) {
+     __syscall_ret ret = __syscall(63, which, curr_value);
+ 
+@@ -896,5 +896,6 @@ int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval
+ 
+     return ret.errno;
+ }
++*/
+ 
+ } // namespace mlibc
+-- 
+2.36.1
+
