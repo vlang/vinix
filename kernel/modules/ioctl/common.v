@@ -6,6 +6,8 @@ module ioctl
 
 // https://github.com/torvalds/linux/blob/5bfc75d92efd494db37f5c4c173d3639d4772966/include/uapi/asm-generic/ioctl.h
 
+pub const fionread = 0x541b
+
 pub const ioc_nrbits = 8
 pub const ioc_typebits = 8
 pub const ioc_sizebits = 14

@@ -15,6 +15,7 @@ import event
 import file
 import resource
 import katomic
+import ioctl
 
 pub const sock_buf = 0x100000
 
@@ -176,7 +177,16 @@ fn (mut this UnixSocket) write(handle voidptr, buf voidptr, loc u64, _count u64)
 }
 
 fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	return error('')
+	match request {
+		ioctl.fionread {
+			mut retp := &u64(argp)
+			unsafe { *retp = this.used }
+			return 0
+		}
+		else {
+			return resource.default_ioctl(handle, request, argp)
+		}
+	}
 }
 
 fn (mut this UnixSocket) unref(handle voidptr) ? {
