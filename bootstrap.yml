@@ -3446,6 +3446,53 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: dejavu
+    source:
+      subdir: '3rdparty'
+      url: 'http://sourceforge.net/projects/dejavu/files/dejavu/2.37/dejavu-fonts-ttf-2.37.tar.bz2'
+      format: 'tar.bz2'
+      extract_path: 'dejavu-fonts-ttf-2.37'
+      version: '2.37'
+    pkgs_required:
+      - freetype
+      - fontconfig
+    configure:
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/ttf', '@THIS_SOURCE_DIR@/dejavu']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/', '@THIS_BUILD_DIR@']
+    build:
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/share/fonts/truetype/']
+      - args: ['cp', '-r', '@THIS_BUILD_DIR@/dejavu/dejavu', '@THIS_COLLECT_DIR@/usr/share/fonts/truetype/']
+    scripts:
+        post_install:
+          - args: 'echo "Running fc-cache; this may take a few seconds..."'
+          - args: ['fc-cache']
+
+  - name: cwm
+    source:
+      subdir: '3rdparty'
+      git: 'https://github.com/leahneukirchen/cwm.git'
+      tag: 'v7.1'
+      version: '7.1'
+    tools_required:
+      - host-pkg-config
+      - host-gcc
+    pkgs_required:
+      - mlibc
+      - libx11
+      - libxmu
+      - libxaw
+      - libxrender
+      - libxft
+      - libxt
+      - libxkbfile
+      - libiconv
+      - dejavu
+    configure:
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/.', './']
+    build:
+      - args: ['make', '-j@PARALLELISM@', 'CC=x86_64-vinix-gcc']
+      - args: ['make', 'install', 'PREFIX=/usr', 'DESTDIR=@THIS_COLLECT_DIR@']
+
   - name: xeyes
     source:
       subdir: '3rdparty'
