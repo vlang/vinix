@@ -1,6 +1,6 @@
-From 640d5f29f6390862e673d69abc9b5ac23df1fdfc Mon Sep 17 00:00:00 2001
+From 5dd0971f99c641780dc5ff991416e5cc2046a070 Mon Sep 17 00:00:00 2001
 From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 21 May 2022 09:21:48 +0200
+Date: Wed, 25 May 2022 02:01:33 +0200
 Subject: [PATCH] Vinix specific changes
 
 ---
@@ -8,7 +8,7 @@ Subject: [PATCH] Vinix specific changes
  1 file changed, 47 insertions(+)
 
 diff --git a/sysdeps/vinix/generic/generic.cpp b/sysdeps/vinix/generic/generic.cpp
-index 8c565cf4..85035edd 100644
+index 580766bb..b503d6ec 100644
 --- a/sysdeps/vinix/generic/generic.cpp
 +++ b/sysdeps/vinix/generic/generic.cpp
 @@ -7,6 +7,7 @@
@@ -73,5 +73,5 @@ index 8c565cf4..85035edd 100644
      __syscall_ret ret = __syscall(26, pid, signal);
  
 -- 
-2.35.1
+2.36.1
 
