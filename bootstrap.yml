@@ -3523,6 +3523,7 @@ packages:
       - libxrender
       - libxft
       - libxt
+      - libxi
       - libxkbfile
       - libiconv
     configure:
