@@ -261,7 +261,7 @@ index 0000000..ba84c2d
 +  handleKeyInput();
 +}
 +
-+void DG_SleepMs(uint32_t ms) { usleep(ms * 1000000); }
++void DG_SleepMs(uint32_t ms) { usleep(ms * 1000); }
 +
 +uint32_t DG_GetTicksMs() {
 +  struct timeval tp;
