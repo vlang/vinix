@@ -355,7 +355,7 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, arg voidptr, stack u64, fs u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut new_thread := new_user_thread(process, false, pc, arg, stack, [], [], 0, false) or {
+	mut new_thread := new_user_thread(process, false, pc, arg, stack, [], [], voidptr(0), false) or {
 		return -1, errno.get()
 	}
 
