@@ -7,7 +7,7 @@ module bitmap
 import memory
 import lib
 
-struct GenericBitmap {
+pub struct GenericBitmap {
 mut:
 	raw_bitmap voidptr
 	entry_cnt  u64
