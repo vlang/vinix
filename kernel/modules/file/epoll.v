@@ -221,7 +221,6 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 		status := resource.status
 
 		if u32(status) & epoll_event.events != 0 {
-			event.events = 0
 			event.events = u32(status) & epoll_event.events
 			i++
 			fd.unref()
@@ -246,7 +245,6 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 		mut event := unsafe { &ret_events[0] }
 
 		if u32(status) & epoll_event.events != 0 {
-			event.events = 0
 			event.events = u32(status) & epoll_event.events
 			i = 1
 			break
