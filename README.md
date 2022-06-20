@@ -96,8 +96,20 @@ This step will take a while.
 
 ### To test
 
-One can execute a `qemu` command like the following in the generated `vinix.iso`.
+In Linux, if KVM is available, run with
 
-```bash
-qemu-system-x86_64 -hda vinix.iso -enable-kvm -m 2G
+```
+make run-kvm
+```
+
+In macOS, if hvf is available, run with
+
+```
+make run-hvf
+```
+
+To run without any acceleration, run with
+
+```
+make run
 ```
