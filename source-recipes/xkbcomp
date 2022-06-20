@@ -1,0 +1,11 @@
+name=xkbcomp
+version=1.4.5
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/app/xkbcomp.git"
+tag="xkbcomp-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

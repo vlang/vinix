@@ -1,0 +1,10 @@
+name=readline
+version=8.1
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/readline.git"
+tag="readline-${version}"
+hostdeps="automake autoconf"
+
+regenerate() {
+    cp /usr/local/share/automake-1.16/config.sub support/
+}

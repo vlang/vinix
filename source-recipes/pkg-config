@@ -1,0 +1,10 @@
+name=pkg-config
+version=0.29.2
+source_method=git
+clone_url="https://gitlab.freedesktop.org/pkg-config/pkg-config.git"
+tag="pkg-config-${version}"
+hostdeps="autoconf automake libtool"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

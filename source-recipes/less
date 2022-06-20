@@ -1,0 +1,8 @@
+name=less
+version=590
+source_method=tarball
+tarball_url="https://www.greenwoodsoftware.com/less/less-590.tar.gz"
+
+regenerate() {
+    true
+}

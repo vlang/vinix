@@ -1,0 +1,20 @@
+name=libffi
+from_source=libffi
+revision=1
+hostdeps="gcc"
+deps="mlibc"
+
+configure() {
+    ${source_dir}/configure           \
+        --host=x86_64-vinix           \
+        --prefix=${prefix}            \
+        --with-sysroot=${sysroot_dir}
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

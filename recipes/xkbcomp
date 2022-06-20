@@ -1,0 +1,23 @@
+name=xkbcomp
+from_source=xkbcomp
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-util-macros libx11 libxkbfile"
+
+configure() {
+        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
+        PKG_CONFIG_LIBDIR="${sysroot_dir}"/usr/lib/pkgconfig:"${sysroot_dir}"/usr/share/pkgconfig \
+    ${source_dir}/configure           \
+        --host=x86_64-vinix           \
+        --prefix=${prefix}            \
+        --sysconfdir=/etc             \
+        --localstatedir=/var
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

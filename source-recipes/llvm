@@ -1,0 +1,9 @@
+name=llvm
+version=14.0.3
+source_method=git
+clone_url="https://github.com/llvm/llvm-project.git"
+tag="llvmorg-${version}"
+
+regenerate() {
+    true
+}

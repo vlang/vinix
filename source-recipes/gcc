@@ -1,0 +1,17 @@
+name=gcc
+version=12.1.0
+source_method=git
+clone_url="https://gcc.gnu.org/git/gcc.git"
+tag="releases/gcc-${version}"
+hostdeps="automake autoconf"
+
+regenerate() {
+    ./contrib/download_prerequisites
+    cp /usr/local/share/automake-1.16/config.sub ./
+    cp /usr/local/share/automake-1.16/config.sub ./gmp-6.2.1/configfsf.sub
+    cp /usr/local/share/automake-1.16/config.sub ./isl-0.24/
+    cp /usr/local/share/automake-1.16/config.sub ./mpc-1.2.1/build-aux/
+    cp /usr/local/share/automake-1.16/config.sub ./mpfr-4.1.0/
+    ( cd gcc && autoconf )
+    ( cd libstdc++-v3 && autoconf )
+}

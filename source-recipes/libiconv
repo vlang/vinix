@@ -1,0 +1,14 @@
+name=libiconv
+version=1.17
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/libiconv.git"
+tag="v${version}"
+hostdeps="automake autoconf"
+imagedeps="git gcc gperf groff"
+
+regenerate() {
+    ./gitsub.sh pull
+    ./autogen.sh
+    cp /usr/local/share/automake-1.16/config.sub ./build-aux/
+    cp /usr/local/share/automake-1.16/config.sub ./libcharset/build-aux/
+}

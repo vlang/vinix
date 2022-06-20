@@ -1,0 +1,10 @@
+name=binutils
+version=2.38
+source_method=git
+clone_url="https://sourceware.org/git/binutils-gdb.git"
+tag="binutils-2_38"
+hostdeps="automake"
+
+regenerate() {
+    cp /usr/local/share/automake-1.16/config.sub ./
+}

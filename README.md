@@ -65,11 +65,12 @@ installed.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU bash`, `GNU coreutils`, `GNU make`, `GNU patch`, `GNU tar`, `GNU gzip`, `GNU binutils`, `GCC`, `G++`, `git`, `subversion`, `mercurial`, `curl`, `wget`, `xz-utils`, `nasm`, `mtools`, `meson`, `ninja`, `perl`, `m4`, `texinfo`, `groff`, `gettext`, `autopoint`, `expat`, `bison`, `flex`, `help2man`, `openssl`, `gperf`, `rsync`, `xsltproc`, `python3`, `python3-pip`, `python3-mako`, `python3-xcbgen`, `xorriso`, and `qemu` to test it.
+`GNU Bash`, `curl`, `git`, `docker`, `coreutils`, `grep`, `find`, `xorriso`,
+and `qemu` to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install bash coreutils make patch tar gzip binutils gcc g++ git subversion mercurial curl wget xz-utils nasm mtools ninja-build perl m4 texinfo groff gettext autopoint libexpat1-dev bison flex help2man libssl-dev gperf rsync xsltproc python3 python-is-python3 python3-pip python3-mako python3-xcbgen xorriso qemu-system-x86
+sudo apt install bash coreutils git docker grep find xorriso qemu-system-x86
 ```
 
 Since the `meson` version from the repositories may be outdated, install it from `pip3`:
@@ -79,49 +80,24 @@ pip3 install --user meson
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed bash coreutils make patch tar gzip binutils gcc git subversion mercurial curl wget xz nasm mtools meson perl m4 texinfo groff gettext expat bison flex help2man openssl gperf rsync libxslt python python-pip python-mako xcb-proto xorriso qemu-arch-extra
-```
-
-### Installing xbstrap
-
-It is necessary to fetch `xbstrap` from `pip3`:
-```bash
-pip3 install --user xbstrap
+sudo pacman -S --needed bash coreutils curl git docker grep find xorriso qemu
 ```
 
 ### Building the distro
 
 To build the distro which includes the cross toolchain necessary
-to build kernel and ports, run:
+to build kernel and ports, as well as the kernel itself, run:
 
 ```bash
-make distro
+make # Build the distribution and image.
 ```
 
 This step will take a while.
 
-It is possible to skip this step. Running the next step, in that case, will build a minimal set of packages to create a minimal usable system only.
-
-### Building the kernel and image
-
-Simply run
-```bash
-make
-```
-
 ### To test
 
-In Linux, if KVM is available, run with
-```bash
-make run-kvm
-```
+One can execute a `qemu` command like the following in the generated `vinix.iso`.
 
-In macOS, if hvf is available, run with
 ```bash
-make run-hvf
-```
-
-To run without any acceleration, run with
-```bash
-make run
+qemu-system-x86_64 -hda vinix.iso -enable-kvm -m 2G
 ```

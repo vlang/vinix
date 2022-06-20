@@ -1,0 +1,12 @@
+name=coreutils
+version=9.1
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/coreutils.git"
+tag="v9.1"
+hostdeps="automake autoconf"
+imagedeps="gperf git rsync wget"
+
+regenerate() {
+    ./bootstrap
+    cp /usr/local/share/automake-1.16/config.sub build-aux/
+}

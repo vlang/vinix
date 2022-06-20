@@ -1,0 +1,10 @@
+name=pcre
+version=8.45
+source_method=git
+clone_url="https://github.com/vinix-os/pcre.git"
+tag="1767"
+hostdeps="automake autoconf autoconf-archive libtool pkg-config"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

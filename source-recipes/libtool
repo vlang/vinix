@@ -1,0 +1,11 @@
+name=libtool
+version=2.4.7
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/libtool.git"
+tag="v${version}"
+hostdeps="autoconf automake"
+imagedeps="git help2man"
+
+regenerate() {
+    ./bootstrap
+}

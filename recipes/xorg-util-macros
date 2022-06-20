@@ -1,0 +1,20 @@
+name=xorg-util-macros
+from_source=xorg-util-macros
+revision=1
+hostdeps="gcc xorg-macros"
+deps="mlibc"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix}  \
+        --sysconfdir=/etc
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

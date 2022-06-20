@@ -1,0 +1,21 @@
+name=zlib
+from_source=zlib
+revision=1
+hostdeps="gcc pkg-config"
+deps="mlibc"
+
+configure() {
+        prefix="${prefix}" \
+        CHOST="x86_64-vinix" \
+        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
+        PKG_CONFIG_LIBDIR="${sysroot_dir}"/usr/lib/pkgconfig:"${sysroot_dir}"/usr/share/pkgconfig \
+    ${source_dir}/configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install
+}

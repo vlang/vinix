@@ -1,0 +1,11 @@
+name=libxxf86vm
+version=1.1.4
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libxxf86vm.git"
+tag="libXxf86vm-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

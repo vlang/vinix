@@ -1,8 +1,0 @@
-pkg_management:
-    format: xbps
-
-define_options:
-    prod: 'true'
-
-container:
-    allow_containerless: true

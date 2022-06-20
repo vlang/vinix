@@ -1,0 +1,11 @@
+name=libfontenc
+version=1.1.4
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libfontenc.git"
+tag="libfontenc-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros xorg-font-util"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

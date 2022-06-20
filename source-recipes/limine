@@ -1,0 +1,11 @@
+name=limine
+version=3.5.1
+source_method=git
+clone_url="https://github.com/limine-bootloader/limine.git"
+tag="v${version}"
+hostdeps="autoconf automake"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

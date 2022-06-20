@@ -1,0 +1,21 @@
+name=libexpat
+from_source=libexpat
+revision=1
+hostdeps="gcc"
+deps="mlibc"
+
+configure() {
+    ${source_dir}/expat/configure     \
+        --host=x86_64-vinix           \
+        --prefix=${prefix}            \
+        --with-sysroot=${sysroot_dir} \
+        --without-xmlwf
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

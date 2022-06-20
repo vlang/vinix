@@ -1,0 +1,29 @@
+name=libx11
+from_source=libx11
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-util-macros xorg-proto libxcb libxtrans"
+imagedeps="gcc"
+
+configure() {
+        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
+        PKG_CONFIG_LIBDIR="${sysroot_dir}"/usr/lib/pkgconfig:"${sysroot_dir}"/usr/share/pkgconfig \
+    ${source_dir}/configure           \
+        --host=x86_64-vinix           \
+        --with-sysroot=${sysroot_dir} \
+        --prefix=${prefix}            \
+        --sysconfdir=/etc             \
+        --localstatedir=/var          \
+        --disable-static              \
+        --disable-ipv6                \
+        --disable-malloc0returnsnull  \
+        --with-keysymdefdir=${sysroot_dir}/usr/include/X11
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

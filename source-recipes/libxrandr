@@ -1,0 +1,11 @@
+name=libxrandr
+version=1.5.2
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libxrandr.git"
+tag="libXrandr-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

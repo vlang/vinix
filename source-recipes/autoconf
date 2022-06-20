@@ -1,0 +1,8 @@
+name=autoconf
+version=2.69
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/autoconf/autoconf-${version}.tar.gz"
+
+regenerate() {
+    true
+}

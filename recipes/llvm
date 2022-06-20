@@ -1,0 +1,33 @@
+name=llvm
+from_source=llvm
+revision=1
+imagedeps="gcc ninja python"
+hostdeps="gcc cmake pkg-config"
+deps="mlibc zlib"
+
+configure() {
+        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
+        PKG_CONFIG_LIBDIR="${sysroot_dir}"/usr/lib/pkgconfig:"${sysroot_dir}"/usr/share/pkgconfig \
+    cmake \
+        -GNinja \
+        -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLLVM_LINK_LLVM_DYLIB=ON \
+        -DLLVM_ENABLE_RTTI=ON \
+        -DLLVM_TARGETS_TO_BUILD=X86 \
+        -DLLVM_TARGET_ARCH=x86_64 \
+        -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-vinix \
+        -DLLVM_HOST_TRIPLE=x86_64-vinix \
+        -DLLVM_ENABLE_TERMINFO=OFF \
+        -Wno-dev \
+        ${source_dir}/llvm
+}
+
+build() {
+    ninja
+}
+
+install() {
+    DESTDIR="${dest_dir}" ninja install
+}

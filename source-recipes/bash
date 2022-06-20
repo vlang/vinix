@@ -1,0 +1,11 @@
+name=bash
+version=5.1.16
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/bash.git"
+tag="master"
+commit="9439ce094c9aa7557a9d53ac7b412a23aa66e36b"
+hostdeps="automake"
+
+regenerate() {
+    cp /usr/local/share/automake-1.16/config.sub support/
+}

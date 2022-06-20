@@ -1,0 +1,11 @@
+name=libffi
+version=3.4.2
+source_method=git
+clone_url="https://github.com/libffi/libffi.git"
+tag="v${version}"
+hostdeps="automake autoconf libtool"
+
+regenerate() {
+    ./autogen.sh
+    cp /usr/local/share/automake-1.16/config.sub ./
+}

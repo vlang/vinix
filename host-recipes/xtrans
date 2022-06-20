@@ -1,0 +1,16 @@
+name=xtrans
+from_source=libxtrans
+revision=1
+imagedeps="gcc"
+
+configure() {
+    "${source_dir}"/configure --prefix="${prefix}"
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

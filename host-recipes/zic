@@ -1,0 +1,17 @@
+name=zic
+from_source=tzdata
+revision=1
+imagedeps="gcc"
+
+configure() {
+    cp -r ${source_dir}/. ./
+}
+
+build() {
+    make zic
+}
+
+install() {
+    mkdir -p ${dest_dir}${prefix}/bin
+    cp zic ${dest_dir}${prefix}/bin/
+}

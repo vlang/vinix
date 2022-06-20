@@ -1,0 +1,21 @@
+name=v
+from_source=v
+revision=1
+imagedeps="gcc git"
+
+configure() {
+    cp -r ${source_dir}/. ./
+}
+
+build() {
+    cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v -lm -lpthread
+}
+
+install() {
+    rm -rf "${dest_dir}${prefix}"/v
+    mkdir -p "${dest_dir}${prefix}"/v
+    cp -r . "${dest_dir}${prefix}"/v/
+
+    mkdir -p "${dest_dir}${prefix}"/bin
+    ln -sf ../v/v "${dest_dir}${prefix}"/bin/v
+}

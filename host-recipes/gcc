@@ -1,0 +1,17 @@
+name=gcc
+from_source=gcc
+revision=1
+hostrundeps="gcc-compiler libgcc libstdc++ binutils"
+deps="mlibc"
+
+configure() {
+    true
+}
+
+build() {
+    true
+}
+
+install() {
+    true
+}

@@ -1,0 +1,22 @@
+name=libgcc
+from_source=gcc
+revision=1
+imagedeps="gcc"
+hostrundeps="gcc-compiler binutils"
+deps="mlibc"
+
+configure() {
+    true
+}
+
+build() {
+    # Hack to continue gcc build
+    cd "${base_dir}"/host-builds/gcc-compiler
+    make -j${parallelism} all-target-libgcc
+}
+
+install() {
+    # Hack to continue gcc build
+    cd "${base_dir}"/host-builds/gcc-compiler
+    DESTDIR="${dest_dir}" make install-strip-target-libgcc
+}

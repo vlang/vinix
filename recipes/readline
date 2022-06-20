@@ -1,0 +1,21 @@
+name=readline
+from_source=readline
+revision=1
+hostdeps="gcc"
+deps="mlibc ncurses"
+
+configure() {
+    ${source_dir}/configure    \
+        --host=x86_64-vinix    \
+        --prefix=${prefix}     \
+        --disable-static       \
+        --enable-multibyte
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    make install DESTDIR="${dest_dir}"
+}

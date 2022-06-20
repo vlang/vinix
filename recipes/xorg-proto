@@ -1,0 +1,21 @@
+name=xorg-proto
+from_source=xorg-proto
+revision=1
+hostdeps="gcc"
+deps="mlibc"
+
+configure() {
+    ${source_dir}/configure  \
+        --host=x86_64-vinix  \
+        --prefix=${prefix}   \
+        --sysconfdir=/etc    \
+        --localstatedir=/var
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

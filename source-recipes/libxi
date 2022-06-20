@@ -1,0 +1,11 @@
+name=libxi
+version=1.8
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libxi.git"
+tag="libXi-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

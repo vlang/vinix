@@ -1,0 +1,23 @@
+name=libgmp
+from_source=libgmp
+revision=1
+imagedeps="gcc"
+hostdeps="gcc automake libtool"
+deps="mlibc"
+
+configure() {
+    ${source_dir}/configure           \
+        --host=x86_64-vinix           \
+        --prefix=${prefix}            \
+        --enable-cxx                  \
+        --disable-static              \
+        --with-sysroot=${sysroot_dir}
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

@@ -1,0 +1,11 @@
+name=libx11
+version=1.8
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libx11.git"
+tag="libX11-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros xtrans"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

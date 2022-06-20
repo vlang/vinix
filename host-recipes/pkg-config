@@ -1,0 +1,16 @@
+name=pkg-config
+from_source=pkg-config
+revision=1
+imagedeps="gcc"
+
+configure() {
+    "${source_dir}"/configure CFLAGS="${common_cflags}" CXXFLAGS="${common_cflags}" --prefix="${prefix}" --with-internal-glib
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

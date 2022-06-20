@@ -1,0 +1,9 @@
+name=cmake
+version=3.23.1
+source_method=git
+clone_url="https://github.com/Kitware/CMake.git"
+tag="v${version}"
+
+regenerate() {
+    true
+}

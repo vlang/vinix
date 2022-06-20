@@ -1,0 +1,12 @@
+name=libgmp
+version=6.2.1
+source_method=mercurial
+clone_url="https://gmplib.org/repo/gmp-6.2/"
+tag="gmp-${version}"
+hostdeps="automake autoconf libtool"
+
+regenerate() {
+    ./.bootstrap
+    cp configfsf.guess config.guess
+    cp /usr/local/share/automake-1.16/config.sub ./
+}

@@ -1,0 +1,12 @@
+name=libpng
+version=1.6.37
+source_method=git
+clone_url="https://git.code.sf.net/p/libpng/code"
+tag="v${version}"
+hostdeps="automake autoconf libtool pkg-config"
+imagedeps="git"
+
+regenerate() {
+    git clean -xf
+    autoreconf -fvi
+}

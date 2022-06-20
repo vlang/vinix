@@ -1,0 +1,10 @@
+name=libexpat
+version=2.4.8
+source_method=git
+clone_url="https://github.com/libexpat/libexpat.git"
+tag="R_2_4_8"
+hostdeps="automake autoconf libtool"
+
+regenerate() {
+    ( cd expat && ./buildconf.sh )
+}

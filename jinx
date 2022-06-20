@@ -1,0 +1,779 @@
+#!/bin/sh
+
+# Copyright (c) 2022, mintsuki
+
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+set -e
+
+parallelism="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || psrinfo -tc 2>/dev/null || echo 1)"
+
+base_dir="$(pwd -P)"
+script_name="$(basename "$0")"
+script_dir="$(dirname "$0")"
+if [ "$script_dir" = "." ] || [ -z "$script_dir" ]; then
+    if echo "$0" | grep "/" >/dev/null 2>&1; then
+        script_dir=.
+    else
+        script_dir="$(dirname $(which "${script_name}"))"
+    fi
+fi
+script_dir="$(cd "${script_dir}" && pwd -P)"
+script="${script_dir}/${script_name}"
+
+[ -f "${base_dir}"/jinx-config ] && . "${base_dir}"/jinx-config
+
+die() {
+    echo $1
+    exit 1
+}
+
+temp_collect=""
+trap 'rm -rf $temp_collect; trap - EXIT; exit' EXIT INT TERM QUIT HUP
+
+make_temp() {
+    tmp="$(mktemp $1)"
+    temp_collect="${temp_collect} ${tmp}"
+}
+
+build_hostdeps() {
+    for hostdep in ${hostdeps} ${hostrundeps}; do
+        [ -f "${base_dir}"/host-recipes/${hostdep} ] || die "missing host dependency '${hostdep}' for recipe '${name}'"
+
+        [ -f "${base_dir}"/host-builds/${hostdep}.installed ] && continue
+
+        "${script}" host-build ${hostdep}
+    done
+}
+
+build_deps() {
+    for dep in ${deps}; do
+        [ -f "${base_dir}"/recipes/${dep} ] || die "missing dependency '${dep}' for recipe '${name}'"
+
+        [ -f "${base_dir}"/builds/${dep}.installed ] && continue
+
+        "${script}" build ${dep}
+    done
+}
+
+get_hostdeps_file_run() {
+    deps_to_do=""
+
+    for hostdep in ${hostrundeps}; do
+        grep ${hostdep} "${hostdeps_file}" >/dev/null 2>&1 || deps_to_do="${deps_to_do} ${hostdep}"
+        grep ${hostdep} "${hostdeps_file}" >/dev/null 2>&1 || printf "${hostdep} " >> "${hostdeps_file}"
+    done
+
+    for hostdep in ${deps_to_do}; do
+        "${script}" internal-get-hostdeps-file-run ${hostdep} "${hostdeps_file}"
+    done
+}
+
+get_hostdeps_file() {
+    deps_to_do=""
+
+    for hostdep in ${hostdeps} ${hostrundeps}; do
+        grep ${hostdep} "${hostdeps_file}" >/dev/null 2>&1 || deps_to_do="${deps_to_do} ${hostdep}"
+        grep ${hostdep} "${hostdeps_file}" >/dev/null 2>&1 || printf "${hostdep} " >> "${hostdeps_file}"
+    done
+
+    for hostdep in ${deps_to_do}; do
+        "${script}" internal-get-hostdeps-file-run ${hostdep} "${hostdeps_file}"
+    done
+}
+
+get_deps_file() {
+    deps_to_do=""
+
+    for dep in ${deps}; do
+        grep ${dep} "${deps_file}" >/dev/null 2>&1 || deps_to_do="${deps_to_do} ${dep}"
+        grep ${dep} "${deps_file}" >/dev/null 2>&1 || printf "${dep} " >> "${deps_file}"
+    done
+
+    for dep in ${deps_to_do}; do
+        "${script}" internal-get-deps-file ${dep} "${deps_file}"
+    done
+}
+
+prepare_container() {
+    make_temp
+    hostdeps_file="${tmp}"
+    make_temp
+    deps_file="${tmp}"
+
+    build_hostdeps
+    build_deps
+
+    get_hostdeps_file
+    get_deps_file
+
+    make_temp -d
+    container_pkgs="${tmp}"
+    make_temp -d
+    sysroot_dir="${tmp}"
+
+    for hostdep in $(cat "${hostdeps_file}"); do
+        cp -r "${base_dir}"/host-pkgs/${hostdep}/usr/local/. "${container_pkgs}"/
+    done
+
+    for dep in $(cat "${deps_file}"); do
+        cp -r "${base_dir}"/pkgs/${dep}/. "${sysroot_dir}"/
+    done
+
+    rm -f "${hostdeps_file}" "${deps_file}"
+
+    imagedeps="$(echo "${imagedeps}" | xargs -n1 | sort -u | xargs)"
+
+    echo "* creating container..."
+
+    make_temp -d
+    dockerfile_dir="${tmp}"
+    dockerfile="${dockerfile_dir}/Dockerfile"
+    cat >"${dockerfile}" <<EOF
+FROM archlinux:latest
+
+RUN pacman -Syu --noconfirm
+RUN pacman --needed --noconfirm -S bison diffutils flex gettext libtool m4 make patch perl texinfo which
+ENV PATH "\$PATH:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
+
+EOF
+
+    if ! [ -z "${imagedeps_aur}" ]; then
+        imagedeps_aur="$(echo "${imagedeps_aur}" | xargs -n1 | sort -u | xargs)"
+
+        echo "RUN pacman --needed --noconfirm -S git sudo fakeroot gcc binutils" >> "${dockerfile}"
+
+        echo "RUN useradd -m auruser" >> "${dockerfile}"
+        echo "RUN echo 'auruser:auruser' | chpasswd" >> "${dockerfile}"
+        echo "RUN groupadd sudo" >> "${dockerfile}"
+        echo "RUN usermod -aG sudo auruser" >> "${dockerfile}"
+        echo "RUN sed -i 's/# %sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD: ALL/g' /etc/sudoers" >> "${dockerfile}"
+
+        echo "USER auruser" >> "${dockerfile}"
+        echo "WORKDIR /home/auruser" >> "${dockerfile}"
+
+        echo "RUN git clone https://aur.archlinux.org/aura-bin.git" >> "${dockerfile}"
+        echo "RUN cd aura-bin && makepkg -si --noconfirm" >> "${dockerfile}"
+
+        for imagedep_aur in ${imagedeps_aur}; do
+            echo "RUN yes | sudo aura -Aax ${imagedep_aur}" >> "${dockerfile}"
+        done
+
+        echo "USER root" >> "${dockerfile}"
+
+        ( echo "${imagedeps_aur}" | grep aura-bin >/dev/null 2>&1 ) || \
+            echo "RUN pacman -Rs aura-bin --noconfirm || true" >> "${dockerfile}"
+
+        echo "RUN pacman -Rs git sudo fakeroot gcc binutils --noconfirm || true" >> "${dockerfile}"
+        echo "RUN pacman -Qdtq | pacman -Rs - --noconfirm || true" >> "${dockerfile}"
+
+        echo "RUN userdel -r auruser" >> "${dockerfile}"
+    fi
+
+    for imagedep in ${imagedeps}; do
+        echo "RUN pacman --needed --noconfirm -S ${imagedep}" >> "${dockerfile}"
+    done
+
+    echo 'CMD ["bash"]' >> "${dockerfile}"
+}
+
+run_in_container() {
+    image_id=$(docker build -q "${dockerfile_dir}" || echo "failed")
+    if [ "$image_id" = "failed" ]; then
+        echo "* cached image causing issues, trying clean..."
+        image_id=$(docker build -q --no-cache "${dockerfile_dir}")
+    fi
+
+    docker run -it --rm \
+        --user=$(id -u):$(id -g) \
+        -v "${container_pkgs}":/usr/local \
+        -v "${sysroot_dir}":/sysroot \
+        -v "${script_dir}":/jinx \
+        -v "${base_dir}":/base_dir \
+        -w /base_dir \
+        ${image_id} \
+        /jinx/${script_name} $1 $2 $3 $4 $5
+}
+
+destroy_container() {
+    rm -rf "${container_pkgs}" "${sysroot_dir}" "${dockerfile_dir}"
+}
+
+do_hg_fetch() {
+    [ -d "${source_dir}" ] && return
+    hg clone ${clone_url} "${base_dir}"/sources/${name}
+    ( cd "${base_dir}"/sources/${name} && hg up ${tag} )
+}
+
+do_git_fetch() {
+    [ -d "${source_dir}" ] && return
+    if ! [ -z "${commit}" ]; then
+        git clone ${clone_url} --branch=${tag} "${base_dir}"/sources/${name}
+        ( cd "${base_dir}"/sources/${name} && git checkout ${commit} )
+    elif [ "${shallow}" = "no" ]; then
+        git clone ${clone_url} --branch=${tag} "${base_dir}"/sources/${name}
+    else
+        git clone ${clone_url} --branch=${tag} --depth=1 "${base_dir}"/sources/${name}
+    fi
+}
+
+do_tarball_fetch() {
+    [ -d "${source_dir}" ] && return
+
+    make_temp -d
+    extract_dir="${tmp}"
+    tarball_path="${base_dir}"/sources/"$(basename "${tarball_url}")"
+
+    curl -o "${tarball_path}" "${tarball_url}"
+
+    ( cd "${extract_dir}" && tar -xf "${tarball_path}" )
+
+    mv "${extract_dir}"/* "${base_dir}"/sources/${name} || (
+        mkdir -p "${base_dir}"/sources/${name}
+        mv "${extract_dir}"/* "${base_dir}"/sources/${name}/
+    )
+
+    rm -rf "${extract_dir}" "${tarball_path}"
+}
+
+get_real_source_dir() {
+    source_dir="${base_dir}"/"${source_dir}"
+    case ${source_method} in
+        tarball|git|mercurial)
+            source_dir="${base_dir}"/sources/${name}
+            ;;
+        *)
+            is_local_package=true
+            ;;
+    esac
+}
+
+do_fetch() {
+    mkdir -p "${base_dir}"/sources
+
+    case ${source_method} in
+        tarball)
+            do_tarball_fetch
+            ;;
+        git)
+            do_git_fetch
+            ;;
+        mercurial)
+            do_hg_fetch
+            ;;
+        *)
+            ;;
+    esac
+}
+
+cont_patch() {
+    . "${base_dir}"/source-recipes/$1
+
+    get_real_source_dir
+
+    make_temp
+    patch_trash="${tmp}"
+
+    cd "${source_dir}"
+
+    if [ -d "${base_dir}"/patches/${name} ]; then
+        for patch in "${base_dir}"/patches/${name}/*; do
+            [ "${patch}" = "${base_dir}/patches/${name}/*" ] && break
+            [ "${patch}" = "${base_dir}"/patches/${name}/jinx-working-patch.patch ] && continue
+            patch --no-backup-if-mismatch -p1 -r "${patch_trash}" < "${patch}"
+        done
+    fi
+
+
+    cp -r "${source_dir}" "${base_dir}"/sources/${name}-clean
+
+    if [ -f "${base_dir}"/patches/${name}/jinx-working-patch.patch ]; then
+        patch --no-backup-if-mismatch -p1 -r "${patch_trash}" < "${base_dir}"/patches/${name}/jinx-working-patch.patch
+    fi
+
+    cp -r "${source_dir}" "${base_dir}"/sources/${name}-workdir
+
+    cd "${base_dir}"
+
+    touch "${base_dir}"/sources/${name}.patched
+}
+
+do_regenerate() {
+    . "${base_dir}"/source-recipes/$1
+
+    get_real_source_dir
+
+    [ -f "${base_dir}"/sources/${name}.regenerated ] && return
+
+    cd "${source_dir}"
+    regenerate
+    cd "${base_dir}"
+
+    touch "${base_dir}"/sources/${name}.regenerated
+}
+
+do_configure_host() {
+    . "${base_dir}"/host-recipes/$1
+
+    [ -f "${base_dir}"/host-builds/${name}.configured ] && return
+
+    mkdir -p "${base_dir}"/host-builds/${name}
+
+    eval $(grep source_dir < "${base_dir}"/source-recipes/${from_source})
+    if [ -z "${source_dir}" ]; then
+        source_dir="${base_dir}"/sources/${from_source}
+    else
+        source_dir="${base_dir}"/"${source_dir}"
+    fi
+
+    prefix="/usr/local"
+    sysroot_dir="/sysroot"
+
+    cd "${base_dir}"/host-builds/${name}
+    configure
+    cd "${base_dir}"
+
+    touch "${base_dir}"/host-builds/${name}.configured
+}
+
+do_build_host() {
+    . "${base_dir}"/host-recipes/$1
+
+    [ -f "${base_dir}"/host-builds/${name}.built ] && return
+
+    eval $(grep source_dir < "${base_dir}"/source-recipes/${from_source})
+    if [ -z "${source_dir}" ]; then
+        source_dir="${base_dir}"/sources/${from_source}
+    else
+        source_dir="${base_dir}"/"${source_dir}"
+    fi
+
+    prefix="/usr/local"
+    sysroot_dir="/sysroot"
+
+    cd "${base_dir}"/host-builds/${name}
+    build
+    cd "${base_dir}"
+
+    touch "${base_dir}"/host-builds/${name}.built
+}
+
+do_install_host() {
+    . "${base_dir}"/host-recipes/$1
+
+    [ -f "${base_dir}"/host-builds/${name}.installed ] && return
+
+    dest_dir="${base_dir}"/host-pkgs/${name}
+
+    rm -rf "${dest_dir}"
+    mkdir -p "${dest_dir}"
+
+    eval $(grep source_dir < "${base_dir}"/source-recipes/${from_source})
+    if [ -z "${source_dir}" ]; then
+        source_dir="${base_dir}"/sources/${from_source}
+    else
+        source_dir="${base_dir}"/"${source_dir}"
+    fi
+
+    prefix="/usr/local"
+    sysroot_dir="/sysroot"
+
+    mkdir -p "${dest_dir}${prefix}"
+
+    cd "${base_dir}"/host-builds/${name}
+    install
+    cd "${base_dir}"
+
+    # Remove libtool files
+    for i in lib lib64 lib32 usr/lib usr/lib64 usr/lib32; do
+        rm -rvf "${dest_dir}${prefix}"/$i/*.la
+    done
+
+    touch "${base_dir}"/host-builds/${name}.installed
+}
+
+do_configure() {
+    . "${base_dir}"/recipes/$1
+
+    [ -f "${base_dir}"/builds/${name}.configured ] && return
+
+    mkdir -p "${base_dir}"/builds/${name}
+
+    eval $(grep source_dir < "${base_dir}"/source-recipes/${from_source})
+    if [ -z "${source_dir}" ]; then
+        source_dir="${base_dir}"/sources/${from_source}
+    else
+        source_dir="${base_dir}"/"${source_dir}"
+    fi
+
+    prefix="/usr"
+    sysroot_dir="/sysroot"
+
+    cd "${base_dir}"/builds/${name}
+    configure
+    cd "${base_dir}"
+
+    touch "${base_dir}"/builds/${name}.configured
+}
+
+do_build() {
+    . "${base_dir}"/recipes/$1
+
+    [ -f "${base_dir}"/builds/${name}.built ] && return
+
+    eval $(grep source_dir < "${base_dir}"/source-recipes/${from_source})
+    if [ -z "${source_dir}" ]; then
+        source_dir="${base_dir}"/sources/${from_source}
+    else
+        source_dir="${base_dir}"/"${source_dir}"
+    fi
+
+    prefix="/usr"
+    sysroot_dir="/sysroot"
+
+    cd "${base_dir}"/builds/${name}
+    build
+    cd "${base_dir}"
+
+    touch "${base_dir}"/builds/${name}.built
+}
+
+do_install() {
+    . "${base_dir}"/recipes/$1
+
+    [ -f "${base_dir}"/builds/${name}.installed ] && return
+
+    dest_dir="${base_dir}"/pkgs/${name}
+
+    rm -rf "${dest_dir}"
+    mkdir -p "${dest_dir}"
+
+    eval $(grep source_dir < "${base_dir}"/source-recipes/${from_source})
+    if [ -z "${source_dir}" ]; then
+        source_dir="${base_dir}"/sources/${from_source}
+    else
+        source_dir="${base_dir}"/"${source_dir}"
+    fi
+
+    prefix="/usr"
+    sysroot_dir="/sysroot"
+
+    mkdir -p "${dest_dir}${prefix}"
+
+    cd "${base_dir}"/builds/${name}
+    install
+    cd "${base_dir}"
+
+    # Remove libtool files
+    for i in lib lib64 lib32 usr/lib usr/lib64 usr/lib32; do
+        rm -rvf "${dest_dir}${prefix}"/$i/*.la
+    done
+
+    touch "${base_dir}"/builds/${name}.installed
+}
+
+precont_patch() {
+    [ -f "${base_dir}"/sources/$1.patched ] && return
+
+    prepare_container
+    run_in_container internal-cont-patch $1
+    destroy_container
+}
+
+do_source() {
+    . "${base_dir}"/source-recipes/$1
+
+    get_real_source_dir
+
+    do_fetch
+
+    "${script}" internal-precont-patch $1
+
+    prepare_container
+    run_in_container internal-regenerate $1
+    destroy_container
+}
+
+do_cmd_rebuild() {
+    rm -rf "${base_dir}"/builds/"$1"*
+    rm -rf "${base_dir}"/pkgs/"$1"*
+
+    do_pkg "$1"
+}
+
+do_cmd_host_rebuild() {
+    rm -rf "${base_dir}"/host-builds/"$1"*
+    rm -rf "${base_dir}"/host-pkgs/"$1"*
+
+    do_host_pkg "$1"
+}
+
+do_cmd_regenerate() {
+    . "${base_dir}"/source-recipes/$1
+
+    [ -f "${base_dir}"/sources/$1.patched ] || die "cannot regenerate non-built package"
+
+    get_real_source_dir
+
+    make_temp
+    patch_file="${tmp}"
+
+    if ! [ "${is_local_package}" = true ]; then
+        cd "${base_dir}"/sources
+
+        # exclude version control dirs
+        make_temp -d
+        vc_dir_clean="${tmp}"
+        rm -rf "${vc_dir_clean}"
+        make_temp -d
+        vc_dir_workdir="${tmp}"
+        rm -rf "${vc_dir_workdir}"
+
+        case "${source_method}" in
+            git)
+                mv $1-clean/.git "${vc_dir_clean}"
+                mv $1-workdir/.git "${vc_dir_workdir}"
+                ;;
+            mercurial)
+                mv $1-clean/.hg "${vc_dir_clean}"
+                mv $1-workdir/.hg "${vc_dir_workdir}"
+                ;;
+            *)
+                ;;
+        esac
+
+        git diff --no-index --no-prefix $1-clean $1-workdir >"${patch_file}" || true
+
+        case "${source_method}" in
+            git)
+                mv "${vc_dir_clean}" $1-clean/.git
+                mv "${vc_dir_workdir}" $1-workdir/.git
+                ;;
+            mercurial)
+                mv "${vc_dir_clean}" $1-clean/.hg
+                mv "${vc_dir_workdir}" $1-workdir/.hg
+                ;;
+            *)
+                ;;
+        esac
+
+        if [ -s "${patch_file}" ]; then
+            mkdir -p "${base_dir}"/patches/$1
+            mv "${patch_file}" "${base_dir}"/patches/$1/jinx-working-patch.patch
+        fi
+
+        cd "${base_dir}"
+
+        rm -rf "${source_dir}"
+        cp -r "${base_dir}"/sources/$1-workdir "${source_dir}"
+    fi
+
+    rm -rf "${base_dir}"/sources/$1.regenerated
+
+    prepare_container
+    run_in_container internal-regenerate $1
+    destroy_container
+}
+
+do_host_pkg() {
+    . "${base_dir}"/host-recipes/$1
+
+    [ -f "${base_dir}"/host-builds/${name}.installed ] && return
+
+    echo "* building host package: $name"
+
+    eval $(grep from_source < "${base_dir}"/host-recipes/$1)
+    [ -f "${base_dir}"/sources/${from_source}.regenerated ] || \
+        "${script}" internal-source "${from_source}"
+
+    prepare_container
+
+    run_in_container internal-configure-host $1
+    run_in_container internal-build-host $1
+    run_in_container internal-install-host $1
+
+    destroy_container
+}
+
+do_pkg() {
+    . "${base_dir}"/recipes/$1
+
+    [ -f "${base_dir}"/builds/${name}.installed ] && return
+
+    echo "* building package: $name"
+
+    eval $(grep from_source < "${base_dir}"/recipes/$1)
+    [ -f "${base_dir}"/sources/${from_source}.regenerated ] || \
+        "${script}" internal-source "${from_source}"
+
+    prepare_container
+
+    run_in_container internal-configure $1
+    run_in_container internal-build $1
+    run_in_container internal-install $1
+
+    destroy_container
+}
+
+cmd_build_all() {
+    for pkg in "${base_dir}"/recipes/*; do
+        "${script}" internal-do-pkg $(basename "${pkg}")
+    done
+}
+
+cmd_host_build() {
+    for i in "$@"; do
+        "${script}" internal-do-host-pkg "$i"
+    done
+}
+
+cmd_build() {
+    for i in "$@"; do
+        "${script}" internal-do-pkg "$i"
+    done
+}
+
+cmd_regenerate() {
+    for i in "$@"; do
+        "${script}" internal-do-regenerate "$i"
+    done
+}
+
+cmd_host_rebuild() {
+    for i in "$@"; do
+        "${script}" internal-do-host-rebuild "$i"
+    done
+}
+
+cmd_rebuild() {
+    for i in "$@"; do
+        "${script}" internal-do-rebuild "$i"
+    done
+}
+
+cmd_clean() {
+    rm -rf "${base_dir}"/builds
+    rm -rf "${base_dir}"/host-builds
+    rm -rf "${base_dir}"/pkgs
+    rm -rf "${base_dir}"/host-pkgs
+    rm -rf "${base_dir}"/sources
+    rm -rf "${base_dir}"/sysroot
+}
+
+cmd_sysroot() {
+    rm -rf "${base_dir}"/sysroot
+    mkdir -p "${base_dir}"/sysroot
+    for pkg in "${base_dir}"/pkgs/*; do
+        echo "* copying $(basename ${pkg}) to sysroot..."
+        cp -r "${pkg}"/. "${base_dir}"/sysroot/
+    done
+}
+
+case "$1" in
+    internal-regenerate)
+        do_regenerate "$2"
+        ;;
+    internal-precont-patch)
+        precont_patch "$2"
+        ;;
+    internal-cont-patch)
+        cont_patch "$2"
+        ;;
+    internal-configure-host)
+        do_configure_host "$2"
+        ;;
+    internal-build-host)
+        do_build_host "$2"
+        ;;
+    internal-install-host)
+        do_install_host "$2"
+        ;;
+    internal-configure)
+        do_configure "$2"
+        ;;
+    internal-build)
+        do_build "$2"
+        ;;
+    internal-install)
+        do_install "$2"
+        ;;
+    internal-get-deps-file)
+        . "${base_dir}"/recipes/$2
+        deps_file="$3"
+        get_deps_file
+        ;;
+    internal-get-hostdeps-file-run)
+        . "${base_dir}"/host-recipes/$2
+        hostdeps_file="$3"
+        get_hostdeps_file_run
+        ;;
+    internal-source)
+        do_source "$2"
+        ;;
+    internal-do-host-pkg)
+        do_host_pkg "$2"
+        ;;
+    internal-do-pkg)
+        do_pkg "$2"
+        ;;
+    internal-do-regenerate)
+        do_cmd_regenerate "$2"
+        ;;
+    internal-do-host-rebuild)
+        do_cmd_host_rebuild "$2"
+        ;;
+    internal-do-rebuild)
+        do_cmd_rebuild "$2"
+        ;;
+    host-build)
+        shift 1
+        cmd_host_build "$@"
+        ;;
+    build)
+        shift 1
+        cmd_build "$@"
+        ;;
+    build-all)
+        cmd_build_all
+        ;;
+    regenerate)
+        shift 1
+        cmd_regenerate "$@"
+        ;;
+    host-rebuild)
+        shift 1
+        cmd_host_rebuild "$@"
+        ;;
+    rebuild)
+        shift 1
+        cmd_rebuild "$@"
+        ;;
+    sysroot)
+        cmd_sysroot
+        ;;
+    clean)
+        cmd_clean
+        ;;
+    *)
+        die "unknown command: $1"
+        ;;
+esac

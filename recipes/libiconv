@@ -1,0 +1,24 @@
+name=libiconv
+from_source=libiconv
+revision=1
+hostdeps="gcc libtool"
+deps="mlibc"
+imagedeps="binutils"
+
+configure() {
+    ${source_dir}/configure           \
+        --host=x86_64-vinix           \
+        --prefix=${prefix}            \
+        --with-sysroot=${sysroot_dir} \
+        --disable-static              \
+        --enable-shared               \
+        --disable-nls
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

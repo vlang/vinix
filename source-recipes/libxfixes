@@ -1,0 +1,11 @@
+name=libxfixes
+version=6.0.0
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libxfixes.git"
+tag="libXfixes-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

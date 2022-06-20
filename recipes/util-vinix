@@ -1,0 +1,21 @@
+name=util-vinix
+from_source=util-vinix
+revision=1
+hostdeps="gcc binutils v"
+deps="mlibc"
+imagedeps="binutils"
+
+configure() {
+    true
+}
+
+build() {
+    cd ${source_dir}
+    export HOME='/tmp'
+    make -j${parallelism} CC=x86_64-vinix-gcc
+}
+
+install() {
+    cd ${source_dir}
+    make install PREFIX="${prefix}" DESTDIR="${dest_dir}"
+}

@@ -1,0 +1,7 @@
+name=kernel
+version=0.0
+source_dir="kernel"
+
+regenerate() {
+    true
+}

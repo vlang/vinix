@@ -1,0 +1,60 @@
+name=tzdata
+from_source=tzdata
+revision=1
+hostdeps="zic gcc binutils"
+deps="mlibc"
+
+configure() {
+    cp -r ${source_dir}/. ./
+}
+
+build() {
+    # Build support programs
+    make CC=x86_64-vinix-gcc AR=x86_64-vinix-ar
+}
+
+install() {
+    # Install support programs
+    make install DESTDIR=${dest_dir} ZIC=zic
+
+    # Create the required directories
+    mkdir -p ${dest_dir}/etc
+    mkdir -p ${dest_dir}/usr/share/zoneinfo/posix
+    mkdir -p ${dest_dir}/usr/share/zoneinfo/right
+
+    # Create the time zone files without leap seconds, convention puts these in both zoneinfo and zoneinfo/posix.
+    # After that. create time time zone files with leap seconds
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo etcetera
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix etcetera
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right etcetera
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo southamerica
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix southamerica
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right southamerica
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo northamerica
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix northamerica
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right northamerica
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo europe
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix europe
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right europe
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo africa
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix africa
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right africa
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo antarctica
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix antarctica
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right antarctica
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo asia
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix asia
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right asia
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo australasia
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix australasia
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right australasia
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo backward
+    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix backward
+    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right backward
+
+    # Create the posixrules file, POSIX requires daylight saving rules to be in accordance with US rules, thus use New York
+    zic -d ${dest_dir}/usr/share/zoneinfo -p America/New_York
+
+    # Default to UTC for localtime, this should be fixed, but that is pending xbstrap support.
+    ln -sf /usr/share/zoneinfo/UTC "${dest_dir}"/etc/localtime
+}

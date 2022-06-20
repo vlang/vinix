@@ -1,0 +1,12 @@
+name=v
+version=0.0.1
+source_method=git
+clone_url="https://github.com/vlang/v.git"
+tag="master"
+commit="4ef9e2c05aeb215e6b467b259f1efa5572c18807"
+hostdeps="automake autoconf"
+imagedeps="curl"
+
+regenerate() {
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/324b69c934d0dbd04a08d5d1a132c49bbf296fcb/v.c
+}

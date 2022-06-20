@@ -1,0 +1,9 @@
+name=autoconf-archive
+version=2022.02.11
+source_method=git
+clone_url="https://github.com/autoconf-archive/autoconf-archive.git"
+tag="v${version}"
+
+regenerate() {
+    true
+}

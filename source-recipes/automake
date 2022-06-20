@@ -1,0 +1,10 @@
+name=automake
+version=1.16.5
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/automake.git"
+tag="v${version}"
+hostdeps="autoconf"
+
+regenerate() {
+    ./bootstrap
+}

@@ -1,0 +1,15 @@
+name=xorg-macros
+from_source=xorg-util-macros
+revision=1
+
+configure() {
+    "${source_dir}"/configure --prefix="${prefix}"
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

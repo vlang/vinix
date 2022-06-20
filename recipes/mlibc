@@ -1,0 +1,26 @@
+name=mlibc
+from_source=mlibc
+revision=1
+imagedeps="meson ninja git base-devel"
+hostdeps="gcc-compiler"
+deps="mlibc-headers"
+
+configure() {
+    meson \
+        --cross-file ${base_dir}/build-support/cross_file.txt \
+        --prefix=${prefix} \
+        --libdir=lib \
+        --buildtype=debugoptimized \
+        -Dmlibc_no_headers=true \
+        -Ddisable_iconv_option=true \
+        -Ddisable_intl_option=true \
+        ${source_dir}
+}
+
+build() {
+    ninja
+}
+
+install() {
+    DESTDIR="${dest_dir}" ninja install
+}

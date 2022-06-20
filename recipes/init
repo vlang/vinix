@@ -1,0 +1,22 @@
+name=init
+from_source=init
+revision=1
+hostdeps="gcc binutils v"
+deps="mlibc"
+imagedeps="binutils"
+
+configure() {
+    true
+}
+
+build() {
+    cd ${source_dir}
+    export HOME='/tmp'
+    VCROSS_COMPILER_NAME=x86_64-vinix-gcc v -os vinix .
+}
+
+install() {
+    cd ${source_dir}
+    mkdir -p "${dest_dir}/sbin"
+    cp init "${dest_dir}/sbin/"
+}

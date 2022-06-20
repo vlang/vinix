@@ -1,0 +1,9 @@
+name=mlibc
+version=0.0
+source_method=git
+clone_url="https://github.com/vinix-os/mlibc.git"
+tag="master"
+
+regenerate() {
+    true
+}

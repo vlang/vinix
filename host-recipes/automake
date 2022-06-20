@@ -1,0 +1,19 @@
+name=automake
+from_source=automake
+revision=1
+imagedeps="gcc"
+hostrundeps="autoconf"
+
+configure() {
+    "${source_dir}"/configure --prefix="${prefix}"
+}
+
+build() {
+    export PATH="$(pwd -P)/bin:$PATH"
+    make bin/aclocal-1.16 bin/automake-1.16 -j${parallelism}
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

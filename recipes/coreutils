@@ -1,0 +1,29 @@
+name=coreutils
+from_source=coreutils
+revision=1
+hostdeps="gcc automake autoconf"
+deps="tzdata mlibc"
+imagedeps="gcc gperf"
+
+configure() {
+    # Huge hack: coreutils does not compile the build-machine binary make-prime-list
+    # using the build-machine compiler. Hence, build and invoke the binary manually here.
+    ${source_dir}/configure
+    make src/make-prime-list
+    ./src/make-prime-list 5000 > "${source_dir}/src/primes.h"
+    rm -rf *
+
+    # Now compile coreutils for the correct target.
+    ${source_dir}/configure    \
+        --host=x86_64-vinix    \
+        --prefix=${prefix}     \
+        CFLAGS="-DSLOW_BUT_NO_HACKS -Wno-error -O2 -pipe"
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}
