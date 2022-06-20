@@ -13,6 +13,10 @@ vinix.iso: distro
 distro:
 	./jinx build-all
 
+.PHONY: basics
+basics:
+	./jinx build base-files kernel init util-vinix bash coreutils
+
 .PHONY: run-kvm
 run-kvm: vinix.iso
 	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS) -smp 1
