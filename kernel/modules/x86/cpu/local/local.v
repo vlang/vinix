@@ -8,7 +8,7 @@ import x86.cpu
 import trace
 
 [packed]
-struct TSS {
+pub struct TSS {
 pub mut:
 	unused0 u32
 	rsp0    u64
@@ -55,7 +55,7 @@ pub mut:
 
 pub const abort_stack_size = 128
 
-struct Local {
+pub struct Local {
 pub mut:
 	cpu_number           u64
 	zero                 u64
