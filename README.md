@@ -70,7 +70,7 @@ and `qemu` to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install bash coreutils git docker grep find xorriso qemu-system-x86
+sudo apt install bash coreutils git docker.io grep find xorriso qemu-system-x86
 ```
 
 Since the `meson` version from the repositories may be outdated, install it from `pip3`:
