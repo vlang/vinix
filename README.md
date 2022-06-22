@@ -92,8 +92,8 @@ to build kernel and ports, as well as the kernel itself, run:
 make # Build the distribution and image.
 ```
 
-This step will take a while, for a minimal distro image, `make basics` is
-available.
+By default the build system will build a minimal distro image. The `make distro` option
+is avaliabe to build the full distro image; this step will take a while.
 
 ### To test
 
