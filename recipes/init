@@ -11,7 +11,7 @@ configure() {
 
 build() {
     cd ${source_dir}
-    export HOME='/tmp'
+    export VMODULES='/tmp/.vmodules'
     VCROSS_COMPILER_NAME=x86_64-vinix-gcc v -os vinix .
 }
 

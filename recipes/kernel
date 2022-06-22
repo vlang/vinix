@@ -10,7 +10,7 @@ configure() {
 
 build() {
     cd ${source_dir}
-    export HOME='/tmp'
+    export VMODULES='/tmp/.vmodules'
     make -j${parallelism} CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
 }
 
