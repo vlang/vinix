@@ -4,10 +4,6 @@ Vinix is an effort to write a modern, fast, and useful operating system in [the 
 
 Join the [Discord chat](https://discord.gg/S5Nm6ZDU38).
 
-## Download the ISO
-
-You can get a continuously updated ISO of Vinix [here](https://builds.vinix-os.org/repos/files/vinix/latest/vinix.iso).
-
 ## What is Vinix all about?
 
 - Keeping the code as simple and easy to understand as possible, while not sacrificing
@@ -31,29 +27,13 @@ virtual machines.
 - [x] nano
 - [x] storage drivers
 - [x] ext2
-- [ ] X.org
+- [x] X.org
 - [ ] X window manager
 - [ ] V-UI
 - [ ] network
 - [ ] Intel HD graphics driver (linux port)
 
 ## Build instructions
-
-It is *highly* recommended to just download an ISO from:
-https://builds.vinix-os.org/repos/files/vinix/latest/vinix.iso
-
-These instructions are for building Vinix, which may take a long time and
-require some debugging on Linux distros that weren't properly tested
-for build.
-
-The tested distributions are: Ubuntu, Debian, and Arch Linux.
-
-### Building Vinix on macOS, *BSD, or other non-Linux OSes
-
-This build system does not support OSes other than Linux, due to how various packages
-interact with the host distro during their build process. Pull requests making the build
-capable of successfully working on non-Linux OSes are welcome, alternatively,
-run the build in an x86_64 Linux VM or real hardware.
 
 ### Distro-agnostic build prerequisites
 
@@ -65,23 +45,34 @@ installed.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU Bash`, `curl`, `git`, `docker`, `coreutils`, `grep`, `find`, `xorriso`,
-and `qemu` to test it.
+`GNU Bash`, `curl`, `git`, `mercurial`, `docker`, `xorriso`, and `qemu`
+to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install bash coreutils git docker.io grep find xorriso qemu-system-x86
-```
-
-Since the `meson` version from the repositories may be outdated, install it from `pip3`:
-```bash
-pip3 install --user meson
+sudo apt install curl git mercurial docker.io xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed bash coreutils curl git docker grep find xorriso qemu
+sudo pacman -S --needed curl git mercurial docker xorriso qemu
 ```
+
+### Docker
+
+Make sure Docker and its daemon are up and running before continuing further.
+This may require logging out and back into your account, or restarting your
+machine.
+
+If Docker is properly running, the output of `docker run hello-world` should
+include:
+```
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+```
+
+If this does not work, search the web for your distro-specific instructions
+for setting up Docker.
 
 ### Building the distro
 
@@ -89,11 +80,11 @@ To build the distro which includes the cross toolchain necessary
 to build kernel and ports, as well as the kernel itself, run:
 
 ```bash
-make # Build the distribution and image.
+make # Build the base distribution and image.
 ```
 
-By default the build system will build a minimal distro image. The `make distro` option
-is avaliabe to build the full distro image; this step will take a while.
+By default the build system will build a minimal distro image. The `make full` option
+is avaliable to build the full distro image; this step will take a while.
 
 ### To test
 

@@ -6,16 +6,18 @@ QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: all
 all: vinix.iso
-vinix.iso: basics
+
+vinix.iso: base
+	./jinx rebuild base-files kernel init util-vinix
 	./build-support/makeiso.sh
 
-.PHONY: distro
-distro:
+.PHONY: full
+full:
 	./jinx build-all
 
-.PHONY: basics
-basics:
-	./jinx build base-files kernel init util-vinix bash coreutils
+.PHONY: base
+base:
+	./jinx build bash coreutils
 
 .PHONY: run-kvm
 run-kvm: vinix.iso
@@ -40,6 +42,9 @@ run: vinix.iso
 .PHONY: clean
 clean:
 	rm -rf iso_root sysroot vinix.iso initramfs.tar
-	./jinx clean
 	cd kernel     && make clean
 	cd util-vinix && make clean
+
+.PHONY: distclean
+distclean: clean
+	./jinx clean
