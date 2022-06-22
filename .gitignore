@@ -8,5 +8,7 @@ iso_root
 vinix.iso
 initramfs.tar
 
-kernel/vinix.elf
+*.elf
+*.bin
+*.a
 *.o
