@@ -62,6 +62,7 @@ override INTERNALVFLAGS := \
 	-enable-globals        \
 	-nofloat               \
 	-autofree              \
+	-gc none               \
 	-d no_backtrace
 
 ifeq ($(PROD), true)

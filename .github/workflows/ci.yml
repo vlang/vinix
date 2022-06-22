@@ -29,7 +29,7 @@ jobs:
         run: cd kernel && make PROD=true CFLAGS="-D__vinix__ -O2 -g -pipe" V="../v/v" && make clean
 
       - name: Attempt to build the util-vinix (debug)
-        run: cd util-vinix && make PROD=false V="$(realpath ../v/v)" VFLAGS="-os vinix" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
+        run: cd util-vinix && make PROD=false V="$(realpath ../v/v)" VFLAGS="-os vinix -gc none" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
 
       - name: Attempt to build the util-vinix (prod)
-        run: cd util-vinix && make PROD=true V="$(realpath ../v/v)" VFLAGS="-os vinix" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
+        run: cd util-vinix && make PROD=true V="$(realpath ../v/v)" VFLAGS="-os vinix -gc none" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
