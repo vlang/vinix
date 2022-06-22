@@ -7,3 +7,8 @@ sysroot
 iso_root
 vinix.iso
 initramfs.tar
+
+*.elf
+*.bin
+*.a
+*.o
