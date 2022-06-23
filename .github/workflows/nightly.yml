@@ -1,0 +1,23 @@
+name: Nightly Vinix rebuild
+
+on: [push]
+  #schedule:
+  #  - cron: '25 4 * * *'
+
+jobs:
+  vinix-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install build-essential curl git mercurial xorriso -y
+
+      - name: Build distro
+        run: JINX_DOCKER_INTERACTIVE=no make full
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v1
+        with:
+          name: vinix.iso
+          path: vinix.iso

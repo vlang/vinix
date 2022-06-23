@@ -203,7 +203,12 @@ run_in_container() {
         image_id=$(docker build -q --no-cache "${dockerfile_dir}")
     fi
 
-    docker run -it --rm \
+    local docker_it="-it"
+
+    [ "$JINX_DOCKER_INTERACTIVE" = "no" ] && \
+        docker_it=""
+
+    docker run $docker_it --rm \
         --user=$(id -u):$(id -g) \
         -v "${container_pkgs}":/usr/local \
         -v "${sysroot_dir}":/sysroot \
