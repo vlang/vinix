@@ -48,7 +48,8 @@ override INTERNALCFLAGS :=        \
 	-Wno-unused-variable          \
 	-Wno-unused-parameter         \
 	-Ifreestanding_headers        \
-	-Ic
+	-Ic                           \
+	-Ilai/include
 
 override INTERNALLDFLAGS :=  \
 	-Tlinker.ld              \
@@ -79,6 +80,12 @@ override COBJ   := $(CFILES:.c=.o) $(SFILES:.S=.o)
 .PHONY: all
 all: $(KERNEL)
 
+LAI_URL := https://github.com/managarm/lai
+LAI_DIR := lai
+
+$(LAI_DIR):
+	git clone $(LAI_URL) --branch master --depth 1
+
 freestanding_headers:
 	git clone https://github.com/mintsuki/freestanding_headers.git
 
@@ -95,7 +102,7 @@ install:
 	install -d "$(DESTDIR)$(PREFIX)"
 	install -s $(KERNEL) "$(DESTDIR)$(PREFIX)/"
 
-blob.o: $(VFILES) freestanding_headers
+blob.o: $(VFILES) $(LAI_DIR) freestanding_headers
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 

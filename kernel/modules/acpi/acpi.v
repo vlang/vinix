@@ -78,6 +78,12 @@ pub fn initialise() {
 		}
 	}
 
+	println('lai: intializing')
+
+	// Setup the ACPI revison and initialize namespace.
+	C.lai_set_acpi_revision(rsdp.revision)
+	C.lai_create_namespace()
+
 	madt_init()
 }
 

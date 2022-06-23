@@ -37,7 +37,7 @@ run-uefi: ovmf
 
 .PHONY: run
 run: vinix.iso
-	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -d int -smp 1
+	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -smp 1
 
 .PHONY: clean
 clean:
