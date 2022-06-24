@@ -92,7 +92,7 @@ clean:
 	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
 
 .PHONY: distclean
-distclean:
+distclean: clean
 	rm -rf freestanding_headers
 
 .PHONY: install

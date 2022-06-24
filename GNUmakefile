@@ -49,9 +49,11 @@ run: vinix.iso
 .PHONY: clean
 clean:
 	rm -rf iso_root sysroot vinix.iso initramfs.tar
-	cd kernel     && make clean
-	cd util-vinix && make clean
+	rm -rf init/init
+	make -C kernel clean
+	make -C util-vinix clean
 
 .PHONY: distclean
 distclean: clean
+	make -C kernel distclean
 	./jinx clean
