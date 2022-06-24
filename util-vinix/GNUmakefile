@@ -6,7 +6,12 @@ ifeq ($(origin CC), default)
 	CC := cc
 endif
 V       ?= v
-PROD    ?= false
+VINIX_PROD ?=
+ifeq ($(VINIX_PROD),yes)
+    override PROD := true
+else
+    override PROD := false
+endif
 VFLAGS  ?= -gc none
 CFLAGS  ?= -O2 -pipe -g
 PREFIX  ?= /usr/local

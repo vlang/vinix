@@ -19,7 +19,12 @@ V       ?= v
 CFLAGS  ?= -O2 -Wall -Wextra -g -pipe
 LDFLAGS ?=
 VFLAGS  ?=
-PROD    ?= false
+VINIX_PROD ?=
+ifeq ($(VINIX_PROD),yes)
+    override PROD := true
+else
+    override PROD := false
+endif
 
 override INTERNALCFLAGS :=        \
 	-ffreestanding                \

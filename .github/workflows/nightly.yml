@@ -14,10 +14,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install build-essential curl git mercurial xorriso -y
 
       - name: Build distro
-        run: JINX_DOCKER_INTERACTIVE=no make full
+        run: JINX_DOCKER_INTERACTIVE=no make distro-full
 
       - name: Build ISO
-        run: JINX_DOCKER_INTERACTIVE=no make
+        run: JINX_DOCKER_INTERACTIVE=no make prod-all
 
       - name: Untag last nightly release
         run: ( git push --delete origin nightly || true ) && ( git tag --delete nightly || true )

@@ -10,6 +10,7 @@ configure() {
 
 build() {
     cd ${source_dir}
+    export VINIX_PROD
     VMODULES=/tmp/.vmodules make -j${parallelism} CC=x86_64-vinix-gcc
 }
 

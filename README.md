@@ -80,11 +80,12 @@ To build the distro which includes the cross toolchain necessary
 to build kernel and ports, as well as the kernel itself, run:
 
 ```bash
-make # Build the base distribution and image.
+make distro-base # Build the base distribution.
+make prod-all    # Make production ISO.
 ```
 
-By default the build system will build a minimal distro image. The `make full` option
-is avaliable to build the full distro image; this step will take a while.
+This will build a minimal distro image. The `make distro-full` option
+is avaliable to build the full distro; this step will take a while.
 
 ### To test
 

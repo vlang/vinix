@@ -9,8 +9,12 @@ configure() {
 }
 
 build() {
+    local PROD_FLAG=""
     cd ${source_dir}
-    VMODULES=/tmp/.vmodules VCROSS_COMPILER_NAME=x86_64-vinix-gcc v -gc none -os vinix .
+    if [ "$VINIX_PROD" = "yes" ]; then
+        PROD_FLAG="-prod"
+    fi
+    VMODULES=/tmp/.vmodules VCROSS_COMPILER_NAME=x86_64-vinix-gcc v $PROD_FLAG -gc none -os vinix .
 }
 
 install() {
