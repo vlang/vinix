@@ -13,12 +13,11 @@ pub:
 [packed]
 pub struct Fadt {
 pub:
-	header                            SDT
-	firmware_ctrl                     u32
-	dsdt                              u32
-
+	header        SDT
+	firmware_ctrl u32
+	dsdt          u32
 	// Field no longer in use, for compatibility only.
-	reserved                           u8
+	reserved u8
 
 	preferred_power_management_profile u8
 	sci_interrupt                      u16
@@ -52,20 +51,17 @@ pub:
 	day_alarm                          u8
 	month_alarm                        u8
 	century                            u8
- 
-    // reserved in ACPI 1.0; used since ACPI 2.0+
-	boot_architecture_flags            u16
- 
-	reserved_2                         u8
-	flags                              u32
- 
-    // 12 byte structure; see below for details
-	reset_reg                          GenericAddressStructure
- 
-	reset_value                        u8
-	reserved_3                         [3]u8 // reserve dez nuts
+	// reserved in ACPI 1.0; used since ACPI 2.0+
+	boot_architecture_flags u16
 
-    // 64bit pointers - Available on ACPI 2.0+
-	x_firmware_control                 u64
-	x_dsdt                             u64
+	reserved_2 u8
+	flags      u32
+	// 12 byte structure; see below for details
+	reset_reg GenericAddressStructure
+
+	reset_value u8
+	reserved_3  [3]u8 // reserve dez nuts
+	// 64bit pointers - Available on ACPI 2.0+
+	x_firmware_control u64
+	x_dsdt             u64
 }
