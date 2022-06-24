@@ -70,8 +70,14 @@ fn laihost_scan(_sig charptr, index int) voidptr {
 		// The DSDT table is put inside the FADT table, instead of listing it in
 		// another ACPI table.
 		fadt := &Fadt(find_sdt("FACP", 0) or { panic("lai: failed to satisfy request (sig=FACP, index=$index)") })
-		return voidptr(fadt.dsdt)
-	}
+        // In FADT if X_DSDT field is non-zero, DSDT field should be
+        // ignored or deprecated.
+        if fadt.x_dsdt != 0 {
+            return voidptr(fadt.x_dsdt)
+        } else {
+		    return voidptr(fadt.dsdt)
+        }
+    }
 	
 	return find_sdt(sig, index) or { voidptr(0x00) /* nullptr */ }
 }
