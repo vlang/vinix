@@ -16,6 +16,9 @@ jobs:
       - name: Build distro
         run: JINX_DOCKER_INTERACTIVE=no make full
 
+      - name: Build ISO
+        run: JINX_DOCKER_INTERACTIVE=no make
+
       - name: Upload ISO
         uses: actions/upload-artifact@v1
         with:
