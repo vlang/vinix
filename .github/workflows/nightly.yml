@@ -19,8 +19,22 @@ jobs:
       - name: Build ISO
         run: JINX_DOCKER_INTERACTIVE=no make
 
-      - name: Upload ISO
-        uses: actions/upload-artifact@v1
+      - name: Untag last nightly release
+        run: ( git push --delete origin nightly || true ) && ( git tag --delete nightly || true )
+
+      - name: Tag new nightly release
+        run: git tag nightly && git push --tags
+
+      - name: Rename vinix.iso
+        run: mv vinix.iso vinix-nightly.iso
+
+      - name: Create nightly release
+        uses: softprops/action-gh-release@v1
         with:
-          name: vinix.iso
-          path: vinix.iso
+          name: Nightly build
+          tag_name: nightly
+          body: Image of an up to date Vinix nightly build.
+          files: |
+            vinix-nightly.iso
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
