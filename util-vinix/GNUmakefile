@@ -7,10 +7,10 @@ ifeq ($(origin CC), default)
 endif
 V       ?= v
 VINIX_PROD ?=
-ifeq ($(VINIX_PROD),yes)
-    override PROD := true
-else
+ifeq ($(VINIX_PROD),no)
     override PROD := false
+else
+    override PROD := true
 endif
 VFLAGS  ?= -gc none
 CFLAGS  ?= -O2 -pipe -g

@@ -20,10 +20,10 @@ CFLAGS  ?= -O2 -Wall -Wextra -g -pipe
 LDFLAGS ?=
 VFLAGS  ?=
 VINIX_PROD ?=
-ifeq ($(VINIX_PROD),yes)
-    override PROD := true
-else
+ifeq ($(VINIX_PROD),no)
     override PROD := false
+else
+    override PROD := true
 endif
 
 override INTERNALCFLAGS :=        \

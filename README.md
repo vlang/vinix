@@ -15,13 +15,22 @@ virtual machines.
 - Exploring V capabilities in bare metal programming and improving the compiler in response to the uncommon needs of bare metal programming.
 - Having fun.
 
+**Note: Vinix is still pre-alpha software not meant for daily or production usage!**
+
 ![Reference screenshot](/screenshot.png?raw=true "Reference screenshot")
+
+## Download latest nightly image
+
+You can grab a pre-built nightly Vinix image at https://github.com/vlang/vinix/releases/download/nightly/vinix-nightly.iso
+
+Make sure to boot the ISO with enough memory (8+GiB) as, for now, Vinix loads its
+entire root filesystem in a ramdisk, in order to be able to more easily boot
+on real hardware.
 
 ## Roadmap
 
 - [x] mlibc
 - [x] bash
-- [x] builds.vinix-os.org
 - [x] gcc/g++
 - [x] V
 - [x] nano
@@ -81,7 +90,7 @@ to build kernel and ports, as well as the kernel itself, run:
 
 ```bash
 make distro-base # Build the base distribution.
-make prod-all    # Make production ISO.
+make all         # Make filesystem and ISO.
 ```
 
 This will build a minimal distro image. The `make distro-full` option
