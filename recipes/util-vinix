@@ -3,7 +3,6 @@ from_source=util-vinix
 revision=1
 hostdeps="gcc binutils v"
 deps="mlibc"
-imagedeps="binutils"
 
 configure() {
     true
@@ -11,8 +10,7 @@ configure() {
 
 build() {
     cd ${source_dir}
-    export VMODULES='/tmp/.vmodules'
-    make -j${parallelism} CC=x86_64-vinix-gcc
+    VMODULES=/tmp/.vmodules make -j${parallelism} CC=x86_64-vinix-gcc
 }
 
 install() {

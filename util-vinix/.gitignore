@@ -1,3 +1,4 @@
+*.c
 chsh/chsh
 fetch/fetch
 lscpu/lscpu

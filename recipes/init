@@ -3,7 +3,6 @@ from_source=init
 revision=1
 hostdeps="gcc binutils v"
 deps="mlibc"
-imagedeps="binutils"
 
 configure() {
     true
@@ -11,12 +10,11 @@ configure() {
 
 build() {
     cd ${source_dir}
-    export VMODULES='/tmp/.vmodules'
-    VCROSS_COMPILER_NAME=x86_64-vinix-gcc v -os vinix .
+    VMODULES=/tmp/.vmodules VCROSS_COMPILER_NAME=x86_64-vinix-gcc v -gc none -os vinix .
 }
 
 install() {
     cd ${source_dir}
-    mkdir -p "${dest_dir}/sbin"
-    cp init "${dest_dir}/sbin/"
+    command install -d "${dest_dir}/sbin"
+    command install -s --strip-program=x86_64-vinix-strip init "${dest_dir}/sbin/"
 }

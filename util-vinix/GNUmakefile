@@ -7,7 +7,7 @@ ifeq ($(origin CC), default)
 endif
 V       ?= v
 PROD    ?= false
-VFLAGS  ?=
+VFLAGS  ?= -gc none
 CFLAGS  ?= -O2 -pipe -g
 PREFIX  ?= /usr/local
 
@@ -30,23 +30,31 @@ override MOUNT_TARGET := $(MOUNT_DIR)/mount
 all: $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)
 
 $(CHSH_TARGET): $(CHSH_DIR)/*
-	cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	while ! ( cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix . ); do \
+		true; \
+	done
 
 $(FETCH_TARGET): $(FETCH_DIR)/*
-	cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	while ! ( cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix . ); do \
+		true; \
+	done
 
 $(LSCPU_TARGET): $(LSCPU_DIR)/*
-	cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	while ! ( cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix . ); do \
+		true; \
+	done
 
 $(MOUNT_TARGET): $(MOUNT_DIR)/*
-	cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	while ! ( cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix . ); do \
+		true; \
+	done
 
 clean:
 	rm -rf $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)
 
 install:
 	install -d "$(DESTDIR)$(PREFIX)/bin"
-	install -s $(CHSH_TARGET)  "$(DESTDIR)$(PREFIX)/bin/"
-	install -s $(FETCH_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
-	install -s $(LSCPU_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
-	install -s $(MOUNT_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
+	install -s --strip-program=x86_64-vinix-strip $(CHSH_TARGET)  "$(DESTDIR)$(PREFIX)/bin/"
+	install -s --strip-program=x86_64-vinix-strip $(FETCH_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
+	install -s --strip-program=x86_64-vinix-strip $(LSCPU_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
+	install -s --strip-program=x86_64-vinix-strip $(MOUNT_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
