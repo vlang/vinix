@@ -2,9 +2,10 @@ name=pkg-config
 from_source=pkg-config
 revision=1
 imagedeps="gcc"
+hostdeps="automake autoconf libtool"
 
 configure() {
-    "${source_dir}"/configure CFLAGS="${common_cflags}" CXXFLAGS="${common_cflags}" --prefix="${prefix}" --with-internal-glib
+    "${source_dir}"/configure CFLAGS="${common_cflags}" CXXFLAGS="${common_cflags}" --prefix="${prefix}"
 }
 
 build() {
@@ -13,14 +14,13 @@ build() {
 
 install() {
     DESTDIR="${dest_dir}" make install-strip
-    cat <<EOF > "${dest_dir}${prefix}/bin/x86_64-vinix-pkg-config"
-#! /bin/sh
-
-export PKG_CONFIG_PATH=
-export PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}"
-export PKG_CONFIG_LIBDIR="${sysroot_dir}/usr/lib/pkgconfig:${sysroot_dir}/usr/share/pkgconfig"
-
-exec pkg-config "\$@"
+    mkdir -p "${dest_dir}${prefix}/share/pkgconfig/personality.d"
+    cat <<EOF >"${dest_dir}${prefix}/share/pkgconfig/personality.d/x86_64-vinix.personality"
+Triplet: x86_64-vinix
+SysrootDir: ${sysroot_dir}
+DefaultSearchPaths: ${sysroot_dir}/usr/lib/pkgconfig:${sysroot_dir}/usr/share/pkgconfig
+SystemIncludePaths: ${sysroot_dir}/usr/include
+SystemLibraryPaths: ${sysroot_dir}/usr/lib
 EOF
-    chmod +x "${dest_dir}${prefix}/bin/x86_64-vinix-pkg-config"
+    ln -s pkgconf "${dest_dir}${prefix}/bin/x86_64-vinix-pkg-config"
 }
