@@ -73,7 +73,7 @@ endif
 
 override KERNEL := vinix.elf
 override VFILES := $(shell find ./ -type f -name '*.v')
-override CFILES := $(shell find ./ -type f -name '*.c')
+CFILES = $(shell find ./ -type f -name '*.c')
 override SFILES := $(shell find ./ -type f -name '*.S')
 override COBJ   := $(CFILES:.c=.o) $(SFILES:.S=.o)
 
@@ -106,10 +106,10 @@ blob.o: $(VFILES) $(LAI_DIR) freestanding_headers
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
-%.o: %.c freestanding_headers
+%.o: %.c $(LAI_DIR) freestanding_headers
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-%.o: %.S freestanding_headers
+%.o: %.S $(LAI_DIR) freestanding_headers
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ)
