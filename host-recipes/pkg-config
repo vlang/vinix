@@ -13,4 +13,14 @@ build() {
 
 install() {
     DESTDIR="${dest_dir}" make install-strip
+    cat <<EOF > "${dest_dir}${prefix}/bin/x86_64-vinix-pkg-config"
+#! /bin/sh
+
+export PKG_CONFIG_PATH=
+export PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}"
+export PKG_CONFIG_LIBDIR="${sysroot_dir}/usr/lib/pkgconfig:${sysroot_dir}/usr/share/pkgconfig"
+
+exec pkg-config "\$@"
+EOF
+    chmod +x "${dest_dir}${prefix}/bin/x86_64-vinix-pkg-config"
 }
