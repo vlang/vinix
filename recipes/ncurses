@@ -1,7 +1,7 @@
 name=ncurses
 from_source=ncurses
 revision=1
-imagedeps="gcc"
+imagedeps="gcc ncurses"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc"
 
