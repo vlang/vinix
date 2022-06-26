@@ -1,7 +1,7 @@
 name=v
 from_source=v
 revision=1
-imagedeps="gcc git"
+imagedeps="gcc"
 
 configure() {
     cp -r ${source_dir}/. ./

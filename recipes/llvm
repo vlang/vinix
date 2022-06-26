@@ -6,8 +6,6 @@ hostdeps="gcc cmake pkg-config"
 deps="mlibc zlib"
 
 configure() {
-        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
-        PKG_CONFIG_LIBDIR="${sysroot_dir}"/usr/lib/pkgconfig:"${sysroot_dir}"/usr/share/pkgconfig \
     cmake \
         -GNinja \
         -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \

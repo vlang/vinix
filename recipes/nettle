@@ -6,8 +6,6 @@ deps="mlibc libgmp"
 imagedeps="gcc"
 
 configure() {
-        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
-        PKG_CONFIG_LIBDIR="${sysroot_dir}"/usr/lib/pkgconfig:"${sysroot_dir}"/usr/share/pkgconfig \
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \

@@ -1,7 +1,7 @@
 name=readline
 from_source=readline
 revision=1
-hostdeps="gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc ncurses"
 
 configure() {

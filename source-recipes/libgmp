@@ -3,7 +3,7 @@ version=6.2.1
 source_method=mercurial
 clone_url="https://gmplib.org/repo/gmp-6.2/"
 tag="gmp-${version}"
-hostdeps="automake autoconf libtool"
+hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
     ./.bootstrap

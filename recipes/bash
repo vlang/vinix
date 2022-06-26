@@ -2,7 +2,7 @@ name=bash
 from_source=bash
 revision=1
 imagedeps="gcc"
-hostdeps="gcc autoconf automake"
+hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc ncurses libiconv readline"
 
 configure() {

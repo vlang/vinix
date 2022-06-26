@@ -2,7 +2,7 @@ name=mlibc
 from_source=mlibc
 revision=1
 imagedeps="meson ninja git base-devel"
-hostdeps="gcc-compiler"
+hostdeps="gcc-compiler pkg-config"
 deps="mlibc-headers"
 
 configure() {

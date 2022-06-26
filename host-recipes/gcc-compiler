@@ -2,7 +2,7 @@ name=gcc-compiler
 from_source=gcc
 revision=1
 imagedeps="gcc"
-hostdeps="automake autoconf"
+hostdeps="autoconf automake"
 hostrundeps="binutils"
 deps="mlibc-headers"
 

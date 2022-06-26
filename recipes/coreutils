@@ -1,17 +1,17 @@
 name=coreutils
 from_source=coreutils
 revision=1
-hostdeps="gcc automake autoconf"
-deps="tzdata mlibc"
+hostdeps="gcc automake autoconf libtool pkg-config"
+deps="mlibc tzdata"
 imagedeps="gcc gperf"
 
 configure() {
     # Huge hack: coreutils does not compile the build-machine binary make-prime-list
     # using the build-machine compiler. Hence, build and invoke the binary manually here.
-    ${source_dir}/configure
-    make src/make-prime-list
-    ./src/make-prime-list 5000 > "${source_dir}/src/primes.h"
-    rm -rf *
+    #${source_dir}/configure
+    #make src/make-prime-list
+    #./src/make-prime-list 5000 > "${source_dir}/src/primes.h"
+    #rm -rf *
 
     # Now compile coreutils for the correct target.
     ${source_dir}/configure    \

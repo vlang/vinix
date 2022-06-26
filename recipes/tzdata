@@ -1,7 +1,8 @@
 name=tzdata
 from_source=tzdata
 revision=1
-hostdeps="zic gcc binutils"
+imagedeps="tzdata"
+hostdeps="gcc binutils"
 deps="mlibc"
 
 configure() {

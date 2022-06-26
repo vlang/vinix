@@ -1,7 +1,7 @@
 name=xorg-util-macros
 from_source=xorg-util-macros
 revision=1
-hostdeps="gcc xorg-macros"
+hostdeps="gcc autoconf automake libtool pkg-config xorg-macros"
 deps="mlibc"
 
 configure() {

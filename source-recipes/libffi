@@ -3,7 +3,7 @@ version=3.4.2
 source_method=git
 clone_url="https://github.com/libffi/libffi.git"
 tag="v${version}"
-hostdeps="automake autoconf libtool"
+hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
     ./autogen.sh

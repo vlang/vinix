@@ -1,7 +1,7 @@
 name=libexpat
 from_source=libexpat
 revision=1
-hostdeps="gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc"
 
 configure() {

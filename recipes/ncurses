@@ -2,13 +2,11 @@ name=ncurses
 from_source=ncurses
 revision=1
 imagedeps="gcc"
-hostdeps="gcc automake autoconf pkg-config"
+hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc"
 
 configure() {
         cf_cv_func_nanosleep=yes \
-        PKG_CONFIG_SYSROOT_DIR="${sysroot_dir}" \
-        PKG_CONFIG_LIBDIR="${sysroot_dir}/usr/lib/pkgconfig:${sysroot_dir}/usr/share/pkgconfig" \
     "${source_dir}"/configure \
         --host=x86_64-vinix \
         --prefix="${prefix}" \

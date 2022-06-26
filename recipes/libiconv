@@ -1,7 +1,7 @@
 name=libiconv
 from_source=libiconv
 revision=1
-hostdeps="gcc libtool"
+hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc"
 imagedeps="binutils"
 
@@ -9,7 +9,6 @@ configure() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
-        --with-sysroot=${sysroot_dir} \
         --disable-static              \
         --enable-shared               \
         --disable-nls

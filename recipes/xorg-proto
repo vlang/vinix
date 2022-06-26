@@ -1,7 +1,7 @@
 name=xorg-proto
 from_source=xorg-proto
 revision=1
-hostdeps="gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc"
 
 configure() {

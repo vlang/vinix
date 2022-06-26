@@ -3,7 +3,7 @@ version=1.17
 source_method=git
 clone_url="https://git.savannah.gnu.org/git/libiconv.git"
 tag="v${version}"
-hostdeps="automake autoconf"
+hostdeps="automake autoconf libtool pkg-config"
 imagedeps="git gcc gperf groff"
 
 regenerate() {

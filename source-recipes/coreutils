@@ -3,7 +3,7 @@ version=9.1
 source_method=git
 clone_url="https://git.savannah.gnu.org/git/coreutils.git"
 tag="v9.1"
-hostdeps="automake autoconf"
+hostdeps="automake autoconf libtool pkg-config"
 imagedeps="gperf git rsync wget"
 
 regenerate() {
