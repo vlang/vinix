@@ -1,6 +1,7 @@
 name=kernel
 from_source=kernel
 revision=1
+imagedeps="git"
 hostdeps="gcc binutils v"
 
 configure() {
