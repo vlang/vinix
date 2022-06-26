@@ -7,7 +7,8 @@ deps="mlibc zlib"
 configure() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
-        --prefix=${prefix}
+        --prefix=${prefix}            \
+        --disable-static
 }
 
 build() {

@@ -16,4 +16,6 @@ build() {
 
 install() {
     DESTDIR="${dest_dir}" make install
+    # Remove static libraries
+    rm -rf "${dest_dir}${prefix}"/lib/*.a
 }

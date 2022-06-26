@@ -11,4 +11,11 @@ regenerate() {
     ./autogen.sh
     cp /usr/local/share/automake-1.16/config.sub ./build-aux/
     cp /usr/local/share/automake-1.16/config.sub ./libcharset/build-aux/
+    cp /usr/local/share/aclocal/libtool.m4 ./m4/
+    cp /usr/local/share/aclocal/libtool.m4 ./libcharset/m4/
+    cp /usr/local/share/libtool/build-aux/ltmain.sh ./build-aux/
+    cp /usr/local/share/libtool/build-aux/ltmain.sh ./libcharset/build-aux/
+    cp /usr/local/share/aclocal/ltversion.m4 ./m4/
+    cp /usr/local/share/aclocal/ltversion.m4 ./libcharset/m4/
+    autoreconf -vfi -I"${source_dir}"/m4 -I"${source_dir}"/srcm4
 }

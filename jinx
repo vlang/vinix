@@ -505,15 +505,19 @@ do_source() {
 }
 
 do_cmd_rebuild() {
-    rm -rf "${base_dir}"/builds/"$1"*
-    rm -rf "${base_dir}"/pkgs/"$1"*
+    rm -rf "${base_dir}"/builds/"$1"
+    rm -rf "${base_dir}"/builds/"$1".*
+    rm -rf "${base_dir}"/pkgs/"$1"
+    rm -rf "${base_dir}"/pkgs/"$1".*
 
     do_pkg "$1"
 }
 
 do_cmd_host_rebuild() {
-    rm -rf "${base_dir}"/host-builds/"$1"*
-    rm -rf "${base_dir}"/host-pkgs/"$1"*
+    rm -rf "${base_dir}"/host-builds/"$1"
+    rm -rf "${base_dir}"/host-builds/"$1".*
+    rm -rf "${base_dir}"/host-pkgs/"$1"
+    rm -rf "${base_dir}"/host-pkgs/"$1".*
 
     do_host_pkg "$1"
 }

@@ -11,7 +11,7 @@ configure() {
         -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_BUILD_TYPE=Release \
-        -DLLVM_LINK_LLVM_DYLIB=ON \
+        -DBUILD_SHARED_LIBS=ON \
         -DLLVM_ENABLE_RTTI=ON \
         -DLLVM_TARGETS_TO_BUILD=X86 \
         -DLLVM_TARGET_ARCH=x86_64 \

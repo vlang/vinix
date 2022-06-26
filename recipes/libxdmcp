@@ -9,7 +9,8 @@ configure() {
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
         --sysconfdir=/etc             \
-        --localstatedir=/var
+        --localstatedir=/var          \
+        --disable-static
 }
 
 build() {

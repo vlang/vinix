@@ -10,14 +10,10 @@ configure() {
 }
 
 build() {
-    # Build support programs
-    make CC=x86_64-vinix-gcc AR=x86_64-vinix-ar
+    true
 }
 
 install() {
-    # Install support programs
-    make install DESTDIR=${dest_dir} ZIC=zic
-
     # Create the required directories
     mkdir -p ${dest_dir}/etc
     mkdir -p ${dest_dir}/usr/share/zoneinfo/posix
