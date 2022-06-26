@@ -1,1 +1,2 @@
 common_cflags="-O2 -pipe"
+export VMODULES='/tmp/.vmodules'

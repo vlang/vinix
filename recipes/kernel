@@ -2,7 +2,6 @@ name=kernel
 from_source=kernel
 revision=1
 hostdeps="gcc binutils v"
-imagedeps="binutils git"
 
 configure() {
     true
@@ -10,12 +9,10 @@ configure() {
 
 build() {
     cd ${source_dir}
-    export VMODULES='/tmp/.vmodules'
-    export VINIX_PROD
     make -j${parallelism} CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
 }
 
 install() {
     cd ${source_dir}
-    make install PREFIX="${prefix}" DESTDIR="${dest_dir}"
+    make install PREFIX="/" DESTDIR="${dest_dir}"
 }

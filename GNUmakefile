@@ -5,18 +5,16 @@
 QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: all
-all: vinix.iso
+all:
+	./jinx rebuild base-files kernel init util-vinix
+	./build-support/makeiso.sh
 
 .PHONY: debug
 debug:
 	cp jinx-config jinx-config.bak
-	echo "VINIX_PROD=no" >> jinx-config
-	$(MAKE) all || true
+	echo "export VINIX_PROD=no" >> jinx-config
+	$(MAKE) all || ( mv jinx-config.bak jinx-config && false )
 	mv jinx-config.bak jinx-config
-
-vinix.iso:
-	./jinx rebuild base-files kernel init util-vinix
-	./build-support/makeiso.sh
 
 .PHONY: distro-full
 distro-full:

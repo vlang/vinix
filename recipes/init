@@ -14,7 +14,7 @@ build() {
     if ! [ "$VINIX_PROD" = "no" ]; then
         PROD_FLAG="-prod"
     fi
-    VMODULES=/tmp/.vmodules VCROSS_COMPILER_NAME=x86_64-vinix-gcc v $PROD_FLAG -gc none -os vinix .
+    VCROSS_COMPILER_NAME=x86_64-vinix-gcc v $PROD_FLAG -gc none -os vinix .
 }
 
 install() {
