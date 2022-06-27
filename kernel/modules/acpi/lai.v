@@ -50,12 +50,12 @@ fn laihost_malloc(size u64) voidptr {
 }
 
 [export: "laihost_realloc"]
-fn laihost_realloc(ptr voidptr, new_size u64) voidptr {
+fn laihost_realloc(ptr voidptr, new_size u64, _old_size u64) voidptr {
 	return memory.realloc(ptr, new_size)
 }
 
 [export: "laihost_free"]
-fn laihost_free(ptr voidptr) {
+fn laihost_free(ptr voidptr, _size u64) {
 	memory.free(ptr)
 }
 
