@@ -15,6 +15,7 @@ import errno
 import block.partition
 import fs
 import katomic
+import time.sys
 
 const (
 	ahci_class      = 0x1
@@ -266,7 +267,7 @@ fn (mut d AHCIDevice) find_cmd_slot() ?u32 {
 }
 
 fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u32, byte_cnt u32) &AHCIHBACommandTable {
-	mut volatile cmd_table := &AHCIHBACommandTable(cmd_hdr.ctba + higher_half)
+	mut volatile cmd_table := &AHCIHBACommandTable((u64(cmd_hdr.ctba) | (u64(cmd_hdr.ctbau) << 32)) + higher_half)
 
 	cmd_table.prdt[0].dba = u32(buffer)
 	cmd_table.prdt[0].dbau = u32(buffer >> 32)
@@ -298,7 +299,7 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		return -1
 	}
 
-	mut volatile cmd_hdr := &AHCIHBACommand(d.regs.clb + higher_half +
+	mut volatile cmd_hdr := &AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
 		cmd_slot * sizeof(AHCIHBACommand))
 
 	cmd_hdr.flags &= ~(0b11111 | (1 << 6))
@@ -341,7 +342,29 @@ fn (mut d AHCIDevice) initialise() ?int {
 		return none
 	}
 
-	mut volatile cmd_hdr := &AHCIHBACommand(d.regs.clb + higher_half +
+	command_list := u64(memory.pmm_alloc(1))
+
+	d.regs.clb = u32(command_list)
+	d.regs.clbu = u32(command_list >> 32)
+
+	for i := u32(0); i < 32; i++ {
+		mut volatile cmd_hdr := &AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+			i * sizeof(AHCIHBACommand))
+
+		desc_base := u64(memory.pmm_alloc(1))
+
+		cmd_hdr.ctba = u32(desc_base)
+		cmd_hdr.ctbau = u32(desc_base >> 32)
+	}
+
+	fib_base := u64(memory.pmm_alloc(1))
+
+	d.regs.fb = u32(fib_base)
+	d.regs.fbu = u32(fib_base >> 32)
+
+	d.regs.cmd |= (1 << 0) | (1 << 4)
+
+	mut volatile cmd_hdr := &AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
 		cmd_slot * sizeof(AHCIHBACommand))
 
 	cmd_hdr.flags &= ~0b11111 | (1 << 7)
@@ -407,6 +430,32 @@ fn (mut d AHCIDevice) initialise() ?int {
 	return 0
 }
 
+pub fn (mut c AHCIController) declare_ownership() int {
+	if c.regs.cap2 & (1 << 0) == 0 {
+		print('ahci: bios handoff not supported\n')
+		return -1
+	}
+
+	c.regs.bohc |= (1 << 1)
+
+	for c.regs.bohc & (1 << 0) == 0 { 
+		asm volatile amd64 { pause }
+	}
+
+	sys.nsleep(25 * 1000000)
+
+	if c.regs.bohc & (1 << 4) != 0 {
+		sys.nsleep(2 * 1000000000)
+	}
+
+	if c.regs.bohc & (1 << 4) != 0 || c.regs.bohc & (1 << 0) != 0 || c.regs.bohc & (1 << 1) == 0 { 
+		print('ahci: bios handoff failed\n')
+		return -1
+	}
+
+	return  0
+}
+
 pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	pci_device.enable_bus_mastering()
 
@@ -427,6 +476,11 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 		print('ahci: 64 bit addressing not supported\n')
 		return -1
 	}
+
+	c.declare_ownership()
+
+	c.regs.ghc |= (1 << 31)
+	c.regs.ghc &= ~(1 << 1)
 
 	c.port_cnt = c.regs.cap & 0b11111
 	c.cmd_slots = c.regs.cap >> 8 & 0b11111

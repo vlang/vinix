@@ -10,6 +10,23 @@ import event
 import event.eventstruct
 import proc
 
+pub fn nsleep(ns i64) {
+	mut interval := time.TimeSpec {
+		tv_sec: ns / 1000000000
+		tv_nsec: ns
+	}
+
+	mut timer := time.new_timer(interval)
+	defer {
+		timer.disarm()
+	}
+
+	mut events := []&eventstruct.Event{}
+	events << &timer.event
+
+	event.await(mut events, true) or {}
+}
+
 pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
