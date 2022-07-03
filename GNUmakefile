@@ -6,7 +6,7 @@ QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: all
 all:
-	./jinx rebuild base-files kernel init util-vinix
+	./jinx build base-files kernel init util-vinix
 	./build-support/makeiso.sh
 
 .PHONY: debug
@@ -44,12 +44,28 @@ run-uefi: ovmf
 run: vinix.iso
 	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -d int -smp 1
 
-.PHONY: clean
-clean:
-	rm -rf iso_root sysroot vinix.iso initramfs.tar
-	rm -rf init/init
+.PHONY: kernel-clean
+kernel-clean:
 	make -C kernel clean
+	rm -rf builds/kernel* pkgs/kernel*
+
+.PHONY: util-vinix-clean
+util-vinix-clean:
 	make -C util-vinix clean
+	rm -rf builds/util-vinix* pkgs/util-vinix*
+
+.PHONY: init-clean
+init-clean:
+	rm -rf init/init
+	rm -rf builds/init* pkgs/init*
+
+.PHONY: base-files-clean
+base-files-clean:
+	rm -rf builds/base-files* pkgs/base-files*
+
+.PHONY: clean
+clean: kernel-clean util-vinix-clean init-clean base-files-clean
+	rm -rf iso_root sysroot vinix.iso initramfs.tar
 
 .PHONY: distclean
 distclean: clean
