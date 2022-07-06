@@ -184,9 +184,7 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				return error('')
 			}
 			mut retp := &u64(argp)
-			unsafe {
-				*retp = this.used
-			}
+			unsafe { *retp = this.used }
 			return 0
 		}
 		else {
@@ -366,9 +364,7 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 }
 
 fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
-	unsafe {
-		this.backlog = []&UnixSocket{cap: backlog}
-	}
+	this.backlog = []&UnixSocket{cap: backlog}
 	this.listening = true
 }
 
