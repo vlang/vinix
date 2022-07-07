@@ -18,12 +18,10 @@ def do_targets_built():
 	return 'X86'
 
 def get_includedir():
-	sysroot = os.environ['XBSTRAP_SYSROOT_DIR']
-	return sysroot + '/usr/include'
+	return '/sysroot/usr/include'
 
 def get_libdir():
-	sysroot = os.environ['XBSTRAP_SYSROOT_DIR']
-	return sysroot + '/usr/lib'
+	return '/sysroot/usr/lib'
 
 def do_has_rtti():
 	return 'YES'
@@ -32,10 +30,10 @@ def do_shared_mode():
 	return 'shared'
 
 def do_libs():
-	return '-lLLVM-{}'.format(our_version)
+	return '-lLLVMAggressiveInstCombine -lLLVMLTO -lLLVMAnalysis -lLLVMLibDriver -lLLVMAsmParser -lLLVMLineEditor -lLLVMAsmPrinter -lLLVMLinker -lLLVMBinaryFormat -lLLVMMC -lLLVMBitReader -lLLVMMCA -lLLVMBitWriter -lLLVMMCDisassembler -lLLVMBitstreamReader -lLLVMMCJIT -lLLVMCFGuard -lLLVMMCParser -lLLVMCFIVerify -lLLVMMIRParser -lLLVMCodeGen -lLLVMObjCARCOpts -lLLVMCore -lLLVMObject -lLLVMCoroutines -lLLVMObjectYAML -lLLVMCoverage -lLLVMOption -lLLVMDWARFLinker -lLLVMOrcJIT -lLLVMDWP -lLLVMOrcShared -lLLVMDebugInfoCodeView -lLLVMOrcTargetProcess -lLLVMDebugInfoDWARF -lLLVMPasses -lLLVMDebugInfoGSYM -lLLVMProfileData -lLLVMDebugInfoMSF -lLLVMRemarks -lLLVMDebugInfoPDB -lLLVMRuntimeDyld -lLLVMDebuginfod -lLLVMScalarOpts -lLLVMDemangle -lLLVMSelectionDAG -lLLVMDiff -lLLVMSupport -lLLVMDlltoolDriver -lLLVMSymbolize -lLLVMExecutionEngine -lLLVMTableGen -lLLVMExegesis -lLLVMTableGenGlobalISel -lLLVMExegesisX86 -lLLVMTarget -lLLVMExtensions -lLLVMTextAPI -lLLVMFileCheck -lLLVMTransformUtils -lLLVMFrontendOpenACC -lLLVMVectorize -lLLVMFrontendOpenMP -lLLVMWindowsManifest -lLLVMFuzzMutate -lLLVMX86AsmParser -lLLVMGlobalISel -lLLVMX86CodeGen -lLLVMIRReader -lLLVMX86Desc -lLLVMInstCombine -lLLVMX86Disassembler -lLLVMInstrumentation -lLLVMX86Info -lLLVMInterfaceStub -lLLVMX86TargetMCA -lLLVMInterpreter -lLLVMXRay -lLLVMJITLink -lLLVMipo'
 
 def do_system_libs():
-	return '-lLLVM-{}'.format(our_version)
+	return '-lLLVMAggressiveInstCombine -lLLVMLTO -lLLVMAnalysis -lLLVMLibDriver -lLLVMAsmParser -lLLVMLineEditor -lLLVMAsmPrinter -lLLVMLinker -lLLVMBinaryFormat -lLLVMMC -lLLVMBitReader -lLLVMMCA -lLLVMBitWriter -lLLVMMCDisassembler -lLLVMBitstreamReader -lLLVMMCJIT -lLLVMCFGuard -lLLVMMCParser -lLLVMCFIVerify -lLLVMMIRParser -lLLVMCodeGen -lLLVMObjCARCOpts -lLLVMCore -lLLVMObject -lLLVMCoroutines -lLLVMObjectYAML -lLLVMCoverage -lLLVMOption -lLLVMDWARFLinker -lLLVMOrcJIT -lLLVMDWP -lLLVMOrcShared -lLLVMDebugInfoCodeView -lLLVMOrcTargetProcess -lLLVMDebugInfoDWARF -lLLVMPasses -lLLVMDebugInfoGSYM -lLLVMProfileData -lLLVMDebugInfoMSF -lLLVMRemarks -lLLVMDebugInfoPDB -lLLVMRuntimeDyld -lLLVMDebuginfod -lLLVMScalarOpts -lLLVMDemangle -lLLVMSelectionDAG -lLLVMDiff -lLLVMSupport -lLLVMDlltoolDriver -lLLVMSymbolize -lLLVMExecutionEngine -lLLVMTableGen -lLLVMExegesis -lLLVMTableGenGlobalISel -lLLVMExegesisX86 -lLLVMTarget -lLLVMExtensions -lLLVMTextAPI -lLLVMFileCheck -lLLVMTransformUtils -lLLVMFrontendOpenACC -lLLVMVectorize -lLLVMFrontendOpenMP -lLLVMWindowsManifest -lLLVMFuzzMutate -lLLVMX86AsmParser -lLLVMGlobalISel -lLLVMX86CodeGen -lLLVMIRReader -lLLVMX86Desc -lLLVMInstCombine -lLLVMX86Disassembler -lLLVMInstrumentation -lLLVMX86Info -lLLVMInterfaceStub -lLLVMX86TargetMCA -lLLVMInterpreter -lLLVMXRay -lLLVMJITLink -lLLVMipo'
 
 def do_cppflags():
 	return ''
