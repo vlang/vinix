@@ -21,10 +21,10 @@ virtual machines.
 
 ## Download latest nightly image
 
-You can grab a pre-built nightly Vinix image at https://github.com/vlang/vinix/releases/download/nightly/vinix-nightly.iso
+You can grab a pre-built nightly Vinix image at https://github.com/vlang/vinix/releases
 
 Make sure to boot the ISO with enough memory (8+GiB) as, for now, Vinix loads its
-entire root filesystem in a ramdisk, in order to be able to more easily boot
+entire root filesystem in a ramdisk in order to be able to more easily boot
 on real hardware.
 
 ## Roadmap
@@ -39,8 +39,8 @@ on real hardware.
 - [x] X.org
 - [ ] X window manager
 - [ ] V-UI
-- [ ] network
-- [ ] Intel HD graphics driver (linux port)
+- [ ] networking
+- [ ] Intel HD graphics driver (Linux port)
 
 ## Build instructions
 
@@ -48,23 +48,19 @@ on real hardware.
 
 The following is a distro-agnostic list of packages needed to build Vinix.
 
-Keep in mind that the following packages should be relatively up to date, so
-older distros may not work despite the following packages having been
-installed.
-
 Skip to a paragraph for your host distro if there is any.
 
-`GNU Bash`, `curl`, `git`, `mercurial`, `docker`, `xorriso`, and `qemu`
+`GNU make`, `curl`, `git`, `mercurial`, `docker`, `xorriso`, and `qemu`
 to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install curl git mercurial docker.io xorriso qemu-system-x86
+sudo apt install make curl git mercurial docker.io xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed curl git mercurial docker xorriso qemu
+sudo pacman -S --needed make curl git mercurial docker xorriso qemu
 ```
 
 ### Docker
@@ -85,7 +81,7 @@ for setting up Docker.
 
 ### Building the distro
 
-To build the distro which includes the cross toolchain necessary
+To build the distro, which includes the cross toolchain necessary
 to build kernel and ports, as well as the kernel itself, run:
 
 ```bash
@@ -93,8 +89,8 @@ make distro-base # Build the base distribution.
 make all         # Make filesystem and ISO.
 ```
 
-This will build a minimal distro image. The `make distro-full` option
-is avaliable to build the full distro; this step will take a while.
+This will build a minimal distro image. The `make distro-full` target
+is also avaliable to build the full distro; this step will take a while.
 
 ### To test
 
