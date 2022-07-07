@@ -8,7 +8,7 @@ jobs:
   vinix-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install build-essential curl git mercurial xorriso -y
@@ -19,22 +19,22 @@ jobs:
       - name: Build ISO
         run: JINX_DOCKER_INTERACTIVE=no make all
 
-      - name: Untag last nightly release
-        run: ( git push --delete origin nightly || true ) && ( git tag --delete nightly || true )
+      - name: Set TAG_DATE variable
+        run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Tag new nightly release
-        run: git tag nightly && git push --tags
+        run: git tag nightly-$TAG_DATE && git push --tags
 
       - name: Rename vinix.iso
-        run: mv vinix.iso vinix-nightly.iso
+        run: mv vinix.iso vinix-nightly-$(date +'%Y%m%d').iso
 
       - name: Create nightly release
         uses: softprops/action-gh-release@v1
         with:
-          name: Nightly build
-          tag_name: nightly
+          name: Nightly build ${{ env.TAG_DATE }}
+          tag_name: nightly-${{ env.TAG_DATE }}
           body: Image of an up to date Vinix nightly build.
           files: |
-            vinix-nightly.iso
+            vinix-nightly-*.iso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
