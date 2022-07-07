@@ -1,0 +1,30 @@
+name=gcc
+from_source=gcc
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc binutils zlib libgmp"
+imagedeps="gcc"
+
+configure() {
+    ${source_dir}/configure                 \
+        --host=x86_64-vinix                 \
+        --prefix=${prefix}                  \
+        --target=x86_64-vinix               \
+        --with-sysroot=/                    \
+        --with-build-sysroot=${sysroot_dir} \
+        --enable-languages=c,c++            \
+        --enable-initfini-array             \
+        --disable-multilib                  \
+        --disable-nls                       \
+        --with-system-zlib                  \
+        --with-gmp=${sysroot_dir}/usr
+}
+
+build() {
+    make -j${parallelism} all-gcc all-target-libgcc all-target-libstdc++-v3
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip-gcc install-strip-target-libgcc install-strip-target-libstdc++-v3
+    ln -s gcc "${dest_dir}"/usr/bin/cc
+}
