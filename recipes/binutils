@@ -2,7 +2,7 @@ name=binutils
 from_source=binutils
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc"
+deps="mlibc zlib libgmp"
 imagedeps="gcc"
 
 configure() {
@@ -12,7 +12,11 @@ configure() {
         --target=x86_64-vinix         \
         --with-sysroot=/              \
         --disable-nls                 \
-        --disable-werror
+        --disable-werror              \
+        --with-system-zlib            \
+        --with-gmp=${sysroot_dir}/usr \
+        --enable-shared               \
+        --enable-host-shared
 }
 
 build() {
@@ -21,4 +25,6 @@ build() {
 
 install() {
     DESTDIR="${dest_dir}" make install-strip-binutils install-strip-gas install-strip-ld
+    # Remove static libraries
+    rm -rf "${dest_dir}${prefix}"/lib/*.a
 }

@@ -17,7 +17,9 @@ configure() {
         --disable-multilib                  \
         --disable-nls                       \
         --with-system-zlib                  \
-        --with-gmp=${sysroot_dir}/usr
+        --with-gmp=${sysroot_dir}/usr       \
+        --enable-shared                     \
+        --enable-host-shared
 }
 
 build() {
@@ -26,5 +28,7 @@ build() {
 
 install() {
     DESTDIR="${dest_dir}" make install-strip-gcc install-strip-target-libgcc install-strip-target-libstdc++-v3
-    ln -s gcc "${dest_dir}"/usr/bin/cc
+    ln -s gcc "${dest_dir}${prefix}"/bin/cc
+    # Remove static libraries
+    rm -rf "${dest_dir}${prefix}"/lib/*.a
 }
