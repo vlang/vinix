@@ -1,2 +1,2 @@
-. jinx-config
+. ${base_dir}/jinx-config
 export VINIX_PROD=no
