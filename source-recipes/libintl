@@ -1,0 +1,13 @@
+name=libintl
+version=0.21
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/gettext/gettext-${version}.tar.gz"
+hostdeps="autoconf automake libtool pkg-config"
+
+regenerate() {
+    sed -i 's|. $srcdir/version.sh|dnl . $srcdir/version.sh|g' libtextstyle/configure.ac
+    sed -i 's|AC_INIT|. $srcdir/version.sh\nAC_INIT([libtextstyle], [$VERSION_NUMBER], [bug-gettext@gnu.org])|g' libtextstyle/configure.ac
+    sed -i 's|gl_INIT_PACKAGE|dnl gl_INIT_PACKAGE|g' libtextstyle/configure.ac
+
+    autoreconf -fvi
+}

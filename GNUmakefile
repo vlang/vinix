@@ -5,23 +5,24 @@
 QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio
 
 .PHONY: all
-all:
+all: jinx
 	./jinx build base-files kernel init util-vinix
 	./build-support/makeiso.sh
 
 .PHONY: debug
 debug:
-	cp jinx-config jinx-config.bak
-	echo "export VINIX_PROD=no" >> jinx-config
-	$(MAKE) all || ( mv jinx-config.bak jinx-config && false )
-	mv jinx-config.bak jinx-config
+	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
+
+jinx:
+	curl -o jinx https://raw.githubusercontent.com/mintsuki/jinx/trunk/jinx
+	chmod +x jinx
 
 .PHONY: distro-full
-distro-full:
+distro-full: jinx
 	./jinx build-all
 
 .PHONY: distro-base
-distro-base:
+distro-base: jinx
 	./jinx build bash coreutils
 
 .PHONY: run-kvm
@@ -68,6 +69,7 @@ clean: kernel-clean util-vinix-clean init-clean base-files-clean
 	rm -rf iso_root sysroot vinix.iso initramfs.tar
 
 .PHONY: distclean
-distclean: clean
+distclean: clean jinx
 	make -C kernel distclean
 	./jinx clean
+	rm jinx

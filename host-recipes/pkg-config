@@ -5,7 +5,8 @@ imagedeps="gcc"
 hostdeps="automake autoconf libtool"
 
 configure() {
-    "${source_dir}"/configure CFLAGS="${common_cflags}" CXXFLAGS="${common_cflags}" --prefix="${prefix}"
+    "${source_dir}"/configure \
+        --prefix="${prefix}"
 }
 
 build() {

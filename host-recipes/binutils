@@ -5,7 +5,11 @@ imagedeps="gcc"
 hostdeps="autoconf automake"
 
 configure() {
-    "${source_dir}"/configure CFLAGS="${common_cflags}" CXXFLAGS="${common_cflags}" --prefix="${prefix}" --target=x86_64-vinix --with-sysroot="${sysroot_dir}" --disable-werror
+    "${source_dir}"/configure \
+        --prefix="${prefix}" \
+        --target=x86_64-vinix \
+        --with-sysroot="${sysroot_dir}" \
+        --disable-werror
 }
 
 build() {

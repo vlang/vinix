@@ -1,0 +1,11 @@
+name=nano
+version=6.3
+source_method=git
+clone_url="https://git.savannah.gnu.org/git/nano.git"
+tag="v${version}"
+hostdeps="automake autoconf libtool pkg-config"
+imagedeps="git"
+
+regenerate() {
+    ./autogen.sh
+}

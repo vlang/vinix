@@ -309,7 +309,13 @@ fn is_printable(c u8) bool {
 	return c >= 0x20 && c <= 0x7e
 }
 
-fn add_to_buf_char(c u8, echo bool) {
+fn add_to_buf_char(_c u8, echo bool) {
+	mut c := _c
+
+	if c == `\n` && console_termios.c_iflag & termios.icrnl == 0 {
+		c = `\r`
+	}
+
 	if console_termios.c_lflag & termios.icanon != 0 {
 		match c {
 			`\n` {

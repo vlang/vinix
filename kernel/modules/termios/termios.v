@@ -14,6 +14,10 @@ pub const echonl = 0x0008
 
 pub const icanon = 0x0010
 
+pub const inlcr = 0x0020
+
+pub const icrnl = 0x0002
+
 pub const iexten = 0x0020
 
 pub const isig = 0x0040
