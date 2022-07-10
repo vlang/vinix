@@ -17,7 +17,10 @@ virtual machines.
 
 **Note: Vinix is still pre-alpha software not meant for daily or production usage!**
 
-![Reference screenshot](/screenshot.png?raw=true "Reference screenshot")
+![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
+![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
+
+Photo by Pixabay: https://www.pexels.com/photo/gray-and-black-galaxy-wallpaper-2150/
 
 ## Download latest nightly image
 

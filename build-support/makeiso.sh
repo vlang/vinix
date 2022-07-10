@@ -14,7 +14,7 @@ rm -rf iso_root
 mkdir -pv iso_root/boot
 cp -r sysroot/boot/vinix.elf iso_root/boot/
 cp -r initramfs.tar iso_root/boot/
-cp -r build-support/limine.cfg build-support/v-logo.bmp iso_root/boot/
+cp -r build-support/limine.cfg build-support/background.bmp iso_root/boot/
 
 # Install the limine binaries.
 cp -r host-pkgs/limine/usr/local/share/limine/limine.sys        iso_root/boot/
