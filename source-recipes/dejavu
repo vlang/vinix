@@ -1,0 +1,8 @@
+name=dejavu
+version=2.37
+source_method=tarball
+tarball_url="https://sourceforge.net/projects/dejavu/files/dejavu/${version}/dejavu-fonts-ttf-${version}.tar.bz2"
+
+regenerate() {
+    true
+}
