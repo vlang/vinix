@@ -1,0 +1,9 @@
+name=libepoxy
+version=1.5.10
+source_method=git
+clone_url="https://github.com/anholt/libepoxy.git"
+tag="${version}"
+
+regenerate() {
+    true
+}

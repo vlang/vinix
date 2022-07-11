@@ -1,0 +1,24 @@
+name=libepoxy
+from_source=libepoxy
+revision=1
+hostdeps="gcc pkg-config"
+deps="mlibc mesa xorg-proto libx11"
+imagedeps="meson ninja"
+
+configure() {
+    meson \
+        --cross-file ${base_dir}/build-support/cross_file.txt \
+        --prefix=${prefix} \
+        --buildtype=release \
+        -Degl=no \
+        -Dtests=false \
+        ${source_dir}
+}
+
+build() {
+    ninja
+}
+
+install() {
+    DESTDIR="${dest_dir}" ninja install
+}
