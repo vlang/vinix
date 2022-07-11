@@ -1,0 +1,13 @@
+name=fontconfig
+version=2.14.0
+source_method=git
+clone_url="https://gitlab.freedesktop.org/fontconfig/fontconfig.git"
+tag="${version}"
+hostdeps="automake autoconf libtool pkg-config"
+imagedeps="gperf"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+    # Make sure we regenerate this file
+    rm -f src/fcobjshash.h
+}
