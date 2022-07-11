@@ -1,0 +1,10 @@
+name=pixman
+version=0.40.0
+source_method=git
+clone_url="https://gitlab.freedesktop.org/pixman/pixman.git"
+tag="pixman-${version}"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

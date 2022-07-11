@@ -1,0 +1,20 @@
+name=pixman
+from_source=pixman
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc libpng"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --disable-static
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}
