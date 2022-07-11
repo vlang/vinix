@@ -3,9 +3,9 @@ version=0.0
 source_method=git
 clone_url="https://github.com/vlang/v.git"
 tag="master"
-commit="a46bcf3571b2824593a6105103696ff191e9e7bd"
+commit="bfcf5b13ed54935f79e7f3828ca334d27f810bac"
 imagedeps="curl"
 
 regenerate() {
-    curl -o v.c https://raw.githubusercontent.com/vlang/vc/6e715ea6f7119299b690acd6848d4ed8ea0eea50/v.c
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/6c28b9142e832f7b069fa48504996f085ba638b2/v.c
 }
