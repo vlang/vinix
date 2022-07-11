@@ -1,0 +1,10 @@
+name=nasm
+version=2.15.05
+source_method=git
+clone_url="https://github.com/netwide-assembler/nasm.git"
+tag="nasm-${version}"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    ./autogen.sh
+}

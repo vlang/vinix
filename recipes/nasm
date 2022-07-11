@@ -1,0 +1,23 @@
+name=nasm
+from_source=nasm
+revision=1
+hostdeps="gcc automake autoconf libtool pkg-config"
+deps="mlibc"
+imagedeps="asciidoc xmlto"
+
+configure() {
+    cp -r ${source_dir}/. .
+    ./configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix}
+}
+
+build() {
+    make
+    make manpages
+}
+
+install() {
+    make strip
+    DESTDIR="${dest_dir}" make install
+}
