@@ -1,0 +1,10 @@
+name=libxml
+version=2.9.14
+source_method=git
+clone_url="https://gitlab.gnome.org/GNOME/libxml2.git"
+tag="v${version}"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}
