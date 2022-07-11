@@ -50,4 +50,6 @@ SECTIONS
         *(COMMON)
         *(.bss .bss.*)
     } : data
+
+    KERNEL_END_SYMBOL = .;
 }
