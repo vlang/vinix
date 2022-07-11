@@ -1,0 +1,9 @@
+name=bzip2
+version=1.0.8
+source_method=git
+clone_url="https://sourceware.org/git/bzip2.git"
+tag="bzip2-${version}"
+
+regenerate() {
+    true
+}

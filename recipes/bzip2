@@ -1,0 +1,30 @@
+name=bzip2
+from_source=bzip2
+revision=1
+hostdeps="gcc pkg-config"
+deps="mlibc"
+
+configure() {
+    cp -r ${source_dir}/. .
+    sed -i 's/all: libbz2.a bzip2 bzip2recover test/all: libbz2.a bzip2 bzip2recover/g' Makefile
+}
+
+build() {
+    make CC=x86_64-vinix-gcc CFLAGS=-fPIC -f Makefile-libbz2_so
+    make clean
+    make CC=x86_64-vinix-gcc AR=x86_64-vinix-ar CFLAGS=-fPIC -j${parallelism}
+}
+
+install() {
+    mkdir -p "${dest_dir}${prefix}/bin" "${dest_dir}${prefix}/lib"
+    command install -s --strip-program=x86_64-vinix-strip bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
+    command install -s --strip-program=x86_64-vinix-strip bzip2recover "${dest_dir}${prefix}/bin/"
+    command install -s --strip-program=x86_64-vinix-strip libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/"
+    ln -sf libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/libbz2.so.1.0"
+    ln -sf libbz2.so.1.0 "${dest_dir}${prefix}/lib/libbz2.so.1"
+    ln -sf libbz2.so.1 "${dest_dir}${prefix}/lib/libbz2.so"
+    ln -sf bzdiff "${dest_dir}${prefix}/bin/bzcmp"
+    ln -sf bzgrep "${dest_dir}${prefix}/bin/bzegrep"
+    ln -sf bzgrep "${dest_dir}${prefix}/bin/bzfgrep"
+    ln -sf bzmore "${dest_dir}${prefix}/bin/bzless"
+}
