@@ -29,6 +29,8 @@ pub mut:
 	mmap_ranges []voidptr
 }
 
+fn C.get_kernel_end_addr() u64
+
 pub fn new_pagemap() &Pagemap {
 	mut top_level := &u64(pmm_alloc(1))
 	if top_level == 0 {
@@ -182,7 +184,9 @@ pub fn vmm_init() {
 	// Map kernel
 	virt := kaddr_req.response.virtual_base
 	phys := kaddr_req.response.physical_base
-	len := 0x10000000
+	// Subtract the kernel virtual base from the kernel's end address
+	// to get the kernel span
+	len := lib.align_up(C.get_kernel_end_addr(), page_size) - virt
 
 	print('vmm: PMRs: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${len:x}\n')
 
