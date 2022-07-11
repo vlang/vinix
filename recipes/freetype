@@ -1,0 +1,23 @@
+name=freetype
+from_source=freetype
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc bzip2 libpng zlib"
+imagedeps="gcc"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --disable-static \
+        --with-harfbuzz=no
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install
+    x86_64-vinix-strip "${dest_dir}${prefix}/lib/libfreetype.so.6.18.3"
+}

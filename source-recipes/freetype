@@ -1,0 +1,12 @@
+name=freetype
+version=2.12.1
+source_method=git
+clone_url="https://gitlab.freedesktop.org/freetype/freetype.git"
+tag="VER-2-12-1"
+hostdeps="automake autoconf libtool pkg-config"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=1 ./autogen.sh
+    cp /usr/local/share/automake-1.16/config.sub ./builds/unix/
+}
