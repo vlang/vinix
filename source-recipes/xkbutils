@@ -1,0 +1,11 @@
+name=xkbutils
+version=1.0.4
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/app/xkbutils.git"
+tag="xkbutils-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    autoreconf -fvi
+}
