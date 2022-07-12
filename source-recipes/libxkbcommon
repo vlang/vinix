@@ -1,0 +1,9 @@
+name=libxkbcommon
+version=1.4.1
+source_method=git
+clone_url="https://github.com/xkbcommon/libxkbcommon.git"
+tag="xkbcommon-${version}"
+
+regenerate() {
+    true
+}

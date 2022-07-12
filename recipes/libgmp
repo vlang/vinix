@@ -10,7 +10,8 @@ configure() {
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
         --enable-cxx                  \
-        --disable-static
+        --disable-static              \
+        --with-sysroot=${sysroot_dir}
 }
 
 build() {

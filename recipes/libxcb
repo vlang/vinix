@@ -13,7 +13,8 @@ configure() {
         --prefix=${prefix}            \
         --sysconfdir=/etc             \
         --localstatedir=/var          \
-        --disable-static
+        --disable-static              \
+        --with-sysroot=${sysroot_dir}
 }
 
 build() {
