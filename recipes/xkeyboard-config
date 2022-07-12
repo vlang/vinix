@@ -1,0 +1,24 @@
+name=xkeyboard-config
+from_source=xkeyboard-config
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-proto libx11"
+imagedeps="python"
+
+configure() {
+    ${source_dir}/configure           \
+        --host=x86_64-vinix           \
+        --prefix=${prefix}            \
+        --sysconfdir=/etc             \
+        --localstatedir=/var          \
+        --disable-nls                 \
+        --with-xkb-rules-symlink=xorg
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

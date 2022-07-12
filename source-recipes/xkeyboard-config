@@ -1,0 +1,11 @@
+name=xkeyboard-config
+version=2.34
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config.git"
+tag="xkeyboard-config-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}
