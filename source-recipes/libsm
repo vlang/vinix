@@ -1,0 +1,11 @@
+name=libsm
+version=1.2.3
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libsm.git"
+tag="libSM-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}

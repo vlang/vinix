@@ -1,0 +1,11 @@
+name=libxt
+version=1.2.1
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libxt.git"
+tag="libXt-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}
