@@ -1,0 +1,11 @@
+name=libxpm
+version=3.5.13
+source_method=git
+clone_url="https://gitlab.freedesktop.org/xorg/lib/libxpm.git"
+tag="libXpm-${version}"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+imagedeps="git"
+
+regenerate() {
+    NOCONFIGURE=yes ./autogen.sh
+}
