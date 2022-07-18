@@ -53,34 +53,18 @@ The following is a distro-agnostic list of packages needed to build Vinix.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU make`, `curl`, `git`, `mercurial`, `docker`, `xorriso`, and `qemu`
+`GNU make`, `curl`, `git`, `mercurial`, `bsdtar`, `xorriso`, and `qemu`
 to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install make curl git mercurial docker.io xorriso qemu-system-x86
+sudo apt install make curl git mercurial bsdtar xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed make curl git mercurial docker xorriso qemu
+sudo pacman -S --needed make curl git mercurial libarchive xorriso qemu
 ```
-
-### Docker
-
-Make sure Docker and its daemon are up and running before continuing further.
-This may require logging out and back into your account, or restarting your
-machine.
-
-If Docker is properly running, the output of `docker run hello-world` should
-include:
-```
-Hello from Docker!
-This message shows that your installation appears to be working correctly.
-```
-
-If this does not work, search the web for your distro-specific instructions
-for setting up Docker.
 
 ### Building the distro
 
