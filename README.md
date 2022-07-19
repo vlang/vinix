@@ -58,7 +58,7 @@ to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install make curl git mercurial bsdtar xorriso qemu-system-x86
+sudo apt install make curl git mercurial libarchive-tools xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
