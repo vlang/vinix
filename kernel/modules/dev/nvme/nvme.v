@@ -424,7 +424,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 	}
 	namespace.nsid = nsid
 	namespace.identity = &NVMENamespaceID(
-		u64(memory.pmm_alloc(lib.div_roundup(sizeof(NVMENamespaceID), page_size))) + higher_half)
+		u64(memory.pmm_alloc(lib.div_roundup<u64>(sizeof(NVMENamespaceID), page_size))) + higher_half)
 
 	mut new_command := &NVMECommand{}
 
@@ -481,10 +481,10 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 	pair.entry_cnt = parent_controller.queue_entries
 
 	pair.submission_queue = &NVMECommand(
-		u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECommand), page_size))) +
+		u64(memory.pmm_alloc(lib.div_roundup<u64>(pair.entry_cnt * sizeof(NVMECommand), page_size))) +
 		higher_half)
 	pair.completion_queue = &NVMECompletion(
-		u64(memory.pmm_alloc(lib.div_roundup(pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
+		u64(memory.pmm_alloc(lib.div_roundup<u64>(pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
 		higher_half)
 
 	submission_offset := page_size + 2 * qid * (4 << parent_controller.strides)
@@ -614,7 +614,7 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 	}
 
 	mut prp_list := &u64(
-		u64(memory.pmm_alloc(lib.div_roundup(ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
+		u64(memory.pmm_alloc(lib.div_roundup<u64>(ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
 		higher_half)
 
 	if (cnt * ns.stat.blksize) > page_size {
@@ -672,7 +672,7 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 
 fn (mut c NVMEController) get_controller_id() int {
 	c.controller_id = &NVMEControllerID(
-		u64(memory.pmm_alloc(lib.div_roundup(sizeof(NVMEControllerID), page_size))) + higher_half)
+		u64(memory.pmm_alloc(lib.div_roundup<u64>(sizeof(NVMEControllerID), page_size))) + higher_half)
 
 	mut new_command := &NVMECommand{}
 
@@ -785,7 +785,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
 	print('nvme: subsystem vendor ID: $c.controller_id.ssvid\n')
 
-	nsid_list := &u32(u64(memory.pmm_alloc(lib.div_roundup(c.controller_id.nn * 4, page_size))) +
+	nsid_list := &u32(u64(memory.pmm_alloc(lib.div_roundup<u64>(c.controller_id.nn * 4, page_size))) +
 		higher_half)
 
 	mut new_command := &NVMECommand{}
