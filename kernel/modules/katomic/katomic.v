@@ -53,8 +53,8 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 }
 
 pub fn inc<T>(var &T) T {
-	mut diff := T(1)
 	unsafe {
+		mut diff := T(1)
 		asm volatile amd64 {
 			lock
 			xadd var, diff
@@ -68,8 +68,8 @@ pub fn inc<T>(var &T) T {
 
 pub fn dec<T>(var &T) bool {
 	mut ret := false
-	mut diff := T(-1)
 	unsafe {
+		mut diff := T(-1)
 		asm volatile amd64 {
 			lock
 			xadd var, diff
@@ -95,8 +95,8 @@ pub fn store<T>(var &T, value T) {
 }
 
 pub fn load<T>(var &T) T {
-	mut ret := T(0)
 	unsafe {
+		mut ret := T(0)
 		asm volatile amd64 {
 			lock
 			xadd var, ret
