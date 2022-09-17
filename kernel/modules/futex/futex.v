@@ -30,11 +30,11 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 	}
 
 	if katomic.load(unsafe { ptr[0] }) != expected {
-		return -1, errno.eagain
+		return errno.err, errno.eagain
 	}
 
 	mut e := &eventstruct.Event(0)
-	phys := proc.current_thread().process.pagemap.virt2phys(u64(ptr)) or { return -1, errno.get() }
+	phys := proc.current_thread().process.pagemap.virt2phys(u64(ptr)) or { return errno.err, errno.get() }
 
 	futex_lock.acquire()
 
@@ -48,7 +48,7 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 	futex_lock.release()
 
 	mut events := [e]
-	event.await(mut events, true) or { return -1, errno.eintr }
+	event.await(mut events, true) or { return errno.err, errno.eintr }
 
 	return 0, 0
 }
@@ -65,7 +65,7 @@ pub fn syscall_futex_wake(_ voidptr, ptr &int) (u64, u64) {
 	// Ensure this page is not lazily mapped
 	katomic.load(unsafe { ptr[0] })
 
-	phys := proc.current_thread().process.pagemap.virt2phys(u64(ptr)) or { return -1, errno.get() }
+	phys := proc.current_thread().process.pagemap.virt2phys(u64(ptr)) or { return errno.err, errno.get() }
 
 	futex_lock.acquire()
 	defer {

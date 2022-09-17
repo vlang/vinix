@@ -79,7 +79,7 @@ pub fn syscall_getitimer(_ voidptr, which int, mut curr_value ITimerVal) (u64, u
 	}
 
 	if which > 2 {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	mut itimers := &ITimer(voidptr(&process.itimers[0]))
@@ -105,7 +105,7 @@ pub fn syscall_setitimer(_ voidptr, which int, mut new_value ITimerVal, mut old_
 	}
 
 	if which > 2 {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	mut itimers := &ITimer(voidptr(&process.itimers[0]))

@@ -153,7 +153,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 	}
 
 	for {
-		which := event.await(mut events, true) or { return -1, errno.eintr }
+		which := event.await(mut events, true) or { return errno.err, errno.eintr }
 
 		if voidptr(timer) != voidptr(0) {
 			if which == u64(events.len) - 1 {
@@ -380,7 +380,7 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 	}
 
 	new_fdnum := fdnum_dup(voidptr(0), oldfdnum, voidptr(0), newfdnum, flags, true, false) or {
-		return -1, errno.get()
+		return errno.err, errno.get()
 	}
 
 	return u64(new_fdnum), 0
@@ -395,7 +395,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.ebadf }
+	mut fd := fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.ebadf }
 
 	mut handle := fd.handle
 
@@ -404,12 +404,12 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	match cmd {
 		file.f_dupfd {
 			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false, false) or {
-				return -1, errno.get()
+				return errno.err, errno.get()
 			})
 		}
 		file.f_dupfd_cloexec {
 			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false, true) or {
-				return -1, errno.get()
+				return errno.err, errno.get()
 			})
 		}
 		file.f_getfd {
@@ -431,7 +431,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		else {
 			print('\nfcntl: Unhandled command: $cmd\n')
 			fd.unref()
-			return -1, errno.einval
+			return errno.err, errno.einval
 		}
 	}
 
@@ -452,7 +452,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	mut fd := &FD(voidptr(0))
 
 	if fdnum != -1 {
-		fd = fd_from_fdnum(voidptr(0), fdnum) or { return -1, errno.get() }
+		fd = fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
 		resource = fd.handle.resource
 	}
 
@@ -466,11 +466,11 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	flags := int(prot_and_flags & 0xffffffff)
 
 	if flags & mmap.map_anonymous == 0 && voidptr(resource) == voidptr(0) {
-		return -1, errno.ebadf
+		return errno.err, errno.ebadf
 	}
 
 	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
-		return -1, errno.get()
+		return errno.err, errno.get()
 	}
 
 	return u64(ret), 0

@@ -219,7 +219,7 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 	}
 
 	if signum < 0 || signum > 34 || signum == userland.sigkill || signum == userland.sigstop {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	mut thread := proc.current_thread()
@@ -402,9 +402,9 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 
 	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
-		'', '', '') or { return -1, errno.get() }
+		'', '', '') or { return errno.err, errno.get() }
 
-	return -1, errno.get()
+	return errno.err, errno.get()
 }
 
 pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
@@ -423,27 +423,27 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 
 	if pid == -1 {
 		if current_process.children.len == 0 {
-			return -1, errno.echild
+			return errno.err, errno.echild
 		}
 		for c in current_process.children {
 			events << &c.event
 		}
 	} else if pid < -1 || pid == 0 {
 		print('\nwaitpid: value of pid not supported\n')
-		return -1, errno.einval
+		return errno.err, errno.einval
 	} else {
 		if current_process.children.len == 0 {
-			return -1, errno.echild
+			return errno.err, errno.echild
 		}
 		child = processes[pid]
 		if voidptr(child) == voidptr(0) || child.ppid != current_process.pid {
-			return -1, errno.echild
+			return errno.err, errno.echild
 		}
 		events << &child.event
 	}
 
 	block := options & userland.wnohang == 0
-	which := event.await(mut events, block) or { return -1, errno.eintr }
+	which := event.await(mut events, block) or { return errno.err, errno.eintr }
 
 	if voidptr(child) == voidptr(0) {
 		child = current_process.children[which]
@@ -512,7 +512,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
-	mut new_process := sched.new_process(old_process, voidptr(0)) or { return -1, errno.get() }
+	mut new_process := sched.new_process(old_process, voidptr(0)) or { return errno.err, errno.get() }
 
 	new_process.name = '${old_process.name}[${new_process.pid}]'
 

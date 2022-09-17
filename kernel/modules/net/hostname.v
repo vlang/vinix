@@ -16,7 +16,7 @@ pub fn syscall_gethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 	real_len := unsafe { C.strlen(&hostname[0]) }
 
 	if len < real_len {
-		return -1, errno.enametoolong
+		return errno.err, errno.enametoolong
 	}
 
 	unsafe { C.memcpy(name, &hostname[0], real_len + 1) }
@@ -25,7 +25,7 @@ pub fn syscall_gethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 
 pub fn syscall_sethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 	if len > hostname_len - 1 {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	unsafe { C.memcpy(&hostname[0], name, len) }

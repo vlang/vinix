@@ -45,7 +45,7 @@ pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u6
 		}
 		else {
 			C.printf(c'clock_get: Unknown clock type\n')
-			return -1, errno.einval
+			return errno.err, errno.einval
 		}
 	}
 
@@ -67,7 +67,7 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 	}
 
 	if req.tv_sec < 0 || req.tv_nsec < 0 || req.tv_nsec >= 1000000000 {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	mut events := []&eventstruct.Event{}
@@ -97,7 +97,7 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 			}
 		}
 
-		return -1, errno.eintr
+		return errno.err, errno.eintr
 	}
 
 	return 0, 0

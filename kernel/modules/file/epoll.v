@@ -102,7 +102,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return -1, errno.get() }
+	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return errno.err, errno.get() }
 	defer {
 		epoll_fd.unref()
 	}
@@ -114,13 +114,13 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 	if epoll_resource is EPoll {
 		epoll = epoll_resource
 	} else {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	match op {
 		file.epoll_ctl_add {
 			if fdnum in epoll.table {
-				return -1, errno.eexist
+				return errno.err, errno.eexist
 			}
 
 			mut event_copy := &EPollEvent{}
@@ -131,7 +131,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 		}
 		file.epoll_ctl_mod {
 			if fdnum !in epoll.table {
-				return -1, errno.enoent
+				return errno.err, errno.enoent
 			}
 
 			mut event_copy := &EPollEvent{}
@@ -142,13 +142,13 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 		}
 		file.epoll_ctl_del {
 			if fdnum !in epoll.table {
-				return -1, errno.enoent
+				return errno.err, errno.enoent
 			}
 
 			epoll.table.delete(fdnum)
 		}
 		else {
-			return -1, errno.einval
+			return errno.err, errno.einval
 		}
 	}
 
@@ -166,7 +166,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return -1, errno.get() }
+	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return errno.err, errno.get() }
 	defer {
 		epoll_fd.unref()
 	}
@@ -178,7 +178,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 	if epoll_resource is EPoll {
 		epoll = epoll_resource
 	} else {
-		return -1, errno.einval
+		return errno.err, errno.einval
 	}
 
 	mut thread := proc.current_thread()
@@ -237,7 +237,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 	}
 
 	for {
-		which := event.await(mut events, true) or { return -1, errno.eintr }
+		which := event.await(mut events, true) or { return errno.err, errno.eintr }
 
 		status := fdlist[which].handle.resource.status
 
@@ -270,7 +270,7 @@ pub fn syscall_epoll_create(_ voidptr, flags int) (u64, u64) {
 	}
 
 	epoll_fdnum := fdnum_create_from_resource(voidptr(0), mut e, cloexec, 0, false) or {
-		return -1, errno.get()
+		return errno.err, errno.get()
 	}
 
 	return u64(epoll_fdnum), 0

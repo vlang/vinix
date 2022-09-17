@@ -342,7 +342,7 @@ pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	munmap(process.pagemap, addr, length) or { return -1, errno.get() }
+	munmap(process.pagemap, addr, length) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -358,7 +358,7 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 	}
 
 	mprotect(process.pagemap, addr, length, prot) or {
-		return -1, errno.get()
+		return errno.err, errno.get()
 	}
 
 	return 0, 0

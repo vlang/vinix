@@ -6,6 +6,8 @@ module errno
 
 import proc
 
+pub const err = u64(-1)
+
 pub const edom = 1
 
 pub const eilseq = 2
