@@ -99,7 +99,7 @@ pub fn initialise() {
 			}
 		}
 
-		match USTARFileType(current_header.filetype) {
+		match unsafe { USTARFileType(current_header.filetype) } {
 			.gnu_long_path {
 				// limit for safety
 				if size >= 65536 {
