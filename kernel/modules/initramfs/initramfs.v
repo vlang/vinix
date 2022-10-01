@@ -53,7 +53,9 @@ fn C.string_free(&string)
 
 [cinit]
 __global (
-	volatile module_req = limine.LimineModuleRequest{response: 0}
+	module_req = limine.LimineModuleRequest{
+		response: 0
+	}
 )
 
 [manualfree]
@@ -99,7 +101,7 @@ pub fn initialise() {
 			}
 		}
 
-		match USTARFileType(current_header.filetype) {
+		match unsafe { USTARFileType(current_header.filetype) } {
 			.gnu_long_path {
 				// limit for safety
 				if size >= 65536 {
