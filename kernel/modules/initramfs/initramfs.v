@@ -53,9 +53,7 @@ fn C.string_free(&string)
 
 [cinit]
 __global (
-	module_req = limine.LimineModuleRequest{
-		response: 0
-	}
+	volatile module_req = limine.LimineModuleRequest{response: 0}
 )
 
 [manualfree]
