@@ -14,7 +14,7 @@ import lib
 import fs
 
 const (
-	gpt_signature = 0x5452415020494645
+	gpt_signature = u32(0x5452415020494645)
 )
 
 struct Partition {
