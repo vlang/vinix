@@ -22,9 +22,9 @@ const (
 	ahci_subclass   = 0x6
 	ahci_progif     = 0x1
 	sata_ata        = 0x101
-	sata_atapi      = 0xeb140101
-	sata_semb       = 0xc33C0101
-	sata_pm         = 0x96690101
+	sata_atapi      = u32(0xeb140101)
+	sata_semb       = u32(0xc33C0101)
+	sata_pm         = u32(0x96690101)
 	hba_cmd_st      = 0x1
 	hba_cmd_fre     = 0x10
 	hba_cmd_fr      = 0x4000
