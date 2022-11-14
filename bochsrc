@@ -1,0 +1,6 @@
+ata0-slave: type=cdrom, path=vinix.iso, status=inserted
+boot: cdrom
+com1: enabled=1
+memory: guest=1024, host=1024
+clock: sync=none, time0=utc
+cpuid: level=6, fsgsbase=true

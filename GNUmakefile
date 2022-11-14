@@ -40,7 +40,10 @@ ovmf:
 .PHONY: run-uefi
 run-uefi: ovmf
 	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS) -smp 4 -bios ovmf/OVMF.fd
-
+run-bochs: vinix.iso
+        bochs -f bochsrc
+run-lingemu: vinix.iso 
+        lingemu runvirt -m 8192 --diskcontroller type=ahci,name=ahcibus1 --disk vinix.iso,disktype=cdrom,controller=ahcibus1
 .PHONY: run
 run: vinix.iso
 	qemu-system-x86_64 $(QEMUFLAGS) -no-shutdown -no-reboot -d int -smp 1
