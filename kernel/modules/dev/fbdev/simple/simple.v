@@ -80,8 +80,8 @@ fn do_register(config &SimpleFBConfig) {
 			transp: config.transp
 			nonstd: 0
 			activate: api.fb_activate_now
-			height: -1
-			width: -1
+			height: 0
+			width: 0
 			accel_flags: 0
 			pixclock: 0
 			left_margin: 0
