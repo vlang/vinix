@@ -2,7 +2,7 @@ name=fontconfig
 from_source=fontconfig
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc freetype libxml libiconv"
+deps="mlibc freetype libexpat libxml"
 imagedeps="python gperf"
 
 configure() {
@@ -13,6 +13,7 @@ configure() {
         --localstatedir=/var \
         --disable-static \
         --disable-docs \
+        --disable-nls \
         --enable-libxml2
 }
 

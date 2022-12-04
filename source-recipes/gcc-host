@@ -1,0 +1,42 @@
+name=gcc-host
+version=12.2.0
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/gcc/gcc-${version}/gcc-${version}.tar.xz"
+tarball_blake2b="715574af9ad678f9dc8cfd19c866bf910c7edfd479e7e9681337feaa9b54e5d304ddb85483816b8d89754d502405823ae2eff0d1e444538763f40be8e428d8da"
+hostdeps="automake autoconf libtool pkg-config"
+allow_network="yes"
+
+regenerate() {
+    ./contrib/download_prerequisites
+    autoreconf -fvi -I./config && libtoolize -cfvi
+    ( cd libiberty && autoreconf -fvi -I./config -I../config && libtoolize -cfvi )
+    ( cd intl && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd zlib && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd c++tools && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd fixincludes && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd gnattools && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libada && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libcody && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd gcc && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libgcc && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libcc1 && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libcpp && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd gotools && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libgo && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libgfortran && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libobjc && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libphobos && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libbacktrace && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libdecnumber && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libquadmath && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libffi && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libatomic && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd lto-plugin && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libgomp && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libitm && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd liboffloadmic && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libsanitizer && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libssp && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libvtv && autoreconf -fvi -I../config && libtoolize -cfvi )
+    ( cd libstdc++-v3 && autoreconf -fvi -I../config && libtoolize -cfvi )
+}

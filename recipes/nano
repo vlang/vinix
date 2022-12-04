@@ -2,16 +2,14 @@ name=nano
 from_source=nano
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc ncurses zlib libintl"
+deps="mlibc ncurses libintl"
 
 configure() {
-        gl_cv_type_wctype_t=yes \
-        gl_cv_type_wctrans_t=yes \
     ${source_dir}/configure    \
         --host=x86_64-vinix    \
         --prefix=${prefix}     \
         --sysconfdir=/etc      \
-        CFLAGS="-DSLOW_BUT_NO_HACKS -Wno-error -O2 -pipe"
+        --disable-nls
 }
 
 build() {

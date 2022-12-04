@@ -1,11 +1,10 @@
 name=xorg-font-util
-version=1.3.2
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/font/util.git"
-tag="font-util-${version}"
+version=1.3.3
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/font/font-util-${version}.tar.xz"
+tarball_blake2b="b893159496fb242c33facda98597e200b41d05fbc28c9c1cf04f5214788f421472562a79ad24cffddad72ebf38f751858712a5c7c2904370ea77f501f78ccc77"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

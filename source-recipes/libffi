@@ -1,11 +1,10 @@
 name=libffi
 version=3.4.2
-source_method=git
-clone_url="https://github.com/libffi/libffi.git"
-tag="v${version}"
+source_method=tarball
+tarball_url="https://github.com/libffi/libffi/releases/download/v${version}/libffi-${version}.tar.gz"
+tarball_blake2b="a8137bc895b819f949fd7705e405be627219c6d1fdef280253330f7407d4a548bb057d7bb0e9225d1767d42f9bf5f0ab3c455db1c3470d7cc876bb7b7d55d308"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    ./autogen.sh
-    cp /usr/local/share/automake-1.16/config.sub ./
+    autoreconf -fvi && libtoolize -cfvi
 }

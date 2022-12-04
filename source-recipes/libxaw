@@ -1,11 +1,10 @@
 name=libxaw
 version=1.0.14
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxaw.git"
-tag="libXaw-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libXaw-${version}.tar.gz"
+tarball_blake2b="8381d9bb9c9a0a496c0d78c0888afc32483c5d26ec7f83c7d69fc544fa02a0e9e3242d6ef70ab9d173d803250de1514bd206c7996e7da7c808664f27806ca535"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

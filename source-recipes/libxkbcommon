@@ -1,8 +1,8 @@
 name=libxkbcommon
 version=1.4.1
-source_method=git
-clone_url="https://github.com/xkbcommon/libxkbcommon.git"
-tag="xkbcommon-${version}"
+source_method=tarball
+tarball_url="https://xkbcommon.org/download/libxkbcommon-${version}.tar.xz"
+tarball_blake2b="a784f3612bb52abb79bf1a2ddd3e7709fa52eddce5cabcf8520ed7df8ec8ea557e51205e1e9d116a0b31eb27b1f3bca33144318c5f01be7312cbb3e48f687fbe"
 
 regenerate() {
     true

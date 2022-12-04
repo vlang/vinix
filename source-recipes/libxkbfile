@@ -1,11 +1,10 @@
 name=libxkbfile
 version=1.1.0
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxkbfile.git"
-tag="libxkbfile-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libxkbfile-${version}.tar.gz"
+tarball_blake2b="ca0d5c69a552abf9d270997fcfe141982d03cb53387dab16a30c6cecce5f74ad7fbae00e69e89820304f1f5e1503e9495a76463d2fac88d8dc9c5813e964f1a0"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

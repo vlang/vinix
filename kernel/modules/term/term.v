@@ -14,11 +14,11 @@ __global (
 	terminal_tag        = &limine.LimineTerminal(0)
 	terminal_print_lock klock.Lock
 	terminal_print_ptr  fn(&limine.LimineTerminal, charptr, u64)
-	terminal_rows       = u32(0)
-	terminal_cols       = u32(0)
+	terminal_rows       = u64(0)
+	terminal_cols       = u64(0)
 	framebuffer_tag     = &limine.LimineFramebuffer(0)
-	framebuffer_width   = u16(0)
-	framebuffer_height  = u16(0)
+	framebuffer_width   = u64(0)
+	framebuffer_height  = u64(0)
 )
 
 [cinit]

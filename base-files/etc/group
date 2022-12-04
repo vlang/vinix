@@ -1,0 +1,15 @@
+root:x:0:
+bin:x:1:daemon
+tty:x:5:
+disk:x:6:
+daemon:x:8:
+lp:x:9:
+kmem:x:15:
+lpadmin:x:19:
+dialout:x:20:
+cdrom:x:24:
+tape:x:26:
+audio:x:29:
+video:x:44:
+nogroup:x:99:
+input:x:108:

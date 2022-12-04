@@ -5,6 +5,7 @@ clone_url="https://github.com/vlang/v.git"
 tag="master"
 commit="bfcf5b13ed54935f79e7f3828ca334d27f810bac"
 imagedeps="curl"
+allow_network="yes"
 
 regenerate() {
     curl -o v.c https://raw.githubusercontent.com/vlang/vc/6c28b9142e832f7b069fa48504996f085ba638b2/v.c

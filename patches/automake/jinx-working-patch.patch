@@ -1,16 +1,21 @@
-From 328fdab89833e6876de0cd15d30cc0e2fec4d6d1 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 20 Feb 2022 05:35:53 +0100
-Subject: [PATCH] Vinix specific changes
-
----
- lib/config.sub | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/lib/config.sub b/lib/config.sub
-index d74fb6d..ae4f8a3 100755
---- a/lib/config.sub
-+++ b/lib/config.sub
+diff --git automake-clean/lib/config.guess automake-workdir/lib/config.guess
+index e81d3ae..08139ca 100755
+--- automake-clean/lib/config.guess
++++ automake-workdir/lib/config.guess
+@@ -929,6 +929,9 @@ EOF
+     i*:PW*:*)
+ 	GUESS=$UNAME_MACHINE-pc-pw32
+ 	;;
++    *:Vinix:*:*)
++	GUESS=$UNAME_MACHINE-pc-vinix
++	;;
+     *:Interix*:*)
+ 	case $UNAME_MACHINE in
+ 	    x86)
+diff --git automake-clean/lib/config.sub automake-workdir/lib/config.sub
+index d74fb6d..64292fe 100755
+--- automake-clean/lib/config.sub
++++ automake-workdir/lib/config.sub
 @@ -1723,7 +1723,7 @@ case $os in
  	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
  	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
@@ -20,6 +25,3 @@ index d74fb6d..ae4f8a3 100755
  	     | mpw* | magic* | mmixware* | mon960* | lnews* \
  	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
  	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
--- 
-2.35.1
-

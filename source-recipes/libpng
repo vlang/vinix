@@ -1,12 +1,10 @@
 name=libpng
 version=1.6.37
-source_method=git
-clone_url="https://git.code.sf.net/p/libpng/code"
-tag="v${version}"
+source_method=tarball
+tarball_url="https://download.sourceforge.net/libpng/libpng-${version}.tar.xz"
+tarball_blake2b="48e8f48a88e0db6fcbc0c0f1a4d5bda6e6c8b03255bacdc60e353256ae41ccc01b5b2a7e0e7b0dea236c53a3b9d1dd89d4bb19445afbebc37bf0f92691452424"
 hostdeps="automake autoconf libtool pkg-config"
-imagedeps="git"
 
 regenerate() {
-    git clean -xf
     autoreconf -fvi
 }

@@ -1,7 +1,7 @@
 name=limine
 from_source=limine
 revision=1
-hostdeps="gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
 imagedeps="nasm gcc mtools"
 
 configure() {
@@ -9,7 +9,8 @@ configure() {
         --prefix="${prefix}" \
         CROSS_TOOLCHAIN=x86_64-vinix \
         LDFLAGS="-static" \
-        --enable-all
+        --enable-all \
+        --disable-uefi-aarch64
 }
 
 build() {

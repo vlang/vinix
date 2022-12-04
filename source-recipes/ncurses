@@ -1,10 +1,10 @@
 name=ncurses
-version=6.3.20220507
-source_method=git
-clone_url="https://github.com/ThomasDickey/ncurses-snapshots.git"
-tag="v6_3_20220507"
-hostdeps="automake"
+version=6.3.20220903
+source_method=tarball
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_3_20220903.tar.gz"
+tarball_blake2b="05f8c12afe9e3fd19020f034e0e6ecde257d3be6676bb5d89f8bc534381c1da18ca9150e51f2e12b7771a24502787dc5f7b1b37e722c9c1ff843946f240f43f6"
+hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    cp /usr/local/share/automake-1.16/config.sub ./
+    libtoolize -cfvi
 }

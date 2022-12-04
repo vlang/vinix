@@ -1,11 +1,10 @@
 name=libxv
 version=1.0.11
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxv.git"
-tag="libXv-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libXv-${version}.tar.gz"
+tarball_blake2b="ef0e69b6012520d0074edb0ce3562d01bbdab9a4b69f22b4c3112213ceaf54fe594cfc9dd336e852eeffaece34bb0d110ab4ede9dc9ee105f17d0508f70bf97e"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

@@ -2,10 +2,12 @@ name=gcc
 from_source=gcc
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc binutils zlib libgmp"
+deps="mlibc binutils zlib gmp mpfr mpc"
 imagedeps="gcc"
 
 configure() {
+        CXXFLAGS_FOR_TARGET="$CFLAGS" \
+        CFLAGS_FOR_TARGET="$CFLAGS" \
     ${source_dir}/configure                 \
         --host=x86_64-vinix                 \
         --prefix=${prefix}                  \
@@ -17,7 +19,6 @@ configure() {
         --disable-multilib                  \
         --disable-nls                       \
         --with-system-zlib                  \
-        --with-gmp=${sysroot_dir}/usr       \
         --enable-shared                     \
         --enable-host-shared
 }
@@ -27,7 +28,14 @@ build() {
 }
 
 install() {
-    DESTDIR="${dest_dir}" make install-strip-gcc install-strip-target-libgcc install-strip-target-libstdc++-v3
+    DESTDIR="${dest_dir}" make install-strip-gcc
+
+    DESTDIR="${dest_dir}" make install-strip-target-libgcc
+    rm "${dest_dir}${prefix}"/lib/gcc/x86_64-vinix/12.2.0/crti.o
+    rm "${dest_dir}${prefix}"/lib/gcc/x86_64-vinix/12.2.0/crtn.o
+
+    DESTDIR="${dest_dir}" make install-strip-target-libstdc++-v3
+
     ln -s gcc "${dest_dir}${prefix}"/bin/cc
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a

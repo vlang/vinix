@@ -1,9 +1,10 @@
 name=libstdc++
-from_source=gcc
+from_source=gcc-host
 revision=1
+hostdeps="autoconf automake libtool pkg-config"
 imagedeps="gcc"
 hostrundeps="gcc-compiler libgcc binutils"
-deps="mlibc"
+deps="mlibc-base"
 
 configure() {
     true

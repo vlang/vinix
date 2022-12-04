@@ -1,0 +1,10 @@
+name=libxcrypt
+version=4.4.28
+source_method=tarball
+tarball_url="https://github.com/besser82/libxcrypt/releases/download/v${version}/libxcrypt-${version}.tar.xz"
+tarball_blake2b="cf40994c461bb0161b1fd585cbc3881d98cbe3d494cfaa33f89c4e1cedcd593f5b603b58309dadbaa7cd436bfabe74b0d2d9a8fafd3a2212f5ef5b18e6f67161"
+hostdeps="autoconf automake libtool pkg-config"
+
+regenerate() {
+    autoreconf -fvi && libtoolize -cfvi
+}

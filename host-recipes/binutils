@@ -2,20 +2,22 @@ name=binutils
 from_source=binutils
 revision=1
 imagedeps="gcc"
-hostdeps="autoconf automake"
+hostdeps="autoconf automake libtool pkg-config"
 
 configure() {
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         --target=x86_64-vinix \
         --with-sysroot="${sysroot_dir}" \
-        --disable-werror
+        --disable-nls \
+        --disable-werror \
+        --disable-dependency-tracking
 }
 
 build() {
-    make -j${parallelism} all-binutils all-gas all-ld
+    make -j${parallelism} all
 }
 
 install() {
-    DESTDIR="${dest_dir}" make install-strip-binutils install-strip-gas install-strip-ld
+    DESTDIR="${dest_dir}" make install-strip
 }

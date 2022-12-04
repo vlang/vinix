@@ -1,11 +1,10 @@
 name=libxau
 version=1.0.9
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxau.git"
-tag="libXau-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libXau-${version}.tar.gz"
+tarball_blake2b="76dec75e8460cd834f34aa4bba68408d6d54d3452b895ce2e5760f717d28f96fa289a1ec9f03f97ac74b581b9a4d43bbb41a8ea5fcddf2f1a99a4b61ac209e2e"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

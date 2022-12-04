@@ -797,8 +797,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			mut w := &ioctl.WinSize(argp)
 			w.ws_row = u16(terminal_rows)
 			w.ws_col = u16(terminal_cols)
-			w.ws_xpixel = framebuffer_width
-			w.ws_ypixel = framebuffer_height
+			w.ws_xpixel = u16(framebuffer_width)
+			w.ws_ypixel = u16(framebuffer_height)
 			return 0
 		}
 		ioctl.tcgets {

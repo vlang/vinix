@@ -3,10 +3,9 @@ from_source=bash
 revision=1
 imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc ncurses libiconv readline"
+deps="mlibc ncurses readline"
 
 configure() {
-        ac_cv_func_wcswidth=no \
     ${source_dir}/configure    \
         --host=x86_64-vinix    \
         --prefix=${prefix}     \

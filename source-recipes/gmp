@@ -1,0 +1,10 @@
+name=gmp
+version=6.2.1
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/gmp/gmp-${version}.tar.xz"
+tarball_blake2b="c0d85f175392a50cfa01bc6b0a312b235946ad8b4f6f84f6dabd33d7a6f2cc75c9b0e1e33057be07750bfa0145b7c4cf3b6188a5be6ca9d7271ec2276c84ebcb"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    autoreconf -fvi && libtoolize -cfvi
+}

@@ -1,8 +1,8 @@
 name=autoconf-archive
-version=2022.02.11
-source_method=git
-clone_url="https://github.com/autoconf-archive/autoconf-archive.git"
-tag="v${version}"
+version=2022.09.03
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/autoconf-archive/autoconf-archive-${version}.tar.xz"
+tarball_blake2b="9511b1bd2afee78209261d9757c3fc6bf079eb6ea82bc039530532cfaaea8a7d977f6310265c0af2fde377edc9bddfcabf1e81c426a9716d5bf4b4eb7bb64a4a"
 
 regenerate() {
     true

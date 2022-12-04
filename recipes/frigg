@@ -1,0 +1,22 @@
+name=frigg
+from_source=frigg
+revision=1
+imagedeps="meson ninja git base-devel"
+
+configure() {
+    meson \
+        --prefix=${prefix} \
+        --libdir=lib \
+        --includedir=share/frigg/include \
+        --buildtype=debugoptimized \
+        -Dbuild_tests=disabled \
+        ${source_dir}
+}
+
+build() {
+    ninja
+}
+
+install() {
+    DESTDIR="${dest_dir}" ninja install
+}

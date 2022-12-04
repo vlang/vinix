@@ -1,8 +1,8 @@
 name=mlibc
-version=0.0
-source_method=git
-clone_url="https://github.com/vinix-os/mlibc.git"
-tag="master"
+version=8797b70698879e6047418386f9bae9b5fdd12dcb
+source_method=tarball
+tarball_url="https://github.com/managarm/mlibc/archive/${version}.tar.gz"
+tarball_blake2b="e37c0748895152093012950373948d8b4cc24a8bfd56c7ba4b433fc54411a35423b18566a9838754a45127c0eb19eaedd70c72afd0797bcfd0cec94722dbfc1c"
 
 regenerate() {
     true

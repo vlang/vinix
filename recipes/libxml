@@ -2,7 +2,7 @@ name=libxml
 from_source=libxml
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc zlib libiconv"
+deps="mlibc zlib"
 
 configure() {
     ${source_dir}/configure \

@@ -1,8 +1,8 @@
 name=cmake
-version=3.23.1
-source_method=git
-clone_url="https://github.com/Kitware/CMake.git"
-tag="v${version}"
+version=3.24.1
+source_method=tarball
+tarball_url="https://github.com/Kitware/CMake/releases/download/v${version}/cmake-${version}.tar.gz"
+tarball_blake2b="628e2610c01af8e03eb7a201ae56a6e909c63314a993d2066f363d6181cfd2d0a0e5c09e9f74ad5ae3d226e15c2b04be250dc9bf1a273158fa3073bcc05c3a8e"
 
 regenerate() {
     true

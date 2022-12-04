@@ -1,11 +1,10 @@
 name=xcb-proto
-version=1.15
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/proto/xcbproto.git"
-tag="xcb-proto-${version}"
+version=1.15.2
+source_method=tarball
+tarball_url="https://www.x.org/releases/individual/xcb/xcb-proto-${version}.tar.xz"
+tarball_blake2b="0d6cc87ea0d2de594ba11b11255779e90d3c7507f0002453b3d1b2ac73fb604e5ee52e516bbcf76bce2a89027f8c8de6289d21aa2bb23d7d3e2ee77211b54946"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

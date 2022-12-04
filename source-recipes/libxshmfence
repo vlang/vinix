@@ -1,11 +1,10 @@
 name=libxshmfence
 version=1.3
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxshmfence.git"
-tag="libxshmfence-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libxshmfence-${version}.tar.gz"
+tarball_blake2b="bd32da52c59550bfec0664d6f831a98f80cc82a4bfc512fe5b2a969bd0445eecd83db9454fb031d8256a60781e6fdd38896346bdfe69d5a5eb3672774ffda7ef"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

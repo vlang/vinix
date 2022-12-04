@@ -1,0 +1,120 @@
+diff --git mlibc-clean/abis/linux/in.h mlibc-workdir/abis/linux/in.h
+index bb5b6ef..8d66fe8 100644
+--- mlibc-clean/abis/linux/in.h
++++ mlibc-workdir/abis/linux/in.h
+@@ -86,6 +86,10 @@ struct group_req {
+ #define INET_ADDRSTRLEN  16
+ #define INET6_ADDRSTRLEN 46
+ 
++#define IPV6_MULTICAST_HOPS 18
++
++#define IP_MULTICAST_TTL 33
++
+ #define IPPORT_RESERVED 1024
+ 
+ #define IPPROTO_IP       0
+diff --git mlibc-clean/options/glibc/generic/execinfo.cpp mlibc-workdir/options/glibc/generic/execinfo.cpp
+index 3474615..de088e9 100644
+--- mlibc-clean/options/glibc/generic/execinfo.cpp
++++ mlibc-workdir/options/glibc/generic/execinfo.cpp
+@@ -1,17 +1,18 @@
+ #include <execinfo.h>
+ #include <bits/ensure.h>
++// #include <mlibc/debug.hpp>
+ 
+-int backtrace(void **, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
+-}
++// int backtrace(void **, int) {
++// 	mlibc::infoLogger() << "backtrace() is a stub" << frg::endlog;
++// 	return 0;
++// }
+ 
+-char **backtrace_symbols(void *const *, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
+-}
++// char **backtrace_symbols(void *const *, int) {
++// 	__ensure(!"Not implemented");
++// 	__builtin_unreachable();
++// }
+ 
+-void backtrace_symbols_fd(void *const *, int, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
+-}
++// void backtrace_symbols_fd(void *const *, int, int) {
++// 	__ensure(!"Not implemented");
++// 	__builtin_unreachable();
++// }
+diff --git mlibc-clean/sysdeps/vinix/meson.build mlibc-workdir/sysdeps/vinix/meson.build
+index 4e3e421..cd7bc6b 100644
+--- mlibc-clean/sysdeps/vinix/meson.build
++++ mlibc-workdir/sysdeps/vinix/meson.build
+@@ -60,10 +60,28 @@ if not headers_only
+ 	crt = custom_target('crt0',
+ 		build_by_default: true,
+ 		command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+-		input: 'crt-x86_64/crt0.S',
++		input: host_machine.cpu_family() / 'crt-src/crt0.S',
+ 		output: 'crt0.o',
+ 		install: true,
+ 		install_dir: get_option('libdir')
+ 	)
++
++	custom_target('crti',
++		build_by_default: true,
++		command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++		input: host_machine.cpu_family() / 'crt-src/crti.S',
++		output: 'crti.o',
++		install: true,
++		install_dir: get_option('libdir')
++	)
++
++	custom_target('crtn',
++		build_by_default: true,
++		command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++		input: host_machine.cpu_family() / 'crt-src/crtn.S',
++		output: 'crtn.o',
++		install: true,
++		install_dir: get_option('libdir')
++	)
+ endif
+ 
+diff --git mlibc-clean/sysdeps/vinix/crt-x86_64/crt0.S mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crt0.S
+similarity index 100%
+rename from mlibc-clean/sysdeps/vinix/crt-x86_64/crt0.S
+rename to mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crt0.S
+diff --git mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crti.S mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crti.S
+new file mode 100644
+index 0000000..911b078
+--- /dev/null
++++ mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crti.S
+@@ -0,0 +1,11 @@
++.section .init
++.global _init
++_init:
++	push %rax
++
++.section .fini
++.global _fini
++_fini:
++	push %rax
++.section .note.GNU-stack,"",%progbits
++
+diff --git mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crtn.S mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crtn.S
+new file mode 100644
+index 0000000..0187e50
+--- /dev/null
++++ mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crtn.S
+@@ -0,0 +1,9 @@
++.section .init
++	pop %rax
++	ret
++
++.section .fini
++	pop %rax
++	ret
++.section .note.GNU-stack,"",%progbits
++

@@ -1,0 +1,153 @@
+diff --git gcc-host-clean/fixincludes/mkfixinc.sh gcc-host-workdir/fixincludes/mkfixinc.sh
+index df90720..484f8bc 100755
+--- gcc-host-clean/fixincludes/mkfixinc.sh
++++ gcc-host-workdir/fixincludes/mkfixinc.sh
+@@ -12,6 +12,7 @@ target=fixinc.sh
+ # Check for special fix rules for particular targets
+ case $machine in
+     i?86-*-cygwin* | \
++    x86_64-*-vinix* | \
+     i?86-*-mingw32* | \
+     x86_64-*-mingw32* | \
+     powerpc-*-eabisim* | \
+diff --git gcc-host-workdir/gcc/config/vinix.h gcc-host-workdir/gcc/config/vinix.h
+new file mode 100644
+index 0000000..ca776e9
+--- /dev/null
++++ gcc-host-workdir/gcc/config/vinix.h
+@@ -0,0 +1,29 @@
++#undef TARGET_VINIX
++#define TARGET_VINIX 1
++
++#undef LIB_SPEC
++#define LIB_SPEC "-lc"
++
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared:crtbeginS.o%s;:crtbegin.o%s}"
++
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++#define GNU_USER_LINK_EMULATION32 "elf_i386"
++#define GNU_USER_LINK_EMULATION64 "elf_x86_64"
++#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
++
++#define GNU_USER_DYNAMIC_LINKER32 "/usr/lib/ld_i386.so"
++#define GNU_USER_DYNAMIC_LINKER64 "/usr/lib/ld.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/usr/lib/ld32.so"
++
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()         \
++  do {                                   \
++    builtin_define ("__vinix__");    \
++    builtin_define ("__unix__");         \
++    builtin_assert ("system=vinix"); \
++    builtin_assert ("system=unix");      \
++    builtin_assert ("system=posix");     \
++  } while (0);
+diff --git gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/config.gcc
+index c5064dd..6bd92e8 100644
+--- gcc-host-clean/gcc/config.gcc
++++ gcc-host-workdir/gcc/config.gcc
+@@ -824,6 +824,15 @@ case ${target} in
+   tmake_file="${tmake_file} t-freebsd"
+   target_has_targetdm=yes
+   ;;
++*-*-vinix*)
++  extra_options="$extra_options gnu-user.opt"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=wrap
++  tmake_file="${tmake_file} t-slibgcc"
++  thread_file='posix'
++  ;;
+ *-*-fuchsia*)
+   native_system_header_dir=/include
+   ;;
+@@ -2242,6 +2251,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
+ 			;;
+ 	esac
+ 	;;
++x86_64-*-vinix*)
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h vinix.h"
++	;;
+ x86_64-*-fuchsia*)
+ 	tmake_file="${tmake_file} i386/t-x86_64-elf"
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
+diff --git gcc-host-clean/libgcc/config.host gcc-host-workdir/libgcc/config.host
+index 8c56fca..3a04f87 100644
+--- gcc-host-clean/libgcc/config.host
++++ gcc-host-workdir/libgcc/config.host
+@@ -271,6 +271,11 @@ case ${host} in
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
+   extra_parts="crtbegin.o crtend.o"
+   ;;
++*-*-vinix*)
++  extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
++  tmake_file="$tmake_file t-crtstuff-pic"
++  tmake_file="$tmake_file t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+@@ -725,6 +730,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
+ x86_64-*-fuchsia*)
+ 	tmake_file="$tmake_file t-libgcc-pic"
+ 	;;
++x86_64-*-vinix*)
++	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
++	tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
++	;;
+ i[34567]86-*-dragonfly*)
+ 	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
+ 	md_unwind_header=i386/dragonfly-unwind.h
+diff --git gcc-host-clean/libgcc/configure.ac gcc-host-workdir/libgcc/configure.ac
+index 2fc9d5d..83d246e 100644
+--- gcc-host-clean/libgcc/configure.ac
++++ gcc-host-workdir/libgcc/configure.ac
+@@ -46,7 +46,7 @@ else
+   libgcc_topdir="${srcdir}/.."
+ fi
+ AC_SUBST(libgcc_topdir)
+-AC_CONFIG_AUX_DIR($libgcc_topdir)
++AC_CONFIG_AUX_DIR([.])
+ AC_CONFIG_HEADER(auto-target.h:config.in)
+ 
+ AC_ARG_ENABLE(shared,
+diff --git gcc-host-clean/libiberty/configure.ac gcc-host-workdir/libiberty/configure.ac
+index 84a7b37..24ddb33 100644
+--- gcc-host-clean/libiberty/configure.ac
++++ gcc-host-workdir/libiberty/configure.ac
+@@ -36,7 +36,7 @@ else
+   libiberty_topdir="${srcdir}/.."
+ fi
+ AC_SUBST(libiberty_topdir)
+-AC_CONFIG_AUX_DIR($libiberty_topdir)
++AC_CONFIG_AUX_DIR([.])
+ 
+ dnl Very limited version of automake's enable-maintainer-mode
+ 
+diff --git gcc-host-clean/libstdc++-v3/crossconfig.m4 gcc-host-workdir/libstdc++-v3/crossconfig.m4
+index ae5283b..73bd205 100644
+--- gcc-host-clean/libstdc++-v3/crossconfig.m4
++++ gcc-host-workdir/libstdc++-v3/crossconfig.m4
+@@ -136,6 +136,18 @@ case "${host}" in
+     AC_CHECK_FUNCS(uselocale)
+     ;;
+ 
++  *-vinix*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_DEFINE(_GLIBCXX_USE_DEV_RANDOM)
++    AC_DEFINE(_GLIBCXX_USE_RANDOM_TR1)
++    GCC_CHECK_TLS
++    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    AC_CHECK_FUNCS(timespec_get)
++    ;;
++
+   *-fuchsia*)
+     SECTION_FLAGS='-ffunction-sections -fdata-sections'
+     AC_SUBST(SECTION_FLAGS)

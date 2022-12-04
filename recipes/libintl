@@ -2,7 +2,7 @@ name=libintl
 from_source=libintl
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc libiconv"
+deps="mlibc-base libiconv"
 
 configure() {
     ${source_dir}/configure    \

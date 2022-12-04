@@ -86,9 +86,9 @@ pub mut:
 pub struct LimineFramebuffer {
 pub mut:
 	address voidptr
-	width u16
-	height u16
-	pitch u16
+	width u64
+	height u64
+	pitch u64
 	bpp u16
 	memory_model u8
 	red_mask_size u8
@@ -113,7 +113,7 @@ pub struct LimineFramebufferRequest {
 pub mut:
 	id [4]u64 = [
 		u64(0xc7b1dd30df4c8b88), 0x0a82e883a194f07b,
-		0xcbfe81d7dd2d1977, 0x063150319ebc9b71
+		0x9d5827dcd881dd75, 0xa3148604f6fab11b
 	]!
 	revision u64
 	response &LimineFramebufferResponse
@@ -123,8 +123,8 @@ pub mut:
 
 pub struct LimineTerminal {
 pub mut:
-	columns u32
-	rows u32
+	columns u64
+	rows u64
 	framebuffer &LimineFramebuffer
 }
 
@@ -140,7 +140,7 @@ pub struct LimineTerminalRequest {
 pub mut:
 	id [4]u64 = [
 		u64(0xc7b1dd30df4c8b88), 0x0a82e883a194f07b,
-		0x0785a0aea5d0750f, 0x1c1936fee0d6cf6e
+		0xc8ac59310c2b0844, 0xa68d0c7265d38878
 	]!
 	revision u64
 	response &LimineTerminalResponse

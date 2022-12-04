@@ -1,0 +1,13 @@
+diff --git fontconfig-clean/src/fcstat.c fontconfig-workdir/src/fcstat.c
+index 4f69eae..2dd064f 100644
+--- fontconfig-clean/src/fcstat.c
++++ fontconfig-workdir/src/fcstat.c
+@@ -386,7 +386,7 @@ FcFStatFs (int fd, FcStatFS *statb)
+ #  endif
+ #  if defined(HAVE_STRUCT_STATFS_F_FSTYPENAME)
+ 	p = buf.f_fstypename;
+-#  elif defined(__linux__) || defined (__EMSCRIPTEN__)
++#  elif defined(__linux__) || defined (__vinix__) || defined (__EMSCRIPTEN__)
+ 	switch (buf.f_type)
+ 	{
+ 	case 0x6969: /* nfs */

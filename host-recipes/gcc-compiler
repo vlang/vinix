@@ -1,16 +1,19 @@
 name=gcc-compiler
-from_source=gcc
+from_source=gcc-host
 revision=1
 imagedeps="gcc"
-hostdeps="autoconf automake"
+hostdeps="autoconf automake libtool pkg-config"
 hostrundeps="binutils"
 deps="mlibc-headers"
 
 configure() {
+        CXXFLAGS_FOR_TARGET="$CFLAGS" \
+        CFLAGS_FOR_TARGET="$CFLAGS" \
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         --target=x86_64-vinix \
         --with-sysroot="${sysroot_dir}" \
+        --disable-nls \
         --enable-languages=c,c++ \
         --disable-multilib \
         --enable-initfini-array

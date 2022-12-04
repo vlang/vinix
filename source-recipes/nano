@@ -1,11 +1,10 @@
 name=nano
-version=6.3
-source_method=git
-clone_url="https://git.savannah.gnu.org/git/nano.git"
-tag="v${version}"
+version=6.4
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/nano/nano-${version}.tar.xz"
+tarball_blake2b="b59ff7a741ce4c8b31afdbbfaf1d704cccbceddcd7f1421f30a6dd40495ec456ca891aeb9777c070c6cce4e9c594f83798ff0cdacdfe06e81b0aa0b700033da3"
 hostdeps="automake autoconf libtool pkg-config"
-imagedeps="git"
 
 regenerate() {
-    ./autogen.sh
+    autoreconf -fvi && libtoolize -cfvi
 }

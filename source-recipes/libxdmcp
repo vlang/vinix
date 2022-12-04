@@ -1,11 +1,10 @@
 name=libxdmcp
 version=1.1.3
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxdmcp.git"
-tag="libXdmcp-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libXdmcp-${version}.tar.gz"
+tarball_blake2b="7d4c21f0597909978137ceebd9624ed592e9631c2edc3893ec3e47c7a5399f5ac8115e2dba11d70c8a270af05a93c8cecb8d4639484dff0813a0efe3979ab3c5"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

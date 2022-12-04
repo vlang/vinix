@@ -1,8 +1,8 @@
 name=zlib
 version=1.2.12
-source_method=git
-clone_url="https://github.com/madler/zlib.git"
-tag="v${version}"
+source_method=tarball
+tarball_url="https://github.com/madler/zlib/archive/refs/tags/v${version}.tar.gz"
+tarball_blake2b="4a0f230ee7d6a7b0d8c6a217918f5075fce9e94946d48686721d79586b213b5f3e623b57999fc72db54c8f49e973dbda41dbb38db9d53c45281e36c25e6500ff"
 
 regenerate() {
     true

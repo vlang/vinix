@@ -1,11 +1,10 @@
 name=limine
-version=3.12.2
-source_method=git
-clone_url="https://github.com/limine-bootloader/limine.git"
-tag="v${version}"
-hostdeps="autoconf automake"
-imagedeps="git"
+version=4.20221204.0
+source_method=tarball
+tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.xz"
+tarball_blake2b="6d0a26bc729266887a42391efe91a1b6c7fffc030efd54742ae782c2ddeb19d6de2f4488604e71b27711ace2c86e8b118fe49995251ee2beb5fda64ee1a8adf9"
+hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    ./bootstrap
+    autoreconf -fvi && libtoolize -cfvi
 }

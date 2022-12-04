@@ -1,10 +1,10 @@
 name=pkg-config
 version=1.8.0
-source_method=git
-clone_url="https://github.com/pkgconf/pkgconf.git"
-tag="pkgconf-${version}"
+source_method=tarball
+tarball_url="https://github.com/pkgconf/pkgconf/archive/refs/tags/pkgconf-${version}.tar.gz"
+tarball_blake2b="41c3496b53ba97f74afd306af872c3c5e5728f9bbf78582f17cf814fd5f92ee502b315f086c8699801b267b09dec4bb9c74adb82dd5674683fb2bafee29d852f"
 hostdeps="autoconf automake libtool"
 
 regenerate() {
-    ./autogen.sh
+    autoreconf -fvi
 }

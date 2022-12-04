@@ -1,0 +1,23 @@
+name=mpfr
+from_source=mpfr
+revision=1
+imagedeps="gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc gmp"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --enable-static=no \
+        --enable-shared=yes \
+        --with-pic
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

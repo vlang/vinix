@@ -9,8 +9,6 @@ configure() {
 }
 
 build() {
-    export PATH="$(pwd -P)/bin:$PATH"
-    make bin/aclocal-1.16 bin/automake-1.16 -j${parallelism}
     make -j${parallelism}
 }
 

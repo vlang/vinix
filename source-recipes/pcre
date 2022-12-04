@@ -1,10 +1,10 @@
 name=pcre
 version=8.45
-source_method=git
-clone_url="https://github.com/vinix-os/pcre.git"
-tag="1767"
-hostdeps="automake autoconf autoconf-archive libtool pkg-config"
+source_method=tarball
+tarball_url="https://netcologne.dl.sourceforge.net/project/pcre/pcre/${version}/pcre-${version}.tar.gz"
+tarball_blake2b="fb40b9f8202b3675b04dc89b7875815db4466240efcb281aa6eddb2de25291735811411253ed28601367ef4a74c4fe2243ae0d21b156765fbc8638739e252745"
+hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

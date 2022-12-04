@@ -1,10 +1,9 @@
 name=freetype
 version=2.12.1
-source_method=git
-clone_url="https://gitlab.freedesktop.org/freetype/freetype.git"
-tag="VER-2-12-1"
+source_method=tarball
+tarball_url="https://download.savannah.gnu.org/releases/freetype/freetype-${version}.tar.xz"
+tarball_blake2b="c4737dc0c6e44e0a911545d604fdb2e8e8b3f5185d3f5dfe4e4561ee2d75b3e5a31afcbb2089306fec4b31ba10324a6ec6499c3735b2b7591c71e96fee4ed278"
 hostdeps="automake autoconf libtool pkg-config"
-imagedeps="git"
 
 regenerate() {
     NOCONFIGURE=1 ./autogen.sh

@@ -1,10 +1,10 @@
 name=libexpat
 version=2.4.8
-source_method=git
-clone_url="https://github.com/libexpat/libexpat.git"
-tag="R_2_4_8"
+source_method=tarball
+tarball_url="https://github.com/libexpat/libexpat/releases/download/R_2_4_8/expat-${version}.tar.xz"
+tarball_blake2b="25da91fdcdefe81740cc8129fa52bf4ceb0bbbee11f0d750485424dbc638f5fba8c30007d0f0b0e3ff5c84fe197b9b220852976272dfe5d6cc451d114297c2d7"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    ( cd expat && ./buildconf.sh )
+    autoreconf -fvi && libtoolize -cfvi
 }

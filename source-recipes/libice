@@ -1,11 +1,10 @@
 name=libice
 version=1.0.10
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libice.git"
-tag="libICE-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libICE-${version}.tar.gz"
+tarball_blake2b="108aaf6c6a157ef8de342e4e25f194413ca46c39a982430c75a149420aad17683d2a9a284f53fe261ff6867001b401765b436396f562ef605cb195a3af53b993"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

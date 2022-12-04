@@ -2,7 +2,7 @@ name=nettle
 from_source=nettle
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc libgmp"
+deps="mlibc gmp"
 imagedeps="gcc"
 
 configure() {

@@ -1,11 +1,10 @@
 name=bash
 version=5.1.16
-source_method=git
-clone_url="https://git.savannah.gnu.org/git/bash.git"
-tag="master"
-commit="9439ce094c9aa7557a9d53ac7b412a23aa66e36b"
-hostdeps="automake"
+source_method=tarball
+tarball_url="https://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz"
+tarball_blake2b="0bc53b24d9b95cd85e45196510104acf6ac6c980f68aedcc83c8409ce6a4682e92736a9cbe089ed92d74590e28918d0bee0e67c8e0f994bd37e45fad83f5b48e"
+hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    cp /usr/local/share/automake-1.16/config.sub support/
+    AUTOHEADER=true autoreconf -fvi && libtoolize -cfvi
 }

@@ -1,11 +1,10 @@
 name=libxrender
 version=0.9.10
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxrender.git"
-tag="libXrender-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libXrender-${version}.tar.gz"
+tarball_blake2b="ab8bcf479d57e7106d5aa5112292435d4cf3b85c4831542c265934300f5916d68514aa62157439b2a472a547f3c0d333d4871aa4d3c9a555fbb7b7abe10caf21"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

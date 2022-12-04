@@ -2,7 +2,7 @@ name=libiconv
 from_source=libiconv
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc"
+deps="mlibc-base"
 imagedeps="binutils"
 
 configure() {

@@ -1,17 +1,7 @@
-From f84d02911a400f08ed6f455814d16c9494fb63c2 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 18 Apr 2022 05:13:42 +0200
-Subject: [PATCH] Vinix specific changes
-
----
- build-aux/ltmain.in |  2 +-
- m4/libtool.m4       | 15 +++++++++++++++
- 2 files changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/build-aux/ltmain.in b/build-aux/ltmain.in
+diff --git libtool-clean/build-aux/ltmain.in libtool-workdir/build-aux/ltmain.in
 index a5f21a1..c06d55c 100644
---- a/build-aux/ltmain.in
-+++ b/build-aux/ltmain.in
+--- libtool-clean/build-aux/ltmain.in
++++ libtool-workdir/build-aux/ltmain.in
 @@ -6497,7 +6497,7 @@ func_mode_link ()
  	      fi
  	    else
@@ -21,11 +11,33 @@ index a5f21a1..c06d55c 100644
  	      # Try looking first in the location we're being installed to.
  	      if test -n "$inst_prefix_dir"; then
  		case $libdir in
-diff --git a/m4/libtool.m4 b/m4/libtool.m4
-index 79a2451..7e05c34 100644
---- a/m4/libtool.m4
-+++ b/m4/libtool.m4
-@@ -2925,6 +2925,17 @@ netbsd*)
+diff --git libtool-clean/libtoolize.in libtool-workdir/libtoolize.in
+index 0c40fed..763619b 100644
+--- libtool-clean/libtoolize.in
++++ libtool-workdir/libtoolize.in
+@@ -1891,7 +1891,7 @@ func_require_seen_libtool ()
+   # Do not remove config.guess, config.sub or install-sh, we don't
+   # install them without --install, and the project may not be using
+   # Automake.  Similarly, do not remove Gnulib files.
+-  all_pkgaux_files="compile depcomp missing ltmain.sh"
++  all_pkgaux_files=""
+   all_pkgmacro_files="libtool.m4 ltargz.m4 ltdl.m4 ltoptions.m4 ltsugar.m4 ltversion.in ltversion.m4 lt~obsolete.m4"
+   all_pkgltdl_files="COPYING.LIB Makefile Makefile.in Makefile.inc Makefile.am README acinclude.m4 aclocal.m4 argz_.h argz.c config.h.in config-h.in configure configure.ac configure.in libltdl/lt__alloc.h libltdl/lt__argz.h libltdl/lt__dirent.h libltdl/lt__glibc.h libltdl/lt__private.h libltdl/lt__strl.h libltdl/lt_dlloader.h libltdl/lt_error.h libltdl/lt_system.h libltdl/slist.h loaders/dld_link.c loaders/dlopen.c loaders/dyld.c loaders/load_add_on.c loaders/loadlibrary.c loaders/preopen.c loaders/shl_load.c lt__alloc.c lt__argz.c lt__dirent.c lt__strl.c lt_dlloader.c lt_error.c ltdl.c ltdl.h ltdl.mk slist.c"
+ 
+diff --git libtool-clean/m4/libtool.m4 libtool-workdir/m4/libtool.m4
+index 79a2451..6101192 100644
+--- libtool-clean/m4/libtool.m4
++++ libtool-workdir/m4/libtool.m4
+@@ -1696,7 +1696,7 @@ AC_CACHE_VAL([lt_cv_sys_max_cmd_len], [dnl
+     lt_cv_sys_max_cmd_len=12288;    # 12K is about right
+     ;;
+ 
+-  gnu*)
++  gnu* | vinix*)
+     # Under GNU Hurd, this test is not required because there is
+     # no limit to the length of command line arguments.
+     # Libtool will interpret -1 as no limit whatsoever
+@@ -2925,6 +2925,18 @@ netbsd*)
    hardcode_into_libs=yes
    ;;
  
@@ -35,6 +47,7 @@ index 79a2451..7e05c34 100644
 +  need_version=no
 +  library_names_spec='$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'
 +  soname_spec='$libname$release$shared_ext$major'
++  dynamic_linker='mlibc ld.so'
 +  shlibpath_var=LD_LIBRARY_PATH
 +  shlibpath_overrides_runpath=no
 +  hardcode_into_libs=yes
@@ -43,7 +56,7 @@ index 79a2451..7e05c34 100644
  newsos6)
    version_type=linux # correct to gnu/linux during the next big refactor
    library_names_spec='$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'
-@@ -3566,6 +3577,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
+@@ -3566,6 +3578,10 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
    lt_cv_deplibs_check_method=pass_all
    ;;
  
@@ -54,6 +67,72 @@ index 79a2451..7e05c34 100644
  netbsd*)
    if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
      lt_cv_deplibs_check_method='match_pattern /lib[[^/]]+(\.so\.[[0-9]]+\.[[0-9]]+|_pic\.a)$'
--- 
-2.35.3
-
+@@ -4446,6 +4462,8 @@ m4_if([$1], [CXX], [
+ 	;;
+       netbsd*)
+ 	;;
++      vinix*)
++	;;
+       *qnx* | *nto*)
+         # QNX uses GNU C++, but need to define -shared option too, otherwise
+         # it will coredump.
+@@ -4794,6 +4812,12 @@ m4_if([$1], [CXX], [
+       _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
+       ;;
+ 
++    vinix*)
++      _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++      _LT_TAGVAR(lt_prog_compiler_pic, $1)='-fPIC'
++      _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
++      ;;
++
+     *nto* | *qnx*)
+       # QNX uses GNU C++, but need to define -shared option too, otherwise
+       # it will coredump.
+@@ -5273,6 +5297,11 @@ _LT_EOF
+       fi
+       ;;
+ 
++    vinix*)
++	_LT_TAGVAR(archive_cmds, $1)='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
++	_LT_TAGVAR(archive_expsym_cmds, $1)='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
++      ;;
++
+     netbsd*)
+       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
+ 	_LT_TAGVAR(archive_cmds, $1)='$LD -Bshareable $libobjs $deplibs $linker_flags -o $lib'
+@@ -5815,6 +5844,9 @@ _LT_EOF
+       esac
+       ;;
+ 
++    vinix*)
++      ;;
++
+     netbsd*)
+       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
+ 	_LT_TAGVAR(archive_cmds, $1)='$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'  # a.out
+@@ -7115,6 +7147,10 @@ if test yes != "$_lt_caught_CXX_error"; then
+ 	esac
+ 	;;
+ 
++      vinix*)
++	    _LT_TAGVAR(ld_shlibs, $1)=yes
++	    ;;
++
+       netbsd*)
+         if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
+ 	  _LT_TAGVAR(archive_cmds, $1)='$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'
+diff --git libtool-clean/m4/ltdl.m4 libtool-workdir/m4/ltdl.m4
+index 772c150..106bebc 100644
+--- libtool-clean/m4/ltdl.m4
++++ libtool-workdir/m4/ltdl.m4
+@@ -497,6 +497,9 @@ AC_CACHE_CHECK([whether deplibs are loaded by dlopen],
+     # at 6.2 and later dlopen does load deplibs.
+     lt_cv_sys_dlopen_deplibs=yes
+     ;;
++  vinix*)
++    lt_cv_sys_dlopen_deplibs=yes
++    ;;
+   netbsd*)
+     lt_cv_sys_dlopen_deplibs=yes
+     ;;

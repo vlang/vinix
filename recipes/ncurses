@@ -10,7 +10,6 @@ configure() {
     "${source_dir}"/configure \
         --host=x86_64-vinix \
         --prefix="${prefix}" \
-        --without-ada \
         --enable-pc-files \
         --with-shared \
         --without-normal \

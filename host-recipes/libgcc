@@ -1,9 +1,10 @@
 name=libgcc
-from_source=gcc
+from_source=gcc-host
 revision=1
+hostdeps="autoconf automake libtool pkg-config"
 imagedeps="gcc"
 hostrundeps="gcc-compiler binutils"
-deps="mlibc"
+deps="mlibc-base"
 
 configure() {
     true
@@ -19,4 +20,6 @@ install() {
     # Hack to continue gcc build
     cd "${base_dir}"/host-builds/gcc-compiler
     DESTDIR="${dest_dir}" make install-strip-target-libgcc
+    rm "${dest_dir}${prefix}"/lib/gcc/x86_64-vinix/12.2.0/crti.o
+    rm "${dest_dir}${prefix}"/lib/gcc/x86_64-vinix/12.2.0/crtn.o
 }

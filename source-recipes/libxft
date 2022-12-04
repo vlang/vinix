@@ -1,11 +1,10 @@
 name=libxft
 version=2.3.4
-source_method=git
-clone_url="https://gitlab.freedesktop.org/xorg/lib/libxft.git"
-tag="libXft-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/libXft-${version}.tar.gz"
+tarball_blake2b="9281135a73f922e5bcc6eb83b4245ad28b8277e62a2cefa5c80130a42e32dbd6c7781d46ff8dd253e12abf5bb1907a34ebd0bd66a11062de4cace0ad4707242c"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
-imagedeps="git"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

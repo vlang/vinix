@@ -1,10 +1,10 @@
 name=pixman
 version=0.40.0
-source_method=git
-clone_url="https://gitlab.freedesktop.org/pixman/pixman.git"
-tag="pixman-${version}"
+source_method=tarball
+tarball_url="https://www.x.org/archive/individual/lib/pixman-${version}.tar.xz"
+tarball_blake2b="29b71f5eb6c3df0318c7a6153c6abbce29748b0b578697916414a869a029635fe5e0bab06b8f701a764c95e475c115ed12eb4f93c751d234b5868f4c4196d7db"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    NOCONFIGURE=yes ./autogen.sh
+    autoreconf -fvi
 }

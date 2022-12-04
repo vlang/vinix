@@ -3,6 +3,7 @@ from_source=kernel
 revision=1
 imagedeps="git"
 hostdeps="gcc binutils v"
+allow_network="yes"
 
 configure() {
     true
