@@ -219,7 +219,7 @@ pub fn map_range(_pagemap &memory.Pagemap, _virt_addr u64, phys_addr u64, _lengt
 	}
 }
 
-pub fn pf_handler(gpr_state &cpu.local.GPRState) ? {
+pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if gpr_state.err & 1 != 0 {
 		// It was a protection violation, crash
 		return error('')
