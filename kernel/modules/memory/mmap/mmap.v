@@ -13,14 +13,14 @@ import x86.cpu.local as cpulocal
 import lib
 
 pub const (
-	prot_none = 0x00
-	prot_read = 0x01
-	prot_write = 0x02
-	prot_exec = 0x04
-	map_private = 0x01
-	map_shared = 0x02
-	map_fixed = 0x04
-	map_anon = 0x08
+	prot_none     = 0x00
+	prot_read     = 0x01
+	prot_write    = 0x02
+	prot_exec     = 0x04
+	map_private   = 0x01
+	map_shared    = 0x02
+	map_fixed     = 0x04
+	map_anon      = 0x08
 	map_anonymous = 0x08
 )
 
@@ -49,7 +49,8 @@ pub fn list_ranges(pagemap &memory.Pagemap) {
 	C.printf(c'Ranges for %llx:\n', voidptr(pagemap))
 	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
 		r := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
-		C.printf(c'\tBase: 0x%llx\tLength: 0x%llx\tOffset: 0x%llx\n', r.base, r.length, r.offset)
+		C.printf(c'\tBase: 0x%llx\tLength: 0x%llx\tOffset: 0x%llx\n', r.base, r.length,
+			r.offset)
 	}
 }
 
@@ -93,13 +94,13 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 		mut global_range := local_range.global
 
 		mut new_local_range := &MmapRangeLocal{
-			pagemap: voidptr(0)
-			global: voidptr(0)
+			pagemap: unsafe { nil }
+			global: unsafe { nil }
 		}
 		unsafe {
 			new_local_range[0] = local_range[0]
 		}
-		if voidptr(global_range.resource) != voidptr(0) {
+		if voidptr(global_range.resource) != unsafe { nil } {
 			global_range.resource.refcount++
 		}
 
@@ -114,7 +115,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			}
 		} else {
 			mut new_global_range := &MmapRangeGlobal{
-				resource: voidptr(0)
+				resource: unsafe { nil }
 				shadow_pagemap: memory.Pagemap{
 					top_level: &u64(0)
 				}
@@ -161,13 +162,11 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 	mut g := unsafe { _g }
 
 	mut pt_flags := memory.pte_present | memory.pte_user
-	if prot & prot_write != 0 {
+	if prot & mmap.prot_write != 0 {
 		pt_flags |= memory.pte_writable
 	}
 
-	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or {
-		return error('')
-	}
+	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return error('') }
 
 	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return error('') }
 
@@ -180,10 +179,9 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 	}
 }
 
-pub fn map_range(_pagemap &memory.Pagemap, _virt_addr u64, phys_addr u64,
-				 _length u64, prot int, _flags int) ? {
-	mut pagemap  := unsafe { _pagemap }
-	flags := _flags | map_anonymous
+pub fn map_range(_pagemap &memory.Pagemap, _virt_addr u64, phys_addr u64, _length u64, prot int, _flags int) ? {
+	mut pagemap := unsafe { _pagemap }
+	flags := _flags | mmap.map_anonymous
 
 	virt_addr := lib.align_down(_virt_addr, page_size)
 	length := lib.align_up(_length + (_virt_addr - virt_addr), page_size)
@@ -194,14 +192,14 @@ pub fn map_range(_pagemap &memory.Pagemap, _virt_addr u64, phys_addr u64,
 		length: length
 		prot: prot
 		flags: flags
-		global: voidptr(0)
+		global: unsafe { nil }
 	}
 
 	mut range_global := &MmapRangeGlobal{
 		locals: []&MmapRangeLocal{}
 		base: virt_addr
 		length: length
-		resource: voidptr(0)
+		resource: unsafe { nil }
 		shadow_pagemap: memory.Pagemap{
 			top_level: &u64(0)
 		}
@@ -221,7 +219,7 @@ pub fn map_range(_pagemap &memory.Pagemap, _virt_addr u64, phys_addr u64,
 	}
 }
 
-pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
+pub fn pf_handler(gpr_state &cpu.local.GPRState) ? {
 	if gpr_state.err & 1 != 0 {
 		// It was a protection violation, crash
 		return error('')
@@ -252,7 +250,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	pagemap.l.release()
 
-	mut page := voidptr(0)
+	mut page := unsafe { nil }
 
 	if range_local.flags & mmap.map_anonymous != 0 {
 		page = memory.pmm_alloc(1)
@@ -265,9 +263,8 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	}
 }
 
-pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
-			prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
-	mut pagemap  := unsafe { _pagemap }
+pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
+	mut pagemap := unsafe { _pagemap }
 	mut resource := unsafe { _resource }
 
 	if _length == 0 {
@@ -278,7 +275,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
 
 	length := lib.align_up(_length, page_size)
 
-	if flags & map_anonymous == 0 && resource.can_mmap == false {
+	if flags & mmap.map_anonymous == 0 && resource.can_mmap == false {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -290,7 +287,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
 	if flags & mmap.map_fixed != 0 {
 		base = u64(addr)
 
-		munmap(pagemap, voidptr(base), length) ?
+		munmap(pagemap, voidptr(base), length)?
 	} else {
 		base = process.mmap_anon_non_fixed_base
 		process.mmap_anon_non_fixed_base += length + page_size
@@ -303,7 +300,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
 		offset: offset
 		prot: prot
 		flags: flags
-		global: voidptr(0)
+		global: unsafe { nil }
 	}
 
 	mut range_global := &MmapRangeGlobal{
@@ -326,7 +323,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64,
 	pagemap.mmap_ranges << voidptr(range_local)
 	pagemap.l.release()
 
-	if voidptr(resource) != voidptr(0) {
+	if voidptr(resource) != unsafe { nil } {
 		resource.refcount++
 	}
 
@@ -351,15 +348,13 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: mprotect(0x%llx, 0x%llx, 0x%x)\n',
-			 process.name.str, addr, length, prot)
+	C.printf(c'\n\e[32m%s\e[m: mprotect(0x%llx, 0x%llx, 0x%x)\n', process.name.str, addr,
+		length, prot)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mprotect(process.pagemap, addr, length, prot) or {
-		return errno.err, errno.get()
-	}
+	mprotect(process.pagemap, addr, length, prot) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -376,9 +371,7 @@ pub fn mprotect(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int) ?
 	length := lib.align_up(_length, page_size)
 
 	for i := u64(addr); i < u64(addr) + length; i += page_size {
-		mut local_range, _, _ := addr2range(pagemap, i) or {
-			continue
-		}
+		mut local_range, _, _ := addr2range(pagemap, i) or { continue }
 
 		if local_range.prot == prot {
 			continue
@@ -411,7 +404,7 @@ pub fn mprotect(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int) ?
 
 		for j := snip_begin; j < snip_end; j += page_size {
 			mut pt_flags := memory.pte_present | memory.pte_user
-			if prot & prot_write != 0 {
+			if prot & mmap.prot_write != 0 {
 				pt_flags |= memory.pte_writable
 			}
 			pagemap.flag_page(j, pt_flags) or {}

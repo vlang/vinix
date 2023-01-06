@@ -80,19 +80,19 @@ fn madt_init() {
 
 		match header.id {
 			0 {
-				println('acpi/madt: Found local APIC #$madt_local_apics.len')
+				println('acpi/madt: Found local APIC #${madt_local_apics.len}')
 				madt_local_apics << unsafe { &MADTLocalApic(header) }
 			}
 			1 {
-				println('acpi/madt: Found IO APIC #$madt_io_apics.len')
+				println('acpi/madt: Found IO APIC #${madt_io_apics.len}')
 				madt_io_apics << unsafe { &MADTIoApic(header) }
 			}
 			2 {
-				println('acpi/madt: Found ISO #$madt_isos.len')
+				println('acpi/madt: Found ISO #${madt_isos.len}')
 				madt_isos << unsafe { &MADTISO(header) }
 			}
 			4 {
-				println('acpi/madt: Found NMI #$madt_nmis.len')
+				println('acpi/madt: Found NMI #${madt_nmis.len}')
 				madt_nmis << unsafe { &MADTNMI(header) }
 			}
 			else {}

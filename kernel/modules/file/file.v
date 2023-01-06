@@ -16,19 +16,19 @@ import memory.mmap
 import time
 
 pub const (
-	f_dupfd = 1
+	f_dupfd         = 1
 	f_dupfd_cloexec = 2
-	f_getfd = 3
-	f_setfd = 4
-	f_getfl = 5
-	f_setfl = 6
-	f_getlk = 7
-	f_setlk = 8
-	f_setlkw = 9
-	f_getown = 10
-	f_setown = 11
+	f_getfd         = 3
+	f_setfd         = 4
+	f_getfl         = 5
+	f_setfl         = 6
+	f_getlk         = 7
+	f_setlk         = 8
+	f_setlkw        = 9
+	f_getown        = 10
+	f_setown        = 11
 
-	fd_cloexec = 1
+	fd_cloexec      = 1
 )
 
 pub struct Handle {
@@ -52,13 +52,13 @@ mut:
 }
 
 pub const (
-	pollin = 0x01
-	pollout = 0x02
-	pollpri = 0x04
-	pollhup = 0x08
-	pollerr = 0x10
-	pollrdhup = 0x20
-	pollnval = 0x40
+	pollin     = 0x01
+	pollout    = 0x02
+	pollpri    = 0x04
+	pollhup    = 0x08
+	pollerr    = 0x10
+	pollrdhup  = 0x20
+	pollnval   = 0x40
 	pollwrnorm = 0x80
 )
 
@@ -66,8 +66,8 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 	mut thread := proc.current_thread()
 	mut process := thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str, voidptr(fds),
-		nfds, voidptr(tmo_p), voidptr(sigmask))
+	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str,
+		voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -77,7 +77,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 	}
 
 	oldmask := thread.masked_signals
-	if voidptr(sigmask) != voidptr(0) {
+	if voidptr(sigmask) != unsafe { nil } {
 		thread.masked_signals = unsafe { sigmask[0] }
 	}
 	defer {
@@ -109,7 +109,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 			continue
 		}
 
-		mut fd := fd_from_fdnum(voidptr(0), fdd.fd) or {
+		mut fd := fd_from_fdnum(unsafe { nil }, fdd.fd) or {
 			fdd.revents = file.pollnval
 			ret++
 			continue
@@ -138,7 +138,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 	mut timer := &time.Timer(0)
 
-	if voidptr(tmo_p) != voidptr(0) {
+	if voidptr(tmo_p) != unsafe { nil } {
 		mut target_time := *tmo_p
 
 		timer = time.new_timer(target_time)
@@ -147,7 +147,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 	}
 
 	defer {
-		if voidptr(timer) != voidptr(0) {
+		if voidptr(timer) != unsafe { nil } {
 			timer.disarm()
 		}
 	}
@@ -155,7 +155,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 	for {
 		which := event.await(mut events, true) or { return errno.err, errno.eintr }
 
-		if voidptr(timer) != voidptr(0) {
+		if voidptr(timer) != unsafe { nil } {
 			if which == u64(events.len) - 1 {
 				return 0, 0
 			}
@@ -214,7 +214,7 @@ pub fn (mut this FD) unref() {
 
 pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 	mut process := &proc.Process(0)
-	if voidptr(_process) == voidptr(0) {
+	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
 	} else {
 		process = unsafe { _process }
@@ -239,7 +239,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 	mut handle := fd.handle
 	mut res := handle.resource
 
-	res.unref(voidptr(handle)) ?
+	res.unref(voidptr(handle))?
 
 	handle.refcount--
 	if handle.refcount == 0 {
@@ -248,12 +248,12 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 
 	C.free(voidptr(fd))
 
-	process.fds[fdnum] = voidptr(0)
+	process.fds[fdnum] = unsafe { nil }
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
 	mut process := &proc.Process(0)
-	if voidptr(_process) == voidptr(0) {
+	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
 	} else {
 		process = unsafe { _process }
@@ -266,7 +266,7 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 
 	if specific == false {
 		for i := oldfd; i < proc.max_fds; i++ {
-			if process.fds[i] == voidptr(0) {
+			if process.fds[i] == unsafe { nil } {
 				process.fds[i] = voidptr(fd)
 				return i
 			}
@@ -302,7 +302,7 @@ pub fn fdnum_create_from_resource(_process &proc.Process, mut res resource.Resou
 
 pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	mut process := &proc.Process(0)
-	if voidptr(_process) == voidptr(0) {
+	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
 	} else {
 		process = unsafe { _process }
@@ -319,7 +319,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	}
 
 	mut ret := unsafe { &FD(process.fds[fdnum]) }
-	if voidptr(ret) == voidptr(0) {
+	if voidptr(ret) == unsafe { nil } {
 		errno.set(errno.ebadf)
 		return none
 	}
@@ -331,14 +331,14 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 
 pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Process, newfdnum int, flags int, specific bool, cloexec bool) ?int {
 	mut old_process := &proc.Process(0)
-	if voidptr(_old_process) == voidptr(0) {
+	if voidptr(_old_process) == unsafe { nil } {
 		old_process = proc.current_thread().process
 	} else {
 		old_process = unsafe { _old_process }
 	}
 
 	mut new_process := &proc.Process(0)
-	if voidptr(_new_process) == voidptr(0) {
+	if voidptr(_new_process) == unsafe { nil } {
 		new_process = proc.current_thread().process
 	} else {
 		new_process = unsafe { _new_process }
@@ -374,14 +374,14 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 	mut thread := proc.current_thread()
 	mut process := thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: dup3(%d, %d, %d)\n', process.name.str, oldfdnum, newfdnum, flags)
+	C.printf(c'\n\e[32m%s\e[m: dup3(%d, %d, %d)\n', process.name.str, oldfdnum, newfdnum,
+		flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	new_fdnum := fdnum_dup(voidptr(0), oldfdnum, voidptr(0), newfdnum, flags, true, false) or {
-		return errno.err, errno.get()
-	}
+	new_fdnum := fdnum_dup(unsafe { nil }, oldfdnum, unsafe { nil }, newfdnum, flags,
+		true, false) or { return errno.err, errno.get() }
 
 	return u64(new_fdnum), 0
 }
@@ -395,7 +395,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.ebadf }
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
 
 	mut handle := fd.handle
 
@@ -403,14 +403,12 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 
 	match cmd {
 		file.f_dupfd {
-			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false, false) or {
-				return errno.err, errno.get()
-			})
+			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false,
+				false) or { return errno.err, errno.get() })
 		}
 		file.f_dupfd_cloexec {
-			ret = u64(fdnum_dup(voidptr(0), fdnum, voidptr(0), int(arg), 0, false, true) or {
-				return errno.err, errno.get()
-			})
+			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false,
+				true) or { return errno.err, errno.get() })
 		}
 		file.f_getfd {
 			ret = if fd.flags & resource.o_cloexec != 0 { u64(file.fd_cloexec) } else { 0 }
@@ -429,7 +427,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			fd.unref()
 		}
 		else {
-			print('\nfcntl: Unhandled command: $cmd\n')
+			print('\nfcntl: Unhandled command: ${cmd}\n')
 			fd.unref()
 			return errno.err, errno.einval
 		}
@@ -442,17 +440,17 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str, addr, length,
-		prot_and_flags, fdnum, offset)
+	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str,
+		addr, length, prot_and_flags, fdnum, offset)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut resource := &resource.Resource(voidptr(0))
+	mut resource := &resource.Resource(unsafe { nil })
 	mut fd := &FD(0)
 
 	if fdnum != -1 {
-		fd = fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+		fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 		resource = fd.handle.resource
 	}
 
@@ -465,7 +463,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	prot := int((prot_and_flags >> 32) & 0xffffffff)
 	flags := int(prot_and_flags & 0xffffffff)
 
-	if flags & mmap.map_anonymous == 0 && voidptr(resource) == voidptr(0) {
+	if flags & mmap.map_anonymous == 0 && voidptr(resource) == unsafe { nil } {
 		return errno.err, errno.ebadf
 	}
 

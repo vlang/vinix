@@ -12,19 +12,21 @@ import x86.cpu.initialisation as cpuinit
 
 __global (
 	bsp_lapic_id = u32(0)
-	smp_ready = false
+	smp_ready    = false
 )
 
 [cinit]
 __global (
-	volatile smp_req = limine.LimineSMPRequest{response: 0}
+	volatile smp_req = limine.LimineSMPRequest{
+		response: 0
+	}
 )
 
 pub fn initialise() {
 	smp_tag := smp_req.response
 
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
-	println('smp: Total CPU count: $smp_tag.cpu_count')
+	println('smp: Total CPU count: ${smp_tag.cpu_count}')
 
 	smp_info_array := smp_tag.cpus
 

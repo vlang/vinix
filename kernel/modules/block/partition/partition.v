@@ -159,9 +159,9 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
-			print('gpt: partition detected [start: ${partition.device_offset:x} sector cnt: $partition.sector_cnt]\n')
+			print('gpt: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
 
-			fs.devtmpfs_add_device(partition, '$prefix$i')
+			fs.devtmpfs_add_device(partition, '${prefix}${i}')
 		}
 
 		return 0
@@ -197,9 +197,9 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
-			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: $partition.sector_cnt]\n')
+			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
 
-			fs.devtmpfs_add_device(partition, '$prefix$i')
+			fs.devtmpfs_add_device(partition, '${prefix}${i}')
 		}
 
 		return 0

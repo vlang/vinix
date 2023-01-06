@@ -13,25 +13,25 @@ import errno
 import proc
 
 pub const (
-	epollin = 0x001
-	epollpri = 0x002
-	epollout = 0x004
-	epollrdnorm = 0x040
-	epollrdband = 0x080
-	epollwrnorm = 0x100
-	epollwrband = 0x200
-	epollmsg = 0x400
-	epollerr = 0x008
-	epollhup = 0x010
-	epollrdhup = 0x2000
+	epollin        = 0x001
+	epollpri       = 0x002
+	epollout       = 0x004
+	epollrdnorm    = 0x040
+	epollrdband    = 0x080
+	epollwrnorm    = 0x100
+	epollwrband    = 0x200
+	epollmsg       = 0x400
+	epollerr       = 0x008
+	epollhup       = 0x010
+	epollrdhup     = 0x2000
 	epollexclusive = u32(1) << 28
-	epollwakeup = u32(1) << 29
-	epolloneshot = u32(1) << 30
-	epollet = u32(1) << 31
-	epoll_cloexec = 1
-	epoll_ctl_add = 1
-	epoll_ctl_del = 2
-	epoll_ctl_mod = 3
+	epollwakeup    = u32(1) << 29
+	epolloneshot   = u32(1) << 30
+	epollet        = u32(1) << 31
+	epoll_cloexec  = 1
+	epoll_ctl_add  = 1
+	epoll_ctl_del  = 2
+	epoll_ctl_mod  = 3
 )
 
 union EPollData {
@@ -96,13 +96,13 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', process.name.str, epfdnum, op, fdnum,
-		voidptr(event))
+	C.printf(c'\n\e[32m%s\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', process.name.str, epfdnum,
+		op, fdnum, voidptr(event))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return errno.err, errno.get() }
+	mut epoll_fd := fd_from_fdnum(unsafe { nil }, epfdnum) or { return errno.err, errno.get() }
 	defer {
 		epoll_fd.unref()
 	}
@@ -155,18 +155,17 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 	return 0, 0
 }
 
-pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
-						   maxevents int, timeout int, sigmask &u64) (u64, u64) {
+pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent, maxevents int, timeout int, sigmask &u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: epoll_pwait(%d, 0x%llx, %d, %d, 0x%llx)\n',
-			 process.name.str, epfdnum, voidptr(ret_events), maxevents, timeout, voidptr(sigmask))
+	C.printf(c'\n\e[32m%s\e[m: epoll_pwait(%d, 0x%llx, %d, %d, 0x%llx)\n', process.name.str,
+		epfdnum, voidptr(ret_events), maxevents, timeout, voidptr(sigmask))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut epoll_fd := fd_from_fdnum(voidptr(0), epfdnum) or { return errno.err, errno.get() }
+	mut epoll_fd := fd_from_fdnum(unsafe { nil }, epfdnum) or { return errno.err, errno.get() }
 	defer {
 		epoll_fd.unref()
 	}
@@ -184,7 +183,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 	mut thread := proc.current_thread()
 
 	oldmask := thread.masked_signals
-	if voidptr(sigmask) != voidptr(0) {
+	if voidptr(sigmask) != unsafe { nil } {
 		thread.masked_signals = unsafe { *sigmask }
 	}
 	defer {
@@ -209,8 +208,8 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 
 		mut event := unsafe { &ret_events[i] }
 
-		mut fd := fd_from_fdnum(voidptr(0), fdnum) or {
-			event.events = epollerr
+		mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or {
+			event.events = file.epollerr
 			event.data.fd = fdnum
 			i++
 			continue
@@ -269,7 +268,7 @@ pub fn syscall_epoll_create(_ voidptr, flags int) (u64, u64) {
 		refcount: 1
 	}
 
-	epoll_fdnum := fdnum_create_from_resource(voidptr(0), mut e, cloexec, 0, false) or {
+	epoll_fdnum := fdnum_create_from_resource(unsafe { nil }, mut e, cloexec, 0, false) or {
 		return errno.err, errno.get()
 	}
 

@@ -49,18 +49,19 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: pipe(0x%llx, 0x%x)\n', process.name.str, voidptr(pipefds), flags)
+	C.printf(c'\n\e[32m%s\e[m: pipe(0x%llx, 0x%x)\n', process.name.str, voidptr(pipefds),
+		flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut new_pipe := create() or { return errno.err, errno.get() }
 
-	rd_fd := file.fdnum_create_from_resource(voidptr(0), mut new_pipe, flags, 0, false) or {
+	rd_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags, 0, false) or {
 		return errno.err, errno.get()
 	}
 
-	wr_fd := file.fdnum_create_from_resource(voidptr(0), mut new_pipe, flags, 0, false) or {
+	wr_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags, 0, false) or {
 		return errno.err, errno.get()
 	}
 

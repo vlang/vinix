@@ -184,7 +184,9 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				return error('')
 			}
 			mut retp := &u64(argp)
-			unsafe { *retp = this.used }
+			unsafe {
+				*retp = this.used
+			}
 			return 0
 		}
 		else {
@@ -458,7 +460,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)
 
-	if msg.msg_name != voidptr(0) && this.connected {
+	if msg.msg_name != unsafe { nil } && this.connected {
 		mut actual_size := msg.msg_namelen
 		if actual_size < sizeof(SockaddrUn) {
 			actual_size = sizeof(SockaddrUn)
@@ -480,7 +482,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 pub fn create(@type int) ?&UnixSocket {
 	mut ret := &UnixSocket{
 		refcount: 1
-		peer: voidptr(0)
+		peer: unsafe { nil }
 		data: unsafe { C.malloc(unix.sock_buf) }
 		capacity: unix.sock_buf
 	}
@@ -491,14 +493,14 @@ pub fn create(@type int) ?&UnixSocket {
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount: 1
-		peer: voidptr(0)
+		peer: unsafe { nil }
 		data: unsafe { C.malloc(unix.sock_buf) }
 		capacity: unix.sock_buf
 	}
 	a.name.sun_family = sock_pub.af_unix
 	mut b := &UnixSocket{
 		refcount: 1
-		peer: voidptr(0)
+		peer: unsafe { nil }
 		data: unsafe { C.malloc(unix.sock_buf) }
 		capacity: unix.sock_buf
 	}

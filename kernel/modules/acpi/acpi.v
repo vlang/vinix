@@ -46,7 +46,9 @@ fn use_xsdt() bool {
 
 [cinit]
 __global (
-	volatile rsdp_req = limine.LimineRSDPRequest{response: 0}
+	volatile rsdp_req = limine.LimineRSDPRequest{
+		response: 0
+	}
 )
 
 pub fn initialise() {
@@ -64,8 +66,8 @@ pub fn initialise() {
 		rsdt = unsafe { &RSDT(byteptr(usize(rsdp.rsdt_addr)) + higher_half) }
 	}
 
-	println('acpi: Revision:  $rsdp.revision')
-	println('acpi: Use XSDT:  $use_xsdt()')
+	println('acpi: Revision:  ${rsdp.revision}')
+	println('acpi: Use XSDT:  ${use_xsdt()}')
 	println('acpi: R/XSDT at: 0x${voidptr(rsdt):x}')
 
 	// We won't support HW reduced ACPI systems
@@ -97,10 +99,10 @@ pub fn find_sdt(signature string, index int) ?voidptr {
 				count++
 				continue
 			}
-			println('acpi: Found "$signature" at 0x${voidptr(ptr):x}')
+			println('acpi: Found "${signature}" at 0x${voidptr(ptr):x}')
 			return voidptr(ptr)
 		}
 	}
 
-	return error('acpi: "$signature" not found')
+	return error('acpi: "${signature}" not found')
 }

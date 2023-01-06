@@ -595,13 +595,13 @@ fn keyboard_handler() {
 }
 
 fn read_ps2() u8 {
-	for kio.port_in<u8>(0x64) & 1 == 0 {}
-	return kio.port_in<u8>(0x60)
+	for kio.port_in[u8](0x64) & 1 == 0 {}
+	return kio.port_in[u8](0x60)
 }
 
 fn write_ps2(port u16, value u8) {
-	for kio.port_in<u8>(0x64) & 2 != 0 {}
-	kio.port_out<u8>(port, value)
+	for kio.port_in[u8](0x64) & 2 != 0 {}
+	kio.port_out[u8](port, value)
 }
 
 fn read_ps2_config() u8 {
@@ -673,15 +673,15 @@ pub fn initialise() {
 
 	mut terminal_context_size := u64(0)
 	term.print(voidptr(&terminal_context_size), u64(-1))
-	print('console: Terminal context size: $terminal_context_size\n')
+	print('console: Terminal context size: ${terminal_context_size}\n')
 
 	// Disable primary and secondary PS/2 ports
 	write_ps2(0x64, 0xad)
 	write_ps2(0x64, 0xa7)
 
 	// Read from port 0x60 to flush the PS/2 controller buffer
-	for kio.port_in<u8>(0x64) & 1 != 0 {
-		kio.port_in<u8>(0x60)
+	for kio.port_in[u8](0x64) & 1 != 0 {
+		kio.port_in[u8](0x60)
 	}
 
 	mut ps2_config := read_ps2_config()
@@ -704,7 +704,7 @@ pub fn initialise() {
 		write_ps2(0x64, 0xa8)
 	}
 
-	go keyboard_handler()
+	spawn keyboard_handler()
 }
 
 struct Console {
