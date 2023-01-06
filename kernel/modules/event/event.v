@@ -166,7 +166,7 @@ pub fn trigger(mut event eventstruct.Event, drop bool) u64 {
 	}
 
 	for i := u64(0); i < event.listeners_i; i++ {
-		mut thread := &proc.Thread(event.listeners[i].thread)
+		mut thread := unsafe { &proc.Thread(event.listeners[i].thread) }
 
 		thread.which_event = event.listeners[i].which
 

@@ -137,7 +137,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			return -1
 		}
 
-		partition_entry_list := &GPTPartitionEntry(partition_entry_buffer)
+		partition_entry_list := unsafe { &GPTPartitionEntry(partition_entry_buffer) }
 
 		for i := 0; i < entry_cnt; i++ {
 			partition_entry := unsafe { &GPTPartitionEntry(&partition_entry_list[i]) }

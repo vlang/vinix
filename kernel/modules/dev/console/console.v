@@ -794,7 +794,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 
 	match request {
 		ioctl.tiocgwinsz {
-			mut w := &ioctl.WinSize(argp)
+			mut w := unsafe { &ioctl.WinSize(argp) }
 			w.ws_row = u16(terminal_rows)
 			w.ws_col = u16(terminal_cols)
 			w.ws_xpixel = u16(framebuffer_width)
@@ -802,7 +802,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.tcgets {
-			mut t := &termios.Termios(argp)
+			mut t := unsafe { &termios.Termios(argp) }
 			unsafe {
 				t[0] = this.termios
 			}
@@ -810,7 +810,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		}
 		// TODO: handle these differently
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			mut t := &termios.Termios(argp)
+			mut t := unsafe { &termios.Termios(argp) }
 			unsafe {
 				this.termios = t[0]
 			}

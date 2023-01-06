@@ -67,7 +67,7 @@ __global (
 )
 
 fn madt_init() {
-	madt := &MADT(find_sdt('APIC', 0) or { panic('System does not have a MADT') })
+	madt := unsafe { &MADT(find_sdt('APIC', 0) or { panic('System does not have a MADT') }) }
 
 	mut current := u64(0)
 

@@ -83,7 +83,7 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 		this.l.release()
 	}
 
-	handle := &file.Handle(_handle)
+	handle := unsafe { &file.Handle(_handle) }
 
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(this.used) == 0 {

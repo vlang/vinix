@@ -61,7 +61,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 		this.l.release()
 	}
 
-	handle := &file.Handle(_handle)
+	handle := unsafe { &file.Handle(_handle) }
 
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(this.used) == 0 {
@@ -237,7 +237,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		this.l.release()
 	}
 
-	handle := &file.Handle(_handle)
+	handle := unsafe { &file.Handle(_handle) }
 
 	for this.backlog.len == 0 {
 		this.status &= ~file.pollin
@@ -285,7 +285,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 }
 
 fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
-	addr := &SockaddrUn(_addr)
+	addr := unsafe { &SockaddrUn(_addr) }
 
 	if addr.sun_family != sock_pub.af_unix {
 		errno.set(errno.einval)
@@ -302,7 +302,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	target_res := target.resource
 
-	mut socket := &UnixSocket(voidptr(0))
+	mut socket := &UnixSocket(0)
 
 	if target_res is UnixSocket {
 		socket = target_res
@@ -342,7 +342,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 }
 
 fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
-	addr := &SockaddrUn(_addr)
+	addr := unsafe { &SockaddrUn(_addr) }
 
 	if addr.sun_family != sock_pub.af_unix {
 		errno.set(errno.einval)
@@ -378,7 +378,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		this.l.release()
 	}
 
-	handle := &file.Handle(_handle)
+	handle := unsafe { &file.Handle(_handle) }
 
 	mut count := u64(0)
 	for i := u64(0); i < msg.msg_iovlen; i++ {

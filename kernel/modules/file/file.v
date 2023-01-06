@@ -230,8 +230,8 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 		process.fds_lock.release()
 	}
 
-	mut fd := &FD(process.fds[fdnum])
-	if voidptr(fd) == voidptr(0) {
+	mut fd := unsafe { &FD(process.fds[fdnum]) }
+	if fd == unsafe { nil } {
 		errno.set(errno.ebadf)
 		return error('')
 	}
@@ -318,7 +318,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 		process.fds_lock.release()
 	}
 
-	mut ret := &FD(process.fds[fdnum])
+	mut ret := unsafe { &FD(process.fds[fdnum]) }
 	if voidptr(ret) == voidptr(0) {
 		errno.set(errno.ebadf)
 		return none
@@ -449,7 +449,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	}
 
 	mut resource := &resource.Resource(voidptr(0))
-	mut fd := &FD(voidptr(0))
+	mut fd := &FD(0)
 
 	if fdnum != -1 {
 		fd = fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }

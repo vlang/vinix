@@ -184,7 +184,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 		parent = vfs_root
 	} else {
 		if dirfd == fs.at_fdcwd {
-			parent = &VFSNode(current_process.current_directory)
+			parent = unsafe { &VFSNode(current_process.current_directory) }
 		} else {
 			dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
 			dir_handle := dir_fd.handle
@@ -192,7 +192,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 				errno.set(errno.enotdir)
 				return none
 			}
-			parent = &VFSNode(dir_handle.node)
+			parent = unsafe { &VFSNode(dir_handle.node) }
 		}
 	}
 
@@ -667,7 +667,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		}
 
 		if dirfd == fs.at_fdcwd {
-			node := &VFSNode(current_process.current_directory)
+			node := unsafe { &VFSNode(current_process.current_directory) }
 			statsrc = &node.resource.stat
 		} else {
 			fd := file.fd_from_fdnum(current_process, dirfd) or { return errno.err, errno.get() }
@@ -826,7 +826,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 		return errno.err, errno.enotdir
 	}
 
-	mut dir_node := &VFSNode(dir_handle.node)
+	mut dir_node := unsafe { &VFSNode(dir_handle.node) }
 
 	if dir_handle.dirlist_valid == false {
 		dir_handle.dirlist.clear()

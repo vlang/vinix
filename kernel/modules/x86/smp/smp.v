@@ -31,7 +31,7 @@ pub fn initialise() {
 	bsp_lapic_id = smp_tag.bsp_lapic_id
 
 	for i := u64(0); i < smp_tag.cpu_count; i++ {
-		mut cpu_local := &cpulocal.Local(memory.malloc(sizeof(cpulocal.Local)))
+		mut cpu_local := unsafe { &cpulocal.Local(memory.malloc(sizeof(cpulocal.Local))) }
 		cpu_locals << cpu_local
 
 		mut smp_info := unsafe { smp_info_array[i] }

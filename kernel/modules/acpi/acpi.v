@@ -70,7 +70,7 @@ pub fn initialise() {
 
 	// We won't support HW reduced ACPI systems
 	if fadt := find_sdt('FACP', 0) {
-		if &SDT(fadt).length >= 116 {
+		if unsafe { &SDT(fadt).length >= 116 } {
 			fadt_flags := unsafe { (&u32(fadt))[28] }
 			if fadt_flags & (1 << 20) != 0 {
 				panic('acpi: OS does not support HW reduced ACPI systems.')

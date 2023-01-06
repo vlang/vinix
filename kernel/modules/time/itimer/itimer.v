@@ -82,7 +82,7 @@ pub fn syscall_getitimer(_ voidptr, which int, mut curr_value ITimerVal) (u64, u
 		return errno.err, errno.einval
 	}
 
-	mut itimers := &ITimer(voidptr(&process.itimers[0]))
+	mut itimers := &ITimer(&process.itimers[0])
 
 	unsafe {
 		curr_value.it_interval.tv_sec = itimers[which].reload_value.tv_sec
@@ -108,7 +108,7 @@ pub fn syscall_setitimer(_ voidptr, which int, mut new_value ITimerVal, mut old_
 		return errno.err, errno.einval
 	}
 
-	mut itimers := &ITimer(voidptr(&process.itimers[0]))
+	mut itimers := unsafe { &ITimer(voidptr(&process.itimers[0])) }
 
 	unsafe {
 		if itimers[which].handler_started == true {

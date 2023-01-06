@@ -109,7 +109,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 
 	epoll_resource := epoll_fd.handle.resource
 
-	mut epoll := &EPoll(voidptr(0))
+	mut epoll := &EPoll(0)
 
 	if epoll_resource is EPoll {
 		epoll = epoll_resource
@@ -173,7 +173,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent,
 
 	epoll_resource := epoll_fd.handle.resource
 
-	mut epoll := &EPoll(voidptr(0))
+	mut epoll := &EPoll(0)
 
 	if epoll_resource is EPoll {
 		epoll = epoll_resource

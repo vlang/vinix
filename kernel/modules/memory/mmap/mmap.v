@@ -48,14 +48,14 @@ pub mut:
 pub fn list_ranges(pagemap &memory.Pagemap) {
 	C.printf(c'Ranges for %llx:\n', voidptr(pagemap))
 	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
-		r := &MmapRangeLocal(pagemap.mmap_ranges[i])
+		r := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
 		C.printf(c'\tBase: 0x%llx\tLength: 0x%llx\tOffset: 0x%llx\n', r.base, r.length, r.offset)
 	}
 }
 
 fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
-		r := &MmapRangeLocal(pagemap.mmap_ranges[i])
+		r := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
 		if addr >= r.base && addr < r.base + r.length {
 			memory_page := addr / page_size
 			file_page := u64(r.offset) / page_size + (memory_page - r.base / page_size)
@@ -71,7 +71,7 @@ pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
 	pagemap.l.acquire()
 
 	for ptr in pagemap.mmap_ranges {
-		local_range := &MmapRangeLocal(ptr)
+		local_range := unsafe { &MmapRangeLocal(ptr) }
 
 		munmap(pagemap, voidptr(local_range.base), local_range.length) or { return error('') }
 	}
@@ -89,7 +89,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	}
 
 	for ptr in old_pagemap.mmap_ranges {
-		local_range := &MmapRangeLocal(ptr)
+		local_range := unsafe { &MmapRangeLocal(ptr) }
 		mut global_range := local_range.global
 
 		mut new_local_range := &MmapRangeLocal{
