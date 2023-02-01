@@ -7,18 +7,15 @@ hostrundeps="gcc-compiler binutils"
 deps="mlibc-base"
 
 configure() {
-    true
+    # Hack to continue gcc build
+    cp -rp "${base_dir}"/host-builds/gcc-compiler/. ./
 }
 
 build() {
-    # Hack to continue gcc build
-    cd "${base_dir}"/host-builds/gcc-compiler
     make -j${parallelism} all-target-libgcc
 }
 
 install() {
-    # Hack to continue gcc build
-    cd "${base_dir}"/host-builds/gcc-compiler
     DESTDIR="${dest_dir}" make install-strip-target-libgcc
     rm "${dest_dir}${prefix}"/lib/gcc/x86_64-vinix/12.2.0/crti.o
     rm "${dest_dir}${prefix}"/lib/gcc/x86_64-vinix/12.2.0/crtn.o
