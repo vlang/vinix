@@ -3,3 +3,8 @@ HISTCONTROL=ignoredups
 HISTSIZE=-1
 HISTFILESIZE=-1
 alias ls="ls --color=auto"
+
+export DISPLAY=:0
+alias 1="X &"
+alias 2="twm &"
+alias 3="xeyes &"

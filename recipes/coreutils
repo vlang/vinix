@@ -6,16 +6,12 @@ deps="mlibc tzdata"
 imagedeps="gcc gperf"
 
 configure() {
-    # Huge hack: coreutils does not compile the build-machine binary make-prime-list
-    # using the build-machine compiler. Hence, build and invoke the binary manually here.
-    ${source_dir}/configure
-    make src/make-prime-list
-    ./src/make-prime-list 5000 > "${source_dir}/src/primes.h"
-    rm -rf *
+    cp -r "${source_dir}"/. ./
 
-    # Now compile coreutils for the correct target.
+    libtoolize -cfvi && autoreconf -fvi
+
         CFLAGS="-DSLOW_BUT_NO_HACKS $CFLAGS" \
-    ${source_dir}/configure    \
+    ./configure    \
         --host=x86_64-vinix    \
         --prefix=${prefix}     \
         --disable-nls

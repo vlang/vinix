@@ -4,7 +4,20 @@ source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/coreutils/coreutils-${version}.tar.xz"
 tarball_blake2b="f5654e4935535275615d44a56c071d1c0746af36cf4615fcc0a5a0d387af9c9023adac31f31a52e16b3d1105b9d4c0fb7ebff9b2862498849f867a866049dd6e"
 hostdeps="automake autoconf libtool pkg-config"
+imagedeps="gcc gperf"
 
 regenerate() {
-    autoreconf -fvi && libtoolize -cfvi
+    libtoolize -cfvi && autoreconf -fvi
+
+    # Huge hack: coreutils does not compile the build-machine binary make-prime-list
+    # using the build-machine compiler. Hence, build and invoke the binary manually here.
+    mkdir tmp_build_dir
+    cd tmp_build_dir
+
+    ../configure
+    make src/make-prime-list
+    ./src/make-prime-list 5000 > ../src/primes.h
+
+    cd ..
+    rm -rf tmp_build_dir
 }

@@ -4,7 +4,7 @@ revision=1
 imagedeps="meson ninja git base-devel"
 
 configure() {
-    meson \
+    meson setup \
         --prefix=${prefix} \
         --libdir=lib \
         --includedir=share/frigg/include \

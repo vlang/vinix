@@ -6,7 +6,7 @@ deps="mlibc libxcb libxml xkeyboard-config"
 imagedeps="meson ninja"
 
 configure() {
-    meson \
+    meson setup \
         --cross-file "${base_dir}/build-support/cross_file.txt" \
         --prefix=/usr \
         --libdir=lib \

@@ -1,17 +1,16 @@
-name=libgmp
-from_source=libgmp
+name=xeyes
+from_source=xeyes
 revision=1
-imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc"
+deps="mlibc libx11 libxmu libxaw libxrender libxft libxt libxi libxkbfile"
 
 configure() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
-        --enable-cxx                  \
-        --disable-static              \
-        --with-sysroot=${sysroot_dir}
+        --sysconfdir=/etc             \
+        --localstatedir=/var          \
+        --disable-selective-werror
 }
 
 build() {

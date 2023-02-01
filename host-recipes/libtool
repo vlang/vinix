@@ -5,7 +5,8 @@ hostdeps="autoconf automake"
 imagedeps="help2man gcc"
 
 configure() {
-    "${source_dir}"/configure \
+    cp -r "${source_dir}"/. ./
+    ./configure \
         --prefix="${prefix}"
 }
 

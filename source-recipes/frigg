@@ -1,8 +1,8 @@
 name=frigg
-version=678d169743dc0ae69d95373ac723156845bfefa4
+version=396cb8d9dee63396b771cf3c124431655aaa150f
 source_method=tarball
 tarball_url="https://github.com/managarm/frigg/archive/${version}.tar.gz"
-tarball_blake2b="3f944fbaa84dd72169253a62cc4a3294596a2bb40963ef445e0c5b3d747781eef2d06117553babf95861d64050db94821bbb119b341365726343b8a644d5505d"
+tarball_blake2b="e8c5e96303ab7ae1462bccc244a3035d538eee3ce88d72ec5e5f1abcfc4336759bb876a15e8dc3c7ba6420a9eb8fef0e2eaa49cad92ddc3a2572c6cb9e05d863"
 
 regenerate() {
     true

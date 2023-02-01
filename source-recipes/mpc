@@ -7,5 +7,5 @@ hostdeps="automake autoconf libtool pkg-config"
 imagedeps="git"
 
 regenerate() {
-    autoreconf -fvi
+    libtoolize -cfvi && autoreconf -fvi
 }

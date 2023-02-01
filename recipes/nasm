@@ -3,10 +3,11 @@ from_source=nasm
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc"
-imagedeps="asciidoc xmlto"
 
 configure() {
-    cp -r ${source_dir}/. .
+    cp -r "${source_dir}"/. .
+    libtoolize -cfvi && autoreconf -fvi -I$(realpath ./autoconf)
+
     ./configure \
         --host=x86_64-vinix \
         --prefix=${prefix}
@@ -14,7 +15,6 @@ configure() {
 
 build() {
     make
-    make manpages
 }
 
 install() {

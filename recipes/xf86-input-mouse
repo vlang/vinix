@@ -1,0 +1,22 @@
+name=xf86-input-mouse
+from_source=xf86-input-mouse
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-server xorg-util-macros libx11"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-static
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

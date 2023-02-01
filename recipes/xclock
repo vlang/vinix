@@ -1,0 +1,24 @@
+name=xclock
+from_source=xclock
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc libx11 libxmu libxaw libxrender libxft libxt libxkbfile"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-selective-werror
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+    mv -v "${dest_dir}"/sysroot/* "${dest_dir}"/
+    rm -rf "${dest_dir}"/sysroot
+}

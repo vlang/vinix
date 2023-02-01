@@ -6,15 +6,13 @@ hostdeps="gcc binutils v"
 allow_network="yes"
 
 configure() {
-    true
+    cp -r "${source_dir}"/. ./
 }
 
 build() {
-    cd ${source_dir}
     make -j${parallelism} CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
 }
 
 install() {
-    cd ${source_dir}
     make install PREFIX="/" DESTDIR="${dest_dir}"
 }

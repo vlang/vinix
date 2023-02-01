@@ -14,5 +14,5 @@ regenerate() {
     cp /usr/local/share/libtool/build-aux/ltmain.sh ./libcharset/build-aux/
     cp /usr/local/share/aclocal/ltversion.m4 ./m4/
     cp /usr/local/share/aclocal/ltversion.m4 ./libcharset/m4/
-    autoreconf -fvi -I"${source_dir}"/m4 -I"${source_dir}"/srcm4
+    libtoolize -cfvi && autoreconf -fvi -I"${source_dir}"/m4 -I"${source_dir}"/srcm4
 }

@@ -10,5 +10,5 @@ regenerate() {
     sed -i "s|AC_INIT|AC_INIT([libtextstyle], [${version}], [bug-gettext@gnu.org])|g" libtextstyle/configure.ac
     sed -i 's|gl_INIT_PACKAGE|dnl gl_INIT_PACKAGE|g' libtextstyle/configure.ac
 
-    autoreconf -fvi
+    libtoolize -cfvi && autoreconf -fvi
 }

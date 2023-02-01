@@ -3,8 +3,8 @@ version=8.1.2
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/readline/readline-${version}.tar.gz"
 tarball_blake2b="0a80eb7fd2be6fa22d0b159183f87c2db33b74d6168c5f57722ada1ad5d0b8338ff8f08e469550555c6f68ce6953fe53d43d3370e8967590ddbeac6db075ef95"
-hostdeps="automake autoconf"
+hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    cp /usr/local/share/automake-1.16/config.sub support/
+    libtoolize -cfvi && AUTOHEADER=true autoreconf -fvi
 }

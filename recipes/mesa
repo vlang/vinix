@@ -9,7 +9,7 @@ configure() {
     cp ${base_dir}/build-support/cross_file.txt ./
     sed -i "/^# sed adds binaries here.\$/a llvm-config = '${base_dir}/build-support/cross-llvm-config'" cross_file.txt
 
-    meson --cross-file cross_file.txt --prefix=/usr --libdir=lib --buildtype=debugoptimized -Dglx=gallium-xlib -Dplatforms=x11 -Ddri-drivers= -Dgallium-drivers=swrast -Dvulkan-drivers= -Dllvm=enabled ${source_dir}
+    meson setup --cross-file cross_file.txt --prefix=/usr --libdir=lib --buildtype=debugoptimized -Dglx=gallium-xlib -Dplatforms=x11 -Ddri-drivers= -Dgallium-drivers=swrast -Dvulkan-drivers= -Dllvm=enabled ${source_dir}
 }
 
 build() {

@@ -1,16 +1,7 @@
-From a799db2640f9154b6f7bd460cd912ba57af05d93 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 9 May 2022 13:46:03 +0200
-Subject: [PATCH] Vinix specific changes
-
----
- configure | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/configure b/configure
-index 18928eb..2c026d4 100755
---- a/configure
-+++ b/configure
+diff --git ncurses-clean/configure ncurses-workdir/configure
+index aeb93b8..45a11c4 100755
+--- ncurses-clean/configure
++++ ncurses-workdir/configure
 @@ -6460,6 +6460,10 @@ CF_EOF
  		LINK_PROGS="$SHELL ${rel_builddir}/mk_prog.sh"
  		LINK_TESTS="$SHELL ${rel_builddir}/mk_prog.sh"
@@ -22,6 +13,3 @@ index 18928eb..2c026d4 100755
  	(mingw*)
  		cf_cv_shlib_version=mingw
  		cf_cv_shlib_version_infix=mingw
--- 
-2.35.1
-

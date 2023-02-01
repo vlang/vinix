@@ -6,7 +6,7 @@ hostdeps="gcc-compiler pkg-config"
 deps="mlibc-headers cxxshim frigg"
 
 configure() {
-    meson \
+    meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
         --libdir=lib \

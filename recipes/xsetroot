@@ -1,0 +1,17 @@
+name=xsetroot
+revision=1
+from_source=xsetroot
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-server libxmu xbitmaps libxcursor"
+
+configure() {
+    ${source_dir}/configure --prefix=${prefix} --host=x86_64-vinix
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    make DESTDIR=${dest_dir} install
+}

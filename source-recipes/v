@@ -3,10 +3,10 @@ version=0.0
 source_method=git
 clone_url="https://github.com/vlang/v.git"
 tag="master"
-commit="bfcf5b13ed54935f79e7f3828ca334d27f810bac"
+commit="2029d1830fb3a3f1b00ff7941b4a62753bf5a679"
 imagedeps="curl"
 allow_network="yes"
 
 regenerate() {
-    curl -o v.c https://raw.githubusercontent.com/vlang/vc/6c28b9142e832f7b069fa48504996f085ba638b2/v.c
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/93205cdc4ca5cb699522e09ecfa4f56721c2238b/v.c
 }

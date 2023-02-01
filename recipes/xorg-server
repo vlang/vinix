@@ -1,0 +1,51 @@
+name=xorg-server
+from_source=xorg-server
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-util-macros xorg-proto xcb-proto libxtrans libxshmfence libx11 libxxf86vm libxkbfile libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xkbcomp pixman"
+
+configure() {
+        CFLAGS="-Wno-error=array-bounds ${common_flags}" \
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-static \
+        --with-xkb-output=/var/lib/xkb \
+        --with-fontrootdir=/usr/share/fonts/X11 \
+        --enable-xorg \
+        --enable-xv \
+        --enable-xvfb \
+        --disable-xephyr \
+        --disable-xwayland \
+        --disable-xnest \
+        --disable-dmx \
+        --disable-suid-wrapper \
+        --disable-pciaccess \
+        --disable-dpms \
+        --disable-screensaver \
+        --disable-xres \
+        --disable-xinerama \
+        --disable-xvmc \
+        --disable-systemd-logind \
+        --disable-secure-rpc \
+        --disable-config-udev \
+        --disable-dri \
+        --disable-dri2 \
+        --disable-dri3 \
+        --disable-vbe \
+        --disable-int10-module \
+        --disable-vgahw \
+        --disable-libdrm \
+        --disable-glamor \
+        --disable-glx
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

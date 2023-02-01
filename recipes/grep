@@ -1,0 +1,24 @@
+name=grep
+from_source=grep
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc pcre"
+imagedeps="gperf"
+
+configure() {
+    cp -r "${source_dir}"/. ./
+    libtoolize -cfvi && autoreconf -fvi
+
+    ./configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --disable-nls
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    DESTDIR="${dest_dir}" make install-strip
+}

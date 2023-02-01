@@ -19,7 +19,5 @@ build() {
 
 install() {
     make install-strip DESTDIR="${dest_dir}"
-    mkdir -p "${dest_dir}"/bin
-    ln -s /usr/bin/bash "${dest_dir}"/bin/bash
-    ln -s /usr/bin/bash "${dest_dir}"/bin/sh
+    ln -s bash "${dest_dir}${prefix}"/bin/sh
 }

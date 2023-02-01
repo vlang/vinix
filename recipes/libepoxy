@@ -6,7 +6,7 @@ deps="mlibc mesa xorg-proto libx11"
 imagedeps="meson ninja"
 
 configure() {
-    meson \
+    meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
         --buildtype=release \

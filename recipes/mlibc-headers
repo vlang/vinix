@@ -6,7 +6,7 @@ imagedeps="meson ninja"
 deps="cxxshim frigg"
 
 configure() {
-    meson \
+    meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
         -Dheaders_only=true \

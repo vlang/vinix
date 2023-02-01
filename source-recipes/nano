@@ -1,10 +1,10 @@
 name=nano
-version=6.4
+version=7.2
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/nano/nano-${version}.tar.xz"
-tarball_blake2b="b59ff7a741ce4c8b31afdbbfaf1d704cccbceddcd7f1421f30a6dd40495ec456ca891aeb9777c070c6cce4e9c594f83798ff0cdacdfe06e81b0aa0b700033da3"
+tarball_blake2b="c7e3b18383e9f2f9db1f6059c875ddd164d730ea0e5b363e66fb8e5f30e8598ba49a5afd8eea3a55e295f1e43fb136019f60cc9154ae276c5d589002c0e5298a"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    autoreconf -fvi && libtoolize -cfvi
+    libtoolize -cfvi && autoreconf -fvi
 }

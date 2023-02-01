@@ -1,0 +1,148 @@
+diff --git xf86-input-mouse-clean/configure.ac xf86-input-mouse-workdir/configure.ac
+index 6c453cd..7ed1521 100644
+--- xf86-input-mouse-clean/configure.ac
++++ xf86-input-mouse-workdir/configure.ac
+@@ -62,7 +62,7 @@ AC_SUBST(inputdir)
+ 
+ # X Server SDK location is required to install xf86-mouse-properties.h
+ # This location is also relayed in the xorg-mouse.pc file
+-sdkdir=`$PKG_CONFIG --variable=sdkdir xorg-server`
++sdkdir="$includedir"
+ 
+ # Workaround overriding sdkdir to be able to create a tarball when user has no
+ # write permission in sdkdir. See DISTCHECK_CONFIGURE_FLAGS in Makefile.am
+@@ -84,6 +84,9 @@ case $host_os in
+   gnu*)
+     OS_MOUSE_NAME=hurd
+     ;;
++  vinix*)
++    OS_MOUSE_NAME=vinix
++    ;;
+ esac
+ AC_SUBST([OS_MOUSE_NAME])
+ 
+diff --git xf86-input-mouse-workdir/src/vinix_mouse.c xf86-input-mouse-workdir/src/vinix_mouse.c
+new file mode 100644
+index 0000000..8de8a7f
+--- /dev/null
++++ xf86-input-mouse-workdir/src/vinix_mouse.c
+@@ -0,0 +1,119 @@
++#ifdef HAVE_XORG_CONFIG_H
++#include <xorg-config.h>
++#endif
++
++#include <xorg-server.h>
++#include <X11/X.h>
++#include <X11/Xproto.h>
++#include "inputstr.h"
++#include "scrnintstr.h"
++#include "mipointer.h"
++
++#include "xf86.h"
++#include "xf86Xinput.h"
++#include "mouse.h"
++#include "xf86_OSlib.h"
++#include "xisb.h"
++
++#include <stdio.h>
++#include <errno.h>
++#include <stdbool.h>
++#include <stdint.h>
++
++#include <sys/stat.h>
++
++#define MOUSE_FLAG_LB (1 << 0)
++#define MOUSE_FLAG_RB (1 << 1)
++#define MOUSE_FLAG_MB (1 << 2)
++
++struct mouse_packet {
++    uint8_t flags;
++    int32_t x_mov;
++    int32_t y_mov;
++};
++
++static void vinixReadInput(InputInfoPtr pInfo) {
++    MouseDevPtr mouse = pInfo->private;
++    struct mouse_packet packet;
++
++    if (read(pInfo->fd, &packet, sizeof(struct mouse_packet)) == sizeof(struct mouse_packet)) {
++        int b = mouse->lastButtons;
++        b &= ~0x7;
++
++        b |= (packet.flags & MOUSE_FLAG_RB) ? 1 : 0;
++        b |= (packet.flags & MOUSE_FLAG_MB) ? 2 : 0;
++        b |= (packet.flags & MOUSE_FLAG_LB) ? 4 : 0;
++
++        mouse->PostEvent(pInfo, b, packet.x_mov, -packet.y_mov, 0, 0);
++    }
++}
++
++static Bool vinixPreInit(InputInfoPtr pInfo, const char *proto, int flag) {
++    MouseDevPtr mouse;
++
++    mouse = pInfo->private;
++
++    mouse->protocol = proto;
++
++    xf86ProcessCommonOptions(pInfo, pInfo->options);
++
++    pInfo->fd = xf86OpenSerial(pInfo->options);
++    if (pInfo->fd == -1) {
++        xf86Msg(X_ERROR, "%s: cannot open mouse device!\n", pInfo->name);
++        return FALSE;
++    }
++
++    mouse->CommonOptions(pInfo);
++    pInfo->read_input = vinixReadInput;
++    return true;
++}
++
++#define DEVPATH "/dev/mouse"
++
++static const char *getdevice(InputInfoPtr pInfo, const char *proto, int flag){
++    struct stat st;
++
++    if (stat(DEVPATH, &st) == -1)
++        return NULL;
++
++    pInfo->options = xf86AddNewOption(pInfo->options, "Device", DEVPATH);
++
++    return DEVPATH;
++}
++
++static int interfacesupport() {
++    return MSE_PS2;
++}
++
++static const char *names[] = {
++    "VinixMouseDev", NULL
++};
++
++static const char **protonames() {
++    return names;
++}
++
++static const char *defaultproto() {
++    return "VinixMouseDev";
++}
++
++static Bool isdefault(const char *protocol) {
++    return strcmp(protocol, defaultproto()) == 0;
++}
++
++OSMouseInfoPtr OSMouseInit(int flag) {
++    OSMouseInfoPtr p;
++
++    p = calloc(sizeof(OSMouseInfoRec), 1);
++
++    if (p == NULL)
++        return NULL;
++
++    p->SupportedInterfaces = interfacesupport;
++    p->BuiltinNames = protonames;
++    p->FindDevice = getdevice;
++    p->DefaultProtocol = defaultproto;
++    p->CheckProtocol = isdefault;
++    p->PreInit = vinixPreInit;
++    return p;
++}

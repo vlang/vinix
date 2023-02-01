@@ -1,0 +1,17 @@
+name=xbitmaps
+revision=1
+from_source=xbitmaps
+hostdeps="gcc autoconf automake libtool pkg-config xorg-macros"
+deps="mlibc"
+
+configure() {
+     ${source_dir}/configure --prefix=${prefix} --host=x86_64-vinix
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    make DESTDIR=${dest_dir} install
+}

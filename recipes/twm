@@ -1,0 +1,21 @@
+name=twm
+revision=1
+from_source=twm
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="mlibc xorg-server xsetroot"
+
+configure() {
+    ${source_dir}/configure \
+        --host=x86_64-vinix \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var
+}
+
+build() {
+    make -j${parallelism}
+}
+
+install() {
+    make DESTDIR=${dest_dir} install-strip
+}
