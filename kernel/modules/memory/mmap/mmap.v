@@ -265,7 +265,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
-	mut resource := unsafe { _resource }
+	mut resource_ := unsafe { _resource }
 
 	if _length == 0 {
 		C.printf(c'mmap: length is 0\n')
@@ -275,7 +275,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 
 	length := lib.align_up(_length, page_size)
 
-	if flags & mmap.map_anonymous == 0 && resource.can_mmap == false {
+	if flags & mmap.map_anonymous == 0 && resource_.can_mmap == false {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -307,7 +307,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		locals: []&MmapRangeLocal{}
 		base: base
 		length: length
-		resource: resource
+		resource: resource_
 		offset: offset
 		shadow_pagemap: memory.Pagemap{
 			top_level: &u64(0)
@@ -323,8 +323,8 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	pagemap.mmap_ranges << voidptr(range_local)
 	pagemap.l.release()
 
-	if voidptr(resource) != unsafe { nil } {
-		resource.refcount++
+	if voidptr(resource_) != unsafe { nil } {
+		resource_.refcount++
 	}
 
 	return voidptr(base)
