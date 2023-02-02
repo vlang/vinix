@@ -236,7 +236,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent, maxev
 	}
 
 	for {
-		which := event_.await(mut events, true) or { return errno.err, errno.eintr }
+		which := event.await(mut events, true) or { return errno.err, errno.eintr }
 
 		status := fdlist[which].handle.resource.status
 
