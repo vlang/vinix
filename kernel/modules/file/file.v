@@ -115,9 +115,9 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 			continue
 		}
 
-		mut resource := fd.handle.resource
+		mut resource_ := fd.handle.resource
 
-		status := resource.status
+		status := resource_.status
 
 		if i16(status) & fdd.events != 0 {
 			fdd.revents = i16(status) & fdd.events
@@ -129,7 +129,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 		fdlist << fd
 		fdnums << i
-		events << &resource.event
+		events << &resource_.event
 	}
 
 	if ret != 0 {
@@ -446,12 +446,12 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut resource := &resource.Resource(unsafe { nil })
+	mut resource_ := &resource.Resource(unsafe { nil })
 	mut fd := &FD(0)
 
 	if fdnum != -1 {
 		fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-		resource = fd.handle.resource
+		resource_ = fd.handle.resource
 	}
 
 	defer {
@@ -463,11 +463,11 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	prot := int((prot_and_flags >> 32) & 0xffffffff)
 	flags := int(prot_and_flags & 0xffffffff)
 
-	if flags & mmap.map_anonymous == 0 && voidptr(resource) == unsafe { nil } {
+	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
 		return errno.err, errno.ebadf
 	}
 
-	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource, offset) or {
+	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset) or {
 		return errno.err, errno.get()
 	}
 

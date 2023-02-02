@@ -206,21 +206,21 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent, maxev
 			break
 		}
 
-		mut event := unsafe { &ret_events[i] }
+		mut event_ := unsafe { &ret_events[i] }
 
 		mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or {
-			event.events = file.epollerr
-			event.data.fd = fdnum
+			event_.events = file.epollerr
+			event_.data.fd = fdnum
 			i++
 			continue
 		}
 
-		mut resource := fd.handle.resource
+		mut resource_ := fd.handle.resource
 
-		status := resource.status
+		status := resource_.status
 
 		if u32(status) & epoll_event.events != 0 {
-			event.events = u32(status) & epoll_event.events
+			event_.events = u32(status) & epoll_event.events
 			i++
 			fd.unref()
 			continue
@@ -228,7 +228,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent, maxev
 
 		fdlist << fd
 		epoll_events << epoll_event
-		events << &resource.event
+		events << &resource_.event
 	}
 
 	if i != 0 || events.len == 0 {
@@ -236,15 +236,15 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent, maxev
 	}
 
 	for {
-		which := event.await(mut events, true) or { return errno.err, errno.eintr }
+		which := event_.await(mut events, true) or { return errno.err, errno.eintr }
 
 		status := fdlist[which].handle.resource.status
 
 		mut epoll_event := unsafe { &epoll_events[which] }
-		mut event := unsafe { &ret_events[0] }
+		mut event_ := unsafe { &ret_events[0] }
 
 		if u32(status) & epoll_event.events != 0 {
-			event.events = u32(status) & epoll_event.events
+			event_.events = u32(status) & epoll_event.events
 			i = 1
 			break
 		}
