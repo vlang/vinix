@@ -92,12 +92,12 @@ fn (mut this EPoll) grow(handle voidptr, new_size u64) ? {
 	return error('')
 }
 
-pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPollEvent) (u64, u64) {
+pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event_ &EPollEvent) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
 	C.printf(c'\n\e[32m%s\e[m: epoll_ctl(%d, %d, %d, 0x%llx)\n', process.name.str, epfdnum,
-		op, fdnum, voidptr(event))
+		op, fdnum, voidptr(event_))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -125,7 +125,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 
 			mut event_copy := &EPollEvent{}
 			unsafe {
-				*event_copy = *event
+				*event_copy = *event_
 			}
 			epoll.table[fdnum] = event_copy
 		}
@@ -136,7 +136,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfdnum int, op int, fdnum int, event &EPoll
 
 			mut event_copy := &EPollEvent{}
 			unsafe {
-				*event_copy = *event
+				*event_copy = *event_
 			}
 			epoll.table[fdnum] = event_copy
 		}
