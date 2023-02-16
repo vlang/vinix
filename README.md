@@ -44,7 +44,7 @@ on real hardware.
 - [ ] Hypervisor
 - [ ] X window manager
 - [ ] V-UI
-- [ ] networking
+- [ ] Networking
 - [ ] Intel HD graphics driver (Linux port)
 
 ## Build instructions
