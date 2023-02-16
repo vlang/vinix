@@ -40,6 +40,8 @@ on real hardware.
 - [x] storage drivers
 - [x] ext2
 - [x] X.org
+- [ ] Wayland 
+- [ ] Hypervisor
 - [ ] X window manager
 - [ ] V-UI
 - [ ] networking
