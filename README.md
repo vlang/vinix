@@ -20,7 +20,7 @@ virtual machines.
 ![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
 ![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
 
-Photo by Pixabay: https://www.pexels.com/photo/gray-and-black-galaxy-wallpaper-2150/
+Photo by Hubblesite.org: https://hubblesite.org/files/live/sites/hubble/files/home/science/stars-and-nebulae/_images/STScI-H-stars-nebulae-0411a-2400x1200.jpg
 
 ## Download latest nightly image
 
