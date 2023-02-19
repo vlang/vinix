@@ -6,25 +6,31 @@ Join the [Discord chat](https://discord.gg/S5Nm6ZDU38).
 
 ## What is Vinix all about?
 
-- Keeping the code as simple and easy to understand as possible, while not sacrificing
-performance and prioritising code correctness.
-- Making a *usable* OS which can *run on real hardware*, not just on emulators or
-virtual machines.
-- Targetting modern 64-bit architectures, CPU features, and multi-core computing.
-- Maintaining good source-level compatibility with Linux to allow to easily port programs over.
-- Exploring V capabilities in bare metal programming and improving the compiler in response to the uncommon needs of bare metal programming.
-- Having fun.
+### The key features of Vinix include:
+
+- Support for modern 64-bit architectures, CPU features, and multi-core computing
+- Keeping the code as simple and easy to understand as possible, while not sacrificing performance and prioritising code correctness.
+- Good source-level compatibility with Linux to enable easy program portability
+- Making a *usable* OS which can *run on real hardware*, not just on emulators or virtual machines.
+- Exploration of V capabilities in bare-metal programming and improving the compiler in response to the uncommon needs of bare-metal programming
+- A fun development experience
+
 
 **Note: Vinix is still pre-alpha software not meant for daily or production usage!**
 
 ![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
 ![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
 
-Photo by Hubblesite.org: https://hubblesite.org/files/live/sites/hubble/files/home/science/stars-and-nebulae/_images/STScI-H-stars-nebulae-0411a-2400x1200.jpg
+Photo by Hubblesite.org:
+<a href="https://hubblesite.org/files/live/sites/hubble/files/home/science/stars-and-nebulae/_images/STScI-H-stars-nebulae-0411a-2400x1200.jpg">Click here</a>
+
+
 
 ## Download latest nightly image
 
-You can grab a pre-built nightly Vinix image at https://github.com/vlang/vinix/releases
+You can grab a pre-built nightly Vinix image at
+<a href="https://github.com/vlang/vinix/releases">Click here to go to the Vinix releases on GitHub</a>
+
 
 Make sure to boot the ISO with enough memory (8+GiB) as, for now, Vinix loads its
 entire root filesystem in a ramdisk in order to be able to more easily boot
@@ -105,3 +111,9 @@ To run without any acceleration, run with
 ```
 make run
 ```
+
+## Thank You for Using Vinix OS!
+
+We hope you've enjoyed trying out Vinix OS and exploring what it has to offer.We appreciate your support and feedback as we continue to develop and improve Vinix OS. If you have any suggestions or issues to report, please don't hesitate to reach out to us on our <a href="https://discord.gg/S5Nm6ZDU38">Discord server</a>
+
+Thank you again for choosing Vinix OS. We look forward to sharing more updates and features with you in the future!
