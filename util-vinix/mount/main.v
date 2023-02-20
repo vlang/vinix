@@ -20,7 +20,7 @@ fn main() {
 			'--help' {
 				println('Usage: ${os.args[0]} [options] <source> <destination>')
 				println('')
-				println('Mounts a filesystem')
+				println('Mount a filesystem')
 				println('')
 				println('Options:')
 				println('--help          display this help')
@@ -74,3 +74,4 @@ fn main() {
 		exit(0)
 	}
 }
+

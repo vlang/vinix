@@ -55,14 +55,19 @@ fn main() {
 	kernel := uname_result.sysname
 	shell := os.getenv('SHELL')
 
-	logo_print(r' __          __   ', '')
-	logo_print(r' \ \        / //  ', '$user$escape_blue@$escape_reset$hostname')
-	logo_print(r'  \ \      / //   ', '${escape_blue}OS$escape_reset:     $os_name')
-	logo_print(r'   \ \    / //    ', '${escape_blue}KERNEL$escape_reset: $kernel')
-	logo_print(r'    \ \  / //     ', '${escape_blue}SHELL$escape_reset:  $shell')
-	logo_print(r'     \ \/ //      ', '')
-	logo_print(r'      \/_//       ', '')
-	println('')
+
+ logo_print(r' ___      ___   ','')
+ logo_print(r'|"  \    /"  |  ','\t$user$escape_blue@$escape_reset$hostname')
+ logo_print(r' \   \  //  /   ','\t${escape_blue}OS$escape_reset:     $os_name')
+ logo_print(r'  \\  \/. ./    ','\t${escape_blue}KERNEL$escape_reset: $kernel')
+ logo_print(r'   \.    //     ','\t${escape_blue}SHELL$escape_reset:  $shell')
+ logo_print(r'    \\   /      ','')
+ logo_print(r'     \__/       ','')
+
+
+
+
+println('')
 }
 
 fn logo_print(logo string, message string) {
