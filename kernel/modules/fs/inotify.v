@@ -28,11 +28,11 @@ fn (mut this INotify) mmap(page u64, flags int) voidptr {
 }
 
 fn (mut this INotify) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	return error('')
+	return none
 }
 
 fn (mut this INotify) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	return error('')
+	return none
 }
 
 fn (mut this INotify) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -40,19 +40,19 @@ fn (mut this INotify) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this INotify) unref(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this INotify) link(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this INotify) unlink(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this INotify) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
 
 pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {

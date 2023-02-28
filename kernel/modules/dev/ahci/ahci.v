@@ -250,7 +250,7 @@ fn (mut dev AHCIDevice) unlink(handle voidptr) ? {
 }
 
 fn (mut dev AHCIDevice) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
 
 fn (mut dev AHCIDevice) mmap(page u64, flags int) voidptr {

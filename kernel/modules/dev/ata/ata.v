@@ -352,5 +352,5 @@ fn (mut dev ATADrive) unlink(handle voidptr) ? {
 }
 
 fn (mut dev ATADrive) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }

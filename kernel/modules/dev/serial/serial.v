@@ -203,5 +203,5 @@ fn (mut this COMPort) unlink(handle voidptr) ? {
 }
 
 fn (mut this COMPort) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }

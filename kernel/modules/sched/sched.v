@@ -226,7 +226,7 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 	mut thread := unsafe { _thread }
 
 	if voidptr(thread) == voidptr(proc.current_thread()) {
-		return error('')
+		return none
 	}
 
 	dequeue_thread(thread)

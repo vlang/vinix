@@ -132,7 +132,7 @@ fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
 	new_storage := memory.realloc(this.storage, new_capacity)
 
 	if new_storage == 0 {
-		return error('')
+		return none
 	}
 
 	this.storage = new_storage

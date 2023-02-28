@@ -36,7 +36,7 @@ pub fn address(addr u64) ?(u64, &Symbol) {
 }
 
 pub fn address_print(addr u64) ? {
-	off, sym := address(addr) or { return error('') }
+	off, sym := address(addr) or { return none }
 	C.printf_panic(c'  [0x%llx] <%s+0x%llx>\n', addr, sym.name, off)
 }
 

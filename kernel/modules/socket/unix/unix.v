@@ -181,7 +181,7 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		ioctl.fionread {
 			if this.listening {
 				errno.set(errno.einval)
-				return error('')
+				return none
 			}
 			mut retp := &u64(argp)
 			unsafe {
@@ -196,25 +196,25 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this UnixSocket) unref(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this UnixSocket) link(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this UnixSocket) unlink(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
 
 fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u64) ? {
 	if this.connected == false {
 		errno.set(errno.enotconn)
-		return error('')
+		return none
 	}
 
 	mut actual_size := unsafe { *addrlen }
@@ -231,7 +231,7 @@ fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u64) ?
 fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	if this.listening == false {
 		errno.set(errno.einval)
-		return error('')
+		return none
 	}
 
 	this.l.acquire()
@@ -280,7 +280,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	mut events := [&this.connection_event]
 	event.await(mut events, true) or {
 		errno.set(errno.eintr)
-		return error('')
+		return none
 	}
 
 	return connection_socket
@@ -291,7 +291,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	if addr.sun_family != sock_pub.af_unix {
 		errno.set(errno.einval)
-		return error('')
+		return none
 	}
 
 	mut thread := proc.current_thread()
@@ -300,7 +300,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	C.printf(c'UNIX socket: Wants to connect to %s\n', path.str)
 
-	mut target := fs.get_node(thread.process.current_directory, path, true) or { return error('') }
+	mut target := fs.get_node(thread.process.current_directory, path, true) or { return none }
 
 	target_res := target.resource
 
@@ -310,14 +310,14 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 		socket = target_res
 	} else {
 		errno.set(errno.einval)
-		return error('')
+		return none
 	}
 
 	// ----
 
 	if socket.listening == false {
 		errno.set(errno.econnrefused)
-		return error('')
+		return none
 	}
 
 	socket.l.acquire()
@@ -332,7 +332,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 	mut events := [&this.connection_event]
 	event.await(mut events, true) or {
 		errno.set(errno.eintr)
-		return error('')
+		return none
 	}
 
 	event.trigger(mut socket.connection_event, false)
@@ -348,7 +348,7 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	if addr.sun_family != sock_pub.af_unix {
 		errno.set(errno.einval)
-		return error('')
+		return none
 	}
 
 	mut thread := proc.current_thread()
@@ -356,7 +356,7 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
 	mut node := fs.create(thread.process.current_directory, path, stat.ifsock) or {
-		return error('')
+		return none
 	}
 
 	this.stat = node.resource.stat

@@ -222,7 +222,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 
 	if fdnum >= proc.max_fds {
 		errno.set(errno.ebadf)
-		return error('')
+		return none
 	}
 
 	process.fds_lock.acquire()
@@ -233,7 +233,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 	mut fd := unsafe { &FD(process.fds[fdnum]) }
 	if fd == unsafe { nil } {
 		errno.set(errno.ebadf)
-		return error('')
+		return none
 	}
 
 	mut handle := fd.handle

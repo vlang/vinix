@@ -22,7 +22,7 @@ fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, 
 		else {
 			C.printf(c'socket: Unknown domain: %d\n', domain)
 			errno.set(errno.einval)
-			return error('')
+			return none
 		}
 	}
 }
@@ -36,7 +36,7 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 		else {
 			C.printf(c'socket: Unknown domain: %d\n', domain)
 			errno.set(errno.einval)
-			return error('')
+			return none
 		}
 	}
 }
