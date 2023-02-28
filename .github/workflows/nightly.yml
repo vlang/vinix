@@ -4,6 +4,10 @@ name: Nightly Vinix rebuild
 #  schedule:
 #    - cron: '0 0 * * *'
 
+on:
+  push:
+    branches: [main]
+
 jobs:
   vinix-build:
     runs-on: ubuntu-latest
