@@ -35,11 +35,11 @@ fn (mut this TimerFD) mmap(page u64, flags int) voidptr {
 }
 
 fn (mut this TimerFD) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	return error('')
+	return none
 }
 
 fn (mut this TimerFD) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	return error('')
+	return none
 }
 
 fn (mut this TimerFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -47,19 +47,19 @@ fn (mut this TimerFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this TimerFD) unref(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this TimerFD) link(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this TimerFD) unlink(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this TimerFD) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
 
 

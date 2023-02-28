@@ -146,11 +146,11 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	mut current_inode := &EXT2Inode { }
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
-		return error('')
+		return none
 	}
 
 	current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size) or {
-		return error('')
+		return none
 	}
 
 	this.l.release()

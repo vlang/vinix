@@ -246,14 +246,14 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
 	if filesystem !in filesystems {
-		return error('')
+		return none
 	}
 
 	mut source_node := &VFSNode(0)
 	if source.len != 0 {
 		_, source_node, _ = path2node(parent, source)
 		if voidptr(source_node) == unsafe { nil } || stat.isdir(source_node.resource.stat.mode) {
-			return error('')
+			return none
 		}
 	}
 
@@ -263,7 +263,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 
 	if target_node == unsafe { nil }
 		|| (!mounting_root && !stat.isdir(target_node.resource.stat.mode)) {
-		return error('')
+		return none
 	}
 
 	mut fs := filesystems[filesystem].instantiate()
@@ -337,12 +337,12 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
 	if voidptr(node) == unsafe { nil } {
-		return error('')
+		return none
 	}
 
 	if stat.isdir(node.resource.stat.mode) && remove_dir == false {
 		errno.set(errno.eisdir)
-		return error('')
+		return none
 	}
 
 	parent_of_tgt.children.delete(basename)

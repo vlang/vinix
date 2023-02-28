@@ -411,7 +411,7 @@ fn (mut dev NVMENamespace) unlink(handle voidptr) ? {
 }
 
 fn (mut dev NVMENamespace) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
 
 fn (mut dev NVMENamespace) mmap(page u64, flags int) voidptr {

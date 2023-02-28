@@ -50,31 +50,31 @@ fn (mut this SignalFD) mmap(page u64, flags int) voidptr {
 }
 
 fn (mut this SignalFD) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	return error('')
+	return none
 }
 
 fn (mut this SignalFD) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	return error('')
+	return none
 }
 
 fn (mut this SignalFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	return error('')
+	return none
 }
 
 fn (mut this SignalFD) unref(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this SignalFD) link(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this SignalFD) unlink(handle voidptr) ? {
-	return error('')
+	return none
 }
 
 fn (mut this SignalFD) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
 
 pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {

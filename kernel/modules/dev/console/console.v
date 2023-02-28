@@ -835,5 +835,5 @@ fn (mut this Console) unlink(handle voidptr) ? {
 }
 
 fn (mut this Console) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }

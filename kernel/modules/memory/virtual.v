@@ -112,7 +112,7 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 }
 
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
-	pte_p := pagemap.virt2pte(virt, false) or { return error('') }
+	pte_p := pagemap.virt2pte(virt, false) or { return none }
 
 	unsafe { *pte_p = 0 }
 
@@ -124,7 +124,7 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	pte_p := pagemap.virt2pte(virt, false) or {
-		return error('')
+		return none
 	}
 
 	unsafe { *pte_p &= ~u64(0xfff) }
@@ -148,9 +148,9 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
 	pml4 := pagemap.top_level
-	pml3 := get_next_level(pml4, pml4_entry, true) or { return error('') }
-	pml2 := get_next_level(pml3, pml3_entry, true) or { return error('') }
-	mut pml1 := get_next_level(pml2, pml2_entry, true) or { return error('') }
+	pml3 := get_next_level(pml4, pml4_entry, true) or { return none }
+	pml2 := get_next_level(pml3, pml3_entry, true) or { return none }
+	mut pml1 := get_next_level(pml2, pml2_entry, true) or { return none }
 
 	unsafe {
 		entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)

@@ -83,7 +83,7 @@ pub fn initialise() {
 	madt_init()
 }
 
-pub fn find_sdt(signature string, index int) ?voidptr {
+pub fn find_sdt(signature string, index int) !voidptr {
 	mut count := 0
 
 	entry_count := (rsdt.header.length - sizeof(SDT)) / u32(if use_xsdt() { 8 } else { 4 })

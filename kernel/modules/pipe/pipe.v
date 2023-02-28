@@ -210,5 +210,5 @@ fn (mut this Pipe) link(handle voidptr) ? {
 }
 
 fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {
-	return error('')
+	return none
 }
