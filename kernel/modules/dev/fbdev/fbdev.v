@@ -130,7 +130,8 @@ fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {
 
 fn create_device_node(index u64) ? {
 	if index >= fbdev_max_device_count {
-		return error('device index out of range')
+		println('device index out of range')
+		return none
 	}
 
 	mut node := unsafe { &fbdev_nodes[index] }
@@ -171,7 +172,8 @@ pub fn register_device(info api.FramebufferInfo) ? {
 	}
 
 	if index >= fbdev_max_device_count {
-		return error('too many registered devices')
+		println('too many registered devices')
+		return none
 	}
 
 	println('fbdev: registered new framebuffer device (using driver ${info.driver.name} and mode ${info.variable.xres}x${info.variable.yres}x${info.variable.bits_per_pixel})')
