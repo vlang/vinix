@@ -128,9 +128,10 @@ fn (mut this FramebufferNode) unlink(handle voidptr) ? {
 fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {
 }
 
-fn create_device_node(index u64) ! {
+fn create_device_node(index u64) ? {
 	if index >= fbdev_max_device_count {
-		return error('device index out of range')
+		println('device index out of range')
+		return none
 	}
 
 	mut node := unsafe { &fbdev_nodes[index] }
