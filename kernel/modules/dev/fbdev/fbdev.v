@@ -151,7 +151,7 @@ fn create_device_node(index u64) ! {
 	println('fbdev: created device node /dev/fb${index}')
 }
 
-pub fn register_device(info api.FramebufferInfo) ! {
+pub fn register_device(info api.FramebufferInfo) ? {
 	mut index := u64(0)
 
 	fbdev_lock.acquire()
@@ -171,7 +171,8 @@ pub fn register_device(info api.FramebufferInfo) ! {
 	}
 
 	if index >= fbdev_max_device_count {
-		return error('too many registered devices')
+		println('too many registered devices')
+		return none
 	}
 
 	println('fbdev: registered new framebuffer device (using driver ${info.driver.name} and mode ${info.variable.xres}x${info.variable.yres}x${info.variable.bits_per_pixel})')

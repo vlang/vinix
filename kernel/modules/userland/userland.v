@@ -591,7 +591,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			stderr)
 	}
 
-	auxval, ld_path := elf.load(new_pagemap, prog, 0) ?
+	auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
 
 	mut entry_point := voidptr(0)
 
@@ -601,7 +601,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		ld_node := fs.get_node(vfs_root, ld_path, true) ?
 		ld := ld_node.resource
 
-		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) ?
+		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) or { return none }
 
 		entry_point = voidptr(ld_auxval.at_entry)
 	}
