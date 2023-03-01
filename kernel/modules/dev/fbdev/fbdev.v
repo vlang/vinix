@@ -128,7 +128,7 @@ fn (mut this FramebufferNode) unlink(handle voidptr) ? {
 fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {
 }
 
-fn create_device_node(index u64) ? {
+fn create_device_node(index u64) ! {
 	if index >= fbdev_max_device_count {
 		return error('device index out of range')
 	}
@@ -151,7 +151,7 @@ fn create_device_node(index u64) ? {
 	println('fbdev: created device node /dev/fb${index}')
 }
 
-pub fn register_device(info api.FramebufferInfo) ? {
+pub fn register_device(info api.FramebufferInfo) ! {
 	mut index := u64(0)
 
 	fbdev_lock.acquire()
