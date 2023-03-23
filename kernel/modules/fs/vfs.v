@@ -506,21 +506,14 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	follow_links := flags & resource.o_nofollow == 0
 
 	mut node := get_node(parent, path, follow_links) or {
-		if creat_flags & resource.o_creat != 0 {
-			// XXX: mlibc does not pass mode? OK... force regular file with 644
-			new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
-				return errno.err, errno.get()
-			}
-			new_node
-		} else {
-			// return errno.err, errno.get()
-			// ^ V compiler doesn't like that, return nil and catch it afterwards
-			parent
+		if creat_flags & resource.o_creat == 0 {
+			return errno.err, errno.get()
 		}
-	}
-
-	if node == parent {
-		return errno.err, errno.get()
+		// XXX: mlibc does not pass mode? OK... force regular file with 644
+		new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
+			return errno.err, errno.get()
+		}
+		new_node
 	}
 
 	if stat.islnk(node.resource.stat.mode) {
