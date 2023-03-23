@@ -505,16 +505,22 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 	creat_flags := flags & resource.file_creation_flags_mask
 	follow_links := flags & resource.o_nofollow == 0
 
-	mut node := &VFSNode{}
-	node = get_node(parent, path, follow_links) or {
+	mut node := get_node(parent, path, follow_links) or {
 		if creat_flags & resource.o_creat != 0 {
 			// XXX: mlibc does not pass mode? OK... force regular file with 644
-			node = internal_create(parent, path, stat.ifreg | 0o644) or {
+			new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
 				return errno.err, errno.get()
 			}
+			new_node
 		} else {
-			return errno.err, errno.get()
+			// return errno.err, errno.get()
+			// ^ V compiler doesn't like that, return nil and catch it afterwards
+			&VFSNode{}
 		}
+	}
+
+	if node == unsafe { &VFSNode{} } {
+		return errno.err, errno.get()
 	}
 
 	if stat.islnk(node.resource.stat.mode) {
