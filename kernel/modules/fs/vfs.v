@@ -515,11 +515,11 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		} else {
 			// return errno.err, errno.get()
 			// ^ V compiler doesn't like that, return nil and catch it afterwards
-			&VFSNode{}
+			parent
 		}
 	}
 
-	if node == unsafe { &VFSNode{} } {
+	if node == parent {
 		return errno.err, errno.get()
 	}
 
