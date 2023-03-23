@@ -514,12 +514,12 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 			new_node
 		} else {
 			// return errno.err, errno.get()
-			// ^ V compiler doesn't like that, return 0 and catch it afterwards
-			0
+			// ^ V compiler doesn't like that, return nil and catch it afterwards
+			parent
 		}
 	}
 
-	if unsafe { node == 0 } {
+	if node == parent {
 		return errno.err, errno.get()
 	}
 
