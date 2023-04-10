@@ -1,4 +1,4 @@
-// initramfs.v: USTAR initramfs driver.
+0// initramfs.v: USTAR initramfs driver.
 // Code is governed by the GPL-2.0 license.
 // Copyright (C) 2021-2022 The Vinix authors.
 
@@ -73,7 +73,7 @@ pub fn initialise() {
 	print('initramfs: Unpacking...')
 
 	mut name_override := ''
-	mut current_header := &USTARHeader(0)
+	mut current_header := &USTARHeader(unsafe { nil })
 	unsafe {
 		current_header = &USTARHeader(initramfs_begin)
 	}

@@ -33,7 +33,7 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 		return errno.err, errno.eagain
 	}
 
-	mut e := &eventstruct.Event(0)
+	mut e := &eventstruct.Event(unsafe { nil })
 	phys := proc.current_thread().process.pagemap.virt2phys(u64(ptr)) or { return errno.err, errno.get() }
 
 	futex_lock.acquire()

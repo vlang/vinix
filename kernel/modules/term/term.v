@@ -11,12 +11,12 @@ import dev.fbdev.simple
 import limine
 
 __global (
-	terminal_tag        = &limine.LimineTerminal(0)
+	terminal_tag        = &limine.LimineTerminal(unsafe { nil })
 	terminal_print_lock klock.Lock
 	terminal_print_ptr  fn(&limine.LimineTerminal, charptr, u64)
 	terminal_rows       = u64(0)
 	terminal_cols       = u64(0)
-	framebuffer_tag     = &limine.LimineFramebuffer(0)
+	framebuffer_tag     = &limine.LimineFramebuffer(unsafe { nil })
 	framebuffer_width   = u64(0)
 	framebuffer_height  = u64(0)
 )

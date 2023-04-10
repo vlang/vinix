@@ -86,7 +86,7 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut signalfd := &SignalFD(0)
+	mut signalfd := &SignalFD(unsafe { nil })
 	mut newfd := int(0)
 
 	mut thread := proc.current_thread()

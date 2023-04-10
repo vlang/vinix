@@ -304,7 +304,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 
 	target_res := target.resource
 
-	mut socket := &UnixSocket(0)
+	mut socket := &UnixSocket(unsafe { nil })
 
 	if target_res is UnixSocket {
 		socket = target_res
