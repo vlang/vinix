@@ -77,7 +77,7 @@ pub mut:
 }
 
 pub fn current_thread() &Thread {
-	mut ret := &Thread(0)
+	mut ret := &Thread(unsafe { nil })
 
 	asm volatile amd64 {
 		mov ret, gs:[8] // get self

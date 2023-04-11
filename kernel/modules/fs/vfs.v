@@ -74,7 +74,7 @@ pub fn add_filesystem(filesystem &FileSystem, identifier string) {
 }
 
 pub fn initialise() {
-	vfs_root = create_node(&TmpFS(0), &VFSNode(0), '', false)
+	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
 
 	filesystems = map[string]&FileSystem{}
 
@@ -178,7 +178,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 
 	current_process := proc.current_thread().process
 
-	mut parent := &VFSNode(0)
+	mut parent := &VFSNode(unsafe { nil })
 
 	if is_absolute == true {
 		parent = vfs_root
@@ -249,7 +249,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 		return none
 	}
 
-	mut source_node := &VFSNode(0)
+	mut source_node := &VFSNode(unsafe { nil })
 	if source.len != 0 {
 		_, source_node, _ = path2node(parent, source)
 		if voidptr(source_node) == unsafe { nil } || stat.isdir(source_node.resource.stat.mode) {
@@ -660,7 +660,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 
 	path := unsafe { cstring_to_vstring(_path) }
 
-	mut statsrc := &stat.Stat(0)
+	mut statsrc := &stat.Stat(unsafe { nil })
 
 	if path.len == 0 {
 		if flags & fs.at_empty_path == 0 {

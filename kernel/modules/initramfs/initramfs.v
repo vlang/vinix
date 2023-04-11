@@ -73,7 +73,7 @@ pub fn initialise() {
 	print('initramfs: Unpacking...')
 
 	mut name_override := ''
-	mut current_header := &USTARHeader(0)
+	mut current_header := &USTARHeader(unsafe { nil })
 	unsafe {
 		current_header = &USTARHeader(initramfs_begin)
 	}

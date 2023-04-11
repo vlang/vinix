@@ -136,7 +136,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		return ret, 0
 	}
 
-	mut timer := &time.Timer(0)
+	mut timer := &time.Timer(unsafe{ nil })
 
 	if voidptr(tmo_p) != unsafe { nil } {
 		mut target_time := *tmo_p
@@ -213,7 +213,7 @@ pub fn (mut this FD) unref() {
 }
 
 pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
-	mut process := &proc.Process(0)
+	mut process := &proc.Process(unsafe { nil })
 	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
 	} else {
@@ -252,7 +252,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
-	mut process := &proc.Process(0)
+	mut process := &proc.Process(unsafe { nil })
 	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
 	} else {
@@ -301,7 +301,7 @@ pub fn fdnum_create_from_resource(_process &proc.Process, mut res resource.Resou
 }
 
 pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
-	mut process := &proc.Process(0)
+	mut process := &proc.Process(unsafe { nil })
 	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
 	} else {
@@ -330,14 +330,14 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 }
 
 pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Process, newfdnum int, flags int, specific bool, cloexec bool) ?int {
-	mut old_process := &proc.Process(0)
+	mut old_process := &proc.Process(unsafe { nil })
 	if voidptr(_old_process) == unsafe { nil } {
 		old_process = proc.current_thread().process
 	} else {
 		old_process = unsafe { _old_process }
 	}
 
-	mut new_process := &proc.Process(0)
+	mut new_process := &proc.Process(unsafe { nil })
 	if voidptr(_new_process) == unsafe { nil } {
 		new_process = proc.current_thread().process
 	} else {
@@ -447,7 +447,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	}
 
 	mut resource_ := &resource.Resource(unsafe { nil })
-	mut fd := &FD(0)
+	mut fd := &FD(unsafe { nil })
 
 	if fdnum != -1 {
 		fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }

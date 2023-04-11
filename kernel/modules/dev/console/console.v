@@ -41,7 +41,7 @@ const (
 
 __global (
 	console_convtab_numpad_numlock map[u8]u8
-	console_res                    = &Console(0)
+	console_res                    = &Console(unsafe { nil })
 	console_read_lock              klock.Lock
 	console_event                  eventstruct.Event
 	console_numlock_active         = bool(false)
@@ -54,11 +54,11 @@ __global (
 	console_buffer_i               = u64(0)
 	console_bigbuf                 [console_bigbuf_size]u8
 	console_bigbuf_i               = u64(0)
-	console_termios                = &termios.Termios(0)
+	console_termios                = &termios.Termios(unsafe { nil })
 	console_decckm                 = false
 	// XXX this is a massive hack to allow ctrl-c and friends without process
 	// groups
-	latest_thread                  = &proc.Thread(0)
+	latest_thread                  = &proc.Thread(unsafe { nil })
 )
 
 const convtab_capslock = [

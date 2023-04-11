@@ -15,7 +15,7 @@ fn C.get_symbol_table() &Symbol
 fn C.printf_panic(charptr, ...voidptr)
 
 pub fn address(addr u64) ?(u64, &Symbol) {
-	mut prev_sym := &Symbol(0)
+	mut prev_sym := &Symbol(unsafe { nil })
 
 	symbol_table := C.get_symbol_table()
 
