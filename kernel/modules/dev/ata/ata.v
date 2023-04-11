@@ -109,7 +109,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		bmr_command: bar4
 		bmr_status: bar4 + 2
 		bmr_prdt: bar4 + 4
-		prdt: &PRDT(0)
+		prdt: &PRDT(unsafe { nil })
 		// To be filled later.
 		prdt_phys: 0
 		// To be filled later.
