@@ -29,7 +29,7 @@ pub fn syscall_kprint(_ voidptr, message charptr) {
 	}
 }
 
-pub fn kprint(message charptr) {
+pub fn kwrite(message charptr) {
 	msglen := unsafe { u64(C.strlen(message)) }
 
 	kprint_lock.acquire()
