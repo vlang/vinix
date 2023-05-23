@@ -266,9 +266,9 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 		return none
 	}
 
-	mut fs := filesystems[filesystem].instantiate()
+	mut f_sys := filesystems[filesystem].instantiate()
 
-	mut mount_node := fs.mount(parent_of_tgt_node, basename, source_node)?
+	mut mount_node := f_sys.mount(parent_of_tgt_node, basename, source_node)?
 
 	target_node.mountpoint = mount_node
 

@@ -84,7 +84,7 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut socket := socket_create(domain, @type, protocol) or { return errno.err, errno.get() }
+	mut sock := socket_create(domain, @type, protocol) or { return errno.err, errno.get() }
 
 	mut flags := int(0)
 	if @type & sock_pub.sock_cloexec != 0 {
@@ -94,7 +94,7 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		flags |= resource.o_nonblock
 	}
 
-	ret := file.fdnum_create_from_resource(voidptr(0), mut socket, flags, 0, false) or {
+	ret := file.fdnum_create_from_resource(voidptr(0), mut sock, flags, 0, false) or {
 		return errno.err, errno.get()
 	}
 
@@ -117,15 +117,15 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 
 	res := fd.handle.resource
 
-	mut socket := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
-		socket = res
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	mut connection_socket := socket.accept(fd.handle) or {
+	mut connection_socket := sock.accept(fd.handle) or {
 		return errno.err, errno.get()
 	}
 
@@ -152,15 +152,15 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64)
 
 	res := fd.handle.resource
 
-	mut socket := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
-		socket = res
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	socket.bind(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	sock.bind(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -181,15 +181,15 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 
 	res := fd.handle.resource
 
-	mut socket := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
-		socket = res
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	socket.listen(fd.handle, backlog) or { return errno.err, errno.get() }
+	sock.listen(fd.handle, backlog) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -210,15 +210,15 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 
 	res := fd.handle.resource
 
-	mut socket := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
-		socket = res
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	ret := socket.recvmsg(fd.handle, msg, flags) or { return errno.err, errno.get() }
+	ret := sock.recvmsg(fd.handle, msg, flags) or { return errno.err, errno.get() }
 
 	return ret, 0
 }
@@ -239,15 +239,15 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u
 
 	res := fd.handle.resource
 
-	mut socket := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
-		socket = res
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	socket.connect(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	sock.connect(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -268,15 +268,15 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u64) (u
 
 	res := fd.handle.resource
 
-	mut socket := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(voidptr(0))
 
 	if res is sock_unix.UnixSocket {
-		socket = res
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	socket.peername(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	sock.peername(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
 
 	return 0, 0
 }

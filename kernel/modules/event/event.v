@@ -30,41 +30,41 @@ fn attach_listeners(mut events []&eventstruct.Event, mut thread proc.Thread) {
 	thread.attached_events_i = 0
 
 	for i := u64(0); i < events.len; i++ {
-		mut event := events[i]
+		mut e := events[i]
 
-		if event.listeners_i == eventstruct.max_listeners {
+		if e.listeners_i == eventstruct.max_listeners {
 			panic('event listeners exhausted')
 		}
 
-		mut listener := &event.listeners[event.listeners_i]
+		mut listener := &e.listeners[e.listeners_i]
 
 		listener.thread = voidptr(thread)
 		listener.which = i
 
-		event.listeners_i++
+		e.listeners_i++
 
 		if thread.attached_events_i == proc.max_events {
 			panic('listening on too many events')
 		}
 
-		thread.attached_events[thread.attached_events_i] = event
+		thread.attached_events[thread.attached_events_i] = e
 		thread.attached_events_i++
 	}
 }
 
 fn detach_listeners(mut thread proc.Thread) {
 	for i := u64(0); i < thread.attached_events_i; i++ {
-		mut event := thread.attached_events[i]
+		mut e := thread.attached_events[i]
 
-		for j := u64(0); j < event.listeners_i; j++ {
-			mut listener := &event.listeners[j]
+		for j := u64(0); j < e.listeners_i; j++ {
+			mut listener := &e.listeners[j]
 
 			if listener.thread != voidptr(thread) {
 				continue
 			}
 
-			event.listeners[j] = event.listeners[event.listeners_i - 1]
-			event.listeners_i--
+			e.listeners[j] = e.listeners[e.listeners_i - 1]
+			e.listeners_i--
 
 			break
 		}
@@ -139,7 +139,7 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	return thread.which_event
 }
 
-pub fn trigger(mut event eventstruct.Event, drop bool) u64 {
+pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	ints := cpu.interrupt_state()
 
 	asm volatile amd64 {
@@ -153,29 +153,29 @@ pub fn trigger(mut event eventstruct.Event, drop bool) u64 {
 		}
 	}
 
-	event.@lock.acquire()
+	e.@lock.acquire()
 	defer {
-		event.@lock.release()
+		e.@lock.release()
 	}
 
-	if event.listeners_i == 0 {
+	if e.listeners_i == 0 {
 		if drop == false {
-			event.pending++
+			e.pending++
 		}
 		return 0
 	}
 
-	for i := u64(0); i < event.listeners_i; i++ {
-		mut thread := unsafe { &proc.Thread(event.listeners[i].thread) }
+	for i := u64(0); i < e.listeners_i; i++ {
+		mut thread := unsafe { &proc.Thread(e.listeners[i].thread) }
 
-		thread.which_event = event.listeners[i].which
+		thread.which_event = e.listeners[i].which
 
 		sched.enqueue_thread(thread, false)
 	}
 
-	ret := event.listeners_i
+	ret := e.listeners_i
 
-	event.listeners_i = 0
+	e.listeners_i = 0
 
 	return ret
 }

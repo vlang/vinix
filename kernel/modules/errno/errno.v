@@ -178,6 +178,6 @@ pub fn get() u64 {
 	return proc.current_thread().errno
 }
 
-pub fn set(errno u64) {
-	proc.current_thread().errno = errno
+pub fn set(err_no u64) {
+	proc.current_thread().errno = err_no
 }
