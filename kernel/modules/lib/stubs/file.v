@@ -53,7 +53,7 @@ pub fn write(fd int, buf &C.void, count u64) i64 {
 		lib.kpanic(voidptr(0), c'write to fd != 1 && fd != 2 is a stub')
 	}
 
-	kprint.kprint(charptr(buf))
+	kprint.kwrite(charptr(buf))
 
 	return i64(count)
 }

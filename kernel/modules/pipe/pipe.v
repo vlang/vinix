@@ -36,13 +36,13 @@ pub mut:
 pub fn initialise() {}
 
 pub fn create() ?&Pipe {
-	mut pipe := &Pipe{
+	mut p := &Pipe{
 		data: unsafe { C.malloc(pipe.pipe_buf) }
 		capacity: pipe.pipe_buf
 	}
-	pipe.stat.mode = stat.ifpipe
+	p.stat.mode = stat.ifpipe
 
-	return pipe
+	return p
 }
 
 pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
