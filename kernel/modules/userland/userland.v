@@ -145,9 +145,9 @@ pub fn syscall_getpid(_ voidptr) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut thread := unsafe { proc.current_thread() }
+	mut t := unsafe { proc.current_thread() }
 
-	return u64(thread.process.pid), 0
+	return u64(t.process.pid), 0
 }
 
 pub fn syscall_getppid(_ voidptr) (u64, u64) {
@@ -159,9 +159,9 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut thread := unsafe { proc.current_thread() }
+	mut t := unsafe { proc.current_thread() }
 
-	return u64(thread.process.ppid), 0
+	return u64(t.process.ppid), 0
 }
 
 pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
@@ -185,23 +185,23 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
-	thread.sigentry = sigentry
+	t.sigentry = sigentry
 
 	return 0, 0
 }
 
 [noreturn]
 pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
-	mut thread := unsafe { proc.current_thread() }
+	mut t := unsafe { proc.current_thread() }
 
 	asm volatile amd64 {
 		cli
 	}
 
-	thread.gpr_state = unsafe { context[0] }
-	thread.masked_signals = old_mask
+	t.gpr_state = unsafe { context[0] }
+	t.masked_signals = old_mask
 
 	sched.yield(false)
 
@@ -222,17 +222,17 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 		return errno.err, errno.einval
 	}
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
 	if voidptr(oldact) != voidptr(0) {
 		unsafe {
-			oldact[0] = thread.sigactions[signum]
+			oldact[0] = t.sigactions[signum]
 		}
 	}
 
 	if voidptr(act) != voidptr(0) {
 		unsafe {
-			thread.sigactions[signum] = act[0]
+			t.sigactions[signum] = act[0]
 		}
 	}
 
@@ -249,24 +249,24 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
 	if voidptr(oldset) != voidptr(0) {
 		unsafe {
-			oldset[0] = thread.masked_signals
+			oldset[0] = t.masked_signals
 		}
 	}
 
 	if voidptr(set) != voidptr(0) {
 		match how {
 			userland.sig_block {
-				thread.masked_signals |= unsafe { set[0] }
+				t.masked_signals |= unsafe { set[0] }
 			}
 			userland.sig_unblock {
-				thread.masked_signals &= ~(unsafe { set[0] })
+				t.masked_signals &= ~(unsafe { set[0] })
 			}
 			userland.sig_setmask {
-				thread.masked_signals = unsafe { set[0] }
+				t.masked_signals = unsafe { set[0] }
 			}
 			else {}
 		}
@@ -278,19 +278,19 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 // Dispatch a signal to _self_, this is called from the scheduler, at the
 // end of syscalls, or from exception handlers.
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
-	mut thread := unsafe { proc.current_thread() }
+	mut t := unsafe { proc.current_thread() }
 
-	if thread.sigentry == 0 {
+	if t.sigentry == 0 {
 		return
 	}
 
 	mut which := -1
 
 	for i := u8(0); i < 64; i++ {
-		if thread.masked_signals & (u64(1) << i) != 0 {
+		if t.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}
-		if katomic.btr(thread.pending_signals, i) == true {
+		if katomic.btr(t.pending_signals, i) == true {
 			which = i
 			break
 		}
@@ -300,58 +300,58 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		return
 	}
 
-	sigaction := thread.sigactions[which]
+	sigaction := t.sigactions[which]
 
-	previous_mask := thread.masked_signals
+	previous_mask := t.masked_signals
 
-	thread.masked_signals |= sigaction.sa_mask
+	t.masked_signals |= sigaction.sa_mask
 	if sigaction.sa_flags & userland.sa_nodefer == 0 {
-		thread.masked_signals |= u64(1) << which
+		t.masked_signals |= u64(1) << which
 	}
 
 	// Respect the redzone
-	thread.gpr_state.rsp -= 128
-	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
+	t.gpr_state.rsp -= 128
+	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
 
 	// Return context
-	thread.gpr_state.rsp -= sizeof(cpulocal.GPRState)
-	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
-	mut return_context := &cpulocal.GPRState(thread.gpr_state.rsp)
+	t.gpr_state.rsp -= sizeof(cpulocal.GPRState)
+	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
+	mut return_context := &cpulocal.GPRState(t.gpr_state.rsp)
 
 	unsafe {
 		return_context[0] = context[0]
-		thread.gpr_state = context[0]
+		t.gpr_state = context[0]
 	}
 	// Siginfo
-	thread.gpr_state.rsp -= sizeof(SigInfo)
-	thread.gpr_state.rsp = lib.align_down(thread.gpr_state.rsp, 16)
-	mut siginfo := &SigInfo(thread.gpr_state.rsp)
+	t.gpr_state.rsp -= sizeof(SigInfo)
+	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
+	mut siginfo := &SigInfo(t.gpr_state.rsp)
 
 	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
 	siginfo.si_signo = which
 
 	// Alignment
-	thread.gpr_state.rsp -= 8
+	t.gpr_state.rsp -= 8
 
 	// Common handler will take (which, siginfo, sigaction, ret_context, prev_mask)
-	thread.gpr_state.rip = thread.sigentry
+	t.gpr_state.rip = t.sigentry
 
-	thread.gpr_state.rdi = u64(which)
-	thread.gpr_state.rsi = u64(siginfo)
-	thread.gpr_state.rdx = sigaction.sa_sigaction
-	thread.gpr_state.rcx = u64(return_context)
-	thread.gpr_state.r8 = previous_mask
+	t.gpr_state.rdi = u64(which)
+	t.gpr_state.rsi = u64(siginfo)
+	t.gpr_state.rdx = sigaction.sa_sigaction
+	t.gpr_state.rcx = u64(return_context)
+	t.gpr_state.r8 = previous_mask
 
 	sched.yield(false)
 }
 
 pub fn sendsig(_thread &proc.Thread, signal u8) {
-	mut thread := unsafe { _thread }
+	mut t := unsafe { _thread }
 
-	katomic.bts(thread.pending_signals, signal)
+	katomic.bts(t.pending_signals, signal)
 
 	// Try to stop an event_await()
-	sched.enqueue_thread(thread, true)
+	sched.enqueue_thread(t, true)
 }
 
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
@@ -649,8 +649,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 
 		return new_process
 	} else {
-		mut thread := proc.current_thread()
-		mut process := thread.process
+		mut t := proc.current_thread()
+		mut process := t.process
 
 		mut old_pagemap := process.pagemap
 
@@ -659,7 +659,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		process.name = '${path}[${process.pid}]'
 
 		kernel_pagemap.switch_to()
-		thread.process = kernel_process
+		t.process = kernel_process
 
 		mmap.delete_pagemap(old_pagemap) ?
 
