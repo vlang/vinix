@@ -10,7 +10,7 @@ pub const max_listeners = 32
 
 pub struct EventListener {
 pub mut:
-	thread voidptr
+	thrd voidptr
 	which  u64
 }
 

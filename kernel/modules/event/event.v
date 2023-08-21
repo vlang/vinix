@@ -38,7 +38,7 @@ fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) {
 
 		mut listener := &e.listeners[e.listeners_i]
 
-		listener.t = voidptr(t)
+		listener.thrd = voidptr(t)
 		listener.which = i
 
 		e.listeners_i++
@@ -59,7 +59,7 @@ fn detach_listeners(mut t proc.Thread) {
 		for j := u64(0); j < e.listeners_i; j++ {
 			mut listener := &e.listeners[j]
 
-			if listener.t != voidptr(t) {
+			if listener.thrd != voidptr(t) {
 				continue
 			}
 
@@ -166,7 +166,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	}
 
 	for i := u64(0); i < e.listeners_i; i++ {
-		mut t := unsafe { &proc.Thread(e.listeners[i].t) }
+		mut t := unsafe { &proc.Thread(e.listeners[i].thrd) }
 
 		t.which_event = e.listeners[i].which
 
