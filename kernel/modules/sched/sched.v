@@ -51,7 +51,7 @@ fn get_next_thread(orig_i int) int {
 
 		mut thread_run := scheduler_running_queue[index]
 
-		if unsafe { t != 0 } {
+		if unsafe { thread_run != 0 } {
 			if katomic.load(thread_run.running_on) == cpu_number || thread_run.l.test_and_acquire() == true {
 				return index
 			}
