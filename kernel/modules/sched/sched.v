@@ -49,10 +49,10 @@ fn get_next_thread(orig_i int) int {
 			index = 0
 		}
 
-		mut thread_run := scheduler_running_queue[index]
+		mut t := scheduler_running_queue[index]
 
-		if unsafe { thread_run != 0 } {
-			if katomic.load(thread_run.running_on) == cpu_number || thread_run.l.test_and_acquire() == true {
+		if unsafe { t != 0 } {
+			if katomic.load(t.running_on) == cpu_number || t.l.test_and_acquire() == true {
 				return index
 			}
 		}
