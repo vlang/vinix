@@ -180,14 +180,14 @@ pub fn syscall_epoll_pwait(_ voidptr, epfdnum int, ret_events &EPollEvent, maxev
 		return errno.err, errno.einval
 	}
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
-	oldmask := thread.masked_signals
+	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
-		thread.masked_signals = unsafe { *sigmask }
+		t.masked_signals = unsafe { *sigmask }
 	}
 	defer {
-		thread.masked_signals = oldmask
+		t.masked_signals = oldmask
 	}
 
 	mut fdlist := []&FD{}

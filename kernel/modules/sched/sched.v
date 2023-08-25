@@ -49,10 +49,10 @@ fn get_next_thread(orig_i int) int {
 			index = 0
 		}
 
-		mut thread := scheduler_running_queue[index]
+		mut t := scheduler_running_queue[index]
 
-		if unsafe { thread != 0 } {
-			if katomic.load(thread.running_on) == cpu_number || thread.l.test_and_acquire() == true {
+		if unsafe { t != 0 } {
+			if katomic.load(t.running_on) == cpu_number || t.l.test_and_acquire() == true {
 				return index
 			}
 		}
@@ -177,17 +177,17 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 }
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
-	mut thread := unsafe { _thread }
+	mut t := unsafe { _thread }
 
-	if thread.is_in_queue == true {
+	if t.is_in_queue == true {
 		return true
 	}
 
-	katomic.store(thread.enqueued_by_signal, by_signal)
+	katomic.store(t.enqueued_by_signal, by_signal)
 
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
-		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(0), u64(thread)) {
-			thread.is_in_queue = true
+		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(0), u64(t)) {
+			t.is_in_queue = true
 
 			// Check if any CPU is idle and wake it up
 			for cpu in cpu_locals {
@@ -205,15 +205,15 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 }
 
 pub fn dequeue_thread(_thread &proc.Thread) bool {
-	mut thread := unsafe { _thread }
+	mut t := unsafe { _thread }
 
-	if thread.is_in_queue == false {
+	if t.is_in_queue == false {
 		return true
 	}
 
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
-		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(thread), u64(0)) {
-			thread.is_in_queue = false
+		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(t), u64(0)) {
+			t.is_in_queue = false
 			return true
 		}
 	}
@@ -223,15 +223,15 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 
 // Like dequeue_thread(), but it stops it immediately
 pub fn intercept_thread(_thread &proc.Thread) ? {
-	mut thread := unsafe { _thread }
+	mut t := unsafe { _thread }
 
-	if voidptr(thread) == voidptr(proc.current_thread()) {
+	if voidptr(t) == voidptr(proc.current_thread()) {
 		return none
 	}
 
-	dequeue_thread(thread)
+	dequeue_thread(t)
 
-	running_on := thread.running_on
+	running_on := t.running_on
 
 	if running_on == u64(-1) {
 		return
@@ -239,8 +239,8 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 
 	apic.lapic_send_ipi(u8(cpu_locals[running_on].lapic_id), scheduler_vector)
 
-	thread.l.acquire()
-	thread.l.release()
+	t.l.acquire()
+	t.l.release()
 }
 
 pub fn yield(save_ctx bool) {
@@ -292,14 +292,14 @@ pub fn dequeue_and_die() {
 	asm volatile amd64 {
 		cli
 	}
-	mut thread := proc.current_thread()
-	dequeue_thread(thread)
-	for ptr in thread.stacks {
+	mut t := proc.current_thread()
+	dequeue_thread(t)
+	for ptr in t.stacks {
 		memory.pmm_free(ptr, sched.stack_size / page_size)
 	}
 	unsafe {
-		thread.stacks.free()
-		free(thread)
+		t.stacks.free()
+		free(t)
 	}
 	yield(false)
 	for {}
@@ -324,7 +324,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		rsp: stack
 	}
 
-	mut thread := &proc.Thread{
+	mut t := &proc.Thread{
 		process: kernel_process
 		cr3: u64(kernel_process.pagemap.top_level)
 		gpr_state: gpr_state
@@ -335,14 +335,14 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 			higher_half)
 	}
 
-	thread.self = voidptr(thread)
-	thread.gs_base = u64(voidptr(thread))
+	t.self = voidptr(t)
+	t.gs_base = u64(voidptr(t))
 
 	if autoenqueue == true {
-		enqueue_thread(thread, false)
+		enqueue_thread(t, false)
 	}
 
-	return thread
+	return t
 }
 
 pub fn syscall_new_thread(_ voidptr, pc voidptr, arg voidptr, stack u64, fs u64) (u64, u64) {
@@ -409,7 +409,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		rsp: u64(stack_vma)
 	}
 
-	mut thread := &proc.Thread{
+	mut t := &proc.Thread{
 		process: process
 		cr3: u64(process.pagemap.top_level)
 		gpr_state: gpr_state
@@ -422,12 +422,12 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			higher_half)
 	}
 
-	thread.self = voidptr(thread)
-	thread.gs_base = u64(0)
-	thread.fs_base = u64(0)
+	t.self = voidptr(t)
+	t.gs_base = u64(0)
+	t.fs_base = u64(0)
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
-	fpu_restore(thread.fpu_storage)
+	fpu_restore(t.fpu_storage)
 
 	default_fcw := u16(0b1100111111)
 
@@ -445,10 +445,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		; memory
 	}
 
-	fpu_save(thread.fpu_storage)
+	fpu_save(t.fpu_storage)
 
 	// Set all sigactions to default
-	for mut sa in thread.sigactions {
+	for mut sa in t.sigactions {
 		sa.sa_sigaction = voidptr(-2)
 	}
 
@@ -511,18 +511,18 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack[-1] = u64(argv.len)
 			stack = &stack[-1]
 
-			thread.gpr_state.rsp -= u64(stack_top) - u64(stack)
+			t.gpr_state.rsp -= u64(stack_top) - u64(stack)
 		}
 	}
 
 	if autoenqueue == true {
-		enqueue_thread(thread, false)
+		enqueue_thread(t, false)
 	}
 
-	thread.tid = process.threads.len
-	process.threads << thread
+	t.tid = process.threads.len
+	process.threads << t
 
-	return thread
+	return t
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {

@@ -63,8 +63,8 @@ pub const (
 )
 
 pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
-	mut thread := proc.current_thread()
-	mut process := thread.process
+	mut t := proc.current_thread()
+	mut process := t.process
 
 	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str,
 		voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
@@ -76,12 +76,12 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		return 0, 0
 	}
 
-	oldmask := thread.masked_signals
+	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
-		thread.masked_signals = unsafe { sigmask[0] }
+		t.masked_signals = unsafe { sigmask[0] }
 	}
 	defer {
-		thread.masked_signals = oldmask
+		t.masked_signals = oldmask
 	}
 
 	mut fdlist := []&FD{}
@@ -371,8 +371,8 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 }
 
 pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64) {
-	mut thread := proc.current_thread()
-	mut process := thread.process
+	mut t := proc.current_thread()
+	mut process := t.process
 
 	C.printf(c'\n\e[32m%s\e[m: dup3(%d, %d, %d)\n', process.name.str, oldfdnum, newfdnum,
 		flags)
@@ -387,8 +387,8 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 }
 
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
-	mut thread := proc.current_thread()
-	mut process := thread.process
+	mut t := proc.current_thread()
+	mut process := t.process
 
 	C.printf(c'\n\e[32m%s\e[m: fcntl(%d, %d, %lld)\n', process.name.str, fdnum, cmd, arg)
 	defer {
