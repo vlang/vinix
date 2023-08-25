@@ -89,11 +89,11 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 	mut signalfd := &SignalFD(unsafe { nil })
 	mut newfd := int(0)
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
-	thread.signalfds_lock.acquire()
+	t.signalfds_lock.acquire()
 	defer {
-		thread.signalfds_lock.release()
+		t.signalfds_lock.release()
 	}
 
 	if fdnum == -1 {
@@ -105,7 +105,7 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 			return errno.err, errno.get()
 		}
 
-		thread.signalfds << voidptr(signalfd)
+		t.signalfds << voidptr(signalfd)
 	} else {
 		mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
 

@@ -294,13 +294,13 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 		return none
 	}
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
 	C.printf(c'UNIX socket: Wants to connect to %s\n', path.str)
 
-	mut target := fs.get_node(thread.process.current_directory, path, true) or { return none }
+	mut target := fs.get_node(t.process.current_directory, path, true) or { return none }
 
 	target_res := target.resource
 
@@ -351,13 +351,11 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
 		return none
 	}
 
-	mut thread := proc.current_thread()
+	mut t := proc.current_thread()
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-	mut node := fs.create(thread.process.current_directory, path, stat.ifsock) or {
-		return none
-	}
+	mut node := fs.create(t.process.current_directory, path, stat.ifsock) or { return none }
 
 	this.stat = node.resource.stat
 	node.resource = unsafe { this }
