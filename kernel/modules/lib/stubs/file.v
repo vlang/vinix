@@ -48,7 +48,7 @@ pub fn pclose(stream &FILE) int {
 }
 
 [export: 'write']
-pub fn write(fd int, buf &C.void, count u64) i64 {
+pub fn write(fd int, buf voidptr, count u64) i64 {
 	if fd != 1 && fd != 2 {
 		lib.kpanic(voidptr(0), c'write to fd != 1 && fd != 2 is a stub')
 	}

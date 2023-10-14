@@ -47,7 +47,7 @@ pub fn memset64(dest voidptr, c int, size u64) voidptr {
 }
 
 [export: 'memmove']
-pub fn memmove(dest &C.void, src &C.void, size u64) &C.void {
+pub fn memmove(dest voidptr, src voidptr, size u64) voidptr {
 	unsafe {
 		mut destm := &u8(dest)
 		srcm := &u8(src)
@@ -67,7 +67,7 @@ pub fn memmove(dest &C.void, src &C.void, size u64) &C.void {
 }
 
 [export: 'memcmp']
-pub fn memcmp(_s1 &C.void, _s2 &C.void, size u64) int {
+pub fn memcmp(_s1 voidptr, _s2 voidptr, size u64) int {
 	unsafe {
 		s1 := &u8(_s1)
 		s2 := &u8(_s2)
