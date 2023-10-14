@@ -82,7 +82,7 @@ pub fn memcmp(_s1 &C.void, _s2 &C.void, size u64) int {
 }
 
 [export: 'strcpy']
-pub fn strcpy(dest &C.char, src &C.char) &C.char {
+pub fn strcpy(dest &char, src &char) &char {
 	mut i := u64(0)
 
 	unsafe {
@@ -105,7 +105,7 @@ pub fn strcpy(dest &C.char, src &C.char) &C.char {
 }
 
 [export: 'strncpy']
-pub fn strncpy(dest &C.char, src &C.char, n u64) &C.char {
+pub fn strncpy(dest &char, src &char, n u64) &char {
 	mut i := u64(0)
 
 	unsafe {
@@ -135,7 +135,7 @@ pub fn strncpy(dest &C.char, src &C.char, n u64) &C.char {
 }
 
 [export: 'strcmp']
-pub fn strcmp(_s1 &C.char, _s2 &C.char) int {
+pub fn strcmp(_s1 &char, _s2 &char) int {
 	unsafe {
 		mut i := u64(0)
 		s1 := &u8(_s1)
@@ -160,7 +160,7 @@ pub fn strcmp(_s1 &C.char, _s2 &C.char) int {
 }
 
 [export: 'strncmp']
-pub fn strncmp(_s1 &C.char, _s2 &C.char, size u64) int {
+pub fn strncmp(_s1 &char, _s2 &char, size u64) int {
 	unsafe {
 		s1 := &u8(_s1)
 		s2 := &u8(_s2)
@@ -182,7 +182,7 @@ pub fn strncmp(_s1 &C.char, _s2 &C.char, size u64) int {
 }
 
 [export: 'strlen']
-pub fn strlen(_ptr &C.char) u64 {
+pub fn strlen(_ptr &char) u64 {
 	mut i := u64(0)
 
 	unsafe {

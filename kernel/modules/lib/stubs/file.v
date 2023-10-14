@@ -38,7 +38,7 @@ pub fn fgets(str charptr, count u64, stream &FILE) charptr {
 }
 
 [export: 'popen']
-pub fn popen(command &C.char, typ &C.char) &FILE {
+pub fn popen(command &char, typ &char) &FILE {
 	lib.kpanic(voidptr(0), c'popen is a stub')
 }
 
