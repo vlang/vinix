@@ -21,7 +21,7 @@ jobs:
         run: make distro-full
 
       - name: Build ISO
-        run: make
+        run: make all
 
       - name: Set TAG_DATE variable
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
