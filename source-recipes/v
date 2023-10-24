@@ -1,9 +1,9 @@
 name=v
-version=0.0
+version=0.4.2
 source_method=git
 clone_url="https://github.com/vlang/v.git"
 tag="master"
-commit="2029d1830fb3a3f1b00ff7941b4a62753bf5a679"
+commit="2a9a0590b7b9bedc8422d6017b71b74adef7d669"
 imagedeps="curl"
 allow_network="yes"
 
