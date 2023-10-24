@@ -8,5 +8,5 @@ imagedeps="curl"
 allow_network="yes"
 
 regenerate() {
-    curl -o v.c https://raw.githubusercontent.com/vlang/vc/master/v.c
+    curl -o https://raw.githubusercontent.com/vlang/vc/master/v.c
 }
