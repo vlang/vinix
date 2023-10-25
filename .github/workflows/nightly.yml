@@ -18,7 +18,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install make curl git mercurial libarchive-tools xorriso -y
 
       - name: Build distro
-        run: make distro-full
+        run: make distro-base
 
       - name: Build ISO
         run: make all
