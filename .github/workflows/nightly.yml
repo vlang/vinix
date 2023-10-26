@@ -10,9 +10,9 @@ on:
 
 jobs:
   vinix-build:
-    runs-on: ubuntu-latest
+    runs-on: x64/ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install build-essential make curl git mercurial libarchive-tools xorriso -y
