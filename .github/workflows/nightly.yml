@@ -18,10 +18,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install build-essential make curl git mercurial libarchive-tools xorriso -y
 
       - name: Build distro
-        run: make -n distro-full
+        run: make -j distro-full
 
       - name: Build ISO
-        run: make -n all
+        run: make -j all
 
       - name: Set TAG_DATE variable
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
