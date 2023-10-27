@@ -1,8 +1,8 @@
 name=pixman
-version=0.40.0
+version=0.42.2
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/pixman-${version}.tar.xz"
-tarball_blake2b="29b71f5eb6c3df0318c7a6153c6abbce29748b0b578697916414a869a029635fe5e0bab06b8f701a764c95e475c115ed12eb4f93c751d234b5868f4c4196d7db"
+tarball_blake2b="6286a9d064a5a24017fccbb0a6e9f6ef932077c2e33ec043826d4a7a6c707c9111d3de4b806cbcdb47fc2794f1f930d24d078de1ff2912061967db0890540957"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {

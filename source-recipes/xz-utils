@@ -1,8 +1,8 @@
 name=xz-utils
-version=5.2.6
+version=5.4.4
 source_method=tarball
 tarball_url="https://tukaani.org/xz/xz-${version}.tar.gz"
-tarball_blake2b="3cc160dc76944ad2a181fbfb23ce386dbbd04e75bbeb0b159aaaf82e2e8157ea8b2bb80b216d79a7c25339bfbd13bd9d8c261789829cc7c3cb86fc893a7b4b94"
+tarball_blake2b="0ade3767651a07a6bb4d53b510d7e97239e182788c42bc3388b97c54463ccaa968e27bcb88d34697df70381eea91279615f2622b5493ae2da22632e9576d8989"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {

@@ -1,8 +1,8 @@
 name=readline
-version=8.1.2
+version=8.2
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/readline/readline-${version}.tar.gz"
-tarball_blake2b="0a80eb7fd2be6fa22d0b159183f87c2db33b74d6168c5f57722ada1ad5d0b8338ff8f08e469550555c6f68ce6953fe53d43d3370e8967590ddbeac6db075ef95"
+tarball_blake2b="7974322b9c092a756a79e537df08e8532f8e0fcb598f77732e28287c33ebec9e9837ed88b43334c310892d56a871b423903f0f564def2fbe700a1004f2ae7b18"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
