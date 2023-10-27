@@ -1,8 +1,8 @@
 name=gcc-host
-version=12.2.0
+version=13.2.0
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/gcc/gcc-${version}/gcc-${version}.tar.xz"
-tarball_blake2b="715574af9ad678f9dc8cfd19c866bf910c7edfd479e7e9681337feaa9b54e5d304ddb85483816b8d89754d502405823ae2eff0d1e444538763f40be8e428d8da"
+tarball_blake2b="0034b29d3d6cc05821f0c4253ce077805943aff7b370729dd203bda57d89c107edd657eeddc2fb1e69ea15c7b0323b961f46516c7f4af89a3ccf7fea84701be2"
 hostdeps="automake autoconf libtool pkg-config"
 allow_network="yes"
 

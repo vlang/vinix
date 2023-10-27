@@ -1,8 +1,8 @@
 name=bash
-version=5.1.16
+version=5.2.15
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz"
-tarball_blake2b="0bc53b24d9b95cd85e45196510104acf6ac6c980f68aedcc83c8409ce6a4682e92736a9cbe089ed92d74590e28918d0bee0e67c8e0f994bd37e45fad83f5b48e"
+tarball_blake2b="6d245c71866ff1900fc6df0b048ca59d513b1a13574d1be766c39a13f3771b0f67b3d653647ec6e1f4d04785aee354aad28d0534ad6ccda463a69f25be038dec"
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
