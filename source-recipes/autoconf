@@ -1,8 +1,8 @@
 name=autoconf
-version=2.71
+version=2.69
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/autoconf/autoconf-${version}.tar.gz"
-tarball_blake2b="1884479b3ff08c7e1a67cd75b208457bf904ec77f0d765d1eb372fa2e6f590db6048125288f1ef46823d2ed664316a22ecee4afbdf08561462533e53d68dc6b5"
+tarball_blake2b="7e8a513bbfcabadad1577919c048cc05ca0a084788850b42570f88afc2fa9c25fb32277412f135b81ba1c0d8079465a6b581d2d78662c991d2183b739fac407c"
 
 regenerate() {
     true
