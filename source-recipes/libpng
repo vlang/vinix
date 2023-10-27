@@ -1,8 +1,8 @@
 name=libpng
-version=1.6.37
+version=1.6.40
 source_method=tarball
 tarball_url="https://download.sourceforge.net/libpng/libpng-${version}.tar.xz"
-tarball_blake2b="48e8f48a88e0db6fcbc0c0f1a4d5bda6e6c8b03255bacdc60e353256ae41ccc01b5b2a7e0e7b0dea236c53a3b9d1dd89d4bb19445afbebc37bf0f92691452424"
+tarball_blake2b="4dd2df57791ca68cc31ba966b9176ecb37458572c60eef34e31ff0d3266d25ad6ea9d2e8cae6bfaf7932b5c7bc231047d3ed139b3464304c41cc4d89611f5ba8"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {

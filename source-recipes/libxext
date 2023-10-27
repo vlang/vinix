@@ -1,8 +1,8 @@
 name=libxext
-version=1.3.4
+version=1.3.5
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/libXext-${version}.tar.gz"
-tarball_blake2b="a251fc34a0a657d073f105fc455b071ad96285f97571363d3d4014fd775e404bc12ed434c8c0751c225dd5c2919e1bfa36f1979eb69b47fa001e4dba5d51d41d"
+tarball_blake2b="74ee5d3fc3832fc5d9774f7f1a8e0d30ab1af97c35f0e3da0b314c228f8f511cdb106c74eeeb1de56db16d4c2b8aaab34b7ca886f02530319fde1a7ae7788598"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

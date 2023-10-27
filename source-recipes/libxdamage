@@ -1,8 +1,8 @@
 name=libxdamage
-version=1.1.5
+version=1.1.6
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/libXdamage-${version}.tar.gz"
-tarball_blake2b="d66bbd305fd4d40c95aa40e11d9c47e1693043daa61c385279564f3859e313250fded7543bdec4414b5f287ebba8c1d3fd65e44429bd02dca62a3654643f58aa"
+tarball_blake2b="e8fcdbb3b93b7f3a74b10adbb4ceaccc963c7f9ce4fe0edee5842fde7d26cbb2cf3061f073c9ca400baa8378d06ed83c8c751495febb1aeb86a27058d74b1543"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

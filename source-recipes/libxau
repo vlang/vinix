@@ -1,8 +1,8 @@
 name=libxau
-version=1.0.9
+version=1.0.11
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/libXau-${version}.tar.gz"
-tarball_blake2b="76dec75e8460cd834f34aa4bba68408d6d54d3452b895ce2e5760f717d28f96fa289a1ec9f03f97ac74b581b9a4d43bbb41a8ea5fcddf2f1a99a4b61ac209e2e"
+tarball_blake2b="2c1066e40fe64ebd8b095bb7bac436d3b0d518080b80e93d1def040af390bd08ed3f4f49feb0b4b390a5733e74bf7429c96ddac5f8fbfb904eb25b496676618a"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

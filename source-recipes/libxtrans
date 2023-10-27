@@ -1,8 +1,8 @@
 name=libxtrans
-version=1.4.0
+version=1.5.0
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/xtrans-${version}.tar.gz"
-tarball_blake2b="60ddbcf9fce4cf9006c24e8d2e362fb82edae54d3d879f3591bedfeaf198687b4d2537a7036df552d93d76709e2f882344b0705260576c207c89177885cb2bf0"
+tarball_blake2b="25a18ba2398e445a1fedec3f0f5a102aef733b621fb83a81d193a2e4a702b8090b70ccea1c6784293050fd26b20e2d4b2d433954c9740c3a94c53362dc88cc9b"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

@@ -1,8 +1,8 @@
 name=libxpm
-version=3.5.13
+version=3.5.17
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/libXpm-${version}.tar.gz"
-tarball_blake2b="227990d308976a7e68f3ff26c0a6e76cefabc57c43d2f5ea8d43d8c6a94952fd61be3be0733dcab19eb15460628bb82185ae907964e51a7be68cca6bfbca99c6"
+tarball_blake2b="0acc342fb0aebad04a2d68f60106ad8f52910b2ca65d402bfda09e5914ab92b2b2b9d57680bbb6c6f1c8767971e9cffc1315337f6645fb61940a9cb5ccdf80c0"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

@@ -1,8 +1,8 @@
 name=libxkbcommon
-version=1.4.1
+version=1.6.0
 source_method=tarball
 tarball_url="https://xkbcommon.org/download/libxkbcommon-${version}.tar.xz"
-tarball_blake2b="a784f3612bb52abb79bf1a2ddd3e7709fa52eddce5cabcf8520ed7df8ec8ea557e51205e1e9d116a0b31eb27b1f3bca33144318c5f01be7312cbb3e48f687fbe"
+tarball_blake2b="ffd373161f12ea6448a9206f57710355ab65b81ebab5dce74e4dfcee1bdc9175406fc434560648f5933b83cac163099c8564c3add6f51d34856def39ab077850"
 
 regenerate() {
     true

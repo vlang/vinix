@@ -1,8 +1,8 @@
 name=libsm
-version=1.2.3
+version=1.2.4
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/lib/libSM-${version}.tar.gz"
-tarball_blake2b="59b7230127a3b00443165c48fee7d7e6526483df3890a17d0c2d42109f87098e83e8e69cde76728fa5bd7af804e077ac8329e01efe34777346542f6ebd6f2aeb"
+tarball_blake2b="9f05c36f933ddbe66e06a96c7b9f5c23a2b5218da724a838b42ef4b798195c24a2be13e1d5c61bccf7660a4880f78da8452fa93a668f483ce808ce840c2cfcfb"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

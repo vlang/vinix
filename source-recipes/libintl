@@ -1,8 +1,8 @@
 name=libintl
-version=0.21
+version=0.22
 source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/gettext/gettext-${version}.tar.gz"
-tarball_blake2b="2eae99d0916b00b2af6fbc6bf7e309076519a10fea16cd49e7aa29fe8aec1ee7c784c6277281b764dc4abacf400cd3fe461129586303c8cd337db15c76cb4b87"
+tarball_blake2b="05d71e796c861faac5e5fefaa1d6dc21cdf5602b4f4f2533b10e67853d0be831f4866be539bb0e77bba008e0dac89fec6676a2abeaf7253a12b37a892c6d6826"
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {

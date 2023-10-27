@@ -1,8 +1,8 @@
 name=mesa
-version=21.3.9
+version=23.2.1
 source_method=tarball
 tarball_url="https://archive.mesa3d.org/mesa-${version}.tar.xz"
-tarball_blake2b="79669f9492c505b1729c526adf5a8261737b6088bdf01db654a0dca8ba22600ec985b574edfeee3a28c76e6e0f815782362973876e1d75b58f4417f45df70add"
+tarball_blake2b="51e44c2e9b7dfe17cf4cb7252e169109d03a006caa8ec34036fb594c0c44e9278d0088170894c1a9debdea911f746470e1d256576e0635cae5c3e670ab49161b"
 
 regenerate() {
     true
