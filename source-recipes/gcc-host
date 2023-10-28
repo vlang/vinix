@@ -34,7 +34,7 @@ regenerate() {
     ( cd lto-plugin && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
     ( cd libgomp && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
     ( cd libitm && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd liboffloadmic && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
+    # ( cd liboffloadmic && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
     ( cd libsanitizer && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
     ( cd libssp && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
     ( cd libvtv && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
