@@ -1,8 +1,8 @@
 name=xorg-util-macros
-version=1.19.3
+version=1.20.0
 source_method=tarball
 tarball_url="https://www.x.org/archive/individual/util/util-macros-${version}.tar.gz"
-tarball_blake2b="191a4e2cd4622f875255a4702a54c6bc05713865aa0a15682a035133e4f90a1c2b3b25d0d5d3fb54d68e2c6e4afea417d57bf46ee811aaace41e5f54e08ac189"
+tarball_blake2b="4c79c7076281ede6a240be2a2a9ffd47edd523d4a1b839589301a21eeb73100f134eced7d81fbd5ad71516174d3d4c8ab9f63e53987cb0f9a59b4fe6496157d8"
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
