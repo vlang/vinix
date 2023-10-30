@@ -1,8 +1,8 @@
 name=xf86-input-mouse
-version=1.9.4
+version=1.9.5
 source_method=tarball
 tarball_url="https://xorg.freedesktop.org/archive/individual/driver/xf86-input-mouse-${version}.tar.gz"
-tarball_blake2b=bcdf6b83816b2879791ff6a162da98272948edf731abed426d27bf64e4a75a3e829e6b7450277b2b079d2c3cd495ca1bb4894a4c39c1b641f59057bba1f0159b
+tarball_blake2b=¨67f4de10424d640913fcafc2292f342a1e993d33e4ecc3c152e818953e19deaba796b96c29e0c07a4f4b74a1eb3bc1c41c3e5ab868cade02c21a90e2556da53f¨
 hostdeps="autoconf automake libtool pkg-config xorg-macros"
 
 regenerate() {
