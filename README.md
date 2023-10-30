@@ -10,7 +10,7 @@ Join the [Discord chat](https://discord.gg/S5Nm6ZDU38).
 performance and prioritising code correctness.
 - Making a *usable* OS which can *run on real hardware*, not just on emulators or
 virtual machines.
-- Targetting modern 64-bit architectures, CPU features, and multi-core computing.
+- Targeting modern 64-bit architectures, CPU features, and multi-core computing.
 - Maintaining good source-level compatibility with Linux to allow to easily port programs over.
 - Exploring V capabilities in bare metal programming and improving the compiler in response to the uncommon needs of bare metal programming.
 - Having fun.
