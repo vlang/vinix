@@ -60,17 +60,17 @@ to test it.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install -y make curl git mercurial libarchive-tools xorriso qemu-system-x86
+sudo apt install -y make curl git mercurial libarchive-tools xorriso qemu-system-x86 bsdtar
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed make curl git mercurial libarchive xorriso qemu
+sudo pacman -S --needed make curl git mercurial libarchive xorriso qemu bsdtar
 ```
 
 ### Build prerequisites for Red Hat Linux and derivatives
 ```bash
-sudo yum install -y make curl git mercurial libarchive xorriso qemu
+sudo yum install -y make curl git mercurial libarchive xorriso qemu bsdtar
 ```
 
 ### Building the distro
