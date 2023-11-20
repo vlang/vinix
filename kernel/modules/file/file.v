@@ -34,7 +34,7 @@ pub const (
 pub struct Handle {
 pub mut:
 	l             klock.Lock
-	resource      &resource.Resource
+	resource      &resource.Resource = unsafe { nil }
 	node          voidptr
 	refcount      int
 	loc           i64
