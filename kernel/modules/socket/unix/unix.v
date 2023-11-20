@@ -40,9 +40,9 @@ pub mut:
 
 	connection_event eventstruct.Event
 	connected        bool
-	peer             &UnixSocket
+	peer             &UnixSocket = unsafe { nil }
 
-	data      &u8
+	data      &u8 = unsafe { nil }
 	read_ptr  u64
 	write_ptr u64
 	capacity  u64
