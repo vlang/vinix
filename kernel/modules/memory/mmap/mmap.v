@@ -39,7 +39,7 @@ pub struct MmapRangeGlobal {
 pub mut:
 	shadow_pagemap memory.Pagemap
 	locals         []&MmapRangeLocal
-	resource       &resource.Resource
+	resource       &resource.Resource = unsafe { nil }
 	base           u64
 	length         u64
 	offset         i64

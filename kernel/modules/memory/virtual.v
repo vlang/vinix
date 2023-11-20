@@ -25,7 +25,7 @@ __global (
 pub struct Pagemap {
 pub mut:
 	l           klock.Lock
-	top_level   &u64
+	top_level   &u64 = unsafe { nil }
 	mmap_ranges []voidptr
 }
 
