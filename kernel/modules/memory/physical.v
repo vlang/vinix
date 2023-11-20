@@ -2,7 +2,7 @@
 // Code is governed by the GPL-2.0 license.
 // Copyright (C) 2021-2022 The Vinix authors.
 
-[manualfree]
+@[manualfree]
 module memory
 
 import lib
@@ -251,7 +251,7 @@ mut:
 	size  u64
 }
 
-[export: 'free']
+@[export: 'free']
 pub fn free(ptr voidptr) {
 	if ptr == voidptr(0) {
 		return
@@ -283,7 +283,7 @@ fn slab_for(size u64) ?&Slab {
 	return none
 }
 
-[export: 'malloc']
+@[export: 'malloc']
 pub fn malloc(size u64) voidptr {
 	mut slab := slab_for(8 + size) or { return big_alloc(size) }
 
@@ -307,7 +307,7 @@ fn big_alloc(size u64) voidptr {
 	return voidptr(u64(ptr) + higher_half + page_size)
 }
 
-[export: 'realloc']
+@[export: 'realloc']
 pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	if ptr == 0 {
 		return malloc(new_size)
@@ -354,7 +354,7 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 	return new_ptr
 }
 
-[export: 'calloc']
+@[export: 'calloc']
 pub fn calloc(a u64, b u64) voidptr {
 	return unsafe { C.malloc(a * b) }
 }

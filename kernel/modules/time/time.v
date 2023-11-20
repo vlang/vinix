@@ -62,7 +62,7 @@ __global (
 	realtime_clock TimeSpec
 )
 
-[cinit]
+@[cinit]
 __global (
 	volatile boottime_req = limine.LimineBootTimeRequest{response: 0}
 )

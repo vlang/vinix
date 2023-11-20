@@ -15,7 +15,7 @@ __global (
 	smp_ready    = false
 )
 
-[cinit]
+@[cinit]
 __global (
 	volatile smp_req = limine.LimineSMPRequest{
 		response: 0

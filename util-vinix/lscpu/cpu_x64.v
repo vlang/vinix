@@ -4,7 +4,7 @@
 
 module cpu
 
-[packed]
+@[packed]
 struct RawVendorID {
 mut:
 	ebx  u32
@@ -13,7 +13,7 @@ mut:
 	zero u8
 }
 
-[packed]
+@[packed]
 struct RawModelName {
 mut:
 	eax1 u32

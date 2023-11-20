@@ -192,7 +192,7 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
-[noreturn]
+@[noreturn]
 pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
 	mut t := unsafe { proc.current_thread() }
 
@@ -461,7 +461,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	return u64(ret), 0
 }
 
-[noreturn]
+@[noreturn]
 pub fn syscall_exit(_ voidptr, status int) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process

@@ -4,12 +4,12 @@
 
 module stubs
 
-[export: 'toupper']
+@[export: 'toupper']
 pub fn toupper(c int) int {
 	return if c >= int(`a`) && c <= int(`z`) { c - 0x20 } else { c }
 }
 
-[export: 'memcpy']
+@[export: 'memcpy']
 pub fn memcpy(dest voidptr, src voidptr, size u64) voidptr {
 	unsafe {
 		mut destm := &u8(dest)
@@ -22,7 +22,7 @@ pub fn memcpy(dest voidptr, src voidptr, size u64) voidptr {
 	return dest
 }
 
-[export: 'memset']
+@[export: 'memset']
 pub fn memset(dest voidptr, c int, size u64) voidptr {
 	unsafe {
 		mut destm := &u8(dest)
@@ -34,7 +34,7 @@ pub fn memset(dest voidptr, c int, size u64) voidptr {
 	return dest
 }
 
-[export: 'memset64']
+@[export: 'memset64']
 pub fn memset64(dest voidptr, c int, size u64) voidptr {
 	unsafe {
 		mut destm := &u64(dest)
@@ -46,7 +46,7 @@ pub fn memset64(dest voidptr, c int, size u64) voidptr {
 	return dest
 }
 
-[export: 'memmove']
+@[export: 'memmove']
 pub fn memmove(dest voidptr, src voidptr, size u64) voidptr {
 	unsafe {
 		mut destm := &u8(dest)
@@ -66,7 +66,7 @@ pub fn memmove(dest voidptr, src voidptr, size u64) voidptr {
 	}
 }
 
-[export: 'memcmp']
+@[export: 'memcmp']
 pub fn memcmp(_s1 voidptr, _s2 voidptr, size u64) int {
 	unsafe {
 		s1 := &u8(_s1)
@@ -81,7 +81,7 @@ pub fn memcmp(_s1 voidptr, _s2 voidptr, size u64) int {
 	return 0
 }
 
-[export: 'strcpy']
+@[export: 'strcpy']
 pub fn strcpy(dest &char, src &char) &char {
 	mut i := u64(0)
 
@@ -104,7 +104,7 @@ pub fn strcpy(dest &char, src &char) &char {
 	}
 }
 
-[export: 'strncpy']
+@[export: 'strncpy']
 pub fn strncpy(dest &char, src &char, n u64) &char {
 	mut i := u64(0)
 
@@ -134,7 +134,7 @@ pub fn strncpy(dest &char, src &char, n u64) &char {
 	}
 }
 
-[export: 'strcmp']
+@[export: 'strcmp']
 pub fn strcmp(_s1 &char, _s2 &char) int {
 	unsafe {
 		mut i := u64(0)
@@ -159,7 +159,7 @@ pub fn strcmp(_s1 &char, _s2 &char) int {
 	return 0
 }
 
-[export: 'strncmp']
+@[export: 'strncmp']
 pub fn strncmp(_s1 &char, _s2 &char, size u64) int {
 	unsafe {
 		s1 := &u8(_s1)
@@ -181,7 +181,7 @@ pub fn strncmp(_s1 &char, _s2 &char, size u64) int {
 	return 0
 }
 
-[export: 'strlen']
+@[export: 'strlen']
 pub fn strlen(_ptr &char) u64 {
 	mut i := u64(0)
 

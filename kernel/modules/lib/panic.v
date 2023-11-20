@@ -12,7 +12,7 @@ import katomic
 
 fn C.printf_panic(charptr, ...voidptr)
 
-[noreturn]
+@[noreturn]
 pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 	asm volatile amd64 {
 		cli

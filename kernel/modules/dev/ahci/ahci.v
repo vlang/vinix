@@ -40,7 +40,7 @@ const (
 	sector_size     = 0x200
 )
 
-[packed]
+@[packed]
 struct AHCIRegisters {
 pub mut:
 	cap       u32
@@ -58,7 +58,7 @@ pub mut:
 	vendor    [24]u32
 }
 
-[packed]
+@[packed]
 struct AHCIPortRegisters {
 pub mut:
 	clb       u32
@@ -83,7 +83,7 @@ pub mut:
 	vs        [10]u32
 }
 
-[packed]
+@[packed]
 struct AHCIHBACommand {
 pub mut:
 	flags    u16
@@ -94,7 +94,7 @@ pub mut:
 	reserved [4]u32
 }
 
-[packed]
+@[packed]
 struct AHCIHBAPrdt {
 pub mut:
 	dba      u32
@@ -103,7 +103,7 @@ pub mut:
 	dbc      u32
 }
 
-[packed]
+@[packed]
 struct AHCIHBACommandTable {
 pub mut:
 	cfis     [64]u8
@@ -112,7 +112,7 @@ pub mut:
 	prdt     [1]AHCIHBAPrdt
 }
 
-[packed]
+@[packed]
 struct AHCIFISh2d {
 pub mut:
 	fis_type u8
@@ -134,7 +134,7 @@ pub mut:
 	reserved u32
 }
 
-[packed]
+@[packed]
 struct AHCIFISd2h {
 	fis_type  u8
 	flags     u8

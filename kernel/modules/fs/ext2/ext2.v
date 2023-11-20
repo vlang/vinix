@@ -13,7 +13,7 @@ import event.eventstruct
 import memory
 import fs
 
-[packed]
+@[packed]
 struct EXT2Superblock {
 pub mut:
 	inode_cnt u32
@@ -53,7 +53,7 @@ pub mut:
 	last_mnt_path[8] u64
 }
 
-[packed]
+@[packed]
 struct EXT2BlockGroupDescriptor {
 pub mut:
 	block_addr_bitmap u32
@@ -65,7 +65,7 @@ pub mut:
 	reserved[7] u16
 }
 
-[packed]
+@[packed]
 struct EXT2Inode {
 pub mut:
 	permissions u16
@@ -87,7 +87,7 @@ pub mut:
 	frag_addr u32
 }
 
-[packed]
+@[packed]
 struct EXT2DirectoryEntry {
 pub mut:
 	inode_index u32

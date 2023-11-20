@@ -6,13 +6,13 @@ module gdt
 
 import klock
 
-[packed]
+@[packed]
 struct GDTPointer {
 	size    u16
 	address voidptr
 }
 
-[packed]
+@[packed]
 struct GDTEntry {
 	limit       u16
 	base_low16  u16

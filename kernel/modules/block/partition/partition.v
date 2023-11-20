@@ -31,7 +31,7 @@ pub mut:
 	sector_cnt    u64
 }
 
-[packed]
+@[packed]
 struct MBRPartition {
 pub mut:
 	drive_status   u8
@@ -52,7 +52,7 @@ pub mut:
 	name                [9]u64
 }
 
-[packed]
+@[packed]
 struct GPTPartitionTableHDR {
 pub mut:
 	identifier            u64

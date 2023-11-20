@@ -31,7 +31,7 @@ const ata_sectors_per_prdt = 16
 
 const ata_bytes_per_prdt = ata_bytes_per_sector * ata_sectors_per_prdt
 
-[packed]
+@[packed]
 struct PRDT {
 pub mut:
 	buffer_phys   u32

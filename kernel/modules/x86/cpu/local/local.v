@@ -7,7 +7,7 @@ module local
 import x86.cpu
 import trace
 
-[packed]
+@[packed]
 pub struct TSS {
 pub mut:
 	unused0 u32

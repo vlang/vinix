@@ -33,12 +33,12 @@ mut:
 	reseed_ctr u64
 }
 
-[inline]
+@[inline]
 fn rotl32(a u32, shift u32) u32 {
 	return (a << shift) | (a >> (32 - shift))
 }
 
-[inline]
+@[inline]
 fn qr(a &u32, b &u32, c &u32, d &u32) {
 	unsafe {
 		*b = *b ^ rotl32(*a + *d, 7)

@@ -51,12 +51,12 @@ fn octal_to_int(s string) u64 {
 
 fn C.string_free(&string)
 
-[cinit]
+@[cinit]
 __global (
 	volatile module_req = limine.LimineModuleRequest{response: 0}
 )
 
-[manualfree]
+@[manualfree]
 pub fn initialise() {
 	if module_req.response.module_count < 1 {
 		panic('No initramfs')
