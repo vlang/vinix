@@ -26,8 +26,8 @@ pub const (
 
 pub struct MmapRangeLocal {
 pub mut:
-	pagemap &memory.Pagemap
-	global  &MmapRangeGlobal
+	pagemap &memory.Pagemap  = unsafe { nil }
+	global  &MmapRangeGlobal = unsafe { nil }
 	base    u64
 	length  u64
 	offset  i64

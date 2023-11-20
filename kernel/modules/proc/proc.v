@@ -18,7 +18,7 @@ pub struct Process {
 pub mut:
 	pid                      int
 	ppid                     int
-	pagemap                  &memory.Pagemap
+	pagemap                  &memory.Pagemap = unsafe { nil }
 	thread_stack_top         u64
 	threads                  []&Thread
 	fds_lock                 klock.Lock
@@ -52,7 +52,7 @@ pub mut:
 	tid                int
 	is_in_queue        bool
 	l                  klock.Lock
-	process            &Process
+	process            &Process = unsafe { nil }
 	gpr_state          cpulocal.GPRState
 	gs_base            u64
 	fs_base            u64

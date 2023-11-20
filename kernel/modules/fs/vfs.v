@@ -35,13 +35,13 @@ mut:
 
 pub struct VFSNode {
 pub mut:
-	mountpoint     &VFSNode
-	redir          &VFSNode
-	resource       &resource.Resource
-	filesystem     &FileSystem
+	mountpoint     &VFSNode = unsafe { nil }
+	redir          &VFSNode = unsafe { nil }
+	resource       &resource.Resource = unsafe { nil }
+	filesystem     &FileSystem        = unsafe { nil }
 	name           string
-	parent         &VFSNode
-	children       &map[string]&VFSNode
+	parent         &VFSNode = unsafe { nil }
+	children       &map[string]&VFSNode = unsafe { nil }
 	symlink_target string
 }
 
@@ -526,7 +526,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) 
 		return errno.err, errno.get()
 	}
 
-	if !stat.isdir(node.resource.stat.mode) && (flags & resource.o_directory != 0) {
+	if !stat.isdir(node.resource.stat.mode) && flags & resource.o_directory != 0 {
 		return errno.err, errno.enotdir
 	}
 

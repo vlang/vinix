@@ -136,7 +136,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		return ret, 0
 	}
 
-	mut timer := &time.Timer(unsafe{ nil })
+	mut timer := &time.Timer(unsafe { nil })
 
 	if voidptr(tmo_p) != unsafe { nil } {
 		mut target_time := *tmo_p
@@ -204,7 +204,7 @@ pub fn (mut this Handle) ioctl(request u64, argp voidptr) ?int {
 
 pub struct FD {
 pub mut:
-	handle &Handle
+	handle &Handle = unsafe { nil }
 	flags  int
 }
 
