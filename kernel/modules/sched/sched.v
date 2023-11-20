@@ -287,7 +287,7 @@ pub fn dequeue_and_yield() {
 	yield(true)
 }
 
-[noreturn]
+@[noreturn]
 pub fn dequeue_and_die() {
 	asm volatile amd64 {
 		cli

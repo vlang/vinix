@@ -44,7 +44,7 @@ fn use_xsdt() bool {
 	return rsdp.revision >= 2 && rsdp.xsdt_addr != 0
 }
 
-[cinit]
+@[cinit]
 __global (
 	volatile rsdp_req = limine.LimineRSDPRequest{
 		response: 0

@@ -158,7 +158,7 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	}
 }
 
-[cinit]
+@[cinit]
 __global (
 	volatile kaddr_req = limine.LimineKernelAddressRequest{response: 0}
 	volatile memmap_req = limine.LimineMemmapRequest{response: 0}

@@ -643,7 +643,7 @@ pub fn limine_term_callback(p &limine.LimineTerminal, t u64, a u64, b u64, c u64
 	}
 }
 
-[cinit]
+@[cinit]
 __global (
 	volatile term_req = limine.LimineTerminalRequest{
 		response: 0

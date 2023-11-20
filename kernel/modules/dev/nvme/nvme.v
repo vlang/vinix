@@ -42,7 +42,7 @@ const (
 	nvme_io_queue_cnt = 0x4
 )
 
-[packed]
+@[packed]
 struct NVMERegisters {
 pub mut:
 	cap   u64
@@ -58,7 +58,7 @@ pub mut:
 	acq   u64
 }
 
-[packed]
+@[packed]
 struct NVMECommandCreateCQ {
 pub mut:
 	rsvd1      [5]u32
@@ -71,7 +71,7 @@ pub mut:
 	rsvd3      [4]u32
 }
 
-[packed]
+@[packed]
 struct NVMECommandCreateSQ {
 pub mut:
 	rsvd1    [5]u32
@@ -84,7 +84,7 @@ pub mut:
 	rsvd3    [4]u32
 }
 
-[packed]
+@[packed]
 struct NVMECommandDeleteQ {
 pub mut:
 	rsvd1 [9]u32
@@ -93,7 +93,7 @@ pub mut:
 	rsvd3 [5]u32
 }
 
-[packed]
+@[packed]
 struct NVMECommandAbort {
 pub mut:
 	rsvd1 [9]u32
@@ -102,7 +102,7 @@ pub mut:
 	rsvd2 [5]u32
 }
 
-[packed]
+@[packed]
 struct NVMECommandFeatures {
 pub mut:
 	nsid    u32
@@ -114,7 +114,7 @@ pub mut:
 	rsvd2   [4]u32
 }
 
-[packed]
+@[packed]
 struct NVMECommandIdentify {
 pub mut:
 	nsid  u32
@@ -125,7 +125,7 @@ pub mut:
 	rsvd2 [5]u32
 }
 
-[packed]
+@[packed]
 struct NVMECommandRW {
 pub mut:
 	nsid     u32
@@ -153,7 +153,7 @@ pub mut:
 	rw           NVMECommandRW
 }
 
-[packed]
+@[packed]
 struct NVMECommand {
 pub mut:
 	opcode  u8
@@ -162,7 +162,7 @@ pub mut:
 	private NVMECommandPrivate
 }
 
-[packed]
+@[packed]
 struct NVMECompletion {
 pub mut:
 	result  u32
@@ -173,7 +173,7 @@ pub mut:
 	status  u16
 }
 
-[packed]
+@[packed]
 struct NVMEPowerStateID {
 pub mut:
 	max_power         u16
@@ -193,7 +193,7 @@ pub mut:
 	rsvd3             [9]u8
 }
 
-[packed]
+@[packed]
 struct NVMEControllerID {
 pub mut:
 	vid    u16
@@ -240,7 +240,7 @@ pub mut:
 	vs     [1024]u8
 }
 
-[packed]
+@[packed]
 struct NVMELbaf {
 pub mut:
 	ms u16
@@ -248,7 +248,7 @@ pub mut:
 	rp u8
 }
 
-[packed]
+@[packed]
 struct NVMENamespaceID {
 pub mut:
 	nsze      u64

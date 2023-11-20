@@ -4,7 +4,7 @@
 
 module acpi
 
-[packed]
+@[packed]
 struct MADT {
 pub:
 	header               SDT
@@ -13,14 +13,14 @@ pub:
 	entries_begin        u8
 }
 
-[packed]
+@[packed]
 struct MADTHeader {
 pub:
 	id     u8
 	length u8
 }
 
-[packed]
+@[packed]
 struct MADTLocalApic {
 pub:
 	header       MADTHeader
@@ -29,7 +29,7 @@ pub:
 	flags        u32
 }
 
-[packed]
+@[packed]
 struct MADTIoApic {
 pub:
 	header   MADTHeader
@@ -39,7 +39,7 @@ pub:
 	gsib     u32
 }
 
-[packed]
+@[packed]
 struct MADTISO {
 pub:
 	header     MADTHeader
@@ -49,7 +49,7 @@ pub:
 	flags      u16
 }
 
-[packed]
+@[packed]
 struct MADTNMI {
 pub:
 	header    MADTHeader

@@ -23,22 +23,22 @@ pub const ioc_typeshift = (ioc_nrshift + ioc_nrbits)
 pub const ioc_sizeshift = (ioc_typeshift + ioc_typebits)
 pub const ioc_dirshift = (ioc_sizeshift + ioc_sizebits)
 
-[inline]
+@[inline]
 pub fn ioctl_dir(ioc u32) u32 {
 	return (ioc >> ioc_dirshift) & ioc_dirmask
 }
 
-[inline]
+@[inline]
 pub fn ioctl_type(ioc u32) u32 {
 	return (ioc >> ioc_typeshift) & ioc_typemask
 }
 
-[inline]
+@[inline]
 pub fn ioctl_size(ioc u32) u32 {
 	return (ioc >> ioc_sizeshift) & ioc_sizemask
 }
 
-[inline]
+@[inline]
 pub fn ioctl_nr(ioc u32) u32 {
 	return (ioc >> ioc_nrshift) & ioc_nrmask
 }

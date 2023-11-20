@@ -21,7 +21,7 @@ __global (
 	framebuffer_height  = u64(0)
 )
 
-[cinit]
+@[cinit]
 __global (
 	volatile fb_req = limine.LimineFramebufferRequest{response: 0}
 )

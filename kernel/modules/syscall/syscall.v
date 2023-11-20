@@ -15,7 +15,7 @@ fn leave(context &cpulocal.GPRState) {
 	userland.dispatch_a_signal(context)
 }
 
-[_naked]
+@[_naked]
 fn syscall_entry() {
 	asm volatile amd64 {
 		swapgs // Save user stack

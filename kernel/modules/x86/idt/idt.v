@@ -6,13 +6,13 @@ module idt
 
 import klock
 
-[packed]
+@[packed]
 struct IDTPointer {
 	size    u16
 	address voidptr
 }
 
-[packed]
+@[packed]
 struct IDTEntry {
 pub mut:
 	offset_low u16
