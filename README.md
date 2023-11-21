@@ -41,12 +41,11 @@ on real hardware.
 - [x] ext2
 - [x] X.org
 - [ ] Networking
-- [ ] Hypervisor
 - [ ] Wayland 
+- [ ] Hypervisor
 - [ ] X window manager
 - [ ] V-UI
 - [ ] Intel HD graphics driver (Linux port)
-
 ## Build instructions
 
 ### Distro-agnostic build prerequisites
