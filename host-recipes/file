@@ -1,15 +1,16 @@
-name=xf86-input-mouse
-from_source=xf86-input-mouse
+name=file
+from_source=file
 revision=1
-hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-server xorg-util-macros libx11"
+imagedeps="file gcc"
 
 build() {
-    ${source_dir}/configure \
-        --host=x86_64-vinix \
+    cp -rp "${source_dir}"/. ./
+
+    ./configure \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \
+        --disable-nls \
         --disable-static
 
     make -j${parallelism}

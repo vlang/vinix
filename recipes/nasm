@@ -4,20 +4,18 @@ revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc"
 
-configure() {
+build() {
     cp -r "${source_dir}"/. .
     libtoolize -cfvi && autoreconf -fvi -I$(realpath ./autoconf)
 
     ./configure \
         --host=x86_64-vinix \
         --prefix=${prefix}
-}
 
-build() {
     make
 }
 
-install() {
+package() {
     make strip
     DESTDIR="${dest_dir}" make install
 }

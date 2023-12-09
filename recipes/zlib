@@ -4,13 +4,11 @@ revision=1
 hostdeps="gcc pkg-config"
 deps="mlibc"
 
-configure() {
+build() {
         prefix="${prefix}" \
         CHOST="x86_64-vinix" \
     ${source_dir}/configure
-}
 
-build() {
     make -j${parallelism}
 }
 

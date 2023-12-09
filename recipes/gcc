@@ -5,7 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc binutils zlib gmp mpfr mpc"
 imagedeps="gcc"
 
-configure() {
+cbuild() {
         CXXFLAGS_FOR_TARGET="$CFLAGS" \
         CFLAGS_FOR_TARGET="$CFLAGS" \
     ${source_dir}/configure                 \
@@ -21,13 +21,11 @@ configure() {
         --with-system-zlib                  \
         --enable-shared                     \
         --enable-host-shared
-}
 
-build() {
     make -j${parallelism} all-gcc all-target-libgcc all-target-libstdc++-v3
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip-gcc
 
     DESTDIR="${dest_dir}" make install-strip-target-libgcc

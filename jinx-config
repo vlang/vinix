@@ -1,4 +1,13 @@
 JINX_MAJOR_VER=0.2
-export CFLAGS="-O2 -pipe -march=x86-64 -mtune=generic"
-export CXXFLAGS="${CFLAGS}"
-export VMODULES='/tmp/.vmodules'
+
+export CFLAGS="-O2 -pipe -fcf-protection"
+export CXXFLAGS="$CFLAGS"
+
+OS_TRIPLET=x86_64-ironclad
+
+autotools_recursive_regen() {
+    for f in $(find . -name configure.ac); do
+        echo "* autotools regen in '$(dirname $f)'..."
+        ( cd "$(dirname "$f")" && libtoolize -cfvi && autoreconf -fvi "$@" )
+    done
+}

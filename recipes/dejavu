@@ -3,15 +3,13 @@ from_source=dejavu
 revision=1
 deps="mlibc freetype fontconfig"
 
-configure() {
-    cp -r ${source_dir}/. .
-}
-
 build() {
+    cp -r ${source_dir}/. .
+
     true
 }
 
-install() {
+package() {
     mkdir -p "${dest_dir}${prefix}/share/fonts/truetype"
     cp -r ttf/* "${dest_dir}${prefix}/share/fonts/truetype/"
 }

@@ -6,7 +6,7 @@ hostdeps="autoconf automake libtool pkg-config"
 hostrundeps="binutils"
 deps="mlibc-headers"
 
-configure() {
+biuld() {
         CXXFLAGS_FOR_TARGET="$CFLAGS" \
         CFLAGS_FOR_TARGET="$CFLAGS" \
     "${source_dir}"/configure \
@@ -17,12 +17,9 @@ configure() {
         --enable-languages=c,c++ \
         --disable-multilib \
         --enable-initfini-array
-}
-
-build() {
     make -j${parallelism} all-gcc
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-gcc
 }

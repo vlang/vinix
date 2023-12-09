@@ -5,7 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc xorg-util-macros xorg-proto libx11 libxtrans libsm libice"
 imagedeps="gcc"
 
-configure() {
+build() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
@@ -14,12 +14,10 @@ configure() {
         --disable-static              \
         --disable-malloc0returnsnull  \
         --with-appdefaultdir=/etc/X11/app-defaults
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

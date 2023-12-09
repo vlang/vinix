@@ -4,14 +4,12 @@ from_source=xsetroot
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc xorg-server libxmu xbitmaps libxcursor"
 
-configure() {
-    ${source_dir}/configure --prefix=${prefix} --host=x86_64-vinix
-}
-
 build() {
+    ${source_dir}/configure --prefix=${prefix} --host=x86_64-vinix
+
     make -j${parallelism}
 }
 
-install() {
+package() {
     make DESTDIR=${dest_dir} install
 }

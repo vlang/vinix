@@ -3,14 +3,10 @@ from_source=gcc-host
 revision=1
 hostrundeps="gcc-compiler libgcc libstdc++ binutils"
 
-configure() {
-    true
-}
-
 build() {
     true
 }
 
-install() {
+package() {
     true
 }

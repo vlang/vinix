@@ -4,11 +4,8 @@ revision=1
 imagedeps="gcc"
 hostrundeps="autoconf"
 
-configure() {
-    "${source_dir}"/configure --prefix="${prefix}"
-}
-
 build() {
+    "${source_dir}"/configure --prefix="${prefix}"
     make -j${parallelism}
 }
 

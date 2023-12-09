@@ -5,7 +5,7 @@ imagedeps="gcc ncurses"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc"
 
-configure() {
+build() {
         cf_cv_func_nanosleep=yes \
     "${source_dir}"/configure \
         --host=x86_64-vinix \
@@ -17,13 +17,11 @@ configure() {
         --with-pkg-config-libdir=/usr/lib/pkgconfig \
         --with-termlib \
         --enable-widec
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     make install DESTDIR="${dest_dir}"
 
     # As we build ncurses with wide character support, make some compatibility links

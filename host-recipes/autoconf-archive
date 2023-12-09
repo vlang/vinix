@@ -2,11 +2,8 @@ name=autoconf-archive
 from_source=autoconf-archive
 revision=1
 
-configure() {
-    true
-}
-
 build() {
+    true
     true
 }
 

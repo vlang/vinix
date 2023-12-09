@@ -5,7 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc pcre"
 imagedeps="gperf"
 
-configure() {
+build() {
     cp -r "${source_dir}"/. ./
     libtoolize -cfvi && autoreconf -fvi
 
@@ -13,12 +13,10 @@ configure() {
         --host=x86_64-vinix \
         --prefix=${prefix} \
         --disable-nls
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

@@ -5,7 +5,7 @@ hostdeps="gcc pkg-config"
 deps="mlibc mesa xorg-proto libx11"
 imagedeps="meson ninja"
 
-configure() {
+build() {
     meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
@@ -13,12 +13,10 @@ configure() {
         -Degl=no \
         -Dtests=false \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" ninja install
 }
