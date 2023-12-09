@@ -3,14 +3,11 @@ from_source=xorg-font-util
 revision=1
 imagedeps="gcc"
 
-configure() {
-    "${source_dir}"/configure --prefix="${prefix}"
-}
-
 build() {
+    "${source_dir}"/configure --prefix="${prefix}"
     make -j${parallelism}
 }
 
-install() {
+build() {
     DESTDIR="${dest_dir}" make install-strip
 }

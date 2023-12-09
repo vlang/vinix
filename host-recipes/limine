@@ -4,19 +4,16 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 imagedeps="nasm gcc mtools"
 
-configure() {
+build() {
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         CROSS_TOOLCHAIN=x86_64-vinix \
         LDFLAGS="-static" \
         --enable-all \
         --disable-uefi-aarch64
-}
-
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

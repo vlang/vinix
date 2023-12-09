@@ -3,15 +3,14 @@ from_source=cmake
 revision=1
 imagedeps="gcc"
 
-configure() {
-    "${source_dir}"/configure --prefix="${prefix}" --parallel="${parallelism}"
-}
-
 build() {
+    "${source_dir}"/configure --prefix="${prefix}" --parallel="${parallelism}"}
+
+
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install
     echo 'include(Platform/UnixPaths)' > "${dest_dir}${prefix}/share/cmake-3.24/Modules/Platform/Vinix.cmake"
 }

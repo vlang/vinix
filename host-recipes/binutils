@@ -4,7 +4,7 @@ revision=1
 imagedeps="gcc"
 hostdeps="autoconf automake libtool pkg-config"
 
-configure() {
+build(){
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         --target=x86_64-vinix \
@@ -12,12 +12,9 @@ configure() {
         --disable-nls \
         --disable-werror \
         --disable-dependency-tracking
-}
-
-build() {
     make -j${parallelism} all
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

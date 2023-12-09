@@ -6,12 +6,9 @@ imagedeps="gcc"
 hostrundeps="gcc-compiler libgcc binutils"
 deps="mlibc-base"
 
-configure() {
+build() {
     # Hack to continue gcc build
     cp -rp "${base_dir}"/host-builds/gcc-compiler/. ./
-}
-
-build() {
     make -j${parallelism} all-target-libstdc++-v3
 }
 

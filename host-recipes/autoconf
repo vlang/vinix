@@ -2,14 +2,11 @@ name=autoconf
 from_source=autoconf
 revision=1
 
-configure() {
-    "${source_dir}"/configure --prefix="${prefix}"
-}
-
 build() {
+    "${source_dir}"/configure --prefix="${prefix}"
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install
 }
