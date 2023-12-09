@@ -7,7 +7,7 @@ deps="mlibc xorg-util-macros xorg-proto xcb-proto libxtrans libxshmfence libx11 
 build() {
         CFLAGS="-Wno-error=array-bounds ${common_flags}" \
     ${source_dir}/configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \

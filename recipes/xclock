@@ -6,7 +6,7 @@ deps="mlibc libx11 libxmu libxaw libxrender libxft libxt libxkbfile"
 
 build() {
     ${source_dir}/configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \

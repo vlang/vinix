@@ -15,8 +15,8 @@ build() {
         -DLLVM_ENABLE_RTTI=ON \
         -DLLVM_TARGETS_TO_BUILD=X86 \
         -DLLVM_TARGET_ARCH=x86_64 \
-        -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-vinix \
-        -DLLVM_HOST_TRIPLE=x86_64-vinix \
+        -DLLVM_DEFAULT_TARGET_TRIPLE=OS_TRIPLET=${OS_TRIPLET} \
+        -DLLVM_HOST_TRIPLE=OS_TRIPLET=${OS_TRIPLET} \
         -DLLVM_ENABLE_TERMINFO=OFF \
         -Wno-dev \
         ${source_dir}/llvm

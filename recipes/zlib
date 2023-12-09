@@ -6,7 +6,7 @@ deps="mlibc"
 
 build() {
         prefix="${prefix}" \
-        CHOST="x86_64-vinix" \
+        CHOST="${OS_TRIPLET}" \
     ${source_dir}/configure
 
     make -j${parallelism}

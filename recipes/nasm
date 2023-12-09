@@ -9,7 +9,7 @@ build() {
     libtoolize -cfvi && autoreconf -fvi -I$(realpath ./autoconf)
 
     ./configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix}
 
     make

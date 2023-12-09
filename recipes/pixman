@@ -6,7 +6,7 @@ deps="mlibc libpng"
 
 build() {
     ${source_dir}/configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --disable-static
 

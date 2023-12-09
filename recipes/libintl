@@ -6,7 +6,7 @@ deps="mlibc-base libiconv"
 
 configure() {
     ${source_dir}/configure    \
-        --host=x86_64-vinix    \
+        --host=${OS_TRIPLET}    \
         --prefix=${prefix}     \
         --without-emacs        \
         --without-lispdir      \

@@ -6,7 +6,7 @@ deps="mlibc-base"
 
 build() {
     ${source_dir}/configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --enable-obsolete-api=yes \
         --disable-xcrypt-compat-files \

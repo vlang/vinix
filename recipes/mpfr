@@ -10,7 +10,7 @@ build() {
     libtoolize -cfvi && autoreconf -fvi
 
     ./configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --enable-static=no \
         --enable-shared=yes \

@@ -5,7 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc xorg-server libxmu xbitmaps libxcursor"
 
 build() {
-    ${source_dir}/configure --prefix=${prefix} --host=x86_64-vinix
+    ${source_dir}/configure --prefix=${prefix} --host=${OS_TRIPLET}
 
     make -j${parallelism}
 }

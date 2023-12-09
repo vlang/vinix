@@ -8,7 +8,7 @@ deps="mlibc"
 build() {
         cf_cv_func_nanosleep=yes \
     "${source_dir}"/configure \
-        --host=x86_64-vinix \
+        --host=${OS_TRIPLET} \
         --prefix="${prefix}" \
         --enable-pc-files \
         --with-shared \
