@@ -5,7 +5,7 @@ imagedeps="gcc ninja python git"
 hostdeps="gcc cmake pkg-config"
 deps="mlibc zlib"
 
-configure() {
+build() {
     cmake \
         -GNinja \
         -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
@@ -20,12 +20,10 @@ configure() {
         -DLLVM_ENABLE_TERMINFO=OFF \
         -Wno-dev \
         ${source_dir}/llvm
-}
 
-build() {
     ninja
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" ninja install
 }

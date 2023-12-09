@@ -5,7 +5,7 @@ hostdeps="gcc pkg-config"
 deps="mlibc libxcb libxml xkeyboard-config"
 imagedeps="meson ninja"
 
-configure() {
+build() {
     meson setup \
         --cross-file "${base_dir}/build-support/cross_file.txt" \
         --prefix=/usr \
@@ -15,13 +15,11 @@ configure() {
         -Denable-x11=true \
         -Denable-wayland=false \
         "${source_dir}"
-}
 
-build() {
     ninja
 }
 
-install() {
+ipackage() {
     DESTDIR="${dest_dir}" ninja install
     mkdir -p "${dest_dir}${prefix}/share/X11/xkb"
 }

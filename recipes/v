@@ -4,15 +4,13 @@ revision=1
 hostdeps="gcc"
 deps="mlibc"
 
-configure() {
-    cp -r ${source_dir}/. ./
-}
-
 build() {
+    cp -r ${source_dir}/. ./
+
     x86_64-vinix-gcc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v
 }
 
-install() {
+package() {
     x86_64-vinix-strip v
 
     rm -rf "${dest_dir}${prefix}"/v

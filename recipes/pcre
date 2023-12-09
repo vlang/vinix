@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc"
 
-configure() {
+build() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
@@ -14,12 +14,10 @@ configure() {
         --enable-pcre32               \
         --disable-static              \
         --with-sysroot=${sysroot_dir}
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc xorg-util-macros xorg-proto libx11 libxtrans libxext libxfixes"
 
-configure() {
+build() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
@@ -12,12 +12,10 @@ configure() {
         --localstatedir=/var          \
         --disable-static              \
         --disable-malloc0returnsnull
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

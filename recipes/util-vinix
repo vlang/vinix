@@ -4,14 +4,12 @@ revision=1
 hostdeps="gcc binutils v"
 deps="mlibc"
 
-configure() {
-    cp -r "${source_dir}"/. ./
-}
-
 build() {
+    cp -r "${source_dir}"/. ./
+
     make -j${parallelism} CC=x86_64-vinix-gcc
 }
 
-install() {
+package() {
     make install PREFIX="${prefix}" DESTDIR="${dest_dir}"
 }

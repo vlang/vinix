@@ -5,17 +5,15 @@ imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc gmp mpfr"
 
-configure() {
+build() {
     ${source_dir}/configure           \
         --host=x86_64-vinix           \
         --prefix=${prefix}            \
         --disable-static
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

@@ -5,15 +5,13 @@ imagedeps="tzdata"
 hostdeps="gcc binutils"
 deps="mlibc"
 
-configure() {
-    cp -r ${source_dir}/. ./
-}
-
 build() {
+    cp -r ${source_dir}/. ./
+
     true
 }
 
-install() {
+package() {
     # Create the required directories
     mkdir -p ${dest_dir}/etc
     mkdir -p ${dest_dir}/usr/share/zoneinfo/posix

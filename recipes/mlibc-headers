@@ -5,7 +5,7 @@ hostdeps="pkg-config"
 imagedeps="meson ninja"
 deps="cxxshim frigg"
 
-configure() {
+build() {
     meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
@@ -14,12 +14,10 @@ configure() {
         -Ddisable_iconv_option=true \
         -Ddisable_intl_option=true \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" ninja install
 }
