@@ -4,6 +4,7 @@ revision=1
 
 build() {
     true
+    true
 }
 
 install() {

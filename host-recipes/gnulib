@@ -4,8 +4,11 @@ revision=1
 
 build() {
     true
-}
 
-install() {
     true
 }
+
+package() {
+    true
+}
+

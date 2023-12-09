@@ -2,10 +2,10 @@ name=fontconfig
 from_source=fontconfig
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc freetype libexpat libxml"
+deps="core-libs freetype libexpat libxml"
 imagedeps="python gperf"
 
-configure() {
+build() {
     ${source_dir}/configure \
         --host=x86_64-vinix \
         --prefix=${prefix} \
@@ -15,12 +15,10 @@ configure() {
         --disable-docs \
         --disable-nls \
         --enable-libxml2
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

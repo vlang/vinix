@@ -5,12 +5,13 @@ hostdeps="autoconf automake"
 imagedeps="help2man gcc"
 
 build() {
-    cp -r "${source_dir}"/. ./
+    cp -rp "${source_dir}"/. ./
     ./configure \
         --prefix="${prefix}"
+
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

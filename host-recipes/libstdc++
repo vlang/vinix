@@ -12,6 +12,6 @@ build() {
     make -j${parallelism} all-target-libstdc++-v3
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip-target-libstdc++-v3
 }

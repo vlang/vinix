@@ -4,18 +4,16 @@ revision=1
 hostdeps="gcc pkg-config"
 deps="mlibc"
 
-configure() {
+build() {
     cp -r ${source_dir}/. .
     sed -i 's/all: libbz2.a bzip2 bzip2recover test/all: libbz2.a bzip2 bzip2recover/g' Makefile
-}
 
-build() {
     make CC=x86_64-vinix-gcc CFLAGS=-fPIC -f Makefile-libbz2_so
     make clean
     make CC=x86_64-vinix-gcc AR=x86_64-vinix-ar CFLAGS=-fPIC -j${parallelism}
 }
 
-install() {
+package() {
     mkdir -p "${dest_dir}${prefix}/bin" "${dest_dir}${prefix}/lib" "${dest_dir}${prefix}/lib/pkgconfig" "${dest_dir}${prefix}/include"
     command install -s --strip-program=x86_64-vinix-strip bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
     command install -s --strip-program=x86_64-vinix-strip bzip2recover "${dest_dir}${prefix}/bin/"

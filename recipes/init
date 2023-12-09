@@ -4,11 +4,9 @@ revision=1
 hostdeps="gcc binutils v"
 deps="mlibc"
 
-configure() {
-    cp -r "${source_dir}"/. ./
-}
-
 build() {
+    cp -r "${source_dir}"/. ./
+
     local PROD_FLAG=""
     if ! [ "$VINIX_PROD" = "no" ]; then
         PROD_FLAG="-prod"
@@ -16,7 +14,7 @@ build() {
     VCROSS_COMPILER_NAME=x86_64-vinix-gcc v $PROD_FLAG -gc none -os vinix .
 }
 
-install() {
+package() {
     command install -d "${dest_dir}/usr/bin"
     command install -s --strip-program=x86_64-vinix-strip init "${dest_dir}/usr/bin/"
 }

@@ -5,9 +5,10 @@ imagedeps="gcc"
 
 build() {
     "${source_dir}"/configure --prefix="${prefix}"
+
     make -j${parallelism}
 }
 
-build() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

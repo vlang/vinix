@@ -2,25 +2,23 @@ name=coreutils
 from_source=coreutils
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc tzdata"
+deps="core-libs tzdata"
 imagedeps="gcc gperf"
 
-configure() {
-    cp -r "${source_dir}"/. ./
-
-    libtoolize -cfvi && autoreconf -fvi
+build() {
+    cp -rp "${source_dir}"/. ./
 
         CFLAGS="-DSLOW_BUT_NO_HACKS $CFLAGS" \
     ./configure    \
         --host=x86_64-vinix    \
         --prefix=${prefix}     \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-nls
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

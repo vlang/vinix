@@ -5,14 +5,12 @@ imagedeps="git"
 hostdeps="gcc binutils v"
 allow_network="yes"
 
-configure() {
-    cp -r "${source_dir}"/. ./
-}
-
 build() {
+    cp -r "${source_dir}"/. ./
+
     make -j${parallelism} CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
 }
 
-install() {
+package() {
     make install PREFIX="/" DESTDIR="${dest_dir}"
 }

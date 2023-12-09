@@ -2,20 +2,18 @@ name=base-files
 from_source=base-files
 revision=1
 
-configure() {
-    true
-}
-
 build() {
     true
 }
 
-install() {
-    cp -rv ${source_dir}/. "${dest_dir}"/
+package() {
+    cp -prv ${source_dir}/. "${dest_dir}"/
     ln -s usr/bin "${dest_dir}"/bin
     ln -s usr/bin "${dest_dir}"/sbin
     ln -s usr/lib "${dest_dir}"/lib
     ln -s usr/lib "${dest_dir}"/lib64
     ln -s bin "${dest_dir}"/usr/sbin
     ln -s lib "${dest_dir}"/usr/lib64
+    mkdir "${dest_dir}"/tmp
+    mkdir "${dest_dir}"/var
 }

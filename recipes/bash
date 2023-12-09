@@ -5,19 +5,17 @@ imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc ncurses readline"
 
-configure() {
+build() {
     ${source_dir}/configure    \
         --host=x86_64-vinix    \
         --prefix=${prefix}     \
         --without-bash-malloc  \
         --disable-nls
-}
 
-build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     make install-strip DESTDIR="${dest_dir}"
     ln -s bash "${dest_dir}${prefix}"/bin/sh
 }
