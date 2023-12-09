@@ -7,9 +7,9 @@ imagedeps="gcc"
 
 build() {
     ${source_dir}/configure           \
-        --host=x86_64-vinix           \
+        --host=${OS_TRIPLET}           \
         --prefix=${prefix}            \
-        --target=x86_64-vinix         \
+        --target=${OS_TRIPLET}         \
         --with-sysroot=${sysroot_dir} \
         --disable-nls                 \
         --disable-werror              \
