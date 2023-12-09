@@ -10,4 +10,4 @@ OS_TRIPLET=x86_64-vinix
 #        echo "* autotools regen in '$(dirname $f)'..."
 #        ( cd "$(dirname "$f")" && libtoolize -cfvi && autoreconf -fvi "$@" )
 #    done
-}
+#}
