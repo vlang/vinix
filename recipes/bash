@@ -7,7 +7,7 @@ deps="mlibc ncurses readline"
 
 build() {
     ${source_dir}/configure    \
-        --host=x86_64-vinix    \
+        --host=${OS_TRIPLET}    \
         --prefix=${prefix}     \
         --without-bash-malloc  \
         --disable-nls

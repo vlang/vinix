@@ -10,7 +10,7 @@ build() {
 
         CFLAGS="-DSLOW_BUT_NO_HACKS $CFLAGS" \
     ./configure    \
-        --host=x86_64-vinix    \
+        --host=${OS_TRIPLET}    \
         --prefix=${prefix}     \
         --sysconfdir=/etc \
         --localstatedir=/var \
