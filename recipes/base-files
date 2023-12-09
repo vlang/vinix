@@ -7,13 +7,13 @@ build() {
 }
 
 package() {
-    cp -prv ${source_dir}/. "${dest_dir}"/
-    ln -s usr/bin "${dest_dir}"/bin
-    ln -s usr/bin "${dest_dir}"/sbin
-    ln -s usr/lib "${dest_dir}"/lib
-    ln -s usr/lib "${dest_dir}"/lib64
-    ln -s bin "${dest_dir}"/usr/sbin
-    ln -s lib "${dest_dir}"/usr/lib64
-    mkdir "${dest_dir}"/tmp
-    mkdir "${dest_dir}"/var
+    sudo cp -prv ${source_dir}/. "${dest_dir}"/
+    sudo ln -s usr/bin "${dest_dir}"/bin
+    sudo ln -s usr/bin "${dest_dir}"/sbin
+    sudo ln -s usr/lib "${dest_dir}"/lib
+    sudo ln -s usr/lib "${dest_dir}"/lib64
+    sudo ln -s bin "${dest_dir}"/usr/sbin
+    sudo ln -s lib "${dest_dir}"/usr/lib64
+    sudo mkdir "${dest_dir}"/tmp
+    sudo mkdir "${dest_dir}"/var
 }
