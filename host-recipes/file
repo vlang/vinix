@@ -1,4 +1,4 @@
-name=file
+ame=file
 from_source=file
 revision=1
 imagedeps="file gcc"
