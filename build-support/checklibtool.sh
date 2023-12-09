@@ -2,6 +2,7 @@
 
 set -e
 
-rm -rf sysroot
-./jinx sysroot
-find ./sysroot/ -name '*.la'
+TMPDIR="$(mktemp -d)"
+./jinx install "$TMPDIR" '*'
+find "$TMPDIR"/ -name '*.la'
+rm -rf "$TMPDIR"
