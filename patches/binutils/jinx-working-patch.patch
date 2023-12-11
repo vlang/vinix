@@ -49,7 +49,7 @@ index 2bae909..c4db83a 100644
 +i[3-7]86-*-vinix*)     targ_emul=elf_i386
 +                       targ_extra_emuls=elf_x86_64
 +                       ;;
-x86_64-*-solaris2*)     targ_emul=elf_x86_64_sol2
+i[3-7]x86_64-*-solaris2*)     targ_emul=elf_x86_64_sol2
                         targ_extra_emuls="elf_x86_64 elf_i386_sol2 elf_i386_ldso elf_i386 elf_iamcu"
                         targ_extra_libpath=$targ_extra_emuls
 @@ -1007,6 +1010,9 @@ x86_64-*-linux-*)	targ_emul=elf_x86_64
