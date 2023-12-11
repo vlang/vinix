@@ -42,16 +42,16 @@ diff --git binutils-clean/ld/configure.tgt binutils-workdir/ld/configure.tgt
 index 2bae909..c4db83a 100644
 --- binutils-clean/ld/configure.tgt
 +++ binutils-workdir/ld/configure.tgt
-@@ -375,6 +375,9 @@ i[3-7]86-*-linux-*) targ_emul=elf_i386
-                        targ64_extra_emuls="elf_x86_64 elf32_x86_64"
-                        targ64_extra_libpath="elf_x86_64 elf32_x86_64"
+@@ -378,6 +378,9 @@ i[3-7]86-*-linux-*) targ_emul=elf_i386
+ i[3-7]86-*-redox*)     targ_emul=elf_i386
+                        targ_extra_emuls=elf_x86_64
                         ;;
 +i[3-7]86-*-vinix*)     targ_emul=elf_i386
 +                       targ_extra_emuls=elf_x86_64
 +                       ;;
- i[3-7]86-*-redox*)     targ_emul=elf_i386
-                        targ_extra_emuls=elf_x86_64
-                        ;;
+x86_64-*-solaris2*)    targ_emul=elf_x86_64_sol2
+                        targ_extra_emuls="elf_x86_64 elf_i386_sol2 elf_i386_ldso elf_i386 elf_iamcu"
+                        targ_extra_libpath=$targ_extra_emuls
 @@ -1007,6 +1010,9 @@ x86_64-*-linux-*)	targ_emul=elf_x86_64
  x86_64-*-redox*)	targ_emul=elf_x86_64
  			targ_extra_emuls=elf_i386
