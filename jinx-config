@@ -5,9 +5,9 @@ export CXXFLAGS="$CFLAGS"
 
 OS_TRIPLET=x86_64-vinix
 
-#autotools_recursive_regen() {
-#    for f in $(find . -name configure.ac); do
-#        echo "* autotools regen in '$(dirname $f)'..."
-#        ( cd "$(dirname "$f")" && libtoolize -cfvi && autoreconf -fvi "$@" )
-#    done
-#}
+autotools_recursive_regen() {
+    for f in $(find . -name configure.ac); do
+        echo "* autotools regen in '$(dirname $f)'..."
+        ( cd "$(dirname "$f")" && libtoolize -cfvi && autoreconf -fvi "$@" )
+    done
+}
