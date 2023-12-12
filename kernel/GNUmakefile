@@ -2,6 +2,8 @@
 # Code is governed by the GPL-2.0 license.
 # Copyright (C) 2021-2022 The Vinix authors.
 
+.ONESHELL:
+
 define DEFAULT_VAR =
     ifeq ($(origin $1), default)
         override $(1) := $(2)
