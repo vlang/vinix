@@ -15,3 +15,4 @@ fn C.flanterm_write(mut ctx Context, buf charptr, count u64)
 
 fn C.flanterm_get_rows(ctx &Context) u64
 fn C.flanterm_get_cols(ctx &Context) u64
+fn C.flanterm_set_callback(mut ctx Context, voidptr callback)

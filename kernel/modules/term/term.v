@@ -5,7 +5,6 @@
 module term
 
 import klock
-import x86.cpu
 import dev.fbdev.api
 import dev.fbdev.simple
 import limine

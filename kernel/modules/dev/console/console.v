@@ -632,8 +632,8 @@ fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
 	}
 }
 
-pub fn limine_term_callback(p &flanterm.Context, t u64, a u64, b u64, c u64) {
-	C.printf(c'Limine terminal callback called\n')
+pub fn flanterm_callback(p &flanterm.Context, t u64, a u64, b u64, c u64) {
+	C.printf(c'Flanterm callback called\n')
 
 	match t {
 		10 {
@@ -644,6 +644,8 @@ pub fn limine_term_callback(p &flanterm.Context, t u64, a u64, b u64, c u64) {
 }
 
 pub fn initialise() {
+	C.flanterm_set_callback(mut flanterm_ctx, voidptr(flanterm_callback))
+
 	console_res = &Console{}
 	console_res.stat.size = 0
 	console_res.stat.blocks = 0
@@ -662,10 +664,6 @@ pub fn initialise() {
 	console_res.status |= file.pollout
 
 	fs.devtmpfs_add_device(console_res, 'console')
-
-	mut terminal_context_size := u64(0)
-	term.print(voidptr(&terminal_context_size), u64(-1))
-	print('console: Terminal context size: ${terminal_context_size}\n')
 
 	// Disable primary and secondary PS/2 ports
 	write_ps2(0x64, 0xad)
