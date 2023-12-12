@@ -20,4 +20,7 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
+
+    # Required for V
+    cp ${source_dir}/options/linux/include/sys/ptrace.h "${dest_dir}${prefix}"/include/sys/
 }
