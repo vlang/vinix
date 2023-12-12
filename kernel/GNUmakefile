@@ -89,6 +89,8 @@ freestanding_headers:
 
 flanterm-c:
 	git clone https://github.com/mintsuki/flanterm.git flanterm-c
+	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
+	exit 0
 
 .PHONY: clean
 clean:
