@@ -11,7 +11,6 @@ import event
 import event.eventstruct
 import klock
 import stat
-import limine
 import term
 import fs
 import ioctl
@@ -22,6 +21,7 @@ import file
 import userland
 import proc
 import katomic
+import flanterm
 
 const (
 	max_scancode        = 0x57
@@ -632,7 +632,7 @@ fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
 	}
 }
 
-pub fn limine_term_callback(p &limine.LimineTerminal, t u64, a u64, b u64, c u64) {
+pub fn limine_term_callback(p &flanterm.Context, t u64, a u64, b u64, c u64) {
 	C.printf(c'Limine terminal callback called\n')
 
 	match t {
@@ -642,14 +642,6 @@ pub fn limine_term_callback(p &limine.LimineTerminal, t u64, a u64, b u64, c u64
 		else {}
 	}
 }
-
-@[cinit]
-__global (
-	volatile term_req = limine.LimineTerminalRequest{
-		response: 0
-		callback: &limine_term_callback
-	}
-)
 
 pub fn initialise() {
 	console_res = &Console{}

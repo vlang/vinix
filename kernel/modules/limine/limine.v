@@ -119,34 +119,6 @@ pub mut:
 	response &LimineFramebufferResponse
 }
 
-// Terminal
-
-pub struct LimineTerminal {
-pub mut:
-	columns u64
-	rows u64
-	framebuffer &LimineFramebuffer
-}
-
-pub struct LimineTerminalResponse {
-pub mut:
-	revision u64
-	terminal_count u64
-	terminals &&LimineTerminal
-	write fn(&LimineTerminal, charptr, u64)
-}
-
-pub struct LimineTerminalRequest {
-pub mut:
-	id [4]u64 = [
-		u64(0xc7b1dd30df4c8b88), 0x0a82e883a194f07b,
-		0xc8ac59310c2b0844, 0xa68d0c7265d38878
-	]!
-	revision u64
-	response &LimineTerminalResponse
-	callback fn(&LimineTerminal, u64, u64, u64, u64)
-}
-
 // 5-level paging
 
 pub struct Limine5LevelPagingResponse {

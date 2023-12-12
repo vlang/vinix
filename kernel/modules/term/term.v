@@ -9,11 +9,12 @@ import x86.cpu
 import dev.fbdev.api
 import dev.fbdev.simple
 import limine
+import flanterm
 
 __global (
-	terminal_tag        = &limine.LimineTerminal(unsafe { nil })
+	flanterm_ctx &flanterm.Context
+
 	terminal_print_lock klock.Lock
-	terminal_print_ptr  fn(&limine.LimineTerminal, charptr, u64)
 	terminal_rows       = u64(0)
 	terminal_cols       = u64(0)
 	framebuffer_tag     = &limine.LimineFramebuffer(unsafe { nil })
@@ -27,14 +28,22 @@ __global (
 )
 
 pub fn initialise() {
-	terminal_tag = unsafe { term_req.response.terminals[0] }
-	terminal_print_ptr = term_req.response.write
-	terminal_rows = terminal_tag.rows
-	terminal_cols = terminal_tag.columns
-
 	framebuffer_tag = unsafe { fb_req.response.framebuffers[0] }
 	framebuffer_width = framebuffer_tag.width
 	framebuffer_height = framebuffer_tag.height
+
+	flanterm_ctx = unsafe { C.flanterm_fb_init(nil, nil,
+											   framebuffer_tag.address, framebuffer_width, framebuffer_height, framebuffer_tag.pitch,
+											   nil,
+											   nil, nil,
+											   nil, nil,
+											   nil, nil,
+											   nil, 0, 0, 1,
+											   1, 1,
+											   0) }
+
+	terminal_rows = C.flanterm_get_rows(flanterm_ctx)
+	terminal_cols = C.flanterm_get_cols(flanterm_ctx)
 }
 
 pub fn framebuffer_init() {
@@ -78,14 +87,7 @@ pub fn framebuffer_init() {
 }
 
 pub fn print(s voidptr, len u64) {
-	current_cr3 := &u64(cpu.read_cr3())
-	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
-		kernel_pagemap.switch_to()
-	}
 	terminal_print_lock.acquire()
-	terminal_print_ptr(terminal_tag, s, len)
+	C.flanterm_write(mut flanterm_ctx, s, len)
 	terminal_print_lock.release()
-	if vmm_initialised && current_cr3 != kernel_pagemap.top_level {
-		cpu.write_cr3(u64(current_cr3))
-	}
 }

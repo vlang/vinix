@@ -87,27 +87,30 @@ all: $(KERNEL)
 freestanding_headers:
 	git clone https://github.com/mintsuki/freestanding_headers.git
 
+flanterm-c:
+	git clone https://github.com/mintsuki/flanterm.git flanterm-c
+
 .PHONY: clean
 clean:
 	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
 
 .PHONY: distclean
 distclean: clean
-	rm -rf freestanding_headers
+	rm -rf freestanding_headers flanterm-c
 
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)/boot"
 	install -s --strip-program=x86_64-vinix-strip $(KERNEL) "$(DESTDIR)$(PREFIX)/boot/"
 
-blob.o: $(VFILES) freestanding_headers
+blob.o: $(VFILES) freestanding_headers flanterm-c
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
-%.o: %.c freestanding_headers
+%.o: %.c freestanding_headers flanterm-c
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-%.o: %.S freestanding_headers
+%.o: %.S freestanding_headers flanterm-c
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ)
