@@ -7,18 +7,19 @@ hostdeps="automake autoconf libtool"
 build() {
     "${source_dir}"/configure \
         --prefix="${prefix}"
+
     make -j${parallelism}
 }
 
 package() {
     DESTDIR="${dest_dir}" make install-strip
     mkdir -p "${dest_dir}${prefix}/share/pkgconfig/personality.d"
-    cat <<EOF >"${dest_dir}${prefix}/share/pkgconfig/personality.d/x86_64-vinix.personality"
-Triplet: x86_64-vinix
+    cat <<EOF >"${dest_dir}${prefix}/share/pkgconfig/personality.d/${OS_TRIPLET}.personality"
+Triplet: ${OS_TRIPLET}
 SysrootDir: ${sysroot_dir}
 DefaultSearchPaths: ${sysroot_dir}/usr/lib/pkgconfig:${sysroot_dir}/usr/share/pkgconfig
 SystemIncludePaths: ${sysroot_dir}/usr/include
 SystemLibraryPaths: ${sysroot_dir}/usr/lib
 EOF
-    ln -s pkgconf "${dest_dir}${prefix}/bin/x86_64-vinix-pkg-config"
+    ln -s pkgconf "${dest_dir}${prefix}/bin/${OS_TRIPLET}-pkg-config"
 }

@@ -2,7 +2,7 @@ name=libxpm
 from_source=libxpm
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-util-macros xorg-proto libx11 libxext libxt"
+deps="core-libs xorg-util-macros xorg-proto libx11 libxext libxt"
 
 build() {
     ${source_dir}/configure           \

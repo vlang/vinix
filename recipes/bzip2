@@ -2,23 +2,23 @@ name=bzip2
 from_source=bzip2
 revision=1
 hostdeps="gcc pkg-config"
-deps="mlibc"
+deps="core-libs"
 
 build() {
     cp -r ${source_dir}/. .
     sed -i 's/all: libbz2.a bzip2 bzip2recover test/all: libbz2.a bzip2 bzip2recover/g' Makefile
 
-    make CC=${OS_TRIPLET}-gcc CFLAGS=-fPIC -f Makefile-libbz2_so
+    make CC=${OS_TRIPLET}-gcc CFLAGS="$CFLAGS -fPIC" -f Makefile-libbz2_so
     make clean
-    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS=-fPIC -j${parallelism}
+    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS -fPIC" -j${parallelism}
 }
 
 package() {
     mkdir -p "${dest_dir}${prefix}/bin" "${dest_dir}${prefix}/lib" "${dest_dir}${prefix}/lib/pkgconfig" "${dest_dir}${prefix}/include"
-    command install -s --strip-program=${OS_TRIPLET}-strip bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
-    command install -s --strip-program=${OS_TRIPLET}-strip bzip2recover "${dest_dir}${prefix}/bin/"
-    command install -s --strip-program=${OS_TRIPLET}-strip libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/"
-    command install -m 644 bzlib.h "${dest_dir}${prefix}/include/"
+    install -s --strip-program=${OS_TRIPLET}-strip bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
+    install -s --strip-program=${OS_TRIPLET}-strip bzip2recover "${dest_dir}${prefix}/bin/"
+    install -s --strip-program=${OS_TRIPLET}-strip libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/"
+    install -m 644 bzlib.h "${dest_dir}${prefix}/include/"
     ln -sf libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/libbz2.so.1.0"
     ln -sf libbz2.so.1.0 "${dest_dir}${prefix}/lib/libbz2.so.1"
     ln -sf libbz2.so.1 "${dest_dir}${prefix}/lib/libbz2.so"

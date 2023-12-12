@@ -1,14 +1,27 @@
 name=mlibc
 from_source=mlibc
 revision=1
-deps="mlibc-base libintl libiconv libxcrypt"
+imagedeps="meson ninja"
+hostdeps="gcc pkg-config libgcc-binaries"
+deps="mlibc-headers cxxshim frigg"
 
 build() {
-    true
+        LDFLAGS="-Wl,/usr/local/libgcc-binaries/libgcc-x86_64.a" \
+    meson setup \
+        --cross-file ${base_dir}/build-support/cross_file.txt \
+        --prefix=${prefix} \
+        --libdir=lib \
+        --buildtype=debugoptimized \
+        -Dmlibc_no_headers=true \
+        -Ddisable_crypt_option=true \
+        -Ddisable_iconv_option=true \
+        -Ddisable_intl_option=true \
+        -Ddisable_libgcc_dependency=true \
+        ${source_dir}
 
-    true
+    ninja
 }
 
 package() {
-    true
+    DESTDIR="${dest_dir}" ninja install
 }

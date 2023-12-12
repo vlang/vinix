@@ -2,7 +2,7 @@ name=xclock
 from_source=xclock
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc libx11 libxmu libxaw libxrender libxft libxt libxkbfile"
+deps="core-libs libx11 libxmu libxaw libxrender libxft libxt libxkbfile"
 
 build() {
     ${source_dir}/configure \

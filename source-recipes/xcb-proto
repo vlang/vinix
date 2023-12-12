@@ -1,8 +1,7 @@
 name=xcb-proto
-version=1.15.2
-source_method=tarball
-tarball_url="https://www.x.org/releases/individual/xcb/xcb-proto-${version}.tar.xz"
-tarball_blake2b="0d6cc87ea0d2de594ba11b11255779e90d3c7507f0002453b3d1b2ac73fb604e5ee52e516bbcf76bce2a89027f8c8de6289d21aa2bb23d7d3e2ee77211b54946"
+version=1.16.0
+tarball_url="https://www.x.org/archive/individual/proto/xcb-proto-${version}.tar.xz"
+tarball_blake2b="1c59ae4c71e697bd4f0298f6e0ea5235fc47baa9cf584e079258f1da8be538d1b67dc45f1325d82495247d0f8020d0244ca334de3794b410a1feaceabd6b285e"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {

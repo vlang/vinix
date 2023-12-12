@@ -2,7 +2,7 @@ name=xkbutils
 from_source=xkbutils
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-util-macros xorg-proto libx11 libxt libxaw"
+deps="core-libs xorg-util-macros xorg-proto libx11 libxt libxaw"
 
 build() {
     ${source_dir}/configure           \

@@ -1,0 +1,29 @@
+name=zstd
+from_source=zstd
+revision=1
+hostdeps="gcc pkg-config"
+deps="core-libs zlib xz-utils"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+
+        CC=${OS_TRIPLET}-gcc \
+        CXX=${OS_TRIPLET}-g++ \
+        AR=${OS_TRIPLET}-ar \
+        PREFIX="${prefix}" \
+    make -j${parallelism}
+}
+
+package() {
+        CC=${OS_TRIPLET}-gcc \
+        DESTDIR="${dest_dir}" \
+        PREFIX="${prefix}" \
+    make install
+
+    # Remove static libraries.
+    rm -rf "${dest_dir}${prefix}"/lib/*.a
+
+    # Strip executables.
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libzstd.so.1.5.5
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/zstd
+}

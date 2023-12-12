@@ -1,57 +1,20 @@
-From cceab301e69fd447413b79a240cc69e21b83dda0 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 18 Apr 2022 04:06:55 +0200
-Subject: [PATCH] Vinix specific changes
-
----
- include/drm-uapi/drm.h                    | 5 +++--
- meson.build                               | 2 +-
- src/compiler/spirv/spirv_to_nir.c         | 1 +
- src/egl/main/egllog.c                     | 1 +
- src/gallium/drivers/llvmpipe/lp_texture.c | 1 -
- src/util/debug.c                          | 1 +
- src/util/detect_os.h                      | 8 ++++++++
- src/util/os_misc.c                        | 4 ++--
- src/util/os_time.c                        | 4 ++--
- src/util/u_printf.h                       | 2 ++
- src/util/u_thread.h                       | 4 ++--
- 11 files changed, 23 insertions(+), 10 deletions(-)
-
-diff --git a/include/drm-uapi/drm.h b/include/drm-uapi/drm.h
-index 5e54c3a..09dda3f 100644
---- a/include/drm-uapi/drm.h
-+++ b/include/drm-uapi/drm.h
-@@ -35,10 +35,11 @@
- #ifndef _DRM_H_
- #define _DRM_H_
- 
--#if   defined(__linux__)
-+#if   defined(__linux__) || defined(__vinix__)
- 
-+#include <sys/ioctl.h>
- #include <linux/types.h>
--#include <asm/ioctl.h>
-+//#include <asm/ioctl.h>
- typedef unsigned int drm_handle_t;
- 
+diff --git mesa-clean/include/drm-uapi/drm.h mesa-workdir/include/drm-uapi/drm.h
+index 5e54c3a..085b5b7 100644
+--- mesa-clean/include/drm-uapi/drm.h
++++ mesa-workdir/include/drm-uapi/drm.h
+@@ -44,7 +44,7 @@ typedef unsigned int drm_handle_t;
  #else /* One of the BSDs */
-diff --git a/meson.build b/meson.build
-index 07c77e1..9b0cea0 100644
---- a/meson.build
-+++ b/meson.build
-@@ -176,7 +176,7 @@ with_any_opengl = with_opengl or with_gles1 or with_gles2
- # Only build shared_glapi if at least one OpenGL API is enabled
- with_shared_glapi = with_shared_glapi and with_any_opengl
  
--system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos'].contains(host_machine.system())
-+system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'vinix', 'sunos'].contains(host_machine.system())
- 
- dri_drivers = get_option('dri-drivers')
- if dri_drivers.contains('auto')
-diff --git a/src/compiler/spirv/spirv_to_nir.c b/src/compiler/spirv/spirv_to_nir.c
+ #include <stdint.h>
+-#include <sys/ioccom.h>
++//#include <sys/ioccom.h>
+ #include <sys/types.h>
+ typedef int8_t   __s8;
+ typedef uint8_t  __u8;
+diff --git mesa-clean/src/compiler/spirv/spirv_to_nir.c mesa-workdir/src/compiler/spirv/spirv_to_nir.c
 index 71cdc83..3d26705 100644
---- a/src/compiler/spirv/spirv_to_nir.c
-+++ b/src/compiler/spirv/spirv_to_nir.c
+--- mesa-clean/src/compiler/spirv/spirv_to_nir.c
++++ mesa-workdir/src/compiler/spirv/spirv_to_nir.c
 @@ -37,6 +37,7 @@
  #include "util/u_string.h"
  
@@ -60,10 +23,10 @@ index 71cdc83..3d26705 100644
  
  #ifndef NDEBUG
  static enum nir_spirv_debug_level
-diff --git a/src/egl/main/egllog.c b/src/egl/main/egllog.c
+diff --git mesa-clean/src/egl/main/egllog.c mesa-workdir/src/egl/main/egllog.c
 index 984dd5b..6a91952 100644
---- a/src/egl/main/egllog.c
-+++ b/src/egl/main/egllog.c
+--- mesa-clean/src/egl/main/egllog.c
++++ mesa-workdir/src/egl/main/egllog.c
 @@ -39,6 +39,7 @@
  #include <stdio.h>
  #include <stdlib.h>
@@ -72,10 +35,10 @@ index 984dd5b..6a91952 100644
  #include "c11/threads.h"
  #include "util/macros.h"
  #include "util/u_string.h"
-diff --git a/src/gallium/drivers/llvmpipe/lp_texture.c b/src/gallium/drivers/llvmpipe/lp_texture.c
+diff --git mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
 index 5bfc8db..d2b31e1 100644
---- a/src/gallium/drivers/llvmpipe/lp_texture.c
-+++ b/src/gallium/drivers/llvmpipe/lp_texture.c
+--- mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c
++++ mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
 @@ -1102,7 +1102,6 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
     default:
        break;
@@ -84,10 +47,10 @@ index 5bfc8db..d2b31e1 100644
     *value = 0;
     return false;
  }
-diff --git a/src/util/debug.c b/src/util/debug.c
+diff --git mesa-clean/src/util/debug.c mesa-workdir/src/util/debug.c
 index 89ae613..fbf45f4 100644
---- a/src/util/debug.c
-+++ b/src/util/debug.c
+--- mesa-clean/src/util/debug.c
++++ mesa-workdir/src/util/debug.c
 @@ -23,6 +23,7 @@
  
  #include <errno.h>
@@ -96,10 +59,10 @@ index 89ae613..fbf45f4 100644
  #include "debug.h"
  #include "u_string.h"
  
-diff --git a/src/util/detect_os.h b/src/util/detect_os.h
-index 6506948..2f8d099 100644
---- a/src/util/detect_os.h
-+++ b/src/util/detect_os.h
+diff --git mesa-clean/src/util/detect_os.h mesa-workdir/src/util/detect_os.h
+index 6506948..a631d69 100644
+--- mesa-clean/src/util/detect_os.h
++++ mesa-workdir/src/util/detect_os.h
 @@ -81,6 +81,11 @@
  #define DETECT_OS_UNIX 1
  #endif
@@ -121,10 +84,10 @@ index 6506948..2f8d099 100644
 +#endif
  
  #endif /* DETECT_OS_H */
-diff --git a/src/util/os_misc.c b/src/util/os_misc.c
-index 31f1c55..d16f1ce 100644
---- a/src/util/os_misc.c
-+++ b/src/util/os_misc.c
+diff --git mesa-clean/src/util/os_misc.c mesa-workdir/src/util/os_misc.c
+index 31f1c55..0095e53 100644
+--- mesa-clean/src/util/os_misc.c
++++ mesa-workdir/src/util/os_misc.c
 @@ -57,7 +57,7 @@
  #  include <unistd.h>
  #  include <log/log.h>
@@ -143,10 +106,10 @@ index 31f1c55..d16f1ce 100644
     const long phys_pages = sysconf(_SC_PHYS_PAGES);
     const long page_size = sysconf(_SC_PAGE_SIZE);
  
-diff --git a/src/util/os_time.c b/src/util/os_time.c
-index d2edd88..337c00b 100644
---- a/src/util/os_time.c
-+++ b/src/util/os_time.c
+diff --git mesa-clean/src/util/os_time.c mesa-workdir/src/util/os_time.c
+index d2edd88..d7c3dfb 100644
+--- mesa-clean/src/util/os_time.c
++++ mesa-workdir/src/util/os_time.c
 @@ -53,7 +53,7 @@
  int64_t
  os_time_get_nano(void)
@@ -165,10 +128,10 @@ index d2edd88..337c00b 100644
     struct timespec time;
     time.tv_sec = usecs / 1000000;
     time.tv_nsec = (usecs % 1000000) * 1000;
-diff --git a/src/util/u_printf.h b/src/util/u_printf.h
+diff --git mesa-clean/src/util/u_printf.h mesa-workdir/src/util/u_printf.h
 index 44dcce5..e9e23ba 100644
---- a/src/util/u_printf.h
-+++ b/src/util/u_printf.h
+--- mesa-clean/src/util/u_printf.h
++++ mesa-workdir/src/util/u_printf.h
 @@ -22,6 +22,8 @@
  #ifndef U_PRINTF_H
  #define U_PRINTF_H
@@ -178,10 +141,10 @@ index 44dcce5..e9e23ba 100644
  #ifdef __cplusplus
  
  #include <string>
-diff --git a/src/util/u_thread.h b/src/util/u_thread.h
-index 013e8be..98d8256 100644
---- a/src/util/u_thread.h
-+++ b/src/util/u_thread.h
+diff --git mesa-clean/src/util/u_thread.h mesa-workdir/src/util/u_thread.h
+index 013e8be..a3a6031 100644
+--- mesa-clean/src/util/u_thread.h
++++ mesa-workdir/src/util/u_thread.h
 @@ -129,7 +129,7 @@ static inline thrd_t u_thread_create(int (*routine)(void *), void *param)
  static inline void u_thread_setname( const char *name )
  {
@@ -200,6 +163,3 @@ index 013e8be..98d8256 100644
     struct timespec ts;
     clockid_t cid;
  
--- 
-2.35.3
-

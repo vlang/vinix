@@ -2,7 +2,7 @@ name=twm
 revision=1
 from_source=twm
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-server xsetroot"
+deps="core-libs xorg-server xsetroot"
 
 build() {
     ${source_dir}/configure \

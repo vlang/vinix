@@ -1,8 +1,7 @@
 name=xsetroot
-version=1.1.3
-source_method=tarball
+version=1.1.2
 tarball_url="https://www.x.org/archive/individual/app/xsetroot-${version}.tar.gz"
-tarball_blake2b=¨b904a9f622883d050751026966341daac1e31ac7c66a6bc54ee6e370c7f096aa5158c7fdc37feb796c7ff7720f654cf9ec194e4ecdb95a3049f3021afee2cb8e¨
+tarball_blake2b=748f5d1a3f2e49883c46406f5ed04aa97f58c1d007ae4a976ffc4e7e816e3c87a2605ab3a288b7448e6877256684ad07b15ae78e97c319cc60f32efaf1732c2e
 hostdeps="autoconf automake libtool pkg-config xorg-macros"
 
 regenerate() {

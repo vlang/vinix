@@ -2,19 +2,21 @@ name=gcc
 from_source=gcc
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc binutils zlib gmp mpfr mpc"
+deps="core-libs binutils zlib gmp mpfr mpc"
 imagedeps="gcc"
 
-cbuild() {
+build() {
         CXXFLAGS_FOR_TARGET="$CFLAGS" \
         CFLAGS_FOR_TARGET="$CFLAGS" \
     ${source_dir}/configure                 \
         --host=${OS_TRIPLET}                 \
         --prefix=${prefix}                  \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --target=${OS_TRIPLET}               \
         --with-sysroot=/                    \
         --with-build-sysroot=${sysroot_dir} \
-        --enable-languages=c,c++            \
+        --enable-languages=c,c++,lto            \
         --enable-initfini-array             \
         --disable-multilib                  \
         --disable-nls                       \
@@ -22,17 +24,11 @@ cbuild() {
         --enable-shared                     \
         --enable-host-shared
 
-    make -j${parallelism} all-gcc all-target-libgcc all-target-libstdc++-v3
+    make -j${parallelism} all-gcc
 }
 
 package() {
     DESTDIR="${dest_dir}" make install-strip-gcc
-
-    DESTDIR="${dest_dir}" make install-strip-target-libgcc
-    rm "${dest_dir}${prefix}"/lib/gcc/${OS_TRIPLET}/12.2.0/crti.o
-    rm "${dest_dir}${prefix}"/lib/gcc/${OS_TRIPLET}/12.2.0/crtn.o
-
-    DESTDIR="${dest_dir}" make install-strip-target-libstdc++-v3
 
     ln -s gcc "${dest_dir}${prefix}"/bin/cc
     # Remove static libraries

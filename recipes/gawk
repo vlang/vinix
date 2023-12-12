@@ -1,0 +1,22 @@
+name=gawk
+from_source=gawk
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs mpfr gmp readline"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+
+    ./configure \
+        --host=${OS_TRIPLET} \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-nls
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install-strip
+}

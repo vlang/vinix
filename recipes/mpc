@@ -3,12 +3,14 @@ from_source=mpc
 revision=1
 imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc gmp mpfr"
+deps="core-libs gmp mpfr"
 
 build() {
     ${source_dir}/configure           \
         --host=${OS_TRIPLET}           \
         --prefix=${prefix}            \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-static
 
     make -j${parallelism}

@@ -1,6 +1,5 @@
 name=twm
 version=1.0.12
-source_method=tarball
 tarball_url="https://www.x.org/pub/individual/app/twm-${version}.tar.xz"
 tarball_blake2b=4bca3572dc51af6d1724aefc42f85f04cf0dcbf5514d098628b7950b59a05bd1f1f6fe51aed492777fad5b169a0d97d0c1f0567aca3e7f33c7de0037c7dbe49f
 hostdeps="autoconf automake libtool pkg-config xorg-macros"

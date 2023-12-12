@@ -2,7 +2,7 @@ name=libxcursor
 from_source=libxcursor
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc libxrender libxfixes libx11"
+deps="core-libs libxrender libxfixes libx11"
 
 build() {
     ${source_dir}/configure \

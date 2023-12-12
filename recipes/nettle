@@ -2,14 +2,16 @@ name=nettle
 from_source=nettle
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc gmp"
+deps="core-libs gmp"
 imagedeps="gcc"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --disable-documentation       \
+    ${source_dir}/configure \
+        --host=${OS_TRIPLET} \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-documentation \
         --disable-static
 
     make -j${parallelism}
@@ -17,4 +19,8 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" make install
+
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/*
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libhogweed.so.6.8
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libnettle.so.8.8
 }

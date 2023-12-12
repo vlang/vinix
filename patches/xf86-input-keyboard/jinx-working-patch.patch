@@ -1,21 +1,9 @@
-From 73d8473c3dd0119a2b4d797a2cf2e6950ef3f4ec Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 30 Jan 2022 11:43:49 +0100
-Subject: [PATCH] Vinix specific changes
-
----
- configure.ac    |  5 +++++
- src/Makefile.am |  7 ++++++-
- src/vinix_kbd.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 42 insertions(+), 1 deletion(-)
- create mode 100644 src/vinix_kbd.c
-
-diff --git a/configure.ac b/configure.ac
-index c3ebdf3..1fca08f 100644
---- a/configure.ac
-+++ b/configure.ac
+diff --git xf86-input-keyboard-clean/configure.ac xf86-input-keyboard-workdir/configure.ac
+index 0f71ce3..9673a82 100644
+--- xf86-input-keyboard-clean/configure.ac
++++ xf86-input-keyboard-workdir/configure.ac
 @@ -57,6 +57,10 @@ AC_SUBST(inputdir)
-
+ 
  # The keyboard driver code is O/S specific
  case $host_os in
 +  vinix*)
@@ -23,30 +11,29 @@ index c3ebdf3..1fca08f 100644
 +    ;;
 +
    linux*)
-     IS_LINUX="yes"
+     AC_MSG_ERROR([This is not the keyboard driver you are looking for. Use evdev or libinput.])
      ;;
 @@ -95,6 +99,7 @@ case $host_os in
  esac
  AC_SUBST([OS_FLAGS])
-
+ 
 +AM_CONDITIONAL(VINIX, [test "x$IS_VINIX" = xyes])
- AM_CONDITIONAL(LINUX, [test "x$IS_LINUX" = xyes])
  AM_CONDITIONAL(BSD, [test "x$IS_BSD" = xyes])
  AM_CONDITIONAL(SOLARIS, [test "x$IS_SOLARIS" = xyes])
-diff --git a/src/Makefile.am b/src/Makefile.am
-index 8612c87..3af76f8 100644
---- a/src/Makefile.am
-+++ b/src/Makefile.am
-@@ -26,11 +26,16 @@ kbd_drv_la_SOURCES = kbd.c xf86OSKbd.h xf86Keymap.h atKeynames.h
+ AM_CONDITIONAL(HURD, [test "x$IS_HURD" = xyes])
+diff --git xf86-input-keyboard-clean/src/Makefile.am xf86-input-keyboard-workdir/src/Makefile.am
+index 52f5f4d..45b0d0f 100644
+--- xf86-input-keyboard-clean/src/Makefile.am
++++ xf86-input-keyboard-workdir/src/Makefile.am
+@@ -26,10 +26,15 @@ kbd_drv_la_SOURCES = kbd.c xf86OSKbd.h xf86Keymap.h atKeynames.h
  kbd_drv_la_LIBADD = $(XORG_LIBS)
  kbd_drv_ladir = @inputdir@
-
+ 
 +VINIX_SRCS = vinix_kbd.c at_scancode.c
  BSD_SRCS = bsd_KbdMap.c bsd_kbd.c bsd_kbd.h at_scancode.c
  HURD_SRCS = hurd_kbd.c at_scancode.c
- LINUX_SRCS = lnx_KbdMap.c lnx_kbd.c lnx_kbd.h at_scancode.c
  SOLARIS_SRCS = sun_kbd.c sun_kbd.h sun_kbdMap.c
-
+ 
 +if VINIX
 +kbd_drv_la_SOURCES += $(VINIX_SRCS)
 +endif
@@ -54,17 +41,17 @@ index 8612c87..3af76f8 100644
  if BSD
  kbd_drv_la_SOURCES += $(BSD_SRCS)
  endif
-@@ -47,4 +52,4 @@ if HURD
+@@ -42,4 +47,4 @@ if HURD
  kbd_drv_la_SOURCES += $(HURD_SRCS)
  endif
-
--EXTRA_DIST = $(BSD_SRCS) $(HURD_SRCS) $(LINUX_SRCS) $(SOLARIS_SRCS)
-+EXTRA_DIST = $(VINIX_SRCS) $(BSD_SRCS) $(HURD_SRCS) $(LINUX_SRCS) $(SOLARIS_SRCS)
-diff --git a/src/vinix_kbd.c b/src/vinix_kbd.c
+ 
+-EXTRA_DIST = $(BSD_SRCS) $(HURD_SRCS) $(SOLARIS_SRCS)
++EXTRA_DIST = $(VINIX_SRCS) $(BSD_SRCS) $(HURD_SRCS) $(SOLARIS_SRCS)
+diff --git xf86-input-keyboard-workdir/src/vinix_kbd.c xf86-input-keyboard-workdir/src/vinix_kbd.c
 new file mode 100644
 index 0000000..b3d3d19
 --- /dev/null
-+++ b/src/vinix_kbd.c
++++ xf86-input-keyboard-workdir/src/vinix_kbd.c
 @@ -0,0 +1,31 @@
 +
 +#ifdef HAVE_CONFIG_H
@@ -97,6 +84,3 @@ index 0000000..b3d3d19
 +{
 +    return FALSE;
 +}
---
-2.35.0
-

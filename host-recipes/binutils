@@ -4,14 +4,15 @@ revision=1
 imagedeps="gcc"
 hostdeps="autoconf automake libtool pkg-config"
 
-build(){
+build() {
     "${source_dir}"/configure \
         --prefix="${prefix}" \
-        --target=x86_64-vinix \
+        --target=${OS_TRIPLET} \
         --with-sysroot="${sysroot_dir}" \
         --disable-nls \
         --disable-werror \
         --disable-dependency-tracking
+
     make -j${parallelism} all
 }
 

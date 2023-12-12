@@ -2,16 +2,17 @@ name=grep
 from_source=grep
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc pcre"
+deps="core-libs pcre2"
 imagedeps="gperf"
 
 build() {
-    cp -r "${source_dir}"/. ./
-    libtoolize -cfvi && autoreconf -fvi
+    cp -rp "${source_dir}"/. ./
 
     ./configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-nls
 
     make -j${parallelism}

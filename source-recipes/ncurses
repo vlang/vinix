@@ -1,8 +1,7 @@
 name=ncurses
-version=6.3.20220903
-source_method=tarball
-tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_3_20220903.tar.gz"
-tarball_blake2b="05f8c12afe9e3fd19020f034e0e6ecde257d3be6676bb5d89f8bc534381c1da18ca9150e51f2e12b7771a24502787dc5f7b1b37e722c9c1ff843946f240f43f6"
+version=6.4.20231111
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_4_20231111.tar.gz"
+tarball_blake2b="0d7b490b50e58281250cc4ebdac8f35cbb3fbf0e13578524003ae4c26c10507d59fb8dd2a4d67102067df77d857c41e6c37c509d9a7cee8661dd3bb80f7cbfef"
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {

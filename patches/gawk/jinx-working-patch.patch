@@ -1,0 +1,39 @@
+diff --git gawk-clean/Makefile.am gawk-workdir/Makefile.am
+index 9f5e40c..beb85d0 100644
+--- gawk-clean/Makefile.am
++++ gawk-workdir/Makefile.am
+@@ -66,7 +66,7 @@ endif
+ 
+ # Build in awklib after in doc, since we want to extract
+ # sample files if doc/gawk.texi changed.
+-SUBDIRS += extras doc awklib po test
++SUBDIRS += extras doc awklib po
+ 
+ # what to make and install
+ bin_PROGRAMS = gawk
+diff --git gawk-clean/configure.ac gawk-workdir/configure.ac
+index 320ad40..34deacc 100644
+--- gawk-clean/configure.ac
++++ gawk-workdir/configure.ac
+@@ -39,7 +39,7 @@ then
+ 	export INSTALL
+ fi
+ 
+-AC_PREREQ([2.71])
++AC_PREREQ([2.69])
+ 
+ AC_CONFIG_MACRO_DIR([m4])
+ AC_CONFIG_AUX_DIR([build-aux])
+diff --git gawk-clean/extension/configure.ac gawk-workdir/extension/configure.ac
+index 7e07a4a..1d10d65 100644
+--- gawk-clean/extension/configure.ac
++++ gawk-workdir/extension/configure.ac
+@@ -25,7 +25,7 @@ dnl Process this file with autoconf to produce a configure script.
+ 
+ AC_INIT([GNU Awk Bundled Extensions],[5.2.2],[bug-gawk@gnu.org],[gawk-extensions])
+ 
+-AC_PREREQ([2.71])
++AC_PREREQ([2.69])
+ 
+ AC_CONFIG_MACRO_DIR([../m4])
+ AC_CONFIG_AUX_DIR([../build-aux])

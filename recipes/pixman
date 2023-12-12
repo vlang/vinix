@@ -2,12 +2,14 @@ name=pixman
 from_source=pixman
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc libpng"
+deps="core-libs libpng"
 
 build() {
     ${source_dir}/configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-static
 
     make -j${parallelism}

@@ -2,7 +2,7 @@ name=binutils
 from_source=binutils
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc zlib gmp"
+deps="core-libs zlib gmp"
 imagedeps="gcc"
 
 build() {
@@ -14,16 +14,22 @@ build() {
         --disable-nls                 \
         --disable-werror              \
         --disable-dependency-tracking \
+        --enable-colored-disassembly \
         --with-system-zlib            \
         --with-gmp=${sysroot_dir}/usr \
         --enable-shared               \
         --enable-host-shared
 
+        SFRAME_LIB_PATH="-L$(pwd -P)/libsframe/.libs" \
     make -j${parallelism} all
 }
 
 package() {
     DESTDIR="${dest_dir}" make install-strip
+
+    # Remove unnecessary directory
+    rm -rf "${dest_dir}${prefix}"/${OS_TRIPLET}
+
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
 }

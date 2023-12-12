@@ -3,13 +3,15 @@ from_source=ncurses
 revision=1
 imagedeps="gcc ncurses"
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc"
+deps="core-libs"
 
 build() {
         cf_cv_func_nanosleep=yes \
     "${source_dir}"/configure \
         --host=${OS_TRIPLET} \
         --prefix="${prefix}" \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --enable-pc-files \
         --with-shared \
         --without-normal \
@@ -36,4 +38,7 @@ package() {
 
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
+
+    # Strip
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libformw.so,libmenuw.so,libncursesw.so,libpanelw.so,libtinfow.so}
 }

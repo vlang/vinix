@@ -7,10 +7,15 @@ imagedeps="nasm gcc mtools"
 build() {
     "${source_dir}"/configure \
         --prefix="${prefix}" \
-        CROSS_TOOLCHAIN=x86_64-vinix \
+        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET} \
         LDFLAGS="-static" \
-        --enable-all \
-        --disable-uefi-aarch64
+        --enable-uefi-ia32 \
+        --enable-uefi-x86-64 \
+        --enable-uefi-cd \
+        --enable-bios \
+        --enable-bios-cd \
+        --enable-bios-pxe
+
     make -j${parallelism}
 }
 

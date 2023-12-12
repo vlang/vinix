@@ -2,7 +2,7 @@ name=init
 from_source=init
 revision=1
 hostdeps="gcc binutils v"
-deps="mlibc"
+deps="core-libs"
 
 build() {
     cp -r "${source_dir}"/. ./
@@ -15,6 +15,6 @@ build() {
 }
 
 package() {
-    command install -d "${dest_dir}/usr/bin"
-    command install -s --strip-program=x86_64-vinix-strip init "${dest_dir}/usr/bin/"
+    install -d "${dest_dir}/usr/bin"
+    install -s --strip-program=x86_64-vinix-strip init "${dest_dir}/usr/bin/"
 }

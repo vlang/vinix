@@ -3,7 +3,7 @@ from_source=llvm
 revision=1
 imagedeps="gcc ninja python git"
 hostdeps="gcc cmake pkg-config"
-deps="mlibc zlib"
+deps="core-libs zlib"
 
 build() {
     cmake \
@@ -15,8 +15,8 @@ build() {
         -DLLVM_ENABLE_RTTI=ON \
         -DLLVM_TARGETS_TO_BUILD=X86 \
         -DLLVM_TARGET_ARCH=x86_64 \
-        -DLLVM_DEFAULT_TARGET_TRIPLE=OS_TRIPLET=${OS_TRIPLET} \
-        -DLLVM_HOST_TRIPLE=OS_TRIPLET=${OS_TRIPLET} \
+        -DLLVM_DEFAULT_TARGET_TRIPLE=${OS_TRIPLET} \
+        -DLLVM_HOST_TRIPLE=${OS_TRIPLET} \
         -DLLVM_ENABLE_TERMINFO=OFF \
         -Wno-dev \
         ${source_dir}/llvm
@@ -25,5 +25,5 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" ninja install
+    DESTDIR="${dest_dir}" ninja install/strip
 }

@@ -1,10 +1,10 @@
 name=dejavu
 from_source=dejavu
 revision=1
-deps="mlibc freetype fontconfig"
+deps="core-libs freetype fontconfig"
 
 build() {
-    cp -r ${source_dir}/. .
+    cp -r ${source_dir}/. ./
 
     true
 }

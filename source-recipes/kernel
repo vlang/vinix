@@ -1,7 +1,9 @@
 name=kernel
 version=0.0
 source_dir="kernel"
+imagedeps="git"
+allow_network="yes"
 
 regenerate() {
-    true
+    git clone https://github.com/mintsuki/freestanding-headers.git freestanding_headers
 }

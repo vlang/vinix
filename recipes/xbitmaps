@@ -2,10 +2,14 @@ name=xbitmaps
 revision=1
 from_source=xbitmaps
 hostdeps="gcc autoconf automake libtool pkg-config xorg-macros"
-deps="mlibc"
+deps="core-libs"
 
 build() {
-     ${source_dir}/configure --prefix=${prefix} --host=x86_64-vinix
+     ${source_dir}/configure \
+        --prefix=${prefix} \
+        --host=${OS_TRIPLET} \
+        --sysconfdir=/etc \
+        --localstatedir=/var
 
     make -j${parallelism}
 }

@@ -2,7 +2,7 @@ name=libxtrans
 from_source=libxtrans
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-util-macros xorg-proto libxcb"
+deps="core-libs xorg-util-macros xorg-proto libxcb"
 
 build() {
     ${source_dir}/configure           \

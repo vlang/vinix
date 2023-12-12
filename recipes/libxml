@@ -2,15 +2,19 @@ name=libxml
 from_source=libxml
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc zlib"
+deps="core-libs zlib"
 
 build() {
     ${source_dir}/configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-static \
+        --with-sysroot=${sysroot_dir} \
         --without-threads \
-        --disable-ipv6
+        --disable-ipv6 \
+        --without-python
 
     make -j${parallelism}
 }

@@ -1,44 +1,14 @@
 name=gcc
 version=13.2.0
-source_method=tarball
 tarball_url="https://ftp.gnu.org/gnu/gcc/gcc-${version}/gcc-${version}.tar.xz"
 tarball_blake2b="0034b29d3d6cc05821f0c4253ce077805943aff7b370729dd203bda57d89c107edd657eeddc2fb1e69ea15c7b0323b961f46516c7f4af89a3ccf7fea84701be2"
 hostdeps="automake autoconf libtool pkg-config"
+imagedeps="git"
 
 regenerate() {
     for i in "${base_dir}"/patches/gcc-host/*; do
         patch -p1 < "$i"
     done
 
-    libtoolize -cfvi && autoreconf -fvi -I$(realpath ./config)
-    ( cd libiberty && libtoolize -cfvi && autoreconf -fvi -I$(realpath ./config) -I$(realpath ../config) )
-    ( cd intl && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd zlib && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd c++tools && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd fixincludes && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd gnattools && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libada && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libcody && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd gcc && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libgcc && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libcc1 && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libcpp && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd gotools && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libgo && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libgfortran && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libobjc && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libphobos && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libbacktrace && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libdecnumber && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libquadmath && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libffi && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libatomic && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd lto-plugin && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libgomp && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libitm && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    # ( cd liboffloadmic && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libsanitizer && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libssp && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libvtv && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
-    ( cd libstdc++-v3 && libtoolize -cfvi && autoreconf -fvi -I$(realpath ../config) )
+    autotools_recursive_regen -I"$(realpath ./config)"
 }

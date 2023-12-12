@@ -1,6 +1,5 @@
 name=xkbutils
 version=1.0.5
-source_method=tarball
 tarball_url="https://www.x.org/archive/individual/app/xkbutils-${version}.tar.xz"
 tarball_blake2b="ac2572b31638120dd5c5e92497f9cde4b43df7ab0f13882f5f1fbac71084dc112a1f9e34d10adf5a4eb83b1b1636ab2388ae8675be5ac1048a3913ac7b0d7f53"
 hostdeps="automake autoconf libtool pkg-config xorg-macros"

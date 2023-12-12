@@ -2,7 +2,7 @@ name=xkeyboard-config
 from_source=xkeyboard-config
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-proto libx11"
+deps="core-libs xorg-proto libx11"
 imagedeps="python"
 
 build() {
@@ -16,6 +16,7 @@ build() {
 
     make -j${parallelism}
 }
+
 package() {
     DESTDIR="${dest_dir}" make install-strip
 }

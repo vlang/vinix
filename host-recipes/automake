@@ -6,6 +6,7 @@ hostrundeps="autoconf"
 
 build() {
     "${source_dir}"/configure --prefix="${prefix}"
+
     make -j${parallelism}
 }
 

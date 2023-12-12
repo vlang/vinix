@@ -1,14 +1,14 @@
 name=libintl
-version=0.22
-source_method=tarball
+version=0.22.3
 tarball_url="https://ftp.gnu.org/gnu/gettext/gettext-${version}.tar.gz"
-tarball_blake2b="05d71e796c861faac5e5fefaa1d6dc21cdf5602b4f4f2533b10e67853d0be831f4866be539bb0e77bba008e0dac89fec6676a2abeaf7253a12b37a892c6d6826"
+tarball_blake2b="aebe85a82cb94c37ed81e9801acf1e89d150f5992fb9be42d53b3f2734c5c95804f0051fabc26b8d0892dfaf89d18df16d4bca6bcb2e9b95eef5d4ae93a64379"
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    sed -i 's|. $srcdir/version.sh|dnl . $srcdir/version.sh|g' libtextstyle/configure.ac
-    sed -i "s|AC_INIT|AC_INIT([libtextstyle], [${version}], [bug-gettext@gnu.org])|g" libtextstyle/configure.ac
-    sed -i 's|gl_INIT_PACKAGE|dnl gl_INIT_PACKAGE|g' libtextstyle/configure.ac
-
+    ( cd gettext-runtime/libasprintf && libtoolize -cfvi && autoreconf -fvi )
+    ( cd gettext-runtime/intl && libtoolize -cfvi && autoreconf -fvi )
+    ( cd gettext-runtime && libtoolize -cfvi && autoreconf -fvi )
+    ( cd gettext-tools && libtoolize -cfvi && autoreconf -fvi )
+    ( cd libtextstyle && libtoolize -cfvi && autoreconf -fvi )
     libtoolize -cfvi && autoreconf -fvi
 }

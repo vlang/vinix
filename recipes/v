@@ -2,7 +2,7 @@ name=v
 from_source=v
 revision=1
 hostdeps="gcc"
-deps="mlibc"
+deps="core-libs"
 
 build() {
     cp -r ${source_dir}/. ./

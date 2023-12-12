@@ -1,12 +1,10 @@
 name=v
-version=0.4.2
-source_method=git
-clone_url="https://github.com/vlang/v.git"
-tag="master"
-commit="99b5019e9968ee8842744718c23b540fc928f6df"
+version=0.0
+tarball_url="https://github.com/vlang/v/archive/4e213f29edae34c6104fc4db738b214eba079418.tar.gz"
+tarball_blake2b="b79dfd32b6d495e34e3c1b6e70576ca01137dcd4a44d457d2786849ba4190df174e7e328f119b96ea8329f0eb0c925d1c04d4da0e5304ebed65f2cdec95399a5"
 imagedeps="curl"
 allow_network="yes"
 
 regenerate() {
-    curl -o v.c https://raw.githubusercontent.com/vlang/vc/99b5019e9968ee8842744718c23b540fc928f6df/v.c
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/345d13207ed478156069e819eafcbe6983e0b41b/v.c
 }

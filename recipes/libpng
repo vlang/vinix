@@ -2,12 +2,14 @@ name=libpng
 from_source=libpng
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc zlib"
+deps="core-libs zlib"
 
 build() {
     ${source_dir}/configure           \
-        --host=${OS_TRIPLET}          \
+        --host=${OS_TRIPLET}           \
         --prefix=${prefix}            \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-static
 
     make -j${parallelism}

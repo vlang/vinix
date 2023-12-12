@@ -2,12 +2,18 @@ name=libintl
 from_source=libintl
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc-base libiconv"
+deps="mlibc libgcc libstdc++ libiconv"
 
-configure() {
+build() {
+        ACLOCAL=true \
+        AUTOCONF=true \
+        AUTOMAKE=true \
+        AUTOHEADER=true \
     ${source_dir}/configure    \
         --host=${OS_TRIPLET}    \
         --prefix=${prefix}     \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --without-emacs        \
         --without-lispdir      \
         `# Normally this controls nls behavior in general, but the libintl` \
@@ -26,12 +32,14 @@ configure() {
         --without-cvs \
         --without-bzip2 \
         --without-xz
-}
 
-build() {
+    sed -i 's/touch $@//g' gettext-runtime/intl/Makefile
+
     make -C gettext-runtime/intl -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make -C gettext-runtime/intl install-strip
+    # For some reason libintl.so is still not stripped, strip it now.
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libintl.so.8.4.0
 }

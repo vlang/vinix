@@ -2,7 +2,7 @@ name=libxaw
 from_source=libxaw
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-util-macros xorg-proto libx11 libxext libxt libxmu libxpm"
+deps="core-libs xorg-util-macros xorg-proto libx11 libxext libxt libxmu libxpm"
 
 build() {
     ${source_dir}/configure           \

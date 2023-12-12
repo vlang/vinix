@@ -11,4 +11,3 @@ build() {
 package() {
     true
 }
-

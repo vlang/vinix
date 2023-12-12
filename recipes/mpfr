@@ -3,15 +3,16 @@ from_source=mpfr
 revision=1
 imagedeps="gcc"
 hostdeps="gcc autoconf autoconf-archive automake libtool pkg-config"
-deps="mlibc gmp"
+deps="core-libs gmp"
 
 build() {
-    cp -r "${source_dir}"/. ./
-    libtoolize -cfvi && autoreconf -fvi
+    cp -rp "${source_dir}"/. ./
 
     ./configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --enable-static=no \
         --enable-shared=yes \
         --with-pic

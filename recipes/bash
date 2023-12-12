@@ -3,14 +3,17 @@ from_source=bash
 revision=1
 imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc ncurses readline"
+deps="core-libs ncurses readline"
 
 build() {
-    ${source_dir}/configure    \
-        --host=${OS_TRIPLET}    \
-        --prefix=${prefix}     \
+    ${source_dir}/configure \
+        --host=${OS_TRIPLET} \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --without-bash-malloc  \
-        --disable-nls
+        --disable-nls \
+        --with-installed-readline="${sysroot}"/usr/lib
 
     make -j${parallelism}
 }

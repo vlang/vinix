@@ -1,12 +1,33 @@
 name=gcc
 from_source=gcc-host
 revision=1
-hostrundeps="gcc-compiler libgcc libstdc++ binutils"
+imagedeps="gcc"
+hostdeps="autoconf automake libtool pkg-config"
+hostrundeps="binutils"
+deps="mlibc-headers"
 
 build() {
-    true
+    cp -rp "${source_dir}"/. ./
+
+    mkdir build && cd build
+
+        CXXFLAGS_FOR_TARGET="$CFLAGS" \
+        CFLAGS_FOR_TARGET="$CFLAGS" \
+    ../configure \
+        --prefix="${prefix}" \
+        --target=${OS_TRIPLET} \
+        --with-sysroot="${sysroot_dir}" \
+        --disable-nls \
+        --enable-languages=c,c++,lto \
+        --disable-multilib \
+        --enable-initfini-array \
+        --enable-shared \
+        --enable-host-shared
+
+    make -j${parallelism} all-gcc
 }
 
 package() {
-    true
+    cd build
+    DESTDIR="${dest_dir}" make install-gcc
 }

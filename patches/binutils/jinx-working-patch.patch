@@ -1,8 +1,21 @@
+diff --git binutils-clean/bfd/Makefile.am binutils-workdir/bfd/Makefile.am
+index 5c5fdef..3c91651 100644
+--- binutils-clean/bfd/Makefile.am
++++ binutils-workdir/bfd/Makefile.am
+@@ -778,7 +778,7 @@ ofiles: stamp-ofiles ; @true
+ libbfd_la_SOURCES = $(BFD32_LIBS_CFILES)
+ EXTRA_libbfd_la_SOURCES = $(CFILES)
+ libbfd_la_DEPENDENCIES = $(OFILES) ofiles ../libsframe/libsframe.la
+-libbfd_la_LIBADD = `cat ofiles` @SHARED_LIBADD@ $(LIBDL) $(ZLIB) $(ZSTD_LIBS) ../libsframe/libsframe.la
++libbfd_la_LIBADD = `cat ofiles` @SHARED_LIBADD@ $(LIBDL) $(ZLIB) $(ZSTD_LIBS) $(SFRAME_LIB_PATH) ../libsframe/libsframe.la
+ libbfd_la_LDFLAGS += -release `cat libtool-soversion` @SHARED_LDFLAGS@
+ 
+ # This file holds an array associating configuration triplets and
 diff --git binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
-index a4c6c8e..40e75a6 100644
+index bdee539..f5d0cf0 100644
 --- binutils-clean/bfd/config.bfd
 +++ binutils-workdir/bfd/config.bfd
-@@ -655,6 +655,11 @@ case "${targ}" in
+@@ -664,6 +664,11 @@ case "${targ}" in
      targ_selvecs=
      targ64_selvecs=x86_64_elf64_vec
      ;;
@@ -14,8 +27,8 @@ index a4c6c8e..40e75a6 100644
  #ifdef BFD64
    x86_64-*-cloudabi*)
      targ_defvec=x86_64_elf64_cloudabi_vec
-@@ -720,6 +725,11 @@ case "${targ}" in
-     targ_selvecs=i386_elf32_vec
+@@ -734,6 +739,11 @@ case "${targ}" in
+     targ_selvecs="i386_elf32_vec iamcu_elf32_vec x86_64_elf32_vec"
      want64=true
      ;;
 +  x86_64-*-vinix*)
@@ -27,32 +40,45 @@ index a4c6c8e..40e75a6 100644
    i[3-7]86-*-lynxos*)
      targ_defvec=i386_elf32_vec
 diff --git binutils-clean/gas/configure.tgt binutils-workdir/gas/configure.tgt
-index 62f806b..6d6fc9a 100644
+index 3429f85..c0a32cc 100644
 --- binutils-clean/gas/configure.tgt
 +++ binutils-workdir/gas/configure.tgt
-@@ -225,6 +225,7 @@ case ${generic_target} in
+@@ -227,6 +227,7 @@ case ${generic_target} in
    i386-*-beos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
    i386-*-elf*)				fmt=elf ;;
-+  i386-*-vinix*)				fmt=elf ;;
++  i386-*-vinix*)				fmt=elf em=gnu ;;
    i386-*-fuchsia*)			fmt=elf ;;
    i386-*-haiku*)			fmt=elf em=haiku ;;
    i386-*-genode*)			fmt=elf ;;
+diff --git binutils-clean/gprofng/libcollector/configure.ac binutils-workdir/gprofng/libcollector/configure.ac
+index 7af9581..c55e424 100644
+--- binutils-clean/gprofng/libcollector/configure.ac
++++ binutils-workdir/gprofng/libcollector/configure.ac
+@@ -18,7 +18,7 @@ dnl <http://www.gnu.org/licenses/>.
+ 
+ m4_include([../../bfd/version.m4])
+ AC_INIT([gprofng], BFD_VERSION)
+-AC_CONFIG_MACRO_DIRS([../../config ../..])
++#AC_CONFIG_MACRO_DIRS([../../config ../..])
+ AC_CONFIG_AUX_DIR(../..)
+ AC_CANONICAL_TARGET
+ AM_INIT_AUTOMAKE
 diff --git binutils-clean/ld/configure.tgt binutils-workdir/ld/configure.tgt
-index 2bae909..c4db83a 100644
+index c62b958..2d8c473 100644
 --- binutils-clean/ld/configure.tgt
 +++ binutils-workdir/ld/configure.tgt
-@@ -378,6 +378,9 @@ i[3-7]86-*-linux-*) targ_emul=elf_i386
- i[3-7]86-*-redox*)     targ_emul=elf_i386
-                        targ_extra_emuls=elf_x86_64
-                        ;;
-+i[3-7]86-*-vinix*)     targ_emul=elf_i386
-+                       targ_extra_emuls=elf_x86_64
-+                       ;;
-i[3-7]86-*-solaris2*)   targ_emul=elf_x86_64_sol2
-                        targ_extra_emuls="elf_x86_64 elf_i386_sol2 elf_i386_ldso elf_i386 elf_iamcu"
-                        targ_extra_libpath=$targ_extra_emuls
-@@ -1007,6 +1010,9 @@ x86_64-*-linux-*)	targ_emul=elf_x86_64
+@@ -378,6 +378,9 @@ i[3-7]86-*-linux-*)	targ_emul=elf_i386
+ i[3-7]86-*-redox*)	targ_emul=elf_i386
+ 			targ_extra_emuls=elf_x86_64
+ 			;;
++i[3-7]86-*-vinix*)	targ_emul=elf_i386
++			targ_extra_emuls=elf_x86_64
++			;;
+ i[3-7]86-*-solaris2*)	targ_emul=elf_i386_sol2
+ 			targ_extra_emuls="elf_i386_ldso elf_i386 elf_iamcu elf_x86_64_sol2 elf_x86_64"
+ 			targ_extra_libpath=$targ_extra_emuls
+@@ -1011,6 +1014,9 @@ x86_64-*-linux-*)	targ_emul=elf_x86_64
  x86_64-*-redox*)	targ_emul=elf_x86_64
  			targ_extra_emuls=elf_i386
  			;;
@@ -63,7 +89,7 @@ i[3-7]86-*-solaris2*)   targ_emul=elf_x86_64_sol2
  			targ_extra_emuls="elf_x86_64 elf_i386_sol2 elf_i386_ldso elf_i386 elf_iamcu"
  			targ_extra_libpath=$targ_extra_emuls
 diff --git binutils-clean/libiberty/configure.ac binutils-workdir/libiberty/configure.ac
-index 6c1ff9c..78cdadc 100644
+index 0748c59..954e014 100644
 --- binutils-clean/libiberty/configure.ac
 +++ binutils-workdir/libiberty/configure.ac
 @@ -37,7 +37,7 @@ else

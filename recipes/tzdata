@@ -3,7 +3,7 @@ from_source=tzdata
 revision=1
 imagedeps="tzdata"
 hostdeps="gcc binutils"
-deps="mlibc"
+deps="core-libs"
 
 build() {
     cp -r ${source_dir}/. ./

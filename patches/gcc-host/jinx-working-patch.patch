@@ -46,10 +46,10 @@ index 0000000..ca776e9
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff --git gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/config.gcc
-index c5064dd..6bd92e8 100644
+index 6fd1594..0e447e3 100644
 --- gcc-host-clean/gcc/config.gcc
 +++ gcc-host-workdir/gcc/config.gcc
-@@ -824,6 +824,15 @@ case ${target} in
+@@ -840,6 +840,15 @@ case ${target} in
    tmake_file="${tmake_file} t-freebsd"
    target_has_targetdm=yes
    ;;
@@ -65,21 +65,21 @@ index c5064dd..6bd92e8 100644
  *-*-fuchsia*)
    native_system_header_dir=/include
    ;;
-@@ -2242,6 +2251,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
+@@ -2214,6 +2223,9 @@ i[34567]86-*-mingw* | x86_64-*-mingw*)
  			;;
  	esac
  	;;
 +x86_64-*-vinix*)
-+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h vinix.h"
++	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h vinix.h"
 +	;;
  x86_64-*-fuchsia*)
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
 diff --git gcc-host-clean/libgcc/config.host gcc-host-workdir/libgcc/config.host
-index 8c56fca..3a04f87 100644
+index b9975de..1fe0834 100644
 --- gcc-host-clean/libgcc/config.host
 +++ gcc-host-workdir/libgcc/config.host
-@@ -271,6 +271,11 @@ case ${host} in
+@@ -263,6 +263,11 @@ case ${host} in
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
    extra_parts="crtbegin.o crtend.o"
    ;;
@@ -91,7 +91,7 @@ index 8c56fca..3a04f87 100644
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
-@@ -725,6 +730,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
+@@ -697,6 +702,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
@@ -116,10 +116,10 @@ index 2fc9d5d..83d246e 100644
  
  AC_ARG_ENABLE(shared,
 diff --git gcc-host-clean/libiberty/configure.ac gcc-host-workdir/libiberty/configure.ac
-index 84a7b37..24ddb33 100644
+index 28d996f..61ff752 100644
 --- gcc-host-clean/libiberty/configure.ac
 +++ gcc-host-workdir/libiberty/configure.ac
-@@ -36,7 +36,7 @@ else
+@@ -37,7 +37,7 @@ else
    libiberty_topdir="${srcdir}/.."
  fi
  AC_SUBST(libiberty_topdir)
@@ -129,7 +129,7 @@ index 84a7b37..24ddb33 100644
  dnl Very limited version of automake's enable-maintainer-mode
  
 diff --git gcc-host-clean/libstdc++-v3/crossconfig.m4 gcc-host-workdir/libstdc++-v3/crossconfig.m4
-index ae5283b..73bd205 100644
+index b3269cb..3303aaa 100644
 --- gcc-host-clean/libstdc++-v3/crossconfig.m4
 +++ gcc-host-workdir/libstdc++-v3/crossconfig.m4
 @@ -136,6 +136,18 @@ case "${host}" in

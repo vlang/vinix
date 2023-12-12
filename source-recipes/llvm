@@ -1,8 +1,7 @@
 name=llvm
-version=17.0.2
-source_method=tarball
+version=14.0.6
 tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/llvm-project-${version}.src.tar.xz"
-tarball_blake2b="3e93b849d45599ae04f4329ce2aafab9e20d58e931a3c08a6a01ec22a7fdb5febd017ee8343d7c410f84927f3e549d34016cbe8b2db156dbe47ef716b6bba246"
+tarball_blake2b="ee67c5407df8cef493b9c0004f15e428f22a536a17e5f4e3eb29a003b8a8ec0abe0fa3e072591161d5f30ef7d8867c1ce34d1b341ad858e93c00263499941a99"
 
 regenerate() {
     true

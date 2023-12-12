@@ -1,8 +1,8 @@
 diff --git ncurses-clean/configure ncurses-workdir/configure
-index aeb93b8..45a11c4 100755
+index d652dc0..5f9d842 100755
 --- ncurses-clean/configure
 +++ ncurses-workdir/configure
-@@ -6460,6 +6460,10 @@ CF_EOF
+@@ -6923,6 +6923,10 @@ CF_EOF
  		LINK_PROGS="$SHELL ${rel_builddir}/mk_prog.sh"
  		LINK_TESTS="$SHELL ${rel_builddir}/mk_prog.sh"
  		;;

@@ -3,10 +3,9 @@ from_source=kernel
 revision=1
 imagedeps="git"
 hostdeps="gcc binutils v"
-allow_network="yes"
 
 build() {
-    cp -r "${source_dir}"/. ./
+    cp -rpf "${source_dir}"/. ./
 
     make -j${parallelism} CC=x86_64-vinix-gcc LD=x86_64-vinix-ld OBJDUMP=x86_64-vinix-objdump
 }

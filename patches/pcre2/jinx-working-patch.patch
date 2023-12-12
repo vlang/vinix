@@ -1,0 +1,13 @@
+diff --git pcre2-clean/src/sljit/sljitUtils.c pcre2-workdir/src/sljit/sljitUtils.c
+index 967593b..bd6c3ed 100644
+--- pcre2-clean/src/sljit/sljitUtils.c
++++ pcre2-workdir/src/sljit/sljitUtils.c
+@@ -329,7 +329,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_u8 *SLJIT_FUNC sljit_stack_resize(struct sljit_st
+ 		if (aligned_new_start > aligned_old_start) {
+ 			posix_madvise((void*)aligned_old_start, aligned_new_start - aligned_old_start, POSIX_MADV_DONTNEED);
+ #ifdef MADV_FREE
+-			madvise((void*)aligned_old_start, aligned_new_start - aligned_old_start, MADV_FREE);
++			//madvise((void*)aligned_old_start, aligned_new_start - aligned_old_start, MADV_FREE);
+ #endif /* MADV_FREE */
+ 		}
+ 	}

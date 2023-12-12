@@ -1,0 +1,12 @@
+diff --git libx11-clean/configure.ac libx11-workdir/configure.ac
+index d7d506e..1896203 100644
+--- libx11-clean/configure.ac
++++ libx11-workdir/configure.ac
+@@ -1,6 +1,6 @@
+ 
+ # Initialize Autoconf
+-AC_PREREQ([2.70])
++AC_PREREQ([2.69])
+ AC_INIT([libX11], [1.8.7],
+         [https://gitlab.freedesktop.org/xorg/lib/libx11/-/issues], [libX11])
+ AC_CONFIG_SRCDIR([Makefile.am])

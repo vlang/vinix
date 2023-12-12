@@ -1,0 +1,9 @@
+name=pcre2
+version=10.42
+tarball_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${version}/pcre2-${version}.tar.gz"
+tarball_blake2b="19233ee4a63d3bc0828f68c646ecbeb8161c242e52c9242976d80b805d5863699766a8f3a23946ac50ced75f48aad6d948bd9aa3fdc7540bd9193065ea7ee9d1"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

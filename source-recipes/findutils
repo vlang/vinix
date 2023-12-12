@@ -1,0 +1,9 @@
+name=findutils
+version=4.9.0
+tarball_url="https://ftp.gnu.org/gnu/findutils/findutils-${version}.tar.xz"
+tarball_blake2b="3ada8903fc552ad2e580a7b631a4b9d941935b3f4231029564c6f2b7b10ba6f2244e2de57f6d79268c5e0481a193f64edbbae637e7a51ae6f495e3eefabf52c9"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

@@ -1,17 +1,18 @@
-name=file
-from_source=file
+name=make
+from_source=make
 revision=1
-imagedeps="file gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs"
 
 build() {
     cp -rp "${source_dir}"/. ./
 
     ./configure \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \
-        --disable-nls \
-        --disable-static
+        --disable-nls
 
     make -j${parallelism}
 }

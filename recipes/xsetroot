@@ -2,14 +2,18 @@ name=xsetroot
 revision=1
 from_source=xsetroot
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-server libxmu xbitmaps libxcursor"
+deps="core-libs xorg-server libxmu xbitmaps libxcursor"
 
 build() {
-    ${source_dir}/configure --prefix=${prefix} --host=${OS_TRIPLET}
+    ${source_dir}/configure \
+        --prefix=${prefix} \
+        --host=${OS_TRIPLET} \
+        --sysconfdir=/etc \
+        --localstatedir=/var
 
     make -j${parallelism}
 }
 
 package() {
-    make DESTDIR=${dest_dir} install
+    make DESTDIR=${dest_dir} install-strip
 }

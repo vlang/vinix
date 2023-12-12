@@ -1,6 +1,5 @@
 name=xorg-server
 version=1.20.14
-source_method=tarball
 tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
 tarball_blake2b="e60cbb6f3023639598d518fb53e3df3a2aced8f8950279f3a1642ad0a9545bea756574c4d41383cba966dc76c317859065b2290c8420668547f26f1d6e508da3"
 hostdeps="automake autoconf libtool pkg-config xorg-macros xorg-font-util xtrans"

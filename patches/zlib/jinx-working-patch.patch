@@ -1,25 +1,13 @@
-From 99dc3b29156857172a7df5c39a603ccedbf7fd81 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Mon, 18 Apr 2022 05:15:25 +0200
-Subject: [PATCH] Vinix specific changes
-
----
- configure | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/configure b/configure
-index 52ff4a0..25fd2b6 100755
---- a/configure
-+++ b/configure
-@@ -218,7 +218,7 @@ if test "$gcc" -eq 1 && ($cc -c $test.c) >> configure.log 2>&1; then
+diff --git zlib-clean/configure zlib-workdir/configure
+index cc867c9..1bba45a 100755
+--- zlib-clean/configure
++++ zlib-workdir/configure
+@@ -226,7 +226,7 @@ if test "$gcc" -eq 1 && ($cc -c $test.c) >> configure.log 2>&1; then
      uname=`(uname -s || echo unknown) 2>/dev/null`
    fi
    case "$uname" in
--  Linux* | linux* | GNU | GNU/* | solaris*)
-+  Linux* | linux* | GNU | GNU/* | solaris* | vinix*)
-         LDSHARED=${LDSHARED-"$cc -shared -Wl,-soname,libz.so.1,--version-script,${SRCDIR}zlib.map"} ;;
-   *BSD | *bsd* | DragonFly)
-         LDSHARED=${LDSHARED-"$cc -shared -Wl,-soname,libz.so.1,--version-script,${SRCDIR}zlib.map"}
--- 
-2.35.3
-
+-  Linux* | linux* | *-linux* | GNU | GNU/* | solaris*)
++  Linux* | linux* | *-linux* | GNU | GNU/* | solaris* | vinix*)
+         case "$mname" in
+         *sparc*)
+             LDFLAGS="${LDFLAGS} -Wl,--no-warn-rwx-segments" ;;

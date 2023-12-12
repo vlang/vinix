@@ -2,13 +2,15 @@ name=libiconv
 from_source=libiconv
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc-base"
+deps="mlibc libgcc libstdc++"
 imagedeps="binutils"
 
 build() {
     ${source_dir}/configure           \
-        --host=${OS_TRIPLET}          \
+        --host=${OS_TRIPLET}           \
         --prefix=${prefix}            \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --disable-static              \
         --enable-shared               \
         --disable-nls
@@ -18,4 +20,6 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" make install-strip
+
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libcharset.so.1.0.0,libiconv.so.2.6.1}
 }

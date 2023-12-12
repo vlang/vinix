@@ -1,0 +1,28 @@
+name=pcre2
+from_source=pcre2
+revision=1
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs bzip2 ncurses readline zlib"
+
+build() {
+    ${source_dir}/configure \
+        --host=${OS_TRIPLET} \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-static \
+        --with-sysroot=${sysroot_dir} \
+        --enable-unicode \
+        --enable-jit \
+        --enable-pcre2-16 \
+        --enable-pcre2-32 \
+        --enable-pcre2grep-libz \
+        --enable-pcre2grep-libbz2 \
+        --enable-pcre2test-libreadline
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install-strip
+}

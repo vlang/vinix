@@ -1,30 +1,20 @@
-From 63821b6c4b72ea4913da1a4b804fd0b8bbbb03d7 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Sat, 14 May 2022 19:07:26 +0200
-Subject: [PATCH] Vinix specific changes
-
----
- include/X11/Xos.h   | 2 +-
- include/X11/Xos_r.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/include/X11/Xos.h b/include/X11/Xos.h
-index 28dfc67..841e7ee 100644
---- a/include/X11/Xos.h
-+++ b/include/X11/Xos.h
+diff --git xorg-proto-clean/include/X11/Xos.h xorg-proto-workdir/include/X11/Xos.h
+index 75cc5b7..6c46e33 100644
+--- xorg-proto-clean/include/X11/Xos.h
++++ xorg-proto-workdir/include/X11/Xos.h
 @@ -60,7 +60,7 @@ in this Software without prior written authorization from The Open Group.
   */
  
  # include <string.h>
--# if defined(__SCO__) || defined(__UNIXWARE__) || defined(__sun) || defined(__CYGWIN__) || defined(_AIX) || defined(__APPLE__)
-+# if defined(__SCO__) || defined(__UNIXWARE__) || defined(__sun) || defined(__CYGWIN__) || defined(_AIX) || defined(__APPLE__) || defined(__vinix__)
+-# if defined(__SCO__) || defined(__UNIXWARE__) || defined(__sun) || defined(__CYGWIN__) || defined(_AIX) || defined(__APPLE__) || defined(__FreeBSD__)
++# if defined(__SCO__) || defined(__UNIXWARE__) || defined(__sun) || defined(__CYGWIN__) || defined(_AIX) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__vinix__)
  #  include <strings.h>
  # else
  #  ifndef index
-diff --git a/include/X11/Xos_r.h b/include/X11/Xos_r.h
-index f963b64..5ade17b 100644
---- a/include/X11/Xos_r.h
-+++ b/include/X11/Xos_r.h
+diff --git xorg-proto-clean/include/X11/Xos_r.h xorg-proto-workdir/include/X11/Xos_r.h
+index f963b64..542c19d 100644
+--- xorg-proto-clean/include/X11/Xos_r.h
++++ xorg-proto-workdir/include/X11/Xos_r.h
 @@ -318,7 +318,7 @@ static __inline__ void _Xpw_copyPasswd(_Xgetpwparams p)
    (_Xos_processUnlock), \
    (p).pwp )
@@ -34,6 +24,3 @@ index f963b64..5ade17b 100644
  # define X_NEEDS_PWPARAMS
  typedef struct {
    struct passwd pws;
--- 
-2.35.1
-

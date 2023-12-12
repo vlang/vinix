@@ -2,7 +2,7 @@ name=zlib
 from_source=zlib
 revision=1
 hostdeps="gcc pkg-config"
-deps="mlibc"
+deps="core-libs"
 
 build() {
         prefix="${prefix}" \
@@ -12,8 +12,10 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
+
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libz.so.1.3
 }

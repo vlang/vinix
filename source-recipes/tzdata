@@ -1,9 +1,7 @@
 name=tzdata
-version=2022f
-source_method=tarball
+version=2023c
 tarball_url="https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz"
-tarball_blake2b="8081972005ac84034957bb85013b373df67937c3f811e33c44fad7ecee0f504b946766fdb1f525d0512b9a8d8e727ee3d8d44640ff55bed3fcd1f3fb3c464c17"
-allow_network="yes"
+tarball_blake2b="8a50aa5f338565d86b8fa5428c138b251bd8dcc3ea66c144b49625d02c5c7aa27f1ace66babd36f10f75cf5eb832ec327b9c2e8adb0384c450130d1ee8c45562"
 
 regenerate() {
     true

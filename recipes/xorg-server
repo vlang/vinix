@@ -2,7 +2,7 @@ name=xorg-server
 from_source=xorg-server
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-util-macros xorg-proto xcb-proto libxtrans libxshmfence libx11 libxxf86vm libxkbfile libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xkbcomp pixman"
+deps="core-libs xorg-util-macros xorg-proto xcb-proto libxtrans libxshmfence libx11 libxxf86vm libxkbfile libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xkbcomp pixman"
 
 build() {
         CFLAGS="-Wno-error=array-bounds ${common_flags}" \
@@ -44,6 +44,6 @@ build() {
     make -j${parallelism}
 }
 
-build() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 }

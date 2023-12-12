@@ -3,12 +3,14 @@ from_source=gmp
 revision=1
 imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc"
+deps="core-libs"
 
 build() {
     ${source_dir}/configure           \
-        --host=x86_64-vinix           \
+        --host=${OS_TRIPLET}           \
         --prefix=${prefix}            \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --enable-cxx                  \
         --disable-static              \
         --with-sysroot=${sysroot_dir}

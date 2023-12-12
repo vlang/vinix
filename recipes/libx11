@@ -2,7 +2,7 @@ name=libx11
 from_source=libx11
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc xorg-util-macros xorg-proto libxcb libxtrans"
+deps="core-libs xorg-util-macros xorg-proto libxcb libxtrans"
 imagedeps="gcc"
 
 build() {

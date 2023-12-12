@@ -2,7 +2,7 @@ name=mesa
 from_source=mesa
 revision=1
 hostdeps="gcc pkg-config"
-deps="mlibc llvm zlib libxshmfence libxrandr libxdamage libxxf86vm libxfixes libx11 libxext libxcb libexpat"
+deps="core-libs llvm zlib libxshmfence libxrandr libxdamage libxxf86vm libxfixes libx11 libxext libxcb libexpat"
 imagedeps="binutils meson ninja python-mako"
 
 build() {
@@ -16,4 +16,6 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
+
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libGL.so.1.5.0,libGLESv1_CM.so.1.1.0,libGLESv2.so.2.0.0,libglapi.so.0.0.0}
 }

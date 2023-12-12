@@ -1,0 +1,9 @@
+name=make
+version=4.4.1
+tarball_url="https://ftp.gnu.org/gnu/make/make-${version}.tar.gz"
+tarball_blake2b="09a4ad8060259e36854b525ab610fd317a86f4926e44e3ab8adba75dccc8d4b445df9dd25ccfb4c25a54bc0e98238a9127e36401d74cbc3503a329eadcdf4995"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

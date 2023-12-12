@@ -1,0 +1,35 @@
+diff --git libxt-clean/aclocal.m4 libxt-workdir/aclocal.m4
+index c1fd0eb..0f2459b 100644
+--- libxt-clean/aclocal.m4
++++ libxt-workdir/aclocal.m4
+@@ -2961,7 +2961,7 @@ AC_LANG_CASE(
+ 	[C], [
+ 		dnl autoconf-2.70 folded AC_PROG_CC_C99 into AC_PROG_CC
+ 		dnl and complains that AC_PROG_CC_C99 is obsolete
+-		m4_version_prereq([2.70],
++		m4_version_prereq([2.69],
+ 			[AC_REQUIRE([AC_PROG_CC])],
+ 			[AC_REQUIRE([AC_PROG_CC_C99])])
+ 	],
+@@ -2997,7 +2997,7 @@ AC_LANG_CASE(
+ 	[C], [
+ 		dnl autoconf-2.70 folded AC_PROG_CC_C99 into AC_PROG_CC
+ 		dnl and complains that AC_PROG_CC_C99 is obsolete
+-		m4_version_prereq([2.70],
++		m4_version_prereq([2.69],
+ 			[AC_REQUIRE([AC_PROG_CC])],
+ 			[AC_REQUIRE([AC_PROG_CC_C99])])
+ 		define([PREFIX], [C])
+diff --git libxt-clean/configure.ac libxt-workdir/configure.ac
+index d7c7dc0..1dddd9e 100644
+--- libxt-clean/configure.ac
++++ libxt-workdir/configure.ac
+@@ -22,7 +22,7 @@
+ #
+ 
+ # Initialize Autoconf
+-AC_PREREQ([2.70])
++AC_PREREQ([2.69])
+ AC_INIT([libXt], [1.3.0],
+ 	[https://gitlab.freedesktop.org/xorg/lib/libxt/-/issues/], [libXt])
+ AC_CONFIG_SRCDIR([Makefile.am])

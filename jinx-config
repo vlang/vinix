@@ -1,7 +1,7 @@
 JINX_MAJOR_VER=0.2
 
-export CFLAGS="-O2 -pipe -fcf-protection"
-export CXXFLAGS="$CFLAGS"
+export CFLAGS="-O2 -pipe -march=x86-64 -mtune=generic"
+export CXXFLAGS="${CFLAGS}"
 
 OS_TRIPLET=x86_64-vinix
 
@@ -11,3 +11,5 @@ autotools_recursive_regen() {
         ( cd "$(dirname "$f")" && libtoolize -cfvi && autoreconf -fvi "$@" )
     done
 }
+
+export VMODULES="/tmp/.vmodules"

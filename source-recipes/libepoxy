@@ -1,6 +1,5 @@
 name=libepoxy
 version=1.5.10
-source_method=tarball
 tarball_url="https://download.gnome.org/sources/libepoxy/1.5/libepoxy-${version}.tar.xz"
 tarball_blake2b="105267b1b19acf8c86e5e9d23741dfc738e014de4f0b30f88e7ec22f98497cc8e006d729f17b5698780ca1dd782bad99f73ae685b2bf882b77670bb6c4b959c9"
 
