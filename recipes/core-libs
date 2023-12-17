@@ -5,8 +5,6 @@ deps="mlibc libgcc libstdc++ libintl libiconv libxcrypt"
 
 build() {
     true
-
-    true
 }
 
 package() {
