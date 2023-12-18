@@ -13,4 +13,5 @@ autotools_recursive_regen() {
 }
 
 export VMODULES="/tmp/.vmodules"
-mkdir -p "${VMODULES}"
+mkdir -p "${VMODULES}"/cache
+mkdir -p /tmp/v_$(id -u)
