@@ -12,7 +12,7 @@ fn leave(context &cpulocal.GPRState) {
 		cli
 	}
 
-	userland.dispatch_a_signal(context)
+	//userland.dispatch_a_signal(context)
 }
 
 @[_naked]

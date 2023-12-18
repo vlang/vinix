@@ -43,7 +43,7 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 			lock
 			cmpxchg here, writethis
 			; +a (ifthis)
-			  +m (here[0]) as here
+			  +m (*here) as here
 			  =@ccz (ret)
 			; r (writethis)
 			; memory

@@ -44,7 +44,7 @@ pub fn (mut l Lock) release() {
 pub fn (mut l Lock) test_and_acquire() bool {
 	caller := u64(C.__builtin_return_address(0))
 
-	ret := katomic.cas(l.l, false, true)
+	ret := katomic.cas(&l.l, false, true)
 	if ret == true {
 		l.caller = caller
 	}

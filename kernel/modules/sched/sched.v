@@ -142,7 +142,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	new_gpr_state := &current_thread.gpr_state
 
 	if new_gpr_state.cs == user_code_seg {
-		C.userland__dispatch_a_signal(new_gpr_state)
+		//C.userland__dispatch_a_signal(new_gpr_state)
 	}
 
 	asm volatile amd64 {
@@ -186,7 +186,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	katomic.store(t.enqueued_by_signal, by_signal)
 
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
-		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(0), u64(t)) {
+		if katomic.cas(voidptr(&scheduler_running_queue[i]), voidptr(0), voidptr(t)) {
 			t.is_in_queue = true
 
 			// Check if any CPU is idle and wake it up
@@ -212,7 +212,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 	}
 
 	for i := u64(0); i < scheduler_running_queue.len; i++ {
-		if katomic.cas(voidptr(&scheduler_running_queue[i]), u64(t), u64(0)) {
+		if katomic.cas(voidptr(&scheduler_running_queue[i]), voidptr(t), voidptr(0)) {
 			t.is_in_queue = false
 			return true
 		}

@@ -93,7 +93,7 @@ __global (
 
 pub fn allocate_pid(process &Process) ?int {
 	for i := int(1); i < 65536; i++ {
-		if katomic.cas(voidptr(&processes[i]), u64(0), u64(process)) {
+		if katomic.cas(voidptr(&processes[i]), voidptr(0), voidptr(process)) {
 			return i
 		}
 	}

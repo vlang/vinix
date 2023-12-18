@@ -67,6 +67,7 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 }
 
 pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
+	/*
 	mut pagemap := unsafe { _pagemap }
 
 	pagemap.l.acquire()
@@ -78,6 +79,7 @@ pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
 	}
 
 	unsafe { free(pagemap) }
+	*/
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {

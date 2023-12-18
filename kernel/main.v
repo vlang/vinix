@@ -110,7 +110,7 @@ pub fn kmain() {
 
 	sched.initialise()
 
-	go kmain_thread()
+	spawn kmain_thread()
 
 	sched.await()
 }
