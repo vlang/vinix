@@ -54,8 +54,6 @@ override INTERNALCFLAGS :=        \
 	-Wno-unused-function          \
 	-Wno-unused-variable          \
 	-Wno-unused-parameter         \
-	-DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES=1 \
-	-DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD=1 \
 	-DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
 	-DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
 	-Ifreestanding_headers        \

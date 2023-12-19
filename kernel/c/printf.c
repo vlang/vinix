@@ -26,12 +26,26 @@ void putchar_(char c) {
   putchar_func(c);
 }
 
-int printf_panic(char *fmt, ...) {
+void klock__Lock_acquire(void *);
+void klock__Lock_release(void *);
+extern char printf_lock;
+
+int printf(const char *fmt, ...) {
+  va_list l;
+  va_start(l, fmt);
+  klock__Lock_acquire(&printf_lock);
+  int ret = vprintf_(fmt, l);
+  klock__Lock_release(&printf_lock);
+  va_end(l);
+  return ret;
+}
+
+int printf_panic(const char *fmt, ...) {
   va_list l;
   va_start(l, fmt);
   void (*old_func)(char) = putchar_func;
   putchar_func = _putchar_panic;
-  int ret = vprintf(fmt, l);
+  int ret = vprintf_(fmt, l);
   va_end(l);
   putchar_func = old_func;
   return ret;
