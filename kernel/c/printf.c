@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include <printf/printf.h>
+
 void dev__serial__out(char);
 void dev__serial__panic_out(char);
 void term__print(const char *, uint64_t);
