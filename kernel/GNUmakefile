@@ -109,21 +109,21 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf freestanding_headers flanterm-c
+	rm -rf freestanding_headers flanterm-c c/printf
 
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)/boot"
 	install -s --strip-program=x86_64-vinix-strip $(KERNEL) "$(DESTDIR)$(PREFIX)/boot/"
 
-blob.o: $(VFILES) freestanding_headers flanterm-c
+blob.o: $(VFILES) freestanding_headers flanterm-c c/printf
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
 
-%.o: %.c freestanding_headers flanterm-c
+%.o: %.c freestanding_headers flanterm-c c/printf
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-%.o: %.S freestanding_headers flanterm-c
+%.o: %.S freestanding_headers flanterm-c c/printf
 	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(KERNEL): blob.o $(COBJ)
