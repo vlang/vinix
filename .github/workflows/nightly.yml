@@ -1,36 +1,51 @@
 name: Nightly Vinix rebuild
 
-#on:
-#  schedule:
-#    - cron: '0 0 * * *'
-
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   vinix-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Unshallow repo tags
+        run: git fetch --prune --unshallow --tags
+
+      - name: Check if build is necessary
+        run: test "$(git tag --points-at HEAD)" = ""
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install build-essential make curl git mercurial libarchive-tools xorriso -y
+        run: sudo apt-get update && sudo apt-get install make curl git mercurial libarchive-tools xorriso -y
 
-      - name: Build distro
-        run: make -j distro-full
+      #- name: Build distro
+      #  run: make distro-full
+
+      #- name: Build ISO
+      #  run: make all
+
+      #- name: Rename vinix.iso
+      #  run: mv vinix.iso vinix-nightly-full-$(date +'%Y%m%d').iso
+
+      #- name: Distclean
+      #  run: make distclean
+
+      - name: Build base distro
+        run: make distro-base
 
       - name: Build ISO
-        run: make -j all
+        run: make all
+
+      - name: Rename vinix.iso
+        run: mv vinix.iso vinix-nightly-base-$(date +'%Y%m%d').iso
 
       - name: Set TAG_DATE variable
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Tag new nightly release
         run: git tag nightly-$TAG_DATE && git push --tags
-
-      - name: Rename vinix.iso
-        run: mv vinix.iso vinix-nightly-$(date +'%Y%m%d').iso
 
       - name: Create nightly release
         uses: softprops/action-gh-release@v1
