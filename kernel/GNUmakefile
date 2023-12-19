@@ -54,13 +54,17 @@ override INTERNALCFLAGS :=        \
 	-Wno-unused-function          \
 	-Wno-unused-variable          \
 	-Wno-unused-parameter         \
+	-DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES=1 \
+	-DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD=1 \
+	-DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
+	-DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
 	-Ifreestanding_headers        \
 	-Ic
 
 override INTERNALLDFLAGS :=  \
 	-Tlinker.ld              \
 	-nostdlib                \
-	-zmax-page-size=0x200000 \
+	-zmax-page-size=0x1000   \
 	-static                  \
 	-gc-sections
 
@@ -91,6 +95,13 @@ freestanding_headers:
 
 flanterm-c:
 	git clone https://github.com/mintsuki/flanterm.git flanterm-c
+	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
+	exit 0
+
+c/printf:
+	mkdir -p c/printf
+	curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/develop/src/printf/printf.c
+	curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/develop/src/printf/printf.h
 	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
 	exit 0
 

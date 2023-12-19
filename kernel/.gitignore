@@ -2,3 +2,4 @@
 /modules/trace/symbol.v
 /freestanding_headers
 /flanterm-c
+/c/printf
