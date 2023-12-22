@@ -7,15 +7,15 @@ module public
 import resource { Resource }
 
 pub const (
-	af_inet = 1
-	af_inet6 = 2
-	af_unix = 3
-	af_local = 3
-	af_unspec = 4
-	af_netlink = 5
+	af_inet = 2
+	af_inet6 = 10
+	af_unix = 1
+	af_local = 1
+	af_unspec = 0
+	af_netlink = 16
 
-	sock_nonblock = 0x10000
-	sock_cloexec = 0x20000
+	sock_nonblock = 0o4000
+	sock_cloexec = 0o2000000
 )
 
 pub interface Socket {
@@ -39,9 +39,9 @@ pub mut:
 pub struct MsgHdr {
 pub mut:
 	msg_name voidptr
-	msg_namelen u64
+	msg_namelen u32
 	msg_iov &IoVec
-	msg_iovlen int
+	msg_iovlen u64
 	msg_control voidptr
 	msg_controllen u64
 	msg_flags int

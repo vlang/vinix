@@ -18,31 +18,31 @@ pub const (
 	ifpipe = 0x3000
 )
 
-pub fn isblk(mode int) bool {
+pub fn isblk(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ifblk
 }
 
-pub fn ischr(mode int) bool {
+pub fn ischr(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ifchr
 }
 
-pub fn isifo(mode int) bool {
+pub fn isifo(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ififo
 }
 
-pub fn isreg(mode int) bool {
+pub fn isreg(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ifreg
 }
 
-pub fn isdir(mode int) bool {
+pub fn isdir(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ifdir
 }
 
-pub fn islnk(mode int) bool {
+pub fn islnk(mode u32) bool {
 	return (mode & stat.ifmt) == stat.iflnk
 }
 
-pub fn issock(mode int) bool {
+pub fn issock(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ifsock
 }
 
@@ -50,17 +50,19 @@ pub struct Stat {
 pub mut:
 	dev     u64
 	ino     u64
-	mode    int
-	nlink   int
-	uid     int
-	gid     int
+	nlink   u64
+	mode    u32
+	uid     u32
+	gid     u32
+	pad0    u32
 	rdev    u64
-	size    u64
+	size    i64
+	blksize i64
+	blocks  i64
 	atim    time.TimeSpec
 	mtim    time.TimeSpec
 	ctim    time.TimeSpec
-	blksize u64
-	blocks  u64
+	pad1    [3]i64
 }
 
 pub const (

@@ -17,11 +17,11 @@ pub const (
 	prot_read     = 0x01
 	prot_write    = 0x02
 	prot_exec     = 0x04
-	map_private   = 0x01
-	map_shared    = 0x02
-	map_fixed     = 0x04
-	map_anon      = 0x08
-	map_anonymous = 0x08
+	map_private   = 0x02
+	map_shared    = 0x01
+	map_fixed     = 0x10
+	map_anon      = 0x20
+	map_anonymous = 0x20
 )
 
 pub struct MmapRangeLocal {
@@ -66,20 +66,16 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	return none
 }
 
-pub fn delete_pagemap(_pagemap &memory.Pagemap) ? {
-	/*
-	mut pagemap := unsafe { _pagemap }
-
+pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 	pagemap.l.acquire()
 
 	for ptr in pagemap.mmap_ranges {
 		local_range := unsafe { &MmapRangeLocal(ptr) }
 
-		munmap(pagemap, voidptr(local_range.base), local_range.length) or { return none }
+		munmap(pagemap, voidptr(local_range.base), local_range.length) or { }
 	}
 
 	unsafe { free(pagemap) }
-	*/
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {

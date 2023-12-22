@@ -16,17 +16,17 @@ import memory.mmap
 import time
 
 pub const (
-	f_dupfd         = 1
-	f_dupfd_cloexec = 2
-	f_getfd         = 3
-	f_setfd         = 4
-	f_getfl         = 5
-	f_setfl         = 6
-	f_getlk         = 7
-	f_setlk         = 8
-	f_setlkw        = 9
-	f_getown        = 10
-	f_setown        = 11
+	f_dupfd         = 0
+	f_dupfd_cloexec = 1030
+	f_getfd         = 1
+	f_setfd         = 2
+	f_getfl         = 3
+	f_setfl         = 4
+	f_getlk         = 5
+	f_setlk         = 6
+	f_setlkw        = 7
+	f_getown        = 8
+	f_setown        = 9
 
 	fd_cloexec      = 1
 )
@@ -53,13 +53,13 @@ mut:
 
 pub const (
 	pollin     = 0x01
-	pollout    = 0x02
-	pollpri    = 0x04
-	pollhup    = 0x08
-	pollerr    = 0x10
-	pollrdhup  = 0x20
-	pollnval   = 0x40
-	pollwrnorm = 0x80
+	pollout    = 0x04
+	pollpri    = 0x02
+	pollhup    = 0x10
+	pollerr    = 0x08
+	pollrdhup  = 0x2000
+	pollnval   = 0x20
+	pollwrnorm = 0x100
 )
 
 pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {

@@ -55,7 +55,7 @@ fn (mut this TmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64
 	mut actual_count := count
 
 	if loc + count > this.stat.size {
-		actual_count = count - ((loc + count) - this.stat.size)
+		actual_count = u64(count - ((loc + count) - this.stat.size))
 	}
 
 	unsafe { C.memcpy(buf, &this.storage[loc], actual_count) }
@@ -139,7 +139,7 @@ fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
 	this.capacity = new_capacity
 
 	this.stat.size = new_size
-	this.stat.blocks = lib.div_roundup(new_size, this.stat.blksize)
+	this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
 }
 
 struct TmpFS {
@@ -160,7 +160,7 @@ fn (mut this TmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNo
 	return this.create(parent, name, 0o644 | stat.ifdir)
 }
 
-fn (mut this TmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
+fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &TmpFSResource{

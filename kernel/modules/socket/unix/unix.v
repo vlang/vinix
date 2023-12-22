@@ -21,7 +21,7 @@ pub const sock_buf = 0x100000
 
 pub struct SockaddrUn {
 pub mut:
-	sun_family u32
+	sun_family u16
 	sun_path   [108]u8
 }
 

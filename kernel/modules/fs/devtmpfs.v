@@ -54,7 +54,7 @@ fn (mut this DevTmpFSResource) read(handle voidptr, buf voidptr, loc u64, count 
 
 	mut actual_count := count
 	if loc + count > this.stat.size {
-		actual_count = count - ((loc + count) - this.stat.size)
+		actual_count = u64(count - ((loc + count) - this.stat.size))
 	}
 
 	unsafe { C.memcpy(buf, &this.storage[loc], actual_count) }
@@ -133,7 +133,7 @@ fn (mut this DevTmpFSResource) grow(handle voidptr, new_size u64) ? {
 	this.capacity = new_capacity
 
 	this.stat.size = new_size
-	this.stat.blocks = lib.div_roundup(new_size, this.stat.blksize)
+	this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
 }
 
 struct DevTmpFS {}
@@ -163,7 +163,7 @@ fn (mut this DevTmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VF
 }
 
 // TODO	should it be maybe `mut parent`? doesn't `create_node` mutate `parent` in `unsafe`(passing it to `mut` field)?
-fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode int) &VFSNode {
+fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &DevTmpFSResource{

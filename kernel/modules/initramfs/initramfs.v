@@ -109,12 +109,12 @@ pub fn initialise() {
 				name_override = unsafe { tos(voidptr(u64(current_header) + 512), int(size)) }
 			}
 			.directory {
-				fs.create(vfs_root, name, int(mode) | stat.ifdir) or {
+				fs.create(vfs_root, name, u32(mode | stat.ifdir)) or {
 					panic('initramfs: failed to create directory $name')
 				}
 			}
 			.regular_file {
-				new_node := fs.create(vfs_root, name, int(mode) | stat.ifreg) or {
+				new_node := fs.create(vfs_root, name, u32(mode | stat.ifreg)) or {
 					panic('initramfs: failed to create file $name')
 				}
 				mut new_resource := new_node.resource

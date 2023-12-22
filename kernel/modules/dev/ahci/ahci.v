@@ -195,17 +195,17 @@ fn (mut dev AHCIDevice) read(handle voidptr, buffer voidptr, loc u64, count u64)
 	start_blk := loc / dev.stat.blksize
 	page_cnt := count / dev.stat.blksize
 
-	aligned_buffer := voidptr(u64(memory.pmm_alloc(page_cnt)) + higher_half)
+	aligned_buffer := voidptr(u64(memory.pmm_alloc(u64(page_cnt))) + higher_half)
 
-	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, false) == -1 {
+	if dev.rw_lba(aligned_buffer, u64(start_blk), u64(page_cnt), false) == -1 {
 		errno.set(errno.eio)
-		memory.pmm_free(aligned_buffer, page_cnt)
+		memory.pmm_free(aligned_buffer, u64(page_cnt))
 		return none
 	}
 
 	unsafe { C.memcpy(buffer, aligned_buffer, count) }
 
-	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), page_cnt)
+	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), u64(page_cnt))
 
 	return i64(count)
 }
@@ -219,16 +219,16 @@ fn (mut dev AHCIDevice) write(handle voidptr, buffer voidptr, loc u64, count u64
 	start_blk := loc / dev.stat.blksize
 	page_cnt := count / dev.stat.blksize
 
-	aligned_buffer := voidptr(u64(memory.pmm_alloc(page_cnt)) + higher_half)
+	aligned_buffer := voidptr(u64(memory.pmm_alloc(u64(page_cnt))) + higher_half)
 	unsafe { C.memcpy(aligned_buffer, buffer, count) }
 
-	if dev.rw_lba(aligned_buffer, start_blk, page_cnt, true) == -1 {
+	if dev.rw_lba(aligned_buffer, u64(start_blk), u64(page_cnt), true) == -1 {
 		errno.set(errno.eio)
-		memory.pmm_free(aligned_buffer, page_cnt)
+		memory.pmm_free(aligned_buffer, u64(page_cnt))
 		return none
 	}
 
-	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), page_cnt)
+	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), u64(page_cnt))
 
 	return i64(count)
 }

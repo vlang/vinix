@@ -21,7 +21,7 @@ import lib
 import strings
 import resource
 
-pub const wnohang = 2
+pub const wnohang = 1
 
 pub const sig_block = 1
 
@@ -492,9 +492,9 @@ pub fn syscall_exit(_ voidptr, status int) {
 		}
 	}
 
-	mmap.delete_pagemap(old_pagemap) or {}
+	mmap.delete_pagemap(mut old_pagemap) or {}
 
-	katomic.store(current_process.status, status | 0x200)
+	katomic.store(current_process.status, status << 8)
 	event.trigger(mut current_process.event, false)
 
 	sched.dequeue_and_die()
@@ -661,7 +661,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		kernel_pagemap.switch_to()
 		t.process = kernel_process
 
-		mmap.delete_pagemap(old_pagemap) ?
+		mmap.delete_pagemap(mut old_pagemap) ?
 
 		process.thread_stack_top = u64(0x70000000000)
 		process.mmap_anon_non_fixed_base = u64(0x80000000000)

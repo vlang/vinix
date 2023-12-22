@@ -1392,11 +1392,11 @@ index 0000000..f421220
 +}
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/access.h mlibc-workdir/sysdeps/vinix/include/abi-bits/access.h
 new file mode 120000
-index 0000000..171f75f
+index 0000000..cb83931
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/access.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/access.h
++../../../../abis/linux/access.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h mlibc-workdir/sysdeps/vinix/include/abi-bits/auxv.h
 new file mode 120000
@@ -1408,59 +1408,59 @@ index 0000000..c43f878
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h
 new file mode 120000
-index 0000000..e9d9f1b
+index 0000000..0b0ec27
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/blkcnt_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/blkcnt_t.h
++../../../../abis/linux/blkcnt_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h
 new file mode 120000
-index 0000000..c6dfb6e
+index 0000000..7dc8d7c
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/blksize_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/blksize_t.h
++../../../../abis/linux/blksize_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/clockid_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/clockid_t.h
 new file mode 120000
-index 0000000..71f37bb
+index 0000000..6a42da5
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/clockid_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/clockid_t.h
++../../../../abis/linux/clockid_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h
 new file mode 120000
-index 0000000..0c1143b
+index 0000000..bca881e
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/dev_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/dev_t.h
++../../../../abis/linux/dev_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/epoll.h mlibc-workdir/sysdeps/vinix/include/abi-bits/epoll.h
 new file mode 120000
-index 0000000..9efc3a0
+index 0000000..eb4b76d
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/epoll.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/epoll.h
++../../../../abis/linux/epoll.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h
 new file mode 120000
-index 0000000..589859f
+index 0000000..6e507de
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/errno.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/errno.h
++../../../../abis/linux/errno.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h
 new file mode 120000
-index 0000000..ea5323a
+index 0000000..463e2c9
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/fcntl.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/fcntl.h
++../../../../abis/linux/fcntl.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/fsblkcnt_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/fsblkcnt_t.h
 new file mode 120000
@@ -1480,35 +1480,35 @@ index 0000000..791755c
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h
 new file mode 120000
-index 0000000..6a77218
+index 0000000..abce6d6
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/gid_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/gid_t.h
++../../../../abis/linux/gid_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h
 new file mode 120000
-index 0000000..b58c683
+index 0000000..418d1d5
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/in.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/in.h
++../../../../abis/linux/in.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h
 new file mode 120000
-index 0000000..10d644e
+index 0000000..4c20aca
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/ino_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/ino_t.h
++../../../../abis/linux/ino_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/inotify.h mlibc-workdir/sysdeps/vinix/include/abi-bits/inotify.h
 new file mode 120000
-index 0000000..3f19ef6
+index 0000000..b5cb282
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/inotify.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/inotify.h
++../../../../abis/linux/inotify.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/ioctls.h mlibc-workdir/sysdeps/vinix/include/abi-bits/ioctls.h
 new file mode 120000
@@ -1520,19 +1520,19 @@ index 0000000..595106b
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/limits.h mlibc-workdir/sysdeps/vinix/include/abi-bits/limits.h
 new file mode 120000
-index 0000000..1aa5894
+index 0000000..6c88db2
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/limits.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/limits.h
++../../../../abis/linux/limits.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
 new file mode 120000
-index 0000000..29d7733
+index 0000000..5d78fdf
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/mode_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/mode_t.h
++../../../../abis/linux/mode_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/mqueue.h mlibc-workdir/sysdeps/vinix/include/abi-bits/mqueue.h
 new file mode 120000
@@ -1552,43 +1552,43 @@ index 0000000..f402b49
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h
 new file mode 120000
-index 0000000..7618c27
+index 0000000..bb3b625
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/nlink_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/nlink_t.h
++../../../../abis/linux/nlink_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/packet.h mlibc-workdir/sysdeps/vinix/include/abi-bits/packet.h
 new file mode 120000
-index 0000000..47067e2
+index 0000000..998ef1a
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/packet.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/packet.h
++../../../../abis/linux/packet.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h
 new file mode 120000
-index 0000000..3fd26a7
+index 0000000..baa90f6
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/pid_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/pid_t.h
++../../../../abis/linux/pid_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/poll.h mlibc-workdir/sysdeps/vinix/include/abi-bits/poll.h
 new file mode 120000
-index 0000000..ab989c7
+index 0000000..8ea6a0a
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/poll.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/poll.h
++../../../../abis/linux/poll.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/ptrace.h mlibc-workdir/sysdeps/vinix/include/abi-bits/ptrace.h
 new file mode 120000
-index 0000000..f391fb7
+index 0000000..b2517b2
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/ptrace.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/ptrace.h
++../../../../abis/linux/ptrace.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h mlibc-workdir/sysdeps/vinix/include/abi-bits/reboot.h
 new file mode 120000
@@ -1600,19 +1600,19 @@ index 0000000..77013a4
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h
 new file mode 120000
-index 0000000..3e59c75
+index 0000000..88d7402
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/resource.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/resource.h
++../../../../abis/linux/resource.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h
 new file mode 120000
-index 0000000..3bd41ef
+index 0000000..df7bccf
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/seek-whence.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/seek-whence.h
++../../../../abis/linux/seek-whence.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/shm.h mlibc-workdir/sysdeps/vinix/include/abi-bits/shm.h
 new file mode 120000
@@ -1632,11 +1632,11 @@ index 0000000..709546b
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h
 new file mode 120000
-index 0000000..0e1d6be
+index 0000000..f1dc016
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/socket.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/socket.h
++../../../../abis/linux/socket.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/socklen_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/socklen_t.h
 new file mode 120000
@@ -1648,11 +1648,11 @@ index 0000000..41f3b11
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h
 new file mode 120000
-index 0000000..82642c3
+index 0000000..1f63b41
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/stat.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/stat.h
++../../../../abis/linux/stat.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/statfs.h mlibc-workdir/sysdeps/vinix/include/abi-bits/statfs.h
 new file mode 120000
@@ -1680,51 +1680,51 @@ index 0000000..9ed6597
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h
 new file mode 120000
-index 0000000..cfcfe76
+index 0000000..ee8f0b0
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/termios.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/termios.h
++../../../../abis/linux/termios.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h
 new file mode 120000
-index 0000000..97f3d52
+index 0000000..2a02625
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/time.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/time.h
++../../../../abis/linux/time.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h
 new file mode 120000
-index 0000000..1113eba
+index 0000000..b306777
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/uid_t.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/uid_t.h
++../../../../abis/linux/uid_t.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/utsname.h mlibc-workdir/sysdeps/vinix/include/abi-bits/utsname.h
 new file mode 120000
-index 0000000..17b993f
+index 0000000..b285754
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/utsname.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/utsname.h
++../../../../abis/linux/utsname.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h
 new file mode 120000
-index 0000000..f1a985e
+index 0000000..bbe258c
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/vm-flags.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/vm-flags.h
++../../../../abis/linux/vm-flags.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/wait.h mlibc-workdir/sysdeps/vinix/include/abi-bits/wait.h
 new file mode 120000
-index 0000000..6d911c7
+index 0000000..feb2840
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/wait.h
 @@ -0,0 +1 @@
-+../../../../abis/mlibc/wait.h
++../../../../abis/linux/wait.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/xattr.h mlibc-workdir/sysdeps/vinix/include/abi-bits/xattr.h
 new file mode 120000

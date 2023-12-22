@@ -291,7 +291,7 @@ fn (mut this EXT2Filesystem) symlink(parent &fs.VFSNode, dest string, target str
 	return new_node
 }
 
-fn (mut this EXT2Filesystem) create(parent &fs.VFSNode, name string, mode int) &fs.VFSNode {
+fn (mut this EXT2Filesystem) create(parent &fs.VFSNode, name string, mode u32) &fs.VFSNode {
 	mut new_node := fs.create_node(this, parent, name, stat.isdir(mode))
 
 	mut resource := &EXT2Resource { filesystem: unsafe { this } }

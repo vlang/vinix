@@ -13,14 +13,14 @@ import errno
 
 pub const (
 	at_fdcwd            = -100
-	at_empty_path       = 1
-	at_symlink_follow   = 2
-	at_symlink_nofollow = 4
-	at_removedir        = 8
-	at_eaccess          = 512
+	at_empty_path       = 0x1000
+	at_symlink_follow   = 0x400
+	at_symlink_nofollow = 0x100
+	at_removedir        = 0x200
+	at_eaccess          = 0x200
 	seek_cur            = 1
 	seek_end            = 2
-	seek_set            = 3
+	seek_set            = 0
 )
 
 interface FileSystem {
@@ -28,7 +28,7 @@ mut:
 	instantiate() &FileSystem
 	populate(&VFSNode)
 	mount(&VFSNode, string, &VFSNode) ?&VFSNode
-	create(&VFSNode, string, int) &VFSNode
+	create(&VFSNode, string, u32) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
 	link(&VFSNode, string, &VFSNode) ?&VFSNode
 }
@@ -351,14 +351,14 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	node.resource.unref(unsafe { nil })?
 }
 
-pub fn create(parent &VFSNode, name string, mode int) ?&VFSNode {
+pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	vfs_lock.acquire()
 	ret := internal_create(parent, name, mode)?
 	vfs_lock.release()
 	return ret
 }
 
-pub fn internal_create(parent &VFSNode, name string, mode int) ?&VFSNode {
+pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
 	if unsafe { target_node != 0 } {
@@ -415,7 +415,7 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	return 0, 0
 }
 
-pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode int) (u64, u64) {
+pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -484,7 +484,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	return to_copy, 0
 }
 
-pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode int) (u64, u64) {
+pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -621,7 +621,7 @@ pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode int, flags int) (u64, u64) {
+pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -757,7 +757,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	return 0, 0
 }
 
-pub fn syscall_fchmod(_ voidptr, fdnum int, mode int) (u64, u64) {
+pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 

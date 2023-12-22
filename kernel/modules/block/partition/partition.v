@@ -110,9 +110,9 @@ fn (mut this Partition) mmap(page u64, flags int) voidptr {
 }
 
 pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
-	lba_buffer := memory.malloc(parent_device.stat.blksize)
+	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
 
-	parent_device.read(0, lba_buffer, parent_device.stat.blksize, parent_device.stat.blksize) or {
+	parent_device.read(0, lba_buffer, u64(parent_device.stat.blksize), u64(parent_device.stat.blksize)) or {
 		print('block: unable to read from device\n')
 		return -1
 	}
@@ -122,7 +122,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 	if gpt_hdr.identifier == partition.gpt_signature {
 		entry_list_lba := gpt_hdr.partition_array_lba
 		entry_cnt := gpt_hdr.partition_entry_cnt
-		entry_list_size := lib.align_up(sizeof(GPTPartitionEntry) * entry_cnt, parent_device.stat.blksize)
+		entry_list_size := lib.align_up(sizeof(GPTPartitionEntry) * entry_cnt, u64(parent_device.stat.blksize))
 
 		if gpt_hdr.partition_entry_size != sizeof(GPTPartitionEntry) {
 			print('gpt: fatal parsing error\n')
@@ -131,7 +131,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 
 		partition_entry_buffer := memory.malloc(entry_list_size)
 
-		parent_device.read(0, partition_entry_buffer, entry_list_lba * parent_device.stat.blksize,
+		parent_device.read(0, partition_entry_buffer, u64(entry_list_lba * parent_device.stat.blksize),
 			entry_list_size) or {
 			print('block: unable to read from device\n')
 			return -1
@@ -148,7 +148,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			}
 
 			mut partition := &Partition{
-				device_offset: partition_entry.starting_lba * parent_device.stat.blksize
+				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
 				sector_cnt: partition_entry.last_lba - partition_entry.starting_lba
 				parent_device: unsafe { parent_device }
 			}
@@ -167,7 +167,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 		return 0
 	}
 
-	parent_device.read(0, lba_buffer, 0, parent_device.stat.blksize) or {
+	parent_device.read(0, lba_buffer, 0, u64(parent_device.stat.blksize)) or {
 		print('block: unable to read from device\n')
 		return -1
 	}
@@ -186,7 +186,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition_entry := unsafe { &MBRPartition(&partitions[i]) }
 
 			mut partition := &Partition{
-				device_offset: partition_entry.starting_lba * parent_device.stat.blksize
+				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
 				sector_cnt: partition_entry.sector_cnt
 				parent_device: unsafe { parent_device }
 			}
