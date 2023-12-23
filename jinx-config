@@ -12,6 +12,8 @@ autotools_recursive_regen() {
     done
 }
 
-export VMODULES="/tmp/.vmodules"
-mkdir -p "${VMODULES}"/cache
-mkdir -p /tmp/v_$(id -u)
+if [ "$in_container" = true ]; then
+    export VMODULES="/tmp/.vmodules"
+    mkdir -p "${VMODULES}"/cache
+    mkdir -p /tmp/v_$(id -u)
+fi
