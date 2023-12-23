@@ -19,7 +19,7 @@ build() {
         -Ddisable_libgcc_dependency=true \
         ${source_dir}
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {

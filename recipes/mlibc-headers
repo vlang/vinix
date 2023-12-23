@@ -15,7 +15,7 @@ build() {
         -Ddisable_intl_option=true \
         ${source_dir}
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {

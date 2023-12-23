@@ -21,7 +21,7 @@ build() {
         -Wno-dev \
         ${source_dir}/llvm
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {

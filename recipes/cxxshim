@@ -11,7 +11,7 @@ build() {
         -Dinstall_headers=true \
         ${source_dir}
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {
