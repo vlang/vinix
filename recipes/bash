@@ -1,9 +1,16 @@
 name=bash
-from_source=bash
+version=5.2.21
 revision=1
+tarball_url="https://ftp.gnu.org/gnu/bash/bash-5.2.21.tar.gz"
+tarball_blake2b="6789c9a0d9eb1ad167d4199bf1438d77934a7bbeae9f9fdd7167cae006b17b3894852440248db1bb6e9cf6d930e8a18b6448a3bb4db8831b2e6d1445b56a2065"
+source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses readline"
+
+regenerate() {
+    libtoolize -cfvi && AUTOHEADER=true autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure \

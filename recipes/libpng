@@ -1,8 +1,15 @@
 name=libpng
-from_source=libpng
+version=1.6.40
 revision=1
+tarball_url="https://download.sourceforge.net/libpng/libpng-1.6.40.tar.xz"
+tarball_blake2b="4dd2df57791ca68cc31ba966b9176ecb37458572c60eef34e31ff0d3266d25ad6ea9d2e8cae6bfaf7932b5c7bc231047d3ed139b3464304c41cc4d89611f5ba8"
+source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure           \

@@ -1,8 +1,15 @@
 name=xsetroot
+version=1.1.2
 revision=1
-from_source=xsetroot
+tarball_url="https://www.x.org/archive/individual/app/xsetroot-1.1.2.tar.gz"
+tarball_blake2b="748f5d1a3f2e49883c46406f5ed04aa97f58c1d007ae4a976ffc4e7e816e3c87a2605ab3a288b7448e6877256684ad07b15ae78e97c319cc60f32efaf1732c2e"
+source_hostdeps="autoconf automake libtool pkg-config xorg-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-server libxmu xbitmaps libxcursor"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure \

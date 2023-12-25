@@ -1,9 +1,0 @@
-name=xf86-input-keyboard
-version=2.0.0
-tarball_url="https://www.x.org/releases/individual/driver/xf86-input-keyboard-${version}.tar.gz"
-tarball_blake2b="f3aa3fca15fc75f8314b7b7248ccb757d667b2c46b22c8e23278d144f30d56515d1aa4190ca82e0c15770550a16dd860fd98a81172dab2e97b04e65fceb2a333"
-hostdeps="automake autoconf libtool pkg-config xorg-macros"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}

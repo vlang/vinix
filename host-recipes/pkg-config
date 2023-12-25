@@ -1,8 +1,15 @@
 name=pkg-config
-from_source=pkg-config
+version=2.0.3
 revision=1
+tarball_url="https://github.com/pkgconf/pkgconf/archive/refs/tags/pkgconf-2.0.3.tar.gz"
+tarball_blake2b="2f305e102913dbd6e45acb4e008afea879f95aab010f1ebc7a83c218d27f2079eb6fac51be811dad9a62057928ce270fe4e8cb6db24070d8f900956af5a67249"
+source_hostdeps="autoconf automake libtool"
 imagedeps="gcc"
 hostdeps="automake autoconf libtool"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     "${source_dir}"/configure \

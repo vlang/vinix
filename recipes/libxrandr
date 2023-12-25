@@ -1,8 +1,15 @@
 name=libxrandr
-from_source=libxrandr
+version=1.5.4
 revision=1
+tarball_url="https://www.x.org/archive/individual/lib/libXrandr-1.5.4.tar.gz"
+tarball_blake2b="d5dd5ef33c4452fac7d2c5f16afc15d9e2dcb4e721824ca6e412c6a990ab529003e1beea087afad9dedbcceab17953e066700dac7df0b2aac2cec404335ba93f"
+source_hostdeps="automake autoconf libtool pkg-config xorg-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-util-macros xorg-proto libx11 libxtrans libxrender libxext"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure           \

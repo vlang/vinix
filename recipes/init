@@ -1,6 +1,7 @@
 name=init
-from_source=init
+version=0.0
 revision=1
+source_dir="init"
 hostdeps="gcc binutils v"
 deps="core-libs"
 

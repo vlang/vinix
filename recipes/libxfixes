@@ -1,8 +1,15 @@
 name=libxfixes
-from_source=libxfixes
+version=6.0.1
 revision=1
+tarball_url="https://www.x.org/archive/individual/lib/libXfixes-6.0.1.tar.gz"
+tarball_blake2b="22be454b2db230057204932ae75aacb2b56523b25b14e501d7e7a2a664e57ae6bcbfa56b6fac4d42d3f8ef770c41debe0eec25451dd70baa9cfc83b1a10e4649"
+source_hostdeps="automake autoconf libtool pkg-config xorg-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-util-macros xorg-proto libx11 libxtrans"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure           \

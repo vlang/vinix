@@ -1,8 +1,15 @@
 name=limine
-from_source=limine
+version=6.20231216.0
 revision=1
-hostdeps="gcc autoconf automake libtool pkg-config"
+tarball_url="https://github.com/limine-bootloader/limine/releases/download/v6.20231216.0/limine-6.20231216.0.tar.xz"
+tarball_blake2b="d30364ccbe666b1aa25a54578ff7d27addc9b08908b7569c813df87ccb7018fd71381fc823c4f5c3ed13bf1de204781d3907696c791e418bafddd4e00dec9a95"
+source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="nasm gcc mtools"
+hostdeps="gcc autoconf automake libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     "${source_dir}"/configure \

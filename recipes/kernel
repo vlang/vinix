@@ -1,8 +1,22 @@
 name=kernel
-from_source=kernel
+version=0.0
 revision=1
+source_dir="kernel"
+source_imagedeps="git"
+source_allow_network="yes"
 imagedeps="git"
 hostdeps="gcc binutils v"
+
+regenerate() {
+    [ -d freestanding_headers ] || git clone https://github.com/mintsuki/freestanding-headers.git freestanding_headers
+    [ -d flanterm-c ] || git clone https://github.com/mintsuki/flanterm.git flanterm-c
+    [ -d c/printf ] || (
+        set -e
+        mkdir -p c/printf
+        curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/develop/src/printf/printf.c
+        curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/develop/src/printf/printf.h
+    )
+}
 
 build() {
     cp -rpf "${source_dir}"/. ./

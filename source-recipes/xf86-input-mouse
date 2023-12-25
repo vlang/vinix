@@ -1,9 +1,0 @@
-name=xf86-input-mouse
-version=1.9.5
-tarball_url="https://xorg.freedesktop.org/archive/individual/driver/xf86-input-mouse-${version}.tar.gz"
-tarball_blake2b="67f4de10424d640913fcafc2292f342a1e993d33e4ecc3c152e818953e19deaba796b96c29e0c07a4f4b74a1eb3bc1c41c3e5ab868cade02c21a90e2556da53f"
-hostdeps="autoconf automake libtool pkg-config xorg-macros"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}

@@ -1,9 +1,0 @@
-name=diffutils
-version=3.10
-tarball_url="https://ftp.gnu.org/gnu/diffutils/diffutils-${version}.tar.xz"
-tarball_blake2b="24a90162b3d876e6378243f19a85a1f1bb4cdfe98d130dee684740a902f2987509d5830dd32df4e26678b468b96960f6f9785ffb922e828cb8b4acce0d8587f6"
-hostdeps="automake autoconf libtool pkg-config"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}

@@ -1,8 +1,15 @@
 name=pcre2
-from_source=pcre2
+version=10.42
 revision=1
+tarball_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.42/pcre2-10.42.tar.gz"
+tarball_blake2b="19233ee4a63d3bc0828f68c646ecbeb8161c242e52c9242976d80b805d5863699766a8f3a23946ac50ced75f48aad6d948bd9aa3fdc7540bd9193065ea7ee9d1"
+source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bzip2 ncurses readline zlib"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure \

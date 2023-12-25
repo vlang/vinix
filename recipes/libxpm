@@ -1,8 +1,15 @@
 name=libxpm
-from_source=libxpm
+version=3.5.17
 revision=1
+tarball_url="https://www.x.org/archive/individual/lib/libXpm-3.5.17.tar.gz"
+tarball_blake2b="0acc342fb0aebad04a2d68f60106ad8f52910b2ca65d402bfda09e5914ab92b2b2b9d57680bbb6c6f1c8767971e9cffc1315337f6645fb61940a9cb5ccdf80c0"
+source_hostdeps="automake autoconf libtool pkg-config xorg-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-util-macros xorg-proto libx11 libxext libxt"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
     ${source_dir}/configure           \

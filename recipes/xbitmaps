@@ -1,8 +1,15 @@
 name=xbitmaps
+version=1.1.2
 revision=1
-from_source=xbitmaps
+tarball_url="https://www.x.org/pub/individual/data/xbitmaps-1.1.2.tar.bz2"
+tarball_blake2b="eff2f1e2efbabf447cbe98db09f81db96dc1442d4cce01b570774fb4e3e7323a40385d7821685724a9d9c69219528da980b2ecf01b0d3b822be8879e4d7f3e9c"
+source_hostdeps="autoconf automake libtool pkg-config xorg-macros"
 hostdeps="gcc autoconf automake libtool pkg-config xorg-macros"
 deps="core-libs"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}
 
 build() {
      ${source_dir}/configure \
