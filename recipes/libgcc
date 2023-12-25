@@ -6,6 +6,8 @@ imagedeps="gcc"
 deps="mlibc"
 
 build() {
+    true
+
     cd "${base_dir}"/host-builds/gcc/build
 
     make -j${parallelism} all-target-libgcc

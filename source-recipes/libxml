@@ -1,0 +1,9 @@
+name=libxml
+version=2.11.5
+tarball_url="https://download.gnome.org/sources/libxml2/2.11/libxml2-${version}.tar.xz"
+tarball_blake2b="4af53ef7c19cfcddcf3de5c694a1b03cf4212f8e4c4cb3d873a897fddd8a89d7a52d049a8b85e96c6cdb471689aa385512d87b9710074e90583bf7ad46319172"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

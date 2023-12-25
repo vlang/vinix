@@ -1,0 +1,9 @@
+name=xeyes
+version=1.2.0
+tarball_url="https://xorg.freedesktop.org/archive/individual/app/xeyes-${version}.tar.gz"
+tarball_blake2b="de152dff4bffb8ce43f7a8ae6b3362088f829acfa2a276b714cb5f92fb7af2935553f685a5cbe9d5f4362177fa71afc5b9e2aabe18010d247a16bad7892c8a7c"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

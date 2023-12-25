@@ -1,0 +1,9 @@
+name=libffi
+version=3.4.4
+tarball_url="https://github.com/libffi/libffi/releases/download/v${version}/libffi-${version}.tar.gz"
+tarball_blake2b="189fe1ffe9507f204581b0ab09995dc7e7b761bb4eac7e338e9f5ff81431aebcef6c182c1839c9f9acb2706697a260c67e6d1351cf7e2aed7c4eb5d694f6f8fd"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

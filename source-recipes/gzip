@@ -1,0 +1,9 @@
+name=gzip
+version=1.13
+tarball_url="https://ftp.gnu.org/gnu/gzip/gzip-${version}.tar.xz"
+tarball_blake2b="f0e3b4c28bafcd3b59b65ac2d71218dc58d81b52c6921c1be038757c99e99184178c5d0e9674caa5099713b8b64e8c85cf061f4abfa20b73b478288f121fb05d"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

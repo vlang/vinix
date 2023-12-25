@@ -1,0 +1,9 @@
+name=libxft
+version=2.3.8
+tarball_url="https://www.x.org/archive/individual/lib/libXft-${version}.tar.gz"
+tarball_blake2b="06d797ed53df793e5b9751bc7984a62a96c973e36d8aa99e4dc96a03e0e7013d6adc9e46f033e1ffcb4632cec2ac0318108ff2894beb4464d44d524254b15328"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

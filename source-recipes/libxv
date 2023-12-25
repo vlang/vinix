@@ -1,0 +1,9 @@
+name=libxv
+version=1.0.12
+tarball_url="https://www.x.org/archive/individual/lib/libXv-${version}.tar.gz"
+tarball_blake2b="21d7d5f40391897d9731ca0772a918d5c33f7de8e3e1307d47e75a44009a74be73a2a47d7751f01e25eabdc6c6ab8889ecda4e266303968b5cec085c38c8edd8"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

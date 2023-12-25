@@ -1,0 +1,8 @@
+name=bzip2
+version=1.0.8
+tarball_url="https://sourceware.org/ftp/bzip2/bzip2-${version}.tar.gz"
+tarball_blake2b="22ab3acd84f4db8c3d6f59340c252faedfd4447cea00dafbd652e65b6cf8a20adf6835c22e58563004cfafdb15348c924996230b4b23cae42da5e25eeac4bdad"
+
+regenerate() {
+    true
+}

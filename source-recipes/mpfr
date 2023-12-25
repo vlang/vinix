@@ -1,0 +1,9 @@
+name=mpfr
+version=4.2.1
+tarball_url="https://ftp.gnu.org/gnu/mpfr/mpfr-${version}.tar.xz"
+tarball_blake2b="ad69f53bc910294647523e7613b18a683f1d0f3dd994168ab2a46b66d0371ffa9b8e7cb59495f898470aea69d343e83fc722f11babe4af7b3a12665a1e65860c"
+hostdeps="automake autoconf autoconf-archive libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

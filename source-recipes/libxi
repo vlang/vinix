@@ -1,0 +1,9 @@
+name=libxi
+version=1.8.1
+tarball_url="https://www.x.org/archive/individual/lib/libXi-${version}.tar.gz"
+tarball_blake2b="473bf5a80c86ef853dcf21b2292eb07818148302b051ca4fb9bfdf42053ae0ae6c53d588de7c027d1c72d7b5a9dba775111f4913b36e771380f4d0fcb823e345"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

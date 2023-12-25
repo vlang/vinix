@@ -1,0 +1,9 @@
+name=grep
+version=3.11
+tarball_url="https://ftp.gnu.org/gnu/grep/grep-${version}.tar.xz"
+tarball_blake2b="e21785bca20b5a090d32bb5dc525fb298af30165106ed4c289b1518ea3d2acdcacfd6309b12f13be29a4b958f19588546119c695deb2b7500d49dcff86357bdc"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

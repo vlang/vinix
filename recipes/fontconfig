@@ -1,18 +1,9 @@
 name=fontconfig
-version=2.14.2
+from_source=fontconfig
 revision=1
-tarball_url="https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.14.2.tar.xz"
-tarball_blake2b="4efeeb7f9a6705d493128d00b60e681a20a47556f4c0d7787a5c7a6d2cbbc22f150cad7988a9836a9e72aeb61e2b6a196c00a071c7042c62283c7720cdbb743d"
-source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="python gperf"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freetype libexpat libxml"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-    # Make sure we regenerate this file
-    rm -f src/fcobjshash.h
-}
+imagedeps="python gperf"
 
 build() {
     ${source_dir}/configure \

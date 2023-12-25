@@ -1,15 +1,8 @@
 name=sed
-version=4.9
+from_source=sed
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/sed/sed-4.9.tar.xz"
-tarball_blake2b="6c7c7dc782b87c3bd0b5e826ba46c2f1dc7bd8c1159945fcf14b394711742964628774cf9f27d844b672721d7849e6c31992d82fafb9ed4118b7feb60406d1e1"
-source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}
 
 build() {
     cp -rp "${source_dir}"/. ./

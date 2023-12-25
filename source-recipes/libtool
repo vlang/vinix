@@ -1,0 +1,11 @@
+name=libtool
+version=2.4.7
+tarball_url="https://ftp.gnu.org/gnu/libtool/libtool-${version}.tar.gz"
+tarball_blake2b="3b7c66050237931443008d6be9c0c30f4938402bf68576cdf02f2248b216bb68c6b797bbfdb8a92caa5e12cb10208cd19771cdcb6b0d83572ad60bfc03e67e98"
+hostdeps="autoconf automake gnulib"
+imagedeps="help2man"
+
+regenerate() {
+    cp -r ${base_dir}/sources/gnulib ./
+    ./bootstrap --force --skip-git --skip-po --gnulib-srcdir=`pwd`/gnulib
+}

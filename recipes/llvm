@@ -1,8 +1,6 @@
 name=llvm
-version=14.0.6
+from_source=llvm
 revision=1
-tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/llvm-project-14.0.6.src.tar.xz"
-tarball_blake2b="ee67c5407df8cef493b9c0004f15e428f22a536a17e5f4e3eb29a003b8a8ec0abe0fa3e072591161d5f30ef7d8867c1ce34d1b341ad858e93c00263499941a99"
 imagedeps="gcc ninja python git"
 hostdeps="gcc cmake pkg-config"
 deps="core-libs zlib"

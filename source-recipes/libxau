@@ -1,0 +1,9 @@
+name=libxau
+version=1.0.11
+tarball_url="https://www.x.org/archive/individual/lib/libXau-${version}.tar.gz"
+tarball_blake2b="2c1066e40fe64ebd8b095bb7bac436d3b0d518080b80e93d1def040af390bd08ed3f4f49feb0b4b390a5733e74bf7429c96ddac5f8fbfb904eb25b496676618a"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

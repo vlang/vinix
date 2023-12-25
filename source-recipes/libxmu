@@ -1,0 +1,9 @@
+name=libxmu
+version=1.1.4
+tarball_url="https://www.x.org/archive/individual/lib/libXmu-${version}.tar.gz"
+tarball_blake2b="b95188ecd667ffa9d831e547803c16637a968199c4e20d11d8beaf8da19c327aeb655c886f21d6b7d1d2a2b9cce522a091ca791c2626ae74d77f838441fa4a90"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

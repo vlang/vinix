@@ -1,0 +1,9 @@
+name=xorg-proto
+version=2023.2
+tarball_url="https://www.x.org/releases/individual/proto/xorgproto-${version}.tar.xz"
+tarball_blake2b="ff255b91770ad11cdcc48d12815317285d8d16d28011a86166f3e07af18b30fdf35c2eb7b6537504eb4c0e9ca65b3116493422b6faebe04ee80e6aee92387675"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

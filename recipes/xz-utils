@@ -1,15 +1,8 @@
 name=xz-utils
-version=5.4.5
+from_source=xz-utils
 revision=1
-tarball_url="https://tukaani.org/xz/xz-5.4.5.tar.gz"
-tarball_blake2b="647c8227080a7f37e3321e778d7f52ccb9da3810f2be81b2d2b46001605b22cef6e724f9b3facfada26a12b24401c9a11449d6066443849b37b28e0eaa199315"
-source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}
 
 build() {
     ${source_dir}/configure           \

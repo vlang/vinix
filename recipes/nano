@@ -1,15 +1,8 @@
 name=nano
-version=7.2
+from_source=nano
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/nano/nano-7.2.tar.xz"
-tarball_blake2b="c7e3b18383e9f2f9db1f6059c875ddd164d730ea0e5b363e66fb8e5f30e8598ba49a5afd8eea3a55e295f1e43fb136019f60cc9154ae276c5d589002c0e5298a"
-source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs ncurses"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}
 
 build() {
     ${source_dir}/configure    \

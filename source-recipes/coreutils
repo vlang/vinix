@@ -1,0 +1,22 @@
+name=coreutils
+version=9.4
+tarball_url="https://ftp.gnu.org/gnu/coreutils/coreutils-${version}.tar.xz"
+tarball_blake2b="83d41c48804c1d470c0e5eed38e692bb6875436dda3f6e2c29784ad6ef563d86e8e066a050e222621b400f78ea4630b1e127d20fc9b76f12096528c42677e35d"
+hostdeps="automake autoconf libtool pkg-config"
+imagedeps="gcc gperf"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+
+    # Huge hack: coreutils does not compile the build-machine binary make-prime-list
+    # using the build-machine compiler. Hence, build and invoke the binary manually here.
+    mkdir tmp_build_dir
+    cd tmp_build_dir
+
+    ../configure
+    make src/make-prime-list
+    ./src/make-prime-list 5000 > ../src/primes.h
+
+    cd ..
+    rm -rf tmp_build_dir
+}

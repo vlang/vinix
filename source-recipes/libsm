@@ -1,0 +1,9 @@
+name=libsm
+version=1.2.4
+tarball_url="https://www.x.org/archive/individual/lib/libSM-${version}.tar.gz"
+tarball_blake2b="9f05c36f933ddbe66e06a96c7b9f5c23a2b5218da724a838b42ef4b798195c24a2be13e1d5c61bccf7660a4880f78da8452fa93a668f483ce808ce840c2cfcfb"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

@@ -1,0 +1,9 @@
+name=xsetroot
+version=1.1.2
+tarball_url="https://www.x.org/archive/individual/app/xsetroot-${version}.tar.gz"
+tarball_blake2b=748f5d1a3f2e49883c46406f5ed04aa97f58c1d007ae4a976ffc4e7e816e3c87a2605ab3a288b7448e6877256684ad07b15ae78e97c319cc60f32efaf1732c2e
+hostdeps="autoconf automake libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

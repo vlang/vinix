@@ -1,15 +1,8 @@
 name=libexpat
-version=2.5.0
+from_source=libexpat
 revision=1
-tarball_url="https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.xz"
-tarball_blake2b="670298d076ff3b512a0212170d40cb04c601a11d6b152f215a5302ad3238c69c2386393d7a6c70bc284be35ce97bf27d87115c3391f4bc17406e509d739d3e31"
-source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}
 
 build() {
     ${source_dir}/configure     \

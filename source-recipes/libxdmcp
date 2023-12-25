@@ -1,0 +1,9 @@
+name=libxdmcp
+version=1.1.4
+tarball_url="https://www.x.org/archive/individual/lib/libXdmcp-${version}.tar.gz"
+tarball_blake2b="83973212793c93253b06ee75902842873f1f322c53dc32f054954131243dcf5c31d6792dc5d216134c9536c142b4d5823c8fd998d048ec093383b4f7362fb066"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

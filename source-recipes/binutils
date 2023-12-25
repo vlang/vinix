@@ -1,0 +1,9 @@
+name=binutils
+version=2.41
+tarball_url="https://ftp.gnu.org/gnu/binutils/binutils-${version}.tar.xz"
+tarball_blake2b="3bccec2b52f7e82a727121bf2a2e51a6249ba63dcd74c665fd834e858645c912ffd8245d848435288b938852830b482905606f55c40df4061215fd75c52ffc75"
+hostdeps="autoconf automake libtool pkg-config"
+
+regenerate() {
+    autotools_recursive_regen -I"$(realpath ./config)"
+}

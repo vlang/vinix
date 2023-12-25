@@ -1,0 +1,9 @@
+name=libxrender
+version=0.9.11
+tarball_url="https://www.x.org/archive/individual/lib/libXrender-${version}.tar.gz"
+tarball_blake2b="c8d5cf0c925ccf885634ac535b83b6280b49bc354a9c054375ed6db916350f1e5a1892f9937e0726d3d29fec0f531e787e03d76c3a0c0a22ca6c289c28f2287e"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

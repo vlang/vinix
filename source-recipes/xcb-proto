@@ -1,0 +1,9 @@
+name=xcb-proto
+version=1.16.0
+tarball_url="https://www.x.org/archive/individual/proto/xcb-proto-${version}.tar.xz"
+tarball_blake2b="1c59ae4c71e697bd4f0298f6e0ea5235fc47baa9cf584e079258f1da8be538d1b67dc45f1325d82495247d0f8020d0244ca334de3794b410a1feaceabd6b285e"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

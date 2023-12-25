@@ -2,3 +2,7 @@ name=mlibc
 version=efbb2e12c579281b1196935132cb4ebbefbacc30
 tarball_url="https://github.com/mintsuki/mlibc/archive/${version}.tar.gz"
 tarball_blake2b="562596471e5e8e6730b7d902c7f3c7276153fd213d7c4ee9973001c2b72f0e88b4e6d393d105183cdd9a5c32ba3c2ae3ec7078af49871fb66ee548db149fd4ef"
+
+regenerate() {
+    true
+}

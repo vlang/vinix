@@ -1,0 +1,9 @@
+name=libxfont2
+version=2.0.6
+tarball_url="https://www.x.org/archive/individual/lib/libXfont2-${version}.tar.gz"
+tarball_blake2b="1a871c6d7c81beadf1c9a5e864a2df186b6429337e86f4fee0c8969d158cf284f10019f69a2f7e0c9298d9f6fa842d5315932152b5e70cb068c5530360e578a0"
+hostdeps="automake autoconf libtool pkg-config xorg-macros xtrans"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

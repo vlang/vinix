@@ -1,0 +1,11 @@
+name=fontconfig
+version=2.14.2
+tarball_url="https://www.freedesktop.org/software/fontconfig/release/fontconfig-${version}.tar.xz"
+tarball_blake2b="4efeeb7f9a6705d493128d00b60e681a20a47556f4c0d7787a5c7a6d2cbbc22f150cad7988a9836a9e72aeb61e2b6a196c00a071c7042c62283c7720cdbb743d"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+    # Make sure we regenerate this file
+    rm -f src/fcobjshash.h
+}

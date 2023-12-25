@@ -1,0 +1,9 @@
+name=xkbcomp
+version=1.4.6
+tarball_url="https://www.x.org/archive/individual/app/xkbcomp-${version}.tar.gz"
+tarball_blake2b="bc0fe69ef4eb809ac9e82fdc40b990bf27b7dd3e358efdb87ab7e34be8ddd0d8bd54e57ab7473f9e22f2714964e2cfb3322ccc2006a64de10dd6f2fc4fa35017"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

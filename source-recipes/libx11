@@ -1,0 +1,9 @@
+name=libx11
+version=1.8.7
+tarball_url="https://www.x.org/archive/individual/lib/libX11-${version}.tar.xz"
+tarball_blake2b="335d8af91c13aba11255c266c4687a7f66b021207a92485d723b4107601bbabb6a0e5535241a3bcff4ac9a99142730d2b3d2e2eaff86b507fee5b35a2590d792"
+hostdeps="automake autoconf libtool pkg-config xorg-macros xtrans"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

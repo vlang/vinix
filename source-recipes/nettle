@@ -1,0 +1,9 @@
+name=nettle
+version=3.9.1
+tarball_url="https://ftp.gnu.org/gnu/nettle/nettle-${version}.tar.gz"
+tarball_blake2b="e3ceaefa19491e58f26b900beaf8b4e746feb2357c7677f5c050f257f4a23c304773446b6283a42a82cf9640e16522b8a71c47f137759f1df23cdeee4625d142"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

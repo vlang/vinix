@@ -2,6 +2,10 @@ name=base-files
 from_source=base-files
 revision=1
 
+build() {
+    true
+}
+
 package() {
     cp -rpv ${source_dir}/. "${dest_dir}"/
     ln -s usr/bin "${dest_dir}"/bin

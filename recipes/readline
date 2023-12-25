@@ -1,15 +1,8 @@
 name=readline
-version=8.2
+from_source=readline
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz"
-tarball_blake2b="7974322b9c092a756a79e537df08e8532f8e0fcb598f77732e28287c33ebec9e9837ed88b43334c310892d56a871b423903f0f564def2fbe700a1004f2ae7b18"
-source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses"
-
-regenerate() {
-    libtoolize -cfvi && AUTOHEADER=true autoreconf -fvi
-}
 
 build() {
     ${source_dir}/configure \

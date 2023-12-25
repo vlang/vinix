@@ -1,11 +1,9 @@
 name=mesa
-version=21.3.9
+from_source=mesa
 revision=1
-tarball_url="https://archive.mesa3d.org/mesa-21.3.9.tar.xz"
-tarball_blake2b="79669f9492c505b1729c526adf5a8261737b6088bdf01db654a0dca8ba22600ec985b574edfeee3a28c76e6e0f815782362973876e1d75b58f4417f45df70add"
-imagedeps="binutils meson ninja python-mako"
 hostdeps="gcc pkg-config"
 deps="core-libs llvm zlib libxshmfence libxrandr libxdamage libxxf86vm libxfixes libx11 libxext libxcb libexpat"
+imagedeps="binutils meson ninja python-mako"
 
 build() {
     cp ${base_dir}/build-support/cross_file.txt ./

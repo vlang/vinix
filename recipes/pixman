@@ -1,15 +1,8 @@
 name=pixman
-version=0.42.2
+from_source=pixman
 revision=1
-tarball_url="https://www.x.org/archive/individual/lib/pixman-0.42.2.tar.xz"
-tarball_blake2b="6286a9d064a5a24017fccbb0a6e9f6ef932077c2e33ec043826d4a7a6c707c9111d3de4b806cbcdb47fc2794f1f930d24d078de1ff2912061967db0890540957"
-source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libpng"
-
-regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
-}
 
 build() {
     ${source_dir}/configure \

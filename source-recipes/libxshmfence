@@ -1,0 +1,9 @@
+name=libxshmfence
+version=1.3.2
+tarball_url="https://www.x.org/archive/individual/lib/libxshmfence-${version}.tar.gz"
+tarball_blake2b="ae99fff03f94c5b001bd901e446f56e4ed2edbfb140ab92ec471ab910af92d45ceeb623718e65e0b8e9bd301aacf0c5d5d3a31dab0246c824aabe0664957e78e"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

@@ -1,0 +1,10 @@
+name=freetype
+version=2.13.2
+tarball_url="https://download.savannah.gnu.org/releases/freetype/freetype-${version}.tar.xz"
+tarball_blake2b="cebc82180d9afaeb112a65ba78903d7bf7a9295a803166a033585ad2325add6023f05066852240c4665e56285345ba503b01ecd461d48f0478a8f3f56136988e"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    NOCONFIGURE=1 ./autogen.sh
+    cp /usr/local/share/automake-1.16/config.sub ./builds/unix/
+}

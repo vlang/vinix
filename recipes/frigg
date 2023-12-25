@@ -1,8 +1,6 @@
 name=frigg
-version=ebdc9dff9b2c9aa7ebda5af490abe1ca404830bd
+from_source=frigg
 revision=1
-tarball_url="https://github.com/managarm/frigg/archive/ebdc9dff9b2c9aa7ebda5af490abe1ca404830bd.tar.gz"
-tarball_blake2b="d9bf8741c6ed13206ebbb23ec6296e2b89218e49f92d9c82012147d36787a78231827c3bb736c7cf7b4d955e898dc08b23f32ddf93865ed63df2db6953bf4f75"
 imagedeps="meson ninja git base-devel"
 
 build() {

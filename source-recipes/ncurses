@@ -1,0 +1,9 @@
+name=ncurses
+version=6.4.20231111
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_4_20231111.tar.gz"
+tarball_blake2b="0d7b490b50e58281250cc4ebdac8f35cbb3fbf0e13578524003ae4c26c10507d59fb8dd2a4d67102067df77d857c41e6c37c509d9a7cee8661dd3bb80f7cbfef"
+hostdeps="autoconf automake libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi
+}

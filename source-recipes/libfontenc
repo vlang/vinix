@@ -1,0 +1,9 @@
+name=libfontenc
+version=1.1.7
+tarball_url="https://www.x.org/archive/individual/lib/libfontenc-${version}.tar.gz"
+tarball_blake2b="538dc45801dd2fc3b18527b5716fd468089206728ce4704416eb0ecd2ed528f951d64e7bf2f779a5852363670724458c966538afcec813a9823f5d04303d1bbb"
+hostdeps="automake autoconf libtool pkg-config xorg-macros xorg-font-util"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

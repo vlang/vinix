@@ -1,0 +1,9 @@
+name=libxxf86vm
+version=1.1.5
+tarball_url="https://www.x.org/archive/individual/lib/libXxf86vm-${version}.tar.gz"
+tarball_blake2b="396676748546bf2903a9d5ee8603babc04634d6547b38baed07134a7fea81f1691c064c07a9cc4990aeaf1edc911b586b5e11c449aa7872c1ea5b46879029f5e"
+hostdeps="automake autoconf libtool pkg-config xorg-macros"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi
+}

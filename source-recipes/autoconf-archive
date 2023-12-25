@@ -1,0 +1,8 @@
+name=autoconf-archive
+version=2023.02.20
+tarball_url="https://ftp.gnu.org/gnu/autoconf-archive/autoconf-archive-${version}.tar.xz"
+tarball_blake2b="a72469e61a6ef702cbf4e30712c7dbe36369da7dad6e2312eb7026af41a989a47ded0a27975349486b69155f9e8199f89720dc57f98440b2766294a0f8755ee6"
+
+regenerate() {
+    true
+}

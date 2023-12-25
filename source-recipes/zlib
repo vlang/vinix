@@ -1,0 +1,8 @@
+name=zlib
+version=1.3
+tarball_url="https://github.com/madler/zlib/archive/refs/tags/v${version}.tar.gz"
+tarball_blake2b="e663d8041a613b544d76313e61b6340adacb53322422d4b6392455627c80cbac430b9fd0fb4a69e59b0fa110f120d29a1e9513bb37888442cc1b9d5075f47ea6"
+
+regenerate() {
+    true
+}

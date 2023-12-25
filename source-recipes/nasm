@@ -1,0 +1,9 @@
+name=nasm
+version=2.15.05
+tarball_url="https://www.nasm.us/pub/nasm/releasebuilds/${version}/nasm-${version}.tar.xz"
+tarball_blake2b="a41434965c2125577b762d907a0a3c251c75d9f9beac230fba4099182c7f7beb08c6d2c05c2432b0dc8ba829f24077f44c3096faea9bd0a533250e6dbbfaef35"
+hostdeps="automake autoconf libtool pkg-config"
+
+regenerate() {
+    libtoolize -cfvi && autoreconf -fvi -I$(realpath ./autoconf)
+}
