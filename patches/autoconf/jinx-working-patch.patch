@@ -6,7 +6,7 @@ index cdfc439..6f224fc 100755
      i*:PW*:*)
  	GUESS=$UNAME_MACHINE-pc-pw32
  	;;
-+    *:vinix:*:*)
++    *:Vinix:*:*)
 +	GUESS=$UNAME_MACHINE-pc-vinix
 +	;;
      *:SerenityOS:*:*)
