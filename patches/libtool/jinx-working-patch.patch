@@ -25,7 +25,7 @@ index 0c40fed..763619b 100644
    all_pkgltdl_files="COPYING.LIB Makefile Makefile.in Makefile.inc Makefile.am README acinclude.m4 aclocal.m4 argz_.h argz.c config.h.in config-h.in configure configure.ac configure.in libltdl/lt__alloc.h libltdl/lt__argz.h libltdl/lt__dirent.h libltdl/lt__glibc.h libltdl/lt__private.h libltdl/lt__strl.h libltdl/lt_dlloader.h libltdl/lt_error.h libltdl/lt_system.h libltdl/slist.h loaders/dld_link.c loaders/dlopen.c loaders/dyld.c loaders/load_add_on.c loaders/loadlibrary.c loaders/preopen.c loaders/shl_load.c lt__alloc.c lt__argz.c lt__dirent.c lt__strl.c lt_dlloader.c lt_error.c ltdl.c ltdl.h ltdl.mk slist.c"
  
 diff --git libtool-clean/m4/libtool.m4 libtool-workdir/m4/libtool.m4
-index 79a2451..6101192 100644
+index 79a2451..b6e8ca4 100644
 --- libtool-clean/m4/libtool.m4
 +++ libtool-workdir/m4/libtool.m4
 @@ -1696,7 +1696,7 @@ AC_CACHE_VAL([lt_cv_sys_max_cmd_len], [dnl
@@ -123,7 +123,7 @@ index 79a2451..6101192 100644
          if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
  	  _LT_TAGVAR(archive_cmds, $1)='$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'
 diff --git libtool-clean/m4/ltdl.m4 libtool-workdir/m4/ltdl.m4
-index 772c150..106bebc 100644
+index 772c150..642966e 100644
 --- libtool-clean/m4/ltdl.m4
 +++ libtool-workdir/m4/ltdl.m4
 @@ -497,6 +497,9 @@ AC_CACHE_CHECK([whether deplibs are loaded by dlopen],

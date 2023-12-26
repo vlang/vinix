@@ -5,5 +5,6 @@ tarball_blake2b="0d7b490b50e58281250cc4ebdac8f35cbb3fbf0e13578524003ae4c26c10507
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    libtoolize -cfvi
+    cp -pv /usr/local/share/libtool/build-aux/config.guess ./
+    cp -pv /usr/local/share/libtool/build-aux/config.sub ./
 }

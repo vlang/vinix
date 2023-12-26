@@ -2,7 +2,7 @@ name=binutils
 from_source=binutils
 revision=1
 imagedeps="gcc"
-hostdeps="autoconf automake libtool pkg-config"
+hostdeps="autoconf-2.69 automake libtool pkg-config"
 
 build() {
     "${source_dir}"/configure \

@@ -5,10 +5,10 @@ tarball_blake2b="aebe85a82cb94c37ed81e9801acf1e89d150f5992fb9be42d53b3f2734c5c95
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    ( cd gettext-runtime/libasprintf && libtoolize -cfvi && autoreconf -fvi )
-    ( cd gettext-runtime/intl && libtoolize -cfvi && autoreconf -fvi )
-    ( cd gettext-runtime && libtoolize -cfvi && autoreconf -fvi )
-    ( cd gettext-tools && libtoolize -cfvi && autoreconf -fvi )
-    ( cd libtextstyle && libtoolize -cfvi && autoreconf -fvi )
-    libtoolize -cfvi && autoreconf -fvi
+    ( cd gettext-runtime/libasprintf && autoreconf -fvi )
+    ( cd gettext-runtime/intl && autoreconf -fvi )
+    ( cd gettext-runtime && autoreconf -fvi )
+    ( cd gettext-tools && autoreconf -fvi )
+    ( cd libtextstyle && autoreconf -fvi )
+    autoreconf -fvi
 }

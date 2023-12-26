@@ -5,5 +5,5 @@ tarball_blake2b="f0e3b4c28bafcd3b59b65ac2d71218dc58d81b52c6921c1be038757c99e9918
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
+    autoreconf -fvi
 }

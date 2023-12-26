@@ -5,5 +5,5 @@ tarball_blake2b="0acc342fb0aebad04a2d68f60106ad8f52910b2ca65d402bfda09e5914ab92b
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
+    autoreconf -fvi
 }

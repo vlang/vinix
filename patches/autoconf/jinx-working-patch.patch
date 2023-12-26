@@ -1,0 +1,27 @@
+diff --git autoconf-clean/build-aux/config.guess autoconf-workdir/build-aux/config.guess
+index cdfc439..6f224fc 100755
+--- autoconf-clean/build-aux/config.guess
++++ autoconf-workdir/build-aux/config.guess
+@@ -933,6 +933,9 @@ EOF
+     i*:PW*:*)
+ 	GUESS=$UNAME_MACHINE-pc-pw32
+ 	;;
++    *:vinix:*:*)
++	GUESS=$UNAME_MACHINE-pc-vinix
++	;;
+     *:SerenityOS:*:*)
+         GUESS=$UNAME_MACHINE-pc-serenity
+         ;;
+diff --git autoconf-clean/build-aux/config.sub autoconf-workdir/build-aux/config.sub
+index defe52c..959a059 100755
+--- autoconf-clean/build-aux/config.sub
++++ autoconf-workdir/build-aux/config.sub
+@@ -1749,7 +1749,7 @@ case $os in
+ 	     | mirbsd* | netbsd* | dicos* | openedition* | ose* \
+ 	     | bitrig* | openbsd* | secbsd* | solidbsd* | libertybsd* | os108* \
+ 	     | ekkobsd* | freebsd* | riscix* | lynxos* | os400* \
+-	     | bosx* | nextstep* | cxux* | oabi* \
++	     | bosx* | nextstep* | cxux* | oabi* | vinix* \
+ 	     | ptx* | ecoff* | winnt* | domain* | vsta* \
+ 	     | udi* | lites* | ieee* | go32* | aux* | hcos* \
+ 	     | chorusrdb* | cegcc* | glidix* | serenity* \

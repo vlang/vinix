@@ -2,7 +2,7 @@ name=gcc
 version=13.2.0
 tarball_url="https://ftp.gnu.org/gnu/gcc/gcc-${version}/gcc-${version}.tar.xz"
 tarball_blake2b="0034b29d3d6cc05821f0c4253ce077805943aff7b370729dd203bda57d89c107edd657eeddc2fb1e69ea15c7b0323b961f46516c7f4af89a3ccf7fea84701be2"
-hostdeps="automake autoconf libtool pkg-config"
+hostdeps="automake autoconf-2.69 libtool pkg-config"
 imagedeps="git"
 
 regenerate() {
@@ -11,4 +11,6 @@ regenerate() {
     done
 
     autotools_recursive_regen -I"$(realpath ./config)"
+
+    cp -pv /usr/local/share/libtool/build-aux/{config.sub,config.guess,install-sh} libiberty/
 }

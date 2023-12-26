@@ -12,7 +12,7 @@ index 5c5fdef..3c91651 100644
  
  # This file holds an array associating configuration triplets and
 diff --git binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
-index bdee539..f5d0cf0 100644
+index bdee539..48b2360 100644
 --- binutils-clean/bfd/config.bfd
 +++ binutils-workdir/bfd/config.bfd
 @@ -664,6 +664,11 @@ case "${targ}" in
@@ -40,7 +40,7 @@ index bdee539..f5d0cf0 100644
    i[3-7]86-*-lynxos*)
      targ_defvec=i386_elf32_vec
 diff --git binutils-clean/gas/configure.tgt binutils-workdir/gas/configure.tgt
-index 3429f85..c0a32cc 100644
+index 3429f85..8fe03c1 100644
 --- binutils-clean/gas/configure.tgt
 +++ binutils-workdir/gas/configure.tgt
 @@ -227,6 +227,7 @@ case ${generic_target} in
@@ -65,7 +65,7 @@ index 7af9581..c55e424 100644
  AC_CANONICAL_TARGET
  AM_INIT_AUTOMAKE
 diff --git binutils-clean/ld/configure.tgt binutils-workdir/ld/configure.tgt
-index c62b958..2d8c473 100644
+index c62b958..3873c96 100644
 --- binutils-clean/ld/configure.tgt
 +++ binutils-workdir/ld/configure.tgt
 @@ -378,6 +378,9 @@ i[3-7]86-*-linux-*)	targ_emul=elf_i386

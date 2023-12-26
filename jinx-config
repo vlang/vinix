@@ -8,7 +8,7 @@ OS_TRIPLET=x86_64-vinix
 autotools_recursive_regen() {
     for f in $(find . -name configure.ac); do
         echo "* autotools regen in '$(dirname $f)'..."
-        ( cd "$(dirname "$f")" && libtoolize -cfvi && autoreconf -fvi "$@" )
+        ( cd "$(dirname "$f")" && autoreconf -fvi "$@" )
     done
 }
 

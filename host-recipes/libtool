@@ -14,4 +14,7 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" make install-strip
+
+    cp -pv /usr/local/share/autoconf/build-aux/config.sub "${dest_dir}${prefix}"/share/libtool/build-aux/
+    cp -pv /usr/local/share/autoconf/build-aux/config.guess "${dest_dir}${prefix}"/share/libtool/build-aux/
 }

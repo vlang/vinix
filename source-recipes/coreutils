@@ -6,7 +6,7 @@ hostdeps="automake autoconf libtool pkg-config"
 imagedeps="gcc gperf"
 
 regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
+    autoreconf -fvi
 
     # Huge hack: coreutils does not compile the build-machine binary make-prime-list
     # using the build-machine compiler. Hence, build and invoke the binary manually here.

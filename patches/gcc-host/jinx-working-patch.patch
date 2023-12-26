@@ -1,5 +1,5 @@
 diff --git gcc-host-clean/fixincludes/mkfixinc.sh gcc-host-workdir/fixincludes/mkfixinc.sh
-index df90720..484f8bc 100755
+index df90720..da6408a 100755
 --- gcc-host-clean/fixincludes/mkfixinc.sh
 +++ gcc-host-workdir/fixincludes/mkfixinc.sh
 @@ -12,6 +12,7 @@ target=fixinc.sh
@@ -12,7 +12,7 @@ index df90720..484f8bc 100755
      powerpc-*-eabisim* | \
 diff --git gcc-host-workdir/gcc/config/vinix.h gcc-host-workdir/gcc/config/vinix.h
 new file mode 100644
-index 0000000..ca776e9
+index 0000000..be79aae
 --- /dev/null
 +++ gcc-host-workdir/gcc/config/vinix.h
 @@ -0,0 +1,29 @@
@@ -46,7 +46,7 @@ index 0000000..ca776e9
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff --git gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/config.gcc
-index 6fd1594..0e447e3 100644
+index 648b3dc..f2b0217 100644
 --- gcc-host-clean/gcc/config.gcc
 +++ gcc-host-workdir/gcc/config.gcc
 @@ -840,6 +840,15 @@ case ${target} in
@@ -76,10 +76,10 @@ index 6fd1594..0e447e3 100644
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
 diff --git gcc-host-clean/libgcc/config.host gcc-host-workdir/libgcc/config.host
-index b9975de..1fe0834 100644
+index 9d72120..b4e90ab 100644
 --- gcc-host-clean/libgcc/config.host
 +++ gcc-host-workdir/libgcc/config.host
-@@ -263,6 +263,11 @@ case ${host} in
+@@ -281,6 +281,11 @@ case ${host} in
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
    extra_parts="crtbegin.o crtend.o"
    ;;
@@ -91,7 +91,7 @@ index b9975de..1fe0834 100644
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
-@@ -697,6 +702,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
+@@ -715,6 +720,10 @@ x86_64-*-elf* | x86_64-*-rtems*)
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
@@ -129,7 +129,7 @@ index 28d996f..61ff752 100644
  dnl Very limited version of automake's enable-maintainer-mode
  
 diff --git gcc-host-clean/libstdc++-v3/crossconfig.m4 gcc-host-workdir/libstdc++-v3/crossconfig.m4
-index b3269cb..3303aaa 100644
+index b3269cb..a1d4a28 100644
 --- gcc-host-clean/libstdc++-v3/crossconfig.m4
 +++ gcc-host-workdir/libstdc++-v3/crossconfig.m4
 @@ -136,6 +136,18 @@ case "${host}" in

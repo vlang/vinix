@@ -2,7 +2,7 @@ name=gcc
 from_source=gcc-host
 revision=1
 imagedeps="gcc"
-hostdeps="autoconf automake libtool pkg-config"
+hostdeps="autoconf-2.69 automake libtool pkg-config"
 hostrundeps="binutils"
 deps="mlibc-headers"
 

@@ -5,6 +5,6 @@ tarball_blake2b="1ddd5c2e6be8400a0a77db4b5fbd4698996fd1a00984e370b1f712f6b9ce456
 hostdeps="automake autoconf libtool pkg-config xorg-macros"
 
 regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
+    autoreconf -fvi
     sed -i 's/pthread-stubs//' "${source_dir}"/configure
 }

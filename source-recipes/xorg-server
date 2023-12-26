@@ -5,5 +5,5 @@ tarball_blake2b="e60cbb6f3023639598d518fb53e3df3a2aced8f8950279f3a1642ad0a9545be
 hostdeps="automake autoconf libtool pkg-config xorg-macros xorg-font-util xtrans"
 
 regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
+    autoreconf -fvi
 }

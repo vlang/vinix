@@ -5,7 +5,7 @@ tarball_blake2b="4efeeb7f9a6705d493128d00b60e681a20a47556f4c0d7787a5c7a6d2cbbc22
 hostdeps="automake autoconf libtool pkg-config"
 
 regenerate() {
-    libtoolize -cfvi && autoreconf -fvi
+    autoreconf -fvi
     # Make sure we regenerate this file
     rm -f src/fcobjshash.h
 }
