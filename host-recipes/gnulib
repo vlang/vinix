@@ -1,13 +1,3 @@
 name=gnulib
 from_source=gnulib
 revision=1
-
-build() {
-    true
-
-    true
-}
-
-package() {
-    true
-}

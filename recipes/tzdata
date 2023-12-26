@@ -7,8 +7,6 @@ deps="core-libs"
 
 build() {
     cp -r ${source_dir}/. ./
-
-    true
 }
 
 package() {

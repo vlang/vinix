@@ -5,8 +5,6 @@ deps="core-libs freetype fontconfig"
 
 build() {
     cp -r ${source_dir}/. ./
-
-    true
 }
 
 package() {

@@ -1,7 +1,3 @@
 name=base-files
 version=0.0
 source_dir="base-files"
-
-regenerate() {
-    true
-}

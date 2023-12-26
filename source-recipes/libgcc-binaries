@@ -2,7 +2,3 @@ name=libgcc-binaries
 version=1e4b24ef15a7d9a2db7570d1c9283fc474dcbd73
 tarball_url="https://github.com/mintsuki/libgcc-binaries/archive/${version}.tar.gz"
 tarball_blake2b="77b8af0466577ca5af9b16d968865d24d42fb422566de2f03dd5b2d984f70015da6b1bd28878855889ee665f0ace4419cee3c40d20ac1176b0c500a1e50302bd"
-
-regenerate() {
-    true
-}
