@@ -1,8 +1,18 @@
 diff --git autoconf-clean/build-aux/config.guess autoconf-workdir/build-aux/config.guess
-index cdfc439..6f224fc 100755
+index cdfc439..0e1b56a 100755
 --- autoconf-clean/build-aux/config.guess
 +++ autoconf-workdir/build-aux/config.guess
-@@ -933,6 +933,9 @@ EOF
+@@ -4,7 +4,8 @@
+ 
+ # shellcheck disable=SC2006,SC2268 # see below for rationale
+ 
+-timestamp='2023-08-22'
++# timestamp it to always be newer
++timestamp='9999-99-99'
+ 
+ # This file is free software; you can redistribute it and/or modify it
+ # under the terms of the GNU General Public License as published by
+@@ -933,6 +934,9 @@ EOF
      i*:PW*:*)
  	GUESS=$UNAME_MACHINE-pc-pw32
  	;;
@@ -13,10 +23,20 @@ index cdfc439..6f224fc 100755
          GUESS=$UNAME_MACHINE-pc-serenity
          ;;
 diff --git autoconf-clean/build-aux/config.sub autoconf-workdir/build-aux/config.sub
-index defe52c..959a059 100755
+index defe52c..8600125 100755
 --- autoconf-clean/build-aux/config.sub
 +++ autoconf-workdir/build-aux/config.sub
-@@ -1749,7 +1749,7 @@ case $os in
+@@ -4,7 +4,8 @@
+ 
+ # shellcheck disable=SC2006,SC2268 # see below for rationale
+ 
+-timestamp='2023-09-19'
++# timestamp it to always be newer
++timestamp='9999-99-99'
+ 
+ # This file is free software; you can redistribute it and/or modify it
+ # under the terms of the GNU General Public License as published by
+@@ -1749,7 +1750,7 @@ case $os in
  	     | mirbsd* | netbsd* | dicos* | openedition* | ose* \
  	     | bitrig* | openbsd* | secbsd* | solidbsd* | libertybsd* | os108* \
  	     | ekkobsd* | freebsd* | riscix* | lynxos* | os400* \
