@@ -15,4 +15,7 @@ package() {
 
     mkdir -p "${dest_dir}${prefix}"/bin
     ln -sf ../v/v "${dest_dir}${prefix}"/bin/v
+
+        strip_command=strip \
+    post_package_strip
 }

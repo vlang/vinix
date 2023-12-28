@@ -23,7 +23,5 @@ package() {
     DESTDIR="${dest_dir}" ninja install
     mkdir -p "${dest_dir}${prefix}/share/X11/xkb"
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/*
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libxkbcommon-x11.so.0.0.0,libxkbcommon.so.0.0.0,libxkbregistry.so.0.0.0}
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/libexec/xkbcommon/*
+    post_package_strip
 }

@@ -28,9 +28,11 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip-gcc
+    DESTDIR="${dest_dir}" make install-gcc
 
     ln -s gcc "${dest_dir}${prefix}"/bin/cc
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
+
+    post_package_strip
 }

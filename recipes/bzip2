@@ -15,9 +15,9 @@ build() {
 
 package() {
     mkdir -p "${dest_dir}${prefix}/bin" "${dest_dir}${prefix}/lib" "${dest_dir}${prefix}/lib/pkgconfig" "${dest_dir}${prefix}/include"
-    install -s --strip-program=${OS_TRIPLET}-strip bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
-    install -s --strip-program=${OS_TRIPLET}-strip bzip2recover "${dest_dir}${prefix}/bin/"
-    install -s --strip-program=${OS_TRIPLET}-strip libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/"
+    install bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
+    install bzip2recover "${dest_dir}${prefix}/bin/"
+    install libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/"
     install -m 644 bzlib.h "${dest_dir}${prefix}/include/"
     ln -sf libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/libbz2.so.1.0"
     ln -sf libbz2.so.1.0 "${dest_dir}${prefix}/lib/libbz2.so.1"
@@ -56,4 +56,6 @@ Requires:
 Libs: -L${prefix}/lib -lbz2
 Cflags: -I${prefix}/include
 EOF
+
+    post_package_strip
 }

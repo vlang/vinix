@@ -51,7 +51,7 @@ clean:
 
 install:
 	install -d "$(DESTDIR)$(PREFIX)/bin"
-	install -s --strip-program=x86_64-vinix-strip $(CHSH_TARGET)  "$(DESTDIR)$(PREFIX)/bin/"
-	install -s --strip-program=x86_64-vinix-strip $(FETCH_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
-	install -s --strip-program=x86_64-vinix-strip $(LSCPU_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
-	install -s --strip-program=x86_64-vinix-strip $(MOUNT_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
+	install $(CHSH_TARGET)  "$(DESTDIR)$(PREFIX)/bin/"
+	install $(FETCH_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
+	install $(LSCPU_TARGET) "$(DESTDIR)$(PREFIX)/bin/"
+	install $(MOUNT_TARGET) "$(DESTDIR)$(PREFIX)/bin/"

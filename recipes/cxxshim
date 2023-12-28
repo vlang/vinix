@@ -16,4 +16,6 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
 }

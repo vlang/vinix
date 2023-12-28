@@ -16,8 +16,6 @@ build() {
 
 package() {
     make install DESTDIR="${dest_dir}"
-    # We strip it manually because install-strip is broken.
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/less
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/lessecho
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/lesskey
+
+    post_package_strip
 }

@@ -13,6 +13,7 @@ build() {
         --libdir=lib \
         --buildtype=debugoptimized \
         -Dmlibc_no_headers=true \
+        -Ddefault_library=both \
         -Ddisable_crypt_option=true \
         -Ddisable_iconv_option=true \
         -Ddisable_intl_option=true \

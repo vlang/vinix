@@ -39,6 +39,5 @@ package() {
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
 
-    # Strip
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libformw.so,libmenuw.so,libncursesw.so,libpanelw.so,libtinfow.so}
+    post_package_strip
 }

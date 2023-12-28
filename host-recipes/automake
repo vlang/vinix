@@ -11,8 +11,11 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
 
     cp -pv /usr/local/share/autoconf/build-aux/config.sub "${dest_dir}${prefix}"/share/automake-1.16/
     cp -pv /usr/local/share/autoconf/build-aux/config.guess "${dest_dir}${prefix}"/share/automake-1.16/
+
+        strip_command=strip \
+    post_package_strip
 }

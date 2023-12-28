@@ -213,10 +213,10 @@ index 524350c..c2e00db 100644
  	rtdl_include_dirs += include_directories('sysdeps/lyre/include')
 diff --git mlibc-workdir/sysdeps/vinix/generic/entry.cpp mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
-index 0000000..5345d0e
+index 0000000..cadab22
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/generic/entry.cpp
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,120 @@
 +#include <stdint.h>
 +#include <stdlib.h>
 +#include <bits/ensure.h>
@@ -231,6 +231,7 @@ index 0000000..5345d0e
 +void __mlibc_initLocale();
 +
 +extern "C" uintptr_t *__dlapi_entrystack();
++extern "C" void __dlapi_enter(uintptr_t *);
 +
 +extern char **environ;
 +static mlibc::exec_stack_data __mlibc_stack_data;
@@ -329,10 +330,10 @@ index 0000000..5345d0e
 +	__builtin_unreachable();
 +}
 +
-+extern "C" void __mlibc_entry(int (*main_fn)(int argc, char *argv[], char *env[])) {
++extern "C" void __mlibc_entry(uintptr_t *entry_stack, int (*main_fn)(int argc, char *argv[], char *env[])) {
 +	mlibc::sys_sigentry((void *)__mlibc_sigentry);
 +
-+	// TODO: call __dlapi_enter, otherwise static builds will break (see Linux sysdeps)
++	__dlapi_enter(entry_stack);
 +	auto result = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
 +	exit(result);
 +}
@@ -2680,15 +2681,16 @@ index 0000000..0713674
 +
 diff --git mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crt0.S mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crt0.S
 new file mode 100644
-index 0000000..d16a46f
+index 0000000..9b77ee7
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crt0.S
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,8 @@
 +.section .text
 +.global _start
 +_start:
-+    mov $main, %rdi
-+    call __mlibc_entry
++	mov %rsp, %rdi
++	mov $main, %rsi
++	call __mlibc_entry
 +.section .note.GNU-stack,"",%progbits
 +
 diff --git mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crti.S mlibc-workdir/sysdeps/vinix/x86_64/crt-src/crti.S

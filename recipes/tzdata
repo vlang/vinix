@@ -50,4 +50,6 @@ package() {
 
     # Default to UTC for localtime, this should be fixed, but that is pending xbstrap support.
     ln -sf /usr/share/zoneinfo/UTC "${dest_dir}"/etc/localtime
+
+    post_package_strip
 }

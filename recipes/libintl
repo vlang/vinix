@@ -39,7 +39,7 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make -C gettext-runtime/intl install-strip
-    # For some reason libintl.so is still not stripped, strip it now.
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libintl.so.8.4.0
+    DESTDIR="${dest_dir}" make -C gettext-runtime/intl install
+
+    post_package_strip
 }

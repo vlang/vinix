@@ -17,7 +17,7 @@ package() {
     rm -rf tmp_libgcc_dir
     mkdir tmp_libgcc_dir
 
-    DESTDIR="$(realpath tmp_libgcc_dir)" make install-strip-target-libgcc
+    DESTDIR="$(realpath tmp_libgcc_dir)" make install-target-libgcc
 
     mkdir -p "${dest_dir}${prefix}"
 

@@ -5,4 +5,6 @@ revision=1
 package() {
     mkdir -p "${dest_dir}${prefix}"/share/aclocal
     cp -r "${source_dir}"/m4/. "${dest_dir}${prefix}"/share/aclocal/
+
+    post_package_strip
 }

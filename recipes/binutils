@@ -25,11 +25,13 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
 
     # Remove unnecessary directory
     rm -rf "${dest_dir}${prefix}"/${OS_TRIPLET}
 
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
+
+    post_package_strip
 }

@@ -19,5 +19,6 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" make install
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}/lib/libfreetype.so.6.20.1"
+
+    post_package_strip
 }

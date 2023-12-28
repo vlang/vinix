@@ -16,7 +16,9 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
     mv -v "${dest_dir}"/sysroot/* "${dest_dir}"/
     rm -rf "${dest_dir}"/sysroot
+
+    post_package_strip
 }

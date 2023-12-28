@@ -23,7 +23,5 @@ package() {
     # Remove static libraries.
     rm -rf "${dest_dir}${prefix}"/lib/*.a
 
-    # Strip executables.
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libzstd.so.1.5.5
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/zstd
+    post_package_strip
 }

@@ -20,5 +20,5 @@ build() {
 package() {
     DESTDIR="${dest_dir}" ninja install
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libepoxy.so.0.0.0
+    post_package_strip
 }

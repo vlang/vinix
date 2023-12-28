@@ -16,4 +16,6 @@ build() {
 
 package() {
     make DESTDIR=${dest_dir} install
+
+    post_package_strip
 }

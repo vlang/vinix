@@ -114,7 +114,7 @@ distclean: clean
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)/boot"
-	install -s --strip-program=x86_64-vinix-strip $(KERNEL) "$(DESTDIR)$(PREFIX)/boot/"
+	install $(KERNEL) "$(DESTDIR)$(PREFIX)/boot/"
 
 blob.o: $(VFILES) freestanding_headers flanterm-c c/printf
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .

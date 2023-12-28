@@ -20,6 +20,5 @@ build() {
 package() {
     make SHLIB_LIBS="-lncursesw" install DESTDIR="${dest_dir}"
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libhistory.so.8
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libreadline.so.8
+    post_package_strip
 }

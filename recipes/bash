@@ -19,6 +19,8 @@ build() {
 }
 
 package() {
-    make install-strip DESTDIR="${dest_dir}"
+    make install DESTDIR="${dest_dir}"
     ln -s bash "${dest_dir}${prefix}"/bin/sh
+
+    post_package_strip
 }

@@ -19,7 +19,7 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libcharset.so.1.0.0,libiconv.so.2.6.1}
+    post_package_strip
 }

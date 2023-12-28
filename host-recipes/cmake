@@ -12,4 +12,7 @@ build() {
 package() {
     DESTDIR="${dest_dir}" make install
     echo 'include(Platform/UnixPaths)' > "${dest_dir}${prefix}/share/cmake-3.27/Modules/Platform/Vinix.cmake"
+
+        strip_command=strip \
+    post_package_strip
 }

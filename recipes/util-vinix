@@ -12,4 +12,6 @@ build() {
 
 package() {
     make install PREFIX="${prefix}" DESTDIR="${dest_dir}"
+
+    post_package_strip
 }

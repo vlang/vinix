@@ -12,7 +12,7 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
     mkdir -p "${dest_dir}${prefix}/share/pkgconfig/personality.d"
     cat <<EOF >"${dest_dir}${prefix}/share/pkgconfig/personality.d/${OS_TRIPLET}.personality"
 Triplet: ${OS_TRIPLET}
@@ -22,4 +22,7 @@ SystemIncludePaths: ${sysroot_dir}/usr/include
 SystemLibraryPaths: ${sysroot_dir}/usr/lib
 EOF
     ln -s pkgconf "${dest_dir}${prefix}/bin/${OS_TRIPLET}-pkg-config"
+
+        strip_command=strip \
+    post_package_strip
 }

@@ -16,5 +16,7 @@ build() {
 
 package() {
     install -d "${dest_dir}/usr/bin"
-    install -s --strip-program=x86_64-vinix-strip init "${dest_dir}/usr/bin/"
+    install init "${dest_dir}/usr/bin/"
+
+    post_package_strip
 }
