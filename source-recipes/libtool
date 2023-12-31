@@ -6,6 +6,6 @@ hostdeps="autoconf automake gnulib"
 imagedeps="help2man"
 
 regenerate() {
-    cp -r ${base_dir}/sources/gnulib ./
+    cp -rp ${base_dir}/sources/gnulib ./
     ./bootstrap --force --skip-git --skip-po --gnulib-srcdir=`pwd`/gnulib
 }

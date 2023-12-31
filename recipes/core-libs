@@ -1,4 +1,3 @@
 name=core-libs
-from_source=mlibc
 revision=1
 deps="mlibc libgcc libstdc++ libintl libiconv libxcrypt"
