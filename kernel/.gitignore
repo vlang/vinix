@@ -1,5 +1,5 @@
-/blob.c
-/modules/trace/symbol.v
-/freestanding_headers
+/freestanding-headers
 /flanterm-c
 /c/printf
+/bin
+/obj

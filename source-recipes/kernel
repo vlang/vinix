@@ -5,12 +5,5 @@ imagedeps="git"
 allow_network="yes"
 
 regenerate() {
-    [ -d freestanding_headers ] || git clone https://github.com/mintsuki/freestanding-headers.git freestanding_headers
-    [ -d flanterm-c ] || git clone https://github.com/mintsuki/flanterm.git flanterm-c
-    [ -d c/printf ] || (
-        set -e
-        mkdir -p c/printf
-        curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/develop/src/printf/printf.c
-        curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/develop/src/printf/printf.h
-    )
+    make ext-deps
 }

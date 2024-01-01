@@ -53,9 +53,11 @@ else
 endif
 
 override CFLAGS += \
+    -g \
     -Wall \
     -Wextra \
     -std=gnu99 \
+    -nostdinc \
     -ffreestanding \
     -fno-omit-frame-pointer \
     -fno-stack-protector \
@@ -76,8 +78,8 @@ override CFLAGS += \
     -mcmodel=kernel
 
 override CPPFLAGS := \
-    -Ifreestanding_headers \
-    -Ic \
+    -isystem freestanding-headers \
+    -I c \
     $(CPPFLAGS) \
     -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
@@ -114,8 +116,11 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 .PHONY: all
 all: bin/$(KERNEL)
 
-freestanding_headers:
-	git clone https://github.com/mintsuki/freestanding_headers.git
+.PHONY: ext-deps
+ext-deps: freestanding-headers flanterm-c c/printf
+
+freestanding-headers:
+	git clone https://github.com/mintsuki/freestanding-headers.git
 
 flanterm-c:
 	git clone https://github.com/mintsuki/flanterm.git flanterm-c
@@ -129,27 +134,27 @@ c/printf:
 	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
 	exit 0
 
-bin/$(KERNEL): GNUmakefile linker.ld obj/blob.o $(OBJ)
+bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	mkdir -p "$$(dirname $@)"
-	$(LD) obj/blob.o $(OBJ) $(LDFLAGS) -o $@
+	$(LD) obj/blob.c.o $(OBJ) $(LDFLAGS) -o $@
 	mv c/symbol_table.c symbol_table.c.tmp
 	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.o
-	$(LD) obj/blob.o $(OBJ) $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.c.o
+	$(LD) obj/blob.c.o $(OBJ) $(LDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c
 
-obj/blob.o: $(VFILES) freestanding_headers flanterm-c c/printf
+obj/blob.c.o: $(VFILES) freestanding-headers flanterm-c c/printf
 	mkdir -p "$$(dirname $@)"
 	$(V) $(VFLAGS) -o obj/blob.c .
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
 
 -include $(HEADER_DEPS)
 
-obj/%.c.o: %.c GNUmakefile freestanding_headers flanterm-c c/printf
+obj/%.c.o: %.c GNUmakefile freestanding-headers flanterm-c c/printf
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-obj/%.S.o: %.S GNUmakefile freestanding_headers flanterm-c c/printf
+obj/%.S.o: %.S GNUmakefile freestanding-headers flanterm-c c/printf
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
@@ -159,7 +164,7 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf freestanding_headers flanterm-c c/printf
+	rm -rf freestanding-headers flanterm-c c/printf
 
 .PHONY: install
 install:
