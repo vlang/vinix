@@ -2,7 +2,12 @@
 # Code is governed by the GPL-2.0 license.
 # Copyright (C) 2021-2022 The Vinix authors.
 
+# Nuke built-in rules and variables.
+override MAKEFLAGS += -rR
+
 .ONESHELL:
+
+override KERNEL := vinix
 
 define DEFAULT_VAR =
     ifeq ($(origin $1), default)
@@ -13,14 +18,33 @@ define DEFAULT_VAR =
     endif
 endef
 
-$(eval $(call DEFAULT_VAR,CC,cc))
-$(eval $(call DEFAULT_VAR,LD,ld))
-$(eval $(call DEFAULT_VAR,OBJDUMP,objdump))
+override DEFAULT_TOOLCHAIN_PREFIX :=
+$(eval $(call DEFAULT_VAR,TOOLCHAIN_PREFIX,$(DEFAULT_TOOLCHAIN_PREFIX)))
 
-V       ?= v
-CFLAGS  ?= -O2 -Wall -Wextra -g -pipe
-LDFLAGS ?=
-VFLAGS  ?=
+override DEFAULT_CC := $(TOOLCHAIN_PREFIX)cc
+$(eval $(call DEFAULT_VAR,CC,$(DEFAULT_CC)))
+
+override DEFAULT_LD := $(TOOLCHAIN_PREFIX)ld
+$(eval $(call DEFAULT_VAR,LD,$(DEFAULT_LD)))
+
+override DEFAULT_OBJDUMP := $(TOOLCHAIN_PREFIX)objdump
+$(eval $(call DEFAULT_VAR,OBJDUMP,$(DEFAULT_OBJDUMP)))
+
+override DEFAULT_V := v
+$(eval $(call DEFAULT_VAR,V,$(DEFAULT_V)))
+
+override DEFAULT_CFLAGS := -g -O2 -pipe
+$(eval $(call DEFAULT_VAR,CFLAGS,$(DEFAULT_CFLAGS)))
+
+override DEFAULT_CPPFLAGS :=
+$(eval $(call DEFAULT_VAR,CPPFLAGS,$(DEFAULT_CPPFLAGS)))
+
+override DEFAULT_VFLAGS :=
+$(eval $(call DEFAULT_VAR,VFLAGS,$(DEFAULT_VFLAGS)))
+
+override DEFAULT_LDFLAGS :=
+$(eval $(call DEFAULT_VAR,LDFLAGS,$(DEFAULT_LDFLAGS)))
+
 VINIX_PROD ?=
 ifeq ($(VINIX_PROD),no)
     override PROD := false
@@ -28,65 +52,67 @@ else
     override PROD := true
 endif
 
-override INTERNALCFLAGS :=        \
-	-ffreestanding                \
-	-std=gnu99                    \
-	-nostdinc                     \
-	-fno-omit-frame-pointer       \
-	-fno-stack-protector          \
-	-fno-stack-check              \
-	-fno-pic                      \
-	-fno-pie                      \
-	-ffunction-sections           \
-	-fdata-sections               \
-	-fno-strict-aliasing          \
-	-mabi=sysv                    \
-	-mno-80387                    \
-	-mno-mmx                      \
-	-mno-3dnow                    \
-	-mno-sse                      \
-	-mno-sse2                     \
-	-mno-red-zone                 \
-	-mcmodel=kernel               \
-	-Wno-address-of-packed-member \
-	-Wno-unused-value             \
-	-Wno-unused-label             \
-	-Wno-unused-function          \
-	-Wno-unused-variable          \
-	-Wno-unused-parameter         \
-	-DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
-	-DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
-	-Ifreestanding_headers        \
-	-Ic
+override CFLAGS += \
+    -Wall \
+    -Wextra \
+    -std=gnu99 \
+    -ffreestanding \
+    -fno-omit-frame-pointer \
+    -fno-stack-protector \
+    -fno-stack-check \
+    -fno-lto \
+    -fno-PIC \
+    -fno-PIE \
+    -ffunction-sections \
+    -fdata-sections \
+    -fno-strict-aliasing \
+    -m64 \
+    -march=x86-64 \
+    -mno-80387 \
+    -mno-mmx \
+    -mno-sse \
+    -mno-sse2 \
+    -mno-red-zone \
+    -mcmodel=kernel
 
-override INTERNALLDFLAGS :=  \
-	-Tlinker.ld              \
-	-nostdlib                \
-	-zmax-page-size=0x1000   \
-	-static                  \
-	-gc-sections
+override CPPFLAGS := \
+    -Ifreestanding_headers \
+    -Ic \
+    $(CPPFLAGS) \
+    -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
+    -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
+    -MMD \
+    -MP
 
-override INTERNALVFLAGS := \
-	-os vinix              \
-	-enable-globals        \
-	-nofloat               \
-	-autofree              \
-	-gc none               \
-	-d no_backtrace
+override LDFLAGS += \
+    -m elf_x86_64 \
+    -nostdlib \
+    -static \
+    -zmax-page-size=0x1000 \
+    -Tlinker.ld \
+    -gc-sections
 
-ifeq ($(PROD), true)
-	override INTERNALVFLAGS += -prod
-	override INTERNALCFLAGS += -DPROD
+override VFLAGS += \
+    -os vinix \
+    -enable-globals \
+    -nofloat \
+    -autofree \
+    -gc none \
+    -d no_backtrace
+
+ifeq ($(PROD),true)
+	override VFLAGS += -prod
+	override CPPFLAGS += -DPROD
 endif
 
-override KERNEL := vinix
-override VFILES := $(shell find ./ -type f -name '*.v')
-override CFILES := $(shell find ./ -type f -name '*.c')
-override SFILES := $(shell find ./ -type f -name '*.S')
-override COBJ   := $(CFILES:.c=.o) $(SFILES:.S=.o)
+override VFILES := $(shell find -L * -type f -name '*.v')
+override CFILES := $(shell find -L * -type f -name '*.c')
+override ASFILES := $(shell find -L * -type f -name '*.S')
+override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
+override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
 .PHONY: all
-all: $(KERNEL)
+all: bin/$(KERNEL)
 
 freestanding_headers:
 	git clone https://github.com/mintsuki/freestanding_headers.git
@@ -103,9 +129,33 @@ c/printf:
 	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
 	exit 0
 
+bin/$(KERNEL): GNUmakefile linker.ld obj/blob.o $(OBJ)
+	mkdir -p "$$(dirname $@)"
+	$(LD) obj/blob.o $(OBJ) $(LDFLAGS) -o $@
+	mv c/symbol_table.c symbol_table.c.tmp
+	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.o
+	$(LD) obj/blob.o $(OBJ) $(LDFLAGS) -o $@
+	mv symbol_table.c.tmp c/symbol_table.c
+
+obj/blob.o: $(VFILES) freestanding_headers flanterm-c c/printf
+	mkdir -p "$$(dirname $@)"
+	$(V) $(VFLAGS) -o obj/blob.c .
+	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
+
+-include $(HEADER_DEPS)
+
+obj/%.c.o: %.c GNUmakefile freestanding_headers flanterm-c c/printf
+	mkdir -p "$$(dirname $@)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+obj/%.S.o: %.S GNUmakefile freestanding_headers flanterm-c c/printf
+	mkdir -p "$$(dirname $@)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
 .PHONY: clean
 clean:
-	rm -rf $(KERNEL) $(COBJ) blob.o blob.c
+	rm -rf bin obj
 
 .PHONY: distclean
 distclean: clean
@@ -114,22 +164,4 @@ distclean: clean
 .PHONY: install
 install:
 	install -d "$(DESTDIR)$(PREFIX)/share/vinix"
-	install -m 644 $(KERNEL) "$(DESTDIR)$(PREFIX)/share/vinix/"
-
-blob.o: $(VFILES) freestanding_headers flanterm-c c/printf
-	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -w -c blob.c -o $@
-
-%.o: %.c freestanding_headers flanterm-c c/printf
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
-
-%.o: %.S freestanding_headers flanterm-c c/printf
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
-
-$(KERNEL): blob.o $(COBJ)
-	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
-	mv c/symbol_table.c symbol_table.c.tmp
-	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c c/symbol_table.c -o c/symbol_table.o
-	$(LD) blob.o $(COBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
-	mv symbol_table.c.tmp c/symbol_table.c
+	install -m 644 bin/$(KERNEL) "$(DESTDIR)$(PREFIX)/share/vinix/"
