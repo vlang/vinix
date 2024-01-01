@@ -21,11 +21,46 @@ post_package_strip() {
     done
 }
 
+autotools_configure() {
+    if [ -z "${configure_script_path}" ]; then
+        configure_script_path="${source_dir}/configure"
+    fi
+
+    ${configure_script_path} \
+        --host=${OS_TRIPLET} \
+        --with-sysroot=${sysroot_dir} \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --bindir=${prefix}/bin \
+        --sbindir=${prefix}/bin \
+        --libdir=${prefix}/lib \
+        --disable-static \
+        --enable-shared \
+        "$@"
+}
+
 autotools_recursive_regen() {
     for f in $(find . -name configure.ac); do
         echo "* autotools regen in '$(dirname $f)'..."
         ( cd "$(dirname "$f")" && autoreconf -fvi "$@" )
     done
+}
+
+meson_configure() {
+    if [ -z "${meson_source_dir}" ]; then
+        meson_source_dir="${source_dir}"
+    fi
+
+    meson setup "${meson_source_dir}" \
+        --cross-file "${base_dir}/build-support/cross_file.txt" \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --libdir=lib \
+        --sbindir=bin \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        "$@"
 }
 
 if [ "$in_container" = true ]; then

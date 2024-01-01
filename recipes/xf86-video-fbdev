@@ -6,12 +6,7 @@ deps="core-libs xorg-server xorg-util-macros"
 
 build() {
         SYSROOT=${sysroot_dir} \
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
+    autotools_configure \
         --disable-pciaccess
 
     make -j${parallelism}

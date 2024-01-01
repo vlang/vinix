@@ -6,11 +6,7 @@ deps="core-libs"
 imagedeps="mtools nasm"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
+    autotools_configure \
         --enable-uefi-ia32 \
         --enable-uefi-x86-64 \
         --enable-uefi-cd \

@@ -5,12 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-util-macros xorg-proto libx11 libxtrans freetype fontconfig bzip2 libfontenc zlib"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
+    autotools_configure \
         --with-bzip2 \
         --disable-devel-docs \
         --disable-selective-werror

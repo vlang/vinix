@@ -6,13 +6,8 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses readline"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --without-bash-malloc  \
-        --disable-nls \
+    autotools_configure \
+        --without-bash-malloc \
         --with-installed-readline="${sysroot}"/usr/lib
 
     make -j${parallelism}

@@ -6,14 +6,11 @@ imagedeps="meson ninja"
 deps="cxxshim frigg"
 
 build() {
-    meson setup \
-        --cross-file ${base_dir}/build-support/cross_file.txt \
-        --prefix=${prefix} \
+    meson_configure \
         -Dheaders_only=true \
         -Ddisable_crypt_option=true \
         -Ddisable_iconv_option=true \
-        -Ddisable_intl_option=true \
-        ${source_dir}
+        -Ddisable_intl_option=true
 
     ninja -j${parallelism}
 }

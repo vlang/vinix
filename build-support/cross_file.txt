@@ -2,9 +2,10 @@
 c = 'x86_64-vinix-gcc'
 cpp = 'x86_64-vinix-g++'
 ar = 'x86_64-vinix-ar'
+nm = 'x86_64-vinix-nm'
 strip = 'x86_64-vinix-strip'
 pkg-config = 'x86_64-vinix-pkg-config'
-# sed adds binaries here.
+llvm-config = '/base_dir/build-support/cross-llvm-config'
 
 [host_machine]
 system = 'vinix'

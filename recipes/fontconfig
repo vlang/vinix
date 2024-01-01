@@ -6,14 +6,7 @@ deps="core-libs freetype libexpat libxml"
 imagedeps="python gperf"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
-        --disable-docs \
-        --disable-nls \
+    autotools_configure \
         --enable-libxml2
 
     make -j${parallelism}

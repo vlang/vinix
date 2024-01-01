@@ -6,14 +6,7 @@ deps="mlibc libgcc libstdc++"
 imagedeps="binutils"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static              \
-        --enable-shared               \
-        --disable-nls
+    autotools_configure
 
     make -j${parallelism}
 }

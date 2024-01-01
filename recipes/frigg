@@ -4,13 +4,10 @@ revision=1
 imagedeps="meson ninja git base-devel"
 
 build() {
-    meson setup \
-        --prefix=${prefix} \
-        --libdir=lib \
+    meson_configure \
         --includedir=share/frigg/include \
         --buildtype=debugoptimized \
-        -Dbuild_tests=disabled \
-        ${source_dir}
+        -Dbuild_tests=disabled
 
     ninja -j${parallelism}
 }

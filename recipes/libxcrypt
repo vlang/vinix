@@ -6,14 +6,9 @@ deps="mlibc libgcc libstdc++"
 imagedeps="python-passlib"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
+    autotools_configure \
         --enable-obsolete-api=yes \
-        --disable-xcrypt-compat-files \
-        --disable-static
+        --disable-xcrypt-compat-files
 
     make -j${parallelism}
 }

@@ -6,12 +6,7 @@ deps="core-libs xorg-util-macros xorg-proto xcb-proto libxtrans libxshmfence lib
 
 build() {
         CFLAGS="-Wno-error=array-bounds ${common_flags}" \
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
+    autotools_configure \
         --with-xkb-output=/var/lib/xkb \
         --with-fontrootdir=/usr/share/fonts/X11 \
         --enable-xorg \

@@ -7,11 +7,7 @@ deps="core-libs"
 
 build() {
         cf_cv_func_nanosleep=yes \
-    "${source_dir}"/configure \
-        --host=${OS_TRIPLET} \
-        --prefix="${prefix}" \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
+    autotools_configure \
         --enable-pc-files \
         --with-shared \
         --without-normal \

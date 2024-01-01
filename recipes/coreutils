@@ -8,13 +8,9 @@ imagedeps="gcc gperf"
 build() {
     cp -rp "${source_dir}"/. ./
 
+        configure_script_path=./configure \
         CFLAGS="-DSLOW_BUT_NO_HACKS $CFLAGS" \
-    ./configure    \
-        --host=${OS_TRIPLET}    \
-        --prefix=${prefix}     \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-nls
+    autotools_configure
 
     make -j${parallelism}
 }

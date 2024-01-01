@@ -6,14 +6,9 @@ deps="core-libs xorg-util-macros xorg-proto libxcb libxtrans"
 imagedeps="gcc"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc             \
-        --localstatedir=/var          \
-        --disable-static              \
-        --disable-ipv6                \
-        --disable-malloc0returnsnull  \
+    autotools_configure \
+        --disable-ipv6 \
+        --disable-malloc0returnsnull \
         --with-keysymdefdir=${sysroot_dir}/usr/include/X11
 
     make -j${parallelism}

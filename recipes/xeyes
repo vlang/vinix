@@ -5,11 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libx11 libxmu libxaw libxrender libxft libxt libxi libxkbfile"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc             \
-        --localstatedir=/var          \
+    autotools_configure \
         --disable-selective-werror
 
     make -j${parallelism}

@@ -6,14 +6,8 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --enable-cxx                  \
-        --disable-static              \
-        --with-sysroot=${sysroot_dir}
+    autotools_configure \
+        --enable-cxx
 
     make -j${parallelism}
 }

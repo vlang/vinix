@@ -6,13 +6,7 @@ deps="core-libs xorg-util-macros xorg-proto libxau libxdmcp xcb-proto"
 imagedeps="python"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc             \
-        --localstatedir=/var          \
-        --disable-static              \
-        --with-sysroot=${sysroot_dir}
+    autotools_configure
 
     make -j${parallelism}
 }

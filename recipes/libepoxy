@@ -6,13 +6,9 @@ deps="core-libs mesa xorg-proto libx11"
 imagedeps="meson ninja"
 
 build() {
-    meson setup \
-        --cross-file ${base_dir}/build-support/cross_file.txt \
-        --prefix=${prefix} \
-        --buildtype=release \
+    meson_configure \
         -Degl=no \
-        -Dtests=false \
-        ${source_dir}
+        -Dtests=false
 
     ninja -j${parallelism}
 }

@@ -6,12 +6,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs gmp mpfr"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static
+    autotools_configure
 
     make -j${parallelism}
 }

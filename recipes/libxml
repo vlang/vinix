@@ -5,13 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
-        --with-sysroot=${sysroot_dir} \
+    autotools_configure \
         --without-threads \
         --disable-ipv6 \
         --without-python

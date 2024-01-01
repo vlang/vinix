@@ -7,18 +7,14 @@ deps="mlibc-headers cxxshim frigg"
 
 build() {
         LDFLAGS="-Wl,/usr/local/libgcc-binaries/libgcc-x86_64.a" \
-    meson setup \
-        --cross-file ${base_dir}/build-support/cross_file.txt \
-        --prefix=${prefix} \
-        --libdir=lib \
+    meson_configure \
         --buildtype=debugoptimized \
         -Dmlibc_no_headers=true \
         -Ddefault_library=both \
         -Ddisable_crypt_option=true \
         -Ddisable_iconv_option=true \
         -Ddisable_intl_option=true \
-        -Ddisable_libgcc_dependency=true \
-        ${source_dir}
+        -Ddisable_libgcc_dependency=true
 
     ninja -j${parallelism}
 }

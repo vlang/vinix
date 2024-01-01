@@ -3,18 +3,12 @@ from_source=libxkbcommon
 revision=1
 hostdeps="gcc pkg-config"
 deps="core-libs libxcb libxml xkeyboard-config"
-imagedeps="meson ninja"
+imagedeps="meson ninja doxygen"
 
 build() {
-    meson setup \
-        --cross-file "${base_dir}/build-support/cross_file.txt" \
-        --prefix=/usr \
-        --libdir=lib \
-        --buildtype=release \
-        -Denable-docs=false \
+    meson_configure \
         -Denable-x11=true \
-        -Denable-wayland=false \
-        "${source_dir}"
+        -Denable-wayland=false
 
     ninja -j${parallelism}
 }

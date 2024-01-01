@@ -7,11 +7,8 @@ deps="core-libs"
 build() {
     cp -rp "${source_dir}"/. ./
 
-    ./configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var
+        configure_script_path=./configure \
+    autotools_configure
 
     make
 }

@@ -6,13 +6,7 @@ deps="core-libs gmp"
 imagedeps="gcc"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-documentation \
-        --disable-static
+    autotools_configure
 
     make -j${parallelism}
 }

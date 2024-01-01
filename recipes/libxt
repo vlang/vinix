@@ -6,13 +6,8 @@ deps="core-libs xorg-util-macros xorg-proto libx11 libxtrans libsm libice"
 imagedeps="gcc"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc             \
-        --localstatedir=/var          \
-        --disable-static              \
-        --disable-malloc0returnsnull  \
+    autotools_configure \
+        --disable-malloc0returnsnull \
         --with-appdefaultdir=/etc/X11/app-defaults
 
     make -j${parallelism}

@@ -5,11 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-server libxmu xbitmaps libxcursor"
 
 build() {
-    ${source_dir}/configure \
-        --prefix=${prefix} \
-        --host=${OS_TRIPLET} \
-        --sysconfdir=/etc \
-        --localstatedir=/var
+    autotools_configure
 
     make -j${parallelism}
 }

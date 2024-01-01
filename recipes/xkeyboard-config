@@ -6,12 +6,7 @@ deps="core-libs xorg-proto libx11"
 imagedeps="python"
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc             \
-        --localstatedir=/var          \
-        --disable-nls                 \
+    autotools_configure \
         --with-xkb-rules-symlink=xorg
 
     make -j${parallelism}

@@ -5,13 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bzip2 ncurses readline zlib"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
-        --with-sysroot=${sysroot_dir} \
+    autotools_configure \
         --enable-unicode \
         --enable-jit \
         --enable-pcre2-16 \

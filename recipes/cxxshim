@@ -4,12 +4,9 @@ revision=1
 imagedeps="meson ninja git base-devel"
 
 build() {
-    meson setup \
-        --prefix=${prefix} \
-        --libdir=lib \
+    meson_configure \
         --includedir=share/cxxshim/include \
-        -Dinstall_headers=true \
-        ${source_dir}
+        -Dinstall_headers=true
 
     ninja -j${parallelism}
 }

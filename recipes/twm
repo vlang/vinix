@@ -5,11 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-server xsetroot"
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var
+    autotools_configure
 
     make -j${parallelism}
 }
