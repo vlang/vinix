@@ -79,7 +79,7 @@ ifeq ($(PROD), true)
 	override INTERNALCFLAGS += -DPROD
 endif
 
-override KERNEL := vinix.elf
+override KERNEL := vinix
 override VFILES := $(shell find ./ -type f -name '*.v')
 override CFILES := $(shell find ./ -type f -name '*.c')
 override SFILES := $(shell find ./ -type f -name '*.S')
@@ -113,8 +113,8 @@ distclean: clean
 
 .PHONY: install
 install:
-	install -d "$(DESTDIR)$(PREFIX)/boot"
-	install $(KERNEL) "$(DESTDIR)$(PREFIX)/boot/"
+	install -d "$(DESTDIR)$(PREFIX)/share/vinix"
+	install -m 644 $(KERNEL) "$(DESTDIR)$(PREFIX)/share/vinix/"
 
 blob.o: $(VFILES) freestanding_headers flanterm-c c/printf
 	$(V) $(VFLAGS) $(INTERNALVFLAGS) -o blob.c .

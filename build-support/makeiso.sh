@@ -13,7 +13,7 @@ rm -rf sysroot
 # Prepare the iso and boot directories.
 rm -rf iso_root
 mkdir -pv iso_root/boot
-cp sysroot/boot/vinix.elf iso_root/boot/
+cp sysroot/usr/share/vinix/vinix iso_root/boot/
 cp initramfs.tar iso_root/boot/
 cp build-support/limine.cfg build-support/background.bmp iso_root/boot/
 

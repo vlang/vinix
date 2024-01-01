@@ -11,7 +11,7 @@ build() {
 }
 
 package() {
-    make install PREFIX="/" DESTDIR="${dest_dir}"
+    make install PREFIX="/usr" DESTDIR="${dest_dir}"
 
     post_package_strip
 }
