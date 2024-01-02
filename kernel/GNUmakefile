@@ -147,6 +147,7 @@ obj/blob.c.o: $(VFILES) freestanding-headers flanterm-c c/printf
 	mkdir -p "$$(dirname $@)"
 	$(V) $(VFLAGS) -o obj/blob.c .
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
+	mv obj/blob.c obj/blob.c.gen
 
 -include $(HEADER_DEPS)
 
