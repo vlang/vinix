@@ -31,6 +31,8 @@ package() {
     cd build
     DESTDIR="${dest_dir}" make install-gcc
 
+    ln -s ${OS_TRIPLET}-gcc "${dest_dir}${prefix}/bin/${OS_TRIPLET}-cc"
+
         strip_command=strip \
     post_package_strip
 }
