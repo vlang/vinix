@@ -22,6 +22,9 @@ jobs:
       - name: Clone and build current V
         run: git clone https://github.com/vlang/v.git --depth=1 && cd v && make
 
+      - name: Download kernel dependencies
+        run: cd kernel && ./get-deps
+
       - name: Attempt to build the Vinix kernel (debug)
         run: cd kernel && make PROD=false CFLAGS="-D__vinix__ -O2 -g -pipe" V="../v/v" && make clean
 

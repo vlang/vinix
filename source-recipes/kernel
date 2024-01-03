@@ -5,5 +5,5 @@ imagedeps="git"
 allow_network="yes"
 
 regenerate() {
-    make ext-deps
+    ./get-deps
 }

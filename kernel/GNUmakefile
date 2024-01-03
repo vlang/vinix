@@ -5,8 +5,6 @@
 # Nuke built-in rules and variables.
 override MAKEFLAGS += -rR
 
-.ONESHELL:
-
 override KERNEL := vinix
 
 define DEFAULT_VAR =
@@ -116,24 +114,6 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 .PHONY: all
 all: bin/$(KERNEL)
 
-.PHONY: ext-deps
-ext-deps: freestanding-headers flanterm-c c/printf
-
-freestanding-headers:
-	git clone https://github.com/mintsuki/freestanding-headers.git
-
-flanterm-c:
-	git clone https://github.com/mintsuki/flanterm.git flanterm-c
-	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
-	exit 0
-
-c/printf:
-	mkdir -p c/printf
-	curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/develop/src/printf/printf.c
-	curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/develop/src/printf/printf.h
-	$(MAKE) $(MAKEFLAGS) $(MAKEOVERRIDES) $(MAKECMDGOALS)
-	exit 0
-
 bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	mkdir -p "$$(dirname $@)"
 	$(LD) obj/blob.c.o $(OBJ) $(LDFLAGS) -o $@
@@ -143,7 +123,7 @@ bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	$(LD) obj/blob.c.o $(OBJ) $(LDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c
 
-obj/blob.c.o: $(VFILES) freestanding-headers flanterm-c c/printf
+obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
 	$(V) $(VFLAGS) -o obj/blob.c .
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
@@ -151,11 +131,11 @@ obj/blob.c.o: $(VFILES) freestanding-headers flanterm-c c/printf
 
 -include $(HEADER_DEPS)
 
-obj/%.c.o: %.c GNUmakefile freestanding-headers flanterm-c c/printf
+obj/%.c.o: %.c GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-obj/%.S.o: %.S GNUmakefile freestanding-headers flanterm-c c/printf
+obj/%.S.o: %.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 

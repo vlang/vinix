@@ -1,0 +1,15 @@
+#! /bin/sh
+
+if ! [ -d freestanding-headers ]; then
+    git clone https://github.com/mintsuki/freestanding-headers.git
+fi
+
+if ! [ -d flanterm-c ]; then
+    git clone https://github.com/mintsuki/flanterm.git flanterm-c
+fi
+
+if ! [ -d c/printf ]; then
+    mkdir -p c/printf
+    curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/develop/src/printf/printf.c
+    curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/develop/src/printf/printf.h
+fi
