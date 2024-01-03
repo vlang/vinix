@@ -1,5 +1,5 @@
-/freestanding-headers
-/flanterm-c
+/c/freestanding-headers
+/c/flanterm
 /c/printf
 /bin
 /obj

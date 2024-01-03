@@ -1,11 +1,11 @@
 #! /bin/sh
 
-if ! [ -d freestanding-headers ]; then
-    git clone https://github.com/mintsuki/freestanding-headers.git
+if ! [ -d c/freestanding-headers ]; then
+    git clone https://github.com/mintsuki/freestanding-headers.git c/freestanding-headers
 fi
 
-if ! [ -d flanterm-c ]; then
-    git clone https://github.com/mintsuki/flanterm.git flanterm-c
+if ! [ -d c/flanterm ]; then
+    git clone https://github.com/mintsuki/flanterm.git c/flanterm
 fi
 
 if ! [ -d c/printf ]; then

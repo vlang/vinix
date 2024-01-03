@@ -76,13 +76,15 @@ override CFLAGS += \
     -mcmodel=kernel
 
 override CPPFLAGS := \
-    -isystem freestanding-headers \
     -I c \
+    -isystem c/freestanding-headers \
     $(CPPFLAGS) \
-    -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
-    -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
     -MMD \
     -MP
+
+obj/c/printf/printf.c.o: override CPPFLAGS += \
+    -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
+    -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
 override LDFLAGS += \
     -m elf_x86_64 \
