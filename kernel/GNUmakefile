@@ -108,8 +108,8 @@ ifeq ($(PROD),true)
 endif
 
 override VFILES := $(shell find -L * -type f -name '*.v')
-override CFILES := $(shell find -L * -type f -name '*.c')
-override ASFILES := $(shell find -L * -type f -name '*.S')
+override CFILES := $(shell find -L c/* -type f -name '*.c')
+override ASFILES := $(shell find -L asm/* -type f -name '*.S')
 override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
@@ -129,7 +129,6 @@ obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
 	$(V) $(VFLAGS) -o obj/blob.c .
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
-	mv obj/blob.c obj/blob.c.gen
 
 -include $(HEADER_DEPS)
 
@@ -147,7 +146,7 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf freestanding-headers flanterm-c c/printf
+	rm -rf c/freestanding-headers c/flanterm c/printf
 
 .PHONY: install
 install:

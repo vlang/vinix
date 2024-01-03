@@ -1,15 +1,23 @@
 #! /bin/sh
 
+set -e
+
+FREESTANDING_HDRS_REV=dd3abd2d7147efc4170dff478d3b7730bed14147
+FLANTERM_REV=852e18fa790e5e09795a3bb70f8b698d77d4d79c
+EYALROZ_PRINTF_REV=af05afe8ef0f84cb9f3a9bbfd79ac81a941cbebf
+
 if ! [ -d c/freestanding-headers ]; then
     git clone https://github.com/mintsuki/freestanding-headers.git c/freestanding-headers
+    git -C c/freestanding-headers checkout ${FREESTANDING_HDRS_REV}
 fi
 
 if ! [ -d c/flanterm ]; then
     git clone https://github.com/mintsuki/flanterm.git c/flanterm
+    git -C c/flanterm checkout ${FLANTERM_REV}
 fi
 
 if ! [ -d c/printf ]; then
     mkdir -p c/printf
-    curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/develop/src/printf/printf.c
-    curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/develop/src/printf/printf.h
+    curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/${EYALROZ_PRINTF_REV}/src/printf/printf.c
+    curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/${EYALROZ_PRINTF_REV}/src/printf/printf.h
 fi
