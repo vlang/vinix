@@ -1,9 +1,0 @@
-name=limine
-version=6.20231227.0
-tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.xz"
-tarball_blake2b="ff7c35fbe9b1ace85450b1e568b2acb8e8165d6465300e6401c2255390dfce981b1cba2cb3065614d422904c20b75c42bf6702884bdda0a9b0b7056df19ae1f8"
-hostdeps="autoconf automake libtool pkg-config"
-
-regenerate() {
-    autoreconf -fvi
-}

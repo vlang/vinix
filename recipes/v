@@ -1,8 +1,16 @@
 name=v
-from_source=v
+version=e5cf33616bcf3c28b0ddda5dcb0b4c3d40e5eecc
 revision=1
+tarball_url="https://github.com/vlang/v/archive/${version}.tar.gz"
+tarball_blake2b="e98291378cf2344eabee3105b01581b0e360122cf73ff2a3b9a9455f10803576dce07108728e079bb5fd4d8cd9fb246fa899c0ae54b6d8bca652da1e0a71c722"
+source_imagedeps="curl"
+source_allow_network="yes"
 hostdeps="gcc"
 deps="core-libs"
+
+regenerate() {
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/d0155737eb913ad3db7553ca038d8088f8d24a99/v.c
+}
 
 build() {
     cp -r ${source_dir}/. ./

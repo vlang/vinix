@@ -1,8 +1,8 @@
 name=mlibc-headers
-from_source=mlibc
 revision=1
-hostdeps="pkg-config"
+from_source=mlibc
 imagedeps="meson ninja"
+hostdeps="pkg-config"
 deps="cxxshim frigg"
 
 build() {

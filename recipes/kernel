@@ -1,7 +1,14 @@
 name=kernel
-from_source=kernel
+version=0.0
 revision=1
+source_dir="kernel"
+source_imagedeps="git"
+source_allow_network="yes"
 hostdeps="gcc v"
+
+regenerate() {
+    ./get-deps
+}
 
 build() {
     cp -rpf "${source_dir}"/. ./

@@ -1,6 +1,7 @@
 name=util-vinix
-from_source=util-vinix
+version=0.0
 revision=1
+source_dir="util-vinix"
 hostdeps="gcc binutils v"
 deps="core-libs"
 

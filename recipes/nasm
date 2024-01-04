@@ -1,8 +1,15 @@
 name=nasm
-from_source=nasm
+version=2.15.05
 revision=1
+tarball_url="https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.xz"
+tarball_blake2b="a41434965c2125577b762d907a0a3c251c75d9f9beac230fba4099182c7f7beb08c6d2c05c2432b0dc8ba829f24077f44c3096faea9bd0a533250e6dbbfaef35"
+source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs"
+
+regenerate() {
+    autoreconf -fvi -I$(realpath ./autoconf)
+}
 
 build() {
     cp -rp "${source_dir}"/. ./

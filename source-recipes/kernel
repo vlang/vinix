@@ -1,9 +1,0 @@
-name=kernel
-version=0.0
-source_dir="kernel"
-imagedeps="git"
-allow_network="yes"
-
-regenerate() {
-    ./get-deps
-}
