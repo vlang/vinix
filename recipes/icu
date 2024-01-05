@@ -1,0 +1,35 @@
+name=icu
+version=73.1
+revision=1
+tarball_url="https://github.com/unicode-org/icu/releases/download/release-73-1/icu4c-73_1-src.tgz"
+tarball_blake2b="45de117efc4a49301c04a997963393967a70b8583abf1a9626331e275c5bc329cf2685de5c80b32f764c8ff2530b5594316d7119ce66503e5adba7842ca24424"
+source_hostdeps="autoconf autoconf-archive automake libtool pkg-config"
+imagedeps="gcc"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs"
+
+regenerate() {
+    ( cd source && autoreconf -fvi )
+    cp source/config/{mh-linux,mh-unknown}
+}
+
+build() {
+    mkdir cross-build
+    cd cross-build
+    ${source_dir}/source/configure \
+        --prefix=/usr/local
+    make -j${parallelism}
+    cd ..
+
+        configure_script_path=${source_dir}/source/configure \
+    autotools_configure \
+        --with-cross-build=$(realpath cross-build)
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

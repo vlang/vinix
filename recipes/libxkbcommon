@@ -1,7 +1,7 @@
 name=libxkbcommon
 version=1.6.0
 revision=1
-tarball_url="https://xkbcommon.org/download/libxkbcommon-1.6.0.tar.xz"
+tarball_url="https://xkbcommon.org/download/libxkbcommon-${version}.tar.xz"
 tarball_blake2b="ffd373161f12ea6448a9206f57710355ab65b81ebab5dce74e4dfcee1bdc9175406fc434560648f5933b83cac163099c8564c3add6f51d34856def39ab077850"
 imagedeps="meson ninja doxygen"
 hostdeps="gcc pkg-config"
@@ -17,6 +17,7 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
+
     mkdir -p "${dest_dir}${prefix}/share/X11/xkb"
 
     post_package_strip

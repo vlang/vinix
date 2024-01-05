@@ -1,7 +1,7 @@
 name=libiconv
 version=1.17
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/libiconv/libiconv-1.17.tar.gz"
+tarball_url="https://ftp.gnu.org/gnu/libiconv/libiconv-${version}.tar.gz"
 tarball_blake2b="1d317dd0655c680a2082c38561cdff51ac1a9181d4734a8bb1e86861dfd66f1a6c0846a90b5b88f3b38b1fa9983d9e563551f27e95a8e329896b71becceae52b"
 source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="binutils"

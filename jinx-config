@@ -7,14 +7,14 @@ OS_TRIPLET=x86_64-vinix
 
 post_package_strip() {
     if [ -z "$strip_command" ]; then
-        strip_command=${OS_TRIPLET}-strip
+        strip_command="${OS_TRIPLET}-strip"
     fi
 
     for f in $(find "${dest_dir}"); do
         if file "$f" | grep 'not stripped' >/dev/null; then
             echo "* stripping '$f'..."
-            stripped_file=$(mktemp)
-            $strip_command "$f" -o "$stripped_file"
+            stripped_file="$(mktemp)"
+            ${strip_command} "$f" -o "$stripped_file"
             chmod --reference="$f" "$stripped_file"
             mv -f "$stripped_file" "$f"
         fi
@@ -37,6 +37,7 @@ autotools_configure() {
         --libdir=${prefix}/lib \
         --disable-static \
         --enable-shared \
+        --disable-malloc0returnsnull \
         "$@"
 }
 

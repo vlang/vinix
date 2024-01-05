@@ -16,13 +16,15 @@ regenerate() {
 build() {
         cf_cv_func_nanosleep=yes \
     autotools_configure \
+        --enable-widec \
         --enable-pc-files \
         --with-shared \
+        --with-cxx-shared \
         --without-normal \
+        --without-debug \
         --with-manpage-format=normal \
         --with-pkg-config-libdir=/usr/lib/pkgconfig \
-        --with-termlib \
-        --enable-widec
+        --with-termlib
 
     make -j${parallelism}
 }
@@ -31,7 +33,7 @@ package() {
     make install DESTDIR="${dest_dir}"
 
     # As we build ncurses with wide character support, make some compatibility links
-    for lib in ncurses form panel menu tinfo ; do
+    for lib in ncurses ncurses++ form panel menu tinfo ; do
        rm -vf                    "${dest_dir}${prefix}"/lib/lib${lib}.so
        echo "INPUT(-l${lib}w)" > "${dest_dir}${prefix}"/lib/lib${lib}.so
        ln -sfv ${lib}w.pc        "${dest_dir}${prefix}"/lib/pkgconfig/${lib}.pc

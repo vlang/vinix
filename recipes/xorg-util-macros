@@ -1,7 +1,7 @@
 name=xorg-util-macros
 version=1.20.0
 revision=1
-tarball_url="https://www.x.org/archive/individual/util/util-macros-1.20.0.tar.gz"
+tarball_url="https://www.x.org/archive/individual/util/util-macros-${version}.tar.gz"
 tarball_blake2b="4c79c7076281ede6a240be2a2a9ffd47edd523d4a1b839589301a21eeb73100f134eced7d81fbd5ad71516174d3d4c8ab9f63e53987cb0f9a59b4fe6496157d8"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config xorg-macros"
