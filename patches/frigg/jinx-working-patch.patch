@@ -1,0 +1,19 @@
+diff --git frigg-clean/include/frg/logging.hpp frigg-workdir/include/frg/logging.hpp
+index 5c73cff..81649fc 100644
+--- frigg-clean/include/frg/logging.hpp
++++ frigg-workdir/include/frg/logging.hpp
+@@ -6,12 +6,14 @@
+ #include <frg/macros.hpp>
+ #include <frg/detection.hpp>
+ 
++/*
+ #if __STDC_HOSTED__
+ #	if __has_include(<iostream>)
+ #		include <iostream>
+ #		define FRIGG_HAS_IOSTREAM
+ #	endif
+ #endif
++*/
+ 
+ namespace frg FRG_VISIBILITY {
+ 
