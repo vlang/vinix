@@ -196,7 +196,7 @@ index 0000000..4dcea40
 +
 +#endif // _ABIBITS_SIGNAL_H
 diff --git mlibc-clean/meson.build mlibc-workdir/meson.build
-index 524350c..c2e00db 100644
+index dc894e2..717fbac 100644
 --- mlibc-clean/meson.build
 +++ mlibc-workdir/meson.build
 @@ -204,6 +204,11 @@ elif host_machine.system() == 'keyronex'
@@ -211,6 +211,23 @@ index 524350c..c2e00db 100644
  elif host_machine.system() == 'lyre'
  	disable_linux_option = true
  	rtdl_include_dirs += include_directories('sysdeps/lyre/include')
+diff --git mlibc-clean/options/glibc/generic/execinfo.cpp mlibc-workdir/options/glibc/generic/execinfo.cpp
+index 3474615..e034881 100644
+--- mlibc-clean/options/glibc/generic/execinfo.cpp
++++ mlibc-workdir/options/glibc/generic/execinfo.cpp
+@@ -1,9 +1,10 @@
+ #include <execinfo.h>
+ #include <bits/ensure.h>
++#include <mlibc/debug.hpp>
+ 
+ int backtrace(void **, int) {
+-	__ensure(!"Not implemented");
+-	__builtin_unreachable();
++	mlibc::infoLogger() << "libc: backtrace() is not implemented!\n" << frg::endlog;
++	return 0;
+ }
+ 
+ char **backtrace_symbols(void *const *, int) {
 diff --git mlibc-workdir/sysdeps/vinix/generic/entry.cpp mlibc-workdir/sysdeps/vinix/generic/entry.cpp
 new file mode 100644
 index 0000000..cadab22
