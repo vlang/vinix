@@ -6,7 +6,7 @@ tarball_blake2b="1ddd5c2e6be8400a0a77db4b5fbd4698996fd1a00984e370b1f712f6b9ce456
 source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
 imagedeps="python"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs xorg-util-macros xorg-proto libxau libxdmcp xcb-proto"
+deps="core-libs xorg-proto libxau libxdmcp xcb-proto"
 
 regenerate() {
     autoreconf -fvi
