@@ -18,10 +18,15 @@ import time.timerfd
 import net
 import time.itimer
 import sched
+import errno
 
 __global (
 	syscall_table [66]voidptr
 )
+
+fn syscall_vacant(_ voidptr) (u64, u64) {
+    return u64(-1), errno.enosys
+}
 
 pub fn init_syscall_table() {
 	syscall_table[0] = voidptr(kprint.syscall_kprint)
@@ -61,7 +66,7 @@ pub fn init_syscall_table() {
 	syscall_table[34] = voidptr(mmap.syscall_munmap)
 	syscall_table[35] = voidptr(fs.syscall_unlinkat)
 	syscall_table[36] = voidptr(file.syscall_ppoll)
-	syscall_table[37] = voidptr(file.syscall_epoll_create)
+	syscall_table[37] = voidptr(syscall_vacant)
 	syscall_table[38] = voidptr(userland.syscall_getgroups)
 	syscall_table[39] = voidptr(socket.syscall_socket)
 	syscall_table[40] = voidptr(socket.syscall_bind)
@@ -71,9 +76,9 @@ pub fn init_syscall_table() {
 	syscall_table[44] = voidptr(fs.syscall_umount)
 	syscall_table[45] = voidptr(userland.syscall_signalfd)
 	syscall_table[46] = voidptr(socket.syscall_socketpair)
-	syscall_table[47] = voidptr(file.syscall_epoll_ctl)
+	syscall_table[47] = voidptr(syscall_vacant)
 	syscall_table[48] = voidptr(mmap.syscall_mprotect)
-	syscall_table[49] = voidptr(file.syscall_epoll_pwait)
+	syscall_table[49] = voidptr(syscall_vacant)
 	syscall_table[50] = voidptr(sys.syscall_clock_get)
 	syscall_table[51] = voidptr(net.syscall_gethostname)
 	syscall_table[52] = voidptr(net.syscall_sethostname)

@@ -356,10 +356,10 @@ index 0000000..cadab22
 +}
 diff --git mlibc-workdir/sysdeps/vinix/generic/generic.cpp mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..ee6c5a4
+index 0000000..ccde70b
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,888 @@
+@@ -0,0 +1,861 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -455,33 +455,6 @@ index 0000000..ee6c5a4
 +	ts.tv_sec = timeout / 1000;
 +	ts.tv_nsec = (timeout % 1000) * 1000000;
 +	return sys_ppoll(fds, count, timeout < 0 ? NULL : &ts, NULL, num_events);
-+}
-+
-+int sys_epoll_pwait(int epfd, struct epoll_event *ev, int n,
-+					int timeout, const sigset_t *sigmask, int *raised) {
-+	__syscall_ret ret = __syscall(49, epfd, ev, n, timeout, sigmask);
-+
-+	if (ret.errno != 0)
-+		return ret.errno;
-+
-+	*raised = (int)ret.ret;
-+	return 0;
-+}
-+
-+int sys_epoll_create(int flags, int *fd) {
-+	__syscall_ret ret = __syscall(37, flags);
-+
-+	if (ret.errno != 0)
-+		return ret.errno;
-+
-+	*fd = (int)ret.ret;
-+	return 0;
-+}
-+
-+int sys_epoll_ctl(int epfd, int mode, int fd, struct epoll_event *ev) {
-+	__syscall_ret ret = __syscall(47, epfd, mode, fd, ev);
-+
-+	return ret.errno;
 +}
 +
 +#ifndef MLIBC_BUILDING_RTDL
