@@ -5,7 +5,8 @@ tarball_url="https://github.com/mintsuki/mlibc/archive/${version}.tar.gz"
 tarball_blake2b="c98c20c03647f0f5828bc95d82217ece8e5d0eee1bbb293dc809d1b39bd8219064d68ab8499c5f7e26c7377a8829cccdeeca1974bdd574cd3d85166e56c7622d"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config libgcc-binaries"
-deps="mlibc-headers cxxshim frigg"
+builddeps="cxxshim frigg"
+deps="mlibc-headers"
 
 build() {
         LDFLAGS="-Wl,/usr/local/libgcc-binaries/libgcc-x86_64.a" \
