@@ -356,10 +356,10 @@ index 0000000..cadab22
 +}
 diff --git mlibc-workdir/sysdeps/vinix/generic/generic.cpp mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..ccde70b
+index 0000000..02af9f4
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,861 @@
+@@ -0,0 +1,868 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -393,6 +393,8 @@ index 0000000..ccde70b
 +	__syscall(15, status);
 +	__builtin_unreachable();
 +}
++
++#ifndef MLIBC_BUILDING_RTDL
 +
 +int sys_kill(pid_t pid, int signal) {
 +	__syscall_ret ret = __syscall(26, pid, signal);
@@ -434,10 +436,14 @@ index 0000000..ccde70b
 +	return 0;
 +}
 +
++#endif
++
 +int sys_tcb_set(void *pointer) {
 +	__syscall(7, pointer);
 +	return 0;
 +}
++
++#ifndef MLIBC_BUILDING_RTDL
 +
 +int sys_ppoll(struct pollfd *fds, int nfds, const struct timespec *timeout,
 +		const sigset_t *sigmask, int *num_events) {
@@ -457,15 +463,16 @@ index 0000000..ccde70b
 +	return sys_ppoll(fds, count, timeout < 0 ? NULL : &ts, NULL, num_events);
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
 +int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set,
 +		fd_set *except_set, const struct timespec *timeout,
 +		const sigset_t *sigmask, int *num_events) {
-+	struct pollfd *fds = (struct pollfd *)malloc(nfds * sizeof(struct pollfd));
++	struct pollfd *fds = (struct pollfd *)calloc(nfds, sizeof(struct pollfd));
++	if (fds == NULL) {
++		return ENOMEM;
++	}
 +
 +	for (int i = 0; i < nfds; i++) {
 +		struct pollfd *fd = &fds[i];
-+		memset(fd, 0, sizeof(struct pollfd));
 +
 +		if (read_set && FD_ISSET(i, read_set))
 +			fd->events |= POLLIN; // TODO: Additional events.
@@ -518,14 +525,15 @@ index 0000000..ccde70b
 +	free(fds);
 +
 +	if (read_set)
-+		memcpy(read_set, &res_read_set, sizeof(fd_set));
++		*read_set = res_read_set;
 +	if (write_set)
-+		memcpy(write_set, &res_write_set, sizeof(fd_set));
++		*write_set = res_write_set;
 +	if (except_set)
-+		memcpy(except_set, &res_except_set, sizeof(fd_set));
++		*except_set = res_except_set;
 +
 +	return 0;
 +}
++
 +#endif
 +
 +int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
@@ -549,15 +557,7 @@ index 0000000..ccde70b
 +	return num_woken;
 +}
 +
-+int sys_timerfd_create(int flags, int *fd) {
-+	__syscall_ret ret = __syscall(54, 0, flags);
-+
-+	if (ret.errno != 0)
-+		return ret.errno;
-+
-+	*fd = (int)ret.ret;
-+	return 0;
-+}
++#ifndef MLIBC_BUILDING_RTDL
 +
 +int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
 +	__syscall_ret ret = __syscall(9, fd, request, arg);
@@ -588,8 +588,10 @@ index 0000000..ccde70b
 +	return 0;
 +}
 +
++#endif
++
 +int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
-+	__syscall_ret ret = __syscall(2, dirfd, path, flags, 0);
++	__syscall_ret ret = __syscall(2, dirfd, path, flags, mode);
 +
 +	if (ret.errno != 0)
 +		return ret.errno;
@@ -601,6 +603,8 @@ index 0000000..ccde70b
 +int sys_open(const char *path, int flags, mode_t mode, int *fd) {
 +	return sys_openat(AT_FDCWD, path, flags, mode, fd);
 +}
++
++#ifndef MLIBC_BUILDING_RTDL
 +
 +int sys_open_dir(const char *path, int *handle) {
 +	return sys_open(path, O_DIRECTORY, 0, handle);
@@ -621,6 +625,8 @@ index 0000000..ccde70b
 +	*bytes_read = sizeof(struct dirent);
 +	return 0;
 +}
++
++#endif
 +
 +int sys_close(int fd) {
 +	__syscall_ret ret = __syscall(6, fd);
@@ -652,6 +658,8 @@ index 0000000..ccde70b
 +	*bytes_read = (ssize_t)ret.ret;
 +	return 0;
 +}
++
++#ifndef MLIBC_BUILDING_RTDL
 +
 +int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
 +	__syscall_ret ret = __syscall(4, fd, buf, count);
@@ -709,11 +717,9 @@ index 0000000..ccde70b
 +	return 0;
 +}
 +
-+int sys_rmdir(const char *path) {
-+	(void)path;
-+	mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
-+	return 0;
-+}
++int sys_rmdir(const char *path) STUB_ONLY
++
++#endif
 +
 +int sys_vm_map(void *hint, size_t size, int prot, int flags,
 +			   int fd, off_t offset, void **window) {
@@ -735,6 +741,8 @@ index 0000000..ccde70b
 +	return 0;
 +}
 +
++#ifndef MLIBC_BUILDING_RTDL
++
 +int sys_vm_protect(void *pointer, size_t size, int prot) {
 +	__syscall_ret ret = __syscall(48, pointer, size, prot);
 +
@@ -743,6 +751,8 @@ index 0000000..ccde70b
 +
 +	return 0;
 +}
++
++#endif
 +
 +int sys_anon_allocate(size_t size, void **pointer) {
 +	return sys_vm_map(NULL, size, PROT_EXEC | PROT_READ | PROT_WRITE,
@@ -753,6 +763,8 @@ index 0000000..ccde70b
 +	(void)pointer; (void)size;
 +	return 0;
 +}
++
++#ifndef MLIBC_BUILDING_RTDL
 +
 +pid_t sys_getpid() {
 +	__syscall_ret ret = __syscall(31);
@@ -826,31 +838,28 @@ index 0000000..ccde70b
 +}
 +
 +int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
++	__syscall_ret ret;
 +	switch (fsfdt) {
 +		case fsfd_target::fd: {
-+			__syscall_ret ret = __syscall(10, fd, statbuf);
-+			if (ret.errno != 0)
-+				return ret.errno;
-+			return ret.ret;
++			ret = __syscall(10, fd, statbuf);
++			break;
 +		}
 +		case fsfd_target::path: {
-+			__syscall_ret ret = __syscall(11, AT_FDCWD, path, statbuf, flags);
-+			if (ret.errno != 0)
-+				return ret.errno;
-+			return ret.ret;
++			ret = __syscall(11, AT_FDCWD, path, statbuf, flags);
++			break;
 +		}
 +		case fsfd_target::fd_path: {
-+			__syscall_ret ret = __syscall(11, fd, path, statbuf, flags);
-+			if (ret.errno != 0)
-+				return ret.errno;
-+			return ret.ret;
++			ret = __syscall(11, fd, path, statbuf, flags);
++			break;
 +		}
 +		default: {
 +			__ensure(!"stat: Invalid fsfdt");
 +			__builtin_unreachable();
 +		}
 +	}
-+	return 0;
++	if (ret.errno != 0)
++		return ret.errno;
++	return ret.ret;
 +}
 +
 +int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
@@ -1206,19 +1215,17 @@ index 0000000..ccde70b
 +	return 0;
 +}
 +
-+
-+int sys_getitimer(int which, struct itimerval *curr_value) {
-+	__syscall_ret ret = __syscall(63, which, curr_value);
-+
-+	return ret.errno;
++int sys_getitimer(int, struct itimerval *) {
++	mlibc::infoLogger() << "mlibc: sys_getitimer() is unimplemented" << frg::endlog;
++	return ENOSYS;
 +}
 +
-+
-+int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value) {
-+	__syscall_ret ret = __syscall(64, which, new_value, old_value);
-+
-+	return ret.errno;
++int sys_setitimer(int, const struct itimerval *, struct itimerval *) {
++	mlibc::infoLogger() << "mlibc: sys_setitimer() is unimplemented" << frg::endlog;
++	return ENOSYS;
 +}
++
++#endif
 +
 +} // namespace mlibc
 diff --git mlibc-workdir/sysdeps/vinix/generic/mntent.cpp mlibc-workdir/sysdeps/vinix/generic/mntent.cpp

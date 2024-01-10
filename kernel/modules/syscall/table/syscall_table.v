@@ -14,9 +14,7 @@ import pipe
 import socket
 import memory.mmap
 import time.sys
-import time.timerfd
 import net
-import time.itimer
 import sched
 import errno
 
@@ -83,16 +81,16 @@ pub fn init_syscall_table() {
 	syscall_table[51] = voidptr(net.syscall_gethostname)
 	syscall_table[52] = voidptr(net.syscall_sethostname)
 	syscall_table[53] = voidptr(sys.syscall_nanosleep)
-	syscall_table[54] = voidptr(timerfd.syscall_timerfd_create)
-	syscall_table[55] = voidptr(timerfd.syscall_timerfd_settime)
-	syscall_table[56] = voidptr(timerfd.syscall_timerfd_gettime)
+	syscall_table[54] = voidptr(syscall_vacant)
+	syscall_table[55] = voidptr(syscall_vacant)
+	syscall_table[56] = voidptr(syscall_vacant)
 	syscall_table[57] = voidptr(fs.syscall_fchmod)
 	syscall_table[58] = voidptr(fs.syscall_linkat)
 	syscall_table[59] = voidptr(socket.syscall_connect)
 	syscall_table[60] = voidptr(socket.syscall_getpeername)
 	syscall_table[61] = voidptr(socket.syscall_accept)
 	syscall_table[62] = voidptr(socket.syscall_recvmsg)
-	syscall_table[63] = voidptr(itimer.syscall_getitimer)
-	syscall_table[64] = voidptr(itimer.syscall_setitimer)
+	syscall_table[63] = voidptr(syscall_vacant)
+	syscall_table[64] = voidptr(syscall_vacant)
 	syscall_table[65] = voidptr(sched.syscall_new_thread)
 }

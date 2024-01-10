@@ -28,7 +28,6 @@ pub mut:
 	current_directory        voidptr
 	event                    eventstruct.Event
 	status                   int
-	itimers                  [4096]u8
 	name                     string
 }
 
