@@ -3,7 +3,8 @@ version=6f146a41dda736572879fc524cf729eb193dc0a6
 revision=1
 tarball_url="https://github.com/managarm/cxxshim/archive/${version}.tar.gz"
 tarball_blake2b="05d8cbad3d46b4272c7e31b1c8041cc5e640cc66853dddf58af953aeba6697dcbc05decb01dc6d4669fec52acd18b3265706dbf710d11dd98e7c1771ac598a49"
-imagedeps="meson ninja git base-devel"
+imagedeps="meson ninja"
+hostdeps="pkg-config"
 
 build() {
     meson_configure \
