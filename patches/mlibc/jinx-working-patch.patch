@@ -356,10 +356,10 @@ index 0000000..cadab22
 +}
 diff --git mlibc-workdir/sysdeps/vinix/generic/generic.cpp mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..02af9f4
+index 0000000..2c4bbbf
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,868 @@
+@@ -0,0 +1,888 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -395,6 +395,26 @@ index 0000000..02af9f4
 +}
 +
 +#ifndef MLIBC_BUILDING_RTDL
++
++[[noreturn]] void sys_thread_exit() {
++	for (;;);
++	__builtin_unreachable();
++}
++
++extern "C" void __mlibc_thread_entry();
++
++int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
++	(void)tcb;
++
++	__syscall_ret ret = __syscall(65, (uintptr_t)__mlibc_thread_entry, (uintptr_t)stack);
++	int ret_value = (int)ret.ret;
++	if (ret_value == -1) {
++		return ret.errno;
++	}
++
++	*pid_out = ret_value;
++	return 0;
++}
 +
 +int sys_kill(pid_t pid, int signal) {
 +	__syscall_ret ret = __syscall(26, pid, signal);
@@ -1387,6 +1407,85 @@ index 0000000..f421220
 +		"ret"
 +	);
 +	(void)number;
++}
+diff --git mlibc-workdir/sysdeps/vinix/generic/thread.S mlibc-workdir/sysdeps/vinix/generic/thread.S
+new file mode 100644
+index 0000000..47ab6a9
+--- /dev/null
++++ mlibc-workdir/sysdeps/vinix/generic/thread.S
+@@ -0,0 +1,9 @@
++.section .text
++.global __mlibc_thread_entry
++__mlibc_thread_entry:
++	pop %rdi
++	pop %rsi
++	pop %rdx
++	call __mlibc_thread_trampoline
++
++.section .note.GNU-stack,"",%progbits
+diff --git mlibc-workdir/sysdeps/vinix/generic/thread.cpp mlibc-workdir/sysdeps/vinix/generic/thread.cpp
+new file mode 100644
+index 0000000..5186e1f
+--- /dev/null
++++ mlibc-workdir/sysdeps/vinix/generic/thread.cpp
+@@ -0,0 +1,58 @@
++#include <sys/mman.h>
++#include <mlibc/debug.hpp>
++#include <errno.h>
++#include <mlibc/all-sysdeps.hpp>
++#include <bits/ensure.h>
++#include <mlibc/tcb.hpp>
++
++extern "C" void __mlibc_thread_trampoline(void *(*fn)(void *), Tcb *tcb, void *arg) {
++	if (mlibc::sys_tcb_set(tcb)) {
++		__ensure(!"failed to set tcb for new thread");
++	}
++
++	while (__atomic_load_n(&tcb->tid, __ATOMIC_RELAXED) == 0) {
++		mlibc::sys_futex_wait(&tcb->tid, 0, nullptr);
++	}
++
++	tcb->invokeThreadFunc(reinterpret_cast<void *>(fn), arg);
++
++	__atomic_store_n(&tcb->didExit, 1, __ATOMIC_RELEASE);
++	mlibc::sys_futex_wake(&tcb->didExit);
++
++	mlibc::sys_thread_exit();
++}
++
++#define DEFAULT_STACK 0x400000
++
++namespace mlibc {
++	int sys_prepare_stack(void **stack, void *entry, void *arg, void *tcb, size_t *stack_size, size_t *guard_size, void **stack_base) {
++		// TODO guard
++
++		mlibc::infoLogger() << "mlibc: sys_prepare_stack() does not setup a guard!" << frg::endlog;
++
++		*guard_size = 0;
++
++		*stack_size = *stack_size ? *stack_size : DEFAULT_STACK;
++
++		if (!*stack) {
++			*stack_base = mmap(NULL, *stack_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
++			if (*stack_base == MAP_FAILED) {
++				return errno;
++			}
++		} else {
++			*stack_base = *stack;
++		}
++		
++		*stack = (void *)((char *)*stack_base + *stack_size);
++
++		void **stack_it = (void **)*stack;
++
++		*--stack_it = arg;
++		*--stack_it = tcb;
++		*--stack_it = entry;
++
++		*stack = (void *)stack_it;
++
++		return 0;
++	}
 +}
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/access.h mlibc-workdir/sysdeps/vinix/include/abi-bits/access.h
 new file mode 120000
@@ -2559,10 +2658,10 @@ index 0000000..2d696e3
 +#endif // _SYS_SYSMACROS_H
 diff --git mlibc-workdir/sysdeps/vinix/meson.build mlibc-workdir/sysdeps/vinix/meson.build
 new file mode 100644
-index 0000000..0713674
+index 0000000..a4c29a1
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/meson.build
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,115 @@
 +
 +rtdl_sources += files(
 +	'generic/generic.cpp'
@@ -2573,7 +2672,9 @@ index 0000000..0713674
 +	'generic/generic.cpp',
 +	'generic/mntent.cpp',
 +	'generic/mount.cpp',
-+	'generic/reboot.cpp'
++	'generic/reboot.cpp',
++	'generic/thread.cpp',
++	'generic/thread.S'
 +)
 +
 +if not no_headers
