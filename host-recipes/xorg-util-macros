@@ -1,4 +1,4 @@
-name=xorg-macros
+name=xorg-util-macros
 from_source=xorg-util-macros
 revision=1
 

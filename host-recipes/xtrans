@@ -1,5 +1,5 @@
 name=xtrans
-from_source=libxtrans
+from_source=xtrans
 revision=1
 imagedeps="gcc"
 
