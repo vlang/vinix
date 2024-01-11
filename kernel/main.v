@@ -32,6 +32,7 @@ import dev.serial
 import dev.streams
 import dev.ahci
 import dev.random
+import dev.mouse
 import syscall.table
 import socket
 import time
@@ -60,6 +61,7 @@ fn kmain_thread() {
 	fbdev.register_driver(simple.get_driver())
 	console.initialise()
 	serial.initialise()
+	mouse.initialise()
 
 	$if !prod {
 		ata.initialise()
