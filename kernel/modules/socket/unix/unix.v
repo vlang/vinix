@@ -119,7 +119,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 	return i64(count)
 }
 
-fn (mut this UnixSocket) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	mut peer := this.peer
@@ -129,9 +129,15 @@ fn (mut this UnixSocket) write(handle voidptr, buf voidptr, loc u64, _count u64)
 		peer.l.release()
 	}
 
+	handle := unsafe { &file.Handle(_handle) }
+
 	// If pipe is full, block or return if nonblock
 	for katomic.load(peer.used) == peer.capacity {
-		// We don't do nonblock yet
+		if handle.flags & resource.o_nonblock != 0 {
+			errno.set(errno.ewouldblock)
+			return none
+		}
+
 		peer.l.release()
 		mut events := [&peer.event]
 		event.await(mut events, true) or {
