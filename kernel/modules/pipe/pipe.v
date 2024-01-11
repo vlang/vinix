@@ -133,6 +133,12 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	this.read_ptr = new_ptr_loc
 	this.used -= count
 
+	if this.used == 0 {
+		this.status &= ~file.pollin
+	}
+	if this.used < this.capacity {
+		this.status |= file.pollout
+	}
 	event.trigger(mut this.event, false)
 
 	return i64(count)
@@ -187,6 +193,10 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	this.write_ptr = new_ptr_loc
 	this.used += count
 
+	if this.used == this.capacity {
+		this.status &= ~file.pollout
+	}
+	this.status |= file.pollin
 	event.trigger(mut this.event, false)
 
 	return i64(count)
