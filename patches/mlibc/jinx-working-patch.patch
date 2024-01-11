@@ -356,10 +356,10 @@ index 0000000..cadab22
 +}
 diff --git mlibc-workdir/sysdeps/vinix/generic/generic.cpp mlibc-workdir/sysdeps/vinix/generic/generic.cpp
 new file mode 100644
-index 0000000..2c4bbbf
+index 0000000..68a2886
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/generic/generic.cpp
-@@ -0,0 +1,888 @@
+@@ -0,0 +1,913 @@
 +#include <bits/ensure.h>
 +#include <mlibc/debug.hpp>
 +#include <mlibc/all-sysdeps.hpp>
@@ -376,6 +376,25 @@ index 0000000..2c4bbbf
 +	__ensure(!"STUB_ONLY function was called"); \
 +	__builtin_unreachable();                    \
 +}
++
++#ifndef MLIBC_BUILDING_RTDL
++
++namespace {
++
++int fcntl_helper(int fd, int request, int *result, ...) {
++	va_list args;
++	va_start(args, result);
++	if(!mlibc::sys_fcntl) {
++		return ENOSYS;
++	}
++	int ret = mlibc::sys_fcntl(fd, request, args, result);
++	va_end(args);
++	return ret;
++}
++
++}
++
++#endif
 +
 +namespace mlibc {
 +
@@ -954,8 +973,8 @@ index 0000000..2c4bbbf
 +	return ret.errno;
 +}
 +
-+int sys_accept(int fd, int *newfd, struct sockaddr *addr_ptr, socklen_t *addr_length) {
-+	__syscall_ret ret = __syscall(61, fd);
++int sys_accept(int fd, int *newfd, struct sockaddr *addr_ptr, socklen_t *addr_length, int flags) {
++	__syscall_ret ret = __syscall(61, fd, addr_ptr, addr_length);
 +
 +	if (ret.errno != 0) {
 +		return ret.errno;
@@ -963,10 +982,16 @@ index 0000000..2c4bbbf
 +
 +	*newfd = ret.ret;
 +
-+	if(addr_ptr && addr_length) {
-+		if(int e = mlibc::sys_peername(*newfd, addr_ptr, *addr_length, addr_length); e) {
-+			return e;
-+		}
++	if(flags & SOCK_NONBLOCK) {
++		int fcntl_ret = 0;
++		fcntl_helper(*newfd, F_GETFL, &fcntl_ret);
++		fcntl_helper(*newfd, F_SETFL, &fcntl_ret, fcntl_ret | O_NONBLOCK);
++	}
++
++	if(flags & SOCK_CLOEXEC) {
++		int fcntl_ret = 0;
++		fcntl_helper(*newfd, F_GETFD, &fcntl_ret);
++		fcntl_helper(*newfd, F_SETFD, &fcntl_ret, fcntl_ret | FD_CLOEXEC);
 +	}
 +
 +	return 0;
