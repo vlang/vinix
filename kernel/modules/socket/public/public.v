@@ -22,9 +22,9 @@ pub interface Socket {
 	Resource
 
 mut:
-	bind(handle voidptr, _addr voidptr, addrlen u64) ?
-	connect(handle voidptr, _addr voidptr, addrlen u64) ?
-	peername(handle voidptr, _addr voidptr, addrlen &u64) ?
+	bind(handle voidptr, _addr voidptr, addrlen u32) ?
+	connect(handle voidptr, _addr voidptr, addrlen u32) ?
+	peername(handle voidptr, _addr voidptr, addrlen &u32) ?
 	listen(handle voidptr, backlog int) ?
 	accept(handle voidptr) ?&Resource
 	recvmsg(handle voidptr, msg &MsgHdr, flags int) ?u64

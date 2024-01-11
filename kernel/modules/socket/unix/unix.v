@@ -211,7 +211,7 @@ fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
 	return none
 }
 
-fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u64) ? {
+fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u32) ? {
 	if this.connected == false {
 		errno.set(errno.enotconn)
 		return none
@@ -286,7 +286,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	return connection_socket
 }
 
-fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
+fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 	addr := unsafe { &SockaddrUn(_addr) }
 
 	if addr.sun_family != sock_pub.af_unix {
@@ -343,7 +343,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u64) ? {
 	event.trigger(mut this.event, false)
 }
 
-fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u64) ? {
+fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u32) ? {
 	addr := unsafe { &SockaddrUn(_addr) }
 
 	if addr.sun_family != sock_pub.af_unix {

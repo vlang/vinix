@@ -136,7 +136,7 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 	return u64(ret), 0
 }
 
-pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64) {
+pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -223,7 +223,7 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 	return ret, 0
 }
 
-pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u64) {
+pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -252,7 +252,7 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u64) (u64, u
 	return 0, 0
 }
 
-pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u64) (u64, u64) {
+pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
