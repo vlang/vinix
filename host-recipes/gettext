@@ -4,7 +4,13 @@ revision=1
 imagedeps="gcc"
 
 build() {
-    "${source_dir}"/configure --prefix="${prefix}"
+    cp -rpv "${source_dir}"/. ./
+
+        ACLOCAL=true \
+        AUTOCONF=true \
+        AUTOMAKE=true \
+        AUTOHEADER=true \
+    ./configure --prefix="${prefix}"
 
     make -j${parallelism}
 }
