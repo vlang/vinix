@@ -3,7 +3,7 @@ version=1.1.1
 revision=1
 tarball_url="https://xorg.freedesktop.org/archive/individual/app/xclock-${version}.tar.gz"
 tarball_blake2b="4fd77b8f1f0962774dd0e6295f7482c05be8107e1606a9705ccd2864d2c9b37adda4a41a6704c6e1363edd2b7e704324799c4feaff39e218b326b66274b48187"
-source_hostdeps="automake autoconf autoconf-archive libtool pkg-config xorg-util-macros"
+source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros gettext"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libx11 libxmu libxaw libxrender libxft libxt libxkbfile"
 
@@ -13,6 +13,7 @@ regenerate() {
 
 build() {
     autotools_configure \
+        --with-appdefaultdir=/etc/X11/app-defaults \
         --disable-selective-werror
 
     make -j${parallelism}
@@ -20,8 +21,6 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" make install
-    mv -v "${dest_dir}"/sysroot/* "${dest_dir}"/
-    rm -rf "${dest_dir}"/sysroot
 
     post_package_strip
 }
