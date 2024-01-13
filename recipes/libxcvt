@@ -1,0 +1,20 @@
+name=libxcvt
+version=0.1.2
+revision=1
+tarball_url="https://www.x.org/archive/individual/lib/libxcvt-${version}.tar.xz"
+tarball_blake2b="8a4803eb6790fd0ea1520fd31e335f7a363c3606e74837a959453be8819ce0d450af7bb651887a891aa657a5eeac3e4983041060fa5c87b1238c83354e425de7"
+imagedeps="meson ninja"
+hostdeps="gcc pkg-config"
+deps="core-libs"
+
+build() {
+    meson_configure
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}
