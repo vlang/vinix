@@ -1,16 +1,7 @@
-From d0fa46208c40788a8a60083d11dc12c96a0179d8 Mon Sep 17 00:00:00 2001
-From: mintsuki <mintsuki@protonmail.com>
-Date: Sun, 20 Feb 2022 06:05:10 +0100
-Subject: [PATCH] Vinix specific changes
-
----
- src/fc/fslibos.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/src/fc/fslibos.h b/src/fc/fslibos.h
+diff --git libxfont2-clean/src/fc/fslibos.h libxfont2-workdir/src/fc/fslibos.h
 index 1ef362d..3475a02 100644
---- a/src/fc/fslibos.h
-+++ b/src/fc/fslibos.h
+--- libxfont2-clean/src/fc/fslibos.h
++++ libxfont2-workdir/src/fc/fslibos.h
 @@ -60,7 +60,7 @@ from The Open Group.
  #   endif
  #  endif
@@ -20,6 +11,3 @@ index 1ef362d..3475a02 100644
  #    define OPEN_MAX 256
  #   else
  #    include <sys/param.h>
---
-2.35.1
-
