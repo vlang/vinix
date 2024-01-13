@@ -1,7 +1,7 @@
-diff --git a/src/fbdev.c b/src/fbdev.c
+diff --git xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-workdir/src/fbdev.c
 index f25ef72..7facb9f 100644
---- a/src/fbdev.c
-+++ b/src/fbdev.c
+--- xf86-video-fbdev-clean/src/fbdev.c
++++ xf86-video-fbdev-workdir/src/fbdev.c
 @@ -339,7 +339,7 @@ FBDevProbe(DriverPtr drv, int flags)
  
  	    dev = xf86FindOptionValue(devSections[i]->options,"fbdev");
