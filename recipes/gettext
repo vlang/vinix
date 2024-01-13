@@ -34,7 +34,7 @@ package() {
 
     # Remove conflicting libintl files
     rm -f "${dest_dir}${prefix}"/include/libintl.h
-    rm -f "${dest_dir}${prefix}"/include/libintl.so*
+    rm -f "${dest_dir}${prefix}"/lib/libintl.so*
     rm -f "${dest_dir}${prefix}"/share/locale/locale.alias
 
     post_package_strip
