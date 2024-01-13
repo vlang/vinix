@@ -42,9 +42,9 @@ autotools_configure() {
 }
 
 autotools_recursive_regen() {
-    for f in $(find . -name configure.ac); do
+    for f in $(find . -name configure.ac -type f); do
         echo "* autotools regen in '$(dirname $f)'..."
-        ( cd "$(dirname "$f")" && autoreconf -fvi "$@" )
+        ( cd "$(dirname "$f")" && autoreconf -fvi "$@" -I${sysroot_dir}/usr/share/aclocal )
     done
 }
 
