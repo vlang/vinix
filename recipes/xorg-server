@@ -3,8 +3,8 @@ version=21.1.10
 revision=1
 tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
 tarball_blake2b="c06d5f09e79b608d9e37f43ed05a0932d9e195cc0da418621c2db45be85ccceef38b14631a4b90e78468c845e4852dc07c65208138b93975f091b2139e437a60"
-source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
-source_deps="xtrans xorg-font-util"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xtrans xorg-font-util xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-proto xcb-proto xtrans libxcvt libxshmfence libx11 libxaw libxxf86vm libxkbfile libxmu libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xorg-xkbcomp xkeyboard-config pixman"
 

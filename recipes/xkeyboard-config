@@ -3,13 +3,14 @@ version=2.34
 revision=1
 tarball_url="https://www.x.org/archive/individual/data/xkeyboard-config/xkeyboard-config-${version}.tar.gz"
 tarball_blake2b="dcd4e7b0b8daf146b92fbb56c64eb32b7d2f42d75a8716226e5bc13b30624aca3ac95e97541561ba2429d5089f6dad495111b1a3f4a76b02d10dbe249461f921"
-source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xorg-util-macros"
 imagedeps="python"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-xkbcomp"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {

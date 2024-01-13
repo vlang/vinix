@@ -3,13 +3,14 @@ version=1.16
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libxcb-${version}.tar.xz"
 tarball_blake2b="1ddd5c2e6be8400a0a77db4b5fbd4698996fd1a00984e370b1f712f6b9ce456c8ccfb6992f2973f5eaf8d5b6b75f39b9f51a1458c2432ddb41edd8199b91b3f9"
-source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xorg-util-macros"
 imagedeps="python"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-proto libxau libxdmcp xcb-proto"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
     sed -i 's/pthread-stubs//' "${source_dir}"/configure
 }
 

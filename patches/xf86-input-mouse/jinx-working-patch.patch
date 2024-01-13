@@ -1,5 +1,5 @@
 diff --git xf86-input-mouse-clean/configure.ac xf86-input-mouse-workdir/configure.ac
-index 6c453cd..7ed1521 100644
+index 1d871b2..d196694 100644
 --- xf86-input-mouse-clean/configure.ac
 +++ xf86-input-mouse-workdir/configure.ac
 @@ -62,7 +62,7 @@ AC_SUBST(inputdir)
@@ -23,7 +23,7 @@ index 6c453cd..7ed1521 100644
  
 diff --git xf86-input-mouse-workdir/src/vinix_mouse.c xf86-input-mouse-workdir/src/vinix_mouse.c
 new file mode 100644
-index 0000000..8de8a7f
+index 0000000..b664773
 --- /dev/null
 +++ xf86-input-mouse-workdir/src/vinix_mouse.c
 @@ -0,0 +1,119 @@

@@ -3,12 +3,13 @@ version=1.1.4
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXmu-${version}.tar.gz"
 tarball_blake2b="b95188ecd667ffa9d831e547803c16637a968199c4e20d11d8beaf8da19c327aeb655c886f21d6b7d1d2a2b9cce522a091ca791c2626ae74d77f838441fa4a90"
-source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libxext libxt"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {

@@ -3,12 +3,13 @@ version=1.0.15
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXaw-${version}.tar.gz"
 tarball_blake2b="71d7b413f9a5178149871c810122589ec74fb4b1e78e884a1538871afd69ad775c3ff15e0c0b21115700f5c9c0965c65336b4c07c1d1069490e6c214ad0f3af0"
-source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libxmu libxpm"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {

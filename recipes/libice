@@ -3,12 +3,13 @@ version=1.1.1
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libICE-${version}.tar.gz"
 tarball_blake2b="1acb1cdb5b0fd49451b6e4498061c16fff35711a19a5da2c2de0046b6b3ed6bd6bdccf8d45f7adcdb7f2f685245176488f149b41087e562945754088f18c220b"
-source_hostdeps="automake autoconf libtool pkg-config xorg-util-macros"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-proto xtrans"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {
