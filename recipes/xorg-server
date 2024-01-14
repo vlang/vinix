@@ -15,6 +15,8 @@ regenerate() {
 build() {
         CFLAGS="-Wno-error=array-bounds ${common_flags}" \
     autotools_configure \
+        --with-xkb-bin-directory=/usr/bin \
+        --with-xkb-path=/usr/share/X11/xkb \
         --with-xkb-output=/var/lib/xkb \
         --with-fontrootdir=/usr/share/fonts/X11 \
         --enable-xorg \

@@ -1,3 +1,29 @@
+diff --git xf86-video-fbdev-clean/configure.ac xf86-video-fbdev-workdir/configure.ac
+index 27778cd..67436db 100644
+--- xf86-video-fbdev-clean/configure.ac
++++ xf86-video-fbdev-workdir/configure.ac
+@@ -86,6 +86,8 @@ AC_SUBST([moduledir])
+ DRIVER_NAME=fbdev
+ AC_SUBST([DRIVER_NAME])
+ 
++AC_SUBST([SYSROOT])
++
+ AC_CONFIG_FILES([
+                 Makefile
+                 src/Makefile
+diff --git xf86-video-fbdev-clean/src/Makefile.am xf86-video-fbdev-workdir/src/Makefile.am
+index fbe420e..1ef5f49 100644
+--- xf86-video-fbdev-clean/src/Makefile.am
++++ xf86-video-fbdev-workdir/src/Makefile.am
+@@ -25,7 +25,7 @@
+ # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
+ AM_CFLAGS = @XORG_CFLAGS@
+ fbdev_drv_la_LTLIBRARIES = fbdev_drv.la
+-fbdev_drv_la_LDFLAGS = -module -avoid-version
++fbdev_drv_la_LDFLAGS = -module -avoid-version -R@moduledir@ -L@SYSROOT@@moduledir@ -lfbdevhw -lshadow
+ fbdev_drv_ladir = @moduledir@/drivers
+ 
+ fbdev_drv_la_SOURCES = \
 diff --git xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-workdir/src/fbdev.c
 index f25ef72..7facb9f 100644
 --- xf86-video-fbdev-clean/src/fbdev.c
