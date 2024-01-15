@@ -1,4 +1,4 @@
-name=dejavu
+name=ttf-dejavu
 version=2.37
 revision=1
 tarball_url="https://sourceforge.net/projects/dejavu/files/dejavu/${version}/dejavu-fonts-ttf-${version}.tar.bz2"
