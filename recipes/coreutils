@@ -10,7 +10,7 @@ hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs tzdata"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 
     # Huge hack: coreutils does not compile the build-machine binary make-prime-list
     # using the build-machine compiler. Hence, build and invoke the binary manually here.

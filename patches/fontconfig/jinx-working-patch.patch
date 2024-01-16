@@ -1,5 +1,5 @@
 diff --git fontconfig-clean/src/fcstat.c fontconfig-workdir/src/fcstat.c
-index 4f69eae..2dd064f 100644
+index 4f69eae..519cf1d 100644
 --- fontconfig-clean/src/fcstat.c
 +++ fontconfig-workdir/src/fcstat.c
 @@ -386,7 +386,7 @@ FcFStatFs (int fd, FcStatFS *statb)

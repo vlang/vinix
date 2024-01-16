@@ -9,6 +9,7 @@ build() {
         --prefix="${prefix}" \
         --target=${OS_TRIPLET} \
         --with-sysroot="${sysroot_dir}" \
+        --enable-cet \
         --disable-nls \
         --disable-werror \
         --disable-dependency-tracking

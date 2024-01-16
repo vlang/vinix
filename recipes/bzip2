@@ -22,9 +22,9 @@ package() {
     install bzdiff "${dest_dir}${prefix}/bin/"
     install bzgrep "${dest_dir}${prefix}/bin/"
     install bzmore "${dest_dir}${prefix}/bin/"
-    install libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/"
+    install libbz2.so.${version} "${dest_dir}${prefix}/lib/"
     install -m 644 bzlib.h "${dest_dir}${prefix}/include/"
-    ln -sf libbz2.so.1.0.8 "${dest_dir}${prefix}/lib/libbz2.so.1.0"
+    ln -sf libbz2.so.${version} "${dest_dir}${prefix}/lib/libbz2.so.1.0"
     ln -sf libbz2.so.1.0 "${dest_dir}${prefix}/lib/libbz2.so.1"
     ln -sf libbz2.so.1 "${dest_dir}${prefix}/lib/libbz2.so"
     ln -sf bzdiff "${dest_dir}${prefix}/bin/bzcmp"
@@ -40,7 +40,7 @@ includedir=${prefix}/include
 
 Name: bzip2
 Description: BZip2 compression library
-Version: 1.0.8
+Version: ${version}
 
 Requires:
 Libs: -L${prefix}/lib -lbz2
@@ -55,7 +55,7 @@ includedir=${prefix}/include
 
 Name: libbz2
 Description: BZip2 compression library
-Version: 1.0.8
+Version: ${version}
 
 Requires:
 Libs: -L${prefix}/lib -lbz2

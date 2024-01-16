@@ -1,4 +1,4 @@
-name=freetype
+name=freetype2
 version=2.13.2
 revision=1
 tarball_url="https://download.savannah.gnu.org/releases/freetype/freetype-${version}.tar.xz"
@@ -10,7 +10,7 @@ deps="core-libs bzip2 libpng zlib"
 
 regenerate() {
     NOCONFIGURE=1 ./autogen.sh
-    cp /usr/local/share/automake-1.16/config.sub ./builds/unix/
+    cp /usr/local/share/automake-1.16/{config.sub,config.guess,install-sh} ./builds/unix/
 }
 
 build() {

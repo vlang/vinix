@@ -9,7 +9,8 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses readline"
 
 regenerate() {
-    AUTOHEADER=true autoreconf -fvi
+        AUTOHEADER=true \
+    autotools_recursive_regen
 }
 
 build() {

@@ -6,7 +6,7 @@ tarball_blake2b="1a871c6d7c81beadf1c9a5e864a2df186b6429337e86f4fee0c8969d158cf28
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs xorg-proto xtrans freetype bzip2 libfontenc zlib"
+deps="core-libs xorg-proto xtrans freetype2 bzip2 libfontenc zlib"
 
 regenerate() {
     autotools_recursive_regen
