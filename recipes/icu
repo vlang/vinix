@@ -10,7 +10,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
 regenerate() {
-    ( cd source && autoreconf -fvi )
+    autotools_recursive_regen
     cp source/config/{mh-linux,mh-unknown}
 }
 
