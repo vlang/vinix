@@ -1,0 +1,25 @@
+name=libxinerama
+version=1.1.5
+revision=1
+tarball_url="https://www.x.org/archive/individual/lib/libXinerama-${version}.tar.gz"
+tarball_blake2b="ac24af05ae483e7f8476cb5fdf901ae80c592a766387e9f662ceeae5906a55e8529b35fcd01b6893289007e30788fd9e3a507af95870acfa6b25b25b159024a5"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libxext xorg-proto"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}
