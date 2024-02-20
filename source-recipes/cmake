@@ -1,0 +1,4 @@
+name=cmake
+version=3.28.2
+tarball_url="https://github.com/Kitware/CMake/releases/download/v${version}/cmake-${version}.tar.gz"
+tarball_blake2b="59941152814af141cdbea5a649d809cb86edaf2f460a493278872cb0dcff45ea2c68d7e783cd4bc4b369bf4d41175aee6d49a4e2b983877700be933340f6596b"

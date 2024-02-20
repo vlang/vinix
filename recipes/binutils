@@ -1,8 +1,8 @@
 name=binutils
-version=2.41
+version=2.42
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/binutils/binutils-${version}.tar.xz"
-tarball_blake2b="3bccec2b52f7e82a727121bf2a2e51a6249ba63dcd74c665fd834e858645c912ffd8245d848435288b938852830b482905606f55c40df4061215fd75c52ffc75"
+tarball_blake2b="e67a5c028fba70e70088fd11b38ec8c9c4ed5a019badefda25abeb6275997b16f0891e7ff3424c4b82bbfae92e8992669826920dd53df61cd48469d8f7cd5bd1"
 source_hostdeps="autoconf-2.69 automake libtool pkg-config"
 imagedeps="gcc"
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
@@ -17,15 +17,12 @@ regenerate() {
 build() {
     autotools_configure \
         --target=${OS_TRIPLET} \
-        --with-sysroot=/ \
         --with-build-sysroot=${sysroot_dir} \
         --enable-cet \
         --enable-colored-disassembly \
         --disable-werror \
-        --disable-dependency-tracking \
         --with-system-zlib
 
-        SFRAME_LIB_PATH="-L$(pwd -P)/libsframe/.libs" \
     make -j${parallelism} all
 }
 

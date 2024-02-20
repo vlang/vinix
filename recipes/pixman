@@ -1,24 +1,20 @@
 name=pixman
-version=0.42.2
+version=0.43.2
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/pixman-${version}.tar.xz"
-tarball_blake2b="6286a9d064a5a24017fccbb0a6e9f6ef932077c2e33ec043826d4a7a6c707c9111d3de4b806cbcdb47fc2794f1f930d24d078de1ff2912061967db0890540957"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+tarball_blake2b="82734efb7cede5b1aeff3a865bfa2a81ff3176be50edc10deb1b5541f160b2dfd21303c1eccba53c0df83f471f3489084479a423dc2f818019af97d4b41dad68"
+imagedeps="meson ninja"
+hostdeps="gcc pkg-config"
 deps="core-libs libpng"
 
-regenerate() {
-    autoreconf -fvi
-}
-
 build() {
-    autotools_configure
+    meson_configure
 
-    make -j${parallelism}
+    ninja -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install
+    DESTDIR="${dest_dir}" ninja install
 
     post_package_strip
 }

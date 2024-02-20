@@ -1,3 +1,16 @@
+diff --git mlibc-clean/abis/linux/statvfs.h mlibc-workdir/abis/linux/statvfs.h
+index 7a75d3a..15269b0 100644
+--- mlibc-clean/abis/linux/statvfs.h
++++ mlibc-workdir/abis/linux/statvfs.h
+@@ -23,6 +23,8 @@ struct statvfs {
+ 	unsigned long f_fsid;
+ 	unsigned long f_flag;
+ 	unsigned long f_namemax;
++
++	char f_basetype[80];
+ };
+ 
+ #endif /* _ABIBITS_STATVFS_H */
 diff --git mlibc-workdir/abis/vinix/signal.h mlibc-workdir/abis/vinix/signal.h
 new file mode 100644
 index 0000000..4dcea40
@@ -196,10 +209,10 @@ index 0000000..4dcea40
 +
 +#endif // _ABIBITS_SIGNAL_H
 diff --git mlibc-clean/meson.build mlibc-workdir/meson.build
-index dc894e2..717fbac 100644
+index 72d0a14..512b0f4 100644
 --- mlibc-clean/meson.build
 +++ mlibc-workdir/meson.build
-@@ -204,6 +204,11 @@ elif host_machine.system() == 'keyronex'
+@@ -215,6 +215,11 @@ elif host_machine.system() == 'keyronex'
  	internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
  	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
  	subdir('sysdeps/keyronex')

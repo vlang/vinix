@@ -10,7 +10,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs gmp mpfr"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {

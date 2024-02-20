@@ -1,25 +1,25 @@
 name=llvm
-version=14.0.6
+version=17.0.6
 revision=1
 tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/llvm-project-${version}.src.tar.xz"
-tarball_blake2b="ee67c5407df8cef493b9c0004f15e428f22a536a17e5f4e3eb29a003b8a8ec0abe0fa3e072591161d5f30ef7d8867c1ce34d1b341ad858e93c00263499941a99"
-imagedeps="gcc ninja python git cmake"
-hostdeps="gcc pkg-config"
-deps="core-libs zlib"
+tarball_blake2b="d6ede1a9fda8756995c3e0654111941649e15794179641806f18919f1dc68c41ca0cabd5693b5096d05dccc3a391cd20d34af1137bf8af92ed3117a1ce84d1b2"
+imagedeps="gcc ninja python git"
+hostdeps="gcc cmake pkg-config"
+deps="core-libs ncurses zlib zstd libffi"
 
 build() {
     cmake \
         -GNinja \
         -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
-        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_PREFIX=${prefix} \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_SHARED_LIBS=ON \
+        -DLLVM_LINK_LLVM_DYLIB=ON \
+        -DLLVM_ENABLE_FFI=ON \
+        -DLLVM_ENABLE_EH=ON \
         -DLLVM_ENABLE_RTTI=ON \
-        -DLLVM_TARGETS_TO_BUILD=X86 \
-        -DLLVM_TARGET_ARCH=x86_64 \
+        -DLLVM_ENABLE_PROJECTS="clang;lld" \
         -DLLVM_DEFAULT_TARGET_TRIPLE=${OS_TRIPLET} \
         -DLLVM_HOST_TRIPLE=${OS_TRIPLET} \
-        -DLLVM_ENABLE_TERMINFO=OFF \
         -Wno-dev \
         ${source_dir}/llvm
 
@@ -28,6 +28,8 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
+
+    rm -rf "${dest_dir}${prefix}"/lib/*.a
 
     post_package_strip
 }

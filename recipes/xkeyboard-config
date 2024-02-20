@@ -1,27 +1,21 @@
 name=xkeyboard-config
-version=2.34
+version=2.40
 revision=1
-tarball_url="https://www.x.org/archive/individual/data/xkeyboard-config/xkeyboard-config-${version}.tar.gz"
-tarball_blake2b="dcd4e7b0b8daf146b92fbb56c64eb32b7d2f42d75a8716226e5bc13b30624aca3ac95e97541561ba2429d5089f6dad495111b1a3f4a76b02d10dbe249461f921"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-util-macros"
-imagedeps="python"
-hostdeps="gcc autoconf automake libtool pkg-config"
+tarball_url="https://www.x.org/archive/individual/data/xkeyboard-config/xkeyboard-config-${version}.tar.xz"
+tarball_blake2b="79dd20e588e72c9fe65ff0885889ae3e2ad0ffbb66b27cf90db36fecfd41f24667fcc0a0a7fc96f3bc5d01502532af3e6b560719413bc16529328dd02d353c92"
+imagedeps="meson ninja python"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-xkbcomp"
 
-regenerate() {
-    autotools_recursive_regen
-}
-
 build() {
-    autotools_configure \
-        --with-xkb-rules-symlink=xorg
+    meson_configure \
+        -Dxorg-rules-symlinks=true
 
-    make -j${parallelism}
+    ninja -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install
+    DESTDIR="${dest_dir}" ninja install
 
     post_package_strip
 }

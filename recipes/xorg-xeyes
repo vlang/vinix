@@ -1,8 +1,8 @@
 name=xorg-xeyes
-version=1.2.0
+version=1.3.0
 revision=1
 tarball_url="https://xorg.freedesktop.org/archive/individual/app/xeyes-${version}.tar.gz"
-tarball_blake2b="de152dff4bffb8ce43f7a8ae6b3362088f829acfa2a276b714cb5f92fb7af2935553f685a5cbe9d5f4362177fa71afc5b9e2aabe18010d247a16bad7892c8a7c"
+tarball_blake2b="76f24c332bf93cb64b6c53c0bbd662f74be96cc08e05a8aec81ed23c25cb80c1b6258f98e824f7bbe9184b7d882d28e98e1e645f20cf2c3a07f480bd5b479395"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

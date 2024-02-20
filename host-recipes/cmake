@@ -1,0 +1,18 @@
+name=cmake
+from_source=cmake
+revision=1
+imagedeps="gcc"
+
+build() {
+    "${source_dir}"/configure --prefix="${prefix}" --parallel="${parallelism}"
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+    echo 'include(Platform/UnixPaths)' > "${dest_dir}${prefix}/share/cmake-3.28/Modules/Platform/Vinix.cmake"
+
+        strip_command=strip \
+    post_package_strip
+}

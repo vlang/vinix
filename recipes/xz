@@ -1,14 +1,14 @@
 name=xz
-version=5.4.5
+version=5.4.6
 revision=1
-tarball_url="https://tukaani.org/xz/xz-${version}.tar.gz"
-tarball_blake2b="647c8227080a7f37e3321e778d7f52ccb9da3810f2be81b2d2b46001605b22cef6e724f9b3facfada26a12b24401c9a11449d6066443849b37b28e0eaa199315"
+tarball_url="https://github.com/tukaani-project/xz/releases/download/v${version}/xz-${version}.tar.gz"
+tarball_blake2b="f0bbd33ea7cd64d475c3501f6e76080c8c0080e377f23462f5f76459935f4e621538ddaa8452d2feaed278d62a596e38ed2aca18ed9e76512c4ec77fa2f4cc5f"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {

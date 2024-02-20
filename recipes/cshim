@@ -1,0 +1,21 @@
+name=cshim
+version=2ec3cf90aac9207ce54eee70aa013910f5a6d243
+revision=1
+tarball_url="https://github.com/managarm/cshim/archive/${version}.tar.gz"
+tarball_blake2b="5b61d30b73900c9bd0c9081130cc9c7d6fec0719c9f916fd6da688246d117e6224206783beb78762b2954679c7ff6520f16177df65e04d203a580d42e136b43f"
+imagedeps="meson ninja"
+hostdeps="pkg-config"
+
+build() {
+    meson_configure \
+        --includedir=share/cshim/include \
+        -Dinstall_headers=true
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}

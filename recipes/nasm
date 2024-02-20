@@ -1,14 +1,14 @@
 name=nasm
-version=2.15.05
+version=2.16.01
 revision=1
 tarball_url="https://www.nasm.us/pub/nasm/releasebuilds/${version}/nasm-${version}.tar.xz"
-tarball_blake2b="a41434965c2125577b762d907a0a3c251c75d9f9beac230fba4099182c7f7beb08c6d2c05c2432b0dc8ba829f24077f44c3096faea9bd0a533250e6dbbfaef35"
+tarball_blake2b="0f7e96648e3db6fa4a8e10a89885f61cab7d79af25adbcc9d4706b3af61206c3cae024b7f873d636f5c1b2cb34ce5e7fbecc16af9b59086e9a1f49fb37c59670"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs"
 
 regenerate() {
-    autoreconf -fvi -I$(realpath ./autoconf)
+    autotools_recursive_regen -I$(realpath ./autoconf)
 }
 
 build() {

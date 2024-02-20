@@ -3,7 +3,6 @@ revision=1
 from_source=mlibc
 imagedeps="meson ninja"
 hostdeps="pkg-config"
-builddeps="cxxshim frigg"
 
 build() {
     meson_configure \

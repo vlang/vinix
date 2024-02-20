@@ -9,7 +9,7 @@ hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc libgcc libstdc++"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {

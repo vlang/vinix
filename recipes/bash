@@ -1,14 +1,26 @@
 name=bash
-version=5.2.21
+version=5.2.26
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz"
+tarball_url="https://ftp.gnu.org/gnu/bash/bash-5.2.21.tar.gz"
 tarball_blake2b="6789c9a0d9eb1ad167d4199bf1438d77934a7bbeae9f9fdd7167cae006b17b3894852440248db1bb6e9cf6d930e8a18b6448a3bb4db8831b2e6d1445b56a2065"
+source_allow_network=yes
+source_imagedeps="curl"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses readline"
 
 regenerate() {
+    curl -Lo bash52-022 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-022
+    curl -Lo bash52-023 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-023
+    curl -Lo bash52-024 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-024
+    curl -Lo bash52-025 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-025
+    curl -Lo bash52-026 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-026
+
+    for f in bash52-02*; do
+        patch -p0 < $f
+    done
+
         AUTOHEADER=true \
     autotools_recursive_regen
 }

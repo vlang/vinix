@@ -1,4 +1,4 @@
-set(CMAKE_SYSTEM_NAME UnixPaths)
+set(CMAKE_SYSTEM_NAME Vinix)
 
 set(CMAKE_FIND_ROOT_PATH /sysroot)
 

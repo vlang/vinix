@@ -6,14 +6,13 @@ tarball_blake2b="0a18840979bb8b20b02eca9d737f20ddcf92a4771386074c38692df8a1c9b0f
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xtrans xorg-font-util xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs xorg-proto xcb-proto xtrans libxinerama libxcvt libxshmfence libx11 libxaw libxxf86vm libxkbfile libxmu libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xorg-xkbcomp xkeyboard-config pixman"
+deps="core-libs xorg-util-macros xorg-proto xcb-proto xtrans libxinerama libxcvt libxshmfence libx11 libxaw libxxf86vm libxkbfile libxmu libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xorg-xkbcomp xkeyboard-config pixman"
 
 regenerate() {
     autotools_recursive_regen
 }
 
 build() {
-        CFLAGS="-Wno-error=array-bounds ${common_flags}" \
     autotools_configure \
         --with-xkb-bin-directory=/usr/bin \
         --with-xkb-path=/usr/share/X11/xkb \

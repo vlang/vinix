@@ -1,9 +1,9 @@
 diff --git llvm-clean/clang/lib/Basic/Targets/OSTargets.h llvm-workdir/clang/lib/Basic/Targets/OSTargets.h
-index 3c1830d..0b74dcf 100644
+index cf8cc8e..37a9ac9 100644
 --- llvm-clean/clang/lib/Basic/Targets/OSTargets.h
 +++ llvm-workdir/clang/lib/Basic/Targets/OSTargets.h
-@@ -338,6 +338,34 @@ public:
-       : OSTargetInfo<Target>(Triple, Opts) {}
+@@ -922,6 +922,34 @@ public:
+   }
  };
  
 +// Vinix Target
@@ -34,47 +34,47 @@ index 3c1830d..0b74dcf 100644
 +  }
 +};
 +
- // Minix Target
+ // WebAssembly target
  template <typename Target>
- class LLVM_LIBRARY_VISIBILITY MinixTargetInfo : public OSTargetInfo<Target> {
+ class LLVM_LIBRARY_VISIBILITY WebAssemblyOSTargetInfo
 diff --git llvm-clean/clang/lib/Basic/Targets.cpp llvm-workdir/clang/lib/Basic/Targets.cpp
-index 994a491..fab58e3 100644
+index 636b59f..e56e5ca 100644
 --- llvm-clean/clang/lib/Basic/Targets.cpp
 +++ llvm-workdir/clang/lib/Basic/Targets.cpp
-@@ -586,6 +586,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+@@ -590,6 +590,8 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
      }
      case llvm::Triple::Haiku:
-       return new HaikuTargetInfo<X86_64TargetInfo>(Triple, Opts);
+       return std::make_unique<HaikuX86_32TargetInfo>(Triple, Opts);
 +    case llvm::Triple::Vinix:
-+      return new VinixTargetInfo<X86_64TargetInfo>(Triple, Opts);
++      return std::make_unique<VinixTargetInfo<X86_32TargetInfo>>(Triple, Opts);
+     case llvm::Triple::RTEMS:
+       return std::make_unique<RTEMSX86_32TargetInfo>(Triple, Opts);
      case llvm::Triple::NaCl:
-       return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
-     case llvm::Triple::PS4:
 diff --git llvm-clean/clang/lib/Driver/CMakeLists.txt llvm-workdir/clang/lib/Driver/CMakeLists.txt
-index 78e8fd1..f95396b 100644
+index a6bd2d4..0c82dd3 100644
 --- llvm-clean/clang/lib/Driver/CMakeLists.txt
 +++ llvm-workdir/clang/lib/Driver/CMakeLists.txt
-@@ -59,6 +59,7 @@ add_clang_library(clangDriver
-   ToolChains/Hexagon.cpp
-   ToolChains/Hurd.cpp
-   ToolChains/Linux.cpp
+@@ -76,6 +76,7 @@ add_clang_library(clangDriver
+   ToolChains/Myriad.cpp
+   ToolChains/NaCl.cpp
+   ToolChains/NetBSD.cpp
 +  ToolChains/Vinix.cpp
-   ToolChains/MipsLinux.cpp
-   ToolChains/MinGW.cpp
-   ToolChains/Minix.cpp
+   ToolChains/OHOS.cpp
+   ToolChains/OpenBSD.cpp
+   ToolChains/PS4CPU.cpp
 diff --git llvm-clean/clang/lib/Driver/Driver.cpp llvm-workdir/clang/lib/Driver/Driver.cpp
-index 3bfddee..12d56b8 100644
+index bdbdad9..422a3dd 100644
 --- llvm-clean/clang/lib/Driver/Driver.cpp
 +++ llvm-workdir/clang/lib/Driver/Driver.cpp
-@@ -30,6 +30,7 @@
- #include "ToolChains/Hurd.h"
- #include "ToolChains/Lanai.h"
- #include "ToolChains/Linux.h"
+@@ -20,6 +20,7 @@
+ #include "ToolChains/Contiki.h"
+ #include "ToolChains/CrossWindows.h"
+ #include "ToolChains/Cuda.h"
 +#include "ToolChains/Vinix.h"
- #include "ToolChains/MSP430.h"
- #include "ToolChains/MSVC.h"
- #include "ToolChains/MinGW.h"
-@@ -5564,6 +5565,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
+ #include "ToolChains/Darwin.h"
+ #include "ToolChains/DragonFly.h"
+ #include "ToolChains/FreeBSD.h"
+@@ -6225,6 +6226,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
      case llvm::Triple::Fuchsia:
        TC = std::make_unique<toolchains::Fuchsia>(*this, Target, Args);
        break;
@@ -85,25 +85,24 @@ index 3bfddee..12d56b8 100644
        TC = std::make_unique<toolchains::Solaris>(*this, Target, Args);
        break;
 diff --git llvm-clean/clang/lib/Driver/ToolChains/Gnu.cpp llvm-workdir/clang/lib/Driver/ToolChains/Gnu.cpp
-index 7a9570a..49cd30e 100644
+index 40038dc..198c4d5 100644
 --- llvm-clean/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ llvm-workdir/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -2099,7 +2099,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
+@@ -2328,7 +2328,7 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
        "x86_64-redhat-linux",    "x86_64-suse-linux",
        "x86_64-manbo-linux-gnu", "x86_64-linux-gnu",
        "x86_64-slackware-linux", "x86_64-unknown-linux",
 -      "x86_64-amazon-linux"};
-+      "x86_64-amazon-linux",
-+      "x86_64-vinix"};
++      "x86_64-amazon-linux", "x86_64-vinix"};
    static const char *const X32Triples[] = {"x86_64-linux-gnux32",
                                             "x86_64-pc-linux-gnux32"};
    static const char *const X32LibDirs[] = {"/libx32", "/lib"};
 diff --git llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp
 new file mode 100644
-index 0000000..c57e739
+index 0000000..d180195
 --- /dev/null
 +++ llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp
-@@ -0,0 +1,427 @@
+@@ -0,0 +1,432 @@
 +//===------- Vinix.cpp - Vinix ToolChain Implementations --------*- C++ -*-===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -117,6 +116,7 @@ index 0000000..c57e739
 +#include "Arch/ARM.h"
 +#include "Arch/Mips.h"
 +#include "Arch/PPC.h"
++#include "Arch/RISCV.h"
 +#include "CommonArgs.h"
 +#include "clang/Config/config.h"
 +#include "clang/Driver/Distro.h"
@@ -148,6 +148,10 @@ index 0000000..c57e739
 +  case llvm::Triple::x86_64:
 +    // We don't want this for x32, otherwise it will match x86_64 libs
 +    return "x86_64-vinix";
++  case llvm::Triple::aarch64:
++    return "aarch64-vinix";
++  case llvm::Triple::riscv64:
++    return "riscv64-vinix";
 +  }
 +  return TargetTriple.str();
 +}
@@ -212,13 +216,13 @@ index 0000000..c57e739
 +  // to the link paths.
 +  path_list &Paths = getFilePaths();
 +
-+  const std::string OSLibDir = getOSLibDir(Triple, Args);
++  const std::string OSLibDir = std::string(getOSLibDir(Triple, Args));
 +  const std::string MultiarchTriple = getMultiarchTriple(D, Triple, SysRoot);
 +
 +  // Add the multilib suffixed paths where they are available.
 +  if (GCCInstallation.isValid()) {
 +    const llvm::Triple &GCCTriple = GCCInstallation.getTriple();
-+    const std::string &LibPath = GCCInstallation.getParentLibPath();
++    const std::string &LibPath = std::string(GCCInstallation.getParentLibPath());
 +    const Multilib &Multilib = GCCInstallation.getMultilib();
 +    const MultilibSet &Multilibs = GCCInstallation.getMultilibs();
 +
@@ -301,7 +305,7 @@ index 0000000..c57e739
 +
 +    // See comments above on the multilib variant for details of why this is
 +    // included even from outside the sysroot.
-+    const std::string &LibPath = GCCInstallation.getParentLibPath();
++    const std::string &LibPath = std::string(GCCInstallation.getParentLibPath());
 +    const llvm::Triple &GCCTriple = GCCInstallation.getTriple();
 +    const Multilib &Multilib = GCCInstallation.getMultilib();
 +    addPathIfExists(D, LibPath + "/../" + GCCTriple.str() + "/lib" +
@@ -344,6 +348,12 @@ index 0000000..c57e739
 +
 +std::string Vinix::getDynamicLinker(const ArgList &Args) const {
 +  switch (getTriple().getArch()) {
++  case llvm::Triple::aarch64:
++    return "/usr/lib/aarch64-vinix/ld.so";
++  case llvm::Triple::riscv64: {
++    StringRef ABIName = tools::riscv::getRISCVABI(Args, getTriple());
++    return ("/usr/lib/riscv64-vinix/ld-riscv64-" + ABIName + ".so").str();
++  }
 +  case llvm::Triple::x86_64:
 +    return "/usr/lib/ld.so";
 +  default:
@@ -454,11 +464,9 @@ index 0000000..c57e739
 +      getMultiarchTriple(getDriver(), getTriple(), getDriver().SysRoot);
 +  const GCCVersion &Version = GCCInstallation.getVersion();
 +
-+  // The primary search for libstdc++ supports multiarch variants.
-+  if (addLibStdCXXIncludePaths(LibDir.str() + "/../include",
-+                               "/c++/" + Version.Text, TripleStr,
-+                               GCCMultiarchTriple, TargetMultiarchTriple,
-+                               Multilib.includeSuffix(), DriverArgs, CC1Args))
++  // Try generic GCC detection first.
++  if (Generic_GCC::addGCCLibStdCxxIncludePaths(DriverArgs, CC1Args,
++                                               TripleStr))
 +    return;
 +
 +  // Otherwise, fall back on a bunch of options which don't use multiarch
@@ -478,10 +486,7 @@ index 0000000..c57e739
 +  };
 +
 +  for (const auto &IncludePath : LibStdCXXIncludePathCandidates) {
-+    if (addLibStdCXXIncludePaths(IncludePath, /*Suffix*/ "", TripleStr,
-+                                 /*GCCMultiarchTriple*/ "",
-+                                 /*TargetMultiarchTriple*/ "",
-+                                 Multilib.includeSuffix(), DriverArgs, CC1Args))
++    if (addLibStdCXXIncludePaths(IncludePath, TripleStr, Multilib.includeSuffix(), DriverArgs, CC1Args))
 +      break;
 +  }
 +}
@@ -530,10 +535,9 @@ index 0000000..c57e739
 +    Res |= SanitizerKind::MemTag;
 +  return Res;
 +}
-+
 diff --git llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h
 new file mode 100644
-index 0000000..6929c18
+index 0000000..37af855
 --- /dev/null
 +++ llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h
 @@ -0,0 +1,49 @@
@@ -570,9 +574,9 @@ index 0000000..6929c18
 +      const llvm::opt::ArgList &DriverArgs,
 +      llvm::opt::ArgStringList &CC1Args) const override;
 +  SanitizerMask getSupportedSanitizers() const override;
-+  virtual std::string computeSysRoot() const;
 +
-+  virtual std::string getDynamicLinker(const llvm::opt::ArgList &Args) const;
++  virtual std::string computeSysRoot() const override;
++  virtual std::string getDynamicLinker(const llvm::opt::ArgList &Args) const override;
 +
 +  std::vector<std::string> ExtraOpts;
 +
@@ -587,12 +591,12 @@ index 0000000..6929c18
 +
 +#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
 diff --git llvm-clean/llvm/cmake/modules/CrossCompile.cmake llvm-workdir/llvm/cmake/modules/CrossCompile.cmake
-index 2a39b6a..ceceb2a 100644
+index 6af47b5..78983fa 100644
 --- llvm-clean/llvm/cmake/modules/CrossCompile.cmake
 +++ llvm-workdir/llvm/cmake/modules/CrossCompile.cmake
 @@ -17,8 +17,8 @@ function(llvm_create_cross_target project_name target_name toolchain buildtype)
        -DCMAKE_TOOLCHAIN_FILE=\"${LLVM_MAIN_SRC_DIR}/cmake/platforms/${toolchain}.cmake\")
-   else()
+   elseif (NOT CMAKE_CROSSCOMPILING)
      set(CROSS_TOOLCHAIN_FLAGS_INIT
 -      -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 -      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
@@ -601,24 +605,12 @@ index 2a39b6a..ceceb2a 100644
        )
    endif()
    set(CROSS_TOOLCHAIN_FLAGS_${target_name} ${CROSS_TOOLCHAIN_FLAGS_INIT}
-diff --git llvm-clean/llvm/include/llvm/ADT/Triple.h llvm-workdir/llvm/include/llvm/ADT/Triple.h
-index 42277c0..10c9f08 100644
---- llvm-clean/llvm/include/llvm/ADT/Triple.h
-+++ llvm-workdir/llvm/include/llvm/ADT/Triple.h
-@@ -181,6 +181,7 @@ public:
-     Linux,
-     Lv2,        // PS3
-     MacOSX,
-+    Vinix,
-     NetBSD,
-     OpenBSD,
-     Solaris,
 diff --git llvm-clean/llvm/include/llvm/Support/SwapByteOrder.h llvm-workdir/llvm/include/llvm/Support/SwapByteOrder.h
-index e8612ba..7471bce 100644
+index 1bbc2e2..0df141c 100644
 --- llvm-clean/llvm/include/llvm/Support/SwapByteOrder.h
 +++ llvm-workdir/llvm/include/llvm/Support/SwapByteOrder.h
-@@ -22,7 +22,7 @@
- #endif
+@@ -20,7 +20,7 @@
+ #include <type_traits>
  
  #if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) ||            \
 -    defined(__Fuchsia__) || defined(__EMSCRIPTEN__)
@@ -626,68 +618,42 @@ index e8612ba..7471bce 100644
  #include <endian.h>
  #elif defined(_AIX)
  #include <sys/machine.h>
-diff --git llvm-clean/llvm/lib/Support/Triple.cpp llvm-workdir/llvm/lib/Support/Triple.cpp
-index a9afcc9..3439ee5 100644
---- llvm-clean/llvm/lib/Support/Triple.cpp
-+++ llvm-workdir/llvm/lib/Support/Triple.cpp
-@@ -215,6 +215,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
-   case Linux: return "linux";
-   case Lv2: return "lv2";
-   case MacOSX: return "macosx";
-+  case Vinix: return "vinix";
-   case Mesa3D: return "mesa3d";
-   case Minix: return "minix";
-   case NVCL: return "nvcl";
-@@ -523,6 +524,7 @@ static Triple::OSType parseOS(StringRef OSName) {
-     .StartsWith("linux", Triple::Linux)
-     .StartsWith("lv2", Triple::Lv2)
-     .StartsWith("macos", Triple::MacOSX)
-+    .StartsWith("vinix", Triple::Vinix)
-     .StartsWith("netbsd", Triple::NetBSD)
-     .StartsWith("openbsd", Triple::OpenBSD)
-     .StartsWith("solaris", Triple::Solaris)
+diff --git llvm-clean/llvm/include/llvm/TargetParser/Triple.h llvm-workdir/llvm/include/llvm/TargetParser/Triple.h
+index 79ccd64..9526721 100644
+--- llvm-clean/llvm/include/llvm/TargetParser/Triple.h
++++ llvm-workdir/llvm/include/llvm/TargetParser/Triple.h
+@@ -197,6 +197,7 @@ public:
+     Lv2,        // PS3
+     MacOSX,
+     NetBSD,
++    Vinix,
+     OpenBSD,
+     Solaris,
+     UEFI,
 diff --git llvm-clean/llvm/lib/Support/Unix/Path.inc llvm-workdir/llvm/lib/Support/Unix/Path.inc
-index 788460d..fd68d3f 100644
+index e2aece4..2c9ea5a 100644
 --- llvm-clean/llvm/lib/Support/Unix/Path.inc
 +++ llvm-workdir/llvm/lib/Support/Unix/Path.inc
-@@ -74,7 +74,7 @@ extern char **environ;
- 
- #include <sys/types.h>
- #if !defined(__APPLE__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) &&   \
--    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX)
-+    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX) && !defined(__vinix__)
- #include <sys/statvfs.h>
- #define STATVFS statvfs
- #define FSTATVFS fstatvfs
-@@ -83,7 +83,7 @@ extern char **environ;
- #if defined(__OpenBSD__) || defined(__FreeBSD__)
- #include <sys/mount.h>
- #include <sys/param.h>
--#elif defined(__linux__)
-+#elif defined(__linux__) || defined(__vinix__)
- #if defined(HAVE_LINUX_MAGIC_H)
- #include <linux/magic.h>
- #else
-@@ -478,7 +478,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
- }
- 
- static bool is_local_impl(struct STATVFS &Vfs) {
--#if defined(__linux__) || defined(__GNU__)
-+#if defined(__linux__) || defined(__GNU__) || defined(__vinix__)
- #ifndef NFS_SUPER_MAGIC
- #define NFS_SUPER_MAGIC 0x6969
- #endif
-@@ -874,7 +874,7 @@ void mapped_file_region::unmapImpl() {
- 
- void mapped_file_region::dontNeedImpl() {
+@@ -497,7 +497,7 @@ static bool is_local_impl(struct STATVFS &Vfs) {
+ #elif defined(__CYGWIN__)
+   // Cygwin doesn't expose this information; would need to use Win32 API.
+   return false;
+-#elif defined(__Fuchsia__)
++#elif defined(__Fuchsia__) || defined(__vinix__)
+   // Fuchsia doesn't yet support remote filesystem mounts.
+   return true;
+ #elif defined(__EMSCRIPTEN__)
+@@ -875,7 +875,7 @@ void mapped_file_region::dontNeedImpl() {
    assert(Mode == mapped_file_region::readonly);
+   if (!Mapping)
+     return;
 -#if defined(__MVS__) || defined(_AIX)
 +#if defined(__MVS__) || defined(_AIX) || defined(__vinix__)
-   // If we don't have madvise, or it isn't beneficial, treat this as a no-op.
-   return;
- #else
+     // If we don't have madvise, or it isn't beneficial, treat this as a no-op.
+ #elif defined(POSIX_MADV_DONTNEED)
+   ::posix_madvise(Mapping, Size, POSIX_MADV_DONTNEED);
 diff --git llvm-clean/llvm/lib/Support/Unix/Program.inc llvm-workdir/llvm/lib/Support/Unix/Program.inc
-index 0893420..0616096 100644
+index 897e227..02f74d7 100644
 --- llvm-clean/llvm/lib/Support/Unix/Program.inc
 +++ llvm-workdir/llvm/lib/Support/Unix/Program.inc
 @@ -41,6 +41,7 @@
@@ -698,28 +664,35 @@ index 0893420..0616096 100644
  #ifdef HAVE_POSIX_SPAWN
  #include <spawn.h>
  
-diff --git llvm-clean/llvm/tools/llvm-dwarfdump/Statistics.cpp llvm-workdir/llvm/tools/llvm-dwarfdump/Statistics.cpp
-index 5c08e43..a19c74e 100644
---- llvm-clean/llvm/tools/llvm-dwarfdump/Statistics.cpp
-+++ llvm-workdir/llvm/tools/llvm-dwarfdump/Statistics.cpp
-@@ -6,6 +6,8 @@
- //
- //===----------------------------------------------------------------------===//
+diff --git llvm-clean/llvm/lib/TargetParser/Triple.cpp llvm-workdir/llvm/lib/TargetParser/Triple.cpp
+index a3d6a06..bff67c6 100644
+--- llvm-clean/llvm/lib/TargetParser/Triple.cpp
++++ llvm-workdir/llvm/lib/TargetParser/Triple.cpp
+@@ -219,6 +219,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+   case Emscripten: return "emscripten";
+   case FreeBSD: return "freebsd";
+   case Fuchsia: return "fuchsia";
++  case Vinix: return "vinix";
+   case Haiku: return "haiku";
+   case HermitCore: return "hermit";
+   case Hurd: return "hurd";
+@@ -575,6 +576,7 @@ static Triple::VendorType parseVendor(StringRef VendorName) {
  
-+#include <cmath>
-+
- #include "llvm-dwarfdump.h"
- #include "llvm/ADT/DenseMap.h"
- #include "llvm/ADT/StringSet.h"
+ static Triple::OSType parseOS(StringRef OSName) {
+   return StringSwitch<Triple::OSType>(OSName)
++    .StartsWith("vinix", Triple::Vinix)
+     .StartsWith("ananas", Triple::Ananas)
+     .StartsWith("cloudabi", Triple::CloudABI)
+     .StartsWith("darwin", Triple::Darwin)
 diff --git llvm-clean/llvm/tools/llvm-shlib/CMakeLists.txt llvm-workdir/llvm/tools/llvm-shlib/CMakeLists.txt
-index 8e2b78f..f30e518 100644
+index 8ace190..47dd871 100644
 --- llvm-clean/llvm/tools/llvm-shlib/CMakeLists.txt
 +++ llvm-workdir/llvm/tools/llvm-shlib/CMakeLists.txt
-@@ -36,6 +36,7 @@ if(LLVM_BUILD_LLVM_DYLIB)
-   if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux") OR (MINGW) OR (HAIKU)
-      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "GNU")
-+     OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Vinix")
+@@ -41,6 +41,7 @@ if(LLVM_BUILD_LLVM_DYLIB)
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
-      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Fuchsia")
       OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "DragonFly")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Fuchsia")
++     OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Vinix")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
+      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")) # FIXME: It should be "GNU ld for elf"
+     configure_file(

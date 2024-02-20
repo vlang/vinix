@@ -1,15 +1,33 @@
 name=readline
-version=8.2
+version=8.2.10
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/readline/readline-${version}.tar.gz"
+tarball_url="https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz"
 tarball_blake2b="7974322b9c092a756a79e537df08e8532f8e0fcb598f77732e28287c33ebec9e9837ed88b43334c310892d56a871b423903f0f564def2fbe700a1004f2ae7b18"
+source_allow_network="yes"
+source_imagedeps="curl"
 source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="patchelf"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses"
 
 regenerate() {
-    AUTOHEADER=true autoreconf -fvi
+    curl -Lo readline82-001 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-001
+    curl -Lo readline82-002 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-002
+    curl -Lo readline82-003 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-003
+    curl -Lo readline82-004 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-004
+    curl -Lo readline82-005 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-005
+    curl -Lo readline82-006 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-006
+    curl -Lo readline82-007 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-007
+    curl -Lo readline82-008 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-008
+    curl -Lo readline82-009 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-009
+    curl -Lo readline82-010 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-010
+
+    for f in readline82-0*; do
+        patch -p0 < $f
+    done
+
+        AUTOHEADER=true \
+    autotools_recursive_regen
 }
 
 build() {

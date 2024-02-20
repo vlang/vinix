@@ -1,8 +1,8 @@
 name=fontconfig
-version=2.14.2
+version=2.15.0
 revision=1
 tarball_url="https://www.freedesktop.org/software/fontconfig/release/fontconfig-${version}.tar.xz"
-tarball_blake2b="4efeeb7f9a6705d493128d00b60e681a20a47556f4c0d7787a5c7a6d2cbbc22f150cad7988a9836a9e72aeb61e2b6a196c00a071c7042c62283c7720cdbb743d"
+tarball_blake2b="17c85fddc4ab84111c4f50afb89ecd8792c3aeaa2690b38fd39fca6f6cece69e9ce0cd3af8a2e54968c79ad1f9bee1e444699a13c068d9dfd3dfe1212ff37533"
 source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="python gperf"
 hostdeps="gcc autoconf automake libtool pkg-config"

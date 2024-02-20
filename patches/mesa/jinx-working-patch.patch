@@ -1,5 +1,5 @@
 diff --git mesa-clean/include/drm-uapi/drm.h mesa-workdir/include/drm-uapi/drm.h
-index 5e54c3a..085b5b7 100644
+index 0254024..c2ffd35 100644
 --- mesa-clean/include/drm-uapi/drm.h
 +++ mesa-workdir/include/drm-uapi/drm.h
 @@ -44,7 +44,7 @@ typedef unsigned int drm_handle_t;
@@ -7,64 +7,53 @@ index 5e54c3a..085b5b7 100644
  
  #include <stdint.h>
 -#include <sys/ioccom.h>
-+//#include <sys/ioccom.h>
++// #include <sys/ioccom.h>
  #include <sys/types.h>
  typedef int8_t   __s8;
  typedef uint8_t  __u8;
 diff --git mesa-clean/src/compiler/spirv/spirv_to_nir.c mesa-workdir/src/compiler/spirv/spirv_to_nir.c
-index 71cdc83..3d26705 100644
+index 5f36118..a501802 100644
 --- mesa-clean/src/compiler/spirv/spirv_to_nir.c
 +++ mesa-workdir/src/compiler/spirv/spirv_to_nir.c
-@@ -37,6 +37,7 @@
- #include "util/u_string.h"
+@@ -39,6 +39,7 @@
+ #include "util/u_debug.h"
  
  #include <stdio.h>
 +#include <strings.h>
  
  #ifndef NDEBUG
- static enum nir_spirv_debug_level
+ uint32_t mesa_spirv_debug = 0;
 diff --git mesa-clean/src/egl/main/egllog.c mesa-workdir/src/egl/main/egllog.c
-index 984dd5b..6a91952 100644
+index 678bb75..016a70d 100644
 --- mesa-clean/src/egl/main/egllog.c
 +++ mesa-workdir/src/egl/main/egllog.c
-@@ -39,6 +39,7 @@
+@@ -37,6 +37,7 @@
  #include <stdio.h>
  #include <stdlib.h>
  #include <string.h>
 +#include <strings.h>
  #include "c11/threads.h"
  #include "util/macros.h"
- #include "util/u_string.h"
+ #include "util/simple_mtx.h"
 diff --git mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
-index 5bfc8db..d2b31e1 100644
+index 5c5a6cd..ae6c23d 100644
 --- mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c
 +++ mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
-@@ -1102,7 +1102,6 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
+@@ -1152,7 +1152,7 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
     default:
        break;
     }
 -   assert(0);
++   // assert(0);
     *value = 0;
     return false;
  }
-diff --git mesa-clean/src/util/debug.c mesa-workdir/src/util/debug.c
-index 89ae613..fbf45f4 100644
---- mesa-clean/src/util/debug.c
-+++ mesa-workdir/src/util/debug.c
-@@ -23,6 +23,7 @@
- 
- #include <errno.h>
- #include <string.h>
-+#include <strings.h>
- #include "debug.h"
- #include "u_string.h"
- 
 diff --git mesa-clean/src/util/detect_os.h mesa-workdir/src/util/detect_os.h
-index 6506948..a631d69 100644
+index 6506948..93ce551 100644
 --- mesa-clean/src/util/detect_os.h
 +++ mesa-workdir/src/util/detect_os.h
-@@ -81,6 +81,11 @@
- #define DETECT_OS_UNIX 1
+@@ -28,6 +28,11 @@
+ #define DETECT_OS_ANDROID 1
  #endif
  
 +#if defined(__vinix__)
@@ -72,20 +61,33 @@ index 6506948..a631d69 100644
 +#define DETECT_OS_UNIX 1
 +#endif
 +
- 
- /*
-  * Make sure DETECT_OS_* are always defined, so that they can be used with #if
-@@ -127,5 +132,8 @@
- #ifndef DETECT_OS_WINDOWS
+ #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+ #define DETECT_OS_FREEBSD 1
+ #define DETECT_OS_BSD 1
+@@ -128,4 +133,8 @@
  #define DETECT_OS_WINDOWS 0
  #endif
+ 
 +#ifndef DETECT_OS_VINIX
 +#define DETECT_OS_VINIX 0
 +#endif
- 
++
  #endif /* DETECT_OS_H */
+diff --git mesa-clean/src/util/futex.h mesa-workdir/src/util/futex.h
+index c397507..995c1e2 100644
+--- mesa-clean/src/util/futex.h
++++ mesa-workdir/src/util/futex.h
+@@ -24,7 +24,7 @@
+ #ifndef UTIL_FUTEX_H
+ #define UTIL_FUTEX_H
+ 
+-#if defined(HAVE_LINUX_FUTEX_H)
++#if defined(HAVE_LINUX_FUTEX_H) && defined(__linux__)
+ #define UTIL_FUTEX_SUPPORTED 1
+ #elif defined(__FreeBSD__)
+ #define UTIL_FUTEX_SUPPORTED 1
 diff --git mesa-clean/src/util/os_misc.c mesa-workdir/src/util/os_misc.c
-index 31f1c55..0095e53 100644
+index c378a9e..64f6cff 100644
 --- mesa-clean/src/util/os_misc.c
 +++ mesa-workdir/src/util/os_misc.c
 @@ -57,7 +57,7 @@
@@ -97,7 +99,7 @@ index 31f1c55..0095e53 100644
  #  include <unistd.h>
  #elif DETECT_OS_OPENBSD || DETECT_OS_FREEBSD
  #  include <sys/resource.h>
-@@ -223,7 +223,7 @@ os_get_option(const char *name)
+@@ -248,7 +248,7 @@ exit_mutex:
  bool
  os_get_total_physical_memory(uint64_t *size)
  {
@@ -107,19 +109,10 @@ index 31f1c55..0095e53 100644
     const long page_size = sysconf(_SC_PAGE_SIZE);
  
 diff --git mesa-clean/src/util/os_time.c mesa-workdir/src/util/os_time.c
-index d2edd88..d7c3dfb 100644
+index 7fb3134..38b6ade 100644
 --- mesa-clean/src/util/os_time.c
 +++ mesa-workdir/src/util/os_time.c
-@@ -53,7 +53,7 @@
- int64_t
- os_time_get_nano(void)
- {
--#if DETECT_OS_LINUX || DETECT_OS_BSD
-+#if DETECT_OS_LINUX || DETECT_OS_BSD || DETECT_OS_VINIX
- 
-    struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-@@ -92,7 +92,7 @@ os_time_get_nano(void)
+@@ -65,7 +65,7 @@ os_time_get_nano(void)
  void
  os_time_sleep(int64_t usecs)
  {
@@ -128,34 +121,33 @@ index d2edd88..d7c3dfb 100644
     struct timespec time;
     time.tv_sec = usecs / 1000000;
     time.tv_nsec = (usecs % 1000000) * 1000;
-diff --git mesa-clean/src/util/u_printf.h mesa-workdir/src/util/u_printf.h
-index 44dcce5..e9e23ba 100644
---- mesa-clean/src/util/u_printf.h
-+++ mesa-workdir/src/util/u_printf.h
-@@ -22,6 +22,8 @@
- #ifndef U_PRINTF_H
- #define U_PRINTF_H
+diff --git mesa-clean/src/util/u_debug.c mesa-workdir/src/util/u_debug.c
+index 61f628e..e390606 100644
+--- mesa-clean/src/util/u_debug.c
++++ mesa-workdir/src/util/u_debug.c
+@@ -32,6 +32,7 @@
+ #include "util/u_math.h"
+ #include <inttypes.h>
  
-+#include <stdarg.h>
-+
- #ifdef __cplusplus
- 
- #include <string>
-diff --git mesa-clean/src/util/u_thread.h mesa-workdir/src/util/u_thread.h
-index 013e8be..a3a6031 100644
---- mesa-clean/src/util/u_thread.h
-+++ mesa-workdir/src/util/u_thread.h
-@@ -129,7 +129,7 @@ static inline thrd_t u_thread_create(int (*routine)(void *), void *param)
- static inline void u_thread_setname( const char *name )
++#include <strings.h>
+ #include <stdio.h>
+ #include <limits.h> /* CHAR_BIT */
+ #include <ctype.h> /* isalnum */
+diff --git mesa-clean/src/util/u_thread.c mesa-workdir/src/util/u_thread.c
+index 55b6b68..277ffbd 100644
+--- mesa-clean/src/util/u_thread.c
++++ mesa-workdir/src/util/u_thread.c
+@@ -75,7 +75,7 @@ int u_thread_create(thrd_t *thrd, int (*routine)(void *), void *param)
+ void u_thread_setname( const char *name )
  {
  #if defined(HAVE_PTHREAD)
--#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS
-+#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_VINIX
+-#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || defined(__GLIBC__)
++#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || defined(__GLIBC__) || DETECT_OS_VINIX
     int ret = pthread_setname_np(pthread_self(), name);
     if (ret == ERANGE) {
        char buf[16];
-@@ -242,7 +242,7 @@ util_set_current_thread_affinity(const uint32_t *mask,
- static inline int64_t
+@@ -154,7 +154,7 @@ util_set_thread_affinity(thrd_t thread,
+ int64_t
  util_thread_get_time_nano(thrd_t thread)
  {
 -#if defined(HAVE_PTHREAD) && !defined(__APPLE__) && !defined(__HAIKU__)

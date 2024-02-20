@@ -9,7 +9,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs pcre2"
 
 regenerate() {
-    autoreconf -fvi
+    autotools_recursive_regen
 }
 
 build() {
