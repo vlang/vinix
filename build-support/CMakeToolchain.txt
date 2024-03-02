@@ -2,8 +2,8 @@ set(CMAKE_SYSTEM_NAME Vinix)
 
 set(CMAKE_FIND_ROOT_PATH /sysroot)
 
-set(CMAKE_C_COMPILER x86_64-vinix-gcc)
-set(CMAKE_CXX_COMPILER x86_64-vinix-g++)
+set(CMAKE_C_COMPILER x86_64-pc-vinix-mlibc-gcc)
+set(CMAKE_CXX_COMPILER x86_64-pc-vinix-mlibc-g++)
 
 # search for programs in the build host directories
 SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)

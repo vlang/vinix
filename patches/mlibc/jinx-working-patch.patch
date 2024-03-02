@@ -1,16 +1,3 @@
-diff --git mlibc-clean/abis/linux/statvfs.h mlibc-workdir/abis/linux/statvfs.h
-index 7a75d3a..15269b0 100644
---- mlibc-clean/abis/linux/statvfs.h
-+++ mlibc-workdir/abis/linux/statvfs.h
-@@ -23,6 +23,8 @@ struct statvfs {
- 	unsigned long f_fsid;
- 	unsigned long f_flag;
- 	unsigned long f_namemax;
-+
-+	char f_basetype[80];
- };
- 
- #endif /* _ABIBITS_STATVFS_H */
 diff --git mlibc-workdir/abis/vinix/signal.h mlibc-workdir/abis/vinix/signal.h
 new file mode 100644
 index 0000000..4dcea40
@@ -1799,11 +1786,11 @@ index 0000000..e3d202f
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/statvfs.h mlibc-workdir/sysdeps/vinix/include/abi-bits/statvfs.h
 new file mode 120000
-index 0000000..1fc80c2
+index 0000000..d0bdd40
 --- /dev/null
 +++ mlibc-workdir/sysdeps/vinix/include/abi-bits/statvfs.h
 @@ -0,0 +1 @@
-+../../../../abis/linux/statvfs.h
++../../../../abis/lyre/statvfs.h
 \ No newline at end of file
 diff --git mlibc-workdir/sysdeps/vinix/include/abi-bits/suseconds_t.h mlibc-workdir/sysdeps/vinix/include/abi-bits/suseconds_t.h
 new file mode 120000

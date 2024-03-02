@@ -15,7 +15,7 @@ regenerate() {
 build() {
     cp -r ${source_dir}/. ./
 
-    x86_64-vinix-gcc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v
+    ${OS_TRIPLET}-gcc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v
 }
 
 package() {

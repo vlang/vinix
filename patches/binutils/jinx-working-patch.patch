@@ -1,16 +1,3 @@
-diff --git binutils-clean/bfd/Makefile.am binutils-workdir/bfd/Makefile.am
-index 5c5fdef..3c91651 100644
---- binutils-clean/bfd/Makefile.am
-+++ binutils-workdir/bfd/Makefile.am
-@@ -778,7 +778,7 @@ ofiles: stamp-ofiles ; @true
- libbfd_la_SOURCES = $(BFD32_LIBS_CFILES)
- EXTRA_libbfd_la_SOURCES = $(CFILES)
- libbfd_la_DEPENDENCIES = $(OFILES) ofiles ../libsframe/libsframe.la
--libbfd_la_LIBADD = `cat ofiles` @SHARED_LIBADD@ $(LIBDL) $(ZLIB) $(ZSTD_LIBS) ../libsframe/libsframe.la
-+libbfd_la_LIBADD = `cat ofiles` @SHARED_LIBADD@ $(LIBDL) $(ZLIB) $(ZSTD_LIBS) $(SFRAME_LIB_PATH) ../libsframe/libsframe.la
- libbfd_la_LDFLAGS += -release `cat libtool-soversion` @SHARED_LDFLAGS@
- 
- # This file holds an array associating configuration triplets and
 diff --git binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
 index bdee539..f5d0cf0 100644
 --- binutils-clean/bfd/config.bfd

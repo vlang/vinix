@@ -25,7 +25,7 @@ index 0c40fed..763619b 100644
    all_pkgltdl_files="COPYING.LIB Makefile Makefile.in Makefile.inc Makefile.am README acinclude.m4 aclocal.m4 argz_.h argz.c config.h.in config-h.in configure configure.ac configure.in libltdl/lt__alloc.h libltdl/lt__argz.h libltdl/lt__dirent.h libltdl/lt__glibc.h libltdl/lt__private.h libltdl/lt__strl.h libltdl/lt_dlloader.h libltdl/lt_error.h libltdl/lt_system.h libltdl/slist.h loaders/dld_link.c loaders/dlopen.c loaders/dyld.c loaders/load_add_on.c loaders/loadlibrary.c loaders/preopen.c loaders/shl_load.c lt__alloc.c lt__argz.c lt__dirent.c lt__strl.c lt_dlloader.c lt_error.c ltdl.c ltdl.h ltdl.mk slist.c"
  
 diff --git libtool-clean/m4/libtool.m4 libtool-workdir/m4/libtool.m4
-index 79a2451..b6e8ca4 100644
+index 79a2451..db95342 100644
 --- libtool-clean/m4/libtool.m4
 +++ libtool-workdir/m4/libtool.m4
 @@ -1696,7 +1696,7 @@ AC_CACHE_VAL([lt_cv_sys_max_cmd_len], [dnl
@@ -41,7 +41,7 @@ index 79a2451..b6e8ca4 100644
    hardcode_into_libs=yes
    ;;
  
-+vinix*)
++*-mlibc)
 +  version_type=linux # correct to gnu/linux during the next big refactor
 +  need_lib_prefix=no
 +  need_version=no
@@ -60,7 +60,7 @@ index 79a2451..b6e8ca4 100644
    lt_cv_deplibs_check_method=pass_all
    ;;
  
-+vinix*)
++*-mlibc)
 +  lt_cv_deplibs_check_method=pass_all
 +  ;;
 +
@@ -71,7 +71,7 @@ index 79a2451..b6e8ca4 100644
  	;;
        netbsd*)
  	;;
-+      vinix*)
++      *-mlibc)
 +	;;
        *qnx* | *nto*)
          # QNX uses GNU C++, but need to define -shared option too, otherwise
@@ -80,7 +80,7 @@ index 79a2451..b6e8ca4 100644
        _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
        ;;
  
-+    vinix*)
++    *-mlibc)
 +      _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
 +      _LT_TAGVAR(lt_prog_compiler_pic, $1)='-fPIC'
 +      _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
@@ -93,7 +93,7 @@ index 79a2451..b6e8ca4 100644
        fi
        ;;
  
-+    vinix*)
++    *-mlibc)
 +	_LT_TAGVAR(archive_cmds, $1)='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
 +	_LT_TAGVAR(archive_expsym_cmds, $1)='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
 +      ;;
@@ -105,7 +105,7 @@ index 79a2451..b6e8ca4 100644
        esac
        ;;
  
-+    vinix*)
++    *-mlibc)
 +      ;;
 +
      netbsd*)
@@ -115,7 +115,7 @@ index 79a2451..b6e8ca4 100644
  	esac
  	;;
  
-+      vinix*)
++      *-mlibc)
 +	    _LT_TAGVAR(ld_shlibs, $1)=yes
 +	    ;;
 +
@@ -123,16 +123,16 @@ index 79a2451..b6e8ca4 100644
          if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
  	  _LT_TAGVAR(archive_cmds, $1)='$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'
 diff --git libtool-clean/m4/ltdl.m4 libtool-workdir/m4/ltdl.m4
-index 772c150..642966e 100644
+index 772c150..0ca254d 100644
 --- libtool-clean/m4/ltdl.m4
 +++ libtool-workdir/m4/ltdl.m4
-@@ -497,6 +497,9 @@ AC_CACHE_CHECK([whether deplibs are loaded by dlopen],
-     # at 6.2 and later dlopen does load deplibs.
+@@ -481,6 +481,9 @@ AC_CACHE_CHECK([whether deplibs are loaded by dlopen],
+     # GNU and its variants, using gnu ld.so (Glibc)
      lt_cv_sys_dlopen_deplibs=yes
      ;;
-+  vinix*)
++  *-mlibc)
 +    lt_cv_sys_dlopen_deplibs=yes
 +    ;;
-   netbsd*)
+   hpux10*|hpux11*)
      lt_cv_sys_dlopen_deplibs=yes
      ;;

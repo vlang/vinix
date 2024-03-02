@@ -13,7 +13,7 @@ regenerate() {
 build() {
     cp -rpf "${source_dir}"/. ./
 
-    make -j${parallelism} TOOLCHAIN_PREFIX=x86_64-vinix-
+    make -j${parallelism} TOOLCHAIN_PREFIX=${OS_TRIPLET}-
 }
 
 package() {

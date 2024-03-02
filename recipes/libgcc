@@ -23,13 +23,7 @@ package() {
     cp -r tmp_libgcc_dir/usr/local/lib "${dest_dir}${prefix}"/
     cp -r tmp_libgcc_dir/usr/local/${OS_TRIPLET}/* "${dest_dir}${prefix}"/
 
-    rm "${dest_dir}${prefix}"/lib/gcc/${OS_TRIPLET}/13.2.0/crti.o
-    rm "${dest_dir}${prefix}"/lib/gcc/${OS_TRIPLET}/13.2.0/crtn.o
-
     # Copy libgcc into GCC's tree else it will complain.
     mkdir -p "${base_dir}"/host-pkgs/gcc/usr/local/lib
     cp -r tmp_libgcc_dir/usr/local/lib/* "${base_dir}"/host-pkgs/gcc/usr/local/lib/
-
-    rm "${base_dir}"/host-pkgs/gcc/usr/local/lib/gcc/${OS_TRIPLET}/13.2.0/crti.o
-    rm "${base_dir}"/host-pkgs/gcc/usr/local/lib/gcc/${OS_TRIPLET}/13.2.0/crtn.o
 }
