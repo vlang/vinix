@@ -5,7 +5,9 @@ imagedeps="gcc"
 
 build() {
     cp -r ${source_dir}/. ./
-    cc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v -lm -lpthread
+    set -x
+    cc $CFLAGS -w -std=gnu99 -fno-strict-aliasing $LDFLAGS v.c -lm -lpthread -o v
+    set +x
 }
 
 package() {

@@ -1,21 +1,23 @@
 name=v
-version=10d738c7733f3046c16358b82bd72b80d7a27c26
+version=9d117fc3a0b6385b72dd98620d30be14960dc0d4
 revision=1
 tarball_url="https://github.com/vlang/v/archive/${version}.tar.gz"
-tarball_blake2b="9d2d98192be8b5467dc1ee94ba55dd71bc42f9065e72edc6b86f947c98271bb61b7d18133dde4a9b1f46dac1e20de5f7d42efde8637db9d1e5aae4d698fdd3aa"
+tarball_blake2b="72886cd2dc8eae009f78be00bbdcf74cfcd5b92a8901da275c100f0c95cf92119d6a2784173c80845b6f508f3ee5758c6b4a18da228657802d1c7a8ea42e1dfe"
 source_imagedeps="curl"
 source_allow_network="yes"
 hostdeps="gcc"
 deps="core-libs"
 
 regenerate() {
-    curl -o v.c https://raw.githubusercontent.com/vlang/vc/4076df679d4d35c51de44c327e8271f3e1eefd01/v.c
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/795fb84abda6a1412cbf2d08267f0279b2da4dcb/v.c
 }
 
 build() {
     cp -r ${source_dir}/. ./
 
-    ${OS_TRIPLET}-gcc -O2 -pipe -w -std=gnu99 -fno-strict-aliasing v.c -o v
+    set -x
+    ${OS_TRIPLET}-gcc $CFLAGS -w -std=gnu99 -fno-strict-aliasing $LDFLAGS v.c -o v
+    set +x
 }
 
 package() {
