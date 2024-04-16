@@ -1,8 +1,8 @@
 name=xorg-xkbutils
-version=1.0.5
+version=1.0.6
 revision=1
 tarball_url="https://www.x.org/archive/individual/app/xkbutils-${version}.tar.xz"
-tarball_blake2b="ac2572b31638120dd5c5e92497f9cde4b43df7ab0f13882f5f1fbac71084dc112a1f9e34d10adf5a4eb83b1b1636ab2388ae8675be5ac1048a3913ac7b0d7f53"
+tarball_blake2b="af97210ded0e5d1d5ce99e71c50c3ade19b5fe926596a3816a8fcbe7ea6b65f08d5216792a45cb4df3191b6f5fc3db059ee1b1b05ecf0fea408562088f6489e4"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

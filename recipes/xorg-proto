@@ -1,8 +1,8 @@
 name=xorg-proto
-version=2023.2
+version=2024.1
 revision=1
 tarball_url="https://www.x.org/releases/individual/proto/xorgproto-${version}.tar.xz"
-tarball_blake2b="ff255b91770ad11cdcc48d12815317285d8d16d28011a86166f3e07af18b30fdf35c2eb7b6537504eb4c0e9ca65b3116493422b6faebe04ee80e6aee92387675"
+tarball_blake2b="a3850f8594e8b4240f731dce696c3ab8310c3b2419117dea3141a093a690d9bc16652e64eb5516073145309c65327bd14be2eaa8843c04de25c8eff6c46d3c1d"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

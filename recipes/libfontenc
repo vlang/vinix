@@ -1,8 +1,8 @@
 name=libfontenc
-version=1.1.7
+version=1.1.8
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libfontenc-${version}.tar.gz"
-tarball_blake2b="538dc45801dd2fc3b18527b5716fd468089206728ce4704416eb0ecd2ed528f951d64e7bf2f779a5852363670724458c966538afcec813a9823f5d04303d1bbb"
+tarball_blake2b="6d613cf17a3414fadb3961eea5493de33bbcdc6d19909d1ac7fa10d9b9c4eba59478f5fa59ac4758a86307fb2c04f40dbcc345203be9161e939de73bc7f93d3a"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-font-util xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

@@ -10,9 +10,9 @@ build() {
     cp -r ${source_dir}/. .
     sed -i 's/all: libbz2.a bzip2 bzip2recover test/all: libbz2.a bzip2 bzip2recover/g' Makefile
 
-    make CC=${OS_TRIPLET}-gcc CFLAGS="$CFLAGS -fPIC" -f Makefile-libbz2_so
+    make CC=${OS_TRIPLET}-gcc CFLAGS="$CFLAGS -fPIC" LDFLAGS="$LDFLAGS" -f Makefile-libbz2_so
     make clean
-    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS -fPIC" -j${parallelism}
+    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS -fPIC" LDFLAGS="$LDFLAGS" -j${parallelism}
 }
 
 package() {

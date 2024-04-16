@@ -3,7 +3,7 @@
 set -e
 
 FREESTANDING_HDRS_REV=dd3abd2d7147efc4170dff478d3b7730bed14147
-FLANTERM_REV=852e18fa790e5e09795a3bb70f8b698d77d4d79c
+FLANTERM_REV=347d9cf1e3fced64aa20ab278e2fdcc834086035
 EYALROZ_PRINTF_REV=af05afe8ef0f84cb9f3a9bbfd79ac81a941cbebf
 
 if ! [ -d c/freestanding-headers ]; then

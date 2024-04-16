@@ -1,8 +1,8 @@
 name=pcre2
-version=10.42
+version=10.43
 revision=1
 tarball_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${version}/pcre2-${version}.tar.gz"
-tarball_blake2b="19233ee4a63d3bc0828f68c646ecbeb8161c242e52c9242976d80b805d5863699766a8f3a23946ac50ced75f48aad6d948bd9aa3fdc7540bd9193065ea7ee9d1"
+tarball_blake2b="7bf9ad4aba00f7f6e11ebbab3a45ab1e801cfcf365fc1ece544e3c0b775415f5790ebe202a8dd5cabbc21606f915c12417fe914c65d34cd2d74cb60581ae1118"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bzip2 ncurses readline zlib"

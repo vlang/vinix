@@ -1,5 +1,5 @@
 diff --git gcc-host-clean/fixincludes/mkfixinc.sh gcc-host-workdir/fixincludes/mkfixinc.sh
-index df90720..484f8bc 100755
+index df90720..c7df202 100755
 --- gcc-host-clean/fixincludes/mkfixinc.sh
 +++ gcc-host-workdir/fixincludes/mkfixinc.sh
 @@ -12,6 +12,7 @@ target=fixinc.sh
@@ -12,7 +12,7 @@ index df90720..484f8bc 100755
      powerpc-*-eabisim* | \
 diff --git gcc-host-workdir/gcc/config/vinix.h gcc-host-workdir/gcc/config/vinix.h
 new file mode 100644
-index 0000000..ca776e9
+index 0000000..c7cdde2
 --- /dev/null
 +++ gcc-host-workdir/gcc/config/vinix.h
 @@ -0,0 +1,29 @@
@@ -23,18 +23,18 @@ index 0000000..ca776e9
 +#define LIB_SPEC "-lc"
 +
 +#undef STARTFILE_SPEC
-+#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared:crtbeginS.o%s;:crtbegin.o%s}"
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared|static-pie|pie|!no-pie:crtbeginS.o%s;:crtbegin.o%s}"
 +
 +#undef ENDFILE_SPEC
-+#define ENDFILE_SPEC "%{shared:crtendS.o%s;:crtend.o%s} crtn.o%s"
++#define ENDFILE_SPEC "%{shared|static-pie|pie|!no-pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
 +
 +#define GNU_USER_LINK_EMULATION32 "elf_i386"
 +#define GNU_USER_LINK_EMULATION64 "elf_x86_64"
 +#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
 +
-+#define GNU_USER_DYNAMIC_LINKER32 "/usr/lib/ld_i386.so"
++#define GNU_USER_DYNAMIC_LINKER32 "/does_not_exist"
 +#define GNU_USER_DYNAMIC_LINKER64 "/usr/lib/ld.so"
-+#define GNU_USER_DYNAMIC_LINKERX32 "/usr/lib/ld32.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/does_not_exist"
 +
 +#undef TARGET_OS_CPP_BUILTINS
 +#define TARGET_OS_CPP_BUILTINS()         \
@@ -46,7 +46,7 @@ index 0000000..ca776e9
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff --git gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/config.gcc
-index 648b3dc..a709885 100644
+index 648b3dc..a8c6b3d 100644
 --- gcc-host-clean/gcc/config.gcc
 +++ gcc-host-workdir/gcc/config.gcc
 @@ -840,6 +840,15 @@ case ${target} in

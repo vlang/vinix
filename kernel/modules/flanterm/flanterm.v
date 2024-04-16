@@ -4,6 +4,9 @@ pub struct Context {}
 
 fn C.flanterm_fb_init(_malloc voidptr, _free voidptr,
 				   	  framebuffer &u32, width u64, height u64, pitch u64,
+				   	  red_mask_size u8, red_mask_shift u8,
+				   	  green_mask_size u8, green_mask_shift u8,
+				   	  blue_mask_size u8, blue_mask_shift u8,
 				   	  canvas &u32,
 				   	  ansi_colours &u32, ansi_bright_colours &u32,
 				   	  default_bg &u32, default_fg &u32,

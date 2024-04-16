@@ -1,7 +1,8 @@
 JINX_MAJOR_VER=0.2
 
-export CFLAGS="-O2 -pipe -march=x86-64 -mtune=generic"
-export CXXFLAGS="${CFLAGS}"
+export CFLAGS="-O2 -pipe -march=x86-64 -mtune=generic -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
+export CXXFLAGS="${CFLAGS} -Wp,-D_GLIBCXX_ASSERTIONS"
+export LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now"
 
 OS_TRIPLET=x86_64-pc-vinix-mlibc
 

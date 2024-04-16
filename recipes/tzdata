@@ -1,8 +1,8 @@
 name=tzdata
-version=2023d
+version=2024a
 revision=1
 tarball_url="https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz"
-tarball_blake2b="b79be37a8a258745d162a575c795ee6476b4fa5f6d2f7b562d9431a238eca276a1747a983778291184fc6e40a0c1f5e6284d41290fd6d1d3bd3118bda83f426e"
+tarball_blake2b="5ec49bbce704411a1d8b3f018b0d8f6c7de24c5600e0cb6c61a7ee29b4a49b1e502d23b40bce6584ea0aa9b66327321608cbabb994071ec4ca2b3a496aa2d621"
 imagedeps="tzdata"
 hostdeps="gcc binutils"
 deps="core-libs"

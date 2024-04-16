@@ -1,8 +1,8 @@
 name=xorg-server
-version=21.1.11
+version=21.1.13
 revision=1
 tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
-tarball_blake2b="0a18840979bb8b20b02eca9d737f20ddcf92a4771386074c38692df8a1c9b0f471af2211f3006f845ad0dd887b3844b7e7aac761bc12fc4e4177f1ada32ec503"
+tarball_blake2b="f6b05439e54b9709ce7a5b5f3702053ebc586ac8f8976bb6de9955ab34eac7201e027e1076584cf5b6d8c2639703e3a908b9e38f5dc52d4897aac8650f462502"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xtrans xorg-font-util xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

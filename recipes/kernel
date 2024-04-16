@@ -5,6 +5,7 @@ source_dir="kernel"
 source_imagedeps="git"
 source_allow_network="yes"
 hostdeps="gcc v"
+deps="core-libs"
 
 regenerate() {
     ./get-deps
@@ -13,7 +14,7 @@ regenerate() {
 build() {
     cp -rpf "${source_dir}"/. ./
 
-    make -j${parallelism} TOOLCHAIN_PREFIX=${OS_TRIPLET}-
+    make -j${parallelism} TOOLCHAIN_PREFIX=${OS_TRIPLET}- LDFLAGS=""
 }
 
 package() {

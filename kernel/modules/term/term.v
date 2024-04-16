@@ -33,12 +33,15 @@ pub fn initialise() {
 
 	flanterm_ctx = unsafe { C.flanterm_fb_init(nil, nil,
 											   framebuffer_tag.address, framebuffer_width, framebuffer_height, framebuffer_tag.pitch,
+											   framebuffer_tag.red_mask_size, framebuffer_tag.red_mask_shift,
+											   framebuffer_tag.green_mask_size, framebuffer_tag.green_mask_shift,
+											   framebuffer_tag.blue_mask_size, framebuffer_tag.blue_mask_shift,
 											   nil,
 											   nil, nil,
 											   nil, nil,
 											   nil, nil,
 											   nil, 0, 0, 1,
-											   1, 1,
+											   0, 0,
 											   0) }
 
 	terminal_rows = C.flanterm_get_rows(flanterm_ctx)

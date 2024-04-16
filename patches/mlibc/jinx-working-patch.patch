@@ -205,12 +205,12 @@ index 72d0a14..512b0f4 100644
  	subdir('sysdeps/keyronex')
 +elif host_machine.system() == 'vinix'
 +	disable_linux_option = true
-+	rtdl_include_dirs += include_directories('sysdeps/vinix/include')
++	rtld_include_dirs += include_directories('sysdeps/vinix/include')
 +	libc_include_dirs += include_directories('sysdeps/vinix/include')
 +	subdir('sysdeps/vinix')
  elif host_machine.system() == 'lyre'
  	disable_linux_option = true
- 	rtdl_include_dirs += include_directories('sysdeps/lyre/include')
+ 	rtld_include_dirs += include_directories('sysdeps/lyre/include')
 diff --git mlibc-clean/options/glibc/generic/execinfo.cpp mlibc-workdir/options/glibc/generic/execinfo.cpp
 index 3474615..e034881 100644
 --- mlibc-clean/options/glibc/generic/execinfo.cpp
@@ -377,7 +377,7 @@ index 0000000..68a2886
 +	__builtin_unreachable();                    \
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +namespace {
 +
@@ -413,7 +413,7 @@ index 0000000..68a2886
 +	__builtin_unreachable();
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +[[noreturn]] void sys_thread_exit() {
 +	for (;;);
@@ -482,7 +482,7 @@ index 0000000..68a2886
 +	return 0;
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +int sys_ppoll(struct pollfd *fds, int nfds, const struct timespec *timeout,
 +		const sigset_t *sigmask, int *num_events) {
@@ -596,7 +596,7 @@ index 0000000..68a2886
 +	return num_woken;
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
 +	__syscall_ret ret = __syscall(9, fd, request, arg);
@@ -643,7 +643,7 @@ index 0000000..68a2886
 +	return sys_openat(AT_FDCWD, path, flags, mode, fd);
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +int sys_open_dir(const char *path, int *handle) {
 +	return sys_open(path, O_DIRECTORY, 0, handle);
@@ -698,7 +698,7 @@ index 0000000..68a2886
 +	return 0;
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
 +	__syscall_ret ret = __syscall(4, fd, buf, count);
@@ -780,7 +780,7 @@ index 0000000..68a2886
 +	return 0;
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +int sys_vm_protect(void *pointer, size_t size, int prot) {
 +	__syscall_ret ret = __syscall(48, pointer, size, prot);
@@ -803,7 +803,7 @@ index 0000000..68a2886
 +	return 0;
 +}
 +
-+#ifndef MLIBC_BUILDING_RTDL
++#ifndef MLIBC_BUILDING_RTLD
 +
 +pid_t sys_getpid() {
 +	__syscall_ret ret = __syscall(31);
@@ -2688,7 +2688,7 @@ index 0000000..a4c29a1
 +++ mlibc-workdir/sysdeps/vinix/meson.build
 @@ -0,0 +1,115 @@
 +
-+rtdl_sources += files(
++rtld_sources += files(
 +	'generic/generic.cpp'
 +)
 +

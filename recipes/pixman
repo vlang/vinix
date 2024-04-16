@@ -1,8 +1,8 @@
 name=pixman
-version=0.43.2
+version=0.43.4
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/pixman-${version}.tar.xz"
-tarball_blake2b="82734efb7cede5b1aeff3a865bfa2a81ff3176be50edc10deb1b5541f160b2dfd21303c1eccba53c0df83f471f3489084479a423dc2f818019af97d4b41dad68"
+tarball_blake2b="c31e5700bfadcd72f522af50509a4a6cd7bbf90c918c75b108e50246f1c76e858125138902a222040ada192710ec788deb43eb65085416f3eff88e3ed970933e"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs libpng"

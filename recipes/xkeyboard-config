@@ -1,8 +1,8 @@
 name=xkeyboard-config
-version=2.40
+version=2.41
 revision=1
 tarball_url="https://www.x.org/archive/individual/data/xkeyboard-config/xkeyboard-config-${version}.tar.xz"
-tarball_blake2b="79dd20e588e72c9fe65ff0885889ae3e2ad0ffbb66b27cf90db36fecfd41f24667fcc0a0a7fc96f3bc5d01502532af3e6b560719413bc16529328dd02d353c92"
+tarball_blake2b="f608c30b31c26f2273907f45929a0fe9e44bb9513d45a791be1ff3fb8da5cd56d4fbb182540c47960f16841a30f89fdab0ad87cc41597c02bfd76643fff6857d"
 imagedeps="meson ninja python"
 hostdeps="gcc pkg-config"
 deps="core-libs xorg-xkbcomp"

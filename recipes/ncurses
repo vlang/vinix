@@ -1,8 +1,8 @@
 name=ncurses
-version=6.4.20240127
+version=6.4.20240330
 revision=1
-tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_4_20240127.tar.gz"
-tarball_blake2b="f7896f50d9b5c0c8c125f0b0da50f17405460849f99d678d9d0b5024f1d55de13bb0650e60fa987dd8ce620a5081a5184601cf4aeb51906737ea28dd21dd6177"
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_4_20240330.tar.gz"
+tarball_blake2b="0d7d6ae5a42144951bd1de51ada04da7a3afe0bc295a099927fc3999109dcbeee05474718643dbb4a0255dea642fbe865adbd4d1f23b5f7421d6f2505abaacd9"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="gcc ncurses patchelf"
 hostdeps="gcc automake autoconf libtool pkg-config"
@@ -24,7 +24,8 @@ build() {
         --without-debug \
         --with-manpage-format=normal \
         --with-pkg-config-libdir=/usr/lib/pkgconfig \
-        --with-termlib
+        --with-termlib \
+        --without-ada
 
     make -j${parallelism}
 }

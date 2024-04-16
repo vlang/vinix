@@ -1,8 +1,8 @@
 name=libxcursor
-version=1.2.1
+version=1.2.2
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXcursor-${version}.tar.gz"
-tarball_blake2b="42ee1c77f9c976541f51044474b6bf60935ee62d3d95298ce9d71c92e612bc12c460c4161c148d7f9c99a9ea76f74b34ca4f4b8980af2ccabd78fdad4752f2f5"
+tarball_blake2b="10411b272290763ce1884d39d850ef0e9e30f716ca29ac4290e2bdb45d7cba88b58a716e79c092d7e43d20ce9e13b45b40c646d92f4179df0e7067bf50ab8b8d"
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

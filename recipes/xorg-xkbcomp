@@ -1,8 +1,8 @@
 name=xorg-xkbcomp
-version=1.4.6
+version=1.4.7
 revision=1
 tarball_url="https://www.x.org/archive/individual/app/xkbcomp-${version}.tar.gz"
-tarball_blake2b="bc0fe69ef4eb809ac9e82fdc40b990bf27b7dd3e358efdb87ab7e34be8ddd0d8bd54e57ab7473f9e22f2714964e2cfb3322ccc2006a64de10dd6f2fc4fa35017"
+tarball_blake2b="75131c5aea7f6861b198638fcb595e741ea7847a408c008bd4b9d8498e8a4476d8f8cfe841f01626ee8ade432a6f76f375aa76dea1822402b4d6b18aeb39fc21"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

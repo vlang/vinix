@@ -1,7 +1,7 @@
 name=pkg-config
-version=2.1.0
+version=2.2.0
 tarball_url="https://distfiles.ariadne.space/pkgconf/pkgconf-${version}.tar.xz"
-tarball_blake2b="43ac91f15106764f0b03ac4e1c3ff59aaba0436a221a295be93dd1a78b74e0185e60be8d24d040cc4ce0b0fb4446a6a8f493e7cc69bafafe5cefa9beab9b2bd5"
+tarball_blake2b="c2a89e932e7671785799f4b82beb75e92f246c152c03e88c847cedef39f2123da0544ff914d1c1512b8616f8b8cfd9f5115b33560042bcfa7ac5f78c0ceb2a27"
 hostdeps="autoconf automake libtool"
 
 regenerate() {

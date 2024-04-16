@@ -8,7 +8,6 @@ build() {
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         TOOLCHAIN_FOR_TARGET=${OS_TRIPLET} \
-        LDFLAGS="-static" \
         --enable-uefi-ia32 \
         --enable-uefi-x86-64 \
         --enable-uefi-cd \
@@ -16,6 +15,7 @@ build() {
         --enable-bios-cd \
         --enable-bios-pxe
 
+        LDFLAGS="$LDFLAGS -static" \
     make -j${parallelism}
 }
 
