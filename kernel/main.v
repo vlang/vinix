@@ -96,7 +96,7 @@ pub fn kmain() {
 	serial.early_initialise()
 
 	// We're alive
-	kprint.kwrite(c'Welcome to Vinix\n\n')
+	println('Welcome to Vinix\n')
 
 	// a dummy call to avoid V warning about an unused `stubs` module
 	_ := stubs.toupper(0)
