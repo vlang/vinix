@@ -1,8 +1,8 @@
-name: Weekly Vinix rebuild
+name: Nightly Vinix rebuild
 
 on:
   schedule:
-    - cron: '0 0 * * 6'
+    - cron: '0 22 * * *'
 
 jobs:
   vinix-build:
@@ -27,7 +27,7 @@ jobs:
       #  run: make all
 
       #- name: Rename vinix.iso
-      #  run: mv vinix.iso vinix-weekly-full-$(date +'%Y%m%d').iso
+      #  run: mv vinix.iso vinix-nightly-full-$(date +'%Y%m%d').iso
 
       #- name: Distclean
       #  run: make distclean
@@ -39,21 +39,21 @@ jobs:
         run: make all
 
       - name: Rename vinix.iso
-        run: mv vinix.iso vinix-weekly-base-$(date +'%Y%m%d').iso
+        run: mv vinix.iso vinix-nightly-base-$(date +'%Y%m%d').iso
 
       - name: Set TAG_DATE variable
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Tag new weekly release
-        run: git tag weekly-$TAG_DATE && git push --tags
+      - name: Tag new nightly release
+        run: git tag nightly-$TAG_DATE && git push --tags
 
-      - name: Create weekly release
+      - name: Create nightly release
         uses: softprops/action-gh-release@v1
         with:
-          name: Weekly build ${{ env.TAG_DATE }}
-          tag_name: weekly-${{ env.TAG_DATE }}
-          body: Image of an up to date Vinix weekly build.
+          name: Nightly build ${{ env.TAG_DATE }}
+          tag_name: nightly-${{ env.TAG_DATE }}
+          body: Image of an up to date Vinix nightly build.
           files: |
-            vinix-weekly-*.iso
+            vinix-nightly-*.iso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
