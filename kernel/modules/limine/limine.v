@@ -172,6 +172,7 @@ pub mut:
 pub const (
 	limine_memmap_usable = 0
 	limine_memmap_bootloader_reclaimable = 5
+	limine_memmap_kernel_and_modules = 6
 )
 
 pub struct LimineMemmapEntry {

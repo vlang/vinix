@@ -38,7 +38,8 @@ pub fn pmm_init() {
 					 i, entries[i].base, entries[i].length, entries[i].@type)
 
 			if entries[i].@type != u32(limine.limine_memmap_usable)
-				&& entries[i].@type != u32(limine.limine_memmap_bootloader_reclaimable) {
+				&& entries[i].@type != u32(limine.limine_memmap_bootloader_reclaimable)
+				&& entries[i].@type != u32(limine.limine_memmap_kernel_and_modules) {
 				continue
 			}
 			top := entries[i].base + entries[i].length
