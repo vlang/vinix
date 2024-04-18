@@ -1,0 +1,26 @@
+name=ace-of-penguins
+version=1.4
+revision=1
+tarball_url="https://www.delorie.com/store/ace/ace-${version}.tar.gz"
+tarball_blake2b=62d32bcada9a945d0a409757ca24c8c5c032e905528d56a51b95f82844c6c8057d39763016fa05015877f23313d842effeaaa362507bb049816d7cf6bdf01a1a
+source_hostdeps="autoconf automake pkg-config libtool"
+source_deps="xorg-util-macros"
+imagedeps="gcc libpng"
+hostdeps="gcc autoconf automake pkg-config libtool"
+deps="core-libs libx11 libxpm libpng zlib"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

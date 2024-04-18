@@ -1,0 +1,70 @@
+diff --git ace-of-penguins-clean/lib/Makefile.am ace-of-penguins-workdir/lib/Makefile.am
+index 2056424..e93f8bd 100644
+--- ace-of-penguins-clean/lib/Makefile.am
++++ ace-of-penguins-workdir/lib/Makefile.am
+@@ -6,7 +6,7 @@ noinst_HEADERS = cards.h
+ CLEANFILES = images.c images.d
+ 
+ INCLUDES = $(X_CFLAGS) @PDA@
+-AM_LDFLAGS = $(X_LIBS)
++AM_LDFLAGS = $(X_LIBS) -lpng -lz -lm
+ 
+ BUILD_CC = @BUILD_CC@
+ AR = @AR@
+diff --git ace-of-penguins-clean/lib/make-imglib.c ace-of-penguins-workdir/lib/make-imglib.c
+index 84cda12..dde0ffa 100644
+--- ace-of-penguins-clean/lib/make-imglib.c
++++ ace-of-penguins-workdir/lib/make-imglib.c
+@@ -86,7 +86,7 @@ scan_image_directory ()
+     png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
+     info_ptr = png_create_info_struct (png_ptr);
+ 
+-    if (setjmp (png_ptr->jmpbuf)) {
++    if (setjmp (png_jmpbuf(png_ptr))) {
+       fclose (f);
+       continue;
+     }
+diff --git ace-of-penguins-clean/lib/xwin.c ace-of-penguins-workdir/lib/xwin.c
+index e4bcca2..724be23 100644
+--- ace-of-penguins-clean/lib/xwin.c
++++ ace-of-penguins-workdir/lib/xwin.c
+@@ -55,7 +55,7 @@ OptionDesc xwin_options_list[] = {
+   { "-visual", OPTION_INTEGER, &visual_id },
+   { 0, 0, 0 }
+ };
+-OptionDesc *xwin_options = xwin_options_list;
++//OptionDesc *xwin_options = xwin_options_list;
+ 
+ Display *display=0;
+ int screen=0;
+@@ -89,10 +89,10 @@ int help_background;
+ /* Motif window hints */
+ typedef struct
+ {
+-  unsigned flags;
+-  unsigned functions;
+-  unsigned decorations;
+-  int inputMode;
++  unsigned long flags;
++  unsigned long functions;
++  unsigned long decorations;
++  long inputMode;
+ } PropMotifWmHints;
+ 
+ typedef PropMotifWmHints        PropMwmHints;
+@@ -841,13 +841,13 @@ build_image (image *src)
+   png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
+   info_ptr = png_create_info_struct (png_ptr);
+ 
+-  if (setjmp (png_ptr->jmpbuf)) {
++  if (setjmp (png_jmpbuf(png_ptr))) {
+     fprintf(stderr, "Invalid PNG image!\n");
+     return;
+   }
+ 
+   file_bytes = src->file_data;
+-  png_set_read_fn (png_ptr, (voidp)&file_bytes, (png_rw_ptr)png_reader);
++  png_set_read_fn (png_ptr, (void*)&file_bytes, (png_rw_ptr)png_reader);
+ 
+   png_read_info (png_ptr, info_ptr);
+ 
