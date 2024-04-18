@@ -24,7 +24,6 @@ __global (
 	scheduler_vector        u8
 	scheduler_running_queue [512]&proc.Thread
 	kernel_process          &proc.Process
-	working_cpus            = u64(0)
 )
 
 pub fn initialise() {
@@ -39,21 +38,28 @@ pub fn initialise() {
 	}
 }
 
-fn get_next_thread(orig_i int) int {
-	cpu_number := cpulocal.current().cpu_number
+fn get_next_thread() &proc.Thread {
+	mut cpu_local := cpulocal.current()
+
+	mut orig_i := cpu_local.last_run_queue_index
+
+	if orig_i >= max_running_threads {
+		orig_i = 0
+	}
 
 	mut index := orig_i + 1
 
 	for {
-		if index >= scheduler_running_queue.len {
+		if index >= max_running_threads {
 			index = 0
 		}
 
 		mut t := scheduler_running_queue[index]
 
 		if unsafe { t != 0 } {
-			if katomic.load(t.running_on) == cpu_number || t.l.test_and_acquire() == true {
-				return index
+			if t.l.test_and_acquire() == true {
+				cpu_local.last_run_queue_index = index
+				return t
 			}
 		}
 
@@ -64,7 +70,8 @@ fn get_next_thread(orig_i int) int {
 		index++
 	}
 
-	return -1
+	cpu_local.last_run_queue_index = index
+	return unsafe { nil }
 }
 
 fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
@@ -78,12 +85,12 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	mut current_thread := proc.current_thread()
 
-	new_index := get_next_thread(cpu_local.last_run_queue_index)
+	mut next_thread := get_next_thread()
 
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if new_index == cpu_local.last_run_queue_index {
+		if unsafe { next_thread == nil } && current_thread.is_in_queue {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
 			return
@@ -97,26 +104,18 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(current_thread.running_on, u64(-1))
 		current_thread.l.release()
-
-		katomic.dec(working_cpus)
 	}
 
-	if new_index == -1 {
+	if unsafe { next_thread == nil } {
 		apic.lapic_eoi()
 		cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
 		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
-		cpu_local.last_run_queue_index = 0
 		katomic.store(cpu_local.is_idle, true)
-		if katomic.load(waiting_event_count) == 0 && katomic.load(working_cpus) == 0 {
-			panic('Event heartbeat has flatlined :(')
-		}
+		kernel_pagemap.switch_to()
 		await()
 	}
 
-	katomic.inc(working_cpus)
-
-	current_thread = scheduler_running_queue[new_index]
-	cpu_local.last_run_queue_index = new_index
+	current_thread = next_thread
 
 	cpu.set_gs_base(voidptr(current_thread))
 	if current_thread.gpr_state.cs == 0x43 {
@@ -185,7 +184,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 	katomic.store(t.enqueued_by_signal, by_signal)
 
-	for i := u64(0); i < scheduler_running_queue.len; i++ {
+	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas(voidptr(&scheduler_running_queue[i]), voidptr(0), voidptr(t)) {
 			t.is_in_queue = true
 
@@ -211,7 +210,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 		return true
 	}
 
-	for i := u64(0); i < scheduler_running_queue.len; i++ {
+	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas(voidptr(&scheduler_running_queue[i]), voidptr(t), voidptr(0)) {
 			t.is_in_queue = false
 			return true
