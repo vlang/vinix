@@ -212,7 +212,7 @@ pub fn (mut this FD) unref() {
 	this.handle.refcount--
 }
 
-pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
+pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 	mut process := &proc.Process(unsafe { nil })
 	if voidptr(_process) == unsafe { nil } {
 		process = proc.current_thread().process
@@ -225,9 +225,13 @@ pub fn fdnum_close(_process &proc.Process, fdnum int) ? {
 		return none
 	}
 
-	process.fds_lock.acquire()
+	if do_lock {
+		process.fds_lock.acquire()
+	}
 	defer {
-		process.fds_lock.release()
+		if do_lock {
+			process.fds_lock.release()
+		}
 	}
 
 	mut fd := unsafe { &FD(process.fds[fdnum]) }
@@ -273,7 +277,7 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 		}
 		return none
 	} else {
-		// fdnum_close(process, oldfd) or {}
+		fdnum_close(process, oldfd, false) or { }
 		process.fds[oldfd] = voidptr(fd)
 		return oldfd
 	}

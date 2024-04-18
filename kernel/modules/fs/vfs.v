@@ -580,7 +580,7 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	file.fdnum_close(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	file.fdnum_close(unsafe { nil }, fdnum, true) or { return errno.err, errno.get() }
 	return 0, 0
 }
 

@@ -482,7 +482,7 @@ pub fn syscall_exit(_ voidptr, status int) {
 			continue
 		}
 
-		file.fdnum_close(current_process, i) or {}
+		file.fdnum_close(current_process, i, true) or {}
 	}
 
 	// PID 1 inherits children
