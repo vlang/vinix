@@ -1,0 +1,21 @@
+name=glu
+version=9.0.3
+revision=1
+tarball_url="https://archive.mesa3d.org/glu/glu-${version}.tar.xz"
+tarball_blake2b="a6fc842004dcca4243ef285e26806afdfb931d21985ad8f9a3f03f438e66b810718bf04e588044ed8db99990e49f806d346dc2ce69cfa91450f046a4dfa39136"
+imagedeps="meson ninja"
+hostdeps="gcc pkg-config"
+deps="core-libs mesa"
+
+build() {
+    meson_configure \
+        -Dgl_provider=gl
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}

@@ -1,0 +1,30 @@
+name=mesa-demos
+version=8.5.0
+revision=1
+tarball_url="https://archive.mesa3d.org/demos/${version}/mesa-demos-${version}.tar.gz"
+tarball_blake2b="82ded42d845449d925809046d605a30d3f66b5aba57716fdfee99611750001a80aebbda5c66099c3ee9525b655d86e8cf4aeb43adbc939182705ba8fa2ab9c92"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs freetype2 mesa glu libx11 libxext"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure \
+        --enable-autotools \
+        --disable-gles1 \
+        --disable-osmesa \
+        --disable-libdrm \
+        --with-system-data-files \
+        --with-glut=no
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}
