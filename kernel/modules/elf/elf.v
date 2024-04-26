@@ -148,10 +148,10 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 			0
 		}
 
-		virt := base + phdr.p_vaddr
+		virt := lib.align_down(base + phdr.p_vaddr, page_size)
 		phys := u64(addr)
 
-		mmap.map_range(pagemap, virt, phys, page_count * page_size, pf, mmap.map_anonymous) or {
+		mmap.map_range(mut pagemap, virt, phys, page_count * page_size, pf, mmap.map_anonymous) or {
 			return error('')
 		}
 

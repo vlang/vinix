@@ -293,12 +293,12 @@ pub fn dequeue_and_die() {
 	}
 	mut t := proc.current_thread()
 	dequeue_thread(t)
-	for ptr in t.stacks {
-		memory.pmm_free(ptr, sched.stack_size / page_size)
-	}
+	//for ptr in t.stacks {
+		//memory.pmm_free(ptr, sched.stack_size / page_size)
+	//}
 	unsafe {
-		t.stacks.free()
-		free(t)
+		//t.stacks.free()
+		//free(t)
 	}
 	yield(false)
 	for {}
@@ -380,7 +380,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		stack_bottom_vma := process.thread_stack_top
 		process.thread_stack_top -= page_size
 
-		mmap.map_range(process.pagemap, stack_bottom_vma, u64(stack_phys), sched.stack_size,
+		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), sched.stack_size,
 			mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
 	} else {
 		stack = &u64(voidptr(_stack))

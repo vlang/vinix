@@ -49,7 +49,7 @@ pub fn pmm_init() {
 		}
 
 		// Calculate the needed size for the bitmap in bytes and align it to page size.
-		pmm_avl_page_count = highest_address / page_size
+		pmm_avl_page_count = lib.div_roundup(highest_address, page_size)
 		bitmap_size := lib.align_up(pmm_avl_page_count / 8, page_size)
 
 		C.printf(c'pmm: Bitmap size: %llu\n', bitmap_size)
@@ -89,14 +89,13 @@ pub fn pmm_init() {
 	// Initialise slabs
 	slabs[0].init(8)
 	slabs[1].init(16)
-	slabs[2].init(24)
-	slabs[3].init(32)
-	slabs[4].init(48)
-	slabs[5].init(64)
-	slabs[6].init(128)
-	slabs[7].init(256)
-	slabs[8].init(512)
-	slabs[9].init(1024)
+	slabs[2].init(32)
+	slabs[3].init(64)
+	slabs[4].init(128)
+	slabs[5].init(256)
+	slabs[6].init(512)
+	slabs[7].init(1024)
+	slabs[8].init(2048)
 }
 
 fn inner_alloc(count u64, limit u64) voidptr {
@@ -161,6 +160,12 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	pmm_lock.acquire()
 	defer {
 		pmm_lock.release()
+	}
+	unsafe {
+		mut p := &u64(u64(ptr) + higher_half)
+		for i := u64(0); i < (count * page_size) / 8; i++ {
+			p[i] = 0xaaaaaaaaaaaaaaaa
+		}
 	}
 	page := u64(ptr) / page_size
 	for i := page; i < page + count; i++ {
@@ -235,6 +240,8 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 		return
 	}
 
+	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
+
 	mut new_head := &u64(ptr)
 	unsafe {
 		new_head[0] = this.first_free
@@ -243,7 +250,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 }
 
 __global (
-	slabs [10]Slab
+	slabs [9]Slab
 )
 
 struct MallocMetadata {
@@ -286,7 +293,7 @@ fn slab_for(size u64) ?&Slab {
 
 @[export: 'malloc']
 pub fn malloc(size u64) voidptr {
-	mut slab := slab_for(8 + size) or { return big_alloc(size) }
+	mut slab := slab_for(size) or { return big_alloc(size) }
 
 	return slab.alloc()
 }
