@@ -42,7 +42,7 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 		e = &eventstruct.Event{}
 		futexes[phys] = e
 	} else {
-		e = futexes[phys]
+		e = unsafe { futexes[phys] } // will always be present
 	}
 
 	futex_lock.release()
@@ -76,7 +76,8 @@ pub fn syscall_futex_wake(_ voidptr, ptr &int) (u64, u64) {
 		return 0, 0
 	}
 
-	ret := event.trigger(mut futexes[phys], true)
+	mut e := unsafe { futexes[phys] }
+	ret := event.trigger(mut e, true)
 
 	return ret, 0
 }

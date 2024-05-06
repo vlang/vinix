@@ -4,7 +4,6 @@
 
 module main
 
-import lib
 import lib.stubs
 // unused, but needed for C function stubs
 import memory
@@ -20,7 +19,6 @@ import sched
 import stat
 import dev.console
 import userland
-import kprint
 import pipe
 import futex
 import pci

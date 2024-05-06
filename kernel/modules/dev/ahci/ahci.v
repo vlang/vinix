@@ -8,7 +8,6 @@ import pci
 import memory
 import stat
 import klock
-import event
 import event.eventstruct
 import resource
 import errno
@@ -438,7 +437,7 @@ pub fn (mut c AHCIController) declare_ownership() int {
 
 	c.regs.bohc |= (1 << 1)
 
-	for c.regs.bohc & (1 << 0) == 0 { 
+	for c.regs.bohc & (1 << 0) == 0 {
 		asm volatile amd64 { pause }
 	}
 
@@ -448,7 +447,7 @@ pub fn (mut c AHCIController) declare_ownership() int {
 		sys.nsleep(2 * 1000000000)
 	}
 
-	if c.regs.bohc & (1 << 4) != 0 || c.regs.bohc & (1 << 0) != 0 || c.regs.bohc & (1 << 1) == 0 { 
+	if c.regs.bohc & (1 << 4) != 0 || c.regs.bohc & (1 << 0) != 0 || c.regs.bohc & (1 << 1) == 0 {
 		print('ahci: bios handoff failed\n')
 		return -1
 	}
@@ -528,7 +527,7 @@ pub fn initialise() {
 		if device.class == ahci.ahci_class && device.subclass == ahci.ahci_subclass
 			&& device.prog_if == ahci.ahci_progif {
 			mut ahci_device := &AHCIController{
-				regs: 0
+				regs: unsafe { nil }
 			}
 
 			if ahci_device.initialise(device) != -1 {

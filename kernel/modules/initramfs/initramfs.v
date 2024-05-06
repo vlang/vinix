@@ -49,12 +49,12 @@ fn octal_to_int(s string) u64 {
 	return ret
 }
 
-fn C.string_free(&string)
-
 @[cinit]
 @[_linker_section: '.requests']
 __global (
-	volatile module_req = limine.LimineModuleRequest{response: 0}
+	volatile module_req = limine.LimineModuleRequest{
+		response: unsafe { nil }
+	}
 )
 
 @[manualfree]

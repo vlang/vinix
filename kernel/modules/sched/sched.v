@@ -524,7 +524,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
 	mut new_process := &proc.Process{
-		pagemap: 0
+		pagemap: unsafe { nil }
 	}
 
 	new_process.pid = proc.allocate_pid(new_process) or { return none }

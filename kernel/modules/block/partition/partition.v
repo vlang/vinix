@@ -7,7 +7,6 @@ module partition
 import memory
 import stat
 import klock
-import event
 import event.eventstruct
 import resource
 import lib

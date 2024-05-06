@@ -492,7 +492,7 @@ pub fn syscall_exit(_ voidptr, status int) {
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
 
-	katomic.store(current_process.status, status << 8)
+	katomic.store(current_process.status, int(u32(status) << 8))
 	event.trigger(mut current_process.event, false)
 
 	sched.dequeue_and_die()

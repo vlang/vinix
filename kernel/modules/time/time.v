@@ -65,7 +65,9 @@ __global (
 @[cinit]
 @[_linker_section: '.requests']
 __global (
-	volatile boottime_req = limine.LimineBootTimeRequest{response: 0}
+	volatile boottime_req = limine.LimineBootTimeRequest{
+		response: unsafe { nil }
+	}
 )
 
 pub fn initialise() {

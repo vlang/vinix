@@ -24,7 +24,9 @@ __global (
 @[cinit]
 @[_linker_section: '.requests']
 __global (
-	volatile fb_req = limine.LimineFramebufferRequest{response: 0}
+	volatile fb_req = limine.LimineFramebufferRequest{
+		response: unsafe { nil }
+	}
 )
 
 pub fn initialise() {

@@ -48,7 +48,7 @@ fn use_xsdt() bool {
 @[_linker_section: '.requests']
 __global (
 	volatile rsdp_req = limine.LimineRSDPRequest{
-		response: 0
+		response: unsafe { nil }
 	}
 )
 

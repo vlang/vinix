@@ -10,6 +10,7 @@ void dev__serial__panic_out(char);
 void term__print(const char *, uint64_t);
 
 static void _putchar(char character) {
+  (void)character;
 #ifndef PROD
   dev__serial__out(character);
 #endif

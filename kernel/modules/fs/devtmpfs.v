@@ -10,7 +10,6 @@ import memory
 import memory.mmap
 import resource
 import lib
-import event
 import event.eventstruct
 import katomic
 
@@ -167,7 +166,7 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &DevTmpFSResource{
-		storage: 0
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
@@ -209,7 +208,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	mut new_node := create_node(this, parent, target, false)
 
 	mut new_resource := &DevTmpFSResource{
-		storage: 0
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
@@ -233,7 +232,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 }
 
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
-	mut new_node := create_node(filesystems['devtmpfs'], devtmpfs_root, name, false)
+	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, devtmpfs_root, name, false)
 
 	new_node.resource = unsafe { device }
 	new_node.resource.stat.dev = devtmpfs_dev_id

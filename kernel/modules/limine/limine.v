@@ -160,7 +160,7 @@ pub mut:
 	processor_id u32
 	lapic_id u32
 	reserved u64
-	goto_address fn(&LimineSMPInfo)
+	goto_address fn(&LimineSMPInfo) = unsafe { nil }
 	extra_argument u64
 }
 
@@ -231,7 +231,7 @@ pub mut:
 	]!
 	revision u64
 	response &LimineEntryPointResponse
-	entry fn()
+	entry fn() = unsafe { nil }
 }
 
 // Kernel file

@@ -10,7 +10,6 @@ import memory
 import memory.mmap
 import resource
 import lib
-import event
 import event.eventstruct
 import katomic
 
@@ -164,7 +163,7 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &TmpFSResource{
-		storage: 0
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
@@ -206,7 +205,7 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 	mut new_node := create_node(this, parent, target, false)
 
 	mut new_resource := &TmpFSResource{
-		storage: 0
+		storage: unsafe { nil }
 		refcount: 1
 	}
 

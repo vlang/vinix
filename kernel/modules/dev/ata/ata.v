@@ -13,7 +13,6 @@ import fs
 import x86.kio
 import lib
 import errno
-import event
 import event.eventstruct
 import katomic
 
