@@ -22,6 +22,7 @@ __global (
 )
 
 @[cinit]
+@[_linker_section: '.requests']
 __global (
 	volatile fb_req = limine.LimineFramebufferRequest{response: 0}
 )

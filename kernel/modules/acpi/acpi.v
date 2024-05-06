@@ -45,6 +45,7 @@ fn use_xsdt() bool {
 }
 
 @[cinit]
+@[_linker_section: '.requests']
 __global (
 	volatile rsdp_req = limine.LimineRSDPRequest{
 		response: 0

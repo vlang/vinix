@@ -63,6 +63,7 @@ __global (
 )
 
 @[cinit]
+@[_linker_section: '.requests']
 __global (
 	volatile boottime_req = limine.LimineBootTimeRequest{response: 0}
 )

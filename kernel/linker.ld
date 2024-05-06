@@ -15,9 +15,10 @@ ENTRY(main__kmain)
 /* MMU permissions */
 PHDRS
 {
-    text    PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ;
-    rodata  PT_LOAD    FLAGS(1 << 2) ;
-    data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ;
+    requests PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
+    text     PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
+    rodata   PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
+    data     PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
 }
 
 SECTIONS
@@ -27,6 +28,16 @@ SECTIONS
     /* Any address in this region will do, but often 0xffffffff80000000 is chosen as */
     /* that is the beginning of the region. */
     . = 0xffffffff80000000;
+
+    /* Define a section to contain the Limine requests and assign it to its own PHDR */
+    .requests : {
+        KEEP(*(.requests_start_marker))
+        KEEP(*(.requests))
+        KEEP(*(.requests_end_marker))
+    } :requests
+
+    /* Move to the next memory page for .text */
+    . += CONSTANT(MAXPAGESIZE);
 
     .text : {
         *(.text .text.*)

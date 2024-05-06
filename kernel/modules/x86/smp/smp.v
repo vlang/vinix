@@ -16,6 +16,7 @@ __global (
 )
 
 @[cinit]
+@[_linker_section: '.requests']
 __global (
 	volatile smp_req = limine.LimineSMPRequest{
 		response: 0
