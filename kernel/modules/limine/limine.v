@@ -17,6 +17,12 @@ __global (
 	]!
 )
 
+pub struct LimineBaseRevision {
+pub mut:
+	id [2]u64 = [ u64(0xf9562b2d5c95a6c8), 0x6a7b384944536bdc ]!
+	revision u64
+}
+
 pub struct LimineUUID {
 pub mut:
 	a u32

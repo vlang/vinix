@@ -34,6 +34,15 @@ import dev.mouse
 import syscall.table
 import socket
 import time
+import limine
+
+@[cinit]
+@[_linker_section: '.requests']
+__global (
+	volatile limine_base_revision = limine.LimineBaseRevision{
+		revision: 2
+	}
+)
 
 fn C._vinit(argc int, argv voidptr)
 
@@ -78,6 +87,11 @@ pub fn main() {
 }
 
 pub fn kmain() {
+	// Ensure the base revision is supported.
+	if limine_base_revision.revision != 0 {
+		for {}
+	}
+
 	// Initialize the memory allocator.
 	memory.pmm_init()
 
