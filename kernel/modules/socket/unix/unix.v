@@ -105,7 +105,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 
 	unsafe { C.memcpy(buf, &this.data[this.read_ptr], before_wrap) }
 	if after_wrap != 0 {
-		unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), &this.data[0], after_wrap) }
+		unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), this.data, after_wrap) }
 	}
 
 	this.read_ptr = new_ptr_loc
@@ -170,7 +170,7 @@ fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64
 
 	unsafe { C.memcpy(&peer.data[peer.write_ptr], buf, before_wrap) }
 	if after_wrap != 0 {
-		unsafe { C.memcpy(&peer.data[0], voidptr(u64(buf) + before_wrap), after_wrap) }
+		unsafe { C.memcpy(peer.data, voidptr(u64(buf) + before_wrap), after_wrap) }
 	}
 
 	peer.write_ptr = new_ptr_loc
@@ -438,7 +438,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	mut tmpbuf := unsafe { &u8(C.malloc(before_wrap + after_wrap)) }
 	unsafe { C.memcpy(tmpbuf, &this.data[this.read_ptr], before_wrap) }
 	if after_wrap != 0 {
-		unsafe { C.memcpy(voidptr(u64(tmpbuf) + before_wrap), &this.data[0], after_wrap) }
+		unsafe { C.memcpy(voidptr(u64(tmpbuf) + before_wrap), this.data, after_wrap) }
 	}
 
 	mut transferred := u64(0)

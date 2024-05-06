@@ -705,7 +705,7 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	}
 
 	unsafe {
-		statbuf[0] = fd.handle.resource.stat
+		*statbuf = fd.handle.resource.stat
 	}
 	return 0, 0
 }
@@ -804,16 +804,14 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 
 fn C.strcpy(charptr, charptr) charptr
 
-pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
+pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: readdir(%d, 0x%llx)\n', process.name.str, fdnum, _buf)
+	C.printf(c'\n\e[32m%s\e[m: readdir(%d, 0x%llx)\n', process.name.str, fdnum, buf)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
-
-	mut buf := unsafe { _buf }
 
 	mut dir_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
@@ -833,7 +831,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 		dir_handle.dirlist.clear()
 		mut i := u64(0)
 		for name, mut orig_node in dir_node.children {
-			node := reduce_node(unsafe { orig_node[0] }, false)
+			node := reduce_node(unsafe { *orig_node }, false)
 			t := match node.resource.stat.mode & stat.ifmt {
 				stat.ifchr {
 					stat.dt_chr
@@ -878,7 +876,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, _buf &stat.Dirent) (u64, u64) {
 	}
 
 	unsafe {
-		buf[0] = dir_handle.dirlist[dir_handle.dirlist_index]
+		*buf = dir_handle.dirlist[dir_handle.dirlist_index]
 	}
 	dir_handle.dirlist_index++
 

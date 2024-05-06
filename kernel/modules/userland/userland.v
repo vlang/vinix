@@ -200,7 +200,7 @@ pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
 		cli
 	}
 
-	t.gpr_state = unsafe { context[0] }
+	t.gpr_state = *context
 	t.masked_signals = old_mask
 
 	sched.yield(false)
@@ -226,14 +226,12 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 
 	if voidptr(oldact) != voidptr(0) {
 		unsafe {
-			oldact[0] = t.sigactions[signum]
+			*oldact = t.sigactions[signum]
 		}
 	}
 
 	if voidptr(act) != voidptr(0) {
-		unsafe {
-			t.sigactions[signum] = act[0]
-		}
+		t.sigactions[signum] = *act
 	}
 
 	return 0, 0
@@ -253,20 +251,20 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 
 	if voidptr(oldset) != voidptr(0) {
 		unsafe {
-			oldset[0] = t.masked_signals
+			*oldset = t.masked_signals
 		}
 	}
 
 	if voidptr(set) != voidptr(0) {
 		match how {
 			userland.sig_block {
-				t.masked_signals |= unsafe { set[0] }
+				t.masked_signals |= *set
 			}
 			userland.sig_unblock {
-				t.masked_signals &= ~(unsafe { set[0] })
+				t.masked_signals &= ~*set
 			}
 			userland.sig_setmask {
-				t.masked_signals = unsafe { set[0] }
+				t.masked_signals = *set
 			}
 			else {}
 		}
@@ -319,9 +317,9 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	mut return_context := &cpulocal.GPRState(t.gpr_state.rsp)
 
 	unsafe {
-		return_context[0] = context[0]
-		t.gpr_state = context[0]
+		*return_context = *context
 	}
+	t.gpr_state = *context
 	// Siginfo
 	t.gpr_state.rsp -= sizeof(SigInfo)
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
@@ -450,7 +448,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	}
 
 	unsafe {
-		status[0] = child.status
+		*status = child.status
 	}
 	ret := child.pid
 

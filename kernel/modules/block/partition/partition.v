@@ -117,7 +117,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 		return -1
 	}
 
-	gpt_hdr := unsafe { &GPTPartitionTableHDR(lba_buffer)[0] }
+	gpt_hdr := unsafe { *&GPTPartitionTableHDR(lba_buffer) }
 
 	if gpt_hdr.identifier == partition.gpt_signature {
 		entry_list_lba := gpt_hdr.partition_array_lba

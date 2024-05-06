@@ -127,7 +127,7 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 
 	unsafe { C.memcpy(buf, &this.data[this.read_ptr], before_wrap) }
 	if after_wrap != 0 {
-		unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), &this.data[0], after_wrap) }
+		unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), this.data, after_wrap) }
 	}
 
 	this.read_ptr = new_ptr_loc
@@ -187,7 +187,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 
 	unsafe { C.memcpy(&this.data[this.write_ptr], buf, before_wrap) }
 	if after_wrap != 0 {
-		unsafe { C.memcpy(&this.data[0], voidptr(u64(buf) + before_wrap), after_wrap) }
+		unsafe { C.memcpy(this.data, voidptr(u64(buf) + before_wrap), after_wrap) }
 	}
 
 	this.write_ptr = new_ptr_loc

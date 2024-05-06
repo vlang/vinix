@@ -10,7 +10,7 @@ pub fn bts<T>(var &T, bit u8) bool {
 		asm volatile amd64 {
 			lock
 			bts var, bit
-			; +m (var[0]) as var
+			; +m (*var) as var
 			  =@ccc (ret)
 			; r (u16(bit)) as bit
 			; memory
@@ -25,7 +25,7 @@ pub fn btr<T>(var &T, bit u8) bool {
 		asm volatile amd64 {
 			lock
 			btr var, bit
-			; +m (var[0]) as var
+			; +m (*var) as var
 			  =@ccc (ret)
 			; r (u16(bit)) as bit
 			; memory
@@ -58,7 +58,7 @@ pub fn inc<T>(var &T) T {
 		asm volatile amd64 {
 			lock
 			xadd var, diff
-			; +m (var[0]) as var
+			; +m (*var) as var
 			  +r (diff)
 			; ; memory
 		}
@@ -73,7 +73,7 @@ pub fn dec<T>(var &T) bool {
 		asm volatile amd64 {
 			lock
 			xadd var, diff
-			; +m (var[0]) as var
+			; +m (*var) as var
 			  +r (diff)
 			  =@ccnz (ret)
 			; ; memory
@@ -87,7 +87,7 @@ pub fn store<T>(var &T, value T) {
 		asm volatile amd64 {
 			lock
 			xchg var, value
-			; +m (var[0]) as var
+			; +m (*var) as var
 			  +r (value)
 			; ; memory
 		}
@@ -100,7 +100,7 @@ pub fn load<T>(var &T) T {
 		asm volatile amd64 {
 			lock
 			xadd var, ret
-			; +m (var[0]) as var
+			; +m (*var) as var
 			  +r (ret)
 			; ; memory
 		}

@@ -67,12 +67,10 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 
 pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 	pte_p := pagemap.virt2pte(virt, false) or { return none }
-	unsafe {
-		if pte_p[0] & 1 == 0 {
-			return none
-		}
-		return pte_p[0] & ~u64(0xfff)
+	if unsafe { *pte_p } & 1 == 0 {
+		return none
 	}
+	return unsafe { *pte_p } & ~u64(0xfff)
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {
@@ -88,25 +86,23 @@ pub fn (mut pagemap Pagemap) switch_to() {
 fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 	mut ret := &u64(0)
 
-	unsafe {
-		mut entry := &u64(u64(current_level) + higher_half + index * 8)
+	mut entry := &u64(u64(current_level) + higher_half + index * 8)
 
-		// Check if entry is present
-		if entry[0] & 0x01 != 0 {
-			// If present, return pointer to it
-			ret = &u64(entry[0] & ~u64(0xfff))
-		} else {
-			if allocate == false {
-				return none
-			}
-
-			// Else, allocate the page table
-			ret = pmm_alloc(1)
-			if ret == 0 {
-				return none
-			}
-			entry[0] = u64(ret) | 0b111
+	// Check if entry is present
+	if unsafe { *entry } & 0x01 != 0 {
+		// If present, return pointer to it
+		ret = &u64(unsafe { *entry } & ~u64(0xfff))
+	} else {
+		if allocate == false {
+			return none
 		}
+
+		// Else, allocate the page table
+		ret = pmm_alloc(1)
+		if ret == 0 {
+			return none
+		}
+		unsafe { *entry = u64(ret) | 0b111 }
 	}
 	return ret
 }
@@ -152,10 +148,9 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	pml2 := get_next_level(pml3, pml3_entry, true) or { return none }
 	mut pml1 := get_next_level(pml2, pml2_entry, true) or { return none }
 
-	unsafe {
-		entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)
-		entry[0] = phys | flags
-	}
+	entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)
+
+	unsafe { *entry = phys | flags }
 }
 
 @[cinit]

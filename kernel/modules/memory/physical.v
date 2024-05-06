@@ -194,7 +194,7 @@ pub fn (mut this Slab) init(ent_size u64) {
 	avl_size := page_size - lib.align_up(sizeof(SlabHeader), ent_size)
 	mut slabptr := &SlabHeader(this.first_free)
 	unsafe {
-		slabptr[0].slab = this
+		(*slabptr).slab = this
 	}
 	this.first_free += lib.align_up(sizeof(SlabHeader), ent_size)
 
@@ -223,7 +223,7 @@ pub fn (mut this Slab) alloc() voidptr {
 	}
 
 	mut old_free := &u64(this.first_free)
-	this.first_free = unsafe { old_free[0] }
+	this.first_free = *old_free
 
 	unsafe { C.memset(voidptr(old_free), 0, this.ent_size) }
 
@@ -244,7 +244,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 
 	mut new_head := &u64(ptr)
 	unsafe {
-		new_head[0] = this.first_free
+		*new_head = this.first_free
 	}
 	this.first_free = u64(new_head)
 }

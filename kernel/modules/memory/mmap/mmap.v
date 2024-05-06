@@ -99,7 +99,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			global: unsafe { nil }
 		}
 		unsafe {
-			new_local_range[0] = local_range[0]
+			*new_local_range = *local_range
 		}
 		new_local_range.pagemap = new_pagemap
 
@@ -113,7 +113,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				old_pte := old_pagemap.virt2pte(i, false) or { continue }
 				new_pte := new_pagemap.virt2pte(i, true) or { return none }
 				unsafe {
-					new_pte[0] = old_pte[0]
+					*new_pte = *old_pte
 				}
 			}
 		} else {
@@ -139,7 +139,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			if local_range.flags & mmap.map_anonymous != 0 {
 				for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 					old_pte := old_pagemap.virt2pte(i, false) or { continue }
-					if unsafe { old_pte[0] & 1 } == 0 {
+					if unsafe { *old_pte } & 1 == 0 {
 						continue
 					}
 					new_pte := new_pagemap.virt2pte(i, true) or { return none }
@@ -147,9 +147,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					page := memory.pmm_alloc_nozero(1)
 					unsafe {
 						C.memcpy(voidptr(u64(page) + higher_half), voidptr(
-							(old_pte[0] & ~(u64(0xfff))) + higher_half), page_size)
-						new_pte[0] = (old_pte[0] & u64(0xfff)) | u64(page)
-						new_spte[0] = new_pte[0]
+							(*old_pte & ~(u64(0xfff))) + higher_half), page_size)
+						*new_pte = (*old_pte & u64(0xfff)) | u64(page)
+						*new_spte = *new_pte
 					}
 				}
 			} else {

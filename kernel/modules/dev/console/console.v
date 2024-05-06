@@ -794,7 +794,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		ioctl.tcgets {
 			mut t := unsafe { &termios.Termios(argp) }
 			unsafe {
-				t[0] = this.termios
+				*t = this.termios
 			}
 			return 0
 		}
@@ -802,7 +802,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
 			mut t := unsafe { &termios.Termios(argp) }
 			unsafe {
-				this.termios = t[0]
+				this.termios = *t
 			}
 			return 0
 		}

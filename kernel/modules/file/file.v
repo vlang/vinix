@@ -78,7 +78,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
-		t.masked_signals = unsafe { sigmask[0] }
+		t.masked_signals = *sigmask
 	}
 	defer {
 		t.masked_signals = oldmask
