@@ -15,6 +15,15 @@ __global (
 	pmm_avl_page_count  = u64(0)
 	pmm_last_used_index = u64(0)
 	free_pages          = u64(0)
+	higher_half         = u64(0)
+)
+
+@[cinit]
+@[_linker_section: '.requests']
+__global (
+	volatile hhdm_req = limine.LimineHHDMRequest{
+		response: unsafe { nil }
+	}
 )
 
 pub fn print_free() {
@@ -26,6 +35,10 @@ pub fn print_free() {
 }
 
 pub fn pmm_init() {
+	higher_half = hhdm_req.response.offset
+
+	C.printf(c'pmm: Higher half direct map at: %p\n', higher_half)
+
 	memmap := memmap_req.response
 
 	unsafe {

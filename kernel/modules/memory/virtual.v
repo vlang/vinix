@@ -17,7 +17,6 @@ pub const (
 
 __global (
 	page_size       = u64(0x1000)
-	higher_half     = u64(0xffff800000000000)
 	kernel_pagemap  Pagemap
 	vmm_initialised = bool(false)
 )
