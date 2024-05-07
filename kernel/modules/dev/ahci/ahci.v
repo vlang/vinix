@@ -321,14 +321,14 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	cmd_ptr.device = 1 << 6
 
 	cmd_ptr.lba0 = u8(start & 0xff)
-	cmd_ptr.lba1 = u8(start >> 8 & 0xff)
-	cmd_ptr.lba2 = u8(start >> 16 & 0xff)
-	cmd_ptr.lba3 = u8(start >> 24 & 0xff)
-	cmd_ptr.lba4 = u8(start >> 32 & 0xff)
-	cmd_ptr.lba5 = u8(start >> 40 & 0xff)
+	cmd_ptr.lba1 = u8((start >> 8) & 0xff)
+	cmd_ptr.lba2 = u8((start >> 16) & 0xff)
+	cmd_ptr.lba3 = u8((start >> 24) & 0xff)
+	cmd_ptr.lba4 = u8((start >> 32) & 0xff)
+	cmd_ptr.lba5 = u8((start >> 40) & 0xff)
 
 	cmd_ptr.countl = u8(cnt & 0xff)
-	cmd_ptr.counth = u8(cnt >> 8 & 0xff)
+	cmd_ptr.counth = u8((cnt >> 8) & 0xff)
 
 	d.send_cmd(cmd_slot)
 
@@ -466,7 +466,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	c.pci_bar = pci_device.get_bar(0x5)
 	c.regs = &AHCIRegisters(c.pci_bar.base + higher_half)
 
-	c.version_maj = c.regs.vs >> 16 & 0xffff
+	c.version_maj = (c.regs.vs >> 16) & 0xffff
 	c.version_min = c.regs.vs & 0xffff
 
 	print('ahci: controller detected version ${c.version_maj:x}:${c.version_min:x}\n')
@@ -482,7 +482,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	c.regs.ghc &= ~(1 << 1)
 
 	c.port_cnt = c.regs.cap & 0b11111
-	c.cmd_slots = c.regs.cap >> 8 & 0b11111
+	c.cmd_slots = (c.regs.cap >> 8) & 0b11111
 
 	for i := u64(0); i < c.port_cnt; i++ {
 		if c.regs.pi & (1 << i) != 0 {

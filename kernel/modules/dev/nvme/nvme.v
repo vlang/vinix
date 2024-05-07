@@ -452,7 +452,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 fn calculate_max_prps(mut c NVMEController, identity &NVMENamespaceID) u64 {
 	lba_shift := identity.lbaf_list[identity.flbas & 0xf].ds
 
-	shift := 12 + (c.regs.cap >> 48 & 0xf)
+	shift := 12 + ((c.regs.cap >> 48) & 0xf)
 	mut max_transfer_shift := u64(20)
 
 	if c.controller_id.mdts != 0 {
@@ -739,7 +739,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	c.queue_entries = c.regs.cap & 0xffff
-	c.strides = c.regs.cap >> 32 & 0xf
+	c.strides = (c.regs.cap >> 32) & 0xf
 
 	c.qid_bitmap.initialise(0xffff)
 
