@@ -14,7 +14,7 @@ regenerate() {
 build() {
     cp -rpf "${source_dir}"/. ./
 
-    make -j${parallelism} TOOLCHAIN_PREFIX=${OS_TRIPLET}- LDFLAGS=""
+    make -j${parallelism} KTOOLCHAIN=${OS_TRIPLET}-
 }
 
 package() {

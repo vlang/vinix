@@ -16,32 +16,32 @@ define DEFAULT_VAR =
     endif
 endef
 
-override DEFAULT_TOOLCHAIN_PREFIX :=
-$(eval $(call DEFAULT_VAR,TOOLCHAIN_PREFIX,$(DEFAULT_TOOLCHAIN_PREFIX)))
+override DEFAULT_KTOOLCHAIN :=
+$(eval $(call DEFAULT_VAR,KTOOLCHAIN,$(DEFAULT_KTOOLCHAIN)))
 
-override DEFAULT_CC := $(TOOLCHAIN_PREFIX)cc
-$(eval $(call DEFAULT_VAR,CC,$(DEFAULT_CC)))
+override DEFAULT_KCC := $(KTOOLCHAIN)cc
+$(eval $(call DEFAULT_VAR,KCC,$(DEFAULT_KCC)))
 
-override DEFAULT_LD := $(TOOLCHAIN_PREFIX)ld
-$(eval $(call DEFAULT_VAR,LD,$(DEFAULT_LD)))
+override DEFAULT_KLD := $(KTOOLCHAIN)ld
+$(eval $(call DEFAULT_VAR,KLD,$(DEFAULT_KLD)))
 
-override DEFAULT_OBJDUMP := $(TOOLCHAIN_PREFIX)objdump
-$(eval $(call DEFAULT_VAR,OBJDUMP,$(DEFAULT_OBJDUMP)))
+override DEFAULT_KOBJDUMP := $(KTOOLCHAIN)objdump
+$(eval $(call DEFAULT_VAR,KOBJDUMP,$(DEFAULT_KOBJDUMP)))
 
-override DEFAULT_V := v
-$(eval $(call DEFAULT_VAR,V,$(DEFAULT_V)))
+override DEFAULT_KV := v
+$(eval $(call DEFAULT_VAR,KV,$(DEFAULT_KV)))
 
-override DEFAULT_CFLAGS := -g -O2 -pipe
-$(eval $(call DEFAULT_VAR,CFLAGS,$(DEFAULT_CFLAGS)))
+override DEFAULT_KCFLAGS := -g -O2 -pipe
+$(eval $(call DEFAULT_VAR,KCFLAGS,$(DEFAULT_KCFLAGS)))
 
-override DEFAULT_CPPFLAGS :=
-$(eval $(call DEFAULT_VAR,CPPFLAGS,$(DEFAULT_CPPFLAGS)))
+override DEFAULT_KCPPFLAGS :=
+$(eval $(call DEFAULT_VAR,KCPPFLAGS,$(DEFAULT_KCPPFLAGS)))
 
-override DEFAULT_VFLAGS :=
-$(eval $(call DEFAULT_VAR,VFLAGS,$(DEFAULT_VFLAGS)))
+override DEFAULT_KVFLAGS :=
+$(eval $(call DEFAULT_VAR,KVFLAGS,$(DEFAULT_KVFLAGS)))
 
-override DEFAULT_LDFLAGS :=
-$(eval $(call DEFAULT_VAR,LDFLAGS,$(DEFAULT_LDFLAGS)))
+override DEFAULT_KLDFLAGS :=
+$(eval $(call DEFAULT_VAR,KLDFLAGS,$(DEFAULT_KLDFLAGS)))
 
 VINIX_PROD ?=
 ifeq ($(VINIX_PROD),no)
@@ -50,7 +50,7 @@ else
     override PROD := true
 endif
 
-override CFLAGS += \
+override KCFLAGS += \
     -g \
     -Wall \
     -Wextra \
@@ -75,18 +75,18 @@ override CFLAGS += \
     -mno-red-zone \
     -mcmodel=kernel
 
-override CPPFLAGS := \
+override KCPPFLAGS := \
     -I c \
     -isystem c/freestanding-headers \
-    $(CPPFLAGS) \
+    $(KCPPFLAGS) \
     -MMD \
     -MP
 
-obj/c/printf/printf.c.o: override CPPFLAGS += \
+obj/c/printf/printf.c.o: override KCPPFLAGS += \
     -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
-override LDFLAGS += \
+override KLDFLAGS += \
     -m elf_x86_64 \
     -nostdlib \
     -static \
@@ -94,7 +94,7 @@ override LDFLAGS += \
     -Tlinker.ld \
     -gc-sections
 
-override VFLAGS += \
+override KVFLAGS += \
     -os vinix \
     -enable-globals \
     -nofloat \
@@ -103,8 +103,8 @@ override VFLAGS += \
     -d no_backtrace
 
 ifeq ($(PROD),true)
-	override VFLAGS += -prod
-	override CPPFLAGS += -DPROD
+	override KVFLAGS += -prod
+	override KCPPFLAGS += -DPROD
 endif
 
 override VFILES := $(shell find -L * -type f -name '*.v')
@@ -118,27 +118,27 @@ all: bin/$(KERNEL)
 
 bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	mkdir -p "$$(dirname $@)"
-	$(LD) obj/blob.c.o $(OBJ) $(LDFLAGS) -o $@
+	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
 	mv c/symbol_table.c symbol_table.c.tmp
-	./gensyms.sh $(OBJDUMP) $@ > c/symbol_table.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.c.o
-	$(LD) obj/blob.c.o $(OBJ) $(LDFLAGS) -o $@
+	./gensyms.sh $(KOBJDUMP) $@ > c/symbol_table.c
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.c.o
+	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c
 
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
-	$(V) $(VFLAGS) -o obj/blob.c .
-	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
+	$(KV) $(KVFLAGS) -o obj/blob.c .
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -w -c obj/blob.c -o $@
 
 -include $(HEADER_DEPS)
 
 obj/%.c.o: %.c GNUmakefile
 	mkdir -p "$$(dirname $@)"
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
 
 obj/%.S.o: %.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
@@ -150,5 +150,5 @@ distclean: clean
 
 .PHONY: install
 install:
-	install -d "$(DESTDIR)$(PREFIX)/share/vinix"
-	install -m 644 bin/$(KERNEL) "$(DESTDIR)$(PREFIX)/share/vinix/"
+	install -d "$(DESTDIR)$(PREFIX)/share/$(KERNEL)"
+	install -m 644 bin/$(KERNEL) "$(DESTDIR)$(PREFIX)/share/$(KERNEL)/"
