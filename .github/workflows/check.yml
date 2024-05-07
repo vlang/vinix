@@ -26,10 +26,10 @@ jobs:
         run: cd kernel && ./get-deps
 
       - name: Attempt to build the Vinix kernel (debug)
-        run: cd kernel && make PROD=false CFLAGS="-D__vinix__ -O2 -g -pipe" V="../v/v" && make clean
+        run: cd kernel && make PROD=false KCFLAGS="-D__vinix__ -O2 -g -pipe" KV="../v/v" && make clean
 
       - name: Attempt to build the Vinix kernel (prod)
-        run: cd kernel && make PROD=true CFLAGS="-D__vinix__ -O2 -g -pipe" V="../v/v" && make clean
+        run: cd kernel && make PROD=true KCFLAGS="-D__vinix__ -O2 -g -pipe" KV="../v/v" && make clean
 
       - name: Attempt to build the util-vinix (debug)
         run: cd util-vinix && make PROD=false V="$(realpath ../v/v)" VFLAGS="-os vinix -gc none" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
