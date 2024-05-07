@@ -1,0 +1,29 @@
+name=libwebp
+version=1.3.2
+revision=1
+tarball_url="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${version}.tar.gz"
+tarball_blake2b="12b3ff3aa9952dd32ce13656146556d5efb6a66860249a8676721980aee10253a1b0335685a769d995e9954cd305190a8ed1878ba4fefce9dcaf41a3976f9e3d"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libjpeg-turbo libpng freeglut sdl2 libtiff"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure \
+        --enable-libwebpmux \
+        --enable-libwebpdemux \
+        --enable-libwebpdecoder \
+        --enable-libwebpextras \
+        --enable-swap-16bit-csp
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

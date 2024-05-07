@@ -1,0 +1,75 @@
+diff --git glib-clean/gio/gcredentialsprivate.h glib-workdir/gio/gcredentialsprivate.h
+index 0310a75..07cd8ec 100644
+--- glib-clean/gio/gcredentialsprivate.h
++++ glib-workdir/gio/gcredentialsprivate.h
+@@ -104,7 +104,7 @@
+  */
+ #undef G_CREDENTIALS_HAS_PID
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__vinix__)
+ #define G_CREDENTIALS_SUPPORTED 1
+ #define G_CREDENTIALS_USE_LINUX_UCRED 1
+ #define G_CREDENTIALS_NATIVE_TYPE G_CREDENTIALS_TYPE_LINUX_UCRED
+diff --git glib-clean/gio/gunixmounts.c glib-workdir/gio/gunixmounts.c
+index 9e97ef1..c089594 100644
+--- glib-clean/gio/gunixmounts.c
++++ glib-workdir/gio/gunixmounts.c
+@@ -961,7 +961,7 @@ _g_get_unix_mounts (void)
+ }
+ 
+ /* QNX {{{2 */
+-#elif defined (HAVE_QNX)
++#elif defined (HAVE_QNX) || defined (__vinix__)
+ 
+ static char *
+ get_mtab_monitor_file (void)
+@@ -1502,7 +1502,7 @@ _g_get_unix_mount_points (void)
+ }
+ 
+ /* QNX {{{2 */
+-#elif defined (HAVE_QNX)
++#elif defined (HAVE_QNX) || defined (__vinix__)
+ static GList *
+ _g_get_unix_mount_points (void)
+ {
+diff --git glib-clean/glib/giounix.c glib-workdir/glib/giounix.c
+index 9d9492b..081a1fe 100644
+--- glib-clean/glib/giounix.c
++++ glib-workdir/glib/giounix.c
+@@ -442,7 +442,10 @@ g_io_unix_get_flags (GIOChannel *channel)
+         channel->is_writeable = TRUE;
+         break;
+       default:
+-        g_assert_not_reached ();
++	channel->is_readable = TRUE;
++        channel->is_writeable = TRUE;
++        break;
++        //g_assert_not_reached ();
+     }
+ 
+   return flags;
+diff --git glib-clean/glib/glib-init.c glib-workdir/glib/glib-init.c
+index c513f51..0de3ab3 100644
+--- glib-clean/glib/glib-init.c
++++ glib-workdir/glib/glib-init.c
+@@ -29,6 +29,7 @@
+ #include "gmem.h"       /* for g_mem_gc_friendly */
+ 
+ #include <string.h>
++#include <strings.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <ctype.h>
+diff --git glib-clean/glib/gstrfuncs.c glib-workdir/glib/gstrfuncs.c
+index 391cf56..86dc760 100644
+--- glib-clean/glib/gstrfuncs.c
++++ glib-workdir/glib/gstrfuncs.c
+@@ -35,6 +35,7 @@
+ #include <stdlib.h>
+ #include <locale.h>
+ #include <string.h>
++#include <strings.h>
+ #include <locale.h>
+ #include <errno.h>
+ #include <garray.h>

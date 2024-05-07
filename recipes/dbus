@@ -1,0 +1,39 @@
+name=dbus
+version=1.15.8
+revision=1
+tarball_url="https://dbus.freedesktop.org/releases/dbus/dbus-${version}.tar.xz"
+tarball_blake2b="7c1962dfccc6a1b6250e80b0706d7f44536fabeff009013865ec4b1edaec6d4b47dcbe8f78caa61ef7aef4bac6b79f0e2027dd16bbb2baae328429e648bf8b8c"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="autoconf-archive"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs glib libexpat"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure \
+        --runstatedir=/run \
+        --disable-doxygen-docs \
+        --disable-xml-docs \
+        --with-systemdsystemunitdir=no \
+        --with-systemduserunitdir=no \
+        --with-system-pid-file=/run/dbus/pid \
+        --with-system-socket=/run/dbus/system_bus_socket \
+        --disable-selinux \
+        --disable-apparmor \
+        --disable-libaudit \
+        --disable-kqueue \
+        --disable-launchd \
+        --disable-systemd \
+        --disable-tests
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

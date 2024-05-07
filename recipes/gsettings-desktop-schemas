@@ -1,0 +1,28 @@
+name=gsettings-desktop-schemas
+version=45.0
+revision=1
+tarball_url="https://download.gnome.org/sources/gsettings-desktop-schemas/45/gsettings-desktop-schemas-${version}.tar.xz"
+tarball_blake2b="b65c846654fac5a104ad9a7d67546c6fb3d54aada178d58c575d22a8c2adc0057c1f1dc177562740f7ae94d0e17743789ca902db7c2fcc42c844bb66e401eaec"
+imagedeps="meson ninja"
+hostdeps="gcc pkg-config"
+deps="core-libs glib"
+
+regenerate() {
+    sed -i -r 's:"(/system):"/org/gnome\1:g' schemas/*.in
+}
+
+build() {
+    meson_configure \
+        -Dintrospection=false
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    glib-compile-schemas "${dest_dir}${prefix}"/share/glib-2.0/schemas
+    rm "${dest_dir}${prefix}"/share/glib-2.0/schemas/gschemas.compiled
+
+    post_package_strip
+}

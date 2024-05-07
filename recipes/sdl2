@@ -1,0 +1,59 @@
+name=sdl2
+version=2.30.2
+revision=1
+tarball_url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-${version}.tar.gz"
+tarball_blake2b="258084c6965281951b78619d7ebcd80b0f6873f54ded93d35b6b898f0533fef9a29bef4a8babe53df50bc589b0565b3a3b1378a930b43fdce575c4a5baa70864"
+imagedeps="gcc ninja git"
+hostdeps="gcc cmake pkg-config"
+deps="core-libs libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxxf86vm mesa"
+
+build() {
+    cmake \
+        -GNinja \
+        -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSDL_ALTIVEC=OFF \
+        -DSDL_DISKAUDIO=OFF \
+        -DSDL_DIRECTFB=ON \
+        -DSDL_OPENGL=ON \
+        -DSDL_OPENGLES=ON \
+        -DSDL_PTHREADS=ON \
+        -DSDL_PTHREADS_SEM=OFF \
+        -DSDL_OSS=OFF \
+        -DSDL_ALSA=OFF \
+        -DSDL_JACK=OFF \
+        -DSDL_ESD=OFF \
+        -DSDL_PULSEAUDIO=OFF \
+        -DSDL_ARTS=OFF \
+        -DSDL_NAS=OFF \
+        -DSDL_SNDIO=OFF \
+        -DSDL_FUSIONSOUND=OFF \
+        -DSDL_LIBSAMPLERATE=OFF \
+        -DSDL_RPATH=OFF \
+        -DSDL_X11=ON \
+        -DSDL_WAYLAND=OFF \
+        -DSDL_WAYLAND_QT_TOUCH=OFF \
+        -DSDL_RPI=OFF \
+        -DSDL_COCOA=OFF \
+        -DSDL_DIRECTX=OFF \
+        -DSDL_WASAPI=OFF \
+        -DSDL_RENDER_D3D=OFF \
+        -DSDL_VIVANTE=OFF \
+        -DSDL_VULKAN=OFF \
+        -DSDL_KMSDRM=OFF \
+        -DSDL_HIDAPI=OFF \
+        -DSDL_SHARED=ON \
+        -DSDL_STATIC=OFF \
+        ${source_dir}
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    rm "${dest_dir}${prefix}"/lib/{libSDL2_test.a,libSDL2main.a}
+
+    post_package_strip
+}

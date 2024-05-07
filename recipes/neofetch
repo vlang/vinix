@@ -1,0 +1,11 @@
+name=neofetch
+version=7.3.11
+revision=1
+tarball_url="https://github.com/hykilpikonna/hyfetch/archive/refs/tags/1.4.11.tar.gz"
+tarball_blake2b="0739dc7bc2a90989dcd4dbdd6d14ce8ba62def2a9e069ae16a3a1435118e3639edcc112fc3fa0b8dd54684744e500672c7397315b78d965b68da2f9b9f702b13"
+deps="bash"
+
+package() {
+    mkdir -p "${dest_dir}"/usr/bin
+    cp -f "${source_dir}"/neofetch "${dest_dir}"/usr/bin/neofetch
+}

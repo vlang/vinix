@@ -1,0 +1,31 @@
+name=libtiff
+version=4.6.0
+revision=1
+tarball_url="https://download.osgeo.org/libtiff/tiff-${version}.tar.xz"
+tarball_blake2b="3b508b02b0a536c5bc8e67fe4c1b09ae9c830252786ef4764202c14d673d1ef9634694de7a5893a3551dec684d00bad9d0442c7fea7bcd09238b9960d443cf62"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs freeglut libjpeg-turbo zlib zstd xz"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure \
+        --without-x \
+        --enable-zlib \
+        --enable-zstd \
+        --enable-jpeg \
+        --enable-lzma \
+        --disable-webp \
+        --enable-cxx
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

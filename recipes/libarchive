@@ -1,0 +1,24 @@
+name=libarchive
+version=3.7.3
+revision=1
+tarball_url="https://github.com/libarchive/libarchive/releases/download/v${version}/libarchive-${version}.tar.xz"
+tarball_blake2b="c53672c8cdbe8f406f00bf4fc6b36e4dffcd23a33909dbec6ef06b86dceefc6062840eff629ba3bd19c36121720e16a8ba10dfa1a35ebed186cc92eb144f55d0"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs zlib xz zstd libexpat libxml"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

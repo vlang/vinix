@@ -1,0 +1,13 @@
+diff --git dbus-clean/dbus/dbus-sysdeps-unix.c dbus-workdir/dbus/dbus-sysdeps-unix.c
+index dbc459c..6a3e851 100644
+--- dbus-clean/dbus/dbus-sysdeps-unix.c
++++ dbus-workdir/dbus/dbus-sysdeps-unix.c
+@@ -4896,7 +4896,7 @@ _dbus_check_setuid (void)
+ 
+   if (_DBUS_UNLIKELY (!check_setuid_initialised))
+     {
+-#ifdef HAVE_GETRESUID
++#if defined HAVE_GETRESUID && !defined(__vinix__)
+       if (getresuid (&ruid, &euid, &suid) != 0 ||
+           getresgid (&rgid, &egid, &sgid) != 0)
+ #endif /* HAVE_GETRESUID */

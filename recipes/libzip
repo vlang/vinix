@@ -1,0 +1,28 @@
+name=libzip
+version=1.10.1
+revision=1
+tarball_url="https://github.com/nih-at/libzip/releases/download/v${version}/libzip-${version}.tar.xz"
+tarball_blake2b="bd5e6ea92ebf1c1210aa4b6fc58f0060d7a87ef2f47ac8475a0e30d67bd7e44f5a7671faf50d670ccfcf4117c379a1b1704871f88ec95654cc2c971e29965018"
+imagedeps="gcc ninja python git"
+hostdeps="gcc cmake pkg-config"
+deps="core-libs zlib bzip2 xz zstd openssl"
+
+build() {
+    cmake \
+        -GNinja \
+        -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DENABLE_GNUTLS=OFF \
+        -DBUILD_DOC=OFF \
+        ${source_dir}
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}

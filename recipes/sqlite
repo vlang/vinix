@@ -1,0 +1,27 @@
+name=sqlite
+version=3.45.2
+revision=1
+tarball_url="https://sqlite.org/2024/sqlite-autoconf-3450200.tar.gz"
+tarball_blake2b="7bc225167a6792a35c2e7a324fe9bff1a1540a01b0fd04197d023f113a368ba6034235045281c7653abdd2ea67aa10a5ed19b024d1d25bdb7232533e25dfb991"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs readline zlib"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure \
+        --enable-readline \
+        --enable-fts5 \
+        CFLAGS="$CFLAGS -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS4=1 -DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_ENABLE_UNLOCK_NOTIFY=1 -DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_SECURE_DELETE=1 -DSQLITE_ENABLE_FTS3_TOKENIZER=1"
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

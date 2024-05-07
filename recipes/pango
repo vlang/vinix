@@ -1,0 +1,21 @@
+name=pango
+version=1.52.2
+revision=1
+tarball_url="https://download.gnome.org/sources/pango/1.52/pango-${version}.tar.xz"
+tarball_blake2b="9367703addcc6805fc14f0c0184d9d1b4093b8947fea9d260c54eb6c86ce56a0d6cfe35c3d6340eaa5d96fb84f0a94c5979ae308bfa79f02e4ce25c4c093556e"
+imagedeps="meson ninja"
+hostdeps="gcc pkg-config"
+deps="core-libs glib fontconfig freetype2 fribidi cairo xorg-proto libx11 xtrans libxext harfbuzz libxft"
+
+build() {
+    meson_configure \
+        -Dintrospection=disabled
+
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}

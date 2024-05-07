@@ -1,0 +1,28 @@
+diff --git libzip-clean/lib/zip_name_locate.c libzip-workdir/lib/zip_name_locate.c
+index 806053c..f2043e5 100644
+--- libzip-clean/lib/zip_name_locate.c
++++ libzip-workdir/lib/zip_name_locate.c
+@@ -33,9 +33,9 @@
+ 
+ 
+ #include <string.h>
+-#ifdef HAVE_STRINGS_H
++//#ifdef HAVE_STRINGS_H
+ #include <strings.h>
+-#endif
++//#endif
+ 
+ #include "zipint.h"
+ 
+diff --git libzip-clean/src/ziptool.c libzip-workdir/src/ziptool.c
+index b900eba..020e352 100644
+--- libzip-clean/src/ziptool.c
++++ libzip-workdir/src/ziptool.c
+@@ -36,6 +36,7 @@
+ #include <errno.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <strings.h>
+ #include <time.h>
+ #ifdef HAVE_UNISTD_H
+ #include <unistd.h>

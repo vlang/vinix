@@ -1,0 +1,114 @@
+diff --git openssl-clean/Configurations/10-main.conf openssl-workdir/Configurations/10-main.conf
+index f815a09..d403653 100644
+--- openssl-clean/Configurations/10-main.conf
++++ openssl-workdir/Configurations/10-main.conf
+@@ -925,6 +925,40 @@ my %targets = (
+         ranlib           => "true",
+     },
+ 
++#### Vinix
++    "vinix-generic64" => {
++        inherit_from     => [ "BASE_unix" ],
++        CFLAGS           => picker(default   => "-Wall",
++                         debug       => "-O0 -g",
++                         release     => "-O3"),
++        CXXFLAGS         => picker(default   => "-Wall",
++                         debug       => "-O0 -g",
++                         release     => "-O3"),
++        cxxflags         => add("-std=c++11"),
++        lib_cppflags     => combine("-DOPENSSL_USE_NODELETE", "-DL_ENDIAN"),
++        bn_ops           => "SIXTY_FOUR_BIT_LONG RC4_CHAR",
++        thread_scheme    => "pthreads",
++        dso_scheme       => "dlfcn",
++        shared_target    => "linux-shared",
++        shared_cflag     => "-fPIC",
++        shared_ldflag    => sub { $disabled{pinshared} ? () : "-Wl,-znodelete" },
++        shared_extension => ".so.\$(SHLIB_VERSION_NUMBER)",
++    },
++
++    # This breaks the usual configuration naming convention but it's more
++    # convenient for us, since it matches the target triples
++
++    "x86_64-pc-vinix-mlibc" => {
++        inherit_from     => [ "vinix-generic64", asm("x86_64_asm") ],
++        perlasm_scheme   => "elf",
++
++        # Configure doesn't want to play nice and passes "--cross-compile-suffix"
++        # on to the GCC invocation
++        CC               => "x86_64-pc-vinix-mlibc-gcc",
++        CXX              => "x86_64-pc-vinix-mlibc-g++",
++
++    },
++
+ #### *BSD
+     "BSD-generic32" => {
+         # As for thread cflag. Idea is to maintain "collective" set of
+diff --git openssl-clean/Configure openssl-workdir/Configure
+index 78cc15d..2d3fb3e 100755
+--- openssl-clean/Configure
++++ openssl-workdir/Configure
+@@ -1549,20 +1549,7 @@ unless ($disabled{"crypto-mdebug-backtrace"})
+ unless ($disabled{afalgeng}) {
+     $config{afalgeng}="";
+     if (grep { $_ eq 'afalgeng' } @{$target{enable}}) {
+-        my $minver = 4*10000 + 1*100 + 0;
+-        if ($config{CROSS_COMPILE} eq "") {
+-            my $verstr = `uname -r`;
+-            my ($ma, $mi1, $mi2) = split("\\.", $verstr);
+-            ($mi2) = $mi2 =~ /(\d+)/;
+-            my $ver = $ma*10000 + $mi1*100 + $mi2;
+-            if ($ver < $minver) {
+-                disable('too-old-kernel', 'afalgeng');
+-            } else {
+-                push @{$config{engdirs}}, "afalg";
+-            }
+-        } else {
+-            disable('cross-compiling', 'afalgeng');
+-        }
++        push @{$config{engdirs}}, "afalg";
+     } else {
+         disable('not-linux', 'afalgeng');
+     }
+diff --git openssl-clean/apps/speed.c openssl-workdir/apps/speed.c
+index 89bf184..7432224 100644
+--- openssl-clean/apps/speed.c
++++ openssl-workdir/apps/speed.c
+@@ -113,6 +113,8 @@
+ # define NO_FORK
+ #endif
+ 
++#include <sys/select.h>
++
+ #define MAX_MISALIGNMENT 63
+ #define MAX_ECDH_SIZE   256
+ #define MISALIGN        64
+diff --git openssl-clean/crypto/mem_sec.c openssl-workdir/crypto/mem_sec.c
+index 222c786..edb5192 100644
+--- openssl-clean/crypto/mem_sec.c
++++ openssl-workdir/crypto/mem_sec.c
+@@ -492,8 +492,10 @@ static int sh_init(size_t size, int minsize)
+         ret = 2;
+ #endif
+ #ifdef MADV_DONTDUMP
++/*
+     if (madvise(sh.arena, sh.arena_size, MADV_DONTDUMP) < 0)
+         ret = 2;
++*/
+ #endif
+ 
+     return ret;
+diff --git openssl-clean/test/rsa_complex.c openssl-workdir/test/rsa_complex.c
+index fac5812..a23670d 100644
+--- openssl-clean/test/rsa_complex.c
++++ openssl-workdir/test/rsa_complex.c
+@@ -14,7 +14,9 @@
+  */
+ #if defined(__STDC_VERSION__)
+ # if __STDC_VERSION__ >= 199901L
+-#  include <complex.h>
++#  if !defined(__vinix__)
++#   include <complex.h>
++#  endif
+ # endif
+ #endif
+ #include <openssl/rsa.h>

@@ -1,0 +1,32 @@
+name=openssl
+version=1.1.1w
+revision=1
+tarball_url="https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-${version}.tar.gz"
+tarball_blake2b="2fdba6ca0188928ab2f74e606136afca66cfa0467170fa6298ef160b64ac6fdcad1e81e5dd14013ce0e9921d0f7417edec531cd0beaf1196fec704c2c6d48395"
+hostdeps="gcc pkg-config"
+deps="core-libs zlib"
+
+build() {
+        CC=${OS_TRIPLET}-gcc \
+        CXX=${OS_TRIPLET}-g++ \
+        AR=${OS_TRIPLET}-ar \
+    ${source_dir}/Configure \
+        --prefix=${prefix} \
+        --openssldir=/etc/ssl \
+        --libdir=lib \
+        ${OS_TRIPLET} \
+        shared \
+        zlib-dynamic \
+        no-afalgeng
+
+    make -j${parallelism}
+}
+
+package() {
+    # Disable installing static libraries.
+    sed -i '/INSTALL_LIBS/s/libcrypto.a libssl.a//' Makefile
+
+    DESTDIR="${dest_dir}" make DESTDIR="${dest_dir}" MANSUFFIX=ssl install
+
+    post_package_strip
+}
