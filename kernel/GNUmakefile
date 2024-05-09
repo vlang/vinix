@@ -128,7 +128,7 @@ bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
 	$(KV) $(KVFLAGS) -o obj/blob.c .
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -w -c obj/blob.c -o $@
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -w -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-int-conversion -c obj/blob.c -o $@
 
 -include $(HEADER_DEPS)
 
