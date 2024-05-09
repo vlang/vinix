@@ -16,6 +16,8 @@ VFLAGS  ?= -gc none
 CFLAGS  ?= -O2 -pipe -g
 PREFIX  ?= /usr/local
 
+override CFLAGS += -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-int-conversion
+
 ifeq ($(PROD), true)
 	override VFLAGS += -prod
 endif

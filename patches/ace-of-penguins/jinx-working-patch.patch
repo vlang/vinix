@@ -11,6 +11,17 @@ index 2056424..e93f8bd 100644
  
  BUILD_CC = @BUILD_CC@
  AR = @AR@
+diff --git ace-of-penguins-clean/lib/imagelib.c ace-of-penguins-workdir/lib/imagelib.c
+index f71b96a..5f14b05 100644
+--- ace-of-penguins-clean/lib/imagelib.c
++++ ace-of-penguins-workdir/lib/imagelib.c
+@@ -1,5 +1,6 @@
+ #include <stdio.h>
+ #include <string.h>
++#include <stdlib.h>
+ #include "imagelib.h"
+ #include "cards.h"
+ 
 diff --git ace-of-penguins-clean/lib/make-imglib.c ace-of-penguins-workdir/lib/make-imglib.c
 index 84cda12..dde0ffa 100644
 --- ace-of-penguins-clean/lib/make-imglib.c

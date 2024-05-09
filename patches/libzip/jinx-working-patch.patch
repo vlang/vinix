@@ -1,5 +1,24 @@
+diff --git libzip-clean/lib/zip_close.c libzip-workdir/lib/zip_close.c
+index ddc2c24..6206bd0 100644
+--- libzip-clean/lib/zip_close.c
++++ libzip-workdir/lib/zip_close.c
+@@ -36,6 +36,7 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <strings.h>
+ #ifdef _WIN32
+ #include <fcntl.h>
+ #include <io.h>
+@@ -742,4 +743,4 @@ static int torrentzip_compare_names(const void *a, const void *b) {
+     }
+ 
+     return strcasecmp(aname, bname);
+-}
+\ No newline at end of file
++}
 diff --git libzip-clean/lib/zip_name_locate.c libzip-workdir/lib/zip_name_locate.c
-index 806053c..f2043e5 100644
+index 4248dc2..fdf113a 100644
 --- libzip-clean/lib/zip_name_locate.c
 +++ libzip-workdir/lib/zip_name_locate.c
 @@ -33,9 +33,9 @@
@@ -15,10 +34,10 @@ index 806053c..f2043e5 100644
  #include "zipint.h"
  
 diff --git libzip-clean/src/ziptool.c libzip-workdir/src/ziptool.c
-index b900eba..020e352 100644
+index 281bfbb..9897044 100644
 --- libzip-clean/src/ziptool.c
 +++ libzip-workdir/src/ziptool.c
-@@ -36,6 +36,7 @@
+@@ -38,6 +38,7 @@
  #include <errno.h>
  #include <stdlib.h>
  #include <string.h>
