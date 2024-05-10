@@ -1,8 +1,8 @@
 name=libxmu
-version=1.2.0
+version=1.2.1
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXmu-${version}.tar.gz"
-tarball_blake2b="eb1adce4a14ba8d699954d653d832071cd53745081f36f91fb0bc2197c1cf5bde98178a6ad7f2b1149db9b031986baaa10e5258dfced0d81720c65f251ec82c8"
+tarball_blake2b="79cb21601f19a72fc771bb7fbde59d0fd3febdcf8fc6c6def91e2d8d9a99df4c7a9e633d819fe93df0cbd774a642cf39d44219c1fdbc154be28ba9086571cbb6"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
