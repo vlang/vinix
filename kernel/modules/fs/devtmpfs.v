@@ -247,3 +247,7 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 		devtmpfs_root.children[name] = new_node
 	}
 }
+
+pub fn devtmpfs_get_root() &VFSNode {
+	return devtmpfs_root
+}

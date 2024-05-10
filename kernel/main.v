@@ -29,6 +29,7 @@ import dev.nvme
 import dev.serial
 import dev.streams
 import dev.ahci
+import dev.hda
 import dev.random
 import dev.mouse
 import syscall.table
@@ -69,6 +70,7 @@ fn kmain_thread() {
 	console.initialise()
 	serial.initialise()
 	mouse.initialise()
+	hda.initialize()
 
 	$if !prod {
 		ata.initialise()
