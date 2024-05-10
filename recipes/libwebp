@@ -1,8 +1,8 @@
 name=libwebp
-version=1.3.2
+version=1.4.0
 revision=1
 tarball_url="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${version}.tar.gz"
-tarball_blake2b="12b3ff3aa9952dd32ce13656146556d5efb6a66860249a8676721980aee10253a1b0335685a769d995e9954cd305190a8ed1878ba4fefce9dcaf41a3976f9e3d"
+tarball_blake2b="022cef190284b69af781718a82b28ee9806d7e6b1e642ee0833e608f64f691ef918a83e99db02335fb9f60d24d6f0cfc58e7e05e99a3f13d2118719d40a71722"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libjpeg-turbo libpng freeglut sdl2 libtiff"
