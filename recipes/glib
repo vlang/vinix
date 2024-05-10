@@ -1,8 +1,8 @@
 name=glib
-version=2.78.4
+version=2.78.6
 revision=1
 tarball_url="https://download.gnome.org/sources/glib/2.78/glib-${version}.tar.xz"
-tarball_blake2b="ada7134597d7d863e581a2bb1097ac07a63b27b53309aadab5b1d3686327ee718ad8c5c07af3fce5cc12328e728fc2c4df5fd9e69f431fa00dc634062ef7f926"
+tarball_blake2b="d16173794c4aa019459cf8c8c84d4107fb8393828f41ec6c631b9452890f34f9022ed848a543ed134fdb8a575faef6b941cea3e05de512eb1b7a99f7601a2485"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs pcre2 libffi zlib"
