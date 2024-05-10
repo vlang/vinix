@@ -1,8 +1,8 @@
 name=libjpeg-turbo
-version=3.0.2
+version=3.0.3
 revision=1
 tarball_url="https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/${version}.tar.gz"
-tarball_blake2b="500c9d3c319ad58f28d6bbf7a208aea0b9af91ec4471a58ba1ad3860acc6f5e99498a1f780fa1984bdf6a6d5f894dbf1ba7c8c2e13e8f3ccc96e16c5b45c1f32"
+tarball_blake2b="cbf0ed5cd065ad5d30d9596ddd10ae0c400a885a3c3c46d5ce286cff003b3af2c12ba23f9c3943026e8de2e6f79dd0383b968811929127f317c2c7d91e2b49f7"
 imagedeps="gcc ninja python git nasm"
 hostdeps="gcc cmake pkg-config"
 deps="core-libs"
