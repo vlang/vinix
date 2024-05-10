@@ -1,0 +1,81 @@
+Only in b/cmd/ossdevlinks: .nomake
+Only in b/cmd/osspartysh: .nomake
+diff -bur a/include/soundcard.h b/include/soundcard.h
+--- a/include/soundcard.h	2021-01-07 23:45:22.000000000 +0200
++++ b/include/soundcard.h	2024-05-11 01:11:40.737534072 +0300
+@@ -52,6 +52,8 @@
+ #else
+ # ifdef __FreeBSD__
+ #    include <sys/ioccom.h>
++# elif defined(__vinix__)
++#    include <asm/ioctl.h>
+ # else
+ #    include <sys/ioctl.h>
+ # endif
+diff -bur a/kernel/OS/Linux/os_linux.h b/kernel/OS/Linux/os_linux.h
+--- a/kernel/OS/Linux/os_linux.h	2021-01-07 23:45:22.000000000 +0200
++++ b/kernel/OS/Linux/os_linux.h	2024-05-11 01:11:40.761534524 +0300
+@@ -58,8 +58,8 @@
+ #include <sys/file.h>
+ #include "oss_ddi.h"
+ #include <sys/stat.h>
+-#include <sys/fcntl.h>
+-#include <asm/poll.h>
++#include <fcntl.h>
++#include <poll.h>
+ #include "kernel/OS/Linux/wrapper/wrap.h"
+ 
+ #undef HZ
+diff -bur a/lib/libossmix/libossmix_tcp.c b/lib/libossmix/libossmix_tcp.c
+--- a/lib/libossmix/libossmix_tcp.c	2021-01-07 23:45:23.000000000 +0200
++++ b/lib/libossmix/libossmix_tcp.c	2024-05-11 01:11:40.767534637 +0300
+@@ -479,7 +479,7 @@
+ 
+   if ((he = gethostbyname (remotehost)) == NULL)
+     {
+-      herror (remotehost);
++      // herror (remotehost);
+       fprintf (stderr, "Cannot find the OSSMIX server \"%s\"\n", remotehost);
+       return -1;
+     }
+diff -bur a/os_cmd/Linux/ossdetect/ossdetect.c b/os_cmd/Linux/ossdetect/ossdetect.c
+--- a/os_cmd/Linux/ossdetect/ossdetect.c	2021-01-07 23:45:23.000000000 +0200
++++ b/os_cmd/Linux/ossdetect/ossdetect.c	2024-05-11 01:11:40.767534637 +0300
+@@ -20,6 +20,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
++#include <limits.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/sysmacros.h>
+diff -bur a/setup/setupdir.sh b/setup/setupdir.sh
+--- a/setup/setupdir.sh	2020-09-30 22:30:10.000000000 +0300
++++ b/setup/setupdir.sh	2024-05-11 01:11:40.768534656 +0300
+@@ -86,7 +86,7 @@
+ echo SRCDIR=$SRCDIR >> .directories
+ echo OSSLIBDIR=$OSSLIBDIR >> .directories
+ 
+-$CC $LDFLAGS -o dirsetup $SRCDIR/setup/dirsetup.c
++cc $LDFLAGS -o dirsetup $SRCDIR/setup/dirsetup.c
+ 
+ # Make sure the latest soundcard.h version is installed in the system
+ #rm /usr/include/sys/soundcard.h
+@@ -144,7 +144,7 @@
+   DTARGETOS="-D$TARGETOS"
+ fi
+ 
+-$CC $LDFLAGS -D`uname -s` $DTARGETOS -o srcconf $SRCDIR/setup/srcconf.c
++cc $LDFLAGS -D`uname -s` $DTARGETOS -o srcconf $SRCDIR/setup/srcconf.c
+ 
+ if ./srcconf $*
+ then
+@@ -247,7 +247,7 @@
+ # Setup the link to the right os.h file for this operating system.
+ (cd kernel/framework/include;ln -s ../../../kernel/OS/$OS/os_*.h os.h)
+ 
+-$CC $LDFLAGS -o ossvers -I./kernel/framework/include  setup/ossvers.c
++cc $LDFLAGS -o ossvers -I./kernel/framework/include  setup/ossvers.c
+ ./ossvers > .version
+ rm ./ossvers
+ 

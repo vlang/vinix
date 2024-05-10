@@ -1,0 +1,25 @@
+name=oss
+version=4.2.2020
+revision=1
+tarball_url="http://www.4front-tech.com/developer/sources/stable/gpl/oss-v4.2-build2020-src-gpl.tar.bz2"
+tarball_blake2b="739aabd8b1851a3878d62b101e91552b647b2b402c83e539d1150c52809b72efbe3c7a93f08ba6b57132f5c20763345fb9579f79315b7a137faec9135a664652"
+imagedeps="gcc"
+hostdeps="gcc libtool pkg-config"
+deps="core-libs"
+
+regenerate() {
+    touch "${source_dir}"/cmd/osspartysh/.nomake
+}
+
+build() {
+    rm -rf *
+    CC=x86_64-pc-vinix-mlibc-gcc "${source_dir}"/configure --enable-libsalsa=NO --only-drv=
+    make build -j${parallelism}
+}
+
+package() {
+    make copy DESTDIR="${dest_dir}"
+    mv "${dest_dir}"/usr/sbin/* "${dest_dir}"/usr/bin
+    rmdir "${dest_dir}/usr/sbin"
+    post_package_strip
+}
