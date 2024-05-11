@@ -415,6 +415,15 @@ fn keyboard_handler() {
 
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
+	// Disable primary and secondary PS/2 ports
+	write_ps2(0x64, 0xad)
+	write_ps2(0x64, 0xa7)
+
+	// Read from port 0x60 to flush the PS/2 controller buffer
+	for kio.port_in[u8](0x64) & 1 != 0 {
+		kio.port_in[u8](0x60)
+	}
+
 	mut ps2_config := read_ps2_config()
 
 	// Enable keyboard interrupt and keyboard scancode translation
@@ -684,15 +693,6 @@ pub fn initialise() {
 	console_res.status |= file.pollout
 
 	fs.devtmpfs_add_device(console_res, 'console')
-
-	// Disable primary and secondary PS/2 ports
-	write_ps2(0x64, 0xad)
-	write_ps2(0x64, 0xa7)
-
-	// Read from port 0x60 to flush the PS/2 controller buffer
-	for kio.port_in[u8](0x64) & 1 != 0 {
-		kio.port_in[u8](0x60)
-	}
 
 	spawn keyboard_handler()
 }
