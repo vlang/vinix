@@ -23,10 +23,18 @@ index f71b96a..5f14b05 100644
  #include "cards.h"
  
 diff --git ace-of-penguins-clean/lib/make-imglib.c ace-of-penguins-workdir/lib/make-imglib.c
-index 84cda12..dde0ffa 100644
+index 84cda12..7dce691 100644
 --- ace-of-penguins-clean/lib/make-imglib.c
 +++ ace-of-penguins-workdir/lib/make-imglib.c
-@@ -86,7 +86,7 @@ scan_image_directory ()
+@@ -1,6 +1,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <ctype.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+@@ -86,7 +87,7 @@ scan_image_directory ()
      png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
      info_ptr = png_create_info_struct (png_ptr);
  
@@ -35,6 +43,15 @@ index 84cda12..dde0ffa 100644
        fclose (f);
        continue;
      }
+@@ -202,7 +203,7 @@ tokenize(char *string)
+   char *rv;
+   if (string) {
+     next = string;
+-    return;
++    return NULL;
+   }
+   while (*next && !isgraph(*next)) next++;
+   if (!*next) return 0;
 diff --git ace-of-penguins-clean/lib/xwin.c ace-of-penguins-workdir/lib/xwin.c
 index e4bcca2..724be23 100644
 --- ace-of-penguins-clean/lib/xwin.c
