@@ -415,6 +415,26 @@ fn keyboard_handler() {
 
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
+	mut ps2_config := read_ps2_config()
+
+	// Enable keyboard interrupt and keyboard scancode translation
+	ps2_config |= (1 << 0) | (1 << 6)
+
+	// Enable mouse interrupt if any
+	if ps2_config & (1 << 5) != 0 {
+		ps2_config |= (1 << 1)
+	}
+
+	write_ps2_config(ps2_config)
+
+	// Enable keyboard port
+	write_ps2(0x64, 0xae)
+
+	// Enable mouse port if any
+	if ps2_config & (1 << 5) != 0 {
+		write_ps2(0x64, 0xa8)
+	}
+
 	console_convtab_numpad_numlock = {
 		u8(0x37): u8(`*`)
 		u8(0x4a): u8(`-`)
@@ -672,26 +692,6 @@ pub fn initialise() {
 	// Read from port 0x60 to flush the PS/2 controller buffer
 	for kio.port_in[u8](0x64) & 1 != 0 {
 		kio.port_in[u8](0x60)
-	}
-
-	mut ps2_config := read_ps2_config()
-
-	// Enable keyboard interrupt and keyboard scancode translation
-	ps2_config |= (1 << 0) | (1 << 6)
-
-	// Enable mouse interrupt if any
-	if ps2_config & (1 << 5) != 0 {
-		ps2_config |= (1 << 1)
-	}
-
-	write_ps2_config(ps2_config)
-
-	// Enable keyboard port
-	write_ps2(0x64, 0xae)
-
-	// Enable mouse port if any
-	if ps2_config & (1 << 5) != 0 {
-		write_ps2(0x64, 0xa8)
 	}
 
 	spawn keyboard_handler()
