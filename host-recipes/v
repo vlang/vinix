@@ -6,7 +6,7 @@ imagedeps="gcc"
 build() {
     cp -r ${source_dir}/. ./
     set -x
-    cc $CFLAGS -w -std=gnu99 -fno-strict-aliasing $LDFLAGS v.c -lm -lpthread -o v
+    cc $CFLAGS -w -std=gnu99 $LDFLAGS v.c -lm -lpthread -o v
     set +x
 }
 
