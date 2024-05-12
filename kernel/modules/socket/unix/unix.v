@@ -64,7 +64,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 	handle := unsafe { &file.Handle(_handle) }
 
 	// If pipe is empty, block or return if nonblock
-	for katomic.load(this.used) == 0 {
+	for katomic.load(&this.used) == 0 {
 		// Return EOF if the pipe was closed
 		//		if this.refcount <= 1 {
 		//			return 0
@@ -132,7 +132,7 @@ fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64
 	handle := unsafe { &file.Handle(_handle) }
 
 	// If pipe is full, block or return if nonblock
-	for katomic.load(peer.used) == peer.capacity {
+	for katomic.load(&peer.used) == peer.capacity {
 		if handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.ewouldblock)
 			return none
@@ -394,7 +394,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	C.printf(c'%d iovecs, %llu bytes\n', msg.msg_iovlen, count)
 
 	// If pipe is empty, block or return if nonblock
-	for katomic.load(this.used) == 0 {
+	for katomic.load(&this.used) == 0 {
 		// Return EOF if the pipe was closed
 		//		if this.refcount <= 1 {
 		//			return 0

@@ -23,7 +23,7 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 				continue
 			}
 			apic.lapic_send_ipi(u8(cpu_local.lapic_id), abort_vector)
-			for katomic.load(cpu_local.aborted) == false {}
+			for katomic.load(&cpu_local.aborted) == false {}
 		}
 	}
 

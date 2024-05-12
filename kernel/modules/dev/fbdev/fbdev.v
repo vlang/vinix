@@ -114,15 +114,15 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 }
 
 fn (mut this FramebufferNode) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this FramebufferNode) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this FramebufferNode) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {

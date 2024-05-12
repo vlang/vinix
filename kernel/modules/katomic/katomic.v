@@ -4,7 +4,7 @@
 
 module katomic
 
-pub fn bts<T>(var &T, bit u8) bool {
+pub fn bts<T>(mut var T, bit u8) bool {
 	mut ret := false
 	unsafe {
 		asm volatile amd64 {
@@ -19,7 +19,7 @@ pub fn bts<T>(var &T, bit u8) bool {
 	return ret
 }
 
-pub fn btr<T>(var &T, bit u8) bool {
+pub fn btr<T>(mut var T, bit u8) bool {
 	mut ret := false
 	unsafe {
 		asm volatile amd64 {
@@ -34,9 +34,8 @@ pub fn btr<T>(var &T, bit u8) bool {
 	return ret
 }
 
-pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
+pub fn cas<T>(mut here T, _ifthis T, writethis T) bool {
 	mut ret := false
-	mut here := unsafe { _here }
 	mut ifthis := _ifthis
 	unsafe {
 		asm volatile amd64 {
@@ -52,7 +51,7 @@ pub fn cas<T>(_here &T, _ifthis T, writethis T) bool {
 	return ret
 }
 
-pub fn inc<T>(var &T) T {
+pub fn inc<T>(mut var T) T {
 	mut diff := unsafe { T(1) }
 	unsafe {
 		asm volatile amd64 {
@@ -66,7 +65,7 @@ pub fn inc<T>(var &T) T {
 	return diff
 }
 
-pub fn dec<T>(var &T) bool {
+pub fn dec<T>(mut var T) bool {
 	mut ret := false
 	unsafe {
 		mut diff := T(-1)
@@ -82,7 +81,7 @@ pub fn dec<T>(var &T) bool {
 	return ret
 }
 
-pub fn store<T>(var &T, value T) {
+pub fn store<T>(mut var T, value T) {
 	unsafe {
 		asm volatile amd64 {
 			lock

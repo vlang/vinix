@@ -284,7 +284,7 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 }
 
 pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
-	katomic.inc(res.refcount)
+	katomic.inc(mut &res.refcount)
 
 	mut new_handle := unsafe { &Handle(C.malloc(sizeof(Handle))) }
 	new_handle.resource = unsafe { res }

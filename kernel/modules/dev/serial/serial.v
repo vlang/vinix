@@ -191,15 +191,15 @@ fn (mut this COMPort) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this COMPort) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this COMPort) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this COMPort) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this COMPort) grow(handle voidptr, new_size u64) ? {

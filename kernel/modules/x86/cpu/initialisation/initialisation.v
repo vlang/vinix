@@ -136,10 +136,10 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	print('smp: CPU $cpu_local.cpu_number online!\n')
 
-	katomic.inc(cpu_local.online)
+	katomic.inc(mut &cpu_local.online)
 
 	if cpu_number != 0 {
-		for katomic.load(scheduler_vector) == 0 {}
+		for katomic.load(&scheduler_vector) == 0 {}
 		sched.await()
 	}
 }

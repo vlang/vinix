@@ -109,7 +109,7 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 		return none
 	}
 
-	katomic.inc(waiting_event_count)
+	katomic.inc(mut &waiting_event_count)
 
 	attach_listeners(mut events, mut t)
 	defer {
@@ -130,7 +130,7 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 
 	sched.yield(true)
 
-	katomic.dec(waiting_event_count)
+	katomic.dec(mut &waiting_event_count)
 
 	if t.enqueued_by_signal {
 		return none

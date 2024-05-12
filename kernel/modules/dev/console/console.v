@@ -813,15 +813,15 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this Console) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this Console) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this Console) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this Console) grow(handle voidptr, new_size u64) ? {

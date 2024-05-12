@@ -237,15 +237,15 @@ fn (mut dev AHCIDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut dev AHCIDevice) unref(handle voidptr) ? {
-	katomic.dec(dev.refcount)
+	katomic.dec(mut &dev.refcount)
 }
 
 fn (mut dev AHCIDevice) link(handle voidptr) ? {
-	katomic.inc(dev.stat.nlink)
+	katomic.inc(mut &dev.stat.nlink)
 }
 
 fn (mut dev AHCIDevice) unlink(handle voidptr) ? {
-	katomic.dec(dev.stat.nlink)
+	katomic.dec(mut &dev.stat.nlink)
 }
 
 fn (mut dev AHCIDevice) grow(handle voidptr, new_size u64) ? {

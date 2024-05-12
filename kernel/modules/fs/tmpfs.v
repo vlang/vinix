@@ -101,7 +101,7 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 }
 
 fn (mut this TmpFSResource) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 
 	if this.refcount == 0 && stat.isreg(this.stat.mode) {
 		memory.free(this.storage)
@@ -110,11 +110,11 @@ fn (mut this TmpFSResource) unref(handle voidptr) ? {
 }
 
 fn (mut this TmpFSResource) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this TmpFSResource) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
@@ -190,10 +190,10 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	return new_node
 }
 
-fn (mut this TmpFS) link(parent &VFSNode, path string, old_node &VFSNode) ?&VFSNode {
+fn (mut this TmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) ?&VFSNode {
 	mut new_node := create_node(this, parent, path, false)
 
-	katomic.inc(old_node.resource.refcount)
+	katomic.inc(mut &old_node.resource.refcount)
 
 	new_node.resource = old_node.resource
 	new_node.children = old_node.children

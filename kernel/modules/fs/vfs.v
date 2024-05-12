@@ -30,7 +30,7 @@ mut:
 	mount(&VFSNode, string, &VFSNode) ?&VFSNode
 	create(&VFSNode, string, u32) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
-	link(&VFSNode, string, &VFSNode) ?&VFSNode
+	link(&VFSNode, string, mut VFSNode) ?&VFSNode
 }
 
 pub struct VFSNode {
@@ -743,9 +743,9 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 
 	follow_links := flags & fs.at_symlink_nofollow == 0
 
-	old_node := get_node(oldparent, oldpath, follow_links) or { return errno.err, errno.get() }
+	mut old_node := get_node(oldparent, oldpath, follow_links) or { return errno.err, errno.get() }
 
-	mut new_node := newparent.filesystem.link(newparent, newpath, old_node) or {
+	mut new_node := newparent.filesystem.link(newparent, newpath, mut old_node) or {
 		return errno.err, errno.get()
 	}
 

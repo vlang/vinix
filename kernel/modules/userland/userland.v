@@ -288,7 +288,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		if t.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}
-		if katomic.btr(t.pending_signals, i) == true {
+		if katomic.btr(mut &t.pending_signals, i) == true {
 			which = i
 			break
 		}
@@ -346,7 +346,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 pub fn sendsig(_thread &proc.Thread, signal u8) {
 	mut t := unsafe { _thread }
 
-	katomic.bts(t.pending_signals, signal)
+	katomic.bts(mut &t.pending_signals, signal)
 
 	// Try to stop an event_await()
 	sched.enqueue_thread(t, true)
@@ -492,8 +492,8 @@ pub fn syscall_exit(_ voidptr, status int) {
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
 
-	katomic.store(current_process.status, int(u32(status) << 8))
-	event.trigger(mut current_process.event, false)
+	katomic.store(mut &current_process.status, int(u32(status) << 8))
+	event.trigger(mut &current_process.event, false)
 
 	sched.dequeue_and_die()
 }

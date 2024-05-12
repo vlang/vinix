@@ -43,15 +43,15 @@ fn (mut this DevNull) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this DevNull) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this DevNull) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this DevNull) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this DevNull) grow(handle voidptr, new_size u64) ? {
@@ -100,15 +100,15 @@ fn (mut this DevZero) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this DevZero) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this DevZero) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this DevZero) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this DevZero) grow(handle voidptr, new_size u64) ? {
@@ -160,15 +160,15 @@ fn (mut this DevFull) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this DevFull) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this DevFull) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this DevFull) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this DevFull) grow(handle voidptr, new_size u64) ? {

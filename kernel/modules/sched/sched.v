@@ -81,7 +81,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	mut cpu_local := cpulocal.current()
 
-	katomic.store(cpu_local.is_idle, false)
+	katomic.store(mut &cpu_local.is_idle, false)
 
 	mut current_thread := proc.current_thread()
 
@@ -102,7 +102,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		current_thread.fs_base = cpu.get_fs_base()
 		current_thread.cr3 = cpu.read_cr3()
 		fpu_save(current_thread.fpu_storage)
-		katomic.store(current_thread.running_on, u64(-1))
+		katomic.store(mut &current_thread.running_on, u64(-1))
 		current_thread.l.release()
 	}
 
@@ -110,7 +110,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		apic.lapic_eoi()
 		cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
 		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
-		katomic.store(cpu_local.is_idle, true)
+		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
 		await()
 	}
@@ -133,7 +133,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	fpu_restore(current_thread.fpu_storage)
 
-	katomic.store(current_thread.running_on, cpu_local.cpu_number)
+	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
 
 	apic.lapic_eoi()
 	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
@@ -182,15 +182,15 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		return true
 	}
 
-	katomic.store(t.enqueued_by_signal, by_signal)
+	katomic.store(mut &t.enqueued_by_signal, by_signal)
 
 	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas(voidptr(&scheduler_running_queue[i]), voidptr(0), voidptr(t)) {
+		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
 			t.is_in_queue = true
 
 			// Check if any CPU is idle and wake it up
 			for cpu in cpu_locals {
-				if katomic.load(cpu.is_idle) == true {
+				if katomic.load(&cpu.is_idle) == true {
 					apic.lapic_send_ipi(u8(cpu.lapic_id), scheduler_vector)
 					break
 				}
@@ -211,7 +211,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 	}
 
 	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas(voidptr(&scheduler_running_queue[i]), voidptr(t), voidptr(0)) {
+		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
 			t.is_in_queue = false
 			return true
 		}

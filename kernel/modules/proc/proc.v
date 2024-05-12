@@ -92,7 +92,7 @@ __global (
 
 pub fn allocate_pid(process &Process) ?int {
 	for i := int(1); i < 65536; i++ {
-		if katomic.cas(voidptr(&processes[i]), voidptr(0), voidptr(process)) {
+		if katomic.cas[&Process](mut &processes[i], unsafe { nil }, process) {
 			return i
 		}
 	}
@@ -100,5 +100,5 @@ pub fn allocate_pid(process &Process) ?int {
 }
 
 pub fn free_pid(pid int) {
-	katomic.store(voidptr(&processes[pid]), u64(0))
+	katomic.store[&Process](mut &processes[pid], unsafe { nil })
 }

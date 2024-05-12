@@ -339,15 +339,15 @@ fn (mut dev ATADrive) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut dev ATADrive) unref(handle voidptr) ? {
-	katomic.dec(dev.refcount)
+	katomic.dec(mut &dev.refcount)
 }
 
 fn (mut dev ATADrive) link(handle voidptr) ? {
-	katomic.inc(dev.stat.nlink)
+	katomic.inc(mut &dev.stat.nlink)
 }
 
 fn (mut dev ATADrive) unlink(handle voidptr) ? {
-	katomic.dec(dev.stat.nlink)
+	katomic.dec(mut &dev.stat.nlink)
 }
 
 fn (mut dev ATADrive) grow(handle voidptr, new_size u64) ? {

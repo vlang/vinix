@@ -126,15 +126,15 @@ fn (mut this URandom) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this URandom) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this URandom) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this URandom) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this URandom) grow(handle voidptr, new_size u64) ? {

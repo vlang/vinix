@@ -50,7 +50,7 @@ pub fn initialise() {
 
 		smp_info.goto_address = cpuinit.initialise
 
-		for katomic.load(cpu_local.online) == 0 {}
+		for katomic.load(&cpu_local.online) == 0 {}
 	}
 
 	smp_ready = true

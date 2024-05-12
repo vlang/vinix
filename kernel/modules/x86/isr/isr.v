@@ -63,7 +63,8 @@ fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
 }
 
 fn abort_handler(num u32, gpr_state &cpulocal.GPRState) {
-	katomic.store(cpulocal.current().aborted, true)
+	mut aborted := &cpulocal.current().aborted
+	katomic.store(mut aborted, true)
 	for {
 		asm volatile amd64 {
 			hlt

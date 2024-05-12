@@ -87,7 +87,7 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	handle := unsafe { &file.Handle(_handle) }
 
 	// If pipe is empty, block or return if nonblock
-	for katomic.load(this.used) == 0 {
+	for katomic.load(&this.used) == 0 {
 		// Return EOF if the pipe was closed
 		if this.refcount <= 1 {
 			return 0
@@ -153,7 +153,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	}
 
 	// If pipe is full, block or return if nonblock
-	for katomic.load(this.used) == this.capacity {
+	for katomic.load(&this.used) == this.capacity {
 		// We don't do nonblock yet
 		this.l.release()
 		mut events := [&this.event]
@@ -207,16 +207,16 @@ fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this Pipe) unref(handle voidptr) ? {
-	katomic.dec(this.refcount)
+	katomic.dec(mut &this.refcount)
 	event.trigger(mut this.event, false)
 }
 
 fn (mut this Pipe) unlink(handle voidptr) ? {
-	katomic.dec(this.stat.nlink)
+	katomic.dec(mut &this.stat.nlink)
 }
 
 fn (mut this Pipe) link(handle voidptr) ? {
-	katomic.inc(this.stat.nlink)
+	katomic.inc(mut &this.stat.nlink)
 }
 
 fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {

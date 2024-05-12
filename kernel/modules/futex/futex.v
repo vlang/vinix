@@ -29,7 +29,7 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	if katomic.load(unsafe { *ptr }) != expected {
+	if katomic.load(ptr) != expected {
 		return errno.err, errno.eagain
 	}
 
@@ -63,7 +63,7 @@ pub fn syscall_futex_wake(_ voidptr, ptr &int) (u64, u64) {
 	}
 
 	// Ensure this page is not lazily mapped
-	katomic.load(unsafe { *ptr })
+	katomic.load(ptr)
 
 	phys := proc.current_thread().process.pagemap.virt2phys(u64(ptr)) or { return errno.err, errno.get() }
 
