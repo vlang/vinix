@@ -12,9 +12,8 @@ regenerate() {
 }
 
 build() {
-    rm -rf *
-    CC=x86_64-pc-vinix-mlibc-gcc "${source_dir}"/configure --enable-libsalsa=NO --only-drv=
-    make build -j${parallelism}
+    CC=${OS_TRIPLET}-gcc "${source_dir}"/configure --enable-libsalsa=NO --only-drv=
+    CC=${OS_TRIPLET}-gcc make build -j${parallelism}
 }
 
 package() {

@@ -1,8 +1,7 @@
-Only in b/cmd/ossdevlinks: .nomake
-Only in b/cmd/osspartysh: .nomake
-diff -bur a/include/soundcard.h b/include/soundcard.h
---- a/include/soundcard.h	2021-01-07 23:45:22.000000000 +0200
-+++ b/include/soundcard.h	2024-05-11 01:11:40.737534072 +0300
+diff --git oss-clean/include/soundcard.h oss-workdir/include/soundcard.h
+index 3f452bc..d10ac83 100644
+--- oss-clean/include/soundcard.h
++++ oss-workdir/include/soundcard.h
 @@ -52,6 +52,8 @@
  #else
  # ifdef __FreeBSD__
@@ -12,9 +11,10 @@ diff -bur a/include/soundcard.h b/include/soundcard.h
  # else
  #    include <sys/ioctl.h>
  # endif
-diff -bur a/kernel/OS/Linux/os_linux.h b/kernel/OS/Linux/os_linux.h
---- a/kernel/OS/Linux/os_linux.h	2021-01-07 23:45:22.000000000 +0200
-+++ b/kernel/OS/Linux/os_linux.h	2024-05-11 01:11:40.761534524 +0300
+diff --git oss-clean/kernel/OS/Linux/os_linux.h oss-workdir/kernel/OS/Linux/os_linux.h
+index 89d5c42..a1e3360 100644
+--- oss-clean/kernel/OS/Linux/os_linux.h
++++ oss-workdir/kernel/OS/Linux/os_linux.h
 @@ -58,8 +58,8 @@
  #include <sys/file.h>
  #include "oss_ddi.h"
@@ -26,10 +26,34 @@ diff -bur a/kernel/OS/Linux/os_linux.h b/kernel/OS/Linux/os_linux.h
  #include "kernel/OS/Linux/wrapper/wrap.h"
  
  #undef HZ
-diff -bur a/lib/libossmix/libossmix_tcp.c b/lib/libossmix/libossmix_tcp.c
---- a/lib/libossmix/libossmix_tcp.c	2021-01-07 23:45:23.000000000 +0200
-+++ b/lib/libossmix/libossmix_tcp.c	2024-05-11 01:11:40.767534637 +0300
-@@ -479,7 +479,7 @@
+diff --git oss-clean/lib/libOSSlib/Makefile oss-workdir/lib/libOSSlib/Makefile
+index 98029f1..2be3082 100644
+--- oss-clean/lib/libOSSlib/Makefile
++++ oss-workdir/lib/libOSSlib/Makefile
+@@ -1,7 +1,7 @@
+ OBJS=libmain.o midiparser.o play_event.o
+ INSTALLLIB=/lib
+-LDFLAGS=-shared -fPIC
+-CFLAGS=-O -fPIC
++override LDFLAGS += -shared -fPIC
++override CFLAGS += -fPIC
+ #LDFLAGS=-Bdynamic
+ AROPTS=rc
+ AR=ar
+@@ -17,7 +17,7 @@ static: libOSSlib.a
+ 	cp libOSSlib.a $(INSTALLLIB)
+ 
+ libOSSlib.so:	$(OBJS)
+-	${CC} $(LDFLAGS) -o libOSSlib.so $(OBJS)
++	${CC} $(CFLAGS) $(LDFLAGS) -o libOSSlib.so $(OBJS)
+ 
+ dep:
+ 
+diff --git oss-clean/lib/libossmix/libossmix_tcp.c oss-workdir/lib/libossmix/libossmix_tcp.c
+index a5da6f6..98a910f 100644
+--- oss-clean/lib/libossmix/libossmix_tcp.c
++++ oss-workdir/lib/libossmix/libossmix_tcp.c
+@@ -479,7 +479,7 @@ tcp_connect (const char *remotehost, int port)
  
    if ((he = gethostbyname (remotehost)) == NULL)
      {
@@ -38,9 +62,10 @@ diff -bur a/lib/libossmix/libossmix_tcp.c b/lib/libossmix/libossmix_tcp.c
        fprintf (stderr, "Cannot find the OSSMIX server \"%s\"\n", remotehost);
        return -1;
      }
-diff -bur a/os_cmd/Linux/ossdetect/ossdetect.c b/os_cmd/Linux/ossdetect/ossdetect.c
---- a/os_cmd/Linux/ossdetect/ossdetect.c	2021-01-07 23:45:23.000000000 +0200
-+++ b/os_cmd/Linux/ossdetect/ossdetect.c	2024-05-11 01:11:40.767534637 +0300
+diff --git oss-clean/os_cmd/Linux/ossdetect/ossdetect.c oss-workdir/os_cmd/Linux/ossdetect/ossdetect.c
+index 4130851..8a89a43 100644
+--- oss-clean/os_cmd/Linux/ossdetect/ossdetect.c
++++ oss-workdir/os_cmd/Linux/ossdetect/ossdetect.c
 @@ -20,6 +20,7 @@
  #include <stdlib.h>
  #include <string.h>
@@ -49,10 +74,11 @@ diff -bur a/os_cmd/Linux/ossdetect/ossdetect.c b/os_cmd/Linux/ossdetect/ossdetec
  #include <sys/types.h>
  #include <sys/stat.h>
  #include <sys/sysmacros.h>
-diff -bur a/setup/setupdir.sh b/setup/setupdir.sh
---- a/setup/setupdir.sh	2020-09-30 22:30:10.000000000 +0300
-+++ b/setup/setupdir.sh	2024-05-11 01:11:40.768534656 +0300
-@@ -86,7 +86,7 @@
+diff --git oss-clean/setup/setupdir.sh oss-workdir/setup/setupdir.sh
+index 3e779a3..ba9980e 100644
+--- oss-clean/setup/setupdir.sh
++++ oss-workdir/setup/setupdir.sh
+@@ -86,7 +86,7 @@ echo BLDDIR=$BLDDIR > .directories
  echo SRCDIR=$SRCDIR >> .directories
  echo OSSLIBDIR=$OSSLIBDIR >> .directories
  
@@ -61,7 +87,7 @@ diff -bur a/setup/setupdir.sh b/setup/setupdir.sh
  
  # Make sure the latest soundcard.h version is installed in the system
  #rm /usr/include/sys/soundcard.h
-@@ -144,7 +144,7 @@
+@@ -144,7 +144,7 @@ then
    DTARGETOS="-D$TARGETOS"
  fi
  
@@ -70,7 +96,7 @@ diff -bur a/setup/setupdir.sh b/setup/setupdir.sh
  
  if ./srcconf $*
  then
-@@ -247,7 +247,7 @@
+@@ -247,7 +247,7 @@ fi
  # Setup the link to the right os.h file for this operating system.
  (cd kernel/framework/include;ln -s ../../../kernel/OS/$OS/os_*.h os.h)
  
@@ -79,3 +105,44 @@ diff -bur a/setup/setupdir.sh b/setup/setupdir.sh
  ./ossvers > .version
  rm ./ossvers
  
+diff --git oss-clean/setup/srcconf.c oss-workdir/setup/srcconf.c
+index 63162aa..ce88114 100644
+--- oss-clean/setup/srcconf.c
++++ oss-workdir/setup/srcconf.c
+@@ -955,14 +955,14 @@ printf("Symlink %s -> %s\n", source, target);
+   fprintf (f, "THISOS=%s\n", this_os);
+ 
+   if (config_phpmake)
+-     fprintf (f, "CFLAGS+=-D__USE_PHPMAKE__\n");
++     fprintf (f, "override CFLAGS+=-D__USE_PHPMAKE__\n");
+ 
+   if (conf.mode == MD_KERNEL || conf.mode == MD_MODULE)
+     {
+ #if defined(__SCO_VERSION__)
+-      fprintf (f, "CFLAGS=-O -D_KERNEL -D_DDI=8\n");
++      fprintf (f, "CFLAGS=-D_KERNEL -D_DDI=8\n");
+ #else
+-      fprintf (f, "CFLAGS += -D_KERNEL -fno-pic\n");
++      fprintf (f, "override CFLAGS += -D_KERNEL -fno-pic\n");
+ #endif
+ #ifdef HAVE_KERNEL_FLAGS
+       add_kernel_flags (f);
+@@ -971,15 +971,15 @@ printf("Symlink %s -> %s\n", source, target);
+ #ifndef __SCO_VERSION__
+   else
+     {
+-      fprintf (f, "CFLAGS+=-O\n");
++      fprintf (f, "override CFLAGS+=\n");
+     }
+ #endif
+ 
+ #if !defined(__SCO_VERSION__)
+   if (*conf.cflags != 0)
+-    fprintf (f, "CFLAGS += %s\n", conf.cflags);
++    fprintf (f, "override CFLAGS += %s\n", conf.cflags);
+   if (conf.mode == MD_SHLIB)
+-    fprintf (f, "CFLAGS += %s\n", shlib_cflags);
++    fprintf (f, "override CFLAGS += %s\n", shlib_cflags);
+ #endif
+   if (conf.mode != MD_KERNEL)
+     objdir = "TMPDIR";
