@@ -336,7 +336,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 
 	t.gpr_state.rdi = u64(which)
 	t.gpr_state.rsi = u64(siginfo)
-	t.gpr_state.rdx = sigaction.sa_sigaction
+	t.gpr_state.rdx = u64(sigaction.sa_sigaction)
 	t.gpr_state.rcx = u64(return_context)
 	t.gpr_state.r8 = previous_mask
 

@@ -108,8 +108,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	if unsafe { next_thread == nil } {
 		apic.lapic_eoi()
-		cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
-		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
+		cpu.set_gs_base(u64(&cpu_local.cpu_number))
+		cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
 		await()
@@ -117,11 +117,11 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	current_thread = next_thread
 
-	cpu.set_gs_base(voidptr(current_thread))
+	cpu.set_gs_base(u64(current_thread))
 	if current_thread.gpr_state.cs == 0x43 {
 		cpu.set_kernel_gs_base(current_thread.gs_base)
 	} else {
-		cpu.set_kernel_gs_base(voidptr(current_thread))
+		cpu.set_kernel_gs_base(u64(current_thread))
 	}
 	cpu.set_fs_base(current_thread.fs_base)
 
@@ -256,8 +256,8 @@ pub fn yield(save_ctx bool) {
 	if save_ctx == true {
 		current_thread.yield_await.acquire()
 	} else {
-		cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
-		cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
+		cpu.set_gs_base(u64(&cpu_local.cpu_number))
+		cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
 	}
 
 	apic.lapic_send_ipi(u8(cpu_local.lapic_id), scheduler_vector)

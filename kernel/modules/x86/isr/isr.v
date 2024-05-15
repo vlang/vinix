@@ -97,8 +97,6 @@ __global (
 	abort_vector = u8(0)
 )
 
-#include <symbols.h>
-
 fn C.interrupt_thunks()
 
 pub fn initialise() {

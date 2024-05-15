@@ -60,8 +60,8 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	pat_msr |= u64(0x0105) << 32
 	msr.wrmsr(0x277, pat_msr)
 
-	cpu.set_gs_base(voidptr(&cpu_local.cpu_number))
-	cpu.set_kernel_gs_base(voidptr(&cpu_local.cpu_number))
+	cpu.set_gs_base(u64(&cpu_local.cpu_number))
+	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
 
 	// Enable SSE/SSE2
 	mut cr0 := cpu.read_cr0()

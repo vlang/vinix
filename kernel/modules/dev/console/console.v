@@ -661,7 +661,7 @@ fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
 	}
 }
 
-pub fn flanterm_callback(p &flanterm.Context, t u64, a u64, b u64, c u64) {
+pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 	C.printf(c'Flanterm callback called\n')
 
 	match t {
@@ -673,7 +673,7 @@ pub fn flanterm_callback(p &flanterm.Context, t u64, a u64, b u64, c u64) {
 }
 
 pub fn initialise() {
-	C.flanterm_set_callback(mut flanterm_ctx, voidptr(flanterm_callback))
+	C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
 
 	console_res = &Console{}
 	console_res.stat.size = 0

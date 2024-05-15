@@ -4,20 +4,22 @@
 
 module trace
 
+#include <symbols.h>
+
 pub struct Symbol {
 pub mut:
 	address u64
 	name    charptr
 }
 
-fn C.get_symbol_table() &Symbol
+fn C.get_symbol_table() voidptr
 
 fn C.printf_panic(charptr, ...voidptr)
 
 pub fn address(addr u64) ?(u64, &Symbol) {
 	mut prev_sym := &Symbol(unsafe { nil })
 
-	symbol_table := C.get_symbol_table()
+	symbol_table := unsafe { &Symbol(C.get_symbol_table()) }
 
 	for i := u64(0); true; i++ {
 		if unsafe { symbol_table[i].address } == 0xffffffffffffffff {

@@ -11,7 +11,7 @@ import limine
 import flanterm
 
 __global (
-	flanterm_ctx &flanterm.Context
+	flanterm_ctx voidptr
 
 	terminal_print_lock klock.Lock
 	terminal_rows       = u64(0)
@@ -61,7 +61,7 @@ pub fn framebuffer_init() {
 	}
 
 	sfb_config := simple.SimpleFBConfig {
-		physical_address: framebuffer_tag.address,
+		physical_address: u64(framebuffer_tag.address),
 		width: u32(framebuffer_width),
 		height: u32(framebuffer_height),
 		stride: u32(framebuffer_tag.pitch),
@@ -93,6 +93,6 @@ pub fn framebuffer_init() {
 
 pub fn print(s voidptr, len u64) {
 	terminal_print_lock.acquire()
-	C.flanterm_write(mut flanterm_ctx, s, len)
+	C.flanterm_write(flanterm_ctx, s, len)
 	terminal_print_lock.release()
 }

@@ -9,6 +9,8 @@ import limine
 import klock
 import x86.cpu
 
+#include <kernel_end_addr.h>
+
 pub const (
 	pte_present = u64(1 << 0)
 	pte_writable = u64(1 << 1)

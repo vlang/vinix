@@ -21,8 +21,3 @@ pub fn ctype_toupper_loc() &&int {
 pub fn kexit(code int) {
 	lib.kpanic(voidptr(0), c'Kernel has called exit()')
 }
-
-@[export: 'qsort']
-pub fn qsort(ptr voidptr, count u64, size u64, comp fn (a voidptr, b voidptr) int) {
-	lib.kpanic(voidptr(0), c'qsort is a stub')
-}
