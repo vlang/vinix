@@ -1,0 +1,201 @@
+diff --git limine-clean/common/lib/gterm.c limine-workdir/common/lib/gterm.c
+index efd5367..cf7f7a0 100644
+--- limine-clean/common/lib/gterm.c
++++ limine-workdir/common/lib/gterm.c
+@@ -14,6 +14,8 @@
+ #include <flanterm/backends/fb.h>
+ #include <lib/term.h>
+ 
++struct flanterm_info flanterm_info = {0};
++
+ // Builtin font originally taken from:
+ // https://github.com/viler-int10h/vga-text-mode-fonts/raw/master/FONTS/PC-OTHER/TOSH-SAT.F16
+ static const uint8_t builtin_font[] = {
+@@ -282,6 +284,8 @@ static size_t margin_gradient = 4;
+ 
+ static uint32_t default_bg, default_fg;
+ static uint32_t default_bg_bright, default_fg_bright;
++static uint32_t ansi_colours[8];
++static uint32_t ansi_bright_colours[8];
+ 
+ static size_t bg_canvas_size;
+ static uint32_t *bg_canvas;
+@@ -497,8 +501,6 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
+     margin = 64;
+     margin_gradient = 4;
+ 
+-    uint32_t ansi_colours[8];
+-
+     ansi_colours[0] = 0x00000000; // black
+     ansi_colours[1] = 0x00aa0000; // red
+     ansi_colours[2] = 0x0000aa00; // green
+@@ -524,8 +526,6 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
+         }
+     }
+ 
+-    uint32_t ansi_bright_colours[8];
+-
+     ansi_bright_colours[0] = 0x00555555; // black
+     ansi_bright_colours[1] = 0x00ff5555; // red
+     ansi_bright_colours[2] = 0x0055ff55; // green
+@@ -721,16 +721,34 @@ no_load_font:;
+                             font_scale_x, font_scale_y,
+                             margin);
+ 
+-        if (terms[terms_i] != NULL) {
+-            terms_i++;
++        if (terms_i == 0) {
++            flanterm_info.valid = true;
++            flanterm_info.canvas = bg_canvas;
++            flanterm_info.ansi_colours = ansi_colours;
++            flanterm_info.ansi_bright_colours = ansi_bright_colours;
++            flanterm_info.default_bg = &default_bg;
++            flanterm_info.default_fg = &default_fg;
++            flanterm_info.default_bg_bright = &default_bg_bright;
++            flanterm_info.default_fg_bright = &default_fg_bright;
++            flanterm_info.font = font;
++            flanterm_info.font_width = font_width;
++            flanterm_info.font_height = font_height;
++            flanterm_info.font_spacing = font_spacing;
++            flanterm_info.font_scale_x = font_scale_x;
++            flanterm_info.font_scale_y = font_scale_y;
++            flanterm_info.margin = margin;
+         }
+ 
+-        if (bg_canvas != NULL) {
++        if (terms_i != 0 && bg_canvas != NULL) {
+             pmm_free(bg_canvas, bg_canvas_size);
+         }
++
++        if (terms[terms_i] != NULL) {
++            terms_i++;
++        }
+     }
+ 
+-    pmm_free(font, FONT_MAX);
++    //pmm_free(font, FONT_MAX);
+ 
+     if (background != NULL) {
+         image_close(background);
+diff --git limine-clean/common/lib/gterm.h limine-workdir/common/lib/gterm.h
+index ec579dc..0ef33cb 100644
+--- limine-clean/common/lib/gterm.h
++++ limine-workdir/common/lib/gterm.h
+@@ -8,4 +8,24 @@
+ bool gterm_init(struct fb_info **ret, size_t *_fbs_count,
+                 char *config, size_t width, size_t height);
+ 
++struct flanterm_info {
++    bool valid;
++    uint32_t *canvas;
++    uint32_t *ansi_colours;
++    uint32_t *ansi_bright_colours;
++    uint32_t *default_bg;
++    uint32_t *default_fg;
++    uint32_t *default_bg_bright;
++    uint32_t *default_fg_bright;
++    void *font;
++    size_t font_width;
++    size_t font_height;
++    size_t font_spacing;
++    size_t font_scale_x;
++    size_t font_scale_y;
++    size_t margin;
++};
++
++extern struct flanterm_info flanterm_info;
++
+ #endif
+diff --git limine-clean/common/protos/limine.c limine-workdir/common/protos/limine.c
+index 1cbdea5..ac5acf6 100644
+--- limine-clean/common/protos/limine.c
++++ limine-workdir/common/protos/limine.c
+@@ -865,7 +865,8 @@ FEAT_END
+ 
+     size_t req_width = 0, req_height = 0, req_bpp = 0;
+ 
+-    char *resolution = config_get_value(config, 0, "RESOLUTION");
++    //char *resolution = config_get_value(config, 0, "RESOLUTION");
++    char *resolution = config_get_value(NULL, 0, "INTERFACE_RESOLUTION");
+     if (resolution != NULL) {
+         parse_resolution(&req_width, &req_height, &req_bpp, resolution);
+     }
+@@ -941,6 +942,39 @@ FEAT_START
+ FEAT_END
+ 
+ no_fb:
++
++FEAT_START
++    if (flanterm_info.valid == false) {
++        break;
++    }
++
++    struct limine_flanterm_info_request *flanterm_info_request = get_request(LIMINE_FLANTERM_INFO_REQUEST);
++    if (flanterm_info_request == NULL) {
++        break; // next feature
++    }
++
++    struct limine_flanterm_info_response *flanterm_info_response =
++        ext_mem_alloc(sizeof(struct limine_flanterm_info_response));
++
++    flanterm_info_response->canvas = reported_addr(flanterm_info.canvas);
++    flanterm_info_response->ansi_colours = reported_addr(flanterm_info.ansi_colours);
++    flanterm_info_response->ansi_bright_colours = reported_addr(flanterm_info.ansi_bright_colours);
++    flanterm_info_response->default_bg = reported_addr(flanterm_info.default_bg);
++    flanterm_info_response->default_fg = reported_addr(flanterm_info.default_fg);
++    flanterm_info_response->default_bg_bright = reported_addr(flanterm_info.default_bg_bright);
++    flanterm_info_response->default_fg_bright = reported_addr(flanterm_info.default_fg_bright);
++    flanterm_info_response->font = reported_addr(flanterm_info.font);
++    flanterm_info_response->font_width = flanterm_info.font_width;
++    flanterm_info_response->font_height = flanterm_info.font_height;
++    flanterm_info_response->font_spacing = flanterm_info.font_spacing;
++    flanterm_info_response->font_scale_x = flanterm_info.font_scale_x;
++    flanterm_info_response->font_scale_y = flanterm_info.font_scale_y;
++    flanterm_info_response->margin = flanterm_info.margin;
++
++    flanterm_info_request->response = reported_addr(flanterm_info_response);
++FEAT_END
++
++
+     // Boot time feature
+ FEAT_START
+     struct limine_boot_time_request *boot_time_request = get_request(LIMINE_BOOT_TIME_REQUEST);
+diff --git limine-clean/limine.h limine-workdir/limine.h
+index 04d9691..28db6b6 100644
+--- limine-clean/limine.h
++++ limine-workdir/limine.h
+@@ -534,6 +534,34 @@ struct limine_efi_memmap_request {
+     LIMINE_PTR(struct limine_efi_memmap_response *) response;
+ };
+ 
++/* Flanterm info */
++
++#define LIMINE_FLANTERM_INFO_REQUEST { LIMINE_COMMON_MAGIC, 0xa175fd375a3e6650, 0x83be3f8b19e6e286 }
++
++struct limine_flanterm_info_response {
++    uint64_t revision;
++    LIMINE_PTR(uint32_t *) canvas;
++    LIMINE_PTR(uint32_t *) ansi_colours;
++    LIMINE_PTR(uint32_t *) ansi_bright_colours;
++    LIMINE_PTR(uint32_t *) default_bg;
++    LIMINE_PTR(uint32_t *) default_fg;
++    LIMINE_PTR(uint32_t *) default_bg_bright;
++    LIMINE_PTR(uint32_t *) default_fg_bright;
++    LIMINE_PTR(void *) font;
++    uint64_t font_width;
++    uint64_t font_height;
++    uint64_t font_spacing;
++    uint64_t font_scale_x;
++    uint64_t font_scale_y;
++    uint64_t margin;
++};
++
++struct limine_flanterm_info_request {
++    uint64_t id[4];
++    uint64_t revision;
++    LIMINE_PTR(struct limine_flanterm_info_response *) response;
++};
++
+ /* Boot time */
+ 
+ #define LIMINE_BOOT_TIME_REQUEST { LIMINE_COMMON_MAGIC, 0x502746e184c088aa, 0xfbc5ec83e6327893 }

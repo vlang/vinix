@@ -332,6 +332,37 @@ pub mut:
 	response &LimineEFISystemTableResponse
 }
 
+// Flanterm info
+
+pub struct LimineFlantermInfoResponse {
+pub mut:
+	revision u64
+	canvas &u32
+	ansi_colours &u32
+	ansi_bright_colours &u32
+	default_bg &u32
+	default_fg &u32
+	default_bg_bright &u32
+	default_fg_bright &u32
+	font voidptr
+	font_width u64
+	font_height u64
+	font_spacing u64
+	font_scale_x u64
+	font_scale_y u64
+	margin u64
+}
+
+pub struct LimineFlantermInfoRequest {
+pub mut:
+	id [4]u64 = [
+		u64(0xc7b1dd30df4c8b88), 0x0a82e883a194f07b,
+		0xa175fd375a3e6650, 0x83be3f8b19e6e286
+	]!
+	revision u64
+	response &LimineFlantermInfoResponse
+}
+
 // Boot time
 
 pub struct LimineBootTimeResponse {
