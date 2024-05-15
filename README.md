@@ -40,10 +40,10 @@ on real hardware.
 - [x] storage drivers
 - [x] ext2
 - [x] X.org
+- [x] X window manager
 - [ ] Networking
 - [ ] Wayland 
 - [ ] Hypervisor
-- [ ] X window manager
 - [ ] V-UI
 - [ ] Intel HD graphics driver (Linux port)
 ## Build instructions
@@ -54,22 +54,24 @@ The following is a distro-agnostic list of packages needed to build Vinix.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU make`, `diffutils`, `curl`, `git`, `bsdtar`, `rsync`, `xorriso`, and `qemu`
+`GNU make`, `findutils`, `curl`, `git`, `bsdtar`, `zstd`, `rsync`, `xorriso`, and `qemu`
 to test it.
+
+Additionally a working C compiler (`cc`) needs to be present.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install -y make diffutils curl git libarchive-tools rsync xorriso qemu-system-x86
+sudo apt install -y build-essential make findutils curl git libarchive-tools zstd rsync xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed make diffutils curl git libarchive rsync xorriso qemu
+sudo pacman -S --needed gcc make findutils curl git libarchive zstd rsync xorriso qemu
 ```
 
 ### Build prerequisites for Red Hat Linux and derivatives
 ```bash
-sudo yum install -y make diffutils curl git bsdtar rsync xorriso qemu
+sudo yum install -y gcc make findutils curl git bsdtar zstd rsync xorriso qemu
 ```
 
 ### Building the distro
