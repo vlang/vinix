@@ -15,7 +15,6 @@ ENTRY(main__kmain)
 /* MMU permissions */
 PHDRS
 {
-    requests PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
     text     PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
     rodata   PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
     data     PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
@@ -29,22 +28,18 @@ SECTIONS
     /* that is the beginning of the region. */
     . = 0xffffffff80000000;
 
-    /* Define a section to contain the Limine requests and assign it to its own PHDR */
-    .requests : {
-        KEEP(*(.requests_start_marker))
-        KEEP(*(.requests))
-        KEEP(*(.requests_end_marker))
-    } :requests
-
-    /* Move to the next memory page for .text */
-    . += CONSTANT(MAXPAGESIZE);
+    text_start = .;
 
     .text : {
         *(.text .text.*)
     } :text
 
+    text_end = .;
+
     /* Move to the next memory page for .rodata */
-    . += CONSTANT(MAXPAGESIZE);
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    rodata_start = .;
 
     .rodata : {
         *(.rodata .rodata.*)
@@ -54,11 +49,19 @@ SECTIONS
         *(.symbol_table)
     } :rodata
 
+    rodata_end = .;
+
     /* Move to the next memory page for .data */
-    . += CONSTANT(MAXPAGESIZE);
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    data_start = .;
 
     .data : {
         *(.data .data.*)
+
+        KEEP(*(.requests_start_marker))
+        KEEP(*(.requests))
+        KEEP(*(.requests_end_marker))
     } :data
 
     /* NOTE: .bss needs to be the last thing mapped to :data, otherwise lots of */
@@ -70,7 +73,7 @@ SECTIONS
         *(COMMON)
     } :data
 
-    KERNEL_END_SYMBOL = .;
+    data_end = .;
 
     /* Discard .note.* and .eh_frame since they may cause issues on some hosts. */
     /DISCARD/ : {

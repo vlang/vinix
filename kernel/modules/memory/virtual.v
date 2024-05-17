@@ -9,12 +9,18 @@ import limine
 import klock
 import x86.cpu
 
-#include <kernel_end_addr.h>
+fn C.text_start()
+fn C.text_end()
+fn C.rodata_start()
+fn C.rodata_end()
+fn C.data_start()
+fn C.data_end()
 
 pub const (
-	pte_present = u64(1 << 0)
-	pte_writable = u64(1 << 1)
-	pte_user = u64(1 << 2)
+	pte_present = u64(1) << 0
+	pte_writable = u64(1) << 1
+	pte_user = u64(1) << 2
+	pte_noexec = u64(1) << 63
 )
 
 __global (
@@ -165,6 +171,18 @@ __global (
 	}
 )
 
+fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
+	aligned_len := lib.align_up(len, page_size)
+
+	print('vmm: Kernel: Mapping at 0x${phys:x} to 0x${virt:x}, length: 0x${aligned_len:x}\n')
+
+	for i := u64(0); i < aligned_len; i += page_size {
+		kernel_pagemap.map_page(virt + i, phys + i, flags) or {
+			panic('vmm init failure')
+		}
+	}
+}
+
 pub fn vmm_init() {
 	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
 	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
@@ -183,19 +201,26 @@ pub fn vmm_init() {
 	}
 
 	// Map kernel
-	virt := kaddr_req.response.virtual_base
-	phys := kaddr_req.response.physical_base
-	// Subtract the kernel virtual base from the kernel's end address
-	// to get the kernel span
-	len := lib.align_up(C.get_kernel_end_addr(), page_size) - virt
+	virtual_base := kaddr_req.response.virtual_base
+	physical_base := kaddr_req.response.physical_base
 
-	print('vmm: PMRs: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${len:x}\n')
+	// Map kernel text
+	text_virt := u64(voidptr(C.text_start))
+	text_phys := (text_virt - virtual_base) + physical_base
+	text_len := u64(voidptr(C.text_end)) - text_virt
+	map_kernel_span(text_virt, text_phys, text_len, pte_present)
 
-	for j := u64(0); j < len; j += page_size {
-		kernel_pagemap.map_page(virt + j, phys + j, 0x03) or {
-			panic('vmm init failure')
-		}
-	}
+	// Map kernel rodata
+	rodata_virt := u64(voidptr(C.rodata_start))
+	rodata_phys := (rodata_virt - virtual_base) + physical_base
+	rodata_len := u64(voidptr(C.rodata_end)) - rodata_virt
+	map_kernel_span(rodata_virt, rodata_phys, rodata_len, pte_present | pte_noexec)
+
+	// Map kernel data
+	data_virt := u64(voidptr(C.data_start))
+	data_phys := (data_virt - virtual_base) + physical_base
+	data_len := u64(voidptr(C.data_end)) - data_virt
+	map_kernel_span(data_virt, data_phys, data_len, pte_present | pte_noexec | pte_writable)
 
 	for i := u64(0x1000); i < 0x100000000; i += page_size {
 		kernel_pagemap.map_page(i, i, 0x03) or { panic('vmm init failure') }
