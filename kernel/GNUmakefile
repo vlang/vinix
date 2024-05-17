@@ -86,6 +86,9 @@ obj/c/printf/printf.c.o: override KCPPFLAGS += \
     -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
+obj/c/flanterm/backends/fb.c.o: override KCPPFLAGS += \
+	-DFLANTERM_FB_DISABLE_BUMP_ALLOC
+
 override KLDFLAGS += \
     -m elf_x86_64 \
     -nostdlib \
