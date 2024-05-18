@@ -147,8 +147,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					page := memory.pmm_alloc_nozero(1)
 					unsafe {
 						C.memcpy(voidptr(u64(page) + higher_half), voidptr(
-							(*old_pte & ~(u64(0xfff))) + higher_half), page_size)
-						*new_pte = (*old_pte & u64(0xfff)) | u64(page)
+							(*old_pte & memory.pte_flags_mask) + higher_half), page_size)
+						*new_pte = (*old_pte & ~memory.pte_flags_mask) | u64(page)
 						*new_spte = *new_pte
 					}
 				}
@@ -169,6 +169,9 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 	mut pt_flags := memory.pte_present | memory.pte_user
 	if prot & mmap.prot_write != 0 {
 		pt_flags |= memory.pte_writable
+	}
+	if prot & mmap.prot_exec == 0 {
+		pt_flags |= memory.pte_noexec
 	}
 
 	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return none }

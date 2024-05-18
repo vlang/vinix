@@ -21,6 +21,7 @@ pub const (
 	pte_writable = u64(1) << 1
 	pte_user = u64(1) << 2
 	pte_noexec = u64(1) << 63
+	pte_flags_mask = ~(u64(0xfff) | pte_present | pte_writable | pte_user | pte_noexec)
 )
 
 __global (
@@ -77,7 +78,7 @@ pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 	if unsafe { *pte_p } & 1 == 0 {
 		return none
 	}
-	return unsafe { *pte_p } & ~u64(0xfff)
+	return unsafe { *pte_p } & pte_flags_mask
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {
@@ -98,7 +99,7 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 	// Check if entry is present
 	if unsafe { *entry } & 0x01 != 0 {
 		// If present, return pointer to it
-		ret = &u64(unsafe { *entry } & ~u64(0xfff))
+		ret = &u64(unsafe { *entry } & pte_flags_mask)
 	} else {
 		if allocate == false {
 			return none
@@ -130,7 +131,7 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 		return none
 	}
 
-	unsafe { *pte_p &= ~u64(0xfff) }
+	unsafe { *pte_p &= pte_flags_mask }
 	unsafe { *pte_p |= flags }
 
 	current_cr3 := cpu.read_cr3()
