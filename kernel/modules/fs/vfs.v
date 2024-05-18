@@ -476,8 +476,6 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 		free(target_node.children)
 	}
 
-	mut filesystem := target_node.filesystem
-
 	parent_of_tgt_node.children.delete(basename)
 
 	return 0, 0
