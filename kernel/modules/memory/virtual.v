@@ -174,7 +174,7 @@ __global (
 fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
 	aligned_len := lib.align_up(len, page_size)
 
-	print('vmm: Kernel: Mapping at 0x${phys:x} to 0x${virt:x}, length: 0x${aligned_len:x}\n')
+	print('vmm: Kernel: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${aligned_len:x}\n')
 
 	for i := u64(0); i < aligned_len; i += page_size {
 		kernel_pagemap.map_page(virt + i, phys + i, flags) or {
