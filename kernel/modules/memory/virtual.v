@@ -222,9 +222,8 @@ pub fn vmm_init() {
 	data_len := u64(voidptr(C.data_end)) - data_virt
 	map_kernel_span(data_virt, data_phys, data_len, pte_present | pte_noexec | pte_writable)
 
-	for i := u64(0x1000); i < 0x100000000; i += page_size {
-		kernel_pagemap.map_page(i, i, 0x03) or { panic('vmm init failure') }
-		kernel_pagemap.map_page(i + higher_half, i, 0x03) or { panic('vmm init failure') }
+	for i := u64(0); i < 0x100000000; i += page_size {
+		kernel_pagemap.map_page(i + higher_half, i, pte_present | pte_noexec | pte_writable) or { panic('vmm init failure') }
 	}
 
 	memmap := memmap_req.response
@@ -240,8 +239,7 @@ pub fn vmm_init() {
 			if j < u64(0x100000000) {
 				continue
 			}
-			kernel_pagemap.map_page(j, j, 0x03) or { panic('vmm init failure') }
-			kernel_pagemap.map_page(j + higher_half, j, 0x03) or { panic('vmm init failure') }
+			kernel_pagemap.map_page(j + higher_half, j, pte_present | pte_noexec | pte_writable) or { panic('vmm init failure') }
 		}
 	}
 
