@@ -1,7 +1,7 @@
 name=libtool
-version=2.4.7
-tarball_url="https://ftp.gnu.org/gnu/libtool/libtool-${version}.tar.gz"
-tarball_blake2b="3b7c66050237931443008d6be9c0c30f4938402bf68576cdf02f2248b216bb68c6b797bbfdb8a92caa5e12cb10208cd19771cdcb6b0d83572ad60bfc03e67e98"
+version=2.5.0
+tarball_url="https://alpha.gnu.org/gnu/libtool/libtool-${version}.tar.gz"
+tarball_blake2b="83494eac1b4c6313bbf58098e4b5f8512022f9730b78dd61736c55783fb4e5444eb1f8aaf13ce259fe7e13225e6fa563440ad74856bde20bde7021e7e3378e3d"
 hostdeps="autoconf automake gnulib"
 imagedeps="help2man"
 
