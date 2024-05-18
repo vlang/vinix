@@ -205,7 +205,11 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 		return none
 	}
 	if follow_links == true {
-		return reduce_node(node, true)
+		ret := reduce_node(node, true)
+		if unsafe { ret == 0 } {
+			return none
+		}
+		return ret
 	}
 	return node
 }
@@ -340,9 +344,24 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 		return none
 	}
 
-	if stat.isdir(node.resource.stat.mode) && remove_dir == false {
-		errno.set(errno.eisdir)
-		return none
+	if stat.isdir(node.resource.stat.mode) {
+		if remove_dir == false {
+			errno.set(errno.eisdir)
+			return none
+		}
+
+		if node.children.len > 2 {
+			errno.set(errno.enotempty)
+			return none
+		}
+
+		unsafe {
+			free(node.children['.'].children)
+			free(node.children['.'])
+			free(node.children['..'].children)
+			free(node.children['..'])
+			free(node.children)
+		}
 	}
 
 	parent_of_tgt.children.delete(basename)
@@ -411,6 +430,55 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	remove_dir := flags & fs.at_removedir != 0
 
 	unlink(parent, path, remove_dir) or { return errno.err, errno.get() }
+
+	return 0, 0
+}
+
+pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: rmdirat(%d, %s)\n', process.name.str, dirfd, _path)
+	defer {
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	if path.len == 0 {
+		return errno.err, errno.enoent
+	}
+
+	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+
+	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, path)
+
+	if unsafe { parent_of_tgt_node == 0 } {
+		return errno.err, errno.enoent
+	}
+
+	if unsafe { target_node == 0 } {
+		return errno.err, errno.enoent
+	}
+
+	if target_node.children.len > 2 {
+		return errno.err, errno.enotempty
+	}
+
+	target_node.resource.unlink(unsafe { nil }) or {}
+	target_node.resource.unref(unsafe { nil }) or {}
+
+	unsafe {
+		free(target_node.children['.'].children)
+		free(target_node.children['.'])
+		free(target_node.children['..'].children)
+		free(target_node.children['..'])
+		free(target_node.children)
+	}
+
+	mut filesystem := target_node.filesystem
+
+	parent_of_tgt_node.children.delete(basename)
 
 	return 0, 0
 }

@@ -101,6 +101,16 @@ fn (mut this DevTmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) 
 
 fn (mut this DevTmpFSResource) unref(handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
+
+	if this.refcount != 0 {
+		return
+	}
+
+	if stat.isreg(this.stat.mode) {
+		memory.free(this.storage)
+	}
+
+	unsafe { free(this) }
 }
 
 fn (mut this DevTmpFSResource) link(handle voidptr) ? {
