@@ -1,0 +1,12 @@
+diff --git gdbm-clean/tools/var.c gdbm-workdir/tools/var.c
+index ccec5b9..39371d2 100644
+--- gdbm-clean/tools/var.c
++++ gdbm-workdir/tools/var.c
+@@ -14,6 +14,7 @@
+    You should have received a copy of the GNU General Public License
+    along with GDBM. If not, see <http://www.gnu.org/licenses/>.    */
+ 
++#include <strings.h>
+ #include "gdbmtool.h"
+ 
+ #define VARF_DFL    0x00   /* Default flags -- everything disabled */

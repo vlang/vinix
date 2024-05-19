@@ -1,0 +1,28 @@
+name=gdbm
+version=1.23
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/gdbm/gdbm-${version}.tar.gz"
+tarball_blake2b="a47746577cf2f3c9b62faea496c4d6a50a8f1b0a5af448cb2215e90057c99b5b630ba3f5357c85dfb7fd98ba4e90969e30a779120c29106ed1e8736721f9bec1"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs readline"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    cp -rp "${source_dir}"/. ./
+
+        configure_script_path=./configure \
+    autotools_configure \
+        --enable-libgdbm-compat
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}
