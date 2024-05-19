@@ -47,5 +47,8 @@ build() {
 package() {
     DESTDIR="${dest_dir}" make install
 
+    mkdir -p "${dest_dir}"/etc/X11
+    cp -v "${base_dir}"/build-support/xorg-server/xorg.conf "${dest_dir}"/etc/X11/
+
     post_package_strip
 }
