@@ -1,0 +1,25 @@
+name=xorg-xinit
+version=1.4.2
+revision=1
+tarball_url="https://www.x.org/releases/individual/app/xinit-${version}.tar.xz"
+tarball_blake2b="8f5c16d5ec9cc16c734b1661def4f7e68321259f24e7aac2b039b8e142fb4a324d2471a0f04d3b4448ae713082ad9ec7018083b00ed1a93aac90fa7db172247d"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libx11 xorg-xauth xorg-xmodmap xorg-xrdb"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure
+
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

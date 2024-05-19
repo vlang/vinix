@@ -1,0 +1,36 @@
+diff --git xorg-xinit-clean/configure.ac xorg-xinit-workdir/configure.ac
+index a40ac46..032b397 100644
+--- xorg-xinit-clean/configure.ac
++++ xorg-xinit-workdir/configure.ac
+@@ -139,19 +139,19 @@ AC_PATH_PROGS(MCOOKIE, [mcookie], [$MCOOKIE],
+   [$PATH:/bin:/usr/bin:/usr/lib:/usr/libexec:/usr/local/bin])
+ 
+ # If mcookie not found, try openssl, else per-system fallbacks
+-if test "x$MCOOKIE" = x ; then
+-    AC_PATH_PROGS(OPENSSL, [openssl], [$OPENSSL],
+-        [$PATH:/bin:/usr/bin:/usr/sbin:/usr/lib:/usr/libexec:/usr/local/bin])
+-    if test "x$OPENSSL" != x ; then
+-        MCOOKIE="$OPENSSL rand -hex 16"
+-    else
+-        case $host_os in
+-            *solaris*)
++#if test "x$MCOOKIE" = x ; then
++#    AC_PATH_PROGS(OPENSSL, [openssl], [$OPENSSL],
++#        [$PATH:/bin:/usr/bin:/usr/sbin:/usr/lib:/usr/libexec:/usr/local/bin])
++#    if test "x$OPENSSL" != x ; then
++#        MCOOKIE="$OPENSSL rand -hex 16"
++#    else
++#        case $host_os in
++#            *solaris*)
+                 MCOOKIE="/usr/bin/od -X -A n -N 16 /dev/urandom | /usr/bin/tr -d ' '"
+-                ;;
+-        esac
+-    fi
+-fi
++#                ;;
++#        esac
++#    fi
++#fi
+ if test "x$MCOOKIE" != x ; then
+ 	STARTX_COOKIE_FLAGS='-DHAS_COOKIE_MAKER -DMK_COOKIE="$(MCOOKIE)"'
+ 	AC_MSG_NOTICE([startx will depend on "$MCOOKIE" to generate xauth cookies])
