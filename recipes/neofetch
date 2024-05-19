@@ -7,5 +7,5 @@ deps="bash"
 
 package() {
     mkdir -p "${dest_dir}"/usr/bin
-    cp -f "${source_dir}"/neofetch "${dest_dir}"/usr/bin/neofetch
+    cp -pv "${source_dir}"/neofetch "${dest_dir}"/usr/bin/neofetch
 }
