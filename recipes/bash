@@ -48,8 +48,8 @@ package() {
     ln -s bash "${dest_dir}${prefix}"/bin/rbash
 
     mkdir -p "${dest_dir}"/etc
-    cp "${base_dir}"/build-support/bash/bash.bashrc "${dest_dir}"/etc/
-    cp "${base_dir}"/build-support/bash/bash.bash_logout "${dest_dir}"/etc/
+    cp -v "${base_dir}"/build-support/bash/bash.bashrc "${dest_dir}"/etc/
+    cp -v "${base_dir}"/build-support/bash/bash.bash_logout "${dest_dir}"/etc/
 
     post_package_strip
 }
