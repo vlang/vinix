@@ -9,7 +9,6 @@ import dev.fbdev.api
 import dev.fbdev.simple
 import limine
 import flanterm
-import memory
 
 __global (
 	flanterm_ctx voidptr
@@ -28,10 +27,6 @@ __global (
 	volatile fb_req = limine.LimineFramebufferRequest{
 		response: unsafe { nil }
 	}
-
-	volatile flanterm_info_req = limine.LimineFlantermInfoRequest{
-		response: unsafe { nil }
-	}
 )
 
 pub fn initialise() {
@@ -39,35 +34,18 @@ pub fn initialise() {
 	framebuffer_width = framebuffer_tag.width
 	framebuffer_height = framebuffer_tag.height
 
-	mut flanterm_info := &limine.LimineFlantermInfoResponse{
-		canvas: unsafe { nil }
-		ansi_colours: unsafe { nil }
-		ansi_bright_colours: unsafe { nil }
-		default_bg: unsafe { nil }
-		default_fg: unsafe { nil }
-		default_bg_bright: unsafe { nil }
-		default_fg_bright: unsafe { nil }
-		font: unsafe { nil }
-		font_spacing: 1
-	}
-	if flanterm_info_req.response != unsafe { nil } {
-		unsafe { *flanterm_info = *flanterm_info_req.response }
-	}
-
-	flanterm_ctx = unsafe { C.flanterm_fb_init(voidptr(memory.malloc), voidptr(memory.free),
+	flanterm_ctx = unsafe { C.flanterm_fb_init(nil, nil,
 											   framebuffer_tag.address, framebuffer_width, framebuffer_height, framebuffer_tag.pitch,
 											   framebuffer_tag.red_mask_size, framebuffer_tag.red_mask_shift,
 											   framebuffer_tag.green_mask_size, framebuffer_tag.green_mask_shift,
 											   framebuffer_tag.blue_mask_size, framebuffer_tag.blue_mask_shift,
-											   flanterm_info.canvas,
-											   flanterm_info.ansi_colours, flanterm_info.ansi_bright_colours,
-											   flanterm_info.default_bg, flanterm_info.default_fg,
-											   flanterm_info.default_bg_bright, flanterm_info.default_fg_bright,
-											   flanterm_info.font,
-											   flanterm_info.font_width, flanterm_info.font_height,
-											   flanterm_info.font_spacing,
-											   flanterm_info.font_scale_x, flanterm_info.font_scale_y,
-											   flanterm_info.margin) }
+											   nil,
+											   nil, nil,
+											   nil, nil,
+											   nil, nil,
+											   nil, 0, 0, 1,
+											   0, 0,
+											   0) }
 
 	terminal_rows = C.flanterm_get_rows(flanterm_ctx)
 	terminal_cols = C.flanterm_get_cols(flanterm_ctx)
