@@ -1,0 +1,27 @@
+name=groff
+version=1.23.0
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/groff/groff-${version}.tar.gz"
+tarball_blake2b="9fc5a2302f034761a17f0639a04b82c536ba8a7db15b062dd736e0011fc5a27fddcaf035af128d09f06762825d9bb965e8f5561e4be7a9fea3fe86ca5f6cb2dd"
+source_hostdeps="automake autoconf libtool pkg-config"
+imagedeps="groff"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    autotools_configure
+
+    make -j${parallelism} GROFFBIN=/usr/bin/groff
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    rm -f "${dest_dir}${prefix}/lib/charset.alias"
+
+    post_package_strip
+}
