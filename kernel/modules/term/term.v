@@ -9,6 +9,7 @@ import dev.fbdev.api
 import dev.fbdev.simple
 import limine
 import flanterm
+import memory
 
 __global (
 	flanterm_ctx voidptr
@@ -34,7 +35,7 @@ pub fn initialise() {
 	framebuffer_width = framebuffer_tag.width
 	framebuffer_height = framebuffer_tag.height
 
-	flanterm_ctx = unsafe { C.flanterm_fb_init(nil, nil,
+	flanterm_ctx = unsafe { C.flanterm_fb_init(voidptr(memory.malloc), voidptr(memory.free),
 											   framebuffer_tag.address, framebuffer_width, framebuffer_height, framebuffer_tag.pitch,
 											   framebuffer_tag.red_mask_size, framebuffer_tag.red_mask_shift,
 											   framebuffer_tag.green_mask_size, framebuffer_tag.green_mask_shift,
