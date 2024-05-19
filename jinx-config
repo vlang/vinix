@@ -51,7 +51,7 @@ autotools_recursive_regen() {
         ACLOCAL_INCLUDE="-I${sysroot_dir}/usr/share/aclocal"
     fi
 
-    for f in $(find . -name configure.ac -o -name configure.in -type f); do
+    for f in $(find . -name configure.ac -o -name configure.in -type f | sort); do
         echo "* autotools regen in '$(dirname $f)'..."
         ( cd "$(dirname "$f")" && autoreconf -fvi "$@" $ACLOCAL_INCLUDE )
     done
