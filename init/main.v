@@ -21,10 +21,7 @@ fn main() {
 	os.setenv('MAIL', '/var/mail', true)
 	os.setenv('XDG_RUNTIME_DIR', '/run', true)
 
-	// FIXME: Doing this instead of the cd bellow causes the system to need
-	// 2 spaces instead of one in the login tty
-	// ??????????????????
-	// os.chdir('/root') or { panic('Could not move to root') }
+	os.chdir('/root') or { panic('Could not move to root') }
 
 	// Read hostname from /etc/hostname and pass to the kernel.
 	hostname_file := os.read_file('/etc/hostname') or { 'vinix' }
@@ -35,6 +32,6 @@ fn main() {
 	C.sethostname(hostname_file[..length].str, length)
 
 	for {
-		os.system('cd ~ && bash --login')
+		os.system("exec -a '-bash' bash --login")
 	}
 }

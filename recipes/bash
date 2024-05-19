@@ -26,6 +26,13 @@ regenerate() {
 }
 
 build() {
+        CFLAGS="$CFLAGS \
+            -DDEFAULT_PATH_VALUE='\"/usr/local/sbin:/usr/local/bin:/usr/bin\"' \
+            -DSTANDARD_UTILS_PATH='\"/usr/bin\"' \
+            -DSYS_BASHRC='\"/etc/bash.bashrc\"' \
+            -DSYS_BASH_LOGOUT='\"/etc/bash.bash_logout\"' \
+            -DNON_INTERACTIVE_LOGIN_SHELLS \
+        " \
     autotools_configure \
         --with-curses \
         --enable-readline \
@@ -38,6 +45,11 @@ build() {
 package() {
     make install DESTDIR="${dest_dir}"
     ln -s bash "${dest_dir}${prefix}"/bin/sh
+    ln -s bash "${dest_dir}${prefix}"/bin/rbash
+
+    mkdir -p "${dest_dir}"/etc
+    cp "${base_dir}"/build-support/bash/bash.bashrc "${dest_dir}"/etc/
+    cp "${base_dir}"/build-support/bash/bash.bash_logout "${dest_dir}"/etc/
 
     post_package_strip
 }
