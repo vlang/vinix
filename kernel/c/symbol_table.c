@@ -5,11 +5,10 @@
 #include <stdint.h>
 #include <symbols.h>
 
-__attribute__((section(".symbol_table")))
-struct symbol symbol_table[] = {
+const struct symbol symbol_table[] = {
     {0xffffffffffffffff, ""}
 };
 
-struct symbol *get_symbol_table(void) {
+const struct symbol *get_symbol_table(void) {
     return symbol_table;
 }

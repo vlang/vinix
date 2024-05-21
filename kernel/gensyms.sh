@@ -37,8 +37,7 @@ struct symbol {
 	char *string;
 };
 
-__attribute__((section(".symbol_table")))
-struct symbol symbol_table[] = {
+const struct symbol symbol_table[] = {
 EOF
 
 paste -d'$' "$TMP2" "$TMP3" | sed "s/^/    {0x/g;s/\\\$/, \"/g;s/\$/\"},/g"
@@ -47,7 +46,7 @@ cat <<EOF
     {0xffffffffffffffff, ""}
 };
 
-struct symbol *get_symbol_table(void) {
+const struct symbol *get_symbol_table(void) {
     return symbol_table;
 }
 EOF

@@ -45,10 +45,6 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
-    .symbol_table : {
-        *(.symbol_table)
-    } :rodata
-
     rodata_end = .;
 
     /* Move to the next memory page for .data */

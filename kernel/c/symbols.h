@@ -21,6 +21,6 @@ struct symbol {
 	char *string;
 };
 
-struct symbol *get_symbol_table(void);
+const struct symbol *get_symbol_table(void);
 
 #endif
