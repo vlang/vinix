@@ -24,7 +24,6 @@ fn main() {
 				println('')
 				println('Options:')
 				println('--help          display this help')
-				println('--help          display this help')
 				println('-t <filesystem> filesystem to mount')
 				exit(0)
 			}
