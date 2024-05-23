@@ -116,9 +116,58 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 }
 
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
-	pte_p := pagemap.virt2pte(virt, false) or { return none }
+	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
+	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
+	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
+	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
-	unsafe { *pte_p = 0 }
+	mut pml4 := pagemap.top_level
+	mut pml4_p := unsafe { &u64(u64(pml4) + higher_half) }
+	mut pml3 := get_next_level(pml4, pml4_entry, false) or { return none }
+	mut pml3_p := unsafe { &u64(u64(pml3) + higher_half) }
+	mut pml2 := get_next_level(pml3, pml3_entry, false) or { return none }
+	mut pml2_p := unsafe { &u64(u64(pml2) + higher_half) }
+	mut pml1 := get_next_level(pml2, pml2_entry, false) or { return none }
+	mut pml1_p := unsafe { &u64(u64(pml1) + higher_half) }
+
+	mut pte_p := unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
+
+	unsafe {
+		*pte_p = 0
+
+		mut i := u64(0)
+		for ; i < 512; i++ {
+			if pml1_p[i] != 0 {
+				break
+			}
+		}
+		if i == 512 {
+			pmm_free(pml1, 1)
+			pml2_p[pml2_entry] = 0
+		}
+
+		i = u64(0)
+		for ; i < 512; i++ {
+			if pml2_p[i] != 0 {
+				break
+			}
+		}
+		if i == 512 {
+			pmm_free(pml2, 1)
+			pml3_p[pml3_entry] = 0
+		}
+
+		i = u64(0)
+		for ; i < 512; i++ {
+			if pml3_p[i] != 0 {
+				break
+			}
+		}
+		if i == 512 {
+			pmm_free(pml3, 1)
+			pml4_p[pml4_entry] = 0
+		}
+	}
 
 	current_cr3 := cpu.read_cr3()
 	if current_cr3 == u64(pagemap.top_level) {
