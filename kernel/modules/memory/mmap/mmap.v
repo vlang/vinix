@@ -530,6 +530,8 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 					global_range.locals.free()
 					free(global_range)
 				}
+			} else {
+				global_range.locals.delete(global_range.locals.index(local_range))
 			}
 			pagemap.mmap_ranges.delete(pagemap.mmap_ranges.index(local_range))
 			unsafe { free(local_range) }
