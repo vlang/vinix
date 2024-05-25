@@ -78,7 +78,11 @@ pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 		munmap(pagemap, voidptr(local_range.base), local_range.length) or { }
 	}
 
-	unsafe { free(pagemap) }
+	unsafe {
+		mmap_ranges.free()
+		pagemap.mmap_ranges.free()
+		free(pagemap)
+	}
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
