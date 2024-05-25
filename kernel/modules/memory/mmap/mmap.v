@@ -499,6 +499,11 @@ pub fn munmap(_pagemap &memory.Pagemap, addr voidptr, _length u64) ? {
 				// global_range.resource.munmap(i)
 			}
 			unsafe { free(local_range) }
+			memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
+			unsafe {
+				global_range.locals.free()
+				free(global_range)
+			}
 		} else {
 			if snip_begin == local_range.base {
 				local_range.offset += i64(snip_size)
