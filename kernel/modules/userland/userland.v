@@ -549,8 +549,10 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		sigactions: old_thread.sigactions
 		masked_signals: old_thread.masked_signals
 		stacks: stacks
-		fpu_storage: unsafe { C.malloc(fpu_storage_size) }
+		fpu_storage: unsafe { malloc(fpu_storage_size) }
 	}
+
+	unsafe { stacks.free() }
 
 	new_thread.self = voidptr(new_thread)
 
