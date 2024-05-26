@@ -101,7 +101,7 @@ override KVFLAGS += \
     -os vinix \
     -enable-globals \
     -nofloat \
-    -autofree \
+    -manualfree \
     -gc none \
     -d no_backtrace
 
