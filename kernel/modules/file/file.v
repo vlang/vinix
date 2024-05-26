@@ -92,6 +92,11 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		for mut f in fdlist {
 			f.unref()
 		}
+		unsafe {
+			events.free()
+			fdnums.free()
+			fdlist.free()
+		}
 	}
 
 	mut ret := u64(0)
@@ -149,6 +154,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 	defer {
 		if voidptr(timer) != unsafe { nil } {
 			timer.disarm()
+			unsafe { free(timer) }
 		}
 	}
 
