@@ -120,9 +120,10 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 
 		match phdr.p_type {
 			elf.pt_interp {
-				mut p := memory.malloc(phdr.p_filesz + 1)
+				mut p := unsafe { malloc(phdr.p_filesz + 1) }
 				res.read(0, p, phdr.p_offset, phdr.p_filesz) or { return error('') }
 				ld_path = unsafe { cstring_to_vstring(p) }
+				unsafe { free(p) }
 			}
 			elf.pt_phdr {
 				auxval.at_phdr = base + phdr.p_vaddr

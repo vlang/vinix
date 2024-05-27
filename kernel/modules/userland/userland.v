@@ -601,9 +601,15 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		ld_node := fs.get_node(vfs_root, ld_path, true) ?
 		ld := ld_node.resource
 
-		ld_auxval, _ := elf.load(new_pagemap, ld, 0x40000000) or { return none }
+		ld_auxval, interp := elf.load(new_pagemap, ld, 0x40000000) or { return none }
+
+		if interp != '' {
+			unsafe { interp.free() }
+		}
 
 		entry_point = voidptr(ld_auxval.at_entry)
+
+		unsafe { ld_path.free() }
 	}
 
 	if execve == false {
