@@ -1,15 +1,15 @@
 name=v
-version=35f6523e473233b73d76858a6b387050c8c11942
+version=2d5c4579016f70de0e65e53f650b477de0f19374
 revision=1
 tarball_url="https://github.com/vlang/v/archive/${version}.tar.gz"
-tarball_blake2b="cca1b0732607bfd1b4c7ad1b245743c3580682e253438a9886a27968a12fef02c3c14f3648a8a075fc9f4add600b6bcb3581558dbccfad4b6d695acd5367dff8"
+tarball_blake2b="b3c8318c5ed2ddef3904aa4cdf07b49faa79af3928dba30e53f374de35c3de9b052c6f898eb226f8d706f5e3d937dc7293943638f06ab9d8c7914c7a45b6c8fa"
 source_imagedeps="curl"
 source_allow_network="yes"
 hostdeps="gcc"
 deps="core-libs"
 
 regenerate() {
-    curl -o v.c https://raw.githubusercontent.com/vlang/vc/859b3a6f31f4fb808a670dfbcde8936a1425c02a/v.c
+    curl -o v.c https://raw.githubusercontent.com/vlang/vc/4418bc5d3f277504c8cb5f4bae8b9f07d24ee30a/v.c
 }
 
 build() {
