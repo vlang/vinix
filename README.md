@@ -71,7 +71,10 @@ sudo pacman -S --needed gcc make findutils curl git libarchive zstd rsync xorris
 ```bash
 sudo yum install -y gcc make findutils curl git bsdtar zstd rsync xorriso qemu
 ```
-
+### Build prerequisites for Void Linux and derivatives
+```bash
+sudo xbps-install -Suv gcc make findutils curl git bsdtar zstd rsync xorriso qemu
+```
 ### Building the distro
 
 To build the distro, which includes the cross toolchain necessary
