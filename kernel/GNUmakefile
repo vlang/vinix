@@ -102,12 +102,16 @@ override KVFLAGS += \
     -enable-globals \
     -nofloat \
     -manualfree \
+    -experimental \
+    -message-limit 10000 \
     -gc none \
     -d no_backtrace
 
 ifeq ($(PROD),true)
 	override KVFLAGS += -prod
 	override KCPPFLAGS += -DPROD
+else
+	override KVFLAGS += -warn-about-allocs
 endif
 
 override VFILES := $(shell find -L * -type f -name '*.v')

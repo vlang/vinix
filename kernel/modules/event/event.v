@@ -204,6 +204,9 @@ pub fn pthread_wait(t &proc.Thread) voidptr {
 	mut events := [&t.exited]
 	await(mut events, true) or {}
 	exit_value := t.exit_value
-	unsafe { free(t) }
+	unsafe {
+		free(t)
+		events.free()
+	}
 	return exit_value
 }

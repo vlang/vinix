@@ -22,6 +22,9 @@ pub fn nsleep(ns i64) {
 	}
 
 	mut events := []&eventstruct.Event{}
+	defer {
+		unsafe { events.free() }
+	}
 	events << &timer.event
 
 	event.await(mut events, true) or {}
@@ -71,6 +74,9 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 	}
 
 	mut events := []&eventstruct.Event{}
+	defer {
+		unsafe { events.free() }
+	}
 
 	mut target_time := *req
 

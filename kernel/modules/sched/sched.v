@@ -334,6 +334,8 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 			higher_half)
 	}
 
+	unsafe { stacks.free() }
+
 	t.self = voidptr(t)
 	t.gs_base = u64(voidptr(t))
 
@@ -354,7 +356,12 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut new_thread := new_user_thread(process, false, pc, voidptr(0), stack, [], [], voidptr(0), false) or {
+	mut empty_string_array := []string{}
+	defer {
+		unsafe { empty_string_array.free() }
+	}
+
+	mut new_thread := new_user_thread(process, false, pc, voidptr(0), stack, empty_string_array, empty_string_array, voidptr(0), false) or {
 		return errno.err, errno.get()
 	}
 
@@ -367,6 +374,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut process := unsafe { _process }
 
 	mut stacks := []voidptr{}
+	defer {
+		unsafe { stacks.free() }
+	}
 
 	mut stack := &u64(0)
 	mut stack_vma := u64(0)
@@ -528,9 +538,6 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	}
 
 	new_process.pid = proc.allocate_pid(new_process) or { return none }
-
-	new_process.threads = []&proc.Thread{}
-	new_process.children = []&proc.Process{}
 
 	if unsafe { old_process != 0 } {
 		new_process.ppid = old_process.pid

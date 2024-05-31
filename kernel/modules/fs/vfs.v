@@ -121,6 +121,9 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 
 	for {
 		mut elem := []u8{}
+		defer {
+			unsafe { elem.free() }
+		}
 
 		for index < path.len && path[index] != `/` {
 			elem << path[index]
@@ -299,6 +302,9 @@ fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 
 pub fn pathname(node &VFSNode) string {
 	mut components := []string{}
+	defer {
+		unsafe { components.free() }
+	}
 
 	mut current_node := unsafe { node }
 

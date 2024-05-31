@@ -48,6 +48,9 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 	futex_lock.release()
 
 	mut events := [e]
+	defer {
+		unsafe { events.free() }
+	}
 	event.await(mut events, true) or { return errno.err, errno.eintr }
 
 	return 0, 0

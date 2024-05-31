@@ -292,13 +292,12 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
 	katomic.inc(mut &res.refcount)
 
-	mut new_handle := unsafe { &Handle(C.malloc(sizeof(Handle))) }
+	mut new_handle := &Handle{}
 	new_handle.resource = unsafe { res }
 	new_handle.refcount = 1
 	new_handle.flags = flags & resource.file_status_flags_mask
-	new_handle.dirlist = []stat.Dirent{}
 
-	mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
+	mut new_fd := &FD{}
 	new_fd.handle = new_handle
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
 
