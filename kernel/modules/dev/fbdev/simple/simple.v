@@ -23,7 +23,7 @@ __global (
 	simplefb_driver      = api.FramebufferDriver{
 		name: 'simplefb'
 		init: simple_init
-		register_device: voidptr(0)
+		register_device: unsafe { nil }
 	}
 	simplefb_initialized = false
 	simplefb_pending_cnt = u32(0)

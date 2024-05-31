@@ -24,7 +24,7 @@ mut:
 }
 
 fn (mut this INotify) mmap(page u64, flags int) voidptr {
-	return voidptr(0)
+	return unsafe { nil }
 }
 
 fn (mut this INotify) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -68,7 +68,7 @@ pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 		refcount: 1
 	}
 
-	fdnum := file.fdnum_create_from_resource(voidptr(0), mut inotify, 0, 0, false) or {
+	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut inotify, 0, 0, false) or {
 		return errno.err, errno.get()
 	}
 

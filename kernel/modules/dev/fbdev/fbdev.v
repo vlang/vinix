@@ -39,7 +39,7 @@ fn (mut this FramebufferNode) mmap(page u64, flags int) voidptr {
 	offset := page * page_size
 
 	if offset >= this.info.size {
-		return voidptr(0)
+		return unsafe { nil }
 	}
 
 	unsafe {

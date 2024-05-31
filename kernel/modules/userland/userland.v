@@ -224,13 +224,13 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 
 	mut t := proc.current_thread()
 
-	if voidptr(oldact) != voidptr(0) {
+	if oldact != unsafe { nil } {
 		unsafe {
 			*oldact = t.sigactions[signum]
 		}
 	}
 
-	if voidptr(act) != voidptr(0) {
+	if act != unsafe { nil } {
 		t.sigactions[signum] = *act
 	}
 
@@ -249,13 +249,13 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 
 	mut t := proc.current_thread()
 
-	if voidptr(oldset) != voidptr(0) {
+	if oldset != unsafe { nil } {
 		unsafe {
 			*oldset = t.masked_signals
 		}
 	}
 
-	if voidptr(set) != voidptr(0) {
+	if set != unsafe { nil } {
 		match how {
 			userland.sig_block {
 				t.masked_signals |= *set
@@ -383,7 +383,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	mut argv := []string{}
 	for i := 0; true; i++ {
 		unsafe {
-			if voidptr(_argv[i]) == voidptr(0) {
+			if _argv[i] == nil {
 				break
 			}
 			argv << cstring_to_vstring(_argv[i])
@@ -392,7 +392,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	mut envp := []string{}
 	for i := 0; true; i++ {
 		unsafe {
-			if voidptr(_envp[i]) == voidptr(0) {
+			if _envp[i] == nil {
 				break
 			}
 			envp << cstring_to_vstring(_envp[i])
@@ -434,7 +434,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 			return errno.err, errno.echild
 		}
 		child = processes[pid]
-		if voidptr(child) == voidptr(0) || child.ppid != current_process.pid {
+		if child == unsafe { nil } || child.ppid != current_process.pid {
 			return errno.err, errno.echild
 		}
 		events << &child.event
@@ -443,7 +443,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	block := options & userland.wnohang == 0
 	which := event.await(mut events, block) or { return errno.err, errno.eintr }
 
-	if voidptr(child) == voidptr(0) {
+	if child == unsafe { nil } {
 		child = current_process.children[which]
 	}
 
@@ -476,7 +476,7 @@ pub fn syscall_exit(_ voidptr, status int) {
 
 	// Close all FDs
 	for i := 0; i < proc.max_fds; i++ {
-		if current_process.fds[i] == voidptr(0) {
+		if current_process.fds[i] == unsafe { nil } {
 			continue
 		}
 
@@ -510,13 +510,13 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
-	mut new_process := sched.new_process(old_process, voidptr(0)) or { return errno.err, errno.get() }
+	mut new_process := sched.new_process(old_process, unsafe { nil }) or { return errno.err, errno.get() }
 
 	new_process.name = '${old_process.name}[${new_process.pid}]'
 
 	// Dup all FDs
 	for i := 0; i < proc.max_fds; i++ {
-		if old_process.fds[i] == voidptr(0) {
+		if old_process.fds[i] == unsafe { nil } {
 			continue
 		}
 
@@ -593,7 +593,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 
 	auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
 
-	mut entry_point := voidptr(0)
+	mut entry_point := unsafe { nil }
 
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
@@ -613,7 +613,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	}
 
 	if execve == false {
-		mut new_process := sched.new_process(voidptr(0), new_pagemap) ?
+		mut new_process := sched.new_process(unsafe { nil }, new_pagemap) ?
 
 		new_process.name = '${path}[${new_process.pid}]'
 
@@ -650,7 +650,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
 
-		sched.new_user_thread(new_process, true, entry_point, voidptr(0), 0, argv, envp,
+		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv, envp,
 			auxval, true) ?
 
 		return new_process
@@ -676,7 +676,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		// old_threads := process.threads
 		process.threads = []&proc.Thread{}
 
-		sched.new_user_thread(process, true, entry_point, voidptr(0), 0, argv, envp, auxval,
+		sched.new_user_thread(process, true, entry_point, unsafe { nil }, 0, argv, envp, auxval,
 			true) ?
 
 		unsafe {

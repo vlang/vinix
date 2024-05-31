@@ -101,13 +101,13 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 			refcount: 1
 		}
 
-		newfd = file.fdnum_create_from_resource(voidptr(0), mut signalfd, flags, 0, false) or {
+		newfd = file.fdnum_create_from_resource(unsafe { nil }, mut signalfd, flags, 0, false) or {
 			return errno.err, errno.get()
 		}
 
 		t.signalfds << voidptr(signalfd)
 	} else {
-		mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+		mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 
 		signalfd = unsafe { &SignalFD(fd.handle.resource) }
 

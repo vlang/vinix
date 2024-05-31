@@ -15,8 +15,8 @@ struct C.__threadattr {}
 
 @[export: 'pthread_create']
 pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine fn (voidptr) voidptr, arg voidptr) int {
-	if voidptr(attr) != voidptr(0) {
-		lib.kpanic(voidptr(0), c'pthread_create() called with non-NULL attr')
+	if attr != unsafe { nil } {
+		lib.kpanic(unsafe { nil }, c'pthread_create() called with non-NULL attr')
 	}
 
 	unsafe {

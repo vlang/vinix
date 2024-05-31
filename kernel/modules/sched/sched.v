@@ -361,7 +361,7 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 		unsafe { empty_string_array.free() }
 	}
 
-	mut new_thread := new_user_thread(process, false, pc, voidptr(0), stack, empty_string_array, empty_string_array, voidptr(0), false) or {
+	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array, empty_string_array, unsafe { nil }, false) or {
 		return errno.err, errno.get()
 	}
 

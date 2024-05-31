@@ -88,7 +88,7 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 	}
 
 	event.await(mut events, true) or {
-		if voidptr(rem) != voidptr(0) {
+		if rem != unsafe { nil } {
 			rem.tv_sec = monotonic_clock.tv_sec - target_time.tv_sec
 			rem.tv_nsec = monotonic_clock.tv_nsec - target_time.tv_nsec
 

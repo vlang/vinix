@@ -30,7 +30,7 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 	cpu_number := if smp_ready { cpulocal.current().cpu_number } else { 0 }
 
 	C.printf_panic(c'KERNEL PANIC: "%s" on CPU %d\n', message, cpu_number)
-	if voidptr(gpr_state) != voidptr(0) {
+	if gpr_state != unsafe { nil } {
 		C.printf_panic(c'Error code: 0x%016llx\n', gpr_state.err)
 		C.printf_panic(c'Register dump:\n')
 		C.printf_panic(c'CS:RIP=%04llx:%016llx\n', gpr_state.cs, gpr_state.rip)
@@ -48,7 +48,7 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 
 	C.printf_panic(c'Stacktrace:\n')
 	trace.stacktrace(0)
-	if voidptr(gpr_state) != voidptr(0) && gpr_state.cs == 0x28 {
+	if gpr_state != unsafe { nil } && gpr_state.cs == 0x28 {
 		trace.stacktrace(gpr_state.rbp)
 	}
 

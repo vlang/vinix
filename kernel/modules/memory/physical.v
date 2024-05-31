@@ -11,7 +11,7 @@ import limine
 
 __global (
 	pmm_lock            klock.Lock
-	pmm_bitmap          = voidptr(0)
+	pmm_bitmap          = unsafe { nil }
 	pmm_avl_page_count  = u64(0)
 	pmm_last_used_index = u64(0)
 	free_pages          = u64(0)
@@ -147,7 +147,7 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 
 		ret = inner_alloc(count, last)
 		if ret == 0 {
-			lib.kpanic(voidptr(0), c'Out of memory')
+			lib.kpanic(unsafe { nil }, c'Out of memory')
 		}
 	}
 
@@ -249,7 +249,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 		this.@lock.release()
 	}
 
-	if ptr == voidptr(0) {
+	if ptr == unsafe { nil } {
 		return
 	}
 
@@ -274,7 +274,7 @@ mut:
 
 @[export: 'free']
 pub fn free(ptr voidptr) {
-	if ptr == voidptr(0) {
+	if ptr == unsafe { nil } {
 		return
 	}
 

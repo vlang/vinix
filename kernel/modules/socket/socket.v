@@ -64,11 +64,11 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 	}
 
 	unsafe {
-		ret[0] = file.fdnum_create_from_resource(voidptr(0), mut socket0, flags, 0, false) or {
+		ret[0] = file.fdnum_create_from_resource(nil, mut socket0, flags, 0, false) or {
 			return errno.err, errno.get()
 		}
 
-		ret[1] = file.fdnum_create_from_resource(voidptr(0), mut socket1, flags, 0, false) or {
+		ret[1] = file.fdnum_create_from_resource(nil, mut socket1, flags, 0, false) or {
 			return errno.err, errno.get()
 		}
 	}
@@ -94,7 +94,7 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		flags |= resource.o_nonblock
 	}
 
-	ret := file.fdnum_create_from_resource(voidptr(0), mut sock, flags, 0, false) or {
+	ret := file.fdnum_create_from_resource(unsafe { nil }, mut sock, flags, 0, false) or {
 		return errno.err, errno.get()
 	}
 
@@ -110,14 +110,14 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
 	res := fd.handle.resource
 
-	mut sock := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if res is sock_unix.UnixSocket {
 		sock = res
@@ -129,7 +129,7 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 		return errno.err, errno.get()
 	}
 
-	ret := file.fdnum_create_from_resource(voidptr(0), mut connection_socket, 0, 0, false) or {
+	ret := file.fdnum_create_from_resource(unsafe { nil }, mut connection_socket, 0, 0, false) or {
 		return errno.err, errno.get()
 	}
 
@@ -145,14 +145,14 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
 	res := fd.handle.resource
 
-	mut sock := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if res is sock_unix.UnixSocket {
 		sock = res
@@ -174,14 +174,14 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
 	res := fd.handle.resource
 
-	mut sock := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if res is sock_unix.UnixSocket {
 		sock = res
@@ -203,14 +203,14 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
 	res := fd.handle.resource
 
-	mut sock := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if res is sock_unix.UnixSocket {
 		sock = res
@@ -232,14 +232,14 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
 	res := fd.handle.resource
 
-	mut sock := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if res is sock_unix.UnixSocket {
 		sock = res
@@ -261,14 +261,14 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(voidptr(0), fdnum) or { return errno.err, errno.get() }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
 	res := fd.handle.resource
 
-	mut sock := &sock_pub.Socket(voidptr(0))
+	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if res is sock_unix.UnixSocket {
 		sock = res
