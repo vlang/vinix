@@ -12,7 +12,7 @@ build() {
 
     make CC=${OS_TRIPLET}-gcc CFLAGS="$CFLAGS -fPIC" LDFLAGS="$LDFLAGS" -f Makefile-libbz2_so
     make clean
-    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS -fPIC" LDFLAGS="$LDFLAGS" -j${parallelism}
+    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" -j${parallelism}
 }
 
 package() {

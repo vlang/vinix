@@ -20,13 +20,15 @@ regenerate() {
 }
 
 build() {
-        CXXFLAGS_FOR_TARGET="$CFLAGS" \
+        CXXFLAGS_FOR_TARGET="$CXXFLAGS" \
         CFLAGS_FOR_TARGET="$CFLAGS" \
     autotools_configure \
         --target=${OS_TRIPLET} \
         --with-sysroot=/ \
         --with-build-sysroot=${sysroot_dir} \
         --enable-languages=c,c++,lto \
+        --enable-default-pie \
+        --enable-default-ssp \
         --enable-initfini-array \
         --disable-multilib \
         --with-system-zlib \

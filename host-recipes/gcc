@@ -19,6 +19,8 @@ build() {
         --with-sysroot="${sysroot_dir}" \
         --disable-nls \
         --enable-languages=c,c++,lto \
+        --enable-default-pie \
+        --enable-default-ssp \
         --disable-multilib \
         --enable-initfini-array \
         --enable-shared \
