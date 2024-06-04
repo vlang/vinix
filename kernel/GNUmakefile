@@ -61,8 +61,7 @@ override KCFLAGS += \
     -fno-stack-protector \
     -fno-stack-check \
     -fno-lto \
-    -fno-PIC \
-    -fno-PIE \
+    -fPIE \
     -ffunction-sections \
     -fdata-sections \
     -fno-strict-aliasing \
@@ -72,8 +71,7 @@ override KCFLAGS += \
     -mno-mmx \
     -mno-sse \
     -mno-sse2 \
-    -mno-red-zone \
-    -mcmodel=kernel
+    -mno-red-zone
 
 override KCPPFLAGS := \
     -I c \
@@ -87,14 +85,15 @@ obj/c/printf/printf.c.o: override KCPPFLAGS += \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
 obj/c/flanterm/backends/fb.c.o: override KCPPFLAGS += \
-	-DFLANTERM_FB_DISABLE_BUMP_ALLOC
+    -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
 override KLDFLAGS += \
     -m elf_x86_64 \
     -nostdlib \
-    -static \
-    -zmax-page-size=0x1000 \
-    -Tlinker.ld \
+    -pie \
+    -z text \
+    -z max-page-size=0x1000 \
+    -T linker.ld \
     -gc-sections
 
 override KVFLAGS += \
