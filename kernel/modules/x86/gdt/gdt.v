@@ -142,7 +142,7 @@ pub fn reload() {
 		push cseg
 		lea rax, [rip + 0x03]
 		push rax
-		retfq
+		lretq
 		pop rax
 		mov ds, dseg
 		mov es, dseg

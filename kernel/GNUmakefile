@@ -134,6 +134,8 @@ bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
 	$(KV) $(KVFLAGS) -o obj/blob.c .
+	sed 's/call 0(/call *(/g' < obj/blob.c > obj/blob.c.tmp
+	mv obj/blob.c.tmp obj/blob.c
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -w -c obj/blob.c -o $@
 
 -include $(HEADER_DEPS)

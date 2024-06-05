@@ -79,7 +79,7 @@ fn syscall_entry() {
 		pop r15 // Restore user stack
 		mov rsp, gs:[32]
 		swapgs
-		rex.w sysret
+		sysretq
 		; ; ; memory
 	}
 }
