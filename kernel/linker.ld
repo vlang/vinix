@@ -63,12 +63,6 @@ SECTIONS
         KEEP(*(.requests_end_marker))
     } :data
 
-    /* Global offset table section, explicitly created because it may cause issues */
-    /* if left as an orphaned section. */
-    .got : {
-        *(.got .got.*)
-    } :data
-
     /* Dynamic section for relocations, both in its own PHDR and inside data PHDR */
     .dynamic : {
         *(.dynamic)

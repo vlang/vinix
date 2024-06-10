@@ -122,6 +122,10 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 .PHONY: all
 all: bin/$(KERNEL)
 
+# The magic printf/dd command is used to force the final ELF file type to ET_DYN.
+# GNU binutils, for silly reasons, forces the ELF type to ET_EXEC even for
+# relocatable PIEs, if the base load address is non-0.
+# See https://sourceware.org/bugzilla/show_bug.cgi?id=31795 for more information.
 bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	mkdir -p "$$(dirname $@)"
 	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
@@ -130,6 +134,7 @@ bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.c.o
 	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c
+	printf '\x03' | dd of=$@ bs=1 count=1 seek=16 conv=notrunc
 
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
