@@ -100,7 +100,7 @@ override KVFLAGS += \
     -os vinix \
     -enable-globals \
     -nofloat \
-    -autofree \
+    -manualfree \
     -experimental \
     -message-limit 10000 \
     -gc none \
