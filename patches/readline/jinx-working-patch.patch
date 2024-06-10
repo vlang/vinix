@@ -1,5 +1,5 @@
 diff --git readline-clean/support/shlib-install readline-workdir/support/shlib-install
-index 661355d..cd7d659 100755
+index 661355d..d23b65c 100644
 --- readline-clean/support/shlib-install
 +++ readline-workdir/support/shlib-install
 @@ -71,7 +71,7 @@ fi
@@ -20,3 +20,22 @@ index 661355d..cd7d659 100755
  	# libname.so -> libname.so.M
  	${echo} ${RM} ${INSTALLDIR}/$LINK1
  	if [ -z "$uninstall" ]; then
+diff --git readline-clean/support/shobj-conf readline-workdir/support/shobj-conf
+index cd7634d..2beb0e6 100644
+--- readline-clean/support/shobj-conf
++++ readline-workdir/support/shobj-conf
+@@ -123,12 +123,12 @@ sunos5*|solaris2*)
+ 	;;
+ 
+ # All versions of Linux (including Gentoo/FreeBSD) or the semi-mythical GNU Hurd.
+-linux*-*|gnu*-*|k*bsd*-gnu-*|midnightbsd*|freebsd*|dragonfly*)
++linux*-*|gnu*-*|k*bsd*-gnu-*|midnightbsd*|freebsd*|dragonfly*|*-mlibc-*)
+ 	SHOBJ_CFLAGS=-fPIC
+ 	SHOBJ_LD='${CC}'
+ 	SHOBJ_LDFLAGS='-shared -Wl,-soname,$@'
+ 
+-	SHLIB_XLDFLAGS='-Wl,-rpath,$(libdir) -Wl,-soname,`basename $@ $(SHLIB_MINOR)`'
++	SHLIB_XLDFLAGS='-Wl,-soname,`basename $@ $(SHLIB_MINOR)`'
+ 	SHLIB_LIBVERSION='$(SHLIB_LIBSUFF).$(SHLIB_MAJOR)$(SHLIB_MINOR)'
+ 	;;
+ 

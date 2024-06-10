@@ -6,7 +6,6 @@ tarball_blake2b="7974322b9c092a756a79e537df08e8532f8e0fcb598f77732e28287c33ebec9
 source_allow_network="yes"
 source_imagedeps="curl"
 source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="patchelf"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses"
 
@@ -39,12 +38,10 @@ build() {
 }
 
 package() {
-    make SHLIB_LIBS="-lncursesw" install DESTDIR="${dest_dir}"
+    make install DESTDIR="${dest_dir}"
 
-    # libraries are created without soname... fix that
-    for lib in libhistory.so.8 libreadline.so.8; do
-        patchelf --set-soname $lib "${dest_dir}${prefix}/lib/$lib"
-    done
+    ln -s libreadline.so.8.2 "${dest_dir}${prefix}"/lib/libreadline.so.8
+    ln -s libhistory.so.8.2 "${dest_dir}${prefix}"/lib/libhistory.so.8
 
     post_package_strip
 }
