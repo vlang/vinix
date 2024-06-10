@@ -1,8 +1,8 @@
 name=cxxshim
-version=6f146a41dda736572879fc524cf729eb193dc0a6
+version=9325f9f75672e50a4fbab5bef3b57c9c02705725
 revision=1
 tarball_url="https://github.com/managarm/cxxshim/archive/${version}.tar.gz"
-tarball_blake2b="05d8cbad3d46b4272c7e31b1c8041cc5e640cc66853dddf58af953aeba6697dcbc05decb01dc6d4669fec52acd18b3265706dbf710d11dd98e7c1771ac598a49"
+tarball_blake2b="bf5faec55dd05fb839cf9f48936c11744f4040441066952fa0910b875be30da6464f835de80bafd9aa0f0c5bb6da678275cec0348ebc03fe66960cfbd81fda4f"
 imagedeps="meson ninja"
 hostdeps="pkg-config"
 
