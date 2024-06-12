@@ -1,8 +1,8 @@
 name=icu
-version=74.2
+version=75.1
 revision=1
-tarball_url="https://github.com/unicode-org/icu/releases/download/release-74-2/icu4c-74_2-src.tgz"
-tarball_blake2b="08790dd3634037177eaec428651afe0da1f71dbad3423bde7ea5a6d49eab5dc011f72b175760fc55f6d8d7d820f7f3dfc369a80a1f7cb2f9f933644beb3d3711"
+tarball_url="https://github.com/unicode-org/icu/releases/download/release-75-1/icu4c-75_1-src.tgz"
+tarball_blake2b="2772b52bf59407188511359ec54bea432bc70ba81610015bb51192f7aff33d5e4b08840cf3bfed3de7f9a91b430b6a6efe9dd75fdc53327d4c9f8fbf54d96d18"
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="autoconf-archive"
 imagedeps="gcc"
