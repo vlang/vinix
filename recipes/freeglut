@@ -1,8 +1,8 @@
 name=freeglut
-version=3.4.0
+version=3.6.0
 revision=1
-tarball_url="https://github.com/FreeGLUTProject/freeglut/releases/download/v${version}/freeglut-${version}.tar.gz"
-tarball_blake2b="47b073c4e81473417358452ede3891b6fc36e324f66eec42fcbbadebb2144680e3b52caded504135239e170fd8f30a1fe8b6666a746b06d48cd7226c98a8114e"
+tarball_url="https://github.com/freeglut/freeglut/releases/download/v${version}/freeglut-${version}.tar.gz"
+tarball_blake2b="c42985013aafbe0e21369295f67355f2b498f284289fceed9baff5de6a46b7fee2a2ee07e00c136f65caa9159b635df82030a112eae101f9f82751abd76636e4"
 imagedeps="gcc ninja python git"
 hostdeps="gcc cmake pkg-config"
 deps="core-libs libxi mesa glu"
