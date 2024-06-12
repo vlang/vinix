@@ -3,21 +3,31 @@
 set -e
 
 FREESTANDING_HDRS_REV=dd3abd2d7147efc4170dff478d3b7730bed14147
-FLANTERM_REV=347d9cf1e3fced64aa20ab278e2fdcc834086035
-EYALROZ_PRINTF_REV=af05afe8ef0f84cb9f3a9bbfd79ac81a941cbebf
+FLANTERM_REV=ef07a10cc38b34aa003d17be97a9f3542e275069
+EYALROZ_PRINTF_REV=727b0e576c0cdadcb4986072666450f1ff7ff01c
 
-if ! [ -d c/freestanding-headers ]; then
-    git clone https://github.com/mintsuki/freestanding-headers.git c/freestanding-headers
-    git -C c/freestanding-headers checkout ${FREESTANDING_HDRS_REV}
-fi
+clone_repo_commit() {
+    if [ -d $2/.git ]; then
+        git -C $2 reset --hard
+        git -C $2 clean -fd
+        if ! git -C $2 checkout $3; then
+            rm -rf $2
+        fi
+    else
+        if [ -d $2 ]; then
+            echo "error: '$2' is not a Git repository"
+            exit 1
+        fi
+    fi
+    if ! [ -d $2 ]; then
+        git clone $1 $2
+        git -C $2 checkout $3
+    fi
+}
 
-if ! [ -d c/flanterm ]; then
-    git clone https://github.com/mintsuki/flanterm.git c/flanterm
-    git -C c/flanterm checkout ${FLANTERM_REV}
-fi
+clone_repo_commit https://github.com/mintsuki/freestanding-headers.git c/freestanding-headers $FREESTANDING_HDRS_REV
+clone_repo_commit https://github.com/mintsuki/flanterm.git c/flanterm $FLANTERM_REV
 
-if ! [ -d c/printf ]; then
-    mkdir -p c/printf
-    curl -Lo c/printf/printf.c https://github.com/eyalroz/printf/raw/${EYALROZ_PRINTF_REV}/src/printf/printf.c
-    curl -Lo c/printf/printf.h https://github.com/eyalroz/printf/raw/${EYALROZ_PRINTF_REV}/src/printf/printf.h
-fi
+clone_repo_commit https://github.com/eyalroz/printf.git printf $EYALROZ_PRINTF_REV
+mkdir -p c/printf
+cp printf/src/printf/printf.c printf/src/printf/printf.h c/printf/
