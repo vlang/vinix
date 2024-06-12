@@ -1,8 +1,8 @@
 name=gtk+-3
-version=3.24.41
+version=3.24.42
 revision=1
 tarball_url="https://download.gnome.org/sources/gtk%2B/3.24/gtk%2B-${version}.tar.xz"
-tarball_blake2b="fbded114fe2b5c1c7bffe79d0a22d559f97081eb972baf31b5c9bd7190bd1ea2875f1c632d3f3be8233377299f1df15bbffbe45d50cc7ff588e034eb41eb8f6e"
+tarball_blake2b="04675abfa056d19a8324c8310789227e661458cfa356b670ba79d61a9498fa1c65161d19799d33d717742912cdddc3400a548573809d5dd4e0f289d0c75e88d9"
 imagedeps="meson ninja gdk-pixbuf2 python-packaging"
 hostdeps="gcc pkg-config"
 deps="core-libs at-spi2-core cairo glib gdk-pixbuf libx11 libxext libxcb libxinerama libxrender libxrandr libxfixes libxdamage pango fribidi libepoxy libxkbcommon fontconfig freetype2 libxi harfbuzz libxcursor gsettings-desktop-schemas dbus"
