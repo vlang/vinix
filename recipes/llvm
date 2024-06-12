@@ -1,8 +1,8 @@
 name=llvm
-version=17.0.6
+version=18.1.7
 revision=1
 tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/llvm-project-${version}.src.tar.xz"
-tarball_blake2b="d6ede1a9fda8756995c3e0654111941649e15794179641806f18919f1dc68c41ca0cabd5693b5096d05dccc3a391cd20d34af1137bf8af92ed3117a1ce84d1b2"
+tarball_blake2b="b8c37bd131fb5f3131bfab4fbad7aa811079ca10723faa14779253bc62b1ee08d4e04650e1da883297ed88a62d518b868a1f13cf57d03233254fd01209da5c02"
 imagedeps="gcc ninja python git"
 hostdeps="gcc cmake pkg-config"
 deps="core-libs ncurses zlib zstd libffi"
