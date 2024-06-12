@@ -1,8 +1,8 @@
 name=sqlite
-version=3.45.3
+version=3.46.0
 revision=1
-tarball_url="https://sqlite.org/2024/sqlite-autoconf-3450300.tar.gz"
-tarball_blake2b="24e47dcfb8fb1dbd0055d48cfc540884439e9443b1b79700e867326feb60b340a9b5d5bdb83eeca210b47251e61b706ec67eb1b84e59b11bae6c76271b1030bf"
+tarball_url="https://sqlite.org/2024/sqlite-autoconf-3460000.tar.gz"
+tarball_blake2b="2f484823b84ab758e21960ac6b730cefa62c26f7ccf5344299a26e6f559d0e02cfd4cff5f5921effdee6e2e49d2ab36b1f91cffdd8599bc2189efab44bf4b197"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs readline zlib"
