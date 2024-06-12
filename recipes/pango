@@ -1,8 +1,8 @@
 name=pango
-version=1.52.2
+version=1.54.0
 revision=1
-tarball_url="https://download.gnome.org/sources/pango/1.52/pango-${version}.tar.xz"
-tarball_blake2b="9367703addcc6805fc14f0c0184d9d1b4093b8947fea9d260c54eb6c86ce56a0d6cfe35c3d6340eaa5d96fb84f0a94c5979ae308bfa79f02e4ce25c4c093556e"
+tarball_url="https://download.gnome.org/sources/pango/1.54/pango-${version}.tar.xz"
+tarball_blake2b="92c389ab3f21631c245575e30804ffee6fef7b60bc6acdf08159aa325d878cf335203267720aec9143ea2a4e590578424cd64011f73da22e1b0beca85e85a276"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs glib fontconfig freetype2 fribidi cairo xorg-proto libx11 xtrans libxext harfbuzz libxft"
