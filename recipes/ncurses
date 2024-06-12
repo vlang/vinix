@@ -1,8 +1,8 @@
 name=ncurses
-version=6.5.20240504
+version=6.5.20240608
 revision=1
-tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5_20240504.tar.gz"
-tarball_blake2b="5590f7451eca39c8b486175688568669827d8a8a55b2327a14f82a0de4685a3c2c3d97450a2c5039aeb9794a943146cf2b451cfaa9b806ee142c3b71cb819079"
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5_20240608.tar.gz"
+tarball_blake2b="b9d3692934d66abe3507b2f8a8082591c8bfae3e93e9e638b2808129815213d5b91e2a9d17726bb6ecb081ddce9bc75d777f6e7343e7a14562c665241e1a3b29"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="gcc ncurses patchelf"
 hostdeps="gcc automake autoconf libtool pkg-config"
