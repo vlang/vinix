@@ -1,8 +1,8 @@
 name=findutils
-version=4.9.0
+version=4.10.0
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/findutils/findutils-${version}.tar.xz"
-tarball_blake2b="3ada8903fc552ad2e580a7b631a4b9d941935b3f4231029564c6f2b7b10ba6f2244e2de57f6d79268c5e0481a193f64edbbae637e7a51ae6f495e3eefabf52c9"
+tarball_blake2b="2eebdcb425c04170d17afb80e7270ba095bd691660d961dcfa731141633d3bb597d0b47d69ed17e891ef884a36d4c232885097e45b41d3d3ac79dbeae6ee2282"
 source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="python"
 hostdeps="gcc autoconf automake libtool pkg-config"
