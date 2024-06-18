@@ -14,6 +14,7 @@ build() {
 
         meson_source_dir=.. \
     meson_configure \
+        -Dcpp_std=c++17 \
         -Dgraphite2=enabled \
         -Dglib=enabled \
         -Dgobject=disabled \
