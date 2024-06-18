@@ -159,7 +159,7 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf c/freestanding-headers c/flanterm c/printf
+	rm -rf c/freestanding-headers c/flanterm c/printf printf
 
 .PHONY: install
 install:
