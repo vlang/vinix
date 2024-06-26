@@ -39,3 +39,22 @@ index cd7634d..2beb0e6 100644
  	SHLIB_LIBVERSION='$(SHLIB_LIBSUFF).$(SHLIB_MAJOR)$(SHLIB_MINOR)'
  	;;
  
+diff --git readline-clean/terminal.c readline-workdir/terminal.c
+index 9997161..6fdf423 100644
+--- readline-clean/terminal.c
++++ readline-workdir/terminal.c
+@@ -102,12 +102,12 @@ static char *term_string_buffer = (char *)NULL;
+ 
+ static int tcap_initialized;
+ 
+-#if !defined (__linux__) && !defined (NCURSES_VERSION)
++//#if !defined (__linux__) && !defined (NCURSES_VERSION)
+ #  if defined (__EMX__) || defined (NEED_EXTERN_PC)
+ extern 
+ #  endif /* __EMX__ || NEED_EXTERN_PC */
+ char PC, *BC, *UP;
+-#endif /* !__linux__ && !NCURSES_VERSION */
++//#endif /* !__linux__ && !NCURSES_VERSION */
+ 
+ /* Some strings to control terminal actions.  These are output by tputs (). */
+ char *_rl_term_clreol;

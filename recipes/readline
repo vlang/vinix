@@ -34,7 +34,7 @@ build() {
         --enable-multibyte \
         --with-curses
 
-    make SHLIB_LIBS="-lncursesw" -j${parallelism}
+    make SHLIB_LIBS="-lncursesw -ltinfow" -j${parallelism}
 }
 
 package() {

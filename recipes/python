@@ -1,0 +1,41 @@
+name=python
+version=3.12.4
+revision=1
+tarball_url="https://www.python.org/ftp/python/${version}/Python-${version}.tar.xz"
+tarball_blake2b="4255171ef8ee1777bab829be7bbaf28a9d5073985b3b1309a41694dda5f6b4ad599df4534a1ce83ec65b357d42416cc18722ca94b4227a45ebd90e2c1df90945"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="autoconf-archive"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs bzip2 xz zlib openssl ncurses readline gdbm tzdata libexpat libffi"
+
+regenerate() {
+    autotools_recursive_regen
+}
+
+build() {
+    echo "ac_cv_file__dev_ptmx=yes" > /tmp/configsite
+    echo "ac_cv_file__dev_ptc=yes" >> /tmp/configsite
+    echo "ac_cv_func_sched_setscheduler=no" >> /tmp/configsite
+
+        CONFIG_SITE=/tmp/configsite \
+    ${source_dir}/configure \
+        --prefix=${prefix} \
+        --host=${OS_TRIPLET} \
+        --build=x86_64 \
+        --with-build-python=python3 \
+        --disable-ipv6 \
+        --enable-shared
+
+    make -j${parallelism}
+}
+
+package() {
+    make DESTDIR="${dest_dir}" install
+
+    ln -sfv python3 "${dest_dir}${prefix}"/bin/python
+    ln -sfv python3-config "${dest_dir}${prefix}"/bin/python-config
+    ln -sfv pydoc3 "${dest_dir}${prefix}"/bin/pydoc
+    ln -sfv idle3 "${dest_dir}${prefix}"/bin/idle
+
+    post_package_strip
+}
