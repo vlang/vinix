@@ -76,9 +76,11 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -141,9 +143,11 @@ fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64
 		peer.l.release()
 		mut events := [&peer.event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 		peer.l.acquire()
 	}
 
@@ -256,9 +260,11 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -285,9 +291,11 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 
 	mut events := [&this.connection_event]
 	event.await(mut events, true) or {
+		unsafe { events.free() }
 		errno.set(errno.eintr)
 		return none
 	}
+	unsafe { events.free() }
 
 	return connection_socket
 }
@@ -337,9 +345,11 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 
 	mut events := [&this.connection_event]
 	event.await(mut events, true) or {
+		unsafe { events.free() }
 		errno.set(errno.eintr)
 		return none
 	}
+	unsafe { events.free() }
 
 	event.trigger(mut socket.connection_event, false)
 
@@ -408,9 +418,11 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 		this.l.acquire()
 	}
 

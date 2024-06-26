@@ -464,6 +464,7 @@ fn keyboard_handler() {
 	for {
 		mut events := [&int_events[vect]]
 		event.await(mut events, true) or {}
+		unsafe { events.free() }
 		input_byte := read_ps2()
 
 		if input_byte == 0xe0 {
@@ -721,9 +722,11 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 	for console_read_lock.test_and_acquire() == false {
 		mut events := [&console_event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 	}
 
 	mut wait := true
@@ -749,9 +752,11 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 				for {
 					mut events := [&console_event]
 					event.await(mut events, true) or {
+						unsafe { events.free() }
 						errno.set(errno.eintr)
 						return none
 					}
+					unsafe { events.free() }
 					if console_read_lock.test_and_acquire() == true {
 						break
 					}

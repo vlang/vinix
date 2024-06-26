@@ -158,6 +158,9 @@ fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 	// Wait on the event of the port's IRQ.
 	mut data := &u8(void_buf)
 	mut events := [&int_events[this.port_vector]]
+	defer {
+		unsafe { events.free() }
+	}
 	for i := u64(0); i < count; {
 		if is_data_received(this.port) {
 			val := kio.port_in<u8>(this.port)

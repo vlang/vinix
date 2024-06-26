@@ -90,6 +90,7 @@ fn (mut this Mouse) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 
 
 		mut events := [&mouse_res.event]
 		event.await(mut events, true) or {}
+		unsafe { events.free() }
 
 		mouse_res.l.acquire()
 	}
@@ -142,6 +143,7 @@ fn handler() {
 	for {
 		mut events := [&int_events[ps2_mouse_vector]]
 		event.await(mut events, true) or {}
+		unsafe { events.free() }
 
         // we will get some spurious packets at the beginning and they will screw
         // up the alignment of the handler cycle so just ignore everything in

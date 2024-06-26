@@ -417,6 +417,9 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	mut status := unsafe { _status }
 
 	mut events := []&eventstruct.Event{}
+	defer {
+		unsafe { events.free() }
+	}
 	mut child := &proc.Process(unsafe { nil })
 
 	if pid == -1 {

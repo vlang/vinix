@@ -98,9 +98,11 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -158,9 +160,11 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
+			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
 		}
+		unsafe { events.free() }
 		this.l.acquire()
 	}
 
