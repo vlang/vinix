@@ -28,7 +28,7 @@ distro-full: jinx
 
 .PHONY: distro-base
 distro-base: jinx
-	./jinx build base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gmp grep gzip less make mpc mpfr nano ncurses pcre2 readline sed tar tzdata util-vinix xz zlib zstd
+	./jinx build base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gmp grep gzip less make mpc mpfr nano ncurses pcre2 python readline sed tar tzdata util-vinix xz zlib zstd
 
 .PHONY: run-kvm
 run-kvm: vinix.iso
