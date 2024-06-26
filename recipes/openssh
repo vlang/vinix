@@ -1,0 +1,36 @@
+name=openssh
+version=9.7p1
+revision=1
+tarball_url="https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz"
+tarball_blake2b="520859fcbdf678808fc8515b64585ab9a90a8055fa869df6fbba3083cb7f73ddb81ed9ea981e131520736a8aed838f85ae68ca63406a410df61039913c5cb48b"
+source_hostdeps="autoconf automake libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs zlib openssl"
+
+regenerate() {
+    autotools_recursive_regen
+
+    cp -v $(find /usr/local/share/automake* -name config.sub) .
+}
+
+build() {
+        ossh_cv_utmpx_h_has_ut_addr=no \
+    autotools_configure \
+        --disable-strip \
+        --sysconfdir=/etc/ssh \
+        --with-privsep-path=/var/lib/sshd \
+        --with-default-path=${prefix}/bin \
+        --with-superuser-path=${prefix}/sbin:${prefix}/bin \
+        --with-pid-dir=/run
+
+    make -j${parallelism}
+}
+
+package() {
+    install -v -m700 -d "${dest_dir}"/var/lib/sshd
+    install -v -d "${dest_dir}"/run
+
+    make install DESTDIR="${dest_dir}"
+
+    post_package_strip
+}
