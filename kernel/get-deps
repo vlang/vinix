@@ -25,7 +25,7 @@ clone_repo_commit() {
     fi
 }
 
-clone_repo_commit https://github.com/mintsuki/freestanding-headers.git c/freestanding-headers $FREESTANDING_HDRS_REV
+clone_repo_commit https://github.com/osdev0/freestanding-headers.git c/freestanding-headers $FREESTANDING_HDRS_REV
 clone_repo_commit https://github.com/mintsuki/flanterm.git c/flanterm $FLANTERM_REV
 
 clone_repo_commit https://github.com/eyalroz/printf.git printf $EYALROZ_PRINTF_REV
