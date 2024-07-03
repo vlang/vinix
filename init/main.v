@@ -10,6 +10,7 @@ import os
 fn C.sethostname(name charptr, len u64) int
 
 fn main(){
+	println('Vinix Init started')
 	os.setenv('TERM', 'linux', true)
 	os.setenv('PATH', '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', true)
 	os.setenv('MAIL', '/var/mail', true)
