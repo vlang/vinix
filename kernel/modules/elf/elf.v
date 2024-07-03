@@ -18,6 +18,8 @@ pub mut:
 }
 
 pub const (
+	et_dyn      = 0x03
+
 	at_entry    = 9
 	at_phdr     = 3
 	at_phent    = 4
@@ -104,8 +106,13 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 		return error('elf: Unsupported ELF file')
 	}
 
+	mut slide := u64(0)
+	if header.@type == et_dyn {
+		slide = 0x400000
+	}
+
 	mut auxval := Auxval{
-		at_entry: base + header.entry
+		at_entry: base + header.entry + slide
 		at_phdr: 0
 		at_phent: sizeof(ProgramHdr)
 		at_phnum: header.ph_num
@@ -126,7 +133,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 				unsafe { free(p) }
 			}
 			elf.pt_phdr {
-				auxval.at_phdr = base + phdr.p_vaddr
+				auxval.at_phdr = base + phdr.p_vaddr + slide
 			}
 			else {}
 		}
@@ -149,7 +156,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 			0
 		}
 
-		virt := lib.align_down(base + phdr.p_vaddr, page_size)
+		virt := lib.align_down(base + phdr.p_vaddr + slide, page_size)
 		phys := u64(addr)
 
 		mmap.map_range(mut pagemap, virt, phys, page_count * page_size, pf, mmap.map_anonymous) or {
