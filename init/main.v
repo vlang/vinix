@@ -9,19 +9,11 @@ import os
 
 fn C.sethostname(name charptr, len u64) int
 
-fn main() {
-	println('Vinix Init started')
-
-	os.setenv('HOME', '/root', true)
+fn main(){
 	os.setenv('TERM', 'linux', true)
 	os.setenv('PATH', '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', true)
-	os.setenv('USER', 'root', true)
-	os.setenv('LOGNAME', 'root', true)
-	os.setenv('SHELL', '/bin/bash', true)
 	os.setenv('MAIL', '/var/mail', true)
 	os.setenv('XDG_RUNTIME_DIR', '/run', true)
-
-	os.chdir('/root') or { panic('Could not move to root') }
 
 	// Read hostname from /etc/hostname and pass to the kernel.
 	hostname_file := os.read_file('/etc/hostname') or { 'vinix' }
@@ -32,6 +24,26 @@ fn main() {
 	C.sethostname(hostname_file[..length].str, length)
 
 	for {
-		os.system("exec -a '-bash' bash --login")
+		name := os.input("${os.hostname() or {"Vinix"}} name:")
+		pass := os.input("Password for ${name}:")
+		passwd := os.read_lines("/etc/passwd")!
+		for line in passwd{
+			split_line := line.split(":")
+			if split_line[0] == name{
+				if split_line[1] == pass{
+					os.setenv('HOME', split_line[5], true)
+					os.setenv('SHELL', split_line[6], true)
+					os.setenv('PATH', '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', true)
+					os.setenv('USER', '${name}', true)
+					os.setenv('LOGNAME', '${name}', true)
+
+					os.chdir(os.getenv("HOME")) or { panic("Could not move to user's home.") }
+					os.system(os.getenv("SHELL"))
+
+					break
+				}
+			}
+		}
+
 	}
 }
