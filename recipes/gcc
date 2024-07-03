@@ -26,6 +26,8 @@ build() {
         --target=${OS_TRIPLET} \
         --with-sysroot=/ \
         --with-build-sysroot=${sysroot_dir} \
+        --with-linker-hash-style=gnu \
+        --enable-linker-build-id \
         --enable-languages=c,c++,lto \
         --enable-default-pie \
         --enable-default-ssp \
