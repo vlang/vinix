@@ -18,6 +18,7 @@ build() {
     autotools_configure \
         --target=${OS_TRIPLET} \
         --with-build-sysroot=${sysroot_dir} \
+        --enable-separate-code \
         --enable-cet \
         --enable-colored-disassembly \
         --disable-werror \
