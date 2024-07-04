@@ -21,25 +21,21 @@ SECTIONS
     /* base load address. */
     . = 0xffffffff80000000 + SIZEOF_HEADERS;
 
-    text_start = .;
-
     .text ALIGN(CONSTANT(MAXPAGESIZE)) : {
+        text_start = .;
         *(.text .text.*)
     }
 
-    text_end = .;
-
-    rodata_start = .;
-
     .rodata ALIGN(CONSTANT(MAXPAGESIZE)) : {
+        text_end = .;
+        rodata_start = .;
         *(.rodata .rodata.*)
     }
 
-    rodata_end = .;
-
-    data_start = .;
-
     .data ALIGN(CONSTANT(MAXPAGESIZE)) : {
+        rodata_end = .;
+        data_start = .;
+
         *(.data .data.*)
 
         /* Place the sections that contain the Limine requests as part of the .data */
