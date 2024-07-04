@@ -57,6 +57,7 @@ override KCFLAGS += \
     -fno-omit-frame-pointer \
     -fno-stack-protector \
     -fno-stack-check \
+    -fno-lto \
     -fPIE \
     -ffunction-sections \
     -fdata-sections \
@@ -85,11 +86,9 @@ obj/c/flanterm/backends/fb.c.o: override KCPPFLAGS += \
 
 override KLDFLAGS += \
     -nostdlib \
-    -pie \
     -Wl,-m,elf_x86_64 \
     -Wl,-nostdlib \
     -Wl,-pie \
-    -Wl,-z,separate-code \
     -Wl,-z,text \
     -Wl,-z,max-page-size=0x1000 \
     -Wl,-T,linker.ld \

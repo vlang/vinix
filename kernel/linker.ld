@@ -17,10 +17,9 @@ SECTIONS
     /* and because that is what the Limine spec mandates. */
     /* Any address in this region will do, but often 0xffffffff80000000 is chosen as */
     /* that is the beginning of the region. */
-    /* Additionally, given there may need to be some space allocated before .text for */
-    /* additonal ELF cruft, have .text start at 0xffffffff80000000 + its own alignment */
-    /* instead of just 0xffffffff80000000. */
-    . = 0xffffffff80000000 + CONSTANT(MAXPAGESIZE);
+    /* Additionally, leave space for the ELF headers by adding SIZEOF_HEADERS to the */
+    /* base load address. */
+    . = 0xffffffff80000000 + SIZEOF_HEADERS;
 
     text_start = .;
 
@@ -50,7 +49,7 @@ SECTIONS
         KEEP(*(.requests_end_marker))
     }
 
-    /* Dynamic section for relocations and other PIE information. */
+    /* Dynamic section for relocations and other PIE related information. */
     .dynamic : {
         *(.dynamic)
     }
