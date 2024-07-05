@@ -21,19 +21,21 @@ SECTIONS
     /* base load address. */
     . = 0xffffffff80000000 + SIZEOF_HEADERS;
 
-    .text ALIGN(CONSTANT(MAXPAGESIZE)) : {
-        text_start = .;
-        *(.text .text.*)
-    }
-
     .rodata ALIGN(CONSTANT(MAXPAGESIZE)) : {
-        text_end = .;
         rodata_start = .;
+
         *(.rodata .rodata.*)
     }
 
-    .data ALIGN(CONSTANT(MAXPAGESIZE)) : {
+    .text ALIGN(CONSTANT(MAXPAGESIZE)) : {
         rodata_end = .;
+        text_start = .;
+
+        *(.text .text.*)
+    }
+
+    .data ALIGN(CONSTANT(MAXPAGESIZE)) : {
+        text_end = .;
         data_start = .;
 
         *(.data .data.*)
@@ -54,7 +56,7 @@ SECTIONS
     /* unnecessary zeros will be written to the binary. */
     /* If you need, for example, .init_array and .fini_array, those should be placed */
     /* above this. */
-    .bss : {
+    .bss ALIGN(CONSTANT(MAXPAGESIZE)) : {
         *(.bss .bss.*)
         *(COMMON)
     }
