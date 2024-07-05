@@ -1,0 +1,117 @@
+diff --git bash-clean/arrayfunc.c bash-workdir/arrayfunc.c
+index 2c05d15..3904c76 100644
+--- bash-clean/arrayfunc.c
++++ bash-workdir/arrayfunc.c
+@@ -208,7 +208,10 @@ bind_assoc_var_internal (entry, hash, key, value, flags)
+   newval = make_array_variable_value (entry, 0, key, value, flags);
+ 
+   if (entry->assign_func)
+-    (*entry->assign_func) (entry, newval, 0, key);
++    {
++      (*entry->assign_func) (entry, newval, 0, key);
++      FREE (key);
++    }
+   else
+     assoc_insert (hash, key, newval);
+ 
+diff --git bash-clean/bashline.c bash-workdir/bashline.c
+index c85b05b..bd7548c 100644
+--- bash-clean/bashline.c
++++ bash-workdir/bashline.c
+@@ -1928,6 +1928,7 @@ bash_command_name_stat_hook (name)
+   result = search_for_command (cname, 0);
+   if (result)
+     {
++      FREE (*name);
+       *name = result;
+       return 1;
+     }
+diff --git bash-clean/builtins/evalstring.c bash-workdir/builtins/evalstring.c
+index df3dd68..20c6a4a 100644
+--- bash-clean/builtins/evalstring.c
++++ bash-workdir/builtins/evalstring.c
+@@ -461,6 +461,8 @@ parse_and_execute (string, from_file, flags)
+ 		      should_jump_to_top_level = 0;
+ 		      last_result = last_command_exit_value = EX_BADUSAGE;
+ 		      set_pipestatus_from_exit (last_command_exit_value);
++		      dispose_command(command);
++		      global_command = (COMMAND *)NULL;
+ 		      reset_parser ();
+ 		      break;
+ 		    }
+@@ -762,6 +764,8 @@ open_redir_file (r, fnp)
+ 
+   if (fnp)
+     *fnp = fn;
++  else
++    free (fn);
+   return fd;
+ }
+ 
+diff --git bash-clean/configure.ac bash-workdir/configure.ac
+index 50a6e20..52d4029 100644
+--- bash-clean/configure.ac
++++ bash-workdir/configure.ac
+@@ -885,7 +885,7 @@ AC_CHECK_DECLS([strtold], [
+ 	[AC_COMPILE_IFELSE(
+ 		[AC_LANG_PROGRAM(
+ 		[[#include <stdlib.h>]],
+-		[[long double r; char *foo, bar; r = strtold(foo, &bar);]]
++		[[long double r; char *foo, *bar; r = strtold(foo, &bar);]]
+ 	)],
+ 	[bash_cv_strtold_broken=no],[bash_cv_strtold_broken=yes])
+         ]
+diff --git bash-clean/examples/loadables/stat.c bash-workdir/examples/loadables/stat.c
+index 1e60e7b..ed5c976 100644
+--- bash-clean/examples/loadables/stat.c
++++ bash-workdir/examples/loadables/stat.c
+@@ -349,6 +349,7 @@ loadstat (vname, var, fname, flags, fmt, sp)
+       key = savestring (arraysubs[i]);
+       value = statval (i, fname, flags, fmt, sp);
+       v = bind_assoc_variable (var, vname, key, value, ASS_FORCE);
++      free (value);
+     }
+   return 0;
+ }
+diff --git bash-clean/lib/sh/random.c bash-workdir/lib/sh/random.c
+index 1eaa71a..27aa87b 100644
+--- bash-clean/lib/sh/random.c
++++ bash-workdir/lib/sh/random.c
+@@ -76,7 +76,7 @@ intrand32 (last)
+   /* Can't seed with 0. */
+   ret = (last == 0) ? 123459876 : last;
+   h = ret / 127773;
+-  l = ret - (127773 * h);
++  l = ret % 127773;
+   t = 16807 * l - 2836 * h;
+   ret = (t < 0) ? t + 0x7fffffff : t;
+ 
+@@ -90,7 +90,7 @@ genseed ()
+   u_bits32_t iv;
+ 
+   gettimeofday (&tv, NULL);
+-  iv = (u_bits32_t)seedrand;		/* let the compiler truncate */
++  iv = (uintptr_t)seedrand;		/* let the compiler truncate */
+   iv = tv.tv_sec ^ tv.tv_usec ^ getpid () ^ getppid () ^ current_user.uid ^ iv;
+   return (iv);
+ }
+diff --git bash-clean/subst.c bash-workdir/subst.c
+index 0dfabfe..d16035e 100644
+--- bash-clean/subst.c
++++ bash-workdir/subst.c
+@@ -10727,6 +10727,7 @@ comsub:
+ 	    {
+ 	      chk_atstar (temp, quoted, pflags, quoted_dollar_at_p, contains_dollar_at);
+ 	      tdesc = parameter_brace_expand_word (temp, SPECIAL_VAR (temp, 0), quoted, pflags, 0);
++	      free (temp1);
+ 	      if (tdesc == &expand_wdesc_error || tdesc == &expand_wdesc_fatal)
+ 		return (tdesc);
+ 	      ret = tdesc;
+@@ -10739,6 +10740,7 @@ comsub:
+ 	    {
+ 	      set_exit_status (EXECUTION_FAILURE);
+ 	      report_error (_("%s: invalid variable name for name reference"), temp);
++	      free (temp1);
+ 	      return (&expand_wdesc_error);	/* XXX */
+ 	    }
+ 	  else
