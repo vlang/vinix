@@ -21,9 +21,9 @@ SECTIONS
     /* base load address. */
     . = 0xffffffff80000000 + SIZEOF_HEADERS;
 
-    .rodata ALIGN(CONSTANT(MAXPAGESIZE)) : {
-        rodata_start = .;
+    rodata_start = . - SIZEOF_HEADERS;
 
+    .rodata ALIGN(CONSTANT(MAXPAGESIZE)) : {
         *(.rodata .rodata.*)
     }
 
