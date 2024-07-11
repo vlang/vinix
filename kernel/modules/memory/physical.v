@@ -24,6 +24,10 @@ __global (
 	volatile hhdm_req = limine.LimineHHDMRequest{
 		response: unsafe { nil }
 	}
+	volatile paging_mode_req = limine.LiminePagingModeRequest{
+		response: unsafe { nil }
+		mode: limine.limine_paging_mode_x86_64_5lvl
+	}
 )
 
 pub fn print_free() {
