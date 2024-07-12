@@ -25,6 +25,9 @@ __global (
 )
 
 pub fn initialise() {
+	if smp_req.response == unsafe { nil } {
+		panic('SMP bootloader response missing')
+	}
 	smp_tag := smp_req.response
 
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')

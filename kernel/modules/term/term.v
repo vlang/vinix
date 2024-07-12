@@ -31,6 +31,9 @@ __global (
 )
 
 pub fn initialise() {
+	if fb_req.response == unsafe { nil } {
+		panic('Framebuffer bootloader response missing')
+	}
 	framebuffer_tag = unsafe { fb_req.response.framebuffers[0] }
 	framebuffer_width = framebuffer_tag.width
 	framebuffer_height = framebuffer_tag.height

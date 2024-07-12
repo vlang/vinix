@@ -250,6 +250,10 @@ __global (
 	volatile memmap_req = limine.LimineMemmapRequest{
 		response: unsafe { nil }
 	}
+	volatile paging_mode_req = limine.LiminePagingModeRequest{
+		response: unsafe { nil }
+		mode: limine.limine_paging_mode_x86_64_5lvl
+	}
 )
 
 fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
@@ -265,13 +269,12 @@ fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
 }
 
 pub fn vmm_init() {
-	if paging_mode_req.response.mode == limine.limine_paging_mode_x86_64_5lvl {
-		print('vmm: Using 5 level paging\n')
-		la57 = true
+	if paging_mode_req.response != unsafe { nil } {
+		if paging_mode_req.response.mode == limine.limine_paging_mode_x86_64_5lvl {
+			print('vmm: Using 5 level paging\n')
+			la57 = true
+		}
 	}
-
-	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
-	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
 
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
@@ -287,6 +290,11 @@ pub fn vmm_init() {
 	}
 
 	// Map kernel
+	if kaddr_req.response == unsafe { nil } {
+		panic('Kernel address bootloader response missing')
+	}
+	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
+	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
 	virtual_base := kaddr_req.response.virtual_base
 	physical_base := kaddr_req.response.physical_base
 
