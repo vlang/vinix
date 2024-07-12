@@ -23,28 +23,27 @@ fn main(){
 		length++
 	}
 	C.sethostname(hostname_file[..length].str, length)
-
 	for {
 		name := os.input("${os.hostname() or {"Vinix"}} name:")
 		pass := os.input("Password for ${name}:")
-		passwd := os.read_lines("/etc/passwd")!
-		for line in passwd{
-			split_line := line.split(":")
-			if split_line[0] == name{
-				if split_line[1] == pass{
-					os.setenv('HOME', split_line[5], true)
-					os.setenv('SHELL', split_line[6], true)
-					os.setenv('PATH', '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', true)
-					os.setenv('USER', '${name}', true)
-					os.setenv('LOGNAME', '${name}', true)
-
-					os.chdir(os.getenv("HOME")) or { panic("Could not move to user's home.") }
-					os.system(os.getenv("SHELL"))
-
-					break
+		login(name,pass,true)
+		os.system(os.getenv("SHELL"))
+	}
+}
+fn login(name string, pass string, checkpass bool){
+	passwd := os.read_lines("/etc/passwd")!
+	for line in passwd{
+		split_line := line.split(":")
+		if split_line[0] == name{
+			if (split_line[1] == pass) || !checkpass{
+				os.setenv('HOME', split_line[5], true)
+				os.setenv('SHELL', split_line[6], true)
+				os.setenv('PATH', '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', true)
+				os.setenv('USER', '${name}', true)
+				os.setenv('LOGNAME', '${name}', true)
+				os.chdir(os.getenv("HOME")) or { panic("Could not move to user's home.") }
+				break
 				}
 			}
-		}
-
 	}
 }
