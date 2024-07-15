@@ -582,7 +582,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2) ?
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
-		real_path, arg := parse_shebang(mut prog) ?
+		real_path, arg := parse_shebang(mut prog, path) ?
 		mut final_argv := [real_path]
 		if arg != '' {
 			final_argv << arg
@@ -697,7 +697,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	}
 }
 
-pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
+pub fn parse_shebang(mut res resource.Resource, path string) ?(string, string) {
 	// Parse the shebang that we already know is there.
 	// Syntax: #![whitespace]interpreter [single arg]new line
 	mut index := u64(2)
@@ -734,11 +734,15 @@ pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 	}
 
 	ret:
-	final_path := build_path.str()
+	mut final_path := build_path.str()
 	final_arg := build_arg.str()
 	unsafe {
 		build_path.free()
 		build_arg.free()
+	}
+	if final_path == path{
+		eprintln("Loop detected! aborting.")
+		final_path = "/dev/null"
 	}
 	return final_path, final_arg
 }
