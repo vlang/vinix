@@ -1,8 +1,8 @@
 name=limine
-version=7.10.2
+version=7.10.3
 revision=1
 tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.gz"
-tarball_blake2b="d42663dab5bd383ed3defe582e8a9ec76a1d9c5f27c1ab32efdc41f64b4415abb17893b592ee8532e2a494922f5efaa3e7774c53c6351f93fa7a335fcdc36708"
+tarball_blake2b="5e85b56bcaffd2beabeacb60b86942de850ed7d78f29c004d7595fb986e575785ddb05f0e4776a35d9116031855fcb8899aeb5cdc8542f57bd4d8fe5d56d139b"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="mtools nasm"
 hostdeps="gcc autoconf automake libtool pkg-config"
