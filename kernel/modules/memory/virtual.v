@@ -252,7 +252,10 @@ __global (
 	}
 	volatile paging_mode_req = limine.LiminePagingModeRequest{
 		response: unsafe { nil }
+		revision: 1
 		mode: limine.limine_paging_mode_x86_64_5lvl
+		max_mode: limine.limine_paging_mode_x86_64_5lvl
+		min_mode: limine.limine_paging_mode_x86_64_4lvl
 	}
 )
 

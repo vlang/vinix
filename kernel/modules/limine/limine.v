@@ -153,7 +153,6 @@ pub struct LiminePagingModeResponse {
 pub mut:
 	revision u64
 	mode u64
-	flags u64
 }
 
 pub struct LiminePagingModeRequest {
@@ -165,7 +164,8 @@ pub mut:
 	revision u64
 	response &LiminePagingModeResponse
 	mode u64
-	flags u64
+	max_mode u64
+	min_mode u64
 }
 
 // SMP
