@@ -1,33 +1,40 @@
 #! /bin/sh
 
-set -e
+set -ex
 
-FREESTANDING_HDRS_REV=dd3abd2d7147efc4170dff478d3b7730bed14147
-FLANTERM_REV=ef07a10cc38b34aa003d17be97a9f3542e275069
-EYALROZ_PRINTF_REV=727b0e576c0cdadcb4986072666450f1ff7ff01c
+srcdir="$(dirname "$0")"
+test -z "$srcdir" && srcdir=.
+
+cd "$srcdir"
+
+FREESTANDING_HEADERS_COMMIT_HASH=dd3abd2d7147efc4170dff478d3b7730bed14147
+FLANTERM_COMMIT_HASH=ef07a10cc38b34aa003d17be97a9f3542e275069
+EYALROZ_PRINTF_COMMIT_HASH=2d75fef6c605e699d2643267cbaeaaa49b0a2635
 
 clone_repo_commit() {
-    if [ -d $2/.git ]; then
+    if test -d $2/.git; then
         git -C $2 reset --hard
         git -C $2 clean -fd
         if ! git -C $2 checkout $3; then
             rm -rf $2
         fi
     else
-        if [ -d $2 ]; then
+        if test -d $2; then
             echo "error: '$2' is not a Git repository"
             exit 1
         fi
     fi
-    if ! [ -d $2 ]; then
+    if ! test -d $2; then
         git clone $1 $2
         git -C $2 checkout $3
     fi
 }
 
-clone_repo_commit https://github.com/osdev0/freestanding-headers.git c/freestanding-headers $FREESTANDING_HDRS_REV
-clone_repo_commit https://github.com/mintsuki/flanterm.git c/flanterm $FLANTERM_REV
+#if test -d .git; then
+    clone_repo_commit https://github.com/osdev0/freestanding-headers.git c/freestanding-headers $FREESTANDING_HEADERS_COMMIT_HASH
+    clone_repo_commit https://github.com/mintsuki/flanterm.git c/flanterm $FLANTERM_COMMIT_HASH
 
-clone_repo_commit https://github.com/eyalroz/printf.git printf $EYALROZ_PRINTF_REV
-mkdir -p c/printf
-cp printf/src/printf/printf.c printf/src/printf/printf.h c/printf/
+    clone_repo_commit https://github.com/eyalroz/printf.git printf $EYALROZ_PRINTF_COMMIT_HASH
+    mkdir -p c/printf
+    cp printf/src/printf/printf.c printf/src/printf/printf.h c/printf/
+#fi

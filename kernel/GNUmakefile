@@ -134,7 +134,7 @@ bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.c.o
 	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
 	mv symbol_table.c.tmp c/symbol_table.c
-	printf '\003' | dd of=$@ bs=1 count=1 seek=16 conv=notrunc
+	printf '\003' | dd of=$@ bs=1 count=1 seek=16 conv=notrunc 2>/dev/null
 
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"

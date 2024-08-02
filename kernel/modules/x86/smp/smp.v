@@ -19,15 +19,20 @@ __global (
 @[_linker_section: '.requests']
 __global (
 	volatile smp_req = limine.LimineSMPRequest{
+		flags: 1 // x2apic allowed
 		response: unsafe { nil }
 	}
 )
 
 pub fn initialise() {
+	if smp_req.response == unsafe { nil } {
+		panic('SMP bootloader response missing')
+	}
 	smp_tag := smp_req.response
 
 	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
 	println('smp: Total CPU count: ${smp_tag.cpu_count}')
+	println('smp: Using x2APIC:    ${x2apic_mode}')
 
 	smp_info_array := smp_tag.cpus
 

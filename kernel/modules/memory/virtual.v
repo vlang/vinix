@@ -26,6 +26,7 @@ pub const (
 
 __global (
 	page_size       = u64(0x1000)
+	la57            = bool(false)
 	kernel_pagemap  Pagemap
 	vmm_initialised = bool(false)
 )
@@ -60,12 +61,18 @@ pub fn new_pagemap() &Pagemap {
 }
 
 pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
+	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
 	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
-	pml4 := pagemap.top_level
+	pml5 := pagemap.top_level
+	pml4 := if !la57 {
+		pagemap.top_level
+	} else {
+		get_next_level(pml5, pml5_entry, allocate) or { return none }
+	}
 	pml3 := get_next_level(pml4, pml4_entry, allocate) or { return none }
 	pml2 := get_next_level(pml3, pml3_entry, allocate) or { return none }
 	pml1 := get_next_level(pml2, pml2_entry, allocate) or { return none }
@@ -116,12 +123,19 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 }
 
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
+	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
 	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
-	mut pml4 := pagemap.top_level
+	mut pml5 := pagemap.top_level
+	mut pml5_p := unsafe { &u64(u64(pml5) + higher_half) }
+	mut pml4 := if !la57 {
+		pagemap.top_level
+	} else {
+		get_next_level(pml5, pml5_entry, false) or { return none }
+	}
 	mut pml4_p := unsafe { &u64(u64(pml4) + higher_half) }
 	mut pml3 := get_next_level(pml4, pml4_entry, false) or { return none }
 	mut pml3_p := unsafe { &u64(u64(pml3) + higher_half) }
@@ -167,6 +181,17 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 			pmm_free(pml3, 1)
 			pml4_p[pml4_entry] = 0
 		}
+		if la57 {
+			for ; i < 512; i++ {
+				if pml4_p[i] != 0 {
+					break
+				}
+			}
+			if i == 512 {
+				pmm_free(pml4, 1)
+				pml5_p[pml5_entry] = 0
+			}
+		}
 	}
 
 	current_cr3 := cpu.read_cr3()
@@ -195,12 +220,18 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 		pagemap.l.release()
 	}
 
+	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
 	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
-	pml4 := pagemap.top_level
+	pml5 := pagemap.top_level
+	pml4 := if !la57 {
+		pagemap.top_level
+	} else {
+		get_next_level(pml5, pml5_entry, true) or { return none }
+	}
 	pml3 := get_next_level(pml4, pml4_entry, true) or { return none }
 	pml2 := get_next_level(pml3, pml3_entry, true) or { return none }
 	mut pml1 := get_next_level(pml2, pml2_entry, true) or { return none }
@@ -219,6 +250,13 @@ __global (
 	volatile memmap_req = limine.LimineMemmapRequest{
 		response: unsafe { nil }
 	}
+	volatile paging_mode_req = limine.LiminePagingModeRequest{
+		response: unsafe { nil }
+		revision: 1
+		mode: limine.limine_paging_mode_x86_64_5lvl
+		max_mode: limine.limine_paging_mode_x86_64_5lvl
+		min_mode: limine.limine_paging_mode_x86_64_4lvl
+	}
 )
 
 fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
@@ -234,8 +272,12 @@ fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
 }
 
 pub fn vmm_init() {
-	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
-	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
+	if paging_mode_req.response != unsafe { nil } {
+		if paging_mode_req.response.mode == limine.limine_paging_mode_x86_64_5lvl {
+			print('vmm: Using 5 level paging\n')
+			la57 = true
+		}
+	}
 
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
@@ -251,6 +293,11 @@ pub fn vmm_init() {
 	}
 
 	// Map kernel
+	if kaddr_req.response == unsafe { nil } {
+		panic('Kernel address bootloader response missing')
+	}
+	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
+	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
 	virtual_base := kaddr_req.response.virtual_base
 	physical_base := kaddr_req.response.physical_base
 

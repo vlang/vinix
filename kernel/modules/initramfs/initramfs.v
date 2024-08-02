@@ -59,6 +59,10 @@ __global (
 
 @[manualfree]
 pub fn initialise() {
+	if module_req.response == unsafe { nil } {
+		panic('Modules bootloader response missing')
+	}
+
 	if module_req.response.module_count < 1 {
 		panic('No initramfs')
 	}

@@ -8,58 +8,42 @@ deps="core-libs"
 
 build() {
     cp -r ${source_dir}/. .
-    sed -i 's/all: libbz2.a bzip2 bzip2recover test/all: libbz2.a bzip2 bzip2recover/g' Makefile
 
-    make CC=${OS_TRIPLET}-gcc CFLAGS="$CFLAGS -fPIC" LDFLAGS="$LDFLAGS" -f Makefile-libbz2_so
-    make clean
-    make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" -j${parallelism}
+    make -f Makefile-libbz2_so CC="${OS_TRIPLET}-gcc $CFLAGS $CPPFLAGS $LDFLAGS"
+    make bzip2 bzip2recover CC="${OS_TRIPLET}-gcc $CFLAGS $CPPFLAGS $LDFLAGS" AR="${OS_TRIPLET}-ar"
 }
 
 package() {
-    mkdir -p "${dest_dir}${prefix}/bin" "${dest_dir}${prefix}/lib" "${dest_dir}${prefix}/lib/pkgconfig" "${dest_dir}${prefix}/include"
-    install bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
-    install bzip2recover "${dest_dir}${prefix}/bin/"
-    install bzdiff "${dest_dir}${prefix}/bin/"
-    install bzgrep "${dest_dir}${prefix}/bin/"
-    install bzmore "${dest_dir}${prefix}/bin/"
-    install libbz2.so.${version} "${dest_dir}${prefix}/lib/"
-    install -m 644 bzlib.h "${dest_dir}${prefix}/include/"
-    ln -sf libbz2.so.${version} "${dest_dir}${prefix}/lib/libbz2.so.1.0"
-    ln -sf libbz2.so.1.0 "${dest_dir}${prefix}/lib/libbz2.so.1"
-    ln -sf libbz2.so.1 "${dest_dir}${prefix}/lib/libbz2.so"
-    ln -sf bzdiff "${dest_dir}${prefix}/bin/bzcmp"
-    ln -sf bzgrep "${dest_dir}${prefix}/bin/bzegrep"
-    ln -sf bzgrep "${dest_dir}${prefix}/bin/bzfgrep"
-    ln -sf bzmore "${dest_dir}${prefix}/bin/bzless"
+    install -dm755 "${dest_dir}${prefix}/"{bin,lib,lib/pkgconfig,include,share/man/man1}
+
+    install -m755 bzip2-shared "${dest_dir}${prefix}/bin/bzip2"
+    install -m755 bzip2recover bzdiff bzgrep bzmore "${dest_dir}${prefix}/bin/"
+    ln -sf bzip2 "${dest_dir}${prefix}/bin/bunzip2"
+    ln -sf bzip2 "${dest_dir}${prefix}/bin/bzcat"
+
+    cp -a libbz2.so* "${dest_dir}${prefix}/lib/"
+    ln -s libbz2.so.${version} "${dest_dir}${prefix}/lib/libbz2.so"
+    ln -s libbz2.so.${version} "${dest_dir}${prefix}/lib/libbz2.so.1"
+
+    install -m644 bzlib.h "${dest_dir}${prefix}/include/"
+
+    install -m644 bzip2.1 "${dest_dir}${prefix}/share/man/man1/"
+    ln -sf bzip2.1 "${dest_dir}${prefix}/share/man/man1/bunzip2.1"
+    ln -sf bzip2.1 "${dest_dir}${prefix}/share/man/man1/bzcat.1"
+    ln -sf bzip2.1 "${dest_dir}${prefix}/share/man/man1/bzip2recover.1"
+
     cat <<EOF >"${dest_dir}${prefix}/lib/pkgconfig/bzip2.pc"
 prefix=${prefix}
-exec_prefix=${prefix}/bin
-libdir=${prefix}/lib
-sharedlibdir=${prefix}/lib
-includedir=${prefix}/include
+exec_prefix=\${prefix}
+bindir=\${exec_prefix}/bin
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
 
 Name: bzip2
-Description: BZip2 compression library
+Description: A file compression library
 Version: ${version}
-
-Requires:
-Libs: -L${prefix}/lib -lbz2
-Cflags: -I${prefix}/include
-EOF
-    cat <<EOF >"${dest_dir}${prefix}/lib/pkgconfig/libbz2.pc"
-prefix=${prefix}
-exec_prefix=${prefix}/bin
-libdir=${prefix}/lib
-sharedlibdir=${prefix}/lib
-includedir=${prefix}/include
-
-Name: libbz2
-Description: BZip2 compression library
-Version: ${version}
-
-Requires:
-Libs: -L${prefix}/lib -lbz2
-Cflags: -I${prefix}/include
+Libs: -L\${libdir} -lbz2
+Cflags: -I\${includedir}
 EOF
 
     post_package_strip

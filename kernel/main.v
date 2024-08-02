@@ -103,12 +103,11 @@ pub fn kmain() {
 	idt.initialise()
 	isr.initialise()
 
+	x2apic_mode = smp_req.response.flags & 1 != 0
+
 	// Init terminal
 	term.initialise()
 	serial.early_initialise()
-
-	// We're alive
-	println('Welcome to Vinix\n')
 
 	// a dummy call to avoid V warning about an unused `stubs` module
 	_ := stubs.toupper(0)

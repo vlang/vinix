@@ -22,20 +22,45 @@ const (
 
 __global (
 	lapic_base = u64(0)
+	x2apic_mode = bool(false)
 )
 
-fn lapic_read(reg u32) u32 {
+fn xapic_read(reg u32) u32 {
 	if lapic_base == u64(0) {
 		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
 	}
 	return kio.mmin(&u32(lapic_base + reg))
 }
 
-fn lapic_write(reg u32, val u32) {
+fn x2apic_read(reg u32) u64 {
+	return msr.rdmsr(0x800 + (reg >> 4))
+}
+
+fn xapic_write(reg u32, val u32) {
 	if lapic_base == u64(0) {
 		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
 	}
 	kio.mmout(&u32(lapic_base + reg), val)
+}
+
+fn x2apic_write(reg u32, val u64) {
+	msr.wrmsr(0x800 + (reg >> 4), val)
+}
+
+fn lapic_read(reg u32) u64 {
+	if x2apic_mode {
+		return x2apic_read(reg)
+	} else {
+		return xapic_read(reg)
+	}
+}
+
+fn lapic_write(reg u32, val u64) {
+	if x2apic_mode {
+		x2apic_write(reg, val)
+	} else {
+		xapic_write(reg, u32(val))
+	}
 }
 
 pub fn lapic_timer_stop() {
@@ -86,9 +111,13 @@ pub fn lapic_eoi() {
 	lapic_write(apic.lapic_reg_eoi, 0)
 }
 
-pub fn lapic_send_ipi(lapic_id u8, vector u8) {
-	lapic_write(apic.lapic_reg_icr1, u32(lapic_id) << 24)
-	lapic_write(apic.lapic_reg_icr0, vector)
+pub fn lapic_send_ipi(lapic_id u32, vector u8) {
+	if x2apic_mode {
+		x2apic_write(apic.lapic_reg_icr0, (u64(lapic_id) << 32) | vector)
+	} else {
+		xapic_write(apic.lapic_reg_icr1, u32(lapic_id) << 24)
+		xapic_write(apic.lapic_reg_icr0, vector)
+	}
 }
 
 fn io_apic_read(io_apic int, reg u32) u32 {

@@ -6,7 +6,7 @@ tarball_blake2b="7c1962dfccc6a1b6250e80b0706d7f44536fabeff009013865ec4b1edaec6d4
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="autoconf-archive"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs glib libexpat"
+deps="core-libs libexpat"
 
 regenerate() {
     autotools_recursive_regen

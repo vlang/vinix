@@ -71,7 +71,11 @@ __global (
 )
 
 pub fn initialise() {
-	epoch := boottime_req.response.boot_time
+	epoch := if boottime_req.response != unsafe { nil } {
+		boottime_req.response.boot_time
+	} else {
+		0
+	}
 
 	monotonic_clock = TimeSpec{i64(epoch), 0}
 	realtime_clock = TimeSpec{i64(epoch), 0}

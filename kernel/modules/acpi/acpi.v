@@ -53,6 +53,9 @@ __global (
 )
 
 pub fn initialise() {
+	if rsdp_req.response == unsafe { nil } {
+		panic('acpi: ACPI not supported on this machine.')
+	}
 	rsdp_ptr := rsdp_req.response.address
 
 	if rsdp_ptr == 0 {

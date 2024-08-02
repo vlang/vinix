@@ -18,12 +18,22 @@ build() {
     autotools_configure \
         --target=${OS_TRIPLET} \
         --with-build-sysroot=${sysroot_dir} \
+        --enable-separate-code \
         --enable-cet \
         --enable-colored-disassembly \
+        --enable-default-execstack=no \
+        --enable-deterministic-archives \
+        --enable-gold \
+        --enable-ld=default \
+        --enable-new-dtags \
+        --enable-plugins \
+        --enable-relro \
+        --enable-threads \
         --disable-werror \
+        --with-pic \
         --with-system-zlib
 
-    make -j${parallelism} all
+    make -j${parallelism}
 }
 
 package() {

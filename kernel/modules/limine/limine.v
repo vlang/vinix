@@ -142,21 +142,30 @@ pub mut:
 	response &LimineFramebufferResponse
 }
 
-// 5-level paging
+// Paging mode
 
-pub struct Limine5LevelPagingResponse {
+pub const (
+	limine_paging_mode_x86_64_4lvl = 0
+	limine_paging_mode_x86_64_5lvl = 1
+)
+
+pub struct LiminePagingModeResponse {
 pub mut:
 	revision u64
+	mode u64
 }
 
-pub struct Limine5LevelPagingRequest {
+pub struct LiminePagingModeRequest {
 pub mut:
 	id [4]u64 = [
 		u64(0xc7b1dd30df4c8b88), 0x0a82e883a194f07b,
-		0x94469551da9b3192, 0xebe5e86db7382888
+		0x95c1a0edab0944cb, 0xa4e5cb3842f7488a
 	]!
 	revision u64
-	response &Limine5LevelPagingResponse
+	response &LiminePagingModeResponse
+	mode u64
+	max_mode u64
+	min_mode u64
 }
 
 // SMP

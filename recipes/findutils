@@ -4,7 +4,6 @@ revision=1
 tarball_url="https://ftp.gnu.org/gnu/findutils/findutils-${version}.tar.xz"
 tarball_blake2b="2eebdcb425c04170d17afb80e7270ba095bd691660d961dcfa731141633d3bb597d0b47d69ed17e891ef884a36d4c232885097e45b41d3d3ac79dbeae6ee2282"
 source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="python"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 

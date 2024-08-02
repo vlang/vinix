@@ -30,6 +30,16 @@ pub:
 }
 
 @[packed]
+struct MADTLocalX2Apic {
+pub:
+	header MADTHeader
+	reserved [2]u8
+	x2apic_id u32
+	flags u32
+	processor_id u32
+}
+
+@[packed]
 struct MADTIoApic {
 pub:
 	header   MADTHeader
@@ -61,6 +71,7 @@ pub:
 __global (
 	madt             &MADT
 	madt_local_apics []&MADTLocalApic
+	madt_local_x2apics []&MADTLocalX2Apic
 	madt_io_apics    []&MADTIoApic
 	madt_isos        []&MADTISO
 	madt_nmis        []&MADTNMI
@@ -82,6 +93,12 @@ fn madt_init() {
 			0 {
 				println('acpi/madt: Found local APIC #${madt_local_apics.len}')
 				madt_local_apics << unsafe { &MADTLocalApic(header) }
+			}
+			9 {
+				if x2apic_mode {
+					println('acpi/madt: Found local x2APIC #${madt_local_x2apics.len}')
+					madt_local_x2apics << unsafe { &MADTLocalX2Apic(header) }
+				}
 			}
 			1 {
 				println('acpi/madt: Found IO APIC #${madt_io_apics.len}')

@@ -35,10 +35,16 @@ pub fn print_free() {
 }
 
 pub fn pmm_init() {
+	if hhdm_req.response == unsafe { nil } {
+		lib.kpanic(unsafe { nil }, c'HHDM bootloader response missing')
+	}
 	higher_half = hhdm_req.response.offset
 
 	C.printf(c'pmm: Higher half direct map at: %p\n', higher_half)
 
+	if memmap_req.response == unsafe { nil } {
+		lib.kpanic(unsafe { nil }, c'Memory map bootloader response missing')
+	}
 	memmap := memmap_req.response
 
 	unsafe {
