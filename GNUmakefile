@@ -19,7 +19,7 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -Lo jinx https://github.com/mintsuki/jinx/raw/c1c78f1aff1ec00c1d2aaa84f7249168be66a972/jinx
+	curl -Lo jinx https://github.com/mintsuki/jinx/raw/99d8151ca5f849e48c38cbe1a232c6a7a1dbc681/jinx
 	chmod +x jinx
 
 .PHONY: distro-full
