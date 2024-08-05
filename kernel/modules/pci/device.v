@@ -113,7 +113,7 @@ pub fn (dev &PCIDevice) set_msi(vector u8) {
 	mut reg0 := 0x4
 	mut reg1 := 0x8
 
-	if ((message_control << 7) & 1) == 1 { // 64 bit support
+	if ((message_control >> 7) & 1) == 1 { // 64 bit support
 		reg1 = 0xc
 	}
 
