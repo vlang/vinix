@@ -1,5 +1,5 @@
 diff --git binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
-index bbf1244..d17c862 100644
+index 6553aac..188a8e0 100644
 --- binutils-clean/bfd/config.bfd
 +++ binutils-workdir/bfd/config.bfd
 @@ -665,6 +665,11 @@ case "${targ}" in
@@ -27,10 +27,10 @@ index bbf1244..d17c862 100644
    i[3-7]86-*-lynxos*)
      targ_defvec=i386_elf32_vec
 diff --git binutils-clean/configure.ac binutils-workdir/configure.ac
-index 8186062..a9458d4 100644
+index eb5b3b3..964ba0c 100644
 --- binutils-clean/configure.ac
 +++ binutils-workdir/configure.ac
-@@ -350,7 +350,7 @@ case "${ENABLE_GOLD}" in
+@@ -351,7 +351,7 @@ case "${ENABLE_GOLD}" in
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | *-*-gnu* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
        | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-dragonfly* \
@@ -40,7 +40,7 @@ index 8186062..a9458d4 100644
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
 diff --git binutils-clean/gas/configure.tgt binutils-workdir/gas/configure.tgt
-index 7c66734..3ab7137 100644
+index d58f218..c57d177 100644
 --- binutils-clean/gas/configure.tgt
 +++ binutils-workdir/gas/configure.tgt
 @@ -229,6 +229,7 @@ case ${generic_target} in
@@ -52,13 +52,13 @@ index 7c66734..3ab7137 100644
    i386-*-haiku*)			fmt=elf em=haiku ;;
    i386-*-genode*)			fmt=elf ;;
 diff --git binutils-clean/gprofng/libcollector/configure.ac binutils-workdir/gprofng/libcollector/configure.ac
-index b0ef678..eeacc89 100644
+index b923645..4df7b1c 100644
 --- binutils-clean/gprofng/libcollector/configure.ac
 +++ binutils-workdir/gprofng/libcollector/configure.ac
 @@ -18,7 +18,7 @@ dnl <http://www.gnu.org/licenses/>.
  
  m4_include([../../bfd/version.m4])
- AC_INIT([gprofng], BFD_VERSION)
+ AC_INIT([gprofng], [BFD_VERSION])
 -AC_CONFIG_MACRO_DIRS([../../config ../..])
 +#AC_CONFIG_MACRO_DIRS([../../config ../..])
  AC_CONFIG_AUX_DIR(../..)
@@ -89,7 +89,7 @@ index f937f78..10fbfe5 100644
  			targ_extra_emuls="elf_x86_64 elf_i386_sol2 elf_i386_ldso elf_i386 elf_iamcu"
  			targ_extra_libpath=$targ_extra_emuls
 diff --git binutils-clean/libiberty/configure.ac binutils-workdir/libiberty/configure.ac
-index 0888e63..10161a1 100644
+index c27e08e..e48ef89 100644
 --- binutils-clean/libiberty/configure.ac
 +++ binutils-workdir/libiberty/configure.ac
 @@ -37,7 +37,7 @@ else
