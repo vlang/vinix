@@ -12,9 +12,7 @@ import resource
 import lib
 import fs
 
-const (
-	gpt_signature = u64(0x5452415020494645)
-)
+const gpt_signature = u64(0x5452415020494645)
 
 struct Partition {
 pub mut:

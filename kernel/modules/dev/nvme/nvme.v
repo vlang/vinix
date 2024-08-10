@@ -19,28 +19,22 @@ import block.partition
 import fs
 import katomic
 
-const (
-	nvme_class    = 0x1
-	nvme_subclass = 0x8
-	nvme_progif   = 0x2
-)
+const nvme_class    = 0x1
+const nvme_subclass = 0x8
+const nvme_progif   = 0x2
 
-const (
-	opcode_delete_sq     = 0x0
-	opcode_create_sq     = 0x1
-	opcode_delete_cq     = 0x4
-	opcode_create_cq     = 0x5
-	opcode_identify      = 0x6
-	opcode_abort         = 0x8
-	opcode_set_features  = 0x9
-	opcode_get_features  = 0xa
-	opcode_ns_management = 0xd
-	opcode_format_cmd    = 0x80
-)
+const opcode_delete_sq     = 0x0
+const opcode_create_sq     = 0x1
+const opcode_delete_cq     = 0x4
+const opcode_create_cq     = 0x5
+const opcode_identify      = 0x6
+const opcode_abort         = 0x8
+const opcode_set_features  = 0x9
+const opcode_get_features  = 0xa
+const opcode_ns_management = 0xd
+const opcode_format_cmd    = 0x80
 
-const (
-	nvme_io_queue_cnt = 0x4
-)
+const nvme_io_queue_cnt = 0x4
 
 @[packed]
 struct NVMERegisters {

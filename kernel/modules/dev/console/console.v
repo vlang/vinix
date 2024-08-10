@@ -21,23 +21,21 @@ import file
 import userland
 import proc
 import katomic
-import flanterm
+import flanterm as _
 
-const (
-	max_scancode        = 0x57
-	capslock            = 0x3a
-	numlock             = 0x45
-	left_alt            = 0x38
-	left_alt_rel        = 0xb8
-	right_shift         = 0x36
-	left_shift          = 0x2a
-	right_shift_rel     = 0xb6
-	left_shift_rel      = 0xaa
-	ctrl                = 0x1d
-	ctrl_rel            = 0x9d
-	console_buffer_size = 1024
-	console_bigbuf_size = 4096
-)
+const max_scancode        = 0x57
+const capslock            = 0x3a
+const numlock             = 0x45
+const left_alt            = 0x38
+const left_alt_rel        = 0xb8
+const right_shift         = 0x36
+const left_shift          = 0x2a
+const right_shift_rel     = 0xb6
+const left_shift_rel      = 0xaa
+const ctrl                = 0x1d
+const ctrl_rel            = 0x9d
+const console_buffer_size = 1024
+const console_bigbuf_size = 4096
 
 __global (
 	console_convtab_numpad_numlock map[u8]u8

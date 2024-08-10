@@ -6,17 +6,15 @@ module stat
 
 import time
 
-pub const (
-	ifmt   = 0xf000
-	ifblk  = 0x6000
-	ifchr  = 0x2000
-	ififo  = 0x1000
-	ifreg  = 0x8000
-	ifdir  = 0x4000
-	iflnk  = 0xa000
-	ifsock = 0xc000
-	ifpipe = 0x3000
-)
+pub const ifmt   = 0xf000
+pub const ifblk  = 0x6000
+pub const ifchr  = 0x2000
+pub const ififo  = 0x1000
+pub const ifreg  = 0x8000
+pub const ifdir  = 0x4000
+pub const iflnk  = 0xa000
+pub const ifsock = 0xc000
+pub const ifpipe = 0x3000
 
 pub fn isblk(mode u32) bool {
 	return (mode & stat.ifmt) == stat.ifblk
@@ -65,17 +63,15 @@ pub mut:
 	pad1    [3]i64
 }
 
-pub const (
-	dt_unknown = 0
-	dt_fifo    = 1
-	dt_chr     = 2
-	dt_dir     = 4
-	dt_blk     = 6
-	dt_reg     = 8
-	dt_lnk     = 10
-	dt_sock    = 12
-	dt_wht     = 14
-)
+pub const dt_unknown = 0
+pub const dt_fifo    = 1
+pub const dt_chr     = 2
+pub const dt_dir     = 4
+pub const dt_blk     = 6
+pub const dt_reg     = 8
+pub const dt_lnk     = 10
+pub const dt_sock    = 12
+pub const dt_wht     = 14
 
 pub struct Dirent {
 pub mut:

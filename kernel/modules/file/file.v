@@ -15,21 +15,19 @@ import event.eventstruct
 import memory.mmap
 import time
 
-pub const (
-	f_dupfd         = 0
-	f_dupfd_cloexec = 1030
-	f_getfd         = 1
-	f_setfd         = 2
-	f_getfl         = 3
-	f_setfl         = 4
-	f_getlk         = 5
-	f_setlk         = 6
-	f_setlkw        = 7
-	f_getown        = 8
-	f_setown        = 9
+pub const f_dupfd         = 0
+pub const f_dupfd_cloexec = 1030
+pub const f_getfd         = 1
+pub const f_setfd         = 2
+pub const f_getfl         = 3
+pub const f_setfl         = 4
+pub const f_getlk         = 5
+pub const f_setlk         = 6
+pub const f_setlkw        = 7
+pub const f_getown        = 8
+pub const f_setown        = 9
 
-	fd_cloexec      = 1
-)
+pub const fd_cloexec      = 1
 
 pub struct Handle {
 pub mut:
@@ -51,16 +49,14 @@ mut:
 	revents i16
 }
 
-pub const (
-	pollin     = 0x01
-	pollout    = 0x04
-	pollpri    = 0x02
-	pollhup    = 0x10
-	pollerr    = 0x08
-	pollrdhup  = 0x2000
-	pollnval   = 0x20
-	pollwrnorm = 0x100
-)
+pub const pollin     = 0x01
+pub const pollout    = 0x04
+pub const pollpri    = 0x02
+pub const pollhup    = 0x10
+pub const pollerr    = 0x08
+pub const pollrdhup  = 0x2000
+pub const pollnval   = 0x20
+pub const pollwrnorm = 0x100
 
 pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut t := proc.current_thread()

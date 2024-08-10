@@ -11,17 +11,15 @@ import proc
 import file
 import errno
 
-pub const (
-	at_fdcwd            = -100
-	at_empty_path       = 0x1000
-	at_symlink_follow   = 0x400
-	at_symlink_nofollow = 0x100
-	at_removedir        = 0x200
-	at_eaccess          = 0x200
-	seek_cur            = 1
-	seek_end            = 2
-	seek_set            = 0
-)
+pub const at_fdcwd            = -100
+pub const at_empty_path       = 0x1000
+pub const at_symlink_follow   = 0x400
+pub const at_symlink_nofollow = 0x100
+pub const at_removedir        = 0x200
+pub const at_eaccess          = 0x200
+pub const seek_cur            = 1
+pub const seek_end            = 2
+pub const seek_set            = 0
 
 interface FileSystem {
 mut:

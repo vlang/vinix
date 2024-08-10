@@ -16,28 +16,26 @@ import fs
 import katomic
 import time.sys
 
-const (
-	ahci_class      = 0x1
-	ahci_subclass   = 0x6
-	ahci_progif     = 0x1
-	sata_ata        = 0x101
-	sata_atapi      = u32(0xeb140101)
-	sata_semb       = u32(0xc33C0101)
-	sata_pm         = u32(0x96690101)
-	hba_cmd_st      = 0x1
-	hba_cmd_fre     = 0x10
-	hba_cmd_fr      = 0x4000
-	hba_cmd_cr      = 0x8000
-	fis_reg_h2d     = 0x27
-	fis_reg_d2h     = 0x34
-	fis_dma_enable  = 0x39
-	fis_dma_setup   = 0x41
-	fis_data        = 0x46
-	fis_bist        = 0x58
-	fis_pio_setup   = 0x5f
-	fis_device_bits = 0xa1
-	sector_size     = 0x200
-)
+const ahci_class      = 0x1
+const ahci_subclass   = 0x6
+const ahci_progif     = 0x1
+const sata_ata        = 0x101
+const sata_atapi      = u32(0xeb140101)
+const sata_semb       = u32(0xc33C0101)
+const sata_pm         = u32(0x96690101)
+const hba_cmd_st      = 0x1
+const hba_cmd_fre     = 0x10
+const hba_cmd_fr      = 0x4000
+const hba_cmd_cr      = 0x8000
+const fis_reg_h2d     = 0x27
+const fis_reg_d2h     = 0x34
+const fis_dma_enable  = 0x39
+const fis_dma_setup   = 0x41
+const fis_data        = 0x46
+const fis_bist        = 0x58
+const fis_pio_setup   = 0x5f
+const fis_device_bits = 0xa1
+const sector_size     = 0x200
 
 @[packed]
 struct AHCIRegisters {

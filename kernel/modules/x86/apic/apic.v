@@ -9,16 +9,14 @@ import x86.msr
 import x86.cpu.local as cpulocal
 import time
 
-const (
-	lapic_reg_icr0          = 0x300
-	lapic_reg_icr1          = 0x310
-	lapic_reg_spurious      = 0x0f0
-	lapic_reg_eoi           = 0x0b0
-	lapic_reg_timer         = 0x320
-	lapic_reg_timer_initcnt = 0x380
-	lapic_reg_timer_curcnt  = 0x390
-	lapic_reg_timer_div     = 0x3e0
-)
+const lapic_reg_icr0          = 0x300
+const lapic_reg_icr1          = 0x310
+const lapic_reg_spurious      = 0x0f0
+const lapic_reg_eoi           = 0x0b0
+const lapic_reg_timer         = 0x320
+const lapic_reg_timer_initcnt = 0x380
+const lapic_reg_timer_curcnt  = 0x390
+const lapic_reg_timer_div     = 0x3e0
 
 __global (
 	lapic_base = u64(0)

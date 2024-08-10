@@ -8,9 +8,7 @@ import x86.kio
 import x86.idt
 import x86.cpu.local as cpulocal
 
-pub const (
-	pit_dividend = u64(1193182)
-)
+pub const pit_dividend = u64(1193182)
 
 pub fn pit_get_current_count() u16 {
 	kio.port_out<u8>(0x43, 0)

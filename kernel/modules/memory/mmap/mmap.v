@@ -12,17 +12,15 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import lib
 
-pub const (
-	prot_none     = 0x00
-	prot_read     = 0x01
-	prot_write    = 0x02
-	prot_exec     = 0x04
-	map_private   = 0x02
-	map_shared    = 0x01
-	map_fixed     = 0x10
-	map_anon      = 0x20
-	map_anonymous = 0x20
-)
+pub const prot_none     = 0x00
+pub const prot_read     = 0x01
+pub const prot_write    = 0x02
+pub const prot_exec     = 0x04
+pub const map_private   = 0x02
+pub const map_shared    = 0x01
+pub const map_fixed     = 0x10
+pub const map_anon      = 0x20
+pub const map_anonymous = 0x20
 
 pub struct MmapRangeLocal {
 pub mut:

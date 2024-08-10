@@ -16,13 +16,11 @@ fn C.rodata_end()
 fn C.data_start()
 fn C.data_end()
 
-pub const (
-	pte_present = u64(1) << 0
-	pte_writable = u64(1) << 1
-	pte_user = u64(1) << 2
-	pte_noexec = u64(1) << 63
-	pte_flags_mask = ~(u64(0xfff) | pte_present | pte_writable | pte_user | pte_noexec)
-)
+pub const pte_present = u64(1) << 0
+pub const pte_writable = u64(1) << 1
+pub const pte_user = u64(1) << 2
+pub const pte_noexec = u64(1) << 63
+pub const pte_flags_mask = ~(u64(0xfff) | pte_present | pte_writable | pte_user | pte_noexec)
 
 __global (
 	page_size       = u64(0x1000)

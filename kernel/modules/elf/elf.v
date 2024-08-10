@@ -17,27 +17,25 @@ pub mut:
 	at_phnum u64
 }
 
-pub const (
-	et_dyn      = 0x03
+pub const et_dyn      = 0x03
 
-	at_entry    = 9
-	at_phdr     = 3
-	at_phent    = 4
-	at_phnum    = 5
+pub const at_entry    = 9
+pub const at_phdr     = 3
+pub const at_phent    = 4
+pub const at_phnum    = 5
 
-	pt_load     = 0x00000001
-	pt_interp   = 0x00000003
-	pt_phdr     = 0x00000006
+pub const pt_load     = 0x00000001
+pub const pt_interp   = 0x00000003
+pub const pt_phdr     = 0x00000006
 
-	abi_sysv    = 0x00
-	arch_x86_64 = 0x3e
-	bits_le     = 0x01
+pub const abi_sysv    = 0x00
+pub const arch_x86_64 = 0x3e
+pub const bits_le     = 0x01
 
-	ei_class    = 4
-	ei_data     = 5
-	ei_version  = 6
-	ei_osabi    = 7
-)
+pub const ei_class    = 4
+pub const ei_data     = 5
+pub const ei_version  = 6
+pub const ei_osabi    = 7
 
 pub struct Header {
 pub mut:
@@ -57,11 +55,9 @@ pub mut:
 	shstrndx  u16
 }
 
-pub const (
-	pf_x = 1
-	pf_w = 2
-	pf_r = 4
-)
+pub const pf_x = 1
+pub const pf_w = 2
+pub const pf_r = 4
 
 pub struct ProgramHdr {
 pub mut:

@@ -144,10 +144,8 @@ pub mut:
 
 // Paging mode
 
-pub const (
-	limine_paging_mode_x86_64_4lvl = 0
-	limine_paging_mode_x86_64_5lvl = 1
-)
+pub const limine_paging_mode_x86_64_4lvl = 0
+pub const limine_paging_mode_x86_64_5lvl = 1
 
 pub struct LiminePagingModeResponse {
 pub mut:
@@ -201,11 +199,9 @@ pub mut:
 
 // Memory map
 
-pub const (
-	limine_memmap_usable = 0
-	limine_memmap_bootloader_reclaimable = 5
-	limine_memmap_kernel_and_modules = 6
-)
+pub const limine_memmap_usable = 0
+pub const limine_memmap_bootloader_reclaimable = 5
+pub const limine_memmap_kernel_and_modules = 6
 
 pub struct LimineMemmapEntry {
 pub mut:

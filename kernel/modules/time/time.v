@@ -8,12 +8,10 @@ import event.eventstruct
 import klock
 import limine
 
-pub const (
-	timer_frequency = u64(1000)
+pub const timer_frequency = u64(1000)
 
-	clock_type_realtime = 0
-	clock_type_monotonic = 1
-)
+pub const clock_type_realtime = 0
+pub const clock_type_monotonic = 1
 
 pub struct TimeSpec {
 pub mut:

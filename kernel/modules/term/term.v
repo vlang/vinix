@@ -8,7 +8,7 @@ import klock
 import dev.fbdev.api
 import dev.fbdev.simple
 import limine
-import flanterm
+import flanterm as _
 import memory
 
 __global (

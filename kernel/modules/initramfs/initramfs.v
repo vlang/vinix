@@ -8,7 +8,7 @@ import lib
 import limine
 import fs
 import stat
-import memory
+import memory as _
 
 struct USTARHeader {
 	name       [100]u8
