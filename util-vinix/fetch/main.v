@@ -11,11 +11,9 @@ import os
 fn C.getlogin() charptr
 fn C.gethostname(name charptr, len u64) int
 
-const (
-	escape_cyan  = '\e[1;36m'
-	escape_blue  = '\e[1;34m'
-	escape_reset = '\e[0m'
-)
+const escape_cyan  = '\e[1;36m'
+const escape_blue  = '\e[1;34m'
+const escape_reset = '\e[0m'
 
 fn main() {
 	mut idx := 1
