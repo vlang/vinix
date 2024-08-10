@@ -18,8 +18,8 @@ __global (
 	higher_half         = u64(0)
 )
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
 	volatile hhdm_req = limine.LimineHHDMRequest{
 		response: unsafe { nil }
@@ -53,8 +53,8 @@ pub fn pmm_init() {
 
 		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
-			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n',
-					 i, entries[i].base, entries[i].length, entries[i].@type)
+			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n', i, entries[i].base,
+				entries[i].length, entries[i].@type)
 
 			if entries[i].@type != u32(limine.limine_memmap_usable)
 				&& entries[i].@type != u32(limine.limine_memmap_bootloader_reclaimable)

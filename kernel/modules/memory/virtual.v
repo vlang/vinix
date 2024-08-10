@@ -83,7 +83,7 @@ pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 	if unsafe { *pte_p } & 1 == 0 {
 		return none
 	}
-	return unsafe { *pte_p } & pte_flags_mask
+	return unsafe { *pte_p } & memory.pte_flags_mask
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {
@@ -104,7 +104,7 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 	// Check if entry is present
 	if unsafe { *entry } & 0x01 != 0 {
 		// If present, return pointer to it
-		ret = &u64(unsafe { *entry } & pte_flags_mask)
+		ret = &u64(unsafe { *entry } & memory.pte_flags_mask)
 	} else {
 		if allocate == false {
 			return none
@@ -115,7 +115,9 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 		if ret == 0 {
 			return none
 		}
-		unsafe { *entry = u64(ret) | 0b111 }
+		unsafe {
+			*entry = u64(ret) | 0b111
+		}
 	}
 	return ret
 }
@@ -191,7 +193,6 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 			}
 		}
 	}
-
 	current_cr3 := cpu.read_cr3()
 	if current_cr3 == u64(pagemap.top_level) {
 		cpu.invlpg(virt)
@@ -199,13 +200,14 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 }
 
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
-	pte_p := pagemap.virt2pte(virt, false) or {
-		return none
+	pte_p := pagemap.virt2pte(virt, false) or { return none }
+
+	unsafe {
+		*pte_p &= memory.pte_flags_mask
 	}
-
-	unsafe { *pte_p &= pte_flags_mask }
-	unsafe { *pte_p |= flags }
-
+	unsafe {
+		*pte_p |= flags
+	}
 	current_cr3 := cpu.read_cr3()
 	if current_cr3 == u64(pagemap.top_level) {
 		cpu.invlpg(virt)
@@ -236,16 +238,18 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 
 	entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)
 
-	unsafe { *entry = phys | flags }
+	unsafe {
+		*entry = phys | flags
+	}
 }
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
-	volatile kaddr_req = limine.LimineKernelAddressRequest{
+	volatile kaddr_req       = limine.LimineKernelAddressRequest{
 		response: unsafe { nil }
 	}
-	volatile memmap_req = limine.LimineMemmapRequest{
+	volatile memmap_req      = limine.LimineMemmapRequest{
 		response: unsafe { nil }
 	}
 	volatile paging_mode_req = limine.LiminePagingModeRequest{
@@ -263,9 +267,7 @@ fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
 	print('vmm: Kernel: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${aligned_len:x}\n')
 
 	for i := u64(0); i < aligned_len; i += page_size {
-		kernel_pagemap.map_page(virt + i, phys + i, flags) or {
-			panic('vmm init failure')
-		}
+		kernel_pagemap.map_page(virt + i, phys + i, flags) or { panic('vmm init failure') }
 	}
 }
 
@@ -303,22 +305,24 @@ pub fn vmm_init() {
 	text_virt := u64(voidptr(C.text_start))
 	text_phys := (text_virt - virtual_base) + physical_base
 	text_len := u64(voidptr(C.text_end)) - text_virt
-	map_kernel_span(text_virt, text_phys, text_len, pte_present)
+	map_kernel_span(text_virt, text_phys, text_len, memory.pte_present)
 
 	// Map kernel rodata
 	rodata_virt := u64(voidptr(C.rodata_start))
 	rodata_phys := (rodata_virt - virtual_base) + physical_base
 	rodata_len := u64(voidptr(C.rodata_end)) - rodata_virt
-	map_kernel_span(rodata_virt, rodata_phys, rodata_len, pte_present | pte_noexec)
+	map_kernel_span(rodata_virt, rodata_phys, rodata_len, memory.pte_present | memory.pte_noexec)
 
 	// Map kernel data
 	data_virt := u64(voidptr(C.data_start))
 	data_phys := (data_virt - virtual_base) + physical_base
 	data_len := u64(voidptr(C.data_end)) - data_virt
-	map_kernel_span(data_virt, data_phys, data_len, pte_present | pte_noexec | pte_writable)
+	map_kernel_span(data_virt, data_phys, data_len, memory.pte_present | memory.pte_noexec | memory.pte_writable)
 
 	for i := u64(0); i < 0x100000000; i += page_size {
-		kernel_pagemap.map_page(i + higher_half, i, pte_present | pte_noexec | pte_writable) or { panic('vmm init failure') }
+		kernel_pagemap.map_page(i + higher_half, i, memory.pte_present | memory.pte_noexec | memory.pte_writable) or {
+			panic('vmm init failure')
+		}
 	}
 
 	memmap := memmap_req.response
@@ -334,7 +338,9 @@ pub fn vmm_init() {
 			if j < u64(0x100000000) {
 				continue
 			}
-			kernel_pagemap.map_page(j + higher_half, j, pte_present | pte_noexec | pte_writable) or { panic('vmm init failure') }
+			kernel_pagemap.map_page(j + higher_half, j, memory.pte_present | memory.pte_noexec | memory.pte_writable) or {
+				panic('vmm init failure')
+			}
 		}
 	}
 

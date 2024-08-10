@@ -5,6 +5,7 @@
 module main
 
 import os
+
 #include <unistd.h>
 
 fn C.sethostname(name charptr, len u64) int

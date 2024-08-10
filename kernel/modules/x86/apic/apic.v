@@ -9,17 +9,17 @@ import x86.msr
 import x86.cpu.local as cpulocal
 import time
 
-const lapic_reg_icr0          = 0x300
-const lapic_reg_icr1          = 0x310
-const lapic_reg_spurious      = 0x0f0
-const lapic_reg_eoi           = 0x0b0
-const lapic_reg_timer         = 0x320
+const lapic_reg_icr0 = 0x300
+const lapic_reg_icr1 = 0x310
+const lapic_reg_spurious = 0x0f0
+const lapic_reg_eoi = 0x0b0
+const lapic_reg_timer = 0x320
 const lapic_reg_timer_initcnt = 0x380
-const lapic_reg_timer_curcnt  = 0x390
-const lapic_reg_timer_div     = 0x3e0
+const lapic_reg_timer_curcnt = 0x390
+const lapic_reg_timer_div = 0x3e0
 
 __global (
-	lapic_base = u64(0)
+	lapic_base  = u64(0)
 	x2apic_mode = bool(false)
 )
 
@@ -173,7 +173,7 @@ pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {
 			if status {
-				print('apic: IRQ $irq using override\n')
+				print('apic: IRQ ${irq} using override\n')
 			}
 			io_apic_set_gsi_redirect(lapic_id, vector, madt_isos[i].gsi, madt_isos[i].flags,
 				status)

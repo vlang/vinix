@@ -19,20 +19,20 @@ import block.partition
 import fs
 import katomic
 
-const nvme_class    = 0x1
+const nvme_class = 0x1
 const nvme_subclass = 0x8
-const nvme_progif   = 0x2
+const nvme_progif = 0x2
 
-const opcode_delete_sq     = 0x0
-const opcode_create_sq     = 0x1
-const opcode_delete_cq     = 0x4
-const opcode_create_cq     = 0x5
-const opcode_identify      = 0x6
-const opcode_abort         = 0x8
-const opcode_set_features  = 0x9
-const opcode_get_features  = 0xa
+const opcode_delete_sq = 0x0
+const opcode_create_sq = 0x1
+const opcode_delete_cq = 0x4
+const opcode_create_cq = 0x5
+const opcode_identify = 0x6
+const opcode_abort = 0x8
+const opcode_set_features = 0x9
+const opcode_get_features = 0xa
 const opcode_ns_management = 0xd
-const opcode_format_cmd    = 0x80
+const opcode_format_cmd = 0x80
 
 const nvme_io_queue_cnt = 0x4
 
@@ -276,8 +276,7 @@ pub mut:
 
 struct NVMEController {
 pub mut:
-	pci_bar pci.PCIBar
-
+	pci_bar       pci.PCIBar
 	volatile regs          &NVMERegisters
 	volatile controller_id &NVMEControllerID
 
@@ -311,8 +310,7 @@ pub mut:
 	admin     bool
 	l         klock.Lock
 
-	parent_controller &NVMEController
-
+	parent_controller   &NVMEController
 	volatile submission_queue    &NVMECommand
 	volatile completion_queue    &NVMECompletion
 	volatile submission_doorbell &u32
@@ -418,7 +416,8 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 	}
 	namespace.nsid = nsid
 	namespace.identity = &NVMENamespaceID(
-		u64(memory.pmm_alloc(lib.div_roundup<u64>(sizeof(NVMENamespaceID), page_size))) + higher_half)
+		u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMENamespaceID), page_size))) +
+		higher_half)
 
 	mut new_command := &NVMECommand{}
 
@@ -475,10 +474,10 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 	pair.entry_cnt = parent_controller.queue_entries
 
 	pair.submission_queue = &NVMECommand(
-		u64(memory.pmm_alloc(lib.div_roundup<u64>(pair.entry_cnt * sizeof(NVMECommand), page_size))) +
+		u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECommand), page_size))) +
 		higher_half)
 	pair.completion_queue = &NVMECompletion(
-		u64(memory.pmm_alloc(lib.div_roundup<u64>(pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
+		u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
 		higher_half)
 
 	submission_offset := page_size + 2 * qid * (4 << parent_controller.strides)
@@ -608,7 +607,7 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 	}
 
 	mut prp_list := &u64(
-		u64(memory.pmm_alloc(lib.div_roundup<u64>(ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
+		u64(memory.pmm_alloc(lib.div_roundup[u64](ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
 		higher_half)
 
 	if (cnt * ns.stat.blksize) > page_size {
@@ -666,7 +665,8 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 
 fn (mut c NVMEController) get_controller_id() int {
 	c.controller_id = &NVMEControllerID(
-		u64(memory.pmm_alloc(lib.div_roundup<u64>(sizeof(NVMEControllerID), page_size))) + higher_half)
+		u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMEControllerID), page_size))) +
+		higher_half)
 
 	mut new_command := &NVMECommand{}
 
@@ -699,7 +699,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	minor_version := (c.regs.vs >> 8) & 0xff
 	tertiary_version := c.regs.vs & 0xff
 
-	print('nvme: Version Detected [$major_version:$minor_version:$tertiary_version]\n')
+	print('nvme: Version Detected [${major_version}:${minor_version}:${tertiary_version}]\n')
 
 	if (u64(c.regs.cap) & (u64(1) << 37)) == 0 {
 		print('nvme: NVME command set not supported\n')
@@ -755,11 +755,11 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	c.regs.acq = u64(c.admin_queue.completion_queue) - higher_half
 
 	c.regs.cc = (0 << 4) | // nvme command set
-	(0 << 11) | // ams = round robin
-	(0 << 14) | // no shutdown notifications
-	(6 << 16) | // io submission queue size 16 bytes
-	(4 << 20) | // io completion queue size 64 bytes
-	(1 << 0) // enable
+	 (0 << 11) | // ams = round robin
+	 (0 << 14) | // no shutdown notifications
+	 (6 << 16) | // io submission queue size 16 bytes
+	 (4 << 20) | // io completion queue size 64 bytes
+	 (1 << 0) // enable
 	for {
 		if c.regs.csts & (1 << 0) != 0 {
 			break
@@ -777,10 +777,10 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
-	print('nvme: subsystem vendor ID: $c.controller_id.ssvid\n')
+	print('nvme: subsystem vendor ID: ${c.controller_id.ssvid}\n')
 
-	nsid_list := &u32(u64(memory.pmm_alloc(lib.div_roundup<u64>(c.controller_id.nn * 4, page_size))) +
-		higher_half)
+	nsid_list := &u32(
+		u64(memory.pmm_alloc(lib.div_roundup[u64](c.controller_id.nn * 4, page_size))) + higher_half)
 
 	mut new_command := &NVMECommand{}
 
@@ -835,7 +835,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 			print('nvme: lba size: ${new_namespace.stat.blksize:x}\n')
 			print('nvme: max prps: ${new_namespace.max_prps:x}\n')
 
-			fs.devtmpfs_add_device(new_namespace, 'nvme${controller_list.len}n$i')
+			fs.devtmpfs_add_device(new_namespace, 'nvme${controller_list.len}n${i}')
 			partition.scan_partitions(mut new_namespace, 'nvme${controller_list.len}n${i}p')
 
 			c.namespace_list << new_namespace

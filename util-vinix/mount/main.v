@@ -36,7 +36,7 @@ fn main() {
 				if idx < os.args.len {
 					filesystem = os.args[idx]
 				} else {
-					println("No filesystem was specified for -t")
+					println('No filesystem was specified for -t')
 					exit(0)
 				}
 			}
@@ -49,27 +49,27 @@ fn main() {
 
 	// Check whether we have all the options we need.
 	if filesystem == '' {
-		println("No filesystem was specified")
+		println('No filesystem was specified')
 		exit(0)
 	}
 	if idx < os.args.len {
 		source = os.args[idx]
 		idx++
 	} else {
-		println("No source was specified")
+		println('No source was specified')
 		exit(0)
 	}
 	if idx < os.args.len {
 		destination = os.args[idx]
 		idx++
 	} else {
-		println("No destination was specified")
+		println('No destination was specified')
 		exit(0)
 	}
 
 	// Do the actual mounting.
 	if C.mount(source.str, destination.str, filesystem.str, 0, 0) != 0 {
-        println("Couldn't mount (${C.errno})")
+		println("Couldn't mount (${C.errno})")
 		exit(0)
 	}
 }

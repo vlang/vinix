@@ -81,7 +81,8 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: signalfd(%d, 0x%llx, 0x%x)\n', process.name.str, fdnum, mask, flags)
+	C.printf(c'\n\e[32m%s\e[m: signalfd(%d, 0x%llx, 0x%x)\n', process.name.str, fdnum,
+		mask, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -101,9 +102,8 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 			refcount: 1
 		}
 
-		newfd = file.fdnum_create_from_resource(unsafe { nil }, mut signalfd, flags, 0, false) or {
-			return errno.err, errno.get()
-		}
+		newfd = file.fdnum_create_from_resource(unsafe { nil }, mut signalfd, flags, 0,
+			false) or { return errno.err, errno.get() }
 
 		t.signalfds << voidptr(signalfd)
 	} else {

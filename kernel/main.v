@@ -36,8 +36,8 @@ import socket
 import time
 import limine
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
 	volatile limine_base_revision = limine.LimineBaseRevision{
 		revision: 2
@@ -76,8 +76,8 @@ fn kmain_thread() {
 		ahci.initialise()
 	}
 
-	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
-	'/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
+	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
+		'/dev/console', '/dev/console') or { panic('Could not start init process') }
 
 	sched.dequeue_and_die()
 }

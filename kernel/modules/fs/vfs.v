@@ -11,15 +11,15 @@ import proc
 import file
 import errno
 
-pub const at_fdcwd            = -100
-pub const at_empty_path       = 0x1000
-pub const at_symlink_follow   = 0x400
+pub const at_fdcwd = -100
+pub const at_empty_path = 0x1000
+pub const at_symlink_follow = 0x400
 pub const at_symlink_nofollow = 0x100
-pub const at_removedir        = 0x200
-pub const at_eaccess          = 0x200
-pub const seek_cur            = 1
-pub const seek_end            = 2
-pub const seek_set            = 0
+pub const at_removedir = 0x200
+pub const at_eaccess = 0x200
+pub const seek_cur = 1
+pub const seek_end = 2
+pub const seek_set = 0
 
 interface FileSystem {
 mut:
@@ -33,12 +33,12 @@ mut:
 
 pub struct VFSNode {
 pub mut:
-	mountpoint     &VFSNode = unsafe { nil }
-	redir          &VFSNode = unsafe { nil }
+	mountpoint     &VFSNode           = unsafe { nil }
+	redir          &VFSNode           = unsafe { nil }
 	resource       &resource.Resource = unsafe { nil }
 	filesystem     &FileSystem        = unsafe { nil }
 	name           string
-	parent         &VFSNode = unsafe { nil }
+	parent         &VFSNode             = unsafe { nil }
 	children       &map[string]&VFSNode = unsafe { nil }
 	symlink_target string
 }
@@ -479,7 +479,6 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 		free(target_node.children['..'])
 		free(target_node.children)
 	}
-
 	parent_of_tgt_node.children.delete(basename)
 
 	return 0, 0

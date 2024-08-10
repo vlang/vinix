@@ -11,8 +11,8 @@ import os
 fn C.getlogin() charptr
 fn C.gethostname(name charptr, len u64) int
 
-const escape_cyan  = '\e[1;36m'
-const escape_blue  = '\e[1;34m'
+const escape_cyan = '\e[1;36m'
+const escape_blue = '\e[1;34m'
 const escape_reset = '\e[0m'
 
 fn main() {
@@ -49,15 +49,15 @@ fn main() {
 
 	user := unsafe { cstring_to_vstring(C.getlogin()) }
 	hostname := unsafe { (&hostname_buffer[0]).vstring() }
-	os_name := '$uname_result.sysname $uname_result.machine $uname_result.version'
+	os_name := '${uname_result.sysname} ${uname_result.machine} ${uname_result.version}'
 	kernel := uname_result.sysname
 	shell := os.getenv('SHELL')
 
 	logo_print(r' __          __   ', '')
-	logo_print(r' \ \        / //  ', '$user$escape_blue@$escape_reset$hostname')
-	logo_print(r'  \ \      / //   ', '${escape_blue}OS$escape_reset:     $os_name')
-	logo_print(r'   \ \    / //    ', '${escape_blue}KERNEL$escape_reset: $kernel')
-	logo_print(r'    \ \  / //     ', '${escape_blue}SHELL$escape_reset:  $shell')
+	logo_print(r' \ \        / //  ', '${user}${escape_blue}@${escape_reset}${hostname}')
+	logo_print(r'  \ \      / //   ', '${escape_blue}OS${escape_reset}:     ${os_name}')
+	logo_print(r'   \ \    / //    ', '${escape_blue}KERNEL${escape_reset}: ${kernel}')
+	logo_print(r'    \ \  / //     ', '${escape_blue}SHELL${escape_reset}:  ${shell}')
 	logo_print(r'     \ \/ //      ', '')
 	logo_print(r'      \/_//       ', '')
 	println('')

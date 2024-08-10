@@ -11,17 +11,17 @@ import x86.cpu.local as cpulocal
 pub const pit_dividend = u64(1193182)
 
 pub fn pit_get_current_count() u16 {
-	kio.port_out<u8>(0x43, 0)
-	lo := kio.port_in<u8>(0x40)
-	hi := kio.port_in<u8>(0x40)
+	kio.port_out[u8](0x43, 0)
+	lo := kio.port_in[u8](0x40)
+	hi := kio.port_in[u8](0x40)
 	return (u16(hi) << 8) | lo
 }
 
 pub fn pit_set_reload_value(new_count u16) {
 	// Channel 0, lo/hi access mode, mode 2 (rate generator)
-	kio.port_out<u8>(0x43, 0x34)
-	kio.port_out<u8>(0x40, u8(new_count))
-	kio.port_out<u8>(0x40, u8(new_count >> 8))
+	kio.port_out[u8](0x43, 0x34)
+	kio.port_out[u8](0x40, u8(new_count))
+	kio.port_out[u8](0x40, u8(new_count >> 8))
 }
 
 pub fn pit_set_frequency(frequency u64) {

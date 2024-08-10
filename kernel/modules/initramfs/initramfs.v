@@ -30,13 +30,13 @@ struct USTARHeader {
 }
 
 enum USTARFileType {
-	regular_file = 0x30
-	hard_link = 0x31
-	sym_link = 0x32
-	char_dev = 0x33
-	block_dev = 0x34
-	directory = 0x35
-	fifo = 0x36
+	regular_file  = 0x30
+	hard_link     = 0x31
+	sym_link      = 0x32
+	char_dev      = 0x33
+	block_dev     = 0x34
+	directory     = 0x35
+	fifo          = 0x36
 	gnu_long_path = 0x4c
 }
 
@@ -49,8 +49,8 @@ fn octal_to_int(s string) u64 {
 	return ret
 }
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
 	volatile module_req = limine.LimineModuleRequest{
 		response: unsafe { nil }
@@ -115,29 +115,29 @@ pub fn initialise() {
 			}
 			.directory {
 				fs.create(vfs_root, name, u32(mode | stat.ifdir)) or {
-					panic('initramfs: failed to create directory $name')
+					panic('initramfs: failed to create directory ${name}')
 				}
 			}
 			.regular_file {
 				new_node := fs.create(vfs_root, name, u32(mode | stat.ifreg)) or {
-					panic('initramfs: failed to create file $name')
+					panic('initramfs: failed to create file ${name}')
 				}
 				mut new_resource := new_node.resource
 				buf := voidptr(u64(current_header) + 512)
 				new_resource.write(0, buf, 0, size) or {
-					panic('initramfs: failed to write file $name')
+					panic('initramfs: failed to write file ${name}')
 				}
 			}
 			.sym_link {
 				fs.symlink(vfs_root, link_name, name) or {
-					panic('initramfs: failed to create symlink $name')
+					panic('initramfs: failed to create symlink ${name}')
 				}
 			}
 			else {}
 		}
 
 		next:
-		//memory.pmm_free(voidptr(u64(current_header) - higher_half), (u64(512) +
+		// memory.pmm_free(voidptr(u64(current_header) - higher_half), (u64(512) +
 		//	lib.align_up(size, 512)) / page_size)
 
 		current_header = &USTARHeader(usize(current_header) + usize(512) +

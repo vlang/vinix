@@ -5,6 +5,7 @@
 module main
 
 import os
+
 #include <unistd.h>
 
 fn C.access(name charptr, mode u32) int
@@ -17,8 +18,8 @@ const passwd_file = '/etc/passwd'
 
 fn main() {
 	// Get command line options, and set defaults.
-	mut username    := ''
-	mut new_shell   := ''
+	mut username := ''
+	mut new_shell := ''
 	mut list_shells := false
 
 	mut idx := 1
@@ -68,7 +69,7 @@ fn main() {
 	// Get the shell list and print them if requested.
 	// TODO: Support comments in the shells file.
 	shells := os.read_lines(shells_file) or {
-		println('$shells_file could not be read')
+		println('${shells_file} could not be read')
 		exit(0)
 	}
 	if list_shells {
@@ -79,25 +80,25 @@ fn main() {
 	}
 
 	// Get the shell.
-	if new_shell == "" {
-		println("Changing shell for $username")
-		new_shell = os.input("New shell: ")
+	if new_shell == '' {
+		println('Changing shell for ${username}')
+		new_shell = os.input('New shell: ')
 	}
 
 	// Check whether the shell is valid.
 	if C.access(new_shell.str, access_f_ok | access_r_ok) == 1 {
-		println("$new_shell cannot be found")
+		println('${new_shell} cannot be found')
 	} else if C.access(new_shell.str, access_x_ok) == 1 {
-		println("$new_shell is not executable")
+		println('${new_shell} is not executable')
 	} else if new_shell !in shells {
-		println("$new_shell is not listed in $shells_file")
-		println("Please consider adding it.")
+		println('${new_shell} is not listed in ${shells_file}')
+		println('Please consider adding it.')
 	}
 
 	// Change the shell in the passwd file.
 	old_shell := os.getenv('SHELL')
 	mut passwd_lines := os.read_lines(passwd_file) or {
-		println('$passwd_file could not be read')
+		println('${passwd_file} could not be read')
 		exit(1)
 	}
 	for i, pswd in passwd_lines {
@@ -106,15 +107,15 @@ fn main() {
 		}
 	}
 	mut new_passwd_file := os.create(passwd_file) or {
-		println('$passwd_file could not be created')
+		println('${passwd_file} could not be created')
 		exit(1)
 	}
 	for ln in passwd_lines {
 		new_passwd_file.writeln(ln) or {
-			println('$passwd_file could not be written')
+			println('${passwd_file} could not be written')
 			exit(1)
 		}
 	}
 	new_passwd_file.close()
-	println("Shell changed $old_shell -> $new_shell")
+	println('Shell changed ${old_shell} -> ${new_shell}')
 }

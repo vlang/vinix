@@ -23,17 +23,17 @@ import proc
 import katomic
 import flanterm as _
 
-const max_scancode        = 0x57
-const capslock            = 0x3a
-const numlock             = 0x45
-const left_alt            = 0x38
-const left_alt_rel        = 0xb8
-const right_shift         = 0x36
-const left_shift          = 0x2a
-const right_shift_rel     = 0xb6
-const left_shift_rel      = 0xaa
-const ctrl                = 0x1d
-const ctrl_rel            = 0x9d
+const max_scancode = 0x57
+const capslock = 0x3a
+const numlock = 0x45
+const left_alt = 0x38
+const left_alt_rel = 0xb8
+const right_shift = 0x36
+const left_shift = 0x2a
+const right_shift_rel = 0xb6
+const left_shift_rel = 0xaa
+const ctrl = 0x1d
+const ctrl_rel = 0x9d
 const console_buffer_size = 1024
 const console_bigbuf_size = 4096
 
@@ -48,9 +48,9 @@ __global (
 	console_ctrl_active            = bool(false)
 	console_alt_active             = bool(false)
 	console_extra_scancodes        = bool(false)
-	console_buffer                 [console_buffer_size]u8
+	console_buffer                 [console.console_buffer_size]u8
 	console_buffer_i               = u64(0)
-	console_bigbuf                 [console_bigbuf_size]u8
+	console_bigbuf                 [console.console_bigbuf_size]u8
 	console_bigbuf_i               = u64(0)
 	console_termios                = &termios.Termios(unsafe { nil })
 	console_decckm                 = false
@@ -739,7 +739,7 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 			for j := u64(0); j < console_bigbuf_i; j++ {
 				console_bigbuf[j] = console_bigbuf[j + 1]
 			}
-			if console_bigbuf_i == 0 && (console_res.status & file.pollin != 0) {
+			if console_bigbuf_i == 0 && console_res.status & file.pollin != 0 {
 				console_res.status &= ~file.pollin
 				event.trigger(mut console_res.event, false)
 			}

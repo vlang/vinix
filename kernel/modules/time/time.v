@@ -57,11 +57,11 @@ pub fn (mut this TimeSpec) sub(interval TimeSpec) bool {
 
 __global (
 	monotonic_clock TimeSpec
-	realtime_clock TimeSpec
+	realtime_clock  TimeSpec
 )
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
 	volatile boottime_req = limine.LimineBootTimeRequest{
 		response: unsafe { nil }
@@ -84,7 +84,7 @@ pub fn initialise() {
 fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
 
 fn timer_handler() {
-	interval := TimeSpec{0, i64(1000000000 / timer_frequency)}
+	interval := TimeSpec{0, i64(1000000000 / time.timer_frequency)}
 
 	monotonic_clock.add(interval)
 	realtime_clock.add(interval)
@@ -114,7 +114,7 @@ pub mut:
 }
 
 __global (
-	timers_lock klock.Lock
+	timers_lock  klock.Lock
 	armed_timers []&Timer
 )
 

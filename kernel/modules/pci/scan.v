@@ -17,7 +17,7 @@ const max_bus = 256
 pub fn initialise() {
 	print('pci: Building device scan\n')
 	mut root_bus := PCIDevice{}
-	configc := root_bus.read<u32>(0xc)
+	configc := root_bus.read[u32](0xc)
 
 	if (configc & 0x800000) == 0 {
 		check_bus(0, -1)
@@ -29,7 +29,7 @@ pub fn initialise() {
 				function: function
 				parent: 0
 			}
-			config0 := host_bridge.read<u32>(0)
+			config0 := host_bridge.read[u32](0)
 			if config0 == 0xffffffff {
 				continue
 			}
@@ -61,18 +61,18 @@ fn check_function(bus u8, slot u8, function u8, parent i64) {
 
 	// Handle PCI to PCI bridges, and we are done.
 	if device.class == 0x6 && device.subclass == 0x4 {
-		config := device.read<u32>(0x18)
+		config := device.read[u32](0x18)
 		check_bus(u8(config >> 8), 1)
 	} else {
 		scanned_devices << device
 
-		status := device.read<u16>(0x6)
+		status := device.read[u16](0x6)
 
 		if (status & (1 << 4)) != 0 { // parse capabilities list
-			mut off := device.read<u8>(0x34)
+			mut off := device.read[u8](0x34)
 
 			for off > 0 {
-				id := device.read<u8>(off)
+				id := device.read[u8](off)
 
 				match id {
 					0x5 {
@@ -83,7 +83,7 @@ fn check_function(bus u8, slot u8, function u8, parent i64) {
 						device.msix_support = true
 						device.msix_offset = off
 
-						message_control := device.read<u16>(off + 2)
+						message_control := device.read[u16](off + 2)
 
 						device.msix_table_size = message_control & 0x7FF
 						device.msix_table_bitmap.initialise(device.msix_table_size)
@@ -91,7 +91,7 @@ fn check_function(bus u8, slot u8, function u8, parent i64) {
 					else {}
 				}
 
-				off = device.read<u8>(off + 1)
+				off = device.read[u8](off + 1)
 			}
 		}
 

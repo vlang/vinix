@@ -17,25 +17,25 @@ pub mut:
 	at_phnum u64
 }
 
-pub const et_dyn      = 0x03
+pub const et_dyn = 0x03
 
-pub const at_entry    = 9
-pub const at_phdr     = 3
-pub const at_phent    = 4
-pub const at_phnum    = 5
+pub const at_entry = 9
+pub const at_phdr = 3
+pub const at_phent = 4
+pub const at_phnum = 5
 
-pub const pt_load     = 0x00000001
-pub const pt_interp   = 0x00000003
-pub const pt_phdr     = 0x00000006
+pub const pt_load = 0x00000001
+pub const pt_interp = 0x00000003
+pub const pt_phdr = 0x00000006
 
-pub const abi_sysv    = 0x00
+pub const abi_sysv = 0x00
 pub const arch_x86_64 = 0x3e
-pub const bits_le     = 0x01
+pub const bits_le = 0x01
 
-pub const ei_class    = 4
-pub const ei_data     = 5
-pub const ei_version  = 6
-pub const ei_osabi    = 7
+pub const ei_class = 4
+pub const ei_data = 5
+pub const ei_version = 6
+pub const ei_osabi = 7
 
 pub struct Header {
 pub mut:
@@ -103,7 +103,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 	}
 
 	mut slide := u64(0)
-	if header.@type == et_dyn {
+	if header.@type == elf.et_dyn {
 		slide = 0x400000
 	}
 
@@ -119,7 +119,9 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 	for i := u64(0); i < header.ph_num; i++ {
 		mut phdr := &ProgramHdr{}
 
-		res.read(0, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) or { return error('') }
+		res.read(0, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) or {
+			return error('')
+		}
 
 		match phdr.p_type {
 			elf.pt_interp {

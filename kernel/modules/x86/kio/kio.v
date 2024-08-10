@@ -4,7 +4,7 @@
 
 module kio
 
-pub fn port_in<T>(port u16) T {
+pub fn port_in[T](port u16) T {
 	mut ret := T(0)
 	asm volatile amd64 {
 		in ret, port
@@ -15,7 +15,7 @@ pub fn port_in<T>(port u16) T {
 	return ret
 }
 
-pub fn port_out<T>(port u16, value T) {
+pub fn port_out[T](port u16, value T) {
 	asm volatile amd64 {
 		out port, value
 		; ; a (value)
@@ -24,7 +24,7 @@ pub fn port_out<T>(port u16, value T) {
 	}
 }
 
-pub fn mmin<T>(addr &T) T {
+pub fn mmin[T](addr &T) T {
 	mut ret := T(0)
 	asm volatile amd64 {
 		mov ret, [addr]
@@ -35,7 +35,7 @@ pub fn mmin<T>(addr &T) T {
 	return ret
 }
 
-pub fn mmout<T>(addr &T, value T) {
+pub fn mmout[T](addr &T, value T) {
 	asm volatile amd64 {
 		mov [addr], value
 		; ; r (addr)
