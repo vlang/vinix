@@ -11,7 +11,7 @@ import event.eventstruct
 import proc
 
 pub fn nsleep(ns i64) {
-	mut interval := time.TimeSpec {
+	mut interval := time.TimeSpec{
 		tv_sec: ns / 1000000000
 		tv_nsec: ns
 	}
@@ -34,17 +34,22 @@ pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u6
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: clock_get(%d, 0x%llx)\n', process.name.str, clock_type, voidptr(ret))
+	C.printf(c'\n\e[32m%s\e[m: clock_get(%d, 0x%llx)\n', process.name.str, clock_type,
+		voidptr(ret))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	match clock_type {
 		time.clock_type_monotonic {
-			unsafe { *ret = monotonic_clock }
+			unsafe {
+				*ret = monotonic_clock
+			}
 		}
 		time.clock_type_realtime {
-			unsafe { *ret = realtime_clock }
+			unsafe {
+				*ret = realtime_clock
+			}
 		}
 		else {
 			C.printf(c'clock_get: Unknown clock type\n')
@@ -59,7 +64,8 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: nanosleep(0x%llx, 0x%llx)\n', process.name.str, voidptr(req), voidptr(rem))
+	C.printf(c'\n\e[32m%s\e[m: nanosleep(0x%llx, 0x%llx)\n', process.name.str, voidptr(req),
+		voidptr(rem))
 
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)

@@ -39,10 +39,10 @@ pub:
 }
 
 pub fn (mut dev PCIDevice) read_info() {
-	config0 := dev.read<int>(0)
-	config8 := dev.read<int>(0x8)
-	configc := dev.read<int>(0xc)
-	config3c := dev.read<int>(0x3c)
+	config0 := dev.read[int](0)
+	config8 := dev.read[int](0x8)
+	configc := dev.read[int](0xc)
+	config3c := dev.read[int](0x3c)
 
 	dev.device_id = u16(config0 >> 16)
 	dev.vendor_id = u16(config0)
@@ -54,44 +54,44 @@ pub fn (mut dev PCIDevice) read_info() {
 	dev.irq_pin = u8(config3c >> 8)
 }
 
-pub fn (dev &PCIDevice) read<T>(offset u32) T {
+pub fn (dev &PCIDevice) read[T](offset u32) T {
 	dev.get_address(offset)
-	return kio.port_in<T>(u16(0xcfc + (offset & 3)))
+	return kio.port_in[T](u16(0xcfc + (offset & 3)))
 }
 
-pub fn (dev &PCIDevice) write<T>(offset u32, value T) {
+pub fn (dev &PCIDevice) write[T](offset u32, value T) {
 	dev.get_address(offset)
-	kio.port_out<T>(u16(0xcfc + (offset & 3)), value)
+	kio.port_out[T](u16(0xcfc + (offset & 3)), value)
 }
 
 pub fn (dev &PCIDevice) is_bar_present(bar u8) bool {
 	assert bar <= 5
 	reg_index := 0x10 + bar * 4
-	return if dev.read<u32>(reg_index) != 0 { true } else { false }
+	return if dev.read[u32](reg_index) != 0 { true } else { false }
 }
 
 pub fn (dev &PCIDevice) get_bar(bar u8) PCIBar {
 	assert bar <= 5
 
 	reg_index := 0x10 + bar * 4
-	bar_low := dev.read<u32>(reg_index)
-	mut bar_size_low := dev.read<u32>(reg_index)
+	bar_low := dev.read[u32](reg_index)
+	mut bar_size_low := dev.read[u32](reg_index)
 
 	is_mmio := if bar_low & 1 == 0 { true } else { false }
 	is_prefetchable := is_mmio && bar_low & (1 << 3) != 0
 	is_64_bits := is_mmio && ((bar_low >> 1) & 0b11) == 0b10
-	bar_high := if is_64_bits { dev.read<u32>(reg_index + 4) } else { 0 }
+	bar_high := if is_64_bits { dev.read[u32](reg_index + 4) } else { 0 }
 
 	base := ((u64(bar_high) << 32) | bar_low) & ~u32(if is_mmio { 0b1111 } else { 0b11 })
 
-	dev.write<u32>(reg_index, 0xFFFFFFFF)
-	bar_size_low = dev.read<u32>(reg_index)
-	dev.write<u32>(reg_index, bar_low)
+	dev.write[u32](reg_index, 0xFFFFFFFF)
+	bar_size_low = dev.read[u32](reg_index)
+	dev.write[u32](reg_index, bar_low)
 
 	bar_size_high := if is_64_bits {
-		dev.write<u32>(reg_index + 4, 0xFFFFFFFF)
-		ret := dev.read<u32>(reg_index + 4)
-		dev.write<u32>(reg_index + 4, bar_high)
+		dev.write[u32](reg_index + 4, 0xFFFFFFFF)
+		ret := dev.read[u32](reg_index + 4)
+		dev.write[u32](reg_index + 4, bar_high)
 		ret
 	} else {
 		0xFFFFFFFF
@@ -108,7 +108,7 @@ pub fn (dev &PCIDevice) get_bar(bar u8) PCIBar {
 }
 
 pub fn (dev &PCIDevice) set_msi(vector u8) {
-	mut message_control := dev.read<u16>(dev.msi_offset + 2)
+	mut message_control := dev.read[u16](dev.msi_offset + 2)
 
 	mut reg0 := 0x4
 	mut reg1 := 0x8
@@ -120,12 +120,12 @@ pub fn (dev &PCIDevice) set_msi(vector u8) {
 	address := (0xfee << 20) | (bsp_lapic_id << 12)
 	data := vector
 
-	dev.write<u32>(u32(dev.msi_offset + reg0), address)
-	dev.write<u32>(u32(dev.msi_offset + reg1), data)
+	dev.write[u32](u32(dev.msi_offset + reg0), address)
+	dev.write[u32](u32(dev.msi_offset + reg1), data)
 
 	message_control |= 1 // enable=1
 	message_control &= ~(0b111 << 4) // mme=0
-	dev.write<u16>(dev.msi_offset + 2, message_control)
+	dev.write[u16](dev.msi_offset + 2, message_control)
 }
 
 pub fn (dev &PCIDevice) set_msix(vector u8) bool {
@@ -134,8 +134,8 @@ pub fn (dev &PCIDevice) set_msix(vector u8) bool {
 		return false
 	}
 
-	table_ptr := dev.read<u32>(dev.msix_offset + 4)
-	dev.read<u32>(dev.msix_offset + 8)
+	table_ptr := dev.read[u32](dev.msix_offset + 4)
+	dev.read[u32](dev.msix_offset + 8)
 
 	bar_index := table_ptr & 0b111
 	bar_offset := (table_ptr >> 3) << 3
@@ -155,22 +155,22 @@ pub fn (dev &PCIDevice) set_msix(vector u8) bool {
 	kio.mmout(&u32(bar_base + 4), u32(0)) // address high
 	kio.mmout(&u32(bar_base + 8), data) // data
 	kio.mmout(&u32(bar_base + 12), u32(0)) // vector control
-	mut message_control := dev.read<u16>(dev.msix_offset + 2)
+	mut message_control := dev.read[u16](dev.msix_offset + 2)
 
 	message_control |= (1 << 15) // enable=1
 	message_control &= ~(1 << 14) // mask=0
-	dev.write<u16>(dev.msix_offset + 2, message_control)
+	dev.write[u16](dev.msix_offset + 2, message_control)
 
 	return true
 }
 
 pub fn (dev &PCIDevice) enable_bus_mastering() {
-	if (dev.read<u32>(0x4) & (1 << 2)) == 0 {
-		dev.write<u32>(0x4, dev.read<u32>(0x4) | (1 << 2))
+	if (dev.read[u32](0x4) & (1 << 2)) == 0 {
+		dev.write[u32](0x4, dev.read[u32](0x4) | (1 << 2))
 	}
 }
 
 fn (dev &PCIDevice) get_address(offset u32) {
 	address := (u32(dev.bus) << 16) | (u32(dev.slot) << 11) | (u32(dev.function) << 8) | (offset & ~(u32(3))) | 0x80000000
-	kio.port_out<u32>(0xcf8, address)
+	kio.port_out[u32](0xcf8, address)
 }

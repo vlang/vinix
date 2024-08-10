@@ -16,7 +16,7 @@ pub fn initialise() {}
 fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, &resource.Resource) {
 	match domain {
 		sock_pub.af_unix {
-			socket0, socket1 := sock_unix.create_pair(@type) ?
+			socket0, socket1 := sock_unix.create_pair(@type)?
 			return &resource.Resource(*socket0), &resource.Resource(*socket1)
 		}
 		else {
@@ -30,7 +30,7 @@ fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, 
 fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	match domain {
 		sock_pub.af_unix {
-			ret := sock_unix.create(@type) ?
+			ret := sock_unix.create(@type)?
 			return ret
 		}
 		else {
@@ -45,8 +45,8 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', process.name.str, domain, @type,
-		protocol, voidptr(ret))
+	C.printf(c'\n\e[32m%s\e[m: socketpair(%d, 0x%x, %d, 0x%llx)\n', process.name.str,
+		domain, @type, protocol, voidptr(ret))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -79,7 +79,8 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: socket(%d, 0x%x, %d)\n', process.name.str, domain, @type, protocol)
+	C.printf(c'\n\e[32m%s\e[m: socket(%d, 0x%x, %d)\n', process.name.str, domain, @type,
+		protocol)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -125,13 +126,10 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	mut connection_socket := sock.accept(fd.handle) or {
-		return errno.err, errno.get()
-	}
+	mut connection_socket := sock.accept(fd.handle) or { return errno.err, errno.get() }
 
-	ret := file.fdnum_create_from_resource(unsafe { nil }, mut connection_socket, 0, 0, false) or {
-		return errno.err, errno.get()
-	}
+	ret := file.fdnum_create_from_resource(unsafe { nil }, mut connection_socket, 0, 0,
+		false) or { return errno.err, errno.get() }
 
 	return u64(ret), 0
 }
@@ -140,7 +138,8 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: bind(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr, addrlen)
+	C.printf(c'\n\e[32m%s\e[m: bind(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr,
+		addrlen)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -198,7 +197,8 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: recvmsg(%d, 0x%llx, 0x%x)\n', process.name.str, fdnum, voidptr(msg), flags)
+	C.printf(c'\n\e[32m%s\e[m: recvmsg(%d, 0x%llx, 0x%x)\n', process.name.str, fdnum,
+		voidptr(msg), flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -227,7 +227,8 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: connect(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr, addrlen)
+	C.printf(c'\n\e[32m%s\e[m: connect(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum,
+		_addr, addrlen)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -256,7 +257,8 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: getpeername(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum, _addr, addrlen)
+	C.printf(c'\n\e[32m%s\e[m: getpeername(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum,
+		_addr, addrlen)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}

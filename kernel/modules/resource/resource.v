@@ -37,11 +37,11 @@ pub const file_status_flags_mask = ~(file_creation_flags_mask | file_descriptor_
 
 pub interface Resource {
 mut:
-	stat stat.Stat
+	stat     stat.Stat
 	refcount int
-	l klock.Lock
-	event eventstruct.Event
-	status int
+	l        klock.Lock
+	event    eventstruct.Event
+	status   int
 	can_mmap bool
 	grow(handle voidptr, new_size u64) ?
 	read(handle voidptr, buf voidptr, loc u64, count u64) ?i64

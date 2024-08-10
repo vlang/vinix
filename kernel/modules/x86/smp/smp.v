@@ -15,8 +15,8 @@ __global (
 	smp_ready    = false
 )
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
 	volatile smp_req = limine.LimineSMPRequest{
 		flags: 1 // x2apic allowed

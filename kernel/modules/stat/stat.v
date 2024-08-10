@@ -6,13 +6,13 @@ module stat
 
 import time
 
-pub const ifmt   = 0xf000
-pub const ifblk  = 0x6000
-pub const ifchr  = 0x2000
-pub const ififo  = 0x1000
-pub const ifreg  = 0x8000
-pub const ifdir  = 0x4000
-pub const iflnk  = 0xa000
+pub const ifmt = 0xf000
+pub const ifblk = 0x6000
+pub const ifchr = 0x2000
+pub const ififo = 0x1000
+pub const ifreg = 0x8000
+pub const ifdir = 0x4000
+pub const iflnk = 0xa000
 pub const ifsock = 0xc000
 pub const ifpipe = 0x3000
 
@@ -64,14 +64,14 @@ pub mut:
 }
 
 pub const dt_unknown = 0
-pub const dt_fifo    = 1
-pub const dt_chr     = 2
-pub const dt_dir     = 4
-pub const dt_blk     = 6
-pub const dt_reg     = 8
-pub const dt_lnk     = 10
-pub const dt_sock    = 12
-pub const dt_wht     = 14
+pub const dt_fifo = 1
+pub const dt_chr = 2
+pub const dt_dir = 4
+pub const dt_blk = 6
+pub const dt_reg = 8
+pub const dt_lnk = 10
+pub const dt_sock = 12
+pub const dt_wht = 14
 
 pub struct Dirent {
 pub mut:

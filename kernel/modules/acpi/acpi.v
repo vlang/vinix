@@ -44,8 +44,8 @@ fn use_xsdt() bool {
 	return rsdp.revision >= 2 && rsdp.xsdt_addr != 0
 }
 
-@[cinit]
 @[_linker_section: '.requests']
+@[cinit]
 __global (
 	volatile rsdp_req = limine.LimineRSDPRequest{
 		response: unsafe { nil }

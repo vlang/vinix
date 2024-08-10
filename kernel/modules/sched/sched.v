@@ -43,14 +43,14 @@ fn get_next_thread() &proc.Thread {
 
 	mut orig_i := cpu_local.last_run_queue_index
 
-	if orig_i >= max_running_threads {
+	if orig_i >= sched.max_running_threads {
 		orig_i = 0
 	}
 
 	mut index := orig_i + 1
 
 	for {
-		if index >= max_running_threads {
+		if index >= sched.max_running_threads {
 			index = 0
 		}
 
@@ -141,7 +141,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	new_gpr_state := &current_thread.gpr_state
 
 	if new_gpr_state.cs == user_code_seg {
-		//C.userland__dispatch_a_signal(new_gpr_state)
+		// C.userland__dispatch_a_signal(new_gpr_state)
 	}
 
 	asm volatile amd64 {
@@ -184,8 +184,10 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 	katomic.store(mut &t.enqueued_by_signal, by_signal)
 
-	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
+	for i := u64(0); i < sched.max_running_threads; i++ {
+		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil },
+			t)
+		{
 			t.is_in_queue = true
 
 			// Check if any CPU is idle and wake it up
@@ -210,7 +212,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 		return true
 	}
 
-	for i := u64(0); i < max_running_threads; i++ {
+	for i := u64(0); i < sched.max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
 			t.is_in_queue = false
 			return true
@@ -293,12 +295,12 @@ pub fn dequeue_and_die() {
 	}
 	mut t := proc.current_thread()
 	dequeue_thread(t)
-	//for ptr in t.stacks {
-		//memory.pmm_free(ptr, sched.stack_size / page_size)
+	// for ptr in t.stacks {
+	// memory.pmm_free(ptr, sched.stack_size / page_size)
 	//}
 	unsafe {
-		//t.stacks.free()
-		//free(t)
+		// t.stacks.free()
+		// free(t)
 	}
 	yield(false)
 	for {}
@@ -350,8 +352,7 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: new_thread(0x%llx, 0x%llx)\n', process.name.str, pc,
-		stack)
+	C.printf(c'\n\e[32m%s\e[m: new_thread(0x%llx, 0x%llx)\n', process.name.str, pc, stack)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -361,9 +362,8 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 		unsafe { empty_string_array.free() }
 	}
 
-	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array, empty_string_array, unsafe { nil }, false) or {
-		return errno.err, errno.get()
-	}
+	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array,
+		empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
 
 	enqueue_thread(new_thread, false)
 

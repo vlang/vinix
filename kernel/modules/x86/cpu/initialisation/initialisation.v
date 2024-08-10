@@ -134,7 +134,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	apic.lapic_timer_calibrate(mut cpu_local)
 
-	print('smp: CPU $cpu_local.cpu_number online!\n')
+	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 
 	katomic.inc(mut &cpu_local.online)
 

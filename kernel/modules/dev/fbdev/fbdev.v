@@ -22,7 +22,7 @@ pub mut:
 	event        eventstruct.Event
 	status       int
 	can_mmap     bool
-	node_lock  	 klock.Lock
+	node_lock    klock.Lock
 	initialized  bool
 	node_created bool
 	info         api.FramebufferInfo
@@ -32,7 +32,7 @@ const fbdev_max_device_count = 32
 
 __global (
 	fbdev_lock  klock.Lock
-	fbdev_nodes [fbdev_max_device_count]FramebufferNode
+	fbdev_nodes [fbdev.fbdev_max_device_count]FramebufferNode
 )
 
 fn (mut this FramebufferNode) mmap(page u64, flags int) voidptr {
@@ -88,7 +88,7 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 			return 0
 		}
 		ioctl.fbioput_vscreeninfo {
-			unsafe { C.memcpy(&this.info.variable, argp,  sizeof(api.FBVarScreenInfo)) }
+			unsafe { C.memcpy(&this.info.variable, argp, sizeof(api.FBVarScreenInfo)) }
 			return 0
 		}
 		ioctl.fbioget_fscreeninfo {
@@ -107,7 +107,7 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 			return none
 		}
 		else {
-			panic('$request')
+			panic('${request}')
 			return resource.default_ioctl(handle, request, argp)
 		}
 	}
@@ -129,7 +129,7 @@ fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {
 }
 
 fn create_device_node(index u64) ? {
-	if index >= fbdev_max_device_count {
+	if index >= fbdev.fbdev_max_device_count {
 		println('device index out of range')
 		return none
 	}
@@ -160,7 +160,7 @@ pub fn register_device(info api.FramebufferInfo) ? {
 		fbdev_lock.release()
 	}
 
-	for index < fbdev_max_device_count {
+	for index < fbdev.fbdev_max_device_count {
 		if fbdev_nodes[index].initialized {
 			index += 1
 			continue
@@ -171,7 +171,7 @@ pub fn register_device(info api.FramebufferInfo) ? {
 		break
 	}
 
-	if index >= fbdev_max_device_count {
+	if index >= fbdev.fbdev_max_device_count {
 		println('too many registered devices')
 		return none
 	}
@@ -189,5 +189,4 @@ pub fn register_driver(driver &api.FramebufferDriver) {
 }
 
 pub fn initialise() {
-
 }

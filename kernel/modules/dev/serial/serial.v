@@ -81,23 +81,23 @@ pub fn initialise() {
 // Initialize a port.
 fn initialise_port(port u16) bool {
 	// Check if the port exists by writing a value and checking it back.
-	kio.port_out<u8>(port + 7, 0x55)
-	if kio.port_in<u8>(port + 7) != 0x55 {
+	kio.port_out[u8](port + 7, 0x55)
+	if kio.port_in[u8](port + 7) != 0x55 {
 		return false
 	}
 
 	// Enable data available interrupts and enable DLAB.
-	kio.port_out<u8>(port + 1, 0x01)
-	kio.port_out<u8>(port + 3, 0x80)
+	kio.port_out[u8](port + 1, 0x01)
+	kio.port_out[u8](port + 3, 0x80)
 
 	// Set divisor to low 1 hi 0 (115200 baud)
-	kio.port_out<u8>(port + 0, 0x01)
-	kio.port_out<u8>(port + 1, 0x00)
+	kio.port_out[u8](port + 0, 0x01)
+	kio.port_out[u8](port + 1, 0x00)
 
 	// Enable FIFO and interrupts
-	kio.port_out<u8>(port + 3, 0x03)
-	kio.port_out<u8>(port + 2, 0xc7)
-	kio.port_out<u8>(port + 4, 0x0b)
+	kio.port_out[u8](port + 3, 0x03)
+	kio.port_out[u8](port + 2, 0xc7)
+	kio.port_out[u8](port + 4, 0x0b)
 	return true
 }
 
@@ -106,10 +106,10 @@ pub fn out(value u8) {
 	com1_lock.acquire()
 	if value == `\n` {
 		for !is_transmiter_empty(serial.com1_port) {}
-		kio.port_out<u8>(serial.com1_port, `\r`)
+		kio.port_out[u8](serial.com1_port, `\r`)
 	}
 	for !is_transmiter_empty(serial.com1_port) {}
-	kio.port_out<u8>(serial.com1_port, value)
+	kio.port_out[u8](serial.com1_port, value)
 	com1_lock.release()
 }
 
@@ -117,18 +117,18 @@ pub fn out(value u8) {
 pub fn panic_out(value u8) {
 	if value == `\n` {
 		for !is_transmiter_empty(serial.com1_port) {}
-		kio.port_out<u8>(serial.com1_port, `\r`)
+		kio.port_out[u8](serial.com1_port, `\r`)
 	}
 	for !is_transmiter_empty(serial.com1_port) {}
-	kio.port_out<u8>(serial.com1_port, value)
+	kio.port_out[u8](serial.com1_port, value)
 }
 
 fn is_transmiter_empty(port u16) bool {
-	return kio.port_in<u8>(port + 5) & 0b01000000 != 0
+	return kio.port_in[u8](port + 5) & 0b01000000 != 0
 }
 
 fn is_data_received(port u16) bool {
-	return kio.port_in<u8>(port + 5) & 0b00000001 != 0
+	return kio.port_in[u8](port + 5) & 0b00000001 != 0
 }
 
 // Resource functions for serial COMPort s
@@ -163,7 +163,7 @@ fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 	}
 	for i := u64(0); i < count; {
 		if is_data_received(this.port) {
-			val := kio.port_in<u8>(this.port)
+			val := kio.port_in[u8](this.port)
 			unsafe {
 				data[i] = val
 			}
@@ -184,7 +184,7 @@ fn (mut this COMPort) write(handle voidptr, buf voidptr, loc u64, count u64) ?i6
 	mut data := &u8(buf)
 	for i in 0 .. count {
 		for !is_transmiter_empty(this.port) {}
-		kio.port_out<u8>(this.port, unsafe { data[i] })
+		kio.port_out[u8](this.port, unsafe { data[i] })
 	}
 	return i64(count)
 }

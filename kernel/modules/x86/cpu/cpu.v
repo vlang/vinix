@@ -9,8 +9,7 @@ import x86.msr
 pub fn invlpg(addr u64) {
 	asm volatile amd64 {
 		invlpg [addr]
-		;
-		; r (addr)
+		; ; r (addr)
 		; memory
 	}
 }

@@ -23,7 +23,7 @@ __global (
 )
 
 fn syscall_vacant(_ voidptr) (u64, u64) {
-    return u64(-1), errno.enosys
+	return u64(-1), errno.enosys
 }
 
 pub fn init_syscall_table() {

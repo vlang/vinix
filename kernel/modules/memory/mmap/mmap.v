@@ -12,14 +12,14 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import lib
 
-pub const prot_none     = 0x00
-pub const prot_read     = 0x01
-pub const prot_write    = 0x02
-pub const prot_exec     = 0x04
-pub const map_private   = 0x02
-pub const map_shared    = 0x01
-pub const map_fixed     = 0x10
-pub const map_anon      = 0x20
+pub const prot_none = 0x00
+pub const prot_read = 0x01
+pub const prot_write = 0x02
+pub const prot_exec = 0x04
+pub const map_private = 0x02
+pub const map_shared = 0x01
+pub const map_fixed = 0x10
+pub const map_anon = 0x20
 pub const map_anonymous = 0x20
 
 pub struct MmapRangeLocal {
@@ -47,9 +47,10 @@ pub fn list_ranges(pagemap &memory.Pagemap) {
 	C.printf(c'Ranges for %llx:\n', voidptr(pagemap))
 	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
 		r := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
-		C.printf(c'                                Base: %p  Length: %p  Offset: %p\n', r.base, r.length,
-			r.offset)
-		C.printf(c'    Global: %p  Base: %p  Length: %p  Offset: %p\n', r.global, r.global.base, r.global.length, r.global.offset)
+		C.printf(c'                                Base: %p  Length: %p  Offset: %p\n',
+			r.base, r.length, r.offset)
+		C.printf(c'    Global: %p  Base: %p  Length: %p  Offset: %p\n', r.global, r.global.base,
+			r.global.length, r.global.offset)
 	}
 }
 
@@ -73,7 +74,7 @@ pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 	for ptr in mmap_ranges {
 		local_range := unsafe { &MmapRangeLocal(ptr) }
 
-		munmap_unlocked(mut pagemap, voidptr(local_range.base), local_range.length) or { }
+		munmap_unlocked(mut pagemap, voidptr(local_range.base), local_range.length) or {}
 	}
 
 	unsafe {
@@ -372,7 +373,7 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 		pagemap.l.release()
 	}
 
-	mprotect_unlocked(mut pagemap, addr, len, prot) ?
+	mprotect_unlocked(mut pagemap, addr, len, prot)?
 }
 
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
@@ -462,7 +463,7 @@ pub fn munmap(mut pagemap memory.Pagemap, addr voidptr, len u64) ? {
 		pagemap.l.release()
 	}
 
-	munmap_unlocked(mut pagemap, addr, len) ?
+	munmap_unlocked(mut pagemap, addr, len)?
 }
 
 pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? {
