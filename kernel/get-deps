@@ -57,8 +57,13 @@ download_by_hash() {
 if ! test -f version; then
     clone_repo_commit \
         https://github.com/osdev0/freestanding-headers.git \
-        c/freestanding-headers \
+        freestanding-headers \
         dd3abd2d7147efc4170dff478d3b7730bed14147
+
+    download_by_hash \
+        https://github.com/osdev0/cc-runtime/raw/dcdf5d82973e77edee597a047a3ef66300903de9/cc-runtime.c \
+        c/cc-runtime.c \
+        199907f5303ab15a963377fabcc1f2ee736e4ed18d54c59aab08345aa5485e8a
 
     clone_repo_commit \
         https://github.com/mintsuki/flanterm.git \

@@ -1,4 +1,5 @@
-/c/freestanding-headers
+/freestanding-headers
+/c/cc-runtime.c
 /c/flanterm
 /c/printf
 /bin

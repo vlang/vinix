@@ -5,8 +5,11 @@
 # Nuke built-in rules and variables.
 override MAKEFLAGS += -rR
 
-override KERNEL := vinix
+# This is the name that our final executable will have.
+# Change as needed.
+override OUTPUT := vinix
 
+# Convenience macro to reliably declare user overridable variables.
 define DEFAULT_VAR =
     ifeq ($(origin $1),default)
         override $(1) := $(2)
@@ -16,30 +19,35 @@ define DEFAULT_VAR =
     endif
 endef
 
-override DEFAULT_KTOOLCHAIN :=
-$(eval $(call DEFAULT_VAR,KTOOLCHAIN,$(DEFAULT_KTOOLCHAIN)))
-
-override DEFAULT_KCC := $(KTOOLCHAIN)cc
+# User controllable C compiler command.
+override DEFAULT_KCC := cc
 $(eval $(call DEFAULT_VAR,KCC,$(DEFAULT_KCC)))
 
-override DEFAULT_KLD := $(KTOOLCHAIN)ld
+# User controllable linker command.
+override DEFAULT_KLD := ld
 $(eval $(call DEFAULT_VAR,KLD,$(DEFAULT_KLD)))
 
-override DEFAULT_KOBJDUMP := $(KTOOLCHAIN)objdump
+# User controllable objdump command.
+override DEFAULT_KOBJDUMP := objdump
 $(eval $(call DEFAULT_VAR,KOBJDUMP,$(DEFAULT_KOBJDUMP)))
 
+# User controllable V command.
 override DEFAULT_KV := v
 $(eval $(call DEFAULT_VAR,KV,$(DEFAULT_KV)))
 
+# User controllable C flags.
 override DEFAULT_KCFLAGS := -g -O2 -pipe
 $(eval $(call DEFAULT_VAR,KCFLAGS,$(DEFAULT_KCFLAGS)))
 
+# User controllable C preprocessor flags. We set none by default.
 override DEFAULT_KCPPFLAGS :=
 $(eval $(call DEFAULT_VAR,KCPPFLAGS,$(DEFAULT_KCPPFLAGS)))
 
+# User controllable V flags. We set none by default.
 override DEFAULT_KVFLAGS :=
 $(eval $(call DEFAULT_VAR,KVFLAGS,$(DEFAULT_KVFLAGS)))
 
+# User controllable linker flags. We set none by default.
 override DEFAULT_KLDFLAGS :=
 $(eval $(call DEFAULT_VAR,KLDFLAGS,$(DEFAULT_KLDFLAGS)))
 
@@ -50,6 +58,7 @@ else
     override PROD := true
 endif
 
+# Internal C flags that should not be changed by the user.
 override KCFLAGS += \
     -g \
     -Wall \
@@ -74,27 +83,29 @@ override KCFLAGS += \
     -mno-red-zone \
     -mcmodel=kernel
 
+# Internal C preprocessor flags that should not be changed by the user.
 override KCPPFLAGS := \
     -I c \
-    -isystem c/freestanding-headers \
     $(KCPPFLAGS) \
+    -isystem freestanding-headers \
     -MMD \
     -MP
 
-obj/c/printf/printf.c.o: override KCPPFLAGS += \
+obj/printf/printf.c.o: override KCPPFLAGS += \
     -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
-obj/c/flanterm/backends/fb.c.o: override KCPPFLAGS += \
+obj/flanterm/backends/fb.c.o: override KCPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
+# Internal linker flags that should not be changed by the user.
 override KLDFLAGS += \
     -m elf_x86_64 \
     -nostdlib \
     -static \
     -z max-page-size=0x1000 \
-    -T linker.ld \
-    -gc-sections
+    -gc-sections \
+    -T linker.ld
 
 override KVFLAGS += \
     -os vinix \
@@ -113,23 +124,31 @@ else
 	override KVFLAGS += -warn-about-allocs
 endif
 
-override VFILES := $(shell find -L * -type f -name '*.v')
-override CFILES := $(shell find -L c/* -type f -name '*.c')
-override ASFILES := $(shell find -L asm/* -type f -name '*.S')
+# Use "find" to glob all *.v, *.c, and *.S files in the tree and obtain the
+# object and header dependency file names.
+override VFILES := $(shell find -L * -type f -name '*.v' | LC_ALL=C sort)
+override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort)
+override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' | LC_ALL=C sort)
 override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
-.PHONY: all
-all: bin/$(KERNEL)
+# Ensure the dependencies have been obtained.
+override MISSING_DEPS := $(shell if ! test -d freestanding-headers || ! test -f c/cc-runtime.c || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h; then echo 1; fi)
+ifeq ($(MISSING_DEPS),1)
+    $(error Please run the ./get-deps script first)
+endif
 
-bin/$(KERNEL): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
+# Default target.
+.PHONY: all
+all: bin/$(OUTPUT)
+
+# Link rules for the final executable.
+bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
 	mkdir -p "$$(dirname $@)"
 	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
-	mv c/symbol_table.c symbol_table.c.tmp
-	./gensyms.sh $(KOBJDUMP) $@ > c/symbol_table.c
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c c/symbol_table.c -o obj/c/symbol_table.c.o
+	./gensyms.sh $(KOBJDUMP) $@ > obj/symbol_table.c
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c obj/symbol_table.c -o obj/symbol_table.c.o
 	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
-	mv symbol_table.c.tmp c/symbol_table.c
 
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
@@ -138,25 +157,31 @@ obj/blob.c.o: $(VFILES)
 	mv obj/blob.c.tmp obj/blob.c
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -w -c obj/blob.c -o $@
 
+# Include header dependencies.
 -include $(HEADER_DEPS)
 
-obj/%.c.o: %.c GNUmakefile
+# Compilation rules for *.c files.
+obj/%.c.o: c/%.c GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
 
-obj/%.S.o: %.S GNUmakefile
+# Compilation rules for *.S files.
+obj/%.S.o: asm/%.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
 
+# Remove object files and the final executable.
 .PHONY: clean
 clean:
 	rm -rf bin obj
 
+# Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf c/freestanding-headers c/flanterm c/printf
+	rm -rf freestanding-headers c/cc-runtime.c c/flanterm c/printf
 
+# Install the final built executable to its final on-root location.
 .PHONY: install
-install:
-	install -d "$(DESTDIR)$(PREFIX)/share/$(KERNEL)"
-	install -m 644 bin/$(KERNEL) "$(DESTDIR)$(PREFIX)/share/$(KERNEL)/"
+install: all
+	install -d "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)"
+	install -m 644 bin/$(OUTPUT) "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)/"

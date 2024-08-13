@@ -14,7 +14,7 @@ regenerate() {
 build() {
     cp -rpf "${source_dir}"/. ./
 
-    make -j${parallelism} KTOOLCHAIN=${OS_TRIPLET}-
+    make -j${parallelism} KCC=${OS_TRIPLET}-gcc KLD=${OS_TRIPLET}-ld KOBJDUMP=${OS_TRIPLET}-objdump
 }
 
 package() {
