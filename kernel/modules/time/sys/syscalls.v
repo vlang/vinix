@@ -12,7 +12,7 @@ import proc
 
 pub fn nsleep(ns i64) {
 	mut interval := time.TimeSpec{
-		tv_sec: ns / 1000000000
+		tv_sec:  ns / 1000000000
 		tv_nsec: ns
 	}
 

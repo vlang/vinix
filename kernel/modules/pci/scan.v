@@ -24,10 +24,10 @@ pub fn initialise() {
 	} else {
 		for function := u8(0); function < pci.max_function; function++ {
 			host_bridge := PCIDevice{
-				bus: 0
-				slot: 0
+				bus:      0
+				slot:     0
 				function: function
-				parent: 0
+				parent:   0
 			}
 			config0 := host_bridge.read[u32](0)
 			if config0 == 0xffffffff {
@@ -49,10 +49,10 @@ fn check_bus(bus u8, parent i64) {
 
 fn check_function(bus u8, slot u8, function u8, parent i64) {
 	mut device := &PCIDevice{
-		bus: bus
-		slot: slot
+		bus:      bus
+		slot:     slot
 		function: function
-		parent: parent
+		parent:   parent
 	}
 	device.read_info()
 	if device.device_id == 0xffff && device.vendor_id == 0xffff {

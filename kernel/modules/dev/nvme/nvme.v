@@ -738,9 +738,9 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	c.qid_bitmap.initialise(0xffff)
 
 	c.admin_queue = &NVMEQueuePair{
-		parent_controller: unsafe { nil }
-		submission_queue: unsafe { nil }
-		completion_queue: unsafe { nil }
+		parent_controller:   unsafe { nil }
+		submission_queue:    unsafe { nil }
+		completion_queue:    unsafe { nil }
 		completion_doorbell: unsafe { nil }
 		submission_doorbell: unsafe { nil }
 	}
@@ -800,9 +800,9 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	for i := 0; i < nvme.nvme_io_queue_cnt; i++ {
 		mut new_io_queue := &NVMEQueuePair{
-			parent_controller: unsafe { nil }
-			submission_queue: unsafe { nil }
-			completion_queue: unsafe { nil }
+			parent_controller:   unsafe { nil }
+			submission_queue:    unsafe { nil }
+			completion_queue:    unsafe { nil }
 			submission_doorbell: unsafe { nil }
 			completion_doorbell: unsafe { nil }
 		}
@@ -822,7 +822,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		if unsafe { nsid_list[i] != 0 } {
 			mut new_namespace := &NVMENamespace{
 				parent_controller: unsafe { nil }
-				identity: unsafe { nil }
+				identity:          unsafe { nil }
 			}
 
 			if new_namespace.initialise(mut c, unsafe { nsid_list[i] }) != 0 {
@@ -850,9 +850,9 @@ pub fn initialise() {
 		if device.class == nvme.nvme_class && device.subclass == nvme.nvme_subclass
 			&& device.prog_if == nvme.nvme_progif {
 			mut nvme_device := &NVMEController{
-				regs: unsafe { nil }
+				regs:          unsafe { nil }
 				controller_id: unsafe { nil }
-				admin_queue: unsafe { nil }
+				admin_queue:   unsafe { nil }
 			}
 
 			if nvme_device.initialise(device) != -1 {

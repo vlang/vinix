@@ -19,7 +19,7 @@ __global (
 @[cinit]
 __global (
 	volatile smp_req = limine.LimineSMPRequest{
-		flags: 1 // x2apic allowed
+		flags:    1 // x2apic allowed
 		response: unsafe { nil }
 	}
 )

@@ -149,7 +149,7 @@ pub fn (mut this Timer) arm() {
 
 pub fn new_timer(when TimeSpec) &Timer {
 	mut timer := &Timer{
-		when: when
+		when:  when
 		fired: false
 		index: -1
 	}

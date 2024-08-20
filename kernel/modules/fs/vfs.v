@@ -51,12 +51,12 @@ __global (
 
 pub fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
 	mut node := &VFSNode{
-		name: name
-		parent: unsafe { parent }
+		name:       name
+		parent:     unsafe { parent }
 		mountpoint: unsafe { nil }
-		redir: unsafe { nil }
-		children: unsafe { nil }
-		resource: &resource.Resource(unsafe { nil })
+		redir:      unsafe { nil }
+		children:   unsafe { nil }
+		resource:   &resource.Resource(unsafe { nil })
 		filesystem: unsafe { filesystem }
 	}
 	if dir {
@@ -928,10 +928,10 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 				}
 			}
 			mut new_dirent := stat.Dirent{
-				ino: node.resource.stat.ino
-				off: i++
+				ino:    node.resource.stat.ino
+				off:    i++
 				reclen: u16(sizeof(stat.Dirent))
-				@type: u8(t)
+				@type:  u8(t)
 			}
 			C.strcpy(&new_dirent.name[0], name.str)
 			dir_handle.dirlist << new_dirent

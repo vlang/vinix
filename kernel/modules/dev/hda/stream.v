@@ -13,29 +13,27 @@ import katomic
 struct HDABufferDescriptor {
 pub mut:
 	address u64
-	length u32
-	ioc u32
+	length  u32
+	ioc     u32
 }
 
-const (
-	max_buffer_descriptors = page_size / sizeof(HDABufferDescriptor)
-	total_buffer_size = max_buffer_descriptors * page_size
-	chunk_size = page_size
-)
+const max_buffer_descriptors = page_size / sizeof(HDABufferDescriptor)
+const total_buffer_size = max_buffer_descriptors * page_size
+const chunk_size = page_size
 
 struct HDAStream {
 pub mut:
-	volatile regs &HDAStreamRegisters
-	volatile dma_pos &u32
-	controller &HDAController
-	bdl &HDABufferDescriptor
-	event eventstruct.Event
-	bdl_phys u64
-	cur_user_pos u32
+	volatile regs           &HDAStreamRegisters
+	volatile dma_pos        &u32
+	controller     &HDAController
+	bdl            &HDABufferDescriptor
+	event          eventstruct.Event
+	bdl_phys       u64
+	cur_user_pos   u32
 	remaining_data u32
-	cur_volume u32
-	channels u8
-	is_output bool
+	cur_volume     u32
+	channels       u8
+	is_output      bool
 }
 
 fn (mut s HDAStream) initialize_output() {
@@ -53,7 +51,7 @@ fn (mut s HDAStream) initialize_output() {
 		s.regs.ctl0 = ctl0
 
 		// cyclic buffer length
-		s.regs.cbl = u32(max_buffer_descriptors * 0x1000)
+		s.regs.cbl = u32(hda.max_buffer_descriptors * 0x1000)
 
 		// 256 entries
 		mut lvi := s.regs.lvi
@@ -77,11 +75,11 @@ pub fn (mut s HDAStream) initialize(index u8, is_output bool) {
 		}
 	}
 
-	for i in 0..max_buffer_descriptors {
+	for i in 0 .. hda.max_buffer_descriptors {
 		unsafe {
 			s.bdl[i].address = u64(memory.pmm_alloc(1))
 			s.bdl[i].length = u32(page_size)
-			if i != 0 && (i * page_size) % chunk_size == 0 {
+			if i != 0 && (i * page_size) % hda.chunk_size == 0 {
 				s.bdl[i].ioc = 1
 			}
 		}
@@ -209,15 +207,15 @@ fn (mut s HDAStream) sync_write(buf voidptr, loc u64, count u64) ?i64 {
 
 		s_remaining := katomic.load(&s.remaining_data)
 
-		if s.regs.ctl0 & sdctl0_run != 0 && s_remaining == total_buffer_size {
+		if s.regs.ctl0 & sdctl0_run != 0 && s_remaining == hda.total_buffer_size {
 			mut events := [&s.event]
 			event.await(mut events, true) or {}
 		}
 
-		to_copy := if i + (total_buffer_size - s_remaining) > count {
+		to_copy := if i + (hda.total_buffer_size - s_remaining) > count {
 			count - i
 		} else {
-			total_buffer_size - s_remaining
+			hda.total_buffer_size - s_remaining
 		}
 
 		mut progress := u64(0)
@@ -241,9 +239,8 @@ fn (mut s HDAStream) sync_write(buf voidptr, loc u64, count u64) ?i64 {
 				ptr := voidptr(desc.address + desc_offset + higher_half)
 				C.memcpy(ptr, voidptr(usize(buf) + i + progress), small_chunk_size)
 			}
-
 			s.cur_user_pos += u32(small_chunk_size)
-			if s.cur_user_pos == u32(total_buffer_size) {
+			if s.cur_user_pos == u32(hda.total_buffer_size) {
 				s.cur_user_pos = 0
 			}
 
@@ -257,7 +254,7 @@ fn (mut s HDAStream) sync_write(buf voidptr, loc u64, count u64) ?i64 {
 			}
 		}
 
-		if s.regs.ctl0 & sdctl0_run == 0 && s.remaining_data >= chunk_size * 2 {
+		if s.regs.ctl0 & sdctl0_run == 0 && s.remaining_data >= hda.chunk_size * 2 {
 			s.play(true)
 			first_write = true
 		}
@@ -268,7 +265,7 @@ fn (mut s HDAStream) sync_write(buf voidptr, loc u64, count u64) ?i64 {
 	if first_write {
 		for {
 			s_remaining := katomic.load(&s.remaining_data)
-			if s_remaining <= chunk_size * 2 {
+			if s_remaining <= hda.chunk_size * 2 {
 				break
 			}
 			mut events := [&s.event]
@@ -284,17 +281,17 @@ fn (mut s HDAStream) wait_until_empty() {
 		s_remaining := katomic.load(&s.remaining_data)
 		if s_remaining == 0 {
 			break
-		} else if s_remaining <= u32(total_buffer_size - chunk_size) {
+		} else if s_remaining <= u32(hda.total_buffer_size - hda.chunk_size) {
 			mut progress := u64(0)
 			for {
-				if progress == chunk_size {
+				if progress == hda.chunk_size {
 					break
 				}
 
 				desc_index := s.cur_user_pos / page_size
 				desc_offset := s.cur_user_pos % page_size
 
-				remaining := chunk_size - progress
+				remaining := hda.chunk_size - progress
 				small_chunk_size := if remaining < (page_size - desc_offset) {
 					remaining
 				} else {
@@ -306,9 +303,8 @@ fn (mut s HDAStream) wait_until_empty() {
 					ptr := voidptr(desc.address + desc_offset + higher_half)
 					C.memset(ptr, 0, small_chunk_size)
 				}
-
 				s.cur_user_pos += u32(small_chunk_size)
-				if s.cur_user_pos == u32(total_buffer_size) {
+				if s.cur_user_pos == u32(hda.total_buffer_size) {
 					s.cur_user_pos = 0
 				}
 
@@ -324,10 +320,10 @@ fn (mut s HDAStream) wait_until_empty() {
 fn (mut s HDAStream) handle_irq() {
 	for {
 		old := katomic.load(&s.remaining_data)
-		new_value := if old <= u32(chunk_size) {
+		new_value := if old <= u32(hda.chunk_size) {
 			u32(0)
 		} else {
-			old - u32(chunk_size)
+			old - u32(hda.chunk_size)
 		}
 		if katomic.cas(mut s.remaining_data, old, new_value) {
 			break

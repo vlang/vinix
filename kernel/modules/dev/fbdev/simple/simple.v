@@ -21,8 +21,8 @@ pub mut:
 
 __global (
 	simplefb_driver      = api.FramebufferDriver{
-		name: 'simplefb'
-		init: simple_init
+		name:            'simplefb'
+		init:            simple_init
 		register_device: unsafe { nil }
 	}
 	simplefb_initialized = false
@@ -47,53 +47,53 @@ fn simple_init() {
 
 fn do_register(config &SimpleFBConfig) {
 	info := api.FramebufferInfo{
-		base: voidptr(config.physical_address)
-		size: config.stride * config.height
+		base:   voidptr(config.physical_address)
+		size:   config.stride * config.height
 		driver: &simplefb_driver
-		fixed: api.FBFixScreenInfo{
-			id: [16]u8{}
-			smem_start: 0
-			smem_len: config.stride * config.height
-			@type: api.fb_type_packed_pixels
-			type_aux: 0
-			visual: api.fb_visual_truecolor
-			xpanstep: 0
-			ypanstep: 0
-			ywrapstep: 0
+		fixed:  api.FBFixScreenInfo{
+			id:          [16]u8{}
+			smem_start:  0
+			smem_len:    config.stride * config.height
+			@type:       api.fb_type_packed_pixels
+			type_aux:    0
+			visual:      api.fb_visual_truecolor
+			xpanstep:    0
+			ypanstep:    0
+			ywrapstep:   0
 			line_length: config.stride
-			mmio_start: 0
-			mmio_len: 0
-			accel: 0
+			mmio_start:  0
+			mmio_len:    0
+			accel:       0
 		}
 		variable: api.FBVarScreenInfo{
-			xres: config.width
-			yres: config.height
-			xres_virtual: config.width
-			yres_virtual: config.height
-			xoffset: 0
-			yoffset: 0
+			xres:           config.width
+			yres:           config.height
+			xres_virtual:   config.width
+			yres_virtual:   config.height
+			xoffset:        0
+			yoffset:        0
 			bits_per_pixel: config.bits_per_pixel
-			grayscale: 0
-			red: config.red
-			green: config.green
-			blue: config.blue
-			transp: config.transp
-			nonstd: 0
-			activate: api.fb_activate_now
-			height: 0
-			width: 0
-			accel_flags: 0
-			pixclock: 0
-			left_margin: 0
-			right_margin: 0
-			upper_margin: 0
-			lower_margin: 0
-			hsync_len: 0
-			vsync_len: 0
-			sync: 0
-			vmode: api.fb_vmode_noninterlaced
-			rotate: 0
-			reserved: [4]u32{}
+			grayscale:      0
+			red:            config.red
+			green:          config.green
+			blue:           config.blue
+			transp:         config.transp
+			nonstd:         0
+			activate:       api.fb_activate_now
+			height:         0
+			width:          0
+			accel_flags:    0
+			pixclock:       0
+			left_margin:    0
+			right_margin:   0
+			upper_margin:   0
+			lower_margin:   0
+			hsync_len:      0
+			vsync_len:      0
+			sync:           0
+			vmode:          api.fb_vmode_noninterlaced
+			rotate:         0
+			reserved:       [4]u32{}
 		}
 	}
 

@@ -542,20 +542,20 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 
 	mut new_thread := &proc.Thread{
-		gpr_state: gpr_state
-		process: new_process
-		timeslice: old_thread.timeslice
-		gs_base: cpu.get_kernel_gs_base()
-		fs_base: cpu.get_fs_base()
-		kernel_stack: kernel_stack
-		pf_stack: pf_stack
-		running_on: u64(-1)
-		cr3: u64(new_process.pagemap.top_level)
-		sigentry: old_thread.sigentry
-		sigactions: old_thread.sigactions
+		gpr_state:      gpr_state
+		process:        new_process
+		timeslice:      old_thread.timeslice
+		gs_base:        cpu.get_kernel_gs_base()
+		fs_base:        cpu.get_fs_base()
+		kernel_stack:   kernel_stack
+		pf_stack:       pf_stack
+		running_on:     u64(-1)
+		cr3:            u64(new_process.pagemap.top_level)
+		sigentry:       old_thread.sigentry
+		sigactions:     old_thread.sigactions
 		masked_signals: old_thread.masked_signals
-		stacks: stacks
-		fpu_storage: unsafe { malloc(fpu_storage_size) }
+		stacks:         stacks
+		fpu_storage:    unsafe { malloc(fpu_storage_size) }
 	}
 
 	unsafe { stacks.free() }
@@ -626,7 +626,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		stdin_node := fs.get_node(vfs_root, stdin, true)?
 		stdin_handle := &file.Handle{
 			resource: stdin_node.resource
-			node: stdin_node
+			node:     stdin_node
 			refcount: 1
 		}
 		stdin_fd := &file.FD{
@@ -637,7 +637,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		stdout_node := fs.get_node(vfs_root, stdout, true)?
 		stdout_handle := &file.Handle{
 			resource: stdout_node.resource
-			node: stdout_node
+			node:     stdout_node
 			refcount: 1
 		}
 		stdout_fd := &file.FD{
@@ -648,7 +648,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		stderr_node := fs.get_node(vfs_root, stderr, true)?
 		stderr_handle := &file.Handle{
 			resource: stderr_node.resource
-			node: stderr_node
+			node:     stderr_node
 			refcount: 1
 		}
 		stderr_fd := &file.FD{

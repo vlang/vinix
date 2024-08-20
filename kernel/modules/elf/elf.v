@@ -109,7 +109,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 
 	mut auxval := Auxval{
 		at_entry: base + header.entry + slide
-		at_phdr: 0
+		at_phdr:  0
 		at_phent: sizeof(ProgramHdr)
 		at_phnum: header.ph_num
 	}

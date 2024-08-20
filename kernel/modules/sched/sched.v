@@ -314,24 +314,24 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	stack := u64(stack_phys) + sched.stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
-		cs: kernel_code_seg
-		ds: kernel_data_seg
-		es: kernel_data_seg
-		ss: kernel_data_seg
+		cs:     kernel_code_seg
+		ds:     kernel_data_seg
+		es:     kernel_data_seg
+		ss:     kernel_data_seg
 		rflags: 0x202
-		rip: u64(pc)
-		rdi: u64(arg)
-		rbp: u64(0)
-		rsp: stack
+		rip:    u64(pc)
+		rdi:    u64(arg)
+		rbp:    u64(0)
+		rsp:    stack
 	}
 
 	mut t := &proc.Thread{
-		process: kernel_process
-		cr3: u64(kernel_process.pagemap.top_level)
-		gpr_state: gpr_state
-		timeslice: 5000
-		running_on: u64(-1)
-		stacks: stacks
+		process:     kernel_process
+		cr3:         u64(kernel_process.pagemap.top_level)
+		gpr_state:   gpr_state
+		timeslice:   5000
+		running_on:  u64(-1)
+		stacks:      stacks
 		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
 			higher_half)
 	}
@@ -406,26 +406,26 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	pf_stack := u64(pf_stack_phys) + sched.stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
-		cs: user_code_seg
-		ds: user_data_seg
-		es: user_data_seg
-		ss: user_data_seg
+		cs:     user_code_seg
+		ds:     user_data_seg
+		es:     user_data_seg
+		ss:     user_data_seg
 		rflags: 0x202
-		rip: u64(pc)
-		rdi: u64(arg)
-		rsp: u64(stack_vma)
+		rip:    u64(pc)
+		rdi:    u64(arg)
+		rsp:    u64(stack_vma)
 	}
 
 	mut t := &proc.Thread{
-		process: process
-		cr3: u64(process.pagemap.top_level)
-		gpr_state: gpr_state
-		timeslice: 5000
-		running_on: u64(-1)
+		process:      process
+		cr3:          u64(process.pagemap.top_level)
+		gpr_state:    gpr_state
+		timeslice:    5000
+		running_on:   u64(-1)
 		kernel_stack: kernel_stack
-		pf_stack: pf_stack
-		stacks: stacks
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
+		pf_stack:     pf_stack
+		stacks:       stacks
+		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
 			higher_half)
 	}
 

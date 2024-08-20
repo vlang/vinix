@@ -52,28 +52,28 @@ pub fn initialise() {
 pub fn framebuffer_init() {
 	sfb_config := simple.SimpleFBConfig{
 		physical_address: u64(framebuffer_tag.address)
-		width: u32(framebuffer_width)
-		height: u32(framebuffer_height)
-		stride: u32(framebuffer_tag.pitch)
-		bits_per_pixel: u32(framebuffer_tag.bpp)
-		red: api.FBBitfield{
-			offset: framebuffer_tag.red_mask_shift
-			length: framebuffer_tag.red_mask_size
+		width:            u32(framebuffer_width)
+		height:           u32(framebuffer_height)
+		stride:           u32(framebuffer_tag.pitch)
+		bits_per_pixel:   u32(framebuffer_tag.bpp)
+		red:              api.FBBitfield{
+			offset:    framebuffer_tag.red_mask_shift
+			length:    framebuffer_tag.red_mask_size
 			msb_right: 0
 		}
 		green: api.FBBitfield{
-			offset: framebuffer_tag.green_mask_shift
-			length: framebuffer_tag.green_mask_size
+			offset:    framebuffer_tag.green_mask_shift
+			length:    framebuffer_tag.green_mask_size
 			msb_right: 0
 		}
 		blue: api.FBBitfield{
-			offset: framebuffer_tag.blue_mask_shift
-			length: framebuffer_tag.blue_mask_size
+			offset:    framebuffer_tag.blue_mask_shift
+			length:    framebuffer_tag.blue_mask_size
 			msb_right: 0
 		}
 		transp: api.FBBitfield{
-			offset: 0
-			length: 0
+			offset:    0
+			length:    0
 			msb_right: 0
 		}
 	}

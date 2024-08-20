@@ -51,7 +51,7 @@ pub fn initialise() {
 
 pub fn reload() {
 	idt_pointer = IDTPointer{
-		size: u16((sizeof(IDTEntry) * 256) - 1)
+		size:    u16((sizeof(IDTEntry) * 256) - 1)
 		address: &idt_entries
 	}
 
@@ -71,11 +71,11 @@ pub fn register_handler(vector u16, handler voidptr, ist u8, flags u8) {
 
 	idt_entries[vector] = IDTEntry{
 		offset_low: u16(address)
-		selector: kernel_code_seg
-		ist: ist
-		flags: flags
+		selector:   kernel_code_seg
+		ist:        ist
+		flags:      flags
 		offset_mid: u16(address >> 16)
-		offset_hi: u32(address >> 32)
-		reserved: 0
+		offset_hi:  u32(address >> 32)
+		reserved:   0
 	}
 }

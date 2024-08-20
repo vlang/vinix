@@ -146,7 +146,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 
 			mut partition := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
-				sector_cnt: partition_entry.last_lba - partition_entry.starting_lba
+				sector_cnt:    partition_entry.last_lba - partition_entry.starting_lba
 				parent_device: unsafe { parent_device }
 			}
 
@@ -184,7 +184,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 
 			mut partition := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
-				sector_cnt: partition_entry.sector_cnt
+				sector_cnt:    partition_entry.sector_cnt
 				parent_device: unsafe { parent_device }
 			}
 

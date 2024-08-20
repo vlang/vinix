@@ -99,7 +99,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 
 		mut new_local_range := &MmapRangeLocal{
 			pagemap: unsafe { nil }
-			global: unsafe { nil }
+			global:  unsafe { nil }
 		}
 		unsafe {
 			*new_local_range = *local_range
@@ -121,7 +121,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			}
 		} else {
 			mut new_global_range := &MmapRangeGlobal{
-				resource: unsafe { nil }
+				resource:       unsafe { nil }
 				shadow_pagemap: memory.Pagemap{
 					top_level: &u64(0)
 				}
@@ -196,18 +196,18 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 
 	mut range_local := &MmapRangeLocal{
 		pagemap: unsafe { pagemap }
-		base: virt_addr
-		length: length
-		prot: prot
-		flags: flags
-		global: unsafe { nil }
+		base:    virt_addr
+		length:  length
+		prot:    prot
+		flags:   flags
+		global:  unsafe { nil }
 	}
 
 	mut range_global := &MmapRangeGlobal{
-		locals: []&MmapRangeLocal{}
-		base: virt_addr
-		length: length
-		resource: unsafe { nil }
+		locals:         []&MmapRangeLocal{}
+		base:           virt_addr
+		length:         length
+		resource:       unsafe { nil }
 		shadow_pagemap: memory.Pagemap{
 			top_level: &u64(0)
 		}
@@ -303,20 +303,20 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 
 	mut range_local := &MmapRangeLocal{
 		pagemap: pagemap
-		base: base
-		length: length
-		offset: offset
-		prot: prot
-		flags: flags
-		global: unsafe { nil }
+		base:    base
+		length:  length
+		offset:  offset
+		prot:    prot
+		flags:   flags
+		global:  unsafe { nil }
 	}
 
 	mut range_global := &MmapRangeGlobal{
-		locals: []&MmapRangeLocal{}
-		base: base
-		length: length
-		resource: resource_
-		offset: offset
+		locals:         []&MmapRangeLocal{}
+		base:           base
+		length:         length
+		resource:       resource_
+		offset:         offset
 		shadow_pagemap: memory.Pagemap{
 			top_level: &u64(0)
 		}
@@ -408,12 +408,12 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 			// Create new range for portion after snip
 			mut postsplit_range := &MmapRangeLocal{
 				pagemap: local_range.pagemap
-				base: snip_end
-				length: (local_range.base + local_range.length) - snip_end
-				offset: local_range.offset + i64(snip_end - local_range.base)
-				prot: local_range.prot
-				flags: local_range.flags
-				global: local_range.global
+				base:    snip_end
+				length:  (local_range.base + local_range.length) - snip_end
+				offset:  local_range.offset + i64(snip_end - local_range.base)
+				prot:    local_range.prot
+				flags:   local_range.flags
+				global:  local_range.global
 			}
 			global_range.locals << postsplit_range
 			pagemap.mmap_ranges << postsplit_range
@@ -444,12 +444,12 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 
 			mut new_range := &MmapRangeLocal{
 				pagemap: local_range.pagemap
-				base: snip_begin
-				length: snip_size
-				offset: new_offset
-				prot: prot
-				flags: local_range.flags
-				global: local_range.global
+				base:    snip_begin
+				length:  snip_size
+				offset:  new_offset
+				prot:    prot
+				flags:   local_range.flags
+				global:  local_range.global
 			}
 			global_range.locals << new_range
 			pagemap.mmap_ranges << new_range
@@ -494,12 +494,12 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 			// Create new range for portion after snip
 			mut postsplit_range := &MmapRangeLocal{
 				pagemap: local_range.pagemap
-				base: snip_end
-				length: (local_range.base + local_range.length) - snip_end
-				offset: local_range.offset + i64(snip_end - local_range.base)
-				prot: local_range.prot
-				flags: local_range.flags
-				global: local_range.global
+				base:    snip_end
+				length:  (local_range.base + local_range.length) - snip_end
+				offset:  local_range.offset + i64(snip_end - local_range.base)
+				prot:    local_range.prot
+				flags:   local_range.flags
+				global:  local_range.global
 			}
 			global_range.locals << postsplit_range
 			pagemap.mmap_ranges << postsplit_range

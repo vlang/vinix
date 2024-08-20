@@ -176,7 +176,7 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &DevTmpFSResource{
-		storage: unsafe { nil }
+		storage:  unsafe { nil }
 		refcount: 1
 	}
 
@@ -218,7 +218,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	mut new_node := create_node(this, parent, target, false)
 
 	mut new_resource := &DevTmpFSResource{
-		storage: unsafe { nil }
+		storage:  unsafe { nil }
 		refcount: 1
 	}
 

@@ -495,7 +495,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 					mut device := &AHCIDevice{
 						parent_controller: unsafe { c }
-						regs: port
+						regs:              port
 					}
 
 					device.initialise() or {

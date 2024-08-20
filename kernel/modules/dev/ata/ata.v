@@ -95,20 +95,20 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		bar4 &= 0xfffffffc
 	}
 	mut dev := &ATADrive{
-		is_master: port_index % 2 != 0
-		data_port: port
-		error_port: port + 1
+		is_master:         port_index % 2 != 0
+		data_port:         port
+		error_port:        port + 1
 		sector_count_port: port + 2
-		lba_low_port: port + 3
-		lba_mid_port: port + 4
-		lba_hi_port: port + 5
-		device_port: port + 6
-		cmd_port: port + 7
-		bar4: bar4
-		bmr_command: bar4
-		bmr_status: bar4 + 2
-		bmr_prdt: bar4 + 4
-		prdt: &PRDT(unsafe { nil })
+		lba_low_port:      port + 3
+		lba_mid_port:      port + 4
+		lba_hi_port:       port + 5
+		device_port:       port + 6
+		cmd_port:          port + 7
+		bar4:              bar4
+		bmr_command:       bar4
+		bmr_status:        bar4 + 2
+		bmr_prdt:          bar4 + 4
+		prdt:              &PRDT(unsafe { nil })
 		// To be filled later.
 		prdt_phys: 0
 		// To be filled later.

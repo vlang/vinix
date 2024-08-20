@@ -237,8 +237,8 @@ fn (mut this EXT2Filesystem) populate(node &fs.VFSNode) {
 fn (mut bro EXT2Filesystem) instantiate() &fs.FileSystem {
 	mut this := &EXT2Filesystem{
 		backing_device: bro.backing_device
-		superblock: bro.superblock
-		root_inode: bro.root_inode
+		superblock:     bro.superblock
+		root_inode:     bro.root_inode
 	}
 
 	this.block_size = 1024 << this.superblock.block_size
@@ -954,8 +954,8 @@ fn (mut fs EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count u64) ?i6
 pub fn ext2_init(backing_device &fs.VFSNode) (&EXT2Filesystem, bool) {
 	mut new_filesystem := &EXT2Filesystem{
 		backing_device: unsafe { backing_device }
-		superblock: &EXT2Superblock{}
-		root_inode: &EXT2Inode{}
+		superblock:     &EXT2Superblock{}
+		root_inode:     &EXT2Inode{}
 	}
 
 	new_filesystem.raw_device_read(new_filesystem.superblock, backing_device.resource.stat.blksize * 2,
