@@ -38,13 +38,22 @@ run-kvm: vinix.iso
 run-hvf: vinix.iso
 	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS)
 
-ovmf:
+ovmf/ovmf-code-x86_64.fd:
 	mkdir -p ovmf
-	cd ovmf && curl -o OVMF.fd https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd
+	curl -Lo $@ https://github.com/limine-bootloader/edk2-ovmf-nightly/releases/latest/download/ovmf-code-x86_64.fd
+
+ovmf/ovmf-vars-x86_64.fd:
+	mkdir -p ovmf
+	curl -Lo $@ https://github.com/limine-bootloader/edk2-ovmf-nightly/releases/latest/download/ovmf-vars-x86_64.fd
 
 .PHONY: run-uefi
-run-uefi: vinix.iso ovmf
-	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS) -bios ovmf/OVMF.fd
+run-uefi: vinix.iso ovmf/ovmf-code-x86_64.fd ovmf/ovmf-vars-x86_64.fd
+	qemu-system-x86_64 \
+		-enable-kvm \
+		-cpu host \
+		-drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-x86_64.fd,readonly=on \
+		-drive if=pflash,unit=1,format=raw,file=ovmf/ovmf-vars-x86_64.fd \
+		$(QEMUFLAGS)
 
 .PHONY: run-bochs
 run-bochs: vinix.iso
