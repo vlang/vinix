@@ -15,7 +15,7 @@ regenerate() {
 build() {
     autotools_configure
 
-    make -j${parallelism} GROFFBIN=/usr/bin/groff
+    make -j${parallelism} GROFFBIN=groff GROFF_BIN_PATH=/usr/bin
 }
 
 package() {
