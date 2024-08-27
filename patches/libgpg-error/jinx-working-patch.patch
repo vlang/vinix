@@ -1,0 +1,30 @@
+diff --git libgpg-error-clean/configure.ac libgpg-error-workdir/configure.ac
+index a24453e..f34d313 100644
+--- libgpg-error-clean/configure.ac
++++ libgpg-error-workdir/configure.ac
+@@ -197,6 +197,10 @@ esac
+ # We need to compile and run a program on the build machine.
+ AX_CC_FOR_BUILD
+ 
++AC_ARG_VAR([CFLAGS_FOR_BUILD], [CFLAGS for host])
++AC_ARG_VAR([CPPFLAGS_FOR_BUILD], [CPPFLAGS for host])
++AC_ARG_VAR([LDFLAGS_FOR_BUILD], [LDFLAGS for host])
++
+ AH_BOTTOM([
+ /* Force using of NLS for W32 even if no libintl has been found.  This is
+    okay because we have our own gettext implementation for W32.  */
+diff --git libgpg-error-clean/src/Makefile.am libgpg-error-workdir/src/Makefile.am
+index 9389e99..4919a12 100644
+--- libgpg-error-clean/src/Makefile.am
++++ libgpg-error-workdir/src/Makefile.am
+@@ -256,6 +256,10 @@ gpg-error.def: Makefile gpg-error.def.in
+ 	  grep -v '^#' >$@
+ 	-rm _$@.h
+ 
++CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
++CPPFLAGS_FOR_BUILD = @CPPFLAGS_FOR_BUILD@
++LDFLAGS_FOR_BUILD = @LDFLAGS_FOR_BUILD@
++
+ # It is correct to use $(CC_FOR_BUILD) here.  We want to run the
+ # program at build time.
+ mkerrcodes$(EXEEXT_FOR_BUILD): mkerrcodes.c mkerrcodes.h Makefile
