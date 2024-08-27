@@ -14,6 +14,9 @@ regenerate() {
 }
 
 build() {
+        BUILD_CFLAGS="$HOST_CFLAGS" \
+        BUILD_CPPFLAGS="$HOST_CPPFLAGS" \
+        BUILD_LDFLAGS="$HOST_LDFLAGS" \
     autotools_configure
 
     make -j${parallelism}
