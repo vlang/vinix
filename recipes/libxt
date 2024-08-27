@@ -5,7 +5,7 @@ tarball_url="https://www.x.org/archive/individual/lib/libXt-${version}.tar.gz"
 tarball_blake2b="3fc41d02802ccfda270030bcad73c0ca14c5b986d7353d8395339053a4d34352addda83fa2766af3d340c96416361de6a941688aff6e9b5bbc769a34af40bf53"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libx11 libsm"
 

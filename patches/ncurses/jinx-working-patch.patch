@@ -63,10 +63,19 @@ index 99f21da..5db41d8 100644
  etip.h:	$(srcdir)/etip.h.in $(srcdir)/edit_cfg.sh
  	cp $(srcdir)/etip.h.in $@
 diff --git ncurses-clean/configure ncurses-workdir/configure
-index 488d93f..677d4a9 100755
+index 4a74bab..615a8cb 100755
 --- ncurses-clean/configure
 +++ ncurses-workdir/configure
-@@ -6925,6 +6925,10 @@ CF_EOF
+@@ -3818,7 +3818,7 @@ echo $ECHO_N "checking if $CXX works... $ECHO_C" >&6
+ 
+ 		save_CPPFLAGS="$CPPFLAGS"
+ 		eval cf_includedir=${includedir}
+-		CPPFLAGS="$CPPFLAGS -I${cf_includedir}"
++		CPPFLAGS="$CPPFLAGS"
+ 
+ cat >"conftest.$ac_ext" <<_ACEOF
+ #line 3824 "configure"
+@@ -7223,6 +7223,10 @@ CF_EOF
  		LINK_PROGS="$SHELL ${rel_builddir}/mk_prog.sh"
  		LINK_TESTS="$SHELL ${rel_builddir}/mk_prog.sh"
  		;;
@@ -129,3 +138,16 @@ index 380f80c..a77ef15 100644
  
  RPATH_LIST	= @RPATH_LIST@
  RESULTING_SYMS	= @RESULTING_SYMS@
+diff --git ncurses-clean/progs/Makefile.in ncurses-workdir/progs/Makefile.in
+index 218e64e..160d308 100644
+--- ncurses-clean/progs/Makefile.in
++++ ncurses-workdir/progs/Makefile.in
+@@ -79,7 +79,7 @@ LIBTOOL_INSTALL	= @LIB_INSTALL@
+ LIBTOOL_UNINSTALL = @LIB_UNINSTALL@
+ 
+ INSTALL		= @INSTALL@
+-INSTALL_PROG	= @INSTALL_PROGRAM@ @INSTALL_OPT_S@
++INSTALL_PROG	= @INSTALL_PROGRAM@
+ transform	= @program_transform_name@
+ 
+ AWK		= @AWK@

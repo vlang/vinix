@@ -7,7 +7,7 @@ source_hostdeps="automake autoconf-2.69 libtool pkg-config"
 source_imagedeps="git"
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
 deps="core-libs binutils zlib gmp mpfr mpc gettext"
-imagedeps="gcc"
+imagedeps="build-essential"
 
 regenerate() {
     for i in "${base_dir}"/patches/gcc-host/*; do
@@ -20,8 +20,10 @@ regenerate() {
 }
 
 build() {
-        CXXFLAGS_FOR_TARGET="$CXXFLAGS" \
-        CFLAGS_FOR_TARGET="$CFLAGS" \
+        CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
+        CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
+        CXXFLAGS_FOR_TARGET="$TARGET_CXXFLAGS" \
+        CFLAGS_FOR_TARGET="$TARGET_CFLAGS" \
     autotools_configure \
         --target=${OS_TRIPLET} \
         --with-sysroot=/ \
@@ -43,6 +45,11 @@ package() {
     DESTDIR="${dest_dir}" make install-gcc
 
     ln -s gcc "${dest_dir}${prefix}"/bin/cc
+    cp -v "${base_dir}"/build-support/gcc/c89 "${dest_dir}${prefix}"/bin/
+    cp -v "${base_dir}"/build-support/gcc/c99 "${dest_dir}${prefix}"/bin/
+    chmod +x "${dest_dir}${prefix}"/bin/c89
+    chmod +x "${dest_dir}${prefix}"/bin/c99
+
     # Remove static libraries
     rm -rf "${dest_dir}${prefix}"/lib/*.a
 

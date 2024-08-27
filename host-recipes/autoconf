@@ -3,6 +3,9 @@ from_source=autoconf
 revision=1
 
 build() {
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
     "${source_dir}"/configure --prefix="${prefix}"
 
     make -j${parallelism}

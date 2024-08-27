@@ -3,9 +3,9 @@ version=9.5
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/coreutils/coreutils-${version}.tar.xz"
 tarball_blake2b="6fd3a77697c9e85f31415c6ad66559faf18acc7d346677a89d4a999c2027886551e78842a7283e7b3b44fe8ef2fde04ba2f88df32a7844d5f69d45bcb7a04b6f"
-source_imagedeps="gcc gperf"
+source_imagedeps="build-essential gperf"
 source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="gcc gperf"
+imagedeps="build-essential gperf"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs tzdata"
 
@@ -29,8 +29,10 @@ build() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
-        CFLAGS="-DSLOW_BUT_NO_HACKS $CFLAGS" \
-    autotools_configure
+        CFLAGS="$TARGET_CFLAGS -DSLOW_BUT_NO_HACKS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+    autotools_configure_noflags
 
     make -j${parallelism}
 }

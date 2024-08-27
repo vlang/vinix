@@ -1,7 +1,7 @@
 name=libstdc++
 revision=1
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
-imagedeps="gcc"
+imagedeps="build-essential"
 deps="mlibc libgcc"
 
 build() {

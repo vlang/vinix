@@ -5,7 +5,7 @@ tarball_url="https://www.x.org/archive/individual/lib/libX11-${version}.tar.xz"
 tarball_blake2b="8858157ac490d65e19500bfbb2ab773a3a30041f8a757ff22fff8fb0124044b8bb826f6dff4115230c757a175b61a3f7d596d976d98be760085749878d64f871"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xtrans xorg-util-macros"
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-proto libxcb xtrans"
 

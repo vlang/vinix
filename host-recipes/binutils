@@ -1,10 +1,13 @@
 name=binutils
 from_source=binutils
 revision=1
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="autoconf-2.69 automake libtool pkg-config"
 
 build() {
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         --target=${OS_TRIPLET} \

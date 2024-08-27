@@ -2,9 +2,12 @@ name=automake
 from_source=automake
 revision=1
 hostdeps="autoconf"
-imagedeps="gcc"
+imagedeps="build-essential"
 
 build() {
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
     "${source_dir}"/configure --prefix="${prefix}"
 
     make -j${parallelism}

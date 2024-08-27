@@ -1,16 +1,18 @@
 name=mlibc
-version=f3e45cac82dcc1a90d8d1629e1b3e75d4fffe9df
+version=67e11fa83ed3606edd1b76c927bd3303d7c87ab9
 revision=1
 tarball_url="https://github.com/managarm/mlibc/archive/${version}.tar.gz"
-tarball_blake2b="820e850b8d385fe8425333e9c3b17fd304194117bc8724b8667bf7990700e24c6b788dadabb46acdccccbf5d0e206e7f326ec203c4c6dfefc76eeac02953eeb9"
-imagedeps="meson ninja"
+tarball_blake2b="73ef40b1abd4f5bf2b0a92b95e597caa0b66f8a981fe797e15fd7c99d5825950ee9de5f777b4d0ac4c44caf01e3c3f769bb1c03e4030461fb104604349fb3bf9"
+imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config libgcc-binaries"
 builddeps="cshim cxxshim frigg"
 deps="mlibc-headers"
 
 build() {
-        LDFLAGS="-Wl,/usr/local/libgcc-binaries/libgcc-x86_64.a" \
-    meson_configure \
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="-Wl,/usr/local/libgcc-binaries/libgcc-$ARCHITECTURE.a" \
+    meson_configure_noflags \
         --buildtype=debugoptimized \
         -Dmlibc_no_headers=true \
         -Ddefault_library=both \

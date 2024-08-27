@@ -2,10 +2,14 @@ name=libtool
 from_source=libtool
 revision=1
 hostdeps="autoconf automake"
-imagedeps="help2man gcc"
+imagedeps="help2man build-essential"
 
 build() {
     cp -rp "${source_dir}"/. ./
+
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
     ./configure \
         --prefix="${prefix}"
 

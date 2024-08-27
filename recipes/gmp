@@ -4,7 +4,7 @@ revision=1
 tarball_url="https://ftp.gnu.org/gnu/gmp/gmp-${version}.tar.xz"
 tarball_blake2b="a865129e2b3f634ec5bad7f97ed89532e43f5662ac47a7d8ab7f0df8c9f8d0886bd984651422e2573c2163bca69c0547c248147ec90880accbd53db97dc0ddee"
 source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 

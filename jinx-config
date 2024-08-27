@@ -1,10 +1,25 @@
-JINX_MAJOR_VER=0.2
+JINX_MAJOR_VER=0.3
 
-export CFLAGS="-O2 -pipe -march=x86-64 -mtune=generic -fstack-clash-protection -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
-export CXXFLAGS="${CFLAGS} -Wp,-D_GLIBCXX_ASSERTIONS"
-export LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now"
+HOST_CFLAGS="-O2 -pipe -fstack-clash-protection"
+HOST_CXXFLAGS="${HOST_CFLAGS} -Wp,-D_GLIBCXX_ASSERTIONS"
+HOST_LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now"
 
-OS_TRIPLET=x86_64-pc-vinix-mlibc
+TARGET_CFLAGS="$HOST_CFLAGS"
+TARGET_CXXFLAGS="$HOST_CXXFLAGS"
+TARGET_LDFLAGS="$HOST_LDFLAGS"
+
+if [ -z "$ARCHITECTURE" ]; then
+    ARCHITECTURE=x86_64
+fi
+
+OS_TRIPLET=$ARCHITECTURE-pc-vinix-mlibc
+
+case "$ARCHITECTURE" in
+    x86_64)
+        TARGET_CFLAGS="$TARGET_CFLAGS -march=x86-64 -mtune=generic -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
+        TARGET_CXXFLAGS="$TARGET_CXXFLAGS -march=x86-64 -mtune=generic -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
+        ;;
+esac
 
 post_package_strip() {
     if [ -z "$strip_command" ]; then
@@ -23,6 +38,13 @@ post_package_strip() {
 }
 
 autotools_configure() {
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+    autotools_configure_noflags "$@"
+}
+
+autotools_configure_noflags() {
     if [ -z "${configure_script_path}" ]; then
         configure_script_path="${source_dir}/configure"
     fi
@@ -58,12 +80,19 @@ autotools_recursive_regen() {
 }
 
 meson_configure() {
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+    meson_configure_noflags "$@"
+}
+
+meson_configure_noflags() {
     if [ -z "${meson_source_dir}" ]; then
         meson_source_dir="${source_dir}"
     fi
 
     meson setup "${meson_source_dir}" \
-        --cross-file "${base_dir}/build-support/cross_file.txt" \
+        --cross-file "${base_dir}/build-support/cross_file-$ARCHITECTURE.txt" \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \
@@ -71,6 +100,34 @@ meson_configure() {
         --sbindir=bin \
         --buildtype=release \
         -Ddefault_library=shared \
+        "$@"
+}
+
+cmake_configure() {
+    cmake_configure_noflags \
+        -DCMAKE_C_FLAGS="$TARGET_CFLAGS" \
+        -DCMAKE_CXX_FLAGS="$TARGET_CXXFLAGS" \
+        -DCMAKE_SHARED_LINKER_FLAGS="$TARGET_LDFLAGS" \
+        "$@"
+}
+
+cmake_configure_noflags() {
+    if [ -z "${cmake_source_dir}" ]; then
+        cmake_source_dir="${source_dir}"
+    fi
+
+    cmake "${cmake_source_dir}" \
+        -DCMAKE_TOOLCHAIN_FILE="${base_dir}/build-support/CMakeToolchain-$ARCHITECTURE.txt" \
+        -DCMAKE_INSTALL_PREFIX=${prefix} \
+        -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+        -DCMAKE_INSTALL_LOCALSTATEDIR=/var \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_INSTALL_SBINDIR=bin \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=True \
+        -DENABLE_STATIC=False \
+        -DPKG_CONFIG_EXECUTABLE="/usr/local/bin/$OS_TRIPLET-pkg-config" \
+        -GNinja \
         "$@"
 }
 

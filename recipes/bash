@@ -6,7 +6,7 @@ tarball_blake2b="6789c9a0d9eb1ad167d4199bf1438d77934a7bbeae9f9fdd7167cae006b17b3
 source_allow_network=yes
 source_imagedeps="curl"
 source_hostdeps="autoconf automake libtool pkg-config"
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses readline"
 
@@ -26,14 +26,16 @@ regenerate() {
 }
 
 build() {
-        CFLAGS="$CFLAGS \
+        CFLAGS="$TARGET_CFLAGS \
             -DDEFAULT_PATH_VALUE='\"/usr/local/sbin:/usr/local/bin:/usr/bin\"' \
             -DSTANDARD_UTILS_PATH='\"/usr/bin\"' \
             -DSYS_BASHRC='\"/etc/bash.bashrc\"' \
             -DSYS_BASH_LOGOUT='\"/etc/bash.bash_logout\"' \
             -DNON_INTERACTIVE_LOGIN_SHELLS \
         " \
-    autotools_configure \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+    autotools_configure_noflags \
         --with-curses \
         --enable-readline \
         --without-bash-malloc \

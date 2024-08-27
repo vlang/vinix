@@ -3,7 +3,7 @@ version=8.5.0
 revision=1
 tarball_url="https://github.com/harfbuzz/harfbuzz/releases/download/${version}/harfbuzz-${version}.tar.xz"
 tarball_blake2b="f598d7de953834499d1ab36c0fc9d95099fd7e99b87f630e1527aaa39deb2d339b9f3caaea3643238c6c1b321557f794f273929950b54fe9de2faa430d77855a"
-imagedeps="meson ninja"
+imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs graphite2 glib zlib freetype2 cairo icu"
 

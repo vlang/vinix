@@ -3,16 +3,12 @@ version=2.30.3
 revision=1
 tarball_url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-${version}.tar.gz"
 tarball_blake2b="9918723bc3a0bc3abfc6d47b4fc7eeabcafdc9925ee93e4f31b3637e843a5b060ae61aef9b93743340a9df914248cff510e5d38e758e032b5ed4df9eed587746"
-imagedeps="gcc ninja git"
-hostdeps="gcc cmake pkg-config"
+imagedeps="cmake ninja-build git"
+hostdeps="gcc pkg-config"
 deps="core-libs libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxxf86vm mesa"
 
 build() {
-    cmake \
-        -GNinja \
-        -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_BUILD_TYPE=Release \
+    cmake_configure \
         -DSDL_ALTIVEC=OFF \
         -DSDL_DISKAUDIO=OFF \
         -DSDL_DIRECTFB=ON \
@@ -44,8 +40,7 @@ build() {
         -DSDL_KMSDRM=OFF \
         -DSDL_HIDAPI=OFF \
         -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        ${source_dir}
+        -DSDL_STATIC=OFF
 
     ninja -j${parallelism}
 }

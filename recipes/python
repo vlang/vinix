@@ -21,7 +21,7 @@ build() {
     ${source_dir}/configure \
         --prefix=${prefix} \
         --host=${OS_TRIPLET} \
-        --build=x86_64 \
+        --build=$ARCHITECTURE \
         --with-build-python=python3 \
         --disable-ipv6 \
         --enable-shared

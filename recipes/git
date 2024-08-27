@@ -4,7 +4,7 @@ revision=1
 tarball_url="https://www.kernel.org/pub/software/scm/git/git-${version}.tar.xz"
 tarball_blake2b="477acc786c26e0b04843ad6d07333607b2274d587263d72c6d036cade725e6f62f8c773903f401c799de71527d0473589afc507eec02f445e0c148dd7cbf407c"
 source_hostdeps="autoconf automake libtool pkg-config"
-imagedeps="base-devel"
+imagedeps="build-essential libcurl4-gnutls-dev"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs python zlib curl openssl openssh"
 

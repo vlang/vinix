@@ -3,16 +3,15 @@ version=18.1.7
 revision=1
 tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/llvm-project-${version}.src.tar.xz"
 tarball_blake2b="b8c37bd131fb5f3131bfab4fbad7aa811079ca10723faa14779253bc62b1ee08d4e04650e1da883297ed88a62d518b868a1f13cf57d03233254fd01209da5c02"
-imagedeps="gcc ninja python git"
-hostdeps="gcc cmake pkg-config"
+imagedeps="build-essential cmake ninja-build git"
+hostdeps="gcc pkg-config"
 deps="core-libs ncurses zlib zstd libffi"
 
 build() {
-    cmake \
-        -GNinja \
-        -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
-        -DCMAKE_INSTALL_PREFIX=${prefix} \
-        -DCMAKE_BUILD_TYPE=Release \
+        cmake_source_dir="${source_dir}/llvm" \
+    cmake_configure \
+        -UBUILD_SHARED_LIBS \
+        -UENABLE_STATIC \
         -DLLVM_LINK_LLVM_DYLIB=ON \
         -DLLVM_ENABLE_FFI=ON \
         -DLLVM_ENABLE_EH=ON \
@@ -20,8 +19,7 @@ build() {
         -DLLVM_ENABLE_PROJECTS="clang;lld" \
         -DLLVM_DEFAULT_TARGET_TRIPLE=${OS_TRIPLET} \
         -DLLVM_HOST_TRIPLE=${OS_TRIPLET} \
-        -Wno-dev \
-        ${source_dir}/llvm
+        -Wno-dev
 
     ninja -j${parallelism}
 }

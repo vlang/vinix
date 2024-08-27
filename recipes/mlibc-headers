@@ -1,7 +1,7 @@
 name=mlibc-headers
 revision=1
 from_source=mlibc
-imagedeps="meson ninja"
+imagedeps="meson ninja-build"
 hostdeps="pkg-config"
 
 build() {

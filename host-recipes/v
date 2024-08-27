@@ -1,12 +1,12 @@
 name=v
 from_source=v
 revision=1
-imagedeps="gcc"
+imagedeps="build-essential"
 
 build() {
     cp -r ${source_dir}/. ./
     set -x
-    cc $CFLAGS -w -std=gnu99 $LDFLAGS v.c -lm -lpthread -o v
+    cc $HOST_CFLAGS -w -std=gnu99 $HOST_LDFLAGS v.c -lm -lpthread -o v
     set +x
 }
 

@@ -1,18 +1,20 @@
 name=gcc
 from_source=gcc-host
 revision=1
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="autoconf-2.69 automake libtool pkg-config"
 hostrundeps="binutils"
 deps="mlibc-headers"
 
 build() {
     cp -rp "${source_dir}"/. ./
+    mkdir -p build && cd build
 
-    mkdir build && cd build
-
-        CXXFLAGS_FOR_TARGET="$CXXFLAGS" \
-        CFLAGS_FOR_TARGET="$CFLAGS" \
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
+        CFLAGS_FOR_TARGET="$TARGET_CFLAGS" \
+        CXXFLAGS_FOR_TARGET="$TARGET_CXXFLAGS" \
     ../configure \
         --prefix="${prefix}" \
         --target=${OS_TRIPLET} \
@@ -34,8 +36,6 @@ build() {
 package() {
     cd build
     DESTDIR="${dest_dir}" make install-gcc
-
-    ln -s ${OS_TRIPLET}-gcc "${dest_dir}${prefix}/bin/${OS_TRIPLET}-cc"
 
         strip_command=strip \
     post_package_strip

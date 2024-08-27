@@ -3,7 +3,7 @@ version=23.3.6
 revision=1
 tarball_url="https://archive.mesa3d.org/mesa-${version}.tar.xz"
 tarball_blake2b="1bec42973aa849ab3553942500de253213736eca5a71550f488cf915d65ee4f47d137772af1c59042f5803cfaf8152f278ccbab29c896d104985263a7121a2ba"
-imagedeps="binutils meson ninja python-setuptools python-mako"
+imagedeps="binutils meson ninja-build python3-setuptools python3-mako"
 hostdeps="gcc pkg-config"
 deps="core-libs llvm zlib libxshmfence libxrandr libxdamage libxxf86vm libxfixes libx11 libxext libxcb libexpat"
 

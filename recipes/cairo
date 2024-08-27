@@ -3,7 +3,7 @@ version=1.18.0
 revision=1
 tarball_url="https://cairographics.org/releases/cairo-${version}.tar.xz"
 tarball_blake2b="6f6abedb2614e3dd1eed7fcb97cd11296584fb2072617ab3d532bee94e6a83db003ce770d39ba1df84c96a9f6880f4de357f78a22904daf1bb874c9570abd336"
-imagedeps="meson ninja binutils"
+imagedeps="meson ninja-build binutils"
 hostdeps="gcc pkg-config"
 deps="core-libs fontconfig freetype2 glib libpng libx11 libxcb libxext libxrender pixman zlib"
 

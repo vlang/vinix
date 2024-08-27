@@ -2,18 +2,26 @@ name=limine
 from_source=limine
 revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
-imagedeps="nasm gcc mtools"
+imagedeps="nasm build-essential mtools"
 
 build() {
+    if [ "$ARCHITECTURE" = "x86_64" ]; then
+        X86_FLAGS="--enable-bios \
+                   --enable-bios-cd \
+                   --enable-bios-pxe \
+                   --enable-uefi-ia32 \
+        "
+    fi
+
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         TOOLCHAIN_FOR_TARGET=${OS_TRIPLET} \
-        --enable-uefi-ia32 \
-        --enable-uefi-x86-64 \
-        --enable-uefi-cd \
-        --enable-bios \
-        --enable-bios-cd \
-        --enable-bios-pxe
+        $X86_FLAGS \
+        --enable-uefi-$ARCHITECTURE \
+        --enable-uefi-cd
 
         LDFLAGS="$LDFLAGS -static" \
     make -j${parallelism}

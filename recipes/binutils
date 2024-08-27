@@ -1,10 +1,10 @@
 name=binutils
-version=2.43
+version=2.43.1
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/binutils/binutils-${version}.tar.xz"
-tarball_blake2b="28b0a04a28273b76eab2d00e00160be889f155f77f5a9d8759ef8dce505c97e97641bf7ec70b92b731b520570a02b06e04e8215b068fcb1bb2573e9ef24732d9"
+tarball_blake2b="c4cd765cea326cd00b5cfe306e2937d820603b42f07a714ceb1349d36ddba0d45c3e125599dadf290d97954035c381781067155600ed87066e494cb9c4b34b45"
 source_hostdeps="autoconf-2.69 automake libtool pkg-config"
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
 deps="core-libs zlib zstd"
 

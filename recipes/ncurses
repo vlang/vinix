@@ -1,10 +1,10 @@
 name=ncurses
-version=6.5.20240608
+version=6.5.20240824
 revision=1
-tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5_20240608.tar.gz"
-tarball_blake2b="b9d3692934d66abe3507b2f8a8082591c8bfae3e93e9e638b2808129815213d5b91e2a9d17726bb6ecb081ddce9bc75d777f6e7343e7a14562c665241e1a3b29"
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5_20240824.tar.gz"
+tarball_blake2b="20936869a6bb4ffe1d890cd5fe233831033d08a6eb57e6198a80bef12b64f982c3dc3a5aca3b3a38788baf74c95e8df394bdbc41ba71523901375c13ee1629f3"
 source_hostdeps="autoconf automake libtool pkg-config"
-imagedeps="gcc ncurses patchelf"
+imagedeps="build-essential ncurses-bin patchelf"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs"
 
@@ -20,6 +20,7 @@ build() {
         --enable-pc-files \
         --with-shared \
         --with-cxx-shared \
+        --with-cxx-binding \
         --without-normal \
         --without-debug \
         --with-manpage-format=normal \
@@ -33,8 +34,7 @@ build() {
 package() {
     make install DESTDIR="${dest_dir}"
 
-    # As we build ncurses with wide character support, make some compatibility links
-    for lib in ncurses ncurses++ form panel menu tinfo ; do
+    for lib in ncurses ncurses++ form panel menu tinfo; do
        rm -vf                    "${dest_dir}${prefix}"/lib/lib${lib}.so
        echo "INPUT(-l${lib}w)" > "${dest_dir}${prefix}"/lib/lib${lib}.so
        ln -sfv ${lib}w.pc        "${dest_dir}${prefix}"/lib/pkgconfig/${lib}.pc

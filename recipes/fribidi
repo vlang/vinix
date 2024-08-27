@@ -4,7 +4,7 @@ revision=1
 tarball_url="https://github.com/fribidi/fribidi/releases/download/v${version}/fribidi-${version}.tar.xz"
 tarball_blake2b="824983149e9a93852b8873b327de0a68f73fd24821f46781fb23f415a728c39d792a8ca54a5fe63f98bd6e8edaae8b42f993e058e1ccf23dabd6315cb210ff47"
 source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="gcc"
+imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
