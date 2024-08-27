@@ -3,7 +3,8 @@
 # Copyright (C) 2021-2022 The Vinix authors.
 
 # Nuke built-in rules and variables.
-override MAKEFLAGS += -rR
+MAKEFLAGS += -rR
+.SUFFIXES:
 
 # This is the name that our final executable will have.
 # Change as needed.
