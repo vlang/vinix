@@ -1,0 +1,32 @@
+diff --git fribidi-clean/configure.ac fribidi-workdir/configure.ac
+index b48ec13..eae845e 100644
+--- fribidi-clean/configure.ac
++++ fribidi-workdir/configure.ac
+@@ -111,7 +111,7 @@ AC_SUBST(SIZEOF_INT)
+ AC_CHECK_SIZEOF(short)
+ AC_CHECK_SIZEOF(void *)
+ AC_CHECK_SIZEOF(wchar_t)
+-AX_PROG_CC_FOR_BUILD
++#AX_PROG_CC_FOR_BUILD
+ 
+ # Checks for compiler characteristics.
+ changequote(,)dnl
+diff --git fribidi-clean/gen.tab/Makefile.am fribidi-workdir/gen.tab/Makefile.am
+index 014c646..8bb10d9 100644
+--- fribidi-clean/gen.tab/Makefile.am
++++ fribidi-workdir/gen.tab/Makefile.am
+@@ -23,10 +23,10 @@ gen_mirroring_tab_CPPFLAGS = $(AM_CPPFLAGS)
+ gen_brackets_tab_CPPFLAGS = $(AM_CPPFLAGS)
+ gen_brackets_type_tab_CPPFLAGS = $(AM_CPPFLAGS)
+ 
+-CFLAGS_FOR_BUILD += -DHAVE_CONFIG_H -I$(top_builddir) -I$(top_builddir)/lib -I$(top_srcdir)/lib
+-CC = $(CC_FOR_BUILD)
+-CFLAGS = $(CFLAGS_FOR_BUILD)
+-LDFLAGS = $(LDFLAGS_FOR_BUILD)
++CFLAGS += -DHAVE_CONFIG_H -I$(top_builddir) -I$(top_builddir)/lib -I$(top_srcdir)/lib
++#CC = $(CC_FOR_BUILD)
++#CFLAGS = $(CFLAGS_FOR_BUILD)
++#LDFLAGS = $(LDFLAGS_FOR_BUILD)
+ 
+ CLEANFILES = $(EXTRA_PROGRAMS)
+ DISTCLEANFILES =
