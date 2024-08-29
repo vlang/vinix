@@ -17,11 +17,11 @@ regenerate() {
 build() {
     cp -rp "${source_dir}"/. ./
 
+        configure_script_path=./configure \
+    autotools_configure \
         CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
         CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
-        LDFLAGS_FOR_BUILD="$HOST_LDFLAGS" \
-        configure_script_path=./configure \
-    autotools_configure
+        LDFLAGS_FOR_BUILD="$HOST_LDFLAGS"
 
     make -j${parallelism}
 }

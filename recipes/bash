@@ -26,6 +26,7 @@ regenerate() {
 }
 
 build() {
+    autotools_configure \
         CFLAGS="$TARGET_CFLAGS \
             -DDEFAULT_PATH_VALUE='\"/usr/local/sbin:/usr/local/bin:/usr/bin\"' \
             -DSTANDARD_UTILS_PATH='\"/usr/bin\"' \
@@ -33,9 +34,6 @@ build() {
             -DSYS_BASH_LOGOUT='\"/etc/bash.bash_logout\"' \
             -DNON_INTERACTIVE_LOGIN_SHELLS \
         " \
-        CXXFLAGS="$TARGET_CXXFLAGS" \
-        LDFLAGS="$TARGET_LDFLAGS" \
-    autotools_configure_noflags \
         --with-curses \
         --enable-readline \
         --without-bash-malloc \

@@ -3,7 +3,6 @@ version=a98a0290a0f77b13eb7b3832991855ab24667258
 revision=1
 tarball_url="https://github.com/vlang/v/archive/${version}.tar.gz"
 tarball_blake2b="b53f76902b07a5b9825f5754d8a1a9c05143e098e5ef55df318acc1479229882f95b91dd7648a378131cf33d715e9727133d29a5a1f570c56e32c6870eae84d1"
-source_imagedeps="curl"
 source_allow_network="yes"
 hostdeps="gcc"
 deps="core-libs"
@@ -16,7 +15,7 @@ build() {
     cp -r ${source_dir}/. ./
 
     set -x
-    ${OS_TRIPLET}-gcc $CFLAGS -w -std=gnu99 $LDFLAGS v.c -o v
+    ${OS_TRIPLET}-gcc $TARGET_CFLAGS $TARGET_CPPFLAGS -w -std=gnu99 $TARGET_LDFLAGS v.c -o v
     set +x
 }
 

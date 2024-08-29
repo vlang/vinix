@@ -15,10 +15,8 @@ build() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
-        CFLAGS="$TARGET_CFLAGS -DSLOW_BUT_NO_HACKS" \
-        CXXFLAGS="$TARGET_CXXFLAGS" \
-        LDFLAGS="$TARGET_LDFLAGS" \
-    autotools_configure_noflags
+    autotools_configure \
+        CFLAGS="$TARGET_CFLAGS -DSLOW_BUT_NO_HACKS"
 
     make -j${parallelism}
 }

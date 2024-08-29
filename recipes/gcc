@@ -20,11 +20,15 @@ regenerate() {
 }
 
 build() {
-        CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
-        CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
-        CXXFLAGS_FOR_TARGET="$TARGET_CXXFLAGS" \
-        CFLAGS_FOR_TARGET="$TARGET_CFLAGS" \
     autotools_configure \
+        CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
+        CPPFLAGS_FOR_BUILD="$HOST_CPPFLAGS" \
+        CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
+        LDFLAGS_FOR_BUILD="$HOST_LDFLAGS" \
+        CFLAGS_FOR_TARGET="$TARGET_CFLAGS" \
+        CPPFLAGS_FOR_TARGET="$TARGET_CPPFLAGS" \
+        CXXFLAGS_FOR_TARGET="$TARGET_CXXFLAGS" \
+        LDFLAGS_FOR_TARGET="$TARGET_LDFLAGS" \
         --target=${OS_TRIPLET} \
         --with-sysroot=/ \
         --with-build-sysroot=${sysroot_dir} \

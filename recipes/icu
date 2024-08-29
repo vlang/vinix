@@ -15,11 +15,13 @@ regenerate() {
 
     mkdir -p cross-build
     cd cross-build
+
+    ${source_dir}/source/configure \
         CFLAGS="$HOST_CFLAGS" \
         CXXFLAGS="$HOST_CXXFLAGS" \
         LDFLAGS="$HOST_LDFLAGS" \
-    ${source_dir}/source/configure \
         --prefix=/usr/local
+
     make -j${parallelism}
     cd ..
 }

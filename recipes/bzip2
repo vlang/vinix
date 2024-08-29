@@ -9,8 +9,8 @@ deps="core-libs"
 build() {
     cp -r ${source_dir}/. .
 
-    make -f Makefile-libbz2_so CC="${OS_TRIPLET}-gcc $TARGET_CFLAGS $TARGET_LDFLAGS"
-    make bzip2 bzip2recover CC="${OS_TRIPLET}-gcc $TARGET_CFLAGS $TARGET_LDFLAGS" AR="${OS_TRIPLET}-ar"
+    make -f Makefile-libbz2_so CC="${OS_TRIPLET}-gcc $TARGET_CFLAGS $TARGET_CPPFLAGS $TARGET_LDFLAGS"
+    make bzip2 bzip2recover CC="${OS_TRIPLET}-gcc $TARGET_CFLAGS $TARGET_CPPFLAGS $TARGET_LDFLAGS" AR="${OS_TRIPLET}-ar"
 }
 
 package() {
