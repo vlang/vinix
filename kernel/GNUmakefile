@@ -11,53 +11,33 @@ MAKEFLAGS += -rR
 override OUTPUT := vinix
 
 # Convenience macro to reliably declare user overridable variables.
-define DEFAULT_VAR =
-    ifeq ($(origin $1),default)
-        override $(1) := $(2)
-    endif
-    ifeq ($(origin $1),undefined)
-        override $(1) := $(2)
-    endif
-endef
+override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval override $(1) := $(2)))
 
 # User controllable C compiler command.
-override DEFAULT_KCC := cc
-$(eval $(call DEFAULT_VAR,KCC,$(DEFAULT_KCC)))
+$(call USER_VARIABLE,KCC,cc)
 
 # User controllable linker command.
-override DEFAULT_KLD := ld
-$(eval $(call DEFAULT_VAR,KLD,$(DEFAULT_KLD)))
+$(call USER_VARIABLE,KLD,ld)
 
 # User controllable objdump command.
-override DEFAULT_KOBJDUMP := objdump
-$(eval $(call DEFAULT_VAR,KOBJDUMP,$(DEFAULT_KOBJDUMP)))
+$(call USER_VARIABLE,KOBJDUMP,objdump)
 
 # User controllable V command.
-override DEFAULT_KV := v
-$(eval $(call DEFAULT_VAR,KV,$(DEFAULT_KV)))
+$(call USER_VARIABLE,KV,v)
 
 # User controllable C flags.
-override DEFAULT_KCFLAGS := -g -O2 -pipe
-$(eval $(call DEFAULT_VAR,KCFLAGS,$(DEFAULT_KCFLAGS)))
+$(call USER_VARIABLE,KCFLAGS,-g -O2 -pipe)
 
 # User controllable C preprocessor flags. We set none by default.
-override DEFAULT_KCPPFLAGS :=
-$(eval $(call DEFAULT_VAR,KCPPFLAGS,$(DEFAULT_KCPPFLAGS)))
+$(call USER_VARIABLE,KCPPFLAGS,)
 
 # User controllable V flags. We set none by default.
-override DEFAULT_KVFLAGS :=
-$(eval $(call DEFAULT_VAR,KVFLAGS,$(DEFAULT_KVFLAGS)))
+$(call USER_VARIABLE,KVFLAGS,)
 
 # User controllable linker flags. We set none by default.
-override DEFAULT_KLDFLAGS :=
-$(eval $(call DEFAULT_VAR,KLDFLAGS,$(DEFAULT_KLDFLAGS)))
+$(call USER_VARIABLE,KLDFLAGS,)
 
-VINIX_PROD ?=
-ifeq ($(VINIX_PROD),no)
-    override PROD := false
-else
-    override PROD := true
-endif
+$(call USER_VARIABLE,VINIX_PROD,)
 
 # Internal C flags that should not be changed by the user.
 override KCFLAGS += \
@@ -118,11 +98,11 @@ override KVFLAGS += \
     -gc none \
     -d no_backtrace
 
-ifeq ($(PROD),true)
-	override KVFLAGS += -prod
-	override KCPPFLAGS += -DPROD
+ifeq ($(VINIX_PROD),no)
+    override KVFLAGS += -warn-about-allocs
 else
-	override KVFLAGS += -warn-about-allocs
+    override KVFLAGS += -prod
+    override KCPPFLAGS += -DPROD
 endif
 
 # Use "find" to glob all *.v, *.c, and *.S files in the tree and obtain the
