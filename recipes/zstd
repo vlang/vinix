@@ -9,18 +9,28 @@ deps="core-libs zlib xz"
 build() {
     cp -rp "${source_dir}"/. ./
 
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        CPPFLAGS="$TARGET_CPPFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
         CC=${OS_TRIPLET}-gcc \
         CXX=${OS_TRIPLET}-g++ \
         AR=${OS_TRIPLET}-ar \
         PREFIX="${prefix}" \
-    make -j${parallelism}
+    make V=1 -j${parallelism}
 }
 
 package() {
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        CPPFLAGS="$TARGET_CPPFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
         CC=${OS_TRIPLET}-gcc \
+        CXX=${OS_TRIPLET}-g++ \
+        AR=${OS_TRIPLET}-ar \
         DESTDIR="${dest_dir}" \
         PREFIX="${prefix}" \
-    make install
+    make V=1 install
 
     # Remove static libraries.
     rm -rf "${dest_dir}${prefix}"/lib/*.a
