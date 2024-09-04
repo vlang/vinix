@@ -48,7 +48,7 @@ jobs:
         run: git tag weekly-$TAG_DATE && git push --tags
 
       - name: Create weekly release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Weekly build ${{ env.TAG_DATE }}
           tag_name: weekly-${{ env.TAG_DATE }}
