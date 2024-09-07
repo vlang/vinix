@@ -1,11 +1,11 @@
 name=mlibc
-version=67e11fa83ed3606edd1b76c927bd3303d7c87ab9
+version=d584611efec00f42f6823cbd36f0677edb15d833
 revision=1
 tarball_url="https://github.com/managarm/mlibc/archive/${version}.tar.gz"
-tarball_blake2b="73ef40b1abd4f5bf2b0a92b95e597caa0b66f8a981fe797e15fd7c99d5825950ee9de5f777b4d0ac4c44caf01e3c3f769bb1c03e4030461fb104604349fb3bf9"
+tarball_blake2b="007f048a59a838ce6717185bde1c889789cf50553755bd2883a4559ab31824532bc785c1bbe2044b92b048b474fe8d5620e74611bb7c79dc5f6fb503a90254f4"
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config libgcc-binaries"
-builddeps="cshim cxxshim frigg"
+builddeps="freestnd-c-hdrs freestnd-cxx-hdrs frigg"
 deps="mlibc-headers"
 
 build() {
