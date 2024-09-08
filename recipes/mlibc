@@ -1,8 +1,8 @@
 name=mlibc
-version=d584611efec00f42f6823cbd36f0677edb15d833
+version=a4a0cdf278dcd3aa4bf9cef200c62acae7336bc9
 revision=1
 tarball_url="https://github.com/managarm/mlibc/archive/${version}.tar.gz"
-tarball_blake2b="007f048a59a838ce6717185bde1c889789cf50553755bd2883a4559ab31824532bc785c1bbe2044b92b048b474fe8d5620e74611bb7c79dc5f6fb503a90254f4"
+tarball_blake2b="e2f8dabbd367e83e4f80da86490d504596eb9fc94be69e5afd4b3fd1a475603a4cb505ef2304bbd3842683cade9b0c17c3f72cde0beb6a1fe1a8e7242a7bd9fc"
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config libgcc-binaries"
 builddeps="freestnd-c-hdrs freestnd-cxx-hdrs frigg"
@@ -19,7 +19,8 @@ build() {
         -Ddisable_crypt_option=true \
         -Ddisable_iconv_option=true \
         -Ddisable_intl_option=true \
-        -Ddisable_libgcc_dependency=true
+        -Ddisable_libgcc_dependency=true \
+        -Duse_freestnd_hdrs=enabled
 
     ninja -j${parallelism}
 }
