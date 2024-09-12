@@ -1,6 +1,6 @@
 # GNUmakefile: Makefile of the kernel.
 # Code is governed by the GPL-2.0 license.
-# Copyright (C) 2021-2022 The Vinix authors.
+# Copyright (C) 2021-2024 The Vinix authors.
 
 # Nuke built-in rules and variables.
 MAKEFLAGS += -rR
@@ -12,6 +12,12 @@ override OUTPUT := vinix
 
 # Convenience macro to reliably declare user overridable variables.
 override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval override $(1) := $(2)))
+
+# Destination directory on install (should always be empty by default).
+$(call USER_VARIABLE,DESTDIR,)
+
+# Install prefix; /usr/local is a good, standard default pick.
+$(call USER_VARIABLE,PREFIX,/usr/local)
 
 # User controllable C compiler command.
 $(call USER_VARIABLE,KCC,cc)
@@ -38,6 +44,13 @@ $(call USER_VARIABLE,KVFLAGS,)
 $(call USER_VARIABLE,KLDFLAGS,)
 
 $(call USER_VARIABLE,VINIX_PROD,)
+
+# Ensure the dependencies have been obtained.
+ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ) && echo 1),1)
+    ifeq ($(shell ( ! test -d freestanding-headers || ! test -f c/cc-runtime.c || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ) && echo 1),1)
+        $(error Please run the ./get-deps script first)
+    endif
+endif
 
 # Internal C flags that should not be changed by the user.
 override KCFLAGS += \
@@ -113,12 +126,6 @@ override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' | LC_ALL=C s
 override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
-# Ensure the dependencies have been obtained.
-override MISSING_DEPS := $(shell if ! test -d freestanding-headers || ! test -f c/cc-runtime.c || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h; then echo 1; fi)
-ifeq ($(MISSING_DEPS),1)
-    $(error Please run the ./get-deps script first)
-endif
-
 # Default target.
 .PHONY: all
 all: bin/$(OUTPUT)
@@ -166,3 +173,9 @@ distclean: clean
 install: all
 	install -d "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)"
 	install -m 644 bin/$(OUTPUT) "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)/"
+
+# Try to undo whatever the "install" target did.
+.PHONY: uninstall
+uninstall:
+	rm -f "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)/$(OUTPUT)"
+	-rmdir "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)"
