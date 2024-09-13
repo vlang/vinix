@@ -47,7 +47,7 @@ $(call USER_VARIABLE,VINIX_PROD,)
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ) && echo 1),1)
-    ifeq ($(shell ( ! test -d freestanding-headers || ! test -f c/cc-runtime.c || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ) && echo 1),1)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs-0bsd || ! test -f c/cc-runtime.c || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ) && echo 1),1)
         $(error Please run the ./get-deps script first)
     endif
 endif
@@ -81,7 +81,7 @@ override KCFLAGS += \
 override KCPPFLAGS := \
     -I c \
     $(KCPPFLAGS) \
-    -isystem freestanding-headers \
+    -isystem freestnd-c-hdrs-0bsd \
     -MMD \
     -MP
 
@@ -166,7 +166,7 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf freestanding-headers c/cc-runtime.c c/flanterm c/printf
+	rm -rf freestnd-c-hdrs-0bsd c/cc-runtime.c c/flanterm c/printf
 
 # Install the final built executable to its final on-root location.
 .PHONY: install
