@@ -52,7 +52,7 @@ The following is a distro-agnostic list of packages needed to build Vinix.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU make`, `findutils`, `curl`, `git`, `bsdtar`, `zstd`, `rsync`, `xorriso`, and `qemu`
+`GNU make`, `findutils`, `curl`, `git`, `zstd`, `rsync`, `xorriso`, and `qemu`
 to test it.
 
 Additionally a working C compiler (`cc`) needs to be present.
@@ -69,11 +69,11 @@ sudo pacman -S --needed gcc make findutils curl git zstd rsync xorriso qemu
 
 ### Build prerequisites for Red Hat Linux and derivatives
 ```bash
-sudo yum install -y gcc make findutils curl git bsdtar zstd rsync xorriso qemu
+sudo yum install -y gcc make findutils curl git zstd rsync xorriso qemu
 ```
 ### Build prerequisites for Void Linux and derivatives
 ```bash
-sudo xbps-install -Suv gcc make findutils curl git bsdtar zstd rsync xorriso qemu
+sudo xbps-install -Suv gcc make findutils curl git zstd rsync xorriso qemu
 ```
 ### Building the distro
 
