@@ -18,7 +18,7 @@ jobs:
         run: test "$(git tag --points-at HEAD)" = ""
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install make diffutils curl git libarchive-tools rsync xorriso -y
+        run: sudo apt-get update && sudo apt-get install make diffutils curl git rsync xorriso -y
 
       #- name: Build distro
       #  run: make distro-full

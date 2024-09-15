@@ -59,12 +59,12 @@ Additionally a working C compiler (`cc`) needs to be present.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install -y build-essential make findutils curl git libarchive-tools zstd rsync xorriso qemu-system-x86
+sudo apt install -y build-essential make findutils curl git zstd rsync xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed gcc make findutils curl git libarchive zstd rsync xorriso qemu
+sudo pacman -S --needed gcc make findutils curl git zstd rsync xorriso qemu
 ```
 
 ### Build prerequisites for Red Hat Linux and derivatives
