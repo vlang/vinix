@@ -2,10 +2,12 @@ name=libtool
 version=2.5.0
 tarball_url="https://alpha.gnu.org/gnu/libtool/libtool-${version}.tar.gz"
 tarball_blake2b="83494eac1b4c6313bbf58098e4b5f8512022f9730b78dd61736c55783fb4e5444eb1f8aaf13ce259fe7e13225e6fa563440ad74856bde20bde7021e7e3378e3d"
-hostdeps="autoconf automake gnulib"
-imagedeps="help2man"
+hostdeps="autoconf automake"
+imagedeps="help2man git"
+allow_network="yes"
 
 regenerate() {
-    cp -rp ${base_dir}/sources/gnulib ./
+    git clone https://git.savannah.gnu.org/git/gnulib.git
+    git -C gnulib checkout c6942e47da903adc68b887cbedfac07b099088f2
     ./bootstrap --force --skip-git --skip-po --gnulib-srcdir=`pwd`/gnulib
 }
