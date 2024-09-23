@@ -8,11 +8,11 @@ imagedeps="build-essential libgpg-error-dev"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libgpg-error"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
@@ -20,7 +20,9 @@ build() {
         --disable-dev-random \
         --disable-asm \
         --with-libgpg-error-prefix="${sysroot_dir}${prefix}"
+}
 
+build() {
     make -j${parallelism}
 }
 

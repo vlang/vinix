@@ -7,10 +7,12 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs mesa"
 
-build() {
+configure() {
     meson_configure \
         -Dgl_provider=gl
+}
 
+build() {
     ninja -j${parallelism}
 }
 

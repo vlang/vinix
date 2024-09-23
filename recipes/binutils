@@ -8,13 +8,13 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
 deps="core-libs zlib zstd"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen -I"$(realpath ./config)"
 
     cp -pv /usr/local/share/libtool/build-aux/{config.sub,config.guess,install-sh} libiberty/
 }
 
-build() {
+configure() {
     autotools_configure \
         --target=${OS_TRIPLET} \
         --with-build-sysroot=${sysroot_dir} \
@@ -32,7 +32,9 @@ build() {
         --disable-werror \
         --with-pic \
         --with-system-zlib
+}
 
+build() {
     make -j${parallelism}
 }
 

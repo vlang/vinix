@@ -7,10 +7,12 @@ imagedeps="meson ninja-build python3-setuptools"
 hostdeps="gcc pkg-config"
 deps="core-libs pcre2 libffi zlib"
 
-build() {
+configure() {
     meson_configure \
         -Dxattr=false
+}
 
+build() {
     ninja -j${parallelism}
 }
 

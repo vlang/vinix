@@ -9,7 +9,7 @@ source_imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
     cp source/config/{mh-linux,mh-unknown}
 
@@ -26,11 +26,13 @@ regenerate() {
     cd ..
 }
 
-build() {
+configure() {
         configure_script_path=${source_dir}/source/configure \
     autotools_configure \
         --with-cross-build=${source_dir}/cross-build
+}
 
+build() {
     make -j${parallelism}
 }
 

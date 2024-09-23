@@ -7,11 +7,11 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freeglut libjpeg-turbo zlib zstd xz"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --without-x \
         --enable-zlib \
@@ -20,7 +20,9 @@ build() {
         --enable-lzma \
         --disable-webp \
         --enable-cxx
+}
 
+build() {
     make -j${parallelism}
 }
 

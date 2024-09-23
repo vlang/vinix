@@ -7,18 +7,20 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib icu readline"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --with-threads \
         --disable-ipv6 \
         --without-python \
         --with-history \
         --with-icu
+}
 
+build() {
     make -j${parallelism}
 }
 

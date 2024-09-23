@@ -10,7 +10,7 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses readline"
 
-regenerate() {
+prepare() {
     curl -Lo bash52-022 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-022
     curl -Lo bash52-023 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-023
     curl -Lo bash52-024 https://ftp.gnu.org/gnu/bash/bash-5.2-patches/bash52-024
@@ -25,7 +25,7 @@ regenerate() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         CFLAGS="$TARGET_CFLAGS \
             -DDEFAULT_PATH_VALUE='\"/usr/local/sbin:/usr/local/bin:/usr/bin\"' \
@@ -38,7 +38,9 @@ build() {
         --enable-readline \
         --without-bash-malloc \
         --with-installed-readline="${sysroot}/usr/lib"
+}
 
+build() {
     make -j${parallelism}
 }
 

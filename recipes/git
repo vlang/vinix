@@ -8,11 +8,11 @@ imagedeps="build-essential libcurl4-gnutls-dev"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs python zlib curl openssl openssh"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     cp -rp ${source_dir}/. .
 
         configure_script_path=./configure \
@@ -22,7 +22,9 @@ build() {
     autotools_configure \
         --with-gitconfig=/etc/gitconfig \
         --with-python=python3
+}
 
+build() {
     make -j${parallelism}
 }
 

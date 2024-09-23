@@ -7,7 +7,7 @@ imagedeps="cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxxf86vm mesa"
 
-build() {
+configure() {
     cmake_configure \
         -DSDL_ALTIVEC=OFF \
         -DSDL_DISKAUDIO=OFF \
@@ -41,7 +41,9 @@ build() {
         -DSDL_HIDAPI=OFF \
         -DSDL_SHARED=ON \
         -DSDL_STATIC=OFF
+}
 
+build() {
     ninja -j${parallelism}
 }
 

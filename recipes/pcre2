@@ -7,11 +7,11 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bzip2 ncurses readline zlib"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-unicode \
         --enable-jit \
@@ -20,7 +20,9 @@ build() {
         --enable-pcre2grep-libz \
         --enable-pcre2grep-libbz2 \
         --enable-pcre2test-libreadline
+}
 
+build() {
     make -j${parallelism}
 }
 

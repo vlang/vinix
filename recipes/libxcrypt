@@ -8,15 +8,17 @@ imagedeps="python3-passlib"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc libgcc libstdc++"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-obsolete-api=yes \
         --disable-xcrypt-compat-files
+}
 
+build() {
     make -j${parallelism}
 }
 

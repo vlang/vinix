@@ -8,17 +8,19 @@ imagedeps="gperf"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freetype2 libexpat libxml"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 
     # Make sure we regenerate this file
     rm -f src/fcobjshash.h
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-libxml2
+}
 
+build() {
     make -j${parallelism}
 }
 

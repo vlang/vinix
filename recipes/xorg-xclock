@@ -8,15 +8,17 @@ source_deps="xorg-util-macros gettext"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libx11 libxaw libxft libxkbfile libxmu libxrender"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --with-appdefaultdir=/etc/X11/app-defaults \
         --disable-selective-werror
+}
 
+build() {
     make -j${parallelism}
 }
 

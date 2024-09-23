@@ -8,11 +8,11 @@ source_deps="autoconf-archive"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bzip2 xz zlib openssl ncurses readline gdbm tzdata libexpat libffi"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     echo "ac_cv_file__dev_ptmx=yes" > /tmp/configsite
     echo "ac_cv_file__dev_ptc=yes" >> /tmp/configsite
     echo "ac_cv_func_sched_setscheduler=no" >> /tmp/configsite
@@ -25,7 +25,9 @@ build() {
         --with-build-python=python3 \
         --disable-ipv6 \
         --enable-shared
+}
 
+build() {
     make -j${parallelism}
 }
 

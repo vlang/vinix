@@ -8,17 +8,19 @@ imagedeps="groff"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bash gdbm groff less libpipeline zlib"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --disable-setuid \
         --with-systemdtmpfilesdir= \
         --with-systemdsystemunitdir= \
         --with-pager=/usr/bin/less
+}
 
+build() {
     make -j${parallelism}
 }
 

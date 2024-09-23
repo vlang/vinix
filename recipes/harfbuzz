@@ -7,7 +7,7 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs graphite2 glib zlib freetype2 cairo icu"
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
     mkdir build && cd build
@@ -24,9 +24,11 @@ build() {
         -Dintrospection=disabled \
         -Dtests=disabled
 
-    ninja -j${parallelism}
-
     cd ..
+}
+
+build() {
+    ( cd build && ninja -j${parallelism} )
 }
 
 package() {

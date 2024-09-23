@@ -8,7 +8,7 @@ hostdeps="gcc pkg-config libgcc-binaries"
 builddeps="freestnd-c-hdrs freestnd-cxx-hdrs frigg"
 deps="mlibc-headers"
 
-build() {
+configure() {
         CFLAGS="$TARGET_CFLAGS" \
         CXXFLAGS="$TARGET_CXXFLAGS" \
         LDFLAGS="-Wl,/usr/local/libgcc-binaries/libgcc-$ARCHITECTURE.a" \
@@ -21,7 +21,9 @@ build() {
         -Ddisable_intl_option=true \
         -Ddisable_libgcc_dependency=true \
         -Duse_freestnd_hdrs=enabled
+}
 
+build() {
     ninja -j${parallelism}
 }
 

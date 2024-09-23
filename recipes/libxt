@@ -9,14 +9,16 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libx11 libsm"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --with-appdefaultdir=/etc/X11/app-defaults
+}
 
+build() {
     make -j${parallelism}
 }
 

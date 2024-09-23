@@ -8,11 +8,11 @@ source_deps="xtrans xorg-font-util xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-util-macros xorg-proto xcb-proto xtrans libxinerama libxcvt libxshmfence libx11 libxaw libxxf86vm libxkbfile libxmu libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xorg-xkbcomp xkeyboard-config pixman"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --with-xkb-bin-directory=/usr/bin \
         --with-xkb-path=/usr/share/X11/xkb \
@@ -40,7 +40,9 @@ build() {
         --disable-libdrm \
         --disable-glamor \
         --disable-glx
+}
 
+build() {
     make -j${parallelism}
 }
 

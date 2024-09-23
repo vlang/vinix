@@ -8,15 +8,17 @@ source_deps="xorg-server xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-server xorg-util-macros"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
         SYSROOT=${sysroot_dir} \
     autotools_configure \
         --disable-pciaccess
+}
 
+build() {
     make -j${parallelism}
 }
 

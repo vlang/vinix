@@ -9,11 +9,11 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs gmp"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
@@ -22,7 +22,9 @@ build() {
         --enable-shared=yes \
         --enable-thread-safe \
         --with-pic
+}
 
+build() {
     make -j${parallelism}
 }
 

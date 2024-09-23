@@ -4,13 +4,15 @@ from_source=mlibc
 imagedeps="meson ninja-build"
 hostdeps="pkg-config"
 
-build() {
+configure() {
     meson_configure \
         -Dheaders_only=true \
         -Ddisable_crypt_option=true \
         -Ddisable_iconv_option=true \
         -Ddisable_intl_option=true
+}
 
+build() {
     ninja -j${parallelism}
 }
 

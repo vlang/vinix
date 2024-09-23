@@ -7,11 +7,13 @@ imagedeps="cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs libxi mesa glu"
 
-build() {
+configure() {
     cmake_configure \
         -DFREEGLUT_BUILD_DEMOS=OFF \
         -DFREEGLUT_BUILD_STATIC_LIBS=OFF
+}
 
+build() {
     ninja -j${parallelism}
 }
 

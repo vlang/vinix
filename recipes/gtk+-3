@@ -7,7 +7,7 @@ imagedeps="meson ninja-build libglib2.0-dev libgdk-pixbuf-2.0 python3-packaging"
 hostdeps="gcc pkg-config"
 deps="core-libs at-spi2-core cairo glib gdk-pixbuf libx11 libxext libxcb libxinerama libxrender libxrandr libxfixes libxdamage pango fribidi libepoxy libxkbcommon fontconfig freetype2 libxi harfbuzz libxcursor gsettings-desktop-schemas dbus"
 
-build() {
+configure() {
     meson_configure \
         -Dprint_backends=file \
         -Dintrospection=false \
@@ -15,7 +15,9 @@ build() {
         -Dbroadway_backend=true \
         -Dwayland_backend=false \
         -Dcolord=no
+}
 
+build() {
     ninja -j${parallelism}
 }
 

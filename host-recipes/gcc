@@ -6,7 +6,7 @@ hostdeps="autoconf-2.69 automake libtool pkg-config"
 hostrundeps="binutils"
 deps="mlibc-headers"
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
     mkdir -p build && cd build
 
@@ -29,7 +29,10 @@ build() {
         --enable-initfini-array \
         --enable-shared \
         --enable-host-shared
+}
 
+build() {
+    cd build
     make -j${parallelism} all-gcc
 }
 

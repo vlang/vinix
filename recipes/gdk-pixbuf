@@ -7,11 +7,13 @@ imagedeps="meson ninja-build libglib2.0-dev"
 hostdeps="gcc pkg-config"
 deps="core-libs glib libjpeg-turbo libpng libx11 libtiff"
 
-build() {
+configure() {
     meson_configure \
         -Dgio_sniffing=false \
         -Dman=false
+}
 
+build() {
     ninja -j${parallelism}
 }
 

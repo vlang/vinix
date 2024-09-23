@@ -8,13 +8,15 @@ imagedeps="libxml2"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

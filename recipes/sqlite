@@ -7,16 +7,18 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs readline zlib"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         CFLAGS="$TARGET_CFLAGS -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS4=1 -DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_ENABLE_UNLOCK_NOTIFY=1 -DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_SECURE_DELETE=1 -DSQLITE_ENABLE_FTS3_TOKENIZER=1" \
         --enable-readline \
         --enable-fts5
+}
 
+build() {
     make -j${parallelism}
 }
 

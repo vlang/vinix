@@ -7,9 +7,11 @@ imagedeps="cmake ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
-build() {
+configure() {
     cmake_configure
+}
 
+build() {
     ninja -j${parallelism}
 }
 

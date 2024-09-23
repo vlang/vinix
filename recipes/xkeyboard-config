@@ -7,10 +7,12 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs xorg-xkbcomp"
 
-build() {
+configure() {
     meson_configure \
         -Dxorg-rules-symlinks=true
+}
 
+build() {
     ninja -j${parallelism}
 }
 

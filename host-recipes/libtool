@@ -4,7 +4,7 @@ revision=1
 hostdeps="autoconf automake"
 imagedeps="help2man build-essential"
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
         CFLAGS="$HOST_CFLAGS" \
@@ -12,7 +12,9 @@ build() {
         LDFLAGS="$HOST_LDFLAGS" \
     ./configure \
         --prefix="${prefix}"
+}
 
+build() {
     make -j${parallelism}
 }
 

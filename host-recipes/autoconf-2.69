@@ -2,12 +2,14 @@ name=autoconf-2.69
 from_source=autoconf-2.69
 revision=1
 
-build() {
+configure() {
         CFLAGS="$HOST_CFLAGS" \
         CXXFLAGS="$HOST_CXXFLAGS" \
         LDFLAGS="$HOST_LDFLAGS" \
     "${source_dir}"/configure --prefix="${prefix}"
+}
 
+build() {
     make -j${parallelism}
 }
 

@@ -4,6 +4,6 @@ tarball_url="https://distfiles.ariadne.space/pkgconf/pkgconf-${version}.tar.xz"
 tarball_blake2b="c2a89e932e7671785799f4b82beb75e92f246c152c03e88c847cedef39f2123da0544ff914d1c1512b8616f8b8cfd9f5115b33560042bcfa7ac5f78c0ceb2a27"
 hostdeps="autoconf automake libtool"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }

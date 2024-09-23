@@ -6,11 +6,13 @@ tarball_blake2b="04cb1722162f1e0c32df9dbb5b6b57201de88382cee8b32972433bd396685bb
 imagedeps="meson ninja-build"
 hostdeps="pkg-config"
 
-build() {
+configure() {
     meson_configure \
         --includedir=share/frigg/include \
         -Dbuild_tests=disabled
+}
 
+build() {
     ninja -j${parallelism}
 }
 

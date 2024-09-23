@@ -8,7 +8,7 @@ imagedeps="binutils"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc libgcc libstdc++"
 
-regenerate() {
+prepare() {
     cp /usr/local/share/aclocal/libtool.m4 ./m4/
     cp /usr/local/share/aclocal/libtool.m4 ./libcharset/m4/
     cp /usr/local/share/libtool/build-aux/ltmain.sh ./build-aux/
@@ -19,9 +19,11 @@ regenerate() {
     autotools_recursive_regen -I"${source_dir}"/m4 -I"${source_dir}"/srcm4
 }
 
-build() {
+configure() {
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

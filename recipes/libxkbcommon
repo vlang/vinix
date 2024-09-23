@@ -7,12 +7,14 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs libxcb libxml xkeyboard-config"
 
-build() {
+configure() {
     meson_configure \
         -Dxkb-config-root="$prefix"/share/X11/xkb \
         -Denable-x11=true \
         -Denable-wayland=false
+}
 
+build() {
     ninja -j${parallelism}
 }
 

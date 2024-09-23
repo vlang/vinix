@@ -7,7 +7,7 @@ imagedeps="build-essential cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs ncurses zlib zstd libffi"
 
-build() {
+configure() {
         cmake_source_dir="${source_dir}/llvm" \
     cmake_configure \
         -UBUILD_SHARED_LIBS \
@@ -20,7 +20,9 @@ build() {
         -DLLVM_DEFAULT_TARGET_TRIPLE=${OS_TRIPLET} \
         -DLLVM_HOST_TRIPLE=${OS_TRIPLET} \
         -Wno-dev
+}
 
+build() {
     ninja -j${parallelism}
 }
 

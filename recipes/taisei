@@ -7,13 +7,15 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs freetype2 libpng sdl2 libwebp zlib cglm openssl libzip"
 
-build() {
+configure() {
     meson_configure \
         -Ddocs=false \
         -Da_sdl2mixer=false \
         -Da_default=null \
         -Db_lto=false
+}
 
+build() {
     ninja -j${parallelism}
 }
 

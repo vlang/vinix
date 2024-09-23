@@ -8,15 +8,17 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs bzip2 libpng zlib"
 
-regenerate() {
+prepare() {
     NOCONFIGURE=1 ./autogen.sh
     cp /usr/local/share/automake-1.16/{config.sub,config.guess,install-sh} ./builds/unix/
 }
 
-build() {
+configure() {
     autotools_configure \
         --with-harfbuzz=no
+}
 
+build() {
     make -j${parallelism}
 }
 

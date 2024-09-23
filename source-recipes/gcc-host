@@ -6,7 +6,7 @@ hostdeps="automake autoconf-2.69 libtool pkg-config"
 imagedeps="git"
 allow_network="yes"
 
-regenerate() {
+prepare() {
     ./contrib/download_prerequisites
 
     # Gettext causes issues and we don't want it anyways.

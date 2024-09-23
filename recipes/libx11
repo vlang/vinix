@@ -9,15 +9,17 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs xorg-proto libxcb xtrans"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --disable-ipv6 \
         --with-keysymdefdir=${sysroot_dir}/usr/include/X11
+}
 
+build() {
     make -j${parallelism}
 }
 

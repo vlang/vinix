@@ -7,11 +7,11 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freetype2 mesa glu libx11 libxext"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-autotools \
         --disable-gles1 \
@@ -19,7 +19,9 @@ build() {
         --disable-libdrm \
         --with-system-data-files \
         --with-glut=no
+}
 
+build() {
     make -j${parallelism}
 }
 

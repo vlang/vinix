@@ -9,7 +9,7 @@ hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
 deps="core-libs binutils zlib gmp mpfr mpc gettext"
 imagedeps="build-essential"
 
-regenerate() {
+prepare() {
     for i in "${base_dir}"/patches/gcc-host/*; do
         patch -p1 < "$i"
     done
@@ -19,7 +19,7 @@ regenerate() {
     cp -pv /usr/local/share/libtool/build-aux/{config.sub,config.guess,install-sh} libiberty/
 }
 
-build() {
+configure() {
     autotools_configure \
         CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
         CPPFLAGS_FOR_BUILD="$HOST_CPPFLAGS" \
@@ -41,7 +41,9 @@ build() {
         --disable-multilib \
         --with-system-zlib \
         --enable-host-shared
+}
 
+build() {
     make -j${parallelism} all-gcc
 }
 

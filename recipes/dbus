@@ -8,11 +8,11 @@ source_deps="autoconf-archive"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libexpat"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --runstatedir=/run \
         --disable-doxygen-docs \
@@ -28,7 +28,9 @@ build() {
         --disable-launchd \
         --disable-systemd \
         --disable-tests
+}
 
+build() {
     make -j${parallelism}
 }
 

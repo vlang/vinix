@@ -7,7 +7,7 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     ( cd gettext-runtime/libasprintf && autoreconf -fvi )
     ( cd gettext-runtime/intl && autoreconf -fvi )
     ( cd gettext-runtime && autoreconf -fvi )
@@ -16,7 +16,7 @@ regenerate() {
     autoreconf -fvi
 }
 
-build() {
+configure() {
     cp -rp ${source_dir}/. ./
 
         ACLOCAL=true \
@@ -25,7 +25,9 @@ build() {
         AUTOHEADER=true \
         configure_script_path=./configure \
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

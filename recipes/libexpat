@@ -7,13 +7,15 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     ./buildconf.sh --force
 }
 
-build() {
+configure() {
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

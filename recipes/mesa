@@ -7,14 +7,16 @@ imagedeps="binutils meson ninja-build python3-setuptools python3-mako"
 hostdeps="gcc pkg-config"
 deps="core-libs llvm zlib libxshmfence libxrandr libxdamage libxxf86vm libxfixes libx11 libxext libxcb libexpat"
 
-build() {
+configure() {
     meson_configure \
         -Dglx=xlib \
         -Dplatforms=x11 \
         -Dgallium-drivers=swrast \
         -Dvulkan-drivers= \
         -Dllvm=enabled
+}
 
+build() {
     ninja -j${parallelism}
 }
 

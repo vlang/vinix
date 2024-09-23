@@ -7,13 +7,13 @@ source_hostdeps="autoconf automake libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib openssl"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 
     cp -v $(find /usr/local/share/automake* -name config.sub) .
 }
 
-build() {
+configure() {
         ossh_cv_utmpx_h_has_ut_addr=no \
     autotools_configure \
         --disable-strip \
@@ -22,7 +22,9 @@ build() {
         --with-default-path=${prefix}/bin \
         --with-superuser-path=${prefix}/sbin:${prefix}/bin \
         --with-pid-dir=/run
+}
 
+build() {
     make -j${parallelism}
 }
 

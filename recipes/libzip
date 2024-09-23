@@ -7,11 +7,13 @@ imagedeps="cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs zlib bzip2 xz zstd openssl"
 
-build() {
+configure() {
     cmake_configure \
         -DENABLE_GNUTLS=OFF \
         -DBUILD_DOC=OFF
+}
 
+build() {
     ninja -j${parallelism}
 }
 

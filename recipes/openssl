@@ -6,7 +6,7 @@ tarball_blake2b="2fdba6ca0188928ab2f74e606136afca66cfa0467170fa6298ef160b64ac6fd
 hostdeps="gcc pkg-config"
 deps="core-libs zlib"
 
-build() {
+configure() {
         CC=${OS_TRIPLET}-gcc \
         CXX=${OS_TRIPLET}-g++ \
         AR=${OS_TRIPLET}-ar \
@@ -18,7 +18,9 @@ build() {
         shared \
         zlib-dynamic \
         no-afalgeng
+}
 
+build() {
     make -j${parallelism}
 }
 

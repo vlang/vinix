@@ -9,16 +9,18 @@ imagedeps="build-essential libpng-dev"
 hostdeps="gcc autoconf automake pkg-config libtool"
 deps="core-libs libx11 libxpm libpng zlib"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         BUILD_CFLAGS="$HOST_CFLAGS" \
         BUILD_CPPFLAGS="$HOST_CPPFLAGS" \
         BUILD_LDFLAGS="$HOST_LDFLAGS"
+}
 
+build() {
     make -j${parallelism}
 }
 

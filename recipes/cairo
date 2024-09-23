@@ -7,13 +7,15 @@ imagedeps="meson ninja-build binutils"
 hostdeps="gcc pkg-config"
 deps="core-libs fontconfig freetype2 glib libpng libx11 libxcb libxext libxrender pixman zlib"
 
-build() {
+configure() {
     meson_configure \
         -Dxlib-xcb=enabled \
         -Dzlib=enabled \
         -Dtee=enabled \
         -Dtests=disabled
+}
 
+build() {
     ninja -j${parallelism}
 }
 

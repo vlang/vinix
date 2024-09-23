@@ -7,7 +7,7 @@ source_allow_network="yes"
 hostdeps="gcc v"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     ./get-deps
 }
 

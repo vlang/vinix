@@ -7,13 +7,15 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs ncurses"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

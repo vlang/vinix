@@ -8,11 +8,11 @@ imagedeps="mtools nasm"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     if [ "$ARCHITECTURE" = "x86_64" ]; then
         X86_FLAGS="--enable-bios \
                    --enable-bios-cd \
@@ -26,7 +26,9 @@ build() {
         --enable-uefi-$ARCHITECTURE \
         --enable-uefi-cd \
         TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}
+}
 
+build() {
     make -j${parallelism}
 }
 

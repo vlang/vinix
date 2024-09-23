@@ -7,11 +7,13 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs mesa xorg-proto libx11"
 
-build() {
+configure() {
     meson_configure \
         -Degl=no \
         -Dtests=false
+}
 
+build() {
     ninja -j${parallelism}
 }
 

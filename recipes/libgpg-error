@@ -8,13 +8,13 @@ imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     cp -v src/syscfg/lock-obj-pub.$ARCHITECTURE-unknown-linux-gnu.h src/syscfg/lock-obj-pub.vinix-mlibc.h
 
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
@@ -22,7 +22,9 @@ build() {
         CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
         CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
         LDFLAGS_FOR_BUILD="$HOST_LDFLAGS"
+}
 
+build() {
     make -j${parallelism}
 }
 

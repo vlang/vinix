@@ -4,12 +4,14 @@ revision=1
 hostdeps="autoconf"
 imagedeps="build-essential"
 
-build() {
+configure() {
         CFLAGS="$HOST_CFLAGS" \
         CXXFLAGS="$HOST_CXXFLAGS" \
         LDFLAGS="$HOST_LDFLAGS" \
     "${source_dir}"/configure --prefix="${prefix}"
+}
 
+build() {
     make -j${parallelism}
 }
 

@@ -7,7 +7,7 @@ source_allow_network="yes"
 hostdeps="gcc"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     curl -o v.c https://raw.githubusercontent.com/vlang/vc/a431875ed96456e7d2b6e1a5794357a1487d41eb/v.c
 }
 

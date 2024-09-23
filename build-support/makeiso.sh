@@ -2,10 +2,18 @@
 
 set -ex
 
+if [ -z "$PKGS_TO_INSTALL" ]; then
+    PKGS_TO_INSTALL=base
+fi
+
 # Build the sysroot with jinx and build limine.
 rm -rf sysroot
-./jinx sysroot
-./jinx host-build limine
+set -f
+./jinx install "sysroot" $PKGS_TO_INSTALL
+set +f
+if ! [ -d host-pkgs/limine ]; then
+    ./jinx host-build limine
+fi
 
 # Make an initramfs with the sysroot.
 ( cd sysroot && tar cf ../initramfs.tar * )

@@ -7,15 +7,17 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs openssl zlib zstd"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-threaded-resolver \
         --with-openssl
+}
 
+build() {
     make -j${parallelism}
 }
 

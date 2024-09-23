@@ -8,12 +8,12 @@ imagedeps="build-essential ncurses-bin patchelf"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     cp -pv /usr/local/share/libtool/build-aux/config.guess ./
     cp -pv /usr/local/share/libtool/build-aux/config.sub ./
 }
 
-build() {
+configure() {
         cf_cv_func_nanosleep=yes \
     autotools_configure \
         --enable-widec \
@@ -27,7 +27,9 @@ build() {
         --with-pkg-config-libdir=/usr/lib/pkgconfig \
         --with-termlib \
         --without-ada
+}
 
+build() {
     make -j${parallelism}
 }
 

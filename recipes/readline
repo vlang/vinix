@@ -9,7 +9,7 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses"
 
-regenerate() {
+prepare() {
     curl -Lo readline82-001 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-001
     curl -Lo readline82-002 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-002
     curl -Lo readline82-003 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-003
@@ -29,11 +29,13 @@ regenerate() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-multibyte \
         --with-curses
+}
 
+build() {
     make SHLIB_LIBS="-lncursesw -ltinfow" -j${parallelism}
 }
 

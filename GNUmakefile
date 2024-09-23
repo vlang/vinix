@@ -10,8 +10,6 @@ all:
 	$(MAKE) vinix.iso
 
 vinix.iso: jinx
-	rm -f builds/kernel.built builds/kernel.packaged
-	$(MAKE) distro-base
 	./build-support/makeiso.sh
 
 .PHONY: debug
@@ -19,16 +17,8 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -Lo jinx https://github.com/mintsuki/jinx/raw/35af34f2d105bf27478112706de08bd98c316be7/jinx
+	curl -Lo jinx https://github.com/mintsuki/jinx/raw/31bafe0d84332bf20388420f3c16879e63314cfe/jinx
 	chmod +x jinx
-
-.PHONY: distro-full
-distro-full: jinx
-	./jinx build-all
-
-.PHONY: distro-base
-distro-base: jinx
-	./jinx build base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gmp grep gzip less make mpc mpfr nano ncurses pcre2 readline sed tar tzdata util-vinix xz zlib zstd
 
 .PHONY: run-kvm
 run-kvm: vinix.iso
@@ -67,33 +57,11 @@ run-lingemu: vinix.iso
 run: vinix.iso
 	qemu-system-x86_64 $(QEMUFLAGS)
 
-.PHONY: kernel-clean
-kernel-clean:
-	make -C kernel clean
-	rm -rf builds/kernel* pkgs/kernel*
-
-.PHONY: util-vinix-clean
-util-vinix-clean:
-	make -C util-vinix clean
-	rm -rf builds/util-vinix* pkgs/util-vinix*
-
-.PHONY: init-clean
-init-clean:
-	rm -rf init/init
-	rm -rf builds/init* pkgs/init*
-
-.PHONY: base-files-clean
-base-files-clean:
-	rm -rf builds/base-files* pkgs/base-files*
-
 .PHONY: clean
-clean: kernel-clean util-vinix-clean init-clean base-files-clean
+clean:
 	rm -rf iso_root sysroot vinix.iso initramfs.tar
 
 .PHONY: distclean
-distclean: jinx
+distclean: clean
 	make -C kernel distclean
-	./jinx clean
-	rm -rf iso_root sysroot vinix.iso initramfs.tar jinx ovmf
-	chmod -R 777 .jinx-cache
-	rm -rf .jinx-cache
+	rm -rf .jinx-cache jinx builds host-builds host-pkgs pkgs sources ovmf

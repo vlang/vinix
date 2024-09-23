@@ -6,7 +6,7 @@ hostdeps="autoconf automake"
 imagedeps="help2man git"
 allow_network="yes"
 
-regenerate() {
+prepare() {
     git clone https://git.savannah.gnu.org/git/gnulib.git
     git -C gnulib checkout c6942e47da903adc68b887cbedfac07b099088f2
     ./bootstrap --force --skip-git --skip-po --gnulib-srcdir=`pwd`/gnulib

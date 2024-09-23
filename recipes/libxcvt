@@ -7,9 +7,11 @@ imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
-build() {
+configure() {
     meson_configure
+}
 
+build() {
     ninja -j${parallelism}
 }
 

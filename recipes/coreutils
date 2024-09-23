@@ -7,17 +7,19 @@ source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs tzdata"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
     autotools_configure \
         CFLAGS="$TARGET_CFLAGS -DSLOW_BUT_NO_HACKS"
+}
 
+build() {
     make -j${parallelism}
 }
 

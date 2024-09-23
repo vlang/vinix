@@ -4,7 +4,7 @@ revision=1
 imagedeps="build-essential"
 hostdeps="autoconf-2.69 automake libtool pkg-config"
 
-build() {
+configure() {
         CFLAGS="$HOST_CFLAGS" \
         CXXFLAGS="$HOST_CXXFLAGS" \
         LDFLAGS="$HOST_LDFLAGS" \
@@ -25,7 +25,9 @@ build() {
         --disable-nls \
         --disable-werror \
         --with-pic
+}
 
+build() {
     make -j${parallelism}
 }
 

@@ -7,11 +7,13 @@ imagedeps="patchelf"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
-build() {
+configure() {
         prefix="${prefix}" \
         CHOST="${OS_TRIPLET}" \
     ${source_dir}/configure
+}
 
+build() {
     make -j${parallelism}
 }
 
