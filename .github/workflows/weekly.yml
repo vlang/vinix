@@ -1,8 +1,8 @@
 name: Weekly Vinix rebuild
 
-on:
-  schedule:
-    - cron: '0 0 * * 6'
+on: [push]
+#  schedule:
+#    - cron: '0 0 * * 6'
 
 jobs:
   vinix-build:
@@ -20,22 +20,13 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install make diffutils curl git rsync xorriso -y
 
-      #- name: Build distro
-      #  run: make distro-full
-
-      #- name: Build ISO
-      #  run: make all
+      #- name: Build full distro and ISO
+      #  run: PKGS_TO_INSTALL='*' make all
 
       #- name: Rename vinix.iso
       #  run: mv vinix.iso vinix-weekly-full-$(date +'%Y%m%d').iso
 
-      #- name: Distclean
-      #  run: make distclean
-
-      - name: Build base distro
-        run: make distro-base
-
-      - name: Build ISO
+      - name: Build base distro and ISO
         run: make all
 
       - name: Rename vinix.iso

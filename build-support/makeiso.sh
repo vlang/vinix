@@ -2,14 +2,10 @@
 
 set -ex
 
-if [ -z "$PKGS_TO_INSTALL" ]; then
-    PKGS_TO_INSTALL=base
-fi
-
 # Build the sysroot with jinx and build limine.
 rm -rf sysroot
 set -f
-./jinx install "sysroot" $PKGS_TO_INSTALL
+./jinx install "sysroot" base $PKGS_TO_INSTALL
 set +f
 if ! [ -d host-pkgs/limine ]; then
     ./jinx host-build limine

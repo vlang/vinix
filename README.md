@@ -52,28 +52,26 @@ The following is a distro-agnostic list of packages needed to build Vinix.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU make`, `findutils`, `curl`, `git`, `zstd`, `rsync`, `xorriso`, and `qemu`
-to test it.
-
-Additionally a working C compiler (`cc`) needs to be present.
+`GNU make`, `findutils`, `curl`, `git`, `xz`, `rsync`, `xorriso`, `qemu`
+to test it, and a working C compiler (`cc`) needs to be present.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install -y build-essential make findutils curl git zstd rsync xorriso qemu-system-x86
+sudo apt install -y build-essential make findutils curl git xz-utils rsync xorriso qemu-system-x86
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed gcc make findutils curl git zstd rsync xorriso qemu
+sudo pacman -S --needed gcc make findutils curl git xz rsync xorriso qemu
 ```
 
 ### Build prerequisites for Red Hat Linux and derivatives
 ```bash
-sudo yum install -y gcc make findutils curl git zstd rsync xorriso qemu
+sudo yum install -y gcc make findutils curl git xz rsync xorriso qemu
 ```
 ### Build prerequisites for Void Linux and derivatives
 ```bash
-sudo xbps-install -Suv gcc make findutils curl git zstd rsync xorriso qemu
+sudo xbps-install -Suv gcc make findutils curl git xz rsync xorriso qemu
 ```
 ### Building the distro
 
@@ -81,12 +79,23 @@ To build the distro, which includes the cross toolchain necessary
 to build kernel and ports, as well as the kernel itself, run:
 
 ```bash
-make distro-base # Build the base distribution.
-make all         # Make filesystem and ISO.
+make all     # Build the base distro and make filesystem and ISO.
 ```
 
-This will build a minimal distro image. The `make distro-full` target
-is also avaliable to build the full distro; this step will take a while.
+This will build a minimal distro image. Setting the `PKGS_TO_INSTALL` env
+variable will allow one to specify a custom set of packages to build/install.
+For example:
+
+```bash
+PKGS_TO_INSTALL='*' make all
+```
+This will build all packages (may take some time). Or:
+
+```bash
+PKGS_TO_INSTALL='python sqlite' make all
+```
+This will build the base system (like `make all`) plus the `python` and `sqlite`
+packages.
 
 ### To test
 
