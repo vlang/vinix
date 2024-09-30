@@ -1,8 +1,8 @@
 name=frigg
-version=edf7b21dc7b5db709ef41f895a252a50c3db87e3
+version=91ada7d4e12b9e73a454e7be13919e989444faa2
 revision=1
 tarball_url="https://github.com/managarm/frigg/archive/${version}.tar.gz"
-tarball_blake2b="04cb1722162f1e0c32df9dbb5b6b57201de88382cee8b32972433bd396685bb683fddc6eab7fefc10e4d7740909babe600884bbebe2e159a1d9ad503fa72f32e"
+tarball_blake2b="ba24af6c50bb8cce7b0a668be50679144af2a5fe06e95f36fa896ca01842a893909ee5e9423ebeea57819017b641522f700f9cbec43c2851dd6576acafbb3f03"
 imagedeps="meson ninja-build"
 hostdeps="pkg-config"
 
