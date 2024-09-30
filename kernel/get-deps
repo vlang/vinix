@@ -16,6 +16,7 @@ clone_repo_commit() {
         fi
     else
         if test -d "$2"; then
+            set +x
             echo "error: '$2' is not a Git repository"
             exit 1
         fi
@@ -34,6 +35,7 @@ download_by_hash() {
     if ! command -v $DOWNLOAD_COMMAND >/dev/null 2>&1; then
         DOWNLOAD_COMMAND="wget -O"
         if ! command -v $DOWNLOAD_COMMAND >/dev/null 2>&1; then
+            set +x
             echo "error: Neither curl nor wget found"
             exit 1
         fi
@@ -42,6 +44,7 @@ download_by_hash() {
     if ! command -v $SHA256_COMMAND >/dev/null 2>&1; then
         SHA256_COMMAND="sha256"
         if ! command -v $SHA256_COMMAND >/dev/null 2>&1; then
+            set +x
             echo "error: Cannot find sha256(sum) command"
             exit 1
         fi
@@ -51,6 +54,7 @@ download_by_hash() {
         mkdir -p "$2" && rm -rf "$2"
         $DOWNLOAD_COMMAND "$2" $1
         if ! $SHA256_COMMAND "$2" | grep $3 >/dev/null 2>&1; then
+            set +x
             echo "error: Cannot download file '$2' by hash"
             echo "incorrect hash:"
             $SHA256_COMMAND "$2"
@@ -60,29 +64,27 @@ download_by_hash() {
     fi
 }
 
-if ! test -f version; then
-    clone_repo_commit \
-        https://github.com/osdev0/freestnd-c-hdrs-0bsd.git \
-        freestnd-c-hdrs-0bsd \
-        0353851fdebe0eb6a4d2c608c5393040d310bf35
+clone_repo_commit \
+    https://github.com/osdev0/freestnd-c-hdrs-0bsd.git \
+    freestnd-c-hdrs-0bsd \
+    0353851fdebe0eb6a4d2c608c5393040d310bf35
 
-    download_by_hash \
-        https://github.com/osdev0/cc-runtime/raw/dcdf5d82973e77edee597a047a3ef66300903de9/cc-runtime.c \
-        c/cc-runtime.c \
-        199907f5303ab15a963377fabcc1f2ee736e4ed18d54c59aab08345aa5485e8a
+download_by_hash \
+    https://github.com/osdev0/cc-runtime/raw/dcdf5d82973e77edee597a047a3ef66300903de9/cc-runtime.c \
+    c/cc-runtime.c \
+    199907f5303ab15a963377fabcc1f2ee736e4ed18d54c59aab08345aa5485e8a
 
-    clone_repo_commit \
-        https://github.com/mintsuki/flanterm.git \
-        c/flanterm \
-        ef07a10cc38b34aa003d17be97a9f3542e275069
+clone_repo_commit \
+    https://github.com/mintsuki/flanterm.git \
+    c/flanterm \
+    ef07a10cc38b34aa003d17be97a9f3542e275069
 
-    download_by_hash \
-        https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.c \
-        c/printf/printf.c \
-        bae9609d84dc7a56ff0b3d0d3787d33edbd1ec224f0f7ff7edefd6b6ae613395
+download_by_hash \
+    https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.c \
+    c/printf/printf.c \
+    bae9609d84dc7a56ff0b3d0d3787d33edbd1ec224f0f7ff7edefd6b6ae613395
 
-    download_by_hash \
-        https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.h \
-        c/printf/printf.h \
-        f63b84650f29394fd1bc6f6dce889d11570fcc152c5d512bfe6b68174c5aed56
-fi
+download_by_hash \
+    https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.h \
+    c/printf/printf.h \
+    f63b84650f29394fd1bc6f6dce889d11570fcc152c5d512bfe6b68174c5aed56

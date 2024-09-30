@@ -46,10 +46,19 @@ $(call USER_VARIABLE,KLDFLAGS,)
 $(call USER_VARIABLE,VINIX_PROD,)
 
 # Ensure the dependencies have been obtained.
-ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ) && echo 1),1)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs-0bsd || ! test -f c/cc-runtime.c || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ) && echo 1),1)
+ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs-0bsd || ! test -f c/cc-runtime.c || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
+endif
+
+# Check if KCC is Clang.
+override KCC_IS_CLANG := $(shell ! $(KCC) --version 2>/dev/null | grep 'clang' >/dev/null 2>&1; echo $$?)
+
+# If the C compiler is Clang, set the target as needed.
+ifeq ($(KCC_IS_CLANG),1)
+    override KCC += \
+        -target x86_64-unknown-none
 endif
 
 # Internal C flags that should not be changed by the user.
@@ -80,8 +89,8 @@ override KCFLAGS += \
 # Internal C preprocessor flags that should not be changed by the user.
 override KCPPFLAGS := \
     -I c \
-    $(KCPPFLAGS) \
     -isystem freestnd-c-hdrs-0bsd \
+    $(KCPPFLAGS) \
     -MMD \
     -MP
 
