@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=autoconf-archive
 version=2023.02.20
 revision=1

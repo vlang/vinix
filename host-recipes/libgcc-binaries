@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libgcc-binaries
 from_source=libgcc-binaries
 revision=1

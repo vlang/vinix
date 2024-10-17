@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=pkg-config
 from_source=pkg-config
 revision=1

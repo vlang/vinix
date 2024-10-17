@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=sed
 version=4.9
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=mlibc-headers
 revision=1
 from_source=mlibc
@@ -6,10 +8,7 @@ hostdeps="pkg-config"
 
 configure() {
     meson_configure \
-        -Dheaders_only=true \
-        -Ddisable_crypt_option=true \
-        -Ddisable_iconv_option=true \
-        -Ddisable_intl_option=true
+        -Dheaders_only=true
 }
 
 build() {

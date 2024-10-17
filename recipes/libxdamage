@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxdamage
 version=1.1.6
 revision=1

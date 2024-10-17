@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=autoconf
 from_source=autoconf
 revision=1

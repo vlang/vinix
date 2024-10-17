@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libx11
 version=1.8.9
 revision=1

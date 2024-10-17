@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=ttf-dejavu
 version=2.37
 revision=1

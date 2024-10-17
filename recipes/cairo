@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=cairo
 version=1.18.0
 revision=1

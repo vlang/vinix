@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxrandr
 version=1.5.4
 revision=1

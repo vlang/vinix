@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=glib
 version=2.78.6
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=fribidi
 version=1.0.15
 revision=1

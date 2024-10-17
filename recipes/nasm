@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=nasm
 version=2.16.03
 revision=1

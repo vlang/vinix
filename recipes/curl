@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=curl
 version=8.8.0
 revision=1

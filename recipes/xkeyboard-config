@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xkeyboard-config
 version=2.42
 revision=1

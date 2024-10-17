@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=binutils
 from_source=binutils
 revision=1

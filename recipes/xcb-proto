@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xcb-proto
 version=1.17.0
 revision=1

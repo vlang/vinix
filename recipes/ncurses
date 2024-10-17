@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=ncurses
 version=6.5.20240824
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libiconv
 version=1.17
 revision=1

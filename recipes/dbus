@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=dbus
 version=1.15.8
 revision=1

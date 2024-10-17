@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xf86-video-fbdev
 version=0.5.0
 revision=1

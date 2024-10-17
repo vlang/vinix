@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=util-vinix
 version=0.0
 revision=1

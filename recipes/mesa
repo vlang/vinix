@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=mesa
 version=23.3.6
 revision=1

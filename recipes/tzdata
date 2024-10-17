@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=tzdata
 version=2024a
 revision=1

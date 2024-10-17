@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=freeglut
 version=3.6.0
 revision=1

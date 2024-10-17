@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=findutils
 version=4.10.0
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xorg-xkbutils
 version=1.0.6
 revision=1

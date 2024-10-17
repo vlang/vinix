@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxinerama
 version=1.1.5
 revision=1

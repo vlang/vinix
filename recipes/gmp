@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=gmp
 version=6.3.0
 revision=1

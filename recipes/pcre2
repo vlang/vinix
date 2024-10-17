@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=pcre2
 version=10.44
 revision=1

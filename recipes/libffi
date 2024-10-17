@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libffi
 version=3.4.6
 revision=1

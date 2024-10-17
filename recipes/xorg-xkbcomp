@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xorg-xkbcomp
 version=1.4.7
 revision=1

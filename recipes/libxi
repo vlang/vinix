@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxi
 version=1.8.1
 revision=1

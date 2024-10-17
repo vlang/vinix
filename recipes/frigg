@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=frigg
 version=91ada7d4e12b9e73a454e7be13919e989444faa2
 revision=1

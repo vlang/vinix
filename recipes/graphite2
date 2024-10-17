@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=graphite2
 version=1.3.14
 revision=1

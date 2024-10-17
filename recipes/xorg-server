@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xorg-server
 version=21.1.13
 revision=1

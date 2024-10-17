@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=readline
 version=8.2.10
 revision=1

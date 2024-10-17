@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=autoconf
 version=2.72
 tarball_url="https://ftp.gnu.org/gnu/autoconf/autoconf-${version}.tar.gz"

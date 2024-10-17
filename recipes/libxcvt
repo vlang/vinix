@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxcvt
 version=0.1.2
 revision=1

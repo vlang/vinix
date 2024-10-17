@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=binutils
 version=2.43.1
 revision=1

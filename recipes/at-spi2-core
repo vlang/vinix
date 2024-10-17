@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=at-spi2-core
 version=2.52.0
 revision=1

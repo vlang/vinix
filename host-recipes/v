@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=v
 from_source=v
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxmu
 version=1.2.1
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libtool
 from_source=libtool
 revision=1

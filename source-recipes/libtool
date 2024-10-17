@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libtool
 version=2.5.0
 tarball_url="https://alpha.gnu.org/gnu/libtool/libtool-${version}.tar.gz"

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxft
 version=2.3.8
 revision=1

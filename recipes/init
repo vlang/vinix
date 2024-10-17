@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=init
 version=0.0
 revision=1

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=gsettings-desktop-schemas
 version=46.0
 revision=1

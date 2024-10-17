@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libxv
 version=1.0.12
 revision=1

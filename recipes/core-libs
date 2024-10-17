@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=core-libs
 revision=1
 deps="mlibc libgcc libstdc++ libintl libiconv libxcrypt"

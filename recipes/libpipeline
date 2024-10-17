@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libpipeline
 version=1.5.7
 revision=1

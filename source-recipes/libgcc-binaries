@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libgcc-binaries
 version=43f345757a39a98ca99727aabf84a00aaea6c658
 tarball_url="https://github.com/osdev0/libgcc-binaries/archive/${version}.tar.gz"

@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=gettext
 version=0.22.5
 revision=1

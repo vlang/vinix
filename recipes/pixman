@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=pixman
 version=0.43.4
 revision=1

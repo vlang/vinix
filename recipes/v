@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=v
 version=a98a0290a0f77b13eb7b3832991855ab24667258
 revision=1

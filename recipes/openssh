@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=openssh
 version=9.7p1
 revision=1

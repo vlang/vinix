@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libpng
 version=1.6.43
 revision=1

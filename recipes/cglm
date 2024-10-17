@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=cglm
 version=0.9.4
 revision=1

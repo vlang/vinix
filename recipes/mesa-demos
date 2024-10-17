@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=mesa-demos
 version=8.5.0
 revision=1

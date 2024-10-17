@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=man-db
 version=2.12.1
 revision=1

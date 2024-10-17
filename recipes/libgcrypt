@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=libgcrypt
 version=1.10.3
 revision=1

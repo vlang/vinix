@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=gdk-pixbuf
 version=2.42.12
 revision=1
