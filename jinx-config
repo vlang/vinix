@@ -1,8 +1,10 @@
+#! /bin/sh
+
 JINX_MAJOR_VER=0.4
 
 HOST_CFLAGS="-O2 -pipe -fstack-clash-protection"
 HOST_CXXFLAGS="${HOST_CFLAGS} -Wp,-D_GLIBCXX_ASSERTIONS"
-HOST_LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now"
+HOST_LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs"
 
 TARGET_CFLAGS="$HOST_CFLAGS"
 TARGET_CXXFLAGS="$HOST_CXXFLAGS"
