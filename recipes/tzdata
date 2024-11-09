@@ -1,59 +1,55 @@
 #! /bin/sh
 
 name=tzdata
-version=2024a
+version=2024b
 revision=1
 tarball_url="https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz"
-tarball_blake2b="5ec49bbce704411a1d8b3f018b0d8f6c7de24c5600e0cb6c61a7ee29b4a49b1e502d23b40bce6584ea0aa9b66327321608cbabb994071ec4ca2b3a496aa2d621"
+tarball_blake2b="58b9eec497ee8e87e0ead06211600ec76bda58738c57adf78b412b7b9305000dc9af7ed232cd161ff05fcb659f5cc7e7fd0e59d0576bdc5d794ea0b592689921"
+source_allow_network="yes"
 imagedeps="tzdata"
 hostdeps="gcc binutils"
-deps="core-libs"
+deps="mlibc libgcc libstdc++ libintl libiconv"
+
+prepare() {
+    curl -Lo tzcode.tar.gz "https://data.iana.org/time-zones/releases/tzcode${version}.tar.gz"
+    tar -xf tzcode.tar.gz
+    sed -i 's/sbin/bin/g' Makefile
+}
 
 build() {
-    cp -r ${source_dir}/. ./
+    cp -rp ${source_dir}/. ./
+
+    make \
+        CC="$OS_TRIPLET-gcc" \
+        AR="$OS_TRIPLET-ar" \
+        CFLAGS="$TARGET_CFLAGS -std=c99 $TARGET_CPPFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+        LDLIBS="-lintl"
 }
 
 package() {
+    make DESTDIR="${dest_dir}" ZIC=zic install
+
+    timezones="africa antarctica asia australasia europe northamerica southamerica etcetera backward factory"
+
     # Create the required directories
-    mkdir -p ${dest_dir}/etc
-    mkdir -p ${dest_dir}/usr/share/zoneinfo/posix
-    mkdir -p ${dest_dir}/usr/share/zoneinfo/right
+    mkdir -p "${dest_dir}"/etc
+    mkdir -p "${dest_dir}"/usr/share/zoneinfo/posix
+    mkdir -p "${dest_dir}"/usr/share/zoneinfo/right
 
     # Create the time zone files without leap seconds, convention puts these in both zoneinfo and zoneinfo/posix.
     # After that. create time time zone files with leap seconds
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo etcetera
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix etcetera
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right etcetera
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo southamerica
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix southamerica
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right southamerica
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo northamerica
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix northamerica
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right northamerica
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo europe
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix europe
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right europe
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo africa
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix africa
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right africa
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo antarctica
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix antarctica
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right antarctica
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo asia
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix asia
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right asia
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo australasia
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix australasia
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right australasia
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo backward
-    zic -L /dev/null -d "${dest_dir}"/usr/share/zoneinfo/posix backward
-    zic -L "${source_dir}"/leapseconds -d "${dest_dir}"/usr/share/zoneinfo/right backward
+    zic -b fat -d "${dest_dir}"/usr/share/zoneinfo $timezones
+    zic -b fat -d "${dest_dir}"/usr/share/zoneinfo/posix $timezones
+    zic -b fat -d "${dest_dir}"/usr/share/zoneinfo/right -L leapseconds $timezones
 
     # Create the posixrules file, POSIX requires daylight saving rules to be in accordance with US rules, thus use New York
-    zic -d ${dest_dir}/usr/share/zoneinfo -p America/New_York
+    zic -b fat -d "${dest_dir}"/usr/share/zoneinfo -p America/New_York
 
-    # Default to UTC for localtime, this should be fixed, but that is pending xbstrap support.
+    # Default to UTC for localtime.
     ln -sf /usr/share/zoneinfo/UTC "${dest_dir}"/etc/localtime
+
+    install -m644 -t "${dest_dir}"/usr/share/zoneinfo iso3166.tab leap-seconds.list zone1970.tab zone.tab SECURITY
 
     post_package_strip
 }

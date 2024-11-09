@@ -29,14 +29,14 @@ index f815a09..face7e1 100644
 +    # This breaks the usual configuration naming convention but it's more
 +    # convenient for us, since it matches the target triples
 +
-+    "x86_64-pc-vinix-mlibc" => {
++    "x86_64-vinix-mlibc" => {
 +        inherit_from     => [ "vinix-generic64", asm("x86_64_asm") ],
 +        perlasm_scheme   => "elf",
 +
 +        # Configure doesn't want to play nice and passes "--cross-compile-suffix"
 +        # on to the GCC invocation
-+        CC               => "x86_64-pc-vinix-mlibc-gcc",
-+        CXX              => "x86_64-pc-vinix-mlibc-g++",
++        CC               => "x86_64-vinix-mlibc-gcc",
++        CXX              => "x86_64-vinix-mlibc-g++",
 +
 +    },
 +

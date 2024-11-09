@@ -1,10 +1,10 @@
 [binaries]
-c = 'x86_64-pc-vinix-mlibc-gcc'
-cpp = 'x86_64-pc-vinix-mlibc-g++'
-ar = 'x86_64-pc-vinix-mlibc-ar'
-nm = 'x86_64-pc-vinix-mlibc-nm'
-strip = 'x86_64-pc-vinix-mlibc-strip'
-pkg-config = 'x86_64-pc-vinix-mlibc-pkg-config'
+c = 'x86_64-vinix-mlibc-gcc'
+cpp = 'x86_64-vinix-mlibc-g++'
+ar = 'x86_64-vinix-mlibc-ar'
+nm = 'x86_64-vinix-mlibc-nm'
+strip = 'x86_64-vinix-mlibc-strip'
+pkg-config = 'x86_64-vinix-mlibc-pkg-config'
 llvm-config = '/base_dir/build-support/cross-llvm-config'
 
 [host_machine]

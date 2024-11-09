@@ -8,15 +8,14 @@ tarball_blake2b="76f24c332bf93cb64b6c53c0bbd662f74be96cc08e05a8aec81ed23c25cb80c
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs libx11 libxcb libxext libxi libxmu libxrender libxt"
+deps="core-libs libx11 libxt libxext libxmu libxrender libxi libxcb"
 
 prepare() {
     autotools_recursive_regen
 }
 
 configure() {
-    autotools_configure \
-        --disable-selective-werror
+    autotools_configure
 }
 
 build() {

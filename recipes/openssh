@@ -1,28 +1,29 @@
 #! /bin/sh
 
 name=openssh
-version=9.7p1
+version=9.9p1
 revision=1
 tarball_url="https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz"
-tarball_blake2b="520859fcbdf678808fc8515b64585ab9a90a8055fa869df6fbba3083cb7f73ddb81ed9ea981e131520736a8aed838f85ae68ca63406a410df61039913c5cb48b"
+tarball_blake2b="817d267e42b8be74a13e0cfd7999bdb4dab6355c7f62c1a4dd89adad310c5fb7fe3f17109ce1a36cd269a3639c1b8f1d18330c615ab3b419253ec027cfa20997"
 source_hostdeps="autoconf automake libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib openssl"
 
 prepare() {
     autotools_recursive_regen
-
-    cp -v $(find /usr/local/share/automake* -name config.sub) .
 }
 
 configure() {
         ossh_cv_utmpx_h_has_ut_addr=no \
     autotools_configure \
-        --disable-strip \
         --sysconfdir=/etc/ssh \
-        --with-privsep-path=/var/lib/sshd \
-        --with-default-path=${prefix}/bin \
-        --with-superuser-path=${prefix}/sbin:${prefix}/bin \
+        --disable-strip \
+        --with-ssl-engine \
+        --with-privsep-user=nobody \
+        --with-privsep-path=${prefix}/share/empty.sshd \
+        --with-default-path=${prefix}/local/sbin:${prefix}/local/bin:${prefix}/bin \
+        --without-zlib-version-check \
+        --with-xauth=/usr/bin/xauth \
         --with-pid-dir=/run
 }
 
@@ -31,10 +32,10 @@ build() {
 }
 
 package() {
-    install -v -m700 -d "${dest_dir}"/var/lib/sshd
+    install -v -m700 -d "${dest_dir}${prefix}"/share/empty.sshd
     install -v -d "${dest_dir}"/run
 
-    make install DESTDIR="${dest_dir}"
+    make DESTDIR="${dest_dir}" install
 
     post_package_strip
 }

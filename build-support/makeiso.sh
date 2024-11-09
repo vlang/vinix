@@ -29,9 +29,11 @@ mkdir -pv iso_root/EFI/BOOT
 cp host-pkgs/limine/usr/local/share/limine/BOOT*.EFI iso_root/EFI/BOOT/
 
 # Create the disk image.
-xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 \
-    -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part \
-    --efi-boot-image --protective-msdos-label iso_root -o vinix.iso
+xorriso -as mkisofs -R -r -J -b boot/limine-bios-cd.bin \
+    -no-emul-boot -boot-load-size 4 -boot-info-table -hfsplus \
+    -apm-block-size 2048 --efi-boot boot/limine-uefi-cd.bin \
+    -efi-boot-part --efi-boot-image --protective-msdos-label \
+    iso_root -o vinix.iso
 
 # Install limine.
 host-pkgs/limine/usr/local/bin/limine bios-install vinix.iso

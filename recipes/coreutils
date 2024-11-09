@@ -7,7 +7,7 @@ tarball_url="https://ftp.gnu.org/gnu/coreutils/coreutils-${version}.tar.xz"
 tarball_blake2b="6fd3a77697c9e85f31415c6ad66559faf18acc7d346677a89d4a999c2027886551e78842a7283e7b3b44fe8ef2fde04ba2f88df32a7844d5f69d45bcb7a04b6f"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="core-libs tzdata"
+deps="core-libs"
 
 prepare() {
     autotools_recursive_regen

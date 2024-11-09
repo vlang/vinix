@@ -5,37 +5,28 @@ version=1.5.6
 revision=1
 tarball_url="https://github.com/facebook/zstd/releases/download/v${version}/zstd-${version}.tar.gz"
 tarball_blake2b="fe17cf0950f8ee2cc07bfa2b41e97f36a1832e396386cb94a55bede975dc974920578cf147b39eecbc5b53ff06fe0dc1fe781a4cab9bc9f767ea28c0e786422e"
+imagedeps="cmake ninja-build"
 hostdeps="gcc pkg-config"
-deps="core-libs zlib xz"
+deps="core-libs zlib xz lz4"
+
+configure() {
+        cmake_source_dir="$source_dir/build/cmake" \
+    cmake_configure \
+        -DZSTD_ZLIB_SUPPORT=ON \
+        -DZSTD_LZMA_SUPPORT=ON \
+        -DZSTD_LZ4_SUPPORT=ON \
+        -DZSTD_BUILD_CONTRIB=OFF \
+        -DZSTD_BUILD_STATIC=OFF \
+        -DZSTD_BUILD_TESTS=OFF \
+        -DZSTD_PROGRAMS_LINK_SHARED=ON
+}
 
 build() {
-    cp -rp "${source_dir}"/. ./
-
-        CFLAGS="$TARGET_CFLAGS" \
-        CXXFLAGS="$TARGET_CXXFLAGS" \
-        CPPFLAGS="$TARGET_CPPFLAGS" \
-        LDFLAGS="$TARGET_LDFLAGS" \
-        CC=${OS_TRIPLET}-gcc \
-        CXX=${OS_TRIPLET}-g++ \
-        AR=${OS_TRIPLET}-ar \
-        PREFIX="${prefix}" \
-    make V=1 -j${parallelism}
+    ninja -j${parallelism}
 }
 
 package() {
-        CFLAGS="$TARGET_CFLAGS" \
-        CXXFLAGS="$TARGET_CXXFLAGS" \
-        CPPFLAGS="$TARGET_CPPFLAGS" \
-        LDFLAGS="$TARGET_LDFLAGS" \
-        CC=${OS_TRIPLET}-gcc \
-        CXX=${OS_TRIPLET}-g++ \
-        AR=${OS_TRIPLET}-ar \
-        DESTDIR="${dest_dir}" \
-        PREFIX="${prefix}" \
-    make V=1 install
-
-    # Remove static libraries.
-    rm -rf "${dest_dir}${prefix}"/lib/*.a
+    DESTDIR="${dest_dir}" ninja install
 
     post_package_strip
 }

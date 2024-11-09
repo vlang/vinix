@@ -1,0 +1,13 @@
+diff --git xtrans-clean/Xtranssock.c xtrans-workdir/Xtranssock.c
+index c9823bd..e380e70 100644
+--- xtrans-clean/Xtranssock.c
++++ xtrans-workdir/Xtranssock.c
+@@ -196,7 +196,7 @@ static Sockettrans2dev Sockettrans2devtab[] = {
+ static int TRANS(SocketINETClose) (XtransConnInfo ciptr);
+ #endif
+ 
+-#if (defined(TCPCONN) && defined(TRANS_SERVER)) || defined(TRANS_REOPEN)
++#if defined(TCPCONN) || defined(TRANS_REOPEN)
+ static int
+ is_numeric (const char *str)
+ {

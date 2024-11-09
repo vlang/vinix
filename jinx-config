@@ -4,7 +4,7 @@ JINX_MAJOR_VER=0.4
 
 HOST_CFLAGS="-O2 -pipe -fstack-clash-protection"
 HOST_CXXFLAGS="${HOST_CFLAGS} -Wp,-D_GLIBCXX_ASSERTIONS"
-HOST_LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs"
+HOST_LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now"
 
 TARGET_CFLAGS="$HOST_CFLAGS"
 TARGET_CXXFLAGS="$HOST_CXXFLAGS"
@@ -14,12 +14,13 @@ if [ -z "$ARCHITECTURE" ]; then
     ARCHITECTURE=x86_64
 fi
 
-OS_TRIPLET=$ARCHITECTURE-pc-vinix-mlibc
+OS_TRIPLET=$ARCHITECTURE-vinix-mlibc
 
 case "$ARCHITECTURE" in
     x86_64)
         TARGET_CFLAGS="$TARGET_CFLAGS -march=x86-64 -mtune=generic -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
         TARGET_CXXFLAGS="$TARGET_CXXFLAGS -march=x86-64 -mtune=generic -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
+        TARGET_LDFLAGS="$TARGET_LDFLAGS -Wl,-z,pack-relative-relocs"
         ;;
 esac
 
@@ -106,10 +107,10 @@ meson_configure_noflags() {
 }
 
 cmake_configure() {
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
     cmake_configure_noflags \
-        -DCMAKE_C_FLAGS="$TARGET_CFLAGS" \
-        -DCMAKE_CXX_FLAGS="$TARGET_CXXFLAGS" \
-        -DCMAKE_SHARED_LINKER_FLAGS="$TARGET_LDFLAGS" \
         "$@"
 }
 

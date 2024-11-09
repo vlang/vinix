@@ -2,4 +2,4 @@
 
 name=core-libs
 revision=1
-deps="mlibc libgcc libstdc++ libintl libiconv libxcrypt"
+deps="mlibc libgcc libstdc++ libintl libiconv libxcrypt tzdata"

@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=xtrans
-version=1.5.0
+version=1.5.1
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/xtrans-${version}.tar.gz"
-tarball_blake2b="25a18ba2398e445a1fedec3f0f5a102aef733b621fb83a81d193a2e4a702b8090b70ccea1c6784293050fd26b20e2d4b2d433954c9740c3a94c53362dc88cc9b"
+tarball_blake2b="0024c9832952783d6799e9fbb49b29f39abdb3f213a10c03197aec7d7fa86f2c249ef211b7298bb32072bf8b5fbec4b638fda578e0f612cca42553ebc83fe574"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

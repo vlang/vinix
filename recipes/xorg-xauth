@@ -8,7 +8,7 @@ tarball_blake2b="6acc6f360b7ed947d5dbc0b197b7ed0a87916f38cd8a0c74215b96ca44e98ea
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="xorg-util-macros xtrans"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs libx11 libxau libxext libxmu"
+deps="core-libs libxmu libxau libxext libx11"
 
 prepare() {
     autotools_recursive_regen

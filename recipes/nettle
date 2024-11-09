@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=nettle
-version=3.9.1
+version=3.10
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/nettle/nettle-${version}.tar.gz"
-tarball_blake2b="e3ceaefa19491e58f26b900beaf8b4e746feb2357c7677f5c050f257f4a23c304773446b6283a42a82cf9640e16522b8a71c47f137759f1df23cdeee4625d142"
+tarball_blake2b="edf0ba6375f06e2dd4b1e3ed4bab5f592ac04a36f748ce0461bbec32622eb3d5f96f89350926c24b5bbbf37dbe14a1ad64bba5df7cb7ad5987ec634573aabbb5"
 source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="build-essential"
 hostdeps="gcc autoconf automake libtool pkg-config"

@@ -7,7 +7,7 @@ tarball_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${ver
 tarball_blake2b="89a9cc8e0a3e43d352dde14d91f8dd9d6691799ced35b6058702b711a8cf8a5c33ecb7e0ccc589d4f5eea534dca9b45cb0cafa80826441953bdb0370c0fc35f5"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs bzip2 ncurses readline zlib"
+deps="core-libs bzip2 readline zlib"
 
 prepare() {
     autotools_recursive_regen

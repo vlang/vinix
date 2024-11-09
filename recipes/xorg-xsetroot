@@ -8,7 +8,8 @@ tarball_blake2b="b904a9f622883d050751026966341daac1e31ac7c66a6bc54ee6e370c7f096a
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs xorg-util-macros libx11 libxmu xbitmaps libxcursor"
+builddeps="xbitmaps"
+deps="core-libs libx11 libxmu libxcursor"
 
 prepare() {
     autotools_recursive_regen

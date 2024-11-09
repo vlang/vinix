@@ -12,6 +12,9 @@ configure() {
         CC=${OS_TRIPLET}-gcc \
         CXX=${OS_TRIPLET}-g++ \
         AR=${OS_TRIPLET}-ar \
+        CFLAGS="$TARGET_CFLAGS" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
     ${source_dir}/Configure \
         --prefix=${prefix} \
         --openssldir=/etc/ssl \

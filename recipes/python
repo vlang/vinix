@@ -1,32 +1,35 @@
 #! /bin/sh
 
 name=python
-version=3.12.4
+version=3.12.7
 revision=1
 tarball_url="https://www.python.org/ftp/python/${version}/Python-${version}.tar.xz"
-tarball_blake2b="4255171ef8ee1777bab829be7bbaf28a9d5073985b3b1309a41694dda5f6b4ad599df4534a1ce83ec65b357d42416cc18722ca94b4227a45ebd90e2c1df90945"
+tarball_blake2b="eed8744261cab3b401963ec5187a8b814adb9a18f8d0a6a3d59c027a83cf8408524af9b20204b0a0861d173cc33c45ae37bb1542a1ace3344dc59c649087ff1f"
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="autoconf-archive"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs bzip2 xz zlib openssl ncurses readline gdbm tzdata libexpat libffi"
+deps="core-libs bzip2 xz zlib openssl ncurses readline gdbm libexpat libffi"
 
 prepare() {
     autotools_recursive_regen
 }
 
 configure() {
-    echo "ac_cv_file__dev_ptmx=yes" > /tmp/configsite
-    echo "ac_cv_file__dev_ptc=yes" >> /tmp/configsite
-    echo "ac_cv_func_sched_setscheduler=no" >> /tmp/configsite
-
-        CONFIG_SITE=/tmp/configsite \
-    ${source_dir}/configure \
-        --prefix=${prefix} \
-        --host=${OS_TRIPLET} \
+        ac_cv_file__dev_ptmx=yes \
+        ac_cv_file__dev_ptc=yes \
+        ac_cv_func_sched_setscheduler=no \
+        ac_cv_buggy_getaddrinfo=no \
+    autotools_configure \
         --build=$ARCHITECTURE \
+        --with-computed-gotos \
+        --enable-optimizations \
+        --enable-ipv6 \
+        --with-system-expat \
+        --enable-loadable-sqlite-extensions \
+        --without-ensurepip \
+        --with-tzpath=/usr/share/zoneinfo \
         --with-build-python=python3 \
-        --disable-ipv6 \
-        --enable-shared
+        --without-static-libpython
 }
 
 build() {
@@ -34,7 +37,7 @@ build() {
 }
 
 package() {
-    make DESTDIR="${dest_dir}" install
+    DESTDIR="${dest_dir}" make install
 
     ln -sfv python3 "${dest_dir}${prefix}"/bin/python
     ln -sfv python3-config "${dest_dir}${prefix}"/bin/python-config

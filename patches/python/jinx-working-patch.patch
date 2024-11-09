@@ -1,5 +1,5 @@
 diff --git python-clean/configure.ac python-workdir/configure.ac
-index 8a32cb5..e55edc7 100644
+index d0d5405..ab4df08 100644
 --- python-clean/configure.ac
 +++ python-workdir/configure.ac
 @@ -559,6 +559,9 @@ then
@@ -22,6 +22,15 @@ index 8a32cb5..e55edc7 100644
  	*)
  		# for now, limit cross builds to known configurations
  		MACHDEP="unknown"
+@@ -1514,7 +1520,7 @@ if test $enable_shared = "yes"; then
+ 	      PY3LIBRARY=libpython3.so
+ 	  fi
+           ;;
+-    Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*)
++    Linux*|Vinix*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*)
+ 	  LDLIBRARY='libpython$(LDVERSION).so'
+ 	  BLDLIBRARY='-L. -lpython$(LDVERSION)'
+ 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 @@ -3407,6 +3413,10 @@ then
  	CYGWIN*)
  		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
