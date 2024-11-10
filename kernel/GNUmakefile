@@ -20,49 +20,52 @@ $(call USER_VARIABLE,DESTDIR,)
 $(call USER_VARIABLE,PREFIX,/usr/local)
 
 # User controllable C compiler command.
-$(call USER_VARIABLE,KCC,cc)
+$(call USER_VARIABLE,CC,cc)
+
+# User controllable archiver command.
+$(call USER_VARIABLE,AR,ar)
 
 # User controllable linker command.
-$(call USER_VARIABLE,KLD,ld)
+$(call USER_VARIABLE,LD,ld)
 
 # User controllable objdump command.
-$(call USER_VARIABLE,KOBJDUMP,objdump)
+$(call USER_VARIABLE,OBJDUMP,objdump)
 
 # User controllable V command.
-$(call USER_VARIABLE,KV,v)
+$(call USER_VARIABLE,V,v)
 
 # User controllable C flags.
-$(call USER_VARIABLE,KCFLAGS,-g -O2 -pipe)
+$(call USER_VARIABLE,CFLAGS,-g -O2 -pipe)
 
 # User controllable C preprocessor flags. We set none by default.
-$(call USER_VARIABLE,KCPPFLAGS,)
+$(call USER_VARIABLE,CPPFLAGS,)
 
 # User controllable V flags. We set none by default.
-$(call USER_VARIABLE,KVFLAGS,)
+$(call USER_VARIABLE,VFLAGS,)
 
 # User controllable linker flags. We set none by default.
-$(call USER_VARIABLE,KLDFLAGS,)
+$(call USER_VARIABLE,LDFLAGS,)
 
 $(call USER_VARIABLE,VINIX_PROD,)
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs-0bsd || ! test -f c/cc-runtime.c || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs-0bsd || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
 endif
 
-# Check if KCC is Clang.
-override KCC_IS_CLANG := $(shell ! $(KCC) --version 2>/dev/null | grep 'clang' >/dev/null 2>&1; echo $$?)
+# Check if CC is Clang.
+override CC_IS_CLANG := $(shell ! $(CC) --version 2>/dev/null | grep 'clang' >/dev/null 2>&1; echo $$?)
 
 # If the C compiler is Clang, set the target as needed.
-ifeq ($(KCC_IS_CLANG),1)
-    override KCC += \
+ifeq ($(CC_IS_CLANG),1)
+    override CC += \
         -target x86_64-unknown-none
 endif
 
 # Internal C flags that should not be changed by the user.
-override KCFLAGS += \
+override CFLAGS += \
     -g \
     -Wall \
     -Wextra \
@@ -87,22 +90,22 @@ override KCFLAGS += \
     -mcmodel=kernel
 
 # Internal C preprocessor flags that should not be changed by the user.
-override KCPPFLAGS := \
+override CPPFLAGS := \
     -I c \
     -isystem freestnd-c-hdrs-0bsd \
-    $(KCPPFLAGS) \
+    $(CPPFLAGS) \
     -MMD \
     -MP
 
-obj/printf/printf.c.o: override KCPPFLAGS += \
+obj/printf/printf.c.o: override CPPFLAGS += \
     -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
-obj/flanterm/backends/fb.c.o: override KCPPFLAGS += \
+obj/flanterm/backends/fb.c.o: override CPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
 # Internal linker flags that should not be changed by the user.
-override KLDFLAGS += \
+override LDFLAGS += \
     -m elf_x86_64 \
     -nostdlib \
     -static \
@@ -110,7 +113,7 @@ override KLDFLAGS += \
     -gc-sections \
     -T linker.ld
 
-override KVFLAGS += \
+override VFLAGS += \
     -os vinix \
     -enable-globals \
     -nofloat \
@@ -121,10 +124,10 @@ override KVFLAGS += \
     -d no_backtrace
 
 ifeq ($(VINIX_PROD),no)
-    override KVFLAGS += -warn-about-allocs
+    override VFLAGS += -warn-about-allocs
 else
-    override KVFLAGS += -prod
-    override KCPPFLAGS += -DPROD
+    override VFLAGS += -prod
+    override CPPFLAGS += -DPROD
 endif
 
 # Use "find" to glob all *.v, *.c, and *.S files in the tree and obtain the
@@ -139,20 +142,30 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 .PHONY: all
 all: bin/$(OUTPUT)
 
+# Link rules for building the C compiler runtime.
+cc-runtime-x86_64/cc-runtime.a: cc-runtime/*
+	rm -rf cc-runtime-x86_64
+	cp -r cc-runtime cc-runtime-x86_64
+	$(MAKE) -C cc-runtime-x86_64 -f cc-runtime.mk \
+		CC="$(CC)" \
+		AR="$(AR)" \
+		CFLAGS="$(CFLAGS)" \
+		CPPFLAGS='-isystem ../freestnd-c-hdrs-0bsd -DCC_RUNTIME_NO_FLOAT'
+
 # Link rules for the final executable.
-bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ)
+bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a
 	mkdir -p "$$(dirname $@)"
-	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
-	./gensyms.sh $(KOBJDUMP) $@ > obj/symbol_table.c
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c obj/symbol_table.c -o obj/symbol_table.c.o
-	$(KLD) obj/blob.c.o $(OBJ) $(KLDFLAGS) -o $@
+	$(LD) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a $(LDFLAGS) -o $@
+	./gensyms.sh $(OBJDUMP) $@ > obj/symbol_table.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c obj/symbol_table.c -o obj/symbol_table.c.o
+	$(LD) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a $(LDFLAGS) -o $@
 
 obj/blob.c.o: $(VFILES)
 	mkdir -p "$$(dirname $@)"
-	$(KV) $(KVFLAGS) -o obj/blob.c .
+	$(V) $(VFLAGS) -o obj/blob.c .
 	sed 's/call 0(/call *(/g' < obj/blob.c > obj/blob.c.tmp
 	mv obj/blob.c.tmp obj/blob.c
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -w -c obj/blob.c -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
@@ -160,22 +173,22 @@ obj/blob.c.o: $(VFILES)
 # Compilation rules for *.c files.
 obj/%.c.o: c/%.c GNUmakefile
 	mkdir -p "$$(dirname $@)"
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 # Compilation rules for *.S files.
 obj/%.S.o: asm/%.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 # Remove object files and the final executable.
 .PHONY: clean
 clean:
-	rm -rf bin obj
+	rm -rf bin obj cc-runtime-x86_64
 
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf freestnd-c-hdrs-0bsd c/cc-runtime.c c/flanterm c/printf
+	rm -rf freestnd-c-hdrs-0bsd cc-runtime c/flanterm c/printf
 
 # Install the final built executable to its final on-root location.
 .PHONY: install

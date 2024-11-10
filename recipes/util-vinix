@@ -4,13 +4,17 @@ name=util-vinix
 version=0.0
 revision=1
 source_dir="util-vinix"
-hostdeps="gcc binutils v"
+hostdeps="gcc v"
 deps="core-libs"
 
 build() {
-    cp -r "${source_dir}"/. ./
+    cp -rp "${source_dir}"/. ./
 
-    make -j${parallelism} CC=${OS_TRIPLET}-gcc
+    make -j${parallelism} \
+        CC=${OS_TRIPLET}-gcc \
+        VFLAGS="-os vinix -gc none" \
+        CFLAGS="$TARGET_CFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS"
 }
 
 package() {

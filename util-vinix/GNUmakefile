@@ -2,21 +2,27 @@
 # Code is governed by the GPL-2.0 license.
 # Copyright (C) 2021-2022 The Vinix authors.
 
-ifeq ($(origin CC), default)
-	CC := cc
-endif
-V       ?= v
+MAKEFLAGS += -rR
+.SUFFIXES:
+
+override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval override $(1) := $(2)))
+
+$(call USER_VARIABLE,CC,cc)
+$(call USER_VARIABLE,V,v)
+
 VINIX_PROD ?=
 ifeq ($(VINIX_PROD),no)
     override PROD := false
 else
     override PROD := true
 endif
-VFLAGS  ?= -gc none
-CFLAGS  ?= -O2 -pipe -g
-PREFIX  ?= /usr/local
 
-override CFLAGS += -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-int-conversion
+$(call USER_VARIABLE,VFLAGS,)
+$(call USER_VARIABLE,CFLAGS,-g -O2 -pipe)
+$(call USER_VARIABLE,LDFLAGS,)
+
+$(call USER_VARIABLE,DESTDIR,)
+$(call USER_VARIABLE,PREFIX,/usr/local)
 
 ifeq ($(PROD), true)
 	override VFLAGS += -prod
@@ -37,16 +43,16 @@ override MOUNT_TARGET := $(MOUNT_DIR)/mount
 all: $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)
 
 $(CHSH_TARGET): $(CHSH_DIR)/*
-	cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 $(FETCH_TARGET): $(FETCH_DIR)/*
-	cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 $(LSCPU_TARGET): $(LSCPU_DIR)/*
-	cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 $(MOUNT_TARGET): $(MOUNT_DIR)/*
-	cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -os vinix .
+	cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 clean:
 	rm -rf $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)

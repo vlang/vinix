@@ -1,5 +1,5 @@
 /freestnd-c-hdrs-0bsd
-/c/cc-runtime.c
+/cc-runtime*
 /c/flanterm
 /c/printf
 /bin

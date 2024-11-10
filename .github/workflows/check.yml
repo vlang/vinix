@@ -26,13 +26,39 @@ jobs:
         run: cd kernel && ./get-deps
 
       - name: Attempt to build the Vinix kernel (debug)
-        run: cd kernel && make PROD=false KCFLAGS="-D__vinix__ -O2 -g -pipe" KV="../v/v" && make clean
+        run: |
+          set -e
+          cd kernel
+          make PROD=false \
+            CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe" \
+            V="$(realpath ../v/v)"
+          make clean
 
       - name: Attempt to build the Vinix kernel (prod)
-        run: cd kernel && make PROD=true KCFLAGS="-D__vinix__ -O2 -g -pipe" KV="../v/v" && make clean
+        run: |
+          set -e
+          cd kernel
+          make PROD=true \
+            CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe" \
+            V="$(realpath ../v/v)"
+          make clean
 
       - name: Attempt to build the util-vinix (debug)
-        run: cd util-vinix && make PROD=false V="$(realpath ../v/v)" VFLAGS="-os vinix -gc none" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
+        run: |
+          set -e
+          cd util-vinix
+          make PROD=false \
+            VFLAGS="-os vinix -gc none" \
+            CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe" \
+            V="$(realpath ../v/v)"
+          make clean
 
       - name: Attempt to build the util-vinix (prod)
-        run: cd util-vinix && make PROD=true V="$(realpath ../v/v)" VFLAGS="-os vinix -gc none" CFLAGS="-D__vinix__ -O2 -g -pipe" && make clean
+        run: |
+          set -e
+          cd util-vinix
+          make PROD=true \
+            VFLAGS="-os vinix -gc none" \
+            CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe" \
+            V="$(realpath ../v/v)"
+          make clean
