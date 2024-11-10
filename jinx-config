@@ -139,3 +139,5 @@ if [ "$in_container" = true ]; then
     mkdir -p "${VMODULES}"/cache
     mkdir -p /tmp/v_$(id -u)
 fi
+
+PROD=true

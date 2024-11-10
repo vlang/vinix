@@ -46,7 +46,7 @@ $(call USER_VARIABLE,VFLAGS,)
 # User controllable linker flags. We set none by default.
 $(call USER_VARIABLE,LDFLAGS,)
 
-$(call USER_VARIABLE,VINIX_PROD,)
+$(call USER_VARIABLE,PROD,)
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
@@ -123,7 +123,7 @@ override VFLAGS += \
     -gc none \
     -d no_backtrace
 
-ifeq ($(VINIX_PROD),no)
+ifeq ($(PROD),false)
     override VFLAGS += -warn-about-allocs
 else
     override VFLAGS += -prod

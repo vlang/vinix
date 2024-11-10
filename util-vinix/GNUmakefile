@@ -10,13 +10,6 @@ override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval 
 $(call USER_VARIABLE,CC,cc)
 $(call USER_VARIABLE,V,v)
 
-VINIX_PROD ?=
-ifeq ($(VINIX_PROD),no)
-    override PROD := false
-else
-    override PROD := true
-endif
-
 $(call USER_VARIABLE,VFLAGS,)
 $(call USER_VARIABLE,CFLAGS,-g -O2 -pipe)
 $(call USER_VARIABLE,LDFLAGS,)
@@ -24,7 +17,9 @@ $(call USER_VARIABLE,LDFLAGS,)
 $(call USER_VARIABLE,DESTDIR,)
 $(call USER_VARIABLE,PREFIX,/usr/local)
 
-ifeq ($(PROD), true)
+$(call USER_VARIABLE,PROD,)
+
+ifeq ($(PROD),true)
 	override VFLAGS += -prod
 endif
 

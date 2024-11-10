@@ -17,6 +17,7 @@ build() {
     cp -rpf "${source_dir}"/. ./
 
     make -j${parallelism} \
+        PROD="$PROD" \
         CC=${OS_TRIPLET}-gcc \
         LD=${OS_TRIPLET}-ld \
         AR=${OS_TRIPLET}-ar \

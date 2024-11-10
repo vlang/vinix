@@ -11,6 +11,7 @@ build() {
     cp -rp "${source_dir}"/. ./
 
     make -j${parallelism} \
+        PROD="$PROD" \
         CC=${OS_TRIPLET}-gcc \
         VFLAGS="-os vinix -gc none" \
         CFLAGS="$TARGET_CFLAGS" \
