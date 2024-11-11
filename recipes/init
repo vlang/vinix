@@ -4,17 +4,21 @@ name=init
 version=0.0
 revision=1
 source_dir="init"
-hostdeps="gcc binutils v"
+hostdeps="gcc v"
 deps="core-libs"
 
 build() {
-    cp -r "${source_dir}"/. ./
+    cp -rp "${source_dir}"/. ./
+
+    set -x
 
     local PROD_FLAG=""
-    if ! [ "$VINIX_PROD" = "no" ]; then
+    if [ "$PROD" = "true" ]; then
         PROD_FLAG="-prod"
     fi
-    VCROSS_COMPILER_NAME=${OS_TRIPLET}-gcc v $PROD_FLAG -gc none -os vinix .
+    VCROSS_COMPILER_NAME=${OS_TRIPLET}-gcc v -os vinix -gc none $PROD_FLAG -cflags "$TARGET_CFLAGS" -ldflags "$TARGET_LDFLAGS" .
+
+    set +x
 }
 
 package() {
