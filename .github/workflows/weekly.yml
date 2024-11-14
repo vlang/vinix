@@ -1,6 +1,8 @@
 name: Weekly Vinix rebuild
 
-on: [push]
+on:
+  schedule:
+    - cron: '0 0 * * 6'
 
 jobs:
   vinix-build:
