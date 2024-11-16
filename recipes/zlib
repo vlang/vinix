@@ -12,6 +12,10 @@ deps="core-libs"
 configure() {
         prefix="${prefix}" \
         CHOST="${OS_TRIPLET}" \
+        CFLAGS="${TARGET_CFLAGS}" \
+        CXXFLAGS="${TARGET_CXXFLAGS}" \
+        CPPFLAGS="${TARGET_CPPFLAGS}" \
+        LDFLAGS="${TARGET_LDFLAGS}" \
     ${source_dir}/configure
 }
 
