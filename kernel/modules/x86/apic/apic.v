@@ -7,6 +7,7 @@ module apic
 import x86.kio
 import x86.msr
 import x86.cpu.local as cpulocal
+import x86.cpu
 import time
 
 const lapic_reg_icr0 = 0x300
@@ -69,24 +70,38 @@ pub fn lapic_timer_stop() {
 pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
 	lapic_timer_stop()
 
-	samples := u64(0xfffff)
-
 	lapic_write(apic.lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
-	lapic_write(apic.lapic_reg_timer_div, 0)
+	lapic_write(apic.lapic_reg_timer_div, 0b1011) // Timer divisor = 1
 
-	time.pit_set_reload_value(0xffff)
+	cpuid_success, _, _, ecx, _ := cpu.cpuid(0x15, 0)
+	if cpuid_success == true && ecx != 0 {
+		cpu_local.lapic_timer_freq = ecx
+		return
+	}
 
-	initial_pit_tick := u64(time.pit_get_current_count())
+	mut samples := u64(16)
+	for {
+		time.pit_set_reload_value(0xfff0)
 
-	lapic_write(apic.lapic_reg_timer_initcnt, u32(samples))
+		initial_pit_tick := u64(time.pit_get_current_count())
 
-	for lapic_read(apic.lapic_reg_timer_curcnt) != 0 {}
+		lapic_write(apic.lapic_reg_timer_initcnt, u32(samples))
 
-	final_pit_tick := u64(time.pit_get_current_count())
+		for lapic_read(apic.lapic_reg_timer_curcnt) != 0 {}
 
-	pit_ticks := initial_pit_tick - final_pit_tick
+		final_pit_tick := u64(time.pit_get_current_count())
 
-	cpu_local.lapic_timer_freq = (samples / pit_ticks) * time.pit_dividend
+		pit_ticks := initial_pit_tick - final_pit_tick
+
+		if pit_ticks < 0x4000 {
+			samples *= 2
+			continue
+		}
+
+		cpu_local.lapic_timer_freq = (samples / pit_ticks) * time.pit_dividend
+
+		break
+	}
 
 	lapic_timer_stop()
 }
@@ -97,7 +112,7 @@ pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec u8, us u64) {
 	ticks := us * (cpu_local.lapic_timer_freq / 1000000)
 
 	lapic_write(apic.lapic_reg_timer, vec)
-	lapic_write(apic.lapic_reg_timer_div, 0)
+	lapic_write(apic.lapic_reg_timer_div, 0b1011)
 	lapic_write(apic.lapic_reg_timer_initcnt, u32(ticks))
 }
 
