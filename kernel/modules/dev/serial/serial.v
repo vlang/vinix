@@ -114,6 +114,7 @@ pub fn out(value u8) {
 }
 
 // Unlocked COM1 reporting.
+@[markused]
 pub fn panic_out(value u8) {
 	if value == `\n` {
 		for !is_transmiter_empty(serial.com1_port) {}

@@ -8,6 +8,7 @@ import klock
 import dev.serial
 import term
 
+@[markused]
 __global (
 	printf_lock klock.Lock
 	kprint_lock klock.Lock
