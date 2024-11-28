@@ -11,6 +11,7 @@ struct C.__file {}
 
 type FILE = C.__file
 
+@[markused]
 __global (
 	stdin  = &FILE(unsafe { nil })
 	stdout = &FILE(unsafe { nil })
