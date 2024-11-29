@@ -10,43 +10,37 @@ MAKEFLAGS += -rR
 # Change as needed.
 override OUTPUT := vinix
 
-# Convenience macro to reliably declare user overridable variables.
-override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval override $(1) := $(2)))
-
-# Destination directory on install (should always be empty by default).
-$(call USER_VARIABLE,DESTDIR,)
-
 # Install prefix; /usr/local is a good, standard default pick.
-$(call USER_VARIABLE,PREFIX,/usr/local)
+PREFIX := /usr/local
 
 # User controllable C compiler command.
-$(call USER_VARIABLE,CC,cc)
+CC := cc
 
 # User controllable archiver command.
-$(call USER_VARIABLE,AR,ar)
+AR := ar
 
 # User controllable linker command.
-$(call USER_VARIABLE,LD,ld)
+LD := ld
 
 # User controllable objdump command.
-$(call USER_VARIABLE,OBJDUMP,objdump)
+OBJDUMP := objdump
 
 # User controllable V command.
-$(call USER_VARIABLE,V,v)
+V := v
 
 # User controllable C flags.
-$(call USER_VARIABLE,CFLAGS,-g -O2 -pipe)
+CFLAGS := -g -O2 -pipe
 
 # User controllable C preprocessor flags. We set none by default.
-$(call USER_VARIABLE,CPPFLAGS,)
+CPPFLAGS :=
 
 # User controllable V flags. We set none by default.
-$(call USER_VARIABLE,VFLAGS,)
+VFLAGS :=
 
 # User controllable linker flags. We set none by default.
-$(call USER_VARIABLE,LDFLAGS,)
+LDFLAGS :=
 
-$(call USER_VARIABLE,PROD,)
+PROD :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
@@ -143,7 +137,7 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 all: bin/$(OUTPUT)
 
 # Link rules for building the C compiler runtime.
-cc-runtime-x86_64/cc-runtime.a: cc-runtime/*
+cc-runtime-x86_64/cc-runtime.a: GNUmakefile cc-runtime/*
 	rm -rf cc-runtime-x86_64
 	cp -r cc-runtime cc-runtime-x86_64
 	$(MAKE) -C cc-runtime-x86_64 -f cc-runtime.mk \
@@ -160,15 +154,15 @@ bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-ru
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c obj/symbol_table.c -o obj/symbol_table.c.o
 	$(LD) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a $(LDFLAGS) -o $@
 
-obj/blob.c.o: $(VFILES)
+# Include header dependencies.
+-include obj/blob.c.d $(HEADER_DEPS)
+
+obj/blob.c.o: GNUmakefile $(VFILES)
 	mkdir -p "$$(dirname $@)"
 	$(V) $(VFLAGS) -o obj/blob.c .
 	sed 's/call 0(/call *(/g' < obj/blob.c > obj/blob.c.tmp
 	mv obj/blob.c.tmp obj/blob.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
-
-# Include header dependencies.
--include $(HEADER_DEPS)
 
 # Compilation rules for *.c files.
 obj/%.c.o: c/%.c GNUmakefile

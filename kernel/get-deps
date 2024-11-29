@@ -72,12 +72,12 @@ clone_repo_commit \
 clone_repo_commit \
     https://github.com/osdev0/cc-runtime.git \
     cc-runtime \
-    13fe6383470f0e4982d926472448d6d3b80a851f
+    9c281448fe40498a6341d74f55c9af4f642c0b1d
 
 clone_repo_commit \
     https://github.com/mintsuki/flanterm.git \
     c/flanterm \
-    ef07a10cc38b34aa003d17be97a9f3542e275069
+    a6f6edd6631c01caab932a59dce97bbd5f0c72c8
 
 download_by_hash \
     https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.c \
