@@ -146,7 +146,7 @@ fn (mut s HDAStream) change_volume(percentage int) {
 					if one_percentage == 0 {
 						one_percentage = 1
 					}
-					mut value := one_percentage * percentage
+					mut value := one_percentage * u32(percentage)
 					if value > max_val {
 						value = max_val
 					}
