@@ -1,6 +1,6 @@
 # GNUmakefile: Main makefile of the project.
 # Code is governed by the GPL-2.0 license.
-# Copyright (C) 2021-2022 The Vinix authors.
+# Copyright (C) 2021-2024 The Vinix authors.
 
 QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio -smp 4
 
@@ -17,7 +17,7 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -Lo jinx https://github.com/mintsuki/jinx/raw/f459adb138abff6afc7936f5fd4bc9e24023a495/jinx
+	curl -Lo jinx https://github.com/mintsuki/jinx/raw/7a101a39eb061713f9c50ceafa1d713f35f17a3b/jinx
 	chmod +x jinx
 
 .PHONY: run-kvm
