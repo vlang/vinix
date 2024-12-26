@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=limine
-version=8.6.0
+version=8.6.1
 revision=1
 tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.gz"
-tarball_blake2b="a24a416f4d26f2716839e8e1b3852fab0bcbbf8e195f415450cff688d2c853486cfa1d484bb8f440cc494725342b4da02ef5354404469faead173869c99fc0c8"
+tarball_blake2b="1f43fdb978b8a11e1222fd7a38001002f4610a1119d9fccb83dcacc6d173526c10a00670a63c705abbfa03e618f784578c2bb950f44b30addd56e198a24a4052"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="mtools nasm"
 hostdeps="gcc autoconf automake libtool pkg-config"
