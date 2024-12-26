@@ -5,11 +5,8 @@ version=2.5.4
 tarball_url="https://ftp.gnu.org/gnu/libtool/libtool-${version}.tar.xz"
 tarball_blake2b="47de3c49a690d44d7ddd5e3b5e4090c91dc5fbb9c40fc4a3963e150fb7329326ee3e21b8c149974726171c4b0380028e0efc7a369c4f04357eea46f69852e1cc"
 hostdeps="autoconf automake"
-imagedeps="help2man git"
-allow_network="yes"
 
 prepare() {
-    git clone https://git.savannah.gnu.org/git/gnulib.git
-    git -C gnulib checkout ea58a72d4db3c4729e51de2633845ee381dd00b6
-    ./bootstrap --force --skip-git --skip-po --gnulib-srcdir=`pwd`/gnulib
+        LIBTOOLIZE=true \
+    autotools_recursive_regen
 }
