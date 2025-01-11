@@ -925,7 +925,7 @@ fn (mut c HDAController) wait_for_verb(index u8) HDAResponseDescriptor {
 	}
 }
 
-fn irq_handler(mut c &HDAController) {
+fn irq_handler(mut c HDAController) {
 	print('hda: using irq ${c.irq_vect:x}\n')
 
 	for {
