@@ -1,0 +1,29 @@
+#! /bin/sh
+
+name=file
+from_source=file
+revision=1
+imagedeps="file build-essential"
+
+configure() {
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
+    "${source_dir}"/configure \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-nls \
+        --disable-static
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+        strip_command=strip \
+    post_package_strip
+}

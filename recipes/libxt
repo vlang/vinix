@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxt
-version=1.3.0
+version=1.3.1
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXt-${version}.tar.gz"
-tarball_blake2b="3fc41d02802ccfda270030bcad73c0ca14c5b986d7353d8395339053a4d34352addda83fa2766af3d340c96416361de6a941688aff6e9b5bbc769a34af40bf53"
+tarball_blake2b="124036245a76703a5bb2379fd0b6605dc665cc58b9df657cfc3b0214574dcad6f46490ee76be8ea7d157afa84940c5ee8edaca37983ff6ec7deb572f51985703"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 imagedeps="build-essential"

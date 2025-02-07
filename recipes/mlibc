@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=mlibc
-version=c906cb5ade774bb43135054ba75530c15ddc94d8
+version=b4752328c6a2b5341dc95d8e3b5a890589cdb43a
 revision=1
-tarball_url="https://github.com/managarm/mlibc/archive/${version}.tar.gz"
-tarball_blake2b="a749e59c4ff8dff530987791da3f07c7cade98caaddc0369039da63eb5924ac1c7c6e99d22cd03732b57e4c5d08edf9808e9aa8e6c317e1b87601d0cd4d698c5"
+git_url="https://github.com/managarm/mlibc.git"
+commit=${version}
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config libgcc-binaries"
 builddeps="freestnd-c-hdrs freestnd-cxx-hdrs frigg"

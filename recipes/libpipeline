@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libpipeline
-version=1.5.7
+version=1.5.8
 revision=1
 tarball_url="https://download.savannah.nongnu.org/releases/libpipeline/libpipeline-${version}.tar.gz"
-tarball_blake2b="b8f9ff6886f8df12e3fefbfaa0cbcb1e07d7baaa8a1dfcf4bc01c17c6632b8c6a40e55395f1e4870ca391eefb1535ebbc3931fcdee51cf5f4293741e437a2f25"
+tarball_blake2b="1feb1a9493fd0850b4e3e446619e7e042bd97d8c0bbb3e13a91d90d6cde3ca2c17fb8a3ca256f65291dadc4d8703ad5d3a795839bf8280adc4547b3ec3d2da7d"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"

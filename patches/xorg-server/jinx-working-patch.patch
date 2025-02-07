@@ -312,24 +312,6 @@ index 61ee8e3..5d69a4e 100644
  #include <sys/utsname.h>
  #endif
  #if defined(SYSV) &&  defined(__i386__)
-diff --git xorg-server-clean/os/ospoll.c xorg-server-workdir/os/ospoll.c
-index c68aabc..a3217dc 100644
---- xorg-server-clean/os/ospoll.c
-+++ xorg-server-workdir/os/ospoll.c
-@@ -45,11 +45,13 @@
- #define HAVE_OSPOLL     1
- #endif
- 
-+/*
- #if !HAVE_OSPOLL && defined(HAVE_EPOLL_CREATE1)
- #include <sys/epoll.h>
- #define EPOLL           1
- #define HAVE_OSPOLL     1
- #endif
-+*/
- 
- #if !HAVE_OSPOLL
- #include "xserver_poll.h"
 diff --git xorg-server-clean/os/utils.c xorg-server-workdir/os/utils.c
 index 92a66e8..646722e 100644
 --- xorg-server-clean/os/utils.c

@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=xorg-xfontsel
+version=1.1.1
+revision=1
+tarball_url="https://www.x.org/pub/individual/app/xfontsel-${version}.tar.xz"
+tarball_blake2b="89d06f85cdd6b1a363711b6b59937d3f7ba6dad4ffd1c1fb2fa2604aa52e7d883726dc72d8d9d96060d7fedcd2c4ca20f30621d28d0174b1b66151705d899864"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libxmu libxaw libxt libx11"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure \
+        --with-appdefaultdir=/etc/X11/app-defaults
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

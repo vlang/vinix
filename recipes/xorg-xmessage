@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=xorg-xmessage
+version=1.0.7
+revision=1
+tarball_url="https://www.x.org/pub/individual/app/xmessage-${version}.tar.xz"
+tarball_blake2b="e2068bdaee66360296b0767b6f110bde5a3fd54b4213b2fc56929c56578ea589e38511011424d6c79da5b35821bf8772e951c299f3c4de093cf64efb8da015ef"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libxaw libx11 libxt"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure \
+        --with-appdefaultdir=/etc/X11/app-defaults
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

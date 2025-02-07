@@ -1,8 +1,8 @@
 diff --git xf86-video-fbdev-clean/configure.ac xf86-video-fbdev-workdir/configure.ac
-index 27778cd..67436db 100644
+index 19fa1c3..27aab06 100644
 --- xf86-video-fbdev-clean/configure.ac
 +++ xf86-video-fbdev-workdir/configure.ac
-@@ -86,6 +86,8 @@ AC_SUBST([moduledir])
+@@ -77,6 +77,8 @@ AC_SUBST([moduledir])
  DRIVER_NAME=fbdev
  AC_SUBST([DRIVER_NAME])
  
@@ -12,12 +12,12 @@ index 27778cd..67436db 100644
                  Makefile
                  src/Makefile
 diff --git xf86-video-fbdev-clean/src/Makefile.am xf86-video-fbdev-workdir/src/Makefile.am
-index fbe420e..1ef5f49 100644
+index cc0290f..2bae4e8 100644
 --- xf86-video-fbdev-clean/src/Makefile.am
 +++ xf86-video-fbdev-workdir/src/Makefile.am
 @@ -25,7 +25,7 @@
  # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
- AM_CFLAGS = @XORG_CFLAGS@
+ AM_CFLAGS = $(BASE_CFLAGS) $(XORG_CFLAGS)
  fbdev_drv_la_LTLIBRARIES = fbdev_drv.la
 -fbdev_drv_la_LDFLAGS = -module -avoid-version
 +fbdev_drv_la_LDFLAGS = -module -avoid-version -R@moduledir@ -L@SYSROOT@@moduledir@ -lfbdevhw -lshadow
@@ -25,10 +25,10 @@ index fbe420e..1ef5f49 100644
  
  fbdev_drv_la_SOURCES = \
 diff --git xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-workdir/src/fbdev.c
-index f25ef72..7facb9f 100644
+index 939c5b8..4ec1ccb 100644
 --- xf86-video-fbdev-clean/src/fbdev.c
 +++ xf86-video-fbdev-workdir/src/fbdev.c
-@@ -339,7 +339,7 @@ FBDevProbe(DriverPtr drv, int flags)
+@@ -331,7 +331,7 @@ FBDevProbe(DriverPtr drv, int flags)
  
  	    dev = xf86FindOptionValue(devSections[i]->options,"fbdev");
  	    if (devSections[i]->busID) {
@@ -37,7 +37,7 @@ index f25ef72..7facb9f 100644
  	        if (xf86ParsePciBusString(devSections[i]->busID,&bus,&device,
  					  &func)) {
  		    if (!xf86CheckPciSlot(bus,device,func))
-@@ -358,7 +358,7 @@ FBDevProbe(DriverPtr drv, int flags)
+@@ -343,7 +343,7 @@ FBDevProbe(DriverPtr drv, int flags)
  	    if (fbdevHWProbe(NULL,dev,NULL)) {
  		pScrn = NULL;
  		if (isPci) {
@@ -46,7 +46,7 @@ index f25ef72..7facb9f 100644
  		    /* XXX what about when there's no busID set? */
  		    int entity;
  		    
-@@ -444,6 +444,7 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
+@@ -419,6 +419,7 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
  	fPtr->pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
  
  #ifndef XSERVER_LIBPCIACCESS
@@ -54,7 +54,7 @@ index f25ef72..7facb9f 100644
  	pScrn->racMemFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
  	/* XXX Is this right?  Can probably remove RAC_FB */
  	pScrn->racIoFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
-@@ -454,6 +455,7 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
+@@ -429,6 +430,7 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
  		   "xf86RegisterResources() found resource conflicts\n");
  		return FALSE;
  	}
@@ -62,12 +62,3 @@ index f25ef72..7facb9f 100644
  #else
  	if (fPtr->pEnt->location.type == BUS_PCI)
  	    pci_dev = fPtr->pEnt->location.id.pci;
-@@ -1010,7 +1012,7 @@ FBDevScreenInit(SCREEN_INIT_ARGS_DECL)
- 	fPtr->CloseScreen = pScreen->CloseScreen;
- 	pScreen->CloseScreen = FBDevCloseScreen;
- 
--#if XV
-+#ifdef XV
- 	{
- 	    XF86VideoAdaptorPtr *ptr;
- 

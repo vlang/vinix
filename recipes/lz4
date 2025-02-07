@@ -1,19 +1,25 @@
 #! /bin/sh
 
 name=lz4
-version=1.9.4
+version=1.10.0
 revision=1
 tarball_url="https://github.com/lz4/lz4/releases/download/v${version}/lz4-${version}.tar.gz"
-tarball_blake2b="2289cdce36acd35283bf2f02ef4d6d8f4805563be6d5a3492f3d6ea7975fb6bd14e1ac2e505df9747776edf8bcf0da7ba4ae7084b150e3ec08a52a9885f92ad5"
-hostdeps="gcc"
+tarball_blake2b="c87a939b748b0449e4f1869579ebc109704aa89e8699b6029217f6786c351d1b0329580dd3a955fe509efb113f29aecbafc83084d65d153f5d43610f4840a819"
+imagedeps="meson ninja-build"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
+configure() {
+        meson_source_dir="${source_dir}"/build/meson \
+    meson_configure
+}
+
 build() {
-    cp -rp "${source_dir}"/. ./
-    make CC="${OS_TRIPLET}-gcc" AR="${OS_TRIPLET}-ar" -j${parallelism}
+    ninja -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" PREFIX="${prefix}" make install
+    DESTDIR="${dest_dir}" ninja install
+
     post_package_strip
 }

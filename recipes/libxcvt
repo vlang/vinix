@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxcvt
-version=0.1.2
+version=0.1.3
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libxcvt-${version}.tar.xz"
-tarball_blake2b="8a4803eb6790fd0ea1520fd31e335f7a363c3606e74837a959453be8819ce0d450af7bb651887a891aa657a5eeac3e4983041060fa5c87b1238c83354e425de7"
+tarball_blake2b="ae104743153077454ba8923d7b8bbe77d834e4795fd735de9e42617c3e49fd63052ad37214e7ab45e3f5884cd6038b60c0ff7c52f8a7892e0dea4630aaf0abad"
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs"

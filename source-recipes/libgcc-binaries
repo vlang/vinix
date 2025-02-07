@@ -1,6 +1,6 @@
 #! /bin/sh
 
 name=libgcc-binaries
-version=43f345757a39a98ca99727aabf84a00aaea6c658
-tarball_url="https://github.com/osdev0/libgcc-binaries/archive/${version}.tar.gz"
-tarball_blake2b="af8c440f25acf1d84245e751f9e1278243ec4ae0da30b834cd05215fb3bb739a4cb331f3eb860020ea5d6aee730ded55ba0a67cda7c23d0d916ab4f5d80c0716"
+version=6097e89af23cc4eec9f31a5a089f93c35e63edef
+git_url="https://github.com/osdev0/libgcc-binaries.git"
+commit=${version}

@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=ncurses
-version=6.5.20241026
+version=6.5
 revision=1
-tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5_20241026.tar.gz"
-tarball_blake2b="ffac6104ab76d69e22a54063e88cf5003745ac76e28603753f8daef9af55c5e57479412c699b117da113985ed67f4b6a99775b2c1e3c2b456cdd154264076cab"
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5.tar.gz"
+tarball_blake2b="7cfcd15062d1abe5f7ce3cb6f1c14dbd31b0fdd82fa4dd832dd75438a683eb39e6d99d78dbaeec908cfe27f4c02475eb4c9c8b822d3ef08cdcfbcd98d5112e00"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="build-essential ncurses-bin patchelf"
 hostdeps="gcc automake autoconf libtool pkg-config"

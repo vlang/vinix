@@ -1,0 +1,25 @@
+diff --git cmatrix-clean/CMakeLists.txt cmatrix-workdir/CMakeLists.txt
+index c5548b3..a036a13 100644
+--- cmatrix-clean/CMakeLists.txt
++++ cmatrix-workdir/CMakeLists.txt
+@@ -14,7 +14,7 @@ set(MKFONTDIR "/usr/bin/mkfontdir")
+ 
+ add_definitions(-DEXCLUDE_CONFIG_H)
+ add_definitions(-DVERSION="${VERSION}")
+-add_definitions(-DUSE_TIOCSTI)
++#add_definitions(-DUSE_TIOCSTI)
+ 
+ include(CheckIncludeFiles)
+ check_include_files("sys/ioctl.h" HAVE_SYS_IOCTL_H)
+diff --git cmatrix-clean/cmatrix.c cmatrix-workdir/cmatrix.c
+index 90284cb..eccc278 100644
+--- cmatrix-clean/cmatrix.c
++++ cmatrix-workdir/cmatrix.c
+@@ -32,6 +32,7 @@
+ #include <termios.h>
+ #include <signal.h>
+ #include <locale.h>
++#include <strings.h>
+ 
+ #ifndef EXCLUDE_CONFIG_H
+ #include "config.h"

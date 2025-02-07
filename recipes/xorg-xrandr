@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=xorg-xrandr
+version=1.5.3
+revision=1
+tarball_url="https://www.x.org/pub/individual/app/xrandr-${version}.tar.xz"
+tarball_blake2b="a2f253e0027976ef1bbf346361f6cfcfb575db36f134ec21e234f733fe7e70959d401c6b078a0d6d0297021aeff12eef57e4fdc865c86531784e439927385995"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libxmu libxaw libxt libx11 libxrandr"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure \
+        --with-appdefaultdir=/etc/X11/app-defaults
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

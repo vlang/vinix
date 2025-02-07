@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=binutils
-version=2.43.1
+version=2.44
 revision=1
-tarball_url="https://ftp.gnu.org/gnu/binutils/binutils-${version}.tar.xz"
-tarball_blake2b="c4cd765cea326cd00b5cfe306e2937d820603b42f07a714ceb1349d36ddba0d45c3e125599dadf290d97954035c381781067155600ed87066e494cb9c4b34b45"
+tarball_url="https://ftp.gnu.org/gnu/binutils/binutils-with-gold-${version}.tar.xz"
+tarball_blake2b="d749d5fbab2d6c2455bf9a988daa5c5ab9ecd9ecd63e4be022bc06483ebc996588c515ee4b931ff2ba7bcf43242068c0747e1cad50740523b2073df5a338614f"
 source_hostdeps="autoconf-2.69 automake libtool pkg-config"
 imagedeps="build-essential"
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"

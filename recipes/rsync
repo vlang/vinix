@@ -1,0 +1,34 @@
+#! /bin/sh
+
+name=rsync
+version=3.4.1
+revision=1
+tarball_url="https://www.samba.org/ftp/rsync/src/rsync-${version}.tar.gz"
+tarball_blake2b="79c1cad697547059ee241e20c26d7f97bed3ad062deb856d31a617fead333a2d9f62c7c47c1efaf70033dbc358fe547d034c35e8181abb51a1fc893557882bc7"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs lz4 openssl xxhash zlib zstd"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    cp -rp "${source_dir}"/. ./
+
+        configure_script_path=./configure \
+    autotools_configure \
+        --with-included-zlib=no
+
+    make reconfigure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

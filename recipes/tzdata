@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=tzdata
-version=2024b
+version=2025a
 revision=1
 tarball_url="https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz"
-tarball_blake2b="58b9eec497ee8e87e0ead06211600ec76bda58738c57adf78b412b7b9305000dc9af7ed232cd161ff05fcb659f5cc7e7fd0e59d0576bdc5d794ea0b592689921"
+tarball_blake2b="ea394e2369254858143d592912b6c2d691e2b2615a9d56461b78a335c33b89a6598a5b0ddbfac19ba5e8df91b67f7b7368dfcb861b7f2639bc6b92486c25f405"
 source_allow_network="yes"
 imagedeps="tzdata"
 hostdeps="gcc binutils"

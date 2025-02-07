@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=patch
+version=2.7.6
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/patch/patch-${version}.tar.xz"
+tarball_blake2b="e3dd2d155a94c39cb60eafc26677e84de14c3a6d5814dff69de091ded52f21862490970254297795f2c42a0c3203f7e88a8f65bb66968f8dfd6e066bf53f2dfb"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    rm -f "${dest_dir}${prefix}/lib/charset.alias"
+
+    post_package_strip
+}

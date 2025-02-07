@@ -1,0 +1,20 @@
+diff --git rsync-clean/lib/compat.c rsync-workdir/lib/compat.c
+index 513d79b..bbcbbc0 100644
+--- rsync-clean/lib/compat.c
++++ rsync-workdir/lib/compat.c
+@@ -156,11 +156,11 @@ char get_decimal_point(void)
+ /* some systems don't take the 2nd argument */
+ int sys_gettimeofday(struct timeval *tv)
+ {
+-#ifdef HAVE_GETTIMEOFDAY_TZ
++//#ifdef HAVE_GETTIMEOFDAY_TZ
+ 	return gettimeofday(tv, NULL);
+-#else
+-	return gettimeofday(tv);
+-#endif
++//#else
++//	return gettimeofday(tv);
++//#endif
+ }
+ 
+ /* Return the int64 number as a string.  If the human_flag arg is non-zero,

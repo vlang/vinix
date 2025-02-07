@@ -1,0 +1,31 @@
+#! /bin/sh
+
+name=m4
+version=1.4.19
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/m4/m4-${version}.tar.xz"
+tarball_blake2b="08694485a49c542761fa9a7db4d7609f4dfb08a5c6b785b57f2e14cf1f696c2a1c788bb5eb934e8159a632b63ff071dfe42511d0109d7b1828f46d33c8bf416a"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    cp -rp "${source_dir}"/. ./
+
+        configure_script_path=./configure \
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

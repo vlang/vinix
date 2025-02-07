@@ -1,8 +1,21 @@
-diff --git libjpeg-turbo-clean/example.c libjpeg-turbo-workdir/example.c
-index 78b658a..491b3f6 100644
---- libjpeg-turbo-clean/example.c
-+++ libjpeg-turbo-workdir/example.c
-@@ -31,6 +31,7 @@
+diff --git libjpeg-turbo-clean/src/cdjpeg.h libjpeg-turbo-workdir/src/cdjpeg.h
+index dbe54a0..15a9eb3 100644
+--- libjpeg-turbo-clean/src/cdjpeg.h
++++ libjpeg-turbo-workdir/src/cdjpeg.h
+@@ -19,7 +19,7 @@
+ #include "jpeglib.h"
+ #include "jerror.h"             /* get library error codes too */
+ #include "cderror.h"            /* get application-specific error codes */
+-
++#include <strings.h>
+ 
+ /*
+  * Object interface for cjpeg's source file decoding modules
+diff --git libjpeg-turbo-clean/src/example.c libjpeg-turbo-workdir/src/example.c
+index 9405611..8a6aa61 100644
+--- libjpeg-turbo-clean/src/example.c
++++ libjpeg-turbo-workdir/src/example.c
+@@ -32,6 +32,7 @@
  #include <stdio.h>
  #include <stdlib.h>
  #include <string.h>
@@ -10,10 +23,23 @@ index 78b658a..491b3f6 100644
  
  #ifdef _WIN32
  #define strcasecmp  stricmp
-diff --git libjpeg-turbo-clean/md5/md5cmp.c libjpeg-turbo-workdir/md5/md5cmp.c
+diff --git libjpeg-turbo-clean/src/jchuff.c libjpeg-turbo-workdir/src/jchuff.c
+index 8cdd5bd..84e535c 100644
+--- libjpeg-turbo-clean/src/jchuff.c
++++ libjpeg-turbo-workdir/src/jchuff.c
+@@ -36,7 +36,7 @@
+ #endif
+ #include <limits.h>
+ #include "jpeg_nbits.h"
+-
++#include <strings.h>
+ 
+ /* Expanded entropy encoder object for Huffman encoding.
+  *
+diff --git libjpeg-turbo-clean/src/md5/md5cmp.c libjpeg-turbo-workdir/src/md5/md5cmp.c
 index 42b94ce..0c8a44f 100644
---- libjpeg-turbo-clean/md5/md5cmp.c
-+++ libjpeg-turbo-workdir/md5/md5cmp.c
+--- libjpeg-turbo-clean/src/md5/md5cmp.c
++++ libjpeg-turbo-workdir/src/md5/md5cmp.c
 @@ -28,6 +28,7 @@
  
  #include <stdio.h>
@@ -22,51 +48,27 @@ index 42b94ce..0c8a44f 100644
  #include "./md5.h"
  #include "../tjutil.h"
  
-diff --git libjpeg-turbo-clean/tjbench.c libjpeg-turbo-workdir/tjbench.c
-index bedc94b..d666aec 100644
---- libjpeg-turbo-clean/tjbench.c
-+++ libjpeg-turbo-workdir/tjbench.c
-@@ -33,6 +33,7 @@
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
+diff --git libjpeg-turbo-clean/src/turbojpeg.c libjpeg-turbo-workdir/src/turbojpeg.c
+index 389aea5..876a7dd 100644
+--- libjpeg-turbo-clean/src/turbojpeg.c
++++ libjpeg-turbo-workdir/src/turbojpeg.c
+@@ -30,6 +30,7 @@
+ /* TurboJPEG/LJT:  this implements the TurboJPEG API using libjpeg or
+    libjpeg-turbo */
+ 
 +#include <strings.h>
  #include <ctype.h>
- #include <math.h>
- #include <errno.h>
-diff --git libjpeg-turbo-clean/tjexample.c libjpeg-turbo-workdir/tjexample.c
-index 1edf30f..0c67cc0 100644
---- libjpeg-turbo-clean/tjexample.c
-+++ libjpeg-turbo-workdir/tjexample.c
-@@ -39,6 +39,7 @@
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
-+#include <strings.h>
- #include <errno.h>
- #include <turbojpeg.h>
- 
-diff --git libjpeg-turbo-clean/tjunittest.c libjpeg-turbo-workdir/tjunittest.c
-index dcd5006..9a033b7 100644
---- libjpeg-turbo-clean/tjunittest.c
-+++ libjpeg-turbo-workdir/tjunittest.c
-@@ -38,6 +38,7 @@
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
-+#include <strings.h>
  #include <limits.h>
- #include <errno.h>
- #include "tjutil.h"
-diff --git libjpeg-turbo-clean/turbojpeg.c libjpeg-turbo-workdir/turbojpeg.c
-index b9fe6e9..75b62c8 100644
---- libjpeg-turbo-clean/turbojpeg.c
-+++ libjpeg-turbo-workdir/turbojpeg.c
-@@ -38,6 +38,7 @@
- #include <jerror.h>
- #include <setjmp.h>
- #include <errno.h>
+ #if !defined(_MSC_VER) || _MSC_VER > 1600
+diff --git libjpeg-turbo-clean/src/turbojpeg.h libjpeg-turbo-workdir/src/turbojpeg.h
+index 274eb7a..d97794d 100644
+--- libjpeg-turbo-clean/src/turbojpeg.h
++++ libjpeg-turbo-workdir/src/turbojpeg.h
+@@ -31,6 +31,7 @@
+ #define __TURBOJPEG_H__
+ 
+ #include <stddef.h>
 +#include <strings.h>
- #include "./turbojpeg.h"
- #include "./tjutil.h"
- #include "transupp.h"
+ 
+ #if defined(_WIN32) && defined(DLLDEFINE)
+ #define DLLEXPORT  __declspec(dllexport)

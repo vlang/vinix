@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=pango
-version=1.54.0
+version=1.56.1
 revision=1
-tarball_url="https://download.gnome.org/sources/pango/1.54/pango-${version}.tar.xz"
-tarball_blake2b="92c389ab3f21631c245575e30804ffee6fef7b60bc6acdf08159aa325d878cf335203267720aec9143ea2a4e590578424cd64011f73da22e1b0beca85e85a276"
+tarball_url="https://download.gnome.org/sources/pango/1.56/pango-${version}.tar.xz"
+tarball_blake2b="a22d8113ecbe1f076ff15ea9fa231897bc1275c45c8c9ba74635ec0b030d7e59acbdd25d52ff9d5a9ef83e1e4d8a56cf84ae3fdc19b028ff6ef1017eb82924c3"
 imagedeps="meson ninja-build libglib2.0-dev"
 hostdeps="gcc pkg-config"
 deps="core-libs glib fontconfig freetype2 fribidi cairo libx11 harfbuzz libxft"

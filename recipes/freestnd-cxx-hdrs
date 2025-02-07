@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=freestnd-cxx-hdrs
-version=674dcb02b37d55c77f7171c5c46efd5cd3dc0f5f
+version=1cc6d4665e1e0ce4408c94616c8c4de4c19b9968
 revision=1
-tarball_url="https://github.com/osdev0/freestnd-cxx-hdrs/archive/${version}.tar.gz"
-tarball_blake2b="83b0c4ec59bd27a65feaf2238e5267062ef0360d07625a8d9412874b0836dbe8bfd772ce06cf1f7f52b5447aa60af34d210f1f1fd0e76f8aa2465ce06978b195"
+git_url="https://github.com/osdev0/freestnd-cxx-hdrs.git"
+commit=${version}
 
 build() {
     cp -rp "${source_dir}"/. ./

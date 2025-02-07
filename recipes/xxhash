@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=xxhash
+version=0.8.3
+revision=1
+tarball_url="https://github.com/Cyan4973/xxHash/archive/refs/tags/v${version}.tar.gz"
+tarball_blake2b="75923c7c5df3490062791fa02ccddfb7281b3646e2b3e4b4a0c0d611c339e07c8d9cb656777fd0fcec9cda484f7b33edf080116bb011f70d6b8299cda63afa4e"
+hostdeps="gcc"
+deps="core-libs"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+
+        CC="${OS_TRIPLET}-gcc" \
+        AR="${OS_TRIPLET}-ar" \
+        CFLAGS="${TARGET_CFLAGS}" \
+        CXXFLAGS="${TARGET_CXXFLAGS}" \
+        CPPFLAGS="${TARGET_CPPFLAGS}" \
+        LDFLAGS="${TARGET_LDFLAGS}" \
+    make \
+        -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" PREFIX="${prefix}" make install
+
+    rm -fv "${dest_dir}${prefix}"/lib/libxxhash.a
+
+    post_package_strip
+}

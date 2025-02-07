@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libsm
-version=1.2.4
+version=1.2.5
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libSM-${version}.tar.gz"
-tarball_blake2b="9f05c36f933ddbe66e06a96c7b9f5c23a2b5218da724a838b42ef4b798195c24a2be13e1d5c61bccf7660a4880f78da8452fa93a668f483ce808ce840c2cfcfb"
+tarball_blake2b="fd1d3e94d342f27a33402aab266de7bd0c4c0ce39cbd9c5e216b7c4dd2a2f34a5a0329a231b9ae3417660db8d2da14a3669d5b344c682dc86343bd44071ade85"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros xtrans"
 hostdeps="gcc autoconf automake libtool pkg-config"

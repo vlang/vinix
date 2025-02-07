@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=xz
-version=5.6.3
+version=5.6.4
 revision=1
 tarball_url="https://github.com/tukaani-project/xz/releases/download/v${version}/xz-${version}.tar.xz"
-tarball_blake2b="7c75a334abdec370d03bea1d07f9211069633e2851e304f189b6b316d9c8363350849404cff318310c3d4a6d2ec6439e64e074f40d7ad5f02ff101757de27f99"
+tarball_blake2b="777bc6b4f1510615bedac1db8bfea19e80b7652906372739fb3ed7c7905bd0aed6f78bb1ca98f4d690f0b2fc03002c16a280359dde67c655ecb9324f8d384551"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"

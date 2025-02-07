@@ -1,0 +1,24 @@
+#! /bin/sh
+
+name=lua
+version=5.4.7
+revision=1
+tarball_url="https://github.com/lua/lua/archive/refs/tags/v${version}.tar.gz"
+tarball_blake2b="9e4f589e78ded6d0665bf38c94080dc642762fc5b91fa47d6bd440a241e86000b6a82f9c4175b5ec509d01f753cc4a257c70c6219f41c1527742615425b9f876"
+imagedeps="git nasm"
+hostdeps="gcc pkg-config"
+deps="core-libs readline"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+    sed -i 's|^#define LUA_ROOT "/usr/local/"$|#define LUA_ROOT "/usr/"|' luaconf.h
+
+    make MYLIBS="-lreadline -lncursesw -ltinfow" CFLAGS="$TARGET_CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE" MYLDFLAGS="$TARGET_LDFLAGS" CC=${OS_TRIPLET}-gcc AR="${OS_TRIPLET}-ar rcu" RANLIB=${OS_TRIPLET}-ranlib -j${parallelism}
+}
+
+package() {
+    mkdir -p "${dest_dir}${prefix}"/bin
+    cp lua "${dest_dir}${prefix}"/bin/
+
+    post_package_strip
+}

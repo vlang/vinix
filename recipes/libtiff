@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libtiff
-version=4.6.0
+version=4.7.0
 revision=1
 tarball_url="https://download.osgeo.org/libtiff/tiff-${version}.tar.xz"
-tarball_blake2b="3b508b02b0a536c5bc8e67fe4c1b09ae9c830252786ef4764202c14d673d1ef9634694de7a5893a3551dec684d00bad9d0442c7fea7bcd09238b9960d443cf62"
+tarball_blake2b="a5df7f3ae71821a13ff5a31db012191dd1b022b1c87fe81f90fd4b4a1349b7aa15d7b336d5fa8ac9e84edcfac5fe46214d9ea54790cb037438c6a5334980c11e"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freeglut libjpeg-turbo zlib zstd xz"

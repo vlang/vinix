@@ -1,0 +1,31 @@
+#! /bin/sh
+
+name=bc
+version=1.08.1
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/bc/bc-${version}.tar.gz"
+tarball_blake2b="51d1bac17f31bb7dbb044c28752cccfe59dd5bcb78a2c3bfa66a345577ea3aee37fef8d7efae83a57e41ae77d7317008f3682dfbc3165c76888770636deead01"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs mpfr gmp readline"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    cp -rp "${source_dir}"/. ./
+
+        configure_script_path=./configure \
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" PREFIX="${prefix}" make install
+
+    post_package_strip
+}

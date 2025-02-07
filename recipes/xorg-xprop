@@ -1,0 +1,29 @@
+#! /bin/sh
+
+name=xorg-xprop
+version=1.2.8
+revision=1
+tarball_url="https://www.x.org/pub/individual/app/xprop-${version}.tar.gz"
+tarball_blake2b="3e5d8a4a9164d745cc881af296bec57a2c1320a194888c07aecb53e1facd13e0b1179b940d70af95603934756b5a0426d450ac55706d56f0b8053d2174e74631"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libx11"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

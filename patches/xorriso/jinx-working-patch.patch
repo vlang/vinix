@@ -1,0 +1,12 @@
+diff --git xorriso-clean/libjte/checksum.c xorriso-workdir/libjte/checksum.c
+index 2ecf34f..83719ae 100644
+--- xorriso-clean/libjte/checksum.c
++++ xorriso-workdir/libjte/checksum.c
+@@ -16,6 +16,7 @@
+ #include <regex.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <strings.h>
+ #include <errno.h>
+ #include <sys/stat.h>
+ 

@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=xorg-xset
+version=1.2.5
+revision=1
+tarball_url="https://www.x.org/pub/individual/app/xset-${version}.tar.xz"
+tarball_blake2b="81d93de0bd2a5f0d76937109a8f16f5e1d5074ec5209ea373d9f4b3f5064ac15a9e3c9cdc850cbe6103469fcdfc4d69df033ce7bbf80e22b507d3664e49911a9"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libxmu"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure \
+        --without-fontcache
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

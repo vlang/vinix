@@ -1,0 +1,24 @@
+#! /bin/sh
+
+name=tree
+version=2.2.1
+revision=1
+tarball_url="https://gitlab.com/OldManProgrammer/unix-tree/-/archive/${version}/unix-tree-${version}.tar.gz"
+tarball_blake2b="7c6bc3249634320aaef8be0c6fd9143faf3c5b6c507c7c3d724efd9e8a8ce8957362665312829c6fdcae7bbc4670b194e45a1f51efc8bb00fcc3237b21ffd058"
+hostdeps="gcc"
+deps="core-libs"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+        CC=${OS_TRIPLET}-gcc \
+        CFLAGS="${TARGET_CFLAGS}" \
+        CPPFLAGS="${TARGET_CPPFLAGS}" \
+        LDFLAGS="${TARGET_LDFLAGS}" \
+    make \
+        -j${parallelism}
+}
+
+package() {
+    make PREFIX="${dest_dir}${prefix}" install
+    post_package_strip
+}

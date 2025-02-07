@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxfont2
-version=2.0.6
+version=2.0.7
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXfont2-${version}.tar.gz"
-tarball_blake2b="1a871c6d7c81beadf1c9a5e864a2df186b6429337e86f4fee0c8969d158cf284f10019f69a2f7e0c9298d9f6fa842d5315932152b5e70cb068c5530360e578a0"
+tarball_blake2b="3a82122366751ee96ba3e7ce020a9e5845527539b787897c664d4dc2977772beab7f04d3890a10ee2697f0ae5b5d6838d1fe62cf1c7942799d6a8210d2e82b57"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros xtrans"
 hostdeps="gcc autoconf automake libtool pkg-config"

@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxcursor
-version=1.2.2
+version=1.2.3
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXcursor-${version}.tar.gz"
-tarball_blake2b="10411b272290763ce1884d39d850ef0e9e30f716ca29ac4290e2bdb45d7cba88b58a716e79c092d7e43d20ce9e13b45b40c646d92f4179df0e7067bf50ab8b8d"
+tarball_blake2b="6f6df48d861b7ffa88dab6bdba850db46a5cbdfc080150365de2ae98bdb79a208a4d0caae4442fcc6ff81334d3d67c5ae16eca2aa627af705d0bc47db32151bb"
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

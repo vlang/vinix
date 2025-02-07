@@ -1,5 +1,5 @@
 diff --git mesa-clean/include/drm-uapi/drm.h mesa-workdir/include/drm-uapi/drm.h
-index 0254024..c2ffd35 100644
+index 4e4f7c2..d41c0b5 100644
 --- mesa-clean/include/drm-uapi/drm.h
 +++ mesa-workdir/include/drm-uapi/drm.h
 @@ -44,7 +44,7 @@ typedef unsigned int drm_handle_t;
@@ -12,32 +12,32 @@ index 0254024..c2ffd35 100644
  typedef int8_t   __s8;
  typedef uint8_t  __u8;
 diff --git mesa-clean/meson.build mesa-workdir/meson.build
-index 2902c10..0717a3a 100644
+index de9c9af..98e14de 100644
 --- mesa-clean/meson.build
 +++ mesa-workdir/meson.build
-@@ -959,7 +959,7 @@ if cc.has_function('fmemopen')
+@@ -999,7 +999,7 @@ if cc.has_function('fmemopen')
  endif
  
  # TODO: this is very incomplete
--if ['linux', 'cygwin', 'gnu', 'freebsd', 'gnu/kfreebsd', 'haiku', 'android'].contains(host_machine.system())
-+if ['linux', 'cygwin', 'gnu', 'freebsd', 'gnu/kfreebsd', 'haiku', 'android', 'vinix'].contains(host_machine.system())
+-if ['linux', 'cygwin', 'gnu', 'freebsd', 'gnu/kfreebsd', 'haiku', 'android', 'managarm'].contains(host_machine.system())
++if ['linux', 'cygwin', 'gnu', 'freebsd', 'gnu/kfreebsd', 'haiku', 'android', 'managarm', 'vinix'].contains(host_machine.system())
    pre_args += '-D_GNU_SOURCE'
  elif host_machine.system() == 'sunos'
    pre_args += '-D__EXTENSIONS__'
 diff --git mesa-clean/src/compiler/spirv/spirv_to_nir.c mesa-workdir/src/compiler/spirv/spirv_to_nir.c
-index 8e38e95..65d6341 100644
+index b4dd47a..a649aff 100644
 --- mesa-clean/src/compiler/spirv/spirv_to_nir.c
 +++ mesa-workdir/src/compiler/spirv/spirv_to_nir.c
-@@ -39,6 +39,7 @@
- #include "util/u_debug.h"
+@@ -40,6 +40,7 @@
+ #include "util/mesa-blake3.h"
  
  #include <stdio.h>
 +#include <strings.h>
  
- #ifndef NDEBUG
- uint32_t mesa_spirv_debug = 0;
+ /* Table of all implemented capabilities.  These are the capabilities that are
+  * implemented in the spirv_to_nir, not what the device supports.
 diff --git mesa-clean/src/egl/main/egllog.c mesa-workdir/src/egl/main/egllog.c
-index 678bb75..016a70d 100644
+index 0de00b2..59d8fdf 100644
 --- mesa-clean/src/egl/main/egllog.c
 +++ mesa-workdir/src/egl/main/egllog.c
 @@ -37,6 +37,7 @@
@@ -47,12 +47,12 @@ index 678bb75..016a70d 100644
 +#include <strings.h>
  #include "c11/threads.h"
  #include "util/macros.h"
- #include "util/simple_mtx.h"
+ #include "util/os_misc.h"
 diff --git mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
-index 5c5a6cd..ae6c23d 100644
+index 5a4796e..6ee584c 100644
 --- mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c
 +++ mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
-@@ -1152,7 +1152,7 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
+@@ -1738,7 +1738,7 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
     default:
        break;
     }
@@ -62,23 +62,24 @@ index 5c5a6cd..ae6c23d 100644
     return false;
  }
 diff --git mesa-clean/src/util/detect_os.h mesa-workdir/src/util/detect_os.h
-index 6506948..c01cf1b 100644
+index 86286df..802814f 100644
 --- mesa-clean/src/util/detect_os.h
 +++ mesa-workdir/src/util/detect_os.h
-@@ -28,6 +28,11 @@
+@@ -28,6 +28,12 @@
  #define DETECT_OS_ANDROID 1
  #endif
  
 +#if defined(__vinix__)
 +#define DETECT_OS_VINIX 1
 +#define DETECT_OS_UNIX 1
++#define DETECT_OS_POSIX 1
 +#endif
 +
  #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
  #define DETECT_OS_FREEBSD 1
  #define DETECT_OS_BSD 1
-@@ -128,4 +133,8 @@
- #define DETECT_OS_WINDOWS 0
+@@ -147,4 +153,8 @@
+ #define DETECT_OS_MANAGARM 0
  #endif
  
 +#ifndef DETECT_OS_VINIX
@@ -86,56 +87,43 @@ index 6506948..c01cf1b 100644
 +#endif
 +
  #endif /* DETECT_OS_H */
-diff --git mesa-clean/src/util/futex.h mesa-workdir/src/util/futex.h
-index c397507..995c1e2 100644
---- mesa-clean/src/util/futex.h
-+++ mesa-workdir/src/util/futex.h
-@@ -24,7 +24,7 @@
- #ifndef UTIL_FUTEX_H
- #define UTIL_FUTEX_H
- 
--#if defined(HAVE_LINUX_FUTEX_H)
-+#if defined(HAVE_LINUX_FUTEX_H) && defined(__linux__)
- #define UTIL_FUTEX_SUPPORTED 1
- #elif defined(__FreeBSD__)
- #define UTIL_FUTEX_SUPPORTED 1
 diff --git mesa-clean/src/util/os_misc.c mesa-workdir/src/util/os_misc.c
-index c378a9e..528dc7c 100644
+index 4b79166..09c16b0 100644
 --- mesa-clean/src/util/os_misc.c
 +++ mesa-workdir/src/util/os_misc.c
 @@ -57,7 +57,7 @@
  #  include <unistd.h>
  #  include <log/log.h>
  #  include <cutils/properties.h>
--#elif DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD
-+#elif DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_VINIX
+-#elif DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_MANAGARM
++#elif DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_MANAGARM || DETECT_OS_VINIX
  #  include <unistd.h>
  #elif DETECT_OS_OPENBSD || DETECT_OS_FREEBSD
  #  include <sys/resource.h>
-@@ -248,7 +248,7 @@ exit_mutex:
+@@ -284,7 +284,7 @@ exit_mutex:
  bool
  os_get_total_physical_memory(uint64_t *size)
  {
--#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD
-+#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_VINIX
+-#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_MANAGARM
++#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_MANAGARM || DETECT_OS_VINIX
     const long phys_pages = sysconf(_SC_PHYS_PAGES);
     const long page_size = sysconf(_SC_PAGE_SIZE);
  
 diff --git mesa-clean/src/util/os_time.c mesa-workdir/src/util/os_time.c
-index 7fb3134..85455c5 100644
+index da8ad7a..aa9aca4 100644
 --- mesa-clean/src/util/os_time.c
 +++ mesa-workdir/src/util/os_time.c
 @@ -65,7 +65,7 @@ os_time_get_nano(void)
  void
  os_time_sleep(int64_t usecs)
  {
--#if DETECT_OS_LINUX
-+#if DETECT_OS_LINUX || DETECT_OS_VINIX
+-#if DETECT_OS_LINUX || DETECT_OS_MANAGARM || DETECT_OS_FUCHSIA
++#if DETECT_OS_LINUX || DETECT_OS_MANAGARM || DETECT_OS_VINIX || DETECT_OS_FUCHSIA
     struct timespec time;
     time.tv_sec = usecs / 1000000;
     time.tv_nsec = (usecs % 1000000) * 1000;
 diff --git mesa-clean/src/util/u_debug.c mesa-workdir/src/util/u_debug.c
-index 61f628e..e390606 100644
+index 79934e9..1a740b4 100644
 --- mesa-clean/src/util/u_debug.c
 +++ mesa-workdir/src/util/u_debug.c
 @@ -32,6 +32,7 @@
@@ -147,15 +135,15 @@ index 61f628e..e390606 100644
  #include <limits.h> /* CHAR_BIT */
  #include <ctype.h> /* isalnum */
 diff --git mesa-clean/src/util/u_thread.c mesa-workdir/src/util/u_thread.c
-index 55b6b68..680935b 100644
+index 255c5f6..7c20f8d 100644
 --- mesa-clean/src/util/u_thread.c
 +++ mesa-workdir/src/util/u_thread.c
 @@ -75,7 +75,7 @@ int u_thread_create(thrd_t *thrd, int (*routine)(void *), void *param)
  void u_thread_setname( const char *name )
  {
  #if defined(HAVE_PTHREAD)
--#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || defined(__GLIBC__)
-+#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || defined(__GLIBC__) || DETECT_OS_VINIX
+-#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || defined(__GLIBC__) || DETECT_OS_MANAGARM || DETECT_OS_FUCHSIA
++#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || defined(__GLIBC__) || DETECT_OS_MANAGARM || DETECT_OS_VINIX || DETECT_OS_FUCHSIA
     int ret = pthread_setname_np(pthread_self(), name);
     if (ret == ERANGE) {
        char buf[16];
@@ -163,8 +151,8 @@ index 55b6b68..680935b 100644
  int64_t
  util_thread_get_time_nano(thrd_t thread)
  {
--#if defined(HAVE_PTHREAD) && !defined(__APPLE__) && !defined(__HAIKU__)
-+#if defined(HAVE_PTHREAD) && !defined(__APPLE__) && !defined(__HAIKU__) && !defined(__vinix__)
+-#if defined(HAVE_PTHREAD) && !defined(__APPLE__) && !defined(__HAIKU__) && !defined(__managarm__)
++#if defined(HAVE_PTHREAD) && !defined(__APPLE__) && !defined(__HAIKU__) && !defined(__managarm__) && !defined(__vinix__)
     struct timespec ts;
     clockid_t cid;
  

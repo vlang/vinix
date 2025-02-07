@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxtst
-version=1.2.4
+version=1.2.5
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXtst-${version}.tar.gz"
-tarball_blake2b="4d878d097bfd09857bf540732f4239dfb3a6e8773f153cf2fd38ab8e0500763c7bc974cc1bb5525e976a36bea7a9c1dd92934210be40b0fb1b1c181343bd20c5"
+tarball_blake2b="5a8569f8818dce0afccba3efac34a54c967e90350deba61fd52c061309105e17481b574d70b609243956447c1bffdff67892d6782206412310ef134ccb6f6736"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=xorg-server
-version=21.1.14
+version=21.1.15
 revision=1
 tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
-tarball_blake2b="b64ff9bbcd1d1c632b588800acb1531d6295a52347294d323d684a7149a4f803fb38357a102d715525511c8bb8554daf2e71c28149ccb650b1c7c1990351f53e"
+tarball_blake2b="a7d5df70a4af98b903a306850a169879cf083b2c811f6e75e1e916f85441214541f7c9fa0e0089c4bf08c67597166d97ea194c6a0a511948568120e579d1104f"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xtrans xorg-font-util xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

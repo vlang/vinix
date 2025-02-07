@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=frigg
-version=922d38debf0b721f14448901eef80525c5b4bed9
+version=307e9361acb49e7d9e5e7f62a1b48de66974d8f4
 revision=1
-tarball_url="https://github.com/managarm/frigg/archive/${version}.tar.gz"
-tarball_blake2b="d0496dedd43d41b92a335e4190499ca085f3d75b9b119c1ab545b87fb2c1d5461168dc2c6adaf9d4958484b45a7cabdeda2fecad062a2a9ade2f3ecd740e36f8"
+git_url="https://github.com/managarm/frigg.git"
+commit=${version}
 imagedeps="meson ninja-build"
 hostdeps="pkg-config"
 

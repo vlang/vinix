@@ -1,0 +1,24 @@
+#! /bin/sh
+
+name=cmatrix
+version=2.0
+revision=1
+tarball_url="https://github.com/abishekvashok/cmatrix/releases/download/v${version}/cmatrix-v${version}-Butterscotch.tar"
+tarball_blake2b="4eec8df0021da2ee5f4e46cd8de30bbd52fe81073aaa4dbaf0f111b6c44be2f4fd7b640e842fabfe9bb0fe21a76cdd926fd8535086c6b6d6c0073de6f06174ae"
+imagedeps="build-essential cmake ninja-build"
+hostdeps="gcc pkg-config"
+deps="core-libs ncurses"
+
+configure() {
+    cmake_configure
+}
+
+build() {
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}

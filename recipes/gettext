@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=gettext
-version=0.22.5
+version=0.23.1
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/gettext/gettext-${version}.tar.xz"
-tarball_blake2b="18c383518f5a78b5c04cf76de976524da2a87a892a30d6386778bb4c7dd526ffc3f14f484906c5d3a513b7caf76ea560e53962b325e552182d6940055d798f24"
+tarball_blake2b="08d10340f3d855a87a96594c6f2dcf72925394f02e86235090f8d272e0a27ce32e57a0fbaed61aaf61d7328ff30be076dccaecaa13832d8db3ec0a51786780b9"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"

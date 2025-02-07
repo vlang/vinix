@@ -1,0 +1,28 @@
+#! /bin/sh
+
+name=file
+version=5.46
+revision=1
+tarball_url="https://astron.com/pub/file/file-${version}.tar.gz"
+tarball_blake2b="2b1df136f01c253cc490b483c644403da0674692ef97ef9e1239878328cfb8ce2bc418c14626145719c69acab00d56b63b5340a2b56c276c996b1e6ad1bfe9b6"
+source_hostdeps="automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config file"
+deps="core-libs bzip2 xz zlib zstd"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

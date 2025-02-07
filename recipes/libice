@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libice
-version=1.1.1
+version=1.1.2
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libICE-${version}.tar.gz"
-tarball_blake2b="1acb1cdb5b0fd49451b6e4498061c16fff35711a19a5da2c2de0046b6b3ed6bd6bdccf8d45f7adcdb7f2f685245176488f149b41087e562945754088f18c220b"
+tarball_blake2b="4715895d10490c526d72032653f52b04d3c3d8f1b6be9fb2ff65a081c5dfccbaa14932588e24a16c8c48e6cc6b348c53f8ce1ccba82e8ca0bbf645b0f82123cd"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xorg-util-macros xtrans"
 hostdeps="gcc autoconf automake libtool pkg-config"

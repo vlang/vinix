@@ -24,15 +24,6 @@ index 9e97ef1..c089594 100644
  
  static char *
  get_mtab_monitor_file (void)
-@@ -1502,7 +1502,7 @@ _g_get_unix_mount_points (void)
- }
- 
- /* QNX {{{2 */
--#elif defined (HAVE_QNX)
-+#elif defined (HAVE_QNX) || defined (__vinix__)
- static GList *
- _g_get_unix_mount_points (void)
- {
 diff --git glib-clean/glib/giounix.c glib-workdir/glib/giounix.c
 index 9d9492b..081a1fe 100644
 --- glib-clean/glib/giounix.c

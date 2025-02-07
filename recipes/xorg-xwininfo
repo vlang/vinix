@@ -1,0 +1,29 @@
+#! /bin/sh
+
+name=xorg-xwininfo
+version=1.1.6
+revision=1
+tarball_url="https://www.x.org/pub/individual/app/xwininfo-${version}.tar.xz"
+tarball_blake2b="d23d175d6083d95ef5f5df79fb1c88b4d92c618dbec90ee3dc4ae07fe2c5600b9c4dd00dcf3a32b512b51ecf9c6a11e5e7a5bb398f2cb479bdea05b076e5fd73"
+source_hostdeps="autoconf automake libtool pkg-config"
+source_deps="xorg-util-macros gettext"
+hostdeps="gcc autoconf automake libtool pkg-config"
+builddeps="libx11"
+deps="core-libs libxcb"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    make DESTDIR=${dest_dir} install
+    post_package_strip
+}

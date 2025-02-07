@@ -1,34 +1,29 @@
 #! /bin/sh
 
 name=mesa-demos
-version=8.5.0
+version=9.0.0
 revision=1
-tarball_url="https://archive.mesa3d.org/demos/${version}/mesa-demos-${version}.tar.gz"
-tarball_blake2b="82ded42d845449d925809046d605a30d3f66b5aba57716fdfee99611750001a80aebbda5c66099c3ee9525b655d86e8cf4aeb43adbc939182705ba8fa2ab9c92"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+tarball_url="https://archive.mesa3d.org/demos/mesa-demos-${version}.tar.xz"
+tarball_blake2b="426211886344e88616670f0da8c71385e0ab86fd7dab60c7a477b165f33d2f7bd5fd9297f1f67c78e60fed5c98ab8851c1bd4ae92a6b0b486fd158196b109eb0"
+imagedeps="meson ninja-build"
+hostdeps="gcc pkg-config"
 deps="core-libs freetype2 mesa glu libx11 libxext"
 
-prepare() {
-    autotools_recursive_regen
-}
-
 configure() {
-    autotools_configure \
-        --enable-autotools \
-        --disable-gles1 \
-        --disable-osmesa \
-        --disable-libdrm \
-        --with-system-data-files \
-        --with-glut=no
+    meson_configure \
+        -Dgles1=disabled \
+        -Dosmesa=disabled \
+        -Dlibdrm=disabled \
+        -Dx11=enabled \
+        -Dwith-system-data-files=true
 }
 
 build() {
-    make -j${parallelism}
+    ninja -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install
+    DESTDIR="${dest_dir}" ninja install
 
     post_package_strip
 }

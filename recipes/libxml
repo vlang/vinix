@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxml
-version=2.12.8
+version=2.13.5
 revision=1
-tarball_url="https://download.gnome.org/sources/libxml2/2.12/libxml2-${version}.tar.xz"
-tarball_blake2b="d26fe61e913e73c923eb8140a9080d6b70078ce45e94fe61d1ca1b8919d5b86feb7f14156f5a8b06ea06a03a96a242ce3a32e8d61169cfa8bde587888438627b"
+tarball_url="https://download.gnome.org/sources/libxml2/2.13/libxml2-${version}.tar.xz"
+tarball_blake2b="46c280630638e2c8009c593bbbcf90ccbfffe9ddcc99987c4d91c2223043759f2b4d6511b31b2357c5250ac3b40d96ef05c17b4d2adc61972665f8a0d899dfe8"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib icu readline"
