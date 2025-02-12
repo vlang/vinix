@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install make diffutils curl git rsync xorriso -y
 
+      - name: Enable user namespaces
+        run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
+
       #- name: Build full distro and ISO
       #  run: PKGS_TO_INSTALL='*' make all
 
