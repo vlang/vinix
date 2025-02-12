@@ -24,22 +24,6 @@ index 9e97ef1..c089594 100644
  
  static char *
  get_mtab_monitor_file (void)
-diff --git glib-clean/glib/giounix.c glib-workdir/glib/giounix.c
-index 9d9492b..081a1fe 100644
---- glib-clean/glib/giounix.c
-+++ glib-workdir/glib/giounix.c
-@@ -442,7 +442,10 @@ g_io_unix_get_flags (GIOChannel *channel)
-         channel->is_writeable = TRUE;
-         break;
-       default:
--        g_assert_not_reached ();
-+	channel->is_readable = TRUE;
-+        channel->is_writeable = TRUE;
-+        break;
-+        //g_assert_not_reached ();
-     }
- 
-   return flags;
 diff --git glib-clean/glib/glib-init.c glib-workdir/glib/glib-init.c
 index c513f51..0de3ab3 100644
 --- glib-clean/glib/glib-init.c
