@@ -19,9 +19,6 @@ CC := cc
 # User controllable archiver command.
 AR := ar
 
-# User controllable linker command.
-LD := ld
-
 # User controllable objdump command.
 OBJDUMP := objdump
 
@@ -44,7 +41,7 @@ PROD :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs-0bsd || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
 endif
@@ -86,7 +83,7 @@ override CFLAGS += \
 # Internal C preprocessor flags that should not be changed by the user.
 override CPPFLAGS := \
     -I c \
-    -isystem freestnd-c-hdrs-0bsd \
+    -isystem freestnd-c-hdrs \
     $(CPPFLAGS) \
     -MMD \
     -MP
@@ -100,11 +97,12 @@ obj/flanterm/backends/fb.c.o: override CPPFLAGS += \
 
 # Internal linker flags that should not be changed by the user.
 override LDFLAGS += \
-    -m elf_x86_64 \
+    -Wl,-m,elf_x86_64 \
+    -Wl,--build-id=none \
     -nostdlib \
     -static \
     -z max-page-size=0x1000 \
-    -gc-sections \
+    -Wl,--gc-sections \
     -T linker.ld
 
 override VFLAGS += \
@@ -132,9 +130,12 @@ override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' | LC_ALL=C s
 override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
-# Default target.
+# Default target. This must come first, before header dependencies.
 .PHONY: all
 all: bin/$(OUTPUT)
+
+# Include header dependencies.
+-include obj/blob.c.d $(HEADER_DEPS)
 
 # Link rules for building the C compiler runtime.
 cc-runtime-x86_64/cc-runtime.a: GNUmakefile cc-runtime/*
@@ -144,18 +145,15 @@ cc-runtime-x86_64/cc-runtime.a: GNUmakefile cc-runtime/*
 		CC="$(CC)" \
 		AR="$(AR)" \
 		CFLAGS="$(CFLAGS)" \
-		CPPFLAGS='-isystem ../freestnd-c-hdrs-0bsd -DCC_RUNTIME_NO_FLOAT'
+		CPPFLAGS='-isystem ../freestnd-c-hdrs -DCC_RUNTIME_NO_FLOAT'
 
 # Link rules for the final executable.
 bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a
 	mkdir -p "$$(dirname $@)"
-	$(LD) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
 	./gensyms.sh $(OBJDUMP) $@ > obj/symbol_table.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c obj/symbol_table.c -o obj/symbol_table.c.o
-	$(LD) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a $(LDFLAGS) -o $@
-
-# Include header dependencies.
--include obj/blob.c.d $(HEADER_DEPS)
+	$(CC) $(CFLAGS) $(LDFLAGS) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
 
 obj/blob.c.o: GNUmakefile $(VFILES)
 	mkdir -p "$$(dirname $@)"
@@ -182,7 +180,7 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf freestnd-c-hdrs-0bsd cc-runtime c/flanterm c/printf
+	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/printf
 
 # Install the final built executable to its final on-root location.
 .PHONY: install
