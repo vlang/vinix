@@ -11,6 +11,7 @@ deps="core-libs"
 
 prepare() {
     curl -o v.c https://raw.githubusercontent.com/vlang/vc/b0d373373845541b811b4ba38d48d75c0fbe7240/v.c
+    patch -p0 <"${base_dir}"/build-support/v/v.c.patch
 }
 
 build() {

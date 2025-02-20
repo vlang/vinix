@@ -1,0 +1,19 @@
+--- v.c	2025-02-20 03:51:33.241023614 +0100
++++ v.c-patched	2025-02-20 06:13:44.421172638 +0100
+@@ -2052,6 +2052,8 @@
+ 
+ // added by module `os`, file: debugger_linux.c.v:3:
+ 
++/*
++
+ #if defined(__has_include)
+ 
+ #if __has_include(<sys/ptrace.h>)
+@@ -2064,6 +2066,7 @@
+ #include <sys/ptrace.h>
+ #endif
+ 
++*/
+ 
+ #if !defined(_WIN32)
+ // added by module `os`, file: fd.c.v:6:
