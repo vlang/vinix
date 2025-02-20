@@ -11,19 +11,6 @@ index 0310a75..07cd8ec 100644
  #define G_CREDENTIALS_SUPPORTED 1
  #define G_CREDENTIALS_USE_LINUX_UCRED 1
  #define G_CREDENTIALS_NATIVE_TYPE G_CREDENTIALS_TYPE_LINUX_UCRED
-diff --git glib-clean/gio/gunixmounts.c glib-workdir/gio/gunixmounts.c
-index 9e97ef1..c089594 100644
---- glib-clean/gio/gunixmounts.c
-+++ glib-workdir/gio/gunixmounts.c
-@@ -961,7 +961,7 @@ _g_get_unix_mounts (void)
- }
- 
- /* QNX {{{2 */
--#elif defined (HAVE_QNX)
-+#elif defined (HAVE_QNX) || defined (__vinix__)
- 
- static char *
- get_mtab_monitor_file (void)
 diff --git glib-clean/glib/glib-init.c glib-workdir/glib/glib-init.c
 index c513f51..0de3ab3 100644
 --- glib-clean/glib/glib-init.c

@@ -94,21 +94,6 @@ index 31c02cc..4e4ca4e 100644
  #include "internal/cryptlib.h"
  #include "internal/o_dir.h"
  #include <openssl/lhash.h>
-diff --git openssl-clean/crypto/mem_sec.c openssl-workdir/crypto/mem_sec.c
-index 222c786..edb5192 100644
---- openssl-clean/crypto/mem_sec.c
-+++ openssl-workdir/crypto/mem_sec.c
-@@ -492,8 +492,10 @@ static int sh_init(size_t size, int minsize)
-         ret = 2;
- #endif
- #ifdef MADV_DONTDUMP
-+/*
-     if (madvise(sh.arena, sh.arena_size, MADV_DONTDUMP) < 0)
-         ret = 2;
-+*/
- #endif
- 
-     return ret;
 diff --git openssl-clean/test/bntest.c openssl-workdir/test/bntest.c
 index 9273e86..c4a1683 100644
 --- openssl-clean/test/bntest.c

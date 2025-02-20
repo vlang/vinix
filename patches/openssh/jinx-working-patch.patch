@@ -13,16 +13,3 @@ index 591d5a3..0a0e5cc 100644
  *-*-cygwin*)
  	LIBS="$LIBS /usr/lib/textreadmode.o"
  	AC_DEFINE([HAVE_CYGWIN], [1], [Define if you are on Cygwin])
-diff --git openssh-clean/sshkey.c openssh-workdir/sshkey.c
-index 1db8378..5c25879 100644
---- openssh-clean/sshkey.c
-+++ openssh-workdir/sshkey.c
-@@ -771,7 +771,7 @@ sshkey_prekey_alloc(u_char **prekeyp, size_t len)
- 	if ((prekey = mmap(NULL, len, PROT_READ|PROT_WRITE,
- 	    MAP_ANON|MAP_PRIVATE|PREKEY_MMAP_FLAG, -1, 0)) == MAP_FAILED)
- 		return SSH_ERR_SYSTEM_ERROR;
--#if defined(MADV_DONTDUMP) && !defined(MAP_CONCEAL) && !defined(MAP_NOCORE)
-+#if !defined(__vinix__) && defined(MADV_DONTDUMP) && !defined(MAP_CONCEAL) && !defined(MAP_NOCORE)
- 	(void)madvise(prekey, len, MADV_DONTDUMP);
- #endif
- 	*prekeyp = prekey;
