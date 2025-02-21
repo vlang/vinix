@@ -5,21 +5,19 @@
 module klock
 
 import katomic
+import x86.cpu
 
 pub struct Lock {
 pub mut:
-	l      bool
-	caller u64
+	l    bool
+	ints bool
 }
 
 fn C.__builtin_return_address(int) voidptr
 
 pub fn (mut l Lock) acquire() {
-	caller := u64(C.__builtin_return_address(0))
-
 	for {
 		if l.test_and_acquire() == true {
-			l.caller = caller
 			return
 		}
 		asm volatile amd64 {
@@ -31,14 +29,17 @@ pub fn (mut l Lock) acquire() {
 
 pub fn (mut l Lock) release() {
 	katomic.store(mut &l.l, false)
+	cpu.interrupt_toggle(l.ints)
 }
 
 pub fn (mut l Lock) test_and_acquire() bool {
-	caller := u64(C.__builtin_return_address(0))
+	ints := cpu.interrupt_toggle(false)
 
 	ret := katomic.cas(mut &l.l, false, true)
 	if ret == true {
-		l.caller = caller
+		l.ints = ints
+	} else {
+		cpu.interrupt_toggle(ints)
 	}
 
 	return ret

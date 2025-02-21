@@ -28,7 +28,8 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 
 	cpu_number := if smp_ready { cpulocal.current().cpu_number } else { 0 }
 
-	C.printf_panic(c'KERNEL PANIC: "%s" on CPU %d\n', message, cpu_number)
+	C.printf_panic(c'\n  *** Vinix KERNEL PANIC on CPU %d ***\n\n', cpu_number)
+	C.printf_panic(c'Panic info: %s\n', message)
 	if gpr_state != unsafe { nil } {
 		C.printf_panic(c'Error code: 0x%016llx\n', gpr_state.err)
 		C.printf_panic(c'Register dump:\n')
