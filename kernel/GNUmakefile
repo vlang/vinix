@@ -19,9 +19,6 @@ CC := cc
 # User controllable archiver command.
 AR := ar
 
-# User controllable objdump command.
-OBJDUMP := objdump
-
 # User controllable V command.
 V := v
 
@@ -150,9 +147,6 @@ cc-runtime-x86_64/cc-runtime.a: GNUmakefile cc-runtime/*
 # Link rules for the final executable.
 bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a
 	mkdir -p "$$(dirname $@)"
-	$(CC) $(CFLAGS) $(LDFLAGS) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
-	./gensyms.sh $(OBJDUMP) $@ > obj/symbol_table.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c obj/symbol_table.c -o obj/symbol_table.c.o
 	$(CC) $(CFLAGS) $(LDFLAGS) obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
 
 obj/blob.c.o: GNUmakefile $(VFILES)

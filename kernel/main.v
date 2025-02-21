@@ -37,6 +37,8 @@ import socket
 import time
 import limine
 
+#include <symbols.h>
+
 @[_linker_section: '.requests']
 @[cinit]
 __global (

@@ -5,7 +5,6 @@
 module local
 
 import x86.cpu
-import trace
 
 @[packed]
 pub struct TSS {
@@ -76,9 +75,7 @@ __global (
 pub fn current() &Local {
 	ints := cpu.interrupt_state()
 	if ints != false {
-		print('Attempted to get current CPU struct without disabling ints\n')
-		trace.stacktrace(0)
-		panic('')
+		panic('Attempted to get current CPU struct without disabling ints')
 	}
 
 	mut cpu_number := u64(0)
