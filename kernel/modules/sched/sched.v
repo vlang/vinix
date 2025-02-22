@@ -487,6 +487,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack = &stack[-1]
 
 			stack = &stack[-2]
+			stack[0] = elf.at_secure
+			stack[1] = 0
+			stack = &stack[-2]
 			stack[0] = elf.at_entry
 			stack[1] = auxval.at_entry
 			stack = &stack[-2]

@@ -8,11 +8,18 @@ import x86.apic
 import x86.cpu.local as cpulocal
 import x86.cpu
 import katomic
+import klock
+
+__global (
+	kpanic_lock klock.Lock
+)
 
 fn C.printf_panic(charptr, ...voidptr)
 
 @[noreturn]
 pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
+	kpanic_lock.acquire()
+
 	asm volatile amd64 {
 		cli
 	}
@@ -22,7 +29,6 @@ pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 				continue
 			}
 			apic.lapic_send_ipi(u8(cpu_local.lapic_id), abort_vector)
-			for katomic.load(&cpu_local.aborted) == false {}
 		}
 	}
 
