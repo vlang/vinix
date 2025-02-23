@@ -23,6 +23,7 @@ pub const at_entry = 9
 pub const at_phdr = 3
 pub const at_phent = 4
 pub const at_phnum = 5
+pub const at_secure = 23
 
 pub const pt_load = 0x00000001
 pub const pt_interp = 0x00000003
