@@ -1,20 +1,20 @@
 #! /bin/sh
 
 name=taisei
-version=1.3.2
+version=1.4.2
 revision=1
-tarball_url="https://github.com/taisei-project/taisei/releases/download/v${version}/taisei-v${version}.tar.xz"
-tarball_blake2b="608b5db6f17e2693539ce0742a1812633e91e901b3935b9e54f91514827642334f6cb6f0217aff713f1ff9dd01d971ae895ac8c98b0360f254b52d3e49bfae61"
-imagedeps="meson ninja-build"
+tarball_url="https://github.com/taisei-project/taisei/releases/download/v${version}/taisei-${version}.tar.xz"
+tarball_blake2b="382e6e02013573f4218a073ad9d19cd128f0b4366d3f3f586e8ab4de9a5948ffedd13a22cefc9a8af04cccd2cf0205c9d6c738b125fd332b363606acd5938e4a"
+imagedeps="meson ninja-build build-essential"
 hostdeps="gcc pkg-config"
-deps="core-libs freetype2 libpng sdl2 libwebp zlib cglm openssl libzip"
+deps="core-libs freetype2 libpng sdl2-compat libwebp zlib cglm openssl"
 
 configure() {
     meson_configure \
-        -Ddocs=false \
-        -Da_sdl2mixer=false \
+        -Ddocs=disabled \
         -Da_default=null \
-        -Db_lto=false
+        -Db_lto=false \
+        -Da_sdl=disabled
 }
 
 build() {

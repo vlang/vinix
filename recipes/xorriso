@@ -15,9 +15,6 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
-        configure_script_path=./configure \
     autotools_configure
 }
 

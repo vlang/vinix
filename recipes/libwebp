@@ -7,7 +7,7 @@ tarball_url="https://storage.googleapis.com/downloads.webmproject.org/releases/w
 tarball_blake2b="022cef190284b69af781718a82b28ee9806d7e6b1e642ee0833e608f64f691ef918a83e99db02335fb9f60d24d6f0cfc58e7e05e99a3f13d2118719d40a71722"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs libjpeg-turbo libpng freeglut sdl2 libtiff"
+deps="core-libs libjpeg-turbo libpng freeglut sdl2-compat libtiff"
 
 prepare() {
     autotools_recursive_regen
