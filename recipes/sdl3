@@ -1,10 +1,10 @@
 #! /bin/sh
 
-name=sdl2
-version=2.30.3
+name=sdl3
+version=3.2.4
 revision=1
-tarball_url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-${version}.tar.gz"
-tarball_blake2b="9918723bc3a0bc3abfc6d47b4fc7eeabcafdc9925ee93e4f31b3637e843a5b060ae61aef9b93743340a9df914248cff510e5d38e758e032b5ed4df9eed587746"
+tarball_url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL3-${version}.tar.gz"
+tarball_blake2b="4886c938ff9eb00af9c7429580fd034bb933efb8a3273d34693dad997268c96619cac2157119cd88c4a330c1ce4d8f4ffd8e00d2a29416be8ccd68990822dc1e"
 imagedeps="cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxxf86vm mesa"
@@ -51,8 +51,6 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
-
-    rm "${dest_dir}${prefix}"/lib/{libSDL2_test.a,libSDL2main.a}
 
     post_package_strip
 }

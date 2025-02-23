@@ -1,0 +1,25 @@
+#! /bin/sh
+
+name=sdl2-compat
+version=2.32.50
+revision=1
+tarball_url="https://github.com/libsdl-org/sdl2-compat/releases/download/release-${version}/sdl2-compat-${version}.tar.gz"
+tarball_blake2b="f003f4b09633d3cef31fb00d6daefbcd329edd21c8dedd47d8adb07d7f65dede6bc818921dd73af3ab9483529f81a66460dc6aac80c2f277dca298b885849599"
+imagedeps="cmake ninja-build git"
+hostdeps="gcc pkg-config"
+deps="sdl3"
+
+configure() {
+    cmake_configure \
+        -DSDL_STATIC=OFF
+}
+
+build() {
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
+}

@@ -1,0 +1,13 @@
+diff --git m4-clean/tests/strerror_r.c m4-workdir/tests/strerror_r.c
+index 71965fb..be88d71 100644
+--- m4-clean/tests/strerror_r.c
++++ m4-workdir/tests/strerror_r.c
+@@ -21,7 +21,7 @@
+ 
+ /* Enable declaration of sys_nerr and sys_errlist in <errno.h> on NetBSD.  */
+ #define _NETBSD_SOURCE 1
+-
++#undef _GNU_SOURCE
+ /* Specification.  */
+ #include <string.h>
+ 
