@@ -9,6 +9,7 @@ import lib.stubs
 import memory
 import term
 import acpi
+import uacpi
 import x86.gdt
 import x86.idt
 import x86.isr
@@ -35,6 +36,7 @@ import dev.mouse
 import syscall.table
 import socket
 import time
+import x86.hpet
 import limine
 
 #include <symbols.h>
@@ -120,6 +122,19 @@ pub fn kmain() {
 
 	// ACPI init
 	acpi.initialise()
+	hpet.initialise()
+
+	mut uacpi_status := uacpi.UACPIStatus.ok
+
+	uacpi_status = C.uacpi_initialize(0)
+	if uacpi_status != uacpi.UACPIStatus.ok {
+		panic('uacpi_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
+	}
+
+	uacpi_status = C.uacpi_namespace_load()
+	if uacpi_status != uacpi.UACPIStatus.ok {
+		panic('uacpi_namespace_load(): ${C.uacpi_status_to_string(uacpi_status)}')
+	}
 
 	smp.initialise()
 

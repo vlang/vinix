@@ -85,18 +85,6 @@ pub fn initialise() {
 	}
 
 	madt_init()
-
-	mut uacpi_status := UACPIStatus.ok
-
-	uacpi_status = C.uacpi_initialize(0)
-	if uacpi_status != UACPIStatus.ok {
-		panic('uacpi_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
-	}
-
-	uacpi_status = C.uacpi_namespace_load()
-	if uacpi_status != UACPIStatus.ok {
-		panic('uacpi_namespace_load(): ${C.uacpi_status_to_string(uacpi_status)}')
-	}
 }
 
 pub fn find_sdt(signature string, index int) !voidptr {

@@ -1,4 +1,4 @@
-module acpi
+module uacpi
 
 import klock
 import event
@@ -9,12 +9,9 @@ import memory
 import lib
 import kprint
 import lib.stubs
+import x86.hpet
 
-//#include <uacpi/uacpi.h>
-//#include <uacpi/kernel_api.h>
-
-@[typedef]
-enum UACPIStatus {
+pub enum UACPIStatus {
 	ok = 0
 	mapping_failed = 1
 	out_of_memory = 2
@@ -248,8 +245,7 @@ pub fn uacpi_kernel_unmap(addr voidptr, len u64) {
 
 @[export: 'uacpi_kernel_get_nanoseconds_since_boot']
 pub fn uacpi_kernel_get_nanoseconds_since_boot() u64 {
-	clock := monotonic_clock
-	return u64(clock.tv_sec * 1000000000 + clock.tv_nsec)
+	return hpet.read_counter() * (1000000000 / hpet_frequency)
 }
 
 @[export: 'uacpi_kernel_io_map']
