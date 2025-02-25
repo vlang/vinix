@@ -2,5 +2,7 @@
 /cc-runtime*
 /c/flanterm
 /c/printf
+/c/uacpi
+/uacpi-repository
 /bin
 /obj

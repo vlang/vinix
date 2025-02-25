@@ -88,3 +88,13 @@ download_by_hash \
     https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.h \
     c/printf/printf.h \
     f63b84650f29394fd1bc6f6dce889d11570fcc152c5d512bfe6b68174c5aed56
+
+# 2.0.0
+clone_repo_commit \
+    https://github.com/uACPI/uACPI.git \
+    uacpi-repository \
+    4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d
+rm -rf c/uacpi
+mkdir -p c/uacpi
+cp -rp uacpi-repository/include/uacpi/* c/uacpi/
+cp -rp uacpi-repository/source/* c/uacpi/

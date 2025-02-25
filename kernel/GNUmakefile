@@ -174,7 +174,7 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/printf
+	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/printf c/uacpi uacpi-repository
 
 # Install the final built executable to its final on-root location.
 .PHONY: install
