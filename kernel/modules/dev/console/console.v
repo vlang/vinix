@@ -310,7 +310,9 @@ fn is_printable(c u8) bool {
 fn add_to_buf_char(_c u8, echo bool) {
 	mut c := _c
 
-	if c == `\r` && console_termios.c_iflag & termios.icrnl == 0 {
+	if c == `\n` && console_termios.c_iflag & termios.icrnl == 0 {
+		c = `\r`
+	} else if c == `\r` && console_termios.c_iflag & termios.icrnl != 0 {
 		c = `\n`
 	}
 
