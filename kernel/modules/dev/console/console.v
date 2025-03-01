@@ -391,7 +391,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 	if echo && console_termios.c_lflag & termios.echo != 0 {
 		if is_printable(c) {
 			print('${c:c}')
-		} else if c >= 0x01 && c <= 0x1a {
+		} else if c >= 0x01 && c <= 0x1f {
 			print('^${c + 0x40:c}')
 		}
 	}
