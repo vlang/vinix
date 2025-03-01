@@ -310,10 +310,18 @@ fn is_printable(c u8) bool {
 fn add_to_buf_char(_c u8, echo bool) {
 	mut c := _c
 
+	if c == `\r` && console_termios.c_iflag & termios.igncr != 0 {
+		return
+	}
+
 	if c == `\n` && console_termios.c_iflag & termios.icrnl == 0 {
 		c = `\r`
 	} else if c == `\r` && console_termios.c_iflag & termios.icrnl != 0 {
 		c = `\n`
+	} else if c == `\r` && console_termios.c_iflag & termios.inlcr == 0 {
+		c = `\n`
+	} else if c == `\n` && console_termios.c_iflag & termios.inlcr != 0 {
+		c = `\r`
 	}
 
 	if console_termios.c_lflag & termios.icanon != 0 {
@@ -684,10 +692,23 @@ pub fn initialise() {
 	console_res.stat.mode = 0o644 | stat.ifchr
 
 	// Initialise termios
-	console_res.termios.c_lflag = termios.isig | termios.icanon | termios.echo
-	console_res.termios.c_cc[termios.vintr] = 0x03
-	console_res.termios.ibaud = 38400
-	console_res.termios.obaud = 38400
+	console_res.termios.c_iflag = termios.brkint | termios.icrnl | termios.ixon | termios.imaxbel
+	console_res.termios.c_oflag = termios.opost | termios.onlcr
+	console_res.termios.c_cflag = termios.cs8 | termios.cread | termios.b38400
+	console_res.termios.c_lflag = termios.isig | termios.icanon | termios.iexten | termios.echo | termios.echoe | termios.echok | termios.echoctl | termios.echoke
+	console_res.termios.c_cc[termios.vintr] = termios.ctrl(`C`)
+	console_res.termios.c_cc[termios.vquit] = termios.ctrl(`\\`)
+	console_res.termios.c_cc[termios.verase] = 0x7f //termios.ctrl(`?`)
+	console_res.termios.c_cc[termios.vkill] = termios.ctrl(`U`)
+	console_res.termios.c_cc[termios.veof] = termios.ctrl(`D`)
+	console_res.termios.c_cc[termios.vstart] = termios.ctrl(`Q`)
+	console_res.termios.c_cc[termios.vstop] = termios.ctrl(`S`)
+	console_res.termios.c_cc[termios.vsusp] = termios.ctrl(`Z`)
+	console_res.termios.c_cc[termios.vreprint] = termios.ctrl(`R`)
+	console_res.termios.c_cc[termios.vwerase] = termios.ctrl(`W`)
+	console_res.termios.c_cc[termios.vlnext] = termios.ctrl(`V`)
+	console_res.termios.c_cc[termios.vdiscard] = termios.ctrl(`O`)
+	console_res.termios.c_cc[termios.vmin] = 1
 
 	console_termios = &console_res.termios
 
