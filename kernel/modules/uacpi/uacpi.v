@@ -10,6 +10,7 @@ import lib
 import kprint
 import lib.stubs
 import x86.hpet
+import pci
 
 pub enum UACPIStatus {
 	ok = 0
@@ -47,8 +48,16 @@ pub enum UACPIStatus {
 	aml_call_stack_depth_limit = 0x0eff000a
 }
 
+pub enum InterruptModel {
+	pic = 0
+	ioapic = 1
+	iosapic = 2
+}
+
 fn C.uacpi_initialize(flags u64) UACPIStatus
 fn C.uacpi_namespace_load() UACPIStatus
+fn C.uacpi_namespace_initialize() UACPIStatus
+fn C.uacpi_set_interrupt_model(InterruptModel) UACPIStatus
 fn C.uacpi_status_to_string(UACPIStatus) charptr
 
 @[export: 'uacpi_kernel_log']
@@ -309,8 +318,10 @@ struct UACPIPCIAddress {
 
 @[export: 'uacpi_kernel_pci_device_open']
 pub fn uacpi_kernel_pci_device_open(addr UACPIPCIAddress, out_handle &voidptr) UACPIStatus {
-	dev := u64(addr.segment) << 32 | u64(addr.bus) << 16 | u64(addr.device) << 8 | u64(addr.function)
-	unsafe { *out_handle = voidptr(dev) }
+	mut pci_device := pci.get_device_by_coordinates(addr.bus, addr.device, addr.function, 0) or {
+		return UACPIStatus.not_found
+	}
+	unsafe { *out_handle = voidptr(pci_device) }
 	return UACPIStatus.ok
 }
 
@@ -321,30 +332,42 @@ pub fn uacpi_kernel_pci_device_close(handle voidptr) {
 
 @[export: 'uacpi_kernel_pci_read8']
 pub fn uacpi_kernel_pci_read8(handle voidptr, offset u64, value &u8) UACPIStatus {
-	return UACPIStatus.unimplemented
+	mut pci_device := unsafe { &pci.PCIDevice(handle) }
+	unsafe { *value = pci_device.read[u8](u32(offset)) }
+	return UACPIStatus.ok
 }
 
 @[export: 'uacpi_kernel_pci_read16']
 pub fn uacpi_kernel_pci_read16(handle voidptr, offset u64, value &u16) UACPIStatus {
-	return UACPIStatus.unimplemented
+	mut pci_device := unsafe { &pci.PCIDevice(handle) }
+	unsafe { *value = pci_device.read[u16](u32(offset)) }
+	return UACPIStatus.ok
 }
 
 @[export: 'uacpi_kernel_pci_read32']
 pub fn uacpi_kernel_pci_read32(handle voidptr, offset u64, value &u32) UACPIStatus {
-	return UACPIStatus.unimplemented
+	mut pci_device := unsafe { &pci.PCIDevice(handle) }
+	unsafe { *value = pci_device.read[u32](u32(offset)) }
+	return UACPIStatus.ok
 }
 
 @[export: 'uacpi_kernel_pci_write8']
 pub fn uacpi_kernel_pci_write8(handle voidptr, offset u64, value u8) UACPIStatus {
-	return UACPIStatus.unimplemented
+	mut pci_device := unsafe { &pci.PCIDevice(handle) }
+	pci_device.write[u8](u32(offset), value)
+	return UACPIStatus.ok
 }
 
 @[export: 'uacpi_kernel_pci_write16']
 pub fn uacpi_kernel_pci_write16(handle voidptr, offset u64, value u16) UACPIStatus {
-	return UACPIStatus.unimplemented
+	mut pci_device := unsafe { &pci.PCIDevice(handle) }
+	pci_device.write[u16](u32(offset), value)
+	return UACPIStatus.ok
 }
 
 @[export: 'uacpi_kernel_pci_write32']
 pub fn uacpi_kernel_pci_write32(handle voidptr, offset u64, value u32) UACPIStatus {
-	return UACPIStatus.unimplemented
+	mut pci_device := unsafe { &pci.PCIDevice(handle) }
+	pci_device.write[u32](u32(offset), value)
+	return UACPIStatus.ok
 }

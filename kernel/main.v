@@ -59,7 +59,6 @@ fn kmain_thread() {
 	pipe.initialise()
 	futex.initialise()
 	fs.initialise()
-	pci.initialise()
 
 	fs.mount(vfs_root, '', '/', 'tmpfs') or {}
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
@@ -124,6 +123,8 @@ pub fn kmain() {
 	acpi.initialise()
 	hpet.initialise()
 
+	pci.initialise()
+
 	mut uacpi_status := uacpi.UACPIStatus.ok
 
 	uacpi_status = C.uacpi_initialize(0)
@@ -134,6 +135,16 @@ pub fn kmain() {
 	uacpi_status = C.uacpi_namespace_load()
 	if uacpi_status != uacpi.UACPIStatus.ok {
 		panic('uacpi_namespace_load(): ${C.uacpi_status_to_string(uacpi_status)}')
+	}
+
+	uacpi_status = C.uacpi_set_interrupt_model(uacpi.InterruptModel.ioapic)
+	if uacpi_status != uacpi.UACPIStatus.ok {
+		panic('uacpi_interrupt_model(): ${C.uacpi_status_to_string(uacpi_status)}')
+	}
+
+	uacpi_status = C.uacpi_namespace_initialize()
+	if uacpi_status != uacpi.UACPIStatus.ok {
+		panic('uacpi_namespace_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
 	}
 
 	smp.initialise()
