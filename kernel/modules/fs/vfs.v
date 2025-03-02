@@ -148,7 +148,7 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			return 0, 0, ''
 		}
 
-		new_node := reduce_node(unsafe { current_node.children[elem_str] }, false)
+		mut new_node := reduce_node(unsafe { current_node.children[elem_str] }, false)
 
 		if last == true {
 			return current_node, new_node, elem_str

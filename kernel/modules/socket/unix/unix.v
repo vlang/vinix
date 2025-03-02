@@ -316,11 +316,11 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 
 	mut target := fs.get_node(t.process.current_directory, path, true) or { return none }
 
-	target_res := target.resource
+	mut target_res := target.resource
 
 	mut socket := &UnixSocket(unsafe { nil })
 
-	if target_res is UnixSocket {
+	if mut target_res is UnixSocket {
 		socket = target_res
 	} else {
 		errno.set(errno.einval)

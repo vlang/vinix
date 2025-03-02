@@ -116,11 +116,11 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 		fd.unref()
 	}
 
-	res := fd.handle.resource
+	mut res := fd.handle.resource
 
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
-	if res is sock_unix.UnixSocket {
+	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -149,11 +149,11 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 		fd.unref()
 	}
 
-	res := fd.handle.resource
+	mut res := fd.handle.resource
 
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
-	if res is sock_unix.UnixSocket {
+	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -178,11 +178,11 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		fd.unref()
 	}
 
-	res := fd.handle.resource
+	mut res := fd.handle.resource
 
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
-	if res is sock_unix.UnixSocket {
+	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -208,11 +208,11 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		fd.unref()
 	}
 
-	res := fd.handle.resource
+	mut res := fd.handle.resource
 
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
-	if res is sock_unix.UnixSocket {
+	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -238,11 +238,11 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 		fd.unref()
 	}
 
-	res := fd.handle.resource
+	mut res := fd.handle.resource
 
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
-	if res is sock_unix.UnixSocket {
+	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -268,11 +268,11 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 		fd.unref()
 	}
 
-	res := fd.handle.resource
+	mut res := fd.handle.resource
 
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
-	if res is sock_unix.UnixSocket {
+	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
