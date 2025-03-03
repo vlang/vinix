@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=cglm
-version=0.9.4
+version=0.9.6
 revision=1
 tarball_url="https://github.com/recp/cglm/archive/refs/tags/v${version}.tar.gz"
-tarball_blake2b="407373eba01fc6867d5fa8ec418eff0f3636d919dfcedf686f29b149c0bc4c1ed8cce5b3c7a1847f9cfab35612f19709d25febad09aaa4ed9ea05e462a97d2a0"
+tarball_blake2b="a51bfb6d9198f4ecf6b1bcc56b346df963e56d5229c226bfa6d3bdccfbb3e25c30e33eccfc3614402a61286e9e87dc1e63e2b8f22e4d0fd640232f40b5a4db70"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
