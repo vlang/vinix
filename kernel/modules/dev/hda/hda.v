@@ -195,7 +195,7 @@ pub fn (verb HDAResponseDescriptor) get_codec() u8 {
 }
 
 pub fn (verb HDAResponseDescriptor) is_unsol() bool {
-	return verb.resp_ex >> 4 & 1 != 0
+	return (verb.resp_ex >> 4) & 1 != 0
 }
 
 struct PCMFormat {
@@ -742,7 +742,7 @@ fn (mut c HDACodec) setup_all_output_paths(sample_rate u32, bits u8, channels u8
 pub fn (mut c HDACodec) initialize() {
 	num_func_groups_resp := c.get_parameter(0, hda.param_node_count)
 	num_func_groups := u8(num_func_groups_resp & 0xFF)
-	func_groups_start_nid := u8(num_func_groups_resp >> 16 & 0xFF)
+	func_groups_start_nid := u8((num_func_groups_resp >> 16) & 0xFF)
 
 	for func_group_nid := func_groups_start_nid; func_group_nid < func_groups_start_nid +
 		num_func_groups; func_group_nid++ {
@@ -758,7 +758,7 @@ pub fn (mut c HDACodec) initialize() {
 
 		num_widgets_resp := c.get_parameter(func_group_nid, hda.param_node_count)
 		num_widgets := u8(num_widgets_resp & 0xFF)
-		widgets_start_nid := u8(num_widgets_resp >> 16 & 0xFF)
+		widgets_start_nid := u8((num_widgets_resp >> 16) & 0xFF)
 
 		print('hda: found ${num_widgets} widgets\n')
 
@@ -770,7 +770,7 @@ pub fn (mut c HDACodec) initialize() {
 			con_list_len := u8(c.get_parameter(widget_nid, hda.param_con_list_len))
 			default_config := c.get_config_default(widget_nid)
 
-			widget_type := u8(audio_caps >> 20 & 0b1111)
+			widget_type := u8((audio_caps >> 20) & 0b1111)
 
 			assert (con_list_len & 1 << 7) == 0, "long form connection lists aren't supported"
 
@@ -794,7 +794,7 @@ pub fn (mut c HDACodec) initialize() {
 					4
 				}
 				for j := 0; j < count; j++ {
-					nid := u8(resp >> (j * 8) & 0xFF)
+					nid := u8((resp >> (j * 8)) & 0xFF)
 					widget.connections << nid
 				}
 			}
@@ -876,7 +876,7 @@ __global (
 
 fn (mut c HDAController) submit_verb(cid u8, nid u8, cmd u16, data u8) u8 {
 	mut corbwp := c.regs.corbwp
-	index := u8(corbwp >> hda.corbwp_wp_shift & hda.corbwp_wp_mask) + 1
+	index := u8((corbwp >> hda.corbwp_wp_shift) & hda.corbwp_wp_mask) + 1
 
 	mut verb := HDAVerbDescriptor{}
 	verb.set_cid(cid)
@@ -895,7 +895,7 @@ fn (mut c HDAController) submit_verb(cid u8, nid u8, cmd u16, data u8) u8 {
 
 fn (mut c HDAController) submit_verb_long(cid u8, nid u8, cmd u8, data u16) u8 {
 	mut corbwp := c.regs.corbwp
-	index := u8(corbwp >> hda.corbwp_wp_shift & hda.corbwp_wp_mask) + 1
+	index := u8((corbwp >> hda.corbwp_wp_shift) & hda.corbwp_wp_mask) + 1
 
 	mut verb := HDAVerbDescriptor{}
 	verb.set_cid(cid)
@@ -914,7 +914,7 @@ fn (mut c HDAController) submit_verb_long(cid u8, nid u8, cmd u8, data u16) u8 {
 
 fn (mut c HDAController) wait_for_verb(index u8) HDAResponseDescriptor {
 	for {
-		cur_index := c.regs.corbwp >> hda.corbwp_wp_shift & hda.corbwp_wp_mask
+		cur_index := (c.regs.corbwp >> hda.corbwp_wp_shift) & hda.corbwp_wp_mask
 		if cur_index == index {
 			break
 		}
@@ -971,8 +971,8 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	// if the controller is already running stop it
 	if gctl & hda.gctl_crst != 0 {
 		gcap := c.regs.gcap
-		in_stream_count := gcap >> hda.gcap_iss_shift & hda.gcap_iss_mask
-		out_stream_count := gcap >> hda.gcap_oss_shift & hda.gcap_oss_mask
+		in_stream_count := (gcap >> hda.gcap_iss_shift) & hda.gcap_iss_mask
+		out_stream_count := (gcap >> hda.gcap_oss_shift) & hda.gcap_oss_mask
 		for i := u64(0); i < in_stream_count; i++ {
 			mut volatile stream_regs := &HDAStreamRegisters(c.pci_bar.base + 0x80 + i * 0x20 +
 				higher_half)
@@ -1022,7 +1022,7 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	mut corb_size := c.regs.corbsize
-	corb_cap := corb_size >> hda.corbsize_szcap_shift & hda.corbsize_szcap_mask
+	corb_cap := (corb_size >> hda.corbsize_szcap_shift) & hda.corbsize_szcap_mask
 	mut chosen_corb_size := u8(0)
 	if corb_cap & 0b100 != 0 {
 		chosen_corb_size = 0b10
@@ -1040,7 +1040,7 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	mut rirb_size := c.regs.rirbsize
-	rirb_cap := rirb_size >> hda.corbsize_szcap_shift & hda.corbsize_szcap_mask
+	rirb_cap := (rirb_size >> hda.corbsize_szcap_shift) & hda.corbsize_szcap_mask
 	mut chosen_rirb_size := u8(0)
 	if rirb_cap & 0b100 != 0 {
 		chosen_rirb_size = 0b10
