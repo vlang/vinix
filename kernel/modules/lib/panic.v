@@ -7,7 +7,7 @@ module lib
 import x86.apic
 import x86.cpu.local as cpulocal
 import x86.cpu
-import katomic
+import katomic as _
 import klock
 
 __global (
