@@ -45,8 +45,7 @@ pub fn initialise() {
 			nil, nil, nil, nil, nil, nil, 0, 0, 1, 0, 0, 0)
 	}
 
-	terminal_rows = C.flanterm_get_rows(flanterm_ctx)
-	terminal_cols = C.flanterm_get_cols(flanterm_ctx)
+	C.flanterm_get_dimensions(flanterm_ctx, &terminal_cols, &terminal_rows)
 }
 
 pub fn framebuffer_init() {

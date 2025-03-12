@@ -32,18 +32,18 @@ clone_repo_commit() {
 
 download_by_hash() {
     DOWNLOAD_COMMAND="curl -Lo"
-    if ! command -v $DOWNLOAD_COMMAND >/dev/null 2>&1; then
+    if ! command -v "${DOWNLOAD_COMMAND%% *}" >/dev/null 2>&1; then
         DOWNLOAD_COMMAND="wget -O"
-        if ! command -v $DOWNLOAD_COMMAND >/dev/null 2>&1; then
+        if ! command -v "${DOWNLOAD_COMMAND%% *}" >/dev/null 2>&1; then
             set +x
             echo "error: Neither curl nor wget found"
             exit 1
         fi
     fi
     SHA256_COMMAND="sha256sum"
-    if ! command -v $SHA256_COMMAND >/dev/null 2>&1; then
+    if ! command -v "${SHA256_COMMAND%% *}" >/dev/null 2>&1; then
         SHA256_COMMAND="sha256"
-        if ! command -v $SHA256_COMMAND >/dev/null 2>&1; then
+        if ! command -v "${SHA256_COMMAND%% *}" >/dev/null 2>&1; then
             set +x
             echo "error: Cannot find sha256(sum) command"
             exit 1
@@ -74,10 +74,11 @@ clone_repo_commit \
     cc-runtime \
     576a01179f3298a4795b92f42c088f9f8800b56b
 
+# 1.0.1
 clone_repo_commit \
     https://github.com/mintsuki/flanterm.git \
     c/flanterm \
-    201100c968ad6db4f38632f9b6c3544854897788
+    409a298eb2d44748e0159c5e5b2ed2ef679879b9
 
 download_by_hash \
     https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.c \
