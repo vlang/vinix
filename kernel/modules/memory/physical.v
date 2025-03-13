@@ -365,7 +365,7 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 		return ptr
 	}
 
-	new_ptr := unsafe { C.malloc(new_size) }
+	new_ptr := unsafe { malloc(new_size) }
 	if new_ptr == 0 {
 		return 0
 	}
@@ -376,12 +376,12 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 		unsafe { C.memcpy(new_ptr, ptr, metadata.size) }
 	}
 
-	C.free(ptr)
+	free(ptr)
 
 	return new_ptr
 }
 
 @[export: 'calloc']
 pub fn calloc(a u64, b u64) voidptr {
-	return unsafe { C.malloc(a * b) }
+	return unsafe { malloc(a * b) }
 }

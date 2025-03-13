@@ -249,10 +249,10 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 
 	handle.refcount--
 	if handle.refcount == 0 {
-		C.free(voidptr(handle))
+		unsafe { free(voidptr(handle)) }
 	}
 
-	C.free(voidptr(fd))
+	unsafe { free(voidptr(fd)) }
 
 	process.fds[fdnum] = unsafe { nil }
 }
@@ -356,7 +356,7 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 
 	mut oldfd := fd_from_fdnum(old_process, oldfdnum) or { return none }
 
-	mut new_fd := unsafe { &FD(C.malloc(sizeof(FD))) }
+	mut new_fd := unsafe { &FD(malloc(sizeof(FD))) }
 	unsafe { C.memcpy(new_fd, oldfd, sizeof(FD)) }
 
 	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {

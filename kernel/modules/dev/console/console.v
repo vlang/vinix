@@ -796,9 +796,9 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
 
-	copy := unsafe { C.malloc(count) }
+	copy := unsafe { malloc(count) }
 	defer {
-		unsafe { C.free(copy) }
+		unsafe { free(copy) }
 	}
 	unsafe { C.memcpy(copy, buf, count) }
 	term.print(copy, count)

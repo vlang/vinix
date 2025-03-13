@@ -275,7 +275,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		peer:      peer
 		connected: true
 		name:      peer.name
-		data:      unsafe { C.malloc(unix.sock_buf) }
+		data:      unsafe { malloc(unix.sock_buf) }
 		capacity:  unix.sock_buf
 	}
 
@@ -447,7 +447,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		}
 	}
 
-	mut tmpbuf := unsafe { &u8(C.malloc(before_wrap + after_wrap)) }
+	mut tmpbuf := unsafe { &u8(malloc(before_wrap + after_wrap)) }
 	unsafe { C.memcpy(tmpbuf, &this.data[this.read_ptr], before_wrap) }
 	if after_wrap != 0 {
 		unsafe { C.memcpy(voidptr(u64(tmpbuf) + before_wrap), this.data, after_wrap) }
@@ -468,7 +468,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		left -= to_transfer
 	}
 
-	unsafe { C.free(tmpbuf) }
+	unsafe { free(tmpbuf) }
 
 	this.read_ptr = new_ptr_loc
 	this.used -= transferred
@@ -499,7 +499,7 @@ pub fn create(@type int) ?&UnixSocket {
 	mut ret := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
-		data:     unsafe { C.malloc(unix.sock_buf) }
+		data:     unsafe { malloc(unix.sock_buf) }
 		capacity: unix.sock_buf
 	}
 	ret.name.sun_family = sock_pub.af_unix
@@ -510,14 +510,14 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
-		data:     unsafe { C.malloc(unix.sock_buf) }
+		data:     unsafe { malloc(unix.sock_buf) }
 		capacity: unix.sock_buf
 	}
 	a.name.sun_family = sock_pub.af_unix
 	mut b := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
-		data:     unsafe { C.malloc(unix.sock_buf) }
+		data:     unsafe { malloc(unix.sock_buf) }
 		capacity: unix.sock_buf
 	}
 	b.name.sun_family = sock_pub.af_unix
