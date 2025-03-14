@@ -5,8 +5,6 @@
 #ifndef _SYMBOLS_H
 #define _SYMBOLS_H
 
-#include <stdint.h>
-
 extern char text_start[];
 extern char text_end[];
 extern char rodata_start[];
@@ -15,12 +13,5 @@ extern char data_start[];
 extern char data_end[];
 
 extern char interrupt_thunks[];
-
-struct symbol {
-	uint64_t address;
-	char *string;
-};
-
-const struct symbol *get_symbol_table(void);
 
 #endif
