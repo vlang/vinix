@@ -34,7 +34,7 @@ PROD :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/printf/printf.c || ! test -f c/printf/printf.h ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/nanoprintf.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
 endif
@@ -80,10 +80,6 @@ override CPPFLAGS := \
     $(CPPFLAGS) \
     -MMD \
     -MP
-
-obj/printf/printf.c.o: override CPPFLAGS += \
-    -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
-    -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
 
 obj/flanterm/backends/fb.c.o: override CPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
@@ -170,7 +166,7 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/printf c/uacpi uacpi-repository
+	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/nanoprintf* c/uacpi uacpi-repository
 
 # Install the final built executable to its final on-root location.
 .PHONY: install

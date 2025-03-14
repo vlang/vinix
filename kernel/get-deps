@@ -81,14 +81,10 @@ clone_repo_commit \
     409a298eb2d44748e0159c5e5b2ed2ef679879b9
 
 download_by_hash \
-    https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.c \
-    c/printf/printf.c \
-    bae9609d84dc7a56ff0b3d0d3787d33edbd1ec224f0f7ff7edefd6b6ae613395
-
-download_by_hash \
-    https://github.com/eyalroz/printf/raw/2d75fef6c605e699d2643267cbaeaaa49b0a2635/src/printf/printf.h \
-    c/printf/printf.h \
-    f63b84650f29394fd1bc6f6dce889d11570fcc152c5d512bfe6b68174c5aed56
+    https://github.com/charlesnicholson/nanoprintf/raw/0281ccf0b4105b194d5afb2cbb3cf308b9129d3a/nanoprintf.h \
+    c/nanoprintf_orig.h \
+    cb4f3b6fdb061c204fc641a3fd950d89daae1097bb1585f881cff056f775f6f1
+sed '/NPF_WRITEBACK(LONG_DOUBLE/d' c/nanoprintf_orig.h >c/nanoprintf.h
 
 # 2.0.0
 clone_repo_commit \

@@ -1,7 +1,7 @@
 /freestnd-c-hdrs
 /cc-runtime*
 /c/flanterm
-/c/printf
+/c/nanoprintf*
 /c/uacpi
 /uacpi-repository
 /bin
