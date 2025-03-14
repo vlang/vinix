@@ -1,7 +1,3 @@
-// term.v: ioctl() constants for terminal control.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module ioctl
 
 pub const tcgets = 0x5401

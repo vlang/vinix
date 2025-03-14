@@ -1,7 +1,3 @@
-// common.v: ioctl() constants.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module ioctl
 
 // https://github.com/torvalds/linux/blob/5bfc75d92efd494db37f5c4c173d3639d4772966/include/uapi/asm-generic/ioctl.h

@@ -1,7 +1,3 @@
-// bit.v: bitwise operations.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module lib
 
 pub fn bittest(bitmap voidptr, index u64) bool {

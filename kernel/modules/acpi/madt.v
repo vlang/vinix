@@ -1,7 +1,3 @@
-// madt.v: Parsing of the Multiple APIC Description Table.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module acpi
 
 @[packed]

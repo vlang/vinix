@@ -1,7 +1,3 @@
-// termios.v: Values for termios related ioctl() and syscalls.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module termios
 
 pub const brkint = 0o0002

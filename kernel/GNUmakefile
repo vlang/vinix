@@ -1,7 +1,3 @@
-# GNUmakefile: Makefile of the kernel.
-# Code is governed by the GPL-2.0 license.
-# Copyright (C) 2021-2024 The Vinix authors.
-
 # Nuke built-in rules and variables.
 MAKEFLAGS += -rR
 .SUFFIXES:

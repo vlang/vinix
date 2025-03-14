@@ -1,7 +1,3 @@
-// fbio.v: ioctl() constants for framebuffer I/O.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module ioctl
 
 pub const fbioget_vscreeninfo = 0x4600

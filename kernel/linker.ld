@@ -1,9 +1,3 @@
-/*
- * linker.ld: Linker script of the kernel.
- * Code is governed by the GPL-2.0 license.
- * Copyright (C) 2021-2024 The Vinix authors.
- */
-
 /* Tell the linker that we want an x86_64 ELF64 output file */
 OUTPUT_FORMAT(elf64-x86-64)
 

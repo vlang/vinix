@@ -1,7 +1,3 @@
-// initialization.v: Core initialization.
-// Code is governed by the GPL-2.0 license.
-// Copyright (C) 2021-2022 The Vinix authors.
-
 module initialisation
 
 import x86.gdt

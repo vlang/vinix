@@ -1,7 +1,3 @@
-# GNUmakefile: Main makefile of the project.
-# Code is governed by the GPL-2.0 license.
-# Copyright (C) 2021-2024 The Vinix authors.
-
 QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio -smp 4
 
 .PHONY: all
