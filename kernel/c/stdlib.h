@@ -5,8 +5,5 @@
 #ifndef _STDLIB_H
 #define _STDLIB_H
 
-int atexit(void (*func)(void));
-void qsort(void* ptr, size_t count, size_t size,
-           int (*comp)(const void*, const void*));
 
 #endif

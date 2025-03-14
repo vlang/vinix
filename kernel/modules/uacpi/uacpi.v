@@ -34,18 +34,6 @@ pub enum UACPIStatus {
 	timeout = 18
 	overridden = 19
 	denied = 20
-
-	aml_undefined_reference = 0x0eff0000
-	aml_invalid_namestring = 0x0eff0001
-	aml_object_already_exists = 0x0eff0002
-	aml_invalid_opcode = 0x0eff0003
-	aml_incompatible_object_type = 0x0eff0004
-	aml_bad_encoding = 0x0eff0005
-	aml_out_of_bounds_index = 0x0eff0006
-	aml_sync_level_too_high = 0x0eff0007
-	aml_invalid_resource = 0x0eff0008
-	aml_loop_timeout = 0x0eff0009
-	aml_call_stack_depth_limit = 0x0eff000a
 }
 
 pub enum InterruptModel {
@@ -54,11 +42,11 @@ pub enum InterruptModel {
 	iosapic = 2
 }
 
-fn C.uacpi_initialize(flags u64) UACPIStatus
-fn C.uacpi_namespace_load() UACPIStatus
-fn C.uacpi_namespace_initialize() UACPIStatus
-fn C.uacpi_set_interrupt_model(InterruptModel) UACPIStatus
-fn C.uacpi_status_to_string(UACPIStatus) charptr
+@[c_extern] fn C.uacpi_initialize(flags u64) UACPIStatus
+@[c_extern] fn C.uacpi_namespace_load() UACPIStatus
+@[c_extern] fn C.uacpi_namespace_initialize() UACPIStatus
+@[c_extern] fn C.uacpi_set_interrupt_model(InterruptModel) UACPIStatus
+@[c_extern] fn C.uacpi_status_to_string(UACPIStatus) charptr
 
 @[export: 'uacpi_kernel_log']
 pub fn uacpi_kernel_log(level int, str charptr) {

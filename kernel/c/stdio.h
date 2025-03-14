@@ -18,6 +18,4 @@ int printf(const char *restrict format, ...);
 int fprintf(FILE *restrict stream, const char *restrict format, ...);
 int printf_panic(const char *restrict format, ...);
 
-void setbuf(FILE *restrict stream, char *restrict buffer);
-
 #endif

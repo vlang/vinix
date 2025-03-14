@@ -152,7 +152,7 @@ bin/$(OUTPUT): GNUmakefile linker.ld obj/blob.c.o $(OBJ) cc-runtime-x86_64/cc-ru
 obj/blob.c.o: GNUmakefile $(VFILES)
 	mkdir -p "$$(dirname $@)"
 	$(V) $(VFLAGS) -o obj/blob.c .
-	sed 's/call 0(/call *(/g' < obj/blob.c > obj/blob.c.tmp
+	sed 's/call 0(/call *(/g;/Wimplicit-function-declaration/d' < obj/blob.c > obj/blob.c.tmp
 	mv obj/blob.c.tmp obj/blob.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
 
