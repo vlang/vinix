@@ -6,9 +6,9 @@ revision=1
 imagedeps="build-essential"
 
 build() {
-    cp -r ${source_dir}/. ./
+    cp -rpf ${source_dir}/. ./
     set -x
-    cc $HOST_CFLAGS $HOST_CPPFLAGS -w -std=gnu99 $HOST_LDFLAGS v.c -lm -lpthread -o v
+    cc $HOST_CFLAGS $HOST_CPPFLAGS -w -std=gnu99 $HOST_LDFLAGS vc/v.c -lm -lpthread -o v
     set +x
 }
 

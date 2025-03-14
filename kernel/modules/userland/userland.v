@@ -682,14 +682,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			auxval, true)?
 
 		unsafe {
-			for s in argv {
-				s.free()
-			}
 			argv.free()
-
-			for s in envp {
-				s.free()
-			}
 			envp.free()
 		}
 		sched.dequeue_and_die()
