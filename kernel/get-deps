@@ -74,11 +74,11 @@ clone_repo_commit \
     cc-runtime \
     576a01179f3298a4795b92f42c088f9f8800b56b
 
-# 1.0.1
+# 1.0.2
 clone_repo_commit \
     https://github.com/mintsuki/flanterm.git \
     c/flanterm \
-    409a298eb2d44748e0159c5e5b2ed2ef679879b9
+    9d0f67b89db1d83236f9ac291339248ba3d5f479
 
 download_by_hash \
     https://github.com/charlesnicholson/nanoprintf/raw/0281ccf0b4105b194d5afb2cbb3cf308b9129d3a/nanoprintf.h \
