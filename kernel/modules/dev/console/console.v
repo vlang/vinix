@@ -351,7 +351,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 				}
 				console_buffer_i--
 				to_backspace := if console_buffer[console_buffer_i] >= 0x01
-					&& console_buffer[console_buffer_i] <= 0x1a {
+					&& console_buffer[console_buffer_i] <= 0x1f {
 					2
 				} else {
 					1
