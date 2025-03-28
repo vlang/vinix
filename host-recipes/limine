@@ -17,7 +17,7 @@ configure() {
 
         CFLAGS="$HOST_CFLAGS" \
         CXXFLAGS="$HOST_CXXFLAGS" \
-        LDFLAGS="$HOST_LDFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS -static" \
     "${source_dir}"/configure \
         --prefix="${prefix}" \
         TOOLCHAIN_FOR_TARGET=${OS_TRIPLET} \
@@ -27,7 +27,6 @@ configure() {
 }
 
 build() {
-        LDFLAGS="$LDFLAGS -static" \
     make -j${parallelism}
 }
 
