@@ -1,7 +1,7 @@
 #! /bin/sh
 
 name=v
-version=37c3f6578c821872bcb5b39263da2c1f505d671b
+version=fcd2eed04845ebd296885c660d5a2ae7bb36022e
 revision=1
 git_url="https://github.com/vlang/v.git"
 commit=${version}
