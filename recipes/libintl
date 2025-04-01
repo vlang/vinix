@@ -4,7 +4,7 @@ name=libintl
 from_source=gettext
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc libgcc libstdc++ libiconv"
+deps="mlibc libgcc openlibm libstdc++ libiconv"
 
 configure() {
         ACLOCAL=true \

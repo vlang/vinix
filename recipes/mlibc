@@ -1,9 +1,9 @@
 #! /bin/sh
 
 name=mlibc
-version=f52bd4e790ba67714cc97e9de2d1cd750e58c00f
+version=c56ec34696cb149205eaaf17d794bcf6f9062259
 revision=1
-git_url="https://github.com/managarm/mlibc.git"
+git_url="https://github.com/mintsuki/mlibc.git"
 commit=${version}
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config libgcc-binaries"

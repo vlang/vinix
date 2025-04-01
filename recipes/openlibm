@@ -1,0 +1,40 @@
+#! /bin/sh
+
+name=openlibm
+version=0.8.6
+revision=1
+git_url="https://github.com/JuliaMath/openlibm.git"
+commit=1eeb1395b4014884608b1f37d9653c1efe4dffce
+imagedeps="cmake ninja-build git"
+hostdeps="gcc pkg-config"
+deps="mlibc libgcc"
+
+configure() {
+    mkdir static_build
+    cd static_build
+    cmake_configure \
+        -DBUILD_SHARED_LIBS=OFF
+    cd ..
+
+    mkdir shared_build
+    cd shared_build
+    cmake_configure
+}
+
+build() {
+    ninja -C static_build -j${parallelism}
+    ninja -C shared_build -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja -C static_build install
+    DESTDIR="${dest_dir}" ninja -C shared_build install
+
+    ln -s openlibm_math.h "${dest_dir}${prefix}"/include/math.h
+    ln -s openlibm_complex.h "${dest_dir}${prefix}"/include/complex.h
+    ln -s openlibm_fenv.h "${dest_dir}${prefix}"/include/fenv.h
+    ln -s libopenlibm.a "${dest_dir}${prefix}"/lib/libm.a
+    ln -s libopenlibm.so "${dest_dir}${prefix}"/lib/libm.so
+
+    post_package_strip
+}
