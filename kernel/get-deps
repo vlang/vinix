@@ -65,18 +65,18 @@ download_by_hash() {
 }
 
 clone_repo_commit \
-    https://github.com/osdev0/freestnd-c-hdrs-0bsd.git \
+    https://codeberg.org/osdev/freestnd-c-hdrs-0bsd.git \
     freestnd-c-hdrs \
     a87c192f3eb66b0806740dc67325f9ad23fc2d0b
 
 clone_repo_commit \
-    https://github.com/osdev0/cc-runtime.git \
+    https://codeberg.org/osdev/cc-runtime.git \
     cc-runtime \
     576a01179f3298a4795b92f42c088f9f8800b56b
 
 # 1.0.2
 clone_repo_commit \
-    https://github.com/mintsuki/flanterm.git \
+    https://codeberg.org/mintsuki/flanterm.git \
     c/flanterm \
     9d0f67b89db1d83236f9ac291339248ba3d5f479
 

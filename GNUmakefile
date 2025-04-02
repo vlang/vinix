@@ -13,8 +13,10 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -Lo jinx https://github.com/mintsuki/jinx/raw/7a101a39eb061713f9c50ceafa1d713f35f17a3b/jinx
-	chmod +x jinx
+	git clone https://codeberg.org/mintsuki/jinx.git jinx-repo
+	git -C jinx-repo checkout 7a101a39eb061713f9c50ceafa1d713f35f17a3b
+	mv jinx-repo/jinx ./
+	rm -rf jinx-repo
 
 .PHONY: run-kvm
 run-kvm: vinix.iso

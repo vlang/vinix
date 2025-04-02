@@ -3,7 +3,7 @@
 name=freestnd-c-hdrs
 version=87956bbcad0e1934e708223913be53131311342d
 revision=1
-git_url="https://github.com/osdev0/freestnd-c-hdrs.git"
+git_url="https://codeberg.org/osdev/freestnd-c-hdrs.git"
 commit=${version}
 
 build() {
