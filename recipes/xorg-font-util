@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=xorg-font-util
+repology_id=font-util
 version=1.4.1
 revision=1
 tarball_url="https://www.x.org/archive/individual/font/font-util-${version}.tar.xz"

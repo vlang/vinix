@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=xorg-xinit
-version=1.4.2
+repology_id=xinit
+version=1.4.4
 revision=1
 tarball_url="https://www.x.org/releases/individual/app/xinit-${version}.tar.xz"
-tarball_blake2b="8f5c16d5ec9cc16c734b1661def4f7e68321259f24e7aac2b039b8e142fb4a324d2471a0f04d3b4448ae713082ad9ec7018083b00ed1a93aac90fa7db172247d"
+tarball_blake2b="54da6f5d31658a228987d4e3a17636bb5f3a36bc7067dfc8bcbe35c2944831e320edd7a92b172a55b2db41d6d757b22cfa2b712beb9d17c8f39d539a4294ba23"
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"

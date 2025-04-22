@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=bc
+repology_id=gnu-bc
 version=1.08.1
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/bc/bc-${version}.tar.gz"

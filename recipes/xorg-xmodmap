@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=xorg-xmodmap
+repology_id=xmodmap
 version=1.0.11
 revision=1
 tarball_url="https://www.x.org/releases/individual/app/xmodmap-${version}.tar.xz"

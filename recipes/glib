@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=glib
-version=2.82.4
+version=2.84.1
 revision=1
-tarball_url="https://download.gnome.org/sources/glib/2.82/glib-${version}.tar.xz"
-tarball_blake2b="62caecc7570b1639f6ddf1deb9debb6d3d6180b74f497f2fcace5ce65d6e28996555d51e5b4980f500bdc3f811b5b6214521b1170f553f2fa1fd240fd0eec835"
+tarball_url="https://download.gnome.org/sources/glib/2.84/glib-${version}.tar.xz"
+tarball_blake2b="d20ade482eb95873adaefc656e22c57e6712a6263a4812e448220040e30144919331cb279566a89a2ab46495b46d6a79e3821e491317587325fa3a64b40d62cc"
 imagedeps="meson ninja-build python3-setuptools"
 hostdeps="gcc pkg-config"
 deps="core-libs pcre2 libffi zlib"

@@ -1,6 +1,6 @@
 #! /bin/sh
 
 name=libgcc-binaries
-version=6097e89af23cc4eec9f31a5a089f93c35e63edef
-git_url="https://github.com/osdev0/libgcc-binaries.git"
+version=0819c2010fdd9c56d1fd075cb4fa39d9c8d45fca
+git_url="https://codeberg.org/osdev/libgcc-binaries.git"
 commit=${version}

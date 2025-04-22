@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=tree
+repology_id=tree-steve-baker
 version=2.2.1
 revision=1
 tarball_url="https://gitlab.com/OldManProgrammer/unix-tree/-/archive/${version}/unix-tree-${version}.tar.gz"

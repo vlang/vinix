@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=at-spi2-core
-version=2.54.1
+version=2.56.1
 revision=1
-tarball_url="https://download.gnome.org/sources/at-spi2-core/2.54/at-spi2-core-${version}.tar.xz"
-tarball_blake2b="b1a1657081f22623bba7730f687dc69e4b7c1562020edc42b29f0a8842ea8443021aab1b8fd23d75877c8023c43c586ce70640be42fef5663983381018e9e80b"
+tarball_url="https://download.gnome.org/sources/at-spi2-core/2.56/at-spi2-core-${version}.tar.xz"
+tarball_blake2b="bee557e2ad4c4d66234f294d13ed3ad7f3c4d3c1d31c10e269d4e805556555ecc0837ab8bbb811a7f90df5379f5c0913bd7b665784cf6d1fcda1cb069f2464eb"
 imagedeps="meson ninja-build libglib2.0-dev"
 hostdeps="gcc pkg-config"
 deps="core-libs bash dbus glib gsettings-desktop-schemas libx11 libxi libxkbcommon libxml libxtst"

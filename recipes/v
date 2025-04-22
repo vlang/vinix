@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=v
-version=fcd2eed04845ebd296885c660d5a2ae7bb36022e
+repology_id=vlang
+version=0.0git
 revision=1
 git_url="https://github.com/vlang/v.git"
-commit=${version}
+commit=fcd2eed04845ebd296885c660d5a2ae7bb36022e
 source_allow_network="yes"
 source_imagedeps="git"
 hostdeps="gcc"
@@ -14,7 +15,7 @@ prepare() {
     git clone https://github.com/vlang/vc.git
     cd vc
 
-    git checkout "$(git log --grep="\[v:master\] ${version} - " --pretty=format:"%H")"
+    git checkout "$(git log --grep="\[v:master\] ${commit} - " --pretty=format:"%H")"
 
     patch -p0 <"${base_dir}"/build-support/v/v.c.patch
 }

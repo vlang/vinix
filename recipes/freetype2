@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=freetype2
+repology_id=freetype
 version=2.13.3
 revision=1
 tarball_url="https://download.savannah.gnu.org/releases/freetype/freetype-${version}.tar.xz"

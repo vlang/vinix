@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=libexpat
-version=2.6.4
+repology_id=expat
+version=2.7.1
 revision=1
-tarball_url="https://github.com/libexpat/libexpat/releases/download/R_2_6_4/expat-${version}.tar.xz"
-tarball_blake2b="70d716722358db8d0acb2c74dbbc9d2362d04a0b856eab6b6d723614b656cf6aad9f6646339e0a32b4151db2e9541439bcb81ec87791e5e6ec0bd36a3ca067cc"
+tarball_url="https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-${version}.tar.xz"
+tarball_blake2b="243ef1c3578234135018d31b567c88a50cadddac86441e4d4a6d6330e113596edbad13b40c79f541d49487e7df98d798032d39ec28b7d67d22f46e4290d14519"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"

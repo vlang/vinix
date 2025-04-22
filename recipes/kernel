@@ -1,7 +1,8 @@
 #! /bin/sh
 
 name=kernel
-version=0.0
+skip_pkg_check=yes
+version=0.0git
 revision=1
 source_dir="kernel"
 source_imagedeps="git"

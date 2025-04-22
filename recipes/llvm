@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=llvm
-version=18.1.7
+version=20.1.3
 revision=1
 tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/llvm-project-${version}.src.tar.xz"
-tarball_blake2b="b8c37bd131fb5f3131bfab4fbad7aa811079ca10723faa14779253bc62b1ee08d4e04650e1da883297ed88a62d518b868a1f13cf57d03233254fd01209da5c02"
+tarball_blake2b="c738abb66dc82580a8f511829bcf87dd8deb8381bd073cd547e4eb02097c0190fa06488e5500cefce95953315432ee6ae3c103c491d08eca4b019e043691fc12"
 imagedeps="build-essential cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs ncurses zlib zstd libffi"

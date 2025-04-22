@@ -1,0 +1,18 @@
+#! /bin/sh
+
+name=ttf-liberation
+repology_id=fonts:liberation
+version=2.1.5
+revision=1
+tarball_url="https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-${version}.tar.gz"
+tarball_blake2b="9c9469b42becd8ccdfa0314b5f2c0fe7c1c59095c67ddc7dc656fe4ed951511e50f78da52c98700ed6f36549aacf4727339c1a786c5f16cc63d8a266318ca3d8"
+deps="core-libs"
+
+build() {
+    cp -r ${source_dir}/. ./
+}
+
+package() {
+    mkdir -p "${dest_dir}${prefix}/share/fonts/truetype"
+    cp -r * "${dest_dir}${prefix}/share/fonts/truetype/"
+}

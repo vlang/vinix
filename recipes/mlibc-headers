@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=mlibc-headers
+skip_pkg_check=yes
 revision=1
 from_source=mlibc
 imagedeps="meson ninja-build"

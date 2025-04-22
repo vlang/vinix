@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=mpfr
-version=4.2.1
+version=4.2.2
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/mpfr/mpfr-${version}.tar.xz"
-tarball_blake2b="ad69f53bc910294647523e7613b18a683f1d0f3dd994168ab2a46b66d0371ffa9b8e7cb59495f898470aea69d343e83fc722f11babe4af7b3a12665a1e65860c"
+tarball_blake2b="6bbf5658e70fbb673a3b65246a6bac708d1571aa6943c6742efd92f468ac71e6f0fe351b757f7133440ea312d9a5fc3549acd89d54f4d975c58bdc204d7b21ec"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="autoconf-archive"
 imagedeps="build-essential"

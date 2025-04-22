@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=zstd
-version=1.5.6
+version=1.5.7
 revision=1
 tarball_url="https://github.com/facebook/zstd/releases/download/v${version}/zstd-${version}.tar.gz"
-tarball_blake2b="fe17cf0950f8ee2cc07bfa2b41e97f36a1832e396386cb94a55bede975dc974920578cf147b39eecbc5b53ff06fe0dc1fe781a4cab9bc9f767ea28c0e786422e"
+tarball_blake2b="ef6bcf13bbb79edce2de21ef4860b01dcb4d2dd47ebd03657d5331c3bb1a207ef128e99ed907a32e787dca7bb51df225ebd8abb2097d03d02c003ca713e1e271"
 imagedeps="cmake ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs zlib xz lz4"

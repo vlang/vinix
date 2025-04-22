@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=libintl
+skip_pkg_check=yes
 from_source=gettext
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"

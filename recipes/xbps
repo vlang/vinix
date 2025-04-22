@@ -1,0 +1,37 @@
+#! /bin/sh
+
+name=xbps
+version=0.59.2
+revision=1
+tarball_url="https://github.com/void-linux/xbps/archive/refs/tags/${version}.tar.gz"
+tarball_blake2b="cabe5676eb1611271f255c75f4439f3ef4ea6096d6fc26f0982da471556e1fd1733cb76a6d5857d3546513b157e8a3493624d09d989134f3f6d7763c55e98a83"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs libarchive openssl"
+
+configure() {
+    cp -rp "${source_dir}"/. ./
+
+        CFLAGS="$TARGET_CFLAGS" \
+        CPPFLAGS="$TARGET_CPPFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+    ./configure \
+        --verbose \
+        --host=${OS_TRIPLET} \
+        --prefix="${prefix}" \
+        --sysconfdir=/etc
+}
+
+build() {
+    make AR="$ARCHITECTURE-vinix-mlibc-ar" RANLIB="$ARCHITECTURE-vinix-mlibc-ranlib" -j${parallelism}
+}
+
+package() {
+    mkdir -p "${dest_dir}${prefix}"/share/xbps.d
+
+    DESTDIR="${dest_dir}" make install
+
+    # Remove static libraries
+    rm "${dest_dir}${prefix}"/lib/*.a
+
+    post_package_strip
+}

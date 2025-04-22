@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libx11
-version=1.8.10
+version=1.8.12
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libX11-${version}.tar.xz"
-tarball_blake2b="72ff400e1aad5bcb04e5dd3fb43f7767fad47e38cf628382cd5ffd5a204efc4de4f626027dddbbc7e10f80f8eaee0bcdf9792d9d012256366920f7ae0cffcb15"
+tarball_blake2b="f4bdb69abb2add723ca84832ef35f239659228c1f5a3f53631f0d4d4afa7030512b9ba65479464f3efecca0e09d1f758e3b92b139dd5e716fac1b8caaf5bb98d"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="xtrans xorg-util-macros"
 imagedeps="build-essential"

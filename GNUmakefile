@@ -14,7 +14,7 @@ debug:
 
 jinx:
 	git clone https://codeberg.org/mintsuki/jinx.git jinx-repo
-	git -C jinx-repo checkout 7a101a39eb061713f9c50ceafa1d713f35f17a3b
+	git -C jinx-repo checkout 275dd562af97a5c9c4ccc5d0e29611cb14f73231
 	mv jinx-repo/jinx ./
 	rm -rf jinx-repo
 

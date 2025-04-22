@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=base-files
+skip_pkg_check=yes
 version=0.0
 revision=1
 source_dir="base-files"
 
 package() {
-    cp -rpv ${source_dir}/. "${dest_dir}"/
+    cp -r ${source_dir}/. "${dest_dir}"/
 }

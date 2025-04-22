@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=xorg-xmessage
+repology_id=xmessage
 version=1.0.7
 revision=1
 tarball_url="https://www.x.org/pub/individual/app/xmessage-${version}.tar.xz"

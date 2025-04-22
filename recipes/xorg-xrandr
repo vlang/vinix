@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=xorg-xrandr
+repology_id=xrandr
 version=1.5.3
 revision=1
 tarball_url="https://www.x.org/pub/individual/app/xrandr-${version}.tar.xz"

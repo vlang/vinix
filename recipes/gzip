@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=gzip
-version=1.13
+version=1.14
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/gzip/gzip-${version}.tar.xz"
-tarball_blake2b="f0e3b4c28bafcd3b59b65ac2d71218dc58d81b52c6921c1be038757c99e99184178c5d0e9674caa5099713b8b64e8c85cf061f4abfa20b73b478288f121fb05d"
+tarball_blake2b="32f7241bd9f3b7f73a59905a5bc9abf4e360e787f692cbb00ad28d48abee52744846d10c07ce2f7aaa3e66bc4b6ab9cd4f1b8e98854bb7d1ec010ae0d5146932"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"

@@ -1,0 +1,39 @@
+diff --git gettext-clean/gettext-runtime/intl/gnulib-lib/getlocalename_l-unsafe.c gettext-workdir/gettext-runtime/intl/gnulib-lib/getlocalename_l-unsafe.c
+index 627434f..9c8e818 100644
+--- gettext-clean/gettext-runtime/intl/gnulib-lib/getlocalename_l-unsafe.c
++++ gettext-workdir/gettext-runtime/intl/gnulib-lib/getlocalename_l-unsafe.c
+@@ -469,6 +469,8 @@ getlocalename_l_unsafe (int category, locale_t locale)
+       struct gl_locale_category_t *plc =
+         &locale->category[gl_log2_lcmask_to_index (gl_log2_lc_mask (category))];
+       return (struct string_with_storage) { plc->name, STORAGE_OBJECT };
++#elif __vinix__
++      return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #elif __GLIBC__ >= 2 && !defined __UCLIBC__
+       /* Work around an incorrect definition of the _NL_LOCALE_NAME macro in
+          glibc < 2.12.
+diff --git gettext-clean/gettext-runtime/gnulib-lib/getlocalename_l-unsafe.c gettext-workdir/gettext-runtime/gnulib-lib/getlocalename_l-unsafe.c
+index 627434f..9c8e818 100644
+--- gettext-clean/gettext-runtime/gnulib-lib/getlocalename_l-unsafe.c
++++ gettext-workdir/gettext-runtime/gnulib-lib/getlocalename_l-unsafe.c
+@@ -469,6 +469,8 @@ getlocalename_l_unsafe (int category, locale_t locale)
+       struct gl_locale_category_t *plc =
+         &locale->category[gl_log2_lcmask_to_index (gl_log2_lc_mask (category))];
+       return (struct string_with_storage) { plc->name, STORAGE_OBJECT };
++#elif __vinix__
++      return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #elif __GLIBC__ >= 2 && !defined __UCLIBC__
+       /* Work around an incorrect definition of the _NL_LOCALE_NAME macro in
+          glibc < 2.12.
+diff --git gettext-clean/gettext-tools/gnulib-lib/getlocalename_l-unsafe.c gettext-workdir/gettext-tools/gnulib-lib/getlocalename_l-unsafe.c
+index 627434f..9c8e818 100644
+--- gettext-clean/gettext-tools/gnulib-lib/getlocalename_l-unsafe.c
++++ gettext-workdir/gettext-tools/gnulib-lib/getlocalename_l-unsafe.c
+@@ -469,6 +469,8 @@ getlocalename_l_unsafe (int category, locale_t locale)
+       struct gl_locale_category_t *plc =
+         &locale->category[gl_log2_lcmask_to_index (gl_log2_lc_mask (category))];
+       return (struct string_with_storage) { plc->name, STORAGE_OBJECT };
++#elif __vinix__
++      return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #elif __GLIBC__ >= 2 && !defined __UCLIBC__
+       /* Work around an incorrect definition of the _NL_LOCALE_NAME macro in
+          glibc < 2.12.

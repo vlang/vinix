@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=cairo
-version=1.18.2
+repology_id=cairo-graphics-library
+version=1.18.4
 revision=1
 tarball_url="https://cairographics.org/releases/cairo-${version}.tar.xz"
-tarball_blake2b="6046ebc96bf79ef4fcff476d998cee756b0132198c129b049101ab7a70fe420b37f0f0b3ff90c51188005a19b87cb9dabe451bd97679d75ef397f0b3feb2af14"
+tarball_blake2b="976de469b077dac964d15257e5d2edf271df720d45370c6cd6ee1d1df79aec5b1e1126a2fb1954c5f5dd74b0b83f32e44d3e442f983d436aa7f389807615b3ed"
 imagedeps="meson ninja-build binutils"
 hostdeps="gcc pkg-config"
 deps="core-libs fontconfig freetype2 glib libpng libx11 libxcb libxext libxrender pixman zlib"

@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libzip
-version=1.10.1
+version=1.11.3
 revision=1
 tarball_url="https://github.com/nih-at/libzip/releases/download/v${version}/libzip-${version}.tar.xz"
-tarball_blake2b="bd5e6ea92ebf1c1210aa4b6fc58f0060d7a87ef2f47ac8475a0e30d67bd7e44f5a7671faf50d670ccfcf4117c379a1b1704871f88ec95654cc2c971e29965018"
+tarball_blake2b="3296ff48ce853687ea4fbe310130c2468c87990da9a6c285acb09406afb23fe2240fb27a94c23db8b2ad58bd7b80f5b6e84d0702957792d0baddd13487c483dd"
 imagedeps="cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="core-libs zlib bzip2 xz zstd openssl"

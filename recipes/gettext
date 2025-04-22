@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=gettext
-version=0.23.1
+repology_srcname=gettext
+version=0.24
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/gettext/gettext-${version}.tar.xz"
-tarball_blake2b="08d10340f3d855a87a96594c6f2dcf72925394f02e86235090f8d272e0a27ce32e57a0fbaed61aaf61d7328ff30be076dccaecaa13832d8db3ec0a51786780b9"
+tarball_blake2b="a171c9a62552d8cbb632f76c734c7b8ef0b99ae56a2b12548bfc61fe671ad4c39611b4e66fe89e51a1d1d31f1052fb6a1d33930820fd0fa8d9fb83bd38504e50"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"

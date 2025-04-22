@@ -1,6 +1,8 @@
 #! /bin/sh
 
 name=libgcc
+skip_pkg_check=yes
+version="$(. "${base_dir}"/source-recipes/gcc-host && echo $version)"
 revision=1
 hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
 imagedeps="build-essential"

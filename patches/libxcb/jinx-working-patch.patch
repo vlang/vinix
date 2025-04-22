@@ -1,0 +1,15 @@
+diff --git libxcb-clean/doc/Makefile.am libxcb-workdir/doc/Makefile.am
+index f3c934a..08880d7 100644
+--- libxcb-clean/doc/Makefile.am
++++ libxcb-workdir/doc/Makefile.am
+@@ -35,8 +35,8 @@ install-data-local:
+ 	  $(mkinstalldirs) '$(DESTDIR)$(htmldir)'; \
+ 	fi
+ 	@for d in $(docdirs); do \
+-	  echo "cp -pR $$d '$(DESTDIR)$(htmldir)/'"; \
+-	  cp -pR $$d '$(DESTDIR)$(htmldir)/'; \
++	  echo "cp -R $$d '$(DESTDIR)$(htmldir)/'"; \
++	  cp -R $$d '$(DESTDIR)$(htmldir)/'; \
+ 	done
+ 
+ uninstall-local:

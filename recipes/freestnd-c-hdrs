@@ -1,10 +1,11 @@
 #! /bin/sh
 
 name=freestnd-c-hdrs
-version=87956bbcad0e1934e708223913be53131311342d
+skip_pkg_check=yes
+version=0.0git
 revision=1
 git_url="https://codeberg.org/osdev/freestnd-c-hdrs.git"
-commit=${version}
+commit=4039f438fb1dc1064d8e98f70e1cf122f91b763b
 
 build() {
     cp -rpf "${source_dir}"/. ./

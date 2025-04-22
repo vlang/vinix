@@ -1,11 +1,11 @@
 #! /bin/sh
 
 name=libxkbcommon
-version=1.7.0
+version=1.8.1
 revision=1
-tarball_url="https://xkbcommon.org/download/libxkbcommon-${version}.tar.xz"
-tarball_blake2b="b85cd8a78fce3c624e0c64c26a37b6d99bb8b8f3de489c6909826f53bdb6d33842f7ffcf955f6a9a8eb57cad53fc9756bd15d05aeb813b0f92985827243949a8"
-imagedeps="meson ninja-build"
+git_url="https://github.com/xkbcommon/libxkbcommon.git"
+commit=b3465081878e80ca6c11fe35c81787ec374ec15a
+imagedeps="git meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs libxcb libxml xkeyboard-config"
 
@@ -24,6 +24,7 @@ package() {
     DESTDIR="${dest_dir}" ninja install
 
     mkdir -p "${dest_dir}${prefix}/share/X11/xkb"
+    touch "${dest_dir}${prefix}/share/X11/xkb/.keep"
 
     post_package_strip
 }

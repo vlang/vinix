@@ -1,0 +1,241 @@
+diff --git xbps-clean/bin/xbps-create/main.c xbps-workdir/bin/xbps-create/main.c
+index 373e744..73ed280 100644
+--- xbps-clean/bin/xbps-create/main.c
++++ xbps-workdir/bin/xbps-create/main.c
+@@ -41,7 +41,7 @@
+ #include <libgen.h>
+ #include <locale.h>
+ #include <dirent.h>
+-
++#include <limits.h>
+ #include <xbps.h>
+ #include "queue.h"
+ 
+diff --git xbps-clean/bin/xbps-install/util.c xbps-workdir/bin/xbps-install/util.c
+index 7cabdd1..0182300 100644
+--- xbps-clean/bin/xbps-install/util.c
++++ xbps-workdir/bin/xbps-install/util.c
+@@ -32,7 +32,7 @@
+ #include <strings.h>
+ #include <sys/ioctl.h>
+ #include <assert.h>
+-
++#include <termios.h>
+ #include <xbps.h>
+ #include "defs.h"
+ 
+diff --git xbps-clean/configure xbps-workdir/configure
+index 57df730..a4109d0 100755
+--- xbps-clean/configure
++++ xbps-workdir/configure
+@@ -1,7 +1,7 @@
+ #!/bin/sh
+ # Try and be like autotools configure, but without autotools
+ 
+-VERSION=0.59.1
++VERSION=0.59.2
+ 
+ # Ensure that we do not inherit these from env
+ OS=
+@@ -189,7 +189,7 @@ else
+ 	echo "Using compiler $CC"
+ fi
+ 
+-[ -z "$DEBUG" ] && DEBUG=yes
++[ -z "$DEBUG" ] && DEBUG=no
+ 
+ echo "CC =	$CC" >>$CONFIG_MK
+ echo "CFLAGS =	-O2" >>$CONFIG_MK
+@@ -275,7 +275,7 @@ fi
+ #
+ # Check for some compiler warning flags.
+ #
+-for f in all extra error shadow "format=2" missing-prototypes \
++for f in all extra shadow "format=2" missing-prototypes \
+ 	missing-declarations nested-externs vla overlength-strings \
+ 	unsafe-loop-optimizations undef sign-compare \
+ 	missing-include-dirs old-style-definition \
+@@ -677,7 +677,7 @@ fi
+ # pkg-config is required to know dependencies for static linking.
+ #
+ printf "Checking for pkg-config ... "
+-PKGCONFIG_BIN=$(_which pkg-config)
++PKGCONFIG_BIN="x86_64-vinix-mlibc-pkg-config"
+ if [ -z "$PKGCONFIG_BIN" ]; then
+ 	echo "not found, exiting."
+ 	exit 1
+@@ -691,14 +691,14 @@ fi
+ LIBARCHIVE_REQVER=3.3.3
+ 
+ printf "Checking for libarchive >= ${LIBARCHIVE_REQVER}  via pkg-config ... "
+-if ! pkg-config --atleast-version=${LIBARCHIVE_REQVER} libarchive; then
++if ! $PKGCONFIG_BIN --atleast-version=${LIBARCHIVE_REQVER} libarchive; then
+ 	echo "libarchive.pc file not found, exiting."
+ 	exit 1
+ else
+-	echo "found version $(pkg-config --modversion libarchive)."
+-	echo "CFLAGS += $(pkg-config --cflags libarchive)" >>$CONFIG_MK
+-	echo "LDFLAGS +=        $(pkg-config --libs libarchive)" >>$CONFIG_MK
+-	echo "STATIC_LIBS +=    $(pkg-config --libs --static libarchive)" \
++	echo "found version $($PKGCONFIG_BIN --modversion libarchive)."
++	echo "CFLAGS += $($PKGCONFIG_BIN --cflags libarchive)" >>$CONFIG_MK
++	echo "LDFLAGS +=        $($PKGCONFIG_BIN --libs libarchive)" >>$CONFIG_MK
++	echo "STATIC_LIBS +=    $($PKGCONFIG_BIN --libs --static libarchive)" \
+ 		>>$CONFIG_MK
+ fi
+ 
+@@ -706,17 +706,17 @@ fi
+ # libssl with pkg-config support is required.
+ #
+ printf "Checking for libssl via pkg-config ... "
+-if pkg-config --exists 'libssl' && ! pkg-config --exists libtls ; then
+-	echo "found OpenSSL version $(pkg-config --modversion libssl)."
+-elif pkg-config --exists libssl libtls; then
+-	echo "found LibreSSL version $(pkg-config --modversion libssl)."
++if $PKGCONFIG_BIN --exists 'libssl' && ! $PKGCONFIG_BIN --exists libtls ; then
++	echo "found OpenSSL version $($PKGCONFIG_BIN --modversion libssl)."
++elif $PKGCONFIG_BIN --exists libssl libtls; then
++	echo "found LibreSSL version $($PKGCONFIG_BIN --modversion libssl)."
+ else
+ 	echo "libssl.pc file not found or incompatible version detected, exiting."
+ 	exit 1
+ fi
+-echo "CFLAGS += $(pkg-config --cflags libssl)" >>$CONFIG_MK
+-echo "LDFLAGS +=        $(pkg-config --libs libssl)" >>$CONFIG_MK
+-echo "STATIC_LIBS +=    $(pkg-config --libs --static libssl)" \
++echo "CFLAGS += $($PKGCONFIG_BIN --cflags libssl)" >>$CONFIG_MK
++echo "LDFLAGS +=        $($PKGCONFIG_BIN --libs libssl)" >>$CONFIG_MK
++echo "STATIC_LIBS +=    $($PKGCONFIG_BIN --libs --static libssl)" \
+ 	>>$CONFIG_MK
+ 
+ #
+@@ -734,13 +734,13 @@ fi
+ #
+ if [ "$BUILD_TESTS" = "yes" ]; then
+ 	printf "Checking for ATF via pkg-config ... "
+-	if ! pkg-config --atleast-version=0.15 atf-c; then
++	if ! $PKGCONFIG_BIN --atleast-version=0.15 atf-c; then
+ 		echo "ATF >= 0.15 not found in PKG_CONFIG_LIBDIR, exiting."
+ 		exit 1
+ 	fi
+-	echo "found version $(pkg-config --modversion atf-c)."
+-	echo "TEST_CFLAGS += $(pkg-config --cflags atf-c)" >>$CONFIG_MK
+-	echo "TEST_LDFLAGS += $(pkg-config --libs atf-c)" >>$CONFIG_MK
++	echo "found version $($PKGCONFIG_BIN --modversion atf-c)."
++	echo "TEST_CFLAGS += $($PKGCONFIG_BIN --cflags atf-c)" >>$CONFIG_MK
++	echo "TEST_LDFLAGS += $($PKGCONFIG_BIN --libs atf-c)" >>$CONFIG_MK
+ 	echo "BUILD_TESTS = yes" >>$CONFIG_MK
+ 	BUILD_TESTS_VALUE=yes
+ else
+diff --git xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist
+deleted file mode 100644
+index c1e82a7..0000000
+--- xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist
++++ /dev/null
+@@ -1,12 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+-<plist version="1.0">
+-<dict>
+-	<key>public-key</key>
+-	<data>LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQ0lqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FnOEFNSUlDQ2dLQ0FnRUF2clN6QlpNdmd2T0NJM0FYYk9qYQoycktSa0pTVE0zYy9FalRJZ0NnRFhndW05M0JQQ3RZOE1jRlZvQ1U0T2lYSEdmVG1xMzlCVk5wTHZMSEw5S2sxCnAyNzhTQmhYVk90YkIyRVZtREtudmZJREVUbGRMR3plN3JaTlJKZHR1TjJtWi9UVnJVQjlTMHlRYytJdWY0aHYKMytEOTdWSWRUSkhBN0FTcjA0MjhwcEVHSkd3U1NoWTJYSm05RDVJMEV1R1JXYzE0TUVHN2RJS0ppWWlNMG5FNAp0WW8yL3ZINElGVEhkblZBM2dZaVp5RG5idUNBUi84RVNmVVRVMTNTTkNPZGJ1ZGYzRDVCY3krVWlNREpJM1llCjRNRktCclQ5WmhaK0dzWEJaWTQ4MmxxaVppNkNMNXB0YzlJUUZmOC9lS1phOGphdGtpVkZWZ3JLZU5Sak9UeE4KZldTdTJua3hHTlgrYmhYWXRoaUdXbUpFWThjQ0FQeUZOK0x2NVJldEsyNTZnZGNiMnNrbUVxZWZ2MnpQQyt3VgpXQmJkSDViRDRiWmpuME42Wmw4MXJ2NVJ6RHZudmYrdkQxNGFGVWJaOFFGcXU3NVBiTDR3Nm1ZTTRsZE0vZzBSCjZOWEU4QXo5Qnd4MnREZlllS3V1dHcxRXBQbTJZdkZ5VFViMWNveUF1VEdSeUFhcDFVVEh2ZzlsaFBJSm1oRlEKSjVrQ2cxcUQ3QTMxV2wwUmxuZTZoZ0dvMFpaTko1Y0pNL3YvelNUS0pjdUZnd283SDBoT0dpbDZEZm84OUI0agpHOTZBQ3lQUytEVktQRlhSWXdqL0FrYkhwYVEyZjFGTUFvU3BCcXVEcUhoM3VrazcxS1g2ajE5dDBpRjhEUUxyCnZ0RlNTZElqREEwMmx3ZVY5TmFRcFdzQ0F3RUFBUT09Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=</data>
+-	<key>public-key-size</key>
+-	<integer>4096</integer>
+-	<key>signature-by</key>
+-	<string>Void Linux</string>
+-</dict>
+-</plist>
+diff --git xbps-clean/data/Makefile xbps-workdir/data/Makefile
+index 8bf9410..4f58736 100644
+--- xbps-clean/data/Makefile
++++ xbps-workdir/data/Makefile
+@@ -16,7 +16,7 @@ install:
+ 	install -d $(DESTDIR)$(PKGCONFIGDIR)
+ 	install -m644 $(PCFILE) $(DESTDIR)$(PKGCONFIGDIR)
+ 	install -d $(DESTDIR)/$(DBDIR)/keys
+-	install -m644 *.plist $(DESTDIR)/$(DBDIR)/keys
++	-install -m644 *.plist $(DESTDIR)/$(DBDIR)/keys
+ 	install -d $(DESTDIR)/$(SHAREDIR)/xbps.d
+ 	install -m644 repod-main.conf $(DESTDIR)/$(SHAREDIR)/xbps.d/00-repository-main.conf
+ 	install -m644 xbps.conf $(DESTDIR)/$(SHAREDIR)/xbps.d/xbps.conf
+diff --git xbps-clean/data/repod-main.conf xbps-workdir/data/repod-main.conf
+index 9890a84..ba3b073 100644
+--- xbps-clean/data/repod-main.conf
++++ xbps-workdir/data/repod-main.conf
+@@ -1 +1 @@
+-repository=https://a-hel-fi.m.voidlinux.org/current
++repository=https://localhost/repo/current
+diff --git xbps-clean/lib/Makefile xbps-workdir/lib/Makefile
+index 847bfdd..f80c0f6 100644
+--- xbps-clean/lib/Makefile
++++ xbps-workdir/lib/Makefile
+@@ -93,8 +93,8 @@ install: all
+ 	install -d $(DESTDIR)$(LIBDIR)
+ 	install -m 644 libxbps.a $(DESTDIR)$(LIBDIR)
+ 	install -m 755 $(LIBXBPS_SHLIB) $(DESTDIR)$(LIBDIR)
+-	cp -a libxbps.so $(DESTDIR)$(LIBDIR)
+-	cp -a libxbps.so.$(LIBXBPS_MAJOR) $(DESTDIR)$(LIBDIR)
++	cp -dR libxbps.so $(DESTDIR)$(LIBDIR)
++	cp -dR libxbps.so.$(LIBXBPS_MAJOR) $(DESTDIR)$(LIBDIR)
+ 
+ .PHONY: uninstall
+ uninstall:
+diff --git xbps-clean/lib/fetch/ftp.c xbps-workdir/lib/fetch/ftp.c
+index 28296a0..f543ce1 100644
+--- xbps-clean/lib/fetch/ftp.c
++++ xbps-workdir/lib/fetch/ftp.c
+@@ -79,7 +79,7 @@
+ #include <string.h>
+ #include <time.h>
+ #include <unistd.h>
+-
++#include <strings.h>
+ #include "fetch.h"
+ #include "common.h"
+ #include "ftperr.h"
+@@ -147,7 +147,7 @@ unmappedaddr(struct sockaddr_in6 *sin6, socklen_t *len)
+ 	sin4->sin_port = port;
+ 	sin4->sin_family = AF_INET;
+ 	*len = sizeof(struct sockaddr_in);
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__vinix__)
+ 	sin4->sin_len = sizeof(struct sockaddr_in);
+ #endif
+ }
+diff --git xbps-clean/lib/fetch/http.c xbps-workdir/lib/fetch/http.c
+index f7b9142..d68b8f8 100644
+--- xbps-clean/lib/fetch/http.c
++++ xbps-workdir/lib/fetch/http.c
+@@ -78,7 +78,7 @@
+ #include <string.h>
+ #include <time.h>
+ #include <unistd.h>
+-
++#include <strings.h>
+ #include <netinet/in.h>
+ #include <netinet/tcp.h>
+ 
+diff --git xbps-clean/lib/portableproplib/prop_object.c xbps-workdir/lib/portableproplib/prop_object.c
+index 50cd918..8295b44 100644
+--- xbps-clean/lib/portableproplib/prop_object.c
++++ xbps-workdir/lib/portableproplib/prop_object.c
+@@ -956,14 +956,14 @@ _prop_object_internalize_map_file(const char *fname)
+ 	if ((sb.st_size & pgmask) == 0)
+ 		need_guard = true;
+ 
+-	mf->poimf_xml = mmap(NULL, need_guard ? mf->poimf_mapsize + pgsize
+-			    		      : mf->poimf_mapsize,
+-			    PROT_READ, MAP_SHARED, fd, (off_t)0);
+-	(void) close(fd);
+-	if (mf->poimf_xml == MAP_FAILED) {
++	mf->poimf_xml = malloc(need_guard ? mf->poimf_mapsize + pgsize : mf->poimf_mapsize);
++	if (mf->poimf_xml == NULL) {
+ 		_PROP_FREE(mf, M_TEMP);
+ 		return (NULL);
+ 	}
++	ssize_t rsz = read(fd, mf->poimf_xml, need_guard ? mf->poimf_mapsize + pgsize : mf->poimf_mapsize);
++	(void) close(fd);
++
+ 	(void)posix_madvise(mf->poimf_xml, mf->poimf_mapsize, POSIX_MADV_SEQUENTIAL);
+ 
+ 	if (need_guard) {

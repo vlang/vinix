@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=libtiff
+repology_id=tiff
 version=4.7.0
 revision=1
 tarball_url="https://download.osgeo.org/libtiff/tiff-${version}.tar.xz"

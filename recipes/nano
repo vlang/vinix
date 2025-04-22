@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=nano
-version=8.3
+version=8.4
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/nano/nano-${version}.tar.xz"
-tarball_blake2b="39c400483f79f11da0f959fed769462b65007f9235cb76d38e71d0a63919b659dc553d44f5d13dd13db801ec361fd7a3ad68b68bfa456ac6c169c861e80c6067"
+tarball_blake2b="2e5dbe6982ef9d284c6e018abad593bf383f27c85047241bafaa098948b73897c0a81b63aa453385ac93afc1c398936464d5a1fb024d00936ad383c5e5e4403f"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs ncurses"
@@ -14,6 +14,7 @@ prepare() {
 }
 
 configure() {
+        gl_cv_func_strcasecmp_works=yes \
     autotools_configure
 }
 

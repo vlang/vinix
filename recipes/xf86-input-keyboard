@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=xf86-input-keyboard
+repology_id=xdrv:keyboard
 version=2.1.0
 revision=1
 tarball_url="https://www.x.org/releases/individual/driver/xf86-input-keyboard-${version}.tar.gz"

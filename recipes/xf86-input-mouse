@@ -1,6 +1,7 @@
 #! /bin/sh
 
 name=xf86-input-mouse
+repology_id=xdrv:mouse
 version=1.9.5
 revision=1
 tarball_url="https://xorg.freedesktop.org/archive/individual/driver/xf86-input-mouse-${version}.tar.gz"

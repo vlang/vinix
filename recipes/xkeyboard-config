@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=xkeyboard-config
-version=2.43
+version=2.44
 revision=1
 tarball_url="https://www.x.org/archive/individual/data/xkeyboard-config/xkeyboard-config-${version}.tar.xz"
-tarball_blake2b="89cf4872305ce3358185ed63f0ff2f0dc90205d50d51b4b881256e0762b12a74f30d0905a75e5feff2f0fef09d94bee778a8cbe83cdf6e048653e8eb42f53087"
+tarball_blake2b="6abb485ef5c9cb1292afaed22ac72026dc22c0a08c3bf04ca29f8dd61d68cbf06e511fe095628a0ab6dec7766374318c4b5bddeb2c4da8a8a692bbbbf4b4e83b"
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs xorg-xkbcomp"
