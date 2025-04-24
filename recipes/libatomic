@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=libatomic
+from_source=gcc-host
+revision=1
+hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
+imagedeps="build-essential"
+deps="mlibc libgcc libstdc++"
+
+build() {
+    cd "${base_dir}"/host-builds/gcc/build
+
+    make -j${parallelism} all-target-libatomic
+}
+
+package() {
+    cd "${base_dir}"/host-builds/gcc/build
+
+    rm -rf tmp_libatomic_dir
+    mkdir tmp_libatomic_dir
+
+    DESTDIR="$(realpath tmp_libatomic_dir)" make install-target-libatomic
+
+    mkdir -p "${dest_dir}${prefix}"
+    cp -r tmp_libatomic_dir/usr/local/${OS_TRIPLET}/* "${dest_dir}${prefix}"/
+
+    # Copy libatomic into GCC's tree else it will complain.
+    mkdir -p "${base_dir}"/host-pkgs/gcc/usr/local/${OS_TRIPLET}
+    cp -r tmp_libatomic_dir/usr/local/${OS_TRIPLET}/* "${base_dir}"/host-pkgs/gcc/usr/local/${OS_TRIPLET}/
+}

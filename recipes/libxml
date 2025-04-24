@@ -2,10 +2,10 @@
 
 name=libxml
 repology_id=libxml2
-version=2.14.1
+version=2.14.2
 revision=1
 tarball_url="https://download.gnome.org/sources/libxml2/2.14/libxml2-${version}.tar.xz"
-tarball_blake2b="adce8c2e50d0aff6f557a771e68b001e796dff4ad81c96cfada0f19a899dbe67eb9b7040fc1f4cee3a3f87511cc6588752560190a8193cbae1783cbd562ed6f1"
+tarball_blake2b="2331234ed60358168298d04c83162bfe7d08e6fc77091fe1ecf8384e68902ab745f039dc807d12dda3124313724806bd7fb651de975dbc60fdaf963bac043ff8"
 source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs zlib icu readline"

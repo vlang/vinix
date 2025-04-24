@@ -18,6 +18,7 @@ prepare() {
 
 configure() {
     autotools_configure \
+        --enable-freetype-config \
         --with-harfbuzz=no
 }
 

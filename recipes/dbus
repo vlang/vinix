@@ -34,5 +34,8 @@ build() {
 package() {
     DESTDIR="${dest_dir}" ninja install
 
+    touch "${dest_dir}/${prefix}"/share/dbus-1/session.d/.keep
+    touch "${dest_dir}"/var/lib/dbus/.keep
+
     post_package_strip
 }

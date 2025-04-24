@@ -88,6 +88,19 @@ index 95c91ee..dd17677 100644
  x86_64-*-fuchsia*)
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
+diff --git gcc-host-clean/libatomic/configure.tgt gcc-host-workdir/libatomic/configure.tgt
+index 4237f28..8327bfa 100644
+--- gcc-host-clean/libatomic/configure.tgt
++++ gcc-host-workdir/libatomic/configure.tgt
+@@ -151,7 +151,7 @@ case "${target}" in
+   *-*-linux* | *-*-gnu* | *-*-k*bsd*-gnu \
+   | *-*-netbsd* | *-*-freebsd* | *-*-openbsd* | *-*-dragonfly* \
+   | *-*-solaris2* | *-*-sysv4* | *-*-irix6* | *-*-osf* | *-*-hpux11* \
+-  | *-*-darwin* | *-*-aix* | *-*-cygwin*)
++  | *-*-darwin* | *-*-aix* | *-*-cygwin* | *-*-mlibc*)
+ 	# POSIX system.  The OS is supported.
+ 	config_path="${config_path} posix"
+ 	;;
 diff --git gcc-host-clean/libcpp/Makefile.in gcc-host-workdir/libcpp/Makefile.in
 index ebbca37..ea97ba4 100644
 --- gcc-host-clean/libcpp/Makefile.in

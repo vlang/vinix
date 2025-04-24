@@ -19,7 +19,7 @@ configure() {
         --disable-setuid \
         --with-systemdtmpfilesdir= \
         --with-systemdsystemunitdir= \
-        --with-pager=/usr/bin/less
+        --with-pager=${prefix}/bin/less
 }
 
 build() {

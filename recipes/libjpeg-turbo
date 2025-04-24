@@ -10,7 +10,8 @@ hostdeps="gcc pkg-config"
 deps="core-libs"
 
 configure() {
-    cmake_configure
+    cmake_configure \
+        -DWITH_JPEG8=ON
 }
 
 build() {

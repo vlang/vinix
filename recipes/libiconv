@@ -8,7 +8,7 @@ tarball_blake2b="374e7a7299d4814d372d8e63246c11f403f9fc990be5b129d016b92a875d2f8
 source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="binutils"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="mlibc libgcc libstdc++"
+deps="mlibc libgcc libstdc++ libatomic"
 
 prepare() {
     cp /usr/local/share/aclocal/libtool.m4 ./m4/
@@ -31,6 +31,10 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" make install
+
+    # Move documentation into a sub-directory
+    mkdir -p "${dest_dir}${prefix}/share/doc/libiconv"
+    mv "${dest_dir}${prefix}/share/doc"/*.html "${dest_dir}${prefix}/share/doc/libiconv/"
 
     post_package_strip
 }

@@ -28,7 +28,7 @@ configure() {
         --with-system-expat \
         --enable-loadable-sqlite-extensions \
         --without-ensurepip \
-        --with-tzpath=/usr/share/zoneinfo \
+        --with-tzpath=${prefix}/share/zoneinfo \
         --with-build-python=python3 \
         --without-static-libpython
 }

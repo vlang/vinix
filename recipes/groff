@@ -27,5 +27,8 @@ package() {
 
     rm -f "${dest_dir}${prefix}/lib/charset.alias"
 
+    # Move documentation to the correct location
+    mv ${dest_dir}${prefix}/share/doc/groff-${version} ${dest_dir}${prefix}/share/doc/groff
+
     post_package_strip
 }

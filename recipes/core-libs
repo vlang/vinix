@@ -4,4 +4,4 @@ name=core-libs
 skip_pkg_check=yes
 version=0.0
 revision=1
-deps="mlibc libgcc libstdc++ libintl libiconv libxcrypt tzdata"
+deps="mlibc libgcc libstdc++ libatomic libintl libiconv libxcrypt tzdata"

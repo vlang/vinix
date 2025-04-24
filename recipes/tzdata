@@ -8,7 +8,7 @@ tarball_blake2b="07421e756cd33f003f1173c320a2e454f767a2ba299b76b54e34dc5cf1c126b
 source_allow_network="yes"
 imagedeps="tzdata"
 hostdeps="gcc binutils"
-deps="mlibc libgcc libstdc++ libintl libiconv"
+deps="mlibc libgcc libstdc++ libatomic libintl libiconv"
 
 prepare() {
     curl -Lo tzcode.tar.gz "https://data.iana.org/time-zones/releases/tzcode${version}.tar.gz"

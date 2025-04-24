@@ -5,12 +5,16 @@ version=2.84.1
 revision=1
 tarball_url="https://download.gnome.org/sources/glib/2.84/glib-${version}.tar.xz"
 tarball_blake2b="d20ade482eb95873adaefc656e22c57e6712a6263a4812e448220040e30144919331cb279566a89a2ab46495b46d6a79e3821e491317587325fa3a64b40d62cc"
-imagedeps="meson ninja-build python3-setuptools"
+imagedeps="meson ninja-build python3-docutils"
 hostdeps="gcc pkg-config"
 deps="core-libs pcre2 libffi zlib"
 
 configure() {
     meson_configure \
+        -Dglib_debug=disabled \
+        -Dman-pages=enabled \
+        -Dsysprof=disabled \
+        -Dintrospection=disabled \
         -Dxattr=false
 }
 

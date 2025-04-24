@@ -8,7 +8,7 @@ tarball_blake2b="42d594fe36f61a1b5343d9fda22541b09373fe74c587537db8203f9c92120b6
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="python3-passlib"
 hostdeps="gcc automake autoconf libtool pkg-config"
-deps="mlibc libgcc libstdc++"
+deps="mlibc libgcc libstdc++ libatomic"
 
 prepare() {
     autotools_recursive_regen

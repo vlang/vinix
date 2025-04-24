@@ -1,16 +1,3 @@
-diff --git xbps-clean/bin/xbps-create/main.c xbps-workdir/bin/xbps-create/main.c
-index 373e744..73ed280 100644
---- xbps-clean/bin/xbps-create/main.c
-+++ xbps-workdir/bin/xbps-create/main.c
-@@ -41,7 +41,7 @@
- #include <libgen.h>
- #include <locale.h>
- #include <dirent.h>
--
-+#include <limits.h>
- #include <xbps.h>
- #include "queue.h"
- 
 diff --git xbps-clean/bin/xbps-install/util.c xbps-workdir/bin/xbps-install/util.c
 index 7cabdd1..0182300 100644
 --- xbps-clean/bin/xbps-install/util.c
@@ -46,21 +33,12 @@ index 57df730..a4109d0 100755
  
  echo "CC =	$CC" >>$CONFIG_MK
  echo "CFLAGS =	-O2" >>$CONFIG_MK
-@@ -275,7 +275,7 @@ fi
- #
- # Check for some compiler warning flags.
- #
--for f in all extra error shadow "format=2" missing-prototypes \
-+for f in all extra shadow "format=2" missing-prototypes \
- 	missing-declarations nested-externs vla overlength-strings \
- 	unsafe-loop-optimizations undef sign-compare \
- 	missing-include-dirs old-style-definition \
 @@ -677,7 +677,7 @@ fi
  # pkg-config is required to know dependencies for static linking.
  #
  printf "Checking for pkg-config ... "
 -PKGCONFIG_BIN=$(_which pkg-config)
-+PKGCONFIG_BIN="x86_64-vinix-mlibc-pkg-config"
++PKGCONFIG_BIN=$(_which ${HOST}-pkg-config)
  if [ -z "$PKGCONFIG_BIN" ]; then
  	echo "not found, exiting."
  	exit 1
@@ -164,7 +142,7 @@ index 9890a84..ba3b073 100644
 +++ xbps-workdir/data/repod-main.conf
 @@ -1 +1 @@
 -repository=https://a-hel-fi.m.voidlinux.org/current
-+repository=https://localhost/repo/current
++repository=https://example.com/repo/current
 diff --git xbps-clean/lib/Makefile xbps-workdir/lib/Makefile
 index 847bfdd..f80c0f6 100644
 --- xbps-clean/lib/Makefile
@@ -215,27 +193,3 @@ index f7b9142..d68b8f8 100644
  #include <netinet/in.h>
  #include <netinet/tcp.h>
  
-diff --git xbps-clean/lib/portableproplib/prop_object.c xbps-workdir/lib/portableproplib/prop_object.c
-index 50cd918..8295b44 100644
---- xbps-clean/lib/portableproplib/prop_object.c
-+++ xbps-workdir/lib/portableproplib/prop_object.c
-@@ -956,14 +956,14 @@ _prop_object_internalize_map_file(const char *fname)
- 	if ((sb.st_size & pgmask) == 0)
- 		need_guard = true;
- 
--	mf->poimf_xml = mmap(NULL, need_guard ? mf->poimf_mapsize + pgsize
--			    		      : mf->poimf_mapsize,
--			    PROT_READ, MAP_SHARED, fd, (off_t)0);
--	(void) close(fd);
--	if (mf->poimf_xml == MAP_FAILED) {
-+	mf->poimf_xml = malloc(need_guard ? mf->poimf_mapsize + pgsize : mf->poimf_mapsize);
-+	if (mf->poimf_xml == NULL) {
- 		_PROP_FREE(mf, M_TEMP);
- 		return (NULL);
- 	}
-+	ssize_t rsz = read(fd, mf->poimf_xml, need_guard ? mf->poimf_mapsize + pgsize : mf->poimf_mapsize);
-+	(void) close(fd);
-+
- 	(void)posix_madvise(mf->poimf_xml, mf->poimf_mapsize, POSIX_MADV_SEQUENTIAL);
- 
- 	if (need_guard) {

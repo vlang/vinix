@@ -26,7 +26,7 @@ configure() {
         --without-normal \
         --without-debug \
         --with-manpage-format=normal \
-        --with-pkg-config-libdir=/usr/lib/pkgconfig \
+        --with-pkg-config-libdir=${prefix}/lib/pkgconfig \
         --with-termlib \
         --without-ada
 }
