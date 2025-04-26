@@ -1,0 +1,12 @@
+diff -urN --no-dereference grep-clean/gnulib-tests/getlocalename_l-unsafe.c grep-workdir/gnulib-tests/getlocalename_l-unsafe.c
+--- grep-clean/gnulib-tests/getlocalename_l-unsafe.c	2025-04-02 23:47:17.000000000 +0200
++++ grep-workdir/gnulib-tests/getlocalename_l-unsafe.c	2025-04-26 19:17:28.052875090 +0200
+@@ -469,6 +469,8 @@
+       struct gl_locale_category_t *plc =
+         &locale->category[gl_log2_lcmask_to_index (gl_log2_lc_mask (category))];
+       return (struct string_with_storage) { plc->name, STORAGE_OBJECT };
++#elif defined __vinix__
++      return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #elif __GLIBC__ >= 2 && !defined __UCLIBC__
+       /* Work around an incorrect definition of the _NL_LOCALE_NAME macro in
+          glibc < 2.12.
