@@ -4,7 +4,7 @@ name=binutils
 from_source=binutils
 revision=1
 imagedeps="build-essential"
-hostdeps="autoconf-2.69 automake libtool pkg-config"
+hostdeps="pkg-config"
 
 configure() {
         CFLAGS="$HOST_CFLAGS" \

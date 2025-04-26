@@ -6,9 +6,7 @@ version=0.5.1
 revision=1
 tarball_url="https://www.x.org/releases/individual/driver/xf86-video-fbdev-${version}.tar.gz"
 tarball_blake2b="02523bc6c38e71c6334b247bf13d54ba32e3f2e3208ad150df5085385f5b9b41d39466a7e307480d0bef154f17b8e5dd05b62923cfdb52672229d2c829fb4ca5"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-server xorg-util-macros"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-server xorg-util-macros"
 
 prepare() {
@@ -16,13 +14,13 @@ prepare() {
 }
 
 configure() {
-        SYSROOT=${sysroot_dir} \
     autotools_configure \
         --disable-pciaccess
 }
 
 build() {
-    make -j${parallelism}
+    make -j${parallelism} \
+        SYSROOT=${sysroot_dir}
 }
 
 package() {

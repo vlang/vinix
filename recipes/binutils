@@ -5,15 +5,12 @@ version=2.44
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/binutils/binutils-with-gold-${version}.tar.xz"
 tarball_blake2b="d749d5fbab2d6c2455bf9a988daa5c5ab9ecd9ecd63e4be022bc06483ebc996588c515ee4b931ff2ba7bcf43242068c0747e1cad50740523b2073df5a338614f"
-source_hostdeps="autoconf-2.69 automake libtool pkg-config"
 imagedeps="build-essential"
-hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs zlib zstd"
 
 prepare() {
-    autotools_recursive_regen -I"$(realpath ./config)"
-
-    cp -pv /usr/local/share/libtool/build-aux/{config.sub,config.guess,install-sh} libiberty/
+    autotools_recursive_regen
 }
 
 configure() {

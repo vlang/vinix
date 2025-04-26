@@ -5,9 +5,7 @@ version=2.0.7
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXfont2-${version}.tar.gz"
 tarball_blake2b="3a82122366751ee96ba3e7ce020a9e5845527539b787897c664d4dc2977772beab7f04d3890a10ee2697f0ae5b5d6838d1fe62cf1c7942799d6a8210d2e82b57"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-util-macros xtrans"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-proto xtrans freetype2 bzip2 libfontenc zlib"
 
 prepare() {

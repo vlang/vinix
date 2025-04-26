@@ -5,9 +5,7 @@ version=1.6.0
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/xtrans-${version}.tar.gz"
 tarball_blake2b="446035fb78ec796c1534f36dc687b40fbe6227d47a623039314117a85cc4b3e37971934790932e46a6dc362de70dfb58ccd1fae43518461789ce8854e27adba8"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-util-macros"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-util-macros"
 
 prepare() {

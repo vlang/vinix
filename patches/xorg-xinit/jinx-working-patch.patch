@@ -1,36 +1,80 @@
-diff --git xorg-xinit-clean/configure.ac xorg-xinit-workdir/configure.ac
-index a40ac46..032b397 100644
---- xorg-xinit-clean/configure.ac
-+++ xorg-xinit-workdir/configure.ac
-@@ -139,19 +139,19 @@ AC_PATH_PROGS(MCOOKIE, [mcookie], [$MCOOKIE],
-   [$PATH:/bin:/usr/bin:/usr/lib:/usr/libexec:/usr/local/bin])
+diff -urN --no-dereference xorg-xinit-clean/configure xorg-xinit-workdir/configure
+--- xorg-xinit-clean/configure	2025-03-09 21:44:30.000000000 +0100
++++ xorg-xinit-workdir/configure	2025-04-26 17:14:07.656999261 +0200
+@@ -12465,75 +12465,7 @@
+ 
  
  # If mcookie not found, try openssl, else per-system fallbacks
 -if test "x$MCOOKIE" = x ; then
--    AC_PATH_PROGS(OPENSSL, [openssl], [$OPENSSL],
--        [$PATH:/bin:/usr/bin:/usr/sbin:/usr/lib:/usr/libexec:/usr/local/bin])
+-    for ac_prog in openssl
+-do
+-  # Extract the first word of "$ac_prog", so it can be a program name with args.
+-set dummy $ac_prog; ac_word=$2
+-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+-printf %s "checking for $ac_word... " >&6; }
+-if test ${ac_cv_path_OPENSSL+y}
+-then :
+-  printf %s "(cached) " >&6
+-else case e in #(
+-  e) case $OPENSSL in
+-  [\\/]* | ?:[\\/]*)
+-  ac_cv_path_OPENSSL="$OPENSSL" # Let the user override the test with a path.
+-  ;;
+-  *)
+-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+-as_dummy="$PATH:/bin:/usr/bin:/usr/sbin:/usr/lib:/usr/libexec:/usr/local/bin"
+-for as_dir in $as_dummy
+-do
+-  IFS=$as_save_IFS
+-  case $as_dir in #(((
+-    '') as_dir=./ ;;
+-    */) ;;
+-    *) as_dir=$as_dir/ ;;
+-  esac
+-    for ac_exec_ext in '' $ac_executable_extensions; do
+-  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
+-    ac_cv_path_OPENSSL="$as_dir$ac_word$ac_exec_ext"
+-    printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
+-    break 2
+-  fi
+-done
+-  done
+-IFS=$as_save_IFS
+-
+-  ;;
+-esac ;;
+-esac
+-fi
+-OPENSSL=$ac_cv_path_OPENSSL
+-if test -n "$OPENSSL"; then
+-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $OPENSSL" >&5
+-printf "%s\n" "$OPENSSL" >&6; }
+-else
+-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+-printf "%s\n" "no" >&6; }
+-fi
+-
+-
+-  test -n "$OPENSSL" && break
+-done
+-test -n "$OPENSSL" || OPENSSL="$OPENSSL"
+-
 -    if test "x$OPENSSL" != x ; then
 -        MCOOKIE="$OPENSSL rand -hex 16"
 -    else
 -        case $host_os in
 -            *solaris*)
-+#if test "x$MCOOKIE" = x ; then
-+#    AC_PATH_PROGS(OPENSSL, [openssl], [$OPENSSL],
-+#        [$PATH:/bin:/usr/bin:/usr/sbin:/usr/lib:/usr/libexec:/usr/local/bin])
-+#    if test "x$OPENSSL" != x ; then
-+#        MCOOKIE="$OPENSSL rand -hex 16"
-+#    else
-+#        case $host_os in
-+#            *solaris*)
-                 MCOOKIE="/usr/bin/od -X -A n -N 16 /dev/urandom | /usr/bin/tr -d ' '"
+-                MCOOKIE="/usr/bin/od -X -A n -N 16 /dev/urandom | /usr/bin/tr -d ' '"
 -                ;;
 -        esac
 -    fi
 -fi
-+#                ;;
-+#        esac
-+#    fi
-+#fi
- if test "x$MCOOKIE" != x ; then
- 	STARTX_COOKIE_FLAGS='-DHAS_COOKIE_MAKER -DMK_COOKIE="$(MCOOKIE)"'
- 	AC_MSG_NOTICE([startx will depend on "$MCOOKIE" to generate xauth cookies])
+-if test "x$MCOOKIE" != x ; then
+-	HAS_COOKIE_MAKER=true
+-	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: startx will depend on \"$MCOOKIE\" to generate xauth cookies" >&5
+-printf "%s\n" "$as_me: startx will depend on \"$MCOOKIE\" to generate xauth cookies" >&6;}
+-fi
++MCOOKIE="/usr/bin/od -X -A n -N 16 /dev/urandom | /usr/bin/tr -d ' '"
+ 
+ 
+ 

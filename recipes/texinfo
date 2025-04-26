@@ -6,9 +6,8 @@ revision=1
 tarball_url="https://ftp.gnu.org/pub/gnu/texinfo/texinfo-${version}.tar.xz"
 tarball_blake2b="fc6bd020310a437a73d5723d257ca3da1d15329e9e668fa78c49ac77759c2c990d4422c2a7071b217ea214b88389a0cbb43d3fcfa5fe9bf9651270167b15c342"
 source_imagedeps="build-essential"
-source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="build-essential help2man"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs ncurses bash gzip"
 
 prepare() {

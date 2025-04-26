@@ -5,9 +5,7 @@ version=1.8.2
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXi-${version}.tar.gz"
 tarball_blake2b="aa9bd4cdcc519bf8b9029766d07e160a2847f3f6808ae5a125f90cd84e8e981436e8cdce2cabe9d58eaba39946b88026d5814c6d19f2cc94e9e4cd69d6bc8e2d"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-util-macros"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-proto libxext libxfixes"
 
 prepare() {

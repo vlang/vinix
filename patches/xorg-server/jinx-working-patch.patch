@@ -1,18 +1,17 @@
-diff --git xorg-server-clean/configure.ac xorg-server-workdir/configure.ac
-index 7ac669f..792940f 100644
---- xorg-server-clean/configure.ac
-+++ xorg-server-workdir/configure.ac
-@@ -1341,7 +1341,7 @@ AM_CONDITIONAL(INT10MODULE, test "x$INT10MODULE" = xyes)
- AC_DEFINE(SHAPE, 1, [Support SHAPE extension])
+diff -urN --no-dereference xorg-server-clean/configure xorg-server-workdir/configure
+--- xorg-server-clean/configure	2025-02-25 19:56:12.000000000 +0100
++++ xorg-server-workdir/configure	2025-04-26 16:46:03.075933995 +0200
+@@ -29969,7 +29969,7 @@
+ 
  
  if test "x$XKBPATH" = "xauto"; then
 -    XKBPATH=$(pkg-config --variable datadir xkbcomp || echo ${datadir})/X11/xkb
 +    XKBPATH=$($PKG_CONFIG --variable datadir xkbcomp || echo ${datadir})/X11/xkb
  fi
  
- AC_DEFINE_DIR(XKB_BASE_DIRECTORY, XKBPATH, [Path to XKB data])
-@@ -1351,7 +1351,7 @@ AC_ARG_WITH(xkb-bin-directory,
- 				[XKB_BIN_DIRECTORY="auto"])
+ 
+@@ -29999,7 +29999,7 @@
+ 
  
  if test "x$XKB_BIN_DIRECTORY" = "xauto"; then
 -    XKB_BIN_DIRECTORY=$(pkg-config --variable bindir xkbcomp)
@@ -20,29 +19,28 @@ index 7ac669f..792940f 100644
      if test -z $XKB_BIN_DIRECTORY; then
          XKB_BIN_DIRECTORY="$bindir"
      fi
-@@ -1946,6 +1946,8 @@ if test "x$XORG" = xyes; then
- 	if test "x$DRM" = xyes -a "x$DRI2" = xyes; then
+@@ -32100,6 +32100,8 @@
  		XORG_DRIVER_MODESETTING=yes
  	fi
-+	
-+	XORG_DRIVER_MODESETTING=no
  
- 	AC_SUBST([XORG_LIBS])
- 	AC_SUBST([XORG_SYS_LIBS])
-@@ -2127,7 +2129,7 @@ dnl XWin requires OpenGL spec files in order to generate wrapper code for native
-            AC_MSG_RESULT(yes)
-            if test "x$KHRONOS_SPEC_DIR" = "xauto" ; then
- 		PKG_CHECK_MODULES([KHRONOS_OPENGL_REGISTRY], [khronos-opengl-registry])
++	XORG_DRIVER_MODESETTING=no
++
+ 
+ 
+ 
+@@ -33161,7 +33163,7 @@
+ printf "%s\n" "yes" >&6; }
+ 
+ fi
 -		KHRONOS_SPEC_DIR=`pkg-config khronos-opengl-registry --variable=specdir`
 +		KHRONOS_SPEC_DIR=`$PKG_CONFIG khronos-opengl-registry --variable=specdir`
             fi
-            AC_SUBST(KHRONOS_SPEC_DIR)
+ 
  	fi
-diff --git xorg-server-clean/hw/xfree86/common/xf86Bus.c xorg-server-workdir/hw/xfree86/common/xf86Bus.c
-index fd144db..6eb018c 100644
---- xorg-server-clean/hw/xfree86/common/xf86Bus.c
-+++ xorg-server-workdir/hw/xfree86/common/xf86Bus.c
-@@ -556,6 +556,7 @@ xf86GetDevFromEntity(int entityIndex, int instance)
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Bus.c xorg-server-workdir/hw/xfree86/common/xf86Bus.c
+--- xorg-server-clean/hw/xfree86/common/xf86Bus.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/common/xf86Bus.c	2025-04-26 16:38:37.228830038 +0200
+@@ -556,6 +556,7 @@
  void
  xf86PostProbe(void)
  {
@@ -50,7 +48,7 @@ index fd144db..6eb018c 100644
      if (fbSlotClaimed && (
  #if (defined(__sparc__) || defined(__sparc)) && !defined(__OpenBSD__)
                               sbusSlotClaimed ||
-@@ -571,6 +572,7 @@ xf86PostProbe(void)
+@@ -571,6 +572,7 @@
          ))
          FatalError("Cannot run in framebuffer mode. Please specify busIDs "
                     "       for all framebuffer devices\n");
@@ -58,10 +56,9 @@ index fd144db..6eb018c 100644
  }
  
  Bool
-diff --git xorg-server-clean/hw/xfree86/common/xf86Config.c xorg-server-workdir/hw/xfree86/common/xf86Config.c
-index 5d814c1..14ebfe6 100644
---- xorg-server-clean/hw/xfree86/common/xf86Config.c
-+++ xorg-server-workdir/hw/xfree86/common/xf86Config.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Config.c xorg-server-workdir/hw/xfree86/common/xf86Config.c
+--- xorg-server-clean/hw/xfree86/common/xf86Config.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/common/xf86Config.c	2025-04-26 16:38:37.228923610 +0200
 @@ -49,6 +49,8 @@
  #include <sys/types.h>
  #include <grp.h>
@@ -71,10 +68,9 @@ index 5d814c1..14ebfe6 100644
  #include "xf86.h"
  #include "xf86Modes.h"
  #include "xf86Parser.h"
-diff --git xorg-server-clean/hw/xfree86/common/xf86Configure.c xorg-server-workdir/hw/xfree86/common/xf86Configure.c
-index 4347f6d..52594c6 100644
---- xorg-server-clean/hw/xfree86/common/xf86Configure.c
-+++ xorg-server-workdir/hw/xfree86/common/xf86Configure.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Configure.c xorg-server-workdir/hw/xfree86/common/xf86Configure.c
+--- xorg-server-clean/hw/xfree86/common/xf86Configure.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/common/xf86Configure.c	2025-04-26 16:38:37.229021593 +0200
 @@ -27,6 +27,8 @@
  #include <xorg-config.h>
  #endif
@@ -84,10 +80,9 @@ index 4347f6d..52594c6 100644
  #include "xf86.h"
  #include "xf86Config.h"
  #include "xf86_OSlib.h"
-diff --git xorg-server-clean/hw/xfree86/common/xf86Events.c xorg-server-workdir/hw/xfree86/common/xf86Events.c
-index 395bbc7..4bf86cb 100644
---- xorg-server-clean/hw/xfree86/common/xf86Events.c
-+++ xorg-server-workdir/hw/xfree86/common/xf86Events.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Events.c xorg-server-workdir/hw/xfree86/common/xf86Events.c
+--- xorg-server-clean/hw/xfree86/common/xf86Events.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/common/xf86Events.c	2025-04-26 16:38:37.229075573 +0200
 @@ -53,6 +53,8 @@
  #include <xorg-config.h>
  #endif
@@ -97,10 +92,9 @@ index 395bbc7..4bf86cb 100644
  #include <X11/X.h>
  #include <X11/Xproto.h>
  #include <X11/Xatom.h>
-diff --git xorg-server-clean/hw/xfree86/common/xf86Helper.c xorg-server-workdir/hw/xfree86/common/xf86Helper.c
-index 0389945..b53b1a7 100644
---- xorg-server-clean/hw/xfree86/common/xf86Helper.c
-+++ xorg-server-workdir/hw/xfree86/common/xf86Helper.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Helper.c xorg-server-workdir/hw/xfree86/common/xf86Helper.c
+--- xorg-server-clean/hw/xfree86/common/xf86Helper.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/common/xf86Helper.c	2025-04-26 16:38:37.229147111 +0200
 @@ -38,6 +38,8 @@
  #include <xorg-config.h>
  #endif
@@ -110,10 +104,9 @@ index 0389945..b53b1a7 100644
  #include <X11/X.h>
  #include "mi.h"
  #include "os.h"
-diff --git xorg-server-clean/hw/xfree86/common/xf86Init.c xorg-server-workdir/hw/xfree86/common/xf86Init.c
-index 5695e71..96c2d15 100644
---- xorg-server-clean/hw/xfree86/common/xf86Init.c
-+++ xorg-server-workdir/hw/xfree86/common/xf86Init.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Init.c xorg-server-workdir/hw/xfree86/common/xf86Init.c
+--- xorg-server-clean/hw/xfree86/common/xf86Init.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/common/xf86Init.c	2025-04-26 16:38:37.229233531 +0200
 @@ -37,6 +37,8 @@
  #include <stdlib.h>
  #include <errno.h>
@@ -123,10 +116,9 @@ index 5695e71..96c2d15 100644
  #undef HAS_UTSNAME
  #if !defined(WIN32)
  #define HAS_UTSNAME 1
-diff --git xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
-index 3d8b92e..f7be685 100644
---- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c
-+++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
+--- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c	2025-04-26 16:38:37.229311398 +0200
 @@ -10,12 +10,12 @@
  #include "xf86_OSproc.h"
  
@@ -142,7 +134,7 @@ index 3d8b92e..f7be685 100644
  #include "globals.h"
  #include <X11/extensions/dpmsconst.h>
  
-@@ -259,6 +259,7 @@ fbdev2xfree_timing(struct fb_var_screeninfo *var, DisplayModePtr mode)
+@@ -259,6 +259,7 @@
  /**
   * Try to find the framebuffer device for a given PCI device
   */
@@ -150,7 +142,7 @@ index 3d8b92e..f7be685 100644
  static int
  fbdev_open_pci(struct pci_device *pPci, char **namep)
  {
-@@ -303,6 +304,7 @@ fbdev_open_pci(struct pci_device *pPci, char **namep)
+@@ -303,6 +304,7 @@
      xf86DrvMsg(-1, X_ERROR, "Unable to find a valid framebuffer device\n");
      return -1;
  }
@@ -158,7 +150,7 @@ index 3d8b92e..f7be685 100644
  
  static int
  fbdev_open(int scrnIndex, const char *dev, char **namep)
-@@ -330,6 +332,7 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+@@ -330,6 +332,7 @@
      }
  
      /* only touch non-PCI devices on this path */
@@ -166,7 +158,7 @@ index 3d8b92e..f7be685 100644
      {
          char buf[PATH_MAX] = {0};
          char *sysfs_path = NULL;
-@@ -344,6 +347,7 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+@@ -344,6 +347,7 @@
          }
          free(sysfs_path);
      }
@@ -174,7 +166,7 @@ index 3d8b92e..f7be685 100644
  
      if (namep) {
          if (-1 == ioctl(fd, FBIOGET_FSCREENINFO, (void *) (&fix))) {
-@@ -363,14 +367,11 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+@@ -363,14 +367,11 @@
  /* -------------------------------------------------------------------- */
  
  Bool
@@ -191,7 +183,7 @@ index 3d8b92e..f7be685 100644
  
      if (-1 == fd)
          return FALSE;
-@@ -379,7 +380,7 @@ fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
+@@ -379,7 +380,7 @@
  }
  
  Bool
@@ -200,7 +192,7 @@ index 3d8b92e..f7be685 100644
  {
      fbdevHWPtr fPtr;
  
-@@ -387,10 +388,7 @@ fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
+@@ -387,10 +388,7 @@
      fPtr = FBDEVHWPTR(pScrn);
  
      /* open device */
@@ -212,7 +204,7 @@ index 3d8b92e..f7be685 100644
      if (-1 == fPtr->fd) {
          xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
                     "Failed to open framebuffer device, consult warnings"
-@@ -881,7 +879,7 @@ RETRY:
+@@ -881,7 +879,7 @@
                         "FBIOBLANK: %s\n", strerror(errno));
  	    break;
          case EINTR:
@@ -221,7 +213,7 @@ index 3d8b92e..f7be685 100644
              goto RETRY;
          default:
              fPtr->unsupported_ioctls |= (1 << FBIOBLANK_UNSUPPORTED);
-@@ -915,7 +913,7 @@ RETRY:
+@@ -915,7 +913,7 @@
                         "FBIOBLANK: %s\n", strerror(errno));
              break;
          case EINTR:
@@ -230,11 +222,10 @@ index 3d8b92e..f7be685 100644
              goto RETRY;
          default:
              fPtr->unsupported_ioctls |= (1 << FBIOBLANK_UNSUPPORTED);
-diff --git xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h
-index 4984ccf..bb3e2f8 100644
---- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h
-+++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h
-@@ -16,9 +16,9 @@ extern _X_EXPORT void fbdevHWFreeRec(ScrnInfoPtr pScrn);
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h
+--- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h	2025-04-26 16:38:37.229364692 +0200
+@@ -16,9 +16,9 @@
  
  extern _X_EXPORT int fbdevHWGetFD(ScrnInfoPtr pScrn);
  
@@ -246,10 +237,9 @@ index 4984ccf..bb3e2f8 100644
                                    char *device);
  
  extern _X_EXPORT char *fbdevHWGetName(ScrnInfoPtr pScrn);
-diff --git xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c
-index 0cb9788..e8cac5d 100644
---- xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c
-+++ xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c
+--- xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c	2025-04-26 16:38:37.229403954 +0200
 @@ -56,6 +56,9 @@
  #include <xorg-config.h>
  #endif
@@ -260,10 +250,9 @@ index 0cb9788..e8cac5d 100644
  #include <X11/X.h>
  #include <xserver_poll.h>
  #include "xf86.h"
-diff --git xorg-server-clean/hw/xfree86/os-support/shared/sigio.c xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c
-index ad8af60..6f81278 100644
---- xorg-server-clean/hw/xfree86/os-support/shared/sigio.c
-+++ xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c
+diff -urN --no-dereference xorg-server-clean/hw/xfree86/os-support/shared/sigio.c xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c
+--- xorg-server-clean/hw/xfree86/os-support/shared/sigio.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c	2025-04-26 16:38:37.229440655 +0200
 @@ -56,6 +56,9 @@
  #include <xorg-config.h>
  #endif
@@ -274,11 +263,10 @@ index ad8af60..6f81278 100644
  #include <X11/X.h>
  #include <xserver_poll.h>
  #include "xf86.h"
-diff --git xorg-server-clean/include/os.h xorg-server-workdir/include/os.h
-index 7db2408..8862645 100644
---- xorg-server-clean/include/os.h
-+++ xorg-server-workdir/include/os.h
-@@ -54,6 +54,7 @@ SOFTWARE.
+diff -urN --no-dereference xorg-server-clean/include/os.h xorg-server-workdir/include/os.h
+--- xorg-server-clean/include/os.h	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/include/os.h	2025-04-26 16:38:37.229487722 +0200
+@@ -54,6 +54,7 @@
  #include <stdlib.h>       /* for reallocarray */
  #endif
  #include <string.h>
@@ -286,11 +274,10 @@ index 7db2408..8862645 100644
  #ifdef MONOTONIC_CLOCK
  #include <time.h>
  #endif
-diff --git xorg-server-clean/mi/mibitblt.c xorg-server-workdir/mi/mibitblt.c
-index 0b13e49..aff6539 100644
---- xorg-server-clean/mi/mibitblt.c
-+++ xorg-server-workdir/mi/mibitblt.c
-@@ -49,6 +49,8 @@ SOFTWARE.
+diff -urN --no-dereference xorg-server-clean/mi/mibitblt.c xorg-server-workdir/mi/mibitblt.c
+--- xorg-server-clean/mi/mibitblt.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/mi/mibitblt.c	2025-04-26 16:38:37.229540846 +0200
+@@ -49,6 +49,8 @@
  #include <dix-config.h>
  #endif
  
@@ -299,11 +286,10 @@ index 0b13e49..aff6539 100644
  #include <X11/X.h>
  #include <X11/Xprotostr.h>
  
-diff --git xorg-server-clean/os/access.c xorg-server-workdir/os/access.c
-index 61ee8e3..5d69a4e 100644
---- xorg-server-clean/os/access.c
-+++ xorg-server-workdir/os/access.c
-@@ -120,7 +120,7 @@ SOFTWARE.
+diff -urN --no-dereference xorg-server-clean/os/access.c xorg-server-workdir/os/access.c
+--- xorg-server-clean/os/access.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/os/access.c	2025-04-26 16:38:37.229626035 +0200
+@@ -120,7 +120,7 @@
  #include <sys/un.h>
  #endif
  
@@ -312,11 +298,10 @@ index 61ee8e3..5d69a4e 100644
  #include <sys/utsname.h>
  #endif
  #if defined(SYSV) &&  defined(__i386__)
-diff --git xorg-server-clean/os/utils.c xorg-server-workdir/os/utils.c
-index 92a66e8..646722e 100644
---- xorg-server-clean/os/utils.c
-+++ xorg-server-workdir/os/utils.c
-@@ -1403,7 +1403,7 @@ System(const char *command)
+diff -urN --no-dereference xorg-server-clean/os/utils.c xorg-server-workdir/os/utils.c
+--- xorg-server-clean/os/utils.c	2025-02-25 19:56:05.000000000 +0100
++++ xorg-server-workdir/os/utils.c	2025-04-26 16:38:37.229735133 +0200
+@@ -1412,7 +1412,7 @@
          return -1;
      }
  
@@ -325,7 +310,7 @@ index 92a66e8..646722e 100644
  }
  
  static struct pid {
-@@ -1633,7 +1633,7 @@ Pclose(void *iop)
+@@ -1642,7 +1642,7 @@
      }
  #endif
  

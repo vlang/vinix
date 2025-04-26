@@ -5,8 +5,7 @@ version=8.4
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/nano/nano-${version}.tar.xz"
 tarball_blake2b="2e5dbe6982ef9d284c6e018abad593bf383f27c85047241bafaa098948b73897c0a81b63aa453385ac93afc1c398936464d5a1fb024d00936ad383c5e5e4403f"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc automake autoconf libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs ncurses file"
 
 prepare() {

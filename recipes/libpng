@@ -5,8 +5,7 @@ version=1.6.47
 revision=1
 tarball_url="https://download.sourceforge.net/libpng/libpng-${version}.tar.xz"
 tarball_blake2b="3dafe005931cd5b7709278f8d1961250c1d80ade4e73b568a211b409e7cac44f42692c6501851620ccd549d5c466b697dc6bbecf56e969e00b54c22a7cde0d72"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs zlib"
 
 prepare() {

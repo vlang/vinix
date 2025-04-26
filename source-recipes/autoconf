@@ -1,6 +1,0 @@
-#! /bin/sh
-
-name=autoconf
-version=2.72
-tarball_url="https://ftp.gnu.org/gnu/autoconf/autoconf-${version}.tar.gz"
-tarball_blake2b="48fff54704176cbf2642230229c628b75c43ef3f810c39eea40cae91dd02e1203d04a544407de96f9172419a94b952865909d969d9e9b6c10879a9d9aeea5ad0"

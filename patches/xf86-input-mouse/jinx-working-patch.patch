@@ -1,8 +1,7 @@
-diff --git xf86-input-mouse-clean/configure.ac xf86-input-mouse-workdir/configure.ac
-index 1d871b2..d196694 100644
---- xf86-input-mouse-clean/configure.ac
-+++ xf86-input-mouse-workdir/configure.ac
-@@ -62,7 +62,7 @@ AC_SUBST(inputdir)
+diff -urN --no-dereference xf86-input-mouse-clean/configure xf86-input-mouse-workdir/configure
+--- xf86-input-mouse-clean/configure	2023-05-05 02:25:26.000000000 +0200
++++ xf86-input-mouse-workdir/configure	2025-04-26 17:00:01.513343944 +0200
+@@ -19591,7 +19591,7 @@
  
  # X Server SDK location is required to install xf86-mouse-properties.h
  # This location is also relayed in the xorg-mouse.pc file
@@ -11,7 +10,7 @@ index 1d871b2..d196694 100644
  
  # Workaround overriding sdkdir to be able to create a tarball when user has no
  # write permission in sdkdir. See DISTCHECK_CONFIGURE_FLAGS in Makefile.am
-@@ -84,6 +84,9 @@ case $host_os in
+@@ -19619,6 +19619,9 @@
    gnu*)
      OS_MOUSE_NAME=hurd
      ;;
@@ -19,13 +18,11 @@ index 1d871b2..d196694 100644
 +    OS_MOUSE_NAME=vinix
 +    ;;
  esac
- AC_SUBST([OS_MOUSE_NAME])
  
-diff --git xf86-input-mouse-workdir/src/vinix_mouse.c xf86-input-mouse-workdir/src/vinix_mouse.c
-new file mode 100644
-index 0000000..b664773
---- /dev/null
-+++ xf86-input-mouse-workdir/src/vinix_mouse.c
+ 
+diff -urN --no-dereference xf86-input-mouse-clean/src/vinix_mouse.c xf86-input-mouse-workdir/src/vinix_mouse.c
+--- xf86-input-mouse-clean/src/vinix_mouse.c	1970-01-01 01:00:00.000000000 +0100
++++ xf86-input-mouse-workdir/src/vinix_mouse.c	2025-04-26 16:56:49.016615558 +0200
 @@ -0,0 +1,119 @@
 +#ifdef HAVE_XORG_CONFIG_H
 +#include <xorg-config.h>

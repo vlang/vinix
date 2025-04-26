@@ -8,10 +8,8 @@ revision=1
 tarball_url="https://ftp.gnu.org/gnu/bash/bash-5.2.${_base_patch}.tar.gz"
 tarball_blake2b="7b4dbb7497ab8b54fa30e82591a0557daf0a0668f458db36a032918abc66c7ed35339e947bd95ff1ffbf353403ebee789d27ffa9c037b51c817c074d7a28bb3b"
 source_allow_network=yes
-source_imagedeps="curl"
-source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="build-essential"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs ncurses readline"
 
 prepare() {
@@ -21,7 +19,6 @@ prepare() {
         done
     fi
 
-        AUTOHEADER=true \
     autotools_recursive_regen
 }
 

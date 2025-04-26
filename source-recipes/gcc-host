@@ -4,8 +4,6 @@ name=gcc-host
 version=14.2.0
 tarball_url="https://ftp.gnu.org/gnu/gcc/gcc-${version}/gcc-${version}.tar.xz"
 tarball_blake2b="87baf2a06dfa75d8fb6cd62c747ef1f57d3b9bbbe33a360d9ed3de4b4dbeaa8d920504c67e409bd9863414202c14fd854b46108e984418171205119216d03d3b"
-hostdeps="automake autoconf-2.69 libtool pkg-config"
-imagedeps="git"
 allow_network="yes"
 
 prepare() {
@@ -14,8 +12,5 @@ prepare() {
     # Gettext causes issues and we don't want it anyways.
     rm -rf gettext*
 
-    autotools_recursive_regen -I"$(realpath ./config)"
-
-    cp -pv /usr/local/share/libtool/build-aux/{config.sub,config.guess,install-sh} libiberty/
-    cp -pv /usr/local/share/libtool/build-aux/{config.sub,config.guess,install-sh} libgcc/
+    autotools_recursive_regen
 }

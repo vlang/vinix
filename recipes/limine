@@ -5,9 +5,8 @@ version=9.2.3
 revision=1
 tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.gz"
 tarball_blake2b="7ce8f729cf8556ee42a751eef69334da5f2f91cda0006d62caccc2731a74951198bb11a2cf20af387edb9f6320987f929883651737a3a80221cddee616338136"
-source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="mtools nasm"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {

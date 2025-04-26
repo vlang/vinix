@@ -5,8 +5,7 @@ version=1.25
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/gdbm/gdbm-${version}.tar.gz"
 tarball_blake2b="6abf5f77823dda7ebcaa775d58f7a311c8f73c7521fe223398b5cb4b4831ad177cfd87fd42f2b24ca2fc5984af7d51abcc5e509ceb6aab2746a52aecb550654b"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs readline"
 
 prepare() {

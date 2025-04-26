@@ -5,8 +5,7 @@ version=1.14
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/gzip/gzip-${version}.tar.xz"
 tarball_blake2b="32f7241bd9f3b7f73a59905a5bc9abf4e360e787f692cbb00ad28d48abee52744846d10c07ce2f7aaa3e66bc4b6ab9cd4f1b8e98854bb7d1ec010ae0d5146932"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {

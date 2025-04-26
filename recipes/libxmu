@@ -5,9 +5,7 @@ version=1.2.1
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXmu-${version}.tar.gz"
 tarball_blake2b="79cb21601f19a72fc771bb7fbde59d0fd3febdcf8fc6c6def91e2d8d9a99df4c7a9e633d819fe93df0cbd774a642cf39d44219c1fdbc154be28ba9086571cbb6"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-util-macros"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs libxext libxt"
 
 prepare() {

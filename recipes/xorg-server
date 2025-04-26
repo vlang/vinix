@@ -5,9 +5,7 @@ version=21.1.16
 revision=1
 tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
 tarball_blake2b="90a2aded6ab324dbaed976461062b7dccbc09466229cf8da8aaf0e9049144a8a5109ad35b1ee994451cdc5c33be45c6cb1f5a32ab6e8c021ca71f6ef180400f8"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xtrans xorg-font-util xorg-util-macros"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-util-macros xorg-proto xcb-proto xtrans libxinerama libxcvt libxshmfence libx11 libxaw libxxf86vm libxkbfile libxmu libxfont2 libepoxy libxi libxv libxdamage libxrender libxrandr libxcb libxfixes libxext nettle xorg-xkbcomp xkeyboard-config pixman"
 
 prepare() {

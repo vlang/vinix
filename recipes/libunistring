@@ -5,8 +5,7 @@ version=1.3
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/libunistring/libunistring-${version}.tar.xz"
 tarball_blake2b="213d24ea4ba5e960a030bd83fc1b6c9d9a5e33d63ade8874e2a15d1b7a0acbe4b2d03df18065f6c17f01bfed94f7e70ef474e713f5c5ad2375cf2438457b0379"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {

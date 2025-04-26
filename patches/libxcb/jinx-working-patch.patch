@@ -1,8 +1,19 @@
-diff --git libxcb-clean/doc/Makefile.am libxcb-workdir/doc/Makefile.am
-index f3c934a..08880d7 100644
---- libxcb-clean/doc/Makefile.am
-+++ libxcb-workdir/doc/Makefile.am
-@@ -35,8 +35,8 @@ install-data-local:
+diff -urN --no-dereference libxcb-clean/configure libxcb-workdir/configure
+--- libxcb-clean/configure	2024-04-15 17:09:34.000000000 +0200
++++ libxcb-workdir/configure	2024-04-15 17:09:34.000000000 +0200
+@@ -21028,7 +21028,7 @@
+ NEEDED="xau >= 0.99.2"
+ case $host_os in
+ linux*|darwin*|solaris*|dragonfly*|freebsd*|netbsd*) ;;
+-     *) NEEDED="$NEEDED pthread-stubs" ;;
++     *) NEEDED="$NEEDED" ;;
+ esac
+ 
+ pkg_failed=no
+diff -urN --no-dereference libxcb-clean/doc/Makefile.in libxcb-workdir/doc/Makefile.in
+--- libxcb-clean/doc/Makefile.in	2024-04-15 17:09:35.000000000 +0200
++++ libxcb-workdir/doc/Makefile.in	2024-04-15 17:09:35.000000000 +0200
+@@ -518,8 +518,8 @@
  	  $(mkinstalldirs) '$(DESTDIR)$(htmldir)'; \
  	fi
  	@for d in $(docdirs); do \

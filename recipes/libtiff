@@ -6,8 +6,7 @@ version=4.7.0
 revision=1
 tarball_url="https://download.osgeo.org/libtiff/tiff-${version}.tar.xz"
 tarball_blake2b="a5df7f3ae71821a13ff5a31db012191dd1b022b1c87fe81f90fd4b4a1349b7aa15d7b336d5fa8ac9e84edcfac5fe46214d9ea54790cb037438c6a5334980c11e"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs freeglut libjpeg-turbo zlib zstd xz"
 
 prepare() {

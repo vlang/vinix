@@ -5,8 +5,7 @@ version=1.35
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/tar/tar-${version}.tar.xz"
 tarball_blake2b="e1a200d21f433cd7d917dd979db16919a9167056ae62cf7d038a6118e56b2fe419cd4a396eee66f1f4dc13a8dc380e23f6ffd7ee0ca84e5dd9ad9411f60e002c"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {

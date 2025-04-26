@@ -6,9 +6,8 @@ version=1.5.6
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/xorriso/xorriso-${version}.pl02.tar.gz"
 tarball_blake2b="5f453cb3b1583865c71947c3ce95d87ea138b87605429fa756e34f0ddedb34037381ef81893bb69ecac9a2bd4302648f22f4cc930bf5567d509d1e26e6530f6b"
-source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="gperf"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs pcre2"
 
 prepare() {

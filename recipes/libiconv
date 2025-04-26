@@ -5,20 +5,12 @@ version=1.18
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/libiconv/libiconv-${version}.tar.gz"
 tarball_blake2b="374e7a7299d4814d372d8e63246c11f403f9fc990be5b129d016b92a875d2f8e9697ef4ef5cbd2e7b7fc97dff427c6b8abf6a99da792fcabd6fc36af38cd4723"
-source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="binutils"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="mlibc libgcc libstdc++ libatomic"
 
 prepare() {
-    cp /usr/local/share/aclocal/libtool.m4 ./m4/
-    cp /usr/local/share/aclocal/libtool.m4 ./libcharset/m4/
-    cp /usr/local/share/libtool/build-aux/ltmain.sh ./build-aux/
-    cp /usr/local/share/libtool/build-aux/ltmain.sh ./libcharset/build-aux/
-    cp /usr/local/share/aclocal/ltversion.m4 ./m4/
-    cp /usr/local/share/aclocal/ltversion.m4 ./libcharset/m4/
-
-    autotools_recursive_regen -I"${source_dir}"/m4 -I"${source_dir}"/srcm4
+    autotools_recursive_regen
 }
 
 configure() {

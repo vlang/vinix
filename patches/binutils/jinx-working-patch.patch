@@ -1,8 +1,7 @@
-diff --git binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
-index 6553aac..188a8e0 100644
---- binutils-clean/bfd/config.bfd
-+++ binutils-workdir/bfd/config.bfd
-@@ -665,6 +665,11 @@ case "${targ}" in
+diff -urN --no-dereference binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
+--- binutils-clean/bfd/config.bfd	2025-02-02 01:00:00.000000000 +0100
++++ binutils-workdir/bfd/config.bfd	2025-04-26 14:41:20.143032608 +0200
+@@ -665,6 +665,11 @@
      targ_selvecs=
      targ64_selvecs=x86_64_elf64_vec
      ;;
@@ -14,7 +13,7 @@ index 6553aac..188a8e0 100644
  #ifdef BFD64
    x86_64-*-cloudabi*)
      targ_defvec=x86_64_elf64_cloudabi_vec
-@@ -735,6 +740,11 @@ case "${targ}" in
+@@ -735,6 +740,11 @@
      targ_selvecs="i386_elf32_vec iamcu_elf32_vec x86_64_elf32_vec"
      want64=true
      ;;
@@ -26,11 +25,10 @@ index 6553aac..188a8e0 100644
  #endif
    i[3-7]86-*-lynxos*)
      targ_defvec=i386_elf32_vec
-diff --git binutils-clean/configure.ac binutils-workdir/configure.ac
-index eb5b3b3..964ba0c 100644
---- binutils-clean/configure.ac
-+++ binutils-workdir/configure.ac
-@@ -351,7 +351,7 @@ case "${ENABLE_GOLD}" in
+diff -urN --no-dereference binutils-clean/configure binutils-workdir/configure
+--- binutils-clean/configure	2025-02-02 01:00:00.000000000 +0100
++++ binutils-workdir/configure	2025-04-26 15:17:58.611614238 +0200
+@@ -3083,7 +3083,7 @@
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | *-*-gnu* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
        | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-dragonfly* \
@@ -39,11 +37,10 @@ index eb5b3b3..964ba0c 100644
          case "${target}" in
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
-diff --git binutils-clean/gas/configure.tgt binutils-workdir/gas/configure.tgt
-index d58f218..c57d177 100644
---- binutils-clean/gas/configure.tgt
-+++ binutils-workdir/gas/configure.tgt
-@@ -229,6 +229,7 @@ case ${generic_target} in
+diff -urN --no-dereference binutils-clean/gas/configure.tgt binutils-workdir/gas/configure.tgt
+--- binutils-clean/gas/configure.tgt	2025-02-02 01:00:00.000000000 +0100
++++ binutils-workdir/gas/configure.tgt	2025-04-26 14:41:20.143369422 +0200
+@@ -229,6 +229,7 @@
    i386-*-beos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
    i386-*-elf*)				fmt=elf ;;
@@ -51,24 +48,10 @@ index d58f218..c57d177 100644
    i386-*-fuchsia*)			fmt=elf ;;
    i386-*-haiku*)			fmt=elf em=haiku ;;
    i386-*-genode*)			fmt=elf ;;
-diff --git binutils-clean/gprofng/libcollector/configure.ac binutils-workdir/gprofng/libcollector/configure.ac
-index b923645..4df7b1c 100644
---- binutils-clean/gprofng/libcollector/configure.ac
-+++ binutils-workdir/gprofng/libcollector/configure.ac
-@@ -18,7 +18,7 @@ dnl <http://www.gnu.org/licenses/>.
- 
- m4_include([../../bfd/version.m4])
- AC_INIT([gprofng], [BFD_VERSION])
--AC_CONFIG_MACRO_DIRS([../../config ../..])
-+#AC_CONFIG_MACRO_DIRS([../../config ../..])
- AC_CONFIG_AUX_DIR(../..)
- AC_CANONICAL_TARGET
- AM_INIT_AUTOMAKE
-diff --git binutils-clean/ld/configure.tgt binutils-workdir/ld/configure.tgt
-index f937f78..10fbfe5 100644
---- binutils-clean/ld/configure.tgt
-+++ binutils-workdir/ld/configure.tgt
-@@ -384,6 +384,9 @@ i[3-7]86-*-linux-*)	targ_emul=elf_i386
+diff -urN --no-dereference binutils-clean/ld/configure.tgt binutils-workdir/ld/configure.tgt
+--- binutils-clean/ld/configure.tgt	2025-02-02 01:00:00.000000000 +0100
++++ binutils-workdir/ld/configure.tgt	2025-04-26 14:41:20.143430958 +0200
+@@ -384,6 +384,9 @@
  i[3-7]86-*-redox*)	targ_emul=elf_i386
  			targ_extra_emuls=elf_x86_64
  			;;
@@ -78,7 +61,7 @@ index f937f78..10fbfe5 100644
  i[3-7]86-*-solaris2*)	targ_emul=elf_i386_sol2
  			targ_extra_emuls="elf_i386_ldso elf_i386 elf_iamcu elf_x86_64_sol2 elf_x86_64"
  			targ_extra_libpath=$targ_extra_emuls
-@@ -1023,6 +1026,9 @@ x86_64-*-linux-*)	targ_emul=elf_x86_64
+@@ -1019,6 +1022,9 @@
  x86_64-*-redox*)	targ_emul=elf_x86_64
  			targ_extra_emuls=elf_i386
  			;;
@@ -88,16 +71,3 @@ index f937f78..10fbfe5 100644
  x86_64-*-solaris2*)	targ_emul=elf_x86_64_sol2
  			targ_extra_emuls="elf_x86_64 elf_i386_sol2 elf_i386_ldso elf_i386 elf_iamcu"
  			targ_extra_libpath=$targ_extra_emuls
-diff --git binutils-clean/libiberty/configure.ac binutils-workdir/libiberty/configure.ac
-index c27e08e..e48ef89 100644
---- binutils-clean/libiberty/configure.ac
-+++ binutils-workdir/libiberty/configure.ac
-@@ -37,7 +37,7 @@ else
-   libiberty_topdir="${srcdir}/.."
- fi
- AC_SUBST(libiberty_topdir)
--AC_CONFIG_AUX_DIR($libiberty_topdir)
-+AC_CONFIG_AUX_DIR([.])
- 
- dnl Very limited version of automake's enable-maintainer-mode
- 

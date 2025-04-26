@@ -6,9 +6,7 @@ version=1.3.1
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/mpc/mpc-${version}.tar.gz"
 tarball_blake2b="76434e6f8830af3571836d51576bfebbc9701e9bbb5c4686f134081cd96cd90ae02f7ff42bf9e3957c7a7ba92b6b2d9cdabe18f0269271147521cd7f6a2d551c"
-source_imagedeps="git"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs gmp mpfr"
 
 prepare() {

@@ -3,7 +3,7 @@
 name=libgcc
 from_source=gcc-host
 revision=1
-hostdeps="gcc autoconf-2.69 automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 imagedeps="build-essential"
 deps="mlibc"
 

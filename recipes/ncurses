@@ -5,14 +5,12 @@ version=6.5
 revision=1
 tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5.tar.gz"
 tarball_blake2b="7cfcd15062d1abe5f7ce3cb6f1c14dbd31b0fdd82fa4dd832dd75438a683eb39e6d99d78dbaeec908cfe27f4c02475eb4c9c8b822d3ef08cdcfbcd98d5112e00"
-source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="build-essential ncurses-bin patchelf"
-hostdeps="gcc automake autoconf libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {
-    cp -pv /usr/local/share/libtool/build-aux/config.guess ./
-    cp -pv /usr/local/share/libtool/build-aux/config.sub ./
+    autotools_recursive_regen
 }
 
 configure() {

@@ -5,9 +5,8 @@ version=1.11.0
 revision=1
 tarball_url="https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-${version}.tar.gz"
 tarball_blake2b="8676efd76a93c6bb9cbfc227d101164782a51f2e399a8c073bf821ee2906c92382b57dd9ef6dae93f9825aca114f32d02dc31d18324e79252457112a0e30c3f3"
-source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="build-essential libgpg-error-dev"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs libgpg-error"
 
 prepare() {

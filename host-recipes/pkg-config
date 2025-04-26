@@ -4,7 +4,6 @@ name=pkg-config
 from_source=pkg-config
 revision=1
 imagedeps="build-essential"
-hostdeps="automake autoconf libtool"
 
 configure() {
         CFLAGS="$HOST_CFLAGS" \

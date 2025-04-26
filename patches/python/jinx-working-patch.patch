@@ -1,8 +1,7 @@
-diff --git python-clean/Modules/fcntlmodule.c python-workdir/Modules/fcntlmodule.c
-index 17ecf4c..ec1f16b 100644
---- python-clean/Modules/fcntlmodule.c
-+++ python-workdir/Modules/fcntlmodule.c
-@@ -596,8 +596,8 @@ all_ins(PyObject* m)
+diff -urN --no-dereference python-clean/Modules/fcntlmodule.c python-workdir/Modules/fcntlmodule.c
+--- python-clean/Modules/fcntlmodule.c	2025-04-08 15:54:08.000000000 +0200
++++ python-workdir/Modules/fcntlmodule.c	2025-04-26 16:11:44.521061432 +0200
+@@ -596,8 +596,8 @@
      if (PyModule_AddIntMacro(m, F_GETOWN_EX)) return -1;
      if (PyModule_AddIntMacro(m, F_SETOWN_EX)) return -1;
      if (PyModule_AddIntMacro(m, F_OWNER_TID)) return -1;
@@ -13,11 +12,10 @@ index 17ecf4c..ec1f16b 100644
  #endif
  #ifdef F_GET_RW_HINT
      // since Linux 4.13
-diff --git python-clean/Objects/mimalloc/prim/unix/prim.c python-workdir/Objects/mimalloc/prim/unix/prim.c
-index 4d3fb65..a8cf9af 100644
---- python-clean/Objects/mimalloc/prim/unix/prim.c
-+++ python-workdir/Objects/mimalloc/prim/unix/prim.c
-@@ -29,6 +29,10 @@ terms of the MIT license. A copy of the license can be found in the file
+diff -urN --no-dereference python-clean/Objects/mimalloc/prim/unix/prim.c python-workdir/Objects/mimalloc/prim/unix/prim.c
+--- python-clean/Objects/mimalloc/prim/unix/prim.c	2025-04-08 15:54:08.000000000 +0200
++++ python-workdir/Objects/mimalloc/prim/unix/prim.c	2025-04-26 16:11:44.521143114 +0200
+@@ -29,6 +29,10 @@
  #include <unistd.h>    // sysconf
  #include <fcntl.h>     // open, close, read, access
  
@@ -28,7 +26,7 @@ index 4d3fb65..a8cf9af 100644
  #if defined(__linux__)
    #include <features.h>
    #include <fcntl.h>
-@@ -51,7 +55,7 @@ terms of the MIT license. A copy of the license can be found in the file
+@@ -51,7 +55,7 @@
    #include <sys/sysctl.h>
  #endif
  
@@ -37,7 +35,7 @@ index 4d3fb65..a8cf9af 100644
    #define MI_HAS_SYSCALL_H
    #include <sys/syscall.h>
  #endif
-@@ -156,6 +160,9 @@ int _mi_prim_free(void* addr, size_t size ) {
+@@ -156,6 +160,9 @@
  static int unix_madvise(void* addr, size_t size, int advice) {
    #if defined(__sun)
    return madvise((caddr_t)addr, size, advice);  // Solaris needs cast (issue #520)
@@ -47,76 +45,61 @@ index 4d3fb65..a8cf9af 100644
    #else
    return madvise(addr, size, advice);
    #endif
-diff --git python-clean/configure.ac python-workdir/configure.ac
-index 3fcb189..09ed934 100644
---- python-clean/configure.ac
-+++ python-workdir/configure.ac
-@@ -339,6 +339,9 @@ then
+diff -urN --no-dereference python-clean/configure python-workdir/configure
+--- python-clean/configure	2025-04-08 15:54:08.000000000 +0200
++++ python-workdir/configure	2025-04-26 16:20:57.317469181 +0200
+@@ -4067,6 +4067,9 @@
  	*-*-wasi*)
  	    ac_sys_system=WASI
  	    ;;
-+	*-*-vinix*)
-+	    ac_sys_system=Vinix
++	*-*-mlibc*)
++	    ac_sys_system=Mlibc
 +	    ;;
  	*)
  		# for now, limit cross builds to known configurations
  		MACHDEP="unknown"
-@@ -452,6 +455,9 @@ AC_ARG_ENABLE([universalsdk],
- 		UNIVERSALSDK=
- 		enable_universalsdk=
- 		;;
-+	*-*-vinix*)
-+		_host_cpu=$host_cpu
-+		;;
- 	*)
- 		UNIVERSALSDK=$enableval
- 		if test ! -d "${UNIVERSALSDK}"
-@@ -739,7 +745,7 @@ AC_SUBST([APP_STORE_COMPLIANCE_PATCH])
- AC_SUBST([_PYTHON_HOST_PLATFORM])
+@@ -4491,7 +4494,7 @@
+ 
  if test "$cross_compiling" = yes; then
  	case "$host" in
 -	*-*-linux*)
-+	*-*-linux*|*-*-vinix*)
++	*-*-linux*|*-*-mlibc*)
  		case "$host_cpu" in
  		arm*)
  			_host_ident=arm
-@@ -1557,7 +1563,7 @@ if test $enable_shared = "yes"; then
+@@ -7587,7 +7590,7 @@
          PY3LIBRARY=libpython3.so
        fi
        ;;
 -    Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*)
-+    Linux*|Vinix*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*)
++    Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*|Mlibc*)
        LDLIBRARY='libpython$(LDVERSION).so'
        BLDLIBRARY='-L. -lpython$(LDVERSION)'
        RUNSHARED=LD_LIBRARY_PATH=`pwd`${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-@@ -3542,6 +3548,10 @@ then
- 	CYGWIN*)
- 		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
- 		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
-+	Vinix*)
-+		LDSHARED='$(CC) -shared'
-+		LDCXXSHARED='$(CXX) -shared'
-+		;;
- 	*)	LDSHARED="ld";;
- 	esac
- fi
-@@ -3594,6 +3604,10 @@ then
- 		fi;;
- 	VxWorks*)
- 		CCSHARED="-fpic -D__SO_PICABILINUX__  -ftls-model=global-dynamic"
-+		;;
-+	Vinix*)
-+		CCSHARED="-fPIC"
-+		;;
- 	esac
- fi
- AC_MSG_RESULT([$CCSHARED])
-@@ -3667,6 +3681,8 @@ then
- 		LINKFORSHARED='-Wl,-E -N 2048K';;
- 	VxWorks*)
- 		LINKFORSHARED='-Wl,-export-dynamic';;
-+	Vinix*)
-+		LINKFORSHARED="-export-dynamic";;
- 	esac
- fi
- AC_MSG_RESULT([$LINKFORSHARED])
+@@ -12983,7 +12986,7 @@
+ 	Emscripten*|WASI*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+-	Linux*|GNU*|QNX*|VxWorks*|Haiku*)
++	Linux*|GNU*|QNX*|VxWorks*|Haiku*|Mlibc*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+ 	FreeBSD*)
+@@ -13068,7 +13071,7 @@
+ 		 then CCSHARED="-fPIC";
+ 		 else CCSHARED="+z";
+ 		 fi;;
+-	Linux*|GNU*) CCSHARED="-fPIC";;
++	Linux*|GNU*|Mlibc*) CCSHARED="-fPIC";;
+ 	Emscripten*|WASI*)
+ 		if test "x$enable_wasm_dynamic_linking" = xyes
+ then :
+@@ -13106,7 +13109,7 @@
+ 	    LINKFORSHARED="-Wl,-E -Wl,+s";;
+ #	    LINKFORSHARED="-Wl,-E -Wl,+s -Wl,+b\$(BINLIBDEST)/lib-dynload";;
+ 	Linux-android*) LINKFORSHARED="-pie -Xlinker -export-dynamic";;
+-	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic";;
++	Linux*|GNU*|Mlibc*) LINKFORSHARED="-Xlinker -export-dynamic";;
+ 	# -u libsys_s pulls in all symbols in libsys
+ 	Darwin/*|iOS/*)
+ 		LINKFORSHARED="$extra_undefs -framework CoreFoundation"

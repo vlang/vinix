@@ -73,15 +73,49 @@ autotools_configure_noflags() {
 }
 
 autotools_recursive_regen() {
-    ACLOCAL_INCLUDE=""
-    if [ -d ${sysroot_dir}/usr/share/aclocal ]; then
-        ACLOCAL_INCLUDE="-I${sysroot_dir}/usr/share/aclocal"
-    fi
-
-    for f in $(find . -name configure.ac -o -name configure.in -type f | sort); do
-        echo "* autotools regen in '$(dirname $f)'..."
-        ( cd "$(dirname "$f")" && autoreconf -fvi "$@" $ACLOCAL_INCLUDE )
+    for f in $(grep -Rl 'GNU config.sub ($timestamp)'); do
+        mv "$f" "$f".reference
+        cp -v ${base_dir}/build-support/config.sub "$f"
+        touch -r "$f".reference "$f"
+        rm -f "$f".reference
     done
+    for f in $(grep -Rl 'GNU config.guess ($timestamp)'); do
+        mv "$f" "$f".reference
+        cp -v ${base_dir}/build-support/config.guess "$f"
+        touch -r "$f".reference "$f"
+        rm -f "$f".reference
+    done
+
+    if ! [ -z "$(grep -Rl 'shlibpath_overrides_runpath=no')" ]; then
+        if [ -z "$(grep -Rl "dynamic_linker='mlibc ld.so'")" ]; then
+            echo "*** Missing libtool support for mlibc - trying to patch support in :3 ***"
+            for f in $(grep -Rl "We cannot seem to hardcode it, guess we'll fake it."); do
+                mv "$f" "$f".reference
+                sed -z \
+                    -e 's/add_dir=-L$libdir/add_dir=-L$lt_sysroot$libdir/g' \
+                    -e 's/add_dir="-L$libdir"/add_dir="-L$lt_sysroot$libdir"/g' \
+                    "$f".reference > "$f"
+                chmod --reference="$f".reference "$f"
+                touch -r "$f".reference "$f"
+                rm -f "$f".reference
+            done
+            for f in $(grep -Rl 'shlibpath_overrides_runpath=no'); do
+                mv "$f" "$f".reference
+                sed -z \
+                    -e 's/hardcode_into_libs=yes\n  ;;\n\nnewsos6)/hardcode_into_libs=yes\n  ;;\n\n*-mlibc)\n  version_type=linux\n  need_lib_prefix=no\n  need_version=no\n  library_names_spec='"'"'$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'"'"'\n  soname_spec='"'"'$libname$release$shared_ext$major'"'"'\n  dynamic_linker='"'"'mlibc ld.so'"'"'\n  shlibpath_var=LD_LIBRARY_PATH\n  shlibpath_overrides_runpath=no\n  hardcode_into_libs=yes\n  ;;\n\nnewsos6)/g' \
+                    -e 's/gnu\*)\n  lt_cv_deplibs_check_method=pass_all\n  ;;/gnu*|*-mlibc)\n  lt_cv_deplibs_check_method=pass_all\n  ;;/g' \
+                    -e 's/netbsd\*)\n	;;\n      \*qnx\* | \*nto\*)\n        # QNX uses GNU C/netbsd*|*-mlibc)\n	;;\n      *qnx* | *nto*)\n        # QNX uses GNU C/g' \
+                    -e 's/lt_prog_compiler_static='"'"'-Bstatic'"'"'\n      ;;\n\n    \*nto\* | \*qnx\*)\n      # QNX uses GNU C/lt_prog_compiler_static='"'"'-Bstatic'"'"'\n      ;;\n\n    *-mlibc)\n      lt_prog_compiler_wl='"'"'-Wl,'"'"'\n      lt_prog_compiler_pic='"'"'-fPIC'"'"'\n      lt_prog_compiler_static='"'"'-static'"'"'\n      ;;\n\n    *nto* | *qnx*)\n      # QNX uses GNU C/g' \
+                    -e 's/ld_shlibs=no\n      fi\n      ;;\n\n    netbsd\*)/ld_shlibs=no\n      fi\n      ;;\n\n    *-mlibc)\n      archive_cmds='"'"'$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'"'"'\n      archive_expsym_cmds='"'"'$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'"'"'\n      ;;\n\n    netbsd*)/g' \
+                    -e 's%netbsd\*)\n      if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	archive_cmds='"'"'$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'"'"'  # a.out%*-mlibc)\n      ;;\n\n    netbsd*)\n      if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	archive_cmds='"'"'$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'"'"'  # a.out%g' \
+                    -e 's%netbsd\*)\n        if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	  archive_cmds_CXX='"'"'$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'"'"'%*-mlibc)\n	    ld_shlibs_CXX=yes\n	    ;;\n\n      netbsd*)\n        if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	  archive_cmds_CXX='"'"'$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'"'"'%g' \
+                    "$f".reference > "$f"
+                chmod --reference="$f".reference "$f"
+                touch -r "$f".reference "$f"
+                rm -f "$f".reference
+            done
+        fi
+    fi
 }
 
 meson_configure() {

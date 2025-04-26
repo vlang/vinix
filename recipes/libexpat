@@ -6,8 +6,7 @@ version=2.7.1
 revision=1
 tarball_url="https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-${version}.tar.xz"
 tarball_blake2b="243ef1c3578234135018d31b567c88a50cadddac86441e4d4a6d6330e113596edbad13b40c79f541d49487e7df98d798032d39ec28b7d67d22f46e4290d14519"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {

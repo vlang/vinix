@@ -5,8 +5,7 @@ version=2.8
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/patch/patch-${version}.tar.xz"
 tarball_blake2b="687f566201adb2e32c3832b911adaddd9994aacb25b66886d6315bfe2752e09fd551b3856a39024b8472b2d95efebf412d4a7c085812a13620de811073a397ad"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {

@@ -6,9 +6,7 @@ version=3.13.3
 revision=1
 tarball_url="https://www.python.org/ftp/python/${version}/Python-${version}.tar.xz"
 tarball_blake2b="24ac47c13cbfa4dc9ce6ae4d18d7b5310f83ac1f4f18722138ef07e01cb8ac37edf6f4301983cb468f533b9b475b5a9d761d3044e61c7ccaa99dceadb954fe34"
-source_hostdeps="autoconf automake libtool pkg-config"
-source_deps="autoconf-archive"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs bzip2 xz zlib openssl ncurses readline gdbm libexpat libffi"
 
 prepare() {

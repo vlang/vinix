@@ -5,8 +5,7 @@ version=5.3.2
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/gawk/gawk-${version}.tar.xz"
 tarball_blake2b="8536777bb45c63d737ef08b3f1b98285cb29ec54400e35b2139c2bc66b464e3ec4950274614d95d94dc7eae18c57333b7c30a44d993855258155fc82b749042a"
-source_hostdeps="automake autoconf libtool pkg-config"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs mpfr gmp readline"
 
 prepare() {

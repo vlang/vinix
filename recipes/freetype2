@@ -6,14 +6,12 @@ version=2.13.3
 revision=1
 tarball_url="https://download.savannah.gnu.org/releases/freetype/freetype-${version}.tar.xz"
 tarball_blake2b="f9591c6998df02b072adaf38a968e91deae8ed4d53ea0cb74d08982c4f0e48b1a98c1378a698164e4f730f07a3b0bea308a94fcc2e2b8ce9967dbf9478b599bd"
-source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="build-essential"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs bzip2 libpng zlib"
 
 prepare() {
-    NOCONFIGURE=1 ./autogen.sh
-    cp /usr/local/share/automake-1.16/{config.sub,config.guess,install-sh} ./builds/unix/
+    autotools_recursive_regen
 }
 
 configure() {

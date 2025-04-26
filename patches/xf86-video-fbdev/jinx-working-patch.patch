@@ -1,34 +1,19 @@
-diff --git xf86-video-fbdev-clean/configure.ac xf86-video-fbdev-workdir/configure.ac
-index 19fa1c3..27aab06 100644
---- xf86-video-fbdev-clean/configure.ac
-+++ xf86-video-fbdev-workdir/configure.ac
-@@ -77,6 +77,8 @@ AC_SUBST([moduledir])
- DRIVER_NAME=fbdev
- AC_SUBST([DRIVER_NAME])
- 
-+AC_SUBST([SYSROOT])
-+
- AC_CONFIG_FILES([
-                 Makefile
-                 src/Makefile
-diff --git xf86-video-fbdev-clean/src/Makefile.am xf86-video-fbdev-workdir/src/Makefile.am
-index cc0290f..2bae4e8 100644
---- xf86-video-fbdev-clean/src/Makefile.am
-+++ xf86-video-fbdev-workdir/src/Makefile.am
-@@ -25,7 +25,7 @@
+diff -urN --no-dereference xf86-video-fbdev-clean/src/Makefile.in xf86-video-fbdev-workdir/src/Makefile.in
+--- xf86-video-fbdev-clean/src/Makefile.in	2024-11-08 16:34:30.000000000 +0100
++++ xf86-video-fbdev-workdir/src/Makefile.in	2025-04-26 17:08:51.528503995 +0200
+@@ -373,7 +373,7 @@
  # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
  AM_CFLAGS = $(BASE_CFLAGS) $(XORG_CFLAGS)
  fbdev_drv_la_LTLIBRARIES = fbdev_drv.la
 -fbdev_drv_la_LDFLAGS = -module -avoid-version
-+fbdev_drv_la_LDFLAGS = -module -avoid-version -R@moduledir@ -L@SYSROOT@@moduledir@ -lfbdevhw -lshadow
++fbdev_drv_la_LDFLAGS = -module -avoid-version -R@moduledir@ -L${SYSROOT}@moduledir@ -lfbdevhw -lshadow
  fbdev_drv_ladir = @moduledir@/drivers
- 
  fbdev_drv_la_SOURCES = \
-diff --git xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-workdir/src/fbdev.c
-index 939c5b8..4ec1ccb 100644
---- xf86-video-fbdev-clean/src/fbdev.c
-+++ xf86-video-fbdev-workdir/src/fbdev.c
-@@ -331,7 +331,7 @@ FBDevProbe(DriverPtr drv, int flags)
+          fbdev.c
+diff -urN --no-dereference xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-workdir/src/fbdev.c
+--- xf86-video-fbdev-clean/src/fbdev.c	2024-11-08 16:34:25.000000000 +0100
++++ xf86-video-fbdev-workdir/src/fbdev.c	2025-04-26 17:02:52.559246179 +0200
+@@ -331,7 +331,7 @@
  
  	    dev = xf86FindOptionValue(devSections[i]->options,"fbdev");
  	    if (devSections[i]->busID) {
@@ -37,7 +22,7 @@ index 939c5b8..4ec1ccb 100644
  	        if (xf86ParsePciBusString(devSections[i]->busID,&bus,&device,
  					  &func)) {
  		    if (!xf86CheckPciSlot(bus,device,func))
-@@ -343,7 +343,7 @@ FBDevProbe(DriverPtr drv, int flags)
+@@ -343,7 +343,7 @@
  	    if (fbdevHWProbe(NULL,dev,NULL)) {
  		pScrn = NULL;
  		if (isPci) {
@@ -46,7 +31,7 @@ index 939c5b8..4ec1ccb 100644
  		    /* XXX what about when there's no busID set? */
  		    int entity;
  		    
-@@ -419,6 +419,7 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
+@@ -419,6 +419,7 @@
  	fPtr->pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
  
  #ifndef XSERVER_LIBPCIACCESS
@@ -54,7 +39,7 @@ index 939c5b8..4ec1ccb 100644
  	pScrn->racMemFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
  	/* XXX Is this right?  Can probably remove RAC_FB */
  	pScrn->racIoFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
-@@ -429,6 +430,7 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
+@@ -429,6 +430,7 @@
  		   "xf86RegisterResources() found resource conflicts\n");
  		return FALSE;
  	}

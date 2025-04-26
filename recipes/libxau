@@ -5,9 +5,7 @@ version=1.0.12
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXau-${version}.tar.gz"
 tarball_blake2b="f3f388352496eb2d18650bdf535e76dfe6dbdce8c20bdf0f3c99ee4fc72df469d7c4a44728d76a9102423e525cc7f52984ee03fdcbfd236cbfac8e7d8d17ba84"
-source_hostdeps="automake autoconf libtool pkg-config"
-source_deps="xorg-util-macros"
-hostdeps="gcc autoconf automake libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="core-libs xorg-proto"
 
 prepare() {

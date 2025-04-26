@@ -4,7 +4,7 @@ name=libintl
 skip_pkg_check=yes
 from_source=gettext
 revision=1
-hostdeps="gcc automake autoconf libtool pkg-config"
+hostdeps="gcc pkg-config"
 deps="mlibc libgcc libstdc++ libatomic libiconv"
 
 configure() {
