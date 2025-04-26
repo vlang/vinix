@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=diffutils
-version=3.10
+version=3.12
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/diffutils/diffutils-${version}.tar.xz"
-tarball_blake2b="24a90162b3d876e6378243f19a85a1f1bb4cdfe98d130dee684740a902f2987509d5830dd32df4e26678b468b96960f6f9785ffb922e828cb8b4acce0d8587f6"
+tarball_blake2b="5b4593b39da71578d7f975603abe9359be215b9ac76548a6ab0d6e3838bb103c7ffcddf7fa01abcd5c6289db9a2f16b43aa3d5e846a9aa4b8db866763c2660de"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
@@ -13,9 +13,7 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
-        configure_script_path=./configure \
+        gl_cv_func_strcasecmp_works=yes \
     autotools_configure
 }
 
