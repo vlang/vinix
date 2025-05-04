@@ -1,3 +1,4 @@
+@[has_globals]
 module lib
 
 import x86.apic

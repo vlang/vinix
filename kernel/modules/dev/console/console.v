@@ -1,3 +1,4 @@
+@[has_globals]
 module console
 
 import x86.idt

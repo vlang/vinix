@@ -1,3 +1,4 @@
+@[has_globals]
 module isr
 
 import x86.idt

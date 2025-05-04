@@ -1,4 +1,4 @@
-@[manualfree]
+@[has_globals; manualfree]
 module memory
 
 import lib

@@ -1,3 +1,4 @@
+@[has_globals]
 module net
 
 import errno

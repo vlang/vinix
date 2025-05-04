@@ -1,3 +1,4 @@
+@[has_globals]
 module oss
 
 import event.eventstruct

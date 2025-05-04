@@ -1,3 +1,4 @@
+@[has_globals]
 module simple
 
 import dev.fbdev.api

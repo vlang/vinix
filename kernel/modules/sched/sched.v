@@ -1,3 +1,4 @@
+@[has_globals]
 module sched
 
 import x86.cpu

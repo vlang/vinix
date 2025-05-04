@@ -1,3 +1,4 @@
+@[has_globals]
 module local
 
 import x86.cpu

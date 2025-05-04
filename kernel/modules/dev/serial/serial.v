@@ -1,3 +1,4 @@
+@[has_globals]
 module serial
 
 import x86.kio

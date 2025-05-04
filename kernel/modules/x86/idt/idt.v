@@ -1,3 +1,4 @@
+@[has_globals]
 module idt
 
 import klock

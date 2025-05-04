@@ -1,3 +1,4 @@
+@[has_globals]
 module cpu
 
 import x86.msr

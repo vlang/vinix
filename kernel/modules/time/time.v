@@ -1,3 +1,4 @@
+@[has_globals]
 module time
 
 import event.eventstruct

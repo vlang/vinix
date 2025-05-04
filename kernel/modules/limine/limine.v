@@ -1,3 +1,4 @@
+@[has_globals]
 module limine
 
 @[_linker_section: '.requests_start_marker']
