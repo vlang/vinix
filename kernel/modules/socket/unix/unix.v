@@ -271,8 +271,8 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		peer:      peer
 		connected: true
 		name:      peer.name
-		data:      unsafe { malloc(unix.sock_buf) }
-		capacity:  unix.sock_buf
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 	}
 
 	peer.refcount++
@@ -495,8 +495,8 @@ pub fn create(@type int) ?&UnixSocket {
 	mut ret := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
-		data:     unsafe { malloc(unix.sock_buf) }
-		capacity: unix.sock_buf
+		data:     unsafe { malloc(sock_buf) }
+		capacity: sock_buf
 	}
 	ret.name.sun_family = sock_pub.af_unix
 	return ret
@@ -506,15 +506,15 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
-		data:     unsafe { malloc(unix.sock_buf) }
-		capacity: unix.sock_buf
+		data:     unsafe { malloc(sock_buf) }
+		capacity: sock_buf
 	}
 	a.name.sun_family = sock_pub.af_unix
 	mut b := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
-		data:     unsafe { malloc(unix.sock_buf) }
-		capacity: unix.sock_buf
+		data:     unsafe { malloc(sock_buf) }
+		capacity: sock_buf
 	}
 	b.name.sun_family = sock_pub.af_unix
 	return a, b

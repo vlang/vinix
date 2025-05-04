@@ -77,7 +77,7 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 				signal = userland.sigsegv
 			}
 			else {
-				lib.kpanic(gpr_state, isr.exception_names[num])
+				lib.kpanic(gpr_state, exception_names[num])
 			}
 		}
 
@@ -85,7 +85,7 @@ fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
 		// userland.dispatch_a_signal(gpr_state)
 		userland.syscall_exit(unsafe { nil }, 128 + signal)
 	} else {
-		lib.kpanic(gpr_state, isr.exception_names[num])
+		lib.kpanic(gpr_state, exception_names[num])
 	}
 }
 

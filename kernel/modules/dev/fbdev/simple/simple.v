@@ -43,10 +43,10 @@ fn simple_init() {
 
 fn do_register(config &SimpleFBConfig) {
 	info := api.FramebufferInfo{
-		base:   voidptr(config.physical_address)
-		size:   config.stride * config.height
-		driver: &simplefb_driver
-		fixed:  api.FBFixScreenInfo{
+		base:     voidptr(config.physical_address)
+		size:     config.stride * config.height
+		driver:   &simplefb_driver
+		fixed:    api.FBFixScreenInfo{
 			id:          [16]u8{}
 			smem_start:  0
 			smem_len:    config.stride * config.height

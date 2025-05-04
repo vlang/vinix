@@ -13,31 +13,31 @@ pub const ifsock = 0xc000
 pub const ifpipe = 0x3000
 
 pub fn isblk(mode u32) bool {
-	return (mode & stat.ifmt) == stat.ifblk
+	return (mode & ifmt) == ifblk
 }
 
 pub fn ischr(mode u32) bool {
-	return (mode & stat.ifmt) == stat.ifchr
+	return (mode & ifmt) == ifchr
 }
 
 pub fn isifo(mode u32) bool {
-	return (mode & stat.ifmt) == stat.ififo
+	return (mode & ifmt) == ififo
 }
 
 pub fn isreg(mode u32) bool {
-	return (mode & stat.ifmt) == stat.ifreg
+	return (mode & ifmt) == ifreg
 }
 
 pub fn isdir(mode u32) bool {
-	return (mode & stat.ifmt) == stat.ifdir
+	return (mode & ifmt) == ifdir
 }
 
 pub fn islnk(mode u32) bool {
-	return (mode & stat.ifmt) == stat.iflnk
+	return (mode & ifmt) == iflnk
 }
 
 pub fn issock(mode u32) bool {
-	return (mode & stat.ifmt) == stat.ifsock
+	return (mode & ifmt) == ifsock
 }
 
 pub struct Stat {

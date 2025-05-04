@@ -80,7 +80,7 @@ pub fn initialise() {
 fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
 
 fn timer_handler() {
-	interval := TimeSpec{0, i64(1000000000 / time.timer_frequency)}
+	interval := TimeSpec{0, i64(1000000000 / timer_frequency)}
 
 	monotonic_clock.add(interval)
 	realtime_clock.add(interval)

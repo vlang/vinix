@@ -259,8 +259,9 @@ fn (mut d AHCIDevice) find_cmd_slot() ?u32 {
 }
 
 fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u32, byte_cnt u32) &AHCIHBACommandTable {
-	mut volatile cmd_table := unsafe{&AHCIHBACommandTable(
-		(u64(cmd_hdr.ctba) | (u64(cmd_hdr.ctbau) << 32)) + higher_half)}
+	mut volatile cmd_table := unsafe {
+		&AHCIHBACommandTable((u64(cmd_hdr.ctba) | (u64(cmd_hdr.ctbau) << 32)) + higher_half)
+	}
 
 	cmd_table.prdt[0].dba = u32(buffer)
 	cmd_table.prdt[0].dbau = u32(buffer >> 32)
@@ -272,18 +273,18 @@ fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u3
 fn (mut d AHCIDevice) send_cmd(slot u32) {
 	for (d.regs.tfd & (0x88)) != 0 {}
 
-	d.regs.cmd &= ~ahci.hba_cmd_st
+	d.regs.cmd &= ~hba_cmd_st
 
-	for (d.regs.cmd & ahci.hba_cmd_cr) != 0 {}
+	for (d.regs.cmd & hba_cmd_cr) != 0 {}
 
-	d.regs.cmd |= ahci.hba_cmd_fr | ahci.hba_cmd_st
+	d.regs.cmd |= hba_cmd_fr | hba_cmd_st
 	d.regs.ci = 1 << slot
 
 	for d.regs.ci & (1 << slot) != 0 {}
 
-	d.regs.cmd &= ~ahci.hba_cmd_st
-	for (d.regs.cmd & ahci.hba_cmd_st) != 0 {}
-	d.regs.cmd &= ~ahci.hba_cmd_fre
+	d.regs.cmd &= ~hba_cmd_st
+	for (d.regs.cmd & hba_cmd_st) != 0 {}
+	d.regs.cmd &= ~hba_cmd_fre
 }
 
 fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
@@ -292,14 +293,16 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		return -1
 	}
 
-	mut volatile cmd_hdr := unsafe{&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
-		higher_half + cmd_slot * sizeof(AHCIHBACommand))}
+	mut volatile cmd_hdr := unsafe {
+		&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+			cmd_slot * sizeof(AHCIHBACommand))
+	}
 
 	cmd_hdr.flags &= ~(0b11111 | (1 << 6))
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
 	cmd_hdr.prdtl = 1
 
-	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(buffer) - higher_half, 1, u32(cnt * ahci.sector_size - 1))
+	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(buffer) - higher_half, 1, u32(cnt * sector_size - 1))
 
 	mut volatile cmd_ptr := unsafe { &AHCIFISh2d(&cmd_table.cfis) }
 	unsafe { C.memset(cmd_ptr, 0, sizeof(AHCIFISh2d)) }
@@ -310,7 +313,7 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		cmd_ptr.command = 0x25
 	}
 
-	cmd_ptr.fis_type = ahci.fis_reg_h2d
+	cmd_ptr.fis_type = fis_reg_h2d
 	cmd_ptr.flags = (1 << 7)
 	cmd_ptr.device = 1 << 6
 
@@ -341,8 +344,10 @@ fn (mut d AHCIDevice) initialise() ?int {
 	d.regs.clbu = u32(command_list >> 32)
 
 	for i := u32(0); i < 32; i++ {
-		mut volatile cmd_hdr := unsafe{&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
-			higher_half + i * sizeof(AHCIHBACommand))}
+		mut volatile cmd_hdr := unsafe {
+			&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+				i * sizeof(AHCIHBACommand))
+		}
 
 		desc_base := u64(memory.pmm_alloc(1))
 
@@ -357,14 +362,16 @@ fn (mut d AHCIDevice) initialise() ?int {
 
 	d.regs.cmd |= (1 << 0) | (1 << 4)
 
-	mut volatile cmd_hdr := unsafe{&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
-		higher_half + cmd_slot * sizeof(AHCIHBACommand))}
+	mut volatile cmd_hdr := unsafe {
+		&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+			cmd_slot * sizeof(AHCIHBACommand))
+	}
 
 	cmd_hdr.flags &= ~0b11111 | (1 << 7)
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
 	cmd_hdr.prdtl = 1
 
-	mut identity := unsafe{&u16(u64(memory.pmm_alloc(1)) + higher_half)}
+	mut identity := unsafe { &u16(u64(memory.pmm_alloc(1)) + higher_half) }
 
 	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(identity) - higher_half, 1, 511)
 
@@ -373,7 +380,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 
 	cmd_ptr.command = 0xec
 	cmd_ptr.flags = (1 << 7)
-	cmd_ptr.fis_type = ahci.fis_reg_h2d
+	cmd_ptr.fis_type = fis_reg_h2d
 
 	d.send_cmd(cmd_slot)
 
@@ -415,8 +422,8 @@ fn (mut d AHCIDevice) initialise() ?int {
 	print('ahci: device: sector count: ${sector_cnt}\n')
 
 	d.stat.blocks = sector_cnt
-	d.stat.blksize = ahci.sector_size
-	d.stat.size = sector_cnt * ahci.sector_size
+	d.stat.blksize = sector_size
+	d.stat.size = sector_cnt * sector_size
 	d.stat.rdev = resource.create_dev_id()
 	d.stat.mode = 0o644 | stat.ifblk
 
@@ -460,7 +467,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	c.pci_bar = pci_device.get_bar(0x5)
-	c.regs = unsafe{&AHCIRegisters(c.pci_bar.base + higher_half)}
+	c.regs = unsafe { &AHCIRegisters(c.pci_bar.base + higher_half) }
 
 	c.version_maj = (c.regs.vs >> 16) & 0xffff
 	c.version_min = c.regs.vs & 0xffff
@@ -482,11 +489,13 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 	for i := u64(0); i < c.port_cnt; i++ {
 		if c.regs.pi & (1 << i) != 0 {
-			mut volatile port := unsafe{&AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) +
-				i * sizeof(AHCIPortRegisters) + higher_half)}
+			mut volatile port := unsafe {
+				&AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) +
+					i * sizeof(AHCIPortRegisters) + higher_half)
+			}
 
 			match port.sig {
-				ahci.sata_ata {
+				sata_ata {
 					print('ahci: sata drive found on port ${i}\n')
 
 					mut device := &AHCIDevice{
@@ -504,10 +513,10 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 					c.device_list << device
 				}
-				ahci.sata_atapi {
+				sata_atapi {
 					print('ahci: enclosure management bridge found on port ${i}\n')
 				}
-				ahci.sata_pm {
+				sata_pm {
 					print('ahci: port multipler found on port ${i}\n')
 				}
 				else {}
@@ -520,8 +529,8 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 pub fn initialise() {
 	for device in scanned_devices {
-		if device.class == ahci.ahci_class && device.subclass == ahci.ahci_subclass
-			&& device.prog_if == ahci.ahci_progif {
+		if device.class == ahci_class && device.subclass == ahci_subclass
+			&& device.prog_if == ahci_progif {
 			mut ahci_device := &AHCIController{
 				regs: unsafe { nil }
 			}

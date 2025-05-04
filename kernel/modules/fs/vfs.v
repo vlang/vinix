@@ -180,7 +180,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	if is_absolute == true {
 		parent = vfs_root
 	} else {
-		if dirfd == fs.at_fdcwd {
+		if dirfd == at_fdcwd {
 			parent = unsafe { &VFSNode(current_process.current_directory) }
 		} else {
 			dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
@@ -427,7 +427,7 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
-	remove_dir := flags & fs.at_removedir != 0
+	remove_dir := flags & at_removedir != 0
 
 	unlink(parent, path, remove_dir) or { return errno.err, errno.get() }
 
@@ -704,7 +704,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
-	follow_links := flags & fs.at_symlink_nofollow == 0
+	follow_links := flags & at_symlink_nofollow == 0
 
 	get_node(parent, path, follow_links) or { return errno.err, errno.get() }
 
@@ -728,11 +728,11 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	mut statsrc := &stat.Stat(unsafe { nil })
 
 	if path.len == 0 {
-		if flags & fs.at_empty_path == 0 {
+		if flags & at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
 
-		if dirfd == fs.at_fdcwd {
+		if dirfd == at_fdcwd {
 			node := unsafe { &VFSNode(current_process.current_directory) }
 			statsrc = &node.resource.stat
 		} else {
@@ -742,7 +742,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
-		follow_links := flags & fs.at_symlink_nofollow == 0
+		follow_links := flags & at_symlink_nofollow == 0
 
 		node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
 
@@ -806,7 +806,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		return errno.err, errno.exdev
 	}
 
-	follow_links := flags & fs.at_symlink_nofollow == 0
+	follow_links := flags & at_symlink_nofollow == 0
 
 	mut old_node := get_node(oldparent, oldpath, follow_links) or { return errno.err, errno.get() }
 
@@ -979,13 +979,13 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 
 	mut base := i64(0)
 	match whence {
-		fs.seek_set {
+		seek_set {
 			base = offset
 		}
-		fs.seek_cur {
+		seek_cur {
 			base = handle.loc + offset
 		}
-		fs.seek_end {
+		seek_end {
 			base = i64(handle.resource.stat.size) + offset
 		}
 		else {

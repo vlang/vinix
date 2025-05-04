@@ -147,10 +147,10 @@ pub fn (dev &PCIDevice) set_msix(vector u8) bool {
 	address := (0xfee << 20) | (bsp_lapic_id << 12)
 	data := vector
 
-	kio.mmout(unsafe{&u32(bar_base)}, address) // address low
-	kio.mmout(unsafe{&u32(bar_base + 4)}, u32(0)) // address high
-	kio.mmout(unsafe{&u32(bar_base + 8)}, data) // data
-	kio.mmout(unsafe{&u32(bar_base + 12)}, u32(0)) // vector control
+	kio.mmout(unsafe { &u32(bar_base) }, address) // address low
+	kio.mmout(unsafe { &u32(bar_base + 4) }, u32(0)) // address high
+	kio.mmout(unsafe { &u32(bar_base + 8) }, data) // data
+	kio.mmout(unsafe { &u32(bar_base + 12) }, u32(0)) // vector control
 	mut message_control := dev.read[u16](dev.msix_offset + 2)
 
 	message_control |= (1 << 15) // enable=1

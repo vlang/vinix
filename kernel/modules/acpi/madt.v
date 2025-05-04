@@ -83,7 +83,7 @@ fn madt_init() {
 			break
 		}
 
-		header := unsafe{ &MADTHeader(u64(&madt.entries_begin) + current) }
+		header := unsafe { &MADTHeader(u64(&madt.entries_begin) + current) }
 
 		match header.id {
 			0 {

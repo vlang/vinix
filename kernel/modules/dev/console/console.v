@@ -44,9 +44,9 @@ __global (
 	console_ctrl_active            = bool(false)
 	console_alt_active             = bool(false)
 	console_extra_scancodes        = bool(false)
-	console_buffer                 [console.console_buffer_size]u8
+	console_buffer                 [console_buffer_size]u8
 	console_buffer_i               = u64(0)
-	console_bigbuf                 [console.console_bigbuf_size]u8
+	console_bigbuf                 [console_bigbuf_size]u8
 	console_bigbuf_i               = u64(0)
 	console_termios                = &termios.Termios(unsafe { nil })
 	console_decckm                 = false
@@ -323,7 +323,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 	if console_termios.c_lflag & termios.icanon != 0 {
 		match c {
 			`\n` {
-				if console_buffer_i == console.console_buffer_size {
+				if console_buffer_i == console_buffer_size {
 					return
 				}
 				console_buffer[console_buffer_i] = c
@@ -336,7 +336,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 						console_res.status |= file.pollin
 						event.trigger(mut console_res.event, false)
 					}
-					if console_bigbuf_i == console.console_bigbuf_size {
+					if console_bigbuf_i == console_bigbuf_size {
 						return
 					}
 					console_bigbuf[console_bigbuf_i] = console_buffer[i]
@@ -367,7 +367,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 			else {}
 		}
 
-		if console_buffer_i == console.console_buffer_size {
+		if console_buffer_i == console_buffer_size {
 			return
 		}
 		console_buffer[console_buffer_i] = c
@@ -377,7 +377,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 			console_res.status |= file.pollin
 			event.trigger(mut console_res.event, false)
 		}
-		if console_bigbuf_i == console.console_bigbuf_size {
+		if console_bigbuf_i == console_bigbuf_size {
 			return
 		}
 		console_bigbuf[console_bigbuf_i] = c
@@ -480,11 +480,11 @@ fn keyboard_handler() {
 			console_extra_scancodes = false
 
 			match input_byte {
-				console.ctrl {
+				ctrl {
 					console_ctrl_active = true
 					continue
 				}
-				console.ctrl_rel {
+				ctrl_rel {
 					console_ctrl_active = false
 					continue
 				}
@@ -562,35 +562,35 @@ fn keyboard_handler() {
 		}
 
 		match input_byte {
-			console.numlock {
+			numlock {
 				console_numlock_active = true
 				continue
 			}
-			console.left_alt {
+			left_alt {
 				console_alt_active = true
 				continue
 			}
-			console.left_alt_rel {
+			left_alt_rel {
 				console_alt_active = false
 				continue
 			}
-			console.left_shift, console.right_shift {
+			left_shift, right_shift {
 				console_shift_active = true
 				continue
 			}
-			console.left_shift_rel, console.right_shift_rel {
+			left_shift_rel, right_shift_rel {
 				console_shift_active = false
 				continue
 			}
-			console.ctrl {
+			ctrl {
 				console_ctrl_active = true
 				continue
 			}
-			console.ctrl_rel {
+			ctrl_rel {
 				console_ctrl_active = false
 				continue
 			}
-			console.capslock {
+			capslock {
 				console_capslock_active = !console_capslock_active
 				continue
 			}
@@ -602,18 +602,18 @@ fn keyboard_handler() {
 		if input_byte in console_convtab_numpad_numlock {
 			c = console_convtab_numpad_numlock[input_byte]
 		} else {
-			if input_byte < console.max_scancode {
+			if input_byte < max_scancode {
 				if console_capslock_active == false && console_shift_active == false {
-					c = console.convtab_nomod[input_byte]
+					c = convtab_nomod[input_byte]
 				}
 				if console_capslock_active == false && console_shift_active == true {
-					c = console.convtab_shift[input_byte]
+					c = convtab_shift[input_byte]
 				}
 				if console_capslock_active == true && console_shift_active == false {
-					c = console.convtab_capslock[input_byte]
+					c = convtab_capslock[input_byte]
 				}
 				if console_capslock_active == true && console_shift_active == true {
-					c = console.convtab_shift_capslock[input_byte]
+					c = convtab_shift_capslock[input_byte]
 				}
 			} else {
 				continue
@@ -671,7 +671,7 @@ pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 
 	match t {
 		10 {
-			dec_private(a, unsafe{&u32(b)}, c)
+			dec_private(a, unsafe { &u32(b) }, c)
 		}
 		else {}
 	}
@@ -694,7 +694,7 @@ pub fn initialise() {
 	console_res.termios.c_lflag = termios.isig | termios.icanon | termios.iexten | termios.echo | termios.echoe | termios.echok | termios.echoctl | termios.echoke
 	console_res.termios.c_cc[termios.vintr] = termios.ctrl(`C`)
 	console_res.termios.c_cc[termios.vquit] = termios.ctrl(`\\`)
-	console_res.termios.c_cc[termios.verase] = 0x7f //termios.ctrl(`?`)
+	console_res.termios.c_cc[termios.verase] = 0x7f // termios.ctrl(`?`)
 	console_res.termios.c_cc[termios.vkill] = termios.ctrl(`U`)
 	console_res.termios.c_cc[termios.veof] = termios.ctrl(`D`)
 	console_res.termios.c_cc[termios.vstart] = termios.ctrl(`Q`)

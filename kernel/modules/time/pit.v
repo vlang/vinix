@@ -21,8 +21,8 @@ pub fn pit_set_reload_value(new_count u16) {
 }
 
 pub fn pit_set_frequency(frequency u64) {
-	mut new_divisor := time.pit_dividend / frequency
-	if time.pit_dividend % frequency > frequency / 2 {
+	mut new_divisor := pit_dividend / frequency
+	if pit_dividend % frequency > frequency / 2 {
 		new_divisor++
 	}
 

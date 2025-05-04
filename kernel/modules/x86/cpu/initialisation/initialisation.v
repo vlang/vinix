@@ -13,7 +13,7 @@ import sched
 import memory
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
-	mut cpu_local := unsafe{&cpulocal.Local(smp_info.extra_argument)}
+	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
 	cpu_number := cpu_local.cpu_number
 
 	cpu_local.lapic_id = smp_info.lapic_id

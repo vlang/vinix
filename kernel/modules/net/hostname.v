@@ -5,7 +5,7 @@ import errno
 const hostname_len = 64
 
 __global (
-	hostname [net.hostname_len]char
+	hostname [hostname_len]char
 )
 
 pub fn syscall_gethostname(_ voidptr, name charptr, len u64) (u64, u64) {
@@ -20,7 +20,7 @@ pub fn syscall_gethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 }
 
 pub fn syscall_sethostname(_ voidptr, name charptr, len u64) (u64, u64) {
-	if len > net.hostname_len - 1 {
+	if len > hostname_len - 1 {
 		return errno.err, errno.einval
 	}
 

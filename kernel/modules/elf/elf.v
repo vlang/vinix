@@ -94,13 +94,13 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 		return error('elf: Invalid magic')
 	}
 
-	if header.ident[elf.ei_class] != 0x02 || header.ident[elf.ei_data] != elf.bits_le
-		|| header.ident[elf.ei_osabi] != elf.abi_sysv || header.machine != elf.arch_x86_64 {
+	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
+		|| header.ident[ei_osabi] != abi_sysv || header.machine != arch_x86_64 {
 		return error('elf: Unsupported ELF file')
 	}
 
 	mut slide := u64(0)
-	if header.@type == elf.et_dyn {
+	if header.@type == et_dyn {
 		slide = 0x400000
 	}
 
@@ -121,19 +121,19 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 		}
 
 		match phdr.p_type {
-			elf.pt_interp {
+			pt_interp {
 				mut p := unsafe { malloc(phdr.p_filesz + 1) }
 				res.read(0, p, phdr.p_offset, phdr.p_filesz) or { return error('') }
 				ld_path = unsafe { cstring_to_vstring(p) }
 				unsafe { free(p) }
 			}
-			elf.pt_phdr {
+			pt_phdr {
 				auxval.at_phdr = base + phdr.p_vaddr + slide
 			}
 			else {}
 		}
 
-		if phdr.p_type != elf.pt_load {
+		if phdr.p_type != pt_load {
 			continue
 		}
 
@@ -145,7 +145,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 			return error('elf: Allocation failure')
 		}
 
-		pf := mmap.prot_read | mmap.prot_exec | if phdr.p_flags & elf.pf_w != 0 {
+		pf := mmap.prot_read | mmap.prot_exec | if phdr.p_flags & pf_w != 0 {
 			mmap.prot_write
 		} else {
 			0

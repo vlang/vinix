@@ -214,7 +214,7 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	if signum < 0 || signum > 34 || signum == userland.sigkill || signum == userland.sigstop {
+	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
 		return errno.err, errno.einval
 	}
 
@@ -253,13 +253,13 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 
 	if set != unsafe { nil } {
 		match how {
-			userland.sig_block {
+			sig_block {
 				t.masked_signals |= *set
 			}
-			userland.sig_unblock {
+			sig_unblock {
 				t.masked_signals &= ~*set
 			}
-			userland.sig_setmask {
+			sig_setmask {
 				t.masked_signals = *set
 			}
 			else {}
@@ -299,7 +299,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	previous_mask := t.masked_signals
 
 	t.masked_signals |= sigaction.sa_mask
-	if sigaction.sa_flags & userland.sa_nodefer == 0 {
+	if sigaction.sa_flags & sa_nodefer == 0 {
 		t.masked_signals |= u64(1) << which
 	}
 
@@ -310,7 +310,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	// Return context
 	t.gpr_state.rsp -= sizeof(cpulocal.GPRState)
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut return_context := unsafe{&cpulocal.GPRState(t.gpr_state.rsp)}
+	mut return_context := unsafe { &cpulocal.GPRState(t.gpr_state.rsp) }
 
 	unsafe {
 		*return_context = *context
@@ -319,7 +319,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	// Siginfo
 	t.gpr_state.rsp -= sizeof(SigInfo)
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut siginfo := unsafe{&SigInfo(t.gpr_state.rsp)}
+	mut siginfo := unsafe { &SigInfo(t.gpr_state.rsp) }
 
 	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
 	siginfo.si_signo = which
@@ -440,7 +440,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 		events << &child.event
 	}
 
-	block := options & userland.wnohang == 0
+	block := options & wnohang == 0
 	which := event.await(mut events, block) or { return errno.err, errno.eintr }
 
 	if child == unsafe { nil } {

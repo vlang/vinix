@@ -63,8 +63,7 @@ pub mut:
 
 pub fn initialise() {
 	// Fetch and setup the PCI device.
-	mut dev := pci.get_device_by_class(ata.pci_class, ata.pci_subclass, ata.pci_progif,
-		0) or {
+	mut dev := pci.get_device_by_class(pci_class, pci_subclass, pci_progif, 0) or {
 		print('ata: No suitable PCI devices found\n')
 		return
 	}
@@ -72,7 +71,7 @@ pub fn initialise() {
 
 	// Probe ports and add devices.
 	mut index := 0
-	for i in 0 .. ata.ata_ports.len {
+	for i in 0 .. ata_ports.len {
 		drive := init_ata_drive(i, mut dev) or { continue }
 		name := 'ata${index}'
 		fs.devtmpfs_add_device(drive, name)
@@ -82,10 +81,10 @@ pub fn initialise() {
 }
 
 fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
-	assert port_index < ata.ata_ports.len
+	assert port_index < ata_ports.len
 
 	// Fetch the IO ports and comm addresses of the drive.
-	port := u16(ata.ata_ports[port_index])
+	port := u16(ata_ports[port_index])
 	mut bar4 := u16(pci_device.read[u32](0x20))
 	if bar4 & 1 != 0 {
 		bar4 &= 0xfffffffc
@@ -108,7 +107,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		// To be filled later.
 		prdt_phys: 0
 		// To be filled later.
-		prdt_cache: unsafe{&u8(0)}
+		prdt_cache: unsafe { &u8(0) }
 		// To be filled later.
 	}
 
@@ -177,12 +176,12 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	dev.stat.rdev = resource.create_dev_id()
 	dev.stat.mode = 0o644 | stat.ifblk
 	dev.prdt_phys = u32(u64(memory.pmm_alloc(1)))
-	dev.prdt = unsafe{&PRDT(dev.prdt_phys + higher_half)}
-	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup[u64](ata.ata_bytes_per_prdt,
+	dev.prdt = unsafe { &PRDT(dev.prdt_phys + higher_half) }
+	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup[u64](ata_bytes_per_prdt,
 		page_size))))
-	dev.prdt.transfer_size = ata.ata_bytes_per_prdt
+	dev.prdt.transfer_size = ata_bytes_per_prdt
 	dev.prdt.mark_end = 0x8000
-	dev.prdt_cache = unsafe{&u8(u64(dev.prdt.buffer_phys) + higher_half)}
+	dev.prdt_cache = unsafe { &u8(u64(dev.prdt.buffer_phys) + higher_half) }
 	return dev
 }
 
@@ -192,21 +191,21 @@ fn (mut this ATADrive) mmap(page u64, flags int) voidptr {
 
 fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
-	if loc % ata.ata_bytes_per_sector != 0 || count % ata.ata_bytes_per_sector != 0 {
+	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
 		errno.set(errno.eio)
 		return none
 	}
 
 	// Actually read.
-	sector_start := loc / ata.ata_bytes_per_sector
-	sector_count := count / ata.ata_bytes_per_sector
+	sector_start := loc / ata_bytes_per_sector
+	sector_count := count / ata_bytes_per_sector
 
 	dev.l.acquire()
 	defer {
 		dev.l.release()
 	}
 
-	for i := u64(0); i < sector_count; i += ata.ata_sectors_per_prdt {
+	for i := u64(0); i < sector_count; i += ata_sectors_per_prdt {
 		sector_loc := sector_start + i
 		kio.port_out[u8](dev.bmr_command, 0)
 		kio.port_out[u32](dev.bmr_prdt, dev.prdt_phys)
@@ -216,10 +215,10 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 		val := if dev.is_master { 0x40 } else { 0x50 }
 		kio.port_out[u8](dev.device_port, u8(val))
 
-		actual_count := if i + ata.ata_sectors_per_prdt > sector_count {
-			sector_count % ata.ata_sectors_per_prdt
+		actual_count := if i + ata_sectors_per_prdt > sector_count {
+			sector_count % ata_sectors_per_prdt
 		} else {
-			ata.ata_sectors_per_prdt
+			ata_sectors_per_prdt
 		}
 
 		kio.port_out[u8](dev.sector_count_port, u8(actual_count >> 8))
@@ -246,29 +245,29 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 		}
 		kio.port_out[u8](dev.bmr_command, 0)
 
-		buffer_final := voidptr(u64(buffer) + i * ata.ata_bytes_per_sector)
-		unsafe { C.memcpy(buffer_final, dev.prdt_cache, actual_count * ata.ata_bytes_per_sector) }
+		buffer_final := voidptr(u64(buffer) + i * ata_bytes_per_sector)
+		unsafe { C.memcpy(buffer_final, dev.prdt_cache, actual_count * ata_bytes_per_sector) }
 	}
 	return i64(count)
 }
 
 fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
-	if loc % ata.ata_bytes_per_sector != 0 || count % ata.ata_bytes_per_sector != 0 {
+	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
 		errno.set(errno.eio)
 		return none
 	}
 
 	// Actually write.
-	sector_start := loc / ata.ata_bytes_per_sector
-	sector_count := count / ata.ata_bytes_per_sector
+	sector_start := loc / ata_bytes_per_sector
+	sector_count := count / ata_bytes_per_sector
 
 	dev.l.acquire()
 	defer {
 		dev.l.release()
 	}
 
-	for i := u64(0); i < sector_count; i += ata.ata_sectors_per_prdt {
+	for i := u64(0); i < sector_count; i += ata_sectors_per_prdt {
 		sector_loc := sector_start + i
 
 		kio.port_out[u8](dev.bmr_command, 0)
@@ -279,15 +278,15 @@ fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) 
 		val := if dev.is_master { 0x40 } else { 0x50 }
 		kio.port_out[u8](dev.device_port, u8(val))
 
-		actual_count := if i + ata.ata_sectors_per_prdt > sector_count {
-			sector_count % ata.ata_sectors_per_prdt
+		actual_count := if i + ata_sectors_per_prdt > sector_count {
+			sector_count % ata_sectors_per_prdt
 		} else {
-			ata.ata_sectors_per_prdt
+			ata_sectors_per_prdt
 		}
 
 		// Copy buffer to DMA area.
-		buffer_final := voidptr(u64(buffer) + i * ata.ata_bytes_per_sector)
-		unsafe { C.memcpy(dev.prdt_cache, buffer_final, actual_count * ata.ata_bytes_per_sector) }
+		buffer_final := voidptr(u64(buffer) + i * ata_bytes_per_sector)
+		unsafe { C.memcpy(dev.prdt_cache, buffer_final, actual_count * ata_bytes_per_sector) }
 
 		kio.port_out[u8](dev.sector_count_port, u8(actual_count >> 8))
 		kio.port_out[u8](dev.lba_low_port, u8((sector_loc & 0x000000FF000000) >> 24))

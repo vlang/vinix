@@ -15,5 +15,5 @@ pub mut:
 	@lock       klock.Lock
 	pending     u64
 	listeners_i u64
-	listeners   [eventstruct.max_listeners]EventListener
+	listeners   [max_listeners]EventListener
 }

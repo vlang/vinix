@@ -56,17 +56,17 @@ pub fn framebuffer_init() {
 			length:    framebuffer_tag.red_mask_size
 			msb_right: 0
 		}
-		green: api.FBBitfield{
+		green:            api.FBBitfield{
 			offset:    framebuffer_tag.green_mask_shift
 			length:    framebuffer_tag.green_mask_size
 			msb_right: 0
 		}
-		blue: api.FBBitfield{
+		blue:             api.FBBitfield{
 			offset:    framebuffer_tag.blue_mask_shift
 			length:    framebuffer_tag.blue_mask_size
 			msb_right: 0
 		}
-		transp: api.FBBitfield{
+		transp:           api.FBBitfield{
 			offset:    0
 			length:    0
 			msb_right: 0

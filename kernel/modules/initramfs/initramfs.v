@@ -136,8 +136,9 @@ pub fn initialise() {
 		// memory.pmm_free(voidptr(u64(current_header) - higher_half), (u64(512) +
 		//	lib.align_up(size, 512)) / page_size)
 
-		current_header = unsafe{&USTARHeader(usize(current_header) + usize(512) +
-			usize(lib.align_up(size, 512)))}
+		current_header = unsafe {
+			&USTARHeader(usize(current_header) + usize(512) + usize(lib.align_up(size, 512)))
+		}
 	}
 
 	print('\ninitramfs: Done.\n')

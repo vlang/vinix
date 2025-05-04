@@ -106,7 +106,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			global_range.resource.refcount++
 		}
 
-		if local_range.flags & mmap.map_shared != 0 {
+		if local_range.flags & map_shared != 0 {
 			global_range.locals << new_local_range
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 				old_pte := old_pagemap.virt2pte(i, false) or { continue }
@@ -119,7 +119,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			mut new_global_range := &MmapRangeGlobal{
 				resource:       unsafe { nil }
 				shadow_pagemap: memory.Pagemap{
-					top_level: unsafe{&u64(0)}
+					top_level: unsafe { &u64(0) }
 				}
 			}
 
@@ -135,7 +135,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 
 			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
-			if local_range.flags & mmap.map_anonymous != 0 {
+			if local_range.flags & map_anonymous != 0 {
 				for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 					old_pte := old_pagemap.virt2pte(i, false) or { continue }
 					if unsafe { *old_pte } & 1 == 0 {
@@ -166,10 +166,10 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 	mut g := unsafe { _g }
 
 	mut pt_flags := memory.pte_present | memory.pte_user
-	if prot & mmap.prot_write != 0 {
+	if prot & prot_write != 0 {
 		pt_flags |= memory.pte_writable
 	}
-	if prot & mmap.prot_exec == 0 {
+	if prot & prot_exec == 0 {
 		pt_flags |= memory.pte_noexec
 	}
 
@@ -185,7 +185,7 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 }
 
 pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _length u64, prot int, _flags int) ? {
-	flags := _flags | mmap.map_anonymous
+	flags := _flags | map_anonymous
 
 	virt_addr := lib.align_down(_virt_addr, page_size)
 	length := lib.align_up(_length + (_virt_addr - virt_addr), page_size)
@@ -205,7 +205,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 		length:         length
 		resource:       unsafe { nil }
 		shadow_pagemap: memory.Pagemap{
-			top_level: unsafe{&u64(0)}
+			top_level: unsafe { &u64(0) }
 		}
 	}
 
@@ -256,7 +256,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut page := unsafe { nil }
 
-	if range_local.flags & mmap.map_anonymous != 0 {
+	if range_local.flags & map_anonymous != 0 {
 		page = memory.pmm_alloc(1)
 	} else {
 		page = range_local.global.resource.mmap(file_page, range_local.flags)
@@ -279,7 +279,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 
 	length := lib.align_up(_length, page_size)
 
-	if flags & mmap.map_anonymous == 0 && resource_.can_mmap == false {
+	if flags & map_anonymous == 0 && resource_.can_mmap == false {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -288,7 +288,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	mut process := current_thread.process
 
 	mut base := u64(0)
-	if flags & mmap.map_fixed != 0 {
+	if flags & map_fixed != 0 {
 		base = u64(addr)
 
 		munmap(mut pagemap, voidptr(base), length)?
@@ -314,7 +314,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		resource:       resource_
 		offset:         offset
 		shadow_pagemap: memory.Pagemap{
-			top_level: unsafe{&u64(0)}
+			top_level: unsafe { &u64(0) }
 		}
 	}
 
@@ -418,10 +418,10 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 
 		for j := snip_begin; j < snip_end; j += page_size {
 			mut pt_flags := memory.pte_present | memory.pte_user
-			if prot & mmap.prot_write != 0 {
+			if prot & prot_write != 0 {
 				pt_flags |= memory.pte_writable
 			}
-			if prot & mmap.prot_exec == 0 {
+			if prot & prot_exec == 0 {
 				pt_flags |= memory.pte_noexec
 			}
 			pagemap.flag_page(j, pt_flags) or {}
@@ -508,7 +508,7 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 
 		if snip_size == local_range.length {
 			if global_range.locals.len == 1 {
-				if local_range.flags & mmap.map_anonymous != 0 {
+				if local_range.flags & map_anonymous != 0 {
 					for j := global_range.base; j < global_range.base + global_range.length; j += page_size {
 						phys := global_range.shadow_pagemap.virt2phys(j) or { continue }
 						global_range.shadow_pagemap.unmap_page(j) or {

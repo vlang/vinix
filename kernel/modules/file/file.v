@@ -107,7 +107,7 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		}
 
 		mut fd := fd_from_fdnum(unsafe { nil }, fdd.fd) or {
-			fdd.revents = file.pollnval
+			fdd.revents = pollnval
 			ret++
 			continue
 		}
@@ -403,27 +403,27 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	mut ret := u64(0)
 
 	match cmd {
-		file.f_dupfd {
+		f_dupfd {
 			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false,
 				false) or { return errno.err, errno.get() })
 		}
-		file.f_dupfd_cloexec {
+		f_dupfd_cloexec {
 			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false,
 				true) or { return errno.err, errno.get() })
 		}
-		file.f_getfd {
-			ret = if fd.flags & resource.o_cloexec != 0 { u64(file.fd_cloexec) } else { 0 }
+		f_getfd {
+			ret = if fd.flags & resource.o_cloexec != 0 { u64(fd_cloexec) } else { 0 }
 			fd.unref()
 		}
-		file.f_setfd {
-			fd.flags = if arg & file.fd_cloexec != 0 { resource.o_cloexec } else { 0 }
+		f_setfd {
+			fd.flags = if arg & fd_cloexec != 0 { resource.o_cloexec } else { 0 }
 			fd.unref()
 		}
-		file.f_getfl {
+		f_getfl {
 			ret = u64(handle.flags)
 			fd.unref()
 		}
-		file.f_setfl {
+		f_setfl {
 			handle.flags = int(arg)
 			fd.unref()
 		}

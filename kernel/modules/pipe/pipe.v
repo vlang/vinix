@@ -33,8 +33,8 @@ pub fn initialise() {}
 
 pub fn create() ?&Pipe {
 	mut p := &Pipe{
-		data:     unsafe { malloc(pipe.pipe_buf) }
-		capacity: pipe.pipe_buf
+		data:     unsafe { malloc(pipe_buf) }
+		capacity: pipe_buf
 	}
 	p.stat.mode = stat.ifpipe
 

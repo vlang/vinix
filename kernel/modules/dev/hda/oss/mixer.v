@@ -164,7 +164,7 @@ fn (mut dev OssMixerDevice) write(handle voidptr, buf voidptr, loc u64, count u6
 
 fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
-		oss.ctl_mix_read {
+		ctl_mix_read {
 			mut value := unsafe { &OssMixerValue(argp) }
 			match value.ctrl {
 				2 {
@@ -177,7 +177,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 				}
 			}
 		}
-		oss.ctl_mix_write {
+		ctl_mix_write {
 			mut value := unsafe { &OssMixerValue(argp) }
 			match value.ctrl {
 				2 {
@@ -193,12 +193,12 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 				}
 			}
 		}
-		oss.ctl_mix_extinfo {
+		ctl_mix_extinfo {
 			mut info := unsafe { &OssMixExt(argp) }
 
 			match info.ctrl {
 				0 {
-					info.entry_type = oss.mixt_devroot
+					info.entry_type = mixt_devroot
 					root := unsafe { &OssMixExtRoot(&info.data) }
 
 					name := 'hda_main'
@@ -210,14 +210,14 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 					return 0
 				}
 				1 {
-					info.entry_type = oss.mixt_marker
+					info.entry_type = mixt_marker
 					return 0
 				}
 				2 {
-					info.entry_type = oss.mixt_monoslider
+					info.entry_type = mixt_monoslider
 					info.min_value = 0
 					info.max_value = 100
-					info.flags = oss.mixf_readable | oss.mixf_writable | oss.mixf_mainvol
+					info.flags = mixf_readable | mixf_writable | mixf_mainvol
 
 					name := 'hda_mainvolume'
 
@@ -232,7 +232,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 				}
 			}
 		}
-		oss.ctl_mixerinfo {
+		ctl_mixerinfo {
 			mut info := unsafe { &OssMixerInfo(argp) }
 
 			name := 'HDA Mixer'

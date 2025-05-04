@@ -112,7 +112,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 
 	gpt_hdr := unsafe { *&GPTPartitionTableHDR(lba_buffer) }
 
-	if gpt_hdr.identifier == partition.gpt_signature {
+	if gpt_hdr.identifier == gpt_signature {
 		entry_list_lba := gpt_hdr.partition_array_lba
 		entry_cnt := gpt_hdr.partition_entry_cnt
 		entry_list_size := lib.align_up(sizeof(GPTPartitionEntry) * entry_cnt, u64(parent_device.stat.blksize))
@@ -168,7 +168,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 	mbr_signature := unsafe { &u16(lba_buffer)[255] }
 
 	if mbr_signature == 0xaa55 {
-		partitions := unsafe{&MBRPartition(u64(lba_buffer) + 0x1be)}
+		partitions := unsafe { &MBRPartition(u64(lba_buffer) + 0x1be) }
 
 		for i := 0; i < 4; i++ {
 			if unsafe { partitions[i].partition_type } == 0

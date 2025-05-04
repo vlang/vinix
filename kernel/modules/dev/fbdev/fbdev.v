@@ -28,7 +28,7 @@ const fbdev_max_device_count = 32
 
 __global (
 	fbdev_lock  klock.Lock
-	fbdev_nodes [fbdev.fbdev_max_device_count]FramebufferNode
+	fbdev_nodes [fbdev_max_device_count]FramebufferNode
 )
 
 fn (mut this FramebufferNode) mmap(page u64, flags int) voidptr {
@@ -125,7 +125,7 @@ fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {
 }
 
 fn create_device_node(index u64) ? {
-	if index >= fbdev.fbdev_max_device_count {
+	if index >= fbdev_max_device_count {
 		println('device index out of range')
 		return none
 	}
@@ -156,7 +156,7 @@ pub fn register_device(info api.FramebufferInfo) ? {
 		fbdev_lock.release()
 	}
 
-	for index < fbdev.fbdev_max_device_count {
+	for index < fbdev_max_device_count {
 		if fbdev_nodes[index].initialized {
 			index += 1
 			continue
@@ -167,7 +167,7 @@ pub fn register_device(info api.FramebufferInfo) ? {
 		break
 	}
 
-	if index >= fbdev.fbdev_max_device_count {
+	if index >= fbdev_max_device_count {
 		println('too many registered devices')
 		return none
 	}

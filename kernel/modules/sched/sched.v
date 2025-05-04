@@ -39,14 +39,14 @@ fn get_next_thread() &proc.Thread {
 
 	mut orig_i := cpu_local.last_run_queue_index
 
-	if orig_i >= sched.max_running_threads {
+	if orig_i >= max_running_threads {
 		orig_i = 0
 	}
 
 	mut index := orig_i + 1
 
 	for {
-		if index >= sched.max_running_threads {
+		if index >= max_running_threads {
 			index = 0
 		}
 
@@ -180,7 +180,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 	katomic.store(mut &t.enqueued_by_signal, by_signal)
 
-	for i := u64(0); i < sched.max_running_threads; i++ {
+	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil },
 			t)
 		{
@@ -208,7 +208,7 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 		return true
 	}
 
-	for i := u64(0); i < sched.max_running_threads; i++ {
+	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
 			t.is_in_queue = false
 			return true
@@ -305,9 +305,9 @@ pub fn dequeue_and_die() {
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
+	stack_phys := memory.pmm_alloc(stack_size / page_size)
 	stacks << stack_phys
-	stack := u64(stack_phys) + sched.stack_size + higher_half
+	stack := u64(stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		cs:     kernel_code_seg
@@ -374,32 +374,32 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		unsafe { stacks.free() }
 	}
 
-	mut stack := unsafe{&u64(0)}
+	mut stack := unsafe { &u64(0) }
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
-		stack = unsafe{&u64(u64(stack_phys) + sched.stack_size + higher_half)}
+		stack_phys := memory.pmm_alloc(stack_size / page_size)
+		stack = unsafe { &u64(u64(stack_phys) + stack_size + higher_half) }
 
 		stack_vma = process.thread_stack_top
-		process.thread_stack_top -= sched.stack_size
+		process.thread_stack_top -= stack_size
 		stack_bottom_vma := process.thread_stack_top
 		process.thread_stack_top -= page_size
 
-		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), sched.stack_size,
+		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), stack_size,
 			mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
 	} else {
 		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
 	}
 
-	kernel_stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
+	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
 	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + sched.stack_size + higher_half
+	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
 
-	pf_stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
+	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
 	stacks << pf_stack_phys
-	pf_stack := u64(pf_stack_phys) + sched.stack_size + higher_half
+	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		cs:     user_code_seg

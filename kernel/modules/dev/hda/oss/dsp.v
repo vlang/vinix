@@ -92,21 +92,21 @@ fn (mut dev OssDevice) write(handle voidptr, buf voidptr, loc u64, count u64) ?i
 
 fn (mut dev OssDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
-		oss.ctl_dsp_halt {
+		ctl_dsp_halt {
 			mut stream := dev.device.get_output_stream()
 			stream.play(false)
 			stream.reset()
 			return 0
 		}
-		oss.ctl_dsp_profile {
+		ctl_dsp_profile {
 			return 0
 		}
-		oss.ctl_setsong {
+		ctl_setsong {
 			ptr := &char(argp)
 			dev.song_name = unsafe { cstring_to_vstring(ptr) }
 			return 0
 		}
-		oss.ctl_getsong {
+		ctl_getsong {
 			ptr := &char(argp)
 			unsafe {
 				C.memcpy(ptr, dev.song_name.str, dev.song_name.len)
@@ -114,11 +114,11 @@ fn (mut dev OssDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			}
 			return 0
 		}
-		oss.ctl_dsp_speed {
+		ctl_dsp_speed {
 			dev.sample_rate = u32(unsafe { *&int(argp) })
 			return 0
 		}
-		oss.ctl_dsp_setfmt {
+		ctl_dsp_setfmt {
 			ptr := &int(argp)
 			fmt := u8(unsafe { *ptr })
 			refined := dev.device.refine_fmt(fmt)
@@ -130,7 +130,7 @@ fn (mut dev OssDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			dev.fmt = refined
 			return 0
 		}
-		oss.ctl_dsp_channels {
+		ctl_dsp_channels {
 			ptr := &int(argp)
 			channels := u8(unsafe { *ptr })
 			refined := dev.device.refine_channels(channels)

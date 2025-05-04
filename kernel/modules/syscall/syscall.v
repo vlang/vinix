@@ -1,7 +1,7 @@
 module syscall
 
 import x86.cpu.local as cpulocal
-//import userland
+// import userland
 
 @[markused]
 fn leave(context &cpulocal.GPRState) {
@@ -9,7 +9,7 @@ fn leave(context &cpulocal.GPRState) {
 		cli
 	}
 
-	//userland.dispatch_a_signal(context)
+	// userland.dispatch_a_signal(context)
 }
 
 @[_naked]

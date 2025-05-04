@@ -63,7 +63,7 @@ pub mut:
 
 pub struct LimineBootloaderInfoRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0xf55038d8e2a1202f,
@@ -82,7 +82,7 @@ pub mut:
 
 pub struct LimineStackSizeRequest {
 pub mut:
-	id [4]u64 = [
+	id         [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x224ef0460a8e8926,
@@ -103,7 +103,7 @@ pub mut:
 
 pub struct LimineHHDMRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x48dcf1cb8ad2b852,
@@ -143,7 +143,7 @@ pub mut:
 
 pub struct LimineFramebufferRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x9d5827dcd881dd75,
@@ -166,7 +166,7 @@ pub mut:
 
 pub struct LiminePagingModeRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x95c1a0edab0944cb,
@@ -201,7 +201,7 @@ pub mut:
 
 pub struct LimineSMPRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x95a67b819a1b857e,
@@ -234,7 +234,7 @@ pub mut:
 
 pub struct LimineMemmapRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x67cf3d9d378a806f,
@@ -253,7 +253,7 @@ pub mut:
 
 pub struct LimineEntryPointRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x13d86c035a1cd3e1,
@@ -274,7 +274,7 @@ pub mut:
 
 pub struct LimineKernelFileRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0xad97e90e83f1ed67,
@@ -295,7 +295,7 @@ pub mut:
 
 pub struct LimineModuleRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x3e7e279702be32af,
@@ -315,7 +315,7 @@ pub mut:
 
 pub struct LimineRSDPRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0xc5e77b6b397e7b43,
@@ -336,7 +336,7 @@ pub mut:
 
 pub struct LimineSMBIOSRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x9e9046f11e095391,
@@ -356,7 +356,7 @@ pub mut:
 
 pub struct LimineEFISystemTableRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x5ceba5163eaaf6d6,
@@ -376,7 +376,7 @@ pub mut:
 
 pub struct LimineBootTimeRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x502746e184c088aa,
@@ -397,7 +397,7 @@ pub mut:
 
 pub struct LimineKernelAddressRequest {
 pub mut:
-	id [4]u64 = [
+	id       [4]u64 = [
 	u64(0xc7b1dd30df4c8b88),
 	0x0a82e883a194f07b,
 	0x71ba76863cc55f63,

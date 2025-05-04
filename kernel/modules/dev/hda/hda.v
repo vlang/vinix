@@ -205,157 +205,157 @@ fn (mut f PCMFormat) set_sample_rate(rate u32) {
 	mut div := u8(0)
 
 	if rate <= 5513 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_8
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_8
 	} else if rate <= 6000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_8
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_8
 	} else if rate <= 6300 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_7
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_7
 	} else if rate <= 6857 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_7
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_7
 	} else if rate <= 7350 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_6
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_6
 	} else if rate <= 8000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_6
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_6
 	} else if rate <= 8820 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_5
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_5
 	} else if rate <= 9600 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_5
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_5
 	} else if rate <= 11025 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_4
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_4
 	} else if rate <= 12000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_4
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_4
 	} else if rate <= 12600 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_7
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_7
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 13714 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_7
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_7
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 14700 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_3
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_3
 	} else if rate <= 16000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_3
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_3
 	} else if rate <= 16538 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_8
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_8
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 17640 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_5
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_5
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 18000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_8
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_8
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 18900 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_7
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_7
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 19200 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_5
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_5
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 20571 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_7
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_7
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 22050 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_2
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_2
 	} else if rate <= 24000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_2
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_2
 	} else if rate <= 25200 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_7
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_7
+		mult = pcm_sample_rate_mult_4
 	} else if rate <= 26460 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_5
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_5
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 27429 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_7
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_7
+		mult = pcm_sample_rate_mult_4
 	} else if rate <= 28800 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_5
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_5
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 29400 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_3
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_3
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 32000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_3
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_3
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 33075 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_4
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_4
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 35280 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_5
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_5
+		mult = pcm_sample_rate_mult_4
 	} else if rate <= 36000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_4
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_4
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 38400 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_5
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_5
+		mult = pcm_sample_rate_mult_4
 	} else if rate <= 44100 {
-		base = hda.pcm_sample_rate_base_441khz
+		base = pcm_sample_rate_base_441khz
 	} else if rate <= 48000 {
-		base = hda.pcm_sample_rate_base_48khz
+		base = pcm_sample_rate_base_48khz
 	} else if rate <= 58800 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_3
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_3
+		mult = pcm_sample_rate_mult_4
 	} else if rate <= 64000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_3
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_3
+		mult = pcm_sample_rate_mult_4
 	} else if rate <= 66150 {
-		base = hda.pcm_sample_rate_base_441khz
-		div = hda.pcm_sample_rate_div_2
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_441khz
+		div = pcm_sample_rate_div_2
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 72000 {
-		base = hda.pcm_sample_rate_base_48khz
-		div = hda.pcm_sample_rate_div_2
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_48khz
+		div = pcm_sample_rate_div_2
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 88200 {
-		base = hda.pcm_sample_rate_base_441khz
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_441khz
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 96000 {
-		base = hda.pcm_sample_rate_base_48khz
-		mult = hda.pcm_sample_rate_mult_2
+		base = pcm_sample_rate_base_48khz
+		mult = pcm_sample_rate_mult_2
 	} else if rate <= 132300 {
-		base = hda.pcm_sample_rate_base_441khz
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_441khz
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 144000 {
-		base = hda.pcm_sample_rate_base_48khz
-		mult = hda.pcm_sample_rate_mult_3
+		base = pcm_sample_rate_base_48khz
+		mult = pcm_sample_rate_mult_3
 	} else if rate <= 176400 {
-		base = hda.pcm_sample_rate_base_441khz
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_441khz
+		mult = pcm_sample_rate_mult_4
 	} else {
-		base = hda.pcm_sample_rate_base_48khz
-		mult = hda.pcm_sample_rate_mult_4
+		base = pcm_sample_rate_base_48khz
+		mult = pcm_sample_rate_mult_4
 	}
 
 	f.value &= ~(1 << 14)
@@ -468,52 +468,52 @@ fn (c HDACodec) refine_channels(channels u8) u8 {
 }
 
 fn (mut c HDACodec) set_converter_format(nid u8, format PCMFormat) {
-	index := c.controller.submit_verb_long(c.cid, nid, hda.cmd_set_converter_format, format.value)
+	index := c.controller.submit_verb_long(c.cid, nid, cmd_set_converter_format, format.value)
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) set_amp_gain_mute(nid u8, data u16) {
-	index := c.controller.submit_verb_long(c.cid, nid, hda.cmd_set_amp_gain_mute, data)
+	index := c.controller.submit_verb_long(c.cid, nid, cmd_set_amp_gain_mute, data)
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) set_selected_con(nid u8, con_index u8) {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_set_con_select, con_index)
+	index := c.controller.submit_verb(c.cid, nid, cmd_set_con_select, con_index)
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) set_power_state(nid u8, state u8) {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_set_power_state, state)
+	index := c.controller.submit_verb(c.cid, nid, cmd_set_power_state, state)
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) set_converter_control(nid u8, channel u8, stream u8) {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_set_converter_control, channel | (stream << 4))
+	index := c.controller.submit_verb(c.cid, nid, cmd_set_converter_control, channel | (stream << 4))
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) set_pin_control(nid u8, data u8) {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_set_pin_control, data)
+	index := c.controller.submit_verb(c.cid, nid, cmd_set_pin_control, data)
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) set_eapd_enable(nid u8, data u8) {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_set_eapd_enable, data)
+	index := c.controller.submit_verb(c.cid, nid, cmd_set_eapd_enable, data)
 	c.controller.wait_for_verb(index)
 }
 
 fn (mut c HDACodec) get_parameter(nid u8, param u8) u32 {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_get_param, param)
+	index := c.controller.submit_verb(c.cid, nid, cmd_get_param, param)
 	return c.controller.wait_for_verb(index).resp
 }
 
 fn (mut c HDACodec) get_con_list(nid u8, offset u8) u32 {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_get_con_list, offset)
+	index := c.controller.submit_verb(c.cid, nid, cmd_get_con_list, offset)
 	return c.controller.wait_for_verb(index).resp
 }
 
 fn (mut c HDACodec) get_config_default(nid u8) u32 {
-	index := c.controller.submit_verb(c.cid, nid, hda.cmd_get_config_default, 0)
+	index := c.controller.submit_verb(c.cid, nid, cmd_get_config_default, 0)
 	return c.controller.wait_for_verb(index).resp
 }
 
@@ -616,7 +616,7 @@ fn (mut c HDACodec) discover_output_paths() {
 			cur_entry.con_range_index++
 
 			next_widget := &c.widgets[nid]
-			if next_widget.widget_type == hda.widget_type_audio_out {
+			if next_widget.widget_type == widget_type_audio_out {
 				mut path := HDASignalPath{}
 
 				for widget in stack {
@@ -683,7 +683,7 @@ fn (mut c HDACodec) setup_all_output_paths(sample_rate u32, bits u8, channels u8
 				c.set_selected_con(widget.nid, index)
 			}
 
-			if widget.widget_type == hda.widget_type_pin_complex {
+			if widget.widget_type == widget_type_pin_complex {
 				if widget.pin_caps & (1 << 16) != 0 {
 					c.set_eapd_enable(widget.nid, 1 << 1)
 				}
@@ -693,18 +693,18 @@ fn (mut c HDACodec) setup_all_output_paths(sample_rate u32, bits u8, channels u8
 				// set output amp, set left amp, set right amp and gain
 				amp_data := u16(1 << 15 | 1 << 13 | 1 << 12 | step)
 				c.set_amp_gain_mute(widget.nid, amp_data)
-				c.set_power_state(widget.nid, hda.power_state_d0)
+				c.set_power_state(widget.nid, power_state_d0)
 				// headphone amp, out enable
 				pin_control := u8(1 << 7 | 1 << 6)
 				c.set_pin_control(widget.nid, pin_control)
-			} else if widget.widget_type == hda.widget_type_audio_mixer {
+			} else if widget.widget_type == widget_type_audio_mixer {
 				step := widget.out_amp_caps & 0x7F
 
 				// set output amp, set left amp, set right amp and gain
 				amp_data := u16(1 << 15 | 1 << 13 | 1 << 12 | step)
 				c.set_amp_gain_mute(widget.nid, amp_data)
-				c.set_power_state(widget.nid, hda.power_state_d0)
-			} else if widget.widget_type == hda.widget_type_audio_out {
+				c.set_power_state(widget.nid, power_state_d0)
+			} else if widget.widget_type == widget_type_audio_out {
 				max_val := widget.out_amp_caps & 0x7F
 
 				mut one_percentage := max_val / 100
@@ -719,7 +719,7 @@ fn (mut c HDACodec) setup_all_output_paths(sample_rate u32, bits u8, channels u8
 				// set output amp, set left amp, set right amp and gain
 				amp_data := u16(1 << 15 | 1 << 13 | 1 << 12 | value)
 				c.set_amp_gain_mute(widget.nid, amp_data)
-				c.set_power_state(widget.nid, hda.power_state_d0)
+				c.set_power_state(widget.nid, power_state_d0)
 
 				// channel 0, stream 1
 				c.set_converter_control(widget.nid, 0, 1)
@@ -736,34 +736,34 @@ fn (mut c HDACodec) setup_all_output_paths(sample_rate u32, bits u8, channels u8
 }
 
 pub fn (mut c HDACodec) initialize() {
-	num_func_groups_resp := c.get_parameter(0, hda.param_node_count)
+	num_func_groups_resp := c.get_parameter(0, param_node_count)
 	num_func_groups := u8(num_func_groups_resp & 0xFF)
 	func_groups_start_nid := u8((num_func_groups_resp >> 16) & 0xFF)
 
 	for func_group_nid := func_groups_start_nid; func_group_nid < func_groups_start_nid +
 		num_func_groups; func_group_nid++ {
-		func_group_type_resp := c.get_parameter(func_group_nid, hda.param_func_group_type)
+		func_group_type_resp := c.get_parameter(func_group_nid, param_func_group_type)
 		func_group_type := u8(func_group_type_resp & 0xFF)
-		if func_group_type != hda.func_group_type_audio {
+		if func_group_type != func_group_type_audio {
 			continue
 		}
 
-		c.set_power_state(func_group_nid, hda.power_state_d0)
+		c.set_power_state(func_group_nid, power_state_d0)
 
 		print('hda: audio function group at ${c.cid:x}:${func_group_nid:x}\n')
 
-		num_widgets_resp := c.get_parameter(func_group_nid, hda.param_node_count)
+		num_widgets_resp := c.get_parameter(func_group_nid, param_node_count)
 		num_widgets := u8(num_widgets_resp & 0xFF)
 		widgets_start_nid := u8((num_widgets_resp >> 16) & 0xFF)
 
 		print('hda: found ${num_widgets} widgets\n')
 
 		for widget_nid := widgets_start_nid; widget_nid < widgets_start_nid + num_widgets; widget_nid++ {
-			audio_caps := c.get_parameter(widget_nid, hda.param_audio_caps)
-			in_amp_caps := c.get_parameter(widget_nid, hda.param_in_amp_caps)
-			out_amp_caps := c.get_parameter(widget_nid, hda.param_out_amp_caps)
-			pin_caps := c.get_parameter(widget_nid, hda.param_pin_caps)
-			con_list_len := u8(c.get_parameter(widget_nid, hda.param_con_list_len))
+			audio_caps := c.get_parameter(widget_nid, param_audio_caps)
+			in_amp_caps := c.get_parameter(widget_nid, param_in_amp_caps)
+			out_amp_caps := c.get_parameter(widget_nid, param_out_amp_caps)
+			pin_caps := c.get_parameter(widget_nid, param_pin_caps)
+			con_list_len := u8(c.get_parameter(widget_nid, param_con_list_len))
 			default_config := c.get_config_default(widget_nid)
 
 			widget_type := u8((audio_caps >> 20) & 0b1111)
@@ -807,28 +807,28 @@ pub fn (mut c HDACodec) initialize() {
 			c.widgets[widget_nid] = widget
 
 			match widget_type {
-				hda.widget_type_audio_out {
+				widget_type_audio_out {
 					c.audio_outputs << widget_nid
 				}
-				hda.widget_type_audio_in {
+				widget_type_audio_in {
 					c.audio_inputs << widget_nid
 				}
-				hda.widget_type_audio_mixer {
+				widget_type_audio_mixer {
 					c.audio_mixers << widget_nid
 				}
-				hda.widget_type_audio_selector {
+				widget_type_audio_selector {
 					c.audio_selectors << widget_nid
 				}
-				hda.widget_type_pin_complex {
+				widget_type_pin_complex {
 					c.pin_complexes << widget_nid
 				}
-				hda.widget_type_power_widget {
+				widget_type_power_widget {
 					c.power_widgets << widget_nid
 				}
-				hda.widget_type_volume_knob {
+				widget_type_volume_knob {
 					c.volume_knobs << widget_nid
 				}
-				hda.widget_type_beep_generator {
+				widget_type_beep_generator {
 					c.beep_generators << widget_nid
 				}
 				else {}
@@ -872,7 +872,7 @@ __global (
 
 fn (mut c HDAController) submit_verb(cid u8, nid u8, cmd u16, data u8) u8 {
 	mut corbwp := c.regs.corbwp
-	index := u8((corbwp >> hda.corbwp_wp_shift) & hda.corbwp_wp_mask) + 1
+	index := u8((corbwp >> corbwp_wp_shift) & corbwp_wp_mask) + 1
 
 	mut verb := HDAVerbDescriptor{}
 	verb.set_cid(cid)
@@ -882,8 +882,8 @@ fn (mut c HDAController) submit_verb(cid u8, nid u8, cmd u16, data u8) u8 {
 	unsafe {
 		c.corb[index] = verb
 	}
-	corbwp &= ~(hda.corbwp_wp_mask << hda.corbwp_wp_shift)
-	corbwp |= index << hda.corbwp_wp_shift
+	corbwp &= ~(corbwp_wp_mask << corbwp_wp_shift)
+	corbwp |= index << corbwp_wp_shift
 	c.regs.corbwp = corbwp
 
 	return index
@@ -891,7 +891,7 @@ fn (mut c HDAController) submit_verb(cid u8, nid u8, cmd u16, data u8) u8 {
 
 fn (mut c HDAController) submit_verb_long(cid u8, nid u8, cmd u8, data u16) u8 {
 	mut corbwp := c.regs.corbwp
-	index := u8((corbwp >> hda.corbwp_wp_shift) & hda.corbwp_wp_mask) + 1
+	index := u8((corbwp >> corbwp_wp_shift) & corbwp_wp_mask) + 1
 
 	mut verb := HDAVerbDescriptor{}
 	verb.set_cid(cid)
@@ -901,8 +901,8 @@ fn (mut c HDAController) submit_verb_long(cid u8, nid u8, cmd u8, data u16) u8 {
 	unsafe {
 		c.corb[index] = verb
 	}
-	corbwp &= ~(hda.corbwp_wp_mask << hda.corbwp_wp_shift)
-	corbwp |= index << hda.corbwp_wp_shift
+	corbwp &= ~(corbwp_wp_mask << corbwp_wp_shift)
+	corbwp |= index << corbwp_wp_shift
 	c.regs.corbwp = corbwp
 
 	return index
@@ -910,7 +910,7 @@ fn (mut c HDAController) submit_verb_long(cid u8, nid u8, cmd u8, data u16) u8 {
 
 fn (mut c HDAController) wait_for_verb(index u8) HDAResponseDescriptor {
 	for {
-		cur_index := (c.regs.corbwp >> hda.corbwp_wp_shift) & hda.corbwp_wp_mask
+		cur_index := (c.regs.corbwp >> corbwp_wp_shift) & corbwp_wp_mask
 		if cur_index == index {
 			break
 		}
@@ -929,11 +929,11 @@ fn irq_handler(mut c HDAController) {
 		event.await(mut events, true) or {}
 
 		intsts := c.regs.intsts
-		if intsts & hda.intsts_sie_mask == 0 {
+		if intsts & intsts_sie_mask == 0 {
 			continue
 		}
 
-		streams := intsts & hda.intsts_sie_mask
+		streams := intsts & intsts_sie_mask
 		for i in 0 .. c.in_stream_count + c.out_stream_count {
 			if streams & (1 << i) != 0 {
 				if i < c.in_stream_count {
@@ -960,42 +960,45 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 		return -1
 	}
 
-	c.regs = unsafe{&HDARegisters(c.pci_bar.base + higher_half)}
+	c.regs = unsafe { &HDARegisters(c.pci_bar.base + higher_half) }
 
 	mut gctl := c.regs.gctl
 
 	// if the controller is already running stop it
-	if gctl & hda.gctl_crst != 0 {
+	if gctl & gctl_crst != 0 {
 		gcap := c.regs.gcap
-		in_stream_count := (gcap >> hda.gcap_iss_shift) & hda.gcap_iss_mask
-		out_stream_count := (gcap >> hda.gcap_oss_shift) & hda.gcap_oss_mask
+		in_stream_count := (gcap >> gcap_iss_shift) & gcap_iss_mask
+		out_stream_count := (gcap >> gcap_oss_shift) & gcap_oss_mask
 		for i := u64(0); i < in_stream_count; i++ {
-			mut volatile stream_regs := unsafe{&HDAStreamRegisters(c.pci_bar.base + 0x80 + i * 0x20 +
-				higher_half)}
+			mut volatile stream_regs := unsafe {
+				&HDAStreamRegisters(c.pci_bar.base + 0x80 + i * 0x20 + higher_half)
+			}
 			mut ctl0 := stream_regs.ctl0
-			ctl0 &= ~hda.sdctl0_run
+			ctl0 &= ~sdctl0_run
 			stream_regs.ctl0 = ctl0
 		}
 		for i := u64(0); i < out_stream_count; i++ {
-			mut volatile stream_regs := unsafe{&HDAStreamRegisters(c.pci_bar.base + 0x80 +
-				c.in_stream_count * 0x20 + i * 0x20 + higher_half)}
+			mut volatile stream_regs := unsafe {
+				&HDAStreamRegisters(c.pci_bar.base + 0x80 + c.in_stream_count * 0x20 + i * 0x20 +
+					higher_half)
+			}
 			mut ctl0 := stream_regs.ctl0
-			ctl0 &= ~hda.sdctl0_run
+			ctl0 &= ~sdctl0_run
 			stream_regs.ctl0 = ctl0
 		}
 
 		mut corbctl := c.regs.corbctl
-		corbctl &= ~hda.corbctl_run
+		corbctl &= ~corbctl_run
 		c.regs.corbctl = corbctl
 		mut rirbctl := c.regs.rirbctl
-		rirbctl &= ~hda.corbctl_run
+		rirbctl &= ~corbctl_run
 		c.regs.rirbctl = rirbctl
 	}
 
-	gctl &= ~hda.gctl_crst
+	gctl &= ~gctl_crst
 	c.regs.gctl = gctl
 	for {
-		if c.regs.gctl & hda.gctl_crst == 0 {
+		if c.regs.gctl & gctl_crst == 0 {
 			break
 		}
 	}
@@ -1003,22 +1006,22 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	sys.nsleep(1000 * 200)
 
 	gctl = c.regs.gctl
-	gctl |= hda.gctl_crst
+	gctl |= gctl_crst
 	c.regs.gctl = gctl
 	for {
-		if c.regs.gctl & hda.gctl_crst != 0 {
+		if c.regs.gctl & gctl_crst != 0 {
 			break
 		}
 	}
 
 	gcap := c.regs.gcap
-	if gcap & hda.gcap_ok64 == 0 {
+	if gcap & gcap_ok64 == 0 {
 		print("hda: controller doesn't support 64-bit\n")
 		return -1
 	}
 
 	mut corb_size := c.regs.corbsize
-	corb_cap := (corb_size >> hda.corbsize_szcap_shift) & hda.corbsize_szcap_mask
+	corb_cap := (corb_size >> corbsize_szcap_shift) & corbsize_szcap_mask
 	mut chosen_corb_size := u8(0)
 	if corb_cap & 0b100 != 0 {
 		chosen_corb_size = 0b10
@@ -1030,13 +1033,13 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 		c.corb_size = 2
 	}
 	if corb_cap != chosen_corb_size << 1 {
-		corb_size &= ~(hda.corbsize_size_mask << hda.corbsize_size_shift)
-		corb_size |= chosen_corb_size << hda.corbsize_size_shift
+		corb_size &= ~(corbsize_size_mask << corbsize_size_shift)
+		corb_size |= chosen_corb_size << corbsize_size_shift
 		c.regs.corbsize = corb_size
 	}
 
 	mut rirb_size := c.regs.rirbsize
-	rirb_cap := (rirb_size >> hda.corbsize_szcap_shift) & hda.corbsize_szcap_mask
+	rirb_cap := (rirb_size >> corbsize_szcap_shift) & corbsize_szcap_mask
 	mut chosen_rirb_size := u8(0)
 	if rirb_cap & 0b100 != 0 {
 		chosen_rirb_size = 0b10
@@ -1048,8 +1051,8 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 		c.rirb_size = 2
 	}
 	if rirb_cap != chosen_rirb_size << 1 {
-		rirb_size &= ~(hda.corbsize_size_mask << hda.corbsize_size_shift)
-		rirb_size |= chosen_rirb_size << hda.corbsize_size_shift
+		rirb_size &= ~(corbsize_size_mask << corbsize_size_shift)
+		rirb_size |= chosen_rirb_size << corbsize_size_shift
 		c.regs.rirbsize = rirb_size
 	}
 
@@ -1057,9 +1060,9 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	rirb_phys := u64(memory.pmm_alloc(1))
 	dma_pos_phys := u64(memory.pmm_alloc(1))
 
-	c.corb = unsafe{&HDAVerbDescriptor(corb_phys + higher_half)}
-	c.rirb = unsafe{&HDAResponseDescriptor(rirb_phys + higher_half)}
-	c.dma_pos = unsafe{&u32(dma_pos_phys + higher_half)}
+	c.corb = unsafe { &HDAVerbDescriptor(corb_phys + higher_half) }
+	c.rirb = unsafe { &HDAResponseDescriptor(rirb_phys + higher_half) }
+	c.dma_pos = unsafe { &u32(dma_pos_phys + higher_half) }
 
 	c.regs.corblbase = u32(corb_phys)
 	c.regs.corbubase = u32(corb_phys >> 32)
@@ -1067,21 +1070,21 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	c.regs.rirbubase = u32(rirb_phys >> 32)
 	c.regs.dplbase = u32(dma_pos_phys)
 	c.regs.dpubase = u32(dma_pos_phys >> 32)
-	c.regs.dplbase |= hda.dplbase_dpbe
+	c.regs.dplbase |= dplbase_dpbe
 
 	mut corbctl := c.regs.corbctl
-	corbctl |= hda.corbctl_run
+	corbctl |= corbctl_run
 	c.regs.corbctl = corbctl
 	mut rirbctl := c.regs.rirbctl
-	rirbctl |= hda.corbctl_run
+	rirbctl |= corbctl_run
 	c.regs.rirbctl = rirbctl
 
 	mut rintcnt := c.regs.rintcnt
 	rintcnt |= 0xFF
 	c.regs.rintcnt = rintcnt
 
-	c.in_stream_count = u8((gcap >> hda.gcap_iss_shift) & hda.gcap_iss_mask)
-	c.out_stream_count = u8((gcap >> hda.gcap_oss_shift) & hda.gcap_oss_mask)
+	c.in_stream_count = u8((gcap >> gcap_iss_shift) & gcap_iss_mask)
+	c.out_stream_count = u8((gcap >> gcap_oss_shift) & gcap_oss_mask)
 
 	for i := u8(0); i < c.in_stream_count; i++ {
 		c.in_streams[i] = unsafe {
@@ -1126,7 +1129,7 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 
 	mut intctl := c.regs.intctl
 	intctl_sie := (u32(1) << (c.in_stream_count + c.out_stream_count)) - 1
-	intctl |= hda.intctl_gie | hda.intctl_cie | intctl_sie
+	intctl |= intctl_gie | intctl_cie | intctl_sie
 	c.regs.intctl = intctl
 
 	// wait for codec initialization
@@ -1156,8 +1159,8 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 
 pub fn initialize() {
 	for device in scanned_devices {
-		if (device.class == hda.hda_class && device.subclass == hda.hda_subclass)
-			|| (device.vendor_id == hda.tgl_sst_vendor && device.device_id == hda.tgl_sst_device) {
+		if (device.class == hda_class && device.subclass == hda_subclass)
+			|| (device.vendor_id == tgl_sst_vendor && device.device_id == tgl_sst_device) {
 			mut hda_device := unsafe {
 				&HDAController{
 					regs:    0

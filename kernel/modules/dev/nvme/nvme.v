@@ -411,14 +411,16 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 		namespace.parent_controller = parent_controller
 	}
 	namespace.nsid = nsid
-	namespace.identity = unsafe{&NVMENamespaceID(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMENamespaceID), page_size))) +
-		higher_half)}
+	namespace.identity = unsafe {
+		&NVMENamespaceID(
+			u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMENamespaceID), page_size))) +
+			higher_half)
+	}
 
 	mut new_command := &NVMECommand{}
 
 	unsafe {
-		new_command.opcode = nvme.opcode_identify
+		new_command.opcode = opcode_identify
 		new_command.private.identify.cns = 0
 		new_command.private.identify.nsid = u32(nsid)
 		new_command.private.identify.prp1 = u64(namespace.identity) - higher_half
@@ -469,18 +471,22 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 	pair.admin = admin
 	pair.entry_cnt = parent_controller.queue_entries
 
-	pair.submission_queue = unsafe{&NVMECommand(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECommand), page_size))) +
-		higher_half)}
-	pair.completion_queue = unsafe{&NVMECompletion(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
-		higher_half)}
+	pair.submission_queue = unsafe {
+		&NVMECommand(
+			u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECommand), page_size))) +
+			higher_half)
+	}
+	pair.completion_queue = unsafe {
+		&NVMECompletion(
+			u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
+			higher_half)
+	}
 
 	submission_offset := page_size + 2 * qid * (4 << parent_controller.strides)
-	pair.submission_doorbell = unsafe{&u32(u64(parent_controller.regs) + submission_offset)}
+	pair.submission_doorbell = unsafe { &u32(u64(parent_controller.regs) + submission_offset) }
 
 	completion_offset := page_size + ((2 * qid + 1) * (4 << parent_controller.strides))
-	pair.completion_doorbell = unsafe{&u32(u64(parent_controller.regs) + completion_offset)}
+	pair.completion_doorbell = unsafe { &u32(u64(parent_controller.regs) + completion_offset) }
 
 	pair.cid_bitmap.initialise(pair.entry_cnt)
 
@@ -491,7 +497,7 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 	mut create_cq_command := &NVMECommand{}
 
 	unsafe {
-		create_cq_command.opcode = nvme.opcode_create_cq
+		create_cq_command.opcode = opcode_create_cq
 		create_cq_command.private.create_cq.prp1 = u64(pair.completion_queue) - higher_half
 		create_cq_command.private.create_cq.cqid = u16(qid)
 		create_cq_command.private.create_cq.qsize = u16(pair.entry_cnt - 1)
@@ -506,7 +512,7 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 	mut create_sq_command := &NVMECommand{}
 
 	unsafe {
-		create_sq_command.opcode = nvme.opcode_create_sq
+		create_sq_command.opcode = opcode_create_sq
 		create_sq_command.private.create_sq.prp1 = u64(pair.submission_queue) - higher_half
 		create_sq_command.private.create_sq.cqid = u16(qid)
 		create_sq_command.private.create_sq.sqid = u16(qid)
@@ -602,9 +608,11 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 		return -1
 	}
 
-	mut prp_list := unsafe{&u64(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
-		higher_half)}
+	mut prp_list := unsafe {
+		&u64(
+			u64(memory.pmm_alloc(lib.div_roundup[u64](ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
+			higher_half)
+	}
 
 	if (cnt * ns.stat.blksize) > page_size {
 		if (cnt * ns.stat.blksize) > (page_size * 2) {
@@ -660,14 +668,16 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 }
 
 fn (mut c NVMEController) get_controller_id() int {
-	c.controller_id = unsafe{&NVMEControllerID(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMEControllerID), page_size))) +
-		higher_half)}
+	c.controller_id = unsafe {
+		&NVMEControllerID(
+			u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMEControllerID), page_size))) +
+			higher_half)
+	}
 
 	mut new_command := &NVMECommand{}
 
 	unsafe {
-		new_command.opcode = nvme.opcode_identify
+		new_command.opcode = opcode_identify
 		new_command.private.identify.cns = 1
 		new_command.private.identify.prp1 = u64(c.controller_id) - higher_half
 	}
@@ -689,7 +699,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	c.pci_bar = pci_device.get_bar(0x0)
 
-	c.regs = unsafe{&NVMERegisters(c.pci_bar.base + higher_half)}
+	c.regs = unsafe { &NVMERegisters(c.pci_bar.base + higher_half) }
 
 	major_version := (c.regs.vs >> 16) & 0xffff
 	minor_version := (c.regs.vs >> 8) & 0xff
@@ -775,13 +785,15 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
 	print('nvme: subsystem vendor ID: ${c.controller_id.ssvid}\n')
 
-	nsid_list := unsafe{&u32(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](c.controller_id.nn * 4, page_size))) + higher_half)}
+	nsid_list := unsafe {
+		&u32(u64(memory.pmm_alloc(lib.div_roundup[u64](c.controller_id.nn * 4, page_size))) +
+			higher_half)
+	}
 
 	mut new_command := &NVMECommand{}
 
 	unsafe {
-		new_command.opcode = nvme.opcode_identify
+		new_command.opcode = opcode_identify
 		new_command.private.identify.cns = 2
 		new_command.private.identify.prp1 = u64(nsid_list) - higher_half
 	}
@@ -792,9 +804,9 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	mut irq_count := u64(0)
 
-	c.io_queue_bitmap.initialise(nvme.nvme_io_queue_cnt)
+	c.io_queue_bitmap.initialise(nvme_io_queue_cnt)
 
-	for i := 0; i < nvme.nvme_io_queue_cnt; i++ {
+	for i := 0; i < nvme_io_queue_cnt; i++ {
 		mut new_io_queue := &NVMEQueuePair{
 			parent_controller:   unsafe { nil }
 			submission_queue:    unsafe { nil }
@@ -843,8 +855,8 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 pub fn initialise() {
 	for device in scanned_devices {
-		if device.class == nvme.nvme_class && device.subclass == nvme.nvme_subclass
-			&& device.prog_if == nvme.nvme_progif {
+		if device.class == nvme_class && device.subclass == nvme_subclass
+			&& device.prog_if == nvme_progif {
 			mut nvme_device := &NVMEController{
 				regs:          unsafe { nil }
 				controller_id: unsafe { nil }

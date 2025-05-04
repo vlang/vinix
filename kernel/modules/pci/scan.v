@@ -18,7 +18,7 @@ pub fn initialise() {
 	if (configc & 0x800000) == 0 {
 		check_bus(0, -1)
 	} else {
-		for function := u8(0); function < pci.max_function; function++ {
+		for function := u8(0); function < max_function; function++ {
 			host_bridge := PCIDevice{
 				bus:      0
 				slot:     0
@@ -36,8 +36,8 @@ pub fn initialise() {
 }
 
 fn check_bus(bus u8, parent i64) {
-	for dev := u8(0); dev < pci.max_device; dev++ {
-		for func := u8(0); func < pci.max_function; func++ {
+	for dev := u8(0); dev < max_device; dev++ {
+		for func := u8(0); func < max_function; func++ {
 			check_function(bus, dev, func, parent)
 		}
 	}
