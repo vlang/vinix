@@ -119,7 +119,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			mut new_global_range := &MmapRangeGlobal{
 				resource:       unsafe { nil }
 				shadow_pagemap: memory.Pagemap{
-					top_level: &u64(0)
+					top_level: unsafe{&u64(0)}
 				}
 			}
 
@@ -205,7 +205,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 		length:         length
 		resource:       unsafe { nil }
 		shadow_pagemap: memory.Pagemap{
-			top_level: &u64(0)
+			top_level: unsafe{&u64(0)}
 		}
 	}
 
@@ -314,7 +314,7 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		resource:       resource_
 		offset:         offset
 		shadow_pagemap: memory.Pagemap{
-			top_level: &u64(0)
+			top_level: unsafe{&u64(0)}
 		}
 	}
 

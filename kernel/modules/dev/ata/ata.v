@@ -108,7 +108,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		// To be filled later.
 		prdt_phys: 0
 		// To be filled later.
-		prdt_cache: &u8(0)
+		prdt_cache: unsafe{&u8(0)}
 		// To be filled later.
 	}
 
@@ -177,12 +177,12 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	dev.stat.rdev = resource.create_dev_id()
 	dev.stat.mode = 0o644 | stat.ifblk
 	dev.prdt_phys = u32(u64(memory.pmm_alloc(1)))
-	dev.prdt = &PRDT(dev.prdt_phys + higher_half)
+	dev.prdt = unsafe{&PRDT(dev.prdt_phys + higher_half)}
 	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup[u64](ata.ata_bytes_per_prdt,
 		page_size))))
 	dev.prdt.transfer_size = ata.ata_bytes_per_prdt
 	dev.prdt.mark_end = 0x8000
-	dev.prdt_cache = &u8(u64(dev.prdt.buffer_phys) + higher_half)
+	dev.prdt_cache = unsafe{&u8(u64(dev.prdt.buffer_phys) + higher_half)}
 	return dev
 }
 

@@ -168,7 +168,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 	mbr_signature := unsafe { &u16(lba_buffer)[255] }
 
 	if mbr_signature == 0xaa55 {
-		partitions := &MBRPartition(u64(lba_buffer) + 0x1be)
+		partitions := unsafe{&MBRPartition(u64(lba_buffer) + 0x1be)}
 
 		for i := 0; i < 4; i++ {
 			if unsafe { partitions[i].partition_type } == 0

@@ -24,7 +24,7 @@ fn xapic_read(reg u32) u32 {
 	if lapic_base == u64(0) {
 		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
 	}
-	return kio.mmin(&u32(lapic_base + reg))
+	return kio.mmin(unsafe{&u32(lapic_base + reg)})
 }
 
 fn x2apic_read(reg u32) u64 {
@@ -35,7 +35,7 @@ fn xapic_write(reg u32, val u32) {
 	if lapic_base == u64(0) {
 		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
 	}
-	kio.mmout(&u32(lapic_base + reg), val)
+	kio.mmout(unsafe{&u32(lapic_base + reg)}, val)
 }
 
 fn x2apic_write(reg u32, val u64) {
@@ -131,14 +131,14 @@ pub fn lapic_send_ipi(lapic_id u32, vector u8) {
 
 fn io_apic_read(io_apic int, reg u32) u32 {
 	base := u64(madt_io_apics[io_apic].address) + higher_half
-	kio.mmout(&u32(base), reg)
-	return kio.mmin(&u32(base + 16))
+	kio.mmout(unsafe{&u32(base)}, reg)
+	return kio.mmin(unsafe{&u32(base + 16)})
 }
 
 fn io_apic_write(io_apic int, reg u32, value u32) {
 	base := u64(madt_io_apics[io_apic].address) + higher_half
-	kio.mmout(&u32(base), reg)
-	kio.mmout(&u32(base + 16), value)
+	kio.mmout(unsafe{&u32(base)}, reg)
+	kio.mmout(unsafe{&u32(base + 16)}, value)
 }
 
 fn io_apic_gsi_count(io_apic int) u32 {

@@ -59,7 +59,7 @@ fn (mut s HDAStream) initialize_output() {
 
 pub fn (mut s HDAStream) initialize(index u8, is_output bool) {
 	bdl_phys := u64(memory.pmm_alloc(1))
-	s.bdl = &HDABufferDescriptor(bdl_phys + higher_half)
+	s.bdl = unsafe{&HDABufferDescriptor(bdl_phys + higher_half)}
 	s.bdl_phys = bdl_phys
 	s.is_output = is_output
 

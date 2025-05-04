@@ -671,7 +671,7 @@ pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 
 	match t {
 		10 {
-			dec_private(a, &u32(b), c)
+			dec_private(a, unsafe{&u32(b)}, c)
 		}
 		else {}
 	}

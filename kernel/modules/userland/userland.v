@@ -310,7 +310,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	// Return context
 	t.gpr_state.rsp -= sizeof(cpulocal.GPRState)
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut return_context := &cpulocal.GPRState(t.gpr_state.rsp)
+	mut return_context := unsafe{&cpulocal.GPRState(t.gpr_state.rsp)}
 
 	unsafe {
 		*return_context = *context
@@ -319,7 +319,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	// Siginfo
 	t.gpr_state.rsp -= sizeof(SigInfo)
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut siginfo := &SigInfo(t.gpr_state.rsp)
+	mut siginfo := unsafe{&SigInfo(t.gpr_state.rsp)}
 
 	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
 	siginfo.si_signo = which

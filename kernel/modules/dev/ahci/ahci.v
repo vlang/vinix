@@ -259,8 +259,8 @@ fn (mut d AHCIDevice) find_cmd_slot() ?u32 {
 }
 
 fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u32, byte_cnt u32) &AHCIHBACommandTable {
-	mut volatile cmd_table := &AHCIHBACommandTable(
-		(u64(cmd_hdr.ctba) | (u64(cmd_hdr.ctbau) << 32)) + higher_half)
+	mut volatile cmd_table := unsafe{&AHCIHBACommandTable(
+		(u64(cmd_hdr.ctba) | (u64(cmd_hdr.ctbau) << 32)) + higher_half)}
 
 	cmd_table.prdt[0].dba = u32(buffer)
 	cmd_table.prdt[0].dbau = u32(buffer >> 32)
@@ -292,8 +292,8 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		return -1
 	}
 
-	mut volatile cmd_hdr := &AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
-		higher_half + cmd_slot * sizeof(AHCIHBACommand))
+	mut volatile cmd_hdr := unsafe{&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
+		higher_half + cmd_slot * sizeof(AHCIHBACommand))}
 
 	cmd_hdr.flags &= ~(0b11111 | (1 << 6))
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
@@ -341,8 +341,8 @@ fn (mut d AHCIDevice) initialise() ?int {
 	d.regs.clbu = u32(command_list >> 32)
 
 	for i := u32(0); i < 32; i++ {
-		mut volatile cmd_hdr := &AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
-			higher_half + i * sizeof(AHCIHBACommand))
+		mut volatile cmd_hdr := unsafe{&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
+			higher_half + i * sizeof(AHCIHBACommand))}
 
 		desc_base := u64(memory.pmm_alloc(1))
 
@@ -357,14 +357,14 @@ fn (mut d AHCIDevice) initialise() ?int {
 
 	d.regs.cmd |= (1 << 0) | (1 << 4)
 
-	mut volatile cmd_hdr := &AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
-		higher_half + cmd_slot * sizeof(AHCIHBACommand))
+	mut volatile cmd_hdr := unsafe{&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) +
+		higher_half + cmd_slot * sizeof(AHCIHBACommand))}
 
 	cmd_hdr.flags &= ~0b11111 | (1 << 7)
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
 	cmd_hdr.prdtl = 1
 
-	mut identity := &u16(u64(memory.pmm_alloc(1)) + higher_half)
+	mut identity := unsafe{&u16(u64(memory.pmm_alloc(1)) + higher_half)}
 
 	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(identity) - higher_half, 1, 511)
 
@@ -460,7 +460,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	c.pci_bar = pci_device.get_bar(0x5)
-	c.regs = &AHCIRegisters(c.pci_bar.base + higher_half)
+	c.regs = unsafe{&AHCIRegisters(c.pci_bar.base + higher_half)}
 
 	c.version_maj = (c.regs.vs >> 16) & 0xffff
 	c.version_min = c.regs.vs & 0xffff
@@ -482,8 +482,8 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 	for i := u64(0); i < c.port_cnt; i++ {
 		if c.regs.pi & (1 << i) != 0 {
-			mut volatile port := &AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) +
-				i * sizeof(AHCIPortRegisters) + higher_half)
+			mut volatile port := unsafe{&AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) +
+				i * sizeof(AHCIPortRegisters) + higher_half)}
 
 			match port.sig {
 				ahci.sata_ata {

@@ -41,8 +41,8 @@ pub fn new_pagemap() &Pagemap {
 	}
 
 	// Import higher half from kernel pagemap
-	mut p1 := &u64(u64(top_level) + higher_half)
-	p2 := &u64(u64(kernel_pagemap.top_level) + higher_half)
+	mut p1 := unsafe{ &u64(u64(top_level) + higher_half) }
+	p2 := unsafe{ &u64(u64(kernel_pagemap.top_level) + higher_half) }
 	for i := u64(256); i < 512; i++ {
 		unsafe {
 			p1[i] = p2[i]
@@ -93,14 +93,14 @@ pub fn (mut pagemap Pagemap) switch_to() {
 }
 
 fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
-	mut ret := &u64(0)
+	mut ret := unsafe{&u64(0)}
 
-	mut entry := &u64(u64(current_level) + higher_half + index * 8)
+	mut entry := unsafe{ &u64(u64(current_level) + higher_half + index * 8) }
 
 	// Check if entry is present
 	if unsafe { *entry } & 0x01 != 0 {
 		// If present, return pointer to it
-		ret = &u64(unsafe { *entry } & memory.pte_flags_mask)
+		ret = unsafe{&u64(*entry & memory.pte_flags_mask)}
 	} else {
 		if allocate == false {
 			return none
@@ -232,7 +232,7 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	pml2 := get_next_level(pml3, pml3_entry, true) or { return none }
 	mut pml1 := get_next_level(pml2, pml2_entry, true) or { return none }
 
-	entry := &u64(u64(pml1) + higher_half + pml1_entry * 8)
+	entry := unsafe{&u64(u64(pml1) + higher_half + pml1_entry * 8)}
 
 	unsafe {
 		*entry = phys | flags

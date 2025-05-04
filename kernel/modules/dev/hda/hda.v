@@ -960,7 +960,7 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 		return -1
 	}
 
-	c.regs = &HDARegisters(c.pci_bar.base + higher_half)
+	c.regs = unsafe{&HDARegisters(c.pci_bar.base + higher_half)}
 
 	mut gctl := c.regs.gctl
 
@@ -970,15 +970,15 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 		in_stream_count := (gcap >> hda.gcap_iss_shift) & hda.gcap_iss_mask
 		out_stream_count := (gcap >> hda.gcap_oss_shift) & hda.gcap_oss_mask
 		for i := u64(0); i < in_stream_count; i++ {
-			mut volatile stream_regs := &HDAStreamRegisters(c.pci_bar.base + 0x80 + i * 0x20 +
-				higher_half)
+			mut volatile stream_regs := unsafe{&HDAStreamRegisters(c.pci_bar.base + 0x80 + i * 0x20 +
+				higher_half)}
 			mut ctl0 := stream_regs.ctl0
 			ctl0 &= ~hda.sdctl0_run
 			stream_regs.ctl0 = ctl0
 		}
 		for i := u64(0); i < out_stream_count; i++ {
-			mut volatile stream_regs := &HDAStreamRegisters(c.pci_bar.base + 0x80 +
-				c.in_stream_count * 0x20 + i * 0x20 + higher_half)
+			mut volatile stream_regs := unsafe{&HDAStreamRegisters(c.pci_bar.base + 0x80 +
+				c.in_stream_count * 0x20 + i * 0x20 + higher_half)}
 			mut ctl0 := stream_regs.ctl0
 			ctl0 &= ~hda.sdctl0_run
 			stream_regs.ctl0 = ctl0
@@ -1057,9 +1057,9 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	rirb_phys := u64(memory.pmm_alloc(1))
 	dma_pos_phys := u64(memory.pmm_alloc(1))
 
-	c.corb = &HDAVerbDescriptor(corb_phys + higher_half)
-	c.rirb = &HDAResponseDescriptor(rirb_phys + higher_half)
-	c.dma_pos = &u32(dma_pos_phys + higher_half)
+	c.corb = unsafe{&HDAVerbDescriptor(corb_phys + higher_half)}
+	c.rirb = unsafe{&HDAResponseDescriptor(rirb_phys + higher_half)}
+	c.dma_pos = unsafe{&u32(dma_pos_phys + higher_half)}
 
 	c.regs.corblbase = u32(corb_phys)
 	c.regs.corbubase = u32(corb_phys >> 32)

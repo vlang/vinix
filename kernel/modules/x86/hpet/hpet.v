@@ -48,7 +48,7 @@ pub fn initialise() {
 		panic('HPET ACPI table not found')
 	}) }
 
-	hpet = &HPET(hpet_table.address + higher_half)
+	hpet = unsafe{&HPET(hpet_table.address + higher_half)}
 
 	mut tmp := kio.mmin(&hpet.general_capabilities)
 

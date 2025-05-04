@@ -207,13 +207,13 @@ pub fn (mut this Slab) init(ent_size u64) {
 	this.first_free += higher_half
 
 	avl_size := page_size - lib.align_up(sizeof(SlabHeader), ent_size)
-	mut slabptr := &SlabHeader(this.first_free)
+	mut slabptr := unsafe{&SlabHeader(this.first_free)}
 	unsafe {
 		(*slabptr).slab = this
 	}
 	this.first_free += lib.align_up(sizeof(SlabHeader), ent_size)
 
-	mut arr := &u64(this.first_free)
+	mut arr := unsafe{&u64(this.first_free)}
 	max := avl_size / ent_size - 1
 	fact := ent_size / 8
 	for i := u64(0); i < max; i++ {
@@ -237,7 +237,7 @@ pub fn (mut this Slab) alloc() voidptr {
 		this.init(this.ent_size)
 	}
 
-	mut old_free := &u64(this.first_free)
+	mut old_free := unsafe{&u64(this.first_free)}
 	this.first_free = *old_free
 
 	unsafe { C.memset(voidptr(old_free), 0, this.ent_size) }
@@ -285,13 +285,13 @@ pub fn free(ptr voidptr) {
 		return
 	}
 
-	mut slab_hdr := &SlabHeader(u64(ptr) & ~u64(0xfff))
+	mut slab_hdr := unsafe{&SlabHeader(u64(ptr) & ~u64(0xfff))}
 
 	slab_hdr.slab.sfree(ptr)
 }
 
 fn big_free(ptr voidptr) {
-	metadata := &MallocMetadata(u64(ptr) - page_size)
+	metadata := unsafe{ &MallocMetadata(u64(ptr) - page_size)}
 
 	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
@@ -322,7 +322,7 @@ fn big_alloc(size u64) voidptr {
 		return 0
 	}
 
-	mut metadata := &MallocMetadata(u64(ptr) + higher_half)
+	mut metadata := unsafe{&MallocMetadata(u64(ptr) + higher_half)}
 
 	metadata.pages = page_count
 	metadata.size = size
@@ -340,7 +340,7 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 		return big_realloc(ptr, new_size)
 	}
 
-	slab_hdr := &SlabHeader(u64(ptr) & ~u64(0xfff))
+	slab_hdr := unsafe{ &SlabHeader(u64(ptr) & ~u64(0xfff)) }
 	mut slab := slab_hdr.slab
 
 	if new_size > slab.ent_size {
@@ -354,7 +354,7 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 }
 
 fn big_realloc(ptr voidptr, new_size u64) voidptr {
-	mut metadata := &MallocMetadata(u64(ptr) - page_size)
+	mut metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
 
 	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
 		metadata.size = new_size

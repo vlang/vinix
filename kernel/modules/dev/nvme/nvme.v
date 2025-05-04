@@ -411,9 +411,9 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 		namespace.parent_controller = parent_controller
 	}
 	namespace.nsid = nsid
-	namespace.identity = &NVMENamespaceID(
+	namespace.identity = unsafe{&NVMENamespaceID(
 		u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMENamespaceID), page_size))) +
-		higher_half)
+		higher_half)}
 
 	mut new_command := &NVMECommand{}
 
@@ -469,18 +469,18 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 	pair.admin = admin
 	pair.entry_cnt = parent_controller.queue_entries
 
-	pair.submission_queue = &NVMECommand(
+	pair.submission_queue = unsafe{&NVMECommand(
 		u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECommand), page_size))) +
-		higher_half)
-	pair.completion_queue = &NVMECompletion(
+		higher_half)}
+	pair.completion_queue = unsafe{&NVMECompletion(
 		u64(memory.pmm_alloc(lib.div_roundup[u64](pair.entry_cnt * sizeof(NVMECompletion), page_size))) +
-		higher_half)
+		higher_half)}
 
 	submission_offset := page_size + 2 * qid * (4 << parent_controller.strides)
-	pair.submission_doorbell = &u32(u64(parent_controller.regs) + submission_offset)
+	pair.submission_doorbell = unsafe{&u32(u64(parent_controller.regs) + submission_offset)}
 
 	completion_offset := page_size + ((2 * qid + 1) * (4 << parent_controller.strides))
-	pair.completion_doorbell = &u32(u64(parent_controller.regs) + completion_offset)
+	pair.completion_doorbell = unsafe{&u32(u64(parent_controller.regs) + completion_offset)}
 
 	pair.cid_bitmap.initialise(pair.entry_cnt)
 
@@ -602,9 +602,9 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 		return -1
 	}
 
-	mut prp_list := &u64(
+	mut prp_list := unsafe{&u64(
 		u64(memory.pmm_alloc(lib.div_roundup[u64](ns.max_prps * queue_pair.entry_cnt * sizeof(u64), page_size))) +
-		higher_half)
+		higher_half)}
 
 	if (cnt * ns.stat.blksize) > page_size {
 		if (cnt * ns.stat.blksize) > (page_size * 2) {
@@ -660,9 +660,9 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 }
 
 fn (mut c NVMEController) get_controller_id() int {
-	c.controller_id = &NVMEControllerID(
+	c.controller_id = unsafe{&NVMEControllerID(
 		u64(memory.pmm_alloc(lib.div_roundup[u64](sizeof(NVMEControllerID), page_size))) +
-		higher_half)
+		higher_half)}
 
 	mut new_command := &NVMECommand{}
 
@@ -689,7 +689,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 
 	c.pci_bar = pci_device.get_bar(0x0)
 
-	c.regs = &NVMERegisters(c.pci_bar.base + higher_half)
+	c.regs = unsafe{&NVMERegisters(c.pci_bar.base + higher_half)}
 
 	major_version := (c.regs.vs >> 16) & 0xffff
 	minor_version := (c.regs.vs >> 8) & 0xff
@@ -775,8 +775,8 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
 	print('nvme: subsystem vendor ID: ${c.controller_id.ssvid}\n')
 
-	nsid_list := &u32(
-		u64(memory.pmm_alloc(lib.div_roundup[u64](c.controller_id.nn * 4, page_size))) + higher_half)
+	nsid_list := unsafe{&u32(
+		u64(memory.pmm_alloc(lib.div_roundup[u64](c.controller_id.nn * 4, page_size))) + higher_half)}
 
 	mut new_command := &NVMECommand{}
 

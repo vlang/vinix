@@ -374,12 +374,12 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		unsafe { stacks.free() }
 	}
 
-	mut stack := &u64(0)
+	mut stack := unsafe{&u64(0)}
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
 		stack_phys := memory.pmm_alloc(sched.stack_size / page_size)
-		stack = &u64(u64(stack_phys) + sched.stack_size + higher_half)
+		stack = unsafe{&u64(u64(stack_phys) + sched.stack_size + higher_half)}
 
 		stack_vma = process.thread_stack_top
 		process.thread_stack_top -= sched.stack_size
