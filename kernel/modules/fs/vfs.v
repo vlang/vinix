@@ -339,6 +339,24 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	return target_node
 }
 
+pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
+	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
+
+	if unsafe { target_node != 0 } || unsafe { parent_of_tgt_node == 0 } {
+		errno.set(errno.eexist)
+		return none
+	}
+
+	_, mut dest_node, _ := path2node(vfs_root, dest)
+
+	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
+
+	unsafe {
+		parent_of_tgt_node.children[basename] = target_node
+	}
+	return target_node
+}
+
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
 	if voidptr(node) == unsafe { nil } {

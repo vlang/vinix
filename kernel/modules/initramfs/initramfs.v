@@ -125,6 +125,11 @@ pub fn initialise() {
 					panic('initramfs: failed to write file ${name}')
 				}
 			}
+			.hard_link {
+				fs.link(vfs_root, link_name, name) or {
+					panic('initramfs: failed to create link ${name}')
+				}
+			}
 			.sym_link {
 				fs.symlink(vfs_root, link_name, name) or {
 					panic('initramfs: failed to create symlink ${name}')
