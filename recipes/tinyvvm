@@ -1,0 +1,35 @@
+#! /bin/sh
+
+name=tinyvvm
+skip_pkg_check=yes
+version=0.0git
+revision=1
+git_url="https://github.com/Eliyaan/tinyvvm.git"
+commit=85ddc187770c833818f3e8dacf1a8d7dd8d2b444
+hostdeps="gcc pkg-config v"
+deps="core-libs libx11"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+
+    set -x
+
+        VCROSS_COMPILER_NAME=${OS_TRIPLET}-gcc \
+    v \
+        -os vinix \
+        -gc none \
+        -prod \
+        -autofree \
+        -cflags "$TARGET_CFLAGS" \
+        -ldflags "$TARGET_LDFLAGS" \
+        .
+
+    set +x
+}
+
+package() {
+    install -d "${dest_dir}/usr/bin"
+    install tinyvvm "${dest_dir}/usr/bin/"
+
+    post_package_strip
+}
