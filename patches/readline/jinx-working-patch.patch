@@ -1,8 +1,7 @@
-diff --git readline-clean/support/shlib-install readline-workdir/support/shlib-install
-index 661355d..d23b65c 100644
+diff -urN --no-dereference readline-clean/support/shlib-install readline-workdir/support/shlib-install
 --- readline-clean/support/shlib-install
 +++ readline-workdir/support/shlib-install
-@@ -71,7 +71,7 @@ fi
+@@ -71,7 +71,7 @@
  # Cygwin installs both a dll (which must go in $BINDIR) and an implicit
  # link library (in $libdir)
  case "$host_os" in
@@ -11,20 +10,19 @@ index 661355d..d23b65c 100644
  	if [ -z "$uninstall" ]; then
  		chmod 755 ${INSTALLDIR}/${LIBNAME}
  	fi ;;
-@@ -146,7 +146,7 @@ bsdi4*|*gnu*|darwin*|macosx*|netbsd*|mirbsd*)
- 	fi
- 	;;
- 
--solaris2*|aix4.[2-9]*|aix[5-9]*|osf*|irix[56]*|sysv[45]*|dgux*|interix*)
-+solaris2*|aix4.[2-9]*|aix[5-9]*|osf*|irix[56]*|sysv[45]*|dgux*|interix*|vinix*)
- 	# libname.so -> libname.so.M
- 	${echo} ${RM} ${INSTALLDIR}/$LINK1
+@@ -118,7 +118,7 @@
+ # Create symlinks to the installed library.  This section is incomplete.
+ #
+ case "$host_os-$host_vendor" in
+-*linux*|freebsd*|dragonfly*)
++*linux*|freebsd*|dragonfly*|vinix*)
+ 	# libname.so.M -> libname.so.M.N
+ 	${echo} ${RM} ${INSTALLDIR}/$LINK2
  	if [ -z "$uninstall" ]; then
-diff --git readline-clean/support/shobj-conf readline-workdir/support/shobj-conf
-index cd7634d..2beb0e6 100644
+diff -urN --no-dereference readline-clean/support/shobj-conf readline-workdir/support/shobj-conf
 --- readline-clean/support/shobj-conf
 +++ readline-workdir/support/shobj-conf
-@@ -123,12 +123,12 @@ sunos5*|solaris2*)
+@@ -123,12 +123,12 @@
  	;;
  
  # All versions of Linux (including Gentoo/FreeBSD) or the semi-mythical GNU Hurd.
@@ -39,11 +37,10 @@ index cd7634d..2beb0e6 100644
  	SHLIB_LIBVERSION='$(SHLIB_LIBSUFF).$(SHLIB_MAJOR)$(SHLIB_MINOR)'
  	;;
  
-diff --git readline-clean/terminal.c readline-workdir/terminal.c
-index 9997161..6fdf423 100644
+diff -urN --no-dereference readline-clean/terminal.c readline-workdir/terminal.c
 --- readline-clean/terminal.c
 +++ readline-workdir/terminal.c
-@@ -102,12 +102,12 @@ static char *term_string_buffer = (char *)NULL;
+@@ -102,12 +102,12 @@
  
  static int tcap_initialized;
  

@@ -1,6 +1,6 @@
 diff -urN --no-dereference xf86-input-keyboard-clean/configure xf86-input-keyboard-workdir/configure
---- xf86-input-keyboard-clean/configure	2024-11-14 21:26:12.000000000 +0100
-+++ xf86-input-keyboard-workdir/configure	2025-04-26 23:43:59.711931244 +0200
+--- xf86-input-keyboard-clean/configure
++++ xf86-input-keyboard-workdir/configure
 @@ -664,6 +664,8 @@
  SOLARIS_TRUE
  BSD_FALSE
@@ -48,8 +48,8 @@ diff -urN --no-dereference xf86-input-keyboard-clean/configure xf86-input-keyboa
    as_fn_error $? "conditional \"BSD\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
 diff -urN --no-dereference xf86-input-keyboard-clean/src/Makefile.in xf86-input-keyboard-workdir/src/Makefile.in
---- xf86-input-keyboard-clean/src/Makefile.in	2024-11-14 21:26:13.000000000 +0100
-+++ xf86-input-keyboard-workdir/src/Makefile.in	2025-04-27 00:21:15.624904482 +0200
+--- xf86-input-keyboard-clean/src/Makefile.in
++++ xf86-input-keyboard-workdir/src/Makefile.in
 @@ -113,6 +113,7 @@
  @BSD_TRUE@am__append_1 = $(BSD_SRCS)
  @SOLARIS_TRUE@am__append_2 = $(SOLARIS_SRCS)
@@ -130,7 +130,7 @@ diff -urN --no-dereference xf86-input-keyboard-clean/src/Makefile.in xf86-input-
  	-rm -f ./$(DEPDIR)/sun_kbdMap.Plo
 diff -urN --no-dereference xf86-input-keyboard-clean/src/vinix_kbd.c xf86-input-keyboard-workdir/src/vinix_kbd.c
 --- xf86-input-keyboard-clean/src/vinix_kbd.c	1970-01-01 01:00:00.000000000 +0100
-+++ xf86-input-keyboard-workdir/src/vinix_kbd.c	2025-04-26 16:38:34.818112788 +0200
++++ xf86-input-keyboard-workdir/src/vinix_kbd.c
 @@ -0,0 +1,31 @@
 +
 +#ifdef HAVE_CONFIG_H

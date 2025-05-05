@@ -1,5 +1,4 @@
-diff --git m4-clean/tests/strerror_r.c m4-workdir/tests/strerror_r.c
-index 71965fb..be88d71 100644
+diff -urN --no-dereference m4-clean/tests/strerror_r.c m4-workdir/tests/strerror_r.c
 --- m4-clean/tests/strerror_r.c
 +++ m4-workdir/tests/strerror_r.c
 @@ -21,7 +21,7 @@

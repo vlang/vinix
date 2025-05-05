@@ -17,7 +17,8 @@ configure() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
-    autotools_configure
+    autotools_configure \
+        CFLAGS="$TARGET_CFLAGS -std=gnu17"
 }
 
 build() {

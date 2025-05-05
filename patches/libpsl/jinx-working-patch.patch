@@ -1,0 +1,11 @@
+diff -urN --no-dereference libpsl-clean/src/psl.c libpsl-workdir/src/psl.c
+--- libpsl-clean/src/psl.c
++++ libpsl-workdir/src/psl.c
+@@ -64,6 +64,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <strings.h>
+ #ifdef HAVE_STRINGS_H
+ # include <strings.h>
+ #endif

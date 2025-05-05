@@ -1,0 +1,52 @@
+diff -urN --no-dereference sdl2-compat-clean/CMakeLists.txt sdl2-compat-workdir/CMakeLists.txt
+--- sdl2-compat-clean/CMakeLists.txt
++++ sdl2-compat-workdir/CMakeLists.txt
+@@ -79,7 +79,8 @@
+ set(SDL_DYLIB_CURRENT_VERSION "${SDL_DYLIB_CURRENT_VERSION_MAJOR}.${SDL_DYLIB_CURRENT_VERSION_MINOR}.${SDL_DYLIB_CURRENT_VERSION_MICRO}")
+ set(SDL_DYLIB_COMPAT_VERSION "${SDL_DYLIB_COMPAT_VERSION_MAJOR}.${SDL_DYLIB_COMPAT_VERSION_MINOR}.${SDL_DYLIB_COMPAT_VERSION_MICRO}")
+ 
+-option(SDL2COMPAT_TESTS "Enable to build SDL2 test programs" ${SDL2COMPAT_MAINPROJECT})
++option(SDL2COMPAT_TEST_LIBRARY "Build the SDL2_test library" ON)
++cmake_dependent_option(SDL2COMPAT_TESTS "Enable to build SDL2 test programs" ${SDL2COMPAT_MAINPROJECT} "SDL2COMPAT_TEST_LIBRARY" OFF)
+ option(SDL2COMPAT_INSTALL "Enable installing SDL2-compat" ${SDL2COMPAT_MAINPROJECT})
+ cmake_dependent_option(SDL2COMPAT_INSTALL_CPACK "Create binary SDL2_compat archive using CPack" ${SDL2COMPAT_MAINPROJECT} "SDL2COMPAT_INSTALL" OFF)
+ cmake_dependent_option(SDL2COMPAT_INSTALL_TESTS "Install test-cases" OFF "SDL2COMPAT_INSTALL;SDL2COMPAT_TESTS" OFF)
+@@ -423,6 +424,7 @@
+ endif()
+ 
+ # SDLtest library...
++if(SDL2COMPAT_TEST_LIBRARY)
+ add_library(SDL2_test STATIC
+   src/test/SDL_test_assert.c
+   src/test/SDL_test_common.c
+@@ -451,6 +453,7 @@
+     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/SDL2>"
+ )
++endif()
+ 
+ if(SDL2COMPAT_TESTS)
+   enable_testing()
+@@ -499,7 +502,10 @@
+   endif()
+   set(SDL2COMPAT_INSTALL_CMAKEDIR "${SDL2COMPAT_INSTALL_CMAKEDIR_DEFAULT}" CACHE STRING "Location where to install SDL2Config.cmake")
+ 
+-  list(APPEND installed_targets SDL2main SDL2_test)
++  list(APPEND installed_targets SDL2main)
++  if(SDL2COMPAT_TEST_LIBRARY)
++    list(APPEND installed_targets SDL2_test)
++  endif()
+   foreach(target ${installed_targets})
+     install(TARGETS ${target} EXPORT ${target}Targets
+       ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+@@ -527,7 +533,9 @@
+   if(MSVC)
+     SDL_install_pdb(SDL2 "${CMAKE_INSTALL_BINDIR}")
+     SDL_install_pdb(SDL2main "${CMAKE_INSTALL_LIBDIR}")
+-    SDL_install_pdb(SDL2_test "${CMAKE_INSTALL_LIBDIR}")
++    if(SDL2COMPAT_TEST_LIBRARY)
++      SDL_install_pdb(SDL2_test "${CMAKE_INSTALL_LIBDIR}")
++    endif()
+   endif()
+   configure_package_config_file(SDL2Config.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/SDL2Config.cmake"
+     PATH_VARS CMAKE_INSTALL_PREFIX CMAKE_INSTALL_FULL_BINDIR CMAKE_INSTALL_FULL_INCLUDEDIR CMAKE_INSTALL_FULL_LIBDIR

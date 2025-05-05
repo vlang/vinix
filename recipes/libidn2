@@ -1,0 +1,27 @@
+#!/bin/sh
+
+name=libidn2
+version=2.3.8
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/libidn/libidn2-${version}.tar.gz"
+tarball_blake2b="8b34975a5a469353ac960ade97d0b67080e811c0d0eb7b11dcb6a4b352753da59b17c812bab8c969877bfe027fc3de0a36b7c6b75942811f17938b676238fb3d"
+hostdeps="gcc pkg-config"
+deps="core-libs libunistring"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

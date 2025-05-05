@@ -1,8 +1,7 @@
-diff --git cairo-clean/meson.build cairo-workdir/meson.build
-index 9100152..1b7e91d 100644
+diff -urN --no-dereference cairo-clean/meson.build cairo-workdir/meson.build
 --- cairo-clean/meson.build
 +++ cairo-workdir/meson.build
-@@ -374,18 +374,18 @@ if x11_dep.found() and xext_dep.found()
+@@ -370,18 +370,18 @@
    # between a set value (bool) or the fallback value (string), so convert to
    # a string and check the string value.
    prop_str = '@0@'.format(prop)
@@ -14,16 +13,15 @@ index 9100152..1b7e91d 100644
 -    res = cc.run(files('meson-cc-tests/ipc_rmid_deferred_release.c'),
 -      dependencies: [x11_dep, xext_dep],
 -      name: 'shmctl IPC_RMID allowes subsequent attaches')
--
--    ipc_rmid_deferred_release = (res.returncode() == 0)
--  else
--    error('Unexpected value for external property ipc_rmid_deferred_release: @0@'.format(prop_str))
--  endif
 +  #elif prop_str == 'auto'
 +  #  res = cc.run(files('meson-cc-tests/ipc_rmid_deferred_release.c'),
 +  #    dependencies: [x11_dep, xext_dep],
 +  #    name: 'shmctl IPC_RMID allowes subsequent attaches')
-+
+ 
+-    ipc_rmid_deferred_release = (res.returncode() == 0)
+-  else
+-    error('Unexpected value for external property ipc_rmid_deferred_release: @0@'.format(prop_str))
+-  endif
 +  #  ipc_rmid_deferred_release = (res.returncode() == 0)
 +  #else
 +  #  error('Unexpected value for external property ipc_rmid_deferred_release: @0@'.format(prop_str))

@@ -7,6 +7,7 @@ tarball_url="https://icon-theme.freedesktop.org/releases/hicolor-icon-theme-${ve
 tarball_blake2b="afa724777d1bfcb40fc94477a473a6c12958888ef442bd3f672abb98eaac5c4f91e025c8c131690c5557d369182e7f687fed745d604509bdffdac269bf0bcdde"
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
+deps="core-libs"
 
 configure() {
     meson_configure
@@ -18,6 +19,4 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
-
-    post_package_strip
 }

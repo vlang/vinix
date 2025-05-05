@@ -1,5 +1,20 @@
-diff --git ace-of-penguins-clean/lib/imagelib.c ace-of-penguins-workdir/lib/imagelib.c
-index f71b96a..5f14b05 100644
+diff -urN --no-dereference ace-of-penguins-clean/lib/Makefile.in ace-of-penguins-workdir/lib/Makefile.in
+--- ace-of-penguins-clean/lib/Makefile.in
++++ ace-of-penguins-workdir/lib/Makefile.in
+@@ -565,10 +565,10 @@
+ 	./make-imglib -n cards -i $(srcdir)/png -d images.d $(srcdir)/images.in images.c
+ 
+ make-imglib : make-imglib.c
+-	$(BUILD_CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(srcdir)/make-imglib.c -o make-imglib -lpng -lz
++	$(BUILD_CC) $(srcdir)/make-imglib.c -o make-imglib -lpng -lz
+ 
+ text2c : text2c.c
+-	$(BUILD_CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(srcdir)/text2c.c -o text2c -lpng -lz
++	$(BUILD_CC) $(srcdir)/text2c.c -o text2c -lpng -lz
+ 
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+ # Otherwise a system limit (for SysV at least) may be exceeded.
+diff -urN --no-dereference ace-of-penguins-clean/lib/imagelib.c ace-of-penguins-workdir/lib/imagelib.c
 --- ace-of-penguins-clean/lib/imagelib.c
 +++ ace-of-penguins-workdir/lib/imagelib.c
 @@ -1,5 +1,6 @@
@@ -9,8 +24,7 @@ index f71b96a..5f14b05 100644
  #include "imagelib.h"
  #include "cards.h"
  
-diff --git ace-of-penguins-clean/lib/make-imglib.c ace-of-penguins-workdir/lib/make-imglib.c
-index 84cda12..7dce691 100644
+diff -urN --no-dereference ace-of-penguins-clean/lib/make-imglib.c ace-of-penguins-workdir/lib/make-imglib.c
 --- ace-of-penguins-clean/lib/make-imglib.c
 +++ ace-of-penguins-workdir/lib/make-imglib.c
 @@ -1,6 +1,7 @@
@@ -21,7 +35,7 @@ index 84cda12..7dce691 100644
  #include <sys/types.h>
  #include <sys/stat.h>
  #include <unistd.h>
-@@ -86,7 +87,7 @@ scan_image_directory ()
+@@ -86,7 +87,7 @@
      png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
      info_ptr = png_create_info_struct (png_ptr);
  
@@ -30,7 +44,7 @@ index 84cda12..7dce691 100644
        fclose (f);
        continue;
      }
-@@ -202,7 +203,7 @@ tokenize(char *string)
+@@ -202,7 +203,7 @@
    char *rv;
    if (string) {
      next = string;
@@ -39,11 +53,10 @@ index 84cda12..7dce691 100644
    }
    while (*next && !isgraph(*next)) next++;
    if (!*next) return 0;
-diff --git ace-of-penguins-clean/lib/xwin.c ace-of-penguins-workdir/lib/xwin.c
-index e4bcca2..724be23 100644
+diff -urN --no-dereference ace-of-penguins-clean/lib/xwin.c ace-of-penguins-workdir/lib/xwin.c
 --- ace-of-penguins-clean/lib/xwin.c
 +++ ace-of-penguins-workdir/lib/xwin.c
-@@ -55,7 +55,7 @@ OptionDesc xwin_options_list[] = {
+@@ -55,7 +55,7 @@
    { "-visual", OPTION_INTEGER, &visual_id },
    { 0, 0, 0 }
  };
@@ -52,7 +65,7 @@ index e4bcca2..724be23 100644
  
  Display *display=0;
  int screen=0;
-@@ -89,10 +89,10 @@ int help_background;
+@@ -89,10 +89,10 @@
  /* Motif window hints */
  typedef struct
  {
@@ -67,7 +80,7 @@ index e4bcca2..724be23 100644
  } PropMotifWmHints;
  
  typedef PropMotifWmHints        PropMwmHints;
-@@ -841,13 +841,13 @@ build_image (image *src)
+@@ -841,13 +841,13 @@
    png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
    info_ptr = png_create_info_struct (png_ptr);
  

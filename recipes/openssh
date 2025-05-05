@@ -34,7 +34,7 @@ package() {
     install -v -m700 -d "${dest_dir}${prefix}"/share/empty.sshd
     install -v -d "${dest_dir}"/run
 
-    make DESTDIR="${dest_dir}" install
+    DESTDIR="${dest_dir}" make install
 
     post_package_strip
 }

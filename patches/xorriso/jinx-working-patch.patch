@@ -1,5 +1,4 @@
-diff --git xorriso-clean/libjte/checksum.c xorriso-workdir/libjte/checksum.c
-index 2ecf34f..83719ae 100644
+diff -urN --no-dereference xorriso-clean/libjte/checksum.c xorriso-workdir/libjte/checksum.c
 --- xorriso-clean/libjte/checksum.c
 +++ xorriso-workdir/libjte/checksum.c
 @@ -16,6 +16,7 @@

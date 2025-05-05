@@ -1,5 +1,4 @@
-diff --git xbps-clean/bin/xbps-install/util.c xbps-workdir/bin/xbps-install/util.c
-index 7cabdd1..0182300 100644
+diff -urN --no-dereference xbps-clean/bin/xbps-install/util.c xbps-workdir/bin/xbps-install/util.c
 --- xbps-clean/bin/xbps-install/util.c
 +++ xbps-workdir/bin/xbps-install/util.c
 @@ -32,7 +32,7 @@
@@ -11,8 +10,7 @@ index 7cabdd1..0182300 100644
  #include <xbps.h>
  #include "defs.h"
  
-diff --git xbps-clean/configure xbps-workdir/configure
-index 57df730..a4109d0 100755
+diff -urN --no-dereference xbps-clean/configure xbps-workdir/configure
 --- xbps-clean/configure
 +++ xbps-workdir/configure
 @@ -1,7 +1,7 @@
@@ -24,7 +22,7 @@ index 57df730..a4109d0 100755
  
  # Ensure that we do not inherit these from env
  OS=
-@@ -189,7 +189,7 @@ else
+@@ -189,7 +189,7 @@
  	echo "Using compiler $CC"
  fi
  
@@ -33,7 +31,7 @@ index 57df730..a4109d0 100755
  
  echo "CC =	$CC" >>$CONFIG_MK
  echo "CFLAGS =	-O2" >>$CONFIG_MK
-@@ -677,7 +677,7 @@ fi
+@@ -677,7 +677,7 @@
  # pkg-config is required to know dependencies for static linking.
  #
  printf "Checking for pkg-config ... "
@@ -42,7 +40,7 @@ index 57df730..a4109d0 100755
  if [ -z "$PKGCONFIG_BIN" ]; then
  	echo "not found, exiting."
  	exit 1
-@@ -691,14 +691,14 @@ fi
+@@ -691,14 +691,14 @@
  LIBARCHIVE_REQVER=3.3.3
  
  printf "Checking for libarchive >= ${LIBARCHIVE_REQVER}  via pkg-config ... "
@@ -62,7 +60,7 @@ index 57df730..a4109d0 100755
  		>>$CONFIG_MK
  fi
  
-@@ -706,17 +706,17 @@ fi
+@@ -706,17 +706,17 @@
  # libssl with pkg-config support is required.
  #
  printf "Checking for libssl via pkg-config ... "
@@ -87,7 +85,7 @@ index 57df730..a4109d0 100755
  	>>$CONFIG_MK
  
  #
-@@ -734,13 +734,13 @@ fi
+@@ -734,13 +734,13 @@
  #
  if [ "$BUILD_TESTS" = "yes" ]; then
  	printf "Checking for ATF via pkg-config ... "
@@ -105,11 +103,9 @@ index 57df730..a4109d0 100755
  	echo "BUILD_TESTS = yes" >>$CONFIG_MK
  	BUILD_TESTS_VALUE=yes
  else
-diff --git xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist
-deleted file mode 100644
-index c1e82a7..0000000
+diff -urN --no-dereference xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist xbps-workdir/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist
 --- xbps-clean/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist
-+++ /dev/null
++++ xbps-workdir/data/60:ae:0c:d6:f0:95:17:80:bc:93:46:7a:89:af:a3:2d.plist	1970-01-01 01:00:00.000000000 +0100
 @@ -1,12 +0,0 @@
 -<?xml version="1.0" encoding="UTF-8"?>
 -<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -123,11 +119,10 @@ index c1e82a7..0000000
 -	<string>Void Linux</string>
 -</dict>
 -</plist>
-diff --git xbps-clean/data/Makefile xbps-workdir/data/Makefile
-index 8bf9410..4f58736 100644
+diff -urN --no-dereference xbps-clean/data/Makefile xbps-workdir/data/Makefile
 --- xbps-clean/data/Makefile
 +++ xbps-workdir/data/Makefile
-@@ -16,7 +16,7 @@ install:
+@@ -16,7 +16,7 @@
  	install -d $(DESTDIR)$(PKGCONFIGDIR)
  	install -m644 $(PCFILE) $(DESTDIR)$(PKGCONFIGDIR)
  	install -d $(DESTDIR)/$(DBDIR)/keys
@@ -136,18 +131,16 @@ index 8bf9410..4f58736 100644
  	install -d $(DESTDIR)/$(SHAREDIR)/xbps.d
  	install -m644 repod-main.conf $(DESTDIR)/$(SHAREDIR)/xbps.d/00-repository-main.conf
  	install -m644 xbps.conf $(DESTDIR)/$(SHAREDIR)/xbps.d/xbps.conf
-diff --git xbps-clean/data/repod-main.conf xbps-workdir/data/repod-main.conf
-index 9890a84..ba3b073 100644
+diff -urN --no-dereference xbps-clean/data/repod-main.conf xbps-workdir/data/repod-main.conf
 --- xbps-clean/data/repod-main.conf
 +++ xbps-workdir/data/repod-main.conf
 @@ -1 +1 @@
 -repository=https://a-hel-fi.m.voidlinux.org/current
 +repository=https://example.com/repo/current
-diff --git xbps-clean/lib/Makefile xbps-workdir/lib/Makefile
-index 847bfdd..f80c0f6 100644
+diff -urN --no-dereference xbps-clean/lib/Makefile xbps-workdir/lib/Makefile
 --- xbps-clean/lib/Makefile
 +++ xbps-workdir/lib/Makefile
-@@ -93,8 +93,8 @@ install: all
+@@ -93,8 +93,8 @@
  	install -d $(DESTDIR)$(LIBDIR)
  	install -m 644 libxbps.a $(DESTDIR)$(LIBDIR)
  	install -m 755 $(LIBXBPS_SHLIB) $(DESTDIR)$(LIBDIR)
@@ -158,8 +151,7 @@ index 847bfdd..f80c0f6 100644
  
  .PHONY: uninstall
  uninstall:
-diff --git xbps-clean/lib/fetch/ftp.c xbps-workdir/lib/fetch/ftp.c
-index 28296a0..f543ce1 100644
+diff -urN --no-dereference xbps-clean/lib/fetch/ftp.c xbps-workdir/lib/fetch/ftp.c
 --- xbps-clean/lib/fetch/ftp.c
 +++ xbps-workdir/lib/fetch/ftp.c
 @@ -79,7 +79,7 @@
@@ -171,7 +163,7 @@ index 28296a0..f543ce1 100644
  #include "fetch.h"
  #include "common.h"
  #include "ftperr.h"
-@@ -147,7 +147,7 @@ unmappedaddr(struct sockaddr_in6 *sin6, socklen_t *len)
+@@ -147,7 +147,7 @@
  	sin4->sin_port = port;
  	sin4->sin_family = AF_INET;
  	*len = sizeof(struct sockaddr_in);
@@ -180,8 +172,7 @@ index 28296a0..f543ce1 100644
  	sin4->sin_len = sizeof(struct sockaddr_in);
  #endif
  }
-diff --git xbps-clean/lib/fetch/http.c xbps-workdir/lib/fetch/http.c
-index f7b9142..d68b8f8 100644
+diff -urN --no-dereference xbps-clean/lib/fetch/http.c xbps-workdir/lib/fetch/http.c
 --- xbps-clean/lib/fetch/http.c
 +++ xbps-workdir/lib/fetch/http.c
 @@ -78,7 +78,7 @@

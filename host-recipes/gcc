@@ -3,7 +3,7 @@
 name=gcc
 from_source=gcc-host
 revision=1
-imagedeps="build-essential"
+imagedeps="experimental:build-essential"
 hostdeps="pkg-config"
 hostrundeps="binutils"
 deps="mlibc-headers"

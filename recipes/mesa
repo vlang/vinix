@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=mesa
-version=25.0.4
+version=25.0.5
 revision=1
 tarball_url="https://archive.mesa3d.org/mesa-${version}.tar.xz"
-tarball_blake2b="b661bc1534bff848c32c559ecc790fd7770682aa7f35403c2fb50b899ad83dbbafb2baecf0e372972849378a4a539eeafe5e9c9e1497ab4313ebcafa89f6e248"
+tarball_blake2b="f17f8c2a733fd3c37f346b9304241dc1d13e01df9c8c723b73b10279dd3c2ebed062ec1f15cdbc8b9936bae840a087b23ac38cae7d8982228d582d468ab8c9c9"
 imagedeps="meson ninja-build python3-mako python3-yaml glslang-tools"
 hostdeps="gcc pkg-config"
 deps="core-libs llvm libexpat libx11 libxcb libxext libxshmfence libxxf86vm libxrandr zlib zstd"

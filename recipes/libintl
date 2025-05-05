@@ -8,10 +8,6 @@ hostdeps="gcc pkg-config"
 deps="mlibc libgcc libstdc++ libatomic libiconv"
 
 configure() {
-        ACLOCAL=true \
-        AUTOCONF=true \
-        AUTOMAKE=true \
-        AUTOHEADER=true \
     autotools_configure \
         --without-emacs \
         --without-lispdir \

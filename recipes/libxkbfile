@@ -6,7 +6,7 @@ revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libxkbfile-${version}.tar.gz"
 tarball_blake2b="07e4f082ab280a5d9ecbd20191167c25c05a530906b79af715d9758d45751157415f9ecf6223c87cab10488b1f3726187437a4ce2cafd1339c88ae32af7c7eb0"
 hostdeps="gcc pkg-config"
-deps="core-libs libx11"
+deps="core-libs xorg-util-macros xorg-proto libx11"
 
 prepare() {
     autotools_recursive_regen

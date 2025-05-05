@@ -13,10 +13,7 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
         LIBS="-liconv -lintl" \
-        configure_script_path=./configure \
     autotools_configure \
         --enable-backup-scripts
 }

@@ -1,8 +1,7 @@
-diff --git libxfont2-clean/src/fc/fslibos.h libxfont2-workdir/src/fc/fslibos.h
-index 1ef362d..3475a02 100644
+diff -urN --no-dereference libxfont2-clean/src/fc/fslibos.h libxfont2-workdir/src/fc/fslibos.h
 --- libxfont2-clean/src/fc/fslibos.h
 +++ libxfont2-workdir/src/fc/fslibos.h
-@@ -60,7 +60,7 @@ from The Open Group.
+@@ -60,7 +60,7 @@
  #   endif
  #  endif
  #  ifndef OPEN_MAX

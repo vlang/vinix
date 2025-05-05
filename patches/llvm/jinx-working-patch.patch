@@ -1,8 +1,7 @@
-diff --git llvm-clean/clang/lib/Basic/Targets/OSTargets.h llvm-workdir/clang/lib/Basic/Targets/OSTargets.h
-index 991efd2..ea1904d 100644
+diff -urN --no-dereference llvm-clean/clang/lib/Basic/Targets/OSTargets.h llvm-workdir/clang/lib/Basic/Targets/OSTargets.h
 --- llvm-clean/clang/lib/Basic/Targets/OSTargets.h
 +++ llvm-workdir/clang/lib/Basic/Targets/OSTargets.h
-@@ -395,6 +395,36 @@ public:
+@@ -395,6 +395,36 @@
    }
  };
  
@@ -39,11 +38,10 @@ index 991efd2..ea1904d 100644
  // NetBSD Target
  template <typename Target>
  class LLVM_LIBRARY_VISIBILITY NetBSDTargetInfo : public OSTargetInfo<Target> {
-diff --git llvm-clean/clang/lib/Basic/Targets.cpp llvm-workdir/clang/lib/Basic/Targets.cpp
-index 281aebd..6c47ad8 100644
+diff -urN --no-dereference llvm-clean/clang/lib/Basic/Targets.cpp llvm-workdir/clang/lib/Basic/Targets.cpp
 --- llvm-clean/clang/lib/Basic/Targets.cpp
 +++ llvm-workdir/clang/lib/Basic/Targets.cpp
-@@ -164,6 +164,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
+@@ -164,6 +164,9 @@
          return std::make_unique<OHOSTargetInfo<AArch64leTargetInfo>>(Triple,
                                                                       Opts);
        }
@@ -53,7 +51,7 @@ index 281aebd..6c47ad8 100644
      case llvm::Triple::NetBSD:
        return std::make_unique<NetBSDTargetInfo<AArch64leTargetInfo>>(Triple,
                                                                       Opts);
-@@ -466,6 +469,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
+@@ -466,6 +469,9 @@
          return std::make_unique<OHOSTargetInfo<RISCV64TargetInfo>>(Triple,
                                                                     Opts);
        }
@@ -63,7 +61,7 @@ index 281aebd..6c47ad8 100644
      default:
        return std::make_unique<RISCV64TargetInfo>(Triple, Opts);
      }
-@@ -654,6 +660,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
+@@ -654,6 +660,9 @@
        return std::make_unique<PS5OSTargetInfo<X86_64TargetInfo>>(Triple, Opts);
      case llvm::Triple::Hurd:
        return std::make_unique<HurdTargetInfo<X86_64TargetInfo>>(Triple, Opts);
@@ -73,11 +71,10 @@ index 281aebd..6c47ad8 100644
      default:
        return std::make_unique<X86_64TargetInfo>(Triple, Opts);
      }
-diff --git llvm-clean/clang/lib/Driver/CMakeLists.txt llvm-workdir/clang/lib/Driver/CMakeLists.txt
-index 5bdb661..a5f97aa 100644
+diff -urN --no-dereference llvm-clean/clang/lib/Driver/CMakeLists.txt llvm-workdir/clang/lib/Driver/CMakeLists.txt
 --- llvm-clean/clang/lib/Driver/CMakeLists.txt
 +++ llvm-workdir/clang/lib/Driver/CMakeLists.txt
-@@ -65,6 +65,7 @@ add_clang_library(clangDriver
+@@ -65,6 +65,7 @@
    ToolChains/HLSL.cpp
    ToolChains/Hurd.cpp
    ToolChains/Linux.cpp
@@ -85,8 +82,7 @@ index 5bdb661..a5f97aa 100644
    ToolChains/MipsLinux.cpp
    ToolChains/MinGW.cpp
    ToolChains/MSP430.cpp
-diff --git llvm-clean/clang/lib/Driver/Driver.cpp llvm-workdir/clang/lib/Driver/Driver.cpp
-index 87855fd..bc8346b 100644
+diff -urN --no-dereference llvm-clean/clang/lib/Driver/Driver.cpp llvm-workdir/clang/lib/Driver/Driver.cpp
 --- llvm-clean/clang/lib/Driver/Driver.cpp
 +++ llvm-workdir/clang/lib/Driver/Driver.cpp
 @@ -32,6 +32,7 @@
@@ -97,7 +93,7 @@ index 87855fd..bc8346b 100644
  #include "ToolChains/MinGW.h"
  #include "ToolChains/MipsLinux.h"
  #include "ToolChains/NaCl.h"
-@@ -6663,6 +6664,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
+@@ -6663,6 +6664,9 @@
      case llvm::Triple::Fuchsia:
        TC = std::make_unique<toolchains::Fuchsia>(*this, Target, Args);
        break;
@@ -107,11 +103,10 @@ index 87855fd..bc8346b 100644
      case llvm::Triple::Solaris:
        TC = std::make_unique<toolchains::Solaris>(*this, Target, Args);
        break;
-diff --git llvm-clean/clang/lib/Driver/ToolChains/Gnu.cpp llvm-workdir/clang/lib/Driver/ToolChains/Gnu.cpp
-index f56eeda..17da48b 100644
+diff -urN --no-dereference llvm-clean/clang/lib/Driver/ToolChains/Gnu.cpp llvm-workdir/clang/lib/Driver/ToolChains/Gnu.cpp
 --- llvm-clean/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ llvm-workdir/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -228,6 +228,8 @@ static const char *getLDMOption(const llvm::Triple &T, const ArgList &Args) {
+@@ -228,6 +228,8 @@
        return "elf_iamcu";
      return "elf_i386";
    case llvm::Triple::aarch64:
@@ -120,10 +115,8 @@ index f56eeda..17da48b 100644
      return "aarch64linux";
    case llvm::Triple::aarch64_be:
      return "aarch64linuxb";
-diff --git llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp
-new file mode 100644
-index 0000000..4c2060c
---- /dev/null
+diff -urN --no-dereference llvm-clean/clang/lib/Driver/ToolChains/Vinix.cpp llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp
+--- llvm-clean/clang/lib/Driver/ToolChains/Vinix.cpp	1970-01-01 01:00:00.000000000 +0100
 +++ llvm-workdir/clang/lib/Driver/ToolChains/Vinix.cpp
 @@ -0,0 +1,227 @@
 +//===--- Vinix.h - Vinix ToolChain Implementations --------*- C++ -*-===//
@@ -353,10 +346,8 @@ index 0000000..4c2060c
 +  for (const auto &Opt : ExtraOpts)
 +    CmdArgs.push_back(Opt.c_str());
 +}
-diff --git llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h
-new file mode 100644
-index 0000000..8fcac48
---- /dev/null
+diff -urN --no-dereference llvm-clean/clang/lib/Driver/ToolChains/Vinix.h llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h
+--- llvm-clean/clang/lib/Driver/ToolChains/Vinix.h	1970-01-01 01:00:00.000000000 +0100
 +++ llvm-workdir/clang/lib/Driver/ToolChains/Vinix.h
 @@ -0,0 +1,55 @@
 +//===--- Vinix.h - Vinix ToolChain Implementations --------*- C++ -*-===//
@@ -414,8 +405,7 @@ index 0000000..8fcac48
 +} // end namespace clang
 +
 +#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_VINIX_H
-diff --git llvm-clean/llvm/include/llvm/ADT/bit.h llvm-workdir/llvm/include/llvm/ADT/bit.h
-index c42b5e6..e4cb05e 100644
+diff -urN --no-dereference llvm-clean/llvm/include/llvm/ADT/bit.h llvm-workdir/llvm/include/llvm/ADT/bit.h
 --- llvm-clean/llvm/include/llvm/ADT/bit.h
 +++ llvm-workdir/llvm/include/llvm/ADT/bit.h
 @@ -29,7 +29,7 @@
@@ -427,11 +417,10 @@ index c42b5e6..e4cb05e 100644
  #include <endian.h>
  #elif defined(_AIX)
  #include <sys/machine.h>
-diff --git llvm-clean/llvm/include/llvm/TargetParser/Triple.h llvm-workdir/llvm/include/llvm/TargetParser/Triple.h
-index 7d67966..ad0e1c3 100644
+diff -urN --no-dereference llvm-clean/llvm/include/llvm/TargetParser/Triple.h llvm-workdir/llvm/include/llvm/TargetParser/Triple.h
 --- llvm-clean/llvm/include/llvm/TargetParser/Triple.h
 +++ llvm-workdir/llvm/include/llvm/TargetParser/Triple.h
-@@ -208,6 +208,7 @@ public:
+@@ -208,6 +208,7 @@
      Linux,
      Lv2, // PS3
      MacOSX,
@@ -439,7 +428,7 @@ index 7d67966..ad0e1c3 100644
      NetBSD,
      OpenBSD,
      Solaris,
-@@ -299,6 +300,7 @@ public:
+@@ -299,6 +300,7 @@
      Amplification,
      OpenCL,
      OpenHOS,
@@ -447,7 +436,7 @@ index 7d67966..ad0e1c3 100644
  
      PAuthTest,
  
-@@ -846,6 +848,8 @@ public:
+@@ -846,6 +848,8 @@
  
    bool isVulkanOS() const { return getOS() == Triple::Vulkan; }
  
@@ -456,11 +445,10 @@ index 7d67966..ad0e1c3 100644
    bool isShaderStageEnvironment() const {
      EnvironmentType Env = getEnvironment();
      return Env == Triple::Pixel || Env == Triple::Vertex ||
-diff --git llvm-clean/llvm/lib/Support/Unix/Path.inc llvm-workdir/llvm/lib/Support/Unix/Path.inc
-index 6004e00..e080ff1 100644
+diff -urN --no-dereference llvm-clean/llvm/lib/Support/Unix/Path.inc llvm-workdir/llvm/lib/Support/Unix/Path.inc
 --- llvm-clean/llvm/lib/Support/Unix/Path.inc
 +++ llvm-workdir/llvm/lib/Support/Unix/Path.inc
-@@ -107,7 +107,7 @@ typedef uint_t uint;
+@@ -107,7 +107,7 @@
  #endif
  
  #if defined(__NetBSD__) || defined(__DragonFly__) || defined(__GNU__) ||       \
@@ -469,7 +457,7 @@ index 6004e00..e080ff1 100644
  #define STATVFS_F_FLAG(vfs) (vfs).f_flag
  #else
  #define STATVFS_F_FLAG(vfs) (vfs).f_flags
-@@ -124,7 +124,8 @@ const file_t kInvalidFile = -1;
+@@ -124,7 +124,8 @@
  #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) ||      \
      defined(__FreeBSD_kernel__) || defined(__linux__) || defined(__CYGWIN__) || \
      defined(__DragonFly__) || defined(_AIX) || defined(__GNU__) ||              \
@@ -479,7 +467,7 @@ index 6004e00..e080ff1 100644
  static int test_dir(char ret[PATH_MAX], const char *dir, const char *bin) {
    struct stat sb;
    char fullpath[PATH_MAX];
-@@ -245,7 +246,8 @@ std::string getMainExecutable(const char *argv0, void *MainAddr) {
+@@ -245,7 +246,8 @@
    // If we don't have procfs mounted, fall back to argv[0]
    if (getprogpath(exe_path, argv0) != NULL)
      return exe_path;
@@ -489,7 +477,7 @@ index 6004e00..e080ff1 100644
    char exe_path[PATH_MAX];
    const char *aPath = "/proc/self/exe";
    if (sys::fs::exists(aPath)) {
-@@ -546,7 +548,7 @@ static bool is_local_impl(struct STATVFS &Vfs) {
+@@ -546,7 +548,7 @@
  
    // vmount entry not found; "remote" is the conservative answer.
    return false;
@@ -498,11 +486,10 @@ index 6004e00..e080ff1 100644
    // The file system can have an arbitrary structure on z/OS; must go with the
    // conservative answer.
    return false;
-diff --git llvm-clean/llvm/lib/TargetParser/Triple.cpp llvm-workdir/llvm/lib/TargetParser/Triple.cpp
-index e9e6f13..c82e580 100644
+diff -urN --no-dereference llvm-clean/llvm/lib/TargetParser/Triple.cpp llvm-workdir/llvm/lib/TargetParser/Triple.cpp
 --- llvm-clean/llvm/lib/TargetParser/Triple.cpp
 +++ llvm-workdir/llvm/lib/TargetParser/Triple.cpp
-@@ -299,6 +299,8 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+@@ -299,6 +299,8 @@
    case Linux: return "linux";
    case Lv2: return "lv2";
    case MacOSX: return "macosx";
@@ -511,7 +498,7 @@ index e9e6f13..c82e580 100644
    case Mesa3D: return "mesa3d";
    case NVCL: return "nvcl";
    case NaCl: return "nacl";
-@@ -384,6 +386,8 @@ StringRef Triple::getEnvironmentTypeName(EnvironmentType Kind) {
+@@ -384,6 +386,8 @@
      return "pauthtest";
    case LLVM:
      return "llvm";
@@ -520,7 +507,7 @@ index e9e6f13..c82e580 100644
    }
  
    llvm_unreachable("Invalid EnvironmentType!");
-@@ -678,6 +682,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+@@ -678,6 +682,7 @@
      .StartsWith("linux", Triple::Linux)
      .StartsWith("lv2", Triple::Lv2)
      .StartsWith("macos", Triple::MacOSX)
@@ -528,7 +515,7 @@ index e9e6f13..c82e580 100644
      .StartsWith("netbsd", Triple::NetBSD)
      .StartsWith("openbsd", Triple::OpenBSD)
      .StartsWith("solaris", Triple::Solaris)
-@@ -766,6 +771,7 @@ static Triple::EnvironmentType parseEnvironment(StringRef EnvironmentName) {
+@@ -766,6 +771,7 @@
        .StartsWith("ohos", Triple::OpenHOS)
        .StartsWith("pauthtest", Triple::PAuthTest)
        .StartsWith("llvm", Triple::LLVM)

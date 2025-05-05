@@ -6,7 +6,7 @@ revision=1
 tarball_url="https://www.x.org/archive/individual/lib/libXft-${version}.tar.gz"
 tarball_blake2b="e9bb0920ed91b30ba867d48a3676af4ce1728e407448030f8731cd344b4d09ab2605617f129a1187f1f175cc03a779f9c36be6d4b56e470a240a13fa88e41a71"
 hostdeps="gcc pkg-config"
-deps="core-libs libxrender fontconfig"
+deps="core-libs xorg-util-macros xorg-proto libx11 libxrender freetype2 fontconfig"
 
 prepare() {
     autotools_recursive_regen

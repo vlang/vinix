@@ -1,6 +1,6 @@
 diff -urN --no-dereference xorg-server-clean/configure xorg-server-workdir/configure
---- xorg-server-clean/configure	2025-02-25 19:56:12.000000000 +0100
-+++ xorg-server-workdir/configure	2025-04-26 16:46:03.075933995 +0200
+--- xorg-server-clean/configure
++++ xorg-server-workdir/configure
 @@ -29969,7 +29969,7 @@
  
  
@@ -38,8 +38,8 @@ diff -urN --no-dereference xorg-server-clean/configure xorg-server-workdir/confi
  
  	fi
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Bus.c xorg-server-workdir/hw/xfree86/common/xf86Bus.c
---- xorg-server-clean/hw/xfree86/common/xf86Bus.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/common/xf86Bus.c	2025-04-26 16:38:37.228830038 +0200
+--- xorg-server-clean/hw/xfree86/common/xf86Bus.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Bus.c
 @@ -556,6 +556,7 @@
  void
  xf86PostProbe(void)
@@ -57,8 +57,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Bus.c xorg-se
  
  Bool
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Config.c xorg-server-workdir/hw/xfree86/common/xf86Config.c
---- xorg-server-clean/hw/xfree86/common/xf86Config.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/common/xf86Config.c	2025-04-26 16:38:37.228923610 +0200
+--- xorg-server-clean/hw/xfree86/common/xf86Config.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Config.c
 @@ -49,6 +49,8 @@
  #include <sys/types.h>
  #include <grp.h>
@@ -69,8 +69,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Config.c xorg
  #include "xf86Modes.h"
  #include "xf86Parser.h"
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Configure.c xorg-server-workdir/hw/xfree86/common/xf86Configure.c
---- xorg-server-clean/hw/xfree86/common/xf86Configure.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/common/xf86Configure.c	2025-04-26 16:38:37.229021593 +0200
+--- xorg-server-clean/hw/xfree86/common/xf86Configure.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Configure.c
 @@ -27,6 +27,8 @@
  #include <xorg-config.h>
  #endif
@@ -81,8 +81,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Configure.c x
  #include "xf86Config.h"
  #include "xf86_OSlib.h"
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Events.c xorg-server-workdir/hw/xfree86/common/xf86Events.c
---- xorg-server-clean/hw/xfree86/common/xf86Events.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/common/xf86Events.c	2025-04-26 16:38:37.229075573 +0200
+--- xorg-server-clean/hw/xfree86/common/xf86Events.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Events.c
 @@ -53,6 +53,8 @@
  #include <xorg-config.h>
  #endif
@@ -93,8 +93,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Events.c xorg
  #include <X11/Xproto.h>
  #include <X11/Xatom.h>
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Helper.c xorg-server-workdir/hw/xfree86/common/xf86Helper.c
---- xorg-server-clean/hw/xfree86/common/xf86Helper.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/common/xf86Helper.c	2025-04-26 16:38:37.229147111 +0200
+--- xorg-server-clean/hw/xfree86/common/xf86Helper.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Helper.c
 @@ -38,6 +38,8 @@
  #include <xorg-config.h>
  #endif
@@ -105,8 +105,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Helper.c xorg
  #include "mi.h"
  #include "os.h"
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Init.c xorg-server-workdir/hw/xfree86/common/xf86Init.c
---- xorg-server-clean/hw/xfree86/common/xf86Init.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/common/xf86Init.c	2025-04-26 16:38:37.229233531 +0200
+--- xorg-server-clean/hw/xfree86/common/xf86Init.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Init.c
 @@ -37,6 +37,8 @@
  #include <stdlib.h>
  #include <errno.h>
@@ -117,8 +117,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/common/xf86Init.c xorg-s
  #if !defined(WIN32)
  #define HAS_UTSNAME 1
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
---- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c	2025-04-26 16:38:37.229311398 +0200
+--- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c
++++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
 @@ -10,12 +10,12 @@
  #include "xf86_OSproc.h"
  
@@ -223,8 +223,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c xorg-s
          default:
              fPtr->unsupported_ioctls |= (1 << FBIOBLANK_UNSUPPORTED);
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h
---- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h	2025-04-26 16:38:37.229364692 +0200
+--- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h
++++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.h
 @@ -16,9 +16,9 @@
  
  extern _X_EXPORT int fbdevHWGetFD(ScrnInfoPtr pScrn);
@@ -238,8 +238,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.h xorg-s
  
  extern _X_EXPORT char *fbdevHWGetName(ScrnInfoPtr pScrn);
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c
---- xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c	2025-04-26 16:38:37.229403954 +0200
+--- xorg-server-clean/hw/xfree86/os-support/shared/posix_tty.c
++++ xorg-server-workdir/hw/xfree86/os-support/shared/posix_tty.c
 @@ -56,6 +56,9 @@
  #include <xorg-config.h>
  #endif
@@ -251,8 +251,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/os-support/shared/posix_
  #include <xserver_poll.h>
  #include "xf86.h"
 diff -urN --no-dereference xorg-server-clean/hw/xfree86/os-support/shared/sigio.c xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c
---- xorg-server-clean/hw/xfree86/os-support/shared/sigio.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c	2025-04-26 16:38:37.229440655 +0200
+--- xorg-server-clean/hw/xfree86/os-support/shared/sigio.c
++++ xorg-server-workdir/hw/xfree86/os-support/shared/sigio.c
 @@ -56,6 +56,9 @@
  #include <xorg-config.h>
  #endif
@@ -264,8 +264,8 @@ diff -urN --no-dereference xorg-server-clean/hw/xfree86/os-support/shared/sigio.
  #include <xserver_poll.h>
  #include "xf86.h"
 diff -urN --no-dereference xorg-server-clean/include/os.h xorg-server-workdir/include/os.h
---- xorg-server-clean/include/os.h	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/include/os.h	2025-04-26 16:38:37.229487722 +0200
+--- xorg-server-clean/include/os.h
++++ xorg-server-workdir/include/os.h
 @@ -54,6 +54,7 @@
  #include <stdlib.h>       /* for reallocarray */
  #endif
@@ -275,8 +275,8 @@ diff -urN --no-dereference xorg-server-clean/include/os.h xorg-server-workdir/in
  #include <time.h>
  #endif
 diff -urN --no-dereference xorg-server-clean/mi/mibitblt.c xorg-server-workdir/mi/mibitblt.c
---- xorg-server-clean/mi/mibitblt.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/mi/mibitblt.c	2025-04-26 16:38:37.229540846 +0200
+--- xorg-server-clean/mi/mibitblt.c
++++ xorg-server-workdir/mi/mibitblt.c
 @@ -49,6 +49,8 @@
  #include <dix-config.h>
  #endif
@@ -287,8 +287,8 @@ diff -urN --no-dereference xorg-server-clean/mi/mibitblt.c xorg-server-workdir/m
  #include <X11/Xprotostr.h>
  
 diff -urN --no-dereference xorg-server-clean/os/access.c xorg-server-workdir/os/access.c
---- xorg-server-clean/os/access.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/os/access.c	2025-04-26 16:38:37.229626035 +0200
+--- xorg-server-clean/os/access.c
++++ xorg-server-workdir/os/access.c
 @@ -120,7 +120,7 @@
  #include <sys/un.h>
  #endif
@@ -299,8 +299,8 @@ diff -urN --no-dereference xorg-server-clean/os/access.c xorg-server-workdir/os/
  #endif
  #if defined(SYSV) &&  defined(__i386__)
 diff -urN --no-dereference xorg-server-clean/os/utils.c xorg-server-workdir/os/utils.c
---- xorg-server-clean/os/utils.c	2025-02-25 19:56:05.000000000 +0100
-+++ xorg-server-workdir/os/utils.c	2025-04-26 16:38:37.229735133 +0200
+--- xorg-server-clean/os/utils.c
++++ xorg-server-workdir/os/utils.c
 @@ -1412,7 +1412,7 @@
          return -1;
      }

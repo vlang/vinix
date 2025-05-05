@@ -1,5 +1,4 @@
-diff --git git-clean/config.mak.uname git-workdir/config.mak.uname
-index a7607a5..cce83ee 100644
+diff -urN --no-dereference git-clean/config.mak.uname git-workdir/config.mak.uname
 --- git-clean/config.mak.uname
 +++ git-workdir/config.mak.uname
 @@ -4,12 +4,12 @@

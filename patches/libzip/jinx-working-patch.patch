@@ -1,5 +1,4 @@
-diff --git libzip-clean/lib/zip_close.c libzip-workdir/lib/zip_close.c
-index ddc2c24..6206bd0 100644
+diff -urN --no-dereference libzip-clean/lib/zip_close.c libzip-workdir/lib/zip_close.c
 --- libzip-clean/lib/zip_close.c
 +++ libzip-workdir/lib/zip_close.c
 @@ -36,6 +36,7 @@
@@ -10,8 +9,7 @@ index ddc2c24..6206bd0 100644
  #ifdef _WIN32
  #include <fcntl.h>
  #include <io.h>
-diff --git libzip-clean/lib/zip_name_locate.c libzip-workdir/lib/zip_name_locate.c
-index 4248dc2..fdf113a 100644
+diff -urN --no-dereference libzip-clean/lib/zip_name_locate.c libzip-workdir/lib/zip_name_locate.c
 --- libzip-clean/lib/zip_name_locate.c
 +++ libzip-workdir/lib/zip_name_locate.c
 @@ -33,9 +33,9 @@
@@ -26,8 +24,7 @@ index 4248dc2..fdf113a 100644
  
  #include "zipint.h"
  
-diff --git libzip-clean/src/ziptool.c libzip-workdir/src/ziptool.c
-index 281bfbb..9897044 100644
+diff -urN --no-dereference libzip-clean/src/ziptool.c libzip-workdir/src/ziptool.c
 --- libzip-clean/src/ziptool.c
 +++ libzip-workdir/src/ziptool.c
 @@ -38,6 +38,7 @@

@@ -1,18 +1,18 @@
 diff -urN --no-dereference gcc-host-clean/fixincludes/mkfixinc.sh gcc-host-workdir/fixincludes/mkfixinc.sh
---- gcc-host-clean/fixincludes/mkfixinc.sh	2024-08-01 10:17:13.000000000 +0200
-+++ gcc-host-workdir/fixincludes/mkfixinc.sh	2025-04-26 14:30:21.814181007 +0200
+--- gcc-host-clean/fixincludes/mkfixinc.sh
++++ gcc-host-workdir/fixincludes/mkfixinc.sh
 @@ -12,6 +12,7 @@
  # Check for special fix rules for particular targets
  case $machine in
      i?86-*-cygwin* | \
-+    *-*-*-mlibc | \
-     i?86-*-mingw32* | \
-     x86_64-*-mingw32* | \
++    *-mlibc* | \
+     *-mingw32* | \
      powerpc-*-eabisim* | \
+     powerpc-*-eabi*    | \
 diff -urN --no-dereference gcc-host-clean/gcc/config/vinix.h gcc-host-workdir/gcc/config/vinix.h
 --- gcc-host-clean/gcc/config/vinix.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-host-workdir/gcc/config/vinix.h	2025-04-26 14:30:21.814250843 +0200
-@@ -0,0 +1,29 @@
++++ gcc-host-workdir/gcc/config/vinix.h
+@@ -0,0 +1,30 @@
 +#undef TARGET_VINIX
 +#define TARGET_VINIX 1
 +
@@ -37,14 +37,15 @@ diff -urN --no-dereference gcc-host-clean/gcc/config/vinix.h gcc-host-workdir/gc
 +#define TARGET_OS_CPP_BUILTINS()         \
 +  do {                                   \
 +    builtin_define ("__vinix__");    \
++    builtin_define ("__mlibc__");         \
 +    builtin_define ("__unix__");         \
 +    builtin_assert ("system=vinix"); \
 +    builtin_assert ("system=unix");      \
 +    builtin_assert ("system=posix");     \
 +  } while (0);
 diff -urN --no-dereference gcc-host-clean/gcc/config.build gcc-host-workdir/gcc/config.build
---- gcc-host-clean/gcc/config.build	2024-08-01 10:17:14.000000000 +0200
-+++ gcc-host-workdir/gcc/config.build	2025-04-26 14:30:21.814297327 +0200
+--- gcc-host-clean/gcc/config.build
++++ gcc-host-workdir/gcc/config.build
 @@ -45,7 +45,7 @@
  build_xm_file=
  build_xm_defines=
@@ -55,9 +56,9 @@ diff -urN --no-dereference gcc-host-clean/gcc/config.build gcc-host-workdir/gcc/
  
  # System-specific settings.
 diff -urN --no-dereference gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/config.gcc
---- gcc-host-clean/gcc/config.gcc	2024-08-01 10:17:14.000000000 +0200
-+++ gcc-host-workdir/gcc/config.gcc	2025-04-26 14:30:21.814501211 +0200
-@@ -878,6 +878,15 @@
+--- gcc-host-clean/gcc/config.gcc
++++ gcc-host-workdir/gcc/config.gcc
+@@ -879,6 +879,15 @@
    rust_target_objs="${rust_target_objs} freebsd-rust.o"
    target_has_targetrustm=yes
    ;;
@@ -73,7 +74,7 @@ diff -urN --no-dereference gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/co
  *-*-fuchsia*)
    native_system_header_dir=/include
    tmake_file="t-fuchsia"
-@@ -2284,6 +2293,9 @@
+@@ -2320,6 +2329,9 @@
  			;;
  	esac
  	;;
@@ -83,9 +84,34 @@ diff -urN --no-dereference gcc-host-clean/gcc/config.gcc gcc-host-workdir/gcc/co
  x86_64-*-fuchsia*)
  	tmake_file="${tmake_file} i386/t-x86_64-elf"
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
+diff -urN --no-dereference gcc-host-clean/gcc/cp/module.cc gcc-host-workdir/gcc/cp/module.cc
+--- gcc-host-clean/gcc/cp/module.cc
++++ gcc-host-workdir/gcc/cp/module.cc
+@@ -1697,8 +1697,10 @@
+ 	      set_error (errno);
+ 	  else
+ 	    {
++#ifndef __vinix__
+ 	      if (madvise (mapping, hdr.pos, MADV_RANDOM))
+ 		goto fail;
++#endif
+ 
+ 	      /* These buffers are never NULL in this case.  */
+ 	      strtab.buffer = mapping + strtab.pos;
+@@ -1808,8 +1810,10 @@
+     }
+   /* We'll be hopping over this randomly.  Some systems declare the
+      first parm as char *, and other declare it as void *.  */
++#ifndef __vinix__
+   if (madvise (reinterpret_cast <char *> (mapping), size, MADV_RANDOM))
+     goto fail;
++#endif
+ 
+   hdr.buffer = (char *)mapping;
+ #else
 diff -urN --no-dereference gcc-host-clean/libatomic/configure.tgt gcc-host-workdir/libatomic/configure.tgt
---- gcc-host-clean/libatomic/configure.tgt	2024-08-01 10:17:17.000000000 +0200
-+++ gcc-host-workdir/libatomic/configure.tgt	2025-04-26 14:30:21.814676639 +0200
+--- gcc-host-clean/libatomic/configure.tgt
++++ gcc-host-workdir/libatomic/configure.tgt
 @@ -151,7 +151,7 @@
    *-*-linux* | *-*-gnu* | *-*-k*bsd*-gnu \
    | *-*-netbsd* | *-*-freebsd* | *-*-openbsd* | *-*-dragonfly* \
@@ -96,8 +122,8 @@ diff -urN --no-dereference gcc-host-clean/libatomic/configure.tgt gcc-host-workd
  	config_path="${config_path} posix"
  	;;
 diff -urN --no-dereference gcc-host-clean/libcpp/Makefile.in gcc-host-workdir/libcpp/Makefile.in
---- gcc-host-clean/libcpp/Makefile.in	2024-08-01 10:18:42.000000000 +0200
-+++ gcc-host-workdir/libcpp/Makefile.in	2025-04-26 14:30:21.814713043 +0200
+--- gcc-host-clean/libcpp/Makefile.in
++++ gcc-host-workdir/libcpp/Makefile.in
 @@ -32,10 +32,10 @@
  AUTOHEADER = @AUTOHEADER@
  CATALOGS = $(patsubst %,po/%,@CATALOGS@)
@@ -121,9 +147,9 @@ diff -urN --no-dereference gcc-host-clean/libcpp/Makefile.in gcc-host-workdir/li
  LIBINTL = @LIBINTL@
  PACKAGE = @PACKAGE@
 diff -urN --no-dereference gcc-host-clean/libgcc/config.host gcc-host-workdir/libgcc/config.host
---- gcc-host-clean/libgcc/config.host	2024-08-01 10:17:17.000000000 +0200
-+++ gcc-host-workdir/libgcc/config.host	2025-04-26 14:30:21.814786793 +0200
-@@ -304,6 +304,11 @@
+--- gcc-host-clean/libgcc/config.host
++++ gcc-host-workdir/libgcc/config.host
+@@ -310,6 +310,11 @@
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
    extra_parts="crtbegin.o crtend.o"
    ;;
@@ -135,7 +161,7 @@ diff -urN --no-dereference gcc-host-clean/libgcc/config.host gcc-host-workdir/li
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
    tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
-@@ -752,6 +757,10 @@
+@@ -767,6 +772,10 @@
  x86_64-*-fuchsia*)
  	tmake_file="$tmake_file t-libgcc-pic"
  	;;
@@ -147,9 +173,9 @@ diff -urN --no-dereference gcc-host-clean/libgcc/config.host gcc-host-workdir/li
  	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
  	md_unwind_header=i386/dragonfly-unwind.h
 diff -urN --no-dereference gcc-host-clean/libstdc++-v3/configure gcc-host-workdir/libstdc++-v3/configure
---- gcc-host-clean/libstdc++-v3/configure	2024-08-01 10:17:18.000000000 +0200
-+++ gcc-host-workdir/libstdc++-v3/configure	2025-04-26 14:30:21.816584905 +0200
-@@ -38822,7 +38822,7 @@
+--- gcc-host-clean/libstdc++-v3/configure
++++ gcc-host-workdir/libstdc++-v3/configure
+@@ -38856,7 +38856,7 @@
  
    fi
      ;;

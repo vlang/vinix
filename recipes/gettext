@@ -14,13 +14,6 @@ prepare() {
 }
 
 configure() {
-    cp -rp ${source_dir}/. ./
-
-        ACLOCAL=true \
-        AUTOCONF=true \
-        AUTOMAKE=true \
-        AUTOHEADER=true \
-        configure_script_path=./configure \
     autotools_configure
 }
 

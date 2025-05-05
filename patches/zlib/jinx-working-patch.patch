@@ -1,8 +1,7 @@
-diff --git zlib-clean/configure zlib-workdir/configure
-index cc867c9..1bba45a 100755
+diff -urN --no-dereference zlib-clean/configure zlib-workdir/configure
 --- zlib-clean/configure
 +++ zlib-workdir/configure
-@@ -226,7 +226,7 @@ if test "$gcc" -eq 1 && ($cc -c $test.c) >> configure.log 2>&1; then
+@@ -227,7 +227,7 @@
      uname=`(uname -s || echo unknown) 2>/dev/null`
    fi
    case "$uname" in

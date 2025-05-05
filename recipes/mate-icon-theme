@@ -1,0 +1,28 @@
+#! /bin/sh
+
+name=mate-icon-theme
+version=1.28.0
+revision=1
+tarball_url="https://pub.mate-desktop.org/releases/1.28/mate-icon-theme-${version}.tar.xz"
+tarball_blake2b="18b7f43c5a1a0c8f9a45feb0d4941d659d67d98918227615d12acd176cc3cf96a8eb48c9d9bfebe4710417b3fffabc89d433d51c44b42df16bf62332a743b6ae"
+hostdeps="gcc pkg-config"
+deps="core-libs"
+
+prepare() {
+    autotools_recursive_regen
+}
+
+configure() {
+    autotools_configure \
+        --disable-icon-mapping
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
+}

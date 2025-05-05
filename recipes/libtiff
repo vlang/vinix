@@ -31,5 +31,8 @@ build() {
 package() {
     DESTDIR="${dest_dir}" make install
 
+    # Move documentation to the correct location
+    mv ${dest_dir}${prefix}/share/doc/tiff-${version} ${dest_dir}${prefix}/share/doc/tiff
+
     post_package_strip
 }

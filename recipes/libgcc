@@ -2,9 +2,10 @@
 
 name=libgcc
 from_source=gcc-host
+skip_pkg_check=yes
 revision=1
 hostdeps="gcc pkg-config"
-imagedeps="build-essential"
+imagedeps="experimental:build-essential"
 deps="mlibc"
 
 build() {

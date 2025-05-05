@@ -1,0 +1,14 @@
+#! /bin/sh
+
+name=autoconf-archive
+version=2024.10.16
+revision=1
+tarball_url="https://ftp.gnu.org/gnu/autoconf-archive/autoconf-archive-${version}.tar.xz"
+tarball_blake2b="64554b7258c527f2e6bb115bec08e358bd4f10b940cdbe58c073fb3bdeccab78897250766e600b7e5fd79a76d633135d1caf2c7e81893bd68cab704073cac2c5"
+
+package() {
+    mkdir -p "${dest_dir}${prefix}"/share/aclocal
+    cp -r "${source_dir}"/m4/. "${dest_dir}${prefix}"/share/aclocal/
+
+    post_package_strip
+}

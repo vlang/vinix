@@ -1,12 +1,12 @@
 #! /bin/sh
 
 name=curl
-version=8.8.0
+version=8.13.0
 revision=1
-tarball_url="https://github.com/curl/curl/releases/download/curl-$(echo ${version} | sed 's/\./_/g')/curl-${version}.tar.xz"
-tarball_blake2b="c14903bad4cbd1752a5335afa6bcc78be1a484692fce0e0a6c2061963e0e6b4e56defb8332cef32d0dbddb481ad0443b71faf3a52a6e9d945c89ecbce373d2a3"
+tarball_url="https://curl.se/download/curl-${version}.tar.xz"
+tarball_blake2b="6869634ad50f015d5c7526699034d5a3f27d9588bc32eacc8080dbd6c690f63b1f25cee40d3fdf8fd9dd8535c305ea9c5edf1d5a02bc6d9ce60fd8c88230aca0"
 hostdeps="gcc pkg-config"
-deps="core-libs openssl zlib zstd"
+deps="core-libs openssl zlib zstd libpsl"
 
 prepare() {
     autotools_recursive_regen

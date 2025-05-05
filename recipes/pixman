@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=pixman
-version=0.44.2
+version=0.46.0
 revision=1
 tarball_url="https://www.x.org/archive/individual/lib/pixman-${version}.tar.xz"
-tarball_blake2b="856aa35ae705de522d70250beee8acc872b54d2b5caa9cee6bc12ffde7c293b3db76f56c75858cc5ab1bc592fb1d4078485c2def2ae4bcd5a50b6dfc2eb477eb"
+tarball_blake2b="5fc9d0df2f685afc1931ac12757d7ec0369c1f90b51f79b696479a2edd0c13e0684938871166318ca5c78b4955195ba5517e98e4666803b9062f4ed2b6593afa"
 imagedeps="meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs libpng"

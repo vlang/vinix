@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libxkbcommon
-version=1.8.1
+version=1.9.1
 revision=1
 git_url="https://github.com/xkbcommon/libxkbcommon.git"
-commit=b3465081878e80ca6c11fe35c81787ec374ec15a
+commit=7df431ac4d0d36639876318a4c69198b03ee50ba
 imagedeps="git meson ninja-build"
 hostdeps="gcc pkg-config"
 deps="core-libs libxcb libxml xkeyboard-config"

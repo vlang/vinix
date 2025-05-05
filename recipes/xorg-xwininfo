@@ -23,6 +23,7 @@ build() {
 }
 
 package() {
-    make DESTDIR=${dest_dir} install
+    DESTDIR="${dest_dir}" make install
+
     post_package_strip
 }

@@ -13,8 +13,7 @@ prepare() {
 }
 
 configure() {
-    autotools_configure \
-        --disable-futex
+    autotools_configure
 }
 
 build() {

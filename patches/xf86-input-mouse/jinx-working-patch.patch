@@ -1,6 +1,6 @@
 diff -urN --no-dereference xf86-input-mouse-clean/configure xf86-input-mouse-workdir/configure
---- xf86-input-mouse-clean/configure	2023-05-05 02:25:26.000000000 +0200
-+++ xf86-input-mouse-workdir/configure	2025-04-26 17:00:01.513343944 +0200
+--- xf86-input-mouse-clean/configure
++++ xf86-input-mouse-workdir/configure
 @@ -19591,7 +19591,7 @@
  
  # X Server SDK location is required to install xf86-mouse-properties.h
@@ -22,7 +22,7 @@ diff -urN --no-dereference xf86-input-mouse-clean/configure xf86-input-mouse-wor
  
 diff -urN --no-dereference xf86-input-mouse-clean/src/vinix_mouse.c xf86-input-mouse-workdir/src/vinix_mouse.c
 --- xf86-input-mouse-clean/src/vinix_mouse.c	1970-01-01 01:00:00.000000000 +0100
-+++ xf86-input-mouse-workdir/src/vinix_mouse.c	2025-04-26 16:56:49.016615558 +0200
++++ xf86-input-mouse-workdir/src/vinix_mouse.c
 @@ -0,0 +1,119 @@
 +#ifdef HAVE_XORG_CONFIG_H
 +#include <xorg-config.h>

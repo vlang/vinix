@@ -15,7 +15,6 @@ prepare() {
 
 configure() {
     autotools_configure \
-        --disable-ipv6 \
         --with-keysymdefdir=${sysroot_dir}/usr/include/X11
 }
 

@@ -1,8 +1,7 @@
-diff --git xorg-proto-clean/include/X11/Xfuncs.h xorg-proto-workdir/include/X11/Xfuncs.h
-index b23c283..89dbbb5 100644
+diff -urN --no-dereference xorg-proto-clean/include/X11/Xfuncs.h xorg-proto-workdir/include/X11/Xfuncs.h
 --- xorg-proto-clean/include/X11/Xfuncs.h
 +++ xorg-proto-workdir/include/X11/Xfuncs.h
-@@ -44,7 +44,7 @@ void bcopy();
+@@ -44,7 +44,7 @@
  #    define bcmp(b1,b2,len) memcmp(b1, b2, len)
  #   else
  #    include <string.h>
@@ -11,11 +10,10 @@ index b23c283..89dbbb5 100644
  #     include <strings.h>
  #    endif
  #    define _XFUNCS_H_INCLUDED_STRING_H
-diff --git xorg-proto-clean/include/X11/Xos.h xorg-proto-workdir/include/X11/Xos.h
-index 75cc5b7..6c46e33 100644
+diff -urN --no-dereference xorg-proto-clean/include/X11/Xos.h xorg-proto-workdir/include/X11/Xos.h
 --- xorg-proto-clean/include/X11/Xos.h
 +++ xorg-proto-workdir/include/X11/Xos.h
-@@ -60,7 +60,7 @@ in this Software without prior written authorization from The Open Group.
+@@ -60,7 +60,7 @@
   */
  
  # include <string.h>
@@ -24,11 +22,10 @@ index 75cc5b7..6c46e33 100644
  #  include <strings.h>
  # else
  #  ifndef index
-diff --git xorg-proto-clean/include/X11/Xos_r.h xorg-proto-workdir/include/X11/Xos_r.h
-index f963b64..542c19d 100644
+diff -urN --no-dereference xorg-proto-clean/include/X11/Xos_r.h xorg-proto-workdir/include/X11/Xos_r.h
 --- xorg-proto-clean/include/X11/Xos_r.h
 +++ xorg-proto-workdir/include/X11/Xos_r.h
-@@ -318,7 +318,7 @@ static __inline__ void _Xpw_copyPasswd(_Xgetpwparams p)
+@@ -318,7 +318,7 @@
    (_Xos_processUnlock), \
    (p).pwp )
  

@@ -1,5 +1,4 @@
-diff --git glib-clean/gio/gcredentialsprivate.h glib-workdir/gio/gcredentialsprivate.h
-index 0310a75..07cd8ec 100644
+diff -urN --no-dereference glib-clean/gio/gcredentialsprivate.h glib-workdir/gio/gcredentialsprivate.h
 --- glib-clean/gio/gcredentialsprivate.h
 +++ glib-workdir/gio/gcredentialsprivate.h
 @@ -104,7 +104,7 @@
@@ -11,11 +10,10 @@ index 0310a75..07cd8ec 100644
  #define G_CREDENTIALS_SUPPORTED 1
  #define G_CREDENTIALS_USE_LINUX_UCRED 1
  #define G_CREDENTIALS_NATIVE_TYPE G_CREDENTIALS_TYPE_LINUX_UCRED
-diff --git glib-clean/glib/glib-init.c glib-workdir/glib/glib-init.c
-index c513f51..0de3ab3 100644
+diff -urN --no-dereference glib-clean/glib/glib-init.c glib-workdir/glib/glib-init.c
 --- glib-clean/glib/glib-init.c
 +++ glib-workdir/glib/glib-init.c
-@@ -29,6 +29,7 @@
+@@ -31,6 +31,7 @@
  #include "gmem.h"       /* for g_mem_gc_friendly */
  
  #include <string.h>
@@ -23,8 +21,7 @@ index c513f51..0de3ab3 100644
  #include <stdlib.h>
  #include <stdio.h>
  #include <ctype.h>
-diff --git glib-clean/glib/gstrfuncs.c glib-workdir/glib/gstrfuncs.c
-index 391cf56..86dc760 100644
+diff -urN --no-dereference glib-clean/glib/gstrfuncs.c glib-workdir/glib/gstrfuncs.c
 --- glib-clean/glib/gstrfuncs.c
 +++ glib-workdir/glib/gstrfuncs.c
 @@ -35,6 +35,7 @@

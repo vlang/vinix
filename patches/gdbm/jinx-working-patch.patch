@@ -1,5 +1,4 @@
-diff --git gdbm-clean/tools/gdbmapp.h gdbm-workdir/tools/gdbmapp.h
-index 3ea826b..e20253a 100644
+diff -urN --no-dereference gdbm-clean/tools/gdbmapp.h gdbm-workdir/tools/gdbmapp.h
 --- gdbm-clean/tools/gdbmapp.h
 +++ gdbm-workdir/tools/gdbmapp.h
 @@ -16,6 +16,7 @@
@@ -10,8 +9,7 @@ index 3ea826b..e20253a 100644
  #include "gettext.h"
  #ifdef HAVE_LOCALE_H
  # include <locale.h>
-diff --git gdbm-clean/tools/var.c gdbm-workdir/tools/var.c
-index 2cf922e..6aed417 100644
+diff -urN --no-dereference gdbm-clean/tools/var.c gdbm-workdir/tools/var.c
 --- gdbm-clean/tools/var.c
 +++ gdbm-workdir/tools/var.c
 @@ -14,6 +14,7 @@

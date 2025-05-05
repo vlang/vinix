@@ -5,7 +5,7 @@ version=3.1.0
 revision=1
 tarball_url="https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/${version}.tar.gz"
 tarball_blake2b="cd02ff01525a8a720f28a3766f18941244cd8e6776ae22735730e0392dc9e9e0659c075aaad7e3371d7e3f9306a4dc8e4514fcb90a00e5ce442f0534ec393862"
-imagedeps="build-essential cmake ninja-build git nasm"
+imagedeps="cmake ninja-build git nasm"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 

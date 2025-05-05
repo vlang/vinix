@@ -5,7 +5,6 @@ version=4.2.2
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/mpfr/mpfr-${version}.tar.xz"
 tarball_blake2b="6bbf5658e70fbb673a3b65246a6bac708d1571aa6943c6742efd92f468ac71e6f0fe351b757f7133440ea312d9a5fc3549acd89d54f4d975c58bdc204d7b21ec"
-imagedeps="build-essential"
 hostdeps="gcc pkg-config"
 deps="core-libs gmp"
 
@@ -14,9 +13,6 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
-        configure_script_path=./configure \
     autotools_configure \
         --enable-static=no \
         --enable-shared=yes \

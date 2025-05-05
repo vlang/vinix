@@ -1,0 +1,25 @@
+#! /bin/sh
+
+name=icu
+from_source=icu
+revision=1
+imagedeps="build-essential pkg-config"
+
+configure() {
+    ${source_dir}/source/configure \
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
+        --prefix=/usr/local
+}
+
+build() {
+    make -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" make install
+
+        strip_command=strip \
+    post_package_strip
+}

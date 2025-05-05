@@ -10,7 +10,10 @@ hostdeps="gcc pkg-config"
 deps="core-libs libxi mesa glu"
 
 configure() {
-    cmake_configure \
+        CFLAGS="$TARGET_CFLAGS -std=gnu17" \
+        CXXFLAGS="$TARGET_CXXFLAGS" \
+        LDFLAGS="$TARGET_LDFLAGS" \
+    cmake_configure_noflags \
         -DFREEGLUT_BUILD_DEMOS=OFF \
         -DFREEGLUT_BUILD_STATIC_LIBS=OFF
 }

@@ -1,8 +1,7 @@
-diff --git mesa-clean/include/drm-uapi/drm.h mesa-workdir/include/drm-uapi/drm.h
-index 4e4f7c2..d41c0b5 100644
+diff -urN --no-dereference mesa-clean/include/drm-uapi/drm.h mesa-workdir/include/drm-uapi/drm.h
 --- mesa-clean/include/drm-uapi/drm.h
 +++ mesa-workdir/include/drm-uapi/drm.h
-@@ -44,7 +44,7 @@ typedef unsigned int drm_handle_t;
+@@ -44,7 +44,7 @@
  #else /* One of the BSDs */
  
  #include <stdint.h>
@@ -11,11 +10,10 @@ index 4e4f7c2..d41c0b5 100644
  #include <sys/types.h>
  typedef int8_t   __s8;
  typedef uint8_t  __u8;
-diff --git mesa-clean/meson.build mesa-workdir/meson.build
-index de9c9af..98e14de 100644
+diff -urN --no-dereference mesa-clean/meson.build mesa-workdir/meson.build
 --- mesa-clean/meson.build
 +++ mesa-workdir/meson.build
-@@ -999,7 +999,7 @@ if cc.has_function('fmemopen')
+@@ -1036,7 +1036,7 @@
  endif
  
  # TODO: this is very incomplete
@@ -24,8 +22,7 @@ index de9c9af..98e14de 100644
    pre_args += '-D_GNU_SOURCE'
  elif host_machine.system() == 'sunos'
    pre_args += '-D__EXTENSIONS__'
-diff --git mesa-clean/src/compiler/spirv/spirv_to_nir.c mesa-workdir/src/compiler/spirv/spirv_to_nir.c
-index b4dd47a..a649aff 100644
+diff -urN --no-dereference mesa-clean/src/compiler/spirv/spirv_to_nir.c mesa-workdir/src/compiler/spirv/spirv_to_nir.c
 --- mesa-clean/src/compiler/spirv/spirv_to_nir.c
 +++ mesa-workdir/src/compiler/spirv/spirv_to_nir.c
 @@ -40,6 +40,7 @@
@@ -36,8 +33,7 @@ index b4dd47a..a649aff 100644
  
  /* Table of all implemented capabilities.  These are the capabilities that are
   * implemented in the spirv_to_nir, not what the device supports.
-diff --git mesa-clean/src/egl/main/egllog.c mesa-workdir/src/egl/main/egllog.c
-index 0de00b2..59d8fdf 100644
+diff -urN --no-dereference mesa-clean/src/egl/main/egllog.c mesa-workdir/src/egl/main/egllog.c
 --- mesa-clean/src/egl/main/egllog.c
 +++ mesa-workdir/src/egl/main/egllog.c
 @@ -37,6 +37,7 @@
@@ -48,11 +44,10 @@ index 0de00b2..59d8fdf 100644
  #include "c11/threads.h"
  #include "util/macros.h"
  #include "util/os_misc.h"
-diff --git mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
-index 5a4796e..6ee584c 100644
+diff -urN --no-dereference mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
 --- mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c
 +++ mesa-workdir/src/gallium/drivers/llvmpipe/lp_texture.c
-@@ -1738,7 +1738,7 @@ llvmpipe_resource_get_param(struct pipe_screen *screen,
+@@ -1741,7 +1741,7 @@
     default:
        break;
     }
@@ -61,8 +56,7 @@ index 5a4796e..6ee584c 100644
     *value = 0;
     return false;
  }
-diff --git mesa-clean/src/util/detect_os.h mesa-workdir/src/util/detect_os.h
-index 86286df..802814f 100644
+diff -urN --no-dereference mesa-clean/src/util/detect_os.h mesa-workdir/src/util/detect_os.h
 --- mesa-clean/src/util/detect_os.h
 +++ mesa-workdir/src/util/detect_os.h
 @@ -28,6 +28,12 @@
@@ -87,8 +81,7 @@ index 86286df..802814f 100644
 +#endif
 +
  #endif /* DETECT_OS_H */
-diff --git mesa-clean/src/util/os_misc.c mesa-workdir/src/util/os_misc.c
-index 4b79166..09c16b0 100644
+diff -urN --no-dereference mesa-clean/src/util/os_misc.c mesa-workdir/src/util/os_misc.c
 --- mesa-clean/src/util/os_misc.c
 +++ mesa-workdir/src/util/os_misc.c
 @@ -57,7 +57,7 @@
@@ -100,7 +93,7 @@ index 4b79166..09c16b0 100644
  #  include <unistd.h>
  #elif DETECT_OS_OPENBSD || DETECT_OS_FREEBSD
  #  include <sys/resource.h>
-@@ -284,7 +284,7 @@ exit_mutex:
+@@ -284,7 +284,7 @@
  bool
  os_get_total_physical_memory(uint64_t *size)
  {
@@ -109,11 +102,10 @@ index 4b79166..09c16b0 100644
     const long phys_pages = sysconf(_SC_PHYS_PAGES);
     const long page_size = sysconf(_SC_PAGE_SIZE);
  
-diff --git mesa-clean/src/util/os_time.c mesa-workdir/src/util/os_time.c
-index da8ad7a..aa9aca4 100644
+diff -urN --no-dereference mesa-clean/src/util/os_time.c mesa-workdir/src/util/os_time.c
 --- mesa-clean/src/util/os_time.c
 +++ mesa-workdir/src/util/os_time.c
-@@ -65,7 +65,7 @@ os_time_get_nano(void)
+@@ -65,7 +65,7 @@
  void
  os_time_sleep(int64_t usecs)
  {
@@ -122,8 +114,7 @@ index da8ad7a..aa9aca4 100644
     struct timespec time;
     time.tv_sec = usecs / 1000000;
     time.tv_nsec = (usecs % 1000000) * 1000;
-diff --git mesa-clean/src/util/u_debug.c mesa-workdir/src/util/u_debug.c
-index 79934e9..1a740b4 100644
+diff -urN --no-dereference mesa-clean/src/util/u_debug.c mesa-workdir/src/util/u_debug.c
 --- mesa-clean/src/util/u_debug.c
 +++ mesa-workdir/src/util/u_debug.c
 @@ -32,6 +32,7 @@
@@ -134,11 +125,10 @@ index 79934e9..1a740b4 100644
  #include <stdio.h>
  #include <limits.h> /* CHAR_BIT */
  #include <ctype.h> /* isalnum */
-diff --git mesa-clean/src/util/u_thread.c mesa-workdir/src/util/u_thread.c
-index 255c5f6..7c20f8d 100644
+diff -urN --no-dereference mesa-clean/src/util/u_thread.c mesa-workdir/src/util/u_thread.c
 --- mesa-clean/src/util/u_thread.c
 +++ mesa-workdir/src/util/u_thread.c
-@@ -75,7 +75,7 @@ int u_thread_create(thrd_t *thrd, int (*routine)(void *), void *param)
+@@ -75,7 +75,7 @@
  void u_thread_setname( const char *name )
  {
  #if defined(HAVE_PTHREAD)
@@ -147,7 +137,7 @@ index 255c5f6..7c20f8d 100644
     int ret = pthread_setname_np(pthread_self(), name);
     if (ret == ERANGE) {
        char buf[16];
-@@ -154,7 +154,7 @@ util_set_thread_affinity(thrd_t thread,
+@@ -154,7 +154,7 @@
  int64_t
  util_thread_get_time_nano(thrd_t thread)
  {

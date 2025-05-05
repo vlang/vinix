@@ -13,9 +13,6 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
-        configure_script_path=./configure \
     autotools_configure \
         CFLAGS="$TARGET_CFLAGS -DSLOW_BUT_NO_HACKS"
 }

@@ -1,5 +1,4 @@
-diff --git libjpeg-turbo-clean/src/cdjpeg.h libjpeg-turbo-workdir/src/cdjpeg.h
-index dbe54a0..15a9eb3 100644
+diff -urN --no-dereference libjpeg-turbo-clean/src/cdjpeg.h libjpeg-turbo-workdir/src/cdjpeg.h
 --- libjpeg-turbo-clean/src/cdjpeg.h
 +++ libjpeg-turbo-workdir/src/cdjpeg.h
 @@ -19,7 +19,7 @@
@@ -11,8 +10,7 @@ index dbe54a0..15a9eb3 100644
  
  /*
   * Object interface for cjpeg's source file decoding modules
-diff --git libjpeg-turbo-clean/src/example.c libjpeg-turbo-workdir/src/example.c
-index 9405611..8a6aa61 100644
+diff -urN --no-dereference libjpeg-turbo-clean/src/example.c libjpeg-turbo-workdir/src/example.c
 --- libjpeg-turbo-clean/src/example.c
 +++ libjpeg-turbo-workdir/src/example.c
 @@ -32,6 +32,7 @@
@@ -23,8 +21,7 @@ index 9405611..8a6aa61 100644
  
  #ifdef _WIN32
  #define strcasecmp  stricmp
-diff --git libjpeg-turbo-clean/src/jchuff.c libjpeg-turbo-workdir/src/jchuff.c
-index 8cdd5bd..84e535c 100644
+diff -urN --no-dereference libjpeg-turbo-clean/src/jchuff.c libjpeg-turbo-workdir/src/jchuff.c
 --- libjpeg-turbo-clean/src/jchuff.c
 +++ libjpeg-turbo-workdir/src/jchuff.c
 @@ -36,7 +36,7 @@
@@ -36,8 +33,7 @@ index 8cdd5bd..84e535c 100644
  
  /* Expanded entropy encoder object for Huffman encoding.
   *
-diff --git libjpeg-turbo-clean/src/md5/md5cmp.c libjpeg-turbo-workdir/src/md5/md5cmp.c
-index 42b94ce..0c8a44f 100644
+diff -urN --no-dereference libjpeg-turbo-clean/src/md5/md5cmp.c libjpeg-turbo-workdir/src/md5/md5cmp.c
 --- libjpeg-turbo-clean/src/md5/md5cmp.c
 +++ libjpeg-turbo-workdir/src/md5/md5cmp.c
 @@ -28,6 +28,7 @@
@@ -48,8 +44,7 @@ index 42b94ce..0c8a44f 100644
  #include "./md5.h"
  #include "../tjutil.h"
  
-diff --git libjpeg-turbo-clean/src/turbojpeg.c libjpeg-turbo-workdir/src/turbojpeg.c
-index 389aea5..876a7dd 100644
+diff -urN --no-dereference libjpeg-turbo-clean/src/turbojpeg.c libjpeg-turbo-workdir/src/turbojpeg.c
 --- libjpeg-turbo-clean/src/turbojpeg.c
 +++ libjpeg-turbo-workdir/src/turbojpeg.c
 @@ -30,6 +30,7 @@
@@ -60,8 +55,7 @@ index 389aea5..876a7dd 100644
  #include <ctype.h>
  #include <limits.h>
  #if !defined(_MSC_VER) || _MSC_VER > 1600
-diff --git libjpeg-turbo-clean/src/turbojpeg.h libjpeg-turbo-workdir/src/turbojpeg.h
-index 274eb7a..d97794d 100644
+diff -urN --no-dereference libjpeg-turbo-clean/src/turbojpeg.h libjpeg-turbo-workdir/src/turbojpeg.h
 --- libjpeg-turbo-clean/src/turbojpeg.h
 +++ libjpeg-turbo-workdir/src/turbojpeg.h
 @@ -31,6 +31,7 @@

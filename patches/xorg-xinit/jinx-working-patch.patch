@@ -1,6 +1,6 @@
 diff -urN --no-dereference xorg-xinit-clean/configure xorg-xinit-workdir/configure
---- xorg-xinit-clean/configure	2025-03-09 21:44:30.000000000 +0100
-+++ xorg-xinit-workdir/configure	2025-04-26 17:14:07.656999261 +0200
+--- xorg-xinit-clean/configure
++++ xorg-xinit-workdir/configure
 @@ -12465,75 +12465,7 @@
  
  

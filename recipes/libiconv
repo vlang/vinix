@@ -28,5 +28,20 @@ package() {
     mkdir -p "${dest_dir}${prefix}/share/doc/libiconv"
     mv "${dest_dir}${prefix}/share/doc"/*.html "${dest_dir}${prefix}/share/doc/libiconv/"
 
+    mkdir -p "${dest_dir}${prefix}/lib/pkgconfig"
+    cat <<EOF >"${dest_dir}${prefix}/lib/pkgconfig/iconv.pc"
+prefix=${prefix}
+exec_prefix=\${prefix}
+bindir=\${exec_prefix}/bin
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: iconv
+Description: libiconv library
+Version: ${version}
+Libs: -L\${libdir} -liconv
+Cflags: -I\${includedir}
+EOF
+
     post_package_strip
 }

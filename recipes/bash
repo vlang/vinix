@@ -25,6 +25,7 @@ prepare() {
 configure() {
     autotools_configure \
         CFLAGS="$TARGET_CFLAGS \
+            -std=gnu17 \
             -DDEFAULT_PATH_VALUE='\"/usr/local/sbin:/usr/local/bin:/usr/bin\"' \
             -DSTANDARD_UTILS_PATH='\"/usr/bin\"' \
             -DSYS_BASHRC='\"/etc/bash.bashrc\"' \

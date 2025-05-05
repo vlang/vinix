@@ -72,47 +72,62 @@ autotools_configure_noflags() {
         "$@"
 }
 
+checked_subst() {
+    tmpfile="$2".checked_subst
+    sed -z -E -e "$1" "$2" >"$tmpfile"
+    if cmp -s "$2" "$tmpfile"; then
+        rm -f "$2".checked_subst
+        if [ "$3" = no_die ]; then
+            return 1
+        else
+            die "*** substitution '$1' failed for file '$2'"
+        fi
+    fi
+
+    #diff --color=auto -ur "$2" "$tmpfile" || true
+
+    touch -r "$2" "$2".checked_subst
+    chmod --reference="$2" "$2".checked_subst
+    mv -f "$2".checked_subst "$2"
+}
+
 autotools_recursive_regen() {
-    for f in $(grep -Rl 'GNU config.sub ($timestamp)'); do
+    for f in $(grep -rl 'GNU config.sub ($timestamp)'); do
         mv "$f" "$f".reference
         cp -v ${base_dir}/build-support/config.sub "$f"
         touch -r "$f".reference "$f"
         rm -f "$f".reference
     done
-    for f in $(grep -Rl 'GNU config.guess ($timestamp)'); do
+    for f in $(grep -rl 'GNU config.guess ($timestamp)'); do
         mv "$f" "$f".reference
         cp -v ${base_dir}/build-support/config.guess "$f"
         touch -r "$f".reference "$f"
         rm -f "$f".reference
     done
 
-    if ! [ -z "$(grep -Rl 'shlibpath_overrides_runpath=no')" ]; then
-        if [ -z "$(grep -Rl "dynamic_linker='mlibc ld.so'")" ]; then
+    if ! [ -z "$(grep -rl "# No shared lib support for Linux oldld, aout, or coff.")" ]; then
+        if [ -z "$(grep -rl "dynamic_linker='mlibc ld.so'")" ]; then
             echo "*** Missing libtool support for mlibc - trying to patch support in :3 ***"
-            for f in $(grep -Rl "We cannot seem to hardcode it, guess we'll fake it."); do
-                mv "$f" "$f".reference
-                sed -z \
-                    -e 's/add_dir=-L$libdir/add_dir=-L$lt_sysroot$libdir/g' \
-                    -e 's/add_dir="-L$libdir"/add_dir="-L$lt_sysroot$libdir"/g' \
-                    "$f".reference > "$f"
-                chmod --reference="$f".reference "$f"
-                touch -r "$f".reference "$f"
-                rm -f "$f".reference
+            for f in $(grep -rl "We cannot seem to hardcode it, guess we'll fake it."); do
+                if grep -q 'add_dir="\?-L$lt_sysroot$libdir"\?' "$f"; then
+                    continue
+                fi
+                checked_subst 's/add_dir=(")?-L\$libdir(")?/add_dir=\1-L$lt_sysroot$libdir\1/g' "$f"
             done
-            for f in $(grep -Rl 'shlibpath_overrides_runpath=no'); do
-                mv "$f" "$f".reference
-                sed -z \
-                    -e 's/hardcode_into_libs=yes\n  ;;\n\nnewsos6)/hardcode_into_libs=yes\n  ;;\n\n*-mlibc)\n  version_type=linux\n  need_lib_prefix=no\n  need_version=no\n  library_names_spec='"'"'$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'"'"'\n  soname_spec='"'"'$libname$release$shared_ext$major'"'"'\n  dynamic_linker='"'"'mlibc ld.so'"'"'\n  shlibpath_var=LD_LIBRARY_PATH\n  shlibpath_overrides_runpath=no\n  hardcode_into_libs=yes\n  ;;\n\nnewsos6)/g' \
-                    -e 's/gnu\*)\n  lt_cv_deplibs_check_method=pass_all\n  ;;/gnu*|*-mlibc)\n  lt_cv_deplibs_check_method=pass_all\n  ;;/g' \
-                    -e 's/netbsd\*)\n	;;\n      \*qnx\* | \*nto\*)\n        # QNX uses GNU C/netbsd*|*-mlibc)\n	;;\n      *qnx* | *nto*)\n        # QNX uses GNU C/g' \
-                    -e 's/lt_prog_compiler_static='"'"'-Bstatic'"'"'\n      ;;\n\n    \*nto\* | \*qnx\*)\n      # QNX uses GNU C/lt_prog_compiler_static='"'"'-Bstatic'"'"'\n      ;;\n\n    *-mlibc)\n      lt_prog_compiler_wl='"'"'-Wl,'"'"'\n      lt_prog_compiler_pic='"'"'-fPIC'"'"'\n      lt_prog_compiler_static='"'"'-static'"'"'\n      ;;\n\n    *nto* | *qnx*)\n      # QNX uses GNU C/g' \
-                    -e 's/ld_shlibs=no\n      fi\n      ;;\n\n    netbsd\*)/ld_shlibs=no\n      fi\n      ;;\n\n    *-mlibc)\n      archive_cmds='"'"'$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'"'"'\n      archive_expsym_cmds='"'"'$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'"'"'\n      ;;\n\n    netbsd*)/g' \
-                    -e 's%netbsd\*)\n      if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	archive_cmds='"'"'$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'"'"'  # a.out%*-mlibc)\n      ;;\n\n    netbsd*)\n      if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	archive_cmds='"'"'$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'"'"'  # a.out%g' \
-                    -e 's%netbsd\*)\n        if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	  archive_cmds_CXX='"'"'$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'"'"'%*-mlibc)\n	    ld_shlibs_CXX=yes\n	    ;;\n\n      netbsd*)\n        if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then\n	  archive_cmds_CXX='"'"'$LD -Bshareable  -o $lib $predep_objects $libobjs $deplibs $postdep_objects $linker_flags'"'"'%g' \
-                    "$f".reference > "$f"
-                chmod --reference="$f".reference "$f"
-                touch -r "$f".reference "$f"
-                rm -f "$f".reference
+            for f in $(grep -rl "# No shared lib support for Linux oldld, aout, or coff."); do
+                if grep -q 'AC_DEFUN(\[AC_PROG_LIBTOOL\]' "$f"; then
+                    continue
+                fi
+                if grep -q 'ltconfig - Create a system-specific libtool' "$f"; then
+                    continue
+                fi
+                checked_subst 's/(# This must be (glibc\/|Linux )?ELF.\nlinux\* \| k\*bsd\*-gnu \| kopensolaris\*-gnu( \| gnu\*)?( \| uclinuxfdpiceabi)?)(\)\n  lt_cv_deplibs_check_method=pass_all)/\1 | *-mlibc\5/g' "$f"
+                checked_subst 's/(\)\n	# FreeBSD uses GNU C)/ | *-mlibc\1/g' "$f" no_die || true
+                checked_subst 's/(lt_prog_compiler_static(_[^=]*)?='"'"'-non_shared'"'"'\n      ;;)(\n\n    linux\* \| k\*bsd\*-gnu \| kopensolaris\*-gnu( \| gnu\*)?\))/\1\n\n    *-mlibc)\n      lt_prog_compiler_wl\2='"'"'-Wl,'"'"'\n      lt_prog_compiler_pic\2='"'"'-fPIC'"'"'\n      lt_prog_compiler_static\2='"'"'-static'"'"'\n      ;;\3/g' "$f"
+                checked_subst 's/(    (haiku|interix\[3-9\])?\*\)\n      (archive_cmds|hardcode_direct)?(_[^=]*)?=)/    *-mlibc)\n      archive_cmds\4='"'"'$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'"'"'\n      archive_expsym_cmds\4='"'"'$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'"'"'\n      ;;\n\n\1/g' "$f"
+                checked_subst 's/(\)\n        # FreeBSD 3 and later use GNU C)/ | *-mlibc\1/g' "$f" no_die || true
+                # putting this last to avoid a bug with determining whether the substitutions should be run or not.
+                checked_subst 's/(hardcode_into_libs=yes\n  ;;\n\n)(# No shared lib support for Linux oldld, aout, or coff.)/\1*-mlibc)\n  version_type=linux\n  need_lib_prefix=no\n  need_version=no\n  library_names_spec='"'"'$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'"'"'\n  soname_spec='"'"'$libname$release$shared_ext$major'"'"'\n  dynamic_linker='"'"'mlibc ld.so'"'"'\n  shlibpath_var=LD_LIBRARY_PATH\n  shlibpath_overrides_runpath=no\n  hardcode_into_libs=yes\n  ;;\n\n\2/g' "$f"
             done
         fi
     fi
@@ -156,6 +171,7 @@ cmake_configure_noflags() {
     fi
 
     cmake "${cmake_source_dir}" \
+        -DCMAKE_MODULE_PATH="${base_dir}/build-support/cmake-host" \
         -DCMAKE_TOOLCHAIN_FILE="${base_dir}/build-support/CMakeToolchain-$ARCHITECTURE.txt" \
         -DCMAKE_INSTALL_PREFIX=${prefix} \
         -DCMAKE_INSTALL_SYSCONFDIR=/etc \

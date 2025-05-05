@@ -15,6 +15,7 @@ prepare() {
 
 configure() {
     autotools_configure \
+        CFLAGS="$TARGET_CFLAGS -std=gnu17" \
         BUILD_CFLAGS="$HOST_CFLAGS" \
         BUILD_CPPFLAGS="$HOST_CPPFLAGS" \
         BUILD_LDFLAGS="$HOST_LDFLAGS"

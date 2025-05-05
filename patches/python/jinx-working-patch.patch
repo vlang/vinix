@@ -1,6 +1,6 @@
 diff -urN --no-dereference python-clean/Modules/fcntlmodule.c python-workdir/Modules/fcntlmodule.c
---- python-clean/Modules/fcntlmodule.c	2025-04-08 15:54:08.000000000 +0200
-+++ python-workdir/Modules/fcntlmodule.c	2025-04-26 16:11:44.521061432 +0200
+--- python-clean/Modules/fcntlmodule.c
++++ python-workdir/Modules/fcntlmodule.c
 @@ -596,8 +596,8 @@
      if (PyModule_AddIntMacro(m, F_GETOWN_EX)) return -1;
      if (PyModule_AddIntMacro(m, F_SETOWN_EX)) return -1;
@@ -13,8 +13,8 @@ diff -urN --no-dereference python-clean/Modules/fcntlmodule.c python-workdir/Mod
  #ifdef F_GET_RW_HINT
      // since Linux 4.13
 diff -urN --no-dereference python-clean/Objects/mimalloc/prim/unix/prim.c python-workdir/Objects/mimalloc/prim/unix/prim.c
---- python-clean/Objects/mimalloc/prim/unix/prim.c	2025-04-08 15:54:08.000000000 +0200
-+++ python-workdir/Objects/mimalloc/prim/unix/prim.c	2025-04-26 16:11:44.521143114 +0200
+--- python-clean/Objects/mimalloc/prim/unix/prim.c
++++ python-workdir/Objects/mimalloc/prim/unix/prim.c
 @@ -29,6 +29,10 @@
  #include <unistd.h>    // sysconf
  #include <fcntl.h>     // open, close, read, access
@@ -46,8 +46,8 @@ diff -urN --no-dereference python-clean/Objects/mimalloc/prim/unix/prim.c python
    return madvise(addr, size, advice);
    #endif
 diff -urN --no-dereference python-clean/configure python-workdir/configure
---- python-clean/configure	2025-04-08 15:54:08.000000000 +0200
-+++ python-workdir/configure	2025-04-26 16:20:57.317469181 +0200
+--- python-clean/configure
++++ python-workdir/configure
 @@ -4067,6 +4067,9 @@
  	*-*-wasi*)
  	    ac_sys_system=WASI

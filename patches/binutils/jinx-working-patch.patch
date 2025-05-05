@@ -1,6 +1,6 @@
 diff -urN --no-dereference binutils-clean/bfd/config.bfd binutils-workdir/bfd/config.bfd
---- binutils-clean/bfd/config.bfd	2025-02-02 01:00:00.000000000 +0100
-+++ binutils-workdir/bfd/config.bfd	2025-04-26 14:41:20.143032608 +0200
+--- binutils-clean/bfd/config.bfd
++++ binutils-workdir/bfd/config.bfd
 @@ -665,6 +665,11 @@
      targ_selvecs=
      targ64_selvecs=x86_64_elf64_vec
@@ -26,8 +26,8 @@ diff -urN --no-dereference binutils-clean/bfd/config.bfd binutils-workdir/bfd/co
    i[3-7]86-*-lynxos*)
      targ_defvec=i386_elf32_vec
 diff -urN --no-dereference binutils-clean/configure binutils-workdir/configure
---- binutils-clean/configure	2025-02-02 01:00:00.000000000 +0100
-+++ binutils-workdir/configure	2025-04-26 15:17:58.611614238 +0200
+--- binutils-clean/configure
++++ binutils-workdir/configure
 @@ -3083,7 +3083,7 @@
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | *-*-gnu* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
@@ -38,8 +38,8 @@ diff -urN --no-dereference binutils-clean/configure binutils-workdir/configure
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
 diff -urN --no-dereference binutils-clean/gas/configure.tgt binutils-workdir/gas/configure.tgt
---- binutils-clean/gas/configure.tgt	2025-02-02 01:00:00.000000000 +0100
-+++ binutils-workdir/gas/configure.tgt	2025-04-26 14:41:20.143369422 +0200
+--- binutils-clean/gas/configure.tgt
++++ binutils-workdir/gas/configure.tgt
 @@ -229,6 +229,7 @@
    i386-*-beos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
@@ -49,8 +49,8 @@ diff -urN --no-dereference binutils-clean/gas/configure.tgt binutils-workdir/gas
    i386-*-haiku*)			fmt=elf em=haiku ;;
    i386-*-genode*)			fmt=elf ;;
 diff -urN --no-dereference binutils-clean/ld/configure.tgt binutils-workdir/ld/configure.tgt
---- binutils-clean/ld/configure.tgt	2025-02-02 01:00:00.000000000 +0100
-+++ binutils-workdir/ld/configure.tgt	2025-04-26 14:41:20.143430958 +0200
+--- binutils-clean/ld/configure.tgt
++++ binutils-workdir/ld/configure.tgt
 @@ -384,6 +384,9 @@
  i[3-7]86-*-redox*)	targ_emul=elf_i386
  			targ_extra_emuls=elf_x86_64

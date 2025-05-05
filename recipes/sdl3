@@ -13,7 +13,6 @@ configure() {
     cmake_configure \
         -DSDL_ALTIVEC=OFF \
         -DSDL_DISKAUDIO=OFF \
-        -DSDL_DIRECTFB=ON \
         -DSDL_OPENGL=ON \
         -DSDL_OPENGLES=ON \
         -DSDL_PTHREADS=ON \
@@ -21,17 +20,11 @@ configure() {
         -DSDL_OSS=OFF \
         -DSDL_ALSA=OFF \
         -DSDL_JACK=OFF \
-        -DSDL_ESD=OFF \
         -DSDL_PULSEAUDIO=OFF \
-        -DSDL_ARTS=OFF \
-        -DSDL_NAS=OFF \
         -DSDL_SNDIO=OFF \
-        -DSDL_FUSIONSOUND=OFF \
-        -DSDL_LIBSAMPLERATE=OFF \
         -DSDL_RPATH=OFF \
         -DSDL_X11=ON \
         -DSDL_WAYLAND=OFF \
-        -DSDL_WAYLAND_QT_TOUCH=OFF \
         -DSDL_RPI=OFF \
         -DSDL_COCOA=OFF \
         -DSDL_DIRECTX=OFF \
@@ -42,7 +35,8 @@ configure() {
         -DSDL_KMSDRM=OFF \
         -DSDL_HIDAPI=ON \
         -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF
+        -DSDL_STATIC=OFF \
+        -DSDL_TEST_LIBRARY=OFF
 }
 
 build() {

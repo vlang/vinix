@@ -11,7 +11,8 @@ deps="sdl3"
 
 configure() {
     cmake_configure \
-        -DSDL_STATIC=OFF
+        -DSDL2COMPAT_STATIC=OFF \
+        -DSDL2COMPAT_TEST_LIBRARY=OFF
 }
 
 build() {
@@ -20,6 +21,8 @@ build() {
 
 package() {
     DESTDIR="${dest_dir}" ninja install
+
+    rm -v "${dest_dir}${prefix}"/lib/*.a
 
     post_package_strip
 }

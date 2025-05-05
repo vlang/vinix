@@ -1,7 +1,6 @@
-diff --git a/random/rndunix.c b/random/rndunix.c
-index fcb45b7..1e32242 100644
---- a/random/rndunix.c
-+++ b/random/rndunix.c
+diff -urN --no-dereference libgcrypt-clean/random/rndunix.c libgcrypt-workdir/random/rndunix.c
+--- libgcrypt-clean/random/rndunix.c
++++ libgcrypt-workdir/random/rndunix.c
 @@ -105,7 +105,7 @@
  #include <unistd.h>
  #include <fcntl.h>

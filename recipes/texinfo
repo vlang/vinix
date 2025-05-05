@@ -13,20 +13,22 @@ deps="core-libs ncurses bash gzip"
 prepare() {
     autotools_recursive_regen
 
-    ./configure \
+    mkdir build && cd build
+    ../configure \
         CFLAGS="$HOST_CFLAGS" \
         CPPFLAGS="$HOST_CPPFLAGS" \
         LDFLAGS="$HOST_LDFLAGS"
 
     make -j${parallelism}
     make -C info makedoc
+
+    cd ..
+    mv build/info/makedoc info/
+    rm -rf build
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
         texinfo_cv_sys_iconv_converts_euc_cn=y \
-        configure_script_path=./configure \
     autotools_configure \
         --disable-perl-xs
 

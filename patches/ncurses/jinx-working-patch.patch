@@ -1,8 +1,7 @@
-diff --git ncurses-clean/c++/Makefile.in ncurses-workdir/c++/Makefile.in
-index 99f21da..5db41d8 100644
+diff -urN --no-dereference ncurses-clean/c++/Makefile.in ncurses-workdir/c++/Makefile.in
 --- ncurses-clean/c++/Makefile.in
 +++ ncurses-workdir/c++/Makefile.in
-@@ -118,7 +118,7 @@ SHLIB_LIST	= $(SHLIB_DIRS) \
+@@ -120,7 +120,7 @@
  		-l@FORM_NAME@@USE_LIB_SUFFIX@ \
  		-l@MENU_NAME@@USE_LIB_SUFFIX@ \
  		-l@PANEL_NAME@@USE_LIB_SUFFIX@ \
@@ -11,7 +10,7 @@ index 99f21da..5db41d8 100644
  
  LIBROOT		= ncurses++
  
-@@ -157,7 +157,7 @@ LDFLAGS_SHARED	= $(TEST_LDFLAGS) $(CFLAGS_SHARED) @LD_SHARED_OPTS@
+@@ -159,7 +159,7 @@
  LDFLAGS_DEFAULT	= $(LINK_@DFT_UPR_MODEL@) $(LDFLAGS_@DFT_UPR_MODEL@)
  
  # flags for library built by this makefile
@@ -20,7 +19,7 @@ index 99f21da..5db41d8 100644
  	@LD_MODEL@ $(TEST_LIBS) @LIBS@ $(CXXLIBS)
  
  AUTO_SRC	= \
-@@ -182,7 +182,7 @@ AUTO_SRC	= \
+@@ -184,7 +184,7 @@
  all \
  libs ::		$(AUTO_SRC) $(LIBRARIES)
  
@@ -29,7 +28,7 @@ index 99f21da..5db41d8 100644
  
  depend :
  
-@@ -256,20 +256,20 @@ $(INCDIR)/panel.h :
+@@ -258,20 +258,20 @@
  
  ###############################################################################
  
@@ -43,6 +42,11 @@ index 99f21da..5db41d8 100644
 -		$(cursesapp_h)
 -	@echo 'compiling demo (obj_s)'
 -	@( cd $(MODEL) && $(LIBTOOL_COMPILE) $(CXX) $(CFLAGS_DEFAULT) -c $(top_srcdir)/c++/demo.cc -o $@ )
+-
+-demo$x:	$(OBJS_DEMO) \
+-	$(LIBRARIES)  \
+-	@TEST_DEPS@
+-	@ECHO_LD@ $(LINK) -o $@ $(OBJS_DEMO) $(LDFLAGS_DEFAULT)
 +#$(MODEL)/demo$o : $(srcdir)/demo.cc \
 +#		$(HEADER_DEPS) \
 +#		$(cursesf_h) \
@@ -50,11 +54,7 @@ index 99f21da..5db41d8 100644
 +#		$(cursesapp_h)
 +#	@echo 'compiling demo (obj_s)'
 +#	@( cd $(MODEL) && $(LIBTOOL_COMPILE) $(CXX) $(CFLAGS_DEFAULT) -c $(top_srcdir)/c++/demo.cc -o $@ )
- 
--demo$x:	$(OBJS_DEMO) \
--	$(LIBRARIES)  \
--	@TEST_DEPS@
--	@ECHO_LD@ $(LINK) -o $@ $(OBJS_DEMO) $(LDFLAGS_DEFAULT)
++
 +#demo$x:	$(OBJS_DEMO) \
 +#	$(LIBRARIES)  \
 +#	@TEST_DEPS@
@@ -62,11 +62,10 @@ index 99f21da..5db41d8 100644
  
  etip.h:	$(srcdir)/etip.h.in $(srcdir)/edit_cfg.sh
  	cp $(srcdir)/etip.h.in $@
-diff --git ncurses-clean/configure ncurses-workdir/configure
-index 4a74bab..615a8cb 100755
+diff -urN --no-dereference ncurses-clean/configure ncurses-workdir/configure
 --- ncurses-clean/configure
 +++ ncurses-workdir/configure
-@@ -3818,7 +3818,7 @@ echo $ECHO_N "checking if $CXX works... $ECHO_C" >&6
+@@ -3821,7 +3821,7 @@
  
  		save_CPPFLAGS="$CPPFLAGS"
  		eval cf_includedir=${includedir}
@@ -74,8 +73,8 @@ index 4a74bab..615a8cb 100755
 +		CPPFLAGS="$CPPFLAGS"
  
  cat >"conftest.$ac_ext" <<_ACEOF
- #line 3824 "configure"
-@@ -7223,6 +7223,10 @@ CF_EOF
+ #line 3827 "configure"
+@@ -7270,6 +7270,10 @@
  		LINK_PROGS="$SHELL ${rel_builddir}/mk_prog.sh"
  		LINK_TESTS="$SHELL ${rel_builddir}/mk_prog.sh"
  		;;
@@ -86,11 +85,10 @@ index 4a74bab..615a8cb 100755
  	(mingw*)
  		cf_cv_shlib_version=mingw
  		cf_cv_shlib_version_infix=mingw
-diff --git ncurses-clean/form/Makefile.in ncurses-workdir/form/Makefile.in
-index a950a3e..9b092c0 100644
+diff -urN --no-dereference ncurses-clean/form/Makefile.in ncurses-workdir/form/Makefile.in
 --- ncurses-clean/form/Makefile.in
 +++ ncurses-workdir/form/Makefile.in
-@@ -110,7 +110,7 @@ LINK		= $(LIBTOOL_LINK)
+@@ -112,7 +112,7 @@
  LDFLAGS		= @LDFLAGS@ @LD_MODEL@ @LIBS@
  
  SHLIB_DIRS	= -L../lib
@@ -99,11 +97,10 @@ index a950a3e..9b092c0 100644
  
  RPATH_LIST	= @RPATH_LIST@
  RESULTING_SYMS	= @RESULTING_SYMS@
-diff --git ncurses-clean/misc/gen-pkgconfig.in ncurses-workdir/misc/gen-pkgconfig.in
-index 89a5cd4..07d94d1 100644
+diff -urN --no-dereference ncurses-clean/misc/gen-pkgconfig.in ncurses-workdir/misc/gen-pkgconfig.in
 --- ncurses-clean/misc/gen-pkgconfig.in
 +++ ncurses-workdir/misc/gen-pkgconfig.in
-@@ -83,7 +83,7 @@ if [ "$includedir" != "/usr/include" ]; then
+@@ -83,7 +83,7 @@
  fi
  
  lib_flags=
@@ -112,11 +109,10 @@ index 89a5cd4..07d94d1 100644
  do
  	case $opt in
  	-l*) # LIBS is handled specially below
-diff --git ncurses-clean/misc/ncurses-config.in ncurses-workdir/misc/ncurses-config.in
-index c9f1cf8..51798da 100644
+diff -urN --no-dereference ncurses-clean/misc/ncurses-config.in ncurses-workdir/misc/ncurses-config.in
 --- ncurses-clean/misc/ncurses-config.in
 +++ ncurses-workdir/misc/ncurses-config.in
-@@ -101,7 +101,7 @@ fi
+@@ -110,7 +110,7 @@
  # There is no portable way to find the list of standard library directories.
  # Require a POSIX shell anyway, to keep this simple.
  lib_flags=
@@ -125,11 +121,10 @@ index c9f1cf8..51798da 100644
  do
  	case $opt in
  	-specs*) # ignore linker specs-files which were used to build library
-diff --git ncurses-clean/panel/Makefile.in ncurses-workdir/panel/Makefile.in
-index 380f80c..a77ef15 100644
+diff -urN --no-dereference ncurses-clean/panel/Makefile.in ncurses-workdir/panel/Makefile.in
 --- ncurses-clean/panel/Makefile.in
 +++ ncurses-workdir/panel/Makefile.in
-@@ -112,7 +112,7 @@ LINK		= $(LIBTOOL_LINK)
+@@ -114,7 +114,7 @@
  LDFLAGS		= @LDFLAGS@ @LD_MODEL@ @LIBS@
  
  SHLIB_DIRS	= -L../lib
@@ -138,11 +133,10 @@ index 380f80c..a77ef15 100644
  
  RPATH_LIST	= @RPATH_LIST@
  RESULTING_SYMS	= @RESULTING_SYMS@
-diff --git ncurses-clean/progs/Makefile.in ncurses-workdir/progs/Makefile.in
-index 218e64e..160d308 100644
+diff -urN --no-dereference ncurses-clean/progs/Makefile.in ncurses-workdir/progs/Makefile.in
 --- ncurses-clean/progs/Makefile.in
 +++ ncurses-workdir/progs/Makefile.in
-@@ -79,7 +79,7 @@ LIBTOOL_INSTALL	= @LIB_INSTALL@
+@@ -80,7 +80,7 @@
  LIBTOOL_UNINSTALL = @LIB_UNINSTALL@
  
  INSTALL		= @INSTALL@

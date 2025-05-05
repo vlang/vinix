@@ -1,8 +1,7 @@
-diff --git dbus-clean/dbus/dbus-sysdeps-unix.c dbus-workdir/dbus/dbus-sysdeps-unix.c
-index dbc459c..6a3e851 100644
+diff -urN --no-dereference dbus-clean/dbus/dbus-sysdeps-unix.c dbus-workdir/dbus/dbus-sysdeps-unix.c
 --- dbus-clean/dbus/dbus-sysdeps-unix.c
 +++ dbus-workdir/dbus/dbus-sysdeps-unix.c
-@@ -4896,7 +4896,7 @@ _dbus_check_setuid (void)
+@@ -5024,7 +5024,7 @@
  
    if (_DBUS_UNLIKELY (!check_setuid_initialised))
      {
