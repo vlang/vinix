@@ -14,12 +14,7 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
-        configure_script_path=./configure \
     autotools_configure \
-        --disable-dev-random \
-        --disable-asm \
         --with-libgpg-error-prefix="${sysroot_dir}${prefix}"
 }
 

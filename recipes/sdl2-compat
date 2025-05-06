@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=sdl2-compat
-version=2.32.54
+version=2.32.56
 revision=1
 tarball_url="https://github.com/libsdl-org/sdl2-compat/releases/download/release-${version}/sdl2-compat-${version}.tar.gz"
-tarball_blake2b="71b28567f0039c1833f3b80f0bc9d025d08d3dc0bc9fe688e18e38064c2ee84149f6e7b66c04004c1d63fd18d141ca2d0a20280a72b12d48fa0f5976a9100cd5"
+tarball_blake2b="ffe635f2f2f220715752185587a4c4cc343acbfe1c17cd96afe176a65354926902b9d26d09c1688130a74561036da808aadc2f93467d4634bf692ffe69b26e57"
 imagedeps="cmake ninja-build git"
 hostdeps="gcc pkg-config"
 deps="sdl3"

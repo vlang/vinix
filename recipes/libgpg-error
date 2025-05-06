@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=libgpg-error
-version=1.54
+version=1.55
 revision=1
 tarball_url="https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-${version}.tar.gz"
-tarball_blake2b="4d2528bcf7f16035b6e97d5756a5b0eb95f8fce431cfd841a69fcec2237d067a1fa832a6a42da40c3d8afc048749854917834ffbafd66dfeb77d9aa4822f48c1"
+tarball_blake2b="5d222849c48aba34257f8c402c51318bcdf66a2c485668b852b322763d090b90d0724e2a0d9857f615bb87227d36720b2595593f7727c54688f5ba08c3c8eafc"
 imagedeps="build-essential"
 hostdeps="gcc pkg-config"
 deps="core-libs"
@@ -16,17 +16,14 @@ prepare() {
 }
 
 configure() {
-    cp -rp "${source_dir}"/. ./
-
-        configure_script_path=./configure \
-    autotools_configure \
-        CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
-        CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
-        LDFLAGS_FOR_BUILD="$HOST_LDFLAGS"
+    autotools_configure
 }
 
 build() {
-    make -j${parallelism}
+    make -j${parallelism} \
+        CFLAGS_FOR_BUILD="$HOST_CFLAGS" \
+        CXXFLAGS_FOR_BUILD="$HOST_CXXFLAGS" \
+        LDFLAGS_FOR_BUILD="$HOST_LDFLAGS"
 }
 
 package() {

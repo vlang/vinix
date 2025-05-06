@@ -1,8 +1,8 @@
 name: Nightly Vinix rebuild
 
-on:
-  schedule:
-    - cron: '0 0 * * *'
+on: [push]
+  #schedule:
+  #  - cron: '0 0 * * *'
 
 jobs:
   vinix-build:
@@ -23,14 +23,14 @@ jobs:
       - name: Enable user namespaces
         run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
 
-      #- name: Build full distro and ISO
-      #  run: PKGS_TO_INSTALL='*' make all
+      - name: Build full distro and ISO
+        run: JINX_CLEAN_WORKDIRS=yes PKGS_TO_INSTALL='*' make all
 
-      #- name: Rename vinix.iso
-      #  run: mv vinix.iso vinix-nightly-full-$(date +'%Y%m%d').iso
+      - name: Rename vinix.iso
+        run: mv vinix.iso vinix-nightly-full-$(date +'%Y%m%d').iso
 
       - name: Build base distro and ISO
-        run: make all
+        run: JINX_CLEAN_WORKDIRS=yes make all
 
       - name: Rename vinix.iso
         run: mv vinix.iso vinix-nightly-base-$(date +'%Y%m%d').iso

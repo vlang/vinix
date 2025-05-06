@@ -5,18 +5,19 @@ repology_id=vlang
 version=0.0git
 revision=1
 git_url="https://github.com/vlang/v.git"
-commit=9df49bfa3128abe22161bf3bba879fbf11548b3b
+commit=dd859eae55cf4e69346851fe285b9af104c8ffb7
 source_allow_network="yes"
 source_imagedeps="git"
 hostdeps="gcc"
 deps="core-libs"
 
 prepare() {
-    git clone https://github.com/vlang/vc.git
+    git clone https://github.com/vlang/vc.git \
+        --revision=216b1cdc8b1acad5b03e9cf8767f44f2742bf8f5 \
+        --depth=1
+
     cd vc
-
-    git checkout "$(git log --grep="\[v:master\] ${commit} - " --pretty=format:"%H")"
-
+    rm -rf .git
     patch -p0 <"${base_dir}"/build-support/v/v.c.patch
 }
 
@@ -32,6 +33,7 @@ package() {
     rm -rf "${dest_dir}${prefix}"/v
     mkdir -p "${dest_dir}${prefix}"/v
     cp -r . "${dest_dir}${prefix}"/v/
+    rm -rf "${dest_dir}${prefix}"/v/.git
 
     mkdir -p "${dest_dir}${prefix}"/bin
     ln -sf ../v/v "${dest_dir}${prefix}"/bin/v

@@ -16,6 +16,7 @@ package() {
     rm -rf "${dest_dir}${prefix}"/v
     mkdir -p "${dest_dir}${prefix}"/v
     cp -r . "${dest_dir}${prefix}"/v/
+    rm -rf "${dest_dir}${prefix}"/v/.git
 
     mkdir -p "${dest_dir}${prefix}"/bin
     ln -sf ../v/v "${dest_dir}${prefix}"/bin/v

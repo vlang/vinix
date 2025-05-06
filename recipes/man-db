@@ -1,10 +1,10 @@
 #! /bin/sh
 
 name=man-db
-version=2.13.0
+version=2.13.1
 revision=1
 tarball_url="https://download.savannah.nongnu.org/releases/man-db/man-db-${version}.tar.xz"
-tarball_blake2b="7ce91a7abc6d3bbd92d4707f13caacd8ab5caee0502a2b115f8aa53f4d38df05b0e03346f70584618cce6f5457113e826828a02b847bff57abd6ba6ec1b2d407"
+tarball_blake2b="f0f61bbd91992e2be8343459addca4bb9892ad4887756a1e58e8dccf71d30fd4bfd105739f1c730d7e73088825508566c9c29e74a59d78453055db25c7a929c6"
 imagedeps="groff"
 hostdeps="gcc pkg-config"
 deps="core-libs bash gdbm groff less libpipeline zlib"

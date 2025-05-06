@@ -2,6 +2,7 @@
 
 name=libgcc
 from_source=gcc-host
+clean_workdirs=no
 skip_pkg_check=yes
 revision=1
 hostdeps="gcc pkg-config"

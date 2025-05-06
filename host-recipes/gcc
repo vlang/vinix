@@ -2,6 +2,7 @@
 
 name=gcc
 from_source=gcc-host
+clean_workdirs=no
 revision=1
 imagedeps="experimental:build-essential"
 hostdeps="pkg-config"
