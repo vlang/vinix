@@ -15,6 +15,7 @@ prepare() {
 
 configure() {
     autotools_configure \
+        --disable-dev-random \
         --with-libgpg-error-prefix="${sysroot_dir}${prefix}"
 }
 
