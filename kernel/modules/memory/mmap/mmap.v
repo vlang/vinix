@@ -4,8 +4,6 @@ import memory
 import resource
 import proc
 import errno
-import x86.cpu
-import x86.cpu.local as cpulocal
 import lib
 
 pub const prot_none = 0x00
@@ -17,6 +15,37 @@ pub const map_shared = 0x01
 pub const map_fixed = 0x10
 pub const map_anon = 0x20
 pub const map_anonymous = 0x20
+
+// Resources that need uncached page table mappings (e.g., framebuffers).
+// On ARM64, device memory must be Non-Cacheable so writes reach hardware.
+__global (
+	uncached_resources     [8]voidptr
+	uncached_resources_cnt = u32(0)
+)
+
+pub fn register_uncached_resource(res voidptr) {
+	if uncached_resources_cnt >= 8 {
+		return
+	}
+	uncached_resources[uncached_resources_cnt] = res
+	uncached_resources_cnt++
+}
+
+// Extract the underlying object pointer from a V interface value.
+// V interfaces are stored as { _object voidptr, _interface_idx int }.
+fn interface_object_ptr(iface voidptr) voidptr {
+	return unsafe { *&voidptr(iface) }
+}
+
+fn is_uncached_resource(iface_ptr voidptr) bool {
+	obj := interface_object_ptr(iface_ptr)
+	for i := u32(0); i < uncached_resources_cnt; i++ {
+		if uncached_resources[i] == obj {
+			return true
+		}
+	}
+	return false
+}
 
 pub struct MmapRangeLocal {
 pub mut:
@@ -37,6 +66,7 @@ pub mut:
 	base           u64
 	length         u64
 	offset         i64
+	pte_extra      u64 // Extra PTE flags (e.g., pte_uncached for device memory)
 }
 
 pub fn list_ranges(pagemap &memory.Pagemap) {
@@ -127,6 +157,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			new_global_range.base = global_range.base
 			new_global_range.length = global_range.length
 			new_global_range.offset = global_range.offset
+			new_global_range.pte_extra = global_range.pte_extra
 
 			new_local_range.global = new_global_range
 
@@ -135,24 +166,20 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 
 			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
-			if local_range.flags & map_anonymous != 0 {
-				for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
-					old_pte := old_pagemap.virt2pte(i, false) or { continue }
-					if unsafe { *old_pte } & 1 == 0 {
-						continue
-					}
-					new_pte := new_pagemap.virt2pte(i, true) or { return none }
-					new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or { return none }
-					page := memory.pmm_alloc_nozero(1)
-					unsafe {
-						C.memcpy(voidptr(u64(page) + higher_half), voidptr(
-							(*old_pte & memory.pte_flags_mask) + higher_half), page_size)
-						*new_pte = (*old_pte & ~memory.pte_flags_mask) | u64(page)
-						*new_spte = *new_pte
-					}
+			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
+				old_pte := old_pagemap.virt2pte(i, false) or { continue }
+				if unsafe { *old_pte } & 1 == 0 {
+					continue
 				}
-			} else {
-				panic('non anon fork')
+				new_pte := new_pagemap.virt2pte(i, true) or { return none }
+				new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or { return none }
+				page := memory.pmm_alloc_nozero(1)
+				unsafe {
+					C.memcpy(voidptr(u64(page) + higher_half), voidptr(
+						(*old_pte & memory.pte_flags_mask) + higher_half), page_size)
+					*new_pte = (*old_pte & ~memory.pte_flags_mask) | u64(page)
+					*new_spte = *new_pte
+				}
 			}
 		}
 
@@ -165,15 +192,23 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {
 	mut g := unsafe { _g }
 
-	mut pt_flags := memory.pte_present | memory.pte_user
+	// Shadow pagemap always gets full access (kernel tracking only)
+	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
+	g.shadow_pagemap.map_page(virt_addr, phys_addr, shadow_flags) or { return none }
+
+	// Process pagemap: PROT_NONE → no pte_user (EL0 cannot access).
+	// Page remains valid (EL1 can still access) so flag_page can
+	// extract the physical address later if mprotect restores access.
+	mut pt_flags := memory.pte_present | g.pte_extra
+	if prot != prot_none {
+		pt_flags |= memory.pte_user
+	}
 	if prot & prot_write != 0 {
 		pt_flags |= memory.pte_writable
 	}
 	if prot & prot_exec == 0 {
 		pt_flags |= memory.pte_noexec
 	}
-
-	g.shadow_pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return none }
 
 	for i := u64(0); i < g.locals.len; i++ {
 		mut l := g.locals[i]
@@ -223,50 +258,6 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 	}
 }
 
-pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
-	if gpr_state.err & 1 != 0 {
-		// It was a protection violation, crash
-		return none
-	}
-
-	mut current_thread := proc.current_thread()
-
-	asm volatile amd64 {
-		sti
-	}
-	defer {
-		asm volatile amd64 {
-			cli
-		}
-	}
-
-	mut process := current_thread.process
-	mut pagemap := process.pagemap
-
-	addr := cpu.read_cr2()
-
-	pagemap.l.acquire()
-
-	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
-		pagemap.l.release()
-		return none
-	}
-
-	pagemap.l.release()
-
-	mut page := unsafe { nil }
-
-	if range_local.flags & map_anonymous != 0 {
-		page = memory.pmm_alloc(1)
-	} else {
-		page = range_local.global.resource.mmap(file_page, range_local.flags)
-	}
-
-	map_page_in_range(range_local.global, memory_page * page_size, u64(page), range_local.prot) or {
-		return none
-	}
-}
-
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
@@ -307,12 +298,21 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		global:  unsafe { nil }
 	}
 
+	// Device memory (framebuffers) needs uncached mapping on ARM64 so
+	// writes reach physical RAM instead of staying in CPU cache.
+	mut extra_pte := u64(0)
+	if voidptr(resource_) != unsafe { nil } && is_uncached_resource(voidptr(resource_)) {
+		extra_pte = memory.pte_uncached
+		// Device memory mapped with Non-Cacheable attribute
+	}
+
 	mut range_global := &MmapRangeGlobal{
 		locals:         []&MmapRangeLocal{}
 		base:           base
 		length:         length
 		resource:       resource_
 		offset:         offset
+		pte_extra:      extra_pte
 		shadow_pagemap: memory.Pagemap{
 			top_level: unsafe { &u64(0) }
 		}
@@ -329,6 +329,22 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 
 	if voidptr(resource_) != unsafe { nil } {
 		resource_.refcount++
+	}
+
+	// Pre-fault all pages immediately to avoid demand-paging page faults.
+	// On QEMU+HVF, LDP/STP instructions on unmapped pages cause data aborts
+	// without ISV bit set, which crashes HVF.
+	for i := u64(0); i < length; i += page_size {
+		mut page := unsafe { nil }
+		if flags & map_anonymous != 0 {
+			page = memory.pmm_alloc(1)
+		} else if voidptr(resource_) != unsafe { nil } {
+			file_page := u64((offset + i64(i)) / i64(page_size))
+			page = resource_.mmap(file_page, flags)
+		}
+		if page != unsafe { nil } {
+			map_page_in_range(range_global, base + i, u64(page), prot) or {}
+		}
 	}
 
 	return voidptr(base)
@@ -352,12 +368,6 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: mprotect(0x%llx, 0x%llx, 0x%x)\n', process.name.str, addr,
-		length, prot)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
 	mprotect(mut process.pagemap, addr, length, prot) or { return errno.err, errno.get() }
 
 	return 0, 0
@@ -374,7 +384,7 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
 	if _length == 0 {
-		C.printf(c'munmap: length is 0\n')
+		C.printf(c'mprotect: length is 0\n')
 		errno.set(errno.einval)
 		return none
 	}
@@ -417,7 +427,10 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
-			mut pt_flags := memory.pte_present | memory.pte_user
+			mut pt_flags := memory.pte_present | global_range.pte_extra
+			if prot != prot_none {
+				pt_flags |= memory.pte_user
+			}
 			if prot & prot_write != 0 {
 				pt_flags |= memory.pte_writable
 			}

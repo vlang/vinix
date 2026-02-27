@@ -4,6 +4,7 @@ module console
 import x86.idt
 import x86.apic
 import x86.kio
+import dev.keyboard
 import event
 import event.eventstruct
 import klock
@@ -20,7 +21,6 @@ import proc
 import katomic
 import flanterm as _
 
-const max_scancode = 0x57
 const capslock = 0x3a
 const numlock = 0x45
 const left_alt = 0x38
@@ -55,250 +55,6 @@ __global (
 	// groups
 	latest_thread                  = &proc.Thread(unsafe { nil })
 )
-
-const convtab_capslock = [
-	`\0`,
-	`\e`,
-	`1`,
-	`2`,
-	`3`,
-	`4`,
-	`5`,
-	`6`,
-	`7`,
-	`8`,
-	`9`,
-	`0`,
-	`-`,
-	`=`,
-	`\b`,
-	`\t`,
-	`Q`,
-	`W`,
-	`E`,
-	`R`,
-	`T`,
-	`Y`,
-	`U`,
-	`I`,
-	`O`,
-	`P`,
-	`[`,
-	`]`,
-	`\n`,
-	`\0`,
-	`A`,
-	`S`,
-	`D`,
-	`F`,
-	`G`,
-	`H`,
-	`J`,
-	`K`,
-	`L`,
-	`;`,
-	`'`,
-	`\``,
-	`\0`,
-	`\\`,
-	`Z`,
-	`X`,
-	`C`,
-	`V`,
-	`B`,
-	`N`,
-	`M`,
-	`,`,
-	`.`,
-	`/`,
-	`\0`,
-	`\0`,
-	`\0`,
-	` `,
-]
-
-const convtab_shift = [
-	`\0`,
-	`\e`,
-	`!`,
-	`@`,
-	`#`,
-	`$`,
-	`%`,
-	`^`,
-	`&`,
-	`*`,
-	`(`,
-	`)`,
-	`_`,
-	`+`,
-	`\b`,
-	`\t`,
-	`Q`,
-	`W`,
-	`E`,
-	`R`,
-	`T`,
-	`Y`,
-	`U`,
-	`I`,
-	`O`,
-	`P`,
-	`{`,
-	`}`,
-	`\n`,
-	`\0`,
-	`A`,
-	`S`,
-	`D`,
-	`F`,
-	`G`,
-	`H`,
-	`J`,
-	`K`,
-	`L`,
-	`:`,
-	`"`,
-	`~`,
-	`\0`,
-	`|`,
-	`Z`,
-	`X`,
-	`C`,
-	`V`,
-	`B`,
-	`N`,
-	`M`,
-	`<`,
-	`>`,
-	`?`,
-	`\0`,
-	`\0`,
-	`\0`,
-	` `,
-]
-
-const convtab_shift_capslock = [
-	`\0`,
-	`\e`,
-	`!`,
-	`@`,
-	`#`,
-	`$`,
-	`%`,
-	`^`,
-	`&`,
-	`*`,
-	`(`,
-	`)`,
-	`_`,
-	`+`,
-	`\b`,
-	`\t`,
-	`q`,
-	`w`,
-	`e`,
-	`r`,
-	`t`,
-	`y`,
-	`u`,
-	`i`,
-	`o`,
-	`p`,
-	`{`,
-	`}`,
-	`\n`,
-	`\0`,
-	`a`,
-	`s`,
-	`d`,
-	`f`,
-	`g`,
-	`h`,
-	`j`,
-	`k`,
-	`l`,
-	`:`,
-	`"`,
-	`~`,
-	`\0`,
-	`|`,
-	`z`,
-	`x`,
-	`c`,
-	`v`,
-	`b`,
-	`n`,
-	`m`,
-	`<`,
-	`>`,
-	`?`,
-	`\0`,
-	`\0`,
-	`\0`,
-	` `,
-]
-
-const convtab_nomod = [
-	`\0`,
-	`\e`,
-	`1`,
-	`2`,
-	`3`,
-	`4`,
-	`5`,
-	`6`,
-	`7`,
-	`8`,
-	`9`,
-	`0`,
-	`-`,
-	`=`,
-	`\b`,
-	`\t`,
-	`q`,
-	`w`,
-	`e`,
-	`r`,
-	`t`,
-	`y`,
-	`u`,
-	`i`,
-	`o`,
-	`p`,
-	`[`,
-	`]`,
-	`\n`,
-	`\0`,
-	`a`,
-	`s`,
-	`d`,
-	`f`,
-	`g`,
-	`h`,
-	`j`,
-	`k`,
-	`l`,
-	`;`,
-	`'`,
-	`\``,
-	`\0`,
-	`\\`,
-	`z`,
-	`x`,
-	`c`,
-	`v`,
-	`b`,
-	`n`,
-	`m`,
-	`,`,
-	`.`,
-	`/`,
-	`\0`,
-	`\0`,
-	`\0`,
-	` `,
-]
 
 fn is_printable(c u8) bool {
 	return c >= 0x20 && c <= 0x7e
@@ -603,26 +359,10 @@ fn keyboard_handler() {
 		if input_byte in console_convtab_numpad_numlock {
 			c = console_convtab_numpad_numlock[input_byte]
 		} else {
-			if input_byte < max_scancode {
-				if console_capslock_active == false && console_shift_active == false {
-					c = convtab_nomod[input_byte]
-				}
-				if console_capslock_active == false && console_shift_active == true {
-					c = convtab_shift[input_byte]
-				}
-				if console_capslock_active == true && console_shift_active == false {
-					c = convtab_capslock[input_byte]
-				}
-				if console_capslock_active == true && console_shift_active == true {
-					c = convtab_shift_capslock[input_byte]
-				}
-			} else {
+			c = keyboard.translate(input_byte, console_shift_active, console_capslock_active, console_ctrl_active)
+			if c == 0 {
 				continue
 			}
-		}
-
-		if console_ctrl_active {
-			c = u8(C.toupper(c) - 0x40)
 		}
 
 		add_to_buf(&c, 1, true)

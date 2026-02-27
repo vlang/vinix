@@ -105,7 +105,7 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 	} else {
 		mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 
-		signalfd = unsafe { &SignalFD(fd.handle.resource) }
+		signalfd = unsafe { &SignalFD(*&voidptr(fd.handle.resource)) }
 
 		fd.unref()
 

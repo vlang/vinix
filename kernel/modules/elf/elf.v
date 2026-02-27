@@ -11,6 +11,7 @@ pub mut:
 	at_phdr  u64
 	at_phent u64
 	at_phnum u64
+	at_base  u64
 }
 
 pub const et_dyn = 0x03
@@ -19,7 +20,14 @@ pub const at_entry = 9
 pub const at_phdr = 3
 pub const at_phent = 4
 pub const at_phnum = 5
+pub const at_pagesz = 6
+pub const at_uid = 11
+pub const at_euid = 12
+pub const at_gid = 13
+pub const at_egid = 14
+pub const at_base = 7
 pub const at_secure = 23
+pub const at_random = 25
 
 pub const pt_load = 0x00000001
 pub const pt_interp = 0x00000003
@@ -27,6 +35,7 @@ pub const pt_phdr = 0x00000006
 
 pub const abi_sysv = 0x00
 pub const arch_x86_64 = 0x3e
+pub const arch_aarch64 = 0xb7
 pub const bits_le = 0x01
 
 pub const ei_class = 4
@@ -82,9 +91,10 @@ pub mut:
 	sh_entsize    u64
 }
 
-pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxval, string) {
+pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxval, string) {
 	mut res := unsafe { _res }
 	mut pagemap := unsafe { _pagemap }
+	mut base := _base
 
 	mut header := &Header{}
 
@@ -95,23 +105,30 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 	}
 
 	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
-		|| header.ident[ei_osabi] != abi_sysv || header.machine != arch_x86_64 {
+		|| header.ident[ei_osabi] != abi_sysv
+		|| (header.machine != arch_x86_64 && header.machine != arch_aarch64) {
 		return error('elf: Unsupported ELF file')
 	}
 
-	mut slide := u64(0)
-	if header.@type == et_dyn {
-		slide = 0x400000
+	// PIE/ET_DYN binaries have p_vaddr starting at 0. Loading at base=0
+	// would map code at virtual address 0, breaking null pointer checks
+	// in ld-musl and userspace. Apply a non-zero base for PIE binaries
+	// when no explicit base is given (base=0 means "auto" for ET_DYN).
+	if base == 0 && header.@type == u16(et_dyn) {
+		base = 0x200000
 	}
 
 	mut auxval := Auxval{
-		at_entry: base + header.entry + slide
+		at_entry: base + header.entry
 		at_phdr:  0
 		at_phent: sizeof(ProgramHdr)
 		at_phnum: header.ph_num
+		at_base:  if base != 0 { base } else { u64(0) }
 	}
 
 	mut ld_path := ''
+	mut load_addr := u64(0)
+	mut load_addr_set := false
 
 	for i := u64(0); i < header.ph_num; i++ {
 		mut phdr := &ProgramHdr{}
@@ -128,13 +145,21 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 				unsafe { free(p) }
 			}
 			pt_phdr {
-				auxval.at_phdr = base + phdr.p_vaddr + slide
+				auxval.at_phdr = base + phdr.p_vaddr
 			}
 			else {}
 		}
 
 		if phdr.p_type != pt_load {
 			continue
+		}
+
+		// Track the first LOAD segment's effective base address
+		// (vaddr - file_offset), matching Linux's load_addr computation.
+		// Needed for AT_PHDR fallback when no PT_PHDR segment exists.
+		if !load_addr_set {
+			load_addr = base + phdr.p_vaddr - phdr.p_offset
+			load_addr_set = true
 		}
 
 		misalign := phdr.p_vaddr & (page_size - 1)
@@ -151,7 +176,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 			0
 		}
 
-		virt := lib.align_down(base + phdr.p_vaddr + slide, page_size)
+		virt := lib.align_down(base + phdr.p_vaddr, page_size)
 		phys := u64(addr)
 
 		mmap.map_range(mut pagemap, virt, phys, page_count * page_size, pf, mmap.map_anonymous) or {
@@ -161,6 +186,13 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, base u64) !(Auxva
 		buf := unsafe { byteptr(addr) + misalign + higher_half }
 
 		res.read(0, buf, phdr.p_offset, phdr.p_filesz) or { return error('') }
+	}
+
+	// If no PT_PHDR segment was found, compute AT_PHDR from the first
+	// LOAD segment's base (like Linux's binfmt_elf.c). This works for both
+	// PIE (vaddr 0) and EXEC (vaddr 0x400000+) binaries.
+	if auxval.at_phdr == 0 {
+		auxval.at_phdr = load_addr + header.phoff
 	}
 
 	return auxval, ld_path

@@ -21,6 +21,21 @@ pub mut:
 	sun_path   [108]u8
 }
 
+// Abstract UNIX socket registry — sockets bound with sun_path[0]=='\0'
+// are stored here instead of in the filesystem.
+struct AbstractSocketEntry {
+mut:
+	in_use   bool
+	name_len u32
+	name     [108]u8
+	socket   &UnixSocket = unsafe { nil }
+}
+
+__global (
+	abstract_sockets      [64]AbstractSocketEntry
+	abstract_sockets_lock klock.Lock
+)
+
 pub struct UnixSocket {
 pub mut:
 	stat     stat.Stat
@@ -253,6 +268,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 			errno.set(errno.ewouldblock)
 			return none
 		}
+		print('unix accept: waiting for connection\n')
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
@@ -263,6 +279,8 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		unsafe { events.free() }
 		this.l.acquire()
 	}
+
+	print('unix accept: got connection, setting up peer\n')
 
 	mut peer := this.backlog.pop()
 
@@ -283,16 +301,10 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		this.status &= ~file.pollin
 	}
 
+	print('unix accept: triggering client connection_event\n')
 	event.trigger(mut peer.connection_event, false)
 
-	mut events := [&this.connection_event]
-	event.await(mut events, true) or {
-		unsafe { events.free() }
-		errno.set(errno.eintr)
-		return none
-	}
-	unsafe { events.free() }
-
+	print('unix accept: done\n')
 	return connection_socket
 }
 
@@ -304,26 +316,42 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 		return none
 	}
 
-	mut t := proc.current_thread()
-
-	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
-
-	C.printf(c'UNIX socket: Wants to connect to %s\n', path.str)
-
-	mut target := fs.get_node(t.process.current_directory, path, true) or { return none }
-
-	mut target_res := target.resource
-
 	mut socket := &UnixSocket(unsafe { nil })
 
-	if mut target_res is UnixSocket {
-		socket = target_res
+	// Abstract socket: sun_path[0] == '\0'
+	if addrlen > 2 && addr.sun_path[0] == 0 {
+		name_len := addrlen - 2
+		abstract_sockets_lock.acquire()
+		for i in 0 .. 64 {
+			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
+				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
+					socket = abstract_sockets[i].socket
+					break
+				}
+			}
+		}
+		abstract_sockets_lock.release()
+		if socket == unsafe { nil } {
+			errno.set(errno.econnrefused)
+			return none
+		}
 	} else {
-		errno.set(errno.einval)
-		return none
-	}
+		mut t := proc.current_thread()
+		path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-	// ----
+		mut target := fs.get_node(t.process.current_directory, path, true) or {
+			return none
+		}
+
+		mut target_res := target.resource
+
+		if mut target_res is UnixSocket {
+			socket = target_res
+		} else {
+			errno.set(errno.econnrefused)
+			return none
+		}
+	}
 
 	if socket.listening == false {
 		errno.set(errno.econnrefused)
@@ -347,10 +375,6 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 	}
 	unsafe { events.free() }
 
-	event.trigger(mut socket.connection_event, false)
-
-	C.printf(c'UNIX socket: Connected!\n')
-
 	this.status |= file.pollout
 	event.trigger(mut this.event, false)
 }
@@ -363,11 +387,45 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u32) ? {
 		return none
 	}
 
+	// Abstract socket: sun_path[0] == '\0', name is in sun_path[1..addrlen-2]
+	if addrlen > 2 && addr.sun_path[0] == 0 {
+		name_len := addrlen - 2 // subtract sizeof(sun_family)
+		abstract_sockets_lock.acquire()
+		defer {
+			abstract_sockets_lock.release()
+		}
+		// Check for duplicate
+		for i in 0 .. 64 {
+			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
+				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
+					errno.set(errno.eaddrinuse)
+					return none
+				}
+			}
+		}
+		// Find free slot
+		for i in 0 .. 64 {
+			if !abstract_sockets[i].in_use {
+				abstract_sockets[i].in_use = true
+				abstract_sockets[i].name_len = name_len
+				unsafe { C.memcpy(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) }
+				abstract_sockets[i].socket = unsafe { this }
+				this.name = *addr
+				return
+			}
+		}
+		// No free slots
+		errno.set(errno.enomem)
+		return none
+	}
+
 	mut t := proc.current_thread()
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-	mut node := fs.create(t.process.current_directory, path, stat.ifsock) or { return none }
+	mut node := fs.create(t.process.current_directory, path, stat.ifsock | 0o777) or {
+		return none
+	}
 
 	this.stat = node.resource.stat
 	node.resource = unsafe { this }

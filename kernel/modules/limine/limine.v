@@ -3,6 +3,7 @@ module limine
 
 @[_linker_section: '.requests_start_marker']
 @[cinit]
+@[export: 'limine_requests_start_marker']
 __global (
 	volatile limine_requests_start_marker = [
 		u64(0xf6b8f4b39de7d1ae),
@@ -14,6 +15,7 @@ __global (
 
 @[_linker_section: '.requests_end_marker']
 @[cinit]
+@[export: 'limine_requests_end_marker']
 __global (
 	volatile limine_requests_end_marker = [
 		u64(0xadc0e0531bb10d03),
@@ -180,44 +182,14 @@ pub mut:
 	min_mode u64
 }
 
-// SMP
-
-pub struct LimineSMPInfo {
-pub mut:
-	processor_id   u32
-	lapic_id       u32
-	reserved       u64
-	goto_address   fn (&LimineSMPInfo) = unsafe { nil }
-	extra_argument u64
-}
-
-pub struct LimineSMPResponse {
-pub mut:
-	revision     u64
-	flags        u32
-	bsp_lapic_id u32
-	cpu_count    u64
-	cpus         &&LimineSMPInfo
-}
-
-pub struct LimineSMPRequest {
-pub mut:
-	id       [4]u64 = [
-	u64(0xc7b1dd30df4c8b88),
-	0x0a82e883a194f07b,
-	0x95a67b819a1b857e,
-	0xa0b61b723b6a73e0,
-]!
-	revision u64
-	response &LimineSMPResponse
-	flags    u64
-}
+// SMP -- arch-specific structs in smp_amd64.v / smp_arm64.v
 
 // Memory map
 
 pub const limine_memmap_usable = 0
 pub const limine_memmap_bootloader_reclaimable = 5
 pub const limine_memmap_kernel_and_modules = 6
+pub const limine_memmap_framebuffer = 7
 
 pub struct LimineMemmapEntry {
 pub mut:
@@ -407,3 +379,27 @@ pub mut:
 	revision u64
 	response &LimineKernelAddressResponse
 }
+
+// DTB (Device Tree Blob) - used on aarch64
+
+pub struct LimineDTBResponse {
+pub mut:
+	revision u64
+	dtb_addr voidptr
+}
+
+pub struct LimineDTBRequest {
+pub mut:
+	id       [4]u64 = [
+	u64(0xc7b1dd30df4c8b88),
+	0x0a82e883a194f07b,
+	0xb40ddb48fb54bac7,
+	0x545081493f81ffb7,
+]!
+	revision u64
+	response &LimineDTBResponse
+}
+
+// AArch64 paging mode constants
+pub const limine_paging_mode_aarch64_4lvl = 0
+pub const limine_paging_mode_aarch64_5lvl = 1

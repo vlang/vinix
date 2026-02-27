@@ -130,3 +130,15 @@ To run without any acceleration, run with
 ```
 make run
 ```
+
+
+```
+  === Vinix aarch64 booting ===
+  vinit → exceptions → term → vmm → timer → gic → sched
+  → scheduler spawns kmain_thread
+  → polling mode timer fires, scheduler switches context via
+  eret
+  → kmain_thread: framebuffer, socket, pipe, futex, fs,
+  initramfs
+  → *** aarch64: Kernel initialisation complete ***
+```

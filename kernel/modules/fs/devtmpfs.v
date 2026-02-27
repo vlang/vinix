@@ -238,21 +238,78 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	return new_node
 }
 
+fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
+	if name in parent.children {
+		return unsafe { parent.children[name] or { panic('devtmpfs: missing child ${name}') } }
+	}
+
+	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name, true)
+	mut new_resource := &DevTmpFSResource{
+		storage:  unsafe { nil }
+		refcount: 1
+	}
+
+	new_resource.stat.size = 0
+	new_resource.stat.blocks = 0
+	new_resource.stat.blksize = 512
+	new_resource.stat.dev = devtmpfs_dev_id
+	new_resource.stat.ino = devtmpfs_inode_counter++
+	new_resource.stat.mode = stat.ifdir | 0o755
+	new_resource.stat.nlink = 1
+	new_resource.stat.atim = realtime_clock
+	new_resource.stat.ctim = realtime_clock
+	new_resource.stat.mtim = realtime_clock
+
+	new_node.resource = new_resource
+	new_node.create_dotentries(parent)
+	mut p := unsafe { parent }
+	unsafe {
+		p.children[name] = new_node
+	}
+	return new_node
+}
+
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
-	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, devtmpfs_root, name,
-		false)
+	mut parent := devtmpfs_root
+	mut leaf := name
+
+	if name.contains('/') {
+		parts := name.split('/')
+		mut path_parts := []string{}
+		for part in parts {
+			if part.len > 0 {
+				path_parts << part
+			}
+		}
+		if path_parts.len == 0 {
+			return
+		}
+
+		for i, part in path_parts {
+			if i == path_parts.len - 1 {
+				leaf = part
+				break
+			}
+			parent = ensure_devtmpfs_dir(parent, part)
+		}
+	}
+
+	if leaf.len == 0 {
+		return
+	}
+
+	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, leaf, false)
 
 	new_node.resource = unsafe { device }
 	new_node.resource.stat.dev = devtmpfs_dev_id
 	new_node.resource.stat.ino = devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1
-
 	new_node.resource.stat.atim = realtime_clock
 	new_node.resource.stat.ctim = realtime_clock
 	new_node.resource.stat.mtim = realtime_clock
 
 	unsafe {
-		devtmpfs_root.children[name] = new_node
+		parent.children[leaf] = new_node
 	}
 }
 

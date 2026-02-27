@@ -391,9 +391,10 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 
 pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	vfs_lock.acquire()
-	ret := internal_create(parent, name, mode)?
-	vfs_lock.release()
-	return ret
+	defer {
+		vfs_lock.release()
+	}
+	return internal_create(parent, name, mode)
 }
 
 pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
@@ -687,22 +688,15 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 }
 
 pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getcwd(0x%llx, %llu)\n', process.name.str, buf, len)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
 	cwd := pathname(proc.current_thread().process.current_directory)
 
-	if cwd.len >= len {
+	bytes_needed := u64(cwd.len + 1) // include null terminator
+	if bytes_needed > len {
 		return errno.err, errno.erange
 	}
 
 	C.strcpy(buf, cwd.str)
-	return 0, 0
+	return bytes_needed, 0
 }
 
 pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags int) (u64, u64) {
@@ -855,8 +849,8 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 		fd.unref()
 	}
 
-	// XXX this wont work for !tmpfs, fix that
-	fd.handle.resource.stat.mode = mode
+	// Preserve file type bits (upper 4 bits), only change permission bits
+	fd.handle.resource.stat.mode = (fd.handle.resource.stat.mode & stat.ifmt) | (mode & ~u32(stat.ifmt))
 	return 0, 0
 }
 

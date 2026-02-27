@@ -22,6 +22,10 @@ __global (
 	}
 )
 
+pub fn get_hhdm_offset() u64 {
+	return higher_half
+}
+
 pub fn print_free() {
 	pmm_lock.acquire()
 	defer {
@@ -43,6 +47,8 @@ pub fn pmm_init() {
 	}
 	memmap := memmap_req.response
 
+	mut no_usable_entries := false
+	mut bitmap_alloc_failed := false
 	unsafe {
 		mut highest_address := u64(0)
 		mut entries := memmap.entries
@@ -52,15 +58,20 @@ pub fn pmm_init() {
 			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n', i, entries[i].base,
 				entries[i].length, entries[i].@type)
 
-			if entries[i].@type != u32(limine.limine_memmap_usable)
-				&& entries[i].@type != u32(limine.limine_memmap_bootloader_reclaimable)
-				&& entries[i].@type != u32(limine.limine_memmap_kernel_and_modules) {
+			// Size PMM strictly from usable RAM. Including non-usable high
+			// regions (e.g. firmware reclaimable areas at large addresses)
+			// can over-inflate the bitmap and fail early on real hardware.
+			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
 			top := entries[i].base + entries[i].length
 			if top > highest_address {
 				highest_address = top
 			}
+		}
+		if highest_address == 0 {
+			no_usable_entries = true
+			return
 		}
 
 		// Calculate the needed size for the bitmap in bytes and align it to page size.
@@ -86,6 +97,10 @@ pub fn pmm_init() {
 				break
 			}
 		}
+		if pmm_bitmap == 0 {
+			bitmap_alloc_failed = true
+			return
+		}
 
 		// Populate free bitmap entries according to the memory map.
 		for i := 0; i < memmap.entry_count; i++ {
@@ -98,6 +113,12 @@ pub fn pmm_init() {
 				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
 			}
 		}
+	}
+	if no_usable_entries {
+		lib.kpanic(unsafe { nil }, c'PMM: no usable memory entries in memmap')
+	}
+	if bitmap_alloc_failed {
+		lib.kpanic(unsafe { nil }, c'PMM: failed to allocate PMM bitmap from usable memory')
 	}
 	print_free()
 

@@ -81,7 +81,9 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut sock := socket_create(domain, @type, protocol) or { return errno.err, errno.get() }
+	mut sock := socket_create(domain, @type, protocol) or {
+		return errno.err, errno.get()
+	}
 
 	mut flags := int(0)
 	if @type & sock_pub.sock_cloexec != 0 {

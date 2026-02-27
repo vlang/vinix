@@ -3,7 +3,6 @@ module time
 
 import event.eventstruct
 import klock
-import limine
 
 pub const timer_frequency = u64(1000)
 
@@ -57,30 +56,9 @@ __global (
 	realtime_clock  TimeSpec
 )
 
-@[_linker_section: '.requests']
-@[cinit]
-__global (
-	volatile boottime_req = limine.LimineBootTimeRequest{
-		response: unsafe { nil }
-	}
-)
-
-pub fn initialise() {
-	epoch := if boottime_req.response != unsafe { nil } {
-		boottime_req.response.boot_time
-	} else {
-		0
-	}
-
-	monotonic_clock = TimeSpec{i64(epoch), 0}
-	realtime_clock = TimeSpec{i64(epoch), 0}
-
-	pit_initialise()
-}
-
 fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
 
-fn timer_handler() {
+pub fn timer_handler() {
 	interval := TimeSpec{0, i64(1000000000 / timer_frequency)}
 
 	monotonic_clock.add(interval)
@@ -148,7 +126,7 @@ pub fn new_timer(when TimeSpec) &Timer {
 	mut timer := &Timer{
 		when:  when
 		fired: false
-		index: -1
+		index: -1,
 	}
 
 	timer.arm()

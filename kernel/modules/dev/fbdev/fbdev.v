@@ -10,6 +10,7 @@ import event.eventstruct
 import dev.fbdev.api
 import katomic
 import errno
+import memory.mmap
 
 pub struct FramebufferNode {
 pub mut:
@@ -39,8 +40,10 @@ fn (mut this FramebufferNode) mmap(page u64, flags int) voidptr {
 		return unsafe { nil }
 	}
 
+	phys := u64(this.info.base) + offset - higher_half
+
 	unsafe {
-		return voidptr(u64(this.info.base) + offset - higher_half)
+		return voidptr(phys)
 	}
 }
 
@@ -99,9 +102,9 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 			errno.set(errno.einval)
 			return none
 		}
-		ioctl.fbioputcmap {
-			errno.set(errno.einval)
-			return none
+		ioctl.fbioputcmap, ioctl.fbiogetcmap {
+			// Colormap operations are no-ops for TrueColor framebuffers
+			return 0
 		}
 		else {
 			panic('${request}')
@@ -145,6 +148,7 @@ fn create_device_node(index u64) ? {
 	node.can_mmap = true
 	node.node_created = true
 
+	mmap.register_uncached_resource(voidptr(node))
 	fs.devtmpfs_add_device(node, 'fb${index}')
 	println('fbdev: created device node /dev/fb${index}')
 }

@@ -16,3 +16,9 @@
 *.bin
 *.a
 *.o
+vinix-aarch64.iso
+*.xml
+.DS_Store
+kernel/linker-aarch64.ld
+boot-image/
+build-support/init-aarch64/init
