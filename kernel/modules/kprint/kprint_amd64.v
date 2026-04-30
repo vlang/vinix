@@ -1,6 +1,7 @@
 module kprint
 
 import dev.serial
+import term
 
 pub fn syscall_kprint(_ voidptr, message charptr) {
 	$if !prod {

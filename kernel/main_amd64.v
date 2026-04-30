@@ -3,6 +3,7 @@ module main
 
 import memory
 import term
+import lib.stubs
 import acpi
 import uacpi
 import x86.gdt
