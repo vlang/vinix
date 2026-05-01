@@ -57,24 +57,22 @@ __global (
 	}
 )
 
-fn C.aarch64__uart__putc(c u8)
-
 fn uart_puts(s string) {
 	for c in s {
-		C.aarch64__uart__putc(c)
+		uart_putc(c)
 	}
 }
 
 fn uart_put_hex(v u64) {
 	hex := '0123456789abcdef'
 	for i := 60; i >= 0; i -= 4 {
-		C.aarch64__uart__putc(hex[int((v >> u64(i)) & 0xf)])
+		uart_putc(hex[int((v >> u64(i)) & 0xf)])
 	}
 }
 
 fn uart_put_dec(n u64) {
 	if n == 0 {
-		C.aarch64__uart__putc(`0`)
+		uart_putc(`0`)
 		return
 	}
 	mut buf := [20]u8{}
@@ -87,16 +85,15 @@ fn uart_put_dec(n u64) {
 	}
 	for i > 0 {
 		i--
-		C.aarch64__uart__putc(buf[i])
+		uart_putc(buf[i])
 	}
 }
 
 // Check USTAR signature without allocating memory
 fn check_ustar(hdr &USTARHeader) bool {
 	return unsafe {
-		hdr.signature[0] == `u` && hdr.signature[1] == `s` &&
-		hdr.signature[2] == `t` && hdr.signature[3] == `a` &&
-		hdr.signature[4] == `r`
+		hdr.signature[0] == `u` && hdr.signature[1] == `s` && hdr.signature[2] == `t`
+			&& hdr.signature[3] == `a` && hdr.signature[4] == `r`
 	}
 }
 
@@ -126,7 +123,6 @@ pub fn initialise() {
 	unsafe {
 		current_header = &USTARHeader(initramfs_begin)
 	}
-
 	initramfs_end := u64(initramfs_begin) + initramfs_size
 
 	for {
@@ -136,18 +132,18 @@ pub fn initialise() {
 			break
 		}
 
-		C.aarch64__uart__putc(`>`)
+		uart_putc(`>`)
 
 		// Check signature without V string allocation
 		if !check_ustar(current_header) {
 			uart_puts('initramfs: no ustar sig at 0x')
 			uart_put_hex(u64(current_header))
-			C.aarch64__uart__putc(`\n`)
+			uart_putc(`\n`)
 			break
 		}
 
 		entry_count++
-		C.aarch64__uart__putc(`+`)
+		uart_putc(`+`)
 
 		name := if name_override == '' {
 			unsafe { tos2(&current_header.name[0]) }
@@ -174,7 +170,7 @@ pub fn initialise() {
 			uart_puts(full_name)
 			uart_puts(' sz=')
 			uart_put_dec(size)
-			C.aarch64__uart__putc(`\n`)
+			uart_putc(`\n`)
 		}
 
 		name_override = ''
@@ -198,7 +194,7 @@ pub fn initialise() {
 				new_node := fs.create(vfs_root, full_name, u32(mode | stat.ifreg)) or {
 					uart_puts('initramfs: FAIL create ')
 					uart_puts(full_name)
-					C.aarch64__uart__putc(`\n`)
+					uart_putc(`\n`)
 					panic('initramfs: failed to create file ${full_name}')
 				}
 				mut new_resource := new_node.resource
@@ -220,7 +216,7 @@ pub fn initialise() {
 			else {}
 		}
 
-		C.aarch64__uart__putc(`!`)
+		uart_putc(`!`)
 
 		next:
 		current_header = unsafe {
