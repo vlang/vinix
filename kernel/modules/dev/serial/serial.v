@@ -152,7 +152,7 @@ fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 	}
 
 	// Wait on the event of the port's IRQ.
-	mut data := &u8(void_buf)
+	mut data := unsafe { &u8(void_buf) }
 	mut events := [&int_events[this.port_vector]]
 	defer {
 		unsafe { events.free() }
@@ -177,7 +177,7 @@ fn (mut this COMPort) write(handle voidptr, buf voidptr, loc u64, count u64) ?i6
 	defer {
 		this.l.release()
 	}
-	mut data := &u8(buf)
+	mut data := unsafe { &u8(buf) }
 	for i in 0 .. count {
 		for !is_transmiter_empty(this.port) {}
 		kio.port_out[u8](this.port, unsafe { data[i] })

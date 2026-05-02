@@ -97,7 +97,7 @@ __global (
 fn C.interrupt_thunks()
 
 pub fn initialise() {
-	thunks := &u64(voidptr(C.interrupt_thunks))
+	thunks := unsafe { &u64(voidptr(C.interrupt_thunks)) }
 
 	for i := u16(0); i < 32; i++ {
 		match i {

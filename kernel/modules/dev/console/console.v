@@ -475,7 +475,7 @@ fn (mut this Console) mmap(page u64, flags int) voidptr {
 fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
 
-	mut buf := &u8(void_buf)
+	mut buf := unsafe { &u8(void_buf) }
 
 	for console_read_lock.test_and_acquire() == false {
 		mut events := [&console_event]

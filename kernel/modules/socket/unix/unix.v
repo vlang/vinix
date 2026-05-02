@@ -204,7 +204,7 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.einval)
 				return none
 			}
-			mut retp := &u64(argp)
+			mut retp := unsafe { &u64(argp) }
 			unsafe {
 				*retp = this.used
 			}

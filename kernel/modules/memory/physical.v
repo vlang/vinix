@@ -278,7 +278,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 
 	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
 
-	mut new_head := &u64(ptr)
+	mut new_head := unsafe { &u64(ptr) }
 	unsafe {
 		*new_head = this.first_free
 	}

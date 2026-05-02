@@ -9,6 +9,7 @@ import lib
 import event.eventstruct
 import katomic
 
+@[heap]
 struct TmpFSResource {
 pub mut:
 	stat     stat.Stat
