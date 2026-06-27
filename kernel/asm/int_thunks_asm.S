@@ -40,12 +40,10 @@ interrupt_thunk_\num:
     mov %eax, %ss
 
     mov $\num, %rdi
-    mov $(\num * 8), %rax
-    lea interrupt_table(%rip), %rbx
-    add %rax, %rbx
+    // OPTIMIZATION: Replaced runtime calculation (mov, lea, add) with compile-time RIP-relative offset computing
     mov %rsp, %rsi
     xor %rbp, %rbp
-    call *(%rbx)
+    call *interrupt_table + (\num * 8)(%rip)
 
     pop %rax
     mov %eax, %ds
