@@ -68,193 +68,98 @@ pub fn get_cpu_info() ?CPUInfo {
 	extended_family_id := (a1 >> 20) & 0xff
 	stepping_id := a1 & 0xf
 
-	model_number := if family_id == 6 || family_id == 15 {
-		model_id | (extended_model_id << 4)
-	} else {
-		model_id
+	model_number := match true {
+		family_id == 6 || family_id == 15 { model_id | (extended_model_id << 4) }
+		else { model_id }
 	}
 
-	cpu_family := if family_id == 15 { family_id + extended_family_id } else { family_id }
+	cpu_family := match true {
+		family_id == 15 { family_id + extended_family_id }
+		else { family_id }
+	}
 
-	// Fetch flags (all of them in EAX=1 for now).
+	// Fetch flags using structural mapping
 	mut flags := []string{}
-	if c1 & cpu.cpuid_feature_ecx_sse3 != 0 {
-		flags << 'sse3'
+
+	// ECX Flags mapping
+	ecx_flags := {
+		cpu.cpuid_feature_ecx_sse3:       'sse3'
+		cpu.cpuid_feature_ecx_pclmul:     'pclmul'
+		cpu.cpuid_feature_ecx_dtes64:     'dtes64'
+		cpu.cpuid_feature_ecx_monitor:    'monitor'
+		cpu.cpuid_feature_ecx_ds_cpl:     'dscpl'
+		cpu.cpuid_feature_ecx_vmx:        'vmx'
+		cpu.cpuid_feature_ecx_smx:        'smx'
+		cpu.cpuid_feature_ecx_est:        'est'
+		cpu.cpuid_feature_ecx_tm2:        'tm2'
+		cpu.cpuid_feature_ecx_ssse3:      'ssse3'
+		cpu.cpuid_feature_ecx_cid:        'cid'
+		cpu.cpuid_feature_ecx_sdbg:       'sdbg'
+		cpu.cpuid_feature_ecx_fma:        'fma'
+		cpu.cpuid_feature_ecx_cx16:       'cx16'
+		cpu.cpuid_feature_ecx_xtpr:       'xtpr'
+		cpu.cpuid_feature_ecx_pdcm:       'pdcm'
+		cpu.cpuid_feature_ecx_pdid:       'pdid'
+		cpu.cpuid_feature_ecx_dca:        'dca'
+		cpu.cpuid_feature_ecx_sse4_1:     'sse4_1'
+		cpu.cpuid_feature_ecx_sse4_2:     'sse4_2'
+		cpu.cpuid_feature_ecx_x2apic:     'x2apic'
+		cpu.cpuid_feature_ecx_movbe:      'movbe'
+		cpu.cpuid_feature_ecx_popcnt:     'popcnt'
+		cpu.cpuid_feature_ecx_tsc:        'tsc'
+		cpu.cpuid_feature_ecx_aes:        'aes'
+		cpu.cpuid_feature_ecx_xsave:      'xsave'
+		cpu.cpuid_feature_ecx_osxsave:    'osxsave'
+		cpu.cpuid_feature_ecx_avx:        'avx'
+		cpu.cpuid_feature_ecx_f16c:       'f16c'
+		cpu.cpuid_feature_ecx_rdrand:     'rdrand'
+		cpu.cpuid_feature_ecx_hypervisor: 'hypervisor'
 	}
-	if c1 & cpu.cpuid_feature_ecx_pclmul != 0 {
-		flags << 'pclmul'
+
+	for mask, name in ecx_flags {
+		if c1 & mask != 0 {
+			flags << name
+		}
 	}
-	if c1 & cpu.cpuid_feature_ecx_dtes64 != 0 {
-		flags << 'dtes64'
+
+	// EDX Flags mapping
+	edx_flags := {
+		cpu.cpuid_feature_edx_fpu:     'fpu'
+		cpu.cpuid_feature_edx_vme:     'vme'
+		cpu.cpuid_feature_edx_de:      'de'
+		cpu.cpuid_feature_edx_pse:     'pse'
+		cpu.cpuid_feature_edx_msr:     'msr'
+		cpu.cpuid_feature_edx_pae:     'pae'
+		cpu.cpuid_feature_edx_mce:     'mce'
+		cpu.cpuid_feature_edx_cx8:     'cx8'
+		cpu.cpuid_feature_edx_apic:    'apic'
+		cpu.cpuid_feature_edx_sep:     'sep'
+		cpu.cpuid_feature_edx_mtrr:    'mtrr'
+		cpu.cpuid_feature_edx_pge:     'pge'
+		cpu.cpuid_feature_edx_mca:     'mca'
+		cpu.cpuid_feature_edx_cmov:    'cmov'
+		cpu.cpuid_feature_edx_pse36:   'pse36'
+		cpu.cpuid_feature_edx_psn:     'psn'
+		cpu.cpuid_feature_edx_clflush: 'clflush'
+		cpu.cpuid_feature_edx_ds:      'ds'
+		cpu.cpuid_feature_edx_acpi:    'acpi'
+		cpu.cpuid_feature_edx_mmx:     'mmx'
+		cpu.cpuid_feature_edx_fxmsr:   'fxmsr'
+		cpu.cpuid_feature_edx_sse:     'sse'
+		cpu.cpuid_feature_edx_sse2:    'sse2'
+		cpu.cpuid_feature_edx_ss:      'ss'
+		cpu.cpuid_feature_edx_htt:     'htt'
+		cpu.cpuid_feature_edx_tm:      'tm'
+		cpu.cpuid_feature_edx_ia64:    'ia64'
+		cpu.cpuid_feature_edx_pbe:     'pbe'
 	}
-	if c1 & cpu.cpuid_feature_ecx_monitor != 0 {
-		flags << 'monitor'
+
+	for mask, name in edx_flags {
+		if d1 & mask != 0 {
+			flags << name
+		}
 	}
-	if c1 & cpu.cpuid_feature_ecx_ds_cpl != 0 {
-		flags << 'dscpl'
-	}
-	if c1 & cpu.cpuid_feature_ecx_vmx != 0 {
-		flags << 'vmx'
-	}
-	if c1 & cpu.cpuid_feature_ecx_smx != 0 {
-		flags << 'smx'
-	}
-	if c1 & cpu.cpuid_feature_ecx_est != 0 {
-		flags << 'est'
-	}
-	if c1 & cpu.cpuid_feature_ecx_tm2 != 0 {
-		flags << 'tm2'
-	}
-	if c1 & cpu.cpuid_feature_ecx_ssse3 != 0 {
-		flags << 'ssse3'
-	}
-	if c1 & cpu.cpuid_feature_ecx_cid != 0 {
-		flags << 'cid'
-	}
-	if c1 & cpu.cpuid_feature_ecx_sdbg != 0 {
-		flags << 'sdbg'
-	}
-	if c1 & cpu.cpuid_feature_ecx_fma != 0 {
-		flags << 'fma'
-	}
-	if c1 & cpu.cpuid_feature_ecx_cx16 != 0 {
-		flags << 'cx16'
-	}
-	if c1 & cpu.cpuid_feature_ecx_xtpr != 0 {
-		flags << 'xtpr'
-	}
-	if c1 & cpu.cpuid_feature_ecx_pdcm != 0 {
-		flags << 'pdcm'
-	}
-	if c1 & cpu.cpuid_feature_ecx_pdid != 0 {
-		flags << 'pdid'
-	}
-	if c1 & cpu.cpuid_feature_ecx_dca != 0 {
-		flags << 'dca'
-	}
-	if c1 & cpu.cpuid_feature_ecx_sse4_1 != 0 {
-		flags << 'sse4_1'
-	}
-	if c1 & cpu.cpuid_feature_ecx_sse4_2 != 0 {
-		flags << 'sse4_2'
-	}
-	if c1 & cpu.cpuid_feature_ecx_x2apic != 0 {
-		flags << 'x2apic'
-	}
-	if c1 & cpu.cpuid_feature_ecx_movbe != 0 {
-		flags << 'movbe'
-	}
-	if c1 & cpu.cpuid_feature_ecx_popcnt != 0 {
-		flags << 'popcnt'
-	}
-	if c1 & cpu.cpuid_feature_ecx_tsc != 0 {
-		flags << 'tsc'
-	}
-	if c1 & cpu.cpuid_feature_ecx_aes != 0 {
-		flags << 'aes'
-	}
-	if c1 & cpu.cpuid_feature_ecx_xsave != 0 {
-		flags << 'xsave'
-	}
-	if c1 & cpu.cpuid_feature_ecx_osxsave != 0 {
-		flags << 'osxsave'
-	}
-	if c1 & cpu.cpuid_feature_ecx_avx != 0 {
-		flags << 'avx'
-	}
-	if c1 & cpu.cpuid_feature_ecx_f16c != 0 {
-		flags << 'f16c'
-	}
-	if c1 & cpu.cpuid_feature_ecx_rdrand != 0 {
-		flags << 'rdrand'
-	}
-	if c1 & cpu.cpuid_feature_ecx_hypervisor != 0 {
-		flags << 'hypervisor'
-	}
-	if d1 & cpu.cpuid_feature_edx_fpu != 0 {
-		flags << 'fpu'
-	}
-	if d1 & cpu.cpuid_feature_edx_vme != 0 {
-		flags << 'vme'
-	}
-	if d1 & cpu.cpuid_feature_edx_de != 0 {
-		flags << 'de'
-	}
-	if d1 & cpu.cpuid_feature_edx_pse != 0 {
-		flags << 'pse'
-	}
-	if d1 & cpu.cpuid_feature_edx_msr != 0 {
-		flags << 'msr'
-	}
-	if d1 & cpu.cpuid_feature_edx_pae != 0 {
-		flags << 'pae'
-	}
-	if d1 & cpu.cpuid_feature_edx_mce != 0 {
-		flags << 'mce'
-	}
-	if d1 & cpu.cpuid_feature_edx_cx8 != 0 {
-		flags << 'cx8'
-	}
-	if d1 & cpu.cpuid_feature_edx_apic != 0 {
-		flags << 'apic'
-	}
-	if d1 & cpu.cpuid_feature_edx_sep != 0 {
-		flags << 'sep'
-	}
-	if d1 & cpu.cpuid_feature_edx_mtrr != 0 {
-		flags << 'mtrr'
-	}
-	if d1 & cpu.cpuid_feature_edx_pge != 0 {
-		flags << 'pge'
-	}
-	if d1 & cpu.cpuid_feature_edx_mca != 0 {
-		flags << 'mca'
-	}
-	if d1 & cpu.cpuid_feature_edx_cmov != 0 {
-		flags << 'cmov'
-	}
-	if d1 & cpu.cpuid_feature_edx_pse36 != 0 {
-		flags << 'pse36'
-	}
-	if d1 & cpu.cpuid_feature_edx_psn != 0 {
-		flags << 'psn'
-	}
-	if d1 & cpu.cpuid_feature_edx_clflush != 0 {
-		flags << 'clflush'
-	}
-	if d1 & cpu.cpuid_feature_edx_ds != 0 {
-		flags << 'ds'
-	}
-	if d1 & cpu.cpuid_feature_edx_acpi != 0 {
-		flags << 'acpi'
-	}
-	if d1 & cpu.cpuid_feature_edx_mmx != 0 {
-		flags << 'mmx'
-	}
-	if d1 & cpu.cpuid_feature_edx_fxmsr != 0 {
-		flags << 'fxmsr'
-	}
-	if d1 & cpu.cpuid_feature_edx_sse != 0 {
-		flags << 'sse'
-	}
-	if d1 & cpu.cpuid_feature_edx_sse2 != 0 {
-		flags << 'sse2'
-	}
-	if d1 & cpu.cpuid_feature_edx_ss != 0 {
-		flags << 'ss'
-	}
-	if d1 & cpu.cpuid_feature_edx_htt != 0 {
-		flags << 'htt'
-	}
-	if d1 & cpu.cpuid_feature_edx_tm != 0 {
-		flags << 'tm'
-	}
-	if d1 & cpu.cpuid_feature_edx_ia64 != 0 {
-		flags << 'ia64'
-	}
-	if d1 & cpu.cpuid_feature_edx_pbe != 0 {
-		flags << 'pbe'
-	}
+
 	flags.sort()
 
 	// Fetch address sizes.
@@ -271,15 +176,15 @@ pub fn get_cpu_info() ?CPUInfo {
 	model_name := unsafe { cstring_to_vstring(charptr(&str1.eax1)) }
 
 	return CPUInfo{
-		address_sizes: [physical_size, linear_size]
+		address_sizes:    [physical_size, linear_size]
 		is_little_endian: true
-		cpu_count: core_count
-		vendor_id: vendor_id
-		model_name: model_name
-		cpu_family: cpu_family
-		model_number: model_number
-		stepping: stepping_id
-		flags: flags
+		cpu_count:        core_count
+		vendor_id:        vendor_id
+		model_name:       model_name
+		cpu_family:       cpu_family
+		model_number:     model_number
+		stepping:         stepping_id
+		flags:            flags
 	}
 }
 
