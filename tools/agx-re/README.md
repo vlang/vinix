@@ -65,8 +65,9 @@ hardware-configuration allocation, host-written table layout and firmware
 read map, exact per-role bootstrap-root bindings, its copied platform block,
 the two root-page CPU/GPU mappings and their prepare/complete lifecycle, the
 mapped bootstrap register region and its G17 no-op producer, both
-shared-object address graphs, the per-role ASC power-state records, and the
-UAT handoff initialization using a deliberately small AArch64 decoder.
+shared-object address graphs, the per-role ASC power-state records, the shared
+runtime object's control fields and four startup producers, and the UAT
+handoff initialization using a deliberately small AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
 trace data are never repository inputs.
 

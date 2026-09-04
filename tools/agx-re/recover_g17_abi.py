@@ -2118,6 +2118,394 @@ def recover_g17_runtime_controls(
     }
 
 
+def recover_g17_runtime_initialization(
+    allocations: list[dict[str, int]],
+    base_init_code: bytes,
+    arm_init_code: bytes,
+    base_power_code: bytes,
+    arm_power_code: bytes,
+) -> dict[str, object]:
+    """Recover the parts of the G17 runtime object written during startup.
+
+    The power-controller payload is assembled from a temporary host object in
+    a deliberately non-linear order. This records the complete destination
+    range without pretending that Vinix knows how to produce its source
+    policy yet.
+    """
+
+    expected_cpu_member = 0x380
+    expected_gpu_member = 0x388
+    expected_size = 0x1CA0
+    allocation_size = next(
+        (
+            item["bytes"]
+            for item in allocations
+            if item["host_cpu_member"] == expected_cpu_member
+            and item["host_gpu_member"] == expected_gpu_member
+        ),
+        None,
+    )
+    if allocation_size != expected_size:
+        raise ValueError(f"unexpected G17 runtime-data allocation size: {allocation_size}")
+
+    require_instruction_sequence(
+        base_init_code,
+        "runtime base-state initialization",
+        (
+            0xB900010C,  # +0x00 = platform feature mask or zero
+            0xB900051F,  # +0x04 = 0
+            0xB900091F,  # +0x08 = 0
+            0xB900191F,  # +0x18 = 0
+            0xB9001D1F,  # +0x1c = 0
+        ),
+    )
+    require_instruction_sequence(
+        base_init_code,
+        "runtime virtual-device state",
+        (
+            0xF941C268,  # runtime CPU member 0x380
+            0xB805E100,  # callback result at unaligned +0x5e
+            0xB845E11F,  # force the volatile read
+        ),
+    )
+    require_instruction_sequence(
+        base_init_code,
+        "runtime platform feature state",
+        (
+            0xF941C26A,
+            0xB8062149,  # platform feature result at +0x62
+            0xB9400109,
+            0xB9002149,  # platform value at +0x20
+        ),
+    )
+    require_instruction_sequence(
+        base_init_code,
+        "runtime state-48 default",
+        (
+            0xF941C26A,
+            0xB900495F,  # +0x48 = 0
+        ),
+    )
+    require_instruction_sequence(
+        base_init_code,
+        "runtime RIART defaults",
+        (
+            0xF941C268,
+            0x52839029,
+            0x8B090109,
+            0x5280002A,
+            0xB900012A,  # +0x1c81 = 1
+            0x528390A9,
+            0x8B090109,
+            0xB900013F,  # +0x1c85 = 0
+            0x52839129,
+            0x8B090109,
+            0xB900013F,  # +0x1c89 = 0
+            0x528391A9,
+            0x8B090108,
+            0xB900011F,  # +0x1c8d = 0
+        ),
+    )
+
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime platform halfword copy",
+        (
+            0xF941C269,
+            0xB900153F,  # +0x14 = 0
+            0xF9414E68,
+            0x9140390A,
+            0x794ED10B,
+            0x7900A92B,  # platform +0x768 -> runtime +0x54
+            0x794ED50B,
+            0x7900AD2B,  # platform +0x76a -> runtime +0x56
+            0x794ED90B,
+            0x7900B12B,  # platform +0x76c -> runtime +0x58
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime early defaults",
+        (
+            0xF941C269,
+            0xB909C93F,  # +0x9c8 = 0
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime unaligned state-5a default",
+        (
+            0xF941C268,
+            0xB805A11F,  # +0x5a = 0
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime kick-channel defaults",
+        (
+            0xF9466A6B,
+            0x5298E50C,
+            0x8B0C016B,
+            0xB900017F,
+            0xB900513F,  # +0x50 = 0
+            0xB9004D3F,  # +0x4c = 0
+            0xB940016C,
+            0x3400008C,
+            0xB940017F,
+            0xB940513F,
+            0xB9404D3F,
+            0xB909E13F,  # +0x9e0 = 0
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime Smart Idle policy copy",
+        (
+            0xBD495140,
+            0xBD07CD20,  # +0x950 -> +0x7cc
+            0xBD495540,
+            0xBD07D120,
+            0xBD495940,
+            0xBD07D520,
+            0xBD495D40,
+            0xBD07D920,
+            0xBD496140,
+            0xBD07DD20,
+            0xBD496540,
+            0xBD07E120,
+            0xBD496940,
+            0xBD07E520,  # +0x968 -> +0x7e4
+            0xBD496D40,
+            0x7E21D800,
+            0x1E39000B,
+            0xB907E92B,  # converted +0x96c -> +0x7e8
+            0xB949494B,
+            0xB907C52B,  # +0x948 -> +0x7c4
+            0xBD494D40,
+            0xBD07C920,  # +0x94c -> +0x7c8
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime role-state zero source",
+        (
+            0x6F00E400,  # v0 = 0
+            0xFD07A960,
+            0xB90F5D7F,
+            0xFD07B160,
+            0xB90F957F,
+            0xB946D109,
+            0x53186129,
+            0xB90F8169,
+            0xB94ED569,
+            0x7100053F,
+            0x1A9F8529,
+            0xF941C26A,
+            0xB806A149,  # +0x6a = normalized role count
+            0x5283882C,
+            0x8B0C014C,
+            0xB9000189,  # +0x1c41 mirrors +0x6a
+            0x528388A9,
+            0x8B090149,
+            0xFD000120,  # +0x1c45 = 0
+            0x528389A9,
+            0x8B090149,
+            0xB900013F,  # +0x1c4d = 0
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime CPMS defaults",
+        (
+            0xB925B93F,
+            0xB900411F,  # +0x40 = 0
+            0xB900451F,  # +0x44 = 0
+        ),
+    )
+    require_instruction_sequence(
+        arm_init_code,
+        "runtime late callback state",
+        (
+            0xF941C269,
+            0xB91C2D28,  # callback result at +0x1c2c
+        ),
+    )
+
+    require_instruction_sequence(
+        base_power_code,
+        "runtime base power defaults",
+        (
+            0xF941C269,
+            0x91281128,  # runtime +0xa04
+            0xB900312B,  # +0x30 = platform feature bit
+            0xB947014B,
+            0xB9002D2B,  # platform +0x700 -> +0x2c
+            0xB946FD4A,
+            0x3400006A,
+            0xB900952A,  # optional platform +0x6fc -> +0x94
+            0xB900AD2A,  # and +0xac
+            0x6F00E400,
+            0xAD000100,
+            0xF900111F,  # clear +0xa04..+0xa2b
+        ),
+    )
+
+    require_instruction_sequence(
+        arm_power_code,
+        "runtime host policy snapshot",
+        (
+            0xF941C008,
+            0x5284F909,
+            0x8B090009,  # host object +0x27c8
+            0xAD410121,
+            0xAD400D22,
+            0x3C8B4103,
+            0x3C8C4101,
+            0x3C8D4100,
+            0x3C8A4102,  # complete runtime +0xa4..+0xe3
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "runtime power-controller prefix",
+        (
+            0xF941C268,
+            0x9104B109,  # destination base runtime +0x12c
+            0xB940628A,
+            0xB900ED0A,  # source +0x60 -> runtime +0xec
+            0xB940668A,
+            0xB900F10A,
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "runtime twin power-controller tables",
+        (
+            0x914046AA,
+            0x9107814A,  # source platform +0x111e0
+            0x9112D10B,  # upper destination runtime +0x4b4
+            0x5280080C,  # 64 qwords per table
+            0xF940014D,
+            0xD109216E,  # lower destination runtime +0x26c
+            0xF90001CD,
+            0xF941254D,
+            0xF800856D,
+            0x9100214A,
+            0xF100058C,
+            0x54FFFF21,
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "runtime power-controller tail",
+        (
+            0xF943168A,  # source +0x628
+            0xF902C52A,  # destination base +0x588 == runtime +0x6b4
+            0xF9431A8A,
+            0xF902C92A,
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "runtime power-controller tail end",
+        (
+            0xF943968A,
+            0xF903452A,
+            0xF9439A8A,  # source +0x730
+            0xF903492A,  # destination base +0x690 == runtime +0x7bc
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "runtime power-controller completion",
+        (
+            0xF941C268,
+            0xB9009D1F,  # +0x9c = 0
+            0xB900A11F,  # +0xa0 = 0
+        ),
+    )
+
+    return {
+        "bytes": expected_size,
+        "host_cpu_member": expected_cpu_member,
+        "host_gpu_member": expected_gpu_member,
+        "zero_initialized": [
+            {"offset": offset, "bytes": width, "value": value}
+            for offset, width, value in (
+                (0x004, 4, 0),
+                (0x008, 4, 0),
+                (0x014, 4, 0),
+                (0x018, 4, 0),
+                (0x01C, 4, 0),
+                (0x040, 4, 0),
+                (0x044, 4, 0),
+                (0x048, 4, 0),
+                (0x04C, 4, 0),
+                (0x050, 4, 0),
+                (0x05A, 4, 0),
+                (0x09C, 4, 0),
+                (0x0A0, 4, 0),
+                (0x9C8, 4, 0),
+                (0x9E0, 4, 0),
+                (0xA04, 0x28, 0),
+                (0x1C45, 8, 0),
+                (0x1C4D, 4, 0),
+                (0x1C81, 4, 1),
+                (0x1C85, 4, 0),
+                (0x1C89, 4, 0),
+                (0x1C8D, 4, 0),
+            )
+        ],
+        "platform_copies": [
+            {
+                "destination_offset": 0x054,
+                "bytes": 6,
+                "source": "platform_config+0x768",
+            },
+            {
+                "destination_offset": 0x0A4,
+                "bytes": 0x40,
+                "source": "firmware_host_object+0x27c8",
+            },
+            {
+                "destination_offset": 0x0EC,
+                "bytes": 0x6D8,
+                "source": "power_controller_snapshot",
+                "complete_destination_range": True,
+            },
+            {
+                "destination_offset": 0x7C4,
+                "bytes": 0x28,
+                "source": "platform_config+0xf948",
+                "converted_tail": True,
+            },
+        ],
+        "power_controller_tables": [
+            {
+                "destination_offset": 0x26C,
+                "source_offset": 0,
+                "bytes": 0x200,
+            },
+            {
+                "destination_offset": 0x4B4,
+                "source_offset": 0x248,
+                "bytes": 0x200,
+            },
+        ],
+        "dynamic_fields": [
+            {"offset": 0x000, "bytes": 4, "source": "platform_feature_mask"},
+            {"offset": 0x020, "bytes": 4, "source": "platform_config+0x131f8"},
+            {"offset": 0x02C, "bytes": 4, "source": "platform_config+0x700"},
+            {"offset": 0x030, "bytes": 4, "source": "platform_feature_bit_0"},
+            {"offset": 0x05E, "bytes": 4, "source": "virtual_device_callback"},
+            {"offset": 0x062, "bytes": 4, "source": "platform_feature_state"},
+            {"offset": 0x06A, "bytes": 4, "source": "normalized_role_count"},
+            {"offset": 0x1C2C, "bytes": 4, "source": "firmware_callback"},
+            {"offset": 0x1C41, "bytes": 4, "source": "normalized_role_count"},
+        ],
+    }
+
+
 def recover_g17_zero_initialized_allocations(code: bytes) -> list[dict[str, object]]:
     require_instruction_sequence(
         code,
@@ -2852,6 +3240,13 @@ def main() -> int:
                 )[1]
             },
         )
+        runtime_initialization = recover_g17_runtime_initialization(
+            allocations,
+            base_init_code,
+            function,
+            base_power_code,
+            power_code,
+        )
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
         )
@@ -2883,6 +3278,7 @@ def main() -> int:
                 "role0_bootstrap_regions": role0_bootstrap_regions,
                 "small_shared_data": small_shared_data,
                 "runtime_controls": runtime_controls,
+                "runtime_initialization": runtime_initialization,
                 "accelerator": accelerator,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,

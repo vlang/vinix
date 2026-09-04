@@ -550,6 +550,171 @@ def runtime_control_code() -> dict[str, bytes]:
     return result
 
 
+def runtime_initialization_code() -> tuple[bytes, bytes, bytes, bytes]:
+    base_init = encode(
+        0xB900010C,
+        0xB900051F,
+        0xB900091F,
+        0xB900191F,
+        0xB9001D1F,
+        0xF941C268,
+        0xB805E100,
+        0xB845E11F,
+        0xF941C26A,
+        0xB8062149,
+        0xB9400109,
+        0xB9002149,
+        0xF941C26A,
+        0xB900495F,
+        0xF941C268,
+        0x52839029,
+        0x8B090109,
+        0x5280002A,
+        0xB900012A,
+        0x528390A9,
+        0x8B090109,
+        0xB900013F,
+        0x52839129,
+        0x8B090109,
+        0xB900013F,
+        0x528391A9,
+        0x8B090108,
+        0xB900011F,
+    )
+    arm_init = encode(
+        0xF941C269,
+        0xB909C93F,
+        0xF941C268,
+        0xB805A11F,
+        0xF941C269,
+        0xB900153F,
+        0xF9414E68,
+        0x9140390A,
+        0x794ED10B,
+        0x7900A92B,
+        0x794ED50B,
+        0x7900AD2B,
+        0x794ED90B,
+        0x7900B12B,
+        0xF9466A6B,
+        0x5298E50C,
+        0x8B0C016B,
+        0xB900017F,
+        0xB900513F,
+        0xB9004D3F,
+        0xB940016C,
+        0x3400008C,
+        0xB940017F,
+        0xB940513F,
+        0xB9404D3F,
+        0xB909E13F,
+        0xBD495140,
+        0xBD07CD20,
+        0xBD495540,
+        0xBD07D120,
+        0xBD495940,
+        0xBD07D520,
+        0xBD495D40,
+        0xBD07D920,
+        0xBD496140,
+        0xBD07DD20,
+        0xBD496540,
+        0xBD07E120,
+        0xBD496940,
+        0xBD07E520,
+        0xBD496D40,
+        0x7E21D800,
+        0x1E39000B,
+        0xB907E92B,
+        0xB949494B,
+        0xB907C52B,
+        0xBD494D40,
+        0xBD07C920,
+        0x6F00E400,
+        0xFD07A960,
+        0xB90F5D7F,
+        0xFD07B160,
+        0xB90F957F,
+        0xB946D109,
+        0x53186129,
+        0xB90F8169,
+        0xB94ED569,
+        0x7100053F,
+        0x1A9F8529,
+        0xF941C26A,
+        0xB806A149,
+        0x5283882C,
+        0x8B0C014C,
+        0xB9000189,
+        0x528388A9,
+        0x8B090149,
+        0xFD000120,
+        0x528389A9,
+        0x8B090149,
+        0xB900013F,
+        0xB925B93F,
+        0xB900411F,
+        0xB900451F,
+        0xF941C269,
+        0xB91C2D28,
+    )
+    base_power = encode(
+        0xF941C269,
+        0x91281128,
+        0xB900312B,
+        0xB947014B,
+        0xB9002D2B,
+        0xB946FD4A,
+        0x3400006A,
+        0xB900952A,
+        0xB900AD2A,
+        0x6F00E400,
+        0xAD000100,
+        0xF900111F,
+    )
+    arm_power = encode(
+        0xF941C008,
+        0x5284F909,
+        0x8B090009,
+        0xAD410121,
+        0xAD400D22,
+        0x3C8B4103,
+        0x3C8C4101,
+        0x3C8D4100,
+        0x3C8A4102,
+        0xF941C268,
+        0x9104B109,
+        0xB940628A,
+        0xB900ED0A,
+        0xB940668A,
+        0xB900F10A,
+        0x914046AA,
+        0x9107814A,
+        0x9112D10B,
+        0x5280080C,
+        0xF940014D,
+        0xD109216E,
+        0xF90001CD,
+        0xF941254D,
+        0xF800856D,
+        0x9100214A,
+        0xF100058C,
+        0x54FFFF21,
+        0xF943168A,
+        0xF902C52A,
+        0xF9431A8A,
+        0xF902C92A,
+        0xF943968A,
+        0xF903452A,
+        0xF9439A8A,
+        0xF903492A,
+        0xF941C268,
+        0xB9009D1F,
+        0xB900A11F,
+    )
+    return base_init, arm_init, base_power, arm_power
+
+
 def zero_initialized_allocations_code() -> bytes:
     return encode(
         0xF9417268,
@@ -690,6 +855,47 @@ class RecoverG17AbiTests(unittest.TestCase):
         del accessors[missing]
         with self.assertRaisesRegex(ValueError, "missing G17 runtime accessor"):
             recover_g17_abi.recover_g17_runtime_controls(allocations, accessors)
+
+    def test_recovers_runtime_initialization(self) -> None:
+        allocations = firmware_shared_allocations() + [
+            {"host_cpu_member": 0x380, "host_gpu_member": 0x388, "bytes": 0x1CA0}
+        ]
+        recovered = recover_g17_abi.recover_g17_runtime_initialization(
+            allocations, *runtime_initialization_code()
+        )
+        self.assertEqual(recovered["bytes"], 0x1CA0)
+        self.assertEqual(recovered["host_cpu_member"], 0x380)
+        self.assertEqual(
+            recovered["platform_copies"][2],
+            {
+                "destination_offset": 0xEC,
+                "bytes": 0x6D8,
+                "source": "power_controller_snapshot",
+                "complete_destination_range": True,
+            },
+        )
+        self.assertEqual(
+            [item["destination_offset"] for item in recovered["power_controller_tables"]],
+            [0x26C, 0x4B4],
+        )
+        initialized = {
+            (item["offset"], item["bytes"]): item["value"]
+            for item in recovered["zero_initialized"]
+        }
+        self.assertEqual(initialized[(0xA04, 0x28)], 0)
+        self.assertEqual(initialized[(0x1C81, 4)], 1)
+        dynamic = {item["offset"]: item for item in recovered["dynamic_fields"]}
+        self.assertEqual(dynamic[0x1C41]["source"], "normalized_role_count")
+
+    def test_rejects_incomplete_runtime_initialization(self) -> None:
+        allocations = firmware_shared_allocations() + [
+            {"host_cpu_member": 0x380, "host_gpu_member": 0x388, "bytes": 0x1CA0}
+        ]
+        base_init, arm_init, base_power, _arm_power = runtime_initialization_code()
+        with self.assertRaisesRegex(ValueError, "host policy snapshot"):
+            recover_g17_abi.recover_g17_runtime_initialization(
+                allocations, base_init, arm_init, base_power, b""
+            )
 
     def test_recovers_zero_initialized_allocations(self) -> None:
         recovered = recover_g17_abi.recover_g17_zero_initialized_allocations(

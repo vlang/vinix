@@ -358,6 +358,8 @@ pub mut:
 	opaque_0dd                           [0x07]u8
 	clpc_deadline_control_effort         u32
 	clpc_deadline_control_override       u32
+	// Completely populated by the G17 host producer from its power-policy
+	// snapshot. It is opaque because Vinix does not yet produce that policy.
 	power_controller_payload_0ec         [0x6d8]u8
 	smart_idle_standby_timer_us          u32
 	smart_idle_probability_initial_bits  u32
@@ -398,12 +400,24 @@ pub mut:
 	fw_util_default_fab_pstate_low       u8
 	fw_util_timer_period                 u8
 	fw_util_pstate_controls              [g17_fw_util_pstate_control_count]G17FwUtilPStateControl
-	opaque_a03                           [0x122d]u8
+	opaque_a03                           u8
+	startup_zero_a04                     [0x28]u8
+	opaque_a2c                           [0x1200]u8
+	firmware_callback_1c2c               u32
 	gpu_keepalive_override               u32
 	gfxc_keepalive_override              u32
 	gpu_keepalive_perf_mode_threshold    u32
 	gpu_keepalive_off_mode_threshold     u32
-	opaque_1c40                          [0x60]u8
+	opaque_1c40                          u8
+	normalized_role_count_1c41           u32
+	startup_zero_1c45                    u64
+	startup_zero_1c4d                    u32
+	opaque_1c51                          [0x30]u8
+	riart_u_level_mask_1c81              u32
+	riart_u_level_disable_mask_1c85      u32
+	riart_t_level_disable_mask_1c89      u32
+	riart_state_1c8d                     u32
+	opaque_1c91                          [0x0f]u8
 }
 
 @[packed]
