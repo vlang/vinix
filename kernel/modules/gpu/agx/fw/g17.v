@@ -286,7 +286,33 @@ pub mut:
 @[packed]
 pub struct G17SmallSharedData {
 pub mut:
-	opaque [0x20]u8
+	ktrace_state              u32
+	host_ready                u32
+	system_sleep_notification u32
+	reserved_00c              u32
+	firmware_power_state      u32
+	reserved_014              u32
+	reserved_018              u32
+	asc_power_generation      u32
+}
+
+pub fn new_g17_small_shared_data(ktrace_state u32) G17SmallSharedData {
+	return G17SmallSharedData{
+		ktrace_state: ktrace_state
+		host_ready:   1
+	}
+}
+
+pub fn initialize_g17_small_shared_data(buffer voidptr, size u64, ktrace_state u32) bool {
+	if buffer == unsafe { nil } || size != g17_small_shared_data_size
+		|| sizeof(G17SmallSharedData) != g17_small_shared_data_size {
+		return false
+	}
+	data := new_g17_small_shared_data(ktrace_state)
+	unsafe {
+		C.memcpy(buffer, &data, sizeof(G17SmallSharedData))
+	}
+	return true
 }
 
 @[packed]

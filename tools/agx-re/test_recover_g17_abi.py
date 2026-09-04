@@ -184,7 +184,9 @@ def firmware_shared_allocations() -> list[dict[str, int]]:
         0x338: 0,
         0x340: 0x88,
         0xAC0: 0x79800,
+        0xAD0: 0x20,
         0xBF0: 0x79800,
+        0xC00: 0x20,
         0xB40: 0x30,
         0xB48: 0x1B0,
         0xB50: 0x30,
@@ -445,6 +447,75 @@ def bootstrap_roots_code() -> tuple[bytes, bytes, bytes, bytes, bytes]:
     return allocation, init, prepare, complete, page_shift
 
 
+def small_shared_data_code() -> tuple[bytes, bytes, bytes, bytes, bytes, bytes, bytes, bytes]:
+    shared_init = encode(
+        0xB94B8E68,
+        0xF9456669,
+        0xB9000128,
+        0xB94CBE68,
+        0xF945FE69,
+        0xB9000128,
+    )
+    base_init = encode(
+        0x52800036,
+        0xF945666B,
+        0xB9000576,
+        0xF945FE6B,
+        0xB9000576,
+    )
+    ktrace = encode(
+        0x52802608,
+        0x9BA80068,
+        0x52800029,
+        0x392E1109,
+        0xB94B8909,
+        0xB90B8D09,
+        0xF9456508,
+        0xB9000109,
+    )
+    wait_power_off = encode(
+        0xF9456408,
+        0xB9401108,
+        0xF945FE68,
+        0xB9401108,
+    )
+    wait_generation = encode(
+        0xF9456408,
+        0xB9401D08,
+        0xF945FE68,
+        0xB9401D08,
+    )
+    snapshot_generation = encode(
+        0xF9456408,
+        0xB9401D08,
+        0xF945FC08,
+        0xB9401D08,
+    )
+    get_sleep = encode(
+        0xF9456408,
+        0xB9400908,
+        0xF945FC09,
+        0xB9400929,
+    )
+    set_sleep = encode(
+        0xF9456408,
+        0x52800029,
+        0xB9000909,
+        0xF945FC08,
+        0xB9000909,
+    )
+    return (
+        shared_init,
+        base_init,
+        ktrace,
+        wait_power_off,
+        wait_generation,
+        snapshot_generation,
+        get_sleep,
+        set_sleep,
+    )
+
+
 def zero_initialized_allocations_code() -> bytes:
     return encode(
         0xF9417268,
@@ -533,6 +604,23 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "two G17 bootstrap-root"):
             recover_g17_abi.recover_g17_bootstrap_roots(
                 b"", init, prepare, complete, page_shift
+            )
+
+    def test_recovers_small_shared_data(self) -> None:
+        recovered = recover_g17_abi.recover_g17_small_shared_data(
+            firmware_shared_allocations(), *small_shared_data_code()
+        )
+        self.assertEqual(recovered["bytes"], 0x20)
+        self.assertEqual(recovered["roles"][0]["host_gpu_member"], 0xAD0)
+        self.assertEqual(recovered["roles"][1]["trace_state_host_member"], 0xCBC)
+        self.assertEqual(recovered["fields"][1]["initial"], 1)
+        self.assertEqual(recovered["fields"][-1]["offset"], 0x1C)
+
+    def test_rejects_incomplete_small_shared_data(self) -> None:
+        codes = small_shared_data_code()
+        with self.assertRaisesRegex(ValueError, "sleep-notification publication"):
+            recover_g17_abi.recover_g17_small_shared_data(
+                firmware_shared_allocations(), *codes[:-1], b""
             )
 
     def test_recovers_zero_initialized_allocations(self) -> None:

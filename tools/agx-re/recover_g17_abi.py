@@ -43,6 +43,12 @@ G17_LEGACY_GART_INIT_INFO = (
 INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
 INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
+KTRACE_FIRMWARE_CALLBACK = "__ZN11AGXFirmware16ktraceFwCallbackE16kd_callback_typePv16AGFIFirmwareRole"
+WAIT_FIRMWARE_POWER_OFF = "__ZN14AGXArmFirmware23waitForFirmwarePowerOffEv"
+WAIT_NEXT_ASC_POWER_GENERATION = "__ZN14AGXArmFirmware29waitForNextASCPowerGenerationEv"
+SNAPSHOT_ASC_POWER_GENERATION = "__ZN14AGXArmFirmware26snapshotASCPowerGenerationEv"
+GET_SYSTEM_SLEEP_NOTIFICATION = "__ZN14AGXArmFirmware35isSystemSleepNotificationInProgressEv.4221"
+SET_SYSTEM_SLEEP_NOTIFICATION = "__ZN14AGXArmFirmware36setSystemSleepNotificationInProgressEb.4222"
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
 DEVICE_CONTROL_RING = "__ZN18AGXAcceleratorRingI33AGFIAcceleratorDeviceControlEntryE"
@@ -1640,6 +1646,147 @@ def recover_firmware_shared_platform_fields(code: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_small_shared_data(
+    allocations: list[dict[str, int]],
+    shared_init_code: bytes,
+    base_init_code: bytes,
+    ktrace_code: bytes,
+    wait_power_off_code: bytes,
+    wait_generation_code: bytes,
+    snapshot_generation_code: bytes,
+    get_sleep_code: bytes,
+    set_sleep_code: bytes,
+) -> dict[str, object]:
+    by_pair = {
+        (item["host_cpu_member"], item["host_gpu_member"]): item["bytes"]
+        for item in allocations
+    }
+    roles = (
+        (0, 0xAC8, 0xAD0, 0xB8C),
+        (1, 0xBF8, 0xC00, 0xCBC),
+    )
+    for role, cpu_member, gpu_member, trace_member in roles:
+        if by_pair.get((cpu_member, gpu_member)) != 0x20:
+            raise ValueError(f"unexpected role {role} small-shared allocation")
+        require_instruction_sequence(
+            shared_init_code,
+            f"role {role} small-shared trace-state publication",
+            (
+                0xB9400000 | (trace_member // 4) << 10 | 19 << 5 | 8,
+                0xF9400000 | (cpu_member // 8) << 10 | 19 << 5 | 9,
+                0xB9000128,  # str w8, [x9]
+            ),
+        )
+
+    require_instruction_sequence(
+        base_init_code,
+        "small-shared host-ready initialization",
+        (
+            0xF945666B,  # role 0 CPU member 0xac8
+            0xB9000576,  # +0x04 = 1
+            0xF945FE6B,  # role 1 CPU member 0xbf8
+            0xB9000576,
+        ),
+    )
+    if struct.pack("<I", 0x52800036) not in base_init_code:  # mov w22, #1
+        raise ValueError("small-shared host-ready value is not one")
+
+    require_instruction_sequence(
+        ktrace_code,
+        "small-shared trace-state update",
+        (
+            0x52802608,  # per-role host stride 0x130
+            0x9BA80068,
+            0x52800029,
+            0x392E1109,
+            0xB94B8909,
+            0xB90B8D09,
+            0xF9456508,
+            0xB9000109,  # publish trace state to +0x00
+        ),
+    )
+    require_instruction_sequence(
+        wait_power_off_code,
+        "small-shared firmware-power-state polling",
+        (
+            0xF9456408,  # role 0 CPU member
+            0xB9401108,  # +0x10
+        ),
+    )
+    require_instruction_sequence(
+        wait_power_off_code,
+        "secondary small-shared firmware-power-state polling",
+        (
+            0xF945FE68,  # role 1 CPU member
+            0xB9401108,  # +0x10
+        ),
+    )
+    require_instruction_sequence(
+        wait_generation_code,
+        "role 0 ASC power-generation wait",
+        (0xF9456408, 0xB9401D08),  # CPU member 0xac8, +0x1c
+    )
+    require_instruction_sequence(
+        wait_generation_code,
+        "role 1 ASC power-generation wait",
+        (0xF945FE68, 0xB9401D08),  # CPU member 0xbf8, +0x1c
+    )
+    require_instruction_sequence(
+        snapshot_generation_code,
+        "role 0 ASC power-generation snapshot",
+        (0xF9456408, 0xB9401D08),
+    )
+    require_instruction_sequence(
+        snapshot_generation_code,
+        "role 1 ASC power-generation snapshot",
+        (0xF945FC08, 0xB9401D08),  # CPU member through x0, +0x1c
+    )
+    require_instruction_sequence(
+        get_sleep_code,
+        "small-shared sleep-notification read",
+        (0xF9456408, 0xB9400908),  # role 0 CPU member, +0x08
+    )
+    require_instruction_sequence(
+        get_sleep_code,
+        "secondary small-shared sleep-notification read",
+        (0xF945FC09, 0xB9400929),  # role 1 CPU member, +0x08
+    )
+    require_instruction_sequence(
+        set_sleep_code,
+        "small-shared sleep-notification publication",
+        (
+            0xF9456408,
+            0x52800029,
+            0xB9000909,  # role 0 +0x08 = 1
+            0xF945FC08,
+            0xB9000909,  # role 1 +0x08 = 1
+        ),
+    )
+
+    return {
+        "bytes": 0x20,
+        "roles": [
+            {
+                "role": role,
+                "host_cpu_member": cpu_member,
+                "host_gpu_member": gpu_member,
+                "trace_state_host_member": trace_member,
+            }
+            for role, cpu_member, gpu_member, trace_member in roles
+        ],
+        "fields": [
+            {"offset": 0x00, "bytes": 4, "name": "ktrace_state", "owner": "host"},
+            {"offset": 0x04, "bytes": 4, "name": "host_ready", "initial": 1},
+            {"offset": 0x08, "bytes": 4, "name": "system_sleep_notification"},
+            {"offset": 0x0C, "bytes": 4, "name": "reserved_00c"},
+            {"offset": 0x10, "bytes": 4, "name": "firmware_power_state", "owner": "firmware"},
+            {"offset": 0x14, "bytes": 4, "name": "reserved_014"},
+            {"offset": 0x18, "bytes": 4, "name": "reserved_018"},
+            {"offset": 0x1C, "bytes": 4, "name": "asc_power_generation", "owner": "firmware"},
+        ],
+    }
+
+
 def recover_g17_zero_initialized_allocations(code: bytes) -> list[dict[str, object]]:
     require_instruction_sequence(
         code,
@@ -2341,6 +2488,27 @@ def main() -> int:
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
+        _address, ktrace_code = symbol_code(driver, KTRACE_FIRMWARE_CALLBACK)
+        _address, wait_power_off_code = symbol_code(driver, WAIT_FIRMWARE_POWER_OFF)
+        _address, wait_generation_code = symbol_code(
+            driver, WAIT_NEXT_ASC_POWER_GENERATION
+        )
+        _address, snapshot_generation_code = symbol_code(
+            driver, SNAPSHOT_ASC_POWER_GENERATION
+        )
+        _address, get_sleep_code = symbol_code(driver, GET_SYSTEM_SLEEP_NOTIFICATION)
+        _address, set_sleep_code = symbol_code(driver, SET_SYSTEM_SLEEP_NOTIFICATION)
+        small_shared_data = recover_g17_small_shared_data(
+            allocations,
+            shared_init_code,
+            base_init_code,
+            ktrace_code,
+            wait_power_off_code,
+            wait_generation_code,
+            snapshot_generation_code,
+            get_sleep_code,
+            set_sleep_code,
+        )
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
         )
@@ -2370,6 +2538,7 @@ def main() -> int:
                 "brn_workaround_table": brn_workaround_table,
                 "zero_initialized_allocations": zero_initialized_allocations,
                 "role0_bootstrap_regions": role0_bootstrap_regions,
+                "small_shared_data": small_shared_data,
                 "accelerator": accelerator,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,
