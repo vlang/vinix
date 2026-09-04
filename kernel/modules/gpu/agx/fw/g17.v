@@ -44,6 +44,8 @@ pub const g17_cached_command_pointer_size = u64(0x08)
 pub const g17_firmware_shared_data_size = u64(0x4c0)
 pub const g17_runtime_data_size = u64(0x1ca0)
 pub const g17_runtime_platform_values_offset = u64(0x54)
+pub const g17_runtime_performance_policy_offset = u64(0xa4)
+pub const g17_runtime_performance_policy_size = u64(0x40)
 pub const g17_runtime_power_policy_offset = u64(0xec)
 pub const g17_runtime_power_policy_size = u64(0x6d8)
 pub const g17_runtime_smart_idle_offset = u64(0x7c4)
@@ -472,6 +474,24 @@ pub fn initialize_g17_runtime_platform_policy(buffer voidptr, size u64) bool {
 		runtime.smart_idle_gpu_min_confidence_bits = 0x3f19999a
 		runtime.smart_idle_gpu_high_confidence_bits = 0x3f666666
 		runtime.smart_idle_reset_iterations = 0x40c00000
+	}
+	return true
+}
+
+// setupConfig explicitly clears the 57 meaningful bytes in the host-side
+// performance-controller policy before initPowerAndPerformanceData copies the
+// enclosing 64-byte slot to runtime+0xa4. The last seven bytes are alignment
+// padding; clear them too so the host-to-firmware snapshot is deterministic.
+// With the override-valid bytes unset, firmware uses the DeviceTree-backed
+// boost minimum-utilization and CE-step values from the hardware config.
+pub fn initialize_g17_runtime_performance_policy(buffer voidptr, size u64) bool {
+	if buffer == unsafe { nil } || size < g17_runtime_data_size
+		|| sizeof(G17RuntimeData) != g17_runtime_data_size {
+		return false
+	}
+	unsafe {
+		C.memset(voidptr(u64(buffer) + g17_runtime_performance_policy_offset), 0,
+			g17_runtime_performance_policy_size)
 	}
 	return true
 }

@@ -754,6 +754,50 @@ def runtime_power_policy_code() -> tuple[bytes, bytes]:
     return arm_power, populate
 
 
+def runtime_performance_policy_code() -> tuple[bytes, bytes]:
+    setup = encode(
+        0x911FA708,
+        0x911FC709,
+        0x911F870A,
+        0xB900011F,
+        0xB900013F,
+        0xB900015F,
+        0x391FEB1F,
+        0x391FF31F,
+        0x391FFB1F,
+        0x911FB708,
+        0xB900011F,
+        0x911FD708,
+        0xB900011F,
+        0x911F9708,
+        0xB900011F,
+        0x391FEF1F,
+        0x391FF71F,
+        0x391FFF1F,
+        0x391FE71F,
+        0x3920031F,
+        0xB927CA7F,
+        0xB927D27F,
+        0xB927D67F,
+        0x391F831F,
+        0xB927DA7F,
+        0xB927CE7F,
+        0xB927DE7F,
+    )
+    arm_power = encode(
+        0xF941C008,
+        0x5284F909,
+        0x8B090009,
+        0xAD410121,
+        0xAD400D22,
+        0x3C8B4103,
+        0x3C8C4101,
+        0x3C8D4100,
+        0x3C8A4102,
+    )
+    return setup, arm_power
+
+
 def runtime_platform_policy_code() -> tuple[
     dict[str, int], dict[str, tuple[int, bytes]]
 ]:
@@ -1096,6 +1140,26 @@ class RecoverG17AbiTests(unittest.TestCase):
         ):
             recover_g17_abi.recover_g17_runtime_power_policy(
                 b"image", arm_power, populate
+            )
+
+    def test_recovers_zeroed_runtime_performance_policy(self) -> None:
+        setup, arm_power = runtime_performance_policy_code()
+        recovered = recover_g17_abi.recover_g17_runtime_performance_policy(
+            setup, arm_power
+        )
+        self.assertEqual(recovered["host_object_offset"], 0x27C8)
+        self.assertEqual(recovered["cleared_source_bytes"], 0x39)
+        self.assertEqual(recovered["copied_source_bytes"], 0x40)
+        self.assertEqual(
+            recovered["runtime_range"], {"offset": 0xA4, "bytes": 0x40}
+        )
+        self.assertEqual(recovered["reserved_tail_bytes"], 7)
+
+    def test_rejects_incomplete_runtime_performance_policy_clear(self) -> None:
+        setup, arm_power = runtime_performance_policy_code()
+        with self.assertRaisesRegex(ValueError, "policy clear"):
+            recover_g17_abi.recover_g17_runtime_performance_policy(
+                setup[:-4], arm_power
             )
 
     def test_recovers_runtime_platform_policy(self) -> None:

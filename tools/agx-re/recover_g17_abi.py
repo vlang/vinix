@@ -42,6 +42,7 @@ G17_LEGACY_GART_INIT_INFO = (
 )
 INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
 INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
+SETUP_CONFIG = "__ZN14AGXArmFirmware11setupConfigEv"
 POPULATE_DPE_PPT_CONFIG = (
     "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData"
 )
@@ -2668,6 +2669,79 @@ def recover_g17_runtime_power_policy(
     }
 
 
+def recover_g17_runtime_performance_policy(
+    setup_code: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover the zeroed G17 performance-controller startup policy.
+
+    setupConfig explicitly clears the 57 named bytes at firmware-host-object
+    offsets 0x27c8..0x2800.  initPowerAndPerformanceData later copies a
+    complete 64-byte slot beginning at 0x27c8 to runtime 0xa4.  The trailing
+    seven bytes are alignment padding, which Vinix clears deterministically.
+    Keep both instruction sequences pinned so a future driver cannot silently
+    turn an assumed zero override into an active controller setting.
+    """
+
+    require_instruction_sequence(
+        setup_code,
+        "G17 performance-controller policy clear",
+        (
+            0x911FA708,  # host object +0x27e9
+            0x911FC709,  # host object +0x27f1
+            0x911F870A,  # host object +0x27e1
+            0xB900011F,
+            0xB900013F,
+            0xB900015F,
+            0x391FEB1F,  # +0x27fa
+            0x391FF31F,  # +0x27fc
+            0x391FFB1F,  # +0x27fe
+            0x911FB708,  # +0x27ed
+            0xB900011F,
+            0x911FD708,  # +0x27f5
+            0xB900011F,
+            0x911F9708,  # +0x27e5
+            0xB900011F,
+            0x391FEF1F,  # +0x27fb
+            0x391FF71F,  # +0x27fd
+            0x391FFF1F,  # +0x27ff
+            0x391FE71F,  # +0x27f9
+            0x3920031F,  # +0x2800
+            0xB927CA7F,  # +0x27c8
+            0xB927D27F,  # +0x27d0
+            0xB927D67F,  # +0x27d4
+            0x391F831F,  # +0x27e0
+            0xB927DA7F,  # +0x27d8
+            0xB927CE7F,  # +0x27cc
+            0xB927DE7F,  # +0x27dc
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "G17 performance-controller policy snapshot",
+        (
+            0xF941C008,
+            0x5284F909,
+            0x8B090009,  # firmware host object +0x27c8
+            0xAD410121,
+            0xAD400D22,
+            0x3C8B4103,
+            0x3C8C4101,
+            0x3C8D4100,
+            0x3C8A4102,  # complete runtime +0xa4..+0xe3
+        ),
+    )
+
+    return {
+        "producer": SETUP_CONFIG,
+        "host_object_offset": 0x27C8,
+        "cleared_source_bytes": 0x39,
+        "copied_source_bytes": 0x40,
+        "runtime_range": {"offset": 0xA4, "bytes": 0x40},
+        "initial_value": 0,
+        "reserved_tail_bytes": 7,
+    }
+
+
 def recover_g17_runtime_platform_policy(image: bytes) -> dict[str, object]:
     """Recover the G17C platform halfwords and Smart Idle startup policy.
 
@@ -3828,6 +3902,7 @@ def main() -> int:
         channels["pools"] = recover_g17_channel_pool_geometry(allocation_code)
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
+        _address, setup_code = symbol_code(driver, SETUP_CONFIG)
         _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
         _address, ktrace_code = symbol_code(driver, KTRACE_FIRMWARE_CALLBACK)
         _address, wait_power_off_code = symbol_code(driver, WAIT_FIRMWARE_POWER_OFF)
@@ -3886,6 +3961,9 @@ def main() -> int:
         runtime_power_policy = recover_g17_runtime_power_policy(
             driver, power_code, dpe_ppt_code
         )
+        runtime_performance_policy = recover_g17_runtime_performance_policy(
+            setup_code, power_code
+        )
         runtime_platform_policy = recover_g17_runtime_platform_policy(driver)
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
@@ -3920,6 +3998,7 @@ def main() -> int:
                 "runtime_controls": runtime_controls,
                 "runtime_initialization": runtime_initialization,
                 "runtime_power_policy": runtime_power_policy,
+                "runtime_performance_policy": runtime_performance_policy,
                 "runtime_platform_policy": runtime_platform_policy,
                 "accelerator": accelerator,
                 "channels": channels,

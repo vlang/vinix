@@ -118,6 +118,9 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	if !fw.initialize_g17_runtime_power_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
 		return false
 	}
+	if !fw.initialize_g17_runtime_performance_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
+		return false
+	}
 	if !fw.initialize_g17_runtime_platform_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
 		return false
 	}
