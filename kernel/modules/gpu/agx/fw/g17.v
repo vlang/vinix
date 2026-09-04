@@ -10,6 +10,7 @@ pub const g17_init_message = u64(0x81) << 48
 pub const g17_init_address_mask = (u64(1) << 44) - 1
 pub const g17_interface_magic = u64(0x0c8bc322072804c0)
 pub const g17_bootstrap_header_size = u64(0xc8)
+pub const g17_bootstrap_page_size = u64(0x4000)
 pub const g17_bootstrap_region_size = u64(0x4000)
 pub const g17_init_register_entry_size = u64(0x18)
 pub const g17_init_register_terminator = u32(0)
@@ -166,6 +167,16 @@ pub mut:
 	secondary_aux_address        u64
 }
 
+// Each firmware role receives its own host/firmware mapped 16 KiB page. Only
+// the leading 0xc8-byte header is consumed by the checked G17 bootstrap
+// handler; clearing the tail makes the entire handoff deterministic.
+@[packed]
+pub struct G17BootstrapPage {
+pub mut:
+	header  G17BootstrapHeader
+	padding [0x3f38]u8
+}
+
 pub fn new_g17_bootstrap_header(role u32) G17BootstrapHeader {
 	return G17BootstrapHeader{
 		interface_magic: g17_interface_magic
@@ -207,6 +218,28 @@ pub fn populate_g17_bootstrap_header(mut header G17BootstrapHeader, role u32,
 
 pub fn validate_g17_bootstrap_header(header &G17BootstrapHeader) bool {
 	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size && sizeof(G17PlatformConfig) == g17_platform_config_size && sizeof(header.platform_config_030) == g17_platform_config_size && header.interface_magic == g17_interface_magic && header.firmware_role <= 1 && header.host_mapped_allocations != 0
+}
+
+pub fn initialize_g17_bootstrap_page(buffer voidptr, size u64, role u32,
+	bootstrap_region_address u64, firmware_shared_data_address u64, runtime_data_address u64,
+	small_shared_data_address u64, primary_region_address u64, secondary_region_address u64,
+	secondary_aux_address u64, platform_config voidptr, platform_config_size u64) bool {
+	if buffer == unsafe { nil } || size != g17_bootstrap_page_size
+		|| sizeof(G17BootstrapPage) != g17_bootstrap_page_size {
+		return false
+	}
+	mut header := G17BootstrapHeader{}
+	if !populate_g17_bootstrap_header(mut header, role, bootstrap_region_address,
+		firmware_shared_data_address, runtime_data_address, small_shared_data_address,
+		primary_region_address, secondary_region_address, secondary_aux_address,
+		platform_config, platform_config_size) {
+		return false
+	}
+	unsafe {
+		C.memset(buffer, 0, size)
+		C.memcpy(buffer, &header, sizeof(G17BootstrapHeader))
+	}
+	return true
 }
 
 // Shared object referenced by root+0x18. The host driver writes these fields
@@ -396,7 +429,7 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
+	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
 }
 
 // Populate the table subset whose source and scale are established by both

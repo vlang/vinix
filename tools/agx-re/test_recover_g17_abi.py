@@ -381,6 +381,70 @@ def bootstrap_region_code() -> tuple[bytes, bytes, bytes, bytes, bytes, bytes]:
     return allocation, prepare, page_shift, set_64_pa, set_64, set_32
 
 
+def bootstrap_roots_code() -> tuple[bytes, bytes, bytes, bytes, bytes]:
+    size_calculation_tail = (
+        0x1AC82308,
+        0x1AC02329,
+        0x4B0803EA,
+        0x4B080129,
+        0x0A290141,
+        0x93407D02,
+        0x52800260,
+    )
+    first_size_calculation = (
+        0xB94002E8,
+        0x52800038,
+        size_calculation_tail[0],
+        0x12800019,
+        *size_calculation_tail[1:],
+    )
+    repeated_size_calculation = (0xB94002E8, *size_calculation_tail)
+    cpu_mapping_prefix = (
+        0xD2804511,
+        0x8B110210,
+        0xF9400208,
+        0x52800001,
+        0xF2E7DAD0,
+        0xD73F0910,
+    )
+    mapping_tail = (
+        0xB4000000,
+        0xAA1303E0,
+        0xAA1403E1,
+        0x52800002,
+        0x52800103,
+        0x94000000,
+    )
+    allocation = encode(
+        *first_size_calculation,
+        *cpu_mapping_prefix,
+        str_x(0, 19, 0x19E0),
+        *mapping_tail,
+        str_x(0, 19, 0x19E8),
+        *repeated_size_calculation,
+        *cpu_mapping_prefix,
+        str_x(0, 19, 0x1A18),
+        *mapping_tail,
+        str_x(0, 19, 0x1A20),
+    )
+    cpu_address = (0x9104E208, 0xF9409E09)
+    init = encode(
+        ldr_x(0, 19, 0x19E0),
+        *cpu_address,
+        ldr_x(0, 19, 0x1A18),
+        *cpu_address,
+    )
+    prepare = encode(
+        ldr_x(0, 19, 0x19E8),
+        0x94000000,
+        ldr_x(0, 19, 0x1A20),
+        0x94000000,
+    )
+    complete = prepare
+    page_shift = encode(0xD503245F, 0x528001C0, 0xD65F03C0)
+    return allocation, init, prepare, complete, page_shift
+
+
 def zero_initialized_allocations_code() -> bytes:
     return encode(
         0xF9417268,
@@ -448,6 +512,27 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cursor reset"):
             recover_g17_abi.recover_g17_bootstrap_region(
                 allocation, b"", page_shift, set_64_pa, set_64, set_32
+            )
+
+    def test_recovers_bootstrap_root_mappings(self) -> None:
+        recovered = recover_g17_abi.recover_g17_bootstrap_roots(
+            *bootstrap_roots_code()
+        )
+        self.assertEqual(recovered["bytes"], 0x4000)
+        self.assertEqual(recovered["firmware_page_shift"], 14)
+        self.assertEqual(recovered["memory_options"], 0x13)
+        self.assertEqual(
+            recovered["roles"][0]["host_cpu_mapping_member"], 0x19E0
+        )
+        self.assertEqual(
+            recovered["roles"][1]["host_gpu_mapping_member"], 0x1A20
+        )
+
+    def test_rejects_incomplete_bootstrap_root_mappings(self) -> None:
+        _allocation, init, prepare, complete, page_shift = bootstrap_roots_code()
+        with self.assertRaisesRegex(ValueError, "two G17 bootstrap-root"):
+            recover_g17_abi.recover_g17_bootstrap_roots(
+                b"", init, prepare, complete, page_shift
             )
 
     def test_recovers_zero_initialized_allocations(self) -> None:

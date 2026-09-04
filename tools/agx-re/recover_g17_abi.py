@@ -25,6 +25,8 @@ INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
 INIT_FIRMWARE_SHARED_DATA = "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
 ALLOC_ARM_FIRMWARE_DATA = "__ZN14AGXArmFirmware17allocFirmwareDataEv"
 PREPARE_FIRMWARE_BOOT = "__ZN14AGXArmFirmware22prepareFirmwareForBootEv"
+PREPARE_FIRMWARE_DATA = "__ZN14AGXArmFirmware19prepareFirmwareDataEv"
+COMPLETE_FIRMWARE_DATA = "__ZN14AGXArmFirmware20completeFirmwareDataEv"
 ARM_FIRMWARE_PAGE_SHIFT = "__ZNK17AGXArmFirmwareASC14getFWPageShiftEv"
 SET_INIT_REGISTER_64_PA = "__ZN14AGXArmFirmware14setInitReg64PAEtyjh.4231"
 SET_INIT_REGISTER_64 = "__ZN14AGXArmFirmware12setInitReg64Etyh.4232"
@@ -569,6 +571,145 @@ def recover_driver_root(code: bytes) -> dict[str, object]:
                 ],
             },
         ],
+    }
+
+
+def recover_g17_bootstrap_roots(
+    allocation_code: bytes,
+    init_code: bytes,
+    prepare_code: bytes,
+    complete_code: bytes,
+    page_shift_code: bytes,
+) -> dict[str, object]:
+    expected_page_shift = struct.pack(
+        "<3I", 0xD503245F, 0x528001C0, 0xD65F03C0
+    )
+    if page_shift_code != expected_page_shift:
+        raise ValueError("G17 bootstrap roots do not use the checked 14-bit page shift")
+
+    # Each root's requested size is one firmware page rounded up to the host
+    # kernel page, with the host page also supplied as the allocation alignment.
+    size_calculation_tail = (
+        0x1AC82308,  # host page bytes
+        0x1AC02329,  # -firmware page bytes
+        0x4B0803EA,
+        0x4B080129,
+        0x0A290141,  # rounded allocation bytes in w1
+        0x93407D02,  # host page alignment in x2
+        0x52800260,  # I/O memory allocation options 0x13
+    )
+    first_size_calculation = struct.pack(
+        "<10I",
+        0xB94002E8,  # load host kernel page shift
+        0x52800038,  # initialize one in w24
+        size_calculation_tail[0],
+        0x12800019,  # initialize -1 in w25
+        *size_calculation_tail[1:],
+    )
+    repeated_size_calculation = struct.pack(
+        "<8I", 0xB94002E8, *size_calculation_tail
+    )
+    if (
+        allocation_code.count(first_size_calculation) != 1
+        or allocation_code.count(repeated_size_calculation) != 1
+    ):
+        raise ValueError("expected two G17 bootstrap-root size calculations")
+
+    roles = (
+        (0, 0x19E0, 0x19E8),
+        (1, 0x1A18, 0x1A20),
+    )
+    allocation_words = [word for _offset, word in words(allocation_code)]
+    init_words = [word for _offset, word in words(init_code)]
+
+    def require_root_allocation(cpu_member: int, gpu_member: int) -> None:
+        cpu_store = 0xF9000000 | (cpu_member // 8) << 10 | 19 << 5
+        gpu_store = 0xF9000000 | (gpu_member // 8) << 10 | 19 << 5
+        candidates = [
+            index for index, word in enumerate(allocation_words) if word == cpu_store
+        ]
+        if len(candidates) != 1:
+            raise ValueError(
+                f"unexpected root CPU mapping stores for host member {cpu_member:#x}"
+            )
+        index = candidates[0]
+        cpu_mapping = (
+            0xD2804511,  # descriptor vtable + 0x228
+            0x8B110210,
+            0xF9400208,
+            0x52800001,  # mapping options 0
+            0xF2E7DAD0,
+            0xD73F0910,
+            cpu_store,
+        )
+        encoded_cpu_mapping = struct.pack(f"<{len(cpu_mapping)}I", *cpu_mapping)
+        if encoded_cpu_mapping not in allocation_code:
+            raise ValueError(
+                f"missing root CPU mapping at host member {cpu_member:#x}"
+            )
+        expected_tail = (
+            0xAA1303E0,  # this
+            0xAA1403E1,  # memory descriptor
+            0x52800002,  # not read-only
+            0x52800103,  # firmware GART range 8
+        )
+        if tuple(allocation_words[index + 2 : index + 6]) != expected_tail:
+            raise ValueError(
+                f"unexpected root GPU mapping arguments for host member {gpu_member:#x}"
+            )
+        if allocation_words[index + 6] & 0xFC000000 != 0x94000000:
+            raise ValueError("root GPU mapping is not made by a direct call")
+        if allocation_words[index + 7] != gpu_store:
+            raise ValueError(
+                f"missing root GPU mapping at host member {gpu_member:#x}"
+            )
+
+        cpu_load = 0xF9400000 | (cpu_member // 8) << 10 | 19 << 5
+        for load_index, word in enumerate(init_words):
+            if word != cpu_load:
+                continue
+            window = init_words[load_index + 1 : load_index + 16]
+            if 0x9104E208 in window and 0xF9409E09 in window:
+                break
+        else:
+            raise ValueError(
+                f"root CPU address accessor was not used for host member {cpu_member:#x}"
+            )
+
+    def require_mapping_lifecycle(code: bytes, member: int, operation: str) -> None:
+        instruction_words = [word for _offset, word in words(code)]
+        expected_load = 0xF9400000 | (member // 8) << 10 | 19 << 5
+        for index, word in enumerate(instruction_words[:-1]):
+            if word == expected_load and instruction_words[index + 1] & 0xFC000000 == 0x94000000:
+                return
+        raise ValueError(
+            f"root GPU mapping at host member {member:#x} is not {operation}"
+        )
+
+    recovered_roles = []
+    for role, cpu_member, gpu_member in roles:
+        require_root_allocation(cpu_member, gpu_member)
+        require_mapping_lifecycle(prepare_code, gpu_member, "prepared")
+        require_mapping_lifecycle(complete_code, gpu_member, "completed")
+        recovered_roles.append(
+            {
+                "role": role,
+                "host_cpu_mapping_member": cpu_member,
+                "host_gpu_mapping_member": gpu_member,
+            }
+        )
+
+    return {
+        "bytes": 0x4000,
+        "firmware_page_shift": 14,
+        "host_page_aligned": True,
+        "memory_options": 0x13,
+        "cpu_mapping_vtable_offset": 0x228,
+        "cpu_address_vtable_offset": 0x138,
+        "firmware_gart_range": 8,
+        "prepared_by": PREPARE_FIRMWARE_DATA,
+        "completed_by": COMPLETE_FIRMWARE_DATA,
+        "roles": recovered_roles,
     }
 
 
@@ -2148,6 +2289,8 @@ def main() -> int:
         _address, handoff_code = symbol_code(driver, INIT_UAT_HANDOFF)
         handoff = recover_g17_handoff(handoff_code)
         _address, arm_allocation_code = symbol_code(driver, ALLOC_ARM_FIRMWARE_DATA)
+        _address, prepare_data_code = symbol_code(driver, PREPARE_FIRMWARE_DATA)
+        _address, complete_data_code = symbol_code(driver, COMPLETE_FIRMWARE_DATA)
         _address, prepare_code = symbol_code(driver, PREPARE_FIRMWARE_BOOT)
         _address, page_shift_code = symbol_code(driver, ARM_FIRMWARE_PAGE_SHIFT)
         _address, set_64_pa_code = symbol_code(driver, SET_INIT_REGISTER_64_PA)
@@ -2162,6 +2305,13 @@ def main() -> int:
             set_32_code,
         )
         bootstrap_region["accelerator_provider"] = init_sequence_provider
+        bootstrap_roots = recover_g17_bootstrap_roots(
+            arm_allocation_code,
+            function,
+            prepare_data_code,
+            complete_data_code,
+            page_shift_code,
+        )
         platform_config = recover_g17_platform_config(driver, page_shift_code)
         allocation_address, allocation_code = symbol_code(driver, ALLOC_FIRMWARE_DATA)
         allocations = recover_firmware_allocations(
@@ -2214,6 +2364,7 @@ def main() -> int:
                 "firmware_uuid": firmware_uuid,
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
+                "bootstrap_roots": bootstrap_roots,
                 "bootstrap_region": bootstrap_region,
                 "platform_config": platform_config,
                 "brn_workaround_table": brn_workaround_table,

@@ -63,7 +63,8 @@ the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
 hardware-configuration allocation, host-written table layout and firmware
 read map, exact per-role bootstrap-root bindings, its copied platform block,
-the mapped bootstrap register region and its G17 no-op producer, both
+the two root-page CPU/GPU mappings and their prepare/complete lifecycle, the
+mapped bootstrap register region and its G17 no-op producer, both
 shared-object address graphs, and the UAT handoff initialization using a
 deliberately small AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
