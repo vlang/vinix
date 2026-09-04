@@ -61,8 +61,9 @@ into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
-hardware-configuration allocation and firmware read map, and the UAT handoff
-initialization using a deliberately small AArch64 decoder.
+hardware-configuration allocation, host-written table layout and firmware
+read map, and the UAT handoff initialization using a deliberately small
+AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
 trace data are never repository inputs.
 

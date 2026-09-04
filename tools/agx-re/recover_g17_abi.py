@@ -23,6 +23,8 @@ INTERFACE_MAGIC = 0x0C8BC322072804C0
 INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
 INIT_FIRMWARE_SHARED_DATA = "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
+INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
+INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
@@ -572,6 +574,171 @@ def recover_hardware_config(
     }
 
 
+def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, ...]) -> None:
+    encoded = struct.pack(f"<{len(sequence)}I", *sequence)
+    if encoded not in code:
+        raise ValueError(f"hardware-config producer has no {label} sequence")
+
+
+def recover_driver_hardware_config_layout(
+    base_init_code: bytes, base_power_code: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover table boundaries written by the pinned G17 host driver.
+
+    Validate loop instructions as well as constants so a coincidental use of
+    an offset elsewhere cannot become a claimed firmware structure field.
+    """
+
+    require_instruction_sequence(
+        base_init_code,
+        "color-matrix copy loop",
+        (
+            0x5280040A,  # mov w10, #32
+            0xF940010B,  # ldr x11, [x8]
+            0xF9001D2B,  # str x11, [x9, #0x38]
+            0xF941810B,  # ldr x11, [x8, #0x300]
+            0xF9019D2B,  # str x11, [x9, #0x338]
+            0xF940050B,
+            0xF900212B,
+            0xF941850B,
+            0xF901A12B,
+            0xF940090B,
+            0xF900252B,
+            0xF941890B,
+            0xF901A52B,
+            0x91006108,  # add x8, x8, #0x18
+            0x91006129,  # add x9, x9, #0x18
+            0xF100054A,  # subs x10, x10, #1
+            0x54FFFE21,  # b.ne
+        ),
+    )
+    require_instruction_sequence(
+        base_init_code,
+        "I/O-mapping copy loop",
+        (
+            0xD2800008,  # mov x8, #0
+            0xD280000A,  # mov x10, #0
+            0xF9415E69,  # ldr config CPU address, [x19, #0x2b8]
+            0xF9129520,
+            0xF9414E60,
+            0x8B08000B,
+            0xB949896C,
+            0xB947856D,
+            0x1B0C7DAD,
+            0x8B0A012E,
+            0xB90651CD,  # record +0x10
+            0xF943C56D,
+            0xF90321CD,  # config +0x640 + record
+            0xF944C96D,
+            0xF9032DCD,  # record +0x18
+            0xB90655CC,  # record +0x14
+            0xB947816B,
+            0x121F016B,
+            0xB90661CB,  # record +0x20
+            0xF90325DF,  # record +0x08
+            0x9100A14A,  # add x10, x10, #0x28
+            0x9110E108,  # add x8, x8, #0x438
+            0xF121215F,  # cmp x10, #0x848
+            0x54FFFDC1,  # b.ne
+        ),
+    )
+
+    base_stores = {
+        immediate
+        for _offset, word in words(base_power_code)
+        if (store := decode_str_unsigned(word)) is not None
+        for _source, base, immediate, width in (store,)
+        if base == 8 and width == 4
+    }
+    frequency_offsets = set(range(0xFC8, 0x1008, 4))
+    secondary_frequency_offsets = set(range(0x1808, 0x1848, 4))
+    required_base_stores = {0xFC4} | frequency_offsets | secondary_frequency_offsets
+    if not required_base_stores.issubset(base_stores):
+        missing = sorted(required_base_stores - base_stores)
+        raise ValueError(
+            "hardware-config producer has incomplete performance tables: "
+            f"{[hex(offset) for offset in missing]}"
+        )
+
+    require_instruction_sequence(
+        arm_power_code,
+        "voltage-table loop setup",
+        (
+            0xF9415E6B,  # ldr config CPU address, [x19, #0x2b8]
+            0x5282010A,  # mov w10, #0x1008
+            0x8B0A016A,  # add x10, x11, x10
+            0x91041108,
+            0x5283110C,  # mov w12, #0x1888
+            0x8B0C016B,  # add x11, x11, x12
+            0x5280020C,  # mov w12, #16
+        ),
+    )
+    arm_stores = {
+        (base, immediate, width)
+        for _offset, word in words(arm_power_code)
+        if (store := decode_str_unsigned(word)) is not None
+        for _source, base, immediate, width in (store,)
+    }
+    voltage_columns = {
+        (10, offset, 4) for offset in range(0, 0x40, 4)
+    } | {(10, 0x400 + offset, 4) for offset in range(0, 0x40, 4)}
+    if not voltage_columns.issubset(arm_stores):
+        raise ValueError("hardware-config producer has incomplete 16-column voltage rows")
+    require_instruction_sequence(
+        arm_power_code,
+        "voltage-table row advance",
+        (
+            0xBC5C0100,
+            0xBC1C0160,  # table at 0x1848 through x11 - 0x40
+            0x91010129,  # add source row, #0x40
+            0xBC404500,
+            0xBC004560,  # table at 0x1888, post-increment #4
+            0x9101014A,  # add destination row, #0x40
+            0xF100058C,  # subs x12, x12, #1
+            0x54FFF721,  # b.ne
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "linear-power table binding",
+        (
+            0xF9415E68,
+            0x52831909,  # mov w9, #0x18c8
+            0x8B090101,  # add x1, x8, x9
+            0x52800002,  # mov w2, #0
+        ),
+    )
+    for offset, materialization in (
+        (0x1908, (0x5283210B, 0x8B0B0134)),
+        (0x1948, (0x5283290B, 0x8B0B012B)),
+        (0x19C8, (0x52833909, 0x8B09010A)),
+    ):
+        require_instruction_sequence(
+            arm_power_code,
+            f"table binding at {offset:#x}",
+            materialization,
+        )
+
+    return {
+        "color_matrices": {
+            "offset": 0x38,
+            "records": 64,
+            "record_bytes": 0x18,
+            "banks": 2,
+        },
+        "io_mappings": {"offset": 0x640, "records": 53, "record_bytes": 0x28},
+        "performance_states": {
+            "capacity": 16,
+            "count_offset": 0xFC4,
+            "frequency_offset": 0xFC8,
+            "voltage_offset": 0x1008,
+            "sram_voltage_offset": 0x1408,
+            "secondary_frequency_offset": 0x1808,
+            "derived_table_offsets": [0x1848, 0x1888, 0x18C8, 0x1908, 0x1948],
+        },
+    }
+
+
 def recover_firmware_config_reads(firmware: bytes) -> dict[str, object]:
     magic = find_materialized_constant(firmware, INTERFACE_MAGIC)
     if len(magic) != 1:
@@ -948,9 +1115,14 @@ def main() -> int:
         accelerator["bindings"] = recover_accelerator_ring_bindings(
             allocations, base_init_code
         )
+        _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
+        _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
         hardware_config = recover_hardware_config(
             allocations, shared_init_code, firmware
+        )
+        hardware_config["host_layout"] = recover_driver_hardware_config_layout(
+            base_init_code, base_power_code, power_code
         )
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:

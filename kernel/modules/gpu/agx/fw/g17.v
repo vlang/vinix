@@ -4,7 +4,6 @@ module fw
 // RTKit build 3255.120.11. This is deliberately only the root bootstrap
 // header: unknown nested structures must not be represented as compatible
 // with the older G13 InitData types in this module.
-
 pub const g17_init_message = u64(0x81) << 48
 pub const g17_init_address_mask = (u64(1) << 44) - 1
 pub const g17_interface_magic = u64(0x0c8bc322072804c0)
@@ -33,6 +32,12 @@ pub const g17_primary_region_size = u64(0xe440)
 pub const g17_secondary_region_size = u64(0x6f0)
 pub const g17_secondary_aux_size = u64(0xa8)
 pub const g17_hardware_config_size = u64(0x2710)
+pub const g17_color_matrix_count = 64
+pub const g17_color_matrix_size = u64(0x18)
+pub const g17_io_mapping_count = 53
+pub const g17_io_mapping_size = u64(0x28)
+pub const g17_performance_state_capacity = 16
+pub const g17_voltage_table_columns = 16
 
 // The primary G17C firmware copies exactly 0xc8 bytes from the host-provided
 // root before dereferencing any nested pointers. The names below describe
@@ -65,9 +70,7 @@ pub fn new_g17_bootstrap_header(role u32) G17BootstrapHeader {
 }
 
 pub fn validate_g17_bootstrap_header(header &G17BootstrapHeader) bool {
-	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size
-		&& header.interface_magic == g17_interface_magic
-		&& header.host_mapped_allocations != 0
+	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size && header.interface_magic == g17_interface_magic && header.host_mapped_allocations != 0
 }
 
 // Shared object referenced by root+0x18. The host driver writes these fields
@@ -135,33 +138,59 @@ pub mut:
 	opaque [0xa8]u8
 }
 
+@[packed]
+pub struct G17ColorMatrixRecord {
+pub mut:
+	coefficients [12]i16
+}
+
+// Modern G17 I/O mappings are 0x28 bytes rather than the 0x20-byte records in
+// older AGX firmware. Only the record boundary is currently established.
+@[packed]
+pub struct G17IoMappingRecord {
+pub mut:
+	opaque [0x28]u8
+}
+
+@[packed]
+pub struct G17VoltageTableRow {
+pub mut:
+	values [g17_voltage_table_columns]u32
+}
+
 // Hardware/configuration allocation published at offset zero of both
-// firmware-shared objects. The region boundaries below are established by
-// the primary firmware's fixed loads and copies. Their contents remain opaque
-// until the corresponding host-side producers have been recovered.
+// firmware-shared objects. The host producer and primary firmware consumer
+// independently establish the record boundaries below. Unknown scalar and
+// derived-power meanings remain opaque.
 @[packed]
 pub struct G17HardwareConfig {
 pub mut:
-	opaque_000                  [0x8f0]u8
-	address_8f0                 u64
-	opaque_8f8                  [0x598]u8
-	firmware_scalar_block_e90   [0x138]u8
-	firmware_table_block_fc8    [0xa00]u8
-	firmware_block_19c8         [0x80]u8
-	opaque_1a48                 [0x148]u8
-	firmware_copied_block_1b90  [0x148]u8
-	opaque_1cd8                 [0x868]u8
-	firmware_late_controls_2540 [0x1d0]u8
+	address_space_layout_000       [0x38]u8
+	color_matrices_038             [g17_color_matrix_count]G17ColorMatrixRecord
+	io_mapping_aux_address_638     u64
+	io_mappings_640                [g17_io_mapping_count]G17IoMappingRecord
+	opaque_e88                     [0x8]u8
+	firmware_scalar_block_e90      [0x134]u8
+	performance_state_count_fc4    u32
+	frequency_table_fc8            [g17_performance_state_capacity]u32
+	voltage_table_1008             [g17_performance_state_capacity]G17VoltageTableRow
+	sram_voltage_table_1408        [g17_performance_state_capacity]G17VoltageTableRow
+	secondary_frequency_table_1808 [g17_performance_state_capacity]u32
+	firmware_table_1848            [g17_performance_state_capacity]u32
+	firmware_table_1888            [g17_performance_state_capacity]u32
+	firmware_table_18c8            [g17_performance_state_capacity]u32
+	firmware_table_1908            [g17_performance_state_capacity]u32
+	firmware_table_1948            [g17_performance_state_capacity]u32
+	opaque_1988                    [0x40]u8
+	firmware_block_19c8            [0x80]u8
+	opaque_1a48                    [0x148]u8
+	firmware_copied_block_1b90     [0x148]u8
+	opaque_1cd8                    [0x868]u8
+	firmware_late_controls_2540    [0x1d0]u8
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size
-		&& sizeof(G17RuntimeData) == g17_runtime_data_size
-		&& sizeof(G17SmallSharedData) == g17_small_shared_data_size
-		&& sizeof(G17PrimaryRegion) == g17_primary_region_size
-		&& sizeof(G17SecondaryRegion) == g17_secondary_region_size
-		&& sizeof(G17SecondaryAux) == g17_secondary_aux_size
-		&& sizeof(G17HardwareConfig) == g17_hardware_config_size
+	return sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.
@@ -214,8 +243,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size
-		&& sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size
-		&& sizeof(G17DataMasterEntry) == g17_data_master_entry_size
-		&& sizeof(G17DeviceControlEntry) == g17_device_control_entry_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size
 }

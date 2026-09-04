@@ -290,6 +290,107 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["bytes"], 0x2710)
         self.assertEqual(recovered["published_shared_cpu_members"], [0xA98, 0xBC8])
 
+    def test_recovers_driver_hardware_config_table_layout(self) -> None:
+        matrix_loop = (
+            0x5280040A,
+            0xF940010B,
+            0xF9001D2B,
+            0xF941810B,
+            0xF9019D2B,
+            0xF940050B,
+            0xF900212B,
+            0xF941850B,
+            0xF901A12B,
+            0xF940090B,
+            0xF900252B,
+            0xF941890B,
+            0xF901A52B,
+            0x91006108,
+            0x91006129,
+            0xF100054A,
+            0x54FFFE21,
+        )
+        io_loop = (
+            0xD2800008,
+            0xD280000A,
+            0xF9415E69,
+            0xF9129520,
+            0xF9414E60,
+            0x8B08000B,
+            0xB949896C,
+            0xB947856D,
+            0x1B0C7DAD,
+            0x8B0A012E,
+            0xB90651CD,
+            0xF943C56D,
+            0xF90321CD,
+            0xF944C96D,
+            0xF9032DCD,
+            0xB90655CC,
+            0xB947816B,
+            0x121F016B,
+            0xB90661CB,
+            0xF90325DF,
+            0x9100A14A,
+            0x9110E108,
+            0xF121215F,
+            0x54FFFDC1,
+        )
+        base_init = encode(*matrix_loop, *io_loop)
+        base_power = encode(
+            *(str_unsigned(9, 8, offset, 4) for offset in (0xFC4,)),
+            *(str_unsigned(11, 8, offset, 4) for offset in range(0xFC8, 0x1008, 4)),
+            *(
+                str_unsigned(11, 8, offset, 4)
+                for offset in range(0x1808, 0x1848, 4)
+            ),
+        )
+        arm_power = encode(
+            0xF9415E6B,
+            0x5282010A,
+            0x8B0A016A,
+            0x91041108,
+            0x5283110C,
+            0x8B0C016B,
+            0x5280020C,
+            *(str_unsigned(13, 10, offset, 4) for offset in range(0, 0x40, 4)),
+            *(
+                str_unsigned(13, 10, 0x400 + offset, 4)
+                for offset in range(0, 0x40, 4)
+            ),
+            0xBC5C0100,
+            0xBC1C0160,
+            0x91010129,
+            0xBC404500,
+            0xBC004560,
+            0x9101014A,
+            0xF100058C,
+            0x54FFF721,
+            0xF9415E68,
+            0x52831909,
+            0x8B090101,
+            0x52800002,
+            0x5283210B,
+            0x8B0B0134,
+            0x5283290B,
+            0x8B0B012B,
+            0x52833909,
+            0x8B09010A,
+        )
+        recovered = recover_g17_abi.recover_driver_hardware_config_layout(
+            base_init, base_power, arm_power
+        )
+        self.assertEqual(recovered["color_matrices"]["records"], 64)
+        self.assertEqual(recovered["io_mappings"]["records"], 53)
+        self.assertEqual(recovered["performance_states"]["voltage_offset"], 0x1008)
+        self.assertEqual(
+            recovered["performance_states"]["derived_table_offsets"][-1], 0x1948
+        )
+
+    def test_rejects_incomplete_driver_hardware_config_layout(self) -> None:
+        with self.assertRaisesRegex(ValueError, "color-matrix"):
+            recover_g17_abi.recover_driver_hardware_config_layout(b"", b"", b"")
+
     def test_recovers_accelerator_ring_bindings(self) -> None:
         allocations = [
             {"host_cpu_member": 0xAE0, "host_gpu_member": 0xAE8, "bytes": 0x30},
