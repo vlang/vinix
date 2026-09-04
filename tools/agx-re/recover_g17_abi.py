@@ -3715,6 +3715,27 @@ def recover_driver_hardware_config_layout(
         )
 
     require_instruction_sequence(
+        base_power_code,
+        "primary and SRAM frequency-table conversion",
+        (
+            0xF9415E68,  # hardware config at firmware object +0x2b8
+            0xB90FC509,  # maximum performance-state index -> +0xfc4
+            0xF9414E69,  # accelerator at firmware object +0x298
+            0x91406D29,  # accelerator +0x1b000
+            0xB943192B,  # primary frequency[0] at +0x1b318
+            0x529BD06A,
+            0x72A8636A,  # reciprocal multiplier 0x431bde83
+            0x9BAA7D6B,
+            0xD372FD6B,  # unsigned product >> 50: Hz to MHz
+            0xB90FC90B,  # primary frequency[0] -> config +0xfc8
+            0xB94B612B,  # SRAM frequency[0] at +0x1bb60
+            0x9BAA7D6B,
+            0xD372FD6B,
+            0xB918090B,  # SRAM frequency[0] -> config +0x1808
+        ),
+    )
+
+    require_instruction_sequence(
         arm_power_code,
         "voltage-table loop setup",
         (
@@ -3788,6 +3809,14 @@ def recover_driver_hardware_config_layout(
             "voltage_offset": 0x1008,
             "sram_voltage_offset": 0x1408,
             "secondary_frequency_offset": 0x1808,
+            "primary_frequency_source_offset": 0x1B318,
+            "secondary_frequency_source_offset": 0x1BB60,
+            "frequency_conversion": {
+                "input": "Hz",
+                "output": "MHz",
+                "multiplier": 0x431BDE83,
+                "right_shift": 50,
+            },
             "derived_table_offsets": [0x1848, 0x1888, 0x18C8, 0x1908, 0x1948],
         },
     }
@@ -4020,6 +4049,8 @@ def recover_g17_hardware_config_constants(
 ) -> dict[str, object]:
     """Recover fixed scalar defaults and the absent G17 border-color table."""
 
+    feature_defaults = recover_g17_feature_defaults(image, base_init_code)
+
     symbols = macho_symbols(image)
     required = (
         G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS,
@@ -4124,6 +4155,7 @@ def recover_g17_hardware_config_constants(
             "debug_flags_initial": 0,
             "fixed_u32": {
                 "0xeb8": 1,
+                **feature_defaults["fixed_u32"],
                 "0xec8": 1,
                 "0xed0": 24000,
                 "0xed4": 1,
@@ -4134,7 +4166,105 @@ def recover_g17_hardware_config_constants(
                 "0xf34": 1,
                 "0xf38": 1,
             },
+            "feature_defaults": feature_defaults,
         },
+    }
+
+
+def recover_g17_feature_defaults(
+    image: bytes, base_init_code: bytes
+) -> dict[str, object]:
+    """Recover deterministic G17 accelerator feature-derived config words."""
+
+    symbols = macho_symbols(image)
+    required = (BASE_CONFIGURE_DEVICE, PI300_CONFIGURE_DEVICE, G17_CONFIGURE_DEVICE)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_CONFIGURE_DEVICE_VTABLE_SLOT
+    )
+    if target != symbols[G17_CONFIGURE_DEVICE]:
+        raise ValueError(f"unexpected G17 configureDevice target {target:#x}")
+
+    g17_address, g17_code = symbol_code(image, G17_CONFIGURE_DEVICE)
+    pi_address, pi_code = symbol_code(image, PI300_CONFIGURE_DEVICE)
+    for address, code, offset, expected, label in (
+        (
+            g17_address,
+            g17_code,
+            0x70,
+            symbols[PI300_CONFIGURE_DEVICE],
+            "G17 configureDevice PI_300 base",
+        ),
+        (
+            pi_address,
+            pi_code,
+            0x48,
+            symbols[BASE_CONFIGURE_DEVICE],
+            "PI_300 configureDevice base",
+        ),
+    ):
+        if offset + 4 > len(code):
+            raise ValueError(f"missing {label} call")
+        call_target = decode_bl_target(
+            address + offset, struct.unpack_from("<I", code, offset)[0]
+        )
+        if call_target != expected:
+            target_text = "non-BL" if call_target is None else f"{call_target:#x}"
+            raise ValueError(
+                f"unexpected {label} target {target_text}; expected {expected:#x}"
+            )
+
+    # Both masks are installed unconditionally after the checked base calls.
+    # The PI_300 mask supplies bit 10, which initFirmwareData publishes at
+    # hardware-config +0xec0. The G17 mask is retained in the report so later
+    # feature-derived fields can be tied to the same selected producer.
+    pi_mask = 0x00000000800184C0
+    g17_mask = 0x0001000018020000
+    require_instruction_words_at(
+        pi_code,
+        "PI_300 fixed accelerator feature mask",
+        {
+            0x84: 0xF9436A68,
+            0x9C: 0x52909809,
+            0xA0: 0x72B00029,
+            0xA4: 0xAA090108,
+            0xA8: 0xF9036A68,
+        },
+    )
+    require_instruction_words_at(
+        g17_code,
+        "G17 fixed accelerator feature mask",
+        {
+            0x94: 0xF9436A68,
+            0x98: 0xD2A30049,
+            0x9C: 0xF2E00029,
+            0xA0: 0xAA090108,
+            0xA4: 0xF9036A68,
+        },
+    )
+    require_instruction_words_at(
+        base_init_code,
+        "G17 feature bit 10 hardware-config publication",
+        {
+            0x1398: 0xF9414E60,
+            0x139C: 0xB946D008,
+            0x13CC: 0xB946D00B,
+            0x13D0: 0x530A296B,
+            0x13D4: 0xB90EC12B,
+        },
+    )
+    if (pi_mask >> 10) & 1 != 1:
+        raise ValueError("PI_300 fixed feature mask does not supply bit 10")
+
+    return {
+        "source_offset": 0x6D0,
+        "configure_device_vtable_slot": G17_CONFIGURE_DEVICE_VTABLE_SLOT,
+        "pi300_unconditional_mask": pi_mask,
+        "g17_unconditional_mask": g17_mask,
+        "fixed_u32": {"0xec0": 1},
     }
 
 

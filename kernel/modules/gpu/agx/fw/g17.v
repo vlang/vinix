@@ -749,8 +749,9 @@ fn populate_g17_color_matrices(mut config G17HardwareConfig) {
 }
 
 // Four-byte-aligned scalar controls at hardware-config offsets 0xe90..0xfc3.
-// Only independently recovered fixed startup values are populated here;
-// feature-derived words remain zero until their producers are modeled.
+// Only independently recovered startup values are populated here. This
+// includes feature-derived words whose selected configureDevice producer is
+// deterministic; all other feature-derived words remain zero.
 @[packed]
 pub struct G17FirmwareScalarBlock {
 pub mut:
@@ -760,6 +761,9 @@ pub mut:
 pub fn new_g17_firmware_scalar_block() G17FirmwareScalarBlock {
 	mut result := G17FirmwareScalarBlock{}
 	result.values[(0xeb8 - 0xe90) / 4] = 1
+	// PI_300 configureDevice unconditionally installs accelerator feature bit
+	// 10; initFirmwareData extracts that bit into this word.
+	result.values[(0xec0 - 0xe90) / 4] = 1
 	result.values[(0xec8 - 0xe90) / 4] = 1
 	result.values[(0xed0 - 0xe90) / 4] = 24_000
 	// The standard path starts with Apple's debug flags disabled, selecting 1.
@@ -820,6 +824,9 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 	config.performance_state_max_fc4 = hardware.perf_state_count - 1
 	for state := u32(0); state < hardware.perf_state_count; state++ {
 		config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
+		// Apple's second source is the perf-states-sram frequency column. The
+		// parser has already required it to match the core frequency exactly.
+		config.secondary_frequency_table_1808[state] = hardware.perf_state_frequencies[state] / 1_000_000
 		base_voltage := hardware.perf_state_voltages[state * g17_voltage_table_columns]
 		base_sram_voltage := hardware.perf_state_sram_voltages[state * g17_voltage_table_columns]
 		for table := u32(0); table < g17_voltage_table_columns; table++ {
@@ -921,6 +928,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		config.performance_state_max_fc4 = hardware.perf_state_count - 1
 		for state := u32(0); state < hardware.perf_state_count; state++ {
 			config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
+			config.secondary_frequency_table_1808[state] = hardware.perf_state_frequencies[state] / 1_000_000
 			base_voltage := hardware.perf_state_voltages[state * g17_voltage_table_columns]
 			base_sram_voltage := hardware.perf_state_sram_voltages[state * g17_voltage_table_columns]
 			for table := u32(0); table < g17_voltage_table_columns; table++ {

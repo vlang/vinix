@@ -1936,7 +1936,24 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x54FFFDC1,
         )
         base_init = encode(*matrix_loop, *io_loop)
+        frequency_conversion = (
+            0xF9415E68,
+            0xB90FC509,
+            0xF9414E69,
+            0x91406D29,
+            0xB943192B,
+            0x529BD06A,
+            0x72A8636A,
+            0x9BAA7D6B,
+            0xD372FD6B,
+            0xB90FC90B,
+            0xB94B612B,
+            0x9BAA7D6B,
+            0xD372FD6B,
+            0xB918090B,
+        )
         base_power = encode(
+            *frequency_conversion,
             *(str_unsigned(9, 8, offset, 4) for offset in (0xFC4,)),
             *(str_unsigned(11, 8, offset, 4) for offset in range(0xFC8, 0x1008, 4)),
             *(
@@ -1982,6 +1999,10 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["color_matrices"]["records"], 64)
         self.assertEqual(recovered["io_mappings"]["records"], 53)
         self.assertEqual(recovered["performance_states"]["voltage_offset"], 0x1008)
+        self.assertEqual(
+            recovered["performance_states"]["secondary_frequency_source_offset"],
+            0x1BB60,
+        )
         self.assertEqual(
             recovered["performance_states"]["derived_table_offsets"][-1], 0x1948
         )
@@ -2233,14 +2254,83 @@ class RecoverG17AbiTests(unittest.TestCase):
                     b"\0",
                 ],
             ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_g17_feature_defaults",
+                return_value={"fixed_u32": {"0xec0": 1}},
+            ),
         ):
             recovered = recover_g17_abi.recover_g17_hardware_config_constants(
                 b"", bytes(base_init), bytes(arm_init)
             )
 
         self.assertEqual(recovered["border_color_table_address"]["value"], 0)
+        self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xec0"], 1)
         self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xed0"], 24000)
         self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xf38"], 1)
+
+    def test_recovers_g17_feature_defaults(self) -> None:
+        base_address = 0x100000
+        pi_address = 0x101000
+        g17_address = 0x102000
+        base_init = bytearray(0x13D8)
+        for offset, word in {
+            0x1398: 0xF9414E60,
+            0x139C: 0xB946D008,
+            0x13CC: 0xB946D00B,
+            0x13D0: 0x530A296B,
+            0x13D4: 0xB90EC12B,
+        }.items():
+            struct.pack_into("<I", base_init, offset, word)
+
+        pi_code = bytearray(0xAC)
+        struct.pack_into("<I", pi_code, 0x48, bl(pi_address + 0x48, base_address))
+        for offset, word in {
+            0x84: 0xF9436A68,
+            0x9C: 0x52909809,
+            0xA0: 0x72B00029,
+            0xA4: 0xAA090108,
+            0xA8: 0xF9036A68,
+        }.items():
+            struct.pack_into("<I", pi_code, offset, word)
+
+        g17_code = bytearray(0xA8)
+        struct.pack_into("<I", g17_code, 0x70, bl(g17_address + 0x70, pi_address))
+        for offset, word in {
+            0x94: 0xF9436A68,
+            0x98: 0xD2A30049,
+            0x9C: 0xF2E00029,
+            0xA0: 0xAA090108,
+            0xA4: 0xF9036A68,
+        }.items():
+            struct.pack_into("<I", g17_code, offset, word)
+
+        symbols = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: base_address,
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: pi_address,
+            recover_g17_abi.G17_CONFIGURE_DEVICE: g17_address,
+        }
+        code = {
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: (pi_address, bytes(pi_code)),
+            recover_g17_abi.G17_CONFIGURE_DEVICE: (g17_address, bytes(g17_code)),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=g17_address
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_feature_defaults(
+                b"", bytes(base_init)
+            )
+
+        self.assertEqual(recovered["pi300_unconditional_mask"], 0x800184C0)
+        self.assertEqual(recovered["fixed_u32"], {"0xec0": 1})
 
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
