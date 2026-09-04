@@ -1,6 +1,7 @@
 module fw
 
 import gpu.agx.hw
+import katomic
 
 // Verified anchors for the G17C firmware shipped with macOS 26.5 (25F71),
 // RTKit build 3255.120.11. This is deliberately only the root bootstrap
@@ -786,6 +787,40 @@ pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 		mut control := &G17ChannelControl(uncached_buffer)
 		control.sentinel_050 = ~u32(0)
 		control.ring_entries = bindings.ring_entries
+	}
+	return true
+}
+
+// Publish one firmware work-command address using the ordering recovered from
+// AGXChannel::writeChannelCommandPointer. One ring entry is deliberately kept
+// empty so equal read/write indices always mean empty, never full. A full ring
+// is reported to the caller rather than spinning inside the kernel.
+pub fn enqueue_g17_channel_command(uncached_buffer voidptr, uncached_size u64,
+	cached_buffer voidptr, cached_size u64, command_gpu_address u64) bool {
+	if uncached_buffer == unsafe { nil } || uncached_size < g17_channel_control_header_size
+		|| cached_buffer == unsafe { nil } || command_gpu_address == 0 {
+		return false
+	}
+
+	unsafe {
+		mut control := &G17ChannelControl(uncached_buffer)
+		entries := katomic.load(&control.ring_entries)
+		if entries < 2 || u64(entries) > cached_size / g17_cached_command_pointer_size {
+			return false
+		}
+		read_index := katomic.load(&control.read_index)
+		write_index := katomic.load(&control.write_index)
+		if read_index >= entries || write_index >= entries {
+			return false
+		}
+		next_index := (write_index + 1) % entries
+		if next_index == read_index {
+			return false
+		}
+
+		mut pointer := &u64(u64(cached_buffer) + u64(write_index) * g17_cached_command_pointer_size)
+		katomic.store(mut pointer, command_gpu_address)
+		katomic.store(mut &control.write_index, next_index)
 	}
 	return true
 }

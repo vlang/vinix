@@ -1097,6 +1097,9 @@ class RecoverG17AbiTests(unittest.TestCase):
             ldr_w(9, 0, 0x54),
             ldr_x(9, 0, 0x68),
             ubfiz_x(10, 8, 3, 61),
+            str_unsigned(1, 11, 0, 8),
+            0xD5033BBF,  # dmb ish
+            str_unsigned(8, 9, 0x40, 4),
         )
         channel = recover_g17_abi.recover_g17_channel_layout(
             reset_code, write_code
@@ -1104,6 +1107,8 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(channel["state"]["bytes"], 0xC0)
         self.assertEqual(channel["uncached_control"]["write_index"], 0x40)
         self.assertEqual(channel["cached_command_pointer_bytes"], 8)
+        self.assertEqual(channel["enqueue"]["reserved_entries"], 1)
+        self.assertTrue(channel["enqueue"]["write_index_published_last"])
 
     def test_rejects_incomplete_g17_channel_layout(self) -> None:
         with self.assertRaisesRegex(ValueError, "CPU bindings"):

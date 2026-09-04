@@ -3303,6 +3303,41 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
     ):
         raise ValueError("G17 cached command-pointer array does not use an 8-byte stride")
 
+    pointer_store_index = next(
+        (
+            index
+            for index, (_offset, word) in enumerate(write_instructions)
+            if (store := decode_str_unsigned(word)) is not None
+            and store[0] == 1
+            and store[2:] == (0, 8)
+        ),
+        None,
+    )
+    barrier_index = next(
+        (
+            index
+            for index, (_offset, word) in enumerate(write_instructions)
+            if word == 0xD5033BBF  # dmb ish
+        ),
+        None,
+    )
+    write_index_store = next(
+        (
+            index
+            for index, (_offset, word) in enumerate(write_instructions)
+            if (store := decode_str_unsigned(word)) is not None
+            and store[2:] == (0x40, 4)
+        ),
+        None,
+    )
+    if (
+        pointer_store_index is None
+        or barrier_index is None
+        or write_index_store is None
+        or not pointer_store_index < barrier_index < write_index_store
+    ):
+        raise ValueError("unexpected G17 channel-pointer publication order")
+
     return {
         "host_channel_members": {
             "state_cpu": 0x58,
@@ -3331,6 +3366,11 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
             "ring_entries": 0x60,
         },
         "cached_command_pointer_bytes": 8,
+        "enqueue": {
+            "reserved_entries": 1,
+            "pointer_barrier": "dmb ish",
+            "write_index_published_last": True,
+        },
     }
 
 
