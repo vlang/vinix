@@ -2332,6 +2332,89 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["pi300_unconditional_mask"], 0x800184C0)
         self.assertEqual(recovered["fixed_u32"], {"0xec0": 1})
 
+    def test_recovers_g17_relative_boost_frequency_table(self) -> None:
+        setup_address = 0x100000
+        setup_code = bytearray(0x550)
+        for offset, word in {
+            0x48C: 0xF9414E68,
+            0x490: 0x91404115,
+            0x494: 0xB94ECEA9,
+            0x498: 0x5290A3EA,
+            0x49C: 0x72AA3D6A,
+            0x4A0: 0x9BAA7D29,
+            0x4A4: 0xD365FD36,
+            0x4C8: 0xF0FF3FC1,
+            0x4CC: 0x913D0C21,
+            0x50C: 0xB9400016,
+            0x510: 0x34004896,
+            0x514: 0xB94F3668,
+            0x518: 0x6B160109,
+            0x520: 0x52800C8A,
+            0x53C: 0x1B0A7EC9,
+            0x540: 0xB90EC6A9,
+            0x544: 0x1B0A7D08,
+            0x548: 0xB90ECAA8,
+            0x54C: 0xB90ECEA9,
+        }.items():
+            struct.pack_into("<I", setup_code, offset, word)
+
+        arm_power = bytearray(0xDBC)
+        for offset, word in {
+            0xCE4: 0x5283210B,
+            0xCE8: 0x8B0B0134,
+            0xCEC: 0xB94B86A9,
+            0xCF0: 0x5290A3EB,
+            0xCF4: 0x72AA3D6B,
+            0xCF8: 0x9BAB7D29,
+            0xCFC: 0xD365FD3A,
+            0xD00: 0x91406D08,
+            0xD04: 0x910C6116,
+            0xD08: 0x8B1A0AC8,
+            0xD0C: 0xB9400117,
+            0xD10: 0xD1000559,
+            0xD14: 0xD37EF738,
+            0xD2C: 0xB940011B,
+            0xD30: 0xD37EF541,
+            0xD34: 0xAA1403E0,
+            0xD3C: 0xEB1A033F,
+            0xD44: 0xCB170368,
+            0xD48: 0x11000749,
+            0xD4C: 0x52800C8A,
+            0xD68: 0xB940018C,
+            0xD6C: 0xCB17018C,
+            0xD84: 0x9B0A7D8B,
+            0xD88: 0x9AC8096B,
+            0xD8C: 0xB90001AB,
+            0xD94: 0x11000529,
+            0xD98: 0xEB1A033F,
+            0xD9C: 0x54FFFDA8,
+            0xDB4: 0x52800C89,
+            0xDB8: 0xB9000109,
+        }.items():
+            struct.pack_into("<I", arm_power, offset, word)
+
+        image = b"gpu-perf-base-pstate\0"
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.INIT_BASE_SETUP_CONFIG: setup_address},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(setup_address, bytes(setup_code)),
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+        ):
+            recovered = recover_g17_abi.recover_g17_relative_boost_frequency_table(
+                image, bytes(arm_power)
+            )
+
+        self.assertEqual(recovered["offset"], 0x1908)
+        self.assertEqual(recovered["base_state_property"], "gpu-perf-base-pstate")
+        self.assertEqual(recovered["maximum_state_value"], 100)
+
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
             0x7100045F,

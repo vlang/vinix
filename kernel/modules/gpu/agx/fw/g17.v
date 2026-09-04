@@ -798,7 +798,7 @@ pub mut:
 	firmware_table_1848            [g17_performance_state_capacity]u32
 	firmware_table_1888            [g17_performance_state_capacity]u32
 	firmware_table_18c8            [g17_performance_state_capacity]u32
-	firmware_table_1908            [g17_performance_state_capacity]u32
+	relative_boost_frequency_1908  [g17_performance_state_capacity]u32
 	firmware_table_1948            [g17_performance_state_capacity]u32
 	opaque_1988                    [0x40]u8
 	firmware_block_19c8            [0x80]u8
@@ -818,6 +818,14 @@ pub fn validate_g17_bootstrap_allocations() bool {
 // until their producers have been recovered.
 pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &hw.HwConfig) bool {
 	if hardware.perf_state_count == 0 || hardware.perf_state_count > g17_performance_state_capacity || hardware.perf_state_table_count == 0 || hardware.perf_state_table_count > g17_voltage_table_columns {
+		return false
+	}
+	if hardware.perf_state_base == 0 || hardware.perf_state_base >= hardware.perf_state_count - 1 {
+		return false
+	}
+	base_frequency := hardware.perf_state_frequencies[hardware.perf_state_base]
+	max_frequency := hardware.perf_state_frequencies[hardware.perf_state_count - 1]
+	if max_frequency <= base_frequency {
 		return false
 	}
 
@@ -842,6 +850,11 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 				base_sram_voltage
 			}
 		}
+	}
+	for state := hardware.perf_state_base + 1; state < hardware.perf_state_count; state++ {
+		frequency_delta := u64(hardware.perf_state_frequencies[state] - base_frequency)
+		frequency_range := u64(max_frequency - base_frequency)
+		config.relative_boost_frequency_1908[state] = u32(frequency_delta * 100 / frequency_range)
 	}
 	return true
 }
@@ -906,7 +919,8 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		|| hardware.perf_state_count == 0
 		|| hardware.perf_state_count > g17_performance_state_capacity
 		|| hardware.perf_state_table_count == 0
-		|| hardware.perf_state_table_count > g17_voltage_table_columns {
+		|| hardware.perf_state_table_count > g17_voltage_table_columns
+		|| hardware.perf_state_base == 0 || hardware.perf_state_base >= hardware.perf_state_count - 1 {
 		return false
 	}
 
@@ -926,6 +940,11 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 			return false
 		}
 		config.performance_state_max_fc4 = hardware.perf_state_count - 1
+		base_frequency := hardware.perf_state_frequencies[hardware.perf_state_base]
+		max_frequency := hardware.perf_state_frequencies[hardware.perf_state_count - 1]
+		if max_frequency <= base_frequency {
+			return false
+		}
 		for state := u32(0); state < hardware.perf_state_count; state++ {
 			config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
 			config.secondary_frequency_table_1808[state] = hardware.perf_state_frequencies[state] / 1_000_000
@@ -944,6 +963,11 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 					base_sram_voltage
 				}
 			}
+		}
+		for state := hardware.perf_state_base + 1; state < hardware.perf_state_count; state++ {
+			frequency_delta := u64(hardware.perf_state_frequencies[state] - base_frequency)
+			frequency_range := u64(max_frequency - base_frequency)
+			config.relative_boost_frequency_1908[state] = u32(frequency_delta * 100 / frequency_range)
 		}
 	}
 	return true

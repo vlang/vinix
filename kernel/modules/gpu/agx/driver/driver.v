@@ -221,8 +221,13 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 		println('agx: t6050 has no gpu-num-perf-states')
 		return false
 	}
-	if state_count == 0 || state_count > 16 || table_count == 0 || table_count > 16 || max_state + 1 != state_count {
-		C.printf(c'agx: invalid t6050 performance dimensions states=%u tables=%u max=%u\n', state_count, table_count, max_state)
+	base_state := devicetree.get_le_u32(gpu_node, 'gpu-perf-base-pstate') or {
+		println('agx: t6050 has no gpu-perf-base-pstate')
+		return false
+	}
+	if state_count == 0 || state_count > 16 || table_count == 0 || table_count > 16
+		|| max_state + 1 != state_count || base_state == 0 || base_state >= max_state {
+		C.printf(c'agx: invalid t6050 performance dimensions states=%u tables=%u base=%u max=%u\n', state_count, table_count, base_state, max_state)
 		return false
 	}
 	states := devicetree.get_le_u32_array(gpu_node, 'perf-states') or {
@@ -260,6 +265,7 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	}
 	cfg.perf_state_count = state_count
 	cfg.perf_state_table_count = table_count
+	cfg.perf_state_base = base_state
 	C.printf(c'agx: loaded %u x %u native performance states (%u..%u MHz)\n', state_count, table_count, cfg.perf_state_frequencies[0] / 1000000, cfg.perf_state_frequencies[state_count - 1] / 1000000)
 	return true
 }

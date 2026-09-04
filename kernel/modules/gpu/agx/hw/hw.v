@@ -117,6 +117,7 @@ pub mut:
 	gpu_mmio_base            u64
 	gpu_mmio_size            u64
 	perf_state_count         u32
+	perf_state_base          u32
 	perf_state_table_count   u32
 	perf_state_frequencies   [16]u32
 	perf_state_voltages      [256]u32
