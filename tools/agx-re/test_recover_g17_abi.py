@@ -157,6 +157,25 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(handoff["flush_records"], 65)
         self.assertEqual(handoff["current_slot_initial"], 0xFFFFFFFF)
 
+    def test_validates_root_allocation_sizes(self) -> None:
+        expected = {
+            0xAB8: 0x4C0,
+            0xBE8: 0x4C0,
+            0x388: 0x1CA0,
+            0xAD0: 0x20,
+            0xC00: 0x20,
+            0xCE0: 0xE440,
+            0xCE8: 0x6F0,
+            0x398: 0xA8,
+        }
+        allocations = [
+            {"host_cpu_member": member - 8, "host_gpu_member": member, "bytes": size}
+            for member, size in expected.items()
+        ]
+        sizes = recover_g17_abi.recover_root_allocation_sizes(allocations)
+        self.assertEqual(sizes["runtime_data"], 0x1CA0)
+        self.assertEqual(sizes["primary_region"], 0xE440)
+
 
 if __name__ == "__main__":
     unittest.main()

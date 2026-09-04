@@ -21,6 +21,7 @@ DRIVER_UUID = "680ACC23-AB13-301C-B28A-3A2A257F7977"
 FIRMWARE_UUID = "0EDFE976-E37B-3E68-9D64-E3ABF7772D11"
 INTERFACE_MAGIC = 0x0C8BC322072804C0
 INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
+ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
 DEVICE_CONTROL_RING = "__ZN18AGXAcceleratorRingI33AGFIAcceleratorDeviceControlEntryE"
@@ -255,6 +256,58 @@ def decode_pair_q(word: int) -> tuple[str, int, int, int, int] | None:
     return kind, first, second, base, immediate * 16
 
 
+def decode_adrp(address: int, word: int) -> tuple[int, int] | None:
+    if word & 0x9F000000 != 0x90000000:
+        return None
+    register = word & 0x1F
+    immediate = ((word >> 5) & 0x7FFFF) << 2 | ((word >> 29) & 0x3)
+    if immediate & (1 << 20):
+        immediate -= 1 << 21
+    target = (address & ~0xFFF) + (immediate << 12)
+    return register, target & 0xFFFFFFFFFFFFFFFF
+
+
+def decode_stp_x(word: int) -> tuple[int, int, int, int] | None:
+    if word & 0xFFC00000 != 0xA9000000:
+        return None
+    first = word & 0x1F
+    base = (word >> 5) & 0x1F
+    second = (word >> 10) & 0x1F
+    immediate = (word >> 15) & 0x7F
+    if immediate & 0x40:
+        immediate -= 0x80
+    return first, second, base, immediate * 8
+
+
+def decode_ldr_d(word: int) -> tuple[int, int, int] | None:
+    if word & 0xFFC00000 != 0xFD400000:
+        return None
+    destination = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = ((word >> 10) & 0xFFF) * 8
+    return destination, base, immediate
+
+
+def decode_str_d(word: int) -> tuple[int, int, int] | None:
+    if word & 0xFFC00000 != 0xFD000000:
+        return None
+    source = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = ((word >> 10) & 0xFFF) * 8
+    return source, base, immediate
+
+
+def decode_stur_d(word: int) -> tuple[int, int, int] | None:
+    if word & 0xFFE00C00 != 0xFC000000:
+        return None
+    source = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = (word >> 12) & 0x1FF
+    if immediate & 0x100:
+        immediate -= 0x200
+    return source, base, immediate
+
+
 def recover_firmware_root(code: bytes) -> dict[str, object]:
     magic = find_materialized_constant(code, INTERFACE_MAGIC)
     if len(magic) != 1:
@@ -311,6 +364,103 @@ def recover_driver_root(code: bytes) -> dict[str, object]:
         "firmware_role_offset": 0x28,
         "host_mapped_allocations_offset": 0x2C,
     }
+
+
+def recover_firmware_allocations(image: bytes, address: int, code: bytes) -> list[dict[str, int]]:
+    registers: dict[int, tuple[str, int]] = {19: ("this", 0)}
+    vectors: dict[int, int] = {}
+    stack: dict[int, tuple[str, int] | int] = {}
+    frame: dict[int, tuple[str, int] | int] = {}
+    allocations: set[tuple[int, int, int]] = set()
+
+    def collect(storage: dict[int, tuple[str, int] | int], size_offset: int) -> None:
+        cpu = storage.get(size_offset - 16)
+        gpu = storage.get(size_offset - 8)
+        size = storage.get(size_offset)
+        if (
+            isinstance(cpu, tuple)
+            and cpu[0] == "this"
+            and isinstance(gpu, tuple)
+            and gpu[0] == "this"
+            and isinstance(size, int)
+        ):
+            allocations.add((cpu[1], gpu[1], size))
+
+    for offset, word in words(code):
+        pc = address + offset
+        page = decode_adrp(pc, word)
+        if page is not None:
+            registers[page[0]] = ("absolute", page[1])
+            continue
+        addition = decode_add_immediate(word)
+        if addition is not None:
+            destination, source, immediate = addition
+            if source in registers:
+                kind, value = registers[source]
+                registers[destination] = (kind, value + immediate)
+            continue
+        load_d = decode_ldr_d(word)
+        if load_d is not None:
+            destination, base, immediate = load_d
+            if base in registers and registers[base][0] == "absolute":
+                location = registers[base][1] + immediate
+                file_offset = virtual_to_file(image, location)
+                vectors[destination] = struct.unpack_from("<Q", image, file_offset)[0]
+            continue
+        pair = decode_stp_x(word)
+        if pair is not None and pair[2] in (29, 31):
+            first, second, _base, stack_offset = pair
+            storage = frame if pair[2] == 29 else stack
+            if first in registers:
+                storage[stack_offset] = registers[first]
+            if second in registers:
+                storage[stack_offset + 8] = registers[second]
+            continue
+        store_x = decode_str_x(word)
+        if store_x is not None and store_x[1] == 31 and store_x[0] in registers:
+            stack[store_x[2]] = registers[store_x[0]]
+            continue
+        store_d = decode_str_d(word)
+        if store_d is not None and store_d[1] == 31 and store_d[0] in vectors:
+            stack[store_d[2]] = vectors[store_d[0]]
+            collect(stack, store_d[2])
+            continue
+        store_unscaled_d = decode_stur_d(word)
+        if (
+            store_unscaled_d is not None
+            and store_unscaled_d[1] == 29
+            and store_unscaled_d[0] in vectors
+        ):
+            frame[store_unscaled_d[2]] = vectors[store_unscaled_d[0]]
+            collect(frame, store_unscaled_d[2])
+
+    return [
+        {"host_cpu_member": cpu, "host_gpu_member": gpu, "bytes": size}
+        for cpu, gpu, size in sorted(allocations)
+    ]
+
+
+def recover_root_allocation_sizes(allocations: list[dict[str, int]]) -> dict[str, int]:
+    by_gpu_member = {item["host_gpu_member"]: item["bytes"] for item in allocations}
+    expected = {
+        "firmware_shared_data": (0xAB8, 0x4C0),
+        "secondary_firmware_shared_data": (0xBE8, 0x4C0),
+        "runtime_data": (0x388, 0x1CA0),
+        "small_shared_data": (0xAD0, 0x20),
+        "secondary_small_shared_data": (0xC00, 0x20),
+        "primary_region": (0xCE0, 0xE440),
+        "secondary_region": (0xCE8, 0x6F0),
+        "secondary_aux": (0x398, 0xA8),
+    }
+    result = {}
+    for name, (member, expected_size) in expected.items():
+        size = by_gpu_member.get(member)
+        if size != expected_size:
+            raise ValueError(
+                f"unexpected {name} allocation through host member {member:#x}: {size}"
+            )
+        result[name] = size
+    return result
 
 
 def recover_ring_accessor(code: bytes) -> tuple[int, int]:
@@ -507,6 +657,11 @@ def main() -> int:
         accelerator = recover_driver_accelerator_layouts(driver)
         _address, handoff_code = symbol_code(driver, INIT_UAT_HANDOFF)
         handoff = recover_g17_handoff(handoff_code)
+        allocation_address, allocation_code = symbol_code(driver, ALLOC_FIRMWARE_DATA)
+        allocations = recover_firmware_allocations(
+            driver, allocation_address, allocation_code
+        )
+        root_allocation_sizes = recover_root_allocation_sizes(allocations)
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))
@@ -520,6 +675,7 @@ def main() -> int:
                 "firmware_root": firmware_root,
                 "accelerator": accelerator,
                 "uat_handoff": handoff,
+                "root_allocation_bytes": root_allocation_sizes,
             },
             indent=2,
         )

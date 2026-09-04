@@ -21,6 +21,12 @@ pub const g17_accelerator_ring_entries = u32(256)
 pub const g17_accelerator_ring_state_size = u64(0x30)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_device_control_entry_size = u64(0x40)
+pub const g17_firmware_shared_data_size = u64(0x4c0)
+pub const g17_runtime_data_size = u64(0x1ca0)
+pub const g17_small_shared_data_size = u64(0x20)
+pub const g17_primary_region_size = u64(0xe440)
+pub const g17_secondary_region_size = u64(0x6f0)
+pub const g17_secondary_aux_size = u64(0xa8)
 
 // The primary G17C firmware copies exactly 0xc8 bytes from the host-provided
 // root before dereferencing any nested pointers. The names below describe
@@ -56,6 +62,78 @@ pub fn validate_g17_bootstrap_header(header &G17BootstrapHeader) bool {
 	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size
 		&& header.interface_magic == g17_interface_magic
 		&& header.host_mapped_allocations != 0
+}
+
+// Shared object referenced by root+0x18. The host driver writes these fields
+// in initFirmwareSharedData and initFirmwareData. Pointer meanings below stay
+// opaque until their target allocations have independently recovered layouts.
+@[packed]
+pub struct G17FirmwareSharedData {
+pub mut:
+	address_000           u64
+	address_008           u64
+	address_010           u64
+	opaque_018            [0x1e8]u8
+	address_200           u64
+	opaque_208            [0x48]u8
+	state_250             u32
+	addresses_254         [5]u64
+	opaque_27c            [0x54]u8
+	address_2d0           u64
+	platform_address_2d8  u64
+	platform_address_2e0  u64
+	platform_address_2e8  u64
+	platform_address_2f0  u64
+	reserved_2f8          u64
+	value_300             u32
+	value_304             u32
+	opaque_308            [0xd8]u8
+	state_3e0             u8
+	status_3e1            [0x90]u8
+	secondary_address_471 u64
+	calibration_479       [0x10]u8
+	opaque_489            [0x37]u8
+}
+
+// Allocation sizes and placements are verified even where their contents are
+// not. Keeping distinct types prevents accidental reuse of G13 layouts.
+@[packed]
+pub struct G17RuntimeData {
+pub mut:
+	opaque [0x1ca0]u8
+}
+
+@[packed]
+pub struct G17SmallSharedData {
+pub mut:
+	opaque [0x20]u8
+}
+
+@[packed]
+pub struct G17PrimaryRegion {
+pub mut:
+	opaque [0xe440]u8
+}
+
+@[packed]
+pub struct G17SecondaryRegion {
+pub mut:
+	opaque [0x6f0]u8
+}
+
+@[packed]
+pub struct G17SecondaryAux {
+pub mut:
+	opaque [0xa8]u8
+}
+
+pub fn validate_g17_bootstrap_allocations() bool {
+	return sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size
+		&& sizeof(G17RuntimeData) == g17_runtime_data_size
+		&& sizeof(G17SmallSharedData) == g17_small_shared_data_size
+		&& sizeof(G17PrimaryRegion) == g17_primary_region_size
+		&& sizeof(G17SecondaryRegion) == g17_secondary_region_size
+		&& sizeof(G17SecondaryAux) == g17_secondary_aux_size
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.
