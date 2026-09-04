@@ -10,6 +10,7 @@ pub const g17_init_message = u64(0x81) << 48
 pub const g17_init_address_mask = (u64(1) << 44) - 1
 pub const g17_interface_magic = u64(0x0c8bc322072804c0)
 pub const g17_bootstrap_header_size = u64(0xc8)
+pub const g17_platform_config_size = u64(0x68)
 pub const g17_firmware_shared_data_offset = u64(0x18)
 pub const g17_runtime_data_offset = u64(0x20)
 pub const g17_firmware_role_offset = u64(0x28)
@@ -56,7 +57,8 @@ pub mut:
 	runtime_data_address         u64
 	firmware_role                u32
 	host_mapped_allocations      u32
-	opaque_030                   [0x78]u8
+	platform_config_030          [g17_platform_config_size]u8
+	opaque_098                   [0x10]u8
 	small_shared_data_address    u64
 	primary_region_address       u64
 	secondary_region_address     u64
@@ -71,8 +73,39 @@ pub fn new_g17_bootstrap_header(role u32) G17BootstrapHeader {
 	}
 }
 
+// Construct only the top-level object consumed by the G17 initialization
+// handler. The 0x68-byte platform block is a separate recovered input; callers
+// must not substitute the older G13 InitData contents for it.
+pub fn populate_g17_bootstrap_header(mut header G17BootstrapHeader, role u32,
+	bootstrap_region_address u64, firmware_shared_data_address u64, runtime_data_address u64,
+	small_shared_data_address u64, primary_region_address u64, secondary_region_address u64,
+	secondary_aux_address u64, platform_config voidptr, platform_config_size u64) bool {
+	if role > 1 || bootstrap_region_address == 0 || firmware_shared_data_address == 0 || runtime_data_address == 0 || small_shared_data_address == 0 || platform_config == unsafe { nil } || platform_config_size != g17_platform_config_size {
+		return false
+	}
+	if (role == 0 && primary_region_address == 0) || (role == 1 && (secondary_region_address == 0 || secondary_aux_address == 0)) {
+		return false
+	}
+
+	header = new_g17_bootstrap_header(role)
+	header.bootstrap_region_address = bootstrap_region_address
+	header.firmware_shared_data_address = firmware_shared_data_address
+	header.runtime_data_address = runtime_data_address
+	header.small_shared_data_address = small_shared_data_address
+	if role == 0 {
+		header.primary_region_address = primary_region_address
+	} else {
+		header.secondary_region_address = secondary_region_address
+		header.secondary_aux_address = secondary_aux_address
+	}
+	unsafe {
+		C.memcpy(&header.platform_config_030[0], platform_config, g17_platform_config_size)
+	}
+	return validate_g17_bootstrap_header(&header)
+}
+
 pub fn validate_g17_bootstrap_header(header &G17BootstrapHeader) bool {
-	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size && header.interface_magic == g17_interface_magic && header.host_mapped_allocations != 0
+	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size && sizeof(header.platform_config_030) == g17_platform_config_size && header.interface_magic == g17_interface_magic && header.firmware_role <= 1 && header.host_mapped_allocations != 0
 }
 
 // Shared object referenced by root+0x18. The host driver writes these fields

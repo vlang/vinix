@@ -92,6 +92,54 @@ def magic(register: int) -> tuple[int, ...]:
     )
 
 
+def driver_root_code() -> bytes:
+    bindings = (
+        (0xAB8, 0x18),
+        (0x388, 0x20),
+        (0xAD0, 0xA8),
+        (0xBE8, 0x18),
+        (0x388, 0x20),
+        (0xC00, 0xA8),
+        (0xCE0, 0xB0),
+        (0xCE8, 0xB8),
+        (0x398, 0xC0),
+    )
+    platform_copy = (
+        0xF9414E68,
+        0x52952917,
+        0x72A00037,
+        0x8B170108,
+        0xF9400108,
+        0x3CC18100,
+        0x3CC28101,
+        0x3CC38102,
+        0xAD020A81,
+        0x3D800E80,
+        0x3CC48100,
+        0x3CC58101,
+        0x3CC68102,
+        0xF9403D08,
+        0xF9004A88,
+        0xAD038A81,
+        0x3D801A80,
+    )
+    return encode(
+        *magic(21),
+        ldr_x(0, 19, 0x1A58),
+        str_x(0, 20, 8),
+        ldr_x(0, 19, 0x1A58),
+        str_x(0, 20, 8),
+        *platform_copy,
+        0xFD001680,
+        0x0F000420,
+        0xFD001680,
+        *sum(
+            ((ldr_x(1, 19, member), str_x(0, 20, offset)) for member, offset in bindings),
+            (),
+        ),
+    )
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_recovers_firmware_root_pointer_offsets(self) -> None:
         code = encode(
@@ -107,10 +155,10 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["copied_bytes"], 0xC8)
 
     def test_recovers_driver_root_stores(self) -> None:
-        stores = tuple(str_x(0, 20, offset) for offset in recover_g17_abi.ROOT_FIELDS)
-        code = encode(*magic(21), *stores)
-        recovered = recover_g17_abi.recover_driver_root(code)
+        recovered = recover_g17_abi.recover_driver_root(driver_root_code())
         self.assertEqual(tuple(recovered["pointer_offsets"]), recover_g17_abi.ROOT_FIELDS)
+        self.assertEqual(recovered["platform_config"]["bytes"], 0x68)
+        self.assertEqual(recovered["roles"][1]["bindings"][-1]["root_offset"], 0xC0)
 
     def test_rejects_incomplete_driver_layout(self) -> None:
         code = encode(*magic(21), str_x(0, 20, 0x18))

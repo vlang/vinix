@@ -415,12 +415,107 @@ def recover_driver_root(code: bytes) -> dict[str, object]:
             found.add(decoded[2])
     if tuple(sorted(found)) != ROOT_FIELDS:
         raise ValueError(f"unexpected driver root stores: {[hex(field) for field in sorted(found)]}")
+
+    instructions = list(words(code))
+    bindings: list[tuple[int, int]] = []
+    for index, (_offset, word) in enumerate(instructions):
+        load = decode_ldr_x(word)
+        if load is None or load[0] != 1 or load[1] != 19:
+            continue
+        for _following_offset, following_word in instructions[index + 1 : index + 28]:
+            following_load = decode_ldr_x(following_word)
+            if following_load is not None and following_load[0] == 1 and following_load[1] == 19:
+                break
+            store = decode_str_x(following_word)
+            if store is not None and store[0] == 0 and store[2] in ROOT_FIELDS:
+                bindings.append((load[2], store[2]))
+                break
+    expected_bindings = [
+        (0xAB8, 0x18),
+        (0x388, 0x20),
+        (0xAD0, 0xA8),
+        (0xBE8, 0x18),
+        (0x388, 0x20),
+        (0xC00, 0xA8),
+        (0xCE0, 0xB0),
+        (0xCE8, 0xB8),
+        (0x398, 0xC0),
+    ]
+    if bindings != expected_bindings:
+        raise ValueError(
+            "unexpected driver root allocation bindings: "
+            f"{[(hex(member), hex(offset)) for member, offset in bindings]}"
+        )
+
+    bootstrap_provider_loads = sum(
+        decode_ldr_x(word) == (0, 19, 0x1A58) for _offset, word in instructions
+    )
+    bootstrap_stores = sum(
+        (store := decode_str_x(word)) is not None
+        and store[0] == 0
+        and store[2] == 8
+        for _offset, word in instructions
+    )
+    if bootstrap_provider_loads != 2 or bootstrap_stores != 2:
+        raise ValueError("driver root bootstrap provider is not shared by both roles")
+
+    require_instruction_sequence(
+        code,
+        "root platform-data copy",
+        (
+            0xF9414E68,  # ldr x8, [x19, #0x298]
+            0x52952917,  # mov w23, #0xa948
+            0x72A00037,  # movk w23, #1, lsl #16
+            0x8B170108,  # add x8, x8, x23
+            0xF9400108,  # ldr x8, [x8]
+            0x3CC18100,
+            0x3CC28101,
+            0x3CC38102,
+            0xAD020A81,  # first 0x30 bytes to root+0x30
+            0x3D800E80,
+            0x3CC48100,
+            0x3CC58101,
+            0x3CC68102,
+            0xF9403D08,
+            0xF9004A88,  # final qword at root+0x90
+            0xAD038A81,
+            0x3D801A80,  # vector data through root+0x8f
+        ),
+    )
+    if code.count(struct.pack("<I", 0xFD001680)) != 2:  # str d0, [x20, #0x28]
+        raise ValueError("driver root role/host-mapping words were not both written")
+    if struct.pack("<I", 0x0F000420) not in code:  # movi v0.2s, #1
+        raise ValueError("driver secondary root role word was not found")
+
     return {
         "interface_magic": INTERFACE_MAGIC,
         "magic_code_offset": magic_start,
         "pointer_offsets": sorted(found),
         "firmware_role_offset": 0x28,
         "host_mapped_allocations_offset": 0x2C,
+        "bootstrap_provider_host_member": 0x1A58,
+        "platform_config": {
+            "host_platform_member": 0x298,
+            "host_platform_pointer_offset": 0x1A948,
+            "root_offset": 0x30,
+            "bytes": 0x68,
+        },
+        "roles": [
+            {
+                "role": 0,
+                "bindings": [
+                    {"host_gpu_member": member, "root_offset": offset}
+                    for member, offset in expected_bindings[:3] + expected_bindings[6:7]
+                ],
+            },
+            {
+                "role": 1,
+                "bindings": [
+                    {"host_gpu_member": member, "root_offset": offset}
+                    for member, offset in expected_bindings[3:6] + expected_bindings[7:]
+                ],
+            },
+        ],
     }
 
 
@@ -577,7 +672,7 @@ def recover_hardware_config(
 def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, ...]) -> None:
     encoded = struct.pack(f"<{len(sequence)}I", *sequence)
     if encoded not in code:
-        raise ValueError(f"hardware-config producer has no {label} sequence")
+        raise ValueError(f"missing {label} instruction sequence")
 
 
 def recover_driver_hardware_config_layout(
