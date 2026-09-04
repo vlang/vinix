@@ -25,6 +25,11 @@ const ttbr_asid_shift = u32(48)
 const ppl_magic = u64(0x4b1d000000000002)
 const handoff_size = u64(0x648)
 
+pub enum UatHandoffAbi {
+	v12_3
+	g17_26_5
+}
+
 @[packed]
 pub struct UatFlushInfo {
 pub mut:
@@ -70,17 +75,18 @@ pub mut:
 
 pub struct UatManager {
 pub mut:
-	contexts            [uat_num_contexts]&UatContext
+	contexts             [uat_num_contexts]&UatContext
 	kernel_lower_pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_pgtable       &pgtable.UatPgtable = unsafe { nil }
-	handoff              &UatHandoff         = unsafe { nil }
-	ttbs                 &SlotTtbs           = unsafe { nil }
+	handoff              &UatHandoff = unsafe { nil }
+	ttbs                 &SlotTtbs = unsafe { nil }
 	ttbs_base            u64
 	handoff_base         u64
 	pagetables_base      u64
 	ias                  u32
 	oas                  u32
 	map_kernel_to_user   bool
+	handoff_abi          UatHandoffAbi
 	handoff_initialized  bool
 	lock                 klock.Lock
 }
@@ -92,7 +98,7 @@ __global (
 // Attach to bootloader-reserved UAT structures. Nothing is written here;
 // handoff initialization must happen only after the GPU RTKit firmware is up.
 pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32, oas u32,
-	map_kernel_to_user bool) ?&UatManager {
+	map_kernel_to_user bool, handoff_abi UatHandoffAbi) ?&UatManager {
 	if ttbs_base & pgtable.uat_pg_mask != 0 || handoff_base & pgtable.uat_pg_mask != 0
 		|| pagetables_base & pgtable.uat_pg_mask != 0 {
 		C.printf(c'uat mmu: reserved regions are not 16 KiB aligned\n')
@@ -115,21 +121,45 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 
 	mgr := &UatManager{
 		kernel_lower_pgtable: lower
-		kernel_pgtable:       upper
-		handoff:              unsafe { &UatHandoff(handoff_base + higher_half) }
-		ttbs:                 unsafe { &SlotTtbs(ttbs_base + higher_half) }
-		ttbs_base:            ttbs_base
-		handoff_base:         handoff_base
-		pagetables_base:      pagetables_base
-		ias:                  ias
-		oas:                  oas
-		map_kernel_to_user:   map_kernel_to_user
+		kernel_pgtable: upper
+		handoff: unsafe { &UatHandoff(handoff_base + higher_half) }
+		ttbs: unsafe { &SlotTtbs(ttbs_base + higher_half) }
+		ttbs_base: ttbs_base
+		handoff_base: handoff_base
+		pagetables_base: pagetables_base
+		ias: ias
+		oas: oas
+		map_kernel_to_user: map_kernel_to_user
+		handoff_abi: handoff_abi
 	}
 	uat_mgr = mgr
 
-	C.printf(c'uat mmu: attached IAS=%u OAS=%u TTBs=0x%llx handoff=0x%llx TTBR1=0x%llx\n',
-		ias, oas, ttbs_base, handoff_base, pagetables_base)
+	C.printf(c'uat mmu: attached IAS=%u OAS=%u TTBs=0x%llx handoff=0x%llx TTBR1=0x%llx\n', ias, oas, ttbs_base, handoff_base, pagetables_base)
 	return mgr
+}
+
+// Initialize the uPPL handoff exactly as the G17 host driver does. Unlike the
+// v12.3 protocol this does not wait for firmware to mirror the magic. Offset
+// 0x638 instead records whether the pre-existing firmware word differed.
+fn (mut mgr UatManager) initialize_g17_handoff() {
+	unsafe {
+		mut h := mgr.handoff
+		h.magic_ap = ppl_magic
+		h.lock_ap = 0
+		h.lock_fw = 0
+		h.turn = 0
+		h.cur_slot = u32(-1)
+		h.unk3 = 0
+		if h.magic_fw != ppl_magic {
+			h.unk2 = 1
+		}
+		for i := 0; i <= uat_num_contexts; i++ {
+			h.flush[i].state = 0
+			h.flush[i].addr = 0
+			h.flush[i].size = 0
+		}
+	}
+	cpu.dsb_sy()
 }
 
 fn shared_store8(mut target &u8, value u8) {
@@ -193,6 +223,12 @@ pub fn (mut mgr UatManager) initialize_handoff() bool {
 	if mgr.handoff == unsafe { nil } || mgr.ttbs == unsafe { nil } {
 		return false
 	}
+	if mgr.handoff_abi == .g17_26_5 {
+		mgr.initialize_g17_handoff()
+		mgr.publish_initial_context_roots()
+		mgr.handoff_initialized = true
+		return true
+	}
 	unsafe {
 		mut h := mgr.handoff
 		katomic.store(mut &h.magic_ap, ppl_magic)
@@ -229,6 +265,12 @@ pub fn (mut mgr UatManager) initialize_handoff() bool {
 	}
 	cpu.dsb_sy()
 
+	mgr.publish_initial_context_roots()
+	mgr.handoff_initialized = true
+	return true
+}
+
+fn (mut mgr UatManager) publish_initial_context_roots() {
 	handoff_lock(mgr.handoff)
 	unsafe {
 		mut slots := mgr.ttbs
@@ -241,8 +283,6 @@ pub fn (mut mgr UatManager) initialize_handoff() bool {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
-	mgr.handoff_initialized = true
-	return true
 }
 
 pub fn (mut mgr UatManager) create_context() ?&UatContext {
@@ -254,10 +294,10 @@ pub fn (mut mgr UatManager) create_context() ?&UatContext {
 		if mgr.contexts[i] == unsafe { nil } {
 			pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
 			ctx := &UatContext{
-				id:      i
+				id: i
 				pgtable: pt
-				active:  true
-				vm_id:   i
+				active: true
+				vm_id: i
 			}
 			mgr.contexts[i] = ctx
 			return ctx

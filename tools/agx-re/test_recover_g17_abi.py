@@ -133,6 +133,30 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(recover_g17_abi.recover_vector_copy_size(code), 0x40)
 
+    def test_recovers_g17_handoff_layout(self) -> None:
+        ppl_magic = 0x4B1D000000000002
+        code = encode(
+            movz(8, ppl_magic & 0xFFFF),
+            movk(8, (ppl_magic >> 48) & 0xFFFF, 48),
+            str_unsigned(8, 0, 0, 8),
+            str_unsigned(31, 0, 0x10, 1),
+            str_unsigned(31, 0, 0x11, 1),
+            str_unsigned(31, 0, 0x14, 4),
+            str_unsigned(9, 0, 0x18, 4),
+            str_unsigned(8, 0, 0x638, 1),
+            str_unsigned(31, 0, 0x640, 8),
+            0x52800829,
+            0xB81F011F,
+            0xF81F811F,
+            0xF801851F,
+            0xF1000529,
+            0x54FFFF81,
+        )
+        handoff = recover_g17_abi.recover_g17_handoff(code)
+        self.assertEqual(handoff["bytes"], 0x648)
+        self.assertEqual(handoff["flush_records"], 65)
+        self.assertEqual(handoff["current_slot_initial"], 0xFFFFFFFF)
+
 
 if __name__ == "__main__":
     unittest.main()

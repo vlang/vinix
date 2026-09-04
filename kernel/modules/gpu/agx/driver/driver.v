@@ -23,8 +23,8 @@ import memory
 pub struct AgxDriver {
 pub mut:
 	gpu         &gpu.GpuManager = unsafe { nil }
-	dcp         &dcp.AppleDCP   = unsafe { nil }
-	drm_dev     &drm.DrmDevice  = unsafe { nil }
+	dcp         &dcp.AppleDCP = unsafe { nil }
+	drm_dev     &drm.DrmDevice = unsafe { nil }
 	hw_config   hw.HwConfig
 	detected    bool
 	initialized bool
@@ -36,15 +36,15 @@ __global (
 
 struct PlatformResources {
 pub:
-	asc_base       u64
-	sgx_base       u64
-	mailbox_base   u64
-	handoff_base   u64
-	handoff_size   u64
+	asc_base        u64
+	sgx_base        u64
+	mailbox_base    u64
+	handoff_base    u64
+	handoff_size    u64
 	pagetables_base u64
 	pagetables_size u64
-	ttbs_base      u64
-	ttbs_size      u64
+	ttbs_base       u64
+	ttbs_size       u64
 }
 
 fn find_gpu_node() ?(&devicetree.DTNode, u32, bool) {
@@ -122,15 +122,15 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 			return none
 		}
 		return PlatformResources{
-			asc_base:     asc_regs[0].base
-			sgx_base:     gpu_regs[0].base
+			asc_base: asc_regs[0].base
+			sgx_base: gpu_regs[0].base
 			mailbox_base: asc_regs[0].base + 0x8000
 			handoff_base: handoff_base
 			handoff_size: handoff_size
 			pagetables_base: pagetables_base
 			pagetables_size: pagetables_size
-			ttbs_base:    ttbs_base
-			ttbs_size:    ttbs_size
+			ttbs_base: ttbs_base
+			ttbs_size: ttbs_size
 		}
 	}
 
@@ -160,8 +160,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		println('agx: GPU mailbox has no register range')
 		return none
 	}
-	ttbs_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region',
-		'memory-region-names', 'ttbs') or {
+	ttbs_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region', 'memory-region-names', 'ttbs') or {
 		println('agx: GPU TTB reserved-memory region is missing')
 		return none
 	}
@@ -169,8 +168,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		println('agx: failed to translate GPU TTB region')
 		return none
 	}
-	handoff_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region',
-		'memory-region-names', 'handoff') or {
+	handoff_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region', 'memory-region-names', 'handoff') or {
 		println('agx: GPU handoff reserved-memory region is missing')
 		return none
 	}
@@ -178,8 +176,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		println('agx: failed to translate GPU handoff region')
 		return none
 	}
-	pagetables_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region',
-		'memory-region-names', 'pagetables') or {
+	pagetables_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region', 'memory-region-names', 'pagetables') or {
 		println('agx: GPU page-table reserved-memory region is missing')
 		return none
 	}
@@ -192,15 +189,15 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		return none
 	}
 	return PlatformResources{
-		asc_base:     asc.base
-		sgx_base:     sgx.base
+		asc_base: asc.base
+		sgx_base: sgx.base
 		mailbox_base: mailbox_regs[0].base
 		handoff_base: handoff_regs[0].base
 		handoff_size: handoff_regs[0].size
 		pagetables_base: pagetables_regs[0].base
 		pagetables_size: pagetables_regs[0].size
-		ttbs_base:    ttbs_regs[0].base
-		ttbs_size:    ttbs_regs[0].size
+		ttbs_base: ttbs_regs[0].base
+		ttbs_size: ttbs_regs[0].size
 	}
 }
 
@@ -221,8 +218,7 @@ pub fn initialise() {
 	agx_driver_inst.detected = true
 
 	if chip_id == 0x6050 {
-		C.printf(c'agx: detected t6050 / G17C, %u cores in %u GPU partitions\n',
-			cfg.gpu_core_count, cfg.num_mgpus)
+		C.printf(c'agx: detected t6050 / G17C, %u cores in %u GPU partitions\n', cfg.gpu_core_count, cfg.num_mgpus)
 	} else {
 		C.printf(c'agx: detected chip 0x%x, %u cores\n', chip_id, cfg.gpu_core_count)
 	}
@@ -241,25 +237,24 @@ pub fn initialise() {
 		println('agx: UAT handoff or page-table reserved region is too small')
 		return
 	}
-	C.printf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n',
-		platform.asc_base, platform.sgx_base, platform.mailbox_base, platform.ttbs_base,
-		platform.ttbs_size)
-	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n',
-		platform.handoff_base, platform.handoff_size, platform.pagetables_base,
-		platform.pagetables_size)
+	C.printf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n', platform.asc_base, platform.sgx_base, platform.mailbox_base, platform.ttbs_base, platform.ttbs_size)
+	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n', platform.handoff_base, platform.handoff_size, platform.pagetables_base, platform.pagetables_size)
 
 	// Never run a newer GPU with the byte layouts and register sequence for
 	// M1. Detection is useful for bring-up logs, but writes here could corrupt
 	// firmware-owned memory or wedge the machine.
 	if !cfg.can_boot_firmware() {
-		C.printf(c'agx: chip 0x%x firmware ABI is not implemented; leaving hardware untouched\n',
-			chip_id)
+		C.printf(c'agx: chip 0x%x firmware ABI is not implemented; leaving hardware untouched\n', chip_id)
 		return
 	}
 
 	// Step 3: Initialize the AGX-internal UAT from its reserved TTB region.
-	_ := mmu.new_manager(platform.ttbs_base, platform.handoff_base, platform.pagetables_base,
-		cfg.uat_ias, cfg.uat_oas, cfg.map_kernel_to_user) or {
+	handoff_abi := if cfg.firmware_abi == .g17_26_5_partial {
+		mmu.UatHandoffAbi.g17_26_5
+	} else {
+		mmu.UatHandoffAbi.v12_3
+	}
+	_ := mmu.new_manager(platform.ttbs_base, platform.handoff_base, platform.pagetables_base, cfg.uat_ias, cfg.uat_oas, cfg.map_kernel_to_user, handoff_abi) or {
 		println('agx: Failed to initialize UAT manager')
 		return
 	}
@@ -274,8 +269,7 @@ pub fn initialise() {
 	stamp_va := u64(0x10_0000)
 	stamp_size := stamp_pages * page_size
 	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(stamp_va, stamp_phys, stamp_size,
-			pgtable.gpu_prot_fw_gpu_shared_rw) {
+		if !uat_mgr.map_kernel(stamp_va, stamp_phys, stamp_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
 			println('agx: Failed to map stamp buffer in UAT')
 			return
 		}
@@ -302,13 +296,13 @@ pub fn initialise() {
 
 	// Step 7: Register DRM driver (name "asahi", features GEM|RENDER|COMPUTE)
 	agx_drm_driver := &drm.DrmDriver{
-		name:       'asahi'
-		desc:       'Apple AGX GPU'
-		major:      1
-		minor:      0
+		name: 'asahi'
+		desc: 'Apple AGX GPU'
+		major: 1
+		minor: 0
 		patchlevel: 0
-		features:   drm.driver_gem | drm.driver_render | drm.driver_compute
-		ioctls:     agx_file.drm_ioctls()
+		features: drm.driver_gem | drm.driver_render | drm.driver_compute
+		ioctls: agx_file.drm_ioctls()
 		file_close: agx_file.release_handle
 	}
 

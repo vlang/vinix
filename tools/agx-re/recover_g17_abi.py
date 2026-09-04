@@ -38,6 +38,7 @@ SUBMIT_DEVICE_CONTROL = (
     "__ZN11AGXFirmware19submitDeviceControlE"
     "P33AGFIAcceleratorDeviceControlEntryjPj"
 )
+INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 
 
 def macho_uuid(image: bytes) -> str | None:
@@ -426,6 +427,61 @@ def recover_driver_accelerator_layouts(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_handoff(code: bytes) -> dict[str, object]:
+    magic = find_materialized_constant(code, INTERFACE_MAGIC)
+    if magic:
+        raise ValueError("UAT handoff unexpectedly contains the firmware interface magic")
+    ppl_magic = 0x4B1D000000000002
+    materialized = find_materialized_constant(code, ppl_magic)
+    if len(materialized) != 1:
+        raise ValueError(f"expected one uPPL magic sequence, found {len(materialized)}")
+    magic_start, magic_end, magic_register = materialized[0]
+    stores = set()
+    for _offset, word in words(code[magic_end:]):
+        store = decode_str_unsigned(word)
+        if store is not None:
+            stores.add(store)
+    expected = {
+        (magic_register, 0, 0x000, 8),
+        (31, 0, 0x010, 1),
+        (31, 0, 0x011, 1),
+        (31, 0, 0x014, 4),
+        (9, 0, 0x018, 4),
+        (8, 0, 0x638, 1),
+        (31, 0, 0x640, 8),
+    }
+    if not expected.issubset(stores):
+        missing = sorted(expected - stores, key=lambda item: item[2])
+        raise ValueError(f"missing G17 handoff stores: {missing}")
+
+    clear_loop = struct.pack(
+        "<6I",
+        0x52800829,  # mov w9, #65
+        0xB81F011F,  # stur wzr, [x8, #-16]
+        0xF81F811F,  # stur xzr, [x8, #-8]
+        0xF801851F,  # str xzr, [x8], #24
+        0xF1000529,  # subs x9, x9, #1
+        0x54FFFF81,  # b.ne to the first store
+    )
+    if code.find(clear_loop, magic_start) < 0:
+        raise ValueError("G17 handoff does not contain the 65-record clear loop")
+    return {
+        "bytes": 0x648,
+        "magic": ppl_magic,
+        "magic_offset": 0,
+        "firmware_magic_offset": 8,
+        "lock_offsets": [0x10, 0x11],
+        "turn_offset": 0x14,
+        "current_slot_offset": 0x18,
+        "current_slot_initial": 0xFFFFFFFF,
+        "flush_offset": 0x20,
+        "flush_records": 65,
+        "flush_record_bytes": 0x18,
+        "mismatch_flag_offset": 0x638,
+        "tail_offset": 0x640,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -449,6 +505,8 @@ def main() -> int:
         driver_root["function"] = INIT_FIRMWARE_DATA
         driver_root["function_address"] = function_address
         accelerator = recover_driver_accelerator_layouts(driver)
+        _address, handoff_code = symbol_code(driver, INIT_UAT_HANDOFF)
+        handoff = recover_g17_handoff(handoff_code)
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))
@@ -461,6 +519,7 @@ def main() -> int:
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "accelerator": accelerator,
+                "uat_handoff": handoff,
             },
             indent=2,
         )
