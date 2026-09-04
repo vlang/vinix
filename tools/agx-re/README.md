@@ -32,6 +32,7 @@ make -f GNUmakefile trace-resources
 make -f GNUmakefile layout
 make -f GNUmakefile firmware
 make -f GNUmakefile kernel-kexts
+make -f GNUmakefile recover-g17-abi
 ```
 
 The normal trace is written to `build/agx_trace.jsonl`; the larger resource
@@ -57,6 +58,9 @@ images from the local recovery volume and emits their hashes, Mach-O UUIDs,
 and virtual layouts. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
 kernel collection and compacts the AGXG17X and firmware-buddy fileset entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
+`recover_g17_abi.py` checks those binaries by UUID and independently recovers
+the shared G17 bootstrap pointer offsets from firmware and
+`AGXArmFirmware::initFirmwareData` using a deliberately small AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
 trace data are never repository inputs.
 

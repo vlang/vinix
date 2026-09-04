@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware inspect kernel-kexts layout test trace trace-resources clean
+.PHONY: all firmware inspect kernel-kexts recover-g17-abi layout test trace trace-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -28,9 +28,12 @@ firmware:
 kernel-kexts:
 	./extract_fileset.py
 
+recover-g17-abi: firmware kernel-kexts
+	./recover_g17_abi.py
+
 test:
 	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
-		test_extract_fileset.py test_trace_diff.py
+		test_extract_fileset.py test_recover_g17_abi.py test_trace_diff.py
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl
