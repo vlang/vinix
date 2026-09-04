@@ -6,10 +6,6 @@ module regs
 
 import aarch64.kio
 import aarch64.cpu
-import memory
-
-// Register block offsets from GPU base
-pub const sgx_base = u64(0x2000000)
 
 // ASC (Apple Silicon Controller) registers
 pub const asc_ctl = u32(0x44)
@@ -29,7 +25,6 @@ pub const gpu_id_clustercfg = u32(0xD04010)
 // GPU resource handle -- encapsulates base addresses for MMIO access
 pub struct GpuResources {
 pub mut:
-	base u64 // MMIO base (HHDM-mapped)
 	sgx  u64 // SGX block base
 	asc  u64 // ASC block base
 }
@@ -43,24 +38,22 @@ pub:
 	unit_code u8
 }
 
-// Create a new GpuResources from a physical base address
-pub fn new_resources(base u64) GpuResources {
-	mapped_base := base + higher_half
+// ASC and SGX are separate named resources in the Apple GPU device tree.
+pub fn new_resources(asc_base u64, sgx_base u64) GpuResources {
 	return GpuResources{
-		base: mapped_base
-		sgx:  mapped_base + sgx_base
-		asc:  mapped_base
+		sgx: sgx_base + higher_half
+		asc: asc_base + higher_half
 	}
 }
 
 // Read a 32-bit value from a register offset relative to base
 pub fn (r &GpuResources) read32(offset u32) u32 {
-	return kio.mmin32(unsafe { &u32(r.base + offset) })
+	return kio.mmin32(unsafe { &u32(r.asc + offset) })
 }
 
 // Write a 32-bit value to a register offset relative to base
 pub fn (r &GpuResources) write32(offset u32, value u32) {
-	kio.mmout32(unsafe { &u32(r.base + offset) }, value)
+	kio.mmout32(unsafe { &u32(r.asc + offset) }, value)
 }
 
 // Read a 32-bit value from SGX register space

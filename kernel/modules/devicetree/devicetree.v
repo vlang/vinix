@@ -40,6 +40,12 @@ pub:
 	len  u32
 }
 
+pub struct DTReg {
+pub:
+	base u64
+	size u64
+}
+
 @[heap]
 pub struct DTNode {
 pub mut:
@@ -69,6 +75,16 @@ fn be32(ptr voidptr) u32 {
 
 fn be64(ptr voidptr) u64 {
 	return (u64(be32(ptr)) << 32) | u64(be32(unsafe { voidptr(u64(ptr) + 4) }))
+}
+
+fn read_cells(ptr voidptr, count u32) ?u64 {
+	if count == 1 {
+		return u64(be32(ptr))
+	}
+	if count == 2 {
+		return be64(ptr)
+	}
+	return none
 }
 
 fn get_string(offset u32) string {
@@ -301,6 +317,171 @@ pub fn get_u64(node &DTNode, name string) ?u64 {
 		return none
 	}
 	return be64(prop.data)
+}
+
+// Get a list of big-endian u32 cells from a property.
+pub fn get_u32_array(node &DTNode, name string) ?[]u32 {
+	prop := get_property(node, name) or { return none }
+	if prop.len == 0 || prop.len % 4 != 0 {
+		return none
+	}
+	mut result := []u32{cap: int(prop.len / 4)}
+	for offset := u32(0); offset < prop.len; offset += 4 {
+		result << be32(unsafe { voidptr(u64(prop.data) + offset) })
+	}
+	return result
+}
+
+// Get a NUL-separated string list from a property.
+pub fn get_string_list(node &DTNode, name string) ?[]string {
+	prop := get_property(node, name) or { return none }
+	if prop.len == 0 {
+		return none
+	}
+	mut result := []string{}
+	mut offset := u32(0)
+	for offset < prop.len {
+		value := unsafe { &u8(u64(prop.data) + offset) }
+		mut length := 0
+		for offset + u32(length) < prop.len && unsafe { value[length] } != 0 {
+			length++
+		}
+		if length > 0 {
+			result << unsafe { tos(value, length) }
+		}
+		offset += u32(length) + 1
+	}
+	return result
+}
+
+fn find_phandle_in(node &DTNode, phandle u32) ?&DTNode {
+	value := get_u32(node, 'phandle') or { get_u32(node, 'linux,phandle') or { u32(0) } }
+	if value == phandle {
+		return node
+	}
+	for child in node.children {
+		found := find_phandle_in(child, phandle) or { continue }
+		return found
+	}
+	return none
+}
+
+pub fn find_phandle(phandle u32) ?&DTNode {
+	if phandle == 0 || dt_root == unsafe { nil } {
+		return none
+	}
+	return find_phandle_in(dt_root, phandle)
+}
+
+// Resolve a phandle-only property entry. This is appropriate for
+// memory-region and mailbox providers with zero argument cells.
+pub fn get_phandle_node(node &DTNode, property string, index u32) ?&DTNode {
+	values := get_u32_array(node, property) or { return none }
+	if index >= u32(values.len) {
+		return none
+	}
+	return find_phandle(values[index])
+}
+
+pub fn get_named_phandle_node(node &DTNode, property string, names_property string, name string) ?&DTNode {
+	names := get_string_list(node, names_property) or { return none }
+	for index, candidate in names {
+		if candidate == name {
+			return get_phandle_node(node, property, u32(index))
+		}
+	}
+	return none
+}
+
+fn translate_one_bus(bus &DTNode, address u64) ?u64 {
+	if bus.parent == unsafe { nil } {
+		return address
+	}
+	ranges := get_property(bus, 'ranges') or {
+		// A missing ranges property is common at the root-facing platform
+		// bus. Preserve the address rather than inventing a translation.
+		return address
+	}
+	if ranges.len == 0 {
+		return address
+	}
+	child_cells := get_u32(bus, '#address-cells') or { u32(2) }
+	parent_cells := get_u32(bus.parent, '#address-cells') or { u32(2) }
+	size_cells := get_u32(bus, '#size-cells') or { u32(2) }
+	entry_cells := child_cells + parent_cells + size_cells
+	if entry_cells == 0 || ranges.len % (entry_cells * 4) != 0 {
+		return none
+	}
+	for offset := u32(0); offset < ranges.len; offset += entry_cells * 4 {
+		child := read_cells(unsafe { voidptr(u64(ranges.data) + offset) }, child_cells) or {
+			return none
+		}
+		parent_offset := offset + child_cells * 4
+		parent := read_cells(unsafe { voidptr(u64(ranges.data) + parent_offset) }, parent_cells) or {
+			return none
+		}
+		size_offset := parent_offset + parent_cells * 4
+		size := read_cells(unsafe { voidptr(u64(ranges.data) + size_offset) }, size_cells) or {
+			return none
+		}
+		if address >= child && address - child < size {
+			return parent + (address - child)
+		}
+	}
+	return none
+}
+
+fn translate_address(node &DTNode, input u64) ?u64 {
+	mut address := input
+	mut bus := node.parent
+	for bus != unsafe { nil } {
+		address = translate_one_bus(bus, address) or { return none }
+		bus = bus.parent
+	}
+	return address
+}
+
+// Parse reg into explicit ranges and translate each base through ancestor
+// bus `ranges` properties into the CPU physical address space.
+pub fn get_translated_reg_ranges(node &DTNode) ?[]DTReg {
+	prop := get_property(node, 'reg') or { return none }
+	addr_cells := if node.parent != unsafe { nil } {
+		get_u32(node.parent, '#address-cells') or { u32(2) }
+	} else {
+		u32(2)
+	}
+	size_cells := if node.parent != unsafe { nil } {
+		get_u32(node.parent, '#size-cells') or { u32(2) }
+	} else {
+		u32(2)
+	}
+	entry_size := (addr_cells + size_cells) * 4
+	if entry_size == 0 || prop.len % entry_size != 0 {
+		return none
+	}
+	mut result := []DTReg{}
+	for offset := u32(0); offset < prop.len; offset += entry_size {
+		base := read_cells(unsafe { voidptr(u64(prop.data) + offset) }, addr_cells) or {
+			return none
+		}
+		size := read_cells(unsafe { voidptr(u64(prop.data) + offset + addr_cells * 4) }, size_cells) or {
+			return none
+		}
+		translated := translate_address(node, base) or { return none }
+		result << DTReg{base: translated, size: size}
+	}
+	return result
+}
+
+pub fn get_named_reg(node &DTNode, name string) ?DTReg {
+	names := get_string_list(node, 'reg-names') or { return none }
+	ranges := get_translated_reg_ranges(node) or { return none }
+	for index, candidate in names {
+		if candidate == name && index < ranges.len {
+			return ranges[index]
+		}
+	}
+	return none
 }
 
 // Get reg property (base, size pairs)

@@ -58,9 +58,53 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertNotIn("private_unknown", result["configuration"])
         self.assertEqual(result["configuration"]["num_cores"], 40)
 
+    def test_decodes_g17_asc_firmware_segments(self) -> None:
+        node = {
+            "compatible": b"iop,ascwrap-v6\0",
+            "reg": struct.pack("<QQQQ", 0x2102600000, 0x88000, 0x2102050000, 8),
+            "segment-names": b"__TEXT;__DATA\0",
+            "segment-ranges": struct.pack(
+                "<QQQIIQQQII",
+                0x10001000000,
+                0xFFFFFC0000000000,
+                0x10001000000,
+                0x4C000,
+                1,
+                0x100026F0000,
+                0xFFFFFC000004C000,
+                0x100026F0000,
+                0x130000,
+                0,
+            ),
+        }
+
+        result = inspect_macos.parse_asc(node)
+
+        self.assertEqual(result["compatible"], ["iop,ascwrap-v6"])
+        self.assertEqual(result["segments"][0]["name"], "__TEXT")
+        self.assertEqual(result["segments"][0]["size"], 0x4C000)
+        self.assertEqual(result["segments"][1]["physical"], 0x100026F0000)
+
     def test_t6050_manifest_cross_checks_topology(self) -> None:
         manifest = {
             "device_tree": {"compatible": ["gpu,t6050"]},
+            "asc": {
+                "compatible": ["iop,ascwrap-v6"],
+                "segments": [
+                    {
+                        "name": "__TEXT",
+                        "physical": 0x10001000000,
+                        "iova": 0xFFFFFC0000000000,
+                        "size": 0x4C000,
+                    },
+                    {
+                        "name": "__DATA",
+                        "physical": 0x100026F0000,
+                        "iova": 0xFFFFFC000004C000,
+                        "size": 0x130000,
+                    },
+                ],
+            },
             "accelerator": {
                 "gpu_core_count": 40,
                 "configuration": {
@@ -71,6 +115,13 @@ class InspectMacOSTests(unittest.TestCase):
                 },
             },
         }
+        manifest["device_tree"].update(
+            {
+                "rtkit_private_vm_region_base": 0xFFFFFC0000000000,
+                "gfx_data_base": 0x100026F0000,
+                "gfx_data_size": 0x130000,
+            }
+        )
         self.assertEqual(inspect_macos.validate_manifest(manifest), [])
 
 

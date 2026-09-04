@@ -117,6 +117,31 @@ def decode_reg(value: Any) -> list[dict[str, int]]:
     return result
 
 
+def decode_segment_names(value: Any) -> list[str]:
+    if not isinstance(value, bytes):
+        raise InspectError("segment-names must be bytes")
+    encoded = value.rstrip(b"\0")
+    return [name.decode("ascii", "strict") for name in encoded.split(b";") if name]
+
+
+def decode_segment_ranges(value: Any) -> list[dict[str, int]]:
+    if not isinstance(value, bytes) or len(value) % 32:
+        raise InspectError("segment-ranges must contain 32-byte Apple ADT entries")
+    result = []
+    for offset in range(0, len(value), 32):
+        physical, iova, remap, size, flags = struct.unpack_from("<QQQII", value, offset)
+        result.append(
+            {
+                "physical": physical,
+                "iova": iova,
+                "remap": remap,
+                "size": size,
+                "flags": flags,
+            }
+        )
+    return result
+
+
 def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
     if "compatible" not in node or "reg" not in node:
         raise InspectError("sgx node is missing compatible or reg")
@@ -132,6 +157,24 @@ def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
         if name in node:
             result[name.replace("-", "_")] = decode_uint(node[name], 64, name)
     return result
+
+
+def parse_asc(node: dict[str, Any]) -> dict[str, Any]:
+    required = ("compatible", "reg", "segment-names", "segment-ranges")
+    missing = [name for name in required if name not in node]
+    if missing:
+        raise InspectError(f"gfx-asc node is missing {', '.join(missing)}")
+    names = decode_segment_names(node["segment-names"])
+    ranges = decode_segment_ranges(node["segment-ranges"])
+    if len(names) != len(ranges):
+        raise InspectError(
+            f"gfx-asc names/ranges differ in length ({len(names)} != {len(ranges)})"
+        )
+    return {
+        "compatible": decode_compatibles(node["compatible"]),
+        "register_ranges": decode_reg(node["reg"]),
+        "segments": [dict(name=name, **segment) for name, segment in zip(names, ranges)],
+    }
 
 
 def parse_accelerator(node: dict[str, Any]) -> dict[str, Any]:
@@ -194,6 +237,21 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     masks = config.get("core_mask_list")
     if isinstance(masks, list) and sum(bin(mask).count("1") for mask in masks) != config.get("num_cores"):
         warnings.append("active bits in core_mask_list do not equal num_cores")
+    asc = manifest.get("asc")
+    if "gpu,t6050" in compatible and isinstance(asc, dict):
+        if "iop,ascwrap-v6" not in asc.get("compatible", []):
+            warnings.append("t6050 gfx-asc is not the observed ascwrap-v6")
+        segments = asc.get("segments", [])
+        if len(segments) >= 2:
+            text, data = segments[0], segments[1]
+            if text.get("iova") != sgx.get("rtkit_private_vm_region_base"):
+                warnings.append("gfx-asc TEXT does not start at the RTKit private VM base")
+            if text.get("iova", 0) + text.get("size", 0) != data.get("iova"):
+                warnings.append("gfx-asc TEXT and DATA virtual ranges are not contiguous")
+            if data.get("physical") != sgx.get("gfx_data_base"):
+                warnings.append("gfx-asc DATA physical address differs from gfx-data-base")
+            if data.get("size") != sgx.get("gfx_data_size"):
+                warnings.append("gfx-asc DATA size differs from gfx-data-size")
     return warnings
 
 
@@ -203,6 +261,11 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     else:
         sgx_raw = _run_plist(["ioreg", "-a", "-p", "IODeviceTree", "-n", "sgx", "-r"])
 
+    if args.asc_plist:
+        asc_raw = _load_plist(args.asc_plist)
+    else:
+        asc_raw = _run_plist(["ioreg", "-a", "-p", "IODeviceTree", "-n", "gfx-asc", "-r"])
+
     if args.accelerator_plist:
         accelerator_raw = _load_plist(args.accelerator_plist)
     else:
@@ -210,12 +273,13 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
 
     driver_path = args.driver_info or Path("/System/Library/Extensions/AGXG17X.kext/Contents/Info.plist")
     manifest = {
-        "schema": 1,
+        "schema": 2,
         "host": {
             "architecture": platform.machine(),
             "macos_version": platform.mac_ver()[0],
         },
         "device_tree": parse_sgx(_first_node(sgx_raw, "sgx plist")),
+        "asc": parse_asc(_first_node(asc_raw, "gfx-asc plist")),
         "accelerator": parse_accelerator(_first_node(accelerator_raw, "accelerator plist")),
         "driver": parse_driver_info(_load_plist(driver_path)),
     }
@@ -226,6 +290,9 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sgx-plist", type=Path, help="read an ioreg sgx plist instead of live IORegistry")
+    parser.add_argument(
+        "--asc-plist", type=Path, help="read an ioreg gfx-asc plist instead of live IORegistry"
+    )
     parser.add_argument(
         "--accelerator-plist", type=Path, help="read an ioreg accelerator plist instead of live IORegistry"
     )

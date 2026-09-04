@@ -7,7 +7,6 @@ module gpu
 // Translates gpu.rs from the Asahi Linux GPU driver
 
 import apple.rtkit
-import apple.dart
 import gpu.agx.regs
 import gpu.agx.hw
 import gpu.agx.mmu
@@ -58,7 +57,6 @@ pub mut:
 	res         regs.GpuResources
 	hw_config   hw.HwConfig
 	rtk         rtkit.RTKit
-	gpu_dart    dart.DART
 	channels    GpuChannels
 	allocs      alloc.HeapAllocator
 	initdata_va   u64
@@ -82,7 +80,7 @@ pub fn get_global_manager() ?&GpuManager {
 	return global_gpu_mgr
 }
 
-pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKit, d &dart.DART) ?&GpuManager {
+pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKit) ?&GpuManager {
 	version, core_count := res.get_gpu_id()
 	println('agx: GPU ID version=0x${version:x} cores=${core_count}')
 
@@ -90,7 +88,6 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		res:       unsafe { *res }
 		hw_config: unsafe { *cfg }
 		rtk:       unsafe { *rtk }
-		gpu_dart:  unsafe { *d }
 		state:     .idle
 		allocs:    alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
 	}
@@ -121,10 +118,6 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 	}
 
 	va := mgr.allocs.alloc(size, alloc.gpu_page_size) or {
-		return none
-	}
-
-	if !mgr.gpu_dart.map(va, phys, size) {
 		return none
 	}
 
@@ -205,62 +198,59 @@ pub fn (mut mgr GpuManager) init() bool {
 	mgr.state = .starting
 	println('agx: Starting GPU initialization')
 
-	// Step 1: Initialize DART IOMMU
-	mgr.gpu_dart.init()
-
-	// Step 2: Start the ASC CPU via ASC_CTL
+	// Step 1: Start the ASC CPU via ASC_CTL
 	mgr.res.start_cpu()
 
-	// Step 3: RTKit boot handshake
+	// Step 2: RTKit boot handshake
 	if !mgr.rtk.boot() {
 		C.printf(c'agx: RTKit boot failed\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 4: Start GPU-specific firmware endpoint (0x20)
+	// Step 3: Start GPU-specific firmware endpoint (0x20)
 	if !mgr.rtk.start_endpoint(u8(ep_firmware)) {
 		C.printf(c'agx: Failed to start firmware endpoint\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 5: Start doorbell endpoint (0x21)
+	// Step 4: Start doorbell endpoint (0x21)
 	if !mgr.rtk.start_endpoint(u8(ep_doorbell)) {
 		C.printf(c'agx: Failed to start doorbell endpoint\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 6: Initialize firmware communication channels
+	// Step 5: Initialize firmware communication channels
 	if !mgr.init_channels() {
 		C.printf(c'agx: Failed to initialize channels\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 7: Allocate and initialize firmware init data
+	// Step 6: Allocate and initialize firmware init data
 	if !mgr.init_firmware_data() {
 		C.printf(c'agx: Failed to initialize firmware data\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 8: Build and send MSG_INIT with initdata VA
+	// Step 7: Build and send MSG_INIT with initdata VA
 	if !mgr.send_fw_msg(msg_init, mgr.initdata_va) {
 		C.printf(c'agx: Failed to send MSG_INIT\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 9: Wait for MSG_INIT acknowledgment
+	// Step 8: Wait for MSG_INIT acknowledgment
 	_ := mgr.rtk.recv_msg_blocking(10000000) or {
 		C.printf(c'agx: Timeout waiting for INIT ack\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 10: Ring doorbell to kick firmware
+	// Step 9: Ring doorbell to kick firmware
 	mgr.kick_firmware()
 
 	mgr.state = .running
@@ -291,12 +281,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		C.printf(c'agx: Failed to allocate initdata VA\n')
 		return false
 	}
-	// Map into GPU VA space via DART and UAT.
-	if !mgr.gpu_dart.map(initdata_va, initdata_phys, initdata_size) {
-		C.printf(c'agx: Failed to map initdata in DART\n')
-		return false
-	}
-
+	// Map into the GPU's internal UAT. AGX does not sit behind an Apple DART.
 	if uat_mgr != unsafe { nil } {
 		if !uat_mgr.map_kernel(initdata_va, initdata_phys, initdata_size, 0x43) {
 			C.printf(c'agx: Failed to map initdata into kernel UAT\n')
