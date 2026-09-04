@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware inspect layout test trace trace-resources clean
+.PHONY: all firmware inspect kernel-kexts layout test trace trace-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -25,8 +25,12 @@ inspect:
 firmware:
 	./extract_firmware.py
 
+kernel-kexts:
+	./extract_fileset.py
+
 test:
-	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py test_trace_diff.py
+	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
+		test_extract_fileset.py test_trace_diff.py
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl
