@@ -43,6 +43,8 @@ pub const g17_channel_pool_queue_stride = u64(0x80)
 pub const g17_cached_command_pointer_size = u64(0x08)
 pub const g17_firmware_shared_data_size = u64(0x4c0)
 pub const g17_runtime_data_size = u64(0x1ca0)
+pub const g17_runtime_power_policy_offset = u64(0xec)
+pub const g17_runtime_power_policy_size = u64(0x6d8)
 pub const g17_small_shared_data_size = u64(0x20)
 pub const g17_primary_region_size = u64(0xe440)
 pub const g17_secondary_region_size = u64(0x6f0)
@@ -380,8 +382,9 @@ pub mut:
 	opaque_0dd                           [0x07]u8
 	clpc_deadline_control_effort         u32
 	clpc_deadline_control_override       u32
-	// Completely populated by the G17 host producer from its power-policy
-	// snapshot. It is opaque because Vinix does not yet produce that policy.
+	// Apple rearranges this range from a DPE/PPT source block. The checked
+	// G17C vtable producer clears that entire source, so the initial payload is
+	// exactly zero even though its individual firmware-owned fields are opaque.
 	power_controller_payload_0ec         [0x6d8]u8
 	smart_idle_standby_timer_us          u32
 	smart_idle_probability_initial_bits  u32
@@ -440,6 +443,23 @@ pub mut:
 	riart_t_level_disable_mask_1c89      u32
 	riart_state_1c8d                     u32
 	opaque_1c91                          [0x0f]u8
+}
+
+// The pinned G17C accelerator inherits the generic DPE/PPT producer at
+// vtable slot 0xd80. That routine clears 0x6e0 bytes at host-object offset
+// 0x1105c; every source byte rearranged into runtime 0x0ec..0x7c3 is within
+// that cleared block. Initialize the proven destination explicitly rather
+// than relying on the shared allocator's current zero-fill behavior.
+pub fn initialize_g17_runtime_power_policy(buffer voidptr, size u64) bool {
+	if buffer == unsafe { nil } || size < g17_runtime_data_size
+		|| sizeof(G17RuntimeData) != g17_runtime_data_size {
+		return false
+	}
+	unsafe {
+		C.memset(voidptr(u64(buffer) + g17_runtime_power_policy_offset), 0,
+			g17_runtime_power_policy_size)
+	}
+	return true
 }
 
 @[packed]

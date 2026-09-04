@@ -115,6 +115,10 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(), fw.g17_hardware_config_size, &mgr.hw_config) {
 		return false
 	}
+	if !fw.initialize_g17_runtime_power_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
+		return false
+	}
+	graph.runtime_policy_ready = true
 
 	for role := 0; role < 2; role++ {
 		if !fw.initialize_g17_small_shared_data(graph.small_shared[role].cpu_address(), fw.g17_small_shared_data_size, 0) {
@@ -163,8 +167,8 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 }
 
 // Construct the recovered allocation graph, but fail closed before MSG_INIT.
-// Runtime power policy and the remaining platform scalars/calibration are
-// populated by Apple-specific producers that are not implemented yet.
+// The remaining platform scalars/calibration are populated by Apple-specific
+// producers that are not implemented yet.
 fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	mut graph := mgr.allocate_g17_firmware_graph() or {
 		C.printf(c'agx: failed to allocate G17 firmware graph\n')
@@ -176,6 +180,6 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	mgr.initdata_va = graph.roots[0].va
 	mgr.initdata_phys = graph.roots[0].phys
-	C.printf(c'agx: G17 graph ready, but runtime policy and platform values are incomplete\n')
+	C.printf(c'agx: G17 graph and zero DPE/PPT policy ready, but platform values are incomplete\n')
 	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
 }

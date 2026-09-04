@@ -42,6 +42,9 @@ G17_LEGACY_GART_INIT_INFO = (
 )
 INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
 INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
+POPULATE_DPE_PPT_CONFIG = (
+    "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData"
+)
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 KTRACE_FIRMWARE_CALLBACK = "__ZN11AGXFirmware16ktraceFwCallbackE16kd_callback_typePv16AGFIFirmwareRole"
 WAIT_FIRMWARE_POWER_OFF = "__ZN14AGXArmFirmware23waitForFirmwarePowerOffEv"
@@ -2568,6 +2571,79 @@ def recover_g17_runtime_initialization(
     }
 
 
+def recover_g17_runtime_power_policy(
+    image: bytes, arm_power_code: bytes, populate_code: bytes
+) -> dict[str, object]:
+    """Prove that the G17 runtime power-controller payload starts as zero.
+
+    The G17 accelerator inherits the generic DPE/PPT producer.  Its vtable
+    target clears 0x6e0 bytes, and the arm-firmware initializer rearranges a
+    subset of that cleared block into the complete runtime payload.  Keep the
+    vtable and call-site checks together so an Apple driver update cannot turn
+    this fact into an unsafe assumption.
+    """
+
+    target = recover_vtable_target(image, G17_ACCELERATOR_VTABLE, 0xD80)
+    symbols = macho_symbols(image)
+    expected_target = symbols.get(POPULATE_DPE_PPT_CONFIG)
+    if expected_target is None or target != expected_target:
+        raise ValueError(
+            f"unexpected G17 DPE/PPT producer target {target:#x}"
+        )
+
+    instructions = [word for _offset, word in words(populate_code)]
+    if (
+        len(instructions) != 4
+        or instructions[:3] != [0xD503245F, 0xAA0103E0, 0x5280DC01]
+        or instructions[3] & 0xFC000000 != 0x14000000
+    ):
+        raise ValueError("G17 DPE/PPT producer is not the checked 0x6e0-byte clear")
+
+    require_instruction_sequence(
+        arm_power_code,
+        "G17 DPE/PPT runtime source",
+        (
+            0xF9416E75,  # firmware host object at this + 0x2d8
+            0x914046B4,  # source base host object + 0x11000
+            0xF9414E60,  # accelerator/platform object at this + 0x298
+        ),
+    )
+    require_instruction_sequence(
+        arm_power_code,
+        "G17 DPE/PPT producer call",
+        (
+            0x91360208,  # accelerator vtable + 0xd80
+            0xF946C209,
+            0x914046AA,  # firmware host object + 0x11000
+            0x91017141,  # producer destination + 0x5c
+        ),
+    )
+
+    source_base = 0x11000
+    clear_offset = 0x5C
+    clear_bytes = 0x6E0
+    copied_source_start = 0x60
+    copied_source_end = 0x738
+    if not (
+        clear_offset <= copied_source_start
+        and copied_source_end <= clear_offset + clear_bytes
+    ):
+        raise ValueError("G17 runtime power-policy source escapes the cleared block")
+
+    return {
+        "producer": POPULATE_DPE_PPT_CONFIG,
+        "accelerator_vtable_slot": 0xD80,
+        "host_object_base": source_base,
+        "cleared_source_offset": clear_offset,
+        "cleared_source_bytes": clear_bytes,
+        "copied_source_range": {
+            "offset": copied_source_start,
+            "bytes": copied_source_end - copied_source_start,
+        },
+        "runtime_range": {"offset": 0xEC, "bytes": 0x6D8, "value": 0},
+    }
+
+
 def recover_g17_zero_initialized_allocations(code: bytes) -> list[dict[str, object]]:
     require_instruction_sequence(
         code,
@@ -3554,6 +3630,23 @@ def main() -> int:
             base_power_code,
             power_code,
         )
+        dpe_ppt_target = recover_vtable_target(
+            driver, G17_ACCELERATOR_VTABLE, 0xD80
+        )
+        dpe_ppt_symbol = next(
+            (
+                name
+                for name, address in macho_symbols(driver).items()
+                if address == dpe_ppt_target and name == POPULATE_DPE_PPT_CONFIG
+            ),
+            None,
+        )
+        if dpe_ppt_symbol is None:
+            raise ValueError("could not resolve the G17 DPE/PPT producer symbol")
+        _address, dpe_ppt_code = symbol_code(driver, dpe_ppt_symbol)
+        runtime_power_policy = recover_g17_runtime_power_policy(
+            driver, power_code, dpe_ppt_code
+        )
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
         )
@@ -3586,6 +3679,7 @@ def main() -> int:
                 "small_shared_data": small_shared_data,
                 "runtime_controls": runtime_controls,
                 "runtime_initialization": runtime_initialization,
+                "runtime_power_policy": runtime_power_policy,
                 "accelerator": accelerator,
                 "channels": channels,
                 "firmware_shared_data": firmware_shared_data,

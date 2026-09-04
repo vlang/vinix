@@ -1,5 +1,6 @@
 import struct
 import unittest
+from unittest import mock
 
 import recover_g17_abi
 
@@ -735,6 +736,20 @@ def runtime_initialization_code() -> tuple[bytes, bytes, bytes, bytes]:
     return base_init, arm_init, base_power, arm_power
 
 
+def runtime_power_policy_code() -> tuple[bytes, bytes]:
+    arm_power = encode(
+        0xF9416E75,
+        0x914046B4,
+        0xF9414E60,
+        0x91360208,
+        0xF946C209,
+        0x914046AA,
+        0x91017141,
+    )
+    populate = encode(0xD503245F, 0xAA0103E0, 0x5280DC01, 0x14000000)
+    return arm_power, populate
+
+
 def zero_initialized_allocations_code() -> bytes:
     return encode(
         0xF9417268,
@@ -915,6 +930,47 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "host policy snapshot"):
             recover_g17_abi.recover_g17_runtime_initialization(
                 allocations, base_init, arm_init, base_power, b""
+            )
+
+    def test_recovers_zeroed_runtime_power_policy(self) -> None:
+        arm_power, populate = runtime_power_policy_code()
+        target = 0x12345678
+        with (
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=target
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.POPULATE_DPE_PPT_CONFIG: target},
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_runtime_power_policy(
+                b"image", arm_power, populate
+            )
+        self.assertEqual(recovered["accelerator_vtable_slot"], 0xD80)
+        self.assertEqual(recovered["cleared_source_bytes"], 0x6E0)
+        self.assertEqual(
+            recovered["runtime_range"], {"offset": 0xEC, "bytes": 0x6D8, "value": 0}
+        )
+
+    def test_rejects_nonzero_runtime_power_policy_producer(self) -> None:
+        arm_power, populate = runtime_power_policy_code()
+        target = 0x12345678
+        populate = populate[:8] + encode(0x52800001) + populate[12:]
+        with (
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=target
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.POPULATE_DPE_PPT_CONFIG: target},
+            ),
+            self.assertRaisesRegex(ValueError, "0x6e0-byte clear"),
+        ):
+            recover_g17_abi.recover_g17_runtime_power_policy(
+                b"image", arm_power, populate
             )
 
     def test_recovers_zero_initialized_allocations(self) -> None:
