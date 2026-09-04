@@ -57,6 +57,61 @@ pub const g17_io_mapping_size = u64(0x28)
 pub const g17_performance_state_capacity = 16
 pub const g17_voltage_table_columns = 16
 
+// Exact 0x68-byte slice copied from fields 0x18..0x7f of the G17 legacy
+// shared-GART backing object into both bootstrap roots at offset 0x30.
+@[packed]
+pub struct G17PlatformConfig {
+pub mut:
+	value_000     u16
+	value_002     u8
+	value_003     u32
+	value_007     u8
+	value_008     u16
+	page_size_00a u16
+	value_00c     u64
+	value_014     u64
+	value_01c     u64
+	value_024     u32
+	value_028     u16
+	page_size_02a u16
+	value_02c     u64
+	value_034     u64
+	value_03c     u64
+	value_044     u32
+	value_048     u16
+	page_size_04a u16
+	value_04c     u64
+	value_054     u64
+	value_05c     u64
+	reserved_064  u32
+}
+
+pub fn new_g17_platform_config() G17PlatformConfig {
+	return G17PlatformConfig{
+		value_000: 0x1000
+		value_002: 0x0c
+		value_003: 0x0e0e0803
+		value_007: 0x24
+		value_008: 0x40
+		page_size_00a: 0x4000
+		value_00c: 0x1
+		value_014: 0x000003ffffffc000
+		value_01c: 0x3f000000000
+		value_024: 0x190e0e08
+		value_028: 0x800
+		page_size_02a: 0x4000
+		value_02c: 0x1
+		value_034: 0x000003ffffffc000
+		value_03c: 0xffe000000
+		value_044: 0x0e0e0e08
+		value_048: 0x800
+		page_size_04a: 0x4000
+		value_04c: 0x1
+		value_054: 0x000003ffffffc000
+		value_05c: 0x1ffc000
+	}
+}
+
 // Root+0x08 points at a 16 KiB firmware-page mapping containing 0x18-byte
 // register writes. The pinned G17 accelerator's producer is a no-op, so its
 // boot-time contents are one kind-zero terminator followed by zeroed storage.
@@ -103,7 +158,7 @@ pub mut:
 	runtime_data_address         u64
 	firmware_role                u32
 	host_mapped_allocations      u32
-	platform_config_030          [g17_platform_config_size]u8
+	platform_config_030          G17PlatformConfig
 	opaque_098                   [0x10]u8
 	small_shared_data_address    u64
 	primary_region_address       u64
@@ -145,13 +200,13 @@ pub fn populate_g17_bootstrap_header(mut header G17BootstrapHeader, role u32,
 		header.secondary_aux_address = secondary_aux_address
 	}
 	unsafe {
-		C.memcpy(&header.platform_config_030[0], platform_config, g17_platform_config_size)
+		C.memcpy(&header.platform_config_030, platform_config, g17_platform_config_size)
 	}
 	return validate_g17_bootstrap_header(&header)
 }
 
 pub fn validate_g17_bootstrap_header(header &G17BootstrapHeader) bool {
-	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size && sizeof(header.platform_config_030) == g17_platform_config_size && header.interface_magic == g17_interface_magic && header.firmware_role <= 1 && header.host_mapped_allocations != 0
+	return sizeof(G17BootstrapHeader) == g17_bootstrap_header_size && sizeof(G17PlatformConfig) == g17_platform_config_size && sizeof(header.platform_config_030) == g17_platform_config_size && header.interface_magic == g17_interface_magic && header.firmware_role <= 1 && header.host_mapped_allocations != 0
 }
 
 // Shared object referenced by root+0x18. The host driver writes these fields

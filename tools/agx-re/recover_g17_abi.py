@@ -34,6 +34,10 @@ G17_POPULATE_INIT_SEQUENCE = "__ZN14AGXAccelerator28populateInitSequenceFirmware
 G17_FW_BRN_SIZE = "__ZNK31AGX·PI_300·X·A0·Accelerator19getSizeOfFWBRNTableEv.8051"
 G17_FIRMWARE_VTABLE = "__ZTV17AGXArmFirmwareASC"
 CONVERT_GPU_VA_TO_FW_VA = "__ZNK14AGXArmFirmware18convertGPUVAToFWVAEyb"
+G17_LEGACY_SHARED_GART_VTABLE = "__ZTV35AGXLegacySharedGartTableBackingG17X"
+G17_LEGACY_GART_INIT_INFO = (
+    "__ZN48AGX·PI_300·X·A0·LegacySharedGartTableBacking12initGartInfoEv"
+)
 INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
 INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
@@ -59,6 +63,7 @@ KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
 G17_FW_BRN_SIZE_VTABLE_SLOT = 0xF90
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
+GART_INIT_INFO_VTABLE_SLOT = 0x178
 
 
 def macho_uuid(image: bytes) -> str | None:
@@ -744,6 +749,31 @@ def recover_vtable_target(image: bytes, vtable_name: str, slot: int) -> int:
     return decode_kernel_auth_rebase(raw_entry)
 
 
+def read_adrp_load(
+    image: bytes,
+    function_address: int,
+    code: bytes,
+    adrp_offset: int,
+    load_offset: int,
+    expected_width: int,
+) -> bytes:
+    if min(adrp_offset, load_offset) < 0 or max(adrp_offset, load_offset) + 4 > len(code):
+        raise ValueError("PC-relative load is outside its function")
+    adrp = decode_adrp(
+        function_address + adrp_offset,
+        struct.unpack_from("<I", code, adrp_offset)[0],
+    )
+    load = decode_load_unsigned(struct.unpack_from("<I", code, load_offset)[0])
+    if adrp is None or load is None:
+        raise ValueError("expected ADRP/load pair was not found")
+    page_register, page = adrp
+    _destination, base, immediate, width = load
+    if base != page_register or width != expected_width:
+        raise ValueError("unexpected PC-relative load shape")
+    file_offset = virtual_to_file(image, page + immediate)
+    return image[file_offset : file_offset + width]
+
+
 def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
     symbols = macho_symbols(image)
     if G17_POPULATE_INIT_SEQUENCE not in symbols:
@@ -767,6 +797,99 @@ def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
         "provider": G17_POPULATE_INIT_SEQUENCE,
         "provider_address": target,
         "entries_appended": 0,
+    }
+
+
+def recover_g17_platform_config(image: bytes, page_shift_code: bytes) -> dict[str, object]:
+    symbols = macho_symbols(image)
+    if G17_LEGACY_GART_INIT_INFO not in symbols:
+        raise ValueError(f"Mach-O has no {G17_LEGACY_GART_INIT_INFO} symbol")
+    provider = recover_vtable_target(
+        image, G17_LEGACY_SHARED_GART_VTABLE, GART_INIT_INFO_VTABLE_SLOT
+    )
+    if provider != symbols[G17_LEGACY_GART_INIT_INFO]:
+        raise ValueError(f"unexpected G17 legacy shared-GART initializer {provider:#x}")
+    function_address, code = symbol_code(image, G17_LEGACY_GART_INIT_INFO)
+
+    if page_shift_code != struct.pack("<3I", 0xD503245F, 0x528001C0, 0xD65F03C0):
+        raise ValueError("G17 shared-GART layout does not have a checked 14-bit page shift")
+    require_instruction_sequence(
+        code,
+        "G17 shared-GART scalar fields",
+        (
+            0xF9003C1F,  # clear object+0x78 through +0x7f
+            0xD001D588,
+            0xB94C1108,
+            0x79003008,  # object+0x18
+            0xD001D588,
+            0xB94C0108,
+            0x39006808,  # object+0x1a
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "G17 shared-GART page geometry",
+        (
+            0xF0FFA3E8,
+            0xF941D908,
+            0xB9400108,
+            0x52800029,
+            0x1AC82128,
+            0x79004408,  # object+0x22
+            0x79008408,  # object+0x42
+            0x7900C408,  # object+0x62
+            0x52800809,  # 0x40
+            0x79004009,  # object+0x20
+            0x53037D08,  # page size >> 3
+            0x79008008,  # object+0x40
+            0x7900C008,  # object+0x60
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "G17 shared-GART fixed ranges",
+        (
+            0xD2C07E08,  # 0x3f000000000
+            0xF8034008,  # object+0x34
+            0xB2672BE8,  # 0xffe000000
+            0xF8054008,  # object+0x54
+            0x32122BE8,  # 0x1ffc000
+            0xF8074008,  # object+0x74
+        ),
+    )
+
+    value_000 = int.from_bytes(read_adrp_load(image, function_address, code, 0x08, 0x0C, 4), "little")
+    value_002 = int.from_bytes(read_adrp_load(image, function_address, code, 0x14, 0x18, 4), "little")
+    value_003 = int.from_bytes(read_adrp_load(image, function_address, code, 0x54, 0x58, 8)[:4], "little")
+    descriptor = read_adrp_load(image, function_address, code, 0x60, 0x64, 16)
+    value_024 = int.from_bytes(read_adrp_load(image, function_address, code, 0x7C, 0x80, 8)[:4], "little")
+    value_044 = int.from_bytes(read_adrp_load(image, function_address, code, 0x88, 0x8C, 8)[:4], "little")
+    expected = (0x1000, 0x0C, 0x0E0E0803, 0x190E0E08, 0x0E0E0E08)
+    if (value_000, value_002, value_003, value_024, value_044) != expected:
+        raise ValueError("unexpected G17 shared-GART scalar literals")
+    if descriptor != bytes.fromhex("010000000000000000c0ffffff030000"):
+        raise ValueError("unexpected G17 shared-GART range descriptor")
+
+    config = bytearray(0x68)
+    struct.pack_into("<HBI", config, 0x00, value_000, value_002, value_003)
+    config[0x07] = 0x24
+    struct.pack_into("<HH", config, 0x08, 0x40, 0x4000)
+    config[0x0C:0x1C] = descriptor
+    struct.pack_into("<QIHH", config, 0x1C, 0x3F000000000, value_024, 0x800, 0x4000)
+    config[0x2C:0x3C] = descriptor
+    struct.pack_into("<QIHH", config, 0x3C, 0xFFE000000, value_044, 0x800, 0x4000)
+    config[0x4C:0x5C] = descriptor
+    struct.pack_into("<Q", config, 0x5C, 0x1FFC000)
+    return {
+        "bytes": len(config),
+        "source_object_offset": 0x18,
+        "accelerator_host_member": 0x1A948,
+        "provider_vtable": G17_LEGACY_SHARED_GART_VTABLE,
+        "provider_vtable_slot": GART_INIT_INFO_VTABLE_SLOT,
+        "provider": G17_LEGACY_GART_INIT_INFO,
+        "page_shift": 14,
+        "descriptor": descriptor.hex(),
+        "initial_bytes": config.hex(),
     }
 
 
@@ -2039,6 +2162,7 @@ def main() -> int:
             set_32_code,
         )
         bootstrap_region["accelerator_provider"] = init_sequence_provider
+        platform_config = recover_g17_platform_config(driver, page_shift_code)
         allocation_address, allocation_code = symbol_code(driver, ALLOC_FIRMWARE_DATA)
         allocations = recover_firmware_allocations(
             driver, allocation_address, allocation_code
@@ -2091,6 +2215,7 @@ def main() -> int:
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "bootstrap_region": bootstrap_region,
+                "platform_config": platform_config,
                 "brn_workaround_table": brn_workaround_table,
                 "zero_initialized_allocations": zero_initialized_allocations,
                 "role0_bootstrap_regions": role0_bootstrap_regions,
