@@ -32,6 +32,7 @@ pub const g17_small_shared_data_size = u64(0x20)
 pub const g17_primary_region_size = u64(0xe440)
 pub const g17_secondary_region_size = u64(0x6f0)
 pub const g17_secondary_aux_size = u64(0xa8)
+pub const g17_hardware_config_size = u64(0x2710)
 
 // The primary G17C firmware copies exactly 0xc8 bytes from the host-provided
 // root before dereferencing any nested pointers. The names below describe
@@ -134,6 +135,25 @@ pub mut:
 	opaque [0xa8]u8
 }
 
+// Hardware/configuration allocation published at offset zero of both
+// firmware-shared objects. The region boundaries below are established by
+// the primary firmware's fixed loads and copies. Their contents remain opaque
+// until the corresponding host-side producers have been recovered.
+@[packed]
+pub struct G17HardwareConfig {
+pub mut:
+	opaque_000                  [0x8f0]u8
+	address_8f0                 u64
+	opaque_8f8                  [0x598]u8
+	firmware_scalar_block_e90   [0x138]u8
+	firmware_table_block_fc8    [0xa00]u8
+	firmware_block_19c8         [0x80]u8
+	opaque_1a48                 [0x148]u8
+	firmware_copied_block_1b90  [0x148]u8
+	opaque_1cd8                 [0x868]u8
+	firmware_late_controls_2540 [0x1d0]u8
+}
+
 pub fn validate_g17_bootstrap_allocations() bool {
 	return sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size
 		&& sizeof(G17RuntimeData) == g17_runtime_data_size
@@ -141,6 +161,7 @@ pub fn validate_g17_bootstrap_allocations() bool {
 		&& sizeof(G17PrimaryRegion) == g17_primary_region_size
 		&& sizeof(G17SecondaryRegion) == g17_secondary_region_size
 		&& sizeof(G17SecondaryAux) == g17_secondary_aux_size
+		&& sizeof(G17HardwareConfig) == g17_hardware_config_size
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.

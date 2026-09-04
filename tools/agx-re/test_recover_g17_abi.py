@@ -34,6 +34,22 @@ def ldr_w(destination: int, base: int, immediate: int) -> int:
     return 0xB9400000 | (immediate // 4) << 10 | base << 5 | destination
 
 
+def ldr_x(destination: int, base: int, immediate: int) -> int:
+    return 0xF9400000 | (immediate // 8) << 10 | base << 5 | destination
+
+
+def ldr_q(destination: int, base: int, immediate: int) -> int:
+    return 0x3DC00000 | (immediate // 16) << 10 | base << 5 | destination
+
+
+def ldrb_register(destination: int, base: int, offset: int) -> int:
+    return 0x38606800 | offset << 16 | base << 5 | destination
+
+
+def add_register(destination: int, first: int, second: int) -> int:
+    return 0x8B000000 | second << 16 | first << 5 | destination
+
+
 def cmp_w_immediate(source: int, immediate: int) -> int:
     return 0x7100001F | immediate << 10 | source << 5
 
@@ -175,6 +191,104 @@ class RecoverG17AbiTests(unittest.TestCase):
         sizes = recover_g17_abi.recover_root_allocation_sizes(allocations)
         self.assertEqual(sizes["runtime_data"], 0x1CA0)
         self.assertEqual(sizes["primary_region"], 0xE440)
+
+    def test_recovers_firmware_hardware_config_reads(self) -> None:
+        prefix = encode(
+            *magic(10),
+            ldr_x(11, 19, 0),
+            ldr_x(8, 11, 0x8F0),
+            ldr_x(11, 19, 0),
+            ldr_q(0, 11, 0xE90),
+            ldr_x(13, 19, 0),
+            add_register(13, 13, 14),
+            ldr_w(13, 13, 0xFC8),
+            ldr_x(16, 19, 0),
+            add_register(16, 16, 17),
+            ldr_w(16, 16, 0x1008),
+            ldr_x(16, 19, 0),
+            add_register(16, 16, 17),
+            ldr_w(16, 16, 0x1408),
+            ldr_x(8, 19, 0),
+            movz_w(9, 0x19C8),
+            add_register(8, 8, 9),
+            pair_q("load", 0, 1, 8, 0),
+            ldr_x(11, 19, 0),
+            ldr_x(11, 11, 0x2610),
+            ldr_x(8, 19, 0),
+            movz_w(9, 0x26F9),
+            ldrb_register(8, 8, 9),
+        )
+        copied = encode(
+            ldr_x(8, 19, 0),
+            movz_w(9, 0x1B90),
+            add_immediate(0, 22, 0x510),
+            add_register(1, 8, 9),
+            movz_w(2, 0x148),
+        )
+        recovered = recover_g17_abi.recover_firmware_config_reads(
+            prefix + copied + bytes(0x800)
+        )
+        self.assertIn(
+            {"offset": 0xFC8, "bytes": 4, "indexed": True},
+            recovered["firmware_direct_reads"],
+        )
+        self.assertEqual(
+            recovered["firmware_bulk_reads"],
+            [
+                {"offset": 0x19C8, "bytes": 0x80},
+                {"offset": 0x1B90, "bytes": 0x148},
+            ],
+        )
+
+    def test_recovers_hardware_config_allocation_and_publication(self) -> None:
+        allocations = [
+            {
+                "host_cpu_member": 0x2B8,
+                "host_gpu_member": 0x300,
+                "bytes": 0x2710,
+            }
+        ]
+        role = lambda member: (
+            ldr_x(1, 19, 0x300),
+            ldr_x(8, 19, member),
+            str_x(0, 8, 0),
+        )
+        shared_code = encode(*role(0xA98), *role(0xBC8))
+        firmware = encode(
+            *magic(10),
+            ldr_x(11, 19, 0),
+            ldr_x(8, 11, 0x8F0),
+            ldr_x(11, 19, 0),
+            ldr_q(0, 11, 0xE90),
+            ldr_x(13, 19, 0),
+            add_register(13, 13, 14),
+            ldr_w(13, 13, 0xFC8),
+            ldr_x(16, 19, 0),
+            add_register(16, 16, 17),
+            ldr_w(16, 16, 0x1008),
+            ldr_x(16, 19, 0),
+            add_register(16, 16, 17),
+            ldr_w(16, 16, 0x1408),
+            ldr_x(8, 19, 0),
+            movz_w(9, 0x19C8),
+            add_register(8, 8, 9),
+            pair_q("load", 0, 1, 8, 0),
+            ldr_x(11, 19, 0),
+            ldr_x(11, 11, 0x2610),
+            ldr_x(8, 19, 0),
+            movz_w(9, 0x26F9),
+            ldrb_register(8, 8, 9),
+            ldr_x(8, 19, 0),
+            movz_w(9, 0x1B90),
+            add_immediate(0, 22, 0x510),
+            add_register(1, 8, 9),
+            movz_w(2, 0x148),
+        ) + bytes(0x800)
+        recovered = recover_g17_abi.recover_hardware_config(
+            allocations, shared_code, firmware
+        )
+        self.assertEqual(recovered["bytes"], 0x2710)
+        self.assertEqual(recovered["published_shared_cpu_members"], [0xA98, 0xBC8])
 
     def test_recovers_accelerator_ring_bindings(self) -> None:
         allocations = [

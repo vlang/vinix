@@ -22,6 +22,7 @@ FIRMWARE_UUID = "0EDFE976-E37B-3E68-9D64-E3ABF7772D11"
 INTERFACE_MAGIC = 0x0C8BC322072804C0
 INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
+INIT_FIRMWARE_SHARED_DATA = "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
@@ -202,6 +203,51 @@ def decode_ldr_w(word: int) -> tuple[int, int, int] | None:
     base = (word >> 5) & 0x1F
     immediate = ((word >> 10) & 0xFFF) * 4
     return destination, base, immediate
+
+
+def decode_load_unsigned(word: int) -> tuple[int, int, int, int] | None:
+    kinds = {
+        0x39400000: 1,
+        0x79400000: 2,
+        0xB9400000: 4,
+        0xF9400000: 8,
+        0xBD400000: 4,
+        0xFD400000: 8,
+        0x3DC00000: 16,
+    }
+    width = kinds.get(word & 0xFFC00000)
+    if width is None:
+        return None
+    destination = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = ((word >> 10) & 0xFFF) * width
+    return destination, base, immediate, width
+
+
+def decode_load_register(word: int) -> tuple[int, int, int, int] | None:
+    kinds = {
+        0x38600800: 1,
+        0x78600800: 2,
+        0xB8600800: 4,
+        0xF8600800: 8,
+    }
+    width = kinds.get(word & 0xFFE00C00)
+    if width is None:
+        return None
+    destination = word & 0x1F
+    base = (word >> 5) & 0x1F
+    offset = (word >> 16) & 0x1F
+    return destination, base, offset, width
+
+
+def decode_add_register(word: int) -> tuple[int, int, int, int] | None:
+    if word & 0xFF200000 != 0x8B000000:
+        return None
+    destination = word & 0x1F
+    first = (word >> 5) & 0x1F
+    second = (word >> 16) & 0x1F
+    shift = (word >> 10) & 0x3F
+    return destination, first, second, shift
 
 
 def decode_cmp_w_immediate(word: int) -> tuple[int, int] | None:
@@ -473,6 +519,176 @@ def recover_root_allocation_sizes(allocations: list[dict[str, int]]) -> dict[str
     return result
 
 
+def recover_hardware_config(
+    allocations: list[dict[str, int]], shared_code: bytes, firmware: bytes
+) -> dict[str, object]:
+    expected_cpu_member = 0x2B8
+    expected_gpu_member = 0x300
+    expected_size = 0x2710
+    size = next(
+        (
+            item["bytes"]
+            for item in allocations
+            if item["host_cpu_member"] == expected_cpu_member
+            and item["host_gpu_member"] == expected_gpu_member
+        ),
+        None,
+    )
+    if size != expected_size:
+        raise ValueError(f"unexpected hardware config allocation size: {size}")
+
+    instructions = list(words(shared_code))
+    published: set[int] = set()
+    for index, (_offset, word) in enumerate(instructions):
+        source = decode_ldr_x(word)
+        if source != (1, 19, expected_gpu_member):
+            continue
+        for following_index in range(index + 1, min(index + 24, len(instructions))):
+            load = decode_ldr_x(instructions[following_index][1])
+            if load is None or load[0] != 8 or load[1] != 19:
+                continue
+            shared_cpu_member = load[2]
+            for _store_offset, store_word in instructions[
+                following_index + 1 : following_index + 18
+            ]:
+                store = decode_str_x(store_word)
+                if store == (0, 8, 0):
+                    published.add(shared_cpu_member)
+                    break
+    if published != {0xA98, 0xBC8}:
+        raise ValueError(
+            "hardware config address was not published to both firmware roles: "
+            f"{[hex(member) for member in sorted(published)]}"
+        )
+
+    reads = recover_firmware_config_reads(firmware)
+    return {
+        "bytes": expected_size,
+        "host_cpu_member": expected_cpu_member,
+        "host_gpu_member": expected_gpu_member,
+        "firmware_shared_offset": 0,
+        "published_shared_cpu_members": sorted(published),
+        **reads,
+    }
+
+
+def recover_firmware_config_reads(firmware: bytes) -> dict[str, object]:
+    magic = find_materialized_constant(firmware, INTERFACE_MAGIC)
+    if len(magic) != 1:
+        raise ValueError(f"expected one firmware interface magic sequence, found {len(magic)}")
+    _magic_start, magic_end, _register = magic[0]
+    code = firmware[magic_end : magic_end + 0x800]
+    origins: dict[int, tuple[int, bool]] = {}
+    constants: dict[int, int] = {}
+    reads: set[tuple[int, int, bool]] = set()
+
+    for _offset, word in words(code):
+        move_x = decode_move_wide(word)
+        move_w = decode_movz_w(word)
+        if move_x is not None and move_x[0] == "movz":
+            constants[move_x[1]] = move_x[2] << move_x[3]
+            origins.pop(move_x[1], None)
+            continue
+        if move_w is not None:
+            constants[move_w[0]] = move_w[1]
+            origins.pop(move_w[0], None)
+            continue
+
+        load = decode_load_unsigned(word)
+        if load is not None:
+            destination, base, immediate, width = load
+            if base in origins:
+                base_offset, indexed = origins[base]
+                reads.add((base_offset + immediate, width, indexed))
+            if width == 8 and base == 19 and immediate == 0:
+                origins[destination] = (0, False)
+            else:
+                origins.pop(destination, None)
+            constants.pop(destination, None)
+            continue
+
+        register_load = decode_load_register(word)
+        if register_load is not None:
+            destination, base, offset_register, width = register_load
+            if base in origins and offset_register in constants:
+                base_offset, indexed = origins[base]
+                reads.add((base_offset + constants[offset_register], width, indexed))
+            origins.pop(destination, None)
+            constants.pop(destination, None)
+            continue
+
+        addition = decode_add_immediate(word)
+        if addition is not None:
+            destination, source, immediate = addition
+            if source in origins:
+                base_offset, indexed = origins[source]
+                origins[destination] = (base_offset + immediate, indexed)
+            else:
+                origins.pop(destination, None)
+            if source in constants:
+                constants[destination] = constants[source] + immediate
+            else:
+                constants.pop(destination, None)
+            continue
+
+        register_add = decode_add_register(word)
+        if register_add is not None:
+            destination, first, second, shift = register_add
+            if first in origins:
+                base_offset, indexed = origins[first]
+                if second in constants:
+                    origins[destination] = (
+                        base_offset + (constants[second] << shift), indexed
+                    )
+                else:
+                    origins[destination] = (base_offset, True)
+            else:
+                origins.pop(destination, None)
+            constants.pop(destination, None)
+            continue
+
+        pair = decode_pair_q(word)
+        if pair is not None and pair[0] == "load" and pair[3] in origins:
+            _kind, _first, _second, base, immediate = pair
+            base_offset, indexed = origins[base]
+            reads.add((base_offset + immediate, 32, indexed))
+
+    required = {
+        (0x8F0, 8, False),
+        (0xE90, 16, False),
+        (0xFC8, 4, True),
+        (0x1008, 4, True),
+        (0x1408, 4, True),
+        (0x19C8, 32, False),
+        (0x2610, 8, False),
+        (0x26F9, 1, False),
+    }
+    if not required.issubset(reads):
+        raise ValueError(f"incomplete firmware hardware-config read map: {required - reads}")
+
+    copied_pattern = struct.pack(
+        "<5I",
+        0xF9400268,  # ldr x8, [x19]
+        0x52837209,  # mov w9, #0x1b90
+        0x911442C0,  # add x0, x22, #0x510
+        0x8B090101,  # add x1, x8, x9
+        0x52802902,  # mov w2, #0x148
+    )
+    if copied_pattern not in code:
+        raise ValueError("firmware 0x1b90 configuration copy was not found")
+
+    return {
+        "firmware_direct_reads": [
+            {"offset": offset, "bytes": width, "indexed": indexed}
+            for offset, width, indexed in sorted(reads)
+        ],
+        "firmware_bulk_reads": [
+            {"offset": 0x19C8, "bytes": 0x80},
+            {"offset": 0x1B90, "bytes": 0x148},
+        ],
+    }
+
+
 def recover_accelerator_ring_bindings(
     allocations: list[dict[str, int]], code: bytes
 ) -> list[dict[str, object]]:
@@ -732,6 +948,10 @@ def main() -> int:
         accelerator["bindings"] = recover_accelerator_ring_bindings(
             allocations, base_init_code
         )
+        _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
+        hardware_config = recover_hardware_config(
+            allocations, shared_init_code, firmware
+        )
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))
@@ -744,6 +964,7 @@ def main() -> int:
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "accelerator": accelerator,
+                "hardware_config": hardware_config,
                 "uat_handoff": handoff,
                 "root_allocation_bytes": root_allocation_sizes,
             },
