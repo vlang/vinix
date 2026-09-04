@@ -31,6 +31,9 @@ SET_INIT_REGISTER_64 = "__ZN14AGXArmFirmware12setInitReg64Etyh.4232"
 SET_INIT_REGISTER_32 = "__ZN14AGXArmFirmware12setInitReg32Etjh.4233"
 G17_ACCELERATOR_VTABLE = "__ZTV18AGXAcceleratorG17X"
 G17_POPULATE_INIT_SEQUENCE = "__ZN14AGXAccelerator28populateInitSequenceFirmwareEh.8148"
+G17_FW_BRN_SIZE = "__ZNK31AGX·PI_300·X·A0·Accelerator19getSizeOfFWBRNTableEv.8051"
+G17_FIRMWARE_VTABLE = "__ZTV17AGXArmFirmwareASC"
+CONVERT_GPU_VA_TO_FW_VA = "__ZNK14AGXArmFirmware18convertGPUVAToFWVAEyb"
 INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
 INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
@@ -54,6 +57,8 @@ SUBMIT_DEVICE_CONTROL = (
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
+G17_FW_BRN_SIZE_VTABLE_SLOT = 0xF90
+FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 
 
 def macho_uuid(image: bytes) -> str | None:
@@ -726,20 +731,26 @@ def decode_kernel_auth_rebase(raw: int) -> int:
     return KERNEL_COLLECTION_BASE + (raw & 0xFFFFFFFF)
 
 
-def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
+def recover_vtable_target(image: bytes, vtable_name: str, slot: int) -> int:
     symbols = macho_symbols(image)
-    for name in (G17_ACCELERATOR_VTABLE, G17_POPULATE_INIT_SEQUENCE):
-        if name not in symbols:
-            raise ValueError(f"Mach-O has no {name} symbol")
-
-    vtable_address = symbols[G17_ACCELERATOR_VTABLE]
+    if vtable_name not in symbols:
+        raise ValueError(f"Mach-O has no {vtable_name} symbol")
     # A C++ vtable symbol begins with two header pointers before virtual slot 0.
-    entry_address = vtable_address + 0x10 + G17_INIT_SEQUENCE_VTABLE_SLOT
+    entry_address = symbols[vtable_name] + 0x10 + slot
     entry_offset = virtual_to_file(image, entry_address)
     if entry_offset + 8 > len(image):
-        raise ValueError("truncated G17 init-sequence vtable entry")
+        raise ValueError(f"truncated {vtable_name} entry at slot {slot:#x}")
     raw_entry = struct.unpack_from("<Q", image, entry_offset)[0]
-    target = decode_kernel_auth_rebase(raw_entry)
+    return decode_kernel_auth_rebase(raw_entry)
+
+
+def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
+    symbols = macho_symbols(image)
+    if G17_POPULATE_INIT_SEQUENCE not in symbols:
+        raise ValueError(f"Mach-O has no {G17_POPULATE_INIT_SEQUENCE} symbol")
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_INIT_SEQUENCE_VTABLE_SLOT
+    )
     if target != symbols[G17_POPULATE_INIT_SEQUENCE]:
         raise ValueError(
             f"unexpected G17 init-sequence provider {target:#x}; "
@@ -756,6 +767,72 @@ def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
         "provider": G17_POPULATE_INIT_SEQUENCE,
         "provider_address": target,
         "entries_appended": 0,
+    }
+
+
+def recover_g17_brn_workaround_table(
+    image: bytes, allocation_code: bytes
+) -> dict[str, object]:
+    require_instruction_sequence(
+        allocation_code,
+        "firmware BRN workaround-table descriptor",
+        (
+            0x910BC268,  # add x8, x19, #0x2f0 (CPU output)
+            0x910CE269,  # add x9, x19, #0x338 (GPU output)
+            0xA90C27E8,
+            0xF9414E60,  # accelerator at host member 0x298
+            0xF9400010,
+            0xAA0003F1,
+            0xF2F9B431,
+            0xDAC11A30,
+            0xAA1003F1,
+            0xDAC147F1,
+            0xEB11021F,
+            0x54000040,
+            0xD4388E40,
+            0x913E4208,  # accelerator vtable + 0xf90
+            0xF947CA09,
+            0xAA0803F1,
+            0xF2FDDD51,
+            0xD73F0931,
+            0xAA1503F1,
+            0x291A7FE0,  # descriptor size = returned w0
+        ),
+    )
+
+    symbols = macho_symbols(image)
+    for name in (G17_FW_BRN_SIZE, CONVERT_GPU_VA_TO_FW_VA):
+        if name not in symbols:
+            raise ValueError(f"Mach-O has no {name} symbol")
+    size_provider = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_FW_BRN_SIZE_VTABLE_SLOT
+    )
+    if size_provider != symbols[G17_FW_BRN_SIZE]:
+        raise ValueError(f"unexpected G17 firmware BRN size provider {size_provider:#x}")
+    _address, size_code = symbol_code(image, G17_FW_BRN_SIZE)
+    if size_code != struct.pack("<3I", 0xD503245F, 0xD2800000, 0xD65F03C0):
+        raise ValueError("G17 firmware BRN table size provider does not return zero")
+
+    converter = recover_vtable_target(
+        image, G17_FIRMWARE_VTABLE, FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT
+    )
+    if converter != symbols[CONVERT_GPU_VA_TO_FW_VA]:
+        raise ValueError(f"unexpected G17 firmware address converter {converter:#x}")
+    _address, converter_code = symbol_code(image, CONVERT_GPU_VA_TO_FW_VA)
+    if converter_code != struct.pack("<3I", 0xD503245F, 0xAA0103E0, 0xD65F03C0):
+        raise ValueError("G17 firmware address conversion is not the checked identity mapping")
+
+    return {
+        "bytes": 0,
+        "host_cpu_member": 0x2F0,
+        "host_gpu_member": 0x338,
+        "accelerator_vtable_slot": G17_FW_BRN_SIZE_VTABLE_SLOT,
+        "size_provider": G17_FW_BRN_SIZE,
+        "firmware_shared_offset": 8,
+        "firmware_address_conversion_vtable_slot": (
+            FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT
+        ),
+        "firmware_address_conversion": CONVERT_GPU_VA_TO_FW_VA,
     }
 
 
@@ -1101,6 +1178,7 @@ def recover_firmware_shared_data_layout(
         0x320: 0x11DD0,
         0x328: 0x68,
         0x330: 0x800,
+        0x338: 0,
         0x340: 0x88,
         0xAC0: 0x79800,
         0xBF0: 0x79800,
@@ -1844,6 +1922,18 @@ def main() -> int:
         allocations = recover_firmware_allocations(
             driver, allocation_address, allocation_code
         )
+        brn_workaround_table = recover_g17_brn_workaround_table(
+            driver, allocation_code
+        )
+        if any(item["host_gpu_member"] == 0x338 for item in allocations):
+            raise ValueError("zero-sized firmware BRN table was unexpectedly allocated")
+        allocations.append(
+            {
+                "host_cpu_member": brn_workaround_table["host_cpu_member"],
+                "host_gpu_member": brn_workaround_table["host_gpu_member"],
+                "bytes": brn_workaround_table["bytes"],
+            }
+        )
         root_allocation_sizes = recover_root_allocation_sizes(allocations)
         _address, base_init_code = symbol_code(driver, INIT_BASE_FIRMWARE_DATA)
         accelerator["bindings"] = recover_accelerator_ring_bindings(
@@ -1876,6 +1966,7 @@ def main() -> int:
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "bootstrap_region": bootstrap_region,
+                "brn_workaround_table": brn_workaround_table,
                 "accelerator": accelerator,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,

@@ -331,14 +331,15 @@ pub mut:
 }
 
 // Complete set of allocation addresses whose placements in the 0x4c0-byte
-// role-specific shared object are independently recovered. The optional
-// platform address at 0x2d0 is published only when the matching platform flag
-// is set; its zero value is therefore valid.
+// role-specific shared object are independently recovered. T6050 reports a
+// zero-sized BRN-workaround table, so that address is intentionally null. The
+// optional platform address at 0x2d0 is published only when the matching
+// platform flag is set; its zero value is therefore valid.
 pub struct G17FirmwareSharedBindings {
 pub mut:
 	role                      u32
 	hardware_config_address   u64
-	common_service_address    u64
+	brn_workaround_address    u64
 	common_control_address    u64
 	large_region_address      u64
 	role0_bootstrap_addresses [5]u64
@@ -356,7 +357,7 @@ pub mut:
 }
 
 pub fn populate_g17_firmware_shared_data(mut data G17FirmwareSharedData, bindings G17FirmwareSharedBindings) bool {
-	if bindings.role > 1 || bindings.hardware_config_address == 0 || bindings.common_service_address == 0 || bindings.common_control_address == 0 || bindings.large_region_address == 0 {
+	if bindings.role > 1 || bindings.hardware_config_address == 0 || bindings.common_control_address == 0 || bindings.large_region_address == 0 {
 		return false
 	}
 	if bindings.accelerator_ring.read_index_address == 0 || bindings.accelerator_ring.cfi_index_address == 0 || bindings.accelerator_ring.write_index_address == 0 || bindings.accelerator_ring.entries_address == 0 {
@@ -379,7 +380,7 @@ pub fn populate_g17_firmware_shared_data(mut data G17FirmwareSharedData, binding
 
 	data = G17FirmwareSharedData{}
 	data.address_000 = bindings.hardware_config_address
-	data.address_008 = bindings.common_service_address
+	data.address_008 = bindings.brn_workaround_address
 	data.address_010 = bindings.common_control_address
 	data.accelerator_ring = bindings.accelerator_ring
 	data.auxiliary_ring_addresses = bindings.auxiliary_ring_addresses

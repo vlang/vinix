@@ -181,6 +181,7 @@ def firmware_shared_allocations() -> list[dict[str, int]]:
         0x320: 0x11DD0,
         0x328: 0x68,
         0x330: 0x800,
+        0x338: 0,
         0x340: 0x88,
         0xAC0: 0x79800,
         0xBF0: 0x79800,
@@ -445,6 +446,15 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(recovered["bytes"], 0x4C0)
         self.assertEqual(len(recovered["roles"][0]["direct_publications"]), 9)
+        self.assertIn(
+            {
+                "shared_cpu_member": 0xA98,
+                "source_gpu_member": 0x338,
+                "shared_offset": 0x08,
+                "source_bytes": 0,
+            },
+            recovered["roles"][0]["direct_publications"],
+        )
         self.assertIn(
             {"shared_cpu_member": 0xBC8, "source_gpu_member": 0x320,
              "shared_offset": 0x471, "source_bytes": 0x11DD0},
