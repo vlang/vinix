@@ -381,6 +381,27 @@ def bootstrap_region_code() -> tuple[bytes, bytes, bytes, bytes, bytes, bytes]:
     return allocation, prepare, page_shift, set_64_pa, set_64, set_32
 
 
+def zero_initialized_allocations_code() -> bytes:
+    return encode(
+        0xF9417268,
+        0xF900311F,
+        0x6F00E400,
+        0xAD020100,
+        0xAD010100,
+        0xAD000100,
+        0xF9417660,
+        0x52810001,
+        0x94AA5CC1,
+        0xF9417E68,
+        0xF900411F,
+        0x6F00E400,
+        0xAD030100,
+        0xAD020100,
+        0xAD010100,
+        0xAD000100,
+    )
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_decodes_kernel_authenticated_rebase(self) -> None:
         raw = 0x80114229019894A8
@@ -410,6 +431,18 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.recover_g17_bootstrap_region(
                 allocation, b"", page_shift, set_64_pa, set_64, set_32
             )
+
+    def test_recovers_zero_initialized_allocations(self) -> None:
+        recovered = recover_g17_abi.recover_g17_zero_initialized_allocations(
+            zero_initialized_allocations_code()
+        )
+        self.assertEqual([item["bytes"] for item in recovered], [0x68, 0x800, 0x88])
+        self.assertEqual(recovered[2]["host_gpu_member"], 0x340)
+        self.assertEqual(len(recovered[2]["firmware_shared_offsets"]), 2)
+
+    def test_rejects_incomplete_zero_initialized_allocations(self) -> None:
+        with self.assertRaisesRegex(ValueError, "0x68-byte"):
+            recover_g17_abi.recover_g17_zero_initialized_allocations(b"")
 
     def test_recovers_firmware_root_pointer_offsets(self) -> None:
         code = encode(
