@@ -270,6 +270,10 @@ pub fn (mut mgr GpuManager) init() bool {
 }
 
 fn (mut mgr GpuManager) init_firmware_data() bool {
+	if mgr.hw_config.firmware_abi == .g17_26_5_partial {
+		return mgr.init_g17_firmware_data()
+	}
+
 	initdata_size := u64(0x10000) // 64KB firmware init blob
 	initdata_pages := lib.div_roundup(initdata_size, page_size)
 

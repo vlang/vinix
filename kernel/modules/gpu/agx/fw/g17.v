@@ -62,6 +62,22 @@ pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
 pub const g17_register_override_size = u64(0x18)
 
+// Allocation sizes in the order published at shared offsets
+// 0x1c0, 0x1c8, ... 0x1f8 for each firmware role.
+pub fn g17_auxiliary_ring_size(index u32) ?u64 {
+	return match index {
+		0 { u64(0x30) }
+		1 { u64(0x4800) }
+		2 { u64(0x1b0) }
+		3 { u64(0x28800) }
+		4 { u64(0x30) }
+		5 { u64(0x9000) }
+		6 { u64(0x30) }
+		7 { u64(0x4800) }
+		else { none }
+	}
+}
+
 // Exact 0x68-byte slice copied from fields 0x18..0x7f of the G17 legacy
 // shared-GART backing object into both bootstrap roots at offset 0x30.
 @[packed]
@@ -524,6 +540,18 @@ pub fn new_g17_role0_region_25c() G17Role0Region25c {
 	}
 }
 
+pub fn initialize_g17_role0_region_25c(buffer voidptr, size u64) bool {
+	if buffer == unsafe { nil } || size != g17_role0_bootstrap_25c_size {
+		return false
+	}
+	unsafe {
+		C.memset(buffer, 0, size)
+		*&u32(u64(buffer) + 0xa18) = 0xffffffff
+		*&u32(u64(buffer) + 0xa30) = 0xffffffff
+	}
+	return true
+}
+
 pub fn new_g17_role0_region_264() G17Role0Region264 {
 	return G17Role0Region264{}
 }
@@ -626,6 +654,44 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 	return true
 }
 
+// Initialize the recovered DeviceTree-backed subset directly in mapped
+// storage. This avoids placing the 0x2710-byte object on the kernel stack.
+pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwConfig) bool {
+	if buffer == unsafe { nil } || size != g17_hardware_config_size
+		|| sizeof(G17HardwareConfig) != g17_hardware_config_size
+		|| hardware.perf_state_count == 0
+		|| hardware.perf_state_count > g17_performance_state_capacity
+		|| hardware.perf_state_table_count == 0
+		|| hardware.perf_state_table_count > g17_voltage_table_columns {
+		return false
+	}
+
+	unsafe {
+		C.memset(buffer, 0, size)
+		mut config := &G17HardwareConfig(buffer)
+		config.performance_state_max_fc4 = hardware.perf_state_count - 1
+		for state := u32(0); state < hardware.perf_state_count; state++ {
+			config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
+			base_voltage := hardware.perf_state_voltages[state * g17_voltage_table_columns]
+			base_sram_voltage := hardware.perf_state_sram_voltages[state * g17_voltage_table_columns]
+			for table := u32(0); table < g17_voltage_table_columns; table++ {
+				offset := state * g17_voltage_table_columns + table
+				config.voltage_table_1008[state].values[table] = if table < hardware.perf_state_table_count {
+					hardware.perf_state_voltages[offset]
+				} else {
+					base_voltage
+				}
+				config.sram_voltage_table_1408[state].values[table] = if table < hardware.perf_state_table_count {
+					hardware.perf_state_sram_voltages[offset]
+				} else {
+					base_sram_voltage
+				}
+			}
+		}
+	}
+	return true
+}
+
 // G17 accelerator rings use three independently cache-line-spaced indices.
 // All indices are range-checked against 256 entries by the Apple host driver.
 @[packed]
@@ -655,7 +721,10 @@ pub mut:
 // role-specific shared object are independently recovered. T6050 reports a
 // zero-sized BRN-workaround table, so that address is intentionally null. The
 // optional platform address at 0x2d0 is published only when the matching
-// platform flag is set; its zero value is therefore valid.
+// platform flag is set; its zero value is therefore valid. The four service
+// addresses at 0x2d8..0x2f0 also have explicit null paths in Apple's pinned
+// producer, so a host which does not provide those services may leave them
+// zero.
 pub struct G17FirmwareSharedBindings {
 pub mut:
 	role                      u32
@@ -721,6 +790,21 @@ pub fn populate_g17_firmware_shared_data(mut data G17FirmwareSharedData, binding
 		data.platform_address_2e8 = bindings.platform_address_2e8
 		data.value_300 = bindings.platform_value_300
 		data.secondary_address_471 = bindings.role1_secondary_address
+	}
+	return true
+}
+
+pub fn initialize_g17_firmware_shared_data(buffer voidptr, size u64, bindings G17FirmwareSharedBindings) bool {
+	if buffer == unsafe { nil } || size != g17_firmware_shared_data_size
+		|| sizeof(G17FirmwareSharedData) != g17_firmware_shared_data_size {
+		return false
+	}
+	mut data := G17FirmwareSharedData{}
+	if !populate_g17_firmware_shared_data(mut data, bindings) {
+		return false
+	}
+	unsafe {
+		C.memcpy(buffer, &data, size)
 	}
 	return true
 }

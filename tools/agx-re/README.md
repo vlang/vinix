@@ -81,7 +81,8 @@ USC generation 3. Vinix now recognizes that topology.
 See [G17_T6050.md](G17_T6050.md) for the versioned register, user-client, and
 firmware observations recovered during this pass.
 
-Hardware launch remains gated because Vinix currently implements only the
-macOS 12.3-era G13 firmware structures. Before enabling T6050 writes, the G17
-firmware InitData, RTKit endpoints, channel layouts, UAT/DART format, power
-handoff, and work-command ABI all need byte-accurate implementations.
+Hardware launch remains gated. Vinix now has the native G17 UAT handoff,
+two-role bootstrap roots, mapped allocation graph, and the recovered portions
+of its shared/runtime objects, but the runtime policy, remaining platform
+values, firmware channel layouts, work-command ABI, and userspace command
+producer still need byte-accurate implementations before enabling T6050.

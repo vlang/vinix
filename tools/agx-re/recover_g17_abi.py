@@ -1749,6 +1749,15 @@ def recover_firmware_shared_platform_fields(code: bytes) -> dict[str, object]:
         if struct.pack("<I", instruction) not in code:
             raise ValueError(f"missing {label} store")
 
+    for instruction, label in (
+        (0xF9016EBF, "nullable primary platform address 0x2d8"),
+        (0xF90176BF, "nullable primary platform address 0x2e8"),
+    ):
+        if struct.pack("<I", instruction) not in code:
+            raise ValueError(f"missing {label} zero store")
+    if code.count(struct.pack("<I", 0xD2800000)) < 2:  # mov x0, #0
+        raise ValueError("missing nullable secondary platform-service addresses")
+
     require_instruction_sequence(
         code,
         "secondary shared platform mirrors",
@@ -1815,10 +1824,18 @@ def recover_firmware_shared_platform_fields(code: bytes) -> dict[str, object]:
             {
                 "platform_pointer_offset": 0x11560,
                 "primary_shared_offsets": [0x2D8, 0x2E0],
+                "primary_object_member": 0x68,
+                "secondary_object_member": 0x58,
+                "mapping_address_vtable_offset": 0x158,
+                "nullable": True,
             },
             {
                 "platform_pointer_offset": 0x11568,
                 "primary_shared_offsets": [0x2E8, 0x2F0],
+                "primary_object_member": 0x68,
+                "secondary_object_member": 0x58,
+                "mapping_address_vtable_offset": 0x158,
+                "nullable": True,
             },
         ],
         "secondary_mirrors": [

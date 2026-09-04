@@ -281,11 +281,15 @@ def firmware_shared_platform_code() -> bytes:
         0x91158108,
         0xF9400108,
         0xF9016EA0,
+        0xF9016EBF,
+        0xD2800000,
         0xF90172A0,
         0x91404408,
         0x9115A108,
         0xF9400108,
         0xF90176A0,
+        0xF90176BF,
+        0xD2800000,
         0xF9017AA0,
         0xF9017EBF,
         0xF945E669,
@@ -988,6 +992,11 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(
             recovered["primary_service_sources"][1]["platform_pointer_offset"],
             0x11568,
+        )
+        self.assertTrue(recovered["primary_service_sources"][0]["nullable"])
+        self.assertEqual(
+            recovered["primary_service_sources"][0]["mapping_address_vtable_offset"],
+            0x158,
         )
         self.assertEqual(recovered["calibration"]["shared_offset"], 0x479)
         self.assertEqual(recovered["primary_state"]["status_bytes"], 0x90)
