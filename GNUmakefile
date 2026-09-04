@@ -12,9 +12,10 @@ vinix.iso: jinx
 debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
-jinx:
+jinx: build-support/jinx/git-clone-commit.patch
 	git clone https://codeberg.org/mintsuki/jinx.git jinx-repo
 	git -C jinx-repo checkout b3c7da97e5247bee0a876a7a5f6c104f019fcf79
+	patch -d jinx-repo -p1 < build-support/jinx/git-clone-commit.patch
 	mv jinx-repo/jinx ./
 	rm -rf jinx-repo
 

@@ -481,6 +481,10 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 		return errno.err, errno.enoent
 	}
 
+	if !stat.isdir(target_node.resource.stat.mode) {
+		return errno.err, errno.enotdir
+	}
+
 	if target_node.children.len > 2 {
 		return errno.err, errno.enotempty
 	}

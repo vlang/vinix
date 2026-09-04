@@ -17,3 +17,10 @@
  
  #if !defined(_WIN32)
  // added by module `os`, file: fd.c.v:6:
+@@ -34253 +34256 @@
+-		if (p->backend != v__pref__Backend__c || p->building_v || p->is_bare || fast_string_eq(p->ccompiler, _SLIT("msvc"))) {
++		if (p->backend != v__pref__Backend__c || p->building_v || p->is_bare || fast_string_eq(p->ccompiler, _SLIT("msvc")) || p->os == v__pref__OS__vinix) {
+@@ -34262,0 +34266,3 @@
++	if (p->os == v__pref__OS__vinix) {
++		v__pref__Preferences_parse_define(p, _SLIT("no_backtrace"));
++	}

@@ -3,7 +3,7 @@
 name=v
 repology_id=vlang
 version=0.0git
-revision=1
+revision=2
 git_url="https://github.com/vlang/v.git"
 commit=dd859eae55cf4e69346851fe285b9af104c8ffb7
 source_allow_network="yes"
@@ -12,9 +12,13 @@ hostdeps="gcc"
 deps="core-libs"
 
 prepare() {
-    git clone https://github.com/vlang/vc.git \
-        --revision=216b1cdc8b1acad5b03e9cf8767f44f2742bf8f5 \
-        --depth=1
+    # `git clone --revision` is not available in Debian 13's Git 2.47.
+    # Fetching the pinned commit explicitly keeps this shallow and portable.
+    git init vc
+    git -C vc fetch --depth=1 \
+        https://github.com/vlang/vc.git \
+        216b1cdc8b1acad5b03e9cf8767f44f2742bf8f5
+    git -C vc -c advice.detachedHead=false checkout --detach FETCH_HEAD
 
     cd vc
     rm -rf .git
@@ -38,5 +42,7 @@ package() {
     mkdir -p "${dest_dir}${prefix}"/bin
     ln -sf ../v/v "${dest_dir}${prefix}"/bin/v
 
-    post_package_strip
+    # The package contains the complete V source tree.  Avoid running the
+    # generic strip helper (and therefore `file`) over every source file.
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/v/v
 }

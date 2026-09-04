@@ -1,0 +1,12 @@
+--- a/options/posix/generic/posix_stdlib.cpp
++++ b/options/posix/generic/posix_stdlib.cpp
+@@ -422,7 +422,8 @@ char *realpath(const char *path, char *out) {
+ 			if(auto slash = strchr(lnk.data() + ls, '/'); slash) {
+ 				ls_view = frg::string_view{lnk.data() + ls, static_cast<size_t>(slash - (lnk.data() + ls))};
+ 			}else{
+-				ls_view = frg::string_view{lnk.data() + ls, strlen(lnk.data()) - ls};
++				// lnk can contain an already-consumed NUL after resolving a relative symlink.
++				ls_view = frg::string_view{lnk.data() + ls, strlen(lnk.data() + ls)};
+ 			}
+ 			ls += ls_view.size() + 1;
+ 
