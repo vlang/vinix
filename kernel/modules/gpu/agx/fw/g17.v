@@ -88,6 +88,7 @@ pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
 pub const g17_register_override_size = u64(0x18)
 pub const g17_default_mcache_writes = u64(0x0000000607800004)
+pub const g17_fixed_config_value_f8c = u64(0x00000000fffeae80)
 
 // Allocation sizes in the order published at shared offsets
 // 0x1c0, 0x1c8, ... 0x1f8 for each firmware role.
@@ -759,6 +760,22 @@ pub mut:
 	values [g17_firmware_scalar_word_count]u32
 }
 
+fn g17_enabled_usc_count(hardware &hw.HwConfig) u32 {
+	mut count := u32(0)
+	mut any_mask := false
+	for source_mask in hardware.core_mask_list {
+		mut mask := source_mask
+		if mask != 0 {
+			any_mask = true
+		}
+		for mask != 0 {
+			count += mask & 1
+			mask >>= 1
+		}
+	}
+	return if any_mask { count } else { hardware.gpu_core_count }
+}
+
 pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlock {
 	mut result := G17FirmwareScalarBlock{}
 	// retrieveChipInfo publishes the chosen-node chip ID followed by the
@@ -785,6 +802,9 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlo
 	result.values[(0xf28 - 0xe90) / 4] = u32(g17_default_mcache_writes >> 32)
 	result.values[(0xf34 - 0xe90) / 4] = 1
 	result.values[(0xf38 - 0xe90) / 4] = 1
+	result.values[(0xf88 - 0xe90) / 4] = g17_enabled_usc_count(hardware)
+	result.values[(0xf8c - 0xe90) / 4] = u32(g17_fixed_config_value_f8c)
+	result.values[(0xf90 - 0xe90) / 4] = u32(g17_fixed_config_value_f8c >> 32)
 	return result
 }
 

@@ -53,6 +53,7 @@ G17_GET_SAMPLE_PERIOD = "__ZN14AGXAccelerator15getSamplePeriodEv.8055"
 G17_DEFAULT_MCACHE_WRITES = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX25halGetDefaultMcacheWritesEv.8045"
 )
+G17_GET_ENABLED_NUM_USCS = "__ZNK14AGXAccelerator17getEnabledNumUSCsEv"
 ACCELERATOR_START = "__ZN14AGXAccelerator5startEP9IOService"
 PI300_CONFIGURE_DEVICE = (
     "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
@@ -63,6 +64,7 @@ G17_CONFIGURE_DEVICE = (
 G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
 G17_GET_SAMPLE_PERIOD_VTABLE_SLOT = 0xF70
 G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
+G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT = 0xAA0
 BASE_CONFIGURE_POWER = (
     "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv"
 )
@@ -4417,6 +4419,101 @@ def recover_g17_default_mcache_writes(
     }
 
 
+def recover_g17_enabled_usc_config(
+    image: bytes, arm_init_code: bytes
+) -> dict[str, object]:
+    """Recover enabled-USC and adjacent fixed configuration at +0xf88."""
+
+    symbols = macho_symbols(image)
+    required = (BASE_CONFIGURE_DEVICE, G17_GET_ENABLED_NUM_USCS)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT
+    )
+    if target != symbols[G17_GET_ENABLED_NUM_USCS]:
+        raise ValueError(f"unexpected G17 enabled-USC target {target:#x}")
+
+    _configure_address, configure_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    _getter_address, getter_code = symbol_code(image, G17_GET_ENABLED_NUM_USCS)
+    if len(getter_code) != 0x44:
+        raise ValueError(f"unexpected G17 enabled-USC getter size {len(getter_code):#x}")
+    require_instruction_words_at(
+        getter_code,
+        "G17 enabled-USC getter",
+        {
+            0x00: 0xD503245F,
+            0x04: 0xF9424008,
+            0x08: 0xF9424409,
+            0x0C: 0xAA08012A,
+            0x10: 0xB400016A,
+            0x14: 0x9E670120,
+            0x18: 0x0E205800,
+            0x1C: 0x0E31B800,
+            0x20: 0x1E260009,
+            0x24: 0x9E670100,
+            0x28: 0x0E205800,
+            0x2C: 0x0E31B800,
+            0x30: 0x1E260008,
+            0x34: 0x0B080120,
+            0x38: 0xD65F03C0,
+            0x3C: 0xB944B000,
+            0x40: 0xD65F03C0,
+        },
+    )
+
+    # configureDevice materializes 0x00000000fffeae80 in x20 and publishes it
+    # at accelerator +0xf740. This is separate from the enabled-USC getter.
+    fixed_value = 0x00000000FFFEAE80
+    require_instruction_words_at(
+        configure_code,
+        "G17 fixed +0xf740 configuration producer",
+        {
+            0x34: 0x529EE508,  # accelerator +0xf728 base
+            0x38: 0x8B080018,
+            0x44: 0x5295D014,
+            0x48: 0x72BFFFD4,
+            0x50C: 0xF9000F14,  # x20 -> accelerator +0xf740
+        },
+    )
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 enabled-USC firmware publication",
+        {
+            0xED4: 0xF9414E60,
+            0xEE8: 0xD2815411,
+            0xEEC: 0x8B110210,
+            0xEF0: 0xF9400208,  # vtable slot +0xaa0
+            0xEF8: 0xD73F0910,
+            0xEFC: 0xF9415E68,
+            0xF08: 0x913E310A,  # config +0xf8c
+            0xF0C: 0xB90F8900,  # enabled USC count -> config +0xf88
+            0xF10: 0xF9414E6B,
+            0xF14: 0x529EE80C,
+            0xF18: 0x8B0C016C,
+            0xF1C: 0xF940018C,  # accelerator +0xf740
+            0xF20: 0xF900014C,
+        },
+    )
+    return {
+        "enabled_usc_count": {
+            "offset": 0xF88,
+            "core_mask_offsets": [0x480, 0x488],
+            "fallback_core_count_offset": 0x4B0,
+            "formula": "popcount(core_mask_0) + popcount(core_mask_1), else core_count",
+            "provider_vtable_slot": G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT,
+            "provider": G17_GET_ENABLED_NUM_USCS,
+        },
+        "fixed_value": {
+            "offset": 0xF8C,
+            "bytes": 8,
+            "value": fixed_value,
+            "source_offset": 0xF740,
+        },
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -5643,6 +5740,9 @@ def main() -> int:
         )
         hardware_config["default_mcache_writes"] = (
             recover_g17_default_mcache_writes(driver, function)
+        )
+        hardware_config["enabled_usc_config"] = recover_g17_enabled_usc_config(
+            driver, function
         )
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)

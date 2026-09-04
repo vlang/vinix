@@ -2470,6 +2470,92 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["value"], 0x0000000607800004)
         self.assertEqual(recovered["source_offset"], 0xF730)
 
+    def test_recovers_g17_enabled_usc_config(self) -> None:
+        configure_address = 0x100000
+        getter_address = 0x200000
+        configure = bytearray(0x510)
+        for offset, word in {
+            0x34: 0x529EE508,
+            0x38: 0x8B080018,
+            0x44: 0x5295D014,
+            0x48: 0x72BFFFD4,
+            0x50C: 0xF9000F14,
+        }.items():
+            struct.pack_into("<I", configure, offset, word)
+        getter_words = {
+            0x00: 0xD503245F,
+            0x04: 0xF9424008,
+            0x08: 0xF9424409,
+            0x0C: 0xAA08012A,
+            0x10: 0xB400016A,
+            0x14: 0x9E670120,
+            0x18: 0x0E205800,
+            0x1C: 0x0E31B800,
+            0x20: 0x1E260009,
+            0x24: 0x9E670100,
+            0x28: 0x0E205800,
+            0x2C: 0x0E31B800,
+            0x30: 0x1E260008,
+            0x34: 0x0B080120,
+            0x38: 0xD65F03C0,
+            0x3C: 0xB944B000,
+            0x40: 0xD65F03C0,
+        }
+        getter = bytearray(0x44)
+        for offset, word in getter_words.items():
+            struct.pack_into("<I", getter, offset, word)
+        arm_init = bytearray(0xF24)
+        for offset, word in {
+            0xED4: 0xF9414E60,
+            0xEE8: 0xD2815411,
+            0xEEC: 0x8B110210,
+            0xEF0: 0xF9400208,
+            0xEF8: 0xD73F0910,
+            0xEFC: 0xF9415E68,
+            0xF08: 0x913E310A,
+            0xF0C: 0xB90F8900,
+            0xF10: 0xF9414E6B,
+            0xF14: 0x529EE80C,
+            0xF18: 0x8B0C016C,
+            0xF1C: 0xF940018C,
+            0xF20: 0xF900014C,
+        }.items():
+            struct.pack_into("<I", arm_init, offset, word)
+        symbols = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: configure_address,
+            recover_g17_abi.G17_GET_ENABLED_NUM_USCS: getter_address,
+        }
+        code = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: (
+                configure_address,
+                bytes(configure),
+            ),
+            recover_g17_abi.G17_GET_ENABLED_NUM_USCS: (
+                getter_address,
+                bytes(getter),
+            ),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=getter_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_enabled_usc_config(
+                b"", bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["enabled_usc_count"]["offset"], 0xF88)
+        self.assertEqual(recovered["fixed_value"]["offset"], 0xF8C)
+        self.assertEqual(recovered["fixed_value"]["value"], 0x00000000FFFEAE80)
+
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000
         pi_address = 0x101000
