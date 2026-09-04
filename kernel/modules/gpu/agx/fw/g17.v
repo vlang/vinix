@@ -87,6 +87,7 @@ pub const g17_fw_util_pstate_control_count = 4
 pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
 pub const g17_register_override_size = u64(0x18)
+pub const g17_default_mcache_writes = u64(0x0000000607800004)
 
 // Allocation sizes in the order published at shared offsets
 // 0x1c0, 0x1c8, ... 0x1f8 for each firmware role.
@@ -780,6 +781,8 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlo
 	result.values[(0xee4 - 0xe90) / 4] = 1
 	result.values[(0xee8 - 0xe90) / 4] = 1
 	result.values[(0xf04 - 0xe90) / 4] = 31
+	result.values[(0xf24 - 0xe90) / 4] = u32(g17_default_mcache_writes)
+	result.values[(0xf28 - 0xe90) / 4] = u32(g17_default_mcache_writes >> 32)
 	result.values[(0xf34 - 0xe90) / 4] = 1
 	result.values[(0xf38 - 0xe90) / 4] = 1
 	return result

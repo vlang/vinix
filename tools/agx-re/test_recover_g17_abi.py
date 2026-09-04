@@ -2405,6 +2405,71 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["accelerator_offset"], 0xF84C)
         self.assertEqual(recovered["formula"], "value")
 
+    def test_recovers_g17_default_mcache_writes(self) -> None:
+        configure_address = 0x100000
+        getter_address = 0x200000
+        configure = bytearray(0x4F0)
+        for offset, word in {
+            0x34: 0x529EE508,
+            0x38: 0x8B080018,
+            0x4D0: 0x913FC208,
+            0x4D4: 0xF947FA09,
+            0x4D8: 0xAA1303E0,
+            0x4E4: 0xD73F0931,
+            0x4EC: 0xF9000700,
+        }.items():
+            struct.pack_into("<I", configure, offset, word)
+        getter = b"".join(
+            struct.pack("<I", word)
+            for word in (
+                0xD503245F,
+                0xD2800080,
+                0xF2A0F000,
+                0xF2C000C0,
+                0xD65F03C0,
+            )
+        )
+        arm_init = bytearray(0x720)
+        for offset, word in {
+            0x6A4: 0xF9414E68,
+            0x6B0: 0x91403D09,
+            0x714: 0xF943992A,
+            0x718: 0x913C916C,
+            0x71C: 0xF900018A,
+        }.items():
+            struct.pack_into("<I", arm_init, offset, word)
+        symbols = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: configure_address,
+            recover_g17_abi.G17_DEFAULT_MCACHE_WRITES: getter_address,
+        }
+        code = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: (
+                configure_address,
+                bytes(configure),
+            ),
+            recover_g17_abi.G17_DEFAULT_MCACHE_WRITES: (getter_address, getter),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=getter_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_default_mcache_writes(
+                b"", bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["offset"], 0xF24)
+        self.assertEqual(recovered["value"], 0x0000000607800004)
+        self.assertEqual(recovered["source_offset"], 0xF730)
+
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000
         pi_address = 0x101000

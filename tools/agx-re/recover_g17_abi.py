@@ -50,6 +50,9 @@ POPULATE_DPE_PPT_CONFIG = (
 BASE_CONFIGURE_DEVICE = "__ZN14AGXAccelerator15configureDeviceEP9IOService"
 RETRIEVE_CHIP_INFO = "__ZN14AGXAccelerator16retrieveChipInfoEP12AGXSChipInfo"
 G17_GET_SAMPLE_PERIOD = "__ZN14AGXAccelerator15getSamplePeriodEv.8055"
+G17_DEFAULT_MCACHE_WRITES = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX25halGetDefaultMcacheWritesEv.8045"
+)
 ACCELERATOR_START = "__ZN14AGXAccelerator5startEP9IOService"
 PI300_CONFIGURE_DEVICE = (
     "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
@@ -59,6 +62,7 @@ G17_CONFIGURE_DEVICE = (
 )
 G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
 G17_GET_SAMPLE_PERIOD_VTABLE_SLOT = 0xF70
+G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
 BASE_CONFIGURE_POWER = (
     "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv"
 )
@@ -4345,6 +4349,74 @@ def recover_g17_power_sample_period(
     }
 
 
+def recover_g17_default_mcache_writes(
+    image: bytes, arm_init_code: bytes
+) -> dict[str, object]:
+    """Recover the fixed G17 memory-cache write mask at config +0xf24."""
+
+    symbols = macho_symbols(image)
+    required = (BASE_CONFIGURE_DEVICE, G17_DEFAULT_MCACHE_WRITES)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT
+    )
+    if target != symbols[G17_DEFAULT_MCACHE_WRITES]:
+        raise ValueError(f"unexpected G17 default mcache-write target {target:#x}")
+
+    _configure_address, configure_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    _getter_address, getter_code = symbol_code(image, G17_DEFAULT_MCACHE_WRITES)
+    if len(getter_code) != 0x14:
+        raise ValueError(
+            f"unexpected G17 default mcache-write provider size {len(getter_code):#x}"
+        )
+    require_instruction_words_at(
+        getter_code,
+        "G17 default mcache-write provider",
+        {
+            0x00: 0xD503245F,
+            0x04: 0xD2800080,
+            0x08: 0xF2A0F000,
+            0x0C: 0xF2C000C0,
+            0x10: 0xD65F03C0,
+        },
+    )
+    value = 4 | (0x780 << 16) | (6 << 32)
+    require_instruction_words_at(
+        configure_code,
+        "G17 default mcache-write host publication",
+        {
+            0x34: 0x529EE508,  # accelerator +0xf728 base
+            0x38: 0x8B080018,
+            0x4D0: 0x913FC208,
+            0x4D4: 0xF947FA09,  # vtable slot +0xff0
+            0x4D8: 0xAA1303E0,
+            0x4E4: 0xD73F0931,
+            0x4EC: 0xF9000700,  # result -> accelerator +0xf730
+        },
+    )
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 default mcache-write firmware publication",
+        {
+            0x6A4: 0xF9414E68,
+            0x6B0: 0x91403D09,  # accelerator +0xf000 base
+            0x714: 0xF943992A,  # accelerator +0xf730
+            0x718: 0x913C916C,  # config +0xf24
+            0x71C: 0xF900018A,
+        },
+    )
+    return {
+        "offset": 0xF24,
+        "bytes": 8,
+        "value": value,
+        "source_offset": 0xF730,
+        "provider_vtable_slot": G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT,
+        "provider": G17_DEFAULT_MCACHE_WRITES,
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -5568,6 +5640,9 @@ def main() -> int:
         hardware_config["chip_info"] = recover_g17_chip_info(driver, function)
         hardware_config["power_sample_period"] = recover_g17_power_sample_period(
             driver, function
+        )
+        hardware_config["default_mcache_writes"] = (
+            recover_g17_default_mcache_writes(driver, function)
         )
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)
