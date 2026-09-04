@@ -176,6 +176,47 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(sizes["runtime_data"], 0x1CA0)
         self.assertEqual(sizes["primary_region"], 0xE440)
 
+    def test_recovers_accelerator_ring_bindings(self) -> None:
+        allocations = [
+            {"host_cpu_member": 0xAE0, "host_gpu_member": 0xAE8, "bytes": 0x30},
+            {"host_cpu_member": 0xAF0, "host_gpu_member": 0xAF8, "bytes": 0x4000},
+            {"host_cpu_member": 0xC10, "host_gpu_member": 0xC18, "bytes": 0x30},
+            {"host_cpu_member": 0xC20, "host_gpu_member": 0xC28, "bytes": 0x4000},
+        ]
+        code = encode(
+            *sum(
+                (
+                    (
+                        0xF9400000 | (member // 8) << 10 | 19 << 5 | 8,
+                        str_x(0, 8, offset),
+                    )
+                    for member in (0xAA0, 0xBD0)
+                    for offset in (0x180, 0x188, 0x190, 0x198)
+                ),
+                (),
+            )
+        )
+        bindings = recover_g17_abi.recover_accelerator_ring_bindings(allocations, code)
+        self.assertEqual(bindings[0]["host_object_member"], 0xAD8)
+        self.assertEqual(bindings[1]["host_entries_gpu_member"], 0xC28)
+        self.assertEqual(
+            bindings[0]["firmware_shared_offsets"]["entries_address"], 0x1B8
+        )
+
+    def test_rejects_incomplete_accelerator_ring_publication(self) -> None:
+        allocations = [
+            {"host_cpu_member": 0xAE0, "host_gpu_member": 0xAE8, "bytes": 0x30},
+            {"host_cpu_member": 0xAF0, "host_gpu_member": 0xAF8, "bytes": 0x4000},
+            {"host_cpu_member": 0xC10, "host_gpu_member": 0xC18, "bytes": 0x30},
+            {"host_cpu_member": 0xC20, "host_gpu_member": 0xC28, "bytes": 0x4000},
+        ]
+        code = encode(
+            0xF9400000 | (0xAA0 // 8) << 10 | 19 << 5 | 8,
+            str_x(0, 8, 0x180),
+        )
+        with self.assertRaisesRegex(ValueError, "accelerator addresses"):
+            recover_g17_abi.recover_accelerator_ring_bindings(allocations, code)
+
 
 if __name__ == "__main__":
     unittest.main()

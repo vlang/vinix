@@ -19,6 +19,11 @@ pub const g17_secondary_region_offset = u64(0xb8)
 pub const g17_secondary_aux_offset = u64(0xc0)
 pub const g17_accelerator_ring_entries = u32(256)
 pub const g17_accelerator_ring_state_size = u64(0x30)
+pub const g17_accelerator_ring_entries_size = u64(0x4000)
+pub const g17_accelerator_ring_addresses_offset = u64(0x1a0)
+pub const g17_accelerator_ring_addresses_size = u64(0x20)
+pub const g17_auxiliary_ring_addresses_offset = u64(0x1c0)
+pub const g17_auxiliary_ring_address_count = 8
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_device_control_entry_size = u64(0x40)
 pub const g17_firmware_shared_data_size = u64(0x4c0)
@@ -70,29 +75,31 @@ pub fn validate_g17_bootstrap_header(header &G17BootstrapHeader) bool {
 @[packed]
 pub struct G17FirmwareSharedData {
 pub mut:
-	address_000           u64
-	address_008           u64
-	address_010           u64
-	opaque_018            [0x1e8]u8
-	address_200           u64
-	opaque_208            [0x48]u8
-	state_250             u32
-	addresses_254         [5]u64
-	opaque_27c            [0x54]u8
-	address_2d0           u64
-	platform_address_2d8  u64
-	platform_address_2e0  u64
-	platform_address_2e8  u64
-	platform_address_2f0  u64
-	reserved_2f8          u64
-	value_300             u32
-	value_304             u32
-	opaque_308            [0xd8]u8
-	state_3e0             u8
-	status_3e1            [0x90]u8
-	secondary_address_471 u64
-	calibration_479       [0x10]u8
-	opaque_489            [0x37]u8
+	address_000              u64
+	address_008              u64
+	address_010              u64
+	opaque_018               [0x188]u8
+	accelerator_ring         G17AcceleratorRingAddresses
+	auxiliary_ring_addresses [g17_auxiliary_ring_address_count]u64
+	address_200              u64
+	opaque_208               [0x48]u8
+	state_250                u32
+	addresses_254            [5]u64
+	opaque_27c               [0x54]u8
+	address_2d0              u64
+	platform_address_2d8     u64
+	platform_address_2e0     u64
+	platform_address_2e8     u64
+	platform_address_2f0     u64
+	reserved_2f8             u64
+	value_300                u32
+	value_304                u32
+	opaque_308               [0xd8]u8
+	state_3e0                u8
+	status_3e1               [0x90]u8
+	secondary_address_471    u64
+	calibration_479          [0x10]u8
+	opaque_489               [0x37]u8
 }
 
 // Allocation sizes and placements are verified even where their contents are
@@ -149,6 +156,18 @@ pub mut:
 	opaque_024  [3]u32
 }
 
+// GPU addresses published in the firmware-shared object at 0x1a0. The host
+// keeps CPU and GPU addresses for the state and entry allocations separately;
+// only these GPU addresses are consumed by firmware.
+@[packed]
+pub struct G17AcceleratorRingAddresses {
+pub mut:
+	read_index_address  u64
+	cfi_index_address   u64
+	write_index_address u64
+	entries_address     u64
+}
+
 // Scheduler submission entry written by
 // AGXArmFirmware::encodeAcceleratorRingCommand. The first word is not yet
 // understood and must be initialized by the future G17 command encoder.
@@ -175,6 +194,7 @@ pub mut:
 
 pub fn validate_g17_accelerator_layouts() bool {
 	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size
+		&& sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size
 		&& sizeof(G17DataMasterEntry) == g17_data_master_entry_size
 		&& sizeof(G17DeviceControlEntry) == g17_device_control_entry_size
 }

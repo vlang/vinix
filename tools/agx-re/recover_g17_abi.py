@@ -21,6 +21,7 @@ DRIVER_UUID = "680ACC23-AB13-301C-B28A-3A2A257F7977"
 FIRMWARE_UUID = "0EDFE976-E37B-3E68-9D64-E3ABF7772D11"
 INTERFACE_MAGIC = 0x0C8BC322072804C0
 INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
+INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
@@ -183,6 +184,15 @@ def decode_str_x(word: int) -> tuple[int, int, int] | None:
     base = (word >> 5) & 0x1F
     immediate = ((word >> 10) & 0xFFF) * 8
     return source, base, immediate
+
+
+def decode_ldr_x(word: int) -> tuple[int, int, int] | None:
+    if word & 0xFFC00000 != 0xF9400000:
+        return None
+    destination = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = ((word >> 10) & 0xFFF) * 8
+    return destination, base, immediate
 
 
 def decode_ldr_w(word: int) -> tuple[int, int, int] | None:
@@ -463,6 +473,62 @@ def recover_root_allocation_sizes(allocations: list[dict[str, int]]) -> dict[str
     return result
 
 
+def recover_accelerator_ring_bindings(
+    allocations: list[dict[str, int]], code: bytes
+) -> list[dict[str, object]]:
+    by_members = {
+        (item["host_cpu_member"], item["host_gpu_member"]): item["bytes"]
+        for item in allocations
+    }
+    roles = (
+        (0, 0xAD8, 0xAE0, 0xAE8, 0xAF0, 0xAF8, 0xAA0),
+        (1, 0xC08, 0xC10, 0xC18, 0xC20, 0xC28, 0xBD0),
+    )
+    published: dict[int, set[int]] = {}
+    instructions = list(words(code))
+    for index, (_offset, word) in enumerate(instructions):
+        store = decode_str_x(word)
+        if store is None or store[0] != 0 or store[1] != 8:
+            continue
+        for _previous_offset, previous_word in instructions[max(0, index - 3) : index]:
+            load = decode_ldr_x(previous_word)
+            if load is not None and load[0] == 8 and load[1] == 19:
+                published.setdefault(load[2], set()).add(store[2])
+
+    result = []
+    for role, obj, state_cpu, state_gpu, entries_cpu, entries_gpu, shared in roles:
+        if by_members.get((state_cpu, state_gpu)) != 0x30:
+            raise ValueError(f"role {role} accelerator state allocation is not 0x30 bytes")
+        if by_members.get((entries_cpu, entries_gpu)) != 0x4000:
+            raise ValueError(f"role {role} accelerator entries allocation is not 0x4000 bytes")
+        offsets = published.get(shared, set())
+        expected = {0x180, 0x188, 0x190, 0x198}
+        if not expected.issubset(offsets):
+            raise ValueError(
+                f"role {role} accelerator addresses are not published through "
+                f"host member {shared:#x}: {sorted(offsets)}"
+            )
+        result.append(
+            {
+                "role": role,
+                "host_object_member": obj,
+                "host_state_cpu_member": state_cpu,
+                "host_state_gpu_member": state_gpu,
+                "host_entries_cpu_member": entries_cpu,
+                "host_entries_gpu_member": entries_gpu,
+                "state_bytes": 0x30,
+                "entries_bytes": 0x4000,
+                "firmware_shared_offsets": {
+                    "read_index_address": 0x1A0,
+                    "cfi_index_address": 0x1A8,
+                    "write_index_address": 0x1B0,
+                    "entries_address": 0x1B8,
+                },
+            }
+        )
+    return result
+
+
 def recover_ring_accessor(code: bytes) -> tuple[int, int]:
     loads = []
     bounds = []
@@ -662,6 +728,10 @@ def main() -> int:
             driver, allocation_address, allocation_code
         )
         root_allocation_sizes = recover_root_allocation_sizes(allocations)
+        _address, base_init_code = symbol_code(driver, INIT_BASE_FIRMWARE_DATA)
+        accelerator["bindings"] = recover_accelerator_ring_bindings(
+            allocations, base_init_code
+        )
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))
