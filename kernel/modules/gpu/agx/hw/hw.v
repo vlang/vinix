@@ -33,6 +33,9 @@ pub enum GpuRevision {
 pub enum FirmwareAbi {
 	unknown
 	v12_3
+	// The macOS 26.5 G17C root header and RTKit transport are identified,
+	// but its nested InitData/channel/work layouts are not complete.
+	g17_26_5_partial
 }
 
 pub struct IoMapping {

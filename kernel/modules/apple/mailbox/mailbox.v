@@ -9,15 +9,16 @@ import aarch64.kio
 import aarch64.cpu
 import klock
 
-// Mailbox registers (offsets from base)
-const mbox_a2i_send0 = u32(0x800) // AP -> IOP data low
-const mbox_a2i_send1 = u32(0x808) // AP -> IOP data high + flags
-const mbox_i2a_recv0 = u32(0xc00) // IOP -> AP data low
-const mbox_i2a_recv1 = u32(0xc08) // IOP -> AP data high + flags
-
-// Control registers
-const mbox_a2i_ctrl = u32(0x810)
-const mbox_i2a_ctrl = u32(0xc10)
+// ASC mailbox v4 register offsets. The mailbox DT resource starts at the
+// mailbox window (the combined ASC window used by m1n1 places this at
+// ASC + 0x8000). A2I is the AP -> coprocessor inbox and I2A is the
+// coprocessor -> AP outbox.
+const mbox_a2i_ctrl = u32(0x110)
+const mbox_i2a_ctrl = u32(0x114)
+const mbox_a2i_send0 = u32(0x800)
+const mbox_a2i_send1 = u32(0x808)
+const mbox_i2a_recv0 = u32(0x830)
+const mbox_i2a_recv1 = u32(0x838)
 
 // Status bits
 const mbox_empty = u32(1 << 17)
@@ -107,12 +108,7 @@ pub fn (mut mbox Mailbox) recv_blocking(timeout int) ?MboxMsg {
 	return none
 }
 
-// Extract endpoint from message
+// Extract endpoint from the low byte of the mailbox's second word.
 pub fn msg_endpoint(msg &MboxMsg) u8 {
 	return u8(msg.data1 & 0xff)
-}
-
-// Extract message type from data
-pub fn msg_type(msg &MboxMsg) u8 {
-	return u8(msg.data0 >> 56)
 }

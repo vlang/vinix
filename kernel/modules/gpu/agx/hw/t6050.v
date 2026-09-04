@@ -18,7 +18,7 @@ pub fn t6050_config() HwConfig {
 		gpu_gen:               .g17
 		gpu_variant:           .c
 		gpu_rev:               .unknown
-		firmware_abi:          .unknown
+		firmware_abi:          .g17_26_5_partial
 		gpu_core_count:        40
 		max_dies:              1
 		num_clusters:          4

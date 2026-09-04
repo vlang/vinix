@@ -116,7 +116,7 @@ pub fn iomfb_set_power(mut rtk rtkit.RTKit, state u32) bool {
 	// Encode: message type in bits [55:48], power state in bits [31:0]
 	payload := (u64(iomfb_msg_set_power) << 48) | u64(state)
 
-	if !rtk.send_msg(iomfb_endpoint, u8(iomfb_msg_set_power), payload) {
+	if !rtk.send_message(iomfb_endpoint, payload) {
 		C.printf(c'iomfb: Failed to send set_power\n')
 		return false
 	}
@@ -144,7 +144,7 @@ pub fn iomfb_get_timing_modes(mut rtk rtkit.RTKit, state &IomfbState) []IomfbTim
 
 	// Send timing mode query
 	payload := u64(iomfb_msg_get_timing_modes) << 48
-	if !rtk.send_msg(iomfb_endpoint, u8(iomfb_msg_get_timing_modes), payload) {
+	if !rtk.send_message(iomfb_endpoint, payload) {
 		C.printf(c'iomfb: Failed to send get_timing_modes\n')
 		return modes
 	}
@@ -194,7 +194,7 @@ pub fn iomfb_set_mode(mut rtk rtkit.RTKit, state &IomfbState, width u32, height 
 	// Encode: type in [55:48], width in [47:32], height in [31:16]
 	payload := (u64(iomfb_msg_set_mode) << 48) | (u64(width) << 32) | (u64(height) << 16)
 
-	if !rtk.send_msg(iomfb_endpoint, u8(iomfb_msg_set_mode), payload) {
+	if !rtk.send_message(iomfb_endpoint, payload) {
 		C.printf(c'iomfb: Failed to send set_mode %ux%u\n', width, height)
 		return false
 	}
@@ -226,7 +226,7 @@ pub fn iomfb_set_mode(mut rtk rtkit.RTKit, state &IomfbState, width u32, height 
 pub fn iomfb_swap_start(mut rtk rtkit.RTKit, state &IomfbState) u32 {
 	payload := u64(iomfb_msg_swap_start) << 48
 
-	if !rtk.send_msg(iomfb_endpoint, u8(iomfb_msg_swap_start), payload) {
+	if !rtk.send_message(iomfb_endpoint, payload) {
 		C.printf(c'iomfb: Failed to send swap_start\n')
 		return 0
 	}
@@ -263,7 +263,7 @@ pub fn iomfb_swap_submit(mut rtk rtkit.RTKit, state &IomfbState, desc &IomfbSwap
 
 	payload := (u64(iomfb_msg_swap_submit) << 48) | (u64(desc.swap_id) << 32) | u64(u32(desc.src_addr >> 32))
 
-	if !rtk.send_msg(iomfb_endpoint, u8(iomfb_msg_swap_submit), payload) {
+	if !rtk.send_message(iomfb_endpoint, payload) {
 		C.printf(c'iomfb: Failed to send swap_submit (id=%u)\n', desc.swap_id)
 		return false
 	}

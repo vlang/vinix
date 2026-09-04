@@ -25,11 +25,12 @@ import sched
 pub const ep_firmware = u32(0x20)
 pub const ep_doorbell = u32(0x21)
 
-// GPU message types (encoded in bits [63:56] by rtkit.send_msg)
-pub const msg_init = u8(0x81)
-pub const msg_tx_doorbell = u8(0x83)
-pub const msg_fwctl = u8(0x84)
-pub const msg_halt = u8(0x85)
+// GPU endpoint messages occupy bits 55:48; the low 44 bits carry an IOVA.
+pub const msg_init = u64(0x81) << 48
+pub const msg_tx_doorbell = u64(0x83) << 48
+pub const msg_fwctl = u64(0x84) << 48
+pub const msg_halt = u64(0x85) << 48
+const msg_address_mask = (u64(1) << 44) - 1
 
 // GPU states
 pub enum GpuState {
@@ -343,8 +344,8 @@ pub fn (mut mgr GpuManager) kick_firmware() {
 }
 
 // Send a firmware message via RTKit
-pub fn (mut mgr GpuManager) send_fw_msg(msg_type u8, data u64) bool {
-	return mgr.rtk.send_msg(u8(ep_firmware), msg_type, data)
+pub fn (mut mgr GpuManager) send_fw_msg(message u64, data u64) bool {
+	return mgr.rtk.send_message(u8(ep_firmware), message | (data & msg_address_mask))
 }
 
 // Process an event from the event channel
