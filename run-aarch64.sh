@@ -76,16 +76,16 @@ if [ ! -f "$LIMINE_EFI" ]; then
     echo "==> BOOTAA64.EFI not found, building Limine ${LIMINE_VERSION}..."
     LIMINE_SRC_DIR="$BOOT_DIR/limine-src-${LIMINE_VERSION}"
     if [ ! -d "$LIMINE_SRC_DIR" ]; then
-        TMPDIR="$(mktemp -d)"
-        curl -sL "https://github.com/limine-bootloader/limine/releases/download/v${LIMINE_VERSION}/limine-${LIMINE_VERSION}.tar.gz" | tar xz -C "$TMPDIR"
-        mv "$TMPDIR/limine-${LIMINE_VERSION}" "$LIMINE_SRC_DIR"
-        rm -rf "$TMPDIR"
+        LIMINE_DOWNLOAD_DIR="$(mktemp -d)"
+        curl -sL "https://github.com/limine-bootloader/limine/releases/download/v${LIMINE_VERSION}/limine-${LIMINE_VERSION}.tar.gz" | tar xz -C "$LIMINE_DOWNLOAD_DIR"
+        mv "$LIMINE_DOWNLOAD_DIR/limine-${LIMINE_VERSION}" "$LIMINE_SRC_DIR"
+        rm -rf "$LIMINE_DOWNLOAD_DIR"
     fi
 
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
     (
         cd "$LIMINE_SRC_DIR"
-        ./configure --enable-uefi-aarch64 --enable-uefi-cd --disable-bios --disable-bios-cd --disable-bios-pxe >/tmp/vinix-limine-config.log 2>&1
+        ./configure --enable-uefi-aarch64 --disable-uefi-cd --disable-bios --disable-bios-cd --disable-bios-pxe >/tmp/vinix-limine-config.log 2>&1
         make -j"$(sysctl -n hw.ncpu)" >/tmp/vinix-limine-make.log 2>&1
     ) || {
         echo "ERROR: Failed to build Limine BOOTAA64.EFI"
@@ -169,7 +169,7 @@ echo "==> Starting QEMU (Ctrl-A X to quit)..."
 if [ "$SERIAL_ONLY" -eq 1 ]; then
     # Use -display none (not -nographic) to keep ramfb for framebuffer/GOP
     # while hiding the QEMU window. -nographic removes display devices entirely.
-    DISPLAY_BACKEND_FLAGS="-display none -monitor none"
+    DISPLAY_BACKEND_FLAGS="-display none"
 elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
     DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND}"
 elif [ "$(uname -s)" = "Darwin" ]; then
@@ -186,7 +186,8 @@ else
     DISPLAY_DEVICE_FLAGS="-device ramfb"
 fi
 
-DISPLAY_FLAGS="$DISPLAY_DEVICE_FLAGS $DISPLAY_BACKEND_FLAGS -serial stdio"
+# Multiplex the serial console and QEMU monitor so Ctrl-A X exits as advertised.
+DISPLAY_FLAGS="$DISPLAY_DEVICE_FLAGS $DISPLAY_BACKEND_FLAGS -serial mon:stdio"
 
 ACCEL_FLAGS="-accel hvf -cpu host"
 if [ "${USE_TCG:-0}" -eq 1 ]; then

@@ -15,7 +15,7 @@ import lib
 import errno
 import time
 
-fn C.sched_switch_context(gpr_state &cpulocal.GPRState, kernel_stack u64)
+fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
 fn C.vinix_call_void_fn(f voidptr)
 
 pub fn initialise() {
@@ -156,7 +156,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	timer.oneshot(current_thread.timeslice)
 
 	// Restore ARM64 GPR state and return via eret (does not return).
-	C.sched_switch_context(&current_thread.gpr_state, current_thread.kernel_stack)
+	C.sched_switch_context(voidptr(&current_thread.gpr_state), current_thread.kernel_stack)
 }
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {

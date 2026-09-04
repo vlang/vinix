@@ -75,7 +75,7 @@ override CFLAGS += \
 
 # On macOS, clang injects platform flags that break bare-metal ELF linking.
 # Use ld.lld directly for AArch64 linking.
-LD_AARCH64 := ld.lld
+LD_AARCH64 ?= ld.lld
 
 # Internal linker flags for AArch64 (passed directly to ld.lld, not via clang).
 override LDFLAGS_DIRECT += \

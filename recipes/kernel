@@ -18,8 +18,10 @@ build() {
     cp -rpf "${source_dir}"/. ./
 
     make -j${parallelism} \
+        ARCH=${ARCHITECTURE} \
         PROD="$PROD" \
         CC=${OS_TRIPLET}-gcc \
+        LD_AARCH64=${OS_TRIPLET}-ld \
         LD=${OS_TRIPLET}-ld \
         AR=${OS_TRIPLET}-ar \
         OBJDUMP=${OS_TRIPLET}-objdump
