@@ -65,6 +65,13 @@ G17_PIO_TABLE_LENGTH = (
 G17_PIO_TABLE = (
     "__ZNK32AGX·PI_300·X·A0·AcceleratorX25getPIORelativeOffsetTableEv"
 )
+G17_DEFAULT_USC_MAX_TGMEM = (
+    "__ZNK31AGX·PI_300·X·A0·Accelerator24halGetDefaultUscMaxTgmemEv"
+)
+SET_GVDM_MODE = "__ZN14AGXAccelerator11setGVDMModeEjjj"
+GET_UMA_MAX_ACTIVE_GTP_KICKS = "__ZN14AGXAccelerator23getUMAMaxActiveGTPKicksEv"
+PERF_COUNTER_SOURCE_STOP = "__ZN17AGXPerfCtrSampler17sourceSamplerStopEv"
+PERF_COUNTER_LOCK_ACCESS = "__ZN17AGXPerfCtrSampler10lockAccessEbP9AGXShared"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 KTRACE_FIRMWARE_CALLBACK = "__ZN11AGXFirmware16ktraceFwCallbackE16kd_callback_typePv16AGFIFirmwareRole"
 WAIT_FIRMWARE_POWER_OFF = "__ZN14AGXArmFirmware23waitForFirmwarePowerOffEv"
@@ -296,6 +303,7 @@ G17_CONFIGURE_DEVICE_VTABLE_SLOT = 0x958
 G17_CONFIGURE_POWER_VTABLE_SLOT = 0xA20
 G17_PIO_TABLE_VTABLE_SLOT = 0x1168
 G17_PIO_TABLE_LENGTH_VTABLE_SLOT = 0x1170
+G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT = 0x10E0
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -1166,6 +1174,40 @@ def require_instruction_words_at(
                 f"unexpected {label} instruction at {offset:#x}: "
                 f"{actual:#010x}, expected {wanted:#010x}"
             )
+
+
+def find_direct_symbol_callers(image: bytes, target: int) -> set[str]:
+    symbols = macho_symbols(image)
+    ordered = sorted((address, name) for name, address in symbols.items())
+    callers: set[str] = set()
+    for item in load_commands(image):
+        if item.command != LC_SEGMENT_64:
+            continue
+        segment = parse_segment(image, item)
+        if segment.name != "__TEXT_EXEC":
+            continue
+        code = image[segment.file_offset : segment.file_offset + segment.file_size]
+        owner_index = 0
+        for offset, word in words(code):
+            address = segment.virtual_address + offset
+            while owner_index + 1 < len(ordered) and ordered[owner_index + 1][0] <= address:
+                owner_index += 1
+            if decode_bl_target(address, word) == target and ordered:
+                callers.add(ordered[owner_index][1])
+    return callers
+
+
+def find_authenticated_target_references(image: bytes, target: int) -> list[int]:
+    references = []
+    for offset in range(0, len(image) - 7, 8):
+        raw = struct.unpack_from("<Q", image, offset)[0]
+        try:
+            decoded = decode_kernel_auth_rebase(raw)
+        except ValueError:
+            continue
+        if decoded == target:
+            references.append(offset)
+    return references
 
 
 def decode_kernel_auth_rebase(raw: int) -> int:
@@ -2979,6 +3021,122 @@ def recover_g17_runtime_platform_policy(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_shared_platform_values(image: bytes) -> dict[str, object]:
+    """Recover initial values copied into the two firmware-shared objects."""
+
+    symbols = macho_symbols(image)
+    required = (
+        BASE_CONFIGURE_DEVICE,
+        G17_DEFAULT_USC_MAX_TGMEM,
+        SET_GVDM_MODE,
+        GET_UMA_MAX_ACTIVE_GTP_KICKS,
+        PERF_COUNTER_SOURCE_STOP,
+        PERF_COUNTER_LOCK_ACCESS,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    default_target = recover_vtable_target(
+        image,
+        G17_ACCELERATOR_VTABLE,
+        G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT,
+    )
+    if default_target != symbols[G17_DEFAULT_USC_MAX_TGMEM]:
+        raise ValueError(
+            f"unexpected G17 default USC max TGMEM target {default_target:#x}"
+        )
+    _default_address, default_code = symbol_code(image, G17_DEFAULT_USC_MAX_TGMEM)
+    if default_code[:12] != struct.pack("<3I", 0xD503245F, 0x52800180, 0xD65F03C0):
+        raise ValueError("unexpected G17 default USC max TGMEM provider")
+
+    _base_address, base_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        base_code,
+        "G17 shared platform source initialization",
+        {
+            # Virtual call at slot 0x10e0, followed by accelerator+0xf7c0.
+            0x444: 0x52821C08,
+            0x448: 0x8B080208,
+            0x44C: 0xF9487209,
+            0x45C: 0xD73F0931,
+            0x464: 0xB9009B00,
+            # Explicit 16-byte clear of accelerator+0xf790.
+            0x68C: 0x6F00E400,
+            0x690: 0x3DBDE660,
+        },
+    )
+
+    _getter_address, getter_code = symbol_code(image, GET_UMA_MAX_ACTIVE_GTP_KICKS)
+    if getter_code[:0x24] != struct.pack(
+        "<9I",
+        0xD503245F,
+        0x529F0688,
+        0x8B080008,
+        0xB9400108,
+        0x34000068,
+        0xB944E800,
+        0xD65F03C0,
+        0x52800020,
+        0xD65F03C0,
+    ):
+        raise ValueError("unexpected GVDM zero-sentinel consumer")
+
+    _setter_address, setter_code = symbol_code(image, SET_GVDM_MODE)
+    require_instruction_words_at(
+        setter_code,
+        "GVDM runtime mode writer",
+        {
+            0x2C: 0x529F0688,
+            0x30: 0x8B080016,
+            0x34: 0x2A010048,
+            0x38: 0x7100011F,
+            0x3C: 0x1A8303F8,
+            0x40: 0xB94002C8,
+            0x44: 0x6B01011F,
+            0xE8: 0xAA1403E1,
+            0xEC: 0xF2F303B0,
+            0xF0: 0xD73F0910,
+            0xF4: 0xB90002D4,
+        },
+    )
+    callers = find_direct_symbol_callers(image, symbols[SET_GVDM_MODE])
+    expected_callers = {PERF_COUNTER_SOURCE_STOP, PERF_COUNTER_LOCK_ACCESS}
+    if callers != expected_callers:
+        raise ValueError(f"unexpected GVDM mode writers: {sorted(callers)}")
+    if find_authenticated_target_references(image, symbols[SET_GVDM_MODE]):
+        raise ValueError("GVDM mode writer unexpectedly appears in a virtual table")
+
+    return {
+        "scalars": [
+            {
+                "role": 1,
+                "platform_offset": 0xF7C0,
+                "shared_offset": 0x300,
+                "value": 12,
+                "producer": G17_DEFAULT_USC_MAX_TGMEM,
+                "vtable_slot": G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT,
+            },
+            {
+                "role": 0,
+                "platform_offset": 0xF834,
+                "shared_offset": 0x304,
+                "value": 0,
+                "producer": "zero/default GVDM mode before performance-counter access",
+                "runtime_writer": SET_GVDM_MODE,
+                "runtime_writer_callers": sorted(callers),
+            },
+        ],
+        "calibration": {
+            "platform_offset": 0xF790,
+            "shared_offset": 0x479,
+            "roles": [0, 1],
+            "bytes": 0x10,
+            "initial_bytes": bytes(0x10).hex(),
+        },
+    }
+
+
 def recover_g17_zero_initialized_allocations(code: bytes) -> list[dict[str, object]]:
     require_instruction_sequence(
         code,
@@ -4158,6 +4316,9 @@ def main() -> int:
         )
         firmware_shared_data["platform_fields"] = (
             recover_firmware_shared_platform_fields(function)
+        )
+        firmware_shared_data["platform_values"] = (
+            recover_g17_shared_platform_values(driver)
         )
         hardware_config = recover_hardware_config(
             allocations, shared_init_code, firmware

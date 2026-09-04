@@ -28,6 +28,7 @@ mut:
 	structurally_ready    bool
 	runtime_policy_ready  bool
 	platform_values_ready bool
+	hardware_config_ready bool
 }
 
 @[inline]
@@ -154,11 +155,17 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 			accelerator_ring: accelerator
 			auxiliary_ring_addresses: auxiliary
 			role1_secondary_address: graph.role1_secondary.va
+			// G17's selected halGetDefaultUscMaxTgmem implementation returns
+			// 12. GVDM mode starts at its zero/default sentinel, and the
+			// shared calibration source is explicitly cleared by configureDevice.
+			platform_value_300: fw.g17_default_usc_max_tgmem
+			platform_value_304: 0
 		}
 		if !fw.initialize_g17_firmware_shared_data(graph.firmware_shared[role].cpu_address(), fw.g17_firmware_shared_data_size, bindings) {
 			return false
 		}
 	}
+	graph.platform_values_ready = true
 
 	platform_config := fw.new_g17_platform_config()
 	if !fw.initialize_g17_bootstrap_page(graph.roots[0].cpu_address(), fw.g17_bootstrap_page_size, 0, graph.bootstrap_region.va, graph.firmware_shared[0].va, graph.runtime.va, graph.small_shared[0].va, graph.primary_region.va, 0, 0, voidptr(&platform_config), fw.g17_platform_config_size) {
@@ -173,8 +180,7 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 }
 
 // Construct the recovered allocation graph, but fail closed before MSG_INIT.
-// The remaining platform scalars/calibration are populated by Apple-specific
-// producers that are not implemented yet.
+// Hardware-config scalar and derived-power producers remain incomplete.
 fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	mut graph := mgr.allocate_g17_firmware_graph() or {
 		C.printf(c'agx: failed to allocate G17 firmware graph\n')
@@ -186,6 +192,7 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	mgr.initdata_va = graph.roots[0].va
 	mgr.initdata_phys = graph.roots[0].phys
-	C.printf(c'agx: G17 graph and runtime policy ready, but shared platform calibration is incomplete\n')
+	C.printf(c'agx: G17 graph, runtime policy, PIO records, and shared platform values ready; hardware config remains incomplete\n')
 	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
+		&& graph.hardware_config_ready
 }

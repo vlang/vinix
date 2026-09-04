@@ -64,6 +64,7 @@ pub const g17_role0_bootstrap_26c_size = u64(0x68)
 pub const g17_role0_bootstrap_274_size = u64(0x800)
 pub const g17_role1_secondary_471_size = u64(0x11dd0)
 pub const g17_primary_shared_state_initial = u8(0xff)
+pub const g17_default_usc_max_tgmem = u32(12)
 pub const g17_color_matrix_count = 64
 pub const g17_color_matrix_size = u64(0x18)
 pub const g17_io_mapping_count = 53

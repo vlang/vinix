@@ -1413,6 +1413,115 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "platform service pair"):
             recover_g17_abi.recover_firmware_shared_platform_fields(b"")
 
+    def test_recovers_g17_shared_platform_values(self) -> None:
+        symbols = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: 0x100000,
+            recover_g17_abi.G17_DEFAULT_USC_MAX_TGMEM: 0x101000,
+            recover_g17_abi.SET_GVDM_MODE: 0x102000,
+            recover_g17_abi.GET_UMA_MAX_ACTIVE_GTP_KICKS: 0x103000,
+            recover_g17_abi.PERF_COUNTER_SOURCE_STOP: 0x104000,
+            recover_g17_abi.PERF_COUNTER_LOCK_ACCESS: 0x105000,
+        }
+        base = bytearray(0x694)
+        for offset, word in {
+            0x444: 0x52821C08,
+            0x448: 0x8B080208,
+            0x44C: 0xF9487209,
+            0x45C: 0xD73F0931,
+            0x464: 0xB9009B00,
+            0x68C: 0x6F00E400,
+            0x690: 0x3DBDE660,
+        }.items():
+            struct.pack_into("<I", base, offset, word)
+        setter = bytearray(0xF8)
+        for offset, word in {
+            0x2C: 0x529F0688,
+            0x30: 0x8B080016,
+            0x34: 0x2A010048,
+            0x38: 0x7100011F,
+            0x3C: 0x1A8303F8,
+            0x40: 0xB94002C8,
+            0x44: 0x6B01011F,
+            0xE8: 0xAA1403E1,
+            0xEC: 0xF2F303B0,
+            0xF0: 0xD73F0910,
+            0xF4: 0xB90002D4,
+        }.items():
+            struct.pack_into("<I", setter, offset, word)
+        functions = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: (0x100000, bytes(base)),
+            recover_g17_abi.G17_DEFAULT_USC_MAX_TGMEM: (
+                0x101000,
+                encode(0xD503245F, 0x52800180, 0xD65F03C0),
+            ),
+            recover_g17_abi.SET_GVDM_MODE: (0x102000, bytes(setter)),
+            recover_g17_abi.GET_UMA_MAX_ACTIVE_GTP_KICKS: (
+                0x103000,
+                encode(
+                    0xD503245F,
+                    0x529F0688,
+                    0x8B080008,
+                    0xB9400108,
+                    0x34000068,
+                    0xB944E800,
+                    0xD65F03C0,
+                    0x52800020,
+                    0xD65F03C0,
+                ),
+            ),
+        }
+        callers = {
+            recover_g17_abi.PERF_COUNTER_SOURCE_STOP,
+            recover_g17_abi.PERF_COUNTER_LOCK_ACCESS,
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=symbols[recover_g17_abi.G17_DEFAULT_USC_MAX_TGMEM],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            mock.patch.object(
+                recover_g17_abi, "find_direct_symbol_callers", return_value=callers
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "find_authenticated_target_references",
+                return_value=[],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_shared_platform_values(b"")
+
+        self.assertEqual(recovered["scalars"][0]["value"], 12)
+        self.assertEqual(recovered["scalars"][1]["value"], 0)
+        self.assertEqual(recovered["calibration"]["initial_bytes"], "00" * 16)
+
+    def test_rejects_wrong_shared_platform_value_vtable(self) -> None:
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={
+                    recover_g17_abi.BASE_CONFIGURE_DEVICE: 1,
+                    recover_g17_abi.G17_DEFAULT_USC_MAX_TGMEM: 2,
+                    recover_g17_abi.SET_GVDM_MODE: 3,
+                    recover_g17_abi.GET_UMA_MAX_ACTIVE_GTP_KICKS: 4,
+                    recover_g17_abi.PERF_COUNTER_SOURCE_STOP: 5,
+                    recover_g17_abi.PERF_COUNTER_LOCK_ACCESS: 6,
+                },
+            ),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=0xDEADBEEF
+            ),
+            self.assertRaisesRegex(ValueError, "default USC"),
+        ):
+            recover_g17_abi.recover_g17_shared_platform_values(b"")
+
     def test_recovers_checked_ring_accessor(self) -> None:
         code = encode(
             ldr_w(0, 8, 0x20),

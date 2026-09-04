@@ -67,8 +67,9 @@ firmware records, exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,
 the mapped bootstrap register region and its G17 no-op producer, both
 shared-object address graphs, the per-role ASC power-state records, the shared
-runtime object's control fields and four startup producers, and the UAT
-handoff initialization using a deliberately small AArch64 decoder.
+runtime object's control fields and four startup producers, the initial shared
+platform scalars/calibration, and the UAT handoff initialization using a
+deliberately small AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
 trace data are never repository inputs.
 
@@ -84,6 +85,7 @@ firmware observations recovered during this pass.
 
 Hardware launch remains gated. Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, and the recovered portions
-of its shared/runtime objects, but the runtime policy, remaining platform
-values, firmware channel layouts, work-command ABI, and userspace command
-producer still need byte-accurate implementations before enabling T6050.
+of its shared/runtime objects, including their initial platform values and
+runtime policy. Remaining hardware-configuration producers, firmware channel
+construction, the work-command ABI, and the userspace command producer still
+need byte-accurate implementations before enabling T6050.
