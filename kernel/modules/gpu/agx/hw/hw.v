@@ -118,6 +118,7 @@ pub mut:
 	gpu_mmio_size            u64
 	soc_revision_major       u32
 	soc_revision_minor       u32
+	gpu_power_sample_period  u32
 	perf_state_count         u32
 	perf_state_base          u32
 	perf_state_table_count   u32

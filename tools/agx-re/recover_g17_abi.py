@@ -49,6 +49,7 @@ POPULATE_DPE_PPT_CONFIG = (
 )
 BASE_CONFIGURE_DEVICE = "__ZN14AGXAccelerator15configureDeviceEP9IOService"
 RETRIEVE_CHIP_INFO = "__ZN14AGXAccelerator16retrieveChipInfoEP12AGXSChipInfo"
+G17_GET_SAMPLE_PERIOD = "__ZN14AGXAccelerator15getSamplePeriodEv.8055"
 ACCELERATOR_START = "__ZN14AGXAccelerator5startEP9IOService"
 PI300_CONFIGURE_DEVICE = (
     "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
@@ -57,6 +58,7 @@ G17_CONFIGURE_DEVICE = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX15configureDeviceEP9IOService"
 )
 G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
+G17_GET_SAMPLE_PERIOD_VTABLE_SLOT = 0xF70
 BASE_CONFIGURE_POWER = (
     "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv"
 )
@@ -4256,6 +4258,93 @@ def recover_g17_chip_info(image: bytes, arm_init_code: bytes) -> dict[str, objec
     }
 
 
+def recover_g17_power_sample_period(
+    image: bytes, arm_init_code: bytes
+) -> dict[str, object]:
+    """Recover the DeviceTree power sample period published at config +0xed8."""
+
+    symbols = macho_symbols(image)
+    required = (BASE_CONFIGURE_DEVICE, G17_GET_SAMPLE_PERIOD)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_GET_SAMPLE_PERIOD_VTABLE_SLOT
+    )
+    if target != symbols[G17_GET_SAMPLE_PERIOD]:
+        raise ValueError(f"unexpected G17 getSamplePeriod target {target:#x}")
+
+    configure_address, configure_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    _getter_address, getter_code = symbol_code(image, G17_GET_SAMPLE_PERIOD)
+    if len(getter_code) != 0x14:
+        raise ValueError(
+            f"unexpected G17 getSamplePeriod size {len(getter_code):#x}"
+        )
+
+    property_name = b"gpu-power-sample-period\0"
+    adrp = decode_adrp(
+        configure_address + 0x7C4,
+        struct.unpack_from("<I", configure_code, 0x7C4)[0],
+    )
+    add = decode_add_immediate(struct.unpack_from("<I", configure_code, 0x7C8)[0])
+    if adrp is None or add is None:
+        raise ValueError("missing GPU power sample-period property reference")
+    page_register, page = adrp
+    destination, source, immediate = add
+    if destination != page_register or source != page_register:
+        raise ValueError("malformed GPU power sample-period property reference")
+    property_offset = virtual_to_file(image, page + immediate)
+    if image[property_offset : property_offset + len(property_name)] != property_name:
+        raise ValueError("GPU power sample-period property reference changed")
+
+    require_instruction_words_at(
+        configure_code,
+        "G17 power sample-period DeviceTree producer",
+        {
+            0x34: 0x529EE508,  # accelerator +0xf728 base
+            0x38: 0x8B080018,
+            0x5CC: 0x91049317,  # accelerator +0xf84c destination
+            0x7C4: 0xB0FF41E1,
+            0x7C8: 0x9115E821,
+            0x808: 0xB9400008,
+            0x80C: 0xB90002E8,  # property value copied unchanged
+        },
+    )
+    require_instruction_words_at(
+        getter_code,
+        "G17 getSamplePeriod provider",
+        {
+            0x00: 0xD503245F,
+            0x04: 0x529F0988,
+            0x08: 0x8B080008,
+            0x0C: 0xB9400100,
+            0x10: 0xD65F03C0,
+        },
+    )
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 power sample-period firmware publication",
+        {
+            0xDC: 0x913DC208,
+            0xE0: 0xF947BA09,
+            0xE4: 0xAA0803F1,
+            0xE8: 0xF2EDFA71,
+            0xEC: 0xD73F0931,
+            0xF0: 0xF9415E68,
+            0xF4: 0xB90ED900,
+        },
+    )
+
+    return {
+        "offset": 0xED8,
+        "property": property_name[:-1].decode(),
+        "accelerator_offset": 0xF84C,
+        "formula": "value",
+        "provider_vtable_slot": G17_GET_SAMPLE_PERIOD_VTABLE_SLOT,
+        "provider": G17_GET_SAMPLE_PERIOD,
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -5477,6 +5566,9 @@ def main() -> int:
             driver, base_init_code, function
         )
         hardware_config["chip_info"] = recover_g17_chip_info(driver, function)
+        hardware_config["power_sample_period"] = recover_g17_power_sample_period(
+            driver, function
+        )
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)
         )

@@ -235,6 +235,23 @@ fn load_t6050_chip_info(mut cfg hw.HwConfig) bool {
 	return true
 }
 
+// Apple's base configureDevice producer copies this little-endian DeviceTree
+// scalar into accelerator +0xf84c. The selected G17 getSamplePeriod method
+// returns it unchanged for publication at firmware hardware-config +0xed8.
+fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConfig) bool {
+	sample_period := devicetree.get_le_u32(gpu_node, 'gpu-power-sample-period') or {
+		println('agx: t6050 has no gpu-power-sample-period')
+		return false
+	}
+	if sample_period == 0 {
+		println('agx: t6050 has an invalid zero GPU power sample period')
+		return false
+	}
+	cfg.gpu_power_sample_period = sample_period
+	C.printf(c'agx: loaded native GPU power sample period %u\n', sample_period)
+	return true
+}
+
 // The unprefixed performance properties are Apple DeviceTree binary records,
 // not big-endian FDT cells. Each record is { frequency_hz, voltage_mv } in
 // little endian, grouped as one complete state table per GPU partition.
@@ -387,6 +404,7 @@ pub fn initialise() {
 	}
 	if chip_id == 0x6050 {
 		if !load_t6050_chip_info(mut cfg)
+			|| !load_t6050_power_sample_period(gpu_node, mut cfg)
 			|| !load_t6050_performance_config(gpu_node, mut cfg)
 			|| !load_t6050_aux_performance_config(gpu_node, mut cfg) {
 			println('agx: t6050 native configuration is incomplete')

@@ -2335,6 +2335,76 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["fields"][1]["formula"], "value >> 4")
         self.assertEqual(recovered["fields"][2]["formula"], "value & 7")
 
+    def test_recovers_g17_power_sample_period(self) -> None:
+        configure_address = 0x100000
+        getter_address = 0x200000
+        configure = bytearray(0x810)
+        for offset, word in {
+            0x34: 0x529EE508,
+            0x38: 0x8B080018,
+            0x5CC: 0x91049317,
+            0x7C4: 0xB0FF41E1,
+            0x7C8: 0x9115E821,
+            0x808: 0xB9400008,
+            0x80C: 0xB90002E8,
+        }.items():
+            struct.pack_into("<I", configure, offset, word)
+        getter = b"".join(
+            struct.pack("<I", word)
+            for word in (
+                0xD503245F,
+                0x529F0988,
+                0x8B080008,
+                0xB9400100,
+                0xD65F03C0,
+            )
+        )
+        arm_init = bytearray(0xF8)
+        for offset, word in {
+            0xDC: 0x913DC208,
+            0xE0: 0xF947BA09,
+            0xE4: 0xAA0803F1,
+            0xE8: 0xF2EDFA71,
+            0xEC: 0xD73F0931,
+            0xF0: 0xF9415E68,
+            0xF4: 0xB90ED900,
+        }.items():
+            struct.pack_into("<I", arm_init, offset, word)
+        symbols = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: configure_address,
+            recover_g17_abi.G17_GET_SAMPLE_PERIOD: getter_address,
+        }
+        code = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: (
+                configure_address,
+                bytes(configure),
+            ),
+            recover_g17_abi.G17_GET_SAMPLE_PERIOD: (getter_address, getter),
+        }
+        image = b"gpu-power-sample-period\0"
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=getter_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+        ):
+            recovered = recover_g17_abi.recover_g17_power_sample_period(
+                image, bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["offset"], 0xED8)
+        self.assertEqual(recovered["property"], "gpu-power-sample-period")
+        self.assertEqual(recovered["accelerator_offset"], 0xF84C)
+        self.assertEqual(recovered["formula"], "value")
+
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000
         pi_address = 0x101000

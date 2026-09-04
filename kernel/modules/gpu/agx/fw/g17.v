@@ -773,6 +773,9 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlo
 	result.values[(0xed0 - 0xe90) / 4] = 24_000
 	// The standard path starts with Apple's debug flags disabled, selecting 1.
 	result.values[(0xed4 - 0xe90) / 4] = 1
+	// G17's selected getSamplePeriod returns the native DeviceTree scalar
+	// cached by configureDevice without applying a conversion.
+	result.values[(0xed8 - 0xe90) / 4] = hardware.gpu_power_sample_period
 	result.values[(0xee0 - 0xe90) / 4] = 1
 	result.values[(0xee4 - 0xe90) / 4] = 1
 	result.values[(0xee8 - 0xe90) / 4] = 1
