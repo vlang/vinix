@@ -219,8 +219,31 @@ pub mut:
 	opaque [0xa8]u8
 }
 
-// These allocations are completely zeroed by the pinned G17 host producer.
+// These allocations are cleared by the pinned G17 host producer. Region 0x25c
+// then receives two -1 sentinels; the remaining regions stay entirely zero.
 // Their consumers have not yet given the individual bytes semantic names.
+@[packed]
+pub struct G17Role0Region254 {
+pub mut:
+	zero_000 [0xc18]u8
+}
+
+@[packed]
+pub struct G17Role0Region25c {
+pub mut:
+	zero_000     [0xa18]u8
+	sentinel_a18 u32
+	zero_a1c     [0x14]u8
+	sentinel_a30 u32
+	zero_a34     [0x614]u8
+}
+
+@[packed]
+pub struct G17Role0Region264 {
+pub mut:
+	zero_000 [0xe10]u8
+}
+
 @[packed]
 pub struct G17Role0Region26c {
 pub mut:
@@ -237,6 +260,21 @@ pub mut:
 pub struct G17SharedControl {
 pub mut:
 	zero_000 [0x88]u8
+}
+
+pub fn new_g17_role0_region_254() G17Role0Region254 {
+	return G17Role0Region254{}
+}
+
+pub fn new_g17_role0_region_25c() G17Role0Region25c {
+	return G17Role0Region25c{
+		sentinel_a18: 0xffffffff
+		sentinel_a30: 0xffffffff
+	}
+}
+
+pub fn new_g17_role0_region_264() G17Role0Region264 {
+	return G17Role0Region264{}
 }
 
 pub fn new_g17_role0_region_26c() G17Role0Region26c {
@@ -303,7 +341,7 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
+	return sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
 }
 
 // Populate the table subset whose source and scale are established by both

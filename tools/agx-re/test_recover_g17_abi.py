@@ -402,6 +402,24 @@ def zero_initialized_allocations_code() -> bytes:
     )
 
 
+def role0_bootstrap_regions_code() -> bytes:
+    return encode(
+        0xF9416260,
+        0x52818301,
+        0x94AA5EB6,
+        0xF9416660,
+        0x52820901,
+        0x94AA5EB3,
+        0xF9416A60,
+        0x5281C201,
+        0x94AA5EB0,
+        0xF9416668,
+        0x12800009,
+        0xB90A1909,
+        0xB90A3109,
+    )
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_decodes_kernel_authenticated_rebase(self) -> None:
         raw = 0x80114229019894A8
@@ -443,6 +461,18 @@ class RecoverG17AbiTests(unittest.TestCase):
     def test_rejects_incomplete_zero_initialized_allocations(self) -> None:
         with self.assertRaisesRegex(ValueError, "0x68-byte"):
             recover_g17_abi.recover_g17_zero_initialized_allocations(b"")
+
+    def test_recovers_role0_bootstrap_regions(self) -> None:
+        recovered = recover_g17_abi.recover_g17_role0_bootstrap_regions(
+            role0_bootstrap_regions_code()
+        )
+        self.assertEqual([item["bytes"] for item in recovered], [0xC18, 0x1048, 0xE10])
+        self.assertEqual(recovered[1]["sentinels"][0]["offset"], 0xA18)
+        self.assertEqual(recovered[1]["sentinels"][1]["value"], 0xFFFFFFFF)
+
+    def test_rejects_incomplete_role0_bootstrap_regions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "region clears"):
+            recover_g17_abi.recover_g17_role0_bootstrap_regions(b"")
 
     def test_recovers_firmware_root_pointer_offsets(self) -> None:
         code = encode(

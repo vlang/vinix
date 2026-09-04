@@ -1439,6 +1439,64 @@ def recover_g17_zero_initialized_allocations(code: bytes) -> list[dict[str, obje
     ]
 
 
+def recover_g17_role0_bootstrap_regions(code: bytes) -> list[dict[str, object]]:
+    require_instruction_sequence(
+        code,
+        "role-0 bootstrap region clears",
+        (
+            0xF9416260,  # ldr x0, [x19, #0x2c0]
+            0x52818301,  # mov w1, #0xc18
+            0x94AA5EB6,  # bzero
+            0xF9416660,  # ldr x0, [x19, #0x2c8]
+            0x52820901,  # mov w1, #0x1048
+            0x94AA5EB3,  # bzero
+            0xF9416A60,  # ldr x0, [x19, #0x2d0]
+            0x5281C201,  # mov w1, #0xe10
+            0x94AA5EB0,  # bzero
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "role-0 bootstrap sentinels",
+        (
+            0xF9416668,  # ldr x8, [x19, #0x2c8]
+            0x12800009,  # mov w9, #-1
+            0xB90A1909,  # str w9, [x8, #0xa18]
+            0xB90A3109,  # str w9, [x8, #0xa30]
+        ),
+    )
+    return [
+        {
+            "name": "role0_region_254",
+            "bytes": 0xC18,
+            "host_cpu_member": 0x2C0,
+            "host_gpu_member": 0x308,
+            "firmware_shared_offset": 0x254,
+            "initial": "zero",
+        },
+        {
+            "name": "role0_region_25c",
+            "bytes": 0x1048,
+            "host_cpu_member": 0x2C8,
+            "host_gpu_member": 0x310,
+            "firmware_shared_offset": 0x25C,
+            "initial": "zero_with_sentinels",
+            "sentinels": [
+                {"offset": 0xA18, "bytes": 4, "value": 0xFFFFFFFF},
+                {"offset": 0xA30, "bytes": 4, "value": 0xFFFFFFFF},
+            ],
+        },
+        {
+            "name": "role0_region_264",
+            "bytes": 0xE10,
+            "host_cpu_member": 0x2D0,
+            "host_gpu_member": 0x318,
+            "firmware_shared_offset": 0x264,
+            "initial": "zero",
+        },
+    ]
+
+
 def recover_driver_hardware_config_layout(
     base_init_code: bytes, base_power_code: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -2002,6 +2060,7 @@ def main() -> int:
         zero_initialized_allocations = recover_g17_zero_initialized_allocations(
             base_init_code
         )
+        role0_bootstrap_regions = recover_g17_role0_bootstrap_regions(base_init_code)
         accelerator["bindings"] = recover_accelerator_ring_bindings(
             allocations, base_init_code
         )
@@ -2034,6 +2093,7 @@ def main() -> int:
                 "bootstrap_region": bootstrap_region,
                 "brn_workaround_table": brn_workaround_table,
                 "zero_initialized_allocations": zero_initialized_allocations,
+                "role0_bootstrap_regions": role0_bootstrap_regions,
                 "accelerator": accelerator,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,
