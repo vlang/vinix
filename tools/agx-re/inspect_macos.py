@@ -159,6 +159,40 @@ def decode_perf_states(
     return result
 
 
+def decode_aux_perf_states(value: Any, name: str) -> dict[str, Any]:
+    """Decode the G17 CS/AFR 64-bit performance-state record."""
+
+    if not isinstance(value, bytes) or len(value) < 16 or len(value) % 8:
+        raise InspectError(f"{name} must contain little-endian 64-bit words")
+    rail_count, state_count = struct.unpack_from("<QQ", value)
+    if not 1 <= rail_count <= 2 or not 1 <= state_count <= 16:
+        raise InspectError(f"{name} has invalid rail/state dimensions")
+    expected = 16 + rail_count * (state_count * 16 + 8)
+    if len(value) != expected:
+        raise InspectError(
+            f"{name} must contain {rail_count} x {state_count} records and SRAM defaults"
+        )
+
+    tables = []
+    offset = 16
+    for _rail in range(rail_count):
+        states = []
+        for _state in range(state_count):
+            voltage_uv, frequency_hz = struct.unpack_from("<QQ", value, offset)
+            offset += 16
+            states.append(
+                {"frequency_hz": frequency_hz, "voltage_uv": voltage_uv}
+            )
+        tables.append(states)
+    defaults = list(struct.unpack_from(f"<{rail_count}Q", value, offset))
+    return {
+        "state_count": state_count,
+        "rail_count": rail_count,
+        "tables": tables,
+        "default_sram_voltage_uv": defaults,
+    }
+
+
 def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
     if "compatible" not in node or "reg" not in node:
         raise InspectError("sgx node is missing compatible or reg")
@@ -181,6 +215,9 @@ def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
                 result[name.replace("-", "_")] = decode_perf_states(
                     node[name], state_count, table_count, name
                 )
+    for name in ("cs-perf-states", "afr-perf-states"):
+        if name in node:
+            result[name.replace("-", "_")] = decode_aux_perf_states(node[name], name)
     return result
 
 
@@ -279,6 +316,19 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                 if [state["frequency_hz"] for state in table] != reference:
                     warnings.append("SRAM performance tables disagree with core frequencies")
                     break
+    for domain in ("cs", "afr"):
+        auxiliary = sgx.get(f"{domain}_perf_states")
+        if not isinstance(auxiliary, dict):
+            continue
+        tables = auxiliary.get("tables", [])
+        if tables:
+            reference = [state["frequency_hz"] for state in tables[0]]
+            for table in tables[1:]:
+                if [state["frequency_hz"] for state in table] != reference:
+                    warnings.append(f"{domain.upper()} performance rails disagree on frequencies")
+                    break
+        if isinstance(state_count, int) and auxiliary.get("state_count") != state_count:
+            warnings.append(f"{domain.upper()} and GPU performance-state counts differ")
     asc = manifest.get("asc")
     if "gpu,t6050" in compatible and isinstance(asc, dict):
         if "iop,ascwrap-v6" not in asc.get("compatible", []):

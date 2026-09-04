@@ -14,6 +14,17 @@ SPEC.loader.exec_module(inspect_macos)
 
 
 class InspectMacOSTests(unittest.TestCase):
+    @staticmethod
+    def aux_perf_states() -> bytes:
+        return b"".join(
+            (
+                struct.pack("<QQ", 1, 2),
+                struct.pack("<QQ", 600_000, 400_000_000),
+                struct.pack("<QQ", 850_000, 900_000_000),
+                struct.pack("<Q", 775_000),
+            )
+        )
+
     def test_decodes_apple_device_tree_little_endian_values(self) -> None:
         perf_states = b"".join(
             struct.pack("<II", frequency, voltage)
@@ -73,6 +84,32 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertNotIn("IORegistryEntryID", result)
         self.assertNotIn("private_unknown", result["configuration"])
         self.assertEqual(result["configuration"]["num_cores"], 40)
+
+    def test_decodes_g17_auxiliary_performance_states(self) -> None:
+        node = {
+            "compatible": b"gpu,t6050\0",
+            "reg": struct.pack("<QQ", 0x2300000000, 0x3FDC000),
+            "cs-perf-states": self.aux_perf_states(),
+            "afr-perf-states": self.aux_perf_states(),
+        }
+
+        result = inspect_macos.parse_sgx(node)
+
+        self.assertEqual(result["cs_perf_states"]["state_count"], 2)
+        self.assertEqual(result["cs_perf_states"]["rail_count"], 1)
+        self.assertEqual(
+            result["cs_perf_states"]["tables"][0][1]["frequency_hz"],
+            900_000_000,
+        )
+        self.assertEqual(
+            result["afr_perf_states"]["default_sram_voltage_uv"], [775_000]
+        )
+
+    def test_rejects_truncated_g17_auxiliary_performance_states(self) -> None:
+        with self.assertRaisesRegex(inspect_macos.InspectError, "records"):
+            inspect_macos.decode_aux_perf_states(
+                self.aux_perf_states()[:-8], "cs-perf-states"
+            )
 
     def test_decodes_g17_asc_firmware_segments(self) -> None:
         node = {

@@ -1990,6 +1990,130 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "color-matrix"):
             recover_g17_abi.recover_driver_hardware_config_layout(b"", b"", b"")
 
+    def test_recovers_g17_auxiliary_performance_layout(self) -> None:
+        property_selector = (
+            0x7100045F,
+            0x5280A128,
+            0x9A880508,
+            0x8B080008,
+            0x39400108,
+            0xF900A07F,
+            0x6F00E400,
+            0xAD090060,
+            0xAD080060,
+            0xAD070060,
+            0xAD060060,
+            0xAD050060,
+            0xAD040060,
+            0xAD030060,
+            0xAD020060,
+            0xAD010060,
+            0xAD000060,
+            0x36000588,
+        )
+        dimensions = (
+            0xA9402ACB,
+            0x52800108,
+            0x2A0A1108,
+            0x52800209,
+            0x1B0B2508,
+            0x51004549,
+            0x6B08001F,
+            0x3A4F2920,
+            0x54001043,
+            0xB944EEA8,
+            0x7100097F,
+            0x7A4B9100,
+            0x54000FC1,
+            0x29002E8A,
+            0x340007AB,
+        )
+        conversion = (
+            0xA9400E30,
+            0xD343FE10,
+            0x9BCC7E10,
+            0xD344FE10,
+            0xB8008410,
+            0x91004230,
+            0xB8004423,
+        )
+        clamp = (0xB840458F, 0xB85801B0, 0x6B0F021F, 0x1A8F820F, 0xB80045AF)
+        parser = encode(*property_selector, *dimensions, *conversion, *clamp)
+        cap = encode(
+            0xD503245F,
+            0x721E783F,
+            0x54000081,
+            0x3900005F,
+            0x528001C0,
+            0xD65F03C0,
+        )
+        cs_binding = (
+            0xB943A109,
+            0x5100052B,
+            0xB91A49AB,
+            0xB94F3E6B,
+            0xB91A4DAB,
+            0x34000489,
+            0xD2800009,
+            0x9140714A,
+            0x910EA14A,
+            0x52834A0B,
+            0x8B0B01AB,
+            0x9111A10C,
+            0x5283620E,
+            0x8B0E01AD,
+        )
+        afr_binding = (
+            0xB944E909,
+            0x5100052B,
+            0xB91B91AB,
+            0xB94F426B,
+            0xB91B95AB,
+            0x34000489,
+            0xD2800009,
+            0x9140714A,
+            0x9113C14A,
+            0x5283730B,
+            0x8B0B01AB,
+            0x9116C10C,
+            0x52838B0E,
+            0x8B0E01AD,
+        )
+        row_copy = (0xB8580200, 0xB8180220, 0xB8404600, 0xB8004620)
+        arm_power = encode(*cs_binding, *row_copy, *afr_binding)
+        symbols = {
+            recover_g17_abi.POPULATE_AUX_PERF_STATE_INFO: 0x1000,
+            recover_g17_abi.G17_GET_PERF_STATE_CAP: 0x2000,
+        }
+
+        def code(_image: bytes, name: str) -> tuple[int, bytes]:
+            if name == recover_g17_abi.POPULATE_AUX_PERF_STATE_INFO:
+                return 0x1000, parser
+            if name == recover_g17_abi.G17_GET_PERF_STATE_CAP:
+                return 0x2000, cap
+            raise AssertionError(name)
+
+        image = b"cs-perf-states\0afr-perf-states\0"
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=symbols[recover_g17_abi.G17_GET_PERF_STATE_CAP],
+            ),
+            mock.patch.object(recover_g17_abi, "symbol_code", side_effect=code),
+        ):
+            recovered = recover_g17_abi.recover_g17_aux_performance_layout(
+                image, arm_power
+            )
+
+        self.assertEqual(recovered["domain_cap"], 14)
+        self.assertEqual(recovered["source_layout"]["sram_voltage_offset"], 0xC8)
+        self.assertEqual(
+            [block["offset"] for block in recovered["firmware_blocks"]],
+            [0x1A48, 0x1B90],
+        )
+
     def test_recovers_g17_pio_mappings(self) -> None:
         image, symbols, functions = g17_pio_mapping_fixture()
 

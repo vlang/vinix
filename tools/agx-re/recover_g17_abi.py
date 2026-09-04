@@ -76,6 +76,13 @@ GART_RANGES = "__ZL11gart_ranges.12908"
 G17_DEFAULT_USC_MAX_TGMEM = (
     "__ZNK31AGX·PI_300·X·A0·Accelerator24halGetDefaultUscMaxTgmemEv"
 )
+POPULATE_AUX_PERF_STATE_INFO = (
+    "__ZN14AGXAccelerator21populatePerfStateInfoILj16ELj2EEEbP9IOService"
+    "14AGXClockDomainR13PerfStateInfoIXT_EXT0_EE"
+)
+G17_GET_PERF_STATE_CAP = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX15getPerfStateCapE14AGXClockDomainRb"
+)
 SET_GVDM_MODE = "__ZN14AGXAccelerator11setGVDMModeEjjj"
 GET_UMA_MAX_ACTIVE_GTP_KICKS = "__ZN14AGXAccelerator23getUMAMaxActiveGTPKicksEv"
 PERF_COUNTER_SOURCE_STOP = "__ZN17AGXPerfCtrSampler17sourceSamplerStopEv"
@@ -312,6 +319,7 @@ G17_CONFIGURE_POWER_VTABLE_SLOT = 0xA20
 G17_PIO_TABLE_VTABLE_SLOT = 0x1168
 G17_PIO_TABLE_LENGTH_VTABLE_SLOT = 0x1170
 G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT = 0x10E0
+G17_GET_PERF_STATE_CAP_VTABLE_SLOT = 0x11D8
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -3767,6 +3775,198 @@ def recover_driver_hardware_config_layout(
     }
 
 
+def recover_g17_aux_performance_layout(
+    image: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover the G17 CS/AFR DeviceTree and firmware block layouts."""
+
+    symbols = macho_symbols(image)
+    required = (POPULATE_AUX_PERF_STATE_INFO, G17_GET_PERF_STATE_CAP)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_GET_PERF_STATE_CAP_VTABLE_SLOT
+    )
+    if target != symbols[G17_GET_PERF_STATE_CAP]:
+        raise ValueError(f"unexpected G17 performance-state cap target {target:#x}")
+
+    _address, parser_code = symbol_code(image, POPULATE_AUX_PERF_STATE_INFO)
+    _address, cap_code = symbol_code(image, G17_GET_PERF_STATE_CAP)
+    for property_name in (b"cs-perf-states\0", b"afr-perf-states\0"):
+        if property_name not in image:
+            raise ValueError(f"missing {property_name[:-1].decode()} property name")
+
+    require_instruction_sequence(
+        parser_code,
+        "G17 auxiliary performance property selector",
+        (
+            0x7100045F,  # clock domain 1 selects CS, 2 selects AFR
+            0x5280A128,  # feature byte +0x509
+            0x9A880508,  # domain 2 selects +0x50a
+            0x8B080008,
+            0x39400108,
+            0xF900A07F,  # clear the complete 0x148-byte destination
+            0x6F00E400,
+            0xAD090060,
+            0xAD080060,
+            0xAD070060,
+            0xAD060060,
+            0xAD050060,
+            0xAD040060,
+            0xAD030060,
+            0xAD020060,
+            0xAD010060,
+            0xAD000060,
+            0x36000588,
+        ),
+    )
+    require_instruction_sequence(
+        parser_code,
+        "G17 auxiliary performance dimensions",
+        (
+            0xA9402ACB,  # rail count, state count
+            0x52800108,
+            0x2A0A1108,
+            0x52800209,
+            0x1B0B2508,  # exact record byte count
+            0x51004549,
+            0x6B08001F,
+            0x3A4F2920,
+            0x54001043,
+            0xB944EEA8,
+            0x7100097F,  # at most two voltage rails
+            0x7A4B9100,
+            0x54000FC1,
+            0x29002E8A,  # publish state count and rail count
+            0x340007AB,
+        ),
+    )
+    require_instruction_sequence(
+        parser_code,
+        "G17 auxiliary voltage and frequency conversion",
+        (
+            0xA9400E30,  # voltage_uV, frequency_Hz
+            0xD343FE10,
+            0x9BCC7E10,
+            0xD344FE10,  # exact unsigned division by 1000
+            0xB8008410,  # state-major two-column voltage table
+            0x91004230,
+            0xB8004423,  # frequency table
+        ),
+    )
+    require_instruction_sequence(
+        parser_code,
+        "G17 auxiliary SRAM voltage clamp",
+        (
+            0xB840458F,  # per-rail default SRAM voltage
+            0xB85801B0,  # corresponding core voltage
+            0x6B0F021F,
+            0x1A8F820F,  # max(core, default)
+            0xB80045AF,
+        ),
+    )
+    if cap_code[:24] != struct.pack(
+        "<6I",
+        0xD503245F,
+        0x721E783F,  # only CS/AFR domains are accepted
+        0x54000081,
+        0x3900005F,
+        0x528001C0,  # both domains have cap 14 on G17C
+        0xD65F03C0,
+    ):
+        raise ValueError("unexpected G17 auxiliary performance-state cap provider")
+
+    for label, sequence in (
+        (
+            "CS",
+            (
+                0xB943A109,
+                0x5100052B,
+                0xB91A49AB,  # config +0x1a48 = state_count - 1
+                0xB94F3E6B,
+                0xB91A4DAB,  # config +0x1a4c = domain cap
+                0x34000489,
+                0xD2800009,
+                0x9140714A,
+                0x910EA14A,  # source frequency table
+                0x52834A0B,
+                0x8B0B01AB,  # destination +0x1a50
+                0x9111A10C,  # source SRAM table
+                0x5283620E,
+                0x8B0E01AD,  # destination +0x1b10
+            ),
+        ),
+        (
+            "AFR",
+            (
+                0xB944E909,
+                0x5100052B,
+                0xB91B91AB,  # config +0x1b90 = state_count - 1
+                0xB94F426B,
+                0xB91B95AB,  # config +0x1b94 = domain cap
+                0x34000489,
+                0xD2800009,
+                0x9140714A,
+                0x9113C14A,  # source frequency table
+                0x5283730B,
+                0x8B0B01AB,  # destination +0x1b98
+                0x9116C10C,  # source SRAM table
+                0x52838B0E,
+                0x8B0E01AD,  # destination +0x1c58
+            ),
+        ),
+    ):
+        require_instruction_sequence(
+            arm_power_code, f"G17 {label} performance block binding", sequence
+        )
+    require_instruction_sequence(
+        arm_power_code,
+        "G17 auxiliary voltage row copy",
+        (
+            0xB8580200,  # source core voltage at SRAM pointer - 0x80
+            0xB8180220,  # destination core voltage at SRAM pointer - 0x80
+            0xB8404600,
+            0xB8004620,  # source/destination SRAM voltage
+        ),
+    )
+
+    return {
+        "properties": ["cs-perf-states", "afr-perf-states"],
+        "device_tree_encoding": {
+            "word_bytes": 8,
+            "header": ["rail_count", "state_count"],
+            "records": ["voltage_uv", "frequency_hz"],
+            "trailer": "default_sram_voltage_uv_per_rail",
+            "voltage_divisor": 1000,
+            "sram_policy": "max(core_mv, default_sram_mv)",
+        },
+        "source_layout": {
+            "bytes": 0x148,
+            "state_capacity": 16,
+            "rail_capacity": 2,
+            "state_count_offset": 0,
+            "rail_count_offset": 4,
+            "frequency_offset": 8,
+            "voltage_offset": 0x48,
+            "sram_voltage_offset": 0xC8,
+        },
+        "firmware_blocks": [
+            {"domain": "CS", "offset": 0x1A48, "bytes": 0x148},
+            {"domain": "AFR", "offset": 0x1B90, "bytes": 0x148},
+        ],
+        "firmware_layout": {
+            "max_state_offset": 0,
+            "domain_cap_offset": 4,
+            "frequency_offset": 8,
+            "voltage_offset": 0x48,
+            "sram_voltage_offset": 0xC8,
+        },
+        "domain_cap": 14,
+        "cap_vtable_slot": G17_GET_PERF_STATE_CAP_VTABLE_SLOT,
+    }
+
+
 def recover_firmware_config_reads(firmware: bytes) -> dict[str, object]:
     magic = find_materialized_constant(firmware, INTERFACE_MAGIC)
     if len(magic) != 1:
@@ -4509,6 +4709,9 @@ def main() -> int:
         )
         hardware_config["host_layout"] = recover_driver_hardware_config_layout(
             base_init_code, base_power_code, power_code
+        )
+        hardware_config["aux_performance_states"] = (
+            recover_g17_aux_performance_layout(driver, power_code)
         )
         hardware_config["pio_mappings"] = recover_g17_pio_mappings(driver)
         hardware_config["pio_uat_mapping"] = recover_g17_pio_uat_mapping(driver)

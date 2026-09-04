@@ -362,6 +362,20 @@ pub fn get_le_u32_array(node &DTNode, name string) ?[]u32 {
 	return result
 }
 
+// Apple vendor records also use native little-endian 64-bit words. Keep this
+// separate from the standard big-endian FDT cell helpers above.
+pub fn get_le_u64_array(node &DTNode, name string) ?[]u64 {
+	prop := get_property(node, name) or { return none }
+	if prop.len == 0 || prop.len % 8 != 0 {
+		return none
+	}
+	mut result := []u64{cap: int(prop.len / 8)}
+	for offset := u32(0); offset < prop.len; offset += 8 {
+		result << le64(unsafe { voidptr(u64(prop.data) + offset) })
+	}
+	return result
+}
+
 // Get a list of big-endian u32 cells from a property.
 pub fn get_u32_array(node &DTNode, name string) ?[]u32 {
 	prop := get_property(node, name) or { return none }

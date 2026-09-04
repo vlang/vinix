@@ -46,6 +46,17 @@ pub:
 	writable   bool
 }
 
+// Native CS/AFR clock-domain data. G17's Apple DeviceTree record has up to
+// sixteen states and two voltage rails; the arrays use state-major indexing.
+pub struct AuxPerfStateConfig {
+pub mut:
+	state_count   u32
+	table_count   u32
+	frequencies   [16]u32
+	voltages      [32]u32
+	sram_voltages [32]u32
+}
+
 pub struct HwConfig {
 pub:
 	chip_id               u32
@@ -110,6 +121,8 @@ pub mut:
 	perf_state_frequencies   [16]u32
 	perf_state_voltages      [256]u32
 	perf_state_sram_voltages [256]u32
+	cs_perf_states           AuxPerfStateConfig
+	afr_perf_states          AuxPerfStateConfig
 }
 
 // The firmware structures under gpu.agx.fw currently describe only the

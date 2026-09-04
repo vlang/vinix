@@ -264,6 +264,78 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	return true
 }
 
+// The auxiliary clock-domain format recovered from Apple's G17 producer is:
+// {rail_count, state_count}, followed by voltage_uV/frequency_Hz pairs for
+// each rail, then one default SRAM voltage_uV per rail. The producer converts
+// voltages to mV and clamps SRAM voltage to max(core, default).
+fn load_t6050_aux_performance_domain(gpu_node &devicetree.DTNode, name string) ?hw.AuxPerfStateConfig {
+	values := devicetree.get_le_u64_array(gpu_node, name) or {
+		println('agx: t6050 has no ${name}')
+		return none
+	}
+	if values.len < 2 || values[0] == 0 || values[0] > 2 || values[1] == 0
+		|| values[1] > 16 {
+		C.printf(c'agx: invalid t6050 %s dimensions\n', name.str)
+		return none
+	}
+	table_count := u32(values[0])
+	state_count := u32(values[1])
+	expected_values := 2 + int(table_count) * (int(state_count) * 2 + 1)
+	if values.len != expected_values {
+		C.printf(c'agx: invalid t6050 %s length=%u expected=%u\n', name.str, u32(values.len), u32(expected_values))
+		return none
+	}
+
+	mut result := hw.AuxPerfStateConfig{
+		state_count: state_count
+		table_count: table_count
+	}
+	for table := u32(0); table < table_count; table++ {
+		for state := u32(0); state < state_count; state++ {
+			source := 2 + int((table * state_count + state) * 2)
+			voltage_uv := values[source]
+			frequency := values[source + 1]
+			if voltage_uv % 1_000 != 0 || voltage_uv / 1_000 > 0xffff_ffff
+				|| frequency > 0xffff_ffff {
+				C.printf(c'agx: invalid t6050 %s state value\n', name.str)
+				return none
+			}
+			if table == 0 {
+				result.frequencies[state] = u32(frequency)
+			} else if frequency != result.frequencies[state] {
+				C.printf(c'agx: t6050 %s table %u state %u has mismatched frequency\n', name.str, table, state)
+				return none
+			}
+			result.voltages[state * 2 + table] = u32(voltage_uv / 1_000)
+		}
+	}
+
+	defaults_base := 2 + int(table_count * state_count * 2)
+	for table := u32(0); table < table_count; table++ {
+		default_uv := values[defaults_base + int(table)]
+		if default_uv % 1_000 != 0 || default_uv / 1_000 > 0xffff_ffff {
+			C.printf(c'agx: invalid t6050 %s SRAM default\n', name.str)
+			return none
+		}
+		default_mv := u32(default_uv / 1_000)
+		for state := u32(0); state < state_count; state++ {
+			index := state * 2 + table
+			core_mv := result.voltages[index]
+			result.sram_voltages[index] = if core_mv > default_mv { core_mv } else { default_mv }
+		}
+	}
+	return result
+}
+
+fn load_t6050_aux_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfig) bool {
+	cs := load_t6050_aux_performance_domain(gpu_node, 'cs-perf-states') or { return false }
+	afr := load_t6050_aux_performance_domain(gpu_node, 'afr-perf-states') or { return false }
+	cfg.cs_perf_states = cs
+	cfg.afr_perf_states = afr
+	C.printf(c'agx: loaded native CS/AFR performance states (%u/%u states)\n', cs.state_count, afr.state_count)
+	return true
+}
+
 // Probe GPU from device tree and bring up all supported subsystems.
 pub fn initialise() {
 	println('agx: Probing Apple GPU')
@@ -277,9 +349,12 @@ pub fn initialise() {
 		C.printf(c'agx: No hardware configuration for chip 0x%x\n', chip_id)
 		return
 	}
-	if chip_id == 0x6050 && !load_t6050_performance_config(gpu_node, mut cfg) {
-		println('agx: t6050 performance configuration is incomplete')
-		return
+	if chip_id == 0x6050 {
+		if !load_t6050_performance_config(gpu_node, mut cfg)
+			|| !load_t6050_aux_performance_config(gpu_node, mut cfg) {
+			println('agx: t6050 performance configuration is incomplete')
+			return
+		}
 	}
 	if !drm_ioctl.validate_asahi_25_layouts() {
 		println('agx: Mesa 25.0.5 DRM UAPI layout validation failed')

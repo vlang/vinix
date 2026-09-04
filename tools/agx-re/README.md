@@ -64,6 +64,7 @@ the shared G17 bootstrap pointer offsets from firmware and
 hardware-configuration allocation, host-written table layout and firmware
 read map, the G17C PIO relative-offset table and its 12 primary-aperture
 firmware records, their physical alignment and GART-10 UAT publication path,
+the native CS/AFR auxiliary performance-state parser and firmware blocks,
 exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,
 the mapped bootstrap register region and its G17 no-op producer, both

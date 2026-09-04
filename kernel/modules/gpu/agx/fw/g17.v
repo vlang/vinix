@@ -71,6 +71,10 @@ pub const g17_io_mapping_count = 53
 pub const g17_io_mapping_size = u64(0x28)
 pub const g17_performance_state_capacity = 16
 pub const g17_voltage_table_columns = 16
+pub const g17_aux_performance_state_capacity = 16
+pub const g17_aux_voltage_table_columns = 2
+pub const g17_aux_performance_state_cap = u32(14)
+pub const g17_aux_performance_block_size = u64(0x148)
 pub const g17_fw_util_pstate_control_count = 4
 pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
@@ -338,56 +342,56 @@ pub mut:
 @[packed]
 pub struct G17RuntimeData {
 pub mut:
-	opaque_000                           [0x0c]u8
-	dm_pause_mode                        u32
-	opaque_010                           [0x04]u8
-	dm_pause_timer                       u32
-	opaque_018                           [0x08]u8
-	mtr_sensor_ptd_override_mask         u64
-	frg_task_timeout                     u32
-	power_config_02c                     u32
-	power_config_030                     u32
-	smart_idle_enabled                   u32
-	state_038                            u32
-	opaque_03c                           [0x04]u8
-	cpms_window_size                     u32
-	cpms_tfca_size                       u32
-	state_048                            u32
-	kick_channel_qos_04c                 u32
-	kick_channel_qos_050                 u32
-	platform_values_054                  [3]u16
-	state_05a                            u32
-	state_05e                            u32
-	state_062                            u32
-	opaque_066                           [0x04]u8
-	state_06a                            u32
-	opaque_06e                           [0x0a]u8
-	command_submission_enabled           u32
-	opaque_07c                           [0x08]u8
-	power_config_084                     u32
-	opaque_088                           [0x0c]u8
-	performance_controller_override      u32
-	performance_state_cap                u32
-	state_09c                            u32
-	state_0a0                            u32
-	performance_controller_target        u32
-	performance_controller_dead_zone     u32
-	performance_controller_transfer      u32
-	performance_boost_min_util           u32
-	performance_boost_ce_step            u32
-	performance_controller_reset_iters   u32
-	performance_boost_min_util_valid     u8
-	performance_time_filter_constants    [2]u32
-	performance_integral_gain_bits       [2]u32
-	performance_proportional_gain_bits   [2]u32
-	performance_dual_filter              u8
-	performance_time_filter_valid        [2]u8
-	performance_integral_gain_valid      [2]u8
-	performance_proportional_gain_valid  [2]u8
-	performance_dual_filter_valid        u8
-	opaque_0dd                           [0x07]u8
-	clpc_deadline_control_effort         u32
-	clpc_deadline_control_override       u32
+	opaque_000                          [0x0c]u8
+	dm_pause_mode                       u32
+	opaque_010                          [0x04]u8
+	dm_pause_timer                      u32
+	opaque_018                          [0x08]u8
+	mtr_sensor_ptd_override_mask        u64
+	frg_task_timeout                    u32
+	power_config_02c                    u32
+	power_config_030                    u32
+	smart_idle_enabled                  u32
+	state_038                           u32
+	opaque_03c                          [0x04]u8
+	cpms_window_size                    u32
+	cpms_tfca_size                      u32
+	state_048                           u32
+	kick_channel_qos_04c                u32
+	kick_channel_qos_050                u32
+	platform_values_054                 [3]u16
+	state_05a                           u32
+	state_05e                           u32
+	state_062                           u32
+	opaque_066                          [0x04]u8
+	state_06a                           u32
+	opaque_06e                          [0x0a]u8
+	command_submission_enabled          u32
+	opaque_07c                          [0x08]u8
+	power_config_084                    u32
+	opaque_088                          [0x0c]u8
+	performance_controller_override     u32
+	performance_state_cap               u32
+	state_09c                           u32
+	state_0a0                           u32
+	performance_controller_target       u32
+	performance_controller_dead_zone    u32
+	performance_controller_transfer     u32
+	performance_boost_min_util          u32
+	performance_boost_ce_step           u32
+	performance_controller_reset_iters  u32
+	performance_boost_min_util_valid    u8
+	performance_time_filter_constants   [2]u32
+	performance_integral_gain_bits      [2]u32
+	performance_proportional_gain_bits  [2]u32
+	performance_dual_filter             u8
+	performance_time_filter_valid       [2]u8
+	performance_integral_gain_valid     [2]u8
+	performance_proportional_gain_valid [2]u8
+	performance_dual_filter_valid       u8
+	opaque_0dd                          [0x07]u8
+	clpc_deadline_control_effort        u32
+	clpc_deadline_control_override      u32
 	// Apple rearranges this range from a DPE/PPT source block. The checked
 	// G17C vtable producer clears that entire source, so the initial payload is
 	// exactly zero even though its individual firmware-owned fields are opaque.
@@ -491,8 +495,7 @@ pub fn initialize_g17_runtime_performance_policy(buffer voidptr, size u64) bool 
 		return false
 	}
 	unsafe {
-		C.memset(voidptr(u64(buffer) + g17_runtime_performance_policy_offset), 0,
-			g17_runtime_performance_policy_size)
+		C.memset(voidptr(u64(buffer) + g17_runtime_performance_policy_offset), 0, g17_runtime_performance_policy_size)
 	}
 	return true
 }
@@ -508,8 +511,7 @@ pub fn initialize_g17_runtime_power_policy(buffer voidptr, size u64) bool {
 		return false
 	}
 	unsafe {
-		C.memset(voidptr(u64(buffer) + g17_runtime_power_policy_offset), 0,
-			g17_runtime_power_policy_size)
+		C.memset(voidptr(u64(buffer) + g17_runtime_power_policy_offset), 0, g17_runtime_power_policy_size)
 	}
 	return true
 }
@@ -674,6 +676,25 @@ pub mut:
 	values [g17_voltage_table_columns]u32
 }
 
+@[packed]
+pub struct G17AuxVoltageTableRow {
+pub mut:
+	values [g17_aux_voltage_table_columns]u32
+}
+
+// Firmware view of the optional CS and AFR clock-domain tables. Apple's host
+// stores max_state at +0, its G17 domain cap at +4, then MHz frequencies,
+// core millivolts, and SRAM millivolts.
+@[packed]
+pub struct G17AuxPerformanceBlock {
+pub mut:
+	performance_state_max u32
+	performance_state_cap u32
+	frequency_table       [g17_aux_performance_state_capacity]u32
+	voltage_table         [g17_aux_performance_state_capacity]G17AuxVoltageTableRow
+	sram_voltage_table    [g17_aux_performance_state_capacity]G17AuxVoltageTableRow
+}
+
 // Hardware/configuration allocation published at offset zero of both
 // firmware-shared objects. The host producer and primary firmware consumer
 // independently establish the record boundaries below. Unknown scalar and
@@ -699,14 +720,14 @@ pub mut:
 	firmware_table_1948            [g17_performance_state_capacity]u32
 	opaque_1988                    [0x40]u8
 	firmware_block_19c8            [0x80]u8
-	opaque_1a48                    [0x148]u8
-	firmware_copied_block_1b90     [0x148]u8
+	cs_performance_1a48            G17AuxPerformanceBlock
+	afr_performance_1b90           G17AuxPerformanceBlock
 	opaque_1cd8                    [0x868]u8
 	firmware_late_controls_2540    [0x1d0]u8
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
+	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size
 }
 
 // Populate the table subset whose source and scale are established by both
@@ -740,15 +761,35 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 	return true
 }
 
+fn populate_g17_aux_performance_block(mut destination G17AuxPerformanceBlock, source &hw.AuxPerfStateConfig) bool {
+	if source.state_count == 0 || source.state_count > g17_aux_performance_state_capacity
+		|| source.table_count == 0 || source.table_count > g17_aux_voltage_table_columns {
+		return false
+	}
+	destination.performance_state_max = source.state_count - 1
+	// The selected G17C getPerfStateCap implementation returns 14 for both
+	// the CS and AFR domains, independently of the parsed table count.
+	destination.performance_state_cap = g17_aux_performance_state_cap
+	for state := u32(0); state < source.state_count; state++ {
+		destination.frequency_table[state] = source.frequencies[state] / 1_000_000
+		for table := u32(0); table < source.table_count; table++ {
+			index := state * g17_aux_voltage_table_columns + table
+			destination.voltage_table[state].values[table] = source.voltages[index]
+			destination.sram_voltage_table[state].values[table] = source.sram_voltages[index]
+		}
+	}
+	return true
+}
+
 fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig) bool {
 	// Recovered from the G17C getPIORelativeOffsetTable virtual selected by
 	// the pinned macOS 26.5 driver. Entries whose primary offset is -1 use a
 	// different host-only mapping path and do not populate these records.
 	indices := [u32(17), 47, 26, 29, 31, 33, 34, 28, 32, 35, 37, 43]
-	offsets := [u64(0), 0x23d00, 0xd04000, 0xd10000, 0xd40000, 0xd44000,
-		0xd4c000, 0xd50000, 0xd60000, 0xe00000, 0xe40000, 0xe60000]
-	sizes := [u32(0x21500), 0x200, 0x8000, 0x4000, 0x4000, 0x4000, 0x200,
-		0x10000, 0x20000, 0x4000, 0x4000, 0x58]
+	offsets := [u64(0), 0x23d00, 0xd04000, 0xd10000, 0xd40000, 0xd44000, 0xd4c000, 0xd50000,
+		0xd60000, 0xe00000, 0xe40000, 0xe60000]
+	sizes := [u32(0x21500), 0x200, 0x8000, 0x4000, 0x4000, 0x4000, 0x200, 0x10000, 0x20000, 0x4000,
+		0x4000, 0x58]
 
 	if hardware.gpu_mmio_base == 0 || hardware.gpu_mmio_size == 0 {
 		return false
@@ -788,6 +829,10 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		C.memset(buffer, 0, size)
 		mut config := &G17HardwareConfig(buffer)
 		if !populate_g17_pio_mappings(mut config, hardware) {
+			return false
+		}
+		if !populate_g17_aux_performance_block(mut config.cs_performance_1a48, &hardware.cs_perf_states)
+			|| !populate_g17_aux_performance_block(mut config.afr_performance_1b90, &hardware.afr_perf_states) {
 			return false
 		}
 		config.performance_state_max_fc4 = hardware.perf_state_count - 1
