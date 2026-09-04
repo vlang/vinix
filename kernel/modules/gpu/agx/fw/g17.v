@@ -800,7 +800,7 @@ pub mut:
 	firmware_table_18c8            [g17_performance_state_capacity]u32
 	relative_boost_frequency_1908  [g17_performance_state_capacity]u32
 	firmware_table_1948            [g17_performance_state_capacity]u32
-	opaque_1988                    [0x40]u8
+	afr_relative_boost_frequency_1988 [g17_performance_state_capacity]u32
 	firmware_block_19c8            [0x80]u8
 	cs_performance_1a48            G17AuxPerformanceBlock
 	afr_performance_1b90           G17AuxPerformanceBlock
@@ -855,6 +855,22 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 		frequency_delta := u64(hardware.perf_state_frequencies[state] - base_frequency)
 		frequency_range := u64(max_frequency - base_frequency)
 		config.relative_boost_frequency_1908[state] = u32(frequency_delta * 100 / frequency_range)
+	}
+	if hardware.afr_perf_states.state_count == 0
+		|| hardware.afr_perf_states.state_count > g17_performance_state_capacity
+		|| hardware.perf_state_base >= hardware.afr_perf_states.state_count - 1 {
+		return false
+	}
+	afr_base_frequency := hardware.afr_perf_states.frequencies[hardware.perf_state_base]
+	afr_max_frequency := hardware.afr_perf_states.frequencies[hardware.afr_perf_states.state_count - 1]
+	if afr_max_frequency <= afr_base_frequency {
+		return false
+	}
+	for state := hardware.perf_state_base + 1; state < hardware.afr_perf_states.state_count; state++ {
+		frequency_delta := u64(hardware.afr_perf_states.frequencies[state] - afr_base_frequency)
+		frequency_range := u64(afr_max_frequency - afr_base_frequency)
+		config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 /
+			frequency_range)
 	}
 	return true
 }
@@ -968,6 +984,20 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 			frequency_delta := u64(hardware.perf_state_frequencies[state] - base_frequency)
 			frequency_range := u64(max_frequency - base_frequency)
 			config.relative_boost_frequency_1908[state] = u32(frequency_delta * 100 / frequency_range)
+		}
+		if hardware.perf_state_base >= hardware.afr_perf_states.state_count - 1 {
+			return false
+		}
+		afr_base_frequency := hardware.afr_perf_states.frequencies[hardware.perf_state_base]
+		afr_max_frequency := hardware.afr_perf_states.frequencies[hardware.afr_perf_states.state_count - 1]
+		if afr_max_frequency <= afr_base_frequency {
+			return false
+		}
+		for state := hardware.perf_state_base + 1; state < hardware.afr_perf_states.state_count; state++ {
+			frequency_delta := u64(hardware.afr_perf_states.frequencies[state] - afr_base_frequency)
+			frequency_range := u64(afr_max_frequency - afr_base_frequency)
+			config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 /
+				frequency_range)
 		}
 	}
 	return true

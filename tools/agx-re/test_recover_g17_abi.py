@@ -2415,6 +2415,70 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["base_state_property"], "gpu-perf-base-pstate")
         self.assertEqual(recovered["maximum_state_value"], 100)
 
+    def test_recovers_g17_afr_relative_boost_frequency_table(self) -> None:
+        afr_address = 0x200000
+        afr_config = bytearray(0xE8)
+        for offset, word in {
+            0x1C: 0x91407008,
+            0x20: 0x9113A114,
+            0xDC: 0xB9400289,
+            0xE4: 0x1B082929,
+        }.items():
+            struct.pack_into("<I", afr_config, offset, word)
+
+        arm_power = bytearray(0xE90)
+        for offset, word in {
+            0xDD8: 0xF9415E69,
+            0xDDC: 0x5283310A,
+            0xDE0: 0x8B0A0134,
+            0xDE4: 0xB94B86A9,
+            0xDE8: 0x5290A3EA,
+            0xDEC: 0x72AA3D6A,
+            0xDF0: 0x9BAA7D29,
+            0xDF4: 0xD365FD35,
+            0xDF8: 0x914072E9,
+            0xDFC: 0x9113C136,
+            0xE00: 0x8B150AC9,
+            0xE04: 0xB9400137,
+            0xE08: 0xD1000519,
+            0xE28: 0xD37EF501,
+            0xE2C: 0xAA1403E0,
+            0xE3C: 0xCB170348,
+            0xE44: 0x52800C8A,
+            0xE50: 0xB940018C,
+            0xE54: 0xCB17018C,
+            0xE58: 0x9B0A7D8C,
+            0xE5C: 0x9AC8098C,
+            0xE64: 0xB900016C,
+            0xE68: 0x910006B5,
+            0xE6C: 0xEB0902BF,
+            0xE70: 0x54FFFEC3,
+            0xE88: 0x52800C89,
+            0xE8C: 0xB9000109,
+        }.items():
+            struct.pack_into("<I", arm_power, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.POPULATE_AFR_FAST_DIE_CONFIG: afr_address},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(afr_address, bytes(afr_config)),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_afr_relative_boost_frequency_table(
+                b"afr-perf-states\0", bytes(arm_power)
+            )
+
+        self.assertEqual(recovered["offset"], 0x1988)
+        self.assertEqual(recovered["domain"], "AFR")
+        self.assertEqual(recovered["frequency_source_offset"], 0x1C4F0)
+        self.assertEqual(recovered["maximum_state_value"], 100)
+
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
             0x7100045F,

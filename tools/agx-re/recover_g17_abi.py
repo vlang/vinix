@@ -90,6 +90,9 @@ G17_SETUP_CSC_ALLOCATION = (
 G17_GENERATE_CSC_COEFFICIENTS = (
     "__ZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEv"
 )
+POPULATE_AFR_FAST_DIE_CONFIG = (
+    "__ZN14AGXAccelerator34populateAFRFastDieDeviceConfigDataEP32AGXFastDieControllerDeviceConfig"
+)
 G17_TPU_CSC_COEFFICIENTS = (
     "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16tpu_coefficients"
 )
@@ -4373,6 +4376,83 @@ def recover_g17_relative_boost_frequency_table(
     }
 
 
+def recover_g17_afr_relative_boost_frequency_table(
+    image: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover the AFR-domain relative boost-frequency table."""
+
+    symbols = macho_symbols(image)
+    if POPULATE_AFR_FAST_DIE_CONFIG not in symbols:
+        raise ValueError(f"Mach-O has no {POPULATE_AFR_FAST_DIE_CONFIG} symbol")
+    _address, afr_config_code = symbol_code(image, POPULATE_AFR_FAST_DIE_CONFIG)
+
+    # The independently named AFR fast-die producer binds its performance-state
+    # record at accelerator +0x1c4e8. The record starts with the state count and
+    # places its frequency array at +8 (accelerator +0x1c4f0).
+    require_instruction_words_at(
+        afr_config_code,
+        "G17 AFR performance-state record",
+        {
+            0x1C: 0x91407008,
+            0x20: 0x9113A114,
+            0xDC: 0xB9400289,
+            0xE4: 0x1B082929,
+        },
+    )
+    if b"afr-perf-states\0" not in image:
+        raise ValueError("missing afr-perf-states property name")
+
+    # The ARM firmware-data producer uses the same scaled base state as the
+    # primary GPU curve, clears the complete destination, and normalizes AFR
+    # frequencies between that base and the final AFR state.
+    require_instruction_words_at(
+        arm_power_code,
+        "G17 AFR relative boost-frequency table",
+        {
+            0xDD8: 0xF9415E69,
+            0xDDC: 0x5283310A,
+            0xDE0: 0x8B0A0134,
+            0xDE4: 0xB94B86A9,
+            0xDE8: 0x5290A3EA,
+            0xDEC: 0x72AA3D6A,
+            0xDF0: 0x9BAA7D29,
+            0xDF4: 0xD365FD35,
+            0xDF8: 0x914072E9,
+            0xDFC: 0x9113C136,
+            0xE00: 0x8B150AC9,
+            0xE04: 0xB9400137,
+            0xE08: 0xD1000519,
+            0xE28: 0xD37EF501,
+            0xE2C: 0xAA1403E0,
+            0xE3C: 0xCB170348,
+            0xE44: 0x52800C8A,
+            0xE50: 0xB940018C,
+            0xE54: 0xCB17018C,
+            0xE58: 0x9B0A7D8C,
+            0xE5C: 0x9AC8098C,
+            0xE64: 0xB900016C,
+            0xE68: 0x910006B5,
+            0xE6C: 0xEB0902BF,
+            0xE70: 0x54FFFEC3,
+            0xE88: 0x52800C89,
+            0xE8C: 0xB9000109,
+        },
+    )
+
+    return {
+        "offset": 0x1988,
+        "entries": 16,
+        "domain": "AFR",
+        "state_property": "afr-perf-states",
+        "base_state_scaled_source_offset": 0x10ECC,
+        "state_count_source_offset": 0x1C4E8,
+        "frequency_source_offset": 0x1C4F0,
+        "formula": "100 * (frequency - base_frequency) / (max_frequency - base_frequency)",
+        "states_at_or_below_base": 0,
+        "maximum_state_value": 100,
+    }
+
+
 def recover_g17_aux_performance_layout(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -5320,6 +5400,9 @@ def main() -> int:
         )
         hardware_config["relative_boost_frequency_table"] = (
             recover_g17_relative_boost_frequency_table(driver, power_code)
+        )
+        hardware_config["afr_relative_boost_frequency_table"] = (
+            recover_g17_afr_relative_boost_frequency_table(driver, power_code)
         )
         hardware_config["pio_mappings"] = recover_g17_pio_mappings(driver)
         hardware_config["pio_uat_mapping"] = recover_g17_pio_uat_mapping(driver)
