@@ -1049,6 +1049,139 @@ def g17_pio_mapping_fixture() -> tuple[
     return image, symbols, functions
 
 
+def g17_pio_uat_fixture() -> tuple[
+    bytes, dict[str, int], dict[str, tuple[int, bytes]]
+]:
+    addresses = {
+        recover_g17_abi.ACCELERATOR_START: 0xFFFFFE0008907C1C,
+        recover_g17_abi.INIT_FIRMWARE_DATA: 0xFFFFFE000896CA9C,
+        recover_g17_abi.CREATE_FW_PIO_MAPPING: 0xFFFFFE0008951F7C,
+        recover_g17_abi.CREATE_FW_GPU_MAPPING: 0xFFFFFE0008952154,
+        recover_g17_abi.GART_RANGES: 0xFFFFFE000713D760,
+    }
+
+    start = bytearray(0xEE4)
+    for offset, word in {
+        0xEA0: 0x5293F018,
+        0xEA4: 0xB0FF41B9,
+        0xEA8: 0x911D8339,
+        0xECC: 0x8B081728,
+        0xED8: 0xA9402909,
+        0xEDC: 0x9ADC2536,
+        0xEE0: 0x9ADC2549,
+    }.items():
+        struct.pack_into("<I", start, offset, word)
+
+    pio = bytearray(0xB8)
+    for offset, word in {
+        0x30: 0x710004BF,
+        0x38: 0xF9400028,
+        0x50: 0x0A2A010A,
+        0x54: 0xB900006A,
+        0x6C: 0x8A0A0100,
+        0x74: 0x8B224108,
+        0x84: 0x8A090108,
+        0x88: 0xCB000101,
+        0x8C: 0x7100029F,
+        0x90: 0x52800068,
+        0x94: 0x1A9F1502,
+        0xA4: 0xAA1503E0,
+        0xA8: 0xAA1603E1,
+        0xAC: 0xAA1403E2,
+        0xB0: 0xAA1303E3,
+        0xB4: 0x94000049,
+    }.items():
+        struct.pack_into("<I", pio, offset, word)
+
+    gpu = bytearray(0x94)
+    for offset, word in {
+        0x38: 0xD3607EC8,
+        0x3C: 0x710026DF,
+        0x48: 0x710002BF,
+        0x4C: 0x528000E9,
+        0x50: 0xD28000AA,
+        0x54: 0xF2C0200A,
+        0x58: 0x9A8A1129,
+        0x90: 0xAA080122,
+    }.items():
+        struct.pack_into("<I", gpu, offset, word)
+
+    publication = (
+        0x928108F5,
+        0x52835917,
+        0x52838E18,
+        0x14000009,
+        0xF9415E68,
+        0x8B150108,
+        0xF907491F,
+        0x910022F7,
+        0x91001318,
+        0x9110E294,
+        0xB100A2B5,
+        0x540005A0,
+        0xF9400688,
+        0xB4FFFEE8,
+        0xB9420A88,
+        0x34FFFEA8,
+        0x39400288,
+        0x3707FE68,
+    )
+    conversion = (
+        0x8B170268,
+        0xF9400100,
+        0xF9400010,
+        0xAA0003F1,
+        0xF2F9B431,
+        0xDAC11A30,
+        0xD2802B11,
+        0x8B110210,
+        0xF9400208,
+        0xF2E63530,
+        0xD73F0910,
+        0xAA1603F1,
+        0x8B180268,
+        0xB9400108,
+        0xF9400270,
+        0xDAC11A30,
+        0xAA1003F1,
+        0xDAC147F1,
+        0xEB11021F,
+        0x54000040,
+        0xD4388E40,
+        0x910B6209,
+        0xF9416E0A,
+        0x8B080001,
+        0xAA1303E0,
+        0x52800002,
+        0xAA0903F1,
+        0xF2F24A11,
+        0xD73F0951,
+        0xF9415E68,
+        0x8B150108,
+        0xF9074900,
+    )
+    functions = {
+        recover_g17_abi.ACCELERATOR_START: (
+            addresses[recover_g17_abi.ACCELERATOR_START],
+            bytes(start),
+        ),
+        recover_g17_abi.INIT_FIRMWARE_DATA: (
+            addresses[recover_g17_abi.INIT_FIRMWARE_DATA],
+            encode(*publication, *conversion),
+        ),
+        recover_g17_abi.CREATE_FW_PIO_MAPPING: (
+            addresses[recover_g17_abi.CREATE_FW_PIO_MAPPING],
+            bytes(pio),
+        ),
+        recover_g17_abi.CREATE_FW_GPU_MAPPING: (
+            addresses[recover_g17_abi.CREATE_FW_GPU_MAPPING],
+            bytes(gpu),
+        ),
+    }
+    image = struct.pack("<4Q", 0xFFFFFC2180000000, 0x01400000, 0x18, 0)
+    return image, addresses, functions
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_decodes_kernel_authenticated_rebase(self) -> None:
         raw = 0x80114229019894A8
@@ -1919,6 +2052,45 @@ class RecoverG17AbiTests(unittest.TestCase):
             self.assertRaisesRegex(ValueError, "source producer"),
         ):
             recover_g17_abi.recover_g17_pio_mappings(image)
+
+    def test_recovers_g17_pio_uat_mapping(self) -> None:
+        image, symbols, functions = g17_pio_uat_fixture()
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+        ):
+            recovered = recover_g17_abi.recover_g17_pio_uat_mapping(image)
+
+        self.assertEqual(recovered["gart_range"], 10)
+        self.assertEqual(recovered["va_start"], 0xFFFFFC2180000000)
+        self.assertEqual(recovered["va_size"], 0x01400000)
+        self.assertEqual(recovered["uat_page_bytes"], 0x4000)
+        self.assertEqual(recovered["writable_gpu_mapping_options"], 7)
+        self.assertEqual(
+            recovered["firmware_virtual_address"],
+            "mapping_gpu_va_plus_physical_page_offset",
+        )
+
+    def test_rejects_modified_g17_pio_uat_range(self) -> None:
+        image, symbols, functions = g17_pio_uat_fixture()
+        modified = bytearray(image)
+        struct.pack_into("<Q", modified, 8, 0x01000000)
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+            self.assertRaisesRegex(ValueError, "firmware-PIO GART range"),
+        ):
+            recover_g17_abi.recover_g17_pio_uat_mapping(bytes(modified))
 
     def test_recovers_accelerator_ring_bindings(self) -> None:
         allocations = [

@@ -6,6 +6,14 @@ module gpu
 // G17 bring-up can never fall through to the older ABI.
 
 import gpu.agx.fw
+import gpu.agx.pgtable
+import lib
+
+// GART range 10 in the pinned G17C host driver. Apple dedicates this 20 MiB
+// canonical-high interval to firmware PIO mappings. Vinix leaves a deliberate
+// fault-catching UAT guard page between independently mapped records.
+const g17_pio_va_start = u64(0xfffffc2180000000)
+const g17_pio_va_end = u64(0xfffffc2181400000)
 
 struct G17FirmwareGraph {
 mut:
@@ -28,6 +36,7 @@ mut:
 	structurally_ready    bool
 	runtime_policy_ready  bool
 	platform_values_ready bool
+	pio_mappings_ready    bool
 	hardware_config_ready bool
 }
 
@@ -106,6 +115,86 @@ fn (mut mgr GpuManager) allocate_g17_firmware_graph() ?&G17FirmwareGraph {
 	return graph
 }
 
+fn unmap_g17_pio_prefix(mapped_vas &[fw.g17_io_mapping_count]u64,
+	mapped_sizes &[fw.g17_io_mapping_count]u64, count int) {
+	if uat_mgr == unsafe { nil } {
+		return
+	}
+	for index := 0; index < count; index++ {
+		if mapped_sizes[index] != 0 {
+			uat_mgr.unmap_kernel(mapped_vas[index], mapped_sizes[index])
+		}
+	}
+}
+
+// Install the active hardware-config PIO records into Apple's firmware MMIO
+// aperture. A single unaligned physical record is page-aligned exactly as
+// createFWPIOMapping does, while the published firmware VA retains its byte
+// offset within that page. G17C's selected address converter is the identity.
+fn (mut mgr GpuManager) map_g17_pio_records(mut graph G17FirmwareGraph) bool {
+	if uat_mgr == unsafe { nil } {
+		return false
+	}
+
+	mut mapped_vas := [fw.g17_io_mapping_count]u64{}
+	mut mapped_sizes := [fw.g17_io_mapping_count]u64{}
+	mut mapped_count := 0
+	mut next_va := g17_pio_va_start
+	unsafe {
+		mut config := &fw.G17HardwareConfig(graph.hardware_config.cpu_address())
+		for index := 0; index < fw.g17_io_mapping_count; index++ {
+			mut record := &config.io_mappings_640[index]
+			if record.physical_address == 0 && record.total_size == 0 {
+				continue
+			}
+			// The recovered G17 records all have one physical element. Reject
+			// unsupported scatter mappings instead of treating them as linear.
+			if record.physical_address == 0 || record.total_size == 0
+				|| record.element_size != record.total_size || record.flags & 1 != 0 {
+				unmap_g17_pio_prefix(mapped_vas, mapped_sizes, mapped_count)
+				return false
+			}
+
+			page_offset := record.physical_address & pgtable.uat_pg_mask
+			physical_page := record.physical_address & ~pgtable.uat_pg_mask
+			span := page_offset + u64(record.total_size)
+			if span < page_offset {
+				unmap_g17_pio_prefix(mapped_vas, mapped_sizes, mapped_count)
+				return false
+			}
+			map_size := lib.align_up(span, pgtable.uat_pgsz)
+			if map_size == 0 || next_va > g17_pio_va_end
+				|| map_size > g17_pio_va_end - next_va {
+				unmap_g17_pio_prefix(mapped_vas, mapped_sizes, mapped_count)
+				return false
+			}
+
+			protection := if record.flags & 2 != 0 {
+				pgtable.gpu_prot_fw_mmio_rw
+			} else {
+				pgtable.gpu_prot_fw_mmio_ro
+			}
+			if !uat_mgr.map_kernel(next_va, physical_page, map_size, protection) {
+				unmap_g17_pio_prefix(mapped_vas, mapped_sizes, mapped_count)
+				return false
+			}
+			record.virtual_address = next_va + page_offset
+			mapped_vas[mapped_count] = next_va
+			mapped_sizes[mapped_count] = map_size
+			mapped_count++
+
+			if map_size + pgtable.uat_pgsz < map_size
+				|| map_size + pgtable.uat_pgsz > g17_pio_va_end - next_va {
+				next_va = g17_pio_va_end
+			} else {
+				next_va += map_size + pgtable.uat_pgsz
+			}
+		}
+	}
+	graph.pio_mappings_ready = mapped_count == 12
+	return graph.pio_mappings_ready
+}
+
 fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) bool {
 	if !fw.initialize_g17_bootstrap_region(graph.bootstrap_region.cpu_address(), fw.g17_bootstrap_region_size) {
 		return false
@@ -114,6 +203,9 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 		return false
 	}
 	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(), fw.g17_hardware_config_size, &mgr.hw_config) {
+		return false
+	}
+	if !mgr.map_g17_pio_records(mut graph) {
 		return false
 	}
 	if !fw.initialize_g17_runtime_power_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
@@ -192,7 +284,7 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	mgr.initdata_va = graph.roots[0].va
 	mgr.initdata_phys = graph.roots[0].phys
-	C.printf(c'agx: G17 graph, runtime policy, PIO records, and shared platform values ready; hardware config remains incomplete\n')
+	C.printf(c'agx: G17 graph, runtime policy, mapped PIO records, and shared platform values ready; hardware config remains incomplete\n')
 	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
-		&& graph.hardware_config_ready
+		&& graph.pio_mappings_ready && graph.hardware_config_ready
 }

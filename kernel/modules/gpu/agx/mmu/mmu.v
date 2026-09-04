@@ -366,6 +366,18 @@ pub fn (mgr &UatManager) map_kernel(iova u64, phys u64, size u64, prot u64) bool
 	return pt.map(iova, phys, size, prot)
 }
 
+// Remove a driver-owned context-zero mapping. This is primarily used to
+// unwind a partially constructed firmware MMIO aperture before MSG_INIT.
+pub fn (mgr &UatManager) unmap_kernel(iova u64, size u64) {
+	if iova < (u64(1) << mgr.ias) {
+		mut pt := unsafe { mgr.kernel_lower_pgtable }
+		pt.unmap(iova, size)
+		return
+	}
+	mut pt := unsafe { mgr.kernel_pgtable }
+	pt.unmap(iova, size)
+}
+
 // Prepare one firmware cache-flush slot. The caller must enqueue the matching
 // 0x14-byte FwCtl message and ring endpoint 0x21 before completing it.
 pub fn (mgr &UatManager) begin_flush(slot u32, addr u64, size u64) bool {

@@ -56,6 +56,13 @@ pub const gpu_prot_fw_gpu_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
 	uat_pte_ap_fw_gpu | uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_fw_private_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only |
 	uat_memattr_normal_cached | uat_pte_af
+// Firmware-only device mappings. The UAT permission encoding uses UXN as
+// the firmware write-enable bit for AP=firmware; this intentionally mirrors
+// Asahi's PROT_FW_MMIO_{RW,RO} encodings rather than CPU stage-1 semantics.
+pub const gpu_prot_fw_mmio_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only |
+	uat_memattr_device | uat_pte_af
+pub const gpu_prot_fw_mmio_ro = uat_pte_os | uat_pte_ap_fw_only | uat_memattr_device |
+	uat_pte_af
 pub const gpu_prot_gpu_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_gpu_only |
 	uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_gpu_shared_ro = uat_pte_os | uat_pte_ap_gpu_only |

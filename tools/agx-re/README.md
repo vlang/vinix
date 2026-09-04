@@ -63,7 +63,8 @@ the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
 hardware-configuration allocation, host-written table layout and firmware
 read map, the G17C PIO relative-offset table and its 12 primary-aperture
-firmware records, exact per-role bootstrap-root bindings, its copied platform
+firmware records, their physical alignment and GART-10 UAT publication path,
+exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,
 the mapped bootstrap register region and its G17 no-op producer, both
 shared-object address graphs, the per-role ASC power-state records, the shared
@@ -84,7 +85,8 @@ See [G17_T6050.md](G17_T6050.md) for the versioned register, user-client, and
 firmware observations recovered during this pass.
 
 Hardware launch remains gated. Vinix now has the native G17 UAT handoff,
-two-role bootstrap roots, mapped allocation graph, and the recovered portions
+two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
+and the recovered portions
 of its shared/runtime objects, including their initial platform values and
 runtime policy. Remaining hardware-configuration producers, firmware channel
 construction, the work-command ABI, and the userspace command producer still

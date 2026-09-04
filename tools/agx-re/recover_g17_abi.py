@@ -47,6 +47,7 @@ POPULATE_DPE_PPT_CONFIG = (
     "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData"
 )
 BASE_CONFIGURE_DEVICE = "__ZN14AGXAccelerator15configureDeviceEP9IOService"
+ACCELERATOR_START = "__ZN14AGXAccelerator5startEP9IOService"
 PI300_CONFIGURE_DEVICE = (
     "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
 )
@@ -65,6 +66,13 @@ G17_PIO_TABLE_LENGTH = (
 G17_PIO_TABLE = (
     "__ZNK32AGX·PI_300·X·A0·AcceleratorX25getPIORelativeOffsetTableEv"
 )
+CREATE_FW_PIO_MAPPING = (
+    "__ZN11AGXFirmware18createFWPIOMappingEPKyjPjbj10eGartRange"
+)
+CREATE_FW_GPU_MAPPING = (
+    "__ZN11AGXFirmware18createFWGPUMappingEP18IOMemoryDescriptorb10eGartRange"
+)
+GART_RANGES = "__ZL11gart_ranges.12908"
 G17_DEFAULT_USC_MAX_TGMEM = (
     "__ZNK31AGX·PI_300·X·A0·Accelerator24halGetDefaultUscMaxTgmemEv"
 )
@@ -3424,6 +3432,182 @@ def recover_g17_pio_mappings(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_pio_uat_mapping(image: bytes) -> dict[str, object]:
+    """Recover the checked G17 firmware-PIO UAT mapping contract."""
+
+    symbols = macho_symbols(image)
+    required = (
+        ACCELERATOR_START,
+        INIT_FIRMWARE_DATA,
+        CREATE_FW_PIO_MAPPING,
+        CREATE_FW_GPU_MAPPING,
+        GART_RANGES,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    start_address, start_code = symbol_code(image, ACCELERATOR_START)
+    require_instruction_words_at(
+        start_code,
+        "G17 GART range table initialization",
+        {
+            0xEA0: 0x5293F018,  # mov w24, #0x9f80: ranges 7..12 and 15
+            0xEA4: 0xB0FF41B9,  # adrp x25, gart_ranges
+            0xEA8: 0x911D8339,  # add x25, x25, #0x760
+            0xECC: 0x8B081728,  # select 0x20-byte record by range number
+            0xED8: 0xA9402909,  # load base and size
+            0xEDC: 0x9ADC2536,  # base >> UAT page shift
+            0xEE0: 0x9ADC2549,  # size >> UAT page shift
+        },
+    )
+    page = decode_adrp(start_address + 0xEA4, 0xB0FF41B9)
+    addition = decode_add_immediate(0x911D8339)
+    if page is None or addition is None:
+        raise ValueError("G17 GART range table address is not materialized")
+    page_register, page_address = page
+    destination, source, immediate = addition
+    table_address = page_address + immediate
+    if (page_register, destination, source) != (25, 25, 25):
+        raise ValueError("G17 GART range table uses unexpected registers")
+    if table_address != symbols[GART_RANGES]:
+        raise ValueError(f"unexpected G17 GART range table {table_address:#x}")
+
+    range_number = 10
+    range_offset = virtual_to_file(image, table_address + range_number * 0x20)
+    if range_offset + 0x20 > len(image):
+        raise ValueError("truncated G17 firmware-PIO GART range")
+    va_start, va_size, range_flags, reserved = struct.unpack_from(
+        "<4Q", image, range_offset
+    )
+    expected_range = (0xFFFFFC2180000000, 0x01400000, 0x18, 0)
+    if (va_start, va_size, range_flags, reserved) != expected_range:
+        raise ValueError("unexpected G17 firmware-PIO GART range")
+
+    pio_address, pio_code = symbol_code(image, CREATE_FW_PIO_MAPPING)
+    require_instruction_words_at(
+        pio_code,
+        "G17 firmware-PIO physical alignment",
+        {
+            0x30: 0x710004BF,  # cmp count, #1
+            0x38: 0xF9400028,  # load the sole physical address
+            0x50: 0x0A2A010A,  # recover its low-page offset
+            0x54: 0xB900006A,  # publish low-page offset
+            0x6C: 0x8A0A0100,  # align physical address down
+            0x74: 0x8B224108,  # add requested element size
+            0x84: 0x8A090108,  # align mapping end up
+            0x88: 0xCB000101,  # obtain aligned mapping length
+            0x8C: 0x7100029F,  # writable flag
+            0x90: 0x52800068,  # writable IOMemoryDescriptor options = 3
+            0x94: 0x1A9F1502,  # read-only options = 1
+            0xA4: 0xAA1503E0,
+            0xA8: 0xAA1603E1,
+            0xAC: 0xAA1403E2,
+            0xB0: 0xAA1303E3,
+        },
+    )
+    mapping_call = decode_bl_target(
+        pio_address + 0xB4, struct.unpack_from("<I", pio_code, 0xB4)[0]
+    )
+    if mapping_call != symbols[CREATE_FW_GPU_MAPPING]:
+        raise ValueError(f"unexpected G17 firmware-PIO mapper target {mapping_call}")
+
+    _gpu_address, gpu_code = symbol_code(image, CREATE_FW_GPU_MAPPING)
+    require_instruction_words_at(
+        gpu_code,
+        "G17 firmware-PIO mapping options",
+        {
+            0x38: 0xD3607EC8,  # GART range number in bits 35:32
+            0x3C: 0x710026DF,  # special-case range 9 only
+            0x48: 0x710002BF,  # writable flag
+            0x4C: 0x528000E9,  # writable mapping options = 7
+            0x50: 0xD28000AA,
+            0x54: 0xF2C0200A,  # read-only options = 0x10000000005
+            0x58: 0x9A8A1129,
+            0x90: 0xAA080122,  # range tag | mapping options
+        },
+    )
+
+    _init_address, init_code = symbol_code(image, INIT_FIRMWARE_DATA)
+    require_instruction_sequence(
+        init_code,
+        "G17 firmware-PIO virtual-address publication",
+        (
+            0x928108F5,  # destination starts at config +0x648
+            0x52835917,  # host mapping-object array at +0x1ac8
+            0x52838E18,  # physical low-page offsets at +0x1c70
+            0x14000009,
+            0xF9415E68,
+            0x8B150108,
+            0xF907491F,
+            0x910022F7,
+            0x91001318,
+            0x9110E294,
+            0xB100A2B5,
+            0x540005A0,
+            0xF9400688,
+            0xB4FFFEE8,
+            0xB9420A88,
+            0x34FFFEA8,
+            0x39400288,
+            0x3707FE68,
+        ),
+    )
+    require_instruction_sequence(
+        init_code,
+        "G17 firmware-PIO mapped-address conversion",
+        (
+            0x8B170268,  # load mapping object by record index
+            0xF9400100,
+            0xF9400010,
+            0xAA0003F1,
+            0xF2F9B431,
+            0xDAC11A30,
+            0xD2802B11,  # mapping getGPUVirtualAddress vtable slot 0x158
+            0x8B110210,
+            0xF9400208,
+            0xF2E63530,
+            0xD73F0910,
+            0xAA1603F1,
+            0x8B180268,
+            0xB9400108,  # add the physical low-page offset
+            0xF9400270,
+            0xDAC11A30,
+            0xAA1003F1,
+            0xDAC147F1,
+            0xEB11021F,
+            0x54000040,
+            0xD4388E40,
+            0x910B6209,  # firmware VA conversion vtable slot 0x2d8
+            0xF9416E0A,
+            0x8B080001,
+            0xAA1303E0,
+            0x52800002,
+            0xAA0903F1,
+            0xF2F24A11,
+            0xD73F0951,
+            0xF9415E68,
+            0x8B150108,
+            0xF9074900,  # store converted VA in config record +0x08
+        ),
+    )
+
+    return {
+        "gart_range": range_number,
+        "va_start": va_start,
+        "va_size": va_size,
+        "va_end": va_start + va_size,
+        "range_flags": range_flags,
+        "uat_page_bytes": 0x4000,
+        "single_element_mapping": "align_down_physical_and_round_up_end",
+        "writable_descriptor_options": 3,
+        "read_only_descriptor_options": 1,
+        "writable_gpu_mapping_options": 7,
+        "read_only_gpu_mapping_options": 0x10000000005,
+        "firmware_virtual_address": "mapping_gpu_va_plus_physical_page_offset",
+    }
+
+
 def recover_driver_hardware_config_layout(
     base_init_code: bytes, base_power_code: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -4327,6 +4511,7 @@ def main() -> int:
             base_init_code, base_power_code, power_code
         )
         hardware_config["pio_mappings"] = recover_g17_pio_mappings(driver)
+        hardware_config["pio_uat_mapping"] = recover_g17_pio_uat_mapping(driver)
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))
