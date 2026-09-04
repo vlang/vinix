@@ -946,6 +946,131 @@ def recover_firmware_shared_data_layout(
     }
 
 
+def recover_firmware_shared_platform_fields(code: bytes) -> dict[str, object]:
+    require_instruction_sequence(
+        code,
+        "primary shared platform service pair",
+        (
+            0xF9454E75,  # ldr x21, [x19, #0xa98]
+            0x91404408,  # add x8, x0, #0x11000
+            0x91158108,  # add x8, x8, #0x560
+            0xF9400108,  # ldr x8, [x8]
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "primary shared second platform service pair",
+        (
+            0x91404408,  # add x8, x0, #0x11000
+            0x9115A108,  # add x8, x8, #0x568
+            0xF9400108,  # ldr x8, [x8]
+        ),
+    )
+    for instruction, label in (
+        (0xF9016EA0, "primary platform address 0x2d8"),
+        (0xF90172A0, "primary platform address 0x2e0"),
+        (0xF90176A0, "primary platform address 0x2e8"),
+        (0xF9017AA0, "primary platform address 0x2f0"),
+        (0xF9017EBF, "primary reserved address 0x2f8"),
+    ):
+        if struct.pack("<I", instruction) not in code:
+            raise ValueError(f"missing {label} store")
+
+    require_instruction_sequence(
+        code,
+        "secondary shared platform mirrors",
+        (
+            0xF945E669,  # ldr x9, [x19, #0xbc8]
+            0xF9416EAA,  # ldr x10, [x21, #0x2d8]
+            0xF9016D2A,  # str x10, [x9, #0x2d8]
+            0xF9017528,  # str x8, [x9, #0x2e8]
+            0xF9017D3F,  # str xzr, [x9, #0x2f8]
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "role-specific shared platform scalars",
+        (
+            0x91403D09,  # add x9, x8, #0xf000
+            0xB947C12A,  # ldr w10, [x9, #0x7c0]
+            0xF945E66B,  # ldr x11, [x19, #0xbc8]
+            0xB903016A,  # str w10, [x11, #0x300]
+            0xB9483529,  # ldr w9, [x9, #0x834]
+            0xB90306A9,  # str w9, [x21, #0x304]
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "primary shared calibration copy",
+        (
+            0xF9454E69,  # ldr x9, [x19, #0xa98]
+            0x9111E529,  # add x9, x9, #0x479
+            0x3DFDE500,  # ldr q0, [x8, #0xf790]
+            0x3D800120,  # str q0, [x9]
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "secondary shared calibration copy",
+        (
+            0xF9414E68,  # ldr x8, [x19, #0x298]
+            0xF945E669,  # ldr x9, [x19, #0xbc8]
+            0x9111E529,  # add x9, x9, #0x479
+            0x3DFDE500,  # ldr q0, [x8, #0xf790]
+            0x3D800120,  # str q0, [x9]
+        ),
+    )
+    require_instruction_sequence(
+        code,
+        "primary shared state initialization",
+        (
+            0x52801FE8,  # mov w8, #0xff
+            0x390F82A8,  # strb w8, [x21, #0x3e0]
+            0x910F86A8,  # add x8, x21, #0x3e1
+            0x6F00E400,  # movi v0.2d, #0
+            0xAD000100,
+            0xAD010100,
+            0xAD020100,
+            0xAD030100,
+            0x3D802100,
+        ),
+    )
+
+    return {
+        "platform_host_member": 0x298,
+        "primary_service_sources": [
+            {
+                "platform_pointer_offset": 0x11560,
+                "primary_shared_offsets": [0x2D8, 0x2E0],
+            },
+            {
+                "platform_pointer_offset": 0x11568,
+                "primary_shared_offsets": [0x2E8, 0x2F0],
+            },
+        ],
+        "secondary_mirrors": [
+            {"primary_shared_offset": 0x2D8, "secondary_shared_offset": 0x2D8},
+            {"primary_shared_offset": 0x2E8, "secondary_shared_offset": 0x2E8},
+        ],
+        "scalars": [
+            {"platform_offset": 0xF7C0, "role": 1, "shared_offset": 0x300},
+            {"platform_offset": 0xF834, "role": 0, "shared_offset": 0x304},
+        ],
+        "calibration": {
+            "platform_offset": 0xF790,
+            "shared_offset": 0x479,
+            "bytes": 0x10,
+            "roles": [0, 1],
+        },
+        "primary_state": {
+            "state_offset": 0x3E0,
+            "state_initial": 0xFF,
+            "status_offset": 0x3E1,
+            "status_bytes": 0x90,
+        },
+    }
+
+
 def recover_driver_hardware_config_layout(
     base_init_code: bytes, base_power_code: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -1486,6 +1611,9 @@ def main() -> int:
         _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
+        )
+        firmware_shared_data["platform_fields"] = (
+            recover_firmware_shared_platform_fields(function)
         )
         hardware_config = recover_hardware_config(
             allocations, shared_init_code, firmware

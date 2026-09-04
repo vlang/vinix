@@ -239,6 +239,52 @@ def auxiliary_shared_code() -> bytes:
     )
 
 
+def firmware_shared_platform_code() -> bytes:
+    return encode(
+        0xF9454E75,
+        0x91404408,
+        0x91158108,
+        0xF9400108,
+        0xF9016EA0,
+        0xF90172A0,
+        0x91404408,
+        0x9115A108,
+        0xF9400108,
+        0xF90176A0,
+        0xF9017AA0,
+        0xF9017EBF,
+        0xF945E669,
+        0xF9416EAA,
+        0xF9016D2A,
+        0xF9017528,
+        0xF9017D3F,
+        0x91403D09,
+        0xB947C12A,
+        0xF945E66B,
+        0xB903016A,
+        0xB9483529,
+        0xB90306A9,
+        0xF9454E69,
+        0x9111E529,
+        0x3DFDE500,
+        0x3D800120,
+        0xF9414E68,
+        0xF945E669,
+        0x9111E529,
+        0x3DFDE500,
+        0x3D800120,
+        0x52801FE8,
+        0x390F82A8,
+        0x910F86A8,
+        0x6F00E400,
+        0xAD000100,
+        0xAD010100,
+        0xAD020100,
+        0xAD030100,
+        0x3D802100,
+    )
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_recovers_firmware_root_pointer_offsets(self) -> None:
         code = encode(
@@ -287,6 +333,21 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.recover_firmware_shared_data_layout(
                 firmware_shared_allocations(), firmware_shared_code(), b""
             )
+
+    def test_recovers_firmware_shared_platform_fields(self) -> None:
+        recovered = recover_g17_abi.recover_firmware_shared_platform_fields(
+            firmware_shared_platform_code()
+        )
+        self.assertEqual(
+            recovered["primary_service_sources"][1]["platform_pointer_offset"],
+            0x11568,
+        )
+        self.assertEqual(recovered["calibration"]["shared_offset"], 0x479)
+        self.assertEqual(recovered["primary_state"]["status_bytes"], 0x90)
+
+    def test_rejects_incomplete_firmware_shared_platform_fields(self) -> None:
+        with self.assertRaisesRegex(ValueError, "platform service pair"):
+            recover_g17_abi.recover_firmware_shared_platform_fields(b"")
 
     def test_recovers_checked_ring_accessor(self) -> None:
         code = encode(

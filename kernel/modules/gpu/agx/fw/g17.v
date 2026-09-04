@@ -43,6 +43,7 @@ pub const g17_role0_bootstrap_264_size = u64(0xe10)
 pub const g17_role0_bootstrap_26c_size = u64(0x68)
 pub const g17_role0_bootstrap_274_size = u64(0x800)
 pub const g17_role1_secondary_471_size = u64(0x11dd0)
+pub const g17_primary_shared_state_initial = u8(0xff)
 pub const g17_color_matrix_count = 64
 pub const g17_color_matrix_size = u64(0x18)
 pub const g17_io_mapping_count = 53
@@ -305,9 +306,16 @@ pub mut:
 	large_region_address      u64
 	role0_bootstrap_addresses [5]u64
 	optional_platform_address u64
+	platform_address_2d8      u64
+	platform_address_2e0      u64
+	platform_address_2e8      u64
+	platform_address_2f0      u64
+	platform_value_300        u32
+	platform_value_304        u32
 	accelerator_ring          G17AcceleratorRingAddresses
 	auxiliary_ring_addresses  [g17_auxiliary_ring_address_count]u64
 	role1_secondary_address   u64
+	calibration               [0x10]u8
 }
 
 pub fn populate_g17_firmware_shared_data(mut data G17FirmwareSharedData, bindings G17FirmwareSharedBindings) bool {
@@ -339,10 +347,20 @@ pub fn populate_g17_firmware_shared_data(mut data G17FirmwareSharedData, binding
 	data.accelerator_ring = bindings.accelerator_ring
 	data.auxiliary_ring_addresses = bindings.auxiliary_ring_addresses
 	data.address_200 = bindings.large_region_address
-	data.address_2d0 = bindings.optional_platform_address
+	data.calibration_479 = bindings.calibration
 	if bindings.role == 0 {
 		data.addresses_254 = bindings.role0_bootstrap_addresses
+		data.address_2d0 = bindings.optional_platform_address
+		data.platform_address_2d8 = bindings.platform_address_2d8
+		data.platform_address_2e0 = bindings.platform_address_2e0
+		data.platform_address_2e8 = bindings.platform_address_2e8
+		data.platform_address_2f0 = bindings.platform_address_2f0
+		data.value_304 = bindings.platform_value_304
+		data.state_3e0 = g17_primary_shared_state_initial
 	} else {
+		data.platform_address_2d8 = bindings.platform_address_2d8
+		data.platform_address_2e8 = bindings.platform_address_2e8
+		data.value_300 = bindings.platform_value_300
 		data.secondary_address_471 = bindings.role1_secondary_address
 	}
 	return true
