@@ -652,11 +652,19 @@ pub mut:
 }
 
 // Modern G17 I/O mappings are 0x28 bytes rather than the 0x20-byte records in
-// older AGX firmware. Only the record boundary is currently established.
+// older AGX firmware. The host copies these fields from one of 53 accelerator
+// PIO descriptors, then later replaces virtual_address when it installs the
+// mapping in the firmware UAT.
 @[packed]
 pub struct G17IoMappingRecord {
 pub mut:
-	opaque [0x28]u8
+	physical_address u64
+	virtual_address  u64
+	total_size       u32
+	element_size     u32
+	relative_offset  u64
+	flags            u32
+	padding          u32
 }
 
 @[packed]
@@ -731,6 +739,38 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 	return true
 }
 
+fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig) bool {
+	// Recovered from the G17C getPIORelativeOffsetTable virtual selected by
+	// the pinned macOS 26.5 driver. Entries whose primary offset is -1 use a
+	// different host-only mapping path and do not populate these records.
+	indices := [u32(17), 47, 26, 29, 31, 33, 34, 28, 32, 35, 37, 43]
+	offsets := [u64(0), 0x23d00, 0xd04000, 0xd10000, 0xd40000, 0xd44000,
+		0xd4c000, 0xd50000, 0xd60000, 0xe00000, 0xe40000, 0xe60000]
+	sizes := [u32(0x21500), 0x200, 0x8000, 0x4000, 0x4000, 0x4000, 0x200,
+		0x10000, 0x20000, 0x4000, 0x4000, 0x58]
+
+	if hardware.gpu_mmio_base == 0 || hardware.gpu_mmio_size == 0 {
+		return false
+	}
+	for mapping := 0; mapping < indices.len; mapping++ {
+		end := offsets[mapping] + u64(sizes[mapping])
+		if end < offsets[mapping] || end > hardware.gpu_mmio_size {
+			return false
+		}
+		index := indices[mapping]
+		config.io_mappings_640[index] = G17IoMappingRecord{
+			physical_address: hardware.gpu_mmio_base + offsets[mapping]
+			total_size: sizes[mapping]
+			element_size: sizes[mapping]
+			relative_offset: offsets[mapping]
+			// All twelve source records are initialized with bit 1. The host
+			// passes that bit as the writable argument to createFWPIOMapping.
+			flags: 2
+		}
+	}
+	return true
+}
+
 // Initialize the recovered DeviceTree-backed subset directly in mapped
 // storage. This avoids placing the 0x2710-byte object on the kernel stack.
 pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwConfig) bool {
@@ -746,6 +786,9 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 	unsafe {
 		C.memset(buffer, 0, size)
 		mut config := &G17HardwareConfig(buffer)
+		if !populate_g17_pio_mappings(mut config, hardware) {
+			return false
+		}
 		config.performance_state_max_fc4 = hardware.perf_state_count - 1
 		for state := u32(0); state < hardware.perf_state_count; state++ {
 			config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000

@@ -101,6 +101,10 @@ pub:
 	// Native Apple DeviceTree performance data. G17 firmware has capacity for
 	// 16 states and 16 voltage domains; the M5 Max currently supplies 14 x 4.
 pub mut:
+	// Translated primary GPU register aperture discovered from the boot
+	// DeviceTree. Modern firmware derives its PIO records from this range.
+	gpu_mmio_base            u64
+	gpu_mmio_size            u64
 	perf_state_count         u32
 	perf_state_table_count   u32
 	perf_state_frequencies   [16]u32

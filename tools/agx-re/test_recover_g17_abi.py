@@ -955,6 +955,100 @@ def role0_bootstrap_regions_code() -> bytes:
     )
 
 
+def g17_pio_mapping_fixture() -> tuple[
+    bytes, dict[str, int], dict[str, tuple[int, bytes]]
+]:
+    table = (
+        (17, 0x000000, 0x21500, 0, 0x00000000, 0, 0, 0),
+        (47, 0x023D00, 0x00200, 0, 0x00000000, 0, 0, 0),
+        (26, 0xD04000, 0x08000, 0, 0xDADADADA, 0, 0, 0),
+        (29, 0xD10000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (31, 0xD40000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (33, 0xD44000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (34, 0xD4C000, 0x00200, 0, 0xDADADADA, 0, 0, 0),
+        (28, 0xD50000, 0x10000, 0, 0xDADADADA, 0, 0, 0),
+        (32, 0xD60000, 0x20000, 0, 0xDADADADA, 0, 0, 0),
+        (35, 0xE00000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (37, 0xE40000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (43, 0xE60000, 0x00058, 0, 0xDADADADA, 0, 0, 0),
+        (20, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (21, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (18, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (19, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (24, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (23, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (44, 0xFFFFFFFF, 0, 0, 0xD24000, 0x100, 0, 0),
+    )
+    image = b"".join(struct.pack("<8I", *entry) for entry in table)
+    symbols = {
+        recover_g17_abi.BASE_CONFIGURE_DEVICE: 0x100000,
+        recover_g17_abi.G17_PIO_TABLE: 0x2000,
+        recover_g17_abi.G17_PIO_TABLE_LENGTH: 0x2100,
+    }
+    configure = bytearray(0x1904)
+    words_at = {
+        0x1010: 0x911E0276,
+        0x1014: 0xAA1603E0,
+        0x1018: 0x529C3601,
+        0x101C: 0x94AB642B,
+        0x1020: 0x52800054,
+        0x1024: 0xB90CAAB4,
+        0x1064: 0xB9044314,
+        0x1094: 0xB9000354,
+        0x10FC: 0xB9087354,
+        0x1130: 0xB90CAB54,
+        0x1198: 0xB9044334,
+        0x11CC: 0xB9087B34,
+        0x1200: 0xB90CB334,
+        0x1234: 0xB9000B94,
+        0x1268: 0xB9044394,
+        0x12B8: 0xB90CB394,
+        0x1464: 0xB90442F4,
+        0x17EC: 0x52822D08,
+        0x17F4: 0xF948B609,
+        0x1804: 0xD73F0931,
+        0x182C: 0x52822E08,
+        0x1834: 0xF948BA09,
+        0x1844: 0xD73F0931,
+        0x1848: 0xB4000BC0,
+        0x1850: 0x52808714,
+        0x1854: 0x529B5B5A,
+        0x1858: 0x72BB5B5A,
+        0x187C: 0xB9400708,
+        0x1888: 0xB9400308,
+        0x18A4: 0x39400128,
+        0x18BC: 0xF9400208,
+        0x18C4: 0x52800001,
+        0x18CC: 0xD73F0910,
+        0x18D0: 0x29402309,
+        0x18D4: 0x9BB47D29,
+        0x18EC: 0x8B080009,
+        0x18F0: 0xF9000549,
+        0x18F4: 0xF9400709,
+        0x18F8: 0xB9020949,
+        0x18FC: 0xF9010948,
+        0x1900: 0xB900055C,
+    }
+    for offset, word in words_at.items():
+        struct.pack_into("<I", configure, offset, word)
+    functions = {
+        recover_g17_abi.BASE_CONFIGURE_DEVICE: (0x100000, bytes(configure)),
+        recover_g17_abi.G17_PIO_TABLE: (
+            0x2000,
+            encode(
+                0xD503245F,
+                0x90000000,
+                add_immediate(0, 0, 0x480),
+                0xD65F03C0,
+            ),
+        ),
+        recover_g17_abi.G17_PIO_TABLE_LENGTH: (
+            0x2100, encode(0xD503245F, movz_w(0, 0x13), 0xD65F03C0)
+        ),
+    }
+    return image, symbols, functions
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_decodes_kernel_authenticated_rebase(self) -> None:
         raw = 0x80114229019894A8
@@ -1653,6 +1747,69 @@ class RecoverG17AbiTests(unittest.TestCase):
     def test_rejects_incomplete_driver_hardware_config_layout(self) -> None:
         with self.assertRaisesRegex(ValueError, "color-matrix"):
             recover_g17_abi.recover_driver_hardware_config_layout(b"", b"", b"")
+
+    def test_recovers_g17_pio_mappings(self) -> None:
+        image, symbols, functions = g17_pio_mapping_fixture()
+
+        def vtable_target(_image: bytes, _name: str, slot: int) -> int:
+            if slot == recover_g17_abi.G17_PIO_TABLE_VTABLE_SLOT:
+                return symbols[recover_g17_abi.G17_PIO_TABLE]
+            if slot == recover_g17_abi.G17_PIO_TABLE_LENGTH_VTABLE_SLOT:
+                return symbols[recover_g17_abi.G17_PIO_TABLE_LENGTH]
+            raise AssertionError(f"unexpected vtable slot {slot:#x}")
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", side_effect=vtable_target
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+        ):
+            recovered = recover_g17_abi.recover_g17_pio_mappings(image)
+
+        self.assertEqual(recovered["table_entries"], 19)
+        self.assertEqual(len(recovered["records"]), 12)
+        self.assertEqual(recovered["records"][0]["index"], 17)
+        self.assertEqual(recovered["records"][0]["total_size"], 0x21500)
+        self.assertEqual(recovered["records"][-1]["index"], 43)
+        self.assertEqual(recovered["records"][-1]["relative_offset"], 0xE60000)
+        self.assertTrue(all(record["writable"] for record in recovered["records"]))
+        self.assertEqual(recovered["alternate_entries"][-1]["alternate_offset"], 0xD24000)
+
+    def test_rejects_modified_g17_pio_source_producer(self) -> None:
+        image, symbols, functions = g17_pio_mapping_fixture()
+        base_address, base_code = functions[recover_g17_abi.BASE_CONFIGURE_DEVICE]
+        modified = bytearray(base_code)
+        struct.pack_into("<I", modified, 0x1020, movz_w(20, 1))
+        functions[recover_g17_abi.BASE_CONFIGURE_DEVICE] = (
+            base_address,
+            bytes(modified),
+        )
+
+        def vtable_target(_image: bytes, _name: str, slot: int) -> int:
+            if slot == recover_g17_abi.G17_PIO_TABLE_VTABLE_SLOT:
+                return symbols[recover_g17_abi.G17_PIO_TABLE]
+            return symbols[recover_g17_abi.G17_PIO_TABLE_LENGTH]
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", side_effect=vtable_target
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+            self.assertRaisesRegex(ValueError, "source producer"),
+        ):
+            recover_g17_abi.recover_g17_pio_mappings(image)
 
     def test_recovers_accelerator_ring_bindings(self) -> None:
         allocations = [

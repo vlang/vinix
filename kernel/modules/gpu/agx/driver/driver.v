@@ -39,6 +39,7 @@ struct PlatformResources {
 pub:
 	asc_base        u64
 	sgx_base        u64
+	sgx_size        u64
 	mailbox_base    u64
 	handoff_base    u64
 	handoff_size    u64
@@ -125,6 +126,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		return PlatformResources{
 			asc_base: asc_regs[0].base
 			sgx_base: gpu_regs[0].base
+			sgx_size: gpu_regs[0].size
 			mailbox_base: asc_regs[0].base + 0x8000
 			handoff_base: handoff_base
 			handoff_size: handoff_size
@@ -192,6 +194,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 	return PlatformResources{
 		asc_base: asc.base
 		sgx_base: sgx.base
+		sgx_size: sgx.size
 		mailbox_base: mailbox_regs[0].base
 		handoff_base: handoff_regs[0].base
 		handoff_size: handoff_regs[0].size
@@ -278,8 +281,6 @@ pub fn initialise() {
 		println('agx: t6050 performance configuration is incomplete')
 		return
 	}
-	agx_driver_inst.hw_config = cfg
-	agx_driver_inst.detected = true
 	if !drm_ioctl.validate_asahi_25_layouts() {
 		println('agx: Mesa 25.0.5 DRM UAPI layout validation failed')
 		return
@@ -302,6 +303,10 @@ pub fn initialise() {
 		println('agx: platform resources are incomplete')
 		return
 	}
+	cfg.gpu_mmio_base = platform.sgx_base
+	cfg.gpu_mmio_size = platform.sgx_size
+	agx_driver_inst.hw_config = cfg
+	agx_driver_inst.detected = true
 	if platform.ttbs_size < 64 * 16 {
 		println('agx: TTB region is too small for 64 UAT contexts')
 		return

@@ -59,6 +59,12 @@ BASE_CONFIGURE_POWER = (
 G17_CONFIGURE_POWER = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX38configurePowerAndPerformanceControllerEv"
 )
+G17_PIO_TABLE_LENGTH = (
+    "__ZNK32AGX·PI_300·X·A0·AcceleratorX31getPIORelativeOffsetTableLengthEv"
+)
+G17_PIO_TABLE = (
+    "__ZNK32AGX·PI_300·X·A0·AcceleratorX25getPIORelativeOffsetTableEv"
+)
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 KTRACE_FIRMWARE_CALLBACK = "__ZN11AGXFirmware16ktraceFwCallbackE16kd_callback_typePv16AGFIFirmwareRole"
 WAIT_FIRMWARE_POWER_OFF = "__ZN14AGXArmFirmware23waitForFirmwarePowerOffEv"
@@ -288,6 +294,8 @@ G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
 G17_FW_BRN_SIZE_VTABLE_SLOT = 0xF90
 G17_CONFIGURE_DEVICE_VTABLE_SLOT = 0x958
 G17_CONFIGURE_POWER_VTABLE_SLOT = 0xA20
+G17_PIO_TABLE_VTABLE_SLOT = 0x1168
+G17_PIO_TABLE_LENGTH_VTABLE_SLOT = 0x1170
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -1144,6 +1152,20 @@ def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, .
     encoded = struct.pack(f"<{len(sequence)}I", *sequence)
     if encoded not in code:
         raise ValueError(f"missing {label} instruction sequence")
+
+
+def require_instruction_words_at(
+    code: bytes, label: str, expected: dict[int, int]
+) -> None:
+    for offset, wanted in expected.items():
+        if offset + 4 > len(code):
+            raise ValueError(f"truncated {label} at {offset:#x}")
+        actual = struct.unpack_from("<I", code, offset)[0]
+        if actual != wanted:
+            raise ValueError(
+                f"unexpected {label} instruction at {offset:#x}: "
+                f"{actual:#010x}, expected {wanted:#010x}"
+            )
 
 
 def decode_kernel_auth_rebase(raw: int) -> int:
@@ -3078,6 +3100,172 @@ def recover_g17_role0_bootstrap_regions(code: bytes) -> list[dict[str, object]]:
     ]
 
 
+def recover_g17_pio_mappings(image: bytes) -> dict[str, object]:
+    """Recover G17C firmware PIO records from the selected virtual table.
+
+    The table itself identifies accelerator PIO descriptor indices and
+    offsets inside IODeviceMemory range zero.  The base configureDevice path
+    turns each primary table entry into a physical address and the later
+    initFirmwareData loop copies the descriptor into the 0x28-byte firmware
+    record.  Pin all three links before reporting the records.
+    """
+
+    symbols = macho_symbols(image)
+    required = (BASE_CONFIGURE_DEVICE, G17_PIO_TABLE, G17_PIO_TABLE_LENGTH)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    table_target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_PIO_TABLE_VTABLE_SLOT
+    )
+    if table_target != symbols[G17_PIO_TABLE]:
+        raise ValueError(f"unexpected G17 PIO table target {table_target:#x}")
+    length_target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_PIO_TABLE_LENGTH_VTABLE_SLOT
+    )
+    if length_target != symbols[G17_PIO_TABLE_LENGTH]:
+        raise ValueError(f"unexpected G17 PIO table length target {length_target:#x}")
+
+    length_address, length_code = symbol_code(image, G17_PIO_TABLE_LENGTH)
+    del length_address
+    if length_code[:12] != struct.pack("<3I", 0xD503245F, 0x52800260, 0xD65F03C0):
+        raise ValueError("unexpected G17 PIO table length provider")
+
+    table_address, table_code = symbol_code(image, G17_PIO_TABLE)
+    if len(table_code) < 16:
+        raise ValueError("truncated G17 PIO table provider")
+    getter_words = struct.unpack_from("<4I", table_code)
+    if getter_words[0] != 0xD503245F or getter_words[3] != 0xD65F03C0:
+        raise ValueError("unexpected G17 PIO table provider prologue")
+    page = decode_adrp(table_address + 4, getter_words[1])
+    addition = decode_add_immediate(getter_words[2])
+    if page is None or addition is None:
+        raise ValueError("G17 PIO table provider has no ADRP/add address")
+    page_register, page_address = page
+    destination, source, immediate = addition
+    if page_register != 0 or destination != 0 or source != 0:
+        raise ValueError("G17 PIO table provider uses an unexpected register")
+    data_address = page_address + immediate
+
+    expected_table = (
+        (17, 0x000000, 0x21500, 0, 0x00000000, 0, 0, 0),
+        (47, 0x023D00, 0x00200, 0, 0x00000000, 0, 0, 0),
+        (26, 0xD04000, 0x08000, 0, 0xDADADADA, 0, 0, 0),
+        (29, 0xD10000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (31, 0xD40000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (33, 0xD44000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (34, 0xD4C000, 0x00200, 0, 0xDADADADA, 0, 0, 0),
+        (28, 0xD50000, 0x10000, 0, 0xDADADADA, 0, 0, 0),
+        (32, 0xD60000, 0x20000, 0, 0xDADADADA, 0, 0, 0),
+        (35, 0xE00000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (37, 0xE40000, 0x04000, 0, 0xDADADADA, 0, 0, 0),
+        (43, 0xE60000, 0x00058, 0, 0xDADADADA, 0, 0, 0),
+        (20, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (21, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (18, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (19, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (24, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (23, 0xFFFFFFFF, 0, 0, 0, 0, 0, 0),
+        (44, 0xFFFFFFFF, 0, 0, 0xD24000, 0x100, 0, 0),
+    )
+    data_offset = virtual_to_file(image, data_address)
+    data_bytes = len(expected_table) * 0x20
+    if data_offset + data_bytes > len(image):
+        raise ValueError("truncated G17 PIO relative-offset table")
+    actual_table = tuple(
+        struct.unpack_from("<8I", image, data_offset + index * 0x20)
+        for index in range(len(expected_table))
+    )
+    if actual_table != expected_table:
+        raise ValueError("unexpected G17 PIO relative-offset table contents")
+
+    _configure_address, configure_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    # These exact sites establish the descriptor-array clear, default flag 2,
+    # all twelve active descriptor flags, both virtual dispatches, and the
+    # primary IODeviceMemory-to-source-record copy path.
+    require_instruction_words_at(
+        configure_code,
+        "G17 PIO source producer",
+        {
+            0x1010: 0x911E0276,
+            0x1014: 0xAA1603E0,
+            0x1018: 0x529C3601,
+            0x101C: 0x94AB642B,
+            0x1020: 0x52800054,
+            0x1024: 0xB90CAAB4,
+            0x1064: 0xB9044314,
+            0x1094: 0xB9000354,
+            0x10FC: 0xB9087354,
+            0x1130: 0xB90CAB54,
+            0x1198: 0xB9044334,
+            0x11CC: 0xB9087B34,
+            0x1200: 0xB90CB334,
+            0x1234: 0xB9000B94,
+            0x1268: 0xB9044394,
+            0x12B8: 0xB90CB394,
+            0x1464: 0xB90442F4,
+            0x17EC: 0x52822D08,
+            0x17F4: 0xF948B609,
+            0x1804: 0xD73F0931,
+            0x182C: 0x52822E08,
+            0x1834: 0xF948BA09,
+            0x1844: 0xD73F0931,
+            0x1848: 0xB4000BC0,
+            0x1850: 0x52808714,
+            0x1854: 0x529B5B5A,
+            0x1858: 0x72BB5B5A,
+            0x187C: 0xB9400708,
+            0x1888: 0xB9400308,
+            0x18A4: 0x39400128,
+            0x18BC: 0xF9400208,
+            0x18C4: 0x52800001,
+            0x18CC: 0xD73F0910,
+            0x18D0: 0x29402309,
+            0x18D4: 0x9BB47D29,
+            0x18EC: 0x8B080009,
+            0x18F0: 0xF9000549,
+            0x18F4: 0xF9400709,
+            0x18F8: 0xB9020949,
+            0x18FC: 0xF9010948,
+            0x1900: 0xB900055C,
+        },
+    )
+
+    records = [
+        {
+            "index": kind,
+            "relative_offset": relative_offset,
+            "total_size": size,
+            "element_size": size,
+            "flags": 2,
+            "writable": True,
+        }
+        for kind, relative_offset, size, *_tail in expected_table
+        if relative_offset != 0xFFFFFFFF
+    ]
+    return {
+        "table_vtable_slot": G17_PIO_TABLE_VTABLE_SLOT,
+        "length_vtable_slot": G17_PIO_TABLE_LENGTH_VTABLE_SLOT,
+        "table_address": data_address,
+        "table_entries": len(expected_table),
+        "source_record_stride": 0x438,
+        "firmware_record_offset": 0x640,
+        "firmware_record_stride": 0x28,
+        "records": records,
+        "alternate_entries": [
+            {
+                "index": entry[0],
+                "primary_offset": entry[1],
+                "alternate_offset": entry[4],
+                "alternate_size": entry[5],
+            }
+            for entry in expected_table
+            if entry[1] == 0xFFFFFFFF
+        ],
+    }
+
+
 def recover_driver_hardware_config_layout(
     base_init_code: bytes, base_power_code: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -3977,6 +4165,7 @@ def main() -> int:
         hardware_config["host_layout"] = recover_driver_hardware_config_layout(
             base_init_code, base_power_code, power_code
         )
+        hardware_config["pio_mappings"] = recover_g17_pio_mappings(driver)
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))
