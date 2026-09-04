@@ -281,7 +281,8 @@ pub fn initialise() {
 	agx_driver_inst.detected = true
 
 	if chip_id == 0x6050 {
-		if !fw.validate_g17_bootstrap_allocations() || !fw.validate_g17_accelerator_layouts() {
+		if !fw.validate_g17_bootstrap_allocations() || !fw.validate_g17_accelerator_layouts()
+			|| !fw.validate_g17_channel_layouts() {
 			println('agx: internal G17 firmware layout validation failed')
 			return
 		}

@@ -261,6 +261,10 @@ SUBMIT_DEVICE_CONTROL = (
     "__ZN11AGXFirmware19submitDeviceControlE"
     "P33AGFIAcceleratorDeviceControlEntryjPj"
 )
+RESET_CHANNEL_STATE = "__ZN10AGXChannel17resetChannelStateEv"
+WRITE_CHANNEL_COMMAND_POINTER = (
+    "__ZN10AGXChannel26writeChannelCommandPointerEyP22AGFIChannelCommandTypey"
+)
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -504,6 +508,36 @@ def decode_umaddl(word: int) -> tuple[int, int, int, int] | None:
     return destination, first, second, addend
 
 
+def decode_bfi_x(word: int) -> tuple[int, int, int, int] | None:
+    """Decode the 64-bit BFI alias of BFM."""
+    if word & 0xFFC00000 != 0xB3400000:
+        return None
+    destination = word & 0x1F
+    source = (word >> 5) & 0x1F
+    immr = (word >> 16) & 0x3F
+    imms = (word >> 10) & 0x3F
+    if imms >= immr:
+        return None
+    lsb = (-immr) & 0x3F
+    width = imms + 1
+    return destination, source, lsb, width
+
+
+def decode_ubfiz_x(word: int) -> tuple[int, int, int, int] | None:
+    """Decode the 64-bit UBFIZ alias, including the LSL immediate alias."""
+    if word & 0xFFC00000 != 0xD3400000:
+        return None
+    destination = word & 0x1F
+    source = (word >> 5) & 0x1F
+    immr = (word >> 16) & 0x3F
+    imms = (word >> 10) & 0x3F
+    if imms >= immr:
+        return None
+    lsb = (-immr) & 0x3F
+    width = imms + 1
+    return destination, source, lsb, width
+
+
 def decode_str_unsigned(word: int) -> tuple[int, int, int, int] | None:
     kinds = {
         0x39000000: 1,
@@ -521,6 +555,17 @@ def decode_str_unsigned(word: int) -> tuple[int, int, int, int] | None:
     base = (word >> 5) & 0x1F
     immediate = ((word >> 10) & 0xFFF) * width
     return source, base, immediate, width
+
+
+def decode_stur_x(word: int) -> tuple[int, int, int] | None:
+    if word & 0xFFE00C00 != 0xF8000000:
+        return None
+    source = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = (word >> 12) & 0x1FF
+    if immediate & 0x100:
+        immediate -= 0x200
+    return source, base, immediate
 
 
 def decode_pair_q(word: int) -> tuple[str, int, int, int, int] | None:
@@ -3090,6 +3135,205 @@ def recover_driver_accelerator_layouts(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_channel_pool_geometry(code: bytes) -> dict[str, object]:
+    """Recover the three per-channel firmware resource-pool geometries."""
+    instructions = list(words(code))
+
+    def initializer(member: int) -> tuple[int, list[tuple[int, int]]]:
+        for index, (_offset, word) in enumerate(instructions):
+            move = decode_movz_w(word)
+            if move is not None and move[1] == member:
+                following = [
+                    item
+                    for _next_offset, next_word in instructions[index + 1 : index + 24]
+                    if (item := decode_movz_w(next_word)) is not None
+                ]
+                return index, following
+        raise ValueError(f"missing G17 channel resource pool {member:#x}")
+
+    _state_index, state_args = initializer(0x11C8)
+    if (2, 0xC0) not in state_args or (4, 9) not in state_args or (5, 1) not in state_args:
+        raise ValueError("unexpected G17 channel-state pool initializer")
+
+    uncached_index, uncached_args = initializer(0x1348)
+    cached_index, cached_args = initializer(0x1408)
+    if (4, 9) not in uncached_args or (5, 0) not in uncached_args:
+        raise ValueError("unexpected G17 uncached-channel pool initializer")
+    if (4, 9) not in cached_args or (5, 1) not in cached_args:
+        raise ValueError("unexpected G17 cached-channel pool initializer")
+
+    formula_window = instructions[max(0, uncached_index - 12) : uncached_index]
+    base = next(
+        (
+            value
+            for _offset, word in formula_window
+            if (move := decode_movz_w(word)) is not None
+            for register, value in (move,)
+            if register == 20
+        ),
+        None,
+    )
+    insertion = next(
+        (
+            decoded
+            for _offset, word in formula_window
+            if (decoded := decode_bfi_x(word)) is not None and decoded[0] == 20
+        ),
+        None,
+    )
+    if base != 0x70 or insertion is None or insertion[2:] != (7, 28):
+        raise ValueError("unexpected G17 channel-memory pool size formula")
+    if cached_index <= uncached_index:
+        raise ValueError("cached G17 channel pool precedes uncached pool")
+
+    return {
+        "channel_state": {
+            "host_pool_member": 0x11C8,
+            "element_bytes": 0xC0,
+            "caching": 1,
+        },
+        "uncached_memory": {
+            "host_pool_member": 0x1348,
+            "element_base_bytes": base,
+            "bytes_per_configured_queue": 1 << insertion[2],
+            "caching": 0,
+        },
+        "cached_memory": {
+            "host_pool_member": 0x1408,
+            "element_base_bytes": base,
+            "bytes_per_configured_queue": 1 << insertion[2],
+            "caching": 1,
+        },
+    }
+
+
+def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str, object]:
+    """Recover the shared state/control layout used by a G17 work channel."""
+    reset_instructions = list(words(reset_code))
+    write_instructions = list(words(write_code))
+
+    channel_loads = {
+        load[2]
+        for _offset, word in reset_instructions + write_instructions
+        if (load := decode_ldr_x(word)) is not None and load[1] == 0
+    }
+    expected_individual_cpu_members = {0x68}
+    if not expected_individual_cpu_members.issubset(channel_loads):
+        raise ValueError(f"missing G17 channel CPU bindings: {sorted(channel_loads)}")
+
+    state_pair = next(
+        (
+            pair
+            for _offset, word in reset_instructions
+            if (pair := decode_ldp_x(word)) is not None
+            and pair[2] == 0
+            and pair[3] == 0x58
+        ),
+        None,
+    )
+    if state_pair is None:
+        raise ValueError("missing G17 state/uncached CPU binding pair")
+
+    state_clear_offsets = {
+        pair[4]
+        for _offset, word in reset_instructions
+        if (pair := decode_pair_q(word)) is not None
+        and pair[0] == "store"
+        and pair[3] == 8
+    }
+    if state_clear_offsets != {0, 0x20, 0x40, 0x60, 0x80, 0xA0}:
+        raise ValueError(f"unexpected G17 channel-state clear: {sorted(state_clear_offsets)}")
+
+    state_stores = {
+        (store[2], store[3])
+        for _offset, word in reset_instructions
+        if (store := decode_str_unsigned(word)) is not None and store[1] == 9
+    }
+    state_stores.update(
+        (store[2], 8)
+        for _offset, word in reset_instructions
+        if (store := decode_stur_x(word)) is not None and store[1] == 9
+    )
+    expected_state_stores = {
+        (0x00, 8),
+        (0x08, 8),
+        (0x10, 8),
+        (0x18, 4),
+        (0x1C, 4),
+        (0x20, 4),
+        (0x24, 4),
+        (0x28, 4),
+        (0x44, 4),
+        (0x48, 4),
+        (0x84, 4),
+        (0x9C, 8),
+    }
+    if not expected_state_stores.issubset(state_stores):
+        raise ValueError(f"incomplete G17 channel-state stores: {sorted(state_stores)}")
+
+    uncached_stores = {
+        (store[2], store[3])
+        for _offset, word in reset_instructions
+        if (store := decode_str_unsigned(word)) is not None and store[1] == 10
+    }
+    expected_uncached_stores = {
+        (0x00, 4),
+        (0x10, 4),
+        (0x20, 4),
+        (0x30, 4),
+        (0x40, 4),
+        (0x50, 4),
+        (0x60, 4),
+    }
+    if not expected_uncached_stores.issubset(uncached_stores):
+        raise ValueError(f"incomplete G17 uncached-channel stores: {sorted(uncached_stores)}")
+
+    write_loads = {
+        (load[2], load[3])
+        for _offset, word in write_instructions
+        if (load := decode_load_unsigned(word)) is not None
+    }
+    expected_write_loads = {(0x00, 4), (0x40, 4), (0x54, 4), (0x60, 4), (0x68, 8)}
+    if not expected_write_loads.issubset(write_loads):
+        raise ValueError(f"incomplete G17 channel enqueue accesses: {sorted(write_loads)}")
+    if not any(
+        decoded[2] == 3
+        for _offset, word in write_instructions
+        if (decoded := decode_ubfiz_x(word)) is not None
+    ):
+        raise ValueError("G17 cached command-pointer array does not use an 8-byte stride")
+
+    return {
+        "host_channel_members": {
+            "state_cpu": 0x58,
+            "uncached_cpu": 0x60,
+            "cached_cpu": 0x68,
+            "ring_entries": 0x54,
+            "state_gpu": 0x80,
+            "uncached_gpu": 0x88,
+            "cached_gpu": 0x90,
+        },
+        "state": {
+            "bytes": 0xC0,
+            "uncached_gpu_address": 0x00,
+            "cached_gpu_address": 0x08,
+            "context_cookie": 0x10,
+            "mode": 0x28,
+            "value_048": 0x48,
+            "flag_084": 0x84,
+            "address_09c": 0x9C,
+        },
+        "uncached_control": {
+            "header_bytes": 0x70,
+            "read_index": 0x00,
+            "write_index": 0x40,
+            "sentinel": 0x50,
+            "ring_entries": 0x60,
+        },
+        "cached_command_pointer_bytes": 8,
+    }
+
+
 def recover_g17_handoff(code: bytes) -> dict[str, object]:
     magic = find_materialized_constant(code, INTERFACE_MAGIC)
     if magic:
@@ -3221,6 +3465,12 @@ def main() -> int:
         accelerator["bindings"] = recover_accelerator_ring_bindings(
             allocations, base_init_code
         )
+        _address, reset_channel_code = symbol_code(driver, RESET_CHANNEL_STATE)
+        _address, write_channel_code = symbol_code(
+            driver, WRITE_CHANNEL_COMMAND_POINTER
+        )
+        channels = recover_g17_channel_layout(reset_channel_code, write_channel_code)
+        channels["pools"] = recover_g17_channel_pool_geometry(allocation_code)
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
@@ -3297,6 +3547,7 @@ def main() -> int:
                 "runtime_controls": runtime_controls,
                 "runtime_initialization": runtime_initialization,
                 "accelerator": accelerator,
+                "channels": channels,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,
                 "uat_handoff": handoff,

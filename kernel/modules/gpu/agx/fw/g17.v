@@ -35,6 +35,11 @@ pub const g17_auxiliary_ring_addresses_offset = u64(0x1c0)
 pub const g17_auxiliary_ring_address_count = 8
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_device_control_entry_size = u64(0x40)
+pub const g17_channel_state_size = u64(0xc0)
+pub const g17_channel_control_header_size = u64(0x70)
+pub const g17_channel_pool_base_size = u64(0x70)
+pub const g17_channel_pool_queue_stride = u64(0x80)
+pub const g17_cached_command_pointer_size = u64(0x08)
 pub const g17_firmware_shared_data_size = u64(0x4c0)
 pub const g17_runtime_data_size = u64(0x1ca0)
 pub const g17_small_shared_data_size = u64(0x20)
@@ -690,6 +695,105 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		}
 	}
 	return true
+}
+
+// Each G17 work context owns a state object and separate cached/uncached
+// allocations. The state points at the GPU mappings; the host updates the
+// uncached indices and stores command addresses in the cached pointer array.
+@[packed]
+pub struct G17ChannelState {
+pub mut:
+	uncached_gpu_address u64
+	cached_gpu_address   u64
+	context_cookie       u64
+	control_018          u32
+	control_01c          u32
+	control_020          u32
+	sentinel_024         u32
+	mode_028             u32
+	opaque_02c           [0x18]u8
+	sentinel_044         u32
+	value_048            u32
+	opaque_04c           [0x38]u8
+	flag_084             u32
+	opaque_088           [0x14]u8
+	address_09c          u64
+	opaque_0a4           [0x1c]u8
+}
+
+@[packed]
+pub struct G17ChannelControl {
+pub mut:
+	read_index   u32
+	opaque_004   [0x0c]u8
+	control_010  u32
+	opaque_014   [0x0c]u8
+	control_020  u32
+	opaque_024   [0x0c]u8
+	control_030  u32
+	opaque_034   [0x0c]u8
+	write_index  u32
+	opaque_044   [0x0c]u8
+	sentinel_050 u32
+	opaque_054   [0x0c]u8
+	ring_entries u32
+	opaque_064   [0x0c]u8
+}
+
+@[packed]
+pub struct G17CachedCommandPointer {
+pub mut:
+	address u64
+}
+
+pub struct G17ChannelBindings {
+pub mut:
+	uncached_gpu_address u64
+	cached_gpu_address   u64
+	context_cookie       u64
+	value_048            u32
+	address_09c          u64
+	ring_entries         u32
+}
+
+// Reproduce AGXChannel::resetChannelState for the checked shared fields. The
+// platform-derived value/address stay explicit so an unknown default cannot
+// accidentally be submitted to firmware.
+pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
+	uncached_buffer voidptr, uncached_size u64, cached_buffer voidptr, cached_size u64,
+	bindings G17ChannelBindings) bool {
+	if state_buffer == unsafe { nil } || state_size != g17_channel_state_size
+		|| uncached_buffer == unsafe { nil } || uncached_size < g17_channel_control_header_size
+		|| cached_buffer == unsafe { nil } || bindings.uncached_gpu_address == 0
+		|| bindings.cached_gpu_address == 0 || bindings.ring_entries == 0
+		|| u64(bindings.ring_entries) > cached_size / g17_cached_command_pointer_size {
+		return false
+	}
+
+	unsafe {
+		C.memset(state_buffer, 0, state_size)
+		C.memset(uncached_buffer, 0, g17_channel_control_header_size)
+		C.memset(cached_buffer, 0, u64(bindings.ring_entries) * g17_cached_command_pointer_size)
+		mut state := &G17ChannelState(state_buffer)
+		state.uncached_gpu_address = bindings.uncached_gpu_address
+		state.cached_gpu_address = bindings.cached_gpu_address
+		state.context_cookie = bindings.context_cookie
+		state.sentinel_024 = ~u32(0)
+		state.mode_028 = 4
+		state.sentinel_044 = ~u32(0)
+		state.value_048 = bindings.value_048
+		state.address_09c = bindings.address_09c
+		mut control := &G17ChannelControl(uncached_buffer)
+		control.sentinel_050 = ~u32(0)
+		control.ring_entries = bindings.ring_entries
+	}
+	return true
+}
+
+pub fn validate_g17_channel_layouts() bool {
+	return sizeof(G17ChannelState) == g17_channel_state_size
+		&& sizeof(G17ChannelControl) == g17_channel_control_header_size
+		&& sizeof(G17CachedCommandPointer) == g17_cached_command_pointer_size
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.

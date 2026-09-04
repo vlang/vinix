@@ -62,9 +62,25 @@ def umaddl(destination: int, first: int, second: int, addend: int = 31) -> int:
     return 0x9BA00000 | second << 16 | addend << 10 | first << 5 | destination
 
 
+def bfi_x(destination: int, source: int, lsb: int, width: int) -> int:
+    immr = (-lsb) & 0x3F
+    imms = width - 1
+    return 0xB3400000 | immr << 16 | imms << 10 | source << 5 | destination
+
+
+def ubfiz_x(destination: int, source: int, lsb: int, width: int) -> int:
+    immr = (-lsb) & 0x3F
+    imms = width - 1
+    return 0xD3400000 | immr << 16 | imms << 10 | source << 5 | destination
+
+
 def str_unsigned(source: int, base: int, immediate: int, width: int) -> int:
     opcode = {1: 0x39000000, 2: 0x79000000, 4: 0xB9000000, 8: 0xF9000000}[width]
     return opcode | (immediate // width) << 10 | base << 5 | source
+
+
+def stur_x(source: int, base: int, immediate: int) -> int:
+    return 0xF8000000 | (immediate & 0x1FF) << 12 | base << 5 | source
 
 
 def pair_q(kind: str, first: int, second: int, base: int, immediate: int) -> int:
@@ -1036,6 +1052,62 @@ class RecoverG17AbiTests(unittest.TestCase):
             pair_q("store", 2, 3, 9, 0x20),
         )
         self.assertEqual(recover_g17_abi.recover_vector_copy_size(code), 0x40)
+
+    def test_recovers_g17_channel_pool_geometry(self) -> None:
+        code = encode(
+            movz_w(8, 0x11C8),
+            movz_w(2, 0xC0),
+            movz_w(4, 9),
+            movz_w(5, 1),
+            movz_w(20, 0x70),
+            bfi_x(20, 8, 7, 28),
+            movz_w(8, 0x1348),
+            movz_w(4, 9),
+            movz_w(5, 0),
+            movz_w(8, 0x1408),
+            movz_w(4, 9),
+            movz_w(5, 1),
+        )
+        pools = recover_g17_abi.recover_g17_channel_pool_geometry(code)
+        self.assertEqual(pools["channel_state"]["element_bytes"], 0xC0)
+        self.assertEqual(pools["uncached_memory"]["element_base_bytes"], 0x70)
+        self.assertEqual(pools["cached_memory"]["bytes_per_configured_queue"], 0x80)
+
+    def test_recovers_g17_channel_layout(self) -> None:
+        reset_code = encode(
+            ldp_x(9, 10, 0, 0x58),
+            ldr_x(8, 0, 0x68),
+            *(pair_q("store", 0, 0, 8, offset)
+              for offset in (0, 0x20, 0x40, 0x60, 0x80, 0xA0)),
+            *(str_unsigned(8, 9, offset, width)
+              for offset, width in (
+                  (0x00, 8), (0x08, 8), (0x10, 8), (0x18, 4),
+                  (0x1C, 4), (0x20, 4), (0x24, 4), (0x28, 4),
+                  (0x44, 4), (0x48, 4), (0x84, 4),
+              )),
+            stur_x(8, 9, 0x9C),
+            *(str_unsigned(8, 10, offset, 4)
+              for offset in (0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60)),
+        )
+        write_code = encode(
+            ldr_x(8, 0, 0x60),
+            ldr_w(9, 8, 0x60),
+            ldr_w(10, 8, 0x40),
+            ldr_w(11, 8, 0x00),
+            ldr_w(9, 0, 0x54),
+            ldr_x(9, 0, 0x68),
+            ubfiz_x(10, 8, 3, 61),
+        )
+        channel = recover_g17_abi.recover_g17_channel_layout(
+            reset_code, write_code
+        )
+        self.assertEqual(channel["state"]["bytes"], 0xC0)
+        self.assertEqual(channel["uncached_control"]["write_index"], 0x40)
+        self.assertEqual(channel["cached_command_pointer_bytes"], 8)
+
+    def test_rejects_incomplete_g17_channel_layout(self) -> None:
+        with self.assertRaisesRegex(ValueError, "CPU bindings"):
+            recover_g17_abi.recover_g17_channel_layout(b"", b"")
 
     def test_recovers_g17_handoff_layout(self) -> None:
         ppl_magic = 0x4B1D000000000002
