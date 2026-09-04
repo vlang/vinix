@@ -33,14 +33,23 @@ __global (
 // Create a new GEM object of the given size.
 // Allocates physical pages and maps them to the higher half.
 pub fn create(size u64) ?&GemObject {
+	return create_aligned(size, page_size)
+}
+
+// Create a GEM object with a physical and size alignment suitable for the
+// target device. AGX callers use 16 KiB; ordinary DRM users retain 4 KiB.
+pub fn create_aligned(size u64, alignment u64) ?&GemObject {
 	if size == 0 {
 		return none
 	}
+	if alignment < page_size || alignment & (alignment - 1) != 0 || alignment % page_size != 0 {
+		return none
+	}
 
-	aligned_size := lib.align_up(size, page_size)
+	aligned_size := lib.align_up(size, alignment)
 	pages := aligned_size / page_size
 
-	phys := memory.pmm_alloc(pages)
+	phys := memory.pmm_alloc_aligned(pages, alignment / page_size)
 	if phys == 0 {
 		return none
 	}

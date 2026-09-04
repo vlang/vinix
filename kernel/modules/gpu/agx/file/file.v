@@ -11,6 +11,7 @@ import drm.ioctl
 import drm.gem
 import drm.syncobj
 import gpu.agx.mmu
+import gpu.agx.pgtable
 import gpu.agx.workqueue
 import gpu.agx.event
 import gpu.agx.queue
@@ -198,7 +199,7 @@ pub fn (f &GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 pub fn (f &GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	mut gc := unsafe { data }
 
-	obj := gem.create(gc.size) or {
+	obj := gem.create_aligned(gc.size, pgtable.uat_pgsz) or {
 		return -12 // ENOMEM
 	}
 
@@ -246,11 +247,10 @@ pub fn (f &GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 
 	// Map the GEM object's physical pages into the VM at the requested address
 	mut pt := unsafe { ctx.pgtable }
-	if !pt.map(bind.addr, obj.phys_addr + bind.offset, bind.range, 0x43) {
+	if !pt.map(bind.addr, obj.phys_addr + bind.offset, bind.range,
+		pgtable.gpu_prot_gpu_shared_rw) {
 		return -12 // ENOMEM
 	}
-	mut m := unsafe { mgr }
-	m.flush(ctx)
 
 	return 0
 }

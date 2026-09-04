@@ -51,7 +51,7 @@ pub mut:
 // Create a new work queue with the given ID, VM context, and priority level.
 pub fn new_workqueue(id u32, vm_id u32, priority u32) ?&WorkQueue {
 	// Allocate ring buffer physical memory (one page is sufficient)
-	ring_phys := u64(memory.pmm_alloc(1))
+	ring_phys := u64(memory.pmm_alloc_aligned(4, 4))
 	if ring_phys == 0 {
 		C.printf(c'workqueue: failed to allocate ring buffer for queue %d\n', id)
 		return none
@@ -59,7 +59,7 @@ pub fn new_workqueue(id u32, vm_id u32, priority u32) ?&WorkQueue {
 
 	// Zero-initialise ring buffer
 	unsafe {
-		C.memset(voidptr(ring_phys + higher_half), 0, 4096)
+		C.memset(voidptr(ring_phys + higher_half), 0, 16384)
 	}
 
 	mut wq := &WorkQueue{
@@ -190,7 +190,7 @@ pub fn (mut wq WorkQueue) destroy() {
 
 	// Free ring buffer physical memory
 	if wq.ring_phys != 0 {
-		memory.pmm_free(voidptr(wq.ring_phys), 1)
+		memory.pmm_free(voidptr(wq.ring_phys), 4)
 		wq.ring_phys = 0
 	}
 }

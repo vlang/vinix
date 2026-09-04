@@ -1,10 +1,10 @@
 module pgtable
 
 // Apple GPU UAT (Unified Address Translation) page table management
-// ARM64 format with 16KB granule, 3-level page tables, 39-bit IAS
+// ARM64 format with a 16 KiB granule and three page-table levels.
 // 2048 PTEs per page (16KB / 8 bytes per PTE)
-// Each level indexes 11 bits: L1[38:28], L2[27:17], L3[16:14] but since
-// GPU uses 16KB granule the leaf level covers bits [24:14] with 2048 entries.
+// The table shifts are 36, 25, and 14. G13/G14 use a 39-bit input address
+// space (8 populated root entries), while G15+ uses 42 bits (64 entries).
 // Translated from the Asahi Linux pgtable.rs / mmu.rs page table code.
 
 import memory
@@ -16,9 +16,10 @@ pub const uat_pgsz = u64(16384)
 pub const uat_pg_shift = u32(14)
 pub const uat_pg_mask = uat_pgsz - 1
 pub const uat_levels = 3
-pub const uat_ias = 39
 pub const uat_ptes_per_page = u32(2048) // 16384 / 8
 pub const uat_pte_bits = u32(11) // log2(2048)
+const uat_root_shift = u32(36)
+const uat_middle_shift = u32(25)
 
 // --- PTE descriptor bits (ARM64 stage-1 format) ---
 pub const uat_pte_valid = u64(1) << 0
@@ -27,6 +28,7 @@ pub const uat_pte_page = u64(3) // Bits [1:0] = 0b11 for L3 page descriptors
 
 // --- PTE attribute bits ---
 pub const uat_pte_af = u64(1) << 10 // Access Flag (must be set)
+pub const uat_pte_ng = u64(1) << 11 // ASID-local instead of global
 pub const uat_pte_sh_inner = u64(3) << 8 // Inner Shareable
 pub const uat_pte_sh_outer = u64(2) << 8 // Outer Shareable
 
@@ -38,6 +40,7 @@ pub const uat_pte_ap_gpu_only = u64(0b10) << 6 // GPU read-only
 // Execute-never bits
 pub const uat_pte_pxn = u64(1) << 53 // Privileged Execute Never
 pub const uat_pte_uxn = u64(1) << 54 // Unprivileged Execute Never
+pub const uat_pte_os = u64(1) << 55 // Mapping is owned by the host OS
 
 // Memory attribute index field (AttrIndx[4:2])
 pub const uat_attrindex_shift = u64(2)
@@ -45,13 +48,18 @@ pub const uat_memattr_normal_cached = u64(0) << 2 // Index 0: Write-Back cached
 pub const uat_memattr_device = u64(1) << 2 // Index 1: Device-nGnRnE
 pub const uat_memattr_normal_uncached = u64(2) << 2 // Index 2: Normal non-cacheable
 
-// Composite GPU protection flags for convenience
-pub const gpu_prot_fw_gpu = uat_pte_ap_fw_gpu | uat_pte_sh_inner | uat_pte_af
-pub const gpu_prot_fw_only = uat_pte_ap_fw_only | uat_pte_sh_inner | uat_pte_af | uat_pte_uxn
-pub const gpu_prot_gpu_ro = uat_pte_ap_gpu_only | uat_pte_sh_inner | uat_pte_af
-
-// Address mask: extract physical address from a PTE (bits [47:14] for 16KB granule)
-pub const pte_addr_mask = u64(0x0000_ffff_ffff_c000)
+// Composite mappings used by the AGX driver. These match Asahi's UAT
+// protection encoding rather than the CPU's superficially similar AP bits.
+pub const gpu_prot_fw_gpu_cached_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
+	uat_pte_ap_fw_gpu | uat_memattr_normal_cached | uat_pte_af
+pub const gpu_prot_fw_gpu_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
+	uat_pte_ap_fw_gpu | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_private_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only |
+	uat_memattr_normal_cached | uat_pte_af
+pub const gpu_prot_gpu_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_gpu_only |
+	uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_gpu_shared_ro = uat_pte_os | uat_pte_ap_gpu_only |
+	uat_memattr_normal_uncached | uat_pte_af
 
 // Number of 4KB kernel pages required for one 16KB GPU page table page
 const kernel_pages_per_uat_page = u64(4) // 4 * 4096 = 16384
@@ -60,16 +68,20 @@ const kernel_pages_per_uat_page = u64(4) // 4 * 4096 = 16384
 
 pub struct UatPgtable {
 pub mut:
-	l1      &u64     = unsafe { nil } // L1 root table (physical address)
-	l1_phys u64                        // Physical address of L1 root
-	lock    klock.Lock
+	l1         &u64     = unsafe { nil } // Root table physical address
+	l1_phys    u64
+	ias        u32
+	oas_mask   u64
+	non_global bool
+	owns_root  bool
+	lock       klock.Lock
 }
 
 // Allocate a single 16KB-aligned page table page.
 // The kernel PMM uses 4KB pages, so we allocate 4 contiguous pages
 // and zero them out (pmm_alloc already zeroes memory).
 pub fn alloc_table_page() ?&u64 {
-	ptr := memory.pmm_alloc(kernel_pages_per_uat_page)
+	ptr := memory.pmm_alloc_aligned(kernel_pages_per_uat_page, kernel_pages_per_uat_page)
 	if ptr == 0 {
 		return none
 	}
@@ -85,18 +97,45 @@ pub fn free_table_page(page &u64) {
 }
 
 // Allocate a new UAT page table with an empty L1 root.
-pub fn new_pgtable() ?&UatPgtable {
+pub fn new_pgtable(ias u32, oas u32) ?&UatPgtable {
+	if ias < 37 || ias > 42 || oas < uat_pg_shift || oas > 48 {
+		return none
+	}
 	l1 := alloc_table_page() or { return none }
 
 	return &UatPgtable{
-		l1:      l1
-		l1_phys: u64(l1)
+		l1:         l1
+		l1_phys:    u64(l1)
+		ias:        ias
+		oas_mask:   (u64(1) << oas) - 1
+		non_global: true
+		owns_root:  true
+	}
+}
+
+// Attach to the firmware/bootloader-reserved TTBR1 root. Existing entries
+// are deliberately preserved because they contain firmware-owned mappings.
+pub fn new_pgtable_with_root(root_phys u64, ias u32, oas u32) ?&UatPgtable {
+	if root_phys & uat_pg_mask != 0 || ias < 37 || ias > 42 || oas < uat_pg_shift
+		|| oas > 48 {
+		return none
+	}
+	return &UatPgtable{
+		l1:         unsafe { &u64(root_phys) }
+		l1_phys:    root_phys
+		ias:        ias
+		oas_mask:   (u64(1) << oas) - 1
+		non_global: false
+		owns_root:  false
 	}
 }
 
 // Destroy a page table, freeing the L1 root and all referenced L2/L3 tables.
 pub fn destroy(pt &UatPgtable) {
 	if pt == unsafe { nil } || pt.l1 == unsafe { nil } {
+		return
+	}
+	if !pt.owns_root {
 		return
 	}
 
@@ -112,7 +151,7 @@ pub fn destroy(pt &UatPgtable) {
 			continue
 		}
 
-		l2_phys := l1_entry & pte_addr_mask
+		l2_phys := l1_entry & pt.oas_mask & ~uat_pg_mask
 		l2_virt := unsafe { &u64(l2_phys + higher_half) }
 
 		// Walk all L2 entries and free any L3 tables
@@ -125,42 +164,35 @@ pub fn destroy(pt &UatPgtable) {
 				continue
 			}
 
-			l3_phys := l2_entry & pte_addr_mask
+			l3_phys := l2_entry & pt.oas_mask & ~uat_pg_mask
 			free_table_page(unsafe { &u64(l3_phys) })
 		}
 
 		free_table_page(unsafe { &u64(l2_phys) })
 	}
 
-	// Free the L1 root itself
 	free_table_page(pt.l1)
 }
 
 // Walk the page table for a given IOVA and return a pointer to the leaf PTE.
 // If `allocate` is true, intermediate table levels are created as needed.
 //
-// Address decomposition for 16KB granule, 3-level, 39-bit IAS:
-//   L1 index: bits [38:28]  (11 bits, 2048 entries)
-//   L2 index: bits [27:17]  (11 bits, 2048 entries)
-//   L3 index: bits [16:14]  (actually bits [24:14] = 11 bits for 2-level leaf)
-//
-// For the M1 GPU the UAT uses a 2-level scheme within 39 bits:
-//   L1 index: bits [38:25]  (top 14 bits, but only 11 used with 2048 entries)
-//   L2 index: bits [24:14]  (11 bits, 2048 entries, leaf level)
-//
-// The 3-level walk is kept for correctness with the full 39-bit range.
+// Address decomposition for the three 16 KiB UAT levels:
+//   root:   bits [IAS-1:36] (8 entries at 39-bit IAS, 64 at 42-bit IAS)
+//   middle: bits [35:25]
+//   leaf:   bits [24:14]
 pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
-	// Validate IOVA is within the 39-bit input address space
-	if iova >> uat_ias != 0 && iova >> uat_ias != (u64(1) << (64 - uat_ias)) - 1 {
-		// Allow both positive (user) and sign-extended negative (kernel) addresses
+	// Accept lower addresses and correctly sign-extended TTBR1 addresses only.
+	upper := iova >> pt.ias
+	upper_mask := (u64(1) << (64 - pt.ias)) - 1
+	if upper != 0 && upper != upper_mask {
+		return none
 	}
+	masked := iova & ((u64(1) << pt.ias) - 1)
 
-	// Level 1 index: bits [38:28]
-	l1_idx := (iova >> 28) & u64(uat_ptes_per_page - 1)
-	// Level 2 index: bits [27:17]
-	l2_idx := (iova >> 17) & u64(uat_ptes_per_page - 1)
-	// Level 3 index: bits [24:14] (11 bits for 2048 entries)
-	l3_idx := (iova >> uat_pg_shift) & u64(uat_ptes_per_page - 1)
+	l1_idx := (masked >> uat_root_shift) & u64(uat_ptes_per_page - 1)
+	l2_idx := (masked >> uat_middle_shift) & u64(uat_ptes_per_page - 1)
+	l3_idx := (masked >> uat_pg_shift) & u64(uat_ptes_per_page - 1)
 
 	// --- Walk L1 ---
 	l1_virt := unsafe { &u64(u64(pt.l1) + higher_half) }
@@ -169,7 +201,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 	mut l2_phys := u64(0)
 
 	if l1_entry & uat_pte_valid != 0 {
-		l2_phys = l1_entry & pte_addr_mask
+		l2_phys = l1_entry & pt.oas_mask & ~uat_pg_mask
 	} else {
 		if !allocate {
 			return none
@@ -190,7 +222,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 	if l2_entry & uat_pte_valid != 0 {
 		// Check if this is a table descriptor pointing to L3
 		if l2_entry & uat_pte_table != 0 {
-			l3_phys = l2_entry & pte_addr_mask
+			l3_phys = l2_entry & pt.oas_mask & ~uat_pg_mask
 		} else {
 			// Block entry at L2 -- return pointer to L2 entry itself
 			return unsafe { &u64(u64(&l2_virt[l2_idx])) }
@@ -228,7 +260,11 @@ pub fn (mut pt UatPgtable) map_page(iova u64, phys u64, prot u64) bool {
 	pte_ptr := pt.get_pte(iova, true) or { return false }
 
 	unsafe {
-		*pte_ptr = (phys & pte_addr_mask) | prot | uat_pte_valid | uat_pte_page | uat_pte_af
+		mut descriptor := (phys & pt.oas_mask & ~uat_pg_mask) | prot | uat_pte_page | uat_pte_af
+		if pt.non_global {
+			descriptor |= uat_pte_ng
+		}
+		*pte_ptr = descriptor
 	}
 	return true
 }
@@ -292,5 +328,5 @@ pub fn (pt &UatPgtable) translate(iova u64) ?u64 {
 	if pte_val & uat_pte_valid == 0 {
 		return none
 	}
-	return (pte_val & pte_addr_mask) | (iova & uat_pg_mask)
+	return (pte_val & pt.oas_mask & ~uat_pg_mask) | (iova & uat_pg_mask)
 }

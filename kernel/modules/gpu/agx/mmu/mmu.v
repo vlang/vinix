@@ -1,61 +1,63 @@
 @[has_globals]
 module mmu
 
-// Apple GPU UAT (Unified Address Translation) context management
-// Manages 64 hardware VM contexts via the TTBAT (Translation Table Base
-// Address Table). Each context has its own UatPgtable for GPU-side address
-// translation. A shared kernel page table is mapped into every context.
+// Apple GPU UAT (Unified Address Translation) context management.
 //
-// Firmware coordination uses a Peterson-style mutual-exclusion handoff
-// region in shared memory. The AP (application processor) and FW each
-// have a flag; the `turn` variable breaks ties.
-//
-// Translated from the Asahi Linux mmu.rs driver code.
+// The GPU firmware owns the hardware context switch. The application
+// processor supplies two TTBRs per context in a reserved 64-entry table and
+// coordinates changes through the reserved uPPL handoff structure. UAT page
+// tables use a 16 KiB granule and are implemented in pgtable.v.
 
 import gpu.agx.pgtable
-import memory
 import klock
 import katomic
-import lib
 import aarch64.cpu
 
-// --- VA range constants ---
-
-// User (per-context) VA range: pages start at 0x4000, up to 2^39
 pub const uat_num_contexts = 64
+pub const uat_kernel_flush_slot = 64
 pub const uat_user_va_start = u64(0x4000)
 pub const uat_user_va_end = u64(1) << 39
-
-// Kernel (shared / firmware) VA range
 pub const uat_kernel_va_start = u64(0xffffffa000000000)
 pub const uat_kernel_va_end = u64(0xffffffb000000000)
 
-// TTBAT entry layout: each slot is 16 bytes (phys[63:0] + cfg[63:0])
-const ttbat_slot_size = u64(16)
+const ttbr_valid = u64(1)
+const ttbr_asid_shift = u32(48)
+const ppl_magic = u64(0x4b1d000000000002)
+const handoff_size = u64(0x648)
 
-// Handoff flush state values
-const handoff_flush_idle = u32(0)
-const handoff_flush_pending = u32(1)
-const handoff_flush_processing = u32(2)
-const handoff_flush_done = u32(3)
+@[packed]
+pub struct UatFlushInfo {
+pub mut:
+	state u64
+	addr  u64
+	size  u64
+}
 
-// --- Handoff region (shared memory with GPU firmware) ---
-
-// Peterson-style mutual exclusion between AP and firmware.
-// Both sides set their flag and yield turn to the other; the one
-// whose turn it is *not* gets to proceed.
+// Byte-exact firmware ABI. In particular, the two lock flags are bytes, the
+// flush array has an extra kernel slot (index 64), and unk3 is at 0x640.
 @[packed]
 pub struct UatHandoff {
 pub mut:
-	lock_ap     u32 // AP interest flag
-	lock_fw     u32 // FW interest flag
-	turn        u32 // Whose turn to wait (0 = AP waits, 1 = FW waits)
-	cur_slot    u32 // Current slot being flushed
-	flush_state u32 // Flush state machine
-	pad         [3]u32
+	magic_ap u64
+	magic_fw u64
+	lock_ap  u8
+	lock_fw  u8
+	pad_12   [2]u8
+	turn     u32
+	cur_slot u32
+	pad_1c   u32
+	flush    [uat_num_contexts + 1]UatFlushInfo
+	unk2     u8
+	pad_639  [7]u8
+	unk3     u64
 }
 
-// --- VM context ---
+@[packed]
+struct SlotTtbs {
+mut:
+	ttb0 u64
+	ttb1 u64
+}
 
 pub struct UatContext {
 pub mut:
@@ -63,74 +65,194 @@ pub mut:
 	pgtable &pgtable.UatPgtable = unsafe { nil }
 	active  bool
 	lock    klock.Lock
-	vm_id   u32 // Firmware-visible VM identifier
+	vm_id   u32
 }
-
-// --- UAT manager ---
 
 pub struct UatManager {
 pub mut:
-	contexts       [uat_num_contexts]&UatContext
-	kernel_pgtable &pgtable.UatPgtable = unsafe { nil }
-	handoff        &UatHandoff         = unsafe { nil }
-	ttbat_base     u64 // Physical / MMIO base of the TTBAT
-	lock           klock.Lock
+	contexts            [uat_num_contexts]&UatContext
+	kernel_lower_pgtable &pgtable.UatPgtable = unsafe { nil }
+	kernel_pgtable       &pgtable.UatPgtable = unsafe { nil }
+	handoff              &UatHandoff         = unsafe { nil }
+	ttbs                 &SlotTtbs           = unsafe { nil }
+	ttbs_base            u64
+	handoff_base         u64
+	pagetables_base      u64
+	ias                  u32
+	oas                  u32
+	map_kernel_to_user   bool
+	handoff_initialized  bool
+	lock                 klock.Lock
 }
 
 __global (
 	uat_mgr = unsafe { &UatManager(nil) }
 )
 
-// Create and initialise the global UAT manager.
-// `ttbat_base` is the physical address of the hardware TTBAT register block.
-pub fn new_manager(ttbat_base u64) ?&UatManager {
-	// Allocate the kernel (shared) page table
-	kpt := pgtable.new_pgtable() or {
-		C.printf(c'uat mmu: failed to allocate kernel page table\n')
+// Attach to bootloader-reserved UAT structures. Nothing is written here;
+// handoff initialization must happen only after the GPU RTKit firmware is up.
+pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32, oas u32,
+	map_kernel_to_user bool) ?&UatManager {
+	if ttbs_base & pgtable.uat_pg_mask != 0 || handoff_base & pgtable.uat_pg_mask != 0
+		|| pagetables_base & pgtable.uat_pg_mask != 0 {
+		C.printf(c'uat mmu: reserved regions are not 16 KiB aligned\n')
+		return none
+	}
+	if sizeof(UatHandoff) != handoff_size || sizeof(SlotTtbs) != 16 {
+		C.printf(c'uat mmu: firmware structure layout mismatch\n')
 		return none
 	}
 
-	// Allocate the handoff region (must be GPU-accessible shared memory)
-	// One 4KB page is sufficient for the handoff structure.
-	handoff_phys := memory.pmm_alloc(1)
-	if handoff_phys == 0 {
-		C.printf(c'uat mmu: failed to allocate handoff region\n')
+	lower := pgtable.new_pgtable(ias, oas) or {
+		C.printf(c'uat mmu: failed to allocate lower kernel page table\n')
 		return none
 	}
-	handoff_ptr := unsafe { &UatHandoff(u64(handoff_phys) + higher_half) }
-
-	// Zero-initialise handoff (pmm_alloc already zeroes, but be explicit)
-	unsafe {
-		C.memset(voidptr(handoff_ptr), 0, sizeof(UatHandoff))
+	upper := pgtable.new_pgtable_with_root(pagetables_base, ias, oas) or {
+		pgtable.destroy(lower)
+		C.printf(c'uat mmu: invalid reserved TTBR1 page table\n')
+		return none
 	}
 
 	mgr := &UatManager{
-		kernel_pgtable: kpt
-		handoff:        handoff_ptr
-		ttbat_base:     ttbat_base
+		kernel_lower_pgtable: lower
+		kernel_pgtable:       upper
+		handoff:              unsafe { &UatHandoff(handoff_base + higher_half) }
+		ttbs:                 unsafe { &SlotTtbs(ttbs_base + higher_half) }
+		ttbs_base:            ttbs_base
+		handoff_base:         handoff_base
+		pagetables_base:      pagetables_base
+		ias:                  ias
+		oas:                  oas
+		map_kernel_to_user:   map_kernel_to_user
 	}
-
 	uat_mgr = mgr
 
-	C.printf(c'uat mmu: initialised, %d VM contexts, ttbat @ 0x%llx\n', uat_num_contexts,
-		ttbat_base)
-
+	C.printf(c'uat mmu: attached IAS=%u OAS=%u TTBs=0x%llx handoff=0x%llx TTBR1=0x%llx\n',
+		ias, oas, ttbs_base, handoff_base, pagetables_base)
 	return mgr
 }
 
-// Allocate a free VM context. Returns a new UatContext with its own page table.
-// Context 0 is reserved for the kernel.
+fn shared_store8(mut target &u8, value u8) {
+	unsafe {
+		*target = value
+	}
+	cpu.dmb_sy()
+}
+
+fn shared_load8(target &u8) u8 {
+	cpu.dmb_sy()
+	return unsafe { *target }
+}
+
+// Dekker lock shared with the GPU firmware. Barriers around byte accesses are
+// required: widening either flag to u32 would overwrite the peer's byte.
+pub fn handoff_lock(h &UatHandoff) {
+	if h == unsafe { nil } {
+		return
+	}
+	unsafe {
+		mut hp := h
+		shared_store8(mut &hp.lock_ap, 1)
+	}
+	for shared_load8(&h.lock_fw) != 0 {
+		if katomic.load(&h.turn) != 0 {
+			unsafe {
+				mut hp := h
+				shared_store8(mut &hp.lock_ap, 0)
+			}
+			for katomic.load(&h.turn) != 0 {
+				cpu.isb()
+			}
+			unsafe {
+				mut hp := h
+				shared_store8(mut &hp.lock_ap, 1)
+			}
+		}
+	}
+	cpu.dmb_sy()
+}
+
+pub fn handoff_unlock(h &UatHandoff) {
+	if h == unsafe { nil } {
+		return
+	}
+	unsafe {
+		mut hp := h
+		katomic.store(mut &hp.turn, u32(1))
+		shared_store8(mut &hp.lock_ap, 0)
+	}
+	cpu.sev()
+}
+
+// Complete the uPPL magic exchange and publish the initial context roots.
+// The firmware must already be running when this is called.
+pub fn (mut mgr UatManager) initialize_handoff() bool {
+	if mgr.handoff_initialized {
+		return true
+	}
+	if mgr.handoff == unsafe { nil } || mgr.ttbs == unsafe { nil } {
+		return false
+	}
+	unsafe {
+		mut h := mgr.handoff
+		katomic.store(mut &h.magic_ap, ppl_magic)
+		katomic.store(mut &h.cur_slot, u32(0))
+		katomic.store(mut &h.unk3, u64(0))
+	}
+	cpu.dsb_sy()
+
+	// Drop the lock periodically so firmware can finish its side of init.
+	mut ready := false
+	for _ in 0 .. 1000 {
+		handoff_lock(mgr.handoff)
+		ready = katomic.load(&mgr.handoff.magic_fw) == ppl_magic
+		handoff_unlock(mgr.handoff)
+		if ready {
+			break
+		}
+		for _ in 0 .. 10000 {
+			cpu.isb()
+		}
+	}
+	if !ready {
+		C.printf(c'uat mmu: firmware handoff magic timed out\n')
+		return false
+	}
+
+	for i := 0; i <= uat_num_contexts; i++ {
+		unsafe {
+			mut h := mgr.handoff
+			katomic.store(mut &h.flush[i].state, u64(0))
+			katomic.store(mut &h.flush[i].addr, u64(0))
+			katomic.store(mut &h.flush[i].size, u64(0))
+		}
+	}
+	cpu.dsb_sy()
+
+	handoff_lock(mgr.handoff)
+	unsafe {
+		mut slots := mgr.ttbs
+		slots[0].ttb0 = mgr.kernel_lower_pgtable.l1_phys | ttbr_valid
+		slots[0].ttb1 = mgr.kernel_pgtable.l1_phys | ttbr_valid
+		for i := 1; i < uat_num_contexts; i++ {
+			slots[i].ttb0 = 0
+			slots[i].ttb1 = 0
+		}
+	}
+	cpu.dsb_sy()
+	handoff_unlock(mgr.handoff)
+	mgr.handoff_initialized = true
+	return true
+}
+
 pub fn (mut mgr UatManager) create_context() ?&UatContext {
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
 	}
-
-	// Scan for a free slot (skip slot 0, reserved for kernel)
 	for i := u32(1); i < uat_num_contexts; i++ {
 		if mgr.contexts[i] == unsafe { nil } {
-			pt := pgtable.new_pgtable() or { return none }
-
+			pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
 			ctx := &UatContext{
 				id:      i
 				pgtable: pt
@@ -138,220 +260,103 @@ pub fn (mut mgr UatManager) create_context() ?&UatContext {
 				vm_id:   i
 			}
 			mgr.contexts[i] = ctx
-
-			C.printf(c'uat mmu: created context %d\n', i)
 			return ctx
 		}
 	}
-
-	C.printf(c'uat mmu: no free VM contexts\n')
 	return none
 }
 
-// Destroy a VM context: unbind from TTBAT, free page tables, release slot.
 pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
-	if ctx == unsafe { nil } {
+	if ctx == unsafe { nil } || ctx.id == 0 || ctx.id >= uat_num_contexts {
 		return
 	}
-
-	id := ctx.id
-	if id == 0 || id >= uat_num_contexts {
-		return
-	}
-
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
 	}
-
-	// Unbind from hardware
 	mgr.unbind_context(ctx)
-
-	// Free page tables
 	if ctx.pgtable != unsafe { nil } {
 		pgtable.destroy(ctx.pgtable)
 	}
-
-	mgr.contexts[id] = unsafe { nil }
-
-	C.printf(c'uat mmu: destroyed context %d\n', id)
+	mgr.contexts[ctx.id] = unsafe { nil }
 }
 
-// Write the page table root into the hardware TTBAT slot for this context.
-// This makes the GPU firmware aware of the context's address space.
 pub fn (mgr &UatManager) bind_context(ctx &UatContext) {
-	if ctx == unsafe { nil } || ctx.pgtable == unsafe { nil } {
+	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.pgtable == unsafe { nil }
+		|| ctx.id >= uat_num_contexts {
 		return
 	}
-
-	slot := ctx.id
-	if slot >= uat_num_contexts {
-		return
-	}
-
-	root_phys := ctx.pgtable.l1_phys
-
-	// Each TTBAT slot: [63:0] = TTBR value (physical address | attributes)
-	slot_addr := mgr.ttbat_base + u64(slot) * ttbat_slot_size
-	slot_virt := slot_addr + higher_half
-
-	unsafe {
-		// Write TTBR0 for this slot (physical base with valid indicator)
-		mut ttbr_ptr := &u64(slot_virt)
-		*ttbr_ptr = root_phys | 1 // Valid bit
-
-		// Write TTBR1 / config word (kernel page table for shared mappings)
-		mut cfg_ptr := &u64(slot_virt + 8)
-		*cfg_ptr = mgr.kernel_pgtable.l1_phys | 1
-	}
-
-	// Ensure the write is visible before firmware reads it
-	cpu.dsb_sy()
-
-	C.printf(c'uat mmu: bound context %d, root=0x%llx\n', slot, root_phys)
-}
-
-// Clear the TTBAT entry, detaching this context from the hardware.
-pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
-	if ctx == unsafe { nil } {
-		return
-	}
-
-	slot := ctx.id
-	if slot >= uat_num_contexts {
-		return
-	}
-
-	slot_addr := mgr.ttbat_base + u64(slot) * ttbat_slot_size
-	slot_virt := slot_addr + higher_half
-
-	unsafe {
-		mut ttbr_ptr := &u64(slot_virt)
-		*ttbr_ptr = 0
-		mut cfg_ptr := &u64(slot_virt + 8)
-		*cfg_ptr = 0
-	}
-
-	cpu.dsb_sy()
-}
-
-// Request a TLB flush for a given context through the firmware handoff.
-pub fn (mgr &UatManager) flush(ctx &UatContext) {
-	if ctx == unsafe { nil } || mgr.handoff == unsafe { nil } {
-		return
-	}
-
+	asid := u64(ctx.id) << ttbr_asid_shift
 	handoff_lock(mgr.handoff)
-	defer {
-		handoff_unlock(mgr.handoff)
+	unsafe {
+		mut slots := mgr.ttbs
+		slots[ctx.id].ttb0 = ctx.pgtable.l1_phys | asid | ttbr_valid
+		slots[ctx.id].ttb1 = if mgr.map_kernel_to_user {
+			mgr.kernel_pgtable.l1_phys | asid | ttbr_valid
+		} else {
+			u64(0)
+		}
 	}
-
-	handoff_flush(mgr.handoff, ctx.id)
+	cpu.dsb_sy()
+	handoff_unlock(mgr.handoff)
 }
 
-// Map a region into the kernel (shared) page table.
-// All VM contexts see the kernel page table via TTBR1 in their TTBAT slot.
-pub fn (mgr &UatManager) map_kernel(iova u64, phys u64, size u64, prot u64) bool {
-	if mgr.kernel_pgtable == unsafe { nil } {
-		return false
+pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
+	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.id >= uat_num_contexts {
+		return
 	}
+	handoff_lock(mgr.handoff)
+	unsafe {
+		mut slots := mgr.ttbs
+		slots[ctx.id].ttb0 = 0
+		slots[ctx.id].ttb1 = 0
+	}
+	cpu.dsb_sy()
+	handoff_unlock(mgr.handoff)
+}
 
+// Map a driver-owned allocation into context zero. Lower addresses use TTBR0;
+// canonical high addresses use the reserved firmware-compatible TTBR1 root.
+pub fn (mgr &UatManager) map_kernel(iova u64, phys u64, size u64, prot u64) bool {
+	if iova < (u64(1) << mgr.ias) {
+		mut pt := unsafe { mgr.kernel_lower_pgtable }
+		return pt.map(iova, phys, size, prot)
+	}
 	mut pt := unsafe { mgr.kernel_pgtable }
 	return pt.map(iova, phys, size, prot)
 }
 
-// --- Peterson-style handoff lock (AP side) ---
-//
-// The AP and firmware each have a flag (lock_ap, lock_fw).
-// The `turn` variable decides who yields when both want to enter.
-// AP sets its flag, sets turn = 1 (yield to FW), then spins while
-// FW flag is set AND turn is still 1.
-
-pub fn handoff_lock(h &UatHandoff) {
-	if h == unsafe { nil } {
-		return
+// Prepare one firmware cache-flush slot. The caller must enqueue the matching
+// 0x14-byte FwCtl message and ring endpoint 0x21 before completing it.
+pub fn (mgr &UatManager) begin_flush(slot u32, addr u64, size u64) bool {
+	if !mgr.handoff_initialized || slot > uat_kernel_flush_slot || size == 0 {
+		return false
 	}
-
-	// Express interest
+	info := &mgr.handoff.flush[slot]
+	if katomic.load(&info.state) != 0 {
+		return false
+	}
 	unsafe {
-		mut hp := h
-		katomic.store(mut &hp.lock_ap, u32(1))
+		mut entry := info
+		katomic.store(mut &entry.addr, addr)
+		katomic.store(mut &entry.size, size)
+		katomic.store(mut &entry.state, u64(1))
 	}
-
-	// Yield priority to firmware
-	unsafe {
-		mut hp := h
-		katomic.store(mut &hp.turn, u32(1))
-	}
-
-	// Full memory barrier so firmware sees our writes
-	cpu.dmb_sy()
-
-	// Spin while firmware holds the lock and it is our turn to wait
-	for {
-		fw := katomic.load(&h.lock_fw)
-		turn := katomic.load(&h.turn)
-		if fw == 0 || turn != 1 {
-			break
-		}
-		// Power-efficient spin
-		cpu.wfe()
-	}
+	cpu.dsb_sy()
+	return true
 }
 
-pub fn handoff_unlock(h &UatHandoff) {
-	if h == unsafe { nil } {
-		return
+pub fn (mgr &UatManager) complete_flush(slot u32) bool {
+	if !mgr.handoff_initialized || slot > uat_kernel_flush_slot {
+		return false
 	}
-
-	// Release our interest
+	info := &mgr.handoff.flush[slot]
+	if katomic.load(&info.state) != 2 {
+		return false
+	}
 	unsafe {
-		mut hp := h
-		katomic.store(mut &hp.lock_ap, u32(0))
+		mut entry := info
+		katomic.store(mut &entry.state, u64(0))
 	}
-
-	cpu.dmb_sy()
-
-	// Wake firmware if it was spinning
-	cpu.sev()
-}
-
-// Request a TLB invalidation for `ctx_id` via the handoff flush protocol.
-// Caller must hold the handoff lock.
-fn handoff_flush(h &UatHandoff, ctx_id u32) {
-	if h == unsafe { nil } {
-		return
-	}
-
-	// Set the slot to flush
-	unsafe {
-		mut hp := h
-		katomic.store(mut &hp.cur_slot, ctx_id)
-	}
-
-	// Signal flush pending
-	unsafe {
-		mut hp := h
-		katomic.store(mut &hp.flush_state, handoff_flush_pending)
-	}
-
-	cpu.dmb_sy()
-
-	// Wait for firmware to acknowledge and complete the flush
-	timeout := 100000
-	for i := 0; i < timeout; i++ {
-		state := katomic.load(&h.flush_state)
-		if state == handoff_flush_done || state == handoff_flush_idle {
-			break
-		}
-		cpu.wfe()
-	}
-
-	// Reset flush state to idle
-	unsafe {
-		mut hp := h
-		katomic.store(mut &hp.flush_state, handoff_flush_idle)
-	}
-
-	cpu.dmb_sy()
+	return true
 }

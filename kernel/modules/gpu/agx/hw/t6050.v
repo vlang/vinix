@@ -31,5 +31,8 @@ pub fn t6050_config() HwConfig {
 		kickid_qid_mask:       0x7f
 		kickid_qid_shift:      40
 		is_sksm:               true
+		uat_ias:               42
+		uat_oas:               42
+		map_kernel_to_user:    true
 	}
 }

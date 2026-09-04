@@ -10,6 +10,7 @@ import apple.rtkit
 import gpu.agx.regs
 import gpu.agx.hw
 import gpu.agx.mmu
+import gpu.agx.pgtable
 import gpu.agx.channel
 import gpu.agx.alloc
 import gpu.agx.fw
@@ -107,14 +108,15 @@ fn pipe_index(priority u32, cmd_type u32) u32 {
 }
 
 fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
-	pages := lib.div_roundup(size, page_size)
-	phys := u64(memory.pmm_alloc(pages))
+	aligned_size := lib.align_up(size, alloc.gpu_page_size)
+	pages := aligned_size / page_size
+	phys := u64(memory.pmm_alloc_aligned(pages, 4))
 	if phys == 0 {
 		return none
 	}
 
 	unsafe {
-		C.memset(voidptr(phys + higher_half), 0, pages * page_size)
+		C.memset(voidptr(phys + higher_half), 0, aligned_size)
 	}
 
 	va := mgr.allocs.alloc(size, alloc.gpu_page_size) or {
@@ -122,7 +124,7 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 	}
 
 	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(va, phys, size, 0x43) {
+		if !uat_mgr.map_kernel(va, phys, aligned_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
 			return none
 		}
 	}
@@ -130,7 +132,7 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 	return SharedBuffer{
 		va:   va
 		phys: phys
-		size: size
+		size: aligned_size
 	}
 }
 
@@ -222,6 +224,14 @@ pub fn (mut mgr GpuManager) init() bool {
 		return false
 	}
 
+	// The firmware side of the uPPL handoff becomes available only after the
+	// RTKit endpoints are running.
+	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
+		C.printf(c'agx: UAT firmware handoff failed\n')
+		mgr.state = .error
+		return false
+	}
+
 	// Step 5: Initialize firmware communication channels
 	if !mgr.init_channels() {
 		C.printf(c'agx: Failed to initialize channels\n')
@@ -263,7 +273,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	initdata_size := u64(0x10000) // 64KB firmware init blob
 	initdata_pages := lib.div_roundup(initdata_size, page_size)
 
-	initdata_phys := u64(memory.pmm_alloc(initdata_pages))
+	initdata_phys := u64(memory.pmm_alloc_aligned(initdata_pages, 4))
 	if initdata_phys == 0 {
 		C.printf(c'agx: Failed to allocate initdata memory\n')
 		return false
@@ -283,7 +293,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	}
 	// Map into the GPU's internal UAT. AGX does not sit behind an Apple DART.
 	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(initdata_va, initdata_phys, initdata_size, 0x43) {
+		if !uat_mgr.map_kernel(initdata_va, initdata_phys, initdata_size,
+			pgtable.gpu_prot_fw_gpu_shared_rw) {
 			C.printf(c'agx: Failed to map initdata into kernel UAT\n')
 			return false
 		}

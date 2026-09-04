@@ -192,6 +192,42 @@ pub fn pmm_alloc(count u64) voidptr {
 	return ret
 }
 
+// Allocate `count` contiguous kernel pages whose physical base is aligned to
+// `alignment_pages`. The alignment must be a non-zero power of two. The PMM
+// itself is 4 KiB-granular, so over-allocate and return the unused prefix and
+// suffix before exposing the aligned range to the caller.
+pub fn pmm_alloc_aligned(count u64, alignment_pages u64) voidptr {
+	if count == 0 || alignment_pages == 0 || alignment_pages & (alignment_pages - 1) != 0 {
+		return unsafe { nil }
+	}
+	if alignment_pages == 1 {
+		return pmm_alloc(count)
+	}
+
+	total_pages := count + alignment_pages - 1
+	raw := pmm_alloc_nozero(total_pages)
+	if raw == unsafe { nil } {
+		return unsafe { nil }
+	}
+	raw_addr := u64(raw)
+	alignment := alignment_pages * page_size
+	aligned_addr := lib.align_up(raw_addr, alignment)
+	prefix_pages := (aligned_addr - raw_addr) / page_size
+	suffix_pages := total_pages - prefix_pages - count
+
+	if prefix_pages != 0 {
+		pmm_free(raw, prefix_pages)
+	}
+	if suffix_pages != 0 {
+		pmm_free(voidptr(aligned_addr + count * page_size), suffix_pages)
+	}
+
+	unsafe {
+		C.memset(voidptr(aligned_addr + higher_half), 0, count * page_size)
+	}
+	return voidptr(aligned_addr)
+}
+
 pub fn pmm_free(ptr voidptr, count u64) {
 	pmm_lock.acquire()
 	defer {

@@ -11,6 +11,7 @@ import gpu.agx.gpu
 import gpu.agx.hw
 import gpu.agx.regs
 import gpu.agx.mmu
+import gpu.agx.pgtable
 import gpu.agx.event
 import gpu.agx.file as agx_file
 import gpu.dcp
@@ -35,11 +36,15 @@ __global (
 
 struct PlatformResources {
 pub:
-	asc_base     u64
-	sgx_base     u64
-	mailbox_base u64
-	ttbs_base    u64
-	ttbs_size    u64
+	asc_base       u64
+	sgx_base       u64
+	mailbox_base   u64
+	handoff_base   u64
+	handoff_size   u64
+	pagetables_base u64
+	pagetables_size u64
+	ttbs_base      u64
+	ttbs_size      u64
 }
 
 fn find_gpu_node() ?(&devicetree.DTNode, u32, bool) {
@@ -100,10 +105,30 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 			println('agx: native SGX node has no gpu-region-size')
 			return none
 		}
+		handoff_base := devicetree.get_u64(gpu_node, 'gfx-handoff-base') or {
+			println('agx: native SGX node has no gfx-handoff-base')
+			return none
+		}
+		handoff_size := devicetree.get_u64(gpu_node, 'gfx-handoff-size') or {
+			println('agx: native SGX node has no gfx-handoff-size')
+			return none
+		}
+		pagetables_base := devicetree.get_u64(gpu_node, 'gfx-shared-region-base') or {
+			println('agx: native SGX node has no gfx-shared-region-base')
+			return none
+		}
+		pagetables_size := devicetree.get_u64(gpu_node, 'gfx-shared-region-size') or {
+			println('agx: native SGX node has no gfx-shared-region-size')
+			return none
+		}
 		return PlatformResources{
 			asc_base:     asc_regs[0].base
 			sgx_base:     gpu_regs[0].base
 			mailbox_base: asc_regs[0].base + 0x8000
+			handoff_base: handoff_base
+			handoff_size: handoff_size
+			pagetables_base: pagetables_base
+			pagetables_size: pagetables_size
 			ttbs_base:    ttbs_base
 			ttbs_size:    ttbs_size
 		}
@@ -144,14 +169,36 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		println('agx: failed to translate GPU TTB region')
 		return none
 	}
-	if ttbs_regs.len == 0 {
-		println('agx: GPU TTB region has no address')
+	handoff_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region',
+		'memory-region-names', 'handoff') or {
+		println('agx: GPU handoff reserved-memory region is missing')
+		return none
+	}
+	handoff_regs := devicetree.get_translated_reg_ranges(handoff_node) or {
+		println('agx: failed to translate GPU handoff region')
+		return none
+	}
+	pagetables_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region',
+		'memory-region-names', 'pagetables') or {
+		println('agx: GPU page-table reserved-memory region is missing')
+		return none
+	}
+	pagetables_regs := devicetree.get_translated_reg_ranges(pagetables_node) or {
+		println('agx: failed to translate GPU page-table region')
+		return none
+	}
+	if ttbs_regs.len == 0 || handoff_regs.len == 0 || pagetables_regs.len == 0 {
+		println('agx: GPU reserved-memory region has no address')
 		return none
 	}
 	return PlatformResources{
 		asc_base:     asc.base
 		sgx_base:     sgx.base
 		mailbox_base: mailbox_regs[0].base
+		handoff_base: handoff_regs[0].base
+		handoff_size: handoff_regs[0].size
+		pagetables_base: pagetables_regs[0].base
+		pagetables_size: pagetables_regs[0].size
 		ttbs_base:    ttbs_regs[0].base
 		ttbs_size:    ttbs_regs[0].size
 	}
@@ -190,9 +237,16 @@ pub fn initialise() {
 		println('agx: TTB region is too small for 64 UAT contexts')
 		return
 	}
+	if platform.handoff_size < sizeof(mmu.UatHandoff) || platform.pagetables_size < pgtable.uat_pgsz {
+		println('agx: UAT handoff or page-table reserved region is too small')
+		return
+	}
 	C.printf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n',
 		platform.asc_base, platform.sgx_base, platform.mailbox_base, platform.ttbs_base,
 		platform.ttbs_size)
+	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n',
+		platform.handoff_base, platform.handoff_size, platform.pagetables_base,
+		platform.pagetables_size)
 
 	// Never run a newer GPU with the byte layouts and register sequence for
 	// M1. Detection is useful for bring-up logs, but writes here could corrupt
@@ -204,14 +258,15 @@ pub fn initialise() {
 	}
 
 	// Step 3: Initialize the AGX-internal UAT from its reserved TTB region.
-	_ := mmu.new_manager(platform.ttbs_base) or {
+	_ := mmu.new_manager(platform.ttbs_base, platform.handoff_base, platform.pagetables_base,
+		cfg.uat_ias, cfg.uat_oas, cfg.map_kernel_to_user) or {
 		println('agx: Failed to initialize UAT manager')
 		return
 	}
 
 	// Step 4: Initialize GPU event stamp storage.
 	stamp_pages := u64(mmu.uat_num_contexts)
-	stamp_phys := u64(memory.pmm_alloc(stamp_pages))
+	stamp_phys := u64(memory.pmm_alloc_aligned(stamp_pages, 4))
 	if stamp_phys == 0 {
 		println('agx: Failed to allocate stamp memory')
 		return
@@ -219,7 +274,8 @@ pub fn initialise() {
 	stamp_va := u64(0x10_0000)
 	stamp_size := stamp_pages * page_size
 	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(stamp_va, stamp_phys, stamp_size, 0x43) {
+		if !uat_mgr.map_kernel(stamp_va, stamp_phys, stamp_size,
+			pgtable.gpu_prot_fw_gpu_shared_rw) {
 			println('agx: Failed to map stamp buffer in UAT')
 			return
 		}

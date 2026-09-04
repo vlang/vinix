@@ -69,7 +69,9 @@ pub:
 	kickid_qid_shift       u32
 	is_sksm                bool
 	base_clock_hz          u64
+	uat_ias                u32 // Input address size (bits)
 	uat_oas                u32 // Output address size (bits)
+	map_kernel_to_user     bool
 	num_banks              u32
 	// Memory regions
 	shared_region_base     u64

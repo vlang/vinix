@@ -44,7 +44,9 @@ pub fn t8103_config() HwConfig {
 		num_frags:              8
 		num_gps:                4
 		base_clock_hz:          24000000 // 24 MHz
+		uat_ias:                39
 		uat_oas:                40
+		map_kernel_to_user:     false
 		num_banks:              1
 		shared_region_base:     0x6800000000
 		shared_region_size:     0x140000
