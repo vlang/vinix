@@ -4,7 +4,6 @@ module devicetree
 // Flattened Device Tree (FDT) parser
 // Parses the DTB blob provided by m1n1/U-Boot via Limine module
 // Follows the DTSpec (devicetree.org) binary format
-
 import lib as _
 import memory as _
 
@@ -75,6 +74,20 @@ fn be32(ptr voidptr) u32 {
 
 fn be64(ptr voidptr) u64 {
 	return (u64(be32(ptr)) << 32) | u64(be32(unsafe { voidptr(u64(ptr) + 4) }))
+}
+
+// Apple DeviceTree payloads embedded as vendor properties retain their
+// original little-endian scalar encoding when a bootloader wraps them in an
+// FDT. Standard FDT cells must continue to use be32()/be64().
+fn le32(ptr voidptr) u32 {
+	p := unsafe { &u8(ptr) }
+	return unsafe {
+		u32(p[0]) | (u32(p[1]) << 8) | (u32(p[2]) << 16) | (u32(p[3]) << 24)
+	}
+}
+
+fn le64(ptr voidptr) u64 {
+	return u64(le32(ptr)) | (u64(le32(unsafe { voidptr(u64(ptr) + 4) })) << 32)
 }
 
 fn read_cells(ptr voidptr, count u32) ?u64 {
@@ -149,7 +162,7 @@ fn parse_node(mut offset &u32, parent &DTNode) &DTNode {
 				}
 
 				mut node := &DTNode{
-					name:   name
+					name: name
 					parent: unsafe { parent }
 				}
 
@@ -190,7 +203,7 @@ fn parse_node(mut offset &u32, parent &DTNode) &DTNode {
 						prop := DTProperty{
 							name: get_string(name_off)
 							data: prop_data
-							len:  prop_len
+							len: prop_len
 						}
 						node.properties << prop
 					} else if next == fdt_nop {
@@ -317,6 +330,36 @@ pub fn get_u64(node &DTNode, name string) ?u64 {
 		return none
 	}
 	return be64(prop.data)
+}
+
+// Read an Apple vendor scalar without reinterpreting it as a standard
+// big-endian FDT cell.
+pub fn get_le_u32(node &DTNode, name string) ?u32 {
+	prop := get_property(node, name) or { return none }
+	if prop.len < 4 {
+		return none
+	}
+	return le32(prop.data)
+}
+
+pub fn get_le_u64(node &DTNode, name string) ?u64 {
+	prop := get_property(node, name) or { return none }
+	if prop.len < 8 {
+		return none
+	}
+	return le64(prop.data)
+}
+
+pub fn get_le_u32_array(node &DTNode, name string) ?[]u32 {
+	prop := get_property(node, name) or { return none }
+	if prop.len == 0 || prop.len % 4 != 0 {
+		return none
+	}
+	mut result := []u32{cap: int(prop.len / 4)}
+	for offset := u32(0); offset < prop.len; offset += 4 {
+		result << le32(unsafe { voidptr(u64(prop.data) + offset) })
+	}
+	return result
 }
 
 // Get a list of big-endian u32 cells from a property.
@@ -468,7 +511,7 @@ pub fn get_translated_reg_ranges(node &DTNode) ?[]DTReg {
 			return none
 		}
 		translated := translate_address(node, base) or { return none }
-		result << DTReg{base: translated, size: size}
+		result << DTReg{ base: translated, size: size }
 	}
 	return result
 }

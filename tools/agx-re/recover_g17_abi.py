@@ -729,7 +729,7 @@ def recover_driver_hardware_config_layout(
         "io_mappings": {"offset": 0x640, "records": 53, "record_bytes": 0x28},
         "performance_states": {
             "capacity": 16,
-            "count_offset": 0xFC4,
+            "max_state_offset": 0xFC4,
             "frequency_offset": 0xFC8,
             "voltage_offset": 0x1008,
             "sram_voltage_offset": 0x1408,

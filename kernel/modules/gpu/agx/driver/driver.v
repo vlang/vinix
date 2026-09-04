@@ -6,7 +6,6 @@ module driver
 // subsystems (UAT, channels, firmware, RTKit), creates the
 // GpuManager, and registers a DRM driver with GEM, render, and compute
 // capabilities.
-
 import gpu.agx.gpu
 import gpu.agx.hw
 import gpu.agx.regs
@@ -97,27 +96,27 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 			println('agx: native gfx-asc register window is incomplete')
 			return none
 		}
-		ttbs_base := devicetree.get_u64(gpu_node, 'gpu-region-base') or {
+		ttbs_base := devicetree.get_le_u64(gpu_node, 'gpu-region-base') or {
 			println('agx: native SGX node has no gpu-region-base')
 			return none
 		}
-		ttbs_size := devicetree.get_u64(gpu_node, 'gpu-region-size') or {
+		ttbs_size := devicetree.get_le_u64(gpu_node, 'gpu-region-size') or {
 			println('agx: native SGX node has no gpu-region-size')
 			return none
 		}
-		handoff_base := devicetree.get_u64(gpu_node, 'gfx-handoff-base') or {
+		handoff_base := devicetree.get_le_u64(gpu_node, 'gfx-handoff-base') or {
 			println('agx: native SGX node has no gfx-handoff-base')
 			return none
 		}
-		handoff_size := devicetree.get_u64(gpu_node, 'gfx-handoff-size') or {
+		handoff_size := devicetree.get_le_u64(gpu_node, 'gfx-handoff-size') or {
 			println('agx: native SGX node has no gfx-handoff-size')
 			return none
 		}
-		pagetables_base := devicetree.get_u64(gpu_node, 'gfx-shared-region-base') or {
+		pagetables_base := devicetree.get_le_u64(gpu_node, 'gfx-shared-region-base') or {
 			println('agx: native SGX node has no gfx-shared-region-base')
 			return none
 		}
-		pagetables_size := devicetree.get_u64(gpu_node, 'gfx-shared-region-size') or {
+		pagetables_size := devicetree.get_le_u64(gpu_node, 'gfx-shared-region-size') or {
 			println('agx: native SGX node has no gfx-shared-region-size')
 			return none
 		}
@@ -201,6 +200,65 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 	}
 }
 
+// The unprefixed performance properties are Apple DeviceTree binary records,
+// not big-endian FDT cells. Each record is { frequency_hz, voltage_mv } in
+// little endian, grouped as one complete state table per GPU partition.
+fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfig) bool {
+	state_count := devicetree.get_le_u32(gpu_node, 'perf-state-count') or {
+		println('agx: t6050 has no perf-state-count')
+		return false
+	}
+	table_count := devicetree.get_le_u32(gpu_node, 'perf-state-table-count') or {
+		println('agx: t6050 has no perf-state-table-count')
+		return false
+	}
+	max_state := devicetree.get_le_u32(gpu_node, 'gpu-num-perf-states') or {
+		println('agx: t6050 has no gpu-num-perf-states')
+		return false
+	}
+	if state_count == 0 || state_count > 16 || table_count == 0 || table_count > 16 || max_state + 1 != state_count {
+		C.printf(c'agx: invalid t6050 performance dimensions states=%u tables=%u max=%u\n', state_count, table_count, max_state)
+		return false
+	}
+	states := devicetree.get_le_u32_array(gpu_node, 'perf-states') or {
+		println('agx: t6050 has no perf-states')
+		return false
+	}
+	sram_states := devicetree.get_le_u32_array(gpu_node, 'perf-states-sram') or {
+		println('agx: t6050 has no perf-states-sram')
+		return false
+	}
+	expected_words := int(state_count * table_count * 2)
+	if states.len != expected_words || sram_states.len != expected_words {
+		C.printf(c'agx: invalid t6050 performance table lengths core=%u sram=%u expected=%u\n', u32(states.len), u32(sram_states.len), u32(expected_words))
+		return false
+	}
+
+	for table := u32(0); table < table_count; table++ {
+		for state := u32(0); state < state_count; state++ {
+			source := int((table * state_count + state) * 2)
+			destination := state * 16 + table
+			frequency := states[source]
+			if table == 0 {
+				cfg.perf_state_frequencies[state] = frequency
+			} else if frequency != cfg.perf_state_frequencies[state] {
+				C.printf(c'agx: t6050 performance table %u state %u has mismatched frequency\n', table, state)
+				return false
+			}
+			if sram_states[source] != frequency {
+				C.printf(c'agx: t6050 SRAM table %u state %u has mismatched frequency\n', table, state)
+				return false
+			}
+			cfg.perf_state_voltages[destination] = states[source + 1]
+			cfg.perf_state_sram_voltages[destination] = sram_states[source + 1]
+		}
+	}
+	cfg.perf_state_count = state_count
+	cfg.perf_state_table_count = table_count
+	C.printf(c'agx: loaded %u x %u native performance states (%u..%u MHz)\n', state_count, table_count, cfg.perf_state_frequencies[0] / 1000000, cfg.perf_state_frequencies[state_count - 1] / 1000000)
+	return true
+}
+
 // Probe GPU from device tree and bring up all supported subsystems.
 pub fn initialise() {
 	println('agx: Probing Apple GPU')
@@ -210,8 +268,12 @@ pub fn initialise() {
 		println('agx: GPU not found in device tree')
 		return
 	}
-	cfg := hw.get_config(chip_id) or {
+	mut cfg := hw.get_config(chip_id) or {
 		C.printf(c'agx: No hardware configuration for chip 0x%x\n', chip_id)
+		return
+	}
+	if chip_id == 0x6050 && !load_t6050_performance_config(gpu_node, mut cfg) {
+		println('agx: t6050 performance configuration is incomplete')
 		return
 	}
 	agx_driver_inst.hw_config = cfg

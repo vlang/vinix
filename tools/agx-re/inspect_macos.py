@@ -142,6 +142,23 @@ def decode_segment_ranges(value: Any) -> list[dict[str, int]]:
     return result
 
 
+def decode_perf_states(
+    value: Any, state_count: int, table_count: int, name: str
+) -> list[list[dict[str, int]]]:
+    expected = state_count * table_count * 8
+    if not isinstance(value, bytes) or len(value) != expected:
+        raise InspectError(f"{name} must contain {state_count} x {table_count} records")
+    result = []
+    for table in range(table_count):
+        records = []
+        for state in range(state_count):
+            offset = (table * state_count + state) * 8
+            frequency, voltage = struct.unpack_from("<II", value, offset)
+            records.append({"frequency_hz": frequency, "voltage_mv": voltage})
+        result.append(records)
+    return result
+
+
 def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
     if "compatible" not in node or "reg" not in node:
         raise InspectError("sgx node is missing compatible or reg")
@@ -156,6 +173,14 @@ def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
     for name in SGX_U64_PROPERTIES:
         if name in node:
             result[name.replace("-", "_")] = decode_uint(node[name], 64, name)
+    state_count = result.get("perf_state_count")
+    table_count = result.get("perf_state_table_count")
+    if isinstance(state_count, int) and isinstance(table_count, int):
+        for name in ("perf-states", "perf-states-sram"):
+            if name in node:
+                result[name.replace("-", "_")] = decode_perf_states(
+                    node[name], state_count, table_count, name
+                )
     return result
 
 
@@ -237,6 +262,23 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     masks = config.get("core_mask_list")
     if isinstance(masks, list) and sum(bin(mask).count("1") for mask in masks) != config.get("num_cores"):
         warnings.append("active bits in core_mask_list do not equal num_cores")
+    state_count = sgx.get("perf_state_count")
+    max_state = sgx.get("gpu_num_perf_states")
+    if isinstance(state_count, int) and isinstance(max_state, int) and max_state + 1 != state_count:
+        warnings.append("gpu-num-perf-states is not perf-state-count minus one")
+    core_states = sgx.get("perf_states")
+    sram_states = sgx.get("perf_states_sram")
+    if isinstance(core_states, list):
+        reference = [state["frequency_hz"] for state in core_states[0]]
+        for table in core_states[1:]:
+            if [state["frequency_hz"] for state in table] != reference:
+                warnings.append("core performance tables disagree on frequencies")
+                break
+        if isinstance(sram_states, list):
+            for table in sram_states:
+                if [state["frequency_hz"] for state in table] != reference:
+                    warnings.append("SRAM performance tables disagree with core frequencies")
+                    break
     asc = manifest.get("asc")
     if "gpu,t6050" in compatible and isinstance(asc, dict):
         if "iop,ascwrap-v6" not in asc.get("compatible", []):

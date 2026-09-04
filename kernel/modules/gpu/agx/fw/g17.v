@@ -1,5 +1,7 @@
 module fw
 
+import gpu.agx.hw
+
 // Verified anchors for the G17C firmware shipped with macOS 26.5 (25F71),
 // RTKit build 3255.120.11. This is deliberately only the root bootstrap
 // header: unknown nested structures must not be represented as compatible
@@ -171,7 +173,7 @@ pub mut:
 	io_mappings_640                [g17_io_mapping_count]G17IoMappingRecord
 	opaque_e88                     [0x8]u8
 	firmware_scalar_block_e90      [0x134]u8
-	performance_state_count_fc4    u32
+	performance_state_max_fc4      u32
 	frequency_table_fc8            [g17_performance_state_capacity]u32
 	voltage_table_1008             [g17_performance_state_capacity]G17VoltageTableRow
 	sram_voltage_table_1408        [g17_performance_state_capacity]G17VoltageTableRow
@@ -191,6 +193,37 @@ pub mut:
 
 pub fn validate_g17_bootstrap_allocations() bool {
 	return sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
+}
+
+// Populate the table subset whose source and scale are established by both
+// the Apple DeviceTree and the G17 host producer. Frequencies are converted
+// from Hz to MHz exactly as the host does. Derived power tables remain zero
+// until their producers have been recovered.
+pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &hw.HwConfig) bool {
+	if hardware.perf_state_count == 0 || hardware.perf_state_count > g17_performance_state_capacity || hardware.perf_state_table_count == 0 || hardware.perf_state_table_count > g17_voltage_table_columns {
+		return false
+	}
+
+	config.performance_state_max_fc4 = hardware.perf_state_count - 1
+	for state := u32(0); state < hardware.perf_state_count; state++ {
+		config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
+		base_voltage := hardware.perf_state_voltages[state * g17_voltage_table_columns]
+		base_sram_voltage := hardware.perf_state_sram_voltages[state * g17_voltage_table_columns]
+		for table := u32(0); table < g17_voltage_table_columns; table++ {
+			offset := state * g17_voltage_table_columns + table
+			config.voltage_table_1008[state].values[table] = if table < hardware.perf_state_table_count {
+				hardware.perf_state_voltages[offset]
+			} else {
+				base_voltage
+			}
+			config.sram_voltage_table_1408[state].values[table] = if table < hardware.perf_state_table_count {
+				hardware.perf_state_sram_voltages[offset]
+			} else {
+				base_sram_voltage
+			}
+		}
+	}
+	return true
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.

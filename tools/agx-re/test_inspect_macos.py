@@ -15,10 +15,24 @@ SPEC.loader.exec_module(inspect_macos)
 
 class InspectMacOSTests(unittest.TestCase):
     def test_decodes_apple_device_tree_little_endian_values(self) -> None:
+        perf_states = b"".join(
+            struct.pack("<II", frequency, voltage)
+            for voltage in (700, 710)
+            for frequency in (500_000_000, 1_000_000_000)
+        )
+        sram_states = b"".join(
+            struct.pack("<II", frequency, 800)
+            for _table in range(2)
+            for frequency in (500_000_000, 1_000_000_000)
+        )
         node = {
             "compatible": b"gpu,t6050\0",
             "reg": struct.pack("<QQQQ", 0x2300000000, 0x3FDC000, 0x2300D00000, 0x177000),
-            "gpu-num-perf-states": struct.pack("<I", 13),
+            "gpu-num-perf-states": struct.pack("<I", 1),
+            "perf-state-count": struct.pack("<I", 2),
+            "perf-state-table-count": struct.pack("<I", 2),
+            "perf-states": perf_states,
+            "perf-states-sram": sram_states,
             "gfx-handoff-base": struct.pack("<Q", 0x11FFF200000),
             "rtkit-private-vm-region-base": struct.pack("<Q", 0xFFFFFC0000000000),
         }
@@ -33,9 +47,11 @@ class InspectMacOSTests(unittest.TestCase):
                 {"base": 0x2300D00000, "size": 0x177000},
             ],
         )
-        self.assertEqual(result["gpu_num_perf_states"], 13)
+        self.assertEqual(result["gpu_num_perf_states"], 1)
         self.assertEqual(result["gfx_handoff_base"], 0x11FFF200000)
         self.assertEqual(result["rtkit_private_vm_region_base"], 0xFFFFFC0000000000)
+        self.assertEqual(result["perf_states"][1][0]["voltage_mv"], 710)
+        self.assertEqual(result["perf_states_sram"][0][1]["frequency_hz"], 1_000_000_000)
 
     def test_selects_only_non_secret_accelerator_properties(self) -> None:
         node = {
