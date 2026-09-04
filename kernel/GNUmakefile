@@ -142,7 +142,7 @@ override CPPFLAGS := \
     -MMD \
     -MP
 
-obj/flanterm/backends/fb.c.o: override CPPFLAGS += \
+obj/c/flanterm/backends/fb.c.o: override CPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
 override VFLAGS += \
@@ -217,8 +217,13 @@ override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' \
 endif
 
 override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort)
-override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
-override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
+# Keep generated C and assembly objects below distinct subdirectories. In
+# particular, c/uacpi used to create obj/uacpi, which V then mistook for the
+# imported modules/uacpi package while compiling obj/vsrc.
+override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
+override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
+override OBJ := $(COBJ) $(ASOBJ)
+override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/asm/,$(ASFILES:.S=.S.d))
 
 # Default target. This must come first, before header dependencies.
 .PHONY: all
@@ -256,12 +261,12 @@ obj/blob.c.o: GNUmakefile $(VFILES)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
 
 # Compilation rules for *.c files.
-obj/%.c.o: c/%.c GNUmakefile
+obj/c/%.c.o: c/%.c GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 # Compilation rules for *.S files.
-obj/%.S.o: asm/%.S GNUmakefile
+obj/asm/%.S.o: asm/%.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
