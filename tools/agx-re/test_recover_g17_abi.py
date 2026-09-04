@@ -2269,6 +2269,72 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xed0"], 24000)
         self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xf38"], 1)
 
+    def test_recovers_g17_chip_info(self) -> None:
+        configure_address = 0x100000
+        retrieve_address = 0x110000
+        configure = bytearray(0x650)
+        retrieve = bytearray(0x164)
+        arm_init = bytearray(0x38)
+        for offset, word in {
+            0x610: 0x529EF908,
+            0x634: 0x91358209,
+            0x638: 0xF946B20A,
+            0x63C: 0x8B080261,
+            0x640: 0xAA1303E0,
+            0x64C: 0xD73F0951,
+        }.items():
+            struct.pack_into("<I", configure, offset, word)
+        for offset, word in {
+            0xBC: 0xB9400008,
+            0xC0: 0xB9000288,
+            0x154: 0xB9400008,
+            0x158: 0x53047D09,
+            0x15C: 0x12000908,
+            0x160: 0x2900A289,
+        }.items():
+            struct.pack_into("<I", retrieve, offset, word)
+        for offset, word in {
+            0x20: 0xF9414E68,
+            0x24: 0x529EF909,
+            0x28: 0x8B090108,
+            0x2C: 0xF9415E69,
+            0x30: 0x3DC00100,
+            0x34: 0x3D83A520,
+        }.items():
+            struct.pack_into("<I", arm_init, offset, word)
+        symbols = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: configure_address,
+            recover_g17_abi.RETRIEVE_CHIP_INFO: retrieve_address,
+        }
+        code = {
+            recover_g17_abi.BASE_CONFIGURE_DEVICE: (
+                configure_address,
+                bytes(configure),
+            ),
+            recover_g17_abi.RETRIEVE_CHIP_INFO: (retrieve_address, bytes(retrieve)),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=retrieve_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_chip_info(
+                b"chip-id\0chip-revision\0", bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["offset"], 0xE90)
+        self.assertEqual(recovered["source_record_offset"], 0xF7C8)
+        self.assertEqual(recovered["fields"][1]["formula"], "value >> 4")
+        self.assertEqual(recovered["fields"][2]["formula"], "value & 7")
+
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000
         pi_address = 0x101000

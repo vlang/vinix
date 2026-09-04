@@ -48,6 +48,7 @@ POPULATE_DPE_PPT_CONFIG = (
     "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData"
 )
 BASE_CONFIGURE_DEVICE = "__ZN14AGXAccelerator15configureDeviceEP9IOService"
+RETRIEVE_CHIP_INFO = "__ZN14AGXAccelerator16retrieveChipInfoEP12AGXSChipInfo"
 ACCELERATOR_START = "__ZN14AGXAccelerator5startEP9IOService"
 PI300_CONFIGURE_DEVICE = (
     "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
@@ -55,6 +56,7 @@ PI300_CONFIGURE_DEVICE = (
 G17_CONFIGURE_DEVICE = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX15configureDeviceEP9IOService"
 )
+G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
 BASE_CONFIGURE_POWER = (
     "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv"
 )
@@ -4175,6 +4177,85 @@ def recover_g17_hardware_config_constants(
     }
 
 
+def recover_g17_chip_info(image: bytes, arm_init_code: bytes) -> dict[str, object]:
+    """Recover the DeviceTree chip identity copied into config +0xe90."""
+
+    symbols = macho_symbols(image)
+    required = (BASE_CONFIGURE_DEVICE, RETRIEVE_CHIP_INFO)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT
+    )
+    if target != symbols[RETRIEVE_CHIP_INFO]:
+        raise ValueError(f"unexpected G17 retrieveChipInfo target {target:#x}")
+
+    _address, configure_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    _address, retrieve_code = symbol_code(image, RETRIEVE_CHIP_INFO)
+    require_instruction_words_at(
+        configure_code,
+        "G17 chip-info destination",
+        {
+            0x610: 0x529EF908,
+            0x634: 0x91358209,
+            0x638: 0xF946B20A,
+            0x63C: 0x8B080261,
+            0x640: 0xAA1303E0,
+            0x64C: 0xD73F0951,
+        },
+    )
+    require_instruction_words_at(
+        retrieve_code,
+        "G17 DeviceTree chip-info extraction",
+        {
+            0xBC: 0xB9400008,
+            0xC0: 0xB9000288,
+            0x154: 0xB9400008,
+            0x158: 0x53047D09,
+            0x15C: 0x12000908,
+            0x160: 0x2900A289,
+        },
+    )
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 hardware-config chip-info publication",
+        {
+            0x20: 0xF9414E68,
+            0x24: 0x529EF909,
+            0x28: 0x8B090108,
+            0x2C: 0xF9415E69,
+            0x30: 0x3DC00100,
+            0x34: 0x3D83A520,
+        },
+    )
+    for property_name in (b"chip-id\0", b"chip-revision\0"):
+        if property_name not in image:
+            raise ValueError(f"missing {property_name[:-1].decode()} property name")
+
+    return {
+        "offset": 0xE90,
+        "bytes": 16,
+        "source_record_offset": 0xF7C8,
+        "retrieve_vtable_slot": G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT,
+        "retrieve_provider": RETRIEVE_CHIP_INFO,
+        "fields": [
+            {"offset": 0, "property": "chip-id", "formula": "value"},
+            {
+                "offset": 4,
+                "property": "chip-revision",
+                "formula": "value >> 4",
+            },
+            {
+                "offset": 8,
+                "property": "chip-revision",
+                "formula": "value & 7",
+            },
+            {"offset": 12, "value": 0},
+        ],
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -5395,6 +5476,7 @@ def main() -> int:
         hardware_config["fixed_constants"] = recover_g17_hardware_config_constants(
             driver, base_init_code, function
         )
+        hardware_config["chip_info"] = recover_g17_chip_info(driver, function)
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)
         )

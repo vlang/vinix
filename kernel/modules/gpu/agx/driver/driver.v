@@ -205,6 +205,36 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 	}
 }
 
+// Match the three-word record produced by Apple's retrieveChipInfo method.
+// These Apple DeviceTree scalar properties are little endian.
+fn load_t6050_chip_info(mut cfg hw.HwConfig) bool {
+	chosen := devicetree.find_node('/chosen') or {
+		println('agx: t6050 has no /chosen node')
+		return false
+	}
+	arm_io := devicetree.find_node('/arm-io') or {
+		println('agx: t6050 has no /arm-io node')
+		return false
+	}
+	chip_id := devicetree.get_le_u32(chosen, 'chip-id') or {
+		println('agx: t6050 has no chip-id')
+		return false
+	}
+	chip_revision := devicetree.get_le_u32(arm_io, 'chip-revision') or {
+		println('agx: t6050 has no chip-revision')
+		return false
+	}
+	if chip_id != cfg.chip_id {
+		C.printf(c'agx: t6050 chip-id mismatch 0x%x != 0x%x\n', chip_id, cfg.chip_id)
+		return false
+	}
+	cfg.soc_revision_major = chip_revision >> 4
+	cfg.soc_revision_minor = chip_revision & 7
+	C.printf(c'agx: loaded native chip info 0x%x revision %u.%u\n', chip_id,
+		cfg.soc_revision_major, cfg.soc_revision_minor)
+	return true
+}
+
 // The unprefixed performance properties are Apple DeviceTree binary records,
 // not big-endian FDT cells. Each record is { frequency_hz, voltage_mv } in
 // little endian, grouped as one complete state table per GPU partition.
@@ -356,9 +386,10 @@ pub fn initialise() {
 		return
 	}
 	if chip_id == 0x6050 {
-		if !load_t6050_performance_config(gpu_node, mut cfg)
+		if !load_t6050_chip_info(mut cfg)
+			|| !load_t6050_performance_config(gpu_node, mut cfg)
 			|| !load_t6050_aux_performance_config(gpu_node, mut cfg) {
-			println('agx: t6050 performance configuration is incomplete')
+			println('agx: t6050 native configuration is incomplete')
 			return
 		}
 	}

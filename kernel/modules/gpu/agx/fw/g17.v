@@ -758,8 +758,13 @@ pub mut:
 	values [g17_firmware_scalar_word_count]u32
 }
 
-pub fn new_g17_firmware_scalar_block() G17FirmwareScalarBlock {
+pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlock {
 	mut result := G17FirmwareScalarBlock{}
+	// retrieveChipInfo publishes the chosen-node chip ID followed by the
+	// major/minor fields extracted from /arm-io/chip-revision.
+	result.values[0] = hardware.chip_id
+	result.values[1] = hardware.soc_revision_major
+	result.values[2] = hardware.soc_revision_minor
 	result.values[(0xeb8 - 0xe90) / 4] = 1
 	// PI_300 configureDevice unconditionally installs accelerator feature bit
 	// 10; initFirmwareData extracts that bit into this word.
@@ -947,7 +952,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		populate_g17_color_matrices(mut config)
 		// G17's selected virtual provider returns zero for this optional table.
 		config.border_color_table_address_638 = 0
-		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block()
+		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware)
 		if !populate_g17_pio_mappings(mut config, hardware) {
 			return false
 		}

@@ -116,6 +116,8 @@ pub mut:
 	// DeviceTree. Modern firmware derives its PIO records from this range.
 	gpu_mmio_base            u64
 	gpu_mmio_size            u64
+	soc_revision_major       u32
+	soc_revision_minor       u32
 	perf_state_count         u32
 	perf_state_base          u32
 	perf_state_table_count   u32
