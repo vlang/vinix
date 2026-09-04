@@ -229,10 +229,7 @@ pub fn initialize_g17_bootstrap_page(buffer voidptr, size u64, role u32,
 		return false
 	}
 	mut header := G17BootstrapHeader{}
-	if !populate_g17_bootstrap_header(mut header, role, bootstrap_region_address,
-		firmware_shared_data_address, runtime_data_address, small_shared_data_address,
-		primary_region_address, secondary_region_address, secondary_aux_address,
-		platform_config, platform_config_size) {
+	if !populate_g17_bootstrap_header(mut header, role, bootstrap_region_address, firmware_shared_data_address, runtime_data_address, small_shared_data_address, primary_region_address, secondary_region_address, secondary_aux_address, platform_config, platform_config_size) {
 		return false
 	}
 	unsafe {
@@ -275,12 +272,53 @@ pub mut:
 	opaque_489               [0x37]u8
 }
 
-// Allocation sizes and placements are verified even where their contents are
-// not. Keeping distinct types prevents accidental reuse of G13 layouts.
+// Six-byte per-state firmware-utilization controls selected by the low two
+// bits of the packed host request. Each value is stored most-significant byte
+// first by the G17 host producer.
+@[packed]
+pub struct G17FwUtilPStateControl {
+pub mut:
+	debounce_period_high  u8
+	debounce_period_low   u8
+	pstate_threshold_high u8
+	pstate_threshold_low  u8
+	pstate_step_size_high u8
+	pstate_step_size_low  u8
+}
+
+// Runtime object referenced by root+0x20. The named tail controls below are
+// independently fixed by short, symbolized G17 accessors. Opaque ranges still
+// contain configuration populated by initFirmwareData and must not be treated
+// as zero-compatible until their producers are recovered.
 @[packed]
 pub struct G17RuntimeData {
 pub mut:
-	opaque [0x1ca0]u8
+	opaque_000                           [0x99c]u8
+	progress_check_interval_3d           u32
+	progress_check_interval_ta           u32
+	progress_check_interval_cl           u32
+	progress_check_threshold             u32
+	opaque_9b0                           [0x0c]u8
+	gpu_idle_off_delay                   u32
+	fender_idle_off_delay                u32
+	firmware_early_wake_timeout          u32
+	gvdm_timer_interval                  u32
+	cl_context_switch_timeout            u32
+	cl_kill_timeout                      u32
+	phase_one_cdm_context_switch_timeout u32
+	frg_context_switch_timeout           u32
+	frg_kill_timeout                     u32
+	opaque_9e0                           [0x08]u8
+	fw_util_default_fab_pstate_high      u8
+	fw_util_default_fab_pstate_low       u8
+	fw_util_timer_period                 u8
+	fw_util_pstate_controls              [4]G17FwUtilPStateControl
+	opaque_a03                           [0x122d]u8
+	gpu_keepalive_override               u32
+	gfxc_keepalive_override              u32
+	gpu_keepalive_perf_mode_threshold    u32
+	gpu_keepalive_off_mode_threshold     u32
+	opaque_1c40                          [0x60]u8
 }
 
 @[packed]
@@ -299,7 +337,7 @@ pub mut:
 pub fn new_g17_small_shared_data(ktrace_state u32) G17SmallSharedData {
 	return G17SmallSharedData{
 		ktrace_state: ktrace_state
-		host_ready:   1
+		host_ready: 1
 	}
 }
 

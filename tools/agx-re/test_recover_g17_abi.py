@@ -516,6 +516,26 @@ def small_shared_data_code() -> tuple[bytes, bytes, bytes, bytes, bytes, bytes, 
     )
 
 
+def runtime_control_code() -> dict[str, bytes]:
+    result = {}
+    strided = {
+        "fw_util_debounce_periods",
+        "fw_util_pstate_threshold",
+        "fw_util_pstate_step_size",
+    }
+    for field_name, (symbol, accesses) in recover_g17_abi.G17_RUNTIME_ACCESSORS.items():
+        runtime_register = 9 if field_name in strided else 8
+        instructions = [ldr_x(runtime_register, 0, 0x380)]
+        if field_name in strided:
+            instructions.extend((0x528000CC, 0x9240042D, 0x9BAC25A9))
+        instructions.extend(
+            str_unsigned(1, runtime_register, offset, width)
+            for offset, width in accesses
+        )
+        result[symbol] = encode(*instructions)
+    return result
+
+
 def zero_initialized_allocations_code() -> bytes:
     return encode(
         0xF9417268,
@@ -622,6 +642,32 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.recover_g17_small_shared_data(
                 firmware_shared_allocations(), *codes[:-1], b""
             )
+
+    def test_recovers_runtime_controls(self) -> None:
+        allocations = firmware_shared_allocations() + [
+            {"host_cpu_member": 0x380, "host_gpu_member": 0x388, "bytes": 0x1CA0}
+        ]
+        recovered = recover_g17_abi.recover_g17_runtime_controls(
+            allocations, runtime_control_code()
+        )
+        self.assertEqual(recovered["bytes"], 0x1CA0)
+        self.assertEqual(recovered["host_gpu_member"], 0x388)
+        self.assertEqual(recovered["fields"][0]["stores"][0]["offset"], 0x99C)
+        self.assertEqual(recovered["fields"][-1]["stores"][0]["offset"], 0x1C3C)
+        self.assertEqual(recovered["fw_util_pstate_controls"]["entries"], 4)
+        self.assertEqual(recovered["fw_util_pstate_controls"]["stride"], 6)
+
+    def test_rejects_incomplete_runtime_controls(self) -> None:
+        allocations = firmware_shared_allocations() + [
+            {"host_cpu_member": 0x380, "host_gpu_member": 0x388, "bytes": 0x1CA0}
+        ]
+        accessors = runtime_control_code()
+        missing = recover_g17_abi.G17_RUNTIME_ACCESSORS[
+            "gpu_keepalive_override"
+        ][0]
+        del accessors[missing]
+        with self.assertRaisesRegex(ValueError, "missing G17 runtime accessor"):
+            recover_g17_abi.recover_g17_runtime_controls(allocations, accessors)
 
     def test_recovers_zero_initialized_allocations(self) -> None:
         recovered = recover_g17_abi.recover_g17_zero_initialized_allocations(

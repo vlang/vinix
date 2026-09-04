@@ -49,6 +49,96 @@ WAIT_NEXT_ASC_POWER_GENERATION = "__ZN14AGXArmFirmware29waitForNextASCPowerGener
 SNAPSHOT_ASC_POWER_GENERATION = "__ZN14AGXArmFirmware26snapshotASCPowerGenerationEv"
 GET_SYSTEM_SLEEP_NOTIFICATION = "__ZN14AGXArmFirmware35isSystemSleepNotificationInProgressEv.4221"
 SET_SYSTEM_SLEEP_NOTIFICATION = "__ZN14AGXArmFirmware36setSystemSleepNotificationInProgressEb.4222"
+G17_RUNTIME_ACCESSORS = {
+    "progress_check_interval_3d": (
+        "__ZN14AGXArmFirmware26setProgressCheckInterval3DEj",
+        ((0x99C, 4),),
+    ),
+    "progress_check_interval_ta": (
+        "__ZN14AGXArmFirmware26setProgressCheckIntervalTAEj",
+        ((0x9A0, 4),),
+    ),
+    "progress_check_interval_cl": (
+        "__ZN14AGXArmFirmware26setProgressCheckIntervalCLEj",
+        ((0x9A4, 4),),
+    ),
+    "progress_check_threshold": (
+        "__ZN14AGXArmFirmware25setProgressCheckThresholdEj",
+        ((0x9A8, 4),),
+    ),
+    "gpu_idle_off_delay": (
+        "__ZN14AGXArmFirmware18setGPUIdleOffDelayEjj",
+        ((0x9BC, 4),),
+    ),
+    "fender_idle_off_delay": (
+        "__ZN14AGXArmFirmware21setFenderIdleOffDelayEjj",
+        ((0x9C0, 4),),
+    ),
+    "firmware_early_wake_timeout": (
+        "__ZN14AGXArmFirmware21setFWEarlyWakeTimeoutEjj",
+        ((0x9C4, 4),),
+    ),
+    "gvdm_timer_interval": (
+        "__ZN14AGXArmFirmware20setGVDMTimerIntervalEj",
+        ((0x9C8, 4),),
+    ),
+    "cl_context_switch_timeout": (
+        "__ZN14AGXArmFirmware25setCLContextSwitchTimeoutEj",
+        ((0x9CC, 4),),
+    ),
+    "cl_kill_timeout": (
+        "__ZN14AGXArmFirmware16setCLKillTimeoutEj",
+        ((0x9D0, 4),),
+    ),
+    "phase_one_cdm_context_switch_timeout": (
+        "__ZN14AGXArmFirmware34setPhaseOneCDMContextSwitchTimeoutEj",
+        ((0x9D4, 4),),
+    ),
+    "frg_context_switch_timeout": (
+        "__ZN14AGXArmFirmware26setFRGContextSwitchTimeoutEj",
+        ((0x9D8, 4),),
+    ),
+    "frg_kill_timeout": (
+        "__ZN14AGXArmFirmware17setFRGKillTimeoutEj",
+        ((0x9DC, 4),),
+    ),
+    "fw_util_default_fab_pstate": (
+        "__ZN14AGXArmFirmware25setFwUtilDefaultFabPStateEy",
+        ((0x9E8, 1), (0x9E9, 1)),
+    ),
+    "fw_util_timer_period": (
+        "__ZN14AGXArmFirmware20setFwUtilTimerPeriodEy",
+        ((0x9EA, 1),),
+    ),
+    "fw_util_debounce_periods": (
+        "__ZN14AGXArmFirmware24setFwUtilDebouncePeriodsEy",
+        ((0x9EB, 1), (0x9EC, 1)),
+    ),
+    "fw_util_pstate_threshold": (
+        "__ZN14AGXArmFirmware24setFwUtilPStateThresholdEy",
+        ((0x9ED, 1), (0x9EE, 1)),
+    ),
+    "fw_util_pstate_step_size": (
+        "__ZN14AGXArmFirmware23setFwUtilPStateStepSizeEy",
+        ((0x9EF, 1), (0x9F0, 1)),
+    ),
+    "gpu_keepalive_override": (
+        "__ZN14AGXArmFirmware23setGPUKeepAliveOverrideE13AGXSKeepAlive",
+        ((0x1C30, 4),),
+    ),
+    "gfxc_keepalive_override": (
+        "__ZN14AGXArmFirmware24setGFXCKeepAliveOverrideE13AGXSKeepAlive",
+        ((0x1C34, 4),),
+    ),
+    "gpu_keepalive_perf_mode_threshold": (
+        "__ZN14AGXArmFirmware32setGPUKeepAlivePerfModeThresholdEj",
+        ((0x1C38, 4),),
+    ),
+    "gpu_keepalive_off_mode_threshold": (
+        "__ZN14AGXArmFirmware31setGPUKeepAliveOffModeThresholdEj",
+        ((0x1C3C, 4),),
+    ),
+}
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
 DEVICE_CONTROL_RING = "__ZN18AGXAcceleratorRingI33AGFIAcceleratorDeviceControlEntryE"
@@ -1787,6 +1877,94 @@ def recover_g17_small_shared_data(
     }
 
 
+def recover_g17_runtime_controls(
+    allocations: list[dict[str, int]], accessor_code: dict[str, bytes]
+) -> dict[str, object]:
+    expected_cpu_member = 0x380
+    expected_gpu_member = 0x388
+    expected_size = 0x1CA0
+    allocation_size = next(
+        (
+            item["bytes"]
+            for item in allocations
+            if item["host_cpu_member"] == expected_cpu_member
+            and item["host_gpu_member"] == expected_gpu_member
+        ),
+        None,
+    )
+    if allocation_size != expected_size:
+        raise ValueError(f"unexpected G17 runtime-data allocation size: {allocation_size}")
+
+    recovered_fields = []
+    for field_name, (symbol, expected_accesses) in G17_RUNTIME_ACCESSORS.items():
+        code = accessor_code.get(symbol)
+        if code is None:
+            raise ValueError(f"missing G17 runtime accessor {symbol}")
+        instructions = list(words(code))
+        runtime_loads = [
+            (index, load[0])
+            for index, (_offset, word) in enumerate(instructions)
+            if (load := decode_ldr_x(word)) is not None
+            and load[2] == expected_cpu_member
+        ]
+        if not runtime_loads:
+            raise ValueError(f"{field_name} does not load the G17 runtime object")
+        actual_accesses: set[tuple[int, int]] = set()
+        for load_index, runtime_register in runtime_loads:
+            for _offset, word in instructions[load_index + 1 : load_index + 13]:
+                store = decode_str_unsigned(word)
+                if store is not None and store[1] == runtime_register:
+                    actual_accesses.add((store[2], store[3]))
+        if not set(expected_accesses).issubset(actual_accesses):
+            raise ValueError(
+                f"unexpected {field_name} runtime stores: "
+                f"{sorted(actual_accesses)}"
+            )
+        recovered_fields.append(
+            {
+                "name": field_name,
+                "accessor": symbol,
+                "stores": [
+                    {"offset": offset, "bytes": width}
+                    for offset, width in expected_accesses
+                ],
+            }
+        )
+
+    for field_name in (
+        "fw_util_debounce_periods",
+        "fw_util_pstate_threshold",
+        "fw_util_pstate_step_size",
+    ):
+        symbol = G17_RUNTIME_ACCESSORS[field_name][0]
+        require_instruction_sequence(
+            accessor_code[symbol],
+            f"{field_name} four-entry stride",
+            (
+                0x528000CC,  # mov w12, #6
+                0x9240042D,  # and x13, x1, #3
+                0x9BAC25A9,  # umaddl x9, w13, w12, x9
+            ),
+        )
+
+    return {
+        "bytes": expected_size,
+        "host_cpu_member": expected_cpu_member,
+        "host_gpu_member": expected_gpu_member,
+        "fields": recovered_fields,
+        "fw_util_pstate_controls": {
+            "offset": 0x9EB,
+            "entries": 4,
+            "stride": 6,
+            "fields": [
+                {"offset": 0, "bytes": 2, "name": "debounce_periods"},
+                {"offset": 2, "bytes": 2, "name": "pstate_threshold"},
+                {"offset": 4, "bytes": 2, "name": "pstate_step_size"},
+            ],
+        },
+    }
+
+
 def recover_g17_zero_initialized_allocations(code: bytes) -> list[dict[str, object]]:
     require_instruction_sequence(
         code,
@@ -2509,6 +2687,13 @@ def main() -> int:
             get_sleep_code,
             set_sleep_code,
         )
+        runtime_controls = recover_g17_runtime_controls(
+            allocations,
+            {
+                symbol: symbol_code(driver, symbol)[1]
+                for symbol, _accesses in G17_RUNTIME_ACCESSORS.values()
+            },
+        )
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
         )
@@ -2539,6 +2724,7 @@ def main() -> int:
                 "zero_initialized_allocations": zero_initialized_allocations,
                 "role0_bootstrap_regions": role0_bootstrap_regions,
                 "small_shared_data": small_shared_data,
+                "runtime_controls": runtime_controls,
                 "accelerator": accelerator,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,
