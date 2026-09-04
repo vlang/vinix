@@ -18,23 +18,43 @@ The Vinix flattened-device-tree parser, in contrast, correctly treats FDT
 cells as big-endian. Keep that distinction when moving observed values into
 the kernel.
 
-The metadata-only IOKit tracer records which external-method selectors and
-buffer sizes Apple's Metal driver uses while rendering an off-screen triangle.
-It does not dump command buffers or memory contents.
+The IOKit/IOGPU tracer records external-method selectors and the private
+IOGPU command-buffer segments Apple's Metal driver produces for a matched
+clear/triangle pair. With an explicit resource opt-in, it also snapshots only
+CPU-visible allocations whose GPU virtual addresses occur in those segments.
+It never maps an unknown GPU address or accesses GPU MMIO.
 
 ```sh
 make -f GNUmakefile test
 make -f GNUmakefile inspect
 make -f GNUmakefile trace
+make -f GNUmakefile trace-resources
+make -f GNUmakefile layout
+make -f GNUmakefile firmware
 ```
 
-The trace is written to `build/agx_trace.jsonl`. Set `AGX_TRACE_ALL=1` only if
-calls on non-GPU IOKit connections are also relevant. By default only sizes
-are recorded. `AGX_TRACE_BYTES=256 make -f GNUmakefile trace` also records a
-capped hexadecimal prefix of each input/output buffer for ABI analysis; those
-traces may contain process-specific addresses and should not be committed.
-Selectors `0x100` through `0x112` are annotated with names recovered from the
-local `AGXDeviceUserClient::getTargetAndMethodForIndex` table.
+The normal trace is written to `build/agx_trace.jsonl`; the larger resource
+trace goes to `build/agx_trace_resources.jsonl`. `AGX_TRACE_BYTES` caps each
+snapshot at 64 KiB. These traces contain process-specific addresses and must
+not be committed. Set `AGX_TRACE_ALL=1` only when calls on non-GPU IOKit
+connections are relevant. Selectors `0x100` through `0x112` are annotated with
+names recovered from the local
+`AGXDeviceUserClient::getTargetAndMethodForIndex` table.
+
+`trace_diff.py` defaults to comparing the clear and triangle command segments.
+It can also select a shared allocation by an observed JSON field:
+
+```sh
+./trace_diff.py build/agx_trace_resources.jsonl \
+  --event resource_snapshot \
+  --where resource_gpu_address=0x10000138000
+```
+
+`objc_layout` records class, method, and ivar metadata exposed by the local
+Objective-C runtime. `extract_firmware.py` extracts only the matching G17C
+images from the local recovery volume and emits their hashes, Mach-O UUIDs,
+and virtual layouts. Both tools write under the ignored `build/` directory;
+Apple binaries and trace data are never repository inputs.
 
 ## Current M5 Max boundary
 
