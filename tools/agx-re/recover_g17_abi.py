@@ -95,6 +95,9 @@ G17_TPU_CSC_COEFFICIENTS = (
 G17_PBE_CSC_COEFFICIENTS = (
     "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16pbe_coefficients"
 )
+G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS = (
+    "__ZN14AGXAccelerator29getBorderColorTableGPUAddressEv.8074"
+)
 SET_GVDM_MODE = "__ZN14AGXAccelerator11setGVDMModeEjjj"
 GET_UMA_MAX_ACTIVE_GTP_KICKS = "__ZN14AGXAccelerator23getUMAMaxActiveGTPKicksEv"
 PERF_COUNTER_SOURCE_STOP = "__ZN17AGXPerfCtrSampler17sourceSamplerStopEv"
@@ -334,6 +337,7 @@ G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT = 0x10E0
 G17_GET_PERF_STATE_CAP_VTABLE_SLOT = 0x11D8
 G17_SETUP_CSC_ALLOCATION_VTABLE_SLOT = 0xF40
 G17_GENERATE_CSC_COEFFICIENTS_VTABLE_SLOT = 0xFB8
+G17_BORDER_COLOR_TABLE_ADDRESS_VTABLE_SLOT = 0xE90
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -4011,6 +4015,129 @@ def recover_g17_color_matrices(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_hardware_config_constants(
+    image: bytes, base_init_code: bytes, arm_init_code: bytes
+) -> dict[str, object]:
+    """Recover fixed scalar defaults and the absent G17 border-color table."""
+
+    symbols = macho_symbols(image)
+    required = (
+        G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS,
+        INIT_BASE_FIRMWARE_DATA,
+        INIT_FIRMWARE_DATA,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 hardware-config symbols: {missing}")
+
+    provider = recover_vtable_target(
+        image,
+        G17_ACCELERATOR_VTABLE,
+        G17_BORDER_COLOR_TABLE_ADDRESS_VTABLE_SLOT,
+    )
+    if provider != symbols[G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS]:
+        raise ValueError(
+            f"unexpected G17 border-color table address provider {provider:#x}"
+        )
+    _address, provider_code = symbol_code(
+        image, G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS
+    )
+    if provider_code != struct.pack(
+        "<3I", 0xD503245F, 0xD2800000, 0xD65F03C0
+    ):
+        raise ValueError("G17 border-color table address provider does not return zero")
+
+    base_address = symbols[INIT_BASE_FIRMWARE_DATA]
+    base_vector = read_adrp_load(
+        image, base_address, base_init_code, 0x13B0, 0x13B4, 16
+    )
+    arm_vector = read_adrp_load(
+        image,
+        symbols[INIT_FIRMWARE_DATA],
+        arm_init_code,
+        0xAC,
+        0xB0,
+        16,
+    )
+    debug_flags = read_adrp_load(
+        image, base_address, base_init_code, 0x13DC, 0x13E0, 1
+    )
+    if base_vector != struct.pack("<4I", 0, 0, 0, 1):
+        raise ValueError("unexpected G17 base hardware-config constant vector")
+    if arm_vector != struct.pack("<4I", 0, 1, 1, 0):
+        raise ValueError("unexpected G17 ARM hardware-config constant vector")
+    if debug_flags != b"\0":
+        raise ValueError("G17 hardware-config debug flags do not start disabled")
+
+    require_instruction_words_at(
+        base_init_code,
+        "G17 base hardware-config scalar constants",
+        {
+            0x1264: 0xF9415E68,
+            0x1268: 0xB90EBD1F,  # config +0xebc = 0
+            0x126C: 0x52800036,
+            0x1270: 0xB90EC916,  # config +0xec8 = 1
+            0x13AC: 0x913AB128,  # config +0xeac
+            0x13B4: 0x3DC35540,
+            0x13B8: 0x3D800100,
+            0x13E4: 0x721C017F,
+            0x13E8: 0x5280190B,
+            0x13EC: 0x1A9F156B,  # disabled debug flags select 1
+            0x13F0: 0xB90ED52B,  # config +0xed4
+            0x165C: 0xF9415E68,
+            0x1660: 0xF9031D00,  # config +0x638 = border-color address
+            0x1664: 0x3968A6A9,
+            0x1668: 0x5301052A,
+            0x166C: 0xB90EA10A,  # debug bit 1 -> config +0xea0
+            0x1670: 0x53041129,
+            0x1674: 0xB90EA909,  # debug bit 4 -> config +0xea8
+        },
+    )
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 ARM hardware-config scalar constants",
+        {
+            0x4C: 0x528BB808,  # 24 MHz in kHz
+            0x50: 0xB90ED128,  # config +0xed0
+            0x58: 0x913B9128,  # config +0xee4
+            0x5C: 0xB20003EA,  # two adjacent one-valued words
+            0x60: 0xF900010A,
+            0x64: 0x528003E8,
+            0x68: 0xB90F0528,  # config +0xf04 = 31
+            0xB0: 0x3DC35100,
+            0xB4: 0x3D83CD20,  # config +0xf30 constant vector
+            0x4E0: 0x52800029,
+            0x4E4: 0xB90EE109,  # config +0xee0 = 1
+        },
+    )
+
+    return {
+        "border_color_table_address": {
+            "offset": 0x638,
+            "value": 0,
+            "provider_vtable_slot": G17_BORDER_COLOR_TABLE_ADDRESS_VTABLE_SLOT,
+            "provider": G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS,
+        },
+        "scalar_block": {
+            "offset": 0xE90,
+            "bytes": 0x134,
+            "debug_flags_initial": 0,
+            "fixed_u32": {
+                "0xeb8": 1,
+                "0xec8": 1,
+                "0xed0": 24000,
+                "0xed4": 1,
+                "0xee0": 1,
+                "0xee4": 1,
+                "0xee8": 1,
+                "0xf04": 31,
+                "0xf34": 1,
+                "0xf38": 1,
+            },
+        },
+    }
+
+
 def recover_g17_aux_performance_layout(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -4950,6 +5077,9 @@ def main() -> int:
             driver, base_init_code
         )
         hardware_config["color_matrices"] = recover_g17_color_matrices(driver)
+        hardware_config["fixed_constants"] = recover_g17_hardware_config_constants(
+            driver, base_init_code, function
+        )
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)
         )

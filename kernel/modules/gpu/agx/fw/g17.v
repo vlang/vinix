@@ -56,6 +56,8 @@ pub const g17_secondary_region_size = u64(0x6f0)
 pub const g17_secondary_aux_size = u64(0xa8)
 pub const g17_hardware_config_size = u64(0x2710)
 pub const g17_address_space_layout_size = u64(0x38)
+pub const g17_firmware_scalar_block_size = u64(0x134)
+pub const g17_firmware_scalar_word_count = 77
 pub const g17_userspace_va_map = u64(0x6f00000000)
 pub const g17_userspace_va_limit = u64(0xffc00000)
 pub const g17_usc_start = u64(0x1000000000)
@@ -746,6 +748,31 @@ fn populate_g17_color_matrices(mut config G17HardwareConfig) {
 		16383, 16384, 16384, -13730, -2654, 16384]!
 }
 
+// Four-byte-aligned scalar controls at hardware-config offsets 0xe90..0xfc3.
+// Only independently recovered fixed startup values are populated here;
+// feature-derived words remain zero until their producers are modeled.
+@[packed]
+pub struct G17FirmwareScalarBlock {
+pub mut:
+	values [g17_firmware_scalar_word_count]u32
+}
+
+pub fn new_g17_firmware_scalar_block() G17FirmwareScalarBlock {
+	mut result := G17FirmwareScalarBlock{}
+	result.values[(0xeb8 - 0xe90) / 4] = 1
+	result.values[(0xec8 - 0xe90) / 4] = 1
+	result.values[(0xed0 - 0xe90) / 4] = 24_000
+	// The standard path starts with Apple's debug flags disabled, selecting 1.
+	result.values[(0xed4 - 0xe90) / 4] = 1
+	result.values[(0xee0 - 0xe90) / 4] = 1
+	result.values[(0xee4 - 0xe90) / 4] = 1
+	result.values[(0xee8 - 0xe90) / 4] = 1
+	result.values[(0xf04 - 0xe90) / 4] = 31
+	result.values[(0xf34 - 0xe90) / 4] = 1
+	result.values[(0xf38 - 0xe90) / 4] = 1
+	return result
+}
+
 // Hardware/configuration allocation published at offset zero of both
 // firmware-shared objects. The host producer and primary firmware consumer
 // independently establish the record boundaries below. Unknown scalar and
@@ -755,10 +782,10 @@ pub struct G17HardwareConfig {
 pub mut:
 	address_space_layout_000       G17AddressSpaceLayout
 	color_matrices_038             [g17_color_matrix_count]G17ColorMatrixRecord
-	io_mapping_aux_address_638     u64
+	border_color_table_address_638 u64
 	io_mappings_640                [g17_io_mapping_count]G17IoMappingRecord
 	opaque_e88                     [0x8]u8
-	firmware_scalar_block_e90      [0x134]u8
+	firmware_scalar_block_e90      G17FirmwareScalarBlock
 	performance_state_max_fc4      u32
 	frequency_table_fc8            [g17_performance_state_capacity]u32
 	voltage_table_1008             [g17_performance_state_capacity]G17VoltageTableRow
@@ -778,7 +805,7 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size
+	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17FirmwareScalarBlock) == g17_firmware_scalar_block_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size
 }
 
 // Populate the table subset whose source and scale are established by both
@@ -881,6 +908,9 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		mut config := &G17HardwareConfig(buffer)
 		config.address_space_layout_000 = new_g17_address_space_layout()
 		populate_g17_color_matrices(mut config)
+		// G17's selected virtual provider returns zero for this optional table.
+		config.border_color_table_address_638 = 0
+		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block()
 		if !populate_g17_pio_mappings(mut config, hardware) {
 			return false
 		}

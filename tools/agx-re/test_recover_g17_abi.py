@@ -2168,6 +2168,80 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(recovered["banks"][1]["nonzero_records"][0]["index"], 28)
 
+    def test_recovers_g17_hardware_config_constants(self) -> None:
+        base_init = bytearray(0x1678)
+        arm_init = bytearray(0x4E8)
+        base_words = {
+            0x1264: 0xF9415E68,
+            0x1268: 0xB90EBD1F,
+            0x126C: 0x52800036,
+            0x1270: 0xB90EC916,
+            0x13AC: 0x913AB128,
+            0x13B4: 0x3DC35540,
+            0x13B8: 0x3D800100,
+            0x13E4: 0x721C017F,
+            0x13E8: 0x5280190B,
+            0x13EC: 0x1A9F156B,
+            0x13F0: 0xB90ED52B,
+            0x165C: 0xF9415E68,
+            0x1660: 0xF9031D00,
+            0x1664: 0x3968A6A9,
+            0x1668: 0x5301052A,
+            0x166C: 0xB90EA10A,
+            0x1670: 0x53041129,
+            0x1674: 0xB90EA909,
+        }
+        arm_words = {
+            0x4C: 0x528BB808,
+            0x50: 0xB90ED128,
+            0x58: 0x913B9128,
+            0x5C: 0xB20003EA,
+            0x60: 0xF900010A,
+            0x64: 0x528003E8,
+            0x68: 0xB90F0528,
+            0xB0: 0x3DC35100,
+            0xB4: 0x3D83CD20,
+            0x4E0: 0x52800029,
+            0x4E4: 0xB90EE109,
+        }
+        for offset, word in base_words.items():
+            struct.pack_into("<I", base_init, offset, word)
+        for offset, word in arm_words.items():
+            struct.pack_into("<I", arm_init, offset, word)
+
+        symbols = {
+            recover_g17_abi.INIT_BASE_FIRMWARE_DATA: 0x1000,
+            recover_g17_abi.INIT_FIRMWARE_DATA: 0x2000,
+            recover_g17_abi.G17_GET_BORDER_COLOR_TABLE_GPU_ADDRESS: 0x3000,
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=0x3000
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(0x3000, encode(0xD503245F, 0xD2800000, 0xD65F03C0)),
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "read_adrp_load",
+                side_effect=[
+                    struct.pack("<4I", 0, 0, 0, 1),
+                    struct.pack("<4I", 0, 1, 1, 0),
+                    b"\0",
+                ],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_hardware_config_constants(
+                b"", bytes(base_init), bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["border_color_table_address"]["value"], 0)
+        self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xed0"], 24000)
+        self.assertEqual(recovered["scalar_block"]["fixed_u32"]["0xf38"], 1)
+
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
             0x7100045F,
