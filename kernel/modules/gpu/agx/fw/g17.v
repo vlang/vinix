@@ -57,6 +57,10 @@ pub const g17_io_mapping_count = 53
 pub const g17_io_mapping_size = u64(0x28)
 pub const g17_performance_state_capacity = 16
 pub const g17_voltage_table_columns = 16
+pub const g17_fw_util_pstate_control_count = 4
+pub const g17_fw_util_pstate_control_size = u64(0x06)
+pub const g17_register_override_count = 16
+pub const g17_register_override_size = u64(0x18)
 
 // Exact 0x68-byte slice copied from fields 0x18..0x7f of the G17 legacy
 // shared-GART backing object into both bootstrap roots at offset 0x30.
@@ -286,6 +290,17 @@ pub mut:
 	pstate_step_size_low  u8
 }
 
+// Runtime register override records are indexed with a 24-byte stride. The
+// producer admits at most 16 entries and publishes the active count at 0x984.
+@[packed]
+pub struct G17RegisterOverride {
+pub mut:
+	value       u64
+	mask        u64
+	register    u32
+	padding_014 u32
+}
+
 // Runtime object referenced by root+0x20. The named tail controls below are
 // independently fixed by short, symbolized G17 accessors. Opaque ranges still
 // contain configuration populated by initFirmwareData and must not be treated
@@ -293,11 +308,81 @@ pub mut:
 @[packed]
 pub struct G17RuntimeData {
 pub mut:
-	opaque_000                           [0x99c]u8
+	opaque_000                           [0x0c]u8
+	dm_pause_mode                        u32
+	opaque_010                           [0x04]u8
+	dm_pause_timer                       u32
+	opaque_018                           [0x08]u8
+	mtr_sensor_ptd_override_mask         u64
+	frg_task_timeout                     u32
+	power_config_02c                     u32
+	power_config_030                     u32
+	smart_idle_enabled                   u32
+	state_038                            u32
+	opaque_03c                           [0x04]u8
+	cpms_window_size                     u32
+	cpms_tfca_size                       u32
+	state_048                            u32
+	kick_channel_qos_04c                 u32
+	kick_channel_qos_050                 u32
+	platform_values_054                  [3]u16
+	state_05a                            u32
+	state_05e                            u32
+	state_062                            u32
+	opaque_066                           [0x04]u8
+	state_06a                            u32
+	opaque_06e                           [0x0a]u8
+	command_submission_enabled           u32
+	opaque_07c                           [0x08]u8
+	power_config_084                     u32
+	opaque_088                           [0x0c]u8
+	performance_controller_override      u32
+	performance_state_cap                u32
+	state_09c                            u32
+	state_0a0                            u32
+	performance_controller_target        u32
+	performance_controller_dead_zone     u32
+	performance_controller_transfer      u32
+	performance_boost_min_util           u32
+	performance_boost_ce_step            u32
+	performance_controller_reset_iters   u32
+	performance_boost_min_util_valid     u8
+	performance_time_filter_constants    [2]u32
+	performance_integral_gain_bits       [2]u32
+	performance_proportional_gain_bits   [2]u32
+	performance_dual_filter              u8
+	performance_time_filter_valid        [2]u8
+	performance_integral_gain_valid      [2]u8
+	performance_proportional_gain_valid  [2]u8
+	performance_dual_filter_valid        u8
+	opaque_0dd                           [0x07]u8
+	clpc_deadline_control_effort         u32
+	clpc_deadline_control_override       u32
+	power_controller_payload_0ec         [0x6d8]u8
+	smart_idle_standby_timer_us          u32
+	smart_idle_probability_initial_bits  u32
+	smart_idle_fn_hit_bits               u32
+	smart_idle_fi_hit_bits               u32
+	smart_idle_fn_miss_bits              u32
+	smart_idle_fi_miss_bits              u32
+	smart_idle_neighbor_hit_bits         u32
+	smart_idle_gpu_min_confidence_bits   u32
+	smart_idle_gpu_high_confidence_bits  u32
+	smart_idle_reset_iterations          u32
+	ut_engagement_primary                u32
+	ut_engagement_secondary              u32
+	pmu_engagement                       u32
+	gpu_keepalive_perf_mode_default      u32
+	gpu_keepalive_off_mode_default       u32
+	opaque_800                           [0x04]u8
+	register_overrides                   [g17_register_override_count]G17RegisterOverride
+	register_override_count              u32
+	opaque_988                           [0x14]u8
 	progress_check_interval_3d           u32
 	progress_check_interval_ta           u32
 	progress_check_interval_cl           u32
 	progress_check_threshold             u32
+	progress_check_dm_config             u32
 	opaque_9b0                           [0x0c]u8
 	gpu_idle_off_delay                   u32
 	fender_idle_off_delay                u32
@@ -312,7 +397,7 @@ pub mut:
 	fw_util_default_fab_pstate_high      u8
 	fw_util_default_fab_pstate_low       u8
 	fw_util_timer_period                 u8
-	fw_util_pstate_controls              [4]G17FwUtilPStateControl
+	fw_util_pstate_controls              [g17_fw_util_pstate_control_count]G17FwUtilPStateControl
 	opaque_a03                           [0x122d]u8
 	gpu_keepalive_override               u32
 	gfxc_keepalive_override              u32
@@ -493,7 +578,7 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
+	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
 }
 
 // Populate the table subset whose source and scale are established by both

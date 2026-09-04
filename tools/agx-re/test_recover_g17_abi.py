@@ -533,6 +533,20 @@ def runtime_control_code() -> dict[str, bytes]:
             for offset, width in accesses
         )
         result[symbol] = encode(*instructions)
+    result[recover_g17_abi.G17_ADD_REGISTER_OVERRIDE] = encode(
+        0x8B0A054A,
+        0xD37DF14A,
+        0x8B0A012B,
+        0xB9081561,
+        0x91201129,
+        0xF9000182,
+        0x91203169,
+        0xF9000123,
+        0xF941C108,
+        0xB9498509,
+        0x11000529,
+        0xB9098509,
+    )
     return result
 
 
@@ -652,8 +666,16 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(recovered["bytes"], 0x1CA0)
         self.assertEqual(recovered["host_gpu_member"], 0x388)
-        self.assertEqual(recovered["fields"][0]["stores"][0]["offset"], 0x99C)
-        self.assertEqual(recovered["fields"][-1]["stores"][0]["offset"], 0x1C3C)
+        fields = {item["name"]: item for item in recovered["fields"]}
+        self.assertEqual(
+            fields["progress_check_interval_3d"]["stores"][0]["offset"], 0x99C
+        )
+        self.assertEqual(
+            fields["gpu_keepalive_off_mode_threshold"]["stores"][0]["offset"],
+            0x1C3C,
+        )
+        self.assertEqual(recovered["register_overrides"]["entries"], 16)
+        self.assertEqual(recovered["register_overrides"]["stride"], 0x18)
         self.assertEqual(recovered["fw_util_pstate_controls"]["entries"], 4)
         self.assertEqual(recovered["fw_util_pstate_controls"]["stride"], 6)
 

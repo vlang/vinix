@@ -49,7 +49,108 @@ WAIT_NEXT_ASC_POWER_GENERATION = "__ZN14AGXArmFirmware29waitForNextASCPowerGener
 SNAPSHOT_ASC_POWER_GENERATION = "__ZN14AGXArmFirmware26snapshotASCPowerGenerationEv"
 GET_SYSTEM_SLEEP_NOTIFICATION = "__ZN14AGXArmFirmware35isSystemSleepNotificationInProgressEv.4221"
 SET_SYSTEM_SLEEP_NOTIFICATION = "__ZN14AGXArmFirmware36setSystemSleepNotificationInProgressEb.4222"
+G17_ADD_REGISTER_OVERRIDE = "__ZN14AGXArmFirmware19addRegisterOverrideEjyy"
 G17_RUNTIME_ACCESSORS = {
+    "dm_pause_mode": (
+        "__ZN14AGXArmFirmware14setDMPauseModeEj",
+        ((0x00C, 4),),
+    ),
+    "dm_pause_timer": (
+        "__ZN14AGXArmFirmware15setDMPauseTimerEj",
+        ((0x014, 4),),
+    ),
+    "frg_task_timeout": (
+        "__ZN14AGXArmFirmware17setFRGTaskTimeoutEj",
+        ((0x028, 4),),
+    ),
+    "smart_idle_enabled": (
+        "__ZN14AGXArmFirmware21setSmartIdleOffEnableEb",
+        ((0x034, 4),),
+    ),
+    "cpms_window_size": (
+        "__ZN14AGXArmFirmware17setCPMSWindowSizeEj",
+        ((0x040, 4),),
+    ),
+    "cpms_tfca_size": (
+        "__ZN14AGXArmFirmware15setCPMSTFCASizeEj",
+        ((0x044, 4),),
+    ),
+    "command_submission_enabled": (
+        "__ZN14AGXArmFirmware27setCommandSubmissionEnabledEb.4234",
+        ((0x078, 4),),
+    ),
+    "performance_controller_target": (
+        "__ZN14AGXArmFirmware30setPerformanceControllerTargetEj",
+        ((0x0A4, 4),),
+    ),
+    "performance_controller_dead_zone": (
+        "__ZN14AGXArmFirmware32setPerformanceControllerDeadZoneEj",
+        ((0x0A8, 4),),
+    ),
+    "performance_controller_transfer_output": (
+        "__ZN14AGXArmFirmware38setPerformanceControllerTransferOutputEj",
+        ((0x0AC, 4),),
+    ),
+    "performance_controller_dual_filter": (
+        "__ZN14AGXArmFirmware34setPerformanceControllerDualFilterEb",
+        ((0x0D5, 1), (0x0DC, 1)),
+    ),
+    "clpc_deadline_control_effort": (
+        "__ZN14AGXArmFirmware28setCLPCDeadlineControlEffortEj",
+        ((0x0E4, 4),),
+    ),
+    "smart_idle_standby_timer_us": (
+        "__ZN14AGXArmFirmware29setSmartIdleOffStandbyTimerUSEj",
+        ((0x7C4, 4),),
+    ),
+    "smart_idle_probability_initial": (
+        "__ZN14AGXArmFirmware26setSmartIdleOffProbInitValEf",
+        ((0x7C8, 4),),
+    ),
+    "smart_idle_fn_hit": (
+        "__ZN14AGXArmFirmware20setSmartIdleOffFnHitEf",
+        ((0x7CC, 4),),
+    ),
+    "smart_idle_fi_hit": (
+        "__ZN14AGXArmFirmware20setSmartIdleOffFiHitEf",
+        ((0x7D0, 4),),
+    ),
+    "smart_idle_fn_miss": (
+        "__ZN14AGXArmFirmware21setSmartIdleOffFnMissEf",
+        ((0x7D4, 4),),
+    ),
+    "smart_idle_fi_miss": (
+        "__ZN14AGXArmFirmware21setSmartIdleOffFiMissEf",
+        ((0x7D8, 4),),
+    ),
+    "smart_idle_neighbor_hit": (
+        "__ZN14AGXArmFirmware21setSmartIdleOffNeiHitEf",
+        ((0x7DC, 4),),
+    ),
+    "smart_idle_gpu_min_confidence": (
+        "__ZN14AGXArmFirmware31setSmartIdleOffGPUMinConfidenceEf",
+        ((0x7E0, 4),),
+    ),
+    "smart_idle_gpu_high_confidence": (
+        "__ZN14AGXArmFirmware32setSmartIdleOffGPUHighConfidenceEf",
+        ((0x7E4, 4),),
+    ),
+    "smart_idle_reset_iterations": (
+        "__ZN14AGXArmFirmware30setSmartIdleOffResetIterationsEj",
+        ((0x7E8, 4),),
+    ),
+    "ut_engagement": (
+        "__ZN14AGXArmFirmware18enableUTEngagementEb",
+        ((0x7EC, 4), (0x7F0, 4)),
+    ),
+    "pmu_engagement": (
+        "__ZN14AGXArmFirmware19enablePMUEngagementEb",
+        ((0x7F4, 4),),
+    ),
+    "register_override_count": (
+        "__ZN14AGXArmFirmware22resetRegisterOverridesEv",
+        ((0x984, 4),),
+    ),
     "progress_check_interval_3d": (
         "__ZN14AGXArmFirmware26setProgressCheckInterval3DEj",
         ((0x99C, 4),),
@@ -65,6 +166,10 @@ G17_RUNTIME_ACCESSORS = {
     "progress_check_threshold": (
         "__ZN14AGXArmFirmware25setProgressCheckThresholdEj",
         ((0x9A8, 4),),
+    ),
+    "progress_check_dm_config": (
+        "__ZN14AGXArmFirmware24setProgressCheckDmConfigE16AGXSLockupConfig19_AGFIDataMasterType",
+        ((0x9AC, 4),),
     ),
     "gpu_idle_off_delay": (
         "__ZN14AGXArmFirmware18setGPUIdleOffDelayEjj",
@@ -405,6 +510,9 @@ def decode_str_unsigned(word: int) -> tuple[int, int, int, int] | None:
         0x79000000: 2,
         0xB9000000: 4,
         0xF9000000: 8,
+        0xBD000000: 4,
+        0xFD000000: 8,
+        0x3D800000: 16,
     }
     width = kinds.get(word & 0xFFC00000)
     if width is None:
@@ -1947,11 +2055,56 @@ def recover_g17_runtime_controls(
             ),
         )
 
+    register_override_code = accessor_code.get(G17_ADD_REGISTER_OVERRIDE)
+    if register_override_code is None:
+        raise ValueError(f"missing G17 runtime accessor {G17_ADD_REGISTER_OVERRIDE}")
+    require_instruction_sequence(
+        register_override_code,
+        "register-override record selection",
+        (
+            0x8B0A054A,  # count * 3
+            0xD37DF14A,  # byte stride 24
+            0x8B0A012B,
+            0xB9081561,  # register at record +0x10
+            0x91201129,  # table base runtime +0x804
+        ),
+    )
+    require_instruction_sequence(
+        register_override_code,
+        "register-override values",
+        (
+            0xF9000182,  # first u64 at record +0x00
+            0x91203169,
+            0xF9000123,  # second u64 at record +0x08
+        ),
+    )
+    require_instruction_sequence(
+        register_override_code,
+        "register-override count publication",
+        (
+            0xF941C108,
+            0xB9498509,
+            0x11000529,
+            0xB9098509,
+        ),
+    )
+
     return {
         "bytes": expected_size,
         "host_cpu_member": expected_cpu_member,
         "host_gpu_member": expected_gpu_member,
         "fields": recovered_fields,
+        "register_overrides": {
+            "offset": 0x804,
+            "entries": 16,
+            "stride": 0x18,
+            "count_offset": 0x984,
+            "fields": [
+                {"offset": 0x00, "bytes": 8, "name": "value"},
+                {"offset": 0x08, "bytes": 8, "name": "mask"},
+                {"offset": 0x10, "bytes": 4, "name": "register"},
+            ],
+        },
         "fw_util_pstate_controls": {
             "offset": 0x9EB,
             "entries": 4,
@@ -2692,6 +2845,11 @@ def main() -> int:
             {
                 symbol: symbol_code(driver, symbol)[1]
                 for symbol, _accesses in G17_RUNTIME_ACCESSORS.values()
+            }
+            | {
+                G17_ADD_REGISTER_OVERRIDE: symbol_code(
+                    driver, G17_ADD_REGISTER_OVERRIDE
+                )[1]
             },
         )
         firmware_shared_data = recover_firmware_shared_data_layout(

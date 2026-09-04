@@ -12,6 +12,7 @@ import gpu.agx.regs
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import gpu.agx.event
+import gpu.agx.fw
 import gpu.agx.file as agx_file
 import gpu.dcp
 import drm
@@ -280,6 +281,10 @@ pub fn initialise() {
 	agx_driver_inst.detected = true
 
 	if chip_id == 0x6050 {
+		if !fw.validate_g17_bootstrap_allocations() || !fw.validate_g17_accelerator_layouts() {
+			println('agx: internal G17 firmware layout validation failed')
+			return
+		}
 		C.printf(c'agx: detected t6050 / G17C, %u cores in %u GPU partitions\n', cfg.gpu_core_count, cfg.num_mgpus)
 	} else {
 		C.printf(c'agx: detected chip 0x%x, %u cores\n', chip_id, cfg.gpu_core_count)
