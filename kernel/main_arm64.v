@@ -43,7 +43,8 @@ __global (
 	volatile kernel_file_req = limine.LimineKernelFileRequest{
 		response: unsafe { nil }
 	}
-	minimal_apple_bringup = true
+	enable_apple_gpu     = false
+	enable_apple_dcp     = false
 	force_qemu_platform  = false
 	aic_timer_irq         = u32(3)
 )
@@ -134,17 +135,24 @@ fn kmain_thread() {
 	initramfs.initialise()
 	print('kmain_thread: initramfs done\n')
 
-	// Keep Apple bring-up minimal until interrupt/device plumbing is stable.
-	if devicetree.is_available() && !minimal_apple_bringup {
-		print('kmain_thread: init GPU driver...\n')
-		agx_driver.initialise()
-		print('kmain_thread: GPU driver done\n')
+	// GPU and display bring-up are independent experiments. In particular,
+	// probing a newly recognized GPU must not run an unrelated DCP sequence.
+	if devicetree.is_available() {
+		if enable_apple_gpu {
+			print('kmain_thread: init GPU driver...\n')
+			agx_driver.initialise()
+			print('kmain_thread: GPU driver done\n')
+		} else {
+			print('kmain_thread: skipping GPU (not enabled)\n')
+		}
 
-		print('kmain_thread: init DCP driver...\n')
-		dcp.initialise()
-		print('kmain_thread: DCP driver done\n')
-	} else if devicetree.is_available() {
-		print('kmain_thread: skipping GPU/DCP (minimal Apple bring-up mode)\n')
+		if enable_apple_dcp {
+			print('kmain_thread: init DCP driver...\n')
+			dcp.initialise()
+			print('kmain_thread: DCP driver done\n')
+		} else {
+			print('kmain_thread: skipping DCP (not enabled)\n')
+		}
 	} else {
 		print('kmain_thread: skipping GPU/DCP (no device tree)\n')
 	}
@@ -187,41 +195,48 @@ fn get_dt_base(compat string, default_base u64) u64 {
 	return default_base
 }
 
-// Apple Silicon GPU/DCP bring-up is still experimental; keep it disabled by
-// default to avoid hard resets on real hardware. Use kernel cmdline
-// "vinix.apple_gpu=1" (or "vinix.minimal_apple=0") to enable it.
+// Apple Silicon GPU/DCP bring-up is still experimental; keep each subsystem
+// disabled by default to avoid hard resets on real hardware. Use kernel
+// cmdline "vinix.apple_gpu=1" and/or "vinix.apple_dcp=1". The legacy
+// "vinix.minimal_apple=0" spelling explicitly enables both.
 fn configure_apple_bringup_from_cmdline() {
 	if kernel_file_req.response == unsafe { nil } {
-		print('boot cmdline: unavailable, using minimal Apple bring-up\n')
+		print('boot cmdline: unavailable, Apple GPU/DCP disabled\n')
 		return
 	}
 	kernel_file := kernel_file_req.response.kernel_file
 	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
-		print('boot cmdline: empty, using minimal Apple bring-up\n')
+		print('boot cmdline: empty, Apple GPU/DCP disabled\n')
 		return
 	}
 
 	cmdline := unsafe { cstring_to_vstring(kernel_file.cmdline) }
 	if cmdline.len == 0 {
-		print('boot cmdline: empty, using minimal Apple bring-up\n')
+		print('boot cmdline: empty, Apple GPU/DCP disabled\n')
 		return
 	}
 
-	if cmdline.contains('vinix.apple_gpu=1') || cmdline.contains('vinix.minimal_apple=0') {
-		minimal_apple_bringup = false
+	if cmdline.contains('vinix.apple_gpu=1') {
+		enable_apple_gpu = true
+	}
+	if cmdline.contains('vinix.apple_dcp=1') {
+		enable_apple_dcp = true
+	}
+	if cmdline.contains('vinix.minimal_apple=0') {
+		enable_apple_gpu = true
+		enable_apple_dcp = true
 	}
 	if cmdline.contains('vinix.minimal_apple=1') {
-		minimal_apple_bringup = true
+		enable_apple_gpu = false
+		enable_apple_dcp = false
 	}
 	if cmdline.contains('vinix.qemu_platform=1') {
 		force_qemu_platform = true
 	}
 
-	if minimal_apple_bringup {
-		print('apple bring-up: minimal mode (GPU/DCP disabled)\n')
-	} else {
-		print('apple bring-up: experimental GPU/DCP enabled via cmdline\n')
-	}
+	C.printf(c'apple bring-up: GPU=%s DCP=%s\n',
+		if enable_apple_gpu { c'enabled' } else { c'disabled' },
+		if enable_apple_dcp { c'enabled' } else { c'disabled' })
 }
 
 fn kmain() {

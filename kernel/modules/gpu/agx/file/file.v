@@ -128,18 +128,21 @@ pub fn (mut f GpuFile) close() {
 // GET_PARAMS ioctl handler -- return GPU hardware parameters.
 pub fn (f &GpuFile) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 	mut params := unsafe { data }
+	mgr := gpu.get_global_manager() or {
+		return -19 // ENODEV
+	}
 	match params.param {
 		0 { // GPU_UNSTABLE_UABI_VERSION
 			params.value = 1
 		}
 		1 { // GPU_CHIP_ID
-			params.value = 0x8103 // M1
+			params.value = mgr.hw_config.chip_id
 		}
 		2 { // GPU_NUM_CORES
-			params.value = 8
+			params.value = mgr.hw_config.gpu_core_count
 		}
 		3 { // GPU_NUM_CLUSTERS
-			params.value = 1
+			params.value = mgr.hw_config.num_clusters
 		}
 		else {
 			return -22 // EINVAL
