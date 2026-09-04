@@ -17,6 +17,10 @@ def add_immediate(destination: int, source: int, immediate: int) -> int:
     return 0x91000000 | immediate << 10 | source << 5 | destination
 
 
+def bl(source: int, target: int) -> int:
+    return 0x94000000 | (((target - source) // 4) & 0x03FFFFFF)
+
+
 def ldp_x(first: int, second: int, base: int, immediate: int) -> int:
     return (
         0xA9400000
@@ -750,6 +754,124 @@ def runtime_power_policy_code() -> tuple[bytes, bytes]:
     return arm_power, populate
 
 
+def runtime_platform_policy_code() -> tuple[
+    dict[str, int], dict[str, tuple[int, bytes]]
+]:
+    addresses = {
+        recover_g17_abi.BASE_CONFIGURE_DEVICE: 0x100000,
+        recover_g17_abi.PI300_CONFIGURE_DEVICE: 0x101000,
+        recover_g17_abi.G17_CONFIGURE_DEVICE: 0x102000,
+        recover_g17_abi.BASE_CONFIGURE_POWER: 0x103000,
+        recover_g17_abi.G17_CONFIGURE_POWER: 0x104000,
+    }
+
+    def code_with(size: int, inserts: dict[int, tuple[int, ...]]) -> bytes:
+        result = bytearray(size)
+        for offset, values in inserts.items():
+            struct.pack_into(f"<{len(values)}I", result, offset, *values)
+        return bytes(result)
+
+    base_device = addresses[recover_g17_abi.BASE_CONFIGURE_DEVICE]
+    pi_device = addresses[recover_g17_abi.PI300_CONFIGURE_DEVICE]
+    g17_device = addresses[recover_g17_abi.G17_CONFIGURE_DEVICE]
+    base_power = addresses[recover_g17_abi.BASE_CONFIGURE_POWER]
+    g17_power = addresses[recover_g17_abi.G17_CONFIGURE_POWER]
+    pi_platform_sequence = (
+        0xF0FF3DC8,
+        0xFD448900,
+        0x12800008,
+        0xB9077268,
+        0xD0FF3E48,
+        0x9111A508,
+        0xF9344268,
+        0x90FFA439,
+        0xF941DB39,
+        0xB9400328,
+        0x1AC82308,
+        0x528FFFE9,
+        0x0B090109,
+        0x4B0803E8,
+        0x0A080128,
+        0x3906629F,
+        0xFD03B660,
+    )
+    base_smart_idle_sequence = (
+        0xF0FF41C8,
+        0x3DC29500,
+        0x3C8142E0,
+        0x528000C8,
+        0xB90026E8,
+        0x52805788,
+        0xB90002E8,
+        0xF0FF41C8,
+        0x3DC29900,
+        0x3C8042E0,
+    )
+    g17_smart_idle_sequence = (
+        0x52933348,
+        0x72A7E328,
+        0xB902E688,
+        0x52801F09,
+        0xB902BA89,
+        0xB942B28A,
+        0x1ACA0929,
+        0xB902B689,
+        0x91093289,
+        0xD0FF3D6A,
+        0xFD44B940,
+        0xFD000120,
+        0x52933349,
+        0x72A7D329,
+        0xB9002E89,
+        0x52A83109,
+        0xB9002289,
+        0x52800209,
+        0xB9000289,
+        0xD0FF3D69,
+        0xFD44BD20,
+        0xFD0002A0,
+        0xD0FF3D69,
+        0xFD44C120,
+        0xFD04CEA0,
+        0xB9001EC8,
+        0x5280BB88,
+        0xB90002C8,
+    )
+    functions = {
+        recover_g17_abi.BASE_CONFIGURE_DEVICE: (base_device, bytes(4)),
+        recover_g17_abi.PI300_CONFIGURE_DEVICE: (
+            pi_device,
+            code_with(
+                0x100,
+                {
+                    0x48: (bl(pi_device + 0x48, base_device),),
+                    0xBC: pi_platform_sequence,
+                },
+            ),
+        ),
+        recover_g17_abi.G17_CONFIGURE_DEVICE: (
+            g17_device,
+            code_with(
+                0x74, {0x70: (bl(g17_device + 0x70, pi_device),)}
+            ),
+        ),
+        recover_g17_abi.BASE_CONFIGURE_POWER: (
+            base_power, code_with(0x3AC, {0x384: base_smart_idle_sequence})
+        ),
+        recover_g17_abi.G17_CONFIGURE_POWER: (
+            g17_power,
+            code_with(
+                0x184,
+                {
+                    0x20: (bl(g17_power + 0x20, base_power),),
+                    0x114: g17_smart_idle_sequence,
+                },
+            ),
+        ),
+    }
+    return addresses, functions
+
+
 def zero_initialized_allocations_code() -> bytes:
     return encode(
         0xF9417268,
@@ -921,6 +1043,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(initialized[(0x1C81, 4)], 1)
         dynamic = {item["offset"]: item for item in recovered["dynamic_fields"]}
         self.assertEqual(dynamic[0x1C41]["source"], "normalized_role_count")
+        self.assertEqual(
+            recovered["platform_copies"][3]["source"], "accelerator+0xe948"
+        )
 
     def test_rejects_incomplete_runtime_initialization(self) -> None:
         allocations = firmware_shared_allocations() + [
@@ -972,6 +1097,59 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.recover_g17_runtime_power_policy(
                 b"image", arm_power, populate
             )
+
+    def test_recovers_runtime_platform_policy(self) -> None:
+        symbols, functions = runtime_platform_policy_code()
+        platform = bytes.fromhex("ffff2800ffffffff")
+        smart_high = struct.pack("<4f", 0.1, 0.25, 0.7, 0.9)
+        smart_low = struct.pack("<4f", 1.0, 0.8, 0.2, 0.9)
+
+        def vtable_target(_image: bytes, _name: str, slot: int) -> int:
+            if slot == recover_g17_abi.G17_CONFIGURE_DEVICE_VTABLE_SLOT:
+                return symbols[recover_g17_abi.G17_CONFIGURE_DEVICE]
+            if slot == recover_g17_abi.G17_CONFIGURE_POWER_VTABLE_SLOT:
+                return symbols[recover_g17_abi.G17_CONFIGURE_POWER]
+            raise AssertionError(f"unexpected vtable slot {slot:#x}")
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                side_effect=vtable_target,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "read_adrp_load",
+                side_effect=(platform, smart_high, smart_low),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_runtime_platform_policy(b"image")
+
+        self.assertEqual(
+            recovered["platform_halfwords"]["values"], [0xFFFF, 40, 0xFFFF]
+        )
+        fields = recovered["smart_idle"]["runtime_fields"]
+        self.assertEqual(fields["standby_timer_us"], 1500)
+        self.assertEqual(fields["gpu_min_confidence_bits"], 0x3F19999A)
+        self.assertEqual(fields["reset_iterations_float_bits"], 0x40C00000)
+        self.assertEqual(recovered["smart_idle"]["source_offset"], 0xE948)
+
+    def test_rejects_wrong_runtime_platform_policy_vtable(self) -> None:
+        symbols, _functions = runtime_platform_policy_code()
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=0xDEADBEEF
+            ),
+            self.assertRaisesRegex(ValueError, "unexpected G17 configureDevice"),
+        ):
+            recover_g17_abi.recover_g17_runtime_platform_policy(b"image")
 
     def test_recovers_zero_initialized_allocations(self) -> None:
         recovered = recover_g17_abi.recover_g17_zero_initialized_allocations(

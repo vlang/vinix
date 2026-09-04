@@ -118,6 +118,9 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	if !fw.initialize_g17_runtime_power_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
 		return false
 	}
+	if !fw.initialize_g17_runtime_platform_policy(graph.runtime.cpu_address(), fw.g17_runtime_data_size) {
+		return false
+	}
 	graph.runtime_policy_ready = true
 
 	for role := 0; role < 2; role++ {
@@ -180,6 +183,6 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	mgr.initdata_va = graph.roots[0].va
 	mgr.initdata_phys = graph.roots[0].phys
-	C.printf(c'agx: G17 graph and zero DPE/PPT policy ready, but platform values are incomplete\n')
+	C.printf(c'agx: G17 graph and runtime policy ready, but shared platform calibration is incomplete\n')
 	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
 }

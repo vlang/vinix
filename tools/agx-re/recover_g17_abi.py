@@ -45,6 +45,19 @@ INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
 POPULATE_DPE_PPT_CONFIG = (
     "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData"
 )
+BASE_CONFIGURE_DEVICE = "__ZN14AGXAccelerator15configureDeviceEP9IOService"
+PI300_CONFIGURE_DEVICE = (
+    "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
+)
+G17_CONFIGURE_DEVICE = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX15configureDeviceEP9IOService"
+)
+BASE_CONFIGURE_POWER = (
+    "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv"
+)
+G17_CONFIGURE_POWER = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX38configurePowerAndPerformanceControllerEv"
+)
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 KTRACE_FIRMWARE_CALLBACK = "__ZN11AGXFirmware16ktraceFwCallbackE16kd_callback_typePv16AGFIFirmwareRole"
 WAIT_FIRMWARE_POWER_OFF = "__ZN14AGXArmFirmware23waitForFirmwarePowerOffEv"
@@ -272,6 +285,8 @@ INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
 G17_FW_BRN_SIZE_VTABLE_SLOT = 0xF90
+G17_CONFIGURE_DEVICE_VTABLE_SLOT = 0x958
+G17_CONFIGURE_POWER_VTABLE_SLOT = 0xA20
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -597,6 +612,15 @@ def decode_adrp(address: int, word: int) -> tuple[int, int] | None:
         immediate -= 1 << 21
     target = (address & ~0xFFF) + (immediate << 12)
     return register, target & 0xFFFFFFFFFFFFFFFF
+
+
+def decode_bl_target(address: int, word: int) -> int | None:
+    if word & 0xFC000000 != 0x94000000:
+        return None
+    immediate = word & 0x03FFFFFF
+    if immediate & (1 << 25):
+        immediate -= 1 << 26
+    return (address + immediate * 4) & 0xFFFFFFFFFFFFFFFF
 
 
 def decode_stp_x(word: int) -> tuple[int, int, int, int] | None:
@@ -2541,7 +2565,7 @@ def recover_g17_runtime_initialization(
             {
                 "destination_offset": 0x7C4,
                 "bytes": 0x28,
-                "source": "platform_config+0xf948",
+                "source": "accelerator+0xe948",
                 "converted_tail": True,
             },
         ],
@@ -2641,6 +2665,221 @@ def recover_g17_runtime_power_policy(
             "bytes": copied_source_end - copied_source_start,
         },
         "runtime_range": {"offset": 0xEC, "bytes": 0x6D8, "value": 0},
+    }
+
+
+def recover_g17_runtime_platform_policy(image: bytes) -> dict[str, object]:
+    """Recover the G17C platform halfwords and Smart Idle startup policy.
+
+    These values are installed by the configureDevice and
+    configurePowerAndPerformanceController virtual paths selected by the G17
+    accelerator.  Validate both vtable targets and their base-class call
+    chains before accepting constants from the implementation.
+    """
+
+    symbols = macho_symbols(image)
+    required = (
+        BASE_CONFIGURE_DEVICE,
+        PI300_CONFIGURE_DEVICE,
+        G17_CONFIGURE_DEVICE,
+        BASE_CONFIGURE_POWER,
+        G17_CONFIGURE_POWER,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    device_target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_CONFIGURE_DEVICE_VTABLE_SLOT
+    )
+    if device_target != symbols[G17_CONFIGURE_DEVICE]:
+        raise ValueError(f"unexpected G17 configureDevice target {device_target:#x}")
+    power_target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_CONFIGURE_POWER_VTABLE_SLOT
+    )
+    if power_target != symbols[G17_CONFIGURE_POWER]:
+        raise ValueError(
+            f"unexpected G17 power-controller configure target {power_target:#x}"
+        )
+
+    g17_device_address, g17_device_code = symbol_code(image, G17_CONFIGURE_DEVICE)
+    pi_device_address, pi_device_code = symbol_code(image, PI300_CONFIGURE_DEVICE)
+    base_power_address, base_power_code = symbol_code(image, BASE_CONFIGURE_POWER)
+    g17_power_address, g17_power_code = symbol_code(image, G17_CONFIGURE_POWER)
+
+    def checked_call(
+        function_address: int,
+        code: bytes,
+        offset: int,
+        expected_target: int,
+        label: str,
+    ) -> None:
+        if offset + 4 > len(code):
+            raise ValueError(f"missing {label} call")
+        word = struct.unpack_from("<I", code, offset)[0]
+        target = decode_bl_target(function_address + offset, word)
+        if target != expected_target:
+            target_text = "non-BL" if target is None else f"{target:#x}"
+            raise ValueError(
+                f"unexpected {label} target {target_text}; expected {expected_target:#x}"
+            )
+
+    checked_call(
+        g17_device_address,
+        g17_device_code,
+        0x70,
+        symbols[PI300_CONFIGURE_DEVICE],
+        "G17 configureDevice base",
+    )
+    checked_call(
+        pi_device_address,
+        pi_device_code,
+        0x48,
+        symbols[BASE_CONFIGURE_DEVICE],
+        "PI300 configureDevice base",
+    )
+    checked_call(
+        g17_power_address,
+        g17_power_code,
+        0x20,
+        symbols[BASE_CONFIGURE_POWER],
+        "G17 power-controller configure base",
+    )
+
+    require_instruction_sequence(
+        pi_device_code,
+        "G17 runtime platform halfword install",
+        (
+            0xF0FF3DC8,  # ADRP of the checked eight-byte constant
+            0xFD448900,
+            0x12800008,
+            0xB9077268,
+            0xD0FF3E48,
+            0x9111A508,
+            0xF9344268,
+            0x90FFA439,
+            0xF941DB39,
+            0xB9400328,
+            0x1AC82308,
+            0x528FFFE9,
+            0x0B090109,
+            0x4B0803E8,
+            0x0A080128,
+            0x3906629F,
+            0xFD03B660,  # constant -> accelerator +0x768
+        ),
+    )
+    platform_bytes = read_adrp_load(
+        image, pi_device_address, pi_device_code, 0xBC, 0xC0, 8
+    )[:6]
+    if len(platform_bytes) != 6:
+        raise ValueError("truncated G17 runtime platform halfword constant")
+
+    require_instruction_sequence(
+        base_power_code,
+        "base Smart Idle policy install",
+        (
+            0xF0FF41C8,
+            0x3DC29500,
+            0x3C8142E0,
+            0x528000C8,
+            0xB90026E8,
+            0x52805788,
+            0xB90002E8,
+            0xF0FF41C8,
+            0x3DC29900,
+            0x3C8042E0,
+        ),
+    )
+    smart_high = read_adrp_load(
+        image, base_power_address, base_power_code, 0x384, 0x388, 16
+    )
+    smart_low = read_adrp_load(
+        image, base_power_address, base_power_code, 0x3A0, 0x3A4, 16
+    )
+    if len(smart_high) != 16 or len(smart_low) != 16:
+        raise ValueError("truncated base Smart Idle policy constant")
+
+    # w8 is materialized as float 0.6 and remains live through the intervening
+    # x9/x10-only setup before it overwrites source offset +0x1c.
+    require_instruction_sequence(
+        g17_power_code,
+        "G17 Smart Idle minimum-confidence override",
+        (
+            0x52933348,
+            0x72A7E328,
+            0xB902E688,
+            0x52801F09,
+            0xB902BA89,
+            0xB942B28A,
+            0x1ACA0929,
+            0xB902B689,
+            0x91093289,
+            0xD0FF3D6A,
+            0xFD44B940,
+            0xFD000120,
+            0x52933349,
+            0x72A7D329,
+            0xB9002E89,
+            0x52A83109,
+            0xB9002289,
+            0x52800209,
+            0xB9000289,
+            0xD0FF3D69,
+            0xFD44BD20,
+            0xFD0002A0,
+            0xD0FF3D69,
+            0xFD44C120,
+            0xFD04CEA0,
+            0xB9001EC8,
+            0x5280BB88,
+            0xB90002C8,
+        ),
+    )
+
+    source = bytearray(0x28)
+    struct.pack_into("<I", source, 0x00, 700)
+    source[0x04:0x14] = smart_low
+    source[0x14:0x24] = smart_high
+    struct.pack_into("<I", source, 0x24, 6)
+    # The G17 override replaces the generic 700 us delay and 0.7 confidence.
+    struct.pack_into("<I", source, 0x00, 1500)
+    struct.pack_into("<I", source, 0x1C, 0x3F19999A)
+
+    runtime = bytearray(source)
+    reset_iterations = struct.unpack_from("<I", source, 0x24)[0]
+    struct.pack_into("<f", runtime, 0x24, float(reset_iterations))
+    field_names = (
+        "standby_timer_us",
+        "probability_initial_bits",
+        "fn_hit_bits",
+        "fi_hit_bits",
+        "fn_miss_bits",
+        "fi_miss_bits",
+        "neighbor_hit_bits",
+        "gpu_min_confidence_bits",
+        "gpu_high_confidence_bits",
+        "reset_iterations_float_bits",
+    )
+    runtime_words = struct.unpack("<10I", runtime)
+
+    return {
+        "configure_device_vtable_slot": G17_CONFIGURE_DEVICE_VTABLE_SLOT,
+        "configure_power_vtable_slot": G17_CONFIGURE_POWER_VTABLE_SLOT,
+        "platform_halfwords": {
+            "source_offset": 0x768,
+            "runtime_offset": 0x054,
+            "values": list(struct.unpack("<3H", platform_bytes)),
+            "bytes": platform_bytes.hex(),
+        },
+        "smart_idle": {
+            "source_offset": 0xE948,
+            "runtime_offset": 0x7C4,
+            "bytes": 0x28,
+            "source_bytes": source.hex(),
+            "runtime_bytes": runtime.hex(),
+            "runtime_fields": dict(zip(field_names, runtime_words)),
+        },
     }
 
 
@@ -3647,6 +3886,7 @@ def main() -> int:
         runtime_power_policy = recover_g17_runtime_power_policy(
             driver, power_code, dpe_ppt_code
         )
+        runtime_platform_policy = recover_g17_runtime_platform_policy(driver)
         firmware_shared_data = recover_firmware_shared_data_layout(
             allocations, shared_init_code, base_init_code
         )
@@ -3680,6 +3920,7 @@ def main() -> int:
                 "runtime_controls": runtime_controls,
                 "runtime_initialization": runtime_initialization,
                 "runtime_power_policy": runtime_power_policy,
+                "runtime_platform_policy": runtime_platform_policy,
                 "accelerator": accelerator,
                 "channels": channels,
                 "firmware_shared_data": firmware_shared_data,

@@ -43,8 +43,11 @@ pub const g17_channel_pool_queue_stride = u64(0x80)
 pub const g17_cached_command_pointer_size = u64(0x08)
 pub const g17_firmware_shared_data_size = u64(0x4c0)
 pub const g17_runtime_data_size = u64(0x1ca0)
+pub const g17_runtime_platform_values_offset = u64(0x54)
 pub const g17_runtime_power_policy_offset = u64(0xec)
 pub const g17_runtime_power_policy_size = u64(0x6d8)
+pub const g17_runtime_smart_idle_offset = u64(0x7c4)
+pub const g17_runtime_smart_idle_size = u64(0x28)
 pub const g17_small_shared_data_size = u64(0x20)
 pub const g17_primary_region_size = u64(0xe440)
 pub const g17_secondary_region_size = u64(0x6f0)
@@ -443,6 +446,34 @@ pub mut:
 	riart_t_level_disable_mask_1c89      u32
 	riart_state_1c8d                     u32
 	opaque_1c91                          [0x0f]u8
+}
+
+// The active G17C configureDevice path replaces the base platform halfwords
+// with ffff/0028/ffff. Its configurePowerAndPerformanceController override
+// then installs this Smart Idle policy at accelerator+0xe948; the ARM firmware
+// copies it to runtime+0x7c4 and converts the final reset count to float.
+pub fn initialize_g17_runtime_platform_policy(buffer voidptr, size u64) bool {
+	if buffer == unsafe { nil } || size < g17_runtime_data_size
+		|| sizeof(G17RuntimeData) != g17_runtime_data_size {
+		return false
+	}
+	unsafe {
+		mut runtime := &G17RuntimeData(buffer)
+		runtime.platform_values_054[0] = 0xffff
+		runtime.platform_values_054[1] = 40
+		runtime.platform_values_054[2] = 0xffff
+		runtime.smart_idle_standby_timer_us = 1500
+		runtime.smart_idle_probability_initial_bits = 0x3f800000
+		runtime.smart_idle_fn_hit_bits = 0x3f4ccccd
+		runtime.smart_idle_fi_hit_bits = 0x3e4ccccd
+		runtime.smart_idle_fn_miss_bits = 0x3f666666
+		runtime.smart_idle_fi_miss_bits = 0x3dcccccd
+		runtime.smart_idle_neighbor_hit_bits = 0x3e800000
+		runtime.smart_idle_gpu_min_confidence_bits = 0x3f19999a
+		runtime.smart_idle_gpu_high_confidence_bits = 0x3f666666
+		runtime.smart_idle_reset_iterations = 0x40c00000
+	}
+	return true
 }
 
 // The pinned G17C accelerator inherits the generic DPE/PPT producer at
