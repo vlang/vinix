@@ -123,12 +123,44 @@ def driver_root_code() -> bytes:
         0xAD038A81,
         0x3D801A80,
     )
+    bootstrap_publication = (
+        0xF94D2E60,
+        0xAA0003F1,
+        0xF9400010,
+        0xF2F9B431,
+        0xDAC11A30,
+        0xAA1003F1,
+        0xDAC147F1,
+        0xEB11021F,
+        0x54000040,
+        0xD4388E40,
+        0x91056208,
+        0xF940AE09,
+        0xAA0803F1,
+        0xF2E63531,
+        0xD73F0931,
+        0xAA0003E1,
+        0xAA1603F1,
+        0xF9400270,
+        0xDAC11A30,
+        0xAA1003F1,
+        0xDAC147F1,
+        0xEB11021F,
+        0x54000040,
+        0xD4388E40,
+        0x910B6208,
+        0xF9416E09,
+        0xAA1303E0,
+        0x52800002,
+        0xAA0803F1,
+        0xF2F24A11,
+        0xD73F0931,
+        0xF9000680,
+    )
     return encode(
         *magic(21),
-        ldr_x(0, 19, 0x1A58),
-        str_x(0, 20, 8),
-        ldr_x(0, 19, 0x1A58),
-        str_x(0, 20, 8),
+        *bootstrap_publication,
+        *bootstrap_publication,
         *platform_copy,
         0xFD001680,
         0x0F000420,
@@ -285,7 +317,99 @@ def firmware_shared_platform_code() -> bytes:
     )
 
 
+def bootstrap_region_code() -> tuple[bytes, bytes, bytes, bytes, bytes, bytes]:
+    allocation = encode(
+        0x52800029,
+        0x1AC0212A,
+        0x113FFD4B,
+        0x4B0A03EA,
+        0x0A0A0161,
+        0x1AC82128,
+        0x93407D02,
+        0x52800260,
+        0xF90D2A60,
+        0xB4005BA0,
+        0xAA1303E0,
+        0xAA1403E1,
+        0x52800002,
+        0x52800103,
+        0x97FF8F6B,
+        0xF90D2E60,
+    )
+    prepare = encode(
+        0xAA0003F3,
+        0xB91AC01F,
+        0xD2815111,
+        0x8B110210,
+        0xF9400208,
+        0x52800021,
+        0xB95AC268,
+        0x8B080009,
+        0xB900113F,
+        0xA9007D3F,
+        0x11006108,
+        0xB91AC268,
+    )
+    page_shift = encode(0xD503245F, 0x528001C0, 0xD65F03C0)
+    set_64_pa = encode(
+        0x5280006A,
+        0x2901A933,
+        0xF9000135,
+        0xB9000936,
+        0x11006108,
+        0xB91AC288,
+    )
+    set_64 = encode(
+        0xB9000935,
+        0xF9000134,
+        0xF0FF3E2A,
+        0xFD43C540,
+        0xFC00C120,
+        0x11006108,
+        0xB91AC268,
+    )
+    set_32 = encode(
+        0xB9000934,
+        0xF9000135,
+        0xF0FF3E2A,
+        0xFD43F140,
+        0xFC00C120,
+        0x11006108,
+        0xB91AC268,
+    )
+    return allocation, prepare, page_shift, set_64_pa, set_64, set_32
+
+
 class RecoverG17AbiTests(unittest.TestCase):
+    def test_decodes_kernel_authenticated_rebase(self) -> None:
+        raw = 0x80114229019894A8
+        self.assertEqual(
+            recover_g17_abi.decode_kernel_auth_rebase(raw),
+            0xFFFFFE000898D4A8,
+        )
+        with self.assertRaisesRegex(ValueError, "not an authenticated"):
+            recover_g17_abi.decode_kernel_auth_rebase(0x019894A8)
+
+    def test_recovers_bootstrap_region(self) -> None:
+        recovered = recover_g17_abi.recover_g17_bootstrap_region(
+            *bootstrap_region_code()
+        )
+        self.assertEqual(recovered["bytes"], 0x4000)
+        self.assertEqual(recovered["host_gpu_mapping_member"], 0x1A58)
+        self.assertEqual(recovered["entry"]["bytes"], 0x18)
+        self.assertEqual(recovered["entry"]["kinds"]["terminator"], 0)
+        self.assertEqual(recovered["entry"]["kinds"]["write_64"], 2)
+        self.assertEqual(recovered["terminator"]["zeroed_bytes"], 0x14)
+
+    def test_rejects_incomplete_bootstrap_region(self) -> None:
+        allocation, _prepare, page_shift, set_64_pa, set_64, set_32 = (
+            bootstrap_region_code()
+        )
+        with self.assertRaisesRegex(ValueError, "cursor reset"):
+            recover_g17_abi.recover_g17_bootstrap_region(
+                allocation, b"", page_shift, set_64_pa, set_64, set_32
+            )
+
     def test_recovers_firmware_root_pointer_offsets(self) -> None:
         code = encode(
             *magic(10),
@@ -303,6 +427,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         recovered = recover_g17_abi.recover_driver_root(driver_root_code())
         self.assertEqual(tuple(recovered["pointer_offsets"]), recover_g17_abi.ROOT_FIELDS)
         self.assertEqual(recovered["platform_config"]["bytes"], 0x68)
+        self.assertEqual(
+            recovered["bootstrap_region"]["mapping_address_vtable_offset"], 0x158
+        )
         self.assertEqual(recovered["roles"][1]["bindings"][-1]["root_offset"], 0xC0)
 
     def test_rejects_incomplete_driver_layout(self) -> None:

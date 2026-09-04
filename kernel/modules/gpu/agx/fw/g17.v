@@ -10,6 +10,12 @@ pub const g17_init_message = u64(0x81) << 48
 pub const g17_init_address_mask = (u64(1) << 44) - 1
 pub const g17_interface_magic = u64(0x0c8bc322072804c0)
 pub const g17_bootstrap_header_size = u64(0xc8)
+pub const g17_bootstrap_region_size = u64(0x4000)
+pub const g17_init_register_entry_size = u64(0x18)
+pub const g17_init_register_terminator = u32(0)
+pub const g17_init_register_write_32 = u32(1)
+pub const g17_init_register_write_64 = u32(2)
+pub const g17_init_register_write_64_pa = u32(3)
 pub const g17_platform_config_size = u64(0x68)
 pub const g17_firmware_shared_data_offset = u64(0x18)
 pub const g17_runtime_data_offset = u64(0x20)
@@ -50,6 +56,37 @@ pub const g17_io_mapping_count = 53
 pub const g17_io_mapping_size = u64(0x28)
 pub const g17_performance_state_capacity = 16
 pub const g17_voltage_table_columns = 16
+
+// Root+0x08 points at a 16 KiB firmware-page mapping containing 0x18-byte
+// register writes. The pinned G17 accelerator's producer is a no-op, so its
+// boot-time contents are one kind-zero terminator followed by zeroed storage.
+@[packed]
+pub struct G17InitRegisterEntry {
+pub mut:
+	value       u64
+	register    u32
+	auxiliary   u32
+	kind        u32
+	padding_014 u32
+}
+
+pub fn new_g17_init_register_terminator() G17InitRegisterEntry {
+	return G17InitRegisterEntry{
+		kind: g17_init_register_terminator
+	}
+}
+
+pub fn initialize_g17_bootstrap_region(buffer voidptr, size u64) bool {
+	if buffer == unsafe { nil } || size != g17_bootstrap_region_size {
+		return false
+	}
+	unsafe {
+		C.memset(buffer, 0, size)
+		terminator := &G17InitRegisterEntry(buffer)
+		*terminator = new_g17_init_register_terminator()
+	}
+	return true
+}
 
 // The primary G17C firmware copies exactly 0xc8 bytes from the host-provided
 // root before dereferencing any nested pointers. The names below describe
@@ -234,7 +271,7 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
+	return sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32)
 }
 
 // Populate the table subset whose source and scale are established by both

@@ -23,6 +23,14 @@ INTERFACE_MAGIC = 0x0C8BC322072804C0
 INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
 INIT_FIRMWARE_SHARED_DATA = "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
+ALLOC_ARM_FIRMWARE_DATA = "__ZN14AGXArmFirmware17allocFirmwareDataEv"
+PREPARE_FIRMWARE_BOOT = "__ZN14AGXArmFirmware22prepareFirmwareForBootEv"
+ARM_FIRMWARE_PAGE_SHIFT = "__ZNK17AGXArmFirmwareASC14getFWPageShiftEv"
+SET_INIT_REGISTER_64_PA = "__ZN14AGXArmFirmware14setInitReg64PAEtyjh.4231"
+SET_INIT_REGISTER_64 = "__ZN14AGXArmFirmware12setInitReg64Etyh.4232"
+SET_INIT_REGISTER_32 = "__ZN14AGXArmFirmware12setInitReg32Etjh.4233"
+G17_ACCELERATOR_VTABLE = "__ZTV18AGXAcceleratorG17X"
+G17_POPULATE_INIT_SEQUENCE = "__ZN14AGXAccelerator28populateInitSequenceFirmwareEh.8148"
 INIT_BASE_POWER_DATA = "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
 INIT_POWER_DATA = "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
 ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
@@ -44,6 +52,8 @@ SUBMIT_DEVICE_CONTROL = (
     "P33AGFIAcceleratorDeviceControlEntryjPj"
 )
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
+KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
+G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
 
 
 def macho_uuid(image: bytes) -> str | None:
@@ -447,17 +457,43 @@ def recover_driver_root(code: bytes) -> dict[str, object]:
             f"{[(hex(member), hex(offset)) for member, offset in bindings]}"
         )
 
-    bootstrap_provider_loads = sum(
-        decode_ldr_x(word) == (0, 19, 0x1A58) for _offset, word in instructions
+    bootstrap_publication = struct.pack(
+        "<32I",
+        0xF94D2E60,  # ldr x0, [x19, #0x1a58]
+        0xAA0003F1,
+        0xF9400010,
+        0xF2F9B431,
+        0xDAC11A30,
+        0xAA1003F1,
+        0xDAC147F1,
+        0xEB11021F,
+        0x54000040,
+        0xD4388E40,
+        0x91056208,  # mapping vtable + 0x158
+        0xF940AE09,
+        0xAA0803F1,
+        0xF2E63531,
+        0xD73F0931,
+        0xAA0003E1,  # mapping address becomes conversion argument
+        0xAA1603F1,
+        0xF9400270,
+        0xDAC11A30,
+        0xAA1003F1,
+        0xDAC147F1,
+        0xEB11021F,
+        0x54000040,
+        0xD4388E40,
+        0x910B6208,  # firmware vtable + 0x2d8
+        0xF9416E09,
+        0xAA1303E0,
+        0x52800002,
+        0xAA0803F1,
+        0xF2F24A11,
+        0xD73F0931,
+        0xF9000680,  # str x0, [x20, #8]
     )
-    bootstrap_stores = sum(
-        (store := decode_str_x(word)) is not None
-        and store[0] == 0
-        and store[2] == 8
-        for _offset, word in instructions
-    )
-    if bootstrap_provider_loads != 2 or bootstrap_stores != 2:
-        raise ValueError("driver root bootstrap provider is not shared by both roles")
+    if code.count(bootstrap_publication) != 2:
+        raise ValueError("driver root bootstrap mapping is not converted for both roles")
 
     require_instruction_sequence(
         code,
@@ -494,6 +530,13 @@ def recover_driver_root(code: bytes) -> dict[str, object]:
         "firmware_role_offset": 0x28,
         "host_mapped_allocations_offset": 0x2C,
         "bootstrap_provider_host_member": 0x1A58,
+        "bootstrap_region": {
+            "root_offset": 8,
+            "host_cpu_member": 0x1A50,
+            "host_gpu_mapping_member": 0x1A58,
+            "mapping_address_vtable_offset": 0x158,
+            "firmware_address_conversion_vtable_offset": 0x2D8,
+        },
         "platform_config": {
             "host_platform_member": 0x298,
             "host_platform_pointer_offset": 0x1A948,
@@ -673,6 +716,190 @@ def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, .
     encoded = struct.pack(f"<{len(sequence)}I", *sequence)
     if encoded not in code:
         raise ValueError(f"missing {label} instruction sequence")
+
+
+def decode_kernel_auth_rebase(raw: int) -> int:
+    """Decode the target field of an arm64e kernel authenticated rebase."""
+
+    if raw & 0xC000000000000000 != 0x8000000000000000:
+        raise ValueError(f"not an authenticated kernel rebase: {raw:#x}")
+    return KERNEL_COLLECTION_BASE + (raw & 0xFFFFFFFF)
+
+
+def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
+    symbols = macho_symbols(image)
+    for name in (G17_ACCELERATOR_VTABLE, G17_POPULATE_INIT_SEQUENCE):
+        if name not in symbols:
+            raise ValueError(f"Mach-O has no {name} symbol")
+
+    vtable_address = symbols[G17_ACCELERATOR_VTABLE]
+    # A C++ vtable symbol begins with two header pointers before virtual slot 0.
+    entry_address = vtable_address + 0x10 + G17_INIT_SEQUENCE_VTABLE_SLOT
+    entry_offset = virtual_to_file(image, entry_address)
+    if entry_offset + 8 > len(image):
+        raise ValueError("truncated G17 init-sequence vtable entry")
+    raw_entry = struct.unpack_from("<Q", image, entry_offset)[0]
+    target = decode_kernel_auth_rebase(raw_entry)
+    if target != symbols[G17_POPULATE_INIT_SEQUENCE]:
+        raise ValueError(
+            f"unexpected G17 init-sequence provider {target:#x}; "
+            f"expected {symbols[G17_POPULATE_INIT_SEQUENCE]:#x}"
+        )
+
+    _address, provider_code = symbol_code(image, G17_POPULATE_INIT_SEQUENCE)
+    expected_stub = struct.pack("<2I", 0xD503245F, 0xD65F03C0)  # bti c; ret
+    if provider_code != expected_stub:
+        raise ValueError("G17 init-sequence provider is not the checked no-op stub")
+    return {
+        "accelerator_vtable": G17_ACCELERATOR_VTABLE,
+        "vtable_slot": G17_INIT_SEQUENCE_VTABLE_SLOT,
+        "provider": G17_POPULATE_INIT_SEQUENCE,
+        "provider_address": target,
+        "entries_appended": 0,
+    }
+
+
+def recover_g17_bootstrap_region(
+    allocation_code: bytes,
+    prepare_code: bytes,
+    page_shift_code: bytes,
+    set_64_pa_code: bytes,
+    set_64_code: bytes,
+    set_32_code: bytes,
+) -> dict[str, object]:
+    expected_page_shift = struct.pack(
+        "<3I",
+        0xD503245F,  # bti c
+        0x528001C0,  # mov w0, #14
+        0xD65F03C0,  # ret
+    )
+    if page_shift_code != expected_page_shift:
+        raise ValueError("G17 firmware page shift is not the checked 14-bit value")
+
+    require_instruction_sequence(
+        allocation_code,
+        "bootstrap-region allocation",
+        (
+            0x52800029,  # mov w9, #1
+            0x1AC0212A,  # lsl w10, w9, w0 (firmware page shift)
+            0x113FFD4B,  # add w11, w10, #0xfff
+            0x4B0A03EA,  # neg w10, w10
+            0x0A0A0161,  # and w1, w11, w10
+            0x1AC82128,  # lsl w8, w9, w8 (host page shift)
+            0x93407D02,  # sxtw x2, w8
+            0x52800260,  # mov w0, #0x13
+        ),
+    )
+    require_instruction_sequence(
+        allocation_code,
+        "bootstrap-region CPU/GPU mapping pair",
+        (
+            0xF90D2A60,  # str x0, [x19, #0x1a50]
+            0xB4005BA0,
+            0xAA1303E0,
+            0xAA1403E1,
+            0x52800002,
+            0x52800103,
+            0x97FF8F6B,
+            0xF90D2E60,  # str x0, [x19, #0x1a58]
+        ),
+    )
+    require_instruction_sequence(
+        prepare_code,
+        "bootstrap-region cursor reset",
+        (
+            0xAA0003F3,
+            0xB91AC01F,  # str wzr, [x0, #0x1ac0]
+        ),
+    )
+    require_instruction_sequence(
+        prepare_code,
+        "bootstrap-region accelerator hook",
+        (
+            0xD2815111,  # mov x17, #0xa88
+            0x8B110210,
+            0xF9400208,
+            0x52800021,  # role 1
+        ),
+    )
+    require_instruction_sequence(
+        prepare_code,
+        "bootstrap-region terminator",
+        (
+            0xB95AC268,  # ldr w8, [x19, #0x1ac0]
+            0x8B080009,
+            0xB900113F,  # kind = 0
+            0xA9007D3F,  # zero value, register, and auxiliary fields
+            0x11006108,  # add cursor, #0x18
+            0xB91AC268,
+        ),
+    )
+    require_instruction_sequence(
+        set_64_pa_code,
+        "64-bit physical-address init-register record",
+        (
+            0x5280006A,  # kind = 3
+            0x2901A933,  # auxiliary + kind
+            0xF9000135,  # 64-bit value
+            0xB9000936,  # register
+            0x11006108,
+            0xB91AC288,
+        ),
+    )
+    require_instruction_sequence(
+        set_64_code,
+        "64-bit init-register record",
+        (
+            0xB9000935,  # register
+            0xF9000134,  # 64-bit value
+            0xF0FF3E2A,
+            0xFD43C540,  # literal { auxiliary = 0, kind = 2 }
+            0xFC00C120,
+            0x11006108,
+            0xB91AC268,
+        ),
+    )
+    require_instruction_sequence(
+        set_32_code,
+        "32-bit init-register record",
+        (
+            0xB9000934,  # register
+            0xF9000135,  # zero-extended 32-bit value
+            0xF0FF3E2A,
+            0xFD43F140,  # literal { auxiliary = 0, kind = 1 }
+            0xFC00C120,
+            0x11006108,
+            0xB91AC268,
+        ),
+    )
+
+    return {
+        "bytes": 0x4000,
+        "requested_bytes": 0x1000,
+        "page_shift": 14,
+        "host_cpu_member": 0x1A50,
+        "host_gpu_mapping_member": 0x1A58,
+        "cursor_host_member": 0x1AC0,
+        "entry": {
+            "bytes": 0x18,
+            "value_offset": 0,
+            "register_offset": 8,
+            "auxiliary_offset": 0xC,
+            "kind_offset": 0x10,
+            "padding_offset": 0x14,
+            "kinds": {
+                "terminator": 0,
+                "write_32": 1,
+                "write_64": 2,
+                "write_64_physical_address": 3,
+            },
+        },
+        "terminator": {
+            "offset": 0,
+            "zeroed_bytes": 0x14,
+            "padding_bytes": 4,
+        },
+    }
 
 
 def recover_direct_shared_publications(code: bytes) -> list[tuple[int, int, int]]:
@@ -1595,8 +1822,24 @@ def main() -> int:
         driver_root["function"] = INIT_FIRMWARE_DATA
         driver_root["function_address"] = function_address
         accelerator = recover_driver_accelerator_layouts(driver)
+        init_sequence_provider = recover_g17_init_sequence_provider(driver)
         _address, handoff_code = symbol_code(driver, INIT_UAT_HANDOFF)
         handoff = recover_g17_handoff(handoff_code)
+        _address, arm_allocation_code = symbol_code(driver, ALLOC_ARM_FIRMWARE_DATA)
+        _address, prepare_code = symbol_code(driver, PREPARE_FIRMWARE_BOOT)
+        _address, page_shift_code = symbol_code(driver, ARM_FIRMWARE_PAGE_SHIFT)
+        _address, set_64_pa_code = symbol_code(driver, SET_INIT_REGISTER_64_PA)
+        _address, set_64_code = symbol_code(driver, SET_INIT_REGISTER_64)
+        _address, set_32_code = symbol_code(driver, SET_INIT_REGISTER_32)
+        bootstrap_region = recover_g17_bootstrap_region(
+            arm_allocation_code,
+            prepare_code,
+            page_shift_code,
+            set_64_pa_code,
+            set_64_code,
+            set_32_code,
+        )
+        bootstrap_region["accelerator_provider"] = init_sequence_provider
         allocation_address, allocation_code = symbol_code(driver, ALLOC_FIRMWARE_DATA)
         allocations = recover_firmware_allocations(
             driver, allocation_address, allocation_code
@@ -1632,6 +1875,7 @@ def main() -> int:
                 "firmware_uuid": firmware_uuid,
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
+                "bootstrap_region": bootstrap_region,
                 "accelerator": accelerator,
                 "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,
