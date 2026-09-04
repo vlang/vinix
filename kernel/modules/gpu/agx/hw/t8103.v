@@ -34,6 +34,7 @@ pub fn t8103_config() HwConfig {
 		gpu_gen:                .g13
 		gpu_variant:            .g
 		gpu_rev:                .a1
+		firmware_abi:           .v12_3
 		gpu_core_count:         8
 		gpu_feat_compat:        0
 		gpu_feat_incompat:      0

@@ -8,13 +8,14 @@ pub enum GpuGen {
 	g13  = 13 // M1 family (t8103, t6000, t6001, t6002)
 	g14  = 14 // M2 family (t8112)
 	g14x = 15 // M2 Pro/Max/Ultra
+	g17  = 17 // M5 family (t6050, t6051, t6052)
 }
 
 pub enum GpuVariant {
-	s = 0 // Base (single die)
-	c = 1 // Max (dual cluster)
-	d = 2 // Ultra (dual die)
-	g = 3 // Pro variant
+	s = 0 // S variant
+	c = 1 // C variant
+	d = 2 // D variant
+	g = 3 // G variant
 }
 
 pub enum GpuRevision {
@@ -24,6 +25,14 @@ pub enum GpuRevision {
 	b1 = 3
 	c0 = 4
 	c1 = 5
+	unknown = 0xff
+}
+
+// InitData and channel layouts are private firmware ABIs. A chip may be
+// discoverable before Vinix has a compatible ABI implementation.
+pub enum FirmwareAbi {
+	unknown
+	v12_3
 }
 
 pub struct IoMapping {
@@ -41,6 +50,7 @@ pub:
 	gpu_gen                GpuGen
 	gpu_variant            GpuVariant
 	gpu_rev                GpuRevision
+	firmware_abi           FirmwareAbi
 	gpu_core_count         u32
 	gpu_feat_compat        u32
 	gpu_feat_incompat      u32
@@ -49,6 +59,12 @@ pub:
 	num_cores_per_cluster  u32
 	num_frags              u32
 	num_gps                u32
+	num_mgpus              u32
+	usc_gen                u32
+	core_mask_list         [4]u32
+	kickid_qid_mask        u32
+	kickid_qid_shift       u32
+	is_sksm                bool
 	base_clock_hz          u64
 	uat_oas                u32 // Output address size (bits)
 	num_banks              u32
@@ -79,6 +95,13 @@ pub:
 	io_mapping_count       u32
 }
 
+// The firmware structures under gpu.agx.fw currently describe only the
+// macOS 12.3-era G13 protocol. Keep newer chips read-only until their exact
+// RTKit, InitData, channel, and work-command layouts have been implemented.
+pub fn (cfg &HwConfig) can_boot_firmware() bool {
+	return cfg.gpu_gen == .g13 && cfg.firmware_abi == .v12_3
+}
+
 pub struct DynConfig {
 pub mut:
 	pwr_temp_tbl       [16]u32
@@ -89,6 +112,9 @@ pub fn get_config(chip_id u32) ?HwConfig {
 	match chip_id {
 		0x8103 {
 			return t8103_config()
+		}
+		0x6050 {
+			return t6050_config()
 		}
 		else {
 			C.printf(c'agx: Unknown chip ID 0x%x\n', chip_id)
