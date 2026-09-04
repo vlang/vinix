@@ -12,6 +12,9 @@ import stat
 import resource
 import errno
 import event.eventstruct
+import drm.gem
+import drm.ioctl
+import drm.syncobj
 
 // DRM driver feature flags
 pub const driver_gem = u32(0x1)
@@ -102,8 +105,8 @@ fn create_device_node(dev &DrmDevice) ?&DrmNode {
 	return node
 }
 
-fn (mut this DrmNode) mmap(_page u64, _flags int) voidptr {
-	return unsafe { nil }
+fn (mut this DrmNode) mmap(page u64, _flags int) voidptr {
+	return gem.get_mmap_page(page) or { return unsafe { nil } }
 }
 
 fn (mut this DrmNode) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -194,6 +197,167 @@ pub fn unregister_device(dev &DrmDevice) {
 	}
 }
 
+fn copy_version_field(address u64, capacity u64, value string) {
+	if address == 0 || capacity == 0 {
+		return
+	}
+	copy_size := if capacity < u64(value.len) { capacity } else { u64(value.len) }
+	unsafe {
+		C.memcpy(voidptr(address), value.str, copy_size)
+	}
+}
+
+fn ioctl_version(dev &DrmDevice, data voidptr) int {
+	if data == unsafe { nil } {
+		return -14 // EFAULT
+	}
+	mut version := unsafe { &ioctl.DrmVersion(data) }
+	name_capacity := version.name_len
+	date_capacity := version.date_len
+	desc_capacity := version.desc_len
+	copy_version_field(version.name, name_capacity, dev.driver.name)
+	copy_version_field(version.date, date_capacity, '20260905')
+	copy_version_field(version.desc, desc_capacity, dev.driver.desc)
+	version.version_major = dev.driver.major
+	version.version_minor = dev.driver.minor
+	version.version_patchlevel = dev.driver.patchlevel
+	version.name_len = u64(dev.driver.name.len)
+	version.date_len = 8
+	version.desc_len = u64(dev.driver.desc.len)
+	return 0
+}
+
+fn ioctl_get_cap(data voidptr) int {
+	if data == unsafe { nil } {
+		return -14
+	}
+	mut cap := unsafe { &ioctl.DrmGetCap(data) }
+	match cap.capability {
+		ioctl.drm_cap_syncobj {
+			cap.value = 1
+			return 0
+		}
+		ioctl.drm_cap_syncobj_timeline {
+			// Vinix currently exposes binary syncobjs only.
+			cap.value = 0
+			return 0
+		}
+		else {
+			cap.value = 0
+			return -22
+		}
+	}
+}
+
+fn ioctl_gem_close(data voidptr) int {
+	if data == unsafe { nil } {
+		return -14
+	}
+	request := unsafe { &ioctl.DrmGemClose(data) }
+	if request.pad != 0 {
+		return -22
+	}
+	obj := gem.get_by_handle(request.handle) or { return -2 }
+	gem.unref(obj)
+	return 0
+}
+
+fn ioctl_syncobj_create(data voidptr) int {
+	if data == unsafe { nil } {
+		return -14
+	}
+	mut request := unsafe { &ioctl.DrmSyncobjCreate(data) }
+	if request.flags & ~ioctl.drm_syncobj_create_signaled != 0 {
+		return -22
+	}
+	obj := syncobj.new_syncobj() or { return -12 }
+	fence := syncobj.new_fence(0, 0)
+	syncobj.replace_fence(obj, fence)
+	if request.flags & ioctl.drm_syncobj_create_signaled != 0 {
+		syncobj.signal(fence)
+	}
+	request.handle = obj.handle
+	return 0
+}
+
+fn ioctl_syncobj_destroy(data voidptr) int {
+	if data == unsafe { nil } {
+		return -14
+	}
+	request := unsafe { &ioctl.DrmSyncobjDestroy(data) }
+	if request.pad != 0 {
+		return -22
+	}
+	syncobj.lookup(request.handle) or { return -22 }
+	syncobj.destroy(request.handle)
+	return 0
+}
+
+fn syncobj_wait_ready(request &ioctl.DrmSyncobjWait, wait_all bool) (bool, u32) {
+	mut ready_count := u32(0)
+	mut first := u32(0)
+	for i := u32(0); i < request.count_handles; i++ {
+		handle := unsafe { *(&u32(request.handles) + i) }
+		obj := syncobj.lookup(handle) or { return false, u32(0xffffffff) }
+		if obj.fence != unsafe { nil } && syncobj.is_signaled(obj.fence) {
+			if ready_count == 0 {
+				first = i
+			}
+			ready_count++
+		}
+	}
+	return if wait_all { ready_count == request.count_handles } else { ready_count != 0 }, first
+}
+
+fn ioctl_syncobj_wait(data voidptr) int {
+	if data == unsafe { nil } {
+		return -14
+	}
+	mut request := unsafe { &ioctl.DrmSyncobjWait(data) }
+	known_flags := ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit |
+		ioctl.drm_syncobj_wait_available | ioctl.drm_syncobj_wait_deadline
+	if request.handles == 0 || request.count_handles == 0 || request.count_handles > 64
+		|| request.flags & ~known_flags != 0 || request.pad != 0 {
+		return -22
+	}
+	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
+	for {
+		ready, first := syncobj_wait_ready(request, wait_all)
+		if first == u32(0xffffffff) {
+			return -22
+		}
+		if ready {
+			request.first_signaled = first
+			return 0
+		}
+		now := syncobj.now_ns()
+		if request.timeout_nsec <= 0 || u64(request.timeout_nsec) <= now {
+			return -62 // ETIME
+		}
+		// Poll in bounded slices so WAIT_ANY observes every fence.
+		remaining := u64(request.timeout_nsec) - now
+		slice := if remaining < 100_000 { remaining } else { u64(100_000) }
+		first_handle := unsafe { *(&u32(request.handles)) }
+		first_obj := syncobj.lookup(first_handle) or { return -22 }
+		if first_obj.fence != unsafe { nil } {
+			syncobj.wait(first_obj.fence, slice)
+		}
+	}
+	return -62
+}
+
+fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr) ?int {
+	match cmd {
+		ioctl.drm_ioctl_version { return ioctl_version(dev, data) }
+		ioctl.drm_ioctl_get_cap { return ioctl_get_cap(data) }
+		ioctl.drm_ioctl_gem_close { return ioctl_gem_close(data) }
+		ioctl.drm_ioctl_syncobj_create { return ioctl_syncobj_create(data) }
+		ioctl.drm_ioctl_syncobj_destroy { return ioctl_syncobj_destroy(data) }
+		ioctl.drm_ioctl_syncobj_wait { return ioctl_syncobj_wait(data) }
+		else { return none }
+	}
+}
+
 // Dispatch a DRM ioctl to the appropriate handler registered by the driver.
 // Returns 0 on success, negative errno on failure.
 pub fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
@@ -203,6 +367,9 @@ pub fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
 
 	if !dev.registered {
 		return -19 // ENODEV
+	}
+	if ret := core_ioctl(dev, cmd, data) {
+		return ret
 	}
 
 	for ioctl in dev.driver.ioctls {

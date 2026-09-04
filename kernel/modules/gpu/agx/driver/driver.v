@@ -16,6 +16,7 @@ import gpu.agx.fw
 import gpu.agx.file as agx_file
 import gpu.dcp
 import drm
+import drm.ioctl as drm_ioctl
 import apple.rtkit
 import devicetree
 import memory
@@ -279,6 +280,10 @@ pub fn initialise() {
 	}
 	agx_driver_inst.hw_config = cfg
 	agx_driver_inst.detected = true
+	if !drm_ioctl.validate_asahi_25_layouts() {
+		println('agx: Mesa 25.0.5 DRM UAPI layout validation failed')
+		return
+	}
 
 	if chip_id == 0x6050 {
 		if !fw.validate_g17_bootstrap_allocations() || !fw.validate_g17_accelerator_layouts()

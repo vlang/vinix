@@ -31,6 +31,9 @@ pub fn t6050_config() HwConfig {
 		kickid_qid_mask:       0x7f
 		kickid_qid_shift:      40
 		is_sksm:               true
+		// hw.tbfrequency on the inspected Mac17,6; also the userspace/GPU
+		// timestamp timebase published by the Apple driver.
+		base_clock_hz:         24000000
 		uat_ias:               42
 		uat_oas:               42
 		map_kernel_to_user:    true

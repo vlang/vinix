@@ -125,6 +125,10 @@ pub fn wait(fence &DmaFence, timeout_ns u64) bool {
 	return is_signaled(fence)
 }
 
+pub fn now_ns() u64 {
+	return timer.get_ns()
+}
+
 // Register a waiter callback on a fence. If the fence is already
 // signaled the callback fires immediately.
 pub fn add_waiter(fence &DmaFence, waiter &FenceWaiter) {

@@ -143,3 +143,21 @@ pub fn create_mmap_offset(obj &GemObject) u64 {
 	}
 	return obj.mmap_offset
 }
+
+// Resolve a DRM fake mmap offset to the backing physical page. The VFS passes
+// the file offset as a 4 KiB page index, while GEM offsets are byte based.
+pub fn get_mmap_page(page u64) ?voidptr {
+	byte_offset := page * page_size
+	gem_objects_lock.acquire()
+	defer { gem_objects_lock.release() }
+	for handle := u32(1); handle < 4096; handle++ {
+		obj := gem_objects[handle]
+		if obj == unsafe { nil } {
+			continue
+		}
+		if byte_offset >= obj.mmap_offset && byte_offset - obj.mmap_offset < obj.size {
+			return voidptr(obj.phys_addr + byte_offset - obj.mmap_offset)
+		}
+	}
+	return none
+}
