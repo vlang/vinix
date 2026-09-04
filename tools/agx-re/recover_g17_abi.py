@@ -54,6 +54,19 @@ G17_DEFAULT_MCACHE_WRITES = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX25halGetDefaultMcacheWritesEv.8045"
 )
 G17_GET_ENABLED_NUM_USCS = "__ZNK14AGXAccelerator17getEnabledNumUSCsEv"
+ACCELERATOR_GET_GPTBAT_BASE = "__ZN14AGXAccelerator13getGPTBATBaseEv"
+PI300_NEW_SECURE_MONITOR = (
+    "__ZN31AGX·PI_300·X·A0·Accelerator19halNewSecureMonitorEv"
+)
+PI300_SECURE_MONITOR_VTABLE = "__ZTV33AGX·PI_300·X·A0·SecureMonitor"
+SECURE_MONITOR_INIT = "__ZN16AGXSecureMonitor4initEP14AGXAccelerator"
+SECURE_MONITOR_GET_GPTBAT_DESC = "__ZN16AGXSecureMonitor13getGPTBATDescEv"
+PI300_READ_GPTBAT_BASE = (
+    "__ZNK33AGX·PI_300·X·A0·SecureMonitor21readGPTBATBaseAddressEv"
+)
+PI300_SETUP_MMU_CONFIG = (
+    "__ZN33AGX·PI_300·X·A0·SecureMonitor14setupMMUConfigEv"
+)
 PI300_ACCELERATOR_START = "__ZN31AGX·PI_300·X·A0·Accelerator5startEP9IOService"
 G17_ACCELERATOR_START = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX5startEP9IOService"
@@ -69,6 +82,11 @@ G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
 G17_GET_SAMPLE_PERIOD_VTABLE_SLOT = 0xF70
 G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
 G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT = 0xAA0
+G17_NEW_SECURE_MONITOR_VTABLE_SLOT = 0xBE0
+G17_GET_GPTBAT_BASE_VTABLE_SLOT = 0x11D0
+SECURE_MONITOR_INIT_VTABLE_SLOT = 0x150
+SECURE_MONITOR_GET_GPTBAT_DESC_VTABLE_SLOT = 0x158
+SECURE_MONITOR_READ_GPTBAT_BASE_VTABLE_SLOT = 0x138
 BASE_CONFIGURE_POWER = (
     "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv"
 )
@@ -685,6 +703,15 @@ def decode_adrp(address: int, word: int) -> tuple[int, int] | None:
 
 def decode_bl_target(address: int, word: int) -> int | None:
     if word & 0xFC000000 != 0x94000000:
+        return None
+    immediate = word & 0x03FFFFFF
+    if immediate & (1 << 25):
+        immediate -= 1 << 26
+    return (address + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+
+
+def decode_b_target(address: int, word: int) -> int | None:
+    if word & 0xFC000000 != 0x14000000:
         return None
     immediate = word & 0x03FFFFFF
     if immediate & (1 << 25):
@@ -4582,6 +4609,195 @@ def recover_g17_uat_config_flag(
     }
 
 
+def recover_g17_gptbat_base(
+    image: bytes, arm_init_code: bytes
+) -> dict[str, object]:
+    """Recover the physical GPTBAT address published at config +0xfb0."""
+
+    symbols = macho_symbols(image)
+    required = (
+        ACCELERATOR_GET_GPTBAT_BASE,
+        PI300_NEW_SECURE_MONITOR,
+        SECURE_MONITOR_INIT,
+        SECURE_MONITOR_GET_GPTBAT_DESC,
+        PI300_READ_GPTBAT_BASE,
+        PI300_SETUP_MMU_CONFIG,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    selected_targets = (
+        (
+            G17_ACCELERATOR_VTABLE,
+            G17_NEW_SECURE_MONITOR_VTABLE_SLOT,
+            PI300_NEW_SECURE_MONITOR,
+        ),
+        (
+            G17_ACCELERATOR_VTABLE,
+            G17_GET_GPTBAT_BASE_VTABLE_SLOT,
+            ACCELERATOR_GET_GPTBAT_BASE,
+        ),
+        (
+            PI300_SECURE_MONITOR_VTABLE,
+            SECURE_MONITOR_INIT_VTABLE_SLOT,
+            SECURE_MONITOR_INIT,
+        ),
+        (
+            PI300_SECURE_MONITOR_VTABLE,
+            SECURE_MONITOR_READ_GPTBAT_BASE_VTABLE_SLOT,
+            PI300_READ_GPTBAT_BASE,
+        ),
+        (
+            PI300_SECURE_MONITOR_VTABLE,
+            SECURE_MONITOR_GET_GPTBAT_DESC_VTABLE_SLOT,
+            SECURE_MONITOR_GET_GPTBAT_DESC,
+        ),
+    )
+    for vtable, slot, expected_name in selected_targets:
+        target = recover_vtable_target(image, vtable, slot)
+        if target != symbols[expected_name]:
+            raise ValueError(
+                f"unexpected {vtable} target {target:#x} at slot {slot:#x}; "
+                f"expected {symbols[expected_name]:#x}"
+            )
+
+    getter_address, getter_code = symbol_code(image, ACCELERATOR_GET_GPTBAT_BASE)
+    if len(getter_code) != 0x60:
+        raise ValueError(f"unexpected GPTBAT-base getter size {len(getter_code):#x}")
+    require_instruction_words_at(
+        getter_code,
+        "G17 GPTBAT-base getter",
+        {
+            0x00: 0xD503245F,
+            0x04: 0x91407008,  # accelerator +0x1c000
+            0x08: 0x912CC108,  # secure-monitor member +0x1cb30
+            0x0C: 0xF9400100,
+            0x30: 0xD2802B11,
+            0x34: 0x8B110210,
+            0x38: 0xF9400208,  # secure-monitor getGPTBATDesc slot +0x158
+            0x40: 0xD73F0910,
+            0x58: struct.unpack_from("<I", getter_code, 0x58)[0],
+            0x5C: 0xD65F03C0,
+        },
+    )
+
+    setup_address, setup_code = symbol_code(image, PI300_SETUP_MMU_CONFIG)
+    require_instruction_words_at(
+        setup_code,
+        "G17 GPTBAT physical-address consumer",
+        {
+            0x8C: 0xD2802B11,
+            0x90: 0x8B110210,
+            0x94: 0xF9400208,  # secure-monitor getGPTBATDesc slot +0x158
+            0x98: 0xAA1303E0,
+            0xA0: 0xD73F0910,
+            0xA4: struct.unpack_from("<I", setup_code, 0xA4)[0],
+            0xA8: 0xD34EA402,  # descriptor physical address -> 16-KiB PFN
+        },
+    )
+    descriptor_physical_address = decode_b_target(
+        getter_address + 0x58, struct.unpack_from("<I", getter_code, 0x58)[0]
+    )
+    setup_physical_address = decode_bl_target(
+        setup_address + 0xA4, struct.unpack_from("<I", setup_code, 0xA4)[0]
+    )
+    if (
+        descriptor_physical_address is None
+        or setup_physical_address != descriptor_physical_address
+    ):
+        raise ValueError("GPTBAT getter no longer returns descriptor physical address")
+
+    monitor_init_address, monitor_init_code = symbol_code(image, SECURE_MONITOR_INIT)
+    property_name = b"gptbat-ready\0"
+    property_page = decode_adrp(
+        monitor_init_address + 0xDC,
+        struct.unpack_from("<I", monitor_init_code, 0xDC)[0],
+    )
+    property_add = decode_add_immediate(
+        struct.unpack_from("<I", monitor_init_code, 0xE0)[0]
+    )
+    if (
+        property_page is None
+        or property_add is None
+        or property_page[0] != 1
+        or property_add[0] != 1
+        or property_add[1] != 1
+    ):
+        raise ValueError("malformed gptbat-ready property reference")
+    property_offset = virtual_to_file(image, property_page[1] + property_add[2])
+    if image[property_offset : property_offset + len(property_name)] != property_name:
+        raise ValueError("gptbat-ready property reference changed")
+    require_instruction_words_at(
+        monitor_init_code,
+        "G17 preinitialized GPTBAT mapping",
+        {
+            0xF0: 0xAA0003F7,
+            0xF4: 0xB4000220,
+            0xF8: 0xF9400270,
+            0x108: 0xD2802711,
+            0x10C: 0x8B110210,
+            0x110: 0xF9400208,  # readGPTBATBaseAddress slot +0x138
+            0x114: 0xAA1303E0,
+            0x11C: 0xD73F0910,
+            0x120: 0xAA1503E1,
+            0x124: 0x52800062,
+            0x128: struct.unpack_from("<I", monitor_init_code, 0x128)[0],
+            0x12C: 0xAA0003F4,
+            0x130: 0xB5000140,
+            0x1F8: 0xB40000D7,
+            0x1FC: 0xA9015A74,  # descriptor and mapping
+            0x200: 0xF9001260,  # mapped CPU pointer
+        },
+    )
+
+    _read_address, read_code = symbol_code(image, PI300_READ_GPTBAT_BASE)
+    if len(read_code) != 0x44:
+        raise ValueError(f"unexpected GPTBAT register-reader size {len(read_code):#x}")
+    require_instruction_words_at(
+        read_code,
+        "G17 GPTBAT register reader",
+        {
+            0x1C: 0xD2803A11,
+            0x20: 0x8B110210,
+            0x24: 0xF9400208,
+            0x28: 0x52900581,
+            0x2C: 0x72A01A01,  # register 0xd0802c
+            0x34: 0xD73F0910,
+            0x38: 0xD3727C00,  # low 32-bit PFN << 14
+            0x40: 0xD65F0FFF,
+        },
+    )
+
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 GPTBAT firmware publication",
+        {
+            0x4B0: 0xF9400010,
+            0x4C0: 0xD2823A11,
+            0x4C4: 0x8B110210,
+            0x4C8: 0xF9400208,  # accelerator getGPTBATBase slot +0x11d0
+            0x4D0: 0xD73F0910,
+            0x4D4: 0xF9415E68,
+            0x4D8: 0x9140090A,
+            0x4DC: 0xF907D900,  # physical GPTBAT address -> config +0xfb0
+        },
+    )
+    return {
+        "offset": 0xFB0,
+        "bytes": 8,
+        "formula": "physical_address(gptbat_descriptor)",
+        "ready_property": property_name[:-1].decode(),
+        "hardware_register": 0xD0802C,
+        "register_formula": "u32(register) << 14",
+        "uat_page_shift": 14,
+        "accelerator_vtable_slot": G17_GET_GPTBAT_BASE_VTABLE_SLOT,
+        "accelerator_provider": ACCELERATOR_GET_GPTBAT_BASE,
+        "secure_monitor_vtable_slot": SECURE_MONITOR_READ_GPTBAT_BASE_VTABLE_SLOT,
+        "secure_monitor_provider": PI300_READ_GPTBAT_BASE,
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -5813,6 +6029,9 @@ def main() -> int:
             driver, function
         )
         hardware_config["uat_config_flag"] = recover_g17_uat_config_flag(
+            driver, function
+        )
+        hardware_config["gptbat_base"] = recover_g17_gptbat_base(
             driver, function
         )
         hardware_config["aux_performance_states"] = (

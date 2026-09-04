@@ -21,6 +21,21 @@ def bl(source: int, target: int) -> int:
     return 0x94000000 | (((target - source) // 4) & 0x03FFFFFF)
 
 
+def b(source: int, target: int) -> int:
+    return 0x14000000 | (((target - source) // 4) & 0x03FFFFFF)
+
+
+def adrp(source: int, target: int, register: int) -> int:
+    pages = ((target & ~0xFFF) - (source & ~0xFFF)) >> 12
+    immediate = pages & 0x1FFFFF
+    return (
+        0x90000000
+        | (immediate & 3) << 29
+        | ((immediate >> 2) & 0x7FFFF) << 5
+        | register
+    )
+
+
 def ldp_x(first: int, second: int, base: int, immediate: int) -> int:
     return (
         0xA9400000
@@ -2618,6 +2633,170 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["offset"], 0xFAC)
         self.assertEqual(recovered["value"], 1)
         self.assertEqual(recovered["source_value"], 4)
+
+    def test_recovers_g17_gptbat_base(self) -> None:
+        getter_address = 0x100000
+        new_monitor_address = 0x200000
+        monitor_init_address = 0x300000
+        descriptor_getter_address = 0x400000
+        register_reader_address = 0x500000
+        setup_address = 0x600000
+        property_address = 0x700123
+        physical_helper_address = 0x800000
+
+        getter = bytearray(0x60)
+        for offset, word in {
+            0x00: 0xD503245F,
+            0x04: 0x91407008,
+            0x08: 0x912CC108,
+            0x0C: 0xF9400100,
+            0x30: 0xD2802B11,
+            0x34: 0x8B110210,
+            0x38: 0xF9400208,
+            0x40: 0xD73F0910,
+            0x58: b(getter_address + 0x58, physical_helper_address),
+            0x5C: 0xD65F03C0,
+        }.items():
+            struct.pack_into("<I", getter, offset, word)
+
+        monitor_init = bytearray(0x204)
+        for offset, word in {
+            0xDC: adrp(monitor_init_address + 0xDC, property_address, 1),
+            0xE0: add_immediate(1, 1, property_address & 0xFFF),
+            0xF0: 0xAA0003F7,
+            0xF4: 0xB4000220,
+            0xF8: 0xF9400270,
+            0x108: 0xD2802711,
+            0x10C: 0x8B110210,
+            0x110: 0xF9400208,
+            0x114: 0xAA1303E0,
+            0x11C: 0xD73F0910,
+            0x120: 0xAA1503E1,
+            0x124: 0x52800062,
+            0x128: bl(monitor_init_address + 0x128, physical_helper_address),
+            0x12C: 0xAA0003F4,
+            0x130: 0xB5000140,
+            0x1F8: 0xB40000D7,
+            0x1FC: 0xA9015A74,
+            0x200: 0xF9001260,
+        }.items():
+            struct.pack_into("<I", monitor_init, offset, word)
+
+        descriptor_getter = b"".join(
+            struct.pack("<I", word)
+            for word in (0xD503245F, 0xF9400800, 0xD65F03C0)
+        )
+        register_reader = bytearray(0x44)
+        for offset, word in {
+            0x1C: 0xD2803A11,
+            0x20: 0x8B110210,
+            0x24: 0xF9400208,
+            0x28: 0x52900581,
+            0x2C: 0x72A01A01,
+            0x34: 0xD73F0910,
+            0x38: 0xD3727C00,
+            0x40: 0xD65F0FFF,
+        }.items():
+            struct.pack_into("<I", register_reader, offset, word)
+        setup = bytearray(0xAC)
+        for offset, word in {
+            0x8C: 0xD2802B11,
+            0x90: 0x8B110210,
+            0x94: 0xF9400208,
+            0x98: 0xAA1303E0,
+            0xA0: 0xD73F0910,
+            0xA4: bl(setup_address + 0xA4, physical_helper_address),
+            0xA8: 0xD34EA402,
+        }.items():
+            struct.pack_into("<I", setup, offset, word)
+        arm_init = bytearray(0x4E0)
+        for offset, word in {
+            0x4B0: 0xF9400010,
+            0x4C0: 0xD2823A11,
+            0x4C4: 0x8B110210,
+            0x4C8: 0xF9400208,
+            0x4D0: 0xD73F0910,
+            0x4D4: 0xF9415E68,
+            0x4D8: 0x9140090A,
+            0x4DC: 0xF907D900,
+        }.items():
+            struct.pack_into("<I", arm_init, offset, word)
+
+        symbols = {
+            recover_g17_abi.ACCELERATOR_GET_GPTBAT_BASE: getter_address,
+            recover_g17_abi.PI300_NEW_SECURE_MONITOR: new_monitor_address,
+            recover_g17_abi.SECURE_MONITOR_INIT: monitor_init_address,
+            recover_g17_abi.SECURE_MONITOR_GET_GPTBAT_DESC: descriptor_getter_address,
+            recover_g17_abi.PI300_READ_GPTBAT_BASE: register_reader_address,
+            recover_g17_abi.PI300_SETUP_MMU_CONFIG: setup_address,
+        }
+        code = {
+            recover_g17_abi.ACCELERATOR_GET_GPTBAT_BASE: (
+                getter_address,
+                bytes(getter),
+            ),
+            recover_g17_abi.SECURE_MONITOR_INIT: (
+                monitor_init_address,
+                bytes(monitor_init),
+            ),
+            recover_g17_abi.SECURE_MONITOR_GET_GPTBAT_DESC: (
+                descriptor_getter_address,
+                descriptor_getter,
+            ),
+            recover_g17_abi.PI300_READ_GPTBAT_BASE: (
+                register_reader_address,
+                bytes(register_reader),
+            ),
+            recover_g17_abi.PI300_SETUP_MMU_CONFIG: (
+                setup_address,
+                bytes(setup),
+            ),
+        }
+        selected_targets = {
+            (
+                recover_g17_abi.G17_ACCELERATOR_VTABLE,
+                recover_g17_abi.G17_NEW_SECURE_MONITOR_VTABLE_SLOT,
+            ): new_monitor_address,
+            (
+                recover_g17_abi.G17_ACCELERATOR_VTABLE,
+                recover_g17_abi.G17_GET_GPTBAT_BASE_VTABLE_SLOT,
+            ): getter_address,
+            (
+                recover_g17_abi.PI300_SECURE_MONITOR_VTABLE,
+                recover_g17_abi.SECURE_MONITOR_INIT_VTABLE_SLOT,
+            ): monitor_init_address,
+            (
+                recover_g17_abi.PI300_SECURE_MONITOR_VTABLE,
+                recover_g17_abi.SECURE_MONITOR_READ_GPTBAT_BASE_VTABLE_SLOT,
+            ): register_reader_address,
+            (
+                recover_g17_abi.PI300_SECURE_MONITOR_VTABLE,
+                recover_g17_abi.SECURE_MONITOR_GET_GPTBAT_DESC_VTABLE_SLOT,
+            ): descriptor_getter_address,
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                side_effect=lambda _image, vtable, slot: selected_targets[(vtable, slot)],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+            mock.patch.object(recover_g17_abi, "virtual_to_file", return_value=0),
+        ):
+            recovered = recover_g17_abi.recover_g17_gptbat_base(
+                b"gptbat-ready\0", bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["offset"], 0xFB0)
+        self.assertEqual(recovered["bytes"], 8)
+        self.assertEqual(recovered["ready_property"], "gptbat-ready")
+        self.assertEqual(recovered["hardware_register"], 0xD0802C)
+        self.assertEqual(recovered["uat_page_shift"], 14)
 
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000

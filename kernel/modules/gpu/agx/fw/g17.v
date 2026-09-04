@@ -776,7 +776,7 @@ fn g17_enabled_usc_count(hardware &hw.HwConfig) u32 {
 	return if any_mask { count } else { hardware.gpu_core_count }
 }
 
-pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlock {
+pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig, uat_ttb_base u64) G17FirmwareScalarBlock {
 	mut result := G17FirmwareScalarBlock{}
 	// retrieveChipInfo publishes the chosen-node chip ID followed by the
 	// major/minor fields extracted from /arm-io/chip-revision.
@@ -808,6 +808,12 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlo
 	// PI_300 start installs UAT configuration 4; the firmware record stores
 	// only whether that value is nonzero.
 	result.values[(0xfac - 0xe90) / 4] = 1
+	// With gptbat-ready set, Apple's secure-monitor object reconstructs this
+	// physical address from register 0xd0802c (PFN << 14). The live T6050
+	// DeviceTree's gpu-region-base and ttbat-phys-addr-base encode the same
+	// address, which is the reserved 64-context TTBR table used by our UAT.
+	result.values[(0xfb0 - 0xe90) / 4] = u32(uat_ttb_base)
+	result.values[(0xfb4 - 0xe90) / 4] = u32(uat_ttb_base >> 32)
 	return result
 }
 
@@ -963,9 +969,11 @@ fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig
 
 // Initialize the recovered DeviceTree-backed subset directly in mapped
 // storage. This avoids placing the 0x2710-byte object on the kernel stack.
-pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwConfig) bool {
+pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwConfig,
+	uat_ttb_base u64) bool {
 	if buffer == unsafe { nil } || size != g17_hardware_config_size
 		|| sizeof(G17HardwareConfig) != g17_hardware_config_size
+		|| uat_ttb_base == 0 || uat_ttb_base & (g17_bootstrap_page_size - 1) != 0
 		|| hardware.perf_state_count == 0
 		|| hardware.perf_state_count > g17_performance_state_capacity
 		|| hardware.perf_state_table_count == 0
@@ -981,7 +989,8 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		populate_g17_color_matrices(mut config)
 		// G17's selected virtual provider returns zero for this optional table.
 		config.border_color_table_address_638 = 0
-		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware)
+		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware,
+			uat_ttb_base)
 		if !populate_g17_pio_mappings(mut config, hardware) {
 			return false
 		}

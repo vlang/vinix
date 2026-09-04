@@ -196,13 +196,17 @@ fn (mut mgr GpuManager) map_g17_pio_records(mut graph G17FirmwareGraph) bool {
 }
 
 fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) bool {
+	if uat_mgr == unsafe { nil } {
+		return false
+	}
 	if !fw.initialize_g17_bootstrap_region(graph.bootstrap_region.cpu_address(), fw.g17_bootstrap_region_size) {
 		return false
 	}
 	if !fw.initialize_g17_role0_region_25c(graph.role0_regions[1].cpu_address(), fw.g17_role0_bootstrap_25c_size) {
 		return false
 	}
-	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(), fw.g17_hardware_config_size, &mgr.hw_config) {
+	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(),
+		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base) {
 		return false
 	}
 	if !mgr.map_g17_pio_records(mut graph) {
