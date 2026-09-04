@@ -675,6 +675,277 @@ def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, .
         raise ValueError(f"missing {label} instruction sequence")
 
 
+def recover_direct_shared_publications(code: bytes) -> list[tuple[int, int, int]]:
+    """Recover {shared CPU member, source GPU member, shared offset} stores.
+
+    The virtual-address conversion helper takes an allocation GPU address in
+    x1 and returns the firmware-visible address in x0. The pinned driver then
+    stores x0 through a direct shared-object pointer or a biased interior
+    pointer.
+    """
+
+    instructions = list(words(code))
+    publications: set[tuple[int, int, int]] = set()
+    current_shared: int | None = None
+    shared_members = {0xA98, 0xBC8}
+
+    for index, (_offset, word) in enumerate(instructions):
+        load = decode_ldr_x(word)
+        if (
+            load is not None
+            and load[0] == 21
+            and load[1] in (0, 19)
+            and load[2] in shared_members
+        ):
+            current_shared = load[2]
+        if load is None or load[0] != 1 or load[1] not in (0, 19):
+            continue
+
+        source_member = load[2]
+        for following_index, (_following_offset, following_word) in enumerate(
+            instructions[index + 1 : index + 36], index + 1
+        ):
+            following_load = decode_ldr_x(following_word)
+            if (
+                following_load is not None
+                and following_load[0] == 1
+                and following_load[1] in (0, 19)
+            ):
+                break
+            store = decode_str_x(following_word)
+            if store is None or store[0] != 0 or current_shared is None:
+                continue
+
+            _source, base, target_offset = store
+            if base == 22:
+                publications.add((current_shared, source_member, 0x254 + target_offset))
+                break
+            if base == 21:
+                publications.add((current_shared, source_member, target_offset))
+                break
+            if base != 8:
+                continue
+
+            target_shared = None
+            target_bias = 0
+            for _prior_offset, prior_word in reversed(
+                instructions[index + 1 : following_index]
+            ):
+                prior_load = decode_ldr_x(prior_word)
+                if (
+                    prior_load is not None
+                    and prior_load[0] == 8
+                    and prior_load[1] == 19
+                    and prior_load[2] in shared_members
+                ):
+                    target_shared = prior_load[2]
+                    break
+                prior_add = decode_add_immediate(prior_word)
+                if (
+                    prior_add is not None
+                    and prior_add[0] == 8
+                    and prior_add[1] == 21
+                ):
+                    target_shared = current_shared
+                    target_bias = prior_add[2]
+                    break
+            if target_shared is not None:
+                publications.add(
+                    (target_shared, source_member, target_bias + target_offset)
+                )
+                break
+
+    return sorted(publications)
+
+
+def recover_auxiliary_shared_publications(code: bytes) -> list[tuple[int, int, int]]:
+    instructions = list(words(code))
+    target_members = {0xAA8: (0xA98, 0x1C0), 0xBD8: (0xBC8, 0x1C0)}
+    publications: set[tuple[int, int, int]] = set()
+
+    for index, (_offset, word) in enumerate(instructions):
+        source = decode_ldr_x(word)
+        if source is None or source[0] != 1 or source[1] != 19:
+            continue
+        for following_index, (_following_offset, following_word) in enumerate(
+            instructions[index + 1 : index + 36], index + 1
+        ):
+            following_source = decode_ldr_x(following_word)
+            if (
+                following_source is not None
+                and following_source[0] == 1
+                and following_source[1] == 19
+            ):
+                break
+            store = decode_str_x(following_word)
+            if store is None or store[0] != 0 or store[1] != 8:
+                continue
+            for _prior_offset, prior_word in reversed(
+                instructions[index + 1 : following_index]
+            ):
+                target = decode_ldr_x(prior_word)
+                if (
+                    target is not None
+                    and target[0] == 8
+                    and target[1] == 19
+                    and target[2] in target_members
+                ):
+                    shared_member, bias = target_members[target[2]]
+                    publications.add((shared_member, source[2], bias + store[2]))
+                    break
+            break
+
+    return sorted(publications)
+
+
+def recover_firmware_shared_data_layout(
+    allocations: list[dict[str, int]], shared_code: bytes, base_code: bytes
+) -> dict[str, object]:
+    direct = recover_direct_shared_publications(shared_code)
+    expected_direct = sorted(
+        (
+            (0xA98, 0x300, 0x000),
+            (0xA98, 0x338, 0x008),
+            (0xA98, 0x340, 0x010),
+            (0xA98, 0xAC0, 0x200),
+            (0xA98, 0x308, 0x254),
+            (0xA98, 0x310, 0x25C),
+            (0xA98, 0x318, 0x264),
+            (0xA98, 0x328, 0x26C),
+            (0xA98, 0x330, 0x274),
+            (0xBC8, 0x300, 0x000),
+            (0xBC8, 0x338, 0x008),
+            (0xBC8, 0x340, 0x010),
+            (0xBC8, 0xBF0, 0x200),
+            (0xBC8, 0x320, 0x471),
+        )
+    )
+    if direct != expected_direct:
+        raise ValueError(
+            "unexpected direct firmware-shared publications: "
+            f"{[(hex(shared), hex(source), hex(offset)) for shared, source, offset in direct]}"
+        )
+
+    auxiliary = recover_auxiliary_shared_publications(base_code)
+    expected_auxiliary = sorted(
+        (shared, source, 0x1C0 + index * 8)
+        for shared, sources in (
+            (0xA98, (0xB40, 0xB60, 0xB48, 0xB68, 0xB50, 0xB70, 0xB58, 0xB78)),
+            (0xBC8, (0xC70, 0xC90, 0xC78, 0xC98, 0xC80, 0xCA0, 0xC88, 0xCA8)),
+        )
+        for index, source in enumerate(sources)
+    )
+    if auxiliary != expected_auxiliary:
+        raise ValueError(
+            "unexpected auxiliary firmware-shared publications: "
+            f"{[(hex(shared), hex(source), hex(offset)) for shared, source, offset in auxiliary]}"
+        )
+
+    require_instruction_sequence(
+        shared_code,
+        "conditional platform shared-address source",
+        (
+            0xF9414E68,  # ldr x8, [x19, #0x298]
+            0x529EEA89,  # mov w9, #0xf754
+            0x8B090109,  # add x9, x8, x9
+            0xB9400129,  # ldr w9, [x9]
+        ),
+    )
+    require_instruction_sequence(
+        shared_code,
+        "conditional platform shared-address pointer",
+        (
+            0x91404D08,  # add x8, x8, #0x13000
+            0x911DA108,  # add x8, x8, #0x768
+            0xF9400101,  # ldr x1, [x8]
+        ),
+    )
+    if struct.pack("<I", 0xF9016AA0) not in shared_code:  # str x0, [x21, #0x2d0]
+        raise ValueError("missing conditional platform shared-address publication")
+
+    allocation_sizes = {
+        item["host_gpu_member"]: item["bytes"] for item in allocations
+    }
+    expected_sizes = {
+        0x300: 0x2710,
+        0x308: 0xC18,
+        0x310: 0x1048,
+        0x318: 0xE10,
+        0x320: 0x11DD0,
+        0x328: 0x68,
+        0x330: 0x800,
+        0x340: 0x88,
+        0xAC0: 0x79800,
+        0xBF0: 0x79800,
+        0xB40: 0x30,
+        0xB48: 0x1B0,
+        0xB50: 0x30,
+        0xB58: 0x30,
+        0xB60: 0x4800,
+        0xB68: 0x28800,
+        0xB70: 0x9000,
+        0xB78: 0x4800,
+        0xC70: 0x30,
+        0xC78: 0x1B0,
+        0xC80: 0x30,
+        0xC88: 0x30,
+        0xC90: 0x4800,
+        0xC98: 0x28800,
+        0xCA0: 0x9000,
+        0xCA8: 0x4800,
+    }
+    mismatched = {
+        member: (allocation_sizes.get(member), size)
+        for member, size in expected_sizes.items()
+        if allocation_sizes.get(member) != size
+    }
+    if mismatched:
+        raise ValueError(
+            "unexpected firmware-shared target allocations: "
+            f"{[(hex(member), actual, expected) for member, (actual, expected) in mismatched.items()]}"
+        )
+
+    def render(items: list[tuple[int, int, int]]) -> list[dict[str, int]]:
+        return [
+            {
+                "shared_cpu_member": shared,
+                "source_gpu_member": source,
+                "shared_offset": offset,
+                **(
+                    {"source_bytes": allocation_sizes[source]}
+                    if source in allocation_sizes
+                    else {}
+                ),
+            }
+            for shared, source, offset in items
+        ]
+
+    return {
+        "bytes": 0x4C0,
+        "roles": [
+            {
+                "role": role,
+                "shared_cpu_member": shared,
+                "shared_gpu_member": gpu,
+                "direct_publications": render(
+                    [item for item in direct if item[0] == shared]
+                ),
+                "auxiliary_publications": render(
+                    [item for item in auxiliary if item[0] == shared]
+                ),
+            }
+            for role, shared, gpu in ((0, 0xA98, 0xAB8), (1, 0xBC8, 0xBE8))
+        ],
+        "conditional_platform_publication": {
+            "host_platform_member": 0x298,
+            "enabled_offset": 0xF754,
+            "pointer_offset": 0x13768,
+            "shared_cpu_member": 0xA98,
+            "shared_offset": 0x2D0,
+        },
+    }
+
+
 def recover_driver_hardware_config_layout(
     base_init_code: bytes, base_power_code: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -1213,6 +1484,9 @@ def main() -> int:
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, shared_init_code = symbol_code(driver, INIT_FIRMWARE_SHARED_DATA)
+        firmware_shared_data = recover_firmware_shared_data_layout(
+            allocations, shared_init_code, base_init_code
+        )
         hardware_config = recover_hardware_config(
             allocations, shared_init_code, firmware
         )
@@ -1231,6 +1505,7 @@ def main() -> int:
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "accelerator": accelerator,
+                "firmware_shared_data": firmware_shared_data,
                 "hardware_config": hardware_config,
                 "uat_handoff": handoff,
                 "root_allocation_bytes": root_allocation_sizes,

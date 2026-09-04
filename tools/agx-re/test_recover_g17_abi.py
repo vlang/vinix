@@ -140,6 +140,105 @@ def driver_root_code() -> bytes:
     )
 
 
+def firmware_shared_allocations() -> list[dict[str, int]]:
+    sizes = {
+        0x300: 0x2710,
+        0x308: 0xC18,
+        0x310: 0x1048,
+        0x318: 0xE10,
+        0x320: 0x11DD0,
+        0x328: 0x68,
+        0x330: 0x800,
+        0x340: 0x88,
+        0xAC0: 0x79800,
+        0xBF0: 0x79800,
+        0xB40: 0x30,
+        0xB48: 0x1B0,
+        0xB50: 0x30,
+        0xB58: 0x30,
+        0xB60: 0x4800,
+        0xB68: 0x28800,
+        0xB70: 0x9000,
+        0xB78: 0x4800,
+        0xC70: 0x30,
+        0xC78: 0x1B0,
+        0xC80: 0x30,
+        0xC88: 0x30,
+        0xC90: 0x4800,
+        0xC98: 0x28800,
+        0xCA0: 0x9000,
+        0xCA8: 0x4800,
+    }
+    return [
+        {
+            "host_cpu_member": member - 8,
+            "host_gpu_member": member,
+            "bytes": size,
+        }
+        for member, size in sizes.items()
+    ]
+
+
+def firmware_shared_code() -> bytes:
+    def direct(source: int, target: int, offset: int) -> tuple[int, ...]:
+        return (ldr_x(1, 19, source), ldr_x(8, 19, target), str_x(0, 8, offset))
+
+    return encode(
+        ldr_x(21, 0, 0xA98),
+        add_immediate(22, 21, 0x254),
+        ldr_x(1, 0, 0x308),
+        str_x(0, 22, 0),
+        *sum(
+            (
+                (ldr_x(1, 19, source), str_x(0, 22, offset - 0x254))
+                for source, offset in (
+                    (0x310, 0x25C),
+                    (0x318, 0x264),
+                    (0x328, 0x26C),
+                    (0x330, 0x274),
+                )
+            ),
+            (),
+        ),
+        *direct(0x340, 0xA98, 0x10),
+        *direct(0x338, 0xA98, 0x08),
+        *direct(0x300, 0xA98, 0x00),
+        *direct(0xAC0, 0xA98, 0x200),
+        0xF9414E68,
+        0x529EEA89,
+        0x8B090109,
+        0xB9400129,
+        0x91404D08,
+        0x911DA108,
+        0xF9400101,
+        0xF9016AA0,
+        ldr_x(21, 19, 0xBC8),
+        ldr_x(1, 19, 0x320),
+        add_immediate(8, 21, 0x471),
+        str_x(0, 8, 0),
+        *direct(0x340, 0xBC8, 0x10),
+        *direct(0x338, 0xBC8, 0x08),
+        *direct(0x300, 0xBC8, 0x00),
+        *direct(0xBF0, 0xBC8, 0x200),
+    )
+
+
+def auxiliary_shared_code() -> bytes:
+    return encode(
+        *sum(
+            (
+                (ldr_x(1, 19, source), ldr_x(8, 19, target), str_x(0, 8, index * 8))
+                for target, sources in (
+                    (0xAA8, (0xB40, 0xB60, 0xB48, 0xB68, 0xB50, 0xB70, 0xB58, 0xB78)),
+                    (0xBD8, (0xC70, 0xC90, 0xC78, 0xC98, 0xC80, 0xCA0, 0xC88, 0xCA8)),
+                )
+                for index, source in enumerate(sources)
+            ),
+            (),
+        )
+    )
+
+
 class RecoverG17AbiTests(unittest.TestCase):
     def test_recovers_firmware_root_pointer_offsets(self) -> None:
         code = encode(
@@ -164,6 +263,30 @@ class RecoverG17AbiTests(unittest.TestCase):
         code = encode(*magic(21), str_x(0, 20, 0x18))
         with self.assertRaisesRegex(ValueError, "unexpected driver root stores"):
             recover_g17_abi.recover_driver_root(code)
+
+    def test_recovers_firmware_shared_data_publications(self) -> None:
+        recovered = recover_g17_abi.recover_firmware_shared_data_layout(
+            firmware_shared_allocations(),
+            firmware_shared_code(),
+            auxiliary_shared_code(),
+        )
+        self.assertEqual(recovered["bytes"], 0x4C0)
+        self.assertEqual(len(recovered["roles"][0]["direct_publications"]), 9)
+        self.assertIn(
+            {"shared_cpu_member": 0xBC8, "source_gpu_member": 0x320,
+             "shared_offset": 0x471, "source_bytes": 0x11DD0},
+            recovered["roles"][1]["direct_publications"],
+        )
+        self.assertEqual(
+            recovered["conditional_platform_publication"]["pointer_offset"],
+            0x13768,
+        )
+
+    def test_rejects_incomplete_firmware_shared_data_publications(self) -> None:
+        with self.assertRaisesRegex(ValueError, "auxiliary firmware-shared"):
+            recover_g17_abi.recover_firmware_shared_data_layout(
+                firmware_shared_allocations(), firmware_shared_code(), b""
+            )
 
     def test_recovers_checked_ring_accessor(self) -> None:
         code = encode(

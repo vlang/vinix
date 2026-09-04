@@ -35,6 +35,14 @@ pub const g17_primary_region_size = u64(0xe440)
 pub const g17_secondary_region_size = u64(0x6f0)
 pub const g17_secondary_aux_size = u64(0xa8)
 pub const g17_hardware_config_size = u64(0x2710)
+pub const g17_common_control_size = u64(0x88)
+pub const g17_role_large_region_size = u64(0x79800)
+pub const g17_role0_bootstrap_254_size = u64(0xc18)
+pub const g17_role0_bootstrap_25c_size = u64(0x1048)
+pub const g17_role0_bootstrap_264_size = u64(0xe10)
+pub const g17_role0_bootstrap_26c_size = u64(0x68)
+pub const g17_role0_bootstrap_274_size = u64(0x800)
+pub const g17_role1_secondary_471_size = u64(0x11dd0)
 pub const g17_color_matrix_count = 64
 pub const g17_color_matrix_size = u64(0x18)
 pub const g17_io_mapping_count = 53
@@ -282,6 +290,62 @@ pub mut:
 	cfi_index_address   u64
 	write_index_address u64
 	entries_address     u64
+}
+
+// Complete set of allocation addresses whose placements in the 0x4c0-byte
+// role-specific shared object are independently recovered. The optional
+// platform address at 0x2d0 is published only when the matching platform flag
+// is set; its zero value is therefore valid.
+pub struct G17FirmwareSharedBindings {
+pub mut:
+	role                      u32
+	hardware_config_address   u64
+	common_service_address    u64
+	common_control_address    u64
+	large_region_address      u64
+	role0_bootstrap_addresses [5]u64
+	optional_platform_address u64
+	accelerator_ring          G17AcceleratorRingAddresses
+	auxiliary_ring_addresses  [g17_auxiliary_ring_address_count]u64
+	role1_secondary_address   u64
+}
+
+pub fn populate_g17_firmware_shared_data(mut data G17FirmwareSharedData, bindings G17FirmwareSharedBindings) bool {
+	if bindings.role > 1 || bindings.hardware_config_address == 0 || bindings.common_service_address == 0 || bindings.common_control_address == 0 || bindings.large_region_address == 0 {
+		return false
+	}
+	if bindings.accelerator_ring.read_index_address == 0 || bindings.accelerator_ring.cfi_index_address == 0 || bindings.accelerator_ring.write_index_address == 0 || bindings.accelerator_ring.entries_address == 0 {
+		return false
+	}
+	for address in bindings.auxiliary_ring_addresses {
+		if address == 0 {
+			return false
+		}
+	}
+	if bindings.role == 0 {
+		for address in bindings.role0_bootstrap_addresses {
+			if address == 0 {
+				return false
+			}
+		}
+	} else if bindings.role1_secondary_address == 0 {
+		return false
+	}
+
+	data = G17FirmwareSharedData{}
+	data.address_000 = bindings.hardware_config_address
+	data.address_008 = bindings.common_service_address
+	data.address_010 = bindings.common_control_address
+	data.accelerator_ring = bindings.accelerator_ring
+	data.auxiliary_ring_addresses = bindings.auxiliary_ring_addresses
+	data.address_200 = bindings.large_region_address
+	data.address_2d0 = bindings.optional_platform_address
+	if bindings.role == 0 {
+		data.addresses_254 = bindings.role0_bootstrap_addresses
+	} else {
+		data.secondary_address_471 = bindings.role1_secondary_address
+	}
+	return true
 }
 
 // Scheduler submission entry written by
