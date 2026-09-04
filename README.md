@@ -96,7 +96,7 @@ This is not permanent across reboots. To make it so, one can do:
 sudo sh -c 'echo "kernel.apparmor_restrict_unprivileged_userns = 0" >/etc/sysctl.d/99-userns.conf'
 ```
 
-This will build a minimal distro image. Setting the `PKGS_TO_INSTALL` env
+This will build the base distro image. Setting the `PKGS_TO_INSTALL` env
 variable will allow one to specify a custom set of packages to build/install.
 For example:
 
@@ -110,6 +110,17 @@ PKGS_TO_INSTALL='python sqlite' make all
 ```
 This will build the base system (like `make all`) plus the `python` and `sqlite`
 packages.
+
+The amd64 base image includes GCC, V, Xorg, and a framebuffer-backed OpenGL
+demo. Boot the image and run:
+
+```sh
+run-gl-triangle
+```
+
+Use `run-gl-triangle --rebuild` to compile the same demo with GCC inside Vinix
+before launching it. OpenGL currently uses Mesa softpipe on the Limine
+framebuffer; accelerated DRM drivers are separate future work.
 
 ### To test
 

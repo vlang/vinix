@@ -2,7 +2,7 @@
 
 name=xorg-server
 version=21.1.16
-revision=1
+revision=2
 tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
 tarball_blake2b="90a2aded6ab324dbaed976461062b7dccbc09466229cf8da8aaf0e9049144a8a5109ad35b1ee994451cdc5c33be45c6cb1f5a32ab6e8c021ca71f6ef180400f8"
 hostdeps="gcc pkg-config"

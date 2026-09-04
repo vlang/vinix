@@ -2,21 +2,26 @@
 
 name=mesa
 version=25.0.5
-revision=1
+revision=2
 tarball_url="https://archive.mesa3d.org/mesa-${version}.tar.xz"
 tarball_blake2b="f17f8c2a733fd3c37f346b9304241dc1d13e01df9c8c723b73b10279dd3c2ebed062ec1f15cdbc8b9936bae840a087b23ac38cae7d8982228d582d468ab8c9c9"
-imagedeps="meson ninja-build python3-mako python3-yaml glslang-tools"
+imagedeps="meson ninja-build python3-mako python3-yaml"
 hostdeps="gcc pkg-config"
-deps="core-libs llvm libexpat libx11 libxcb libxext libxshmfence libxxf86vm libxrandr zlib zstd"
+deps="core-libs libexpat libx11 libxcb libxext libxshmfence libxxf86vm libxrandr zlib zstd"
 
 configure() {
+    # amd64 currently exposes the boot framebuffer rather than DRM render
+    # nodes. Mesa's Xlib GLX frontend plus softpipe provides OpenGL directly
+    # over that X display without requiring server-side GLX or LLVM.
     meson_configure \
         -Dglx=xlib \
         -Dplatforms=x11 \
-        -Dgallium-drivers=llvmpipe,softpipe \
-        -Dvulkan-drivers=swrast \
+        -Dgallium-drivers=softpipe \
+        -Dvulkan-drivers= \
+        -Dllvm=disabled \
+        -Ddraw-use-llvm=false \
         -Dosmesa=true \
-        -Dvideo-codecs=all
+        -Dvideo-codecs=
 }
 
 build() {

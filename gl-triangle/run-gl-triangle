@@ -1,0 +1,59 @@
+#!/bin/sh
+
+set -eu
+
+export LIBGL_ALWAYS_SOFTWARE=1
+export GALLIUM_DRIVER=softpipe
+
+triangle=/usr/bin/gl-triangle
+if test "${1:-}" = --rebuild; then
+    echo "run-gl-triangle: compiling the demo with Vinix GCC"
+    gcc /usr/share/examples/gl-triangle/triangle.c \
+        -O2 -o /tmp/gl-triangle -lglut -lGL -lm
+    triangle=/tmp/gl-triangle
+    shift
+fi
+
+if test -n "${DISPLAY:-}"; then
+    exec "${triangle}" "$@"
+fi
+
+mkdir -p /tmp/.X11-unix /var/lib/xkb
+
+display=:0
+if test -e /tmp/.X11-unix/X0 || test -e /tmp/.X0-lock; then
+    echo "run-gl-triangle: display :0 is already in use" >&2
+    echo "run-gl-triangle: set DISPLAY to use an existing X server" >&2
+    exit 1
+fi
+
+echo "run-gl-triangle: starting Xorg on ${display} with /dev/fb0"
+/usr/bin/Xorg "${display}" -config /etc/X11/xorg.conf -nolisten tcp -noreset \
+    </dev/null >/var/log/Xorg.gl-triangle.log 2>&1 &
+xorg_pid=$!
+
+# Xorg signals xinit when ready, but this small standalone launcher has no
+# xinit parent. A short bounded probe also gives useful diagnostics on failure.
+ready=0
+for delay in 1 2 3 4 5; do
+    sleep 1
+    if test -e /tmp/.X11-unix/X0; then
+        ready=1
+        break
+    fi
+    if ! kill -0 "${xorg_pid}" 2>/dev/null; then
+        break
+    fi
+done
+
+if test "${ready}" -ne 1; then
+    echo "run-gl-triangle: Xorg did not become ready" >&2
+    if test -f /var/log/Xorg.gl-triangle.log; then
+        cat /var/log/Xorg.gl-triangle.log >&2
+    fi
+    exit 1
+fi
+
+export DISPLAY="${display}"
+echo "run-gl-triangle: Xorg is ready; launching OpenGL demo"
+exec "${triangle}" "$@"
