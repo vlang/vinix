@@ -2556,6 +2556,69 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["fixed_value"]["offset"], 0xF8C)
         self.assertEqual(recovered["fixed_value"]["value"], 0x00000000FFFEAE80)
 
+    def test_recovers_g17_uat_config_flag(self) -> None:
+        pi_address = 0x100000
+        g17_address = 0x200000
+        pi_start = bytearray(0x4C)
+        for offset, word in {
+            0x18: 0x91407008,
+            0x1C: 0x912E8108,
+            0x20: 0x529EEE89,
+            0x24: 0x8B090009,
+            0x3C: 0x52800088,
+            0x40: 0xB9000128,
+            0x44: 0x52800028,
+            0x48: 0x39001528,
+        }.items():
+            struct.pack_into("<I", pi_start, offset, word)
+        g17_start = bytearray(0x1E4)
+        for offset, word in {
+            0x1D4: 0xAA1303E0,
+            0x1D8: 0xAA1403E1,
+            0x1DC: bl(g17_address + 0x1DC, pi_address),
+            0x1E0: 0x340012E0,
+        }.items():
+            struct.pack_into("<I", g17_start, offset, word)
+        arm_init = bytearray(0x4B0)
+        for offset, word in {
+            0x498: 0x529EEE89,
+            0x49C: 0x8B090009,
+            0x4A0: 0xB9400129,
+            0x4A4: 0x7100013F,
+            0x4A8: 0x1A9F07E9,
+            0x4AC: 0xB90FAD09,
+        }.items():
+            struct.pack_into("<I", arm_init, offset, word)
+        symbols = {
+            recover_g17_abi.PI300_ACCELERATOR_START: pi_address,
+            recover_g17_abi.G17_ACCELERATOR_START: g17_address,
+        }
+        code = {
+            recover_g17_abi.PI300_ACCELERATOR_START: (
+                pi_address,
+                bytes(pi_start),
+            ),
+            recover_g17_abi.G17_ACCELERATOR_START: (
+                g17_address,
+                bytes(g17_start),
+            ),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_uat_config_flag(
+                b"", bytes(arm_init)
+            )
+
+        self.assertEqual(recovered["offset"], 0xFAC)
+        self.assertEqual(recovered["value"], 1)
+        self.assertEqual(recovered["source_value"], 4)
+
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000
         pi_address = 0x101000

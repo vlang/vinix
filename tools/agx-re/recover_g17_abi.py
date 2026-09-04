@@ -54,6 +54,10 @@ G17_DEFAULT_MCACHE_WRITES = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX25halGetDefaultMcacheWritesEv.8045"
 )
 G17_GET_ENABLED_NUM_USCS = "__ZNK14AGXAccelerator17getEnabledNumUSCsEv"
+PI300_ACCELERATOR_START = "__ZN31AGX·PI_300·X·A0·Accelerator5startEP9IOService"
+G17_ACCELERATOR_START = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX5startEP9IOService"
+)
 ACCELERATOR_START = "__ZN14AGXAccelerator5startEP9IOService"
 PI300_CONFIGURE_DEVICE = (
     "__ZN31AGX·PI_300·X·A0·Accelerator15configureDeviceEP9IOService"
@@ -4514,6 +4518,70 @@ def recover_g17_enabled_usc_config(
     }
 
 
+def recover_g17_uat_config_flag(
+    image: bytes, arm_init_code: bytes
+) -> dict[str, object]:
+    """Recover the nonzero-UAT-configuration flag at config +0xfac."""
+
+    symbols = macho_symbols(image)
+    required = (PI300_ACCELERATOR_START, G17_ACCELERATOR_START)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    pi_address, pi_code = symbol_code(image, PI300_ACCELERATOR_START)
+    g17_address, g17_code = symbol_code(image, G17_ACCELERATOR_START)
+    call_target = decode_bl_target(
+        g17_address + 0x1DC, struct.unpack_from("<I", g17_code, 0x1DC)[0]
+    )
+    if call_target != pi_address:
+        raise ValueError("G17 start no longer directly calls PI_300 start")
+    require_instruction_words_at(
+        g17_code,
+        "G17 PI_300 start call",
+        {
+            0x1D4: 0xAA1303E0,
+            0x1D8: 0xAA1403E1,
+            0x1DC: struct.unpack_from("<I", g17_code, 0x1DC)[0],
+            0x1E0: 0x340012E0,
+        },
+    )
+    require_instruction_words_at(
+        pi_code,
+        "G17 UAT configuration producer",
+        {
+            0x18: 0x91407008,
+            0x1C: 0x912E8108,
+            0x20: 0x529EEE89,
+            0x24: 0x8B090009,  # accelerator +0xf774
+            0x3C: 0x52800088,
+            0x40: 0xB9000128,  # UAT configuration = 4
+            0x44: 0x52800028,
+            0x48: 0x39001528,
+        },
+    )
+    require_instruction_words_at(
+        arm_init_code,
+        "G17 UAT configuration flag publication",
+        {
+            0x498: 0x529EEE89,
+            0x49C: 0x8B090009,
+            0x4A0: 0xB9400129,
+            0x4A4: 0x7100013F,
+            0x4A8: 0x1A9F07E9,
+            0x4AC: 0xB90FAD09,
+        },
+    )
+    return {
+        "offset": 0xFAC,
+        "value": 1,
+        "source_offset": 0xF774,
+        "source_value": 4,
+        "formula": "source != 0",
+        "producer": PI300_ACCELERATOR_START,
+        "g17_caller": G17_ACCELERATOR_START,
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -5742,6 +5810,9 @@ def main() -> int:
             recover_g17_default_mcache_writes(driver, function)
         )
         hardware_config["enabled_usc_config"] = recover_g17_enabled_usc_config(
+            driver, function
+        )
+        hardware_config["uat_config_flag"] = recover_g17_uat_config_flag(
             driver, function
         )
         hardware_config["aux_performance_states"] = (

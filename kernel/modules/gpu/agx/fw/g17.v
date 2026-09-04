@@ -805,6 +805,9 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig) G17FirmwareScalarBlo
 	result.values[(0xf88 - 0xe90) / 4] = g17_enabled_usc_count(hardware)
 	result.values[(0xf8c - 0xe90) / 4] = u32(g17_fixed_config_value_f8c)
 	result.values[(0xf90 - 0xe90) / 4] = u32(g17_fixed_config_value_f8c >> 32)
+	// PI_300 start installs UAT configuration 4; the firmware record stores
+	// only whether that value is nonzero.
+	result.values[(0xfac - 0xe90) / 4] = 1
 	return result
 }
 
