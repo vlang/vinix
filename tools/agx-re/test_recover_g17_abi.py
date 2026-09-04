@@ -2082,6 +2082,92 @@ class RecoverG17AbiTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "CSC allocation provider"):
                 recover_g17_abi.recover_g17_address_space_layout(b"", b"")
 
+    def test_recovers_g17_color_matrices(self) -> None:
+        function_address = 0x1000
+        tpu_address = 0x3000
+        pbe_address = 0x4000
+        code = bytearray(0x74)
+        expected_words = {
+            0x00: 0xD503245F,
+            0x04: 0xD2800008,
+            0x08: 0x91406809,
+            0x0C: 0x910D2129,
+            0x10: 0x9140680A,
+            0x14: 0x910D614A,
+            0x18: 0x9140680B,
+            0x1C: 0x9119616B,
+            0x24: add_immediate(12, 12, tpu_address & 0xFFF),
+            0x2C: add_immediate(13, 13, pbe_address & 0xFFF),
+            0x30: 0x8B08018E,
+            0x34: 0x8B08012F,
+            0x38: 0x8B0801B0,
+            0x3C: 0x3DC001C0,
+            0x40: 0x3D8001E0,
+            0x44: 0x3DC00200,
+            0x48: 0x3D80C1E0,
+            0x4C: 0x8B08014F,
+            0x50: 0x8B080171,
+            0x54: 0xFD4009C0,
+            0x58: 0xFD0001E0,
+            0x5C: 0xFD400A00,
+            0x60: 0xFD000220,
+            0x64: 0x91006108,
+            0x68: 0xF10C011F,
+            0x6C: 0x54FFFE21,
+            0x70: 0xD65F03C0,
+        }
+
+        def adrp(source: int, target: int, register: int) -> int:
+            pages = ((target & ~0xFFF) - (source & ~0xFFF)) >> 12
+            immediate = pages & 0x1FFFFF
+            return (
+                0x90000000
+                | (immediate & 3) << 29
+                | ((immediate >> 2) & 0x7FFFF) << 5
+                | register
+            )
+
+        expected_words[0x20] = adrp(function_address + 0x20, tpu_address, 12)
+        expected_words[0x28] = adrp(function_address + 0x28, pbe_address, 13)
+        for offset, word in expected_words.items():
+            struct.pack_into("<I", code, offset, word)
+
+        tpu = bytearray(0x300)
+        pbe = bytearray(0x300)
+        struct.pack_into("<12h", tpu, 7 * 0x18, 8200, 0, 0, 0, 0, 8200, 0, 0, 0, 0, 8200, 0)
+        struct.pack_into("<12h", pbe, 28 * 0x18, 9797, 19235, 3736, 0, -5537, -10846, 16383, 16384, 16384, -13730, -2654, 16384)
+        symbols = {
+            recover_g17_abi.G17_GENERATE_CSC_COEFFICIENTS: function_address,
+            recover_g17_abi.G17_TPU_CSC_COEFFICIENTS: tpu_address,
+            recover_g17_abi.G17_PBE_CSC_COEFFICIENTS: pbe_address,
+        }
+        blobs = {
+            recover_g17_abi.G17_GENERATE_CSC_COEFFICIENTS: bytes(code),
+            recover_g17_abi.G17_TPU_CSC_COEFFICIENTS: bytes(tpu),
+            recover_g17_abi.G17_PBE_CSC_COEFFICIENTS: bytes(pbe),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=function_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: (symbols[name], blobs[name]),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_color_matrices(b"")
+
+        self.assertEqual(recovered["records"], 64)
+        self.assertEqual(
+            recovered["banks"][0]["nonzero_records"],
+            [{"index": 7, "coefficients": [8200, 0, 0, 0, 0, 8200, 0, 0, 0, 0, 8200, 0]}],
+        )
+        self.assertEqual(recovered["banks"][1]["nonzero_records"][0]["index"], 28)
+
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
             0x7100045F,

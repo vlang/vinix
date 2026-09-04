@@ -729,6 +729,23 @@ pub fn new_g17_address_space_layout() G17AddressSpaceLayout {
 	}
 }
 
+// The selected PI_300 producer copies two 32-record read-only tables into the
+// accelerator object. All records except 7, 8, and 28 in each bank are zero.
+fn populate_g17_color_matrices(mut config G17HardwareConfig) {
+	config.color_matrices_038[7].coefficients = [i16(8200), 0, 0, 0, 0, 8200, 0, 0, 0, 0, 8200,
+		0]!
+	config.color_matrices_038[8].coefficients = [i16(9419), 0, 11514, -13942, 9419, -2826, -5865,
+		6263, 9419, 14553, 0, -16981]!
+	config.color_matrices_038[28].coefficients = [i16(8192), -8, 11483, -11475, 8192, -2816, -5850,
+		8666, 8192, 14518, 8, -14526]!
+	config.color_matrices_038[32 + 7].coefficients = [i16(32736), 0, 0, 0, 0, 32736, 0, 0, 0, 0,
+		32736, 0]!
+	config.color_matrices_038[32 + 8].coefficients = [i16(-32768), 0, 0, 0, 0, -32768, 0, 0, 0,
+		0, -32768, 0]!
+	config.color_matrices_038[32 + 28].coefficients = [i16(9797), 19235, 3736, 0, -5537, -10846,
+		16383, 16384, 16384, -13730, -2654, 16384]!
+}
+
 // Hardware/configuration allocation published at offset zero of both
 // firmware-shared objects. The host producer and primary firmware consumer
 // independently establish the record boundaries below. Unknown scalar and
@@ -863,6 +880,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		C.memset(buffer, 0, size)
 		mut config := &G17HardwareConfig(buffer)
 		config.address_space_layout_000 = new_g17_address_space_layout()
+		populate_g17_color_matrices(mut config)
 		if !populate_g17_pio_mappings(mut config, hardware) {
 			return false
 		}

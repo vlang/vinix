@@ -86,6 +86,15 @@ G17_GET_PERF_STATE_CAP = (
 G17_SETUP_CSC_ALLOCATION = (
     "__ZN31AGX·PI_300·X·A0·Accelerator18setupCSCAllocationEv.8063"
 )
+G17_GENERATE_CSC_COEFFICIENTS = (
+    "__ZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEv"
+)
+G17_TPU_CSC_COEFFICIENTS = (
+    "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16tpu_coefficients"
+)
+G17_PBE_CSC_COEFFICIENTS = (
+    "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16pbe_coefficients"
+)
 SET_GVDM_MODE = "__ZN14AGXAccelerator11setGVDMModeEjjj"
 GET_UMA_MAX_ACTIVE_GTP_KICKS = "__ZN14AGXAccelerator23getUMAMaxActiveGTPKicksEv"
 PERF_COUNTER_SOURCE_STOP = "__ZN17AGXPerfCtrSampler17sourceSamplerStopEv"
@@ -324,6 +333,7 @@ G17_PIO_TABLE_LENGTH_VTABLE_SLOT = 0x1170
 G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT = 0x10E0
 G17_GET_PERF_STATE_CAP_VTABLE_SLOT = 0x11D8
 G17_SETUP_CSC_ALLOCATION_VTABLE_SLOT = 0xF40
+G17_GENERATE_CSC_COEFFICIENTS_VTABLE_SLOT = 0xFB8
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -3897,6 +3907,110 @@ def recover_g17_address_space_layout(
     }
 
 
+def recover_g17_color_matrices(image: bytes) -> dict[str, object]:
+    """Recover both 32-record CSC coefficient banks selected by G17."""
+
+    symbols = macho_symbols(image)
+    required = (
+        G17_GENERATE_CSC_COEFFICIENTS,
+        G17_TPU_CSC_COEFFICIENTS,
+        G17_PBE_CSC_COEFFICIENTS,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 CSC coefficient symbols: {missing}")
+
+    provider = recover_vtable_target(
+        image,
+        G17_ACCELERATOR_VTABLE,
+        G17_GENERATE_CSC_COEFFICIENTS_VTABLE_SLOT,
+    )
+    if provider != symbols[G17_GENERATE_CSC_COEFFICIENTS]:
+        raise ValueError(f"unexpected G17 CSC coefficient provider {provider:#x}")
+
+    function_address, code = symbol_code(image, G17_GENERATE_CSC_COEFFICIENTS)
+    if len(code) != 0x74:
+        raise ValueError(f"unexpected G17 CSC coefficient producer size {len(code):#x}")
+    expected_words = {
+        0x00: 0xD503245F,
+        0x04: 0xD2800008,
+        0x08: 0x91406809,
+        0x0C: 0x910D2129,
+        0x10: 0x9140680A,
+        0x14: 0x910D614A,
+        0x18: 0x9140680B,
+        0x1C: 0x9119616B,
+        0x30: 0x8B08018E,
+        0x34: 0x8B08012F,
+        0x38: 0x8B0801B0,
+        0x3C: 0x3DC001C0,
+        0x40: 0x3D8001E0,
+        0x44: 0x3DC00200,
+        0x48: 0x3D80C1E0,
+        0x4C: 0x8B08014F,
+        0x50: 0x8B080171,
+        0x54: 0xFD4009C0,
+        0x58: 0xFD0001E0,
+        0x5C: 0xFD400A00,
+        0x60: 0xFD000220,
+        0x64: 0x91006108,
+        0x68: 0xF10C011F,
+        0x6C: 0x54FFFE21,
+        0x70: 0xD65F03C0,
+    }
+    require_instruction_words_at(code, "G17 CSC coefficient producer", expected_words)
+
+    # Resolve both ADRP/add pairs instead of trusting their symbol names alone.
+    for adrp_offset, add_offset, symbol in (
+        (0x20, 0x24, G17_TPU_CSC_COEFFICIENTS),
+        (0x28, 0x2C, G17_PBE_CSC_COEFFICIENTS),
+    ):
+        adrp = decode_adrp(
+            function_address + adrp_offset,
+            struct.unpack_from("<I", code, adrp_offset)[0],
+        )
+        add = decode_add_immediate(struct.unpack_from("<I", code, add_offset)[0])
+        if adrp is None or add is None:
+            raise ValueError(f"missing G17 CSC source address for {symbol}")
+        page_register, page = adrp
+        destination, source, immediate = add
+        if destination != page_register or source != page_register:
+            raise ValueError(f"malformed G17 CSC source address for {symbol}")
+        if page + immediate != symbols[symbol]:
+            raise ValueError(f"G17 CSC producer does not reference {symbol}")
+
+    banks = []
+    for name in (G17_TPU_CSC_COEFFICIENTS, G17_PBE_CSC_COEFFICIENTS):
+        _address, blob = symbol_code(image, name)
+        if len(blob) != 0x300:
+            raise ValueError(f"unexpected G17 CSC bank size for {name}: {len(blob):#x}")
+        values = struct.unpack("<384h", blob)
+        nonzero_records = []
+        for index in range(32):
+            coefficients = list(values[index * 12 : (index + 1) * 12])
+            if any(coefficients):
+                nonzero_records.append(
+                    {"index": index, "coefficients": coefficients}
+                )
+        banks.append(
+            {
+                "source": name,
+                "records": 32,
+                "record_bytes": 0x18,
+                "nonzero_records": nonzero_records,
+            }
+        )
+
+    return {
+        "offset": 0x38,
+        "records": 64,
+        "record_bytes": 0x18,
+        "provider_vtable_slot": G17_GENERATE_CSC_COEFFICIENTS_VTABLE_SLOT,
+        "provider": G17_GENERATE_CSC_COEFFICIENTS,
+        "banks": banks,
+    }
+
+
 def recover_g17_aux_performance_layout(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -4835,6 +4949,7 @@ def main() -> int:
         hardware_config["address_space_layout"] = recover_g17_address_space_layout(
             driver, base_init_code
         )
+        hardware_config["color_matrices"] = recover_g17_color_matrices(driver)
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)
         )
