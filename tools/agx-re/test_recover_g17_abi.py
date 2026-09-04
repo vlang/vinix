@@ -1990,6 +1990,98 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "color-matrix"):
             recover_g17_abi.recover_driver_hardware_config_layout(b"", b"", b"")
 
+    def test_recovers_g17_address_space_layout(self) -> None:
+        base_init = bytearray(0x16F4)
+        expected_words = {
+            0x1478: 0xF9415E68,
+            0x1480: 0x3DC35920,
+            0x1484: 0xD2C00209,
+            0x1488: 0x4E080D21,
+            0x148C: 0xAD000500,
+            0x1490: 0xB27143E9,
+            0x1494: 0xF2C05FE9,
+            0x1498: 0xF9001109,
+            0x1538: 0x91406808,
+            0x153C: 0x910D0108,
+            0x1540: 0xF9400108,
+            0x1544: 0xB40001C8,
+            0x1558: 0xD2802B11,
+            0x1570: 0xAA0003E8,
+            0x1574: 0xF9415E69,
+            0x157C: 0xF9001928,
+            0x16A8: 0x910B6208,
+            0x16B0: 0xD2B02801,
+            0x16B4: 0xF2DF8421,
+            0x16B8: 0xF2FFFFE1,
+            0x16BC: 0xAA1303E0,
+            0x16C0: 0x52800002,
+            0x16F0: 0xF9001500,
+        }
+        for offset, word in expected_words.items():
+            struct.pack_into("<I", base_init, offset, word)
+
+        symbols = {
+            recover_g17_abi.INIT_BASE_FIRMWARE_DATA: 0x1000,
+            recover_g17_abi.G17_SETUP_CSC_ALLOCATION: 0x2000,
+            recover_g17_abi.CONVERT_GPU_VA_TO_FW_VA: 0x3000,
+        }
+        stubs = {
+            recover_g17_abi.G17_SETUP_CSC_ALLOCATION: encode(
+                0xD503245F, 0x52800020, 0xD65F03C0
+            ),
+            recover_g17_abi.CONVERT_GPU_VA_TO_FW_VA: encode(
+                0xD503245F, 0xAA0103E0, 0xD65F03C0
+            ),
+        }
+
+        def vtable_target(_image: bytes, _name: str, slot: int) -> int:
+            if slot == recover_g17_abi.G17_SETUP_CSC_ALLOCATION_VTABLE_SLOT:
+                return symbols[recover_g17_abi.G17_SETUP_CSC_ALLOCATION]
+            if slot == recover_g17_abi.FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT:
+                return symbols[recover_g17_abi.CONVERT_GPU_VA_TO_FW_VA]
+            raise AssertionError(f"unexpected vtable slot {slot:#x}")
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", side_effect=vtable_target
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: (symbols[name], stubs[name]),
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "read_adrp_load",
+                return_value=struct.pack("<QQ", 0x6F00000000, 0xFFC00000),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_address_space_layout(
+                b"", bytes(base_init)
+            )
+
+        self.assertEqual(recovered["bytes"], 0x38)
+        self.assertEqual(recovered["usc_start"], [0x1000000000, 0x1000000000])
+        self.assertEqual(recovered["unknown_page"], 0x2FFFFFF8000)
+        self.assertEqual(recovered["timestamp_area_base"], 0xFFFFFC2181400000)
+        self.assertEqual(recovered["yuv_csc_table_address"], 0)
+
+    def test_rejects_g17_address_space_layout_with_legacy_csc_provider(self) -> None:
+        symbols = {
+            recover_g17_abi.INIT_BASE_FIRMWARE_DATA: 0x1000,
+            recover_g17_abi.G17_SETUP_CSC_ALLOCATION: 0x2000,
+            recover_g17_abi.CONVERT_GPU_VA_TO_FW_VA: 0x3000,
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi, "recover_vtable_target", return_value=0x4000
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "CSC allocation provider"):
+                recover_g17_abi.recover_g17_address_space_layout(b"", b"")
+
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
             0x7100045F,

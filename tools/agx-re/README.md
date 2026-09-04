@@ -62,7 +62,8 @@ into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
 hardware-configuration allocation, host-written table layout and firmware
-read map, the G17C PIO relative-offset table and its 12 primary-aperture
+read map, its fixed address-space prefix and G17 no-op CSC allocation, the
+G17C PIO relative-offset table and its 12 primary-aperture
 firmware records, their physical alignment and GART-10 UAT publication path,
 the native CS/AFR auxiliary performance-state parser and firmware blocks,
 exact per-role bootstrap-root bindings, its copied platform

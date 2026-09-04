@@ -83,6 +83,9 @@ POPULATE_AUX_PERF_STATE_INFO = (
 G17_GET_PERF_STATE_CAP = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX15getPerfStateCapE14AGXClockDomainRb"
 )
+G17_SETUP_CSC_ALLOCATION = (
+    "__ZN31AGX·PI_300·X·A0·Accelerator18setupCSCAllocationEv.8063"
+)
 SET_GVDM_MODE = "__ZN14AGXAccelerator11setGVDMModeEjjj"
 GET_UMA_MAX_ACTIVE_GTP_KICKS = "__ZN14AGXAccelerator23getUMAMaxActiveGTPKicksEv"
 PERF_COUNTER_SOURCE_STOP = "__ZN17AGXPerfCtrSampler17sourceSamplerStopEv"
@@ -320,6 +323,7 @@ G17_PIO_TABLE_VTABLE_SLOT = 0x1168
 G17_PIO_TABLE_LENGTH_VTABLE_SLOT = 0x1170
 G17_DEFAULT_USC_MAX_TGMEM_VTABLE_SLOT = 0x10E0
 G17_GET_PERF_STATE_CAP_VTABLE_SLOT = 0x11D8
+G17_SETUP_CSC_ALLOCATION_VTABLE_SLOT = 0xF40
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
 
@@ -3775,6 +3779,124 @@ def recover_driver_hardware_config_layout(
     }
 
 
+def recover_g17_address_space_layout(
+    image: bytes, base_init_code: bytes
+) -> dict[str, object]:
+    """Recover the complete fixed 0x38-byte hardware-config prefix.
+
+    The final word is the optional YUV CSC allocation.  G17 selects a stub
+    which returns success without allocating it, and initFirmwareData writes
+    zero when that mapping is absent.
+    """
+
+    symbols = macho_symbols(image)
+    required = (G17_SETUP_CSC_ALLOCATION, CONVERT_GPU_VA_TO_FW_VA)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 address-space symbols: {missing}")
+
+    csc_provider = recover_vtable_target(
+        image,
+        G17_ACCELERATOR_VTABLE,
+        G17_SETUP_CSC_ALLOCATION_VTABLE_SLOT,
+    )
+    if csc_provider != symbols[G17_SETUP_CSC_ALLOCATION]:
+        raise ValueError(f"unexpected G17 CSC allocation provider {csc_provider:#x}")
+    _address, csc_code = symbol_code(image, G17_SETUP_CSC_ALLOCATION)
+    if csc_code != struct.pack(
+        "<3I",
+        0xD503245F,  # bti c
+        0x52800020,  # mov w0, #1
+        0xD65F03C0,  # ret
+    ):
+        raise ValueError("G17 CSC allocation provider is not the checked no-op")
+
+    converter = recover_vtable_target(
+        image, G17_FIRMWARE_VTABLE, FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT
+    )
+    if converter != symbols[CONVERT_GPU_VA_TO_FW_VA]:
+        raise ValueError(f"unexpected G17 firmware address converter {converter:#x}")
+    _address, converter_code = symbol_code(image, CONVERT_GPU_VA_TO_FW_VA)
+    if converter_code != struct.pack("<3I", 0xD503245F, 0xAA0103E0, 0xD65F03C0):
+        raise ValueError("G17 firmware address conversion is not the checked identity mapping")
+
+    # The constant vector supplies offsets 0x00 and 0x08.  Keep its
+    # PC-relative load tied to the checked instruction offsets so a driver
+    # update cannot silently reuse unrelated read-only data.
+    fixed_pair = read_adrp_load(
+        image,
+        symbols[INIT_BASE_FIRMWARE_DATA],
+        base_init_code,
+        0x147C,
+        0x1480,
+        16,
+    )
+    if len(fixed_pair) != 16:
+        raise ValueError("truncated G17 hardware-config address constant")
+    userspace_va_map, userspace_va_limit = struct.unpack("<QQ", fixed_pair)
+    if (userspace_va_map, userspace_va_limit) != (0x6F00000000, 0xFFC00000):
+        raise ValueError(
+            "unexpected G17 hardware-config userspace VA constants: "
+            f"{userspace_va_map:#x}, {userspace_va_limit:#x}"
+        )
+
+    require_instruction_words_at(
+        base_init_code,
+        "G17 hardware-config address-space prefix",
+        {
+            0x1478: 0xF9415E68,  # hardware-config CPU address
+            0x1480: 0x3DC35920,  # load checked 16-byte constant
+            0x1484: 0xD2C00209,  # 0x10_00000000
+            0x1488: 0x4E080D21,  # duplicate into both USC words
+            0x148C: 0xAD000500,  # config +0x00 through +0x1f
+            0x1490: 0xB27143E9,  # begin 0x2ff_ffff8000
+            0x1494: 0xF2C05FE9,
+            0x1498: 0xF9001109,  # config +0x20
+        },
+    )
+    require_instruction_words_at(
+        base_init_code,
+        "G17 optional CSC address publication",
+        {
+            0x1538: 0x91406808,  # accelerator +0x1a000
+            0x153C: 0x910D0108,  # optional mapping member +0x340
+            0x1540: 0xF9400108,
+            0x1544: 0xB40001C8,  # skip getGPUVirtualAddress when null
+            0x1558: 0xD2802B11,  # mapping vtable slot 0x158
+            0x1570: 0xAA0003E8,
+            0x1574: 0xF9415E69,  # hardware-config CPU address
+            0x157C: 0xF9001928,  # config +0x30, including zero path
+        },
+    )
+    require_instruction_words_at(
+        base_init_code,
+        "G17 timestamp-area address publication",
+        {
+            0x16A8: 0x910B6208,  # firmware converter vtable slot 0x2d8
+            0x16B0: 0xD2B02801,
+            0x16B4: 0xF2DF8421,
+            0x16B8: 0xF2FFFFE1,  # 0xfffffc2181400000
+            0x16BC: 0xAA1303E0,
+            0x16C0: 0x52800002,
+            0x16F0: 0xF9001500,  # config +0x28
+        },
+    )
+
+    return {
+        "offset": 0,
+        "bytes": 0x38,
+        "userspace_va_map": userspace_va_map,
+        "userspace_va_limit": userspace_va_limit,
+        "usc_start": [0x1000000000, 0x1000000000],
+        "unknown_page": 0x2FFFFFF8000,
+        "timestamp_area_base": 0xFFFFFC2181400000,
+        "yuv_csc_table_address": 0,
+        "csc_allocation_vtable_slot": G17_SETUP_CSC_ALLOCATION_VTABLE_SLOT,
+        "csc_allocation_provider": G17_SETUP_CSC_ALLOCATION,
+        "firmware_address_conversion": CONVERT_GPU_VA_TO_FW_VA,
+    }
+
+
 def recover_g17_aux_performance_layout(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -4709,6 +4831,9 @@ def main() -> int:
         )
         hardware_config["host_layout"] = recover_driver_hardware_config_layout(
             base_init_code, base_power_code, power_code
+        )
+        hardware_config["address_space_layout"] = recover_g17_address_space_layout(
+            driver, base_init_code
         )
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)
