@@ -1844,7 +1844,7 @@ def classify_g17_value_argument(
             traced = trace_g17_register_copy(instructions, index, source)
             if traced is not None:
                 return traced
-            return {
+            result: dict[str, object] = {
                 "kind": "computed",
                 "producer_offset": offset,
                 "operation": "register_copy",
@@ -1852,6 +1852,10 @@ def classify_g17_value_argument(
                 "bytes": width,
                 "instruction": word,
             }
+            expression = trace_g17_value_expression(instructions, before, 4)
+            if expression is not None:
+                result["expression"] = expression
+            return result
 
         instruction_class = word & 0x1F000000
         if word & 0x1F == 4 and instruction_class in classes:
@@ -9577,8 +9581,18 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                 "via_register" in entry["value_source"]
                 for entry in encoder_calls
             ),
+            "copy_value_calls": sum(
+                entry["value_source"].get("operation") == "register_copy"
+                for entry in encoder_calls
+            ),
+            "recovered_copy_expression_calls": sum(
+                entry["value_source"].get("operation") == "register_copy"
+                and "expression" in entry["value_source"]
+                for entry in encoder_calls
+            ),
             "unresolved_copy_value_calls": sum(
                 entry["value_source"].get("operation") == "register_copy"
+                and "expression" not in entry["value_source"]
                 for entry in encoder_calls
             ),
             "recovered_expression_calls": sum(

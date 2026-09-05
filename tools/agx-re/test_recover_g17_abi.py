@@ -4672,6 +4672,20 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(source["base"]["source"]["kind"], "argument")
         self.assertEqual(source["base"]["source"]["name"], "command")
 
+    def test_recovers_g17_expression_through_value_copy(self) -> None:
+        instructions = [
+            (0x00, 0xF943B268),  # ldr x8, [x19, #0x760]
+            (0x04, 0x927AE516),  # and x22, x8, #0xffffffffffffffc0
+            (0x08, 0xAA1603E4),  # mov x4, x22
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 3)
+        self.assertEqual(recovered["operation"], "register_copy")
+        self.assertEqual(recovered["expression"]["operation"], "copy")
+        self.assertEqual(recovered["expression"]["source"]["operation"], "and")
+        self.assertEqual(
+            recovered["expression"]["source"]["source"]["member"], 0x760
+        )
+
     def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
         instructions = [
             (0x00, 0x5294E802),  # mov w2, #0xa740
