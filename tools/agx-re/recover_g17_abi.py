@@ -10972,11 +10972,11 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         "alignment": 8,
         "address_space_identified": False,
         "selectors_complete": False,
+        "selector_formulas_complete": False,
         "completeness_note": (
             "every virtual encoder selector argument is statically resolved, "
-            "but two inline CL selector words are runtime-dependent; the "
-            "machine emission graph is recovered separately while its branch "
-            "predicate expressions remain to be classified"
+            "but the finite static selector set excludes two inline CL words "
+            "whose complete formulas are runtime-dependent"
         ),
         "distinct_literal_encoded_fields": len(literal_encoded_union),
         "distinct_literal_selectors": len(literal_selector_union),
@@ -11307,6 +11307,50 @@ def build_g17_emission_cfg(
                 "can_trap": traps,
             }
         )
+    decisions = []
+    trap_guard_count = 0
+    for index in sorted(reachable):
+        offset, word = instructions[index]
+        target = decode_local_branch_target(offset, word)
+        if target is None or decode_b_target(offset, word) is not None:
+            continue
+        branch_successors = successors(index)
+        if len(branch_successors) != 2:
+            continue
+        taken = next_events((branch_successors[0],))
+        fallthrough = next_events((branch_successors[1],))
+        if taken == fallthrough:
+            continue
+
+        def trap_only(outcome: tuple[list[int], bool, bool]) -> bool:
+            return not outcome[0] and not outcome[1] and outcome[2]
+
+        if trap_only(taken) or trap_only(fallthrough):
+            trap_guard_count += 1
+            continue
+        flags = decode_conditional_branch(offset, word)
+        compare_zero = decode_compare_zero_branch(offset, word)
+        test_bit = decode_test_bit_branch(offset, word)
+        decoded = compare_zero if compare_zero is not None else test_bit
+        decisions.append(
+            {
+                "producer_offset": offset,
+                "target_offset": target,
+                "kind": "flags" if flags is not None else "compare_zero"
+                if compare_zero is not None
+                else "test_bit",
+                "condition": flags[1] if flags is not None else decoded["condition"],
+                "register": None if flags is not None else decoded["register"],
+                "taken": {
+                    "next": taken[0],
+                    "can_return": taken[1],
+                },
+                "fallthrough": {
+                    "next": fallthrough[0],
+                    "can_return": fallthrough[1],
+                },
+            }
+        )
     return {
         "entry": first,
         "empty_return_path": empty_return_path,
@@ -11314,6 +11358,9 @@ def build_g17_emission_cfg(
         "event_count": len(event_offsets),
         "edge_count": sum(len(node["next"]) for node in nodes),
         "loop_edge_count": loop_edges,
+        "semantic_decision_count": len(decisions),
+        "trap_guard_count": trap_guard_count,
+        "decisions": decisions,
         "nodes": nodes,
     }
 
@@ -11341,12 +11388,76 @@ def recover_g17_register_emission_cfg(
             for entry in dynamic_records.get(label, [])
         )
         graph = build_g17_emission_cfg(list(words(code)), events)
+        instructions = list(words(code))
+        index_by_offset = {
+            offset: index for index, (offset, _word) in enumerate(instructions)
+        }
+        recovered_predicates = 0
+        for decision in graph["decisions"]:
+            offset = int(decision["producer_offset"])
+            index = index_by_offset[offset]
+            word = instructions[index][1]
+            flags = decode_conditional_branch(offset, word)
+            compare_zero = decode_compare_zero_branch(offset, word)
+            test_bit = decode_test_bit_branch(offset, word)
+            if flags is not None:
+                predicate = trace_g17_condition_expression(
+                    instructions, index, 0, frozenset()
+                )
+            else:
+                decoded = compare_zero if compare_zero is not None else test_bit
+                source = trace_g17_value_expression(
+                    instructions, index, int(decoded["register"])
+                )
+                if source is None and label == "3D" and offset == 0xF8:
+                    require_instruction_words_at(
+                        code,
+                        "G17 3D register-list pass induction",
+                        {
+                            0x030: 0xD2800017,  # pass = 0
+                            0x0BC: 0x910006F7,  # pass++
+                            0x0C4: 0xF10012FF,  # four passes
+                            0x0C8: 0x540134A0,
+                            0x0F8: 0x35000317,  # first pass differs
+                        },
+                    )
+                    source = {
+                        "kind": "loop_induction",
+                        "name": "pass",
+                        "initial": 0,
+                        "step": 1,
+                        "limit": 4,
+                        "bytes": 4,
+                    }
+                predicate = (
+                    None
+                    if source is None
+                    else {
+                        "kind": "condition",
+                        "producer_offset": offset,
+                        "operation": "compare_zero"
+                        if compare_zero is not None
+                        else "test_bit",
+                        "bytes": decoded["bytes"],
+                        **({"bit": decoded["bit"]} if test_bit is not None else {}),
+                        "source": source,
+                    }
+                )
+            if predicate is not None:
+                decision["predicate"] = predicate
+                recovered_predicates += 1
+        graph["recovered_predicate_count"] = recovered_predicates
+        graph["predicates_complete"] = (
+            recovered_predicates == graph["semantic_decision_count"]
+        )
         graph["virtual_call_events"] = len(calls)
         graph["inline_events"] = len(events) - len(calls)
         result[label] = graph
     return {
         "machine_order_complete": True,
-        "predicate_expressions_complete": False,
+        "predicate_expressions_complete": all(
+            graph["predicates_complete"] for graph in result.values()
+        ),
         "producers": result,
     }
 
@@ -12490,9 +12601,16 @@ def main() -> int:
         inline_register_records = recover_g17_inline_register_records(driver)
         channels["register_selectors"] = register_selectors
         channels["inline_register_records"] = inline_register_records
-        channels["register_emission_cfg"] = recover_g17_register_emission_cfg(
+        register_emission_cfg = recover_g17_register_emission_cfg(
             driver, register_selectors, inline_register_records
         )
+        register_selectors["selector_formulas_complete"] = (
+            inline_register_records["all_inline_forms_located"]
+        )
+        inline_register_records["control_flow_complete"] = (
+            register_emission_cfg["predicate_expressions_complete"]
+        )
+        channels["register_emission_cfg"] = register_emission_cfg
         channels["command_stream_format"] = (
             recover_g17_command_stream_format(driver)
         )

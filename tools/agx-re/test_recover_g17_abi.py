@@ -5420,6 +5420,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["entry"], [0x04, 0x0C])
         self.assertFalse(recovered["empty_return_path"])
         self.assertFalse(recovered["pre_emission_trap"])
+        self.assertEqual(recovered["semantic_decision_count"], 1)
+        self.assertEqual(recovered["trap_guard_count"], 0)
+        self.assertEqual(recovered["decisions"][0]["condition"], "eq")
         self.assertEqual(recovered["nodes"][0]["next"], [0x14])
         self.assertEqual(recovered["nodes"][1]["next"], [0x14])
         self.assertTrue(recovered["nodes"][2]["can_return"])
@@ -5436,6 +5439,8 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(guarded["entry"], [0x08])
         self.assertFalse(guarded["empty_return_path"])
         self.assertTrue(guarded["pre_emission_trap"])
+        self.assertEqual(guarded["semantic_decision_count"], 0)
+        self.assertEqual(guarded["trap_guard_count"], 1)
 
     def test_rejects_g17_selector_sample_matching_emission_count(self) -> None:
         # If the literal sample ever reached the emission count the set would

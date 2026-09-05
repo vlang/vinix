@@ -137,8 +137,9 @@ symbolic, while their value formulas are complete. Value provenance is
 classified at every virtual call (209 constants
 or direct descriptor loads plus 105 recovered expression trees), so all 314
 call-value formulas are now represented. A complete machine-level emission CFG
-also records possible ordering for all 324 virtual and inline sites; its branch
-predicate expressions still remain to be encoded.
+also records possible ordering for all 324 virtual and inline sites, and all 21
+ordering predicates have expression trees. The two runtime CL selectors keep
+the finite static set open, but every selector formula is complete.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command
