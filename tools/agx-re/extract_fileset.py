@@ -54,6 +54,13 @@ DEFAULT_ENTRIES = (
     # The T6050 PMP wrapper advertises iop,ascwrap-v6. Its concrete subclass,
     # rather than the AppleA7IOP base, owns the actual CPU run/reset registers.
     "com.apple.driver.AppleA7IOP-ASCWrap-v6",
+    # A pre-loaded T6050 PMP image is not executable until AppleA7IOP maps its
+    # segments through mapper 0. Keep the concrete T8110 DART and its mapper
+    # family beside the wrapper so that page-table and iovmInsert semantics
+    # are recovered from the same kernel collection instead of borrowed from
+    # the older T8020-style Vinix driver.
+    "com.apple.driver.AppleT8110DART",
+    "com.apple.driver.IODARTFamily",
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",

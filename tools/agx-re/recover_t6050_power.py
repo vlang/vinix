@@ -21,8 +21,11 @@ from recover_g17_abi import (
     macho_symbols,
     macho_uuid,
     read_adrp_add_cstring,
+    read_adrp_add_address,
+    read_virtual_u32_table,
     recover_vtable_target,
     symbol_code,
+    virtual_to_file,
 )
 
 
@@ -48,6 +51,9 @@ APPLE_PMP_FIRMWARE_UUID = "2AFE4BC5-2371-341F-BD24-3D643EFBAFD0"
 RTBUDDY_UUID = "4FEFDDA4-3743-34AC-869D-EAE695595A4C"
 APPLE_A7IOP_UUID = "DD46FF2D-6ADD-3A7D-8BCC-7184A5E3398A"
 APPLE_ASCWRAP_V6_UUID = "7206DC2B-CA0F-3289-876B-A46F283D5798"
+APPLE_T8110_DART_UUID = "4C6C1E5C-04E3-3B6C-98AC-5A64255B8207"
+IODART_FAMILY_UUID = "DB9C5931-E7EC-3601-A7FF-E1F3EFBD5BCC"
+T6050_KERNEL_UUID = "FF5FFF89-5F93-3D5F-A4FB-74B8C8C313AC"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
 DEFAULT_APPLE_T6050_PMGR = Path("build/kext/g17c/driver.AppleT6050PMGR.macho")
 DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
@@ -59,6 +65,11 @@ DEFAULT_APPLE_A7IOP = Path("build/kext/g17c/driver.AppleA7IOP.macho")
 DEFAULT_APPLE_ASCWRAP_V6 = Path(
     "build/kext/g17c/driver.AppleA7IOP-ASCWrap-v6.macho"
 )
+DEFAULT_APPLE_T8110_DART = Path(
+    "build/kext/g17c/driver.AppleT8110DART.macho"
+)
+DEFAULT_IODART_FAMILY = Path("build/kext/g17c/driver.IODARTFamily.macho")
+DEFAULT_KERNEL = Path("build/kext/g17c/kernel.macho")
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
 PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
 PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
@@ -187,6 +198,25 @@ APPLE_A7IOP_PHYSICAL = "__ZN10AppleA7IOP25getWrapperPhysicalAddressEv"
 APPLE_A7IOP_ENABLE_SRAM = "__ZN10AppleA7IOP10enableSRAMEb"
 APPLE_A7IOP_ENABLE_POWER = "__ZN10AppleA7IOP12_enablePowerEbj"
 APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT = 0x9C8
+APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE = (
+    "__ZN10AppleA7IOP21_dartMapiBootFirmwareEP8IOMapper"
+)
+IODART_MAPPER_VTABLE = "__ZTV12IODARTMapper"
+IODART_MAPPER_GET_PAGE_SIZE = "__ZNK12IODARTMapper11getPageSizeEv"
+IODART_MAPPER_IOVM_INSERT = "__ZN12IODARTMapper10iovmInsertEjyyyy"
+IODART_MAPPER_IOVM_INSERT_ONE = (
+    "__ZN12IODARTMapper11_iovmInsertEP13IODARTVMSpacejjjj"
+)
+APPLE_T8110_DART_ENABLE_TRANSLATION = (
+    "__ZN14AppleT8110DART17enableTranslationEjb"
+)
+APPLE_T8110_DART_SET_TRANSLATION = "__ZN14AppleT8110DART14setTranslationEjjjj"
+APPLE_T8110_DART_INVALIDATE_TLB = (
+    "__ZN14AppleT8110DART13invalidateTLBEP13IODARTVMSpacejjj"
+)
+T8110_DART_MAX_TRANSLATION_LEVELS = "_t8110dart_max_translation_levels"
+T8110_DART_VO_TT_INDEX = "_t8110dart_vo_tt_index"
+T8110_DART_VO_TTE = "_t8110dart_vo_tte"
 APPLE_ASCWRAP_V6_VTABLE = "__ZTV14AppleASCWrapV6"
 APPLE_ASCWRAP_V6_INITIALIZE = "__ZN14AppleASCWrapV610initializeEv"
 APPLE_ASCWRAP_V6_SET_IORVBAR = "__ZN14AppleASCWrapV611_setIORVBAREy"
@@ -2418,6 +2448,7 @@ def recover_apple_a7iop_code_contract(
         APPLE_A7IOP_PHYSICAL,
         APPLE_A7IOP_ENABLE_SRAM,
         APPLE_A7IOP_ENABLE_POWER,
+        APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE,
     )
     missing = [name for name in required if name not in functions]
     if missing:
@@ -2514,6 +2545,33 @@ def recover_apple_a7iop_code_contract(
     ):
         raise ValueError("AppleA7IOP startCPU run-control dispatch changed")
 
+    _dart_map_address, dart_map_code = functions[
+        APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE
+    ]
+    if not _has_ordered_words(
+        dart_map_code,
+        (
+            0x3944C008,  # ldrb w8, [x0, #0x130] -- map-complete latch
+            0xF9409408,  # ldr x8, [x0, #0x128] -- iBoot segment records
+            0xD2811111,  # mov x17, #0x888 -- IOMapper::getPageSize
+            0xD2811211,  # mov x17, #0x890 -- reserve/check mapper range
+            0xB9401D0A,  # ldr w10, [x8, #0x1c] -- segment flags
+            0x370805EA,  # tbnz w10, #1 -- skip non-mapped segment
+            0xF9400909,  # ldr x9, [x8, #0x10] -- segment IOVA
+            0xB940190B,  # ldr w11, [x8, #0x18] -- segment byte size
+            0x7200015F,  # tst w10, #1 -- executable/read-only flag
+            0x5280006A,  # mov w10, #3 -- read/write direction
+            0x1A9F0541,  # csinc w1, w10, wzr, eq -- 1 or 3
+            0xF9400104,  # ldr x4, [x8] -- physical base
+            0xD2811411,  # mov x17, #0x8a0 -- IOMapper::iovmInsert
+            0x8A160145,  # and x5, x10, x22 -- page-aligned byte size
+            0xD2800003,  # mov x3, #0 -- no IOVA displacement
+            0xD73F0910,  # blraa x8, x16
+            0x3904C268,  # strb w8, [x19, #0x130] -- mapping complete
+        ),
+    ):
+        raise ValueError("AppleA7IOP iBoot firmware DART mapping changed")
+
     _a7_reg_address, a7_reg_code = functions[APPLE_A7IOP_REG]
     if a7_reg_code != expected_reg:
         raise ValueError("AppleA7IOP register accessor changed")
@@ -2600,6 +2658,23 @@ def recover_apple_a7iop_code_contract(
                 "start_cpu_run_vtable_slot": 0xA28,
                 "start_cpu_run_argument": True,
             },
+            "iboot_firmware_mapping": {
+                "mapper_get_page_size_vtable_slot": 0x888,
+                "mapper_reserve_vtable_slot": 0x890,
+                "mapper_insert_vtable_slot": 0x8A0,
+                "segment_record_size": 0x20,
+                "physical_offset": 0,
+                "iova_offset": 0x10,
+                "size_offset": 0x18,
+                "flags_offset": 0x1C,
+                "skip_flag_bit": 1,
+                "text_direction": 1,
+                "data_direction": 3,
+                "meaning": (
+                    "pre-loaded segments are page-aligned and inserted into "
+                    "the supplied IOMapper before the wrapper CPU is released"
+                ),
+            },
             "scope": (
                 "resource and power-domain ownership only; does not start or "
                 "prove the IOP ready"
@@ -2643,6 +2718,7 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
             APPLE_A7IOP_PHYSICAL,
             APPLE_A7IOP_ENABLE_SRAM,
             APPLE_A7IOP_ENABLE_POWER,
+            APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE,
         )
     }
     a7_start_address, a7_start_code = functions[APPLE_A7IOP_START]
@@ -2666,6 +2742,252 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
     return {
         "uuid": identity,
         **recover_apple_a7iop_code_contract(functions, vtable_targets),
+    }
+
+
+def recover_iodart_family_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+    vtable_targets: dict[int, int],
+    direction_lookup: tuple[int, ...],
+) -> dict[str, object]:
+    required = (
+        IODART_MAPPER_GET_PAGE_SIZE,
+        IODART_MAPPER_IOVM_INSERT,
+        IODART_MAPPER_IOVM_INSERT_ONE,
+    )
+    missing = [name for name in required if name not in functions]
+    if missing:
+        raise ValueError(f"IODARTFamily has no code body for {missing!r}")
+    expected_slots = {
+        0x888: functions[IODART_MAPPER_GET_PAGE_SIZE][0],
+        0x8A0: functions[IODART_MAPPER_IOVM_INSERT][0],
+    }
+    for slot, expected in expected_slots.items():
+        if vtable_targets.get(slot) != expected:
+            raise ValueError(f"IODARTMapper vtable slot {slot:#x} changed")
+    if direction_lookup != (0, 2, 1, 3):
+        raise ValueError(
+            f"IODARTMapper direction lookup changed: {direction_lookup!r}"
+        )
+
+    _page_address, page_code = functions[IODART_MAPPER_GET_PAGE_SIZE]
+    if page_code != struct.pack(
+        "<4I", 0xD503245F, 0xF9409008, 0xF9401900, 0xD65F03C0
+    ):
+        raise ValueError("IODARTMapper page-size accessor changed")
+
+    _insert_address, insert_code = functions[IODART_MAPPER_IOVM_INSERT]
+    if not _has_ordered_words(
+        insert_code,
+        (
+            0x12000428,  # and w8, w1, #3 -- IODirection index
+            0xB8685937,  # ldr w23, [direction lookup, w8, uxtw #2]
+            0xF9408408,  # ldr x8, [x0, #0x108] -- mapper DVA prefix
+            0xAA020108,  # orr x8, x8, x2 -- requested DVA
+            0x8B030118,  # add x24, x8, x3 -- DVA displacement
+            0xF9401908,  # ldr x8, [x8, #0x30] -- page size
+            0xB9411668,  # ldr w8, [x19, #0x114] -- page shift
+            0x9AC82716,  # lsr x22, x24, x8 -- DVA page
+            0x9AC8269B,  # lsr x27, x20, x8 -- physical page
+            0x97FFFF63,  # call the per-page insertion path
+        ),
+    ):
+        raise ValueError("IODARTMapper iovmInsert argument conversion changed")
+
+    _one_address, one_code = functions[IODART_MAPPER_IOVM_INSERT_ONE]
+    if not _has_ordered_words(
+        one_code,
+        (
+            0xAA1503E1,  # mapper virtual page
+            0xAA1703E2,  # physical page number
+            0x52800043,  # page type 2
+            0xAA1603E4,  # protection from direction lookup
+            0x94000C12,  # IODARTVMSpace::setTranslation
+            0x52800022,  # invalidate one page after insertion
+        ),
+    ):
+        raise ValueError("IODARTMapper per-page insertion changed")
+
+    return {
+        "mapper": {
+            "get_page_size_vtable_slot": 0x888,
+            "iovm_insert_vtable_slot": 0x8A0,
+            "direction_lookup": list(direction_lookup),
+            "direction_1_protection": direction_lookup[1],
+            "direction_3_protection": direction_lookup[3],
+            "page_type": 2,
+            "invalidation": "one DART page after each inserted page",
+        }
+    }
+
+
+def recover_iodart_family(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != IODART_FAMILY_UUID:
+        raise ValueError(f"unsupported IODARTFamily UUID {identity}")
+    functions = {
+        name: symbol_code(image, name)
+        for name in (
+            IODART_MAPPER_GET_PAGE_SIZE,
+            IODART_MAPPER_IOVM_INSERT,
+            IODART_MAPPER_IOVM_INSERT_ONE,
+        )
+    }
+    vtable_targets = {
+        slot: recover_vtable_target(image, IODART_MAPPER_VTABLE, slot)
+        for slot in (0x888, 0x8A0)
+    }
+    insert_address, insert_code = functions[IODART_MAPPER_IOVM_INSERT]
+    table_address = read_adrp_add_address(
+        insert_address, insert_code, 0x34, 0x38
+    )
+    direction_lookup = read_virtual_u32_table(image, table_address, 4)
+    return {
+        "uuid": identity,
+        **recover_iodart_family_code_contract(
+            functions, vtable_targets, direction_lookup
+        ),
+    }
+
+
+def recover_apple_t8110_dart_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+) -> dict[str, object]:
+    required = (
+        APPLE_T8110_DART_ENABLE_TRANSLATION,
+        APPLE_T8110_DART_SET_TRANSLATION,
+        APPLE_T8110_DART_INVALIDATE_TLB,
+    )
+    missing = [name for name in required if name not in functions]
+    if missing:
+        raise ValueError(f"AppleT8110DART has no code body for {missing!r}")
+
+    _enable_address, enable_code = functions[APPLE_T8110_DART_ENABLE_TRANSLATION]
+    if not _has_ordered_words(
+        enable_code,
+        (
+            0x7100005F,  # cmp w2, #0 -- requested translation state
+            0x52902288,  # mov w8, #0x8114 -- disable selector
+            0x9A880501,  # cinc x1, x8, ne -- enable selector 0x8115
+            0x52800083,  # four-byte SID payload
+        ),
+    ):
+        raise ValueError("AppleT8110DART translation-control transport changed")
+
+    _set_address, set_code = functions[APPLE_T8110_DART_SET_TRANSLATION]
+    if not _has_ordered_words(
+        set_code,
+        (
+            0xD3727D1A,  # physical page number -> byte address, shift 14
+            0xD3727E9A,  # DVA page number -> byte address, shift 14
+            0x52880002,  # mov w2, #0x4000 -- one DART page
+            0x52800068,  # three translation descriptors in the request
+        ),
+    ):
+        raise ValueError("AppleT8110DART 16 KiB translation path changed")
+
+    _invalidate_address, invalidate_code = functions[
+        APPLE_T8110_DART_INVALIDATE_TLB
+    ]
+    if invalidate_code != struct.pack("<2I", 0xD503245F, 0xD65F03C0):
+        raise ValueError("AppleT8110DART invalidate ownership changed")
+    return {
+        "translation": {
+            "page_shift": 14,
+            "page_size": 0x4000,
+            "disable_selector": 0x8114,
+            "enable_selector": 0x8115,
+            "sid_payload_bytes": 4,
+            "driver_invalidate_method": "no-op",
+            "hardware_update_owner": "kernel PPL/SPTM IOMMU request",
+        }
+    }
+
+
+def recover_apple_t8110_dart(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_T8110_DART_UUID:
+        raise ValueError(f"unsupported AppleT8110DART UUID {identity}")
+    functions = {
+        name: symbol_code(image, name)
+        for name in (
+            APPLE_T8110_DART_ENABLE_TRANSLATION,
+            APPLE_T8110_DART_SET_TRANSLATION,
+            APPLE_T8110_DART_INVALIDATE_TLB,
+        )
+    }
+    return {
+        "uuid": identity,
+        **recover_apple_t8110_dart_code_contract(functions),
+    }
+
+
+def recover_t8110_kernel_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+    index_masks: tuple[int, ...],
+    index_shifts: tuple[int, ...],
+) -> dict[str, object]:
+    required = (
+        T8110_DART_MAX_TRANSLATION_LEVELS,
+        T8110_DART_VO_TT_INDEX,
+        T8110_DART_VO_TTE,
+    )
+    missing = [name for name in required if name not in functions]
+    if missing:
+        raise ValueError(f"kernel has no T8110 DART code body for {missing!r}")
+    if index_masks != (0x3E00000000, 0x1FFC00000, 0x3FF800, 0x7FF):
+        raise ValueError(f"T8110 DART index masks changed: {index_masks!r}")
+    if index_shifts != (33, 22, 11, 0):
+        raise ValueError(f"T8110 DART index shifts changed: {index_shifts!r}")
+
+    _levels_address, levels_code = functions[T8110_DART_MAX_TRANSLATION_LEVELS]
+    if not _has_ordered_words(levels_code, (0x52800068, 0x1A880500)):
+        raise ValueError("T8110 DART maximum-level selection changed")
+    _tte_address, tte_code = functions[T8110_DART_VO_TTE]
+    if not _has_ordered_words(
+        tte_code,
+        (
+            0x360003EA,  # bit 0 is the valid bit
+            0xD37CED4A,  # encoded address << 4
+            0x92726D40,  # retain physical bits through 0x3ffffffc000
+        ),
+    ):
+        raise ValueError("T8110 DART table-entry decoding changed")
+    return {
+        "page_table": {
+            "max_levels": 4,
+            "valid_bit": 0,
+            "physical_decode_shift": 4,
+            "physical_decode_mask": 0x3FFFFFFC000,
+            "index_masks_on_page_number": list(index_masks),
+            "index_shifts_on_page_number": list(index_shifts),
+        }
+    }
+
+
+def recover_t8110_kernel(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != T6050_KERNEL_UUID:
+        raise ValueError(f"unsupported T6050 kernel UUID {identity}")
+    functions = {
+        name: symbol_code(image, name)
+        for name in (
+            T8110_DART_MAX_TRANSLATION_LEVELS,
+            T8110_DART_VO_TT_INDEX,
+            T8110_DART_VO_TTE,
+        )
+    }
+    index_address, index_code = functions[T8110_DART_VO_TT_INDEX]
+    masks_address = read_adrp_add_address(index_address, index_code, 0x78, 0x7C)
+    shifts_address = read_adrp_add_address(index_address, index_code, 0x88, 0x8C)
+    masks_offset = virtual_to_file(image, masks_address)
+    index_masks = struct.unpack_from("<4Q", image, masks_offset)
+    index_shifts = read_virtual_u32_table(image, shifts_address, 4)
+    return {
+        "uuid": identity,
+        **recover_t8110_kernel_code_contract(
+            functions, index_masks, index_shifts
+        ),
     }
 
 
@@ -2938,6 +3260,104 @@ def recover_apple_ascwrap_v6(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_t6050_pmp_darts(
+    root: AdtNode,
+    pmp_wrappers: dict[str, tuple[str, AdtNode]],
+    die_stride: int,
+) -> list[dict[str, object]]:
+    expected_sids = [0, 1, 2, 5, 6, 7, 8, 9]
+    result = []
+    for die, role in enumerate(("PMP0", "PMP1")):
+        dart_name = f"dart-pmp{die}"
+        dart_path, dart = find_one(
+            root,
+            dart_name,
+            lambda node, expected=dart_name: (
+                node_name(node) == expected and compatible_with(node, "dart,t8110")
+            ),
+        )
+        registers = parse_reg_regions(dart.property("reg"), f"{dart_name} reg")
+        expected_registers = [
+            (0x841A0000 + die * die_stride, 0xC000),
+            (0x841B0000 + die * die_stride, 0x4000),
+        ]
+        sids = decode_u32_array(dart.property("sid"), f"{dart_name} sid")
+        page_size = decode_integer(dart.property("page-size"), f"{dart_name} page-size")
+        sid_count = decode_integer(dart.property("sid-count"), f"{dart_name} sid-count")
+        options = decode_integer(dart.property("dart-options"), f"{dart_name} dart-options")
+        flush_by_dva = decode_integer(
+            dart.property("flush-by-dva"), f"{dart_name} flush-by-dva"
+        )
+        vm_base = decode_integer(dart.property("vm-base"), f"{dart_name} vm-base")
+        vm_size = decode_integer(dart.property("vm-size"), f"{dart_name} vm-size")
+        if (
+            registers != expected_registers
+            or sids != expected_sids
+            or page_size != 0x4000
+            or sid_count != 16
+            or options != 0x65
+            or flush_by_dva != 0
+            or vm_base != 0x10000000000
+            or vm_size != 0x1000000000
+        ):
+            raise ValueError(
+                f"T6050 {dart_name} contract changed: regs={registers!r}, "
+                f"sids={sids!r}, page={page_size:#x}, count={sid_count}, "
+                f"options={options:#x}, flush={flush_by_dva}, "
+                f"vm={vm_base:#x}+{vm_size:#x}"
+            )
+
+        mapper_name = f"mapper-pmp{die}"
+        mapper_path, mapper = find_one(
+            dart,
+            mapper_name,
+            lambda node, expected=mapper_name: (
+                node_name(node) == expected
+                and compatible_with(node, "iommu-mapper")
+            ),
+        )
+        if mapper_path.startswith(f"/{dart_name}"):
+            mapper_path = dart_path + mapper_path[len(f'/{dart_name}') :]
+        mapper_index = decode_integer(mapper.property("reg"), f"{mapper_name} reg")
+        mapper_phandle = decode_integer(
+            mapper.property("AAPL,phandle"), f"{mapper_name} phandle"
+        )
+        _wrapper_path, wrapper = pmp_wrappers[role]
+        wrapper_parent = decode_integer(
+            wrapper.property("iommu-parent"), f"{role} iommu-parent"
+        )
+        if mapper_index != 0 or wrapper_parent != mapper_phandle:
+            raise ValueError(
+                f"T6050 {role} mapper binding changed: index={mapper_index}, "
+                f"wrapper={wrapper_parent:#x}, mapper={mapper_phandle:#x}"
+            )
+        result.append(
+            {
+                "die": die,
+                "path": dart_path,
+                "compatible": "dart,t8110",
+                "registers": [
+                    {"index": index, "base": base, "size": size}
+                    for index, (base, size) in enumerate(registers)
+                ],
+                "page_size": page_size,
+                "sid_count": sid_count,
+                "active_sids": sids,
+                "mapper": {
+                    "path": mapper_path,
+                    "index": mapper_index,
+                    "phandle": mapper_phandle,
+                    "wrapper_iommu_parent": wrapper_parent,
+                },
+                "managed_vm": {"base": vm_base, "size": vm_size},
+                "iboot_firmware_iova_below_managed_vm": 0x1000000 < vm_base,
+                "dart_options": options,
+                "flush_by_dva": bool(flush_by_dva),
+            }
+        )
+    return result
+
+
 def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     sgx_path, sgx = find_one(
         root,
@@ -2977,6 +3397,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     if set(pmp_wrappers) != {"PMP0", "PMP1"}:
         raise ValueError(f"unexpected T6050 PMP die roles: {sorted(pmp_wrappers)!r}")
     ptd_die_bases = [ptd_region[0] + die * die_stride for die in range(2)]
+    pmp_darts = recover_t6050_pmp_darts(root, pmp_wrappers, die_stride)
 
     wrapper_registers: dict[str, list[tuple[int, int]]] = {}
     wrapper_interrupts: dict[str, list[int]] = {}
@@ -3216,7 +3637,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 18,
+        "schema": 19,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -3284,6 +3705,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     },
                 },
             ],
+            "darts": pmp_darts,
             "agx_soc_device": agx_device,
             "soc_device_count": len(soc_devices),
             "soc_device_packet": {
@@ -3334,6 +3756,13 @@ def main() -> int:
     parser.add_argument(
         "--ascwrap-v6", type=Path, default=DEFAULT_APPLE_ASCWRAP_V6
     )
+    parser.add_argument(
+        "--t8110-dart", type=Path, default=DEFAULT_APPLE_T8110_DART
+    )
+    parser.add_argument(
+        "--iodart-family", type=Path, default=DEFAULT_IODART_FAMILY
+    )
+    parser.add_argument("--kernel", type=Path, default=DEFAULT_KERNEL)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -3356,6 +3785,15 @@ def main() -> int:
         manifest["apple_a7iop"] = recover_apple_a7iop(args.apple_a7iop.read_bytes())
         manifest["apple_ascwrap_v6"] = recover_apple_ascwrap_v6(
             args.ascwrap_v6.read_bytes()
+        )
+        manifest["apple_t8110_dart"] = recover_apple_t8110_dart(
+            args.t8110_dart.read_bytes()
+        )
+        manifest["iodart_family"] = recover_iodart_family(
+            args.iodart_family.read_bytes()
+        )
+        manifest["t8110_kernel"] = recover_t8110_kernel(
+            args.kernel.read_bytes()
         )
     except (OSError, ValueError) as error:
         parser.error(str(error))

@@ -197,7 +197,37 @@ def fixture_tree(
             "iop-version": struct.pack("<I", 1),
             "ptd-update-reg-index": struct.pack("<I", 3),
             "sram-index": struct.pack("<I", 1),
+            "iommu-parent": struct.pack("<I", 0x24D if die == 0 else 0x26B),
         }
+
+    def pmp_dart(die: int) -> bytes:
+        phandle = 0x24D if die == 0 else 0x26B
+        mapper = adt_node(
+            f"mapper-pmp{die}",
+            {
+                "compatible": b"iommu-mapper\0",
+                "reg": struct.pack("<I", 0),
+                "AAPL,phandle": struct.pack("<I", phandle),
+            },
+            [],
+        )
+        offset = die * 0x4000000000
+        return adt_node(
+            f"dart-pmp{die}",
+            {
+                "compatible": b"dart,t8110\0",
+                "reg": struct.pack("<QQQQ", 0x841A0000 + offset, 0xC000,
+                                   0x841B0000 + offset, 0x4000),
+                "sid": struct.pack("<8I", 0, 1, 2, 5, 6, 7, 8, 9),
+                "page-size": struct.pack("<I", 0x4000),
+                "sid-count": struct.pack("<I", 16),
+                "dart-options": struct.pack("<I", 0x65),
+                "flush-by-dva": struct.pack("<I", 0),
+                "vm-base": struct.pack("<Q", 0x10000000000),
+                "vm-size": struct.pack("<Q", 0x1000000000),
+            },
+            [mapper],
+        )
 
     pmp = adt_node(
         "pmp1",
@@ -227,6 +257,8 @@ def fixture_tree(
                 [],
             ),
             sgx,
+            pmp_dart(0),
+            pmp_dart(1),
             pmp0,
             pmp,
         ],
@@ -258,7 +290,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 18)
+        self.assertEqual(result["schema"], 19)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -270,6 +302,12 @@ class RecoverT6050PowerTests(unittest.TestCase):
         )
         self.assertEqual(result["pmp"]["firmware"], "t6050pmp")
         self.assertEqual(result["pmp"]["version"], 2)
+        self.assertEqual(result["pmp"]["darts"][0]["compatible"], "dart,t8110")
+        self.assertEqual(result["pmp"]["darts"][0]["mapper"]["index"], 0)
+        self.assertEqual(result["pmp"]["darts"][1]["registers"][0]["base"], 0x40841A0000)
+        self.assertTrue(
+            result["pmp"]["darts"][0]["iboot_firmware_iova_below_managed_vm"]
+        )
         self.assertEqual(result["pmp"]["region_base"], 0x4284500000)
         self.assertEqual(result["pmp"]["agx_soc_device"]["id"], 0x10)
         self.assertEqual(result["pmp"]["agx_soc_device"]["index"], 15)
@@ -1458,6 +1496,26 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0xAA1303E3,
             0xD73F0931,
         )
+        dart_map_code = struct.pack(
+            "<17I",
+            0x3944C008,
+            0xF9409408,
+            0xD2811111,
+            0xD2811211,
+            0xB9401D0A,
+            0x370805EA,
+            0xF9400909,
+            0xB940190B,
+            0x7200015F,
+            0x5280006A,
+            0x1A9F0541,
+            0xF9400104,
+            0xD2811411,
+            0x8A160145,
+            0xD2800003,
+            0xD73F0910,
+            0x3904C268,
+        )
         functions = {
             recover_t6050_power.APPLE_WRAPPER_MAILBOX_START: (0x1000, start_code),
             recover_t6050_power.APPLE_WRAPPER_MAILBOX_REG: (0x2000, reg_code),
@@ -1476,6 +1534,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.APPLE_A7IOP_ENABLE_POWER: (
                 0x8000,
                 enable_power_code,
+            ),
+            recover_t6050_power.APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE: (
+                0x9000,
+                dart_map_code,
             ),
         }
         vtable_targets = {
@@ -1496,6 +1558,13 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(
             result["apple_a7iop"]["cpu_control"]["start_cpu_run_vtable_slot"],
             0xA28,
+        )
+        self.assertEqual(
+            result["apple_a7iop"]["iboot_firmware_mapping"]["mapper_insert_vtable_slot"],
+            0x8A0,
+        )
+        self.assertEqual(
+            result["apple_a7iop"]["iboot_firmware_mapping"]["text_direction"], 1
         )
 
         bad_functions = dict(functions)
@@ -1675,6 +1744,96 @@ class RecoverT6050PowerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "mailbox inbox"):
             recover_t6050_power.recover_apple_ascwrap_v6_code_contract(
                 bad_functions, slots
+            )
+
+    def test_recovers_t8110_dart_mapping_contracts(self) -> None:
+        page_code = struct.pack(
+            "<4I", 0xD503245F, 0xF9409008, 0xF9401900, 0xD65F03C0
+        )
+        insert_code = struct.pack(
+            "<10I",
+            0x12000428,
+            0xB8685937,
+            0xF9408408,
+            0xAA020108,
+            0x8B030118,
+            0xF9401908,
+            0xB9411668,
+            0x9AC82716,
+            0x9AC8269B,
+            0x97FFFF63,
+        )
+        insert_one_code = struct.pack(
+            "<6I",
+            0xAA1503E1,
+            0xAA1703E2,
+            0x52800043,
+            0xAA1603E4,
+            0x94000C12,
+            0x52800022,
+        )
+        iodart_functions = {
+            recover_t6050_power.IODART_MAPPER_GET_PAGE_SIZE: (0x1000, page_code),
+            recover_t6050_power.IODART_MAPPER_IOVM_INSERT: (0x2000, insert_code),
+            recover_t6050_power.IODART_MAPPER_IOVM_INSERT_ONE: (
+                0x3000,
+                insert_one_code,
+            ),
+        }
+        mapper = recover_t6050_power.recover_iodart_family_code_contract(
+            iodart_functions, {0x888: 0x1000, 0x8A0: 0x2000}, (0, 2, 1, 3)
+        )["mapper"]
+        self.assertEqual(mapper["direction_1_protection"], 2)
+        self.assertEqual(mapper["direction_3_protection"], 3)
+        self.assertEqual(mapper["page_type"], 2)
+
+        t8110_functions = {
+            recover_t6050_power.APPLE_T8110_DART_ENABLE_TRANSLATION: (
+                0x4000,
+                struct.pack("<4I", 0x7100005F, 0x52902288, 0x9A880501, 0x52800083),
+            ),
+            recover_t6050_power.APPLE_T8110_DART_SET_TRANSLATION: (
+                0x5000,
+                struct.pack("<4I", 0xD3727D1A, 0xD3727E9A, 0x52880002, 0x52800068),
+            ),
+            recover_t6050_power.APPLE_T8110_DART_INVALIDATE_TLB: (
+                0x6000,
+                struct.pack("<2I", 0xD503245F, 0xD65F03C0),
+            ),
+        }
+        translation = recover_t6050_power.recover_apple_t8110_dart_code_contract(
+            t8110_functions
+        )["translation"]
+        self.assertEqual(translation["page_size"], 0x4000)
+        self.assertEqual(translation["hardware_update_owner"], "kernel PPL/SPTM IOMMU request")
+
+        kernel_functions = {
+            recover_t6050_power.T8110_DART_MAX_TRANSLATION_LEVELS: (
+                0x7000,
+                struct.pack("<2I", 0x52800068, 0x1A880500),
+            ),
+            recover_t6050_power.T8110_DART_VO_TT_INDEX: (0x8000, b""),
+            recover_t6050_power.T8110_DART_VO_TTE: (
+                0x9000,
+                struct.pack("<3I", 0x360003EA, 0xD37CED4A, 0x92726D40),
+            ),
+        }
+        page_table = recover_t6050_power.recover_t8110_kernel_code_contract(
+            kernel_functions,
+            (0x3E00000000, 0x1FFC00000, 0x3FF800, 0x7FF),
+            (33, 22, 11, 0),
+        )["page_table"]
+        self.assertEqual(page_table["physical_decode_shift"], 4)
+        self.assertEqual(page_table["max_levels"], 4)
+
+        bad = dict(iodart_functions)
+        bad[recover_t6050_power.IODART_MAPPER_IOVM_INSERT] = (
+            0x2000,
+            insert_code.replace(struct.pack("<I", 0x12000428), struct.pack("<I", 0x12000028)),
+        )
+        with self.assertRaisesRegex(ValueError, "argument conversion"):
+            recover_t6050_power.recover_iodart_family_code_contract(
+                bad, {0x888: 0x1000, 0x8A0: 0x2000}, (0, 2, 1, 3)
             )
 
     def test_rejects_changed_sgx_gate_order(self) -> None:

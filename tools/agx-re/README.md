@@ -168,6 +168,19 @@ registers 0 and 1, verifies the IORVBAR lock after the 64-bit write, and
 preserves Apple's two-access stop sequence. Probe does not construct it until
 the firmware and RTBuddy owner is complete.
 
+The same recovery now follows the preloaded PMP image through its mapper
+boundary. The signed DeviceTree binds each PMP wrapper to mapper 0 of a
+die-local `dart,t8110`; the two DART register pairs are separated by the T6050
+die stride, use 16 KiB pages, and advertise active SIDs 0, 1, 2, 5, 6, 7, 8,
+and 9. UUID-pinned AppleA7IOP code inserts each non-skipped 32-byte segment
+record through `IODARTMapper::iovmInsert` before CPU release. The matching
+IODARTFamily image proves that direction 1 becomes read-only protection 2 and
+direction 3 becomes read/write protection 3. AppleT8110DART plus the matching
+kernel entry independently pin 16 KiB page conversion, four table levels,
+valid bit 0, and the T8110 physical-address decode. This is sufficient to
+reject an old T8020-style DART implementation, but not yet sufficient to take
+ownership of bootloader-protected page tables or enable PMP execution.
+
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
