@@ -3615,6 +3615,45 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_recovers_g17_cleared_accelerator_inputs(self) -> None:
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_cleared_accelerator_inputs(
+            driver.read_bytes()
+        )
+
+        self.assertTrue(recovered["zeroed_allocation"])
+        self.assertEqual(recovered["accelerator_bytes"], 0x1CBD0)
+        self.assertEqual(
+            recovered["fields"],
+            {0x2544: 0x72C, 0x25F4: 0x730, 0x25F8: 0xF91C, 0x26A4: 0xF914, 0x26BC: 0xF958},
+        )
+        # Every member must lie inside the allocation it is cleared by.
+        for member in recovered["cleared_members"]:
+            self.assertLess(member, recovered["accelerator_bytes"])
+
+    def test_idle_timer_store_is_not_an_accelerator_member_write(self) -> None:
+        # A width-aware sweep flags idlePowerOffTimer's store at +0x728 as
+        # covering +0x72c, but its base is the accelerator plus 0x13000, so the
+        # store lands at +0x13728. Without that the field would look written.
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        image = driver.read_bytes()
+        _address, code = recover_g17_abi.symbol_code(
+            image, recover_g17_abi.IDLE_POWER_OFF_TIMER
+        )
+        self.assertTrue(recover_g17_abi.stores_covering(code, 20, 0x72C))
+        base = struct.unpack_from("<I", code, 0x2C)[0]
+        decoded = recover_g17_abi.decode_add_immediate(base)
+        self.assertIsNotNone(decoded)
+        # Shifted add: the decoder already folds in the lsl #12.
+        self.assertEqual((base >> 22) & 1, 1)
+        self.assertEqual(decoded[2], 0x13000)
+        # So the store lands well past the member the sweep flagged.
+        self.assertEqual(decoded[2] + 0x728, 0x13728)
+
     def test_recovers_g17_unit_mask_field(self) -> None:
         driver = Path("build/kext/g17c/AGXG17X.macho")
         if not driver.exists():

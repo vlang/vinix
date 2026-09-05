@@ -452,6 +452,8 @@ G17_COMMAND_3D_BYTES = 0x2240
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 8
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
+G17_ACCELERATOR_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
+IDLE_POWER_OFF_TIMER = "__ZN14AGXAccelerator17idlePowerOffTimerEv"
 G17_FEATURE_MASK = 0x0001000018020000
 PARSE_HARDWARE_KERNEL_COMMAND = (
     "__ZN24AGXHardwareKernelCommand16parseAndValidateER21AGXSharedStreamParserS1_"
@@ -5972,6 +5974,50 @@ def recover_g17_linear_power_transfer_tables(
     }
 
 
+def stores_covering_any(code: bytes, targets: set[int]) -> dict[int, list[tuple[int, int]]]:
+    """One decode pass returning covering stores for every target and base.
+
+    Same coverage rules as stores_covering, but sweeping each base register
+    separately costs a full rescan per register; this walks the code once.
+    """
+
+    unscaled_widths = {
+        0x38000000: 1, 0x78000000: 2, 0xB8000000: 4, 0xF8000000: 8,
+        0xBC000000: 4, 0xFC000000: 8, 0x3C800000: 16,
+    }
+    pair_widths = {
+        0x29000000: 4, 0xA9000000: 8, 0x2D000000: 4, 0x6D000000: 8, 0xAD000000: 16,
+    }
+    hits: dict[int, list[tuple[int, int]]] = {}
+
+    def record(base: int, low: int, high: int, site: int) -> None:
+        for target in targets:
+            if low <= target < high:
+                hits.setdefault(target, []).append((base, site))
+
+    for offset, word in words(code):
+        store = decode_str_unsigned(word)
+        if store is not None:
+            _source, base, immediate, width = store
+            record(base, immediate, immediate + width, offset)
+            continue
+        width = unscaled_widths.get(word & 0xFFE00C00)
+        if width is not None:
+            immediate = (word >> 12) & 0x1FF
+            if immediate & 0x100:
+                immediate -= 0x200
+            record((word >> 5) & 0x1F, immediate, immediate + width, offset)
+            continue
+        width = pair_widths.get(word & 0xFFC00000)
+        if width is not None:
+            immediate = (word >> 15) & 0x7F
+            if immediate & 0x40:
+                immediate -= 0x80
+            immediate *= width
+            record((word >> 5) & 0x1F, immediate, immediate + width * 2, offset)
+    return hits
+
+
 def stores_covering(code: bytes, base: int, target: int) -> list[int]:
     """Offsets of any store through `base` whose bytes cover `target`.
 
@@ -7162,6 +7208,91 @@ def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_cleared_accelerator_inputs(image: bytes) -> dict[str, object]:
+    """Show the late-control fields whose accelerator sources are never set.
+
+    Five of the outstanding fields read accelerator members that nothing in the
+    extracted binaries ever writes. The accelerator is allocated through the
+    same zeroing operator new the ASC uses, so those members keep zero and the
+    fields they feed do too.
+    """
+
+    symbols = macho_symbols(image)
+    required = (G17_ACCELERATOR_ALLOC, IDLE_POWER_OFF_TIMER)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing cleared-input symbols: {missing}")
+
+    _address, alloc = symbol_code(image, G17_ACCELERATOR_ALLOC)
+    require_instruction_words_at(
+        alloc,
+        "G17 accelerator allocation",
+        {
+            0x018: 0x52997A01,  # registered type size 0x1cbd0
+            0x01C: 0x72A00021,
+            0x020: 0x94C7EE3E,  # the zeroing typed operator new
+        },
+    )
+    accelerator_bytes = 0x1CBD0
+
+    sources = {
+        0x2544: 0x72C,
+        0x25F4: 0x730,
+        0x25F8: 0xF91C,
+        0x26A4: 0xF914,
+        0x26BC: 0xF958,
+    }
+    for offset in sources.values():
+        if offset >= accelerator_bytes:
+            raise ValueError(f"accelerator member {offset:#x} is outside the object")
+
+    # A sweep over every base register finds any store whose bytes cover the
+    # member, so a wider or paired store cannot hide one.
+    # Scan the executable segment once. Doing this per symbol would re-parse
+    # and re-sort the symbol table on every call, which is quadratic.
+    members = set(sources.values()) | {0xF91D}
+    covering: dict[int, list[tuple[int, int]]] = {}
+    for item in load_commands(image):
+        if item.command != LC_SEGMENT_64:
+            continue
+        segment = parse_segment(image, item)
+        if segment.name != "__TEXT_EXEC":
+            continue
+        code = image[segment.file_offset : segment.file_offset + segment.file_size]
+        for member, sites in stores_covering_any(code, members).items():
+            covering.setdefault(member, []).extend(sites)
+
+    # The only hits are through bases that are not the accelerator. The one in
+    # an AGXAccelerator method is a pointer offset a whole 0x13000 further on,
+    # so its 0x728 store lands at +0x13728.
+    _address, timer = symbol_code(image, IDLE_POWER_OFF_TIMER)
+    require_instruction_words_at(
+        timer,
+        "G17 idle timer derived base",
+        {
+            0x02C: 0x91404E74,  # x20 = accelerator + 0x13000
+            0x094: 0xF903969F,  # so this store targets +0x13728
+        },
+    )
+    for member in (0xF914, 0xF91C, 0xF91D, 0xF958):
+        if covering.get(member):
+            raise ValueError(
+                f"accelerator member {member:#x} is now written at "
+                f"{covering[member][0]}"
+            )
+
+    return {
+        "accelerator_bytes": accelerator_bytes,
+        "zeroed_allocation": True,
+        "cleared_members": sorted(set(sources.values())),
+        "fields": {config: member for config, member in sorted(sources.items())},
+        "guarded_field": {
+            "config": 0x2544,
+            "note": "only written when its source is nonzero, so it stays clear",
+        },
+    }
+
+
 def recover_g17_unit_mask_field(image: bytes) -> dict[str, object]:
     """Recover config +0x2554, a bit mask sized by a chip-info nibble product.
 
@@ -7519,6 +7650,8 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
 
     fixed = {store["offset"]: 0 for store in stores if store["zero_source"]}
     fixed.update({0x2578: 1, 0x25A0: 1, 0x2600: 0, 0x26F0: 1, 0x2560: 0})
+    cleared = recover_g17_cleared_accelerator_inputs(image)
+    fixed.update({offset: 0 for offset in cleared["fields"]})
     # +0x2570 is not a constant, but its producer and inputs are settled, so it
     # is emitted rather than outstanding. Track it separately from the fixed
     # values so the accounting still distinguishes the two.
@@ -7537,6 +7670,7 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         "fixed": dict(sorted(fixed.items())),
         "wide_fixed": {0x2560: 16, 0x2600: 8, 0x26F0: 8},
         "core_mask_relay": core_mask,
+        "cleared_accelerator_inputs": cleared,
         "derived": derived_offsets,
         "runtime_dependent": undetermined,
         "complete": False,

@@ -1113,9 +1113,9 @@ pub const g17_late_controls_offset = u64(0x2540)
 pub const g17_late_controls_size = u64(0x1d0)
 
 // The statically determined part of the late-control block. Apple's ARM
-// producer writes 36 fields into config +0x2540..+0x270f; these 22 are fixed
+// producer writes 36 fields into config +0x2540..+0x270f; these 27 are fixed
 // for G17, including four tests of the fixed feature mask and one more field
-// derived from it, all of which come out zero. The other fourteen depend on
+// derived from it, all of which come out zero. Seven more depend on
 // run-time inputs and stay zero here, so the block is not complete.
 // Values the late-control block needs that are read from hardware rather than
 // fixed. Passed as a struct so adding the remaining ones does not keep
@@ -1144,6 +1144,14 @@ fn populate_g17_late_controls(mut config G17HardwareConfig, inputs G17LateContro
 		0x26e0,
 		0x2706,
 		0x270a,
+		// These read accelerator members that nothing ever writes; the
+		// accelerator is zero-allocated, so the sources and these fields are
+		// clear. +0x2544 is only written when its source is nonzero, which it
+		// never is.
+		0x2544,
+		0x25f4,
+		0x26a4,
+		0x26bc,
 	]!
 	unsafe {
 		base := &u8(&config.firmware_late_controls_2540[0])
@@ -1155,7 +1163,7 @@ fn populate_g17_late_controls(mut config G17HardwareConfig, inputs G17LateContro
 			mut slot := &u32(base + offset - g17_late_controls_offset)
 			*slot = 1
 		}
-		for offset in [u64(0x2600), 0x26a8]! {
+		for offset in [u64(0x2600), 0x26a8, 0x25f8]! {
 			mut wide := &u64(base + offset - g17_late_controls_offset)
 			*wide = 0
 		}
