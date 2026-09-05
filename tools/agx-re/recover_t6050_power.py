@@ -99,6 +99,13 @@ APPLE_WRAPPER_MAILBOX_REG = "__ZN19AppleWrapperMailbox4_regEj"
 APPLE_WRAPPER_MAILBOX_PHYSICAL = (
     "__ZN19AppleWrapperMailbox25getWrapperPhysicalAddressEv"
 )
+APPLE_A7IOP_VTABLE = "__ZTV10AppleA7IOP"
+APPLE_A7IOP_START = "__ZN10AppleA7IOP5startEP9IOService"
+APPLE_A7IOP_REG = "__ZN10AppleA7IOP4_regEj"
+APPLE_A7IOP_PHYSICAL = "__ZN10AppleA7IOP25getWrapperPhysicalAddressEv"
+APPLE_A7IOP_ENABLE_SRAM = "__ZN10AppleA7IOP10enableSRAMEb"
+APPLE_A7IOP_ENABLE_POWER = "__ZN10AppleA7IOP12_enablePowerEbj"
+APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT = 0x9C8
 
 
 @dataclass(frozen=True)
@@ -1615,13 +1622,19 @@ def recover_apple_pmp(image: bytes, rtbuddy_image: bytes) -> dict[str, object]:
 
 def recover_apple_a7iop_code_contract(
     functions: dict[str, tuple[int, bytes]],
+    vtable_targets: dict[int, int],
 ) -> dict[str, object]:
-    """Recover AppleWrapperMailbox's wrapper-MMIO ownership contract."""
+    """Recover the AppleA7IOP wrapper-MMIO and SRAM-power contracts."""
 
     required = (
         APPLE_WRAPPER_MAILBOX_START,
         APPLE_WRAPPER_MAILBOX_REG,
         APPLE_WRAPPER_MAILBOX_PHYSICAL,
+        APPLE_A7IOP_START,
+        APPLE_A7IOP_REG,
+        APPLE_A7IOP_PHYSICAL,
+        APPLE_A7IOP_ENABLE_SRAM,
+        APPLE_A7IOP_ENABLE_POWER,
     )
     missing = [name for name in required if name not in functions]
     if missing:
@@ -1669,7 +1682,115 @@ def recover_apple_a7iop_code_contract(
     ):
         raise ValueError("AppleWrapperMailbox physical-address accessor changed")
 
+    _a7_start_address, a7_start_code = functions[APPLE_A7IOP_START]
+    if not _has_ordered_words(
+        a7_start_code,
+        (
+            0xF9407E80,  # ldr x0, [x20, #0xf8] -- wrapper provider
+            0x911C4208,  # add x8, x16, #0x710 -- mapDeviceMemoryWithIndex slot
+            0xF9438A09,  # ldr x9, [x16, #0x710]
+            0x52800001,  # mov w1, #0 -- device-memory index
+            0x52800002,  # mov w2, #0 -- map options
+            0xD73F0931,  # blraa x9, x17
+            0xF900B680,  # str x0, [x20, #0x168] -- retained memory map
+            0xD2802711,  # mov x17, #0x138 -- getVirtualAddress slot
+            0x8B110210,  # add x16, x16, x17
+            0xF9400208,  # ldr x8, [x16]
+            0xD73F0910,  # blraa x8, x16
+            0xF9008280,  # str x0, [x20, #0x100] -- mapped register VA
+            0xB9400008,  # ldr w8, [x0] -- sram-index OSData payload
+            0xB9015E88,  # str w8, [x20, #0x15c] -- SRAM power selector
+            0x7100011F,  # cmp w8, #0
+            0x1A9F07E2,  # cset w2, ne -- should-control-sram value
+        ),
+    ):
+        raise ValueError("AppleA7IOP device-memory or SRAM-property mapping changed")
+
+    _a7_reg_address, a7_reg_code = functions[APPLE_A7IOP_REG]
+    if a7_reg_code != expected_reg:
+        raise ValueError("AppleA7IOP register accessor changed")
+
+    a7_physical_address, a7_physical_code = functions[APPLE_A7IOP_PHYSICAL]
+    if (
+        len(a7_physical_code) < 0x20
+        or struct.unpack_from("<I", a7_physical_code, 0x0C)[0] != 0xF940B400
+        or struct.unpack_from("<I", a7_physical_code, 0x10)[0] != 0xB40000A0
+        or struct.unpack_from("<I", a7_physical_code, 0x14)[0] & 0xFC000000
+        != 0x94000000
+        or direct_branch_target_at(a7_physical_address, a7_physical_code, 0x14)
+        is None
+    ):
+        raise ValueError("AppleA7IOP physical-address accessor changed")
+
+    _enable_sram_address, enable_sram_code = functions[APPLE_A7IOP_ENABLE_SRAM]
+    if not _has_ordered_words(
+        enable_sram_code,
+        (
+            0xB9415C02,  # ldr w2, [x0, #0x15c] -- sram-index value
+            0x34000222,  # cbz w2 -- zero means unsupported
+            0xD2813911,  # mov x17, #0x9c8 -- _enablePower slot
+            0x8B110210,  # add x16, x16, x17
+            0xF9400208,  # ldr x8, [x16]
+            0xD73F0910,  # blraa x8, x16; x1 remains requested state
+            0x52805C40,  # mov w0, #0x2e2 -- unsupported error low half
+            0x72BC0000,  # movk w0, #0xe000, lsl #16
+        ),
+    ):
+        raise ValueError("AppleA7IOP SRAM-power dispatch changed")
+    if vtable_targets.get(APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT) != functions[
+        APPLE_A7IOP_ENABLE_POWER
+    ][0]:
+        raise ValueError("AppleA7IOP SRAM-power vtable target changed")
+
+    _enable_power_address, enable_power_code = functions[APPLE_A7IOP_ENABLE_POWER]
+    if not _has_ordered_words(
+        enable_power_code,
+        (
+            0xAA0203F3,  # mov x19, x2 -- power-domain selector
+            0xAA0103F4,  # mov x20, x1 -- requested state
+            0xF9407C00,  # ldr x0, [x0, #0xf8] -- wrapper provider
+            0xD2811511,  # mov x17, #0x8a8 -- prepare power transition
+            0xD73F0910,  # blraa x8, x16
+            0xF9407EA0,  # ldr x0, [x21, #0xf8] -- wrapper provider again
+            0x9122C208,  # add x8, x16, #0x8b0 -- set power state
+            0xF9445A09,  # ldr x9, [x16, #0x8b0]
+            0xAA1403E1,  # mov x1, x20 -- requested state
+            0xD2800002,  # mov x2, #0
+            0xAA1303E3,  # mov x3, x19 -- sram-index power selector
+            0xD73F0931,  # blraa x9, x17
+        ),
+    ):
+        raise ValueError("AppleA7IOP provider power transition changed")
+
     return {
+        "apple_a7iop": {
+            "device_memory_index": 0,
+            "map_options": 0,
+            "provider_object_offset": 0xF8,
+            "memory_map_object_offset": 0x168,
+            "mapped_virtual_address_offset": 0x100,
+            "register_access": {
+                "width_bits": 32,
+                "offset_unit": "bytes",
+                "address": "mapped virtual address + zero-extended offset",
+            },
+            "physical_address_source": "retained device-memory map",
+            "sram_power": {
+                "selector_property": "sram-index",
+                "selector_object_offset": 0x15C,
+                "zero_means_unsupported": True,
+                "published_capability_property": "should-control-sram",
+                "enable_power_vtable_slot": APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT,
+                "provider_prepare_power_vtable_slot": 0x8A8,
+                "provider_set_power_vtable_slot": 0x8B0,
+                "provider_selector_argument": "x3",
+                "meaning": "provider power-domain selector; not a reg[] index",
+            },
+            "scope": (
+                "resource and power-domain ownership only; does not start or "
+                "prove the IOP ready"
+            ),
+        },
         "wrapper_mailbox": {
             "device_memory_index": 0,
             "map_options": 0,
@@ -1702,11 +1823,33 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
             APPLE_WRAPPER_MAILBOX_START,
             APPLE_WRAPPER_MAILBOX_REG,
             APPLE_WRAPPER_MAILBOX_PHYSICAL,
+            APPLE_A7IOP_START,
+            APPLE_A7IOP_REG,
+            APPLE_A7IOP_PHYSICAL,
+            APPLE_A7IOP_ENABLE_SRAM,
+            APPLE_A7IOP_ENABLE_POWER,
+        )
+    }
+    a7_start_address, a7_start_code = functions[APPLE_A7IOP_START]
+    for (adrp_offset, add_offset), expected in {
+        (0x794, 0x798): "sram-index",
+        (0x80C, 0x810): "should-control-sram",
+    }.items():
+        actual = read_adrp_add_cstring(
+            image, a7_start_address, a7_start_code, adrp_offset, add_offset
+        )
+        if actual != expected:
+            raise ValueError(
+                f"AppleA7IOP start string changed at {adrp_offset:#x}: {actual!r}"
+            )
+    vtable_targets = {
+        APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT: recover_vtable_target(
+            image, APPLE_A7IOP_VTABLE, APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT
         )
     }
     return {
         "uuid": identity,
-        **recover_apple_a7iop_code_contract(functions),
+        **recover_apple_a7iop_code_contract(functions, vtable_targets),
     }
 
 
@@ -1986,7 +2129,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 12,
+        "schema": 13,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -2025,7 +2168,11 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     "interrupts": wrapper_interrupts["PMP0"],
                     "iop_version": 1,
                     "ptd_update_reg_index": 3,
-                    "sram_index": 1,
+                    "sram_power_domain": {
+                        "property": "sram-index",
+                        "selector": 1,
+                        "not_a_register_index": True,
+                    },
                 },
                 {
                     "die": 1,
@@ -2041,7 +2188,11 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     "interrupts": wrapper_interrupts["PMP1"],
                     "iop_version": 1,
                     "ptd_update_reg_index": 3,
-                    "sram_index": 1,
+                    "sram_power_domain": {
+                        "property": "sram-index",
+                        "selector": 1,
+                        "not_a_register_index": True,
+                    },
                 },
             ],
             "agx_soc_device": agx_device,

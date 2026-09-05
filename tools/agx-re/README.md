@@ -124,6 +124,9 @@ and virtual address, and performs 32-bit register loads using byte offsets.
 It also ties the wrapper physical-address accessor to that same retained map.
 The result identifies T6050 wrapper `reg[0]` as the mailbox/control Device-MMIO
 aperture without treating resource ownership as CPU-start or IOP readiness.
+The alternate `AppleA7IOP` class independently maps the same index and proves
+that `sram-index` is forwarded as a provider power-domain selector. It is not
+a `reg[]` index, so the report deliberately leaves wrapper `reg[1]` unlabeled.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published

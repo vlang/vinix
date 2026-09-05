@@ -530,8 +530,10 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 	ptd_update_reg_index := devicetree.get_le_u32(wrapper, 'ptd-update-reg-index') or {
 		return false
 	}
-	sram_index := devicetree.get_le_u32(wrapper, 'sram-index') or { return false }
-	if iop_version != 1 || ptd_update_reg_index != 3 || sram_index != 1 {
+	// Despite its name, AppleA7IOP passes sram-index as the provider power
+	// transition's domain selector; it is not a DeviceTree reg[] index.
+	sram_power_domain := devicetree.get_le_u32(wrapper, 'sram-index') or { return false }
+	if iop_version != 1 || ptd_update_reg_index != 3 || sram_power_domain != 1 {
 		C.printf(c'agx: t6050 PMP%u wrapper control properties changed\n', die)
 		return false
 	}

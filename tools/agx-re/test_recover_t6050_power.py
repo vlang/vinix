@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 12)
+        self.assertEqual(result["schema"], 13)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -311,6 +311,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(
             [die["ptd_update_reg_index"] for die in result["pmp"]["dies"]],
             [3, 3],
+        )
+        self.assertEqual(
+            [die["sram_power_domain"]["selector"] for die in result["pmp"]["dies"]],
+            [1, 1],
+        )
+        self.assertTrue(
+            all(
+                die["sram_power_domain"]["not_a_register_index"]
+                for die in result["pmp"]["dies"]
+            )
         )
 
     def test_recovers_pmp_v2_binary_dispatch(self) -> None:
@@ -909,7 +919,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 bad_functions, symbols, rtbuddy_symbols
             )
 
-    def test_recovers_apple_wrapper_mailbox_mmio_resource(self) -> None:
+    def test_recovers_apple_a7iop_resource_and_sram_power_contracts(self) -> None:
         start_code = struct.pack(
             "<12I",
             0xF9407E80,
@@ -939,6 +949,54 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0xB4000080,
             0xA8C17BFD,
         )
+        a7_start_code = struct.pack(
+            "<16I",
+            0xF9407E80,
+            0x911C4208,
+            0xF9438A09,
+            0x52800001,
+            0x52800002,
+            0xD73F0931,
+            0xF900B680,
+            0xD2802711,
+            0x8B110210,
+            0xF9400208,
+            0xD73F0910,
+            0xF9008280,
+            0xB9400008,
+            0xB9015E88,
+            0x7100011F,
+            0x1A9F07E2,
+        )
+        a7_physical_code = physical_code.replace(
+            struct.pack("<I", 0xF940A000), struct.pack("<I", 0xF940B400)
+        )
+        enable_sram_code = struct.pack(
+            "<8I",
+            0xB9415C02,
+            0x34000222,
+            0xD2813911,
+            0x8B110210,
+            0xF9400208,
+            0xD73F0910,
+            0x52805C40,
+            0x72BC0000,
+        )
+        enable_power_code = struct.pack(
+            "<12I",
+            0xAA0203F3,
+            0xAA0103F4,
+            0xF9407C00,
+            0xD2811511,
+            0xD73F0910,
+            0xF9407EA0,
+            0x9122C208,
+            0xF9445A09,
+            0xAA1403E1,
+            0xD2800002,
+            0xAA1303E3,
+            0xD73F0931,
+        )
         functions = {
             recover_t6050_power.APPLE_WRAPPER_MAILBOX_START: (0x1000, start_code),
             recover_t6050_power.APPLE_WRAPPER_MAILBOX_REG: (0x2000, reg_code),
@@ -946,13 +1004,30 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 0x3000,
                 physical_code,
             ),
+            recover_t6050_power.APPLE_A7IOP_START: (0x4000, a7_start_code),
+            recover_t6050_power.APPLE_A7IOP_REG: (0x5000, reg_code),
+            recover_t6050_power.APPLE_A7IOP_PHYSICAL: (0x6000, a7_physical_code),
+            recover_t6050_power.APPLE_A7IOP_ENABLE_SRAM: (0x7000, enable_sram_code),
+            recover_t6050_power.APPLE_A7IOP_ENABLE_POWER: (
+                0x8000,
+                enable_power_code,
+            ),
         }
-        result = recover_t6050_power.recover_apple_a7iop_code_contract(functions)
+        vtable_targets = {
+            recover_t6050_power.APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT: 0x8000
+        }
+        result = recover_t6050_power.recover_apple_a7iop_code_contract(
+            functions, vtable_targets
+        )
         wrapper = result["wrapper_mailbox"]
         self.assertEqual(wrapper["device_memory_index"], 0)
         self.assertEqual(wrapper["memory_map_object_offset"], 0x140)
         self.assertEqual(wrapper["mapped_virtual_address_offset"], 0x100)
         self.assertEqual(wrapper["register_access"]["width_bits"], 32)
+        self.assertEqual(
+            result["apple_a7iop"]["sram_power"]["meaning"],
+            "provider power-domain selector; not a reg[] index",
+        )
 
         bad_functions = dict(functions)
         bad_functions[recover_t6050_power.APPLE_WRAPPER_MAILBOX_REG] = (
@@ -960,7 +1035,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
             reg_code.replace(struct.pack("<I", 0xB8614900), struct.pack("<I", 0xF8614900)),
         )
         with self.assertRaisesRegex(ValueError, "register accessor"):
-            recover_t6050_power.recover_apple_a7iop_code_contract(bad_functions)
+            recover_t6050_power.recover_apple_a7iop_code_contract(
+                bad_functions, vtable_targets
+            )
 
     def test_rejects_changed_sgx_gate_order(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree((0x267, 0x268)))
