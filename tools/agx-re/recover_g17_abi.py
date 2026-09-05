@@ -1308,6 +1308,182 @@ def decode_bitfield_value(word: int) -> dict[str, object] | None:
     }
 
 
+def decode_conditional_select_value(word: int) -> dict[str, object] | None:
+    if word & 0x1FE00000 != 0x1A800000:
+        return None
+    op2 = (word >> 10) & 0x3
+    if op2 > 1:
+        return None
+    operation = (
+        ("csel", "csinc"),
+        ("csinv", "csneg"),
+    )[(word >> 30) & 0x1][op2]
+    return {
+        "operation": operation,
+        "destination_register": word & 0x1F,
+        "first_register": (word >> 5) & 0x1F,
+        "second_register": (word >> 16) & 0x1F,
+        "condition": (
+            "eq",
+            "ne",
+            "cs",
+            "cc",
+            "mi",
+            "pl",
+            "vs",
+            "vc",
+            "hi",
+            "ls",
+            "ge",
+            "lt",
+            "gt",
+            "le",
+            "al",
+            "nv",
+        )[(word >> 12) & 0xF],
+        "bytes": 8 if word & 0x80000000 else 4,
+    }
+
+
+def trace_g17_condition_expression(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Recover the compare/test which supplies a conditional select's NZCV."""
+
+    for definition_index in range(use_index - 1, -1, -1):
+        offset, word = instructions[definition_index]
+        immediate = decode_add_sub_immediate_value(word)
+        logical_x = decode_logical_immediate_x(word)
+        logical_w = decode_logical_immediate_w(word)
+        register = decode_add_sub_register_value(word)
+        logical_register = decode_logical_shifted_register(word)
+        logical = logical_x if logical_x is not None else logical_w
+        sets_flags = bool(
+            immediate is not None and word & (1 << 29)
+            or logical is not None and logical[0] == "ands"
+            or register is not None and word & (1 << 29)
+            or logical_register is not None
+            and logical_register["operation"] in ("ands", "bics")
+        )
+        if not sets_flags:
+            continue
+        if not (
+            immediate is not None
+            or logical_x is not None
+            or logical_w is not None
+            or register is not None
+            or logical_register is not None
+        ):
+            return None
+
+        use_offset = instructions[use_index][0]
+        for branch_index, (branch_offset, branch_word) in enumerate(instructions):
+            target = decode_local_branch_target(branch_offset, branch_word)
+            if (
+                target is not None
+                and offset < target <= use_offset
+                and not definition_index < branch_index < use_index
+            ):
+                return None
+        for call_offset, call_word in instructions[definition_index + 1 : use_index]:
+            if (
+                decode_bl_target(call_offset, call_word) is not None
+                or call_word & 0xFFFFFC00 == 0xD73F0800
+            ):
+                return None
+
+        if immediate is not None:
+            source = int(immediate["source_register"])
+            if source == 31:
+                return None
+            source_value = trace_g17_value_expression(
+                instructions, definition_index, source, depth + 1, seen
+            )
+            if source_value is None:
+                return None
+            return {
+                "kind": "condition",
+                "producer_offset": offset,
+                "operation": "cmp" if immediate["operation"] == "sub" else "cmn",
+                "bytes": immediate["bytes"],
+                "source": source_value,
+                "immediate": immediate["immediate"],
+            }
+
+        if logical is not None:
+            _operation, _destination, source, value = logical
+            source_value = (
+                {"kind": "constant", "value": 0}
+                if source == 31
+                else trace_g17_value_expression(
+                    instructions, definition_index, source, depth + 1, seen
+                )
+            )
+            if source_value is None:
+                return None
+            return {
+                "kind": "condition",
+                "producer_offset": offset,
+                "operation": "tst",
+                "bytes": 8 if logical_x is not None else 4,
+                "source": source_value,
+                "immediate": value,
+            }
+
+        if register is not None:
+            operands = []
+            for source in (register["first_register"], register["second_register"]):
+                if source == 31:
+                    return None
+                source_value = trace_g17_value_expression(
+                    instructions, definition_index, int(source), depth + 1, seen
+                )
+                if source_value is None:
+                    return None
+                operands.append(source_value)
+            return {
+                "kind": "condition",
+                "producer_offset": offset,
+                "operation": "cmp" if register["operation"] == "sub" else "cmn",
+                "bytes": register["bytes"],
+                "modifier": register.get("extend", register.get("shift")),
+                "amount": register["amount"],
+                "first": operands[0],
+                "second": operands[1],
+            }
+
+        if logical_register is not None:
+            operands = []
+            for source in (
+                logical_register["first_register"],
+                logical_register["second_register"],
+            ):
+                source_value = (
+                    {"kind": "constant", "value": 0}
+                    if source == 31
+                    else trace_g17_value_expression(
+                        instructions, definition_index, int(source), depth + 1, seen
+                    )
+                )
+                if source_value is None:
+                    return None
+                operands.append(source_value)
+            return {
+                "kind": "condition",
+                "producer_offset": offset,
+                "operation": "tst",
+                "bytes": logical_register["bytes"],
+                "shift": logical_register["shift"],
+                "amount": logical_register["amount"],
+                "first": operands[0],
+                "second": operands[1],
+            }
+    return None
+
+
 def trace_g17_value_expression(
     instructions: list[tuple[int, int]],
     use_index: int,
@@ -1514,6 +1690,39 @@ def trace_g17_value_expression(
                 return None
             result["destination"] = destination_value
         return result
+
+    conditional = decode_conditional_select_value(word)
+    if conditional is not None and conditional["destination_register"] == register:
+        operands = []
+        for source in (
+            conditional["first_register"],
+            conditional["second_register"],
+        ):
+            source_value = (
+                {"kind": "constant", "value": 0}
+                if source == 31
+                else trace_g17_value_expression(
+                    instructions, definition_index, int(source), depth + 1, next_seen
+                )
+            )
+            if source_value is None:
+                return None
+            operands.append(source_value)
+        condition = trace_g17_condition_expression(
+            instructions, definition_index, depth + 1, next_seen
+        )
+        if condition is None:
+            return None
+        return {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": conditional["operation"],
+            "bytes": conditional["bytes"],
+            "condition": conditional["condition"],
+            "predicate": condition,
+            "first": operands[0],
+            "second": operands[1],
+        }
     return None
 
 
@@ -9323,6 +9532,11 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             ),
             "recovered_expression_calls": sum(
                 "expression" in entry["value_source"]
+                for entry in encoder_calls
+            ),
+            "recovered_conditional_calls": sum(
+                entry["value_source"].get("operation") == "conditional"
+                and "expression" in entry["value_source"]
                 for entry in encoder_calls
             ),
             "resolved_encoder_selectors": sorted(resolved),

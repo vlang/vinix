@@ -4638,6 +4638,25 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(expression["first"]["member"], 0x760)
         self.assertEqual(expression["second"]["member"], 0x768)
 
+    def test_recovers_g17_conditional_value_and_predicate(self) -> None:
+        instructions = [
+            (0x00, 0xF943A269),  # ldr x9, [x19, #0x740]
+            (0x04, 0x395F866A),  # ldrb w10, [x19, #0x7e1]
+            (0x08, 0x7200015F),  # tst w10, #1
+            (0x0C, 0x926BE92A),  # and x10, x9, #0xffffffffffe0ffff
+            (0x10, 0xB26C014A),  # orr x10, x10, #0x100000
+            (0x14, 0x9A891144),  # csel x4, x10, x9, ne
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 6)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "csel")
+        self.assertEqual(expression["condition"], "ne")
+        self.assertEqual(expression["first"]["operation"], "orr")
+        self.assertEqual(expression["second"]["member"], 0x740)
+        self.assertEqual(expression["predicate"]["operation"], "tst")
+        self.assertEqual(expression["predicate"]["source"]["member"], 0x7E1)
+        self.assertEqual(expression["predicate"]["immediate"], 1)
+
     def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
         instructions = [
             (0x00, 0x5294E802),  # mov w2, #0xa740
