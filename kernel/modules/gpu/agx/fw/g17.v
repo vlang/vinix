@@ -2,6 +2,7 @@ module fw
 
 import gpu.agx.hw
 import katomic
+import klock
 
 // Verified anchors for the G17C firmware shipped with macOS 26.5 (25F71),
 // RTKit build 3255.120.11. This is deliberately only the root bootstrap
@@ -1580,6 +1581,7 @@ pub mut:
 	slot_count    u32
 	slot_cursor   u32
 	exhausted     bool
+	lock          klock.Lock
 }
 
 pub struct G17CommandSlot {
@@ -1594,6 +1596,10 @@ pub:
 // byte is clear, marks it and leaves the cursor one past it. A full ring
 // returns none instead of blocking, matching the null Apple returns.
 pub fn (mut pool G17CommandPool) acquire_g17_command_slot() ?G17CommandSlot {
+	pool.lock.acquire()
+	defer {
+		pool.lock.release()
+	}
 	if pool.slot_count == 0 || pool.element_bytes == 0
 		|| pool.in_use == unsafe { nil } || pool.cpu_base == unsafe { nil } {
 		return none
@@ -1629,6 +1635,10 @@ pub fn (mut pool G17CommandPool) acquire_g17_command_slot() ?G17CommandSlot {
 // Release a slot back to its ring. Apple clears the byte when the firmware
 // reports the command complete.
 pub fn (mut pool G17CommandPool) release_g17_command_slot(index u32) bool {
+	pool.lock.acquire()
+	defer {
+		pool.lock.release()
+	}
 	if index >= pool.slot_count || pool.in_use == unsafe { nil } {
 		return false
 	}
@@ -1639,6 +1649,31 @@ pub fn (mut pool G17CommandPool) release_g17_command_slot(index u32) bool {
 		pool.in_use[index] = pool.in_use[index] - 1
 	}
 	return true
+}
+
+// Reproduce the address-to-slot part of AGX3DCommandDescriptor::complete,
+// while adding bounds and alignment checks that Apple's trusted internal
+// pointer does not need. The slot byte is decremented only after the address
+// has been proven to name the start of an element in this pool.
+pub fn (mut pool G17CommandPool) release_g17_command_address(command_cpu voidptr) bool {
+	if command_cpu == unsafe { nil } || pool.cpu_base == unsafe { nil }
+		|| pool.element_bytes == 0 || pool.slot_count == 0 {
+		return false
+	}
+	command_address := u64(command_cpu)
+	base := u64(pool.cpu_base)
+	if command_address < base {
+		return false
+	}
+	offset := command_address - base
+	if offset % u64(pool.element_bytes) != 0 {
+		return false
+	}
+	index := offset / u64(pool.element_bytes)
+	if index >= u64(pool.slot_count) {
+		return false
+	}
+	return pool.release_g17_command_slot(u32(index))
 }
 
 pub const g17_scheduler_state_size = u64(0x40)

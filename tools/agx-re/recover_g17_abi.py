@@ -487,6 +487,7 @@ GENERATE_REGISTER_LIST_3D = (
     "EP20AGFIChannelCommand3DP22AGX3DCommandDescriptor"
 )
 G17_COMMAND_3D_BYTES = 0x2240
+COMPLETE_COMMAND_3D = "__ZN22AGX3DCommandDescriptor8completeEv"
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 8
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
@@ -8589,6 +8590,57 @@ def recover_g17_channel_command_pools(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_3d_command_reclamation(image: bytes) -> dict[str, object]:
+    """Recover how a completed 3D descriptor releases its command slot.
+
+    The descriptor retains the command's CPU pointer.  complete subtracts the
+    pool CPU base, divides by the element size, decrements the matching in-use
+    byte under the pool lock, and finally clears the retained pointer.  This
+    independently ties the 3D completion path to the 0x1688 pool block.
+    """
+
+    symbols = macho_symbols(image)
+    if COMPLETE_COMMAND_3D not in symbols:
+        raise ValueError(f"Mach-O is missing {COMPLETE_COMMAND_3D}")
+
+    _address, code = symbol_code(image, COMPLETE_COMMAND_3D)
+    require_instruction_words_at(
+        code,
+        "G17 3D command reclamation",
+        {
+            0x16C: 0xF9421E68,  # retained command CPU pointer at descriptor +0x438
+            0x1F4: 0xF942D934,  # firmware object at channel +0x5b0
+            0x1F8: 0xB9569A89,  # pool CPU base at block +0x10
+            0x1FC: 0x4B090108,  # command CPU - pool CPU base
+            0x200: 0xF94B5689,  # element size at block +0x20
+            0x204: 0x9AC90915,  # slot = byte offset / element size
+            0x208: 0xF94B6280,  # pool lock at block +0x38
+            0x210: 0xF94B5288,  # in-use bytes at block +0x18
+            0x214: 0x8B150109,  # address of the selected in-use byte
+            0x218: 0x39400129,  # load in-use byte
+            0x21C: 0x34000069,  # leave an already-clear slot clear
+            0x220: 0x51000529,  # decrement by one
+            0x224: 0x38356909,  # store selected in-use byte
+            0x238: 0xF9021E7F,  # clear descriptor +0x438 after unlock
+        },
+    )
+
+    block = 0x1688
+    return {
+        "descriptor_command_cpu_member": 0x438,
+        "pool_block": block,
+        "pool_cpu_base_member": block + 0x10,
+        "pool_in_use_member": block + 0x18,
+        "pool_element_bytes_member": block + 0x20,
+        "pool_exhausted_member": block + 0x30,
+        "pool_lock_member": block + 0x38,
+        "slot_formula": "(command_cpu - pool_cpu_base) / element_bytes",
+        "decrement_if_nonzero": True,
+        "clear_descriptor_pointer": True,
+        "producer": COMPLETE_COMMAND_3D,
+    }
+
+
 def recover_g17_queue_device_inputs(
     driver: bytes, iogpu: bytes
 ) -> dict[str, object]:
@@ -9295,6 +9347,9 @@ def main() -> int:
             driver, iogpu
         )
         channels["command_pools"] = recover_g17_channel_command_pools(driver)
+        channels["command_3d_reclamation"] = (
+            recover_g17_3d_command_reclamation(driver)
+        )
         channels["command_common_fields"] = (
             recover_g17_channel_command_common_fields(driver)
         )

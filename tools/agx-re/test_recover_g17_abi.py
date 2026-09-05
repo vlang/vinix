@@ -4707,6 +4707,59 @@ class RecoverG17AbiTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 recover_g17_abi.recover_g17_channel_command_pools(b"")
 
+    def test_recovers_g17_3d_command_reclamation(self) -> None:
+        code = bytearray(0x300)
+        for offset, word in {
+            0x16C: 0xF9421E68,
+            0x1F4: 0xF942D934,
+            0x1F8: 0xB9569A89,
+            0x1FC: 0x4B090108,
+            0x200: 0xF94B5689,
+            0x204: 0x9AC90915,
+            0x208: 0xF94B6280,
+            0x210: 0xF94B5288,
+            0x214: 0x8B150109,
+            0x218: 0x39400129,
+            0x21C: 0x34000069,
+            0x220: 0x51000529,
+            0x224: 0x38356909,
+            0x238: 0xF9021E7F,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.COMPLETE_COMMAND_3D: 0x920000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x920000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_3d_command_reclamation(b"")
+
+        self.assertEqual(recovered["descriptor_command_cpu_member"], 0x438)
+        self.assertEqual(recovered["pool_block"], 0x1688)
+        self.assertEqual(recovered["pool_in_use_member"], 0x16A0)
+        self.assertTrue(recovered["decrement_if_nonzero"])
+        self.assertTrue(recovered["clear_descriptor_pointer"])
+
+    def test_rejects_changed_g17_3d_command_reclamation(self) -> None:
+        code = bytearray(0x300)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.COMPLETE_COMMAND_3D: 0x920000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x920000, bytes(code))
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_3d_command_reclamation(b"")
+
     def test_recovers_g17_queue_device_inputs(self) -> None:
         queue_address = 0x500000
         device_address = 0x510000
