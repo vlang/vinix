@@ -135,8 +135,10 @@ pub mut:
 	perf_state_base          u32
 	perf_state_table_count   u32
 	perf_state_frequencies   [16]u32
+	perf_state_powers        [16]u32
 	perf_state_voltages      [256]u32
 	perf_state_sram_voltages [256]u32
+	max_power_mw             u32
 	cs_perf_states           AuxPerfStateConfig
 	afr_perf_states          AuxPerfStateConfig
 }

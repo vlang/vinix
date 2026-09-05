@@ -307,8 +307,9 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 		}
 	}
 	if cfg.perf_state_count > 0 {
-		params.min_frequency_khz = cfg.perf_state_frequencies[0] / 1000
+		params.min_frequency_khz = cfg.perf_state_frequencies[cfg.perf_state_base] / 1000
 		params.max_frequency_khz = cfg.perf_state_frequencies[cfg.perf_state_count - 1] / 1000
+		params.max_power_mw = cfg.max_power_mw
 	}
 	return params
 }

@@ -311,6 +311,112 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 	return true
 }
 
+// G13 receives its operating points through the standard OPP-v2 FDT binding.
+// m1n1 derives this table from the machine's Apple DeviceTree, so it reflects
+// the exact voltage and power data for both seven- and eight-core t8103 parts.
+// Native Apple DeviceTree does not contain the phandle-based representation.
+fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfig) bool {
+	opp_table := devicetree.get_phandle_node(gpu_node, 'operating-points-v2', 0) or {
+		println('agx: t8103 has no operating-points-v2 table')
+		return false
+	}
+	if opp_table.children.len < 2 {
+		C.printf(c'agx: invalid t8103 OPP count %u\n', u32(opp_table.children.len))
+		return false
+	}
+
+	mut frequencies := [16]u32{}
+	mut powers := [16]u32{}
+	mut voltages := [256]u32{}
+	mut sram_voltages := [256]u32{}
+	mut state_count := u32(0)
+	mut max_power_mw := u32(0)
+	for opp in opp_table.children {
+		if status := devicetree.get_string_list(opp, 'status') {
+			if status.len > 0 && status[0] == 'disabled' {
+				continue
+			}
+		}
+		if state_count >= 16 {
+			println('agx: t8103 has too many enabled OPPs')
+			return false
+		}
+		frequency_hz := devicetree.get_u64(opp, 'opp-hz') or {
+			println('agx: t8103 OPP has no 64-bit opp-hz')
+			return false
+		}
+		voltage_uv := devicetree.get_u32_array(opp, 'opp-microvolt') or {
+			println('agx: t8103 OPP has no opp-microvolt array')
+			return false
+		}
+		power_uw := devicetree.get_u32(opp, 'opp-microwatt') or {
+			println('agx: t8103 OPP has no opp-microwatt value')
+			return false
+		}
+		if frequency_hz == 0 || frequency_hz > 0xffff_ffff || voltage_uv.len != int(cfg.num_clusters)
+			|| power_uw < 1000 {
+			C.printf(c'agx: invalid t8103 OPP %u dimensions or values\n', state_count)
+			return false
+		}
+		frequency := u32(frequency_hz)
+		if state_count > 0 && frequency <= frequencies[state_count - 1] {
+			C.printf(c'agx: t8103 OPP %u is not frequency ordered\n', state_count)
+			return false
+		}
+		frequencies[state_count] = frequency
+		power_mw := power_uw / 1000
+		powers[state_count] = power_mw
+		if power_mw > max_power_mw {
+			max_power_mw = power_mw
+		}
+		for cluster := u32(0); cluster < cfg.num_clusters; cluster++ {
+			if voltage_uv[cluster] < 1000 {
+				C.printf(c'agx: invalid t8103 OPP %u cluster %u voltage\n', state_count, cluster)
+				return false
+			}
+			voltage_mv := voltage_uv[cluster] / 1000
+			destination := state_count * 16 + cluster
+			voltages[destination] = voltage_mv
+			min_sram_mv := cfg.pwr_min_sram_microvolt / 1000
+			sram_voltages[destination] = if voltage_mv > min_sram_mv {
+				voltage_mv
+			} else {
+				min_sram_mv
+			}
+		}
+		state_count++
+	}
+	if state_count < 2 || max_power_mw == 0 {
+		println('agx: t8103 has too few valid operating points')
+		return false
+	}
+	base_state := devicetree.get_u32(gpu_node, 'apple,perf-base-pstate') or { u32(1) }
+	if base_state >= state_count {
+		C.printf(c'agx: invalid t8103 base performance state %u/%u\n', base_state, state_count)
+		return false
+	}
+	power_sample_period := devicetree.get_u32(gpu_node, 'apple,power-sample-period') or {
+		println('agx: t8103 has no apple,power-sample-period')
+		return false
+	}
+	if power_sample_period == 0 {
+		println('agx: t8103 has a zero power sample period')
+		return false
+	}
+
+	cfg.perf_state_count = state_count
+	cfg.perf_state_base = base_state
+	cfg.perf_state_table_count = cfg.num_clusters
+	cfg.perf_state_frequencies = frequencies
+	cfg.perf_state_powers = powers
+	cfg.perf_state_voltages = voltages
+	cfg.perf_state_sram_voltages = sram_voltages
+	cfg.max_power_mw = max_power_mw
+	cfg.gpu_power_sample_period = power_sample_period
+	C.printf(c'agx: loaded %u t8103 operating points (%u..%u MHz, %u mW max)\n', state_count, frequencies[base_state] / 1000000, frequencies[state_count - 1] / 1000000, max_power_mw)
+	return true
+}
+
 // The unprefixed performance properties are Apple DeviceTree binary records,
 // not big-endian FDT cells. Each record is { frequency_hz, voltage_mv } in
 // little endian, grouped as one complete state table per GPU partition.
@@ -461,6 +567,14 @@ pub fn initialise() {
 		C.printf(c'agx: No hardware configuration for chip 0x%x\n', chip_id)
 		return
 	}
+	mut g13_performance_config_complete := false
+	if chip_id == 0x8103 {
+		if native_adt {
+			println('agx: native t8103 OPP translation is not implemented')
+		} else {
+			g13_performance_config_complete = load_t8103_performance_config(gpu_node, mut cfg)
+		}
+	}
 	if chip_id == 0x6050 {
 		if !load_t6050_chip_info(mut cfg)
 			|| !load_t6050_power_sample_period(gpu_node, mut cfg)
@@ -548,6 +662,10 @@ pub fn initialise() {
 	// here could corrupt firmware-owned memory or wedge the machine.
 	if !cfg.can_boot_firmware() {
 		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n', chip_id, cfg.firmware_abi_name())
+		return
+	}
+	if chip_id == 0x8103 && !g13_performance_config_complete {
+		println('agx: t8103 performance configuration is incomplete; leaving hardware untouched')
 		return
 	}
 
