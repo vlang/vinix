@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 13)
+        self.assertEqual(result["schema"], 14)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -917,6 +917,189 @@ class RecoverT6050PowerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ping request/wait"):
             recover_t6050_power.recover_apple_pmp_code_contract(
                 bad_functions, symbols, rtbuddy_symbols
+            )
+
+    def test_recovers_pmp_firmware_patch_and_rtbuddy_fixup_contract(self) -> None:
+        def branch(source: int, target: int) -> bytes:
+            delta = (target - source) // 4
+            return struct.pack("<I", 0x94000000 | delta & 0x3FFFFFF)
+
+        start = 0x1000
+        patch = 0x2000
+        patch_u32 = 0x4000
+        fixup = 0x5000
+        load = 0x6000
+        next_target = 0x8000
+
+        rtbuddy_names = (
+            recover_t6050_power.RTBUDDY_FIRMWARE_SERVICE_PRE_LOAD,
+            recover_t6050_power.RTBUDDY_FIRMWARE_SERVICE_PATCH,
+            recover_t6050_power.RTBUDDY_FIRMWARE_COPY_TO_TARGET,
+            recover_t6050_power.RTBUDDY_FIRMWARE_CREATE_COREDUMP_MAP,
+            recover_t6050_power.RTBUDDY_FIRMWARE_PUBLISH,
+            recover_t6050_power.RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
+            recover_t6050_power.RTBUDDY_FIRMWARE_UPDATE_PATCHBAY,
+            recover_t6050_power.RTBUDDY_FIRMWARE_UPDATE_COREDUMP_PATCHBAY,
+            recover_t6050_power.RTBUDDY_FIRMWARE_GET_ROLE,
+            recover_t6050_power.RTBUDDY_FIRMWARE_ANNOUNCE,
+            recover_t6050_power.RTBUDDY_CALL_PATCHBAY_CALLBACK,
+            recover_t6050_power.RTBUDDY_POWER_ON,
+            recover_t6050_power.RTBUDDY_WAIT_FOR_FIRMWARE_SERVICE_GATED,
+        )
+        rtbuddy_symbols = {
+            name: next_target + index * 0x100
+            for index, name in enumerate(rtbuddy_names)
+        }
+        rtbuddy_symbols[recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP] = fixup
+        rtbuddy_symbols[recover_t6050_power.RTBUDDY_LOAD_FIRMWARE_GATED] = load
+
+        start_code = struct.pack(
+            "<9I",
+            0xB900CA88,
+            0xB900CE88,
+            0xB900D288,
+            0xB900D688,
+            0xB900DA88,
+            0x291BA289,
+            0xB900E688,
+            0xB900EA88,
+            0xF9405E82,
+        )
+        patch_code = bytearray(struct.pack("<56I", *([0xD503201F] * 56)))
+        mandatory_words = {
+            0x20: 0x52886855,
+            0x24: 0x72AA09B5,
+            0x28: 0x52882A16,
+            0x2C: 0x72A88876,
+            0x34: 0x91032002,
+            0x3C: 0x52892881,
+            0x40: 0x72A84881,
+            0x48: 0x91033282,
+            0x50: 0x52892881,
+            0x54: 0x72A88AC1,
+            0x5C: 0x91034282,
+            0x64: 0x52882A01,
+            0x68: 0x72A88861,
+            0x70: 0x111BD2C1,
+            0x74: 0x91035282,
+            0x80: 0x528003A8,
+            0x84: 0x2A0802A1,
+            0x88: 0x91036282,
+            0x94: 0x52800288,
+            0x98: 0x2A0802A1,
+            0x9C: 0x91037282,
+            0xA8: 0x91038282,
+            0xB0: 0x52886841,
+            0xB4: 0x72AA09A1,
+            0xBC: 0x11005AA1,
+            0xC0: 0x91039282,
+            0xCC: 0x9103A282,
+            0xD4: 0x52882A41,
+            0xD8: 0x72A86AC1,
+        }
+        for offset, word in mandatory_words.items():
+            struct.pack_into("<I", patch_code, offset, word)
+        for offset in (0x44, 0x58, 0x6C, 0x7C, 0x90, 0xA4, 0xB8, 0xC8, 0xDC):
+            patch_code[offset : offset + 4] = branch(patch + offset, patch_u32)
+
+        fixup_code = bytearray()
+
+        def add_fixup_call(name: str) -> None:
+            source = fixup + len(fixup_code)
+            fixup_code.extend(branch(source, rtbuddy_symbols[name]))
+
+        add_fixup_call(recover_t6050_power.RTBUDDY_POWER_ON)
+        fixup_code.extend(struct.pack("<2I", 0xD2811211, 0xD73F0910))
+        add_fixup_call(recover_t6050_power.RTBUDDY_FIRMWARE_COPY_TO_TARGET)
+        add_fixup_call(recover_t6050_power.RTBUDDY_FIRMWARE_CREATE_COREDUMP_MAP)
+        fixup_code.extend(struct.pack("<2I", 0xD2811311, 0xD73F0910))
+        add_fixup_call(recover_t6050_power.RTBUDDY_CALL_PATCHBAY_CALLBACK)
+        fixup_code.extend(struct.pack("<2I", 0xD2811511, 0xD73F0910))
+        fixup_code.extend(struct.pack("<2I", 0xD2811611, 0xD73F0910))
+        add_fixup_call(recover_t6050_power.RTBUDDY_FIRMWARE_PUBLISH)
+        add_fixup_call(recover_t6050_power.RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY)
+
+        load_code = bytearray()
+
+        def add_load_call(name: str) -> None:
+            source = load + len(load_code)
+            load_code.extend(branch(source, rtbuddy_symbols[name]))
+
+        add_load_call(recover_t6050_power.RTBUDDY_FIRMWARE_GET_ROLE)
+        add_load_call(
+            recover_t6050_power.RTBUDDY_WAIT_FOR_FIRMWARE_SERVICE_GATED
+        )
+        load_code.extend(struct.pack("<2I", 0xF910F674, 0xF950BA62))
+        add_load_call(recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP)
+        load_code.extend(struct.pack("<3I", 0x52800028, 0x39042E68, 0xF950F660))
+        add_load_call(recover_t6050_power.RTBUDDY_FIRMWARE_ANNOUNCE)
+
+        pmp_functions = {
+            recover_t6050_power.APPLE_PMP_FIRMWARE_START: (start, start_code),
+            recover_t6050_power.APPLE_PMP_FIRMWARE_PATCH: (patch, bytes(patch_code)),
+        }
+        pmp_symbols = {
+            recover_t6050_power.APPLE_PMP_FIRMWARE_START: start,
+            recover_t6050_power.APPLE_PMP_FIRMWARE_PATCH: patch,
+            recover_t6050_power.RTBUDDY_FIRMWARE_PATCH_U32: patch_u32,
+        }
+        rtbuddy_functions = {
+            recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP: (
+                fixup,
+                bytes(fixup_code),
+            ),
+            recover_t6050_power.RTBUDDY_LOAD_FIRMWARE_GATED: (
+                load,
+                bytes(load_code),
+            ),
+        }
+        pmp_slots = {0x5F0: start, 0x898: patch}
+        service_slots = {
+            0x890: rtbuddy_symbols[
+                recover_t6050_power.RTBUDDY_FIRMWARE_SERVICE_PRE_LOAD
+            ],
+            0x898: rtbuddy_symbols[
+                recover_t6050_power.RTBUDDY_FIRMWARE_SERVICE_PATCH
+            ],
+        }
+        firmware_slots = {
+            0x8A8: rtbuddy_symbols[
+                recover_t6050_power.RTBUDDY_FIRMWARE_UPDATE_PATCHBAY
+            ],
+            0x8B0: rtbuddy_symbols[
+                recover_t6050_power.RTBUDDY_FIRMWARE_UPDATE_COREDUMP_PATCHBAY
+            ],
+        }
+        result = recover_t6050_power.recover_apple_pmp_firmware_code_contract(
+            pmp_functions,
+            pmp_symbols,
+            rtbuddy_functions,
+            rtbuddy_symbols,
+            pmp_slots,
+            service_slots,
+            firmware_slots,
+        )
+        writes = result["mandatory_patchbay_writes"]
+        self.assertEqual(len(writes), 9)
+        self.assertEqual([item["tag"] for item in writes[:4]], ["BDID", "DVID", "DCAP", "DCHD"])
+        self.assertIn("no PMP run-state", result["rtbuddy_fixup"]["scope"])
+
+        bad_patch = bytearray(patch_code)
+        struct.pack_into("<I", bad_patch, 0xD8, 0x72A86AE1)
+        bad_pmp_functions = dict(pmp_functions)
+        bad_pmp_functions[recover_t6050_power.APPLE_PMP_FIRMWARE_PATCH] = (
+            patch,
+            bytes(bad_patch),
+        )
+        with self.assertRaisesRegex(ValueError, "mandatory patchbay writes"):
+            recover_t6050_power.recover_apple_pmp_firmware_code_contract(
+                bad_pmp_functions,
+                pmp_symbols,
+                rtbuddy_functions,
+                rtbuddy_symbols,
+                pmp_slots,
+                service_slots,
+                firmware_slots,
             )
 
     def test_recovers_apple_a7iop_resource_and_sram_power_contracts(self) -> None:

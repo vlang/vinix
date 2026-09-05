@@ -44,11 +44,15 @@ PMP_PTD_RANGE_NAME_OFFSET = 16
 APPLE_PMGR_UUID = "42F1AD20-5320-3803-8A70-05104BD5FBA7"
 APPLE_T6050_PMGR_UUID = "0AEACB61-66C5-3D24-AEA2-0A9DFFCF17E2"
 APPLE_PMP_UUID = "AA65CE02-93C8-33DE-A7BE-B11E1621F739"
+APPLE_PMP_FIRMWARE_UUID = "2AFE4BC5-2371-341F-BD24-3D643EFBAFD0"
 RTBUDDY_UUID = "4FEFDDA4-3743-34AC-869D-EAE695595A4C"
 APPLE_A7IOP_UUID = "DD46FF2D-6ADD-3A7D-8BCC-7184A5E3398A"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
 DEFAULT_APPLE_T6050_PMGR = Path("build/kext/g17c/driver.AppleT6050PMGR.macho")
 DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
+DEFAULT_APPLE_PMP_FIRMWARE = Path(
+    "build/kext/g17c/driver.ApplePMPFirmware.macho"
+)
 DEFAULT_RTBUDDY = Path("build/kext/g17c/driver.RTBuddy.macho")
 DEFAULT_APPLE_A7IOP = Path("build/kext/g17c/driver.AppleA7IOP.macho")
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
@@ -87,6 +91,53 @@ APPLE_PMP_V2_SEND_MESSAGE = "__ZN10ApplePMPv211sendMessageEy"
 APPLE_PMP_V2_WRITE_DASHBOARD = "__ZN10ApplePMPv214writeDashboardEjy"
 APPLE_PMP_V2_GET_PROPERTY_DATA = "__ZN10ApplePMPv215getPropertyDataEPKc"
 APPLE_PMP_V2_PING_GATED = "__ZN10ApplePMPv29pingGatedEPv"
+APPLE_PMP_FIRMWARE_VTABLE = "__ZTV16ApplePMPFirmware"
+APPLE_PMP_FIRMWARE_START = "__ZN16ApplePMPFirmware5startEP9IOService"
+APPLE_PMP_FIRMWARE_PATCH = (
+    "__ZN16ApplePMPFirmware13patchFirmwareEP15RTBuddyFirmware"
+)
+RTBUDDY_FIRMWARE_SERVICE_VTABLE = "__ZTV22RTBuddyFirmwareService"
+RTBUDDY_FIRMWARE_VTABLE = "__ZTV15RTBuddyFirmware"
+RTBUDDY_FIRMWARE_SERVICE_PRE_LOAD = (
+    "__ZN22RTBuddyFirmwareService15preFirmwareLoadEP15RTBuddyFirmware"
+)
+RTBUDDY_FIRMWARE_SERVICE_PATCH = (
+    "__ZN22RTBuddyFirmwareService13patchFirmwareEP15RTBuddyFirmware"
+)
+RTBUDDY_FIRMWARE_PATCH_U32 = "__ZN15RTBuddyFirmware13patchBayWriteIjEEbjRKT_"
+RTBUDDY_FIRMWARE_FIXUP = (
+    "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService"
+)
+RTBUDDY_FIRMWARE_COPY_TO_TARGET = (
+    "__ZN15RTBuddyFirmware12copyToTargetEP7RTBuddy"
+)
+RTBUDDY_FIRMWARE_CREATE_COREDUMP_MAP = (
+    "__ZN15RTBuddyFirmware17createCoredumpMapEP7RTBuddy"
+)
+RTBUDDY_FIRMWARE_PUBLISH = (
+    "__ZN15RTBuddyFirmware19publishToIORegistryEP7RTBuddy"
+)
+RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY = (
+    "__ZN15RTBuddyFirmware17writeBackPatchBayEv"
+)
+RTBUDDY_FIRMWARE_UPDATE_PATCHBAY = (
+    "__ZN15RTBuddyFirmware14updatePatchBayEP7RTBuddy"
+)
+RTBUDDY_FIRMWARE_UPDATE_COREDUMP_PATCHBAY = (
+    "__ZN15RTBuddyFirmware26updateCoredumpWithPatchBayEv"
+)
+RTBUDDY_FIRMWARE_GET_ROLE = "__ZNK15RTBuddyFirmware7getRoleEv"
+RTBUDDY_FIRMWARE_ANNOUNCE = "__ZNK15RTBuddyFirmware8announceEv"
+RTBUDDY_CALL_PATCHBAY_CALLBACK = (
+    "__ZN7RTBuddy20callPatchbayCallbackEP15RTBuddyFirmware"
+)
+RTBUDDY_POWER_ON = "__ZN7RTBuddy7powerOnEv"
+RTBUDDY_LOAD_FIRMWARE_GATED = (
+    "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware"
+)
+RTBUDDY_WAIT_FOR_FIRMWARE_SERVICE_GATED = (
+    "__ZN7RTBuddy28_waitForFirmwareServiceGatedEv"
+)
 RTBUDDY_ENDPOINT_GET_SLAVE = "__ZN15RTBuddyEndpoint17getSlaveProcessorEv"
 RTBUDDY_ENDPOINT_INIT_OWNER = (
     "__ZN15RTBuddyEndpoint12initForOwnerEP8OSObjectPFvS1_PvS2_ES2_"
@@ -1620,6 +1671,379 @@ def recover_apple_pmp(image: bytes, rtbuddy_image: bytes) -> dict[str, object]:
     }
 
 
+def recover_apple_pmp_firmware_code_contract(
+    pmp_functions: dict[str, tuple[int, bytes]],
+    pmp_symbols: dict[str, int],
+    rtbuddy_functions: dict[str, tuple[int, bytes]],
+    rtbuddy_symbols: dict[str, int],
+    pmp_vtable_targets: dict[int, int],
+    service_vtable_targets: dict[int, int],
+    firmware_vtable_targets: dict[int, int],
+) -> dict[str, object]:
+    """Recover PMP's mandatory patchbay inputs and RTBuddy fixup order.
+
+    This deliberately stops at RTBuddy's firmware-loaded bookkeeping.  That
+    byte and the subsequent IORegistry announcement are not a PMP run-state or
+    dashboard-ready acknowledgement and must not open the hardware write gate.
+    """
+
+    required_pmp = (
+        APPLE_PMP_FIRMWARE_START,
+        APPLE_PMP_FIRMWARE_PATCH,
+        RTBUDDY_FIRMWARE_PATCH_U32,
+    )
+    missing_pmp = [name for name in required_pmp if name not in pmp_symbols]
+    if missing_pmp:
+        raise ValueError(
+            f"ApplePMPFirmware is missing firmware symbols: {missing_pmp!r}"
+        )
+    for name in (APPLE_PMP_FIRMWARE_START, APPLE_PMP_FIRMWARE_PATCH):
+        if name not in pmp_functions:
+            raise ValueError(f"ApplePMPFirmware has no code body for {name}")
+
+    required_rtbuddy = (
+        RTBUDDY_FIRMWARE_SERVICE_PRE_LOAD,
+        RTBUDDY_FIRMWARE_SERVICE_PATCH,
+        RTBUDDY_FIRMWARE_FIXUP,
+        RTBUDDY_FIRMWARE_COPY_TO_TARGET,
+        RTBUDDY_FIRMWARE_CREATE_COREDUMP_MAP,
+        RTBUDDY_FIRMWARE_PUBLISH,
+        RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
+        RTBUDDY_FIRMWARE_UPDATE_PATCHBAY,
+        RTBUDDY_FIRMWARE_UPDATE_COREDUMP_PATCHBAY,
+        RTBUDDY_FIRMWARE_GET_ROLE,
+        RTBUDDY_FIRMWARE_ANNOUNCE,
+        RTBUDDY_CALL_PATCHBAY_CALLBACK,
+        RTBUDDY_POWER_ON,
+        RTBUDDY_LOAD_FIRMWARE_GATED,
+        RTBUDDY_WAIT_FOR_FIRMWARE_SERVICE_GATED,
+    )
+    missing_rtbuddy = [
+        name for name in required_rtbuddy if name not in rtbuddy_symbols
+    ]
+    if missing_rtbuddy:
+        raise ValueError(
+            f"RTBuddy is missing PMP firmware-load symbols: {missing_rtbuddy!r}"
+        )
+    for name in (RTBUDDY_FIRMWARE_FIXUP, RTBUDDY_LOAD_FIRMWARE_GATED):
+        if name not in rtbuddy_functions:
+            raise ValueError(f"RTBuddy has no code body for {name}")
+
+    expected_pmp_slots = {
+        0x5F0: pmp_symbols[APPLE_PMP_FIRMWARE_START],
+        0x898: pmp_symbols[APPLE_PMP_FIRMWARE_PATCH],
+    }
+    if pmp_vtable_targets != expected_pmp_slots:
+        raise ValueError("ApplePMPFirmware vtable overrides changed")
+    expected_service_slots = {
+        0x890: rtbuddy_symbols[RTBUDDY_FIRMWARE_SERVICE_PRE_LOAD],
+        0x898: rtbuddy_symbols[RTBUDDY_FIRMWARE_SERVICE_PATCH],
+    }
+    if service_vtable_targets != expected_service_slots:
+        raise ValueError("RTBuddyFirmwareService fixup slots changed")
+    expected_firmware_slots = {
+        0x8A8: rtbuddy_symbols[RTBUDDY_FIRMWARE_UPDATE_PATCHBAY],
+        0x8B0: rtbuddy_symbols[RTBUDDY_FIRMWARE_UPDATE_COREDUMP_PATCHBAY],
+    }
+    if firmware_vtable_targets != expected_firmware_slots:
+        raise ValueError("RTBuddyFirmware patchbay slots changed")
+
+    _start_address, start_code = pmp_functions[APPLE_PMP_FIRMWARE_START]
+    if not _has_ordered_words(
+        start_code,
+        (
+            0xB900CA88,  # board-id -> this+0xc8
+            0xB900CE88,  # dram-vendor-id -> this+0xcc
+            0xB900D288,  # dram-capacity -> this+0xd0
+            0xB900D688,  # dram-channel-disable -> this+0xd4
+            0xB900DA88,  # pmc -> this+0xd8
+            0x291BA289,  # pmc-pmgr bits 0/3 -> this+0xdc/+0xe0
+            0xB900E688,  # pmc-msg-disabled -> this+0xe4
+            0xB900EA88,  # soc-chip-variant -> this+0xe8
+            0xF9405E82,  # Role property object from this+0xb8
+        ),
+    ):
+        raise ValueError("ApplePMPFirmware mandatory property collection changed")
+
+    patch_address, patch_code = pmp_functions[APPLE_PMP_FIRMWARE_PATCH]
+    # These are the nine unconditional u32 writes at the head of
+    # ApplePMPFirmware::patchFirmware.  Later boot-argument-driven writes are
+    # optional and are intentionally outside this invariant.
+    mandatory_words = {
+        0x20: 0x52886855,  # mov w21, #0x4342
+        0x24: 0x72AA09B5,  # movk w21, #0x504d, lsl #16
+        0x28: 0x52882A16,  # mov w22, #0x4150
+        0x2C: 0x72A88876,  # movk w22, #0x4443, lsl #16
+        0x34: 0x91032002,  # add x2, x0, #0xc8
+        0x3C: 0x52892881,  # BDID low half
+        0x40: 0x72A84881,  # BDID high half
+        0x48: 0x91033282,  # add x2, x20, #0xcc
+        0x50: 0x52892881,  # DVID low half
+        0x54: 0x72A88AC1,  # DVID high half
+        0x5C: 0x91034282,  # add x2, x20, #0xd0
+        0x64: 0x52882A01,  # DCAP low half
+        0x68: 0x72A88861,  # DCAP high half
+        0x70: 0x111BD2C1,  # DCHD = DCAP + 0x6f4
+        0x74: 0x91035282,  # add x2, x20, #0xd4
+        0x80: 0x528003A8,  # PMC_ suffix
+        0x84: 0x2A0802A1,  # PMC_ = PMCB | 0x1d
+        0x88: 0x91036282,  # add x2, x20, #0xd8
+        0x94: 0x52800288,  # PMCV suffix
+        0x98: 0x2A0802A1,  # PMCV = PMCB | 0x14
+        0x9C: 0x91037282,  # add x2, x20, #0xdc
+        0xA8: 0x91038282,  # add x2, x20, #0xe0
+        0xB0: 0x52886841,  # PMCB low half
+        0xB4: 0x72AA09A1,  # PMCB high half
+        0xBC: 0x11005AA1,  # PMCX = PMCB + 0x16
+        0xC0: 0x91039282,  # add x2, x20, #0xe4
+        0xCC: 0x9103A282,  # add x2, x20, #0xe8
+        0xD4: 0x52882A41,  # CVAR low half
+        0xD8: 0x72A86AC1,  # CVAR high half
+    }
+    if len(patch_code) < 0xE0 or any(
+        struct.unpack_from("<I", patch_code, offset)[0] != expected
+        for offset, expected in mandatory_words.items()
+    ):
+        raise ValueError("ApplePMPFirmware mandatory patchbay writes changed")
+    mandatory_call_offsets = (
+        0x44,
+        0x58,
+        0x6C,
+        0x7C,
+        0x90,
+        0xA4,
+        0xB8,
+        0xC8,
+        0xDC,
+    )
+    if any(
+        direct_branch_target_at(patch_address, patch_code, offset)
+        != pmp_symbols[RTBUDDY_FIRMWARE_PATCH_U32]
+        for offset in mandatory_call_offsets
+    ):
+        raise ValueError("ApplePMPFirmware mandatory patchbay call targets changed")
+
+    fixup_address, fixup_code = rtbuddy_functions[RTBUDDY_FIRMWARE_FIXUP]
+    fixup_direct_order = (
+        RTBUDDY_POWER_ON,
+        RTBUDDY_FIRMWARE_COPY_TO_TARGET,
+        RTBUDDY_FIRMWARE_CREATE_COREDUMP_MAP,
+        RTBUDDY_CALL_PATCHBAY_CALLBACK,
+        RTBUDDY_FIRMWARE_PUBLISH,
+        RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
+    )
+    fixup_offsets: list[int] = []
+    for name in fixup_direct_order:
+        offsets = [
+            offset
+            for offset in range(0, len(fixup_code) - 3, 4)
+            if direct_branch_target_at(fixup_address, fixup_code, offset)
+            == rtbuddy_symbols[name]
+        ]
+        if len(offsets) != 1:
+            raise ValueError(f"RTBuddy firmware fixup call count changed for {name}")
+        fixup_offsets.append(offsets[0])
+    virtual_slot_words = (
+        0xD2811211,  # service slot 0x890: preFirmwareLoad
+        0xD2811311,  # service slot 0x898: patchFirmware
+        0xD2811511,  # firmware slot 0x8a8: updatePatchBay
+        0xD2811611,  # firmware slot 0x8b0: updateCoredumpWithPatchBay
+    )
+    virtual_offsets: list[int] = []
+    for word in virtual_slot_words:
+        needle = struct.pack("<I", word)
+        offsets = [
+            offset
+            for offset in range(0, len(fixup_code) - 3, 4)
+            if fixup_code[offset : offset + 4] == needle
+        ]
+        if len(offsets) != 1:
+            raise ValueError("RTBuddy firmware virtual fixup slots changed")
+        virtual_offsets.append(offsets[0])
+    complete_fixup_offsets = (
+        fixup_offsets[0],
+        virtual_offsets[0],
+        fixup_offsets[1],
+        fixup_offsets[2],
+        virtual_offsets[1],
+        fixup_offsets[3],
+        virtual_offsets[2],
+        virtual_offsets[3],
+        fixup_offsets[4],
+        fixup_offsets[5],
+    )
+    if list(complete_fixup_offsets) != sorted(complete_fixup_offsets):
+        raise ValueError("RTBuddy firmware fixup ordering changed")
+
+    load_address, load_code = rtbuddy_functions[RTBUDDY_LOAD_FIRMWARE_GATED]
+    load_direct_order = (
+        RTBUDDY_FIRMWARE_GET_ROLE,
+        RTBUDDY_WAIT_FOR_FIRMWARE_SERVICE_GATED,
+        RTBUDDY_FIRMWARE_FIXUP,
+        RTBUDDY_FIRMWARE_ANNOUNCE,
+    )
+    load_offsets: list[int] = []
+    for name in load_direct_order:
+        offsets = [
+            offset
+            for offset in range(0, len(load_code) - 3, 4)
+            if direct_branch_target_at(load_address, load_code, offset)
+            == rtbuddy_symbols[name]
+        ]
+        if len(offsets) != 1:
+            raise ValueError(f"RTBuddy gated load call count changed for {name}")
+        load_offsets.append(offsets[0])
+    load_words = (
+        0xF910F674,  # selected firmware -> RTBuddy+0x21e8
+        0xF950BA62,  # firmware service from RTBuddy+0x2170
+        0x52800028,  # mov w8, #1 after fixup
+        0x39042E68,  # firmware-loaded byte at RTBuddy+0x10b
+        0xF950F660,  # reload selected firmware before announce
+    )
+    load_word_offsets = [
+        load_code.find(struct.pack("<I", word)) for word in load_words
+    ]
+    complete_load_offsets = (
+        load_offsets[0],
+        load_offsets[1],
+        load_word_offsets[0],
+        load_word_offsets[1],
+        load_offsets[2],
+        load_word_offsets[2],
+        load_word_offsets[3],
+        load_word_offsets[4],
+        load_offsets[3],
+    )
+    if -1 in load_word_offsets or list(complete_load_offsets) != sorted(
+        complete_load_offsets
+    ):
+        raise ValueError("RTBuddy gated firmware-load completion changed")
+
+    mandatory_patches = (
+        ("BDID", "board-id", 0xC8),
+        ("DVID", "dram-vendor-id", 0xCC),
+        ("DCAP", "dram-capacity", 0xD0),
+        ("DCHD", "dram-channel-disable", 0xD4),
+        ("PMC_", "pmc", 0xD8),
+        ("PMCV", "pmc-pmgr bit 0", 0xDC),
+        ("PMCB", "pmc-pmgr bit 3", 0xE0),
+        ("PMCX", "pmc-msg-disabled", 0xE4),
+        ("CVAR", "soc-chip-variant", 0xE8),
+    )
+    return {
+        "service": {
+            "start_vtable_slot": 0x5F0,
+            "pre_firmware_load_vtable_slot": 0x890,
+            "patch_firmware_vtable_slot": 0x898,
+            "patch_override": "ApplePMPFirmware::patchFirmware",
+        },
+        "mandatory_patchbay_writes": [
+            {
+                "tag": tag,
+                "source": source,
+                "service_object_offset": offset,
+                "value_bits": 32,
+            }
+            for tag, source, offset in mandatory_patches
+        ],
+        "rtbuddy_fixup": {
+            "ordering": [
+                "power on RTBuddy target",
+                "service preFirmwareLoad",
+                "copy firmware to target when required",
+                "create coredump map when required",
+                "service patchFirmware",
+                "invoke registered patchbay callback",
+                "firmware updatePatchBay",
+                "firmware updateCoredumpWithPatchBay when required",
+                "publish firmware to IORegistry",
+                "write patchbay back to the target image",
+            ],
+            "firmware_object_offset": 0x21E8,
+            "firmware_service_object_offset": 0x2170,
+            "firmware_loaded_byte_offset": 0x10B,
+            "completion": "set firmware-loaded byte, then announce firmware",
+            "scope": (
+                "image preparation and RTBuddy bookkeeping only; no PMP "
+                "run-state or dashboard-ready acknowledgement is established"
+            ),
+        },
+    }
+
+
+def recover_apple_pmp_firmware(
+    image: bytes, rtbuddy_image: bytes
+) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_PMP_FIRMWARE_UUID:
+        raise ValueError(f"unsupported ApplePMPFirmware UUID {identity}")
+    rtbuddy_identity = macho_uuid(rtbuddy_image)
+    if rtbuddy_identity != RTBUDDY_UUID:
+        raise ValueError(f"unsupported RTBuddy UUID {rtbuddy_identity}")
+    pmp_symbols = macho_symbols(image)
+    rtbuddy_symbols = macho_symbols(rtbuddy_image)
+    pmp_functions = {
+        name: symbol_code(image, name)
+        for name in (APPLE_PMP_FIRMWARE_START, APPLE_PMP_FIRMWARE_PATCH)
+    }
+    rtbuddy_functions = {
+        name: symbol_code(rtbuddy_image, name)
+        for name in (RTBUDDY_FIRMWARE_FIXUP, RTBUDDY_LOAD_FIRMWARE_GATED)
+    }
+    start_address, start_code = pmp_functions[APPLE_PMP_FIRMWARE_START]
+    expected_start_strings = {
+        (0xE0, 0xE4): "role",
+        (0x128, 0x12C): "firmware-name",
+        (0x1C8, 0x1CC): "IODeviceTree:/chosen",
+        (0x210, 0x214): "board-id",
+        (0x2A0, 0x2A4): "dram-vendor-id",
+        (0x358, 0x35C): "dram-capacity",
+        (0x3C0, 0x3C4): "dram-channel-disable",
+        (0x408, 0x40C): "IODeviceTree:/arm-io/pmgr",
+        (0x450, 0x454): "pmc",
+        (0x4E0, 0x4E4): "pmc-pmgr",
+        (0x5A0, 0x5A4): "pmc-msg-disabled",
+        (0x608, 0x60C): "soc-chip-variant",
+        (0x670, 0x674): "Role",
+    }
+    for (adrp_offset, add_offset), expected in expected_start_strings.items():
+        actual = read_adrp_add_cstring(
+            image, start_address, start_code, adrp_offset, add_offset
+        )
+        if actual != expected:
+            raise ValueError(
+                "ApplePMPFirmware start string changed at "
+                f"{adrp_offset:#x}: {actual!r}"
+            )
+    pmp_vtable_targets = {
+        slot: recover_vtable_target(image, APPLE_PMP_FIRMWARE_VTABLE, slot)
+        for slot in (0x5F0, 0x898)
+    }
+    service_vtable_targets = {
+        slot: recover_vtable_target(
+            rtbuddy_image, RTBUDDY_FIRMWARE_SERVICE_VTABLE, slot
+        )
+        for slot in (0x890, 0x898)
+    }
+    firmware_vtable_targets = {
+        slot: recover_vtable_target(rtbuddy_image, RTBUDDY_FIRMWARE_VTABLE, slot)
+        for slot in (0x8A8, 0x8B0)
+    }
+    return {
+        "uuid": identity,
+        "rtbuddy_uuid": rtbuddy_identity,
+        "firmware_load": recover_apple_pmp_firmware_code_contract(
+            pmp_functions,
+            pmp_symbols,
+            rtbuddy_functions,
+            rtbuddy_symbols,
+            pmp_vtable_targets,
+            service_vtable_targets,
+            firmware_vtable_targets,
+        ),
+    }
+
+
 def recover_apple_a7iop_code_contract(
     functions: dict[str, tuple[int, bytes]],
     vtable_targets: dict[int, int],
@@ -2129,7 +2553,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 13,
+        "schema": 14,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -2237,6 +2661,9 @@ def main() -> int:
         "--t6050-pmgr", type=Path, default=DEFAULT_APPLE_T6050_PMGR
     )
     parser.add_argument("--pmp", type=Path, default=DEFAULT_APPLE_PMP)
+    parser.add_argument(
+        "--pmp-firmware", type=Path, default=DEFAULT_APPLE_PMP_FIRMWARE
+    )
     parser.add_argument("--rtbuddy", type=Path, default=DEFAULT_RTBUDDY)
     parser.add_argument("--apple-a7iop", type=Path, default=DEFAULT_APPLE_A7IOP)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
@@ -2254,6 +2681,9 @@ def main() -> int:
         )
         manifest["apple_pmp"] = recover_apple_pmp(
             args.pmp.read_bytes(), args.rtbuddy.read_bytes()
+        )
+        manifest["apple_pmp_firmware"] = recover_apple_pmp_firmware(
+            args.pmp_firmware.read_bytes(), args.rtbuddy.read_bytes()
         )
         manifest["apple_a7iop"] = recover_apple_a7iop(args.apple_a7iop.read_bytes())
     except (OSError, ValueError) as error:

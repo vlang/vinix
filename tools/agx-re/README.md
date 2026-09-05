@@ -98,7 +98,12 @@ enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves
 that Device aperture to `0x84240000` and `0x4084240000`. It also proves both
 PMP nubs have identical device/range tables, pins their die-strided shared
 regions, validates every die-strided wrapper register/IRQ/gate binding, and
-records the requested-die selection used by ordinary state commands. Vinix
+records the requested-die selection used by ordinary state commands. The
+UUID-pinned ApplePMPFirmware/RTBuddy pass additionally recovers the nine
+mandatory 32-bit PMP patchbay inputs and the exact RTBuddy firmware-fixup
+ordering. Its `firmware-loaded` byte and IORegistry announcement are reported
+as image-preparation bookkeeping, not as a PMP run-state or dashboard-ready
+acknowledgement. Vinix
 mirrors the low-level contract with a dormant bounds-checked
 paired reader and separate write portal. A nonblocking owner serializes one
 transaction across both dies and makes post-write failures sticky, but it is
