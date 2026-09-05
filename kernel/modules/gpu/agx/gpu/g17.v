@@ -205,8 +205,11 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	if !fw.initialize_g17_role0_region_25c(graph.role0_regions[1].cpu_address(), fw.g17_role0_bootstrap_25c_size) {
 		return false
 	}
+	// Apple counts enabled cores from the mask registers rather than from a
+	// published topology, so read them the same way.
 	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(),
-		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base) {
+		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base,
+		mgr.res.enabled_gpu_core_count()) {
 		return false
 	}
 	// Emitting the config is not the same as it being complete; the gate

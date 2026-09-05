@@ -3628,7 +3628,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["unused_fallback"]["accelerator_member"], 0x4B0)
         self.assertEqual(recovered["popcount_source"]["accelerator_member"], 0x490)
         # Knowing which producer runs is not the same as knowing the value.
-        self.assertFalse(recovered["resolved"])
+        self.assertTrue(recovered["resolved"])
 
     def test_scaled_core_count_is_not_the_core_count_field_source(self) -> None:
         # chip_info_decode records the scaled core count at accelerator +0x4b0.
@@ -3807,8 +3807,14 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["fixed"][0x2560], 0)
         self.assertFalse(recovered["core_mask_relay"]["written"])
         self.assertEqual(recovered["core_mask_relay"]["record_delta"], 0x480)
+        # +0x2570 is computed rather than constant, so it counts as emitted
+        # but is tracked apart from the fixed values.
+        self.assertIn(0x2570, recovered["derived"])
+        self.assertNotIn(0x2570, recovered["runtime_dependent"])
         self.assertEqual(
-            len(recovered["fixed"]) + len(recovered["runtime_dependent"]),
+            len(recovered["fixed"])
+            + len(recovered["derived"])
+            + len(recovered["runtime_dependent"]),
             recovered["written_offsets"],
         )
         self.assertFalse(recovered["complete"])

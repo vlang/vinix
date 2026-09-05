@@ -1117,7 +1117,7 @@ pub const g17_late_controls_size = u64(0x1d0)
 // for G17, including four tests of the fixed feature mask and one more field
 // derived from it, all of which come out zero. The other fourteen depend on
 // run-time inputs and stay zero here, so the block is not complete.
-fn populate_g17_late_controls(mut config G17HardwareConfig) {
+fn populate_g17_late_controls(mut config G17HardwareConfig, enabled_core_count u32) {
 	fixed_u32 := [
 		u64(0x2540),
 		0x2548,
@@ -1156,11 +1156,16 @@ fn populate_g17_late_controls(mut config G17HardwareConfig) {
 		C.memset(voidptr(base + u64(0x2560) - g17_late_controls_offset), 0, 16)
 		mut one := &u64(base + u64(0x26f0) - g17_late_controls_offset)
 		*one = 1
+		// +0x2570 has two producers picked by a chip-info byte that is always
+		// set, so the population count of the core masks always wins over the
+		// scaled core count.
+		mut cores := &u32(base + u64(0x2570) - g17_late_controls_offset)
+		*cores = enabled_core_count
 	}
 }
 
 pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwConfig,
-	uat_ttb_base u64) bool {
+	uat_ttb_base u64, enabled_core_count u32) bool {
 	if buffer == unsafe { nil } || size != g17_hardware_config_size
 		|| sizeof(G17HardwareConfig) != g17_hardware_config_size
 		|| uat_ttb_base == 0 || uat_ttb_base & (g17_bootstrap_page_size - 1) != 0
@@ -1180,7 +1185,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		populate_g17_color_matrices(mut config)
 		// G17's selected virtual provider returns zero for this optional table.
 		config.border_color_table_address_638 = 0
-		populate_g17_late_controls(mut config)
+		populate_g17_late_controls(mut config, enabled_core_count)
 		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware,
 			uat_ttb_base)
 		if !populate_g17_pio_mappings(mut config, hardware) {

@@ -7204,6 +7204,21 @@ def recover_g17_core_count_gate(image: bytes) -> dict[str, object]:
                     f"branch at {offset:#x} can skip the chip-info gate assignment"
                 )
 
+    require_instruction_words_at(
+        reader,
+        "G17 core-mask register read",
+        {
+            0x260: 0x5282A017,  # register offset 0xe01500
+            0x264: 0x72A01C17,
+            0x354: 0xCB180008,  # mapping base minus the page-aligned offset
+            0x358: 0x8B170108,  # plus the register offset
+            0x35C: 0xB9400109,  # word 0
+            0x360: 0xB940050A,  # word 1
+            0x364: 0xAA0A8129,  # combined into a 64-bit mask
+            0x368: 0xB9400908,  # word 2
+        },
+    )
+
     _address, producer = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
     require_instruction_words_at(
         producer,
@@ -7239,7 +7254,19 @@ def recover_g17_core_count_gate(image: bytes) -> dict[str, object]:
             "words": 3,
             "note": "first pair is the cleared record head, so the select steps on by 0x10",
         },
-        "resolved": False,
+        "mask_registers": {
+            # readChipInfo maps this separately from the ordinary register
+            # accessor, but the base is getGPUPhysicalAddress(), which probe
+            # sets to the physical address of device-memory range 0 -- the same
+            # SGX aperture sgx_read32 addresses.
+            "base": "getGPUPhysicalAddress",
+            "base_source": "IOMemoryDescriptor::getPhysicalAddress of device memory 0",
+            "offset": 0xE01500,
+            "words": [0xE01500, 0xE01504, 0xE01508],
+            "layout": "words 0 and 1 form a 64-bit mask, word 2 a 32-bit mask",
+        },
+        "formula": "popcount(mask0) + popcount(mask1)",
+        "resolved": True,
     }
 
 
@@ -7407,8 +7434,14 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
 
     fixed = {store["offset"]: 0 for store in stores if store["zero_source"]}
     fixed.update({0x2578: 1, 0x25A0: 1, 0x2600: 0, 0x26F0: 1, 0x2560: 0})
+    # +0x2570 is not a constant, but its producer and inputs are settled, so it
+    # is emitted rather than outstanding. Track it separately from the fixed
+    # values so the accounting still distinguishes the two.
+    derived_offsets = [0x2570]
     fixed.update(feature_values)
-    undetermined = [offset for offset in offsets if offset not in fixed]
+    undetermined = [
+        offset for offset in offsets if offset not in fixed and offset not in derived_offsets
+    ]
 
     return {
         "region": {"offset": 0x2540, "bytes": 0x1D0},
@@ -7419,6 +7452,7 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         "fixed": dict(sorted(fixed.items())),
         "wide_fixed": {0x2560: 16, 0x2600: 8, 0x26F0: 8},
         "core_mask_relay": core_mask,
+        "derived": derived_offsets,
         "runtime_dependent": undetermined,
         "complete": False,
     }

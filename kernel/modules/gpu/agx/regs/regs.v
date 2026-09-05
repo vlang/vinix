@@ -26,6 +26,15 @@ pub const gpu_id_identity_14 = u32(0xD04014)
 pub const gpu_id_identity_18 = u32(0xD04018)
 pub const gpu_id_identity_1c = u32(0xD0401C)
 
+// GPU core-mask registers. Apple's readChipInfo maps these separately from the
+// ordinary register accessor, but the base it uses is getGPUPhysicalAddress(),
+// which probe sets to the physical address of device-memory range 0 -- the
+// same SGX aperture sgx_read32 addresses. Words 0 and 1 form a 64-bit mask and
+// word 2 a 32-bit one.
+pub const gpu_core_mask_lo = u32(0xE01500)
+pub const gpu_core_mask_hi = u32(0xE01504)
+pub const gpu_core_mask_ext = u32(0xE01508)
+
 // Apple's readChipInfo decodes the chip variant out of the version register:
 // byte 3 must be the family value, and byte 2 selects the variant. That
 // variant reaches the accelerator at +0x4a0 and is what the G17 power model
@@ -35,6 +44,27 @@ pub const gpu_id_version_family_shift = u32(24)
 pub const gpu_id_version_family_agx = u32(0x0b)
 pub const gpu_id_version_variant_shift = u32(16)
 pub const gpu_chip_variant_g17_base = u32(0x20)
+
+// Number of enabled GPU cores, counted the way the firmware's late-control
+// block does: the population count of the two core masks. Reading the
+// registers rather than trusting a published topology keeps this correct on
+// parts with cores fused off.
+pub fn (r &GpuResources) enabled_gpu_core_count() u32 {
+	low := u64(r.sgx_read32(gpu_core_mask_lo))
+	high := u64(r.sgx_read32(gpu_core_mask_hi))
+	extended := u64(r.sgx_read32(gpu_core_mask_ext))
+	return u32(popcount64(low | (high << 32)) + popcount64(extended))
+}
+
+fn popcount64(value u64) u32 {
+	mut remaining := value
+	mut count := u32(0)
+	for remaining != 0 {
+		remaining &= remaining - 1
+		count++
+	}
+	return count
+}
 
 // GPU topology as Apple's readChipInfo derives it from the cluster
 // configuration register. The core count this yields matches the count the
