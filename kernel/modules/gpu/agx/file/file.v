@@ -17,6 +17,8 @@ import klock
 const max_submission_commands = u32(64)
 const max_submission_syncs = u32(64)
 const max_command_attachments = u32(16)
+const max_render_dimension = u32(16384)
+const max_render_layers = u32(2048)
 
 struct GpuMapping {
 mut:
@@ -387,6 +389,36 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	return -22
 }
 
+// Validate the fixed render payload fields consumed by Mesa 25.0.5. These are
+// the same limits enforced by the matching downstream Asahi UAPI. Extensions
+// remain disabled until Vinix can copy and walk their userspace linked list
+// without faulting in the kernel.
+fn valid_render_command(command &ioctl.DrmAsahiCmdRender) bool {
+	if command.extensions != 0 || command.flags & ~ioctl.asahi_render_supported_flags != 0 {
+		return false
+	}
+	if command.fb_width == 0 || command.fb_width > max_render_dimension
+		|| command.fb_height == 0 || command.fb_height > max_render_dimension
+		|| command.layers == 0 || command.layers > max_render_layers {
+		return false
+	}
+	if !((command.utile_width == 32 && command.utile_height == 32)
+		|| (command.utile_width == 32 && command.utile_height == 16)
+		|| (command.utile_width == 16 && command.utile_height == 16)) {
+		return false
+	}
+	if command.samples != 1 && command.samples != 2 && command.samples != 4 {
+		return false
+	}
+	if command.vertex_attachment_count > max_command_attachments
+		|| command.fragment_attachment_count > max_command_attachments
+		|| (command.vertex_attachment_count != 0 && command.vertex_attachments == 0)
+		|| (command.fragment_attachment_count != 0 && command.fragment_attachments == 0) {
+		return false
+	}
+	return true
+}
+
 // Validate the Mesa envelope but do not reinterpret its command buffer as the
 // obsolete v12.3 placeholder. G17/HAL300 work commands have a different,
 // partially recovered layout; rejecting them is the only safe behavior until
@@ -420,6 +452,10 @@ pub fn (f &GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				if command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
 					|| (command.result_size != 0
 					&& command.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
+					return -22
+				}
+				render := unsafe { &ioctl.DrmAsahiCmdRender(command.cmd_buffer) }
+				if !valid_render_command(render) {
 					return -22
 				}
 			}

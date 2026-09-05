@@ -1467,8 +1467,9 @@ pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes
 // DUPM minimum/maximum virtual methods, which return 1 and 2; four more use the
 // cross-image-checked IOGPUMemoryMap GPU-address accessor. Bit-test, compare-zero,
 // and nested forward merges are represented without guessing; the CL runtime
-// random and post-increment counter roots are pinned too. The conditions/order
-// of the complete per-pass sequences are not yet recovered.
+// random and post-increment counter roots are pinned too. The complete emission
+// graph and all semantic ordering predicates are recovered by the UUID-pinned
+// tooling, but that declarative graph is not yet ported into this kernel encoder.
 pub const g17_3d_register_passes = u32(4)
 pub const g17_3d_register_stride = u64(0x720)
 pub const g17_3d_register_stream_offset = u64(0xa0)

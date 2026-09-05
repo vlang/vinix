@@ -113,6 +113,15 @@ pub const asahi_bind_object_usage_timestamps = u32(1) << 0
 pub const asahi_cmd_render = u32(0)
 pub const asahi_cmd_blit = u32(1)
 pub const asahi_cmd_compute = u32(2)
+pub const asahi_render_no_clear_pipeline_textures = u64(1) << 0
+pub const asahi_render_set_when_reloading_z_or_s = u64(1) << 1
+pub const asahi_render_vertex_spills = u64(1) << 2
+pub const asahi_render_process_empty_tiles = u64(1) << 3
+pub const asahi_render_no_vertex_clustering = u64(1) << 4
+pub const asahi_render_msaa_zs = u64(1) << 5
+pub const asahi_render_supported_flags = asahi_render_no_clear_pipeline_textures
+	| asahi_render_set_when_reloading_z_or_s | asahi_render_vertex_spills
+	| asahi_render_process_empty_tiles | asahi_render_no_vertex_clustering | asahi_render_msaa_zs
 pub const asahi_queue_cap_render = u32(1) << asahi_cmd_render
 pub const asahi_queue_cap_blit = u32(1) << asahi_cmd_blit
 pub const asahi_queue_cap_compute = u32(1) << asahi_cmd_compute
