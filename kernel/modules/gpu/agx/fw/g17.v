@@ -1221,6 +1221,21 @@ pub const g17_3d_register_selector_mask = u32(0xfffc0006)
 pub const g17_3d_register_summary_offset = u64(0x828)
 pub const g17_3d_register_summary_stride = u64(0x10)
 
+// Selector field of a register-list entry. The template mask leaves bits 0 and
+// 3..17 settable, and every selector recovered from Apple's four producers is
+// 8-byte aligned with an optional bit-0 flag. What the selectors name is not
+// established: they are not the SGX MMIO offsets in the regs module.
+pub const g17_3d_register_selector_field = u32(0x3fff9)
+pub const g17_3d_register_selector_flag = u32(0x1)
+pub const g17_3d_register_selector_align = u32(8)
+
+// Reject a selector Apple's encoding could not have produced. The field mask
+// has bits 1 and 2 clear, so it already enforces 8-byte alignment apart from
+// the low flag; no separate alignment test is needed.
+pub fn valid_g17_register_selector(selector u32) bool {
+	return selector & ~g17_3d_register_selector_field == 0
+}
+
 // Per-pass metadata: the stream's GPU address followed by its entry and byte
 // counters, both 16-bit.
 @[packed]
@@ -1267,6 +1282,10 @@ pub fn bind_g17_register_stream(command voidptr, pass u32, stream_gpu_address u6
 // value unaligned, four bytes later, so each entry is 12 bytes.
 pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, value u64) bool {
 	if command == unsafe { nil } || pass >= g17_3d_register_passes {
+		return false
+	}
+
+	if !valid_g17_register_selector(selector) {
 		return false
 	}
 

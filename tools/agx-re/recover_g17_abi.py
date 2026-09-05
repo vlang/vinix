@@ -449,6 +449,23 @@ GENERATE_REGISTER_LIST_3D = (
     "EP20AGFIChannelCommand3DP22AGX3DCommandDescriptor"
 )
 G17_COMMAND_3D_BYTES = 0x2240
+G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
+SELECTOR_ARGUMENT_WINDOW = 8
+REGISTER_LIST_PRODUCERS = {
+    "3D": GENERATE_REGISTER_LIST_3D,
+    "FastBlit": (
+        "__ZN33AGX·PI_300·X·A0·3DChannelSKSM31generateRegisterListForFastBlit"
+        "EP26AGFIChannelCommandFastBlitP22AGX3DCommandDescriptor"
+    ),
+    "CL": (
+        "__ZN33AGX·PI_300·X·A0·CLChannelSKSM20generateRegisterList"
+        "EP20AGFIChannelCommandCLP22AGXCLCommandDescriptor"
+    ),
+    "TA": (
+        "__ZN33AGX·PI_300·X·A0·TAChannelSKSM20generateRegisterList"
+        "EP20AGFIChannelCommandTAP22AGXTACommandDescriptor"
+    ),
+}
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -6855,6 +6872,13 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
     }
 
 
+def decode_orr_register(word: int) -> tuple[int, int, int] | None:
+    """Decode the 32-bit register form of ORR (shifted register, no shift)."""
+    if word & 0xFFE0FC00 != 0x2A000000:
+        return None
+    return word & 0x1F, (word >> 5) & 0x1F, (word >> 16) & 0x1F
+
+
 def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
     """Decode LDR (immediate, unsigned offset) for a 128-bit SIMD register."""
     if word & 0xFFC00000 != 0x3DC00000:
@@ -6863,6 +6887,128 @@ def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
     base = (word >> 5) & 0x1F
     immediate = ((word >> 10) & 0xFFF) * 16
     return destination, base, immediate
+
+
+def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
+    """Recover the selector encoding and the set each work producer emits.
+
+    The selector word keeps the template bits under 0xfffc0006 and receives the
+    selector in the rest, so only bits 0 and 3..17 are settable.  Every
+    selector recovered respects that: bits 1 and 2 are always clear and the
+    value is 8-byte aligned apart from an optional bit 0.
+
+    The selector *sets* are deliberately reported as incomplete.  Only literals
+    materialized with a move immediate are recovered, and each producer has
+    several times more entry-emission sites than it has such literals, so most
+    selectors are computed at run time.  What the selectors name is also not
+    established -- they are not SGX MMIO offsets.
+    """
+
+    symbols = macho_symbols(image)
+    missing = [name for name in REGISTER_LIST_PRODUCERS.values() if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing register-list producers: {missing}")
+
+    settable = ~G17_SELECTOR_TEMPLATE_MASK & 0xFFFFFFFF
+    if settable != 0x0003FFF9:
+        raise ValueError(f"unexpected G17 selector field {settable:#x}")
+
+    producers: dict[str, object] = {}
+    union: set[int] = set()
+    for label, name in sorted(REGISTER_LIST_PRODUCERS.items()):
+        _address, code = symbol_code(image, name)
+        immediates: dict[int, int] = {}
+        recency: dict[int, int] = {}
+        found: set[int] = set()
+        context = -SELECTOR_ARGUMENT_WINDOW
+        for index, (_offset, word) in enumerate(words(code)):
+            # The producers materialize selectors with the 32-bit move forms.
+            opcode = word & 0x7F800000
+            if opcode in (0x52800000, 0x72800000):
+                register = word & 0x1F
+                immediate = (word >> 5) & 0xFFFF
+                shift = ((word >> 21) & 0x3) * 16
+                if opcode == 0x52800000:
+                    immediates[register] = immediate << shift
+                else:
+                    immediates[register] = (
+                        immediates.get(register, 0) & ~(0xFFFF << shift)
+                    ) | (immediate << shift)
+                recency[register] = index
+                continue
+            selector = decode_orr_register(word)
+            if selector is not None:
+                _destination, _first, source = selector
+                candidate = immediates.get(source)
+                if candidate is not None and not candidate & ~settable:
+                    found.add(candidate)
+                continue
+            # The encoder helper takes its context in x0 as a stack address
+            # and the selector in w2. Requiring the stack argument keeps
+            # ordinary virtual calls, which pass an object in x0, out.
+            if word & 0xFFC003FF == 0x910003E0:
+                context = index
+                continue
+            if word & 0xFFFFFC00 == 0xD73F0800:
+                candidate = immediates.get(2)
+                if (
+                    candidate is not None
+                    and not candidate & ~settable
+                    and index - recency.get(2, -SELECTOR_ARGUMENT_WINDOW)
+                    < SELECTOR_ARGUMENT_WINDOW
+                    and index - context < SELECTOR_ARGUMENT_WINDOW
+                ):
+                    found.add(candidate)
+        if not found:
+            raise ValueError(f"{label} producer emits no register selectors")
+        for candidate in found:
+            if candidate & 0x6:
+                raise ValueError(
+                    f"{label} selector {candidate:#x} sets a template-owned bit"
+                )
+            if candidate & ~0x1 & 0x7:
+                raise ValueError(f"{label} selector {candidate:#x} is not 8-byte aligned")
+        # Every entry emission advances the byte-length counter by 12, so the
+        # number of those sites bounds how many selectors a producer can use.
+        emission_sites = 0
+        buffered = list(words(code))
+        for index, (_offset, word) in enumerate(buffered):
+            # 32-bit ADD immediate of 12, i.e. one entry's worth of bytes.
+            if word & 0xFFC00000 != 0x11000000 or (word >> 10) & 0xFFF != 0xC:
+                continue
+            for _following_offset, following in buffered[index + 1 : index + 3]:
+                if following & 0xFFFFFC00 == 0x790E1400:
+                    emission_sites += 1
+                    break
+        if emission_sites <= len(found):
+            raise ValueError(
+                f"{label} selector sample is no longer smaller than its "
+                f"{emission_sites} emission sites"
+            )
+        union |= found
+        producers[label] = {
+            "producer": name,
+            "literal_selectors": len(found),
+            "entry_emission_sites": emission_sites,
+            "selectors": sorted(found),
+        }
+
+    return {
+        "template_mask": G17_SELECTOR_TEMPLATE_MASK,
+        "selector_field": settable,
+        "flag_bit": 0x1,
+        "alignment": 8,
+        "address_space_identified": False,
+        "selectors_complete": False,
+        "completeness_note": (
+            "only move-immediate literals are recovered; each producer has "
+            "several times more entry-emission sites, so most selectors are "
+            "computed at run time"
+        ),
+        "distinct_literal_selectors": len(union),
+        "maximum_selector": max(union),
+        "producers": producers,
+    }
 
 
 def recover_g17_3d_register_lists(image: bytes) -> dict[str, object]:
@@ -7605,6 +7751,7 @@ def main() -> int:
         channels["command_3d_register_lists"] = (
             recover_g17_3d_register_lists(driver)
         )
+        channels["register_selectors"] = recover_g17_register_selectors(driver)
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)

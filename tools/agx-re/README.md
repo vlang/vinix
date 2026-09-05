@@ -107,7 +107,8 @@ The channel-command pools are recovered: the slot-ring block layout, the
 allocation scan, and the exact byte size of all twelve named command types.
 The 3D command's register-list layout is recovered: four passes on a 0x720
 stride, 0x700 stream bytes each, the 12-byte entry format, and the descriptor
-summary array. The per-entry selectors are still open.
+summary array. The selector encoding is recovered and validated, but the selector sets are
+only a literal sample: most selectors are computed at run time.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command

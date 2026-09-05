@@ -3550,6 +3550,89 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_register_selectors(self) -> None:
+        def producer(literals, emissions: int) -> bytes:
+            code = bytearray()
+            for value in literals:
+                code += struct.pack("<I", 0x52800000 | ((value & 0xFFFF) << 5) | 11)
+                if value >> 16:
+                    code += struct.pack(
+                        "<I", 0x72A00000 | (((value >> 16) & 0xFFFF) << 5) | 11
+                    )
+                code += struct.pack("<I", 0x2A0B014A)  # orr w10, w10, w11
+            for _ in range(emissions):
+                code += struct.pack("<I", 0x11003129)  # add w9, w9, #0xc
+                code += struct.pack("<I", 0x790E1509)  # strh w9, [x8, #0x70a]
+            return bytes(code)
+
+        literals = {
+            "3D": [0x1739, 0x17E1, 0x16020],
+            "CL": [0x90, 0x98, 0x1A440],
+            "FastBlit": [0x28, 0x1498],
+            "TA": [0x128, 0x130, 0x1C880],
+        }
+        codes = {
+            recover_g17_abi.REGISTER_LIST_PRODUCERS[label]: (
+                0x800000,
+                producer(values, 40),
+            )
+            for label, values in literals.items()
+        }
+        symbols = {name: address for name, (address, _c) in codes.items()}
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_register_selectors(b"")
+
+        self.assertEqual(recovered["selector_field"], 0x0003FFF9)
+        self.assertEqual(recovered["flag_bit"], 1)
+        self.assertEqual(recovered["alignment"], 8)
+        # The sets are a sample, never a complete list.
+        self.assertFalse(recovered["selectors_complete"])
+        self.assertFalse(recovered["address_space_identified"])
+        self.assertEqual(
+            recovered["producers"]["3D"]["selectors"], [0x1739, 0x17E1, 0x16020]
+        )
+        self.assertEqual(recovered["producers"]["3D"]["entry_emission_sites"], 40)
+        self.assertEqual(recovered["distinct_literal_selectors"], 11)
+
+    def test_rejects_g17_selector_sample_matching_emission_count(self) -> None:
+        # If the literal sample ever reached the emission count the set would
+        # be claiming completeness it has not earned.
+        def producer() -> bytes:
+            code = bytearray()
+            for value in (0x1739, 0x17E1):
+                code += struct.pack("<I", 0x52800000 | (value << 5) | 11)
+                code += struct.pack("<I", 0x2A0B014A)
+            for _ in range(2):
+                code += struct.pack("<I", 0x11003129)
+                code += struct.pack("<I", 0x790E1509)
+            return bytes(code)
+
+        codes = {
+            name: (0x800000, producer())
+            for name in recover_g17_abi.REGISTER_LIST_PRODUCERS.values()
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={n: 0x800000 for n in codes},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_register_selectors(b"")
+
     def test_recovers_g17_3d_register_lists(self) -> None:
         code = bytearray(0x27DC)
         for offset, word in {
