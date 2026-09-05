@@ -6,6 +6,7 @@ module regs
 
 import aarch64.kio
 import aarch64.cpu
+import memory
 
 // ASC (Apple Silicon Controller) registers
 pub const asc_ctl = u32(0x44)
@@ -39,10 +40,13 @@ pub:
 }
 
 // ASC and SGX are separate named resources in the Apple GPU device tree.
-pub fn new_resources(asc_base u64, sgx_base u64) GpuResources {
+
+pub fn new_resources(asc_base u64, asc_size u64, sgx_base u64, sgx_size u64) GpuResources {
+	// Apple places both apertures far above the 4 GiB direct-map window. Map
+	// them explicitly as Device-nGnRnE before any ASC or SGX register access.
 	return GpuResources{
-		sgx: sgx_base + higher_half
-		asc: asc_base + higher_half
+		sgx: memory.map_mmio(sgx_base, sgx_size)
+		asc: memory.map_mmio(asc_base, asc_size)
 	}
 }
 

@@ -38,6 +38,7 @@ __global (
 struct PlatformResources {
 pub:
 	asc_base        u64
+	asc_size        u64
 	sgx_base        u64
 	sgx_size        u64
 	mailbox_base    u64
@@ -125,6 +126,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		}
 		return PlatformResources{
 			asc_base: asc_regs[0].base
+			asc_size: asc_regs[0].size
 			sgx_base: gpu_regs[0].base
 			sgx_size: gpu_regs[0].size
 			mailbox_base: asc_regs[0].base + 0x8000
@@ -193,6 +195,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 	}
 	return PlatformResources{
 		asc_base: asc.base
+		asc_size: asc.size
 		sgx_base: sgx.base
 		sgx_size: sgx.size
 		mailbox_base: mailbox_regs[0].base
@@ -445,6 +448,11 @@ pub fn initialise() {
 		println('agx: UAT handoff or page-table reserved region is too small')
 		return
 	}
+	if platform.asc_size < u64(regs.asc_ctl) + 4
+		|| platform.sgx_size < u64(regs.gpu_id_clustercfg) + 4 {
+		println('agx: ASC or SGX register window is too small')
+		return
+	}
 	C.printf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n', platform.asc_base, platform.sgx_base, platform.mailbox_base, platform.ttbs_base, platform.ttbs_size)
 	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n', platform.handoff_base, platform.handoff_size, platform.pagetables_base, platform.pagetables_size)
 
@@ -485,7 +493,8 @@ pub fn initialise() {
 	gpu_event_mgr = event.new_event_manager(stamp_va, stamp_phys)
 
 	// Step 5: Create GPU resources, RTKit, and GpuManager.
-	gpu_res := regs.new_resources(platform.asc_base, platform.sgx_base)
+	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.sgx_base,
+		platform.sgx_size)
 	gpu_rtk := rtkit.new_rtkit(platform.mailbox_base, 'agx')
 
 	mut mgr := gpu.new_gpu_manager(&gpu_res, &cfg, &gpu_rtk) or {
