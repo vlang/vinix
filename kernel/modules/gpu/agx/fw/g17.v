@@ -1959,6 +1959,7 @@ pub fn populate_g17_ta_render_passthrough(descriptor voidptr, descriptor_bytes u
 		destination := &u8(descriptor)
 		source := &u8(payload)
 		copy_g17_descriptor_range(destination, 0xfe0, source, 0x000, 0x30)
+		copy_g17_descriptor_range(destination, 0x1050, source, 0x030, 0x40)
 		copy_g17_descriptor_range(destination, 0x1010, source, 0x1f0, 0x20)
 		copy_g17_descriptor_range(destination, 0x1030, source, 0x210, 0x08)
 		copy_g17_descriptor_range(destination, 0x1038, source, 0x220, 0x10)

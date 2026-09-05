@@ -164,7 +164,7 @@ render object is the `0x15b0` `AGXTACommandDescriptor` subclass. The same
 recovery pins its derived-to-base initialization chain and 17 unique nonzero
 scalar defaults, which the kernel installs without copying Apple's host C++
 object pointers or embedded synchronization state.
-The adjacent straight-line TA passthrough is executable too: 32 direct copy
+The adjacent straight-line TA passthrough is executable too: 33 direct copy
 ranges and 23 masked flags span the selected object's base prefix and derived
 tail through `+0x15a8`, with all source and destination bounds pinned to the
 Apple binary. Resource-derived and computed fields still need native Vinix

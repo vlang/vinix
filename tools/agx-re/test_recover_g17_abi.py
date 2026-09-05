@@ -5028,6 +5028,8 @@ class RecoverG17AbiTests(unittest.TestCase):
         for offset, word in {
             0x1D64: 0xF9400F48,
             0x1D68: 0x3DC00100,
+            0x1D80: 0xF9401909,
+            0x1DB0: 0x3DC01900,
             0x1DC0: 0x3DC07D00,
             0x1E44: 0x39491909,
             0x1E60: 0x3948F509,
@@ -5067,10 +5069,14 @@ class RecoverG17AbiTests(unittest.TestCase):
 
         self.assertEqual(recovered["payload_bytes"], 0x9D0)
         self.assertEqual(recovered["descriptor_bytes"], 0x15B0)
-        self.assertEqual(len(recovered["pre_common_copy_ranges"]), 19)
+        self.assertEqual(len(recovered["pre_common_copy_ranges"]), 20)
         self.assertEqual(len(recovered["pre_common_bit_fields"]), 15)
         self.assertEqual(len(recovered["post_common_copy_ranges"]), 13)
         self.assertEqual(len(recovered["post_common_bit_fields"]), 8)
+        self.assertEqual(
+            recovered["pre_common_copy_ranges"][1],
+            {"source_offset": 0x30, "descriptor_member": 0x1050, "bytes": 0x40},
+        )
         self.assertEqual(
             recovered["pre_common_bit_fields"][0],
             {

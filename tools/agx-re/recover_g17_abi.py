@@ -11548,6 +11548,8 @@ def recover_g17_ta_render_passthrough(image: bytes) -> dict[str, object]:
         {
             0x1D64: 0xF9400F48,  # retained raw payload at parsed command +0x18
             0x1D68: 0x3DC00100,  # payload +0 -> descriptor +0xfe0
+            0x1D80: 0xF9401909,  # payload +0x30 -> descriptor +0x1050
+            0x1DB0: 0x3DC01900,  # payload +0x60 completes the 0x40-byte range
             0x1DC0: 0x3DC07D00,  # payload +0x1f0 -> descriptor +0x1010
             0x1E44: 0x39491909,  # payload +0x246, reduced to bit zero
             0x1E60: 0x3948F509,  # payload +0x23d, reduced to bit zero
@@ -11574,6 +11576,7 @@ def recover_g17_ta_render_passthrough(image: bytes) -> dict[str, object]:
 
     pre_common_copy_ranges = [
         (0x000, 0xFE0, 0x30),
+        (0x030, 0x1050, 0x40),
         (0x1F0, 0x1010, 0x20),
         (0x210, 0x1030, 0x08),
         (0x220, 0x1038, 0x10),
