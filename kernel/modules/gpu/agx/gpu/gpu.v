@@ -18,7 +18,6 @@ import gpu.agx.fw
 import gpu.agx.queue
 import gpu.agx.event
 import memory
-import lib
 import klock
 import sched
 
@@ -199,9 +198,15 @@ mut:
 
 struct G13ChannelAllocations {
 mut:
-	states    [g13_channel_allocation_count]SharedBuffer
-	rings     [g13_channel_allocation_count]SharedBuffer
-	allocated u32
+	states           [g13_channel_allocation_count]SharedBuffer
+	rings            [g13_channel_allocation_count]SharedBuffer
+	allocated        u32
+	initdata         SharedBuffer
+	unknown_buffer   SharedBuffer
+	runtime_pointers SharedBuffer
+	globals          SharedBuffer
+	fw_status        SharedBuffer
+	fwlog_payload    SharedBuffer
 }
 
 @[inline]
@@ -270,12 +275,12 @@ fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 }
 
 fn (mut mgr GpuManager) alloc_g13_channel_pair(mut allocations G13ChannelAllocations,
-	index u32, state_size u64, ring_size u64) bool {
+	index u32, state_size u64, ring_size u64, ring_protection u64) bool {
 	if index != allocations.allocated || index >= g13_channel_allocation_count {
 		return false
 	}
 	mut state := mgr.alloc_shared_buffer(state_size) or { return false }
-	ring := mgr.alloc_shared_buffer(ring_size) or {
+	ring := mgr.alloc_shared_buffer_with_protection(ring_size, ring_protection) or {
 		mgr.free_shared_buffer(mut state)
 		return false
 	}
@@ -286,6 +291,12 @@ fn (mut mgr GpuManager) alloc_g13_channel_pair(mut allocations G13ChannelAllocat
 }
 
 fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelAllocations) {
+	mgr.free_shared_buffer(mut allocations.initdata)
+	mgr.free_shared_buffer(mut allocations.fwlog_payload)
+	mgr.free_shared_buffer(mut allocations.fw_status)
+	mgr.free_shared_buffer(mut allocations.globals)
+	mgr.free_shared_buffer(mut allocations.runtime_pointers)
+	mgr.free_shared_buffer(mut allocations.unknown_buffer)
 	mut count := allocations.allocated
 	for count > 0 {
 		count--
@@ -314,27 +325,27 @@ fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
 		}
 	}
 
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_device_control_index, sizeof(channel.RingHeader), u64(fw.device_control_size) * sizeof(fw.FwDeviceControlMsg)) {
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_device_control_index, sizeof(channel.RingHeader), u64(fw.device_control_size) * sizeof(fw.FwDeviceControlMsg), pgtable.gpu_prot_fw_private_rw) {
 		return none
 	}
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_control_index, sizeof(channel.FwCtlRingHeader), u64(fw.fw_ctl_size) * sizeof(fw.FwFwCtlMsg)) {
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_control_index, sizeof(channel.FwCtlRingHeader), u64(fw.fw_ctl_size) * sizeof(fw.FwFwCtlMsg), pgtable.gpu_prot_fw_gpu_shared_rw) {
 		return none
 	}
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_event_index, sizeof(channel.RingHeader), u64(fw.event_size) * sizeof(fw.FwEventMsg)) {
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_event_index, sizeof(channel.RingHeader), u64(fw.event_size) * sizeof(fw.FwEventMsg), pgtable.gpu_prot_fw_gpu_shared_rw) {
 		return none
 	}
 	// Firmware logging has six independent state/ring subchannels.
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_log_index, 6 * sizeof(channel.RingHeader), 6 * u64(fw.fw_log_size) * sizeof(fw.FwLogMsg)) {
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_log_index, 6 * sizeof(channel.RingHeader), 6 * u64(fw.fw_log_size) * sizeof(fw.FwLogMsg), pgtable.gpu_prot_fw_gpu_shared_rw) {
 		return none
 	}
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_ktrace_index, sizeof(channel.RingHeader), u64(fw.ktrace_size) * sizeof(fw.FwKTraceMsg)) {
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_ktrace_index, sizeof(channel.RingHeader), u64(fw.ktrace_size) * sizeof(fw.FwKTraceMsg), pgtable.gpu_prot_fw_gpu_shared_rw) {
 		return none
 	}
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * sizeof(fw.FwStatsMsg)) {
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * sizeof(fw.FwStatsMsg), pgtable.gpu_prot_fw_gpu_shared_rw) {
 		return none
 	}
 	for pipe := u32(0); pipe < 12; pipe++ {
-		if !mgr.alloc_g13_channel_pair(mut allocations, g13_pipe_base_index + pipe, sizeof(channel.RingHeader), u64(fw.pipe_size) * sizeof(fw.FwRunWorkQueueMsg)) {
+		if !mgr.alloc_g13_channel_pair(mut allocations, g13_pipe_base_index + pipe, sizeof(channel.RingHeader), u64(fw.pipe_size) * sizeof(fw.FwRunWorkQueueMsg), pgtable.gpu_prot_fw_private_rw) {
 			return none
 		}
 	}
@@ -380,6 +391,15 @@ fn (mut mgr GpuManager) init_channels() bool {
 	return true
 }
 
+fn (mut mgr GpuManager) fail_g13_initialization() bool {
+	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_g13_channels()
+	mgr.initdata_va = 0
+	mgr.initdata_phys = 0
+	mgr.state = .error
+	return false
+}
+
 // Full GPU initialization sequence
 pub fn (mut mgr GpuManager) init() bool {
 	mgr.lock.acquire()
@@ -422,9 +442,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
 			C.printf(c'agx: RTKit boot failed for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g13_initialization()
 		}
 	}
 
@@ -432,9 +450,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
 			C.printf(c'agx: Failed to start firmware endpoint for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g13_initialization()
 		}
 	}
 
@@ -442,9 +458,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
 			C.printf(c'agx: Failed to start doorbell endpoint for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g13_initialization()
 		}
 	}
 
@@ -452,37 +466,32 @@ pub fn (mut mgr GpuManager) init() bool {
 	// RTKit endpoints are running.
 	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
 		C.printf(c'agx: UAT firmware handoff failed\n')
-		mgr.state = .error
-		return false
+		return mgr.fail_g13_initialization()
 	}
 
 	// Step 5: Initialize firmware communication channels
 	if !mgr.init_channels() {
 		C.printf(c'agx: Failed to initialize channels\n')
-		mgr.state = .error
-		return false
+		return mgr.fail_g13_initialization()
 	}
 
 	// Step 6: Allocate and initialize firmware init data
 	if !mgr.init_firmware_data() {
 		C.printf(c'agx: Failed to initialize firmware data\n')
-		mgr.state = .error
-		return false
+		return mgr.fail_g13_initialization()
 	}
 
 	// Step 7: Publish the v12.3 Initialize command before making InitData live.
 	initialize := fw.make_device_control_initialize()
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
 		C.printf(c'agx: Failed to queue device-control Initialize\n')
-		mgr.state = .error
-		return false
+		return mgr.fail_g13_initialization()
 	}
 
 	// Step 8: Build and send MSG_INIT with initdata VA.
 	if !mgr.send_fw_msg(msg_init, mgr.initdata_va) {
 		C.printf(c'agx: Failed to send MSG_INIT\n')
-		mgr.state = .error
-		return false
+		return mgr.fail_g13_initialization()
 	}
 
 	// Step 9: Ring the device-control doorbell, then wake the firmware. MSG_INIT
@@ -490,8 +499,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// acknowledgement can steal the first real firmware notification.
 	if !mgr.ring_device_control() || !mgr.kick_firmware() {
 		C.printf(c'agx: Failed to ring G13 initialization doorbells\n')
-		mgr.state = .error
-		return false
+		return mgr.fail_g13_initialization()
 	}
 
 	mgr.state = .running
@@ -504,64 +512,66 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	if mgr.hw_config.firmware_abi == .g17_26_5_partial {
 		return mgr.init_g17_firmware_data()
 	}
-
-	initdata_size := u64(0x10000) // 64KB firmware init blob
-	initdata_pages := lib.div_roundup(initdata_size, page_size)
-
-	initdata_phys := u64(memory.pmm_alloc_aligned(initdata_pages, 4))
-	if initdata_phys == 0 {
-		C.printf(c'agx: Failed to allocate initdata memory\n')
+	if mgr.g13_channels == unsafe { nil } || !fw.validate_g13_initdata_layouts() {
+		C.printf(c'agx: G13 InitData outer layout validation failed\n')
+		return false
+	}
+	mut graph := unsafe { mgr.g13_channels }
+	if graph.initdata.va != 0 {
 		return false
 	}
 
-	// Zero-initialise
+	graph.unknown_buffer = mgr.alloc_shared_buffer_with_protection(0x4000, pgtable.gpu_prot_fw_shared_ro) or {
+		return false
+	}
+	graph.runtime_pointers = mgr.alloc_shared_buffer_with_protection(fw.g13_runtime_pointers_size, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.globals = mgr.alloc_shared_buffer_with_protection(fw.g13_globals_size, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.fw_status = mgr.alloc_shared_buffer(sizeof(fw.G13FwStatus)) or {
+		return false
+	}
+	graph.fwlog_payload = mgr.alloc_shared_buffer(u64(fw.g13_fwlog_subchannels) * u64(fw.g13_fwlog_payload_count) * sizeof(fw.FwLogPayloadMsg)) or {
+		return false
+	}
+	graph.initdata = mgr.alloc_shared_buffer_with_protection(fw.g13_initdata_size, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+
 	unsafe {
-		C.memset(voidptr(initdata_phys + higher_half), 0, initdata_size)
-	}
-
-	mgr.initdata_phys = initdata_phys
-
-	// Allocate a VA from the shared heap and map via the kernel page table
-	initdata_va := mgr.allocs.alloc(initdata_size, alloc.gpu_page_size) or {
-		C.printf(c'agx: Failed to allocate initdata VA\n')
-		return false
-	}
-	// Map into the GPU's internal UAT. AGX does not sit behind an Apple DART.
-	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(initdata_va, initdata_phys, initdata_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
-			C.printf(c'agx: Failed to map initdata into kernel UAT\n')
-			return false
+		mut runtime := &fw.G13RuntimePointers(graph.runtime_pointers.phys + higher_half)
+		for priority := u32(0); priority < 4; priority++ {
+			base := priority * 3
+			runtime.pipes[priority].vertex = fw.make_g13_ring_pointers(mgr.channels.pipes[base].state_base, mgr.channels.pipes[base].ring_base)
+			runtime.pipes[priority].fragment = fw.make_g13_ring_pointers(mgr.channels.pipes[base + 1].state_base, mgr.channels.pipes[base + 1].ring_base)
+			runtime.pipes[priority].compute = fw.make_g13_ring_pointers(mgr.channels.pipes[base + 2].state_base, mgr.channels.pipes[base + 2].ring_base)
 		}
+		runtime.device_control = fw.make_g13_ring_pointers(mgr.channels.device_ctrl.state_base, mgr.channels.device_ctrl.ring_base)
+		runtime.event = fw.make_g13_ring_pointers(mgr.channels.event.state_base, mgr.channels.event.ring_base)
+		runtime.fw_log = fw.make_g13_ring_pointers(mgr.channels.fw_log.state_base, mgr.channels.fw_log.ring_base)
+		runtime.ktrace = fw.make_g13_ring_pointers(mgr.channels.ktrace.state_base, mgr.channels.ktrace.ring_base)
+		runtime.stats = fw.make_g13_ring_pointers(mgr.channels.stats.state_base, mgr.channels.stats.ring_base)
+		runtime.fwlog_buffer = graph.fwlog_payload.va
+		// RuntimeScratch::unk_6b38 is 0xff in the reference 12.3 builder.
+		runtime.gpu_scratch[0x68b8] = 0xff
+
+		mut globals := &fw.G13Globals(graph.globals.phys + higher_half)
+		globals.unk_028 = 1
+		globals.unk_02c = 1
+		globals.unk_034 = 120
+
+		mut status := &fw.G13FwStatus(graph.fw_status.phys + higher_half)
+		status.fwctl = fw.make_g13_ring_pointers(mgr.channels.fw_ctrl.state_base, mgr.channels.fw_ctrl.ring_base)
 	}
 
-	mgr.initdata_va = initdata_va
-
-	// Build minimal initdata tree used by firmware bootstrap.
-	channel_base := mgr.channels.device_ctrl.ring_base
-	log_base := mgr.channels.fw_log.ring_base
-	ktrace_base := mgr.channels.ktrace.ring_base
-	stats_base := mgr.channels.stats.ring_base
-
-	mut init := fw.build_initdata(&mgr.hw_config, channel_base, log_base, ktrace_base, stats_base)
-	init.region_a_addr = initdata_va + 0x400
-	init.region_b_addr = initdata_va + 0x800
-	init.region_c_addr = initdata_va + 0xC00
-	init.fw_status_addr = initdata_va + 0x1000
-
-	region_a := fw.build_region_a(channel_base, log_base, mgr.channels.fw_log.ring_size * mgr.channels.fw_log.entry_size, ktrace_base, mgr.channels.ktrace.ring_size * mgr.channels.ktrace.entry_size, stats_base, mgr.channels.stats.ring_size * mgr.channels.stats.entry_size)
-	region_b := fw.build_region_b(&mgr.hw_config)
-	region_c := fw.RegionC{}
-	status := fw.FwStatus{}
-
-	base := initdata_phys + higher_half
+	initdata := fw.build_g13_initdata(graph.unknown_buffer.va, graph.runtime_pointers.va, graph.globals.va, graph.fw_status.va, mgr.hw_config.uat_oas) or { return false }
 	unsafe {
-		C.memcpy(voidptr(base), &init, sizeof(fw.InitData))
-		C.memcpy(voidptr(base + 0x400), &region_a, sizeof(fw.RegionA))
-		C.memcpy(voidptr(base + 0x800), &region_b, sizeof(fw.RegionB))
-		C.memcpy(voidptr(base + 0xC00), &region_c, sizeof(fw.RegionC))
-		C.memcpy(voidptr(base + 0x1000), &status, sizeof(fw.FwStatus))
+		C.memcpy(voidptr(graph.initdata.phys + higher_half), &initdata, sizeof(fw.G13InitData))
 	}
-
+	mgr.initdata_va = graph.initdata.va
+	mgr.initdata_phys = graph.initdata.phys
 	return true
 }
 

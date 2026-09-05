@@ -106,6 +106,15 @@ pub mut:
 	pad_10    [40]u8
 }
 
+@[packed]
+pub struct FwLogPayloadMsg {
+pub mut:
+	msg_type  u32
+	sequence  u32
+	timestamp u64
+	message   [0xc8]u8
+}
+
 // Kernel trace channel message
 @[packed]
 pub struct FwKTraceMsg {
@@ -137,5 +146,6 @@ pub fn validate_g13_channel_layouts() bool {
 		&& sizeof(ChannelRingPointers) == 0x10 && sizeof(FwDeviceControlMsg) == 0x30
 		&& sizeof(FwRunWorkQueueMsg) == 0x38 && sizeof(FwEventMsg) == 0x38
 		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0x38
-		&& sizeof(FwKTraceMsg) == 0x40 && sizeof(FwStatsMsg) == 0x30
+		&& sizeof(FwLogPayloadMsg) == 0xd8 && sizeof(FwKTraceMsg) == 0x40
+		&& sizeof(FwStatsMsg) == 0x30
 }
