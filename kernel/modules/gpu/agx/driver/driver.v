@@ -83,6 +83,30 @@ fn find_native_asc_node(role u32) ?&devicetree.DTNode {
 	return none
 }
 
+fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bool {
+	// m1n1/Linux publishes the negotiated tuple as standard big-endian FDT
+	// cells. Native Apple DeviceTree does not expose this Linux property, so it
+	// remains safely covered by the partial-ABI boot gate.
+	if native_adt {
+		C.printf(c'agx: native t8103 firmware compatibility is unavailable\n')
+		return true
+	}
+	compat := devicetree.get_u32_array(gpu_node, 'apple,firmware-compat') or {
+		C.printf(c'agx: t8103 device tree has no apple,firmware-compat\n')
+		return false
+	}
+	if compat.len != 3 {
+		C.printf(c'agx: malformed t8103 firmware compatibility tuple\n')
+		return false
+	}
+	C.printf(c'agx: t8103 firmware compatibility %u.%u.%u\n', compat[0], compat[1], compat[2])
+	if compat[0] != 12 || compat[1] != 3 || compat[2] != 0 {
+		C.printf(c'agx: only the G13 12.3.0 firmware ABI is being implemented\n')
+		return false
+	}
+	return true
+}
+
 fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 	chip_id u32) ?PlatformResources {
 	gpu_regs := devicetree.get_translated_reg_ranges(gpu_node) or {
@@ -470,6 +494,9 @@ pub fn initialise() {
 	// nodes and m1n1/Linux nodes expose different layouts.
 	platform := get_platform_resources(gpu_node, native_adt, chip_id) or {
 		println('agx: platform resources are incomplete')
+		return
+	}
+	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt) {
 		return
 	}
 	cfg.gpu_mmio_base = platform.sgx_base
