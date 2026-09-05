@@ -494,6 +494,7 @@ G17_COMMAND_3D_BYTES = 0x2240
 COMPLETE_COMMAND_3D = "__ZN22AGX3DCommandDescriptor8completeEv"
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 10
+VALUE_ARGUMENT_WINDOW = 20
 RCE_ENCODE_ENTRY = "__ZNK36AGX·PI_300·X·A0·RCEBufferEncoder11encodeEntryEPvjhy"
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 G17_ACCELERATOR_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
@@ -935,6 +936,128 @@ def resolve_static_w_register(
             if not skipped:
                 return None
     return None
+
+
+def resolve_static_x_register(
+    instructions: list[tuple[int, int]], before: int, register: int, depth: int = 0
+) -> int | None:
+    """Resolve a move-wide constant feeding a 64-bit argument register."""
+
+    if depth > 8:
+        return None
+    for index in range(before - 1, -1, -1):
+        _offset, word = instructions[index]
+        materialized_w = decode_movz_w(word)
+        if materialized_w is not None and materialized_w[0] == register:
+            return materialized_w[1] & 0xFFFFFFFF
+        updated_w = decode_movk_w(word)
+        if updated_w is not None and updated_w[0] == register:
+            return resolve_static_w_register(instructions, before, register)
+
+        wide = decode_move_wide(word)
+        if wide is not None and wide[1] == register:
+            kind, _destination, immediate, shift = wide
+            if kind == "movz":
+                return immediate << shift
+            base = resolve_static_x_register(instructions, index, register, depth + 1)
+            if base is None:
+                return None
+            mask = 0xFFFF << shift
+            return ((base & ~mask) | immediate << shift) & 0xFFFFFFFFFFFFFFFF
+
+        load = decode_load_unsigned(word)
+        if load is not None and load[0] == register:
+            return None
+        load = decode_load_register(word)
+        if load is not None and load[0] == register:
+            return None
+        destination = word & 0x1F
+        if destination == register and word & 0x1F000000 in (
+            0x0A000000,
+            0x0B000000,
+            0x11000000,
+            0x12000000,
+            0x13000000,
+            0x1A000000,
+            0x1B000000,
+        ):
+            return None
+        if register <= 18 and (
+            decode_bl_target(0, word) is not None
+            or word & 0xFFFFFC00 == 0xD73F0800
+        ):
+            return None
+    return None
+
+
+def classify_g17_value_argument(
+    instructions: list[tuple[int, int]], before: int
+) -> dict[str, object]:
+    """Classify the last x4/w4 writer before one register encoder call."""
+
+    classes = {
+        0x0A000000: "logical_register",
+        0x0B000000: "add_sub_register",
+        0x11000000: "add_sub_immediate",
+        0x12000000: "logical_immediate",
+        0x13000000: "bitfield",
+        0x1A000000: "conditional",
+        0x1B000000: "multiply",
+    }
+    start = max(0, before - VALUE_ARGUMENT_WINDOW)
+    for index in range(before - 1, start - 1, -1):
+        offset, word = instructions[index]
+        load = decode_load_unsigned(word)
+        if load is not None and load[0] == 4:
+            _destination, base, member, width = load
+            return {
+                "kind": "descriptor_load" if base == 19 else "indirect_load",
+                "producer_offset": offset,
+                "base_register": base,
+                "member": member,
+                "bytes": width,
+                "signed": False,
+            }
+        if word & 0xFFC0001F == 0xB9800004:  # LDRSW x4, [xn, #imm]
+            base = (word >> 5) & 0x1F
+            member = ((word >> 10) & 0xFFF) * 4
+            return {
+                "kind": "descriptor_load" if base == 19 else "indirect_load",
+                "producer_offset": offset,
+                "base_register": base,
+                "member": member,
+                "bytes": 4,
+                "signed": True,
+            }
+
+        move_w = decode_movz_w(word)
+        update_w = decode_movk_w(word)
+        wide = decode_move_wide(word)
+        if (
+            move_w is not None and move_w[0] == 4
+            or update_w is not None and update_w[0] == 4
+            or wide is not None and wide[1] == 4
+        ):
+            value = resolve_static_x_register(instructions, before, 4)
+            if value is None:
+                raise ValueError(
+                    f"G17 value at producer +{offset:#x} is no longer constant"
+                )
+            return {
+                "kind": "constant",
+                "producer_offset": offset,
+                "value": value,
+            }
+
+        instruction_class = word & 0x1F000000
+        if word & 0x1F == 4 and instruction_class in classes:
+            return {
+                "kind": "computed",
+                "producer_offset": offset,
+                "operation": classes[instruction_class],
+                "instruction": word,
+            }
+    raise ValueError("G17 register-entry value has no nearby x4 writer")
 
 
 def decode_umaddl(word: int) -> tuple[int, int, int, int] | None:
@@ -8486,7 +8609,7 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         recency: dict[int, int] = {}
         found: set[int] = set()
         context = -SELECTOR_ARGUMENT_WINDOW
-        encoder_calls: list[tuple[int, int, int]] = []
+        encoder_calls: list[dict[str, object]] = []
         for index, (offset, word) in enumerate(buffered):
             # The producers materialize selectors with the 32-bit move forms.
             opcode = word & 0xFF800000
@@ -8562,7 +8685,16 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                             f"{label} mode at producer +{offset:#x} is no "
                             "longer a static bit"
                         )
-                    encoder_calls.append((offset, resolved, mode))
+                    encoder_calls.append(
+                        {
+                            "producer_offset": offset,
+                            "selector": resolved,
+                            "mode": mode,
+                            "value_source": classify_g17_value_argument(
+                                buffered, index
+                            ),
+                        }
+                    )
         if not found:
             raise ValueError(f"{label} producer emits no register selectors")
         for candidate in found:
@@ -8588,7 +8720,7 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                 f"{label} selector sample is no longer smaller than its "
                 f"{emission_sites} emission sites"
             )
-        resolved = {selector for _offset, selector, _mode in encoder_calls}
+        resolved = {int(entry["selector"]) for entry in encoder_calls}
         for candidate in resolved:
             if candidate & ~encoder_selector_field:
                 raise ValueError(
@@ -8612,13 +8744,30 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             "encoder_call_sites": len(encoder_calls),
             "statically_resolved_encoder_calls": len(encoder_calls),
             "mode_0_calls": sum(
-                mode == 0 for _offset, _selector, mode in encoder_calls
+                entry["mode"] == 0 for entry in encoder_calls
             ),
             "mode_1_calls": sum(
-                mode == 1 for _offset, _selector, mode in encoder_calls
+                entry["mode"] == 1 for entry in encoder_calls
+            ),
+            "constant_value_calls": sum(
+                entry["value_source"]["kind"] == "constant"
+                for entry in encoder_calls
+            ),
+            "descriptor_value_calls": sum(
+                entry["value_source"]["kind"] == "descriptor_load"
+                for entry in encoder_calls
+            ),
+            "indirect_value_calls": sum(
+                entry["value_source"]["kind"] == "indirect_load"
+                for entry in encoder_calls
+            ),
+            "computed_value_calls": sum(
+                entry["value_source"]["kind"] == "computed"
+                for entry in encoder_calls
             ),
             "resolved_encoder_selectors": sorted(resolved),
             "static_selectors": sorted(static),
+            "encoder_entries": encoder_calls,
         }
 
     return {

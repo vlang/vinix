@@ -4392,6 +4392,7 @@ class RecoverG17AbiTests(unittest.TestCase):
             code += struct.pack("<I", 0x910083E0)  # add x0, sp, #0x20
             code += struct.pack("<I", 0x5132A2C2)  # sub w2, w22, #0xca8
             code += struct.pack("<I", 0x52800003)  # mov w3, #0
+            code += struct.pack("<I", 0xD2800004)  # mov x4, #0
             code += struct.pack("<I", 0xD73F0910)  # blraa x8, x16
             for _ in range(emissions):
                 code += struct.pack("<I", 0x11003129)  # add w9, w9, #0xc
@@ -4442,6 +4443,12 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["producers"]["3D"]["encoder_call_sites"], 1)
         self.assertEqual(recovered["producers"]["3D"]["mode_0_calls"], 1)
         self.assertEqual(recovered["producers"]["3D"]["mode_1_calls"], 0)
+        self.assertEqual(recovered["producers"]["3D"]["constant_value_calls"], 1)
+        value_source = recovered["producers"]["3D"]["encoder_entries"][0][
+            "value_source"
+        ]
+        self.assertEqual(value_source["kind"], "constant")
+        self.assertEqual(value_source["value"], 0)
         self.assertEqual(
             recovered["producers"]["3D"]["resolved_encoder_selectors"],
             [0x15378],
@@ -4489,6 +4496,22 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.decode_logical_immediate_w(0x321C0362),
             ("orr", 2, 27, 0x10),
         )
+
+    def test_classifies_g17_register_value_source(self) -> None:
+        descriptor_load = [(0x40, 0xF943B264)]  # ldr x4, [x19, #0x760]
+        self.assertEqual(
+            recover_g17_abi.classify_g17_value_argument(descriptor_load, 1),
+            {
+                "kind": "descriptor_load",
+                "producer_offset": 0x40,
+                "base_register": 19,
+                "member": 0x760,
+                "bytes": 8,
+                "signed": False,
+            },
+        )
+        with self.assertRaises(ValueError):
+            recover_g17_abi.classify_g17_value_argument([(0, 0xD503201F)], 1)
 
     def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
         instructions = [

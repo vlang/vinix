@@ -1460,9 +1460,10 @@ pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes
 // pass owns 0x700 stream bytes and the next pass starts 0x14 bytes after the
 // previous metadata ends. Entries are 12 bytes: a selector word then an
 // unaligned 64-bit value. Apple's selector argument is statically recovered at
-// every virtual encoder call, and both 3D inline forms are located; the value
-// sources and conditions/order of the complete per-pass sequences are not yet
-// recovered.
+// every virtual encoder call, and both 3D inline forms are located. Every x4
+// writer is classified as a constant, descriptor load, or bounded computation;
+// the computed expressions and conditions/order of the complete per-pass
+// sequences are not yet recovered.
 pub const g17_3d_register_passes = u32(4)
 pub const g17_3d_register_stride = u64(0x720)
 pub const g17_3d_register_stream_offset = u64(0xa0)
