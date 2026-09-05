@@ -141,7 +141,7 @@ pub mut:
 	port_vector int
 }
 
-fn (mut this COMPort) mmap(page u64, flags int) voidptr {
+fn (mut this COMPort) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

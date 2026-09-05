@@ -68,7 +68,7 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	return 0, 0
 }
 
-fn (mut this Pipe) mmap(page u64, flags int) voidptr {
+fn (mut this Pipe) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

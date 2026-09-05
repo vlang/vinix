@@ -275,6 +275,6 @@ fn (mut dev OssMixerDevice) unlink(handle voidptr) ? {
 	katomic.dec(mut dev.stat.nlink)
 }
 
-fn (mut dev OssMixerDevice) mmap(page u64, flags int) voidptr {
+fn (mut dev OssMixerDevice) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }

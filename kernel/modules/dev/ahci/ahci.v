@@ -246,7 +246,7 @@ fn (mut dev AHCIDevice) grow(handle voidptr, new_size u64) ? {
 	return none
 }
 
-fn (mut dev AHCIDevice) mmap(page u64, flags int) voidptr {
+fn (mut dev AHCIDevice) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

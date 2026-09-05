@@ -33,7 +33,7 @@ __global (
 	fbdev_nodes [fbdev_max_device_count]FramebufferNode
 )
 
-fn (mut this FramebufferNode) mmap(page u64, flags int) voidptr {
+fn (mut this FramebufferNode) mmap(_handle voidptr, page u64, flags int) voidptr {
 	offset := page * page_size
 
 	if offset >= this.info.size {

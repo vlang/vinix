@@ -60,7 +60,7 @@ pub mut:
 	used      u64
 }
 
-fn (mut this UnixSocket) mmap(page u64, flags int) voidptr {
+fn (mut this UnixSocket) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

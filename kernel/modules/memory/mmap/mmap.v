@@ -63,6 +63,9 @@ pub mut:
 	shadow_pagemap memory.Pagemap
 	locals         []&MmapRangeLocal
 	resource       &resource.Resource = unsafe { nil }
+	handle         voidptr
+	handle_ref     fn (voidptr) = unsafe { nil }
+	handle_unref   fn (voidptr) = unsafe { nil }
 	base           u64
 	length         u64
 	offset         i64
@@ -132,10 +135,6 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 		}
 		new_local_range.pagemap = new_pagemap
 
-		if voidptr(global_range.resource) != unsafe { nil } {
-			global_range.resource.refcount++
-		}
-
 		if local_range.flags & map_shared != 0 {
 			global_range.locals << new_local_range
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
@@ -154,6 +153,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			}
 
 			new_global_range.resource = global_range.resource
+			new_global_range.handle = global_range.handle
+			new_global_range.handle_ref = global_range.handle_ref
+			new_global_range.handle_unref = global_range.handle_unref
 			new_global_range.base = global_range.base
 			new_global_range.length = global_range.length
 			new_global_range.offset = global_range.offset
@@ -165,6 +167,10 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			new_global_range.locals << new_local_range
 
 			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+			if new_global_range.handle != unsafe { nil }
+				&& new_global_range.handle_ref != unsafe { nil } {
+				new_global_range.handle_ref(new_global_range.handle)
+			}
 
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 				old_pte := old_pagemap.virt2pte(i, false) or { continue }
@@ -258,12 +264,16 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 	}
 }
 
-pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags int, _resource &resource.Resource, offset i64) ?voidptr {
+pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags int, _resource &resource.Resource, offset i64, handle voidptr, handle_ref fn (voidptr), handle_unref fn (voidptr)) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
 
 	if _length == 0 {
 		C.printf(c'mmap: length is 0\n')
+		errno.set(errno.einval)
+		return none
+	}
+	if flags & map_anonymous == 0 && (offset < 0 || offset % i64(page_size) != 0) {
 		errno.set(errno.einval)
 		return none
 	}
@@ -301,9 +311,14 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	// Device memory (framebuffers) needs uncached mapping on ARM64 so
 	// writes reach physical RAM instead of staying in CPU cache.
 	mut extra_pte := u64(0)
-	if voidptr(resource_) != unsafe { nil } && is_uncached_resource(voidptr(resource_)) {
+	if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil }
+		&& is_uncached_resource(voidptr(resource_)) {
 		extra_pte = memory.pte_uncached
 		// Device memory mapped with Non-Cacheable attribute
+	}
+	mut range_handle := voidptr(0)
+	if flags & map_anonymous == 0 {
+		range_handle = handle
 	}
 
 	mut range_global := &MmapRangeGlobal{
@@ -311,6 +326,9 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		base:           base
 		length:         length
 		resource:       resource_
+		handle:         range_handle
+		handle_ref:     handle_ref
+		handle_unref:   handle_unref
 		offset:         offset
 		pte_extra:      extra_pte
 		shadow_pagemap: memory.Pagemap{
@@ -327,8 +345,8 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	pagemap.mmap_ranges << voidptr(range_local)
 	pagemap.l.release()
 
-	if voidptr(resource_) != unsafe { nil } {
-		resource_.refcount++
+	if range_handle != unsafe { nil } && handle_ref != unsafe { nil } {
+		handle_ref(range_handle)
 	}
 
 	// Pre-fault all pages immediately to avoid demand-paging page faults.
@@ -340,7 +358,12 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 			page = memory.pmm_alloc(1)
 		} else if voidptr(resource_) != unsafe { nil } {
 			file_page := u64((offset + i64(i)) / i64(page_size))
-			page = resource_.mmap(file_page, flags)
+			page = resource_.mmap(handle, file_page, flags)
+		}
+		if flags & map_anonymous == 0 && page == unsafe { nil } {
+			munmap(mut pagemap, voidptr(base), length) or {}
+			errno.set(errno.einval)
+			return none
 		}
 		if page != unsafe { nil } {
 			map_page_in_range(range_global, base + i, u64(page), prot) or {}
@@ -534,6 +557,10 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 					// global_range.resource.munmap(i)
 				}
 				memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
+				if global_range.handle != unsafe { nil }
+					&& global_range.handle_unref != unsafe { nil } {
+					global_range.handle_unref(global_range.handle)
+				}
 				unsafe {
 					global_range.locals.free()
 					free(global_range)

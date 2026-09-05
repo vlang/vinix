@@ -26,6 +26,7 @@ mut:
 	handle u32
 	addr   u64
 	size   u64
+	obj    &gem.GemObject = unsafe { nil }
 }
 
 pub struct GpuFile {
@@ -34,6 +35,8 @@ pub mut:
 	vms           []&mmu.UatContext
 	queues        []&workqueue.WorkQueue
 	mappings      []GpuMapping
+	objects       []&gem.GemObject
+	mmap_objects  []&gem.GemObject
 	next_queue_id u32
 	lock          klock.Lock
 }
@@ -100,7 +103,6 @@ pub fn (mut f GpuFile) close() {
 		q.destroy()
 	}
 	f.queues.clear()
-	f.mappings.clear()
 
 	mgr := uat_mgr
 	if mgr != unsafe { nil } {
@@ -110,7 +112,79 @@ pub fn (mut f GpuFile) close() {
 		}
 	}
 	f.vms.clear()
+	for mapping in f.mappings {
+		gem.unref(mapping.obj)
+	}
+	f.mappings.clear()
+	for obj in f.mmap_objects {
+		gem.unref(obj)
+	}
+	f.mmap_objects.clear()
+	for obj in f.objects {
+		gem.unref(obj)
+	}
+	f.objects.clear()
 	f.lock.release()
+}
+
+fn (mut f GpuFile) get_object_ref(handle u32) ?&gem.GemObject {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	for obj in f.objects {
+		if obj.handle == handle {
+			gem.ref_obj(obj)
+			return obj
+		}
+	}
+	return none
+}
+
+fn (mut f GpuFile) authorize_mmap(handle u32) ?u64 {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	mut found := &gem.GemObject(unsafe { nil })
+	for obj in f.objects {
+		if obj.handle == handle {
+			found = obj
+			break
+		}
+	}
+	if voidptr(found) == unsafe { nil } {
+		return none
+	}
+	for obj in f.mmap_objects {
+		if voidptr(obj) == voidptr(found) {
+			return gem.create_mmap_offset(found)
+		}
+	}
+	gem.ref_obj(found)
+	f.mmap_objects << found
+	return gem.create_mmap_offset(found)
+}
+
+fn (mut f GpuFile) mmap_page(page u64) voidptr {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	for obj in f.mmap_objects {
+		if phys := gem.get_object_mmap_page(obj, page) {
+			return phys
+		}
+	}
+	return unsafe { nil }
+}
+
+fn (mut f GpuFile) close_object_handle(handle u32) int {
+	f.lock.acquire()
+	for i, obj in f.objects {
+		if obj.handle == handle {
+			f.objects.delete(i)
+			f.lock.release()
+			gem.unref(obj)
+			return 0
+		}
+	}
+	f.lock.release()
+	return -2 // ENOENT
 }
 
 fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
@@ -238,6 +312,11 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 			return -16 // EBUSY
 		}
 	}
+	for mapping in f.mappings {
+		if mapping.vm_id == request.vm_id {
+			return -16
+		}
+	}
 	for i, vm in f.vms {
 		if vm.id == request.vm_id {
 			mut manager := unsafe { uat_mgr }
@@ -249,7 +328,7 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 	return -22
 }
 
-pub fn (f &GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
+pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	mut request := unsafe { data }
 	valid_flags := ioctl.asahi_gem_writeback | ioctl.asahi_gem_vm_private
 	if request.extensions != 0 || request.pad != 0 || request.flags & ~valid_flags != 0 {
@@ -261,17 +340,19 @@ pub fn (f &GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 		return -22
 	}
 	obj := gem.create_aligned(request.size, pgtable.uat_pgsz) or { return -12 }
+	f.lock.acquire()
+	f.objects << obj
+	f.lock.release()
 	request.handle = obj.handle
 	return 0
 }
 
-pub fn (f &GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) int {
+pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) int {
 	mut request := unsafe { data }
 	if request.extensions != 0 || request.flags != 0 {
 		return -22
 	}
-	obj := gem.get_by_handle(request.handle) or { return -2 }
-	request.offset = gem.create_mmap_offset(obj)
+	request.offset = f.authorize_mmap(request.handle) or { return -2 }
 	return 0
 }
 
@@ -291,9 +372,10 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 
 	match request.op {
 		ioctl.asahi_bind_op_bind {
-			obj := gem.get_by_handle(request.handle) or { return -2 }
+			obj := f.get_object_ref(request.handle) or { return -2 }
 			if request.offset & pgtable.uat_pg_mask != 0 || request.offset > obj.size
 				|| request.range > obj.size - request.offset {
+				gem.unref(obj)
 				return -22
 			}
 			protection := if request.flags & ioctl.asahi_bind_write != 0 {
@@ -302,6 +384,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				pgtable.gpu_prot_gpu_shared_ro
 			}
 			if !pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) {
+				gem.unref(obj)
 				return -12
 			}
 			f.lock.acquire()
@@ -310,6 +393,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				handle: request.handle
 				addr: request.addr
 				size: request.range
+				obj: obj
 			}
 			f.lock.release()
 			return 0
@@ -324,6 +408,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				mapping := f.mappings[i]
 				if mapping.vm_id == request.vm_id && mapping.addr == request.addr
 					&& mapping.size == request.range {
+					gem.unref(mapping.obj)
 					f.mappings.delete(i)
 				}
 			}
@@ -334,15 +419,18 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			if request.handle == 0 || request.flags != 0 || request.offset != 0 || request.addr != 0 {
 				return -22
 			}
+			obj := f.get_object_ref(request.handle) or { return -2 }
 			f.lock.acquire()
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
-				if mapping.vm_id == request.vm_id && mapping.handle == request.handle {
+				if mapping.vm_id == request.vm_id && voidptr(mapping.obj) == voidptr(obj) {
 					pt.unmap(mapping.addr, mapping.size)
+					gem.unref(mapping.obj)
 					f.mappings.delete(i)
 				}
 			}
 			f.lock.release()
+			gem.unref(obj)
 			return 0
 		}
 		else {
@@ -423,7 +511,7 @@ fn valid_render_command(command &ioctl.DrmAsahiCmdRender) bool {
 // obsolete v12.3 placeholder. G17/HAL300 work commands have a different,
 // partially recovered layout; rejecting them is the only safe behavior until
 // gpu.g17 has a complete encoder and completion path.
-pub fn (f &GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
+pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	request := unsafe { data }
 	if request.extensions != 0 || request.flags != 0 || request.command_count == 0
 		|| request.command_count > max_submission_commands || request.commands == 0
@@ -473,11 +561,13 @@ pub fn (f &GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 			if request.result_handle == 0 {
 				return -22
 			}
-			result := gem.get_by_handle(request.result_handle) or { return -2 }
+			result := f.get_object_ref(request.result_handle) or { return -2 }
 			if command.result_offset > result.size
 				|| command.result_size > result.size - command.result_offset {
+				gem.unref(result)
 				return -22
 			}
+			gem.unref(result)
 		} else if command.result_offset != 0 {
 			return -22
 		}
@@ -487,6 +577,28 @@ pub fn (f &GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 
 fn dispatch(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
 	return get_or_create_file(handle, dev)
+}
+
+fn lookup_file(handle voidptr) ?&GpuFile {
+	if handle == unsafe { nil } {
+		return none
+	}
+	file_map_lock.acquire()
+	defer { file_map_lock.release() }
+	f := file_map[u64(handle)] or { return none }
+	return f
+}
+
+pub fn close_gem_handle(_dev &drm.DrmDevice, handle voidptr, object_handle u32) int {
+	f := lookup_file(handle) or { return -2 }
+	mut file := unsafe { f }
+	return file.close_object_handle(object_handle)
+}
+
+pub fn mmap_handle(_dev &drm.DrmDevice, handle voidptr, page u64, _flags int) voidptr {
+	f := lookup_file(handle) or { return unsafe { nil } }
+	mut file := unsafe { f }
+	return file.mmap_page(page)
 }
 
 fn ioctl_get_params_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
@@ -508,12 +620,14 @@ fn ioctl_vm_destroy_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) in
 
 fn ioctl_gem_create_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	f := dispatch(handle, dev) or { return -19 }
-	return f.ioctl_gem_create(unsafe { &ioctl.DrmAsahiGemCreate(data) })
+	mut file := unsafe { f }
+	return file.ioctl_gem_create(unsafe { &ioctl.DrmAsahiGemCreate(data) })
 }
 
 fn ioctl_gem_mmap_offset_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	f := dispatch(handle, dev) or { return -19 }
-	return f.ioctl_gem_mmap_offset(unsafe { &ioctl.DrmAsahiGemMmapOffset(data) })
+	mut file := unsafe { f }
+	return file.ioctl_gem_mmap_offset(unsafe { &ioctl.DrmAsahiGemMmapOffset(data) })
 }
 
 fn ioctl_gem_bind_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
@@ -536,7 +650,8 @@ fn ioctl_queue_destroy_handler(dev &drm.DrmDevice, handle voidptr, data voidptr)
 
 fn ioctl_submit_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	f := dispatch(handle, dev) or { return -19 }
-	return f.ioctl_submit(unsafe { &ioctl.DrmAsahiSubmit(data) })
+	mut file := unsafe { f }
+	return file.ioctl_submit(unsafe { &ioctl.DrmAsahiSubmit(data) })
 }
 
 pub fn drm_ioctls() []drm.DrmIoctl {

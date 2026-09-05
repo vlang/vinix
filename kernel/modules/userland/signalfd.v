@@ -41,7 +41,7 @@ pub mut:
 	queue []&SFDSiginfo
 }
 
-fn (mut this SignalFD) mmap(page u64, flags int) voidptr {
+fn (mut this SignalFD) mmap(_handle voidptr, page u64, flags int) voidptr {
 	panic('')
 }
 

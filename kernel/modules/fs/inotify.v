@@ -19,7 +19,7 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this INotify) mmap(page u64, flags int) voidptr {
+fn (mut this INotify) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return unsafe { nil }
 }
 

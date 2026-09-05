@@ -41,7 +41,8 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if range_local.flags & map_anonymous != 0 {
 		page = memory.pmm_alloc(1)
 	} else {
-		page = range_local.global.resource.mmap(file_page, range_local.flags)
+		page = range_local.global.resource.mmap(range_local.global.handle, file_page,
+			range_local.flags)
 	}
 
 	map_page_in_range(range_local.global, memory_page * page_size, u64(page), range_local.prot) or {

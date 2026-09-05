@@ -252,7 +252,7 @@ pub mut:
 	termios termios.Termios
 }
 
-fn (mut this Console) mmap(page u64, flags int) voidptr {
+fn (mut this Console) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

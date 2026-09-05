@@ -22,7 +22,7 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevNull) mmap(page u64, flags int) voidptr {
+fn (mut this DevNull) mmap(_handle voidptr, page u64, flags int) voidptr {
 	panic('')
 }
 
@@ -78,7 +78,7 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevZero) mmap(page u64, flags int) voidptr {
+fn (mut this DevZero) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return memory.pmm_alloc(1)
 }
 
@@ -137,7 +137,7 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevFull) mmap(page u64, flags int) voidptr {
+fn (mut this DevFull) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return memory.pmm_alloc(1)
 }
 

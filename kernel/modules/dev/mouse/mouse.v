@@ -66,7 +66,7 @@ pub mut:
 	packet     MousePacket
 }
 
-fn (mut this Mouse) mmap(page u64, flags int) voidptr {
+fn (mut this Mouse) mmap(_handle voidptr, page u64, flags int) voidptr {
 	panic('')
 }
 

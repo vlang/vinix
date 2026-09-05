@@ -38,6 +38,8 @@ pub mut:
 	features   u32
 	ioctls     []DrmIoctl
 	file_close fn (&DrmDevice, voidptr) = unsafe { nil }
+	gem_close  fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
+	mmap       fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
 }
 
 pub struct DrmDevice {
@@ -100,13 +102,19 @@ fn create_device_node(dev &DrmDevice) ?&DrmNode {
 	node.stat.blksize = 4096
 	node.stat.rdev = resource.create_dev_id()
 	node.stat.mode = stat.ifchr | 0o666
+	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
 	fs.devtmpfs_add_device(node, 'dri/card${dev.dev_id}')
 	return node
 }
 
-fn (mut this DrmNode) mmap(page u64, _flags int) voidptr {
-	return gem.get_mmap_page(page) or { return unsafe { nil } }
+fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
+	if handle == unsafe { nil } || voidptr(this.dev) == unsafe { nil }
+		|| voidptr(this.dev.driver) == unsafe { nil }
+		|| this.dev.driver.mmap == unsafe { nil } {
+		return unsafe { nil }
+	}
+	return this.dev.driver.mmap(this.dev, handle, page, flags)
 }
 
 fn (mut this DrmNode) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -249,13 +257,16 @@ fn ioctl_get_cap(data voidptr) int {
 	}
 }
 
-fn ioctl_gem_close(data voidptr) int {
+fn ioctl_gem_close(dev &DrmDevice, handle voidptr, data voidptr) int {
 	if data == unsafe { nil } {
 		return -14
 	}
 	request := unsafe { &ioctl.DrmGemClose(data) }
 	if request.pad != 0 {
 		return -22
+	}
+	if dev.driver.gem_close != unsafe { nil } {
+		return dev.driver.gem_close(dev, handle, request.handle)
 	}
 	obj := gem.get_by_handle(request.handle) or { return -2 }
 	gem.unref(obj)
@@ -346,11 +357,11 @@ fn ioctl_syncobj_wait(data voidptr) int {
 	return -62
 }
 
-fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr) ?int {
+fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 	match cmd {
 		ioctl.drm_ioctl_version { return ioctl_version(dev, data) }
 		ioctl.drm_ioctl_get_cap { return ioctl_get_cap(data) }
-		ioctl.drm_ioctl_gem_close { return ioctl_gem_close(data) }
+		ioctl.drm_ioctl_gem_close { return ioctl_gem_close(dev, handle, data) }
 		ioctl.drm_ioctl_syncobj_create { return ioctl_syncobj_create(data) }
 		ioctl.drm_ioctl_syncobj_destroy { return ioctl_syncobj_destroy(data) }
 		ioctl.drm_ioctl_syncobj_wait { return ioctl_syncobj_wait(data) }
@@ -368,7 +379,7 @@ pub fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
 	if !dev.registered {
 		return -19 // ENODEV
 	}
-	if ret := core_ioctl(dev, cmd, data) {
+	if ret := core_ioctl(dev, cmd, data, handle) {
 		return ret
 	}
 

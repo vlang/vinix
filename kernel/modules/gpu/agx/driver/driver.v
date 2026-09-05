@@ -564,6 +564,8 @@ pub fn initialise() {
 		features: drm.driver_gem | drm.driver_render | drm.driver_compute
 		ioctls: agx_file.drm_ioctls()
 		file_close: agx_file.release_handle
+		gem_close: agx_file.close_gem_handle
+		mmap: agx_file.mmap_handle
 	}
 
 	agx_driver_inst.drm_dev = drm.register_driver(agx_drm_driver) or {

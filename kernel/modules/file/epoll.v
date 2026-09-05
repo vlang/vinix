@@ -86,7 +86,7 @@ fn (mut this EpollResource) grow(handle voidptr, new_size u64) ? {
 	return none
 }
 
-fn (mut this EpollResource) mmap(page u64, flags int) voidptr {
+fn (mut this EpollResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return unsafe { nil }
 }
 

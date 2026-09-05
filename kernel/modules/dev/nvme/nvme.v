@@ -403,7 +403,7 @@ fn (mut dev NVMENamespace) grow(handle voidptr, new_size u64) ? {
 	return none
 }
 
-fn (mut dev NVMENamespace) mmap(page u64, flags int) voidptr {
+fn (mut dev NVMENamespace) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

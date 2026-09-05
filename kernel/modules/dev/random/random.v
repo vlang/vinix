@@ -73,7 +73,7 @@ fn (mut this URandom) do_salsa20_block(mut out [16]u32) {
 	}
 }
 
-fn (mut this URandom) mmap(page u64, flags int) voidptr {
+fn (mut this URandom) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return memory.pmm_alloc(1)
 }
 

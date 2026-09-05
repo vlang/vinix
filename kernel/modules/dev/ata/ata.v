@@ -185,7 +185,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	return dev
 }
 
-fn (mut this ATADrive) mmap(page u64, flags int) voidptr {
+fn (mut this ATADrive) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

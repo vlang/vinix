@@ -104,7 +104,7 @@ pub mut:
 	filesystem &EXT2Filesystem
 }
 
-fn (mut this EXT2Resource) mmap(page u64, flags int) voidptr {
+fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 

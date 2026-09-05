@@ -47,7 +47,7 @@ mut:
 	unref(handle voidptr) ?
 	link(handle voidptr) ?
 	unlink(handle voidptr) ?
-	mmap(page u64, flags int) voidptr
+	mmap(handle voidptr, page u64, flags int) voidptr
 }
 
 __global (

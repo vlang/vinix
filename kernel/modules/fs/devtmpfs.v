@@ -24,7 +24,7 @@ pub mut:
 	capacity u64
 }
 
-fn (mut this DevTmpFSResource) mmap(page u64, flags int) voidptr {
+fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	this.l.acquire()
 	defer {
 		this.l.release()

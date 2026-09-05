@@ -98,8 +98,8 @@ fn (mut this Partition) grow(handle voidptr, new_size u64) ? {
 	return this.parent_device.grow(handle, new_size)
 }
 
-fn (mut this Partition) mmap(page u64, flags int) voidptr {
-	return this.parent_device.mmap(page, flags)
+fn (mut this Partition) mmap(handle voidptr, page u64, flags int) voidptr {
+	return this.parent_device.mmap(handle, page, flags)
 }
 
 pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {

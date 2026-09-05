@@ -51,6 +51,22 @@ fn (mut this Handle) unref() {
 	unsafe { free(voidptr(this)) }
 }
 
+fn retain_mmap_handle(handle voidptr) {
+	if handle == unsafe { nil } {
+		return
+	}
+	mut open_handle := unsafe { &Handle(handle) }
+	katomic.inc(mut &open_handle.refcount)
+}
+
+fn release_mmap_handle(handle voidptr) {
+	if handle == unsafe { nil } {
+		return
+	}
+	mut open_handle := unsafe { &Handle(handle) }
+	open_handle.unref()
+}
+
 struct PollFD {
 mut:
 	fd      int
@@ -476,7 +492,13 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 		return errno.err, errno.ebadf
 	}
 
-	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset) or {
+	mut mapping_handle := voidptr(0)
+	if fdnum != -1 {
+		mapping_handle = voidptr(fd.handle)
+	}
+	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset,
+		mapping_handle,
+		retain_mmap_handle, release_mmap_handle) or {
 		return errno.err, errno.get()
 	}
 

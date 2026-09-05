@@ -167,6 +167,6 @@ fn (mut dev OssDevice) unlink(handle voidptr) ? {
 	katomic.dec(mut dev.stat.nlink)
 }
 
-fn (mut dev OssDevice) mmap(page u64, flags int) voidptr {
+fn (mut dev OssDevice) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
