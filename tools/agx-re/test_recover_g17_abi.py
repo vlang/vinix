@@ -4522,6 +4522,15 @@ class RecoverG17AbiTests(unittest.TestCase):
                 "value": 0xFFFFFFFFFFFFFFFF,
             },
         )
+        negative_one_w = [(0x46, 0x12800004)]  # mov w4, #-1
+        self.assertEqual(
+            recover_g17_abi.classify_g17_value_argument(negative_one_w, 1),
+            {
+                "kind": "constant",
+                "producer_offset": 0x46,
+                "value": 0xFFFFFFFF,
+            },
+        )
 
         copied_descriptor = [
             (0x48, 0xF943B276),  # ldr x22, [x19, #0x760]
@@ -4574,6 +4583,60 @@ class RecoverG17AbiTests(unittest.TestCase):
                 "instruction": 0xAA1603E4,
             },
         )
+
+    def test_recovers_g17_register_value_expression(self) -> None:
+        instructions = [
+            (0x00, 0xF943B268),  # ldr x8, [x19, #0x760]
+            (0x04, 0x927AE504),  # and x4, x8, #0xffffffffffffffc0
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 2)
+        self.assertEqual(recovered["kind"], "computed")
+        self.assertEqual(
+            recovered["expression"],
+            {
+                "kind": "expression",
+                "producer_offset": 0x04,
+                "operation": "and",
+                "bytes": 8,
+                "immediate": 0xFFFFFFFFFFFFFFC0,
+                "source": {
+                    "kind": "descriptor_load",
+                    "producer_offset": 0x00,
+                    "member": 0x760,
+                    "bytes": 8,
+                    "signed": False,
+                },
+            },
+        )
+
+    def test_g17_bitfield_insert_expression_keeps_old_destination(self) -> None:
+        and_x4_x8 = (0x92405D24 & ~0x3E0) | (8 << 5)
+        instructions = [
+            (0x00, 0xB94B2A68),  # ldr w8, [x19, #0xb28]
+            (0x04, and_x4_x8),  # and x4, x8, #0xffffff
+            (0x08, 0xB94B2E69),  # ldr w9, [x19, #0xb2c]
+            (0x0C, 0xD343FD29),  # lsr x9, x9, #3
+            (0x10, 0xB3687124),  # bfi x4, x9, #24, #29
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 5)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "bfm")
+        self.assertEqual(expression["destination"]["operation"], "and")
+        self.assertEqual(expression["source"]["operation"], "ubfm")
+
+    def test_recovers_g17_register_add_expression(self) -> None:
+        instructions = [
+            (0x00, 0xF943B279),  # ldr x25, [x19, #0x760]
+            (0x04, 0xF943B67C),  # ldr x28, [x19, #0x768]
+            (0x08, 0x8B1C0324),  # add x4, x25, x28
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 3)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "add")
+        self.assertEqual(expression["modifier"], "lsl")
+        self.assertEqual(expression["amount"], 0)
+        self.assertEqual(expression["first"]["member"], 0x760)
+        self.assertEqual(expression["second"]["member"], 0x768)
 
     def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
         instructions = [

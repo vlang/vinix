@@ -771,6 +771,15 @@ def decode_movk_w(word: int) -> tuple[int, int, int] | None:
     return register, immediate, shift
 
 
+def decode_movn_w(word: int) -> tuple[int, int] | None:
+    if word & 0xFF800000 != 0x12800000:
+        return None
+    register = word & 0x1F
+    shift = ((word >> 21) & 0x1) * 16
+    immediate = ((word >> 5) & 0xFFFF) << shift
+    return register, (~immediate) & 0xFFFFFFFF
+
+
 def decode_add_sub_immediate_w(word: int) -> tuple[str, int, int, int] | None:
     opcode = word & 0xFF000000
     if opcode == 0x11000000:
@@ -845,6 +854,9 @@ def resolve_static_w_register(
     use_offset = instructions[before][0] if before < len(instructions) else 1 << 63
     for index in range(before - 1, -1, -1):
         offset, word = instructions[index]
+        inverted = decode_movn_w(word)
+        if inverted is not None and inverted[0] == register:
+            return inverted[1]
         materialized = decode_movz_w(word)
         if materialized is not None and materialized[0] == register:
             return materialized[1] & 0xFFFFFFFF
@@ -949,6 +961,9 @@ def resolve_static_x_register(
         return None
     for index in range(before - 1, -1, -1):
         _offset, word = instructions[index]
+        inverted_w = decode_movn_w(word)
+        if inverted_w is not None and inverted_w[0] == register:
+            return inverted_w[1]
         materialized_w = decode_movz_w(word)
         if materialized_w is not None and materialized_w[0] == register:
             return materialized_w[1] & 0xFFFFFFFF
@@ -1035,6 +1050,8 @@ def g17_register_is_written(word: int, register: int) -> bool:
     load = decode_load_register(word)
     if load is not None and load[0] == register:
         return True
+    if word & 0xFFC0001F == 0xB9800000 | register:  # LDRSW Xt, [Xn, #imm]
+        return True
     pair = decode_ldp_x(word)
     if pair is not None and register in pair[:2]:
         return True
@@ -1043,6 +1060,9 @@ def g17_register_is_written(word: int, register: int) -> bool:
         return True
     move_w = decode_movz_w(word)
     if move_w is not None and move_w[0] == register:
+        return True
+    move_n_w = decode_movn_w(word)
+    if move_n_w is not None and move_n_w[0] == register:
         return True
     update_w = decode_movk_w(word)
     if update_w is not None and update_w[0] == register:
@@ -1059,6 +1079,49 @@ def g17_register_is_written(word: int, register: int) -> bool:
     )
 
 
+def find_dominating_g17_register_write(
+    instructions: list[tuple[int, int]], use_index: int, register: int
+) -> int | None:
+    """Find a reaching integer definition without choosing across a CFG join."""
+
+    definition_index = next(
+        (
+            index
+            for index in range(use_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], register)
+        ),
+        None,
+    )
+    if definition_index is None:
+        return None
+
+    definition_offset = instructions[definition_index][0]
+    use_offset = (
+        instructions[use_index][0]
+        if use_index < len(instructions)
+        else instructions[-1][0] + 4
+    )
+    for branch_index, (offset, word) in enumerate(instructions):
+        target = decode_local_branch_target(offset, word)
+        if (
+            target is not None
+            and definition_offset < target <= use_offset
+            and not definition_index < branch_index < use_index
+        ):
+            return None
+
+    # AAPCS64 calls may replace every caller-saved register. Callee-saved
+    # values are precisely why the copy tracing above is useful across calls.
+    if register <= 18:
+        for offset, word in instructions[definition_index + 1 : use_index]:
+            if (
+                decode_bl_target(offset, word) is not None
+                or word & 0xFFFFFC00 == 0xD73F0800
+            ):
+                return None
+    return definition_index
+
+
 def trace_g17_register_copy(
     instructions: list[tuple[int, int]], copy_index: int, source: int
 ) -> dict[str, object] | None:
@@ -1066,30 +1129,14 @@ def trace_g17_register_copy(
 
     if not 19 <= source <= 28:
         return None
-    definition_index = next(
-        (
-            index
-            for index in range(copy_index - 1, -1, -1)
-            if g17_register_is_written(instructions[index][1], source)
-        ),
-        None,
+    definition_index = find_dominating_g17_register_write(
+        instructions, copy_index, source
     )
     if definition_index is None:
         return None
 
     definition_offset, definition = instructions[definition_index]
     copy_offset = instructions[copy_index][0]
-    # A branch from outside the candidate definition's region to a later
-    # instruction could reach the copy without executing that definition.
-    # Reject such joins rather than assigning a path-specific value.
-    for branch_index, (offset, word) in enumerate(instructions):
-        target = decode_local_branch_target(offset, word)
-        if (
-            target is not None
-            and definition_offset < target <= copy_offset
-            and not definition_index < branch_index < copy_index
-        ):
-            return None
 
     load = decode_load_unsigned(definition)
     if load is not None and load[0] == source and load[1] == 19:
@@ -1119,6 +1166,7 @@ def trace_g17_register_copy(
             }
     if (
         decode_move_wide(definition) is not None
+        or decode_movn_w(definition) is not None
         or decode_movz_w(definition) is not None
         or decode_movk_w(definition) is not None
     ):
@@ -1131,6 +1179,341 @@ def trace_g17_register_copy(
                 "via_register": source,
                 "value": value,
             }
+    return None
+
+
+def decode_logical_shifted_register(word: int) -> dict[str, object] | None:
+    if word & 0x1F000000 != 0x0A000000:
+        return None
+    width = 8 if word & 0x80000000 else 4
+    amount = (word >> 10) & 0x3F
+    if width == 4 and amount >= 32:
+        return None
+    kinds = ("and", "orr", "eor", "ands")
+    kind = kinds[(word >> 29) & 0x3]
+    if word & (1 << 21):
+        kind = {"and": "bic", "orr": "orn", "eor": "eon", "ands": "bics"}[
+            kind
+        ]
+    return {
+        "operation": kind,
+        "destination_register": word & 0x1F,
+        "first_register": (word >> 5) & 0x1F,
+        "second_register": (word >> 16) & 0x1F,
+        "shift": ("lsl", "lsr", "asr", "ror")[(word >> 22) & 0x3],
+        "amount": amount,
+        "bytes": width,
+    }
+
+
+def decode_logical_immediate_x(word: int) -> tuple[str, int, int, int] | None:
+    kinds = {
+        0x92000000: "and",
+        0xB2000000: "orr",
+        0xD2000000: "eor",
+        0xF2000000: "ands",
+    }
+    kind = kinds.get(word & 0xFF800000)
+    if kind is None:
+        return None
+    destination = word & 0x1F
+    source = (word >> 5) & 0x1F
+    n = (word >> 22) & 0x1
+    immr = (word >> 16) & 0x3F
+    imms = (word >> 10) & 0x3F
+    length_source = n << 6 | (~imms & 0x3F)
+    length = length_source.bit_length() - 1
+    if length < 1:
+        return None
+    levels = (1 << length) - 1
+    rotation = immr & levels
+    ones = imms & levels
+    if ones == levels:
+        return None
+    element_bits = 1 << length
+    element_mask = (1 << element_bits) - 1
+    element = (1 << (ones + 1)) - 1
+    if rotation:
+        element = (
+            (element >> rotation) | (element << (element_bits - rotation))
+        ) & element_mask
+    immediate = 0
+    for shift in range(0, 64, element_bits):
+        immediate |= element << shift
+    return kind, destination, source, immediate
+
+
+def decode_add_sub_immediate_value(word: int) -> dict[str, object] | None:
+    if word & 0x1F000000 != 0x11000000:
+        return None
+    immediate = (word >> 10) & 0xFFF
+    if word & (1 << 22):
+        immediate <<= 12
+    return {
+        "operation": "sub" if word & (1 << 30) else "add",
+        "destination_register": word & 0x1F,
+        "source_register": (word >> 5) & 0x1F,
+        "immediate": immediate,
+        "bytes": 8 if word & 0x80000000 else 4,
+    }
+
+
+def decode_add_sub_register_value(word: int) -> dict[str, object] | None:
+    if word & 0x1F000000 != 0x0B000000:
+        return None
+    result: dict[str, object] = {
+        "operation": "sub" if word & (1 << 30) else "add",
+        "destination_register": word & 0x1F,
+        "first_register": (word >> 5) & 0x1F,
+        "second_register": (word >> 16) & 0x1F,
+        "bytes": 8 if word & 0x80000000 else 4,
+    }
+    if word & (1 << 21):
+        result["extend"] = (
+            "uxtb",
+            "uxth",
+            "uxtw",
+            "uxtx",
+            "sxtb",
+            "sxth",
+            "sxtw",
+            "sxtx",
+        )[(word >> 13) & 0x7]
+        result["amount"] = (word >> 10) & 0x7
+    else:
+        shift = (word >> 22) & 0x3
+        if shift == 3:
+            return None
+        result["shift"] = ("lsl", "lsr", "asr")[shift]
+        result["amount"] = (word >> 10) & 0x3F
+    return result
+
+
+def decode_bitfield_value(word: int) -> dict[str, object] | None:
+    if word & 0x1F800000 != 0x13000000:
+        return None
+    opcode = (word >> 29) & 0x3
+    if opcode == 3:
+        return None
+    width = 8 if word & 0x80000000 else 4
+    if ((word >> 22) & 0x1) != (width == 8):
+        return None
+    return {
+        "operation": ("sbfm", "bfm", "ubfm")[opcode],
+        "destination_register": word & 0x1F,
+        "source_register": (word >> 5) & 0x1F,
+        "rotate": (word >> 16) & 0x3F,
+        "mask_end": (word >> 10) & 0x3F,
+        "bytes": width,
+    }
+
+
+def trace_g17_value_expression(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    register: int,
+    depth: int = 0,
+    seen: frozenset[tuple[int, int]] = frozenset(),
+) -> dict[str, object] | None:
+    """Build a conservative expression tree for one integer register value."""
+
+    key = (use_index, register)
+    if depth > 12 or key in seen:
+        return None
+    definition_index = find_dominating_g17_register_write(
+        instructions, use_index, register
+    )
+    if definition_index is None:
+        return None
+    offset, word = instructions[definition_index]
+    next_seen = seen | {key}
+
+    load = decode_load_unsigned(word)
+    if load is not None and load[0] == register and load[1] == 19:
+        _destination, _base, member, width = load
+        return {
+            "kind": "descriptor_load",
+            "producer_offset": offset,
+            "member": member,
+            "bytes": width,
+            "signed": False,
+        }
+    if word & 0xFFC0001F == 0xB9800000 | register:
+        base = (word >> 5) & 0x1F
+        if base == 19:
+            return {
+                "kind": "descriptor_load",
+                "producer_offset": offset,
+                "member": ((word >> 10) & 0xFFF) * 4,
+                "bytes": 4,
+                "signed": True,
+            }
+
+    if (
+        decode_move_wide(word) is not None
+        or decode_movn_w(word) is not None
+        or decode_movz_w(word) is not None
+        or decode_movk_w(word) is not None
+    ):
+        value = resolve_static_x_register(instructions, use_index, register)
+        if value is not None:
+            return {
+                "kind": "constant",
+                "producer_offset": offset,
+                "value": value,
+            }
+
+    copy = decode_register_copy(word)
+    if copy is not None and copy[0] == register:
+        _destination, source, width = copy
+        if source == 31:
+            return {"kind": "constant", "producer_offset": offset, "value": 0}
+        source_value = trace_g17_value_expression(
+            instructions, definition_index, source, depth + 1, next_seen
+        )
+        if source_value is None:
+            return None
+        return {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": "copy",
+            "bytes": width,
+            "source": source_value,
+        }
+
+    immediate = decode_logical_immediate_x(word)
+    width = 8
+    if immediate is None:
+        immediate = decode_logical_immediate_w(word)
+        width = 4
+    if immediate is not None and immediate[1] == register:
+        operation, _destination, source, value = immediate
+        source_value = (
+            {"kind": "constant", "value": 0}
+            if source == 31
+            else trace_g17_value_expression(
+                instructions, definition_index, source, depth + 1, next_seen
+            )
+        )
+        if source_value is None:
+            return None
+        return {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": operation,
+            "bytes": width,
+            "immediate": value,
+            "source": source_value,
+        }
+
+    logical = decode_logical_shifted_register(word)
+    if logical is not None and logical["destination_register"] == register:
+        operands = []
+        for source in (logical["first_register"], logical["second_register"]):
+            source_value = (
+                {"kind": "constant", "value": 0}
+                if source == 31
+                else trace_g17_value_expression(
+                    instructions, definition_index, int(source), depth + 1, next_seen
+                )
+            )
+            if source_value is None:
+                return None
+            operands.append(source_value)
+        return {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": logical["operation"],
+            "bytes": logical["bytes"],
+            "shift": logical["shift"],
+            "amount": logical["amount"],
+            "first": operands[0],
+            "second": operands[1],
+        }
+
+    arithmetic = decode_add_sub_immediate_value(word)
+    if arithmetic is not None and arithmetic["destination_register"] == register:
+        source = int(arithmetic["source_register"])
+        if source == 31:
+            return None  # SP is not a value root for register entries.
+        source_value = trace_g17_value_expression(
+            instructions, definition_index, source, depth + 1, next_seen
+        )
+        if source_value is None:
+            return None
+        return {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": arithmetic["operation"],
+            "bytes": arithmetic["bytes"],
+            "immediate": arithmetic["immediate"],
+            "source": source_value,
+        }
+
+    arithmetic_register = decode_add_sub_register_value(word)
+    if (
+        arithmetic_register is not None
+        and arithmetic_register["destination_register"] == register
+    ):
+        operands = []
+        for source in (
+            arithmetic_register["first_register"],
+            arithmetic_register["second_register"],
+        ):
+            if source == 31:
+                return None
+            source_value = trace_g17_value_expression(
+                instructions, definition_index, int(source), depth + 1, next_seen
+            )
+            if source_value is None:
+                return None
+            operands.append(source_value)
+        return {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": arithmetic_register["operation"],
+            "bytes": arithmetic_register["bytes"],
+            "modifier": arithmetic_register.get(
+                "extend", arithmetic_register.get("shift")
+            ),
+            "amount": arithmetic_register["amount"],
+            "first": operands[0],
+            "second": operands[1],
+        }
+
+    bitfield = decode_bitfield_value(word)
+    if bitfield is not None and bitfield["destination_register"] == register:
+        source = int(bitfield["source_register"])
+        source_value = (
+            {"kind": "constant", "value": 0}
+            if source == 31
+            else trace_g17_value_expression(
+                instructions, definition_index, source, depth + 1, next_seen
+            )
+        )
+        if source_value is None:
+            return None
+        result = {
+            "kind": "expression",
+            "producer_offset": offset,
+            "operation": bitfield["operation"],
+            "bytes": bitfield["bytes"],
+            "rotate": bitfield["rotate"],
+            "mask_end": bitfield["mask_end"],
+            "source": source_value,
+        }
+        if bitfield["operation"] == "bfm":
+            destination_value = trace_g17_value_expression(
+                instructions,
+                definition_index,
+                register,
+                depth + 1,
+                next_seen,
+            )
+            if destination_value is None:
+                return None
+            result["destination"] = destination_value
+        return result
     return None
 
 
@@ -1175,10 +1558,12 @@ def classify_g17_value_argument(
             }
 
         move_w = decode_movz_w(word)
+        move_n_w = decode_movn_w(word)
         update_w = decode_movk_w(word)
         wide = decode_move_wide(word)
         if (
             move_w is not None and move_w[0] == 4
+            or move_n_w is not None and move_n_w[0] == 4
             or update_w is not None and update_w[0] == 4
             or wide is not None and wide[1] == 4
         ):
@@ -1210,12 +1595,16 @@ def classify_g17_value_argument(
 
         instruction_class = word & 0x1F000000
         if word & 0x1F == 4 and instruction_class in classes:
-            return {
+            result: dict[str, object] = {
                 "kind": "computed",
                 "producer_offset": offset,
                 "operation": classes[instruction_class],
                 "instruction": word,
             }
+            expression = trace_g17_value_expression(instructions, before, 4)
+            if expression is not None:
+                result["expression"] = expression
+            return result
     raise ValueError("G17 register-entry value has no nearby x4 writer")
 
 
@@ -8930,6 +9319,10 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             ),
             "unresolved_copy_value_calls": sum(
                 entry["value_source"].get("operation") == "register_copy"
+                for entry in encoder_calls
+            ),
+            "recovered_expression_calls": sum(
+                "expression" in entry["value_source"]
                 for entry in encoder_calls
             ),
             "resolved_encoder_selectors": sorted(resolved),
