@@ -8423,9 +8423,9 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     In addition to the literal audit, a narrow backwards slice resolves the w2
     selector argument at every virtual encoder call.  That recovers the
     ADD/SUB-derived and OR-composed values which dominate the producers.  The
-    complete flag remains false because some records are assembled inline --
-    including a two-record CL sequence -- and their control-flow ordering is
-    not classified yet.  What the selectors name is also not established;
+    complete flag remains false because a two-record CL inline sequence has
+    runtime-dependent selector words and the producers' control-flow ordering
+    is not classified yet.  What the selectors name is also not established;
     they are not SGX MMIO offsets.
     """
 
@@ -8576,13 +8576,164 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         "selectors_complete": False,
         "completeness_note": (
             "every virtual encoder selector argument is statically resolved, "
-            "but manually assembled records and control-flow ordering remain "
-            "to be classified"
+            "but two inline CL selector words are runtime-dependent and the "
+            "control-flow ordering remains to be classified"
         ),
         "distinct_literal_selectors": len(literal_union),
         "distinct_static_selectors": len(static_union),
         "maximum_selector": max(static_union),
         "producers": producers,
+    }
+
+
+def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
+    """Recover register records emitted without the virtual encoder helper.
+
+    Three producers seed their stream with a record and may append a second
+    one directly. FastBlit does the same with a computed static selector. CL
+    additionally constructs two adjacent records from the low 32 bits of its
+    accelerator base; those remain symbolic rather than being misreported as
+    static selector constants.
+    """
+
+    symbols = macho_symbols(image)
+    missing = [name for name in REGISTER_LIST_PRODUCERS.values() if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing register-list producers: {missing}")
+
+    code = {
+        label: symbol_code(image, name)[1]
+        for label, name in REGISTER_LIST_PRODUCERS.items()
+    }
+    require_instruction_words_at(
+        code["3D"],
+        "G17 3D inline register records",
+        {
+            0x100: 0x0A18014A,  # preserve template bits
+            0x104: 0x5282E72B,  # selector 0x1739
+            0x108: 0x2A0B014A,
+            0x10C: 0xB900A12A,
+            0x114: 0x5280002B,  # value one
+            0x178: 0x0A180129,
+            0x17C: 0x5282FC2B,  # selector 0x17e1
+            0x180: 0x2A0B0129,
+            0x184: 0xB9000109,
+            0x188: 0xF800410A,  # value one at header +4
+            0x194: 0x11003129,  # publish one 12-byte record
+        },
+    )
+    require_instruction_words_at(
+        code["TA"],
+        "G17 TA inline register records",
+        {
+            0x088: 0x0A0A0129,
+            0x08C: 0x5282FC2B,  # selector 0x17e1
+            0x090: 0x2A0B0129,
+            0x094: 0xB90062A9,
+            0x098: 0x52800029,
+            0x09C: 0xF80642A9,
+            0x0C8: 0x0A0A0129,
+            0x0CC: 0x5282FE2A,  # selector 0x17f1
+            0x0D0: 0x2A0A0129,
+            0x0D4: 0xB9000109,
+            0x0DC: 0xF8004109,
+            0x0F4: 0x11003129,
+        },
+    )
+    require_instruction_words_at(
+        code["FastBlit"],
+        "G17 FastBlit inline register records",
+        {
+            0x06C: 0x120E4D29,  # preserve template and six low control bits
+            0x070: 0x5282E72A,  # selector 0x1739
+            0x074: 0x2A0A0129,
+            0x078: 0xB9000109,
+            0x080: 0xF8004109,  # value one
+            0x114: 0x5280F21C,  # selector base 0x790
+            0x118: 0x72A0003C,  # selector base 0x10790
+            0x124: 0x120E4129,  # preserve template bits
+            0x128: 0x0B1C0129,  # add static base 0x10790
+            0x12C: 0x511E1D29,  # subtract 0x787 -> selector 0x10009
+            0x130: 0xB9000D09,
+            0x134: 0xF9000916,  # computed blit-control value
+            0x140: 0x11003129,
+        },
+    )
+    require_instruction_words_at(
+        code["CL"],
+        "G17 CL inline register records",
+        {
+            0x03C: 0xF9400815,  # accelerator base from owner +0x10
+            0x090: 0x0A0B0129,
+            0x094: 0x5282FC2A,  # selector 0x17e1
+            0x098: 0x2A0A0129,
+            0x09C: 0xB9004289,
+            0x0A4: 0xF8044289,
+            0x0D8: 0x0A0B0129,
+            0x0DC: 0x5282FE2A,  # selector 0x17f1
+            0x0E0: 0x2A0A0129,
+            0x0E4: 0xB9000109,
+            0x0EC: 0xF8004109,
+            0x0B8: 0x91404EAA,  # accelerator base +0x13000
+            0x0BC: 0x91080156,  # dynamic selector base +0x200
+            0x137C: 0x0A0B014A,
+            0x1380: 0x0B0A02CA,
+            0x1384: 0x1100254A,  # dynamic base +9
+            0x1388: 0xB907628A,
+            0x139C: 0x0A0B014A,
+            0x13A0: 0x0B0A02CA,
+            0x13A4: 0x1100054A,  # dynamic base +1
+            0x13A8: 0xB9076E8A,
+            0x13AC: 0xF903BA89,
+            0x13B8: 0x1100314A,
+        },
+    )
+
+    static_records = {
+        "3D": [
+            {"producer_offset": 0x104, "selector": 0x1739, "value": 1},
+            {"producer_offset": 0x17C, "selector": 0x17E1, "value": 1},
+        ],
+        "TA": [
+            {"producer_offset": 0x08C, "selector": 0x17E1, "value": 1},
+            {"producer_offset": 0x0CC, "selector": 0x17F1, "value": 1},
+        ],
+        "FastBlit": [
+            {"producer_offset": 0x070, "selector": 0x1739, "value": 1},
+            {
+                "producer_offset": 0x128,
+                "selector": 0x10009,
+                "value_source": "computed_blit_control",
+            },
+        ],
+        "CL": [
+            {"producer_offset": 0x094, "selector": 0x17E1, "value": 1},
+            {"producer_offset": 0x0DC, "selector": 0x17F1, "value": 1},
+        ],
+    }
+    dynamic_records = {
+        "CL": [
+            {
+                "producer_offset": 0x1380,
+                "selector_expression": "low32(accelerator_base + 0x13200) + 0x9",
+                "value_source": "masked_descriptor_word_or_5",
+            },
+            {
+                "producer_offset": 0x13A0,
+                "selector_expression": "low32(accelerator_base + 0x13200) + 0x1",
+                "value_source": "descriptor_index_and_masked_word",
+            },
+        ]
+    }
+    return {
+        "static_record_count": sum(len(records) for records in static_records.values()),
+        "dynamic_record_count": sum(
+            len(records) for records in dynamic_records.values()
+        ),
+        "all_inline_forms_located": True,
+        "control_flow_complete": False,
+        "static_records": static_records,
+        "dynamic_records": dynamic_records,
     }
 
 
@@ -9712,6 +9863,9 @@ def main() -> int:
             recover_g17_3d_register_lists(driver)
         )
         channels["register_selectors"] = recover_g17_register_selectors(driver)
+        channels["inline_register_records"] = (
+            recover_g17_inline_register_records(driver)
+        )
         channels["command_stream_format"] = (
             recover_g17_command_stream_format(driver)
         )

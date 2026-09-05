@@ -132,7 +132,8 @@ stride, 0x700 stream bytes each, the 12-byte entry format, and the descriptor
 summary array. The selector encoding is recovered and validated, but the selector sets are
 not complete yet. The UUID-pinned backwards slice resolves every virtual encoder
 call (314 physical call sites and 235 distinct static values together with the
-literal audit); manually assembled entries and their control-flow ordering remain.
+literal audit). All ten inline forms are located too; two CL selectors remain
+symbolic, and the value sources plus control-flow ordering remain to be encoded.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command

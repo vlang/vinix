@@ -4465,6 +4465,93 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.resolve_static_w_register(instructions[:4], 3, 2)
         )
 
+    def test_recovers_g17_inline_register_records(self) -> None:
+        anchors = {
+            "3D": {
+                0x100: 0x0A18014A, 0x104: 0x5282E72B, 0x108: 0x2A0B014A,
+                0x10C: 0xB900A12A, 0x114: 0x5280002B, 0x178: 0x0A180129,
+                0x17C: 0x5282FC2B, 0x180: 0x2A0B0129, 0x184: 0xB9000109,
+                0x188: 0xF800410A, 0x194: 0x11003129,
+            },
+            "TA": {
+                0x088: 0x0A0A0129, 0x08C: 0x5282FC2B, 0x090: 0x2A0B0129,
+                0x094: 0xB90062A9, 0x098: 0x52800029, 0x09C: 0xF80642A9,
+                0x0C8: 0x0A0A0129, 0x0CC: 0x5282FE2A, 0x0D0: 0x2A0A0129,
+                0x0D4: 0xB9000109, 0x0DC: 0xF8004109, 0x0F4: 0x11003129,
+            },
+            "FastBlit": {
+                0x06C: 0x120E4D29, 0x070: 0x5282E72A, 0x074: 0x2A0A0129,
+                0x078: 0xB9000109, 0x080: 0xF8004109, 0x114: 0x5280F21C,
+                0x118: 0x72A0003C, 0x124: 0x120E4129, 0x128: 0x0B1C0129,
+                0x12C: 0x511E1D29, 0x130: 0xB9000D09, 0x134: 0xF9000916,
+                0x140: 0x11003129,
+            },
+            "CL": {
+                0x03C: 0xF9400815, 0x090: 0x0A0B0129, 0x094: 0x5282FC2A,
+                0x098: 0x2A0A0129, 0x09C: 0xB9004289, 0x0A4: 0xF8044289,
+                0x0B8: 0x91404EAA, 0x0BC: 0x91080156, 0x0D8: 0x0A0B0129,
+                0x0DC: 0x5282FE2A, 0x0E0: 0x2A0A0129, 0x0E4: 0xB9000109,
+                0x0EC: 0xF8004109, 0x137C: 0x0A0B014A,
+                0x1380: 0x0B0A02CA, 0x1384: 0x1100254A,
+                0x1388: 0xB907628A, 0x139C: 0x0A0B014A,
+                0x13A0: 0x0B0A02CA, 0x13A4: 0x1100054A,
+                0x13A8: 0xB9076E8A, 0x13AC: 0xF903BA89,
+                0x13B8: 0x1100314A,
+            },
+        }
+        codes = {}
+        for label, values in anchors.items():
+            code = bytearray(max(values) + 4)
+            for offset, word in values.items():
+                struct.pack_into("<I", code, offset, word)
+            name = recover_g17_abi.REGISTER_LIST_PRODUCERS[label]
+            codes[name] = (0x800000, bytes(code))
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={name: address for name, (address, _code) in codes.items()},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_inline_register_records(b"")
+
+        self.assertTrue(recovered["all_inline_forms_located"])
+        self.assertFalse(recovered["control_flow_complete"])
+        self.assertEqual(recovered["static_record_count"], 8)
+        self.assertEqual(recovered["dynamic_record_count"], 2)
+        self.assertEqual(
+            recovered["static_records"]["FastBlit"][1]["selector"], 0x10009
+        )
+        self.assertIn(
+            "accelerator_base + 0x13200",
+            recovered["dynamic_records"]["CL"][0]["selector_expression"],
+        )
+
+        cl_name = recover_g17_abi.REGISTER_LIST_PRODUCERS["CL"]
+        changed_cl = bytearray(codes[cl_name][1])
+        struct.pack_into("<I", changed_cl, 0x13A4, 0)
+        changed_codes = dict(codes)
+        changed_codes[cl_name] = (0x800000, bytes(changed_cl))
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={name: address for name, (address, _code) in changed_codes.items()},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: changed_codes[name],
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_inline_register_records(b"")
+
     def test_rejects_g17_selector_sample_matching_emission_count(self) -> None:
         # If the literal sample ever reached the emission count the set would
         # be claiming completeness it has not earned.
