@@ -11491,6 +11491,48 @@ def recover_g17_3d_common_passthrough(image: bytes) -> dict[str, object]:
         (0x37E, 0x899),
         (0x37F, 0x7E0),
     ]
+
+    # Count the real masking operations rather than inferring a count from
+    # nearby byte fields. Every selected G17C boolean copy is exactly one
+    # LDRB -> AND #1 -> STRB chain. This also makes a stale prose count fail
+    # against the binary instead of becoming part of the recovered ABI.
+    mask_operations = []
+    for instruction_offset, word in words(copy_code):
+        logical = decode_logical_immediate_w(word)
+        if logical is None or logical[0] != "and" or logical[3] != 1:
+            continue
+        if instruction_offset < 4 or instruction_offset + 8 > len(copy_code):
+            raise ValueError("truncated G17 common boolean mask chain")
+        load = decode_integer_load_unsigned(
+            struct.unpack_from("<I", copy_code, instruction_offset - 4)[0]
+        )
+        store = decode_integer_store_unsigned(
+            struct.unpack_from("<I", copy_code, instruction_offset + 4)[0]
+        )
+        _kind, destination_register, source_register, _mask = logical
+        if (
+            load is None
+            or store is None
+            or load[:2] != (source_register, 1)
+            or load[3] != 1
+            or store[:2] != (destination_register, 0)
+            or store[3] != 1
+        ):
+            raise ValueError("malformed G17 common boolean mask chain")
+        mask_operations.append(
+            {
+                "producer_offset": instruction_offset,
+                "source_offset": load[2],
+                "descriptor_member": store[2],
+                "mask": 1,
+            }
+        )
+    if len(mask_operations) != len(bit_fields) or {
+        (entry["source_offset"], entry["descriptor_member"])
+        for entry in mask_operations
+    } != set(bit_fields):
+        raise ValueError("G17 common boolean copy map does not match mask chains")
+
     source_bytes = 0x3EC
     descriptor_bytes = 0xC40
     if any(source + size > source_bytes or destination + size > descriptor_bytes
@@ -11523,8 +11565,88 @@ def recover_g17_3d_common_passthrough(image: bytes) -> dict[str, object]:
             }
             for source, destination in bit_fields
         ],
+        "mask_operations": mask_operations,
         "producer": COPY_3D_COMMON_PASSTHROUGH,
         "caller": PROCESS_RENDER_SETUP,
+    }
+
+
+def explain_g17_3d_common_boolean_accounting(
+    render_payload: dict[str, object], common_passthrough: dict[str, object]
+) -> dict[str, object]:
+    """Reconcile parser booleans with the common descriptor-copy helper."""
+
+    source = common_passthrough["source"]
+    common_start = int(source["payload_offset"])
+    common_bytes = int(source["bytes"])
+    common_end = common_start + common_bytes
+    helper_fields = common_passthrough["bit_fields"]
+    mask_operations = common_passthrough["mask_operations"]
+    helper_sources = {
+        common_start + int(field["source_offset"]) for field in helper_fields
+    }
+    helper_destinations = {
+        int(field["descriptor_member"]) for field in helper_fields
+    }
+
+    def mentions_payload_offset(value: object, target: int) -> bool:
+        if isinstance(value, dict):
+            if value.get("payload_offset") == target:
+                return True
+            return any(mentions_payload_offset(item, target) for item in value.values())
+        if isinstance(value, list):
+            return any(mentions_payload_offset(item, target) for item in value)
+        return False
+
+    validation = render_payload["validation"]
+    parser_only = []
+    for field in render_payload["bit_fields"]:
+        payload_offset = int(field["payload_offset"])
+        if not common_start <= payload_offset < common_end:
+            continue
+        if payload_offset in helper_sources:
+            continue
+        parser_only.append(
+            {
+                "payload_offset": payload_offset,
+                "common_source_offset": payload_offset - common_start,
+                "command_member": int(field["command_member"]),
+                "mask": int(field["mask"]),
+                "validation_operand": mentions_payload_offset(validation, payload_offset),
+            }
+        )
+
+    combined_sources = helper_sources | {
+        int(field["payload_offset"]) for field in parser_only
+    }
+    if (
+        len(mask_operations) != 8
+        or len(helper_sources) != 8
+        or len(helper_destinations) != 8
+        or {field["payload_offset"] for field in parser_only} != {0x646, 0x650}
+        or len(combined_sources) != 10
+    ):
+        raise ValueError("unexpected G17 common-record boolean accounting")
+
+    return {
+        "counting_rule": "one field per LDRB -> AND #1 -> STRB chain in the helper",
+        "helper": {
+            "mask_operations": len(mask_operations),
+            "unique_source_fields": len(helper_sources),
+            "unique_descriptor_fields": len(helper_destinations),
+            "one_to_one": len(mask_operations)
+            == len(helper_sources)
+            == len(helper_destinations),
+        },
+        "parser_only_fields_within_common_record": parser_only,
+        "combined_distinct_raw_boolean_sources": len(combined_sources),
+        "nine_field_count": {
+            "supported": False,
+            "reason": (
+                "the helper maps eight sources to eight destinations; including the "
+                "two parser-only fields in the same raw record yields ten, not nine"
+            ),
+        },
     }
 
 
@@ -14527,12 +14649,15 @@ def main() -> int:
         channels["command_stream_format"] = (
             recover_g17_command_stream_format(driver)
         )
-        channels["render_payload_format"] = (
-            recover_g17_render_payload_format(driver)
+        render_payload_format = recover_g17_render_payload_format(driver)
+        channels["render_payload_format"] = render_payload_format
+        descriptor_3d_common = recover_g17_3d_common_passthrough(driver)
+        descriptor_3d_common["boolean_accounting"] = (
+            explain_g17_3d_common_boolean_accounting(
+                render_payload_format, descriptor_3d_common
+            )
         )
-        channels["descriptor_3d_common_passthrough"] = (
-            recover_g17_3d_common_passthrough(driver)
-        )
+        channels["descriptor_3d_common_passthrough"] = descriptor_3d_common
         channels["descriptor_ta_render_passthrough"] = (
             recover_g17_ta_render_passthrough(driver)
         )

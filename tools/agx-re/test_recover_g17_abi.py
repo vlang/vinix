@@ -4910,9 +4910,31 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x1A4: 0xB9088809,
             0x1B4: 0x3D82BC00,
             0x1BC: 0x3D82C000,
+            0x1C0: 0x394DFC29,
             0x1C4: 0x12000129,
             0x1C8: 0x391F8009,
+            0x1CC: 0x394DF829,
+            0x1D0: 0x12000129,
+            0x1D4: 0x39226409,
+            0x1D8: 0x394DD429,
+            0x1DC: 0x12000129,
+            0x1E0: 0x39223009,
+            0x1E4: 0x394DE029,
+            0x1E8: 0x12000129,
+            0x1EC: 0x39225409,
+            0x1F0: 0x394DE429,
+            0x1F4: 0x12000129,
+            0x1F8: 0x39225809,
+            0x1FC: 0x394DEC29,
+            0x200: 0x12000129,
+            0x204: 0x39226009,
             0x20C: 0xB9041009,
+            0x210: 0x394DF029,
+            0x214: 0x12000129,
+            0x218: 0x39258809,
+            0x21C: 0x394DF429,
+            0x220: 0x12000129,
+            0x224: 0x39258C09,
             0x228: 0x3D815101,
             0x230: 0xFD059C00,
             0x238: 0xB90B4008,
@@ -4975,6 +4997,78 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(len(recovered["bit_fields"]), 8)
         self.assertEqual(recovered["bit_fields"][-1]["descriptor_member"], 0x7E0)
+        self.assertEqual(len(recovered["mask_operations"]), 8)
+        self.assertEqual(
+            recovered["mask_operations"][0],
+            {
+                "producer_offset": 0x1C4,
+                "source_offset": 0x37F,
+                "descriptor_member": 0x7E0,
+                "mask": 1,
+            },
+        )
+
+        accounting = recover_g17_abi.explain_g17_3d_common_boolean_accounting(
+            {
+                "bit_fields": [
+                    {"payload_offset": 0x646, "command_member": 0x281, "mask": 1},
+                    {"payload_offset": 0x650, "command_member": 0x283, "mask": 1},
+                    {"payload_offset": 0x8B0, "command_member": 0x1B9, "mask": 1},
+                ],
+                "validation": [
+                    {
+                        "operation": "implies",
+                        "condition": {"payload_offset": 0x23C, "bit": 0},
+                        "required": {"payload_offset": 0x646, "bit": 0},
+                    }
+                ],
+            },
+            recovered,
+        )
+        self.assertEqual(
+            accounting["helper"],
+            {
+                "mask_operations": 8,
+                "unique_source_fields": 8,
+                "unique_descriptor_fields": 8,
+                "one_to_one": True,
+            },
+        )
+        self.assertEqual(
+            [
+                field["payload_offset"]
+                for field in accounting["parser_only_fields_within_common_record"]
+            ],
+            [0x646, 0x650],
+        )
+        self.assertTrue(
+            accounting["parser_only_fields_within_common_record"][0][
+                "validation_operand"
+            ]
+        )
+        self.assertFalse(
+            accounting["parser_only_fields_within_common_record"][1][
+                "validation_operand"
+            ]
+        )
+        self.assertEqual(accounting["combined_distinct_raw_boolean_sources"], 10)
+        self.assertFalse(accounting["nine_field_count"]["supported"])
+
+        struct.pack_into("<I", copy_code, 0x214, 0xD503201F)
+        code_by_symbol[recover_g17_abi.COPY_3D_COMMON_PASSTHROUGH] = (
+            copy_address,
+            bytes(copy_code),
+        )
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, symbol: code_by_symbol[symbol],
+            ),
+            self.assertRaisesRegex(ValueError, "boolean copy map"),
+        ):
+            recover_g17_abi.recover_g17_3d_common_passthrough(b"")
 
     def test_rejects_g17_3d_passthrough_call_retarget(self) -> None:
         copy_code = bytearray(0x250)
