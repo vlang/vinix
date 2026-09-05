@@ -5,8 +5,56 @@ from __future__ import annotations
 
 import argparse
 import json
+import struct
 from pathlib import Path
 from typing import Any
+
+
+# Record framing recovered from AGXHardwareKernelCommand::parseAndValidate: a
+# fixed header followed by a payload whose length lives inside that header.
+SEGMENT_HEADER_BYTES = 8
+RECORD_HEADER_BYTES = 0xC0
+PAYLOAD_LENGTH_OFFSET = 0x9C
+
+
+def walk_segment(data: bytes) -> dict[str, object]:
+    """Walk a captured command segment with the recovered record format.
+
+    This is the cross-check that the statically recovered framing actually
+    describes bytes the Metal driver produced on this machine.
+    """
+
+    if len(data) < SEGMENT_HEADER_BYTES:
+        raise ValueError("segment is shorter than its header")
+    magic, declared = struct.unpack_from("<II", data, 0)
+    if declared != len(data):
+        raise ValueError(
+            f"segment length field {declared:#x} does not match {len(data):#x}"
+        )
+
+    records = []
+    offset = SEGMENT_HEADER_BYTES
+    while offset + RECORD_HEADER_BYTES <= len(data):
+        payload = struct.unpack_from(
+            "<I", data, offset + PAYLOAD_LENGTH_OFFSET
+        )[0]
+        end = offset + RECORD_HEADER_BYTES + payload
+        if end > len(data):
+            raise ValueError(
+                f"record at {offset:#x} claims {payload:#x} payload bytes, "
+                f"past the {len(data):#x}-byte segment"
+            )
+        records.append(
+            {"offset": offset, "payload_bytes": payload, "end": end}
+        )
+        offset = end
+
+    return {
+        "magic": magic,
+        "declared_bytes": declared,
+        "records": records,
+        "trailing_bytes": len(data) - offset,
+    }
 
 
 def load_snapshot(
@@ -81,6 +129,11 @@ def main() -> int:
         help="require a JSON record field to equal VALUE; may be repeated",
     )
     parser.add_argument("--json", action="store_true", dest="as_json")
+    parser.add_argument(
+        "--walk",
+        action="store_true",
+        help="parse each segment with the recovered record framing",
+    )
     args = parser.parse_args()
 
     try:
@@ -94,6 +147,27 @@ def main() -> int:
         right = load_snapshot(args.trace, args.event, args.right, args.index, filters)
     except (OSError, ValueError) as error:
         parser.error(str(error))
+
+    if args.walk:
+        try:
+            for label, data in ((args.left, left), (args.right, right)):
+                walked = walk_segment(data)
+                print(
+                    f"{label}: magic={walked['magic']:#x} "
+                    f"{walked['declared_bytes']} bytes, "
+                    f"{len(walked['records'])} record(s), "
+                    f"{walked['trailing_bytes']} trailing"
+                )
+                for index, record in enumerate(walked["records"]):
+                    print(
+                        f"  record {index}: {record['offset']:#06x}"
+                        f" +{RECORD_HEADER_BYTES:#x} header"
+                        f" +{record['payload_bytes']:#x} payload"
+                        f" -> {record['end']:#06x}"
+                    )
+        except ValueError as error:
+            parser.error(str(error))
+        return 0
 
     runs = difference_runs(left, right)
     result = {

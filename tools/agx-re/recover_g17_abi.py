@@ -451,6 +451,9 @@ GENERATE_REGISTER_LIST_3D = (
 G17_COMMAND_3D_BYTES = 0x2240
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 8
+PARSE_HARDWARE_KERNEL_COMMAND = (
+    "__ZN24AGXHardwareKernelCommand16parseAndValidateER21AGXSharedStreamParserS1_"
+)
 REGISTER_LIST_PRODUCERS = {
     "3D": GENERATE_REGISTER_LIST_3D,
     "FastBlit": (
@@ -6889,6 +6892,61 @@ def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
     return destination, base, immediate
 
 
+def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
+    """Recover the userspace command-stream record format.
+
+    AGXHardwareKernelCommand::parseAndValidate reads the stream through an
+    AGXSharedStreamParser cursor: it copies a fixed 0xc0-byte header out of the
+    stream, then takes the following payload's length from a field inside that
+    header.  This is the format Mesa has to emit, so it is the one piece of the
+    work-command path that is userspace-visible.
+    """
+
+    symbols = macho_symbols(image)
+    if PARSE_HARDWARE_KERNEL_COMMAND not in symbols:
+        raise ValueError(f"Mach-O is missing {PARSE_HARDWARE_KERNEL_COMMAND}")
+
+    _address, code = symbol_code(image, PARSE_HARDWARE_KERNEL_COMMAND)
+    require_instruction_words_at(
+        code,
+        "G17 command-stream record parse",
+        {
+            0x004: 0xF9400829,  # cursor at parser +0x10
+            0x008: 0xF9400028,  # start at parser +0x00
+            0x00C: 0xEB08013F,  # cursor must not precede the start
+            0x014: 0xB1030128,  # fixed header is 0xc0 bytes
+            0x01C: 0xF940042A,  # end at parser +0x08
+            0x058: 0xF9000828,  # cursor advanced past the header
+            0x070: 0x52802009,  # terminator marker 0x100
+            0x074: 0xB9000C09,  # stored at command +0xc
+            0x080: 0xB940AC09,  # payload length at command +0xac
+            0x084: 0xAB090109,  # payload follows the header
+            0x098: 0xF9000829,  # cursor advanced past the payload
+            0x0A4: 0x3D803400,  # payload bounds at command +0xd0
+            0x0A8: 0xF9007008,  # payload start at command +0xe0
+        },
+    )
+
+    header_bytes = 0xC0
+    command_header_offset = 0x10
+    payload_length_member = 0xAC
+    payload_length_offset = payload_length_member - command_header_offset
+    if not 0 <= payload_length_offset < header_bytes:
+        raise ValueError("payload length field falls outside the record header")
+
+    return {
+        "parser": {"start": 0x00, "end": 0x08, "cursor": 0x10},
+        "header_bytes": header_bytes,
+        "command_header_offset": command_header_offset,
+        "payload_length_offset": payload_length_offset,
+        "payload_bounds_member": 0xD0,
+        "payload_start_member": 0xE0,
+        "terminator_marker": 0x100,
+        "terminator_member": 0x0C,
+        "producer": PARSE_HARDWARE_KERNEL_COMMAND,
+    }
+
+
 def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     """Recover the selector encoding and the set each work producer emits.
 
@@ -7752,6 +7810,9 @@ def main() -> int:
             recover_g17_3d_register_lists(driver)
         )
         channels["register_selectors"] = recover_g17_register_selectors(driver)
+        channels["command_stream_format"] = (
+            recover_g17_command_stream_format(driver)
+        )
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)

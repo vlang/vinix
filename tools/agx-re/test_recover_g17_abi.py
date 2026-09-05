@@ -3550,6 +3550,43 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_command_stream_format(self) -> None:
+        code = bytearray(0x3F4)
+        for offset, word in {
+            0x004: 0xF9400829,
+            0x008: 0xF9400028,
+            0x00C: 0xEB08013F,
+            0x014: 0xB1030128,
+            0x01C: 0xF940042A,
+            0x058: 0xF9000828,
+            0x070: 0x52802009,
+            0x074: 0xB9000C09,
+            0x080: 0xB940AC09,
+            0x084: 0xAB090109,
+            0x098: 0xF9000829,
+            0x0A4: 0x3D803400,
+            0x0A8: 0xF9007008,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.PARSE_HARDWARE_KERNEL_COMMAND: 0x900000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x900000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_command_stream_format(b"")
+
+        self.assertEqual(recovered["parser"], {"start": 0x00, "end": 0x08, "cursor": 0x10})
+        self.assertEqual(recovered["header_bytes"], 0xC0)
+        # The field is at 0xac of the command, which is 0x9c of the record.
+        self.assertEqual(recovered["payload_length_offset"], 0x9C)
+        self.assertEqual(recovered["terminator_marker"], 0x100)
+
     def test_recovers_g17_register_selectors(self) -> None:
         def producer(literals, emissions: int) -> bytes:
             code = bytearray()
