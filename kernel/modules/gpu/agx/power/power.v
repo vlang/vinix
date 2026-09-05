@@ -511,8 +511,9 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 		return false
 	}
 	// AppleWrapperMailbox maps reg[0] as its mailbox/control Device-MMIO
-	// aperture. ApplePMPv2 independently resolves reg[3] as PTD-update memory.
-	// Keep reg[1] and reg[2] unlabeled until their consumers are proven.
+	// aperture. AppleASCWrapV6 maps reg[1] as its 64-bit IORVBAR aperture,
+	// while ApplePMPv2 independently resolves reg[3] as PTD-update memory.
+	// Keep reg[2] unlabeled until its consumer is proven.
 	bases := [u64(0x84e00000), 0x84850000, 0x84500000, 0x84250000]!
 	sizes := [u64(0x88000), 0x4000, 0x100000, 0x4000]!
 	die_offset := u64(die) * t6050_die_stride

@@ -51,6 +51,9 @@ DEFAULT_ENTRIES = (
     # recovered at named symbol boundaries.
     "com.apple.driver.RTBuddy",
     "com.apple.driver.AppleA7IOP",
+    # The T6050 PMP wrapper advertises iop,ascwrap-v6. Its concrete subclass,
+    # rather than the AppleA7IOP base, owns the actual CPU run/reset registers.
+    "com.apple.driver.AppleA7IOP-ASCWrap-v6",
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",

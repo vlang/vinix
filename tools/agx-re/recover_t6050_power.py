@@ -47,6 +47,7 @@ APPLE_PMP_UUID = "AA65CE02-93C8-33DE-A7BE-B11E1621F739"
 APPLE_PMP_FIRMWARE_UUID = "2AFE4BC5-2371-341F-BD24-3D643EFBAFD0"
 RTBUDDY_UUID = "4FEFDDA4-3743-34AC-869D-EAE695595A4C"
 APPLE_A7IOP_UUID = "DD46FF2D-6ADD-3A7D-8BCC-7184A5E3398A"
+APPLE_ASCWRAP_V6_UUID = "7206DC2B-CA0F-3289-876B-A46F283D5798"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
 DEFAULT_APPLE_T6050_PMGR = Path("build/kext/g17c/driver.AppleT6050PMGR.macho")
 DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
@@ -55,6 +56,9 @@ DEFAULT_APPLE_PMP_FIRMWARE = Path(
 )
 DEFAULT_RTBUDDY = Path("build/kext/g17c/driver.RTBuddy.macho")
 DEFAULT_APPLE_A7IOP = Path("build/kext/g17c/driver.AppleA7IOP.macho")
+DEFAULT_APPLE_ASCWRAP_V6 = Path(
+    "build/kext/g17c/driver.AppleA7IOP-ASCWrap-v6.macho"
+)
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
 PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
 PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
@@ -152,11 +156,22 @@ APPLE_WRAPPER_MAILBOX_PHYSICAL = (
 )
 APPLE_A7IOP_VTABLE = "__ZTV10AppleA7IOP"
 APPLE_A7IOP_START = "__ZN10AppleA7IOP5startEP9IOService"
+APPLE_A7IOP_START_CPU_OPTIONS = (
+    "__ZN10AppleA7IOP19startCPUWithOptionsEP15IOSlaveFirmwarej"
+)
 APPLE_A7IOP_REG = "__ZN10AppleA7IOP4_regEj"
 APPLE_A7IOP_PHYSICAL = "__ZN10AppleA7IOP25getWrapperPhysicalAddressEv"
 APPLE_A7IOP_ENABLE_SRAM = "__ZN10AppleA7IOP10enableSRAMEb"
 APPLE_A7IOP_ENABLE_POWER = "__ZN10AppleA7IOP12_enablePowerEbj"
 APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT = 0x9C8
+APPLE_ASCWRAP_V6_VTABLE = "__ZTV14AppleASCWrapV6"
+APPLE_ASCWRAP_V6_INITIALIZE = "__ZN14AppleASCWrapV610initializeEv"
+APPLE_ASCWRAP_V6_SET_IORVBAR = "__ZN14AppleASCWrapV611_setIORVBAREy"
+APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED = "__ZN14AppleASCWrapV616_isIORVBARLockedEv"
+APPLE_ASCWRAP_V6_MAP_FIRMWARE = (
+    "__ZN14AppleASCWrapV612_mapFirmwareEyP18IOMemoryDescriptorj"
+)
+APPLE_ASCWRAP_V6_RUN_CPU = "__ZN14AppleASCWrapV67_runCPUEb"
 
 
 @dataclass(frozen=True)
@@ -2055,6 +2070,7 @@ def recover_apple_a7iop_code_contract(
         APPLE_WRAPPER_MAILBOX_REG,
         APPLE_WRAPPER_MAILBOX_PHYSICAL,
         APPLE_A7IOP_START,
+        APPLE_A7IOP_START_CPU_OPTIONS,
         APPLE_A7IOP_REG,
         APPLE_A7IOP_PHYSICAL,
         APPLE_A7IOP_ENABLE_SRAM,
@@ -2129,6 +2145,31 @@ def recover_apple_a7iop_code_contract(
         ),
     ):
         raise ValueError("AppleA7IOP device-memory or SRAM-property mapping changed")
+    if not _has_ordered_words(
+        a7_start_code,
+        (
+            0x52800028,  # CPU-control writes are enabled by default
+            0x3904CA88,  # strb w8, [x20, #0x132]
+            0xD2805B11,  # provider property lookup slot 0x2d8
+            0xB4000040,  # no cpu-ctrl-filtered property: retain default
+            0x3904CA9F,  # property present: suppress CPU-control writes
+        ),
+    ):
+        raise ValueError("AppleA7IOP CPU-control filter handling changed")
+
+    _start_cpu_address, start_cpu_code = functions[APPLE_A7IOP_START_CPU_OPTIONS]
+    if not _has_ordered_words(
+        start_cpu_code,
+        (
+            0xD2814511,  # _runCPU vtable slot 0xa28
+            0x8B110210,
+            0xF9400208,
+            0xAA1303E0,
+            0x52800021,  # requested run state = true
+            0xD73F0910,
+        ),
+    ):
+        raise ValueError("AppleA7IOP startCPU run-control dispatch changed")
 
     _a7_reg_address, a7_reg_code = functions[APPLE_A7IOP_REG]
     if a7_reg_code != expected_reg:
@@ -2210,6 +2251,12 @@ def recover_apple_a7iop_code_contract(
                 "provider_selector_argument": "x3",
                 "meaning": "provider power-domain selector; not a reg[] index",
             },
+            "cpu_control": {
+                "filter_property": "cpu-ctrl-filtered",
+                "filter_absent_behavior": "permit concrete wrapper CPU-control writes",
+                "start_cpu_run_vtable_slot": 0xA28,
+                "start_cpu_run_argument": True,
+            },
             "scope": (
                 "resource and power-domain ownership only; does not start or "
                 "prove the IOP ready"
@@ -2248,6 +2295,7 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
             APPLE_WRAPPER_MAILBOX_REG,
             APPLE_WRAPPER_MAILBOX_PHYSICAL,
             APPLE_A7IOP_START,
+            APPLE_A7IOP_START_CPU_OPTIONS,
             APPLE_A7IOP_REG,
             APPLE_A7IOP_PHYSICAL,
             APPLE_A7IOP_ENABLE_SRAM,
@@ -2258,6 +2306,7 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
     for (adrp_offset, add_offset), expected in {
         (0x794, 0x798): "sram-index",
         (0x80C, 0x810): "should-control-sram",
+        (0x88C, 0x890): "cpu-ctrl-filtered",
     }.items():
         actual = read_adrp_add_cstring(
             image, a7_start_address, a7_start_code, adrp_offset, add_offset
@@ -2274,6 +2323,190 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
     return {
         "uuid": identity,
         **recover_apple_a7iop_code_contract(functions, vtable_targets),
+    }
+
+
+def recover_apple_ascwrap_v6_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+    vtable_targets: dict[int, int],
+) -> dict[str, object]:
+    """Recover the concrete ASCWrap-v6 firmware and CPU-control registers."""
+
+    required = (
+        APPLE_ASCWRAP_V6_INITIALIZE,
+        APPLE_ASCWRAP_V6_SET_IORVBAR,
+        APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED,
+        APPLE_ASCWRAP_V6_MAP_FIRMWARE,
+        APPLE_ASCWRAP_V6_RUN_CPU,
+    )
+    missing = [name for name in required if name not in functions]
+    if missing:
+        raise ValueError(f"AppleASCWrapV6 has no code body for {missing!r}")
+    expected_slots = {
+        0x970: functions[APPLE_ASCWRAP_V6_INITIALIZE][0],
+        0xA18: functions[APPLE_ASCWRAP_V6_MAP_FIRMWARE][0],
+        0xA28: functions[APPLE_ASCWRAP_V6_RUN_CPU][0],
+    }
+    if vtable_targets != expected_slots:
+        raise ValueError("AppleASCWrapV6 firmware/run vtable targets changed")
+
+    _initialize_address, initialize_code = functions[APPLE_ASCWRAP_V6_INITIALIZE]
+    if not _has_ordered_words(
+        initialize_code,
+        (
+            0xF9407C00,  # wrapper provider at this+0xf8
+            0xD280E211,  # mapDeviceMemoryWithIndex slot 0x710
+            0x52800021,  # device-memory index 1
+            0x52800002,  # mapping options 0
+            0xD73F0910,
+            0xF900C660,  # retained map at this+0x188
+            0xD2802711,  # getVirtualAddress slot 0x138
+            0xD73F0910,
+            0xF900CA60,  # mapped VA at this+0x190
+        ),
+    ):
+        raise ValueError("AppleASCWrapV6 IORVBAR resource mapping changed")
+
+    _set_address, set_code = functions[APPLE_ASCWRAP_V6_SET_IORVBAR]
+    expected_set = struct.pack(
+        "<7I",
+        0xD503245F,  # bti c
+        0xB9418008,  # ldr w8, [x0, #0x180] -- register byte offset
+        0xB2400029,  # orr x9, x1, #1 -- address plus lock bit
+        0xF940C80A,  # ldr x10, [x0, #0x190] -- device-memory index 1 VA
+        0x8B080148,  # add x8, x10, x8
+        0xF9000109,  # str x9, [x8]
+        0xD65F03C0,  # ret
+    )
+    if set_code != expected_set:
+        raise ValueError("AppleASCWrapV6 IORVBAR writer changed")
+
+    _locked_address, locked_code = functions[APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED]
+    expected_locked = struct.pack(
+        "<7I",
+        0xD503245F,  # bti c
+        0xB9418008,  # ldr w8, [x0, #0x180] -- register byte offset
+        0xF940C809,  # ldr x9, [x0, #0x190] -- device-memory index 1 VA
+        0x8B080128,  # add x8, x9, x8
+        0xF9400108,  # ldr x8, [x8]
+        0x12000100,  # and w0, w8, #1
+        0xD65F03C0,  # ret
+    )
+    if locked_code != expected_locked:
+        raise ValueError("AppleASCWrapV6 IORVBAR lock test changed")
+
+    _map_address, map_code = functions[APPLE_ASCWRAP_V6_MAP_FIRMWARE]
+    if not _has_ordered_words(
+        map_code,
+        (
+            0x37080243,  # options bit 1 skips this mapping path
+            0xB9418268,  # register byte offset at this+0x180
+            0xF940CA69,  # device-memory index 1 VA at this+0x190
+            0x8B080128,
+            0xF9400108,  # read IORVBAR
+            0x36000088,  # fail closed when lock bit 0 is clear
+        ),
+    ):
+        raise ValueError("AppleASCWrapV6 firmware-map lock requirement changed")
+
+    _run_address, run_code = functions[APPLE_ASCWRAP_V6_RUN_CPU]
+    if not _has_ordered_words(
+        run_code,
+        (
+            0x3944C808,  # CPU-control permission byte at this+0x132
+            0x36000528,  # no permission means no register access
+            0xD2813511,  # _reg vtable slot 0x9a8
+            0x52800881,  # register byte offset 0x44
+            0xD73F0910,
+            0xF9408268,  # device-memory index 0 VA at this+0x100
+            0x34000094,  # branch between run and stop sequences
+            0x321C0009,  # run: set bit 4
+            0xB9004509,  # store wrapper register 0x44
+            0x121B780A,  # stop phase 1: clear bit 4
+            0xB900450A,
+            0xD2813511,  # reread register 0x44
+            0x52800881,
+            0xD73F0910,
+            0x121A7808,  # stop phase 2: clear bit 5
+            0xB9004528,
+        ),
+    ):
+        raise ValueError("AppleASCWrapV6 CPU run-control sequence changed")
+
+    return {
+        "iorvbar": {
+            "device_memory_index": 1,
+            "map_options": 0,
+            "memory_map_object_offset": 0x188,
+            "mapped_virtual_address_offset": 0x190,
+            "register_offset_object_offset": 0x180,
+            "t6050_register_offset": 0,
+            "access_width_bits": 64,
+            "write_value": "firmware address OR lock bit 0",
+            "map_requirement": "lock bit 0 must already be set",
+        },
+        "cpu_run_control": {
+            "device_memory_index": 0,
+            "register_offset": 0x44,
+            "access_width_bits": 32,
+            "run": "read-modify-write setting bit 4",
+            "stop": (
+                "read-modify-write clearing bit 4, then reread and clear bit 5"
+            ),
+            "permission_object_offset": 0x132,
+            "filter_property": "cpu-ctrl-filtered",
+            "t6050_filter_property_present": False,
+        },
+        "vtable_slots": {
+            "initialize": 0x970,
+            "map_firmware": 0xA18,
+            "run_cpu": 0xA28,
+            "register_read": 0x9A8,
+        },
+        "scope": (
+            "concrete firmware/run register contract only; it does not prove "
+            "that PMP reached RTKit or dashboard readiness"
+        ),
+    }
+
+
+def recover_apple_ascwrap_v6(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_ASCWRAP_V6_UUID:
+        raise ValueError(f"unsupported AppleASCWrapV6 UUID {identity}")
+    functions = {
+        name: symbol_code(image, name)
+        for name in (
+            APPLE_ASCWRAP_V6_INITIALIZE,
+            APPLE_ASCWRAP_V6_SET_IORVBAR,
+            APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED,
+            APPLE_ASCWRAP_V6_MAP_FIRMWARE,
+            APPLE_ASCWRAP_V6_RUN_CPU,
+        )
+    }
+    initialize_address, initialize_code = functions[APPLE_ASCWRAP_V6_INITIALIZE]
+    for (adrp_offset, add_offset), expected in {
+        (0x84, 0x88): "nmi-ext-irq",
+        (0xA4, 0xA8): "ext-irq-reg-index",
+        (0x21C, 0x220): "idle-ctrl-check",
+    }.items():
+        actual = read_adrp_add_cstring(
+            image, initialize_address, initialize_code, adrp_offset, add_offset
+        )
+        if actual != expected:
+            raise ValueError(
+                "AppleASCWrapV6 initialize string changed at "
+                f"{adrp_offset:#x}: {actual!r}"
+            )
+    vtable_targets = {
+        slot: recover_vtable_target(image, APPLE_ASCWRAP_V6_VTABLE, slot)
+        for slot in (0x970, 0xA18, 0xA28)
+    }
+    return {
+        "uuid": identity,
+        "wrapper_v6": recover_apple_ascwrap_v6_code_contract(
+            functions, vtable_targets
+        ),
     }
 
 
@@ -2362,6 +2595,8 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             != 1
         ):
             raise ValueError(f"T6050 {role} wrapper control properties changed")
+        if "cpu-ctrl-filtered" in wrapper.properties:
+            raise ValueError(f"T6050 {role} unexpectedly filters CPU control")
         wrapper_registers[role] = registers
         wrapper_interrupts[role] = interrupts
 
@@ -2553,7 +2788,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 14,
+        "schema": 15,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -2591,6 +2826,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     ],
                     "interrupts": wrapper_interrupts["PMP0"],
                     "iop_version": 1,
+                    "cpu_control_filtered": False,
                     "ptd_update_reg_index": 3,
                     "sram_power_domain": {
                         "property": "sram-index",
@@ -2611,6 +2847,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     ],
                     "interrupts": wrapper_interrupts["PMP1"],
                     "iop_version": 1,
+                    "cpu_control_filtered": False,
                     "ptd_update_reg_index": 3,
                     "sram_power_domain": {
                         "property": "sram-index",
@@ -2666,6 +2903,9 @@ def main() -> int:
     )
     parser.add_argument("--rtbuddy", type=Path, default=DEFAULT_RTBUDDY)
     parser.add_argument("--apple-a7iop", type=Path, default=DEFAULT_APPLE_A7IOP)
+    parser.add_argument(
+        "--ascwrap-v6", type=Path, default=DEFAULT_APPLE_ASCWRAP_V6
+    )
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -2686,6 +2926,9 @@ def main() -> int:
             args.pmp_firmware.read_bytes(), args.rtbuddy.read_bytes()
         )
         manifest["apple_a7iop"] = recover_apple_a7iop(args.apple_a7iop.read_bytes())
+        manifest["apple_ascwrap_v6"] = recover_apple_ascwrap_v6(
+            args.ascwrap_v6.read_bytes()
+        )
     except (OSError, ValueError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -122,6 +122,10 @@ class ExtractFilesetTests(unittest.TestCase):
         self.assertIn("com.apple.driver.ApplePMPFirmware", extract_fileset.DEFAULT_ENTRIES)
         self.assertIn("com.apple.driver.RTBuddy", extract_fileset.DEFAULT_ENTRIES)
         self.assertIn("com.apple.driver.AppleA7IOP", extract_fileset.DEFAULT_ENTRIES)
+        self.assertIn(
+            "com.apple.driver.AppleA7IOP-ASCWrap-v6",
+            extract_fileset.DEFAULT_ENTRIES,
+        )
 
     def test_extracts_kernel_payload_with_modern_trailing_metadata(self) -> None:
         payload = b"bvx2 compressed bytes"

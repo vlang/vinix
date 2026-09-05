@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 14)
+        self.assertEqual(result["schema"], 15)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -1133,7 +1133,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0xA8C17BFD,
         )
         a7_start_code = struct.pack(
-            "<16I",
+            "<21I",
             0xF9407E80,
             0x911C4208,
             0xF9438A09,
@@ -1150,6 +1150,20 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0xB9015E88,
             0x7100011F,
             0x1A9F07E2,
+            0x52800028,
+            0x3904CA88,
+            0xD2805B11,
+            0xB4000040,
+            0x3904CA9F,
+        )
+        start_cpu_code = struct.pack(
+            "<6I",
+            0xD2814511,
+            0x8B110210,
+            0xF9400208,
+            0xAA1303E0,
+            0x52800021,
+            0xD73F0910,
         )
         a7_physical_code = physical_code.replace(
             struct.pack("<I", 0xF940A000), struct.pack("<I", 0xF940B400)
@@ -1188,6 +1202,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 physical_code,
             ),
             recover_t6050_power.APPLE_A7IOP_START: (0x4000, a7_start_code),
+            recover_t6050_power.APPLE_A7IOP_START_CPU_OPTIONS: (
+                0x4800,
+                start_cpu_code,
+            ),
             recover_t6050_power.APPLE_A7IOP_REG: (0x5000, reg_code),
             recover_t6050_power.APPLE_A7IOP_PHYSICAL: (0x6000, a7_physical_code),
             recover_t6050_power.APPLE_A7IOP_ENABLE_SRAM: (0x7000, enable_sram_code),
@@ -1211,6 +1229,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
             result["apple_a7iop"]["sram_power"]["meaning"],
             "provider power-domain selector; not a reg[] index",
         )
+        self.assertEqual(
+            result["apple_a7iop"]["cpu_control"]["start_cpu_run_vtable_slot"],
+            0xA28,
+        )
 
         bad_functions = dict(functions)
         bad_functions[recover_t6050_power.APPLE_WRAPPER_MAILBOX_REG] = (
@@ -1220,6 +1242,111 @@ class RecoverT6050PowerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "register accessor"):
             recover_t6050_power.recover_apple_a7iop_code_contract(
                 bad_functions, vtable_targets
+            )
+
+    def test_recovers_ascwrap_v6_iorvbar_and_cpu_run_control(self) -> None:
+        initialize = 0x1000
+        map_firmware = 0x2000
+        run_cpu = 0x3000
+        initialize_code = struct.pack(
+            "<9I",
+            0xF9407C00,
+            0xD280E211,
+            0x52800021,
+            0x52800002,
+            0xD73F0910,
+            0xF900C660,
+            0xD2802711,
+            0xD73F0910,
+            0xF900CA60,
+        )
+        set_iorvbar_code = struct.pack(
+            "<7I",
+            0xD503245F,
+            0xB9418008,
+            0xB2400029,
+            0xF940C80A,
+            0x8B080148,
+            0xF9000109,
+            0xD65F03C0,
+        )
+        is_locked_code = struct.pack(
+            "<7I",
+            0xD503245F,
+            0xB9418008,
+            0xF940C809,
+            0x8B080128,
+            0xF9400108,
+            0x12000100,
+            0xD65F03C0,
+        )
+        map_code = struct.pack(
+            "<6I",
+            0x37080243,
+            0xB9418268,
+            0xF940CA69,
+            0x8B080128,
+            0xF9400108,
+            0x36000088,
+        )
+        run_code = struct.pack(
+            "<16I",
+            0x3944C808,
+            0x36000528,
+            0xD2813511,
+            0x52800881,
+            0xD73F0910,
+            0xF9408268,
+            0x34000094,
+            0x321C0009,
+            0xB9004509,
+            0x121B780A,
+            0xB900450A,
+            0xD2813511,
+            0x52800881,
+            0xD73F0910,
+            0x121A7808,
+            0xB9004528,
+        )
+        functions = {
+            recover_t6050_power.APPLE_ASCWRAP_V6_INITIALIZE: (
+                initialize,
+                initialize_code,
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_SET_IORVBAR: (
+                0x1800,
+                set_iorvbar_code,
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED: (
+                0x1900,
+                is_locked_code,
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_MAP_FIRMWARE: (
+                map_firmware,
+                map_code,
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_RUN_CPU: (run_cpu, run_code),
+        }
+        slots = {0x970: initialize, 0xA18: map_firmware, 0xA28: run_cpu}
+        result = recover_t6050_power.recover_apple_ascwrap_v6_code_contract(
+            functions, slots
+        )
+        self.assertEqual(result["iorvbar"]["device_memory_index"], 1)
+        self.assertEqual(result["iorvbar"]["t6050_register_offset"], 0)
+        self.assertEqual(result["cpu_run_control"]["device_memory_index"], 0)
+        self.assertEqual(result["cpu_run_control"]["register_offset"], 0x44)
+        self.assertIn("bit 4", result["cpu_run_control"]["run"])
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.APPLE_ASCWRAP_V6_RUN_CPU] = (
+            run_cpu,
+            run_code.replace(
+                struct.pack("<I", 0x321C0009), struct.pack("<I", 0x321B0009)
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "CPU run-control"):
+            recover_t6050_power.recover_apple_ascwrap_v6_code_contract(
+                bad_functions, slots
             )
 
     def test_rejects_changed_sgx_gate_order(self) -> None:

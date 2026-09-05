@@ -130,8 +130,14 @@ It also ties the wrapper physical-address accessor to that same retained map.
 The result identifies T6050 wrapper `reg[0]` as the mailbox/control Device-MMIO
 aperture without treating resource ownership as CPU-start or IOP readiness.
 The alternate `AppleA7IOP` class independently maps the same index and proves
-that `sram-index` is forwarded as a provider power-domain selector. It is not
-a `reg[]` index, so the report deliberately leaves wrapper `reg[1]` unlabeled.
+that `sram-index` is forwarded as a provider power-domain selector rather than
+a `reg[]` index. The UUID-pinned concrete `AppleASCWrapV6` subclass maps
+wrapper `reg[1]` and proves it is the 64-bit IORVBAR aperture: firmware setup
+writes the image address with lock bit 0, while the wrapper CPU run path uses
+the 32-bit register at `reg[0]+0x44`. T6050 lacks `cpu-ctrl-filtered`, so the
+base start path permits the concrete run/stop writes. This is a register
+contract, not proof that PMP firmware reached RTKit or dashboard readiness;
+wrapper `reg[2]` remains unlabeled.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
