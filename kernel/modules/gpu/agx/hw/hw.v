@@ -147,7 +147,11 @@ pub:
 	uat_oas               u32 // Output address size (bits)
 	map_kernel_to_user    bool
 	num_banks             u32
+	preempt1_size         u64
+	preempt2_size         u64
+	preempt3_size         u64
 	compute_preempt1_size u64
+	render_tiling_control u32
 	// Memory regions
 	shared_region_base     u64
 	shared_region_size     u64

@@ -721,7 +721,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 		|| request.queue_caps == 0 || request.queue_caps & ~known_caps != 0 {
 		return -22
 	}
-	f.find_vm(request.vm_id) or { return -22 }
+	vm := f.find_vm(request.vm_id) or { return -22 }
 	f.lock.acquire()
 	id := f.allocate_queue_id_locked() or {
 		f.lock.release()
@@ -767,7 +767,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 			channel_mask |= gpu.g13_queue_channel_compute
 		}
 		mut gpu_manager := unsafe { manager }
-		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, request.priority) or {
+		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, request.priority, vm) or {
 			mut queue := unsafe { wq }
 			queue.destroy()
 			return -12

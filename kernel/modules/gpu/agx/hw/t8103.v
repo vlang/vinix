@@ -103,7 +103,11 @@ pub fn t8103_config() HwConfig {
 		uat_oas: 40
 		map_kernel_to_user: false
 		num_banks: 1
+		preempt1_size: 0x540
+		preempt2_size: 0x280
+		preempt3_size: 0x20
 		compute_preempt1_size: 0x7f80
+		render_tiling_control: 0xa041
 		shared_region_base: 0x6800000000
 		shared_region_size: 0x140000
 		fw_private_region_base: 0x6800140000

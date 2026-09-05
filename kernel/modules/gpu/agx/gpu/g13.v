@@ -17,6 +17,10 @@ pub const g13_queue_channel_fragment = u32(1) << 1
 pub const g13_queue_channel_compute = u32(1) << 2
 const g13_queue_channel_mask = g13_queue_channel_vertex | g13_queue_channel_fragment | g13_queue_channel_compute
 const g13_compute_no_preemption = u64(1) << 0
+const g13_tvb_max_size = u64(862_322_688)
+const g13_tvb_max_blocks = u32(g13_tvb_max_size / fw.g13_tvb_block_size)
+const g13_tvb_max_blocks_nomemless = g13_tvb_max_blocks / u32(3)
+const g13_tvb_max_pages = g13_tvb_max_blocks * fw.g13_tvb_pages_per_block
 
 struct G13EventResources {
 mut:
@@ -34,6 +38,39 @@ mut:
 	pipe_type  u32
 	is_new     bool
 	lock       klock.Lock
+}
+
+struct G13RenderBufferResources {
+mut:
+	context       &mmu.UatContext = unsafe { nil }
+	slot          u32
+	slot_reserved bool
+	info          SharedBuffer
+	block_control SharedBuffer
+	counter       SharedBuffer
+	stats         SharedBuffer
+	kernel_buffer SharedBuffer
+	page_list     &mmu.UatBuffer = unsafe { nil }
+	block_list    &mmu.UatBuffer = unsafe { nil }
+	blocks        []&mmu.UatBuffer
+	initialized   bool
+}
+
+struct G13TileInfo {
+mut:
+	tiles_x            u32
+	tiles_y            u32
+	tiles              u32
+	tiles_per_mtile_x  u32
+	tiles_per_mtile_y  u32
+	utiles_per_mtile_x u32
+	utiles_per_mtile_y u32
+	tilemap_size       u64
+	tail_pointer_size  u64
+	layermeta_size     u64
+	min_tvb_blocks     u32
+	utile_config       u32
+	params             fw.G13TilingParameters
 }
 
 pub struct G13ComputeAttachment {
@@ -93,6 +130,8 @@ mut:
 	notifier        SharedBuffer
 	subqueues       [3]G13SubQueueResources
 	event_sequences [3]u64
+	render_buffer   G13RenderBufferResources
+	vm              &mmu.UatContext = unsafe { nil }
 	released        bool
 }
 
@@ -121,6 +160,221 @@ fn (mut mgr GpuManager) flush_g13_queue_mappings(resources &G13QueueResources) b
 			|| !mgr.flush_g13_kernel_buffer(&queue.info) {
 			return false
 		}
+	}
+	return true
+}
+
+@[inline]
+fn g13_div_round_up(value u32, divisor u32) u32 {
+	return value / divisor + if value % divisor != 0 { u32(1) } else { u32(0) }
+}
+
+@[inline]
+fn g13_align_u32(value u32, alignment u32) u32 {
+	return (value + alignment - 1) & ~(alignment - 1)
+}
+
+fn g13_tile_info(width u32, height u32, layers u32, utile_width u32,
+	utile_height u32, samples u32, ppp_control u32, helper_cfg u32) ?G13TileInfo {
+	if width == 0 || height == 0 || width > 16384 || height > 16384 || layers == 0
+		|| layers > 2048 || !((utile_width == 32 && utile_height == 32)
+		|| (utile_width == 32 && utile_height == 16)
+		|| (utile_width == 16 && utile_height == 16)) {
+		return none
+	}
+	sample_bits := match samples {
+		1 { u32(0) }
+		2 { u32(1) }
+		4 { u32(2) }
+		else {
+			return none
+		}
+	}
+	utiles_per_tile_x := u32(32) / utile_width
+	utiles_per_tile_y := u32(32) / utile_height
+	utiles_per_tile := utiles_per_tile_x * utiles_per_tile_y
+	tiles_x := g13_div_round_up(width, 32)
+	tiles_y := g13_div_round_up(height, 32)
+	tiles := tiles_x * tiles_y
+	tiles_per_mtile_x := g13_align_u32(g13_div_round_up(tiles_x, 4), 4)
+	tiles_per_mtile_y := g13_align_u32(g13_div_round_up(tiles_y, 4), 4)
+	tiles_per_mtile := tiles_per_mtile_x * tiles_per_mtile_y
+	region_size := g13_align_u32(5 * tiles_per_mtile * utiles_per_tile, 4) / 4
+	tail_pointer_stride := 8 * utiles_per_tile * tiles_per_mtile / 4
+	tilemap_size := u64(4) * region_size * u64(16) * layers
+	tail_pointer_size := u64(4) * tail_pointer_stride * u64(16) * layers
+	min_tvb_blocks := g13_align_u32(g13_div_round_up(tiles, 128), 8)
+	mut utile_config := ((utile_width / 16) << 12) | ((utile_height / 16) << 14)
+	utile_config |= sample_bits
+	return G13TileInfo{
+		tiles_x: tiles_x
+		tiles_y: tiles_y
+		tiles: tiles
+		tiles_per_mtile_x: tiles_per_mtile_x
+		tiles_per_mtile_y: tiles_per_mtile_y
+		utiles_per_mtile_x: tiles_per_mtile_x * utiles_per_tile_x
+		utiles_per_mtile_y: tiles_per_mtile_y * utiles_per_tile_y
+		tilemap_size: tilemap_size
+		tail_pointer_size: tail_pointer_size
+		layermeta_size: if layers > 1 { u64(0x100) } else { u64(0) }
+		min_tvb_blocks: min_tvb_blocks
+		utile_config: utile_config
+		params: fw.G13TilingParameters{
+			region_size: region_size
+			unk_4: 0x88
+			ppp_control: ppp_control
+			x_max: u16(width - 1)
+			y_max: u16(height - 1)
+			te_screen: ((tiles_y - 1) << 12) | (tiles_x - 1)
+			te_mtile_1: 3 * tiles_per_mtile_x | (2 * tiles_per_mtile_x << 9) | (tiles_per_mtile_x << 18)
+			te_mtile_2: 3 * tiles_per_mtile_y | (2 * tiles_per_mtile_y << 9) | (tiles_per_mtile_y << 18)
+			tiles_per_mtile: tiles_per_mtile
+			tail_pointer_stride: tail_pointer_stride
+			unk_24: 0x100
+			unk_28: if layers > 1 { 0xe000 | (layers - 1) } else { u32(0x8000) }
+			helper_cfg: helper_cfg
+		}
+	}
+}
+
+fn (mut mgr GpuManager) reserve_g13_tvb_slot() ?u32 {
+	for slot := u32(0); slot < fw.g13_tvb_slot_count; slot++ {
+		if !mgr.g13_tvb_slots[slot] {
+			mgr.g13_tvb_slots[slot] = true
+			return slot
+		}
+	}
+	return none
+}
+
+// Caller holds mgr.lock. No submitted job may still reference this buffer.
+fn (mut mgr GpuManager) free_g13_render_buffer_locked(mut buffer G13RenderBufferResources) {
+	if !buffer.initialized && !buffer.slot_reserved && buffer.info.va == 0
+		&& buffer.page_list == unsafe { nil } {
+		return
+	}
+	if buffer.context != unsafe { nil } {
+		mut context := unsafe { buffer.context }
+		for index := buffer.blocks.len - 1; index >= 0; index-- {
+			context.release_driver_buffer(buffer.blocks[index])
+		}
+		buffer.blocks.clear()
+		context.release_driver_buffer(buffer.block_list)
+		context.release_driver_buffer(buffer.page_list)
+	}
+	mgr.free_shared_buffer(mut buffer.kernel_buffer)
+	mgr.free_shared_buffer(mut buffer.stats)
+	mgr.free_shared_buffer(mut buffer.counter)
+	mgr.free_shared_buffer(mut buffer.block_control)
+	mgr.free_shared_buffer(mut buffer.info)
+	if buffer.slot_reserved && buffer.slot < fw.g13_tvb_slot_count {
+		mgr.g13_tvb_slots[buffer.slot] = false
+	}
+	buffer = G13RenderBufferResources{}
+	mgr.g13_private.gc()
+	mgr.g13_shared.gc()
+}
+
+fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResources,
+	ctx &mmu.UatContext) bool {
+	if ctx == unsafe { nil } || !ctx.active || ctx.id == 0 || !fw.validate_g13_buffer_layouts()
+		|| mgr.hw_config.preempt1_size == 0 || mgr.hw_config.preempt2_size == 0
+		|| mgr.hw_config.preempt3_size == 0 {
+		return false
+	}
+	mut buffer := &resources.render_buffer
+	buffer.context = unsafe { ctx }
+	buffer.slot = mgr.reserve_g13_tvb_slot() or { return false }
+	buffer.slot_reserved = true
+	mut complete := false
+	defer {
+		if !complete {
+			mgr.free_g13_render_buffer_locked(mut buffer)
+		}
+	}
+	mut context := unsafe { ctx }
+	buffer.info = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13BufferInfo), pgtable.gpu_prot_fw_private_rw) or { return false }
+	buffer.block_control = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferBlockControl)) or {
+		return false
+	}
+	buffer.counter = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferCounter)) or { return false }
+	buffer.stats = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferStats)) or { return false }
+	buffer.kernel_buffer = mgr.alloc_g13_shared_buffer(0x40) or { return false }
+	buffer.page_list = context.alloc_driver_buffer(u64(g13_tvb_max_pages) * sizeof(u32), true) or {
+		return false
+	}
+	buffer.block_list = context.alloc_driver_buffer(u64(g13_tvb_max_blocks) * u64(2) * sizeof(u32), true) or {
+		return false
+	}
+	unsafe {
+		mut info := &fw.G13BufferInfo(buffer.info.cpu_address())
+		info.cur_id = -1
+		info.page_list = buffer.page_list.va
+		info.page_list_size = g13_tvb_max_pages * u32(sizeof(u32))
+		info.max_blocks = g13_tvb_max_blocks
+		info.block_list = buffer.block_list.va
+		info.block_control = buffer.block_control.va
+		info.block_size = u32(fw.g13_tvb_block_size)
+		info.counter = buffer.counter.va
+		info.unk_80 = 1
+		info.max_pages = g13_tvb_max_pages
+		info.max_pages_nomemless = g13_tvb_max_blocks_nomemless * fw.g13_tvb_pages_per_block
+		mut stats := &fw.G13BufferStats(buffer.stats.cpu_address())
+		stats.reset = 1
+	}
+	if !mgr.flush_g13_kernel_buffer(&buffer.info)
+		|| !mgr.flush_g13_kernel_buffer(&buffer.block_control)
+		|| !mgr.flush_g13_kernel_buffer(&buffer.counter)
+		|| !mgr.flush_g13_kernel_buffer(&buffer.stats)
+		|| !mgr.flush_g13_kernel_buffer(&buffer.kernel_buffer)
+		|| !mgr.flush_g13_uat_range(ctx.id, buffer.page_list.va, buffer.page_list.size)
+		|| !mgr.flush_g13_uat_range(ctx.id, buffer.block_list.va, buffer.block_list.size) {
+		return false
+	}
+	buffer.initialized = true
+	complete = true
+	return true
+}
+
+// Grow the queue's TVB to the minimum needed by a scene. The page and block
+// tables are updated only after every new block has a valid, acknowledged UAT
+// mapping, so firmware never observes a half-committed heap extension.
+fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResources,
+	minimum u32) bool {
+	if !buffer.initialized || buffer.context == unsafe { nil } || minimum == 0
+		|| minimum > g13_tvb_max_blocks || u32(buffer.blocks.len) >= minimum {
+		return buffer.initialized && u32(buffer.blocks.len) >= minimum
+	}
+	mut context := unsafe { buffer.context }
+	old_count := u32(buffer.blocks.len)
+	for _ in old_count .. minimum {
+		block := context.alloc_driver_buffer(fw.g13_tvb_block_size, false) or {
+			return false
+		}
+		if !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
+			context.release_driver_buffer(block)
+			return false
+		}
+		buffer.blocks << block
+	}
+	unsafe {
+		mut pages := &u32(buffer.page_list.cpu_address())
+		mut blocks := &u32(buffer.block_list.cpu_address())
+		for index := old_count; index < minimum; index++ {
+			page_number := u32(buffer.blocks[index].va >> fw.g13_tvb_page_shift)
+			blocks[index * 2] = page_number
+			for page := u32(0); page < fw.g13_tvb_pages_per_block; page++ {
+				pages[index * fw.g13_tvb_pages_per_block + page] = page_number + page
+			}
+		}
+		mut control := &fw.G13BufferBlockControl(buffer.block_control.cpu_address())
+		control.total = minimum
+		control.wptr = minimum
+		mut info := &fw.G13BufferInfo(buffer.info.cpu_address())
+		page_count := minimum * fw.g13_tvb_pages_per_block
+		info.page_count = page_count
+		info.block_count = minimum
+		info.last_page = page_count - 1
 	}
 	return true
 }
@@ -203,6 +457,7 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 		return
 	}
 	resources.released = true
+	mgr.free_g13_render_buffer_locked(mut resources.render_buffer)
 	for index := 2; index >= 0; index-- {
 		mut queue := &resources.subqueues[index]
 		queue.lock.acquire()
@@ -645,10 +900,11 @@ pub fn (job &G13ComputeJobResources) timestamp_values() fw.G13JobTimestamps {
 }
 
 pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
-	channel_mask u32, priority u32) ?&G13QueueResources {
+	channel_mask u32, priority u32, vm &mmu.UatContext) ?&G13QueueResources {
 	if queue_id == 0 || channel_mask == 0 || channel_mask & ~g13_queue_channel_mask != 0
 		|| priority >= 4 || !fw.validate_g13_workqueue_layouts()
-		|| !fw.validate_g13_event_layouts() {
+		|| !fw.validate_g13_event_layouts() || vm == unsafe { nil } || !vm.active
+		|| vm.id == 0 {
 		return none
 	}
 	mgr.lock.acquire()
@@ -664,6 +920,7 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 		queue_id: queue_id
 		channel_mask: channel_mask
 		priority: priority
+		vm: unsafe { vm }
 	}
 	mut complete := false
 	defer {
@@ -699,6 +956,10 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 			&& !mgr.initialize_g13_subqueue(mut resources, pipe_type) {
 			return none
 		}
+	}
+	if channel_mask & g13_queue_channel_vertex != 0
+		&& !mgr.initialize_g13_render_buffer(mut resources, vm) {
+		return none
 	}
 	if !mgr.flush_g13_queue_mappings(resources) {
 		return none

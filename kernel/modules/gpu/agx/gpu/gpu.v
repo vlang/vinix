@@ -100,6 +100,7 @@ mut:
 	g13_events       G13EventResources
 	g13_queues       []&G13QueueResources
 	g13_compute_jobs []&G13ComputeJobResources
+	g13_tvb_slots    [fw.g13_tvb_slot_count]bool
 	g17_graph        &G17FirmwareGraph = unsafe { nil }
 	g17_queues       []&G17QueueResources
 	fwctl_lock       klock.Lock
