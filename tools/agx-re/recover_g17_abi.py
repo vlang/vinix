@@ -561,6 +561,9 @@ SCHEDULER_STATE_STACK_INIT_SLOT = 0x20
 IOGPU_COMMAND_QUEUE_INIT = (
     "__ZN17IOGPUCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs"
 )
+IOGPU_COMMAND_DESCRIPTOR_INIT = (
+    "__ZN22IOGPUCommandDescriptor4initEP5IOGPUP17IOGPUCommandQueueP9IOGPUTask"
+)
 AGX_COMMAND_QUEUE_INIT = (
     "__ZN15AGXCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs"
 )
@@ -11651,7 +11654,7 @@ def explain_g17_3d_common_boolean_accounting(
 
 
 def recover_g17_render_descriptor_fields(
-    image: bytes, render_payload: dict[str, object]
+    image: bytes, iogpu: bytes, render_payload: dict[str, object]
 ) -> dict[str, object]:
     """Recover normalized render-command fields copied after raw passthrough.
 
@@ -11663,8 +11666,15 @@ def recover_g17_render_descriptor_fields(
     """
 
     symbols = macho_symbols(image)
-    if PROCESS_RENDER_SETUP not in symbols:
-        raise ValueError(f"Mach-O is missing {PROCESS_RENDER_SETUP}")
+    required = (PROCESS_RENDER_SETUP, BASE_CONFIGURE_DEVICE)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing {missing[0]}")
+    iogpu_symbols = macho_symbols(iogpu)
+    if IOGPU_COMMAND_DESCRIPTOR_INIT not in iogpu_symbols:
+        raise ValueError(
+            f"IOGPUFamily is missing {IOGPU_COMMAND_DESCRIPTOR_INIT}"
+        )
     _address, code = symbol_code(image, PROCESS_RENDER_SETUP)
     require_instruction_words_at(
         code,
@@ -11703,6 +11713,36 @@ def recover_g17_render_descriptor_fields(
             0x21CC: 0x39400108,
             0x21D0: 0x12000108,
             0x21D4: 0x3930E328,  # -> descriptor +0xc38
+        },
+    )
+
+    # IOGPUCommandDescriptor::init retains its IOGPU* first argument at
+    # descriptor +0x10. AGX passes the accelerator there. configureDevice
+    # explicitly clears accelerator +0xf7e8..+0xf7e9 before the descriptor
+    # readers run, so the conditional fallback byte is a checked zero for
+    # this selected driver rather than an input Vinix must invent.
+    _address, descriptor_init = symbol_code(iogpu, IOGPU_COMMAND_DESCRIPTOR_INIT)
+    require_instruction_words_at(
+        descriptor_init,
+        "G17 descriptor accelerator retention",
+        {
+            0x020: 0xAA0103F7,  # retain the IOGPU* first argument
+            0x024: 0xAA0003F4,  # descriptor base
+            0x060: 0xAA1403F8,
+            0x064: 0xF8038F1F,  # descriptor +0x38, post-indexed
+            0x068: 0xF81D8317,  # IOGPU* -> descriptor +0x10
+        },
+    )
+    _address, configure_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        configure_code,
+        "G17 descriptor fallback device bit",
+        {
+            0x034: 0x529EE508,  # accelerator member block +0xf728
+            0x038: 0x8B080018,
+            0x5A8: 0x6F00E401,  # zero vector
+            0x5AC: 0x3D802F01,  # accelerator +0xf7d8..+0xf7e7
+            0x5B0: 0x7901831F,  # zero +0xf7e8..+0xf7e9
         },
     )
 
@@ -11774,9 +11814,13 @@ def recover_g17_render_descriptor_fields(
             "condition_mask": 1,
             "nonzero_value": 1,
             "zero_source": {
-                "object_pointer_member": 0x10,
-                "object_byte_offset": 0xF7E9,
+                "descriptor_object_pointer_member": 0x10,
+                "object_role": "IOGPU_accelerator",
+                "accelerator_member": 0xF7E9,
                 "mask": 1,
+                "value": 0,
+                "producer": BASE_CONFIGURE_DEVICE,
+                "producer_offset": 0x5B0,
             },
             "producer_offset": 0x21D4,
         },
@@ -14791,7 +14835,7 @@ def main() -> int:
         render_payload_format = recover_g17_render_payload_format(driver)
         channels["render_payload_format"] = render_payload_format
         channels["descriptor_render_command_fields"] = (
-            recover_g17_render_descriptor_fields(driver, render_payload_format)
+            recover_g17_render_descriptor_fields(driver, iogpu, render_payload_format)
         )
         descriptor_3d_common = recover_g17_3d_common_passthrough(driver)
         descriptor_3d_common["boolean_accounting"] = (

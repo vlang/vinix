@@ -2030,22 +2030,14 @@ pub fn populate_g17_ta_render_passthrough(descriptor voidptr, descriptor_bytes u
 	return true
 }
 
-// Host value read through the descriptor's retained device object when the
-// normalized command does not force descriptor byte +0xc38 to one. Keep that
-// object lookup outside the wire-layout helper: Vinix does not construct the
-// Apple C++ object graph, and the caller must supply the independently
-// recovered device control bit.
-pub struct G17RenderDescriptorInputs {
-pub:
-	object_control_f7e9 u8
-}
-
 // Copy the normalized-command portion of processRenderSetup into the staging
 // descriptor. This is a separate nine-write stage: eight writes are direct
 // command fields and the ninth selects between literal one and a device bit.
-// It must not be counted as a ninth boolean in the eight-chain common helper.
+// The selected G17 configureDevice path explicitly initializes that retained
+// accelerator bit to zero. It must not be counted as a ninth boolean in the
+// eight-chain common helper.
 pub fn populate_g17_render_descriptor_fields(descriptor voidptr, descriptor_bytes u64,
-	command voidptr, command_bytes u64, inputs G17RenderDescriptorInputs) bool {
+	command voidptr, command_bytes u64) bool {
 	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size
 		|| command == unsafe { nil } || command_bytes < g17_render_kernel_command_size {
 		return false
@@ -2070,7 +2062,7 @@ pub fn populate_g17_render_descriptor_fields(descriptor voidptr, descriptor_byte
 		destination[0x0c38] = if source[0x283] & 1 != 0 {
 			u8(1)
 		} else {
-			inputs.object_control_f7e9 & 1
+			u8(0)
 		}
 	}
 	return true

@@ -175,8 +175,10 @@ Apple binary. Resource-derived and computed fields still need native Vinix
 producers before the descriptor can drive hardware submission.
 The following normalized-command bridge is executable as well: eight direct
 descriptor writes and one conditional device-bit write are recovered with
-their raw-payload provenance. Its nine-write total is explicitly reported as
-a separate stage and cannot be confused with the common helper's eight masks.
+their raw-payload provenance. The fallback device bit is also traced through
+the retained accelerator pointer to its explicit zero initializer. Its
+nine-write total is reported as a separate stage and cannot be confused with
+the common helper's eight masks.
 
 `generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this

@@ -4894,6 +4894,8 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["error_markers"]["validation"], 0xA)
 
     def test_recovers_g17_normalized_render_descriptor_fields(self) -> None:
+        driver = b"driver"
+        iogpu = b"iogpu"
         setup_code = bytearray(0x2200)
         anchors = {
             0x0048: 0x911E70B7,
@@ -4932,6 +4934,24 @@ class RecoverG17AbiTests(unittest.TestCase):
         }
         for offset, word in anchors.items():
             struct.pack_into("<I", setup_code, offset, word)
+        configure_code = bytearray(0x5B4)
+        for offset, word in {
+            0x034: 0x529EE508,
+            0x038: 0x8B080018,
+            0x5A8: 0x6F00E401,
+            0x5AC: 0x3D802F01,
+            0x5B0: 0x7901831F,
+        }.items():
+            struct.pack_into("<I", configure_code, offset, word)
+        descriptor_init = bytearray(0x6C)
+        for offset, word in {
+            0x020: 0xAA0103F7,
+            0x024: 0xAA0003F4,
+            0x060: 0xAA1403F8,
+            0x064: 0xF8038F1F,
+            0x068: 0xF81D8317,
+        }.items():
+            struct.pack_into("<I", descriptor_init, offset, word)
         payload_format = {
             "copy_ranges": [
                 {"payload_offset": 0x821, "command_member": 0x208, "bytes": 1},
@@ -4945,20 +4965,39 @@ class RecoverG17AbiTests(unittest.TestCase):
                 {"payload_offset": 0x650, "command_member": 0x283, "mask": 1},
             ],
         }
+
+        def symbols_for(image: bytes) -> dict[str, int]:
+            if image == driver:
+                return {
+                    recover_g17_abi.PROCESS_RENDER_SETUP: 0x940000,
+                    recover_g17_abi.BASE_CONFIGURE_DEVICE: 0x950000,
+                }
+            self.assertEqual(image, iogpu)
+            return {recover_g17_abi.IOGPU_COMMAND_DESCRIPTOR_INIT: 0xA00000}
+
+        def code_for(image: bytes, name: str) -> tuple[int, bytes]:
+            if image == driver and name == recover_g17_abi.PROCESS_RENDER_SETUP:
+                return 0x940000, bytes(setup_code)
+            if image == driver and name == recover_g17_abi.BASE_CONFIGURE_DEVICE:
+                return 0x950000, bytes(configure_code)
+            if image == iogpu and name == recover_g17_abi.IOGPU_COMMAND_DESCRIPTOR_INIT:
+                return 0xA00000, bytes(descriptor_init)
+            self.fail(f"unexpected symbol_code request for {name}")
+
         with (
             mock.patch.object(
                 recover_g17_abi,
                 "macho_symbols",
-                return_value={recover_g17_abi.PROCESS_RENDER_SETUP: 0x940000},
+                side_effect=symbols_for,
             ),
             mock.patch.object(
                 recover_g17_abi,
                 "symbol_code",
-                return_value=(0x940000, bytes(setup_code)),
+                side_effect=code_for,
             ),
         ):
             recovered = recover_g17_abi.recover_g17_render_descriptor_fields(
-                b"", payload_format
+                driver, iogpu, payload_format
             )
 
         self.assertEqual(recovered["direct_write_count"], 8)
@@ -4990,28 +5029,72 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(
             recovered["conditional_field"]["zero_source"],
             {
-                "object_pointer_member": 0x10,
-                "object_byte_offset": 0xF7E9,
+                "descriptor_object_pointer_member": 0x10,
+                "object_role": "IOGPU_accelerator",
+                "accelerator_member": 0xF7E9,
                 "mask": 1,
+                "value": 0,
+                "producer": recover_g17_abi.BASE_CONFIGURE_DEVICE,
+                "producer_offset": 0x5B0,
             },
         )
         self.assertIn("separate", recovered["counting_note"])
+
+        struct.pack_into("<I", descriptor_init, 0x068, 0xD503201F)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                side_effect=symbols_for,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=code_for,
+            ),
+            self.assertRaisesRegex(ValueError, "descriptor accelerator retention"),
+        ):
+            recover_g17_abi.recover_g17_render_descriptor_fields(
+                driver, iogpu, payload_format
+            )
+        struct.pack_into("<I", descriptor_init, 0x068, 0xF81D8317)
+
+        struct.pack_into("<I", configure_code, 0x5B0, 0xD503201F)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                side_effect=symbols_for,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=code_for,
+            ),
+            self.assertRaisesRegex(ValueError, "fallback device bit"),
+        ):
+            recover_g17_abi.recover_g17_render_descriptor_fields(
+                driver, iogpu, payload_format
+            )
+        struct.pack_into("<I", configure_code, 0x5B0, 0x7901831F)
 
         struct.pack_into("<I", setup_code, 0x21D4, 0xD503201F)
         with (
             mock.patch.object(
                 recover_g17_abi,
                 "macho_symbols",
-                return_value={recover_g17_abi.PROCESS_RENDER_SETUP: 0x940000},
+                side_effect=symbols_for,
             ),
             mock.patch.object(
                 recover_g17_abi,
                 "symbol_code",
-                return_value=(0x940000, bytes(setup_code)),
+                side_effect=code_for,
             ),
             self.assertRaisesRegex(ValueError, "normalized render descriptor fields"),
         ):
-            recover_g17_abi.recover_g17_render_descriptor_fields(b"", payload_format)
+            recover_g17_abi.recover_g17_render_descriptor_fields(
+                driver, iogpu, payload_format
+            )
 
     def test_recovers_g17_3d_common_passthrough(self) -> None:
         copy_address = 0x930000
