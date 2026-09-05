@@ -2066,11 +2066,13 @@ def trace_g17_value_expression(
                     "base": base_value,
                 }
 
+    wide = decode_move_wide(word)
+    update_w = decode_movk_w(word)
     if (
-        decode_move_wide(word) is not None
+        wide is not None
         or decode_movn_w(word) is not None
         or decode_movz_w(word) is not None
-        or decode_movk_w(word) is not None
+        or update_w is not None
     ):
         value = resolve_static_x_register(instructions, use_index, register)
         if value is not None:
@@ -2079,6 +2081,32 @@ def trace_g17_value_expression(
                 "producer_offset": offset,
                 "value": value,
             }
+        update = (
+            (wide[2], wide[3], 8)
+            if wide is not None and wide[0] == "movk"
+            else (update_w[1], update_w[2], 4)
+            if update_w is not None
+            else None
+        )
+        if update is not None:
+            immediate, shift, width = update
+            source_value = trace_g17_value_expression(
+                instructions,
+                definition_index,
+                register,
+                depth + 1,
+                next_seen,
+            )
+            if source_value is not None:
+                return {
+                    "kind": "expression",
+                    "producer_offset": offset,
+                    "operation": "movk",
+                    "bytes": width,
+                    "immediate": immediate,
+                    "shift": shift,
+                    "source": source_value,
+                }
 
     copy = decode_register_copy(word)
     if copy is not None and copy[0] == register:

@@ -4857,6 +4857,20 @@ class RecoverG17AbiTests(unittest.TestCase):
             },
         )
 
+    def test_recovers_g17_movk_over_expression(self) -> None:
+        instructions = [
+            (0x00, 0xB27053EC),  # mov x12, #0x1fffff0000
+            (0x04, 0xF29F0C0C),  # movk x12, #0xf860
+            (0x08, 0xAA0C03E4),  # mov x4, x12
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 3)
+        expression = recovered["expression"]["source"]
+        self.assertEqual(expression["operation"], "movk")
+        self.assertEqual(expression["bytes"], 8)
+        self.assertEqual(expression["immediate"], 0xF860)
+        self.assertEqual(expression["shift"], 0)
+        self.assertEqual(expression["source"]["operation"], "orr")
+
     def test_recovers_g17_dup_count_virtual_call_expression(self) -> None:
         blraa_x9_x17 = 0xD73F0800 | 9 << 5 | 17
         orr_x4_x23_x0_lsl_32 = 0xAA000000 | 32 << 10 | 23 << 5 | 4
