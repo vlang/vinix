@@ -521,6 +521,9 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 		}
 	}
 	iop_version := devicetree.get_le_u32(wrapper, 'iop-version') or { return false }
+	// ApplePMPv2 reads this property from the wrapper service and uses its
+	// value in getDeviceMemoryWithIndex(), proving that reg[3] is the
+	// PTD-update resource. This still says nothing about firmware readiness.
 	ptd_update_reg_index := devicetree.get_le_u32(wrapper, 'ptd-update-reg-index') or {
 		return false
 	}

@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 10)
+        self.assertEqual(result["schema"], 11)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -756,6 +756,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
         dashboard = 0x7000
         get_property = 0x8000
         ping = 0x9000
+        get_slave = 0xA000
+        init_owner = 0xB000
+        set_power_action = 0xC000
 
         def branch(source: int, target: int, link: bool = False) -> bytes:
             delta = (target - source) // 4
@@ -765,20 +768,48 @@ class RecoverT6050PowerTests(unittest.TestCase):
         handler_prefix = struct.pack(
             "<5I", 0xD374DC28, 0x51000D09, 0x7100093F, 0x7100091F, 0x7100051F
         )
+        start_code = bytearray(
+            struct.pack(
+                "<4I",
+                0xF9404400,
+                0xF9004660,
+                0xB9408808,
+                0xB9009268,
+            )
+        )
+        start_code += branch(start + len(start_code), get_slave, True)
+        start_code += struct.pack(
+            "<11I",
+            0xF9004E60,
+            0xF9005A60,
+            0xF9404800,
+            0xF9005E60,
+            0xB9400001,
+            0xF9405E60,
+            0x52800002,
+            0xF9006260,
+            0xF9405E60,
+            0x52800021,
+            0xF9006675,
+        )
+        start_code += struct.pack(
+            "<8I",
+            0xF9404660,
+            0xB0FFFFB0,
+            0x91270210,
+            0xD2830211,
+            0xDAC10230,
+            0xAA1003E2,
+            0xAA1303E1,
+            0xD2800003,
+        )
+        start_code += branch(start + len(start_code), init_owner, True)
+        start_code += struct.pack("<2I", 0xF9404660, 0xAA1003E1)
+        start_code += branch(start + len(start_code), set_power_action, True)
         functions = {
             recover_t6050_power.APPLE_PMP_V2_START: (
                 start,
-                struct.pack(
-                    "<8I",
-                    0xF9404660,
-                    0xB0FFFFB0,
-                    0x91270210,
-                    0xD2830211,
-                    0xDAC10230,
-                    0xAA1003E2,
-                    0xAA1303E1,
-                    0xD2800003,
-                ),
+                bytes(start_code),
             ),
             recover_t6050_power.APPLE_PMP_V2_MESSAGE_HANDLER: (
                 handler,
@@ -849,7 +880,18 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.APPLE_PMP_V2_GET_PROPERTY_DATA: get_property,
             recover_t6050_power.APPLE_PMP_V2_PING_GATED: ping,
         }
-        result = recover_t6050_power.recover_apple_pmp_code_contract(functions, symbols)
+        rtbuddy_symbols = {
+            recover_t6050_power.RTBUDDY_ENDPOINT_GET_SLAVE: get_slave,
+            recover_t6050_power.RTBUDDY_ENDPOINT_INIT_OWNER: init_owner,
+            recover_t6050_power.RTBUDDY_ENDPOINT_SET_POWER_ACTION: set_power_action,
+        }
+        result = recover_t6050_power.recover_apple_pmp_code_contract(
+            functions, symbols, rtbuddy_symbols
+        )
+        self.assertEqual(result["attachment"]["mapper_index"], 1)
+        self.assertEqual(
+            result["attachment"]["ptd_update_property"], "ptd-update-reg-index"
+        )
         self.assertEqual(result["mailbox"]["message_class"]["shift"], 52)
         self.assertEqual(result["mailbox"]["classes"]["power"], [2])
         self.assertEqual(result["ping"]["completion_power_subtype"], 1)
@@ -863,7 +905,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ping_code.replace(struct.pack("<I", 0xD2E00417), struct.pack("<I", 0xD2E00617)),
         )
         with self.assertRaisesRegex(ValueError, "ping request/wait"):
-            recover_t6050_power.recover_apple_pmp_code_contract(bad_functions, symbols)
+            recover_t6050_power.recover_apple_pmp_code_contract(
+                bad_functions, symbols, rtbuddy_symbols
+            )
 
     def test_rejects_changed_sgx_gate_order(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree((0x267, 0x268)))

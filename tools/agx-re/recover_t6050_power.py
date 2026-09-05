@@ -20,6 +20,7 @@ from recover_g17_abi import (
     decode_test_bit_branch,
     macho_symbols,
     macho_uuid,
+    read_adrp_add_cstring,
     recover_vtable_target,
     symbol_code,
 )
@@ -43,9 +44,11 @@ PMP_PTD_RANGE_NAME_OFFSET = 16
 APPLE_PMGR_UUID = "42F1AD20-5320-3803-8A70-05104BD5FBA7"
 APPLE_T6050_PMGR_UUID = "0AEACB61-66C5-3D24-AEA2-0A9DFFCF17E2"
 APPLE_PMP_UUID = "AA65CE02-93C8-33DE-A7BE-B11E1621F739"
+RTBUDDY_UUID = "4FEFDDA4-3743-34AC-869D-EAE695595A4C"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
 DEFAULT_APPLE_T6050_PMGR = Path("build/kext/g17c/driver.AppleT6050PMGR.macho")
 DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
+DEFAULT_RTBUDDY = Path("build/kext/g17c/driver.RTBuddy.macho")
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
 PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
 PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
@@ -82,6 +85,13 @@ APPLE_PMP_V2_SEND_MESSAGE = "__ZN10ApplePMPv211sendMessageEy"
 APPLE_PMP_V2_WRITE_DASHBOARD = "__ZN10ApplePMPv214writeDashboardEjy"
 APPLE_PMP_V2_GET_PROPERTY_DATA = "__ZN10ApplePMPv215getPropertyDataEPKc"
 APPLE_PMP_V2_PING_GATED = "__ZN10ApplePMPv29pingGatedEPv"
+RTBUDDY_ENDPOINT_GET_SLAVE = "__ZN15RTBuddyEndpoint17getSlaveProcessorEv"
+RTBUDDY_ENDPOINT_INIT_OWNER = (
+    "__ZN15RTBuddyEndpoint12initForOwnerEP8OSObjectPFvS1_PvS2_ES2_"
+)
+RTBUDDY_ENDPOINT_SET_POWER_ACTION = (
+    "__ZN15RTBuddyEndpoint19setPowerStateActionEPFiP8OSObjectmmE"
+)
 
 
 @dataclass(frozen=True)
@@ -1303,7 +1313,9 @@ def recover_apple_t6050_pmgr(
 
 
 def recover_apple_pmp_code_contract(
-    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+    rtbuddy_symbols: dict[str, int],
 ) -> dict[str, object]:
     """Recover the RTBuddy mailbox and ping-completion contract.
 
@@ -1328,6 +1340,17 @@ def recover_apple_pmp_code_contract(
     missing = [name for name in required if name not in symbols]
     if missing:
         raise ValueError(f"ApplePMP is missing PMPv2 symbols: {missing!r}")
+    missing_rtbuddy = [
+        name
+        for name in (
+            RTBUDDY_ENDPOINT_GET_SLAVE,
+            RTBUDDY_ENDPOINT_INIT_OWNER,
+            RTBUDDY_ENDPOINT_SET_POWER_ACTION,
+        )
+        if name not in rtbuddy_symbols
+    ]
+    if missing_rtbuddy:
+        raise ValueError(f"RTBuddy is missing ApplePMP attach symbols: {missing_rtbuddy!r}")
     for name in (
         APPLE_PMP_V2_START,
         APPLE_PMP_V2_MESSAGE_HANDLER,
@@ -1339,7 +1362,53 @@ def recover_apple_pmp_code_contract(
         if name not in functions:
             raise ValueError(f"ApplePMP has no code body for {name}")
 
-    _start_address, start_code = functions[APPLE_PMP_V2_START]
+    start_address, start_code = functions[APPLE_PMP_V2_START]
+    start_targets = direct_branch_targets(start_address, start_code)
+    for target in (
+        RTBUDDY_ENDPOINT_GET_SLAVE,
+        RTBUDDY_ENDPOINT_INIT_OWNER,
+        RTBUDDY_ENDPOINT_SET_POWER_ACTION,
+    ):
+        if rtbuddy_symbols[target] not in start_targets:
+            raise ValueError(f"ApplePMPv2 start no longer calls {target}")
+
+    def one_start_call_offset(target: str) -> int:
+        offsets = [
+            offset
+            for offset in range(0, len(start_code) - 3, 4)
+            if direct_branch_target_at(start_address, start_code, offset)
+            == rtbuddy_symbols[target]
+        ]
+        if len(offsets) != 1:
+            raise ValueError(f"ApplePMPv2 start call count changed for {target}")
+        return offsets[0]
+
+    get_slave_offset = one_start_call_offset(RTBUDDY_ENDPOINT_GET_SLAVE)
+    init_owner_offset = one_start_call_offset(RTBUDDY_ENDPOINT_INIT_OWNER)
+    set_power_offset = one_start_call_offset(RTBUDDY_ENDPOINT_SET_POWER_ACTION)
+    if not get_slave_offset < init_owner_offset < set_power_offset:
+        raise ValueError("ApplePMPv2 RTBuddy attach ordering changed")
+    if not _has_ordered_words(
+        start_code,
+        (
+            0xF9404400,  # ldr x0, [x0, #0x88] -- endpoint from endpoint service
+            0xF9004660,  # str x0, [x19, #0x88] -- retained endpoint
+            0xB9408808,  # ldr w8, [x0, #0x88] -- endpoint identifier
+            0xB9009268,  # str w8, [x19, #0x90]
+            0xF9004E60,  # str x0, [x19, #0x98] -- slave processor
+            0xF9005A60,  # str x0, [x19, #0xb0] -- AppleA7IOPNub
+            0xF9404800,  # ldr x0, [x0, #0x90] -- wrapper service
+            0xF9005E60,  # str x0, [x19, #0xb8]
+            0xB9400001,  # ldr w1, [x0] -- ptd-update-reg-index value
+            0xF9405E60,  # ldr x0, [x19, #0xb8] -- wrapper service
+            0x52800002,  # mov w2, #0 -- getDeviceMemoryWithIndex options
+            0xF9006260,  # str x0, [x19, #0xc0] -- PTD update memory
+            0xF9405E60,  # ldr x0, [x19, #0xb8] -- wrapper service
+            0x52800021,  # mov w1, #1 -- mapper index
+            0xF9006675,  # str x21, [x19, #0xc8] -- retained mapper
+        ),
+    ):
+        raise ValueError("ApplePMPv2 wrapper resource attachment changed")
     # The RTBuddy service lives at this+0x88.  start() installs the static
     # message callback with (service, this, callback, 0).
     if not _has_words_in_order(
@@ -1443,6 +1512,24 @@ def recover_apple_pmp_code_contract(
         raise ValueError("ApplePMPv2 diagnostic dashboard write contract changed")
 
     return {
+        "attachment": {
+            "provider": "RTBuddyEndpointService",
+            "provider_endpoint_offset": 0x88,
+            "endpoint_identifier_offset": 0x88,
+            "slave_processor_object_offset": 0x98,
+            "wrapper_service_object_offset": 0xB8,
+            "ptd_update_property": "ptd-update-reg-index",
+            "ptd_update_memory_object_offset": 0xC0,
+            "mapper_index": 1,
+            "mapper_object_offset": 0xC8,
+            "ordering": [
+                "resolve endpoint and slave processor",
+                "resolve wrapper PTD-update memory and mapper",
+                "install message callback",
+                "install power-state callback",
+            ],
+            "scope": "host attachment only; does not start or prove PMP firmware ready",
+        },
         "mailbox": {
             "word_bits": 64,
             "message_class": {"shift": 52, "bits": 4},
@@ -1474,11 +1561,15 @@ def recover_apple_pmp_code_contract(
     }
 
 
-def recover_apple_pmp(image: bytes) -> dict[str, object]:
+def recover_apple_pmp(image: bytes, rtbuddy_image: bytes) -> dict[str, object]:
     identity = macho_uuid(image)
     if identity != APPLE_PMP_UUID:
         raise ValueError(f"unsupported ApplePMP UUID {identity}")
     symbols = macho_symbols(image)
+    rtbuddy_identity = macho_uuid(rtbuddy_image)
+    if rtbuddy_identity != RTBUDDY_UUID:
+        raise ValueError(f"unsupported RTBuddy UUID {rtbuddy_identity}")
+    rtbuddy_symbols = macho_symbols(rtbuddy_image)
     functions = {
         name: symbol_code(image, name)
         for name in (
@@ -1490,9 +1581,28 @@ def recover_apple_pmp(image: bytes) -> dict[str, object]:
             APPLE_PMP_V2_PING_GATED,
         )
     }
+    start_address, start_code = functions[APPLE_PMP_V2_START]
+    expected_start_strings = {
+        (0x94, 0x98): "role",
+        (0x154, 0x158): "ptd-update-reg-index",
+        (0x260, 0x264): "setActive",
+        (0x328, 0x32C): "PMP workloop",
+        (0x3F8, 0x3FC): "wait-for",
+    }
+    for (adrp_offset, add_offset), expected in expected_start_strings.items():
+        actual = read_adrp_add_cstring(
+            image, start_address, start_code, adrp_offset, add_offset
+        )
+        if actual != expected:
+            raise ValueError(
+                f"ApplePMPv2 start string changed at {adrp_offset:#x}: {actual!r}"
+            )
     return {
         "uuid": identity,
-        "pmp_v2": recover_apple_pmp_code_contract(functions, symbols),
+        "rtbuddy_uuid": rtbuddy_identity,
+        "pmp_v2": recover_apple_pmp_code_contract(
+            functions, symbols, rtbuddy_symbols
+        ),
     }
 
 
@@ -1772,7 +1882,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 10,
+        "schema": 11,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -1872,6 +1982,7 @@ def main() -> int:
         "--t6050-pmgr", type=Path, default=DEFAULT_APPLE_T6050_PMGR
     )
     parser.add_argument("--pmp", type=Path, default=DEFAULT_APPLE_PMP)
+    parser.add_argument("--rtbuddy", type=Path, default=DEFAULT_RTBUDDY)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -1885,7 +1996,9 @@ def main() -> int:
         manifest["apple_t6050_pmgr"] = recover_apple_t6050_pmgr(
             args.t6050_pmgr.read_bytes(), pmgr_symbols
         )
-        manifest["apple_pmp"] = recover_apple_pmp(args.pmp.read_bytes())
+        manifest["apple_pmp"] = recover_apple_pmp(
+            args.pmp.read_bytes(), args.rtbuddy.read_bytes()
+        )
     except (OSError, ValueError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)

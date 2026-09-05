@@ -45,6 +45,12 @@ DEFAULT_ENTRIES = (
     # named symbol boundaries rather than guessed from indirect vtable calls.
     "com.apple.driver.ApplePMP",
     "com.apple.driver.ApplePMPFirmware",
+    # ApplePMPv2 attaches to RTBuddyEndpointService rather than driving the
+    # wrapper mailbox directly. AppleA7IOP owns the ascwrap-v6 resource map;
+    # retain both binaries so attach and wrapper-register semantics can be
+    # recovered at named symbol boundaries.
+    "com.apple.driver.RTBuddy",
+    "com.apple.driver.AppleA7IOP",
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",

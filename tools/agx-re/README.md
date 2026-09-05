@@ -109,11 +109,15 @@ PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated
 report labels that result as neither global PMP nor AGX-dashboard readiness,
 and likewise keeps ApplePMP's diagnostic `pmptool-config` writer separate
-from ApplePMGR's device-state request. The report separates the SoC-device ID,
-record index, dense virtual-state index, and SOC-DEV-PKT bit slice; those
-values are not interchangeable. Its sanitized JSON report is written under
-`build/`; raw Apple DeviceTree or executable bytes are never repository
-inputs.
+from ApplePMGR's device-state request. Together with a UUID-pinned RTBuddy
+image, the same check proves that ApplePMP resolves wrapper `reg[3]` through
+`ptd-update-reg-index`, obtains mapper index 1, and installs the endpoint
+message and power callbacks only after those resources. That result is an
+attachment contract, not a firmware-readiness signal. The report separates
+the SoC-device ID, record index, dense virtual-state index, and SOC-DEV-PKT bit
+slice; those values are not interchangeable. Its sanitized JSON report is
+written under `build/`; raw Apple DeviceTree or executable bytes are never
+repository inputs.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
