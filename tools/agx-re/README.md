@@ -149,14 +149,20 @@ that `sram-index` is forwarded as a provider power-domain selector rather than
 a `reg[]` index. The UUID-pinned concrete `AppleASCWrapV6` subclass maps
 wrapper `reg[1]` and proves it is the 64-bit IORVBAR aperture: firmware setup
 writes the image address with lock bit 0, while the wrapper CPU run path uses
-the 32-bit register at `reg[0]+0x44`. T6050 lacks `cpu-ctrl-filtered`, so the
-base start path permits the concrete run/stop writes. This is a register
-contract, not proof that PMP firmware reached RTKit or dashboard readiness;
+the 32-bit register at `reg[0]+0x44`. The same concrete binary proves that the
+mailbox-v4 window starts at `reg[0]+0x8000`: control registers are at relative
+offsets `0x110` and `0x114`, message items are at `0x800` and `0x830`, and
+each item is two complete 64-bit words. The endpoint occupies the low byte of
+the second word; status bits 16 and 17 mean full and empty, respectively.
+Vinix's common ASC mailbox transport now preserves both 64-bit words instead
+of truncating the second word to 32 bits. T6050 lacks `cpu-ctrl-filtered`, so
+the base start path permits the concrete run/stop writes. These are register
+contracts, not proof that PMP firmware reached RTKit or dashboard readiness;
 wrapper `reg[2]` remains unlabeled. Vinix now has a dormant per-die transport
-for these proven resources: it maps only wrapper registers 0 and 1, verifies
-the IORVBAR lock after the 64-bit write, and preserves Apple's two-access stop
-sequence. Probe does not construct it until the firmware and RTBuddy owner is
-complete.
+for the proven IORVBAR and run-control resources: it maps only wrapper
+registers 0 and 1, verifies the IORVBAR lock after the 64-bit write, and
+preserves Apple's two-access stop sequence. Probe does not construct it until
+the firmware and RTBuddy owner is complete.
 
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and

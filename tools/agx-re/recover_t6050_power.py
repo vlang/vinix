@@ -191,6 +191,17 @@ APPLE_ASCWRAP_V6_MAP_FIRMWARE = (
     "__ZN14AppleASCWrapV612_mapFirmwareEyP18IOMemoryDescriptorj"
 )
 APPLE_ASCWRAP_V6_RUN_CPU = "__ZN14AppleASCWrapV67_runCPUEb"
+APPLE_ASCWRAP_V6_INBOX = "__ZN14AppleASCWrapV66_inboxEPv"
+APPLE_ASCWRAP_V6_OUTBOX = "__ZN14AppleASCWrapV67_outboxEPv"
+APPLE_ASCWRAP_V6_KIC_INBOX_ENABLED = (
+    "__ZN14AppleASCWrapV619_getKICInboxEnabledEv"
+)
+APPLE_ASCWRAP_V6_INBOX_EMPTY = "__ZN14AppleASCWrapV614_getInboxEmptyEv"
+APPLE_ASCWRAP_V6_INBOX_FULL = "__ZN14AppleASCWrapV613_getInboxFullEv"
+APPLE_ASCWRAP_V6_OUTBOX_EMPTY = "__ZN14AppleASCWrapV615_getOutboxEmptyEv"
+APPLE_ASCWRAP_V6_MAILBOX_ITEM_SIZE = (
+    "__ZNK14AppleASCWrapV615mailboxItemSizeEv"
+)
 
 
 @dataclass(frozen=True)
@@ -2625,6 +2636,13 @@ def recover_apple_ascwrap_v6_code_contract(
         APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED,
         APPLE_ASCWRAP_V6_MAP_FIRMWARE,
         APPLE_ASCWRAP_V6_RUN_CPU,
+        APPLE_ASCWRAP_V6_INBOX,
+        APPLE_ASCWRAP_V6_OUTBOX,
+        APPLE_ASCWRAP_V6_KIC_INBOX_ENABLED,
+        APPLE_ASCWRAP_V6_INBOX_EMPTY,
+        APPLE_ASCWRAP_V6_INBOX_FULL,
+        APPLE_ASCWRAP_V6_OUTBOX_EMPTY,
+        APPLE_ASCWRAP_V6_MAILBOX_ITEM_SIZE,
     )
     missing = [name for name in required if name not in functions]
     if missing:
@@ -2720,6 +2738,57 @@ def recover_apple_ascwrap_v6_code_contract(
     ):
         raise ValueError("AppleASCWrapV6 CPU run-control sequence changed")
 
+    _inbox_address, inbox_code = functions[APPLE_ASCWRAP_V6_INBOX]
+    expected_inbox = struct.pack(
+        "<7I",
+        0xD503245F,  # bti c
+        0xA9402428,  # ldp x8, x9, [x1] -- complete 16-byte item
+        0xF940800A,  # ldr x10, [x0, #0x100] -- reg[0] mapped VA
+        0x5291000B,  # mov w11, #0x8800
+        0x8B0B014A,  # add x10, x10, x11
+        0xA9002548,  # stp x8, x9, [x10]
+        0xD65F03C0,  # ret
+    )
+    if inbox_code != expected_inbox:
+        raise ValueError("AppleASCWrapV6 mailbox inbox layout changed")
+
+    _outbox_address, outbox_code = functions[APPLE_ASCWRAP_V6_OUTBOX]
+    expected_outbox = struct.pack(
+        "<7I",
+        0xD503245F,  # bti c
+        0xF9408008,  # ldr x8, [x0, #0x100] -- reg[0] mapped VA
+        0x52910609,  # mov w9, #0x8830
+        0x8B090108,  # add x8, x8, x9
+        0xA9402508,  # ldp x8, x9, [x8]
+        0xA9002428,  # stp x8, x9, [x1] -- complete 16-byte item
+        0xD65F03C0,  # ret
+    )
+    if outbox_code != expected_outbox:
+        raise ValueError("AppleASCWrapV6 mailbox outbox layout changed")
+
+    _size_address, item_size_code = functions[APPLE_ASCWRAP_V6_MAILBOX_ITEM_SIZE]
+    if item_size_code != struct.pack("<3I", 0xD503245F, 0x52800200, 0xD65F03C0):
+        raise ValueError("AppleASCWrapV6 mailbox item size changed")
+
+    status_contracts = (
+        (APPLE_ASCWRAP_V6_KIC_INBOX_ENABLED, 0x52902201, 0x12000000),
+        (APPLE_ASCWRAP_V6_INBOX_EMPTY, 0x52902201, 0x53114400),
+        (APPLE_ASCWRAP_V6_INBOX_FULL, 0x52902201, 0x53104280),
+        (APPLE_ASCWRAP_V6_OUTBOX_EMPTY, 0x52902281, 0x53114680),
+    )
+    for name, register_offset, bit_extract in status_contracts:
+        _address, code = functions[name]
+        if not _has_ordered_words(
+            code,
+            (
+                0xD2813511,  # _reg vtable slot 0x9a8
+                register_offset,
+                0xD73F0910,
+                bit_extract,
+            ),
+        ):
+            raise ValueError(f"AppleASCWrapV6 mailbox status accessor changed: {name}")
+
     return {
         "iorvbar": {
             "device_memory_index": 1,
@@ -2743,6 +2812,26 @@ def recover_apple_ascwrap_v6_code_contract(
             "permission_object_offset": 0x132,
             "filter_property": "cpu-ctrl-filtered",
             "t6050_filter_property_present": False,
+        },
+        "mailbox_v4": {
+            "device_memory_index": 0,
+            "window_offset": 0x8000,
+            "window_size": 0x1000,
+            "item_size": 16,
+            "access_width_bits": 64,
+            "registers": {
+                "a2i_control": 0x110,
+                "i2a_control": 0x114,
+                "a2i_message": 0x800,
+                "i2a_message": 0x830,
+            },
+            "status_bits": {
+                "kic_inbox_enabled": 0,
+                "full": 16,
+                "empty": 17,
+            },
+            "message_words": 2,
+            "endpoint": "low byte of the second 64-bit word",
         },
         "vtable_slots": {
             "initialize": 0x970,
@@ -2769,6 +2858,13 @@ def recover_apple_ascwrap_v6(image: bytes) -> dict[str, object]:
             APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED,
             APPLE_ASCWRAP_V6_MAP_FIRMWARE,
             APPLE_ASCWRAP_V6_RUN_CPU,
+            APPLE_ASCWRAP_V6_INBOX,
+            APPLE_ASCWRAP_V6_OUTBOX,
+            APPLE_ASCWRAP_V6_KIC_INBOX_ENABLED,
+            APPLE_ASCWRAP_V6_INBOX_EMPTY,
+            APPLE_ASCWRAP_V6_INBOX_FULL,
+            APPLE_ASCWRAP_V6_OUTBOX_EMPTY,
+            APPLE_ASCWRAP_V6_MAILBOX_ITEM_SIZE,
         )
     }
     initialize_address, initialize_code = functions[APPLE_ASCWRAP_V6_INITIALIZE]
@@ -3075,7 +3171,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 16,
+        "schema": 17,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,

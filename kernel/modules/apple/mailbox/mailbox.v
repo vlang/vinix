@@ -2,7 +2,7 @@
 module mailbox
 
 // Apple ASC Mailbox
-// 96-bit messages: 64-bit data + 32-bit endpoint/flags
+// 128-bit mailbox items: 64-bit data + 64-bit endpoint/flags
 // MMIO-based send/receive for communication with coprocessors (GPU, DCP, etc.)
 
 import aarch64.kio
@@ -28,7 +28,7 @@ const mbox_full = u32(1 << 16)
 pub struct MboxMsg {
 pub mut:
 	data0 u64 // Lower 64 bits of message data
-	data1 u32 // Upper 32 bits (endpoint + type)
+	data1 u64 // Second 64-bit word; endpoint is in its low byte
 }
 
 pub struct Mailbox {
@@ -48,8 +48,12 @@ fn (mbox &Mailbox) read_reg(offset u32) u32 {
 	return kio.mmin32(unsafe { &u32(mbox.base + offset) })
 }
 
-fn (mbox &Mailbox) write_reg(offset u32, value u32) {
-	kio.mmout32(unsafe { &u32(mbox.base + offset) }, value)
+fn (mbox &Mailbox) read_reg64(offset u32) u64 {
+	return kio.mmin(unsafe { &u64(mbox.base + offset) })
+}
+
+fn (mbox &Mailbox) write_reg64(offset u32, value u64) {
+	kio.mmout(unsafe { &u64(mbox.base + offset) }, value)
 }
 
 // Send a message to the coprocessor (AP -> IOP)
@@ -66,10 +70,10 @@ pub fn (mut mbox Mailbox) send(msg MboxMsg) bool {
 			// The high-word MMIO write publishes this message to the IOP.
 			// Make every preceding shared-memory write globally visible first.
 			cpu.dmb_sy()
-			// Write data low first, then high (write to high triggers send)
-			mbox.write_reg(mbox_a2i_send0, u32(msg.data0))
-			mbox.write_reg(mbox_a2i_send0 + 4, u32(msg.data0 >> 32))
-			mbox.write_reg(mbox_a2i_send1, msg.data1)
+			// AppleASCWrapV6 writes a complete 16-byte item at +0x800. Keep
+			// the same word order: publishing the second word completes send.
+			mbox.write_reg64(mbox_a2i_send0, msg.data0)
+			mbox.write_reg64(mbox_a2i_send1, msg.data1)
 			return true
 		}
 		cpu.isb()
@@ -91,15 +95,14 @@ pub fn (mut mbox Mailbox) recv() ?MboxMsg {
 		return none
 	}
 
-	lo := mbox.read_reg(mbox_i2a_recv0)
-	hi := mbox.read_reg(mbox_i2a_recv0 + 4)
-	flags := mbox.read_reg(mbox_i2a_recv1)
+	data := mbox.read_reg64(mbox_i2a_recv0)
+	flags := mbox.read_reg64(mbox_i2a_recv1)
 	// The message may advertise data the IOP just wrote to shared memory.
 	// Prevent later consumers from observing that memory before the FIFO read.
 	cpu.dmb_sy()
 
 	return MboxMsg{
-		data0: u64(lo) | (u64(hi) << 32)
+		data0: data
 		data1: flags
 	}
 }

@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 16)
+        self.assertEqual(result["schema"], 17)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -1532,6 +1532,32 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0x121A7808,
             0xB9004528,
         )
+        inbox_code = struct.pack(
+            "<7I",
+            0xD503245F,
+            0xA9402428,
+            0xF940800A,
+            0x5291000B,
+            0x8B0B014A,
+            0xA9002548,
+            0xD65F03C0,
+        )
+        outbox_code = struct.pack(
+            "<7I",
+            0xD503245F,
+            0xF9408008,
+            0x52910609,
+            0x8B090108,
+            0xA9402508,
+            0xA9002428,
+            0xD65F03C0,
+        )
+
+        def status_code(register_offset: int, bit_extract: int) -> bytes:
+            return struct.pack(
+                "<4I", 0xD2813511, register_offset, 0xD73F0910, bit_extract
+            )
+
         functions = {
             recover_t6050_power.APPLE_ASCWRAP_V6_INITIALIZE: (
                 initialize,
@@ -1550,6 +1576,28 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 map_code,
             ),
             recover_t6050_power.APPLE_ASCWRAP_V6_RUN_CPU: (run_cpu, run_code),
+            recover_t6050_power.APPLE_ASCWRAP_V6_INBOX: (0x4000, inbox_code),
+            recover_t6050_power.APPLE_ASCWRAP_V6_OUTBOX: (0x4100, outbox_code),
+            recover_t6050_power.APPLE_ASCWRAP_V6_KIC_INBOX_ENABLED: (
+                0x4200,
+                status_code(0x52902201, 0x12000000),
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_INBOX_EMPTY: (
+                0x4300,
+                status_code(0x52902201, 0x53114400),
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_INBOX_FULL: (
+                0x4400,
+                status_code(0x52902201, 0x53104280),
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_OUTBOX_EMPTY: (
+                0x4500,
+                status_code(0x52902281, 0x53114680),
+            ),
+            recover_t6050_power.APPLE_ASCWRAP_V6_MAILBOX_ITEM_SIZE: (
+                0x4600,
+                struct.pack("<3I", 0xD503245F, 0x52800200, 0xD65F03C0),
+            ),
         }
         slots = {0x970: initialize, 0xA18: map_firmware, 0xA28: run_cpu}
         result = recover_t6050_power.recover_apple_ascwrap_v6_code_contract(
@@ -1560,6 +1608,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["cpu_run_control"]["device_memory_index"], 0)
         self.assertEqual(result["cpu_run_control"]["register_offset"], 0x44)
         self.assertIn("bit 4", result["cpu_run_control"]["run"])
+        self.assertEqual(result["mailbox_v4"]["window_offset"], 0x8000)
+        self.assertEqual(result["mailbox_v4"]["item_size"], 16)
+        self.assertEqual(result["mailbox_v4"]["registers"]["a2i_control"], 0x110)
+        self.assertEqual(result["mailbox_v4"]["registers"]["i2a_message"], 0x830)
 
         bad_functions = dict(functions)
         bad_functions[recover_t6050_power.APPLE_ASCWRAP_V6_RUN_CPU] = (
@@ -1569,6 +1621,18 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
         )
         with self.assertRaisesRegex(ValueError, "CPU run-control"):
+            recover_t6050_power.recover_apple_ascwrap_v6_code_contract(
+                bad_functions, slots
+            )
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.APPLE_ASCWRAP_V6_INBOX] = (
+            0x4000,
+            inbox_code.replace(
+                struct.pack("<I", 0x5291000B), struct.pack("<I", 0x5291020B)
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "mailbox inbox"):
             recover_t6050_power.recover_apple_ascwrap_v6_code_contract(
                 bad_functions, slots
             )

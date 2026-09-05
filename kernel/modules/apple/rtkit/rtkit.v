@@ -103,7 +103,7 @@ fn management_message(kind u8, payload u64) u64 {
 fn (mut rtk RTKit) send_management(kind u8, payload u64) bool {
 	return rtk.mbox.send(mailbox.MboxMsg{
 		data0: management_message(kind, payload)
-		data1: u32(ep_mgmt)
+		data1: u64(ep_mgmt)
 	})
 }
 
@@ -371,7 +371,7 @@ pub fn (mut rtk RTKit) start_endpoint(ep u8) bool {
 pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
 	return rtk.mbox.send(mailbox.MboxMsg{
 		data0: data
-		data1: u32(ep)
+		data1: u64(ep)
 	})
 }
 
