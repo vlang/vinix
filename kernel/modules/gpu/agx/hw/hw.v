@@ -66,6 +66,67 @@ pub mut:
 	sram_voltages [32]u32
 }
 
+pub struct G13PowerZoneConfig {
+pub mut:
+	target        u32
+	target_offset u32
+	filter_tc     u32
+}
+
+// Raw M1 firmware power-controller inputs. Fields named *_f32 store their
+// IEEE-754 bit patterns; Vinix builds the kernel with floating point disabled.
+pub struct G13PowerConfig {
+pub mut:
+	valid                           bool
+	power_zone_count                u32
+	power_zones                     [5]G13PowerZoneConfig
+	core_leak_coef_f32              [8]u32
+	sram_leak_coef_f32              [8]u32
+	avg_power_filter_tc_ms          u32
+	avg_power_ki_only_f32           u32
+	avg_power_kp_f32                u32
+	avg_power_min_duty_cycle        u32
+	avg_power_target_filter_tc      u32
+	fast_die0_integral_gain_f32     u32
+	fast_die0_proportional_gain_f32 u32
+	fast_die0_prop_tgt_delta        u32
+	fast_die0_release_temp          u32
+	fender_idle_off_delay_ms        u32
+	fw_early_wake_timeout_ms        u32
+	idle_off_delay_ms               u32
+	idle_off_standby_timer          u32
+	perf_boost_ce_step              u32
+	perf_boost_min_util             u32
+	perf_filter_drop_threshold      u32
+	perf_filter_time_constant       u32
+	perf_filter_time_constant2      u32
+	perf_integral_gain_f32          u32
+	perf_integral_gain2_f32         u32
+	perf_integral_min_clamp         u32
+	perf_proportional_gain_f32      u32
+	perf_proportional_gain2_f32     u32
+	perf_reset_iters                u32
+	perf_tgt_utilization            u32
+	ppm_filter_time_constant_ms     u32
+	ppm_ki_f32                      u32
+	ppm_kp_f32                      u32
+	pwr_filter_time_constant        u32
+	pwr_integral_gain_f32           u32
+	pwr_integral_min_clamp          u32
+	pwr_min_duty_cycle              u32
+	pwr_proportional_gain_f32       u32
+	pwr_sample_period_aic_clks      u32
+	se_engagement_criteria          i32
+	se_filter_time_constant         u32
+	se_filter_time_constant_1       u32
+	se_inactive_threshold           u32
+	se_ki_f32                       u32
+	se_ki_1_f32                     u32
+	se_kp_f32                       u32
+	se_kp_1_f32                     u32
+	se_reset_criteria               u32
+}
+
 pub struct HwConfig {
 pub:
 	chip_id              u32
@@ -139,6 +200,7 @@ pub mut:
 	perf_state_voltages      [256]u32
 	perf_state_sram_voltages [256]u32
 	max_power_mw             u32
+	g13_power                G13PowerConfig
 	cs_perf_states           AuxPerfStateConfig
 	afr_perf_states          AuxPerfStateConfig
 }
