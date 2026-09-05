@@ -90,7 +90,8 @@ plus the version-pinned RTBuddy wrapper's independent `0x20` message and
 the mapped bootstrap register region and its G17 no-op producer, both
 shared-object address graphs, the per-role ASC power-state records, the shared
 runtime object's control fields and four startup producers, the initial shared
-platform scalars/calibration, and the UAT handoff initialization using a
+platform scalars/calibration, the fixed render payload's normalized copy map
+and cross-field validation, and the UAT handoff initialization using a
 deliberately small AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
 trace data are never repository inputs.

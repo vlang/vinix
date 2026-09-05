@@ -4445,6 +4445,93 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["error_markers"]["auxiliary_stream"], 0x102)
         self.assertEqual(recovered["terminator_marker"], 0x100)
 
+    def test_recovers_g17_render_payload_format(self) -> None:
+        code = bytearray(0x224)
+        for offset, word in {
+            0x004: 0xF9400828,
+            0x008: 0xF9400029,
+            0x014: 0xF9000C1F,
+            0x020: 0xB9000C09,
+            0x02C: 0xB1274109,
+            0x040: 0xF9000829,
+            0x044: 0xF9000C08,
+            0x04C: 0x91032109,
+            0x064: 0xAD010400,
+            0x070: 0xF9409D09,
+            0x074: 0xF9004809,
+            0x07C: 0x3D801800,
+            0x080: 0x91136109,
+            0x0B4: 0x3C898000,
+            0x0B8: 0x3DC05100,
+            0x0BC: 0x3D804400,
+            0x0C8: 0xF940C109,
+            0x0CC: 0xF900A809,
+            0x0DC: 0x3DC15500,
+            0x0E0: 0x3D800120,
+            0x0F0: 0xF942C90A,
+            0x0F4: 0xF900CC0A,
+            0x100: 0x91093109,
+            0x10C: 0xB901A80A,
+            0x118: 0xF9432D0A,
+            0x124: 0xF900012A,
+            0x12C: 0x12000169,
+            0x134: 0x3962C109,
+            0x138: 0x12000129,
+            0x144: 0xB901BC09,
+            0x184: 0xAD000520,
+            0x188: 0xF9433509,
+            0x18C: 0xF9010009,
+            0x190: 0x39608509,
+            0x194: 0x39082009,
+            0x1A8: 0x3D808400,
+            0x1C0: 0xAD120400,
+            0x1C8: 0x12000149,
+            0x1D4: 0x1200012C,
+            0x1E0: 0x1200018C,
+            0x1EC: 0x1200018C,
+            0x1F4: 0x395F8108,
+            0x1F8: 0x4A0B0108,
+            0x200: 0x3600004A,
+            0x204: 0x360000A9,
+            0x208: 0x52800028,
+            0x20C: 0x39002008,
+            0x21C: 0x52800149,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={
+                    recover_g17_abi.PARSE_RENDER_HARDWARE_KERNEL_COMMAND: 0x920000
+                },
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x920000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_render_payload_format(b"")
+
+        self.assertEqual(recovered["payload_bytes"], 0x9D0)
+        self.assertEqual(recovered["payload_pointer_member"], 0x18)
+        self.assertEqual(len(recovered["copy_ranges"]), 11)
+        self.assertEqual(
+            recovered["copy_ranges"][0],
+            {"payload_offset": 0xC8, "command_member": 0x20, "bytes": 0x78},
+        )
+        self.assertEqual(len(recovered["bit_fields"]), 10)
+        self.assertEqual(recovered["bit_fields"][0]["mask"], 1)
+        self.assertEqual(
+            recovered["validation"][1],
+            {
+                "operation": "implies",
+                "condition": {"payload_offset": 0x23C, "bit": 0},
+                "required": {"payload_offset": 0x646, "bit": 0},
+            },
+        )
+        self.assertEqual(recovered["error_markers"]["validation"], 0xA)
+
     def test_recovers_g17_channel_command_common_fields(self) -> None:
         code = bytearray(0x300)
         for offset, word in {

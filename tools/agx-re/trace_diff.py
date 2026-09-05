@@ -23,6 +23,9 @@ AUXILIARY_U16_FLAG_OFFSET = 0x88
 AUXILIARY_U16_LENGTH_OFFSET = 0x8C
 AUXILIARY_U64_FLAG_OFFSET = 0x94
 AUXILIARY_U64_LENGTH_OFFSET = 0x98
+RENDER_PAYLOAD_BYTES = 0x9D0
+RENDER_MATCH_FLAG_OFFSETS = (0x240, 0x7E0)
+RENDER_IMPLICATION_FLAG_OFFSETS = (0x23C, 0x646)
 
 
 def walk_segment(data: bytes) -> dict[str, object]:
@@ -103,6 +106,29 @@ def walk_segment(data: bytes) -> dict[str, object]:
             "payload_end": payload_end,
             "end": end,
         }
+        if payload == RENDER_PAYLOAD_BYTES:
+            payload_offset = offset + RECORD_HEADER_BYTES
+            match_bits = [
+                data[payload_offset + member] & 1
+                for member in RENDER_MATCH_FLAG_OFFSETS
+            ]
+            implication_bits = [
+                data[payload_offset + member] & 1
+                for member in RENDER_IMPLICATION_FLAG_OFFSETS
+            ]
+            valid = match_bits[0] == match_bits[1] and (
+                not implication_bits[0] or implication_bits[1]
+            )
+            if not valid:
+                raise ValueError(
+                    f"record at {offset:#x} violates the recovered render "
+                    "payload invariants"
+                )
+            record["render_validation"] = {
+                "equal_bits": match_bits,
+                "implication_bits": implication_bits,
+                "valid": True,
+            }
         if extension is not None:
             record["primary_extension"] = extension
         records.append(record)
@@ -233,6 +259,12 @@ def main() -> int:
                         f"aux-u64={header['auxiliary_u64_flag']:#x}/"
                         f"{header['auxiliary_u64_bytes']:#x}"
                     )
+                    if validation := record.get("render_validation"):
+                        print(
+                            "    render validation: "
+                            f"equal={validation['equal_bits']} "
+                            f"implies={validation['implication_bits']} valid"
+                        )
                     if extension := record.get("primary_extension"):
                         print(
                             "    primary extension: "

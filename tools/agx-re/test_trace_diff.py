@@ -61,6 +61,10 @@ class WalkSegmentTests(unittest.TestCase):
         self.assertEqual(len(walked["records"]), 1)
         self.assertEqual(walked["records"][0]["payload_bytes"], 0x9D0)
         self.assertEqual(
+            walked["records"][0]["render_validation"],
+            {"equal_bits": [0, 0], "implication_bits": [0, 0], "valid": True},
+        )
+        self.assertEqual(
             walked["records"][0]["header"],
             {
                 "primary_extension_flag": 0,
@@ -71,6 +75,14 @@ class WalkSegmentTests(unittest.TestCase):
             },
         )
         self.assertEqual(walked["trailing_bytes"], 40)
+
+    def test_rejects_invalid_render_payload_flags(self) -> None:
+        data = bytearray(self.segment(trace_diff.RENDER_PAYLOAD_BYTES))
+        payload = trace_diff.SEGMENT_HEADER_BYTES + trace_diff.RECORD_HEADER_BYTES
+        data[payload + trace_diff.RENDER_MATCH_FLAG_OFFSETS[1]] = 1
+
+        with self.assertRaisesRegex(ValueError, "render payload invariants"):
+            trace_diff.walk_segment(bytes(data))
 
     def test_reports_separate_auxiliary_stream_requirements(self) -> None:
         data = bytearray(self.segment(0))

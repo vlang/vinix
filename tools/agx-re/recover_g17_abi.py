@@ -523,6 +523,9 @@ G17_FEATURE_MASK = 0x0001000018020000
 PARSE_HARDWARE_KERNEL_COMMAND = (
     "__ZN24AGXHardwareKernelCommand16parseAndValidateER21AGXSharedStreamParserS1_"
 )
+PARSE_RENDER_HARDWARE_KERNEL_COMMAND = (
+    "__ZN30AGXRenderHardwareKernelCommand16parseAndValidateER21AGXSharedStreamParser"
+)
 REGISTER_LIST_PRODUCERS = {
     "3D": GENERATE_REGISTER_LIST_3D,
     "FastBlit": (
@@ -10679,6 +10682,136 @@ def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_render_payload_format(image: bytes) -> dict[str, object]:
+    """Recover the fixed render payload and its normalized command fields.
+
+    The base hardware-command parser exposes a payload cursor. The render
+    subtype consumes exactly 0x9d0 bytes from it, retains the source pointer,
+    copies the fields used by processRender into a compact command object and
+    enforces two cross-field bit invariants. Record both the source ranges and
+    normalized destinations so a future encoder need not guess either ABI.
+    """
+
+    symbols = macho_symbols(image)
+    if PARSE_RENDER_HARDWARE_KERNEL_COMMAND not in symbols:
+        raise ValueError(f"Mach-O is missing {PARSE_RENDER_HARDWARE_KERNEL_COMMAND}")
+
+    _address, code = symbol_code(image, PARSE_RENDER_HARDWARE_KERNEL_COMMAND)
+    require_instruction_words_at(
+        code,
+        "G17 render command payload parse",
+        {
+            0x004: 0xF9400828,  # cursor at parser +0x10
+            0x008: 0xF9400029,  # start at parser +0x00
+            0x014: 0xF9000C1F,  # clear retained payload on framing error
+            0x020: 0xB9000C09,  # error marker at command +0x0c
+            0x02C: 0xB1274109,  # consume exactly 0x9d0 bytes
+            0x040: 0xF9000829,  # publish the advanced cursor
+            0x044: 0xF9000C08,  # retain payload pointer at command +0x18
+            0x04C: 0x91032109,  # first source range begins at payload +0xc8
+            0x064: 0xAD010400,  # -> command +0x20
+            0x070: 0xF9409D09,  # final qword at payload +0x138
+            0x074: 0xF9004809,  # -> command +0x90
+            0x07C: 0x3D801800,  # completes command +0x20..+0x97
+            0x080: 0x91136109,  # source range at payload +0x4d8
+            0x0B4: 0x3C898000,  # -> command +0x98
+            0x0B8: 0x3DC05100,  # source range at payload +0x140
+            0x0BC: 0x3D804400,  # -> command +0x110
+            0x0C8: 0xF940C109,  # final qword at payload +0x180
+            0x0CC: 0xF900A809,  # -> command +0x150
+            0x0DC: 0x3DC15500,  # source range at payload +0x550
+            0x0E0: 0x3D800120,  # -> command +0x158
+            0x0F0: 0xF942C90A,  # final qword at payload +0x590
+            0x0F4: 0xF900CC0A,  # -> command +0x198
+            0x100: 0x91093109,  # payload +0x24c
+            0x10C: 0xB901A80A,  # payload +0x254 -> command +0x1a8
+            0x118: 0xF9432D0A,  # payload +0x658
+            0x124: 0xF900012A,  # -> unaligned command +0x1ac
+            0x12C: 0x12000169,  # payload +0x240 is reduced to bit zero
+            0x134: 0x3962C109,  # payload +0x8b0
+            0x138: 0x12000129,  # is reduced to bit zero
+            0x144: 0xB901BC09,  # payload +0x234 -> command +0x1bc
+            0x184: 0xAD000520,  # payload +0x25f..+0x27e -> command +0x1db
+            0x188: 0xF9433509,  # payload +0x668
+            0x18C: 0xF9010009,  # -> command +0x200
+            0x190: 0x39608509,  # payload +0x821
+            0x194: 0x39082009,  # -> command +0x208
+            0x1A8: 0x3D808400,  # payload +0x840..+0x86f -> command +0x210
+            0x1C0: 0xAD120400,  # payload +0x870..+0x8af -> command +0x240
+            0x1C8: 0x12000149,  # payload +0x23c -> command +0x280 bit zero
+            0x1D4: 0x1200012C,  # payload +0x646 -> command +0x281 bit zero
+            0x1E0: 0x1200018C,  # payload +0x248 -> command +0x282 bit zero
+            0x1EC: 0x1200018C,  # payload +0x650 -> command +0x283 bit zero
+            0x1F4: 0x395F8108,  # validation compares payload +0x7e0
+            0x1F8: 0x4A0B0108,  # with payload +0x240
+            0x200: 0x3600004A,  # payload +0x23c gates the second invariant
+            0x204: 0x360000A9,  # which requires payload +0x646
+            0x208: 0x52800028,  # successful parse sets byte one
+            0x20C: 0x39002008,  # at command +0x08
+            0x21C: 0x52800149,  # invariant error marker 0x0a
+        },
+    )
+
+    copy_ranges = [
+        {"payload_offset": 0x0C8, "command_member": 0x020, "bytes": 0x78},
+        {"payload_offset": 0x4D8, "command_member": 0x098, "bytes": 0x78},
+        {"payload_offset": 0x140, "command_member": 0x110, "bytes": 0x48},
+        {"payload_offset": 0x550, "command_member": 0x158, "bytes": 0x48},
+        {"payload_offset": 0x24C, "command_member": 0x1A0, "bytes": 0x0C},
+        {"payload_offset": 0x658, "command_member": 0x1AC, "bytes": 0x0C},
+        {"payload_offset": 0x234, "command_member": 0x1BC, "bytes": 0x04},
+        {"payload_offset": 0x25F, "command_member": 0x1DB, "bytes": 0x20},
+        {"payload_offset": 0x668, "command_member": 0x200, "bytes": 0x08},
+        {"payload_offset": 0x821, "command_member": 0x208, "bytes": 0x01},
+        {"payload_offset": 0x840, "command_member": 0x210, "bytes": 0x70},
+    ]
+    bit_fields = [
+        {"payload_offset": 0x240, "command_member": 0x1B8},
+        {"payload_offset": 0x8B0, "command_member": 0x1B9},
+        {"payload_offset": 0x247, "command_member": 0x1C0},
+        {"payload_offset": 0x25C, "command_member": 0x1D8},
+        {"payload_offset": 0x25D, "command_member": 0x1D9},
+        {"payload_offset": 0x25E, "command_member": 0x1DA},
+        {"payload_offset": 0x23C, "command_member": 0x280},
+        {"payload_offset": 0x646, "command_member": 0x281},
+        {"payload_offset": 0x248, "command_member": 0x282},
+        {"payload_offset": 0x650, "command_member": 0x283},
+    ]
+    payload_bytes = 0x9D0
+    if any(
+        field["payload_offset"] + field.get("bytes", 1) > payload_bytes
+        for field in copy_ranges + bit_fields
+    ):
+        raise ValueError("render command field falls outside its fixed payload")
+
+    return {
+        "parser": {"start": 0x00, "end": 0x08, "cursor": 0x10},
+        "payload_bytes": payload_bytes,
+        "payload_pointer_member": 0x18,
+        "copy_ranges": copy_ranges,
+        "bit_fields": [dict(field, mask=1) for field in bit_fields],
+        "validation": [
+            {
+                "operation": "equal_bits",
+                "left": {"payload_offset": 0x7E0, "bit": 0},
+                "right": {"payload_offset": 0x240, "bit": 0},
+            },
+            {
+                "operation": "implies",
+                "condition": {"payload_offset": 0x23C, "bit": 0},
+                "required": {"payload_offset": 0x646, "bit": 0},
+            },
+        ],
+        "success": {"member": 0x08, "value": 1},
+        "error_markers": {
+            "member": 0x0C,
+            "framing": 0x100,
+            "validation": 0x0A,
+        },
+        "producer": PARSE_RENDER_HARDWARE_KERNEL_COMMAND,
+    }
+
+
 def recover_g17_channel_command_common_fields(image: bytes) -> dict[str, object]:
     """Recover the common host-written fields in every channel command.
 
@@ -12667,6 +12800,9 @@ def main() -> int:
         channels["register_emission_cfg"] = register_emission_cfg
         channels["command_stream_format"] = (
             recover_g17_command_stream_format(driver)
+        )
+        channels["render_payload_format"] = (
+            recover_g17_render_payload_format(driver)
         )
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
