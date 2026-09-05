@@ -51,6 +51,10 @@ pub:
 	writable   bool
 }
 
+pub fn (mapping &IoMapping) is_present() bool {
+	return mapping.phys != 0 && mapping.size != 0
+}
+
 // Native CS/AFR clock-domain data. G17's Apple DeviceTree record has up to
 // sixteen states and two voltage rails; the arrays use state-major indexing.
 pub struct AuxPerfStateConfig {

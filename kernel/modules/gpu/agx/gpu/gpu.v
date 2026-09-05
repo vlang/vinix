@@ -33,6 +33,11 @@ pub const msg_fwctl = u64(0x84) << 48
 pub const msg_halt = u64(0x85) << 48
 const msg_address_mask = (u64(1) << 44) - 1
 
+// G13 v12.3 doorbell selectors. Pipe doorbells use the pipe type in bits 1:0
+// and the priority index in bits 3:2; firmware-global controls occupy 0x10+.
+pub const doorbell_kick_firmware = u32(0x10)
+pub const doorbell_device_control = u32(0x11)
+
 // GPU states
 pub enum GpuState {
 	idle     = 0
@@ -176,7 +181,7 @@ fn (mut mgr GpuManager) stop_firmware_cpus(count u32) {
 }
 
 struct SharedBuffer {
-	mut:
+mut:
 	va   u64
 	phys u64
 	size u64
@@ -185,6 +190,11 @@ struct SharedBuffer {
 @[inline]
 fn pipe_index(priority u32, cmd_type u32) u32 {
 	return (priority % 4) * 3 + (cmd_type % 3)
+}
+
+@[inline]
+fn pipe_doorbell(priority u32, cmd_type u32) u32 {
+	return (priority % 4) << 2 | (cmd_type % 3)
 }
 
 fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(size u64,
@@ -243,6 +253,11 @@ fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 }
 
 fn (mut mgr GpuManager) init_channels() bool {
+	if sizeof(channel.RingHeader) != 0x30 || !fw.validate_g13_channel_layouts() {
+		C.printf(c'agx: G13 channel ABI layout validation failed\n')
+		return false
+	}
+
 	// Device control TX
 	devctl_entry := u32(sizeof(fw.FwDeviceControlMsg))
 	devctl_size := u64(sizeof(channel.RingHeader)) + u64(fw.device_control_size) * u64(devctl_entry)
@@ -279,11 +294,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 
 	// 12 pipe channels: 4 priorities x (vertex, fragment, compute)
 	for i := u32(0); i < 12; i++ {
-		entry_size := match i % 3 {
-			0 { u32(sizeof(fw.FwVertexCmd)) }
-			1 { u32(sizeof(fw.FwFragmentCmd)) }
-			else { u32(sizeof(fw.FwComputeCmd)) }
-		}
+		entry_size := u32(sizeof(fw.FwRunWorkQueueMsg))
 		pipe_bytes := u64(sizeof(channel.RingHeader)) + u64(fw.pipe_size) * u64(entry_size)
 		pipe := mgr.alloc_shared_buffer(pipe_bytes) or { return false }
 		mgr.channels.pipes[i] = channel.new_tx_channel('pipe${i}', pipe.va, pipe.phys, fw.pipe_size, entry_size)
@@ -367,22 +378,29 @@ pub fn (mut mgr GpuManager) init() bool {
 		return false
 	}
 
-	// Step 7: Build and send MSG_INIT with initdata VA
+	// Step 7: Publish the v12.3 Initialize command before making InitData live.
+	initialize := fw.make_device_control_initialize()
+	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
+		C.printf(c'agx: Failed to queue device-control Initialize\n')
+		mgr.state = .error
+		return false
+	}
+
+	// Step 8: Build and send MSG_INIT with initdata VA.
 	if !mgr.send_fw_msg(msg_init, mgr.initdata_va) {
 		C.printf(c'agx: Failed to send MSG_INIT\n')
 		mgr.state = .error
 		return false
 	}
 
-	// Step 8: Wait for MSG_INIT acknowledgment
-	_ := mgr.rtk.recv_msg_blocking(10000000) or {
-		C.printf(c'agx: Timeout waiting for INIT ack\n')
+	// Step 9: Ring the device-control doorbell, then wake the firmware. MSG_INIT
+	// has no synchronous reply; consuming an arbitrary RTKit message as an
+	// acknowledgement can steal the first real firmware notification.
+	if !mgr.ring_device_control() || !mgr.kick_firmware() {
+		C.printf(c'agx: Failed to ring G13 initialization doorbells\n')
 		mgr.state = .error
 		return false
 	}
-
-	// Step 9: Ring doorbell to kick firmware
-	mgr.kick_firmware()
 
 	mgr.state = .running
 	spawn event_worker(mut mgr)
@@ -467,9 +485,19 @@ pub fn (mut mgr GpuManager) send_doorbell_to_role(role u32, channel_id u32) bool
 	return mgr.send_role_message(role, u8(ep_doorbell), msg_tx_doorbell | (u64(channel_id) & msg_address_mask))
 }
 
-// Ring the doorbell for the default device-control channel.
-pub fn (mut mgr GpuManager) kick_firmware() {
-	mgr.send_doorbell(0)
+// Wake the G13 firmware after updating global submission state.
+pub fn (mut mgr GpuManager) kick_firmware() bool {
+	return mgr.send_doorbell(doorbell_kick_firmware)
+}
+
+// Notify G13 firmware that a device-control command is available.
+pub fn (mut mgr GpuManager) ring_device_control() bool {
+	return mgr.send_doorbell(doorbell_device_control)
+}
+
+// Notify one of the four priority instances of a G13 work pipe.
+fn (mut mgr GpuManager) ring_pipe(priority u32, cmd_type u32) bool {
+	return mgr.send_doorbell(pipe_doorbell(priority, cmd_type))
 }
 
 // Send a firmware-control message via RTKit on the firmware endpoint (0x20).
@@ -485,19 +513,24 @@ pub fn (mut mgr GpuManager) send_fw_msg_to_role(role u32, message u64, data u64)
 pub fn (mut mgr GpuManager) handle_event() {
 	mut buf := [64]u8{}
 	for mgr.channels.event.dequeue(voidptr(&buf[0])) {
-		// Dispatch based on event type at offset 4
-		event_type := unsafe { *&u32(&buf[4]) }
+		// EventMsg is a repr(C, u32) enum: its discriminant is the first word.
+		event_type := unsafe { *&u32(&buf[0]) }
 		match event_type {
-			fw.fw_event_init {
-				println('agx: Firmware init event received')
-			}
-			fw.fw_event_vertex_done, fw.fw_event_fragment_done, fw.fw_event_compute_done, fw.fw_event_stamp {
+			fw.fw_event_flag {
 				gpu_event_mgr.scan_completions()
 			}
-			fw.fw_event_error {
+			fw.fw_event_fault {
 				C.printf(c'agx: GPU firmware error event\n')
 				info := mgr.res.get_fault_info()
 				C.printf(c'agx: Fault addr=0x%llx unit=%d\n', info.addr, info.unit_code)
+				mgr.state = .error
+			}
+			fw.fw_event_timeout {
+				C.printf(c'agx: GPU firmware timeout event\n')
+				mgr.state = .error
+			}
+			fw.fw_event_grow_tvb {
+				C.printf(c'agx: GrowTVB event is not implemented\n')
 				mgr.state = .error
 			}
 			else {
@@ -535,6 +568,9 @@ pub fn (mut mgr GpuManager) submit_render(cmd &queue.RenderCommand, priority u32
 		if !mgr.channels.pipes[idx].enqueue(voidptr(&vertex)) {
 			return false
 		}
+		if !mgr.ring_pipe(pipe_prio, 0) {
+			return false
+		}
 	}
 
 	if cmd.flags & queue.render_flag_fragment != 0 {
@@ -562,9 +598,10 @@ pub fn (mut mgr GpuManager) submit_render(cmd &queue.RenderCommand, priority u32
 		if !mgr.channels.pipes[idx].enqueue(voidptr(&fragment)) {
 			return false
 		}
+		if !mgr.ring_pipe(pipe_prio, 1) {
+			return false
+		}
 	}
-
-	mgr.kick_firmware()
 	return true
 }
 
@@ -599,8 +636,7 @@ pub fn (mut mgr GpuManager) submit_compute(cmd &queue.ComputeCommand, priority u
 		return false
 	}
 
-	mgr.kick_firmware()
-	return true
+	return mgr.ring_pipe(priority % 4, 2)
 }
 
 fn event_worker(mut mgr GpuManager) {
