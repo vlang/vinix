@@ -91,6 +91,19 @@ pub mut:
 	data [0x40]u8
 }
 
+@[packed]
+pub struct G13BarrierCommand {
+pub mut:
+	tag          u32
+	wait_stamp   u64
+	wait_value   u32
+	wait_slot    u32
+	stamp_self   u32
+	uuid         u32
+	barrier_type u32
+	padding      [0x20]u8
+}
+
 pub fn g13_workqueue_priority(priority u32) ?G13WorkQueuePriority {
 	return match priority {
 		0 {
@@ -151,4 +164,5 @@ pub fn validate_g13_workqueue_layouts() bool {
 		&& sizeof(G13WorkQueuePriority) == 0x1c
 		&& sizeof(G13WorkQueueInfo) == 0xb0
 		&& sizeof(G13GpuContextData) == 0x40
+		&& sizeof(G13BarrierCommand) == 0x40
 }

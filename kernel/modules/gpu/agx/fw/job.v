@@ -1,40 +1,53 @@
 module fw
 
-// Job descriptor firmware structures
-// Early G13 job sketches. These are not the complete firmware v12.3 layouts
-// and are unreachable while that ABI is marked partial.
+// Common G13/macOS 12.3 job records embedded in vertex, fragment, and compute
+// work commands.
 
-// Must match workqueue.max_job_slots
-const fw_max_job_slots = 127
-
-// Firmware job descriptor -- wraps a pointer to a command and
-// carries scheduling metadata (priority, stamps, completion tags).
 @[packed]
-pub struct FwJob {
+pub struct G13JobMeta {
 pub mut:
-	tag               u32
-	unk_4             u32
-	cmd_addr          u64 // GPU pointer to command (vertex/fragment/compute)
-	cmd_count         u32
-	unk_14            u32
-	completion_tag    u32
-	unk_1c            u32
-	stamp_addr        u64
-	stamp_value_start u32
-	stamp_value_end   u32
-	unk_30            u64
-	unk_38            u64
-	unk_40            u32
-	priority          u32
-	unk_48            u64
+	unk_0          u16
+	unk_2          u8
+	no_preemption  u8
+	stamp          u64
+	fw_stamp       u64
+	stamp_value    u32
+	stamp_slot     u32
+	evctl_index    u32
+	flush_stamps   u32
+	uuid           u32
+	event_sequence u32
 }
 
-// Firmware job list -- an array of job descriptors that the firmware
-// processes sequentially from its work queue ring buffer.
 @[packed]
-pub struct FwJobList {
+pub struct G13EncoderParams {
 pub mut:
-	count u32
-	pad   u32
-	jobs  [fw_max_job_slots]FwJob
+	unk_8         u32
+	sync_grow     u32
+	unk_10        u32
+	encoder_id    u32
+	unk_18        u32
+	unk_mask      u32
+	sampler_array u64
+	sampler_count u32
+	sampler_max   u32
+}
+
+@[packed]
+pub struct G13JobTimestamps {
+pub mut:
+	start u64
+	end   u64
+}
+
+@[packed]
+pub struct G13RenderTimestamps {
+pub mut:
+	vertex   G13JobTimestamps
+	fragment G13JobTimestamps
+}
+
+pub fn validate_g13_job_layouts() bool {
+	return sizeof(G13JobMeta) == 0x2c && sizeof(G13EncoderParams) == 0x28
+		&& sizeof(G13JobTimestamps) == 0x10 && sizeof(G13RenderTimestamps) == 0x20
 }

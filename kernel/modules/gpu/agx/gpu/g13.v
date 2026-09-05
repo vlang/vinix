@@ -5,8 +5,11 @@ module gpu
 // or its file is closed.
 
 import gpu.agx.fw
+import gpu.agx.alloc
 import gpu.agx.pgtable
 import gpu.agx.event
+import katomic
+import klock
 
 pub const g13_queue_channel_vertex = u32(1) << 0
 pub const g13_queue_channel_fragment = u32(1) << 1
@@ -29,6 +32,7 @@ mut:
 	info       SharedBuffer
 	pipe_type  u32
 	is_new     bool
+	lock       klock.Lock
 }
 
 pub struct G13QueueResources {
@@ -130,10 +134,12 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	resources.released = true
 	for index := 2; index >= 0; index-- {
 		mut queue := &resources.subqueues[index]
+		queue.lock.acquire()
 		mgr.free_shared_buffer(mut queue.info)
 		mgr.free_shared_buffer(mut queue.ring)
 		mgr.free_shared_buffer(mut queue.state)
 		mgr.free_shared_buffer(mut queue.gpu_buffer)
+		queue.lock.release()
 	}
 	mgr.free_shared_buffer(mut resources.notifier)
 	mgr.free_shared_buffer(mut resources.threshold)
@@ -141,6 +147,80 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	mgr.free_shared_buffer(mut resources.context)
 	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
+}
+
+// Publish a private work-command pointer into a queue-owned ring and then
+// publish the corresponding RunWorkQueue message into the global priority
+// pipe. Holding the outer ring lock across both writes prevents a full outer
+// ring from stranding an otherwise-visible inner command.
+pub fn (mut mgr GpuManager) submit_g13_queue_command(resources &G13QueueResources,
+	pipe_type u32, command_va u64, event_slot u32) bool {
+	if resources == unsafe { nil } || resources.released || mgr.state != .running
+		|| mgr.hw_config.gpu_gen != .g13 || pipe_type >= 3
+		|| command_va < alloc.g13_private_start || command_va >= alloc.g13_private_end
+		|| event_slot >= event.max_stamps
+		|| resources.channel_mask & (u32(1) << pipe_type) == 0
+		|| resources.priority >= 4 {
+		return false
+	}
+	outer_index := pipe_index(resources.priority, pipe_type)
+	mut outer := &mgr.channels.pipes[outer_index]
+	outer.lock.acquire()
+	if outer.ring_size == 0 || outer.entry_size != sizeof(fw.FwRunWorkQueueMsg)
+		|| outer.state_phys == 0 || outer.ring_phys == 0 {
+		outer.lock.release()
+		return false
+	}
+	outer_read := unsafe { &u32(outer.state_phys + higher_half) }
+	mut outer_write := unsafe { &u32(outer.state_phys + higher_half + outer.write_off) }
+	outer_wp := katomic.load(outer_write)
+	outer_rp := katomic.load(outer_read)
+	outer_next := (outer_wp + 1) % outer.ring_size
+	if outer_next == outer_rp {
+		outer.lock.release()
+		return false
+	}
+
+	mut owned := unsafe { resources }
+	mut queue := &owned.subqueues[pipe_type]
+	queue.lock.acquire()
+	if owned.released || queue.state.phys == 0 || queue.ring.phys == 0 || queue.info.va == 0 {
+		queue.lock.release()
+		outer.lock.release()
+		return false
+	}
+	mut state := unsafe { &fw.G13WorkQueueRingState(queue.state.cpu_address()) }
+	inner_wp := katomic.load(&state.cpu_wptr)
+	inner_done := katomic.load(&state.gpu_doneptr)
+	inner_next := (inner_wp + 1) % fw.g13_workqueue_entries
+	if inner_next == inner_done {
+		queue.lock.release()
+		outer.lock.release()
+		return false
+	}
+	unsafe {
+		mut entry := &u64(queue.ring.phys + higher_half + u64(inner_wp) * sizeof(u64))
+		*entry = command_va
+	}
+	katomic.store(mut &state.cpu_wptr, inner_next)
+
+	message := fw.FwRunWorkQueueMsg{
+		pipe_type: pipe_type
+		work_queue_addr: queue.info.va
+		write_ptr: inner_next
+		event_slot: event_slot
+		is_new: if queue.is_new { u8(1) } else { u8(0) }
+	}
+	unsafe {
+		destination := voidptr(outer.ring_phys + higher_half + u64(outer_wp) * outer.entry_size)
+		C.memcpy(destination, &message, sizeof(fw.FwRunWorkQueueMsg))
+	}
+	katomic.store(mut outer_write, outer_next)
+	queue.is_new = false
+	queue.lock.release()
+	outer.lock.release()
+	_ = mgr.ring_pipe(resources.priority, pipe_type)
+	return true
 }
 
 pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
