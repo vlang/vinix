@@ -3071,6 +3071,152 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["base_state_property"], "gpu-perf-base-pstate")
         self.assertEqual(recovered["maximum_state_value"], 100)
 
+    def test_recovers_g17_sram_power_scale_table(self) -> None:
+        setup = bytearray(0x250)
+        for offset, word in {
+            0x224: 0xF9414E60,
+            0x228: 0xB94F3661,
+            0x22C: 0xF9400010,
+            0x23C: 0xD2819811,
+            0x240: 0x8B110210,
+            0x244: 0xF9400208,
+            0x24C: 0xD73F0910,
+        }.items():
+            struct.pack_into("<I", setup, offset, word)
+
+        configure = bytearray(0xA8)
+        for offset, word in {
+            0x94: 0xF9436A68,
+            0x98: 0xD2A30049,
+            0x9C: 0xF2E00029,
+            0xA0: 0xAA090108,
+            0xA4: 0xF9036A68,
+        }.items():
+            struct.pack_into("<I", configure, offset, word)
+
+        producer = bytearray(0x88)
+        for offset, word in {
+            0x14: 0x395B4808,
+            0x18: 0x36080508,
+            0x20: 0xF942D808,
+            0x24: 0x9133C108,
+            0x28: 0x91404409,
+            0x2C: 0x91072129,
+            0x30: 0xF9000128,
+            0x44: 0xD2819E11,
+            0x48: 0x8B110210,
+            0x4C: 0xF9400208,
+            0x58: 0xD73F0910,
+            0x80: 0x9132C202,
+            0x84: 0xF9465A10,
+        }.items():
+            struct.pack_into("<I", producer, offset, word)
+
+        sram = bytearray(0xD4)
+        for offset, word in {
+            0x04: 0x91406C08,
+            0x08: 0x910C4108,
+            0x0C: 0xB9400108,
+            0x14: 0x91404409,
+            0x18: 0x91072129,
+            0x1C: 0xF9400129,
+            0x44: 0x9101412B,
+            0x48: 0x5291EB8C,
+            0x4C: 0x72A7F04C,
+            0x58: 0xAD3E8160,
+            0x5C: 0xAD3F8160,
+            0x90: 0x5291EB8D,
+            0x94: 0x72A7F04D,
+            0x9C: 0x3C810580,
+            0xBC: 0x5291EB8A,
+            0xC0: 0x72A7F04A,
+            0xC4: 0xB800452A,
+            0xC8: 0xF1000508,
+            0xCC: 0x54FFFFC1,
+        }.items():
+            struct.pack_into("<I", sram, offset, word)
+
+        base_power = bytearray(0x44)
+        for offset, word in {
+            0x20: 0xF9416C00,
+            0x24: 0x5283BA01,
+            0x28: 0x72A00021,
+            0x2C: 0x94AA6439,
+            0x30: 0xF9416E68,
+            0x34: 0x91029100,
+            0x38: 0x9133C261,
+            0x3C: 0x52802C02,
+            0x40: 0x94AA63C8,
+        }.items():
+            struct.pack_into("<I", base_power, offset, word)
+
+        arm_power = bytearray(0x53C)
+        for offset, word in {
+            0x294: 0xF9416E68,
+            0x400: 0xF9415E6B,
+            0x404: 0x5282010A,
+            0x408: 0x8B0A016A,
+            0x40C: 0x91041108,
+            0x410: 0x5283110C,
+            0x414: 0x8B0C016B,
+            0x418: 0x5280020C,
+            0x51C: 0xBC5C0100,
+            0x520: 0xBC1C0160,
+            0x524: 0x91010129,
+            0x528: 0xBC404500,
+            0x52C: 0xBC004560,
+            0x530: 0x9101014A,
+            0x534: 0xF100058C,
+            0x538: 0x54FFF721,
+        }.items():
+            struct.pack_into("<I", arm_power, offset, word)
+
+        symbols = {
+            recover_g17_abi.INIT_BASE_SETUP_CONFIG: 0x100000,
+            recover_g17_abi.G17_CONFIGURE_DEVICE: 0x101000,
+            recover_g17_abi.G17_POPULATE_POWER_ESTIMATION_CONFIG: 0x102000,
+            recover_g17_abi.G17_POPULATE_SRAM_POWER_SCALE_DATA: 0x103000,
+            recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE_DATA: 0x104000,
+        }
+        code = {
+            recover_g17_abi.INIT_BASE_SETUP_CONFIG: bytes(setup),
+            recover_g17_abi.G17_CONFIGURE_DEVICE: bytes(configure),
+            recover_g17_abi.G17_POPULATE_POWER_ESTIMATION_CONFIG: bytes(producer),
+            recover_g17_abi.G17_POPULATE_SRAM_POWER_SCALE_DATA: bytes(sram),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                side_effect=lambda _image, _vtable, slot: {
+                    recover_g17_abi.G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT: symbols[
+                        recover_g17_abi.G17_POPULATE_POWER_ESTIMATION_CONFIG
+                    ],
+                    recover_g17_abi.G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT: symbols[
+                        recover_g17_abi.G17_POPULATE_SRAM_POWER_SCALE_DATA
+                    ],
+                    recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT: symbols[
+                        recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE_DATA
+                    ],
+                }[slot],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: (symbols[name], code[name]),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_sram_power_scale_table(
+                b"", bytes(base_power), bytes(arm_power)
+            )
+
+        self.assertEqual(recovered["offset"], 0x1848)
+        self.assertEqual(recovered["raw_float"], 0x3F828F5C)
+        self.assertAlmostEqual(recovered["value"], 1.02)
+        self.assertEqual(recovered["state_count_source_offset"], 0x1B310)
+        self.assertEqual(recovered["feature_bit"], 17)
+
     def test_recovers_g17_afr_relative_boost_frequency_table(self) -> None:
         afr_address = 0x200000
         afr_config = bytearray(0xE8)

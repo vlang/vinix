@@ -97,6 +97,9 @@ G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
 G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT = 0xAA0
 G17_READ_CHIP_INFO_VTABLE_SLOT = 0x1210
 G17_PERF_STATE_MAP_VTABLE_SLOT = 0x1218
+G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT = 0xCC0
+G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT = 0xCB0
+G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT = 0xCF0
 G17_NEW_SECURE_MONITOR_VTABLE_SLOT = 0xBE0
 G17_GET_GPTBAT_BASE_VTABLE_SLOT = 0x11D0
 SECURE_MONITOR_INIT_VTABLE_SLOT = 0x150
@@ -139,6 +142,15 @@ G17_GENERATE_CSC_COEFFICIENTS = (
 )
 POPULATE_AFR_FAST_DIE_CONFIG = (
     "__ZN14AGXAccelerator34populateAFRFastDieDeviceConfigDataEP32AGXFastDieControllerDeviceConfig"
+)
+G17_POPULATE_POWER_ESTIMATION_CONFIG = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX33populatePowerEstimationConfigDataEj"
+)
+G17_POPULATE_SRAM_POWER_SCALE_DATA = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX26populateSRAMPowerScaleDataEv"
+)
+G17_POPULATE_CHIP_LEAKAGE_DATA = (
+    "__ZN32AGX·PI_300·X·A0·AcceleratorX23populateChipLeakageDataEj"
 )
 G17_TPU_CSC_COEFFICIENTS = (
     "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16tpu_coefficients"
@@ -5182,6 +5194,191 @@ def recover_g17_relative_boost_frequency_table(
     }
 
 
+def recover_g17_sram_power_scale_table(
+    image: bytes, base_power_code: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover the G17 SRAM power-scale row copied to config +0x1848."""
+
+    symbols = macho_symbols(image)
+    required = (
+        INIT_BASE_SETUP_CONFIG,
+        G17_CONFIGURE_DEVICE,
+        G17_POPULATE_POWER_ESTIMATION_CONFIG,
+        G17_POPULATE_SRAM_POWER_SCALE_DATA,
+        G17_POPULATE_CHIP_LEAKAGE_DATA,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    selected_targets = (
+        (
+            G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT,
+            G17_POPULATE_POWER_ESTIMATION_CONFIG,
+        ),
+        (
+            G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT,
+            G17_POPULATE_SRAM_POWER_SCALE_DATA,
+        ),
+        (
+            G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT,
+            G17_POPULATE_CHIP_LEAKAGE_DATA,
+        ),
+    )
+    for slot, name in selected_targets:
+        target = recover_vtable_target(image, G17_ACCELERATOR_VTABLE, slot)
+        if target != symbols[name]:
+            raise ValueError(f"unexpected G17 vtable target at {slot:#x}: {target:#x}")
+
+    # setupConfig invokes the selected power-estimation producer with the
+    # maximum performance-state index previously saved at firmware +0xf34.
+    _setup_address, setup_code = symbol_code(image, INIT_BASE_SETUP_CONFIG)
+    require_instruction_words_at(
+        setup_code,
+        "G17 power-estimation setup call",
+        {
+            0x224: 0xF9414E60,
+            0x228: 0xB94F3661,
+            0x22C: 0xF9400010,
+            0x23C: 0xD2819811,
+            0x240: 0x8B110210,
+            0x244: 0xF9400208,
+            0x24C: 0xD73F0910,
+        },
+    )
+
+    # G17 configureDevice unconditionally adds feature bit 17. The selected
+    # producer tests that bit through byte +0x6d2 before binding its private
+    # firmware config at +0xcf0 and dispatching the SRAM and leakage writers.
+    _configure_address, configure_code = symbol_code(image, G17_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        configure_code,
+        "G17 power-estimation feature bit",
+        {
+            0x94: 0xF9436A68,
+            0x98: 0xD2A30049,
+            0x9C: 0xF2E00029,
+            0xA0: 0xAA090108,
+            0xA4: 0xF9036A68,
+        },
+    )
+    g17_feature_mask = 0x0001000018020000
+    if not g17_feature_mask & (1 << 17):
+        raise ValueError("G17 fixed feature mask does not supply bit 17")
+
+    _producer_address, producer_code = symbol_code(
+        image, G17_POPULATE_POWER_ESTIMATION_CONFIG
+    )
+    require_instruction_words_at(
+        producer_code,
+        "G17 SRAM power-scale dispatch",
+        {
+            0x14: 0x395B4808,
+            0x18: 0x36080508,
+            0x20: 0xF942D808,
+            0x24: 0x9133C108,
+            0x28: 0x91404409,
+            0x2C: 0x91072129,
+            0x30: 0xF9000128,
+            0x44: 0xD2819E11,
+            0x48: 0x8B110210,
+            0x4C: 0xF9400208,
+            0x58: 0xD73F0910,
+            0x80: 0x9132C202,
+            0x84: 0xF9465A10,
+        },
+    )
+
+    _sram_address, sram_code = symbol_code(
+        image, G17_POPULATE_SRAM_POWER_SCALE_DATA
+    )
+    if len(sram_code) != 0xD4:
+        raise ValueError(
+            f"unexpected G17 SRAM power-scale producer size {len(sram_code):#x}"
+        )
+    require_instruction_words_at(
+        sram_code,
+        "G17 SRAM power-scale fill",
+        {
+            0x04: 0x91406C08,
+            0x08: 0x910C4108,
+            0x0C: 0xB9400108,
+            0x14: 0x91404409,
+            0x18: 0x91072129,
+            0x1C: 0xF9400129,
+            0x44: 0x9101412B,
+            0x48: 0x5291EB8C,
+            0x4C: 0x72A7F04C,
+            0x58: 0xAD3E8160,
+            0x5C: 0xAD3F8160,
+            0x90: 0x5291EB8D,
+            0x94: 0x72A7F04D,
+            0x9C: 0x3C810580,
+            0xBC: 0x5291EB8A,
+            0xC0: 0x72A7F04A,
+            0xC4: 0xB800452A,
+            0xC8: 0xF1000508,
+            0xCC: 0x54FFFFC1,
+        },
+    )
+
+    # The base firmware producer zeroes its runtime object and copies the
+    # accelerator-populated 0xcf0 block to runtime +0xa4. The ARM producer
+    # then copies runtime +0xc4 (0xcf0 + 0x20) to hardware config +0x1848.
+    require_instruction_words_at(
+        base_power_code,
+        "G17 power-estimation runtime copy",
+        {
+            0x20: 0xF9416C00,
+            0x24: 0x5283BA01,
+            0x28: 0x72A00021,
+            0x2C: 0x94AA6439,
+            0x30: 0xF9416E68,
+            0x34: 0x91029100,
+            0x38: 0x9133C261,
+            0x3C: 0x52802C02,
+            0x40: 0x94AA63C8,
+        },
+    )
+    require_instruction_words_at(
+        arm_power_code,
+        "G17 SRAM power-scale firmware copy",
+        {
+            0x294: 0xF9416E68,
+            0x400: 0xF9415E6B,
+            0x404: 0x5282010A,
+            0x408: 0x8B0A016A,
+            0x40C: 0x91041108,
+            0x410: 0x5283110C,
+            0x414: 0x8B0C016B,
+            0x418: 0x5280020C,
+            0x51C: 0xBC5C0100,
+            0x520: 0xBC1C0160,
+            0x524: 0x91010129,
+            0x528: 0xBC404500,
+            0x52C: 0xBC004560,
+            0x530: 0x9101014A,
+            0x534: 0xF100058C,
+            0x538: 0x54FFF721,
+        },
+    )
+
+    raw_value = 0x3F828F5C
+    return {
+        "offset": 0x1848,
+        "entries": 16,
+        "active_entries": "gpu-perf-state-count",
+        "state_count_source_offset": 0x1B310,
+        "accelerator_config_offset": 0xD10,
+        "runtime_source_offset": 0xC4,
+        "raw_float": raw_value,
+        "value": struct.unpack("<f", struct.pack("<I", raw_value))[0],
+        "feature_bit": 17,
+        "producer_vtable_slot": G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT,
+        "producer": G17_POPULATE_POWER_ESTIMATION_CONFIG,
+    }
+
+
 def recover_g17_afr_relative_boost_frequency_table(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -6416,6 +6613,11 @@ def main() -> int:
         )
         hardware_config["relative_boost_frequency_table"] = (
             recover_g17_relative_boost_frequency_table(driver, power_code)
+        )
+        hardware_config["sram_power_scale_table"] = (
+            recover_g17_sram_power_scale_table(
+                driver, base_power_code, power_code
+            )
         )
         hardware_config["afr_relative_boost_frequency_table"] = (
             recover_g17_afr_relative_boost_frequency_table(driver, power_code)

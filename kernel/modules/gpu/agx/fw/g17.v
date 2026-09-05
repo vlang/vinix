@@ -84,6 +84,7 @@ pub const g17_aux_voltage_table_columns = 2
 pub const g17_aux_performance_state_cap = u32(14)
 pub const g17_aux_performance_block_size = u64(0x148)
 pub const g17_performance_state_map_block_size = u64(0x80)
+pub const g17_sram_power_scale = u32(0x3f828f5c)
 pub const g17_fw_util_pstate_control_count = 4
 pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
@@ -855,7 +856,7 @@ pub mut:
 	voltage_table_1008             [g17_performance_state_capacity]G17VoltageTableRow
 	sram_voltage_table_1408        [g17_performance_state_capacity]G17VoltageTableRow
 	secondary_frequency_table_1808 [g17_performance_state_capacity]u32
-	firmware_table_1848            [g17_performance_state_capacity]u32
+	sram_power_scale_1848          [g17_performance_state_capacity]u32
 	firmware_table_1888            [g17_performance_state_capacity]u32
 	firmware_table_18c8            [g17_performance_state_capacity]u32
 	relative_boost_frequency_1908  [g17_performance_state_capacity]u32
@@ -898,6 +899,7 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 	config.performance_state_max_fc4 = hardware.perf_state_count - 1
 	for state := u32(0); state < hardware.perf_state_count; state++ {
 		config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
+		config.sram_power_scale_1848[state] = g17_sram_power_scale
 		// Apple's second source is the perf-states-sram frequency column. The
 		// parser has already required it to match the core frequency exactly.
 		config.secondary_frequency_table_1808[state] = hardware.perf_state_frequencies[state] / 1_000_000
@@ -1034,6 +1036,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		}
 		for state := u32(0); state < hardware.perf_state_count; state++ {
 			config.frequency_table_fc8[state] = hardware.perf_state_frequencies[state] / 1_000_000
+			config.sram_power_scale_1848[state] = g17_sram_power_scale
 			config.secondary_frequency_table_1808[state] = hardware.perf_state_frequencies[state] / 1_000_000
 			base_voltage := hardware.perf_state_voltages[state * g17_voltage_table_columns]
 			base_sram_voltage := hardware.perf_state_sram_voltages[state * g17_voltage_table_columns]
