@@ -86,6 +86,13 @@ pub const g17_aux_performance_block_size = u64(0x148)
 pub const g17_performance_state_map_block_size = u64(0x80)
 pub const g17_sram_power_scale = u32(0x3f828f5c)
 pub const g17_linear_power_transfer_maximum = u32(100)
+pub const g17_leakage_fuse_physical_address = u64(0x23_8837_4000)
+pub const g17_leakage_fuse_size = u64(0x1000)
+pub const g17_leakage_fuse_word_198 = u64(0x198)
+pub const g17_leakage_fuse_word_19c = u64(0x19c)
+pub const g17_leakage_fuse_word_1a0 = u64(0x1a0)
+pub const g17_leakage_core_capacity = 8
+pub const g17_leakage_group_capacity = 2
 pub const g17_fw_util_pstate_control_count = 4
 pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
@@ -896,6 +903,58 @@ pub mut:
 	values      [g17_performance_state_capacity * g17_voltage_table_columns]u32
 }
 
+// Per-die leakage calibration recovered from the G17 fuse aperture. Values
+// are kept in quarter units so the M5 Max path does not need floating point
+// merely to decode its integer and quarter-integer fuse fields. The later
+// power-model stage converts these values while evaluating Apple's equation.
+pub struct G17LeakageCalibration {
+pub mut:
+	core_count             u32
+	group_count            u32
+	core_combined_quarters [g17_leakage_core_capacity]u32
+	group_quarters         [g17_leakage_group_capacity]u32
+}
+
+// Decode the three fuse words consumed by populateChipLeakageData. G17C uses
+// selector order 0,1,2,3 twice. Selectors 0/3 take bits 8..21 of word 0x198;
+// selectors 1/2 join bits 22..31 of 0x198 with bits 0..3 of 0x19c. Every core
+// also receives bits 4..15 of 0x19c. The group field crosses the 0x19c/0x1a0
+// boundary. Variant 0x21 applies the alternate x2 and /2 scales; M5 Max is
+// variant 0x22 and takes x1 and /4.
+pub fn decode_g17_leakage_calibration(word_198 u32, word_19c u32, word_1a0 u32,
+	chip_variant u32, core_count u32, group_count u32) ?G17LeakageCalibration {
+	if core_count == 0 || core_count > g17_leakage_core_capacity
+		|| group_count == 0 || group_count > g17_leakage_group_capacity
+		|| chip_variant < 0x20 || chip_variant > 0x22 {
+		return none
+	}
+
+	plain := (word_198 >> 8) & 0x3fff
+	joined := ((word_198 >> 22) & 0x3ff) | ((word_19c & 0xf) << 10)
+	secondary := (word_19c >> 4) & 0xfff
+	selectors := [u32(0), 1, 2, 3, 0, 1, 2, 3]!
+
+	mut result := G17LeakageCalibration{
+		core_count: core_count
+		group_count: group_count
+	}
+	for core := u32(0); core < core_count; core++ {
+		primary := if selectors[core] == 0 || selectors[core] == 3 { plain } else { joined }
+		// Store exact quarter units: x2 becomes x8 quarters, x1 becomes x4;
+		// /2 becomes x2 quarters and /4 becomes x1.
+		primary_quarters := primary * if chip_variant == 0x21 { u32(8) } else { u32(4) }
+		secondary_quarters := secondary * if chip_variant == 0x21 { u32(2) } else { u32(1) }
+		result.core_combined_quarters[core] = primary_quarters + secondary_quarters
+	}
+
+	joined_groups := (u64(word_1a0) << 32) | u64(word_19c)
+	group_quarters := u32((joined_groups >> 25) & 0xfff) * 8
+	for group := u32(0); group < group_count; group++ {
+		result.group_quarters[group] = group_quarters
+	}
+	return result
+}
+
 fn g17_power_matrix_row_sum(matrix &G17PowerMatrix, state u32) u32 {
 	mut total := u32(0)
 	for column := u32(0); column < matrix.columns; column++ {
@@ -1086,10 +1145,10 @@ pub const g17_gap_late_control_runtime = u32(1 << 1)
 //
 //   linear_power_transfer  Config +0x18c8 and +0x1948 are 0..100 curves
 //                          normalised from power matrices whose leakage term
-//                          is seeded with per-die fuse calibration. Producing
-//                          them needs the fuse aperture at physical
-//                          0x23_8837_4000 and a freestanding pow, and the
-//                          kernel builds with -nofloat.
+//                          is seeded with per-die fuse calibration. The fuse
+//                          fields are decoded above; producing the matrices
+//                          still needs the recovered pow-based leakage model,
+//                          while the kernel builds with -nofloat.
 //
 //   late_control_runtime   CLEARED. All 36 fields in +0x2540..+0x270f are
 //                          accounted for: 34 fixed and two computed from the

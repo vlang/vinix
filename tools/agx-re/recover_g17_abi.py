@@ -5871,6 +5871,110 @@ def recover_g17_linear_power_transfer_tables(
     if decode_bl_target(0xCC, struct.unpack_from("<I", leak_code, 0xCC)[0]) is None:
         raise ValueError("chip-leakage aperture is not mapped by a direct call")
 
+    # Recover the fuse-field descriptor table rather than treating the mapped
+    # aperture as an opaque per-die input. The selected G17 producer has eight
+    # core selectors followed immediately by four 0x28-byte descriptors. Each
+    # descriptor names a primary word/shift/mask and, optionally, a second
+    # word/mask/left-shift whose bits are joined to it.
+    require_instruction_words_at(
+        leak_code,
+        "G17 chip-leakage fuse decode",
+        {
+            0x14C: 0xB944E6BB,  # active core selector count at accelerator +0x4e4
+            0x1A0: 0xB9400210,  # optional second fuse word
+            0x1A4: 0x29444620,  # optional second mask and left shift
+            0x1AC: 0x9AD12210,  # optional field shifted into place
+            0x1B0: 0x9ACE25AD,  # primary word >> descriptor shift
+            0x1B4: 0x8A0F01AD,  # primary descriptor mask
+            0x1B8: 0xAA0D020D,  # join optional and primary fields
+            0x1BC: 0x9E2301A0,  # integer primary field -> float
+            0x1C0: 0x1E202800,  # G17B scale x2
+            0x1C8: 0xB9419F0D,  # secondary source word at fuse +0x19c
+            0x1CC: 0x53043DAD,  # secondary bits 4..15
+            0x1D0: 0x1E03FDA0,  # G17B secondary scale /2
+            0x260: 0x9E2301A1,  # G17C integer primary field -> float
+            0x264: 0x1E212821,
+            0x268: 0x1E200821,  # x2 then x0.5 leaves x1
+            0x270: 0xB9419F0D,
+            0x274: 0x53043DAD,
+            0x278: 0x1E03F9A1,  # G17C secondary scale /4
+            0x398: 0xB944EEB5,  # active group count at accelerator +0x4ec
+            0x3AC: 0xB9419F08,  # group low word at fuse +0x19c
+            0x3B0: 0xB941A309,  # group high word at fuse +0x1a0
+            0x3B4: 0x13886528,  # extract across bit 25 of the word pair
+            0x3B8: 0x531F2D08,  # retain twelve bits and multiply by two
+        },
+    )
+
+    def referenced_table(adrp_offset: int, add_offset: int, register: int) -> int:
+        adrp = decode_adrp(
+            _leak_address + adrp_offset,
+            struct.unpack_from("<I", leak_code, adrp_offset)[0],
+        )
+        add = decode_add_immediate(
+            struct.unpack_from("<I", leak_code, add_offset)[0]
+        )
+        if adrp is None or add is None:
+            raise ValueError("chip-leakage fuse table reference changed")
+        adrp_register, page = adrp
+        destination, source, immediate = add
+        if adrp_register != register or destination != register or source != register:
+            raise ValueError("chip-leakage fuse table register changed")
+        return page + immediate
+
+    descriptor_table = referenced_table(0x170, 0x174, 8)
+    selector_table = referenced_table(0x18C, 0x190, 12)
+    selector_bytes = descriptor_table - selector_table
+    if selector_bytes != 0x20:
+        raise ValueError(
+            f"unexpected chip-leakage core selector bytes {selector_bytes:#x}"
+        )
+    selector_offset = virtual_to_file(image, selector_table)
+    selectors = list(struct.unpack_from("<8I", image, selector_offset))
+    if selectors != [0, 1, 2, 3, 0, 1, 2, 3]:
+        raise ValueError(f"unexpected chip-leakage core selectors {selectors}")
+    descriptor_count = max(selectors) + 1
+    descriptor_offset = virtual_to_file(image, descriptor_table)
+    descriptors = []
+    for index in range(descriptor_count):
+        fields = struct.unpack_from("<10I", image, descriptor_offset + index * 0x28)
+        descriptors.append(
+            {
+                "index": index,
+                "record_bytes": 0x28,
+                "tag": fields[0],
+                "has_secondary": bool(fields[1]),
+                "primary_word_offset": fields[2],
+                "primary_shift": fields[3],
+                "primary_mask": fields[4],
+                "secondary_word_offset": fields[6],
+                "secondary_shift": fields[7],
+                "secondary_mask": fields[8],
+                "secondary_left_shift": fields[9],
+            }
+        )
+    expected_descriptors = [
+        (False, 0x198, 8, 0x3FFF, 0, 0, 0, 0),
+        (True, 0x198, 22, 0x3FF, 0x19C, 0, 0xF, 10),
+        (True, 0x198, 22, 0x3FF, 0x19C, 0, 0xF, 10),
+        (False, 0x198, 8, 0x3FFF, 0, 0, 0, 0),
+    ]
+    actual_descriptors = [
+        (
+            item["has_secondary"],
+            item["primary_word_offset"],
+            item["primary_shift"],
+            item["primary_mask"],
+            item["secondary_word_offset"],
+            item["secondary_shift"],
+            item["secondary_mask"],
+            item["secondary_left_shift"],
+        )
+        for item in descriptors
+    ]
+    if actual_descriptors != expected_descriptors:
+        raise ValueError("G17 chip-leakage fuse descriptors changed")
+
     # Each leakage evaluation selects one bucket from a static parameter table
     # and returns a value directly proportional to the fused input.
     def leakage_table(name: str) -> dict[str, object]:
@@ -5912,6 +6016,8 @@ def recover_g17_linear_power_transfer_tables(
             "variant_table": buckets[1],
             "default_thresholds": [record[0] for record in records[0]],
             "variant_thresholds": [record[0] for record in records[1]],
+            "default_records": records[0],
+            "variant_records": records[1],
         }
 
     return {
@@ -5960,6 +6066,21 @@ def recover_g17_linear_power_transfer_tables(
             "producer": G17_POPULATE_CHIP_LEAKAGE,
             "fuse_physical_address": physical,
             "fuse_bytes": 0x1000,
+            "fuse_word_offsets": [0x198, 0x19C, 0x1A0],
+            "core_selector_table": selector_table,
+            "core_selectors": selectors,
+            "core_descriptors": descriptors,
+            "variant_scales": {
+                "0x21": {"primary_multiplier": 2, "secondary_divisor": 2},
+                "other_g17": {"primary_multiplier": 1, "secondary_divisor": 4},
+            },
+            "group_field": {
+                "low_word_offset": 0x19C,
+                "high_word_offset": 0x1A0,
+                "right_shift": 25,
+                "width": 12,
+                "multiplier": 2,
+            },
             "core_leakage_offset": 0xE50,
             "core_leakage_second_offset": 0xED0,
             "group_leakage_offset": 0xF20,
@@ -7640,11 +7761,12 @@ def recover_g17_core_count_gate(image: bytes) -> dict[str, object]:
 
 
 def recover_g17_chip_info_decode(image: bytes) -> dict[str, object]:
-    """Recover how the chip-info topology fields come out of cluster config.
+    """Recover how the chip-info power dimensions come out of cluster config.
 
-    readChipInfo derives the GPU topology from the cluster-configuration
-    register with plain integer arithmetic, so the fields the late-control
-    block later reads are reproducible from a register Vinix already maps.
+    readChipInfo derives internal dimensions from the cluster-configuration
+    register with plain integer arithmetic. The power-model producers consume
+    the +0x64/+0x6c fields through accelerator +0x4e4/+0x4ec. They are not the
+    public num_cores/num_mgpus values in GPUConfigurationVariable.
     """
 
     symbols = macho_symbols(image)
@@ -7660,7 +7782,7 @@ def recover_g17_chip_info_decode(image: bytes) -> dict[str, object]:
             0x1A0: 0xB9006E68,  # -> chip info +0x6c
             0x1A4: 0x53083EA9,  # (cluster_config >> 8) & 0xff
             0x1A8: 0x1B087D28,  # multiplied together
-            0x1AC: 0xB9006668,  # -> chip info +0x64, the core count
+            0x1AC: 0xB9006668,  # -> chip info +0x64, power column count
             0x1B0: 0x12001EA9,  # cluster_config & 0xff
             0x1B4: 0xB9007A69,  # -> chip info +0x78
             0x1B8: 0x1B097D09,  # core count * that
@@ -7671,27 +7793,29 @@ def recover_g17_chip_info_decode(image: bytes) -> dict[str, object]:
     return {
         "source_register": 0xD04010,
         "fields": {
-            "cluster_count": {
+            "power_group_count": {
                 "chip_info": 0x6C,
+                "accelerator_member": 0x4EC,
                 "shift": 16,
                 "mask": 0xF,
             },
-            "cores_per_cluster": {
+            "columns_per_group": {
                 "shift": 8,
                 "mask": 0xFF,
             },
-            "core_count": {
+            "power_column_count": {
                 "chip_info": 0x64,
-                "formula": "cores_per_cluster * cluster_count",
+                "accelerator_member": 0x4E4,
+                "formula": "columns_per_group * power_group_count",
             },
-            "unit_count": {
+            "units_per_column": {
                 "chip_info": 0x78,
                 "shift": 0,
                 "mask": 0xFF,
             },
-            "scaled_core_count": {
+            "scaled_column_count": {
                 "chip_info": 0x30,
-                "formula": "core_count * unit_count",
+                "formula": "power_column_count * units_per_column",
                 # This is the value the late-control +0x2570 fallback reads,
                 # relayed to accelerator +0x4b0.
                 "accelerator_member": 0x480 + 0x30,

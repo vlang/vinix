@@ -89,32 +89,34 @@ fn popcount64(value u64) u32 {
 	return count
 }
 
-// GPU topology as Apple's readChipInfo derives it from the cluster
-// configuration register. The core count this yields matches the count the
-// accelerator publishes: on Mac17,6 the register gives four clusters of ten,
-// and the driver reports forty cores.
+// Internal GPU dimensions as Apple's readChipInfo derives them from the
+// cluster-configuration register. These are the power-model column/group
+// counts copied to accelerator +0x4e4/+0x4ec; they are not the public shader
+// core and GPU-partition counts in GPUConfigurationVariable. In particular,
+// the G17C leakage producer has only eight selectors for +0x4e4 columns and a
+// two-element destination for +0x4ec groups.
 pub struct GpuIdentity {
 pub:
-	clusters          u32
-	cores_per_cluster u32
-	core_count        u32
-	unit_count        u32
-	// core_count * unit_count, which the firmware late-control block reads
-	// back through accelerator +0x4b0.
-	scaled_core_count u32
+	group_count       u32
+	columns_per_group u32
+	column_count      u32
+	units_per_column  u32
+	// column_count * units_per_column, copied through accelerator +0x4b0.
+	// The selected late-control producer does not use this fallback value.
+	scaled_column_count u32
 }
 
 pub fn decode_gpu_identity(cluster_config u32) GpuIdentity {
-	clusters := (cluster_config >> 16) & 0xf
-	per_cluster := (cluster_config >> 8) & 0xff
+	groups := (cluster_config >> 16) & 0xf
+	per_group := (cluster_config >> 8) & 0xff
 	units := cluster_config & 0xff
-	cores := per_cluster * clusters
+	columns := per_group * groups
 	return GpuIdentity{
-		clusters: clusters
-		cores_per_cluster: per_cluster
-		core_count: cores
-		unit_count: units
-		scaled_core_count: cores * units
+		group_count: groups
+		columns_per_group: per_group
+		column_count: columns
+		units_per_column: units
+		scaled_column_count: columns * units
 	}
 }
 

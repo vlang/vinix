@@ -3362,6 +3362,20 @@ class RecoverG17AbiTests(unittest.TestCase):
             struct.pack_into("<11d", image, base, 1000.0, *([1.0] * 10))
             struct.pack_into("<11d", image, base + 0x58, -1.0, *([1.0] * 10))
 
+        selector_table = 0x6000
+        descriptor_table = selector_table + 0x20
+        struct.pack_into("<8I", image, selector_table, 0, 1, 2, 3, 0, 1, 2, 3)
+        descriptors = (
+            (0x40000000, 0, 0x198, 8, 0x3FFF, 0, 0, 0, 0, 0),
+            (0x40000000, 1, 0x198, 22, 0x3FF, 0, 0x19C, 0, 0xF, 10),
+            (0x40000000, 1, 0x198, 22, 0x3FF, 0, 0x19C, 0, 0xF, 10),
+            (0x40000000, 0, 0x198, 8, 0x3FFF, 0, 0, 0, 0, 0),
+        )
+        for index, descriptor in enumerate(descriptors):
+            struct.pack_into(
+                "<10I", image, descriptor_table + index * 0x28, *descriptor
+            )
+
         arm_power = bytearray(0xC00)
         for offset, word in {
             0x948: 0xF9415E68,
@@ -3455,6 +3469,33 @@ class RecoverG17AbiTests(unittest.TestCase):
             0xC0: movk(0, 0x23, 32),
             0xC4: 0x52820001,
             0xCC: bl(leakage_address + 0xCC, 0x800000),
+            0x14C: 0xB944E6BB,
+            0x170: adrp(leakage_address + 0x170, descriptor_table, 8),
+            0x174: add_immediate(8, 8, descriptor_table & 0xFFF),
+            0x18C: adrp(leakage_address + 0x18C, selector_table, 12),
+            0x190: add_immediate(12, 12, selector_table & 0xFFF),
+            0x1A0: 0xB9400210,
+            0x1A4: 0x29444620,
+            0x1AC: 0x9AD12210,
+            0x1B0: 0x9ACE25AD,
+            0x1B4: 0x8A0F01AD,
+            0x1B8: 0xAA0D020D,
+            0x1BC: 0x9E2301A0,
+            0x1C0: 0x1E202800,
+            0x1C8: 0xB9419F0D,
+            0x1CC: 0x53043DAD,
+            0x1D0: 0x1E03FDA0,
+            0x260: 0x9E2301A1,
+            0x264: 0x1E212821,
+            0x268: 0x1E200821,
+            0x270: 0xB9419F0D,
+            0x274: 0x53043DAD,
+            0x278: 0x1E03F9A1,
+            0x398: 0xB944EEB5,
+            0x3AC: 0xB9419F08,
+            0x3B0: 0xB941A309,
+            0x3B4: 0x13886528,
+            0x3B8: 0x531F2D08,
         }.items():
             struct.pack_into("<I", leakage, offset, word)
 
@@ -3741,7 +3782,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertTrue(recovered["resolved"])
 
     def test_scaled_core_count_is_not_the_core_count_field_source(self) -> None:
-        # chip_info_decode records the scaled core count at accelerator +0x4b0.
+        # chip_info_decode records the scaled column count at accelerator +0x4b0.
         # The gate proves that producer never runs, so the two recoveries must
         # agree that +0x4b0 is unused rather than one implying it is the source.
         driver = Path("build/kext/g17c/AGXG17X.macho")
@@ -3750,7 +3791,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         image = driver.read_bytes()
         decode = recover_g17_abi.recover_g17_chip_info_decode(image)
         gate = recover_g17_abi.recover_g17_core_count_gate(image)
-        scaled = decode["fields"]["scaled_core_count"]["accelerator_member"]
+        scaled = decode["fields"]["scaled_column_count"]["accelerator_member"]
         self.assertEqual(scaled, gate["unused_fallback"]["accelerator_member"])
         self.assertNotEqual(scaled, gate["popcount_source"]["accelerator_member"])
 
@@ -3783,25 +3824,35 @@ class RecoverG17AbiTests(unittest.TestCase):
 
         fields = recovered["fields"]
         self.assertEqual(recovered["source_register"], 0xD04010)
-        self.assertEqual(fields["cluster_count"]["chip_info"], 0x6C)
-        self.assertEqual(fields["core_count"]["chip_info"], 0x64)
-        self.assertEqual(fields["scaled_core_count"]["accelerator_member"], 0x4B0)
+        self.assertEqual(fields["power_group_count"]["chip_info"], 0x6C)
+        self.assertEqual(fields["power_group_count"]["accelerator_member"], 0x4EC)
+        self.assertEqual(fields["power_column_count"]["chip_info"], 0x64)
+        self.assertEqual(fields["power_column_count"]["accelerator_member"], 0x4E4)
+        self.assertEqual(fields["scaled_column_count"]["accelerator_member"], 0x4B0)
 
-    def test_chip_info_decode_reproduces_the_published_core_count(self) -> None:
-        # The decode is only credible if it yields the count the accelerator
-        # actually publishes. Mac17,6 reports 40 cores; its cluster config must
-        # therefore describe four clusters of ten.
-        manifest = Path("build/live_macos.json")
-        if not manifest.exists():
-            self.skipTest("live manifest is not available")
-        with manifest.open() as handle:
-            live = json.load(handle)
-        published = live["accelerator"]["configuration"]["num_cores"]
+    def test_chip_info_power_dimensions_match_their_consumers(self) -> None:
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        image = driver.read_bytes()
+        decode = recover_g17_abi.recover_g17_chip_info_decode(image)["fields"]
+        _, power_code = recover_g17_abi.symbol_code(
+            image, recover_g17_abi.INIT_POWER_DATA
+        )
+        power = recover_g17_abi.recover_g17_linear_power_transfer_tables(
+            image, power_code
+        )
+        tables = power["tables"]
 
-        cluster_config = (4 << 16) | (10 << 8) | 1
-        clusters = (cluster_config >> 16) & 0xF
-        per_cluster = (cluster_config >> 8) & 0xFF
-        self.assertEqual(per_cluster * clusters, published)
+        self.assertEqual(
+            decode["power_column_count"]["accelerator_member"],
+            tables[0]["matrix_column_count_offset"],
+        )
+        self.assertEqual(
+            decode["power_group_count"]["accelerator_member"],
+            tables[1]["matrix_column_count_offset"],
+        )
+        self.assertEqual(len(power["chip_leakage"]["core_selectors"]), 8)
 
     def test_recovers_g17_chip_info_registers(self) -> None:
         code = bytearray(0x61C)
@@ -4675,8 +4726,35 @@ class RecoverG17AbiTests(unittest.TestCase):
             recovered["chip_leakage"]["fuse_physical_address"], 0x23_8837_4000
         )
         self.assertEqual(recovered["chip_leakage"]["fuse_bytes"], 0x1000)
+        self.assertEqual(
+            recovered["chip_leakage"]["fuse_word_offsets"], [0x198, 0x19C, 0x1A0]
+        )
+        self.assertEqual(
+            recovered["chip_leakage"]["core_selectors"], [0, 1, 2, 3, 0, 1, 2, 3]
+        )
+        self.assertEqual(
+            [
+                descriptor["primary_shift"]
+                for descriptor in recovered["chip_leakage"]["core_descriptors"]
+            ],
+            [8, 22, 22, 8],
+        )
+        self.assertEqual(
+            recovered["chip_leakage"]["group_field"],
+            {
+                "low_word_offset": 0x19C,
+                "high_word_offset": 0x1A0,
+                "right_shift": 25,
+                "width": 12,
+                "multiplier": 2,
+            },
+        )
         self.assertEqual(recovered["leakage_model"]["temperature"], 110.0)
         self.assertEqual(recovered["leakage_model"]["vdd_gpu"]["buckets"], 2)
+        self.assertEqual(
+            recovered["leakage_model"]["vdd_gpu"]["default_records"][0],
+            [1000.0] + [1.0] * 10,
+        )
         self.assertEqual(
             recovered["leakage_model"]["afr"]["default_thresholds"], [1000.0, -1.0]
         )

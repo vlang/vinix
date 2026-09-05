@@ -101,7 +101,7 @@ firmware observations recovered during this pass.
 Hardware launch remains gated, and the gate is now derived rather than
 asserted: `fw.g17_hardware_config_gaps()` enumerates the outstanding pieces as
 a bitmask, `init_g17_firmware_data` fails closed while any bit is set, and the
-analyzer test suite checks that both declared gaps are still justified by the
+analyzer test suite checks that the declared gap is still justified by the
 recovery output. Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 and the recovered portions
@@ -110,7 +110,10 @@ runtime policy. Firmware channel
 construction, the work-command ABI, and the userspace command producer still
 need byte-accurate implementations before enabling T6050. The hardware
 configuration's late-control block is now complete, so the only gap left there
-is the two die-dependent power rows.
+is the two die-dependent power rows. Their three-word eFuse input, selector
+sequence, bitfield descriptors, and G17C scaling are now recovered and decoded
+in integer quarter-units; evaluating the remaining pow-based model without
+hardware floating point is the next step.
 
 The channel-command pools are recovered: the slot-ring block layout, the
 allocation scan, and the exact byte size of all twelve named command types.

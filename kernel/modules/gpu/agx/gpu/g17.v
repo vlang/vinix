@@ -7,7 +7,10 @@ module gpu
 
 import gpu.agx.fw
 import gpu.agx.pgtable
+import gpu.agx.regs
+import aarch64.kio
 import lib
+import memory
 
 // GART range 10 in the pinned G17C host driver. Apple dedicates this 20 MiB
 // canonical-high interval to firmware PIO mappings. Vinix leaves a deliberate
@@ -38,6 +41,8 @@ mut:
 	platform_values_ready bool
 	pio_mappings_ready    bool
 	hardware_config_ready bool
+	leakage_calibration    fw.G17LeakageCalibration
+	leakage_fuses_ready    bool
 }
 
 @[inline]
@@ -205,6 +210,26 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	if !fw.initialize_g17_role0_region_25c(graph.role0_regions[1].cpu_address(), fw.g17_role0_bootstrap_25c_size) {
 		return false
 	}
+	// Apple's selected G17 producer maps this separate read-only eFuse
+	// aperture and consumes exactly three words. Snapshot them with volatile
+	// MMIO reads, then keep the decoded values in integer quarter-units for the
+	// still-gated power-model stage.
+	identity := regs.decode_gpu_identity(mgr.res.sgx_read32(regs.gpu_id_clustercfg))
+	chip_variant := regs.decode_gpu_chip_variant(mgr.res.sgx_read32(regs.gpu_id_version)) or {
+		return false
+	}
+	fuse_base := memory.map_mmio(fw.g17_leakage_fuse_physical_address,
+		fw.g17_leakage_fuse_size)
+	word_198 := kio.mmin32(unsafe { &u32(fuse_base + fw.g17_leakage_fuse_word_198) })
+	word_19c := kio.mmin32(unsafe { &u32(fuse_base + fw.g17_leakage_fuse_word_19c) })
+	word_1a0 := kio.mmin32(unsafe { &u32(fuse_base + fw.g17_leakage_fuse_word_1a0) })
+	graph.leakage_calibration = fw.decode_g17_leakage_calibration(word_198, word_19c,
+		word_1a0, chip_variant, identity.column_count, identity.group_count) or {
+		return false
+	}
+	graph.leakage_fuses_ready = true
+	C.printf(c'agx: decoded G17 leakage calibration for %u power columns / %u groups\n',
+		identity.column_count, identity.group_count)
 	// Apple counts enabled cores from the mask registers rather than from a
 	// published topology, so read them the same way.
 	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(),
@@ -285,7 +310,7 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 }
 
 // Construct the recovered allocation graph, but fail closed before MSG_INIT.
-// Hardware-config scalar and derived-power producers remain incomplete.
+// The hardware-config power-model producer remains incomplete.
 fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	mut graph := mgr.allocate_g17_firmware_graph() or {
 		C.printf(c'agx: failed to allocate G17 firmware graph\n')
@@ -304,5 +329,5 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 		C.printf(c'agx: G17 graph ready; hardware config still has gaps 0x%x\n', gaps)
 	}
 	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
-		&& graph.pio_mappings_ready && graph.hardware_config_ready
+		&& graph.pio_mappings_ready && graph.leakage_fuses_ready && graph.hardware_config_ready
 }
