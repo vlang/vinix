@@ -3550,6 +3550,86 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_channel_state_sources(self) -> None:
+        init_address = 0x300000
+        qos_address = 0x310000
+
+        reset = bytearray(0x224)
+        for offset, word in {
+            0x05C: 0xB9404C08,
+            0x064: 0xB9004928,
+            0x078: 0xF9407C0A,
+            0x07C: 0xF809C12A,
+            0x088: 0xB940540B,
+            0x08C: 0xB900614B,
+        }.items():
+            struct.pack_into("<I", reset, offset, word)
+
+        qos = bytearray(0x28)
+        for offset, word in {
+            0x04: 0xF9466808,
+            0x08: 0x5298E509,
+            0x0C: 0x8B090108,
+            0x10: 0x52800029,
+            0x14: 0xB9000109,
+            0x18: 0xF941C008,
+            0x1C: 0xB9005101,
+            0x20: 0xB9004D02,
+        }.items():
+            struct.pack_into("<I", qos, offset, word)
+
+        init = bytearray(0x1514)
+        for offset, word in {
+            0x068: 0xB9449AA8,
+            0x078: 0xF9445EA9,
+            0x07C: 0xF9007E69,
+            0x094: 0x12800009,
+            0x098: 0x29092269,
+            0x5B8: 0x52801009,
+            0x5BC: 0x710202DF,
+            0x5C0: 0x1A8932C9,
+            0x5C4: 0x531C6D29,
+            0x5C8: 0xB9005669,
+        }.items():
+            struct.pack_into("<I", init, offset, word)
+
+        codes = {
+            recover_g17_abi.CHANNEL_INIT: (init_address, bytes(init)),
+            recover_g17_abi.SET_KICK_CHANNEL_QOS: (qos_address, bytes(qos)),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={
+                    recover_g17_abi.CHANNEL_INIT: init_address,
+                    recover_g17_abi.SET_KICK_CHANNEL_QOS: qos_address,
+                },
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_state_sources(
+                b"", bytes(reset)
+            )
+
+        self.assertEqual(recovered["queue_value"]["state_offset"], 0x48)
+        self.assertEqual(recovered["queue_value"]["queue_seed_member"], 0x498)
+        self.assertEqual(recovered["queue_address"]["state_offset"], 0x9C)
+        self.assertEqual(recovered["queue_address"]["queue_seed_member"], 0x8B8)
+        self.assertEqual(recovered["ring_entries"]["multiplier"], 16)
+        self.assertEqual(recovered["ring_entries"]["maximum_request"], 0x80)
+        # The runtime QoS pair shares the +0x4c offset but is a different object.
+        self.assertTrue(
+            recovered["runtime_kick_channel_qos"]["distinct_from_channel_state"]
+        )
+        self.assertEqual(
+            recovered["runtime_kick_channel_qos"]["runtime_host_member"], 0x380
+        )
+
     def test_recovers_g17_linear_power_transfer_tables(self) -> None:
         arm_power, fixtures = self._linear_power_transfer_fixtures()
         recovered = self._run_linear_power_transfer(arm_power, fixtures)

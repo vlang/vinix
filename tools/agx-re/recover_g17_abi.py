@@ -418,6 +418,10 @@ RESET_CHANNEL_STATE = "__ZN10AGXChannel17resetChannelStateEv"
 WRITE_CHANNEL_COMMAND_POINTER = (
     "__ZN10AGXChannel26writeChannelCommandPointerEyP22AGFIChannelCommandTypey"
 )
+CHANNEL_INIT = (
+    "__ZN10AGXChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy19_AGFIDataMasterType"
+)
+SET_KICK_CHANNEL_QOS = "__ZN14AGXArmFirmware17setKickChannelQosEjj"
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -6824,6 +6828,107 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
     }
 
 
+def recover_g17_channel_state_sources(image: bytes, reset_code: bytes) -> dict[str, object]:
+    """Trace the two channel-state inputs that resetChannelState only copies.
+
+    The reset path reads both from its own object, so they look opaque there.
+    AGXChannel::init seeds them from the owning AGXCommandQueue, at +0x498 and
+    +0x8b8, which makes them queue properties rather than platform constants.
+    setKickChannelQos is checked here too, but only to keep it separated: it
+    writes +0x4c/+0x50 of the runtime object at firmware member 0x380, not of
+    a channel, so it is unrelated to channel state +0x48 despite the offset.
+    """
+
+    symbols = macho_symbols(image)
+    required = (CHANNEL_INIT, SET_KICK_CHANNEL_QOS)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 channel-source symbols: {missing}")
+
+    # resetChannelState copies channel +0x4c to state +0x48, channel +0xf8 to
+    # state +0x9c, and channel +0x54 to the uncached ring-entry count.
+    require_instruction_words_at(
+        reset_code,
+        "G17 channel-state input copies",
+        {
+            0x05C: 0xB9404C08,
+            0x064: 0xB9004928,
+            0x078: 0xF9407C0A,
+            0x07C: 0xF809C12A,
+            0x088: 0xB940540B,
+            0x08C: 0xB900614B,
+        },
+    )
+
+    # The QoS setter writes the runtime object at firmware member 0x380, which
+    # already models +0x4c/+0x50 as its kick-channel QoS pair. It is asserted
+    # here so that the identical offset is not mistaken for the channel input
+    # above if either producer changes.
+    _address, qos_code = symbol_code(image, SET_KICK_CHANNEL_QOS)
+    if len(qos_code) != 0x28:
+        raise ValueError(f"unexpected kick-channel QoS setter size {len(qos_code):#x}")
+    require_instruction_words_at(
+        qos_code,
+        "G17 kick-channel QoS setter",
+        {
+            0x04: 0xF9466808,  # runtime object at firmware +0xcd0
+            0x08: 0x5298E509,  # mov w9, #0xc728
+            0x0C: 0x8B090108,
+            0x10: 0x52800029,  # publish the QoS update flag
+            0x14: 0xB9000109,
+            0x18: 0xF941C008,  # runtime object at firmware +0x380
+            0x1C: 0xB9005101,  # first QoS word -> channel +0x50
+            0x20: 0xB9004D02,  # second QoS word -> channel +0x4c
+        },
+    )
+
+    # AGXChannel::init seeds both members from the owning command queue and
+    # derives the ring-entry count from its requested depth.
+    _address, init_code = symbol_code(image, CHANNEL_INIT)
+    require_instruction_words_at(
+        init_code,
+        "G17 channel input seeding",
+        {
+            0x068: 0xB9449AA8,  # command queue +0x498
+            0x078: 0xF9445EA9,  # command queue +0x8b8
+            0x07C: 0xF9007E69,  # -> channel +0xf8
+            0x094: 0x12800009,
+            0x098: 0x29092269,  # -0x1 and the QoS seed -> channel +0x48/+0x4c
+            0x5B8: 0x52801009,  # mov w9, #0x80
+            0x5BC: 0x710202DF,
+            0x5C0: 0x1A8932C9,  # min(requested, 0x80)
+            0x5C4: 0x531C6D29,  # * 16
+            0x5C8: 0xB9005669,  # -> channel +0x54
+        },
+    )
+
+    return {
+        "queue_value": {
+            "state_offset": 0x48,
+            "channel_member": 0x4C,
+            "queue_seed_member": 0x498,
+        },
+        "queue_address": {
+            "state_offset": 0x9C,
+            "channel_member": 0xF8,
+            "queue_seed_member": 0x8B8,
+        },
+        "runtime_kick_channel_qos": {
+            "setter": SET_KICK_CHANNEL_QOS,
+            "runtime_host_member": 0x380,
+            "runtime_members": [0x50, 0x4C],
+            "update_flag_runtime_offset": 0xC728,
+            "distinct_from_channel_state": True,
+        },
+        "ring_entries": {
+            "control_offset": 0x60,
+            "channel_member": 0x54,
+            "maximum_request": 0x80,
+            "multiplier": 16,
+        },
+    }
+
+
 def recover_g17_handoff(code: bytes) -> dict[str, object]:
     magic = find_materialized_constant(code, INTERFACE_MAGIC)
     if magic:
@@ -6966,6 +7071,9 @@ def main() -> int:
         )
         channels = recover_g17_channel_layout(reset_channel_code, write_channel_code)
         channels["pools"] = recover_g17_channel_pool_geometry(allocation_code)
+        channels["state_sources"] = recover_g17_channel_state_sources(
+            driver, reset_channel_code
+        )
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)

@@ -1157,11 +1157,11 @@ pub mut:
 	mode_028             u32
 	opaque_02c           [0x18]u8
 	sentinel_044         u32
-	value_048            u32
+	queue_value_048      u32
 	opaque_04c           [0x38]u8
 	flag_084             u32
 	opaque_088           [0x14]u8
-	address_09c          u64
+	queue_address_09c    u64
 	opaque_0a4           [0x1c]u8
 }
 
@@ -1195,14 +1195,18 @@ pub mut:
 	uncached_gpu_address u64
 	cached_gpu_address   u64
 	context_cookie       u64
-	value_048            u32
-	address_09c          u64
+	queue_value_048      u32
+	queue_address_09c    u64
 	ring_entries         u32
 }
 
-// Reproduce AGXChannel::resetChannelState for the checked shared fields. The
-// platform-derived value/address stay explicit so an unknown default cannot
-// accidentally be submitted to firmware.
+// Reproduce AGXChannel::resetChannelState for the checked shared fields.
+// resetChannelState only copies state +0x48 and +0x9c out of its own object,
+// but AGXChannel::init seeds those two channel members from the owning
+// AGXCommandQueue at +0x498 and +0x8b8, so they are queue properties rather
+// than platform constants. They stay explicit because that queue object is
+// not modelled yet. Note the runtime object also has a +0x4c/+0x50 QoS pair;
+// the matching offset is a coincidence and not this value.
 pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 	uncached_buffer voidptr, uncached_size u64, cached_buffer voidptr, cached_size u64,
 	bindings G17ChannelBindings) bool {
@@ -1225,8 +1229,8 @@ pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 		state.sentinel_024 = ~u32(0)
 		state.mode_028 = 4
 		state.sentinel_044 = ~u32(0)
-		state.value_048 = bindings.value_048
-		state.address_09c = bindings.address_09c
+		state.queue_value_048 = bindings.queue_value_048
+		state.queue_address_09c = bindings.queue_address_09c
 		mut control := &G17ChannelControl(uncached_buffer)
 		control.sentinel_050 = ~u32(0)
 		control.ring_entries = bindings.ring_entries
