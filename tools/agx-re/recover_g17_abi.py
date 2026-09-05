@@ -7208,6 +7208,80 @@ def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_remaining_late_controls(image: bytes) -> dict[str, object]:
+    """Settle the late-control fields that are neither zero nor register-fed.
+
+    Three take fixed non-zero content: a 48-byte run of ones, and a pair of
+    bytes copied from accelerator members configureDevice deliberately clears.
+    A fourth is guarded by a feature bit that is clear, so its store never runs.
+    """
+
+    symbols = macho_symbols(image)
+    required = (ARM_INIT_FIRMWARE_DATA, BASE_CONFIGURE_DEVICE)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing remaining late-control symbols: {missing}")
+
+    _address, producer = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
+    require_instruction_words_at(
+        producer,
+        "G17 late-control ones run",
+        {
+            0xF38: 0x6F07E7E0,  # every lane set
+            0xF3C: 0xAD000120,  # 32 bytes from config +0x25bc
+            0xF40: 0x3D800920,  # 16 more
+        },
+    )
+    require_instruction_words_at(
+        producer,
+        "G17 late-control copied bytes",
+        {
+            0xF54: 0x395BC16A,  # accelerator +0x6f0
+            0xF58: 0x3904F12A,  # -> config +0x26f8
+            0xF5C: 0x395BE16A,  # accelerator +0x6f8
+            0xF60: 0x3904F52A,  # -> config +0x26f9
+        },
+    )
+    require_instruction_words_at(
+        producer,
+        "G17 late-control feature guard",
+        {
+            0xF64: 0xF9436969,  # the fixed feature mask
+            0xF68: 0xD366FD2A,
+            0xF74: 0x3600004A,  # bit 0x26 clear skips both stores
+            0xF7C: 0x5284B589,  # config +0x25ac
+            0xF84: 0xB20003E9,  # would take a pair of ones
+            0xF88: 0xF9000109,
+        },
+    )
+    if (G17_FEATURE_MASK >> 0x26) & 1:
+        raise ValueError("late-control guard bit is now set; +0x25ac would be written")
+
+    # The copied bytes read members configureDevice clears; the only other
+    # writers are fence and submission paths that run long after this.
+    _address, configure = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        configure,
+        "G17 cleared copy sources",
+        {
+            0x028: 0xAA0003F3,  # x19 is the accelerator
+            0x5F8: 0x790DE27F,  # clears +0x6f0
+            0x5FC: 0x391BE27F,  # clears +0x6f8
+        },
+    )
+
+    return {
+        "ones_run": {"offset": 0x25BC, "bytes": 0x30, "value": 0xFF},
+        "copied_bytes": {0x26F8: 0x6F0, 0x26F9: 0x6F8},
+        "guarded": {
+            "offset": 0x25AC,
+            "feature_bit": 0x26,
+            "would_be": 0x100000001,
+            "written": bool((G17_FEATURE_MASK >> 0x26) & 1),
+        },
+    }
+
+
 def recover_g17_cleared_accelerator_inputs(image: bytes) -> dict[str, object]:
     """Show the late-control fields whose accelerator sources are never set.
 
@@ -7652,6 +7726,10 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
     fixed.update({0x2578: 1, 0x25A0: 1, 0x2600: 0, 0x26F0: 1, 0x2560: 0})
     cleared = recover_g17_cleared_accelerator_inputs(image)
     fixed.update({offset: 0 for offset in cleared["fields"]})
+    remaining = recover_g17_remaining_late_controls(image)
+    fixed.update({0x25AC: 0, 0x26F8: 0, 0x26F9: 0})
+    fixed[remaining["ones_run"]["offset"]] = remaining["ones_run"]["value"]
+    fixed[0x25DC] = remaining["ones_run"]["value"]
     # +0x2570 is not a constant, but its producer and inputs are settled, so it
     # is emitted rather than outstanding. Track it separately from the fixed
     # values so the accounting still distinguishes the two.
@@ -7671,6 +7749,7 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         "wide_fixed": {0x2560: 16, 0x2600: 8, 0x26F0: 8},
         "core_mask_relay": core_mask,
         "cleared_accelerator_inputs": cleared,
+        "remaining_late_controls": remaining,
         "derived": derived_offsets,
         "runtime_dependent": undetermined,
         "complete": False,

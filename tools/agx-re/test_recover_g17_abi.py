@@ -3615,6 +3615,33 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_recovers_g17_remaining_late_controls(self) -> None:
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_remaining_late_controls(
+            driver.read_bytes()
+        )
+
+        # 48 bytes of ones, written as a store pair plus a single store.
+        self.assertEqual(recovered["ones_run"], {"offset": 0x25BC, "bytes": 0x30, "value": 0xFF})
+        self.assertEqual(recovered["copied_bytes"], {0x26F8: 0x6F0, 0x26F9: 0x6F8})
+        # The guarded field would take a pair of ones, but its bit is clear.
+        self.assertFalse(recovered["guarded"]["written"])
+        self.assertEqual(recovered["guarded"]["would_be"], 0x100000001)
+
+    def test_ones_run_stops_before_the_next_field(self) -> None:
+        # The run must not reach +0x25ec, which the producer sets to zero
+        # afterwards; overlapping would make the order matter.
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_remaining_late_controls(
+            driver.read_bytes()
+        )
+        run = recovered["ones_run"]
+        self.assertEqual(run["offset"] + run["bytes"], 0x25EC)
+
     def test_recovers_g17_cleared_accelerator_inputs(self) -> None:
         driver = Path("build/kext/g17c/AGXG17X.macho")
         if not driver.exists():
