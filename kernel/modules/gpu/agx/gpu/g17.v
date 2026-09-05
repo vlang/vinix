@@ -892,11 +892,47 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 					|| fw.g17_firmware_completion_has_firing_stamps(&entry)
 				continue
 			}
-			if entry.event_type == fw.g17_firmware_event_clpc_notification {
+			if entry.event_type == fw.g17_firmware_event_gpu_restart {
+				if !fw.validate_g17_firmware_gpu_restart(&entry) {
+					C.printf(c'agx: invalid G17 GPU-restart event on role %d\n', role)
+				} else {
+					C.printf(c'agx: G17 firmware requested GPU restart on role %d\n', role)
+				}
+				// Apple forwards this record to IOGPUScheduler's hardware-error
+				// recovery path. Vinix cannot safely continue until it has an
+				// equivalent reset/replay engine, so transition the GPU to its
+				// fail-closed error state and stop processing callbacks.
+				mgr.state = .error
+				return false
+			}
+			if entry.event_type == fw.g17_firmware_event_channel_error {
+				if !fw.validate_g17_firmware_channel_error(&entry) {
+					C.printf(c'agx: invalid G17 channel-error event on role %d\n', role)
+				} else {
+					C.printf(c'agx: G17 firmware reported a channel error on role %d\n', role)
+				}
+				// Apple's handler identifies the owning channel and performs
+				// subtype-specific recovery. Until Vinix can reproduce that
+				// lifecycle, stopping the GPU is the only safe response.
+				mgr.state = .error
+				return false
+			}
+			if entry.event_type == fw.g17_firmware_event_metrology_aging {
+				// Apple sends this result only to its optional platform
+				// reliability-monitor service. With no corresponding Vinix
+				// service, consuming the validated advisory event is equivalent
+				// to Apple's own absent-service path.
+				if !fw.validate_g17_firmware_metrology_aging(&entry) {
+					mgr.state = .error
+					return false
+				}
+				continue
+			}
+			if entry.event_type == fw.g17_firmware_event_rt_completion {
 				// Apple forwards this value only to optional IOGPU CLPC
 				// performance observers. Vinix has no corresponding observer
 				// layer, so consuming the validated advisory event is sufficient.
-				if !fw.validate_g17_firmware_clpc_notification(&entry) {
+				if !fw.validate_g17_firmware_rt_completion(&entry) {
 					mgr.state = .error
 					return false
 				}

@@ -48,9 +48,13 @@ FIRMWARE_RING_FETCH = (
     "__ZN24AGXFirmwareRingValidator14fetchNextEntryEP26AGFIFirmwareEventRingEntry"
 )
 IOGPU_EVENT_SIGNAL_STAMP = "__ZN17IOGPUEventMachine11signalStampEij"
+IOGPU_EVENT_GET_NUM_STAMPS = "__ZN17IOGPUEventMachine12getNumStampsEv"
 IOGPU_EVENT_TEST_ALL_STAMPS = "__ZNK17IOGPUEventMachine13testAllStampsEv"
 IOGPU_FENCE_INTERRUPT_OCCURRED = "__ZN17IOGPUFenceMachine24iofenceInterruptOccurredEv"
 IOGPU_FENCE_NOTIFY_CLPC = "__ZN17IOGPUFenceMachine23notifyCLPCIOPerfControlEy"
+IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR = (
+    "__ZN14IOGPUScheduler19signalHardwareErrorE15eRestartRequesti"
+)
 IOGPU_SIGNAL_STAMPS_UPDATED = "__ZN5IOGPU19signalStampsUpdatedEv"
 G17_CLEAR_FIRMWARE_INTERRUPTS = (
     "__ZN14AGXArmFirmware34clearOutstandingFirmwareInterruptsEv.4213"
@@ -665,6 +669,40 @@ G17_GENERATE_CSC_COEFFICIENTS_VTABLE_SLOT = 0xFB8
 G17_BORDER_COLOR_TABLE_ADDRESS_VTABLE_SLOT = 0xE90
 FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT = 0x2D8
 GART_INIT_INFO_VTABLE_SLOT = 0x178
+G17_FIRMWARE_EVENT_VALIDATORS = {
+    0: (0x1494, "AGFIFirmwareEventAlive", "kAGFIFirmwareEventTypeFirmwareAlive"),
+    1: (0x147C, "AGFIFirmwareEventStampUpdate", "kAGFIFirmwareEventTypeStampsUpdated"),
+    4: (0x1488, "AGFIFirmwareEventHWRecovery", "kAGFIFirmwareEventTypeGPURestart"),
+    6: (0x1570, "AGFIFirmwareEventPMRequestMemory", "kAGFIFirmwareEventTypeAllocatePMMemory"),
+    7: (0x14D0, "AGFIChannelErrorEventArgs", "kAGFIFirmwareEventTypeChannelError"),
+    8: (0x14A0, "AGFIFirmwareEventMetrologyAging", "kAGFIFirmwareEventTypeMtrResult"),
+    9: (0x14DC, "AGFIFirmwareEventUMARequestMemory", "kAGFIFirmwareEventTypeUMAAsyncAlloc"),
+    10: (
+        0x14C4,
+        "AGFIFirmwareEventSharedEventSignalComplete",
+        "kAGFIFirmwareEventTypeSharedEventSignalComplete",
+    ),
+    12: (
+        0x14B8,
+        "AGFIFirmwareEventProcessExitComplete",
+        "kAGFIFirmwareEventTypeProcessExitComplete",
+    ),
+    13: (
+        0x1470,
+        "AGFIFirmwareEventUMAGrowPool",
+        "kAGFIFirmwareEventTypeUMAAsyncGrowRequestComplete",
+    ),
+    14: (
+        0x14AC,
+        "AGFIFirmwareEventRTCompletionInfo",
+        "kAGFIFirmwareEventTypeRTCompletionEvent",
+    ),
+    15: (
+        0x1464,
+        "AGFIFirmwareEventUMAThresholdInterrupt",
+        "kAGFIFirmwareEventTypeUMAThresholdInterrupt",
+    ),
+}
 
 
 def macho_uuid(image: bytes) -> str | None:
@@ -715,6 +753,25 @@ def virtual_to_file(image: bytes, address: int) -> int:
         if segment.virtual_address <= address < segment.virtual_address + segment.file_size:
             return segment.file_offset + address - segment.virtual_address
     raise ValueError(f"virtual address {address:#x} is not backed by a Mach-O segment")
+
+
+def read_adrp_add_cstring(
+    image: bytes, function_address: int, code: bytes, adrp_offset: int, add_offset: int
+) -> str:
+    if adrp_offset + 4 > len(code) or add_offset + 4 > len(code):
+        raise ValueError("truncated PC-relative C string reference")
+    page = decode_adrp(
+        function_address + adrp_offset,
+        struct.unpack_from("<I", code, adrp_offset)[0],
+    )
+    add = decode_add_immediate(struct.unpack_from("<I", code, add_offset)[0])
+    if page is None or add is None or page[0] != add[1]:
+        raise ValueError("invalid PC-relative C string reference")
+    offset = virtual_to_file(image, page[1] + add[2])
+    end = image.find(b"\0", offset)
+    if end < 0:
+        raise ValueError("unterminated PC-relative C string")
+    return image[offset:end].decode("utf-8", "replace")
 
 
 def symbol_code(image: bytes, name: str) -> tuple[int, bytes]:
@@ -14391,6 +14448,7 @@ def recover_g17_firmware_event_ring(
     symbols = macho_symbols(driver)
     iogpu_symbols = macho_symbols(iogpu)
     required = (
+        ACCELERATOR_START,
         FIRMWARE_INIT,
         FIRMWARE_DRAIN_EVENT_RING,
         FIRMWARE_DRAIN_EVENT_RING_ROLE,
@@ -14402,10 +14460,12 @@ def recover_g17_firmware_event_ring(
         if name not in symbols:
             raise ValueError(f"driver Mach-O has no {name} symbol")
     for name in (
+        IOGPU_EVENT_GET_NUM_STAMPS,
         IOGPU_EVENT_SIGNAL_STAMP,
         IOGPU_EVENT_TEST_ALL_STAMPS,
         IOGPU_FENCE_INTERRUPT_OCCURRED,
         IOGPU_FENCE_NOTIFY_CLPC,
+        IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR,
         IOGPU_SIGNAL_STAMPS_UPDATED,
     ):
         if name not in iogpu_symbols:
@@ -14599,6 +14659,9 @@ def recover_g17_firmware_event_actions(
         for event_type in direct_noop_types
     ):
         raise ValueError("G17 firmware event direct host no-op dispatch changed")
+    validated_event_types = recover_g17_firmware_event_validators(
+        driver, role_address, role_code
+    )
 
     # Type 0 does execute a virtual call, but the selected G17 firmware class
     # resolves that call to a two-instruction no-op. Keep it separate from the
@@ -14650,6 +14713,106 @@ def recover_g17_firmware_event_actions(
     ]:
         raise ValueError("G17 CLPC notification target changed")
 
+    # Type 8 is a metrology-aging result sent only to the optional platform
+    # reliability monitor retained at firmware +0xfb0. With that service
+    # absent, Apple itself returns directly to the drain loop.
+    if dispatch_anchor + dispatch_offsets[8] != role_address + 0x290:
+        raise ValueError("G17 metrology-aging event dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 metrology-aging event",
+        {
+            0x294: 0xB94053E8,  # event type at entry +0
+            0x298: 0x7100211F,  # event type 8
+            0x2A0: 0xB94057E8,  # u32 result at entry +4
+            0x2A4: 0xB81503A8,
+            0x2A8: 0xF947DA60,  # optional firmware +0xfb0 service
+            0x2AC: 0xB4FFF080,  # absent service returns to the drain loop
+            0x2B0: 0x52800048,  # reliability-monitor message type 2
+            0x2B4: 0x390283E8,
+            0x2C8: 0xD2802811,  # service vtable slot 0x140
+            0x2D4: 0x910283E1,
+            0x2D8: 0xD102C3A2,
+            0x2DC: 0xD2800003,
+        },
+    )
+    start_address, start_code = symbol_code(driver, ACCELERATOR_START)
+    require_instruction_words_at(
+        start_code,
+        "G17 reliability-monitor service binding",
+        {
+            0x2CA4: 0xB0FF41A1,
+            0x2CA8: 0x91378021,
+            0x2CAC: 0xAA1603E0,
+            0x2CB4: 0xF942DA68,  # accelerator +0x5b0 -> firmware
+            0x2CB8: 0xF907D900,  # retain service at firmware +0xfb0
+        },
+    )
+    reliability_service = read_adrp_add_cstring(
+        driver, start_address, start_code, 0x2CA4, 0x2CA8
+    )
+    if reliability_service != "function-reliability_monitor":
+        raise ValueError("G17 metrology-aging reliability service changed")
+
+    # Type 4 is the firmware's GPU-restart record. Apple validates its stamp
+    # slot and ultimately requests a hardware-error restart from IOGPU's
+    # scheduler. Vinix has no equivalent recovery engine, so its safe current
+    # policy is to stop callback processing and transition the GPU to error.
+    if dispatch_anchor + dispatch_offsets[4] != role_address + 0x180:
+        raise ValueError("G17 GPU-restart event dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 GPU-restart event",
+        {
+            0x184: 0xB94053E8,  # event type at entry +0
+            0x188: 0x7100111F,  # event type 4
+            0x190: 0xB9405FF6,  # signed stamp slot at entry +0xc
+            0x194: 0xF9400288,
+            0x198: 0xF940A100,  # accelerator event machine at +0x140
+            0x1CC: 0xD2803A11,  # firmware validation vtable slot 0x1d0
+            0x1D8: 0x910143E9,
+            0x1DC: 0xB27E0121,  # pass event payload at entry +4
+            0x27C: 0xF940AD20,  # accelerator scheduler at +0x158
+            0x280: 0x52800021,  # eRestartRequest = 1
+        },
+    )
+    stamp_count_call = struct.unpack_from("<I", role_code, 0x19C)[0]
+    if decode_bl_target(role_address + 0x19C, stamp_count_call) != iogpu_symbols[
+        IOGPU_EVENT_GET_NUM_STAMPS
+    ]:
+        raise ValueError("G17 GPU-restart stamp-count target changed")
+    restart_call = struct.unpack_from("<I", role_code, 0x284)[0]
+    if decode_bl_target(role_address + 0x284, restart_call) != iogpu_symbols[
+        IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR
+    ]:
+        raise ValueError("G17 GPU-restart scheduler target changed")
+
+    # Type 7 is a channel error. Apple's recovery path is much larger, but
+    # these leading checks establish the complete fixed header that Vinix
+    # must validate before taking its conservative whole-GPU failure path.
+    if dispatch_anchor + dispatch_offsets[7] != role_address + 0x590:
+        raise ValueError("G17 channel-error event dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 channel-error event",
+        {
+            0x594: 0xB94053E8,  # event type at entry +0
+            0x598: 0x71001D1F,  # event type 7
+            0x5A0: 0xB94057E8,  # channel-error subtype at entry +4
+            0x5A4: 0x7100151F,  # subtype below 5
+            0x5AC: 0xB9405BE8,  # data-master type at entry +8
+            0x5B0: 0x71000D1F,  # data-master type below 3
+            0x5B8: 0xB9405FF6,  # signed stamp slot at entry +0xc
+            0x5BC: 0xF9400288,
+            0x5C0: 0xF940A100,  # accelerator event machine at +0x140
+        },
+    )
+    channel_stamp_count_call = struct.unpack_from("<I", role_code, 0x5C4)[0]
+    if decode_bl_target(
+        role_address + 0x5C4, channel_stamp_count_call
+    ) != iogpu_symbols[IOGPU_EVENT_GET_NUM_STAMPS]:
+        raise ValueError("G17 channel-error stamp-count target changed")
+
     accepted_types = [
         event_type
         for event_type in range(32)
@@ -14662,7 +14825,7 @@ def recover_g17_firmware_event_actions(
         event_type for event_type in direct_noop_types if event_type not in accepted_types
     ]
     effective_noops = [0, *accepted_direct_noops]
-    implemented = {*effective_noops, 1, 14}
+    implemented = {*effective_noops, 1, 4, 7, 8, 14}
     return {
         "jump_table_function_offsets": {
             str(event_type): dispatch_anchor + offset - role_address
@@ -14684,9 +14847,43 @@ def recover_g17_firmware_event_actions(
             }
         ],
         "host_noop_event_types": effective_noops,
+        "validated_event_types": validated_event_types,
+        "fatal_events": [
+            {
+                "type": 4,
+                "record": "AGFIFirmwareEventHWRecovery",
+                "stamp_slot_offset": 0xC,
+                "invalid_stamp_slot": -1,
+                "host_action": "IOGPUScheduler::signalHardwareError",
+                "restart_request": 1,
+                "vinix_policy": "stop_gpu_without_recovery_engine",
+            },
+            {
+                "type": 7,
+                "record": "AGFIChannelErrorEventArgs",
+                "subtype_offset": 4,
+                "subtype_limit": 5,
+                "data_master_offset": 8,
+                "data_master_limit": 3,
+                "stamp_slot_offset": 0xC,
+                "invalid_stamp_slot": -1,
+                "host_action": "AGXFirmware::handleChannelErrorEvent",
+                "vinix_policy": "stop_gpu_without_channel_recovery",
+            },
+        ],
         "advisory_events": [
             {
+                "type": 8,
+                "record": "AGFIFirmwareEventMetrologyAging",
+                "payload_offset": 4,
+                "payload_bytes": 4,
+                "host_action": "function-reliability_monitor",
+                "host_action_optional": True,
+                "vinix_policy": "consume_without_reliability_monitor",
+            },
+            {
                 "type": 14,
+                "record": "AGFIFirmwareEventRTCompletionInfo",
                 "payload_offset": 4,
                 "payload_bytes": 8,
                 "host_action": "IOGPUFenceMachine::notifyCLPCIOPerfControl",
@@ -14697,6 +14894,38 @@ def recover_g17_firmware_event_actions(
             event_type for event_type in accepted_types if event_type not in implemented
         ],
     }
+
+
+def recover_g17_firmware_event_validators(
+    driver: bytes, role_address: int, role_code: bytes
+) -> dict[str, object]:
+    """Recover Apple's internal record and enum names for typed event arms."""
+
+    recovered: dict[str, object] = {}
+    prefix = (
+        "const RET *AGXFirmwareRingValidator::validateType("
+        "const AGFIFirmwareEventRingEntry *) const "
+    )
+    for event_type, (reference_offset, record, event_name) in (
+        G17_FIRMWARE_EVENT_VALIDATORS.items()
+    ):
+        actual = read_adrp_add_cstring(
+            driver,
+            role_address,
+            role_code,
+            reference_offset,
+            reference_offset + 4,
+        )
+        expected = (
+            f"{prefix}[RET = {record}, FWET1 = {event_name}, "
+            "FWET2 = kAGFIFirmwareEventNone]"
+        )
+        if actual != expected:
+            raise ValueError(
+                f"G17 firmware event type {event_type} validator identity changed"
+            )
+        recovered[str(event_type)] = {"record": record, "enum": event_name}
+    return recovered
 
 
 def recover_g17_rtbuddy_endpoints(

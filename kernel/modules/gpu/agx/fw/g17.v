@@ -48,9 +48,16 @@ pub const g17_firmware_event_entries_size = u64(0x4800)
 pub const g17_firmware_event_type_mask = u32(0x2000ffd3)
 pub const g17_firmware_event_controller = u32(0)
 pub const g17_firmware_event_completion = u32(1)
+pub const g17_firmware_event_gpu_restart = u32(4)
 pub const g17_firmware_event_host_noop_mask = u32(0x20000801)
-pub const g17_firmware_event_clpc_notification = u32(14)
+pub const g17_firmware_event_channel_error = u32(7)
+pub const g17_firmware_event_metrology_aging = u32(8)
+pub const g17_firmware_event_rt_completion = u32(14)
 pub const g17_firmware_event_flag_limit = u16(0x18)
+// Apple's type-4/type-7 handlers compare against IOGPUEventMachine's dynamic
+// stamp count. Vinix's v12.3 event manager exposes exactly the same 128 slots
+// (event.max_stamps), so reject records outside the locally configured array.
+pub const g17_firmware_event_stamp_slots = u32(128)
 pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_data_master_entries_bytes = u64(0x1800)
@@ -2632,15 +2639,48 @@ pub mut:
 	opaque_016       [0x32]u8
 }
 
-// Event type 14 carries a single unaligned CLPC performance-control value.
-// Apple's IOGPU layer only forwards it to optional performance observers;
-// Vinix has no CLPC observer layer, so the callback consumes it as advisory.
+// Event type 4 requests GPU recovery. Apple accepts -1 as an unscoped stamp
+// slot or one of the same 128 event-machine slots used by completion events.
 @[packed]
-pub struct G17FirmwareClpcNotificationEvent {
+pub struct G17FirmwareGpuRestartEvent {
 pub mut:
 	event_type u32
-	value      u64
-	opaque_00c [0x3c]u8
+	opaque_004 [8]u8
+	stamp_slot i32
+	opaque_010 [0x38]u8
+}
+
+// Event type 7 reports a channel error. The subtype and data-master limits
+// are checked before Apple enters its channel-specific recovery machinery.
+@[packed]
+pub struct G17FirmwareChannelErrorEvent {
+pub mut:
+	event_type  u32
+	subtype     u32
+	data_master u32
+	stamp_slot  i32
+	opaque_010  [0x38]u8
+}
+
+// Event type 8 carries a metrology-aging result for an optional platform
+// reliability monitor. With no such service, Apple returns to its drain loop.
+@[packed]
+pub struct G17FirmwareMetrologyAgingEvent {
+pub mut:
+	event_type u32
+	result     u32
+	opaque_008 [0x40]u8
+}
+
+// Event type 14 is AGFIFirmwareEventRTCompletionInfo. Apple forwards its
+// unaligned value only to optional IOGPU CLPC performance observers; Vinix
+// has no CLPC observer layer, so the callback consumes it as advisory.
+@[packed]
+pub struct G17FirmwareRtCompletionEvent {
+pub mut:
+	event_type      u32
+	completion_info u64
+	opaque_00c      [0x3c]u8
 }
 
 pub fn validate_g17_firmware_completion_event(entry &G17FirmwareEventRingEntry) bool {
@@ -2661,6 +2701,25 @@ pub fn g17_firmware_completion_has_firing_stamps(entry &G17FirmwareEventRingEntr
 		|| event.firing[3] != 0
 }
 
+pub fn validate_g17_firmware_gpu_restart(entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || entry.event_type != g17_firmware_event_gpu_restart
+		|| sizeof(G17FirmwareGpuRestartEvent) != g17_firmware_event_entry_size {
+		return false
+	}
+	event := unsafe { &G17FirmwareGpuRestartEvent(entry) }
+	return event.stamp_slot == -1 || u32(event.stamp_slot) < g17_firmware_event_stamp_slots
+}
+
+pub fn validate_g17_firmware_channel_error(entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || entry.event_type != g17_firmware_event_channel_error
+		|| sizeof(G17FirmwareChannelErrorEvent) != g17_firmware_event_entry_size {
+		return false
+	}
+	event := unsafe { &G17FirmwareChannelErrorEvent(entry) }
+	return event.subtype < 5 && event.data_master < 3
+		&& (event.stamp_slot == -1 || u32(event.stamp_slot) < g17_firmware_event_stamp_slots)
+}
+
 @[inline]
 pub fn g17_firmware_event_is_host_noop(event_type u32) bool {
 	// Accepted types 11 and 29 return directly to Apple's drain loop. Type
@@ -2672,10 +2731,16 @@ pub fn g17_firmware_event_is_host_noop(event_type u32) bool {
 }
 
 @[inline]
-pub fn validate_g17_firmware_clpc_notification(entry &G17FirmwareEventRingEntry) bool {
+pub fn validate_g17_firmware_metrology_aging(entry &G17FirmwareEventRingEntry) bool {
 	return entry != unsafe { nil }
-		&& entry.event_type == g17_firmware_event_clpc_notification
-		&& sizeof(G17FirmwareClpcNotificationEvent) == g17_firmware_event_entry_size
+		&& entry.event_type == g17_firmware_event_metrology_aging
+		&& sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size
+}
+
+@[inline]
+pub fn validate_g17_firmware_rt_completion(entry &G17FirmwareEventRingEntry) bool {
+	return entry != unsafe { nil } && entry.event_type == g17_firmware_event_rt_completion
+		&& sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size
 }
 
 // Return -1 for corrupt ring state or an event outside Apple's checked mask,
@@ -3005,5 +3070,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareClpcNotificationEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
 }

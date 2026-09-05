@@ -2256,9 +2256,13 @@ class RecoverG17AbiTests(unittest.TestCase):
         *,
         controller_code: bytes = struct.pack("<2I", 0xD503245F, 0xD65F03C0),
         clpc_call_target: int = 0x110000,
+        restart_call_target: int = 0x140000,
+        channel_stamp_call_target: int = 0x130000,
+        reliability_service: str = "function-reliability_monitor",
+        changed_validator_type: int = -1,
     ) -> dict[str, object]:
         role_address = 0x100000
-        role = bytearray(0x180)
+        role = bytearray(0x600)
         for offset, word in {
             0x120: 0xB94053E8,
             0x124: 0x35009B88,
@@ -2274,10 +2278,47 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x170: 0xF9414E68,
             0x174: 0xF940A900,
             0x178: bl(role_address + 0x178, clpc_call_target),
+            0x184: 0xB94053E8,
+            0x188: 0x7100111F,
+            0x190: 0xB9405FF6,
+            0x194: 0xF9400288,
+            0x198: 0xF940A100,
+            0x19C: bl(role_address + 0x19C, 0x130000),
+            0x1CC: 0xD2803A11,
+            0x1D8: 0x910143E9,
+            0x1DC: 0xB27E0121,
+            0x27C: 0xF940AD20,
+            0x280: 0x52800021,
+            0x284: bl(role_address + 0x284, restart_call_target),
+            0x294: 0xB94053E8,
+            0x298: 0x7100211F,
+            0x2A0: 0xB94057E8,
+            0x2A4: 0xB81503A8,
+            0x2A8: 0xF947DA60,
+            0x2AC: 0xB4FFF080,
+            0x2B0: 0x52800048,
+            0x2B4: 0x390283E8,
+            0x2C8: 0xD2802811,
+            0x2D4: 0x910283E1,
+            0x2D8: 0xD102C3A2,
+            0x2DC: 0xD2800003,
+            0x594: 0xB94053E8,
+            0x598: 0x71001D1F,
+            0x5A0: 0xB94057E8,
+            0x5A4: 0x7100151F,
+            0x5AC: 0xB9405BE8,
+            0x5B0: 0x71000D1F,
+            0x5B8: 0xB9405FF6,
+            0x5BC: 0xF9400288,
+            0x5C0: 0xF940A100,
+            0x5C4: bl(role_address + 0x5C4, channel_stamp_call_target),
         }.items():
             struct.pack_into("<I", role, offset, word)
         dispatch_offsets = [0] * 16
         dispatch_offsets[0] = 0x0C
+        dispatch_offsets[4] = 0x70
+        dispatch_offsets[7] = 0x480
+        dispatch_offsets[8] = 0x180
         dispatch_offsets[14] = 0x4C
         for event_type in (2, 3, 5, 11):
             dispatch_offsets[event_type] = -0x54
@@ -2286,8 +2327,51 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT: controller_target
         }
         iogpu_symbols = {
-            recover_g17_abi.IOGPU_FENCE_NOTIFY_CLPC: 0x110000
+            recover_g17_abi.IOGPU_EVENT_GET_NUM_STAMPS: 0x130000,
+            recover_g17_abi.IOGPU_FENCE_NOTIFY_CLPC: 0x110000,
+            recover_g17_abi.IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR: 0x140000,
         }
+        start_address = 0x200000
+        start = bytearray(0x2CBC)
+        for offset, word in {
+            0x2CA4: 0xB0FF41A1,
+            0x2CA8: 0x91378021,
+            0x2CAC: 0xAA1603E0,
+            0x2CB4: 0xF942DA68,
+            0x2CB8: 0xF907D900,
+        }.items():
+            struct.pack_into("<I", start, offset, word)
+
+        def symbol_code(_image: bytes, name: str) -> tuple[int, bytes]:
+            if name == recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT:
+                return controller_target, controller_code
+            if name == recover_g17_abi.ACCELERATOR_START:
+                return start_address, bytes(start)
+            raise AssertionError(f"unexpected symbol {name}")
+
+        def cstring(
+            _image: bytes,
+            _address: int,
+            _code: bytes,
+            adrp_offset: int,
+            _add_offset: int,
+        ) -> str:
+            if adrp_offset == 0x2CA4:
+                return reliability_service
+            for event_type, (offset, record, event_name) in (
+                recover_g17_abi.G17_FIRMWARE_EVENT_VALIDATORS.items()
+            ):
+                if offset != adrp_offset:
+                    continue
+                suffix = " changed" if event_type == changed_validator_type else ""
+                return (
+                    "const RET *AGXFirmwareRingValidator::validateType("
+                    "const AGFIFirmwareEventRingEntry *) const "
+                    f"[RET = {record}, FWET1 = {event_name}, "
+                    f"FWET2 = kAGFIFirmwareEventNone]{suffix}"
+                )
+            raise AssertionError(f"unexpected C string reference {adrp_offset:#x}")
+
         with mock.patch.object(
             recover_g17_abi,
             "recover_vtable_target",
@@ -2295,7 +2379,11 @@ class RecoverG17AbiTests(unittest.TestCase):
         ), mock.patch.object(
             recover_g17_abi,
             "symbol_code",
-            return_value=(controller_target, controller_code),
+            side_effect=symbol_code,
+        ), mock.patch.object(
+            recover_g17_abi,
+            "read_adrp_add_cstring",
+            side_effect=cstring,
         ):
             return recover_g17_abi.recover_g17_firmware_event_actions(
                 b"driver",
@@ -2314,10 +2402,17 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["host_noop_event_types"], [0, 11, 29])
         self.assertEqual(recovered["resolved_host_noop_events"][0]["type"], 0)
         self.assertEqual(recovered["resolved_host_noop_events"][0]["vtable_slot"], 0x878)
-        self.assertEqual(recovered["advisory_events"][0]["type"], 14)
+        self.assertEqual(
+            recovered["validated_event_types"]["8"]["record"],
+            "AGFIFirmwareEventMetrologyAging",
+        )
+        self.assertEqual(
+            [event["type"] for event in recovered["advisory_events"]], [8, 14]
+        )
+        self.assertEqual([event["type"] for event in recovered["fatal_events"]], [4, 7])
         self.assertEqual(
             recovered["unimplemented_action_event_types"],
-            [4, 6, 7, 8, 9, 10, 12, 13, 15],
+            [6, 9, 10, 12, 13, 15],
         )
 
     def test_rejects_non_noop_g17_controller_event_handler(self) -> None:
@@ -2327,6 +2422,22 @@ class RecoverG17AbiTests(unittest.TestCase):
     def test_rejects_wrong_g17_clpc_notification_target(self) -> None:
         with self.assertRaisesRegex(ValueError, "CLPC notification target"):
             self._recover_g17_event_actions(clpc_call_target=0x110004)
+
+    def test_rejects_wrong_g17_restart_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "GPU-restart scheduler target"):
+            self._recover_g17_event_actions(restart_call_target=0x140004)
+
+    def test_rejects_wrong_g17_channel_error_stamp_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "channel-error stamp-count target"):
+            self._recover_g17_event_actions(channel_stamp_call_target=0x130004)
+
+    def test_rejects_changed_g17_event_validator_identity(self) -> None:
+        with self.assertRaisesRegex(ValueError, "type 8 validator identity"):
+            self._recover_g17_event_actions(changed_validator_type=8)
+
+    def test_rejects_wrong_g17_reliability_service(self) -> None:
+        with self.assertRaisesRegex(ValueError, "reliability service"):
+            self._recover_g17_event_actions(reliability_service="other-service")
 
     def test_rejects_single_role_g17_boot_transport(self) -> None:
         notify = bytearray(0x134)
