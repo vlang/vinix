@@ -52,6 +52,7 @@ pub mut:
 	lock        klock.Lock
 	registered  bool
 	node        &DrmNode = unsafe { nil }
+	render_node &DrmNode = unsafe { nil }
 }
 
 // Forward-reference placeholder for GEM objects stored at device level.
@@ -70,6 +71,7 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
+	render   bool
 	dev      &DrmDevice = unsafe { nil }
 }
 
@@ -107,59 +109,62 @@ const ioctl_direction_mask = u32(0x3)
 fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
 	return match cmd {
 		ioctl.drm_ioctl_version {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmVersion)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmVersion)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_ioctl_get_cap {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmGetCap)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmGetCap)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_ioctl_gem_close {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmGemClose)), direction: ioctl_write}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmGemClose)), direction: ioctl_write }
 		}
 		ioctl.drm_ioctl_syncobj_create {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmSyncobjCreate)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjCreate)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_ioctl_syncobj_destroy {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmSyncobjDestroy)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjDestroy)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_ioctl_syncobj_wait {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_asahi_get_params {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_asahi_vm_create {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_asahi_vm_destroy {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: ioctl_write}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: ioctl_write }
 		}
 		ioctl.drm_asahi_gem_create {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_asahi_gem_mmap_offset {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_asahi_gem_bind {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: ioctl_write}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: ioctl_write }
 		}
 		ioctl.drm_asahi_queue_create {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: ioctl_write | ioctl_read}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_asahi_queue_destroy {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: ioctl_write}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: ioctl_write }
 		}
 		ioctl.drm_asahi_submit {
-			DrmIoctlLayout{size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: ioctl_write}
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: ioctl_write }
 		}
-		else { return none }
+		else {
+			return none
+		}
 	}
 }
 
-fn create_device_node(dev &DrmDevice) ?&DrmNode {
+fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
 
 	mut node := &DrmNode{
 		dev: unsafe { dev }
+		render: render
 	}
 	node.stat.size = 0
 	node.stat.blocks = 0
@@ -168,7 +173,7 @@ fn create_device_node(dev &DrmDevice) ?&DrmNode {
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
-	fs.devtmpfs_add_device(node, 'dri/card${dev.dev_id}')
+	fs.devtmpfs_add_device(node, 'dri/${name}')
 	return node
 }
 
@@ -276,18 +281,26 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 	next_dev_id++
 
 	mut dev := &DrmDevice{
-		dev_id:     id
-		driver:     unsafe { driver }
+		dev_id: id
+		driver: unsafe { driver }
 		registered: true
 	}
 
-	dev.node = create_device_node(dev) or {
+	dev.node = create_device_node(dev, 'card${id}', false) or {
 		return none
+	}
+	if driver.features & driver_render != 0 {
+		dev.render_node = create_device_node(dev, 'renderD${128 + id}', true) or {
+			return none
+		}
 	}
 	registered_devices[id] = dev
 
 	println('drm: Registered driver ${driver.name} as card${id}')
 	println('drm: created device node /dev/dri/card${id}')
+	if dev.render_node != unsafe { nil } {
+		println('drm: created device node /dev/dri/renderD${128 + id}')
+	}
 	return dev
 }
 
@@ -429,8 +442,7 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjWait(data) }
-	known_flags := ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit |
-		ioctl.drm_syncobj_wait_available | ioctl.drm_syncobj_wait_deadline
+	known_flags := ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit | ioctl.drm_syncobj_wait_available | ioctl.drm_syncobj_wait_deadline
 	if request.handles == 0 || request.count_handles == 0 || request.count_handles > 64
 		|| request.flags & ~known_flags != 0 || request.pad != 0 {
 		return -22
@@ -464,13 +476,27 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 
 fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 	match cmd {
-		ioctl.drm_ioctl_version { return ioctl_version(dev, data) }
-		ioctl.drm_ioctl_get_cap { return ioctl_get_cap(data) }
-		ioctl.drm_ioctl_gem_close { return ioctl_gem_close(dev, handle, data) }
-		ioctl.drm_ioctl_syncobj_create { return ioctl_syncobj_create(handle, data) }
-		ioctl.drm_ioctl_syncobj_destroy { return ioctl_syncobj_destroy(handle, data) }
-		ioctl.drm_ioctl_syncobj_wait { return ioctl_syncobj_wait(handle, data) }
-		else { return none }
+		ioctl.drm_ioctl_version {
+			return ioctl_version(dev, data)
+		}
+		ioctl.drm_ioctl_get_cap {
+			return ioctl_get_cap(data)
+		}
+		ioctl.drm_ioctl_gem_close {
+			return ioctl_gem_close(dev, handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_create {
+			return ioctl_syncobj_create(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_destroy {
+			return ioctl_syncobj_destroy(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_wait {
+			return ioctl_syncobj_wait(handle, data)
+		}
+		else {
+			return none
+		}
 	}
 }
 
