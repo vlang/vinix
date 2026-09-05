@@ -126,6 +126,8 @@ pub mut:
 	quarantined        bool
 	submitted          bool
 	released           bool
+	completion         fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
+	completion_data    voidptr
 }
 
 pub struct G13RenderCommand {
@@ -244,6 +246,21 @@ pub mut:
 	quarantined             bool
 	submitted               bool
 	released                bool
+	completion              fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
+	completion_data         voidptr
+	tvb_size_bytes          u64
+}
+
+pub struct G13RenderResultValues {
+pub:
+	vertex_start      u64
+	vertex_end        u64
+	fragment_start    u64
+	fragment_end      u64
+	tvb_size_bytes    u64
+	tvb_usage_bytes   u64
+	num_tvb_overflows u32
+	overflowed        bool
 }
 
 pub struct G13QueueResources {
@@ -955,6 +972,17 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 	return true
 }
 
+fn complete_g13_render_job(mut job G13RenderJobResources, successful bool) {
+	if job.completion == unsafe { nil } {
+		return
+	}
+	callback := job.completion
+	data := job.completion_data
+	job.completion = unsafe { nil }
+	job.completion_data = unsafe { nil }
+	callback(job, successful, data)
+}
+
 // Construct the complete paired vertex/tiler and fragment object graph for a
 // single-cluster G13 render pass. It remains unpublished until
 // submit_g13_render_job() transfers both queue batches to firmware.
@@ -1007,6 +1035,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	job.fragment_event_sequence = queue.event_sequences[1]
 	queue.event_sequences[1]++
 	job.scene = mgr.allocate_g13_render_scene_locked(resources, &tile) or { return none }
+	job.tvb_size_bytes = u64(resources.render_buffer.blocks.len) * fw.g13_tvb_block_size
 
 	job.init_buffer = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13InitBufferCommand), pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.barrier = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13BarrierCommand), pgtable.gpu_prot_fw_private_rw) or { return none }
@@ -1473,6 +1502,7 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 	mgr.lock.acquire()
 	mut owned := unsafe { job }
 	if !owned.submitted {
+		complete_g13_render_job(mut owned, false)
 		if !mgr.free_g13_render_job_locked(mut owned, owned.mappings_published)
 			&& !owned.quarantined {
 			owned.quarantined = true
@@ -1480,6 +1510,28 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 		}
 	}
 	mgr.lock.release()
+}
+
+// Install the one-shot completion callback before publishing a prepared job.
+// The callback runs with the manager lock held, while the firmware result
+// backing is still valid. It must not call back into GpuManager.
+pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources,
+	callback fn (&G13RenderJobResources, bool, voidptr), data voidptr) bool {
+	if job == unsafe { nil } || callback == unsafe { nil } {
+		return false
+	}
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	mut owned := unsafe { job }
+	if owned.released || owned.submitted || owned.quarantined
+		|| owned.completion != unsafe { nil } {
+		return false
+	}
+	owned.completion = callback
+	owned.completion_data = data
+	return true
 }
 
 // Publish both halves of a render pass only after all four rings have enough
@@ -1673,6 +1725,7 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 			continue
 		}
 		mut owned := unsafe { job }
+		complete_g13_render_job(mut owned, true)
 		if mgr.free_g13_render_job_locked(mut owned, true) {
 			mgr.g13_render_jobs.delete(index)
 		}
@@ -1685,6 +1738,7 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 fn (mut mgr GpuManager) release_all_g13_render_jobs() {
 	for index := mgr.g13_render_jobs.len - 1; index >= 0; index-- {
 		mut job := unsafe { mgr.g13_render_jobs[index] }
+		complete_g13_render_job(mut job, false)
 		mgr.free_g13_render_job_locked(mut job, false)
 	}
 	mgr.g13_render_jobs.clear()
@@ -1695,6 +1749,26 @@ pub fn (job &G13RenderJobResources) timestamp_values() fw.G13RenderTimestamps {
 		return fw.G13RenderTimestamps{}
 	}
 	return unsafe { *&fw.G13RenderTimestamps(job.scene.timestamps.cpu_address()) }
+}
+
+pub fn (job &G13RenderJobResources) result_values() G13RenderResultValues {
+	if job == unsafe { nil } || job.released || job.scene.timestamps.phys == 0
+		|| job.scene.scene.phys == 0 || job.fragment.phys == 0 {
+		return G13RenderResultValues{}
+	}
+	timestamps := unsafe { &fw.G13RenderTimestamps(job.scene.timestamps.cpu_address()) }
+	scene := unsafe { &fw.G13BufferScene(job.scene.scene.cpu_address()) }
+	fragment := unsafe { &fw.G13RunFragment(job.fragment.cpu_address()) }
+	return G13RenderResultValues{
+		vertex_start: timestamps.vertex.start
+		vertex_end: timestamps.vertex.end
+		fragment_start: timestamps.fragment.start
+		fragment_end: timestamps.fragment.end
+		tvb_size_bytes: job.tvb_size_bytes
+		tvb_usage_bytes: u64(scene.total_page_count) * fw.g13_tvb_page_size
+		num_tvb_overflows: fragment.tvb_overflow_count
+		overflowed: scene.total_page_count > scene.pass_page_count
+	}
 }
 
 fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResources,
@@ -1744,6 +1818,17 @@ fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResourc
 	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
 	return true
+}
+
+fn complete_g13_compute_job(mut job G13ComputeJobResources, successful bool) {
+	if job.completion == unsafe { nil } {
+		return
+	}
+	callback := job.completion
+	data := job.completion_data
+	job.completion = unsafe { nil }
+	job.completion_data = unsafe { nil }
+	callback(job, successful, data)
 }
 
 // Construct one byte-exact G13 v12.3 compute command and its microsequence.
@@ -1947,6 +2032,7 @@ pub fn (mut mgr GpuManager) release_g13_compute_job(job &G13ComputeJobResources)
 	mgr.lock.acquire()
 	mut owned := unsafe { job }
 	if !owned.submitted {
+		complete_g13_compute_job(mut owned, false)
 		if !mgr.free_g13_compute_job_locked(mut owned, owned.mappings_published)
 			&& !owned.quarantined {
 			owned.quarantined = true
@@ -1954,6 +2040,27 @@ pub fn (mut mgr GpuManager) release_g13_compute_job(job &G13ComputeJobResources)
 		}
 	}
 	mgr.lock.release()
+}
+
+// Install the one-shot completion callback before publishing a prepared job.
+// The callback runs with the manager lock held, while timestamps remain valid.
+pub fn (mut mgr GpuManager) set_g13_compute_completion(job &G13ComputeJobResources,
+	callback fn (&G13ComputeJobResources, bool, voidptr), data voidptr) bool {
+	if job == unsafe { nil } || callback == unsafe { nil } {
+		return false
+	}
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	mut owned := unsafe { job }
+	if owned.released || owned.submitted || owned.quarantined
+		|| owned.completion != unsafe { nil } {
+		return false
+	}
+	owned.completion = callback
+	owned.completion_data = data
+	return true
 }
 
 // Transfer a prepared compute job to firmware. Once this succeeds, the
@@ -1997,6 +2104,7 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 			continue
 		}
 		mut owned := unsafe { job }
+		complete_g13_compute_job(mut owned, true)
 		if mgr.free_g13_compute_job_locked(mut owned, true) {
 			mgr.g13_compute_jobs.delete(index)
 		}
@@ -2009,6 +2117,7 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 fn (mut mgr GpuManager) release_all_g13_compute_jobs() {
 	for index := mgr.g13_compute_jobs.len - 1; index >= 0; index-- {
 		mut job := unsafe { mgr.g13_compute_jobs[index] }
+		complete_g13_compute_job(mut job, false)
 		mgr.free_g13_compute_job_locked(mut job, false)
 	}
 	mgr.g13_compute_jobs.clear()
