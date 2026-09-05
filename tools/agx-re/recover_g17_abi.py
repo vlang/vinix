@@ -493,7 +493,7 @@ GENERATE_REGISTER_LIST_3D = (
 G17_COMMAND_3D_BYTES = 0x2240
 COMPLETE_COMMAND_3D = "__ZN22AGX3DCommandDescriptor8completeEv"
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
-SELECTOR_ARGUMENT_WINDOW = 8
+SELECTOR_ARGUMENT_WINDOW = 10
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 G17_ACCELERATOR_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
 IDLE_POWER_OFF_TIMER = "__ZN14AGXAccelerator17idlePowerOffTimerEv"
@@ -756,6 +756,184 @@ def decode_movz_w(word: int) -> tuple[int, int] | None:
     shift = ((word >> 21) & 0x1) * 16
     immediate = ((word >> 5) & 0xFFFF) << shift
     return register, immediate
+
+
+def decode_movk_w(word: int) -> tuple[int, int, int] | None:
+    if word & 0xFF800000 != 0x72800000:
+        return None
+    register = word & 0x1F
+    shift = ((word >> 21) & 0x1) * 16
+    immediate = (word >> 5) & 0xFFFF
+    return register, immediate, shift
+
+
+def decode_add_sub_immediate_w(word: int) -> tuple[str, int, int, int] | None:
+    opcode = word & 0xFF000000
+    if opcode == 0x11000000:
+        kind = "add"
+    elif opcode == 0x51000000:
+        kind = "sub"
+    else:
+        return None
+    destination = word & 0x1F
+    source = (word >> 5) & 0x1F
+    immediate = (word >> 10) & 0xFFF
+    if word & (1 << 22):
+        immediate <<= 12
+    return kind, destination, source, immediate
+
+
+def decode_logical_immediate_w(word: int) -> tuple[str, int, int, int] | None:
+    """Decode a 32-bit logical-immediate instruction and expand its mask."""
+
+    opcode = word & 0xFF800000
+    kinds = {
+        0x12000000: "and",
+        0x32000000: "orr",
+        0x52000000: "eor",
+        0x72000000: "ands",
+    }
+    kind = kinds.get(opcode)
+    if kind is None:
+        return None
+    destination = word & 0x1F
+    source = (word >> 5) & 0x1F
+    immr = (word >> 16) & 0x3F
+    imms = (word >> 10) & 0x3F
+
+    # ARM's DecodeBitMasks algorithm. N is necessarily zero for the W form.
+    length_source = (~imms) & 0x3F
+    length = length_source.bit_length() - 1
+    if length < 1:
+        return None
+    levels = (1 << length) - 1
+    rotation = immr & levels
+    ones = imms & levels
+    if ones == levels:
+        return None
+    element_bits = 1 << length
+    element_mask = (1 << element_bits) - 1
+    element = (1 << (ones + 1)) - 1
+    if rotation:
+        element = (
+            (element >> rotation) | (element << (element_bits - rotation))
+        ) & element_mask
+    immediate = 0
+    for shift in range(0, 32, element_bits):
+        immediate |= element << shift
+    return kind, destination, source, immediate
+
+
+def resolve_static_w_register(
+    instructions: list[tuple[int, int]], before: int, register: int, depth: int = 0
+) -> int | None:
+    """Resolve the local constant feeding a 32-bit register use.
+
+    The G17 register-list producers keep a few selector bases in callee-saved
+    registers and derive individual selectors with ADD/SUB immediates. This
+    deliberately narrow backwards slice handles only those forms and rejects
+    loads or calls which could make the value runtime-dependent.
+    """
+
+    if depth > 8:
+        return None
+
+    use_offset = instructions[before][0] if before < len(instructions) else 1 << 63
+    for index in range(before - 1, -1, -1):
+        offset, word = instructions[index]
+        materialized = decode_movz_w(word)
+        if materialized is not None and materialized[0] == register:
+            return materialized[1] & 0xFFFFFFFF
+        updated = decode_movk_w(word)
+        if updated is not None and updated[0] == register:
+            base = resolve_static_w_register(instructions, index, register, depth + 1)
+            if base is None:
+                return None
+            _destination, immediate, shift = updated
+            mask = 0xFFFF << shift
+            return ((base & ~mask) | immediate << shift) & 0xFFFFFFFF
+        arithmetic = decode_add_sub_immediate_w(word)
+        if arithmetic is not None and arithmetic[1] == register:
+            kind, _destination, source, immediate = arithmetic
+            base = resolve_static_w_register(instructions, index, source, depth + 1)
+            if base is None:
+                return None
+            if kind == "add":
+                return (base + immediate) & 0xFFFFFFFF
+            return (base - immediate) & 0xFFFFFFFF
+
+        logical = decode_logical_immediate_w(word)
+        if logical is not None and logical[1] == register:
+            kind, _destination, source, immediate = logical
+            base = 0 if source == 31 else resolve_static_w_register(
+                instructions, index, source, depth + 1
+            )
+            if base is None:
+                return None
+            if kind == "and" or kind == "ands":
+                return base & immediate
+            if kind == "orr":
+                return base | immediate
+            return base ^ immediate
+
+        logical_register = decode_orr_register(word)
+        if logical_register is not None and logical_register[0] == register:
+            _destination, first, second = logical_register
+            first_value = 0 if first == 31 else resolve_static_w_register(
+                instructions, index, first, depth + 1
+            )
+            second_value = 0 if second == 31 else resolve_static_w_register(
+                instructions, index, second, depth + 1
+            )
+            if first_value is None or second_value is None:
+                return None
+            return first_value | second_value
+
+        # A load makes the value data-dependent. Direct and authenticated
+        # calls clobber the caller-saved registers under AAPCS64.
+        load = decode_load_unsigned(word)
+        if load is not None and load[0] == register:
+            return None
+        load = decode_load_register(word)
+        if load is not None and load[0] == register:
+            return None
+
+        # Reject instruction families which write the register but are not in
+        # the intentionally small constant-expression language above. This is
+        # especially important for callee-saved selector bases: several are
+        # reused for runtime data later in the same producer.
+        destination = word & 0x1F
+        instruction_class = word & 0x1F000000
+        if destination == register and instruction_class in (
+            0x0A000000,  # logical shifted-register, including shifted ORR
+            0x0B000000,  # add/subtract shifted or extended register
+            0x10000000,  # PC-relative address generation
+            0x11000000,  # other add/subtract immediate forms
+            0x12000000,  # other logical-immediate forms
+            0x13000000,  # bitfield/extract forms
+            0x1A000000,  # conditional/data-processing register forms
+            0x1B000000,  # multiply-add forms
+        ):
+            return None
+        wide = decode_move_wide(word)
+        if wide is not None and wide[1] == register:
+            return None
+        if register <= 18 and (
+            decode_bl_target(offset, word) is not None
+            or word & 0xFFFFFC00 == 0xD73F0800
+        ):
+            # The producers occasionally lower two mutually exclusive call
+            # paths as call; b join; call; join. The first call cannot clobber
+            # the second path when its following unconditional branch skips
+            # the current use, so continue through that dead linear range.
+            skipped = any(
+                (target := decode_b_target(branch_offset, branch_word)) is not None
+                and target > use_offset
+                for branch_offset, branch_word in instructions[index + 1 : before]
+            )
+            if not skipped:
+                return None
+    return None
 
 
 def decode_umaddl(word: int) -> tuple[int, int, int, int] | None:
@@ -8242,11 +8420,13 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     selector recovered respects that: bits 1 and 2 are always clear and the
     value is 8-byte aligned apart from an optional bit 0.
 
-    The selector *sets* are deliberately reported as incomplete.  Only literals
-    materialized with a move immediate are recovered, and each producer has
-    several times more entry-emission sites than it has such literals, so most
-    selectors are computed at run time.  What the selectors name is also not
-    established -- they are not SGX MMIO offsets.
+    In addition to the literal audit, a narrow backwards slice resolves the w2
+    selector argument at every virtual encoder call.  That recovers the
+    ADD/SUB-derived and OR-composed values which dominate the producers.  The
+    complete flag remains false because some records are assembled inline --
+    including a two-record CL sequence -- and their control-flow ordering is
+    not classified yet.  What the selectors name is also not established;
+    they are not SGX MMIO offsets.
     """
 
     symbols = macho_symbols(image)
@@ -8259,16 +8439,19 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         raise ValueError(f"unexpected G17 selector field {settable:#x}")
 
     producers: dict[str, object] = {}
-    union: set[int] = set()
+    literal_union: set[int] = set()
+    static_union: set[int] = set()
     for label, name in sorted(REGISTER_LIST_PRODUCERS.items()):
         _address, code = symbol_code(image, name)
+        buffered = list(words(code))
         immediates: dict[int, int] = {}
         recency: dict[int, int] = {}
         found: set[int] = set()
         context = -SELECTOR_ARGUMENT_WINDOW
-        for index, (_offset, word) in enumerate(words(code)):
+        encoder_calls: list[tuple[int, int]] = []
+        for index, (offset, word) in enumerate(buffered):
             # The producers materialize selectors with the 32-bit move forms.
-            opcode = word & 0x7F800000
+            opcode = word & 0xFF800000
             if opcode in (0x52800000, 0x72800000):
                 register = word & 0x1F
                 immediate = (word >> 5) & 0xFFFF
@@ -8304,6 +8487,38 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                     and index - context < SELECTOR_ARGUMENT_WINDOW
                 ):
                     found.add(candidate)
+
+                # A real encoder call is followed by publication of one
+                # 12-byte entry. Requiring both the stack encoder context and
+                # that publication excludes the three unrelated virtual calls
+                # present in every producer.
+                publishes_entry = False
+                for following_index, (_following_offset, following) in enumerate(
+                    buffered[index + 1 : index + 20], index + 1
+                ):
+                    arithmetic = decode_add_sub_immediate_w(following)
+                    if (
+                        arithmetic is None
+                        or arithmetic[0] != "add"
+                        or arithmetic[3] != 12
+                    ):
+                        continue
+                    if any(
+                        store & 0xFFFFFC00 == 0x790E1400
+                        for _store_offset, store in buffered[
+                            following_index + 1 : following_index + 3
+                        ]
+                    ):
+                        publishes_entry = True
+                        break
+                if index - context <= SELECTOR_ARGUMENT_WINDOW and publishes_entry:
+                    resolved = resolve_static_w_register(buffered, index, 2)
+                    if resolved is None:
+                        raise ValueError(
+                            f"{label} selector at producer +{offset:#x} is no "
+                            "longer statically resolvable"
+                        )
+                    encoder_calls.append((offset, resolved))
         if not found:
             raise ValueError(f"{label} producer emits no register selectors")
         for candidate in found:
@@ -8316,7 +8531,6 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         # Every entry emission advances the byte-length counter by 12, so the
         # number of those sites bounds how many selectors a producer can use.
         emission_sites = 0
-        buffered = list(words(code))
         for index, (_offset, word) in enumerate(buffered):
             # 32-bit ADD immediate of 12, i.e. one entry's worth of bytes.
             if word & 0xFFC00000 != 0x11000000 or (word >> 10) & 0xFFF != 0xC:
@@ -8330,12 +8544,27 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                 f"{label} selector sample is no longer smaller than its "
                 f"{emission_sites} emission sites"
             )
-        union |= found
+        resolved = {selector for _offset, selector in encoder_calls}
+        for candidate in resolved:
+            if candidate & ~settable:
+                raise ValueError(
+                    f"{label} resolved selector {candidate:#x} exceeds the field"
+                )
+        if not encoder_calls:
+            raise ValueError(f"{label} producer has no classified encoder calls")
+
+        static = found | resolved
+        literal_union |= found
+        static_union |= static
         producers[label] = {
             "producer": name,
             "literal_selectors": len(found),
             "entry_emission_sites": emission_sites,
             "selectors": sorted(found),
+            "encoder_call_sites": len(encoder_calls),
+            "statically_resolved_encoder_calls": len(encoder_calls),
+            "resolved_encoder_selectors": sorted(resolved),
+            "static_selectors": sorted(static),
         }
 
     return {
@@ -8346,12 +8575,13 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         "address_space_identified": False,
         "selectors_complete": False,
         "completeness_note": (
-            "only move-immediate literals are recovered; each producer has "
-            "several times more entry-emission sites, so most selectors are "
-            "computed at run time"
+            "every virtual encoder selector argument is statically resolved, "
+            "but manually assembled records and control-flow ordering remain "
+            "to be classified"
         ),
-        "distinct_literal_selectors": len(union),
-        "maximum_selector": max(union),
+        "distinct_literal_selectors": len(literal_union),
+        "distinct_static_selectors": len(static_union),
+        "maximum_selector": max(static_union),
         "producers": producers,
     }
 

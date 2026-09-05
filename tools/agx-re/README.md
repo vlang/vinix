@@ -130,7 +130,9 @@ checked equivalent.
 The 3D command's register-list layout is recovered: four passes on a 0x720
 stride, 0x700 stream bytes each, the 12-byte entry format, and the descriptor
 summary array. The selector encoding is recovered and validated, but the selector sets are
-only a literal sample: most selectors are computed at run time.
+not complete yet. The UUID-pinned backwards slice resolves every virtual encoder
+call (314 physical call sites and 235 distinct static values together with the
+literal audit); manually assembled entries and their control-flow ordering remain.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command

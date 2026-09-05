@@ -4387,6 +4387,12 @@ class RecoverG17AbiTests(unittest.TestCase):
                         "<I", 0x72A00000 | (((value >> 16) & 0xFFFF) << 5) | 11
                     )
                 code += struct.pack("<I", 0x2A0B014A)  # orr w10, w10, w11
+            code += struct.pack("<I", 0x528C0416)  # mov w22, #0x6020
+            code += struct.pack("<I", 0x72A00036)  # movk w22, #1, lsl #16
+            code += struct.pack("<I", 0x910083E0)  # add x0, sp, #0x20
+            code += struct.pack("<I", 0x5132A2C2)  # sub w2, w22, #0xca8
+            code += struct.pack("<I", 0x52800003)  # mov w3, #0
+            code += struct.pack("<I", 0xD73F0910)  # blraa x8, x16
             for _ in range(emissions):
                 code += struct.pack("<I", 0x11003129)  # add w9, w9, #0xc
                 code += struct.pack("<I", 0x790E1509)  # strh w9, [x8, #0x70a]
@@ -4426,7 +4432,38 @@ class RecoverG17AbiTests(unittest.TestCase):
             recovered["producers"]["3D"]["selectors"], [0x1739, 0x17E1, 0x16020]
         )
         self.assertEqual(recovered["producers"]["3D"]["entry_emission_sites"], 40)
+        self.assertEqual(recovered["producers"]["3D"]["encoder_call_sites"], 1)
+        self.assertEqual(
+            recovered["producers"]["3D"]["resolved_encoder_selectors"],
+            [0x15378],
+        )
+        self.assertIn(0x15378, recovered["producers"]["3D"]["static_selectors"])
         self.assertEqual(recovered["distinct_literal_selectors"], 11)
+
+    def test_decodes_g17_selector_logical_immediate(self) -> None:
+        # orr w2, w27, #0x10
+        self.assertEqual(
+            recover_g17_abi.decode_logical_immediate_w(0x321C0362),
+            ("orr", 2, 27, 0x10),
+        )
+
+    def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
+        instructions = [
+            (0x00, 0x5294E802),  # mov w2, #0xa740
+            (0x04, 0xD503201F),  # nop (the real producer branches here)
+            (0x08, 0xD73F0910),  # blraa x8, x16
+            (0x0C, 0x14000003),  # b +0xc, skipping the alternate call
+            (0x10, 0x52800024),  # mov w4, #1
+            (0x14, 0xD73F0910),  # alternate blraa x8, x16
+            (0x18, 0xD503201F),
+        ]
+        self.assertEqual(
+            recover_g17_abi.resolve_static_w_register(instructions, 5, 2),
+            0xA740,
+        )
+        self.assertIsNone(
+            recover_g17_abi.resolve_static_w_register(instructions[:4], 3, 2)
+        )
 
     def test_rejects_g17_selector_sample_matching_emission_count(self) -> None:
         # If the literal sample ever reached the emission count the set would
