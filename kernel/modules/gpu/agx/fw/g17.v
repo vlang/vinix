@@ -9,6 +9,11 @@ import katomic
 // with the older G13 InitData types in this module.
 pub const g17_init_message = u64(0x81) << 48
 pub const g17_init_address_mask = (u64(1) << 44) - 1
+pub const g17_akf_message_type_shift = u32(48)
+pub const g17_akf_message_type_mask = u64(0x3f)
+pub const g17_akf_callback_type = u8(2)
+pub const g17_akf_ready_type = u8(9)
+pub const g17_ready_ack_message = u64(0x89) << 48
 pub const g17_interface_magic = u64(0x0c8bc322072804c0)
 pub const g17_bootstrap_header_size = u64(0xc8)
 pub const g17_bootstrap_page_size = u64(0x4000)
@@ -104,6 +109,16 @@ pub const g17_register_override_size = u64(0x18)
 pub const g17_default_mcache_writes = u64(0x0000000607800004)
 pub const g17_setup_config_value_f4c = u32(0x31)
 pub const g17_fixed_config_value_f8c = u64(0x00000000fffeae80)
+
+@[inline]
+pub fn g17_init_message_for_root(root_iova u64) u64 {
+	return g17_init_message | (root_iova & g17_init_address_mask)
+}
+
+@[inline]
+pub fn g17_akf_message_type(message u64) u8 {
+	return u8((message >> g17_akf_message_type_shift) & g17_akf_message_type_mask)
+}
 
 // Allocation sizes in the order published at shared offsets
 // 0x1c0, 0x1c8, ... 0x1f8 for each firmware role.

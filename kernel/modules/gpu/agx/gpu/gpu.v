@@ -7,6 +7,7 @@ module gpu
 // Translates gpu.rs from the Asahi Linux GPU driver
 
 import apple.rtkit
+import apple.mailbox
 import gpu.agx.regs
 import gpu.agx.hw
 import gpu.agx.mmu
@@ -55,15 +56,17 @@ pub mut:
 
 pub struct GpuManager {
 pub mut:
-	res           regs.GpuResources
-	hw_config     hw.HwConfig
-	rtk           rtkit.RTKit
-	channels      GpuChannels
-	allocs        alloc.HeapAllocator
-	initdata_va   u64
-	initdata_phys u64
-	state         GpuState
-	lock          klock.Lock
+	res            regs.GpuResources
+	hw_config      hw.HwConfig
+	rtk            rtkit.RTKit
+	secondary_rtk  rtkit.RTKit
+	firmware_roles u32
+	channels       GpuChannels
+	allocs         alloc.HeapAllocator
+	initdata_va    u64
+	initdata_phys  u64
+	state          GpuState
+	lock           klock.Lock
 mut:
 	g17_graph &G17FirmwareGraph = unsafe { nil }
 }
@@ -83,7 +86,14 @@ pub fn get_global_manager() ?&GpuManager {
 	return global_gpu_mgr
 }
 
-pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKit) ?&GpuManager {
+pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKit,
+	secondary_rtk &rtkit.RTKit) ?&GpuManager {
+	if res.firmware_role_count == 0 || res.firmware_role_count > 2 {
+		return none
+	}
+	if res.firmware_role_count == 2 && secondary_rtk.mbox.base == 0 {
+		return none
+	}
 	version, core_count := res.get_gpu_id()
 	println('agx: GPU ID version=0x${version:x} cores=${core_count}')
 
@@ -91,11 +101,77 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		res: unsafe { *res }
 		hw_config: unsafe { *cfg }
 		rtk: unsafe { *rtk }
+		secondary_rtk: unsafe { *secondary_rtk }
+		firmware_roles: res.firmware_role_count
 		state: .idle
 		allocs: alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
 	}
 
 	return mgr
+}
+
+fn (mut mgr GpuManager) boot_firmware_role(role u32) bool {
+	return match role {
+		0 { mgr.rtk.boot() }
+		1 {
+			if mgr.firmware_roles == 2 {
+				mgr.secondary_rtk.boot()
+			} else {
+				false
+			}
+		}
+		else { false }
+	}
+}
+
+fn (mut mgr GpuManager) start_firmware_endpoint(role u32, endpoint u8) bool {
+	return match role {
+		0 { mgr.rtk.start_endpoint(endpoint) }
+		1 {
+			if mgr.firmware_roles == 2 {
+				mgr.secondary_rtk.start_endpoint(endpoint)
+			} else {
+				false
+			}
+		}
+		else { false }
+	}
+}
+
+fn (mut mgr GpuManager) send_role_message(role u32, endpoint u8, message u64) bool {
+	return match role {
+		0 { mgr.rtk.send_message(endpoint, message) }
+		1 {
+			if mgr.firmware_roles == 2 {
+				mgr.secondary_rtk.send_message(endpoint, message)
+			} else {
+				false
+			}
+		}
+		else { false }
+	}
+}
+
+fn (mut mgr GpuManager) recv_role_message(role u32) ?mailbox.MboxMsg {
+	return match role {
+		0 { mgr.rtk.recv_msg() }
+		1 {
+			if mgr.firmware_roles == 2 {
+				mgr.secondary_rtk.recv_msg()
+			} else {
+				none
+			}
+		}
+		else { none }
+	}
+}
+
+fn (mut mgr GpuManager) stop_firmware_cpus(count u32) {
+	mut remaining := count
+	for remaining > 0 {
+		remaining--
+		mgr.res.stop_cpu(remaining)
+	}
 }
 
 struct SharedBuffer {
@@ -197,29 +273,48 @@ pub fn (mut mgr GpuManager) init() bool {
 
 	mgr.state = .starting
 	println('agx: Starting GPU initialization')
-
-	// Step 1: Start the ASC CPU via ASC_CTL
-	mgr.res.start_cpu()
-
-	// Step 2: RTKit boot handshake
-	if !mgr.rtk.boot() {
-		C.printf(c'agx: RTKit boot failed\n')
-		mgr.state = .error
-		return false
+	if mgr.hw_config.firmware_abi == .g17_26_5_partial {
+		return mgr.init_g17()
 	}
 
-	// Step 3: Start GPU-specific firmware endpoint (0x20)
-	if !mgr.rtk.start_endpoint(u8(ep_firmware)) {
-		C.printf(c'agx: Failed to start firmware endpoint\n')
-		mgr.state = .error
-		return false
+	// Step 1: Start every firmware role's independent ASC CPU via ASC_CTL.
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.res.start_cpu(role) {
+			C.printf(c'agx: Failed to start ASC role %u\n', role)
+			mgr.stop_firmware_cpus(role)
+			mgr.state = .error
+			return false
+		}
 	}
 
-	// Step 4: Start doorbell endpoint (0x21)
-	if !mgr.rtk.start_endpoint(u8(ep_doorbell)) {
-		C.printf(c'agx: Failed to start doorbell endpoint\n')
-		mgr.state = .error
-		return false
+	// Step 2: Negotiate the RTKit transport independently for every role.
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.boot_firmware_role(role) {
+			C.printf(c'agx: RTKit boot failed for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+	}
+
+	// Step 3: Start GPU-specific firmware endpoint (0x20) on each role.
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
+			C.printf(c'agx: Failed to start firmware endpoint for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+	}
+
+	// Step 4: Start doorbell endpoint (0x21) on each role.
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
+			C.printf(c'agx: Failed to start doorbell endpoint for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
 	}
 
 	// The firmware side of the uPPL handoff becomes available only after the
@@ -337,7 +432,11 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 // the channel id; they are NOT the firmware-control endpoint (0x20) used for
 // INIT/FWCTL. Ring state must already be published before this is called.
 pub fn (mut mgr GpuManager) send_doorbell(channel_id u32) bool {
-	return mgr.rtk.send_message(u8(ep_doorbell), msg_tx_doorbell | (u64(channel_id) & msg_address_mask))
+	return mgr.send_doorbell_to_role(0, channel_id)
+}
+
+pub fn (mut mgr GpuManager) send_doorbell_to_role(role u32, channel_id u32) bool {
+	return mgr.send_role_message(role, u8(ep_doorbell), msg_tx_doorbell | (u64(channel_id) & msg_address_mask))
 }
 
 // Ring the doorbell for the default device-control channel.
@@ -347,7 +446,11 @@ pub fn (mut mgr GpuManager) kick_firmware() {
 
 // Send a firmware-control message via RTKit on the firmware endpoint (0x20).
 pub fn (mut mgr GpuManager) send_fw_msg(message u64, data u64) bool {
-	return mgr.rtk.send_message(u8(ep_firmware), message | (data & msg_address_mask))
+	return mgr.send_fw_msg_to_role(0, message, data)
+}
+
+pub fn (mut mgr GpuManager) send_fw_msg_to_role(role u32, message u64, data u64) bool {
+	return mgr.send_role_message(role, u8(ep_firmware), message | (data & msg_address_mask))
 }
 
 // Process an event from the event channel
@@ -489,6 +592,6 @@ pub fn (mut mgr GpuManager) shutdown() {
 
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
-	mgr.res.stop_cpu()
+	mgr.stop_firmware_cpus(mgr.firmware_roles)
 	println('agx: GPU shutdown complete')
 }

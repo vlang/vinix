@@ -9,6 +9,8 @@ import gpu.agx.fw
 import gpu.agx.pgtable
 import gpu.agx.regs
 import aarch64.kio
+import aarch64.cpu
+import apple.mailbox
 import klock
 import lib
 import memory
@@ -352,6 +354,121 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 		mgr.g17_graph = graph
 	}
 	return ready
+}
+
+// Bring up the two G17 AKF transports without passing through the legacy G13
+// InitData/channel path. The whole-chip launch gate remains in driver.v until
+// the work-command and completion ABIs are also complete, so this sequence is
+// compiled and reviewed before it can touch an M5 Max.
+fn (mut mgr GpuManager) init_g17() bool {
+	if mgr.firmware_roles != 2 {
+		C.printf(c'agx: G17 requires exactly two firmware roles\n')
+		mgr.state = .error
+		return false
+	}
+
+	// Both root mappings must exist before either role can report started: the
+	// Apple callback immediately publishes the matching root IOVA.
+	if !mgr.init_g17_firmware_data() || mgr.g17_graph == unsafe { nil } {
+		C.printf(c'agx: Failed to initialize G17 firmware data\n')
+		mgr.state = .error
+		return false
+	}
+
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.res.start_cpu(role) {
+			C.printf(c'agx: Failed to start G17 ASC role %u\n', role)
+			mgr.stop_firmware_cpus(role)
+			mgr.state = .error
+			return false
+		}
+	}
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.boot_firmware_role(role) {
+			C.printf(c'agx: G17 RTKit boot failed for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
+			C.printf(c'agx: G17 firmware endpoint failed for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+	}
+
+	// Publish the final UAT handoff after both firmware endpoints can service
+	// it, but before either root is exposed for firmware dereferences.
+	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
+		C.printf(c'agx: G17 UAT firmware handoff failed\n')
+		mgr.stop_firmware_cpus(mgr.firmware_roles)
+		mgr.state = .error
+		return false
+	}
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		root_iova := mgr.g17_graph.roots[role].va
+		message := fw.g17_init_message_for_root(root_iova)
+		if !mgr.send_role_message(role, u8(ep_firmware), message) {
+			C.printf(c'agx: Failed to publish G17 root for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+	}
+
+	if !mgr.wait_g17_ready() {
+		C.printf(c'agx: G17 firmware ready handshake failed\n')
+		mgr.stop_firmware_cpus(mgr.firmware_roles)
+		mgr.state = .error
+		return false
+	}
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
+			C.printf(c'agx: G17 doorbell endpoint failed for role %u\n', role)
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+	}
+
+	mgr.state = .running
+	println('agx: G17 dual-role firmware bootstrap complete')
+	return true
+}
+
+// Apple decodes bits 53:48. Type 9 consumes a one-shot guard and broadcasts
+// 0x89 through both transports. Type 2 requires a callback implementation
+// that Vinix does not yet have, so encountering it during boot fails closed.
+fn (mut mgr GpuManager) wait_g17_ready() bool {
+	for _ in 0 .. 10_000_000 {
+		mut received := false
+		for role := u32(0); role < mgr.firmware_roles; role++ {
+			msg := mgr.recv_role_message(role) or { continue }
+			received = true
+			if mailbox.msg_endpoint(&msg) != u8(ep_firmware) {
+				continue
+			}
+			kind := fw.g17_akf_message_type(msg.data0)
+			if kind == fw.g17_akf_callback_type {
+				C.printf(c'agx: unsupported G17 AKF callback during boot on role %u\n', role)
+				return false
+			}
+			if kind != fw.g17_akf_ready_type {
+				continue
+			}
+			for ack_role := u32(0); ack_role < mgr.firmware_roles; ack_role++ {
+				if !mgr.send_role_message(ack_role, u8(ep_firmware), fw.g17_ready_ack_message) {
+					return false
+				}
+			}
+			return true
+		}
+		if !received {
+			cpu.wfe()
+		}
+	}
+	return false
 }
 
 // Serialize one host producer per role, matching Apple's IOCommandGate around

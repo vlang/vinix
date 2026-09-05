@@ -106,6 +106,8 @@ configuration gate is derived rather than asserted:
 producer, and `init_g17_firmware_data` still fails closed if that changes.
 Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
+separate GFX/GFX1 ASC and RTKit ownership, and the guarded dual-role root/ready
+handshake,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and
 runtime policy. Firmware channel

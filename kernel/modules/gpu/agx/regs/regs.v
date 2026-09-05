@@ -161,8 +161,10 @@ pub fn decode_gpu_chip_variant(version u32) ?u32 {
 // GPU resource handle -- encapsulates base addresses for MMIO access
 pub struct GpuResources {
 pub mut:
-	sgx  u64 // SGX block base
-	asc  u64 // ASC block base
+	sgx                 u64 // SGX block base
+	asc                 u64 // Primary ASC block base (firmware role 0)
+	secondary_asc       u64 // Secondary ASC block base (firmware role 1)
+	firmware_role_count u32
 }
 
 // Fault information from GPU fault registers
@@ -176,23 +178,63 @@ pub:
 
 // ASC and SGX are separate named resources in the Apple GPU device tree.
 
-pub fn new_resources(asc_base u64, asc_size u64, sgx_base u64, sgx_size u64) GpuResources {
+pub fn new_resources(asc_base u64, asc_size u64, secondary_asc_base u64,
+	secondary_asc_size u64, firmware_role_count u32, sgx_base u64, sgx_size u64) GpuResources {
 	// Apple places both apertures far above the 4 GiB direct-map window. Map
 	// them explicitly as Device-nGnRnE before any ASC or SGX register access.
+	secondary_asc := if firmware_role_count == 2 {
+		memory.map_mmio(secondary_asc_base, secondary_asc_size)
+	} else {
+		u64(0)
+	}
 	return GpuResources{
 		sgx: memory.map_mmio(sgx_base, sgx_size)
 		asc: memory.map_mmio(asc_base, asc_size)
+		secondary_asc: secondary_asc
+		firmware_role_count: firmware_role_count
 	}
+}
+
+fn (r &GpuResources) asc_for_role(role u32) ?u64 {
+	if role == 0 && r.firmware_role_count >= 1 {
+		return r.asc
+	}
+	if role == 1 && r.firmware_role_count == 2 && r.secondary_asc != 0 {
+		return r.secondary_asc
+	}
+	return none
+}
+
+fn read_asc32(base u64, offset u32) u32 {
+	return kio.mmin32(unsafe { &u32(base + offset) })
+}
+
+fn write_asc32(base u64, offset u32, value u32) {
+	kio.mmout32(unsafe { &u32(base + offset) }, value)
 }
 
 // Read a 32-bit value from a register offset relative to base
 pub fn (r &GpuResources) read32(offset u32) u32 {
-	return kio.mmin32(unsafe { &u32(r.asc + offset) })
+	return read_asc32(r.asc, offset)
 }
 
 // Write a 32-bit value to a register offset relative to base
 pub fn (r &GpuResources) write32(offset u32, value u32) {
-	kio.mmout32(unsafe { &u32(r.asc + offset) }, value)
+	write_asc32(r.asc, offset, value)
+}
+
+// Access an ASC register for one firmware role. G17C has two independent
+// ASC wrappers; treating the second mailbox as an offset in the first wrapper
+// would address unrelated MMIO.
+pub fn (r &GpuResources) read32_for_role(role u32, offset u32) ?u32 {
+	base := r.asc_for_role(role) or { return none }
+	return read_asc32(base, offset)
+}
+
+pub fn (r &GpuResources) write32_for_role(role u32, offset u32, value u32) bool {
+	base := r.asc_for_role(role) or { return false }
+	write_asc32(base, offset, value)
+	return true
 }
 
 // Read a 32-bit value from SGX register space
@@ -206,21 +248,27 @@ pub fn (r &GpuResources) sgx_write32(offset u32, value u32) {
 }
 
 // Start the GPU coprocessor CPU via ASC_CTL
-pub fn (r &GpuResources) start_cpu() {
-	mut ctl := r.read32(asc_ctl)
+pub fn (r &GpuResources) start_cpu(role u32) bool {
+	mut ctl := r.read32_for_role(role, asc_ctl) or { return false }
 	ctl |= asc_ctl_cpu_run
-	r.write32(asc_ctl, ctl)
+	if !r.write32_for_role(role, asc_ctl, ctl) {
+		return false
+	}
 	cpu.dsb_sy()
 	cpu.isb()
-	println('agx: GPU ASC CPU started')
+	println('agx: GPU ASC role ${role} CPU started')
+	return true
 }
 
 // Stop the GPU coprocessor CPU
-pub fn (r &GpuResources) stop_cpu() {
-	mut ctl := r.read32(asc_ctl)
+pub fn (r &GpuResources) stop_cpu(role u32) bool {
+	mut ctl := r.read32_for_role(role, asc_ctl) or { return false }
 	ctl &= ~asc_ctl_cpu_run
-	r.write32(asc_ctl, ctl)
+	if !r.write32_for_role(role, asc_ctl, ctl) {
+		return false
+	}
 	cpu.dsb_sy()
+	return true
 }
 
 // Read fault info after a GPU fault
@@ -230,9 +278,9 @@ pub fn (r &GpuResources) get_fault_info() FaultInfo {
 	addr_hi := r.sgx_read32(sgx_fault_info + 8)
 
 	return FaultInfo{
-		addr:      u64(addr_lo) | (u64(addr_hi) << 32)
-		write:     (status & (1 << 1)) != 0
-		vm_slot:   (status >> 8) & 0xff
+		addr: u64(addr_lo) | (u64(addr_hi) << 32)
+		write: (status & (1 << 1)) != 0
+		vm_slot: (status >> 8) & 0xff
 		unit_code: u8(status >> 24)
 	}
 }

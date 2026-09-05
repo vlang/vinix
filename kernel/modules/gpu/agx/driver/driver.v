@@ -533,10 +533,14 @@ pub fn initialise() {
 	gpu_event_mgr = event.new_event_manager(stamp_va, stamp_phys)
 
 	// Step 5: Create GPU resources, RTKit, and GpuManager.
-	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.sgx_base, platform.sgx_size)
+	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.secondary_asc_base, platform.secondary_asc_size, platform.firmware_role_count, platform.sgx_base, platform.sgx_size)
 	gpu_rtk := rtkit.new_rtkit(platform.mailbox_base, 'agx')
+	mut gpu_secondary_rtk := rtkit.RTKit{}
+	if platform.firmware_role_count == 2 {
+		gpu_secondary_rtk = rtkit.new_rtkit(platform.secondary_mailbox_base, 'agx-gfx1')
+	}
 
-	mut mgr := gpu.new_gpu_manager(&gpu_res, &cfg, &gpu_rtk) or {
+	mut mgr := gpu.new_gpu_manager(&gpu_res, &cfg, &gpu_rtk, &gpu_secondary_rtk) or {
 		println('agx: Failed to create GPU manager')
 		return
 	}
