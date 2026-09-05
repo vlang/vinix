@@ -6335,6 +6335,75 @@ class RecoverG17AbiTests(unittest.TestCase):
             recovered["runtime_kick_channel_qos"]["runtime_host_member"], 0x380
         )
 
+    def test_recovers_g17_channel_data_master_types(self) -> None:
+        base_address = 0x300000
+        wrapper_addresses = {
+            "TA": 0x310000,
+            "3D": 0x320000,
+            "CL": 0x330000,
+        }
+        symbols = {recover_g17_abi.CHANNEL_INIT: base_address}
+        codes = {}
+        for kind, value in (("TA", 0), ("3D", 1), ("CL", 2)):
+            symbol = recover_g17_abi.G17_CHANNEL_INITIALIZERS[kind]
+            address = wrapper_addresses[kind]
+            symbols[symbol] = address
+            codes[symbol] = (
+                address,
+                struct.pack(
+                    "<II",
+                    0x52800006 | value << 5,
+                    bl(address + 4, base_address),
+                ),
+            )
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_data_master_types(b"")
+
+        self.assertEqual(
+            {
+                kind: item["data_master_type"]
+                for kind, item in recovered["subclasses"].items()
+            },
+            {"TA": 0, "3D": 1, "CL": 2},
+        )
+        self.assertEqual(recovered["base_initializer"], recover_g17_abi.CHANNEL_INIT)
+
+    def test_rejects_changed_g17_channel_data_master_type(self) -> None:
+        base_address = 0x300000
+        symbols = {recover_g17_abi.CHANNEL_INIT: base_address}
+        codes = {}
+        for index, kind in enumerate(("TA", "3D", "CL")):
+            symbol = recover_g17_abi.G17_CHANNEL_INITIALIZERS[kind]
+            address = 0x310000 + index * 0x10000
+            symbols[symbol] = address
+            codes[symbol] = (
+                address,
+                struct.pack(
+                    "<II",
+                    0x52800006,
+                    bl(address + 4, base_address),
+                ),
+            )
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+            self.assertRaises(ValueError),
+        ):
+            recover_g17_abi.recover_g17_channel_data_master_types(b"")
+
     def test_recovers_g17_linear_power_transfer_tables(self) -> None:
         arm_power, fixtures = self._linear_power_transfer_fixtures()
         recovered = self._run_linear_power_transfer(arm_power, fixtures)

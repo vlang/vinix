@@ -475,6 +475,11 @@ SUBMIT_NOP_UNPREPARED = (
 CHANNEL_INIT = (
     "__ZN10AGXChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy19_AGFIDataMasterType"
 )
+G17_CHANNEL_INITIALIZERS = {
+    "TA": "__ZN12AGXTAChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy",
+    "3D": "__ZN12AGX3DChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy",
+    "CL": "__ZN12AGXCLChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy",
+}
 SET_KICK_CHANNEL_QOS = "__ZN14AGXArmFirmware17setKickChannelQosEjj"
 ARM_ALLOC_FIRMWARE_DATA = "__ZN14AGXArmFirmware17allocFirmwareDataEv"
 ALLOCATE_SCHEDULER_STATE = "__ZN15AGXCommandQueue22allocateSchedulerStateEv"
@@ -12401,6 +12406,57 @@ def recover_g17_channel_state_sources(image: bytes, reset_code: bytes) -> dict[s
     }
 
 
+def recover_g17_channel_data_master_types(image: bytes) -> dict[str, object]:
+    """Recover the AGFI data-master type supplied by each channel subclass.
+
+    Each concrete G17 channel initializer is a small wrapper around the base
+    AGXChannel::init method.  The seventh argument is materialized in w6
+    immediately before that direct call, so this does not depend on a guessed
+    C++ enum declaration or on type names found in strings.
+    """
+
+    symbols = macho_symbols(image)
+    required = (CHANNEL_INIT, *G17_CHANNEL_INITIALIZERS.values())
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 channel initializer symbols: {missing}")
+
+    base_address = symbols[CHANNEL_INIT]
+    recovered = {}
+    for kind, symbol in G17_CHANNEL_INITIALIZERS.items():
+        address, code = symbol_code(image, symbol)
+        decoded = list(words(code))
+        matches = []
+        for index, (offset, word) in enumerate(decoded[:-1]):
+            move = decode_movz_w(word)
+            next_offset, next_word = decoded[index + 1]
+            if (
+                move is not None
+                and move[0] == 6
+                and next_offset == offset + 4
+                and decode_bl_target(address + next_offset, next_word) == base_address
+            ):
+                matches.append(move[1])
+        if len(matches) != 1:
+            raise ValueError(
+                f"expected one G17 {kind} data-master initializer call, "
+                f"found {len(matches)}"
+            )
+        recovered[kind] = {
+            "initializer": symbol,
+            "data_master_type": matches[0],
+        }
+
+    observed = {kind: item["data_master_type"] for kind, item in recovered.items()}
+    expected = {"TA": 0, "3D": 1, "CL": 2}
+    if observed != expected:
+        raise ValueError(f"unexpected G17 channel data-master types: {observed}")
+    return {
+        "base_initializer": CHANNEL_INIT,
+        "subclasses": recovered,
+    }
+
+
 def recover_g17_handoff(code: bytes) -> dict[str, object]:
     magic = find_materialized_constant(code, INTERFACE_MAGIC)
     if magic:
@@ -12757,6 +12813,7 @@ def main() -> int:
         channels["state_sources"] = recover_g17_channel_state_sources(
             driver, reset_channel_code
         )
+        channels["data_master_types"] = recover_g17_channel_data_master_types(driver)
         channels["scheduler_state"] = recover_g17_scheduler_state(driver)
         channels["queue_device_inputs"] = recover_g17_queue_device_inputs(
             driver, iogpu
