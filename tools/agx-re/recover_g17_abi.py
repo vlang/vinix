@@ -7087,6 +7087,81 @@ def config_pointer_stores(
     return found
 
 
+def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
+    """Recover the GPU ID registers the chip-info record is decoded from.
+
+    The chip-info fields that feed the late-control block are not opaque
+    accelerator state: readChipInfo builds them from the GPU ID register block
+    at 0xd04000.  The version register's byte 3 must be 0xb, and its byte 2
+    selects the chip variant that later steers the whole power model.
+    """
+
+    symbols = macho_symbols(image)
+    if PI300_READ_CHIP_INFO not in symbols:
+        raise ValueError(f"Mach-O is missing {PI300_READ_CHIP_INFO}")
+
+    _address, code = symbol_code(image, PI300_READ_CHIP_INFO)
+    require_instruction_words_at(
+        code,
+        "G17 GPU identity register reads",
+        {
+            0x03C: 0x5288001A,  # register block base 0xd04000
+            0x040: 0x72A01A1A,
+            0x054: 0x52880001,  # version register read
+            0x058: 0x72A01A01,
+            0x070: 0x91004341,  # block +0x10
+            0x08C: 0x91005341,  # block +0x14
+            0x0A8: 0x91006341,  # block +0x18
+            0x0C4: 0x91007341,  # block +0x1c
+        },
+    )
+    require_instruction_words_at(
+        code,
+        "G17 chip variant decode",
+        {
+            0x0EC: 0x53187EE8,  # version >> 24
+            0x0F0: 0x71002D1F,  # must be 0xb
+            0x0F8: 0x53105EE8,  # (version >> 16) & 0xff
+            0x0FC: 0x7100111F,
+            0x104: 0x71000D1F,
+            0x10C: 0x7100091F,
+            0x114: 0x52800148,
+            0x118: 0xB9007668,
+            0x11C: 0x52800408,  # selector 2 -> variant 0x20
+            0x120: 0xB9002268,
+            0x564: 0x52800288,
+            0x56C: 0x52800428,  # selector 3 -> variant 0x21
+            0x578: 0x52800448,  # selector 4 -> variant 0x22
+            0x57C: 0xB9002268,
+        },
+    )
+
+    base = 0xD04000
+    return {
+        "register_block": base,
+        "registers": {
+            "version": base,
+            "count": base + 0x08,
+            "cluster_config": base + 0x10,
+            "identity_14": base + 0x14,
+            "identity_18": base + 0x18,
+            "identity_1c": base + 0x1C,
+        },
+        "version_family_byte": {"shift": 24, "value": 0xB},
+        "variant_selector": {"shift": 16, "mask": 0xFF},
+        "variants": {2: 0x20, 3: 0x21, 4: 0x22},
+        "companion_values": {2: 0x0A, 3: 0x14, 4: 0x28},
+        "chip_info_variant_offset": 0x20,
+        "chip_info_companion_offset": 0x74,
+        # The relay puts the variant where the power model reads it.
+        "accelerator_variant_member": 0x480 + 0x20,
+        "variant_consumers": [
+            G17_POPULATE_MAX_PERF_POWER_CS,
+            G17_CALCULATE_VDD_GPU_LEAKAGE,
+        ],
+    }
+
+
 def recover_g17_core_mask_relay(image: bytes) -> dict[str, object]:
     """Show the accelerator's core-mask pair is the cleared chip-info head.
 
@@ -8256,6 +8331,9 @@ def main() -> int:
         )
         hardware_config["secondary_performance_block"] = (
             recover_g17_secondary_performance_block(driver)
+        )
+        hardware_config["chip_info_registers"] = (
+            recover_g17_chip_info_registers(driver)
         )
         hardware_config["late_controls"] = recover_g17_late_controls(driver)
         hardware_config["linear_power_transfer_tables"] = (

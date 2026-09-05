@@ -3614,6 +3614,77 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_recovers_g17_chip_info_registers(self) -> None:
+        code = bytearray(0x61C)
+        for offset, word in {
+            0x03C: 0x5288001A,
+            0x040: 0x72A01A1A,
+            0x054: 0x52880001,
+            0x058: 0x72A01A01,
+            0x070: 0x91004341,
+            0x08C: 0x91005341,
+            0x0A8: 0x91006341,
+            0x0C4: 0x91007341,
+            0x0EC: 0x53187EE8,
+            0x0F0: 0x71002D1F,
+            0x0F8: 0x53105EE8,
+            0x0FC: 0x7100111F,
+            0x104: 0x71000D1F,
+            0x10C: 0x7100091F,
+            0x114: 0x52800148,
+            0x118: 0xB9007668,
+            0x11C: 0x52800408,
+            0x120: 0xB9002268,
+            0x564: 0x52800288,
+            0x56C: 0x52800428,
+            0x578: 0x52800448,
+            0x57C: 0xB9002268,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.PI300_READ_CHIP_INFO: 0xC00000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0xC00000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_chip_info_registers(b"")
+
+        self.assertEqual(recovered["register_block"], 0xD04000)
+        self.assertEqual(recovered["registers"]["version"], 0xD04000)
+        self.assertEqual(recovered["registers"]["cluster_config"], 0xD04010)
+        self.assertEqual(recovered["registers"]["identity_1c"], 0xD0401C)
+        self.assertEqual(recovered["version_family_byte"], {"shift": 24, "value": 0xB})
+        self.assertEqual(recovered["variants"], {2: 0x20, 3: 0x21, 4: 0x22})
+        # The variant must land where the power model reads it.
+        self.assertEqual(recovered["accelerator_variant_member"], 0x4A0)
+
+    def test_chip_variant_reaches_the_power_model_field(self) -> None:
+        # The relay delta and the chip-info variant offset must compose to the
+        # accelerator member the CS power producer compares against 0x21.
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        image = driver.read_bytes()
+        registers = recover_g17_abi.recover_g17_chip_info_registers(image)
+        relay = recover_g17_abi.recover_g17_core_mask_relay(image)
+        self.assertEqual(
+            relay["record_delta"] + registers["chip_info_variant_offset"],
+            registers["accelerator_variant_member"],
+        )
+        power = recover_g17_abi.recover_g17_linear_power_transfer_tables(
+            image,
+            recover_g17_abi.symbol_code(image, recover_g17_abi.INIT_POWER_DATA)[1],
+        )
+        self.assertEqual(
+            power["tables"][1]["chip_variant_offset"],
+            registers["accelerator_variant_member"],
+        )
+
     def test_declared_hardware_config_gaps_are_still_justified(self) -> None:
         # fw.g17_hardware_config_gaps() declares exactly two outstanding
         # pieces. If the recovery ever shows either is settled, the kernel-side

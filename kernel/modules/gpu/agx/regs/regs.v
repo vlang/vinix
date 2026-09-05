@@ -22,6 +22,33 @@ pub const sgx_doa_outstanding_acks = u32(0x17400)
 pub const gpu_id_version = u32(0xD04000)
 pub const gpu_id_count = u32(0xD04008)
 pub const gpu_id_clustercfg = u32(0xD04010)
+pub const gpu_id_identity_14 = u32(0xD04014)
+pub const gpu_id_identity_18 = u32(0xD04018)
+pub const gpu_id_identity_1c = u32(0xD0401C)
+
+// Apple's readChipInfo decodes the chip variant out of the version register:
+// byte 3 must be the family value, and byte 2 selects the variant. That
+// variant reaches the accelerator at +0x4a0 and is what the G17 power model
+// switches on -- 0x21 picks one set of coefficients, 0x22 another leakage
+// parameter table.
+pub const gpu_id_version_family_shift = u32(24)
+pub const gpu_id_version_family_agx = u32(0x0b)
+pub const gpu_id_version_variant_shift = u32(16)
+pub const gpu_chip_variant_g17_base = u32(0x20)
+
+// Decode the chip variant, or none when the register does not describe a
+// family this decode was recovered against.
+pub fn decode_gpu_chip_variant(version u32) ?u32 {
+	if (version >> gpu_id_version_family_shift) & 0xff != gpu_id_version_family_agx {
+		return none
+	}
+	selector := (version >> gpu_id_version_variant_shift) & 0xff
+	if selector < 2 || selector > 4 {
+		return none
+	}
+	// Selectors 2, 3 and 4 map onto 0x20, 0x21 and 0x22.
+	return gpu_chip_variant_g17_base + (selector - 2)
+}
 
 // GPU resource handle -- encapsulates base addresses for MMIO access
 pub struct GpuResources {
