@@ -1091,15 +1091,13 @@ pub const g17_gap_late_control_runtime = u32(1 << 1)
 //                          0x23_8837_4000 and a freestanding pow, and the
 //                          kernel builds with -nofloat.
 //
-//   late_control_runtime   Fourteen of the 36 fields in +0x2540..+0x270f read
-//                          accelerator state rather than fixed values. The
-//                          sources are named -- mostly chip-info record fields
-//                          reached through the +0x480 relay -- but not yet
-//                          reproduced.
+//   late_control_runtime   CLEARED. All 36 fields in +0x2540..+0x270f are
+//                          accounted for: 34 fixed and two computed from the
+//                          core-mask and identity registers.
 //
 // Anything not listed here is recovered and emitted.
 pub fn g17_hardware_config_gaps() u32 {
-	return g17_gap_linear_power_transfer | g17_gap_late_control_runtime
+	return g17_gap_linear_power_transfer
 }
 
 // The hardware configuration may only be handed to firmware once every gap is
@@ -1113,10 +1111,10 @@ pub const g17_late_controls_offset = u64(0x2540)
 pub const g17_late_controls_size = u64(0x1d0)
 
 // The statically determined part of the late-control block. Apple's ARM
-// producer writes 36 fields into config +0x2540..+0x270f; these 32 are fixed
+// producer writes 36 fields into config +0x2540..+0x270f; 34 are fixed
 // for G17, including four tests of the fixed feature mask and one more field
-// derived from it, all of which come out zero. Two more depend on
-// run-time inputs and stay zero here, so the block is not complete.
+// derived from it, all of which come out zero. The other two are computed
+// from hardware. Every field in the block is now accounted for.
 // Values the late-control block needs that are read from hardware rather than
 // fixed. Passed as a struct so adding the remaining ones does not keep
 // widening the hardware-config signature.
@@ -1154,6 +1152,9 @@ fn populate_g17_late_controls(mut config G17HardwareConfig, inputs G17LateContro
 		0x26bc,
 		// Guarded by a feature bit that is clear, so its store never runs.
 		0x25ac,
+		// The address converter is the identity and its input member is only
+		// ever cleared, so this converts zero to zero.
+		0x269c,
 	]!
 	unsafe {
 		base := &u8(&config.firmware_late_controls_2540[0])
@@ -1161,7 +1162,7 @@ fn populate_g17_late_controls(mut config G17HardwareConfig, inputs G17LateContro
 			mut slot := &u32(base + offset - g17_late_controls_offset)
 			*slot = 0
 		}
-		for offset in [u64(0x2578), 0x25a0]! {
+		for offset in [u64(0x2578), 0x25a0, 0x26c0]! {
 			mut slot := &u32(base + offset - g17_late_controls_offset)
 			*slot = 1
 		}

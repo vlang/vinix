@@ -3615,6 +3615,21 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_recovers_g17_final_late_controls(self) -> None:
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_final_late_controls(
+            driver.read_bytes()
+        )
+        self.assertEqual(recovered["literal_field"], {"config": 0x26C0, "value": 1})
+        converted = recovered["converted_field"]
+        self.assertEqual(converted["config"], 0x269C)
+        self.assertEqual(converted["firmware_member"], 0x1AB8)
+        # Both halves matter: identity converter, and a member only ever cleared.
+        self.assertTrue(converted["identity"])
+        self.assertEqual(converted["value"], 0)
+
     def test_recovers_g17_remaining_late_controls(self) -> None:
         driver = Path("build/kext/g17c/AGXG17X.macho")
         if not driver.exists():
@@ -3874,9 +3889,14 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertTrue(power["die_dependent"])
 
+        # The late-control bit has been cleared, so the recovery must now show
+        # every field accounted for. If this regresses, the bit is wrong.
         late = recover_g17_abi.recover_g17_late_controls(image)
-        self.assertFalse(late["complete"])
-        self.assertTrue(late["runtime_dependent"])
+        self.assertTrue(late["complete"])
+        self.assertEqual(late["runtime_dependent"], [])
+        self.assertEqual(
+            len(late["fixed"]) + len(late["derived"]), late["written_offsets"]
+        )
 
     def test_recovers_g17_late_controls_from_the_real_producer(self) -> None:
         # This one is checked against the shipped binary rather than a stub:
@@ -3913,7 +3933,10 @@ class RecoverG17AbiTests(unittest.TestCase):
             + len(recovered["runtime_dependent"]),
             recovered["written_offsets"],
         )
-        self.assertFalse(recovered["complete"])
+        # Every field is now accounted for, which is what lets the boot gate's
+        # late-control bit be cleared.
+        self.assertEqual(recovered["runtime_dependent"], [])
+        self.assertTrue(recovered["complete"])
 
     def test_stores_covering_spans_wide_and_paired_stores(self) -> None:
         # A byte is covered by a wider store at a lower offset, and by the

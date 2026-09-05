@@ -7208,6 +7208,85 @@ def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_final_late_controls(image: bytes) -> dict[str, object]:
+    """Settle the last two late-control fields.
+
+    +0x26c0 takes a literal one. +0x269c passes firmware member 0x1ab8 through
+    the address converter, and both ends of that are known: the converter is
+    the identity, and the member is only ever written by the constructor
+    clearing it, so the field is zero.
+    """
+
+    symbols = macho_symbols(image)
+    required = (ARM_INIT_FIRMWARE_DATA, CONVERT_GPU_VA_TO_FW_VA, G17_ARM_FIRMWARE_ASC_META_ALLOC)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing final late-control symbols: {missing}")
+
+    _address, producer = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
+    require_instruction_words_at(
+        producer,
+        "G17 final late-control fields",
+        {
+            0x0380: 0xF94D5E61,  # firmware +0x1ab8
+            0x0394: 0xD2805B11,  # the address-conversion vtable slot
+            0x03A4: 0x52800002,
+            0x03B4: 0x5284D389,  # config +0x269c
+            0x03BC: 0xF9000100,
+            0x10F8: 0x52800034,  # w20 = 1
+            0x126C: 0xB926C114,  # -> config +0x26c0
+        },
+    )
+    # Nothing may reassign w20 between the literal and the store.
+    for offset, word in words(producer):
+        if not 0x10F8 < offset < 0x126C:
+            continue
+        for decoder in (decode_ldr_x, decode_ldr_w, decode_add_immediate, decode_movz_w):
+            decoded = decoder(word)
+            if decoded is not None and decoded[0] == 20:
+                raise ValueError(f"w20 is reassigned at {offset:#x} before the store")
+
+    # The converter is the identity, so the field is whatever the member holds.
+    converter = recover_vtable_target(
+        image, G17_FIRMWARE_VTABLE, FIRMWARE_ADDRESS_CONVERSION_VTABLE_SLOT
+    )
+    if converter != symbols[CONVERT_GPU_VA_TO_FW_VA]:
+        raise ValueError(f"unexpected firmware address converter {converter:#x}")
+    _address, convert = symbol_code(image, CONVERT_GPU_VA_TO_FW_VA)
+    if convert != struct.pack("<3I", 0xD503245F, 0xAA0103E0, 0xD65F03C0):
+        raise ValueError("firmware address converter is no longer the identity")
+
+    # And the member is only ever cleared.
+    _address, alloc = symbol_code(image, G17_ARM_FIRMWARE_ASC_META_ALLOC)
+    require_instruction_words_at(
+        alloc, "G17 converted member cleared", {0x940: 0xF90D5E7F}
+    )
+    writers = []
+    for item in load_commands(image):
+        if item.command != LC_SEGMENT_64:
+            continue
+        segment = parse_segment(image, item)
+        if segment.name != "__TEXT_EXEC":
+            continue
+        code = image[segment.file_offset : segment.file_offset + segment.file_size]
+        writers.extend(stores_covering_any(code, {0x1AB8}).get(0x1AB8, []))
+    if len(writers) != 1:
+        raise ValueError(
+            f"firmware +0x1ab8 has {len(writers)} writers; it may no longer be zero"
+        )
+
+    return {
+        "converted_field": {
+            "config": 0x269C,
+            "firmware_member": 0x1AB8,
+            "converter": CONVERT_GPU_VA_TO_FW_VA,
+            "identity": True,
+            "value": 0,
+        },
+        "literal_field": {"config": 0x26C0, "value": 1},
+    }
+
+
 def recover_g17_remaining_late_controls(image: bytes) -> dict[str, object]:
     """Settle the late-control fields that are neither zero nor register-fed.
 
@@ -7730,6 +7809,9 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
     fixed.update({0x25AC: 0, 0x26F8: 0, 0x26F9: 0})
     fixed[remaining["ones_run"]["offset"]] = remaining["ones_run"]["value"]
     fixed[0x25DC] = remaining["ones_run"]["value"]
+    final = recover_g17_final_late_controls(image)
+    fixed[final["converted_field"]["config"]] = final["converted_field"]["value"]
+    fixed[final["literal_field"]["config"]] = final["literal_field"]["value"]
     # +0x2570 is not a constant, but its producer and inputs are settled, so it
     # is emitted rather than outstanding. Track it separately from the fixed
     # values so the accounting still distinguishes the two.
@@ -7750,9 +7832,10 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         "core_mask_relay": core_mask,
         "cleared_accelerator_inputs": cleared,
         "remaining_late_controls": remaining,
+        "final_late_controls": final,
         "derived": derived_offsets,
         "runtime_dependent": undetermined,
-        "complete": False,
+        "complete": not undetermined,
     }
 
 
