@@ -2251,6 +2251,83 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "interrupt count"):
             recover_g17_abi.g17_callback_interrupt_index(3)
 
+    def _recover_g17_event_actions(
+        self,
+        *,
+        controller_code: bytes = struct.pack("<2I", 0xD503245F, 0xD65F03C0),
+        clpc_call_target: int = 0x110000,
+    ) -> dict[str, object]:
+        role_address = 0x100000
+        role = bytearray(0x180)
+        for offset, word in {
+            0x120: 0xB94053E8,
+            0x124: 0x35009B88,
+            0x138: 0xD2810F11,
+            0x13C: 0x8B110210,
+            0x140: 0xF9400208,
+            0x144: 0x910143E1,
+            0x148: 0xAA1303E0,
+            0x150: 0xD73F0910,
+            0x160: 0xB94053E8,
+            0x164: 0x7100391F,
+            0x16C: 0xF84543E1,
+            0x170: 0xF9414E68,
+            0x174: 0xF940A900,
+            0x178: bl(role_address + 0x178, clpc_call_target),
+        }.items():
+            struct.pack_into("<I", role, offset, word)
+        dispatch_offsets = [0] * 16
+        dispatch_offsets[0] = 0x0C
+        dispatch_offsets[14] = 0x4C
+        for event_type in (2, 3, 5, 11):
+            dispatch_offsets[event_type] = -0x54
+        controller_target = 0x120000
+        driver_symbols = {
+            recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT: controller_target
+        }
+        iogpu_symbols = {
+            recover_g17_abi.IOGPU_FENCE_NOTIFY_CLPC: 0x110000
+        }
+        with mock.patch.object(
+            recover_g17_abi,
+            "recover_vtable_target",
+            return_value=controller_target,
+        ), mock.patch.object(
+            recover_g17_abi,
+            "symbol_code",
+            return_value=(controller_target, controller_code),
+        ):
+            return recover_g17_abi.recover_g17_firmware_event_actions(
+                b"driver",
+                role_address,
+                bytes(role),
+                tuple(dispatch_offsets),
+                driver_symbols,
+                iogpu_symbols,
+            )
+
+    def test_classifies_g17_noop_and_advisory_events(self) -> None:
+        recovered = self._recover_g17_event_actions()
+        self.assertEqual(recovered["jump_table_host_noop_event_types"], [2, 3, 5, 11])
+        self.assertEqual(recovered["validator_rejected_noop_event_types"], [2, 3, 5])
+        self.assertEqual(recovered["direct_host_noop_event_types"], [11, 29])
+        self.assertEqual(recovered["host_noop_event_types"], [0, 11, 29])
+        self.assertEqual(recovered["resolved_host_noop_events"][0]["type"], 0)
+        self.assertEqual(recovered["resolved_host_noop_events"][0]["vtable_slot"], 0x878)
+        self.assertEqual(recovered["advisory_events"][0]["type"], 14)
+        self.assertEqual(
+            recovered["unimplemented_action_event_types"],
+            [4, 6, 7, 8, 9, 10, 12, 13, 15],
+        )
+
+    def test_rejects_non_noop_g17_controller_event_handler(self) -> None:
+        with self.assertRaisesRegex(ValueError, "no longer a no-op"):
+            self._recover_g17_event_actions(controller_code=bytes(8))
+
+    def test_rejects_wrong_g17_clpc_notification_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "CLPC notification target"):
+            self._recover_g17_event_actions(clpc_call_target=0x110004)
+
     def test_rejects_single_role_g17_boot_transport(self) -> None:
         notify = bytearray(0x134)
         receive = bytearray(0xF0)

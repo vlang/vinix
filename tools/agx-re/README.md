@@ -118,8 +118,9 @@ two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 separate GFX/GFX1 ASC and RTKit ownership, and the guarded dual-role root/ready
 handshake. The eight-entry t6050 interrupt topology now selects Apple's
 callback source 4, and Vinix can drain both validated 256-entry firmware event
-rings, preserve all five recovered host no-op event types, and translate the
-type-1 128-slot firing mask into fence-completion scans,
+rings, preserve all three effective host no-op event types, consume the optional
+type-14 CLPC observer notification, and translate the type-1 128-slot firing
+mask into fence-completion scans,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and
 runtime policy. The work-command ABI and userspace command producer still
@@ -154,8 +155,8 @@ per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
 channel ring geometry, the creating process ID and the app GPU role are all
 recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
-register emission graph into the work-command encoder and implementing
-the remaining callback error/control event types and work-command reclamation.
+register emission graph into the work-command encoder, implementing the nine
+remaining callback error/control event actions, and work-command reclamation.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
 eight masked flags, and the independently allocated `0xc40` base prefix; the

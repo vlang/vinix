@@ -892,9 +892,21 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 					|| fw.g17_firmware_completion_has_firing_stamps(&entry)
 				continue
 			}
-			// Types 2, 3, 5, 11, and 29 branch straight back to Apple's drain
-			// loop. Other accepted records need their individual response ABIs
-			// before Vinix may continue after them.
+			if entry.event_type == fw.g17_firmware_event_clpc_notification {
+				// Apple forwards this value only to optional IOGPU CLPC
+				// performance observers. Vinix has no corresponding observer
+				// layer, so consuming the validated advisory event is sufficient.
+				if !fw.validate_g17_firmware_clpc_notification(&entry) {
+					mgr.state = .error
+					return false
+				}
+				continue
+			}
+			// Accepted types 11 and 29 branch straight back to Apple's drain
+			// loop. Type 0 resolves through the selected G17 firmware vtable
+			// to an exact `bti c; ret` implementation. Jump-table slots 2,
+			// 3 and 5 are also no-ops, but the validator rejects them before
+			// dispatch. Other accepted records need their response ABIs.
 			if !fw.g17_firmware_event_is_host_noop(entry.event_type) {
 				C.printf(c'agx: unsupported G17 firmware event %u on role %d\n',
 					entry.event_type, role)

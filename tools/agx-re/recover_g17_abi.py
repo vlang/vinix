@@ -40,6 +40,9 @@ FIRMWARE_DRAIN_EVENT_RING = "__ZN11AGXFirmware22drainFirmwareEventRingEv"
 FIRMWARE_DRAIN_EVENT_RING_ROLE = (
     "__ZN11AGXFirmware22drainFirmwareEventRingE16AGFIFirmwareRole"
 )
+G17_HANDLE_FIRMWARE_CONTROLLER_EVENT = (
+    "__ZN14AGXArmFirmware29handleFirmwareControllerEventEPK26AGFIFirmwareEventRingEntry"
+)
 FIRMWARE_INIT = "__ZN11AGXFirmware4initEP14AGXAccelerator"
 FIRMWARE_RING_FETCH = (
     "__ZN24AGXFirmwareRingValidator14fetchNextEntryEP26AGFIFirmwareEventRingEntry"
@@ -47,6 +50,7 @@ FIRMWARE_RING_FETCH = (
 IOGPU_EVENT_SIGNAL_STAMP = "__ZN17IOGPUEventMachine11signalStampEij"
 IOGPU_EVENT_TEST_ALL_STAMPS = "__ZNK17IOGPUEventMachine13testAllStampsEv"
 IOGPU_FENCE_INTERRUPT_OCCURRED = "__ZN17IOGPUFenceMachine24iofenceInterruptOccurredEv"
+IOGPU_FENCE_NOTIFY_CLPC = "__ZN17IOGPUFenceMachine23notifyCLPCIOPerfControlEy"
 IOGPU_SIGNAL_STAMPS_UPDATED = "__ZN5IOGPU19signalStampsUpdatedEv"
 G17_CLEAR_FIRMWARE_INTERRUPTS = (
     "__ZN14AGXArmFirmware34clearOutstandingFirmwareInterruptsEv.4213"
@@ -14391,6 +14395,8 @@ def recover_g17_firmware_event_ring(
         FIRMWARE_DRAIN_EVENT_RING,
         FIRMWARE_DRAIN_EVENT_RING_ROLE,
         FIRMWARE_RING_FETCH,
+        G17_FIRMWARE_VTABLE,
+        G17_HANDLE_FIRMWARE_CONTROLLER_EVENT,
     )
     for name in required:
         if name not in symbols:
@@ -14399,6 +14405,7 @@ def recover_g17_firmware_event_ring(
         IOGPU_EVENT_SIGNAL_STAMP,
         IOGPU_EVENT_TEST_ALL_STAMPS,
         IOGPU_FENCE_INTERRUPT_OCCURRED,
+        IOGPU_FENCE_NOTIFY_CLPC,
         IOGPU_SIGNAL_STAMPS_UPDATED,
     ):
         if name not in iogpu_symbols:
@@ -14470,14 +14477,14 @@ def recover_g17_firmware_event_ring(
     table_address = table_page[1] + table_add[2]
     table_offset = virtual_to_file(driver, table_address)
     dispatch_offsets = struct.unpack_from("<16i", driver, table_offset)
-    dispatch_anchor = role_address + 0x110
-    drain_loop = role_address + 0xBC
-    host_noop_types = (2, 3, 5, 11)
-    if any(
-        dispatch_anchor + dispatch_offsets[event_type] != drain_loop
-        for event_type in host_noop_types
-    ):
-        raise ValueError("G17 firmware event host no-op dispatch changed")
+    event_actions = recover_g17_firmware_event_actions(
+        driver,
+        role_address,
+        role_code,
+        dispatch_offsets,
+        symbols,
+        iogpu_symbols,
+    )
     require_instruction_words_at(
         role_code,
         "G17 firmware completion event",
@@ -14556,9 +14563,7 @@ def recover_g17_firmware_event_ring(
         "entries": mask_count[1],
         "entries_bytes": 0x4800,
         "accepted_event_mask": mask_count[0],
-        # Accepted types above the 0..15 jump-table range also return directly
-        # to the drain loop. The pinned accepted mask has only type 29 there.
-        "host_noop_event_types": [*host_noop_types, 29],
+        **event_actions,
         "completion_event": {
             "type": 1,
             "firing_masks_offset": 4,
@@ -14571,6 +14576,126 @@ def recover_g17_firmware_event_ring(
             "tests_all_stamps_after_drain": True,
         },
         "read_index_publish_barrier": "dmb ish",
+    }
+
+
+def recover_g17_firmware_event_actions(
+    driver: bytes,
+    role_address: int,
+    role_code: bytes,
+    dispatch_offsets: tuple[int, ...],
+    driver_symbols: dict[str, int],
+    iogpu_symbols: dict[str, int],
+) -> dict[str, object]:
+    """Classify only event actions proven by the selected G17 host binaries."""
+
+    if len(dispatch_offsets) != 16:
+        raise ValueError("G17 firmware event dispatch table is not 16 entries")
+    dispatch_anchor = role_address + 0x110
+    drain_loop = role_address + 0xBC
+    direct_noop_types = (2, 3, 5, 11)
+    if any(
+        dispatch_anchor + dispatch_offsets[event_type] != drain_loop
+        for event_type in direct_noop_types
+    ):
+        raise ValueError("G17 firmware event direct host no-op dispatch changed")
+
+    # Type 0 does execute a virtual call, but the selected G17 firmware class
+    # resolves that call to a two-instruction no-op. Keep it separate from the
+    # jump-table no-ops so the generated accounting explains the distinction.
+    if dispatch_anchor + dispatch_offsets[0] != role_address + 0x11C:
+        raise ValueError("G17 firmware-controller event dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 firmware-controller event dispatch",
+        {
+            0x120: 0xB94053E8,  # event type at entry +0
+            0x124: 0x35009B88,  # type 0 required
+            0x138: 0xD2810F11,  # firmware vtable slot 0x878
+            0x13C: 0x8B110210,
+            0x140: 0xF9400208,
+            0x144: 0x910143E1,  # complete event entry at stack +0x50
+            0x148: 0xAA1303E0,
+            0x150: 0xD73F0910,
+        },
+    )
+    controller_target = recover_vtable_target(driver, G17_FIRMWARE_VTABLE, 0x878)
+    if controller_target != driver_symbols[G17_HANDLE_FIRMWARE_CONTROLLER_EVENT]:
+        raise ValueError("G17 firmware-controller event vtable target changed")
+    _controller_address, controller_code = symbol_code(
+        driver, G17_HANDLE_FIRMWARE_CONTROLLER_EVENT
+    )
+    if controller_code != struct.pack("<2I", 0xD503245F, 0xD65F03C0):
+        raise ValueError("G17 firmware-controller event handler is no longer a no-op")
+
+    # Type 14 only forwards its unaligned u64 payload to IOGPU's optional CLPC
+    # performance-control observers. Vinix has no CLPC policy/observer layer,
+    # so consuming this advisory record has no command or fence side effect.
+    if dispatch_anchor + dispatch_offsets[14] != role_address + 0x15C:
+        raise ValueError("G17 CLPC notification event dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 CLPC notification event",
+        {
+            0x160: 0xB94053E8,  # event type at entry +0
+            0x164: 0x7100391F,  # event type 14
+            0x16C: 0xF84543E1,  # unaligned u64 payload at entry +4
+            0x170: 0xF9414E68,  # firmware +0x298 -> accelerator
+            0x174: 0xF940A900,  # accelerator +0x150 -> fence machine
+        },
+    )
+    clpc_call = struct.unpack_from("<I", role_code, 0x178)[0]
+    if decode_bl_target(role_address + 0x178, clpc_call) != iogpu_symbols[
+        IOGPU_FENCE_NOTIFY_CLPC
+    ]:
+        raise ValueError("G17 CLPC notification target changed")
+
+    accepted_types = [
+        event_type
+        for event_type in range(32)
+        if 0x2000FFD3 & (1 << event_type)
+    ]
+    accepted_direct_noops = [
+        event_type for event_type in (*direct_noop_types, 29) if event_type in accepted_types
+    ]
+    rejected_noop_slots = [
+        event_type for event_type in direct_noop_types if event_type not in accepted_types
+    ]
+    effective_noops = [0, *accepted_direct_noops]
+    implemented = {*effective_noops, 1, 14}
+    return {
+        "jump_table_function_offsets": {
+            str(event_type): dispatch_anchor + offset - role_address
+            for event_type, offset in enumerate(dispatch_offsets)
+        },
+        "jump_table_host_noop_event_types": list(direct_noop_types),
+        # Types 2, 3 and 5 have no-op jump-table slots but cannot pass the
+        # selected validator mask. Type 11 can, and type 29 is accepted above
+        # the table range before returning directly to the drain loop.
+        "validator_rejected_noop_event_types": rejected_noop_slots,
+        "direct_host_noop_event_types": accepted_direct_noops,
+        "resolved_host_noop_events": [
+            {
+                "type": 0,
+                "dispatch": "firmware_vtable",
+                "vtable_slot": 0x878,
+                "target": G17_HANDLE_FIRMWARE_CONTROLLER_EVENT,
+                "implementation": "bti_c_ret",
+            }
+        ],
+        "host_noop_event_types": effective_noops,
+        "advisory_events": [
+            {
+                "type": 14,
+                "payload_offset": 4,
+                "payload_bytes": 8,
+                "host_action": "IOGPUFenceMachine::notifyCLPCIOPerfControl",
+                "vinix_policy": "consume_without_clpc_observers",
+            }
+        ],
+        "unimplemented_action_event_types": [
+            event_type for event_type in accepted_types if event_type not in implemented
+        ],
     }
 
 
