@@ -3217,6 +3217,127 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["state_count_source_offset"], 0x1B310)
         self.assertEqual(recovered["feature_bit"], 17)
 
+    def test_recovers_zero_g17_static_power_scale_table(self) -> None:
+        alloc_address = 0x100000
+        type_view_address = 0x200330
+        operator_new_address = 0x500000
+        kalloc_address = 0x501000
+        static_address = 0x600000
+
+        alloc = bytearray(0x9B0)
+        for offset, word in {
+            0x18: adrp(alloc_address + 0x18, type_view_address, 0),
+            0x1C: add_immediate(0, 0, 0x330),
+            0x20: movz_w(1, 0x2920),
+            0x24: bl(alloc_address + 0x24, operator_new_address),
+            0x28: 0xAA0003F3,
+        }.items():
+            struct.pack_into("<I", alloc, offset, word)
+
+        operator_new = bytearray(0x64)
+        for offset, word in {
+            0x14: 0xB9402C08,
+            0x18: 0x92405D08,
+            0x1C: 0xEB08003F,
+            0x20: 0x54000129,
+            0x44: 0x52800081,
+            0x48: bl(operator_new_address + 0x48, kalloc_address),
+        }.items():
+            struct.pack_into("<I", operator_new, offset, word)
+
+        sram = bytearray(0xC8)
+        for offset, word in {
+            0x0C: 0xB9400108,
+            0x1C: 0xF9400129,
+            0xB4: 0x8B0A0929,
+            0xB8: 0x91008129,
+            0xC4: 0xB800452A,
+        }.items():
+            struct.pack_into("<I", sram, offset, word)
+
+        leakage = bytearray(0x540)
+        for offset, word in {
+            0x2C0: 0xF942DABA,
+            0x2C4: 0x91394348,
+            0x2C8: 0x913A4349,
+            0x330: 0x913B4348,
+            0x334: 0x913C4349,
+            0x3FC: 0x913C8348,
+            0x400: 0x913CA349,
+        }.items():
+            struct.pack_into("<I", leakage, offset, word)
+
+        arm_power = bytearray(0x53C)
+        for offset, word in {
+            0x40C: 0x91041108,
+            0x410: 0x5283110C,
+            0x414: 0x8B0C016B,
+            0x418: 0x5280020C,
+            0x528: 0xBC404500,
+            0x52C: 0xBC004560,
+            0x534: 0xF100058C,
+            0x538: 0x54FFF721,
+        }.items():
+            struct.pack_into("<I", arm_power, offset, word)
+
+        driver_image_bytes = bytearray(0x40)
+        struct.pack_into("<I", driver_image_bytes, 0x2C, 0x2920)
+        driver_image = bytes(driver_image_bytes)
+        kernel_image = b"kernel"
+        driver_symbols = {
+            recover_g17_abi.G17_ARM_FIRMWARE_ASC_META_ALLOC: alloc_address,
+            recover_g17_abi.G17_POPULATE_SRAM_POWER_SCALE_DATA: 0x300000,
+            recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE_DATA: 0x301000,
+            recover_g17_abi.G17_POPULATE_STATIC_POWER_DATA: static_address,
+        }
+        kernel_symbols = {
+            recover_g17_abi.OS_OBJECT_TYPED_OPERATOR_NEW: operator_new_address,
+            recover_g17_abi.KALLOC_TYPE_IMPL: kalloc_address,
+        }
+        driver_code = {
+            recover_g17_abi.G17_ARM_FIRMWARE_ASC_META_ALLOC: bytes(alloc),
+            recover_g17_abi.G17_POPULATE_SRAM_POWER_SCALE_DATA: bytes(sram),
+            recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE_DATA: bytes(leakage),
+            recover_g17_abi.G17_POPULATE_STATIC_POWER_DATA: struct.pack(
+                "<2I", 0xD503245F, 0xD65F03C0
+            ),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                side_effect=lambda image: kernel_symbols
+                if image == kernel_image
+                else driver_symbols,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda image, name: (
+                    (kernel_symbols[name], bytes(operator_new))
+                    if image == kernel_image
+                    else (driver_symbols[name], driver_code[name])
+                ),
+            ),
+            mock.patch.object(
+                recover_g17_abi, "virtual_to_file", return_value=0
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=static_address,
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_static_power_scale_table(
+                driver_image, kernel_image, bytes(arm_power)
+            )
+
+        self.assertEqual(recovered["offset"], 0x1888)
+        self.assertEqual(recovered["values"], [0] * 16)
+        self.assertEqual(recovered["allocator_flag_name"], "Z_ZERO")
+        self.assertEqual(recovered["type_bytes"], 0x2920)
+        self.assertEqual(recovered["static_provider_vtable_slot"], 0xCE0)
+
     def test_recovers_g17_afr_relative_boost_frequency_table(self) -> None:
         afr_address = 0x200000
         afr_config = bytearray(0xE8)

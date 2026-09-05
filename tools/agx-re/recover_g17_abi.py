@@ -35,6 +35,9 @@ G17_ACCELERATOR_VTABLE = "__ZTV18AGXAcceleratorG17X"
 G17_POPULATE_INIT_SEQUENCE = "__ZN14AGXAccelerator28populateInitSequenceFirmwareEh.8148"
 G17_FW_BRN_SIZE = "__ZNK31AGX·PI_300·X·A0·Accelerator19getSizeOfFWBRNTableEv.8051"
 G17_FIRMWARE_VTABLE = "__ZTV17AGXArmFirmwareASC"
+G17_ARM_FIRMWARE_ASC_META_ALLOC = "__ZNK17AGXArmFirmwareASC9MetaClass5allocEv"
+OS_OBJECT_TYPED_OPERATOR_NEW = "_OSObject_typed_operator_new"
+KALLOC_TYPE_IMPL = "_kalloc_type_impl"
 CONVERT_GPU_VA_TO_FW_VA = "__ZNK14AGXArmFirmware18convertGPUVAToFWVAEyb"
 G17_LEGACY_SHARED_GART_VTABLE = "__ZTV35AGXLegacySharedGartTableBackingG17X"
 G17_LEGACY_GART_INIT_INFO = (
@@ -100,6 +103,7 @@ G17_PERF_STATE_MAP_VTABLE_SLOT = 0x1218
 G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT = 0xCC0
 G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT = 0xCB0
 G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT = 0xCF0
+G17_POPULATE_STATIC_POWER_VTABLE_SLOT = 0xCE0
 G17_NEW_SECURE_MONITOR_VTABLE_SLOT = 0xBE0
 G17_GET_GPTBAT_BASE_VTABLE_SLOT = 0x11D0
 SECURE_MONITOR_INIT_VTABLE_SLOT = 0x150
@@ -151,6 +155,9 @@ G17_POPULATE_SRAM_POWER_SCALE_DATA = (
 )
 G17_POPULATE_CHIP_LEAKAGE_DATA = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX23populateChipLeakageDataEj"
+)
+G17_POPULATE_STATIC_POWER_DATA = (
+    "__ZN14AGXAccelerator23populateStaticPowerDataEv.8120"
 )
 G17_TPU_CSC_COEFFICIENTS = (
     "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16tpu_coefficients"
@@ -5379,6 +5386,162 @@ def recover_g17_sram_power_scale_table(
     }
 
 
+def recover_g17_static_power_scale_table(
+    image: bytes, kernel_image: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Prove that G17 leaves the static power-scale row at +0x1888 zero."""
+
+    symbols = macho_symbols(image)
+    kernel_symbols = macho_symbols(kernel_image)
+    required = (
+        G17_ARM_FIRMWARE_ASC_META_ALLOC,
+        G17_POPULATE_SRAM_POWER_SCALE_DATA,
+        G17_POPULATE_CHIP_LEAKAGE_DATA,
+        G17_POPULATE_STATIC_POWER_DATA,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    kernel_required = (OS_OBJECT_TYPED_OPERATOR_NEW, KALLOC_TYPE_IMPL)
+    kernel_missing = [name for name in kernel_required if name not in kernel_symbols]
+    if kernel_missing:
+        raise ValueError(f"kernel Mach-O has no {kernel_missing[0]} symbol")
+
+    # The ASC OSObject has a 0x2920-byte typed-allocation view. Its MetaClass
+    # alloc routine requests exactly that size from OSObject's typed operator
+    # new, so the normal fixed-type branch is necessarily selected.
+    alloc_address, alloc_code = symbol_code(image, G17_ARM_FIRMWARE_ASC_META_ALLOC)
+    if len(alloc_code) != 0x9B0:
+        raise ValueError(f"unexpected G17 ASC allocator size {len(alloc_code):#x}")
+    require_instruction_words_at(
+        alloc_code,
+        "G17 ASC typed allocation",
+        {
+            0x1C: 0x910CC000,
+            0x20: 0x52852401,
+            0x28: 0xAA0003F3,
+        },
+    )
+    adrp = decode_adrp(
+        alloc_address + 0x18, struct.unpack_from("<I", alloc_code, 0x18)[0]
+    )
+    addition = decode_add_immediate(struct.unpack_from("<I", alloc_code, 0x1C)[0])
+    if adrp is None or addition is None:
+        raise ValueError("malformed G17 ASC typed-allocation view reference")
+    page_register, page = adrp
+    destination, source, immediate = addition
+    if (page_register, destination, source) != (0, 0, 0):
+        raise ValueError("G17 ASC typed-allocation view no longer uses x0")
+    type_view_address = page + immediate
+    type_view_offset = virtual_to_file(image, type_view_address)
+    type_size = struct.unpack_from("<I", image, type_view_offset + 0x2C)[0] & 0xFFFFFF
+    if type_size != 0x2920:
+        raise ValueError(f"unexpected G17 ASC typed-allocation size {type_size:#x}")
+    alloc_call = decode_bl_target(
+        alloc_address + 0x24, struct.unpack_from("<I", alloc_code, 0x24)[0]
+    )
+    if alloc_call != kernel_symbols[OS_OBJECT_TYPED_OPERATOR_NEW]:
+        raise ValueError("G17 ASC allocator does not call OSObject typed operator new")
+
+    # This live kernel's operator-new fixed-type branch passes literal flag 4
+    # to kalloc_type_impl. XNU defines flag 4 as Z_ZERO, establishing the
+    # initial value of every byte not subsequently written by the constructor.
+    new_address, new_code = symbol_code(kernel_image, OS_OBJECT_TYPED_OPERATOR_NEW)
+    if len(new_code) != 0x64:
+        raise ValueError(f"unexpected OSObject typed operator-new size {len(new_code):#x}")
+    require_instruction_words_at(
+        new_code,
+        "OSObject zeroed typed allocation",
+        {
+            0x14: 0xB9402C08,
+            0x18: 0x92405D08,
+            0x1C: 0xEB08003F,
+            0x20: 0x54000129,
+            0x44: 0x52800081,
+        },
+    )
+    kalloc_call = decode_bl_target(
+        new_address + 0x48, struct.unpack_from("<I", new_code, 0x48)[0]
+    )
+    if kalloc_call != kernel_symbols[KALLOC_TYPE_IMPL]:
+        raise ValueError("OSObject typed operator new has an unexpected allocator target")
+
+    # The only G17 writer before the copied row is the checked SRAM producer.
+    # With the driver's 16-state capacity its +0x20 row ends at +0x60, exactly
+    # where the untouched static row begins. The leakage writer starts at
+    # firmware-object +0xe50, well after the source at +0xd50.
+    _sram_address, sram_code = symbol_code(
+        image, G17_POPULATE_SRAM_POWER_SCALE_DATA
+    )
+    require_instruction_words_at(
+        sram_code,
+        "G17 SRAM/static power row boundary",
+        {
+            0x0C: 0xB9400108,
+            0x1C: 0xF9400129,
+            0xB4: 0x8B0A0929,
+            0xB8: 0x91008129,
+            0xC4: 0xB800452A,
+        },
+    )
+    _leakage_address, leakage_code = symbol_code(
+        image, G17_POPULATE_CHIP_LEAKAGE_DATA
+    )
+    if len(leakage_code) != 0x540:
+        raise ValueError(f"unexpected G17 chip-leakage producer size {len(leakage_code):#x}")
+    require_instruction_words_at(
+        leakage_code,
+        "G17 leakage-data destination ranges",
+        {
+            0x2C0: 0xF942DABA,
+            0x2C4: 0x91394348,
+            0x2C8: 0x913A4349,
+            0x330: 0x913B4348,
+            0x334: 0x913C4349,
+            0x3FC: 0x913C8348,
+            0x400: 0x913CA349,
+        },
+    )
+    static_target = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_POPULATE_STATIC_POWER_VTABLE_SLOT
+    )
+    if static_target != symbols[G17_POPULATE_STATIC_POWER_DATA]:
+        raise ValueError(f"unexpected G17 static-power provider {static_target:#x}")
+    _static_address, static_code = symbol_code(image, G17_POPULATE_STATIC_POWER_DATA)
+    if static_code != struct.pack("<2I", 0xD503245F, 0xD65F03C0):
+        raise ValueError("G17 static-power provider is not a no-op")
+
+    require_instruction_words_at(
+        arm_power_code,
+        "G17 zero static power-scale firmware copy",
+        {
+            0x40C: 0x91041108,
+            0x410: 0x5283110C,
+            0x414: 0x8B0C016B,
+            0x418: 0x5280020C,
+            0x528: 0xBC404500,
+            0x52C: 0xBC004560,
+            0x534: 0xF100058C,
+            0x538: 0x54FFF721,
+        },
+    )
+
+    return {
+        "offset": 0x1888,
+        "entries": 16,
+        "values": [0] * 16,
+        "accelerator_config_offset": 0xD50,
+        "runtime_source_offset": 0x104,
+        "allocator": OS_OBJECT_TYPED_OPERATOR_NEW,
+        "allocator_flag": 4,
+        "allocator_flag_name": "Z_ZERO",
+        "type_view_address": type_view_address,
+        "type_bytes": type_size,
+        "static_provider_vtable_slot": G17_POPULATE_STATIC_POWER_VTABLE_SLOT,
+        "static_provider": G17_POPULATE_STATIC_POWER_DATA,
+    }
+
+
 def recover_g17_afr_relative_boost_frequency_table(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -6422,11 +6585,15 @@ def main() -> int:
         "--driver", type=Path, default=Path("build/kext/g17c/AGXG17X.macho")
     )
     parser.add_argument(
+        "--kernel", type=Path, default=Path("build/kext/g17c/kernel.macho")
+    )
+    parser.add_argument(
         "--firmware", type=Path, default=Path("build/firmware/g17c/armfw.bin")
     )
     args = parser.parse_args()
     try:
         driver = args.driver.read_bytes()
+        kernel = args.kernel.read_bytes()
         firmware = args.firmware.read_bytes()
         driver_uuid = macho_uuid(driver)
         firmware_uuid = macho_uuid(firmware)
@@ -6618,6 +6785,9 @@ def main() -> int:
             recover_g17_sram_power_scale_table(
                 driver, base_power_code, power_code
             )
+        )
+        hardware_config["static_power_scale_table"] = (
+            recover_g17_static_power_scale_table(driver, kernel, power_code)
         )
         hardware_config["afr_relative_boost_frequency_table"] = (
             recover_g17_afr_relative_boost_frequency_table(driver, power_code)

@@ -32,6 +32,7 @@ LC_FILESET_ENTRY = 0x80000035
 COMPRESSION_LZFSE = 0x801
 DEFAULT_PREBOOT = Path("/System/Volumes/Preboot")
 DEFAULT_ENTRIES = (
+    "com.apple.kernel",
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",
@@ -250,8 +251,14 @@ def extract_entry(collection: bytes, entry_offset: int) -> bytes:
                 item.size for item in header_commands if item.offset == new.command_offset
             ):
                 raise ValueError(f"segment {new.name} has truncated section commands")
+            section_size = struct.unpack_from("<Q", header, section + 40)[0]
             old_section_offset = struct.unpack_from("<I", header, section + 48)[0]
-            if old.file_offset <= old_section_offset < old.file_offset + old.file_size:
+            if section_size == 0:
+                # Fileset collections may retain a collection-relative offset
+                # on empty marker sections. Standalone Mach-O readers still
+                # validate that field even though the section has no bytes.
+                struct.pack_into("<I", header, section + 48, 0)
+            elif old.file_offset <= old_section_offset < old.file_offset + old.file_size:
                 struct.pack_into(
                     "<I",
                     header,

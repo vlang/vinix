@@ -857,7 +857,7 @@ pub mut:
 	sram_voltage_table_1408        [g17_performance_state_capacity]G17VoltageTableRow
 	secondary_frequency_table_1808 [g17_performance_state_capacity]u32
 	sram_power_scale_1848          [g17_performance_state_capacity]u32
-	firmware_table_1888            [g17_performance_state_capacity]u32
+	static_power_scale_1888        [g17_performance_state_capacity]u32
 	firmware_table_18c8            [g17_performance_state_capacity]u32
 	relative_boost_frequency_1908  [g17_performance_state_capacity]u32
 	firmware_table_1948            [g17_performance_state_capacity]u32

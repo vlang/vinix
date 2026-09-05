@@ -56,7 +56,8 @@ It can also select a shared allocation by an observed JSON field:
 Objective-C runtime. `extract_firmware.py` extracts only the matching G17C
 images from the local recovery volume and emits their hashes, Mach-O UUIDs,
 and virtual layouts. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
-kernel collection and compacts the AGXG17X and firmware-buddy fileset entries
+kernel collection and compacts the kernel, AGXG17X, and firmware-buddy fileset
+entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
@@ -67,9 +68,9 @@ color-matrix banks, border-color-table stub, and fixed scalar defaults, the
 G17C PIO relative-offset table and its 12 primary-aperture
 firmware records, their physical alignment and GART-10 UAT publication path,
 the primary and SRAM frequency-table sources and conversion and the relative
-boost-frequency transfer table, the per-state SRAM power-scale row, the fixed
-two-bank performance-state map, the native CS/AFR auxiliary performance-state
-parser and firmware blocks,
+boost-frequency transfer table, the per-state SRAM power-scale row and zeroed
+G17 static-power row, the fixed two-bank performance-state map, the native
+CS/AFR auxiliary performance-state parser and firmware blocks,
 exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,
 the mapped bootstrap register region and its G17 no-op producer, both

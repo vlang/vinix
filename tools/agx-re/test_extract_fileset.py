@@ -71,7 +71,13 @@ def fake_collection() -> tuple[bytes, int]:
     sym_offset = link_offset + 0x100
     str_offset = link_offset + 0x200
     entry_commands = [
-        segment_command("__TEXT", 0x100000, entry_offset, text_size, [("__const", entry_offset + 0x400, 0x20)]),
+        segment_command(
+            "__TEXT",
+            0x100000,
+            entry_offset,
+            text_size,
+            [("__const", entry_offset + 0x400, 0x20), ("__empty", 0x5400000, 0)],
+        ),
         segment_command("__TEXT_EXEC", 0x200000, code_offset, code_size, [("__text", code_offset, 0x100)]),
         segment_command("__LINKEDIT", 0x300000, link_offset, link_size, []),
         struct.pack("<IIIIII", extract_fileset.LC_SYMTAB, 24, sym_offset, 1, str_offset, 16),
@@ -138,6 +144,10 @@ class ExtractFilesetTests(unittest.TestCase):
         del text_command
         section_offset = struct.unpack_from("<I", image, segments[0].command_offset + 72 + 48)[0]
         self.assertEqual(section_offset, 0x400)
+        empty_section_offset = struct.unpack_from(
+            "<I", image, segments[0].command_offset + 72 + 80 + 48
+        )[0]
+        self.assertEqual(empty_section_offset, 0)
         symbol_command = next(item for item in commands if item.command == extract_fileset.LC_SYMTAB)
         symbol_offset, count, string_offset, string_size = struct.unpack_from(
             "<IIII", image, symbol_command.offset + 8
