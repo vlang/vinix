@@ -20,14 +20,16 @@ pub fn bts[T](mut var T, bit u8) bool {
 }
 
 pub fn btr[T](mut var T, bit u8) bool {
+	// LDCLR atomically computes *var = *var & ~operand, so the operand must
+	// be the bit(s) to clear (mask), NOT its complement. Passing ~mask would
+	// clear every OTHER bit and leave the target bit set.
 	mask := unsafe { T(1) << bit }
-	nmask := ~mask
 	mut old := unsafe { T(0) }
 	unsafe {
 		asm volatile aarch64 {
-			ldclr nmask, old, [var]
+			ldclr mask, old, [var]
 			; =r (old)
-			; r (nmask)
+			; r (mask)
 			  r (var)
 			; memory
 		}
@@ -49,6 +51,24 @@ pub fn cas[T](mut here T, _ifthis T, writethis T) bool {
 	// Compare raw bytes, NOT V's == operator. V's == on pointer types
 	// (e.g. &Process) dereferences and compares struct contents, which
 	// crashes when the pointers are nil.
+	return unsafe { C.memcmp(voidptr(&ifthis), voidptr(&_ifthis), sizeof(T)) == 0 }
+}
+
+// cas_acquire is a compare-and-swap with acquire ordering on success (CASA).
+// Lock acquisition must use this so that memory accesses inside the critical
+// section cannot be reordered before the lock is taken. A plain relaxed CAS
+// plus a compiler "memory" clobber does NOT provide CPU acquire ordering.
+pub fn cas_acquire[T](mut here T, _ifthis T, writethis T) bool {
+	mut ifthis := _ifthis
+	unsafe {
+		asm volatile aarch64 {
+			casa ifthis, writethis, [here]
+			; +r (ifthis)
+			; r (writethis)
+			  r (here)
+			; memory
+		}
+	}
 	return unsafe { C.memcmp(voidptr(&ifthis), voidptr(&_ifthis), sizeof(T)) == 0 }
 }
 

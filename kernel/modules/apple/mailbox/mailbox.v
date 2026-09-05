@@ -8,6 +8,7 @@ module mailbox
 import aarch64.kio
 import aarch64.cpu
 import klock
+import memory
 
 // Mailbox registers (offsets from base)
 const mbox_a2i_send0 = u32(0x800) // AP -> IOP data low
@@ -37,7 +38,8 @@ pub mut:
 
 pub fn new_mailbox(base u64) Mailbox {
 	return Mailbox{
-		base: base + higher_half
+		// Map the ASC mailbox aperture as Device memory (registers up to 0xc14).
+		base: memory.map_mmio(base, 0x1000)
 	}
 }
 

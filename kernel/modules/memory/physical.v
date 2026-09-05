@@ -75,8 +75,11 @@ pub fn pmm_init() {
 		}
 
 		// Calculate the needed size for the bitmap in bytes and align it to page size.
+		// Use ceiling division for the byte count: a page count that is not a
+		// multiple of 8 still needs a full trailing byte, and flooring here can
+		// under-size the bitmap by a page after alignment (e.g. 32769 pages).
 		pmm_avl_page_count = lib.div_roundup(highest_address, page_size)
-		bitmap_size := lib.align_up(pmm_avl_page_count / 8, page_size)
+		bitmap_size := lib.align_up(lib.div_roundup(pmm_avl_page_count, 8), page_size)
 
 		C.printf(c'pmm: Bitmap size: %llu\n', bitmap_size)
 
@@ -181,6 +184,47 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 
 pub fn pmm_alloc(count u64) voidptr {
 	ret := pmm_alloc_nozero(count)
+
+	// We always zero out memory for security reasons
+	unsafe {
+		mut ptr := &u64(u64(ret) + higher_half)
+		for i := u64(0); i < (count * page_size) / 8; i++ {
+			ptr[i] = 0
+		}
+	}
+	return ret
+}
+
+// Fallible allocator variants for callers that can recover from exhaustion
+// (e.g. user-controlled GEM/driver allocations). Unlike pmm_alloc these return
+// nil on out-of-memory instead of panicking, so resource pressure cannot be
+// turned into a kernel panic by a userspace request.
+pub fn pmm_alloc_nozero_fallible(count u64) voidptr {
+	pmm_lock.acquire()
+	defer {
+		pmm_lock.release()
+	}
+
+	last := pmm_last_used_index
+	mut ret := inner_alloc(count, pmm_avl_page_count)
+
+	if ret == 0 {
+		pmm_last_used_index = 0
+		ret = inner_alloc(count, last)
+		if ret == 0 {
+			return unsafe { nil }
+		}
+	}
+
+	free_pages -= count
+	return ret
+}
+
+pub fn pmm_alloc_fallible(count u64) voidptr {
+	ret := pmm_alloc_nozero_fallible(count)
+	if ret == unsafe { nil } {
+		return unsafe { nil }
+	}
 
 	// We always zero out memory for security reasons
 	unsafe {

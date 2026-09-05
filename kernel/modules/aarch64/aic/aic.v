@@ -1,13 +1,17 @@
 @[has_globals]
 module aic
 
-// Apple Interrupt Controller v2 (AICv2)
+// Apple Interrupt Controller v1 (AICv1)
 // MMIO base typically at 0x23B100000 (from device tree)
-// Handles IRQ routing on Apple Silicon
+// Handles IRQ routing on Apple Silicon (t8103 / base M1).
+//
+// NOTE: AICv2 (M1 Pro/Max and later) uses a different register layout whose
+// offsets are computed from AIC_INFO; that variant needs a separate backend.
 
 import aarch64.kio
 import aarch64.exception
 import klock
+import memory
 
 // AIC registers (offsets from base)
 const aic_info = u32(0x0004)
@@ -19,11 +23,13 @@ const aic_ipi_mask_set = u32(0x2024)
 const aic_ipi_mask_clr = u32(0x2028)
 const aic_hw_state = u32(0x3000) // base for per-irq state
 
-// Per-IRQ register offsets (indexed by IRQ number)
-const aic_mask_set = u32(0x4000)  // base for mask set registers (32 IRQs per reg)
-const aic_mask_clr = u32(0x4080)  // base for mask clear registers
-const aic_sw_set = u32(0x4100)
-const aic_sw_clr = u32(0x4180)
+// Per-IRQ register offsets (indexed by IRQ number, 32 IRQs per 32-bit reg).
+// AICv1 layout (matches Linux irq-apple-aic.c):
+//   SW set/clear at 0x4000/0x4080, mask set/clear at 0x4100/0x4180.
+const aic_sw_set = u32(0x4000)
+const aic_sw_clr = u32(0x4080)
+const aic_mask_set = u32(0x4100)
+const aic_mask_clr = u32(0x4180)
 
 // Event types from AIC_EVENT register
 const aic_event_type_hw = u32(1)
@@ -41,6 +47,7 @@ __global (
 	aic_lock       klock.Lock
 	aic_hw_handler fn (u32, voidptr)
 	aic_ipi_handler fn ()
+	aic_fiq_handler fn (voidptr)
 )
 
 fn aic_read(offset u32) u32 {
@@ -52,7 +59,9 @@ fn aic_write(offset u32, value u32) {
 }
 
 pub fn initialise(base u64) {
-	aic_base = base + higher_half
+	// Map the AIC register aperture as Device memory (it lives far above the
+	// 4 GiB HHDM window, so plain `base + higher_half` is not valid).
+	aic_base = memory.map_mmio(base, 0x8000)
 
 	info := aic_read(aic_info)
 	aic_nr_irqs = info & 0xffff
@@ -77,6 +86,13 @@ pub fn initialise(base u64) {
 }
 
 fn aic_dispatch(gpr_state voidptr) {
+	// The Apple architectural timer is delivered as an FIQ handled directly by
+	// the CPU, not as an AIC event. Give the FIQ handler first look on every
+	// entry; it self-gates on the timer's pending status.
+	if aic_fiq_handler != unsafe { nil } {
+		aic_fiq_handler(gpr_state)
+	}
+
 	for {
 		evt := aic_read(aic_event)
 		evt_type := (evt >> 16) & 0xff
@@ -87,6 +103,9 @@ fn aic_dispatch(gpr_state voidptr) {
 				if aic_hw_handler != unsafe { nil } {
 					aic_hw_handler(irq, gpr_state)
 				}
+				// Reading AIC_EVENT auto-masks the delivered hardware IRQ; the
+				// EOI/unmask lifecycle must re-enable it so it can fire again.
+				unmask_irq(irq)
 			}
 			aic_event_type_ipi {
 				// Clear IPI
@@ -111,6 +130,13 @@ pub fn register_hw_handler(handler fn (u32, voidptr)) {
 // Register a handler for IPI (inter-processor interrupt) events.
 pub fn register_ipi_handler(handler fn ()) {
 	aic_ipi_handler = handler
+}
+
+// Register a handler invoked at the top of every interrupt dispatch, before
+// AIC events are read. Used for FIQ-delivered sources such as the Apple
+// architectural timer, which never appear as AIC events.
+pub fn register_fiq_handler(handler fn (voidptr)) {
+	aic_fiq_handler = handler
 }
 
 pub fn mask_irq(irq u32) {

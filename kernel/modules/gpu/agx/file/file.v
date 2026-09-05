@@ -241,6 +241,22 @@ pub fn (f &GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 		return -22 // EINVAL
 	}
 
+	// Validate the request using subtraction (never wrapping addition):
+	//   * a zero-length range is meaningless;
+	//   * [offset, offset+range) must lie entirely within the object, so the
+	//     mapping cannot reach past the GEM object into unrelated physical
+	//     memory;
+	//   * [addr, addr+range) must not wrap the GPU virtual address space.
+	if bind.range == 0 {
+		return -22 // EINVAL
+	}
+	if bind.offset > obj.size || bind.range > obj.size - bind.offset {
+		return -22 // EINVAL
+	}
+	if bind.range > u64(-1) - bind.addr {
+		return -22 // EINVAL
+	}
+
 	// Map the GEM object's physical pages into the VM at the requested address
 	mut pt := unsafe { ctx.pgtable }
 	if !pt.map(bind.addr, obj.phys_addr + bind.offset, bind.range, 0x43) {

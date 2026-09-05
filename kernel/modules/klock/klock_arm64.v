@@ -31,19 +31,26 @@ pub fn (mut l Lock) acquire() {
 }
 
 pub fn (mut l Lock) release() {
+	// Snapshot the saved interrupt state BEFORE publishing the unlocked
+	// state. Once l.l is cleared another CPU can acquire the lock and
+	// overwrite l.ints, so reading it afterwards would restore the wrong
+	// interrupt flags.
+	ints := l.ints
 	katomic.store(mut &l.l, u64(0))
 	// Send event to wake up any WFE-spinning CPUs
 	asm volatile aarch64 {
 		sev
 		; ; ; memory
 	}
-	cpu.interrupt_toggle(l.ints)
+	cpu.interrupt_toggle(ints)
 }
 
 pub fn (mut l Lock) test_and_acquire() bool {
 	ints := cpu.interrupt_toggle(false)
 
-	ret := katomic.cas(mut &l.l, u64(0), u64(1))
+	// Acquire ordering on the successful swap (CASA) so the critical section
+	// cannot observe stale memory from before the lock was held.
+	ret := katomic.cas_acquire(mut &l.l, u64(0), u64(1))
 	if ret == true {
 		l.ints = ints
 	} else {

@@ -117,60 +117,81 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 	return ret
 }
 
+// Returns true if every one of the 512 descriptors in a page-table page
+// (addressed through its higher-half virtual pointer) is empty.
+fn arm64_table_empty(table_p &u64) bool {
+	for i := u64(0); i < 512; i++ {
+		if unsafe { table_p[i] } != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
+	// Serialize against map_page/other unmaps on this pagemap.
+	pagemap.l.acquire()
+	defer {
+		pagemap.l.release()
+	}
+
 	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	l2_entry := (virt & (u64(0x1ff) << 21)) >> 21
 	l3_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
-	mut l0 := pagemap.top_level
-	mut l1 := get_next_level(l0, l0_entry, false) or { return none }
-	mut l1_p := unsafe { &u64(u64(l1) + higher_half) }
-	mut l2 := get_next_level(l1, l1_entry, false) or { return none }
-	mut l2_p := unsafe { &u64(u64(l2) + higher_half) }
-	mut l3 := get_next_level(l2, l2_entry, false) or { return none }
-	mut l3_p := unsafe { &u64(u64(l3) + higher_half) }
+	// l0..l3 are physical table addresses; l0_p..l3_p are the higher-half
+	// virtual pointers used to read/write descriptors.
+	l0 := pagemap.top_level
+	l1 := get_next_level(l0, l0_entry, false) or { return none }
+	l2 := get_next_level(l1, l1_entry, false) or { return none }
+	l3 := get_next_level(l2, l2_entry, false) or { return none }
 
-	mut pte_p := unsafe { &u64(u64(&l3[l3_entry]) + higher_half) }
+	l0_p := unsafe { &u64(u64(l0) + higher_half) }
+	l1_p := unsafe { &u64(u64(l1) + higher_half) }
+	l2_p := unsafe { &u64(u64(l2) + higher_half) }
+	l3_p := unsafe { &u64(u64(l3) + higher_half) }
 
+	// Clear the leaf entry and flush its translation first.
 	unsafe {
-		*pte_p = 0
+		l3_p[l3_entry] = 0
+	}
+	cpu.tlbi_vaae1(virt >> 12)
+	cpu.dsb_sy()
 
-		mut i := u64(0)
-		for ; i < 512; i++ {
-			if l3_p[i] != 0 {
-				break
-			}
-		}
-		if i == 512 {
-			pmm_free(l3, 1)
+	// Reclaim now-empty tables from the leaf upward. At every level the parent
+	// descriptor is unlinked (and the write made visible with a barrier) BEFORE
+	// the child table's memory is returned to the PMM, so no live descriptor can
+	// ever point at freed/reused memory. The L0 root table is never freed, but
+	// its entry into the empty L1 MUST be cleared.
+	if arm64_table_empty(l3_p) {
+		unsafe {
 			l2_p[l2_entry] = 0
 		}
+		cpu.dsb_sy()
+		pmm_free(l3, 1)
 
-		i = u64(0)
-		for ; i < 512; i++ {
-			if l2_p[i] != 0 {
-				break
+		if arm64_table_empty(l2_p) {
+			unsafe {
+				l1_p[l1_entry] = 0
 			}
-		}
-		if i == 512 {
+			cpu.dsb_sy()
 			pmm_free(l2, 1)
-			l1_p[l1_entry] = 0
-		}
 
-		i = u64(0)
-		for ; i < 512; i++ {
-			if l1_p[i] != 0 {
-				break
+			if arm64_table_empty(l1_p) {
+				unsafe {
+					l0_p[l0_entry] = 0
+				}
+				cpu.dsb_sy()
+				pmm_free(l1, 1)
 			}
-		}
-		if i == 512 {
-			pmm_free(l1, 1)
-			// Don't free L0 (root table)
 		}
 	}
 
-	cpu.tlbi_vaae1(virt >> 12)
+	// Drop any TLB caching of the intermediate walks we just tore down.
+	cpu.tlbi_vmalle1()
+	cpu.dsb_sy()
+	cpu.isb()
 }
 
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
@@ -207,6 +228,26 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	}
 	// Invalidate any stale TLB entry for this virtual address.
 	cpu.tlbi_vaae1(virt >> 12)
+}
+
+// map_mmio maps a physical device (MMIO) aperture into the higher-half direct
+// map with Device-nGnRnE attributes and returns its virtual address. This must
+// be used by every device driver instead of assuming `phys + higher_half` is
+// already valid: vmm_init only pre-maps the first 4 GiB as Device memory, so
+// Apple register apertures (AIC/ASC/DART/PMGR, all far above 4 GiB) are either
+// unmapped or, if they happen to fall inside a RAM memmap entry, mapped Normal
+// cacheable — the wrong memory type for registers.
+pub fn map_mmio(phys u64, len u64) u64 {
+	page_base := lib.align_down(phys, page_size)
+	page_top := lib.align_up(phys + len, page_size)
+	for pg := page_base; pg < page_top; pg += page_size {
+		kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | pte_device) or {
+			panic('map_mmio: failed to map device aperture')
+		}
+	}
+	cpu.dsb_sy()
+	cpu.isb()
+	return phys + higher_half
 }
 
 @[_linker_section: '.requests']

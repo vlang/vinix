@@ -32,8 +32,9 @@ pub mut:
 	lock   klock.Lock
 }
 
+const syncobj_max_handles = u32(1024)
+
 __global (
-	syncobj_counter = u32(1)
 	syncobj_table   [1024]&SyncObj
 	syncobj_lock    klock.Lock
 )
@@ -154,11 +155,18 @@ pub fn new_syncobj() ?&SyncObj {
 		syncobj_lock.release()
 	}
 
-	handle := syncobj_counter
-	syncobj_counter++
-
-	if handle >= 1024 {
-		return none
+	// Recycle freed handles by scanning for an empty slot instead of consuming
+	// a monotonic counter that never resets (which exhausted the table after
+	// 1023 creations regardless of how many were destroyed).
+	mut handle := u32(0)
+	for i := u32(1); i < syncobj_max_handles; i++ {
+		if syncobj_table[i] == unsafe { nil } {
+			handle = i
+			break
+		}
+	}
+	if handle == 0 {
+		return none // table exhausted
 	}
 
 	mut obj := &SyncObj{
@@ -171,7 +179,7 @@ pub fn new_syncobj() ?&SyncObj {
 
 // Look up a sync object by handle.
 pub fn lookup(handle u32) ?&SyncObj {
-	if handle == 0 || handle >= 1024 {
+	if handle == 0 || handle >= syncobj_max_handles {
 		return none
 	}
 
@@ -188,7 +196,7 @@ pub fn lookup(handle u32) ?&SyncObj {
 // Destroy a sync object, removing it from the global table.
 pub fn destroy(handle u32) {
 	syncobj_lock.acquire()
-	if handle > 0 && handle < 1024 {
+	if handle > 0 && handle < syncobj_max_handles {
 		syncobj_table[handle] = unsafe { nil }
 	}
 	syncobj_lock.release()

@@ -337,12 +337,20 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	return true
 }
 
-// Ring the firmware doorbell to trigger processing
-pub fn (mut mgr GpuManager) kick_firmware() {
-	mgr.send_fw_msg(msg_tx_doorbell, 0)
+// Ring the firmware doorbell for a specific channel to trigger processing.
+// Doorbells are delivered on the dedicated doorbell endpoint (0x21) and carry
+// the channel id; they are NOT the firmware-control endpoint (0x20) used for
+// INIT/FWCTL. Ring state must already be published before this is called.
+pub fn (mut mgr GpuManager) send_doorbell(channel_id u32) bool {
+	return mgr.rtk.send_msg(u8(ep_doorbell), msg_tx_doorbell, u64(channel_id))
 }
 
-// Send a firmware message via RTKit
+// Ring the doorbell for the default device-control channel.
+pub fn (mut mgr GpuManager) kick_firmware() {
+	mgr.send_doorbell(0)
+}
+
+// Send a firmware-control message via RTKit on the firmware endpoint (0x20).
 pub fn (mut mgr GpuManager) send_fw_msg(msg_type u8, data u64) bool {
 	return mgr.rtk.send_msg(u8(ep_firmware), msg_type, data)
 }
