@@ -143,7 +143,12 @@ writes the image address with lock bit 0, while the wrapper CPU run path uses
 the 32-bit register at `reg[0]+0x44`. T6050 lacks `cpu-ctrl-filtered`, so the
 base start path permits the concrete run/stop writes. This is a register
 contract, not proof that PMP firmware reached RTKit or dashboard readiness;
-wrapper `reg[2]` remains unlabeled.
+wrapper `reg[2]` remains unlabeled. Vinix now has a dormant per-die transport
+for these proven resources: it maps only wrapper registers 0 and 1, verifies
+the IORVBAR lock after the 64-bit write, and preserves Apple's two-access stop
+sequence. Probe does not construct it until the firmware and RTBuddy owner is
+complete.
+
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published

@@ -1,10 +1,12 @@
 module power
 
-// Native Apple DeviceTree validation and dormant ApplePTD transport for the
-// T6050 GPU power path. Actual PMP transitions remain disabled until PMP
-// service integration and the firmware handoff are implemented.
+// Native Apple DeviceTree validation plus dormant wrapper and ApplePTD
+// transports for the T6050 GPU power path. Actual PMP transitions remain
+// disabled until PMP service integration and the firmware handoff are
+// implemented.
 
 import devicetree
+import aarch64.kio
 import aarch64.timer
 import klock
 import memory
@@ -32,6 +34,10 @@ const t6050_agx_request_entry = u32(0x1e0)
 const t6050_agx_ack_entry = u32(0x1e8)
 const t6050_pmp_status_entry = u32(1)
 const t6050_agx_ack_timeout_us = u64(15_000_000)
+const t6050_wrapper_cpu_control_offset = u64(0x44)
+const t6050_wrapper_cpu_run = u32(1) << 4
+const t6050_wrapper_cpu_stop_phase2 = u32(1) << 5
+const t6050_wrapper_iorvbar_lock = u64(1)
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -47,6 +53,18 @@ pub:
 pub struct T6050PtdTransport {
 pub:
 	die_bases [2]u64
+}
+
+// Device-memory resources owned by one AppleASCWrapV6 instance. reg[0] is
+// the mailbox/control aperture and reg[1] is the IORVBAR aperture. reg[2]
+// remains deliberately unmapped because its consumer has not been recovered.
+pub struct T6050PmpWrapper {
+pub:
+	die          u32
+	control_base u64
+	iorvbar_base u64
+mut:
+	lock klock.Lock
 }
 
 enum T6050PowerPhase {
@@ -105,6 +123,22 @@ pub fn t6050_agx_acknowledged(entry &T6050PtdEntry, request u64) bool {
 	return entry.matches_request(request, u64(1) << t6050_agx_record_index)
 }
 
+pub fn t6050_iorvbar_value(firmware_address u64) u64 {
+	return firmware_address | t6050_wrapper_iorvbar_lock
+}
+
+pub fn t6050_cpu_run_value(current u32) u32 {
+	return current | t6050_wrapper_cpu_run
+}
+
+pub fn t6050_cpu_stop_request_value(current u32) u32 {
+	return current & ~t6050_wrapper_cpu_run
+}
+
+pub fn t6050_cpu_stop_finalize_value(current u32) u32 {
+	return current & ~t6050_wrapper_cpu_stop_phase2
+}
+
 fn t6050_ptd_offset(entry u32, base u64, stride u64, width u64) ?u64 {
 	offset := base + u64(entry) * stride
 	if width > t6050_ptd_size || offset > t6050_ptd_size - width {
@@ -134,6 +168,98 @@ pub fn map_t6050_power_controller() ?T6050PowerController {
 		transport: transport
 		phase: .idle
 	}
+}
+
+// Map the two resources whose consumers and access widths are proven by the
+// T6050 AppleASCWrapV6 binary. Construction performs no register access and is
+// intentionally not part of the GPU probe until the PMP firmware image owner
+// and RTBuddy state machine are implemented.
+pub fn map_t6050_pmp_wrapper(die u32) ?T6050PmpWrapper {
+	path := if die == 0 {
+		'/arm-io/pmp0'
+	} else if die == 1 {
+		'/arm-io/pmp1'
+	} else {
+		return none
+	}
+	wrapper := devicetree.find_node(path) or { return none }
+	if !validate_pmp_wrapper(wrapper, die) {
+		return none
+	}
+	regions := devicetree.get_translated_reg_ranges(wrapper) or { return none }
+	control_base := memory.map_mmio(regions[0].base, regions[0].size)
+	iorvbar_base := memory.map_mmio(regions[1].base, regions[1].size)
+	if control_base == 0 || iorvbar_base == 0 {
+		return none
+	}
+	return T6050PmpWrapper{
+		die: die
+		control_base: control_base
+		iorvbar_base: iorvbar_base
+	}
+}
+
+// Program the firmware address and its hardware lock in one 64-bit access,
+// then verify the lock bit exactly as AppleASCWrapV6::_isIORVBARLocked does.
+// A physical firmware base must leave the hardware-owned lock bit clear.
+pub fn (mut wrapper T6050PmpWrapper) set_iorvbar(firmware_address u64) bool {
+	if wrapper.iorvbar_base == 0 || firmware_address == 0
+		|| firmware_address & t6050_wrapper_iorvbar_lock != 0 {
+		return false
+	}
+	wrapper.lock.acquire()
+	defer {
+		wrapper.lock.release()
+	}
+	address := unsafe { &u64(wrapper.iorvbar_base) }
+	kio.mmout(address, t6050_iorvbar_value(firmware_address))
+	return kio.mmin(address) & t6050_wrapper_iorvbar_lock != 0
+}
+
+pub fn (mut wrapper T6050PmpWrapper) is_iorvbar_locked() bool {
+	if wrapper.iorvbar_base == 0 {
+		return false
+	}
+	wrapper.lock.acquire()
+	defer {
+		wrapper.lock.release()
+	}
+	value := kio.mmin(unsafe { &u64(wrapper.iorvbar_base) })
+	return value & t6050_wrapper_iorvbar_lock != 0
+}
+
+// AppleASCWrapV6 performs a 32-bit read-modify-write at reg[0]+0x44. Preserve
+// every unrelated bit rather than treating this as a command register.
+pub fn (mut wrapper T6050PmpWrapper) start_cpu() bool {
+	if wrapper.control_base == 0 {
+		return false
+	}
+	wrapper.lock.acquire()
+	defer {
+		wrapper.lock.release()
+	}
+	address := unsafe { &u32(wrapper.control_base + t6050_wrapper_cpu_control_offset) }
+	current := kio.mmin32(address)
+	kio.mmout32(address, t6050_cpu_run_value(current))
+	return true
+}
+
+// Stopping is two distinct hardware phases: clear bit 4, reread the register,
+// then clear bit 5 in the new value. Do not combine the accesses.
+pub fn (mut wrapper T6050PmpWrapper) stop_cpu() bool {
+	if wrapper.control_base == 0 {
+		return false
+	}
+	wrapper.lock.acquire()
+	defer {
+		wrapper.lock.release()
+	}
+	address := unsafe { &u32(wrapper.control_base + t6050_wrapper_cpu_control_offset) }
+	current := kio.mmin32(address)
+	kio.mmout32(address, t6050_cpu_stop_request_value(current))
+	refreshed := kio.mmin32(address)
+	kio.mmout32(address, t6050_cpu_stop_finalize_value(refreshed))
+	return true
 }
 
 // Match ApplePTD::readPTD's single LDP from base + entry*16. Device memory
@@ -283,6 +409,28 @@ fn validate_t6050_ptd_codec() bool {
 		&& !t6050_agx_acknowledged(&ack, request_off)
 		&& status_offset == 16 && request_write_offset == 0x10f00
 		&& ack_read_offset == 0x1e80
+}
+
+fn validate_t6050_wrapper_codec() bool {
+	firmware_address := u64(0x284500000)
+	control := u32(0xa5a55a65)
+	running := t6050_cpu_run_value(control)
+	stop_requested := t6050_cpu_stop_request_value(running)
+	stop_finalized := t6050_cpu_stop_finalize_value(stop_requested)
+	// Exercise the rejected-input path without accessing the zero MMIO bases.
+	// This keeps the concrete IORVBAR writer reachable in generated code while
+	// read-only admission validation remains side-effect free.
+	mut unmapped := T6050PmpWrapper{}
+	if _ := map_t6050_pmp_wrapper(2) {
+		return false
+	}
+	if unmapped.set_iorvbar(0) || unmapped.is_iorvbar_locked()
+		|| unmapped.start_cpu() || unmapped.stop_cpu() {
+		return false
+	}
+	return t6050_iorvbar_value(firmware_address) == 0x284500001
+		&& running == 0xa5a55a75 && stop_requested == 0xa5a55a65
+		&& stop_finalized == 0xa5a55a45
 }
 
 fn read_native_u8(data voidptr, offset u32) u8 {
@@ -556,8 +704,8 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 // controller remains dormant until the firmware-side handoff owns its startup
 // order. This function therefore performs no mapping or MMIO access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
-	if !validate_t6050_ptd_codec() {
-		println('agx: internal t6050 ApplePTD transport validation failed')
+	if !validate_t6050_ptd_codec() || !validate_t6050_wrapper_codec() {
+		println('agx: internal t6050 PMP transport validation failed')
 		return false
 	}
 	pmgr_node := devicetree.find_compatible('pmgr1,t6050') or {
