@@ -497,6 +497,7 @@ IOGPU_COMMAND_QUEUE_INIT = (
     "__ZN17IOGPUCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs"
 )
 IOGPU_DEVICE_INIT = "__ZN11IOGPUDevice4initEP5IOGPUP4task"
+IOGPU_CHANNEL_INIT = "__ZN12IOGPUChannel4initEP5IOGPUi"
 AGX_SHARED_INIT = "__ZN9AGXShared4initEP5IOGPUP4tasky"
 AGX_SHARED_SET_APP_GPU_ROLE = "__ZN9AGXShared16set_app_gpu_roleEi13eIOGPUAppRole"
 CONFIGURE_POOL_ELEMENT_SIZES = "__ZN11AGXFirmware25configurePoolElementSizesEv"
@@ -12457,6 +12458,55 @@ def recover_g17_channel_data_master_types(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_channel_identity(driver: bytes, iogpu: bytes) -> dict[str, object]:
+    """Recover the work-channel ID inherited from IOGPUChannel.
+
+    AGXChannel::init calls the IOGPUChannel base initializer through its
+    imported vtable with the accelerator from command-queue member +0x538 and
+    a fixed second argument of 0x80.  The separately symbolized IOGPUFamily
+    implementation stores that second argument at channel +0x18, the same
+    field consumed by the G17 outer-ring encoder.
+    """
+
+    driver_symbols = macho_symbols(driver)
+    iogpu_symbols = macho_symbols(iogpu)
+    if CHANNEL_INIT not in driver_symbols:
+        raise ValueError("driver is missing AGXChannel::init")
+    if IOGPU_CHANNEL_INIT not in iogpu_symbols:
+        raise ValueError("IOGPUFamily is missing IOGPUChannel::init")
+
+    _address, channel_code = symbol_code(driver, CHANNEL_INIT)
+    require_instruction_words_at(
+        channel_code,
+        "G17 IOGPU channel initialization",
+        {
+            0x048: 0x91052109,  # imported IOGPUChannel vtable slot +0x148
+            0x04C: 0xF940A508,
+            0x050: 0xF9429C21,  # command queue +0x538 -> base owner
+            0x054: 0x52801002,  # fixed channel ID 0x80
+            0x060: 0xD73F0911,  # authenticated indirect base-init call
+        },
+    )
+    _address, base_code = symbol_code(iogpu, IOGPU_CHANNEL_INIT)
+    require_instruction_words_at(
+        base_code,
+        "IOGPU channel identity store",
+        {
+            0x018: 0xAA0203F4,  # preserve the second init argument
+            0x040: 0xF9000A75,  # owner -> channel +0x10
+            0x044: 0xB9001A74,  # ID -> channel +0x18
+        },
+    )
+    return {
+        "value": 0x80,
+        "channel_member": 0x18,
+        "bytes": 4,
+        "base_owner": {"command_queue_member": 0x538, "channel_member": 0x10},
+        "base_initializer": IOGPU_CHANNEL_INIT,
+        "outer_entry_bytes": 1,
+    }
+
+
 def recover_g17_handoff(code: bytes) -> dict[str, object]:
     magic = find_materialized_constant(code, INTERFACE_MAGIC)
     if magic:
@@ -12814,6 +12864,7 @@ def main() -> int:
             driver, reset_channel_code
         )
         channels["data_master_types"] = recover_g17_channel_data_master_types(driver)
+        channels["identity"] = recover_g17_channel_identity(driver, iogpu)
         channels["scheduler_state"] = recover_g17_scheduler_state(driver)
         channels["queue_device_inputs"] = recover_g17_queue_device_inputs(
             driver, iogpu

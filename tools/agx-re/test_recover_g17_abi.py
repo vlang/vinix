@@ -6404,6 +6404,53 @@ class RecoverG17AbiTests(unittest.TestCase):
         ):
             recover_g17_abi.recover_g17_channel_data_master_types(b"")
 
+    def test_recovers_g17_channel_identity(self) -> None:
+        channel = bytearray(0x64)
+        for offset, word in {
+            0x048: 0x91052109,
+            0x04C: 0xF940A508,
+            0x050: 0xF9429C21,
+            0x054: 0x52801002,
+            0x060: 0xD73F0911,
+        }.items():
+            struct.pack_into("<I", channel, offset, word)
+        base = bytearray(0x48)
+        for offset, word in {
+            0x018: 0xAA0203F4,
+            0x040: 0xF9000A75,
+            0x044: 0xB9001A74,
+        }.items():
+            struct.pack_into("<I", base, offset, word)
+
+        def symbols(image: bytes):
+            if image == b"driver":
+                return {recover_g17_abi.CHANNEL_INIT: 0x300000}
+            return {recover_g17_abi.IOGPU_CHANNEL_INIT: 0x400000}
+
+        def code(image: bytes, name: str):
+            if image == b"driver" and name == recover_g17_abi.CHANNEL_INIT:
+                return 0x300000, bytes(channel)
+            if image == b"iogpu" and name == recover_g17_abi.IOGPU_CHANNEL_INIT:
+                return 0x400000, bytes(base)
+            raise AssertionError(name)
+
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", side_effect=symbols),
+            mock.patch.object(recover_g17_abi, "symbol_code", side_effect=code),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_identity(
+                b"driver", b"iogpu"
+            )
+
+        self.assertEqual(recovered["value"], 0x80)
+        self.assertEqual(recovered["channel_member"], 0x18)
+        self.assertEqual(recovered["outer_entry_bytes"], 1)
+        self.assertEqual(recovered["base_owner"]["command_queue_member"], 0x538)
+
+    def test_rejects_changed_g17_channel_identity(self) -> None:
+        with self.assertRaises(ValueError):
+            recover_g17_abi.recover_g17_channel_identity(b"", b"")
+
     def test_recovers_g17_linear_power_transfer_tables(self) -> None:
         arm_power, fixtures = self._linear_power_transfer_fixtures()
         recovered = self._run_linear_power_transfer(arm_power, fixtures)

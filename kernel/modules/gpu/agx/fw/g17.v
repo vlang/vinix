@@ -46,6 +46,8 @@ pub const g17_device_control_entry_size = u64(0x40)
 pub const g17_accelerator_command_ta = u32(0)
 pub const g17_accelerator_command_3d = u32(1)
 pub const g17_accelerator_command_cl = u32(2)
+pub const g17_data_master_channel_id = u8(0x80)
+pub const g17_data_master_channel_flag = u8(0)
 pub const g17_channel_state_size = u64(0xc0)
 pub const g17_channel_control_header_size = u64(0x70)
 pub const g17_channel_pool_base_size = u64(0x70)
@@ -2344,6 +2346,23 @@ pub:
 	submission_index     u16
 	channel_id           u8
 	channel_flag         u8
+}
+
+// Build the outer command fields that are invariant for all concrete G17
+// work channels. The Apple base initializer assigns ID 0x80 and clears the
+// one-byte channel flag; neither value is selected by userspace.
+pub fn new_g17_data_master_command(channel_data_address u64, command_type u32,
+	submission_index u16) ?G17DataMasterCommand {
+	if channel_data_address == 0 || !valid_g17_accelerator_command_type(command_type) {
+		return none
+	}
+	return G17DataMasterCommand{
+		channel_data_address: channel_data_address
+		command_type: command_type
+		submission_index: submission_index
+		channel_id: g17_data_master_channel_id
+		channel_flag: g17_data_master_channel_flag
+	}
 }
 
 @[inline]
