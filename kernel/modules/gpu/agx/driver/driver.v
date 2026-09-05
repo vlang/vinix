@@ -488,7 +488,7 @@ pub fn initialise() {
 		}
 		C.printf(c'agx: detected t6050 / G17C, %u cores in %u GPU partitions\n', cfg.gpu_core_count, cfg.num_mgpus)
 	} else {
-		C.printf(c'agx: detected chip 0x%x, %u cores\n', chip_id, cfg.gpu_core_count)
+		C.printf(c'agx: detected chip 0x%x, up to %u cores\n', chip_id, cfg.gpu_core_count)
 	}
 
 	// Step 2: Resolve all addresses without touching hardware. Native Apple
@@ -502,7 +502,6 @@ pub fn initialise() {
 	}
 	cfg.gpu_mmio_base = platform.sgx_base
 	cfg.gpu_mmio_size = platform.sgx_size
-	agx_driver_inst.hw_config = cfg
 	agx_driver_inst.detected = true
 	if platform.ttbs_size < 64 * 16 {
 		println('agx: TTB region is too small for 64 UAT contexts')
@@ -522,15 +521,31 @@ pub fn initialise() {
 		println('agx: G17 requires complete GFX and GFX1 ASC resources')
 		return
 	}
+	// Mapping and reading the SGX identity window is safe before firmware
+	// bring-up and lets a fused 7-core base M1 Air report its real topology.
+	// No ASC, UAT, power, or firmware state is modified here.
+	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.secondary_asc_base, platform.secondary_asc_size, platform.firmware_role_count, platform.sgx_base, platform.sgx_size)
+	if chip_id == 0x8103 {
+		identity := gpu_res.get_g13_identity() or {
+			println('agx: invalid G13 hardware identity')
+			return
+		}
+		if !cfg.apply_g13_identity(identity.revision_code, identity.num_clusters, identity.num_cores_per_cluster, identity.num_frags_per_cluster, identity.num_gps_per_cluster, identity.total_active_cores, identity.core_masks) {
+			println('agx: G13 hardware identity exceeds t8103 limits')
+			return
+		}
+		C.printf(c'agx: t8103 topology %u/%u active cores, mask=0x%x\n', identity.total_active_cores, identity.num_clusters * identity.num_cores_per_cluster, identity.core_masks[0])
+	}
+	agx_driver_inst.hw_config = cfg
 	C.printf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n', platform.asc_base, platform.sgx_base, platform.mailbox_base, platform.ttbs_base, platform.ttbs_size)
 	if platform.firmware_role_count == 2 {
 		C.printf(c'agx: GFX1 ASC=0x%llx mailbox=0x%llx\n', platform.secondary_asc_base, platform.secondary_mailbox_base)
 	}
 	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n', platform.handoff_base, platform.handoff_size, platform.pagetables_base, platform.pagetables_size)
 
-	// Never run a newer GPU with the byte layouts and register sequence for
-	// M1. Detection is useful for bring-up logs, but writes here could corrupt
-	// firmware-owned memory or wedge the machine.
+	// Never run a GPU with incomplete private byte layouts. Read-only identity
+	// probing above is useful for bring-up, but firmware or power-state writes
+	// here could corrupt firmware-owned memory or wedge the machine.
 	if !cfg.can_boot_firmware() {
 		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n', chip_id, cfg.firmware_abi_name())
 		return
@@ -564,8 +579,7 @@ pub fn initialise() {
 	}
 	gpu_event_mgr = event.new_event_manager(stamp_va, stamp_phys)
 
-	// Step 5: Create GPU resources, RTKit, and GpuManager.
-	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.secondary_asc_base, platform.secondary_asc_size, platform.firmware_role_count, platform.sgx_base, platform.sgx_size)
+	// Step 5: Create RTKit and GpuManager using the mapped GPU resources.
 	gpu_rtk := rtkit.new_rtkit(platform.mailbox_base, 'agx')
 	mut gpu_secondary_rtk := rtkit.RTKit{}
 	if platform.firmware_role_count == 2 {
