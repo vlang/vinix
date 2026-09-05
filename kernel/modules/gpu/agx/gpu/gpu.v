@@ -15,7 +15,6 @@ import gpu.agx.pgtable
 import gpu.agx.channel
 import gpu.agx.alloc
 import gpu.agx.fw
-import gpu.agx.queue
 import gpu.agx.event
 import memory
 import klock
@@ -953,105 +952,6 @@ pub fn (mut mgr GpuManager) handle_event() {
 			}
 		}
 	}
-}
-
-pub fn (mut mgr GpuManager) submit_render(cmd &queue.RenderCommand, priority u32) bool {
-	if mgr.state != .running {
-		return false
-	}
-
-	pipe_prio := priority % 4
-	if cmd.flags & queue.render_flag_vertex != 0 {
-		vertex := fw.FwVertexCmd{
-			header: fw.FwCmdHeader{
-				tag: fw.cmd_type_run_vertex
-				cmd_type: fw.cmd_type_run_vertex
-				flags: cmd.flags
-			}
-			scene_addr: cmd.scene_addr
-			buf_addr: cmd.vertex_buf_addr
-			buf_size: cmd.vertex_buf_size
-			tvb_addr: cmd.tvb_addr
-			vertex_count: cmd.vertex_count
-			instance_count: cmd.instance_count
-			stamp_addr: cmd.stamp_addr
-			stamp_value: cmd.stamp_value
-			result_addr: cmd.result_addr
-			result_size: cmd.result_size
-		}
-		idx := pipe_index(pipe_prio, 0)
-		if !mgr.channels.pipes[idx].enqueue(voidptr(&vertex)) {
-			return false
-		}
-		if !mgr.ring_pipe(pipe_prio, 0) {
-			return false
-		}
-	}
-
-	if cmd.flags & queue.render_flag_fragment != 0 {
-		fragment := fw.FwFragmentCmd{
-			header: fw.FwCmdHeader{
-				tag: fw.cmd_type_run_fragment
-				cmd_type: fw.cmd_type_run_fragment
-				flags: cmd.flags
-			}
-			scene_addr: cmd.scene_addr
-			buf_addr: cmd.frag_buf_addr
-			buf_size: cmd.frag_buf_size
-			width: cmd.width
-			height: cmd.height
-			tile_width: cmd.tile_width
-			tile_height: cmd.tile_height
-			stamp_addr: cmd.stamp_addr
-			stamp_value: cmd.stamp_value
-			result_addr: cmd.result_addr
-			result_size: cmd.result_size
-			layers: cmd.layers
-			samples: cmd.samples
-		}
-		idx := pipe_index(pipe_prio, 1)
-		if !mgr.channels.pipes[idx].enqueue(voidptr(&fragment)) {
-			return false
-		}
-		if !mgr.ring_pipe(pipe_prio, 1) {
-			return false
-		}
-	}
-	return true
-}
-
-pub fn (mut mgr GpuManager) submit_compute(cmd &queue.ComputeCommand, priority u32) bool {
-	if mgr.state != .running {
-		return false
-	}
-
-	compute := fw.FwComputeCmd{
-		header: fw.FwCmdHeader{
-			tag: fw.cmd_type_run_compute
-			cmd_type: fw.cmd_type_run_compute
-			flags: cmd.flags
-		}
-		buf_addr: cmd.compute_buf_addr
-		buf_size: cmd.compute_buf_size
-		wg_x: cmd.wg_x
-		wg_y: cmd.wg_y
-		wg_z: cmd.wg_z
-		grid_x: cmd.grid_x
-		grid_y: cmd.grid_y
-		grid_z: cmd.grid_z
-		shared_mem_size: cmd.shared_mem_size
-		stamp_addr: cmd.stamp_addr
-		stamp_value: cmd.stamp_value
-		result_addr: cmd.result_addr
-		result_size: cmd.result_size
-	}
-
-	idx := pipe_index(priority % 4, 2)
-	if !mgr.channels.pipes[idx].enqueue(voidptr(&compute)) {
-		return false
-	}
-
-	return mgr.ring_pipe(priority % 4, 2)
 }
 
 fn event_worker(mut mgr GpuManager) {
