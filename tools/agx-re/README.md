@@ -118,6 +118,12 @@ the SoC-device ID, record index, dense virtual-state index, and SOC-DEV-PKT bit
 slice; those values are not interchangeable. Its sanitized JSON report is
 written under `build/`; raw Apple DeviceTree or executable bytes are never
 repository inputs.
+The UUID-pinned AppleA7IOP check independently proves that
+`AppleWrapperMailbox` maps wrapper device-memory index 0, retains both its map
+and virtual address, and performs 32-bit register loads using byte offsets.
+It also ties the wrapper physical-address accessor to that same retained map.
+The result identifies T6050 wrapper `reg[0]` as the mailbox/control Device-MMIO
+aperture without treating resource ownership as CPU-start or IOP readiness.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published

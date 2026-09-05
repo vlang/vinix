@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 11)
+        self.assertEqual(result["schema"], 12)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -908,6 +908,59 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.recover_apple_pmp_code_contract(
                 bad_functions, symbols, rtbuddy_symbols
             )
+
+    def test_recovers_apple_wrapper_mailbox_mmio_resource(self) -> None:
+        start_code = struct.pack(
+            "<12I",
+            0xF9407E80,
+            0x911C4208,
+            0xF9438A09,
+            0x52800001,
+            0x52800002,
+            0xD73F0931,
+            0xF900A280,
+            0xD2802711,
+            0x8B110210,
+            0xF9400208,
+            0xD73F0910,
+            0xF9008280,
+        )
+        reg_code = struct.pack(
+            "<4I", 0xD503245F, 0xF9408008, 0xB8614900, 0xD65F03C0
+        )
+        physical_code = struct.pack(
+            "<8I",
+            0xD503237F,
+            0xA9BF7BFD,
+            0x910003FD,
+            0xF940A000,
+            0xB40000A0,
+            0x94000001,
+            0xB4000080,
+            0xA8C17BFD,
+        )
+        functions = {
+            recover_t6050_power.APPLE_WRAPPER_MAILBOX_START: (0x1000, start_code),
+            recover_t6050_power.APPLE_WRAPPER_MAILBOX_REG: (0x2000, reg_code),
+            recover_t6050_power.APPLE_WRAPPER_MAILBOX_PHYSICAL: (
+                0x3000,
+                physical_code,
+            ),
+        }
+        result = recover_t6050_power.recover_apple_a7iop_code_contract(functions)
+        wrapper = result["wrapper_mailbox"]
+        self.assertEqual(wrapper["device_memory_index"], 0)
+        self.assertEqual(wrapper["memory_map_object_offset"], 0x140)
+        self.assertEqual(wrapper["mapped_virtual_address_offset"], 0x100)
+        self.assertEqual(wrapper["register_access"]["width_bits"], 32)
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.APPLE_WRAPPER_MAILBOX_REG] = (
+            0x2000,
+            reg_code.replace(struct.pack("<I", 0xB8614900), struct.pack("<I", 0xF8614900)),
+        )
+        with self.assertRaisesRegex(ValueError, "register accessor"):
+            recover_t6050_power.recover_apple_a7iop_code_contract(bad_functions)
 
     def test_rejects_changed_sgx_gate_order(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree((0x267, 0x268)))

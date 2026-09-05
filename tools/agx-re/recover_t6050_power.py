@@ -45,10 +45,12 @@ APPLE_PMGR_UUID = "42F1AD20-5320-3803-8A70-05104BD5FBA7"
 APPLE_T6050_PMGR_UUID = "0AEACB61-66C5-3D24-AEA2-0A9DFFCF17E2"
 APPLE_PMP_UUID = "AA65CE02-93C8-33DE-A7BE-B11E1621F739"
 RTBUDDY_UUID = "4FEFDDA4-3743-34AC-869D-EAE695595A4C"
+APPLE_A7IOP_UUID = "DD46FF2D-6ADD-3A7D-8BCC-7184A5E3398A"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
 DEFAULT_APPLE_T6050_PMGR = Path("build/kext/g17c/driver.AppleT6050PMGR.macho")
 DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
 DEFAULT_RTBUDDY = Path("build/kext/g17c/driver.RTBuddy.macho")
+DEFAULT_APPLE_A7IOP = Path("build/kext/g17c/driver.AppleA7IOP.macho")
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
 PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
 PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
@@ -91,6 +93,11 @@ RTBUDDY_ENDPOINT_INIT_OWNER = (
 )
 RTBUDDY_ENDPOINT_SET_POWER_ACTION = (
     "__ZN15RTBuddyEndpoint19setPowerStateActionEPFiP8OSObjectmmE"
+)
+APPLE_WRAPPER_MAILBOX_START = "__ZN19AppleWrapperMailbox5startEP9IOService"
+APPLE_WRAPPER_MAILBOX_REG = "__ZN19AppleWrapperMailbox4_regEj"
+APPLE_WRAPPER_MAILBOX_PHYSICAL = (
+    "__ZN19AppleWrapperMailbox25getWrapperPhysicalAddressEv"
 )
 
 
@@ -1606,6 +1613,103 @@ def recover_apple_pmp(image: bytes, rtbuddy_image: bytes) -> dict[str, object]:
     }
 
 
+def recover_apple_a7iop_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+) -> dict[str, object]:
+    """Recover AppleWrapperMailbox's wrapper-MMIO ownership contract."""
+
+    required = (
+        APPLE_WRAPPER_MAILBOX_START,
+        APPLE_WRAPPER_MAILBOX_REG,
+        APPLE_WRAPPER_MAILBOX_PHYSICAL,
+    )
+    missing = [name for name in required if name not in functions]
+    if missing:
+        raise ValueError(f"AppleA7IOP has no code body for {missing!r}")
+
+    _start_address, start_code = functions[APPLE_WRAPPER_MAILBOX_START]
+    if not _has_ordered_words(
+        start_code,
+        (
+            0xF9407E80,  # ldr x0, [x20, #0xf8] -- wrapper provider
+            0x911C4208,  # add x8, x16, #0x710 -- mapDeviceMemoryWithIndex slot
+            0xF9438A09,  # ldr x9, [x16, #0x710]
+            0x52800001,  # mov w1, #0 -- device-memory index
+            0x52800002,  # mov w2, #0 -- map options
+            0xD73F0931,  # blraa x9, x17
+            0xF900A280,  # str x0, [x20, #0x140] -- retained memory map
+            0xD2802711,  # mov x17, #0x138 -- getVirtualAddress slot
+            0x8B110210,  # add x16, x16, x17
+            0xF9400208,  # ldr x8, [x16]
+            0xD73F0910,  # blraa x8, x16
+            0xF9008280,  # str x0, [x20, #0x100] -- mapped register VA
+        ),
+    ):
+        raise ValueError("AppleWrapperMailbox device-memory mapping changed")
+
+    _reg_address, reg_code = functions[APPLE_WRAPPER_MAILBOX_REG]
+    expected_reg = struct.pack(
+        "<4I",
+        0xD503245F,  # bti c
+        0xF9408008,  # ldr x8, [x0, #0x100] -- mapped register VA
+        0xB8614900,  # ldr w0, [x8, w1, uxtw] -- byte offset, 32-bit access
+        0xD65F03C0,  # ret
+    )
+    if reg_code != expected_reg:
+        raise ValueError("AppleWrapperMailbox register accessor changed")
+
+    physical_address, physical_code = functions[APPLE_WRAPPER_MAILBOX_PHYSICAL]
+    if (
+        len(physical_code) < 0x20
+        or struct.unpack_from("<I", physical_code, 0x0C)[0] != 0xF940A000
+        or struct.unpack_from("<I", physical_code, 0x10)[0] != 0xB40000A0
+        or struct.unpack_from("<I", physical_code, 0x14)[0] & 0xFC000000
+        != 0x94000000
+        or direct_branch_target_at(physical_address, physical_code, 0x14) is None
+    ):
+        raise ValueError("AppleWrapperMailbox physical-address accessor changed")
+
+    return {
+        "wrapper_mailbox": {
+            "device_memory_index": 0,
+            "map_options": 0,
+            "provider_object_offset": 0xF8,
+            "map_device_memory_vtable_slot": 0x710,
+            "memory_map_object_offset": 0x140,
+            "get_virtual_address_vtable_slot": 0x138,
+            "mapped_virtual_address_offset": 0x100,
+            "register_access": {
+                "width_bits": 32,
+                "offset_unit": "bytes",
+                "address": "mapped virtual address + zero-extended offset",
+            },
+            "physical_address_source": "retained device-memory map",
+            "scope": (
+                "wrapper mailbox/control resource ownership only; does not start "
+                "or prove the IOP ready"
+            ),
+        }
+    }
+
+
+def recover_apple_a7iop(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_A7IOP_UUID:
+        raise ValueError(f"unsupported AppleA7IOP UUID {identity}")
+    functions = {
+        name: symbol_code(image, name)
+        for name in (
+            APPLE_WRAPPER_MAILBOX_START,
+            APPLE_WRAPPER_MAILBOX_REG,
+            APPLE_WRAPPER_MAILBOX_PHYSICAL,
+        )
+    }
+    return {
+        "uuid": identity,
+        **recover_apple_a7iop_code_contract(functions),
+    }
+
+
 def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     sgx_path, sgx = find_one(
         root,
@@ -1882,7 +1986,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 11,
+        "schema": 12,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -1983,6 +2087,7 @@ def main() -> int:
     )
     parser.add_argument("--pmp", type=Path, default=DEFAULT_APPLE_PMP)
     parser.add_argument("--rtbuddy", type=Path, default=DEFAULT_RTBUDDY)
+    parser.add_argument("--apple-a7iop", type=Path, default=DEFAULT_APPLE_A7IOP)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -1999,6 +2104,7 @@ def main() -> int:
         manifest["apple_pmp"] = recover_apple_pmp(
             args.pmp.read_bytes(), args.rtbuddy.read_bytes()
         )
+        manifest["apple_a7iop"] = recover_apple_a7iop(args.apple_a7iop.read_bytes())
     except (OSError, ValueError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)
