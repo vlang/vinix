@@ -3550,6 +3550,124 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_scheduler_state(self) -> None:
+        alloc_address = 0x400000
+        stack_init_address = 0x410000
+        queue_address = 0x420000
+        name_address = 0x1000
+
+        image = bytearray(0x2000)
+        image[name_address : name_address + 23] = b"AGFICmdQueueSchedState\0"
+
+        alloc = bytearray(0xE38)
+        for offset, word in {
+            0xD54: 0xF9414E61,
+            0xD58: 0x52829908,
+            0xD5C: 0x8B080274,
+            0xD74: adrp(alloc_address + 0xD74, name_address, 3),
+            0xD78: add_immediate(3, 3, name_address & 0xFFF),
+            0xD7C: 0xAA1403E0,
+            0xD80: 0x52800802,
+            0xD84: 0x52800124,
+            0xD88: 0x52800025,
+            0xD8C: 0xD2800006,
+            0xD90: 0x52800007,
+        }.items():
+            struct.pack_into("<I", alloc, offset, word)
+
+        stack = bytearray(0xC4)
+        for offset, word in {
+            0x20: 0xAA0203F5,
+            0x68: 0xF9005275,
+            0x7C: 0x8B150509,
+            0x80: 0xD1000529,
+            0x84: 0xCB0803E8,
+            0x88: 0x8A080128,
+            0x8C: 0xF9002E68,
+            0x90: 0x9AD50908,
+            0x94: 0xB9006268,
+        }.items():
+            struct.pack_into("<I", stack, offset, word)
+
+        queue = bytearray(0x42C)
+        for offset, word in {
+            0x028: 0xF9429C08,
+            0x02C: 0xF942D915,
+            0x030: 0x52829908,
+            0x0EC: 0xB9552ABB,
+            0x0F0: 0x1ADB0B1C,
+            0x144: 0xF9045660,
+            0x1E8: 0x1B1BE389,
+            0x1EC: 0x9B097ED6,
+            0x220: 0x8B160008,
+            0x224: 0xF9045E68,
+            0x2A8: 0xF9045268,
+            0x348: 0xB908B278,
+            0x3BC: 0xF9445268,
+            0x3C0: 0xF900191F,
+            0x3C8: 0xAD008100,
+            0x3CC: 0x3D800100,
+            0x3D0: 0xF9445268,
+            0x3D4: 0x529FFFE9,
+            0x3D8: 0x79000109,
+            0x3DC: 0x52800020,
+            0x3E0: 0x39001500,
+            0x3E4: 0x52801FE9,
+            0x3E8: 0x3900CD09,
+            0x3EC: 0xB802211F,
+            0x3F0: 0xF9424A69,
+            0x3F4: 0x39448129,
+            0x3F8: 0x39009909,
+        }.items():
+            struct.pack_into("<I", queue, offset, word)
+
+        codes = {
+            recover_g17_abi.ARM_ALLOC_FIRMWARE_DATA: (alloc_address, bytes(alloc)),
+            recover_g17_abi.SCHEDULER_STATE_STACK_INIT: (
+                stack_init_address,
+                bytes(stack),
+            ),
+            recover_g17_abi.ALLOCATE_SCHEDULER_STATE: (queue_address, bytes(queue)),
+        }
+        symbols = {name: address for name, (address, _c) in codes.items()}
+        symbols[recover_g17_abi.SCHEDULER_STATE_STACK_VTABLE] = 0x430000
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=symbols
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+            mock.patch.object(
+                recover_g17_abi, "virtual_to_file", side_effect=lambda _image, a: a
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=stack_init_address,
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_scheduler_state(bytes(image))
+
+        self.assertEqual(recovered["pool_name"], "AGFICmdQueueSchedState")
+        self.assertEqual(recovered["element_bytes"], 0x40)
+        self.assertEqual(recovered["queue_bindings"]["gpu_address"], 0x8B8)
+        self.assertEqual(recovered["queue_bindings"]["cpu_address"], 0x8A0)
+        self.assertEqual(recovered["stack_host_member"], 0x14C8)
+        self.assertEqual(recovered["zeroed_bytes"], 0x38)
+        self.assertEqual(
+            [field["offset"] for field in recovered["initial_fields"]],
+            [0x00, 0x05, 0x22, 0x26, 0x33],
+        )
+        self.assertEqual(recovered["initial_fields"][0]["value"], 0xFFFF)
+        self.assertEqual(recovered["initial_fields"][-1]["value"], 0xFF)
+
+    def test_rejects_changed_g17_scheduler_state_element_size(self) -> None:
+        with self.assertRaises(ValueError):
+            recover_g17_abi.recover_g17_scheduler_state(b"")
+
     def test_recovers_g17_channel_state_sources(self) -> None:
         init_address = 0x300000
         qos_address = 0x310000

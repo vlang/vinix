@@ -422,6 +422,18 @@ CHANNEL_INIT = (
     "__ZN10AGXChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy19_AGFIDataMasterType"
 )
 SET_KICK_CHANNEL_QOS = "__ZN14AGXArmFirmware17setKickChannelQosEjj"
+ARM_ALLOC_FIRMWARE_DATA = "__ZN14AGXArmFirmware17allocFirmwareDataEv"
+ALLOCATE_SCHEDULER_STATE = "__ZN15AGXCommandQueue22allocateSchedulerStateEv"
+SCHEDULER_STATE_STACK = (
+    "__ZN24AGXFirmwareResourceStackI19_AGFISchedulerState15AGXCommandQueue"
+    "Lj64ELj256EE"
+)
+SCHEDULER_STATE_STACK_INIT = (
+    SCHEDULER_STATE_STACK
+    + "4initEP14AGXAcceleratoryPKcy17AGXCachingOptionsP9IOGPUTask19AGXFWPoolShrinkMode"
+)
+SCHEDULER_STATE_STACK_VTABLE = "__ZTV" + SCHEDULER_STATE_STACK.removeprefix("__ZN")
+SCHEDULER_STATE_STACK_INIT_SLOT = 0x20
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -6828,6 +6840,156 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
     }
 
 
+def recover_g17_scheduler_state(image: bytes) -> dict[str, object]:
+    """Recover the per-queue _AGFISchedulerState element and its pool.
+
+    Channel state +0x9c is copied from command queue +0x8b8, which
+    AGXCommandQueue::allocateSchedulerState fills with the GPU address of one
+    element of the AGFICmdQueueSchedState firmware pool.  That pool, its
+    element size and the element's initial content are all fixed, so the whole
+    path is recoverable even though the queue object is not modelled yet.
+    """
+
+    symbols = macho_symbols(image)
+    required = (
+        ARM_ALLOC_FIRMWARE_DATA,
+        SCHEDULER_STATE_STACK_INIT,
+        ALLOCATE_SCHEDULER_STATE,
+        SCHEDULER_STATE_STACK_VTABLE,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 scheduler-state symbols: {missing}")
+
+    # allocFirmwareData binds the pool through the stack's own vtable, so the
+    # element size is the literal it passes rather than a stored constant.
+    init_target = recover_vtable_target(
+        image, SCHEDULER_STATE_STACK_VTABLE, SCHEDULER_STATE_STACK_INIT_SLOT
+    )
+    if init_target != symbols[SCHEDULER_STATE_STACK_INIT]:
+        raise ValueError(f"unexpected scheduler-state stack init {init_target:#x}")
+
+    alloc_address, alloc_code = symbol_code(image, ARM_ALLOC_FIRMWARE_DATA)
+    require_instruction_words_at(
+        alloc_code,
+        "G17 scheduler-state pool binding",
+        {
+            0xD54: 0xF9414E61,  # accelerator at firmware +0x298
+            0xD58: 0x52829908,  # mov w8, #0x14c8
+            0xD5C: 0x8B080274,  # stack object at ASC +0x14c8
+            0xD7C: 0xAA1403E0,
+            0xD80: 0x52800802,  # element size 0x40
+            0xD84: 0x52800124,  # alignment shift 9
+            0xD88: 0x52800025,  # caching option 1
+            0xD8C: 0xD2800006,  # no owning task
+            0xD90: 0x52800007,  # shrink mode 0
+        },
+    )
+    adrp = decode_adrp(
+        alloc_address + 0xD74, struct.unpack_from("<I", alloc_code, 0xD74)[0]
+    )
+    add = decode_add_immediate(struct.unpack_from("<I", alloc_code, 0xD78)[0])
+    if adrp is None or add is None:
+        raise ValueError("scheduler-state pool no longer names itself")
+    _register, page = adrp
+    _destination, _source, immediate = add
+    name_offset = virtual_to_file(image, page + immediate)
+    pool_name = image[name_offset : image.index(b"\0", name_offset)].decode()
+    if pool_name != "AGFICmdQueueSchedState":
+        raise ValueError(f"unexpected scheduler-state pool name {pool_name!r}")
+
+    # The stack derives its block geometry from the element size and page size.
+    _address, stack_code = symbol_code(image, SCHEDULER_STATE_STACK_INIT)
+    require_instruction_words_at(
+        stack_code,
+        "G17 scheduler-state pool geometry",
+        {
+            0x20: 0xAA0203F5,  # element size argument
+            0x68: 0xF9005275,  # -> stack +0xa0
+            0x7C: 0x8B150509,  # page bytes + 2 * element size
+            0x80: 0xD1000529,
+            0x84: 0xCB0803E8,
+            0x88: 0x8A080128,  # rounded down to a page multiple
+            0x8C: 0xF9002E68,  # -> stack +0x58
+            0x90: 0x9AD50908,  # block bytes / element size
+            0x94: 0xB9006268,  # -> stack +0x60
+        },
+    )
+
+    # allocateSchedulerState publishes four members of the owning queue.
+    _address, queue_code = symbol_code(image, ALLOCATE_SCHEDULER_STATE)
+    require_instruction_words_at(
+        queue_code,
+        "G17 scheduler-state queue publication",
+        {
+            0x028: 0xF9429C08,  # accelerator at queue +0x538
+            0x02C: 0xF942D915,  # ASC at accelerator +0x5b0
+            0x030: 0x52829908,
+            0x0EC: 0xB9552ABB,  # elements per block
+            0x0F0: 0x1ADB0B1C,  # block index
+            0x144: 0xF9045660,  # owning resource -> queue +0x8a8
+            0x1E8: 0x1B1BE389,  # index within the block
+            0x1EC: 0x9B097ED6,  # * element size
+            0x220: 0x8B160008,
+            0x224: 0xF9045E68,  # GPU address -> queue +0x8b8
+            0x2A8: 0xF9045268,  # CPU address -> queue +0x8a0
+            0x348: 0xB908B278,  # allocation index -> queue +0x8b0
+        },
+    )
+
+    # The element is zeroed through +0x37 and then given its fixed defaults.
+    require_instruction_words_at(
+        queue_code,
+        "G17 scheduler-state initial content",
+        {
+            0x3BC: 0xF9445268,
+            0x3C0: 0xF900191F,  # zero +0x30..+0x37
+            0x3C8: 0xAD008100,  # zero +0x10..+0x2f
+            0x3CC: 0x3D800100,  # zero +0x00..+0x0f
+            0x3D0: 0xF9445268,
+            0x3D4: 0x529FFFE9,
+            0x3D8: 0x79000109,  # 0xffff -> +0x00
+            0x3DC: 0x52800020,
+            0x3E0: 0x39001500,  # 1 -> +0x05
+            0x3E4: 0x52801FE9,
+            0x3E8: 0x3900CD09,  # 0xff -> +0x33
+            0x3EC: 0xB802211F,  # 0 -> +0x22
+            0x3F0: 0xF9424A69,  # queue +0x490
+            0x3F4: 0x39448129,  # its byte +0x120
+            0x3F8: 0x39009909,  # -> +0x26
+        },
+    )
+
+    return {
+        "pool_name": pool_name,
+        "element_bytes": 0x40,
+        "alignment_shift": 9,
+        "caching_option": 1,
+        "shrink_mode": 0,
+        "stack_host_member": 0x14C8,
+        "stack_element_size_member": 0xA0,
+        "stack_block_bytes_member": 0x58,
+        "stack_elements_per_block_member": 0x60,
+        "block_bytes": "(page_bytes + 2 * element_bytes - 1) & -page_bytes",
+        "queue_accelerator_member": 0x538,
+        "accelerator_asc_member": 0x5B0,
+        "queue_bindings": {
+            "cpu_address": 0x8A0,
+            "resource": 0x8A8,
+            "allocation_index": 0x8B0,
+            "gpu_address": 0x8B8,
+        },
+        "zeroed_bytes": 0x38,
+        "initial_fields": [
+            {"offset": 0x00, "bytes": 2, "value": 0xFFFF},
+            {"offset": 0x05, "bytes": 1, "value": 1},
+            {"offset": 0x22, "bytes": 4, "value": 0},
+            {"offset": 0x26, "bytes": 1, "source": {"queue_member": 0x490, "offset": 0x120}},
+            {"offset": 0x33, "bytes": 1, "value": 0xFF},
+        ],
+    }
+
+
 def recover_g17_channel_state_sources(image: bytes, reset_code: bytes) -> dict[str, object]:
     """Trace the two channel-state inputs that resetChannelState only copies.
 
@@ -7074,6 +7236,7 @@ def main() -> int:
         channels["state_sources"] = recover_g17_channel_state_sources(
             driver, reset_channel_code
         )
+        channels["scheduler_state"] = recover_g17_scheduler_state(driver)
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)

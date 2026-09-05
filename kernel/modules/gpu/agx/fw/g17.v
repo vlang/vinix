@@ -871,7 +871,7 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17FirmwareScalarBlock) == g17_firmware_scalar_block_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size && sizeof(G17PerformanceStateMapBlock) == g17_performance_state_map_block_size
+	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17FirmwareScalarBlock) == g17_firmware_scalar_block_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size && sizeof(G17PerformanceStateMapBlock) == g17_performance_state_map_block_size && sizeof(G17SchedulerState) == g17_scheduler_state_size
 }
 
 // G17PowerMatrix carries one Apple power-matrix row per performance state.
@@ -1188,6 +1188,60 @@ pub mut:
 pub struct G17CachedCommandPointer {
 pub mut:
 	address u64
+}
+
+pub const g17_scheduler_state_size = u64(0x40)
+
+// One element of Apple's AGFICmdQueueSchedState firmware pool. Every command
+// queue owns exactly one, and its GPU address is what channel state +0x9c
+// carries, which is why initialize_g17_channel takes that address as an input.
+@[packed]
+pub struct G17SchedulerState {
+pub mut:
+	sentinel_000   u16
+	opaque_002     [0x03]u8
+	flag_005       u8
+	opaque_006     [0x1c]u8
+	value_022      u32
+	queue_flag_026 u8
+	opaque_027     [0x0c]u8
+	sentinel_033   u8
+	opaque_034     [0x0c]u8
+}
+
+// Reproduce the element defaults AGXCommandQueue::allocateSchedulerState
+// writes after the pool hands out an element. Apple only clears the first
+// 0x38 bytes there because the backing is already zeroed; clearing the whole
+// element is equivalent and keeps the tail defined.
+pub fn initialize_g17_scheduler_state(buffer voidptr, size u64, queue_flag u8) bool {
+	if buffer == unsafe { nil } || size != g17_scheduler_state_size {
+		return false
+	}
+
+	unsafe {
+		C.memset(buffer, 0, g17_scheduler_state_size)
+		mut state := &G17SchedulerState(buffer)
+		state.sentinel_000 = 0xffff
+		state.flag_005 = 1
+		state.value_022 = 0
+		state.queue_flag_026 = queue_flag
+		state.sentinel_033 = 0xff
+	}
+	return true
+}
+
+// Block geometry for the same pool. Apple rounds one page plus two elements
+// down to a page multiple, then divides by the element size. The mask relies
+// on the page size being a power of two, which the UAT already requires.
+pub fn g17_scheduler_state_block_bytes(page_bytes u64) u64 {
+	if page_bytes == 0 || page_bytes & (page_bytes - 1) != 0 {
+		return 0
+	}
+	return (page_bytes + 2 * g17_scheduler_state_size - 1) & ~(page_bytes - 1)
+}
+
+pub fn g17_scheduler_states_per_block(page_bytes u64) u64 {
+	return g17_scheduler_state_block_bytes(page_bytes) / g17_scheduler_state_size
 }
 
 pub struct G17ChannelBindings {
