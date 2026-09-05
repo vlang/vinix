@@ -3135,6 +3135,123 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["frequency_source_offset"], 0x1C4F0)
         self.assertEqual(recovered["maximum_state_value"], 100)
 
+    def test_recovers_g17_performance_state_map_block(self) -> None:
+        probe_address = 0x100000
+        pi_address = 0x200000
+        g17_address = 0x201000
+        parser_address = 0x202000
+
+        probe = bytearray(0xC78)
+        for offset, word in {
+            0x6C: 0x6F00E400,
+            0x70: 0xAD0283E0,
+            0x74: 0xAD0383E0,
+            0x78: 0x3D8027E0,
+            0x7C: 0xF90053FF,
+            0x80: 0xAD0183E0,
+            0x84: 0xAD0083E0,
+            0xB80: 0x394257E8,
+            0xB84: 0x36000148,
+            0xBB4: 0x91406A68,
+            0xBB8: 0x91292109,
+            0xBBC: 0x3D800120,
+            0xBC0: 0x912A2109,
+            0xBC4: 0x6F00E400,
+            0xBC8: 0x3D800120,
+            0xBCC: 0x91296109,
+            0xBD0: 0x912A610A,
+            0xBDC: 0x3D800121,
+            0xBE0: 0x3D800140,
+            0xBE4: 0x9129A109,
+            0xBE8: 0x912AA10A,
+            0xBF4: 0x3D800121,
+            0xBF8: 0x3D800140,
+            0xBFC: 0x9129E109,
+            0xC00: 0x912AE108,
+            0xC0C: 0x3D800121,
+            0xC10: 0x3D800100,
+        }.items():
+            struct.pack_into("<I", probe, offset, word)
+
+        pi_code = bytes(0x61C)
+        g17_code = bytearray(0x34)
+        struct.pack_into("<I", g17_code, 0x14, bl(g17_address + 0x14, pi_address))
+        struct.pack_into("<I", g17_code, 0x20, 0xBC089260)
+        struct.pack_into("<I", g17_code, 0x24, 0x3902127F)
+        parser_code = struct.pack("<2I", 0xD503245F, 0xD65F03C0)
+
+        arm_power = bytearray(0x92C)
+        for offset, word in {
+            0x804: 0xF9415E68,
+            0x808: 0x52833909,
+            0x80C: 0x8B09010A,
+            0x810: 0xF9414E69,
+            0x814: 0x91406929,
+            0x818: 0x6F00E400,
+            0x81C: 0xAD030140,
+            0x820: 0xAD020140,
+            0x824: 0xAD010140,
+            0x828: 0xAD000140,
+            0x82C: 0xB94A492A,
+            0x830: 0xB919C90A,
+            0x834: 0xB94A892A,
+            0x838: 0xB91A090A,
+            0x91C: 0xB94A852A,
+            0x920: 0xB91A050A,
+            0x924: 0xB94AC529,
+            0x928: 0xB91A4509,
+        }.items():
+            struct.pack_into("<I", arm_power, offset, word)
+
+        symbols = {
+            recover_g17_abi.FAMILY_GET_PROBE_SCORE: probe_address,
+            recover_g17_abi.PI300_READ_CHIP_INFO: pi_address,
+            recover_g17_abi.G17_READ_CHIP_INFO: g17_address,
+            recover_g17_abi.G17_PARSE_PERF_STATE_MAP_REGS: parser_address,
+        }
+        code = {
+            recover_g17_abi.FAMILY_GET_PROBE_SCORE: (
+                probe_address,
+                bytes(probe),
+            ),
+            recover_g17_abi.PI300_READ_CHIP_INFO: (pi_address, pi_code),
+            recover_g17_abi.G17_READ_CHIP_INFO: (g17_address, bytes(g17_code)),
+            recover_g17_abi.G17_PARSE_PERF_STATE_MAP_REGS: (
+                parser_address,
+                parser_code,
+            ),
+        }
+        vectors = [
+            struct.pack("<4I", start, start + 1, start + 2, start + 3)
+            for start in range(0, 16, 4)
+        ]
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=parser_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "read_adrp_load",
+                side_effect=vectors,
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_perf_state_map_block(
+                b"", bytes(arm_power)
+            )
+
+        self.assertEqual(recovered["offset"], 0x19C8)
+        self.assertEqual(recovered["enable_byte_value"], 0)
+        self.assertEqual(recovered["banks"][0]["values"], list(range(16)))
+        self.assertEqual(recovered["banks"][1]["values"], [0] * 16)
+
     def test_recovers_g17_auxiliary_performance_layout(self) -> None:
         property_selector = (
             0x7100045F,

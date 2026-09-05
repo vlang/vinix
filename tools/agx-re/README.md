@@ -67,7 +67,7 @@ color-matrix banks, border-color-table stub, and fixed scalar defaults, the
 G17C PIO relative-offset table and its 12 primary-aperture
 firmware records, their physical alignment and GART-10 UAT publication path,
 the primary and SRAM frequency-table sources and conversion and the relative
-boost-frequency transfer table,
+boost-frequency transfer table, the fixed two-bank performance-state map,
 the native CS/AFR auxiliary performance-state parser and firmware blocks,
 exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,

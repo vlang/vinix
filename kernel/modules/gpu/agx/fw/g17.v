@@ -83,6 +83,7 @@ pub const g17_aux_performance_state_capacity = 16
 pub const g17_aux_voltage_table_columns = 2
 pub const g17_aux_performance_state_cap = u32(14)
 pub const g17_aux_performance_block_size = u64(0x148)
+pub const g17_performance_state_map_block_size = u64(0x80)
 pub const g17_fw_util_pstate_control_count = 4
 pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
@@ -706,6 +707,15 @@ pub mut:
 	sram_voltage_table    [g17_aux_performance_state_capacity]G17AuxVoltageTableRow
 }
 
+// G17C's selected map-register parser is a no-op, so the family fallback
+// supplies an identity primary bank and a zero auxiliary bank.
+@[packed]
+pub struct G17PerformanceStateMapBlock {
+pub mut:
+	primary   [g17_performance_state_capacity]u32
+	auxiliary [g17_performance_state_capacity]u32
+}
+
 // Fixed address-space prefix at the start of the hardware/configuration
 // allocation. G17C uses an identity firmware-address conversion. Its selected
 // setupCSCAllocation implementation is a no-op, so the optional YUV table
@@ -851,7 +861,7 @@ pub mut:
 	relative_boost_frequency_1908  [g17_performance_state_capacity]u32
 	firmware_table_1948            [g17_performance_state_capacity]u32
 	afr_relative_boost_frequency_1988 [g17_performance_state_capacity]u32
-	firmware_block_19c8            [0x80]u8
+	performance_state_map_19c8     G17PerformanceStateMapBlock
 	cs_performance_1a48            G17AuxPerformanceBlock
 	afr_performance_1b90           G17AuxPerformanceBlock
 	opaque_1cd8                    [0x868]u8
@@ -859,7 +869,13 @@ pub mut:
 }
 
 pub fn validate_g17_bootstrap_allocations() bool {
-	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17FirmwareScalarBlock) == g17_firmware_scalar_block_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size
+	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17FirmwareScalarBlock) == g17_firmware_scalar_block_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size && sizeof(G17PerformanceStateMapBlock) == g17_performance_state_map_block_size
+}
+
+fn populate_g17_performance_state_map(mut config G17HardwareConfig) {
+	for state := 0; state < g17_performance_state_capacity; state++ {
+		config.performance_state_map_19c8.primary[state] = u32(state)
+	}
 }
 
 // Populate the table subset whose source and scale are established by both
@@ -922,6 +938,7 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 		config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 /
 			frequency_range)
 	}
+	populate_g17_performance_state_map(mut config)
 	return true
 }
 
@@ -1053,6 +1070,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 			config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 /
 				frequency_range)
 		}
+		populate_g17_performance_state_map(mut config)
 	}
 	return true
 }

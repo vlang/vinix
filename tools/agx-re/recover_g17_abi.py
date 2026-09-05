@@ -60,6 +60,10 @@ PI300_READ_CHIP_INFO = (
 G17_READ_CHIP_INFO = (
     "__ZNK32AGX·PI_300·X·A0·AcceleratorX12readChipInfoEP16AGXGPUCoreConfig"
 )
+FAMILY_GET_PROBE_SCORE = "__ZN20AGXFamilyAccelerator13getProbeScoreEv"
+G17_PARSE_PERF_STATE_MAP_REGS = (
+    "__ZN20AGXFamilyAccelerator21parsePerfStateMapRegsEv.8015"
+)
 DEVICE_USER_GET_CONFIG = (
     "__ZN19AGXDeviceUserClient15getDeviceConfigEP16AGXGPUCoreConfig"
 )
@@ -92,6 +96,7 @@ G17_GET_SAMPLE_PERIOD_VTABLE_SLOT = 0xF70
 G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
 G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT = 0xAA0
 G17_READ_CHIP_INFO_VTABLE_SLOT = 0x1210
+G17_PERF_STATE_MAP_VTABLE_SLOT = 0x1218
 G17_NEW_SECURE_MONITOR_VTABLE_SLOT = 0xBE0
 G17_GET_GPTBAT_BASE_VTABLE_SLOT = 0x11D0
 SECURE_MONITOR_INIT_VTABLE_SLOT = 0x150
@@ -5254,6 +5259,193 @@ def recover_g17_afr_relative_boost_frequency_table(
     }
 
 
+def recover_g17_perf_state_map_block(
+    image: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover the fixed two-bank performance-state map at config +0x19c8."""
+
+    symbols = macho_symbols(image)
+    required = (
+        FAMILY_GET_PROBE_SCORE,
+        PI300_READ_CHIP_INFO,
+        G17_READ_CHIP_INFO,
+        G17_PARSE_PERF_STATE_MAP_REGS,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+
+    parser = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_PERF_STATE_MAP_VTABLE_SLOT
+    )
+    if parser != symbols[G17_PARSE_PERF_STATE_MAP_REGS]:
+        raise ValueError(f"unexpected G17 performance-state map parser {parser:#x}")
+    _address, parser_code = symbol_code(image, G17_PARSE_PERF_STATE_MAP_REGS)
+    if parser_code != struct.pack("<2I", 0xD503245F, 0xD65F03C0):
+        raise ValueError("G17 performance-state map parser is not a no-op")
+
+    pi_address, pi_code = symbol_code(image, PI300_READ_CHIP_INFO)
+    g17_address, g17_code = symbol_code(image, G17_READ_CHIP_INFO)
+    if len(pi_code) != 0x61C or len(g17_code) != 0x34:
+        raise ValueError("unexpected G17 chip-info producer size")
+    require_instruction_words_at(
+        g17_code,
+        "G17 performance-state map enable-byte preservation",
+        {
+            0x20: 0xBC089260,  # unaligned float at core config +0x89
+            0x24: 0x3902127F,  # clear adjacent byte +0x84 only
+        },
+    )
+    call = decode_bl_target(
+        g17_address + 0x14, struct.unpack_from("<I", g17_code, 0x14)[0]
+    )
+    if call != pi_address:
+        raise ValueError("G17 chip-info producer does not call its PI_300 base")
+
+    # getProbeScore clears the complete temporary AGXGPUCoreConfig before the
+    # selected readChipInfo chain. Neither checked producer writes byte +0x85,
+    # so the later TBZ always selects the fixed fallback on G17C.
+    def stores_covering(code: bytes, base: int, target: int) -> list[int]:
+        hits: list[int] = []
+        unscaled_widths = {
+            0x38000000: 1,
+            0x78000000: 2,
+            0xB8000000: 4,
+            0xF8000000: 8,
+            0xBC000000: 4,
+            0xFC000000: 8,
+            0x3C800000: 16,
+        }
+        pair_widths = {
+            0x29000000: 4,
+            0xA9000000: 8,
+            0x2D000000: 4,
+            0x6D000000: 8,
+            0xAD000000: 16,
+        }
+        for offset, word in words(code):
+            store = decode_str_unsigned(word)
+            if store is not None:
+                _source, store_base, immediate, width = store
+                if store_base == base and immediate <= target < immediate + width:
+                    hits.append(offset)
+                continue
+            width = unscaled_widths.get(word & 0xFFE00C00)
+            if width is not None and (word >> 5) & 0x1F == base:
+                immediate = (word >> 12) & 0x1FF
+                if immediate & 0x100:
+                    immediate -= 0x200
+                if immediate <= target < immediate + width:
+                    hits.append(offset)
+                continue
+            width = pair_widths.get(word & 0xFFC00000)
+            if width is not None and (word >> 5) & 0x1F == base:
+                immediate = (word >> 15) & 0x7F
+                if immediate & 0x40:
+                    immediate -= 0x80
+                immediate *= width
+                if immediate <= target < immediate + width * 2:
+                    hits.append(offset)
+        return hits
+
+    for label, code in (("PI_300", pi_code), ("G17", g17_code)):
+        if hits := stores_covering(code, 19, 0x85):
+            raise ValueError(
+                f"{label} chip-info producer writes map enable byte at {hits[0]:#x}"
+            )
+
+    probe_address, probe_code = symbol_code(image, FAMILY_GET_PROBE_SCORE)
+    if len(probe_code) != 0xC78:
+        raise ValueError("unexpected AGX family probe-score producer size")
+    require_instruction_words_at(
+        probe_code,
+        "G17 fixed performance-state map fallback",
+        {
+            0x6C: 0x6F00E400,
+            0x70: 0xAD0283E0,
+            0x74: 0xAD0383E0,
+            0x78: 0x3D8027E0,
+            0x7C: 0xF90053FF,
+            0x80: 0xAD0183E0,
+            0x84: 0xAD0083E0,
+            0xB80: 0x394257E8,
+            0xB84: 0x36000148,
+            0xBB4: 0x91406A68,
+            0xBB8: 0x91292109,
+            0xBBC: 0x3D800120,
+            0xBC0: 0x912A2109,
+            0xBC4: 0x6F00E400,
+            0xBC8: 0x3D800120,
+            0xBCC: 0x91296109,
+            0xBD0: 0x912A610A,
+            0xBDC: 0x3D800121,
+            0xBE0: 0x3D800140,
+            0xBE4: 0x9129A109,
+            0xBE8: 0x912AA10A,
+            0xBF4: 0x3D800121,
+            0xBF8: 0x3D800140,
+            0xBFC: 0x9129E109,
+            0xC00: 0x912AE108,
+            0xC0C: 0x3D800121,
+            0xC10: 0x3D800100,
+        },
+    )
+    vectors = b"".join(
+        read_adrp_load(image, probe_address, probe_code, adrp, load, 16)
+        for adrp, load in (
+            (0xBAC, 0xBB0),
+            (0xBD4, 0xBD8),
+            (0xBEC, 0xBF0),
+            (0xC04, 0xC08),
+        )
+    )
+    first_bank = list(struct.unpack("<16I", vectors))
+    if first_bank != list(range(16)):
+        raise ValueError("unexpected G17 fixed performance-state map values")
+
+    # The ARM firmware-data producer clears the whole destination and then
+    # copies the two 16-word accelerator banks to +0x19c8 and +0x1a08.
+    require_instruction_words_at(
+        arm_power_code,
+        "G17 performance-state map firmware copy",
+        {
+            0x804: 0xF9415E68,
+            0x808: 0x52833909,
+            0x80C: 0x8B09010A,
+            0x810: 0xF9414E69,
+            0x814: 0x91406929,
+            0x818: 0x6F00E400,
+            0x81C: 0xAD030140,
+            0x820: 0xAD020140,
+            0x824: 0xAD010140,
+            0x828: 0xAD000140,
+            0x82C: 0xB94A492A,
+            0x830: 0xB919C90A,
+            0x834: 0xB94A892A,
+            0x838: 0xB91A090A,
+            0x91C: 0xB94A852A,
+            0x920: 0xB91A050A,
+            0x924: 0xB94AC529,
+            0x928: 0xB91A4509,
+        },
+    )
+
+    return {
+        "offset": 0x19C8,
+        "bytes": 0x80,
+        "entries_per_bank": 16,
+        "source_offsets": [0x1AA48, 0x1AA88],
+        "enable_byte_offset": 0x85,
+        "enable_byte_value": 0,
+        "parser_vtable_slot": G17_PERF_STATE_MAP_VTABLE_SLOT,
+        "parser": G17_PARSE_PERF_STATE_MAP_REGS,
+        "banks": [
+            {"offset": 0x19C8, "values": first_bank},
+            {"offset": 0x1A08, "values": [0] * 16},
+        ],
+    }
+
+
 def recover_g17_aux_performance_layout(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -6227,6 +6419,9 @@ def main() -> int:
         )
         hardware_config["afr_relative_boost_frequency_table"] = (
             recover_g17_afr_relative_boost_frequency_table(driver, power_code)
+        )
+        hardware_config["performance_state_map_block"] = (
+            recover_g17_perf_state_map_block(driver, power_code)
         )
         hardware_config["pio_mappings"] = recover_g17_pio_mappings(driver)
         hardware_config["pio_uat_mapping"] = recover_g17_pio_uat_mapping(driver)
