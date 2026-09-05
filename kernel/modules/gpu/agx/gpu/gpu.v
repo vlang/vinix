@@ -47,6 +47,8 @@ const g13_stats_index = 5
 const g13_pipe_base_index = 6
 const g13_mmio_va_start = u64(0xffffffaf00000000)
 const g13_mmio_va_end = u64(0xffffffb000000000)
+const g13_buffer_manager_low_va = u64(0x20_0000_0000)
+const g13_buffer_manager_high_va = u64(0xffffffaeffff0000)
 
 // GPU states
 pub enum GpuState {
@@ -210,6 +212,16 @@ mut:
 	fw_status        SharedBuffer
 	fwlog_payload    SharedBuffer
 	hwdata_b         SharedBuffer
+	stats_vertex     SharedBuffer
+	stats_fragment   SharedBuffer
+	stats_compute    SharedBuffer
+	unknown_190      SharedBuffer
+	unknown_198      SharedBuffer
+	unknown_1b8      SharedBuffer
+	unknown_1c0      SharedBuffer
+	unknown_1c8      SharedBuffer
+	buffer_manager   SharedBuffer
+	buffer_manager_high_mapped bool
 	io_mapping_vas   [fw.g13_io_mapping_count]u64
 	io_mapping_sizes [fw.g13_io_mapping_count]u64
 }
@@ -261,6 +273,31 @@ fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(size u64,
 
 fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 	return mgr.alloc_shared_buffer_with_protection(size, pgtable.gpu_prot_fw_gpu_shared_rw)
+}
+
+fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
+	if iova == 0 || iova & pgtable.uat_pg_mask != 0 || size == 0
+		|| size > u64(-1) - pgtable.uat_pg_mask || uat_mgr == unsafe { nil } {
+		return none
+	}
+	aligned_size := (size + pgtable.uat_pg_mask) & ~pgtable.uat_pg_mask
+	pages := aligned_size / page_size
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
+	if phys == 0 {
+		return none
+	}
+	unsafe {
+		C.memset(voidptr(phys + higher_half), 0, aligned_size)
+	}
+	if !uat_mgr.map_kernel(iova, phys, aligned_size, protection) {
+		memory.pmm_free(voidptr(phys), pages)
+		return none
+	}
+	return SharedBuffer{
+		va: iova
+		phys: phys
+		size: aligned_size
+	}
 }
 
 // Release a driver-owned shared allocation after its firmware consumer has
@@ -379,6 +416,19 @@ fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocation
 fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelAllocations) {
 	unmap_g13_io_mappings(mut allocations)
 	mgr.free_shared_buffer(mut allocations.initdata)
+	if allocations.buffer_manager_high_mapped && uat_mgr != unsafe { nil } {
+		uat_mgr.unmap_kernel(g13_buffer_manager_high_va, allocations.buffer_manager.size)
+		allocations.buffer_manager_high_mapped = false
+	}
+	mgr.free_shared_buffer(mut allocations.buffer_manager)
+	mgr.free_shared_buffer(mut allocations.unknown_1c8)
+	mgr.free_shared_buffer(mut allocations.unknown_1c0)
+	mgr.free_shared_buffer(mut allocations.unknown_1b8)
+	mgr.free_shared_buffer(mut allocations.unknown_198)
+	mgr.free_shared_buffer(mut allocations.unknown_190)
+	mgr.free_shared_buffer(mut allocations.stats_compute)
+	mgr.free_shared_buffer(mut allocations.stats_fragment)
+	mgr.free_shared_buffer(mut allocations.stats_vertex)
 	mgr.free_shared_buffer(mut allocations.hwdata_b)
 	mgr.free_shared_buffer(mut allocations.fwlog_payload)
 	mgr.free_shared_buffer(mut allocations.fw_status)
@@ -638,6 +688,43 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	if !mgr.map_g13_io_mappings(mut graph) {
 		return false
 	}
+	graph.stats_vertex = mgr.alloc_shared_buffer_with_protection(sizeof(fw.G13GlobalStatsVertex), pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.stats_fragment = mgr.alloc_shared_buffer_with_protection(sizeof(fw.G13GlobalStatsFragment), pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	unsafe {
+		mut stats := &fw.G13GlobalStatsFragment(graph.stats_fragment.phys + higher_half)
+		stats.current_stamp = -1
+		stats.unknown_id = -1
+	}
+	graph.stats_compute = mgr.alloc_shared_buffer_with_protection(sizeof(fw.G13GlobalStatsCompute), pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.unknown_190 = mgr.alloc_shared_buffer_with_protection(0x80, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.unknown_198 = mgr.alloc_shared_buffer_with_protection(0xc0, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.unknown_1b8 = mgr.alloc_shared_buffer_with_protection(0x1000, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.unknown_1c0 = mgr.alloc_shared_buffer_with_protection(0x300, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.unknown_1c8 = mgr.alloc_shared_buffer_with_protection(0x1000, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	graph.buffer_manager = alloc_fixed_buffer(g13_buffer_manager_low_va, 0x4000, pgtable.gpu_prot_gpu_shared_rw) or {
+		return false
+	}
+	if !uat_mgr.map_kernel(g13_buffer_manager_high_va, graph.buffer_manager.phys,
+		graph.buffer_manager.size, pgtable.gpu_prot_fw_shared_rw) {
+		return false
+	}
+	graph.buffer_manager_high_mapped = true
 	graph.initdata = mgr.alloc_shared_buffer_with_protection(fw.g13_initdata_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
@@ -655,9 +742,19 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.fw_log = fw.make_g13_ring_pointers(mgr.channels.fw_log.state_base, mgr.channels.fw_log.ring_base)
 		runtime.ktrace = fw.make_g13_ring_pointers(mgr.channels.ktrace.state_base, mgr.channels.ktrace.ring_base)
 		runtime.stats = fw.make_g13_ring_pointers(mgr.channels.stats.state_base, mgr.channels.stats.ring_base)
+		runtime.stats_vertex = graph.stats_vertex.va
+		runtime.stats_fragment = graph.stats_fragment.va
+		runtime.stats_compute = graph.stats_compute.va
+		runtime.unkptr_190 = graph.unknown_190.va
+		runtime.unkptr_198 = graph.unknown_198.va
 		runtime.hwdata_b = graph.hwdata_b.va
 		runtime.hwdata_b_2 = graph.hwdata_b.va
 		runtime.fwlog_buffer = graph.fwlog_payload.va
+		runtime.unkptr_1b8 = graph.unknown_1b8.va
+		runtime.unkptr_1c0 = graph.unknown_1c0.va
+		runtime.unkptr_1c8 = graph.unknown_1c8.va
+		runtime.buffer_mgr_gpu_addr = g13_buffer_manager_low_va
+		runtime.buffer_mgr_fw_addr = g13_buffer_manager_high_va
 		// RuntimeScratch::unk_6b38 is 0xff in the reference 12.3 builder.
 		runtime.gpu_scratch[0x68b8] = 0xff
 

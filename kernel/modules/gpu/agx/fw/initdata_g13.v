@@ -11,6 +11,31 @@ pub const g13_fwlog_subchannels = u32(6)
 pub const g13_fwlog_payload_count = u32(0x100)
 
 @[packed]
+pub struct G13GlobalStatsVertex {
+pub mut:
+	total_commands u32
+	opaque         [0x3000]u8
+}
+
+@[packed]
+pub struct G13GlobalStatsFragment {
+pub mut:
+	total_commands u32
+	unk_004        u32
+	opaque_008     [0x100]u8
+	current_stamp  i32
+	opaque_10c     [0x14]u8
+	unknown_id     i32
+	opaque_124     [0x1000]u8
+}
+
+@[packed]
+pub struct G13GlobalStatsCompute {
+pub mut:
+	opaque [0x3000]u8
+}
+
+@[packed]
 pub struct G13PipeChannels {
 pub mut:
 	vertex   ChannelRingPointers
@@ -159,4 +184,7 @@ pub fn validate_g13_initdata_layouts() bool {
 		&& sizeof(G13RuntimePointers) == g13_runtime_pointers_size
 		&& sizeof(G13Globals) == g13_globals_size && sizeof(G13FwStatus) == 0x80
 		&& sizeof(G13UatLevelInfo) == 0x20 && sizeof(G13InitData) == g13_initdata_size
+		&& sizeof(G13GlobalStatsVertex) == 0x3004
+		&& sizeof(G13GlobalStatsFragment) == 0x1124
+		&& sizeof(G13GlobalStatsCompute) == 0x3000
 }

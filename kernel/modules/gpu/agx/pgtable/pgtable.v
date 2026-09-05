@@ -54,6 +54,8 @@ pub const gpu_prot_fw_gpu_cached_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
 	uat_pte_ap_fw_gpu | uat_memattr_normal_cached | uat_pte_af
 pub const gpu_prot_fw_gpu_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
 	uat_pte_ap_fw_gpu | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
+	uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_fw_shared_ro = uat_pte_os | uat_pte_pxn | uat_pte_ap_fw_only |
 	uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_fw_private_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only |
