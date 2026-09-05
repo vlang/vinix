@@ -35,6 +35,16 @@ def b_cond(source: int, target: int, condition: int) -> int:
     )
 
 
+def tbz(source: int, target: int, register: int, bit: int) -> int:
+    return (
+        0x36000000
+        | (bit >> 5) << 31
+        | (bit & 0x1F) << 19
+        | (((target - source) // 4) & 0x3FFF) << 5
+        | register
+    )
+
+
 def adrp(source: int, target: int, register: int) -> int:
     pages = ((target & ~0xFFF) - (source & ~0xFFF)) >> 12
     immediate = pages & 0x1FFFFF
@@ -4760,6 +4770,41 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(expression["predicate"]["operation"], "tst")
         self.assertEqual(expression["taken"]["member"], 0x760)
         self.assertEqual(expression["fallthrough"]["operation"], "orr")
+
+    def test_recovers_g17_test_bit_branch_merge(self) -> None:
+        instructions = [
+            (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
+            (0x04, 0x395F8668),  # ldrb w8, [x19, #0x7e1]
+            (0x08, tbz(0x08, 0x10, 8, 0)),
+            (0x0C, 0xB2400084),  # orr x4, x4, #1
+            (0x10, 0xD503201F),
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 5)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "branch_select")
+        self.assertEqual(expression["condition"], "bit_clear")
+        self.assertEqual(expression["predicate"]["operation"], "test_bit")
+        self.assertEqual(expression["predicate"]["source"]["member"], 0x7E1)
+        self.assertEqual(expression["taken"]["member"], 0x760)
+        self.assertEqual(expression["fallthrough"]["operation"], "orr")
+
+    def test_recovers_g17_test_bit_branch_diamond(self) -> None:
+        instructions = [
+            (0x00, 0x395F8668),  # ldrb w8, [x19, #0x7e1]
+            (0x04, tbz(0x04, 0x10, 8, 0)),
+            (0x08, 0xB9476264),  # ldr w4, [x19, #0x760]
+            (0x0C, b(0x0C, 0x14)),
+            (0x10, 0x528000E4),  # mov w4, #7
+            (0x14, 0xD503201F),
+        ]
+        expression = recover_g17_abi.trace_g17_value_expression(
+            instructions, 6, 4
+        )
+        self.assertIsNotNone(expression)
+        self.assertEqual(expression["operation"], "branch_select")
+        self.assertEqual(expression["condition"], "bit_clear")
+        self.assertEqual(expression["taken"]["value"], 7)
+        self.assertEqual(expression["fallthrough"]["member"], 0x760)
 
     def test_rejects_g17_ambiguous_conditional_branch_merge(self) -> None:
         instructions = [

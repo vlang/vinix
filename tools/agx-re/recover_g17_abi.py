@@ -1114,6 +1114,22 @@ def decode_conditional_branch(
     return target, condition
 
 
+def decode_test_bit_branch(address: int, word: int) -> dict[str, object] | None:
+    if word & 0x7E000000 != 0x36000000:
+        return None
+    target = decode_local_branch_target(address, word)
+    if target is None:
+        return None
+    bit = ((word >> 31) & 0x1) << 5 | (word >> 19) & 0x1F
+    return {
+        "target": target,
+        "condition": "bit_set" if word & (1 << 24) else "bit_clear",
+        "register": word & 0x1F,
+        "bit": bit,
+        "bytes": 8 if bit >= 32 else 4,
+    }
+
+
 def g17_register_is_written(word: int, register: int) -> bool:
     """Recognize the integer writers present in the register-list producers."""
 
@@ -1764,27 +1780,135 @@ def trace_g17_control_flow_merge(
         if use_index < len(instructions)
         else instructions[-1][0] + 4
     )
-    branches = [
-        (index, offset, decoded)
-        for index, (offset, word) in enumerate(instructions[:definition_index])
-        for decoded in (decode_conditional_branch(offset, word),)
-        if decoded is not None and definition_offset < decoded[0] <= use_offset
-    ]
-    if len(branches) != 1:
-        return None
-    branch_index, branch_offset, (target, condition) = branches[0]
+    candidates: list[dict[str, object]] = []
+    for branch_index, (branch_offset, branch_word) in enumerate(
+        instructions[:definition_index]
+    ):
+        decoded = decode_conditional_branch(branch_offset, branch_word)
+        test_bit = decode_test_bit_branch(branch_offset, branch_word)
+        if decoded is not None:
+            target, condition = decoded
+            branch: dict[str, object] = {
+                "index": branch_index,
+                "offset": branch_offset,
+                "target": target,
+                "condition": condition,
+                "kind": "flags",
+            }
+        elif test_bit is not None:
+            branch = {
+                "index": branch_index,
+                "offset": branch_offset,
+                **test_bit,
+                "kind": "test_bit",
+            }
+            target = int(test_bit["target"])
+        else:
+            continue
 
-    predicate = trace_g17_condition_expression(
-        instructions, branch_index, depth + 1, seen
-    )
-    taken = trace_g17_value_expression(
-        instructions, branch_index, register, depth + 1, seen
-    )
-    if predicate is None or taken is None:
+        if definition_offset < target <= use_offset:
+            branch["shape"] = "skip"
+            candidates.append(branch)
+            continue
+        target_index = next(
+            (
+                index
+                for index, (offset, _word) in enumerate(instructions)
+                if offset == target
+            ),
+            None,
+        )
+        if target_index is None or target_index > definition_index:
+            continue
+        bridges = [
+            (index, bridge_target)
+            for index, (offset, word) in enumerate(
+                instructions[branch_index + 1 : target_index], branch_index + 1
+            )
+            for bridge_target in (decode_b_target(offset, word),)
+            if bridge_target is not None
+            and definition_offset < bridge_target <= use_offset
+        ]
+        if len(bridges) == 1:
+            bridge_index, join = bridges[0]
+            branch.update(
+                {
+                    "shape": "diamond",
+                    "target_index": target_index,
+                    "bridge_index": bridge_index,
+                    "join": join,
+                }
+            )
+            candidates.append(branch)
+
+    if len(candidates) != 1:
+        return None
+    branch = candidates[0]
+    branch_index = int(branch["index"])
+    branch_offset = int(branch["offset"])
+    target = int(branch["target"])
+    condition = str(branch["condition"])
+
+    if branch["kind"] == "flags":
+        predicate = trace_g17_condition_expression(
+            instructions, branch_index, depth + 1, seen
+        )
+    else:
+        predicate_source = trace_g17_value_expression(
+            instructions,
+            branch_index,
+            int(branch["register"]),
+            depth + 1,
+            seen,
+        )
+        predicate = (
+            None
+            if predicate_source is None
+            else {
+                "kind": "condition",
+                "producer_offset": branch_offset,
+                "operation": "test_bit",
+                "bytes": branch["bytes"],
+                "bit": branch["bit"],
+                "source": predicate_source,
+            }
+        )
+    if predicate is None:
         return None
 
-    fallthrough_instructions = list(instructions)
-    fallthrough_instructions[branch_index] = (branch_offset, 0xD503201F)
+    if branch["shape"] == "skip":
+        taken = trace_g17_value_expression(
+            instructions, branch_index, register, depth + 1, seen
+        )
+        fallthrough_instructions = list(instructions)
+        fallthrough_instructions[branch_index] = (branch_offset, 0xD503201F)
+    else:
+        target_index = int(branch["target_index"])
+        join = int(branch["join"])
+        join_index = next(
+            (
+                index
+                for index, (offset, _word) in enumerate(instructions)
+                if offset == join
+            ),
+            None,
+        )
+        if join_index is None:
+            return None
+        taken_instructions = list(instructions)
+        for index in range(branch_index, target_index):
+            offset, _word = taken_instructions[index]
+            taken_instructions[index] = (offset, 0xD503201F)
+        taken = trace_g17_value_expression(
+            taken_instructions, use_index, register, depth + 1, seen
+        )
+        fallthrough_instructions = list(instructions)
+        fallthrough_instructions[branch_index] = (branch_offset, 0xD503201F)
+        for index in range(target_index, join_index):
+            offset, _word = fallthrough_instructions[index]
+            fallthrough_instructions[index] = (offset, 0xD503201F)
+    if taken is None:
+        return None
     fallthrough = trace_g17_value_expression(
         fallthrough_instructions, use_index, register, depth + 1, seen
     )
