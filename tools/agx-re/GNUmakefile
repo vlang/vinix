@@ -28,7 +28,7 @@ firmware:
 kernel-kexts:
 	./extract_fileset.py
 
-recover-t6050-power:
+recover-t6050-power: kernel-kexts
 	./recover_t6050_power.py
 
 recover-g17-abi: firmware kernel-kexts

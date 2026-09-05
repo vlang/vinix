@@ -42,6 +42,14 @@ def soc_device_record(device_id: int, name: str) -> bytes:
     return bytes(record)
 
 
+def ptd_range_record(
+    range_id: int, entry_offset: int, entry_count: int, doorbell: int, name: str
+) -> bytes:
+    return struct.pack("<4I", range_id, entry_offset, entry_count, doorbell) + name.encode().ljust(
+        16, b"\0"
+    )
+
+
 def fixture_tree(power_handles: tuple[int, ...] = (0x268, 0x267)) -> bytes:
     devices = b"".join(
         pmgr_record(handle, name)
@@ -70,6 +78,15 @@ def fixture_tree(power_handles: tuple[int, ...] = (0x268, 0x267)) -> bytes:
             "region-base": struct.pack("<Q", 0x4284500000),
             "region-size": struct.pack("<Q", 0x100000),
             "soc-device": soc_device_record(1, "OTHER") + soc_device_record(0x10, "AGX"),
+            "ptd-range": b"".join(
+                (
+                    ptd_range_record(1, 0, 1, 0, "NULL"),
+                    ptd_range_record(9, 0x90, 0x150, 0, "SOC-DEV-PKT"),
+                    ptd_range_record(10, 0x1E0, 8, 0, "SOC-DEV-PS-REQ"),
+                    ptd_range_record(11, 0x1E8, 8, 0, "SOC-DEV-PS-ACK"),
+                )
+            ),
+            "pm-ptd-ranges": struct.pack("<IIII", 1, 9, 10, 11),
         },
         [],
     )
@@ -115,6 +132,49 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["pmp"]["firmware"], "t6050pmp")
         self.assertEqual(result["pmp"]["region_base"], 0x4284500000)
         self.assertEqual(result["pmp"]["agx_soc_device"]["id"], 0x10)
+        self.assertEqual(
+            result["pmp"]["device_state_dashboard"]["SOC-DEV-PS-REQ"]["entry_offset"],
+            0x1E0,
+        )
+
+    def test_recovers_pmp_v2_binary_dispatch(self) -> None:
+        send = 0x1000
+        dispatch = 0x2000
+        state = 0x3000
+        virtual = 0x4000
+        read = 0x5000
+        write = 0x6000
+
+        def branch(source: int, target: int, link: bool = False) -> bytes:
+            delta = (target - source) // 4
+            return struct.pack("<I", (0x94000000 if link else 0x14000000) | delta & 0x3FFFFFF)
+
+        functions = {
+            recover_t6050_power.PMP_SEND_COMMAND: (send, branch(send, dispatch)),
+            recover_t6050_power.PMP_WRITE_DASHBOARD: (
+                dispatch,
+                struct.pack("<II", 0x51003828, 0x7100091F)
+                + branch(dispatch + 8, virtual)
+                + branch(dispatch + 12, state),
+            ),
+            recover_t6050_power.PMP_SET_DEVICE_STATE: (
+                state,
+                struct.pack("<II", 0x7100087F, 0x39400C08)
+                + branch(state + 8, read, True)
+                + branch(state + 12, write, True),
+            ),
+        }
+        symbols = {
+            recover_t6050_power.PMP_SEND_COMMAND: send,
+            recover_t6050_power.PMP_WRITE_DASHBOARD: dispatch,
+            recover_t6050_power.PMP_SET_DEVICE_STATE: state,
+            recover_t6050_power.PMP_SET_VIRTUAL_DEVICE_STATE: virtual,
+            recover_t6050_power.APPLE_PTD_READ: read,
+            recover_t6050_power.APPLE_PTD_WRITE: write,
+        }
+        result = recover_t6050_power.recover_pmp_code_contract(functions, symbols)
+        self.assertEqual(result["device_state_commands"], [14, 15])
+        self.assertEqual(result["device_index_field"], 3)
 
     def test_rejects_changed_sgx_gate_order(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree((0x267, 0x268)))

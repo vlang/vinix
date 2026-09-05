@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from extract_firmware import der_item
+from recover_g17_abi import macho_symbols, macho_uuid, symbol_code
 
 
 DEFAULT_PREBOOT = Path("/System/Volumes/Preboot")
@@ -31,6 +32,18 @@ PMGR_DEVICE_HANDLE_OFFSET = 26
 PMGR_DEVICE_NAME_OFFSET = 32
 PMP_SOC_DEVICE_BYTES = 124
 PMP_SOC_DEVICE_NAME_OFFSET = 116
+PMP_PTD_RANGE_BYTES = 32
+PMP_PTD_RANGE_NAME_OFFSET = 16
+APPLE_PMGR_UUID = "42F1AD20-5320-3803-8A70-05104BD5FBA7"
+DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
+PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
+PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
+PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
+PMP_SET_VIRTUAL_DEVICE_STATE = (
+    "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj"
+)
+APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
+APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
 
 
 @dataclass(frozen=True)
@@ -265,6 +278,156 @@ def parse_pmp_soc_devices(data: bytes) -> list[dict[str, object]]:
     return result
 
 
+def parse_pmp_ptd_ranges(data: bytes) -> list[dict[str, object]]:
+    if not data or len(data) % PMP_PTD_RANGE_BYTES:
+        raise ValueError("PMP ptd-range property is not an array of 32-byte records")
+    result = []
+    for index, offset in enumerate(range(0, len(data), PMP_PTD_RANGE_BYTES)):
+        record = data[offset : offset + PMP_PTD_RANGE_BYTES]
+        range_id, entry_offset, entry_count, doorbell = struct.unpack_from("<4I", record)
+        result.append(
+            {
+                "index": index,
+                "id": range_id,
+                "entry_offset": entry_offset,
+                "entry_count": entry_count,
+                "doorbell": doorbell,
+                "name": decode_cstring(
+                    record[PMP_PTD_RANGE_NAME_OFFSET:], "PMP PTD-range name"
+                ),
+            }
+        )
+    return result
+
+
+def direct_branch_targets(function_address: int, code: bytes) -> set[int]:
+    """Return direct AArch64 B/BL targets from one function body."""
+    result = set()
+    for offset in range(0, len(code) - 3, 4):
+        word = struct.unpack_from("<I", code, offset)[0]
+        if word & 0x7C000000 != 0x14000000:
+            continue
+        immediate = word & 0x03FFFFFF
+        if immediate & 0x02000000:
+            immediate -= 1 << 26
+        result.add((function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF)
+    return result
+
+
+def _has_sub_cmp_window(code: bytes, source: int, first: int, count: int) -> bool:
+    """Recognize `sub wN,wSource,#first; cmp wN,#count` without fixing wN."""
+    words = [struct.unpack_from("<I", code, offset)[0] for offset in range(0, len(code) - 3, 4)]
+    for left, right in zip(words, words[1:]):
+        if left & 0xFF000000 != 0x51000000:
+            continue
+        destination = left & 0x1F
+        left_source = (left >> 5) & 0x1F
+        immediate = (left >> 10) & 0xFFF
+        if left & (1 << 22):
+            immediate <<= 12
+        if (left_source, immediate) != (source, first):
+            continue
+        if right & 0xFF00001F != 0x7100001F:
+            continue
+        right_source = (right >> 5) & 0x1F
+        right_immediate = (right >> 10) & 0xFFF
+        if right & (1 << 22):
+            right_immediate <<= 12
+        if (right_source, right_immediate) == (destination, count):
+            return True
+    return False
+
+
+def _has_cmp_w_immediate(code: bytes, source: int, immediate: int) -> bool:
+    for offset in range(0, len(code) - 3, 4):
+        word = struct.unpack_from("<I", code, offset)[0]
+        if word & 0xFF00001F != 0x7100001F or (word >> 5) & 0x1F != source:
+            continue
+        value = (word >> 10) & 0xFFF
+        if word & (1 << 22):
+            value <<= 12
+        if value == immediate:
+            return True
+    return False
+
+
+def _has_ldrb(code: bytes, destination: int, base: int, immediate: int) -> bool:
+    for offset in range(0, len(code) - 3, 4):
+        word = struct.unpack_from("<I", code, offset)[0]
+        if word & 0xFFC00000 != 0x39400000:
+            continue
+        if (
+            word & 0x1F,
+            (word >> 5) & 0x1F,
+            (word >> 10) & 0xFFF,
+        ) == (destination, base, immediate):
+            return True
+    return False
+
+
+def recover_pmp_code_contract(
+    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+) -> dict[str, object]:
+    required = (
+        PMP_SEND_COMMAND,
+        PMP_WRITE_DASHBOARD,
+        PMP_SET_DEVICE_STATE,
+        PMP_SET_VIRTUAL_DEVICE_STATE,
+        APPLE_PTD_READ,
+        APPLE_PTD_WRITE,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"ApplePMGR is missing power symbols: {missing!r}")
+    for name in (PMP_SEND_COMMAND, PMP_WRITE_DASHBOARD, PMP_SET_DEVICE_STATE):
+        if name not in functions:
+            raise ValueError(f"ApplePMGR has no code body for {name}")
+
+    send_address, send_code = functions[PMP_SEND_COMMAND]
+    if symbols[PMP_WRITE_DASHBOARD] not in direct_branch_targets(send_address, send_code):
+        raise ValueError("sendPMPCommand no longer routes to the PMP dashboard")
+
+    dispatch_address, dispatch_code = functions[PMP_WRITE_DASHBOARD]
+    dispatch_targets = direct_branch_targets(dispatch_address, dispatch_code)
+    if not _has_sub_cmp_window(dispatch_code, source=1, first=14, count=2):
+        raise ValueError("PMP dashboard no longer selects the command-14/15 window")
+    for target in (PMP_SET_DEVICE_STATE, PMP_SET_VIRTUAL_DEVICE_STATE):
+        if symbols[target] not in dispatch_targets:
+            raise ValueError(f"PMP dashboard no longer dispatches to {target}")
+
+    state_address, state_code = functions[PMP_SET_DEVICE_STATE]
+    state_targets = direct_branch_targets(state_address, state_code)
+    if not _has_cmp_w_immediate(state_code, source=3, immediate=2):
+        raise ValueError("PMP device dashboard no longer bounds state to 0/1")
+    if not _has_ldrb(state_code, destination=8, base=0, immediate=3):
+        raise ValueError("PMP device dashboard index is no longer DeviceData byte 3")
+    for target in (APPLE_PTD_READ, APPLE_PTD_WRITE):
+        if symbols[target] not in state_targets:
+            raise ValueError(f"PMP device dashboard no longer calls {target}")
+
+    return {
+        "device_state_commands": [14, 15],
+        "device_states": [0, 1],
+        "device_index_field": 3,
+        "transport": "PTD dashboard request/ack bitsets",
+    }
+
+
+def recover_apple_pmgr(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_PMGR_UUID:
+        raise ValueError(f"unsupported ApplePMGR UUID {identity}")
+    symbols = macho_symbols(image)
+    functions = {
+        name: symbol_code(image, name)
+        for name in (PMP_SEND_COMMAND, PMP_WRITE_DASHBOARD, PMP_SET_DEVICE_STATE)
+    }
+    return {
+        "uuid": identity,
+        "pmp_v2": recover_pmp_code_contract(functions, symbols),
+    }
+
+
 def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     sgx_path, sgx = find_one(
         root,
@@ -315,6 +478,28 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     if len(agx_devices) != 1 or agx_devices[0]["id"] != 0x10:
         raise ValueError(f"unexpected PMP AGX SoC-device records: {agx_devices!r}")
 
+    ptd_ranges = parse_pmp_ptd_ranges(nub.property("ptd-range"))
+    ptd_by_name = {str(item["name"]): item for item in ptd_ranges}
+    if len(ptd_by_name) != len(ptd_ranges):
+        raise ValueError("PMP ptd-range property contains duplicate names")
+    expected_dashboard = {
+        "SOC-DEV-PKT": (9, 0x90, 0x150),
+        "SOC-DEV-PS-REQ": (10, 0x1E0, 8),
+        "SOC-DEV-PS-ACK": (11, 0x1E8, 8),
+    }
+    dashboard: dict[str, dict[str, object]] = {}
+    for name, expected in expected_dashboard.items():
+        item = ptd_by_name.get(name)
+        if item is None:
+            raise ValueError(f"PMP DeviceTree has no {name} PTD range")
+        actual = (item["id"], item["entry_offset"], item["entry_count"])
+        if actual != expected:
+            raise ValueError(f"PMP {name} PTD range changed: {actual!r}")
+        dashboard[name] = item
+    power_range_ids = decode_u32_array(nub.property("pm-ptd-ranges"), "pm-ptd-ranges")
+    if any(item["id"] not in power_range_ids for item in dashboard.values()):
+        raise ValueError("PMP power PTD list omits a device-state dashboard range")
+
     gfx_handles: dict[str, dict[str, object]] = {}
     for handle, expected_name in ((0x266, "GFX_ASC"), (0x291, "GFX_ASC1")):
         gate = resolve_gate(handle, devices)
@@ -341,6 +526,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             "region_base": decode_integer(nub.property("region-base"), "PMP region-base"),
             "region_size": decode_integer(nub.property("region-size"), "PMP region-size"),
             "agx_soc_device": agx_devices[0],
+            "device_state_dashboard": dashboard,
         },
     }
 
@@ -361,6 +547,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device-tree", type=Path, help="override devicetree.img4")
     parser.add_argument("--preboot", type=Path, default=DEFAULT_PREBOOT)
+    parser.add_argument("--pmgr", type=Path, default=DEFAULT_APPLE_PMGR)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -368,6 +555,7 @@ def main() -> int:
         payload = device_tree_im4p_payload(source.read_bytes())
         root = parse_adt(decompress_device_tree(payload))
         manifest = recover_t6050_power(root)
+        manifest["apple_pmgr"] = recover_apple_pmgr(args.pmgr.read_bytes())
     except (OSError, ValueError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)
