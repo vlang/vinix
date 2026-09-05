@@ -95,6 +95,7 @@ pub mut:
 	lock           klock.Lock
 mut:
 	g13_channels &G13ChannelAllocations = unsafe { nil }
+	g13_events   G13EventResources
 	g13_queues   []&G13QueueResources
 	g17_graph    &G17FirmwareGraph = unsafe { nil }
 	g17_queues   []&G17QueueResources
@@ -624,6 +625,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 fn (mut mgr GpuManager) fail_g13_initialization() bool {
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
 	mgr.release_g13_channels()
+	mgr.release_g13_event_resources_locked()
 	mgr.initdata_va = 0
 	mgr.initdata_phys = 0
 	mgr.state = .error
@@ -923,7 +925,7 @@ pub fn (mut mgr GpuManager) handle_event() {
 		event_type := unsafe { *&u32(&buf[0]) }
 		match event_type {
 			fw.fw_event_flag {
-				gpu_event_mgr.scan_completions()
+				event.scan_all_completions()
 			}
 			fw.fw_event_fault {
 				C.printf(c'agx: GPU firmware error event\n')
@@ -1055,7 +1057,7 @@ pub fn (mut mgr GpuManager) submit_compute(cmd &queue.ComputeCommand, priority u
 fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		mgr.handle_event()
-		gpu_event_mgr.scan_completions()
+		event.scan_all_completions()
 		sched.yield(false)
 	}
 }
@@ -1072,6 +1074,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
 	mgr.release_all_g13_queue_resources()
 	mgr.release_g13_channels()
+	mgr.release_g13_event_resources_locked()
 	mgr.release_all_g17_queue_resources()
 	mgr.release_g17_firmware_graph()
 	println('agx: GPU shutdown complete')

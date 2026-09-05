@@ -6,12 +6,20 @@ module gpu
 
 import gpu.agx.fw
 import gpu.agx.pgtable
+import gpu.agx.event
 
 pub const g13_queue_channel_vertex = u32(1) << 0
 pub const g13_queue_channel_fragment = u32(1) << 1
 pub const g13_queue_channel_compute = u32(1) << 2
 const g13_queue_channel_mask = g13_queue_channel_vertex | g13_queue_channel_fragment |
 	g13_queue_channel_compute
+
+struct G13EventResources {
+mut:
+	driver_stamps   SharedBuffer
+	firmware_stamps SharedBuffer
+	initialized     bool
+}
 
 struct G13SubQueueResources {
 mut:
@@ -35,6 +43,47 @@ mut:
 	notifier      SharedBuffer
 	subqueues     [3]G13SubQueueResources
 	released      bool
+}
+
+// Allocate the two event-counter arrays in their correct cacheability classes.
+// This runs after the UAT exists but before either firmware or DRM queues start.
+pub fn (mut mgr GpuManager) initialize_g13_event_resources() bool {
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	if mgr.state != .idle || mgr.hw_config.gpu_gen != .g13 || mgr.g13_events.initialized {
+		return false
+	}
+	bytes := u64(event.max_stamps) * event.stamp_size
+	mgr.g13_events.driver_stamps = mgr.alloc_g13_shared_buffer(bytes) or { return false }
+	mgr.g13_events.firmware_stamps = mgr.alloc_g13_buffer_with_protection(bytes,
+		pgtable.gpu_prot_fw_private_rw) or {
+		mgr.free_shared_buffer(mut mgr.g13_events.driver_stamps)
+		return false
+	}
+	if !event.configure_event_manager(mgr.g13_events.driver_stamps.va,
+		mgr.g13_events.driver_stamps.phys, mgr.g13_events.firmware_stamps.va,
+		mgr.g13_events.firmware_stamps.phys) {
+		mgr.free_shared_buffer(mut mgr.g13_events.firmware_stamps)
+		mgr.free_shared_buffer(mut mgr.g13_events.driver_stamps)
+		return false
+	}
+	mgr.g13_events.initialized = true
+	return true
+}
+
+// Caller holds mgr.lock or owns the unpublished manager.
+fn (mut mgr GpuManager) release_g13_event_resources_locked() {
+	if !mgr.g13_events.initialized {
+		return
+	}
+	event.reset_event_manager()
+	mgr.free_shared_buffer(mut mgr.g13_events.firmware_stamps)
+	mgr.free_shared_buffer(mut mgr.g13_events.driver_stamps)
+	mgr.g13_events.initialized = false
+	mgr.g13_private.gc()
+	mgr.g13_shared.gc()
 }
 
 fn (mut mgr GpuManager) initialize_g13_subqueue(mut resources G13QueueResources,
@@ -105,7 +154,8 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 	defer {
 		mgr.lock.release()
 	}
-	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13 || mgr.g13_channels == unsafe { nil } {
+	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13
+		|| mgr.g13_channels == unsafe { nil } || !event.event_manager_ready() {
 		return none
 	}
 

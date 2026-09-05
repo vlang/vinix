@@ -11,7 +11,6 @@ import gpu.agx.hw
 import gpu.agx.regs
 import gpu.agx.mmu
 import gpu.agx.pgtable
-import gpu.agx.event
 import gpu.agx.fw
 import gpu.agx.file as agx_file
 import gpu.dcp
@@ -19,7 +18,6 @@ import drm
 import drm.ioctl as drm_ioctl
 import apple.rtkit
 import devicetree
-import memory
 
 pub struct AgxDriver {
 pub mut:
@@ -861,24 +859,7 @@ pub fn initialise() {
 		return
 	}
 
-	// Step 4: Initialize GPU event stamp storage.
-	stamp_pages := u64(mmu.uat_num_contexts)
-	stamp_phys := u64(memory.pmm_alloc_aligned(stamp_pages, 4))
-	if stamp_phys == 0 {
-		println('agx: Failed to allocate stamp memory')
-		return
-	}
-	stamp_va := u64(0x10_0000)
-	stamp_size := stamp_pages * page_size
-	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(stamp_va, stamp_phys, stamp_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
-			println('agx: Failed to map stamp buffer in UAT')
-			return
-		}
-	}
-	gpu_event_mgr = event.new_event_manager(stamp_va, stamp_phys)
-
-	// Step 5: Create RTKit and GpuManager using the mapped GPU resources.
+	// Step 4: Create RTKit and GpuManager using the mapped GPU resources.
 	gpu_rtk := rtkit.new_rtkit(platform.mailbox_base, 'agx')
 	mut gpu_secondary_rtk := rtkit.RTKit{}
 	if platform.firmware_role_count == 2 {
@@ -889,8 +870,12 @@ pub fn initialise() {
 		println('agx: Failed to create GPU manager')
 		return
 	}
+	if !mgr.initialize_g13_event_resources() {
+		println('agx: Failed to initialize native G13 event stamps')
+		return
+	}
 
-	// Step 6: Init GPU (RTKit boot, firmware init)
+	// Step 5: Init GPU (RTKit boot, firmware init)
 	if !mgr.init() {
 		println('agx: GPU initialization failed')
 		return
