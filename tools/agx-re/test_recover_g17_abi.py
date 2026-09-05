@@ -45,6 +45,23 @@ def tbz(source: int, target: int, register: int, bit: int) -> int:
     )
 
 
+def cbz(
+    source: int,
+    target: int,
+    register: int,
+    *,
+    nonzero: bool = False,
+    width: int = 8,
+) -> int:
+    return (
+        0x34000000
+        | (width == 8) << 31
+        | nonzero << 24
+        | (((target - source) // 4) & 0x7FFFF) << 5
+        | register
+    )
+
+
 def adrp(source: int, target: int, register: int) -> int:
     pages = ((target & ~0xFFF) - (source & ~0xFFF)) >> 12
     immediate = pages & 0x1FFFFF
@@ -64,6 +81,10 @@ def ldp_x(first: int, second: int, base: int, immediate: int) -> int:
         | base << 5
         | first
     )
+
+
+def ldrb(destination: int, base: int, immediate: int) -> int:
+    return 0x39400000 | immediate << 10 | base << 5 | destination
 
 
 def stp_x(first: int, second: int, base: int, immediate: int) -> int:
@@ -4806,6 +4827,24 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(expression["taken"]["value"], 7)
         self.assertEqual(expression["fallthrough"]["member"], 0x760)
 
+    def test_recovers_g17_compare_zero_branch_merge(self) -> None:
+        instructions = [
+            (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
+            (0x04, cbz(0x04, 0x0C, 4, nonzero=True)),
+            (0x08, 0xF943C264),  # ldr x4, [x19, #0x780]
+            (0x0C, 0xD503201F),
+        ]
+        expression = recover_g17_abi.trace_g17_value_expression(
+            instructions, 4, 4
+        )
+        self.assertIsNotNone(expression)
+        self.assertEqual(expression["operation"], "branch_select")
+        self.assertEqual(expression["condition"], "nonzero")
+        self.assertEqual(expression["predicate"]["operation"], "compare_zero")
+        self.assertEqual(expression["predicate"]["source"]["member"], 0x760)
+        self.assertEqual(expression["taken"]["member"], 0x760)
+        self.assertEqual(expression["fallthrough"]["member"], 0x780)
+
     def test_recovers_g17_four_way_compare_merge(self) -> None:
         instructions = [
             (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
@@ -4835,6 +4874,126 @@ class RecoverG17AbiTests(unittest.TestCase):
             [case["value"]["immediate"] for case in expression["cases"]],
             [3, 2, 1],
         )
+
+    def test_recovers_g17_nested_optional_bit_set(self) -> None:
+        instructions = [
+            (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
+            (0x04, 0x39400268),  # ldrb w8, [x19]
+            (0x08, tbz(0x08, 0x24, 8, 0)),
+            (0x0C, 0xB9400269),  # ldr w9, [x19]
+            (0x10, cbz(0x10, 0x20, 9, nonzero=True, width=4)),
+            (0x14, 0xB9400669),  # ldr w9, [x19, #4]
+            (0x18, 0x3100053F),  # cmn w9, #1
+            (0x1C, b_cond(0x1C, 0x24, 0)),
+            (0x20, 0xB2750084),  # orr x4, x4, #0x800
+            (0x24, 0xD503201F),
+        ]
+        expression = recover_g17_abi.trace_g17_value_expression(
+            instructions, 10, 4
+        )
+        self.assertIsNotNone(expression)
+        self.assertEqual(expression["condition"], "bit_clear")
+        self.assertEqual(expression["taken"]["member"], 0x760)
+        compare_zero = expression["fallthrough"]
+        self.assertEqual(compare_zero["condition"], "nonzero")
+        self.assertEqual(compare_zero["taken"]["immediate"], 0x800)
+        inner = compare_zero["fallthrough"]
+        self.assertEqual(inner["condition"], "eq")
+        self.assertEqual(inner["taken"]["member"], 0x760)
+        self.assertEqual(inner["fallthrough"]["immediate"], 0x800)
+
+    def test_recovers_g17_cl_table_or_fallback_base(self) -> None:
+        instructions = [
+            (0x31C, ldrb(10, 19, 0x58)),
+            (0x320, tbz(0x320, 0x35C, 10, 0)),
+            (0x324, ldr_w(10, 19, 0x5C)),
+            (0x328, 0x5100054A),  # sub w10, w10, #1
+            (0x32C, 0x7100195F),  # cmp w10, #6
+            (0x330, b_cond(0x330, 0x36C, 8)),  # b.hi
+            (0x334, adrp(0x334, 0x5000, 11)),
+            (0x338, add_immediate(11, 11, 0x40)),
+            (0x33C, 0xD37D7D4A),  # ubfiz x10, x10, #3, #32
+            (0x340, 0xEB2AC15F),  # cmp x10, w10, sxtw
+            (0x344, 0x8B2AC16C),  # add x12, x11, w10, sxtw
+            (0x348, 0x8B0A0170),  # add x16, x11, x10
+            (0x34C, 0xF2E575B0),  # movk x16, #0x2bad, lsl #48
+            (0x350, 0x9A90018C),  # csel x12, x12, x16, eq
+            (0x354, 0xF940018A),  # ldr x10, [x12]
+            (0x358, b(0x358, 0x378)),
+            (0x35C, 0xD2884018),
+            (0x360, 0xF2AA8058),
+            (0x364, 0xF2C00038),
+            (0x368, b(0x368, 0x390)),
+            (0x36C, 0xD284402A),
+            (0x370, 0xF2AA800A),
+            (0x374, 0xF2C0002A),
+            (0x378, ldr_w(11, 19, 0x6C)),
+            (0x37C, 0xAA0B454A),  # orr x10, x10, x11, lsl #17
+            (0x380, 0x9293BFEB),
+            (0x384, 0xF2BFFDCB),
+            (0x388, 0xF2E0002B),
+            (0x38C, 0x8A0B0158),  # and x24, x10, x11
+            (0x390, 0xD503201F),
+        ]
+        expression = recover_g17_abi.trace_g17_value_expression(
+            instructions, 30, 24
+        )
+        self.assertIsNotNone(expression)
+        self.assertEqual(expression["operation"], "branch_select")
+        self.assertEqual(expression["condition"], "bit_clear")
+        self.assertEqual(expression["taken"]["value"], 0x154024200)
+        dynamic = expression["fallthrough"]
+        self.assertEqual(dynamic["operation"], "and")
+        self.assertEqual(dynamic["first"]["first"]["condition"], "hi")
+        self.assertEqual(dynamic["first"]["first"]["taken"]["value"], 0x154002201)
+
+    def test_recovers_g17_cl_mode_selected_low_bit(self) -> None:
+        instructions = [
+            (0x390, ldr_w(10, 19, 0x100)),
+            (0x394, 0x7100095F),  # cmp w10, #2
+            (0x398, b_cond(0x398, 0x3D8, 0)),
+            (0x39C, 0x7100055F),  # cmp w10, #1
+            (0x3A0, b_cond(0x3A0, 0x3C0, 0)),
+            (0x3A4, cbz(0x3A4, 0x3EC, 10, nonzero=True, width=4)),
+            (0x3A8, ldrb(10, 19, 0x44)),
+            (0x3AC, tbz(0x3AC, 0x410, 10, 0)),
+            (0x3B0, ldr_w(10, 19, 0x48)),
+            (0x3B4, 0x7100015F),  # cmp w10, #0
+            (0x3B8, 0x1A9F17EA),  # cset w10, eq
+            (0x3BC, b(0x3BC, 0x414)),
+            (0x3C0, ldrb(10, 19, 0x44)),
+            (0x3C4, tbz(0x3C4, 0x3F0, 10, 0)),
+            (0x3C8, ldr_w(10, 19, 0x48)),
+            (0x3CC, 0x7100015F),  # cmp w10, #0
+            (0x3D0, 0x1A9F17EA),  # cset w10, eq
+            (0x3D4, b(0x3D4, 0x3F4)),
+            (0x3D8, recover_g17_abi.G17_CL_RANDOM_CALL_WORD),
+            (0x3DC, 0x1200000A),  # and w10, w0, #1
+            (0x3E0, 0xD503201F),
+            (0x3E4, 0xD503201F),
+            (0x3E8, b(0x3E8, 0x414)),
+            (0x3EC, b(0x3EC, 0x414)),
+            (0x3F0, ldr_w(10, 19, 0x40)),
+            (0x3F4, adrp(0x3F4, 0x5000, 11)),
+            (0x3F8, ldrb(12, 11, 8)),
+            (0x3FC, 0x1100058D),  # add w13, w12, #1
+            (0x400, 0x3900216D),  # strb w13, [x11, #8]
+            (0x404, 0x0B0C014A),  # add w10, w10, w12
+            (0x408, 0x1200014A),  # and w10, w10, #1
+            (0x40C, b(0x40C, 0x414)),
+            (0x410, ldr_w(10, 19, 0x40)),
+            (0x414, 0xD503201F),
+        ]
+        expression = recover_g17_abi.trace_g17_value_expression(
+            instructions, 34, 10
+        )
+        self.assertIsNotNone(expression)
+        self.assertEqual(expression["operation"], "multiway_select")
+        self.assertEqual([case["equals"] for case in expression["cases"]], [2, 1, 0])
+        self.assertEqual(expression["cases"][0]["value"]["source"]["provider"], "_random")
+        counter = expression["cases"][1]["value"]["source"]["second"]
+        self.assertEqual(counter["kind"], "object_load")
+        self.assertEqual(counter["update"], "postincrement")
 
     def test_rejects_g17_ambiguous_conditional_branch_merge(self) -> None:
         instructions = [

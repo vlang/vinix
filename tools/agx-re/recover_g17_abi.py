@@ -511,7 +511,10 @@ COMPLETE_COMMAND_3D = "__ZN22AGX3DCommandDescriptor8completeEv"
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 10
 VALUE_ARGUMENT_WINDOW = 20
-G17_VALUE_EXPRESSION_MAX_DEPTH = 16
+G17_VALUE_EXPRESSION_MAX_DEPTH = 20
+G17_CL_RANDOM_CALL_OFFSET = 0x3D8
+G17_CL_RANDOM_CALL_WORD = 0x94B3CB9D
+KERNEL_RANDOM = "_random"
 RCE_ENCODE_ENTRY = "__ZNK36AGX·PI_300·X·A0·RCEBufferEncoder11encodeEntryEPvjhy"
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 G17_ACCELERATOR_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
@@ -1131,6 +1134,22 @@ def decode_test_bit_branch(address: int, word: int) -> dict[str, object] | None:
     }
 
 
+def decode_compare_zero_branch(
+    address: int, word: int
+) -> dict[str, object] | None:
+    if word & 0x7E000000 != 0x34000000:
+        return None
+    target = decode_local_branch_target(address, word)
+    if target is None:
+        return None
+    return {
+        "target": target,
+        "condition": "nonzero" if word & (1 << 24) else "zero",
+        "register": word & 0x1F,
+        "bytes": 8 if word & (1 << 31) else 4,
+    }
+
+
 def g17_register_is_written(word: int, register: int) -> bool:
     """Recognize the integer writers present in the register-list producers."""
 
@@ -1248,6 +1267,22 @@ def trace_g17_known_call_return(
         authenticated_call = call_word & 0xFFFFFC00 == 0xD73F0800
         if direct_call is None and not authenticated_call:
             continue
+        if direct_call is not None:
+            if (
+                call_offset == G17_CL_RANDOM_CALL_OFFSET
+                and call_word == G17_CL_RANDOM_CALL_WORD
+                and g17_definition_dominates_use(
+                    instructions, call_index, use_index
+                )
+            ):
+                return {
+                    "kind": "call_result",
+                    "producer_offset": call_offset,
+                    "method": "random",
+                    "provider": KERNEL_RANDOM,
+                    "bytes": 4,
+                }
+            return None
         if not authenticated_call or not g17_definition_dominates_use(
             instructions, call_index, use_index
         ):
@@ -1852,6 +1887,525 @@ def trace_g17_four_way_compare_merge(
     }
 
 
+def trace_g17_optional_bit_set_merge(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    register: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Recover the nested test/CBNZ/compare guard around one ORR bit set."""
+
+    definition_index = next(
+        (
+            index
+            for index in range(use_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], register)
+        ),
+        None,
+    )
+    if definition_index is None or definition_index < 6:
+        return None
+    definition_offset, definition = instructions[definition_index]
+    logical = decode_logical_immediate_x(definition)
+    if (
+        logical is None
+        or logical[0] != "orr"
+        or logical[1] != register
+        or logical[2] != register
+    ):
+        return None
+    join = (
+        instructions[definition_index + 1][0]
+        if definition_index + 1 < len(instructions)
+        else definition_offset + 4
+    )
+    outer_index = definition_index - 6
+    compare_zero_index = definition_index - 4
+    inner_index = definition_index - 1
+    outer_offset, outer_word = instructions[outer_index]
+    compare_zero_offset, compare_zero_word = instructions[compare_zero_index]
+    inner_offset, inner_word = instructions[inner_index]
+    outer = decode_test_bit_branch(outer_offset, outer_word)
+    compare_zero = decode_compare_zero_branch(
+        compare_zero_offset, compare_zero_word
+    )
+    inner = decode_conditional_branch(inner_offset, inner_word)
+    if (
+        outer is None
+        or int(outer["target"]) != join
+        or compare_zero is None
+        or compare_zero["condition"] != "nonzero"
+        or int(compare_zero["target"]) != definition_offset
+        or inner is None
+        or inner[0] != join
+    ):
+        return None
+
+    base = trace_g17_value_expression(
+        instructions, definition_index, register, depth + 1, seen
+    )
+    outer_source = trace_g17_value_expression(
+        instructions,
+        outer_index,
+        int(outer["register"]),
+        depth + 1,
+        seen,
+    )
+    compare_zero_source = trace_g17_value_expression(
+        instructions,
+        compare_zero_index,
+        int(compare_zero["register"]),
+        depth + 1,
+        seen,
+    )
+    inner_predicate = trace_g17_condition_expression(
+        instructions, inner_index, depth + 1, seen
+    )
+    if (
+        base is None
+        or outer_source is None
+        or compare_zero_source is None
+        or inner_predicate is None
+    ):
+        return None
+
+    modified = {
+        "kind": "expression",
+        "producer_offset": definition_offset,
+        "operation": "orr",
+        "bytes": 8,
+        "immediate": logical[3],
+        "source": base,
+    }
+    inner_select = {
+        "kind": "expression",
+        "producer_offset": inner_offset,
+        "operation": "branch_select",
+        "condition": inner[1],
+        "target_offset": join,
+        "predicate": inner_predicate,
+        "taken": base,
+        "fallthrough": modified,
+    }
+    compare_zero_select = {
+        "kind": "expression",
+        "producer_offset": compare_zero_offset,
+        "operation": "branch_select",
+        "condition": "nonzero",
+        "target_offset": definition_offset,
+        "predicate": {
+            "kind": "condition",
+            "producer_offset": compare_zero_offset,
+            "operation": "compare_zero",
+            "bytes": compare_zero["bytes"],
+            "source": compare_zero_source,
+        },
+        "taken": modified,
+        "fallthrough": inner_select,
+    }
+    return {
+        "kind": "expression",
+        "producer_offset": outer_offset,
+        "operation": "branch_select",
+        "condition": outer["condition"],
+        "target_offset": join,
+        "predicate": {
+            "kind": "condition",
+            "producer_offset": outer_offset,
+            "operation": "test_bit",
+            "bytes": outer["bytes"],
+            "bit": outer["bit"],
+            "source": outer_source,
+        },
+        "taken": base,
+        "fallthrough": compare_zero_select,
+    }
+
+
+def trace_g17_cl_base_merge(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    register: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Recover CL's table/fallback base selected by two descriptor fields."""
+
+    definition_index = next(
+        (
+            index
+            for index in range(use_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], register)
+        ),
+        None,
+    )
+    if definition_index is None or definition_index < 28:
+        return None
+    start = definition_index - 28
+    block = instructions[start : definition_index + 2]
+    if len(block) != 30:
+        return None
+    join = block[29][0]
+    outer = decode_test_bit_branch(*block[1])
+    inner = decode_conditional_branch(*block[5])
+    if (
+        outer is None
+        or outer["condition"] != "bit_clear"
+        or outer["target"] != block[16][0]
+        or inner != (block[20][0], "hi")
+        or decode_b_target(*block[15]) != block[23][0]
+        or decode_b_target(*block[19]) != join
+    ):
+        return None
+    packed = decode_logical_shifted_register(block[24][1])
+    masked = decode_logical_shifted_register(block[28][1])
+    if (
+        packed is None
+        or packed["operation"] != "orr"
+        or packed["destination_register"] != 10
+        or packed["first_register"] != 10
+        or packed["second_register"] != 11
+        or packed["shift"] != "lsl"
+        or packed["amount"] != 17
+        or masked is None
+        or masked["operation"] != "and"
+        or masked["destination_register"] != register
+        or masked["first_register"] != 10
+        or masked["second_register"] != 11
+        or masked["amount"] != 0
+    ):
+        return None
+
+    def load_value(relative: int) -> dict[str, object] | None:
+        load = decode_integer_load_unsigned(block[relative][1])
+        if load is None:
+            return None
+        _destination, base, member, width = load
+        if base == 19:
+            return {
+                "kind": "descriptor_load",
+                "producer_offset": block[relative][0],
+                "member": member,
+                "bytes": width,
+                "signed": False,
+            }
+        base_value = trace_g17_value_expression(
+            instructions, start + relative, base, depth + 1, seen
+        )
+        if base_value is None:
+            return None
+        return {
+            "kind": "object_load",
+            "producer_offset": block[relative][0],
+            "member": member,
+            "bytes": width,
+            "signed": False,
+            "base": base_value,
+        }
+
+    flag = load_value(0)
+    predicate = trace_g17_condition_expression(
+        instructions, start + 5, depth + 1, seen
+    )
+    table_value = trace_g17_value_expression(
+        instructions, start + 15, 10, depth + 1, seen
+    )
+    descriptor_bits = load_value(23)
+    constant_base = resolve_static_x_register(instructions, start + 19, register)
+    fallback = resolve_static_x_register(instructions, start + 23, 10)
+    mask = resolve_static_x_register(instructions, start + 28, 11)
+    if (
+        flag is None
+        or predicate is None
+        or table_value is None
+        or descriptor_bits is None
+        or constant_base is None
+        or fallback is None
+        or mask is None
+    ):
+        return None
+
+    selected = {
+        "kind": "expression",
+        "producer_offset": block[5][0],
+        "operation": "branch_select",
+        "condition": "hi",
+        "target_offset": block[20][0],
+        "predicate": predicate,
+        "taken": {
+            "kind": "constant",
+            "producer_offset": block[22][0],
+            "value": fallback,
+        },
+        "fallthrough": table_value,
+    }
+    dynamic = {
+        "kind": "expression",
+        "producer_offset": block[28][0],
+        "operation": "and",
+        "bytes": 8,
+        "first": {
+            "kind": "expression",
+            "producer_offset": block[24][0],
+            "operation": "orr",
+            "bytes": 8,
+            "shift": "lsl",
+            "amount": 17,
+            "first": selected,
+            "second": descriptor_bits,
+        },
+        "second": {
+            "kind": "constant",
+            "producer_offset": block[27][0],
+            "value": mask,
+        },
+    }
+    return {
+        "kind": "expression",
+        "producer_offset": block[1][0],
+        "operation": "branch_select",
+        "condition": "bit_clear",
+        "target_offset": block[16][0],
+        "predicate": {
+            "kind": "condition",
+            "producer_offset": block[1][0],
+            "operation": "test_bit",
+            "bytes": outer["bytes"],
+            "bit": outer["bit"],
+            "source": flag,
+        },
+        "taken": {
+            "kind": "constant",
+            "producer_offset": block[18][0],
+            "value": constant_base,
+        },
+        "fallthrough": dynamic,
+    }
+
+
+def trace_g17_cl_mode_bit_merge(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    register: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Recover CL's mode-selected descriptor, counter, or random low bit."""
+
+    definition_index = next(
+        (
+            index
+            for index in range(use_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], register)
+        ),
+        None,
+    )
+    if definition_index is None or definition_index < 32:
+        return None
+    mode_index = definition_index - 32
+    block = instructions[mode_index : definition_index + 2]
+    if len(block) != 34:
+        return None
+    join = block[33][0]
+
+    def compare_immediate(relative: int, immediate: int) -> bool:
+        decoded = decode_add_sub_immediate_value(block[relative][1])
+        return bool(
+            decoded is not None
+            and decoded["operation"] == "sub"
+            and decoded["destination_register"] == 31
+            and decoded["source_register"] == register
+            and decoded["immediate"] == immediate
+            and decoded["bytes"] == 4
+            and block[relative][1] & (1 << 29)
+        )
+
+    if not compare_immediate(1, 2) or not compare_immediate(3, 1):
+        return None
+    if decode_conditional_branch(*block[2]) != (block[18][0], "eq"):
+        return None
+    if decode_conditional_branch(*block[4]) != (block[12][0], "eq"):
+        return None
+    default_branch = decode_compare_zero_branch(*block[5])
+    if (
+        default_branch is None
+        or default_branch["condition"] != "nonzero"
+        or default_branch["register"] != register
+        or default_branch["target"] != block[23][0]
+    ):
+        return None
+    for relative, target in ((11, join), (17, block[25][0]), (22, join), (23, join), (31, join)):
+        if decode_b_target(*block[relative]) != target:
+            return None
+
+    flag_zero = decode_test_bit_branch(*block[7])
+    flag_one = decode_test_bit_branch(*block[13])
+    if (
+        flag_zero is None
+        or flag_zero["target"] != block[32][0]
+        or flag_one is None
+        or flag_one["target"] != block[24][0]
+    ):
+        return None
+    random_mask = decode_logical_immediate_w(block[19][1])
+    counter_load = decode_integer_load_unsigned(block[26][1])
+    counter_increment = decode_add_sub_immediate_value(block[27][1])
+    counter_store = decode_str_unsigned(block[28][1])
+    counter_add = decode_add_sub_register_value(block[29][1])
+    counter_mask = decode_logical_immediate_w(block[30][1])
+    if (
+        block[18][0] != G17_CL_RANDOM_CALL_OFFSET
+        or block[18][1] != G17_CL_RANDOM_CALL_WORD
+        or random_mask != ("and", register, 0, 1)
+        or counter_load is None
+        or counter_increment is None
+        or counter_increment["operation"] != "add"
+        or counter_increment["source_register"] != counter_load[0]
+        or counter_increment["immediate"] != 1
+        or counter_increment["bytes"] != 4
+        or counter_store is None
+        or counter_store[0] != counter_increment["destination_register"]
+        or counter_store[1:] != counter_load[1:]
+        or counter_add is None
+        or counter_add["operation"] != "add"
+        or counter_add["destination_register"] != register
+        or counter_add["first_register"] != register
+        or counter_add["second_register"] != counter_load[0]
+        or counter_add["amount"] != 0
+        or counter_mask != ("and", register, register, 1)
+    ):
+        return None
+
+    def load_value(relative: int) -> dict[str, object] | None:
+        load = decode_integer_load_unsigned(block[relative][1])
+        if load is None or load[0] == 31:
+            return None
+        destination, base, member, width = load
+        if base == 19:
+            return {
+                "kind": "descriptor_load",
+                "producer_offset": block[relative][0],
+                "member": member,
+                "bytes": width,
+                "signed": False,
+            }
+        base_value = trace_g17_value_expression(
+            instructions,
+            mode_index + relative,
+            base,
+            depth + 1,
+            seen,
+        )
+        if base_value is None:
+            return None
+        return {
+            "kind": "object_load",
+            "producer_offset": block[relative][0],
+            "member": member,
+            "bytes": width,
+            "signed": False,
+            "base": base_value,
+        }
+
+    selector = load_value(0)
+    zero_flag = load_value(6)
+    zero_fallthrough = trace_g17_value_expression(
+        instructions, mode_index + 11, register, depth + 1, seen
+    )
+    zero_taken = load_value(32)
+    one_flag = load_value(12)
+    one_fallthrough = trace_g17_value_expression(
+        instructions, mode_index + 17, register, depth + 1, seen
+    )
+    one_taken = load_value(24)
+    random_value = trace_g17_value_expression(
+        instructions, mode_index + 20, register, depth + 1, seen
+    )
+    counter_register = int(counter_add["second_register"])
+    counter = load_value(26)
+    values = (
+        selector,
+        zero_flag,
+        zero_fallthrough,
+        zero_taken,
+        one_flag,
+        one_fallthrough,
+        one_taken,
+        random_value,
+        counter,
+    )
+    if any(value is None for value in values) or counter_register == 31:
+        return None
+
+    def test_bit_predicate(
+        relative: int, decoded: dict[str, object], source: dict[str, object]
+    ) -> dict[str, object]:
+        return {
+            "kind": "condition",
+            "producer_offset": block[relative][0],
+            "operation": "test_bit",
+            "bytes": decoded["bytes"],
+            "bit": decoded["bit"],
+            "source": source,
+        }
+
+    mode_zero = {
+        "kind": "expression",
+        "producer_offset": block[7][0],
+        "operation": "branch_select",
+        "condition": flag_zero["condition"],
+        "target_offset": block[32][0],
+        "predicate": test_bit_predicate(7, flag_zero, zero_flag),
+        "taken": zero_taken,
+        "fallthrough": zero_fallthrough,
+    }
+    mode_one_selected = {
+        "kind": "expression",
+        "producer_offset": block[13][0],
+        "operation": "branch_select",
+        "condition": flag_one["condition"],
+        "target_offset": block[24][0],
+        "predicate": test_bit_predicate(13, flag_one, one_flag),
+        "taken": one_taken,
+        "fallthrough": one_fallthrough,
+    }
+    mode_one = {
+        "kind": "expression",
+        "producer_offset": block[30][0],
+        "operation": "and",
+        "bytes": 4,
+        "immediate": 1,
+        "source": {
+            "kind": "expression",
+            "producer_offset": block[29][0],
+            "operation": "add",
+            "bytes": 4,
+            "modifier": counter_add.get("extend", counter_add.get("shift")),
+            "amount": counter_add["amount"],
+            "first": mode_one_selected,
+            "second": {
+                **counter,
+                "update": "postincrement",
+                "update_offset": block[28][0],
+            },
+        },
+    }
+    return {
+        "kind": "expression",
+        "producer_offset": block[1][0],
+        "operation": "multiway_select",
+        "selector": selector,
+        "cases": [
+            {"equals": 2, "value": random_value},
+            {"equals": 1, "value": mode_one},
+            {"equals": 0, "value": mode_zero},
+        ],
+        "default": selector,
+        "join_offset": join,
+    }
+
+
 def trace_g17_control_flow_merge(
     instructions: list[tuple[int, int]],
     use_index: int,
@@ -1883,6 +2437,7 @@ def trace_g17_control_flow_merge(
     ):
         decoded = decode_conditional_branch(branch_offset, branch_word)
         test_bit = decode_test_bit_branch(branch_offset, branch_word)
+        compare_zero = decode_compare_zero_branch(branch_offset, branch_word)
         if decoded is not None:
             target, condition = decoded
             branch: dict[str, object] = {
@@ -1900,6 +2455,14 @@ def trace_g17_control_flow_merge(
                 "kind": "test_bit",
             }
             target = int(test_bit["target"])
+        elif compare_zero is not None:
+            branch = {
+                "index": branch_index,
+                "offset": branch_offset,
+                **compare_zero,
+                "kind": "compare_zero",
+            }
+            target = int(compare_zero["target"])
         else:
             continue
 
@@ -1950,7 +2513,7 @@ def trace_g17_control_flow_merge(
         predicate = trace_g17_condition_expression(
             instructions, branch_index, depth + 1, seen
         )
-    else:
+    elif branch["kind"] == "test_bit":
         predicate_source = trace_g17_value_expression(
             instructions,
             branch_index,
@@ -1967,6 +2530,25 @@ def trace_g17_control_flow_merge(
                 "operation": "test_bit",
                 "bytes": branch["bytes"],
                 "bit": branch["bit"],
+                "source": predicate_source,
+            }
+        )
+    else:
+        predicate_source = trace_g17_value_expression(
+            instructions,
+            branch_index,
+            int(branch["register"]),
+            depth + 1,
+            seen,
+        )
+        predicate = (
+            None
+            if predicate_source is None
+            else {
+                "kind": "condition",
+                "producer_offset": branch_offset,
+                "operation": "compare_zero",
+                "bytes": branch["bytes"],
                 "source": predicate_source,
             }
         )
@@ -2048,6 +2630,18 @@ def trace_g17_value_expression(
         merge = trace_g17_four_way_compare_merge(
             instructions, use_index, register, depth, seen
         )
+        if merge is None:
+            merge = trace_g17_optional_bit_set_merge(
+                instructions, use_index, register, depth, seen
+            )
+        if merge is None:
+            merge = trace_g17_cl_base_merge(
+                instructions, use_index, register, depth, seen
+            )
+        if merge is None:
+            merge = trace_g17_cl_mode_bit_merge(
+                instructions, use_index, register, depth, seen
+            )
         if merge is None:
             merge = trace_g17_control_flow_merge(
                 instructions, use_index, register, depth, seen
@@ -2166,6 +2760,14 @@ def trace_g17_value_expression(
                     "signed": True,
                     "base": base_value,
                 }
+
+    pc_relative = decode_adrp(offset, word)
+    if pc_relative is not None and pc_relative[0] == register:
+        return {
+            "kind": "pc_relative_page",
+            "producer_offset": offset,
+            "page_delta": pc_relative[1] - (offset & ~0xFFF),
+        }
 
     wide = decode_move_wide(word)
     update_w = decode_movk_w(word)
@@ -10105,6 +10707,36 @@ def recover_g17_register_entry_codec(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_random_provider(driver: bytes, kernel: bytes) -> dict[str, object]:
+    """Cross-check the CL mode-2 low-bit source against the kernel image."""
+
+    symbols = macho_symbols(kernel)
+    if KERNEL_RANDOM not in symbols:
+        raise ValueError(f"Mach-O is missing {KERNEL_RANDOM}")
+    function_address, code = symbol_code(
+        driver, REGISTER_LIST_PRODUCERS["CL"]
+    )
+    require_instruction_words_at(
+        code,
+        "G17 CL random-bit provider",
+        {G17_CL_RANDOM_CALL_OFFSET: G17_CL_RANDOM_CALL_WORD},
+    )
+    target = decode_bl_target(
+        function_address + G17_CL_RANDOM_CALL_OFFSET,
+        G17_CL_RANDOM_CALL_WORD,
+    )
+    if target != symbols[KERNEL_RANDOM]:
+        raise ValueError(
+            f"G17 CL random call targets {target:#x}, not "
+            f"{KERNEL_RANDOM} at {symbols[KERNEL_RANDOM]:#x}"
+        )
+    return {
+        "provider": KERNEL_RANDOM,
+        "call_offset": G17_CL_RANDOM_CALL_OFFSET,
+        "return_mask": 1,
+    }
+
+
 def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     """Recover the selector encoding and the set each work producer emits.
 
@@ -11658,6 +12290,9 @@ def main() -> int:
         )
         channels["memory_map_virtual_address"] = (
             recover_g17_memory_map_virtual_address(driver, iogpu)
+        )
+        channels["random_provider"] = recover_g17_random_provider(
+            driver, kernel
         )
         channels["register_selectors"] = recover_g17_register_selectors(driver)
         channels["inline_register_records"] = (

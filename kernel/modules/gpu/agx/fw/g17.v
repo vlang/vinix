@@ -1462,13 +1462,13 @@ pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes
 // unaligned 64-bit value. Apple's selector argument is statically recovered at
 // every virtual encoder call, and both 3D inline forms are located. Every x4
 // writer is classified as a constant, descriptor load, or bounded computation,
-// including safe traces through dominating callee-saved copies and 101 complete
+// including safe traces through dominating callee-saved copies and 105 complete
 // descriptor/object/stack-rooted expression trees. Four trees use the UUID-pinned
 // DUPM minimum/maximum virtual methods, which return 1 and 2; four more use the
-// cross-image-checked IOGPUMemoryMap GPU-address accessor. Bit-test skips and
-// one canonical two-arm diamond are represented without guessing. The remaining
-// expressions and conditions/order of the complete per-pass sequences are not yet
-// recovered.
+// cross-image-checked IOGPUMemoryMap GPU-address accessor. Bit-test, compare-zero,
+// and nested forward merges are represented without guessing; the CL runtime
+// random and post-increment counter roots are pinned too. The conditions/order
+// of the complete per-pass sequences are not yet recovered.
 pub const g17_3d_register_passes = u32(4)
 pub const g17_3d_register_stride = u64(0x720)
 pub const g17_3d_register_stream_offset = u64(0xa0)
