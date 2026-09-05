@@ -1414,6 +1414,10 @@ pub const g17_command_ksm_add_kicks_size = u32(0x40)
 pub const g17_command_ksm_config_update_size = u32(0xc0)
 pub const g17_command_ksm_kick_queue_size = u32(0x40)
 pub const g17_channel_command_known_prefix_size = u64(0x6a)
+pub const g17_render_payload_size = u64(0x9d0)
+pub const g17_render_kernel_command_size = u64(0x284)
+pub const g17_render_payload_framing_error = u32(0x100)
+pub const g17_render_payload_validation_error = u32(0x0a)
 pub const g17_command_pool_fallback_capacity = u32(80)
 pub const g17_work_command_pool_multiplier = u32(3)
 pub const g17_fallback_work_command_slots = g17_command_pool_fallback_capacity * g17_work_command_pool_multiplier
@@ -1450,6 +1454,83 @@ pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes
 		prefix.data_master_type = data_master_type
 		prefix.control_032 = 0
 		prefix.control_062 = 0
+	}
+	return true
+}
+
+// Host-side normalized object produced by
+// AGXRenderHardwareKernelCommand::parseAndValidate. This is not a firmware
+// work command: retained_payload_pointer is only valid while the staged input
+// remains alive, and processRender consumes this object before constructing a
+// 3D channel command. Every byte through +0x283 is now accounted for by the
+// pinned G17C producer; reserved spans remain named as opaque storage so later
+// consumers cannot accidentally infer a field ABI from them.
+@[packed]
+pub struct G17ParsedRenderCommand {
+pub mut:
+	opaque_000               [0x08]u8
+	success                  u8
+	opaque_009               [0x03]u8
+	error_marker             u32
+	opaque_010               [0x08]u8
+	retained_payload_pointer u64
+	normalized_020           [0x264]u8
+}
+
+// Normalize one render subtype payload exactly as the UUID-pinned macOS 26.5
+// AGXG17X 351.2 parser does. The source may contain later records, so this
+// consumes the fixed 0x9d0-byte prefix rather than requiring equality. The
+// caller owns both kernel buffers and must keep payload alive while using the
+// retained pointer. No user address may be passed directly to this function.
+pub fn parse_g17_render_payload(command voidptr, command_bytes u64, payload voidptr,
+	payload_bytes u64) bool {
+	if command == unsafe { nil } || command_bytes < g17_render_kernel_command_size {
+		return false
+	}
+
+	unsafe {
+		mut parsed := &G17ParsedRenderCommand(command)
+		parsed.success = 0
+		if payload == nil || payload_bytes < g17_render_payload_size {
+			parsed.retained_payload_pointer = 0
+			parsed.error_marker = g17_render_payload_framing_error
+			return false
+		}
+
+		parsed.retained_payload_pointer = u64(payload)
+		mut destination := &u8(command)
+		source := &u8(payload)
+		C.memcpy(voidptr(destination + 0x020), voidptr(source + 0x0c8), 0x78)
+		C.memcpy(voidptr(destination + 0x098), voidptr(source + 0x4d8), 0x78)
+		C.memcpy(voidptr(destination + 0x110), voidptr(source + 0x140), 0x48)
+		C.memcpy(voidptr(destination + 0x158), voidptr(source + 0x550), 0x48)
+		C.memcpy(voidptr(destination + 0x1a0), voidptr(source + 0x24c), 0x0c)
+		C.memcpy(voidptr(destination + 0x1ac), voidptr(source + 0x658), 0x0c)
+		C.memcpy(voidptr(destination + 0x1bc), voidptr(source + 0x234), 0x04)
+		C.memcpy(voidptr(destination + 0x1db), voidptr(source + 0x25f), 0x20)
+		C.memcpy(voidptr(destination + 0x200), voidptr(source + 0x668), 0x08)
+		C.memcpy(voidptr(destination + 0x208), voidptr(source + 0x821), 0x01)
+		C.memcpy(voidptr(destination + 0x210), voidptr(source + 0x840), 0x70)
+
+		destination[0x1b8] = source[0x240] & 1
+		destination[0x1b9] = source[0x8b0] & 1
+		destination[0x1c0] = source[0x247] & 1
+		destination[0x1d8] = source[0x25c] & 1
+		destination[0x1d9] = source[0x25d] & 1
+		destination[0x1da] = source[0x25e] & 1
+		destination[0x280] = source[0x23c] & 1
+		destination[0x281] = source[0x646] & 1
+		destination[0x282] = source[0x248] & 1
+		destination[0x283] = source[0x650] & 1
+
+		if (source[0x7e0] & 1) != (source[0x240] & 1)
+			|| ((source[0x23c] & 1) != 0 && (source[0x646] & 1) == 0) {
+			parsed.error_marker = g17_render_payload_validation_error
+			return false
+		}
+
+		parsed.error_marker = 0
+		parsed.success = 1
 	}
 	return true
 }
@@ -1554,8 +1635,7 @@ pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, mode u
 	unsafe {
 		entry := &u8(command) + u64(pass) * g17_3d_register_stride + g17_3d_register_stream_offset + u64(trailer.byte_length)
 		mut selector_word := &u32(entry)
-		*selector_word = (*selector_word & g17_3d_register_selector_mask)
-			| (selector & g17_3d_register_selector_field) | u32(mode)
+		*selector_word = (*selector_word & g17_3d_register_selector_mask) | (selector & g17_3d_register_selector_field) | u32(mode)
 		mut encoded := value
 		C.memcpy(voidptr(entry + 4), &encoded, 8)
 	}
@@ -1901,6 +1981,7 @@ pub fn validate_g17_channel_layouts() bool {
 		&& sizeof(G17ChannelControl) == g17_channel_control_header_size
 		&& sizeof(G17CachedCommandPointer) == g17_cached_command_pointer_size
 		&& sizeof(G17ChannelCommandKnownPrefix) == g17_channel_command_known_prefix_size
+		&& sizeof(G17ParsedRenderCommand) == g17_render_kernel_command_size
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.
