@@ -59,6 +59,25 @@ pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 	return unsafe { *pte_p } & pte_flags_mask
 }
 
+// Resolve one userspace page for a checked kernel copy. Callers must hold the
+// pagemap lock while using the returned physical address so munmap/mprotect
+// cannot invalidate the access between validation and memcpy.
+pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
+	user_limit := if la57 { u64(1) << 56 } else { u64(1) << 47 }
+	if virt >= user_limit {
+		return none
+	}
+	pte_p := pagemap.virt2pte(virt, false) or { return none }
+	pte := unsafe { *pte_p }
+	if pte & pte_present == 0 || pte & pte_user == 0 {
+		return none
+	}
+	if write && pte & pte_writable == 0 {
+		return none
+	}
+	return pte & pte_flags_mask
+}
+
 pub fn (mut pagemap Pagemap) switch_to() {
 	top_level := pagemap.top_level
 

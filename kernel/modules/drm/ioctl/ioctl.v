@@ -17,7 +17,7 @@ pub const drm_ioctl_syncobj_create = u32(0xbf)
 pub const drm_ioctl_syncobj_destroy = u32(0xc0)
 pub const drm_ioctl_syncobj_handle_to_fd = u32(0xc1)
 pub const drm_ioctl_syncobj_fd_to_handle = u32(0xc2)
-pub const drm_ioctl_syncobj_wait = u32(0xc7)
+pub const drm_ioctl_syncobj_wait = u32(0xc3)
 pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
 
 pub const drm_cap_syncobj = u64(0x13)

@@ -13,6 +13,7 @@ import gpu.agx.pgtable
 import gpu.agx.workqueue
 import gpu.agx.gpu
 import klock
+import usercopy
 
 const max_submission_commands = u32(64)
 const max_submission_syncs = u32(64)
@@ -530,8 +531,16 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	if !queue_found {
 		return -22
 	}
+	commands_bytes := u64(request.command_count) * sizeof(ioctl.DrmAsahiCommand)
+	if commands_bytes - 1 > ~request.commands {
+		return -14
+	}
 	for i := u32(0); i < request.command_count; i++ {
-		command := unsafe { &ioctl.DrmAsahiCommand(request.commands + u64(i) * sizeof(ioctl.DrmAsahiCommand)) }
+		mut command := ioctl.DrmAsahiCommand{}
+		if !usercopy.copy_from_user(voidptr(&command), request.commands + u64(i) * sizeof(ioctl.DrmAsahiCommand),
+			sizeof(ioctl.DrmAsahiCommand)) {
+			return -14
+		}
 		if command.extensions != 0 || command.flags != 0 || command.cmd_buffer == 0 {
 			return -22
 		}
@@ -542,8 +551,12 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 					&& command.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
 					return -22
 				}
-				render := unsafe { &ioctl.DrmAsahiCmdRender(command.cmd_buffer) }
-				if !valid_render_command(render) {
+				mut render := ioctl.DrmAsahiCmdRender{}
+				if !usercopy.copy_from_user(voidptr(&render), command.cmd_buffer,
+					sizeof(ioctl.DrmAsahiCmdRender)) {
+					return -14
+				}
+				if !valid_render_command(&render) {
 					return -22
 				}
 			}
