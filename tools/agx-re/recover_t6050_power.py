@@ -35,7 +35,9 @@ PMP_SOC_DEVICE_NAME_OFFSET = 116
 PMP_PTD_RANGE_BYTES = 32
 PMP_PTD_RANGE_NAME_OFFSET = 16
 APPLE_PMGR_UUID = "42F1AD20-5320-3803-8A70-05104BD5FBA7"
+APPLE_PMP_UUID = "AA65CE02-93C8-33DE-A7BE-B11E1621F739"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
+DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
 PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
 PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
@@ -46,6 +48,15 @@ PMP_INIT_V2 = "__ZN9ApplePMGR10_initPMPv2Ev"
 PMP_GET_DEVICE_INDEX = "__ZN9ApplePMGR18_getPMPDeviceIndexEtj"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
+APPLE_PMP_V2_START = "__ZN10ApplePMPv25startEP9IOService"
+APPLE_PMP_V2_MESSAGE_HANDLER = "__ZN10ApplePMPv214messageHandlerEPvS0_"
+APPLE_PMP_V2_HANDLE_MEMORY = "__ZN10ApplePMPv216handleMemMessageEy"
+APPLE_PMP_V2_HANDLE_POWER = "__ZN10ApplePMPv215handlePMMessageEy"
+APPLE_PMP_V2_HANDLE_REGISTRY = "__ZN10ApplePMPv221handleRegistryMessageEy"
+APPLE_PMP_V2_SEND_MESSAGE = "__ZN10ApplePMPv211sendMessageEy"
+APPLE_PMP_V2_WRITE_DASHBOARD = "__ZN10ApplePMPv214writeDashboardEjy"
+APPLE_PMP_V2_GET_PROPERTY_DATA = "__ZN10ApplePMPv215getPropertyDataEPKc"
+APPLE_PMP_V2_PING_GATED = "__ZN10ApplePMPv29pingGatedEPv"
 
 
 @dataclass(frozen=True)
@@ -619,6 +630,200 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_apple_pmp_code_contract(
+    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+) -> dict[str, object]:
+    """Recover the RTBuddy mailbox and ping-completion contract.
+
+    ApplePMPv2's PM subtype-1 message is sometimes tempting to label a global
+    PMP-ready notification.  The producer/consumer code proves a narrower
+    meaning: it completes a class-2 ping, clears the ping's in-flight byte,
+    and wakes the thread sleeping on that byte.  Keep that distinction in the
+    generated report so it cannot accidentally open the AGX power gate.
+    """
+
+    required = (
+        APPLE_PMP_V2_START,
+        APPLE_PMP_V2_MESSAGE_HANDLER,
+        APPLE_PMP_V2_HANDLE_MEMORY,
+        APPLE_PMP_V2_HANDLE_POWER,
+        APPLE_PMP_V2_HANDLE_REGISTRY,
+        APPLE_PMP_V2_SEND_MESSAGE,
+        APPLE_PMP_V2_WRITE_DASHBOARD,
+        APPLE_PMP_V2_GET_PROPERTY_DATA,
+        APPLE_PMP_V2_PING_GATED,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"ApplePMP is missing PMPv2 symbols: {missing!r}")
+    for name in (
+        APPLE_PMP_V2_START,
+        APPLE_PMP_V2_MESSAGE_HANDLER,
+        APPLE_PMP_V2_HANDLE_POWER,
+        APPLE_PMP_V2_SEND_MESSAGE,
+        APPLE_PMP_V2_WRITE_DASHBOARD,
+        APPLE_PMP_V2_PING_GATED,
+    ):
+        if name not in functions:
+            raise ValueError(f"ApplePMP has no code body for {name}")
+
+    _start_address, start_code = functions[APPLE_PMP_V2_START]
+    # The RTBuddy service lives at this+0x88.  start() installs the static
+    # message callback with (service, this, callback, 0).
+    if not _has_words_in_order(
+        start_code,
+        (
+            0xF9404660,  # ldr x0, [x19, #0x88]
+            0xB0FFFFB0,  # adrp x16, page(messageHandler)
+            0x91270210,  # add x16, x16, #0x9c0
+            0xD2830211,  # mov x17, #0x1810
+            0xDAC10230,  # pacia x16, x17
+            0xAA1003E2,  # mov x2, x16
+            0xAA1303E1,  # mov x1, x19
+            0xD2800003,  # mov x3, #0
+        ),
+    ):
+        raise ValueError("ApplePMPv2 no longer installs its RTBuddy message handler")
+
+    handler_address, handler_code = functions[APPLE_PMP_V2_MESSAGE_HANDLER]
+    handler_targets = direct_branch_targets(handler_address, handler_code)
+    for target in (
+        APPLE_PMP_V2_HANDLE_MEMORY,
+        APPLE_PMP_V2_HANDLE_POWER,
+        APPLE_PMP_V2_HANDLE_REGISTRY,
+    ):
+        if symbols[target] not in handler_targets:
+            raise ValueError(
+                f"ApplePMPv2 message handler no longer dispatches to {target}"
+            )
+    if not _has_ordered_words(
+        handler_code,
+        (
+            0xD374DC28,  # ubfx x8, x1, #52, #4 -- message class
+            0x51000D09,  # sub w9, w8, #3
+            0x7100093F,  # cmp w9, #2 -- registry classes 3/4
+            0x7100091F,  # cmp w8, #2 -- power class
+            0x7100051F,  # cmp w8, #1 -- memory class
+        ),
+    ):
+        raise ValueError("ApplePMPv2 message-class decoder changed")
+
+    _power_address, power_code = functions[APPLE_PMP_V2_HANDLE_POWER]
+    if not _has_words_in_order(
+        power_code,
+        (
+            0x92500C28,  # and x8, x1, #0xf000000000000 -- PM subtype
+            0xD2E00029,  # mov x9, #0x1000000000000 -- subtype 1
+            0xEB09011F,  # cmp x8, x9
+        ),
+    ) or not _has_ordered_words(
+        power_code,
+        (
+            0x3904201F,  # strb wzr, [x0, #0x108] -- ping no longer busy
+            0x91042001,  # add x1, x0, #0x108 -- wakeup event
+        ),
+    ):
+        raise ValueError("ApplePMPv2 ping-completion message changed")
+
+    _send_address, send_code = functions[APPLE_PMP_V2_SEND_MESSAGE]
+    if not _has_ordered_words(
+        send_code,
+        (
+            0xF90007E1,  # str x1, [sp, #8] -- one 64-bit mailbox word
+            0xF9404400,  # ldr x0, [x0, #0x88] -- RTBuddy service
+            0xD2803D11,  # mov x17, #0x1e8 -- send vtable slot
+            0x910023E1,  # add x1, sp, #8
+            0xD2800002,  # mov x2, #0
+            0x52800023,  # mov w3, #1 -- one word
+        ),
+    ):
+        raise ValueError("ApplePMPv2 RTBuddy send-message ABI changed")
+
+    _ping_address, ping_code = functions[APPLE_PMP_V2_PING_GATED]
+    if not _has_ordered_words(
+        ping_code,
+        (
+            0x39442008,  # ldrb w8, [x0, #0x108] -- reject overlapping ping
+            0xD2E00417,  # mov x23, #0x20000000000000 -- class 2
+            0xB3407C17,  # bfxil x23, x0, #0, #32 -- timestamp payload
+            0x390422B7,  # strb w23, [x21, #0x108] -- mark in flight
+            0x910422A1,  # add x1, x21, #0x108 -- sleep event
+        ),
+    ):
+        raise ValueError("ApplePMPv2 ping request/wait protocol changed")
+
+    dashboard_address, dashboard_code = functions[APPLE_PMP_V2_WRITE_DASHBOARD]
+    dashboard_targets = direct_branch_targets(dashboard_address, dashboard_code)
+    if (
+        symbols[APPLE_PMP_V2_GET_PROPERTY_DATA] not in dashboard_targets
+        or not _has_ordered_words(
+            dashboard_code,
+            (
+                0xF9406000,  # ldr x0, [x0, #0xc0] -- PTD/dashboard object
+                0xAA0203F4,  # mov x20, x2 -- 64-bit value
+                0xAA0103F5,  # mov x21, x1 -- dashboard index
+                0xD0FF05A1,  # adrp x1, page("pmptool-config")
+                0x910C0021,  # add x1, x1, #0x300
+                0xF9000134,  # str x20, [x9] -- indexed 64-bit write
+            ),
+        )
+    ):
+        raise ValueError("ApplePMPv2 diagnostic dashboard write contract changed")
+
+    return {
+        "mailbox": {
+            "word_bits": 64,
+            "message_class": {"shift": 52, "bits": 4},
+            "classes": {
+                "memory": [1],
+                "power": [2],
+                "registry": [3, 4],
+            },
+            "rtbuddy_object_offset": 0x88,
+            "send_vtable_slot": 0x1E8,
+            "send_word_count": 1,
+        },
+        "ping": {
+            "request_class": 2,
+            "request_payload": "low 32 bits of host timestamp",
+            "completion_power_subtype": 1,
+            "power_subtype": {"shift": 48, "bits": 4},
+            "in_flight_byte_offset": 0x108,
+            "completion": "clear in-flight byte and wake its sleepers",
+            "scope": "ping completion, not proof of AGX dashboard readiness",
+        },
+        "diagnostic_dashboard": {
+            "object_offset": 0xC0,
+            "configuration_property": "pmptool-config",
+            "index_unit_bits": 64,
+            "write_bits": 64,
+            "scope": "diagnostic API, not the ApplePMGR AGX state request",
+        },
+    }
+
+
+def recover_apple_pmp(image: bytes) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_PMP_UUID:
+        raise ValueError(f"unsupported ApplePMP UUID {identity}")
+    symbols = macho_symbols(image)
+    functions = {
+        name: symbol_code(image, name)
+        for name in (
+            APPLE_PMP_V2_START,
+            APPLE_PMP_V2_MESSAGE_HANDLER,
+            APPLE_PMP_V2_HANDLE_POWER,
+            APPLE_PMP_V2_SEND_MESSAGE,
+            APPLE_PMP_V2_WRITE_DASHBOARD,
+            APPLE_PMP_V2_PING_GATED,
+        )
+    }
+    return {
+        "uuid": identity,
+        "pmp_v2": recover_apple_pmp_code_contract(functions, symbols),
+    }
+
+
 def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     sgx_path, sgx = find_one(
         root,
@@ -735,7 +940,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         gfx_handles[expected_name] = gate
 
     return {
-        "schema": 2,
+        "schema": 3,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -785,6 +990,7 @@ def main() -> int:
     parser.add_argument("--device-tree", type=Path, help="override devicetree.img4")
     parser.add_argument("--preboot", type=Path, default=DEFAULT_PREBOOT)
     parser.add_argument("--pmgr", type=Path, default=DEFAULT_APPLE_PMGR)
+    parser.add_argument("--pmp", type=Path, default=DEFAULT_APPLE_PMP)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -793,6 +999,7 @@ def main() -> int:
         root = parse_adt(decompress_device_tree(payload))
         manifest = recover_t6050_power(root)
         manifest["apple_pmgr"] = recover_apple_pmgr(args.pmgr.read_bytes())
+        manifest["apple_pmp"] = recover_apple_pmp(args.pmp.read_bytes())
     except (OSError, ValueError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -40,6 +40,11 @@ DEFAULT_ENTRIES = (
     "com.apple.driver.AppleARMPlatform",
     "com.apple.driver.ApplePMGR",
     "com.apple.driver.AppleT6050PMGR",
+    # ApplePMGR's ready callbacks and commands cross these service interfaces;
+    # retain both sides so readiness and command transport can be checked at
+    # named symbol boundaries rather than guessed from indirect vtable calls.
+    "com.apple.driver.ApplePMP",
+    "com.apple.driver.ApplePMPFirmware",
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",

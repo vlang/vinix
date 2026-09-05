@@ -68,7 +68,7 @@ IM4P or boot IMG4 form of `t6050pmp`, verifies its `pmpf` payload is an ARM64
 PRELOAD Mach-O, and records its hash, UUID, virtual layout, symbol count, and
 function-start-metadata boundary. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
 kernel collection and compacts the kernel, AGXG17X, firmware-buddy, and
-AppleARMPlatform/PMGR power-owner fileset entries
+AppleARMPlatform/PMGR/PMP power-owner fileset entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 `IOGPUFamily` is included because `AGXCommandQueue` inherits its device
 binding, and with it the last two channel inputs, from `IOGPUCommandQueue`;
@@ -80,10 +80,16 @@ to `GFX_SGX` and `GFX_BUSY`, identifies both GFX ASC handles, and proves that
 the AGX SoC-device record and device-state request/ack PTD ranges belong to the
 `t6050pmp` RTKit nub. It also checks the UUID-pinned ApplePMGR binary for the
 command-14/15 PTD-dashboard dispatch, its state/index bounds, and the exact
-host-built selector maps. The report separates the SoC-device ID, record
-index, dense virtual-state index, and SOC-DEV-PKT bit slice; those values are
-not interchangeable. Its sanitized JSON report is written under `build/`; raw
-Apple DeviceTree or executable bytes are never repository inputs.
+host-built selector maps. A separate UUID-pinned ApplePMP check recovers the
+PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
+ping completion: it clears and wakes the ping's in-flight byte. The generated
+report labels that result as neither global PMP nor AGX-dashboard readiness,
+and likewise keeps ApplePMP's diagnostic `pmptool-config` writer separate
+from ApplePMGR's device-state request. The report separates the SoC-device ID,
+record index, dense virtual-state index, and SOC-DEV-PKT bit slice; those
+values are not interchangeable. Its sanitized JSON report is written under
+`build/`; raw Apple DeviceTree or executable bytes are never repository
+inputs.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published

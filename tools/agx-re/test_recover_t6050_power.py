@@ -186,6 +186,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
+        self.assertEqual(result["schema"], 3)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -317,6 +318,125 @@ class RecoverT6050PowerTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "device-index table"):
             recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+
+    def test_recovers_apple_pmp_v2_mailbox_and_ping_completion(self) -> None:
+        start = 0x1000
+        handler = 0x2000
+        memory = 0x3000
+        power = 0x4000
+        registry = 0x5000
+        send = 0x6000
+        dashboard = 0x7000
+        get_property = 0x8000
+        ping = 0x9000
+
+        def branch(source: int, target: int, link: bool = False) -> bytes:
+            delta = (target - source) // 4
+            opcode = 0x94000000 if link else 0x14000000
+            return struct.pack("<I", opcode | delta & 0x3FFFFFF)
+
+        handler_prefix = struct.pack(
+            "<5I", 0xD374DC28, 0x51000D09, 0x7100093F, 0x7100091F, 0x7100051F
+        )
+        functions = {
+            recover_t6050_power.APPLE_PMP_V2_START: (
+                start,
+                struct.pack(
+                    "<8I",
+                    0xF9404660,
+                    0xB0FFFFB0,
+                    0x91270210,
+                    0xD2830211,
+                    0xDAC10230,
+                    0xAA1003E2,
+                    0xAA1303E1,
+                    0xD2800003,
+                ),
+            ),
+            recover_t6050_power.APPLE_PMP_V2_MESSAGE_HANDLER: (
+                handler,
+                handler_prefix
+                + branch(handler + len(handler_prefix), memory, True)
+                + branch(handler + len(handler_prefix) + 4, power, True)
+                + branch(handler + len(handler_prefix) + 8, registry, True),
+            ),
+            recover_t6050_power.APPLE_PMP_V2_HANDLE_POWER: (
+                power,
+                struct.pack(
+                    "<6I",
+                    0x92500C28,
+                    0xD2E00029,
+                    0xEB09011F,
+                    0x3904201F,
+                    0xD503201F,
+                    0x91042001,
+                ),
+            ),
+            recover_t6050_power.APPLE_PMP_V2_SEND_MESSAGE: (
+                send,
+                struct.pack(
+                    "<6I",
+                    0xF90007E1,
+                    0xF9404400,
+                    0xD2803D11,
+                    0x910023E1,
+                    0xD2800002,
+                    0x52800023,
+                ),
+            ),
+            recover_t6050_power.APPLE_PMP_V2_WRITE_DASHBOARD: (
+                dashboard,
+                struct.pack(
+                    "<5I",
+                    0xF9406000,
+                    0xAA0203F4,
+                    0xAA0103F5,
+                    0xD0FF05A1,
+                    0x910C0021,
+                )
+                + branch(dashboard + 20, get_property, True)
+                + struct.pack("<I", 0xF9000134),
+            ),
+            recover_t6050_power.APPLE_PMP_V2_PING_GATED: (
+                ping,
+                struct.pack(
+                    "<7I",
+                    0x39442008,
+                    0xD2E00417,
+                    0xB3407C17,
+                    0xD503201F,
+                    0x390422B7,
+                    0xD503201F,
+                    0x910422A1,
+                ),
+            ),
+        }
+        symbols = {
+            recover_t6050_power.APPLE_PMP_V2_START: start,
+            recover_t6050_power.APPLE_PMP_V2_MESSAGE_HANDLER: handler,
+            recover_t6050_power.APPLE_PMP_V2_HANDLE_MEMORY: memory,
+            recover_t6050_power.APPLE_PMP_V2_HANDLE_POWER: power,
+            recover_t6050_power.APPLE_PMP_V2_HANDLE_REGISTRY: registry,
+            recover_t6050_power.APPLE_PMP_V2_SEND_MESSAGE: send,
+            recover_t6050_power.APPLE_PMP_V2_WRITE_DASHBOARD: dashboard,
+            recover_t6050_power.APPLE_PMP_V2_GET_PROPERTY_DATA: get_property,
+            recover_t6050_power.APPLE_PMP_V2_PING_GATED: ping,
+        }
+        result = recover_t6050_power.recover_apple_pmp_code_contract(functions, symbols)
+        self.assertEqual(result["mailbox"]["message_class"]["shift"], 52)
+        self.assertEqual(result["mailbox"]["classes"]["power"], [2])
+        self.assertEqual(result["ping"]["completion_power_subtype"], 1)
+        self.assertIn("not proof", result["ping"]["scope"])
+        self.assertIn("not the ApplePMGR", result["diagnostic_dashboard"]["scope"])
+
+        bad_functions = dict(functions)
+        ping_address, ping_code = bad_functions[recover_t6050_power.APPLE_PMP_V2_PING_GATED]
+        bad_functions[recover_t6050_power.APPLE_PMP_V2_PING_GATED] = (
+            ping_address,
+            ping_code.replace(struct.pack("<I", 0xD2E00417), struct.pack("<I", 0xD2E00617)),
+        )
+        with self.assertRaisesRegex(ValueError, "ping request/wait"):
+            recover_t6050_power.recover_apple_pmp_code_contract(bad_functions, symbols)
 
     def test_rejects_changed_sgx_gate_order(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree((0x267, 0x268)))
