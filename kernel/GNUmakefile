@@ -33,6 +33,10 @@ VFLAGS :=
 # User controllable linker flags. We set none by default.
 LDFLAGS :=
 
+# Optional direct linker for cross-building x86_64 on a non-x86 host. Leave
+# empty to retain the compiler-driver link used by native builds.
+LD_X86_64 ?=
+
 PROD :=
 
 # Ensure the dependencies have been obtained.
@@ -130,6 +134,15 @@ override LDFLAGS += \
     -static \
     -z max-page-size=0x1000 \
     -Wl,--gc-sections \
+    -T linker.ld
+
+override LDFLAGS_DIRECT_X86_64 += \
+    -m elf_x86_64 \
+    --build-id=none \
+    --nostdlib \
+    --static \
+    -z max-page-size=0x1000 \
+    --gc-sections \
     -T linker.ld
 
 endif # ARCH
@@ -248,7 +261,11 @@ bin/$(OUTPUT): GNUmakefile $(if $(filter aarch64,$(ARCH)),linker-aarch64.ld,link
 ifeq ($(ARCH),aarch64)
 	$(LD_AARCH64) $(LDFLAGS_DIRECT) obj/blob.c.o $(OBJ) cc-runtime-$(ARCH)/cc-runtime.a -o $@
 else
+ifneq ($(strip $(LD_X86_64)),)
+	$(LD_X86_64) $(LDFLAGS_DIRECT_X86_64) obj/blob.c.o $(OBJ) cc-runtime-$(ARCH)/cc-runtime.a -o $@
+else
 	$(CC) $(CFLAGS) $(LDFLAGS) obj/blob.c.o $(OBJ) cc-runtime-$(ARCH)/cc-runtime.a -o $@
+endif
 endif
 
 obj/blob.c.o: GNUmakefile $(VFILES)

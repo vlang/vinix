@@ -119,8 +119,65 @@ run-gl-triangle
 ```
 
 Use `run-gl-triangle --rebuild` to compile the same demo with GCC inside Vinix
-before launching it. OpenGL currently uses Mesa softpipe on the Limine
-framebuffer; accelerated DRM drivers are separate future work.
+before launching it. On amd64 this currently uses Mesa softpipe on the Limine
+framebuffer.
+
+### Apple M1 GPU test image
+
+Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It
+uses the Mesa 25.0.5 Asahi Gallium driver for surfaceless EGL/GLES2 rendering,
+then copies the completed GPU frame to the Limine framebuffer. The private GPU
+firmware structures are currently pinned to Apple firmware ABI 12.3.0; the
+driver refuses other firmware ABIs before touching GPU hardware.
+
+Build Mesa in the Debian ARM64 VM (install `clang`, `lld`, `meson`, `ninja`,
+`pkg-config`, `bison`, `flex`, `python3-mako`, `python3-yaml`,
+`libclang-19-dev`, `libclc-19-dev`, `libllvmspirvlib-19-dev`, and
+`spirv-tools` there):
+
+```sh
+./build-asahi-aarch64.sh
+```
+
+Copy `build-aarch64-asahi/staging` back to the same path in the macOS checkout,
+then build the full ARM64 userland and kernel. The userland build needs the
+Homebrew LLVM tools (`brew install llvm`):
+
+```sh
+./build-userland-aarch64.sh
+make -C kernel ARCH=aarch64 CC=clang
+```
+
+Alternatively, build the GCC/V userland in the same ARM64 VM without copying
+the Mesa staging directory first:
+
+```sh
+VINIX_ASAHI_STAGING="$PWD/build-aarch64-asahi/staging" \
+VINIX_MUSL_SYSROOT="$PWD/build-aarch64-asahi/sysroot" \
+    ./build-userland-aarch64-vm.sh
+```
+
+This produces `build-support/init-aarch64/initramfs.tar`; copy that file and
+`kernel/bin/vinix` back to the macOS checkout before deploying.
+
+Deploy to an already-mounted M1 EFI system partition with the explicit GPU
+opt-in, then boot through m1n1 so Vinix receives the patched device tree:
+
+```sh
+./deploy-m1-efi.sh --apple-gpu /Volumes/EFI
+```
+
+Once Vinix boots, verify the render node and run the hardware-only demo:
+
+```sh
+ls -l /dev/dri/renderD128
+run-gl-triangle-agx --rebuild
+```
+
+The demo prints the EGL and GL renderer strings, rejects software renderers,
+validates a rendered pixel, and reports when the frame reaches `/dev/fb0`.
+The M5 Max (`t6050`/G17C) work remains separate and is still fail-closed until
+its firmware command ABI is complete.
 
 ### To test
 

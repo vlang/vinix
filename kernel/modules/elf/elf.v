@@ -153,6 +153,9 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		if phdr.p_type != pt_load {
 			continue
 		}
+		if phdr.p_filesz > phdr.p_memsz {
+			return error('elf: LOAD segment filesz exceeds memsz')
+		}
 
 		// Track the first LOAD segment's effective base address
 		// (vaddr - file_offset), matching Linux's load_addr computation.
@@ -169,6 +172,10 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		if addr == 0 {
 			return error('elf: Allocation failure')
 		}
+		// ELF requires the portion of a LOAD segment beyond p_filesz to be
+		// zero-filled. Clear the complete allocation before copying file data;
+		// PMM pages can contain data left by an earlier allocation.
+		unsafe { C.memset(byteptr(addr) + higher_half, 0, page_count * page_size) }
 
 		pf := mmap.prot_read | mmap.prot_exec | if phdr.p_flags & pf_w != 0 {
 			mmap.prot_write

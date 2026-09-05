@@ -115,6 +115,14 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 }
 
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
+	pagemap.l.acquire()
+	defer {
+		pagemap.l.release()
+	}
+	pagemap.unmap_page_unlocked(virt)?
+}
+
+pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30

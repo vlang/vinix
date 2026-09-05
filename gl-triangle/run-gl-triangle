@@ -2,6 +2,16 @@
 
 set -eu
 
+# The Apple GPU is a render-only device today.  Its EGL demo renders into an
+# off-screen buffer and copies the completed frame to /dev/fb0, so it does not
+# need Xorg/DRI3.  Keep the X11 softpipe demo as the portable fallback.
+if test "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 \
+    && test -e /dev/dri/renderD128 \
+    && test -x /usr/bin/run-gl-triangle-agx \
+    && test -x /usr/bin/gl-triangle-agx; then
+    exec /usr/bin/run-gl-triangle-agx "$@"
+fi
+
 export LIBGL_ALWAYS_SOFTWARE=1
 export GALLIUM_DRIVER=softpipe
 

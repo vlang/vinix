@@ -482,7 +482,7 @@ if [ -d "$X11_STAGING/usr/bin" ] && [ -f "$X11_STAGING/usr/bin/Xorg" ]; then
 
     # Development headers for in-guest OpenGL builds (triangle demo, etc.)
     mkdir -p "$STAGING/usr/include"
-    for incdir in GL KHR X11; do
+    for incdir in EGL GL GLES2 GLES3 KHR X11; do
         if [ -d "$X11_STAGING/usr/include/$incdir" ]; then
             cp -a "$X11_STAGING/usr/include/$incdir" "$STAGING/usr/include/"
         elif [ -d "$X11_SYSROOT/usr/include/$incdir" ]; then
@@ -598,10 +598,27 @@ int main(int argc, char **argv) {
 }
 GLEOF
 
+    # Keep the exact EGL/GLES source in the image so --rebuild verifies that
+    # the Vinix-hosted GCC can compile and link against the Asahi userspace.
+    if [ -f "$SCRIPT_DIR/gl-triangle/egl_triangle.c" ]; then
+        mkdir -p "$STAGING/usr/share/examples/gl-triangle"
+        cp "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
+            "$STAGING/usr/share/examples/gl-triangle/"
+    fi
+
     # Helper that compiles and launches the triangle under Xorg.
 cat > "$STAGING/usr/bin/run-gl-triangle" << 'GLRUN'
 #!/bin/sh
 set -e
+
+# Prefer the render-only Apple GPU path when its Mesa runtime and DRM node are
+# present.  It displays through /dev/fb0 and deliberately bypasses Xorg.
+if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != "1" ] \
+    && [ -e /dev/dri/renderD128 ] \
+    && [ -x /usr/bin/run-gl-triangle-agx ] \
+    && [ -x /usr/bin/gl-triangle-agx ]; then
+    exec /usr/bin/run-gl-triangle-agx "$@"
+fi
 
 target="/usr/bin/tri"
 compile_log="/tmp/run-gl-triangle-compile.log"
@@ -734,6 +751,36 @@ FONTALIAS
     echo "    X11 files integrated ($X11_SIZE)"
 else
     echo "==> X11 staging not found, skipping (run build-x11-aarch64.sh first)"
+fi
+
+# The native Asahi build is produced in the Debian ARM64 VM. Once its staging
+# directory has been copied back beside this script, merge it last so its EGL,
+# GLES and Gallium libraries replace any software-only Mesa copies from X11.
+ASAHI_STAGING="$SCRIPT_DIR/build-aarch64-asahi/staging"
+if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
+    echo "==> Integrating native Apple GPU userspace..."
+    cp -a "$ASAHI_STAGING/." "$STAGING/"
+    install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" \
+        "$STAGING/usr/bin/run-gl-triangle"
+    install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \
+        "$STAGING/usr/bin/run-gl-triangle-agx"
+
+    # Make copied library links self-contained in the initramfs. Some links
+    # in the Alpine packages are absolute and otherwise resolve on the host.
+    find "$STAGING/usr/lib" -type l -name '*.so*' | while IFS= read -r link; do
+        target=$(readlink "$link")
+        if [ "${target#/}" != "$target" ]; then
+            real="$STAGING$target"
+        else
+            real="$(cd "$(dirname "$link")" && realpath -q "$target" 2>/dev/null || echo "$(dirname "$link")/$target")"
+        fi
+        if [ -f "$real" ]; then
+            rm "$link"
+            cp "$real" "$link"
+        fi
+    done
+else
+    echo "==> Asahi staging not found, skipping (run build-asahi-aarch64.sh in the ARM64 VM first)"
 fi
 
 echo "==> Packaging initramfs..."

@@ -13,6 +13,15 @@ diff -urN --no-dereference mesa-clean/include/drm-uapi/drm.h mesa-workdir/includ
 diff -urN --no-dereference mesa-clean/meson.build mesa-workdir/meson.build
 --- mesa-clean/meson.build
 +++ mesa-workdir/meson.build
+@@ -127,7 +127,7 @@
+ # Only build shared_glapi if at least one OpenGL API is enabled
+ with_shared_glapi = with_shared_glapi and with_any_opengl
+ 
+-system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos', 'android', 'managarm'].contains(host_machine.system())
++system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos', 'android', 'managarm', 'vinix'].contains(host_machine.system())
+ 
+ gallium_drivers = get_option('gallium-drivers')
+ if gallium_drivers.contains('auto')
 @@ -1036,7 +1036,7 @@
  endif
  
@@ -145,4 +154,195 @@ diff -urN --no-dereference mesa-clean/src/util/u_thread.c mesa-workdir/src/util/
 +#if defined(HAVE_PTHREAD) && !defined(__APPLE__) && !defined(__HAIKU__) && !defined(__managarm__) && !defined(__vinix__)
     struct timespec ts;
     clockid_t cid;
+
+diff -urN --no-dereference mesa-clean/src/loader/loader.c mesa-workdir/src/loader/loader.c
+--- mesa-clean/src/loader/loader.c
++++ mesa-workdir/src/loader/loader.c
+@@ -258,6 +258,18 @@
+ bool
+ loader_is_device_render_capable(int fd)
+ {
++#ifdef __vinix__
++   /* Vinix exposes render nodes without Linux sysfs.  libdrm's generic
++    * drmGetDevice2() therefore cannot reconstruct a drmDevice from st_rdev,
++    * even though the fd is a fully functional DRM render node. */
++   drmVersionPtr version = drmGetVersion(fd);
++   if (!version)
++      return false;
++
++   bool ret = strcmp(version->name, "asahi") == 0;
++   drmFreeVersion(version);
++   return ret;
++#else
+    drmDevicePtr dev_ptr;
+    bool ret;
+ 
+@@ -269,6 +281,7 @@
+    drmFreeDevice(&dev_ptr);
+ 
+    return ret;
++#endif
+ }
+ 
+ char *
+diff -urN --no-dereference mesa-clean/src/egl/main/egldevice.c mesa-workdir/src/egl/main/egldevice.c
+--- mesa-clean/src/egl/main/egldevice.c
++++ mesa-workdir/src/egl/main/egldevice.c
+@@ -174,6 +174,14 @@
+    if (software)
+       goto out;
+ 
++#ifdef __vinix__
++   /* There is one native AGX render node today.  It was inserted by
++    * _eglDeviceRefreshList(), so no sysfs-backed drmGetDevice2 lookup is
++    * needed to match this already-open fd to its EGLDevice. */
++   dev = dev->Next;
++   goto out;
++#endif
++
+ #ifdef HAVE_LIBDRM
+    drmDevicePtr device;
+ 
+@@ -314,6 +322,34 @@
+    count++;
+ 
+ #ifdef HAVE_LIBDRM
++#ifdef __vinix__
++   /* libdrm enumerates through Linux sysfs.  Vinix deliberately has no fake
++    * sysfs hierarchy, so describe its stable first render node directly. */
++   if (dev->Next)
++      return count + 1;
++
++   drmDevicePtr device = calloc(1, sizeof(*device));
++   if (!device)
++      return count;
++
++   device->nodes = calloc(DRM_NODE_MAX, sizeof(*device->nodes));
++   if (!device->nodes) {
++      free(device);
++      return count;
++   }
++
++   device->nodes[DRM_NODE_RENDER] = strdup("/dev/dri/renderD128");
++   if (!device->nodes[DRM_NODE_RENDER]) {
++      drmFreeDevice(&device);
++      return count;
++   }
++   device->available_nodes = 1 << DRM_NODE_RENDER;
++   device->bustype = DRM_BUS_PLATFORM;
++   if (_eglAddDRMDevice(device) >= 0)
++      count++;
++   else
++      drmFreeDevice(&device);
++#else
+    drmDevicePtr devices[64];
+    int num_devs, ret;
+ 
+@@ -336,6 +368,7 @@
+       if (ret >= 0)
+          count++;
+    }
++#endif
+ #endif
+ 
+    return count;
+diff -urN --no-dereference mesa-clean/src/gallium/auxiliary/target-helpers/drm_helper_public.h mesa-workdir/src/gallium/auxiliary/target-helpers/drm_helper_public.h
+--- mesa-clean/src/gallium/auxiliary/target-helpers/drm_helper_public.h
++++ mesa-workdir/src/gallium/auxiliary/target-helpers/drm_helper_public.h
+@@ -23,6 +23,7 @@
+ extern const struct drm_driver_descriptor tegra_driver_descriptor;
+ extern const struct drm_driver_descriptor lima_driver_descriptor;
+ extern const struct drm_driver_descriptor zink_driver_descriptor;
++extern const struct drm_driver_descriptor asahi_driver_descriptor;
+ extern const struct drm_driver_descriptor kmsro_driver_descriptor;
+ 
+ #endif /* _DRM_HELPER_PUBLIC_H */
+diff -urN --no-dereference mesa-clean/src/gallium/auxiliary/target-helpers/drm_helper.h mesa-workdir/src/gallium/auxiliary/target-helpers/drm_helper.h
+--- mesa-clean/src/gallium/auxiliary/target-helpers/drm_helper.h
++++ mesa-workdir/src/gallium/auxiliary/target-helpers/drm_helper.h
+@@ -420,6 +420,25 @@
+ DRM_DRIVER_DESCRIPTOR_STUB(zink)
+ #endif
+ 
++#ifdef GALLIUM_ASAHI
++#include "asahi/drm/asahi_drm_public.h"
++
++static struct pipe_screen *
++pipe_asahi_create_screen(int fd, const struct pipe_screen_config *config)
++{
++   struct pipe_screen *screen = asahi_drm_screen_create(fd, config);
++   return screen ? debug_screen_wrap(screen) : NULL;
++}
++
++const driOptionDescription asahi_driconf[] = {
++      #include "asahi/driinfo_asahi.h"
++};
++DRM_DRIVER_DESCRIPTOR(asahi, asahi_driconf, ARRAY_SIZE(asahi_driconf))
++
++#else
++DRM_DRIVER_DESCRIPTOR_STUB(asahi)
++#endif
++
+ #ifdef GALLIUM_KMSRO
+ #include "kmsro/drm/kmsro_drm_public.h"
+ 
+diff -urN --no-dereference mesa-clean/src/gallium/auxiliary/pipe-loader/pipe_loader_drm.c mesa-workdir/src/gallium/auxiliary/pipe-loader/pipe_loader_drm.c
+--- mesa-clean/src/gallium/auxiliary/pipe-loader/pipe_loader_drm.c
++++ mesa-workdir/src/gallium/auxiliary/pipe-loader/pipe_loader_drm.c
+@@ -92,6 +92,7 @@
+    &tegra_driver_descriptor,
+    &lima_driver_descriptor,
+    &zink_driver_descriptor,
++   &asahi_driver_descriptor,
+ };
+ #endif
+ 
+diff -urN --no-dereference mesa-clean/src/asahi/libagx/meson.build mesa-workdir/src/asahi/libagx/meson.build
+--- mesa-clean/src/asahi/libagx/meson.build
++++ mesa-workdir/src/asahi/libagx/meson.build
+@@ -29,7 +29,8 @@
+     '-fmacro-prefix-map=@0@='.format(relative_dir),
+     ],
+   env: ['MESA_SHADER_CACHE_DISABLE=true'],
+-  depends : [prog_mesa_clc, agx_pack],
++  depends : [agx_pack] + (get_option('mesa-clc') == 'system' ?
++                          [] : [prog_mesa_clc]),
+   depfile : 'libagx_shaders.h.d',
+ )
+ 
+@@ -38,7 +39,8 @@
+   input : libagx_spv,
+   output : 'libagx.h',
+   command : [prog_vtn_bindgen, libagx_spv, '@OUTPUT@'],
+-  depends : [prog_vtn_bindgen],
++  depends : get_option('mesa-clc') == 'system' ?
++            [] : [prog_vtn_bindgen],
+ )
+ 
+ idep_libagx = declare_dependency(
+diff -urN --no-dereference mesa-clean/src/asahi/lib/meson.build mesa-workdir/src/asahi/lib/meson.build
+--- mesa-clean/src/asahi/lib/meson.build
++++ mesa-workdir/src/asahi/lib/meson.build
+@@ -56,7 +56,8 @@
+   output : ['libagx_shaders.h', 'libagx_shaders.c'],
+   command : [prog_asahi_clc, libagx_spv, '@OUTPUT0@', '@OUTPUT1@'],
+   env: ['MESA_SHADER_CACHE_DISABLE=true'],
+-  depends : [prog_asahi_clc],
++  depends : get_option('precomp-compiler') == 'system' ?
++            [] : [prog_asahi_clc],
+ )
+ 
+ idep_libagx_shaders_h = declare_dependency(
+diff -urN --no-dereference mesa-clean/src/gallium/drivers/asahi/meson.build mesa-workdir/src/gallium/drivers/asahi/meson.build
+--- mesa-clean/src/gallium/drivers/asahi/meson.build
++++ mesa-workdir/src/gallium/drivers/asahi/meson.build
+@@ -23,7 +23,7 @@
+   include_directories : [inc_gallium_aux, inc_gallium, inc_include, inc_src, inc_asahi, inc_virtio_gpu, inc_virtio_vdrm],
+   c_args : [c_msvc_compat_args, '-Wno-c2x-extensions'],
+   gnu_symbol_visibility : 'hidden',
+-  dependencies : [idep_nir, idep_mesautil, idep_agx_pack, dep_libdrm, idep_mesaclc, idep_libagx, idep_libagx_shaders_h],
++  dependencies : [idep_nir, idep_mesautil, idep_agx_pack, dep_libdrm, idep_libagx, idep_libagx_shaders_h],
+ )
+ 
+ driver_asahi = declare_dependency(
  

@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+unset LIBGL_ALWAYS_SOFTWARE
+unset LIBGL_ALWAYS_INDIRECT
+export EGL_PLATFORM=surfaceless
+export MESA_LOADER_DRIVER_OVERRIDE=asahi
+
+triangle=/usr/bin/gl-triangle-agx
+if [ "${1:-}" = --rebuild ] || [ "${1:-}" = --compile ]; then
+    echo "run-gl-triangle-agx: compiling the demo with Vinix GCC"
+    gcc /usr/share/examples/gl-triangle/egl_triangle.c -O2 \
+        -o /tmp/gl-triangle-agx -lEGL -lGLESv2 -ldl -lpthread -lm
+    triangle=/tmp/gl-triangle-agx
+    shift
+fi
+
+if [ ! -e /dev/dri/renderD128 ]; then
+    echo "run-gl-triangle-agx: /dev/dri/renderD128 is unavailable" >&2
+    exit 1
+fi
+
+if [ ! -x "$triangle" ]; then
+    echo "run-gl-triangle-agx: accelerated triangle binary is unavailable" >&2
+    exit 1
+fi
+
+exec "$triangle" "$@"

@@ -98,19 +98,32 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 	pagemap.l.acquire()
 
-	mmap_ranges := pagemap.mmap_ranges
-
-	for ptr in mmap_ranges {
-		local_range := unsafe { &MmapRangeLocal(ptr) }
-
-		munmap_unlocked(mut pagemap, voidptr(local_range.base), local_range.length) or {}
+	// munmap_unlocked() removes entries from pagemap.mmap_ranges. Always consume
+	// the current first entry instead of iterating a shallow copy of the array:
+	// deleting while iterating that copy skipped ranges, retained stale pointers,
+	// and then freed the same backing allocation twice.
+	for pagemap.mmap_ranges.len != 0 {
+		local_range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[0]) }
+		old_len := pagemap.mmap_ranges.len
+		munmap_unlocked(mut pagemap, voidptr(local_range.base), local_range.length) or {
+			pagemap.l.release()
+			return none
+		}
+		if pagemap.mmap_ranges.len >= old_len {
+			pagemap.l.release()
+			errno.set(errno.einval)
+			return none
+		}
 	}
+
+	top_level := pagemap.top_level
+	pagemap.l.release()
 
 	unsafe {
-		mmap_ranges.free()
 		pagemap.mmap_ranges.free()
-		free(pagemap)
 	}
+	memory.pmm_free(top_level, 1)
+	unsafe { free(pagemap) }
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
@@ -539,7 +552,7 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
-			pagemap.unmap_page(j) or {}
+			pagemap.unmap_page_unlocked(j) or {}
 		}
 
 		if snip_size == local_range.length {

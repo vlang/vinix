@@ -147,11 +147,17 @@ fn arm64_table_empty(table_p &u64) bool {
 }
 
 pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
-	// Serialize against map_page/other unmaps on this pagemap.
 	pagemap.l.acquire()
 	defer {
 		pagemap.l.release()
 	}
+	pagemap.unmap_page_unlocked(virt)?
+}
+
+// Remove one mapping while the caller holds pagemap.l.  Keeping this separate
+// avoids recursively acquiring the non-recursive pagemap lock from munmap(),
+// which serializes a complete range before tearing it down.
+pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 
 	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
