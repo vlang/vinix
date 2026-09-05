@@ -83,7 +83,10 @@ command-14/15 PTD-dashboard dispatch, its state/index bounds, exact host-built
 selector maps, and the flag-`0x02` filter used by initial and dynamic state
 notification. The report distinguishes the four flag-`0x10` GFX leaf records,
 which do not emit PMP state commands, from the aggregate `GFX` proxy whose
-selector `0x10` reaches the ordinary AGX request/ack path. A separate
+selector `0x10` reaches the ordinary AGX request/ack path. It also proves that
+dynamic transitions wait on the per-die `PMP-STATUS` PTD entry before device
+status mutation, while explicitly reporting that the separately scheduled
+initial-status callback has no such local wait. A separate
 UUID-pinned ApplePMP check recovers the
 PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated

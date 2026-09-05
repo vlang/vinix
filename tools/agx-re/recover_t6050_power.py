@@ -49,6 +49,10 @@ PMP_GET_DEVICE_INDEX = "__ZN9ApplePMGR18_getPMPDeviceIndexEtj"
 PMP_NOTIFY_INITIAL = "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv"
 PMP_ENABLE_DEVICE_GATED = "__ZN9ApplePMGR18_enableDeviceGatedEmmmm"
 PMP_DEVICE_ID_TO_DATA = "__ZN9ApplePMGR21_deviceIDToDeviceDataEt"
+PMP_CHECK_NOTIFY = "__ZN9ApplePMGR15_checkNotifyPMPEt"
+PMP_WAIT_READY = "__ZN9ApplePMGR22_waitForPMPReadyActionEm"
+PMP_WAIT_READY_V2 = "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej"
+PMP_READY_GATED = "__ZN9ApplePMGR20_pmpReadyActionGatedEj"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
 APPLE_PMP_V2_START = "__ZN10ApplePMPv25startEP9IOService"
@@ -445,6 +449,10 @@ def recover_pmp_code_contract(
         PMP_NOTIFY_INITIAL,
         PMP_ENABLE_DEVICE_GATED,
         PMP_DEVICE_ID_TO_DATA,
+        PMP_CHECK_NOTIFY,
+        PMP_WAIT_READY,
+        PMP_WAIT_READY_V2,
+        PMP_READY_GATED,
         APPLE_PTD_READ,
         APPLE_PTD_WRITE,
     )
@@ -460,6 +468,9 @@ def recover_pmp_code_contract(
         PMP_GET_DEVICE_INDEX,
         PMP_NOTIFY_INITIAL,
         PMP_ENABLE_DEVICE_GATED,
+        PMP_WAIT_READY,
+        PMP_WAIT_READY_V2,
+        PMP_READY_GATED,
     ):
         if name not in functions:
             raise ValueError(f"ApplePMGR has no code body for {name}")
@@ -605,12 +616,15 @@ def recover_pmp_code_contract(
 
     enable_address, enable_code = functions[PMP_ENABLE_DEVICE_GATED]
     enable_targets = direct_branch_targets(enable_address, enable_code)
-    for target in (PMP_DEVICE_ID_TO_DATA, PMP_SEND_COMMAND):
+    for target in (PMP_DEVICE_ID_TO_DATA, PMP_CHECK_NOTIFY, PMP_SEND_COMMAND):
         if symbols[target] not in enable_targets:
             raise ValueError(f"dynamic PMP state sync no longer calls {target}")
     notify_test = struct.pack("<I", 0x360801C8)  # tbz w8, #1
+    wait_slot = struct.pack("<I", 0xD2815811)  # mov x17, #0xac0
     if (
         enable_code.count(notify_test) != 2
+        or enable_code.count(wait_slot) != 1
+        or enable_code.find(wait_slot) > enable_code.find(notify_test)
         or not _has_ordered_words(
             enable_code,
             (
@@ -621,6 +635,63 @@ def recover_pmp_code_contract(
         )
     ):
         raise ValueError("dynamic PMP state-notification filter changed")
+
+    _wait_address, wait_code = functions[PMP_WAIT_READY]
+    if not _has_ordered_words(
+        wait_code,
+        (
+            0xD2815611,  # mov x17, #0xab0 -- pmpV1 predicate slot
+            0xD2803D11,  # mov x17, #0x1e8 -- command-gate action
+            0xD2815711,  # mov x17, #0xab8 -- pmpV2 predicate slot
+            0xD2803D11,  # mov x17, #0x1e8 -- command-gate action
+        ),
+    ):
+        raise ValueError("PMP readiness version/command-gate dispatch changed")
+
+    wait_v2_address, wait_v2_code = functions[PMP_WAIT_READY_V2]
+    wait_v2_targets = direct_branch_targets(wait_v2_address, wait_v2_code)
+    if symbols[APPLE_PTD_READ] not in wait_v2_targets or not _has_ordered_words(
+        wait_v2_code,
+        (
+            0xB95BF000,  # ldr w0, [x0, #0x1bf0] -- timeout seconds
+            0x9141CA88,  # add x8, x20, #0x72000
+            0x9120F108,  # add x8, x8, #0x83c -- per-die ready bytes
+            0x394002A8,  # ldrb w8, [x21] -- already ready
+            0x9141CE88,  # add x8, x20, #0x73000
+            0x9121C117,  # add x23, x8, #0x870 -- ApplePTD pointer
+            0x9141CA88,  # add x8, x20, #0x72000
+            0x91208118,  # add x24, x8, #0x820 -- PMP-STATUS range pointer
+            0xF94DC280,  # ldr x0, [x20, #0x1b80] -- command gate
+            0x91084208,  # add x8, x16, #0x210 -- deadline sleep slot
+            0xF94002E0,  # ldr x0, [x23] -- ApplePTD
+            0xF9400301,  # ldr x1, [x24] -- PMP-STATUS range
+            0xB9400422,  # ldr w2, [x1, #4] -- PTD entry offset
+            0xF94023E8,  # ldr x8, [sp, #0x40] -- returned PTD value
+            0xB5000188,  # cbnz x8 -- a nonzero status is ready
+            0x52800028,  # mov w8, #1
+            0x390002A8,  # strb w8, [x21] -- latch per-die ready
+        ),
+    ):
+        raise ValueError("PMPv2 PTD readiness wait changed")
+
+    _ready_address, ready_code = functions[PMP_READY_GATED]
+    if not _has_ordered_words(
+        ready_code,
+        (
+            0xD2815611,  # mov x17, #0xab0 -- pmpV1 predicate slot
+            0xD2815711,  # mov x17, #0xab8 -- pmpV2 predicate slot
+            0x9141CA68,  # add x8, x19, #0x72000
+            0x9120F108,  # add x8, x8, #0x83c -- per-die ready bytes
+            0x52800028,  # mov w8, #1
+            0x39000028,  # strb w8, [x1] -- latch ready
+            0xF94DC260,  # ldr x0, [x19, #0x1b80] -- command gate
+            0xD2804111,  # mov x17, #0x208 -- wakeup slot
+            0x52800002,  # mov w2, #0 -- wake one/all mode
+        ),
+    ):
+        raise ValueError("PMP readiness callback changed")
+    if wait_slot in initial_code:
+        raise ValueError("initial PMP state sync unexpectedly gained a readiness wait")
 
     return {
         "device_state_commands": [14, 15],
@@ -637,6 +708,26 @@ def recover_pmp_code_contract(
             "initial_sync": PMP_NOTIFY_INITIAL,
             "dynamic_sync": PMP_ENABLE_DEVICE_GATED,
             "target": "public handle at +0x1a, selector byte at +3 if zero",
+        },
+        "readiness": {
+            "scope": "per die",
+            "virtual_wait_slot": 0xAC0,
+            "command_gate_object_offset": 0x1B80,
+            "command_gate_action_slot": 0x1E8,
+            "command_gate_sleep_deadline_slot": 0x210,
+            "command_gate_wakeup_slot": 0x208,
+            "timeout_seconds_object_offset": 0x1BF0,
+            "ready_bytes_object_offset": 0x7283C,
+            "ptd_driver_object_offset": 0x73870,
+            "status_range_object_offset": 0x72820,
+            "ready_value": "nonzero 64-bit PMP-STATUS entry",
+            "dynamic_transition_order": (
+                "checkNotifyPMP, wait until ready, mutate device state, "
+                "then emit command 14/15"
+            ),
+            "initial_sync": (
+                "scheduled separately; its gated callback has no explicit ready wait"
+            ),
         },
         "device_index_map": {
             "source": "soc-device",
@@ -678,6 +769,9 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
             PMP_GET_DEVICE_INDEX,
             PMP_NOTIFY_INITIAL,
             PMP_ENABLE_DEVICE_GATED,
+            PMP_WAIT_READY,
+            PMP_WAIT_READY_V2,
+            PMP_READY_GATED,
         )
     }
     return {
@@ -888,6 +982,12 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     )
     _pmgr_path, pmgr = find_one(root, "PMGR node", lambda node: node_name(node) == "pmgr")
     devices = parse_pmgr_devices(pmgr.property("devices"))
+    pmp_version = decode_integer(pmgr.property("pmp"), "pmgr pmp")
+    if pmp_version != 2:
+        raise ValueError(f"T6050 PMGR PMP version changed: {pmp_version}")
+    ptd_range_ids = decode_u32_array(pmgr.property("ptd-ranges"), "pmgr ptd-ranges")
+    if ptd_range_ids != [10, 11, 12, 13, 2, 4]:
+        raise ValueError(f"T6050 PMGR PTD range bindings changed: {ptd_range_ids!r}")
 
     power_handles = decode_u32_array(sgx.property("power-gates"), "sgx power-gates")
     clock_handles = decode_u32_array(sgx.property("clock-gates"), "sgx clock-gates")
@@ -943,6 +1043,17 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         "SOC-DEV-PS-REQ": (10, 0x1E0, 8),
         "SOC-DEV-PS-ACK": (11, 0x1E8, 8),
     }
+    readiness_range = ptd_by_name.get("PMP-STATUS")
+    if readiness_range is None:
+        raise ValueError("PMP DeviceTree has no PMP-STATUS PTD range")
+    readiness_actual = (
+        readiness_range["id"],
+        readiness_range["entry_offset"],
+        readiness_range["entry_count"],
+        readiness_range["doorbell"],
+    )
+    if readiness_actual != (2, 1, 1, 16):
+        raise ValueError(f"PMP readiness range changed: {readiness_actual!r}")
     dashboard: dict[str, dict[str, object]] = {}
     for name, expected in expected_dashboard.items():
         item = ptd_by_name.get(name)
@@ -955,6 +1066,8 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     power_range_ids = decode_u32_array(nub.property("pm-ptd-ranges"), "pm-ptd-ranges")
     if any(item["id"] not in power_range_ids for item in dashboard.values()):
         raise ValueError("PMP power PTD list omits a device-state dashboard range")
+    if readiness_range["id"] not in power_range_ids:
+        raise ValueError("PMP power PTD list omits the readiness status range")
 
     packet_range = dashboard["SOC-DEV-PKT"]
     packet_cursor = int(packet_range["entry_offset"])
@@ -1030,7 +1143,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 4,
+        "schema": 5,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -1043,6 +1156,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             "nub_path": nub_path,
             "role": "PMP1",
             "firmware": "t6050pmp",
+            "version": pmp_version,
             "region_base": decode_integer(nub.property("region-base"), "PMP region-base"),
             "region_size": decode_integer(nub.property("region-size"), "PMP region-size"),
             "agx_soc_device": agx_device,
@@ -1060,6 +1174,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             },
             "device_state_target": device_state_target,
             "leaf_gate_state_notifications": False,
+            "readiness_status_range": readiness_range,
             "device_state_dashboard": dashboard,
         },
     }

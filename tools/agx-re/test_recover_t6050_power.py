@@ -153,12 +153,13 @@ def fixture_tree(
             "ptd-range": b"".join(
                 (
                     ptd_range_record(1, 0, 1, 0, "NULL"),
+                    ptd_range_record(2, 1, 1, 16, "PMP-STATUS"),
                     ptd_range_record(9, 0x90, 0x150, 0, "SOC-DEV-PKT"),
                     ptd_range_record(10, 0x1E0, 8, 0, "SOC-DEV-PS-REQ"),
                     ptd_range_record(11, 0x1E8, 8, 0, "SOC-DEV-PS-ACK"),
                 )
             ),
-            "pm-ptd-ranges": struct.pack("<IIII", 1, 9, 10, 11),
+            "pm-ptd-ranges": struct.pack("<IIIII", 1, 2, 9, 10, 11),
         },
         [],
     )
@@ -167,7 +168,23 @@ def fixture_tree(
         {"compatible": b"iop,ascwrap-v6\0", "role": b"PMP1\0"},
         [nub],
     )
-    arm_io = adt_node("arm-io", {}, [adt_node("pmgr", {"devices": devices}, []), sgx, pmp])
+    arm_io = adt_node(
+        "arm-io",
+        {},
+        [
+            adt_node(
+                "pmgr",
+                {
+                    "devices": devices,
+                    "pmp": struct.pack("<I", 2),
+                    "ptd-ranges": struct.pack("<6I", 10, 11, 12, 13, 2, 4),
+                },
+                [],
+            ),
+            sgx,
+            pmp,
+        ],
+    )
     return adt_node("device-tree", {}, [arm_io])
 
 
@@ -195,7 +212,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 4)
+        self.assertEqual(result["schema"], 5)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -206,6 +223,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
             result["sgx"]["power_gates"][0]["pmp_dispatch"]["emits_device_state"]
         )
         self.assertEqual(result["pmp"]["firmware"], "t6050pmp")
+        self.assertEqual(result["pmp"]["version"], 2)
         self.assertEqual(result["pmp"]["region_base"], 0x4284500000)
         self.assertEqual(result["pmp"]["agx_soc_device"]["id"], 0x10)
         self.assertEqual(result["pmp"]["agx_soc_device"]["index"], 15)
@@ -222,6 +240,8 @@ class RecoverT6050PowerTests(unittest.TestCase):
             "ordinary",
         )
         self.assertFalse(result["pmp"]["leaf_gate_state_notifications"])
+        self.assertEqual(result["pmp"]["readiness_status_range"]["name"], "PMP-STATUS")
+        self.assertEqual(result["pmp"]["readiness_status_range"]["entry_offset"], 1)
         self.assertEqual(result["pmp"]["soc_device_packet"]["trailing_reserved_bits"], 16)
         self.assertEqual(
             result["pmp"]["device_state_dashboard"]["SOC-DEV-PS-REQ"]["entry_offset"],
@@ -240,6 +260,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
         initial = 0x9000
         enable = 0xA000
         device_data = 0xB000
+        wait_ready = 0xC000
+        wait_ready_v2 = 0xD000
+        ready_gated = 0xE000
+        check_notify = 0xF000
 
         def branch(source: int, target: int, link: bool = False) -> bytes:
             delta = (target - source) // 4
@@ -329,12 +353,57 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
             recover_t6050_power.PMP_ENABLE_DEVICE_GATED: (
                 enable,
-                struct.pack("<I", 0x794002A1)
-                + branch(enable + 4, device_data, True)
+                branch(enable, check_notify, True)
+                + struct.pack("<2I", 0xD2815811, 0xD73F0910)
+                + struct.pack("<I", 0x794002A1)
+                + branch(enable + 16, device_data, True)
                 + struct.pack("<2I", 0x39400008, 0x360801C8)
                 + struct.pack("<I", 0x794002A1)
-                + branch(enable + 20, send, True)
+                + branch(enable + 32, send, True)
                 + struct.pack("<2I", 0x39400008, 0x360801C8),
+            ),
+            recover_t6050_power.PMP_WAIT_READY: (
+                wait_ready,
+                struct.pack("<4I", 0xD2815611, 0xD2803D11, 0xD2815711, 0xD2803D11),
+            ),
+            recover_t6050_power.PMP_WAIT_READY_V2: (
+                wait_ready_v2,
+                struct.pack(
+                    "<17I",
+                    0xB95BF000,
+                    0x9141CA88,
+                    0x9120F108,
+                    0x394002A8,
+                    0x9141CE88,
+                    0x9121C117,
+                    0x9141CA88,
+                    0x91208118,
+                    0xF94DC280,
+                    0x91084208,
+                    0xF94002E0,
+                    0xF9400301,
+                    0xB9400422,
+                    0xF94023E8,
+                    0xB5000188,
+                    0x52800028,
+                    0x390002A8,
+                )
+                + branch(wait_ready_v2 + 68, read, True),
+            ),
+            recover_t6050_power.PMP_READY_GATED: (
+                ready_gated,
+                struct.pack(
+                    "<9I",
+                    0xD2815611,
+                    0xD2815711,
+                    0x9141CA68,
+                    0x9120F108,
+                    0x52800028,
+                    0x39000028,
+                    0xF94DC260,
+                    0xD2804111,
+                    0x52800002,
+                ),
             ),
         }
         symbols = {
@@ -347,6 +416,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.PMP_NOTIFY_INITIAL: initial,
             recover_t6050_power.PMP_ENABLE_DEVICE_GATED: enable,
             recover_t6050_power.PMP_DEVICE_ID_TO_DATA: device_data,
+            recover_t6050_power.PMP_CHECK_NOTIFY: check_notify,
+            recover_t6050_power.PMP_WAIT_READY: wait_ready,
+            recover_t6050_power.PMP_WAIT_READY_V2: wait_ready_v2,
+            recover_t6050_power.PMP_READY_GATED: ready_gated,
             recover_t6050_power.APPLE_PTD_READ: read,
             recover_t6050_power.APPLE_PTD_WRITE: write,
         }
@@ -356,6 +429,8 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["device_index_map"]["record_stride"], 124)
         self.assertEqual(result["device_index_map"]["allocated_entries"], 257)
         self.assertEqual(result["state_notification"]["flag"], 0x02)
+        self.assertEqual(result["readiness"]["virtual_wait_slot"], 0xAC0)
+        self.assertEqual(result["readiness"]["status_range_object_offset"], 0x72820)
 
         bad_functions = dict(functions)
         init_address, init_code = bad_functions[recover_t6050_power.PMP_INIT_V2]
