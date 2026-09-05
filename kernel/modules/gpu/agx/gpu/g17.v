@@ -9,6 +9,7 @@ import gpu.agx.fw
 import gpu.agx.pgtable
 import gpu.agx.regs
 import aarch64.kio
+import klock
 import lib
 import memory
 
@@ -35,14 +36,15 @@ mut:
 	role1_secondary       SharedBuffer
 	accelerator_state     [2]SharedBuffer
 	accelerator_entries   [2]SharedBuffer
+	accelerator_locks     [2]klock.Lock
 	auxiliary             [2][8]SharedBuffer
 	structurally_ready    bool
 	runtime_policy_ready  bool
 	platform_values_ready bool
 	pio_mappings_ready    bool
 	hardware_config_ready bool
-	leakage_calibration    fw.G17LeakageCalibration
-	leakage_fuses_ready    bool
+	leakage_calibration   fw.G17LeakageCalibration
+	leakage_fuses_ready   bool
 }
 
 @[inline]
@@ -218,29 +220,23 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	chip_variant := regs.decode_gpu_chip_variant(mgr.res.sgx_read32(regs.gpu_id_version)) or {
 		return false
 	}
-	fuse_base := memory.map_mmio(fw.g17_leakage_fuse_physical_address,
-		fw.g17_leakage_fuse_size)
+	fuse_base := memory.map_mmio(fw.g17_leakage_fuse_physical_address, fw.g17_leakage_fuse_size)
 	word_198 := kio.mmin32(unsafe { &u32(fuse_base + fw.g17_leakage_fuse_word_198) })
 	word_19c := kio.mmin32(unsafe { &u32(fuse_base + fw.g17_leakage_fuse_word_19c) })
 	word_1a0 := kio.mmin32(unsafe { &u32(fuse_base + fw.g17_leakage_fuse_word_1a0) })
-	graph.leakage_calibration = fw.decode_g17_leakage_calibration(word_198, word_19c,
-		word_1a0, chip_variant, identity.column_count, identity.group_count) or {
+	graph.leakage_calibration = fw.decode_g17_leakage_calibration(word_198, word_19c, word_1a0, chip_variant, identity.column_count, identity.group_count) or {
 		return false
 	}
 	graph.leakage_fuses_ready = true
-	C.printf(c'agx: decoded G17 leakage calibration for %u power columns / %u groups\n',
-		identity.column_count, identity.group_count)
+	C.printf(c'agx: decoded G17 leakage calibration for %u power columns / %u groups\n', identity.column_count, identity.group_count)
 	// Apple counts enabled cores from the mask registers rather than from a
 	// published topology, so read both the total and each power-column slice
 	// the same way.
 	mut enabled_uscs := [fw.g17_leakage_core_capacity]u32{}
 	for column := u32(0); column < identity.column_count; column++ {
-		enabled_uscs[column] = mgr.res.enabled_gpu_usc_count(column,
-			identity.units_per_column) or { return false }
+		enabled_uscs[column] = mgr.res.enabled_gpu_usc_count(column, identity.units_per_column) or { return false }
 	}
-	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(),
-		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base,
-		fw.G17LateControlInputs{
+	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(), fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base, fw.G17LateControlInputs{
 		enabled_core_count: mgr.res.enabled_gpu_core_count()
 		unit_mask: mgr.res.gpu_unit_count_mask()
 	}) {
@@ -248,8 +244,7 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	}
 	unsafe {
 		mut config := &fw.G17HardwareConfig(graph.hardware_config.cpu_address())
-		if !fw.populate_g17_power_model(mut config, &mgr.hw_config,
-			&graph.leakage_calibration, fw.G17PowerModelInputs{
+		if !fw.populate_g17_power_model(mut config, &mgr.hw_config, &graph.leakage_calibration, fw.G17PowerModelInputs{
 			chip_variant: chip_variant
 			group_count: identity.group_count
 			columns_per_group: identity.columns_per_group
@@ -279,6 +274,9 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 
 	for role := 0; role < 2; role++ {
 		if !fw.initialize_g17_small_shared_data(graph.small_shared[role].cpu_address(), fw.g17_small_shared_data_size, 0) {
+			return false
+		}
+		if !fw.initialize_g17_accelerator_ring(graph.accelerator_state[role].cpu_address(), fw.g17_accelerator_ring_state_size, graph.accelerator_entries[role].cpu_address(), fw.g17_accelerator_ring_entries_size) {
 			return false
 		}
 
@@ -348,6 +346,36 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	} else {
 		C.printf(c'agx: G17 graph ready; hardware config still has gaps 0x%x\n', gaps)
 	}
-	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
+	ready := graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
 		&& graph.pio_mappings_ready && graph.leakage_fuses_ready && graph.hardware_config_ready
+	if ready {
+		mgr.g17_graph = graph
+	}
+	return ready
+}
+
+// Serialize one host producer per role, matching Apple's IOCommandGate around
+// AGXAcceleratorRing::nextEntry. Doorbell delivery is deliberately separate:
+// its G17 kick-channel routing is still part of the guarded runtime ABI work.
+fn (mut graph G17FirmwareGraph) enqueue_data_master(role u32,
+	command fw.G17DataMasterCommand) bool {
+	if role >= 2 {
+		return false
+	}
+	graph.accelerator_locks[role].acquire()
+	defer {
+		graph.accelerator_locks[role].release()
+	}
+	return fw.enqueue_g17_data_master_entry(graph.accelerator_state[role].cpu_address(), fw.g17_accelerator_ring_state_size, graph.accelerator_entries[role].cpu_address(), fw.g17_accelerator_ring_entries_size, command)
+}
+
+// Stage a byte-accurate outer-ring entry once a G17 channel command has been
+// built. This is intentionally unavailable until the retained bootstrap graph
+// exists, and it does not imply that the still-gated firmware can be booted.
+pub fn (mut mgr GpuManager) enqueue_g17_data_master(role u32,
+	command fw.G17DataMasterCommand) bool {
+	if mgr.g17_graph == unsafe { nil } {
+		return false
+	}
+	return mgr.g17_graph.enqueue_data_master(role, command)
 }

@@ -1695,6 +1695,81 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(fields["channel_data_address"], {"offset": 8, "bytes": 8})
         self.assertEqual(fields["flags"], {"offset": 0x17, "bytes": 1})
 
+    def test_recovers_complete_accelerator_command_contract(self) -> None:
+        code = encode(
+            0xD503245F,
+            0xB9001022,
+            0xF9404068,
+            0xF9000428,
+            0x79002824,
+            0xB9401868,
+            0x39005828,
+            0x3940F068,
+            0x52800029,
+            0x0A280128,
+            0x39005C28,
+            0xD65F03C0,
+        )
+        contract = recover_g17_abi.recover_accelerator_command_contract(code)
+        self.assertEqual(contract["reserved_000"]["encoder_action"], "preserved")
+        self.assertEqual(
+            contract["channel_sources"]["channel_data_address"]["channel_offset"],
+            0x80,
+        )
+        self.assertEqual(contract["flags_formula"], "1 & ~channel_flag")
+
+    def test_recovers_data_master_submission_publication(self) -> None:
+        common = (
+            0xB9400284,
+            0xF94002B0,
+            0xAA1503F1,
+            0xF2F9B431,
+            0xDAC11A30,
+            0xD2804F11,
+            0x8B110210,
+            0xF9400208,
+            0xAA1503E0,
+            0xF94007E1,
+        )
+        tail = (
+            0xAA1303E3,
+            0xF2E058F0,
+            0xD73F0910,
+            0xD5033BBF,
+            0xF94002D0,
+            0xAA1603F1,
+            0xF2F3D511,
+            0xDAC11A30,
+            0xF8438E08,
+            0xAA1603E0,
+            0xF2F0EB70,
+            0xD73F0910,
+            0x11000408,
+            0xF94002D0,
+            0xAA1603F1,
+            0xF2F3D511,
+            0xDAC11A30,
+            0xF8410E09,
+            0x12001D01,
+            0xAA1603E0,
+            0xF2E27510,
+            0xD73F0930,
+        )
+        recovered = recover_g17_abi.recover_data_master_submission_sequence(
+            encode(*common, 0x52800022, *tail), 1
+        )
+        self.assertEqual(recovered["command_type"], 1)
+        self.assertEqual(recovered["publish_barrier"], "dmb ish")
+        self.assertEqual(
+            recovered["next_write_index"], "(write_index + 1) & 0xff"
+        )
+
+    def test_rejects_wrong_data_master_command_type(self) -> None:
+        with self.assertRaisesRegex(ValueError, "publication"):
+            recover_g17_abi.recover_data_master_submission_sequence(
+                encode(0x52800042), 1
+            )
+
     def test_recovers_device_control_copy_size(self) -> None:
         code = encode(
             pair_q("load", 0, 1, 21, 0),

@@ -410,6 +410,23 @@ ENCODE_ACCELERATOR_COMMAND = (
     "__ZN14AGXArmFirmware28encodeAcceleratorRingCommandE"
     "P30AGFIAcceleratorDataMasterEntry26AGFIAcceleratorCommandTypeP10AGXChannelj"
 )
+SUBMIT_DATA_MASTER_CHANNELS = {
+    "TA": (
+        "__ZN11AGXFirmware15submitTAChannelE"
+        "P10AGXChannelRK22_AGXChannelSubmitInfo_jjb",
+        0,
+    ),
+    "3D": (
+        "__ZN11AGXFirmware15submit3DChannelE"
+        "P10AGXChannelRK22_AGXChannelSubmitInfo_jjbb",
+        1,
+    ),
+    "CL": (
+        "__ZN11AGXFirmware15submitCLChannelE"
+        "P10AGXChannelRK22_AGXChannelSubmitInfo_jjb",
+        2,
+    ),
+}
 SUBMIT_DEVICE_CONTROL = (
     "__ZN11AGXFirmware19submitDeviceControlE"
     "P33AGFIAcceleratorDeviceControlEntryjPj"
@@ -6766,6 +6783,118 @@ def recover_accelerator_command_fields(code: bytes) -> dict[str, dict[str, int]]
     return fields
 
 
+def recover_accelerator_command_contract(code: bytes) -> dict[str, object]:
+    # This is the complete pinned G17C encoder, not just a sample of its
+    # stores. In particular, it proves that the first qword is preserved.
+    require_instruction_sequence(
+        code,
+        "complete accelerator data-master encoder",
+        (
+            0xD503245F,  # bti c
+            0xB9001022,  # command type -> entry +0x10
+            0xF9404068,  # channel state GPU address <- channel +0x80
+            0xF9000428,  # -> entry +0x08
+            0x79002824,  # submission index -> entry +0x14
+            0xB9401868,  # channel ID <- channel +0x18
+            0x39005828,  # -> entry +0x16
+            0x3940F068,  # channel flag <- channel +0x3c
+            0x52800029,  # 1
+            0x0A280128,  # flags = 1 & ~channel_flag
+            0x39005C28,  # -> entry +0x17
+            0xD65F03C0,  # ret
+        ),
+    )
+    return {
+        "reserved_000": {
+            "offset": 0,
+            "bytes": 8,
+            "encoder_action": "preserved",
+            "vinix_policy": "zero_before_encode",
+        },
+        "channel_sources": {
+            "channel_data_address": {"channel_offset": 0x80, "bytes": 8},
+            "channel_id": {"channel_offset": 0x18, "bytes": 4},
+            "channel_flag": {"channel_offset": 0x3C, "bytes": 1},
+        },
+        "flags_formula": "1 & ~channel_flag",
+    }
+
+
+def recover_data_master_submission_sequence(
+    code: bytes, command_type: int
+) -> dict[str, object]:
+    # The three producers have the same publication tail. The only changing
+    # instruction is the immediate command type passed to the virtual encoder.
+    if not 0 <= command_type <= 2:
+        raise ValueError(f"invalid data-master command type {command_type}")
+    type_instruction = 0x52800002 | (command_type << 5)
+    require_instruction_sequence(
+        code,
+        f"data-master command type {command_type} publication",
+        (
+            0xB9400284,  # submission index
+            0xF94002B0,
+            0xAA1503F1,
+            0xF2F9B431,
+            0xDAC11A30,
+            0xD2804F11,  # encoder vtable slot 0x278
+            0x8B110210,
+            0xF9400208,
+            0xAA1503E0,
+            0xF94007E1,  # entry returned by nextEntry
+            type_instruction,
+            0xAA1303E3,  # channel
+            0xF2E058F0,
+            0xD73F0910,  # encodeAcceleratorRingCommand
+            0xD5033BBF,  # dmb ish before publishing the index
+            0xF94002D0,
+            0xAA1603F1,
+            0xF2F3D511,
+            0xDAC11A30,
+            0xF8438E08,  # getWriteIndex vtable slot 0x38
+            0xAA1603E0,
+            0xF2F0EB70,
+            0xD73F0910,
+            0x11000408,  # write + 1
+            0xF94002D0,
+            0xAA1603F1,
+            0xF2F3D511,
+            0xDAC11A30,
+            0xF8410E09,  # setWriteIndex vtable slot 0x10
+            0x12001D01,  # & 0xff
+            0xAA1603E0,
+            0xF2E27510,
+            0xD73F0930,
+        ),
+    )
+    return {
+        "command_type": command_type,
+        "publish_barrier": "dmb ish",
+        "next_write_index": "(write_index + 1) & 0xff",
+    }
+
+
+def recover_data_master_submission_protocol(
+    image: bytes, next_entry_address: int
+) -> dict[str, object]:
+    commands = {}
+    for label, (symbol, command_type) in SUBMIT_DATA_MASTER_CHANNELS.items():
+        _address, code = symbol_code(image, symbol)
+        if not any(
+            decode_bl_target(_address + offset, word) == next_entry_address
+            for offset, word in words(code)
+        ):
+            raise ValueError(f"{label} submission does not reserve a data-master entry")
+        commands[label] = recover_data_master_submission_sequence(code, command_type)
+
+    return {
+        "serialized_by": "IOCommandGate",
+        "usable_entries": 255,
+        "full_condition": "((write_index + 1) & 0xff) == read_index",
+        "commands": commands,
+    }
+
+
 def recover_vector_copy_size(code: bytes) -> int:
     ranges: dict[tuple[str, int], set[int]] = {}
     for _offset, word in words(code):
@@ -6803,10 +6932,12 @@ def recover_driver_accelerator_layouts(image: bytes) -> dict[str, object]:
             raise ValueError(f"unexpected {entry} ring entry limits: {limits}")
         layouts.append({"entry": entry, "indices": offsets, "entries": 256})
 
-    _address, next_entry = symbol_code(image, NEXT_DATA_MASTER_ENTRY)
+    next_entry_address, next_entry = symbol_code(image, NEXT_DATA_MASTER_ENTRY)
     data_master_size = recover_entry_stride(next_entry)
     _address, encoder = symbol_code(image, ENCODE_ACCELERATOR_COMMAND)
     fields = recover_accelerator_command_fields(encoder)
+    contract = recover_accelerator_command_contract(encoder)
+    submission = recover_data_master_submission_protocol(image, next_entry_address)
     _address, submit_control = symbol_code(image, SUBMIT_DEVICE_CONTROL)
     device_control_size = recover_vector_copy_size(submit_control)
     if data_master_size != 0x18 or device_control_size != 0x40:
@@ -6819,6 +6950,8 @@ def recover_driver_accelerator_layouts(image: bytes) -> dict[str, object]:
         "state_bytes": 0x30,
         "data_master_entry_bytes": data_master_size,
         "data_master_fields": fields,
+        "data_master_contract": contract,
+        "data_master_submission": submission,
         "device_control_entry_bytes": device_control_size,
     }
 

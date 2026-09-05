@@ -35,7 +35,11 @@ pub const g17_accelerator_ring_addresses_size = u64(0x20)
 pub const g17_auxiliary_ring_addresses_offset = u64(0x1c0)
 pub const g17_auxiliary_ring_address_count = 8
 pub const g17_data_master_entry_size = u64(0x18)
+pub const g17_data_master_entries_bytes = u64(0x1800)
 pub const g17_device_control_entry_size = u64(0x40)
+pub const g17_accelerator_command_ta = u32(0)
+pub const g17_accelerator_command_3d = u32(1)
+pub const g17_accelerator_command_cl = u32(2)
 pub const g17_channel_state_size = u64(0xc0)
 pub const g17_channel_control_header_size = u64(0x70)
 pub const g17_channel_pool_base_size = u64(0x70)
@@ -853,26 +857,26 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig, uat_ttb_base u64) G1
 @[packed]
 pub struct G17HardwareConfig {
 pub mut:
-	address_space_layout_000       G17AddressSpaceLayout
-	color_matrices_038             [g17_color_matrix_count]G17ColorMatrixRecord
-	border_color_table_address_638 u64
-	io_mappings_640                [g17_io_mapping_count]G17IoMappingRecord
-	opaque_e88                     [0x8]u8
-	firmware_scalar_block_e90      G17FirmwareScalarBlock
-	performance_state_max_fc4      u32
-	frequency_table_fc8            [g17_performance_state_capacity]u32
-	voltage_table_1008             [g17_performance_state_capacity]G17VoltageTableRow
-	sram_voltage_table_1408        [g17_performance_state_capacity]G17VoltageTableRow
-	secondary_frequency_table_1808 [g17_performance_state_capacity]u32
-	sram_power_scale_1848          [g17_performance_state_capacity]u32
-	static_power_scale_1888        [g17_performance_state_capacity]u32
-	firmware_table_18c8            [g17_performance_state_capacity]u32
-	relative_boost_frequency_1908  [g17_performance_state_capacity]u32
-	firmware_table_1948            [g17_performance_state_capacity]u32
+	address_space_layout_000          G17AddressSpaceLayout
+	color_matrices_038                [g17_color_matrix_count]G17ColorMatrixRecord
+	border_color_table_address_638    u64
+	io_mappings_640                   [g17_io_mapping_count]G17IoMappingRecord
+	opaque_e88                        [0x8]u8
+	firmware_scalar_block_e90         G17FirmwareScalarBlock
+	performance_state_max_fc4         u32
+	frequency_table_fc8               [g17_performance_state_capacity]u32
+	voltage_table_1008                [g17_performance_state_capacity]G17VoltageTableRow
+	sram_voltage_table_1408           [g17_performance_state_capacity]G17VoltageTableRow
+	secondary_frequency_table_1808    [g17_performance_state_capacity]u32
+	sram_power_scale_1848             [g17_performance_state_capacity]u32
+	static_power_scale_1888           [g17_performance_state_capacity]u32
+	firmware_table_18c8               [g17_performance_state_capacity]u32
+	relative_boost_frequency_1908     [g17_performance_state_capacity]u32
+	firmware_table_1948               [g17_performance_state_capacity]u32
 	afr_relative_boost_frequency_1988 [g17_performance_state_capacity]u32
-	performance_state_map_19c8     G17PerformanceStateMapBlock
-	cs_performance_1a48            G17AuxPerformanceBlock
-	afr_performance_1b90           G17AuxPerformanceBlock
+	performance_state_map_19c8        G17PerformanceStateMapBlock
+	cs_performance_1a48               G17AuxPerformanceBlock
+	afr_performance_1b90              G17AuxPerformanceBlock
 	// Second performance-state block, shaped like the primary one at +0xfc4
 	// and sourced from the accelerator's SRAM-side arrays at
 	// +0x1bb58/+0x1bb60/+0x1bba0. Its producer is gated on accelerator byte
@@ -1073,8 +1077,7 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 	for state := hardware.perf_state_base + 1; state < hardware.afr_perf_states.state_count; state++ {
 		frequency_delta := u64(hardware.afr_perf_states.frequencies[state] - afr_base_frequency)
 		frequency_range := u64(afr_max_frequency - afr_base_frequency)
-		config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 /
-			frequency_range)
+		config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 / frequency_range)
 	}
 	populate_g17_performance_state_map(mut config)
 	return true
@@ -1274,8 +1277,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		// G17's selected virtual provider returns zero for this optional table.
 		config.border_color_table_address_638 = 0
 		populate_g17_late_controls(mut config, inputs)
-		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware,
-			uat_ttb_base)
+		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware, uat_ttb_base)
 		if !populate_g17_pio_mappings(mut config, hardware) {
 			return false
 		}
@@ -1325,8 +1327,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		for state := hardware.perf_state_base + 1; state < hardware.afr_perf_states.state_count; state++ {
 			frequency_delta := u64(hardware.afr_perf_states.frequencies[state] - afr_base_frequency)
 			frequency_range := u64(afr_max_frequency - afr_base_frequency)
-			config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 /
-				frequency_range)
+			config.afr_relative_boost_frequency_1988[state] = u32(frequency_delta * 100 / frequency_range)
 		}
 		populate_g17_performance_state_map(mut config)
 	}
@@ -1449,8 +1450,7 @@ pub mut:
 
 fn g17_register_pass(command voidptr, pass u32) &G17RegisterStreamTrailer {
 	return unsafe {
-		&G17RegisterStreamTrailer(&u8(command) + u64(pass) * g17_3d_register_stride +
-			g17_3d_register_metadata_offset)
+		&G17RegisterStreamTrailer(&u8(command) + u64(pass) * g17_3d_register_stride + g17_3d_register_metadata_offset)
 	}
 }
 
@@ -1487,11 +1487,9 @@ pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, value 
 	}
 
 	unsafe {
-		entry := &u8(command) + u64(pass) * g17_3d_register_stride +
-			g17_3d_register_stream_offset + u64(trailer.byte_length)
+		entry := &u8(command) + u64(pass) * g17_3d_register_stride + g17_3d_register_stream_offset + u64(trailer.byte_length)
 		mut selector_word := &u32(entry)
-		*selector_word = (*selector_word & g17_3d_register_selector_mask) |
-			(selector & ~g17_3d_register_selector_mask)
+		*selector_word = (*selector_word & g17_3d_register_selector_mask) | (selector & ~g17_3d_register_selector_mask)
 		mut encoded := value
 		C.memcpy(voidptr(entry + 4), &encoded, 8)
 	}
@@ -1510,9 +1508,7 @@ pub fn publish_g17_register_summaries(command voidptr, descriptor voidptr) bool 
 	for pass := u32(0); pass < g17_3d_register_passes; pass++ {
 		trailer := g17_register_pass(command, pass)
 		unsafe {
-			mut summary := &G17RegisterPassSummary(&u8(descriptor) +
-				g17_3d_register_summary_offset +
-				u64(pass) * g17_3d_register_summary_stride)
+			mut summary := &G17RegisterPassSummary(&u8(descriptor) + g17_3d_register_summary_offset + u64(pass) * g17_3d_register_summary_stride)
 			summary.gpu_address = trailer.gpu_address
 			summary.entry_count = trailer.entry_count
 		}
@@ -1603,15 +1599,15 @@ pub const g17_max_app_gpu_role = u8(3)
 @[packed]
 pub struct G17SchedulerState {
 pub mut:
-	sentinel_000   u16
-	opaque_002     [0x03]u8
-	flag_005       u8
-	opaque_006     [0x1c]u8
-	value_022      u32
-	app_gpu_role   u8
-	opaque_027     [0x0c]u8
-	sentinel_033   u8
-	opaque_034     [0x0c]u8
+	sentinel_000 u16
+	opaque_002   [0x03]u8
+	flag_005     u8
+	opaque_006   [0x1c]u8
+	value_022    u32
+	app_gpu_role u8
+	opaque_027   [0x0c]u8
+	sentinel_033 u8
+	opaque_034   [0x0c]u8
 }
 
 // Reproduce the element defaults AGXCommandQueue::allocateSchedulerState
@@ -1858,17 +1854,108 @@ pub fn initialize_g17_firmware_shared_data(buffer voidptr, size u64, bindings G1
 }
 
 // Scheduler submission entry written by
-// AGXArmFirmware::encodeAcceleratorRingCommand. The first word is not yet
-// understood and must be initialized by the future G17 command encoder.
+// AGXArmFirmware::encodeAcceleratorRingCommand. The complete 0x30-byte Apple
+// encoder does not touch the first qword. Vinix clears the whole entry before
+// filling the five encoded fields so the reserved word remains deterministic
+// when a ring slot is reused.
 @[packed]
 pub struct G17DataMasterEntry {
 pub mut:
-	opaque_000           u64
+	reserved_000         u64
 	channel_data_address u64
 	command_type         u32
 	submission_index     u16
 	channel_id           u8
 	flags                u8
+}
+
+pub struct G17DataMasterCommand {
+pub:
+	channel_data_address u64
+	command_type         u32
+	submission_index     u16
+	channel_id           u8
+	channel_flag         u8
+}
+
+@[inline]
+fn valid_g17_accelerator_command_type(command_type u32) bool {
+	return command_type == g17_accelerator_command_ta
+		|| command_type == g17_accelerator_command_3d
+		|| command_type == g17_accelerator_command_cl
+}
+
+// Reproduce AGXArmFirmware::encodeAcceleratorRingCommand. Apple sources the
+// address, ID, and flag from AGXChannel +0x80/+0x18/+0x3c; the caller passes
+// those already-decoded values here. Clearing first is a Vinix invariant that
+// gives the encoder-preserved qword a defined zero value on every wrap.
+pub fn encode_g17_data_master_entry(entry &G17DataMasterEntry,
+	command G17DataMasterCommand) bool {
+	if entry == unsafe { nil } || command.channel_data_address == 0
+		|| !valid_g17_accelerator_command_type(command.command_type) {
+		return false
+	}
+
+	unsafe {
+		C.memset(entry, 0, g17_data_master_entry_size)
+		entry.channel_data_address = command.channel_data_address
+		entry.command_type = command.command_type
+		entry.submission_index = command.submission_index
+		entry.channel_id = command.channel_id
+		entry.flags = u8(1) & ~command.channel_flag
+	}
+	return true
+}
+
+// Reset one firmware-facing accelerator ring. The backing allocation is one
+// 16 KiB GPU page, while its 256 0x18-byte entries occupy the first 0x1800
+// bytes. Clearing the complete allocation also establishes reserved_000 == 0.
+pub fn initialize_g17_accelerator_ring(state_buffer voidptr, state_size u64,
+	entries_buffer voidptr, entries_size u64) bool {
+	if state_buffer == unsafe { nil } || state_size != g17_accelerator_ring_state_size
+		|| entries_buffer == unsafe { nil } || entries_size < g17_data_master_entries_bytes {
+		return false
+	}
+	unsafe {
+		C.memset(state_buffer, 0, state_size)
+		C.memset(entries_buffer, 0, entries_size)
+	}
+	return true
+}
+
+// Reserve, encode, and publish one outer data-master entry. Apple's nextEntry
+// is serialized by an IOCommandGate, compares ((write + 1) & 0xff) with the
+// read index, and therefore exposes 255 of the 256 slots. Its producer executes
+// dmb ish before setWriteIndex; katomic.store is a release store and provides
+// the required entry-before-index publication ordering. Callers must serialize
+// producers for a given ring just as Apple's command gate does.
+pub fn enqueue_g17_data_master_entry(state_buffer voidptr, state_size u64,
+	entries_buffer voidptr, entries_size u64, command G17DataMasterCommand) bool {
+	if state_buffer == unsafe { nil } || state_size != g17_accelerator_ring_state_size
+		|| entries_buffer == unsafe { nil } || entries_size < g17_data_master_entries_bytes {
+		return false
+	}
+
+	unsafe {
+		mut state := &G17AcceleratorRingState(state_buffer)
+		read_index := katomic.load(&state.read_index)
+		write_index := katomic.load(&state.write_index)
+		if read_index >= g17_accelerator_ring_entries
+			|| write_index >= g17_accelerator_ring_entries {
+			return false
+		}
+		next_index := (write_index + 1) & 0xff
+		if next_index == read_index {
+			return false
+		}
+
+		mut entry := &G17DataMasterEntry(&u8(entries_buffer) + u64(write_index) * g17_data_master_entry_size)
+		if !encode_g17_data_master_entry(entry, command) {
+			return false
+		}
+		katomic.store(mut &state.write_index, next_index)
+	}
+	return true
 }
 
 // The device-control path copies a complete 0x40-byte entry into its ring.
@@ -1882,5 +1969,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes
 }

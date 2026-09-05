@@ -55,15 +55,17 @@ pub mut:
 
 pub struct GpuManager {
 pub mut:
-	res         regs.GpuResources
-	hw_config   hw.HwConfig
-	rtk         rtkit.RTKit
-	channels    GpuChannels
-	allocs      alloc.HeapAllocator
+	res           regs.GpuResources
+	hw_config     hw.HwConfig
+	rtk           rtkit.RTKit
+	channels      GpuChannels
+	allocs        alloc.HeapAllocator
 	initdata_va   u64
 	initdata_phys u64
-	state       GpuState
-		lock        klock.Lock
+	state         GpuState
+	lock          klock.Lock
+mut:
+	g17_graph &G17FirmwareGraph = unsafe { nil }
 }
 
 __global (
@@ -86,11 +88,11 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 	println('agx: GPU ID version=0x${version:x} cores=${core_count}')
 
 	mut mgr := &GpuManager{
-		res:       unsafe { *res }
+		res: unsafe { *res }
 		hw_config: unsafe { *cfg }
-		rtk:       unsafe { *rtk }
-		state:     .idle
-		allocs:    alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
+		rtk: unsafe { *rtk }
+		state: .idle
+		allocs: alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
 	}
 
 	return mgr
@@ -130,7 +132,7 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 	}
 
 	return SharedBuffer{
-		va:   va
+		va: va
 		phys: phys
 		size: aligned_size
 	}
@@ -141,15 +143,13 @@ fn (mut mgr GpuManager) init_channels() bool {
 	devctl_entry := u32(sizeof(fw.FwDeviceControlMsg))
 	devctl_size := u64(sizeof(channel.RingHeader)) + u64(fw.device_control_size) * u64(devctl_entry)
 	devctl := mgr.alloc_shared_buffer(devctl_size) or { return false }
-	mgr.channels.device_ctrl = channel.new_tx_channel('devctl', devctl.va, devctl.phys,
-		fw.device_control_size, devctl_entry)
+	mgr.channels.device_ctrl = channel.new_tx_channel('devctl', devctl.va, devctl.phys, fw.device_control_size, devctl_entry)
 
 	// Firmware control TX
 	fwctl_entry := u32(sizeof(fw.FwFwCtlMsg))
 	fwctl_size := u64(sizeof(channel.RingHeader)) + u64(fw.fw_ctl_size) * u64(fwctl_entry)
 	fwctl := mgr.alloc_shared_buffer(fwctl_size) or { return false }
-	mgr.channels.fw_ctrl = channel.new_tx_channel('fwctl', fwctl.va, fwctl.phys, fw.fw_ctl_size,
-		fwctl_entry)
+	mgr.channels.fw_ctrl = channel.new_tx_channel('fwctl', fwctl.va, fwctl.phys, fw.fw_ctl_size, fwctl_entry)
 
 	// Event RX
 	event_entry := u32(sizeof(fw.FwEventMsg))
@@ -166,8 +166,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 	ktrace_entry := u32(sizeof(fw.FwKTraceMsg))
 	ktrace_size := u64(sizeof(channel.RingHeader)) + u64(fw.ktrace_size) * u64(ktrace_entry)
 	ktrace := mgr.alloc_shared_buffer(ktrace_size) or { return false }
-	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace.va, ktrace.phys, fw.ktrace_size,
-		ktrace_entry)
+	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace.va, ktrace.phys, fw.ktrace_size, ktrace_entry)
 
 	stats_entry := u32(sizeof(fw.FwStatsMsg))
 	stats_size := u64(sizeof(channel.RingHeader)) + u64(fw.stats_size) * u64(stats_entry)
@@ -183,8 +182,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 		}
 		pipe_bytes := u64(sizeof(channel.RingHeader)) + u64(fw.pipe_size) * u64(entry_size)
 		pipe := mgr.alloc_shared_buffer(pipe_bytes) or { return false }
-		mgr.channels.pipes[i] = channel.new_tx_channel('pipe${i}', pipe.va, pipe.phys, fw.pipe_size,
-			entry_size)
+		mgr.channels.pipes[i] = channel.new_tx_channel('pipe${i}', pipe.va, pipe.phys, fw.pipe_size, entry_size)
 	}
 
 	return true
@@ -297,8 +295,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	}
 	// Map into the GPU's internal UAT. AGX does not sit behind an Apple DART.
 	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(initdata_va, initdata_phys, initdata_size,
-			pgtable.gpu_prot_fw_gpu_shared_rw) {
+		if !uat_mgr.map_kernel(initdata_va, initdata_phys, initdata_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
 			C.printf(c'agx: Failed to map initdata into kernel UAT\n')
 			return false
 		}
@@ -318,10 +315,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	init.region_c_addr = initdata_va + 0xC00
 	init.fw_status_addr = initdata_va + 0x1000
 
-	region_a := fw.build_region_a(channel_base, log_base,
-		mgr.channels.fw_log.ring_size * mgr.channels.fw_log.entry_size, ktrace_base,
-		mgr.channels.ktrace.ring_size * mgr.channels.ktrace.entry_size, stats_base,
-		mgr.channels.stats.ring_size * mgr.channels.stats.entry_size)
+	region_a := fw.build_region_a(channel_base, log_base, mgr.channels.fw_log.ring_size * mgr.channels.fw_log.entry_size, ktrace_base, mgr.channels.ktrace.ring_size * mgr.channels.ktrace.entry_size, stats_base, mgr.channels.stats.ring_size * mgr.channels.stats.entry_size)
 	region_b := fw.build_region_b(&mgr.hw_config)
 	region_c := fw.RegionC{}
 	status := fw.FwStatus{}
@@ -343,8 +337,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 // the channel id; they are NOT the firmware-control endpoint (0x20) used for
 // INIT/FWCTL. Ring state must already be published before this is called.
 pub fn (mut mgr GpuManager) send_doorbell(channel_id u32) bool {
-	return mgr.rtk.send_message(u8(ep_doorbell), msg_tx_doorbell |
-		(u64(channel_id) & msg_address_mask))
+	return mgr.rtk.send_message(u8(ep_doorbell), msg_tx_doorbell | (u64(channel_id) & msg_address_mask))
 }
 
 // Ring the doorbell for the default device-control channel.
@@ -367,8 +360,7 @@ pub fn (mut mgr GpuManager) handle_event() {
 			fw.fw_event_init {
 				println('agx: Firmware init event received')
 			}
-			fw.fw_event_vertex_done, fw.fw_event_fragment_done, fw.fw_event_compute_done,
-			fw.fw_event_stamp {
+			fw.fw_event_vertex_done, fw.fw_event_fragment_done, fw.fw_event_compute_done, fw.fw_event_stamp {
 				gpu_event_mgr.scan_completions()
 			}
 			fw.fw_event_error {
@@ -393,20 +385,20 @@ pub fn (mut mgr GpuManager) submit_render(cmd &queue.RenderCommand, priority u32
 	if cmd.flags & queue.render_flag_vertex != 0 {
 		vertex := fw.FwVertexCmd{
 			header: fw.FwCmdHeader{
-				tag:      fw.cmd_type_run_vertex
+				tag: fw.cmd_type_run_vertex
 				cmd_type: fw.cmd_type_run_vertex
-				flags:    cmd.flags
+				flags: cmd.flags
 			}
-			scene_addr:     cmd.scene_addr
-			buf_addr:       cmd.vertex_buf_addr
-			buf_size:       cmd.vertex_buf_size
-			tvb_addr:       cmd.tvb_addr
-			vertex_count:   cmd.vertex_count
+			scene_addr: cmd.scene_addr
+			buf_addr: cmd.vertex_buf_addr
+			buf_size: cmd.vertex_buf_size
+			tvb_addr: cmd.tvb_addr
+			vertex_count: cmd.vertex_count
 			instance_count: cmd.instance_count
-			stamp_addr:     cmd.stamp_addr
-			stamp_value:    cmd.stamp_value
-			result_addr:    cmd.result_addr
-			result_size:    cmd.result_size
+			stamp_addr: cmd.stamp_addr
+			stamp_value: cmd.stamp_value
+			result_addr: cmd.result_addr
+			result_size: cmd.result_size
 		}
 		idx := pipe_index(pipe_prio, 0)
 		if !mgr.channels.pipes[idx].enqueue(voidptr(&vertex)) {
@@ -417,23 +409,23 @@ pub fn (mut mgr GpuManager) submit_render(cmd &queue.RenderCommand, priority u32
 	if cmd.flags & queue.render_flag_fragment != 0 {
 		fragment := fw.FwFragmentCmd{
 			header: fw.FwCmdHeader{
-				tag:      fw.cmd_type_run_fragment
+				tag: fw.cmd_type_run_fragment
 				cmd_type: fw.cmd_type_run_fragment
-				flags:    cmd.flags
+				flags: cmd.flags
 			}
-			scene_addr:  cmd.scene_addr
-			buf_addr:    cmd.frag_buf_addr
-			buf_size:    cmd.frag_buf_size
-			width:       cmd.width
-			height:      cmd.height
-			tile_width:  cmd.tile_width
+			scene_addr: cmd.scene_addr
+			buf_addr: cmd.frag_buf_addr
+			buf_size: cmd.frag_buf_size
+			width: cmd.width
+			height: cmd.height
+			tile_width: cmd.tile_width
 			tile_height: cmd.tile_height
-			stamp_addr:  cmd.stamp_addr
+			stamp_addr: cmd.stamp_addr
 			stamp_value: cmd.stamp_value
 			result_addr: cmd.result_addr
 			result_size: cmd.result_size
-			layers:      cmd.layers
-			samples:     cmd.samples
+			layers: cmd.layers
+			samples: cmd.samples
 		}
 		idx := pipe_index(pipe_prio, 1)
 		if !mgr.channels.pipes[idx].enqueue(voidptr(&fragment)) {
@@ -452,23 +444,23 @@ pub fn (mut mgr GpuManager) submit_compute(cmd &queue.ComputeCommand, priority u
 
 	compute := fw.FwComputeCmd{
 		header: fw.FwCmdHeader{
-			tag:      fw.cmd_type_run_compute
+			tag: fw.cmd_type_run_compute
 			cmd_type: fw.cmd_type_run_compute
-			flags:    cmd.flags
+			flags: cmd.flags
 		}
-		buf_addr:        cmd.compute_buf_addr
-		buf_size:        cmd.compute_buf_size
-		wg_x:            cmd.wg_x
-		wg_y:            cmd.wg_y
-		wg_z:            cmd.wg_z
-		grid_x:          cmd.grid_x
-		grid_y:          cmd.grid_y
-		grid_z:          cmd.grid_z
+		buf_addr: cmd.compute_buf_addr
+		buf_size: cmd.compute_buf_size
+		wg_x: cmd.wg_x
+		wg_y: cmd.wg_y
+		wg_z: cmd.wg_z
+		grid_x: cmd.grid_x
+		grid_y: cmd.grid_y
+		grid_z: cmd.grid_z
 		shared_mem_size: cmd.shared_mem_size
-		stamp_addr:      cmd.stamp_addr
-		stamp_value:     cmd.stamp_value
-		result_addr:     cmd.result_addr
-		result_size:     cmd.result_size
+		stamp_addr: cmd.stamp_addr
+		stamp_value: cmd.stamp_value
+		result_addr: cmd.result_addr
+		result_size: cmd.result_size
 	}
 
 	idx := pipe_index(priority % 4, 2)
