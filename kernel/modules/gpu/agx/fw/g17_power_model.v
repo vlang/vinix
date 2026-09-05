@@ -159,6 +159,42 @@ fn g17_fraction_to_f32_bits(numerator u32, denominator u32) ?u32 {
 		u64(denominator))
 }
 
+// Firmware structures carry IEEE-754 words, but the kernel is compiled with
+// floating point disabled. Keep the small amount of arithmetic needed by the
+// recovered InitData builders in the integer domain. These helpers deliberately
+// support only the finite, normal ranges used by Apple's power-controller DT
+// properties; an unsupported future value keeps firmware bootstrap closed.
+fn firmware_u32_to_f32_bits(value u32) ?u32 {
+	return g17_u32_to_f32_bits(value)
+}
+
+fn firmware_fraction_to_f32_bits(numerator u32, denominator u32) ?u32 {
+	return g17_fraction_to_f32_bits(numerator, denominator)
+}
+
+fn firmware_f32_multiply_bits(left u32, right u32) ?u32 {
+	if left & 0x7fff_ffff == 0 || right & 0x7fff_ffff == 0 {
+		return 0
+	}
+	sign := (left ^ right) & 0x8000_0000
+	product := g17_f32_mul_positive(left & 0x7fff_ffff, right & 0x7fff_ffff) or {
+		return none
+	}
+	return product | sign
+}
+
+fn firmware_f32_one_minus_bits(value u32) ?u32 {
+	if value >> 31 != 0 {
+		return none
+	}
+	value_q40 := g17_f32_bits_to_q40(value) or { return none }
+	one_q40 := u64(1) << g17_power_model_q_bits
+	if value_q40 > one_q40 {
+		return none
+	}
+	return g17_q40_to_f32_bits(one_q40 - value_q40)
+}
+
 fn g17_f32_bits_to_u32_trunc(value u32) ?u32 {
 	if value == 0 {
 		return 0

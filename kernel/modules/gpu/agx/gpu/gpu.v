@@ -212,6 +212,7 @@ mut:
 	fw_status        SharedBuffer
 	fwlog_payload    SharedBuffer
 	hwdata_b         SharedBuffer
+	hwdata_a         SharedBuffer
 	stats_vertex     SharedBuffer
 	stats_fragment   SharedBuffer
 	stats_compute    SharedBuffer
@@ -429,6 +430,7 @@ fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelA
 	mgr.free_shared_buffer(mut allocations.stats_compute)
 	mgr.free_shared_buffer(mut allocations.stats_fragment)
 	mgr.free_shared_buffer(mut allocations.stats_vertex)
+	mgr.free_shared_buffer(mut allocations.hwdata_a)
 	mgr.free_shared_buffer(mut allocations.hwdata_b)
 	mgr.free_shared_buffer(mut allocations.fwlog_payload)
 	mgr.free_shared_buffer(mut allocations.fw_status)
@@ -685,6 +687,15 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 			return false
 		}
 	}
+	graph.hwdata_a = mgr.alloc_shared_buffer_with_protection(fw.g13_hwdata_a_size, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	unsafe {
+		mut hwdata_a := &fw.G13HwDataA(graph.hwdata_a.phys + higher_half)
+		if !fw.populate_g13_hwdata_a(mut hwdata_a, &mgr.hw_config) {
+			return false
+		}
+	}
 	if !mgr.map_g13_io_mappings(mut graph) {
 		return false
 	}
@@ -745,6 +756,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.stats_vertex = graph.stats_vertex.va
 		runtime.stats_fragment = graph.stats_fragment.va
 		runtime.stats_compute = graph.stats_compute.va
+		runtime.hwdata_a = graph.hwdata_a.va
 		runtime.unkptr_190 = graph.unknown_190.va
 		runtime.unkptr_198 = graph.unknown_198.va
 		runtime.hwdata_b = graph.hwdata_b.va

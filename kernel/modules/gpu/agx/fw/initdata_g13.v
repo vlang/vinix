@@ -1,8 +1,8 @@
 module fw
 
-// Exact outer layouts for the macOS 12.3 G13 firmware object graph. The
-// hardware- and power-data bodies are still incomplete, so these structures
-// do not make the v12.3_partial ABI safe to boot by themselves.
+// Exact outer layouts for the macOS 12.3 G13 firmware object graph. The global
+// configuration body and native work commands are still incomplete, so these
+// structures do not make the v12.3_partial ABI safe to boot by themselves.
 
 pub const g13_runtime_pointers_size = u64(0x6bc0)
 pub const g13_globals_size = u64(0x11d40)

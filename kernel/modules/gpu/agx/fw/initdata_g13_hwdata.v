@@ -250,4 +250,5 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 
 pub fn validate_g13_hwdata_layouts() bool {
 	return sizeof(G13IoMapping) == 0x20 && sizeof(G13HwDataB) == g13_hwdata_b_size
+		&& validate_g13_hwdata_a_layout()
 }
