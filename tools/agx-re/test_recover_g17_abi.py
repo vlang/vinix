@@ -3615,6 +3615,35 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_recovers_g17_core_count_gate(self) -> None:
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_core_count_gate(driver.read_bytes())
+
+        self.assertEqual(recovered["config_offset"], 0x2570)
+        self.assertTrue(recovered["gate"]["always_set"])
+        self.assertEqual(recovered["selected"], "popcount")
+        # The scaled core count is explicitly the path not taken.
+        self.assertEqual(recovered["unused_fallback"]["accelerator_member"], 0x4B0)
+        self.assertEqual(recovered["popcount_source"]["accelerator_member"], 0x490)
+        # Knowing which producer runs is not the same as knowing the value.
+        self.assertFalse(recovered["resolved"])
+
+    def test_scaled_core_count_is_not_the_core_count_field_source(self) -> None:
+        # chip_info_decode records the scaled core count at accelerator +0x4b0.
+        # The gate proves that producer never runs, so the two recoveries must
+        # agree that +0x4b0 is unused rather than one implying it is the source.
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        image = driver.read_bytes()
+        decode = recover_g17_abi.recover_g17_chip_info_decode(image)
+        gate = recover_g17_abi.recover_g17_core_count_gate(image)
+        scaled = decode["fields"]["scaled_core_count"]["accelerator_member"]
+        self.assertEqual(scaled, gate["unused_fallback"]["accelerator_member"])
+        self.assertNotEqual(scaled, gate["popcount_source"]["accelerator_member"])
+
     def test_recovers_g17_chip_info_decode(self) -> None:
         code = bytearray(0x61C)
         for offset, word in {

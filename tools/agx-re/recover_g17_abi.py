@@ -7162,6 +7162,87 @@ def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_core_count_gate(image: bytes) -> dict[str, object]:
+    """Determine which source config +0x2570 takes on G17.
+
+    The field has two producers picked by accelerator byte +0x506. That byte is
+    chip-info +0x86, which readChipInfo writes from w22 -- and w22 is
+    unconditionally reassigned to 1 before that store, so the bit is always set
+    and the popcount producer always wins. The scaled core count at
+    accelerator +0x4b0 is the path *not* taken.
+
+    The popcount then reads the second mask pair, because the first is the
+    cleared head of the chip-info record and the select falls through to a
+    0x10-byte offset.
+    """
+
+    symbols = macho_symbols(image)
+    required = (PI300_READ_CHIP_INFO, ARM_INIT_FIRMWARE_DATA)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing core-count gate symbols: {missing}")
+
+    _address, reader = symbol_code(image, PI300_READ_CHIP_INFO)
+    require_instruction_words_at(
+        reader,
+        "G17 chip-info gate byte",
+        {
+            0x258: 0x52800036,  # w22 = 1, well before the store
+            0x348: 0x39021A76,  # -> chip info +0x86
+            0x36C: 0xA9012269,  # the mask pair at chip info +0x10/+0x18
+        },
+    )
+    # Nothing may jump over the reassignment, or the byte could still hold the
+    # identity register read that reaches w22 earlier.
+    for offset, word in words(reader):
+        if not 0x1E8 <= offset < 0x258:
+            continue
+        for decoder in (decode_b_target, decode_bl_target):
+            target = decoder(offset, word)
+            if target is not None and target > 0x258:
+                raise ValueError(
+                    f"branch at {offset:#x} can skip the chip-info gate assignment"
+                )
+
+    _address, producer = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
+    require_instruction_words_at(
+        producer,
+        "G17 core-count producer select",
+        {
+            0x6B4: 0x3954190A,  # accelerator +0x506
+            0x6B8: 0x3600024A,  # bit clear would take the scaled fallback
+            0x6CC: 0x5280020C,
+            0x6D0: 0xF100017F,  # first mask pair zero?
+            0x6D4: 0x9A8C13EB,  # then step on by 0x10
+            0x6D8: 0x8B0B014A,
+            0x6DC: 0x6D400141,  # popcount source
+        },
+    )
+
+    return {
+        "config_offset": 0x2570,
+        "gate": {
+            "accelerator_byte": 0x506,
+            "chip_info_byte": 0x86,
+            "value": 1,
+            "always_set": True,
+        },
+        "selected": "popcount",
+        "unused_fallback": {
+            "accelerator_member": 0x4B0,
+            "chip_info": 0x30,
+            "reason": "gate bit is always set, so this producer never runs",
+        },
+        "popcount_source": {
+            "accelerator_member": 0x490,
+            "chip_info": 0x10,
+            "words": 3,
+            "note": "first pair is the cleared record head, so the select steps on by 0x10",
+        },
+        "resolved": False,
+    }
+
+
 def recover_g17_chip_info_decode(image: bytes) -> dict[str, object]:
     """Recover how the chip-info topology fields come out of cluster config.
 
@@ -8392,6 +8473,9 @@ def main() -> int:
         )
         hardware_config["secondary_performance_block"] = (
             recover_g17_secondary_performance_block(driver)
+        )
+        hardware_config["core_count_gate"] = (
+            recover_g17_core_count_gate(driver)
         )
         hardware_config["chip_info_decode"] = (
             recover_g17_chip_info_decode(driver)
