@@ -1067,6 +1067,37 @@ def decode_local_branch_target(address: int, word: int) -> int | None:
     return address + immediate * 4
 
 
+def decode_conditional_branch(
+    address: int, word: int
+) -> tuple[int, str] | None:
+    if word & 0xFF000010 != 0x54000000:
+        return None
+    target = decode_local_branch_target(address, word)
+    if target is None:
+        return None
+    condition = (
+        "eq",
+        "ne",
+        "cs",
+        "cc",
+        "mi",
+        "pl",
+        "vs",
+        "vc",
+        "hi",
+        "ls",
+        "ge",
+        "lt",
+        "gt",
+        "le",
+        "al",
+        "nv",
+    )[word & 0xF]
+    if condition in ("al", "nv"):
+        return None
+    return target, condition
+
+
 def g17_register_is_written(word: int, register: int) -> bool:
     """Recognize the integer writers present in the register-list producers."""
 
@@ -1618,6 +1649,69 @@ def trace_g17_condition_expression(
     return None
 
 
+def trace_g17_control_flow_merge(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    register: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Recover one forward conditional edge around the last definition."""
+
+    definition_index = next(
+        (
+            index
+            for index in range(use_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], register)
+        ),
+        None,
+    )
+    if definition_index is None:
+        return None
+    definition_offset = instructions[definition_index][0]
+    use_offset = (
+        instructions[use_index][0]
+        if use_index < len(instructions)
+        else instructions[-1][0] + 4
+    )
+    branches = [
+        (index, offset, decoded)
+        for index, (offset, word) in enumerate(instructions[:definition_index])
+        for decoded in (decode_conditional_branch(offset, word),)
+        if decoded is not None and definition_offset < decoded[0] <= use_offset
+    ]
+    if len(branches) != 1:
+        return None
+    branch_index, branch_offset, (target, condition) = branches[0]
+
+    predicate = trace_g17_condition_expression(
+        instructions, branch_index, depth + 1, seen
+    )
+    taken = trace_g17_value_expression(
+        instructions, branch_index, register, depth + 1, seen
+    )
+    if predicate is None or taken is None:
+        return None
+
+    fallthrough_instructions = list(instructions)
+    fallthrough_instructions[branch_index] = (branch_offset, 0xD503201F)
+    fallthrough = trace_g17_value_expression(
+        fallthrough_instructions, use_index, register, depth + 1, seen
+    )
+    if fallthrough is None:
+        return None
+    return {
+        "kind": "expression",
+        "producer_offset": branch_offset,
+        "operation": "branch_select",
+        "condition": condition,
+        "target_offset": target,
+        "predicate": predicate,
+        "taken": taken,
+        "fallthrough": fallthrough,
+    }
+
+
 def trace_g17_value_expression(
     instructions: list[tuple[int, int]],
     use_index: int,
@@ -1634,10 +1728,22 @@ def trace_g17_value_expression(
         instructions, use_index, register
     )
     if definition_index is None:
-        if 0 <= register <= 7 and not any(
-            decode_bl_target(offset, word) is not None
-            or word & 0xFFFFFC00 == 0xD73F0800
-            for offset, word in instructions[:use_index]
+        merge = trace_g17_control_flow_merge(
+            instructions, use_index, register, depth, seen
+        )
+        if merge is not None:
+            return merge
+        if (
+            0 <= register <= 7
+            and not any(
+                g17_register_is_written(word, register)
+                for _offset, word in instructions[:use_index]
+            )
+            and not any(
+                decode_bl_target(offset, word) is not None
+                or word & 0xFFFFFC00 == 0xD73F0800
+                for offset, word in instructions[:use_index]
+            )
         ):
             names = ("channel", "command", "descriptor")
             return {

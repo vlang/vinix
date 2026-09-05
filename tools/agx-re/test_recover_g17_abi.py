@@ -27,6 +27,14 @@ def b(source: int, target: int) -> int:
     return 0x14000000 | (((target - source) // 4) & 0x03FFFFFF)
 
 
+def b_cond(source: int, target: int, condition: int) -> int:
+    return (
+        0x54000000
+        | (((target - source) // 4) & 0x7FFFF) << 5
+        | condition
+    )
+
+
 def adrp(source: int, target: int, register: int) -> int:
     pages = ((target & ~0xFFF) - (source & ~0xFFF)) >> 12
     immediate = pages & 0x1FFFFF
@@ -4593,6 +4601,36 @@ class RecoverG17AbiTests(unittest.TestCase):
                 "instruction": 0xAA1603E4,
             },
         )
+
+    def test_recovers_g17_single_conditional_branch_merge(self) -> None:
+        instructions = [
+            (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
+            (0x04, 0x395F8668),  # ldrb w8, [x19, #0x7e1]
+            (0x08, 0x7200011F),  # tst w8, #1
+            (0x0C, b_cond(0x0C, 0x14, 0)),  # b.eq +0x8
+            (0x10, 0xB2400084),  # orr x4, x4, #1
+            (0x14, 0xD503201F),
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 6)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "branch_select")
+        self.assertEqual(expression["condition"], "eq")
+        self.assertEqual(expression["predicate"]["operation"], "tst")
+        self.assertEqual(expression["taken"]["member"], 0x760)
+        self.assertEqual(expression["fallthrough"]["operation"], "orr")
+
+    def test_rejects_g17_ambiguous_conditional_branch_merge(self) -> None:
+        instructions = [
+            (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
+            (0x04, b_cond(0x04, 0x14, 0)),
+            (0x08, b_cond(0x08, 0x14, 1)),
+            (0x0C, 0xB2400084),  # orr x4, x4, #1
+            (0x10, 0xD503201F),
+            (0x14, 0xD503201F),
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 6)
+        self.assertEqual(recovered["kind"], "computed")
+        self.assertNotIn("expression", recovered)
 
     def test_g17_prologue_definition_dominates_loop_backedge(self) -> None:
         ldr_x8_x20_020 = 0xF9400008 | (20 << 5) | ((0x20 // 8) << 10)
