@@ -31,6 +31,11 @@ pub enum GpuRevision {
 // discoverable before Vinix has a compatible ABI implementation.
 pub enum FirmwareAbi {
 	unknown
+	// The G13 v12.3 transport has been identified, but Vinix does not yet
+	// construct the complete nested InitData graph or native work commands.
+	v12_3_partial
+	// Reserved for the byte-validated implementation. No chip may select this
+	// value until bootstrap and command submission match the firmware ABI.
 	v12_3
 	// The macOS 26.5 G17C root header and RTKit transport are identified,
 	// but its nested InitData/channel/work layouts are not complete.
@@ -135,6 +140,15 @@ pub mut:
 // RTKit, InitData, channel, and work-command layouts have been implemented.
 pub fn (cfg &HwConfig) can_boot_firmware() bool {
 	return cfg.gpu_gen == .g13 && cfg.firmware_abi == .v12_3
+}
+
+pub fn (cfg &HwConfig) firmware_abi_name() &char {
+	return match cfg.firmware_abi {
+		.unknown { c'unknown' }
+		.v12_3_partial { c'G13 v12.3 (partial)' }
+		.v12_3 { c'G13 v12.3' }
+		.g17_26_5_partial { c'G17 26.5 (partial)' }
+	}
 }
 
 pub struct DynConfig {

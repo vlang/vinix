@@ -1,9 +1,8 @@
 module fw
 
 // Job descriptor firmware structures
-// These packed structs define the top-level job descriptors that wrap
-// individual vertex/fragment/compute commands for submission to the
-// firmware work queue. Byte-accurate layout for firmware version 12.3.0.
+// Early G13 job sketches. These are not the complete firmware v12.3 layouts
+// and are unreachable while that ABI is marked partial.
 
 // Must match workqueue.max_job_slots
 const fw_max_job_slots = 127

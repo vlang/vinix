@@ -1,10 +1,9 @@
 module fw
 
 // Firmware vertex command structures
-// These packed structs must match the firmware binary layout exactly.
-// The FwVertexCmd is submitted to the GPU via the vertex pipe channel
-// and tells the firmware how to execute the vertex/tiling stage of a
-// render pass. Byte-accurate layout for firmware version 12.3.0.
+// Early G13 vertex-command sketch. The complete v12.3 command contains the
+// firmware work-queue, notifier, buffer, microsequence, timestamp, tiling,
+// and job-metadata graph and is not represented by this type yet.
 
 // Firmware vertex command descriptor
 @[packed]

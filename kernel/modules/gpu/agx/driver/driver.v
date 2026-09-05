@@ -500,7 +500,8 @@ pub fn initialise() {
 	// M1. Detection is useful for bring-up logs, but writes here could corrupt
 	// firmware-owned memory or wedge the machine.
 	if !cfg.can_boot_firmware() {
-		C.printf(c'agx: chip 0x%x firmware ABI is not implemented; leaving hardware untouched\n', chip_id)
+		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n',
+			chip_id, cfg.firmware_abi_name())
 		return
 	}
 

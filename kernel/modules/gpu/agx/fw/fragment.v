@@ -1,10 +1,8 @@
 module fw
 
 // Firmware fragment command structures
-// These packed structs must match the firmware binary layout exactly.
-// The FwFragmentCmd is submitted to the GPU via the fragment pipe channel
-// and tells the firmware how to execute the fragment/pixel shading stage
-// of a render pass. Byte-accurate layout for firmware version 12.3.0.
+// Early G13 fragment-command sketch. Hardware bootstrap and submission remain
+// disabled until the complete v12.3 firmware object graph is represented.
 
 // Firmware fragment command descriptor
 @[packed]

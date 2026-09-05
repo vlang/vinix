@@ -1,9 +1,8 @@
 module fw
 
-// Apple GPU firmware ABI types
-// These packed structs must match the firmware binary layout exactly.
-// Target firmware version: 12.3.0 (M1 / t8103)
-// Translates fw/types.rs from the Asahi Linux GPU driver
+// Early common-type sketches for the partial G13 v12.3 implementation.
+// Hardware bootstrap remains gated off until every firmware-visible type is
+// independently byte-validated.
 
 // GPU firmware version
 pub const fw_ver_major = u32(12)

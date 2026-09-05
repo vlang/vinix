@@ -1,10 +1,8 @@
 module fw
 
 // Firmware compute command structures
-// These packed structs must match the firmware binary layout exactly.
-// The FwComputeCmd is submitted to the GPU via the compute pipe channel
-// and tells the firmware how to dispatch a compute workload.
-// Byte-accurate layout for firmware version 12.3.0.
+// Early G13 compute-command sketch. Hardware bootstrap and submission remain
+// disabled until the complete v12.3 firmware object graph is represented.
 
 // Firmware compute command descriptor
 @[packed]

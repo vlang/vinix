@@ -1,9 +1,9 @@
 module fw
 
-// Firmware InitData structure tree
-// Massive initialization data structure that must be byte-perfect
-// for firmware version 12.3.0 on M1 (t8103).
-// Translates fw/initdata.rs from the Asahi Linux GPU driver
+// Early G13 InitData sketch. This is deliberately not selected by any
+// boot-enabled hardware configuration: the real v12.3 ABI is a graph of
+// separately allocated runtime, globals, status, channel, and hardware-data
+// objects. Do not send this abbreviated layout to M1 firmware.
 
 import gpu.agx.hw
 
