@@ -765,8 +765,9 @@ pub fn initialise() {
 		}
 	}
 	if chip_id == 0x8103
-		&& (!regs.validate_g13_identity_decoder() || !regs.validate_g13_fault_decoder()) {
-		println('agx: internal G13 register decoder validation failed')
+		&& (!regs.validate_g13_identity_decoder() || !regs.validate_g13_fault_decoder()
+		|| !fw.validate_g13_workqueue_layouts() || !fw.validate_g13_event_layouts()) {
+		println('agx: internal G13 register/queue ABI validation failed')
 		return
 	}
 	if !drm_ioctl.validate_asahi_25_layouts() {

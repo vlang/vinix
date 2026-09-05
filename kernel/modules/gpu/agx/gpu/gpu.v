@@ -95,6 +95,7 @@ pub mut:
 	lock           klock.Lock
 mut:
 	g13_channels &G13ChannelAllocations = unsafe { nil }
+	g13_queues   []&G13QueueResources
 	g17_graph    &G17FirmwareGraph = unsafe { nil }
 	g17_queues   []&G17QueueResources
 }
@@ -214,6 +215,11 @@ mut:
 	phys      u64
 	size      u64
 	allocator u32
+}
+
+@[inline]
+fn (buffer &SharedBuffer) cpu_address() voidptr {
+	return voidptr(buffer.phys + higher_half)
 }
 
 struct G13ChannelAllocations {
@@ -1064,6 +1070,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_all_g13_queue_resources()
 	mgr.release_g13_channels()
 	mgr.release_all_g17_queue_resources()
 	mgr.release_g17_firmware_graph()

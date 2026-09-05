@@ -104,11 +104,6 @@ fn g17_work_command_element_size(index int) ?u32 {
 	}
 }
 
-@[inline]
-fn (buffer &SharedBuffer) cpu_address() voidptr {
-	return voidptr(buffer.phys + higher_half)
-}
-
 fn (mut mgr GpuManager) free_g17_queue_resources_locked(mut resources G17QueueResources) {
 	if resources.released {
 		return

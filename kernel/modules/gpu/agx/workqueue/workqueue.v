@@ -9,10 +9,8 @@ module workqueue
 
 import drm.syncobj
 import klock
-import memory
 
 pub const max_job_slots = 127
-const workqueue_ring_pages = u64(4)
 
 // Work error codes
 pub const work_err_none = u32(0)
@@ -39,9 +37,6 @@ pub mut:
 	vm_id          u32
 	priority       u32
 	caps           u32
-	ring_addr      u64 // ring buffer GPU VA
-	ring_phys      u64
-	ring_size      u32
 	slots          [max_job_slots]&WorkItem
 	next_slot      u32
 	completed_slot u32
@@ -49,32 +44,19 @@ pub mut:
 	lock           klock.Lock
 }
 
-// Create a new work queue with the given ID, VM context, priority, and the
-// command types which userspace selected when creating it.
+// Create host-side completion bookkeeping. Firmware-visible queue state is
+// generation-specific and owned by gpu.G13QueueResources/G17QueueResources.
 pub fn new_workqueue(id u32, vm_id u32, priority u32, caps u32) ?&WorkQueue {
-	// Queue creation is userspace-triggered, so physical exhaustion must be an
-	// ordinary ENOMEM path rather than a kernel panic.
-	ring_phys := u64(memory.pmm_alloc_aligned_fallible(workqueue_ring_pages, 4))
-	if ring_phys == 0 {
-		C.printf(c'workqueue: failed to allocate ring buffer for queue %d\n', id)
+	if id == 0 || caps == 0 || priority >= 4 {
 		return none
 	}
 
-	// Zero-initialise ring buffer
-	unsafe {
-		C.memset(voidptr(ring_phys + higher_half), 0, 16384)
+	return &WorkQueue{
+		id:       id
+		vm_id:    vm_id
+		priority: priority
+		caps:     caps
 	}
-
-	mut wq := &WorkQueue{
-		id:        id
-		vm_id:     vm_id
-		priority:  priority
-		caps:      caps
-		ring_phys: ring_phys
-		ring_size: max_job_slots
-	}
-
-	return wq
 }
 
 // Submit a work item to the queue. Returns the slot index on success,
@@ -194,9 +176,4 @@ pub fn (mut wq WorkQueue) destroy() {
 
 	wq.pending_count = 0
 
-	// Free ring buffer physical memory
-	if wq.ring_phys != 0 {
-		memory.pmm_free(voidptr(wq.ring_phys), workqueue_ring_pages)
-		wq.ring_phys = 0
-	}
 }
