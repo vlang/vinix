@@ -50,6 +50,7 @@ pub:
 	owner_process_id u32
 	channel_mask      u32
 	ring_entries      u32
+	priority          u32
 mut:
 	scheduler SharedBuffer
 	timestamp SharedBuffer
@@ -132,9 +133,10 @@ fn (mut mgr GpuManager) free_g17_queue_resources_locked(mut resources G17QueueRe
 // UAT; treating the producer ring as uncached would change firmware-visible
 // ordering even though both mappings point at ordinary physical memory.
 pub fn (mut mgr GpuManager) create_g17_queue_resources(queue_id u32,
-	owner_process_id u32, channel_mask u32) ?&G17QueueResources {
+	owner_process_id u32, channel_mask u32, priority u32) ?&G17QueueResources {
 	if queue_id == 0 || owner_process_id == 0 || channel_mask == 0
-		|| channel_mask & ~g17_queue_channel_mask != 0 {
+		|| channel_mask & ~g17_queue_channel_mask != 0
+		|| priority >= fw.g17_channel_priority_count {
 		return none
 	}
 	mgr.lock.acquire()
@@ -156,6 +158,7 @@ pub fn (mut mgr GpuManager) create_g17_queue_resources(queue_id u32,
 		owner_process_id: owner_process_id
 		channel_mask: channel_mask
 		ring_entries: ring_entries
+		priority: priority
 	}
 	mut complete := false
 	defer {
@@ -196,6 +199,7 @@ pub fn (mut mgr GpuManager) create_g17_queue_resources(queue_id u32,
 				owning_process_id: owner_process_id
 				queue_address_09c: resources.scheduler.va
 				ring_entries: ring_entries
+				priority: priority
 			}) {
 			return none
 		}

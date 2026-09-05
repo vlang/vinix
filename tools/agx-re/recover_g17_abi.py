@@ -511,6 +511,11 @@ SUBMIT_DEVICE_CONTROL = (
     "P33AGFIAcceleratorDeviceControlEntryjPj"
 )
 RESET_CHANNEL_STATE = "__ZN10AGXChannel17resetChannelStateEv"
+GET_CHANNEL_PRIORITY = "__ZN10AGXChannel11getPriorityEv"
+ARM_SET_CHANNEL_PRIORITY = (
+    "__ZN14AGXArmFirmware18setChannelPriorityE"
+    "P17_AGFIChannelState23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel"
+)
 WRITE_CHANNEL_COMMAND_POINTER = (
     "__ZN10AGXChannel26writeChannelCommandPointerEyP22AGFIChannelCommandTypey"
 )
@@ -9689,6 +9694,138 @@ def recover_g17_channel_pool_geometry(code: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_channel_priority(image: bytes) -> dict[str, object]:
+    """Recover the firmware channel-priority fields and canonical profiles.
+
+    The outer data-master ring is selected from state +0x28. Apple's setter
+    writes the full 0x1c-byte priority block, so initializing only that selector
+    would leave mutually dependent firmware policy fields inconsistent.
+    """
+
+    symbols = macho_symbols(image)
+    required = (
+        GET_CHANNEL_PRIORITY,
+        ARM_SET_CHANNEL_PRIORITY,
+        AGX_COMMAND_QUEUE_INIT,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 channel-priority symbols: {missing}")
+
+    _address, getter = symbol_code(image, GET_CHANNEL_PRIORITY)
+    if len(getter) != 0x10:
+        raise ValueError(f"unexpected G17 priority getter size {len(getter):#x}")
+    require_instruction_words_at(
+        getter,
+        "G17 channel-priority getter",
+        {
+            0x00: 0xD503245F,  # bti c
+            0x04: 0xF9402C08,  # channel +0x58 -> shared state
+            0x08: 0xB9402900,  # state +0x28 -> data-master priority
+            0x0C: 0xD65F03C0,
+        },
+    )
+
+    _address, setter = symbol_code(image, ARM_SET_CHANNEL_PRIORITY)
+    if len(setter) != 0x144:
+        raise ValueError(f"unexpected G17 priority setter size {len(setter):#x}")
+    require_instruction_words_at(
+        setter,
+        "G17 channel-priority profiles",
+        {
+            0x04: 0x7100045F,  # context priority 0/1 split
+            0x0C: 0x7100085F,  # context priority 2
+            0x14: 0x7100105F,  # context priority 4
+            0x1C: 0x7100145F,  # context priority 5
+            0x28: 0xB900283F,  # type 5: ring priority 0
+            0x30: 0xB9003829,
+            0x34: 0x929FFFE9,
+            0x3C: 0x340003C2,  # type 0
+            0x48: 0x7100049F,  # type 1 QoS cases
+            0x50: 0x34000684,
+            0x54: 0x7100049F,
+            0x60: 0xB9002828,
+            0x68: 0xD2FFFFE9,
+            0x6C: 0xF9001829,
+            0x74: 0xB9004029,
+            0x7C: 0x52800028,  # context priority 4/default
+            0x80: 0xB9002828,
+            0x88: 0xB2607FE9,
+            0x8C: 0xF9001829,
+            0x94: 0x52800068,  # context priority 2
+            0x98: 0xB9002828,
+            0xA0: 0xF900183F,
+            0xA4: 0xB900403F,
+            0xA8: 0xB9002C28,  # duplicate ring priority
+            0xAC: 0xB9003C23,  # caller-provided subpriority
+            0xB4: 0x52800008,  # context priority 0
+            0xB8: 0xB900283F,
+            0xC4: 0x929FFFEA,
+            0xC8: 0xF900182A,
+            0xCC: 0xB9004029,
+            0xD4: 0x7100089F,  # QoS 2
+            0xE4: 0x52800068,  # QoS 4 selects ring priority 3
+            0xF0: 0xF900183F,
+            0xF8: 0xB9004029,
+            0x100: 0x52800048,  # other QoS values stay on priority 2
+            0x10C: 0xD2FFFFE9,
+            0x114: 0x52800069,
+            0x128: 0x52800048,  # QoS 2 canonical medium profile
+            0x134: 0xD2FFFFE9,
+            0x13C: 0xB9004028,
+        },
+    )
+
+    _address, queue_init = symbol_code(image, AGX_COMMAND_QUEUE_INIT)
+    require_instruction_words_at(
+        queue_init,
+        "G17 default channel subpriority",
+        {
+            0x284: 0x52800048,  # mov w8, #2
+            0x288: 0xB9081A68,  # -> command queue +0x818
+        },
+    )
+
+    # These are the canonical contexts whose state +0x28 values cover all four
+    # data-master rings. Context 1 uses Apple's default QoS level 2. A default
+    # subpriority of 2 is independently established by AGXCommandQueue::init.
+    profiles = [
+        {
+            "priority": 0,
+            "context_priority": 0,
+            "qos": 2,
+            "fields": [0, 0, 0xFFFFFFFFFFFF0000, 1, 2, 1],
+        },
+        {
+            "priority": 1,
+            "context_priority": 4,
+            "qos": 2,
+            "fields": [1, 1, 0xFFFFFFFF00000000, 0, 2, 0],
+        },
+        {
+            "priority": 2,
+            "context_priority": 1,
+            "qos": 2,
+            "fields": [2, 2, 0xFFFF000000000000, 0, 2, 2],
+        },
+        {
+            "priority": 3,
+            "context_priority": 2,
+            "qos": 2,
+            "fields": [3, 3, 0, 0, 2, 0],
+        },
+    ]
+    return {
+        "state_offset": 0x28,
+        "bytes": 0x1C,
+        "reset_priority": 4,
+        "field_offsets": [0x28, 0x2C, 0x30, 0x38, 0x3C, 0x40],
+        "field_bytes": [4, 4, 8, 4, 4, 4],
+        "default_subpriority": 2,
+        "profiles": profiles,
+    }
+
+
 def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str, object]:
     """Recover the shared state/control layout used by a G17 work channel."""
     reset_instructions = list(words(reset_code))
@@ -13668,6 +13805,7 @@ def main() -> int:
         channels["state_sources"] = recover_g17_channel_state_sources(
             driver, reset_channel_code
         )
+        channels["priority"] = recover_g17_channel_priority(driver)
         channels["data_master_types"] = recover_g17_channel_data_master_types(driver)
         channels["data_master_rings"] = recover_g17_data_master_ring_bindings(
             allocations, base_init_code

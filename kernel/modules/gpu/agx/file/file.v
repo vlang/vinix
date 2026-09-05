@@ -532,7 +532,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 		}
 		mut gpu_manager := unsafe { manager }
 		g17_resources = gpu_manager.create_g17_queue_resources(id, f.owner_process_id,
-			channel_mask) or {
+			channel_mask, request.priority) or {
 			mut queue := unsafe { wq }
 			queue.destroy()
 			return -12

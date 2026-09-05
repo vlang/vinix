@@ -59,6 +59,8 @@ pub const g17_data_master_address_record_size = u64(0x20)
 pub const g17_data_master_priority_record_size = u64(0x60)
 pub const g17_data_master_address_table_size = u64(0x180)
 pub const g17_device_control_entry_size = u64(0x40)
+pub const g17_channel_priority_count = u32(4)
+pub const g17_channel_default_subpriority = u32(2)
 pub const g17_accelerator_command_ta = u32(0)
 pub const g17_accelerator_command_3d = u32(1)
 pub const g17_accelerator_command_cl = u32(2)
@@ -1386,7 +1388,11 @@ pub mut:
 	control_020          u32
 	sentinel_024         u32
 	mode_028             u32
-	opaque_02c           [0x18]u8
+	mode_02c             u32
+	threshold_030        u64
+	control_038          u32
+	subpriority_03c      u32
+	qos_040              u32
 	sentinel_044         u32
 	owning_process_id    u32
 	opaque_04c           [0x38]u8
@@ -2187,6 +2193,44 @@ pub mut:
 	owning_process_id    u32
 	queue_address_09c    u64
 	ring_entries         u32
+	priority             u32
+}
+
+// Apply the canonical realtime/high/medium/low profiles exposed by the Asahi
+// queue UAPI. AGXArmFirmware::setChannelPriority maps Apple context priorities
+// 0/4/1/2 onto firmware data-master priorities 0/1/2/3 respectively. Its full
+// state block is reproduced here with Apple's default subpriority 2.
+fn initialize_g17_channel_priority(mut state G17ChannelState, priority u32) bool {
+	if priority >= g17_channel_priority_count {
+		return false
+	}
+	state.subpriority_03c = g17_channel_default_subpriority
+	match priority {
+		0 {
+			state.mode_028 = 0
+			state.mode_02c = 0
+			state.threshold_030 = u64(0xffffffffffff0000)
+			state.control_038 = 1
+			state.qos_040 = 1
+		}
+		1 {
+			state.mode_028 = 1
+			state.mode_02c = 1
+			state.threshold_030 = u64(0xffffffff00000000)
+		}
+		2 {
+			state.mode_028 = 2
+			state.mode_02c = 2
+			state.threshold_030 = u64(0xffff000000000000)
+			state.qos_040 = 2
+		}
+		3 {
+			state.mode_028 = 3
+			state.mode_02c = 3
+		}
+		else { return false }
+	}
+	return true
 }
 
 // Reproduce AGXChannel::resetChannelState for the checked shared fields.
@@ -2203,6 +2247,7 @@ pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 		|| uncached_buffer == unsafe { nil } || uncached_size < g17_channel_control_header_size
 		|| cached_buffer == unsafe { nil } || bindings.uncached_gpu_address == 0
 		|| bindings.cached_gpu_address == 0 || bindings.ring_entries == 0
+		|| bindings.priority >= g17_channel_priority_count
 		|| u64(bindings.ring_entries) > cached_size / g17_cached_command_pointer_size {
 		return false
 	}
@@ -2216,10 +2261,12 @@ pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 		state.cached_gpu_address = bindings.cached_gpu_address
 		state.context_cookie = bindings.context_cookie
 		state.sentinel_024 = ~u32(0)
-		state.mode_028 = 4
 		state.sentinel_044 = ~u32(0)
 		state.owning_process_id = bindings.owning_process_id
 		state.queue_address_09c = bindings.queue_address_09c
+		if !initialize_g17_channel_priority(mut state, bindings.priority) {
+			return false
+		}
 		mut control := &G17ChannelControl(uncached_buffer)
 		control.sentinel_050 = ~u32(0)
 		control.ring_entries = bindings.ring_entries

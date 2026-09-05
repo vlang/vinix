@@ -1925,6 +1925,106 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["priority_shift"], 2)
         self.assertEqual(recovered["commands"]["CL"]["low_bits"], 2)
 
+    def test_recovers_g17_channel_priority_profiles(self) -> None:
+        getter = encode(0xD503245F, 0xF9402C08, 0xB9402900, 0xD65F03C0)
+        setter = bytearray(0x144)
+        for offset, word in {
+            0x04: 0x7100045F,
+            0x0C: 0x7100085F,
+            0x14: 0x7100105F,
+            0x1C: 0x7100145F,
+            0x28: 0xB900283F,
+            0x30: 0xB9003829,
+            0x34: 0x929FFFE9,
+            0x3C: 0x340003C2,
+            0x48: 0x7100049F,
+            0x50: 0x34000684,
+            0x54: 0x7100049F,
+            0x60: 0xB9002828,
+            0x68: 0xD2FFFFE9,
+            0x6C: 0xF9001829,
+            0x74: 0xB9004029,
+            0x7C: 0x52800028,
+            0x80: 0xB9002828,
+            0x88: 0xB2607FE9,
+            0x8C: 0xF9001829,
+            0x94: 0x52800068,
+            0x98: 0xB9002828,
+            0xA0: 0xF900183F,
+            0xA4: 0xB900403F,
+            0xA8: 0xB9002C28,
+            0xAC: 0xB9003C23,
+            0xB4: 0x52800008,
+            0xB8: 0xB900283F,
+            0xC4: 0x929FFFEA,
+            0xC8: 0xF900182A,
+            0xCC: 0xB9004029,
+            0xD4: 0x7100089F,
+            0xE4: 0x52800068,
+            0xF0: 0xF900183F,
+            0xF8: 0xB9004029,
+            0x100: 0x52800048,
+            0x10C: 0xD2FFFFE9,
+            0x114: 0x52800069,
+            0x128: 0x52800048,
+            0x134: 0xD2FFFFE9,
+            0x13C: 0xB9004028,
+        }.items():
+            struct.pack_into("<I", setter, offset, word)
+        functions = {
+            recover_g17_abi.GET_CHANNEL_PRIORITY: (0, getter),
+            recover_g17_abi.ARM_SET_CHANNEL_PRIORITY: (0, bytes(setter)),
+            recover_g17_abi.AGX_COMMAND_QUEUE_INIT: (
+                0,
+                bytes(0x284) + encode(0x52800048, 0xB9081A68),
+            ),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=dict.fromkeys(functions, 0)
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_priority(b"")
+        self.assertEqual(recovered["reset_priority"], 4)
+        self.assertEqual(
+            [profile["context_priority"] for profile in recovered["profiles"]],
+            [0, 4, 1, 2],
+        )
+        self.assertEqual(
+            recovered["profiles"][2]["fields"],
+            [2, 2, 0xFFFF000000000000, 0, 2, 2],
+        )
+
+    def test_rejects_modified_g17_channel_priority_profile(self) -> None:
+        functions = {
+            recover_g17_abi.GET_CHANNEL_PRIORITY: (
+                0,
+                encode(0xD503245F, 0xF9402C08, 0xB9402900, 0xD65F03C0),
+            ),
+            recover_g17_abi.ARM_SET_CHANNEL_PRIORITY: (0, bytes(0x144)),
+            recover_g17_abi.AGX_COMMAND_QUEUE_INIT: (
+                0,
+                bytes(0x284) + encode(0x52800048, 0xB9081A68),
+            ),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=dict.fromkeys(functions, 0)
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            self.assertRaisesRegex(ValueError, "channel-priority profiles"),
+        ):
+            recover_g17_abi.recover_g17_channel_priority(b"")
+
     def test_recovers_g17_dual_role_boot_transport(self) -> None:
         notify = bytearray(0x134)
         receive = bytearray(0xF0)
