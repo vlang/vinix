@@ -200,6 +200,7 @@ pub mut:
 	perf_state_voltages      [256]u32
 	perf_state_sram_voltages [256]u32
 	max_power_mw             u32
+	firmware_version         [4]u32
 	g13_power                G13PowerConfig
 	cs_perf_states           AuxPerfStateConfig
 	afr_perf_states          AuxPerfStateConfig

@@ -16,6 +16,7 @@ import gpu.agx.gpu
 import klock
 import proc
 import usercopy
+import aarch64.timer
 
 const max_submission_commands = u32(64)
 const max_submission_syncs = u32(64)
@@ -276,7 +277,7 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 	cfg := &manager.hw_config
 	mut params := ioctl.DrmAsahiParamsGlobal{
 		unstable_uabi_version:       ioctl.drm_asahi_unstable_uabi_version
-		feat_compat:                 u64(cfg.gpu_feat_compat)
+		feat_compat:                 u64(cfg.gpu_feat_compat) | ioctl.asahi_feat_gettime
 		feat_incompat:               u64(cfg.gpu_feat_incompat)
 		gpu_generation:              u32(cfg.gpu_gen)
 		gpu_variant:                 asahi_variant(manager)
@@ -289,9 +290,9 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 		num_gps_per_cluster:         if cfg.num_clusters == 0 { u32(0) } else { cfg.num_gps / cfg.num_clusters }
 		num_cores_total_active:      cfg.gpu_core_count
 		vm_page_size:                u32(pgtable.uat_pgsz)
-		vm_user_start:               u64(0x100000000)
-		vm_user_end:                 u64(1) << cfg.uat_ias
-		vm_kernel_min_size:          u64(32) << 30
+		vm_user_start:               mmu.uat_user_va_start
+		vm_user_end:                 mmu.uat_unknown_page
+		vm_kernel_min_size:          u64(0x20000000)
 		max_syncs_per_submission:    max_submission_syncs
 		max_commands_per_submission: max_submission_commands
 		max_commands_in_flight:      workqueue.max_job_slots
@@ -311,6 +312,7 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 		params.max_frequency_khz = cfg.perf_state_frequencies[cfg.perf_state_count - 1] / 1000
 		params.max_power_mw = cfg.max_power_mw
 	}
+	params.firmware_version = cfg.firmware_version
 	return params
 }
 
@@ -343,12 +345,16 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	}
 	address_limit := u64(1) << mgr.ias
 	if request.extensions != 0 || request.pad != 0 || request.kernel_start >= request.kernel_end
+		|| request.kernel_start < mmu.uat_user_va_start
 		|| request.kernel_start & pgtable.uat_pg_mask != 0
-		|| request.kernel_end & pgtable.uat_pg_mask != 0 || request.kernel_end > address_limit {
+		|| request.kernel_end & pgtable.uat_pg_mask != 0
+		|| request.kernel_end > mmu.uat_unknown_page
+		|| request.kernel_end - request.kernel_start < 0x20000000
+		|| request.kernel_end > address_limit {
 		return -22
 	}
 	mut m := unsafe { mgr }
-	ctx := m.create_context() or { return -12 }
+	ctx := m.create_context(request.kernel_start, request.kernel_end) or { return -12 }
 	m.bind_context(ctx)
 	f.lock.acquire()
 	f.vms << ctx
@@ -418,7 +424,10 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	if request.extensions != 0 || request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) != 0
 		|| request.addr & pgtable.uat_pg_mask != 0 || request.range == 0
 		|| request.range & pgtable.uat_pg_mask != 0
-		|| request.range > u64(-1) - request.addr {
+		|| request.range > u64(-1) - request.addr
+		|| request.addr < mmu.uat_user_va_start
+		|| request.addr >= mmu.uat_unknown_page
+		|| request.range > mmu.uat_unknown_page - request.addr {
 		return -22
 	}
 	ctx := f.find_vm(request.vm_id) or { return -22 }
@@ -426,9 +435,16 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 		return -22
 	}
 	mut pt := unsafe { ctx.pgtable }
+	end := request.addr + request.range
+	if request.addr < ctx.kernel_end && end > ctx.kernel_start {
+		return -22
+	}
 
 	match request.op {
 		ioctl.asahi_bind_op_bind {
+			if request.flags == 0 {
+				return -22
+			}
 			obj := f.get_object_ref(request.handle) or { return -2 }
 			if request.offset & pgtable.uat_pg_mask != 0 || request.offset > obj.size
 				|| request.range > obj.size - request.offset {
@@ -494,6 +510,15 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			return -22
 		}
 	}
+}
+
+pub fn (f &GpuFile) ioctl_get_time(data &ioctl.DrmAsahiGetTime) int {
+	mut request := unsafe { data }
+	if request.extensions != 0 || request.flags != 0 {
+		return -22
+	}
+	request.gpu_timestamp = timer.get_ns()
+	return 0
 }
 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
@@ -891,6 +916,11 @@ fn ioctl_submit_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	return file.ioctl_submit(unsafe { &ioctl.DrmAsahiSubmit(data) })
 }
 
+fn ioctl_get_time_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
+	f := dispatch(handle, dev) or { return -19 }
+	return f.ioctl_get_time(unsafe { &ioctl.DrmAsahiGetTime(data) })
+}
+
 pub fn drm_ioctls() []drm.DrmIoctl {
 	return [
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_params, handler: ioctl_get_params_handler},
@@ -902,5 +932,6 @@ pub fn drm_ioctls() []drm.DrmIoctl {
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_create, handler: ioctl_queue_create_handler},
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_destroy, handler: ioctl_queue_destroy_handler},
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_submit, handler: ioctl_submit_handler},
+		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_time, handler: ioctl_get_time_handler},
 	]
 }

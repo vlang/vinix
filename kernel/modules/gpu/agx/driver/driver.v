@@ -107,6 +107,21 @@ fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bo
 	return true
 }
 
+fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
+	mut cfg hw.HwConfig) {
+	if native_adt {
+		return
+	}
+	version := devicetree.get_u32_array(gpu_node, 'apple,firmware-version') or { return }
+	if version.len > cfg.firmware_version.len {
+		C.printf(c'agx: ignoring malformed firmware version tuple\n')
+		return
+	}
+	for index := 0; index < version.len; index++ {
+		cfg.firmware_version[index] = version[index]
+	}
+}
+
 fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 	chip_id u32) ?PlatformResources {
 	gpu_regs := devicetree.get_translated_reg_ranges(gpu_node) or {
@@ -730,6 +745,7 @@ pub fn initialise() {
 		C.printf(c'agx: No hardware configuration for chip 0x%x\n', chip_id)
 		return
 	}
+	load_fdt_firmware_version(gpu_node, native_adt, mut cfg)
 	mut g13_performance_config_complete := false
 	if chip_id == 0x8103 {
 		if native_adt {

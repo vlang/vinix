@@ -74,6 +74,8 @@ pub mut:
 	lock    klock.Lock
 	vm_id   u32
 	dummy_phys u64
+	kernel_start u64
+	kernel_end   u64
 }
 
 pub struct UatManager {
@@ -288,7 +290,12 @@ fn (mut mgr UatManager) publish_initial_context_roots() {
 	handoff_unlock(mgr.handoff)
 }
 
-pub fn (mut mgr UatManager) create_context() ?&UatContext {
+pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&UatContext {
+	if kernel_start < uat_user_va_start || kernel_start >= kernel_end
+		|| kernel_end > uat_unknown_page || kernel_start & pgtable.uat_pg_mask != 0
+		|| kernel_end & pgtable.uat_pg_mask != 0 {
+		return none
+	}
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
@@ -313,6 +320,8 @@ pub fn (mut mgr UatManager) create_context() ?&UatContext {
 				active: true
 				vm_id: i
 				dummy_phys: dummy_phys
+				kernel_start: kernel_start
+				kernel_end: kernel_end
 			}
 			mgr.contexts[i] = ctx
 			return ctx
