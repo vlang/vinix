@@ -38,6 +38,19 @@ pub mut:
 	dirlist_index u64
 }
 
+// A Handle is the open-file description shared by dup() and fork(). Its
+// resource reference must therefore be released exactly once, after both the
+// final descriptor and every in-flight lookup have dropped their references.
+fn (mut this Handle) unref() {
+	if katomic.dec(mut &this.refcount) {
+		return
+	}
+
+	mut res := this.resource
+	res.unref(voidptr(this)) or {}
+	unsafe { free(voidptr(this)) }
+}
+
 struct PollFD {
 mut:
 	fd      int
@@ -207,7 +220,8 @@ pub mut:
 }
 
 pub fn (mut this FD) unref() {
-	this.handle.refcount--
+	mut handle := this.handle
+	handle.unref()
 }
 
 pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
@@ -238,19 +252,10 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 		return none
 	}
 
-	mut handle := fd.handle
-	mut res := handle.resource
-
-	res.unref(voidptr(handle))?
-
-	handle.refcount--
-	if handle.refcount == 0 {
-		unsafe { free(voidptr(handle)) }
-	}
-
-	unsafe { free(voidptr(fd)) }
-
 	process.fds[fdnum] = unsafe { nil }
+	mut handle := fd.handle
+	unsafe { free(voidptr(fd)) }
+	handle.unref()
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
@@ -325,7 +330,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 		return none
 	}
 
-	ret.handle.refcount++
+	katomic.inc(mut &ret.handle.refcount)
 
 	return ret
 }
@@ -351,22 +356,25 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 	}
 
 	mut oldfd := fd_from_fdnum(old_process, oldfdnum) or { return none }
+	defer {
+		oldfd.unref()
+	}
 
 	mut new_fd := unsafe { &FD(malloc(sizeof(FD))) }
 	unsafe { C.memcpy(new_fd, oldfd, sizeof(FD)) }
+	katomic.inc(mut &oldfd.handle.refcount)
 
 	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {
-		oldfd.unref()
+		mut handle := new_fd.handle
+		unsafe { free(voidptr(new_fd)) }
+		handle.unref()
 		return none
 	}
 
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
 	if cloexec {
-		new_fd.flags &= resource.o_cloexec
+		new_fd.flags |= resource.o_cloexec
 	}
-
-	oldfd.handle.refcount++
-	oldfd.handle.resource.refcount++
 
 	return new_fdnum
 }
