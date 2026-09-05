@@ -262,6 +262,7 @@ mut:
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
 	quarantined        bool
+	render_job_active  bool
 	released           bool
 }
 
@@ -442,10 +443,10 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 	buffer.counter = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferCounter)) or { return false }
 	buffer.stats = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferStats)) or { return false }
 	buffer.kernel_buffer = mgr.alloc_g13_shared_buffer(0x40) or { return false }
-	buffer.page_list = context.alloc_driver_buffer(u64(g13_tvb_max_pages) * sizeof(u32), true) or {
+	buffer.page_list = context.alloc_driver_buffer_aligned(u64(g13_tvb_max_pages) * sizeof(u32), true, fw.g13_tvb_page_size) or {
 		return false
 	}
-	buffer.block_list = context.alloc_driver_buffer(u64(g13_tvb_max_blocks) * u64(2) * sizeof(u32), true) or {
+	buffer.block_list = context.alloc_driver_buffer_aligned(u64(g13_tvb_max_blocks) * u64(2) * sizeof(u32), true, fw.g13_tvb_page_size) or {
 		return false
 	}
 	unsafe {
@@ -481,7 +482,7 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 	mut context := unsafe { buffer.context }
 	old_count := u32(buffer.blocks.len)
 	for _ in old_count .. minimum {
-		block := context.alloc_driver_buffer(fw.g13_tvb_block_size, false) or {
+		block := context.alloc_driver_buffer_aligned(fw.g13_tvb_block_size, false, fw.g13_tvb_page_size) or {
 			return false
 		}
 		if !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
@@ -850,17 +851,17 @@ fn (mut mgr GpuManager) allocate_g13_render_scene_locked(resources &G13QueueReso
 			mgr.free_g13_render_scene_locked(mut scene, ctx)
 		}
 	}
-	scene.user_buffer = context.alloc_driver_buffer(0x80, false) or { return none }
-	scene.heapmeta = context.alloc_driver_buffer(0x200 + tile.layermeta_size, false) or {
+	scene.user_buffer = context.alloc_driver_buffer_aligned(0x80, false, fw.g13_tvb_page_size) or { return none }
+	scene.heapmeta = context.alloc_driver_buffer_aligned(0x200 + tile.layermeta_size, false, fw.g13_tvb_page_size) or {
 		return none
 	}
-	scene.tilemap = context.alloc_driver_buffer(tile.tilemap_size, false) or { return none }
-	scene.tail_pointer_cache = context.alloc_driver_buffer(tile.tail_pointer_size, true) or {
+	scene.tilemap = context.alloc_driver_buffer_aligned(tile.tilemap_size, false, fw.g13_tvb_page_size) or { return none }
+	scene.tail_pointer_cache = context.alloc_driver_buffer_aligned(tile.tail_pointer_size, true, fw.g13_tvb_page_size) or {
 		return none
 	}
 	preempt_size := mgr.hw_config.preempt1_size + mgr.hw_config.preempt2_size + mgr.hw_config.preempt3_size
-	scene.preempt = context.alloc_driver_buffer(preempt_size, false) or { return none }
-	scene.aux_framebuffer = context.alloc_driver_buffer(0x8000, false) or { return none }
+	scene.preempt = context.alloc_driver_buffer_aligned(preempt_size, false, fw.g13_tvb_page_size) or { return none }
+	scene.aux_framebuffer = context.alloc_driver_buffer_aligned(0x8000, false, fw.g13_tvb_page_size) or { return none }
 	scene.scene = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferScene)) or { return none }
 	scene.timestamps = mgr.alloc_g13_shared_buffer(sizeof(fw.G13RenderTimestamps)) or {
 		return none
@@ -944,6 +945,10 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 		mgr.free_shared_buffer(mut job.vertex_microsequence)
 	}
 	mgr.release_g13_render_scene_backing_locked(mut job.scene, job.context, invalidate)
+	if job.queue != unsafe { nil } {
+		mut queue := unsafe { job.queue }
+		queue.render_job_active = false
+	}
 	mgr.g13_gpu_readonly.gc()
 	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
@@ -972,9 +977,12 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		mgr.lock.release()
 	}
 	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13
-		|| mgr.g13_channels == unsafe { nil } || resources.released {
+		|| mgr.g13_channels == unsafe { nil } || resources.released
+		|| resources.render_job_active {
 		return none
 	}
+	mut queue := unsafe { resources }
+	queue.render_job_active = true
 	mut job := &G13RenderJobResources{
 		queue: unsafe { resources }
 		context: unsafe { resources.vm }
@@ -994,7 +1002,6 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	job.fragment_event_reserved = true
 	job.vertex_stamp_value = event.advance_stamp(job.vertex_event_slot) or { return none }
 	job.fragment_stamp_value = event.advance_stamp(job.fragment_event_slot) or { return none }
-	mut queue := unsafe { resources }
 	job.vertex_event_sequence = queue.event_sequences[0]
 	queue.event_sequences[0]++
 	job.fragment_event_sequence = queue.event_sequences[1]
@@ -1295,7 +1302,9 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 			unk_job_buffer: job.vertex.va + fw.g13_vertex_unk_buf_0_offset
 			uuid: input.vertex_command_id
 			attachments: vertex_attachments
-			unk_178: 1
+			// This word is padding in the macOS 12.3 microsequence ABI. The
+			// single-cluster marker only occupies it starting with 13.0 beta 4.
+			unk_178: 0
 		}
 		mut vertex_offset := u64(0)
 		C.memcpy(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset), voidptr(&vertex_start), sizeof(fw.G13MicroseqStartVertex))
@@ -1636,13 +1645,17 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 		|| !owned.vertex_event_reserved
 		|| !owned.fragment_event_reserved || owned.queue == unsafe { nil }
 		|| owned.queue.released || owned.context == unsafe { nil } || !owned.context.active
-		|| owned.queue.threshold.phys == 0 {
+		|| owned.queue.threshold.phys == 0 || owned.queue.render_buffer.counter.phys == 0 {
 		return false
 	}
 	mut threshold := unsafe { &u64(owned.queue.threshold.cpu_address()) }
 	old_threshold := katomic.load(threshold)
 	katomic.store(mut threshold, old_threshold + u64(2))
+	mut tvb_count := unsafe { &u32(owned.queue.render_buffer.counter.cpu_address()) }
+	old_tvb_count := katomic.load(tvb_count)
+	katomic.store(mut tvb_count, old_tvb_count + u32(1))
 	if !mgr.publish_g13_render_job_locked(mut owned) {
+		katomic.store(mut tvb_count, old_tvb_count)
 		katomic.store(mut threshold, old_threshold)
 		return false
 	}
@@ -1774,7 +1787,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 	job.stamp_value = event.advance_stamp(job.event_slot) or { return none }
 	preempt_size := mgr.hw_config.compute_preempt1_size + u64(32)
 	mut user_context := unsafe { ctx }
-	job.preempt = user_context.alloc_driver_buffer(preempt_size, false) or { return none }
+	job.preempt = user_context.alloc_driver_buffer_aligned(preempt_size, false, fw.g13_tvb_page_size) or { return none }
 	job.command = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13RunCompute), pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
 	logical_microsequence_size := if input.has_result { u64(0x228) } else { u64(0x1c0) }
 	job.microsequence = mgr.alloc_g13_buffer_with_protection(logical_microsequence_size, pgtable.gpu_prot_fw_private_rw) or { return none }

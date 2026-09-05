@@ -384,10 +384,22 @@ pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 // to both the GPU and firmware. Publishing a new mapping to running firmware
 // still requires the caller to issue a UAT flush before queue submission.
 pub fn (mut ctx UatContext) alloc_driver_buffer(size u64, private bool) ?&UatBuffer {
+	return ctx.alloc_driver_buffer_aligned(size, private, pgtable.uat_pgsz)
+}
+
+// Allocate a driver buffer at a stricter GPU-VA alignment. The G13 tiled
+// buffer manager encodes addresses in 32 KiB units even though UAT pages are
+// 16 KiB, so its per-VM allocator must preserve that larger alignment.
+pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
+	alignment u64) ?&UatBuffer {
 	if size == 0 || size > u64(-1) - pgtable.uat_pg_mask || ctx.pgtable == unsafe { nil } {
 		return none
 	}
-	aligned_size := (size + pgtable.uat_pg_mask) & ~pgtable.uat_pg_mask
+	if alignment < pgtable.uat_pgsz || alignment & (alignment - 1) != 0
+		|| alignment & pgtable.uat_pg_mask != 0 {
+		return none
+	}
+	aligned_size := (size + alignment - 1) & ~(alignment - 1)
 	pages := aligned_size / u64(4096)
 
 	ctx.lock.acquire()
@@ -407,12 +419,12 @@ pub fn (mut ctx UatContext) alloc_driver_buffer(size u64, private bool) ?&UatBuf
 	}
 
 	va := if private {
-		ctx.driver_private.alloc(aligned_size, pgtable.uat_pgsz) or {
+		ctx.driver_private.alloc(aligned_size, alignment) or {
 			memory.pmm_free(voidptr(phys), pages)
 			return none
 		}
 	} else {
-		ctx.driver_gpu.alloc(aligned_size, pgtable.uat_pgsz) or {
+		ctx.driver_gpu.alloc(aligned_size, alignment) or {
 			memory.pmm_free(voidptr(phys), pages)
 			return none
 		}
