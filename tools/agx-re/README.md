@@ -104,7 +104,10 @@ and the recovered portions
 of its shared/runtime objects, including their initial platform values and
 runtime policy. Firmware channel
 construction, the work-command ABI, and the userspace command producer still
-need byte-accurate implementations before enabling T6050.
+need byte-accurate implementations before enabling T6050. The hardware
+configuration no longer has an unrecovered region: what remains there is the
+eleven run-time-dependent late-control fields and the two die-dependent power
+rows.
 
 The channel-command pools are recovered: the slot-ring block layout, the
 allocation scan, and the exact byte size of all twelve named command types.

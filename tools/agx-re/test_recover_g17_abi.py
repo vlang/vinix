@@ -3550,6 +3550,56 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_secondary_performance_block(self) -> None:
+        code = bytearray(0x800)
+        for offset, word in {
+            0x740: 0x395416C8,
+            0x744: 0x36000608,
+            0x74C: 0xF9415E75,
+            0x750: 0x52839B08,
+            0x758: 0x52810901,
+            0x760: 0xB94B5A88,
+            0x764: 0x51000509,
+            0x768: 0xB91CDAA9,
+            0x77C: 0x52839B8A,
+            0x784: 0x912E828B,
+            0x788: 0x5283A38C,
+            0x790: 0x529BD06D,
+            0x794: 0x72A8636D,
+            0x7A4: 0x9101016B,
+            0x7A8: 0x9101018C,
+            0x7B4: 0xB868792E,
+            0x7B8: 0x9BAD7DCE,
+            0x7BC: 0xD372FDCE,
+            0x7C0: 0xB828794E,
+            0x7C4: 0xB94B5E8E,
+            0x7E0: 0xB9440211,
+            0x7E4: 0xB90401F1,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.INIT_POWER_DATA: 0xB00000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0xB00000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_secondary_performance_block(b"")
+
+        self.assertEqual(recovered["offset"], 0x1CD8)
+        self.assertEqual(recovered["zeroed_bytes"], 0x848)
+        self.assertEqual(recovered["frequency_offset"], 0x1CDC)
+        self.assertEqual(recovered["voltage_offset"], 0x1D1C)
+        self.assertEqual(recovered["sram_voltage_offset"], 0x211C)
+        self.assertEqual(recovered["frequency_source"], 0x1BB60)
+        self.assertEqual(recovered["gate_byte"], 0x505)
+        # The block must fit inside the span the producer clears.
+        self.assertEqual(recovered["trailing_bytes"], 4)
+
     def test_recovers_g17_late_controls(self) -> None:
         code = bytearray(0x135C)
         for offset, word in {

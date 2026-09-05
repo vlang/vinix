@@ -6894,6 +6894,78 @@ def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
     return destination, base, immediate
 
 
+def recover_g17_secondary_performance_block(image: bytes) -> dict[str, object]:
+    """Recover the second performance-state block at config +0x1cd8.
+
+    The 0x868 bytes after the AFR block are not opaque.  When the accelerator's
+    gate byte is set, initPowerAndPerformanceData zeroes 0x848 bytes at +0x1cd8
+    and refills them with a maximum state index, one frequency per state
+    converted from Hz to MHz, and two 16-column voltage matrices -- the same
+    shape as the primary block at +0xfc4, sourced from the SRAM arrays instead.
+    """
+
+    symbols = macho_symbols(image)
+    if INIT_POWER_DATA not in symbols:
+        raise ValueError(f"Mach-O is missing {INIT_POWER_DATA}")
+
+    _address, code = symbol_code(image, INIT_POWER_DATA)
+    require_instruction_words_at(
+        code,
+        "G17 secondary performance block",
+        {
+            0x740: 0x395416C8,  # gate byte at accelerator +0x505
+            0x744: 0x36000608,  # skipped entirely when clear
+            0x74C: 0xF9415E75,  # hardware config
+            0x750: 0x52839B08,  # mov w8, #0x1cd8
+            0x758: 0x52810901,  # zero 0x848 bytes
+            0x760: 0xB94B5A88,  # state count at accelerator +0x1bb58
+            0x764: 0x51000509,
+            0x768: 0xB91CDAA9,  # count - 1 -> config +0x1cd8
+            0x77C: 0x52839B8A,  # frequency table at config +0x1cdc
+            0x784: 0x912E828B,  # voltage source at accelerator +0x1bba0
+            0x788: 0x5283A38C,  # voltage table at config +0x1d1c
+            0x790: 0x529BD06D,  # Hz to MHz reciprocal
+            0x794: 0x72A8636D,
+            0x7A4: 0x9101016B,  # 0x40-byte source row stride
+            0x7A8: 0x9101018C,  # 0x40-byte destination row stride
+            0x7B4: 0xB868792E,  # frequency[state]
+            0x7B8: 0x9BAD7DCE,
+            0x7BC: 0xD372FDCE,
+            0x7C0: 0xB828794E,  # -> config frequency table
+            0x7C4: 0xB94B5E8E,  # column count at accelerator +0x1bb5c
+            0x7E0: 0xB9440211,  # second matrix is 0x400 further on
+            0x7E4: 0xB90401F1,
+        },
+    )
+
+    zeroed = 0x848
+    block = {
+        "offset": 0x1CD8,
+        "zeroed_bytes": zeroed,
+        "gate_byte": 0x505,
+        "max_state_offset": 0x1CD8,
+        "frequency_offset": 0x1CDC,
+        "voltage_offset": 0x1D1C,
+        "sram_voltage_offset": 0x1D1C + 0x400,
+        "row_bytes": 0x40,
+        "state_count_source": 0x1BB58,
+        "column_count_source": 0x1BB5C,
+        "frequency_source": 0x1BB60,
+        "voltage_source": 0x1BBA0,
+        "frequency_conversion": {
+            "input": "Hz",
+            "output": "MHz",
+            "multiplier": 0x431BDE83,
+            "right_shift": 50,
+        },
+    }
+    used = (block["sram_voltage_offset"] + 0x400) - block["offset"]
+    if used > zeroed:
+        raise ValueError("G17 secondary performance block overruns its cleared span")
+    block["trailing_bytes"] = zeroed - used
+    return block
+
+
 def recover_g17_late_controls(image: bytes) -> dict[str, object]:
     """Recover the statically determined half of the late-control block.
 
@@ -8011,6 +8083,9 @@ def main() -> int:
         )
         hardware_config["afr_relative_boost_frequency_table"] = (
             recover_g17_afr_relative_boost_frequency_table(driver, power_code)
+        )
+        hardware_config["secondary_performance_block"] = (
+            recover_g17_secondary_performance_block(driver)
         )
         hardware_config["late_controls"] = recover_g17_late_controls(driver)
         hardware_config["linear_power_transfer_tables"] = (

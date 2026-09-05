@@ -866,7 +866,15 @@ pub mut:
 	performance_state_map_19c8     G17PerformanceStateMapBlock
 	cs_performance_1a48            G17AuxPerformanceBlock
 	afr_performance_1b90           G17AuxPerformanceBlock
-	opaque_1cd8                    [0x868]u8
+	// Second performance-state block. Apple gates it on accelerator byte
+	// +0x505, zeroes 0x848 bytes and refills them with the same shape as the
+	// primary block at +0xfc4, sourced from the accelerator's SRAM-side
+	// arrays at +0x1bb58/+0x1bb60/+0x1bba0.
+	secondary_performance_max_1cd8 u32
+	secondary_frequency_1cdc       [g17_performance_state_capacity]u32
+	secondary_voltage_1d1c         [g17_performance_state_capacity]G17VoltageTableRow
+	secondary_sram_voltage_211c    [g17_performance_state_capacity]G17VoltageTableRow
+	opaque_251c                    [0x24]u8
 	firmware_late_controls_2540    [0x1d0]u8
 }
 
@@ -981,7 +989,14 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 				base_sram_voltage
 			}
 		}
+		// The second block repeats the same rows; only its accelerator source
+		// arrays differ, and the parser has already required the two frequency
+		// columns to match.
+		config.secondary_frequency_1cdc[state] = hardware.perf_state_frequencies[state] / 1_000_000
+		config.secondary_voltage_1d1c[state] = config.voltage_table_1008[state]
+		config.secondary_sram_voltage_211c[state] = config.sram_voltage_table_1408[state]
 	}
+	config.secondary_performance_max_1cd8 = hardware.perf_state_count - 1
 	for state := hardware.perf_state_base + 1; state < hardware.perf_state_count; state++ {
 		frequency_delta := u64(hardware.perf_state_frequencies[state] - base_frequency)
 		frequency_range := u64(max_frequency - base_frequency)
