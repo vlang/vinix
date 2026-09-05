@@ -2259,11 +2259,13 @@ class RecoverG17AbiTests(unittest.TestCase):
         restart_call_target: int = 0x140000,
         channel_stamp_call_target: int = 0x130000,
         shared_event_call_target: int = 0x150000,
+        process_get_call_target: int = 0x160000,
+        process_remove_call_target: int = 0x170000,
         reliability_service: str = "function-reliability_monitor",
         changed_validator_type: int = -1,
     ) -> dict[str, object]:
         role_address = 0x100000
-        role = bytearray(0x600)
+        role = bytearray(0x800)
         for offset, word in {
             0x120: 0xB94053E8,
             0x124: 0x35009B88,
@@ -2330,6 +2332,25 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x5BC: 0xF9400288,
             0x5C0: 0xF940A100,
             0x5C4: bl(role_address + 0x5C4, channel_stamp_call_target),
+            0x094: 0x5299701C,
+            0x098: 0x72A0003C,
+            0x6F8: 0xB94053E8,
+            0x6FC: 0x7100311F,
+            0x700: 0x54006DC1,
+            0x704: 0xF9414E68,
+            0x708: 0x8B1C0108,
+            0x70C: 0xF9400100,
+            0x710: 0xB4FFCD60,
+            0x714: 0xF84543F9,
+            0x718: 0xAA1903E1,
+            0x71C: bl(role_address + 0x71C, process_get_call_target),
+            0x720: 0xAA0003F6,
+            0x724: 0xF9414E68,
+            0x728: 0x8B1C0108,
+            0x72C: 0xF9400100,
+            0x730: 0xAA1903E1,
+            0x734: bl(role_address + 0x734, process_remove_call_target),
+            0x738: 0xB4FFCC36,
         }.items():
             struct.pack_into("<I", role, offset, word)
         dispatch_offsets = [0] * 16
@@ -2338,6 +2359,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         dispatch_offsets[7] = 0x480
         dispatch_offsets[8] = 0x180
         dispatch_offsets[10] = 0x430
+        dispatch_offsets[12] = 0x5E4
         dispatch_offsets[14] = 0x4C
         for event_type in (2, 3, 5, 11):
             dispatch_offsets[event_type] = -0x54
@@ -2349,6 +2371,8 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.IOGPU_EVENT_GET_NUM_STAMPS: 0x130000,
             recover_g17_abi.IOGPU_FENCE_NOTIFY_CLPC: 0x110000,
             recover_g17_abi.IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR: 0x140000,
+            recover_g17_abi.IOGPU_WEAK_NAMESPACE_GET_OBJECT: 0x160000,
+            recover_g17_abi.IOGPU_WEAK_NAMESPACE_REMOVE_OBJECT: 0x170000,
         }
         iosurface_symbols = {
             recover_g17_abi.IOSURFACE_ROOT_SIGNAL_EVENT_ID: 0x150000,
@@ -2437,8 +2461,11 @@ class RecoverG17AbiTests(unittest.TestCase):
             [event["type"] for event in recovered["host_service_events"]], [10]
         )
         self.assertEqual(
+            [event["type"] for event in recovered["host_lifecycle_events"]], [12]
+        )
+        self.assertEqual(
             recovered["unimplemented_action_event_types"],
-            [6, 9, 12, 13, 15],
+            [6, 9, 13, 15],
         )
 
     def test_rejects_non_noop_g17_controller_event_handler(self) -> None:
@@ -2460,6 +2487,12 @@ class RecoverG17AbiTests(unittest.TestCase):
     def test_rejects_wrong_g17_shared_event_completion_target(self) -> None:
         with self.assertRaisesRegex(ValueError, "shared-event completion target"):
             self._recover_g17_event_actions(shared_event_call_target=0x150004)
+
+    def test_rejects_wrong_g17_process_exit_namespace_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "namespace lookup target"):
+            self._recover_g17_event_actions(process_get_call_target=0x160004)
+        with self.assertRaisesRegex(ValueError, "namespace removal target"):
+            self._recover_g17_event_actions(process_remove_call_target=0x170004)
 
     def test_rejects_changed_g17_event_validator_identity(self) -> None:
         with self.assertRaisesRegex(ValueError, "type 8 validator identity"):

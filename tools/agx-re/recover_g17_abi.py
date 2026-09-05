@@ -56,6 +56,8 @@ IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR = (
     "__ZN14IOGPUScheduler19signalHardwareErrorE15eRestartRequesti"
 )
 IOGPU_SIGNAL_STAMPS_UPDATED = "__ZN5IOGPU19signalStampsUpdatedEv"
+IOGPU_WEAK_NAMESPACE_GET_OBJECT = "__ZNK18IOGPUWeakNamespace9getObjectEj"
+IOGPU_WEAK_NAMESPACE_REMOVE_OBJECT = "__ZN18IOGPUWeakNamespace12removeObjectEj"
 IOSURFACE_ROOT_SIGNAL_EVENT_ID = "__ZN13IOSurfaceRoot13signalEventIDEj"
 G17_CLEAR_FIRMWARE_INTERRUPTS = (
     "__ZN14AGXArmFirmware34clearOutstandingFirmwareInterruptsEv.4213"
@@ -14469,6 +14471,8 @@ def recover_g17_firmware_event_ring(
         IOGPU_FENCE_NOTIFY_CLPC,
         IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR,
         IOGPU_SIGNAL_STAMPS_UPDATED,
+        IOGPU_WEAK_NAMESPACE_GET_OBJECT,
+        IOGPU_WEAK_NAMESPACE_REMOVE_OBJECT,
     ):
         if name not in iogpu_symbols:
             raise ValueError(f"IOGPUFamily Mach-O has no {name} symbol")
@@ -14856,6 +14860,46 @@ def recover_g17_firmware_event_actions(
     ) != iosurface_symbols[IOSURFACE_ROOT_SIGNAL_EVENT_ID]:
         raise ValueError("G17 shared-event completion target changed")
 
+    # Type 12 removes a process object from an IOGPUWeakNamespace. Apple
+    # returns immediately when getObject() finds no entry. Vinix never creates
+    # this Apple-only namespace, so its complete current path is the same
+    # empty-namespace lifecycle acknowledgement.
+    if dispatch_anchor + dispatch_offsets[12] != role_address + 0x6F4:
+        raise ValueError("G17 process-exit completion dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 process-exit completion",
+        {
+            0x094: 0x5299701C,
+            0x098: 0x72A0003C,  # accelerator weak namespace at +0x1cb80
+            0x6F8: 0xB94053E8,  # event type at entry +0
+            0x6FC: 0x7100311F,  # event type 12
+            0x700: 0x54006DC1,
+            0x704: 0xF9414E68,  # firmware +0x298 -> accelerator
+            0x708: 0x8B1C0108,
+            0x70C: 0xF9400100,  # weak namespace pointer
+            0x710: 0xB4FFCD60,  # absent namespace returns to drain loop
+            0x714: 0xF84543F9,  # unaligned u64 object ID at entry +4
+            0x718: 0xAA1903E1,
+            0x720: 0xAA0003F6,  # retain lookup result
+            0x724: 0xF9414E68,
+            0x728: 0x8B1C0108,
+            0x72C: 0xF9400100,
+            0x730: 0xAA1903E1,
+            0x738: 0xB4FFCC36,  # missing object returns after removal
+        },
+    )
+    process_get_call = struct.unpack_from("<I", role_code, 0x71C)[0]
+    if decode_bl_target(
+        role_address + 0x71C, process_get_call
+    ) != iogpu_symbols[IOGPU_WEAK_NAMESPACE_GET_OBJECT]:
+        raise ValueError("G17 process-exit namespace lookup target changed")
+    process_remove_call = struct.unpack_from("<I", role_code, 0x734)[0]
+    if decode_bl_target(
+        role_address + 0x734, process_remove_call
+    ) != iogpu_symbols[IOGPU_WEAK_NAMESPACE_REMOVE_OBJECT]:
+        raise ValueError("G17 process-exit namespace removal target changed")
+
     accepted_types = [
         event_type
         for event_type in range(32)
@@ -14868,7 +14912,7 @@ def recover_g17_firmware_event_actions(
         event_type for event_type in direct_noop_types if event_type not in accepted_types
     ]
     effective_noops = [0, *accepted_direct_noops]
-    implemented = {*effective_noops, 1, 4, 7, 8, 10, 14}
+    implemented = {*effective_noops, 1, 4, 7, 8, 10, 12, 14}
     return {
         "jump_table_function_offsets": {
             str(event_type): dispatch_anchor + offset - role_address
@@ -14944,6 +14988,20 @@ def recover_g17_firmware_event_actions(
                 "host_action": "IOSurfaceRoot::signalEventID",
                 "host_action_id_bits": 32,
                 "vinix_policy": "consume_without_iosurface_registry",
+            }
+        ],
+        "host_lifecycle_events": [
+            {
+                "type": 12,
+                "record": "AGFIFirmwareEventProcessExitComplete",
+                "object_id_offset": 4,
+                "object_id_bytes": 8,
+                "namespace_accelerator_member": 0x1CB80,
+                "host_actions": [
+                    "IOGPUWeakNamespace::getObject",
+                    "IOGPUWeakNamespace::removeObject",
+                ],
+                "vinix_policy": "consume_without_iogpu_object_namespace",
             }
         ],
         "unimplemented_action_event_types": [

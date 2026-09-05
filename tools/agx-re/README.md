@@ -157,7 +157,7 @@ per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
 channel ring geometry, the creating process ID and the app GPU role are all
 recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
-register emission graph into the work-command encoder, implementing the five
+register emission graph into the work-command encoder, implementing the four
 remaining callback error/control event actions, and work-command reclamation.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,

@@ -53,6 +53,7 @@ pub const g17_firmware_event_host_noop_mask = u32(0x20000801)
 pub const g17_firmware_event_channel_error = u32(7)
 pub const g17_firmware_event_metrology_aging = u32(8)
 pub const g17_firmware_event_shared_event_signal_complete = u32(10)
+pub const g17_firmware_event_process_exit_complete = u32(12)
 pub const g17_firmware_event_rt_completion = u32(14)
 pub const g17_firmware_event_flag_limit = u16(0x18)
 // Apple's type-4/type-7 handlers compare against IOGPUEventMachine's dynamic
@@ -2686,6 +2687,16 @@ pub mut:
 	opaque_018              [0x30]u8
 }
 
+// Event type 12 removes a process object from Apple's IOGPU weak namespace.
+// Vinix has no such host-object registry, making every valid ID a miss.
+@[packed]
+pub struct G17FirmwareProcessExitComplete {
+pub mut:
+	event_type u32
+	object_id  u64
+	opaque_00c [0x3c]u8
+}
+
 // Event type 14 is AGFIFirmwareEventRTCompletionInfo. Apple forwards its
 // unaligned value only to optional IOGPU CLPC performance observers; Vinix
 // has no CLPC observer layer, so the callback consumes it as advisory.
@@ -2760,6 +2771,13 @@ pub fn validate_g17_firmware_shared_event_signal_complete(entry &G17FirmwareEven
 	}
 	event := unsafe { &G17FirmwareSharedEventSignalComplete(entry) }
 	return event.event_id != 0
+}
+
+@[inline]
+pub fn validate_g17_firmware_process_exit_complete(entry &G17FirmwareEventRingEntry) bool {
+	return entry != unsafe { nil }
+		&& entry.event_type == g17_firmware_event_process_exit_complete
+		&& sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size
 }
 
 @[inline]
@@ -3095,5 +3113,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
 }

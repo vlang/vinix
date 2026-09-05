@@ -938,6 +938,16 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 				}
 				continue
 			}
+			if entry.event_type == fw.g17_firmware_event_process_exit_complete {
+				// Apple removes this ID from an IOGPU host-object namespace.
+				// Vinix creates no entries in that namespace, so its lookup is
+				// necessarily the same miss that Apple treats as complete.
+				if !fw.validate_g17_firmware_process_exit_complete(&entry) {
+					mgr.state = .error
+					return false
+				}
+				continue
+			}
 			if entry.event_type == fw.g17_firmware_event_rt_completion {
 				// Apple forwards this value only to optional IOGPU CLPC
 				// performance observers. Vinix has no corresponding observer
