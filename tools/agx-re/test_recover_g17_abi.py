@@ -3550,6 +3550,120 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_queue_device_inputs(self) -> None:
+        queue_address = 0x500000
+        device_address = 0x510000
+        shared_address = 0x520000
+        role_address = 0x530000
+        proc_pid_address = 0x540000
+
+        queue = bytearray(0x200)
+        for offset, word in {
+            0x0F8: 0xF9024A74,
+            0x0FC: 0xB9406288,
+            0x100: 0xB9049A68,
+        }.items():
+            struct.pack_into("<I", queue, offset, word)
+
+        device = bytearray(0x21C)
+        for offset, word in {
+            0x0E0: bl(device_address + 0x0E0, proc_pid_address),
+            0x0E4: 0xB9006260,
+            0x104: bl(device_address + 0x104, proc_pid_address),
+            0x108: 0xB9006260,
+        }.items():
+            struct.pack_into("<I", device, offset, word)
+
+        shared = bytearray(0x210)
+        for offset, word in {0x100: 0x52800048, 0x104: 0x39048268}.items():
+            struct.pack_into("<I", shared, offset, word)
+
+        role = bytearray(0x300)
+        for offset, word in {
+            0x2EC: 0x7100111F,
+            0x2F0: 0x54000D22,
+            0x2F8: 0x39048118,
+        }.items():
+            struct.pack_into("<I", role, offset, word)
+
+        iogpu_codes = {
+            recover_g17_abi.IOGPU_COMMAND_QUEUE_INIT: (queue_address, bytes(queue)),
+            recover_g17_abi.IOGPU_DEVICE_INIT: (device_address, bytes(device)),
+        }
+        driver_codes = {
+            recover_g17_abi.AGX_SHARED_INIT: (shared_address, bytes(shared)),
+            recover_g17_abi.AGX_SHARED_SET_APP_GPU_ROLE: (role_address, bytes(role)),
+        }
+        symbol_tables = {
+            b"iogpu": {n: a for n, (a, _c) in iogpu_codes.items()},
+            b"driver": {n: a for n, (a, _c) in driver_codes.items()},
+        }
+        codes = iogpu_codes | driver_codes
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                side_effect=lambda image: symbol_tables[image],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_queue_device_inputs(
+                b"driver", b"iogpu"
+            )
+
+        self.assertEqual(recovered["queue_device_member"], 0x490)
+        self.assertEqual(recovered["queue_value_member"], 0x498)
+        self.assertEqual(recovered["process_id"]["channel_state_offset"], 0x48)
+        self.assertEqual(recovered["process_id"]["device_member"], 0x60)
+        self.assertEqual(recovered["process_id"]["producer_address"], proc_pid_address)
+        self.assertEqual(recovered["app_gpu_role"]["default"], 2)
+        self.assertEqual(recovered["app_gpu_role"]["maximum"], 3)
+        self.assertEqual(recovered["app_gpu_role"]["scheduler_state_offset"], 0x26)
+
+    def test_rejects_split_g17_device_process_id_producers(self) -> None:
+        # Both IOGPUDevice::init paths must reach the same producer.
+        queue_address = 0x500000
+        device_address = 0x510000
+        queue = bytearray(0x200)
+        for offset, word in {
+            0x0F8: 0xF9024A74,
+            0x0FC: 0xB9406288,
+            0x100: 0xB9049A68,
+        }.items():
+            struct.pack_into("<I", queue, offset, word)
+        device = bytearray(0x21C)
+        for offset, word in {
+            0x0E0: bl(device_address + 0x0E0, 0x540000),
+            0x0E4: 0xB9006260,
+            0x104: bl(device_address + 0x104, 0x550000),
+            0x108: 0xB9006260,
+        }.items():
+            struct.pack_into("<I", device, offset, word)
+        codes = {
+            recover_g17_abi.IOGPU_COMMAND_QUEUE_INIT: (queue_address, bytes(queue)),
+            recover_g17_abi.IOGPU_DEVICE_INIT: (device_address, bytes(device)),
+        }
+        symbols = {n: a for n, (a, _c) in codes.items()} | {
+            recover_g17_abi.AGX_SHARED_INIT: 0,
+            recover_g17_abi.AGX_SHARED_SET_APP_GPU_ROLE: 0,
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=symbols
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_queue_device_inputs(b"d", b"i")
+
     def test_recovers_g17_scheduler_state(self) -> None:
         alloc_address = 0x400000
         stack_init_address = 0x410000

@@ -36,6 +36,9 @@ DEFAULT_ENTRIES = (
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",
+    # AGXCommandQueue inherits its device binding from IOGPUCommandQueue, so
+    # the two remaining channel inputs can only be resolved with this entry.
+    "com.apple.iokit.IOGPUFamily",
 )
 
 

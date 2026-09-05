@@ -59,6 +59,8 @@ and virtual layouts. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
 kernel collection and compacts the kernel, AGXG17X, and firmware-buddy fileset
 entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
+`IOGPUFamily` is included because `AGXCommandQueue` inherits its device
+binding, and with it the last two channel inputs, from `IOGPUCommandQueue`.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
@@ -100,6 +102,11 @@ of its shared/runtime objects, including their initial platform values and
 runtime policy. Firmware channel
 construction, the work-command ABI, and the userspace command producer still
 need byte-accurate implementations before enabling T6050.
+
+Channel and scheduler-state construction no longer needs unknown inputs: the
+per-queue `_AGFISchedulerState` element, the creating process ID and the app
+GPU role are all recovered, so what remains for submission is the work command
+format itself.
 
 The two linear power-transfer tables are the one recovered part that cannot be
 made byte-accurate offline: their rows derive from per-die fuse calibration.

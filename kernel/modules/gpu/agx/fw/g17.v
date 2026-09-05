@@ -1157,7 +1157,7 @@ pub mut:
 	mode_028             u32
 	opaque_02c           [0x18]u8
 	sentinel_044         u32
-	queue_value_048      u32
+	owning_process_id    u32
 	opaque_04c           [0x38]u8
 	flag_084             u32
 	opaque_088           [0x14]u8
@@ -1191,6 +1191,8 @@ pub mut:
 }
 
 pub const g17_scheduler_state_size = u64(0x40)
+pub const g17_default_app_gpu_role = u8(2)
+pub const g17_max_app_gpu_role = u8(3)
 
 // One element of Apple's AGFICmdQueueSchedState firmware pool. Every command
 // queue owns exactly one, and its GPU address is what channel state +0x9c
@@ -1203,7 +1205,7 @@ pub mut:
 	flag_005       u8
 	opaque_006     [0x1c]u8
 	value_022      u32
-	queue_flag_026 u8
+	app_gpu_role   u8
 	opaque_027     [0x0c]u8
 	sentinel_033   u8
 	opaque_034     [0x0c]u8
@@ -1212,9 +1214,12 @@ pub mut:
 // Reproduce the element defaults AGXCommandQueue::allocateSchedulerState
 // writes after the pool hands out an element. Apple only clears the first
 // 0x38 bytes there because the backing is already zeroed; clearing the whole
-// element is equivalent and keeps the tail defined.
-pub fn initialize_g17_scheduler_state(buffer voidptr, size u64, queue_flag u8) bool {
-	if buffer == unsafe { nil } || size != g17_scheduler_state_size {
+// element is equivalent and keeps the tail defined. The role byte is read
+// from the AGXShared device, which AGXShared::init defaults to
+// g17_default_app_gpu_role and set_app_gpu_role bounds to 0..3.
+pub fn initialize_g17_scheduler_state(buffer voidptr, size u64, app_gpu_role u8) bool {
+	if buffer == unsafe { nil } || size != g17_scheduler_state_size
+		|| app_gpu_role > g17_max_app_gpu_role {
 		return false
 	}
 
@@ -1224,7 +1229,7 @@ pub fn initialize_g17_scheduler_state(buffer voidptr, size u64, queue_flag u8) b
 		state.sentinel_000 = 0xffff
 		state.flag_005 = 1
 		state.value_022 = 0
-		state.queue_flag_026 = queue_flag
+		state.app_gpu_role = app_gpu_role
 		state.sentinel_033 = 0xff
 	}
 	return true
@@ -1249,18 +1254,18 @@ pub mut:
 	uncached_gpu_address u64
 	cached_gpu_address   u64
 	context_cookie       u64
-	queue_value_048      u32
+	owning_process_id    u32
 	queue_address_09c    u64
 	ring_entries         u32
 }
 
 // Reproduce AGXChannel::resetChannelState for the checked shared fields.
-// resetChannelState only copies state +0x48 and +0x9c out of its own object,
-// but AGXChannel::init seeds those two channel members from the owning
-// AGXCommandQueue at +0x498 and +0x8b8, so they are queue properties rather
-// than platform constants. They stay explicit because that queue object is
-// not modelled yet. Note the runtime object also has a +0x4c/+0x50 QoS pair;
-// the matching offset is a coincidence and not this value.
+// resetChannelState only copies state +0x48 and +0x9c out of its own object.
+// AGXChannel::init seeds those from the owning AGXCommandQueue at +0x498 and
+// +0x8b8; the first is inherited from IOGPUCommandQueue::init, which copies
+// the device's process ID, and the second is the queue's scheduler-state GPU
+// address. Note the runtime object also has a +0x4c/+0x50 kick-channel QoS
+// pair; the matching offset is a coincidence and not this value.
 pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 	uncached_buffer voidptr, uncached_size u64, cached_buffer voidptr, cached_size u64,
 	bindings G17ChannelBindings) bool {
@@ -1283,7 +1288,7 @@ pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 		state.sentinel_024 = ~u32(0)
 		state.mode_028 = 4
 		state.sentinel_044 = ~u32(0)
-		state.queue_value_048 = bindings.queue_value_048
+		state.owning_process_id = bindings.owning_process_id
 		state.queue_address_09c = bindings.queue_address_09c
 		mut control := &G17ChannelControl(uncached_buffer)
 		control.sentinel_050 = ~u32(0)

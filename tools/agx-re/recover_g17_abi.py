@@ -434,6 +434,12 @@ SCHEDULER_STATE_STACK_INIT = (
 )
 SCHEDULER_STATE_STACK_VTABLE = "__ZTV" + SCHEDULER_STATE_STACK.removeprefix("__ZN")
 SCHEDULER_STATE_STACK_INIT_SLOT = 0x20
+IOGPU_COMMAND_QUEUE_INIT = (
+    "__ZN17IOGPUCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs"
+)
+IOGPU_DEVICE_INIT = "__ZN11IOGPUDevice4initEP5IOGPUP4task"
+AGX_SHARED_INIT = "__ZN9AGXShared4initEP5IOGPUP4tasky"
+AGX_SHARED_SET_APP_GPU_ROLE = "__ZN9AGXShared16set_app_gpu_roleEi13eIOGPUAppRole"
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -6840,6 +6846,100 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
     }
 
 
+def recover_g17_queue_device_inputs(
+    driver: bytes, iogpu: bytes
+) -> dict[str, object]:
+    """Resolve the last two channel/scheduler inputs to producible values.
+
+    AGXCommandQueue never writes +0x490 or +0x498 itself: it inherits both from
+    IOGPUCommandQueue::init, which stores the owning IOGPUDevice and copies the
+    device's +0x60.  IOGPUDevice::init sets that word to the creating process
+    ID, and the AGXShared device byte the scheduler element copies is the app
+    GPU role.  Both are values Vinix can produce for its own clients.
+    """
+
+    iogpu_symbols = macho_symbols(iogpu)
+    driver_symbols = macho_symbols(driver)
+    if IOGPU_COMMAND_QUEUE_INIT not in iogpu_symbols:
+        raise ValueError("IOGPUFamily is missing IOGPUCommandQueue::init")
+    if IOGPU_DEVICE_INIT not in iogpu_symbols:
+        raise ValueError("IOGPUFamily is missing IOGPUDevice::init")
+    for name in (AGX_SHARED_INIT, AGX_SHARED_SET_APP_GPU_ROLE):
+        if name not in driver_symbols:
+            raise ValueError(f"AGXG17X is missing {name}")
+
+    _address, queue_code = symbol_code(iogpu, IOGPU_COMMAND_QUEUE_INIT)
+    require_instruction_words_at(
+        queue_code,
+        "IOGPU command-queue device binding",
+        {
+            0x0F8: 0xF9024A74,  # IOGPUDevice -> queue +0x490
+            0x0FC: 0xB9406288,  # device +0x60
+            0x100: 0xB9049A68,  # -> queue +0x498
+        },
+    )
+
+    device_address, device_code = symbol_code(iogpu, IOGPU_DEVICE_INIT)
+    require_instruction_words_at(
+        device_code,
+        "IOGPU device process identifier",
+        {
+            0x0E4: 0xB9006260,  # proc_pid result -> device +0x60
+            0x108: 0xB9006260,  # same store on the 32-bit path
+        },
+    )
+    pids = set()
+    for offset in (0xE0, 0x104):
+        target = decode_bl_target(
+            device_address + offset, struct.unpack_from("<I", device_code, offset)[0]
+        )
+        if target is None:
+            raise ValueError("IOGPUDevice::init no longer calls a direct producer")
+        pids.add(target)
+    if len(pids) != 1:
+        raise ValueError("IOGPUDevice::init uses two different producers for +0x60")
+
+    _address, shared_code = symbol_code(driver, AGX_SHARED_INIT)
+    require_instruction_words_at(
+        shared_code,
+        "AGXShared default app GPU role",
+        {
+            0x100: 0x52800048,  # mov w8, #2
+            0x104: 0x39048268,  # -> device byte +0x120
+        },
+    )
+    _address, role_code = symbol_code(driver, AGX_SHARED_SET_APP_GPU_ROLE)
+    require_instruction_words_at(
+        role_code,
+        "AGXShared app GPU role bound",
+        {
+            0x2EC: 0x7100111F,  # cmp w8, #4
+            0x2F0: 0x54000D22,  # reject 4 and above
+            0x2F8: 0x39048118,  # accepted role -> device byte +0x120
+        },
+    )
+
+    return {
+        "queue_device_member": 0x490,
+        "queue_value_member": 0x498,
+        "device_class": "AGXShared",
+        "process_id": {
+            "device_member": 0x60,
+            "channel_state_offset": 0x48,
+            "producer": "proc_pid(get_bsdtask_info(task))",
+            "producer_address": sorted(pids)[0],
+        },
+        "app_gpu_role": {
+            "device_member": 0x120,
+            "bytes": 1,
+            "scheduler_state_offset": 0x26,
+            "default": 2,
+            "maximum": 3,
+            "setter": AGX_SHARED_SET_APP_GPU_ROLE,
+        },
+    }
+
+
 def recover_g17_scheduler_state(image: bytes) -> dict[str, object]:
     """Recover the per-queue _AGFISchedulerState element and its pool.
 
@@ -7157,11 +7257,15 @@ def main() -> int:
     parser.add_argument(
         "--firmware", type=Path, default=Path("build/firmware/g17c/armfw.bin")
     )
+    parser.add_argument(
+        "--iogpu", type=Path, default=Path("build/kext/g17c/iokit.IOGPUFamily.macho")
+    )
     args = parser.parse_args()
     try:
         driver = args.driver.read_bytes()
         kernel = args.kernel.read_bytes()
         firmware = args.firmware.read_bytes()
+        iogpu = args.iogpu.read_bytes()
         driver_uuid = macho_uuid(driver)
         firmware_uuid = macho_uuid(firmware)
         if driver_uuid != DRIVER_UUID:
@@ -7237,6 +7341,9 @@ def main() -> int:
             driver, reset_channel_code
         )
         channels["scheduler_state"] = recover_g17_scheduler_state(driver)
+        channels["queue_device_inputs"] = recover_g17_queue_device_inputs(
+            driver, iogpu
+        )
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)
