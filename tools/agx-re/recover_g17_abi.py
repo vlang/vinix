@@ -607,7 +607,9 @@ def words(code: bytes):
 
 def decode_move_wide(word: int) -> tuple[str, int, int, int] | None:
     opcode = word & 0xFF800000
-    if opcode == 0xD2800000:
+    if opcode == 0x92800000:
+        kind = "movn"
+    elif opcode == 0xD2800000:
         kind = "movz"
     elif opcode == 0xF2800000:
         kind = "movk"
@@ -957,6 +959,8 @@ def resolve_static_x_register(
         wide = decode_move_wide(word)
         if wide is not None and wide[1] == register:
             kind, _destination, immediate, shift = wide
+            if kind == "movn":
+                return (~(immediate << shift)) & 0xFFFFFFFFFFFFFFFF
             if kind == "movz":
                 return immediate << shift
             base = resolve_static_x_register(instructions, index, register, depth + 1)
@@ -987,6 +991,146 @@ def resolve_static_x_register(
             or word & 0xFFFFFC00 == 0xD73F0800
         ):
             return None
+    return None
+
+
+def decode_register_copy(word: int) -> tuple[int, int, int] | None:
+    """Decode the MOV alias of ORR with the zero register."""
+
+    # sf | 01 | 01010 | 0 | 00 | Rm | 000000 | 11111 | Rd
+    if word & 0x7FE0FFE0 != 0x2A0003E0:
+        return None
+    width = 8 if word & 0x80000000 else 4
+    return word & 0x1F, (word >> 16) & 0x1F, width
+
+
+def decode_local_branch_target(address: int, word: int) -> int | None:
+    """Decode direct intra-function branches used by dominance checks."""
+
+    target = decode_b_target(address, word)
+    if target is not None:
+        return target
+    if word & 0xFF000010 == 0x54000000:  # B.cond
+        immediate = (word >> 5) & 0x7FFFF
+        bits = 19
+    elif word & 0x7E000000 == 0x34000000:  # CBZ / CBNZ
+        immediate = (word >> 5) & 0x7FFFF
+        bits = 19
+    elif word & 0x7E000000 == 0x36000000:  # TBZ / TBNZ
+        immediate = (word >> 5) & 0x3FFF
+        bits = 14
+    else:
+        return None
+    if immediate & (1 << (bits - 1)):
+        immediate -= 1 << bits
+    return address + immediate * 4
+
+
+def g17_register_is_written(word: int, register: int) -> bool:
+    """Recognize the integer writers present in the register-list producers."""
+
+    load = decode_load_unsigned(word)
+    if load is not None and load[0] == register:
+        return True
+    load = decode_load_register(word)
+    if load is not None and load[0] == register:
+        return True
+    pair = decode_ldp_x(word)
+    if pair is not None and register in pair[:2]:
+        return True
+    move = decode_move_wide(word)
+    if move is not None and move[1] == register:
+        return True
+    move_w = decode_movz_w(word)
+    if move_w is not None and move_w[0] == register:
+        return True
+    update_w = decode_movk_w(word)
+    if update_w is not None and update_w[0] == register:
+        return True
+    return word & 0x1F == register and word & 0x1F000000 in (
+        0x0A000000,
+        0x0B000000,
+        0x10000000,
+        0x11000000,
+        0x12000000,
+        0x13000000,
+        0x1A000000,
+        0x1B000000,
+    )
+
+
+def trace_g17_register_copy(
+    instructions: list[tuple[int, int]], copy_index: int, source: int
+) -> dict[str, object] | None:
+    """Trace a callee-saved value copy to a dominating load or constant."""
+
+    if not 19 <= source <= 28:
+        return None
+    definition_index = next(
+        (
+            index
+            for index in range(copy_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], source)
+        ),
+        None,
+    )
+    if definition_index is None:
+        return None
+
+    definition_offset, definition = instructions[definition_index]
+    copy_offset = instructions[copy_index][0]
+    # A branch from outside the candidate definition's region to a later
+    # instruction could reach the copy without executing that definition.
+    # Reject such joins rather than assigning a path-specific value.
+    for branch_index, (offset, word) in enumerate(instructions):
+        target = decode_local_branch_target(offset, word)
+        if (
+            target is not None
+            and definition_offset < target <= copy_offset
+            and not definition_index < branch_index < copy_index
+        ):
+            return None
+
+    load = decode_load_unsigned(definition)
+    if load is not None and load[0] == source and load[1] == 19:
+        _destination, base, member, width = load
+        return {
+            "kind": "descriptor_load",
+            "producer_offset": copy_offset,
+            "source_offset": definition_offset,
+            "via_register": source,
+            "base_register": base,
+            "member": member,
+            "bytes": width,
+            "signed": False,
+        }
+    if definition & 0xFFC0001F == 0xB9800000 | source:
+        base = (definition >> 5) & 0x1F
+        if base == 19:
+            return {
+                "kind": "descriptor_load",
+                "producer_offset": copy_offset,
+                "source_offset": definition_offset,
+                "via_register": source,
+                "base_register": base,
+                "member": ((definition >> 10) & 0xFFF) * 4,
+                "bytes": 4,
+                "signed": True,
+            }
+    if (
+        decode_move_wide(definition) is not None
+        or decode_movz_w(definition) is not None
+        or decode_movk_w(definition) is not None
+    ):
+        value = resolve_static_x_register(instructions, copy_index, source)
+        if value is not None:
+            return {
+                "kind": "constant",
+                "producer_offset": copy_offset,
+                "source_offset": definition_offset,
+                "via_register": source,
+                "value": value,
+            }
     return None
 
 
@@ -1047,6 +1191,21 @@ def classify_g17_value_argument(
                 "kind": "constant",
                 "producer_offset": offset,
                 "value": value,
+            }
+
+        copy = decode_register_copy(word)
+        if copy is not None and copy[0] == 4:
+            _destination, source, width = copy
+            traced = trace_g17_register_copy(instructions, index, source)
+            if traced is not None:
+                return traced
+            return {
+                "kind": "computed",
+                "producer_offset": offset,
+                "operation": "register_copy",
+                "source_register": source,
+                "bytes": width,
+                "instruction": word,
             }
 
         instruction_class = word & 0x1F000000
@@ -8763,6 +8922,14 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             ),
             "computed_value_calls": sum(
                 entry["value_source"]["kind"] == "computed"
+                for entry in encoder_calls
+            ),
+            "traced_copy_value_calls": sum(
+                "via_register" in entry["value_source"]
+                for entry in encoder_calls
+            ),
+            "unresolved_copy_value_calls": sum(
+                entry["value_source"].get("operation") == "register_copy"
                 for entry in encoder_calls
             ),
             "resolved_encoder_selectors": sorted(resolved),

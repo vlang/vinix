@@ -4513,6 +4513,68 @@ class RecoverG17AbiTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             recover_g17_abi.classify_g17_value_argument([(0, 0xD503201F)], 1)
 
+        negative_one = [(0x44, 0x92800004)]  # mov x4, #-1
+        self.assertEqual(
+            recover_g17_abi.classify_g17_value_argument(negative_one, 1),
+            {
+                "kind": "constant",
+                "producer_offset": 0x44,
+                "value": 0xFFFFFFFFFFFFFFFF,
+            },
+        )
+
+        copied_descriptor = [
+            (0x48, 0xF943B276),  # ldr x22, [x19, #0x760]
+            (0x4C, 0xAA1603E4),  # mov x4, x22
+        ]
+        self.assertEqual(
+            recover_g17_abi.classify_g17_value_argument(copied_descriptor, 2),
+            {
+                "kind": "descriptor_load",
+                "producer_offset": 0x4C,
+                "source_offset": 0x48,
+                "via_register": 22,
+                "base_register": 19,
+                "member": 0x760,
+                "bytes": 8,
+                "signed": False,
+            },
+        )
+
+        copied_constant = [
+            (0x50, 0xD2804016),  # mov x22, #0x200
+            (0x54, 0xAA1603E4),  # mov x4, x22
+        ]
+        self.assertEqual(
+            recover_g17_abi.classify_g17_value_argument(copied_constant, 2),
+            {
+                "kind": "constant",
+                "producer_offset": 0x54,
+                "source_offset": 0x50,
+                "via_register": 22,
+                "value": 0x200,
+            },
+        )
+
+    def test_does_not_trace_g17_register_copy_across_join(self) -> None:
+        instructions = [
+            (0x00, 0xF943B276),  # ldr x22, [x19, #0x760]
+            (0x04, 0x14000002),  # b +0x8
+            (0x08, 0xF943B676),  # alternate ldr x22, [x19, #0x768]
+            (0x0C, 0xAA1603E4),  # mov x4, x22
+        ]
+        self.assertEqual(
+            recover_g17_abi.classify_g17_value_argument(instructions, 4),
+            {
+                "kind": "computed",
+                "producer_offset": 0x0C,
+                "operation": "register_copy",
+                "source_register": 22,
+                "bytes": 8,
+                "instruction": 0xAA1603E4,
+            },
+        )
+
     def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
         instructions = [
             (0x00, 0x5294E802),  # mov w2, #0xa740
