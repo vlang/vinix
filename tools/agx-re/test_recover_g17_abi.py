@@ -3550,6 +3550,136 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_channel_command_pools(self) -> None:
+        sizes_address = 0x600000
+        alloc_address = 0x610000
+        literal_base = 0x1000
+
+        image = bytearray(0x4000)
+        struct.pack_into("<QQ", image, literal_base + 0x00, 0x2240, 0xA00)
+        struct.pack_into("<QQ", image, literal_base + 0x10, 0x1040, 0x80)
+        struct.pack_into("<QQ", image, literal_base + 0x20, 0x40, 0x80)
+        struct.pack_into("<QQ", image, literal_base + 0x30, 0xC0, 0x40)
+
+        sizes = bytearray(0x54)
+        for offset, word in {
+            0x04: 0x52813808,
+            0x08: 0xF9010C08,
+            0x0C: adrp(sizes_address + 0x0C, literal_base + 0x00, 8),
+            0x10: 0x3DC00000 | (((literal_base & 0xFFF) // 16) << 10) | (8 << 5),
+            0x14: adrp(sizes_address + 0x14, literal_base + 0x10, 8),
+            0x18: 0x3DC00000 | ((((literal_base + 0x10) & 0xFFF) // 16) << 10) | (8 << 5) | 1,
+            0x1C: 0xAD110400,
+            0x20: 0x52800808,
+            0x24: 0xF9012408,
+            0x28: adrp(sizes_address + 0x28, literal_base + 0x20, 9),
+            0x2C: 0x3DC00000 | ((((literal_base + 0x20) & 0xFFF) // 16) << 10) | (9 << 5),
+            0x30: 0x3D809400,
+            0x34: 0x52801009,
+            0x38: 0x4E080D00,
+            0x3C: 0xF9013409,
+            0x40: adrp(sizes_address + 0x40, literal_base + 0x30, 9),
+            0x44: 0x3DC00000 | ((((literal_base + 0x30) & 0xFFF) // 16) << 10) | (9 << 5) | 1,
+            0x48: 0xAD138400,
+            0x4C: 0xF9014808,
+        }.items():
+            struct.pack_into("<I", sizes, offset, word)
+
+        # allocFirmwareData: one movz/ldr pair per pool block.
+        bindings = [
+            (0x1688, 0x220),
+            (0x16C8, 0x228),
+            (0x1708, 0x230),
+            (0x1748, 0x238),
+            (0x1788, 0x248),
+            (0x17C8, 0x250),
+            (0x1808, 0x258),
+            (0x1848, 0x268),
+            (0x1888, 0x270),
+            (0x18C8, 0x278),
+            (0x1908, 0x280),
+            (0x1948, 0x288),
+            (0x1988, 0x290),
+        ]
+        alloc = bytearray(len(bindings) * 0x10)
+        for index, (block, member) in enumerate(bindings):
+            base = index * 0x10
+            struct.pack_into("<I", alloc, base, 0x52800000 | (block << 5) | 8)
+            struct.pack_into(
+                "<I", alloc, base + 4, 0xF9400000 | ((member // 8) << 10) | (19 << 5) | 9
+            )
+
+        def request(block: int) -> bytes:
+            code = bytearray(0x124)
+            struct.pack_into(
+                "<I", code, 0x14, 0xF9400000 | (((block + 0x18) // 8) << 10) | 8
+            )
+            return bytes(code)
+
+        barrier = bytearray(request(0x1748))
+        for offset, word in {
+            0x014: 0xF94BB008,
+            0x024: 0xF94BC000,
+            0x02C: 0xB9577268,
+            0x034: 0xB9577669,
+            0x078: 0xB9576A68,
+            0x07C: 0x1B087EB6,
+            0x0AC: 0x8B160008,
+            0x0B0: 0xF9000288,
+            0x0DC: 0xB9177668,
+            0x0EC: 0xF94BAE68,
+            0x0F0: 0x8B160114,
+        }.items():
+            struct.pack_into("<I", barrier, offset, word)
+
+        codes = {
+            recover_g17_abi.CONFIGURE_POOL_ELEMENT_SIZES: (sizes_address, bytes(sizes)),
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: (alloc_address, bytes(alloc)),
+            recover_g17_abi.REQUEST_CHANNEL_COMMAND_BARRIER: (0x620000, bytes(barrier)),
+            "__ZN11AGXFirmware23requestChannelCommand3DEPyS0_": (0x630000, request(0x1688)),
+            "__ZN11AGXFirmware23requestChannelCommandTAEPyS0_": (0x640000, request(0x1648)),
+        }
+        symbols = {name: address for name, (address, _c) in codes.items()}
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+            mock.patch.object(
+                recover_g17_abi, "virtual_to_file", side_effect=lambda _image, a: a
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_command_pools(bytes(image))
+
+        self.assertEqual(recovered["block_bytes"], 0x40)
+        self.assertEqual(recovered["block_layout"]["element_bytes"], 0x20)
+        self.assertEqual(recovered["commands"]["3D"]["command_bytes"], 0x2240)
+        self.assertEqual(recovered["commands"]["3D"]["block"], 0x1688)
+        self.assertEqual(recovered["commands"]["Barrier"]["command_bytes"], 0x80)
+        self.assertEqual(recovered["commands"]["TA"]["command_bytes"], 0x9C0)
+
+    def test_rejects_short_g17_pool_size_producer(self) -> None:
+        codes = {
+            recover_g17_abi.CONFIGURE_POOL_ELEMENT_SIZES: (0, b"\x00" * 0x40),
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: (0, b""),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={n: 0 for n in codes},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_channel_command_pools(b"")
+
     def test_recovers_g17_queue_device_inputs(self) -> None:
         queue_address = 0x500000
         device_address = 0x510000

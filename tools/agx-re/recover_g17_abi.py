@@ -440,6 +440,10 @@ IOGPU_COMMAND_QUEUE_INIT = (
 IOGPU_DEVICE_INIT = "__ZN11IOGPUDevice4initEP5IOGPUP4task"
 AGX_SHARED_INIT = "__ZN9AGXShared4initEP5IOGPUP4tasky"
 AGX_SHARED_SET_APP_GPU_ROLE = "__ZN9AGXShared16set_app_gpu_roleEi13eIOGPUAppRole"
+CONFIGURE_POOL_ELEMENT_SIZES = "__ZN11AGXFirmware25configurePoolElementSizesEv"
+BASE_ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
+REQUEST_CHANNEL_COMMAND_BARRIER = "__ZN11AGXFirmware28requestChannelCommandBarrierEPy"
+TA_COMMAND_POOL = 0x1648
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -6846,6 +6850,152 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
     }
 
 
+def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
+    """Decode LDR (immediate, unsigned offset) for a 128-bit SIMD register."""
+    if word & 0xFFC00000 != 0x3DC00000:
+        return None
+    destination = word & 0x1F
+    base = (word >> 5) & 0x1F
+    immediate = ((word >> 10) & 0xFFF) * 16
+    return destination, base, immediate
+
+
+def recover_g17_channel_command_pools(image: bytes) -> dict[str, object]:
+    """Recover the channel-command pools and their per-type command sizes.
+
+    Every work command is taken from a preallocated slot ring.  Each ring is a
+    0x40-byte control block in the firmware object, the slot size is one entry
+    of the table configurePoolElementSizes installs, and each
+    requestChannelCommandX binds one specific block.  Together these give the
+    exact byte size of every channel command type.
+    """
+
+    symbols = macho_symbols(image)
+    required = (CONFIGURE_POOL_ELEMENT_SIZES, BASE_ALLOC_FIRMWARE_DATA)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing channel-command pool symbols: {missing}")
+
+    # The size table is a fixed sequence of literals and vector loads.
+    sizes_address, sizes_code = symbol_code(image, CONFIGURE_POOL_ELEMENT_SIZES)
+    if len(sizes_code) != 0x54:
+        raise ValueError(f"unexpected pool size producer length {len(sizes_code):#x}")
+    require_instruction_words_at(
+        sizes_code,
+        "G17 channel-command pool sizes",
+        {
+            0x04: 0x52813808,  # mov w8, #0x9c0
+            0x08: 0xF9010C08,  # -> firmware +0x218
+            0x1C: 0xAD110400,  # -> firmware +0x220
+            0x20: 0x52800808,  # mov w8, #0x40
+            0x24: 0xF9012408,  # -> firmware +0x248
+            0x30: 0x3D809400,  # -> firmware +0x250
+            0x34: 0x52801009,  # mov w9, #0x80
+            0x38: 0x4E080D00,  # both halves 0x40
+            0x3C: 0xF9013409,  # -> firmware +0x268
+            0x48: 0xAD138400,  # -> firmware +0x270 and +0x280
+            0x4C: 0xF9014808,  # -> firmware +0x290
+        },
+    )
+    element_sizes = {0x218: 0x9C0, 0x248: 0x40, 0x268: 0x80, 0x270: 0x40, 0x278: 0x40, 0x290: 0x40}
+    for load_offset, member in ((0x10, 0x220), (0x18, 0x230), (0x2C, 0x250), (0x44, 0x280)):
+        adrp = decode_adrp(
+            sizes_address + load_offset - 4,
+            struct.unpack_from("<I", sizes_code, load_offset - 4)[0],
+        )
+        load = decode_ldr_q(struct.unpack_from("<I", sizes_code, load_offset)[0])
+        if adrp is None or load is None:
+            raise ValueError("pool size table is no longer a literal vector load")
+        _register, page = adrp
+        _destination, _base, immediate = load
+        offset = virtual_to_file(image, page + immediate)
+        low, high = struct.unpack_from("<QQ", image, offset)
+        element_sizes[member] = low
+        element_sizes[member + 8] = high
+
+    # allocFirmwareData binds each block to one entry of that table.
+    _address, alloc_code = symbol_code(image, BASE_ALLOC_FIRMWARE_DATA)
+    alloc_words = list(words(alloc_code))
+    pool_sizes: dict[int, int] = {}
+    for index, (_offset, word) in enumerate(alloc_words):
+        materialized = decode_movz_w(word)
+        if materialized is None or materialized[0] != 8:
+            continue
+        base = materialized[1]
+        if not 0x1600 <= base <= 0x1A00:
+            continue
+        for _next_offset, following in alloc_words[index : index + 8]:
+            load = decode_ldr_x(following)
+            if load is not None and load[0] == 9 and load[1] == 19:
+                pool_sizes[base] = load[2]
+                break
+    # The TA block is bound before the loop body and uses the leading literal.
+    pool_sizes.setdefault(TA_COMMAND_POOL, 0x218)
+    if len(pool_sizes) < 13:
+        raise ValueError(f"recovered only {len(pool_sizes)} channel-command pools")
+
+    # Each request function opens with the in-use byte array at block +0x18.
+    commands = {}
+    for name in sorted(symbols):
+        if "requestChannelCommand" not in name:
+            continue
+        _address, request_code = symbol_code(image, name)
+        block = None
+        for _offset, word in list(words(request_code))[:12]:
+            load = decode_ldr_x(word)
+            if load is not None and load[0] == 8 and load[1] == 0:
+                block = load[2] - 0x18
+                break
+        if block is None:
+            raise ValueError(f"{name} does not open with its pool block")
+        member = pool_sizes.get(block)
+        if member is None or member not in element_sizes:
+            raise ValueError(f"{name} binds an unknown pool block {block:#x}")
+        label = name.split("requestChannelCommand")[1].split("E")[0]
+        commands[label] = {
+            "block": block,
+            "size_member": member,
+            "command_bytes": element_sizes[member],
+        }
+
+    # The allocator itself is identical for every type; check one in full.
+    _address, barrier_code = symbol_code(image, REQUEST_CHANNEL_COMMAND_BARRIER)
+    require_instruction_words_at(
+        barrier_code,
+        "G17 channel-command slot allocation",
+        {
+            0x014: 0xF94BB008,  # in-use bytes at block +0x18
+            0x024: 0xF94BC000,  # block lock at +0x38
+            0x02C: 0xB9577268,  # slot count at +0x28
+            0x034: 0xB9577669,  # slot cursor at +0x2c
+            0x078: 0xB9576A68,  # element size at +0x20
+            0x07C: 0x1B087EB6,  # slot * element size
+            0x0AC: 0x8B160008,  # GPU base + offset
+            0x0B0: 0xF9000288,  # -> caller's output
+            0x0DC: 0xB9177668,  # advanced cursor
+            0x0EC: 0xF94BAE68,  # CPU base at block +0x10
+            0x0F0: 0x8B160114,  # returned CPU pointer
+        },
+    )
+
+    return {
+        "block_bytes": 0x40,
+        "block_layout": {
+            "resource": 0x08,
+            "cpu_base": 0x10,
+            "in_use_bytes": 0x18,
+            "element_bytes": 0x20,
+            "slot_count": 0x28,
+            "slot_cursor": 0x2C,
+            "exhausted": 0x30,
+            "lock": 0x38,
+        },
+        "gpu_address_vtable_slot": 0x158,
+        "size_producer": CONFIGURE_POOL_ELEMENT_SIZES,
+        "commands": commands,
+    }
+
+
 def recover_g17_queue_device_inputs(
     driver: bytes, iogpu: bytes
 ) -> dict[str, object]:
@@ -7344,6 +7494,7 @@ def main() -> int:
         channels["queue_device_inputs"] = recover_g17_queue_device_inputs(
             driver, iogpu
         )
+        channels["command_pools"] = recover_g17_channel_command_pools(driver)
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)

@@ -103,6 +103,8 @@ runtime policy. Firmware channel
 construction, the work-command ABI, and the userspace command producer still
 need byte-accurate implementations before enabling T6050.
 
+The channel-command pools are recovered: the slot-ring block layout, the
+allocation scan, and the exact byte size of all twelve named command types.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command

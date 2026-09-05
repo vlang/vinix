@@ -1190,6 +1190,94 @@ pub mut:
 	address u64
 }
 
+// Byte size of every G17 channel command, from the table
+// AGXFirmware::configurePoolElementSizes installs.
+pub const g17_command_ta_size = u32(0x9c0)
+pub const g17_command_3d_size = u32(0x2240)
+pub const g17_command_fast_blit_size = u32(0xa00)
+pub const g17_command_cl_size = u32(0x1040)
+pub const g17_command_barrier_size = u32(0x80)
+pub const g17_command_pm_grow_size = u32(0x40)
+pub const g17_command_pm_rebuild_size = u32(0x40)
+pub const g17_command_remote_node_size = u32(0x80)
+pub const g17_command_final_frg_kick_size = u32(0x40)
+pub const g17_command_ksm_add_kicks_size = u32(0x40)
+pub const g17_command_ksm_config_update_size = u32(0xc0)
+pub const g17_command_ksm_kick_queue_size = u32(0x40)
+
+// One preallocated channel-command slot ring. Apple keeps one of these per
+// command type in a 0x40-byte firmware-object block; only the fields the
+// allocator actually uses are modelled here.
+pub struct G17CommandPool {
+pub mut:
+	cpu_base      voidptr
+	gpu_base      u64
+	in_use        &u8 = unsafe { nil }
+	element_bytes u32
+	slot_count    u32
+	slot_cursor   u32
+	exhausted     bool
+}
+
+pub struct G17CommandSlot {
+pub:
+	index u32
+	cpu   voidptr
+	gpu   u64
+}
+
+// Reproduce AGXFirmware::requestChannelCommandX. Apple scans forward from the
+// cursor for at most slot_count entries, takes the first slot whose in-use
+// byte is clear, marks it and leaves the cursor one past it. A full ring
+// returns none instead of blocking, matching the null Apple returns.
+pub fn (mut pool G17CommandPool) acquire_g17_command_slot() ?G17CommandSlot {
+	if pool.slot_count == 0 || pool.element_bytes == 0
+		|| pool.in_use == unsafe { nil } || pool.cpu_base == unsafe { nil } {
+		return none
+	}
+
+	mut slot := pool.slot_cursor % pool.slot_count
+	mut remaining := pool.slot_count
+	for remaining > 0 {
+		if unsafe { pool.in_use[slot] } == 0 {
+			break
+		}
+		slot = (slot + 1) % pool.slot_count
+		remaining--
+	}
+	if remaining == 0 {
+		return none
+	}
+
+	offset := u64(slot) * u64(pool.element_bytes)
+	unsafe {
+		pool.in_use[slot] = pool.in_use[slot] + 1
+	}
+	pool.slot_cursor = (slot + 1) % pool.slot_count
+	cpu := unsafe { voidptr(&u8(pool.cpu_base) + offset) }
+	pool.exhausted = cpu == unsafe { nil }
+	return G17CommandSlot{
+		index: slot
+		cpu: cpu
+		gpu: pool.gpu_base + offset
+	}
+}
+
+// Release a slot back to its ring. Apple clears the byte when the firmware
+// reports the command complete.
+pub fn (mut pool G17CommandPool) release_g17_command_slot(index u32) bool {
+	if index >= pool.slot_count || pool.in_use == unsafe { nil } {
+		return false
+	}
+	unsafe {
+		if pool.in_use[index] == 0 {
+			return false
+		}
+		pool.in_use[index] = pool.in_use[index] - 1
+	}
+	return true
+}
+
 pub const g17_scheduler_state_size = u64(0x40)
 pub const g17_default_app_gpu_role = u8(2)
 pub const g17_max_app_gpu_role = u8(3)
