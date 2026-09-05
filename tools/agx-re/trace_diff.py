@@ -15,6 +15,10 @@ from typing import Any
 SEGMENT_HEADER_BYTES = 8
 RECORD_HEADER_BYTES = 0xC0
 PAYLOAD_LENGTH_OFFSET = 0x9C
+PRIMARY_EXTENSION_FLAG_OFFSET = 0x90
+PRIMARY_EXTENSION_HEADER_BYTES = 0x10
+PRIMARY_EXTENSION_COUNT_OFFSETS = (0x00, 0x04)
+PRIMARY_EXTENSION_ELEMENT_BYTES = (0x02, 0x18)
 
 
 def walk_segment(data: bytes) -> dict[str, object]:
@@ -38,15 +42,50 @@ def walk_segment(data: bytes) -> dict[str, object]:
         payload = struct.unpack_from(
             "<I", data, offset + PAYLOAD_LENGTH_OFFSET
         )[0]
-        end = offset + RECORD_HEADER_BYTES + payload
-        if end > len(data):
+        payload_end = offset + RECORD_HEADER_BYTES + payload
+        if payload_end > len(data):
             raise ValueError(
                 f"record at {offset:#x} claims {payload:#x} payload bytes, "
                 f"past the {len(data):#x}-byte segment"
             )
-        records.append(
-            {"offset": offset, "payload_bytes": payload, "end": end}
-        )
+        end = payload_end
+        extension = None
+        if struct.unpack_from(
+            "<I", data, offset + PRIMARY_EXTENSION_FLAG_OFFSET
+        )[0]:
+            header_end = payload_end + PRIMARY_EXTENSION_HEADER_BYTES
+            if header_end > len(data):
+                raise ValueError(
+                    f"record at {offset:#x} has a truncated primary extension header"
+                )
+            counts = struct.unpack_from("<II", data, payload_end)
+            item_bytes = tuple(
+                count * width
+                for count, width in zip(counts, PRIMARY_EXTENSION_ELEMENT_BYTES)
+            )
+            end = header_end + sum(item_bytes)
+            if end > len(data):
+                raise ValueError(
+                    f"record at {offset:#x} primary extension runs past the "
+                    f"{len(data):#x}-byte segment"
+                )
+            extension = {
+                "offset": payload_end,
+                "header_bytes": PRIMARY_EXTENSION_HEADER_BYTES,
+                "counts": list(counts),
+                "element_bytes": list(PRIMARY_EXTENSION_ELEMENT_BYTES),
+                "item_bytes": list(item_bytes),
+                "end": end,
+            }
+        record = {
+            "offset": offset,
+            "payload_bytes": payload,
+            "payload_end": payload_end,
+            "end": end,
+        }
+        if extension is not None:
+            record["primary_extension"] = extension
+        records.append(record)
         offset = end
 
     return {
@@ -163,8 +202,15 @@ def main() -> int:
                         f"  record {index}: {record['offset']:#06x}"
                         f" +{RECORD_HEADER_BYTES:#x} header"
                         f" +{record['payload_bytes']:#x} payload"
-                        f" -> {record['end']:#06x}"
+                        f" -> {record['payload_end']:#06x}"
                     )
+                    if extension := record.get("primary_extension"):
+                        print(
+                            "    primary extension: "
+                            f"counts={extension['counts']} "
+                            f"item_bytes={extension['item_bytes']} "
+                            f"-> {extension['end']:#06x}"
+                        )
         except ValueError as error:
             parser.error(str(error))
         return 0

@@ -4329,6 +4329,16 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x098: 0xF9000829,
             0x0A4: 0x3D803400,
             0x0A8: 0xF9007008,
+            0x0B4: 0xB940A009,
+            0x0DC: 0x91004129,
+            0x11C: 0x3DC00100,
+            0x120: 0x3C8E8000,
+            0x124: 0xB940E80A,
+            0x128: 0xAB0A056A,
+            0x158: 0xB940EC08,
+            0x15C: 0x8B080508,
+            0x160: 0xAB080D48,
+            0x170: 0xF900800A,
         }.items():
             struct.pack_into("<I", code, offset, word)
 
@@ -4348,6 +4358,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["header_bytes"], 0xC0)
         # The field is at 0xac of the command, which is 0x9c of the record.
         self.assertEqual(recovered["payload_length_offset"], 0x9C)
+        self.assertEqual(
+            recovered["primary_extension"]["element_bytes"], [2, 24]
+        )
         self.assertEqual(recovered["terminator_marker"], 0x100)
 
     def test_recovers_g17_channel_command_common_fields(self) -> None:

@@ -78,3 +78,34 @@ class WalkSegmentTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             trace_diff.walk_segment(bytes(data))
+
+    def test_walks_primary_extension(self) -> None:
+        record = bytearray(trace_diff.RECORD_HEADER_BYTES)
+        struct.pack_into(
+            "<I", record, trace_diff.PRIMARY_EXTENSION_FLAG_OFFSET, 1
+        )
+        extension = struct.pack("<4I", 2, 1, 0, 0) + bytes(2 * 2 + 1 * 24)
+        total = trace_diff.SEGMENT_HEADER_BYTES + len(record) + len(extension)
+        data = struct.pack("<II", 0x10000, total) + record + extension
+
+        walked = trace_diff.walk_segment(data)
+
+        self.assertEqual(walked["trailing_bytes"], 0)
+        self.assertEqual(
+            walked["records"][0]["primary_extension"]["counts"], [2, 1]
+        )
+        self.assertEqual(
+            walked["records"][0]["primary_extension"]["item_bytes"], [4, 24]
+        )
+
+    def test_rejects_truncated_primary_extension(self) -> None:
+        data = bytearray(self.segment(0))
+        struct.pack_into(
+            "<I",
+            data,
+            trace_diff.SEGMENT_HEADER_BYTES
+            + trace_diff.PRIMARY_EXTENSION_FLAG_OFFSET,
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "extension header"):
+            trace_diff.walk_segment(bytes(data))
