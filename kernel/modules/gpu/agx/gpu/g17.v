@@ -242,6 +242,63 @@ pub fn (mut resources G17QueueResources) enqueue_channel_command(command_type u3
 		channel.cached.cpu_address(), channel.cached.size, command_gpu_address)
 }
 
+// Couple the inner channel-pointer publication to its outer data-master entry.
+// The outer ring is checked and locked first, so an unavailable outer slot can
+// never strand a newly visible inner command. Apple's submit-info record takes
+// its submission index from the inner write index after pointer publication.
+pub fn (mut mgr GpuManager) submit_g17_queue_command(resources &G17QueueResources,
+	command_type u32, command_gpu_address u64) bool {
+	if resources == unsafe { nil } || resources.released || mgr.state != .running
+		|| mgr.g17_graph == unsafe { nil } || command_type >= g17_work_channel_count
+		|| resources.channel_mask & (u32(1) << command_type) == 0
+		|| resources.priority >= fw.g17_data_master_priorities || command_gpu_address == 0 {
+		return false
+	}
+
+	mut graph := unsafe { mgr.g17_graph }
+	graph.data_master_locks[resources.priority][command_type].acquire()
+	defer {
+		graph.data_master_locks[resources.priority][command_type].release()
+	}
+	outer_state := &graph.data_master_state[resources.priority][command_type]
+	outer_entries := &graph.data_master_entries[resources.priority][command_type]
+	if !fw.g17_data_master_ring_has_space(outer_state.cpu_address(),
+		fw.g17_accelerator_ring_state_size) {
+		return false
+	}
+
+	mut queue_resources := unsafe { resources }
+	mut channel := &queue_resources.channels[command_type]
+	channel.lock.acquire()
+	defer {
+		channel.lock.release()
+	}
+	// Resource teardown closes the admission gate before taking channel.lock.
+	if queue_resources.released || channel.state.va == 0 {
+		return false
+	}
+	submission_index := fw.publish_g17_channel_command(channel.uncached.cpu_address(),
+		channel.uncached.size, channel.cached.cpu_address(), channel.cached.size,
+		command_gpu_address) or { return false }
+	command := fw.new_g17_data_master_command(channel.state.va, command_type,
+		submission_index) or {
+		mgr.state = .error
+		return false
+	}
+	if !fw.enqueue_g17_data_master_entry(outer_state.cpu_address(),
+		fw.g17_accelerator_ring_state_size, outer_entries.cpu_address(),
+		fw.g17_data_master_entries_bytes, command) {
+		mgr.state = .error
+		return false
+	}
+	channel_id := fw.g17_data_master_doorbell_channel(resources.priority, command_type) or {
+		mgr.state = .error
+		return false
+	}
+	_ = mgr.send_doorbell(channel_id)
+	return true
+}
+
 pub fn (mut mgr GpuManager) release_g17_queue_resources(resources &G17QueueResources) {
 	if resources == unsafe { nil } {
 		return

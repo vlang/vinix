@@ -2278,33 +2278,40 @@ pub fn initialize_g17_channel(state_buffer voidptr, state_size u64,
 // AGXChannel::writeChannelCommandPointer. One ring entry is deliberately kept
 // empty so equal read/write indices always mean empty, never full. A full ring
 // is reported to the caller rather than spinning inside the kernel.
-pub fn enqueue_g17_channel_command(uncached_buffer voidptr, uncached_size u64,
-	cached_buffer voidptr, cached_size u64, command_gpu_address u64) bool {
+pub fn publish_g17_channel_command(uncached_buffer voidptr, uncached_size u64,
+	cached_buffer voidptr, cached_size u64, command_gpu_address u64) ?u16 {
 	if uncached_buffer == unsafe { nil } || uncached_size < g17_channel_control_header_size
 		|| cached_buffer == unsafe { nil } || command_gpu_address == 0 {
-		return false
+		return none
 	}
 
 	unsafe {
 		mut control := &G17ChannelControl(uncached_buffer)
 		entries := katomic.load(&control.ring_entries)
 		if entries < 2 || u64(entries) > cached_size / g17_cached_command_pointer_size {
-			return false
+			return none
 		}
 		read_index := katomic.load(&control.read_index)
 		write_index := katomic.load(&control.write_index)
 		if read_index >= entries || write_index >= entries {
-			return false
+			return none
 		}
 		next_index := (write_index + 1) % entries
 		if next_index == read_index {
-			return false
+			return none
 		}
 
 		mut pointer := &u64(u64(cached_buffer) + u64(write_index) * g17_cached_command_pointer_size)
 		katomic.store(mut pointer, command_gpu_address)
 		katomic.store(mut &control.write_index, next_index)
+		return u16(next_index)
 	}
+}
+
+pub fn enqueue_g17_channel_command(uncached_buffer voidptr, uncached_size u64,
+	cached_buffer voidptr, cached_size u64, command_gpu_address u64) bool {
+	publish_g17_channel_command(uncached_buffer, uncached_size, cached_buffer,
+		cached_size, command_gpu_address) or { return false }
 	return true
 }
 
@@ -2672,6 +2679,25 @@ pub fn enqueue_g17_data_master_entry(state_buffer voidptr, state_size u64,
 		katomic.store(mut &state.write_index, next_index)
 	}
 	return true
+}
+
+// Check outer-ring capacity while the caller holds its producer lock. Firmware
+// only advances read_index, so a true result cannot become false before the
+// same producer publishes unless the shared state is corrupt.
+pub fn g17_data_master_ring_has_space(state_buffer voidptr, state_size u64) bool {
+	if state_buffer == unsafe { nil } || state_size != g17_accelerator_ring_state_size {
+		return false
+	}
+	unsafe {
+		state := &G17AcceleratorRingState(state_buffer)
+		read_index := katomic.load(&state.read_index)
+		write_index := katomic.load(&state.write_index)
+		if read_index >= g17_accelerator_ring_entries
+			|| write_index >= g17_accelerator_ring_entries {
+			return false
+		}
+		return ((write_index + 1) & 0xff) != read_index
+	}
 }
 
 // The device-control path copies a complete 0x40-byte entry into its ring.

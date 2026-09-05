@@ -2025,6 +2025,69 @@ class RecoverG17AbiTests(unittest.TestCase):
         ):
             recover_g17_abi.recover_g17_channel_priority(b"")
 
+    def test_recovers_g17_channel_submit_info(self) -> None:
+        code = bytearray(0x32C)
+        for offset, word in {
+            0x24: 0xA9425013,
+            0x28: 0xF9401808,
+            0x38: 0xF9403509,
+            0x3C: 0xA9017FFF,
+            0x54: 0xB940DE8A,
+            0x58: 0xB940528B,
+            0x64: 0xF9406A8C,
+            0x80: 0xF90001A9,
+            0x84: 0x11000549,
+            0x88: 0xB900DE89,
+            0x8C: 0xF940328A,
+            0x90: 0xB9404156,
+            0xB8: 0x290127F6,
+            0xBC: 0xB940F288,
+            0xC0: 0xB90013E8,
+            0xC4: 0xF9400168,
+            0xC8: 0xF9402508,
+            0xCC: 0xF9000FE8,
+            0x2A8: 0xB940CA88,
+            0x2BC: 0xF9406660,
+            0x2C0: 0x910023E2,
+            0x2C4: 0x12000343,
+            0x2C8: 0xAA1403E1,
+            0x2D0: 0xD73F0911,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.SUBMIT_COMMAND_TO_FIRMWARE_BLOCK: 0},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_submit_info(b"")
+        self.assertEqual(recovered["bytes"], 0x18)
+        self.assertEqual(
+            recovered["fields"]["submission_index"]["source"],
+            "uncached_control.write_index_after_pointer_publication",
+        )
+        self.assertEqual(
+            recovered["fields"]["submission_index"]["outer_entry_bytes"], 2
+        )
+
+    def test_rejects_modified_g17_channel_submit_info(self) -> None:
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.SUBMIT_COMMAND_TO_FIRMWARE_BLOCK: 0},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0, bytes(0x32C))
+            ),
+            self.assertRaisesRegex(ValueError, "submit-info construction"),
+        ):
+            recover_g17_abi.recover_g17_channel_submit_info(b"")
+
     def test_recovers_g17_dual_role_boot_transport(self) -> None:
         notify = bytearray(0x134)
         receive = bytearray(0xF0)

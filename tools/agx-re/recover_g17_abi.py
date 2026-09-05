@@ -516,6 +516,10 @@ ARM_SET_CHANNEL_PRIORITY = (
     "__ZN14AGXArmFirmware18setChannelPriorityE"
     "P17_AGFIChannelState23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel"
 )
+SUBMIT_COMMAND_TO_FIRMWARE_BLOCK = (
+    "____ZN12AGXWorkQueue23submitCommandToFirmwareE"
+    "P10AGXChannelP20AGXCommandDescriptorb_block_invoke"
+)
 WRITE_CHANNEL_COMMAND_POINTER = (
     "__ZN10AGXChannel26writeChannelCommandPointerEyP22AGFIChannelCommandTypey"
 )
@@ -9826,6 +9830,78 @@ def recover_g17_channel_priority(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_channel_submit_info(image: bytes) -> dict[str, object]:
+    """Recover the 24-byte host submit-info record and its ring-index source."""
+
+    symbols = macho_symbols(image)
+    if SUBMIT_COMMAND_TO_FIRMWARE_BLOCK not in symbols:
+        raise ValueError("Mach-O is missing G17 submit-to-firmware block")
+    _address, code = symbol_code(image, SUBMIT_COMMAND_TO_FIRMWARE_BLOCK)
+    if len(code) != 0x32C:
+        raise ValueError(f"unexpected G17 submit block size {len(code):#x}")
+    require_instruction_words_at(
+        code,
+        "G17 channel submit-info construction",
+        {
+            0x24: 0xA9425013,  # captured work queue and channel
+            0x28: 0xF9401808,  # captured command descriptor
+            0x38: 0xF9403509,  # command GPU address at descriptor +0x68
+            0x3C: 0xA9017FFF,  # zero submit-info bytes +0x08..+0x17
+            0x54: 0xB940DE8A,  # channel host sequence at +0xdc
+            0x58: 0xB940528B,  # host tracking-ring entries at +0x50
+            0x64: 0xF9406A8C,  # host tracking-ring pointer at +0xd0
+            0x80: 0xF90001A9,  # retain the command address before submission
+            0x84: 0x11000549,  # increment the host sequence
+            0x88: 0xB900DE89,
+            0x8C: 0xF940328A,  # uncached channel-control CPU address
+            0x90: 0xB9404156,  # published write index at control +0x40
+            0xB8: 0x290127F6,  # info +0x00/+0x04
+            0xBC: 0xB940F288,  # channel counter at +0xf0
+            0xC0: 0xB90013E8,  # info +0x08
+            0xC4: 0xF9400168,
+            0xC8: 0xF9402508,  # selected metadata object +0x48
+            0xCC: 0xF9000FE8,  # info +0x10
+            0x2A8: 0xB940CA88,  # channel data-master type at +0xc8
+            0x2BC: 0xF9406660,  # owning accelerator at work queue +0xc8
+            0x2C0: 0x910023E2,  # x2 = &submit_info at stack +0x08
+            0x2C4: 0x12000343,  # caller flag
+            0x2C8: 0xAA1403E1,  # x1 = channel
+            0x2D0: 0xD73F0911,  # dispatch TA/3D/CL submit wrapper
+        },
+    )
+    return {
+        "bytes": 0x18,
+        "fields": {
+            "submission_index": {
+                "offset": 0x00,
+                "bytes": 4,
+                "source": "uncached_control.write_index_after_pointer_publication",
+                "outer_entry_bytes": 2,
+            },
+            "host_sequence": {
+                "offset": 0x04,
+                "bytes": 4,
+                "source": "channel.host_sequence_after_increment",
+            },
+            "channel_counter": {
+                "offset": 0x08,
+                "bytes": 4,
+                "source_channel_member": 0xF0,
+            },
+            "reserved_00c": {"offset": 0x0C, "bytes": 4, "value": 0},
+            "metadata": {
+                "offset": 0x10,
+                "bytes": 8,
+                "selected_object_member": 0x48,
+            },
+        },
+        "dispatch": {
+            "data_master_type_channel_member": 0xC8,
+            "accelerator_work_queue_member": 0xC8,
+        },
+    }
+
+
 def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str, object]:
     """Recover the shared state/control layout used by a G17 work channel."""
     reset_instructions = list(words(reset_code))
@@ -13806,6 +13882,7 @@ def main() -> int:
             driver, reset_channel_code
         )
         channels["priority"] = recover_g17_channel_priority(driver)
+        channels["submit_info"] = recover_g17_channel_submit_info(driver)
         channels["data_master_types"] = recover_g17_channel_data_master_types(driver)
         channels["data_master_rings"] = recover_g17_data_master_ring_bindings(
             allocations, base_init_code
