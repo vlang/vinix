@@ -1414,6 +1414,18 @@ pub const g17_command_ksm_add_kicks_size = u32(0x40)
 pub const g17_command_ksm_config_update_size = u32(0xc0)
 pub const g17_command_ksm_kick_queue_size = u32(0x40)
 pub const g17_channel_command_known_prefix_size = u64(0x6a)
+pub const g17_shared_stream_parser_size = u64(0x18)
+pub const g17_hardware_command_header_size = u64(0xc0)
+pub const g17_parsed_hardware_command_size = u64(0x170)
+pub const g17_hardware_command_payload_length_offset = u64(0x9c)
+pub const g17_primary_extension_length_offset = u64(0x90)
+pub const g17_aux_u16_extension_gate_offset = u64(0x88)
+pub const g17_aux_u16_extension_length_offset = u64(0x8c)
+pub const g17_aux_u64_extension_gate_offset = u64(0x94)
+pub const g17_aux_u64_extension_length_offset = u64(0x98)
+pub const g17_extension_count_header_size = u64(0x10)
+pub const g17_hardware_command_terminator_error = u32(0x100)
+pub const g17_hardware_command_auxiliary_error = u32(0x102)
 pub const g17_render_payload_size = u64(0x9d0)
 pub const g17_render_kernel_command_size = u64(0x284)
 pub const g17_render_payload_framing_error = u32(0x100)
@@ -1455,6 +1467,212 @@ pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes
 		prefix.control_032 = 0
 		prefix.control_062 = 0
 	}
+	return true
+}
+
+// Cursor layout used by AGXSharedStreamParser. Vinix constructs these from
+// kernel-owned staged buffers; start/end/cursor are never accepted from
+// userspace. Keeping addresses as integers makes every bounds transition
+// explicit and avoids undefined pointer arithmetic at the end of a span.
+@[packed]
+pub struct G17SharedStreamParser {
+pub mut:
+	start  u64
+	end    u64
+	cursor u64
+}
+
+pub fn initialize_g17_shared_stream_parser(mut parser G17SharedStreamParser, data voidptr,
+	bytes u64) bool {
+	start := u64(data)
+	if (data == unsafe { nil } && bytes != 0) || bytes > ~u64(0) - start {
+		return false
+	}
+	parser.start = start
+	parser.end = start + bytes
+	parser.cursor = start
+	return true
+}
+
+struct G17StreamSpan {
+	start u64
+	end   u64
+}
+
+fn take_g17_stream_span(mut parser G17SharedStreamParser, bytes u64) ?G17StreamSpan {
+	if parser.cursor < parser.start || parser.cursor > parser.end
+		|| bytes > ~u64(0) - parser.cursor {
+		return none
+	}
+	end := parser.cursor + bytes
+	if end > parser.end {
+		return none
+	}
+	span := G17StreamSpan{
+		start: parser.cursor
+		end: end
+	}
+	parser.cursor = end
+	return span
+}
+
+fn take_g17_span_address(cursor u64, end u64, count u64, element_bytes u64) ?G17StreamSpan {
+	if element_bytes != 0 && count > ~u64(0) / element_bytes {
+		return none
+	}
+	bytes := count * element_bytes
+	if cursor > end || bytes > ~u64(0) - cursor || cursor + bytes > end {
+		return none
+	}
+	return G17StreamSpan{
+		start: cursor
+		end: cursor + bytes
+	}
+}
+
+fn read_g17_u32(address u64) u32 {
+	mut value := u32(0)
+	unsafe {
+		C.memcpy(&value, voidptr(address), sizeof(u32))
+	}
+	return value
+}
+
+// Host-side result of AGXHardwareKernelCommand::parseAndValidate. The object
+// points into the staged primary and auxiliary streams; it must be consumed
+// before those buffers are released and must never be sent to firmware as-is.
+@[packed]
+pub struct G17ParsedHardwareCommand {
+pub mut:
+	opaque_000               [0x08]u8
+	success                  u8
+	opaque_009               [0x03]u8
+	error_marker             u32
+	record_header            [0xc0]u8
+	payload_start            u64
+	payload_end              u64
+	payload_pointer          u64
+	primary_extension_counts [4]u32
+	primary_u16_array        u64
+	primary_24_byte_array    u64
+	opaque_108               [0x18]u8
+	aux_u16_extension_counts [4]u32
+	aux_u16_arrays           [4]u64
+	aux_u64_extension_counts [4]u32
+	aux_u64_group_arrays     [2]u64
+}
+
+fn fail_g17_hardware_command(mut command G17ParsedHardwareCommand, marker u32) bool {
+	command.success = 0
+	command.error_marker = marker
+	return false
+}
+
+// Parse one base hardware-command record from two kernel-owned streams. The
+// primary stream contains the fixed header, payload, and optional primary
+// extension; the two auxiliary extensions consume consecutive ranges from the
+// separate auxiliary stream. Successful pointers always remain inside their
+// corresponding staged span.
+pub fn parse_g17_hardware_command(mut command G17ParsedHardwareCommand,
+	mut primary G17SharedStreamParser, mut auxiliary G17SharedStreamParser) bool {
+	command.success = 0
+	command.error_marker = 0
+	command.payload_start = 0
+	command.payload_end = 0
+	command.payload_pointer = 0
+	command.primary_u16_array = 0
+	command.primary_24_byte_array = 0
+	for index := 0; index < 4; index++ {
+		command.aux_u16_arrays[index] = 0
+	}
+	command.aux_u64_group_arrays[0] = 0
+	command.aux_u64_group_arrays[1] = 0
+
+	header := take_g17_stream_span(mut primary, g17_hardware_command_header_size) or {
+		return fail_g17_hardware_command(mut command, g17_hardware_command_terminator_error)
+	}
+	unsafe {
+		C.memcpy(&command.record_header[0], voidptr(header.start), g17_hardware_command_header_size)
+	}
+
+	payload_length := read_g17_u32(header.start + g17_hardware_command_payload_length_offset)
+	payload := take_g17_stream_span(mut primary, u64(payload_length)) or {
+		return fail_g17_hardware_command(mut command, g17_hardware_command_terminator_error)
+	}
+	if payload.start == payload.end {
+		return fail_g17_hardware_command(mut command, g17_hardware_command_terminator_error)
+	}
+	command.payload_start = payload.start
+	command.payload_end = payload.end
+	command.payload_pointer = payload.start
+
+	primary_extension_bytes := read_g17_u32(header.start + g17_primary_extension_length_offset)
+	if primary_extension_bytes != 0 {
+		extension := take_g17_stream_span(mut primary, g17_extension_count_header_size + u64(primary_extension_bytes)) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_terminator_error)
+		}
+		unsafe {
+			C.memcpy(&command.primary_extension_counts[0], voidptr(extension.start), g17_extension_count_header_size)
+		}
+		mut cursor := extension.start + g17_extension_count_header_size
+		first_array := take_g17_span_address(cursor, extension.end, u64(command.primary_extension_counts[0]), 2) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_terminator_error)
+		}
+		command.primary_u16_array = first_array.start
+		cursor = first_array.end
+		second_array := take_g17_span_address(cursor, extension.end, u64(command.primary_extension_counts[1]), 24) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_terminator_error)
+		}
+		command.primary_24_byte_array = second_array.start
+	}
+
+	if read_g17_u32(header.start + g17_aux_u16_extension_gate_offset) != 0 {
+		extension_bytes := read_g17_u32(header.start + g17_aux_u16_extension_length_offset)
+		extension := take_g17_stream_span(mut auxiliary, u64(extension_bytes)) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+		}
+		if u64(extension_bytes) < g17_extension_count_header_size {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+		}
+		unsafe {
+			C.memcpy(&command.aux_u16_extension_counts[0], voidptr(extension.start), g17_extension_count_header_size)
+		}
+		mut cursor := extension.start + g17_extension_count_header_size
+		for index := 0; index < 4; index++ {
+			array := take_g17_span_address(cursor, extension.end, u64(command.aux_u16_extension_counts[index]), 2) or {
+				return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+			}
+			command.aux_u16_arrays[index] = array.start
+			cursor = array.end
+		}
+	}
+
+	if read_g17_u32(header.start + g17_aux_u64_extension_gate_offset) != 0 {
+		extension_bytes := read_g17_u32(header.start + g17_aux_u64_extension_length_offset)
+		extension := take_g17_stream_span(mut auxiliary, u64(extension_bytes)) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+		}
+		if u64(extension_bytes) < g17_extension_count_header_size {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+		}
+		unsafe {
+			C.memcpy(&command.aux_u64_extension_counts[0], voidptr(extension.start), g17_extension_count_header_size)
+		}
+		mut cursor := extension.start + g17_extension_count_header_size
+		first_group_count := u64(command.aux_u64_extension_counts[0]) + u64(command.aux_u64_extension_counts[1])
+		second_group_count := u64(command.aux_u64_extension_counts[2]) + u64(command.aux_u64_extension_counts[3])
+		first_group := take_g17_span_address(cursor, extension.end, first_group_count, 8) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+		}
+		command.aux_u64_group_arrays[0] = first_group.start
+		cursor = first_group.end
+		second_group := take_g17_span_address(cursor, extension.end, second_group_count, 8) or {
+			return fail_g17_hardware_command(mut command, g17_hardware_command_auxiliary_error)
+		}
+		command.aux_u64_group_arrays[1] = second_group.start
+	}
+
+	command.success = 1
 	return true
 }
 
@@ -1981,6 +2199,8 @@ pub fn validate_g17_channel_layouts() bool {
 		&& sizeof(G17ChannelControl) == g17_channel_control_header_size
 		&& sizeof(G17CachedCommandPointer) == g17_cached_command_pointer_size
 		&& sizeof(G17ChannelCommandKnownPrefix) == g17_channel_command_known_prefix_size
+		&& sizeof(G17SharedStreamParser) == g17_shared_stream_parser_size
+		&& sizeof(G17ParsedHardwareCommand) == g17_parsed_hardware_command_size
 		&& sizeof(G17ParsedRenderCommand) == g17_render_kernel_command_size
 }
 

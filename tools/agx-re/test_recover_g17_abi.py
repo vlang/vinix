@@ -4417,6 +4417,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         # The field is at 0xac of the command, which is 0x9c of the record.
         self.assertEqual(recovered["payload_length_offset"], 0x9C)
         self.assertEqual(
+            recovered["primary_extension"]["stream_length_offset"], 0x90
+        )
+        self.assertEqual(
             recovered["primary_extension"]["element_bytes"], [2, 24]
         )
         self.assertEqual(

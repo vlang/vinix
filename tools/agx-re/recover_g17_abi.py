@@ -10586,7 +10586,7 @@ def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
             0x098: 0xF9000829,  # cursor advanced past the payload
             0x0A4: 0x3D803400,  # payload bounds at command +0xd0
             0x0A8: 0xF9007008,  # payload start at command +0xe0
-            0x0B4: 0xB940A009,  # record +0x90 gates a primary extension
+            0x0B4: 0xB940A009,  # bytes after the primary extension header
             0x0DC: 0x91004129,  # its count header is 0x10 bytes
             0x11C: 0x3DC00100,  # copy the extension count header
             0x120: 0x3C8E8000,  # to command +0xe8
@@ -10641,7 +10641,7 @@ def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
         "payload_bounds_member": 0xD0,
         "payload_start_member": 0xE0,
         "primary_extension": {
-            "flag_offset": 0x90,
+            "stream_length_offset": 0x90,
             "header_bytes": 0x10,
             "count_offsets": [0x00, 0x04],
             "element_bytes": [0x02, 0x18],

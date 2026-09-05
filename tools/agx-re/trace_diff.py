@@ -15,7 +15,7 @@ from typing import Any
 SEGMENT_HEADER_BYTES = 8
 RECORD_HEADER_BYTES = 0xC0
 PAYLOAD_LENGTH_OFFSET = 0x9C
-PRIMARY_EXTENSION_FLAG_OFFSET = 0x90
+PRIMARY_EXTENSION_LENGTH_OFFSET = 0x90
 PRIMARY_EXTENSION_HEADER_BYTES = 0x10
 PRIMARY_EXTENSION_COUNT_OFFSETS = (0x00, 0x04)
 PRIMARY_EXTENSION_ELEMENT_BYTES = (0x02, 0x18)
@@ -47,8 +47,8 @@ def walk_segment(data: bytes) -> dict[str, object]:
     offset = SEGMENT_HEADER_BYTES
     while offset + RECORD_HEADER_BYTES <= len(data):
         header = {
-            "primary_extension_flag": struct.unpack_from(
-                "<I", data, offset + PRIMARY_EXTENSION_FLAG_OFFSET
+            "primary_extension_bytes": struct.unpack_from(
+                "<I", data, offset + PRIMARY_EXTENSION_LENGTH_OFFSET
             )[0],
             "auxiliary_u16_flag": struct.unpack_from(
                 "<I", data, offset + AUXILIARY_U16_FLAG_OFFSET
@@ -74,29 +74,33 @@ def walk_segment(data: bytes) -> dict[str, object]:
             )
         end = payload_end
         extension = None
-        if header["primary_extension_flag"]:
+        if header["primary_extension_bytes"]:
             header_end = payload_end + PRIMARY_EXTENSION_HEADER_BYTES
-            if header_end > len(data):
+            extension_end = header_end + header["primary_extension_bytes"]
+            if extension_end > len(data):
                 raise ValueError(
-                    f"record at {offset:#x} has a truncated primary extension header"
+                    f"record at {offset:#x} has a truncated primary extension"
                 )
             counts = struct.unpack_from("<II", data, payload_end)
             item_bytes = tuple(
                 count * width
                 for count, width in zip(counts, PRIMARY_EXTENSION_ELEMENT_BYTES)
             )
-            end = header_end + sum(item_bytes)
-            if end > len(data):
+            item_end = header_end + sum(item_bytes)
+            if item_end > extension_end:
                 raise ValueError(
-                    f"record at {offset:#x} primary extension runs past the "
-                    f"{len(data):#x}-byte segment"
+                    f"record at {offset:#x} primary arrays run past the "
+                    f"{header['primary_extension_bytes']:#x}-byte extension"
                 )
+            end = extension_end
             extension = {
                 "offset": payload_end,
                 "header_bytes": PRIMARY_EXTENSION_HEADER_BYTES,
+                "bytes": header["primary_extension_bytes"],
                 "counts": list(counts),
                 "element_bytes": list(PRIMARY_EXTENSION_ELEMENT_BYTES),
                 "item_bytes": list(item_bytes),
+                "item_end": item_end,
                 "end": end,
             }
         record = {
@@ -253,7 +257,7 @@ def main() -> int:
                     header = record["header"]
                     print(
                         "    stream fields: "
-                        f"primary={header['primary_extension_flag']:#x} "
+                        f"primary={header['primary_extension_bytes']:#x} "
                         f"aux-u16={header['auxiliary_u16_flag']:#x}/"
                         f"{header['auxiliary_u16_bytes']:#x} "
                         f"aux-u64={header['auxiliary_u64_flag']:#x}/"
