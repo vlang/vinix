@@ -133,7 +133,8 @@ summary array. The selector encoding is recovered and validated, but the selecto
 not complete yet. The UUID-pinned backwards slice resolves every virtual encoder
 call (314 physical call sites and 234 distinct static selectors together with the
 literal audit). All ten inline forms are located too; two CL selectors remain
-symbolic. Value provenance is classified at every virtual call (209 constants
+symbolic, while their value formulas are complete. Value provenance is
+classified at every virtual call (209 constants
 or direct descriptor loads plus 105 recovered expression trees), so all 314
 call-value formulas are now represented. The control-flow ordering still remains
 to be encoded.

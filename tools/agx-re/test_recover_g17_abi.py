@@ -5323,7 +5323,12 @@ class RecoverG17AbiTests(unittest.TestCase):
                 0x098: 0x2A0A0129, 0x09C: 0xB9004289, 0x0A4: 0xF8044289,
                 0x0B8: 0x91404EAA, 0x0BC: 0x91080156, 0x0D8: 0x0A0B0129,
                 0x0DC: 0x5282FE2A, 0x0E0: 0x2A0A0129, 0x0E4: 0xB9000109,
-                0x0EC: 0xF8004109, 0x137C: 0x0A0B014A,
+                0x0EC: 0xF8004109, 0x1330: 0xF9420A69,
+                0x1334: 0xA95B22EA, 0x1338: 0xB944B2AB,
+                0x133C: 0x9276810C, 0x1340: 0x528000A8,
+                0x1344: 0xAA08018D, 0x134C: 0xF90001CD,
+                0x1360: 0x8B0B0569, 0x1364: 0xD375D137,
+                0x1368: 0x8B0C02E9, 0x137C: 0x0A0B014A,
                 0x1380: 0x0B0A02CA, 0x1384: 0x1100254A,
                 0x1388: 0xB907628A, 0x139C: 0x0A0B014A,
                 0x13A0: 0x0B0A02CA, 0x13A4: 0x1100054A,
@@ -5353,6 +5358,7 @@ class RecoverG17AbiTests(unittest.TestCase):
             recovered = recover_g17_abi.recover_g17_inline_register_records(b"")
 
         self.assertTrue(recovered["all_inline_forms_located"])
+        self.assertTrue(recovered["all_inline_values_recovered"])
         self.assertFalse(recovered["control_flow_complete"])
         self.assertEqual(recovered["static_record_count"], 8)
         self.assertEqual(recovered["dynamic_record_count"], 2)
@@ -5363,6 +5369,19 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertIn(
             "accelerator_base + 0x13200",
             recovered["dynamic_records"]["CL"][0]["selector_expression"],
+        )
+        dynamic = recovered["dynamic_records"]["CL"]
+        self.assertEqual(dynamic[0]["value_expression"]["immediate"], 5)
+        self.assertEqual(
+            dynamic[0]["value_expression"]["source"]["mask"],
+            0x7FFFFFFFC00,
+        )
+        self.assertEqual(
+            dynamic[1]["value_expression"]["first"]["factor"], 0x1800
+        )
+        self.assertEqual(
+            dynamic[1]["value_expression"]["second"]["source"]["member"],
+            0x1B8,
         )
 
         cl_name = recover_g17_abi.REGISTER_LIST_PRODUCERS["CL"]

@@ -10992,7 +10992,8 @@ def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
     one directly. FastBlit does the same with a computed static selector. CL
     additionally constructs two adjacent records from the low 32 bits of its
     accelerator base; those remain symbolic rather than being misreported as
-    static selector constants.
+    static selector constants. Their two descriptor/channel value formulas
+    are recovered exactly as structured expressions.
     """
 
     symbols = macho_symbols(image)
@@ -11075,6 +11076,16 @@ def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
             0x0EC: 0xF8004109,
             0x0B8: 0x91404EAA,  # accelerator base +0x13000
             0x0BC: 0x91080156,  # dynamic selector base +0x200
+            0x1330: 0xF9420A69,  # descriptor +0x410
+            0x1334: 0xA95B22EA,  # channel words at +0x1b0/+0x1b8
+            0x1338: 0xB944B2AB,  # accelerator index at +0x4b0
+            0x133C: 0x9276810C,  # channel[0x1b8] & 0x7fffffffc00
+            0x1340: 0x528000A8,
+            0x1344: 0xAA08018D,  # first value: masked word | 5
+            0x134C: 0xF90001CD,  # first value -> command +0x764
+            0x1360: 0x8B0B0569,  # index * 3
+            0x1364: 0xD375D137,  # then * 2048
+            0x1368: 0x8B0C02E9,  # second value: scaled index + masked word
             0x137C: 0x0A0B014A,
             0x1380: 0x0B0A02CA,
             0x1384: 0x1100254A,  # dynamic base +9
@@ -11137,13 +11148,50 @@ def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
                 "producer_offset": 0x1380,
                 "selector_expression": "low32(accelerator_base + 0x13200) + 0x8",
                 "mode": 1,
-                "value_source": "masked_descriptor_word_or_5",
+                "value_expression": {
+                    "operation": "orr",
+                    "bytes": 8,
+                    "immediate": 5,
+                    "source": {
+                        "operation": "and",
+                        "bytes": 8,
+                        "mask": 0x7FFFFFFFC00,
+                        "source": {
+                            "kind": "channel_load",
+                            "member": 0x1B8,
+                            "bytes": 8,
+                        },
+                    },
+                },
             },
             {
                 "producer_offset": 0x13A0,
                 "selector_expression": "low32(accelerator_base + 0x13200)",
                 "mode": 1,
-                "value_source": "descriptor_index_and_masked_word",
+                "value_expression": {
+                    "operation": "add",
+                    "bytes": 8,
+                    "first": {
+                        "operation": "multiply",
+                        "bytes": 8,
+                        "factor": 0x1800,
+                        "source": {
+                            "kind": "accelerator_load",
+                            "member": 0x4B0,
+                            "bytes": 4,
+                        },
+                    },
+                    "second": {
+                        "operation": "and",
+                        "bytes": 8,
+                        "mask": 0x7FFFFFFFC00,
+                        "source": {
+                            "kind": "channel_load",
+                            "member": 0x1B8,
+                            "bytes": 8,
+                        },
+                    },
+                },
             },
         ]
     }
@@ -11153,6 +11201,7 @@ def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
             len(records) for records in dynamic_records.values()
         ),
         "all_inline_forms_located": True,
+        "all_inline_values_recovered": True,
         "control_flow_complete": False,
         "static_records": static_records,
         "dynamic_records": dynamic_records,
