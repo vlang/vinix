@@ -1,8 +1,8 @@
 module fw
 
-// Exact outer layouts for the macOS 12.3 G13 firmware object graph. The global
-// configuration body and native work commands are still incomplete, so these
-// structures do not make the v12.3_partial ABI safe to boot by themselves.
+// Exact outer layouts for the macOS 12.3 G13 firmware object graph. Opaque
+// regions retain their byte-exact ABI extent while their host-owned fields are
+// populated by the dedicated Globals and HwData builders.
 
 pub const g13_runtime_pointers_size = u64(0x6bc0)
 pub const g13_globals_size = u64(0x11d40)
@@ -43,9 +43,8 @@ pub mut:
 	compute  ChannelRingPointers
 }
 
-// The channel prefix is fully typed. The remaining pointer and scratch region
-// retains its exact 12.3 size and key pointer slots without pretending the
-// still-unknown hardware data is ready for firmware consumption.
+// The channel prefix and every host-populated pointer are typed. The remaining
+// firmware-owned scratch region retains its exact v12.3 extent.
 @[packed]
 pub struct G13RuntimePointers {
 pub mut:

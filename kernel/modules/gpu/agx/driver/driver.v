@@ -84,8 +84,8 @@ fn find_native_asc_node(role u32) ?&devicetree.DTNode {
 
 fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bool {
 	// m1n1/Linux publishes the negotiated tuple as standard big-endian FDT
-	// cells. Native Apple DeviceTree does not expose this Linux property, so it
-	// remains safely covered by the partial-ABI boot gate.
+	// cells. Native Apple DeviceTree does not expose this Linux property. Its
+	// missing OPP-v2 data keeps that path fail-closed before hardware access.
 	if native_adt {
 		C.printf(c'agx: native t8103 firmware compatibility is unavailable\n')
 		return true
@@ -836,6 +836,8 @@ pub fn initialise() {
 	}
 	if chip_id == 0x8103
 		&& (!regs.validate_g13_identity_decoder() || !regs.validate_g13_fault_decoder()
+			|| !fw.validate_g13_channel_layouts() || !fw.validate_g13_initdata_layouts()
+			|| !fw.validate_g13_hwdata_layouts()
 			|| !fw.validate_g13_workqueue_layouts() || !fw.validate_g13_event_layouts()
 			|| !fw.validate_g13_microsequence_layouts() || !fw.validate_g13_job_layouts()
 			|| !fw.validate_g13_compute_layouts() || !fw.validate_g13_buffer_layouts()

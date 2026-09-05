@@ -1,8 +1,6 @@
 module fw
 
-// Early common-type sketches for the partial G13 v12.3 implementation.
-// Hardware bootstrap remains gated off until every firmware-visible type is
-// independently byte-validated.
+// Small common types shared by the byte-validated G13 v12.3 implementation.
 
 // GPU firmware version
 pub const fw_ver_major = u32(12)
@@ -46,11 +44,11 @@ pub mut:
 @[packed]
 pub struct FwCmdHeader {
 pub mut:
-	tag     u32
+	tag      u32
 	cmd_type u32
-	unk_8   u32
-	flags   u32
-	control u64
+	unk_8    u32
+	flags    u32
+	control  u64
 }
 
 // Buffer descriptor

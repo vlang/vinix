@@ -684,7 +684,11 @@ pub fn (f &GpuFile) ioctl_get_time(data &ioctl.DrmAsahiGetTime) int {
 	if request.extensions != 0 || request.flags != 0 {
 		return -22
 	}
-	request.gpu_timestamp = timer.get_ns()
+	// Mesa 25.0.5 interprets this value in timer_frequency_hz units and
+	// performs the nanosecond conversion itself. G13 firmware timestamps use
+	// the same architectural counter, so returning nanoseconds here would
+	// make CPU/GPU correlation roughly 41.7x too large on a 24 MHz M1.
+	request.gpu_timestamp = timer.get_count()
 	return 0
 }
 

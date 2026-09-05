@@ -153,6 +153,12 @@ fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		ioctl.drm_asahi_submit {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: ioctl_write }
 		}
+		ioctl.drm_asahi_get_time {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: ioctl_write | ioctl_read }
+		}
+		ioctl.drm_asahi_gem_bind_object {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: ioctl_write | ioctl_read }
+		}
 		else {
 			return none
 		}

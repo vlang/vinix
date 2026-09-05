@@ -2,8 +2,8 @@ module hw
 
 // Apple M1 (t8103) GPU configuration
 // G13 generation, G variant, 8 cores, 24MHz base clock, 40-bit OAS
-// Firmware bootstrap stays disabled until the complete G13 v12.3 private ABI
-// is byte-validated. Detecting the chip and reporting its resources is safe.
+// The runtime identity decoder replaces the eight-core maximum with the fused
+// topology, including the seven-core base M1 Air configuration.
 
 pub fn t8103_config() HwConfig {
 	mut mappings := [20]IoMapping{}
@@ -88,7 +88,7 @@ pub fn t8103_config() HwConfig {
 		gpu_gen: .g13
 		gpu_variant: .g
 		gpu_rev: .a1
-		firmware_abi: .v12_3_partial
+		firmware_abi: .v12_3
 		firmware_gpu_core_id: 11 // G13G in the firmware ABI
 		gpu_core_count: 8
 		gpu_feat_compat: 0
