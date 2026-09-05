@@ -98,7 +98,10 @@ enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves
 that Device aperture to `0x84240000` and `0x4084240000`. It also proves both
 PMP nubs have identical device/range tables, pins their die-strided shared
 regions, and records the requested-die selection used by ordinary state
-commands. A separate UUID-pinned
+commands. Vinix mirrors the low-level contract with a dormant bounds-checked
+paired reader and separate write portal; it is not mapped until a serialized,
+failure-safe transaction owner can be placed behind the G17 boot gate. A
+separate UUID-pinned
 ApplePMP check recovers the
 PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated

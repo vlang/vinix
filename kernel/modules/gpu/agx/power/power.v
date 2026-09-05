@@ -1,10 +1,11 @@
 module power
 
-// Read-only native Apple DeviceTree validation for the T6050 GPU power path.
-// Actual PMP transitions remain disabled until service/initial-sync ordering,
-// transport ownership, and failure recovery are implemented.
+// Native Apple DeviceTree validation and dormant ApplePTD transport for the
+// T6050 GPU power path. Actual PMP transitions remain disabled until transport
+// serialization, failure recovery, and firmware handoff are implemented.
 
 import devicetree
+import memory
 
 const pmgr_device_record_size = u32(48)
 const pmgr_device_flags_offset = u32(0)
@@ -20,6 +21,150 @@ const t6050_ptd_reg_index = 7
 const t6050_ptd_base = u64(0x84240000)
 const t6050_ptd_size = u64(0x40000)
 const t6050_die_stride = u64(0x4000000000)
+const t6050_ptd_read_stride = u64(16)
+const t6050_ptd_write_base = u64(0x10000)
+const t6050_ptd_write_stride = u64(8)
+const t6050_ptd_new_data = u64(1) << 54
+const t6050_agx_record_index = u32(15)
+const t6050_agx_request_entry = u32(0x1e0)
+const t6050_agx_ack_entry = u32(0x1e8)
+const t6050_pmp_status_entry = u32(1)
+
+// ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
+// readPTD shifts its payload and retains the caller-provided byte at +0xf.
+pub struct T6050PtdEntry {
+pub:
+	data     u64
+	metadata u64
+}
+
+// This low-level transport intentionally has no internal spinlock. A complete
+// owner must serialize the request read-modify-write and acknowledgement state
+// machine without holding Vinix's interrupt-disabling spinlock while polling.
+pub struct T6050PtdTransport {
+pub:
+	die_bases [2]u64
+}
+
+pub fn decode_t6050_ptd_entry(data u64, raw_metadata u64, caller_tag u8) T6050PtdEntry {
+	metadata := (raw_metadata >> 10) | (((raw_metadata >> 1) & 1) << 54)
+		| ((raw_metadata & 1) << 55) | (u64(caller_tag) << 56)
+	return T6050PtdEntry{
+		data: data
+		metadata: metadata
+	}
+}
+
+pub fn (entry &T6050PtdEntry) has_new_data() bool {
+	return entry.metadata & t6050_ptd_new_data != 0
+}
+
+pub fn (entry &T6050PtdEntry) matches_request(request u64, mask u64) bool {
+	return entry.has_new_data() && (entry.data ^ request) & mask == 0
+}
+
+pub fn t6050_agx_request_value(current u64, enabled bool) u64 {
+	mask := u64(1) << t6050_agx_record_index
+	return if enabled { current | mask } else { current & ~mask }
+}
+
+pub fn t6050_agx_acknowledged(entry &T6050PtdEntry, request u64) bool {
+	return entry.matches_request(request, u64(1) << t6050_agx_record_index)
+}
+
+fn t6050_ptd_offset(entry u32, base u64, stride u64, width u64) ?u64 {
+	offset := base + u64(entry) * stride
+	if width > t6050_ptd_size || offset > t6050_ptd_size - width {
+		return none
+	}
+	return offset
+}
+
+// Constructing this maps both die apertures as Device-nGnRnE. Keep the call
+// behind the G17 boot gate until one owner can serialize full transactions.
+pub fn map_t6050_ptd_transport() ?T6050PtdTransport {
+	die0 := memory.map_mmio(t6050_ptd_base, t6050_ptd_size)
+	die1 := memory.map_mmio(t6050_ptd_base + t6050_die_stride, t6050_ptd_size)
+	if die0 == 0 || die1 == 0 {
+		return none
+	}
+	return T6050PtdTransport{
+		die_bases: [u64(die0), die1]!
+	}
+}
+
+// Match ApplePTD::readPTD's single LDP from base + entry*16. Device memory
+// supplies ordering; the memory clobber prevents compiler reordering.
+pub fn (transport &T6050PtdTransport) read(die u32, entry u32,
+	caller_tag u8) ?T6050PtdEntry {
+	if die >= transport.die_bases.len {
+		return none
+	}
+	offset := t6050_ptd_offset(entry, 0, t6050_ptd_read_stride, 16) or { return none }
+	address := unsafe { &u64(transport.die_bases[die] + offset) }
+	mut data := u64(0)
+	mut raw_metadata := u64(0)
+	asm volatile aarch64 {
+		ldp data, raw_metadata, [address]
+		; =r (data)
+		  =r (raw_metadata)
+		; r (address)
+		; memory
+	}
+	return decode_t6050_ptd_entry(data, raw_metadata, caller_tag)
+}
+
+// Match ApplePTD::writePTD's distinct base + 0x10000 + entry*8 portal.
+pub fn (transport &T6050PtdTransport) write(die u32, entry u32, value u64) bool {
+	if die >= transport.die_bases.len {
+		return false
+	}
+	offset := t6050_ptd_offset(entry, t6050_ptd_write_base, t6050_ptd_write_stride,
+		8) or { return false }
+	address := unsafe { &u64(transport.die_bases[die] + offset) }
+	asm volatile aarch64 {
+		str value, [address]
+		; ; r (address)
+		  r (value)
+		; memory
+	}
+	return true
+}
+
+fn validate_t6050_ptd_codec() bool {
+	decoded := decode_t6050_ptd_entry(0x1234, (u64(0x155) << 10) | 3, 0xa5)
+	expected_metadata := (u64(0xa5) << 56) | (u64(3) << 54) | 0x155
+	request_on := t6050_agx_request_value(0, true)
+	request_off := t6050_agx_request_value(request_on, false)
+	status_offset := t6050_ptd_offset(t6050_pmp_status_entry, 0,
+		t6050_ptd_read_stride, 16) or { return false }
+	request_write_offset := t6050_ptd_offset(t6050_agx_request_entry,
+		t6050_ptd_write_base, t6050_ptd_write_stride, 8) or { return false }
+	ack_read_offset := t6050_ptd_offset(t6050_agx_ack_entry, 0,
+		t6050_ptd_read_stride, 16) or { return false }
+	ack := T6050PtdEntry{
+		data: request_on
+		metadata: t6050_ptd_new_data
+	}
+	// Exercise the bounds-failure path so the dormant MMIO methods remain in
+	// the generated C/assembly without touching an aperture during validation.
+	unmapped := T6050PtdTransport{
+		die_bases: [u64(0), 0]!
+	}
+	if unmapped.write(2, 0, 0) {
+		return false
+	}
+	if _ := unmapped.read(2, 0, 0) {
+		return false
+	}
+	return sizeof(T6050PtdEntry) == 16 && decoded.data == 0x1234
+		&& decoded.metadata == expected_metadata
+		&& request_on == u64(1) << t6050_agx_record_index && request_off == 0
+		&& t6050_agx_acknowledged(&ack, request_on)
+		&& !t6050_agx_acknowledged(&ack, request_off)
+		&& status_offset == 16 && request_write_offset == 0x10f00
+		&& ack_read_offset == 0x1e80
+}
 
 fn read_native_u8(data voidptr, offset u32) u8 {
 	value := unsafe { &u8(u64(data) + offset) }
@@ -239,6 +384,10 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 // cleanup, and the firmware-side handoff. This function therefore performs no
 // mapping or MMIO access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
+	if !validate_t6050_ptd_codec() {
+		println('agx: internal t6050 ApplePTD transport validation failed')
+		return false
+	}
 	pmgr_node := devicetree.find_compatible('pmgr1,t6050') or {
 		println('agx: native t6050 PMGR node not found')
 		return false
