@@ -7162,6 +7162,91 @@ def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_unit_mask_field(image: bytes) -> dict[str, object]:
+    """Recover config +0x2554, a bit mask sized by a chip-info nibble product.
+
+    readChipInfo splits identity register 0xd04018 into six nibbles and stores
+    three pairwise products. The third of those reaches accelerator +0x4d0, and
+    the late-control producer turns it into a mask of that many bits, saturating
+    to all ones once the count passes 63.
+    """
+
+    symbols = macho_symbols(image)
+    required = (PI300_READ_CHIP_INFO, ARM_INIT_FIRMWARE_DATA)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing unit-mask symbols: {missing}")
+
+    address, reader = symbol_code(image, PI300_READ_CHIP_INFO)
+    require_instruction_words_at(
+        reader,
+        "G17 chip-info nibble products",
+        {
+            0x1E8: 0x53104F08,  # (identity >> 16) & 0xf
+            0x1EC: 0x12000F09,  # identity & 0xf
+            0x1F0: 0x0E040F00,  # both lanes get the identity word
+            0x1FC: 0x2EA14401,  # high nibble pair
+            0x208: 0x2EA24400,  # low nibble pair
+            0x214: 0x0E221C21,
+            0x218: 0x0E221C00,
+            0x224: 0x1B097D08,  # first product
+            0x228: 0x0EA09C20,  # remaining two products
+            0x238: 0xB9004A68,  # -> chip info +0x48
+            0x23C: 0x3C84C260,  # -> chip info +0x4c and +0x50
+        },
+    )
+
+    shifts: list[tuple[int, int]] = [(0, 16)]
+    for load_offset in (0x1F8, 0x204):
+        adrp = decode_adrp(
+            address + load_offset - 4,
+            struct.unpack_from("<I", reader, load_offset - 4)[0],
+        )
+        load = decode_ldr_d(struct.unpack_from("<I", reader, load_offset)[0])
+        if adrp is None or load is None:
+            raise ValueError("nibble shift vector is no longer a literal load")
+        _register, page = adrp
+        _destination, _base, immediate = load
+        offset = virtual_to_file(image, page + immediate)
+        lanes = struct.unpack_from("<2i", image, offset)
+        if any(lane > 0 for lane in lanes):
+            raise ValueError(f"nibble shift vector {lanes} is not a right shift")
+        shifts.append(lanes)
+
+    # shifts[1] is the high nibble of each pair, shifts[2] the low one.
+    high, low = shifts[1], shifts[2]
+    products = [
+        {"chip_info": 0x48, "shifts": [0, 16]},
+        {"chip_info": 0x4C, "shifts": [-low[0], -high[0]]},
+        {"chip_info": 0x50, "shifts": [-low[1], -high[1]]},
+    ]
+
+    _producer_address, producer = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
+    require_instruction_words_at(
+        producer,
+        "G17 unit mask",
+        {
+            0x568: 0xB944D12A,  # accelerator +0x4d0
+            0x56C: 0x9280000B,
+            0x570: 0x9ACA216B,  # -1 << count
+            0x574: 0x7100FD5F,  # saturate past 63
+            0x578: 0x1280000A,
+            0x57C: 0x5A8B814A,
+            0x580: 0xB925550A,  # -> config +0x2554
+        },
+    )
+
+    return {
+        "config_offset": 0x2554,
+        "identity_register": 0xD04018,
+        "nibble_products": products,
+        "count_chip_info": 0x50,
+        "count_accelerator_member": 0x480 + 0x50,
+        "saturate_above": 63,
+        "formula": "count >= 64 ? 0xffffffff : low32(~(~0 << count))",
+    }
+
+
 def recover_g17_core_count_gate(image: bytes) -> dict[str, object]:
     """Determine which source config +0x2570 takes on G17.
 
@@ -7437,7 +7522,7 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
     # +0x2570 is not a constant, but its producer and inputs are settled, so it
     # is emitted rather than outstanding. Track it separately from the fixed
     # values so the accounting still distinguishes the two.
-    derived_offsets = [0x2570]
+    derived_offsets = [0x2554, 0x2570]
     fixed.update(feature_values)
     undetermined = [
         offset for offset in offsets if offset not in fixed and offset not in derived_offsets
@@ -8507,6 +8592,9 @@ def main() -> int:
         )
         hardware_config["secondary_performance_block"] = (
             recover_g17_secondary_performance_block(driver)
+        )
+        hardware_config["unit_mask_field"] = (
+            recover_g17_unit_mask_field(driver)
         )
         hardware_config["core_count_gate"] = (
             recover_g17_core_count_gate(driver)

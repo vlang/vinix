@@ -209,7 +209,10 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	// published topology, so read them the same way.
 	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(),
 		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base,
-		mgr.res.enabled_gpu_core_count()) {
+		fw.G17LateControlInputs{
+		enabled_core_count: mgr.res.enabled_gpu_core_count()
+		unit_mask: mgr.res.gpu_unit_count_mask()
+	}) {
 		return false
 	}
 	// Emitting the config is not the same as it being complete; the gate

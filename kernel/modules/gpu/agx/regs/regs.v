@@ -45,6 +45,29 @@ pub const gpu_id_version_family_agx = u32(0x0b)
 pub const gpu_id_version_variant_shift = u32(16)
 pub const gpu_chip_variant_g17_base = u32(0x20)
 
+// Identity register +0x18 carries six nibbles, paired into three products.
+// Apple stores them at chip-info +0x48/+0x4c/+0x50; the last is the unit count
+// the firmware's late-control mask is sized from.
+pub fn gpu_identity_nibble_products(identity u32) (u32, u32, u32) {
+	return (identity & 0xf) * ((identity >> 16) & 0xf), ((identity >> 4) & 0xf) * ((identity >> 20) & 0xf), ((identity >> 8) & 0xf) * ((identity >> 24) & 0xf)
+}
+
+// Mask of `count` low bits. Apple shifts in 64 bits and keeps the low word, so
+// any count of 32 or more yields all ones, and a count past 63 is saturated
+// explicitly rather than wrapping on the shift.
+pub fn gpu_unit_mask(count u32) u32 {
+	if count >= 32 {
+		return 0xffffffff
+	}
+	return u32((u64(1) << count) - 1)
+}
+
+// The late-control unit mask, read and derived the way Apple does.
+pub fn (r &GpuResources) gpu_unit_count_mask() u32 {
+	_, _, units := gpu_identity_nibble_products(r.sgx_read32(gpu_id_identity_18))
+	return gpu_unit_mask(units)
+}
+
 // Number of enabled GPU cores, counted the way the firmware's late-control
 // block does: the population count of the two core masks. Reading the
 // registers rather than trusting a published topology keeps this correct on

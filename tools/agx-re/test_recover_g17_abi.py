@@ -3615,6 +3615,35 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_recovers_g17_unit_mask_field(self) -> None:
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_unit_mask_field(driver.read_bytes())
+
+        self.assertEqual(recovered["config_offset"], 0x2554)
+        self.assertEqual(recovered["identity_register"], 0xD04018)
+        self.assertEqual(recovered["count_chip_info"], 0x50)
+        self.assertEqual(recovered["count_accelerator_member"], 0x4D0)
+        # The three products pair a low nibble with one 16 bits above it.
+        self.assertEqual(
+            [product["shifts"] for product in recovered["nibble_products"]],
+            [[0, 16], [4, 20], [8, 24]],
+        )
+
+    def test_unit_mask_saturates_the_way_apple_builds_it(self) -> None:
+        # Apple shifts in 64 bits and keeps the low word, so any count of 32 or
+        # more is all ones; a count past 63 is saturated rather than wrapping.
+        def mask(count: int) -> int:
+            if count > 63:
+                return 0xFFFFFFFF
+            return (~(0xFFFFFFFFFFFFFFFF << count)) & 0xFFFFFFFF
+
+        for count in (0, 1, 10, 31):
+            self.assertEqual(mask(count), (1 << count) - 1)
+        for count in (32, 40, 63, 64, 225):
+            self.assertEqual(mask(count), 0xFFFFFFFF)
+
     def test_recovers_g17_core_count_gate(self) -> None:
         driver = Path("build/kext/g17c/AGXG17X.macho")
         if not driver.exists():
@@ -3810,6 +3839,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         # +0x2570 is computed rather than constant, so it counts as emitted
         # but is tracked apart from the fixed values.
         self.assertIn(0x2570, recovered["derived"])
+        self.assertIn(0x2554, recovered["derived"])
         self.assertNotIn(0x2570, recovered["runtime_dependent"])
         self.assertEqual(
             len(recovered["fixed"])
