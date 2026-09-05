@@ -303,7 +303,9 @@ pub fn get_fence(obj &SyncObj) ?&DmaFence {
 
 // Associate an Asahi timeline point with a fence. The unstable Asahi UAPI
 // uses timeline syncobjs internally even when generic DRM timeline ioctls are
-// unavailable. Values must advance monotonically for a given object.
+// unavailable. Different Mesa contexts can publish unique points out of
+// order, so keep the exact value-to-fence mapping without imposing insertion
+// order.
 pub fn add_timeline_point(obj &SyncObj, value u64, fence &DmaFence) bool {
 	if obj == unsafe { nil } || fence == unsafe { nil } || value == 0 {
 		return false
@@ -313,17 +315,10 @@ pub fn add_timeline_point(obj &SyncObj, value u64, fence &DmaFence) bool {
 	defer {
 		o.lock.release()
 	}
-	mut latest := u64(0)
 	for point in o.timeline_points {
 		if point.value == value {
 			return false
 		}
-		if point.value > latest {
-			latest = point.value
-		}
-	}
-	if value <= latest {
-		return false
 	}
 	o.timeline_points << TimelinePoint{
 		value: value

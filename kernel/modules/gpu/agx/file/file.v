@@ -23,6 +23,7 @@ import aarch64.timer
 const max_submission_commands = u32(64)
 const max_submission_syncs = u32(64)
 const max_command_attachments = u32(16)
+const max_g13_submission_commands = u32(2)
 const max_render_dimension = u32(16384)
 const max_render_layers = u32(2048)
 
@@ -59,6 +60,13 @@ mut:
 	fences          [64]&syncobj.DmaFence
 	timeline        [64]bool
 	timeline_values [64]u64
+}
+
+struct StagedG13Command {
+mut:
+	descriptor ioctl.DrmAsahiCommand
+	render     gpu.G13RenderCommand
+	compute    gpu.G13ComputeCommand
 }
 
 @[heap]
@@ -422,7 +430,7 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 		vm_kernel_min_size: u64(0x20000000)
 		max_syncs_per_submission: max_submission_syncs
 		max_commands_per_submission: if cfg.gpu_gen == .g13 {
-			u32(1)
+			max_g13_submission_commands
 		} else {
 			max_submission_commands
 		}
@@ -1028,22 +1036,29 @@ fn stage_attachment_array(pointer u64, count u32) (int, [16]gpu.G13ComputeAttach
 	return 0, staged
 }
 
+fn wait_g13_fence(fence &syncobj.DmaFence) int {
+	if fence == unsafe { nil } {
+		return -22
+	}
+	for !syncobj.is_signaled(fence) {
+		manager := gpu.get_global_manager() or { return -19 }
+		if manager.state != .running {
+			return -19
+		}
+		syncobj.wait(fence, 1_000_000)
+		sched.yield(false)
+	}
+	if syncobj.get_error(fence) != 0 {
+		return -5
+	}
+	return 0
+}
+
 fn wait_staged_syncs(staged &StagedSyncArray) int {
 	for i := u32(0); i < staged.count; i++ {
-		fence := staged.fences[i]
-		if fence == unsafe { nil } {
-			return -22
-		}
-		for !syncobj.is_signaled(fence) {
-			manager := gpu.get_global_manager() or { return -19 }
-			if manager.state != .running {
-				return -19
-			}
-			syncobj.wait(fence, 1_000_000)
-			sched.yield(false)
-		}
-		if syncobj.get_error(fence) != 0 {
-			return -5
+		result := wait_g13_fence(staged.fences[i])
+		if result != 0 {
+			return result
 		}
 	}
 	return 0
@@ -1174,7 +1189,94 @@ fn make_g13_compute_command(command &ioctl.DrmAsahiCmdCompute,
 	}
 }
 
-fn finish_g13_submit(mut state G13SubmitCompletion, successful bool) {
+// Copy the complete Mesa command array before acquiring any driver locks.
+// G13 accepts the render-only/compute-only cases plus Mesa's ordered
+// compute-then-render pair. Serial execution below provides the pair's
+// compute-to-render barrier without exposing partially submitted work.
+fn stage_g13_commands(pointer u64, count u32) (int, [2]StagedG13Command) {
+	mut staged := [2]StagedG13Command{}
+	if pointer == 0 || count == 0 || count > max_g13_submission_commands {
+		return -22, staged
+	}
+	bytes := u64(count) * sizeof(ioctl.DrmAsahiCommand)
+	if bytes - 1 > ~pointer {
+		return -14, staged
+	}
+	for i := u32(0); i < count; i++ {
+		mut descriptor := ioctl.DrmAsahiCommand{}
+		if !usercopy.copy_from_user(voidptr(&descriptor), pointer + u64(i) * sizeof(ioctl.DrmAsahiCommand), sizeof(ioctl.DrmAsahiCommand)) {
+			return -14, staged
+		}
+		if descriptor.extensions != 0 || descriptor.flags != 0 || descriptor.cmd_buffer == 0 {
+			return -22, staged
+		}
+		for barrier in descriptor.barriers {
+			if barrier != ioctl.asahi_barrier_none && barrier > i {
+				return -22, staged
+			}
+		}
+		staged[i].descriptor = descriptor
+		match descriptor.cmd_type {
+			ioctl.asahi_cmd_render {
+				if descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
+					|| (descriptor.result_size != 0
+						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
+					return -22, staged
+				}
+				mut render := ioctl.DrmAsahiCmdRender{}
+				if !usercopy.copy_from_user(voidptr(&render), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
+					return -14, staged
+				}
+				if !valid_render_command(&render) {
+					return -22, staged
+				}
+				vertex_result, vertex_attachments := stage_attachment_array(render.vertex_attachments, render.vertex_attachment_count)
+				if vertex_result != 0 {
+					return vertex_result, staged
+				}
+				fragment_result, fragment_attachments := stage_attachment_array(render.fragment_attachments, render.fragment_attachment_count)
+				if fragment_result != 0 {
+					return fragment_result, staged
+				}
+				staged[i].render = make_g13_render_command(&render, vertex_attachments, fragment_attachments, descriptor.result_size != 0)
+			}
+			ioctl.asahi_cmd_compute {
+				// Mesa 25.0.5 reports sizeof - 8 for compatibility with 6.11.8,
+				// while the userspace pointer still addresses the current struct.
+				if (descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
+					&& descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute) - u64(8))
+					|| (descriptor.result_size != 0
+						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
+					return -22, staged
+				}
+				mut compute := ioctl.DrmAsahiCmdCompute{}
+				if !usercopy.copy_from_user(voidptr(&compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
+					return -14, staged
+				}
+				if !valid_compute_command(&compute) {
+					return -22, staged
+				}
+				attachment_result, attachments := stage_attachment_array(compute.attachments, compute.attachment_count)
+				if attachment_result != 0 {
+					return attachment_result, staged
+				}
+				staged[i].compute = make_g13_compute_command(&compute, attachments, descriptor.result_size != 0)
+			}
+			else {
+				return -22, staged
+			}
+		}
+	}
+	if count == 2 && (staged[0].descriptor.cmd_type != ioctl.asahi_cmd_compute
+		|| staged[1].descriptor.cmd_type != ioctl.asahi_cmd_render
+		|| staged[1].descriptor.barriers[0] != ioctl.asahi_barrier_none
+		|| staged[1].descriptor.barriers[1] != 1) {
+		return -22, staged
+	}
+	return 0, staged
+}
+
+fn discard_g13_completion(mut state G13SubmitCompletion) {
 	if state.file != unsafe { nil } && state.vm_id < mmu.uat_num_contexts {
 		katomic.dec(mut &state.file.inflight_by_vm[state.vm_id])
 	}
@@ -1182,14 +1284,18 @@ fn finish_g13_submit(mut state G13SubmitCompletion, successful bool) {
 		gem.unref(state.result)
 		state.result = unsafe { nil }
 	}
+	unsafe {
+		free(voidptr(state))
+	}
+}
+
+fn finish_g13_submit(mut state G13SubmitCompletion, successful bool) {
 	if successful {
 		syncobj.signal(state.fence)
 	} else {
 		syncobj.signal_error(state.fence, -5)
 	}
-	unsafe {
-		free(voidptr(state))
-	}
+	discard_g13_completion(mut state)
 }
 
 fn g13_render_completed(job &gpu.G13RenderJobResources, successful bool, data voidptr) {
@@ -1248,17 +1354,23 @@ fn g13_compute_completed(job &gpu.G13ComputeJobResources, successful bool, data 
 	finish_g13_submit(mut state, successful)
 }
 
-// Submit one byte-exact v12.3 G13 command. Per-queue serialization preserves
-// implicit subqueue ordering while native multi-command barriers remain
-// unimplemented. G17/HAL300 payloads continue to fail closed.
+// Submit one or two byte-exact v12.3 G13 commands. Mesa emits a
+// compute-then-render pair when a batch needs both subqueues. Vinix preserves
+// that barrier conservatively by waiting for compute retirement before
+// publishing render; the userspace output fence is attached only to the final
+// command. G17/HAL300 payloads continue to fail closed.
 pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	request := unsafe { data }
-	if request.extensions != 0 || request.flags != 0 || request.command_count != 1
-		|| request.commands == 0
+	if request.extensions != 0 || request.flags != 0 || request.command_count == 0
+		|| request.command_count > max_g13_submission_commands || request.commands == 0
 		|| request.in_sync_count > max_submission_syncs || request.out_sync_count > max_submission_syncs
 		|| (request.in_sync_count != 0 && request.in_syncs == 0)
 		|| (request.out_sync_count != 0 && request.out_syncs == 0) {
 		return -22
+	}
+	command_result, commands := stage_g13_commands(request.commands, request.command_count)
+	if command_result != 0 {
+		return command_result
 	}
 	sync_result, input_syncs := stage_sync_array(f.owner_key, request.in_syncs, request.in_sync_count, true)
 	if sync_result != 0 {
@@ -1268,72 +1380,6 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	if output_result != 0 {
 		return output_result
 	}
-	if sizeof(ioctl.DrmAsahiCommand) - 1 > ~request.commands {
-		return -14
-	}
-	mut command := ioctl.DrmAsahiCommand{}
-	if !usercopy.copy_from_user(voidptr(&command), request.commands, sizeof(ioctl.DrmAsahiCommand)) {
-		return -14
-	}
-	if command.extensions != 0 || command.flags != 0 || command.cmd_buffer == 0
-		|| (command.barriers[0] != ioctl.asahi_barrier_none && command.barriers[0] != 0)
-		|| (command.barriers[1] != ioctl.asahi_barrier_none && command.barriers[1] != 0) {
-		return -22
-	}
-
-	mut render_command := gpu.G13RenderCommand{}
-	mut compute_command := gpu.G13ComputeCommand{}
-	match command.cmd_type {
-		ioctl.asahi_cmd_render {
-			if command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
-				|| (command.result_size != 0
-					&& command.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
-				return -22
-			}
-			mut render := ioctl.DrmAsahiCmdRender{}
-			if !usercopy.copy_from_user(voidptr(&render), command.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
-				return -14
-			}
-			if !valid_render_command(&render) {
-				return -22
-			}
-			vertex_result, vertex_attachments := stage_attachment_array(render.vertex_attachments, render.vertex_attachment_count)
-			if vertex_result != 0 {
-				return vertex_result
-			}
-			fragment_result, fragment_attachments := stage_attachment_array(render.fragment_attachments, render.fragment_attachment_count)
-			if fragment_result != 0 {
-				return fragment_result
-			}
-			render_command = make_g13_render_command(&render, vertex_attachments, fragment_attachments, command.result_size != 0)
-		}
-		ioctl.asahi_cmd_compute {
-			// Mesa 25.0.5 deliberately reports sizeof - 8 for compatibility
-			// with 6.11.8 kernels, while still passing the full current struct.
-			if (command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
-				&& command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute) - u64(8))
-				|| (command.result_size != 0
-					&& command.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
-				return -22
-			}
-			mut compute := ioctl.DrmAsahiCmdCompute{}
-			if !usercopy.copy_from_user(voidptr(&compute), command.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
-				return -14
-			}
-			if !valid_compute_command(&compute) {
-				return -22
-			}
-			attachment_result, attachments := stage_attachment_array(compute.attachments, compute.attachment_count)
-			if attachment_result != 0 {
-				return attachment_result
-			}
-			compute_command = make_g13_compute_command(&compute, attachments, command.result_size != 0)
-		}
-		else {
-			return -22
-		}
-	}
-
 	dependency_result := wait_staged_syncs(&input_syncs)
 	if dependency_result != 0 {
 		return dependency_result
@@ -1371,12 +1417,16 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 			break
 		}
 	}
-	if queue_resources == unsafe { nil }
-		|| (command.cmd_type == ioctl.asahi_cmd_render
-			&& queue_caps & ioctl.asahi_queue_cap_render == 0)
-		|| (command.cmd_type == ioctl.asahi_cmd_compute
-			&& queue_caps & ioctl.asahi_queue_cap_compute == 0) {
+	if queue_resources == unsafe { nil } {
 		return -22
+	}
+	for i := u32(0); i < request.command_count; i++ {
+		if (commands[i].descriptor.cmd_type == ioctl.asahi_cmd_render
+			&& queue_caps & ioctl.asahi_queue_cap_render == 0)
+			|| (commands[i].descriptor.cmd_type == ioctl.asahi_cmd_compute
+				&& queue_caps & ioctl.asahi_queue_cap_compute == 0) {
+			return -22
+		}
 	}
 	vm := f.find_vm(vm_id) or { return -22 }
 
@@ -1388,88 +1438,138 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 
 	mut result_object := &gem.GemObject(unsafe { nil })
-	if command.result_size != 0 {
-		if request.result_handle == 0 {
-			return -22
-		}
-		for object in f.objects {
-			if object.handle == request.result_handle {
-				result_object = object
-				break
+	for i := u32(0); i < request.command_count; i++ {
+		descriptor := commands[i].descriptor
+		if descriptor.result_size != 0 {
+			if request.result_handle == 0 {
+				return -22
 			}
-		}
-		if result_object == unsafe { nil } || command.result_offset > result_object.size
-			|| command.result_size > result_object.size - command.result_offset {
+			if result_object == unsafe { nil } {
+				for object in f.objects {
+					if object.handle == request.result_handle {
+						result_object = object
+						break
+					}
+				}
+			}
+			if result_object == unsafe { nil } || descriptor.result_offset > result_object.size
+				|| descriptor.result_size > result_object.size - descriptor.result_offset {
+				return -22
+			}
+		} else if descriptor.result_offset != 0 {
 			return -22
 		}
-		gem.ref_obj(result_object)
-	} else if command.result_offset != 0 {
-		return -22
 	}
 
 	mut render_job := &gpu.G13RenderJobResources(unsafe { nil })
 	mut compute_job := &gpu.G13ComputeJobResources(unsafe { nil })
-	if command.cmd_type == ioctl.asahi_cmd_render {
-		render_job = gpu_manager.prepare_g13_render_job(queue_resources, &render_command) or {
-			if result_object != unsafe { nil } {
-				gem.unref(result_object)
+	mut render_index := -1
+	mut compute_index := -1
+	for i := u32(0); i < request.command_count; i++ {
+		if commands[i].descriptor.cmd_type == ioctl.asahi_cmd_compute {
+			compute_index = int(i)
+			compute_job = gpu_manager.prepare_g13_compute_job(queue_resources, vm, &commands[i].compute) or {
+				if render_job != unsafe { nil } {
+					gpu_manager.release_g13_render_job(render_job)
+				}
+				return -12
 			}
-			return -12
-		}
-	} else {
-		compute_job = gpu_manager.prepare_g13_compute_job(queue_resources, vm, &compute_command) or {
-			if result_object != unsafe { nil } {
-				gem.unref(result_object)
+		} else {
+			render_index = int(i)
+			render_job = gpu_manager.prepare_g13_render_job(queue_resources, &commands[i].render) or {
+				if compute_job != unsafe { nil } {
+					gpu_manager.release_g13_compute_job(compute_job)
+				}
+				return -12
 			}
-			return -12
 		}
 	}
 
-	fence := syncobj.new_fence(f.owner_key, timer.get_ns())
-	mut completion := &G13SubmitCompletion{
-		file: unsafe { &f }
-		vm_id: vm_id
-		fence: fence
-		result: result_object
-		result_offset: command.result_offset
-	}
-	katomic.inc(mut &f.inflight_by_vm[vm_id])
-	callback_set := if command.cmd_type == ioctl.asahi_cmd_render {
-		gpu_manager.set_g13_render_completion(render_job, g13_render_completed, voidptr(completion))
+	final_fence := syncobj.new_fence(f.owner_key, timer.get_ns())
+	compute_fence := if compute_job != unsafe { nil } && render_job != unsafe { nil } {
+		syncobj.new_fence(f.owner_key, timer.get_ns())
 	} else {
-		gpu_manager.set_g13_compute_completion(compute_job, g13_compute_completed, voidptr(completion))
+		final_fence
 	}
-	if !callback_set {
-		katomic.dec(mut &f.inflight_by_vm[vm_id])
-		if result_object != unsafe { nil } {
-			gem.unref(result_object)
+	if compute_job != unsafe { nil } {
+		compute_descriptor := commands[compute_index].descriptor
+		if compute_descriptor.result_size != 0 {
+			gem.ref_obj(result_object)
 		}
-		unsafe {
-			free(voidptr(completion))
+		mut completion := &G13SubmitCompletion{
+			file: unsafe { &f }
+			vm_id: vm_id
+			fence: compute_fence
+			result: if compute_descriptor.result_size != 0 {
+				result_object
+			} else {
+				&gem.GemObject(unsafe { nil })
+			}
+			result_offset: compute_descriptor.result_offset
 		}
-		if render_job != unsafe { nil } {
+		katomic.inc(mut &f.inflight_by_vm[vm_id])
+		if !gpu_manager.set_g13_compute_completion(compute_job, g13_compute_completed, voidptr(completion)) {
+			discard_g13_completion(mut completion)
+			gpu_manager.release_g13_compute_job(compute_job)
+			if render_job != unsafe { nil } {
+				gpu_manager.release_g13_render_job(render_job)
+			}
+			return -5
+		}
+	}
+	if render_job != unsafe { nil } {
+		render_descriptor := commands[render_index].descriptor
+		if render_descriptor.result_size != 0 {
+			gem.ref_obj(result_object)
+		}
+		mut completion := &G13SubmitCompletion{
+			file: unsafe { &f }
+			vm_id: vm_id
+			fence: final_fence
+			result: if render_descriptor.result_size != 0 {
+				result_object
+			} else {
+				&gem.GemObject(unsafe { nil })
+			}
+			result_offset: render_descriptor.result_offset
+		}
+		katomic.inc(mut &f.inflight_by_vm[vm_id])
+		if !gpu_manager.set_g13_render_completion(render_job, g13_render_completed, voidptr(completion)) {
+			discard_g13_completion(mut completion)
 			gpu_manager.release_g13_render_job(render_job)
+			if compute_job != unsafe { nil } {
+				gpu_manager.release_g13_compute_job(compute_job)
+			}
+			return -5
 		}
+	}
+	if !install_output_syncs(&output_syncs, final_fence) {
 		if compute_job != unsafe { nil } {
 			gpu_manager.release_g13_compute_job(compute_job)
 		}
-		return -5
-	}
-	if !install_output_syncs(&output_syncs, fence) {
 		if render_job != unsafe { nil } {
 			gpu_manager.release_g13_render_job(render_job)
-		} else {
-			gpu_manager.release_g13_compute_job(compute_job)
 		}
 		return -22
 	}
-	if command.cmd_type == ioctl.asahi_cmd_render {
-		if !gpu_manager.submit_g13_render_job(render_job) {
-			gpu_manager.release_g13_render_job(render_job)
+	if compute_job != unsafe { nil } {
+		if !gpu_manager.submit_g13_compute_job(compute_job) {
+			gpu_manager.release_g13_compute_job(compute_job)
+			if render_job != unsafe { nil } {
+				gpu_manager.release_g13_render_job(render_job)
+			}
 			return -16
 		}
-	} else if !gpu_manager.submit_g13_compute_job(compute_job) {
-		gpu_manager.release_g13_compute_job(compute_job)
+		if render_job != unsafe { nil } {
+			compute_result := wait_g13_fence(compute_fence)
+			if compute_result != 0 {
+				gpu_manager.release_g13_render_job(render_job)
+				return compute_result
+			}
+		}
+	}
+	if render_job != unsafe { nil } && !gpu_manager.submit_g13_render_job(render_job) {
+		gpu_manager.release_g13_render_job(render_job)
 		return -16
 	}
 	return 0

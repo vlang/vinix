@@ -167,7 +167,15 @@ opt-in, then boot through m1n1 so Vinix receives the patched device tree:
 ./deploy-m1-efi.sh --apple-gpu /Volumes/EFI
 ```
 
-Once Vinix boots, verify the render node and run the hardware-only demo:
+The test image automatically rebuilds and runs the hardware-only demo when it
+finds the M1 render node. A successful first-hardware boot prints:
+
+```text
+VINIX M1 AGX RENDER TEST: PASS
+```
+
+It applies a two-minute watchdog and always leaves a recovery shell after a
+failure. To rerun it manually or collect the renderer output again:
 
 ```sh
 ls -l /dev/dri/renderD128
@@ -176,8 +184,9 @@ run-gl-triangle-agx --rebuild
 
 The demo prints the EGL and GL renderer strings, rejects software renderers,
 validates a rendered pixel, and reports when the frame reaches `/dev/fb0`.
-The M5 Max (`t6050`/G17C) work remains separate and is still fail-closed until
-its firmware command ABI is complete.
+The base M1 Air (`t8103`/G13G, including its 7-core fuse configuration) is the
+first hardware target. The M5 Max (`t6050`/G17C) work remains separate and is
+still fail-closed until its firmware command ABI is complete.
 
 ### To test
 

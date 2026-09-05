@@ -221,8 +221,17 @@ echo "VINIX ARM64 GCC/V BOOT TEST"
 /usr/v/v -gc none run /root/hello.v
 echo "VINIX ARM64 GCC/V BOOT TEST: PASS"
 
-if [ -e /dev/dri/renderD128 ]; then
-    echo "Apple GPU render node detected; run-gl-triangle-agx is ready"
+if [ -e /dev/dri/renderD128 ] && [ -x /usr/bin/run-gl-triangle-agx ]; then
+    echo "Apple GPU render node detected; starting the M1 render test"
+    if timeout -k 5 120 /usr/bin/run-gl-triangle-agx --rebuild; then
+        echo "VINIX M1 AGX RENDER TEST: PASS"
+    else
+        status=$?
+        echo "VINIX M1 AGX RENDER TEST: FAIL ($status)" >&2
+        echo "A recovery shell will remain available for diagnostics." >&2
+    fi
+elif [ -e /dev/dri/renderD128 ]; then
+    echo "VINIX M1 AGX RENDER TEST: FAIL (Mesa runtime unavailable)" >&2
 else
     echo "Apple GPU render node absent (expected on QEMU virt)"
 fi

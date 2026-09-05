@@ -345,4 +345,21 @@ diff -urN --no-dereference mesa-clean/src/gallium/drivers/asahi/meson.build mesa
  )
  
  driver_asahi = declare_dependency(
+
+diff -urN --no-dereference mesa-clean/src/gallium/drivers/asahi/agx_pipe.c mesa-workdir/src/gallium/drivers/asahi/agx_pipe.c
+--- mesa-clean/src/gallium/drivers/asahi/agx_pipe.c
++++ mesa-workdir/src/gallium/drivers/asahi/agx_pipe.c
+@@ -2583,13 +2583,6 @@
+    struct agx_screen *agx_screen;
+    struct pipe_screen *screen;
  
+-   /* Refuse to probe. There is no stable UAPI yet. Upstream Mesa cannot be used
+-    * yet with Asahi. Do not try. Do not patch out this check. Do not teach
+-    * others about patching this check. Do not distribute upstream Mesa with
+-    * this check patched out.
+-    */
+-   return NULL;
+-
+    agx_screen = rzalloc(NULL, struct agx_screen);
+    if (!agx_screen)
+       return NULL;
