@@ -4893,6 +4893,126 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(recovered["error_markers"]["validation"], 0xA)
 
+    def test_recovers_g17_normalized_render_descriptor_fields(self) -> None:
+        setup_code = bytearray(0x2200)
+        anchors = {
+            0x0048: 0x911E70B7,
+            0x0244: 0xF90033F7,
+            0x1804: 0xF94033F7,
+            0x1CEC: 0x394A0B48,
+            0x1CF4: 0x12000108,
+            0x1CF8: 0x3937F2E8,
+            0x20E0: 0xFD400120,
+            0x20E4: 0xFD025320,
+            0x20E8: 0xB9426749,
+            0x20EC: 0xB904AB29,
+            0x2134: 0x3946E349,
+            0x2138: 0x12000129,
+            0x213C: 0x392642E9,
+            0x2140: 0x394A0349,
+            0x2144: 0x12000129,
+            0x2148: 0x392632E9,
+            0x2190: 0x3946E348,
+            0x2194: 0x12000108,
+            0x2198: 0x39225F28,
+            0x219C: 0x394A0748,
+            0x21A0: 0x12000108,
+            0x21A4: 0x39224F28,
+            0x21A8: 0x39482348,
+            0x21AC: 0x39258328,
+            0x21B0: 0x394A0F48,
+            0x21B4: 0x36000068,
+            0x21B8: 0x52800028,
+            0x21C0: 0xF9400B28,
+            0x21C4: 0x529EFD29,
+            0x21C8: 0x8B090108,
+            0x21CC: 0x39400108,
+            0x21D0: 0x12000108,
+            0x21D4: 0x3930E328,
+        }
+        for offset, word in anchors.items():
+            struct.pack_into("<I", setup_code, offset, word)
+        payload_format = {
+            "copy_ranges": [
+                {"payload_offset": 0x821, "command_member": 0x208, "bytes": 1},
+                {"payload_offset": 0x840, "command_member": 0x210, "bytes": 0x70},
+            ],
+            "bit_fields": [
+                {"payload_offset": 0x240, "command_member": 0x1B8, "mask": 1},
+                {"payload_offset": 0x23C, "command_member": 0x280, "mask": 1},
+                {"payload_offset": 0x646, "command_member": 0x281, "mask": 1},
+                {"payload_offset": 0x248, "command_member": 0x282, "mask": 1},
+                {"payload_offset": 0x650, "command_member": 0x283, "mask": 1},
+            ],
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.PROCESS_RENDER_SETUP: 0x940000},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(0x940000, bytes(setup_code)),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_render_descriptor_fields(
+                b"", payload_format
+            )
+
+        self.assertEqual(recovered["direct_write_count"], 8)
+        self.assertEqual(recovered["total_descriptor_writes"], 9)
+        self.assertEqual(
+            recovered["descriptor_alias"], {"source_argument": 5, "addend": 0x79C}
+        )
+        self.assertEqual(
+            recovered["direct_fields"][0],
+            {
+                "command_member": 0x282,
+                "payload_offset": 0x248,
+                "descriptor_member": 0x1598,
+                "bytes": 1,
+                "producer_offset": 0x1CF8,
+                "mask": 1,
+            },
+        )
+        self.assertEqual(recovered["direct_fields"][1]["payload_offset"], 0x88C)
+        self.assertEqual(recovered["direct_fields"][2]["payload_offset"], 0x894)
+        self.assertEqual(
+            [
+                field["descriptor_member"]
+                for field in recovered["direct_fields"]
+                if field["command_member"] == 0x1B8
+            ],
+            [0x112C, 0x897],
+        )
+        self.assertEqual(
+            recovered["conditional_field"]["zero_source"],
+            {
+                "object_pointer_member": 0x10,
+                "object_byte_offset": 0xF7E9,
+                "mask": 1,
+            },
+        )
+        self.assertIn("separate", recovered["counting_note"])
+
+        struct.pack_into("<I", setup_code, 0x21D4, 0xD503201F)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.PROCESS_RENDER_SETUP: 0x940000},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(0x940000, bytes(setup_code)),
+            ),
+            self.assertRaisesRegex(ValueError, "normalized render descriptor fields"),
+        ):
+            recover_g17_abi.recover_g17_render_descriptor_fields(b"", payload_format)
+
     def test_recovers_g17_3d_common_passthrough(self) -> None:
         copy_address = 0x930000
         setup_address = 0x940000

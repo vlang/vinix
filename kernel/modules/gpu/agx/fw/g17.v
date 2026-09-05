@@ -2030,6 +2030,52 @@ pub fn populate_g17_ta_render_passthrough(descriptor voidptr, descriptor_bytes u
 	return true
 }
 
+// Host value read through the descriptor's retained device object when the
+// normalized command does not force descriptor byte +0xc38 to one. Keep that
+// object lookup outside the wire-layout helper: Vinix does not construct the
+// Apple C++ object graph, and the caller must supply the independently
+// recovered device control bit.
+pub struct G17RenderDescriptorInputs {
+pub:
+	object_control_f7e9 u8
+}
+
+// Copy the normalized-command portion of processRenderSetup into the staging
+// descriptor. This is a separate nine-write stage: eight writes are direct
+// command fields and the ninth selects between literal one and a device bit.
+// It must not be counted as a ninth boolean in the eight-chain common helper.
+pub fn populate_g17_render_descriptor_fields(descriptor voidptr, descriptor_bytes u64,
+	command voidptr, command_bytes u64, inputs G17RenderDescriptorInputs) bool {
+	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size
+		|| command == unsafe { nil } || command_bytes < g17_render_kernel_command_size {
+		return false
+	}
+
+	unsafe {
+		destination := &u8(descriptor)
+		source := &u8(command)
+		// processRenderSetup only reaches this block after parseAndValidate.
+		if source[0x08] != 1 {
+			return false
+		}
+
+		destination[0x1598] = source[0x282] & 1
+		copy_g17_descriptor_range(destination, 0x04a0, source, 0x25c, 0x08)
+		copy_g17_descriptor_range(destination, 0x04a8, source, 0x264, 0x04)
+		destination[0x112c] = source[0x1b8] & 1
+		destination[0x1128] = source[0x280] & 1
+		destination[0x0897] = source[0x1b8] & 1
+		destination[0x0893] = source[0x281] & 1
+		destination[0x0960] = source[0x208]
+		destination[0x0c38] = if source[0x283] & 1 != 0 {
+			u8(1)
+		} else {
+			inputs.object_control_f7e9 & 1
+		}
+	}
+	return true
+}
+
 // Register-list layout inside the 3D channel command.
 // generateRegisterListFor3D runs four passes with a 0x720 stride. Pass i keeps
 // its stream at i * 0x720 + 0xa0 and its metadata at i * 0x720 + 0x7a0, so a

@@ -11650,6 +11650,145 @@ def explain_g17_3d_common_boolean_accounting(
     }
 
 
+def recover_g17_render_descriptor_fields(
+    image: bytes, render_payload: dict[str, object]
+) -> dict[str, object]:
+    """Recover normalized render-command fields copied after raw passthrough.
+
+    processRenderSetup consumes both the retained raw payload and the compact
+    AGXRenderHardwareKernelCommand built by parseAndValidate. Keep this block
+    separate from copy3DCommonPassthroughData: it contains eight direct
+    descriptor writes and one conditional write, and is therefore a genuine
+    nine-write stage rather than a ninth boolean in the common copy helper.
+    """
+
+    symbols = macho_symbols(image)
+    if PROCESS_RENDER_SETUP not in symbols:
+        raise ValueError(f"Mach-O is missing {PROCESS_RENDER_SETUP}")
+    _address, code = symbol_code(image, PROCESS_RENDER_SETUP)
+    require_instruction_words_at(
+        code,
+        "G17 normalized render descriptor fields",
+        {
+            0x0048: 0x911E70B7,  # descriptor alias is argument 5 +0x79c
+            0x0244: 0xF90033F7,  # preserve it across the setup body
+            0x1804: 0xF94033F7,  # restore before the normalized writes
+            0x1CEC: 0x394A0B48,  # command +0x282
+            0x1CF4: 0x12000108,  # reduced to bit zero
+            0x1CF8: 0x3937F2E8,  # -> descriptor +0x1598
+            0x20E0: 0xFD400120,  # command +0x25c
+            0x20E4: 0xFD025320,  # -> descriptor +0x4a0
+            0x20E8: 0xB9426749,  # command +0x264
+            0x20EC: 0xB904AB29,  # -> descriptor +0x4a8
+            0x2134: 0x3946E349,  # command +0x1b8
+            0x2138: 0x12000129,
+            0x213C: 0x392642E9,  # -> descriptor +0x112c
+            0x2140: 0x394A0349,  # command +0x280
+            0x2144: 0x12000129,
+            0x2148: 0x392632E9,  # -> descriptor +0x1128
+            0x2190: 0x3946E348,  # command +0x1b8 again
+            0x2194: 0x12000108,
+            0x2198: 0x39225F28,  # -> descriptor +0x897
+            0x219C: 0x394A0748,  # command +0x281
+            0x21A0: 0x12000108,
+            0x21A4: 0x39224F28,  # -> descriptor +0x893
+            0x21A8: 0x39482348,  # command +0x208
+            0x21AC: 0x39258328,  # -> descriptor +0x960
+            0x21B0: 0x394A0F48,  # command +0x283 condition
+            0x21B4: 0x36000068,  # nonzero selects literal one
+            0x21B8: 0x52800028,
+            0x21C0: 0xF9400B28,  # otherwise follow descriptor +0x10
+            0x21C4: 0x529EFD29,  # object byte +0xf7e9
+            0x21C8: 0x8B090108,
+            0x21CC: 0x39400108,
+            0x21D0: 0x12000108,
+            0x21D4: 0x3930E328,  # -> descriptor +0xc38
+        },
+    )
+
+    def payload_source(command_member: int, size: int) -> tuple[int, bool]:
+        matches: list[tuple[int, bool]] = []
+        for field in render_payload["copy_ranges"]:
+            member = int(field["command_member"])
+            field_size = int(field["bytes"])
+            if member <= command_member and command_member + size <= member + field_size:
+                matches.append(
+                    (
+                        int(field["payload_offset"]) + command_member - member,
+                        False,
+                    )
+                )
+        for field in render_payload["bit_fields"]:
+            if int(field["command_member"]) == command_member and size == 1:
+                matches.append((int(field["payload_offset"]), True))
+        if len(matches) != 1:
+            raise ValueError(
+                f"G17 normalized field {command_member:#x}+{size:#x} has "
+                f"{len(matches)} raw-payload sources"
+            )
+        return matches[0]
+
+    direct_specs = [
+        (0x282, 0x1598, 1, True, 0x1CF8),
+        (0x25C, 0x04A0, 8, False, 0x20E4),
+        (0x264, 0x04A8, 4, False, 0x20EC),
+        (0x1B8, 0x112C, 1, True, 0x213C),
+        (0x280, 0x1128, 1, True, 0x2148),
+        (0x1B8, 0x0897, 1, True, 0x2198),
+        (0x281, 0x0893, 1, True, 0x21A4),
+        (0x208, 0x0960, 1, False, 0x21AC),
+    ]
+    direct_fields = []
+    for command_member, descriptor_member, size, masked, producer_offset in direct_specs:
+        payload_offset, parser_masked = payload_source(command_member, size)
+        if parser_masked != masked:
+            raise ValueError("G17 render descriptor mask provenance changed")
+        field = {
+            "command_member": command_member,
+            "payload_offset": payload_offset,
+            "descriptor_member": descriptor_member,
+            "bytes": size,
+            "producer_offset": producer_offset,
+        }
+        if masked:
+            field["mask"] = 1
+        direct_fields.append(field)
+
+    conditional_member = 0x283
+    conditional_payload, parser_masked = payload_source(conditional_member, 1)
+    if not parser_masked or conditional_payload != 0x650:
+        raise ValueError("G17 conditional render field provenance changed")
+
+    return {
+        "source_stage": "normalized_render_command",
+        "command_bytes": 0x284,
+        "descriptor_bytes": 0x15B0,
+        "descriptor_alias": {"source_argument": 5, "addend": 0x79C},
+        "direct_write_count": len(direct_fields),
+        "direct_fields": direct_fields,
+        "conditional_field": {
+            "command_member": conditional_member,
+            "payload_offset": conditional_payload,
+            "descriptor_member": 0xC38,
+            "bytes": 1,
+            "condition_mask": 1,
+            "nonzero_value": 1,
+            "zero_source": {
+                "object_pointer_member": 0x10,
+                "object_byte_offset": 0xF7E9,
+                "mask": 1,
+            },
+            "producer_offset": 0x21D4,
+        },
+        "total_descriptor_writes": len(direct_fields) + 1,
+        "counting_note": (
+            "this stage has nine descriptor writes; it is separate from the "
+            "eight boolean mask chains in copy3DCommonPassthroughData"
+        ),
+        "producer": PROCESS_RENDER_SETUP,
+    }
+
+
 def recover_g17_ta_render_passthrough(image: bytes) -> dict[str, object]:
     """Recover the raw render-payload copies around the 3D common helper."""
 
@@ -14651,6 +14790,9 @@ def main() -> int:
         )
         render_payload_format = recover_g17_render_payload_format(driver)
         channels["render_payload_format"] = render_payload_format
+        channels["descriptor_render_command_fields"] = (
+            recover_g17_render_descriptor_fields(driver, render_payload_format)
+        )
         descriptor_3d_common = recover_g17_3d_common_passthrough(driver)
         descriptor_3d_common["boolean_accounting"] = (
             explain_g17_3d_common_boolean_accounting(
