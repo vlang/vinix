@@ -23,6 +23,8 @@ pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
 pub const drm_cap_syncobj = u64(0x13)
 pub const drm_cap_syncobj_timeline = u64(0x14)
 pub const drm_syncobj_create_signaled = u32(1) << 0
+pub const drm_syncobj_fd_to_handle_import_sync_file = u32(1) << 0
+pub const drm_syncobj_handle_to_fd_export_sync_file = u32(1) << 0
 pub const drm_syncobj_wait_all = u32(1) << 0
 pub const drm_syncobj_wait_for_submit = u32(1) << 1
 pub const drm_syncobj_wait_available = u32(1) << 2
@@ -62,6 +64,14 @@ pub mut:
 pub struct DrmSyncobjDestroy {
 pub mut:
 	handle u32
+	pad    u32
+}
+
+pub struct DrmSyncobjHandle {
+pub mut:
+	handle u32
+	flags  u32
+	fd     i32
 	pad    u32
 }
 
@@ -463,6 +473,7 @@ pub fn validate_asahi_25_layouts() bool {
 		&& sizeof(DrmGemClose) == 8
 		&& sizeof(DrmSyncobjCreate) == 8
 		&& sizeof(DrmSyncobjDestroy) == 8
+		&& sizeof(DrmSyncobjHandle) == 16
 		&& sizeof(DrmSyncobjWait) == 40
 		&& sizeof(DrmAsahiParamsGlobal) == 432
 		&& sizeof(DrmAsahiGetParams) == 32

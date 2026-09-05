@@ -8,6 +8,7 @@ module drm
 import klock
 import katomic
 import fs
+import file
 import stat
 import resource
 import errno
@@ -75,6 +76,55 @@ pub mut:
 	dev      &DrmDevice = unsafe { nil }
 }
 
+// A sync-file fd is a stable reference to one DMA fence. Mesa uses this to
+// snapshot the last submitted batch fence and, when necessary, import that
+// snapshot into another binary syncobj. The fence allocations are retained by
+// the syncobj subsystem, while this small wrapper follows ordinary fd lifetime.
+struct SyncFileResource {
+pub mut:
+	stat     stat.Stat
+	refcount int
+	l        klock.Lock
+	event    eventstruct.Event
+	status   int
+	can_mmap bool
+	fence    &syncobj.DmaFence = unsafe { nil }
+}
+
+fn (mut this SyncFileResource) mmap(_handle voidptr, _page u64, _flags int) voidptr {
+	return unsafe { nil }
+}
+
+fn (mut this SyncFileResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
+	errno.set(errno.einval)
+	return none
+}
+
+fn (mut this SyncFileResource) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
+	errno.set(errno.einval)
+	return none
+}
+
+fn (mut this SyncFileResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	return resource.default_ioctl(handle, request, argp)
+}
+
+fn (mut this SyncFileResource) unref(_handle voidptr) ? {
+	if katomic.dec(mut &this.refcount) {
+		return
+	}
+	unsafe { free(voidptr(this)) }
+}
+
+fn (mut this SyncFileResource) link(_handle voidptr) ? {
+}
+
+fn (mut this SyncFileResource) unlink(_handle voidptr) ? {
+}
+
+fn (mut this SyncFileResource) grow(_handle voidptr, _new_size u64) ? {
+}
+
 __global (
 	registered_devices [64]&DrmDevice
 	next_dev_id        = u32(0)
@@ -122,6 +172,9 @@ fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		}
 		ioctl.drm_ioctl_syncobj_destroy {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjDestroy)), direction: ioctl_write | ioctl_read }
+		}
+		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjHandle)), direction: ioctl_write | ioctl_read }
 		}
 		ioctl.drm_ioctl_syncobj_wait {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read }
@@ -425,6 +478,72 @@ fn ioctl_syncobj_destroy(handle voidptr, data voidptr) int {
 	return if syncobj.destroy(u64(handle), request.handle) { 0 } else { -22 }
 }
 
+fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
+	if fence == unsafe { nil } {
+		return none
+	}
+	mut wrapper := &SyncFileResource{
+		fence: unsafe { fence }
+	}
+	mut fd := file.fd_create_from_resource(mut wrapper, resource.o_cloexec) or {
+		unsafe { free(voidptr(wrapper)) }
+		return none
+	}
+	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
+		fd.unref()
+		unsafe { free(voidptr(fd)) }
+		return none
+	}
+	return fdnum
+}
+
+// Resolve only fds created by create_sync_file_fd. The interface type check
+// rejects arbitrary user-provided descriptors before accessing fence state.
+fn sync_file_fence_from_fd(fdnum int) ?&syncobj.DmaFence {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return none }
+	defer {
+		fd.unref()
+	}
+	mut res := fd.handle.resource
+	if mut res is SyncFileResource {
+		if res.fence == unsafe { nil } {
+			return none
+		}
+		return unsafe { res.fence }
+	}
+	return none
+}
+
+fn ioctl_syncobj_handle_to_fd(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } {
+		return -14
+	}
+	mut request := unsafe { &ioctl.DrmSyncobjHandle(data) }
+	if request.flags != ioctl.drm_syncobj_handle_to_fd_export_sync_file || request.pad != 0 {
+		return -22
+	}
+	obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
+	fence := syncobj.get_fence(obj) or { return -22 }
+	fdnum := create_sync_file_fd(fence) or { return -24 }
+	request.fd = i32(fdnum)
+	return 0
+}
+
+fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } {
+		return -14
+	}
+	request := unsafe { &ioctl.DrmSyncobjHandle(data) }
+	if request.flags != ioctl.drm_syncobj_fd_to_handle_import_sync_file || request.pad != 0
+		|| request.fd < 0 {
+		return -22
+	}
+	obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
+	fence := sync_file_fence_from_fd(request.fd) or { return -9 }
+	syncobj.replace_fence(obj, fence)
+	return 0
+}
+
 fn syncobj_wait_ready(owner u64, request &ioctl.DrmSyncobjWait, wait_all bool) (bool, u32) {
 	mut ready_count := u32(0)
 	mut first := u32(0)
@@ -496,6 +615,12 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_syncobj_destroy {
 			return ioctl_syncobj_destroy(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_handle_to_fd {
+			return ioctl_syncobj_handle_to_fd(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_fd_to_handle {
+			return ioctl_syncobj_fd_to_handle(handle, data)
 		}
 		ioctl.drm_ioctl_syncobj_wait {
 			return ioctl_syncobj_wait(handle, data)
