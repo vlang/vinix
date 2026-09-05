@@ -671,6 +671,12 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	graph.globals = mgr.alloc_shared_buffer_with_protection(fw.g13_globals_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
+	unsafe {
+		mut globals := &fw.G13Globals(graph.globals.phys + higher_half)
+		if !fw.populate_g13_globals(mut globals, &mgr.hw_config) {
+			return false
+		}
+	}
 	graph.fw_status = mgr.alloc_shared_buffer(sizeof(fw.G13FwStatus)) or {
 		return false
 	}
@@ -769,11 +775,6 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.buffer_mgr_fw_addr = g13_buffer_manager_high_va
 		// RuntimeScratch::unk_6b38 is 0xff in the reference 12.3 builder.
 		runtime.gpu_scratch[0x68b8] = 0xff
-
-		mut globals := &fw.G13Globals(graph.globals.phys + higher_half)
-		globals.unk_028 = 1
-		globals.unk_02c = 1
-		globals.unk_034 = 120
 
 		mut status := &fw.G13FwStatus(graph.fw_status.phys + higher_half)
 		status.fwctl = fw.make_g13_ring_pointers(mgr.channels.fw_ctrl.state_base, mgr.channels.fw_ctrl.ring_base)

@@ -79,21 +79,6 @@ pub mut:
 	gpu_scratch         [0x6940]u8
 }
 
-// Globals is much larger than its configuration prefix. Preserve the known
-// prefix fields and the exact G13 v12.3 extent while the power model is ported.
-@[packed]
-pub struct G13Globals {
-pub mut:
-	ktrace_enable u32
-	unk_004       [0x20]u8
-	unk_024       u32
-	unk_028       u32
-	unk_02c       u32
-	unk_030       u32
-	unk_034       u32
-	opaque_038    [0x11d08]u8
-}
-
 @[packed]
 pub struct G13FwStatus {
 pub mut:
