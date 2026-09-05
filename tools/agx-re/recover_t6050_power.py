@@ -17,6 +17,7 @@ from pathlib import Path
 
 from extract_firmware import der_item
 from recover_g17_abi import (
+    decode_test_bit_branch,
     macho_symbols,
     macho_uuid,
     recover_vtable_target,
@@ -410,6 +411,19 @@ def direct_branch_count(function_address: int, code: bytes, target: int) -> int:
     return result
 
 
+def direct_branch_target_at(function_address: int, code: bytes, offset: int) -> int | None:
+    """Decode one direct AArch64 B/BL at a known function-relative offset."""
+    if offset < 0 or offset + 4 > len(code):
+        return None
+    word = struct.unpack_from("<I", code, offset)[0]
+    if word & 0x7C000000 != 0x14000000:
+        return None
+    immediate = word & 0x03FFFFFF
+    if immediate & 0x02000000:
+        immediate -= 1 << 26
+    return (function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+
+
 def _has_sub_cmp_window(code: bytes, source: int, first: int, count: int) -> bool:
     """Recognize `sub wN,wSource,#first; cmp wN,#count` without fixing wN."""
     words = [struct.unpack_from("<I", code, offset)[0] for offset in range(0, len(code) - 3, 4)]
@@ -717,6 +731,83 @@ def recover_pmp_code_contract(
     ):
         raise ValueError("PMP device-state acknowledgement loop changed")
 
+    # The initial state publisher deliberately runs before PMP readiness.  Its
+    # safety depends on this exact state-machine edge: the level request is
+    # written first, then PMP-STATUS is sampled.  A zero status latches the
+    # per-die ready byte to zero and branches to the successful return without
+    # touching PS-ACK.  Once status is nonzero, the fallthrough reads PS-ACK.
+    status_prefix = struct.pack(
+        "<5I",
+        0xF9400380,  # ldr x0, [x28] -- ApplePTD owner
+        0xF9402B61,  # ldr x1, [x27, #0x50] -- PMP-STATUS range
+        0xB9400422,  # ldr w2, [x1, #4] -- status PTD entry
+        0xD101A3A3,  # sub x3, x29, #0x68 -- returned Entry
+        0xAA1503E4,  # mov x4, x21 -- selected PTD die
+    )
+    status_offset = state_code.find(status_prefix)
+    status_suffix = struct.pack(
+        "<4I",
+        0xF85983A8,  # ldur x8, [x29, #-0x68] -- status data
+        0xF100011F,  # cmp x8, #0
+        0x1A9F07E8,  # cset w8, ne
+        0x39000328,  # strb w8, [x25] -- per-die ready byte
+    )
+    if (
+        status_offset < 0
+        or direct_branch_target_at(state_address, state_code, status_offset + 20)
+        != symbols[APPLE_PTD_READ]
+        or state_code[status_offset + 24 : status_offset + 40] != status_suffix
+    ):
+        raise ValueError("PMP device-state status probe changed")
+
+    ready_offset = state_code.find(struct.pack("<I", 0x39400328), status_offset + 40)
+    ready_branch = (
+        decode_test_bit_branch(
+            state_address + ready_offset + 4,
+            struct.unpack_from("<I", state_code, ready_offset + 4)[0],
+        )
+        if ready_offset >= 0 and ready_offset + 8 <= len(state_code)
+        else None
+    )
+    ack_prefix = struct.pack(
+        "<5I",
+        0xF9400380,  # ldr x0, [x28] -- ApplePTD owner
+        0xF9401F61,  # ldr x1, [x27, #0x38] -- PS-ACK range
+        0xB9400422,  # ldr w2, [x1, #4] -- ack PTD entry
+        0xD101A3A3,  # sub x3, x29, #0x68 -- returned Entry
+        0xAA1503E4,  # mov x4, x21 -- selected PTD die
+    )
+    success_target = ready_branch["target"] if ready_branch is not None else -1
+    success_offset = success_target - state_address
+    if (
+        ready_branch is None
+        or ready_branch != {
+            "target": success_target,
+            "condition": "bit_clear",
+            "register": 8,
+            "bit": 0,
+            "bytes": 4,
+        }
+        or state_code[ready_offset + 8 : ready_offset + 28] != ack_prefix
+        or direct_branch_target_at(state_address, state_code, ready_offset + 28)
+        != symbols[APPLE_PTD_READ]
+        or success_offset < ready_offset + 32
+        or success_offset + 4 > len(state_code)
+        or struct.unpack_from("<I", state_code, success_offset)[0] != 0x52800014
+    ):
+        raise ValueError("PMP device-state pre-ready acknowledgement bypass changed")
+
+    write_offsets = [
+        offset
+        for offset in range(0, len(state_code) - 3, 4)
+        if direct_branch_target_at(state_address, state_code, offset)
+        == symbols[APPLE_PTD_WRITE]
+    ]
+    if len(write_offsets) != 1:
+        raise ValueError("PMP device-state request write ownership changed")
+    if not write_offsets[0] < status_offset < ready_offset:
+        raise ValueError("PMP device-state request/status ordering changed")
+
     _init_address, init_code = functions[PMP_INIT_V2]
     # this+0x72848; memset(..., 0xff, 0x404).  The 0x404-byte allocation is
     # 257 signed u32 entries.  Lookups admit only selectors below 256; the
@@ -958,6 +1049,13 @@ def recover_pmp_code_contract(
                 "recomputed in the loop but never read by this function"
             ),
             "request_after_success": "preserved; there is no second PTD write",
+            "pre_ready_behavior": (
+                "publish the persistent request, sample PMP-STATUS, and return success "
+                "without reading PS-ACK when status is zero"
+            ),
+            "ready_behavior": (
+                "latch the per-die ready byte and poll PS-ACK when PMP-STATUS is nonzero"
+            ),
             "timeout": "dump the PMPTOOL PTD range and panic",
         },
         "state_notification": {
@@ -990,7 +1088,8 @@ def recover_pmp_code_contract(
                 "then emit command 14/15"
             ),
             "initial_sync": (
-                "scheduled separately; its gated callback has no explicit ready wait"
+                "scheduled separately; it may publish level requests before ready, and "
+                "the ordinary transaction then bypasses PS-ACK while status is zero"
             ),
         },
         "device_index_map": {
@@ -1625,7 +1724,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 8,
+        "schema": 9,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,

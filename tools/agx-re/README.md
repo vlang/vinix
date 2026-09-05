@@ -86,9 +86,12 @@ which do not emit PMP state commands, from the aggregate `GFX` proxy whose
 selector `0x10` reaches the ordinary AGX request/ack path. It also proves that
 dynamic transitions wait on the per-die `PMP-STATUS` PTD entry before device
 status mutation, while explicitly reporting that the separately scheduled
-initial-status callback has no such local wait. The ordinary request/ack
-report also pins the AGX mask, `newData` metadata bit, state-match condition,
-15-second fatal timeout, and its single persistent request write. The same
+initial-status callback has no such local wait. The ordinary transaction
+proves why: it publishes its persistent request before sampling status and
+returns without reading `PS-ACK` when status is zero; a nonzero status enters
+the acknowledgement loop. The report also pins the AGX mask, `newData`
+metadata bit, state-match condition, 15-second fatal timeout, and its single
+persistent request write. The same
 ApplePMGR check recovers the asymmetric ApplePTD read and write windows and
 metadata transform. A UUID-pinned AppleT6050PMGR check proves that PTD RegMap
 enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves

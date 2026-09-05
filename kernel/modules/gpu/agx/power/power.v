@@ -233,10 +233,11 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 	return true
 }
 
-// Validate only the read-only ownership and transport contract here. The
-// running PMP still has to complete its service and initial-state ordering
-// before SOC-DEV-PS-REQ can be written, so this function deliberately performs
-// no mapping or MMIO access.
+// Validate only the read-only ownership and transport contract here. Apple's
+// initial synchronization can publish a persistent request before readiness,
+// but Vinix still needs mapping ownership, serialized transactions, timeout
+// cleanup, and the firmware-side handoff. This function therefore performs no
+// mapping or MMIO access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 	pmgr_node := devicetree.find_compatible('pmgr1,t6050') or {
 		println('agx: native t6050 PMGR node not found')

@@ -231,7 +231,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 8)
+        self.assertEqual(result["schema"], 9)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -302,6 +302,81 @@ class RecoverT6050PowerTests(unittest.TestCase):
             delta = (target - source) // 4
             return struct.pack("<I", (0x94000000 if link else 0x14000000) | delta & 0x3FFFFFF)
 
+        def tbz(source: int, target: int, register: int, bit: int) -> int:
+            delta = (target - source) // 4
+            return (
+                0x36000000
+                | (bit >> 5) << 31
+                | (bit & 0x1F) << 19
+                | (delta & 0x3FFF) << 5
+                | register
+            )
+
+        state_code = bytearray(struct.pack("<II", 0x7100087F, 0x39400C08))
+        state_code += branch(state + len(state_code), read, True)
+        state_code += branch(state + len(state_code), write, True)
+        state_code += struct.pack(
+            "<7I",
+            0xB9406B69,
+            0x1B162128,
+            0xB9400153,
+            0x52837B88,
+            0x39400108,
+            0x7200011F,
+            0x1A9F12D5,
+        )
+        state_code += struct.pack(
+            "<17I",
+            0x52800029,
+            0x9AD3213A,
+            0xF9401B61,
+            0xAA1A0109,
+            0x8A3A0108,
+            0x7100033F,
+            0x9A890103,
+            0xF9401B61,
+            0xB9400148,
+            0x360812C8,
+            0x53020908,
+            0x52800C80,
+            0x52884801,
+            0x72A001E1,
+            0x528001E0,
+            0x52994001,
+            0x72A77341,
+        )
+        state_code += struct.pack(
+            "<5I", 0xF9400380, 0xF9402B61, 0xB9400422, 0xD101A3A3, 0xAA1503E4
+        )
+        state_code += branch(state + len(state_code), read, True)
+        state_code += struct.pack(
+            "<5I", 0xF85983A8, 0xF100011F, 0x1A9F07E8, 0x39000328, 0xD503201F
+        )
+        ready_offset = len(state_code)
+        state_code += struct.pack("<2I", 0x39400328, 0)
+        state_code += struct.pack(
+            "<5I", 0xF9400380, 0xF9401F61, 0xB9400422, 0xD101A3A3, 0xAA1503E4
+        )
+        state_code += branch(state + len(state_code), read, True)
+        state_code += struct.pack(
+            "<7I",
+            0xA979A3B3,
+            0x924A0114,
+            0xB4FFF234,
+            0xCA080268,
+            0x8A1A0108,
+            0xB5FFF1A8,
+            0xF9402F68,
+        )
+        success_offset = len(state_code)
+        state_code += struct.pack("<I", 0x52800014)
+        struct.pack_into(
+            "<I",
+            state_code,
+            ready_offset + 4,
+            tbz(state + ready_offset + 4, state + success_offset, 8, 0),
+        )
+
         functions = {
             recover_t6050_power.PMP_SEND_COMMAND: (send, branch(send, dispatch)),
             recover_t6050_power.PMP_WRITE_DASHBOARD: (
@@ -313,48 +388,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
             recover_t6050_power.PMP_SET_DEVICE_STATE: (
                 state,
-                struct.pack("<II", 0x7100087F, 0x39400C08)
-                + branch(state + 8, read, True)
-                + branch(state + 12, write, True)
-                + struct.pack(
-                    "<7I",
-                    0xB9406B69,
-                    0x1B162128,
-                    0xB9400153,
-                    0x52837B88,
-                    0x39400108,
-                    0x7200011F,
-                    0x1A9F12D5,
-                )
-                + struct.pack(
-                    "<25I",
-                    0x52800029,
-                    0x9AD3213A,
-                    0xF9401B61,
-                    0xAA1A0109,
-                    0x8A3A0108,
-                    0x7100033F,
-                    0x9A890103,
-                    0xF9401B61,
-                    0xB9400148,
-                    0x360812C8,
-                    0x53020908,
-                    0x52800C80,
-                    0x52884801,
-                    0x72A001E1,
-                    0x528001E0,
-                    0x52994001,
-                    0x72A77341,
-                    0xF9402B61,
-                    0xF9401F61,
-                    0xA979A3B3,
-                    0x924A0114,
-                    0xB4FFF234,
-                    0xCA080268,
-                    0x8A1A0108,
-                    0xB5FFF1A8,
-                )
-                + struct.pack("<I", 0xF9402F68),
+                bytes(state_code),
             ),
             recover_t6050_power.PMP_SET_VIRTUAL_DEVICE_STATE: (
                 virtual,
@@ -563,6 +597,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
         )
         self.assertEqual(result["ordinary_request_ack"]["ack_new_data"]["bit"], 54)
         self.assertEqual(result["ordinary_request_ack"]["timeout_seconds"], 15)
+        self.assertIn(
+            "without reading PS-ACK",
+            result["ordinary_request_ack"]["pre_ready_behavior"],
+        )
         self.assertEqual(
             result["ordinary_request_ack"]["selector_die_stride_object_offset"],
             0x72838,
@@ -581,6 +619,13 @@ class RecoverT6050PowerTests(unittest.TestCase):
             init_code.replace(struct.pack("<I", 0x52808082), struct.pack("<I", 0x52808062), 1),
         )
         with self.assertRaisesRegex(ValueError, "device-index table"):
+            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+
+        bad_functions = dict(functions)
+        bad_state = bytearray(state_code)
+        struct.pack_into("<I", bad_state, ready_offset + 4, 0xD503201F)
+        bad_functions[recover_t6050_power.PMP_SET_DEVICE_STATE] = (state, bytes(bad_state))
+        with self.assertRaisesRegex(ValueError, "pre-ready acknowledgement bypass"):
             recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
 
     def test_recovers_t6050_pmgr_ptd_regmap_dispatch(self) -> None:
