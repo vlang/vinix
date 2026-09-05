@@ -2088,6 +2088,87 @@ class RecoverG17AbiTests(unittest.TestCase):
         ):
             recover_g17_abi.recover_g17_channel_submit_info(b"")
 
+    def test_recovers_g17_channel_submission_flag(self) -> None:
+        mark_name = recover_g17_abi.MARK_CHANNEL_SUBMITTED_PREFIX + ".1"
+        unmark_name = recover_g17_abi.UNMARK_CHANNEL_SUBMITTED_PREFIX + ".1"
+        submit = bytearray(0x300)
+        for offset, word in {
+            0x2D4: 0x34000160,
+            0x2D8: 0xF9400290,
+            0x2E8: 0xD2804011,
+            0x2EC: 0x8B110210,
+            0x2F0: 0xF9400208,
+            0x2F4: 0xAA1403E0,
+            0x2FC: 0xD73F0910,
+        }.items():
+            struct.pack_into("<I", submit, offset, word)
+        priority = bytearray(0x9C)
+        for offset, word in {
+            0x58: 0xF9402E68,
+            0x5C: 0xB9402909,
+            0x60: 0x6B09029F,
+            0x64: 0x540001A0,
+            0x68: 0x12800009,
+            0x6C: 0xB9004509,
+            0x80: 0xD2804111,
+            0x84: 0x8B110210,
+            0x88: 0xF9400208,
+            0x8C: 0xAA1303E0,
+            0x94: 0xD73F0910,
+            0x98: 0xD5033BBF,
+        }.items():
+            struct.pack_into("<I", priority, offset, word)
+        functions = {
+            recover_g17_abi.SUBMIT_COMMAND_TO_FIRMWARE_BLOCK: (0, bytes(submit)),
+            recover_g17_abi.SET_CHANNEL_PRIORITY: (0, bytes(priority)),
+            mark_name: (
+                0,
+                encode(0xD503245F, 0x52800028, 0x3900F008, 0xD65F03C0),
+            ),
+            unmark_name: (0, encode(0xD503245F, 0x3900F01F, 0xD65F03C0)),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=dict.fromkeys(functions, 0)
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_submission_flag(b"")
+        self.assertEqual(recovered["channel_member"], 0x3C)
+        self.assertEqual(recovered["first_submission_flags"], 1)
+        self.assertEqual(recovered["following_submission_flags"], 0)
+        self.assertTrue(recovered["mark_after_successful_outer_submission"])
+
+    def test_rejects_modified_g17_channel_submission_flag(self) -> None:
+        functions = {
+            recover_g17_abi.SUBMIT_COMMAND_TO_FIRMWARE_BLOCK: (0, bytes(0x300)),
+            recover_g17_abi.SET_CHANNEL_PRIORITY: (0, bytes(0x9C)),
+            recover_g17_abi.MARK_CHANNEL_SUBMITTED_PREFIX + ".1": (
+                0,
+                encode(0xD503245F, 0x52800028, 0x3900F008, 0xD65F03C0),
+            ),
+            recover_g17_abi.UNMARK_CHANNEL_SUBMITTED_PREFIX + ".1": (
+                0,
+                encode(0xD503245F, 0x3900F01F, 0xD65F03C0),
+            ),
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=dict.fromkeys(functions, 0)
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+            self.assertRaisesRegex(ValueError, "submitted transition"),
+        ):
+            recover_g17_abi.recover_g17_channel_submission_flag(b"")
+
     def test_recovers_g17_dual_role_boot_transport(self) -> None:
         notify = bytearray(0x134)
         receive = bytearray(0xF0)

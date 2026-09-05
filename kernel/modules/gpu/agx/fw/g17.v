@@ -2575,9 +2575,11 @@ pub:
 
 // Build the outer command fields that are invariant for all concrete G17
 // work channels. The Apple base initializer assigns ID 0x80 and clears the
-// one-byte channel flag; neither value is selected by userspace.
+// one-byte channel flag. The work-queue path marks that flag only after its
+// first outer submission succeeds, so later entries encode a different flags
+// byte without exposing either value to userspace.
 pub fn new_g17_data_master_command(channel_data_address u64, command_type u32,
-	submission_index u16) ?G17DataMasterCommand {
+	submission_index u16, commands_submitted bool) ?G17DataMasterCommand {
 	if channel_data_address == 0 || !valid_g17_accelerator_command_type(command_type) {
 		return none
 	}
@@ -2586,7 +2588,7 @@ pub fn new_g17_data_master_command(channel_data_address u64, command_type u32,
 		command_type: command_type
 		submission_index: submission_index
 		channel_id: g17_data_master_channel_id
-		channel_flag: g17_data_master_channel_flag
+		channel_flag: if commands_submitted { u8(1) } else { g17_data_master_channel_flag }
 	}
 }
 

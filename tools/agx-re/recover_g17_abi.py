@@ -520,6 +520,16 @@ SUBMIT_COMMAND_TO_FIRMWARE_BLOCK = (
     "____ZN12AGXWorkQueue23submitCommandToFirmwareE"
     "P10AGXChannelP20AGXCommandDescriptorb_block_invoke"
 )
+MARK_CHANNEL_SUBMITTED_PREFIX = (
+    "__ZN10AGXChannel32markCommandsSubmittedToAccelRingEv"
+)
+UNMARK_CHANNEL_SUBMITTED_PREFIX = (
+    "__ZN10AGXChannel34unmarkCommandsSubmittedToAccelRingEv"
+)
+SET_CHANNEL_PRIORITY = (
+    "__ZN10AGXChannel11setPriorityE"
+    "23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel"
+)
 WRITE_CHANNEL_COMMAND_POINTER = (
     "__ZN10AGXChannel26writeChannelCommandPointerEyP22AGFIChannelCommandTypey"
 )
@@ -9902,6 +9912,96 @@ def recover_g17_channel_submit_info(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_channel_submission_flag(image: bytes) -> dict[str, object]:
+    """Recover the first-versus-following submission flag transition.
+
+    The outer-ring encoder samples AGXChannel +0x3c before the work-queue
+    block invokes the channel's mark method.  A successful first submission
+    therefore encodes flags=1 and marks the channel; following submissions
+    encode flags=0 until a priority change invokes the matching unmark method.
+    """
+
+    symbols = macho_symbols(image)
+    required = (SUBMIT_COMMAND_TO_FIRMWARE_BLOCK, SET_CHANNEL_PRIORITY)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 submission-flag symbols: {missing}")
+
+    mark_symbols = sorted(
+        name for name in symbols if name.startswith(MARK_CHANNEL_SUBMITTED_PREFIX)
+    )
+    unmark_symbols = sorted(
+        name for name in symbols if name.startswith(UNMARK_CHANNEL_SUBMITTED_PREFIX)
+    )
+    if not mark_symbols or len(mark_symbols) != len(unmark_symbols):
+        raise ValueError(
+            "G17 channel mark/unmark implementations are missing or unbalanced"
+        )
+    for name in mark_symbols:
+        _address, code = symbol_code(image, name)
+        require_instruction_sequence(
+            code,
+            "G17 channel submitted mark",
+            (0xD503245F, 0x52800028, 0x3900F008, 0xD65F03C0),
+        )
+    for name in unmark_symbols:
+        _address, code = symbol_code(image, name)
+        require_instruction_sequence(
+            code,
+            "G17 channel submitted unmark",
+            (0xD503245F, 0x3900F01F, 0xD65F03C0),
+        )
+
+    _address, submit_code = symbol_code(image, SUBMIT_COMMAND_TO_FIRMWARE_BLOCK)
+    require_instruction_words_at(
+        submit_code,
+        "G17 channel submitted transition",
+        {
+            0x2D4: 0x34000160,  # failed outer submission skips the transition
+            0x2D8: 0xF9400290,  # channel vtable
+            0x2E8: 0xD2804011,  # mark slot 0x200
+            0x2EC: 0x8B110210,
+            0x2F0: 0xF9400208,
+            0x2F4: 0xAA1403E0,  # channel object
+            0x2FC: 0xD73F0910,
+        },
+    )
+
+    _address, priority_code = symbol_code(image, SET_CHANNEL_PRIORITY)
+    require_instruction_words_at(
+        priority_code,
+        "G17 channel submitted priority reset",
+        {
+            0x58: 0xF9402E68,  # shared channel state
+            0x5C: 0xB9402909,  # current priority at state +0x28
+            0x60: 0x6B09029F,
+            0x64: 0x540001A0,  # unchanged priority skips the reset
+            0x68: 0x12800009,
+            0x6C: 0xB9004509,  # invalidate state +0x44
+            0x80: 0xD2804111,  # unmark slot 0x208
+            0x84: 0x8B110210,
+            0x88: 0xF9400208,
+            0x8C: 0xAA1303E0,  # channel object
+            0x94: 0xD73F0910,
+            0x98: 0xD5033BBF,  # state/flag update barrier
+        },
+    )
+
+    return {
+        "channel_member": 0x3C,
+        "bytes": 1,
+        "initial": 0,
+        "outer_flags_formula": "1 & ~channel_flag",
+        "first_submission_flags": 1,
+        "following_submission_flags": 0,
+        "mark_vtable_slot": 0x200,
+        "mark_after_successful_outer_submission": True,
+        "unmark_vtable_slot": 0x208,
+        "unmark_on_priority_change": True,
+        "implementations": len(mark_symbols),
+    }
+
+
 def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str, object]:
     """Recover the shared state/control layout used by a G17 work channel."""
     reset_instructions = list(words(reset_code))
@@ -13883,6 +13983,7 @@ def main() -> int:
         )
         channels["priority"] = recover_g17_channel_priority(driver)
         channels["submit_info"] = recover_g17_channel_submit_info(driver)
+        channels["submission_flag"] = recover_g17_channel_submission_flag(driver)
         channels["data_master_types"] = recover_g17_channel_data_master_types(driver)
         channels["data_master_rings"] = recover_g17_data_master_ring_bindings(
             allocations, base_init_code

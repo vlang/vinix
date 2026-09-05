@@ -35,10 +35,11 @@ const g17_queue_channel_mask = g17_queue_channel_ta | g17_queue_channel_3d |
 
 struct G17QueueChannelResources {
 mut:
-	state    SharedBuffer
-	uncached SharedBuffer
-	cached   SharedBuffer
-	lock     klock.Lock
+	state              SharedBuffer
+	uncached           SharedBuffer
+	cached             SharedBuffer
+	commands_submitted bool
+	lock               klock.Lock
 }
 
 // Complete shared-memory ownership for one native G17 command queue. These
@@ -281,7 +282,7 @@ pub fn (mut mgr GpuManager) submit_g17_queue_command(resources &G17QueueResource
 		channel.uncached.size, channel.cached.cpu_address(), channel.cached.size,
 		command_gpu_address) or { return false }
 	command := fw.new_g17_data_master_command(channel.state.va, command_type,
-		submission_index) or {
+		submission_index, channel.commands_submitted) or {
 		mgr.state = .error
 		return false
 	}
@@ -291,6 +292,9 @@ pub fn (mut mgr GpuManager) submit_g17_queue_command(resources &G17QueueResource
 		mgr.state = .error
 		return false
 	}
+	// Apple's markCommandsSubmittedToAccelRing runs after the outer submitter
+	// succeeds. The next entry therefore changes flags from 1 to 0.
+	channel.commands_submitted = true
 	channel_id := fw.g17_data_master_doorbell_channel(resources.priority, command_type) or {
 		mgr.state = .error
 		return false
