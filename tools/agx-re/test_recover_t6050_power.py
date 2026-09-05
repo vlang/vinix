@@ -47,10 +47,12 @@ def soc_device_record(
     name: str,
     packet_bytes: int = 0,
     virtual_state_config: int = 0,
+    state_flags: int = 0,
 ) -> bytes:
     record = bytearray(recover_t6050_power.PMP_SOC_DEVICE_BYTES)
     struct.pack_into("<I", record, 0, device_id)
     struct.pack_into("<I", record, 0x0C, packet_bytes)
+    struct.pack_into("<I", record, 0x08, state_flags)
     struct.pack_into("<I", record, 0x2C, virtual_state_config)
     encoded_name = name.encode()
     if len(encoded_name) < 8:
@@ -139,6 +141,7 @@ def fixture_tree(
             name,
             packet_bytes[index] if index < len(packet_bytes) else 0,
             2 if index in virtual_devices else 0,
+            3 if index == 15 else 0,
         )
         for index, name in enumerate(soc_names)
     )
@@ -212,7 +215,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 5)
+        self.assertEqual(result["schema"], 6)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -230,6 +233,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["pmp"]["agx_soc_device"]["packet_bit_offset"], 0x1C0)
         self.assertEqual(result["pmp"]["agx_soc_device"]["packet_bit_count"], 8)
         self.assertEqual(result["pmp"]["agx_soc_device"]["virtual_state_index"], 3)
+        self.assertEqual(result["pmp"]["agx_soc_device"]["state_flags"], 3)
         self.assertEqual(result["pmp"]["device_state_target"]["handle"], 0x16A)
         self.assertEqual(
             result["pmp"]["device_state_target"]["pmp_dispatch"]["selector"],
@@ -282,7 +286,36 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 state,
                 struct.pack("<II", 0x7100087F, 0x39400C08)
                 + branch(state + 8, read, True)
-                + branch(state + 12, write, True),
+                + branch(state + 12, write, True)
+                + struct.pack(
+                    "<25I",
+                    0x52800029,
+                    0x9AD3213A,
+                    0xF9401B61,
+                    0xAA1A0109,
+                    0x8A3A0108,
+                    0x7100033F,
+                    0x9A890103,
+                    0xF9401B61,
+                    0xB9400148,
+                    0x360812C8,
+                    0x53020908,
+                    0x52800C80,
+                    0x52884801,
+                    0x72A001E1,
+                    0x528001E0,
+                    0x52994001,
+                    0x72A77341,
+                    0xF9402B61,
+                    0xF9401F61,
+                    0xA979A3B3,
+                    0x924A0114,
+                    0xB4FFF234,
+                    0xCA080268,
+                    0x8A1A0108,
+                    0xB5FFF1A8,
+                )
+                + struct.pack("<I", 0xF9402F68),
             ),
             recover_t6050_power.PMP_SET_VIRTUAL_DEVICE_STATE: (
                 virtual,
@@ -429,6 +462,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["device_index_map"]["record_stride"], 124)
         self.assertEqual(result["device_index_map"]["allocated_entries"], 257)
         self.assertEqual(result["state_notification"]["flag"], 0x02)
+        self.assertEqual(result["ordinary_request_ack"]["ack_new_data"]["bit"], 54)
+        self.assertEqual(result["ordinary_request_ack"]["timeout_seconds"], 15)
+        self.assertIn("never read", result["ordinary_request_ack"]["poll_deadline_observed_use"])
         self.assertEqual(result["readiness"]["virtual_wait_slot"], 0xAC0)
         self.assertEqual(result["readiness"]["status_range_object_offset"], 0x72820)
 

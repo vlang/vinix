@@ -319,6 +319,9 @@ def parse_pmp_soc_devices(data: bytes) -> list[dict[str, object]]:
                 # The stripped PMP firmware shifts this field left by three
                 # while assigning each record's SOC-DEV-PKT subrange.
                 "packet_bytes": struct.unpack_from("<I", record, 0x0C)[0],
+                # Bit 1 requests a PS-ACK synchronization.  Bit 2 suppresses
+                # that wait for a transition to state 1 only.
+                "state_flags": struct.unpack_from("<I", record, 0x08)[0],
                 # ApplePMGR assigns a dense virtual-dashboard index to every
                 # record with a nonzero word at +0x2c.
                 "virtual_state_config": struct.unpack_from("<I", record, 0x2C)[0],
@@ -363,6 +366,21 @@ def direct_branch_targets(function_address: int, code: bytes) -> set[int]:
         if immediate & 0x02000000:
             immediate -= 1 << 26
         result.add((function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF)
+    return result
+
+
+def direct_branch_count(function_address: int, code: bytes, target: int) -> int:
+    """Count direct AArch64 B/BL instructions to one target."""
+    result = 0
+    for offset in range(0, len(code) - 3, 4):
+        word = struct.unpack_from("<I", code, offset)[0]
+        if word & 0x7C000000 != 0x14000000:
+            continue
+        immediate = word & 0x03FFFFFF
+        if immediate & 0x02000000:
+            immediate -= 1 << 26
+        actual = (function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+        result += actual == target
     return result
 
 
@@ -506,6 +524,46 @@ def recover_pmp_code_contract(
     for target in (APPLE_PTD_READ, APPLE_PTD_WRITE):
         if symbols[target] not in state_targets:
             raise ValueError(f"PMP device dashboard no longer calls {target}")
+    if direct_branch_count(state_address, state_code, symbols[APPLE_PTD_WRITE]) != 1:
+        raise ValueError("PMP device dashboard request write count changed")
+    if not _has_ordered_words(
+        state_code,
+        (
+            0x52800029,  # mov w9, #1
+            0x9AD3213A,  # lsl x26, x9, x19 -- 1 << soc-device index
+            0xF9401B61,  # ldr x1, [x27, #0x30] -- PS-REQ range
+            0xAA1A0109,  # orr x9, x8, x26 -- requested state 1
+            0x8A3A0108,  # bic x8, x8, x26 -- requested state 0
+            0x7100033F,  # cmp w25, #0
+            0x9A890103,  # csel x3, x8, x9, eq -- select request value
+            0xF9401B61,  # ldr x1, [x27, #0x30] -- write PS-REQ
+        ),
+    ):
+        raise ValueError("PMP device-state request encoding changed")
+    if not _has_ordered_words(
+        state_code,
+        (
+            0xB9400148,  # ldr w8, [x10] -- soc-device state flags at +8
+            0x360812C8,  # tbz w8, #1 -- no acknowledgement required
+            0x53020908,  # ubfx w8, w8, #2, #1 -- skip-enable-ack flag
+            0x52800C80,  # mov w0, #100
+            0x52884801,  # mov w1, #0x4240
+            0x72A001E1,  # movk w1, #0xf -- 1,000,000 (100 ms)
+            0x528001E0,  # mov w0, #15
+            0x52994001,  # mov w1, #0xca00
+            0x72A77341,  # movk w1, #0x3b9a -- 1,000,000,000 (15 s)
+            0xF9402B61,  # ldr x1, [x27, #0x50] -- PMP-STATUS range
+            0xF9401F61,  # ldr x1, [x27, #0x38] -- PS-ACK range
+            0xA979A3B3,  # ldp x19, x8, [x29, #-0x68] -- ack data/metadata
+            0x924A0114,  # and x20, x8, #0x40000000000000 -- newData bit 54
+            0xB4FFF234,  # cbz x20 -- poll until newData
+            0xCA080268,  # eor x8, x19, x8 -- ack versus requested value
+            0x8A1A0108,  # and x8, x8, x26 -- compare this device bit
+            0xB5FFF1A8,  # cbnz x8 -- poll until requested value matches
+            0xF9402F68,  # ldr x8, [x27, #0x58] -- PMPTOOL diagnostics
+        ),
+    ):
+        raise ValueError("PMP device-state acknowledgement loop changed")
 
     _init_address, init_code = functions[PMP_INIT_V2]
     # this+0x72848; memset(..., 0xff, 0x404).  The 0x404-byte allocation is
@@ -701,6 +759,25 @@ def recover_pmp_code_contract(
             "virtual_flag": 0x10,
             "virtual_class_field": 15,
             "virtual_class_minimum": 0,
+        },
+        "ordinary_request_ack": {
+            "request_range_object_offset": 0x72800,
+            "ack_range_object_offset": 0x72808,
+            "status_range_object_offset": 0x72820,
+            "diagnostic_range_object_offset": 0x72828,
+            "device_mask": "1 << soc-device record index",
+            "request": "read-modify-write; clear for state 0, set for state 1",
+            "ack_required_flag": 0x02,
+            "skip_state_1_ack_flag": 0x04,
+            "ack_new_data": {"metadata_word": 1, "bit": 54},
+            "success": "newData is set and the selected ack bit equals the request",
+            "timeout_seconds": 15,
+            "computed_poll_deadline_ms": 100,
+            "poll_deadline_observed_use": (
+                "recomputed in the loop but never read by this function"
+            ),
+            "request_after_success": "preserved; there is no second PTD write",
+            "timeout": "dump the PMPTOOL PTD range and panic",
         },
         "state_notification": {
             "flag": 0x02,
@@ -1086,11 +1163,12 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     if packet_cursor > packet_end:
         raise ValueError("PMP SoC-device packet slices exceed SOC-DEV-PKT")
     agx_device = agx_devices[0]
-    expected_agx_layout = (0x1C0, 8, 3)
+    expected_agx_layout = (0x1C0, 8, 3, 3)
     actual_agx_layout = (
         agx_device["packet_bit_offset"],
         agx_device["packet_bit_count"],
         agx_device["virtual_state_index"],
+        agx_device["state_flags"],
     )
     if actual_agx_layout != expected_agx_layout:
         raise ValueError(f"PMP AGX packet layout changed: {actual_agx_layout!r}")
@@ -1143,7 +1221,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 5,
+        "schema": 6,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
