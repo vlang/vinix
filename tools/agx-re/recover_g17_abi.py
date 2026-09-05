@@ -444,6 +444,11 @@ CONFIGURE_POOL_ELEMENT_SIZES = "__ZN11AGXFirmware25configurePoolElementSizesEv"
 BASE_ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
 REQUEST_CHANNEL_COMMAND_BARRIER = "__ZN11AGXFirmware28requestChannelCommandBarrierEPy"
 TA_COMMAND_POOL = 0x1648
+GENERATE_REGISTER_LIST_3D = (
+    "__ZN33AGX·PI_300·X·A0·3DChannelSKSM25generateRegisterListFor3D"
+    "EP20AGFIChannelCommand3DP22AGX3DCommandDescriptor"
+)
+G17_COMMAND_3D_BYTES = 0x2240
 INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
@@ -6860,6 +6865,79 @@ def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
     return destination, base, immediate
 
 
+def recover_g17_3d_register_lists(image: bytes) -> dict[str, object]:
+    """Recover the register-list encoding inside the 0x2240-byte 3D command.
+
+    generateRegisterListFor3D runs four passes with a 0x720 stride.  Each pass
+    encodes a stream of 12-byte entries -- a selector word then an unaligned
+    64-bit value -- and maintains a GPU address plus 16-bit entry and byte
+    counters.  What is *not* settled is the record framing: the counters sit at
+    stride + 0x88, past the 0x720 stride, so consecutive records cannot simply
+    be 0x720 bytes of independent storage.  Only the proven encoding is
+    reported; no capacity is derived from the stride.
+    """
+
+    symbols = macho_symbols(image)
+    if GENERATE_REGISTER_LIST_3D not in symbols:
+        raise ValueError(f"Mach-O is missing {GENERATE_REGISTER_LIST_3D}")
+
+    _address, code = symbol_code(image, GENERATE_REGISTER_LIST_3D)
+    require_instruction_words_at(
+        code,
+        "G17 3D register-list framing",
+        {
+            0x034: 0x528000D8,  # preserved selector-template mask, low half
+            0x038: 0x72BFFF98,  # and high half: 0xfffc0006
+            0x0C0: 0x911C82B5,  # sub-block stride 0x720
+            0x0C4: 0xF10012FF,  # four sub-blocks
+            0x0CC: 0x8B150329,  # command + sub-block offset
+            0x0D0: 0x91028128,  # stream starts at sub-block +0xa0
+            0x0D4: 0xB907A93F,  # entry counter cleared at +0x7a8
+            0x0D8: 0xF942226A,  # command GPU base from descriptor +0x440
+            0x0E4: 0xF903D12A,  # stream GPU address -> sub-block +0x7a0
+            0x100: 0x0A18014A,  # selector template preserved
+            0x188: 0xF800410A,  # 64-bit value follows the selector word
+            0x190: 0x794E1509,  # byte length at stream +0x70a
+            0x194: 0x11003129,  # advanced by 12
+            0x198: 0x790E1509,
+            0x19C: 0x794E110A,  # entry count at stream +0x708
+            0x1A0: 0x1100054A,  # advanced by one
+            0x1A4: 0x790E110A,
+        },
+    )
+
+    stream_offset = 0xA0
+    counter_offset = 0x7A8
+    stride = 0x720
+    passes = 4
+    if passes * stride > G17_COMMAND_3D_BYTES:
+        raise ValueError("G17 3D register-list passes overflow the command")
+    # Record the inconsistency rather than papering over it: the last pass
+    # writes its counters at 3 * 0x720 + 0x7a8, which is past 4 * 0x720.
+    trailing = (passes - 1) * stride + counter_offset + 4
+    if trailing > G17_COMMAND_3D_BYTES:
+        raise ValueError("G17 3D register-list counters fall outside the command")
+
+    return {
+        "command_bytes": G17_COMMAND_3D_BYTES,
+        "passes": passes,
+        "stride": stride,
+        "stream_offset": stream_offset,
+        "gpu_address_offset": 0x7A0,
+        "entry_count_offset": counter_offset,
+        "byte_length_offset": 0x7AA,
+        "entry_bytes": 0xC,
+        "selector_template_mask": 0xFFFC0006,
+        "gpu_base_descriptor_member": 0x440,
+        "record_framing_resolved": False,
+        "framing_note": (
+            "counters live at stride + 0x88, so the 0x720 stride is not the "
+            "size of an independent per-pass record; capacity is unknown"
+        ),
+        "producer": GENERATE_REGISTER_LIST_3D,
+    }
+
+
 def recover_g17_channel_command_pools(image: bytes) -> dict[str, object]:
     """Recover the channel-command pools and their per-type command sizes.
 
@@ -7495,6 +7573,9 @@ def main() -> int:
             driver, iogpu
         )
         channels["command_pools"] = recover_g17_channel_command_pools(driver)
+        channels["command_3d_register_lists"] = (
+            recover_g17_3d_register_lists(driver)
+        )
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)
         _address, setup_code = symbol_code(driver, SETUP_CONFIG)

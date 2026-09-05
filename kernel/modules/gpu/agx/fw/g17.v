@@ -1205,6 +1205,75 @@ pub const g17_command_ksm_add_kicks_size = u32(0x40)
 pub const g17_command_ksm_config_update_size = u32(0xc0)
 pub const g17_command_ksm_kick_queue_size = u32(0x40)
 
+// Register-list encoding inside the 3D channel command.
+// generateRegisterListFor3D runs four passes with a 0x720 stride, encoding a
+// stream of 12-byte entries and maintaining a GPU address plus 16-bit entry
+// and byte counters. The record framing is deliberately NOT modelled: the
+// counters sit at stride + 0x88, so 0x720 is not the size of an independent
+// per-pass record and the usable stream capacity is still unknown. Callers
+// therefore pass the stream limit they have established themselves.
+pub const g17_3d_register_passes = u32(4)
+pub const g17_3d_register_stride = u64(0x720)
+pub const g17_3d_register_stream_offset = u64(0xa0)
+pub const g17_3d_register_gpu_address_offset = u64(0x7a0)
+pub const g17_3d_register_entry_size = u64(0xc)
+pub const g17_3d_register_selector_mask = u32(0xfffc0006)
+
+// Trailer maintained per pass: the stream's GPU address followed by its entry
+// and byte counters, both 16-bit.
+@[packed]
+pub struct G17RegisterStreamTrailer {
+pub mut:
+	gpu_address u64
+	entry_count u16
+	byte_length u16
+}
+
+// Point one pass's stream at its GPU address and empty it, matching the setup
+// generateRegisterListFor3D does before each pass.
+pub fn bind_g17_register_stream(record voidptr, stream_gpu_address u64) bool {
+	if record == unsafe { nil } || stream_gpu_address == 0 {
+		return false
+	}
+
+	unsafe {
+		mut trailer := &G17RegisterStreamTrailer(&u8(record) +
+			g17_3d_register_gpu_address_offset)
+		trailer.gpu_address = stream_gpu_address
+		trailer.entry_count = 0
+		trailer.byte_length = 0
+	}
+	return true
+}
+
+// Append one {selector, value} pair. Apple keeps the template bits already
+// present in the selector word and writes the 64-bit value unaligned, four
+// bytes later, so each entry is 12 bytes. `stream_limit` is the caller's
+// established byte budget for the stream, since it is not derivable from the
+// stride.
+pub fn append_g17_register_entry(record voidptr, stream_limit u64, selector u32, value u64) bool {
+	if record == unsafe { nil } || stream_limit < g17_3d_register_entry_size {
+		return false
+	}
+
+	unsafe {
+		base := &u8(record)
+		mut trailer := &G17RegisterStreamTrailer(base + g17_3d_register_gpu_address_offset)
+		if u64(trailer.byte_length) + g17_3d_register_entry_size > stream_limit {
+			return false
+		}
+		entry := base + g17_3d_register_stream_offset + u64(trailer.byte_length)
+		mut selector_word := &u32(entry)
+		*selector_word = (*selector_word & g17_3d_register_selector_mask) |
+			(selector & ~g17_3d_register_selector_mask)
+		mut encoded := value
+		C.memcpy(voidptr(entry + 4), &encoded, 8)
+		trailer.byte_length += u16(g17_3d_register_entry_size)
+		trailer.entry_count++
+	}
+	return true
+}
+
 // One preallocated channel-command slot ring. Apple keeps one of these per
 // command type in a 0x40-byte firmware-object block; only the fields the
 // allocator actually uses are modelled here.

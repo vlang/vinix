@@ -105,6 +105,8 @@ need byte-accurate implementations before enabling T6050.
 
 The channel-command pools are recovered: the slot-ring block layout, the
 allocation scan, and the exact byte size of all twelve named command types.
+The 3D command's register-list encoding is recovered as far as its 12-byte
+entry format and counters; its record framing is explicitly still open.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command

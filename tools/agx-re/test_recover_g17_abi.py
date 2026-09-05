@@ -3550,6 +3550,87 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_3d_register_lists(self) -> None:
+        code = bytearray(0x27DC)
+        for offset, word in {
+            0x034: 0x528000D8,
+            0x038: 0x72BFFF98,
+            0x0C0: 0x911C82B5,
+            0x0C4: 0xF10012FF,
+            0x0CC: 0x8B150329,
+            0x0D0: 0x91028128,
+            0x0D4: 0xB907A93F,
+            0x0D8: 0xF942226A,
+            0x0E4: 0xF903D12A,
+            0x100: 0x0A18014A,
+            0x188: 0xF800410A,
+            0x190: 0x794E1509,
+            0x194: 0x11003129,
+            0x198: 0x790E1509,
+            0x19C: 0x794E110A,
+            0x1A0: 0x1100054A,
+            0x1A4: 0x790E110A,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.GENERATE_REGISTER_LIST_3D: 0x700000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x700000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_3d_register_lists(b"")
+
+        self.assertEqual(recovered["passes"], 4)
+        self.assertEqual(recovered["stride"], 0x720)
+        self.assertEqual(recovered["stream_offset"], 0xA0)
+        self.assertEqual(recovered["entry_bytes"], 0xC)
+        self.assertEqual(recovered["selector_template_mask"], 0xFFFC0006)
+        self.assertEqual(recovered["gpu_base_descriptor_member"], 0x440)
+        # The framing is explicitly unresolved; no capacity may be reported.
+        self.assertFalse(recovered["record_framing_resolved"])
+        self.assertNotIn("entry_capacity", recovered)
+        self.assertNotIn("stream_capacity", recovered)
+
+    def test_rejects_changed_g17_3d_register_entry_stride(self) -> None:
+        code = bytearray(0x27DC)
+        for offset, word in {
+            0x034: 0x528000D8,
+            0x038: 0x72BFFF98,
+            0x0C0: 0x911C82B5,
+            0x0C4: 0xF10012FF,
+            0x0CC: 0x8B150329,
+            0x0D0: 0x91028128,
+            0x0D4: 0xB907A93F,
+            0x0D8: 0xF942226A,
+            0x0E4: 0xF903D12A,
+            0x100: 0x0A18014A,
+            0x188: 0xF800410A,
+            0x190: 0x794E1509,
+            0x194: 0x11004129,
+            0x198: 0x790E1509,
+            0x19C: 0x794E110A,
+            0x1A0: 0x1100054A,
+            0x1A4: 0x790E110A,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.GENERATE_REGISTER_LIST_3D: 0},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0, bytes(code))
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_3d_register_lists(b"")
+
     def test_recovers_g17_channel_command_pools(self) -> None:
         sizes_address = 0x600000
         alloc_address = 0x610000
