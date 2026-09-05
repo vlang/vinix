@@ -791,10 +791,10 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 					|| fw.g17_firmware_completion_has_firing_stamps(&entry)
 				continue
 			}
-			// Type 2 branches straight back to Apple's drain loop. Preserve
-			// that no-op behavior. Other accepted event records need their
-			// individual response ABIs before Vinix may continue after them.
-			if entry.event_type != fw.g17_firmware_event_host_noop {
+			// Types 2, 3, 5, 11, and 29 branch straight back to Apple's drain
+			// loop. Other accepted records need their individual response ABIs
+			// before Vinix may continue after them.
+			if !fw.g17_firmware_event_is_host_noop(entry.event_type) {
 				C.printf(c'agx: unsupported G17 firmware event %u on role %d\n',
 					entry.event_type, role)
 				mgr.state = .error

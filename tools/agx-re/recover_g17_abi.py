@@ -13193,8 +13193,13 @@ def recover_g17_firmware_event_ring(
     table_offset = virtual_to_file(driver, table_address)
     dispatch_offsets = struct.unpack_from("<16i", driver, table_offset)
     dispatch_anchor = role_address + 0x110
-    if dispatch_anchor + dispatch_offsets[2] != role_address + 0xBC:
-        raise ValueError("G17 firmware event type 2 is no longer a host no-op")
+    drain_loop = role_address + 0xBC
+    host_noop_types = (2, 3, 5, 11)
+    if any(
+        dispatch_anchor + dispatch_offsets[event_type] != drain_loop
+        for event_type in host_noop_types
+    ):
+        raise ValueError("G17 firmware event host no-op dispatch changed")
     require_instruction_words_at(
         role_code,
         "G17 firmware completion event",
@@ -13273,6 +13278,9 @@ def recover_g17_firmware_event_ring(
         "entries": mask_count[1],
         "entries_bytes": 0x4800,
         "accepted_event_mask": mask_count[0],
+        # Accepted types above the 0..15 jump-table range also return directly
+        # to the drain loop. The pinned accepted mask has only type 29 there.
+        "host_noop_event_types": [*host_noop_types, 29],
         "completion_event": {
             "type": 1,
             "firing_masks_offset": 4,

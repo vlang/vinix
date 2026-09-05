@@ -118,7 +118,7 @@ two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 separate GFX/GFX1 ASC and RTKit ownership, and the guarded dual-role root/ready
 handshake. The eight-entry t6050 interrupt topology now selects Apple's
 callback source 4, and Vinix can drain both validated 256-entry firmware event
-rings, preserve the recovered type-2 host no-op behavior, and translate the
+rings, preserve all five recovered host no-op event types, and translate the
 type-1 128-slot firing mask into fence-completion scans,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and

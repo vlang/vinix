@@ -48,6 +48,7 @@ pub const g17_firmware_event_entries_size = u64(0x4800)
 pub const g17_firmware_event_type_mask = u32(0x2000ffd3)
 pub const g17_firmware_event_completion = u32(1)
 pub const g17_firmware_event_host_noop = u32(2)
+pub const g17_firmware_event_host_noop_mask = u32(0x2000082c)
 pub const g17_firmware_event_flag_limit = u16(0x18)
 pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
@@ -2317,6 +2318,12 @@ pub fn g17_firmware_completion_has_firing_stamps(entry &G17FirmwareEventRingEntr
 	event := unsafe { &G17FirmwareCompletionEvent(entry) }
 	return event.firing[0] != 0 || event.firing[1] != 0 || event.firing[2] != 0
 		|| event.firing[3] != 0
+}
+
+@[inline]
+pub fn g17_firmware_event_is_host_noop(event_type u32) bool {
+	return event_type < 32
+		&& g17_firmware_event_host_noop_mask & (u32(1) << event_type) != 0
 }
 
 // Return -1 for corrupt ring state or an event outside Apple's checked mask,
