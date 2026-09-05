@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model layout test trace trace-resources clean
+.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model layout test trace trace-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -25,6 +25,9 @@ inspect:
 firmware:
 	./extract_firmware.py
 
+pmp-firmware:
+	./extract_pmp_firmware.py
+
 kernel-kexts:
 	./extract_fileset.py
 
@@ -42,7 +45,8 @@ check-g17-power-model:
 
 test:
 	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
-		test_extract_fileset.py test_recover_t6050_power.py test_recover_g17_abi.py \
+		test_extract_pmp_firmware.py test_extract_fileset.py \
+		test_recover_t6050_power.py test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \
 		test_trace_diff.py
 

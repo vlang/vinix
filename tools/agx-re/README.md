@@ -31,6 +31,7 @@ make -f GNUmakefile trace
 make -f GNUmakefile trace-resources
 make -f GNUmakefile layout
 make -f GNUmakefile firmware
+make -f GNUmakefile pmp-firmware
 make -f GNUmakefile kernel-kexts
 make -f GNUmakefile recover-t6050-power
 make -f GNUmakefile recover-g17-abi
@@ -62,7 +63,10 @@ It can also select a shared allocation by an observed JSON field:
 `objc_layout` records class, method, and ivar metadata exposed by the local
 Objective-C runtime. `extract_firmware.py` extracts only the matching G17C
 images from the local recovery volume and emits their hashes, Mach-O UUIDs,
-and virtual layouts. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
+and virtual layouts. `extract_pmp_firmware.py` accepts the local bare recovery
+IM4P or boot IMG4 form of `t6050pmp`, verifies its `pmpf` payload is an ARM64
+PRELOAD Mach-O, and records its hash, UUID, virtual layout, symbol count, and
+function-start-metadata boundary. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
 kernel collection and compacts the kernel, AGXG17X, firmware-buddy, and
 AppleARMPlatform/PMGR power-owner fileset entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
