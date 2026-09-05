@@ -38,19 +38,28 @@ struct G17QueueOwnership {
 	resources &gpu.G17QueueResources = unsafe { nil }
 }
 
+struct TimestampObject {
+	id   u32
+	va   u64
+	size u64
+	obj  &gem.GemObject = unsafe { nil }
+}
+
 pub struct GpuFile {
 pub mut:
-	dev           &drm.DrmDevice = unsafe { nil }
-	vms           []&mmu.UatContext
-	queues        []&workqueue.WorkQueue
-	mappings      []GpuMapping
-	objects       []&gem.GemObject
-	mmap_objects  []&gem.GemObject
-	g17_queues    []G17QueueOwnership
-	next_queue_id u32
-	owner_process_id u32
-	owner_key     u64
-	lock          klock.Lock
+	dev                &drm.DrmDevice = unsafe { nil }
+	vms                []&mmu.UatContext
+	queues             []&workqueue.WorkQueue
+	mappings           []GpuMapping
+	objects            []&gem.GemObject
+	mmap_objects       []&gem.GemObject
+	g17_queues         []G17QueueOwnership
+	timestamp_objects  []TimestampObject
+	next_queue_id      u32
+	next_timestamp_id  u32
+	owner_process_id   u32
+	owner_key          u64
+	lock               klock.Lock
 }
 
 __global (
@@ -109,10 +118,11 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 		return none
 	}
 	return &GpuFile{
-		dev: unsafe { dev }
-		next_queue_id: 1
+		dev:               unsafe { dev }
+		next_queue_id:     1
+		next_timestamp_id: 1
 		owner_process_id: u32(current.process.pid)
-		owner_key: owner_key
+		owner_key:         owner_key
 	}
 }
 
@@ -130,6 +140,18 @@ pub fn (mut f GpuFile) close() {
 		}
 	}
 	f.g17_queues.clear()
+	if manager != unsafe { nil } {
+		mut gpu_manager := unsafe { manager }
+		for object in f.timestamp_objects {
+			gpu_manager.unmap_g13_timestamp_buffer(object.va, object.size)
+			gem.unref(object.obj)
+		}
+	} else {
+		for object in f.timestamp_objects {
+			gem.unref(object.obj)
+		}
+	}
+	f.timestamp_objects.clear()
 
 	mgr := uat_mgr
 	if mgr != unsafe { nil } {
@@ -233,6 +255,32 @@ fn (mut f GpuFile) allocate_queue_id_locked() ?u32 {
 		}
 		if !used {
 			f.next_queue_id = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
+			return candidate
+		}
+		candidate = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
+		if candidate == start {
+			return none
+		}
+	}
+	return none
+}
+
+fn (mut f GpuFile) allocate_timestamp_id_locked() ?u32 {
+	mut candidate := f.next_timestamp_id
+	if candidate == 0 {
+		candidate = 1
+	}
+	start := candidate
+	for {
+		mut used := false
+		for object in f.timestamp_objects {
+			if object.id == candidate {
+				used = true
+				break
+			}
+		}
+		if !used {
+			f.next_timestamp_id = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
 			return candidate
 		}
 		candidate = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
@@ -519,6 +567,82 @@ pub fn (f &GpuFile) ioctl_get_time(data &ioctl.DrmAsahiGetTime) int {
 	}
 	request.gpu_timestamp = timer.get_ns()
 	return 0
+}
+
+pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) int {
+	mut request := unsafe { data }
+	if request.extensions != 0 || request.pad != 0 || request.vm_id != 0 {
+		return -22
+	}
+	match request.op {
+		ioctl.asahi_bind_object_op_bind {
+			if request.flags != ioctl.asahi_bind_object_usage_timestamps
+				|| request.object_handle != 0 || request.range == 0
+				|| request.offset & pgtable.uat_pg_mask != 0
+				|| request.range & pgtable.uat_pg_mask != 0 {
+				return -22
+			}
+			obj := f.get_object_ref(request.handle) or { return -2 }
+			if request.offset > obj.size || request.range > obj.size - request.offset
+				|| obj.phys_addr > u64(-1) - request.offset {
+				gem.unref(obj)
+				return -22
+			}
+			manager := gpu.get_global_manager() or {
+				gem.unref(obj)
+				return -19
+			}
+			mut gpu_manager := unsafe { manager }
+			va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset,
+				request.range) or {
+				gem.unref(obj)
+				return -12
+			}
+			f.lock.acquire()
+			id := f.allocate_timestamp_id_locked() or {
+				f.lock.release()
+				gpu_manager.unmap_g13_timestamp_buffer(va, request.range)
+				gem.unref(obj)
+				return -24
+			}
+			f.timestamp_objects << TimestampObject{
+				id: id
+				va: va
+				size: request.range
+				obj: obj
+			}
+			f.lock.release()
+			request.object_handle = id
+			return 0
+		}
+		ioctl.asahi_bind_object_op_unbind {
+			if request.flags != 0 || request.handle != 0 || request.offset != 0
+				|| request.range != 0 || request.object_handle == 0 {
+				return -22
+			}
+			manager := gpu.get_global_manager() or { return -19 }
+			f.lock.acquire()
+			mut found := TimestampObject{}
+			mut present := false
+			for index, object in f.timestamp_objects {
+				if object.id == request.object_handle {
+					found = object
+					f.timestamp_objects.delete(index)
+					present = true
+					break
+				}
+			}
+			f.lock.release()
+			if !present {
+				return -2
+			}
+			mut gpu_manager := unsafe { manager }
+			gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)
+			gem.unref(found.obj)
+			return 0
+		}
+		else { return -22 }
+	}
 }
 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
@@ -921,6 +1045,12 @@ fn ioctl_get_time_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int 
 	return f.ioctl_get_time(unsafe { &ioctl.DrmAsahiGetTime(data) })
 }
 
+fn ioctl_gem_bind_object_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
+	f := dispatch(handle, dev) or { return -19 }
+	mut file := unsafe { f }
+	return file.ioctl_gem_bind_object(unsafe { &ioctl.DrmAsahiGemBindObject(data) })
+}
+
 pub fn drm_ioctls() []drm.DrmIoctl {
 	return [
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_params, handler: ioctl_get_params_handler},
@@ -933,5 +1063,6 @@ pub fn drm_ioctls() []drm.DrmIoctl {
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_destroy, handler: ioctl_queue_destroy_handler},
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_submit, handler: ioctl_submit_handler},
 		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_time, handler: ioctl_get_time_handler},
+		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_bind_object, handler: ioctl_gem_bind_object_handler},
 	]
 }

@@ -33,6 +33,8 @@ pub const g13_shared_start = u64(0xffffffa800000000)
 pub const g13_shared_end = u64(0xffffffaa00000000)
 pub const g13_readonly_start = u64(0xffffffaa00000000)
 pub const g13_readonly_end = u64(0xffffffac00000000)
+pub const g13_timestamp_start = u64(0xffffffae10000000)
+pub const g13_timestamp_end = u64(0xffffffae14000000)
 
 // --- Individual allocation record ---
 
