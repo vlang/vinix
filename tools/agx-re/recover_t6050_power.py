@@ -42,6 +42,8 @@ PMP_SET_DEVICE_STATE = "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj"
 PMP_SET_VIRTUAL_DEVICE_STATE = (
     "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj"
 )
+PMP_INIT_V2 = "__ZN9ApplePMGR10_initPMPv2Ev"
+PMP_GET_DEVICE_INDEX = "__ZN9ApplePMGR18_getPMPDeviceIndexEtj"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
 
@@ -69,6 +71,9 @@ class PmgrDevice:
     index: int
     handle: int
     name: str
+    flags: int
+    pmp_selector: int
+    pmp_virtual_class: int
 
 
 def align_up(value: int, alignment: int) -> int:
@@ -247,7 +252,16 @@ def parse_pmgr_devices(data: bytes) -> list[PmgrDevice]:
         record = data[offset : offset + PMGR_DEVICE_BYTES]
         name = decode_cstring(record[PMGR_DEVICE_NAME_OFFSET:], "PMGR device name")
         handle = struct.unpack_from("<H", record, PMGR_DEVICE_HANDLE_OFFSET)[0]
-        result.append(PmgrDevice(index, handle, name))
+        result.append(
+            PmgrDevice(
+                index,
+                handle,
+                name,
+                record[0],
+                record[3],
+                int.from_bytes(record[15:16], "little", signed=True),
+            )
+        )
     return result
 
 
@@ -257,7 +271,19 @@ def resolve_gate(handle: int, devices: list[PmgrDevice]) -> dict[str, object]:
         names = ", ".join(device.name for device in matches) or "none"
         raise ValueError(f"power handle {handle:#x} has non-unique PMGR mapping: {names}")
     device = matches[0]
-    return {"handle": handle, "name": device.name, "record_index": device.index}
+    return {
+        "handle": handle,
+        "name": device.name,
+        "record_index": device.index,
+        "pmp_dispatch": {
+            "flags": device.flags,
+            "selector": device.pmp_selector,
+            "virtual_class": device.pmp_virtual_class,
+            "virtual_device": bool(
+                device.flags & 0x10 and device.pmp_virtual_class >= 0
+            ),
+        },
+    }
 
 
 def parse_pmp_soc_devices(data: bytes) -> list[dict[str, object]]:
@@ -270,6 +296,12 @@ def parse_pmp_soc_devices(data: bytes) -> list[dict[str, object]]:
             {
                 "index": index,
                 "id": struct.unpack_from("<I", record)[0],
+                # The stripped PMP firmware shifts this field left by three
+                # while assigning each record's SOC-DEV-PKT subrange.
+                "packet_bytes": struct.unpack_from("<I", record, 0x0C)[0],
+                # ApplePMGR assigns a dense virtual-dashboard index to every
+                # record with a nonzero word at +0x2c.
+                "virtual_state_config": struct.unpack_from("<I", record, 0x2C)[0],
                 "name": decode_cstring(
                     record[PMP_SOC_DEVICE_NAME_OFFSET:], "PMP SoC-device name"
                 ),
@@ -365,6 +397,25 @@ def _has_ldrb(code: bytes, destination: int, base: int, immediate: int) -> bool:
     return False
 
 
+def _has_words_in_order(code: bytes, expected: tuple[int, ...]) -> bool:
+    """Recognize a short UUID-pinned instruction slice with no gaps."""
+    if not expected:
+        return True
+    needle = struct.pack(f"<{len(expected)}I", *expected)
+    return code.find(needle) >= 0
+
+
+def _has_ordered_words(code: bytes, expected: tuple[int, ...]) -> bool:
+    """Recognize instruction words in program order while allowing a gap."""
+    offset = 0
+    for word in expected:
+        found = code.find(struct.pack("<I", word), offset)
+        if found < 0:
+            return False
+        offset = found + 4
+    return True
+
+
 def recover_pmp_code_contract(
     functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
 ) -> dict[str, object]:
@@ -373,13 +424,22 @@ def recover_pmp_code_contract(
         PMP_WRITE_DASHBOARD,
         PMP_SET_DEVICE_STATE,
         PMP_SET_VIRTUAL_DEVICE_STATE,
+        PMP_INIT_V2,
+        PMP_GET_DEVICE_INDEX,
         APPLE_PTD_READ,
         APPLE_PTD_WRITE,
     )
     missing = [name for name in required if name not in symbols]
     if missing:
         raise ValueError(f"ApplePMGR is missing power symbols: {missing!r}")
-    for name in (PMP_SEND_COMMAND, PMP_WRITE_DASHBOARD, PMP_SET_DEVICE_STATE):
+    for name in (
+        PMP_SEND_COMMAND,
+        PMP_WRITE_DASHBOARD,
+        PMP_SET_DEVICE_STATE,
+        PMP_SET_VIRTUAL_DEVICE_STATE,
+        PMP_INIT_V2,
+        PMP_GET_DEVICE_INDEX,
+    ):
         if name not in functions:
             raise ValueError(f"ApplePMGR has no code body for {name}")
 
@@ -394,6 +454,16 @@ def recover_pmp_code_contract(
     for target in (PMP_SET_DEVICE_STATE, PMP_SET_VIRTUAL_DEVICE_STATE):
         if symbols[target] not in dispatch_targets:
             raise ValueError(f"PMP dashboard no longer dispatches to {target}")
+    if not _has_ordered_words(
+        dispatch_code,
+        (
+            0x39400008,  # ldrb w8, [x0] -- DeviceData flags
+            0x362003C8,  # tbz w8, #4 -- ordinary-device fallback
+            0x39C03C08,  # ldrsb w8, [x0, #0xf] -- virtual class
+            0x37F80388,  # tbnz w8, #31 -- ordinary-device fallback
+        ),
+    ):
+        raise ValueError("PMP dashboard virtual-device dispatch predicate changed")
 
     state_address, state_code = functions[PMP_SET_DEVICE_STATE]
     state_targets = direct_branch_targets(state_address, state_code)
@@ -405,10 +475,124 @@ def recover_pmp_code_contract(
         if symbols[target] not in state_targets:
             raise ValueError(f"PMP device dashboard no longer calls {target}")
 
+    _init_address, init_code = functions[PMP_INIT_V2]
+    # this+0x72848; memset(..., 0xff, 0x404).  The 0x404-byte allocation is
+    # 257 signed u32 entries.  Lookups admit only selectors below 256; the
+    # purpose of the extra initialized word is deliberately not inferred.
+    if not _has_words_in_order(
+        init_code,
+        (
+            0x9141CA68,  # add x8, x19, #0x72000
+            0x91212117,  # add x23, x8, #0x848
+            0xAA1703E0,  # mov x0, x23
+            0x52801FE1,  # mov w1, #0xff
+            0x52808082,  # mov w2, #0x404
+        ),
+    ):
+        raise ValueError("initPMPv2 no longer initializes the device-index table")
+    if not _has_words_in_order(
+        init_code,
+        (
+            0x9141CA68,  # add x8, x19, #0x72000
+            0x91313118,  # add x24, x8, #0xc4c
+            0xAA1803E0,  # mov x0, x24
+            0x52801FE1,  # mov w1, #0xff
+            0x52808082,  # mov w2, #0x404
+        ),
+    ):
+        raise ValueError("initPMPv2 no longer initializes the virtual-state table")
+    if not _has_words_in_order(
+        init_code,
+        (
+            0xB94002CB,  # ldr w11, [x22] -- soc-device ID
+            0xD37EF56B,  # lsl x11, x11, #2
+        ),
+    ) or not _has_ordered_words(
+        init_code,
+        (
+            0xB9000188,  # str w8, [x12] -- table[ID] = record index
+            0x91000508,  # add x8, x8, #1
+            0x9101F2D6,  # add x22, x22, #0x7c
+        ),
+    ):
+        raise ValueError("initPMPv2 no longer maps SoC-device IDs to record indices")
+    if not _has_ordered_words(
+        init_code,
+        (
+            0xB9402ECB,  # ldr w11, [x22, #0x2c]
+            0xB94002CB,  # ldr w11, [x22] -- soc-device ID
+            0xB9000189,  # str w9, [x12] -- dense virtual-state index
+            0x11000529,  # add w9, w9, #1
+        ),
+    ):
+        raise ValueError("initPMPv2 no longer constructs the virtual-state table")
+
+    _lookup_address, lookup_code = functions[PMP_GET_DEVICE_INDEX]
+    if not _has_words_in_order(
+        lookup_code,
+        (
+            0x39400C08,  # ldrb w8, [x0, #3]
+            0x9141CA69,  # add x9, x19, #0x72000
+            0x9120E129,  # add x9, x9, #0x838
+            0xB9400129,  # ldr w9, [x9]
+            0x1B142128,  # madd w8, w9, w20, w8
+            0x7104011F,  # cmp w8, #0x100
+        ),
+    ) or not _has_words_in_order(
+        lookup_code,
+        (
+            0x9141CA69,  # add x9, x19, #0x72000
+            0x91212129,  # add x9, x9, #0x848
+        ),
+    ):
+        raise ValueError("getPMPDeviceIndex no longer uses selector + die*stride")
+
+    virtual_address, virtual_code = functions[PMP_SET_VIRTUAL_DEVICE_STATE]
+    virtual_targets = direct_branch_targets(virtual_address, virtual_code)
+    if not _has_cmp_w_immediate(virtual_code, source=3, immediate=2):
+        raise ValueError("PMP virtual-device dashboard no longer bounds state to 0/1")
+    if not _has_ldrb(virtual_code, destination=8, base=0, immediate=3):
+        raise ValueError("PMP virtual-device selector is no longer DeviceData byte 3")
+    if not _has_ordered_words(
+        virtual_code,
+        (
+            0x9131314A,  # add x10, x10, #0xc4c -- virtual-state table
+            0xB9400179,  # ldr w25, [x11] -- dense PTD entry index
+        ),
+    ):
+        raise ValueError("PMP virtual-device dashboard no longer uses its dense map")
+    if symbols[APPLE_PTD_WRITE] not in virtual_targets:
+        raise ValueError("PMP virtual-device dashboard no longer writes ApplePTD")
+
     return {
         "device_state_commands": [14, 15],
         "device_states": [0, 1],
         "device_index_field": 3,
+        "device_dispatch": {
+            "virtual_flag": 0x10,
+            "virtual_class_field": 15,
+            "virtual_class_minimum": 0,
+        },
+        "device_index_map": {
+            "source": "soc-device",
+            "key_offset": 0,
+            "value": "record index",
+            "record_stride": PMP_SOC_DEVICE_BYTES,
+            "initial_value": -1,
+            "allocated_entries": 257,
+            "lookup_entries": 256,
+            "selector_field": 3,
+            "die_stride_object_offset": 0x72838,
+            "table_object_offset": 0x72848,
+        },
+        "virtual_state_map": {
+            "source": "nonzero soc-device word at +0x2c",
+            "key": "soc-device id",
+            "value": "dense PTD entry index",
+            "initial_value": -1,
+            "allocated_entries": 257,
+            "table_object_offset": 0x72C4C,
+        },
         "transport": "PTD dashboard request/ack bitsets",
     }
 
@@ -420,7 +604,14 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
     symbols = macho_symbols(image)
     functions = {
         name: symbol_code(image, name)
-        for name in (PMP_SEND_COMMAND, PMP_WRITE_DASHBOARD, PMP_SET_DEVICE_STATE)
+        for name in (
+            PMP_SEND_COMMAND,
+            PMP_WRITE_DASHBOARD,
+            PMP_SET_DEVICE_STATE,
+            PMP_SET_VIRTUAL_DEVICE_STATE,
+            PMP_INIT_V2,
+            PMP_GET_DEVICE_INDEX,
+        )
     }
     return {
         "uuid": identity,
@@ -475,7 +666,11 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
 
     soc_devices = parse_pmp_soc_devices(nub.property("soc-device"))
     agx_devices = [device for device in soc_devices if device["name"] == "AGX"]
-    if len(agx_devices) != 1 or agx_devices[0]["id"] != 0x10:
+    if (
+        len(agx_devices) != 1
+        or agx_devices[0]["id"] != 0x10
+        or agx_devices[0]["index"] != 15
+    ):
         raise ValueError(f"unexpected PMP AGX SoC-device records: {agx_devices!r}")
 
     ptd_ranges = parse_pmp_ptd_ranges(nub.property("ptd-range"))
@@ -500,6 +695,36 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     if any(item["id"] not in power_range_ids for item in dashboard.values()):
         raise ValueError("PMP power PTD list omits a device-state dashboard range")
 
+    packet_range = dashboard["SOC-DEV-PKT"]
+    packet_cursor = int(packet_range["entry_offset"])
+    virtual_state_index = 0
+    for device in soc_devices:
+        packet_bits = int(device["packet_bytes"]) * 8
+        device["packet_bit_offset"] = packet_cursor
+        device["packet_bit_count"] = packet_bits
+        packet_cursor += packet_bits
+        if int(device["virtual_state_config"]):
+            device["virtual_state_index"] = virtual_state_index
+            virtual_state_index += 1
+        else:
+            device["virtual_state_index"] = None
+    packet_end = int(packet_range["entry_offset"]) + int(packet_range["entry_count"])
+    if packet_cursor > packet_end:
+        raise ValueError("PMP SoC-device packet slices exceed SOC-DEV-PKT")
+    agx_device = agx_devices[0]
+    expected_agx_layout = (0x1C0, 8, 3)
+    actual_agx_layout = (
+        agx_device["packet_bit_offset"],
+        agx_device["packet_bit_count"],
+        agx_device["virtual_state_index"],
+    )
+    if actual_agx_layout != expected_agx_layout:
+        raise ValueError(f"PMP AGX packet layout changed: {actual_agx_layout!r}")
+    if packet_end - packet_cursor != 16:
+        raise ValueError(
+            f"PMP SOC-DEV-PKT trailing reserve changed: {packet_end - packet_cursor} bits"
+        )
+
     gfx_handles: dict[str, dict[str, object]] = {}
     for handle, expected_name in ((0x266, "GFX_ASC"), (0x291, "GFX_ASC1")):
         gate = resolve_gate(handle, devices)
@@ -510,7 +735,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         gfx_handles[expected_name] = gate
 
     return {
-        "schema": 1,
+        "schema": 2,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -525,7 +750,19 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             "firmware": "t6050pmp",
             "region_base": decode_integer(nub.property("region-base"), "PMP region-base"),
             "region_size": decode_integer(nub.property("region-size"), "PMP region-size"),
-            "agx_soc_device": agx_devices[0],
+            "agx_soc_device": agx_device,
+            "soc_device_count": len(soc_devices),
+            "soc_device_packet": {
+                "unit": "bits",
+                "consumed_bits": packet_cursor - int(packet_range["entry_offset"]),
+                "trailing_reserved_bits": packet_end - packet_cursor,
+            },
+            "device_index_map": {
+                "key": "soc-device id",
+                "value": "soc-device record index",
+                "agx_key": agx_device["id"],
+                "agx_value": agx_device["index"],
+            },
             "device_state_dashboard": dashboard,
         },
     }

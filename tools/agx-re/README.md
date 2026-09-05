@@ -79,9 +79,11 @@ records. It fails closed unless the installed T6050 image maps them, in order,
 to `GFX_SGX` and `GFX_BUSY`, identifies both GFX ASC handles, and proves that
 the AGX SoC-device record and device-state request/ack PTD ranges belong to the
 `t6050pmp` RTKit nub. It also checks the UUID-pinned ApplePMGR binary for the
-command-14/15 PTD-dashboard dispatch and its state/index bounds. Its sanitized
-JSON report is written under `build/`; raw Apple DeviceTree or executable bytes
-are never repository inputs.
+command-14/15 PTD-dashboard dispatch, its state/index bounds, and the exact
+host-built selector maps. The report separates the SoC-device ID, record
+index, dense virtual-state index, and SOC-DEV-PKT bit slice; those values are
+not interchangeable. Its sanitized JSON report is written under `build/`; raw
+Apple DeviceTree or executable bytes are never repository inputs.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
