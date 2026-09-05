@@ -4806,6 +4806,36 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(expression["taken"]["value"], 7)
         self.assertEqual(expression["fallthrough"]["member"], 0x760)
 
+    def test_recovers_g17_four_way_compare_merge(self) -> None:
+        instructions = [
+            (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
+            (0x04, ldr_w(9, 19, 0x8C8)),
+            (0x08, 0x7100213F),  # cmp w9, #8
+            (0x0C, b_cond(0x0C, 0x30, 0)),
+            (0x10, 0x7100113F),  # cmp w9, #4
+            (0x14, b_cond(0x14, 0x28, 0)),
+            (0x18, 0x7100093F),  # cmp w9, #2
+            (0x1C, b_cond(0x1C, 0x34, 1)),
+            (0x20, 0xB2400084),  # orr x4, x4, #1
+            (0x24, b(0x24, 0x34)),
+            (0x28, 0xB27F0084),  # orr x4, x4, #2
+            (0x2C, b(0x2C, 0x34)),
+            (0x30, 0xB2400484),  # orr x4, x4, #3
+            (0x34, 0xD503201F),
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 14)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "multiway_select")
+        self.assertEqual(expression["selector"]["member"], 0x8C8)
+        self.assertEqual(expression["default"]["member"], 0x760)
+        self.assertEqual(
+            [case["equals"] for case in expression["cases"]], [8, 4, 2]
+        )
+        self.assertEqual(
+            [case["value"]["immediate"] for case in expression["cases"]],
+            [3, 2, 1],
+        )
+
     def test_rejects_g17_ambiguous_conditional_branch_merge(self) -> None:
         instructions = [
             (0x00, 0xF943B264),  # ldr x4, [x19, #0x760]
@@ -4870,6 +4900,21 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(expression["immediate"], 0xF860)
         self.assertEqual(expression["shift"], 0)
         self.assertEqual(expression["source"]["operation"], "orr")
+
+    def test_recovers_bounded_deep_g17_value_expression(self) -> None:
+        instructions = [(0x00, 0xF943B268)]  # ldr x8, [x19, #0x760]
+        instructions.extend(
+            (index * 4, 0xB2400108)  # orr x8, x8, #1
+            for index in range(1, 15)
+        )
+        instructions.append((0x3C, 0xAA0803E4))  # mov x4, x8
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 16)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "copy")
+        for _ in range(14):
+            expression = expression["source"]
+            self.assertEqual(expression["operation"], "orr")
+        self.assertEqual(expression["source"]["member"], 0x760)
 
     def test_recovers_g17_dup_count_virtual_call_expression(self) -> None:
         blraa_x9_x17 = 0xD73F0800 | 9 << 5 | 17

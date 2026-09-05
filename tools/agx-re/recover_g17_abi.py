@@ -511,6 +511,7 @@ COMPLETE_COMMAND_3D = "__ZN22AGX3DCommandDescriptor8completeEv"
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 10
 VALUE_ARGUMENT_WINDOW = 20
+G17_VALUE_EXPRESSION_MAX_DEPTH = 16
 RCE_ENCODE_ENTRY = "__ZNK36AGX·PI_300·X·A0·RCEBufferEncoder11encodeEntryEPvjhy"
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 G17_ACCELERATOR_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
@@ -1755,6 +1756,102 @@ def trace_g17_condition_expression(
     return None
 
 
+def trace_g17_four_way_compare_merge(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    register: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Recover Apple's compact 8/4/2/default register initialization."""
+
+    definition_index = next(
+        (
+            index
+            for index in range(use_index - 1, -1, -1)
+            if g17_register_is_written(instructions[index][1], register)
+        ),
+        None,
+    )
+    if definition_index is None or definition_index < 10:
+        return None
+    start = definition_index - 10
+    block = instructions[start : definition_index + 2]
+    if len(block) != 12:
+        return None
+    join = block[11][0]
+
+    compares = []
+    for relative, immediate in ((0, 8), (2, 4), (4, 2)):
+        decoded = decode_add_sub_immediate_value(block[relative][1])
+        if (
+            decoded is None
+            or decoded["operation"] != "sub"
+            or decoded["destination_register"] != 31
+            or decoded["immediate"] != immediate
+            or decoded["bytes"] != 4
+            or not block[relative][1] & (1 << 29)
+        ):
+            return None
+        compares.append(int(decoded["source_register"]))
+    if len(set(compares)) != 1 or compares[0] == 31:
+        return None
+
+    expected_branches = (
+        (1, "eq", block[10][0]),
+        (3, "eq", block[8][0]),
+        (5, "ne", join),
+    )
+    for relative, condition, target in expected_branches:
+        decoded = decode_conditional_branch(*block[relative])
+        if decoded != (target, condition):
+            return None
+    if decode_b_target(*block[7]) != join or decode_b_target(*block[9]) != join:
+        return None
+
+    for relative, immediate in ((6, 1), (8, 2), (10, 3)):
+        logical = decode_logical_immediate_x(block[relative][1])
+        if (
+            logical is None
+            or logical[:3] != ("orr", register, register)
+            or logical[3] != immediate
+        ):
+            return None
+
+    selector = trace_g17_value_expression(
+        instructions, start, compares[0], depth + 1, seen
+    )
+    base = trace_g17_value_expression(
+        instructions, start, register, depth + 1, seen
+    )
+    if selector is None or base is None:
+        return None
+
+    def value_with_bits(immediate: int) -> dict[str, object]:
+        return {
+            "kind": "expression",
+            "producer_offset": block[{1: 6, 2: 8, 3: 10}[immediate]][0],
+            "operation": "orr",
+            "bytes": 8,
+            "immediate": immediate,
+            "source": base,
+        }
+
+    return {
+        "kind": "expression",
+        "producer_offset": block[0][0],
+        "operation": "multiway_select",
+        "selector": selector,
+        "cases": [
+            {"equals": 8, "value": value_with_bits(3)},
+            {"equals": 4, "value": value_with_bits(2)},
+            {"equals": 2, "value": value_with_bits(1)},
+        ],
+        "default": base,
+        "join_offset": join,
+    }
+
+
 def trace_g17_control_flow_merge(
     instructions: list[tuple[int, int]],
     use_index: int,
@@ -1936,7 +2033,7 @@ def trace_g17_value_expression(
     """Build a conservative expression tree for one integer register value."""
 
     key = (use_index, register)
-    if depth > 12 or key in seen:
+    if depth > G17_VALUE_EXPRESSION_MAX_DEPTH or key in seen:
         return None
     if register == 0:
         known_call = trace_g17_known_call_return(
@@ -1948,9 +2045,13 @@ def trace_g17_value_expression(
         instructions, use_index, register
     )
     if definition_index is None:
-        merge = trace_g17_control_flow_merge(
+        merge = trace_g17_four_way_compare_merge(
             instructions, use_index, register, depth, seen
         )
+        if merge is None:
+            merge = trace_g17_control_flow_merge(
+                instructions, use_index, register, depth, seen
+            )
         if merge is not None:
             return merge
         if (
