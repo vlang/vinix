@@ -35,6 +35,10 @@ pub const g13_shared_start = u64(0xffffffa800000000)
 pub const g13_shared_end = u64(0xffffffaa00000000)
 pub const g13_readonly_start = u64(0xffffffaa00000000)
 pub const g13_readonly_end = u64(0xffffffac00000000)
+// RTKit system endpoints allocate crash/log/report buffers from this dedicated
+// 256 MiB kernel-UAT range. It must not overlap regular firmware structures.
+pub const g13_rtkit_start = u64(0xffffffae00000000)
+pub const g13_rtkit_end = u64(0xffffffae10000000)
 pub const g13_timestamp_start = u64(0xffffffae10000000)
 pub const g13_timestamp_end = u64(0xffffffae14000000)
 

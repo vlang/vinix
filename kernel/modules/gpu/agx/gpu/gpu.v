@@ -30,6 +30,7 @@ pub const msg_init = u64(0x81) << 48
 pub const msg_tx_doorbell = u64(0x83) << 48
 pub const msg_fwctl = u64(0x84) << 48
 pub const msg_halt = u64(0x85) << 48
+pub const msg_rx_doorbell = u64(0x42) << 48
 const msg_address_mask = (u64(1) << 44) - 1
 
 // G13 v12.3 doorbell selectors. Pipe doorbells use the pipe type in bits 1:0
@@ -55,6 +56,7 @@ const buffer_allocator_g13_shared = u32(2)
 const buffer_allocator_g13_readonly = u32(3)
 const buffer_allocator_fixed = u32(4)
 const buffer_allocator_g13_gpu_readonly = u32(5)
+const buffer_allocator_g13_rtkit = u32(6)
 
 // GPU states
 pub enum GpuState {
@@ -90,21 +92,24 @@ pub mut:
 	g13_gpu_readonly alloc.HeapAllocator
 	g13_shared       alloc.HeapAllocator
 	g13_readonly     alloc.HeapAllocator
+	g13_rtkit        alloc.HeapAllocator
 	g13_timestamp    alloc.HeapAllocator
 	initdata_va      u64
 	initdata_phys    u64
 	state            GpuState
 	lock             klock.Lock
 mut:
-	g13_channels     &G13ChannelAllocations = unsafe { nil }
-	g13_events       G13EventResources
-	g13_queues       []&G13QueueResources
-	g13_compute_jobs []&G13ComputeJobResources
-	g13_render_jobs  []&G13RenderJobResources
-	g13_tvb_slots    [fw.g13_tvb_slot_count]bool
-	g17_graph        &G17FirmwareGraph = unsafe { nil }
-	g17_queues       []&G17QueueResources
-	fwctl_lock       klock.Lock
+	g13_channels      &G13ChannelAllocations = unsafe { nil }
+	g13_events        G13EventResources
+	g13_queues        []&G13QueueResources
+	g13_compute_jobs  []&G13ComputeJobResources
+	g13_render_jobs   []&G13RenderJobResources
+	g13_tvb_slots     [fw.g13_tvb_slot_count]bool
+	g17_graph         &G17FirmwareGraph = unsafe { nil }
+	g17_queues        []&G17QueueResources
+	fwctl_lock        klock.Lock
+	rtkit_buffer_lock klock.Lock
+	rtkit_buffers     []SharedBuffer
 }
 
 __global (
@@ -145,7 +150,11 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		g13_gpu_readonly: alloc.new_heap('g13-gpu-readonly', alloc.g13_gpu_readonly_start, alloc.g13_gpu_readonly_end)
 		g13_shared: alloc.new_heap('g13-shared', alloc.g13_shared_start, alloc.g13_shared_end)
 		g13_readonly: alloc.new_heap('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end)
+		g13_rtkit: alloc.new_heap('g13-rtkit', alloc.g13_rtkit_start, alloc.g13_rtkit_end)
 		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
+	}
+	if cfg.gpu_gen == .g13 {
+		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
 	}
 
 	return mgr
@@ -227,6 +236,24 @@ mut:
 @[inline]
 fn (buffer &SharedBuffer) cpu_address() voidptr {
 	return voidptr(buffer.phys + higher_half)
+}
+
+// RTKit calls this while servicing system-endpoint buffer requests. Keep every
+// allocation owned by the manager until the ASC has been stopped.
+fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
+	if context == unsafe { nil } {
+		return 0
+	}
+	mut mgr := unsafe { &GpuManager(context) }
+	if mgr.hw_config.gpu_gen != .g13 {
+		return 0
+	}
+	buffer := alloc_buffer_from_heap(mut mgr.g13_rtkit, size, pgtable.gpu_prot_fw_shared_rw, buffer_allocator_g13_rtkit) or { return 0 }
+	iova := buffer.va
+	mgr.rtkit_buffer_lock.acquire()
+	mgr.rtkit_buffers << buffer
+	mgr.rtkit_buffer_lock.release()
+	return iova
 }
 
 struct G13ChannelAllocations {
@@ -412,6 +439,7 @@ fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
 			buffer_allocator_g13_shared { mgr.g13_shared.release(buffer.va) }
 			buffer_allocator_g13_readonly { mgr.g13_readonly.release(buffer.va) }
 			buffer_allocator_g13_gpu_readonly { mgr.g13_gpu_readonly.release(buffer.va) }
+			buffer_allocator_g13_rtkit { mgr.g13_rtkit.release(buffer.va) }
 			else {}
 		}
 	}
@@ -427,6 +455,18 @@ fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
 fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 	unmap_shared_buffer(mut buffer)
 	mgr.release_shared_buffer_backing(mut buffer)
+}
+
+fn (mut mgr GpuManager) release_rtkit_buffers() {
+	mgr.rtkit_buffer_lock.acquire()
+	mut count := mgr.rtkit_buffers.len
+	for count > 0 {
+		count--
+		mgr.free_shared_buffer(mut mgr.rtkit_buffers[count])
+	}
+	mgr.rtkit_buffers.clear()
+	mgr.g13_rtkit.gc()
+	mgr.rtkit_buffer_lock.release()
 }
 
 fn (mut mgr GpuManager) alloc_g13_channel_pair(mut allocations G13ChannelAllocations,
@@ -649,6 +689,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 
 fn (mut mgr GpuManager) fail_g13_initialization() bool {
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_rtkit_buffers()
 	mgr.release_g13_channels()
 	mgr.release_g13_event_resources_locked()
 	mgr.initdata_va = 0
@@ -1032,8 +1073,62 @@ pub fn (mut mgr GpuManager) handle_event() {
 	}
 }
 
+fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg) bool {
+	return match role {
+		0 { mgr.rtk.handle_system_message(msg) }
+		1 {
+			if mgr.firmware_roles == 2 {
+				mgr.secondary_rtk.handle_system_message(msg)
+			} else {
+				false
+			}
+		}
+		else { false }
+	}
+}
+
+// Drain the ASC transport even though ring channels are polled separately.
+// Doorbells are notifications only, but leaving them in the mailbox eventually
+// back-pressures firmware and prevents later system endpoint messages.
+fn (mut mgr GpuManager) poll_rtkit_messages() bool {
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		for _ in 0 .. 256 {
+			msg := mgr.recv_role_message(role) or { break }
+			ep := mailbox.msg_endpoint(&msg)
+			if ep < u8(ep_firmware) {
+				if !mgr.handle_role_system_message(role, msg) {
+					return false
+				}
+				continue
+			}
+			if ep == u8(ep_firmware) && msg.data0 == msg_rx_doorbell {
+				continue
+			}
+			C.printf(c'agx: unexpected RTKit role=%u ep=0x%x message=0x%llx\n', role, ep, msg.data0)
+		}
+	}
+	return true
+}
+
+fn (mut mgr GpuManager) drain_auxiliary_channels() {
+	mut buf := [256]u8{}
+	for subchannel := u32(0); subchannel < 6; subchannel++ {
+		for mgr.channels.fw_log.dequeue_subchannel(voidptr(&buf[0]), subchannel) {
+		}
+	}
+	for mgr.channels.ktrace.dequeue(voidptr(&buf[0])) {
+	}
+	for mgr.channels.stats.dequeue(voidptr(&buf[0])) {
+	}
+}
+
 fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
+		if !mgr.poll_rtkit_messages() {
+			C.printf(c'agx: RTKit system endpoint failed\n')
+			mgr.state = .error
+			break
+		}
 		mgr.handle_event()
 		if mgr.state != .running {
 			break
@@ -1041,6 +1136,7 @@ fn event_worker(mut mgr GpuManager) {
 		event.scan_all_completions()
 		mgr.reap_g13_render_jobs()
 		mgr.reap_g13_compute_jobs()
+		mgr.drain_auxiliary_channels()
 		sched.yield(false)
 	}
 	if mgr.state == .error {
@@ -1060,6 +1156,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_rtkit_buffers()
 	mgr.release_all_g13_render_jobs()
 	mgr.release_all_g13_compute_jobs()
 	mgr.release_all_g13_queue_resources()

@@ -63,6 +63,9 @@ pub fn (mut mbox Mailbox) send(msg MboxMsg) bool {
 	for i := 0; i < 1000000; i++ {
 		status := mbox.read_reg(mbox_a2i_ctrl)
 		if status & mbox_full == 0 {
+			// The high-word MMIO write publishes this message to the IOP.
+			// Make every preceding shared-memory write globally visible first.
+			cpu.dmb_sy()
 			// Write data low first, then high (write to high triggers send)
 			mbox.write_reg(mbox_a2i_send0, u32(msg.data0))
 			mbox.write_reg(mbox_a2i_send0 + 4, u32(msg.data0 >> 32))
@@ -91,6 +94,9 @@ pub fn (mut mbox Mailbox) recv() ?MboxMsg {
 	lo := mbox.read_reg(mbox_i2a_recv0)
 	hi := mbox.read_reg(mbox_i2a_recv0 + 4)
 	flags := mbox.read_reg(mbox_i2a_recv1)
+	// The message may advertise data the IOP just wrote to shared memory.
+	// Prevent later consumers from observing that memory before the FIFO read.
+	cpu.dmb_sy()
 
 	return MboxMsg{
 		data0: u64(lo) | (u64(hi) << 32)
