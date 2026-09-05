@@ -1035,10 +1035,18 @@ pub fn (mut mgr GpuManager) handle_event() {
 fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		mgr.handle_event()
+		if mgr.state != .running {
+			break
+		}
 		event.scan_all_completions()
 		mgr.reap_g13_render_jobs()
 		mgr.reap_g13_compute_jobs()
 		sched.yield(false)
+	}
+	if mgr.state == .error {
+		// Stop every firmware CPU before failure callbacks release userspace
+		// mappings. shutdown() then signals all retained jobs as failed.
+		mgr.shutdown()
 	}
 }
 

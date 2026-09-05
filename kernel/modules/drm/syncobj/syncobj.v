@@ -25,26 +25,32 @@ pub mut:
 	waiters  []&FenceWaiter
 }
 
+struct TimelinePoint {
+	value u64
+	fence &DmaFence = unsafe { nil }
+}
+
 pub struct SyncObj {
 pub mut:
 	handle u32
 	fence  &DmaFence = unsafe { nil }
 	lock   klock.Lock
 mut:
-	owner u64
+	owner           u64
+	timeline_points []TimelinePoint
 }
 
 const syncobj_max_objects = u32(1024)
 
 __global (
-	syncobj_table   [1024]&SyncObj
-	syncobj_lock    klock.Lock
+	syncobj_table [1024]&SyncObj
+	syncobj_lock  klock.Lock
 )
 
 // Create a new DMA fence with the given context and sequence number.
 pub fn new_fence(context u64, seqno u64) &DmaFence {
 	return &DmaFence{
-		seqno:   seqno
+		seqno: seqno
 		context: context
 	}
 }
@@ -98,6 +104,17 @@ pub fn is_signaled(fence &DmaFence) bool {
 		return true // a null fence is considered signaled
 	}
 	return katomic.load(&fence.signaled)
+}
+
+pub fn get_error(fence &DmaFence) int {
+	if fence == unsafe { nil } {
+		return 0
+	}
+	mut f := unsafe { fence }
+	f.lock.acquire()
+	error := f.error
+	f.lock.release()
+	return error
 }
 
 // Busy-wait for a fence to become signaled, with a timeout in nanoseconds.
@@ -264,4 +281,72 @@ pub fn replace_fence(obj &SyncObj, fence &DmaFence) {
 	o.lock.acquire()
 	o.fence = unsafe { fence }
 	o.lock.release()
+}
+
+// Snapshot a binary syncobj fence under its object lock. Fence allocations
+// are intentionally retained after handle destruction, so the returned
+// pointer remains valid for an in-flight submission.
+pub fn get_fence(obj &SyncObj) ?&DmaFence {
+	if obj == unsafe { nil } {
+		return none
+	}
+	mut o := unsafe { obj }
+	o.lock.acquire()
+	defer {
+		o.lock.release()
+	}
+	if o.fence == unsafe { nil } {
+		return none
+	}
+	return unsafe { o.fence }
+}
+
+// Associate an Asahi timeline point with a fence. The unstable Asahi UAPI
+// uses timeline syncobjs internally even when generic DRM timeline ioctls are
+// unavailable. Values must advance monotonically for a given object.
+pub fn add_timeline_point(obj &SyncObj, value u64, fence &DmaFence) bool {
+	if obj == unsafe { nil } || fence == unsafe { nil } || value == 0 {
+		return false
+	}
+	mut o := unsafe { obj }
+	o.lock.acquire()
+	defer {
+		o.lock.release()
+	}
+	mut latest := u64(0)
+	for point in o.timeline_points {
+		if point.value == value {
+			return false
+		}
+		if point.value > latest {
+			latest = point.value
+		}
+	}
+	if value <= latest {
+		return false
+	}
+	o.timeline_points << TimelinePoint{
+		value: value
+		fence: unsafe { fence }
+	}
+	return true
+}
+
+// Resolve a previously submitted point. Keeping exact points avoids treating
+// an out-of-order later fence as completion of an earlier dependency.
+pub fn get_timeline_fence(obj &SyncObj, value u64) ?&DmaFence {
+	if obj == unsafe { nil } || value == 0 {
+		return none
+	}
+	mut o := unsafe { obj }
+	o.lock.acquire()
+	defer {
+		o.lock.release()
+	}
+	for point in o.timeline_points {
+		if point.value == value && point.fence != unsafe { nil } {
+			return unsafe { point.fence }
+		}
+	}
+	return none
 }

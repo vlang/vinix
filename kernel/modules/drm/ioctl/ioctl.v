@@ -130,6 +130,18 @@ pub const asahi_barrier_none = u32(0xffffffff)
 pub const asahi_sync_syncobj = u32(0)
 pub const asahi_sync_timeline_syncobj = u32(1)
 
+pub const asahi_status_pending = u32(0)
+pub const asahi_status_complete = u32(1)
+pub const asahi_status_unknown_error = u32(2)
+pub const asahi_status_timeout = u32(3)
+pub const asahi_status_fault = u32(4)
+pub const asahi_status_killed = u32(5)
+pub const asahi_status_no_device = u32(6)
+pub const asahi_status_channel_error = u32(7)
+pub const asahi_result_render_tvb_grow_ovf = u64(1) << 0
+pub const asahi_result_render_tvb_grow_min = u64(1) << 1
+pub const asahi_result_render_tvb_overflowed = u64(1) << 2
+
 // Global parameter group returned by DRM_ASAHI_GET_PARAMS. The fixed array is
 // deliberately 32 u64s: Mesa indexes it by cluster, even when the GPU exposes
 // fewer active clusters.

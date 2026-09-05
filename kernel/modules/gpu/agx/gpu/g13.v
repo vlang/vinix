@@ -128,6 +128,8 @@ pub mut:
 	released           bool
 	completion         fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
 	completion_data    voidptr
+	completion_result  fw.G13JobTimestamps
+	completion_ready   bool
 }
 
 pub struct G13RenderCommand {
@@ -223,6 +225,18 @@ mut:
 	aux_framebuffer    &mmu.UatBuffer = unsafe { nil }
 }
 
+pub struct G13RenderResultValues {
+pub:
+	vertex_start      u64
+	vertex_end        u64
+	fragment_start    u64
+	fragment_end      u64
+	tvb_size_bytes    u64
+	tvb_usage_bytes   u64
+	num_tvb_overflows u32
+	overflowed        bool
+}
+
 pub struct G13RenderJobResources {
 pub mut:
 	vertex_event_slot       u32
@@ -249,18 +263,8 @@ pub mut:
 	completion              fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	completion_data         voidptr
 	tvb_size_bytes          u64
-}
-
-pub struct G13RenderResultValues {
-pub:
-	vertex_start      u64
-	vertex_end        u64
-	fragment_start    u64
-	fragment_end      u64
-	tvb_size_bytes    u64
-	tvb_usage_bytes   u64
-	num_tvb_overflows u32
-	overflowed        bool
+	completion_result       G13RenderResultValues
+	completion_result_ready bool
 }
 
 pub struct G13QueueResources {
@@ -1725,9 +1729,14 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 			continue
 		}
 		mut owned := unsafe { job }
-		complete_g13_render_job(mut owned, true)
+		owned.completion_result = read_g13_render_result(owned)
+		owned.completion_result_ready = true
 		if mgr.free_g13_render_job_locked(mut owned, true) {
 			mgr.g13_render_jobs.delete(index)
+			complete_g13_render_job(mut owned, true)
+		} else {
+			owned.quarantined = true
+			complete_g13_render_job(mut owned, false)
 		}
 	}
 	mgr.lock.release()
@@ -1752,6 +1761,16 @@ pub fn (job &G13RenderJobResources) timestamp_values() fw.G13RenderTimestamps {
 }
 
 pub fn (job &G13RenderJobResources) result_values() G13RenderResultValues {
+	if job == unsafe { nil } {
+		return G13RenderResultValues{}
+	}
+	if job.completion_result_ready {
+		return job.completion_result
+	}
+	return read_g13_render_result(job)
+}
+
+fn read_g13_render_result(job &G13RenderJobResources) G13RenderResultValues {
 	if job == unsafe { nil } || job.released || job.scene.timestamps.phys == 0
 		|| job.scene.scene.phys == 0 || job.fragment.phys == 0 {
 		return G13RenderResultValues{}
@@ -2104,9 +2123,14 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 			continue
 		}
 		mut owned := unsafe { job }
-		complete_g13_compute_job(mut owned, true)
+		owned.completion_result = owned.timestamp_values()
+		owned.completion_ready = true
 		if mgr.free_g13_compute_job_locked(mut owned, true) {
 			mgr.g13_compute_jobs.delete(index)
+			complete_g13_compute_job(mut owned, true)
+		} else {
+			owned.quarantined = true
+			complete_g13_compute_job(mut owned, false)
 		}
 	}
 	mgr.lock.release()
@@ -2131,7 +2155,13 @@ pub fn (job &G13ComputeJobResources) command_address() u64 {
 }
 
 pub fn (job &G13ComputeJobResources) timestamp_values() fw.G13JobTimestamps {
-	if job == unsafe { nil } || job.released || job.timestamps.phys == 0 {
+	if job == unsafe { nil } {
+		return fw.G13JobTimestamps{}
+	}
+	if job.completion_ready {
+		return job.completion_result
+	}
+	if job.released || job.timestamps.phys == 0 {
 		return fw.G13JobTimestamps{}
 	}
 	return unsafe { *&fw.G13JobTimestamps(job.timestamps.cpu_address()) }
@@ -2247,6 +2277,33 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResou
 		}
 	}
 	return true
+}
+
+// Vinix currently serializes native G13 submissions per userspace queue. This
+// preserves the DRM scheduler's implicit ordering until multi-command barrier
+// objects and independent TVB scene slots are implemented.
+pub fn (mut mgr GpuManager) g13_queue_busy(resources &G13QueueResources) bool {
+	if resources == unsafe { nil } {
+		return true
+	}
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	if resources.released || resources.quarantined {
+		return true
+	}
+	for job in mgr.g13_render_jobs {
+		if !job.released && voidptr(job.queue) == voidptr(resources) {
+			return true
+		}
+	}
+	for job in mgr.g13_compute_jobs {
+		if !job.released && voidptr(job.queue) == voidptr(resources) {
+			return true
+		}
+	}
+	return false
 }
 
 // Caller holds the manager lock during shutdown.
