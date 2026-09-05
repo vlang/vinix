@@ -209,6 +209,9 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base) {
 		return false
 	}
+	// Emitting the config is not the same as it being complete; the gate
+	// tracks the recovered gaps rather than a bare false.
+	graph.hardware_config_ready = fw.g17_hardware_config_complete()
 	if !mgr.map_g17_pio_records(mut graph) {
 		return false
 	}
@@ -288,7 +291,12 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	mgr.initdata_va = graph.roots[0].va
 	mgr.initdata_phys = graph.roots[0].phys
-	C.printf(c'agx: G17 graph, runtime policy, mapped PIO records, and shared platform values ready; hardware config remains incomplete\n')
+	gaps := fw.g17_hardware_config_gaps()
+	if gaps == 0 {
+		println('agx: G17 firmware data complete')
+	} else {
+		C.printf(c'agx: G17 graph ready; hardware config still has gaps 0x%x\n', gaps)
+	}
 	return graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
 		&& graph.pio_mappings_ready && graph.hardware_config_ready
 }

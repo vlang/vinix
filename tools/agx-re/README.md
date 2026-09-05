@@ -98,7 +98,11 @@ USC generation 3. Vinix now recognizes that topology.
 See [G17_T6050.md](G17_T6050.md) for the versioned register, user-client, and
 firmware observations recovered during this pass.
 
-Hardware launch remains gated. Vinix now has the native G17 UAT handoff,
+Hardware launch remains gated, and the gate is now derived rather than
+asserted: `fw.g17_hardware_config_gaps()` enumerates the outstanding pieces as
+a bitmask, `init_g17_firmware_data` fails closed while any bit is set, and the
+analyzer test suite checks that both declared gaps are still justified by the
+recovery output. Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and

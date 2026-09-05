@@ -3614,6 +3614,25 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
+    def test_declared_hardware_config_gaps_are_still_justified(self) -> None:
+        # fw.g17_hardware_config_gaps() declares exactly two outstanding
+        # pieces. If the recovery ever shows either is settled, the kernel-side
+        # bitmask is stale and the boot gate would stay shut for no reason --
+        # or worse, someone clears a bit the evidence does not support.
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        image = driver.read_bytes()
+
+        power = recover_g17_abi.recover_g17_linear_power_transfer_tables(
+            image, recover_g17_abi.symbol_code(image, recover_g17_abi.INIT_POWER_DATA)[1]
+        )
+        self.assertTrue(power["die_dependent"])
+
+        late = recover_g17_abi.recover_g17_late_controls(image)
+        self.assertFalse(late["complete"])
+        self.assertTrue(late["runtime_dependent"])
+
     def test_recovers_g17_late_controls_from_the_real_producer(self) -> None:
         # This one is checked against the shipped binary rather than a stub:
         # the point of the derived scan is that a hand-built store list was

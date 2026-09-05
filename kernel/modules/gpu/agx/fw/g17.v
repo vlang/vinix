@@ -1075,6 +1075,40 @@ fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig
 
 // Initialize the recovered DeviceTree-backed subset directly in mapped
 // storage. This avoids placing the 0x2710-byte object on the kernel stack.
+// Outstanding pieces of the G17 hardware configuration, as a bitmask. The
+// firmware boot gate is derived from this rather than from a bare `false`, so
+// the blockers are enumerated where they would be fixed and the gate opens by
+// construction once they are all gone.
+pub const g17_gap_linear_power_transfer = u32(1 << 0)
+pub const g17_gap_late_control_runtime = u32(1 << 1)
+
+// Bits still set for this build. Each has a recovered reason:
+//
+//   linear_power_transfer  Config +0x18c8 and +0x1948 are 0..100 curves
+//                          normalised from power matrices whose leakage term
+//                          is seeded with per-die fuse calibration. Producing
+//                          them needs the fuse aperture at physical
+//                          0x23_8837_4000 and a freestanding pow, and the
+//                          kernel builds with -nofloat.
+//
+//   late_control_runtime   Fourteen of the 36 fields in +0x2540..+0x270f read
+//                          accelerator state rather than fixed values. The
+//                          sources are named -- mostly chip-info record fields
+//                          reached through the +0x480 relay -- but not yet
+//                          reproduced.
+//
+// Anything not listed here is recovered and emitted.
+pub fn g17_hardware_config_gaps() u32 {
+	return g17_gap_linear_power_transfer | g17_gap_late_control_runtime
+}
+
+// The hardware configuration may only be handed to firmware once every gap is
+// closed. A partially correct config is worse than none: firmware acts on it,
+// so a wrong power curve or control word wedges the GPU rather than failing.
+pub fn g17_hardware_config_complete() bool {
+	return g17_hardware_config_gaps() == 0
+}
+
 pub const g17_late_controls_offset = u64(0x2540)
 pub const g17_late_controls_size = u64(0x1d0)
 
