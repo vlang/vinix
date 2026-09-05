@@ -207,6 +207,18 @@ def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
     for name in SGX_U64_PROPERTIES:
         if name in node:
             result[name.replace("-", "_")] = decode_uint(node[name], 64, name)
+    interrupts = node.get("interrupts")
+    if interrupts is not None:
+        if not isinstance(interrupts, bytes) or len(interrupts) % 4:
+            raise InspectError("interrupts must contain little-endian 32-bit specifiers")
+        result["interrupts"] = list(
+            struct.unpack(f"<{len(interrupts) // 4}I", interrupts)
+        )
+        result["interrupt_count"] = len(result["interrupts"])
+    if "interrupts-valid" in node:
+        result["interrupts_valid"] = decode_uint(
+            node["interrupts-valid"], 32, "interrupts-valid"
+        )
     state_count = result.get("perf_state_count")
     table_count = result.get("perf_state_table_count")
     if isinstance(state_count, int) and isinstance(table_count, int):

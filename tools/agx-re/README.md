@@ -116,7 +116,9 @@ producer, and `init_g17_firmware_data` still fails closed if that changes.
 Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 separate GFX/GFX1 ASC and RTKit ownership, and the guarded dual-role root/ready
-handshake,
+handshake. The eight-entry t6050 interrupt topology now selects Apple's
+callback source 4, and Vinix can drain both validated 256-entry firmware event
+rings while preserving the recovered type-2 host no-op behavior,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and
 runtime policy. Firmware channel
@@ -153,7 +155,7 @@ channel ring geometry, the creating process ID and the app GPU role are all
 recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
 register emission graph into the work-command encoder and implementing
-callback/completion handling.
+the remaining callback event types and completion handling.
 
 `generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this

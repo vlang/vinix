@@ -40,6 +40,14 @@ pub const g17_accelerator_ring_addresses_offset = u64(0x1a0)
 pub const g17_accelerator_ring_addresses_size = u64(0x20)
 pub const g17_auxiliary_ring_addresses_offset = u64(0x1c0)
 pub const g17_auxiliary_ring_address_count = 8
+pub const g17_firmware_event_state_auxiliary_index = 0
+pub const g17_firmware_event_entries_auxiliary_index = 1
+pub const g17_firmware_event_ring_entries = u32(256)
+pub const g17_firmware_event_entry_size = u64(0x48)
+pub const g17_firmware_event_entries_size = u64(0x4800)
+pub const g17_firmware_event_type_mask = u32(0x2000ffd3)
+pub const g17_firmware_event_host_noop = u32(2)
+pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_data_master_entries_bytes = u64(0x1800)
 pub const g17_device_control_entry_size = u64(0x40)
@@ -2269,6 +2277,52 @@ pub mut:
 	opaque_024  [3]u32
 }
 
+// Callback interrupt 4 drains one of these role-local firmware event rings.
+// It uses the same sparse 0x30-byte index layout as the accelerator rings,
+// but its entries are fixed 0x48-byte AGFIFirmwareEventRingEntry records.
+@[packed]
+pub struct G17FirmwareEventRingEntry {
+pub mut:
+	event_type u32
+	opaque_004 [0x44]u8
+}
+
+// Return -1 for corrupt ring state or an event outside Apple's checked mask,
+// 0 when empty, and 1 after copying and consuming one complete entry. The
+// acquire/release operations preserve firmware-entry-before-index ordering.
+pub fn dequeue_g17_firmware_event(state_buffer voidptr, state_size u64,
+	entries_buffer voidptr, entries_size u64, entry &G17FirmwareEventRingEntry) int {
+	if state_buffer == unsafe { nil } || state_size != g17_accelerator_ring_state_size
+		|| entries_buffer == unsafe { nil } || entries_size < g17_firmware_event_entries_size
+		|| entry == unsafe { nil } || sizeof(G17FirmwareEventRingEntry) != g17_firmware_event_entry_size {
+		return -1
+	}
+
+	unsafe {
+		mut state := &G17AcceleratorRingState(state_buffer)
+		read_index := katomic.load(&state.read_index)
+		write_index := katomic.load(&state.write_index)
+		if read_index >= g17_firmware_event_ring_entries
+			|| write_index >= g17_firmware_event_ring_entries {
+			return -1
+		}
+		if read_index == write_index {
+			return 0
+		}
+
+		source := &G17FirmwareEventRingEntry(&u8(entries_buffer) +
+			u64(read_index) * g17_firmware_event_entry_size)
+		if source.event_type >= 32
+			|| g17_firmware_event_type_mask & (u32(1) << source.event_type) == 0 {
+			return -1
+		}
+		C.memcpy(entry, source, g17_firmware_event_entry_size)
+		katomic.store(mut &state.read_index,
+			(read_index + 1) & (g17_firmware_event_ring_entries - 1))
+	}
+	return 1
+}
+
 // GPU addresses published in the firmware-shared object at 0x1a0. The host
 // keeps CPU and GPU addresses for the state and entry allocations separately;
 // only these GPU addresses are consumed by firmware.
@@ -2506,5 +2560,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes
 }

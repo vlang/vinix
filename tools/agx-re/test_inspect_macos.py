@@ -46,6 +46,10 @@ class InspectMacOSTests(unittest.TestCase):
             "perf-states-sram": sram_states,
             "gfx-handoff-base": struct.pack("<Q", 0x11FFF200000),
             "rtkit-private-vm-region-base": struct.pack("<Q", 0xFFFFFC0000000000),
+            "interrupts": struct.pack(
+                "<8I", 0x990, 0x991, 0x992, 0x993, 0x1C2, 0xAF6, 0x99F, 0x9A1
+            ),
+            "interrupts-valid": struct.pack("<I", 0xDF),
         }
 
         result = inspect_macos.parse_sgx(node)
@@ -63,6 +67,19 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertEqual(result["rtkit_private_vm_region_base"], 0xFFFFFC0000000000)
         self.assertEqual(result["perf_states"][1][0]["voltage_mv"], 710)
         self.assertEqual(result["perf_states_sram"][0][1]["frequency_hz"], 1_000_000_000)
+        self.assertEqual(result["interrupt_count"], 8)
+        self.assertEqual(result["interrupts"][4], 0x1C2)
+        self.assertEqual(result["interrupts_valid"], 0xDF)
+
+    def test_rejects_truncated_interrupt_specifiers(self) -> None:
+        with self.assertRaisesRegex(inspect_macos.InspectError, "interrupts"):
+            inspect_macos.parse_sgx(
+                {
+                    "compatible": b"gpu,t6050\0",
+                    "reg": struct.pack("<QQ", 0x2300000000, 0x3FDC000),
+                    "interrupts": b"\x01\x02\x03",
+                }
+            )
 
     def test_selects_only_non_secret_accelerator_properties(self) -> None:
         node = {

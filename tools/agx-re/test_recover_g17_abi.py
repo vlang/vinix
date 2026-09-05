@@ -1893,6 +1893,14 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["ready_ack_transport_count"], 2)
         self.assertTrue(recovered["requires_both_transport_boots"])
 
+    def test_selects_t6050_callback_interrupt(self) -> None:
+        self.assertEqual(recover_g17_abi.g17_callback_interrupt_index(8), 4)
+        self.assertEqual(recover_g17_abi.g17_callback_interrupt_index(5), 4)
+        self.assertEqual(recover_g17_abi.g17_callback_interrupt_index(4), 0)
+        self.assertEqual(recover_g17_abi.g17_callback_interrupt_index(1), 0)
+        with self.assertRaisesRegex(ValueError, "interrupt count"):
+            recover_g17_abi.g17_callback_interrupt_index(3)
+
     def test_rejects_single_role_g17_boot_transport(self) -> None:
         notify = bytearray(0x134)
         receive = bytearray(0xF0)

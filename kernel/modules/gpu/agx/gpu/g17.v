@@ -74,6 +74,7 @@ mut:
 	accelerator_entries   [2]SharedBuffer
 	accelerator_locks     [2]klock.Lock
 	auxiliary             [2][8]SharedBuffer
+	event_lock            klock.Lock
 	command_backings      [g17_work_command_pool_count]SharedBuffer
 	command_in_use        [g17_work_command_pool_count]&u8
 	command_pools         [g17_work_command_pool_count]fw.G17CommandPool
@@ -749,8 +750,49 @@ fn (mut mgr GpuManager) init_g17() bool {
 }
 
 // Apple decodes bits 53:48. Type 9 consumes a one-shot guard and broadcasts
-// 0x89 through both transports. Type 2 requires a callback implementation
-// that Vinix does not yet have, so encountering it during boot fails closed.
+// 0x89 through both transports. On an eight-interrupt t6050, type 2 signals
+// interrupt source 4. Its clearOutstandingFirmwareInterrupts hook is a no-op,
+// then the common handler drains both roles' firmware event rings.
+fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
+	if mgr.g17_graph == unsafe { nil } {
+		return false
+	}
+	mut graph := unsafe { mgr.g17_graph }
+	graph.event_lock.acquire()
+	defer {
+		graph.event_lock.release()
+	}
+
+	for role := 0; role < 2; role++ {
+		state := &graph.auxiliary[role][fw.g17_firmware_event_state_auxiliary_index]
+		entries := &graph.auxiliary[role][fw.g17_firmware_event_entries_auxiliary_index]
+		for _ in 0 .. fw.g17_firmware_event_ring_entries {
+			mut entry := fw.G17FirmwareEventRingEntry{}
+			result := fw.dequeue_g17_firmware_event(state.cpu_address(),
+				fw.g17_accelerator_ring_state_size, entries.cpu_address(), entries.size,
+				&entry)
+			if result < 0 {
+				C.printf(c'agx: corrupt G17 firmware event ring for role %d\n', role)
+				mgr.state = .error
+				return false
+			}
+			if result == 0 {
+				break
+			}
+			// Type 2 branches straight back to Apple's drain loop. Preserve
+			// that no-op behavior. Other accepted event records need their
+			// individual response ABIs before Vinix may continue after them.
+			if entry.event_type != fw.g17_firmware_event_host_noop {
+				C.printf(c'agx: unsupported G17 firmware event %u on role %d\n',
+					entry.event_type, role)
+				mgr.state = .error
+				return false
+			}
+		}
+	}
+	return true
+}
+
 fn (mut mgr GpuManager) wait_g17_ready() bool {
 	for _ in 0 .. 10_000_000 {
 		mut received := false
@@ -762,8 +804,10 @@ fn (mut mgr GpuManager) wait_g17_ready() bool {
 			}
 			kind := fw.g17_akf_message_type(msg.data0)
 			if kind == fw.g17_akf_callback_type {
-				C.printf(c'agx: unsupported G17 AKF callback during boot on role %u\n', role)
-				return false
+				if !mgr.handle_g17_akf_callback() {
+					return false
+				}
+				continue
 			}
 			if kind != fw.g17_akf_ready_type {
 				continue

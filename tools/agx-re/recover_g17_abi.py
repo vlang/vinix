@@ -32,6 +32,28 @@ NOTIFY_FIRMWARE_STARTED = (
 RECEIVED_MESSAGE_FROM_AKF = (
     "__ZN14AGXArmFirmware22receivedMessageFromAKFEy16AGFIFirmwareRole"
 )
+ACCELERATOR_HANDLE_INTERRUPT = (
+    "__ZN14AGXAccelerator15handleInterruptEP22IOInterruptEventSourcei"
+)
+FIRMWARE_HANDLE_EVENT = "__ZN11AGXFirmware11handleEventE17AGXInterruptIndex"
+FIRMWARE_DRAIN_EVENT_RING = "__ZN11AGXFirmware22drainFirmwareEventRingEv"
+FIRMWARE_DRAIN_EVENT_RING_ROLE = (
+    "__ZN11AGXFirmware22drainFirmwareEventRingE16AGFIFirmwareRole"
+)
+FIRMWARE_INIT = "__ZN11AGXFirmware4initEP14AGXAccelerator"
+FIRMWARE_RING_FETCH = (
+    "__ZN24AGXFirmwareRingValidator14fetchNextEntryEP26AGFIFirmwareEventRingEntry"
+)
+G17_CLEAR_FIRMWARE_INTERRUPTS = (
+    "__ZN14AGXArmFirmware34clearOutstandingFirmwareInterruptsEv.4213"
+)
+IOFILTER_INTERRUPT_EVENT_SOURCE_VTABLE = "__ZTV28IOFilterInterruptEventSource"
+IOFILTER_INTERRUPT_EVENT_SOURCE_FACTORY = (
+    "__ZN28IOFilterInterruptEventSource26filterInterruptEventSourceEP8OSObject"
+    "PFvS1_P22IOInterruptEventSourceiEPFbS1_PS_EP9IOServicei"
+)
+IOFILTER_SIGNAL_INTERRUPT = "__ZN28IOFilterInterruptEventSource15signalInterruptEv"
+IOINTERRUPT_GET_INDEX = "__ZNK22IOInterruptEventSource11getIntIndexEv"
 BOOT_FIRMWARE = "__ZN14AGXArmFirmware12bootFirmwareEv"
 RTBUDDY_READ_MESSAGE = "__ZN22AGXFirmwareKextRTBuddy18readMessageFromAKFEPy"
 RTBUDDY_SEND_MESSAGE_GATED = (
@@ -12886,6 +12908,322 @@ def recover_g17_boot_transport(
     }
 
 
+def g17_callback_interrupt_index(interrupt_count: int) -> int:
+    """Apply AGXAccelerator::configureDevice's callback-source selection."""
+
+    if 5 <= interrupt_count <= 8:
+        return 4
+    if interrupt_count in (1, 4):
+        return 0
+    raise ValueError(f"unsupported AGX interrupt count {interrupt_count}")
+
+
+def recover_g17_akf_callback(driver: bytes, kernel: bytes) -> dict[str, object]:
+    """Recover the type-2 AKF callback's host interrupt dispatch.
+
+    The callback word carries no event body. Apple indexes the accelerator's
+    IOFilterInterruptEventSource array with a selector chosen from the
+    ``interrupts`` property, calls signalInterrupt(), recovers the source's
+    interrupt index in the normal action, and forwards that index to
+    AGXFirmware::handleEvent(). An eight-interrupt t6050 therefore selects
+    index 4, which clears outstanding firmware interrupts and drains the
+    role-specific firmware rings.
+    """
+
+    driver_symbols = macho_symbols(driver)
+    kernel_symbols = macho_symbols(kernel)
+    driver_required = (
+        RECEIVED_MESSAGE_FROM_AKF,
+        ACCELERATOR_START,
+        BASE_CONFIGURE_DEVICE,
+        ACCELERATOR_HANDLE_INTERRUPT,
+        FIRMWARE_HANDLE_EVENT,
+        FIRMWARE_DRAIN_EVENT_RING,
+        G17_CLEAR_FIRMWARE_INTERRUPTS,
+        G17_FIRMWARE_VTABLE,
+        "__ZN11AGXFirmware18drainFirmwareRingsEb",
+    )
+    kernel_required = (
+        IOFILTER_INTERRUPT_EVENT_SOURCE_VTABLE,
+        IOFILTER_INTERRUPT_EVENT_SOURCE_FACTORY,
+        IOFILTER_SIGNAL_INTERRUPT,
+        IOINTERRUPT_GET_INDEX,
+    )
+    for name in driver_required:
+        if name not in driver_symbols:
+            raise ValueError(f"driver Mach-O has no {name} symbol")
+    for name in kernel_required:
+        if name not in kernel_symbols:
+            raise ValueError(f"kernel Mach-O has no {name} symbol")
+
+    _receive_address, receive_code = symbol_code(driver, RECEIVED_MESSAGE_FROM_AKF)
+    start_address, start_code = symbol_code(driver, ACCELERATOR_START)
+    _configure_address, configure_code = symbol_code(driver, BASE_CONFIGURE_DEVICE)
+    _interrupt_address, interrupt_code = symbol_code(
+        driver, ACCELERATOR_HANDLE_INTERRUPT
+    )
+    event_address, event_code = symbol_code(driver, FIRMWARE_HANDLE_EVENT)
+
+    require_instruction_words_at(
+        receive_code,
+        "G17 type-2 callback dispatch",
+        {
+            0x014: 0xD370D428,  # message[53:48]
+            0x020: 0xF100091F,  # callback type 2
+            0x028: 0xF9414C08,  # firmware +0x298 -> accelerator
+            0x02C: 0x395D3109,  # callback selector at accelerator +0x74c
+            0x030: 0x8B090D08,  # select one pointer with an 8-byte stride
+            0x034: 0xF942E900,  # event-source array at accelerator +0x5d0
+            0x048: 0xD2804B11,  # signalInterrupt virtual slot 0x258
+            0x04C: 0x8B110210,
+            0x050: 0xF9400208,
+            0x058: 0xD73F0910,
+        },
+    )
+    require_instruction_words_at(
+        start_code,
+        "G17 interrupt-event-source construction",
+        {
+            0x3460: 0x7100051F,  # require at least one interrupt
+            0x3468: 0xD2800015,  # interrupt index starts at zero
+            0x346C: 0x91174277,  # event-source array starts at +0x5d0
+            0x347C: 0x910006B5,  # increment interrupt index
+            0x3480: 0x910022F7,  # increment event-source slot
+            0x348C: 0xF90002FF,  # clear the selected array slot
+            0x35E8: 0xAA1303E0,  # owner
+            0x35EC: 0xAA1603E1,  # interrupt action
+            0x35F0: 0xAA1003E2,  # interrupt filter
+            0x35F4: 0xAA1903E3,  # provider
+            0x35F8: 0xAA1503E4,  # interrupt index
+            0x3600: 0xF90002E0,  # retain source in the indexed array
+        },
+    )
+    factory_call = struct.unpack_from("<I", start_code, 0x35FC)[0]
+    if decode_bl_target(start_address + 0x35FC, factory_call) != kernel_symbols[
+        IOFILTER_INTERRUPT_EVENT_SOURCE_FACTORY
+    ]:
+        raise ValueError("G17 interrupt source is not created by the checked factory")
+
+    require_instruction_words_at(
+        configure_code,
+        "G17 callback interrupt selection",
+        {
+            0x9D0: 0x53027C08,  # interrupt property byte count / 4
+            0x9D4: 0x51001509,  # first multi-interrupt count is 5
+            0x9D8: 0x7100113F,  # counts 5..8 use callback index 4
+            0x9E0: 0x52802089,  # selector/flag halfword 0x104
+            0x9E4: 0x790E9A69,  # accelerator +0x74c
+            0x9F4: 0x7100111F,  # four interrupts use index 0
+            0x9FC: 0x7100051F,  # one interrupt also uses index 0
+            0xA04: 0x790E9A7F,
+            0xA08: 0x391D3A68,  # retain interrupt count at +0x74e
+            0xA38: 0xB9075268,  # retain interrupts-valid mask at +0x750
+        },
+    )
+    require_instruction_words_at(
+        interrupt_code,
+        "G17 interrupt action forwarding",
+        {
+            0x010: 0xF942D813,  # accelerator +0x5b0 -> firmware
+            0x024: 0xD2803D11,  # getIntIndex virtual slot 0x1e8
+            0x060: 0x910CA202,  # firmware handleEvent slot 0x328
+            0x064: 0xF9419610,
+            0x068: 0x12001C01,  # forward the low 8-bit interrupt index
+            0x06C: 0xAA1303E0,
+        },
+    )
+    require_instruction_words_at(
+        event_code,
+        "G17 firmware-ring callback event",
+        {
+            0x080: 0x7100103F,  # interrupt index 4
+            0x084: 0x54000700,  # enters common firmware-ring drain path
+            0x174: 0xD2811011,  # clearOutstandingFirmwareInterrupts slot 0x880
+            0x178: 0x8B110210,
+            0x17C: 0xF9400208,
+            0x190: 0x52800021,  # drainFirmwareRings(true)
+        },
+    )
+    drain_branch = struct.unpack_from("<I", event_code, 0x1B8)[0]
+    if decode_b_target(event_address + 0x1B8, drain_branch) != driver_symbols[
+        "__ZN11AGXFirmware18drainFirmwareRingsEb"
+    ]:
+        raise ValueError("G17 callback event no longer drains firmware rings")
+
+    kernel_slots = {
+        0x1E8: IOINTERRUPT_GET_INDEX,
+        0x258: IOFILTER_SIGNAL_INTERRUPT,
+    }
+    for slot, expected in kernel_slots.items():
+        target = recover_vtable_target(
+            kernel, IOFILTER_INTERRUPT_EVENT_SOURCE_VTABLE, slot
+        )
+        if target != kernel_symbols[expected]:
+            raise ValueError(
+                f"unexpected IOFilterInterruptEventSource slot {slot:#x} target"
+            )
+    firmware_slots = {
+        0x328: FIRMWARE_HANDLE_EVENT,
+        0x880: G17_CLEAR_FIRMWARE_INTERRUPTS,
+        0x888: FIRMWARE_DRAIN_EVENT_RING,
+    }
+    for slot, expected in firmware_slots.items():
+        target = recover_vtable_target(driver, G17_FIRMWARE_VTABLE, slot)
+        if target != driver_symbols[expected]:
+            raise ValueError(f"unexpected G17 firmware slot {slot:#x} target")
+    _clear_address, clear_code = symbol_code(driver, G17_CLEAR_FIRMWARE_INTERRUPTS)
+    if clear_code != struct.pack("<2I", 0xD503245F, 0xD65F03C0):
+        raise ValueError("G17 clearOutstandingFirmwareInterrupts is no longer a no-op")
+
+    return {
+        "message_type": 2,
+        "message_payload_consumed": False,
+        "firmware_role_consumed": False,
+        "accelerator_host_member": 0x298,
+        "callback_selector_member": 0x74C,
+        "event_source_array_member": 0x5D0,
+        "event_source_stride": 8,
+        "signal_interrupt_vtable_slot": 0x258,
+        "get_interrupt_index_vtable_slot": 0x1E8,
+        "handle_event_vtable_slot": 0x328,
+        "interrupt_count_property": "interrupts",
+        "interrupt_specifier_bytes": 4,
+        "selector_rules": {"1_or_4": 0, "5_through_8": 4},
+        "t6050_interrupt_count": 8,
+        "t6050_callback_interrupt_index": g17_callback_interrupt_index(8),
+        "clear_interrupts_vtable_slot": 0x880,
+        "drain_event_ring_vtable_slot": 0x888,
+        "drains_both_firmware_roles": True,
+    }
+
+
+def recover_g17_firmware_event_ring(driver: bytes) -> dict[str, object]:
+    """Recover the role-local ring consumed by callback interrupt index 4."""
+
+    symbols = macho_symbols(driver)
+    required = (
+        FIRMWARE_INIT,
+        FIRMWARE_DRAIN_EVENT_RING,
+        FIRMWARE_DRAIN_EVENT_RING_ROLE,
+        FIRMWARE_RING_FETCH,
+    )
+    for name in required:
+        if name not in symbols:
+            raise ValueError(f"driver Mach-O has no {name} symbol")
+
+    init_address, init_code = symbol_code(driver, FIRMWARE_INIT)
+    _wrapper_address, wrapper_code = symbol_code(driver, FIRMWARE_DRAIN_EVENT_RING)
+    role_address, role_code = symbol_code(driver, FIRMWARE_DRAIN_EVENT_RING_ROLE)
+    _fetch_address, fetch_code = symbol_code(driver, FIRMWARE_RING_FETCH)
+
+    require_instruction_words_at(
+        init_code,
+        "G17 firmware event-ring validator",
+        {
+            0x118: 0x9129C275,  # role records start at firmware +0xa70
+            0x128: 0x9117C276,  # validators start at firmware +0x5f0
+            0x130: 0x52802617,  # role record stride 0x130
+            0x190: 0xF9414E6B,  # validator owner is the accelerator
+            0x194: 0x5280480A,  # role validator stride 0x240
+            0x198: 0x9B0A5B0A,
+            0x19C: 0xA949312D,  # event state CPU/GPU pair at role +0x90
+            0x1A4: 0xA94B3D2E,  # event entries CPU/GPU pair at role +0xb0
+            0x284: 0xF901094B,  # validator +0x210 owner
+            0x288: 0x3D808D40,  # validator +0x230 mask/count pair
+            0x28C: 0xF9010D4D,  # validator +0x218 state CPU address
+            0x290: 0xF901114E,  # validator +0x220 entries CPU address
+        },
+    )
+    mask_count = struct.unpack(
+        "<2Q", read_adrp_load(driver, init_address, init_code, 0x168, 0x16C, 16)
+    )
+    if mask_count != (0x2000FFD3, 0x100):
+        raise ValueError(f"unexpected G17 firmware event mask/count {mask_count}")
+
+    require_instruction_words_at(
+        wrapper_code,
+        "G17 dual-role firmware event drain",
+        {
+            0x014: 0x52800001,  # drain role 0
+            0x018: 0x9400000A,
+            0x020: 0x52800021,  # then drain role 1
+        },
+    )
+    require_instruction_words_at(
+        role_code,
+        "G17 role firmware event drain",
+        {
+            0x028: 0x0B010C28,  # role * 9
+            0x02C: 0x531A6508,  # role * 0x240
+            0x030: 0x8B080009,
+            0x034: 0xF9440928,  # validator entries CPU address at +0x810
+            0x03C: 0x91200134,  # selected validator at role base +0x800
+            0x040: 0xF9400689,  # state CPU address at validator +8
+            0x044: 0xB940012B,  # shared read index at state +0
+            0x048: 0xB9001A8B,  # snapshot read index
+            0x04C: 0xB9402129,  # shared write index at state +0x20
+            0x050: 0xB9001E89,  # snapshot write index
+            0x054: 0xF940168A,  # entry count at validator +0x28
+            0x0E8: 0xAA1403E0,
+            0x0EC: 0x940054F6,  # fetch one 0x48-byte event entry
+        },
+    )
+    table_page = decode_adrp(
+        role_address + 0x104, struct.unpack_from("<I", role_code, 0x104)[0]
+    )
+    table_add = decode_add_immediate(struct.unpack_from("<I", role_code, 0x108)[0])
+    if table_page is None or table_add is None or table_page[0] != table_add[1]:
+        raise ValueError("G17 firmware event dispatch table address changed")
+    table_address = table_page[1] + table_add[2]
+    table_offset = virtual_to_file(driver, table_address)
+    dispatch_offsets = struct.unpack_from("<16i", driver, table_offset)
+    dispatch_anchor = role_address + 0x110
+    if dispatch_anchor + dispatch_offsets[2] != role_address + 0xBC:
+        raise ValueError("G17 firmware event type 2 is no longer a host no-op")
+    require_instruction_words_at(
+        fetch_code,
+        "G17 firmware event-ring fetch",
+        {
+            0x010: 0xF9400808,  # entries CPU address at validator +0x10
+            0x018: 0x2943240A,  # cached read/write indices at +0x18/+0x1c
+            0x024: 0xF9401409,  # entry count at +0x28
+            0x030: 0x8B0A0D4A,  # read index * 9
+            0x034: 0xD37DF14A,  # then * 8: 0x48-byte entries
+            0x050: 0xB9000028,  # first entry word is the event type
+            0x0D8: 0xB900442A,  # copy through entry +0x44
+            0x0DC: 0xF940100A,  # accepted-event mask at validator +0x20
+            0x0E0: 0x9AC8254A,  # select the event-type bit
+            0x0E4: 0x3600058A,
+            0x0EC: 0x1100054A,  # advance read index
+            0x0F0: 0x9AC9094B,  # modulo entry count
+            0x0F8: 0xB9001809,  # update cached read index
+            0x0FC: 0xD5033BBF,  # publish after consuming the entry
+            0x104: 0xF940040A,  # shared state address at validator +8
+            0x108: 0xB9000149,  # publish shared read index at state +0
+        },
+    )
+
+    return {
+        "role_count": 2,
+        "role_record_host_member": 0xA70,
+        "role_record_stride": 0x130,
+        "validator_host_member": 0x5F0,
+        "validator_role_stride": 0x240,
+        "event_validator_member": 0x210,
+        "state_auxiliary_index": 0,
+        "entries_auxiliary_index": 1,
+        "state_bytes": 0x30,
+        "state_read_index_offset": 0,
+        "state_cfi_index_offset": 0x10,
+        "state_write_index_offset": 0x20,
+        "entry_bytes": 0x48,
+        "entries": mask_count[1],
+        "entries_bytes": 0x4800,
+        "accepted_event_mask": mask_count[0],
+        "read_index_publish_barrier": "dmb ish",
+    }
+
+
 def recover_g17_rtbuddy_endpoints(
     read_code: bytes,
     send_code: bytes,
@@ -13016,6 +13354,12 @@ def main() -> int:
         _address, boot_firmware_code = symbol_code(driver, BOOT_FIRMWARE)
         boot_transport = recover_g17_boot_transport(
             notify_started_code, received_akf_code, boot_firmware_code
+        )
+        boot_transport["callback_dispatch"] = recover_g17_akf_callback(
+            driver, kernel
+        )
+        boot_transport["callback_dispatch"]["firmware_event_ring"] = (
+            recover_g17_firmware_event_ring(driver)
         )
         rtbuddy_endpoints = recover_g17_rtbuddy_endpoints(
             symbol_code(rtbuddy, RTBUDDY_READ_MESSAGE)[1],
