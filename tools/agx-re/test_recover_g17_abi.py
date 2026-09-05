@@ -3550,6 +3550,56 @@ class RecoverG17AbiTests(unittest.TestCase):
                 fixtures["image"], arm_power
             )
 
+    def test_recovers_g17_late_controls(self) -> None:
+        code = bytearray(0x135C)
+        for offset, word in {
+            0x006C: 0xB925F13F,
+            0x03D8: 0xF913555F,
+            0x0514: 0xB925411F,
+            0x0584: 0xB9255D1F,
+            0x0734: 0xB925757F,
+            0x0794: 0xB9257969,
+            0x0838: 0xB925B93F,
+            0x0F2C: 0xB9259D0A,
+            0x0F34: 0xB925A10A,
+            0x0F44: 0xB925ED1F,
+            0x0F50: 0xB925B50A,
+            0x0F70: 0xB925A509,
+            0x0F78: 0xB925A91F,
+            0x1114: 0xB926E11F,
+            0x1278: 0xB926C509,
+            0x1284: 0xFD137900,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.ARM_INIT_FIRMWARE_DATA: 0xA00000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0xA00000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_late_controls(b"")
+
+        self.assertEqual(recovered["region"], {"offset": 0x2540, "bytes": 0x1D0})
+        self.assertEqual(recovered["fixed_u32"][0x2578], 1)
+        self.assertEqual(recovered["fixed_u32"][0x25A0], 1)
+        self.assertEqual(recovered["fixed_u64"][0x26F0], 1)
+        # All four feature-mask tests come out zero for G17.
+        for offset in (0x259C, 0x25A4, 0x25B4, 0x26C4):
+            self.assertEqual(recovered["fixed_u32"][offset], 0)
+        # Determined plus run-time dependent must account for every write.
+        self.assertEqual(
+            len(recovered["fixed_u32"])
+            + len(recovered["fixed_u64"])
+            + len(recovered["runtime_dependent"]),
+            recovered["written_fields"],
+        )
+        self.assertFalse(recovered["complete"])
+
     def test_recovers_g17_command_stream_format(self) -> None:
         code = bytearray(0x3F4)
         for offset, word in {

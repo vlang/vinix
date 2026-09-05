@@ -451,6 +451,8 @@ GENERATE_REGISTER_LIST_3D = (
 G17_COMMAND_3D_BYTES = 0x2240
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 8
+ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
+G17_FEATURE_MASK = 0x0001000018020000
 PARSE_HARDWARE_KERNEL_COMMAND = (
     "__ZN24AGXHardwareKernelCommand16parseAndValidateER21AGXSharedStreamParserS1_"
 )
@@ -6892,6 +6894,77 @@ def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
     return destination, base, immediate
 
 
+def recover_g17_late_controls(image: bytes) -> dict[str, object]:
+    """Recover the statically determined half of the late-control block.
+
+    AGXArmFirmware::initFirmwareData writes 27 fields into hardware-config
+    offsets 0x2540..0x270f.  Sixteen of them are fixed for G17: literal zeros
+    and ones, one 64-bit literal, and four tests of the fixed feature mask that
+    all come out zero.  The remaining eleven depend on run-time inputs and are
+    listed but not valued, so the block stays incomplete.
+    """
+
+    symbols = macho_symbols(image)
+    if ARM_INIT_FIRMWARE_DATA not in symbols:
+        raise ValueError(f"Mach-O is missing {ARM_INIT_FIRMWARE_DATA}")
+
+    _address, code = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
+    require_instruction_words_at(
+        code,
+        "G17 late-control block",
+        {
+            0x006C: 0xB925F13F,
+            0x03D8: 0xF913555F,
+            0x0514: 0xB925411F,
+            0x0584: 0xB9255D1F,
+            0x0734: 0xB925757F,
+            0x0794: 0xB9257969,
+            0x0838: 0xB925B93F,
+            0x0F2C: 0xB9259D0A,
+            0x0F34: 0xB925A10A,
+            0x0F44: 0xB925ED1F,
+            0x0F50: 0xB925B50A,
+            0x0F70: 0xB925A509,
+            0x0F78: 0xB925A91F,
+            0x1114: 0xB926E11F,
+            0x1278: 0xB926C509,
+            0x1284: 0xFD137900,
+        },
+    )
+
+    if G17_FEATURE_MASK & (1 << 17) == 0:
+        raise ValueError("G17 feature mask lost the power-estimation bit")
+    feature_fields = {0x259C: 0x25, 0x25A4: 0x26, 0x25B4: 0x07, 0x26C4: 0x35}
+    feature_values = {
+        offset: (G17_FEATURE_MASK >> bit) & 1 for offset, bit in feature_fields.items()
+    }
+    if any(feature_values.values()):
+        raise ValueError(
+            "a G17 late-control feature bit is now set; its field is no longer zero"
+        )
+
+    fields = {offset: 0 for offset in (
+        0x2540, 0x255C, 0x2574, 0x25A8, 0x25B8, 0x25EC, 0x25F0, 0x26E0
+    )}
+    fields.update({0x2578: 1, 0x25A0: 1})
+    fields.update(feature_values)
+
+    return {
+        "region": {"offset": 0x2540, "bytes": 0x1D0},
+        "producer": ARM_INIT_FIRMWARE_DATA,
+        "written_fields": 27,
+        "feature_mask": G17_FEATURE_MASK,
+        "feature_bit_fields": feature_fields,
+        "fixed_u32": dict(sorted(fields.items())),
+        "fixed_u64": {0x26A8: 0, 0x26F0: 1},
+        "runtime_dependent": sorted(
+            [0x2544, 0x2548, 0x2554, 0x2560, 0x2570, 0x25F4, 0x25F8, 0x2600,
+             0x26A4, 0x26BC, 0x26C0]
+        ),
+        "complete": False,
+    }
+
+
 def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
     """Recover the userspace command-stream record format.
 
@@ -7939,6 +8012,7 @@ def main() -> int:
         hardware_config["afr_relative_boost_frequency_table"] = (
             recover_g17_afr_relative_boost_frequency_table(driver, power_code)
         )
+        hardware_config["late_controls"] = recover_g17_late_controls(driver)
         hardware_config["linear_power_transfer_tables"] = (
             recover_g17_linear_power_transfer_tables(driver, power_code)
         )

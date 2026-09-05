@@ -1061,6 +1061,44 @@ fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig
 
 // Initialize the recovered DeviceTree-backed subset directly in mapped
 // storage. This avoids placing the 0x2710-byte object on the kernel stack.
+pub const g17_late_controls_offset = u64(0x2540)
+pub const g17_late_controls_size = u64(0x1d0)
+
+// The statically determined half of the late-control block. Apple's ARM
+// producer writes 27 fields into config +0x2540..+0x270f; these sixteen are
+// fixed for G17, including four tests of the fixed feature mask that all come
+// out zero. The other eleven depend on run-time inputs and stay zero here, so
+// the block is not complete.
+fn populate_g17_late_controls(mut config G17HardwareConfig) {
+	fixed_u32 := [
+		[u64(0x2540), 0]!,
+		[u64(0x255c), 0]!,
+		[u64(0x2574), 0]!,
+		[u64(0x2578), 1]!,
+		[u64(0x259c), 0]!,
+		[u64(0x25a0), 1]!,
+		[u64(0x25a4), 0]!,
+		[u64(0x25a8), 0]!,
+		[u64(0x25b4), 0]!,
+		[u64(0x25b8), 0]!,
+		[u64(0x25ec), 0]!,
+		[u64(0x25f0), 0]!,
+		[u64(0x26c4), 0]!,
+		[u64(0x26e0), 0]!,
+	]!
+	unsafe {
+		base := &u8(&config.firmware_late_controls_2540[0])
+		for entry in fixed_u32 {
+			mut slot := &u32(base + entry[0] - g17_late_controls_offset)
+			*slot = u32(entry[1])
+		}
+		mut zero := &u64(base + u64(0x26a8) - g17_late_controls_offset)
+		*zero = 0
+		mut one := &u64(base + u64(0x26f0) - g17_late_controls_offset)
+		*one = 1
+	}
+}
+
 pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwConfig,
 	uat_ttb_base u64) bool {
 	if buffer == unsafe { nil } || size != g17_hardware_config_size
@@ -1082,6 +1120,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 		populate_g17_color_matrices(mut config)
 		// G17's selected virtual provider returns zero for this optional table.
 		config.border_color_table_address_638 = 0
+		populate_g17_late_controls(mut config)
 		config.firmware_scalar_block_e90 = new_g17_firmware_scalar_block(hardware,
 			uat_ttb_base)
 		if !populate_g17_pio_mappings(mut config, hardware) {
