@@ -114,6 +114,11 @@ class ExtractFilesetTests(unittest.TestCase):
         self.assertIn("com.apple.iokit.IOGPUFamily", extract_fileset.DEFAULT_ENTRIES)
         self.assertIn("com.apple.iokit.IOSurface", extract_fileset.DEFAULT_ENTRIES)
 
+    def test_default_entries_cover_t6050_power_owners(self) -> None:
+        self.assertIn("com.apple.driver.AppleARMPlatform", extract_fileset.DEFAULT_ENTRIES)
+        self.assertIn("com.apple.driver.ApplePMGR", extract_fileset.DEFAULT_ENTRIES)
+        self.assertIn("com.apple.driver.AppleT6050PMGR", extract_fileset.DEFAULT_ENTRIES)
+
     def test_extracts_kernel_payload_with_modern_trailing_metadata(self) -> None:
         payload = b"bvx2 compressed bytes"
         im4p = der(

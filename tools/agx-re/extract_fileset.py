@@ -33,6 +33,13 @@ COMPRESSION_LZFSE = 0x801
 DEFAULT_PREBOOT = Path("/System/Volumes/Preboot")
 DEFAULT_ENTRIES = (
     "com.apple.kernel",
+    # Modern T6050 GPU power gates are AppleARMIODevice handles delegated to
+    # AppleT6050PMGR and, in gated paths, PMP firmware.  Keep the three owner
+    # implementations available so the transition ABI can be recovered rather
+    # than incorrectly treating DeviceTree handles as raw register offsets.
+    "com.apple.driver.AppleARMPlatform",
+    "com.apple.driver.ApplePMGR",
+    "com.apple.driver.AppleT6050PMGR",
     "com.apple.AGXFirmwareKextG17XRTBuddy",
     "com.apple.AGXFirmwareKextRTBuddy64",
     "com.apple.AGXG17X",

@@ -32,6 +32,7 @@ make -f GNUmakefile trace-resources
 make -f GNUmakefile layout
 make -f GNUmakefile firmware
 make -f GNUmakefile kernel-kexts
+make -f GNUmakefile recover-t6050-power
 make -f GNUmakefile recover-g17-abi
 ```
 
@@ -62,12 +63,19 @@ It can also select a shared allocation by an observed JSON field:
 Objective-C runtime. `extract_firmware.py` extracts only the matching G17C
 images from the local recovery volume and emits their hashes, Mach-O UUIDs,
 and virtual layouts. `extract_fileset.py` unwraps the local IMG4/LZFSE boot
-kernel collection and compacts the kernel, AGXG17X, and firmware-buddy fileset
-entries
+kernel collection and compacts the kernel, AGXG17X, firmware-buddy, and
+AppleARMPlatform/PMGR power-owner fileset entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 `IOGPUFamily` is included because `AGXCommandQueue` inherits its device
 binding, and with it the last two channel inputs, from `IOGPUCommandQueue`;
 `IOSurface` identifies the cross-kext shared-event completion target.
+`recover_t6050_power.py` independently parses the local IMG4/LZFSE boot
+DeviceTree and resolves SGX's opaque power/clock handles against PMGR's device
+records. It fails closed unless the installed T6050 image maps them, in order,
+to `GFX_SGX` and `GFX_BUSY`, identifies both GFX ASC handles, and proves that
+the AGX SoC-device record belongs to the `t6050pmp` RTKit nub. Its sanitized
+JSON report is written under `build/`; raw Apple DeviceTree bytes are never a
+repository input.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
