@@ -60,7 +60,35 @@ class WalkSegmentTests(unittest.TestCase):
         self.assertEqual(walked["magic"], 0x10000)
         self.assertEqual(len(walked["records"]), 1)
         self.assertEqual(walked["records"][0]["payload_bytes"], 0x9D0)
+        self.assertEqual(
+            walked["records"][0]["header"],
+            {
+                "primary_extension_flag": 0,
+                "auxiliary_u16_flag": 0,
+                "auxiliary_u16_bytes": 0,
+                "auxiliary_u64_flag": 0,
+                "auxiliary_u64_bytes": 0,
+            },
+        )
         self.assertEqual(walked["trailing_bytes"], 40)
+
+    def test_reports_separate_auxiliary_stream_requirements(self) -> None:
+        data = bytearray(self.segment(0))
+        record = trace_diff.SEGMENT_HEADER_BYTES
+        struct.pack_into("<I", data, record + trace_diff.AUXILIARY_U16_FLAG_OFFSET, 3)
+        struct.pack_into("<I", data, record + trace_diff.AUXILIARY_U16_LENGTH_OFFSET, 0x40)
+        struct.pack_into("<I", data, record + trace_diff.AUXILIARY_U64_FLAG_OFFSET, 5)
+        struct.pack_into("<I", data, record + trace_diff.AUXILIARY_U64_LENGTH_OFFSET, 0x80)
+
+        walked = trace_diff.walk_segment(bytes(data))
+
+        header = walked["records"][0]["header"]
+        self.assertEqual(header["auxiliary_u16_flag"], 3)
+        self.assertEqual(header["auxiliary_u16_bytes"], 0x40)
+        self.assertEqual(header["auxiliary_u64_flag"], 5)
+        self.assertEqual(header["auxiliary_u64_bytes"], 0x80)
+        # The auxiliary bytes live on parser x2, not after this x1 record.
+        self.assertEqual(walked["records"][0]["end"], len(data))
 
     def test_rejects_mismatched_declared_length(self) -> None:
         data = bytearray(self.segment(0x40))

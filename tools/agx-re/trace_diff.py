@@ -19,6 +19,10 @@ PRIMARY_EXTENSION_FLAG_OFFSET = 0x90
 PRIMARY_EXTENSION_HEADER_BYTES = 0x10
 PRIMARY_EXTENSION_COUNT_OFFSETS = (0x00, 0x04)
 PRIMARY_EXTENSION_ELEMENT_BYTES = (0x02, 0x18)
+AUXILIARY_U16_FLAG_OFFSET = 0x88
+AUXILIARY_U16_LENGTH_OFFSET = 0x8C
+AUXILIARY_U64_FLAG_OFFSET = 0x94
+AUXILIARY_U64_LENGTH_OFFSET = 0x98
 
 
 def walk_segment(data: bytes) -> dict[str, object]:
@@ -39,6 +43,23 @@ def walk_segment(data: bytes) -> dict[str, object]:
     records = []
     offset = SEGMENT_HEADER_BYTES
     while offset + RECORD_HEADER_BYTES <= len(data):
+        header = {
+            "primary_extension_flag": struct.unpack_from(
+                "<I", data, offset + PRIMARY_EXTENSION_FLAG_OFFSET
+            )[0],
+            "auxiliary_u16_flag": struct.unpack_from(
+                "<I", data, offset + AUXILIARY_U16_FLAG_OFFSET
+            )[0],
+            "auxiliary_u16_bytes": struct.unpack_from(
+                "<I", data, offset + AUXILIARY_U16_LENGTH_OFFSET
+            )[0],
+            "auxiliary_u64_flag": struct.unpack_from(
+                "<I", data, offset + AUXILIARY_U64_FLAG_OFFSET
+            )[0],
+            "auxiliary_u64_bytes": struct.unpack_from(
+                "<I", data, offset + AUXILIARY_U64_LENGTH_OFFSET
+            )[0],
+        }
         payload = struct.unpack_from(
             "<I", data, offset + PAYLOAD_LENGTH_OFFSET
         )[0]
@@ -50,9 +71,7 @@ def walk_segment(data: bytes) -> dict[str, object]:
             )
         end = payload_end
         extension = None
-        if struct.unpack_from(
-            "<I", data, offset + PRIMARY_EXTENSION_FLAG_OFFSET
-        )[0]:
+        if header["primary_extension_flag"]:
             header_end = payload_end + PRIMARY_EXTENSION_HEADER_BYTES
             if header_end > len(data):
                 raise ValueError(
@@ -79,6 +98,7 @@ def walk_segment(data: bytes) -> dict[str, object]:
             }
         record = {
             "offset": offset,
+            "header": header,
             "payload_bytes": payload,
             "payload_end": payload_end,
             "end": end,
@@ -203,6 +223,15 @@ def main() -> int:
                         f" +{RECORD_HEADER_BYTES:#x} header"
                         f" +{record['payload_bytes']:#x} payload"
                         f" -> {record['payload_end']:#06x}"
+                    )
+                    header = record["header"]
+                    print(
+                        "    stream fields: "
+                        f"primary={header['primary_extension_flag']:#x} "
+                        f"aux-u16={header['auxiliary_u16_flag']:#x}/"
+                        f"{header['auxiliary_u16_bytes']:#x} "
+                        f"aux-u64={header['auxiliary_u64_flag']:#x}/"
+                        f"{header['auxiliary_u64_bytes']:#x}"
                     )
                     if extension := record.get("primary_extension"):
                         print(

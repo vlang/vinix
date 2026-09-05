@@ -10593,6 +10593,33 @@ def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
             0x15C: 0x8B080508,  # multiply it by three
             0x160: 0xAB080D48,  # then by eight: 24-byte elements
             0x170: 0xF900800A,  # first array pointer at command +0x100
+            0x17C: 0xB9409809,  # record +0x88 gates the u16 aux extension
+            0x194: 0xB9409C0B,  # record +0x8c is its byte length
+            0x23C: 0x3DC00100,  # copy its four-count header
+            0x240: 0x3D804800,  # to command +0x120
+            0x244: 0xB941200B,  # first count at extension +0x00
+            0x264: 0xF900980A,  # first u16-array pointer at command +0x130
+            0x278: 0xB941240B,  # second count at extension +0x04
+            0x298: 0xF9009C0B,  # second pointer at command +0x138
+            0x2AC: 0xB941280D,  # third count at extension +0x08
+            0x2CC: 0xF900A00D,  # third pointer at command +0x140
+            0x2D8: 0xB9412C08,  # fourth count at extension +0x0c
+            0x2F4: 0xF900A408,  # fourth pointer at command +0x148
+            0x1C4: 0xB940A409,  # record +0x94 gates the u64 aux extension
+            0x1E0: 0xB940A80C,  # record +0x98 is its byte length
+            0x370: 0x3DC00160,  # copy its four-count header
+            0x374: 0x3D805400,  # to command +0x150
+            0x378: 0xB941580A,  # third count at extension +0x08
+            0x37C: 0xB9415C0C,  # fourth count at extension +0x0c
+            0x380: 0xB941540D,  # second count at extension +0x04
+            0x384: 0xB941500E,  # first count at extension +0x00
+            0x388: 0x0B0E01AD,  # first group count is count0 + count1
+            0x3A8: 0xF900B008,  # first u64-group pointer at command +0x160
+            0x3B4: 0x0B0A0188,  # second group count is count2 + count3
+            0x3D0: 0xF900B408,  # second pointer at command +0x168
+            0x3D4: 0x52800028,  # successful parse sets byte one
+            0x3D8: 0x39002008,  # at command +0x08
+            0x3EC: 0x52802049,  # auxiliary parse error marker 0x102
         },
     )
 
@@ -10618,6 +10645,33 @@ def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
             "header_member": 0xE8,
             "first_array_member": 0xF8,
             "second_array_member": 0x100,
+        },
+        "auxiliary_stream_extensions": {
+            "u16_arrays": {
+                "flag_offset": 0x88,
+                "stream_length_offset": 0x8C,
+                "header_bytes": 0x10,
+                "count_offsets": [0x00, 0x04, 0x08, 0x0C],
+                "element_bytes": [0x02, 0x02, 0x02, 0x02],
+                "header_member": 0x120,
+                "array_members": [0x130, 0x138, 0x140, 0x148],
+            },
+            "u64_groups": {
+                "flag_offset": 0x94,
+                "stream_length_offset": 0x98,
+                "header_bytes": 0x10,
+                "count_offsets": [0x00, 0x04, 0x08, 0x0C],
+                "element_bytes": 0x08,
+                "group_count_indices": [[0, 1], [2, 3]],
+                "header_member": 0x150,
+                "group_array_members": [0x160, 0x168],
+            },
+        },
+        "success": {"member": 0x08, "value": 1},
+        "error_markers": {
+            "member": 0x0C,
+            "terminator": 0x100,
+            "auxiliary_stream": 0x102,
         },
         "terminator_marker": 0x100,
         "terminator_member": 0x0C,

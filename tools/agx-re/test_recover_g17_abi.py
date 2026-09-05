@@ -4370,6 +4370,33 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x15C: 0x8B080508,
             0x160: 0xAB080D48,
             0x170: 0xF900800A,
+            0x17C: 0xB9409809,
+            0x194: 0xB9409C0B,
+            0x23C: 0x3DC00100,
+            0x240: 0x3D804800,
+            0x244: 0xB941200B,
+            0x264: 0xF900980A,
+            0x278: 0xB941240B,
+            0x298: 0xF9009C0B,
+            0x2AC: 0xB941280D,
+            0x2CC: 0xF900A00D,
+            0x2D8: 0xB9412C08,
+            0x2F4: 0xF900A408,
+            0x1C4: 0xB940A409,
+            0x1E0: 0xB940A80C,
+            0x370: 0x3DC00160,
+            0x374: 0x3D805400,
+            0x378: 0xB941580A,
+            0x37C: 0xB9415C0C,
+            0x380: 0xB941540D,
+            0x384: 0xB941500E,
+            0x388: 0x0B0E01AD,
+            0x3A8: 0xF900B008,
+            0x3B4: 0x0B0A0188,
+            0x3D0: 0xF900B408,
+            0x3D4: 0x52800028,
+            0x3D8: 0x39002008,
+            0x3EC: 0x52802049,
         }.items():
             struct.pack_into("<I", code, offset, word)
 
@@ -4392,6 +4419,30 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(
             recovered["primary_extension"]["element_bytes"], [2, 24]
         )
+        self.assertEqual(
+            recovered["auxiliary_stream_extensions"]["u16_arrays"],
+            {
+                "flag_offset": 0x88,
+                "stream_length_offset": 0x8C,
+                "header_bytes": 0x10,
+                "count_offsets": [0, 4, 8, 12],
+                "element_bytes": [2, 2, 2, 2],
+                "header_member": 0x120,
+                "array_members": [0x130, 0x138, 0x140, 0x148],
+            },
+        )
+        self.assertEqual(
+            recovered["auxiliary_stream_extensions"]["u64_groups"]
+            ["group_count_indices"],
+            [[0, 1], [2, 3]],
+        )
+        self.assertEqual(
+            recovered["auxiliary_stream_extensions"]["u64_groups"]
+            ["group_array_members"],
+            [0x160, 0x168],
+        )
+        self.assertEqual(recovered["success"], {"member": 8, "value": 1})
+        self.assertEqual(recovered["error_markers"]["auxiliary_stream"], 0x102)
         self.assertEqual(recovered["terminator_marker"], 0x100)
 
     def test_recovers_g17_channel_command_common_fields(self) -> None:

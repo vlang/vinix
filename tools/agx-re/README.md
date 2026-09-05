@@ -44,9 +44,12 @@ names recovered from the local
 `AGXDeviceUserClient::getTargetAndMethodForIndex` table.
 
 `trace_diff.py` defaults to comparing the clear and triangle command segments.
-`--walk` instead parses each segment with the record and primary-extension
-framing recovered from `AGXHardwareKernelCommand::parseAndValidate`, which is
-how that grammar is checked against bytes the Metal driver actually produced.
+`--walk` instead parses each primary segment with the record and
+primary-extension framing recovered from
+`AGXHardwareKernelCommand::parseAndValidate`, and reports the gates and byte
+lengths for the method's separate auxiliary stream. This is how the grammar is
+checked against bytes the Metal driver actually produced without conflating
+the two parser cursors.
 It can also select a shared allocation by an observed JSON field:
 
 ```sh
