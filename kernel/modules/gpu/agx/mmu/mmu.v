@@ -12,6 +12,7 @@ import gpu.agx.pgtable
 import klock
 import katomic
 import aarch64.cpu
+import memory
 
 pub const uat_num_contexts = 64
 pub const uat_kernel_flush_slot = 64
@@ -72,6 +73,7 @@ pub mut:
 	active  bool
 	lock    klock.Lock
 	vm_id   u32
+	dummy_phys u64
 }
 
 pub struct UatManager {
@@ -293,12 +295,24 @@ pub fn (mut mgr UatManager) create_context() ?&UatContext {
 	}
 	for i := u32(1); i < uat_num_contexts; i++ {
 		if mgr.contexts[i] == unsafe { nil } {
-			pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
+			mut pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
+			dummy_phys := u64(memory.pmm_alloc_aligned_fallible(4, 4))
+			if dummy_phys == 0 {
+				pgtable.destroy(pt)
+				return none
+			}
+			if !pt.map(uat_unknown_page, dummy_phys, pgtable.uat_pgsz,
+				pgtable.gpu_prot_gpu_shared_rw) {
+				memory.pmm_free(voidptr(dummy_phys), 4)
+				pgtable.destroy(pt)
+				return none
+			}
 			ctx := &UatContext{
 				id: i
 				pgtable: pt
 				active: true
 				vm_id: i
+				dummy_phys: dummy_phys
 			}
 			mgr.contexts[i] = ctx
 			return ctx
@@ -318,6 +332,9 @@ pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 	mgr.unbind_context(ctx)
 	if ctx.pgtable != unsafe { nil } {
 		pgtable.destroy(ctx.pgtable)
+	}
+	if ctx.dummy_phys != 0 {
+		memory.pmm_free(voidptr(ctx.dummy_phys), 4)
 	}
 	mgr.contexts[ctx.id] = unsafe { nil }
 }
