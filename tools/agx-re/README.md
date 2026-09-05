@@ -158,10 +158,17 @@ register emission graph into the work-command encoder and implementing
 the remaining callback error/control event types and work-command reclamation.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
-eight masked flags, and the independently allocated `0xc40` descriptor size;
-the kernel applies that map only to staged, bounds-checked buffers. The same
-recovery pins the derived descriptor clear and ten nonzero scalar defaults,
-which the kernel installs without copying Apple's host C++ object pointers.
+eight masked flags, and the independently allocated `0xc40` base prefix; the
+kernel applies that map only to staged, bounds-checked buffers. The selected
+render object is the `0x15b0` `AGXTACommandDescriptor` subclass. The same
+recovery pins its derived-to-base initialization chain and 17 unique nonzero
+scalar defaults, which the kernel installs without copying Apple's host C++
+object pointers or embedded synchronization state.
+The adjacent straight-line TA passthrough is executable too: 32 direct copy
+ranges and 23 masked flags span the selected object's base prefix and derived
+tail through `+0x15a8`, with all source and destination bounds pinned to the
+Apple binary. Resource-derived and computed fields still need native Vinix
+producers before the descriptor can drive hardware submission.
 
 `generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this

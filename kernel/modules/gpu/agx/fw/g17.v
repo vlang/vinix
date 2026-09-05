@@ -1800,22 +1800,38 @@ pub fn parse_g17_render_payload(command voidptr, command_bytes u64, payload void
 	return true
 }
 
-// Host-only staging layout allocated by AGX3DCommandDescriptor::MetaClass.
+// Host-only staging layout selected through AGXTACommandDescriptor::MetaClass.
+// Its first 0xc40 bytes are the AGX3DCommandDescriptor base-class prefix.
 // Firmware never receives this object directly. The HAL300 work-command
-// producer reads it while building the four firmware-private register lists.
-pub const g17_3d_descriptor_size = u64(0xc40)
+// producer reads it while building the firmware-private register lists.
+pub const g17_3d_descriptor_base_size = u64(0xc40)
+pub const g17_3d_descriptor_size = u64(0x15b0)
 pub const g17_3d_common_payload_offset = u64(0x2d0)
 pub const g17_3d_common_passthrough_size = u64(0x3ec)
 
 @[packed]
 pub struct G17ThreeDDescriptor {
 pub mut:
-	opaque [0xc40]u8
+	opaque [0x15b0]u8
 }
 
 fn write_g17_descriptor_value(destination &u8, member u64, bytes u64, value u64) {
 	unsafe {
 		C.memcpy(voidptr(destination + member), &value, bytes)
+	}
+}
+
+fn copy_g17_descriptor_range(destination &u8, member u64, source &u8,
+	source_offset u64, bytes u64) {
+	unsafe {
+		C.memcpy(voidptr(destination + member), voidptr(source + source_offset), bytes)
+	}
+}
+
+fn copy_g17_descriptor_bit(destination &u8, member u64, bytes u64, source &u8,
+	source_offset u64) {
+	unsafe {
+		write_g17_descriptor_value(destination, member, bytes, u64(source[source_offset] & 1))
 	}
 }
 
@@ -1840,6 +1856,13 @@ pub fn initialize_g17_3d_descriptor(descriptor voidptr, descriptor_bytes u64) bo
 		write_g17_descriptor_value(destination, 0xaa0, 8, 0xffff_ffff)
 		write_g17_descriptor_value(destination, 0xb60, 4, 0xffff_ffff)
 		write_g17_descriptor_value(destination, 0xc30, 4, 1)
+		write_g17_descriptor_value(destination, 0xe18, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0xf60, 4, 2)
+		write_g17_descriptor_value(destination, 0x1208, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x1264, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x126c, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x13a8, 8, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x13e8, 4, 0xffff_ffff)
 	}
 	return true
 }
@@ -1918,6 +1941,90 @@ pub fn populate_g17_3d_common_passthrough(descriptor voidptr, descriptor_bytes u
 		destination[0x963] = source[0x37d] & 1
 		destination[0x899] = source[0x37e] & 1
 		destination[0x7e0] = source[0x37f] & 1
+	}
+	return true
+}
+
+// Reproduce the raw-payload portion of AGXCommandQueue::processRenderSetup
+// for the selected AGXTACommandDescriptor. Resource addresses and fields
+// computed by the rest of processRenderSetup remain separate stages.
+pub fn populate_g17_ta_render_passthrough(descriptor voidptr, descriptor_bytes u64,
+	payload voidptr, payload_bytes u64) bool {
+	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size
+		|| payload == unsafe { nil } || payload_bytes < g17_render_payload_size {
+		return false
+	}
+
+	unsafe {
+		destination := &u8(descriptor)
+		source := &u8(payload)
+		copy_g17_descriptor_range(destination, 0xfe0, source, 0x000, 0x30)
+		copy_g17_descriptor_range(destination, 0x1010, source, 0x1f0, 0x20)
+		copy_g17_descriptor_range(destination, 0x1030, source, 0x210, 0x08)
+		copy_g17_descriptor_range(destination, 0x1038, source, 0x220, 0x10)
+		copy_g17_descriptor_range(destination, 0x1048, source, 0x230, 0x04)
+		copy_g17_descriptor_range(destination, 0x10c0, source, 0x0b8, 0x0c)
+		copy_g17_descriptor_range(destination, 0x1090, source, 0x070, 0x30)
+		copy_g17_descriptor_range(destination, 0x10e0, source, 0x1e4, 0x0c)
+		copy_g17_descriptor_range(destination, 0x1110, source, 0x168, 0x08)
+		copy_g17_descriptor_range(destination, 0x1108, source, 0x0a0, 0x08)
+		copy_g17_descriptor_range(destination, 0x13b0, source, 0x238, 0x04)
+		copy_g17_descriptor_range(destination, 0x0f60, source, 0x258, 0x04)
+		copy_g17_descriptor_range(destination, 0x14d0, source, 0x280, 0x30)
+		copy_g17_descriptor_range(destination, 0x1518, source, 0x2b0, 0x10)
+		copy_g17_descriptor_range(destination, 0x1528, source, 0x2c0, 0x0c)
+		copy_g17_descriptor_range(destination, 0x086c, source, 0x810, 0x04)
+		copy_g17_descriptor_range(destination, 0x0870, source, 0x818, 0x08)
+		copy_g17_descriptor_range(destination, 0x0961, source, 0x822, 0x01)
+		copy_g17_descriptor_range(destination, 0x0950, source, 0x830, 0x0c)
+
+		copy_g17_descriptor_bit(destination, 0x1100, 4, source, 0x246)
+		copy_g17_descriptor_bit(destination, 0x1129, 1, source, 0x23d)
+		copy_g17_descriptor_bit(destination, 0x1130, 1, source, 0x243)
+		copy_g17_descriptor_bit(destination, 0x112a, 1, source, 0x23e)
+		copy_g17_descriptor_bit(destination, 0x112b, 1, source, 0x23f)
+		copy_g17_descriptor_bit(destination, 0x112d, 1, source, 0x241)
+		copy_g17_descriptor_bit(destination, 0x112f, 1, source, 0x242)
+		copy_g17_descriptor_bit(destination, 0x1132, 1, source, 0x249)
+		copy_g17_descriptor_bit(destination, 0x1270, 1, source, 0x244)
+		copy_g17_descriptor_bit(destination, 0x1271, 1, source, 0x245)
+		copy_g17_descriptor_bit(destination, 0x1539, 1, source, 0x24b)
+		copy_g17_descriptor_bit(destination, 0x15a8, 1, source, 0x24a)
+		copy_g17_descriptor_bit(destination, 0x112e, 1, source, 0x820)
+		copy_g17_descriptor_bit(destination, 0x0868, 1, source, 0x814)
+		copy_g17_descriptor_bit(destination, 0x088d, 1, source, 0x820)
+	}
+
+	if !populate_g17_3d_common_passthrough(descriptor, descriptor_bytes, payload,
+		payload_bytes) {
+		return false
+	}
+
+	unsafe {
+		destination := &u8(descriptor)
+		source := &u8(payload)
+		copy_g17_descriptor_range(destination, 0x04c0, source, 0x6c0, 0x08)
+		copy_g17_descriptor_range(destination, 0x0618, source, 0x6c8, 0x30)
+		copy_g17_descriptor_range(destination, 0x0568, source, 0x728, 0x80)
+		copy_g17_descriptor_range(destination, 0x0678, source, 0x7a8, 0x08)
+		copy_g17_descriptor_range(destination, 0x06f8, source, 0x7b0, 0x08)
+		copy_g17_descriptor_range(destination, 0x0690, source, 0x7b8, 0x08)
+		copy_g17_descriptor_range(destination, 0x0720, source, 0x7c0, 0x08)
+		copy_g17_descriptor_range(destination, 0x06a8, source, 0x7c8, 0x08)
+		copy_g17_descriptor_range(destination, 0x06c0, source, 0x7d0, 0x08)
+		copy_g17_descriptor_range(destination, 0x079c, source, 0x6f8, 0x0c)
+		copy_g17_descriptor_range(destination, 0x0780, source, 0x708, 0x10)
+		copy_g17_descriptor_range(destination, 0x04c8, source, 0x7e8, 0x18)
+		copy_g17_descriptor_range(destination, 0x0aa8, source, 0x808, 0x04)
+
+		copy_g17_descriptor_bit(destination, 0x088e, 1, source, 0x7d8)
+		copy_g17_descriptor_bit(destination, 0x088f, 1, source, 0x7d9)
+		copy_g17_descriptor_bit(destination, 0x0890, 1, source, 0x7da)
+		copy_g17_descriptor_bit(destination, 0x0891, 1, source, 0x7db)
+		copy_g17_descriptor_bit(destination, 0x0892, 1, source, 0x7dc)
+		copy_g17_descriptor_bit(destination, 0x089a, 1, source, 0x7dd)
+		copy_g17_descriptor_bit(destination, 0x089b, 1, source, 0x7de)
+		copy_g17_descriptor_bit(destination, 0x0800, 1, source, 0x80c)
 	}
 	return true
 }

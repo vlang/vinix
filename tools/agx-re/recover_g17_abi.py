@@ -623,6 +623,11 @@ INIT_3D_COMMAND_DESCRIPTOR = (
     "__ZN22AGX3DCommandDescriptor4initEP5IOGPUP17IOGPUCommandQueueP9IOGPUTask"
     "PKcyP19AGXDebugBufferShmem"
 )
+ALLOC_TA_COMMAND_DESCRIPTOR = "__ZNK22AGXTACommandDescriptor9MetaClass5allocEv"
+INIT_TA_COMMAND_DESCRIPTOR = (
+    "__ZN22AGXTACommandDescriptor4initEP5IOGPUP17IOGPUCommandQueueP9IOGPUTask"
+    "PKcyP19AGXDebugBufferShmem"
+)
 REGISTER_LIST_PRODUCERS = {
     "3D": GENERATE_REGISTER_LIST_3D,
     "FastBlit": (
@@ -11523,11 +11528,167 @@ def recover_g17_3d_common_passthrough(image: bytes) -> dict[str, object]:
     }
 
 
-def recover_g17_3d_descriptor_initialization(image: bytes) -> dict[str, object]:
-    """Recover scalar defaults needed by a host-only 3D staging object."""
+def recover_g17_ta_render_passthrough(image: bytes) -> dict[str, object]:
+    """Recover the raw render-payload copies around the 3D common helper."""
 
     symbols = macho_symbols(image)
-    required = (ALLOC_3D_COMMAND_DESCRIPTOR, INIT_3D_COMMAND_DESCRIPTOR)
+    required = (PROCESS_RENDER_SETUP, COPY_3D_COMMON_PASSTHROUGH)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing TA render passthrough producers: {missing}")
+
+    setup_address, setup_code = symbol_code(image, PROCESS_RENDER_SETUP)
+    copy_address = symbols[COPY_3D_COMMON_PASSTHROUGH]
+    call_word = struct.unpack_from("<I", setup_code, 0x1F78)[0]
+    if decode_bl_target(setup_address + 0x1F78, call_word) != copy_address:
+        raise ValueError("G17 TA render setup no longer calls the 3D common helper")
+    require_instruction_words_at(
+        setup_code,
+        "G17 TA render passthrough",
+        {
+            0x1D64: 0xF9400F48,  # retained raw payload at parsed command +0x18
+            0x1D68: 0x3DC00100,  # payload +0 -> descriptor +0xfe0
+            0x1DC0: 0x3DC07D00,  # payload +0x1f0 -> descriptor +0x1010
+            0x1E44: 0x39491909,  # payload +0x246, reduced to bit zero
+            0x1E60: 0x3948F509,  # payload +0x23d, reduced to bit zero
+            0x1ECC: 0xB9423909,  # payload +0x238 -> descriptor +0x13b0
+            0x1EE8: 0x3DC0A100,  # payload +0x280 -> descriptor +0x14d0
+            0x1F1C: 0x39492908,  # payload +0x24a -> descriptor +0x15a8
+            0x1F28: 0xF9400F48,  # reload retained payload
+            0x1F38: 0xB948110A,  # payload +0x810 -> descriptor +0x86c
+            0x1F70: 0x910B4101,  # common record at payload +0x2d0
+            0x1F78: call_word,
+            0x1F7C: 0xF9400F48,  # reload after helper
+            0x1F80: 0xF9436109,  # payload +0x6c0 -> descriptor +0x4c0
+            0x1FA8: 0xF9439509,  # payload +0x728 -> descriptor +0x568
+            0x2058: 0xFD437D00,  # payload +0x6f8 -> derived +0x79c prefix
+            0x2068: 0x911C2109,  # payload +0x708 vector source
+            0x2084: 0xBD47D900,  # four packed flags at payload +0x7d8
+            0x2088: 0x2F08A400,
+            0x208C: 0x2F0797C0,
+            0x2090: 0x0E001800,
+            0x20BC: 0xB9480909,  # payload +0x808 -> descriptor +0xaa8
+            0x20CC: 0x39200328,  # payload +0x80c bit -> descriptor +0x800
+        },
+    )
+
+    pre_common_copy_ranges = [
+        (0x000, 0xFE0, 0x30),
+        (0x1F0, 0x1010, 0x20),
+        (0x210, 0x1030, 0x08),
+        (0x220, 0x1038, 0x10),
+        (0x230, 0x1048, 0x04),
+        (0x0B8, 0x10C0, 0x0C),
+        (0x070, 0x1090, 0x30),
+        (0x1E4, 0x10E0, 0x0C),
+        (0x168, 0x1110, 0x08),
+        (0x0A0, 0x1108, 0x08),
+        (0x238, 0x13B0, 0x04),
+        (0x258, 0xF60, 0x04),
+        (0x280, 0x14D0, 0x30),
+        (0x2B0, 0x1518, 0x10),
+        (0x2C0, 0x1528, 0x0C),
+        (0x810, 0x86C, 0x04),
+        (0x818, 0x870, 0x08),
+        (0x822, 0x961, 0x01),
+        (0x830, 0x950, 0x0C),
+    ]
+    pre_common_bit_fields = [
+        (0x246, 0x1100, 4),
+        (0x23D, 0x1129, 1),
+        (0x243, 0x1130, 1),
+        (0x23E, 0x112A, 1),
+        (0x23F, 0x112B, 1),
+        (0x241, 0x112D, 1),
+        (0x242, 0x112F, 1),
+        (0x249, 0x1132, 1),
+        (0x244, 0x1270, 1),
+        (0x245, 0x1271, 1),
+        (0x24B, 0x1539, 1),
+        (0x24A, 0x15A8, 1),
+        (0x820, 0x112E, 1),
+        (0x814, 0x868, 1),
+        (0x820, 0x88D, 1),
+    ]
+    post_common_copy_ranges = [
+        (0x6C0, 0x4C0, 0x08),
+        (0x6C8, 0x618, 0x30),
+        (0x728, 0x568, 0x80),
+        (0x7A8, 0x678, 0x08),
+        (0x7B0, 0x6F8, 0x08),
+        (0x7B8, 0x690, 0x08),
+        (0x7C0, 0x720, 0x08),
+        (0x7C8, 0x6A8, 0x08),
+        (0x7D0, 0x6C0, 0x08),
+        (0x6F8, 0x79C, 0x0C),
+        (0x708, 0x780, 0x10),
+        (0x7E8, 0x4C8, 0x18),
+        (0x808, 0xAA8, 0x04),
+    ]
+    post_common_bit_fields = [
+        (0x7D8, 0x88E, 1),
+        (0x7D9, 0x88F, 1),
+        (0x7DA, 0x890, 1),
+        (0x7DB, 0x891, 1),
+        (0x7DC, 0x892, 1),
+        (0x7DD, 0x89A, 1),
+        (0x7DE, 0x89B, 1),
+        (0x80C, 0x800, 1),
+    ]
+    payload_bytes = 0x9D0
+    descriptor_bytes = 0x15B0
+    ranges = pre_common_copy_ranges + post_common_copy_ranges
+    fields = pre_common_bit_fields + post_common_bit_fields
+    if any(source + size > payload_bytes or destination + size > descriptor_bytes
+           for source, destination, size in ranges):
+        raise ValueError("TA render passthrough copy falls outside its objects")
+    if any(source >= payload_bytes or destination + size > descriptor_bytes
+           for source, destination, size in fields):
+        raise ValueError("TA render passthrough bit field falls outside its objects")
+
+    def encode_ranges(values: list[tuple[int, int, int]]) -> list[dict[str, int]]:
+        return [
+            {
+                "source_offset": source,
+                "descriptor_member": destination,
+                "bytes": size,
+            }
+            for source, destination, size in values
+        ]
+
+    def encode_fields(values: list[tuple[int, int, int]]) -> list[dict[str, int]]:
+        return [
+            {
+                "source_offset": source,
+                "descriptor_member": destination,
+                "destination_bytes": size,
+                "mask": 1,
+            }
+            for source, destination, size in values
+        ]
+
+    return {
+        "payload_bytes": payload_bytes,
+        "descriptor_bytes": descriptor_bytes,
+        "pre_common_copy_ranges": encode_ranges(pre_common_copy_ranges),
+        "pre_common_bit_fields": encode_fields(pre_common_bit_fields),
+        "common": COPY_3D_COMMON_PASSTHROUGH,
+        "post_common_copy_ranges": encode_ranges(post_common_copy_ranges),
+        "post_common_bit_fields": encode_fields(post_common_bit_fields),
+        "producer": PROCESS_RENDER_SETUP,
+    }
+
+
+def recover_g17_3d_descriptor_initialization(image: bytes) -> dict[str, object]:
+    """Recover the selected TA subclass size and its scalar staging defaults."""
+
+    symbols = macho_symbols(image)
+    required = (
+        ALLOC_3D_COMMAND_DESCRIPTOR,
+        INIT_3D_COMMAND_DESCRIPTOR,
+        ALLOC_TA_COMMAND_DESCRIPTOR,
+        INIT_TA_COMMAND_DESCRIPTOR,
+    )
     missing = [name for name in required if name not in symbols]
     if missing:
         raise ValueError(f"Mach-O is missing 3D descriptor initializers: {missing}")
@@ -11567,8 +11728,57 @@ def recover_g17_3d_descriptor_initialization(image: bytes) -> dict[str, object]:
         },
     )
 
+    _ta_alloc_address, ta_alloc_code = symbol_code(image, ALLOC_TA_COMMAND_DESCRIPTOR)
+    require_instruction_words_at(
+        ta_alloc_code,
+        "G17 TA descriptor allocation defaults",
+        {
+            0x018: 0x5282B601,  # selected typed allocation size 0x15b0
+            0x07C: 0xB9096808,  # inherited -1 at +0x968
+            0x08C: 0x2F00E5E1,  # inherited 0x00000000ffffffff
+            0x090: 0xFD055001,  # -> +0xaa0
+            0x098: 0xB90B6008,  # inherited -1 at +0xb60
+            0x114: 0xB9126C08,  # -1 at +0x126c
+            0x124: 0xFD09D401,  # 0x00000000ffffffff at +0x13a8
+            0x134: 0xB913E808,  # -1 at +0x13e8
+        },
+    )
+    if len(ta_alloc_code) != 0x1A8:
+        raise ValueError(
+            f"unexpected G17 TA descriptor allocator size {len(ta_alloc_code):#x}"
+        )
+
+    ta_init_address, ta_init_code = symbol_code(image, INIT_TA_COMMAND_DESCRIPTOR)
+    base_init_address = symbols[INIT_3D_COMMAND_DESCRIPTOR]
+    base_call_word = struct.unpack_from("<I", ta_init_code, 0x18)[0]
+    if decode_bl_target(ta_init_address + 0x18, base_call_word) != base_init_address:
+        raise ValueError("G17 TA descriptor init no longer calls its 3D base init")
+    require_instruction_words_at(
+        ta_init_code,
+        "G17 TA descriptor initialization defaults",
+        {
+            0x018: base_call_word,
+            0x0DC: 0x12800015,  # literal -1 used by derived defaults
+            0x0E0: 0xB9120A75,  # -> +0x1208
+            0x164: 0xB9126675,  # -> +0x1264
+            0x168: 0xB9014675,  # inherited +0x144
+            0x1A8: 0x52800048,  # literal two
+            0x1AC: 0xB90F6268,  # -> +0xf60
+            0x1B0: 0xF94A5A68,  # mask existing +0x14b0
+            0x1B4: 0x9254A508,
+            0x1B8: 0xF90A5A68,
+            0x1BC: 0xB90E1A75,  # -1 at +0xe18
+        },
+    )
+    if len(ta_init_code) != 0x1D4:
+        raise ValueError(
+            f"unexpected G17 TA descriptor init size {len(ta_init_code):#x}"
+        )
+
     return {
-        "descriptor_bytes": 0xC40,
+        "base_descriptor_bytes": 0xC40,
+        "descriptor_bytes": 0x15B0,
+        "selected_class": "AGXTACommandDescriptor",
         # Vinix staging does not instantiate the C++ base classes or their
         # retained OSObject pointers. A full clear is a host-side invariant;
         # these are the nonzero scalar defaults the selected derived
@@ -11586,14 +11796,30 @@ def recover_g17_3d_descriptor_initialization(image: bytes) -> dict[str, object]:
             {"member": 0xAA0, "bytes": 8, "value": 0xFFFFFFFF},
             {"member": 0xB60, "bytes": 4, "value": 0xFFFFFFFF},
             {"member": 0xC30, "bytes": 4, "value": 1},
+            {"member": 0xE18, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0xF60, "bytes": 4, "value": 2},
+            {"member": 0x1208, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0x1264, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0x126C, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0x13A8, "bytes": 8, "value": 0xFFFFFFFF},
+            {"member": 0x13E8, "bytes": 4, "value": 0xFFFFFFFF},
         ],
-        "masked_default": {
-            "member": 0xC28,
-            "bytes": 8,
-            "mask": 0xFFFFF000003FFFFF,
-        },
-        "allocator": ALLOC_3D_COMMAND_DESCRIPTOR,
-        "initializer": INIT_3D_COMMAND_DESCRIPTOR,
+        "masked_defaults": [
+            {
+                "member": 0xC28,
+                "bytes": 8,
+                "mask": 0xFFFFF000003FFFFF,
+            },
+            {
+                "member": 0x14B0,
+                "bytes": 8,
+                "mask": 0xFFFFF000003FFFFF,
+            },
+        ],
+        "base_allocator": ALLOC_3D_COMMAND_DESCRIPTOR,
+        "base_initializer": INIT_3D_COMMAND_DESCRIPTOR,
+        "allocator": ALLOC_TA_COMMAND_DESCRIPTOR,
+        "initializer": INIT_TA_COMMAND_DESCRIPTOR,
     }
 
 
@@ -14303,6 +14529,9 @@ def main() -> int:
         )
         channels["descriptor_3d_common_passthrough"] = (
             recover_g17_3d_common_passthrough(driver)
+        )
+        channels["descriptor_ta_render_passthrough"] = (
+            recover_g17_ta_render_passthrough(driver)
         )
         channels["descriptor_3d_initialization"] = (
             recover_g17_3d_descriptor_initialization(driver)
