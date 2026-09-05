@@ -147,25 +147,29 @@ def fixture_tree(
         )
         for index, name in enumerate(soc_names)
     )
-    nub = adt_node(
-        "iop-pmp1-nub",
-        {
-            "compatible": b"iop-nub,rtbuddy-v2\0",
-            "firmware-name": b"t6050pmp\0",
-            "region-base": struct.pack("<Q", 0x4284500000),
-            "region-size": struct.pack("<Q", 0x100000),
-            "soc-device": soc_devices,
-            "ptd-range": b"".join(
-                (
-                    ptd_range_record(1, 0, 1, 0, "NULL"),
-                    ptd_range_record(2, 1, 1, 16, "PMP-STATUS"),
-                    ptd_range_record(9, 0x90, 0x150, 0, "SOC-DEV-PKT"),
-                    ptd_range_record(10, 0x1E0, 8, 0, "SOC-DEV-PS-REQ"),
-                    ptd_range_record(11, 0x1E8, 8, 0, "SOC-DEV-PS-ACK"),
-                )
-            ),
-            "pm-ptd-ranges": struct.pack("<IIIII", 1, 2, 9, 10, 11),
-        },
+    ptd_ranges = b"".join(
+        (
+            ptd_range_record(1, 0, 1, 0, "NULL"),
+            ptd_range_record(2, 1, 1, 16, "PMP-STATUS"),
+            ptd_range_record(9, 0x90, 0x150, 0, "SOC-DEV-PKT"),
+            ptd_range_record(10, 0x1E0, 8, 0, "SOC-DEV-PS-REQ"),
+            ptd_range_record(11, 0x1E8, 8, 0, "SOC-DEV-PS-ACK"),
+        )
+    )
+    power_range_ids = (1, 2, 3, 4, 5, 6, 7, 8, 40, 9, 10, 11, 12, 13, 14)
+    nub_properties = {
+        "compatible": b"iop-nub,rtbuddy-v2\0",
+        "firmware-name": b"t6050pmp\0",
+        "region-base": struct.pack("<Q", 0x4284500000),
+        "region-size": struct.pack("<Q", 0x100000),
+        "soc-device": soc_devices,
+        "ptd-range": ptd_ranges,
+        "pm-ptd-ranges": struct.pack("<15I", *power_range_ids),
+    }
+    nub = adt_node("iop-pmp1-nub", nub_properties, [])
+    nub0 = adt_node(
+        "iop-pmp0-nub",
+        {**nub_properties, "region-base": struct.pack("<Q", 0x284500000)},
         [],
     )
     pmp = adt_node(
@@ -176,7 +180,7 @@ def fixture_tree(
     pmp0 = adt_node(
         "pmp0",
         {"compatible": b"iop,ascwrap-v6\0", "role": b"PMP0\0"},
-        [],
+        [nub0],
     )
     arm_io = adt_node(
         "arm-io",
@@ -227,7 +231,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 7)
+        self.assertEqual(result["schema"], 8)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -269,6 +273,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
             result["apple_ptd_mmio"]["die_bases"],
             [0x84240000, 0x4084240000],
         )
+        self.assertEqual(
+            [(die["role"], die["region_base"]) for die in result["pmp"]["dies"]],
+            [("PMP0", 0x284500000), ("PMP1", 0x4284500000)],
+        )
 
     def test_recovers_pmp_v2_binary_dispatch(self) -> None:
         send = 0x1000
@@ -288,6 +296,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
         check_notify = 0xF000
         get_reg_map = 0x10000
         write_reg64 = 0x11000
+        wait_cluster = 0x12000
 
         def branch(source: int, target: int, link: bool = False) -> bytes:
             delta = (target - source) // 4
@@ -307,6 +316,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 struct.pack("<II", 0x7100087F, 0x39400C08)
                 + branch(state + 8, read, True)
                 + branch(state + 12, write, True)
+                + struct.pack(
+                    "<7I",
+                    0xB9406B69,
+                    0x1B162128,
+                    0xB9400153,
+                    0x52837B88,
+                    0x39400108,
+                    0x7200011F,
+                    0x1A9F12D5,
+                )
                 + struct.pack(
                     "<25I",
                     0x52800029,
@@ -399,10 +418,27 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 initial,
                 struct.pack("<2I", 0x394002A8, 0x360801A8)
                 + branch(initial + 8, device_data, True)
+                + branch(initial + 12, wait_cluster, True)
                 + struct.pack(
                     "<4I", 0x794036A8, 0x35000048, 0x39400EA8, 0xA900E7E8
                 )
-                + branch(initial + 28, send, True),
+                + branch(initial + 32, send, True),
+            ),
+            recover_t6050_power.PMP_WAIT_CLUSTER_POWER_UP: (
+                wait_cluster,
+                struct.pack(
+                    "<10I",
+                    0x79403437,
+                    0x35000057,
+                    0x39400C37,
+                    0x394026CD,
+                    0x370000ED,
+                    0xD2804011,
+                    0x910026C1,
+                    0x52800002,
+                    0x384092C8,
+                    0x3707FE68,
+                ),
             ),
             recover_t6050_power.PMP_ENABLE_DEVICE_GATED: (
                 enable,
@@ -503,6 +539,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.PMP_INIT_V2: init,
             recover_t6050_power.PMP_GET_DEVICE_INDEX: lookup,
             recover_t6050_power.PMP_NOTIFY_INITIAL: initial,
+            recover_t6050_power.PMP_WAIT_CLUSTER_POWER_UP: wait_cluster,
             recover_t6050_power.PMP_ENABLE_DEVICE_GATED: enable,
             recover_t6050_power.PMP_DEVICE_ID_TO_DATA: device_data,
             recover_t6050_power.PMP_CHECK_NOTIFY: check_notify,
@@ -520,8 +557,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["device_index_map"]["record_stride"], 124)
         self.assertEqual(result["device_index_map"]["allocated_entries"], 257)
         self.assertEqual(result["state_notification"]["flag"], 0x02)
+        self.assertIn(
+            "does not read ApplePTD",
+            result["state_notification"]["initial_precondition_scope"],
+        )
         self.assertEqual(result["ordinary_request_ack"]["ack_new_data"]["bit"], 54)
         self.assertEqual(result["ordinary_request_ack"]["timeout_seconds"], 15)
+        self.assertEqual(
+            result["ordinary_request_ack"]["selector_die_stride_object_offset"],
+            0x72838,
+        )
         self.assertIn("never read", result["ordinary_request_ack"]["poll_deadline_observed_use"])
         self.assertEqual(result["readiness"]["virtual_wait_slot"], 0xAC0)
         self.assertEqual(result["readiness"]["status_range_object_offset"], 0x72820)

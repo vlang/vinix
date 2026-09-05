@@ -62,6 +62,23 @@ fn node_string_contains(node &devicetree.DTNode, property string, expected strin
 	return false
 }
 
+fn native_properties_equal(left &devicetree.DTNode, right &devicetree.DTNode,
+	property string) bool {
+	left_value := devicetree.get_property(left, property) or { return false }
+	right_value := devicetree.get_property(right, property) or { return false }
+	if left_value.len != right_value.len {
+		return false
+	}
+	left_bytes := unsafe { &u8(left_value.data) }
+	right_bytes := unsafe { &u8(right_value.data) }
+	for index := u32(0); index < left_value.len; index++ {
+		if unsafe { left_bytes[index] } != unsafe { right_bytes[index] } {
+			return false
+		}
+	}
+	return true
+}
+
 fn find_native_asc_node(role u32) ?&devicetree.DTNode {
 	name := if role == 0 { 'gfx-asc' } else { 'gfx1-asc' }
 	if node := devicetree.find_node('/arm-io/${name}') {
@@ -216,16 +233,6 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 	return true
 }
 
-fn power_range_contains(nub &devicetree.DTNode, expected_id u32) bool {
-	ranges := devicetree.get_le_u32_array(nub, 'pm-ptd-ranges') or { return false }
-	for range_id in ranges {
-		if range_id == expected_id {
-			return true
-		}
-	}
-	return false
-}
-
 // Validate only the read-only ownership and transport contract here. The
 // running PMP still has to complete its service and initial-state ordering
 // before SOC-DEV-PS-REQ can be written, so this function deliberately performs
@@ -249,13 +256,32 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		println('agx: native t6050 PMP1 RTKit nub not found')
 		return false
 	}
+	pmp0_nub := devicetree.find_node('/arm-io/pmp0/iop-pmp0-nub') or {
+		println('agx: native t6050 PMP0 RTKit nub not found')
+		return false
+	}
 	if !node_string_contains(pmp0, 'compatible', 'iop,ascwrap-v6')
 		|| !node_string_contains(pmp0, 'role', 'PMP0')
 		|| !node_string_contains(pmp, 'compatible', 'iop,ascwrap-v6')
 		|| !node_string_contains(pmp, 'role', 'PMP1')
+		|| !node_string_contains(pmp0_nub, 'compatible', 'iop-nub,rtbuddy-v2')
+		|| !node_string_contains(pmp0_nub, 'firmware-name', 't6050pmp')
 		|| !node_string_contains(pmp_nub, 'compatible', 'iop-nub,rtbuddy-v2')
 		|| !node_string_contains(pmp_nub, 'firmware-name', 't6050pmp') {
-		println('agx: native t6050 PMP1 ownership changed')
+		println('agx: native t6050 PMP ownership changed')
+		return false
+	}
+	pmp0_region_base := devicetree.get_le_u64(pmp0_nub, 'region-base') or { return false }
+	pmp1_region_base := devicetree.get_le_u64(pmp_nub, 'region-base') or { return false }
+	pmp0_region_size := devicetree.get_le_u64(pmp0_nub, 'region-size') or { return false }
+	pmp1_region_size := devicetree.get_le_u64(pmp_nub, 'region-size') or { return false }
+	if pmp0_region_base != 0x284500000 || pmp1_region_base != 0x4284500000
+		|| pmp0_region_size != 0x100000 || pmp1_region_size != 0x100000
+		|| pmp1_region_base - pmp0_region_base != t6050_die_stride
+		|| !native_properties_equal(pmp0_nub, pmp_nub, 'soc-device')
+		|| !native_properties_equal(pmp0_nub, pmp_nub, 'ptd-range')
+		|| !native_properties_equal(pmp0_nub, pmp_nub, 'pm-ptd-ranges') {
+		println('agx: native t6050 PMP die contracts differ')
 		return false
 	}
 	pmp_version := devicetree.get_le_u32(pmgr_node, 'pmp') or {
@@ -287,10 +313,8 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !validate_ptd_range(pmp_nub, 'SOC-DEV-PKT', 9, 0x90, 0x150, 0)
 		|| !validate_ptd_range(pmp_nub, 'SOC-DEV-PS-REQ', 10, 0x1e0, 8, 0)
 		|| !validate_ptd_range(pmp_nub, 'SOC-DEV-PS-ACK', 11, 0x1e8, 8, 0)
-		|| !power_range_contains(pmp_nub, 2)
-		|| !power_range_contains(pmp_nub, 9)
-		|| !power_range_contains(pmp_nub, 10)
-		|| !power_range_contains(pmp_nub, 11) {
+		|| !validate_u32_array(pmp_nub, 'pm-ptd-ranges', [u32(1), 2, 3, 4, 5, 6,
+			7, 8, 40, 9, 10, 11, 12, 13, 14]) {
 		return false
 	}
 	println('agx: validated native t6050 PMP power ownership (read-only)')

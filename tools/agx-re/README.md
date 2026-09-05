@@ -92,7 +92,10 @@ report also pins the AGX mask, `newData` metadata bit, state-match condition,
 ApplePMGR check recovers the asymmetric ApplePTD read and write windows and
 metadata transform. A UUID-pinned AppleT6050PMGR check proves that PTD RegMap
 enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves
-that Device aperture to `0x84240000` and `0x4084240000`. A separate UUID-pinned
+that Device aperture to `0x84240000` and `0x4084240000`. It also proves both
+PMP nubs have identical device/range tables, pins their die-strided shared
+regions, and records the requested-die selection used by ordinary state
+commands. A separate UUID-pinned
 ApplePMP check recovers the
 PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated

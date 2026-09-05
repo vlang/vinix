@@ -54,6 +54,7 @@ PMP_SET_VIRTUAL_DEVICE_STATE = (
 PMP_INIT_V2 = "__ZN9ApplePMGR10_initPMPv2Ev"
 PMP_GET_DEVICE_INDEX = "__ZN9ApplePMGR18_getPMPDeviceIndexEtj"
 PMP_NOTIFY_INITIAL = "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv"
+PMP_WAIT_CLUSTER_POWER_UP = "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm"
 PMP_ENABLE_DEVICE_GATED = "__ZN9ApplePMGR18_enableDeviceGatedEmmmm"
 PMP_DEVICE_ID_TO_DATA = "__ZN9ApplePMGR21_deviceIDToDeviceDataEt"
 PMP_CHECK_NOTIFY = "__ZN9ApplePMGR15_checkNotifyPMPEt"
@@ -593,6 +594,7 @@ def recover_pmp_code_contract(
         PMP_INIT_V2,
         PMP_GET_DEVICE_INDEX,
         PMP_NOTIFY_INITIAL,
+        PMP_WAIT_CLUSTER_POWER_UP,
         PMP_ENABLE_DEVICE_GATED,
         PMP_DEVICE_ID_TO_DATA,
         PMP_CHECK_NOTIFY,
@@ -615,6 +617,7 @@ def recover_pmp_code_contract(
         PMP_INIT_V2,
         PMP_GET_DEVICE_INDEX,
         PMP_NOTIFY_INITIAL,
+        PMP_WAIT_CLUSTER_POWER_UP,
         PMP_ENABLE_DEVICE_GATED,
         PMP_WAIT_READY,
         PMP_WAIT_READY_V2,
@@ -661,6 +664,20 @@ def recover_pmp_code_contract(
             raise ValueError(f"PMP device dashboard no longer calls {target}")
     if direct_branch_count(state_address, state_code, symbols[APPLE_PTD_WRITE]) != 1:
         raise ValueError("PMP device dashboard request write count changed")
+    if not _has_ordered_words(
+        state_code,
+        (
+            0x39400C08,  # ldrb w8, [x0, #3] -- DeviceData selector
+            0xB9406B69,  # ldr w9, [x27, #0x68] -- selector die stride
+            0x1B162128,  # madd w8, w9, w22, w8 -- selector + stride*die
+            0xB9400153,  # ldr w19, [x10] -- mapped soc-device record index
+            0x52837B88,  # mov w8, #0x1bdc -- multi-PMP flag byte
+            0x39400108,  # ldrb w8, [x8]
+            0x7200011F,  # tst w8, #1
+            0x1A9F12D5,  # csel w21, w22, wzr, ne -- selected PTD die
+        ),
+    ):
+        raise ValueError("PMP device-state selector or PTD die selection changed")
     if not _has_ordered_words(
         state_code,
         (
@@ -791,7 +808,7 @@ def recover_pmp_code_contract(
 
     initial_address, initial_code = functions[PMP_NOTIFY_INITIAL]
     initial_targets = direct_branch_targets(initial_address, initial_code)
-    for target in (PMP_DEVICE_ID_TO_DATA, PMP_SEND_COMMAND):
+    for target in (PMP_DEVICE_ID_TO_DATA, PMP_WAIT_CLUSTER_POWER_UP, PMP_SEND_COMMAND):
         if symbols[target] not in initial_targets:
             raise ValueError(f"initial PMP state sync no longer calls {target}")
     if not _has_ordered_words(
@@ -806,6 +823,29 @@ def recover_pmp_code_contract(
         ),
     ):
         raise ValueError("initial PMP state-notification filter changed")
+
+    cluster_address, cluster_code = functions[PMP_WAIT_CLUSTER_POWER_UP]
+    cluster_targets = direct_branch_targets(cluster_address, cluster_code)
+    if (
+        symbols[APPLE_PTD_READ] in cluster_targets
+        or symbols[PMP_WAIT_READY] in cluster_targets
+        or not _has_ordered_words(
+            cluster_code,
+            (
+                0x79403437,  # ldrh w23, [x1, #0x1a] -- public handle
+                0x35000057,  # cbnz w23 -- otherwise selector byte
+                0x39400C37,  # ldrb w23, [x1, #3]
+                0x394026CD,  # ldrb w13, [x22, #9] -- cluster transition byte
+                0x370000ED,  # tbnz w13, #0 -- sleep while transitioning
+                0xD2804011,  # mov x17, #0x200 -- command-gate sleep slot
+                0x910026C1,  # add x1, x22, #9 -- sleep event
+                0x52800002,  # mov w2, #0
+                0x384092C8,  # ldurb w8, [x22, #9]
+                0x3707FE68,  # tbnz w8, #0 -- retry until cluster is stable
+            ),
+        )
+    ):
+        raise ValueError("initial PMP cluster-power wait changed")
 
     enable_address, enable_code = functions[PMP_ENABLE_DEVICE_GATED]
     enable_targets = direct_branch_targets(enable_address, enable_code)
@@ -901,6 +941,12 @@ def recover_pmp_code_contract(
             "status_range_object_offset": 0x72820,
             "diagnostic_range_object_offset": 0x72828,
             "device_mask": "1 << soc-device record index",
+            "device_index_lookup": (
+                "table[DeviceData selector + selector-die-stride * requested die]"
+            ),
+            "selector_die_stride_object_offset": 0x72838,
+            "multi_pmp_flag": {"object_offset": 0x1BDC, "bit": 0},
+            "ptd_die": "requested die when multi-PMP bit 0 is set; otherwise die 0",
             "request": "read-modify-write; clear for state 0, set for state 1",
             "ack_required_flag": 0x02,
             "skip_state_1_ack_flag": 0x04,
@@ -920,6 +966,12 @@ def recover_pmp_code_contract(
             "initial_sync": PMP_NOTIFY_INITIAL,
             "dynamic_sync": PMP_ENABLE_DEVICE_GATED,
             "target": "public handle at +0x1a, selector byte at +3 if zero",
+            "initial_precondition": (
+                "wait for dependent cluster transition bytes to become stable"
+            ),
+            "initial_precondition_scope": (
+                "cluster power only; it does not read ApplePTD or call the PMP-ready wait"
+            ),
         },
         "readiness": {
             "scope": "per die",
@@ -981,6 +1033,7 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
             PMP_INIT_V2,
             PMP_GET_DEVICE_INDEX,
             PMP_NOTIFY_INITIAL,
+            PMP_WAIT_CLUSTER_POWER_UP,
             PMP_ENABLE_DEVICE_GATED,
             PMP_WAIT_READY,
             PMP_WAIT_READY_V2,
@@ -1420,6 +1473,37 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     if nub_path.startswith(f"/{node_name(pmp)}"):
         nub_path = pmp_path + nub_path[len(f'/{node_name(pmp)}') :]
 
+    pmp0_path, pmp0 = pmp_wrappers["PMP0"]
+    pmp0_nub_path, pmp0_nub = find_one(
+        pmp0,
+        "t6050pmp PMP0 RTKit nub",
+        lambda node: (
+            node.properties.get("firmware-name") is not None
+            and decode_cstring(node.property("firmware-name"), "firmware-name")
+            == "t6050pmp"
+            and compatible_with(node, "iop-nub,rtbuddy-v2")
+        ),
+    )
+    if pmp0_nub_path.startswith(f"/{node_name(pmp0)}"):
+        pmp0_nub_path = pmp0_path + pmp0_nub_path[len(f'/{node_name(pmp0)}') :]
+    for property_name in ("soc-device", "ptd-range", "pm-ptd-ranges"):
+        if pmp0_nub.property(property_name) != nub.property(property_name):
+            raise ValueError(f"T6050 PMP die {property_name} tables differ")
+    pmp_regions = [
+        (
+            decode_integer(pmp0_nub.property("region-base"), "PMP0 region-base"),
+            decode_integer(pmp0_nub.property("region-size"), "PMP0 region-size"),
+        ),
+        (
+            decode_integer(nub.property("region-base"), "PMP1 region-base"),
+            decode_integer(nub.property("region-size"), "PMP1 region-size"),
+        ),
+    ]
+    if pmp_regions != [(0x284500000, 0x100000), (0x4284500000, 0x100000)]:
+        raise ValueError(f"T6050 PMP shared regions changed: {pmp_regions!r}")
+    if pmp_regions[1][0] - pmp_regions[0][0] != die_stride:
+        raise ValueError("T6050 PMP shared-region delta no longer matches die stride")
+
     soc_devices = parse_pmp_soc_devices(nub.property("soc-device"))
     agx_devices = [device for device in soc_devices if device["name"] == "AGX"]
     if (
@@ -1459,6 +1543,8 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             raise ValueError(f"PMP {name} PTD range changed: {actual!r}")
         dashboard[name] = item
     power_range_ids = decode_u32_array(nub.property("pm-ptd-ranges"), "pm-ptd-ranges")
+    if power_range_ids != [1, 2, 3, 4, 5, 6, 7, 8, 40, 9, 10, 11, 12, 13, 14]:
+        raise ValueError(f"T6050 PMP power PTD bindings changed: {power_range_ids!r}")
     if any(item["id"] not in power_range_ids for item in dashboard.values()):
         raise ValueError("PMP power PTD list omits a device-state dashboard range")
     if readiness_range["id"] not in power_range_ids:
@@ -1539,7 +1625,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 7,
+        "schema": 8,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -1563,6 +1649,24 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             "version": pmp_version,
             "region_base": decode_integer(nub.property("region-base"), "PMP region-base"),
             "region_size": decode_integer(nub.property("region-size"), "PMP region-size"),
+            "dies": [
+                {
+                    "die": 0,
+                    "role": "PMP0",
+                    "path": pmp0_path,
+                    "nub_path": pmp0_nub_path,
+                    "region_base": pmp_regions[0][0],
+                    "region_size": pmp_regions[0][1],
+                },
+                {
+                    "die": 1,
+                    "role": "PMP1",
+                    "path": pmp_path,
+                    "nub_path": nub_path,
+                    "region_base": pmp_regions[1][0],
+                    "region_size": pmp_regions[1][1],
+                },
+            ],
             "agx_soc_device": agx_device,
             "soc_device_count": len(soc_devices),
             "soc_device_packet": {
