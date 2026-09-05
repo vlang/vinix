@@ -4600,6 +4600,56 @@ class RecoverG17AbiTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not the checked constant stub"):
                 recover_g17_abi.recover_g17_constant_virtual_returns(b"")
 
+    def test_recovers_g17_memory_map_virtual_address(self) -> None:
+        driver = b"driver"
+        iogpu = b"iogpu"
+        provider_address = 0xA483B6C
+        symbols = {
+            driver: {
+                recover_g17_abi.AGX_LEGACY_MEMORY_MAP_VTABLE: 0x810000,
+                recover_g17_abi.AGX_SECURE_MEMORY_MAP_VTABLE: 0x820000,
+            },
+            iogpu: {
+                recover_g17_abi.IOGPU_MEMORY_MAP_VTABLE: 0x830000,
+                recover_g17_abi.IOGPU_MEMORY_MAP_GPU_VA: provider_address,
+            },
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                side_effect=lambda image: symbols[image],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=provider_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(
+                    provider_address,
+                    struct.pack("<3I", 0xD503245F, 0xF9401400, 0xD65F03C0),
+                ),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_memory_map_virtual_address(
+                driver, iogpu
+            )
+
+        self.assertEqual(recovered["vtable_slot"], 0x158)
+        self.assertEqual(recovered["object_member"], 0x28)
+        self.assertEqual(recovered["provider_address"], provider_address)
+        self.assertEqual(
+            recovered["inherited_by"],
+            [
+                recover_g17_abi.IOGPU_MEMORY_MAP_VTABLE,
+                recover_g17_abi.AGX_LEGACY_MEMORY_MAP_VTABLE,
+                recover_g17_abi.AGX_SECURE_MEMORY_MAP_VTABLE,
+            ],
+        )
+
     def test_decodes_g17_selector_logical_immediate(self) -> None:
         # orr w2, w27, #0x10
         self.assertEqual(
@@ -4794,6 +4844,41 @@ class RecoverG17AbiTests(unittest.TestCase):
         source = recovered["expression"]["source"]
         self.assertEqual(source["kind"], "constant")
         self.assertEqual(source["value"], 7)
+
+    def test_recovers_g17_memory_map_virtual_address_expression(self) -> None:
+        instructions = [
+            (0x00, ldr_x(8, 19, 0xB80)),
+            (0x04, ldr_w(24, 19, 0xB88)),
+            (0x08, ldr_x(8, 8, 0x30)),
+            (0x0C, ldr_x(0, 8, 0x68)),
+            (0x10, ldr_x(16, 0, 0)),
+            (0x14, ldr_x(9, 16, 0x158)),
+            (0x18, 0xD73F0800 | 9 << 5 | 17),
+            (0x1C, 0x8B000000 | 24 << 16 | 8),  # add x8, x0, x24
+            (0x20, 0x927A9108),  # and x8, x8, #0x7ffffffffc0
+            (0x24, 0xB2400104),  # orr x4, x8, #1
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 10)
+        address = recovered["expression"]["source"]["source"]["first"]
+        self.assertEqual(address["kind"], "virtual_load")
+        self.assertEqual(address["method"], "gpu_virtual_address")
+        self.assertEqual(address["vtable_slot"], 0x158)
+        self.assertEqual(address["member"], 0x28)
+        self.assertEqual(address["receiver"]["member"], 0x68)
+        self.assertEqual(address["receiver"]["base"]["member"], 0x30)
+        self.assertEqual(
+            address["receiver"]["base"]["base"]["member"], 0xB80
+        )
+
+    def test_rejects_untyped_g17_memory_map_slot_call(self) -> None:
+        instructions = [
+            (0x00, ldr_x(16, 0, 0)),
+            (0x04, ldr_x(9, 16, 0x158)),
+            (0x08, 0xD73F0800 | 9 << 5 | 17),
+            (0x0C, 0xAA0003E4),  # mov x4, x0
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 4)
+        self.assertNotIn("expression", recovered)
 
     def test_g17_bitfield_insert_expression_keeps_old_destination(self) -> None:
         and_x4_x8 = (0x92405D24 & ~0x3E0) | (8 << 5)

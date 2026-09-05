@@ -127,6 +127,12 @@ G17_CONSTANT_VIRTUAL_RETURNS = {
     0x10F8: ("dup_min_count", G17_DUPM_MIN_COUNT, 1),
     0x1100: ("dup_max_count", G17_DUPM_MAX_COUNT, 2),
 }
+IOGPU_MEMORY_MAP_VTABLE = "__ZTV14IOGPUMemoryMap"
+AGX_LEGACY_MEMORY_MAP_VTABLE = "__ZTV18AGXLegacyMemoryMap"
+AGX_SECURE_MEMORY_MAP_VTABLE = "__ZTV18AGXSecureMemoryMap"
+IOGPU_MEMORY_MAP_GPU_VA = "__ZN14IOGPUMemoryMap20getGPUVirtualAddressEv"
+IOGPU_MEMORY_MAP_GPU_VA_SLOT = 0x158
+IOGPU_MEMORY_MAP_GPU_VA_MEMBER = 0x28
 G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT = 0xCC0
 G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT = 0xCB0
 G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT = 0xCF0
@@ -1209,10 +1215,13 @@ def g17_definition_dominates_use(
     )
 
 
-def trace_g17_constant_call_return(
-    instructions: list[tuple[int, int]], use_index: int
+def trace_g17_known_call_return(
+    instructions: list[tuple[int, int]],
+    use_index: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
 ) -> dict[str, object] | None:
-    """Recognize the two UUID-pinned constant G17 accelerator methods."""
+    """Recognize the narrow set of UUID-pinned virtual return values."""
 
     for call_index in range(use_index - 1, -1, -1):
         call_offset, call_word = instructions[call_index]
@@ -1237,9 +1246,37 @@ def trace_g17_constant_call_return(
         if target_load is None:
             return None
         destination, base, member, width = target_load
-        method = G17_CONSTANT_VIRTUAL_RETURNS.get(member)
-        if destination != target_register or base != 16 or width != 8 or method is None:
+        if destination != target_register or base != 16 or width != 8:
             return None
+        method = G17_CONSTANT_VIRTUAL_RETURNS.get(member)
+        if method is None:
+            if member != IOGPU_MEMORY_MAP_GPU_VA_SLOT:
+                return None
+            receiver = trace_g17_value_expression(
+                instructions,
+                call_index,
+                0,
+                depth + 1,
+                seen | {(use_index, 0)},
+            )
+            if (
+                receiver is None
+                or receiver.get("kind") != "object_load"
+                or receiver.get("member") != 0x68
+                or not isinstance(receiver.get("base"), dict)
+                or receiver["base"].get("kind") != "object_load"
+                or receiver["base"].get("member") != 0x30
+            ):
+                return None
+            return {
+                "kind": "virtual_load",
+                "producer_offset": call_offset,
+                "vtable_slot": member,
+                "method": "gpu_virtual_address",
+                "provider": IOGPU_MEMORY_MAP_GPU_VA,
+                "member": IOGPU_MEMORY_MAP_GPU_VA_MEMBER,
+                "receiver": receiver,
+            }
         label, provider, value = method
         return {
             "kind": "constant_call",
@@ -1778,9 +1815,11 @@ def trace_g17_value_expression(
     if depth > 12 or key in seen:
         return None
     if register == 0:
-        constant_call = trace_g17_constant_call_return(instructions, use_index)
-        if constant_call is not None:
-            return constant_call
+        known_call = trace_g17_known_call_return(
+            instructions, use_index, depth, seen
+        )
+        if known_call is not None:
+            return known_call
     definition_index = find_dominating_g17_register_write(
         instructions, use_index, register
     )
@@ -2938,6 +2977,55 @@ def recover_g17_constant_virtual_returns(image: bytes) -> dict[str, object]:
     return {
         "accelerator_vtable": G17_ACCELERATOR_VTABLE,
         "methods": methods,
+    }
+
+
+def recover_g17_memory_map_virtual_address(
+    driver: bytes, iogpu: bytes
+) -> dict[str, object]:
+    """Validate the inherited IOGPUMemoryMap GPU-address accessor."""
+
+    driver_symbols = macho_symbols(driver)
+    iogpu_symbols = macho_symbols(iogpu)
+    for vtable in (AGX_LEGACY_MEMORY_MAP_VTABLE, AGX_SECURE_MEMORY_MAP_VTABLE):
+        if vtable not in driver_symbols:
+            raise ValueError(f"AGX driver has no {vtable} symbol")
+    for symbol in (IOGPU_MEMORY_MAP_VTABLE, IOGPU_MEMORY_MAP_GPU_VA):
+        if symbol not in iogpu_symbols:
+            raise ValueError(f"IOGPUFamily has no {symbol} symbol")
+
+    provider_address = iogpu_symbols[IOGPU_MEMORY_MAP_GPU_VA]
+    targets = {
+        IOGPU_MEMORY_MAP_VTABLE: recover_vtable_target(
+            iogpu, IOGPU_MEMORY_MAP_VTABLE, IOGPU_MEMORY_MAP_GPU_VA_SLOT
+        ),
+        AGX_LEGACY_MEMORY_MAP_VTABLE: recover_vtable_target(
+            driver, AGX_LEGACY_MEMORY_MAP_VTABLE, IOGPU_MEMORY_MAP_GPU_VA_SLOT
+        ),
+        AGX_SECURE_MEMORY_MAP_VTABLE: recover_vtable_target(
+            driver, AGX_SECURE_MEMORY_MAP_VTABLE, IOGPU_MEMORY_MAP_GPU_VA_SLOT
+        ),
+    }
+    if any(target != provider_address for target in targets.values()):
+        raise ValueError(
+            "G17 memory-map vtables do not share the checked GPU-address accessor"
+        )
+
+    _address, code = symbol_code(iogpu, IOGPU_MEMORY_MAP_GPU_VA)
+    expected = struct.pack(
+        "<3I",
+        0xD503245F,  # bti c
+        0xF9401400,  # ldr x0, [x0, #0x28]
+        0xD65F03C0,  # ret
+    )
+    if code != expected:
+        raise ValueError("IOGPUMemoryMap GPU-address accessor has changed")
+    return {
+        "vtable_slot": IOGPU_MEMORY_MAP_GPU_VA_SLOT,
+        "provider": IOGPU_MEMORY_MAP_GPU_VA,
+        "provider_address": provider_address,
+        "object_member": IOGPU_MEMORY_MAP_GPU_VA_MEMBER,
+        "inherited_by": sorted(targets),
     }
 
 
@@ -11314,6 +11402,9 @@ def main() -> int:
         channels["register_entry_codec"] = recover_g17_register_entry_codec(driver)
         channels["constant_virtual_returns"] = (
             recover_g17_constant_virtual_returns(driver)
+        )
+        channels["memory_map_virtual_address"] = (
+            recover_g17_memory_map_virtual_address(driver, iogpu)
         )
         channels["register_selectors"] = recover_g17_register_selectors(driver)
         channels["inline_register_records"] = (
