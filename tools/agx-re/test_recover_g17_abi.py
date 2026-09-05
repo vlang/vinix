@@ -4422,23 +4422,66 @@ class RecoverG17AbiTests(unittest.TestCase):
         ):
             recovered = recover_g17_abi.recover_g17_register_selectors(b"")
 
-        self.assertEqual(recovered["selector_field"], 0x0003FFF9)
+        self.assertEqual(recovered["encoded_field"], 0x0003FFF9)
+        self.assertEqual(recovered["selector_field"], 0x0003FFF8)
+        self.assertEqual(recovered["mode_bit"], 1)
         self.assertEqual(recovered["flag_bit"], 1)
         self.assertEqual(recovered["alignment"], 8)
         # The sets are a sample, never a complete list.
         self.assertFalse(recovered["selectors_complete"])
         self.assertFalse(recovered["address_space_identified"])
         self.assertEqual(
-            recovered["producers"]["3D"]["selectors"], [0x1739, 0x17E1, 0x16020]
+            recovered["producers"]["3D"]["encoded_fields"],
+            [0x1739, 0x17E1, 0x16020],
+        )
+        self.assertEqual(
+            recovered["producers"]["3D"]["selectors"],
+            [0x1738, 0x17E0, 0x16020],
         )
         self.assertEqual(recovered["producers"]["3D"]["entry_emission_sites"], 40)
         self.assertEqual(recovered["producers"]["3D"]["encoder_call_sites"], 1)
+        self.assertEqual(recovered["producers"]["3D"]["mode_0_calls"], 1)
+        self.assertEqual(recovered["producers"]["3D"]["mode_1_calls"], 0)
         self.assertEqual(
             recovered["producers"]["3D"]["resolved_encoder_selectors"],
             [0x15378],
         )
         self.assertIn(0x15378, recovered["producers"]["3D"]["static_selectors"])
         self.assertEqual(recovered["distinct_literal_selectors"], 11)
+
+    def test_recovers_g17_register_entry_codec(self) -> None:
+        code = bytearray(0x28)
+        for offset, word in {
+            0x004: 0xB9400028,
+            0x008: 0x121F7908,
+            0x00C: 0x120E4108,
+            0x010: 0x121D3849,
+            0x014: 0x33000069,
+            0x018: 0x2A080128,
+            0x01C: 0xB9000028,
+            0x020: 0xF8004024,
+            0x024: 0xD65F03C0,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.RCE_ENCODE_ENTRY: 0x810000},
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(0x810000, bytes(code)),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_register_entry_codec(b"")
+
+        self.assertEqual(recovered["entry_bytes"], 12)
+        self.assertEqual(recovered["selector_mask"], 0x3FFF8)
+        self.assertEqual(recovered["mode_mask"], 1)
+        self.assertEqual(recovered["preserved_template_mask"], 0xFFFC0006)
+        self.assertEqual(recovered["value_offset"], 4)
 
     def test_decodes_g17_selector_logical_immediate(self) -> None:
         # orr w2, w27, #0x10
@@ -4525,8 +4568,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["static_record_count"], 8)
         self.assertEqual(recovered["dynamic_record_count"], 2)
         self.assertEqual(
-            recovered["static_records"]["FastBlit"][1]["selector"], 0x10009
+            recovered["static_records"]["FastBlit"][1]["selector"], 0x10008
         )
+        self.assertEqual(recovered["static_records"]["FastBlit"][1]["mode"], 1)
         self.assertIn(
             "accelerator_base + 0x13200",
             recovered["dynamic_records"]["CL"][0]["selector_expression"],

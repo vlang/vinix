@@ -131,7 +131,7 @@ The 3D command's register-list layout is recovered: four passes on a 0x720
 stride, 0x700 stream bytes each, the 12-byte entry format, and the descriptor
 summary array. The selector encoding is recovered and validated, but the selector sets are
 not complete yet. The UUID-pinned backwards slice resolves every virtual encoder
-call (314 physical call sites and 235 distinct static values together with the
+call (314 physical call sites and 234 distinct static selectors together with the
 literal audit). All ten inline forms are located too; two CL selectors remain
 symbolic, and the value sources plus control-flow ordering remain to be encoded.
 Channel and scheduler-state construction no longer needs unknown inputs: the

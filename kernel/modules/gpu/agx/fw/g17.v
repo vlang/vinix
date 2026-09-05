@@ -1473,17 +1473,15 @@ pub const g17_3d_register_selector_mask = u32(0xfffc0006)
 pub const g17_3d_register_summary_offset = u64(0x828)
 pub const g17_3d_register_summary_stride = u64(0x10)
 
-// Selector field of a register-list entry. The template mask leaves bits 0 and
-// 3..17 settable, and every selector recovered from Apple's four producers is
-// 8-byte aligned with an optional bit-0 flag. What the selectors name is not
-// established: they are not the SGX MMIO offsets in the regs module.
-pub const g17_3d_register_selector_field = u32(0x3fff9)
-pub const g17_3d_register_selector_flag = u32(0x1)
+// Field split of a register-list entry. HAL300 encodeEntry masks the selector
+// argument to bits 3..17 and inserts a separate one-bit mode argument at bit
+// zero; bits 1, 2 and 18..31 remain from the command-pool template. What the
+// selectors name is not established: they are not SGX MMIO offsets.
+pub const g17_3d_register_selector_field = u32(0x3fff8)
+pub const g17_3d_register_mode_field = u32(0x1)
 pub const g17_3d_register_selector_align = u32(8)
 
-// Reject a selector Apple's encoding could not have produced. The field mask
-// has bits 1 and 2 clear, so it already enforces 8-byte alignment apart from
-// the low flag; no separate alignment test is needed.
+// Reject a selector Apple's w2 encoding could not have produced.
 pub fn valid_g17_register_selector(selector u32) bool {
 	return selector & ~g17_3d_register_selector_field == 0
 }
@@ -1528,15 +1526,16 @@ pub fn bind_g17_register_stream(command voidptr, pass u32, stream_gpu_address u6
 	return true
 }
 
-// Append one {selector, value} pair to a pass's stream. Apple keeps the
-// template bits already present in the selector word and writes the 64-bit
-// value unaligned, four bytes later, so each entry is 12 bytes.
-pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, value u64) bool {
+// Append one {selector, mode, value} record to a pass's stream. Apple keeps
+// the template bits already present in the first word, installs mode at bit 0,
+// and writes the 64-bit value unaligned four bytes later.
+pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, mode u8,
+	value u64) bool {
 	if command == unsafe { nil } || pass >= g17_3d_register_passes {
 		return false
 	}
 
-	if !valid_g17_register_selector(selector) {
+	if !valid_g17_register_selector(selector) || mode > 1 {
 		return false
 	}
 
@@ -1548,7 +1547,8 @@ pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, value 
 	unsafe {
 		entry := &u8(command) + u64(pass) * g17_3d_register_stride + g17_3d_register_stream_offset + u64(trailer.byte_length)
 		mut selector_word := &u32(entry)
-		*selector_word = (*selector_word & g17_3d_register_selector_mask) | (selector & ~g17_3d_register_selector_mask)
+		*selector_word = (*selector_word & g17_3d_register_selector_mask)
+			| (selector & g17_3d_register_selector_field) | u32(mode)
 		mut encoded := value
 		C.memcpy(voidptr(entry + 4), &encoded, 8)
 	}

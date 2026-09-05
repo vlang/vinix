@@ -494,6 +494,7 @@ G17_COMMAND_3D_BYTES = 0x2240
 COMPLETE_COMMAND_3D = "__ZN22AGX3DCommandDescriptor8completeEv"
 G17_SELECTOR_TEMPLATE_MASK = 0xFFFC0006
 SELECTOR_ARGUMENT_WINDOW = 10
+RCE_ENCODE_ENTRY = "__ZNK36AGX·PI_300·X·A0·RCEBufferEncoder11encodeEntryEPvjhy"
 ARM_INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 G17_ACCELERATOR_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
 IDLE_POWER_OFF_TIMER = "__ZN14AGXAccelerator17idlePowerOffTimerEv"
@@ -8412,13 +8413,48 @@ def recover_g17_channel_command_common_fields(image: bytes) -> dict[str, object]
     }
 
 
+def recover_g17_register_entry_codec(image: bytes) -> dict[str, object]:
+    """Recover the HAL300 register-entry encoder's exact three-field split."""
+
+    symbols = macho_symbols(image)
+    if RCE_ENCODE_ENTRY not in symbols:
+        raise ValueError(f"Mach-O is missing {RCE_ENCODE_ENTRY}")
+    _address, code = symbol_code(image, RCE_ENCODE_ENTRY)
+    require_instruction_words_at(
+        code,
+        "G17 register-entry codec",
+        {
+            0x004: 0xB9400028,  # existing template word
+            0x008: 0x121F7908,  # clear encoded mode bit 0
+            0x00C: 0x120E4108,  # preserve 0xfffc0007 after that clear
+            0x010: 0x121D3849,  # selector argument & 0x3fff8
+            0x014: 0x33000069,  # insert mode argument bit 0
+            0x018: 0x2A080128,
+            0x01C: 0xB9000028,  # encoded word at +0
+            0x020: 0xF8004024,  # unaligned 64-bit value at +4
+            0x024: 0xD65F03C0,
+        },
+    )
+    return {
+        "entry_bytes": 12,
+        "selector_argument": 2,
+        "selector_mask": 0x0003FFF8,
+        "mode_argument": 3,
+        "mode_mask": 0x1,
+        "preserved_template_mask": 0xFFFC0006,
+        "value_argument": 4,
+        "value_offset": 4,
+        "producer": RCE_ENCODE_ENTRY,
+    }
+
+
 def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     """Recover the selector encoding and the set each work producer emits.
 
-    The selector word keeps the template bits under 0xfffc0006 and receives the
-    selector in the rest, so only bits 0 and 3..17 are settable.  Every
-    selector recovered respects that: bits 1 and 2 are always clear and the
-    value is 8-byte aligned apart from an optional bit 0.
+    The encoded word keeps the template bits under 0xfffc0006. Virtual encoder
+    calls supply an 8-byte-aligned selector in w2 (bits 3..17) and a separate
+    one-bit mode in w3, which becomes encoded bit 0. Inline paths construct
+    the combined word directly.
 
     In addition to the literal audit, a narrow backwards slice resolves the w2
     selector argument at every virtual encoder call.  That recovers the
@@ -8437,9 +8473,11 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     settable = ~G17_SELECTOR_TEMPLATE_MASK & 0xFFFFFFFF
     if settable != 0x0003FFF9:
         raise ValueError(f"unexpected G17 selector field {settable:#x}")
+    encoder_selector_field = settable & ~0x1
 
     producers: dict[str, object] = {}
-    literal_union: set[int] = set()
+    literal_encoded_union: set[int] = set()
+    literal_selector_union: set[int] = set()
     static_union: set[int] = set()
     for label, name in sorted(REGISTER_LIST_PRODUCERS.items()):
         _address, code = symbol_code(image, name)
@@ -8448,7 +8486,7 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         recency: dict[int, int] = {}
         found: set[int] = set()
         context = -SELECTOR_ARGUMENT_WINDOW
-        encoder_calls: list[tuple[int, int]] = []
+        encoder_calls: list[tuple[int, int, int]] = []
         for index, (offset, word) in enumerate(buffered):
             # The producers materialize selectors with the 32-bit move forms.
             opcode = word & 0xFF800000
@@ -8518,7 +8556,13 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                             f"{label} selector at producer +{offset:#x} is no "
                             "longer statically resolvable"
                         )
-                    encoder_calls.append((offset, resolved))
+                    mode = resolve_static_w_register(buffered, index, 3)
+                    if mode not in (0, 1):
+                        raise ValueError(
+                            f"{label} mode at producer +{offset:#x} is no "
+                            "longer a static bit"
+                        )
+                    encoder_calls.append((offset, resolved, mode))
         if not found:
             raise ValueError(f"{label} producer emits no register selectors")
         for candidate in found:
@@ -8544,32 +8588,44 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
                 f"{label} selector sample is no longer smaller than its "
                 f"{emission_sites} emission sites"
             )
-        resolved = {selector for _offset, selector in encoder_calls}
+        resolved = {selector for _offset, selector, _mode in encoder_calls}
         for candidate in resolved:
-            if candidate & ~settable:
+            if candidate & ~encoder_selector_field:
                 raise ValueError(
                     f"{label} resolved selector {candidate:#x} exceeds the field"
                 )
         if not encoder_calls:
             raise ValueError(f"{label} producer has no classified encoder calls")
 
-        static = found | resolved
-        literal_union |= found
+        literal_selectors = {encoded & ~0x1 for encoded in found}
+        static = literal_selectors | resolved
+        literal_encoded_union |= found
+        literal_selector_union |= literal_selectors
         static_union |= static
         producers[label] = {
             "producer": name,
-            "literal_selectors": len(found),
+            "literal_encoded_fields": len(found),
+            "literal_selectors": len(literal_selectors),
             "entry_emission_sites": emission_sites,
-            "selectors": sorted(found),
+            "encoded_fields": sorted(found),
+            "selectors": sorted(literal_selectors),
             "encoder_call_sites": len(encoder_calls),
             "statically_resolved_encoder_calls": len(encoder_calls),
+            "mode_0_calls": sum(
+                mode == 0 for _offset, _selector, mode in encoder_calls
+            ),
+            "mode_1_calls": sum(
+                mode == 1 for _offset, _selector, mode in encoder_calls
+            ),
             "resolved_encoder_selectors": sorted(resolved),
             "static_selectors": sorted(static),
         }
 
     return {
         "template_mask": G17_SELECTOR_TEMPLATE_MASK,
-        "selector_field": settable,
+        "encoded_field": settable,
+        "selector_field": encoder_selector_field,
+        "mode_bit": 0x1,
         "flag_bit": 0x1,
         "alignment": 8,
         "address_space_identified": False,
@@ -8579,7 +8635,8 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             "but two inline CL selector words are runtime-dependent and the "
             "control-flow ordering remains to be classified"
         ),
-        "distinct_literal_selectors": len(literal_union),
+        "distinct_literal_encoded_fields": len(literal_encoded_union),
+        "distinct_literal_selectors": len(literal_selector_union),
         "distinct_static_selectors": len(static_union),
         "maximum_selector": max(static_union),
         "producers": producers,
@@ -8691,36 +8748,59 @@ def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
 
     static_records = {
         "3D": [
-            {"producer_offset": 0x104, "selector": 0x1739, "value": 1},
-            {"producer_offset": 0x17C, "selector": 0x17E1, "value": 1},
+            {
+                "producer_offset": 0x104,
+                "selector": 0x1738,
+                "mode": 1,
+                "value": 1,
+            },
+            {
+                "producer_offset": 0x17C,
+                "selector": 0x17E0,
+                "mode": 1,
+                "value": 1,
+            },
         ],
         "TA": [
-            {"producer_offset": 0x08C, "selector": 0x17E1, "value": 1},
-            {"producer_offset": 0x0CC, "selector": 0x17F1, "value": 1},
+            {"producer_offset": 0x08C, "selector": 0x17E0, "mode": 1, "value": 1},
+            {"producer_offset": 0x0CC, "selector": 0x17F0, "mode": 1, "value": 1},
         ],
         "FastBlit": [
-            {"producer_offset": 0x070, "selector": 0x1739, "value": 1},
+            {"producer_offset": 0x070, "selector": 0x1738, "mode": 1, "value": 1},
             {
                 "producer_offset": 0x128,
-                "selector": 0x10009,
+                "selector": 0x10008,
+                "mode": 1,
                 "value_source": "computed_blit_control",
             },
         ],
         "CL": [
-            {"producer_offset": 0x094, "selector": 0x17E1, "value": 1},
-            {"producer_offset": 0x0DC, "selector": 0x17F1, "value": 1},
+            {
+                "producer_offset": 0x094,
+                "selector": 0x17E0,
+                "mode": 1,
+                "value": 1,
+            },
+            {
+                "producer_offset": 0x0DC,
+                "selector": 0x17F0,
+                "mode": 1,
+                "value": 1,
+            },
         ],
     }
     dynamic_records = {
         "CL": [
             {
                 "producer_offset": 0x1380,
-                "selector_expression": "low32(accelerator_base + 0x13200) + 0x9",
+                "selector_expression": "low32(accelerator_base + 0x13200) + 0x8",
+                "mode": 1,
                 "value_source": "masked_descriptor_word_or_5",
             },
             {
                 "producer_offset": 0x13A0,
-                "selector_expression": "low32(accelerator_base + 0x13200) + 0x1",
+                "selector_expression": "low32(accelerator_base + 0x13200)",
+                "mode": 1,
                 "value_source": "descriptor_index_and_masked_word",
             },
         ]
@@ -9862,6 +9942,7 @@ def main() -> int:
         channels["command_3d_register_lists"] = (
             recover_g17_3d_register_lists(driver)
         )
+        channels["register_entry_codec"] = recover_g17_register_entry_codec(driver)
         channels["register_selectors"] = recover_g17_register_selectors(driver)
         channels["inline_register_records"] = (
             recover_g17_inline_register_records(driver)
