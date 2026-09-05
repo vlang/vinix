@@ -125,6 +125,7 @@ pub mut:
 	mappings_published bool
 	quarantined        bool
 	submitted          bool
+	pending_counted    bool
 	released           bool
 	completion         fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
 	completion_data    voidptr
@@ -259,6 +260,7 @@ pub mut:
 	mappings_published      bool
 	quarantined             bool
 	submitted               bool
+	pending_counted         bool
 	released                bool
 	completion              fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	completion_data         voidptr
@@ -285,6 +287,57 @@ mut:
 	quarantined        bool
 	render_job_active  bool
 	released           bool
+}
+
+// The firmware samples pending_submissions to decide whether the GPU may
+// sleep. Manager serialization makes the host-side update a single-writer
+// operation; katomic load/store retain the acquire/release ordering required
+// by the shared firmware ABI.
+fn (mut mgr GpuManager) g13_pending_submissions_locked() ?&u32 {
+	if mgr.g13_channels == unsafe { nil } {
+		return none
+	}
+	graph := mgr.g13_channels
+	if graph.globals.phys == 0
+		|| graph.globals.size < fw.g13_globals_pending_submissions_offset + sizeof(u32) {
+		return none
+	}
+	return unsafe {
+		&u32(graph.globals.phys + higher_half + fw.g13_globals_pending_submissions_offset)
+	}
+}
+
+fn (mut mgr GpuManager) begin_g13_operation_locked() bool {
+	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13 {
+		return false
+	}
+	mut pending := mgr.g13_pending_submissions_locked() or { return false }
+	old_pending := katomic.load(pending)
+	if old_pending == ~u32(0) {
+		return false
+	}
+	katomic.store(mut pending, old_pending + 1)
+	if !mgr.kick_firmware() {
+		katomic.store(mut pending, old_pending)
+		C.printf(c'agx: failed to wake G13 firmware for submission\n')
+		mgr.state = .error
+		return false
+	}
+	return true
+}
+
+fn (mut mgr GpuManager) end_g13_operation_locked() bool {
+	mut pending := mgr.g13_pending_submissions_locked() or { return false }
+	old_pending := katomic.load(pending)
+	if old_pending == 0 {
+		C.printf(c'agx: G13 pending submission counter underflow\n')
+		if mgr.state == .running {
+			mgr.state = .error
+		}
+		return false
+	}
+	katomic.store(mut pending, old_pending - 1)
+	return true
 }
 
 fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
@@ -495,14 +548,13 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 // tables are updated only after every new block has a valid, acknowledged UAT
 // mapping, so firmware never observes a half-committed heap extension.
 fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResources,
-	minimum u32) bool {
+	minimum u32, firmware_active bool) bool {
 	if !buffer.initialized || buffer.context == unsafe { nil } || minimum == 0
 		|| minimum > g13_tvb_max_blocks || u32(buffer.blocks.len) >= minimum {
 		return buffer.initialized && u32(buffer.blocks.len) >= minimum
 	}
 	mut context := unsafe { buffer.context }
-	old_count := u32(buffer.blocks.len)
-	for _ in old_count .. minimum {
+	for u32(buffer.blocks.len) < minimum {
 		block := context.alloc_driver_buffer_aligned(fw.g13_tvb_block_size, false, fw.g13_tvb_page_size) or {
 			return false
 		}
@@ -510,28 +562,85 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 			context.release_driver_buffer(block)
 			return false
 		}
-		buffer.blocks << block
-	}
-	unsafe {
-		mut pages := &u32(buffer.page_list.cpu_address())
-		mut blocks := &u32(buffer.block_list.cpu_address())
-		for index := old_count; index < minimum; index++ {
-			page_number := u32(buffer.blocks[index].va >> fw.g13_tvb_page_shift)
+		index := u32(buffer.blocks.len)
+		unsafe {
+			mut pages := &u32(buffer.page_list.cpu_address())
+			mut blocks := &u32(buffer.block_list.cpu_address())
+			page_number := u32(block.va >> fw.g13_tvb_page_shift)
 			blocks[index * 2] = page_number
 			for page := u32(0); page < fw.g13_tvb_pages_per_block; page++ {
 				pages[index * fw.g13_tvb_pages_per_block + page] = page_number + page
 			}
+			buffer.blocks << block
+			new_count := index + 1
+			page_count := new_count * fw.g13_tvb_pages_per_block
+			// Publishing wptr last makes all newly populated table entries visible
+			// before firmware is allowed to allocate from the added block.
+			mut control := &fw.G13BufferBlockControl(buffer.block_control.cpu_address())
+			katomic.store(mut &control.total, new_count)
+			katomic.store(mut &control.wptr, new_count)
+			// During a GrowTVB request firmware owns the active Info counters. It
+			// learns about added blocks exclusively through BlockControl.
+			if !firmware_active {
+				mut info := &fw.G13BufferInfo(buffer.info.cpu_address())
+				katomic.store(mut &info.page_count, page_count)
+				katomic.store(mut &info.block_count, new_count)
+				katomic.store(mut &info.last_page, page_count - 1)
+			}
 		}
-		mut control := &fw.G13BufferBlockControl(buffer.block_control.cpu_address())
-		control.total = minimum
-		control.wptr = minimum
-		mut info := &fw.G13BufferInfo(buffer.info.cpu_address())
-		page_count := minimum * fw.g13_tvb_pages_per_block
-		info.page_count = page_count
-		info.block_count = minimum
-		info.last_page = page_count - 1
 	}
 	return true
+}
+
+// Service firmware's synchronous tiled-buffer growth request. The ACK is
+// required even if the slot cannot be grown, otherwise the firmware remains
+// blocked forever waiting for device control.
+fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
+	if event_msg == unsafe { nil } {
+		return
+	}
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13 {
+		return
+	}
+
+	mut found := false
+	mut grew := false
+	if event_msg.buffer_slot < fw.g13_tvb_slot_count && event_msg.vm_slot != 0 {
+		for resources in mgr.g13_queues {
+			if resources.released || resources.vm == unsafe { nil }
+				|| resources.vm.id != event_msg.vm_slot || !resources.render_buffer.initialized
+				|| resources.render_buffer.slot != event_msg.buffer_slot {
+				continue
+			}
+			found = true
+			mut buffer := unsafe { &resources.render_buffer }
+			current := u32(buffer.blocks.len)
+			target := if current > g13_tvb_max_blocks - u32(10) {
+				g13_tvb_max_blocks
+			} else {
+				current + u32(10)
+			}
+			if target > current {
+				grew = mgr.ensure_g13_tvb_blocks(mut buffer, target, true)
+			}
+			break
+		}
+	}
+	if !found {
+		C.printf(c'agx: GrowTVB requested unknown slot=%u vm=%u\n', event_msg.buffer_slot, event_msg.vm_slot)
+	} else if !grew {
+		C.printf(c'agx: failed to grow TVB slot=%u vm=%u\n', event_msg.buffer_slot, event_msg.vm_slot)
+	}
+
+	ack := fw.make_grow_tvb_ack(event_msg.buffer_slot, event_msg.vm_slot, event_msg.counter)
+	if !mgr.channels.device_ctrl.enqueue(voidptr(&ack)) || !mgr.ring_device_control() {
+		C.printf(c'agx: failed to acknowledge GrowTVB slot=%u vm=%u\n', event_msg.buffer_slot, event_msg.vm_slot)
+		mgr.state = .error
+	}
 }
 
 // Allocate the two event-counter arrays in their correct cacheability classes.
@@ -860,7 +969,7 @@ fn (mut mgr GpuManager) allocate_g13_render_scene_locked(resources &G13QueueReso
 		return none
 	}
 	mut buffer := unsafe { &resources.render_buffer }
-	if !mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks) {
+	if !mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false) {
 		return none
 	}
 	ctx := resources.vm
@@ -1710,7 +1819,15 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 	mut tvb_count := unsafe { &u32(owned.queue.render_buffer.counter.cpu_address()) }
 	old_tvb_count := katomic.load(tvb_count)
 	katomic.store(mut tvb_count, old_tvb_count + u32(1))
+	if !mgr.begin_g13_operation_locked() {
+		katomic.store(mut tvb_count, old_tvb_count)
+		katomic.store(mut threshold, old_threshold)
+		return false
+	}
+	owned.pending_counted = true
 	if !mgr.publish_g13_render_job_locked(mut owned) {
+		mgr.end_g13_operation_locked()
+		owned.pending_counted = false
 		katomic.store(mut tvb_count, old_tvb_count)
 		katomic.store(mut threshold, old_threshold)
 		return false
@@ -1731,6 +1848,10 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 		mut owned := unsafe { job }
 		owned.completion_result = read_g13_render_result(owned)
 		owned.completion_result_ready = true
+		if owned.pending_counted {
+			mgr.end_g13_operation_locked()
+			owned.pending_counted = false
+		}
 		if mgr.free_g13_render_job_locked(mut owned, true) {
 			mgr.g13_render_jobs.delete(index)
 			complete_g13_render_job(mut owned, true)
@@ -1747,6 +1868,10 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 fn (mut mgr GpuManager) release_all_g13_render_jobs() {
 	for index := mgr.g13_render_jobs.len - 1; index >= 0; index-- {
 		mut job := unsafe { mgr.g13_render_jobs[index] }
+		if job.pending_counted {
+			mgr.end_g13_operation_locked()
+			job.pending_counted = false
+		}
 		complete_g13_render_job(mut job, false)
 		mgr.free_g13_render_job_locked(mut job, false)
 	}
@@ -2106,7 +2231,14 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 	mut threshold := unsafe { &u64(queue.threshold.cpu_address()) }
 	old_threshold := katomic.load(threshold)
 	katomic.store(mut threshold, old_threshold + u64(1))
+	if !mgr.begin_g13_operation_locked() {
+		katomic.store(mut threshold, old_threshold)
+		return false
+	}
+	owned.pending_counted = true
 	if !mgr.submit_g13_queue_command(queue, 2, owned.command.va, owned.event_slot) {
+		mgr.end_g13_operation_locked()
+		owned.pending_counted = false
 		katomic.store(mut threshold, old_threshold)
 		return false
 	}
@@ -2125,6 +2257,10 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 		mut owned := unsafe { job }
 		owned.completion_result = owned.timestamp_values()
 		owned.completion_ready = true
+		if owned.pending_counted {
+			mgr.end_g13_operation_locked()
+			owned.pending_counted = false
+		}
 		if mgr.free_g13_compute_job_locked(mut owned, true) {
 			mgr.g13_compute_jobs.delete(index)
 			complete_g13_compute_job(mut owned, true)
@@ -2141,6 +2277,10 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 fn (mut mgr GpuManager) release_all_g13_compute_jobs() {
 	for index := mgr.g13_compute_jobs.len - 1; index >= 0; index-- {
 		mut job := unsafe { mgr.g13_compute_jobs[index] }
+		if job.pending_counted {
+			mgr.end_g13_operation_locked()
+			job.pending_counted = false
+		}
 		complete_g13_compute_job(mut job, false)
 		mgr.free_g13_compute_job_locked(mut job, false)
 	}

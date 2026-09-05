@@ -2,6 +2,10 @@ module fw
 
 import gpu.agx.hw
 
+// Host/firmware operation guard used to keep the GPU awake while submitted
+// work is outstanding. This is an AtomicU32 in the v12.3 firmware ABI.
+pub const g13_globals_pending_submissions_offset = u64(0x8904)
+
 // macOS 12.3 / G13 global firmware state. Firmware mutates most of this
 // object, so preserve the full ABI extent and initialize only host-owned
 // configuration words recovered from the reference driver.

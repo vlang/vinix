@@ -48,6 +48,7 @@ pub:
 
 // G13 v12.3 device-control messages are a 32-bit discriminant followed by a
 // fixed 0x2c-byte payload. Initialize (0x19) carries an all-zero payload.
+pub const device_control_grow_tvb_ack = u32(0x0d)
 pub const device_control_initialize = u32(0x19)
 
 @[packed]
@@ -55,6 +56,30 @@ pub struct FwDeviceControlMsg {
 pub mut:
 	tag     u32
 	payload [11]u32
+}
+
+@[packed]
+pub struct FwGrowTVBAck {
+pub mut:
+	tag         u32
+	unk_4       u32
+	buffer_slot u32
+	vm_slot     u32
+	counter     u32
+	subpipe     u32
+	pad_18      [6]u32
+}
+
+pub fn make_grow_tvb_ack(buffer_slot u32, vm_slot u32, counter u32) FwGrowTVBAck {
+	return FwGrowTVBAck{
+		tag: device_control_grow_tvb_ack
+		unk_4: 1
+		buffer_slot: buffer_slot
+		vm_slot: vm_slot
+		counter: counter
+		// The reference v12.3 driver uses subpipe zero.
+		subpipe: 0
+	}
 }
 
 pub fn make_device_control_initialize() FwDeviceControlMsg {
@@ -83,6 +108,16 @@ pub struct FwEventMsg {
 pub mut:
 	tag     u32
 	payload [13]u32
+}
+
+@[packed]
+pub struct FwGrowTVBEvent {
+pub mut:
+	tag         u32
+	vm_slot     u32
+	buffer_slot u32
+	counter     u32
+	pad_10      [10]u32
 }
 
 // Firmware control channel message
@@ -144,6 +179,7 @@ pub mut:
 pub fn validate_g13_channel_layouts() bool {
 	return sizeof(FwChannelState) == 0x30 && sizeof(FwCtlChannelState) == 0x20
 		&& sizeof(ChannelRingPointers) == 0x10 && sizeof(FwDeviceControlMsg) == 0x30
+		&& sizeof(FwGrowTVBAck) == 0x30 && sizeof(FwGrowTVBEvent) == 0x38
 		&& sizeof(FwRunWorkQueueMsg) == 0x38 && sizeof(FwEventMsg) == 0x38
 		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0x38
 		&& sizeof(FwLogPayloadMsg) == 0xd8 && sizeof(FwKTraceMsg) == 0x40

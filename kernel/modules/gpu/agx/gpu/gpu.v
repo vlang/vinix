@@ -1066,8 +1066,8 @@ pub fn (mut mgr GpuManager) handle_event() {
 				mgr.state = .error
 			}
 			fw.fw_event_grow_tvb {
-				C.printf(c'agx: GrowTVB event is not implemented\n')
-				mgr.state = .error
+				grow := unsafe { &fw.FwGrowTVBEvent(&buf[0]) }
+				mgr.handle_g13_grow_tvb(grow)
 			}
 			else {
 				C.printf(c'agx: Unhandled event type %d\n', event_type)
