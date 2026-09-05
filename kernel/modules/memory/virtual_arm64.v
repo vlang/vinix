@@ -61,7 +61,7 @@ pub fn new_pagemap() &Pagemap {
 	// On ARM64, TTBR1 handles kernel space. User pagemaps (TTBR0) do
 	// not need higher-half entries copied.
 	return &Pagemap{
-		top_level:   top_level
+		top_level: top_level
 		mmap_ranges: []voidptr{}
 	}
 }
@@ -213,13 +213,49 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 }
 
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
-	pte_p := pagemap.virt2pte(virt, false) or { return none }
+	mut pte_p := pagemap.virt2pte(virt, false) or { return none }
 	phys := unsafe { *pte_p } & pte_flags_mask
 	new_pte := portable_to_arm64_pte(phys, flags)
-	unsafe {
-		*pte_p = new_pte
+	install_arm64_pte(mut pte_p, virt, new_pte)
+}
+
+// Install a page descriptor in an active page table. Replacing a valid
+// descriptor with different attributes must use ARM64 break-before-make;
+// otherwise a CPU may combine the old address or memory type with the new
+// descriptor. During vmm_init the new table is not active yet, so the final
+// whole-VM invalidation is sufficient and avoids a barrier per HHDM page.
+fn install_arm64_pte(mut entry &u64, virt u64, new_pte u64) {
+	old_pte := unsafe { *entry }
+	if old_pte == new_pte {
+		return
 	}
-	cpu.tlbi_vaae1(virt >> 12)
+	if !vmm_initialised {
+		unsafe {
+			*entry = new_pte
+		}
+		return
+	}
+
+	if old_pte & 1 != 0 {
+		unsafe {
+			*entry = 0
+		}
+		cpu.dsb_ishst()
+		cpu.tlbi_vaae1(virt >> 12)
+		cpu.dsb_ish()
+		cpu.isb()
+	}
+
+	unsafe {
+		*entry = new_pte
+	}
+	cpu.dsb_ishst()
+	if old_pte & 1 == 0 {
+		// Invalidate a cached translation fault for a newly mapped page.
+		cpu.tlbi_vaae1(virt >> 12)
+		cpu.dsb_ish()
+	}
+	cpu.isb()
 }
 
 pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
@@ -238,14 +274,24 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	l2 := get_next_level(l1, l1_entry, true) or { return none }
 	mut l3 := get_next_level(l2, l2_entry, true) or { return none }
 
-	entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
+	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 
 	new_pte := portable_to_arm64_pte(phys, flags)
-	unsafe {
-		*entry = new_pte
+	install_arm64_pte(mut entry, virt, new_pte)
+}
+
+fn remap_hhdm_span(phys u64, len u64, flags u64, failure string) u64 {
+	if len == 0 || phys > u64(-1) - len || phys + len > u64(-1) - (page_size - 1) {
+		panic('${failure}: invalid physical aperture')
 	}
-	// Invalidate any stale TLB entry for this virtual address.
-	cpu.tlbi_vaae1(virt >> 12)
+	page_base := lib.align_down(phys, page_size)
+	page_top := lib.align_up(phys + len, page_size)
+	for pg := page_base; pg < page_top; pg += page_size {
+		kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | flags) or { panic('${failure}: failed to map physical aperture') }
+	}
+	cpu.dsb_sy()
+	cpu.isb()
+	return phys + higher_half
 }
 
 // map_mmio maps a physical device (MMIO) aperture into the higher-half direct
@@ -256,16 +302,14 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 // unmapped or, if they happen to fall inside a RAM memmap entry, mapped Normal
 // cacheable — the wrong memory type for registers.
 pub fn map_mmio(phys u64, len u64) u64 {
-	page_base := lib.align_down(phys, page_size)
-	page_top := lib.align_up(phys + len, page_size)
-	for pg := page_base; pg < page_top; pg += page_size {
-		kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | pte_device) or {
-			panic('map_mmio: failed to map device aperture')
-		}
-	}
-	cpu.dsb_sy()
-	cpu.isb()
-	return phys + higher_half
+	return remap_hhdm_span(phys, len, pte_device, 'map_mmio')
+}
+
+// Map reserved coprocessor shared memory as Normal Non-Cacheable. Apple maps
+// the AGX uPPL handoff and TTB array with write-combining semantics; leaving
+// their HHDM aliases Write-Back cacheable can hide AP stores from firmware.
+pub fn map_uncached(phys u64, len u64) u64 {
+	return remap_hhdm_span(phys, len, pte_uncached, 'map_uncached')
 }
 
 @[_linker_section: '.requests']
@@ -274,7 +318,7 @@ __global (
 	volatile paging_mode_req = limine.LiminePagingModeRequest{
 		response: unsafe { nil }
 		revision: 1
-		mode:     limine.limine_paging_mode_aarch64_4lvl
+		mode: limine.limine_paging_mode_aarch64_4lvl
 		max_mode: limine.limine_paging_mode_aarch64_4lvl
 		min_mode: limine.limine_paging_mode_aarch64_4lvl
 	}
@@ -382,16 +426,16 @@ pub fn vmm_init() {
 		tcr_ips = 5
 	}
 	tcr := u64(16) | // T0SZ = 16 -> 48-bit user VA
-		(u64(16) << 16) | // T1SZ = 16 -> 48-bit kernel VA
-		(u64(0b00) << 14) | // TG0 = 4KB granule (TTBR0)
-		(u64(0b10) << 30) | // TG1 = 4KB granule (TTBR1)
-		(tcr_ips << 32) | // IPS = physical address size
-		(u64(0b11) << 12) | // SH0 = inner shareable
-		(u64(0b11) << 28) | // SH1 = inner shareable
-		(u64(0b01) << 10) | // ORGN0 = Write-Back
-		(u64(0b01) << 26) | // ORGN1 = Write-Back
-		(u64(0b01) << 8) | // IRGN0 = Write-Back
-		(u64(0b01) << 24) // IRGN1 = Write-Back
+	(u64(16) << 16) | // T1SZ = 16 -> 48-bit kernel VA
+	(u64(0b00) << 14) | // TG0 = 4KB granule (TTBR0)
+	(u64(0b10) << 30) | // TG1 = 4KB granule (TTBR1)
+	(tcr_ips << 32) | // IPS = physical address size
+	(u64(0b11) << 12) | // SH0 = inner shareable
+	(u64(0b11) << 28) | // SH1 = inner shareable
+	(u64(0b01) << 10) | // ORGN0 = Write-Back
+	(u64(0b01) << 26) | // ORGN1 = Write-Back
+	(u64(0b01) << 8) | // IRGN0 = Write-Back
+	(u64(0b01) << 24) // IRGN1 = Write-Back
 	cpu.write_tcr_el1(tcr)
 
 	// Load TTBR1 with kernel page tables

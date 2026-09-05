@@ -14,6 +14,7 @@ import klock
 import katomic
 import aarch64.cpu
 import memory
+import aarch64.timer
 
 pub const uat_num_contexts = 64
 pub const uat_kernel_flush_slot = 64
@@ -120,8 +121,8 @@ __global (
 	uat_mgr = unsafe { &UatManager(nil) }
 )
 
-// Attach to bootloader-reserved UAT structures. Nothing is written here;
-// handoff initialization must happen only after the GPU RTKit firmware is up.
+// Attach to bootloader-reserved UAT structures. Handoff initialization must
+// happen only after the GPU ASC CPU is running.
 pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32, oas u32,
 	map_kernel_to_user bool, handoff_abi UatHandoffAbi) ?&UatManager {
 	if ttbs_base & pgtable.uat_pg_mask != 0 || handoff_base & pgtable.uat_pg_mask != 0
@@ -138,17 +139,32 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 		C.printf(c'uat mmu: failed to allocate lower kernel page table\n')
 		return none
 	}
-	upper := pgtable.new_pgtable_with_root(pagetables_base, ias, oas) or {
+	mut upper := pgtable.new_pgtable_with_root(pagetables_base, ias, oas) or {
 		pgtable.destroy(lower)
 		C.printf(c'uat mmu: invalid reserved TTBR1 page table\n')
 		return none
 	}
+	if handoff_abi == .v12_3 {
+		// G13 has a 39-bit TTBR1 root. Slot 2 spans the driver's canonical
+		// kernel window and must point to a fresh 36-bit table, exactly as the
+		// reference driver replaces kpt0()[2]. Other reserved entries belong
+		// to firmware and are left untouched.
+		if ias != 39 || !upper.clear_external_root_entry(2) {
+			pgtable.destroy(lower)
+			C.printf(c'uat mmu: invalid G13 reserved TTBR1 geometry\n')
+			return none
+		}
+		cpu.dsb_sy()
+	}
+
+	handoff_virt := memory.map_uncached(handoff_base, sizeof(UatHandoff))
+	ttbs_virt := memory.map_uncached(ttbs_base, u64(uat_num_contexts) * sizeof(SlotTtbs))
 
 	mgr := &UatManager{
 		kernel_lower_pgtable: lower
 		kernel_pgtable: upper
-		handoff: unsafe { &UatHandoff(handoff_base + higher_half) }
-		ttbs: unsafe { &SlotTtbs(ttbs_base + higher_half) }
+		handoff: unsafe { &UatHandoff(handoff_virt) }
+		ttbs: unsafe { &SlotTtbs(ttbs_virt) }
 		ttbs_base: ttbs_base
 		handoff_base: handoff_base
 		pagetables_base: pagetables_base
@@ -263,17 +279,16 @@ pub fn (mut mgr UatManager) initialize_handoff() bool {
 	cpu.dsb_sy()
 
 	// Drop the lock periodically so firmware can finish its side of init.
+	// Match the reference driver's one-second deadline and 10 ms cadence.
 	mut ready := false
-	for _ in 0 .. 1000 {
+	for _ in 0 .. 100 {
 		handoff_lock(mgr.handoff)
 		ready = katomic.load(&mgr.handoff.magic_fw) == ppl_magic
 		handoff_unlock(mgr.handoff)
 		if ready {
 			break
 		}
-		for _ in 0 .. 10000 {
-			cpu.isb()
-		}
+		timer.busywait_us(10000)
 	}
 	if !ready {
 		C.printf(c'uat mmu: firmware handoff magic timed out\n')

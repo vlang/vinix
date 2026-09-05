@@ -18,6 +18,7 @@ import drm
 import drm.ioctl as drm_ioctl
 import apple.rtkit
 import devicetree
+import aarch64.pmgr
 
 pub struct AgxDriver {
 pub mut:
@@ -342,6 +343,15 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	mut powers := [16]u32{}
 	mut voltages := [256]u32{}
 	mut sram_voltages := [256]u32{}
+	min_sram_microvolt := devicetree.get_u32(gpu_node, 'apple,min-sram-microvolt') or {
+		println('agx: t8103 has no apple,min-sram-microvolt')
+		return false
+	}
+	if min_sram_microvolt < 1000 {
+		println('agx: t8103 has an invalid minimum SRAM voltage')
+		return false
+	}
+	min_sram_mv := min_sram_microvolt / 1000
 	mut state_count := u32(0)
 	mut max_power_mw := u32(0)
 	for opp in opp_table.children {
@@ -390,7 +400,6 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 			voltage_mv := voltage_uv[cluster] / 1000
 			destination := state_count * 16 + cluster
 			voltages[destination] = voltage_mv
-			min_sram_mv := cfg.pwr_min_sram_microvolt / 1000
 			sram_voltages[destination] = if voltage_mv > min_sram_mv {
 				voltage_mv
 			} else {
@@ -418,6 +427,7 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	}
 
 	cfg.perf_state_count = state_count
+	cfg.min_sram_microvolt = min_sram_microvolt
 	cfg.perf_state_base = base_state
 	cfg.perf_state_table_count = cfg.num_clusters
 	cfg.perf_state_frequencies = frequencies
@@ -730,6 +740,68 @@ fn load_t6050_aux_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwC
 	return true
 }
 
+fn is_pmgr_power_domain(node &devicetree.DTNode) bool {
+	compatibles := devicetree.get_string_list(node, 'compatible') or { return false }
+	for compatible in compatibles {
+		if compatible == 'apple,pmgr-pwrstate' || compatible == 'apple,t8103-pmgr-pwrstate' {
+			return true
+		}
+	}
+	return false
+}
+
+// Power-domain providers on the m1n1/Linux t8103 tree use zero argument
+// cells. Enable every parent first (pmp before gfx), then transition the leaf
+// using the PMGR aperture containing that provider.
+fn enable_device_power_domains(node &devicetree.DTNode, depth u32) bool {
+	if depth > 8 {
+		println('agx: power-domain hierarchy is too deep')
+		return false
+	}
+	domains := devicetree.get_u32_array(node, 'power-domains') or {
+		if depth == 0 {
+			println('agx: GPU node has no power-domain provider')
+			return false
+		}
+		return true
+	}
+	if depth == 0 && domains.len == 0 {
+		println('agx: GPU node has an empty power-domain list')
+		return false
+	}
+	for handle in domains {
+		domain := devicetree.find_phandle(handle) or {
+			C.printf(c'agx: unresolved power-domain phandle 0x%x\n', handle)
+			return false
+		}
+		cells := devicetree.get_u32(domain, '#power-domain-cells') or { u32(0) }
+		if cells != 0 || !is_pmgr_power_domain(domain) {
+			C.printf(c'agx: unsupported power-domain provider %s\n', domain.name.str)
+			return false
+		}
+		if !enable_device_power_domains(domain, depth + 1) {
+			return false
+		}
+		offset := devicetree.get_u32(domain, 'reg') or {
+			C.printf(c'agx: power domain %s has no register offset\n', domain.name.str)
+			return false
+		}
+		if domain.parent == unsafe { nil } {
+			return false
+		}
+		apertures := devicetree.get_translated_reg_ranges(domain.parent) or {
+			C.printf(c'agx: power domain %s has no PMGR aperture\n', domain.name.str)
+			return false
+		}
+		if apertures.len == 0 || !pmgr.enable_region(apertures[0].base, apertures[0].size, offset) {
+			C.printf(c'agx: failed to enable power domain %s\n', domain.name.str)
+			return false
+		}
+		C.printf(c'agx: enabled power domain %s\n', domain.name.str)
+	}
+	return true
+}
+
 // Probe GPU from device tree and bring up all supported subsystems.
 pub fn initialise() {
 	println('agx: Probing Apple GPU')
@@ -817,9 +889,24 @@ pub fn initialise() {
 		println('agx: G17 requires complete GFX and GFX1 ASC resources')
 		return
 	}
-	// Mapping and reading the SGX identity window is safe before firmware
-	// bring-up and lets a fused 7-core base M1 Air report its real topology.
-	// No ASC, UAT, power, or firmware state is modified here.
+
+	// Never power a GPU whose private firmware ABI or platform performance
+	// inputs are incomplete. This check precedes every power-domain/ASC write.
+	if !cfg.can_boot_firmware() {
+		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n', chip_id, cfg.firmware_abi_name())
+		return
+	}
+	if chip_id == 0x8103 && !g13_performance_config_complete {
+		println('agx: t8103 performance configuration is incomplete; leaving hardware untouched')
+		return
+	}
+	if !native_adt && !enable_device_power_domains(gpu_node, 0) {
+		println('agx: failed to enable GPU power-domain hierarchy')
+		return
+	}
+
+	// The identity registers are valid after the gfx power domain is active.
+	// Reading the fused core mask here distinguishes the 7-core base M1 Air.
 	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.secondary_asc_base, platform.secondary_asc_size, platform.firmware_role_count, platform.sgx_base, platform.sgx_size)
 	if chip_id == 0x8103 {
 		identity := gpu_res.get_g13_identity() or {
@@ -838,18 +925,6 @@ pub fn initialise() {
 		C.printf(c'agx: GFX1 ASC=0x%llx mailbox=0x%llx\n', platform.secondary_asc_base, platform.secondary_mailbox_base)
 	}
 	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n', platform.handoff_base, platform.handoff_size, platform.pagetables_base, platform.pagetables_size)
-
-	// Never run a GPU with incomplete private byte layouts. Read-only identity
-	// probing above is useful for bring-up, but firmware or power-state writes
-	// here could corrupt firmware-owned memory or wedge the machine.
-	if !cfg.can_boot_firmware() {
-		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n', chip_id, cfg.firmware_abi_name())
-		return
-	}
-	if chip_id == 0x8103 && !g13_performance_config_complete {
-		println('agx: t8103 performance configuration is incomplete; leaving hardware untouched')
-		return
-	}
 
 	// Step 3: Initialize the AGX-internal UAT from its reserved TTB region.
 	handoff_abi := if cfg.firmware_abi == .g17_26_5_partial {

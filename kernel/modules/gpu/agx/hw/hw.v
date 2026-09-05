@@ -168,7 +168,6 @@ pub:
 	pwr_filter_time_const      u32
 	pwr_perf_base_clk          u32
 	pwr_perf_boost_clk         u32
-	pwr_min_sram_microvolt     u32
 	pwr_avg_power_filter_tc_ms u32
 	pwr_avg_power_ki_dt        u32
 	pwr_avg_power_kp           u32
@@ -197,6 +196,7 @@ pub mut:
 	soc_revision_major       u32
 	soc_revision_minor       u32
 	gpu_power_sample_period  u32
+	min_sram_microvolt       u32
 	perf_state_count         u32
 	perf_state_base          u32
 	perf_state_table_count   u32

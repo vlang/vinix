@@ -158,7 +158,7 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 		|| config.perf_state_count > 16 || config.perf_state_table_count == 0
 		|| config.perf_state_table_count > 8 || config.perf_state_base >= config.perf_state_count
 		|| config.max_power_mw == 0 || config.gpu_power_sample_period == 0 || uat_ttb_base == 0
-		|| unknown_page == 0 {
+		|| unknown_page == 0 || config.min_sram_microvolt < 1000 {
 		return false
 	}
 	revision_id := g13_firmware_revision_id(config.gpu_rev) or { return false }
@@ -202,7 +202,7 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	data.num_cores = config.gpu_core_count
 	data.max_pstate = config.perf_state_count - 1
 	data.num_pstates = config.perf_state_count
-	data.min_sram_voltage_mv = config.pwr_min_sram_microvolt / 1000
+	data.min_sram_voltage_mv = config.min_sram_microvolt / 1000
 	data.unk_ab8 = 0x48
 	data.unk_abc = 0x8
 	data.unk_ac0 = 0x1020

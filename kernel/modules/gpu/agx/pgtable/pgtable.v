@@ -118,8 +118,8 @@ pub fn new_pgtable(ias u32, oas u32) ?&UatPgtable {
 	}
 }
 
-// Attach to the firmware/bootloader-reserved TTBR1 root. Existing entries
-// are deliberately preserved because they contain firmware-owned mappings.
+// Attach to the firmware/bootloader-reserved TTBR1 root. Callers preserve
+// firmware-owned entries and explicitly replace only the driver window.
 pub fn new_pgtable_with_root(root_phys u64, ias u32, oas u32) ?&UatPgtable {
 	if root_phys & uat_pg_mask != 0 || ias < 37 || ias > 42 || oas < uat_pg_shift
 		|| oas > 48 {
@@ -133,6 +133,25 @@ pub fn new_pgtable_with_root(root_phys u64, ias u32, oas u32) ?&UatPgtable {
 		non_global: false
 		owns_root: false
 	}
+}
+
+// Unlink one entry from a borrowed root without freeing the bootloader-owned
+// subtree it previously referenced. The G13 driver owns root slot 2 for
+// 0xffffffa000000000..0xffffffb000000000 and replaces that slot on attach.
+pub fn (mut pt UatPgtable) clear_external_root_entry(index u32) bool {
+	root_entries := u32(1) << (pt.ias - uat_root_shift)
+	if pt.owns_root || index >= root_entries {
+		return false
+	}
+	pt.lock.acquire()
+	defer {
+		pt.lock.release()
+	}
+	root := unsafe { &u64(u64(pt.l1) + higher_half) }
+	unsafe {
+		root[index] = 0
+	}
+	return true
 }
 
 // Destroy a page table, freeing the L1 root and all referenced L2/L3 tables.

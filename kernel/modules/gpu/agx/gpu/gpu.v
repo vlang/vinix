@@ -736,7 +736,36 @@ pub fn (mut mgr GpuManager) init() bool {
 		C.printf(c'agx: G13 topology: %u/%u active cores, mask 0x%x\n', identity.total_active_cores, identity.num_cores_per_cluster * identity.num_clusters, identity.core_masks[0])
 	}
 
-	// Step 2: Negotiate the RTKit transport independently for every role.
+	// Step 2: Complete the uPPL handoff as soon as the ASC is running. RTKit
+	// system endpoints may request and access UAT-backed buffers during boot,
+	// so context-zero roots must be visible before transport negotiation.
+	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
+		C.printf(c'agx: UAT firmware handoff failed\n')
+		return mgr.fail_g13_initialization()
+	}
+
+	// Step 3: Construct every firmware-visible channel and InitData mapping
+	// before negotiating RTKit. The reference G13 driver also publishes the
+	// device-control Initialize command before rtk.boot().
+	if !mgr.init_channels() {
+		C.printf(c'agx: Failed to initialize channels\n')
+		return mgr.fail_g13_initialization()
+	}
+
+	// Step 4: Allocate and initialize firmware init data.
+	if !mgr.init_firmware_data() {
+		C.printf(c'agx: Failed to initialize firmware data\n')
+		return mgr.fail_g13_initialization()
+	}
+
+	// Step 5: Publish the v12.3 Initialize command before making InitData live.
+	initialize := fw.make_device_control_initialize()
+	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
+		C.printf(c'agx: Failed to queue device-control Initialize\n')
+		return mgr.fail_g13_initialization()
+	}
+
+	// Step 6: Negotiate the RTKit transport independently for every role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
 			C.printf(c'agx: RTKit boot failed for role %u\n', role)
@@ -744,7 +773,7 @@ pub fn (mut mgr GpuManager) init() bool {
 		}
 	}
 
-	// Step 3: Start GPU-specific firmware endpoint (0x20) on each role.
+	// Step 7: Start GPU-specific firmware endpoint (0x20) on each role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
 			C.printf(c'agx: Failed to start firmware endpoint for role %u\n', role)
@@ -752,7 +781,7 @@ pub fn (mut mgr GpuManager) init() bool {
 		}
 	}
 
-	// Step 4: Start doorbell endpoint (0x21) on each role.
+	// Step 8: Start doorbell endpoint (0x21) on each role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
 			C.printf(c'agx: Failed to start doorbell endpoint for role %u\n', role)
@@ -760,39 +789,13 @@ pub fn (mut mgr GpuManager) init() bool {
 		}
 	}
 
-	// The firmware side of the uPPL handoff becomes available only after the
-	// RTKit endpoints are running.
-	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
-		C.printf(c'agx: UAT firmware handoff failed\n')
-		return mgr.fail_g13_initialization()
-	}
-
-	// Step 5: Initialize firmware communication channels
-	if !mgr.init_channels() {
-		C.printf(c'agx: Failed to initialize channels\n')
-		return mgr.fail_g13_initialization()
-	}
-
-	// Step 6: Allocate and initialize firmware init data
-	if !mgr.init_firmware_data() {
-		C.printf(c'agx: Failed to initialize firmware data\n')
-		return mgr.fail_g13_initialization()
-	}
-
-	// Step 7: Publish the v12.3 Initialize command before making InitData live.
-	initialize := fw.make_device_control_initialize()
-	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
-		C.printf(c'agx: Failed to queue device-control Initialize\n')
-		return mgr.fail_g13_initialization()
-	}
-
-	// Step 8: Build and send MSG_INIT with initdata VA.
+	// Step 9: Build and send MSG_INIT with initdata VA.
 	if !mgr.send_fw_msg(msg_init, mgr.initdata_va) {
 		C.printf(c'agx: Failed to send MSG_INIT\n')
 		return mgr.fail_g13_initialization()
 	}
 
-	// Step 9: Ring the device-control doorbell, then wake the firmware. MSG_INIT
+	// Step 10: Ring the device-control doorbell, then wake the firmware. MSG_INIT
 	// has no synchronous reply; consuming an arbitrary RTKit message as an
 	// acknowledgement can steal the first real firmware notification.
 	if !mgr.ring_device_control() || !mgr.kick_firmware() {

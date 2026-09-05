@@ -119,7 +119,6 @@ pub fn t8103_config() HwConfig {
 		pwr_filter_time_const: 9
 		pwr_perf_base_clk: 1000
 		pwr_perf_boost_clk: 1398
-		pwr_min_sram_microvolt: 790000
 		pwr_avg_power_filter_tc_ms: 1000
 		pwr_avg_power_ki_dt: 0
 		pwr_avg_power_kp: 0
