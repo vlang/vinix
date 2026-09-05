@@ -191,6 +191,35 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 	return -2 // ENOENT
 }
 
+// Reserve a nonzero per-open queue ID. Failed queue construction may leave a
+// hole, so wraparound also checks live IDs instead of assuming monotonic IDs
+// can never be exhausted.
+fn (mut f GpuFile) allocate_queue_id_locked() ?u32 {
+	mut candidate := f.next_queue_id
+	if candidate == 0 {
+		candidate = 1
+	}
+	start := candidate
+	for {
+		mut used := false
+		for queue in f.queues {
+			if queue.id == candidate {
+				used = true
+				break
+			}
+		}
+		if !used {
+			f.next_queue_id = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
+			return candidate
+		}
+		candidate = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
+		if candidate == start {
+			return none
+		}
+	}
+	return none
+}
+
 fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
 	for vm in f.vms {
 		if vm.id == vm_id {
@@ -454,8 +483,10 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	}
 	f.find_vm(request.vm_id) or { return -22 }
 	f.lock.acquire()
-	id := f.next_queue_id
-	f.next_queue_id++
+	id := f.allocate_queue_id_locked() or {
+		f.lock.release()
+		return -24 // EMFILE
+	}
 	f.lock.release()
 	wq := workqueue.new_workqueue(id, request.vm_id, request.priority, request.queue_caps) or {
 		return -12

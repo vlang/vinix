@@ -9,10 +9,10 @@ module workqueue
 
 import drm.syncobj
 import klock
-import katomic
 import memory
 
 pub const max_job_slots = 127
+const workqueue_ring_pages = u64(4)
 
 // Work error codes
 pub const work_err_none = u32(0)
@@ -52,8 +52,9 @@ pub mut:
 // Create a new work queue with the given ID, VM context, priority, and the
 // command types which userspace selected when creating it.
 pub fn new_workqueue(id u32, vm_id u32, priority u32, caps u32) ?&WorkQueue {
-	// Allocate ring buffer physical memory (one page is sufficient)
-	ring_phys := u64(memory.pmm_alloc_aligned(4, 4))
+	// Queue creation is userspace-triggered, so physical exhaustion must be an
+	// ordinary ENOMEM path rather than a kernel panic.
+	ring_phys := u64(memory.pmm_alloc_aligned_fallible(workqueue_ring_pages, 4))
 	if ring_phys == 0 {
 		C.printf(c'workqueue: failed to allocate ring buffer for queue %d\n', id)
 		return none
@@ -96,6 +97,7 @@ pub fn (mut wq WorkQueue) submit(item &WorkItem) ?u32 {
 
 	wq.slots[slot] = unsafe { item }
 	wq.pending_count++
+	wq.next_slot = (slot + 1) % max_job_slots
 
 	return slot
 }
@@ -183,8 +185,9 @@ pub fn (mut wq WorkQueue) destroy() {
 		}
 		item := unsafe { item_opt }
 		if item.fence != unsafe { nil } && !item.completed {
-			// Signal fence so waiters do not hang
-			syncobj.signal(item.fence)
+			// Queue destruction cancels work; wake waiters with a failure rather
+			// than falsely reporting successful GPU completion.
+			syncobj.signal_error(item.fence, -int(work_err_killed))
 		}
 		wq.slots[i] = unsafe { nil }
 	}
@@ -193,7 +196,7 @@ pub fn (mut wq WorkQueue) destroy() {
 
 	// Free ring buffer physical memory
 	if wq.ring_phys != 0 {
-		memory.pmm_free(voidptr(wq.ring_phys), 4)
+		memory.pmm_free(voidptr(wq.ring_phys), workqueue_ring_pages)
 		wq.ring_phys = 0
 	}
 }
