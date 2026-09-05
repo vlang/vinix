@@ -37,17 +37,21 @@ __global (
 
 struct PlatformResources {
 pub:
-	asc_base        u64
-	asc_size        u64
-	sgx_base        u64
-	sgx_size        u64
-	mailbox_base    u64
-	handoff_base    u64
-	handoff_size    u64
-	pagetables_base u64
-	pagetables_size u64
-	ttbs_base       u64
-	ttbs_size       u64
+	asc_base               u64
+	asc_size               u64
+	secondary_asc_base     u64
+	secondary_asc_size     u64
+	sgx_base               u64
+	sgx_size               u64
+	mailbox_base           u64
+	secondary_mailbox_base u64
+	firmware_role_count    u32
+	handoff_base           u64
+	handoff_size           u64
+	pagetables_base        u64
+	pagetables_size        u64
+	ttbs_base              u64
+	ttbs_size              u64
 }
 
 fn find_gpu_node() ?(&devicetree.DTNode, u32, bool) {
@@ -68,17 +72,19 @@ fn find_gpu_node() ?(&devicetree.DTNode, u32, bool) {
 	return none
 }
 
-fn find_native_asc_node() ?&devicetree.DTNode {
-	if node := devicetree.find_node('/arm-io/gfx-asc') {
+fn find_native_asc_node(role u32) ?&devicetree.DTNode {
+	name := if role == 0 { 'gfx-asc' } else { 'gfx1-asc' }
+	if node := devicetree.find_node('/arm-io/${name}') {
 		return node
 	}
-	if node := devicetree.find_node('/soc/gfx-asc') {
+	if node := devicetree.find_node('/soc/${name}') {
 		return node
 	}
 	return none
 }
 
-fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?PlatformResources {
+fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
+	chip_id u32) ?PlatformResources {
 	gpu_regs := devicetree.get_translated_reg_ranges(gpu_node) or {
 		println('agx: failed to translate GPU register ranges')
 		return none
@@ -88,7 +94,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 			println('agx: native SGX node has no registers')
 			return none
 		}
-		asc_node := find_native_asc_node() or {
+		asc_node := find_native_asc_node(0) or {
 			println('agx: native gfx-asc node not found')
 			return none
 		}
@@ -99,6 +105,28 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		if asc_regs.len == 0 || asc_regs[0].size < 0x9000 {
 			println('agx: native gfx-asc register window is incomplete')
 			return none
+		}
+		mut secondary_asc_base := u64(0)
+		mut secondary_asc_size := u64(0)
+		mut secondary_mailbox_base := u64(0)
+		mut firmware_role_count := u32(1)
+		if chip_id == 0x6050 {
+			secondary_node := find_native_asc_node(1) or {
+				println('agx: native G17 gfx1-asc node not found')
+				return none
+			}
+			secondary_regs := devicetree.get_translated_reg_ranges(secondary_node) or {
+				println('agx: failed to translate native gfx1-asc registers')
+				return none
+			}
+			if secondary_regs.len == 0 || secondary_regs[0].size < 0x9000 {
+				println('agx: native gfx1-asc register window is incomplete')
+				return none
+			}
+			secondary_asc_base = secondary_regs[0].base
+			secondary_asc_size = secondary_regs[0].size
+			secondary_mailbox_base = secondary_regs[0].base + 0x8000
+			firmware_role_count = 2
 		}
 		ttbs_base := devicetree.get_le_u64(gpu_node, 'gpu-region-base') or {
 			println('agx: native SGX node has no gpu-region-base')
@@ -127,9 +155,13 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		return PlatformResources{
 			asc_base: asc_regs[0].base
 			asc_size: asc_regs[0].size
+			secondary_asc_base: secondary_asc_base
+			secondary_asc_size: secondary_asc_size
 			sgx_base: gpu_regs[0].base
 			sgx_size: gpu_regs[0].size
 			mailbox_base: asc_regs[0].base + 0x8000
+			secondary_mailbox_base: secondary_mailbox_base
+			firmware_role_count: firmware_role_count
 			handoff_base: handoff_base
 			handoff_size: handoff_size
 			pagetables_base: pagetables_base
@@ -199,6 +231,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool) ?Platfor
 		sgx_base: sgx.base
 		sgx_size: sgx.size
 		mailbox_base: mailbox_regs[0].base
+		firmware_role_count: 1
 		handoff_base: handoff_regs[0].base
 		handoff_size: handoff_regs[0].size
 		pagetables_base: pagetables_regs[0].base
@@ -233,8 +266,7 @@ fn load_t6050_chip_info(mut cfg hw.HwConfig) bool {
 	}
 	cfg.soc_revision_major = chip_revision >> 4
 	cfg.soc_revision_minor = chip_revision & 7
-	C.printf(c'agx: loaded native chip info 0x%x revision %u.%u\n', chip_id,
-		cfg.soc_revision_major, cfg.soc_revision_minor)
+	C.printf(c'agx: loaded native chip info 0x%x revision %u.%u\n', chip_id, cfg.soc_revision_major, cfg.soc_revision_minor)
 	return true
 }
 
@@ -432,7 +464,7 @@ pub fn initialise() {
 
 	// Step 2: Resolve all addresses without touching hardware. Native Apple
 	// nodes and m1n1/Linux nodes expose different layouts.
-	platform := get_platform_resources(gpu_node, native_adt) or {
+	platform := get_platform_resources(gpu_node, native_adt, chip_id) or {
 		println('agx: platform resources are incomplete')
 		return
 	}
@@ -453,7 +485,15 @@ pub fn initialise() {
 		println('agx: ASC or SGX register window is too small')
 		return
 	}
+	if chip_id == 0x6050 && (platform.firmware_role_count != 2
+		|| platform.secondary_asc_size < u64(regs.asc_ctl) + 4) {
+		println('agx: G17 requires complete GFX and GFX1 ASC resources')
+		return
+	}
 	C.printf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n', platform.asc_base, platform.sgx_base, platform.mailbox_base, platform.ttbs_base, platform.ttbs_size)
+	if platform.firmware_role_count == 2 {
+		C.printf(c'agx: GFX1 ASC=0x%llx mailbox=0x%llx\n', platform.secondary_asc_base, platform.secondary_mailbox_base)
+	}
 	C.printf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n', platform.handoff_base, platform.handoff_size, platform.pagetables_base, platform.pagetables_size)
 
 	// Never run a newer GPU with the byte layouts and register sequence for
@@ -493,8 +533,7 @@ pub fn initialise() {
 	gpu_event_mgr = event.new_event_manager(stamp_va, stamp_phys)
 
 	// Step 5: Create GPU resources, RTKit, and GpuManager.
-	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.sgx_base,
-		platform.sgx_size)
+	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.sgx_base, platform.sgx_size)
 	gpu_rtk := rtkit.new_rtkit(platform.mailbox_base, 'agx')
 
 	mut mgr := gpu.new_gpu_manager(&gpu_res, &cfg, &gpu_rtk) or {

@@ -232,11 +232,17 @@ def parse_asc(node: dict[str, Any]) -> dict[str, Any]:
         raise InspectError(
             f"gfx-asc names/ranges differ in length ({len(names)} != {len(ranges)})"
         )
-    return {
+    result = {
         "compatible": decode_compatibles(node["compatible"]),
         "register_ranges": decode_reg(node["reg"]),
         "segments": [dict(name=name, **segment) for name, segment in zip(names, ranges)],
     }
+    role = node.get("role")
+    if isinstance(role, bytes):
+        role = role.rstrip(b"\0").decode("ascii", "strict")
+    if isinstance(role, str):
+        result["role"] = role
+    return result
 
 
 def parse_accelerator(node: dict[str, Any]) -> dict[str, Any]:
@@ -330,10 +336,24 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         if isinstance(state_count, int) and auxiliary.get("state_count") != state_count:
             warnings.append(f"{domain.upper()} and GPU performance-state counts differ")
     asc = manifest.get("asc")
-    if "gpu,t6050" in compatible and isinstance(asc, dict):
-        if "iop,ascwrap-v6" not in asc.get("compatible", []):
-            warnings.append("t6050 gfx-asc is not the observed ascwrap-v6")
-        segments = asc.get("segments", [])
+    asc_roles = manifest.get("asc_roles", [asc] if isinstance(asc, dict) else [])
+    if "gpu,t6050" in compatible:
+        if not isinstance(asc_roles, list) or len(asc_roles) != 2:
+            warnings.append("t6050 does not expose both GFX and GFX1 firmware ASCs")
+        else:
+            roles = [item.get("role") for item in asc_roles if isinstance(item, dict)]
+            if roles != ["GFX", "GFX1"]:
+                warnings.append("t6050 firmware ASC roles are not GFX/GFX1")
+            if any(
+                "iop,ascwrap-v6" not in item.get("compatible", [])
+                for item in asc_roles
+                if isinstance(item, dict)
+            ):
+                warnings.append("t6050 firmware ASC is not the observed ascwrap-v6")
+        if isinstance(asc, dict):
+            segments = asc.get("segments", [])
+        else:
+            segments = []
         if len(segments) >= 2:
             text, data = segments[0], segments[1]
             if text.get("iova") != sgx.get("rtkit_private_vm_region_base"):
@@ -358,12 +378,25 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     else:
         asc_raw = _run_plist(["ioreg", "-a", "-p", "IODeviceTree", "-n", "gfx-asc", "-r"])
 
+    if args.asc1_plist:
+        asc1_raw = _load_plist(args.asc1_plist)
+    elif args.asc_plist:
+        asc1_raw = None
+    else:
+        asc1_raw = _run_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "gfx1-asc", "-r"]
+        )
+
     if args.accelerator_plist:
         accelerator_raw = _load_plist(args.accelerator_plist)
     else:
         accelerator_raw = _run_plist(["ioreg", "-a", "-r", "-c", "AGXAcceleratorG17X"])
 
     driver_path = args.driver_info or Path("/System/Library/Extensions/AGXG17X.kext/Contents/Info.plist")
+    primary_asc = parse_asc(_first_node(asc_raw, "gfx-asc plist"))
+    asc_roles = [primary_asc]
+    if asc1_raw is not None:
+        asc_roles.append(parse_asc(_first_node(asc1_raw, "gfx1-asc plist")))
     manifest = {
         "schema": 2,
         "host": {
@@ -371,7 +404,8 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             "macos_version": platform.mac_ver()[0],
         },
         "device_tree": parse_sgx(_first_node(sgx_raw, "sgx plist")),
-        "asc": parse_asc(_first_node(asc_raw, "gfx-asc plist")),
+        "asc": primary_asc,
+        "asc_roles": asc_roles,
         "accelerator": parse_accelerator(_first_node(accelerator_raw, "accelerator plist")),
         "driver": parse_driver_info(_load_plist(driver_path)),
     }
@@ -384,6 +418,9 @@ def main() -> int:
     parser.add_argument("--sgx-plist", type=Path, help="read an ioreg sgx plist instead of live IORegistry")
     parser.add_argument(
         "--asc-plist", type=Path, help="read an ioreg gfx-asc plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--asc1-plist", type=Path, help="read an ioreg gfx1-asc plist instead of live IORegistry"
     )
     parser.add_argument(
         "--accelerator-plist", type=Path, help="read an ioreg accelerator plist instead of live IORegistry"

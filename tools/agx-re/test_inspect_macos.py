@@ -114,6 +114,7 @@ class InspectMacOSTests(unittest.TestCase):
     def test_decodes_g17_asc_firmware_segments(self) -> None:
         node = {
             "compatible": b"iop,ascwrap-v6\0",
+            "role": b"GFX1\0",
             "reg": struct.pack("<QQQQ", 0x2102600000, 0x88000, 0x2102050000, 8),
             "segment-names": b"__TEXT;__DATA\0",
             "segment-ranges": struct.pack(
@@ -134,6 +135,7 @@ class InspectMacOSTests(unittest.TestCase):
         result = inspect_macos.parse_asc(node)
 
         self.assertEqual(result["compatible"], ["iop,ascwrap-v6"])
+        self.assertEqual(result["role"], "GFX1")
         self.assertEqual(result["segments"][0]["name"], "__TEXT")
         self.assertEqual(result["segments"][0]["size"], 0x4C000)
         self.assertEqual(result["segments"][1]["physical"], 0x100026F0000)
@@ -143,6 +145,7 @@ class InspectMacOSTests(unittest.TestCase):
             "device_tree": {"compatible": ["gpu,t6050"]},
             "asc": {
                 "compatible": ["iop,ascwrap-v6"],
+                "role": "GFX",
                 "segments": [
                     {
                         "name": "__TEXT",
@@ -158,6 +161,16 @@ class InspectMacOSTests(unittest.TestCase):
                     },
                 ],
             },
+            "asc_roles": [
+                {
+                    "compatible": ["iop,ascwrap-v6"],
+                    "role": "GFX",
+                },
+                {
+                    "compatible": ["iop,ascwrap-v6"],
+                    "role": "GFX1",
+                },
+            ],
             "accelerator": {
                 "gpu_core_count": 40,
                 "configuration": {
@@ -176,6 +189,28 @@ class InspectMacOSTests(unittest.TestCase):
             }
         )
         self.assertEqual(inspect_macos.validate_manifest(manifest), [])
+
+    def test_t6050_manifest_requires_both_firmware_roles(self) -> None:
+        manifest = {
+            "device_tree": {"compatible": ["gpu,t6050"]},
+            "asc": {"compatible": ["iop,ascwrap-v6"], "role": "GFX"},
+            "asc_roles": [
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX"}
+            ],
+            "accelerator": {
+                "gpu_core_count": 40,
+                "configuration": {
+                    "gpu_gen": 17,
+                    "gpu_var": "C",
+                    "num_cores": 40,
+                    "core_mask_list": [0x3FF, 0x3FF, 0x3FF, 0x3FF],
+                },
+            },
+        }
+        warnings = inspect_macos.validate_manifest(manifest)
+        self.assertIn(
+            "t6050 does not expose both GFX and GFX1 firmware ASCs", warnings
+        )
 
 
 if __name__ == "__main__":
