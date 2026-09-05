@@ -2571,6 +2571,47 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["fixed_value"]["offset"], 0xF8C)
         self.assertEqual(recovered["fixed_value"]["value"], 0x00000000FFFEAE80)
 
+    def test_recovers_g17_setup_config_constants(self) -> None:
+        configure = bytearray(0x924)
+        for offset, word in {
+            0x34: 0x529EE508,
+            0x38: 0x8B080018,
+            0x52C: 0xB907067F,
+            0x5A8: 0x6F00E401,
+            0x5AC: 0x3D802F01,
+            0x5B8: 0xFC044301,
+            0x918: 0x52800008,
+            0x91C: 0x52800629,
+            0x920: 0xB9004709,
+        }.items():
+            struct.pack_into("<I", configure, offset, word)
+        arm_setup = bytearray(0x2FAC)
+        for offset, word in {
+            0x28: 0xF9414E68,
+            0x34: 0x529EED8A,
+            0x38: 0x8B0A010A,
+            0x44: 0xF9415E6C,
+            0x5C: 0xB940014B,
+            0x60: 0xB90F4D8B,
+            0x64: 0x3CC6C140,
+            0x68: 0x3D83DD80,
+            0x2FA0: 0xB9470509,
+            0x2FA4: 0xF9415E6A,
+            0x2FA8: 0xB90EDD49,
+        }.items():
+            struct.pack_into("<I", arm_setup, offset, word)
+
+        recovered = recover_g17_abi.recover_g17_setup_config_constants(
+            bytes(configure), bytes(arm_setup)
+        )
+
+        self.assertEqual(recovered["fixed_u32"]["offset"], 0xF4C)
+        self.assertEqual(recovered["fixed_u32"]["value"], 0x31)
+        self.assertEqual(
+            list(recovered["zero_u32"]),
+            ["0xedc", "0xf70", "0xf74", "0xf78", "0xf7c"],
+        )
+
     def test_recovers_g17_uat_config_flag(self) -> None:
         pi_address = 0x100000
         g17_address = 0x200000

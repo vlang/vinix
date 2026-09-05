@@ -4226,6 +4226,62 @@ def recover_g17_hardware_config_constants(
     }
 
 
+def recover_g17_setup_config_constants(
+    configure_code: bytes, arm_setup_code: bytes
+) -> dict[str, object]:
+    """Recover scalar defaults published by AGXArmFirmware::setupConfig."""
+
+    # configureDevice uses accelerator +0xf728 as the base for these source
+    # fields. It clears the 16-byte source at +0xf7d8 and the word at
+    # +0xf76c, then deliberately replaces the latter with 0x31.
+    require_instruction_words_at(
+        configure_code,
+        "G17 setupConfig scalar sources",
+        {
+            0x34: 0x529EE508,
+            0x38: 0x8B080018,
+            0x52C: 0xB907067F,  # accelerator +0x704 = 0
+            0x5A8: 0x6F00E401,
+            0x5AC: 0x3D802F01,  # accelerator +0xf7d8..0xf7e7 = 0
+            0x5B8: 0xFC044301,  # accelerator +0xf76c..0xf773 = 0
+            0x918: 0x52800008,
+            0x91C: 0x52800629,  # replacement value 0x31
+            0x920: 0xB9004709,  # -> accelerator +0xf76c
+        },
+    )
+    require_instruction_words_at(
+        arm_setup_code,
+        "G17 setupConfig scalar publication",
+        {
+            0x28: 0xF9414E68,
+            0x34: 0x529EED8A,
+            0x38: 0x8B0A010A,  # accelerator +0xf76c
+            0x44: 0xF9415E6C,
+            0x5C: 0xB940014B,
+            0x60: 0xB90F4D8B,  # -> config +0xf4c
+            0x64: 0x3CC6C140,  # accelerator +0xf7d8
+            0x68: 0x3D83DD80,  # -> config +0xf70..0xf7f
+            0x2FA0: 0xB9470509,  # accelerator +0x704
+            0x2FA4: 0xF9415E6A,
+            0x2FA8: 0xB90EDD49,  # -> config +0xedc
+        },
+    )
+    return {
+        "fixed_u32": {
+            "offset": 0xF4C,
+            "source_offset": 0xF76C,
+            "value": 0x31,
+        },
+        "zero_u32": {
+            "0xedc": {"source_offset": 0x704},
+            "0xf70": {"source_offset": 0xF7D8},
+            "0xf74": {"source_offset": 0xF7DC},
+            "0xf78": {"source_offset": 0xF7E0},
+            "0xf7c": {"source_offset": 0xF7E4},
+        },
+    }
+
+
 def recover_g17_chip_info(image: bytes, arm_init_code: bytes) -> dict[str, object]:
     """Recover the DeviceTree chip identity copied into config +0xe90."""
 
@@ -6040,6 +6096,7 @@ def main() -> int:
         )
         root_allocation_sizes = recover_root_allocation_sizes(allocations)
         _address, base_init_code = symbol_code(driver, INIT_BASE_FIRMWARE_DATA)
+        _address, configure_code = symbol_code(driver, BASE_CONFIGURE_DEVICE)
         zero_initialized_allocations = recover_g17_zero_initialized_allocations(
             base_init_code
         )
@@ -6139,6 +6196,9 @@ def main() -> int:
         hardware_config["color_matrices"] = recover_g17_color_matrices(driver)
         hardware_config["fixed_constants"] = recover_g17_hardware_config_constants(
             driver, base_init_code, function
+        )
+        hardware_config["setup_constants"] = recover_g17_setup_config_constants(
+            configure_code, setup_code
         )
         hardware_config["chip_info"] = recover_g17_chip_info(driver, function)
         hardware_config["power_sample_period"] = recover_g17_power_sample_period(
