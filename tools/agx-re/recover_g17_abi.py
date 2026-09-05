@@ -486,6 +486,26 @@ SUBMIT_DATA_MASTER_CHANNELS = {
         2,
     ),
 }
+ARM_SUBMIT_DATA_MASTER_CHANNELS = {
+    "TA": (
+        "__ZN14AGXArmFirmware15submitTAChannelE"
+        "P10AGXChannelRK22_AGXChannelSubmitInfo_jjb",
+        SUBMIT_DATA_MASTER_CHANNELS["TA"][0],
+        0,
+    ),
+    "3D": (
+        "__ZN14AGXArmFirmware15submit3DChannelE"
+        "P10AGXChannelRK22_AGXChannelSubmitInfo_jjbb",
+        SUBMIT_DATA_MASTER_CHANNELS["3D"][0],
+        1,
+    ),
+    "CL": (
+        "__ZN14AGXArmFirmware15submitCLChannelE"
+        "P10AGXChannelRK22_AGXChannelSubmitInfo_jjb",
+        SUBMIT_DATA_MASTER_CHANNELS["CL"][0],
+        2,
+    ),
+}
 SUBMIT_DEVICE_CONTROL = (
     "__ZN11AGXFirmware19submitDeviceControlE"
     "P33AGFIAcceleratorDeviceControlEntryjPj"
@@ -9159,7 +9179,7 @@ def recover_firmware_config_reads(firmware: bytes) -> dict[str, object]:
     }
 
 
-def recover_accelerator_ring_bindings(
+def recover_device_control_ring_bindings(
     allocations: list[dict[str, int]], code: bytes
 ) -> list[dict[str, object]]:
     by_members = {
@@ -9184,14 +9204,18 @@ def recover_accelerator_ring_bindings(
     result = []
     for role, obj, state_cpu, state_gpu, entries_cpu, entries_gpu, shared in roles:
         if by_members.get((state_cpu, state_gpu)) != 0x30:
-            raise ValueError(f"role {role} accelerator state allocation is not 0x30 bytes")
+            raise ValueError(
+                f"role {role} device-control state allocation is not 0x30 bytes"
+            )
         if by_members.get((entries_cpu, entries_gpu)) != 0x4000:
-            raise ValueError(f"role {role} accelerator entries allocation is not 0x4000 bytes")
+            raise ValueError(
+                f"role {role} device-control entries allocation is not 0x4000 bytes"
+            )
         offsets = published.get(shared, set())
         expected = {0x180, 0x188, 0x190, 0x198}
         if not expected.issubset(offsets):
             raise ValueError(
-                f"role {role} accelerator addresses are not published through "
+                f"role {role} device-control addresses are not published through "
                 f"host member {shared:#x}: {sorted(offsets)}"
             )
         result.append(
@@ -9380,6 +9404,154 @@ def recover_data_master_submission_protocol(
         "serialized_by": "IOCommandGate",
         "usable_entries": 255,
         "full_condition": "((write_index + 1) & 0xff) == read_index",
+        "commands": commands,
+    }
+
+
+def recover_g17_data_master_ring_bindings(
+    allocations: list[dict[str, int]], init_code: bytes
+) -> dict[str, object]:
+    """Recover the 3 command-type x 4 priority data-master ring matrix.
+
+    These are distinct from the two role-local device-control rings at host
+    members 0xad8 and 0xc08. Each data-master object has a 0x28-byte host
+    stride and owns exact 0x30/0x1800-byte state/entry allocations. The host
+    publishes the twelve address records into the primary 0x79800-byte shared
+    region as four 0x60-byte priority records.
+    """
+
+    by_members = {
+        (item["host_cpu_member"], item["host_gpu_member"]): item["bytes"]
+        for item in allocations
+    }
+    command_bases = {"TA": 0x3B0, "3D": 0x450, "CL": 0x4F0}
+    bindings = []
+    for priority in range(4):
+        for command_type, (label, base) in enumerate(command_bases.items()):
+            host_object = base + priority * 0x28
+            state_pair = (host_object + 0x08, host_object + 0x10)
+            entries_pair = (host_object + 0x18, host_object + 0x20)
+            if by_members.get(state_pair) != 0x30:
+                raise ValueError(
+                    f"G17 {label} priority {priority} state allocation is not 0x30 bytes"
+                )
+            if by_members.get(entries_pair) != 0x1800:
+                raise ValueError(
+                    f"G17 {label} priority {priority} entry allocation is not 0x1800 bytes"
+                )
+            bindings.append(
+                {
+                    "priority": priority,
+                    "command": label,
+                    "command_type": command_type,
+                    "host_object_member": host_object,
+                    "host_state_cpu_member": state_pair[0],
+                    "host_state_gpu_member": state_pair[1],
+                    "host_entries_cpu_member": entries_pair[0],
+                    "host_entries_gpu_member": entries_pair[1],
+                    "state_bytes": 0x30,
+                    "entries_bytes": 0x1800,
+                    "primary_large_region_offset": priority * 0x60
+                    + command_type * 0x20,
+                }
+            )
+
+    # initFirmwareData first resets all four 0x28-byte objects in each type,
+    # then publishes read/CFI/write/entry addresses in 0x20-byte subrecords.
+    # Pin the loop extents and every first-priority store so a changed matrix
+    # cannot silently retain this derived layout.
+    require_instruction_words_at(
+        init_code,
+        "G17 data-master ring matrix",
+        {
+            0x524: 0x9100A2F7,  # next 0x28-byte ring object
+            0x528: 0xF10282FF,  # four objects, total 0xa0 bytes
+            0x530: 0xD2800016,  # publication priority/object offset
+            0x55C: 0x52800B17,  # first record store cursor 0x58
+            0x568: 0x8B160278,  # object = firmware + priority * 0x28
+            0x56C: 0x910EC315,  # TA object base 0x3b0
+            0x5DC: 0xF81A8100,  # TA read address -> record +0x00
+            0x64C: 0xF81B0100,  # TA CFI address -> record +0x08
+            0x6C0: 0xF81B8100,  # TA write address -> record +0x10
+            0x70C: 0xF81C0100,  # TA entries address -> record +0x18
+            0x780: 0xF81C8100,  # 3D read address -> record +0x20
+            0x7F0: 0xF81D0100,  # 3D CFI address -> record +0x28
+            0x864: 0xF81D8100,  # 3D write address -> record +0x30
+            0x8B0: 0xF81E0100,  # 3D entries address -> record +0x38
+            0x924: 0xF81E8100,  # CL read address -> record +0x40
+            0x994: 0xF81F0100,  # CL CFI address -> record +0x48
+            0xA08: 0xF81F8100,  # CL write address -> record +0x50
+            0xA54: 0xF9000100,  # CL entries address -> record +0x58
+            0xA58: 0x910182F7,  # next 0x60-byte priority record
+            0xA5C: 0x9100A2D6,  # next 0x28-byte object in each type
+            0xA60: 0xF10762FF,  # four records, total 0x180 bytes
+        },
+    )
+    return {
+        "priorities": 4,
+        "command_types": 3,
+        "host_object_stride": 0x28,
+        "address_record_bytes": 0x20,
+        "priority_record_bytes": 0x60,
+        "primary_large_region_offset": 0,
+        "primary_large_region_bytes": 0x180,
+        "bindings": bindings,
+    }
+
+
+def recover_g17_data_master_doorbells(image: bytes) -> dict[str, object]:
+    """Recover the work-doorbell message encoded by each ARM submit wrapper."""
+
+    symbols = macho_symbols(image)
+    commands = {}
+    for label, (wrapper, base, command_type) in ARM_SUBMIT_DATA_MASTER_CHANNELS.items():
+        if wrapper not in symbols or base not in symbols:
+            raise ValueError(f"Mach-O is missing G17 {label} submit wrapper")
+        address, code = symbol_code(image, wrapper)
+        if not any(
+            decode_bl_target(address + offset, word) == symbols[base]
+            for offset, word in words(code)
+        ):
+            raise ValueError(f"G17 {label} wrapper no longer calls the base submitter")
+
+        type_words = (
+            (0xD2E01069,)
+            if command_type == 0
+            else (0xD2800009 | (command_type << 5), 0xF2E01069)
+        )
+        require_instruction_sequence(
+            code,
+            f"G17 {label} work doorbell",
+            (
+                0x531E0A68,  # priority[2:0] -> message bits [4:2]
+                0xF94CEE80,  # primary role transport at host +0x19d8
+                *type_words,  # command type in message bits [1:0], type 0x83
+                0xF9400010,
+                0xAA0003F1,
+                0xF2F9B431,
+                0xDAC11A30,
+                0xD2811511,  # transport doorbell-send slot 0x8a8
+                0x8B110210,
+                0xF940020A,
+                0xAA1003E3,
+                0xAA090101,  # message = (0x83 << 48) | priority | type
+                0xAA0A03F0,
+                0x52800002,
+            ),
+        )
+        commands[label] = {
+            "command_type": command_type,
+            "low_bits": command_type,
+        }
+
+    return {
+        "message_type": 0x83,
+        "transport_host_member": 0x19D8,
+        "transport_role": 0,
+        "transport_send_vtable_slot": 0x8A8,
+        "priority_shift": 2,
+        "priority_bits": 3,
+        "formula": "(0x83 << 48) | (priority << 2) | command_type",
         "commands": commands,
     }
 
@@ -13484,7 +13656,7 @@ def main() -> int:
             base_init_code
         )
         role0_bootstrap_regions = recover_g17_role0_bootstrap_regions(base_init_code)
-        accelerator["bindings"] = recover_accelerator_ring_bindings(
+        accelerator["device_control_bindings"] = recover_device_control_ring_bindings(
             allocations, base_init_code
         )
         _address, reset_channel_code = symbol_code(driver, RESET_CHANNEL_STATE)
@@ -13497,6 +13669,12 @@ def main() -> int:
             driver, reset_channel_code
         )
         channels["data_master_types"] = recover_g17_channel_data_master_types(driver)
+        channels["data_master_rings"] = recover_g17_data_master_ring_bindings(
+            allocations, base_init_code
+        )
+        channels["data_master_doorbells"] = recover_g17_data_master_doorbells(
+            driver
+        )
         channels["identity"] = recover_g17_channel_identity(driver, iogpu)
         channels["scheduler_state"] = recover_g17_scheduler_state(driver)
         channels["queue_device_inputs"] = recover_g17_queue_device_inputs(

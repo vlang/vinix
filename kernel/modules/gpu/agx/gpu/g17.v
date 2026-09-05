@@ -23,6 +23,7 @@ const g17_pio_va_start = u64(0xfffffc2180000000)
 const g17_pio_va_end = u64(0xfffffc2181400000)
 const g17_work_command_pool_count = 4
 const g17_work_channel_count = 3
+const g17_work_priority_count = 4
 
 // A Vinix DRM queue owns at most one instance of each native Apple work
 // channel. The bit positions deliberately match _AGFIDataMasterType.
@@ -71,9 +72,11 @@ mut:
 	large_regions         [2]SharedBuffer
 	role0_regions         [5]SharedBuffer
 	role1_secondary       SharedBuffer
-	accelerator_state     [2]SharedBuffer
-	accelerator_entries   [2]SharedBuffer
-	accelerator_locks     [2]klock.Lock
+	device_control_state   [2]SharedBuffer
+	device_control_entries [2]SharedBuffer
+	data_master_state      [g17_work_priority_count][g17_work_channel_count]SharedBuffer
+	data_master_entries    [g17_work_priority_count][g17_work_channel_count]SharedBuffer
+	data_master_locks      [g17_work_priority_count][g17_work_channel_count]klock.Lock
 	auxiliary             [2][8]SharedBuffer
 	event_lock            klock.Lock
 	command_backings      [g17_work_command_pool_count]SharedBuffer
@@ -218,8 +221,8 @@ pub fn (resources &G17QueueResources) channel_state_address(command_type u32) ?u
 }
 
 // Serialize the cached-pointer producer with the matching uncached indices.
-// Doorbell and outer-ring publication remain separate until completion and
-// callback handling are implemented.
+// The still-gated command encoder publishes this before the matching outer
+// data-master entry, just as Apple's work-queue path does.
 pub fn (mut resources G17QueueResources) enqueue_channel_command(command_type u32,
 	command_gpu_address u64) bool {
 	if resources.released || command_type >= g17_work_channel_count
@@ -308,6 +311,12 @@ fn (mut mgr GpuManager) free_g17_firmware_graph(mut graph G17FirmwareGraph) {
 		}
 		mgr.free_shared_buffer(mut graph.command_backings[index])
 	}
+	for priority := g17_work_priority_count - 1; priority >= 0; priority-- {
+		for command_type := g17_work_channel_count - 1; command_type >= 0; command_type-- {
+			mgr.free_shared_buffer(mut graph.data_master_entries[priority][command_type])
+			mgr.free_shared_buffer(mut graph.data_master_state[priority][command_type])
+		}
+	}
 	for index := 4; index >= 0; index-- {
 		mgr.free_shared_buffer(mut graph.role0_regions[index])
 	}
@@ -315,8 +324,8 @@ fn (mut mgr GpuManager) free_g17_firmware_graph(mut graph G17FirmwareGraph) {
 		for index := fw.g17_auxiliary_ring_address_count - 1; index >= 0; index-- {
 			mgr.free_shared_buffer(mut graph.auxiliary[role][index])
 		}
-		mgr.free_shared_buffer(mut graph.accelerator_entries[role])
-		mgr.free_shared_buffer(mut graph.accelerator_state[role])
+		mgr.free_shared_buffer(mut graph.device_control_entries[role])
+		mgr.free_shared_buffer(mut graph.device_control_state[role])
 		mgr.free_shared_buffer(mut graph.large_regions[role])
 		mgr.free_shared_buffer(mut graph.small_shared[role])
 		mgr.free_shared_buffer(mut graph.firmware_shared[role])
@@ -394,10 +403,10 @@ fn (mut mgr GpuManager) allocate_g17_firmware_graph() ?&G17FirmwareGraph {
 		graph.large_regions[role] = mgr.alloc_shared_buffer(fw.g17_role_large_region_size) or {
 			return none
 		}
-		graph.accelerator_state[role] = mgr.alloc_shared_buffer(fw.g17_accelerator_ring_state_size) or {
+		graph.device_control_state[role] = mgr.alloc_shared_buffer(fw.g17_accelerator_ring_state_size) or {
 			return none
 		}
-		graph.accelerator_entries[role] = mgr.alloc_shared_buffer(fw.g17_accelerator_ring_entries_size) or {
+		graph.device_control_entries[role] = mgr.alloc_shared_buffer(fw.g17_device_control_entries_size) or {
 			return none
 		}
 		for index := 0; index < fw.g17_auxiliary_ring_address_count; index++ {
@@ -409,6 +418,16 @@ fn (mut mgr GpuManager) allocate_g17_firmware_graph() ?&G17FirmwareGraph {
 	for index := 0; index < 5; index++ {
 		size := role0_region_size(index) or { return none }
 		graph.role0_regions[index] = mgr.alloc_shared_buffer(size) or { return none }
+	}
+	for priority := 0; priority < g17_work_priority_count; priority++ {
+		for command_type := 0; command_type < g17_work_channel_count; command_type++ {
+			graph.data_master_state[priority][command_type] = mgr.alloc_shared_buffer(fw.g17_accelerator_ring_state_size) or {
+				return none
+			}
+			graph.data_master_entries[priority][command_type] = mgr.alloc_shared_buffer(fw.g17_data_master_entries_bytes) or {
+				return none
+			}
+		}
 	}
 
 	// Use Apple's recovered fallback capacity until a device-specific override
@@ -601,15 +620,15 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 		if !fw.initialize_g17_small_shared_data(graph.small_shared[role].cpu_address(), fw.g17_small_shared_data_size, 0) {
 			return false
 		}
-		if !fw.initialize_g17_accelerator_ring(graph.accelerator_state[role].cpu_address(), fw.g17_accelerator_ring_state_size, graph.accelerator_entries[role].cpu_address(), fw.g17_accelerator_ring_entries_size) {
+		if !fw.initialize_g17_accelerator_ring(graph.device_control_state[role].cpu_address(), fw.g17_accelerator_ring_state_size, graph.device_control_entries[role].cpu_address(), fw.g17_device_control_entries_size) {
 			return false
 		}
 
 		accelerator := fw.G17AcceleratorRingAddresses{
-			read_index_address: graph.accelerator_state[role].va
-			cfi_index_address: graph.accelerator_state[role].va + 0x10
-			write_index_address: graph.accelerator_state[role].va + 0x20
-			entries_address: graph.accelerator_entries[role].va
+			read_index_address: graph.device_control_state[role].va
+			cfi_index_address: graph.device_control_state[role].va + 0x10
+			write_index_address: graph.device_control_state[role].va + 0x20
+			entries_address: graph.device_control_entries[role].va
 		}
 		mut auxiliary := [8]u64{}
 		for index := 0; index < fw.g17_auxiliary_ring_address_count; index++ {
@@ -636,6 +655,28 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 		}
 		if !fw.initialize_g17_firmware_shared_data(graph.firmware_shared[role].cpu_address(), fw.g17_firmware_shared_data_size, bindings) {
 			return false
+		}
+	}
+	// Work submission uses a separate 3 x 4 data-master matrix in the primary
+	// large shared region. The role-local 0x4000-byte rings above carry device
+	// control commands and have an incompatible 0x40-byte entry format.
+	for priority := 0; priority < g17_work_priority_count; priority++ {
+		for command_type := 0; command_type < g17_work_channel_count; command_type++ {
+			state := &graph.data_master_state[priority][command_type]
+			entries := &graph.data_master_entries[priority][command_type]
+			if !fw.initialize_g17_accelerator_ring(state.cpu_address(), fw.g17_accelerator_ring_state_size,
+				entries.cpu_address(), fw.g17_data_master_entries_bytes) {
+				return false
+			}
+			if !fw.publish_g17_data_master_ring_addresses(graph.large_regions[0].cpu_address(),
+				graph.large_regions[0].size, u32(priority), u32(command_type), fw.G17AcceleratorRingAddresses{
+					read_index_address: state.va
+					cfi_index_address: state.va + 0x10
+					write_index_address: state.va + 0x20
+					entries_address: entries.va
+				}) {
+				return false
+			}
 		}
 	}
 	graph.platform_values_ready = true
@@ -841,28 +882,47 @@ fn (mut mgr GpuManager) wait_g17_ready() bool {
 	return false
 }
 
-// Serialize one host producer per role, matching Apple's IOCommandGate around
-// AGXAcceleratorRing::nextEntry. Doorbell delivery is deliberately separate:
-// its G17 kick-channel routing is still part of the guarded runtime ABI work.
-fn (mut graph G17FirmwareGraph) enqueue_data_master(role u32,
+// Serialize one producer per command type and queue priority, matching Apple's
+// IOCommandGate around AGXAcceleratorRing::nextEntry.
+fn (mut graph G17FirmwareGraph) enqueue_data_master(priority u32,
 	command fw.G17DataMasterCommand) bool {
-	if role >= 2 {
+	if priority >= fw.g17_data_master_priorities
+		|| command.command_type >= fw.g17_data_master_command_types {
 		return false
 	}
-	graph.accelerator_locks[role].acquire()
+	graph.data_master_locks[priority][command.command_type].acquire()
 	defer {
-		graph.accelerator_locks[role].release()
+		graph.data_master_locks[priority][command.command_type].release()
 	}
-	return fw.enqueue_g17_data_master_entry(graph.accelerator_state[role].cpu_address(), fw.g17_accelerator_ring_state_size, graph.accelerator_entries[role].cpu_address(), fw.g17_accelerator_ring_entries_size, command)
+	state := &graph.data_master_state[priority][command.command_type]
+	entries := &graph.data_master_entries[priority][command.command_type]
+	return fw.enqueue_g17_data_master_entry(state.cpu_address(), fw.g17_accelerator_ring_state_size,
+		entries.cpu_address(), fw.g17_data_master_entries_bytes, command)
 }
 
 // Stage a byte-accurate outer-ring entry once a G17 channel command has been
 // built. This is intentionally unavailable until the retained bootstrap graph
 // exists, and it does not imply that the still-gated firmware can be booted.
-pub fn (mut mgr GpuManager) enqueue_g17_data_master(role u32,
+pub fn (mut mgr GpuManager) enqueue_g17_data_master(priority u32,
 	command fw.G17DataMasterCommand) bool {
 	if mgr.g17_graph == unsafe { nil } {
 		return false
 	}
-	return mgr.g17_graph.enqueue_data_master(role, command)
+	return mgr.g17_graph.enqueue_data_master(priority, command)
+}
+
+// Publish a prepared outer work entry and deliver its recovered 0x83
+// doorbell through the primary transport. Once the ring entry is visible the
+// submission is accepted; a transient mailbox failure may delay it but must
+// not make callers retry and duplicate the command.
+pub fn (mut mgr GpuManager) submit_g17_data_master(priority u32,
+	command fw.G17DataMasterCommand) bool {
+	channel := fw.g17_data_master_doorbell_channel(priority, command.command_type) or {
+		return false
+	}
+	if !mgr.enqueue_g17_data_master(priority, command) {
+		return false
+	}
+	_ = mgr.send_doorbell(channel)
+	return true
 }

@@ -1819,6 +1819,112 @@ class RecoverG17AbiTests(unittest.TestCase):
                 encode(0x52800042), 1
             )
 
+    def test_recovers_g17_data_master_ring_matrix(self) -> None:
+        allocations = []
+        for base in (0x3B0, 0x450, 0x4F0):
+            for priority in range(4):
+                host = base + priority * 0x28
+                allocations.extend(
+                    (
+                        {
+                            "host_cpu_member": host + 0x08,
+                            "host_gpu_member": host + 0x10,
+                            "bytes": 0x30,
+                        },
+                        {
+                            "host_cpu_member": host + 0x18,
+                            "host_gpu_member": host + 0x20,
+                            "bytes": 0x1800,
+                        },
+                    )
+                )
+        code = bytearray(0xA64)
+        for offset, word in {
+            0x524: 0x9100A2F7,
+            0x528: 0xF10282FF,
+            0x530: 0xD2800016,
+            0x55C: 0x52800B17,
+            0x568: 0x8B160278,
+            0x56C: 0x910EC315,
+            0x5DC: 0xF81A8100,
+            0x64C: 0xF81B0100,
+            0x6C0: 0xF81B8100,
+            0x70C: 0xF81C0100,
+            0x780: 0xF81C8100,
+            0x7F0: 0xF81D0100,
+            0x864: 0xF81D8100,
+            0x8B0: 0xF81E0100,
+            0x924: 0xF81E8100,
+            0x994: 0xF81F0100,
+            0xA08: 0xF81F8100,
+            0xA54: 0xF9000100,
+            0xA58: 0x910182F7,
+            0xA5C: 0x9100A2D6,
+            0xA60: 0xF10762FF,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+        recovered = recover_g17_abi.recover_g17_data_master_ring_bindings(
+            allocations, bytes(code)
+        )
+        self.assertEqual(recovered["priorities"], 4)
+        self.assertEqual(recovered["primary_large_region_bytes"], 0x180)
+        self.assertEqual(len(recovered["bindings"]), 12)
+        self.assertEqual(
+            recovered["bindings"][-1]["primary_large_region_offset"], 0x160
+        )
+
+    def test_rejects_wrong_g17_data_master_ring_backing(self) -> None:
+        with self.assertRaisesRegex(ValueError, "state allocation"):
+            recover_g17_abi.recover_g17_data_master_ring_bindings([], b"")
+
+    def test_recovers_g17_data_master_doorbells(self) -> None:
+        symbols = {}
+        functions = {}
+        for index, (_label, (wrapper, base, command_type)) in enumerate(
+            recover_g17_abi.ARM_SUBMIT_DATA_MASTER_CHANNELS.items()
+        ):
+            wrapper_address = 0x100000 + index * 0x1000
+            base_address = 0x200000 + index * 0x1000
+            symbols[wrapper] = wrapper_address
+            symbols[base] = base_address
+            type_words = (
+                (0xD2E01069,)
+                if command_type == 0
+                else (0xD2800009 | (command_type << 5), 0xF2E01069)
+            )
+            functions[wrapper] = (
+                wrapper_address,
+                encode(
+                    bl(wrapper_address, base_address),
+                    0x531E0A68,
+                    0xF94CEE80,
+                    *type_words,
+                    0xF9400010,
+                    0xAA0003F1,
+                    0xF2F9B431,
+                    0xDAC11A30,
+                    0xD2811511,
+                    0x8B110210,
+                    0xF940020A,
+                    0xAA1003E3,
+                    0xAA090101,
+                    0xAA0A03F0,
+                    0x52800002,
+                ),
+            )
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: functions[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_data_master_doorbells(b"")
+        self.assertEqual(recovered["transport_role"], 0)
+        self.assertEqual(recovered["priority_shift"], 2)
+        self.assertEqual(recovered["commands"]["CL"]["low_bits"], 2)
+
     def test_recovers_g17_dual_role_boot_transport(self) -> None:
         notify = bytearray(0x134)
         receive = bytearray(0xF0)
@@ -7088,7 +7194,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         ):
             recover_g17_abi.recover_g17_pio_uat_mapping(bytes(modified))
 
-    def test_recovers_accelerator_ring_bindings(self) -> None:
+    def test_recovers_device_control_ring_bindings(self) -> None:
         allocations = [
             {"host_cpu_member": 0xAE0, "host_gpu_member": 0xAE8, "bytes": 0x30},
             {"host_cpu_member": 0xAF0, "host_gpu_member": 0xAF8, "bytes": 0x4000},
@@ -7108,14 +7214,16 @@ class RecoverG17AbiTests(unittest.TestCase):
                 (),
             )
         )
-        bindings = recover_g17_abi.recover_accelerator_ring_bindings(allocations, code)
+        bindings = recover_g17_abi.recover_device_control_ring_bindings(
+            allocations, code
+        )
         self.assertEqual(bindings[0]["host_object_member"], 0xAD8)
         self.assertEqual(bindings[1]["host_entries_gpu_member"], 0xC28)
         self.assertEqual(
             bindings[0]["firmware_shared_offsets"]["entries_address"], 0x1B8
         )
 
-    def test_rejects_incomplete_accelerator_ring_publication(self) -> None:
+    def test_rejects_incomplete_device_control_ring_publication(self) -> None:
         allocations = [
             {"host_cpu_member": 0xAE0, "host_gpu_member": 0xAE8, "bytes": 0x30},
             {"host_cpu_member": 0xAF0, "host_gpu_member": 0xAF8, "bytes": 0x4000},
@@ -7126,8 +7234,8 @@ class RecoverG17AbiTests(unittest.TestCase):
             0xF9400000 | (0xAA0 // 8) << 10 | 19 << 5 | 8,
             str_x(0, 8, 0x180),
         )
-        with self.assertRaisesRegex(ValueError, "accelerator addresses"):
-            recover_g17_abi.recover_accelerator_ring_bindings(allocations, code)
+        with self.assertRaisesRegex(ValueError, "device-control addresses"):
+            recover_g17_abi.recover_device_control_ring_bindings(allocations, code)
 
 
 if __name__ == "__main__":

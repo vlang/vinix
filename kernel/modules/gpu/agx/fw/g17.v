@@ -35,7 +35,7 @@ pub const g17_secondary_region_offset = u64(0xb8)
 pub const g17_secondary_aux_offset = u64(0xc0)
 pub const g17_accelerator_ring_entries = u32(256)
 pub const g17_accelerator_ring_state_size = u64(0x30)
-pub const g17_accelerator_ring_entries_size = u64(0x4000)
+pub const g17_device_control_entries_size = u64(0x4000)
 pub const g17_accelerator_ring_addresses_offset = u64(0x1a0)
 pub const g17_accelerator_ring_addresses_size = u64(0x20)
 pub const g17_auxiliary_ring_addresses_offset = u64(0x1c0)
@@ -53,6 +53,11 @@ pub const g17_firmware_event_flag_limit = u16(0x18)
 pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_data_master_entries_bytes = u64(0x1800)
+pub const g17_data_master_priorities = u32(4)
+pub const g17_data_master_command_types = u32(3)
+pub const g17_data_master_address_record_size = u64(0x20)
+pub const g17_data_master_priority_record_size = u64(0x60)
+pub const g17_data_master_address_table_size = u64(0x180)
 pub const g17_device_control_entry_size = u64(0x40)
 pub const g17_accelerator_command_ta = u32(0)
 pub const g17_accelerator_command_3d = u32(1)
@@ -2267,8 +2272,9 @@ pub fn validate_g17_channel_layouts() bool {
 		&& sizeof(G17ParsedRenderCommand) == g17_render_kernel_command_size
 }
 
-// G17 accelerator rings use three independently cache-line-spaced indices.
-// All indices are range-checked against 256 entries by the Apple host driver.
+// Both G17 device-control and data-master rings use three independently
+// cache-line-spaced indices. All indices are range-checked against 256 entries
+// by the Apple host driver.
 @[packed]
 pub struct G17AcceleratorRingState {
 pub mut:
@@ -2281,7 +2287,7 @@ pub mut:
 }
 
 // Callback interrupt 4 drains one of these role-local firmware event rings.
-// It uses the same sparse 0x30-byte index layout as the accelerator rings,
+// It uses the same sparse 0x30-byte index layout as the command rings,
 // but its entries are fixed 0x48-byte AGFIFirmwareEventRingEntry records.
 @[packed]
 pub struct G17FirmwareEventRingEntry {
@@ -2372,6 +2378,28 @@ pub mut:
 	cfi_index_address   u64
 	write_index_address u64
 	entries_address     u64
+}
+
+// The primary 0x79800-byte shared region begins with four priority records.
+// Each record contains TA, 3D, then CL ring addresses. The two 0x4000-byte
+// role-local rings in G17FirmwareSharedData are device-control rings and must
+// never be used for these 0x18-byte data-master entries.
+pub fn publish_g17_data_master_ring_addresses(buffer voidptr, size u64,
+	priority u32, command_type u32, addresses G17AcceleratorRingAddresses) bool {
+	if buffer == unsafe { nil } || priority >= g17_data_master_priorities
+		|| !valid_g17_accelerator_command_type(command_type)
+		|| size < g17_data_master_address_table_size
+		|| addresses.read_index_address == 0 || addresses.cfi_index_address == 0
+		|| addresses.write_index_address == 0 || addresses.entries_address == 0 {
+		return false
+	}
+	offset := u64(priority) * g17_data_master_priority_record_size
+		+ u64(command_type) * g17_data_master_address_record_size
+	unsafe {
+		C.memcpy(voidptr(u64(buffer) + offset), &addresses,
+			g17_data_master_address_record_size)
+	}
+	return true
 }
 
 // Complete set of allocation addresses whose placements in the 0x4c0-byte
@@ -2515,6 +2543,16 @@ fn valid_g17_accelerator_command_type(command_type u32) bool {
 		|| command_type == g17_accelerator_command_cl
 }
 
+// AGXArmFirmware sends work doorbells through the primary role transport.
+// Bits 1:0 select TA/3D/CL and bits 4:2 select one of four queue priorities.
+pub fn g17_data_master_doorbell_channel(priority u32, command_type u32) ?u32 {
+	if priority >= g17_data_master_priorities
+		|| !valid_g17_accelerator_command_type(command_type) {
+		return none
+	}
+	return (priority << 2) | command_type
+}
+
 // Reproduce AGXArmFirmware::encodeAcceleratorRingCommand. Apple sources the
 // address, ID, and flag from AGXChannel +0x80/+0x18/+0x3c; the caller passes
 // those already-decoded values here. Clearing first is a Vinix invariant that
@@ -2537,9 +2575,10 @@ pub fn encode_g17_data_master_entry(entry &G17DataMasterEntry,
 	return true
 }
 
-// Reset one firmware-facing accelerator ring. The backing allocation is one
-// 16 KiB GPU page, while its 256 0x18-byte entries occupy the first 0x1800
-// bytes. Clearing the complete allocation also establishes reserved_000 == 0.
+// Reset one firmware-facing command ring. Data-master entry storage is exactly
+// 0x1800 bytes; device-control rings pass their larger 0x4000-byte storage.
+// Clearing the complete allocation also establishes reserved_000 == 0 for
+// every data-master entry.
 pub fn initialize_g17_accelerator_ring(state_buffer voidptr, state_size u64,
 	entries_buffer voidptr, entries_size u64) bool {
 	if state_buffer == unsafe { nil } || state_size != g17_accelerator_ring_state_size
@@ -2599,5 +2638,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
 }
