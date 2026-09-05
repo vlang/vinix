@@ -1412,6 +1412,43 @@ pub const g17_command_final_frg_kick_size = u32(0x40)
 pub const g17_command_ksm_add_kicks_size = u32(0x40)
 pub const g17_command_ksm_config_update_size = u32(0xc0)
 pub const g17_command_ksm_kick_queue_size = u32(0x40)
+pub const g17_channel_command_known_prefix_size = u64(0x6a)
+
+// Common packed prefix written by AGXChannel::submitNopUnprepared after a
+// command slot has been selected. Only these four host-written fields are
+// named. In particular, callers must preserve every opaque byte because the
+// pool backing constructor may have installed command-specific templates.
+@[packed]
+pub struct G17ChannelCommandKnownPrefix {
+pub mut:
+	opaque_000       [0x1a]u8
+	control_01a      u32
+	opaque_01e       [0x04]u8
+	data_master_type u32
+	opaque_026       [0x0c]u8
+	control_032      u32
+	opaque_036       [0x2c]u8
+	control_062      u64
+}
+
+// Apply only the recovered common fields to an existing pool command. This
+// intentionally does not clear the command or any opaque byte.
+pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes u64,
+	data_master_type u32) bool {
+	if command == unsafe { nil } || command_bytes < g17_channel_command_known_prefix_size
+		|| data_master_type > g17_accelerator_command_cl {
+		return false
+	}
+
+	unsafe {
+		mut prefix := &G17ChannelCommandKnownPrefix(command)
+		prefix.control_01a = 1
+		prefix.data_master_type = data_master_type
+		prefix.control_032 = 0
+		prefix.control_062 = 0
+	}
+	return true
+}
 
 // Register-list layout inside the 3D channel command.
 // generateRegisterListFor3D runs four passes with a 0x720 stride. Pass i keeps
@@ -1749,6 +1786,7 @@ pub fn validate_g17_channel_layouts() bool {
 	return sizeof(G17ChannelState) == g17_channel_state_size
 		&& sizeof(G17ChannelControl) == g17_channel_control_header_size
 		&& sizeof(G17CachedCommandPointer) == g17_cached_command_pointer_size
+		&& sizeof(G17ChannelCommandKnownPrefix) == g17_channel_command_known_prefix_size
 }
 
 // G17 accelerator rings use three independently cache-line-spaced indices.

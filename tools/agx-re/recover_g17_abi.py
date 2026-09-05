@@ -452,6 +452,10 @@ RESET_CHANNEL_STATE = "__ZN10AGXChannel17resetChannelStateEv"
 WRITE_CHANNEL_COMMAND_POINTER = (
     "__ZN10AGXChannel26writeChannelCommandPointerEyP22AGFIChannelCommandTypey"
 )
+SUBMIT_NOP_UNPREPARED = (
+    "__ZN10AGXChannel19submitNopUnpreparedEP22IOGPUCommandDescriptor"
+    "22AGFIChannelCommandType19_AGFIDataMasterType"
+)
 CHANNEL_INIT = (
     "__ZN10AGXChannel4initEPK15AGXCommandQueueP12AGXWorkQueueiiy19_AGFIDataMasterType"
 )
@@ -8178,6 +8182,53 @@ def recover_g17_command_stream_format(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_channel_command_common_fields(image: bytes) -> dict[str, object]:
+    """Recover the common host-written fields in every channel command.
+
+    submitNopUnprepared selects the command pool by AGFIChannelCommandType,
+    then writes the same four packed fields before it publishes the command.
+    The final qword ends at 0x6a, which is inside even the smallest 0x80-byte
+    channel command.  Other bytes are deliberately left opaque: pool backing
+    construction may have installed per-command templates there.
+    """
+
+    symbols = macho_symbols(image)
+    if SUBMIT_NOP_UNPREPARED not in symbols:
+        raise ValueError(f"Mach-O is missing {SUBMIT_NOP_UNPREPARED}")
+
+    _address, code = symbol_code(image, SUBMIT_NOP_UNPREPARED)
+    require_instruction_words_at(
+        code,
+        "G17 common channel-command fields",
+        {
+            0x024: 0xAA0303F6,  # data-master type argument preserved in w22
+            0x218: 0xB80222F6,  # -> packed command +0x22
+            0x21C: 0x52800028,  # literal one
+            0x220: 0xB801A2E8,  # -> packed command +0x1a
+            0x224: 0xB80322FF,  # zero -> packed command +0x32
+            0x228: 0xF80622FF,  # zero -> packed command +0x62
+        },
+    )
+
+    fields = {
+        "control_01a": {"offset": 0x1A, "bytes": 4, "value": 1},
+        "data_master_type": {"offset": 0x22, "bytes": 4, "source_argument": 3},
+        "control_032": {"offset": 0x32, "bytes": 4, "value": 0},
+        "control_062": {"offset": 0x62, "bytes": 8, "value": 0},
+    }
+    end = max(field["offset"] + field["bytes"] for field in fields.values())
+    if end != 0x6A or end > 0x80:
+        raise ValueError(f"unexpected common command prefix extent {end:#x}")
+
+    return {
+        "known_prefix_bytes": end,
+        "smallest_command_bytes": 0x80,
+        "preserve_other_bytes": True,
+        "fields": fields,
+        "producer": SUBMIT_NOP_UNPREPARED,
+    }
+
+
 def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
     """Recover the selector encoding and the set each work producer emits.
 
@@ -9244,6 +9295,9 @@ def main() -> int:
             driver, iogpu
         )
         channels["command_pools"] = recover_g17_channel_command_pools(driver)
+        channels["command_common_fields"] = (
+            recover_g17_channel_command_common_fields(driver)
+        )
         channels["command_3d_register_lists"] = (
             recover_g17_3d_register_lists(driver)
         )

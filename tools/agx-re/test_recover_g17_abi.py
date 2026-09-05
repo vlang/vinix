@@ -4332,6 +4332,51 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["payload_length_offset"], 0x9C)
         self.assertEqual(recovered["terminator_marker"], 0x100)
 
+    def test_recovers_g17_channel_command_common_fields(self) -> None:
+        code = bytearray(0x300)
+        for offset, word in {
+            0x024: 0xAA0303F6,
+            0x218: 0xB80222F6,
+            0x21C: 0x52800028,
+            0x220: 0xB801A2E8,
+            0x224: 0xB80322FF,
+            0x228: 0xF80622FF,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.SUBMIT_NOP_UNPREPARED: 0x910000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x910000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_command_common_fields(b"")
+
+        self.assertEqual(recovered["known_prefix_bytes"], 0x6A)
+        self.assertTrue(recovered["preserve_other_bytes"])
+        self.assertEqual(recovered["fields"]["control_01a"]["value"], 1)
+        self.assertEqual(recovered["fields"]["data_master_type"]["offset"], 0x22)
+        self.assertEqual(recovered["fields"]["control_062"]["bytes"], 8)
+
+    def test_rejects_changed_g17_channel_command_common_field(self) -> None:
+        code = bytearray(0x300)
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.SUBMIT_NOP_UNPREPARED: 0x910000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0x910000, bytes(code))
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_channel_command_common_fields(b"")
+
     def test_recovers_g17_register_selectors(self) -> None:
         def producer(literals, emissions: int) -> bytes:
             code = bytearray()

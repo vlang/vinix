@@ -122,6 +122,8 @@ Apple's rounding points without emitting kernel floating-point instructions.
 
 The channel-command pools are recovered: the slot-ring block layout, the
 allocation scan, and the exact byte size of all twelve named command types.
+The four common packed fields written by `submitNopUnprepared` are also pinned
+and have a template-preserving Vinix encoder.
 The 3D command's register-list layout is recovered: four passes on a 0x720
 stride, 0x700 stream bytes each, the 12-byte entry format, and the descriptor
 summary array. The selector encoding is recovered and validated, but the selector sets are
