@@ -5972,6 +5972,57 @@ def recover_g17_linear_power_transfer_tables(
     }
 
 
+def stores_covering(code: bytes, base: int, target: int) -> list[int]:
+    """Offsets of any store through `base` whose bytes cover `target`.
+
+    Used to prove a struct byte is never written, so it keeps whatever cleared
+    it. Widths matter: a byte can be covered by a wider store at a lower
+    offset, or by either half of a store pair.
+    """
+
+    hits: list[int] = []
+    unscaled_widths = {
+        0x38000000: 1,
+        0x78000000: 2,
+        0xB8000000: 4,
+        0xF8000000: 8,
+        0xBC000000: 4,
+        0xFC000000: 8,
+        0x3C800000: 16,
+    }
+    pair_widths = {
+        0x29000000: 4,
+        0xA9000000: 8,
+        0x2D000000: 4,
+        0x6D000000: 8,
+        0xAD000000: 16,
+    }
+    for offset, word in words(code):
+        store = decode_str_unsigned(word)
+        if store is not None:
+            _source, store_base, immediate, width = store
+            if store_base == base and immediate <= target < immediate + width:
+                hits.append(offset)
+            continue
+        width = unscaled_widths.get(word & 0xFFE00C00)
+        if width is not None and (word >> 5) & 0x1F == base:
+            immediate = (word >> 12) & 0x1FF
+            if immediate & 0x100:
+                immediate -= 0x200
+            if immediate <= target < immediate + width:
+                hits.append(offset)
+            continue
+        width = pair_widths.get(word & 0xFFC00000)
+        if width is not None and (word >> 5) & 0x1F == base:
+            immediate = (word >> 15) & 0x7F
+            if immediate & 0x40:
+                immediate -= 0x80
+            immediate *= width
+            if immediate <= target < immediate + width * 2:
+                hits.append(offset)
+    return hits
+
+
 def recover_g17_perf_state_map_block(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -6018,49 +6069,6 @@ def recover_g17_perf_state_map_block(
     # getProbeScore clears the complete temporary AGXGPUCoreConfig before the
     # selected readChipInfo chain. Neither checked producer writes byte +0x85,
     # so the later TBZ always selects the fixed fallback on G17C.
-    def stores_covering(code: bytes, base: int, target: int) -> list[int]:
-        hits: list[int] = []
-        unscaled_widths = {
-            0x38000000: 1,
-            0x78000000: 2,
-            0xB8000000: 4,
-            0xF8000000: 8,
-            0xBC000000: 4,
-            0xFC000000: 8,
-            0x3C800000: 16,
-        }
-        pair_widths = {
-            0x29000000: 4,
-            0xA9000000: 8,
-            0x2D000000: 4,
-            0x6D000000: 8,
-            0xAD000000: 16,
-        }
-        for offset, word in words(code):
-            store = decode_str_unsigned(word)
-            if store is not None:
-                _source, store_base, immediate, width = store
-                if store_base == base and immediate <= target < immediate + width:
-                    hits.append(offset)
-                continue
-            width = unscaled_widths.get(word & 0xFFE00C00)
-            if width is not None and (word >> 5) & 0x1F == base:
-                immediate = (word >> 12) & 0x1FF
-                if immediate & 0x100:
-                    immediate -= 0x200
-                if immediate <= target < immediate + width:
-                    hits.append(offset)
-                continue
-            width = pair_widths.get(word & 0xFFC00000)
-            if width is not None and (word >> 5) & 0x1F == base:
-                immediate = (word >> 15) & 0x7F
-                if immediate & 0x40:
-                    immediate -= 0x80
-                immediate *= width
-                if immediate <= target < immediate + width * 2:
-                    hits.append(offset)
-        return hits
-
     for label, code in (("PI_300", pi_code), ("G17", g17_code)):
         if hits := stores_covering(code, 19, 0x85):
             raise ValueError(
@@ -7079,6 +7087,48 @@ def config_pointer_stores(
     return found
 
 
+def recover_g17_core_mask_relay(image: bytes) -> dict[str, object]:
+    """Show the accelerator's core-mask pair is the cleared chip-info head.
+
+    getProbeScore builds the chip-info record on its own stack at sp+0x10 and
+    copies it to accelerator +0x480 with a uniform +0x480 delta, so accelerator
+    +0x480 and +0x488 are chip-info +0x00 and +0x08.
+    """
+
+    symbols = macho_symbols(image)
+    required = (FAMILY_GET_PROBE_SCORE, PI300_READ_CHIP_INFO, G17_READ_CHIP_INFO)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing chip-info relay symbols: {missing}")
+
+    _address, probe_code = symbol_code(image, FAMILY_GET_PROBE_SCORE)
+    require_instruction_words_at(
+        probe_code,
+        "G17 chip-info core-mask relay",
+        {
+            0x068: 0x910043F5,  # add x21, sp, #0x10 -- the record itself
+            0xC14: 0xAD4087E0,  # ldp q0, q1, [sp, #0x10] -- its first 0x20 bytes
+            0xC18: 0x3D812260,  # -> accelerator +0x480
+            0xC1C: 0x3D812661,  # -> accelerator +0x490
+        },
+    )
+
+    writers = []
+    for label, name in (("PI_300", PI300_READ_CHIP_INFO), ("G17", G17_READ_CHIP_INFO)):
+        _reader_address, reader_code = symbol_code(image, name)
+        for target in (0x00, 0x08):
+            if hits := stores_covering(reader_code, 19, target):
+                writers.append({"reader": label, "byte": target, "site": hits[0]})
+
+    return {
+        "record_delta": 0x480,
+        "accelerator_members": [0x480, 0x488],
+        "chip_info_bytes": [0x00, 0x08],
+        "written": bool(writers),
+        "writers": writers,
+    }
+
+
 def recover_g17_late_controls(image: bytes) -> dict[str, object]:
     """Recover the statically determined part of the late-control block.
 
@@ -7129,8 +7179,17 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
     if literal is None:
         raise ValueError("late-control literal is no longer a direct load")
 
+    # +0x2560 copies the accelerator's core-mask pair, but only when either
+    # half is nonzero. getProbeScore stages the chip-info record at sp+0x10 and
+    # relays it to accelerator +0x480 one-for-one, so those halves are chip-info
+    # +0x00 and +0x08 -- and neither selected reader writes them, so the guard
+    # never passes and the field keeps the zero the config was cleared to.
+    core_mask = recover_g17_core_mask_relay(image)
+    if core_mask["written"]:
+        raise ValueError("G17 chip-info core-mask pair is no longer left clear")
+
     fixed = {store["offset"]: 0 for store in stores if store["zero_source"]}
-    fixed.update({0x2578: 1, 0x25A0: 1, 0x2600: 0, 0x26F0: 1})
+    fixed.update({0x2578: 1, 0x25A0: 1, 0x2600: 0, 0x26F0: 1, 0x2560: 0})
     fixed.update(feature_values)
     undetermined = [offset for offset in offsets if offset not in fixed]
 
@@ -7141,7 +7200,8 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         "feature_mask": G17_FEATURE_MASK,
         "feature_bit_fields": feature_fields,
         "fixed": dict(sorted(fixed.items())),
-        "wide_fixed": {0x2600: 8, 0x26F0: 8},
+        "wide_fixed": {0x2560: 16, 0x2600: 8, 0x26F0: 8},
+        "core_mask_relay": core_mask,
         "runtime_dependent": undetermined,
         "complete": False,
     }

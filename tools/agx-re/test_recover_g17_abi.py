@@ -3633,11 +3633,27 @@ class RecoverG17AbiTests(unittest.TestCase):
             self.assertEqual(recovered["fixed"][offset], 0)
         for offset in (0x258C, 0x2706, 0x270A, 0x2600):
             self.assertEqual(recovered["fixed"][offset], 0)
+        # +0x2560 only copies the core-mask pair when a half is nonzero, and
+        # those halves are chip-info bytes no G17C reader writes.
+        self.assertEqual(recovered["fixed"][0x2560], 0)
+        self.assertFalse(recovered["core_mask_relay"]["written"])
+        self.assertEqual(recovered["core_mask_relay"]["record_delta"], 0x480)
         self.assertEqual(
             len(recovered["fixed"]) + len(recovered["runtime_dependent"]),
             recovered["written_offsets"],
         )
         self.assertFalse(recovered["complete"])
+
+    def test_stores_covering_spans_wide_and_paired_stores(self) -> None:
+        # A byte is covered by a wider store at a lower offset, and by the
+        # second half of a pair; both must count as written.
+        wide = struct.pack("<I", 0x3D800260)  # str q0, [x19]
+        self.assertEqual(recover_g17_abi.stores_covering(wide, 19, 0x0C), [0])
+        pair = struct.pack("<I", 0xA9008260)  # stp x0, x0, [x19, #8]
+        self.assertEqual(recover_g17_abi.stores_covering(pair, 19, 0x10), [0])
+        # A store through a different base must not count.
+        other = struct.pack("<I", 0x3D8002A0)  # str q0, [x21]
+        self.assertEqual(recover_g17_abi.stores_covering(other, 19, 0x0C), [])
 
     def test_config_pointer_stores_ignores_foreign_bases(self) -> None:
         # A store at the same offset through a register that never held the

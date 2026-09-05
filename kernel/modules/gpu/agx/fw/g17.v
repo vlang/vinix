@@ -1079,9 +1079,9 @@ pub const g17_late_controls_offset = u64(0x2540)
 pub const g17_late_controls_size = u64(0x1d0)
 
 // The statically determined part of the late-control block. Apple's ARM
-// producer writes 36 fields into config +0x2540..+0x270f; these 21 are fixed
+// producer writes 36 fields into config +0x2540..+0x270f; these 22 are fixed
 // for G17, including four tests of the fixed feature mask and one more field
-// derived from it, all of which come out zero. The other fifteen depend on
+// derived from it, all of which come out zero. The other fourteen depend on
 // run-time inputs and stay zero here, so the block is not complete.
 fn populate_g17_late_controls(mut config G17HardwareConfig) {
 	fixed_u32 := [
@@ -1116,6 +1116,10 @@ fn populate_g17_late_controls(mut config G17HardwareConfig) {
 			mut wide := &u64(base + offset - g17_late_controls_offset)
 			*wide = 0
 		}
+		// +0x2560 copies the accelerator core-mask pair, but only when either
+		// half is nonzero. Those halves are the chip-info record's first two
+		// words, which no selected G17C reader writes, so the copy never runs.
+		C.memset(voidptr(base + u64(0x2560) - g17_late_controls_offset), 0, 16)
 		mut one := &u64(base + u64(0x26f0) - g17_late_controls_offset)
 		*one = 1
 	}
