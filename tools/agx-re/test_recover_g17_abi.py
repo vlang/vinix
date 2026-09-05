@@ -2266,6 +2266,7 @@ class RecoverG17AbiTests(unittest.TestCase):
     ) -> dict[str, object]:
         role_address = 0x100000
         role = bytearray(0xD00)
+        flist_meta_class_target = 0x210000
         for offset, word in {
             0x120: 0xB94053E8,
             0x124: 0x35009B88,
@@ -2351,6 +2352,61 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x730: 0xAA1903E1,
             0x734: bl(role_address + 0x734, process_remove_call_target),
             0x738: 0xB4FFCC36,
+            0x2F4: 0xB94053E8,
+            0x2F8: 0x71003D1F,
+            0x300: 0xB94057F8,
+            0x304: 0x7104031F,
+            0x30C: 0xF9414E7B,
+            0x310: 0x91404F77,
+            0x314: 0xF942DEFA,
+            0x320: 0xB945C2E8,
+            0x32C: 0xF942E6E8,
+            0x624: 0xD503249F,
+            0x628: 0xB94053E8,
+            0x62C: 0x7100351F,
+            0x634: 0xB9405BE8,
+            0x638: 0x7104011F,
+            0x640: 0xF845C3E8,
+            0x644: 0xB4006E88,
+            0x648: 0xF84643E8,
+            0x64C: 0xB4006E48,
+            0x650: 0xB94057F6,
+            0x668: 0xD2815611,
+            0x698: 0xF846C3F9,
+            0x69C: 0xB94077F6,
+            0x6A0: 0x294AEBFB,
+            0x768: 0xAA1703E0,
+            0x76C: adrp(role_address + 0x76C, flist_meta_class_target, 1),
+            0x770: add_immediate(1, 1, flist_meta_class_target & 0xFFF),
+            0x778: 0xB4002D40,
+            0x780: 0xF9402800,
+            0x794: 0xD2803011,
+            0x7A0: 0xAA1B03E1,
+            0x7A4: 0xAA1A03E2,
+            0x7A8: 0xAA1903E3,
+            0x7AC: 0xAA1603E4,
+            0x7B4: 0xD73F0910,
+            0x810: 0xAA1603E0,
+            0x814: adrp(role_address + 0x814, flist_meta_class_target, 1),
+            0x818: add_immediate(1, 1, flist_meta_class_target & 0xFFF),
+            0x820: 0xB4001BE0,
+            0x8CC: 0xB9401328,
+            0x8D0: 0x7104011F,
+            0x908: 0xB9408329,
+            0x90C: 0xB940EB28,
+            0x924: 0xB9008328,
+            0x938: 0xD2822411,
+            0x944: 0xD102C3A2,
+            0x94C: 0xAA1903E1,
+            0x968: 0xD102C3A8,
+            0x96C: 0xF803811F,
+            0x970: 0x6F00E400,
+            0x974: 0x3C828100,
+            0x978: 0x3C818100,
+            0x97C: 0x3C808100,
+            0x980: 0x52800428,
+            0x984: 0x292A63A8,
+            0xA38: 0x94000329,
             0xAF0: 0xB94053E8,
             0xAF4: 0x7100191F,
             0xAFC: 0xB94057F6,
@@ -2385,7 +2441,9 @@ class RecoverG17AbiTests(unittest.TestCase):
         dispatch_offsets[8] = 0x180
         dispatch_offsets[10] = 0x430
         dispatch_offsets[12] = 0x5E4
+        dispatch_offsets[13] = 0x514
         dispatch_offsets[14] = 0x4C
+        dispatch_offsets[15] = 0x1E0
         for event_type in (2, 3, 5, 11):
             dispatch_offsets[event_type] = -0x54
         controller_target = 0x120000
@@ -2397,6 +2455,8 @@ class RecoverG17AbiTests(unittest.TestCase):
         physical_grow_target = 0x1D0000
         virtual_grow_target = 0x1E0000
         role_table_target = 0x1F0000
+        retire_grow_target = 0x220000
+        update_uma_target = 0x230000
         driver_symbols = {
             recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT: controller_target,
             recover_g17_abi.ALLOCATE_PM_MEMORY_EVENT: allocate_worker_target,
@@ -2406,6 +2466,10 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.HWPB_MANAGER_META_CLASS: hwpb_meta_class_target,
             recover_g17_abi.PARAMETER_MANAGEMENT_GROW: physical_grow_target,
             recover_g17_abi.PARAMETER_MANAGEMENT_VIRTUAL_GROW: virtual_grow_target,
+            recover_g17_abi.USC_PRIV_MEM_FLIST_META_CLASS: flist_meta_class_target,
+            recover_g17_abi.IMPLICIT_GROW_ENGINE_VTABLE: 0x240000,
+            recover_g17_abi.USC_PRIV_MEM_RETIRE_GROW_REQUEST: retire_grow_target,
+            recover_g17_abi.G17_HAL_UPDATE_UMA_DESC: update_uma_target,
         }
         iogpu_symbols = {
             recover_g17_abi.IOGPU_EVENT_GET_NUM_STAMPS: 0x130000,
@@ -2536,6 +2600,8 @@ class RecoverG17AbiTests(unittest.TestCase):
                 (recover_g17_abi.G17_FIRMWARE_VTABLE, 0x280): arm_submit_target,
                 (recover_g17_abi.PARAMETER_MANAGEMENT_VTABLE, 0x190): physical_grow_target,
                 (recover_g17_abi.PARAMETER_MANAGEMENT_VIRTUAL_VTABLE, 0x190): virtual_grow_target,
+                (recover_g17_abi.IMPLICIT_GROW_ENGINE_VTABLE, 0x180): retire_grow_target,
+                (recover_g17_abi.G17_ACCELERATOR_VTABLE, 0x1120): update_uma_target,
             }
             return targets[(vtable, slot)]
 
@@ -2612,7 +2678,8 @@ class RecoverG17AbiTests(unittest.TestCase):
             [event["type"] for event in recovered["host_lifecycle_events"]], [12]
         )
         self.assertEqual(
-            [event["type"] for event in recovered["host_resource_events"]], [6]
+            [event["type"] for event in recovered["host_resource_events"]],
+            [6, 13, 15],
         )
         pm_memory = recovered["host_resource_events"][0]
         self.assertEqual(pm_memory["host_action"], "AGXParameterManagement::growImmediately")
@@ -2627,6 +2694,14 @@ class RecoverG17AbiTests(unittest.TestCase):
             pm_memory["device_control_response"]["copied_host_request_range"],
             {"source_offset": 8, "target_offset": 8, "bytes": 0x18},
         )
+        grow_complete = recovered["host_resource_events"][1]
+        self.assertEqual(
+            grow_complete["host_action"],
+            "IAGXUSCPrivMemGrowEngine::retireGrowRequest",
+        )
+        threshold = recovered["host_resource_events"][2]
+        self.assertEqual(threshold["host_action"], "Accelerator::halUpdateUMADesc")
+        self.assertEqual(threshold["device_control_response"]["command_type"], 0x21)
         self.assertEqual(
             recovered["unimplemented_action_event_types"],
             [6, 9, 13, 15],

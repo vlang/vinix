@@ -539,6 +539,15 @@ PARAMETER_MANAGEMENT_GROW = "__ZN22AGXParameterManagement15growImmediatelyEv"
 PARAMETER_MANAGEMENT_VIRTUAL_GROW = (
     "__ZN29AGXParameterManagementVirtual15growImmediatelyEv"
 )
+USC_PRIV_MEM_FLIST_META_CLASS = "__ZN18AGXUSCPrivMemFList10gMetaClassE"
+IMPLICIT_GROW_ENGINE_VTABLE = "__ZTV21AGXImplicitGrowEngine"
+USC_PRIV_MEM_RETIRE_GROW_REQUEST = (
+    "__ZN24IAGXUSCPrivMemGrowEngine17retireGrowRequestEiiyj"
+)
+G17_HAL_UPDATE_UMA_DESC = (
+    "__ZN31AGX·PI_300·X·A0·Accelerator16halUpdateUMADescE"
+    "P18AGXUSCPrivMemFListRK30AGXUSCPrivateMemDescUpdateData"
+)
 RESET_CHANNEL_STATE = "__ZN10AGXChannel17resetChannelStateEv"
 GET_CHANNEL_PRIORITY = "__ZN10AGXChannel11getPriorityEv"
 ARM_SET_CHANNEL_PRIORITY = (
@@ -14944,6 +14953,161 @@ def recover_g17_pm_memory_event_action(
     }
 
 
+def recover_g17_uma_flist_event_actions(
+    driver: bytes,
+    role_address: int,
+    role_code: bytes,
+    dispatch_offsets: tuple[int, ...],
+    driver_symbols: dict[str, int],
+) -> list[dict[str, object]]:
+    """Recover G17 USC-private-memory FList completion/threshold events."""
+
+    required = (
+        USC_PRIV_MEM_FLIST_META_CLASS,
+        IMPLICIT_GROW_ENGINE_VTABLE,
+        USC_PRIV_MEM_RETIRE_GROW_REQUEST,
+        G17_HAL_UPDATE_UMA_DESC,
+    )
+    missing = [name for name in required if name not in driver_symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 UMA FList symbols: {missing}")
+
+    dispatch_anchor = 0x110
+    if dispatch_anchor + dispatch_offsets[13] != 0x624:
+        raise ValueError("G17 UMA grow-completion dispatch changed")
+    if dispatch_anchor + dispatch_offsets[15] != 0x2F0:
+        raise ValueError("G17 UMA threshold dispatch changed")
+
+    # Type 13 validates both non-null 64-bit payloads and the same dynamic
+    # stamp namespace used by the other firmware completion records. It then
+    # resolves the FList by its bounded 8-bit index and passes the trailing
+    # result pair to the grow engine retained at FList +0x50.
+    require_instruction_words_at(
+        role_code,
+        "G17 UMA grow-completion event",
+        {
+            0x628: 0xB94053E8,  # event type at +0
+            0x62C: 0x7100351F,  # type 13
+            0x634: 0xB9405BE8,  # FList index at +8
+            0x638: 0x7104011F,  # below 256
+            0x640: 0xF845C3E8,  # nonzero value at +0x0c
+            0x644: 0xB4006E88,
+            0x648: 0xF84643E8,  # nonzero value at +0x14
+            0x64C: 0xB4006E48,
+            0x650: 0xB94057F6,  # signed stamp slot at +4
+            0x668: 0xD2815611,  # stamp-count vtable slot 0xab0
+            0x698: 0xF846C3F9,  # grow result value at +0x1c
+            0x69C: 0xB94077F6,  # grow result flags at +0x24
+            0x6A0: 0x294AEBFB,  # stamp slot and FList index
+            0x768: 0xAA1703E0,  # candidate FList
+            0x778: 0xB4002D40,  # fail when the typed object is absent
+            0x780: 0xF9402800,  # grow engine at FList +0x50
+            0x794: 0xD2803011,  # grow-engine vtable slot 0x180
+            0x7A0: 0xAA1B03E1,  # stamp slot
+            0x7A4: 0xAA1A03E2,  # FList index
+            0x7A8: 0xAA1903E3,  # result value
+            0x7AC: 0xAA1603E4,  # result flags
+            0x7B4: 0xD73F0910,
+        },
+    )
+    grow_flist_class = read_adrp_add_address(
+        role_address, role_code, 0x76C, 0x770
+    )
+    if grow_flist_class != driver_symbols[USC_PRIV_MEM_FLIST_META_CLASS]:
+        raise ValueError("G17 UMA grow-completion FList class changed")
+
+    retire_grow = recover_vtable_target(driver, IMPLICIT_GROW_ENGINE_VTABLE, 0x180)
+    if retire_grow != driver_symbols[USC_PRIV_MEM_RETIRE_GROW_REQUEST]:
+        raise ValueError("G17 UMA grow-completion action changed")
+
+    # Type 15 looks up the same FList index. When its firmware threshold is
+    # above the host's current value, Apple updates the descriptor through the
+    # selected accelerator, then sends device-control command 0x21 carrying
+    # the FList index. Vinix cannot emit that acknowledgement without owning
+    # the FList state it describes.
+    require_instruction_words_at(
+        role_code,
+        "G17 UMA threshold event",
+        {
+            0x2F4: 0xB94053E8,  # event type at +0
+            0x2F8: 0x71003D1F,  # type 15
+            0x300: 0xB94057F8,  # FList index at +4
+            0x304: 0x7104031F,  # below 256
+            0x30C: 0xF9414E7B,  # firmware +0x298 -> accelerator
+            0x310: 0x91404F77,  # FList registry at accelerator +0x13000
+            0x314: 0xF942DEFA,  # registry lock at +0x135b8
+            0x320: 0xB945C2E8,  # registry count at +0x135c0
+            0x32C: 0xF942E6E8,  # registry entries at +0x135c8
+            0x810: 0xAA1603E0,  # candidate FList
+            0x820: 0xB4001BE0,  # fail when the typed object is absent
+            0x8CC: 0xB9401328,  # FList identity/index below 256
+            0x8D0: 0x7104011F,
+            0x908: 0xB9408329,  # current threshold at FList +0x80
+            0x90C: 0xB940EB28,  # requested threshold at FList +0xe8
+            0x924: 0xB9008328,  # publish the new host threshold
+            0x938: 0xD2822411,  # accelerator vtable slot 0x1120
+            0x944: 0xD102C3A2,  # descriptor-update record
+            0x94C: 0xAA1903E1,  # FList argument
+            0x968: 0xD102C3A8,
+            0x96C: 0xF803811F,
+            0x970: 0x6F00E400,
+            0x974: 0x3C828100,
+            0x978: 0x3C818100,
+            0x97C: 0x3C808100,  # zero complete 0x40-byte response
+            0x980: 0x52800428,  # device-control command 0x21
+            0x984: 0x292A63A8,  # command and FList index at +0/+4
+            0xA38: 0x94000329,  # optional synchronous completion wait
+        },
+    )
+    threshold_flist_class = read_adrp_add_address(
+        role_address, role_code, 0x814, 0x818
+    )
+    if threshold_flist_class != driver_symbols[USC_PRIV_MEM_FLIST_META_CLASS]:
+        raise ValueError("G17 UMA threshold FList class changed")
+
+    update_uma = recover_vtable_target(driver, G17_ACCELERATOR_VTABLE, 0x1120)
+    if update_uma != driver_symbols[G17_HAL_UPDATE_UMA_DESC]:
+        raise ValueError("G17 UMA threshold descriptor action changed")
+
+    common = {
+        "manager_class": "AGXUSCPrivMemFList",
+        "flist_index_limit": 0x100,
+        "vinix_policy": "stop_gpu_without_usc_private_memory_manager",
+    }
+    return [
+        {
+            **common,
+            "type": 13,
+            "record": "AGFIFirmwareEventUMAGrowPool",
+            "stamp_slot_offset": 4,
+            "invalid_stamp_slot": -1,
+            "flist_index_offset": 8,
+            "required_nonzero_u64_offsets": [0xC, 0x14],
+            "grow_result_value_offset": 0x1C,
+            "grow_result_flags_offset": 0x24,
+            "grow_engine_member": 0x50,
+            "host_action": "IAGXUSCPrivMemGrowEngine::retireGrowRequest",
+            "host_action_vtable_slot": 0x180,
+        },
+        {
+            **common,
+            "type": 15,
+            "record": "AGFIFirmwareEventUMAThresholdInterrupt",
+            "flist_index_offset": 4,
+            "current_threshold_member": 0x80,
+            "requested_threshold_member": 0xE8,
+            "host_action": "Accelerator::halUpdateUMADesc",
+            "host_action_vtable_slot": 0x1120,
+            "device_control_response": {
+                "command_type": 0x21,
+                "entry_bytes": 0x40,
+                "flist_index_offset": 4,
+                "zero_range": {"offset": 8, "bytes": 0x38},
+            },
+        },
+    ]
+
+
 def recover_g17_firmware_event_actions(
     driver: bytes,
     role_address: int,
@@ -14969,6 +15133,9 @@ def recover_g17_firmware_event_actions(
         driver, role_address, role_code
     )
     pm_memory_event = recover_g17_pm_memory_event_action(
+        driver, role_address, role_code, dispatch_offsets, driver_symbols
+    )
+    uma_flist_events = recover_g17_uma_flist_event_actions(
         driver, role_address, role_code, dispatch_offsets, driver_symbols
     )
 
@@ -15301,7 +15468,7 @@ def recover_g17_firmware_event_actions(
                 "vinix_policy": "consume_without_iogpu_object_namespace",
             }
         ],
-        "host_resource_events": [pm_memory_event],
+        "host_resource_events": [pm_memory_event, *uma_flist_events],
         "unimplemented_action_event_types": [
             event_type for event_type in accepted_types if event_type not in implemented
         ],

@@ -907,6 +907,31 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 				mgr.state = .error
 				return false
 			}
+			if entry.event_type == fw.g17_firmware_event_uma_grow_pool {
+				if !fw.validate_g17_firmware_uma_grow_pool(&entry) {
+					C.printf(c'agx: invalid G17 UMA grow completion on role %d\n', role)
+				} else {
+					C.printf(c'agx: G17 firmware completed an unowned UMA grow on role %d\n',
+						role)
+				}
+				// The event retires a request in an AGXUSCPrivMemFList grow
+				// engine. No such host object exists in Vinix yet.
+				mgr.state = .error
+				return false
+			}
+			if entry.event_type == fw.g17_firmware_event_uma_threshold_interrupt {
+				if !fw.validate_g17_firmware_uma_threshold_interrupt(&entry) {
+					C.printf(c'agx: invalid G17 UMA threshold event on role %d\n', role)
+				} else {
+					C.printf(c'agx: G17 firmware requested an unowned UMA threshold update on role %d\n',
+						role)
+				}
+				// Apple updates the FList descriptor before sending command
+				// 0x21. A bare acknowledgement would expose stale/nonexistent
+				// private-memory state to firmware.
+				mgr.state = .error
+				return false
+			}
 			if entry.event_type == fw.g17_firmware_event_gpu_restart {
 				if !fw.validate_g17_firmware_gpu_restart(&entry) {
 					C.printf(c'agx: invalid G17 GPU-restart event on role %d\n', role)
@@ -1072,6 +1097,21 @@ pub fn (mut mgr GpuManager) stage_g17_allocate_pm_memory_response(role u32,
 	}
 	mut response := fw.G17DeviceControlEntry{}
 	if !fw.encode_g17_allocate_pm_memory_response(&response, event_entry) {
+		return false
+	}
+	return mgr.g17_graph.enqueue_device_control(role, &response)
+}
+
+// Encode and stage command 0x21 for the future USC-private-memory manager.
+// The live callback remains fail-closed until halUpdateUMADesc has a native
+// equivalent and has completed successfully.
+pub fn (mut mgr GpuManager) stage_g17_uma_threshold_response(role u32,
+	event_entry &fw.G17FirmwareEventRingEntry) bool {
+	if mgr.g17_graph == unsafe { nil } {
+		return false
+	}
+	mut response := fw.G17DeviceControlEntry{}
+	if !fw.encode_g17_uma_threshold_response(&response, event_entry) {
 		return false
 	}
 	return mgr.g17_graph.enqueue_device_control(role, &response)

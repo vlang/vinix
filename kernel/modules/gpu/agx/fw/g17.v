@@ -55,7 +55,9 @@ pub const g17_firmware_event_channel_error = u32(7)
 pub const g17_firmware_event_metrology_aging = u32(8)
 pub const g17_firmware_event_shared_event_signal_complete = u32(10)
 pub const g17_firmware_event_process_exit_complete = u32(12)
+pub const g17_firmware_event_uma_grow_pool = u32(13)
 pub const g17_firmware_event_rt_completion = u32(14)
+pub const g17_firmware_event_uma_threshold_interrupt = u32(15)
 pub const g17_firmware_event_flag_limit = u16(0x18)
 // Apple's type-4/type-7 handlers compare against IOGPUEventMachine's dynamic
 // stamp count. Vinix's v12.3 event manager exposes exactly the same 128 slots
@@ -63,6 +65,7 @@ pub const g17_firmware_event_flag_limit = u16(0x18)
 pub const g17_firmware_event_stamp_slots = u32(128)
 pub const g17_firmware_event_pm_manager_limit = u32(0x7f)
 pub const g17_firmware_event_pm_request_kind_limit = u32(0x40)
+pub const g17_firmware_event_uma_flist_limit = u32(0x100)
 pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_data_master_entries_bytes = u64(0x1800)
@@ -73,6 +76,7 @@ pub const g17_data_master_priority_record_size = u64(0x60)
 pub const g17_data_master_address_table_size = u64(0x180)
 pub const g17_device_control_entry_size = u64(0x40)
 pub const g17_device_control_allocate_pm_memory = u32(8)
+pub const g17_device_control_update_uma_threshold = u32(0x21)
 pub const g17_device_control_allocate_pm_flags = u32(0x19)
 pub const g17_device_control_role_primary = u32(0)
 pub const g17_device_control_allocate_pm_doorbell = u64(0x8400000000000011)
@@ -2721,6 +2725,22 @@ pub mut:
 	opaque_00c [0x3c]u8
 }
 
+// Event type 13 completes one USC-private-memory grow request. Apple requires
+// both unaligned values to be nonzero, resolves flist_index to an
+// AGXUSCPrivMemFList, and calls the retained grow engine's retireGrowRequest.
+@[packed]
+pub struct G17FirmwareUmaGrowPool {
+pub mut:
+	event_type         u32
+	stamp_slot         i32
+	flist_index        u32
+	required_value_00c u64
+	required_value_014 u64
+	grow_result_value  u64
+	grow_result_flags  u32
+	opaque_028         [0x20]u8
+}
+
 // Event type 14 is AGFIFirmwareEventRTCompletionInfo. Apple forwards its
 // unaligned value only to optional IOGPU CLPC performance observers; Vinix
 // has no CLPC observer layer, so the callback consumes it as advisory.
@@ -2730,6 +2750,17 @@ pub mut:
 	event_type      u32
 	completion_info u64
 	opaque_00c      [0x3c]u8
+}
+
+// Event type 15 asks the host to raise the selected FList threshold and then
+// return device-control command 0x21. The backing object is host-created and
+// must exist before the response can be acknowledged safely.
+@[packed]
+pub struct G17FirmwareUmaThresholdInterrupt {
+pub mut:
+	event_type  u32
+	flist_index u32
+	opaque_008  [0x40]u8
 }
 
 pub fn validate_g17_firmware_completion_event(entry &G17FirmwareEventRingEntry) bool {
@@ -2815,10 +2846,29 @@ pub fn validate_g17_firmware_process_exit_complete(entry &G17FirmwareEventRingEn
 		&& sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size
 }
 
+pub fn validate_g17_firmware_uma_grow_pool(entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || entry.event_type != g17_firmware_event_uma_grow_pool
+		|| sizeof(G17FirmwareUmaGrowPool) != g17_firmware_event_entry_size {
+		return false
+	}
+	event := unsafe { &G17FirmwareUmaGrowPool(entry) }
+	return (event.stamp_slot == -1 || u32(event.stamp_slot) < g17_firmware_event_stamp_slots)
+		&& event.flist_index < g17_firmware_event_uma_flist_limit
+		&& event.required_value_00c != 0 && event.required_value_014 != 0
+}
+
 @[inline]
 pub fn validate_g17_firmware_rt_completion(entry &G17FirmwareEventRingEntry) bool {
 	return entry != unsafe { nil } && entry.event_type == g17_firmware_event_rt_completion
 		&& sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size
+}
+
+pub fn validate_g17_firmware_uma_threshold_interrupt(entry &G17FirmwareEventRingEntry) bool {
+	return entry != unsafe { nil }
+		&& entry.event_type == g17_firmware_event_uma_threshold_interrupt
+		&& sizeof(G17FirmwareUmaThresholdInterrupt) == g17_firmware_event_entry_size
+		&& unsafe { &G17FirmwareUmaThresholdInterrupt(entry) }.flist_index <
+		g17_firmware_event_uma_flist_limit
 }
 
 // Return -1 for corrupt ring state or an event outside Apple's checked mask,
@@ -3161,6 +3211,14 @@ pub mut:
 	opaque_020        [0x20]u8
 }
 
+@[packed]
+pub struct G17DeviceControlUpdateUmaThreshold {
+pub mut:
+	command_type u32
+	flist_index  u32
+	opaque_008   [0x38]u8
+}
+
 // Construct the byte-exact acknowledgement Apple emits only after its host
 // parameter manager has successfully grown. This function does not publish
 // the response, ring its 0x84/0x11 doorbell, or imply that Vinix can service
@@ -3182,6 +3240,25 @@ pub fn encode_g17_allocate_pm_memory_response(entry &G17DeviceControlEntry,
 		response.request_value = event.request_value
 		response.request_kind_copy = event.request_kind
 		response.firmware_token = event.firmware_token
+	}
+	return true
+}
+
+// Construct the response Apple sends after halUpdateUMADesc has made the new
+// FList threshold visible. As with the PM-memory response, encoding alone does
+// not authorize the callback to acknowledge an unserviced request.
+pub fn encode_g17_uma_threshold_response(entry &G17DeviceControlEntry,
+	event_entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || !validate_g17_firmware_uma_threshold_interrupt(event_entry)
+		|| sizeof(G17DeviceControlUpdateUmaThreshold) != g17_device_control_entry_size {
+		return false
+	}
+	unsafe {
+		C.memset(entry, 0, g17_device_control_entry_size)
+		event := &G17FirmwareUmaThresholdInterrupt(event_entry)
+		mut response := &G17DeviceControlUpdateUmaThreshold(entry)
+		response.command_type = g17_device_control_update_uma_threshold
+		response.flist_index = event.flist_index
 	}
 	return true
 }
@@ -3219,5 +3296,5 @@ pub fn enqueue_g17_device_control_entry(state_buffer voidptr, state_size u64,
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwarePmRequestMemory) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && sizeof(G17DeviceControlAllocatePmMemory) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwarePmRequestMemory) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaGrowPool) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaThresholdInterrupt) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && sizeof(G17DeviceControlAllocatePmMemory) == g17_device_control_entry_size && sizeof(G17DeviceControlUpdateUmaThreshold) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
 }
