@@ -9,6 +9,7 @@ module mmu
 // tables use a 16 KiB granule and are implemented in pgtable.v.
 
 import gpu.agx.pgtable
+import gpu.agx.alloc as gpu_alloc
 import klock
 import katomic
 import aarch64.cpu
@@ -68,14 +69,32 @@ mut:
 
 pub struct UatContext {
 pub mut:
-	id      u32
-	pgtable &pgtable.UatPgtable = unsafe { nil }
-	active  bool
-	lock    klock.Lock
-	vm_id   u32
-	dummy_phys u64
-	kernel_start u64
-	kernel_end   u64
+	id             u32
+	pgtable        &pgtable.UatPgtable = unsafe { nil }
+	active         bool
+	lock           klock.Lock
+	vm_id          u32
+	dummy_phys     u64
+	kernel_start   u64
+	kernel_end     u64
+	driver_gpu     gpu_alloc.HeapAllocator
+	driver_private gpu_alloc.HeapAllocator
+mut:
+	driver_buffers []&UatBuffer
+}
+
+// Driver-owned backing mapped into a user UAT context. These objects occupy
+// Mesa's reserved kernel VA window, so userspace GEM_BIND requests cannot
+// alias them. The queue/job owner must retain the object until firmware has
+// retired every command that references it.
+pub struct UatBuffer {
+pub:
+	va      u64
+	phys    u64
+	size    u64
+	private bool
+mut:
+	released bool
 }
 
 pub struct UatManager {
@@ -302,14 +321,18 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 	}
 	for i := u32(1); i < uat_num_contexts; i++ {
 		if mgr.contexts[i] == unsafe { nil } {
+			kernel_half_size := ((kernel_end - kernel_start) >> 1) & ~pgtable.uat_pg_mask
+			kernel_midpoint := kernel_start + kernel_half_size
+			if kernel_half_size == 0 || kernel_midpoint >= kernel_end {
+				return none
+			}
 			mut pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
 			dummy_phys := u64(memory.pmm_alloc_aligned_fallible(4, 4))
 			if dummy_phys == 0 {
 				pgtable.destroy(pt)
 				return none
 			}
-			if !pt.map(uat_unknown_page, dummy_phys, pgtable.uat_pgsz,
-				pgtable.gpu_prot_gpu_shared_rw) {
+			if !pt.map(uat_unknown_page, dummy_phys, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw) {
 				memory.pmm_free(voidptr(dummy_phys), 4)
 				pgtable.destroy(pt)
 				return none
@@ -322,6 +345,8 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				dummy_phys: dummy_phys
 				kernel_start: kernel_start
 				kernel_end: kernel_end
+				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', kernel_start, kernel_midpoint)
+				driver_private: gpu_alloc.new_heap('uat-user-private', kernel_midpoint, kernel_end)
 			}
 			mgr.contexts[i] = ctx
 			return ctx
@@ -339,13 +364,139 @@ pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 		mgr.lock.release()
 	}
 	mgr.unbind_context(ctx)
-	if ctx.pgtable != unsafe { nil } {
-		pgtable.destroy(ctx.pgtable)
+	mut owned := unsafe { ctx }
+	owned.release_all_driver_buffers()
+	owned.active = false
+	if owned.pgtable != unsafe { nil } {
+		pgtable.destroy(owned.pgtable)
 	}
-	if ctx.dummy_phys != 0 {
-		memory.pmm_free(voidptr(ctx.dummy_phys), 4)
+	if owned.dummy_phys != 0 {
+		memory.pmm_free(voidptr(owned.dummy_phys), 4)
+		owned.dummy_phys = 0
 	}
 	mgr.contexts[ctx.id] = unsafe { nil }
+}
+
+// Allocate physically contiguous, CPU-visible memory in the half of Mesa's
+// reserved VM window matching the requested coherency domain. GPU-shared
+// buffers are coherent and GPU-only; private buffers are cached and visible
+// to both the GPU and firmware. Publishing a new mapping to running firmware
+// still requires the caller to issue a UAT flush before queue submission.
+pub fn (mut ctx UatContext) alloc_driver_buffer(size u64, private bool) ?&UatBuffer {
+	if size == 0 || size > u64(-1) - pgtable.uat_pg_mask || ctx.pgtable == unsafe { nil } {
+		return none
+	}
+	aligned_size := (size + pgtable.uat_pg_mask) & ~pgtable.uat_pg_mask
+	pages := aligned_size / u64(4096)
+
+	ctx.lock.acquire()
+	defer {
+		ctx.lock.release()
+	}
+	if !ctx.active {
+		return none
+	}
+
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
+	if phys == 0 {
+		return none
+	}
+	unsafe {
+		C.memset(voidptr(phys + higher_half), 0, aligned_size)
+	}
+
+	va := if private {
+		ctx.driver_private.alloc(aligned_size, pgtable.uat_pgsz) or {
+			memory.pmm_free(voidptr(phys), pages)
+			return none
+		}
+	} else {
+		ctx.driver_gpu.alloc(aligned_size, pgtable.uat_pgsz) or {
+			memory.pmm_free(voidptr(phys), pages)
+			return none
+		}
+	}
+	protection := if private {
+		pgtable.gpu_prot_fw_gpu_cached_rw
+	} else {
+		pgtable.gpu_prot_gpu_shared_rw
+	}
+	mut pt := unsafe { ctx.pgtable }
+	if !pt.map(va, phys, aligned_size, protection) {
+		if private {
+			ctx.driver_private.release(va)
+			ctx.driver_private.gc()
+		} else {
+			ctx.driver_gpu.release(va)
+			ctx.driver_gpu.gc()
+		}
+		memory.pmm_free(voidptr(phys), pages)
+		return none
+	}
+
+	buffer := &UatBuffer{
+		va: va
+		phys: phys
+		size: aligned_size
+		private: private
+	}
+	ctx.driver_buffers << buffer
+	return buffer
+}
+
+fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
+	if buffer == unsafe { nil } {
+		return
+	}
+	mut owned := unsafe { buffer }
+	if owned.released {
+		return
+	}
+	owned.released = true
+	if ctx.pgtable != unsafe { nil } && owned.va != 0 && owned.size != 0 {
+		mut pt := unsafe { ctx.pgtable }
+		pt.unmap(owned.va, owned.size)
+	}
+	if owned.phys != 0 && owned.size != 0 {
+		memory.pmm_free(voidptr(owned.phys), owned.size / u64(4096))
+	}
+	if owned.private {
+		ctx.driver_private.release(owned.va)
+	} else {
+		ctx.driver_gpu.release(owned.va)
+	}
+}
+
+pub fn (mut ctx UatContext) release_driver_buffer(buffer &UatBuffer) {
+	ctx.lock.acquire()
+	for index, candidate in ctx.driver_buffers {
+		if voidptr(candidate) == voidptr(buffer) {
+			ctx.release_driver_buffer_locked(candidate)
+			ctx.driver_buffers.delete(index)
+			break
+		}
+	}
+	ctx.driver_gpu.gc()
+	ctx.driver_private.gc()
+	ctx.lock.release()
+}
+
+fn (mut ctx UatContext) release_all_driver_buffers() {
+	ctx.lock.acquire()
+	for index := ctx.driver_buffers.len - 1; index >= 0; index-- {
+		ctx.release_driver_buffer_locked(ctx.driver_buffers[index])
+	}
+	ctx.driver_buffers.clear()
+	ctx.driver_gpu.gc()
+	ctx.driver_private.gc()
+	ctx.lock.release()
+}
+
+pub fn (buffer &UatBuffer) cpu_address() voidptr {
+	if buffer == unsafe { nil } || buffer.released || buffer.phys == 0 {
+		return unsafe { nil }
+	}
+	return voidptr(buffer.phys + higher_half)
 }
 
 pub fn (mgr &UatManager) bind_context(ctx &UatContext) {
