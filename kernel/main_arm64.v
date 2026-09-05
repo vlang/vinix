@@ -91,12 +91,14 @@ fn parse_aic_guest_virtual_timer_irq() ?u32 {
 	return be32(unsafe { voidptr(u64(interrupts.data) + u64(cell_index * 4)) })
 }
 
-fn aic_hw_irq_handler(irq u32, gpr_state voidptr) {
-	if irq != aic_timer_irq {
-		return
+// The Apple architectural (virtual) timer is delivered as an FIQ, not an AIC
+// hardware IRQ event, so it must be serviced from the FIQ dispatch path and
+// gated on the timer's own ISTATUS rather than on an AIC IRQ number.
+fn aic_fiq_handler(gpr_state voidptr) {
+	if timer.is_pending() {
+		timer_handler := sched.get_timer_handler()
+		timer_handler(gpr_state)
 	}
-	timer_handler := sched.get_timer_handler()
-	timer_handler(gpr_state)
 }
 
 fn bootstrap_cpu0() {
@@ -311,10 +313,11 @@ fn kmain() {
 			if timer_irq := parse_aic_guest_virtual_timer_irq() {
 				aic_timer_irq = timer_irq
 			}
-			aic.register_hw_handler(aic_hw_irq_handler)
-			aic.unmask_irq(aic_timer_irq)
+			// Timer is FIQ-delivered on Apple Silicon: service it from the FIQ
+			// dispatch path instead of unmasking it as an AIC hardware IRQ.
+			aic.register_fiq_handler(aic_fiq_handler)
 			use_aic = true
-			print('aic: timer irq ${aic_timer_irq}\n')
+			print('aic: timer via FIQ (dt irq hint ${aic_timer_irq})\n')
 			print('aic done\n')
 		} else {
 			print('no Apple AIC node found in device tree\n')

@@ -23,8 +23,9 @@ pub mut:
 	name        string
 }
 
+const gem_max_handles = u32(4096)
+
 __global (
-	next_handle      = u32(1)
 	next_mmap_offset = u64(0x10000000) // start mmap offsets above 256 MiB
 	gem_objects_lock klock.Lock
 	gem_objects      [4096]&GemObject
@@ -46,18 +47,41 @@ pub fn create_aligned(size u64, alignment u64) ?&GemObject {
 		return none
 	}
 
+	// Overflow-checked device alignment. AGX buffers must retain their 16 KiB
+	// size and physical-address alignment while remaining fallible.
+	if size > u64(-1) - (alignment - 1) {
+		return none
+	}
 	aligned_size := lib.align_up(size, alignment)
 	pages := aligned_size / page_size
 
-	phys := memory.pmm_alloc_aligned(pages, alignment / page_size)
-	if phys == 0 {
-		return none
+	// Everything below runs under the table lock so handle selection, the
+	// mmap-offset counter, and the physical allocation cannot race with other
+	// creators. Handles are recycled by scanning for a free slot rather than
+	// consuming a monotonic counter, and exhaustion is detected BEFORE any
+	// physical memory is allocated.
+	gem_objects_lock.acquire()
+	defer {
+		gem_objects_lock.release()
 	}
 
-	handle := next_handle
-	next_handle++
+	mut handle := u32(0)
+	for i := u32(1); i < gem_max_handles; i++ {
+		if gem_objects[i] == unsafe { nil } {
+			handle = i
+			break
+		}
+	}
+	if handle == 0 {
+		return none // handle table exhausted
+	}
 
-	if handle >= 4096 {
+	// Fallible allocation: a user-sized request must never panic the kernel.
+	phys := memory.pmm_alloc_aligned_fallible(pages, alignment / page_size)
+	if phys == unsafe { nil } {
+		return none
+	}
+	if aligned_size > u64(-1) - next_mmap_offset {
 		memory.pmm_free(phys, pages)
 		return none
 	}
@@ -74,9 +98,7 @@ pub fn create_aligned(size u64, alignment u64) ?&GemObject {
 		mmap_offset: mmap_off
 	}
 
-	gem_objects_lock.acquire()
 	gem_objects[handle] = obj
-	gem_objects_lock.release()
 
 	return obj
 }
@@ -88,7 +110,7 @@ pub fn destroy(obj &GemObject) {
 	}
 
 	gem_objects_lock.acquire()
-	if obj.handle < 4096 {
+	if obj.handle < gem_max_handles {
 		gem_objects[obj.handle] = unsafe { nil }
 	}
 	gem_objects_lock.release()
@@ -101,7 +123,7 @@ pub fn destroy(obj &GemObject) {
 
 // Look up a GEM object by its handle.
 pub fn get_by_handle(handle u32) ?&GemObject {
-	if handle == 0 || handle >= 4096 {
+	if handle == 0 || handle >= gem_max_handles {
 		return none
 	}
 

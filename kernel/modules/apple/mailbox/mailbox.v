@@ -8,6 +8,7 @@ module mailbox
 import aarch64.kio
 import aarch64.cpu
 import klock
+import memory
 
 // ASC mailbox v4 register offsets. The mailbox DT resource starts at the
 // mailbox window (the combined ASC window used by m1n1 places this at
@@ -38,7 +39,8 @@ pub mut:
 
 pub fn new_mailbox(base u64) Mailbox {
 	return Mailbox{
-		base: base + higher_half
+		// Map the ASC mailbox aperture as Device memory (registers up to 0xc14).
+		base: memory.map_mmio(base, 0x1000)
 	}
 }
 

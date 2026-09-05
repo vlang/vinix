@@ -55,7 +55,12 @@ pub fn get_ns() u64 {
 // Get current time in microseconds
 pub fn get_us() u64 {
 	count := get_count()
-	return count * 1000000 / timer_freq
+	// Avoid overflow: split into whole seconds and fractional counts, exactly
+	// as get_ns() does. `count * 1000000` overflows a u64 after a few hours of
+	// uptime at typical timer frequencies.
+	secs := count / timer_freq
+	frac := count % timer_freq
+	return secs * 1000000 + frac * 1000000 / timer_freq
 }
 
 // Sleep for approximately `us` microseconds (busy wait)

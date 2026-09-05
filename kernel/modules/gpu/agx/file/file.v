@@ -277,7 +277,8 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
 	if request.extensions != 0 || request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) != 0
 		|| request.addr & pgtable.uat_pg_mask != 0 || request.range == 0
-		|| request.range & pgtable.uat_pg_mask != 0 {
+		|| request.range & pgtable.uat_pg_mask != 0
+		|| request.range > u64(-1) - request.addr {
 		return -22
 	}
 	ctx := f.find_vm(request.vm_id) or { return -22 }
