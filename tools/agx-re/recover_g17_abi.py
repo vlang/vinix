@@ -10974,8 +10974,9 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         "selectors_complete": False,
         "completeness_note": (
             "every virtual encoder selector argument is statically resolved, "
-            "but two inline CL selector words are runtime-dependent and the "
-            "control-flow ordering remains to be classified"
+            "but two inline CL selector words are runtime-dependent; the "
+            "machine emission graph is recovered separately while its branch "
+            "predicate expressions remain to be classified"
         ),
         "distinct_literal_encoded_fields": len(literal_encoded_union),
         "distinct_literal_selectors": len(literal_selector_union),
@@ -11205,6 +11206,148 @@ def recover_g17_inline_register_records(image: bytes) -> dict[str, object]:
         "control_flow_complete": False,
         "static_records": static_records,
         "dynamic_records": dynamic_records,
+    }
+
+
+def build_g17_emission_cfg(
+    instructions: list[tuple[int, int]], event_offsets: set[int]
+) -> dict[str, object]:
+    """Collapse a producer CFG to its externally visible record emissions."""
+
+    if not instructions:
+        raise ValueError("G17 emission CFG has no instructions")
+    index_by_offset = {offset: index for index, (offset, _word) in enumerate(instructions)}
+    if len(index_by_offset) != len(instructions):
+        raise ValueError("G17 emission CFG has duplicate instruction offsets")
+    missing = sorted(event_offsets - index_by_offset.keys())
+    if missing:
+        raise ValueError(f"G17 emission offsets are not instructions: {missing}")
+
+    def is_break(word: int) -> bool:
+        return word & 0xFFE0001F == 0xD4200000
+
+    def is_return(word: int) -> bool:
+        return word in (0xD65F03C0, 0xD65F0BFF, 0xD65F0FFF)
+
+    def successors(index: int) -> tuple[int, ...]:
+        offset, word = instructions[index]
+        target = decode_b_target(offset, word)
+        if target is not None:
+            if target not in index_by_offset:
+                raise ValueError(f"G17 branch at {offset:#x} leaves its producer")
+            return (index_by_offset[target],)
+        target = decode_local_branch_target(offset, word)
+        if target is not None:
+            if target not in index_by_offset:
+                raise ValueError(f"G17 branch at {offset:#x} leaves its producer")
+            following = index + 1
+            return (
+                (index_by_offset[target], following)
+                if following < len(instructions)
+                else (index_by_offset[target],)
+            )
+        if is_break(word):  # authenticated-call failure
+            return ()
+        if is_return(word):
+            return ()
+        return (index + 1,) if index + 1 < len(instructions) else ()
+
+    reachable: set[int] = set()
+    pending = [0]
+    while pending:
+        index = pending.pop()
+        if index in reachable:
+            continue
+        reachable.add(index)
+        pending.extend(successors(index))
+    unreachable_events = sorted(
+        offset for offset in event_offsets if index_by_offset[offset] not in reachable
+    )
+    if unreachable_events:
+        raise ValueError(f"G17 emission events are unreachable: {unreachable_events}")
+
+    def next_events(
+        start_indices: tuple[int, ...]
+    ) -> tuple[list[int], bool, bool]:
+        found: set[int] = set()
+        returns = False
+        traps = False
+        seen: set[int] = set()
+        pending = list(start_indices)
+        while pending:
+            index = pending.pop()
+            if index in seen:
+                continue
+            seen.add(index)
+            offset = instructions[index][0]
+            if offset in event_offsets:
+                found.add(offset)
+                continue
+            following = successors(index)
+            if not following:
+                word = instructions[index][1]
+                traps |= is_break(word)
+                returns |= is_return(word) or index + 1 == len(instructions)
+            else:
+                pending.extend(following)
+        return sorted(found), returns, traps
+
+    first, empty_return_path, pre_emission_trap = next_events((0,))
+    nodes = []
+    loop_edges = 0
+    for offset in sorted(event_offsets):
+        index = index_by_offset[offset]
+        following, returns, traps = next_events(successors(index))
+        loop_edges += sum(target <= offset for target in following)
+        nodes.append(
+            {
+                "producer_offset": offset,
+                "next": following,
+                "can_return": returns,
+                "can_trap": traps,
+            }
+        )
+    return {
+        "entry": first,
+        "empty_return_path": empty_return_path,
+        "pre_emission_trap": pre_emission_trap,
+        "event_count": len(event_offsets),
+        "edge_count": sum(len(node["next"]) for node in nodes),
+        "loop_edge_count": loop_edges,
+        "nodes": nodes,
+    }
+
+
+def recover_g17_register_emission_cfg(
+    image: bytes,
+    selectors: dict[str, object],
+    inline_records: dict[str, object],
+) -> dict[str, object]:
+    """Recover possible register-record ordering from all producer branches."""
+
+    result: dict[str, object] = {}
+    static_records = inline_records["static_records"]
+    dynamic_records = inline_records["dynamic_records"]
+    for label, name in REGISTER_LIST_PRODUCERS.items():
+        _address, code = symbol_code(image, name)
+        calls = selectors["producers"][label]["encoder_entries"]
+        events = {int(entry["producer_offset"]) for entry in calls}
+        events.update(
+            int(entry["producer_offset"])
+            for entry in static_records.get(label, [])
+        )
+        events.update(
+            int(entry["producer_offset"])
+            for entry in dynamic_records.get(label, [])
+        )
+        graph = build_g17_emission_cfg(list(words(code)), events)
+        graph["virtual_call_events"] = len(calls)
+        graph["inline_events"] = len(events) - len(calls)
+        result[label] = graph
+    return {
+        "machine_order_complete": True,
+        "predicate_expressions_complete": False,
+        "producers": result,
     }
 
 
@@ -12343,9 +12486,12 @@ def main() -> int:
         channels["random_provider"] = recover_g17_random_provider(
             driver, kernel
         )
-        channels["register_selectors"] = recover_g17_register_selectors(driver)
-        channels["inline_register_records"] = (
-            recover_g17_inline_register_records(driver)
+        register_selectors = recover_g17_register_selectors(driver)
+        inline_register_records = recover_g17_inline_register_records(driver)
+        channels["register_selectors"] = register_selectors
+        channels["inline_register_records"] = inline_register_records
+        channels["register_emission_cfg"] = recover_g17_register_emission_cfg(
+            driver, register_selectors, inline_register_records
         )
         channels["command_stream_format"] = (
             recover_g17_command_stream_format(driver)

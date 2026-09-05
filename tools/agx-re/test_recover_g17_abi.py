@@ -5404,6 +5404,39 @@ class RecoverG17AbiTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 recover_g17_abi.recover_g17_inline_register_records(b"")
 
+    def test_collapses_g17_register_emission_cfg(self) -> None:
+        instructions = [
+            (0x00, b_cond(0x00, 0x0C, 0)),
+            (0x04, 0xD503201F),  # event A
+            (0x08, b(0x08, 0x14)),
+            (0x0C, 0xD503201F),  # event B
+            (0x10, b(0x10, 0x14)),
+            (0x14, 0xD503201F),  # shared event C
+            (0x18, 0xD65F03C0),
+        ]
+        recovered = recover_g17_abi.build_g17_emission_cfg(
+            instructions, {0x04, 0x0C, 0x14}
+        )
+        self.assertEqual(recovered["entry"], [0x04, 0x0C])
+        self.assertFalse(recovered["empty_return_path"])
+        self.assertFalse(recovered["pre_emission_trap"])
+        self.assertEqual(recovered["nodes"][0]["next"], [0x14])
+        self.assertEqual(recovered["nodes"][1]["next"], [0x14])
+        self.assertTrue(recovered["nodes"][2]["can_return"])
+
+        authenticated_guard = [
+            (0x00, b_cond(0x00, 0x08, 0)),
+            (0x04, 0xD4388E40),
+            (0x08, 0xD503201F),
+            (0x0C, 0xD65F03C0),
+        ]
+        guarded = recover_g17_abi.build_g17_emission_cfg(
+            authenticated_guard, {0x08}
+        )
+        self.assertEqual(guarded["entry"], [0x08])
+        self.assertFalse(guarded["empty_return_path"])
+        self.assertTrue(guarded["pre_emission_trap"])
+
     def test_rejects_g17_selector_sample_matching_emission_count(self) -> None:
         # If the literal sample ever reached the emission count the set would
         # be claiming completeness it has not earned.
