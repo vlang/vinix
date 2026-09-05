@@ -17,8 +17,11 @@ pub fn t6050_config() HwConfig {
 		chip_id:               0x6050
 		gpu_gen:               .g17
 		gpu_variant:           .c
-		gpu_rev:               .unknown
+		gpu_rev:               .c0
 		firmware_abi:          .g17_26_5_partial
+		// The live getDeviceConfig core record reports PI_300 core type 0x22.
+		// This private firmware ID is distinct from public GPU generation 17.
+		firmware_gpu_core_id:  0x22
 		gpu_core_count:        40
 		max_dies:              1
 		num_clusters:          4

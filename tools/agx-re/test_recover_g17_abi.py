@@ -2798,6 +2798,92 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["hardware_register"], 0xD0802C)
         self.assertEqual(recovered["uat_page_shift"], 14)
 
+    def test_recovers_g17_gpu_identity_config(self) -> None:
+        pi_address = 0x100000
+        g17_address = 0x200000
+        config_address = 0x300000
+        pi = bytearray(0x580)
+        for offset, word in {
+            0xEC: 0x53187EE8,
+            0xF0: 0x71002D1F,
+            0xF8: 0x53105EE8,
+            0xFC: 0x7100111F,
+            0x16C: 0x7100053F,
+            0x170: 0x540000A1,
+            0x174: 0x7100051F,
+            0x178: 0x54000061,
+            0x17C: 0x52800088,
+            0x180: 0x14000005,
+            0x194: 0xB9002668,
+            0x578: 0x52800448,
+            0x57C: 0xB9002268,
+        }.items():
+            struct.pack_into("<I", pi, offset, word)
+        g17 = bytearray(0x34)
+        for offset, word in {
+            0x10: 0xAA0103F3,
+            0x14: bl(g17_address + 0x14, pi_address),
+            0x20: 0xBC089260,
+            0x24: 0x3902127F,
+            0x30: 0xD65F0FFF,
+        }.items():
+            struct.pack_into("<I", g17, offset, word)
+        config = bytearray(0x50)
+        for offset, word in {
+            0x08: 0x3DC12100,
+            0x0C: 0x3DC12501,
+            0x10: 0x3DC12902,
+            0x14: 0x3DC12D03,
+            0x3C: 0xAD019023,
+            0x40: 0xAD008821,
+            0x44: 0x3D800020,
+            0x4C: 0xD65F03C0,
+        }.items():
+            struct.pack_into("<I", config, offset, word)
+        base_init = bytearray(0x168C)
+        for offset, word in {
+            0x1678: 0xF9414E69,
+            0x167C: 0xFD425120,
+            0x1680: 0xFD07DD00,
+            0x1684: 0xB944B129,
+            0x1688: 0xB90FC109,
+        }.items():
+            struct.pack_into("<I", base_init, offset, word)
+        symbols = {
+            recover_g17_abi.PI300_READ_CHIP_INFO: pi_address,
+            recover_g17_abi.G17_READ_CHIP_INFO: g17_address,
+            recover_g17_abi.DEVICE_USER_GET_CONFIG: config_address,
+        }
+        code = {
+            recover_g17_abi.PI300_READ_CHIP_INFO: (pi_address, bytes(pi)),
+            recover_g17_abi.G17_READ_CHIP_INFO: (g17_address, bytes(g17)),
+            recover_g17_abi.DEVICE_USER_GET_CONFIG: (
+                config_address,
+                bytes(config),
+            ),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                return_value=g17_address,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: code[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_gpu_identity_config(
+                b"", bytes(base_init)
+            )
+
+        self.assertEqual(recovered["core_type"]["offset"], 0xFB8)
+        self.assertEqual(recovered["core_type"]["selector_value"], 0x22)
+        self.assertEqual(recovered["revision_id"]["c0_decoder_value"], 4)
+        self.assertEqual(recovered["active_core_count"]["offset"], 0xFC0)
+
     def test_recovers_g17_feature_defaults(self) -> None:
         base_address = 0x100000
         pi_address = 0x101000

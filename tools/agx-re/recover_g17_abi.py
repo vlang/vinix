@@ -54,6 +54,15 @@ G17_DEFAULT_MCACHE_WRITES = (
     "__ZN32AGX·PI_300·X·A0·AcceleratorX25halGetDefaultMcacheWritesEv.8045"
 )
 G17_GET_ENABLED_NUM_USCS = "__ZNK14AGXAccelerator17getEnabledNumUSCsEv"
+PI300_READ_CHIP_INFO = (
+    "__ZNK31AGX·PI_300·X·A0·Accelerator12readChipInfoEP16AGXGPUCoreConfig"
+)
+G17_READ_CHIP_INFO = (
+    "__ZNK32AGX·PI_300·X·A0·AcceleratorX12readChipInfoEP16AGXGPUCoreConfig"
+)
+DEVICE_USER_GET_CONFIG = (
+    "__ZN19AGXDeviceUserClient15getDeviceConfigEP16AGXGPUCoreConfig"
+)
 ACCELERATOR_GET_GPTBAT_BASE = "__ZN14AGXAccelerator13getGPTBATBaseEv"
 PI300_NEW_SECURE_MONITOR = (
     "__ZN31AGX·PI_300·X·A0·Accelerator19halNewSecureMonitorEv"
@@ -82,6 +91,7 @@ G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
 G17_GET_SAMPLE_PERIOD_VTABLE_SLOT = 0xF70
 G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
 G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT = 0xAA0
+G17_READ_CHIP_INFO_VTABLE_SLOT = 0x1210
 G17_NEW_SECURE_MONITOR_VTABLE_SLOT = 0xBE0
 G17_GET_GPTBAT_BASE_VTABLE_SLOT = 0x11D0
 SECURE_MONITOR_INIT_VTABLE_SLOT = 0x150
@@ -4798,6 +4808,118 @@ def recover_g17_gptbat_base(
     }
 
 
+def recover_g17_gpu_identity_config(
+    image: bytes, base_init_code: bytes
+) -> dict[str, object]:
+    """Recover the G17 core/revision/count tuple at config +0xfb8."""
+
+    symbols = macho_symbols(image)
+    required = (PI300_READ_CHIP_INFO, G17_READ_CHIP_INFO, DEVICE_USER_GET_CONFIG)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    selected = recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_READ_CHIP_INFO_VTABLE_SLOT
+    )
+    if selected != symbols[G17_READ_CHIP_INFO]:
+        raise ValueError(f"unexpected G17 readChipInfo target {selected:#x}")
+
+    pi_address, pi_code = symbol_code(image, PI300_READ_CHIP_INFO)
+    g17_address, g17_code = symbol_code(image, G17_READ_CHIP_INFO)
+    if len(g17_code) != 0x34:
+        raise ValueError(f"unexpected G17 readChipInfo size {len(g17_code):#x}")
+    call_target = decode_bl_target(
+        g17_address + 0x14, struct.unpack_from("<I", g17_code, 0x14)[0]
+    )
+    if call_target != pi_address:
+        raise ValueError("G17 readChipInfo no longer calls the PI_300 provider")
+    require_instruction_words_at(
+        g17_code,
+        "G17 readChipInfo wrapper",
+        {
+            0x10: 0xAA0103F3,
+            0x14: struct.unpack_from("<I", g17_code, 0x14)[0],
+            0x20: 0xBC089260,
+            0x24: 0x3902127F,
+            0x30: 0xD65F0FFF,
+        },
+    )
+
+    # PI_300 maps ID_VERSION's version selector 4 to core type 0x22. Its
+    # revision decoder maps the 1/1 major/minor encoding to revision ID 4.
+    require_instruction_words_at(
+        pi_code,
+        "G17 GPU core/revision identity decoder",
+        {
+            0xEC: 0x53187EE8,
+            0xF0: 0x71002D1F,
+            0xF8: 0x53105EE8,
+            0xFC: 0x7100111F,
+            0x16C: 0x7100053F,
+            0x170: 0x540000A1,
+            0x174: 0x7100051F,
+            0x178: 0x54000061,
+            0x17C: 0x52800088,
+            0x180: 0x14000005,
+            0x194: 0xB9002668,
+            0x578: 0x52800448,
+            0x57C: 0xB9002268,
+        },
+    )
+
+    _config_address, config_code = symbol_code(image, DEVICE_USER_GET_CONFIG)
+    if len(config_code) != 0x50:
+        raise ValueError(f"unexpected getDeviceConfig size {len(config_code):#x}")
+    require_instruction_words_at(
+        config_code,
+        "G17 core-config export",
+        {
+            0x08: 0x3DC12100,
+            0x0C: 0x3DC12501,
+            0x10: 0x3DC12902,  # accelerator +0x4a0 -> output +0x20
+            0x14: 0x3DC12D03,  # accelerator +0x4b0 -> output +0x30
+            0x3C: 0xAD019023,
+            0x40: 0xAD008821,
+            0x44: 0x3D800020,
+            0x4C: 0xD65F03C0,
+        },
+    )
+    require_instruction_words_at(
+        base_init_code,
+        "G17 GPU identity firmware publication",
+        {
+            0x1678: 0xF9414E69,
+            0x167C: 0xFD425120,  # core type/revision from accelerator +0x4a0
+            0x1680: 0xFD07DD00,  # -> config +0xfb8
+            0x1684: 0xB944B129,  # active cores from accelerator +0x4b0
+            0x1688: 0xB90FC109,  # -> config +0xfc0
+        },
+    )
+    return {
+        "core_type": {
+            "offset": 0xFB8,
+            "source_offset": 0x4A0,
+            "device_config_offset": 0x20,
+            "id_version_selector": 4,
+            "selector_value": 0x22,
+        },
+        "revision_id": {
+            "offset": 0xFBC,
+            "source_offset": 0x4A4,
+            "device_config_offset": 0x24,
+            "c0_decoder_value": 4,
+        },
+        "active_core_count": {
+            "offset": 0xFC0,
+            "source_offset": 0x4B0,
+            "device_config_offset": 0x30,
+            "formula": "active core count decoded from GPU identification registers",
+        },
+        "provider_vtable_slot": G17_READ_CHIP_INFO_VTABLE_SLOT,
+        "provider": G17_READ_CHIP_INFO,
+    }
+
+
 def recover_g17_feature_defaults(
     image: bytes, base_init_code: bytes
 ) -> dict[str, object]:
@@ -6033,6 +6155,9 @@ def main() -> int:
         )
         hardware_config["gptbat_base"] = recover_g17_gptbat_base(
             driver, function
+        )
+        hardware_config["gpu_identity"] = recover_g17_gpu_identity_config(
+            driver, base_init_code
         )
         hardware_config["aux_performance_states"] = (
             recover_g17_aux_performance_layout(driver, power_code)

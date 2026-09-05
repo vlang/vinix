@@ -814,6 +814,12 @@ pub fn new_g17_firmware_scalar_block(hardware &hw.HwConfig, uat_ttb_base u64) G1
 	// address, which is the reserved 64-context TTBR table used by our UAT.
 	result.values[(0xfb0 - 0xe90) / 4] = u32(uat_ttb_base)
 	result.values[(0xfb4 - 0xe90) / 4] = u32(uat_ttb_base >> 32)
+	// getDeviceConfig exposes these same three fields at offsets 0x20, 0x24,
+	// and 0x30. The base firmware producer copies them unchanged from the
+	// accelerator core record into the hardware configuration.
+	result.values[(0xfb8 - 0xe90) / 4] = hardware.firmware_gpu_core_id
+	result.values[(0xfbc - 0xe90) / 4] = u32(hardware.gpu_rev)
+	result.values[(0xfc0 - 0xe90) / 4] = hardware.gpu_core_count
 	return result
 }
 
@@ -974,6 +980,7 @@ pub fn initialize_g17_hardware_config(buffer voidptr, size u64, hardware &hw.HwC
 	if buffer == unsafe { nil } || size != g17_hardware_config_size
 		|| sizeof(G17HardwareConfig) != g17_hardware_config_size
 		|| uat_ttb_base == 0 || uat_ttb_base & (g17_bootstrap_page_size - 1) != 0
+		|| hardware.firmware_gpu_core_id == 0 || hardware.gpu_rev == .unknown
 		|| hardware.perf_state_count == 0
 		|| hardware.perf_state_count > g17_performance_state_capacity
 		|| hardware.perf_state_table_count == 0

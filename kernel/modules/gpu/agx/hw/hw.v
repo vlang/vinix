@@ -64,6 +64,7 @@ pub:
 	gpu_variant           GpuVariant
 	gpu_rev               GpuRevision
 	firmware_abi          FirmwareAbi
+	firmware_gpu_core_id  u32
 	gpu_core_count        u32
 	gpu_feat_compat       u32
 	gpu_feat_incompat     u32
