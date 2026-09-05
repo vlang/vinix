@@ -110,6 +110,10 @@ def fake_collection() -> tuple[bytes, int]:
 
 
 class ExtractFilesetTests(unittest.TestCase):
+    def test_default_entries_cover_cross_kext_gpu_event_targets(self) -> None:
+        self.assertIn("com.apple.iokit.IOGPUFamily", extract_fileset.DEFAULT_ENTRIES)
+        self.assertIn("com.apple.iokit.IOSurface", extract_fileset.DEFAULT_ENTRIES)
+
     def test_extracts_kernel_payload_with_modern_trailing_metadata(self) -> None:
         payload = b"bvx2 compressed bytes"
         im4p = der(

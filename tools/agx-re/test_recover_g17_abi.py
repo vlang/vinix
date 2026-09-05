@@ -2258,6 +2258,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         clpc_call_target: int = 0x110000,
         restart_call_target: int = 0x140000,
         channel_stamp_call_target: int = 0x130000,
+        shared_event_call_target: int = 0x150000,
         reliability_service: str = "function-reliability_monitor",
         changed_validator_type: int = -1,
     ) -> dict[str, object]:
@@ -2302,6 +2303,23 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x2D4: 0x910283E1,
             0x2D8: 0xD102C3A2,
             0x2DC: 0xD2800003,
+            0x544: 0xB94053E8,
+            0x548: 0x7100291F,
+            0x54C: 0x54007BC1,
+            0x550: 0xF84543E1,
+            0x554: 0xB4007601,
+            0x558: 0xB94067E8,
+            0x55C: 0x34000108,
+            0x560: 0xF9414E68,
+            0x564: 0x5286AA09,
+            0x568: 0x72A00029,
+            0x56C: 0x8B090108,
+            0x570: 0xF9400108,
+            0x574: 0x91003108,
+            0x578: 0x089FFD15,
+            0x57C: 0xF9414E68,
+            0x580: 0xF9407900,
+            0x584: bl(role_address + 0x584, shared_event_call_target),
             0x594: 0xB94053E8,
             0x598: 0x71001D1F,
             0x5A0: 0xB94057E8,
@@ -2319,6 +2337,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         dispatch_offsets[4] = 0x70
         dispatch_offsets[7] = 0x480
         dispatch_offsets[8] = 0x180
+        dispatch_offsets[10] = 0x430
         dispatch_offsets[14] = 0x4C
         for event_type in (2, 3, 5, 11):
             dispatch_offsets[event_type] = -0x54
@@ -2330,6 +2349,9 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.IOGPU_EVENT_GET_NUM_STAMPS: 0x130000,
             recover_g17_abi.IOGPU_FENCE_NOTIFY_CLPC: 0x110000,
             recover_g17_abi.IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR: 0x140000,
+        }
+        iosurface_symbols = {
+            recover_g17_abi.IOSURFACE_ROOT_SIGNAL_EVENT_ID: 0x150000,
         }
         start_address = 0x200000
         start = bytearray(0x2CBC)
@@ -2392,6 +2414,7 @@ class RecoverG17AbiTests(unittest.TestCase):
                 tuple(dispatch_offsets),
                 driver_symbols,
                 iogpu_symbols,
+                iosurface_symbols,
             )
 
     def test_classifies_g17_noop_and_advisory_events(self) -> None:
@@ -2411,8 +2434,11 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual([event["type"] for event in recovered["fatal_events"]], [4, 7])
         self.assertEqual(
+            [event["type"] for event in recovered["host_service_events"]], [10]
+        )
+        self.assertEqual(
             recovered["unimplemented_action_event_types"],
-            [6, 9, 10, 12, 13, 15],
+            [6, 9, 12, 13, 15],
         )
 
     def test_rejects_non_noop_g17_controller_event_handler(self) -> None:
@@ -2430,6 +2456,10 @@ class RecoverG17AbiTests(unittest.TestCase):
     def test_rejects_wrong_g17_channel_error_stamp_target(self) -> None:
         with self.assertRaisesRegex(ValueError, "channel-error stamp-count target"):
             self._recover_g17_event_actions(channel_stamp_call_target=0x130004)
+
+    def test_rejects_wrong_g17_shared_event_completion_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "shared-event completion target"):
+            self._recover_g17_event_actions(shared_event_call_target=0x150004)
 
     def test_rejects_changed_g17_event_validator_identity(self) -> None:
         with self.assertRaisesRegex(ValueError, "type 8 validator identity"):

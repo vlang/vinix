@@ -56,6 +56,7 @@ IOGPU_SCHEDULER_SIGNAL_HARDWARE_ERROR = (
     "__ZN14IOGPUScheduler19signalHardwareErrorE15eRestartRequesti"
 )
 IOGPU_SIGNAL_STAMPS_UPDATED = "__ZN5IOGPU19signalStampsUpdatedEv"
+IOSURFACE_ROOT_SIGNAL_EVENT_ID = "__ZN13IOSurfaceRoot13signalEventIDEj"
 G17_CLEAR_FIRMWARE_INTERRUPTS = (
     "__ZN14AGXArmFirmware34clearOutstandingFirmwareInterruptsEv.4213"
 )
@@ -14441,12 +14442,13 @@ def recover_g17_akf_callback(driver: bytes, kernel: bytes) -> dict[str, object]:
 
 
 def recover_g17_firmware_event_ring(
-    driver: bytes, iogpu: bytes
+    driver: bytes, iogpu: bytes, iosurface: bytes
 ) -> dict[str, object]:
     """Recover the role-local ring consumed by callback interrupt index 4."""
 
     symbols = macho_symbols(driver)
     iogpu_symbols = macho_symbols(iogpu)
+    iosurface_symbols = macho_symbols(iosurface)
     required = (
         ACCELERATOR_START,
         FIRMWARE_INIT,
@@ -14470,6 +14472,10 @@ def recover_g17_firmware_event_ring(
     ):
         if name not in iogpu_symbols:
             raise ValueError(f"IOGPUFamily Mach-O has no {name} symbol")
+    if IOSURFACE_ROOT_SIGNAL_EVENT_ID not in iosurface_symbols:
+        raise ValueError(
+            f"IOSurface Mach-O has no {IOSURFACE_ROOT_SIGNAL_EVENT_ID} symbol"
+        )
 
     init_address, init_code = symbol_code(driver, FIRMWARE_INIT)
     _wrapper_address, wrapper_code = symbol_code(driver, FIRMWARE_DRAIN_EVENT_RING)
@@ -14544,6 +14550,7 @@ def recover_g17_firmware_event_ring(
         dispatch_offsets,
         symbols,
         iogpu_symbols,
+        iosurface_symbols,
     )
     require_instruction_words_at(
         role_code,
@@ -14646,6 +14653,7 @@ def recover_g17_firmware_event_actions(
     dispatch_offsets: tuple[int, ...],
     driver_symbols: dict[str, int],
     iogpu_symbols: dict[str, int],
+    iosurface_symbols: dict[str, int],
 ) -> dict[str, object]:
     """Classify only event actions proven by the selected G17 host binaries."""
 
@@ -14813,6 +14821,41 @@ def recover_g17_firmware_event_actions(
     ) != iogpu_symbols[IOGPU_EVENT_GET_NUM_STAMPS]:
         raise ValueError("G17 channel-error stamp-count target changed")
 
+    # Type 10 acknowledges an IOSurface shared-event signal. The record's
+    # nonzero u64 ID is narrowed by IOSurfaceRoot::signalEventID(unsigned int),
+    # which is a no-op when that ID has no registered IOSurfaceSharedEvent.
+    # Vinix has no IOSurface registry and never emits this Apple-only command,
+    # so consuming a validated completion matches the empty-registry path.
+    if dispatch_anchor + dispatch_offsets[10] != role_address + 0x540:
+        raise ValueError("G17 shared-event completion dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 shared-event signal completion",
+        {
+            0x544: 0xB94053E8,  # event type at entry +0
+            0x548: 0x7100291F,  # event type 10
+            0x54C: 0x54007BC1,
+            0x550: 0xF84543E1,  # unaligned u64 event ID at entry +4
+            0x554: 0xB4007601,  # event ID must be nonzero
+            0x558: 0xB94067E8,  # pre-signal release flag at entry +0x14
+            0x55C: 0x34000108,
+            0x560: 0xF9414E68,  # firmware +0x298 -> accelerator
+            0x564: 0x5286AA09,
+            0x568: 0x72A00029,  # accelerator member 0x13550
+            0x56C: 0x8B090108,
+            0x570: 0xF9400108,
+            0x574: 0x91003108,  # pointed object byte +0xc
+            0x578: 0x089FFD15,  # release-store byte 1
+            0x57C: 0xF9414E68,
+            0x580: 0xF9407900,  # accelerator IOSurfaceRoot at +0xf0
+        },
+    )
+    shared_event_call = struct.unpack_from("<I", role_code, 0x584)[0]
+    if decode_bl_target(
+        role_address + 0x584, shared_event_call
+    ) != iosurface_symbols[IOSURFACE_ROOT_SIGNAL_EVENT_ID]:
+        raise ValueError("G17 shared-event completion target changed")
+
     accepted_types = [
         event_type
         for event_type in range(32)
@@ -14825,7 +14868,7 @@ def recover_g17_firmware_event_actions(
         event_type for event_type in direct_noop_types if event_type not in accepted_types
     ]
     effective_noops = [0, *accepted_direct_noops]
-    implemented = {*effective_noops, 1, 4, 7, 8, 14}
+    implemented = {*effective_noops, 1, 4, 7, 8, 10, 14}
     return {
         "jump_table_function_offsets": {
             str(event_type): dispatch_anchor + offset - role_address
@@ -14888,6 +14931,19 @@ def recover_g17_firmware_event_actions(
                 "payload_bytes": 8,
                 "host_action": "IOGPUFenceMachine::notifyCLPCIOPerfControl",
                 "vinix_policy": "consume_without_clpc_observers",
+            }
+        ],
+        "host_service_events": [
+            {
+                "type": 10,
+                "record": "AGFIFirmwareEventSharedEventSignalComplete",
+                "event_id_offset": 4,
+                "event_id_bytes": 8,
+                "event_id_nonzero": True,
+                "pre_signal_release_flag_offset": 0x14,
+                "host_action": "IOSurfaceRoot::signalEventID",
+                "host_action_id_bits": 32,
+                "vinix_policy": "consume_without_iosurface_registry",
             }
         ],
         "unimplemented_action_event_types": [
@@ -15021,6 +15077,11 @@ def main() -> int:
         "--iogpu", type=Path, default=Path("build/kext/g17c/iokit.IOGPUFamily.macho")
     )
     parser.add_argument(
+        "--iosurface",
+        type=Path,
+        default=Path("build/kext/g17c/iokit.IOSurface.macho"),
+    )
+    parser.add_argument(
         "--rtbuddy",
         type=Path,
         default=Path("build/kext/g17c/AGXFirmwareKextG17XRTBuddy.macho"),
@@ -15031,6 +15092,7 @@ def main() -> int:
         kernel = args.kernel.read_bytes()
         firmware = args.firmware.read_bytes()
         iogpu = args.iogpu.read_bytes()
+        iosurface = args.iosurface.read_bytes()
         rtbuddy = args.rtbuddy.read_bytes()
         driver_uuid = macho_uuid(driver)
         firmware_uuid = macho_uuid(firmware)
@@ -15063,7 +15125,7 @@ def main() -> int:
             driver, kernel
         )
         boot_transport["callback_dispatch"]["firmware_event_ring"] = (
-            recover_g17_firmware_event_ring(driver, iogpu)
+            recover_g17_firmware_event_ring(driver, iogpu, iosurface)
         )
         rtbuddy_endpoints = recover_g17_rtbuddy_endpoints(
             symbol_code(rtbuddy, RTBUDDY_READ_MESSAGE)[1],

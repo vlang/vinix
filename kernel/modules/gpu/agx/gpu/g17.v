@@ -928,6 +928,16 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 				}
 				continue
 			}
+			if entry.event_type == fw.g17_firmware_event_shared_event_signal_complete {
+				// Apple signals an IOSurface registry ID. Vinix exposes DRM
+				// syncobjs instead and cannot have a matching IOSurface entry,
+				// making this equivalent to Apple's empty-registry no-op.
+				if !fw.validate_g17_firmware_shared_event_signal_complete(&entry) {
+					mgr.state = .error
+					return false
+				}
+				continue
+			}
 			if entry.event_type == fw.g17_firmware_event_rt_completion {
 				// Apple forwards this value only to optional IOGPU CLPC
 				// performance observers. Vinix has no corresponding observer

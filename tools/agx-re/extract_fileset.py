@@ -39,6 +39,9 @@ DEFAULT_ENTRIES = (
     # AGXCommandQueue inherits its device binding from IOGPUCommandQueue, so
     # the two remaining channel inputs can only be resolved with this entry.
     "com.apple.iokit.IOGPUFamily",
+    # Firmware shared-event completions leave AGX and enter the IOSurface
+    # registry, so keep the target image available for symbol-level checks.
+    "com.apple.iokit.IOSurface",
 )
 
 

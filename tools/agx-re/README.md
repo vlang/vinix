@@ -66,7 +66,8 @@ kernel collection and compacts the kernel, AGXG17X, and firmware-buddy fileset
 entries
 into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 `IOGPUFamily` is included because `AGXCommandQueue` inherits its device
-binding, and with it the last two channel inputs, from `IOGPUCommandQueue`.
+binding, and with it the last two channel inputs, from `IOGPUCommandQueue`;
+`IOSurface` identifies the cross-kext shared-event completion target.
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
@@ -120,10 +121,12 @@ handshake. The eight-entry t6050 interrupt topology now selects Apple's
 callback source 4, and Vinix can drain both validated 256-entry firmware event
 rings, preserve all three effective host no-op event types, consume the
 optional type-8 reliability and type-14 RT/CLPC observer notifications, and
-translate the type-1 128-slot firing mask into fence-completion scans. The
+translate the type-1 128-slot firing mask into fence-completion scans. It also
+validates and consumes type-10 IOSurface shared-event completions because Vinix
+has no IOSurface registry or producer for those Apple-only commands. The
 recovered portions of its shared/runtime objects include their initial platform
-values and runtime policy. The work-command ABI and userspace command producer still
-need byte-accurate implementations before enabling T6050. The hardware
+values and runtime policy. The work-command ABI and userspace command producer
+still need byte-accurate implementations before enabling T6050. The hardware
 configuration is now complete, including the two die-dependent power rows.
 Their three-word eFuse input is decoded in integer quarter-units and combined
 with version-pinned Q24.40 leakage factors; integer binary32 helpers reproduce
@@ -154,7 +157,7 @@ per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
 channel ring geometry, the creating process ID and the app GPU role are all
 recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
-register emission graph into the work-command encoder, implementing the six
+register emission graph into the work-command encoder, implementing the five
 remaining callback error/control event actions, and work-command reclamation.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
