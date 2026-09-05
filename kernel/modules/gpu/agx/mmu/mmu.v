@@ -17,6 +17,7 @@ pub const uat_num_contexts = 64
 pub const uat_kernel_flush_slot = 64
 pub const uat_user_va_start = u64(0x4000)
 pub const uat_user_va_end = u64(1) << 39
+pub const uat_unknown_page = uat_user_va_end - 2 * pgtable.uat_pgsz
 pub const uat_kernel_va_start = u64(0xffffffa000000000)
 pub const uat_kernel_va_end = u64(0xffffffb000000000)
 

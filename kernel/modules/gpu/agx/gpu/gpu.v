@@ -45,6 +45,8 @@ const g13_fw_log_index = 3
 const g13_ktrace_index = 4
 const g13_stats_index = 5
 const g13_pipe_base_index = 6
+const g13_mmio_va_start = u64(0xffffffaf00000000)
+const g13_mmio_va_end = u64(0xffffffb000000000)
 
 // GPU states
 pub enum GpuState {
@@ -207,6 +209,9 @@ mut:
 	globals          SharedBuffer
 	fw_status        SharedBuffer
 	fwlog_payload    SharedBuffer
+	hwdata_b         SharedBuffer
+	io_mapping_vas   [fw.g13_io_mapping_count]u64
+	io_mapping_sizes [fw.g13_io_mapping_count]u64
 }
 
 @[inline]
@@ -290,8 +295,91 @@ fn (mut mgr GpuManager) alloc_g13_channel_pair(mut allocations G13ChannelAllocat
 	return true
 }
 
+fn unmap_g13_io_mappings(mut allocations G13ChannelAllocations) {
+	if uat_mgr == unsafe { nil } {
+		return
+	}
+	for index := 0; index < fw.g13_io_mapping_count; index++ {
+		if allocations.io_mapping_sizes[index] != 0 {
+			uat_mgr.unmap_kernel(allocations.io_mapping_vas[index], allocations.io_mapping_sizes[index])
+			allocations.io_mapping_vas[index] = 0
+			allocations.io_mapping_sizes[index] = 0
+		}
+	}
+}
+
+// Map the t8103 firmware PIO aperture at the canonical v12.3 MMIO range and
+// publish one byte-exact HwDataB record per ABI slot. Sparse slots stay zero.
+fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocations) bool {
+	if uat_mgr == unsafe { nil } || allocations.hwdata_b.phys == 0
+		|| mgr.hw_config.io_mapping_count != fw.g13_io_mapping_count {
+		return false
+	}
+	mut next_va := g13_mmio_va_start
+	mut mapped_count := u32(0)
+	unsafe {
+		mut data := &fw.G13HwDataB(allocations.hwdata_b.phys + higher_half)
+		for index := 0; index < fw.g13_io_mapping_count; index++ {
+			mapping := mgr.hw_config.io_mappings[index]
+			if !mapping.is_present() {
+				continue
+			}
+			if mapping.range_size == 0 || mapping.range_size > mapping.size
+				|| mapping.size > 0xffff_ffff || mapping.range_size > 0xffff_ffff {
+				unmap_g13_io_mappings(mut allocations)
+				return false
+			}
+			page_offset := mapping.phys & pgtable.uat_pg_mask
+			physical_page := mapping.phys & ~pgtable.uat_pg_mask
+			if mapping.size > u64(-1) - page_offset {
+				unmap_g13_io_mappings(mut allocations)
+				return false
+			}
+			span := page_offset + mapping.size
+			if span > u64(-1) - pgtable.uat_pg_mask {
+				unmap_g13_io_mappings(mut allocations)
+				return false
+			}
+			map_size := (span + pgtable.uat_pg_mask) & ~pgtable.uat_pg_mask
+			if map_size == 0 || next_va > g13_mmio_va_end || map_size > g13_mmio_va_end - next_va {
+				unmap_g13_io_mappings(mut allocations)
+				return false
+			}
+			protection := if mapping.writable {
+				pgtable.gpu_prot_fw_mmio_rw
+			} else {
+				pgtable.gpu_prot_fw_mmio_ro
+			}
+			if !uat_mgr.map_kernel(next_va, physical_page, map_size, protection) {
+				unmap_g13_io_mappings(mut allocations)
+				return false
+			}
+			allocations.io_mapping_vas[index] = next_va
+			allocations.io_mapping_sizes[index] = map_size
+			data.io_mappings[index] = fw.G13IoMapping{
+				physical_address: mapping.phys
+				virtual_address: next_va + page_offset
+				total_size: u32(mapping.size)
+				element_size: u32(mapping.range_size)
+				readwrite: if mapping.writable { u64(1) } else { u64(0) }
+			}
+			mapped_count++
+
+			if map_size > u64(-1) - pgtable.uat_pgsz
+				|| map_size + pgtable.uat_pgsz > g13_mmio_va_end - next_va {
+				next_va = g13_mmio_va_end
+			} else {
+				next_va += map_size + pgtable.uat_pgsz
+			}
+		}
+	}
+	return mapped_count == 10
+}
+
 fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelAllocations) {
+	unmap_g13_io_mappings(mut allocations)
 	mgr.free_shared_buffer(mut allocations.initdata)
+	mgr.free_shared_buffer(mut allocations.hwdata_b)
 	mgr.free_shared_buffer(mut allocations.fwlog_payload)
 	mgr.free_shared_buffer(mut allocations.fw_status)
 	mgr.free_shared_buffer(mut allocations.globals)
@@ -512,7 +600,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	if mgr.hw_config.firmware_abi == .g17_26_5_partial {
 		return mgr.init_g17_firmware_data()
 	}
-	if mgr.g13_channels == unsafe { nil } || !fw.validate_g13_initdata_layouts() {
+	if mgr.g13_channels == unsafe { nil } || !fw.validate_g13_initdata_layouts()
+		|| !fw.validate_g13_hwdata_layouts() {
 		C.printf(c'agx: G13 InitData outer layout validation failed\n')
 		return false
 	}
@@ -536,6 +625,19 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	graph.fwlog_payload = mgr.alloc_shared_buffer(u64(fw.g13_fwlog_subchannels) * u64(fw.g13_fwlog_payload_count) * sizeof(fw.FwLogPayloadMsg)) or {
 		return false
 	}
+	graph.hwdata_b = mgr.alloc_shared_buffer_with_protection(fw.g13_hwdata_b_size, pgtable.gpu_prot_fw_private_rw) or {
+		return false
+	}
+	unsafe {
+		mut hwdata_b := &fw.G13HwDataB(graph.hwdata_b.phys + higher_half)
+		if !fw.populate_g13_hwdata_b(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base,
+			mmu.uat_unknown_page) {
+			return false
+		}
+	}
+	if !mgr.map_g13_io_mappings(mut graph) {
+		return false
+	}
 	graph.initdata = mgr.alloc_shared_buffer_with_protection(fw.g13_initdata_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
@@ -553,6 +655,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.fw_log = fw.make_g13_ring_pointers(mgr.channels.fw_log.state_base, mgr.channels.fw_log.ring_base)
 		runtime.ktrace = fw.make_g13_ring_pointers(mgr.channels.ktrace.state_base, mgr.channels.ktrace.ring_base)
 		runtime.stats = fw.make_g13_ring_pointers(mgr.channels.stats.state_base, mgr.channels.stats.ring_base)
+		runtime.hwdata_b = graph.hwdata_b.va
+		runtime.hwdata_b_2 = graph.hwdata_b.va
 		runtime.fwlog_buffer = graph.fwlog_payload.va
 		// RuntimeScratch::unk_6b38 is 0xff in the reference 12.3 builder.
 		runtime.gpu_scratch[0x68b8] = 0xff
