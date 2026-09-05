@@ -283,6 +283,34 @@ def parse_pmp(node: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def parse_pmp_endpoint_service(node: dict[str, Any]) -> dict[str, Any]:
+    if node.get("IOObjectClass") != "RTBuddyEndpointService":
+        raise InspectError("PMP endpoint service has an unexpected IOObjectClass")
+    name = node.get("IORegistryEntryName")
+    if not isinstance(name, str):
+        raise InspectError("PMP endpoint service is missing its registry name")
+    role = next(
+        (candidate for candidate in ("PMP0", "PMP1") if name.startswith(candidate + "Endpoint")),
+        None,
+    )
+    if role is None:
+        raise InspectError("PMP endpoint service has an unexpected registry name")
+    suffix_text = name[len(role + "Endpoint") :]
+    if not suffix_text.isdecimal():
+        raise InspectError("PMP endpoint service has a non-numeric suffix")
+    service_suffix = int(suffix_text)
+    wire_endpoint = service_suffix + 0x1F
+    if service_suffix < 1 or wire_endpoint > 0xFF:
+        raise InspectError("PMP endpoint service suffix is out of range")
+    return {
+        "name": name,
+        "class": "RTBuddyEndpointService",
+        "role": role,
+        "service_suffix": service_suffix,
+        "wire_endpoint": wire_endpoint,
+    }
+
+
 def parse_arm_io(node: dict[str, Any]) -> dict[str, Any]:
     if "compatible" not in node or "die-count" not in node:
         raise InspectError("arm-io node is missing compatible or die-count")
@@ -460,6 +488,25 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                 ]
                 if item.get("segments") != expected_segments:
                     warnings.append(f"t6050 {role} iBoot firmware map changed")
+        if "pmp_endpoint_services" in manifest:
+            endpoint_services = manifest["pmp_endpoint_services"]
+            if not isinstance(endpoint_services, list) or len(endpoint_services) != len(
+                pmp_roles if isinstance(pmp_roles, list) else []
+            ):
+                warnings.append("t6050 PMP endpoint-service count changed")
+            else:
+                for index, service in enumerate(endpoint_services):
+                    expected_role = f"PMP{index}"
+                    if (
+                        not isinstance(service, dict)
+                        or service.get("role") != expected_role
+                        or service.get("service_suffix") != 1
+                        or service.get("wire_endpoint") != 0x20
+                    ):
+                        warnings.append(
+                            f"t6050 {expected_role} application endpoint changed"
+                        )
+                        break
     return warnings
 
 
@@ -506,6 +553,24 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             ["ioreg", "-a", "-p", "IODeviceTree", "-n", "pmp1", "-r"]
         )
 
+    if args.pmp0_endpoint_plist:
+        pmp0_endpoint_raw = _load_plist(args.pmp0_endpoint_plist)
+    elif args.pmp0_plist:
+        pmp0_endpoint_raw = None
+    else:
+        pmp0_endpoint_raw = _run_plist(
+            ["ioreg", "-a", "-r", "-n", "PMP0Endpoint1"]
+        )
+
+    if args.pmp1_endpoint_plist:
+        pmp1_endpoint_raw = _load_plist(args.pmp1_endpoint_plist)
+    elif args.pmp1_plist or pmp1_raw is None:
+        pmp1_endpoint_raw = None
+    else:
+        pmp1_endpoint_raw = _run_plist(
+            ["ioreg", "-a", "-r", "-n", "PMP1Endpoint1"]
+        )
+
     if args.accelerator_plist:
         accelerator_raw = _load_plist(args.accelerator_plist)
     else:
@@ -519,8 +584,21 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     pmp_roles = [parse_pmp(_first_node(pmp0_raw, "pmp0 plist"))]
     if pmp1_raw is not None:
         pmp_roles.append(parse_pmp(_first_node(pmp1_raw, "pmp1 plist")))
+    pmp_endpoint_services = []
+    if pmp0_endpoint_raw is not None:
+        pmp_endpoint_services.append(
+            parse_pmp_endpoint_service(
+                _first_node(pmp0_endpoint_raw, "PMP0 endpoint plist")
+            )
+        )
+    if pmp1_endpoint_raw is not None:
+        pmp_endpoint_services.append(
+            parse_pmp_endpoint_service(
+                _first_node(pmp1_endpoint_raw, "PMP1 endpoint plist")
+            )
+        )
     manifest = {
-        "schema": 3,
+        "schema": 4,
         "host": {
             "architecture": platform.machine(),
             "macos_version": platform.mac_ver()[0],
@@ -530,6 +608,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         "asc": primary_asc,
         "asc_roles": asc_roles,
         "pmp_roles": pmp_roles,
+        "pmp_endpoint_services": pmp_endpoint_services,
         "accelerator": parse_accelerator(_first_node(accelerator_raw, "accelerator plist")),
         "driver": parse_driver_info(_load_plist(driver_path)),
     }
@@ -554,6 +633,16 @@ def main() -> int:
     )
     parser.add_argument(
         "--pmp1-plist", type=Path, help="read an ioreg pmp1 plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--pmp0-endpoint-plist",
+        type=Path,
+        help="read a PMP0Endpoint1 IOService plist instead of live IORegistry",
+    )
+    parser.add_argument(
+        "--pmp1-endpoint-plist",
+        type=Path,
+        help="read a PMP1Endpoint1 IOService plist instead of live IORegistry",
     )
     parser.add_argument(
         "--accelerator-plist", type=Path, help="read an ioreg accelerator plist instead of live IORegistry"

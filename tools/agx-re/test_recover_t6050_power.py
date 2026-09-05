@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 17)
+        self.assertEqual(result["schema"], 18)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -1117,6 +1117,8 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
             recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_HELLO,
             recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+            recover_t6050_power.RTBUDDY_CREATE_ENDPOINT,
+            recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
         )
         symbols = {name: 0x1000 + index * 0x1000 for index, name in enumerate(names)}
 
@@ -1247,9 +1249,24 @@ class RecoverT6050PowerTests(unittest.TestCase):
 
         roll_code = bytearray(
             struct.pack(
-                "<6I",
+                "<5I",
                 0xB9415808,
                 0x7100151F,
+                0xD3609436,
+                0x531B6AD5,
+                0x36000097,
+            )
+        )
+        call(
+            roll_code,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+            recover_t6050_power.RTBUDDY_CREATE_ENDPOINT,
+        )
+        roll_code.extend(
+            struct.pack(
+                "<6I",
+                0x110006B5,
+                0x53017EF7,
                 0xD73F0910,
                 0x35000180,
                 0xF9403A60,
@@ -1301,6 +1318,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 ],
                 bytes(roll_code),
             ),
+            recover_t6050_power.RTBUDDY_CREATE_ENDPOINT: (
+                symbols[recover_t6050_power.RTBUDDY_CREATE_ENDPOINT],
+                struct.pack("<I", 0xD65F03C0),
+            ),
+            recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME: (
+                symbols[
+                    recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME
+                ],
+                struct.pack("<2I", 0x51007C33, 0xA9004FE0),
+            ),
         }
         result = (
             recover_t6050_power.recover_rtbuddy_boot_handshake_code_contract(
@@ -1310,6 +1337,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
         handshake = result["rtkit_handshake"]
         self.assertEqual(handshake["protocol_version"], 12)
         self.assertEqual(handshake["transport_ready_status"], 6)
+        self.assertEqual(
+            handshake["endpoint_roll_call"]["endpoint1_wire_endpoint"], 0x20
+        )
         self.assertIn("does not prove ApplePMGR", handshake["scope"])
 
         bad_functions = dict(functions)
@@ -1322,6 +1352,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
         )
         with self.assertRaisesRegex(ValueError, "roll-call readiness"):
+            recover_t6050_power.recover_rtbuddy_boot_handshake_code_contract(
+                bad_functions, symbols
+            )
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME] = (
+            symbols[recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME],
+            struct.pack("<2I", 0x51008033, 0xA9004FE0),
+        )
+        with self.assertRaisesRegex(ValueError, "service-name mapping"):
             recover_t6050_power.recover_rtbuddy_boot_handshake_code_contract(
                 bad_functions, symbols
             )

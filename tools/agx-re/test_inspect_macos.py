@@ -198,6 +198,20 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertEqual(result["compatible"], ["arm-io,t6050"])
         self.assertEqual(result["die_count"], 1)
 
+    def test_decodes_pmp_application_endpoint_service(self) -> None:
+        result = inspect_macos.parse_pmp_endpoint_service(
+            {
+                "IORegistryEntryName": "PMP0Endpoint1",
+                "IOObjectClass": "RTBuddyEndpointService",
+                "IORegistryEntryID": 123456,
+            }
+        )
+
+        self.assertEqual(result["role"], "PMP0")
+        self.assertEqual(result["service_suffix"], 1)
+        self.assertEqual(result["wire_endpoint"], 0x20)
+        self.assertNotIn("IORegistryEntryID", result)
+
     def test_t6050_manifest_cross_checks_topology(self) -> None:
         manifest = {
             "platform": {"compatible": ["arm-io,t6050"], "die_count": 2},
@@ -234,6 +248,20 @@ class InspectMacOSTests(unittest.TestCase):
                 inspect_macos.parse_pmp(self.pmp_node("PMP0", 0x284500000)),
                 inspect_macos.parse_pmp(self.pmp_node("PMP1", 0x4284500000)),
             ],
+            "pmp_endpoint_services": [
+                inspect_macos.parse_pmp_endpoint_service(
+                    {
+                        "IORegistryEntryName": "PMP0Endpoint1",
+                        "IOObjectClass": "RTBuddyEndpointService",
+                    }
+                ),
+                inspect_macos.parse_pmp_endpoint_service(
+                    {
+                        "IORegistryEntryName": "PMP1Endpoint1",
+                        "IOObjectClass": "RTBuddyEndpointService",
+                    }
+                ),
+            ],
             "accelerator": {
                 "gpu_core_count": 40,
                 "configuration": {
@@ -252,6 +280,36 @@ class InspectMacOSTests(unittest.TestCase):
             }
         )
         self.assertEqual(inspect_macos.validate_manifest(manifest), [])
+
+    def test_t6050_manifest_rejects_changed_pmp_application_endpoint(self) -> None:
+        manifest = {
+            "platform": {"compatible": ["arm-io,t6050"], "die_count": 1},
+            "device_tree": {"compatible": ["gpu,t6050"]},
+            "asc_roles": [
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX"},
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX1"},
+            ],
+            "pmp_roles": [
+                inspect_macos.parse_pmp(self.pmp_node("PMP0", 0x284500000))
+            ],
+            "pmp_endpoint_services": [
+                {
+                    "name": "PMP0Endpoint2",
+                    "class": "RTBuddyEndpointService",
+                    "role": "PMP0",
+                    "service_suffix": 2,
+                    "wire_endpoint": 0x21,
+                }
+            ],
+            "accelerator": {
+                "configuration": {"gpu_gen": 17, "gpu_var": "C"}
+            },
+        }
+
+        self.assertIn(
+            "t6050 PMP0 application endpoint changed",
+            inspect_macos.validate_manifest(manifest),
+        )
 
     def test_t6050_manifest_rejects_changed_pmp_preload_mapping(self) -> None:
         manifest = {

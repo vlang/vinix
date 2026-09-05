@@ -118,7 +118,11 @@ advances to status 5, and only a successfully replied endpoint roll call
 advances to transport-ready status 6. Both polling and blocking validation
 paths are pinned, including timeout and terminal-failure behavior. Status 6 is
 RTKit transport readiness, not ApplePMGR's separate `PMP-STATUS` or AGX
-dashboard acknowledgement. Vinix
+dashboard acknowledgement. The roll-call decoder also proves that the low
+32-bit bitmap names wire endpoints in groups of 32. RTBuddy's generic service
+label subtracts `0x1f`, so the live `PMP0Endpoint1` service is wire endpoint
+`0x20`, not endpoint 1. The live inspector now checks that translation for
+every active die without retaining registry identifiers. Vinix
 mirrors the low-level contract with a dormant bounds-checked
 paired reader and separate write portal. A nonblocking owner serializes one
 transaction across the active dies and makes post-write failures sticky, but

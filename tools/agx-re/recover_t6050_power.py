@@ -161,6 +161,10 @@ RTBUDDY_MANAGEMENT_HANDLE_HELLO = (
 RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL = (
     "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy"
 )
+RTBUDDY_CREATE_ENDPOINT = "__ZN7RTBuddy14createEndpointEj"
+RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME = (
+    "__ZN22RTBuddyEndpointService10createNameEP9IOServicej"
+)
 RTBUDDY_ENDPOINT_GET_SLAVE = "__ZN15RTBuddyEndpoint17getSlaveProcessorEv"
 RTBUDDY_ENDPOINT_INIT_OWNER = (
     "__ZN15RTBuddyEndpoint12initForOwnerEP8OSObjectPFvS1_PvS2_ES2_"
@@ -2037,6 +2041,8 @@ def recover_rtbuddy_boot_handshake_code_contract(
         RTBUDDY_SET_IOP_STATUS_PUBLIC,
         RTBUDDY_MANAGEMENT_HANDLE_HELLO,
         RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+        RTBUDDY_CREATE_ENDPOINT,
+        RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
     )
     missing_symbols = [name for name in required if name not in symbols]
     if missing_symbols:
@@ -2202,6 +2208,32 @@ def recover_rtbuddy_boot_handshake_code_contract(
         raise ValueError("RTBuddy management Hello negotiation changed")
 
     roll_address, roll_code = functions[RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL]
+    if direct_branch_count(
+        roll_address, roll_code, symbols[RTBUDDY_CREATE_ENDPOINT]
+    ) != 1 or not _has_ordered_words(
+        roll_code,
+        (
+            0xD3609436,  # bitmap group is bits 32..37
+            0x531B6AD5,  # first wire endpoint is group * 32
+            0x36000097,  # create an endpoint for each set bitmap bit
+            0x110006B5,  # advance to the next wire endpoint
+            0x53017EF7,  # advance to the next bitmap bit
+        ),
+    ):
+        raise ValueError("RTBuddy endpoint roll-call bitmap decoder changed")
+
+    _create_name_address, create_name_code = functions[
+        RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME
+    ]
+    if not _has_ordered_words(
+        create_name_code,
+        (
+            0x51007C33,  # generic service suffix = wire endpoint - 0x1f
+            0xA9004FE0,  # format(provider-name, suffix)
+        ),
+    ):
+        raise ValueError("RTBuddy application endpoint service-name mapping changed")
+
     roll_status_offsets = [
         offset
         for offset in range(0, len(roll_code) - 3, 4)
@@ -2261,6 +2293,17 @@ def recover_rtbuddy_boot_handshake_code_contract(
             "validation_success": "target status reached",
             "validation_failure": "status 0x8000 or configured timeout",
             "transport_ready_status": 6,
+            "endpoint_roll_call": {
+                "bitmap_word_bits": 32,
+                "group_field": {"shift": 32, "bits": 6},
+                "wire_endpoint": "group * 32 + set-bit index",
+                "application_service_suffix": "wire endpoint - 0x1f",
+                "endpoint1_wire_endpoint": 0x20,
+                "scope": (
+                    "Endpoint1 is a service-name suffix, not RTKit wire "
+                    "endpoint 1"
+                ),
+            },
             "scope": (
                 "RTBuddy transport and endpoint discovery only; it does not "
                 "prove ApplePMGR observed PMP-STATUS or an AGX dashboard ack"
@@ -2296,6 +2339,8 @@ def recover_apple_pmp_firmware(
         RTBUDDY_SET_IOP_STATUS_PUBLIC,
         RTBUDDY_MANAGEMENT_HANDLE_HELLO,
         RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+        RTBUDDY_CREATE_ENDPOINT,
+        RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
     )
     rtbuddy_functions = {
         name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
@@ -3171,7 +3216,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 17,
+        "schema": 18,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
