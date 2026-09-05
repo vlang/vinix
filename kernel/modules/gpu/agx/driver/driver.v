@@ -446,6 +446,10 @@ pub fn initialise() {
 			return
 		}
 	}
+	if chip_id == 0x8103 && !regs.validate_g13_identity_decoder() {
+		println('agx: internal G13 identity decoder validation failed')
+		return
+	}
 	if !drm_ioctl.validate_asahi_25_layouts() {
 		println('agx: Mesa 25.0.5 DRM UAPI layout validation failed')
 		return
@@ -500,8 +504,7 @@ pub fn initialise() {
 	// M1. Detection is useful for bring-up logs, but writes here could corrupt
 	// firmware-owned memory or wedge the machine.
 	if !cfg.can_boot_firmware() {
-		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n',
-			chip_id, cfg.firmware_abi_name())
+		C.printf(c'agx: chip 0x%x firmware ABI %s is not complete; leaving hardware untouched\n', chip_id, cfg.firmware_abi_name())
 		return
 	}
 

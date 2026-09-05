@@ -68,31 +68,24 @@ pub mut:
 
 pub struct HwConfig {
 pub:
-	chip_id               u32
-	gpu_gen               GpuGen
-	gpu_variant           GpuVariant
-	gpu_rev               GpuRevision
-	firmware_abi          FirmwareAbi
-	firmware_gpu_core_id  u32
-	gpu_core_count        u32
-	gpu_feat_compat       u32
-	gpu_feat_incompat     u32
-	max_dies              u32
-	num_clusters          u32
-	num_cores_per_cluster u32
-	num_frags             u32
-	num_gps               u32
-	num_mgpus             u32
-	usc_gen               u32
-	core_mask_list        [4]u32
-	kickid_qid_mask       u32
-	kickid_qid_shift      u32
-	is_sksm               bool
-	base_clock_hz         u64
-	uat_ias               u32 // Input address size (bits)
-	uat_oas               u32 // Output address size (bits)
-	map_kernel_to_user    bool
-	num_banks             u32
+	chip_id              u32
+	gpu_gen              GpuGen
+	gpu_variant          GpuVariant
+	firmware_abi         FirmwareAbi
+	firmware_gpu_core_id u32
+	gpu_feat_compat      u32
+	gpu_feat_incompat    u32
+	max_dies             u32
+	num_mgpus            u32
+	usc_gen              u32
+	kickid_qid_mask      u32
+	kickid_qid_shift     u32
+	is_sksm              bool
+	base_clock_hz        u64
+	uat_ias              u32 // Input address size (bits)
+	uat_oas              u32 // Output address size (bits)
+	map_kernel_to_user   bool
+	num_banks            u32
 	// Memory regions
 	shared_region_base     u64
 	shared_region_size     u64
@@ -122,6 +115,15 @@ pub:
 	// Native Apple DeviceTree performance data. G17 firmware has capacity for
 	// 16 states and 16 voltage domains; the M5 Max currently supplies 14 x 4.
 pub mut:
+	// Runtime topology is read from hardware on G13 because fused-off cores
+	// differ between otherwise identical t8103 products.
+	gpu_rev               GpuRevision
+	gpu_core_count        u32
+	num_clusters          u32
+	num_cores_per_cluster u32
+	num_frags             u32
+	num_gps               u32
+	core_mask_list        [4]u32
 	// Translated primary GPU register aperture discovered from the boot
 	// DeviceTree. Modern firmware derives its PIO records from this range.
 	gpu_mmio_base            u64
@@ -153,6 +155,40 @@ pub fn (cfg &HwConfig) firmware_abi_name() &char {
 		.v12_3 { c'G13 v12.3' }
 		.g17_26_5_partial { c'G17 26.5 (partial)' }
 	}
+}
+
+// Apply topology read from the G13 identity registers. Static configuration
+// fields are maxima; the active core count and masks vary with fused-off cores
+// (the base M1 Air commonly reports seven active cores).
+pub fn (mut cfg HwConfig) apply_g13_identity(revision_code u32, num_clusters u32,
+	num_cores_per_cluster u32, num_frags_per_cluster u32, num_gps_per_cluster u32,
+	total_active_cores u32, core_masks [4]u32) bool {
+	if cfg.gpu_gen != .g13 || num_clusters == 0 || num_clusters > cfg.num_clusters
+		|| num_cores_per_cluster == 0 || num_cores_per_cluster > cfg.num_cores_per_cluster
+		|| num_frags_per_cluster > cfg.num_frags / cfg.num_clusters
+		|| num_gps_per_cluster > cfg.num_gps / cfg.num_clusters || total_active_cores == 0
+		|| total_active_cores > num_clusters * num_cores_per_cluster {
+		return false
+	}
+	revision := match revision_code {
+		0x00 { GpuRevision.a0 }
+		0x01 { GpuRevision.a1 }
+		0x10 { GpuRevision.b0 }
+		0x11 { GpuRevision.b1 }
+		0x20 { GpuRevision.c0 }
+		0x21 { GpuRevision.c1 }
+		else {
+			return false
+		}
+	}
+	cfg.gpu_rev = revision
+	cfg.gpu_core_count = total_active_cores
+	cfg.num_clusters = num_clusters
+	cfg.num_cores_per_cluster = num_cores_per_cluster
+	cfg.num_frags = num_clusters * num_frags_per_cluster
+	cfg.num_gps = num_clusters * num_gps_per_cluster
+	cfg.core_mask_list = core_masks
+	return true
 }
 
 pub struct DynConfig {

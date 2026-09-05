@@ -325,6 +325,21 @@ pub fn (mut mgr GpuManager) init() bool {
 			return false
 		}
 	}
+	if mgr.hw_config.gpu_gen == .g13 {
+		identity := mgr.res.get_g13_identity() or {
+			C.printf(c'agx: Invalid G13 identity registers\n')
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+		if !mgr.hw_config.apply_g13_identity(identity.revision_code, identity.num_clusters, identity.num_cores_per_cluster, identity.num_frags_per_cluster, identity.num_gps_per_cluster, identity.total_active_cores, identity.core_masks) {
+			C.printf(c'agx: G13 identity exceeds t8103 hardware limits\n')
+			mgr.stop_firmware_cpus(mgr.firmware_roles)
+			mgr.state = .error
+			return false
+		}
+		C.printf(c'agx: G13 topology: %u/%u active cores, mask 0x%x\n', identity.total_active_cores, identity.num_cores_per_cluster * identity.num_clusters, identity.core_masks[0])
+	}
 
 	// Step 2: Negotiate the RTKit transport independently for every role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {

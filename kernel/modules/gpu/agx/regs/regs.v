@@ -26,6 +26,92 @@ pub const gpu_id_identity_14 = u32(0xD04014)
 pub const gpu_id_identity_18 = u32(0xD04018)
 pub const gpu_id_identity_1c = u32(0xD0401C)
 
+// G13/G14 identity uses a different register contract from G14X/G17. These
+// names follow the v12.3 Asahi decoder and are kept separate from the modern
+// identity helpers below.
+pub const g13_id_counts_1 = u32(0xd04010)
+pub const g13_id_counts_2 = u32(0xd04014)
+pub const g13_id_clusters = u32(0xd0401c)
+pub const g13_core_mask_0 = u32(0xd01500)
+pub const g13_core_mask_1 = u32(0xd01514)
+
+pub struct G13Identity {
+pub:
+	revision_code         u32
+	num_clusters          u32
+	num_cores_per_cluster u32
+	num_frags_per_cluster u32
+	num_gps_per_cluster   u32
+	total_active_cores    u32
+	core_masks            [4]u32
+}
+
+// Decode the six G13 identity registers without touching MMIO. Keeping this
+// pure makes fused-core configurations (including the 7-core base M1 Air)
+// deterministic and independently testable.
+pub fn decode_g13_identity(version u32, counts_1 u32, counts_2 u32, clusters_reg u32,
+	core_mask_0 u32, core_mask_1 u32) ?G13Identity {
+	if (version >> 24) & 0xff != 4 || (version >> 16) & 0xff != 2 {
+		return none
+	}
+	revision_code := (version >> 8) & 0xff
+	if revision_code != 0x00 && revision_code != 0x01 && revision_code != 0x10
+		&& revision_code != 0x11 && revision_code != 0x20 && revision_code != 0x21 {
+		return none
+	}
+	num_clusters := (clusters_reg >> 12) & 0xff
+	num_cores := counts_1 & 0xff
+	num_gps := (counts_2 >> 16) & 0xff
+	if num_clusters == 0 || num_clusters > 4 || num_cores == 0 || num_cores > 32
+		|| num_gps == 0 || num_clusters * num_cores > 64 {
+		return none
+	}
+
+	packed_masks := u64(core_mask_0) | (u64(core_mask_1) << 32)
+	cluster_mask := if num_cores == 32 {
+		u64(0xffff_ffff)
+	} else {
+		(u64(1) << num_cores) - 1
+	}
+	mut masks := [4]u32{}
+	mut active := u32(0)
+	for cluster := u32(0); cluster < num_clusters; cluster++ {
+		mask := u32((packed_masks >> (cluster * num_cores)) & cluster_mask)
+		masks[cluster] = mask
+		active += popcount64(mask)
+	}
+	used_bits := num_clusters * num_cores
+	if used_bits < 64 && packed_masks >> used_bits != 0 {
+		return none
+	}
+	if active == 0 {
+		return none
+	}
+
+	return G13Identity{
+		revision_code: revision_code
+		num_clusters: num_clusters
+		num_cores_per_cluster: num_cores
+		num_frags_per_cluster: num_cores
+		num_gps_per_cluster: num_gps
+		total_active_cores: active
+		core_masks: masks
+	}
+}
+
+pub fn validate_g13_identity_decoder() bool {
+	base_air := decode_g13_identity(0x04020100, 8, u32(4) << 16, u32(1) << 12, 0x7f, 0) or { return false }
+	full_m1 := decode_g13_identity(0x04020100, 8, u32(4) << 16, u32(1) << 12, 0xff, 0) or { return false }
+	if base_air.total_active_cores != 7 || base_air.core_masks[0] != 0x7f
+		|| full_m1.total_active_cores != 8 || full_m1.core_masks[0] != 0xff {
+		return false
+	}
+	if _ := decode_g13_identity(0x04020100, 8, u32(4) << 16, u32(1) << 12, 0x17f, 0) {
+		return false
+	}
+	return true
+}
+
 // GPU core-mask registers. Apple's readChipInfo maps these separately from the
 // ordinary register accessor, but the base it uses is getGPUPhysicalAddress(),
 // which probe sets to the physical address of device-memory range 0 -- the
@@ -290,4 +376,8 @@ pub fn (r &GpuResources) get_gpu_id() (u32, u32) {
 	version := r.sgx_read32(gpu_id_version)
 	core_count := r.sgx_read32(gpu_id_count)
 	return version, core_count
+}
+
+pub fn (r &GpuResources) get_g13_identity() ?G13Identity {
+	return decode_g13_identity(r.sgx_read32(gpu_id_version), r.sgx_read32(g13_id_counts_1), r.sgx_read32(g13_id_counts_2), r.sgx_read32(g13_id_clusters), r.sgx_read32(g13_core_mask_0), r.sgx_read32(g13_core_mask_1))
 }
