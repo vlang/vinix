@@ -94,6 +94,7 @@ pub:
 	size    u64
 	private bool
 mut:
+	mapped   bool
 	released bool
 }
 
@@ -439,6 +440,7 @@ pub fn (mut ctx UatContext) alloc_driver_buffer(size u64, private bool) ?&UatBuf
 		phys: phys
 		size: aligned_size
 		private: private
+		mapped: true
 	}
 	ctx.driver_buffers << buffer
 	return buffer
@@ -453,9 +455,10 @@ fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
 		return
 	}
 	owned.released = true
-	if ctx.pgtable != unsafe { nil } && owned.va != 0 && owned.size != 0 {
+	if owned.mapped && ctx.pgtable != unsafe { nil } && owned.va != 0 && owned.size != 0 {
 		mut pt := unsafe { ctx.pgtable }
 		pt.unmap(owned.va, owned.size)
+		owned.mapped = false
 	}
 	if owned.phys != 0 && owned.size != 0 {
 		memory.pmm_free(voidptr(owned.phys), owned.size / u64(4096))
@@ -465,6 +468,38 @@ fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
 	} else {
 		ctx.driver_gpu.release(owned.va)
 	}
+}
+
+// Remove a driver-buffer translation but retain its physical backing until
+// the caller has completed the matching firmware UAT invalidation.
+pub fn (mut ctx UatContext) unmap_driver_buffer(buffer &UatBuffer) bool {
+	if buffer == unsafe { nil } {
+		return false
+	}
+	ctx.lock.acquire()
+	defer {
+		ctx.lock.release()
+	}
+	for candidate in ctx.driver_buffers {
+		if voidptr(candidate) != voidptr(buffer) {
+			continue
+		}
+		mut owned := unsafe { candidate }
+		if owned.released {
+			return false
+		}
+		if !owned.mapped {
+			return true
+		}
+		if ctx.pgtable == unsafe { nil } || owned.va == 0 || owned.size == 0 {
+			return false
+		}
+		mut pt := unsafe { ctx.pgtable }
+		pt.unmap(owned.va, owned.size)
+		owned.mapped = false
+		return true
+	}
+	return false
 }
 
 pub fn (mut ctx UatContext) release_driver_buffer(buffer &UatBuffer) {

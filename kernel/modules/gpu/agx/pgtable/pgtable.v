@@ -50,27 +50,21 @@ pub const uat_memattr_normal_uncached = u64(2) << 2 // Index 2: Normal non-cache
 
 // Composite mappings used by the AGX driver. These match Asahi's UAT
 // protection encoding rather than the CPU's superficially similar AP bits.
-pub const gpu_prot_fw_gpu_cached_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
-	uat_pte_ap_fw_gpu | uat_memattr_normal_cached | uat_pte_af
-pub const gpu_prot_fw_gpu_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
-	uat_pte_ap_fw_gpu | uat_memattr_normal_uncached | uat_pte_af
-pub const gpu_prot_fw_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn |
-	uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
-pub const gpu_prot_fw_shared_ro = uat_pte_os | uat_pte_pxn | uat_pte_ap_fw_only |
-	uat_memattr_normal_uncached | uat_pte_af
-pub const gpu_prot_fw_private_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only |
-	uat_memattr_normal_cached | uat_pte_af
+pub const gpu_prot_fw_gpu_cached_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_gpu | uat_memattr_normal_cached | uat_pte_af
+pub const gpu_prot_fw_gpu_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_gpu | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_shared_ro = uat_pte_os | uat_pte_pxn | uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_private_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_normal_cached | uat_pte_af
+// Firmware-private R/W while the GPU can only read. Apple UAT uses PXN as the
+// extra GPU-read permission bit for this otherwise firmware-private mapping.
+pub const gpu_prot_gpu_ro_fw_private_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_normal_cached | uat_pte_af
 // Firmware-only device mappings. The UAT permission encoding uses UXN as
 // the firmware write-enable bit for AP=firmware; this intentionally mirrors
 // Asahi's PROT_FW_MMIO_{RW,RO} encodings rather than CPU stage-1 semantics.
-pub const gpu_prot_fw_mmio_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only |
-	uat_memattr_device | uat_pte_af
-pub const gpu_prot_fw_mmio_ro = uat_pte_os | uat_pte_ap_fw_only | uat_memattr_device |
-	uat_pte_af
-pub const gpu_prot_gpu_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_gpu_only |
-	uat_memattr_normal_uncached | uat_pte_af
-pub const gpu_prot_gpu_shared_ro = uat_pte_os | uat_pte_ap_gpu_only |
-	uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_mmio_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_device | uat_pte_af
+pub const gpu_prot_fw_mmio_ro = uat_pte_os | uat_pte_ap_fw_only | uat_memattr_device | uat_pte_af
+pub const gpu_prot_gpu_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_gpu_shared_ro = uat_pte_os | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
 
 // Number of 4KB kernel pages required for one 16KB GPU page table page
 const kernel_pages_per_uat_page = u64(4) // 4 * 4096 = 16384
@@ -79,7 +73,7 @@ const kernel_pages_per_uat_page = u64(4) // 4 * 4096 = 16384
 
 pub struct UatPgtable {
 pub mut:
-	l1         &u64     = unsafe { nil } // Root table physical address
+	l1         &u64 = unsafe { nil } // Root table physical address
 	l1_phys    u64
 	ias        u32
 	oas_mask   u64
@@ -115,12 +109,12 @@ pub fn new_pgtable(ias u32, oas u32) ?&UatPgtable {
 	l1 := alloc_table_page() or { return none }
 
 	return &UatPgtable{
-		l1:         l1
-		l1_phys:    u64(l1)
-		ias:        ias
-		oas_mask:   (u64(1) << oas) - 1
+		l1: l1
+		l1_phys: u64(l1)
+		ias: ias
+		oas_mask: (u64(1) << oas) - 1
 		non_global: true
-		owns_root:  true
+		owns_root: true
 	}
 }
 
@@ -132,12 +126,12 @@ pub fn new_pgtable_with_root(root_phys u64, ias u32, oas u32) ?&UatPgtable {
 		return none
 	}
 	return &UatPgtable{
-		l1:         unsafe { &u64(root_phys) }
-		l1_phys:    root_phys
-		ias:        ias
-		oas_mask:   (u64(1) << oas) - 1
+		l1: unsafe { &u64(root_phys) }
+		l1_phys: root_phys
+		ias: ias
+		oas_mask: (u64(1) << oas) - 1
 		non_global: false
-		owns_root:  false
+		owns_root: false
 	}
 }
 

@@ -54,6 +54,7 @@ const buffer_allocator_g13_private = u32(1)
 const buffer_allocator_g13_shared = u32(2)
 const buffer_allocator_g13_readonly = u32(3)
 const buffer_allocator_fixed = u32(4)
+const buffer_allocator_g13_gpu_readonly = u32(5)
 
 // GPU states
 pub enum GpuState {
@@ -78,28 +79,30 @@ pub mut:
 
 pub struct GpuManager {
 pub mut:
-	res            regs.GpuResources
-	hw_config      hw.HwConfig
-	rtk            rtkit.RTKit
-	secondary_rtk  rtkit.RTKit
-	firmware_roles u32
-	channels       GpuChannels
-	allocs         alloc.HeapAllocator
-	g13_private    alloc.HeapAllocator
-	g13_shared     alloc.HeapAllocator
-	g13_readonly   alloc.HeapAllocator
-	g13_timestamp  alloc.HeapAllocator
-	initdata_va    u64
-	initdata_phys  u64
-	state          GpuState
-	lock           klock.Lock
+	res              regs.GpuResources
+	hw_config        hw.HwConfig
+	rtk              rtkit.RTKit
+	secondary_rtk    rtkit.RTKit
+	firmware_roles   u32
+	channels         GpuChannels
+	allocs           alloc.HeapAllocator
+	g13_private      alloc.HeapAllocator
+	g13_gpu_readonly alloc.HeapAllocator
+	g13_shared       alloc.HeapAllocator
+	g13_readonly     alloc.HeapAllocator
+	g13_timestamp    alloc.HeapAllocator
+	initdata_va      u64
+	initdata_phys    u64
+	state            GpuState
+	lock             klock.Lock
 mut:
-	g13_channels &G13ChannelAllocations = unsafe { nil }
-	g13_events   G13EventResources
-	g13_queues   []&G13QueueResources
-	g17_graph    &G17FirmwareGraph = unsafe { nil }
-	g17_queues   []&G17QueueResources
-	fwctl_lock   klock.Lock
+	g13_channels     &G13ChannelAllocations = unsafe { nil }
+	g13_events       G13EventResources
+	g13_queues       []&G13QueueResources
+	g13_compute_jobs []&G13ComputeJobResources
+	g17_graph        &G17FirmwareGraph = unsafe { nil }
+	g17_queues       []&G17QueueResources
+	fwctl_lock       klock.Lock
 }
 
 __global (
@@ -137,6 +140,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		state: .idle
 		allocs: alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
 		g13_private: alloc.new_heap('g13-private', alloc.g13_private_start, alloc.g13_private_end)
+		g13_gpu_readonly: alloc.new_heap('g13-gpu-readonly', alloc.g13_gpu_readonly_start, alloc.g13_gpu_readonly_end)
 		g13_shared: alloc.new_heap('g13-shared', alloc.g13_shared_start, alloc.g13_shared_end)
 		g13_readonly: alloc.new_heap('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end)
 		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
@@ -215,6 +219,7 @@ mut:
 	phys      u64
 	size      u64
 	allocator u32
+	mapped    bool
 }
 
 @[inline]
@@ -292,6 +297,7 @@ fn alloc_buffer_from_heap(mut heap alloc.HeapAllocator, size u64, protection u64
 		phys: phys
 		size: aligned_size
 		allocator: allocator_id
+		mapped: true
 	}
 }
 
@@ -315,6 +321,9 @@ fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64,
 		}
 		pgtable.gpu_prot_fw_shared_ro {
 			alloc_buffer_from_heap(mut mgr.g13_readonly, size, protection, buffer_allocator_g13_readonly)
+		}
+		pgtable.gpu_prot_gpu_ro_fw_private_rw {
+			alloc_buffer_from_heap(mut mgr.g13_gpu_readonly, size, protection, buffer_allocator_g13_gpu_readonly)
 		}
 		else { none }
 	}
@@ -376,22 +385,31 @@ fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
 		phys: phys
 		size: aligned_size
 		allocator: buffer_allocator_fixed
+		mapped: true
 	}
 }
 
-// Release a driver-owned shared allocation after its firmware consumer has
-// stopped. The caller batches heap GC so a complete reverse-order unwind can
-// collapse the whole virtual-address suffix in one pass.
-fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
+// Remove a context-zero UAT mapping while retaining its physical backing.
+// Dynamic job teardown must invalidate the removed translation before the
+// backing page is returned to the PMM and can be reused for another object.
+fn unmap_shared_buffer(mut buffer SharedBuffer) {
+	if !buffer.mapped || buffer.va == 0 || buffer.size == 0 {
+		return
+	}
+	if uat_mgr != unsafe { nil } {
+		uat_mgr.unmap_kernel(buffer.va, buffer.size)
+	}
+	buffer.mapped = false
+}
+
+fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
 	if buffer.va != 0 {
-		if uat_mgr != unsafe { nil } && buffer.size != 0 {
-			uat_mgr.unmap_kernel(buffer.va, buffer.size)
-		}
 		match buffer.allocator {
 			buffer_allocator_default { mgr.allocs.release(buffer.va) }
 			buffer_allocator_g13_private { mgr.g13_private.release(buffer.va) }
 			buffer_allocator_g13_shared { mgr.g13_shared.release(buffer.va) }
 			buffer_allocator_g13_readonly { mgr.g13_readonly.release(buffer.va) }
+			buffer_allocator_g13_gpu_readonly { mgr.g13_gpu_readonly.release(buffer.va) }
 			else {}
 		}
 	}
@@ -399,6 +417,14 @@ fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 		memory.pmm_free(voidptr(buffer.phys), buffer.size / page_size)
 	}
 	buffer = SharedBuffer{}
+}
+
+// Release a driver-owned shared allocation after its firmware consumer has
+// stopped. The caller batches heap GC so a complete reverse-order unwind can
+// collapse the whole virtual-address suffix in one pass.
+fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
+	unmap_shared_buffer(mut buffer)
+	mgr.release_shared_buffer_backing(mut buffer)
 }
 
 fn (mut mgr GpuManager) alloc_g13_channel_pair(mut allocations G13ChannelAllocations,
@@ -531,6 +557,7 @@ fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelA
 	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
 	mgr.g13_readonly.gc()
+	mgr.g13_gpu_readonly.gc()
 }
 
 fn (mut mgr GpuManager) release_g13_channels() {
@@ -1007,6 +1034,7 @@ fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		mgr.handle_event()
 		event.scan_all_completions()
+		mgr.reap_g13_compute_jobs()
 		sched.yield(false)
 	}
 }
@@ -1021,6 +1049,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_all_g13_compute_jobs()
 	mgr.release_all_g13_queue_resources()
 	mgr.release_g13_channels()
 	mgr.release_g13_event_resources_locked()

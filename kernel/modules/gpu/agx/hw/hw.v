@@ -129,24 +129,25 @@ pub mut:
 
 pub struct HwConfig {
 pub:
-	chip_id              u32
-	gpu_gen              GpuGen
-	gpu_variant          GpuVariant
-	firmware_abi         FirmwareAbi
-	firmware_gpu_core_id u32
-	gpu_feat_compat      u32
-	gpu_feat_incompat    u32
-	max_dies             u32
-	num_mgpus            u32
-	usc_gen              u32
-	kickid_qid_mask      u32
-	kickid_qid_shift     u32
-	is_sksm              bool
-	base_clock_hz        u64
-	uat_ias              u32 // Input address size (bits)
-	uat_oas              u32 // Output address size (bits)
-	map_kernel_to_user   bool
-	num_banks            u32
+	chip_id               u32
+	gpu_gen               GpuGen
+	gpu_variant           GpuVariant
+	firmware_abi          FirmwareAbi
+	firmware_gpu_core_id  u32
+	gpu_feat_compat       u32
+	gpu_feat_incompat     u32
+	max_dies              u32
+	num_mgpus             u32
+	usc_gen               u32
+	kickid_qid_mask       u32
+	kickid_qid_shift      u32
+	is_sksm               bool
+	base_clock_hz         u64
+	uat_ias               u32 // Input address size (bits)
+	uat_oas               u32 // Output address size (bits)
+	map_kernel_to_user    bool
+	num_banks             u32
+	compute_preempt1_size u64
 	// Memory regions
 	shared_region_base     u64
 	shared_region_size     u64

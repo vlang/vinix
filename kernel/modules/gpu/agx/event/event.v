@@ -18,20 +18,21 @@ pub const stamp_size = u32(4)
 
 pub struct StampState {
 pub mut:
-	value  u32
-	fence  &syncobj.DmaFence = unsafe { nil }
-	in_use bool
+	value     u32
+	fence     &syncobj.DmaFence = unsafe { nil }
+	in_use    bool
+	completed bool
 }
 
 pub struct EventManager {
 pub mut:
-	stamp_base u64 // GPU VA of stamp array
-	stamp_phys u64 // physical address
+	stamp_base    u64 // GPU VA of stamp array
+	stamp_phys    u64 // physical address
 	fw_stamp_base u64
 	fw_stamp_phys u64
-	stamps     [max_stamps]StampState
-	initialized bool
-	lock       klock.Lock
+	stamps        [max_stamps]StampState
+	initialized   bool
+	lock          klock.Lock
 }
 
 __global (
@@ -91,6 +92,7 @@ pub fn (mut em EventManager) alloc_stamp() ?u32 {
 			em.stamps[i].in_use = true
 			em.stamps[i].value = 0
 			em.stamps[i].fence = unsafe { nil }
+			em.stamps[i].completed = false
 			unsafe {
 				mut stamp := &u32(em.stamp_phys + u64(i) * stamp_size + higher_half)
 				mut fw_stamp := &u32(em.fw_stamp_phys + u64(i) * stamp_size + higher_half)
@@ -118,6 +120,7 @@ pub fn (mut em EventManager) free_stamp(index u32) {
 	em.stamps[index].in_use = false
 	em.stamps[index].fence = unsafe { nil }
 	em.stamps[index].value = 0
+	em.stamps[index].completed = false
 }
 
 // Return the GPU virtual address of a stamp slot.
@@ -179,6 +182,9 @@ pub fn (mut em EventManager) check_completion(index u32) bool {
 	if !em.stamps[index].in_use {
 		return false
 	}
+	if em.stamps[index].completed {
+		return true
+	}
 
 	// Read the stamp value from shared memory
 	stamp_phys_addr := em.stamp_phys + u64(index) * u64(stamp_size)
@@ -194,6 +200,7 @@ pub fn (mut em EventManager) check_completion(index u32) bool {
 		if em.stamps[index].fence != unsafe { nil } {
 			syncobj.signal(em.stamps[index].fence)
 		}
+		em.stamps[index].completed = true
 		return true
 	}
 
@@ -231,6 +238,9 @@ pub fn (mut em EventManager) scan_completions() {
 		if !em.stamps[i].in_use {
 			continue
 		}
+		if em.stamps[i].completed {
+			continue
+		}
 
 		if em.stamps[i].value == 0 {
 			continue
@@ -245,9 +255,7 @@ pub fn (mut em EventManager) scan_completions() {
 			if em.stamps[i].fence != unsafe { nil } {
 				syncobj.signal(em.stamps[i].fence)
 			}
-			// Mark slot as no longer in use
-			em.stamps[i].in_use = false
-			em.stamps[i].fence = unsafe { nil }
+			em.stamps[i].completed = true
 		}
 	}
 }
@@ -256,4 +264,28 @@ pub fn (mut em EventManager) scan_completions() {
 // encapsulated in this module.
 pub fn scan_all_completions() {
 	gpu_event_mgr.scan_completions()
+}
+
+pub fn reserve_stamp() ?u32 {
+	return gpu_event_mgr.alloc_stamp()
+}
+
+pub fn release_stamp(index u32) {
+	gpu_event_mgr.free_stamp(index)
+}
+
+pub fn advance_stamp(index u32) ?u32 {
+	return gpu_event_mgr.next_stamp_value(index)
+}
+
+pub fn driver_stamp_address(index u32) u64 {
+	return gpu_event_mgr.get_stamp_addr(index)
+}
+
+pub fn firmware_stamp_address(index u32) u64 {
+	return gpu_event_mgr.get_fw_stamp_addr(index)
+}
+
+pub fn stamp_completed(index u32) bool {
+	return gpu_event_mgr.check_completion(index)
 }

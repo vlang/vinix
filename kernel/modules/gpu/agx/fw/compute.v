@@ -4,6 +4,14 @@ module fw
 // from the queue's GPU-read-only heap while retaining write access to its
 // timestamp and bookkeeping fields.
 
+pub const g13_compute_unk_pointee_offset = u64(0x14)
+pub const g13_compute_job_params_1_offset = u64(0x68)
+pub const g13_compute_microsequence_offset = u64(0x1e8)
+pub const g13_compute_job_params_2_offset = u64(0x1f4)
+pub const g13_compute_cur_ts_offset = u64(0x2a8)
+pub const g13_compute_start_ts_offset = u64(0x2b0)
+pub const g13_compute_end_ts_offset = u64(0x2b8)
+
 @[packed]
 pub struct G13ComputeJobParameters1 {
 pub mut:

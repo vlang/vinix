@@ -29,6 +29,8 @@ pub const gpu_readonly_end = u64(0x400000000) // 16 GB cumulative
 // classes in the exact disjoint ranges expected by the v12.3 firmware ABI.
 pub const g13_private_start = u64(0xffffffa000000000)
 pub const g13_private_end = u64(0xffffffa600000000)
+pub const g13_gpu_readonly_start = u64(0xffffffa600000000)
+pub const g13_gpu_readonly_end = u64(0xffffffa800000000)
 pub const g13_shared_start = u64(0xffffffa800000000)
 pub const g13_shared_end = u64(0xffffffaa00000000)
 pub const g13_readonly_start = u64(0xffffffaa00000000)
@@ -40,8 +42,8 @@ pub const g13_timestamp_end = u64(0xffffffae14000000)
 
 pub struct Allocation {
 pub mut:
-	va     u64  // GPU virtual address of the allocation
-	size   u64  // Size in bytes (always 16KB-aligned)
+	va     u64 // GPU virtual address of the allocation
+	size   u64 // Size in bytes (always 16KB-aligned)
 	in_use bool // false once freed; eligible for GC
 }
 
@@ -63,10 +65,10 @@ pub mut:
 // Create a new heap allocator managing the VA range [start, end).
 pub fn new_heap(name string, start u64, end u64) HeapAllocator {
 	return HeapAllocator{
-		name:  name
+		name: name
 		start: start
-		end:   end
-		top:   start
+		end: end
+		top: start
 	}
 }
 
@@ -97,8 +99,7 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 		h.gc_locked()
 		aligned_top2 := lib.align_up(h.top, actual_align)
 		if aligned_top2 + aligned_size > h.end {
-			C.printf(c'gpu alloc %s: out of VA space (need 0x%llx, avail 0x%llx)\n',
-				h.name.str, aligned_size, h.end - aligned_top2)
+			C.printf(c'gpu alloc %s: out of VA space (need 0x%llx, avail 0x%llx)\n', h.name.str, aligned_size, h.end - aligned_top2)
 			return none
 		}
 		// Use the post-GC pointer
@@ -106,8 +107,8 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 		h.top = va + aligned_size
 
 		a := &Allocation{
-			va:     va
-			size:   aligned_size
+			va: va
+			size: aligned_size
 			in_use: true
 		}
 		h.allocations << a
@@ -118,8 +119,8 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	h.top = va + aligned_size
 
 	a := &Allocation{
-		va:     va
-		size:   aligned_size
+		va: va
+		size: aligned_size
 		in_use: true
 	}
 	h.allocations << a
@@ -183,7 +184,6 @@ fn (mut h HeapAllocator) gc_locked() {
 			break
 		}
 	}
-
 }
 
 // Return the total number of bytes currently in use (allocated and not freed).
