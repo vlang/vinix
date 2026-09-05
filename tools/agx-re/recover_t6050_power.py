@@ -136,11 +136,30 @@ RTBUDDY_CALL_PATCHBAY_CALLBACK = (
     "__ZN7RTBuddy20callPatchbayCallbackEP15RTBuddyFirmware"
 )
 RTBUDDY_POWER_ON = "__ZN7RTBuddy7powerOnEv"
+RTBUDDY_LOAD_FIRMWARE = "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware"
 RTBUDDY_LOAD_FIRMWARE_GATED = (
     "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware"
 )
 RTBUDDY_WAIT_FOR_FIRMWARE_SERVICE_GATED = (
     "__ZN7RTBuddy28_waitForFirmwareServiceGatedEv"
+)
+RTBUDDY_PERFORM_POWER_STATE_GATED = (
+    "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState"
+)
+RTBUDDY_IOP_VALIDATE = "__ZN7RTBuddy12_iopValidateEv"
+RTBUDDY_IOP_VALIDATE_POLLING = (
+    "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus"
+)
+RTBUDDY_IOP_VALIDATE_BLOCKING = (
+    "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus"
+)
+RTBUDDY_SET_IOP_STATUS = "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus"
+RTBUDDY_SET_IOP_STATUS_PUBLIC = "__ZN7RTBuddy12setIopStatusE12RtbIopStatus"
+RTBUDDY_MANAGEMENT_HANDLE_HELLO = (
+    "__ZN25RTBuddyManagementEndpoint12_handleHelloEy"
+)
+RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL = (
+    "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy"
 )
 RTBUDDY_ENDPOINT_GET_SLAVE = "__ZN15RTBuddyEndpoint17getSlaveProcessorEv"
 RTBUDDY_ENDPOINT_INIT_OWNER = (
@@ -1986,6 +2005,259 @@ def recover_apple_pmp_firmware_code_contract(
     }
 
 
+def recover_rtbuddy_boot_handshake_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+) -> dict[str, object]:
+    """Recover the CPU-start to RTKit endpoint-roll-call state machine.
+
+    Status 6 is the first transport-level milestone after CPU start: it is
+    published only after a valid Hello and a successfully replied endpoint
+    roll call.  It still says nothing about ApplePMGR's PMP dashboard state.
+    """
+
+    required = (
+        RTBUDDY_LOAD_FIRMWARE,
+        RTBUDDY_PERFORM_POWER_STATE_GATED,
+        RTBUDDY_IOP_VALIDATE,
+        RTBUDDY_IOP_VALIDATE_POLLING,
+        RTBUDDY_IOP_VALIDATE_BLOCKING,
+        RTBUDDY_SET_IOP_STATUS,
+        RTBUDDY_SET_IOP_STATUS_PUBLIC,
+        RTBUDDY_MANAGEMENT_HANDLE_HELLO,
+        RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+    )
+    missing_symbols = [name for name in required if name not in symbols]
+    if missing_symbols:
+        raise ValueError(
+            f"RTBuddy is missing boot-handshake symbols: {missing_symbols!r}"
+        )
+    missing_functions = [name for name in required if name not in functions]
+    if missing_functions:
+        raise ValueError(
+            f"RTBuddy has no boot-handshake code body for {missing_functions!r}"
+        )
+
+    _load_address, load_code = functions[RTBUDDY_LOAD_FIRMWARE]
+    if not _has_ordered_words(
+        load_code,
+        (
+            0x39443668,  # power-transition suppression byte at RTBuddy+0x10d
+            0x37000168,  # skip the power transition when it is set
+            0xD2810311,  # RTBuddy setPowerState vtable slot 0x818
+            0xAA1303E0,
+            0x52800021,  # requested RTBuddy power state 1
+            0xD2800002,  # no provider override
+            0xD73F0910,
+        ),
+    ):
+        raise ValueError("RTBuddy firmware-load power transition changed")
+
+    perform_address, perform_code = functions[RTBUDDY_PERFORM_POWER_STATE_GATED]
+    if direct_branch_count(
+        perform_address, perform_code, symbols[RTBUDDY_SET_IOP_STATUS]
+    ) != 2 or direct_branch_count(
+        perform_address, perform_code, symbols[RTBUDDY_IOP_VALIDATE]
+    ) != 1:
+        raise ValueError("RTBuddy managed boot status calls changed")
+    status_four_offset = perform_code.find(struct.pack("<I", 0x52800081))
+    validate_offsets = [
+        offset
+        for offset in range(0, len(perform_code) - 3, 4)
+        if direct_branch_target_at(perform_address, perform_code, offset)
+        == symbols[RTBUDDY_IOP_VALIDATE]
+    ]
+    if (
+        status_four_offset < 0
+        or direct_branch_target_at(
+            perform_address, perform_code, status_four_offset + 4
+        )
+        != symbols[RTBUDDY_SET_IOP_STATUS]
+        or len(validate_offsets) != 1
+        or not _has_ordered_words(
+            perform_code[status_four_offset : validate_offsets[0] + 4],
+            (
+                0x52800081,  # status 4 before starting the IOP
+                0xF9405A60,  # concrete AppleA7IOP wrapper at RTBuddy+0xb0
+                0xF950F661,  # selected firmware at RTBuddy+0x21e8
+                0xD2811111,  # AppleA7IOP startCPUWithOptions slot 0x888
+                0xD73F0910,
+            ),
+        )
+    ):
+        raise ValueError("RTBuddy managed CPU-start ordering changed")
+
+    validate_address, validate_code = functions[RTBUDDY_IOP_VALIDATE]
+    if (
+        direct_branch_count(
+            validate_address,
+            validate_code,
+            symbols[RTBUDDY_IOP_VALIDATE_POLLING],
+        )
+        != 1
+        or direct_branch_count(
+            validate_address,
+            validate_code,
+            symbols[RTBUDDY_IOP_VALIDATE_BLOCKING],
+        )
+        != 1
+        or not _has_ordered_words(
+            validate_code,
+            (
+                0x39440008,  # validation mode byte at RTBuddy+0x100
+                0x39442268,  # wrapper-running byte at RTBuddy+0x108
+                0x528000D4,  # ordinary initial target status 6
+                0x52800114,  # alternate target status 8
+                0xF9009A60,  # validation start timestamp at RTBuddy+0x130
+                0x52844B08,  # polling selector byte at RTBuddy+0x2258
+            ),
+        )
+    ):
+        raise ValueError("RTBuddy IOP validation dispatch changed")
+
+    _polling_address, polling_code = functions[RTBUDDY_IOP_VALIDATE_POLLING]
+    validation_result_words = (
+        0xB9412800,  # timeout configuration at RTBuddy+0x128
+        0xD2813D11,  # pollHardwareForMessage vtable slot 0x9e8
+        0xB9415A88,  # current IOP status at RTBuddy+0x158
+        0x6B08027F,  # success when current status equals the target
+        0x7140211F,  # terminal failure status 0x8000
+        0x528058E9,  # base error 0xe00002c7
+        0x72BC0009,
+        0x11003D2A,  # timeout error = base + 0xf = 0xe00002d6
+    )
+    if not _has_ordered_words(polling_code, validation_result_words):
+        raise ValueError("RTBuddy polling validation loop changed")
+
+    _blocking_address, blocking_code = functions[RTBUDDY_IOP_VALIDATE_BLOCKING]
+    if not _has_ordered_words(
+        blocking_code,
+        (
+            0x91056015,  # address of status word at RTBuddy+0x158
+            0xB9412A80,  # timeout configuration at RTBuddy+0x128
+            0x91084208,  # command-gate sleep vtable slot 0x210
+            0xB9415A88,  # current IOP status
+            0x6B08027F,  # success when current status equals the target
+            0x7140211F,  # terminal failure status 0x8000
+            0x528058E9,
+            0x72BC0009,
+            0x11003D2A,
+        ),
+    ):
+        raise ValueError("RTBuddy blocking validation loop changed")
+
+    set_public_address, set_public_code = functions[RTBUDDY_SET_IOP_STATUS_PUBLIC]
+    if direct_branch_count(
+        set_public_address, set_public_code, symbols[RTBUDDY_SET_IOP_STATUS]
+    ) != 1 or not _has_ordered_words(
+        set_public_code,
+        (
+            0xD2811111,  # obtain the RTBuddy command gate
+            0x91056261,  # status word at RTBuddy+0x158
+            0x52800002,  # wake every waiter for that word
+        ),
+    ):
+        raise ValueError("RTBuddy IOP status publication changed")
+
+    hello_address, hello_code = functions[RTBUDDY_MANAGEMENT_HANDLE_HELLO]
+    hello_status_offsets = [
+        offset
+        for offset in range(0, len(hello_code) - 3, 4)
+        if direct_branch_target_at(hello_address, hello_code, offset)
+        == symbols[RTBUDDY_SET_IOP_STATUS_PUBLIC]
+    ]
+    if (
+        len(hello_status_offsets) != 2
+        or struct.unpack_from("<I", hello_code, hello_status_offsets[0] - 4)[0]
+        != 0x528000A1
+        or struct.unpack_from("<I", hello_code, hello_status_offsets[1] - 4)[0]
+        != 0x52900001
+        or not _has_ordered_words(
+            hello_code,
+            (
+                0xB9415808,  # current IOP status
+                0x7100111F,  # Hello is expected while status is 4
+                0x7140211F,  # also handle the 0x8000 failure sentinel
+                0xB9010661,  # save the Hello word
+                0x12003C28,  # peer minimum protocol, low 16 bits
+                0x7100311F,  # peer minimum must be <= 12
+                0xD350FC28,  # peer maximum protocol, high 16 bits
+                0x12003D08,
+                0x7100311F,  # peer maximum must be >= 12
+                0x528000A1,  # accepted Hello advances to status 5
+            ),
+        )
+    ):
+        raise ValueError("RTBuddy management Hello negotiation changed")
+
+    roll_address, roll_code = functions[RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL]
+    roll_status_offsets = [
+        offset
+        for offset in range(0, len(roll_code) - 3, 4)
+        if direct_branch_target_at(roll_address, roll_code, offset)
+        == symbols[RTBUDDY_SET_IOP_STATUS_PUBLIC]
+    ]
+    if (
+        len(roll_status_offsets) != 1
+        or struct.unpack_from("<I", roll_code, roll_status_offsets[0] - 4)[0]
+        != 0x528000C1
+        or not _has_ordered_words(
+            roll_code,
+            (
+                0xB9415808,  # current IOP status
+                0x7100151F,  # endpoint roll call is expected at status 5
+                0xD73F0910,  # send the roll-call reply
+                0x35000180,  # do not advance when the reply send fails
+                0xF9403A60,  # owning RTBuddy
+                0x528000C1,  # successful roll call advances to status 6
+            ),
+        )
+    ):
+        raise ValueError("RTBuddy endpoint roll-call readiness changed")
+
+    return {
+        "firmware_load_power_transition": {
+            "set_power_state_vtable_slot": 0x818,
+            "requested_state": 1,
+            "transition_suppression_byte_offset": 0x10D,
+        },
+        "managed_cpu_start": {
+            "status_before_start": 4,
+            "wrapper_object_offset": 0xB0,
+            "firmware_object_offset": 0x21E8,
+            "start_cpu_with_options_vtable_slot": 0x888,
+            "completion": "enter IOP validation immediately after CPU start",
+        },
+        "rtkit_handshake": {
+            "status_object_offset": 0x158,
+            "timeout_object_offset": 0x128,
+            "protocol_version": 12,
+            "states": [
+                {"status": 4, "meaning": "CPU start issued; awaiting Hello"},
+                {"status": 5, "meaning": "Hello accepted at protocol 12"},
+                {
+                    "status": 6,
+                    "meaning": "endpoint roll-call reply sent successfully",
+                },
+                {"status": 8, "meaning": "alternate power-state target"},
+                {"status": 0x8000, "meaning": "terminal validation failure"},
+            ],
+            "validation_modes": ["poll mailbox", "block on status word"],
+            "validation_target_selection": (
+                "status 6 when RTBuddy byte 0x100 or 0x108 is set; "
+                "otherwise status 8"
+            ),
+            "validation_success": "target status reached",
+            "validation_failure": "status 0x8000 or configured timeout",
+            "transport_ready_status": 6,
+            "scope": (
+                "RTBuddy transport and endpoint discovery only; it does not "
+                "prove ApplePMGR observed PMP-STATUS or an AGX dashboard ack"
+            ),
+        },
+    }
+
+
 def recover_apple_pmp_firmware(
     image: bytes, rtbuddy_image: bytes
 ) -> dict[str, object]:
@@ -2001,9 +2273,21 @@ def recover_apple_pmp_firmware(
         name: symbol_code(image, name)
         for name in (APPLE_PMP_FIRMWARE_START, APPLE_PMP_FIRMWARE_PATCH)
     }
+    rtbuddy_function_names = (
+        RTBUDDY_FIRMWARE_FIXUP,
+        RTBUDDY_LOAD_FIRMWARE_GATED,
+        RTBUDDY_LOAD_FIRMWARE,
+        RTBUDDY_PERFORM_POWER_STATE_GATED,
+        RTBUDDY_IOP_VALIDATE,
+        RTBUDDY_IOP_VALIDATE_POLLING,
+        RTBUDDY_IOP_VALIDATE_BLOCKING,
+        RTBUDDY_SET_IOP_STATUS,
+        RTBUDDY_SET_IOP_STATUS_PUBLIC,
+        RTBUDDY_MANAGEMENT_HANDLE_HELLO,
+        RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+    )
     rtbuddy_functions = {
-        name: symbol_code(rtbuddy_image, name)
-        for name in (RTBUDDY_FIRMWARE_FIXUP, RTBUDDY_LOAD_FIRMWARE_GATED)
+        name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
     }
     start_address, start_code = pmp_functions[APPLE_PMP_FIRMWARE_START]
     expected_start_strings = {
@@ -2055,6 +2339,9 @@ def recover_apple_pmp_firmware(
             pmp_vtable_targets,
             service_vtable_targets,
             firmware_vtable_targets,
+        ),
+        "rtkit_boot": recover_rtbuddy_boot_handshake_code_contract(
+            rtbuddy_functions, rtbuddy_symbols
         ),
     }
 
@@ -2788,7 +3075,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 15,
+        "schema": 16,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,

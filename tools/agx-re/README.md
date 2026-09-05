@@ -103,7 +103,13 @@ UUID-pinned ApplePMPFirmware/RTBuddy pass additionally recovers the nine
 mandatory 32-bit PMP patchbay inputs and the exact RTBuddy firmware-fixup
 ordering. Its `firmware-loaded` byte and IORegistry announcement are reported
 as image-preparation bookkeeping, not as a PMP run-state or dashboard-ready
-acknowledgement. Vinix
+acknowledgement. The same UUID-pinned RTBuddy pass now follows the subsequent
+managed boot path: status 4 precedes `startCPUWithOptions`, a protocol-12 Hello
+advances to status 5, and only a successfully replied endpoint roll call
+advances to transport-ready status 6. Both polling and blocking validation
+paths are pinned, including timeout and terminal-failure behavior. Status 6 is
+RTKit transport readiness, not ApplePMGR's separate `PMP-STATUS` or AGX
+dashboard acknowledgement. Vinix
 mirrors the low-level contract with a dormant bounds-checked
 paired reader and separate write portal. A nonblocking owner serializes one
 transaction across both dies and makes post-write failures sticky, but it is

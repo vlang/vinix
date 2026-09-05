@@ -258,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 15)
+        self.assertEqual(result["schema"], 16)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -1100,6 +1100,230 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 pmp_slots,
                 service_slots,
                 firmware_slots,
+            )
+
+    def test_recovers_rtbuddy_cpu_start_and_rtkit_readiness(self) -> None:
+        def branch(source: int, target: int) -> bytes:
+            delta = (target - source) // 4
+            return struct.pack("<I", 0x94000000 | delta & 0x3FFFFFF)
+
+        names = (
+            recover_t6050_power.RTBUDDY_LOAD_FIRMWARE,
+            recover_t6050_power.RTBUDDY_PERFORM_POWER_STATE_GATED,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE_POLLING,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE_BLOCKING,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_HELLO,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+        )
+        symbols = {name: 0x1000 + index * 0x1000 for index, name in enumerate(names)}
+
+        def call(code: bytearray, owner: str, target: str) -> None:
+            source = symbols[owner] + len(code)
+            code.extend(branch(source, symbols[target]))
+
+        load_code = struct.pack(
+            "<7I",
+            0x39443668,
+            0x37000168,
+            0xD2810311,
+            0xAA1303E0,
+            0x52800021,
+            0xD2800002,
+            0xD73F0910,
+        )
+
+        perform_code = bytearray(struct.pack("<I", 0x528000E1))
+        call(
+            perform_code,
+            recover_t6050_power.RTBUDDY_PERFORM_POWER_STATE_GATED,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS,
+        )
+        perform_code.extend(struct.pack("<I", 0x52800081))
+        call(
+            perform_code,
+            recover_t6050_power.RTBUDDY_PERFORM_POWER_STATE_GATED,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS,
+        )
+        perform_code.extend(
+            struct.pack(
+                "<5I",
+                0xF9405A60,
+                0xF950F661,
+                0xD2811111,
+                0xD73F0910,
+                0xAA1303E0,
+            )
+        )
+        call(
+            perform_code,
+            recover_t6050_power.RTBUDDY_PERFORM_POWER_STATE_GATED,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE,
+        )
+
+        validate_code = bytearray(
+            struct.pack(
+                "<6I",
+                0x39440008,
+                0x39442268,
+                0x528000D4,
+                0x52800114,
+                0xF9009A60,
+                0x52844B08,
+            )
+        )
+        call(
+            validate_code,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE_POLLING,
+        )
+        call(
+            validate_code,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE,
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE_BLOCKING,
+        )
+
+        polling_code = struct.pack(
+            "<8I",
+            0xB9412800,
+            0xD2813D11,
+            0xB9415A88,
+            0x6B08027F,
+            0x7140211F,
+            0x528058E9,
+            0x72BC0009,
+            0x11003D2A,
+        )
+        blocking_code = struct.pack(
+            "<9I",
+            0x91056015,
+            0xB9412A80,
+            0x91084208,
+            0xB9415A88,
+            0x6B08027F,
+            0x7140211F,
+            0x528058E9,
+            0x72BC0009,
+            0x11003D2A,
+        )
+        set_public_code = bytearray()
+        call(
+            set_public_code,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS,
+        )
+        set_public_code.extend(
+            struct.pack("<3I", 0xD2811111, 0x91056261, 0x52800002)
+        )
+
+        hello_code = bytearray(
+            struct.pack(
+                "<10I",
+                0xB9415808,
+                0x7100111F,
+                0x7140211F,
+                0xB9010661,
+                0x12003C28,
+                0x7100311F,
+                0xD350FC28,
+                0x12003D08,
+                0x7100311F,
+                0x528000A1,
+            )
+        )
+        call(
+            hello_code,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_HELLO,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
+        )
+        hello_code.extend(struct.pack("<I", 0x52900001))
+        call(
+            hello_code,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_HELLO,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
+        )
+
+        roll_code = bytearray(
+            struct.pack(
+                "<6I",
+                0xB9415808,
+                0x7100151F,
+                0xD73F0910,
+                0x35000180,
+                0xF9403A60,
+                0x528000C1,
+            )
+        )
+        call(
+            roll_code,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
+        )
+
+        functions = {
+            recover_t6050_power.RTBUDDY_LOAD_FIRMWARE: (
+                symbols[recover_t6050_power.RTBUDDY_LOAD_FIRMWARE],
+                load_code,
+            ),
+            recover_t6050_power.RTBUDDY_PERFORM_POWER_STATE_GATED: (
+                symbols[recover_t6050_power.RTBUDDY_PERFORM_POWER_STATE_GATED],
+                bytes(perform_code),
+            ),
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE: (
+                symbols[recover_t6050_power.RTBUDDY_IOP_VALIDATE],
+                bytes(validate_code),
+            ),
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE_POLLING: (
+                symbols[recover_t6050_power.RTBUDDY_IOP_VALIDATE_POLLING],
+                polling_code,
+            ),
+            recover_t6050_power.RTBUDDY_IOP_VALIDATE_BLOCKING: (
+                symbols[recover_t6050_power.RTBUDDY_IOP_VALIDATE_BLOCKING],
+                blocking_code,
+            ),
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS: (
+                symbols[recover_t6050_power.RTBUDDY_SET_IOP_STATUS],
+                struct.pack("<I", 0xD65F03C0),
+            ),
+            recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC: (
+                symbols[recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC],
+                bytes(set_public_code),
+            ),
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_HELLO: (
+                symbols[recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_HELLO],
+                bytes(hello_code),
+            ),
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL: (
+                symbols[
+                    recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL
+                ],
+                bytes(roll_code),
+            ),
+        }
+        result = (
+            recover_t6050_power.recover_rtbuddy_boot_handshake_code_contract(
+                functions, symbols
+            )
+        )
+        handshake = result["rtkit_handshake"]
+        self.assertEqual(handshake["protocol_version"], 12)
+        self.assertEqual(handshake["transport_ready_status"], 6)
+        self.assertIn("does not prove ApplePMGR", handshake["scope"])
+
+        bad_functions = dict(functions)
+        bad_functions[
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL
+        ] = (
+            symbols[recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL],
+            bytes(roll_code).replace(
+                struct.pack("<I", 0x528000C1), struct.pack("<I", 0x528000E1)
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "roll-call readiness"):
+            recover_t6050_power.recover_rtbuddy_boot_handshake_code_contract(
+                bad_functions, symbols
             )
 
     def test_recovers_apple_a7iop_resource_and_sram_power_contracts(self) -> None:
