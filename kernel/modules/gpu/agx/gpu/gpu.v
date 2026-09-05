@@ -19,6 +19,7 @@ import gpu.agx.event
 import memory
 import klock
 import sched
+import aarch64.timer
 
 // RTKit endpoint IDs for GPU firmware
 pub const ep_firmware = u32(0x20)
@@ -98,6 +99,7 @@ mut:
 	g13_queues   []&G13QueueResources
 	g17_graph    &G17FirmwareGraph = unsafe { nil }
 	g17_queues   []&G17QueueResources
+	fwctl_lock   klock.Lock
 }
 
 __global (
@@ -136,10 +138,8 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		allocs: alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
 		g13_private: alloc.new_heap('g13-private', alloc.g13_private_start, alloc.g13_private_end)
 		g13_shared: alloc.new_heap('g13-shared', alloc.g13_shared_start, alloc.g13_shared_end)
-		g13_readonly: alloc.new_heap('g13-readonly', alloc.g13_readonly_start,
-			alloc.g13_readonly_end)
-		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start,
-			alloc.g13_timestamp_end)
+		g13_readonly: alloc.new_heap('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end)
+		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
 	}
 
 	return mgr
@@ -224,29 +224,29 @@ fn (buffer &SharedBuffer) cpu_address() voidptr {
 
 struct G13ChannelAllocations {
 mut:
-	states           [g13_channel_allocation_count]SharedBuffer
-	rings            [g13_channel_allocation_count]SharedBuffer
-	allocated        u32
-	initdata         SharedBuffer
-	unknown_buffer   SharedBuffer
-	runtime_pointers SharedBuffer
-	globals          SharedBuffer
-	fw_status        SharedBuffer
-	fwlog_payload    SharedBuffer
-	hwdata_b         SharedBuffer
-	hwdata_a         SharedBuffer
-	stats_vertex     SharedBuffer
-	stats_fragment   SharedBuffer
-	stats_compute    SharedBuffer
-	unknown_190      SharedBuffer
-	unknown_198      SharedBuffer
-	unknown_1b8      SharedBuffer
-	unknown_1c0      SharedBuffer
-	unknown_1c8      SharedBuffer
-	buffer_manager   SharedBuffer
+	states                     [g13_channel_allocation_count]SharedBuffer
+	rings                      [g13_channel_allocation_count]SharedBuffer
+	allocated                  u32
+	initdata                   SharedBuffer
+	unknown_buffer             SharedBuffer
+	runtime_pointers           SharedBuffer
+	globals                    SharedBuffer
+	fw_status                  SharedBuffer
+	fwlog_payload              SharedBuffer
+	hwdata_b                   SharedBuffer
+	hwdata_a                   SharedBuffer
+	stats_vertex               SharedBuffer
+	stats_fragment             SharedBuffer
+	stats_compute              SharedBuffer
+	unknown_190                SharedBuffer
+	unknown_198                SharedBuffer
+	unknown_1b8                SharedBuffer
+	unknown_1c0                SharedBuffer
+	unknown_1c8                SharedBuffer
+	buffer_manager             SharedBuffer
 	buffer_manager_high_mapped bool
-	io_mapping_vas   [fw.g13_io_mapping_count]u64
-	io_mapping_sizes [fw.g13_io_mapping_count]u64
+	io_mapping_vas             [fw.g13_io_mapping_count]u64
+	io_mapping_sizes           [fw.g13_io_mapping_count]u64
 }
 
 @[inline]
@@ -308,16 +308,13 @@ fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64,
 	protection u64) ?SharedBuffer {
 	return match protection {
 		pgtable.gpu_prot_fw_private_rw {
-			alloc_buffer_from_heap(mut mgr.g13_private, size, protection,
-				buffer_allocator_g13_private)
+			alloc_buffer_from_heap(mut mgr.g13_private, size, protection, buffer_allocator_g13_private)
 		}
 		pgtable.gpu_prot_fw_shared_rw {
-			alloc_buffer_from_heap(mut mgr.g13_shared, size, protection,
-				buffer_allocator_g13_shared)
+			alloc_buffer_from_heap(mut mgr.g13_shared, size, protection, buffer_allocator_g13_shared)
 		}
 		pgtable.gpu_prot_fw_shared_ro {
-			alloc_buffer_from_heap(mut mgr.g13_readonly, size, protection,
-				buffer_allocator_g13_readonly)
+			alloc_buffer_from_heap(mut mgr.g13_readonly, size, protection, buffer_allocator_g13_readonly)
 		}
 		else { none }
 	}
@@ -779,8 +776,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	}
 	unsafe {
 		mut hwdata_b := &fw.G13HwDataB(graph.hwdata_b.phys + higher_half)
-		if !fw.populate_g13_hwdata_b(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base,
-			mmu.uat_unknown_page) {
+		if !fw.populate_g13_hwdata_b(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base, mmu.uat_unknown_page) {
 			return false
 		}
 	}
@@ -828,8 +824,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	graph.buffer_manager = alloc_fixed_buffer(g13_buffer_manager_low_va, 0x4000, pgtable.gpu_prot_gpu_shared_rw) or {
 		return false
 	}
-	if !uat_mgr.map_kernel(g13_buffer_manager_high_va, graph.buffer_manager.phys,
-		graph.buffer_manager.size, pgtable.gpu_prot_fw_shared_rw) {
+	if !uat_mgr.map_kernel(g13_buffer_manager_high_va, graph.buffer_manager.phys, graph.buffer_manager.size, pgtable.gpu_prot_fw_shared_rw) {
 		return false
 	}
 	graph.buffer_manager_high_mapped = true
@@ -900,6 +895,60 @@ pub fn (mut mgr GpuManager) kick_firmware() bool {
 // Notify G13 firmware that a device-control command is available.
 pub fn (mut mgr GpuManager) ring_device_control() bool {
 	return mgr.send_doorbell(doorbell_device_control)
+}
+
+// Publish a G13 UAT invalidation through the secure firmware-control ring and
+// wait until firmware has consumed it and completed the handoff transaction.
+// A single in-flight request keeps the ring token comparison unambiguous even
+// when its modulo-256 write pointer wraps.
+pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bool {
+	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13 || uat_mgr == unsafe { nil }
+		|| slot > mmu.uat_kernel_flush_slot || addr & pgtable.uat_pg_mask != 0 || size == 0
+		|| size & pgtable.uat_pg_mask != 0 {
+		return false
+	}
+	pages := size / pgtable.uat_pgsz
+	if pages == 0 || pages >= 0x10000 {
+		return false
+	}
+
+	mgr.fwctl_lock.acquire()
+	defer {
+		mgr.fwctl_lock.release()
+	}
+	if !uat_mgr.begin_flush(slot, addr, size) {
+		return false
+	}
+	message := fw.FwFwCtlMsg{
+		addr: addr
+		slot: slot
+		page_count: u16(pages)
+		unk_12: 2
+	}
+	token := mgr.channels.fw_ctrl.enqueue_with_token(voidptr(&message)) or {
+		uat_mgr.abort_unpublished_flush(slot)
+		return false
+	}
+	if !mgr.send_role_message(0, u8(ep_doorbell), msg_fwctl) {
+		mgr.state = .error
+		return false
+	}
+
+	started := timer.get_ns()
+	for mgr.channels.fw_ctrl.read_pointer() != token {
+		if timer.get_ns() - started >= u64(1_000_000_000) {
+			C.printf(c'agx: firmware-control UAT flush timed out\n')
+			mgr.state = .error
+			return false
+		}
+		sched.yield(false)
+	}
+	if !uat_mgr.complete_flush(slot) {
+		C.printf(c'agx: firmware-control UAT handoff did not complete\n')
+		mgr.state = .error
+		return false
+	}
+	return true
 }
 
 // Notify one of the four priority instances of a G13 work pipe.

@@ -111,6 +111,18 @@ pub fn new_rx_channel_with_subchannels(name string, state_va u64, state_phys u64
 
 // Write an entry to the ring buffer, advance write_ptr with wrap
 pub fn (mut ch TxChannel) enqueue(data voidptr) bool {
+	ch.enqueue_with_token(data) or { return false }
+	return true
+}
+
+// Enqueue and return the write pointer firmware must reach after consuming
+// this command. Firmware-control requests use this token for synchronous UAT
+// invalidation; regular channels can ignore it through enqueue().
+pub fn (mut ch TxChannel) enqueue_with_token(data voidptr) ?u32 {
+	if data == unsafe { nil } || ch.state_phys == 0 || ch.ring_phys == 0
+		|| ch.ring_size < 2 || ch.entry_size == 0 {
+		return none
+	}
 	ch.lock.acquire()
 	defer {
 		ch.lock.release()
@@ -124,7 +136,7 @@ pub fn (mut ch TxChannel) enqueue(data voidptr) bool {
 
 	// One entry stays empty so equal pointers unambiguously mean empty.
 	if next_wp == rp {
-		return false
+		return none
 	}
 
 	offset := u64(wp) * u64(ch.entry_size)
@@ -134,7 +146,14 @@ pub fn (mut ch TxChannel) enqueue(data voidptr) bool {
 	}
 
 	katomic.store(mut write_ptr, next_wp)
-	return true
+	return next_wp
+}
+
+pub fn (ch &TxChannel) read_pointer() u32 {
+	if ch.state_phys == 0 {
+		return 0
+	}
+	return unsafe { katomic.load(&u32(ch.state_phys + higher_half)) }
 }
 
 // Read an entry from the ring buffer, advance read_ptr with wrap

@@ -52,20 +52,20 @@ struct TimestampObject {
 
 pub struct GpuFile {
 pub mut:
-	dev                &drm.DrmDevice = unsafe { nil }
-	vms                []&mmu.UatContext
-	queues             []&workqueue.WorkQueue
-	mappings           []GpuMapping
-	objects            []&gem.GemObject
-	mmap_objects       []&gem.GemObject
-	g17_queues         []G17QueueOwnership
-	g13_queues         []G13QueueOwnership
-	timestamp_objects  []TimestampObject
-	next_queue_id      u32
-	next_timestamp_id  u32
-	owner_process_id   u32
-	owner_key          u64
-	lock               klock.Lock
+	dev               &drm.DrmDevice = unsafe { nil }
+	vms               []&mmu.UatContext
+	queues            []&workqueue.WorkQueue
+	mappings          []GpuMapping
+	objects           []&gem.GemObject
+	mmap_objects      []&gem.GemObject
+	g17_queues        []G17QueueOwnership
+	g13_queues        []G13QueueOwnership
+	timestamp_objects []TimestampObject
+	next_queue_id     u32
+	next_timestamp_id u32
+	owner_process_id  u32
+	owner_key         u64
+	lock              klock.Lock
 }
 
 __global (
@@ -124,11 +124,11 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 		return none
 	}
 	return &GpuFile{
-		dev:               unsafe { dev }
-		next_queue_id:     1
+		dev: unsafe { dev }
+		next_queue_id: 1
 		next_timestamp_id: 1
 		owner_process_id: u32(current.process.pid)
-		owner_key:         owner_key
+		owner_key: owner_key
 	}
 }
 
@@ -313,6 +313,32 @@ fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
 	return none
 }
 
+fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u64) bool {
+	return first_addr < second_addr + second_size && second_addr < first_addr + first_size
+}
+
+// G13 firmware may retain both UAT translations and noncoherent cache lines.
+// Break large mappings into the 16-bit page counts accepted by FwCtlMsg.
+fn flush_g13_mapping(ctx &mmu.UatContext, addr u64, size u64) bool {
+	manager := gpu.get_global_manager() or { return false }
+	if manager.hw_config.gpu_gen != .g13 {
+		return true
+	}
+	mut gpu_manager := unsafe { manager }
+	max_flush_size := u64(0xffff) * pgtable.uat_pgsz
+	mut current := addr
+	mut remaining := size
+	for remaining != 0 {
+		chunk := if remaining > max_flush_size { max_flush_size } else { remaining }
+		if !gpu_manager.flush_g13_uat_range(ctx.id, current, chunk) {
+			return false
+		}
+		current += chunk
+		remaining -= chunk
+	}
+	return true
+}
+
 fn asahi_variant(config &gpu.GpuManager) u32 {
 	return match config.hw_config.gpu_variant {
 		.s { u32(`S`) }
@@ -337,30 +363,38 @@ fn asahi_revision(config &gpu.GpuManager) u32 {
 fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 	cfg := &manager.hw_config
 	mut params := ioctl.DrmAsahiParamsGlobal{
-		unstable_uabi_version:       ioctl.drm_asahi_unstable_uabi_version
-		feat_compat:                 u64(cfg.gpu_feat_compat) | ioctl.asahi_feat_gettime
-		feat_incompat:               u64(cfg.gpu_feat_incompat)
-		gpu_generation:              u32(cfg.gpu_gen)
-		gpu_variant:                 asahi_variant(manager)
-		gpu_revision:                asahi_revision(manager)
-		chip_id:                     cfg.chip_id
-		num_dies:                    cfg.max_dies
-		num_clusters_total:          cfg.num_clusters
-		num_cores_per_cluster:       cfg.num_cores_per_cluster
-		num_frags_per_cluster:       if cfg.num_clusters == 0 { u32(0) } else { cfg.num_frags / cfg.num_clusters }
-		num_gps_per_cluster:         if cfg.num_clusters == 0 { u32(0) } else { cfg.num_gps / cfg.num_clusters }
-		num_cores_total_active:      cfg.gpu_core_count
-		vm_page_size:                u32(pgtable.uat_pgsz)
-		vm_user_start:               mmu.uat_user_va_start
-		vm_user_end:                 mmu.uat_unknown_page
-		vm_kernel_min_size:          u64(0x20000000)
-		max_syncs_per_submission:    max_submission_syncs
+		unstable_uabi_version: ioctl.drm_asahi_unstable_uabi_version
+		feat_compat: u64(cfg.gpu_feat_compat) | ioctl.asahi_feat_gettime
+		feat_incompat: u64(cfg.gpu_feat_incompat)
+		gpu_generation: u32(cfg.gpu_gen)
+		gpu_variant: asahi_variant(manager)
+		gpu_revision: asahi_revision(manager)
+		chip_id: cfg.chip_id
+		num_dies: cfg.max_dies
+		num_clusters_total: cfg.num_clusters
+		num_cores_per_cluster: cfg.num_cores_per_cluster
+		num_frags_per_cluster: if cfg.num_clusters == 0 {
+			u32(0)
+		} else {
+			cfg.num_frags / cfg.num_clusters
+		}
+		num_gps_per_cluster: if cfg.num_clusters == 0 {
+			u32(0)
+		} else {
+			cfg.num_gps / cfg.num_clusters
+		}
+		num_cores_total_active: cfg.gpu_core_count
+		vm_page_size: u32(pgtable.uat_pgsz)
+		vm_user_start: mmu.uat_user_va_start
+		vm_user_end: mmu.uat_unknown_page
+		vm_kernel_min_size: u64(0x20000000)
+		max_syncs_per_submission: max_submission_syncs
 		max_commands_per_submission: max_submission_commands
-		max_commands_in_flight:      workqueue.max_job_slots
-		max_attachments:             max_command_attachments
-		timer_frequency_hz:          u32(cfg.base_clock_hz)
-		result_render_size:          u32(sizeof(ioctl.DrmAsahiResultRender))
-		result_compute_size:         u32(sizeof(ioctl.DrmAsahiResultCompute))
+		max_commands_in_flight: workqueue.max_job_slots
+		max_attachments: max_command_attachments
+		timer_frequency_hz: u32(cfg.base_clock_hz)
+		result_render_size: u32(sizeof(ioctl.DrmAsahiResultRender))
+		result_compute_size: u32(sizeof(ioctl.DrmAsahiResultCompute))
 		user_timestamp_frequency_hz: cfg.base_clock_hz
 	}
 	for i := u32(0); i < cfg.num_clusters && i < ioctl.drm_asahi_max_clusters; i++ {
@@ -517,11 +551,26 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			} else {
 				pgtable.gpu_prot_gpu_shared_ro
 			}
+			f.lock.acquire()
+			for mapping in f.mappings {
+				if mapping.vm_id == request.vm_id
+					&& ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) {
+					f.lock.release()
+					gem.unref(obj)
+					return -16 // EBUSY
+				}
+			}
 			if !pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) {
+				f.lock.release()
 				gem.unref(obj)
 				return -12
 			}
-			f.lock.acquire()
+			if !flush_g13_mapping(ctx, request.addr, request.range) {
+				pt.unmap(request.addr, request.range)
+				f.lock.release()
+				gem.unref(obj)
+				return -5 // EIO
+			}
 			f.mappings << GpuMapping{
 				vm_id: request.vm_id
 				handle: request.handle
@@ -536,18 +585,20 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			if request.handle != 0 || request.flags != 0 || request.offset != 0 {
 				return -22
 			}
-			pt.unmap(request.addr, request.range)
 			f.lock.acquire()
-			for i := f.mappings.len - 1; i >= 0; i-- {
-				mapping := f.mappings[i]
+			for i, mapping in f.mappings {
 				if mapping.vm_id == request.vm_id && mapping.addr == request.addr
 					&& mapping.size == request.range {
+					pt.unmap(request.addr, request.range)
+					flush_ok := flush_g13_mapping(ctx, request.addr, request.range)
 					gem.unref(mapping.obj)
 					f.mappings.delete(i)
+					f.lock.release()
+					return if flush_ok { 0 } else { -5 }
 				}
 			}
 			f.lock.release()
-			return 0
+			return -22
 		}
 		ioctl.asahi_bind_op_unbind_all {
 			if request.handle == 0 || request.flags != 0 || request.offset != 0 || request.addr != 0 {
@@ -555,17 +606,21 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			}
 			obj := f.get_object_ref(request.handle) or { return -2 }
 			f.lock.acquire()
+			mut flush_ok := true
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
 				if mapping.vm_id == request.vm_id && voidptr(mapping.obj) == voidptr(obj) {
 					pt.unmap(mapping.addr, mapping.size)
+					if !flush_g13_mapping(ctx, mapping.addr, mapping.size) {
+						flush_ok = false
+					}
 					gem.unref(mapping.obj)
 					f.mappings.delete(i)
 				}
 			}
 			f.lock.release()
 			gem.unref(obj)
-			return 0
+			return if flush_ok { 0 } else { -5 }
 		}
 		else {
 			return -22
@@ -606,8 +661,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				return -19
 			}
 			mut gpu_manager := unsafe { manager }
-			va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset,
-				request.range) or {
+			va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset, request.range) or {
 				gem.unref(obj)
 				return -12
 			}
@@ -654,14 +708,15 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 			gem.unref(found.obj)
 			return 0
 		}
-		else { return -22 }
+		else {
+			return -22
+		}
 	}
 }
 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	mut request := unsafe { data }
-	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit |
-		ioctl.asahi_queue_cap_compute
+	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit | ioctl.asahi_queue_cap_compute
 	if request.extensions != 0 || request.flags != 0 || request.pad != 0 || request.priority > 3
 		|| request.queue_caps == 0 || request.queue_caps & ~known_caps != 0 {
 		return -22
@@ -695,8 +750,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 			channel_mask |= gpu.g17_queue_channel_cl
 		}
 		mut gpu_manager := unsafe { manager }
-		g17_resources = gpu_manager.create_g17_queue_resources(id, f.owner_process_id,
-			channel_mask, request.priority) or {
+		g17_resources = gpu_manager.create_g17_queue_resources(id, f.owner_process_id, channel_mask, request.priority) or {
 			mut queue := unsafe { wq }
 			queue.destroy()
 			return -12
@@ -713,8 +767,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 			channel_mask |= gpu.g13_queue_channel_compute
 		}
 		mut gpu_manager := unsafe { manager }
-		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask,
-			request.priority) or {
+		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, request.priority) or {
 			mut queue := unsafe { wq }
 			queue.destroy()
 			return -12
@@ -837,8 +890,7 @@ fn validate_sync_array(owner u64, pointer u64, count u32, input bool) int {
 	}
 	for i := u32(0); i < count; i++ {
 		mut item := ioctl.DrmAsahiSync{}
-		if !usercopy.copy_from_user(voidptr(&item), pointer + u64(i) * sizeof(ioctl.DrmAsahiSync),
-			sizeof(ioctl.DrmAsahiSync)) {
+		if !usercopy.copy_from_user(voidptr(&item), pointer + u64(i) * sizeof(ioctl.DrmAsahiSync), sizeof(ioctl.DrmAsahiSync)) {
 			return -14
 		}
 		if item.extensions != 0 || item.sync_type != ioctl.asahi_sync_syncobj
@@ -868,8 +920,7 @@ fn validate_attachment_array(pointer u64, count u32) int {
 	}
 	for i := u32(0); i < count; i++ {
 		mut attachment := ioctl.DrmAsahiAttachment{}
-		if !usercopy.copy_from_user(voidptr(&attachment),
-			pointer + u64(i) * sizeof(ioctl.DrmAsahiAttachment), sizeof(ioctl.DrmAsahiAttachment)) {
+		if !usercopy.copy_from_user(voidptr(&attachment), pointer + u64(i) * sizeof(ioctl.DrmAsahiAttachment), sizeof(ioctl.DrmAsahiAttachment)) {
 			return -14
 		}
 		if attachment.flags != 0 || attachment.order < 1 || attachment.order > 6 {
@@ -912,13 +963,11 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		return -22
 	}
 	queue_caps := f.get_queue_caps(request.queue_id) or { return -22 }
-	mut sync_result := validate_sync_array(f.owner_key, request.in_syncs, request.in_sync_count,
-		true)
+	mut sync_result := validate_sync_array(f.owner_key, request.in_syncs, request.in_sync_count, true)
 	if sync_result != 0 {
 		return sync_result
 	}
-	sync_result = validate_sync_array(f.owner_key, request.out_syncs, request.out_sync_count,
-		false)
+	sync_result = validate_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if sync_result != 0 {
 		return sync_result
 	}
@@ -930,8 +979,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	mut prior_compute_commands := u32(0)
 	for i := u32(0); i < request.command_count; i++ {
 		mut command := ioctl.DrmAsahiCommand{}
-		if !usercopy.copy_from_user(voidptr(&command), request.commands + u64(i) * sizeof(ioctl.DrmAsahiCommand),
-			sizeof(ioctl.DrmAsahiCommand)) {
+		if !usercopy.copy_from_user(voidptr(&command), request.commands + u64(i) * sizeof(ioctl.DrmAsahiCommand), sizeof(ioctl.DrmAsahiCommand)) {
 			return -14
 		}
 		if command.extensions != 0 || command.flags != 0 || command.cmd_buffer == 0 {
@@ -940,7 +988,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		if (command.barriers[0] != ioctl.asahi_barrier_none
 			&& command.barriers[0] > prior_render_commands)
 			|| (command.barriers[1] != ioctl.asahi_barrier_none
-			&& command.barriers[1] > prior_compute_commands) {
+				&& command.barriers[1] > prior_compute_commands) {
 			return -22
 		}
 		match command.cmd_type {
@@ -948,24 +996,21 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				if queue_caps & ioctl.asahi_queue_cap_render == 0
 					|| command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
 					|| (command.result_size != 0
-					&& command.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
+						&& command.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
 					return -22
 				}
 				mut render := ioctl.DrmAsahiCmdRender{}
-				if !usercopy.copy_from_user(voidptr(&render), command.cmd_buffer,
-					sizeof(ioctl.DrmAsahiCmdRender)) {
+				if !usercopy.copy_from_user(voidptr(&render), command.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
 					return -14
 				}
 				if !valid_render_command(&render) {
 					return -22
 				}
-				mut attachment_result := validate_attachment_array(render.vertex_attachments,
-					render.vertex_attachment_count)
+				mut attachment_result := validate_attachment_array(render.vertex_attachments, render.vertex_attachment_count)
 				if attachment_result != 0 {
 					return attachment_result
 				}
-				attachment_result = validate_attachment_array(render.fragment_attachments,
-					render.fragment_attachment_count)
+				attachment_result = validate_attachment_array(render.fragment_attachments, render.fragment_attachment_count)
 				if attachment_result != 0 {
 					return attachment_result
 				}
@@ -975,25 +1020,25 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				if queue_caps & ioctl.asahi_queue_cap_compute == 0
 					|| command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
 					|| (command.result_size != 0
-					&& command.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
+						&& command.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
 					return -22
 				}
 				mut compute := ioctl.DrmAsahiCmdCompute{}
-				if !usercopy.copy_from_user(voidptr(&compute), command.cmd_buffer,
-					sizeof(ioctl.DrmAsahiCmdCompute)) {
+				if !usercopy.copy_from_user(voidptr(&compute), command.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
 					return -14
 				}
 				if !valid_compute_command(&compute) {
 					return -22
 				}
-				attachment_result := validate_attachment_array(compute.attachments,
-					compute.attachment_count)
+				attachment_result := validate_attachment_array(compute.attachments, compute.attachment_count)
 				if attachment_result != 0 {
 					return attachment_result
 				}
 				prior_compute_commands++
 			}
-			else { return -22 }
+			else {
+				return -22
+			}
 		}
 		if command.result_size != 0 {
 			if request.result_handle == 0 {
@@ -1105,16 +1150,16 @@ fn ioctl_gem_bind_object_handler(dev &drm.DrmDevice, handle voidptr, data voidpt
 
 pub fn drm_ioctls() []drm.DrmIoctl {
 	return [
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_params, handler: ioctl_get_params_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_vm_create, handler: ioctl_vm_create_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_vm_destroy, handler: ioctl_vm_destroy_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_create, handler: ioctl_gem_create_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_mmap_offset, handler: ioctl_gem_mmap_offset_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_bind, handler: ioctl_gem_bind_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_create, handler: ioctl_queue_create_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_destroy, handler: ioctl_queue_destroy_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_submit, handler: ioctl_submit_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_time, handler: ioctl_get_time_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_bind_object, handler: ioctl_gem_bind_object_handler},
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, handler: ioctl_get_params_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, handler: ioctl_vm_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, handler: ioctl_vm_destroy_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, handler: ioctl_gem_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, handler: ioctl_gem_mmap_offset_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, handler: ioctl_gem_bind_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, handler: ioctl_queue_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, handler: ioctl_queue_destroy_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, handler: ioctl_submit_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, handler: ioctl_get_time_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, handler: ioctl_gem_bind_object_handler },
 	]
 }

@@ -590,3 +590,22 @@ pub fn (mgr &UatManager) complete_flush(slot u32) bool {
 	}
 	return true
 }
+
+// Cancel a flush reservation only before its command has been published to
+// firmware. Once the FWCTL ring owns the request, timing out is fatal and the
+// slot must not be reused underneath a late firmware completion.
+pub fn (mgr &UatManager) abort_unpublished_flush(slot u32) {
+	if !mgr.handoff_initialized || slot > uat_kernel_flush_slot {
+		return
+	}
+	info := &mgr.handoff.flush[slot]
+	if katomic.load(&info.state) != 1 {
+		return
+	}
+	unsafe {
+		mut entry := info
+		katomic.store(mut &entry.addr, u64(0))
+		katomic.store(mut &entry.size, u64(0))
+		katomic.store(mut &entry.state, u64(0))
+	}
+}
