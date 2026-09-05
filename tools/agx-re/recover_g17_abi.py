@@ -521,6 +521,24 @@ SUBMIT_DEVICE_CONTROL = (
     "__ZN11AGXFirmware19submitDeviceControlE"
     "P33AGFIAcceleratorDeviceControlEntryjPj"
 )
+ARM_SUBMIT_DEVICE_CONTROL = (
+    "__ZN14AGXArmFirmware19submitDeviceControlE"
+    "P33AGFIAcceleratorDeviceControlEntryjPj"
+)
+ACCELERATOR_SUBMIT_DEVICE_CONTROL = (
+    "__ZN14AGXAccelerator19submitDeviceControlE"
+    "P33AGFIAcceleratorDeviceControlEntryPjS2_"
+)
+ALLOCATE_PM_MEMORY_EVENT = (
+    "__ZN14AGXAccelerator19allocateMemoryEventEP22IOInterruptEventSourcei"
+)
+HWPB_MANAGER_META_CLASS = "__ZN23AGXHWParamBufferManager10gMetaClassE"
+PARAMETER_MANAGEMENT_VTABLE = "__ZTV22AGXParameterManagement"
+PARAMETER_MANAGEMENT_VIRTUAL_VTABLE = "__ZTV29AGXParameterManagementVirtual"
+PARAMETER_MANAGEMENT_GROW = "__ZN22AGXParameterManagement15growImmediatelyEv"
+PARAMETER_MANAGEMENT_VIRTUAL_GROW = (
+    "__ZN29AGXParameterManagementVirtual15growImmediatelyEv"
+)
 RESET_CHANNEL_STATE = "__ZN10AGXChannel17resetChannelStateEv"
 GET_CHANNEL_PRIORITY = "__ZN10AGXChannel11getPriorityEv"
 ARM_SET_CHANNEL_PRIORITY = (
@@ -761,20 +779,39 @@ def virtual_to_file(image: bytes, address: int) -> int:
 def read_adrp_add_cstring(
     image: bytes, function_address: int, code: bytes, adrp_offset: int, add_offset: int
 ) -> str:
+    address = read_adrp_add_address(
+        function_address, code, adrp_offset, add_offset
+    )
+    offset = virtual_to_file(image, address)
+    end = image.find(b"\0", offset)
+    if end < 0:
+        raise ValueError("unterminated PC-relative C string")
+    return image[offset:end].decode("utf-8", "replace")
+
+
+def read_adrp_add_address(
+    function_address: int, code: bytes, adrp_offset: int, add_offset: int
+) -> int:
     if adrp_offset + 4 > len(code) or add_offset + 4 > len(code):
-        raise ValueError("truncated PC-relative C string reference")
+        raise ValueError("truncated PC-relative address reference")
     page = decode_adrp(
         function_address + adrp_offset,
         struct.unpack_from("<I", code, adrp_offset)[0],
     )
     add = decode_add_immediate(struct.unpack_from("<I", code, add_offset)[0])
     if page is None or add is None or page[0] != add[1]:
-        raise ValueError("invalid PC-relative C string reference")
-    offset = virtual_to_file(image, page[1] + add[2])
-    end = image.find(b"\0", offset)
-    if end < 0:
-        raise ValueError("unterminated PC-relative C string")
-    return image[offset:end].decode("utf-8", "replace")
+        raise ValueError("invalid PC-relative address reference")
+    return (page[1] + add[2]) & 0xFFFFFFFFFFFFFFFF
+
+
+def read_virtual_u32_table(image: bytes, address: int, count: int) -> tuple[int, ...]:
+    if count < 0:
+        raise ValueError("negative virtual table element count")
+    offset = virtual_to_file(image, address)
+    size = count * 4
+    if offset + size > len(image):
+        raise ValueError("truncated virtual u32 table")
+    return struct.unpack_from(f"<{count}I", image, offset)
 
 
 def symbol_code(image: bytes, name: str) -> tuple[int, bytes]:
@@ -14650,6 +14687,263 @@ def recover_g17_firmware_event_ring(
     }
 
 
+def recover_g17_pm_memory_event_action(
+    driver: bytes,
+    role_address: int,
+    role_code: bytes,
+    dispatch_offsets: tuple[int, ...],
+    driver_symbols: dict[str, int],
+) -> dict[str, object]:
+    """Recover the complete host dispatch contract for firmware event type 6."""
+
+    required = (
+        ALLOCATE_PM_MEMORY_EVENT,
+        ACCELERATOR_SUBMIT_DEVICE_CONTROL,
+        ARM_SUBMIT_DEVICE_CONTROL,
+        SUBMIT_DEVICE_CONTROL,
+        HWPB_MANAGER_META_CLASS,
+        PARAMETER_MANAGEMENT_GROW,
+        PARAMETER_MANAGEMENT_VIRTUAL_GROW,
+    )
+    missing = [name for name in required if name not in driver_symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 PM-memory symbols: {missing}")
+
+    # The interrupt path validates the five-field payload, copies it into a
+    # private eight-entry/32-byte host ring, and wakes the allocation worker.
+    # It deliberately does not allocate from interrupt context.
+    # Type 6 first passes through the role-independent accelerator guard at
+    # +0xa0; the actual typed arm starts at +0xaf0 when that guard is clear.
+    if 0x110 + dispatch_offsets[6] != 0x0A0:
+        raise ValueError("G17 PM-memory event dispatch changed")
+    require_instruction_words_at(
+        role_code,
+        "G17 PM-memory event",
+        {
+            0xAF0: 0xB94053E8,  # event type at entry +0
+            0xAF4: 0x7100191F,  # event type 6
+            0xAFC: 0xB94057F6,  # signed stamp slot at entry +4
+            0xB14: 0xD2815611,  # stamp-count vtable slot 0xab0
+            0xB44: 0xB9405BF6,  # manager index at entry +8
+            0xB48: 0x7101FEDF,  # manager index below 0x7f
+            0xB50: 0xB94063F7,  # request kind at entry +0x10
+            0xB54: 0x710102FF,  # request kind below 0x40
+            0xB5C: 0xB94057FA,
+            0xB60: 0xB9405FFB,  # request value at entry +0x0c
+            0xB64: 0xF84643F9,  # unaligned token at entry +0x14
+            0xB68: 0xF9414E7C,  # firmware +0x298 -> accelerator
+            0xB6C: 0x52935D08,
+            0xB70: 0x72A00028,  # host ring control at accelerator +0x19ae8
+            0xBB8: 0x8B080388,  # entries at accelerator +0x199e8
+            0xBD8: 0xF900015F,  # record +0 = 0
+            0xBDC: 0x29016956,  # entry +8, entry +4 -> record +8
+            0xBE0: 0x29025D5B,  # entry +0xc, entry +0x10 -> record +0x10
+            0xBE4: 0xF9000D59,  # entry +0x14 -> record +0x18
+            0xBF0: 0x12000908,  # eight-entry host-ring wrap
+            0xC00: 0xF9414E68,
+            0xC04: 0xF9423500,  # allocation event source at accelerator +0x468
+            0xC2C: 0x9107E208,
+            0xC30: 0xF940FE09,  # signal-work-available vtable slot 0x1f8
+        },
+    )
+
+    # start() binds the exact worker to the event source retained at +0x468.
+    start_address, start_code = symbol_code(driver, ACCELERATOR_START)
+    require_instruction_words_at(
+        start_code,
+        "G17 PM-memory worker registration",
+        {
+            0x3850: 0xD2825EF1,
+            0x3854: 0xDAC10230,
+            0x3858: 0xAA1003E1,
+            0x385C: 0xAA1303E0,
+            0x3860: 0xD2800002,
+            0x3864: 0x52800003,
+            0x386C: 0xF9023660,  # event source -> accelerator +0x468
+        },
+    )
+    registered_worker = read_adrp_add_address(
+        start_address, start_code, 0x3848, 0x384C
+    )
+    if registered_worker != driver_symbols[ALLOCATE_PM_MEMORY_EVENT]:
+        raise ValueError("G17 PM-memory event source worker changed")
+
+    worker_address, worker_code = symbol_code(driver, ALLOCATE_PM_MEMORY_EVENT)
+    require_instruction_words_at(
+        worker_code,
+        "G17 PM-memory allocation worker",
+        {
+            0x028: 0x91406408,
+            0x02C: 0x912BA119,  # host ring control +0x19ae8
+            0x060: 0x9100E3E8,
+            0x064: 0x6F00E400,
+            0x068: 0xAD010100,  # zero device-control bytes +0x20..+0x3f
+            0x06C: 0x52800108,  # command type 8
+            0x070: 0x29075FE8,  # command type and request kind at +0/+4
+            0x074: 0x3CC082A0,  # host request +8..+0x17
+            0x078: 0x3C8403E0,  # -> device control +8..+0x17
+            0x07C: 0xF9400EA8,  # host request +0x18
+            0x080: 0xF9002BE8,  # -> device control +0x18
+            0x088: 0x52800328,  # submission flags 0x19
+            0x0E4: 0x9107A208,  # firmware submit callback slot 0x1e8
+            0x0E8: 0xF940F609,
+            0x0FC: 0xAA1003E1,  # callback argument
+            0x100: 0x9100E3E2,  # complete 0x40-byte device-control entry
+            0x104: 0xD10153A3,  # flags/result word
+            0x108: 0xD10163A4,  # completion index
+            0x17C: 0xB94002A8,  # private host record discriminator
+            0x180: 0x35000E48,  # nonzero records are rejected
+            0x1C0: 0xB9400AB6,  # manager index from host record +8
+            0x210: 0xAA1703E0,
+            0x21C: 0x94C9D252,  # OSMetaClassBase::safeMetaCast
+            0x24C: 0xF9404ED8,  # parameter manager at HWPB manager +0x98
+            0x250: 0xF9409B00,  # its lock at +0x130
+            0x268: 0xD2803211,  # parameter-manager vtable slot 0x190
+            0x27C: 0xD73F0910,
+            0x280: 0xAA0003F7,  # growImmediately result
+        },
+    )
+    callback = read_adrp_add_address(worker_address, worker_code, 0x0EC, 0x0F0)
+    if callback != driver_symbols[ACCELERATOR_SUBMIT_DEVICE_CONTROL]:
+        raise ValueError("G17 PM-memory device-control callback changed")
+    meta_class = read_adrp_add_address(worker_address, worker_code, 0x214, 0x218)
+    if meta_class != driver_symbols[HWPB_MANAGER_META_CLASS]:
+        raise ValueError("G17 PM-memory manager class changed")
+
+    callback_address, callback_code = symbol_code(
+        driver, ACCELERATOR_SUBMIT_DEVICE_CONTROL
+    )
+    require_instruction_words_at(
+        callback_code,
+        "G17 accelerator device-control callback",
+        {
+            0x058: 0xF942DAC0,  # selected firmware object
+            0x06C: 0xF9400010,  # firmware vtable
+            0x070: 0xAA0003F1,
+            0x074: 0xF2F9B431,
+            0x078: 0xDAC11A30,  # authenticate vtable
+            0x07C: 0xD2805011,  # submitDeviceControl slot 0x280
+            0x080: 0x8B110210,
+            0x084: 0xF9400208,
+            0x090: 0xAA1403E1,  # complete device-control entry
+            0x094: 0xAA1303E3,  # result word
+            0x0B4: 0xAA0403F1,
+            0x0BC: 0xD71F0A11,  # authenticated tail call
+        },
+    )
+    if callback_address != driver_symbols[ACCELERATOR_SUBMIT_DEVICE_CONTROL]:
+        raise ValueError("G17 accelerator device-control callback symbol moved")
+
+    physical_grow = recover_vtable_target(driver, PARAMETER_MANAGEMENT_VTABLE, 0x190)
+    virtual_grow = recover_vtable_target(
+        driver, PARAMETER_MANAGEMENT_VIRTUAL_VTABLE, 0x190
+    )
+    if physical_grow != driver_symbols[PARAMETER_MANAGEMENT_GROW]:
+        raise ValueError("G17 physical parameter-memory grow action changed")
+    if virtual_grow != driver_symbols[PARAMETER_MANAGEMENT_VIRTUAL_GROW]:
+        raise ValueError("G17 virtual parameter-memory grow action changed")
+
+    # The callback resolves through the selected firmware vtable to the ARM
+    # submitter. Its command-to-role table sends type 8 through role zero, and
+    # flags 0x19 produce one 0x84/0x11 doorbell with the wait bit set.
+    arm_target = recover_vtable_target(driver, G17_FIRMWARE_VTABLE, 0x280)
+    if arm_target != driver_symbols[ARM_SUBMIT_DEVICE_CONTROL]:
+        raise ValueError("G17 PM-memory device-control submitter changed")
+    arm_address, arm_code = symbol_code(driver, ARM_SUBMIT_DEVICE_CONTROL)
+    require_instruction_words_at(
+        arm_code,
+        "G17 PM-memory device-control submission",
+        {
+            0x02C: 0xB9400038,  # command discriminator
+            0x030: 0x36180102,  # flags bit 3 enables type-8 token check
+            0x034: 0x7100231F,
+            0x03C: 0xF9414E88,
+            0x040: 0xF9434508,  # expected token at accelerator +0x688
+            0x044: 0xF9400C29,  # submitted token at command +0x18
+            0x048: 0xEB09011F,
+            0x068: 0xD37EF709,  # command type * 4
+            0x080: 0xB940015A,  # role selected by the table
+            0x134: 0x12000668,  # flags & 3 requests a doorbell
+            0x138: 0x34000508,
+            0x13C: 0x52833B08,
+            0x140: 0x8B080294,  # transports at firmware +0x19d8
+            0x160: 0x53041273,  # flags bit 4 -> synchronous/wait argument
+            0x178: 0xD2811511,  # transport slot 0x8a8
+            0x184: 0xD2800221,
+            0x188: 0xF2E01081,  # doorbell 0x8400000000000011
+            0x194: 0xD73F0910,
+        },
+    )
+    base_call = struct.unpack_from("<I", arm_code, 0x08C)[0]
+    if decode_bl_target(arm_address + 0x08C, base_call) != driver_symbols[
+        SUBMIT_DEVICE_CONTROL
+    ]:
+        raise ValueError("G17 PM-memory base device-control submit target changed")
+    role_table_address = read_adrp_add_address(arm_address, arm_code, 0x060, 0x064)
+    # Command discriminators 0..57 are valid in this producer. The words
+    # immediately following are a different constant table (100, 200, ...),
+    # so do not accidentally absorb them into the role map.
+    role_table = read_virtual_u32_table(driver, role_table_address, 58)
+    if any(role > 1 for role in role_table) or role_table[8] != 0:
+        raise ValueError("G17 PM-memory device-control role mapping changed")
+
+    return {
+        "type": 6,
+        "record": "AGFIFirmwareEventPMRequestMemory",
+        "stamp_slot_offset": 4,
+        "invalid_stamp_slot": -1,
+        "manager_index_offset": 8,
+        "manager_index_limit": 0x7F,
+        "request_value_offset": 0xC,
+        "request_kind_offset": 0x10,
+        "request_kind_limit": 0x40,
+        "firmware_token_offset": 0x14,
+        "firmware_token_bytes": 8,
+        "interrupt_action": "enqueue_host_request_and_wake_worker",
+        "host_request_ring": {
+            "control_accelerator_member": 0x19AE8,
+            "entries_accelerator_member": 0x199E8,
+            "entries": 8,
+            "entry_bytes": 0x20,
+            "worker_event_source_accelerator_member": 0x468,
+            "record_layout": {
+                "discriminator_offset": 0,
+                "discriminator": 0,
+                "manager_index_offset": 8,
+                "stamp_slot_offset": 0xC,
+                "request_value_offset": 0x10,
+                "request_kind_offset": 0x14,
+                "firmware_token_offset": 0x18,
+            },
+        },
+        "device_control_response": {
+            "command_type": 8,
+            "submission_flags": 0x19,
+            "role": 0,
+            "entry_bytes": 0x40,
+            "request_kind_offset": 4,
+            "copied_host_request_range": {
+                "source_offset": 8,
+                "target_offset": 8,
+                "bytes": 0x18,
+            },
+            "zero_range": {"offset": 0x20, "bytes": 0x20},
+            "token_check": {
+                "entry_offset": 0x18,
+                "accelerator_member": 0x688,
+            },
+            "doorbell": 0x8400000000000011,
+            "doorbell_count": 1,
+            "doorbell_wait_argument": 1,
+        },
+        "manager_class": "AGXHWParamBufferManager",
+        "parameter_manager_member": 0x98,
+        "host_action": "AGXParameterManagement::growImmediately",
+        "host_action_vtable_slot": 0x190,
+        "vinix_policy": "stop_gpu_without_parameter_memory_manager",
+    }
+
+
 def recover_g17_firmware_event_actions(
     driver: bytes,
     role_address: int,
@@ -14673,6 +14967,9 @@ def recover_g17_firmware_event_actions(
         raise ValueError("G17 firmware event direct host no-op dispatch changed")
     validated_event_types = recover_g17_firmware_event_validators(
         driver, role_address, role_code
+    )
+    pm_memory_event = recover_g17_pm_memory_event_action(
+        driver, role_address, role_code, dispatch_offsets, driver_symbols
     )
 
     # Type 0 does execute a virtual call, but the selected G17 firmware class
@@ -15004,6 +15301,7 @@ def recover_g17_firmware_event_actions(
                 "vinix_policy": "consume_without_iogpu_object_namespace",
             }
         ],
+        "host_resource_events": [pm_memory_event],
         "unimplemented_action_event_types": [
             event_type for event_type in accepted_types if event_type not in implemented
         ],

@@ -76,6 +76,7 @@ mut:
 	role1_secondary       SharedBuffer
 	device_control_state   [2]SharedBuffer
 	device_control_entries [2]SharedBuffer
+	device_control_locks   [2]klock.Lock
 	data_master_state      [g17_work_priority_count][g17_work_channel_count]SharedBuffer
 	data_master_entries    [g17_work_priority_count][g17_work_channel_count]SharedBuffer
 	data_master_locks      [g17_work_priority_count][g17_work_channel_count]klock.Lock
@@ -892,6 +893,20 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 					|| fw.g17_firmware_completion_has_firing_stamps(&entry)
 				continue
 			}
+			if entry.event_type == fw.g17_firmware_event_pm_request_memory {
+				if !fw.validate_g17_firmware_pm_request_memory(&entry) {
+					C.printf(c'agx: invalid G17 parameter-memory request on role %d\n', role)
+				} else {
+					C.printf(c'agx: G17 firmware requested parameter-memory growth on role %d\n',
+						role)
+				}
+				// Apple grows the selected AGXHWParamBufferManager before it
+				// sends device-control type 8. Vinix has no equivalent backing
+				// manager yet, so acknowledging would let firmware consume memory
+				// that does not exist. Preserve the request and fail closed.
+				mgr.state = .error
+				return false
+			}
 			if entry.event_type == fw.g17_firmware_event_gpu_restart {
 				if !fw.validate_g17_firmware_gpu_restart(&entry) {
 					C.printf(c'agx: invalid G17 GPU-restart event on role %d\n', role)
@@ -1026,6 +1041,40 @@ fn (mut graph G17FirmwareGraph) enqueue_data_master(priority u32,
 	entries := &graph.data_master_entries[priority][command.command_type]
 	return fw.enqueue_g17_data_master_entry(state.cpu_address(), fw.g17_accelerator_ring_state_size,
 		entries.cpu_address(), fw.g17_data_master_entries_bytes, command)
+}
+
+// Serialize one producer for each role-local device-control ring. This only
+// stages a caller-prepared entry; it deliberately does not send the recovered
+// 0x84/0x11 notification.
+fn (mut graph G17FirmwareGraph) enqueue_device_control(role u32,
+	entry &fw.G17DeviceControlEntry) bool {
+	if role >= 2 || entry == unsafe { nil } {
+		return false
+	}
+	graph.device_control_locks[role].acquire()
+	defer {
+		graph.device_control_locks[role].release()
+	}
+	state := &graph.device_control_state[role]
+	entries := &graph.device_control_entries[role]
+	return fw.enqueue_g17_device_control_entry(state.cpu_address(),
+		fw.g17_accelerator_ring_state_size, entries.cpu_address(),
+		fw.g17_device_control_entries_size, entry)
+}
+
+// Encode and stage the recovered type-8 response for tests and the eventual
+// parameter-buffer manager. The callback must not call this until the host has
+// actually satisfied the firmware's allocation request.
+pub fn (mut mgr GpuManager) stage_g17_allocate_pm_memory_response(role u32,
+	event_entry &fw.G17FirmwareEventRingEntry) bool {
+	if mgr.g17_graph == unsafe { nil } {
+		return false
+	}
+	mut response := fw.G17DeviceControlEntry{}
+	if !fw.encode_g17_allocate_pm_memory_response(&response, event_entry) {
+		return false
+	}
+	return mgr.g17_graph.enqueue_device_control(role, &response)
 }
 
 // Stage a byte-accurate outer-ring entry once a G17 channel command has been

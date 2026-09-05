@@ -2265,7 +2265,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         changed_validator_type: int = -1,
     ) -> dict[str, object]:
         role_address = 0x100000
-        role = bytearray(0x800)
+        role = bytearray(0xD00)
         for offset, word in {
             0x120: 0xB94053E8,
             0x124: 0x35009B88,
@@ -2351,11 +2351,36 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x730: 0xAA1903E1,
             0x734: bl(role_address + 0x734, process_remove_call_target),
             0x738: 0xB4FFCC36,
+            0xAF0: 0xB94053E8,
+            0xAF4: 0x7100191F,
+            0xAFC: 0xB94057F6,
+            0xB14: 0xD2815611,
+            0xB44: 0xB9405BF6,
+            0xB48: 0x7101FEDF,
+            0xB50: 0xB94063F7,
+            0xB54: 0x710102FF,
+            0xB5C: 0xB94057FA,
+            0xB60: 0xB9405FFB,
+            0xB64: 0xF84643F9,
+            0xB68: 0xF9414E7C,
+            0xB6C: 0x52935D08,
+            0xB70: 0x72A00028,
+            0xBB8: 0x8B080388,
+            0xBD8: 0xF900015F,
+            0xBDC: 0x29016956,
+            0xBE0: 0x29025D5B,
+            0xBE4: 0xF9000D59,
+            0xBF0: 0x12000908,
+            0xC00: 0xF9414E68,
+            0xC04: 0xF9423500,
+            0xC2C: 0x9107E208,
+            0xC30: 0xF940FE09,
         }.items():
             struct.pack_into("<I", role, offset, word)
         dispatch_offsets = [0] * 16
         dispatch_offsets[0] = 0x0C
         dispatch_offsets[4] = 0x70
+        dispatch_offsets[6] = -0x70
         dispatch_offsets[7] = 0x480
         dispatch_offsets[8] = 0x180
         dispatch_offsets[10] = 0x430
@@ -2364,8 +2389,23 @@ class RecoverG17AbiTests(unittest.TestCase):
         for event_type in (2, 3, 5, 11):
             dispatch_offsets[event_type] = -0x54
         controller_target = 0x120000
+        allocate_worker_target = 0x180000
+        accelerator_submit_target = 0x190000
+        arm_submit_target = 0x1A0000
+        base_submit_target = 0x1B0000
+        hwpb_meta_class_target = 0x1C0000
+        physical_grow_target = 0x1D0000
+        virtual_grow_target = 0x1E0000
+        role_table_target = 0x1F0000
         driver_symbols = {
-            recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT: controller_target
+            recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT: controller_target,
+            recover_g17_abi.ALLOCATE_PM_MEMORY_EVENT: allocate_worker_target,
+            recover_g17_abi.ACCELERATOR_SUBMIT_DEVICE_CONTROL: accelerator_submit_target,
+            recover_g17_abi.ARM_SUBMIT_DEVICE_CONTROL: arm_submit_target,
+            recover_g17_abi.SUBMIT_DEVICE_CONTROL: base_submit_target,
+            recover_g17_abi.HWPB_MANAGER_META_CLASS: hwpb_meta_class_target,
+            recover_g17_abi.PARAMETER_MANAGEMENT_GROW: physical_grow_target,
+            recover_g17_abi.PARAMETER_MANAGEMENT_VIRTUAL_GROW: virtual_grow_target,
         }
         iogpu_symbols = {
             recover_g17_abi.IOGPU_EVENT_GET_NUM_STAMPS: 0x130000,
@@ -2378,22 +2418,126 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.IOSURFACE_ROOT_SIGNAL_EVENT_ID: 0x150000,
         }
         start_address = 0x200000
-        start = bytearray(0x2CBC)
+        start = bytearray(0x3870)
         for offset, word in {
             0x2CA4: 0xB0FF41A1,
             0x2CA8: 0x91378021,
             0x2CAC: 0xAA1603E0,
             0x2CB4: 0xF942DA68,
             0x2CB8: 0xF907D900,
+            0x3848: adrp(start_address + 0x3848, allocate_worker_target, 16),
+            0x384C: add_immediate(16, 16, allocate_worker_target & 0xFFF),
+            0x3850: 0xD2825EF1,
+            0x3854: 0xDAC10230,
+            0x3858: 0xAA1003E1,
+            0x385C: 0xAA1303E0,
+            0x3860: 0xD2800002,
+            0x3864: 0x52800003,
+            0x386C: 0xF9023660,
         }.items():
             struct.pack_into("<I", start, offset, word)
+
+        worker = bytearray(0x284)
+        for offset, word in {
+            0x028: 0x91406408,
+            0x02C: 0x912BA119,
+            0x060: 0x9100E3E8,
+            0x064: 0x6F00E400,
+            0x068: 0xAD010100,
+            0x06C: 0x52800108,
+            0x070: 0x29075FE8,
+            0x074: 0x3CC082A0,
+            0x078: 0x3C8403E0,
+            0x07C: 0xF9400EA8,
+            0x080: 0xF9002BE8,
+            0x088: 0x52800328,
+            0x0E4: 0x9107A208,
+            0x0E8: 0xF940F609,
+            0x0EC: adrp(allocate_worker_target + 0x0EC, accelerator_submit_target, 16),
+            0x0F0: add_immediate(16, 16, accelerator_submit_target & 0xFFF),
+            0x0FC: 0xAA1003E1,
+            0x100: 0x9100E3E2,
+            0x104: 0xD10153A3,
+            0x108: 0xD10163A4,
+            0x17C: 0xB94002A8,
+            0x180: 0x35000E48,
+            0x1C0: 0xB9400AB6,
+            0x210: 0xAA1703E0,
+            0x214: adrp(allocate_worker_target + 0x214, hwpb_meta_class_target, 1),
+            0x218: add_immediate(1, 1, hwpb_meta_class_target & 0xFFF),
+            0x21C: 0x94C9D252,
+            0x24C: 0xF9404ED8,
+            0x250: 0xF9409B00,
+            0x268: 0xD2803211,
+            0x27C: 0xD73F0910,
+            0x280: 0xAA0003F7,
+        }.items():
+            struct.pack_into("<I", worker, offset, word)
+
+        arm_submit = bytearray(0x198)
+        for offset, word in {
+            0x02C: 0xB9400038,
+            0x030: 0x36180102,
+            0x034: 0x7100231F,
+            0x03C: 0xF9414E88,
+            0x040: 0xF9434508,
+            0x044: 0xF9400C29,
+            0x048: 0xEB09011F,
+            0x060: adrp(arm_submit_target + 0x060, role_table_target, 8),
+            0x064: add_immediate(8, 8, role_table_target & 0xFFF),
+            0x068: 0xD37EF709,
+            0x080: 0xB940015A,
+            0x08C: bl(arm_submit_target + 0x08C, base_submit_target),
+            0x134: 0x12000668,
+            0x138: 0x34000508,
+            0x13C: 0x52833B08,
+            0x140: 0x8B080294,
+            0x160: 0x53041273,
+            0x178: 0xD2811511,
+            0x184: 0xD2800221,
+            0x188: 0xF2E01081,
+            0x194: 0xD73F0910,
+        }.items():
+            struct.pack_into("<I", arm_submit, offset, word)
+
+        accelerator_submit = bytearray(0xC0)
+        for offset, word in {
+            0x058: 0xF942DAC0,
+            0x06C: 0xF9400010,
+            0x070: 0xAA0003F1,
+            0x074: 0xF2F9B431,
+            0x078: 0xDAC11A30,
+            0x07C: 0xD2805011,
+            0x080: 0x8B110210,
+            0x084: 0xF9400208,
+            0x090: 0xAA1403E1,
+            0x094: 0xAA1303E3,
+            0x0B4: 0xAA0403F1,
+            0x0BC: 0xD71F0A11,
+        }.items():
+            struct.pack_into("<I", accelerator_submit, offset, word)
 
         def symbol_code(_image: bytes, name: str) -> tuple[int, bytes]:
             if name == recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT:
                 return controller_target, controller_code
             if name == recover_g17_abi.ACCELERATOR_START:
                 return start_address, bytes(start)
+            if name == recover_g17_abi.ALLOCATE_PM_MEMORY_EVENT:
+                return allocate_worker_target, bytes(worker)
+            if name == recover_g17_abi.ARM_SUBMIT_DEVICE_CONTROL:
+                return arm_submit_target, bytes(arm_submit)
+            if name == recover_g17_abi.ACCELERATOR_SUBMIT_DEVICE_CONTROL:
+                return accelerator_submit_target, bytes(accelerator_submit)
             raise AssertionError(f"unexpected symbol {name}")
+
+        def vtable_target(_image: bytes, vtable: str, slot: int) -> int:
+            targets = {
+                (recover_g17_abi.G17_FIRMWARE_VTABLE, 0x878): controller_target,
+                (recover_g17_abi.G17_FIRMWARE_VTABLE, 0x280): arm_submit_target,
+                (recover_g17_abi.PARAMETER_MANAGEMENT_VTABLE, 0x190): physical_grow_target,
+                (recover_g17_abi.PARAMETER_MANAGEMENT_VIRTUAL_VTABLE, 0x190): virtual_grow_target,
+            }
+            return targets[(vtable, slot)]
 
         def cstring(
             _image: bytes,
@@ -2421,7 +2565,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         with mock.patch.object(
             recover_g17_abi,
             "recover_vtable_target",
-            return_value=controller_target,
+            side_effect=vtable_target,
         ), mock.patch.object(
             recover_g17_abi,
             "symbol_code",
@@ -2430,6 +2574,10 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi,
             "read_adrp_add_cstring",
             side_effect=cstring,
+        ), mock.patch.object(
+            recover_g17_abi,
+            "read_virtual_u32_table",
+            return_value=(0,) * 58,
         ):
             return recover_g17_abi.recover_g17_firmware_event_actions(
                 b"driver",
@@ -2462,6 +2610,22 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(
             [event["type"] for event in recovered["host_lifecycle_events"]], [12]
+        )
+        self.assertEqual(
+            [event["type"] for event in recovered["host_resource_events"]], [6]
+        )
+        pm_memory = recovered["host_resource_events"][0]
+        self.assertEqual(pm_memory["host_action"], "AGXParameterManagement::growImmediately")
+        self.assertEqual(pm_memory["device_control_response"]["command_type"], 8)
+        self.assertEqual(pm_memory["device_control_response"]["submission_flags"], 0x19)
+        self.assertEqual(pm_memory["device_control_response"]["role"], 0)
+        self.assertEqual(
+            pm_memory["host_request_ring"]["record_layout"]["stamp_slot_offset"],
+            0xC,
+        )
+        self.assertEqual(
+            pm_memory["device_control_response"]["copied_host_request_range"],
+            {"source_offset": 8, "target_offset": 8, "bytes": 0x18},
         )
         self.assertEqual(
             recovered["unimplemented_action_event_types"],

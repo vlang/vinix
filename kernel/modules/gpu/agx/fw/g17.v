@@ -49,6 +49,7 @@ pub const g17_firmware_event_type_mask = u32(0x2000ffd3)
 pub const g17_firmware_event_controller = u32(0)
 pub const g17_firmware_event_completion = u32(1)
 pub const g17_firmware_event_gpu_restart = u32(4)
+pub const g17_firmware_event_pm_request_memory = u32(6)
 pub const g17_firmware_event_host_noop_mask = u32(0x20000801)
 pub const g17_firmware_event_channel_error = u32(7)
 pub const g17_firmware_event_metrology_aging = u32(8)
@@ -60,6 +61,8 @@ pub const g17_firmware_event_flag_limit = u16(0x18)
 // stamp count. Vinix's v12.3 event manager exposes exactly the same 128 slots
 // (event.max_stamps), so reject records outside the locally configured array.
 pub const g17_firmware_event_stamp_slots = u32(128)
+pub const g17_firmware_event_pm_manager_limit = u32(0x7f)
+pub const g17_firmware_event_pm_request_kind_limit = u32(0x40)
 pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_data_master_entries_bytes = u64(0x1800)
@@ -69,6 +72,10 @@ pub const g17_data_master_address_record_size = u64(0x20)
 pub const g17_data_master_priority_record_size = u64(0x60)
 pub const g17_data_master_address_table_size = u64(0x180)
 pub const g17_device_control_entry_size = u64(0x40)
+pub const g17_device_control_allocate_pm_memory = u32(8)
+pub const g17_device_control_allocate_pm_flags = u32(0x19)
+pub const g17_device_control_role_primary = u32(0)
+pub const g17_device_control_allocate_pm_doorbell = u64(0x8400000000000011)
 pub const g17_channel_priority_count = u32(4)
 pub const g17_channel_default_subpriority = u32(2)
 pub const g17_accelerator_command_ta = u32(0)
@@ -2652,6 +2659,23 @@ pub mut:
 	opaque_010 [0x38]u8
 }
 
+// Event type 6 asks the host parameter-buffer manager to grow its backing
+// storage. Apple queues this record to a non-interrupt worker, calls
+// AGXParameterManagement::growImmediately, then returns device-control type 8.
+// Vinix names and validates the wire request but must not acknowledge it until
+// it owns an equivalent parameter-buffer allocator.
+@[packed]
+pub struct G17FirmwarePmRequestMemory {
+pub mut:
+	event_type     u32
+	stamp_slot     i32
+	manager_index  u32
+	request_value  u32
+	request_kind   u32
+	firmware_token u64
+	opaque_01c     [0x2c]u8
+}
+
 // Event type 7 reports a channel error. The subtype and data-master limits
 // are checked before Apple enters its channel-specific recovery machinery.
 @[packed]
@@ -2733,6 +2757,17 @@ pub fn validate_g17_firmware_gpu_restart(entry &G17FirmwareEventRingEntry) bool 
 	}
 	event := unsafe { &G17FirmwareGpuRestartEvent(entry) }
 	return event.stamp_slot == -1 || u32(event.stamp_slot) < g17_firmware_event_stamp_slots
+}
+
+pub fn validate_g17_firmware_pm_request_memory(entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || entry.event_type != g17_firmware_event_pm_request_memory
+		|| sizeof(G17FirmwarePmRequestMemory) != g17_firmware_event_entry_size {
+		return false
+	}
+	event := unsafe { &G17FirmwarePmRequestMemory(entry) }
+	return (event.stamp_slot == -1 || u32(event.stamp_slot) < g17_firmware_event_stamp_slots)
+		&& event.manager_index < g17_firmware_event_pm_manager_limit
+		&& event.request_kind < g17_firmware_event_pm_request_kind_limit
 }
 
 pub fn validate_g17_firmware_channel_error(entry &G17FirmwareEventRingEntry) bool {
@@ -3103,8 +3138,6 @@ pub fn g17_data_master_ring_has_space(state_buffer voidptr, state_size u64) bool
 }
 
 // The device-control path copies a complete 0x40-byte entry into its ring.
-// Only its command discriminator is named until individual commands have
-// been recovered.
 @[packed]
 pub struct G17DeviceControlEntry {
 pub mut:
@@ -3112,6 +3145,79 @@ pub mut:
 	opaque_004   [0x3c]u8
 }
 
+// Response to firmware event type 6. request_kind is deliberately repeated:
+// Apple's worker writes it at +0x04, then copies the normalized host request
+// bytes +0x08..+0x1f into the same offsets in this command.
+@[packed]
+pub struct G17DeviceControlAllocatePmMemory {
+pub mut:
+	command_type      u32
+	request_kind      u32
+	manager_index     u32
+	stamp_slot        i32
+	request_value     u32
+	request_kind_copy u32
+	firmware_token    u64
+	opaque_020        [0x20]u8
+}
+
+// Construct the byte-exact acknowledgement Apple emits only after its host
+// parameter manager has successfully grown. This function does not publish
+// the response, ring its 0x84/0x11 doorbell, or imply that Vinix can service
+// the allocation request.
+pub fn encode_g17_allocate_pm_memory_response(entry &G17DeviceControlEntry,
+	event_entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || !validate_g17_firmware_pm_request_memory(event_entry)
+		|| sizeof(G17DeviceControlAllocatePmMemory) != g17_device_control_entry_size {
+		return false
+	}
+	unsafe {
+		C.memset(entry, 0, g17_device_control_entry_size)
+		event := &G17FirmwarePmRequestMemory(event_entry)
+		mut response := &G17DeviceControlAllocatePmMemory(entry)
+		response.command_type = g17_device_control_allocate_pm_memory
+		response.request_kind = event.request_kind
+		response.manager_index = event.manager_index
+		response.stamp_slot = event.stamp_slot
+		response.request_value = event.request_value
+		response.request_kind_copy = event.request_kind
+		response.firmware_token = event.firmware_token
+	}
+	return true
+}
+
+// Publish one complete device-control entry. Callers must hold a role-local
+// producer lock, and must perform the separately recovered doorbell only after
+// this release publication succeeds.
+pub fn enqueue_g17_device_control_entry(state_buffer voidptr, state_size u64,
+	entries_buffer voidptr, entries_size u64, entry &G17DeviceControlEntry) bool {
+	if state_buffer == unsafe { nil } || state_size != g17_accelerator_ring_state_size
+		|| entries_buffer == unsafe { nil } || entries_size < g17_device_control_entries_size
+		|| entry == unsafe { nil } || sizeof(G17DeviceControlEntry) != g17_device_control_entry_size {
+		return false
+	}
+
+	unsafe {
+		mut state := &G17AcceleratorRingState(state_buffer)
+		read_index := katomic.load(&state.read_index)
+		write_index := katomic.load(&state.write_index)
+		if read_index >= g17_accelerator_ring_entries
+			|| write_index >= g17_accelerator_ring_entries {
+			return false
+		}
+		next_index := (write_index + 1) & 0xff
+		if next_index == read_index {
+			return false
+		}
+
+		mut target := &G17DeviceControlEntry(&u8(entries_buffer) +
+			u64(write_index) * g17_device_control_entry_size)
+		C.memcpy(target, entry, g17_device_control_entry_size)
+		katomic.store(mut &state.write_index, next_index)
+	}
+	return true
+}
+
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwarePmRequestMemory) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && sizeof(G17DeviceControlAllocatePmMemory) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
 }
