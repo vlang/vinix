@@ -210,3 +210,9 @@ pub fn (mut em EventManager) scan_completions() {
 		}
 	}
 }
+
+// Firmware event handlers use this entry point so the global manager remains
+// encapsulated in this module.
+pub fn scan_all_completions() {
+	gpu_event_mgr.scan_completions()
+}

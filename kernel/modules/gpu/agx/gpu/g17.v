@@ -6,6 +6,7 @@ module gpu
 // G17 bring-up can never fall through to the older ABI.
 
 import gpu.agx.fw
+import gpu.agx.event
 import gpu.agx.pgtable
 import gpu.agx.regs
 import aarch64.kio
@@ -763,6 +764,7 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 		graph.event_lock.release()
 	}
 
+	mut completion_pending := false
 	for role := 0; role < 2; role++ {
 		state := &graph.auxiliary[role][fw.g17_firmware_event_state_auxiliary_index]
 		entries := &graph.auxiliary[role][fw.g17_firmware_event_entries_auxiliary_index]
@@ -779,6 +781,16 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 			if result == 0 {
 				break
 			}
+			if entry.event_type == fw.g17_firmware_event_completion {
+				if !fw.validate_g17_firmware_completion_event(&entry) {
+					C.printf(c'agx: invalid G17 completion event on role %d\n', role)
+					mgr.state = .error
+					return false
+				}
+				completion_pending = completion_pending
+					|| fw.g17_firmware_completion_has_firing_stamps(&entry)
+				continue
+			}
 			// Type 2 branches straight back to Apple's drain loop. Preserve
 			// that no-op behavior. Other accepted event records need their
 			// individual response ABIs before Vinix may continue after them.
@@ -789,6 +801,9 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 				return false
 			}
 		}
+	}
+	if completion_pending {
+		event.scan_all_completions()
 	}
 	return true
 }

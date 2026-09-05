@@ -44,6 +44,10 @@ FIRMWARE_INIT = "__ZN11AGXFirmware4initEP14AGXAccelerator"
 FIRMWARE_RING_FETCH = (
     "__ZN24AGXFirmwareRingValidator14fetchNextEntryEP26AGFIFirmwareEventRingEntry"
 )
+IOGPU_EVENT_SIGNAL_STAMP = "__ZN17IOGPUEventMachine11signalStampEij"
+IOGPU_EVENT_TEST_ALL_STAMPS = "__ZNK17IOGPUEventMachine13testAllStampsEv"
+IOGPU_FENCE_INTERRUPT_OCCURRED = "__ZN17IOGPUFenceMachine24iofenceInterruptOccurredEv"
+IOGPU_SIGNAL_STAMPS_UPDATED = "__ZN5IOGPU19signalStampsUpdatedEv"
 G17_CLEAR_FIRMWARE_INTERRUPTS = (
     "__ZN14AGXArmFirmware34clearOutstandingFirmwareInterruptsEv.4213"
 )
@@ -13097,10 +13101,13 @@ def recover_g17_akf_callback(driver: bytes, kernel: bytes) -> dict[str, object]:
     }
 
 
-def recover_g17_firmware_event_ring(driver: bytes) -> dict[str, object]:
+def recover_g17_firmware_event_ring(
+    driver: bytes, iogpu: bytes
+) -> dict[str, object]:
     """Recover the role-local ring consumed by callback interrupt index 4."""
 
     symbols = macho_symbols(driver)
+    iogpu_symbols = macho_symbols(iogpu)
     required = (
         FIRMWARE_INIT,
         FIRMWARE_DRAIN_EVENT_RING,
@@ -13110,6 +13117,14 @@ def recover_g17_firmware_event_ring(driver: bytes) -> dict[str, object]:
     for name in required:
         if name not in symbols:
             raise ValueError(f"driver Mach-O has no {name} symbol")
+    for name in (
+        IOGPU_EVENT_SIGNAL_STAMP,
+        IOGPU_EVENT_TEST_ALL_STAMPS,
+        IOGPU_FENCE_INTERRUPT_OCCURRED,
+        IOGPU_SIGNAL_STAMPS_UPDATED,
+    ):
+        if name not in iogpu_symbols:
+            raise ValueError(f"IOGPUFamily Mach-O has no {name} symbol")
 
     init_address, init_code = symbol_code(driver, FIRMWARE_INIT)
     _wrapper_address, wrapper_code = symbol_code(driver, FIRMWARE_DRAIN_EVENT_RING)
@@ -13181,6 +13196,44 @@ def recover_g17_firmware_event_ring(driver: bytes) -> dict[str, object]:
     if dispatch_anchor + dispatch_offsets[2] != role_address + 0xBC:
         raise ValueError("G17 firmware event type 2 is no longer a host no-op")
     require_instruction_words_at(
+        role_code,
+        "G17 firmware completion event",
+        {
+            0x368: 0xB94053E8,  # event type at entry +0
+            0x36C: 0x7100051F,  # completion event type 1
+            0x374: 0x7940CBE8,  # checked halfword at entry +0x14
+            0x378: 0x7100611F,  # checked halfword must be below 0x18
+            0x384: 0xF84543F7,  # firing bits 0..63 at entry +4
+            0x388: 0xF845C3F9,  # firing bits 64..127 at entry +0xc
+            0x3B0: 0xF940A300,  # accelerator event machine at +0x140
+            0x3B4: 0xAA1603E1,  # bit index
+            0x3E0: 0x321B0341,  # second word starts at stamp index 32
+            0x468: 0xB9404FE9,  # remember whether any stamp fired
+            0x470: 0xB9004FE9,
+            0x12A8: 0xB9404FE8,  # no global notification without firing bits
+            0x12AC: 0x36000A28,
+            0x12B0: 0xF9414E74,  # firmware +0x298 -> accelerator
+            0x12B4: 0xF940AA80,  # accelerator fence machine at +0x150
+            0x12BC: 0xAA1403E0,
+            0x12C4: 0xF940A280,  # accelerator event machine at +0x140
+        },
+    )
+    for call_offset in (0x3BC, 0x3E8, 0x414, 0x440):
+        call = struct.unpack_from("<I", role_code, call_offset)[0]
+        if decode_bl_target(role_address + call_offset, call) != iogpu_symbols[
+            IOGPU_EVENT_SIGNAL_STAMP
+        ]:
+            raise ValueError("G17 completion event no longer signals every firing bit")
+    completion_calls = {
+        0x12B8: IOGPU_FENCE_INTERRUPT_OCCURRED,
+        0x12C0: IOGPU_SIGNAL_STAMPS_UPDATED,
+        0x12C8: IOGPU_EVENT_TEST_ALL_STAMPS,
+    }
+    for call_offset, expected in completion_calls.items():
+        call = struct.unpack_from("<I", role_code, call_offset)[0]
+        if decode_bl_target(role_address + call_offset, call) != iogpu_symbols[expected]:
+            raise ValueError(f"G17 completion callback no longer calls {expected}")
+    require_instruction_words_at(
         fetch_code,
         "G17 firmware event-ring fetch",
         {
@@ -13220,6 +13273,17 @@ def recover_g17_firmware_event_ring(driver: bytes) -> dict[str, object]:
         "entries": mask_count[1],
         "entries_bytes": 0x4800,
         "accepted_event_mask": mask_count[0],
+        "completion_event": {
+            "type": 1,
+            "firing_masks_offset": 4,
+            "firing_mask_words": 4,
+            "firing_stamp_slots": 128,
+            "checked_halfword_offset": 0x14,
+            "checked_halfword_limit": 0x18,
+            "signals_each_firing_stamp": True,
+            "signals_stamps_updated": True,
+            "tests_all_stamps_after_drain": True,
+        },
         "read_index_publish_barrier": "dmb ish",
     }
 
@@ -13359,7 +13423,7 @@ def main() -> int:
             driver, kernel
         )
         boot_transport["callback_dispatch"]["firmware_event_ring"] = (
-            recover_g17_firmware_event_ring(driver)
+            recover_g17_firmware_event_ring(driver, iogpu)
         )
         rtbuddy_endpoints = recover_g17_rtbuddy_endpoints(
             symbol_code(rtbuddy, RTBUDDY_READ_MESSAGE)[1],

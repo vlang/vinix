@@ -46,7 +46,9 @@ pub const g17_firmware_event_ring_entries = u32(256)
 pub const g17_firmware_event_entry_size = u64(0x48)
 pub const g17_firmware_event_entries_size = u64(0x4800)
 pub const g17_firmware_event_type_mask = u32(0x2000ffd3)
+pub const g17_firmware_event_completion = u32(1)
 pub const g17_firmware_event_host_noop = u32(2)
+pub const g17_firmware_event_flag_limit = u16(0x18)
 pub const g17_t6050_callback_interrupt_index = u32(4)
 pub const g17_data_master_entry_size = u64(0x18)
 pub const g17_data_master_entries_bytes = u64(0x1800)
@@ -2287,6 +2289,36 @@ pub mut:
 	opaque_004 [0x44]u8
 }
 
+// Event type 1 signals up to 128 IOGPU event-machine stamp slots. Apple
+// validates the trailing halfword before walking every set bit, then performs
+// one batched all-stamps completion pass after the ring has drained.
+@[packed]
+pub struct G17FirmwareCompletionEvent {
+pub mut:
+	event_type       u32
+	firing           [4]u32
+	checked_halfword u16
+	opaque_016       [0x32]u8
+}
+
+pub fn validate_g17_firmware_completion_event(entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || entry.event_type != g17_firmware_event_completion
+		|| sizeof(G17FirmwareCompletionEvent) != g17_firmware_event_entry_size {
+		return false
+	}
+	event := unsafe { &G17FirmwareCompletionEvent(entry) }
+	return event.checked_halfword < g17_firmware_event_flag_limit
+}
+
+pub fn g17_firmware_completion_has_firing_stamps(entry &G17FirmwareEventRingEntry) bool {
+	if !validate_g17_firmware_completion_event(entry) {
+		return false
+	}
+	event := unsafe { &G17FirmwareCompletionEvent(entry) }
+	return event.firing[0] != 0 || event.firing[1] != 0 || event.firing[2] != 0
+		|| event.firing[3] != 0
+}
+
 // Return -1 for corrupt ring state or an event outside Apple's checked mask,
 // 0 when empty, and 1 after copying and consuming one complete entry. The
 // acquire/release operations preserve firmware-entry-before-index ordering.
@@ -2560,5 +2592,5 @@ pub mut:
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes
 }
