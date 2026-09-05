@@ -1117,7 +1117,7 @@ def find_dominating_g17_register_write(
         if (
             target is not None
             and definition_offset < target <= use_offset
-            and not definition_index < branch_index < use_index
+            and branch_index < definition_index
         ):
             return None
 
@@ -1396,7 +1396,7 @@ def trace_g17_condition_expression(
             if (
                 target is not None
                 and offset < target <= use_offset
-                and not definition_index < branch_index < use_index
+                and branch_index < definition_index
             ):
                 return None
         for call_offset, call_word in instructions[definition_index + 1 : use_index]:

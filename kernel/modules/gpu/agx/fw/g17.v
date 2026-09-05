@@ -1462,7 +1462,7 @@ pub fn populate_g17_channel_command_common_fields(command voidptr, command_bytes
 // unaligned 64-bit value. Apple's selector argument is statically recovered at
 // every virtual encoder call, and both 3D inline forms are located. Every x4
 // writer is classified as a constant, descriptor load, or bounded computation,
-// including safe traces through dominating callee-saved copies and 57 complete
+// including safe traces through dominating callee-saved copies and 69 complete
 // descriptor/object-rooted expression trees. The remaining expressions and the
 // conditions/order of the complete per-pass sequences are not yet recovered.
 pub const g17_3d_register_passes = u32(4)

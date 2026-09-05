@@ -4584,6 +4584,19 @@ class RecoverG17AbiTests(unittest.TestCase):
             },
         )
 
+    def test_g17_prologue_definition_dominates_loop_backedge(self) -> None:
+        ldr_x8_x20_020 = 0xF9400008 | (20 << 5) | ((0x20 // 8) << 10)
+        instructions = [
+            (0x00, 0xAA0103F4),  # mov x20, x1 (command argument)
+            (0x04, ldr_x8_x20_020),
+            (0x08, 0x927AE504),  # and x4, x8, #0xffffffffffffffc0
+            (0x0C, 0x17FFFFFE),  # loop back to +0x4
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 3)
+        source = recovered["expression"]["source"]
+        self.assertEqual(source["kind"], "object_load")
+        self.assertEqual(source["base"]["source"]["name"], "command")
+
     def test_recovers_g17_register_value_expression(self) -> None:
         instructions = [
             (0x00, 0xF943B268),  # ldr x8, [x19, #0x760]
