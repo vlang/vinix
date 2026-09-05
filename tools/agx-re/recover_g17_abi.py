@@ -19,6 +19,7 @@ from extract_fileset import LC_SEGMENT_64, LC_SYMTAB, LC_UUID, load_commands, pa
 
 DRIVER_UUID = "680ACC23-AB13-301C-B28A-3A2A257F7977"
 FIRMWARE_UUID = "0EDFE976-E37B-3E68-9D64-E3ABF7772D11"
+RTBUDDY_UUID = "93F44AA7-63B3-3D75-8A9E-E4095ABBDD1D"
 INTERFACE_MAGIC = 0x0C8BC322072804C0
 INIT_FIRMWARE_DATA = "__ZN14AGXArmFirmware16initFirmwareDataEv"
 INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
@@ -32,6 +33,15 @@ RECEIVED_MESSAGE_FROM_AKF = (
     "__ZN14AGXArmFirmware22receivedMessageFromAKFEy16AGFIFirmwareRole"
 )
 BOOT_FIRMWARE = "__ZN14AGXArmFirmware12bootFirmwareEv"
+RTBUDDY_READ_MESSAGE = "__ZN22AGXFirmwareKextRTBuddy18readMessageFromAKFEPy"
+RTBUDDY_SEND_MESSAGE_GATED = (
+    "__ZN22AGXFirmwareKextRTBuddy26sendMessageToFirmwareGatedEPy"
+)
+RTBUDDY_MATCHED_ENDPOINT_GATED = (
+    "__ZN22AGXFirmwareKextRTBuddy23matchedGFXEndpointGatedEPv"
+)
+RTBUDDY_ENABLE_ENDPOINTS = "__ZN22AGXFirmwareKextRTBuddy15enableEndpointsEv"
+RTBUDDY_RECEIVED_MESSAGE = "__ZN22AGXFirmwareKextRTBuddy22receivedMessageFromAKFEy"
 PREPARE_FIRMWARE_DATA = "__ZN14AGXArmFirmware19prepareFirmwareDataEv"
 COMPLETE_FIRMWARE_DATA = "__ZN14AGXArmFirmware20completeFirmwareDataEv"
 ARM_FIRMWARE_PAGE_SHIFT = "__ZNK17AGXArmFirmwareASC14getFWPageShiftEv"
@@ -9035,6 +9045,84 @@ def recover_g17_boot_transport(
     }
 
 
+def recover_g17_rtbuddy_endpoints(
+    read_code: bytes,
+    send_code: bytes,
+    matched_code: bytes,
+    enable_code: bytes,
+    received_code: bytes,
+) -> dict[str, object]:
+    """Recover the endpoint objects used by the G17 RTBuddy wrapper."""
+
+    require_instruction_words_at(
+        matched_code,
+        "G17 RTBuddy endpoint matching",
+        {
+            0x01C: 0xB9408828,  # RTBuddyEndpointService endpoint ID at +0x88
+            0x020: 0x7100851F,  # endpoint 0x21
+            0x028: 0x7100811F,  # endpoint 0x20
+            0x030: 0xF9009674,  # endpoint 0x20 object -> host +0x128
+            0x100: 0xF9009A74,  # endpoint 0x21 object -> host +0x130
+        },
+    )
+    require_instruction_words_at(
+        read_code,
+        "G17 RTBuddy message receive",
+        {
+            0x00C: 0xF9409400,  # read exclusively through endpoint 0x20 object
+            0x010: 0x52800002,
+        },
+    )
+    require_instruction_words_at(
+        send_code,
+        "G17 RTBuddy message send",
+        {
+            0x008: 0xF9409400,  # send exclusively through endpoint 0x20 object
+            0x028: 0xD2803D11,  # RTBuddy endpoint send slot 0x1e8
+            0x02C: 0x8B110210,
+            0x030: 0xF9400208,
+            0x03C: 0xD2800002,
+            0x040: 0x52800023,
+        },
+    )
+    require_instruction_words_at(
+        enable_code,
+        "G17 RTBuddy endpoint enable",
+        {
+            0x014: 0xF9409400,  # endpoint 0x20 object
+            0x028: 0xD2802E11,  # endpoint enable slot 0x170
+            0x02C: 0x8B110210,
+            0x030: 0xF9400208,
+            0x03C: 0xF9409A60,  # endpoint 0x21 object
+            0x064: 0x9105C208,
+            0x068: 0xF940BA09,
+            0x078: 0xF940BA60,  # AGXArmFirmware owner at host +0x170
+            0x07C: 0xB9412261,  # firmware role at host +0x120
+        },
+    )
+    require_instruction_words_at(
+        received_code,
+        "G17 RTBuddy receive forwarding",
+        {
+            0x004: 0xF940B808,  # AGXArmFirmware owner at host +0x170
+            0x008: 0xB9412002,  # firmware role at host +0x120
+        },
+    )
+
+    return {
+        "message_endpoint": 0x20,
+        "doorbell_endpoint": 0x21,
+        "endpoint_service_id_member": 0x88,
+        "message_endpoint_host_member": 0x128,
+        "doorbell_endpoint_host_member": 0x130,
+        "endpoint_enable_vtable_slot": 0x170,
+        "message_send_vtable_slot": 0x1E8,
+        "firmware_role_host_member": 0x120,
+        "arm_firmware_host_member": 0x170,
+        "receive_forwards_role": True,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -9049,18 +9137,27 @@ def main() -> int:
     parser.add_argument(
         "--iogpu", type=Path, default=Path("build/kext/g17c/iokit.IOGPUFamily.macho")
     )
+    parser.add_argument(
+        "--rtbuddy",
+        type=Path,
+        default=Path("build/kext/g17c/AGXFirmwareKextG17XRTBuddy.macho"),
+    )
     args = parser.parse_args()
     try:
         driver = args.driver.read_bytes()
         kernel = args.kernel.read_bytes()
         firmware = args.firmware.read_bytes()
         iogpu = args.iogpu.read_bytes()
+        rtbuddy = args.rtbuddy.read_bytes()
         driver_uuid = macho_uuid(driver)
         firmware_uuid = macho_uuid(firmware)
+        rtbuddy_uuid = macho_uuid(rtbuddy)
         if driver_uuid != DRIVER_UUID:
             raise ValueError(f"unsupported AGXG17X UUID {driver_uuid}")
         if firmware_uuid != FIRMWARE_UUID:
             raise ValueError(f"unsupported G17 firmware UUID {firmware_uuid}")
+        if rtbuddy_uuid != RTBUDDY_UUID:
+            raise ValueError(f"unsupported G17 RTBuddy UUID {rtbuddy_uuid}")
         function_address, function = symbol_code(driver, INIT_FIRMWARE_DATA)
         driver_root = recover_driver_root(function)
         driver_root["function"] = INIT_FIRMWARE_DATA
@@ -9078,6 +9175,13 @@ def main() -> int:
         _address, boot_firmware_code = symbol_code(driver, BOOT_FIRMWARE)
         boot_transport = recover_g17_boot_transport(
             notify_started_code, received_akf_code, boot_firmware_code
+        )
+        rtbuddy_endpoints = recover_g17_rtbuddy_endpoints(
+            symbol_code(rtbuddy, RTBUDDY_READ_MESSAGE)[1],
+            symbol_code(rtbuddy, RTBUDDY_SEND_MESSAGE_GATED)[1],
+            symbol_code(rtbuddy, RTBUDDY_MATCHED_ENDPOINT_GATED)[1],
+            symbol_code(rtbuddy, RTBUDDY_ENABLE_ENDPOINTS)[1],
+            symbol_code(rtbuddy, RTBUDDY_RECEIVED_MESSAGE)[1],
         )
         _address, page_shift_code = symbol_code(driver, ARM_FIRMWARE_PAGE_SHIFT)
         _address, set_64_pa_code = symbol_code(driver, SET_INIT_REGISTER_64_PA)
@@ -9306,10 +9410,12 @@ def main() -> int:
                 "schema": 1,
                 "driver_uuid": driver_uuid,
                 "firmware_uuid": firmware_uuid,
+                "rtbuddy_uuid": rtbuddy_uuid,
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "bootstrap_roots": bootstrap_roots,
                 "boot_transport": boot_transport,
+                "rtbuddy_endpoints": rtbuddy_endpoints,
                 "bootstrap_region": bootstrap_region,
                 "platform_config": platform_config,
                 "brn_workaround_table": brn_workaround_table,

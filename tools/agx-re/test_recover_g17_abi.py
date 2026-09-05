@@ -1909,6 +1909,63 @@ class RecoverG17AbiTests(unittest.TestCase):
                 bytes(notify), bytes(receive), bytes(boot)
             )
 
+    def test_recovers_g17_rtbuddy_endpoints(self) -> None:
+        read = bytearray(0x14)
+        send = bytearray(0x44)
+        matched = bytearray(0x104)
+        enable = bytearray(0x80)
+        received = bytearray(0x0C)
+        for target, words in (
+            (read, {0x00C: 0xF9409400, 0x010: 0x52800002}),
+            (
+                send,
+                {
+                    0x008: 0xF9409400,
+                    0x028: 0xD2803D11,
+                    0x02C: 0x8B110210,
+                    0x030: 0xF9400208,
+                    0x03C: 0xD2800002,
+                    0x040: 0x52800023,
+                },
+            ),
+            (
+                matched,
+                {
+                    0x01C: 0xB9408828,
+                    0x020: 0x7100851F,
+                    0x028: 0x7100811F,
+                    0x030: 0xF9009674,
+                    0x100: 0xF9009A74,
+                },
+            ),
+            (
+                enable,
+                {
+                    0x014: 0xF9409400,
+                    0x028: 0xD2802E11,
+                    0x02C: 0x8B110210,
+                    0x030: 0xF9400208,
+                    0x03C: 0xF9409A60,
+                    0x064: 0x9105C208,
+                    0x068: 0xF940BA09,
+                    0x078: 0xF940BA60,
+                    0x07C: 0xB9412261,
+                },
+            ),
+            (received, {0x004: 0xF940B808, 0x008: 0xB9412002}),
+        ):
+            for offset, word in words.items():
+                struct.pack_into("<I", target, offset, word)
+
+        recovered = recover_g17_abi.recover_g17_rtbuddy_endpoints(
+            bytes(read), bytes(send), bytes(matched), bytes(enable), bytes(received)
+        )
+        self.assertEqual(recovered["message_endpoint"], 0x20)
+        self.assertEqual(recovered["doorbell_endpoint"], 0x21)
+        self.assertEqual(recovered["message_endpoint_host_member"], 0x128)
+        self.assertEqual(recovered["doorbell_endpoint_host_member"], 0x130)
+        self.assertTrue(recovered["receive_forwards_role"])
+
     def test_recovers_device_control_copy_size(self) -> None:
         code = encode(
             pair_q("load", 0, 1, 21, 0),
