@@ -34,11 +34,11 @@ pub mut:
 	version_minor      int
 	version_patchlevel int
 	name_len           u64
-	name                u64
+	name               u64
 	date_len           u64
-	date                u64
+	date               u64
 	desc_len           u64
-	desc                u64
+	desc               u64
 }
 
 pub struct DrmGetCap {
@@ -119,9 +119,8 @@ pub const asahi_render_vertex_spills = u64(1) << 2
 pub const asahi_render_process_empty_tiles = u64(1) << 3
 pub const asahi_render_no_vertex_clustering = u64(1) << 4
 pub const asahi_render_msaa_zs = u64(1) << 5
-pub const asahi_render_supported_flags = asahi_render_no_clear_pipeline_textures
-	| asahi_render_set_when_reloading_z_or_s | asahi_render_vertex_spills
-	| asahi_render_process_empty_tiles | asahi_render_no_vertex_clustering | asahi_render_msaa_zs
+pub const asahi_render_no_preemption = u64(1) << 6
+pub const asahi_render_supported_flags = asahi_render_no_clear_pipeline_textures | asahi_render_set_when_reloading_z_or_s | asahi_render_vertex_spills | asahi_render_process_empty_tiles | asahi_render_no_vertex_clustering | asahi_render_msaa_zs | asahi_render_no_preemption
 pub const asahi_compute_no_preemption = u64(1) << 0
 pub const asahi_queue_cap_render = u32(1) << asahi_cmd_render
 pub const asahi_queue_cap_blit = u32(1) << asahi_cmd_blit
@@ -302,82 +301,82 @@ pub mut:
 
 pub struct DrmAsahiCmdRender {
 pub mut:
-	extensions                    u64
-	flags                         u64
-	encoder_ptr                   u64
-	vertex_usc_base               u64
-	fragment_usc_base             u64
-	vertex_attachments            u64
-	fragment_attachments          u64
-	vertex_attachment_count       u32
-	fragment_attachment_count     u32
-	vertex_helper_program         u32
-	fragment_helper_program       u32
-	vertex_helper_cfg             u32
-	fragment_helper_cfg           u32
-	vertex_helper_arg             u64
-	fragment_helper_arg           u64
-	depth_buffer_load             u64
-	depth_buffer_load_stride      u64
-	depth_buffer_store            u64
-	depth_buffer_store_stride     u64
-	depth_buffer_partial          u64
-	depth_buffer_partial_stride   u64
-	depth_meta_buffer_load        u64
-	depth_meta_buffer_load_stride u64
-	depth_meta_buffer_store       u64
-	depth_meta_buffer_store_stride u64
-	depth_meta_buffer_partial       u64
-	depth_meta_buffer_partial_stride u64
-	stencil_buffer_load              u64
-	stencil_buffer_load_stride       u64
-	stencil_buffer_store             u64
-	stencil_buffer_store_stride      u64
-	stencil_buffer_partial           u64
-	stencil_buffer_partial_stride    u64
-	stencil_meta_buffer_load         u64
-	stencil_meta_buffer_load_stride  u64
-	stencil_meta_buffer_store        u64
-	stencil_meta_buffer_store_stride u64
+	extensions                         u64
+	flags                              u64
+	encoder_ptr                        u64
+	vertex_usc_base                    u64
+	fragment_usc_base                  u64
+	vertex_attachments                 u64
+	fragment_attachments               u64
+	vertex_attachment_count            u32
+	fragment_attachment_count          u32
+	vertex_helper_program              u32
+	fragment_helper_program            u32
+	vertex_helper_cfg                  u32
+	fragment_helper_cfg                u32
+	vertex_helper_arg                  u64
+	fragment_helper_arg                u64
+	depth_buffer_load                  u64
+	depth_buffer_load_stride           u64
+	depth_buffer_store                 u64
+	depth_buffer_store_stride          u64
+	depth_buffer_partial               u64
+	depth_buffer_partial_stride        u64
+	depth_meta_buffer_load             u64
+	depth_meta_buffer_load_stride      u64
+	depth_meta_buffer_store            u64
+	depth_meta_buffer_store_stride     u64
+	depth_meta_buffer_partial          u64
+	depth_meta_buffer_partial_stride   u64
+	stencil_buffer_load                u64
+	stencil_buffer_load_stride         u64
+	stencil_buffer_store               u64
+	stencil_buffer_store_stride        u64
+	stencil_buffer_partial             u64
+	stencil_buffer_partial_stride      u64
+	stencil_meta_buffer_load           u64
+	stencil_meta_buffer_load_stride    u64
+	stencil_meta_buffer_store          u64
+	stencil_meta_buffer_store_stride   u64
 	stencil_meta_buffer_partial        u64
 	stencil_meta_buffer_partial_stride u64
-	scissor_array             u64
-	depth_bias_array          u64
-	visibility_result_buffer  u64
-	vertex_sampler_array      u64
-	vertex_sampler_count      u32
-	vertex_sampler_max        u32
-	fragment_sampler_array    u64
-	fragment_sampler_count    u32
-	fragment_sampler_max      u32
-	zls_ctrl                  u64
-	ppp_multisamplectl        u64
-	ppp_ctrl                  u32
-	fb_width                  u32
-	fb_height                 u32
-	utile_width               u32
-	utile_height              u32
-	samples                   u32
-	layers                    u32
-	encoder_id                u32
-	cmd_ta_id                 u32
-	cmd_3d_id                 u32
-	sample_size               u32
-	tib_blocks                u32
-	iogpu_unk_214             u32
-	merge_upper_x             u32
-	merge_upper_y             u32
-	load_pipeline             u32
-	load_pipeline_bind        u32
-	store_pipeline            u32
-	store_pipeline_bind       u32
-	partial_reload_pipeline   u32
-	partial_reload_pipeline_bind u32
-	partial_store_pipeline      u32
-	partial_store_pipeline_bind u32
-	depth_dimensions            u32
-	isp_bgobjdepth              u32
-	isp_bgobjvals               u32
+	scissor_array                      u64
+	depth_bias_array                   u64
+	visibility_result_buffer           u64
+	vertex_sampler_array               u64
+	vertex_sampler_count               u32
+	vertex_sampler_max                 u32
+	fragment_sampler_array             u64
+	fragment_sampler_count             u32
+	fragment_sampler_max               u32
+	zls_ctrl                           u64
+	ppp_multisamplectl                 u64
+	ppp_ctrl                           u32
+	fb_width                           u32
+	fb_height                          u32
+	utile_width                        u32
+	utile_height                       u32
+	samples                            u32
+	layers                             u32
+	encoder_id                         u32
+	cmd_ta_id                          u32
+	cmd_3d_id                          u32
+	sample_size                        u32
+	tib_blocks                         u32
+	iogpu_unk_214                      u32
+	merge_upper_x                      u32
+	merge_upper_y                      u32
+	load_pipeline                      u32
+	load_pipeline_bind                 u32
+	store_pipeline                     u32
+	store_pipeline_bind                u32
+	partial_reload_pipeline            u32
+	partial_reload_pipeline_bind       u32
+	partial_store_pipeline             u32
+	partial_store_pipeline_bind        u32
+	depth_dimensions                   u32
+	isp_bgobjdepth                     u32
+	isp_bgobjvals                      u32
 }
 
 pub struct DrmAsahiCmdCompute {

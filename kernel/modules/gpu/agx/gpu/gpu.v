@@ -100,6 +100,7 @@ mut:
 	g13_events       G13EventResources
 	g13_queues       []&G13QueueResources
 	g13_compute_jobs []&G13ComputeJobResources
+	g13_render_jobs  []&G13RenderJobResources
 	g13_tvb_slots    [fw.g13_tvb_slot_count]bool
 	g17_graph        &G17FirmwareGraph = unsafe { nil }
 	g17_queues       []&G17QueueResources
@@ -1035,6 +1036,7 @@ fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		mgr.handle_event()
 		event.scan_all_completions()
+		mgr.reap_g13_render_jobs()
 		mgr.reap_g13_compute_jobs()
 		sched.yield(false)
 	}
@@ -1050,6 +1052,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_all_g13_render_jobs()
 	mgr.release_all_g13_compute_jobs()
 	mgr.release_all_g13_queue_resources()
 	mgr.release_g13_channels()

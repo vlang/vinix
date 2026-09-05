@@ -800,37 +800,48 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	f.lock.acquire()
 	for i, mut q in f.queues {
 		if q.id == request.queue_id {
-			q.destroy()
-			f.queues.delete(i)
 			mut resources := &gpu.G17QueueResources(unsafe { nil })
 			mut g13_resources := &gpu.G13QueueResources(unsafe { nil })
+			mut g17_index := -1
+			mut g13_index := -1
 			for ownership_index, ownership in f.g17_queues {
 				if ownership.queue_id == request.queue_id {
 					resources = ownership.resources
-					f.g17_queues.delete(ownership_index)
+					g17_index = ownership_index
 					break
 				}
 			}
 			for ownership_index, ownership in f.g13_queues {
 				if ownership.queue_id == request.queue_id {
 					g13_resources = ownership.resources
-					f.g13_queues.delete(ownership_index)
+					g13_index = ownership_index
 					break
 				}
 			}
-			f.lock.release()
+			manager := gpu.get_global_manager() or {
+				f.lock.release()
+				return -19
+			}
+			mut gpu_manager := unsafe { manager }
+			// A G13 queue cannot disappear while a retained firmware job still
+			// references its rings, notifier, TVB, or VM context.
+			if g13_resources != unsafe { nil }
+				&& !gpu_manager.release_g13_queue_resources(g13_resources) {
+				f.lock.release()
+				return -16 // EBUSY (or quarantined after a failed UAT flush)
+			}
 			if resources != unsafe { nil } {
-				if manager := gpu.get_global_manager() {
-					mut gpu_manager := unsafe { manager }
-					gpu_manager.release_g17_queue_resources(resources)
-				}
+				gpu_manager.release_g17_queue_resources(resources)
 			}
-			if g13_resources != unsafe { nil } {
-				if manager := gpu.get_global_manager() {
-					mut gpu_manager := unsafe { manager }
-					gpu_manager.release_g13_queue_resources(g13_resources)
-				}
+			q.destroy()
+			f.queues.delete(i)
+			if g17_index >= 0 {
+				f.g17_queues.delete(g17_index)
 			}
+			if g13_index >= 0 {
+				f.g13_queues.delete(g13_index)
+			}
+			f.lock.release()
 			return 0
 		}
 	}
