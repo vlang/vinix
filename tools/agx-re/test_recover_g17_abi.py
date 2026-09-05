@@ -4707,6 +4707,114 @@ class RecoverG17AbiTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 recover_g17_abi.recover_g17_channel_command_pools(b"")
 
+    def test_recovers_g17_command_pool_backing(self) -> None:
+        addresses = {
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: 0x610000,
+            recover_g17_abi.COMMAND_POOL_CREATE_BACKING: 0x620000,
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: 0x630000,
+            recover_g17_abi.G17_CONFIGURE_DEVICE: 0x640000,
+        }
+        alloc = bytearray(0x600)
+        for offset, word in {
+            0x38: 0xF9414C01,
+            0x3C: 0x91404428,
+            0x40: 0x91058108,
+            0x44: 0xB9400119,
+            0x48: 0x35000059,
+            0x4C: 0xB9471839,
+            0x300: 0x0B190734,
+            0x580: 0x5282D108,
+            0x594: 0xAA1403E1,
+            0x5A0: 0x5282D908,
+            0x5B4: 0xAA1403E1,
+            0x5C0: 0x5282E108,
+            0x5D4: 0xAA1403E1,
+        }.items():
+            struct.pack_into("<I", alloc, offset, word)
+        for offset in (0x598, 0x5B8, 0x5D8):
+            struct.pack_into(
+                "<I",
+                alloc,
+                offset,
+                bl(addresses[recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA] + offset,
+                   addresses[recover_g17_abi.COMMAND_POOL_CREATE_BACKING]),
+            )
+
+        create = bytearray(0x300)
+        for offset, word in {
+            0x28: 0xF9000002,
+            0x2C: 0xF9401017,
+            0x68: 0x2A1503E8,
+            0x6C: 0x52800029,
+            0x70: 0x1AD82129,
+            0x78: 0x9B0826E8,
+            0x7C: 0xD1000508,
+            0x80: 0xCB0903E9,
+            0x84: 0x8A090115,
+            0x29C: 0xF9000674,
+            0x2C8: 0xF9000A60,
+            0x2D0: 0xF9401268,
+            0x2D4: 0x9AC80AA8,
+            0x2D8: 0xB9002A68,
+            0x2E4: 0xF9000E60,
+        }.items():
+            struct.pack_into("<I", create, offset, word)
+
+        pi_configure = bytearray(0x90)
+        struct.pack_into("<II", pi_configure, 0x88, 0x52800A09, 0xB9071A69)
+        g17_configure = bytearray(0xC8)
+        for offset, word in {
+            0x30: 0x91404408,
+            0x34: 0x91058114,
+            0xA8: 0xB9400288,
+            0xAC: 0x35000048,
+            0xB0: 0xB9471A68,
+            0xC4: 0xB9072A68,
+        }.items():
+            struct.pack_into("<I", g17_configure, offset, word)
+
+        codes = {
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: bytes(alloc),
+            recover_g17_abi.COMMAND_POOL_CREATE_BACKING: bytes(create),
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: bytes(pi_configure),
+            recover_g17_abi.G17_CONFIGURE_DEVICE: bytes(g17_configure),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=addresses),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: (addresses[name], codes[name]),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_command_pool_backing(b"")
+
+        self.assertEqual(recovered["capacity_override_member"], 0x11160)
+        self.assertEqual(recovered["fallback_capacity"], 80)
+        self.assertEqual(recovered["work_pool_multiplier"], 3)
+        self.assertEqual(recovered["fallback_work_requested_slots"], 240)
+        self.assertEqual(recovered["slot_count_formula"],
+                         "backing_bytes / element_bytes")
+
+    def test_rejects_changed_g17_command_pool_backing(self) -> None:
+        addresses = {
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: 0x610000,
+            recover_g17_abi.COMMAND_POOL_CREATE_BACKING: 0x620000,
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: 0x630000,
+            recover_g17_abi.G17_CONFIGURE_DEVICE: 0x640000,
+        }
+        codes = {name: bytearray(0x600) for name in addresses}
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=addresses),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: (addresses[name], bytes(codes[name])),
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                recover_g17_abi.recover_g17_command_pool_backing(b"")
+
     def test_recovers_g17_3d_command_reclamation(self) -> None:
         code = bytearray(0x300)
         for offset, word in {

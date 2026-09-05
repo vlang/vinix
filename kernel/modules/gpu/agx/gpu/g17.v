@@ -20,6 +20,7 @@ import memory
 // fault-catching UAT guard page between independently mapped records.
 const g17_pio_va_start = u64(0xfffffc2180000000)
 const g17_pio_va_end = u64(0xfffffc2181400000)
+const g17_work_command_pool_count = 4
 
 struct G17FirmwareGraph {
 mut:
@@ -40,13 +41,27 @@ mut:
 	accelerator_entries   [2]SharedBuffer
 	accelerator_locks     [2]klock.Lock
 	auxiliary             [2][8]SharedBuffer
+	command_backings      [g17_work_command_pool_count]SharedBuffer
+	command_in_use        [g17_work_command_pool_count]&u8
+	command_pools         [g17_work_command_pool_count]fw.G17CommandPool
 	structurally_ready    bool
 	runtime_policy_ready  bool
 	platform_values_ready bool
 	pio_mappings_ready    bool
 	hardware_config_ready bool
+	command_pools_ready   bool
 	leakage_calibration   fw.G17LeakageCalibration
 	leakage_fuses_ready   bool
+}
+
+fn g17_work_command_element_size(index int) ?u32 {
+	return match index {
+		0 { fw.g17_command_ta_size }
+		1 { fw.g17_command_3d_size }
+		2 { fw.g17_command_fast_blit_size }
+		3 { fw.g17_command_cl_size }
+		else { none }
+	}
 }
 
 @[inline]
@@ -119,6 +134,27 @@ fn (mut mgr GpuManager) allocate_g17_firmware_graph() ?&G17FirmwareGraph {
 	for index := 0; index < 5; index++ {
 		size := role0_region_size(index) or { return none }
 		graph.role0_regions[index] = mgr.alloc_shared_buffer(size) or { return none }
+	}
+
+	// Use Apple's recovered fallback capacity until a device-specific override
+	// source is recovered. The four work pools request 3 * 80 elements. Their
+	// page-rounded allocations can contain extra complete elements, so allocate
+	// one host-only use byte for every actual slot rather than only the request.
+	for index := 0; index < g17_work_command_pool_count; index++ {
+		element_bytes := g17_work_command_element_size(index) or { return none }
+		geometry := fw.g17_command_pool_geometry(element_bytes, fw.g17_fallback_work_command_slots) or {
+			return none
+		}
+		graph.command_backings[index] = mgr.alloc_shared_buffer(geometry.backing_bytes) or {
+			return none
+		}
+		in_use := memory.malloc(u64(geometry.slot_count))
+		if in_use == unsafe { nil } {
+			return none
+		}
+		unsafe {
+			graph.command_in_use[index] = &u8(in_use)
+		}
 	}
 
 	return graph
@@ -273,6 +309,17 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 		return false
 	}
 	graph.runtime_policy_ready = true
+	for index := 0; index < g17_work_command_pool_count; index++ {
+		element_bytes := g17_work_command_element_size(index) or { return false }
+		geometry := fw.g17_command_pool_geometry(element_bytes, fw.g17_fallback_work_command_slots) or {
+			return false
+		}
+		backing := &graph.command_backings[index]
+		if !fw.initialize_g17_command_pool(mut graph.command_pools[index], backing.cpu_address(), backing.va, backing.size, graph.command_in_use[index], u64(geometry.slot_count), element_bytes, fw.g17_fallback_work_command_slots) {
+			return false
+		}
+	}
+	graph.command_pools_ready = true
 
 	for role := 0; role < 2; role++ {
 		if !fw.initialize_g17_small_shared_data(graph.small_shared[role].cpu_address(), fw.g17_small_shared_data_size, 0) {
@@ -350,6 +397,7 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	ready := graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
 		&& graph.pio_mappings_ready && graph.leakage_fuses_ready && graph.hardware_config_ready
+		&& graph.command_pools_ready
 	if ready {
 		mgr.g17_graph = graph
 	}

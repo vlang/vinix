@@ -480,6 +480,10 @@ AGX_SHARED_INIT = "__ZN9AGXShared4initEP5IOGPUP4tasky"
 AGX_SHARED_SET_APP_GPU_ROLE = "__ZN9AGXShared16set_app_gpu_roleEi13eIOGPUAppRole"
 CONFIGURE_POOL_ELEMENT_SIZES = "__ZN11AGXFirmware25configurePoolElementSizesEv"
 BASE_ALLOC_FIRMWARE_DATA = "__ZN11AGXFirmware17allocFirmwareDataEv"
+COMMAND_POOL_CREATE_BACKING = (
+    "__ZN9PoolClassI20AGFIChannelCommand3DE13createBackingE"
+    "jP14AGXAcceleratoryb"
+)
 REQUEST_CHANNEL_COMMAND_BARRIER = "__ZN11AGXFirmware28requestChannelCommandBarrierEPy"
 TA_COMMAND_POOL = 0x1648
 GENERATE_REGISTER_LIST_3D = (
@@ -8590,6 +8594,124 @@ def recover_g17_channel_command_pools(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_command_pool_backing(image: bytes) -> dict[str, object]:
+    """Recover capacity selection and backing geometry for work-command pools.
+
+    allocFirmwareData selects a device-provided capacity or the PI-300
+    fallback, triples it for TA/3D/FastBlit/CL, and passes that requested count
+    to the shared PoolClass::createBacking implementation.  createBacking
+    rounds element_bytes * requested_slots to the kernel page size and exposes
+    every complete element in that allocation, so page padding can add slots.
+    """
+
+    symbols = macho_symbols(image)
+    required = (
+        BASE_ALLOC_FIRMWARE_DATA,
+        COMMAND_POOL_CREATE_BACKING,
+        PI300_CONFIGURE_DEVICE,
+        G17_CONFIGURE_DEVICE,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing command-pool backing symbols: {missing}")
+
+    _address, pi_configure = symbol_code(image, PI300_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        pi_configure,
+        "G17 command-pool fallback capacity",
+        {
+            0x88: 0x52800A09,  # mov w9, #0x50
+            0x8C: 0xB9071A69,  # str w9, [x19, #0x718]
+        },
+    )
+
+    # The G17 override lives in the generation-specific tail of the
+    # accelerator.  A zero override selects the PI-300 fallback; the selected
+    # value is also cached at +0x728 by configureDevice.
+    _address, g17_configure = symbol_code(image, G17_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        g17_configure,
+        "G17 command-pool capacity selection",
+        {
+            0x30: 0x91404408,  # accelerator +0x11000
+            0x34: 0x91058114,  # +0x160 -> override at +0x11160
+            0xA8: 0xB9400288,  # load override
+            0xAC: 0x35000048,  # keep it when nonzero
+            0xB0: 0xB9471A68,  # otherwise load fallback at +0x718
+            0xC4: 0xB9072A68,  # cache selected capacity at +0x728
+        },
+    )
+
+    alloc_address, alloc = symbol_code(image, BASE_ALLOC_FIRMWARE_DATA)
+    require_instruction_words_at(
+        alloc,
+        "G17 work-command pool count",
+        {
+            0x38: 0xF9414C01,  # accelerator at firmware +0x298
+            0x3C: 0x91404428,  # accelerator +0x11000
+            0x40: 0x91058108,  # +0x160 -> capacity override
+            0x44: 0xB9400119,  # load override into w25
+            0x48: 0x35000059,  # keep it when nonzero
+            0x4C: 0xB9471839,  # otherwise fallback at +0x718
+            0x300: 0x0B190734,  # w20 = w25 + (w25 << 1)
+            0x580: 0x5282D108,  # 3D pool block +0x1688
+            0x594: 0xAA1403E1,  # requested count = w20
+            0x5A0: 0x5282D908,  # FastBlit pool block +0x16c8
+            0x5B4: 0xAA1403E1,  # requested count = w20
+            0x5C0: 0x5282E108,  # CL pool block +0x1708
+            0x5D4: 0xAA1403E1,  # requested count = w20
+        },
+    )
+    create_address = symbols[COMMAND_POOL_CREATE_BACKING]
+    for call_offset in (0x598, 0x5B8, 0x5D8):
+        call = struct.unpack_from("<I", alloc, call_offset)[0]
+        if decode_bl_target(alloc_address + call_offset, call) != create_address:
+            raise ValueError(
+                f"G17 work-command pool call at {call_offset:#x} no longer "
+                "targets the shared createBacking"
+            )
+
+    _address, create = symbol_code(image, COMMAND_POOL_CREATE_BACKING)
+    require_instruction_words_at(
+        create,
+        "G17 command-pool backing geometry",
+        {
+            0x28: 0xF9000002,  # accelerator at block +0x00
+            0x2C: 0xF9401017,  # element bytes at block +0x20
+            0x68: 0x2A1503E8,  # requested count
+            0x6C: 0x52800029,  # one page unit
+            0x70: 0x1AD82129,  # page bytes = 1 << page_shift
+            0x78: 0x9B0826E8,  # count * element bytes + one page
+            0x7C: 0xD1000508,  # page-rounding bias
+            0x80: 0xCB0903E9,  # page-alignment mask
+            0x84: 0x8A090115,  # rounded backing bytes
+            0x29C: 0xF9000674,  # backing resource at block +0x08
+            0x2C8: 0xF9000A60,  # CPU base at block +0x10
+            0x2D0: 0xF9401268,  # element bytes at block +0x20
+            0x2D4: 0x9AC80AA8,  # slots = backing bytes / element bytes
+            0x2D8: 0xB9002A68,  # slot count at block +0x28
+            0x2E4: 0xF9000E60,  # in-use bytes at block +0x18
+        },
+    )
+
+    fallback_capacity = 0x50
+    multiplier = 3
+    return {
+        "capacity_override_member": 0x11160,
+        "capacity_fallback_member": 0x718,
+        "selected_capacity_member": 0x728,
+        "fallback_capacity": fallback_capacity,
+        "work_pool_multiplier": multiplier,
+        "fallback_work_requested_slots": fallback_capacity * multiplier,
+        "backing_alignment": "1 << kernel_page_shift",
+        "backing_bytes_formula":
+            "align_up(element_bytes * requested_slots, kernel_page_bytes)",
+        "slot_count_formula": "backing_bytes / element_bytes",
+        "in_use_bytes_formula": "slot_count",
+        "producer": COMMAND_POOL_CREATE_BACKING,
+    }
+
+
 def recover_g17_3d_command_reclamation(image: bytes) -> dict[str, object]:
     """Recover how a completed 3D descriptor releases its command slot.
 
@@ -9347,6 +9469,9 @@ def main() -> int:
             driver, iogpu
         )
         channels["command_pools"] = recover_g17_channel_command_pools(driver)
+        channels["command_pools"]["backing"] = (
+            recover_g17_command_pool_backing(driver)
+        )
         channels["command_3d_reclamation"] = (
             recover_g17_3d_command_reclamation(driver)
         )

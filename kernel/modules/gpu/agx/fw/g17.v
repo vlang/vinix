@@ -1414,6 +1414,9 @@ pub const g17_command_ksm_add_kicks_size = u32(0x40)
 pub const g17_command_ksm_config_update_size = u32(0xc0)
 pub const g17_command_ksm_kick_queue_size = u32(0x40)
 pub const g17_channel_command_known_prefix_size = u64(0x6a)
+pub const g17_command_pool_fallback_capacity = u32(80)
+pub const g17_work_command_pool_multiplier = u32(3)
+pub const g17_fallback_work_command_slots = g17_command_pool_fallback_capacity * g17_work_command_pool_multiplier
 
 // Common packed prefix written by AGXChannel::submitNopUnprepared after a
 // command slot has been selected. Only these four host-written fields are
@@ -1584,11 +1587,77 @@ pub mut:
 	lock          klock.Lock
 }
 
+// Geometry produced by PoolClass::createBacking. The requested element count
+// is rounded up in bytes to one 16 KiB kernel/GPU page, after which every
+// complete element in the rounded allocation becomes a usable slot. This is
+// why slot_count can be slightly larger than requested_slots.
+pub struct G17CommandPoolGeometry {
+pub:
+	requested_slots u32
+	backing_bytes   u64
+	slot_count      u32
+}
+
 pub struct G17CommandSlot {
 pub:
 	index u32
 	cpu   voidptr
 	gpu   u64
+}
+
+// Calculate the exact backing geometry used by Apple's G17 pool constructor.
+pub fn g17_command_pool_geometry(element_bytes u32, requested_slots u32) ?G17CommandPoolGeometry {
+	if element_bytes == 0 || requested_slots == 0 {
+		return none
+	}
+	requested_bytes := u64(element_bytes) * u64(requested_slots)
+	if requested_bytes > u64(0xffff_ffff_ffff_ffff) - (g17_bootstrap_page_size - 1) {
+		return none
+	}
+	backing_bytes := (requested_bytes + g17_bootstrap_page_size - 1) & ~(g17_bootstrap_page_size - 1)
+	slot_count := backing_bytes / u64(element_bytes)
+	if backing_bytes == 0 || slot_count < u64(requested_slots) || slot_count > 0xffff_ffff {
+		return none
+	}
+	return G17CommandPoolGeometry{
+		requested_slots: requested_slots
+		backing_bytes: backing_bytes
+		slot_count: u32(slot_count)
+	}
+}
+
+// Bind an already mapped, page-rounded backing allocation and its host-only
+// in-use array to a pool. The backing must match the recovered constructor's
+// geometry exactly; accepting a merely large-enough allocation would change
+// the slot count observed by the allocator.
+pub fn initialize_g17_command_pool(mut pool G17CommandPool, cpu_base voidptr,
+	gpu_base u64, backing_bytes u64, in_use &u8, in_use_bytes u64,
+	element_bytes u32, requested_slots u32) bool {
+	geometry := g17_command_pool_geometry(element_bytes, requested_slots) or { return false }
+	if cpu_base == unsafe { nil } || gpu_base == 0 || in_use == unsafe { nil }
+		|| backing_bytes != geometry.backing_bytes
+		|| in_use_bytes < u64(geometry.slot_count) {
+		return false
+	}
+	last_offset := backing_bytes - 1
+	if u64(cpu_base) > u64(0xffff_ffff_ffff_ffff) - last_offset
+		|| gpu_base > u64(0xffff_ffff_ffff_ffff) - last_offset {
+		return false
+	}
+
+	unsafe {
+		C.memset(in_use, 0, u64(geometry.slot_count))
+	}
+	pool.cpu_base = cpu_base
+	pool.gpu_base = gpu_base
+	unsafe {
+		pool.in_use = in_use
+	}
+	pool.element_bytes = element_bytes
+	pool.slot_count = geometry.slot_count
+	pool.slot_cursor = 0
+	pool.exhausted = false
+	return true
 }
 
 // Reproduce AGXFirmware::requestChannelCommandX. Apple scans forward from the

@@ -120,8 +120,9 @@ Their three-word eFuse input is decoded in integer quarter-units and combined
 with version-pinned Q24.40 leakage factors; integer binary32 helpers reproduce
 Apple's rounding points without emitting kernel floating-point instructions.
 
-The channel-command pools are recovered: the slot-ring block layout, the
-allocation scan, and the exact byte size of all twelve named command types.
+The channel-command pools are recovered: the slot-ring block layout, capacity
+selection, page-rounded backing geometry, allocation scan, and exact byte size
+of all twelve named command types.
 The four common packed fields written by `submitNopUnprepared` are also pinned
 and have a template-preserving Vinix encoder. The 3D descriptor completion
 path now pins address-to-slot reclamation back to the 3D pool and Vinix has a
