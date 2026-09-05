@@ -150,8 +150,10 @@ the finite static set open, but every selector formula is complete.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
 channel ring geometry, the creating process ID and the app GPU role are all
-recovered. What remains for submission is porting the complete register
-emission graph into the work-command encoder and implementing completion.
+recovered and now have capability-specific, cache-correct DRM queue ownership
+with reverse-order unwind. What remains for submission is porting the complete
+register emission graph into the work-command encoder and implementing
+callback/completion handling.
 
 `generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this

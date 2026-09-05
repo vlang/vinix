@@ -68,7 +68,8 @@ pub mut:
 	state          GpuState
 	lock           klock.Lock
 mut:
-	g17_graph &G17FirmwareGraph = unsafe { nil }
+	g17_graph  &G17FirmwareGraph = unsafe { nil }
+	g17_queues []&G17QueueResources
 }
 
 __global (
@@ -186,7 +187,8 @@ fn pipe_index(priority u32, cmd_type u32) u32 {
 	return (priority % 4) * 3 + (cmd_type % 3)
 }
 
-fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
+fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(size u64,
+	protection u64) ?SharedBuffer {
 	if size == 0 || size > u64(-1) - (alloc.gpu_page_size - 1) || uat_mgr == unsafe { nil } {
 		return none
 	}
@@ -206,7 +208,7 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 		return none
 	}
 
-	if !uat_mgr.map_kernel(va, phys, aligned_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
+	if !uat_mgr.map_kernel(va, phys, aligned_size, protection) {
 		mgr.allocs.release(va)
 		mgr.allocs.gc()
 		memory.pmm_free(voidptr(phys), pages)
@@ -218,6 +220,10 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 		phys: phys
 		size: aligned_size
 	}
+}
+
+fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
+	return mgr.alloc_shared_buffer_with_protection(size, pgtable.gpu_prot_fw_gpu_shared_rw)
 }
 
 // Release a driver-owned shared allocation after its firmware consumer has
@@ -615,6 +621,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_all_g17_queue_resources()
 	mgr.release_g17_firmware_graph()
 	println('agx: GPU shutdown complete')
 }

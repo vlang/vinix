@@ -12306,6 +12306,7 @@ def recover_g17_channel_runtime_resources(
         timestamp_code,
         "G17 timestamp-queue mappings",
         {
+            0x058: 0xB9003A7F,  # update mode starts disabled at object +0x38
             0x05C: 0xF942DA95,  # firmware object at accelerator +0x5b0
             0x064: 0x8B0802B4,  # timestamp stack at +0x1288
             0x24C: 0x8B160008,
@@ -12365,6 +12366,7 @@ def recover_g17_channel_runtime_resources(
             "object_gpu_member": 0x28,
             "self_gpu_address_offset": 0x08,
             "update_mode_flag_offset": 0x10,
+            "initial_update_mode": 0,
             "context_cookie_state_offset": 0x10,
             "command_queue_owner_member": 0x680,
         },

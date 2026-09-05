@@ -21,6 +21,39 @@ import memory
 const g17_pio_va_start = u64(0xfffffc2180000000)
 const g17_pio_va_end = u64(0xfffffc2181400000)
 const g17_work_command_pool_count = 4
+const g17_work_channel_count = 3
+
+// A Vinix DRM queue owns at most one instance of each native Apple work
+// channel. The bit positions deliberately match _AGFIDataMasterType.
+pub const g17_queue_channel_ta = u32(1) << fw.g17_accelerator_command_ta
+pub const g17_queue_channel_3d = u32(1) << fw.g17_accelerator_command_3d
+pub const g17_queue_channel_cl = u32(1) << fw.g17_accelerator_command_cl
+const g17_queue_channel_mask = g17_queue_channel_ta | g17_queue_channel_3d |
+	g17_queue_channel_cl
+
+struct G17QueueChannelResources {
+mut:
+	state    SharedBuffer
+	uncached SharedBuffer
+	cached   SharedBuffer
+	lock     klock.Lock
+}
+
+// Complete shared-memory ownership for one native G17 command queue. These
+// allocations stay separate from the global bootstrap graph because Apple
+// creates and tears them down with the userspace queue, not with firmware.
+pub struct G17QueueResources {
+pub:
+	queue_id          u32
+	owner_process_id u32
+	channel_mask      u32
+	ring_entries      u32
+mut:
+	scheduler SharedBuffer
+	timestamp SharedBuffer
+	channels  [g17_work_channel_count]G17QueueChannelResources
+	released  bool
+}
 
 struct G17FirmwareGraph {
 mut:
@@ -67,6 +100,167 @@ fn g17_work_command_element_size(index int) ?u32 {
 @[inline]
 fn (buffer &SharedBuffer) cpu_address() voidptr {
 	return voidptr(buffer.phys + higher_half)
+}
+
+fn (mut mgr GpuManager) free_g17_queue_resources_locked(mut resources G17QueueResources) {
+	if resources.released {
+		return
+	}
+	// Close the admission gate before waiting for any in-flight producer.
+	// Resource objects remain allocated after release, so a racing producer
+	// can observe the flag without dereferencing freed object storage.
+	resources.released = true
+	for index := g17_work_channel_count - 1; index >= 0; index-- {
+		resources.channels[index].lock.acquire()
+		mgr.free_shared_buffer(mut resources.channels[index].cached)
+		mgr.free_shared_buffer(mut resources.channels[index].uncached)
+		mgr.free_shared_buffer(mut resources.channels[index].state)
+		resources.channels[index].lock.release()
+	}
+	mgr.free_shared_buffer(mut resources.timestamp)
+	mgr.free_shared_buffer(mut resources.scheduler)
+	mgr.allocs.gc()
+}
+
+// Allocate and initialize the queue-owned resources recovered from the G17C
+// Apple driver. Cached and uncached pool attributes are kept distinct in the
+// UAT; treating the producer ring as uncached would change firmware-visible
+// ordering even though both mappings point at ordinary physical memory.
+pub fn (mut mgr GpuManager) create_g17_queue_resources(queue_id u32,
+	owner_process_id u32, channel_mask u32) ?&G17QueueResources {
+	if queue_id == 0 || owner_process_id == 0 || channel_mask == 0
+		|| channel_mask & ~g17_queue_channel_mask != 0 {
+		return none
+	}
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	if mgr.state != .running || mgr.g17_graph == unsafe { nil } {
+		return none
+	}
+
+	ring_entries := fw.g17_channel_ring_entries(fw.g17_default_configured_work_queues)
+	channel_bytes := fw.g17_channel_memory_size(fw.g17_default_configured_work_queues)
+	if ring_entries == 0 || channel_bytes < fw.g17_channel_control_header_size {
+		return none
+	}
+
+	mut resources := &G17QueueResources{
+		queue_id: queue_id
+		owner_process_id: owner_process_id
+		channel_mask: channel_mask
+		ring_entries: ring_entries
+	}
+	mut complete := false
+	defer {
+		if !complete {
+			mgr.free_g17_queue_resources_locked(mut resources)
+		}
+	}
+
+	resources.scheduler = mgr.alloc_shared_buffer_with_protection(fw.g17_scheduler_state_size,
+		pgtable.gpu_prot_fw_gpu_cached_rw) or { return none }
+	resources.timestamp = mgr.alloc_shared_buffer_with_protection(fw.g17_timestamp_state_size,
+		pgtable.gpu_prot_fw_gpu_shared_rw) or { return none }
+	// AGXTimeStampQueue::init clears host mode +0x38 before its first reset.
+	if !fw.initialize_g17_scheduler_state(resources.scheduler.cpu_address(),
+		fw.g17_scheduler_state_size, fw.g17_default_app_gpu_role)
+		|| !fw.initialize_g17_timestamp_state(resources.timestamp.cpu_address(),
+		fw.g17_timestamp_state_size, resources.timestamp.va, false) {
+		return none
+	}
+
+	for command_type := u32(0); command_type < g17_work_channel_count; command_type++ {
+		if channel_mask & (u32(1) << command_type) == 0 {
+			continue
+		}
+		mut channel := &resources.channels[command_type]
+		channel.state = mgr.alloc_shared_buffer_with_protection(fw.g17_channel_state_size,
+			pgtable.gpu_prot_fw_gpu_cached_rw) or { return none }
+		channel.uncached = mgr.alloc_shared_buffer_with_protection(channel_bytes,
+			pgtable.gpu_prot_fw_gpu_shared_rw) or { return none }
+		channel.cached = mgr.alloc_shared_buffer_with_protection(channel_bytes,
+			pgtable.gpu_prot_fw_gpu_cached_rw) or { return none }
+		if !fw.initialize_g17_channel(channel.state.cpu_address(), fw.g17_channel_state_size,
+			channel.uncached.cpu_address(), channel_bytes, channel.cached.cpu_address(),
+			channel_bytes, fw.G17ChannelBindings{
+				uncached_gpu_address: channel.uncached.va
+				cached_gpu_address: channel.cached.va
+				context_cookie: resources.timestamp.va
+				owning_process_id: owner_process_id
+				queue_address_09c: resources.scheduler.va
+				ring_entries: ring_entries
+			}) {
+			return none
+		}
+	}
+
+	mgr.g17_queues << resources
+	complete = true
+	return resources
+}
+
+// Return the firmware-visible channel state used by an outer data-master
+// entry. An absent capability remains absent rather than aliasing channel 0.
+pub fn (resources &G17QueueResources) channel_state_address(command_type u32) ?u64 {
+	if resources.released || command_type >= g17_work_channel_count
+		|| resources.channel_mask & (u32(1) << command_type) == 0 {
+		return none
+	}
+	address := resources.channels[command_type].state.va
+	if address == 0 {
+		return none
+	}
+	return address
+}
+
+// Serialize the cached-pointer producer with the matching uncached indices.
+// Doorbell and outer-ring publication remain separate until completion and
+// callback handling are implemented.
+pub fn (mut resources G17QueueResources) enqueue_channel_command(command_type u32,
+	command_gpu_address u64) bool {
+	if resources.released || command_type >= g17_work_channel_count
+		|| resources.channel_mask & (u32(1) << command_type) == 0 {
+		return false
+	}
+	mut channel := &resources.channels[command_type]
+	channel.lock.acquire()
+	defer {
+		channel.lock.release()
+	}
+	return fw.enqueue_g17_channel_command(channel.uncached.cpu_address(), channel.uncached.size,
+		channel.cached.cpu_address(), channel.cached.size, command_gpu_address)
+}
+
+pub fn (mut mgr GpuManager) release_g17_queue_resources(resources &G17QueueResources) {
+	if resources == unsafe { nil } {
+		return
+	}
+	mgr.lock.acquire()
+	defer {
+		mgr.lock.release()
+	}
+	mut owned := unsafe { resources }
+	if owned.released {
+		return
+	}
+	for index, candidate in mgr.g17_queues {
+		if voidptr(candidate) == voidptr(resources) {
+			mgr.g17_queues.delete(index)
+			break
+		}
+	}
+	mgr.free_g17_queue_resources_locked(mut owned)
+}
+
+// Caller holds the manager lock during shutdown.
+fn (mut mgr GpuManager) release_all_g17_queue_resources() {
+	for index := mgr.g17_queues.len - 1; index >= 0; index-- {
+		mut resources := unsafe { mgr.g17_queues[index] }
+		mgr.free_g17_queue_resources_locked(mut resources)
+	}
+	mgr.g17_queues.clear()
 }
 
 fn role0_region_size(index int) ?u64 {

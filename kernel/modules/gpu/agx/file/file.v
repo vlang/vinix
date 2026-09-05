@@ -14,6 +14,7 @@ import gpu.agx.pgtable
 import gpu.agx.workqueue
 import gpu.agx.gpu
 import klock
+import proc
 import usercopy
 
 const max_submission_commands = u32(64)
@@ -31,6 +32,11 @@ mut:
 	obj    &gem.GemObject = unsafe { nil }
 }
 
+struct G17QueueOwnership {
+	queue_id  u32
+	resources &gpu.G17QueueResources = unsafe { nil }
+}
+
 pub struct GpuFile {
 pub mut:
 	dev           &drm.DrmDevice = unsafe { nil }
@@ -39,7 +45,9 @@ pub mut:
 	mappings      []GpuMapping
 	objects       []&gem.GemObject
 	mmap_objects  []&gem.GemObject
+	g17_queues    []G17QueueOwnership
 	next_queue_id u32
+	owner_process_id u32
 	owner_key     u64
 	lock          klock.Lock
 }
@@ -94,9 +102,15 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 	if dev == unsafe { nil } || uat_mgr == unsafe { nil } || owner_key == 0 {
 		return none
 	}
+	current := proc.current_thread()
+	if current == unsafe { nil } || current.process == unsafe { nil }
+		|| current.process.pid <= 0 {
+		return none
+	}
 	return &GpuFile{
 		dev: unsafe { dev }
 		next_queue_id: 1
+		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
 	}
 }
@@ -107,6 +121,14 @@ pub fn (mut f GpuFile) close() {
 		q.destroy()
 	}
 	f.queues.clear()
+	manager := gpu.get_global_manager() or { unsafe { nil } }
+	if manager != unsafe { nil } {
+		mut gpu_manager := unsafe { manager }
+		for ownership in f.g17_queues {
+			gpu_manager.release_g17_queue_resources(ownership.resources)
+		}
+	}
+	f.g17_queues.clear()
 
 	mgr := uat_mgr
 	if mgr != unsafe { nil } {
@@ -491,8 +513,39 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	wq := workqueue.new_workqueue(id, request.vm_id, request.priority, request.queue_caps) or {
 		return -12
 	}
+	mut g17_resources := &gpu.G17QueueResources(unsafe { nil })
+	manager := gpu.get_global_manager() or {
+		mut queue := unsafe { wq }
+		queue.destroy()
+		return -19
+	}
+	if manager.hw_config.gpu_gen == .g17 {
+		mut channel_mask := u32(0)
+		if request.queue_caps & ioctl.asahi_queue_cap_render != 0 {
+			channel_mask |= gpu.g17_queue_channel_ta
+		}
+		if request.queue_caps & (ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit) != 0 {
+			channel_mask |= gpu.g17_queue_channel_3d
+		}
+		if request.queue_caps & ioctl.asahi_queue_cap_compute != 0 {
+			channel_mask |= gpu.g17_queue_channel_cl
+		}
+		mut gpu_manager := unsafe { manager }
+		g17_resources = gpu_manager.create_g17_queue_resources(id, f.owner_process_id,
+			channel_mask) or {
+			mut queue := unsafe { wq }
+			queue.destroy()
+			return -12
+		}
+	}
 	f.lock.acquire()
 	f.queues << wq
+	if g17_resources != unsafe { nil } {
+		f.g17_queues << G17QueueOwnership{
+			queue_id: id
+			resources: g17_resources
+		}
+	}
 	f.lock.release()
 	request.queue_id = id
 	return 0
@@ -504,14 +557,29 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 		return -22
 	}
 	f.lock.acquire()
-	defer { f.lock.release() }
 	for i, mut q in f.queues {
 		if q.id == request.queue_id {
 			q.destroy()
 			f.queues.delete(i)
+			mut resources := &gpu.G17QueueResources(unsafe { nil })
+			for ownership_index, ownership in f.g17_queues {
+				if ownership.queue_id == request.queue_id {
+					resources = ownership.resources
+					f.g17_queues.delete(ownership_index)
+					break
+				}
+			}
+			f.lock.release()
+			if resources != unsafe { nil } {
+				if manager := gpu.get_global_manager() {
+					mut gpu_manager := unsafe { manager }
+					gpu_manager.release_g17_queue_resources(resources)
+				}
+			}
 			return 0
 		}
 	}
+	f.lock.release()
 	return -22
 }
 

@@ -6203,6 +6203,7 @@ class RecoverG17AbiTests(unittest.TestCase):
                 0x118: 0xAA1503E5,
             },
             recover_g17_abi.TIMESTAMP_QUEUE_INIT: {
+                0x058: 0xB9003A7F,
                 0x05C: 0xF942DA95,
                 0x064: 0x8B0802B4,
                 0x24C: 0x8B160008,
@@ -6270,6 +6271,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["channel_ring"]["default_pointer_bytes"], 0x2800)
         self.assertEqual(recovered["timestamp_state"]["bytes"], 0x18)
         self.assertEqual(recovered["timestamp_state"]["object_gpu_member"], 0x28)
+        self.assertEqual(recovered["timestamp_state"]["initial_update_mode"], 0)
         self.assertEqual(
             recovered["timestamp_state"]["context_cookie_state_offset"], 0x10
         )
