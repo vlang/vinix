@@ -4657,6 +4657,21 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(expression["predicate"]["source"]["member"], 0x7E1)
         self.assertEqual(expression["predicate"]["immediate"], 1)
 
+    def test_recovers_g17_argument_rooted_object_load(self) -> None:
+        ldr_w8_x21_020 = 0xB9400008 | (21 << 5) | ((0x20 // 4) << 10)
+        instructions = [
+            (0x00, 0xAA0103F5),  # mov x21, x1 (command argument)
+            (0x04, ldr_w8_x21_020),
+            (0x08, 0x92401904),  # and x4, x8, #0x7f
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 3)
+        source = recovered["expression"]["source"]
+        self.assertEqual(source["kind"], "object_load")
+        self.assertEqual(source["member"], 0x20)
+        self.assertEqual(source["base"]["operation"], "copy")
+        self.assertEqual(source["base"]["source"]["kind"], "argument")
+        self.assertEqual(source["base"]["source"]["name"], "command")
+
     def test_resolves_selector_across_mutually_exclusive_call(self) -> None:
         instructions = [
             (0x00, 0x5294E802),  # mov w2, #0xa740

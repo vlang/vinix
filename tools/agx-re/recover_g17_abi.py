@@ -717,6 +717,17 @@ def decode_load_unsigned(word: int) -> tuple[int, int, int, int] | None:
     return destination, base, immediate, width
 
 
+def decode_integer_load_unsigned(word: int) -> tuple[int, int, int, int] | None:
+    if word & 0xFFC00000 not in (
+        0x39400000,
+        0x79400000,
+        0xB9400000,
+        0xF9400000,
+    ):
+        return None
+    return decode_load_unsigned(word)
+
+
 def decode_load_register(word: int) -> tuple[int, int, int, int] | None:
     kinds = {
         0x38600800: 1,
@@ -1044,7 +1055,7 @@ def decode_local_branch_target(address: int, word: int) -> int | None:
 def g17_register_is_written(word: int, register: int) -> bool:
     """Recognize the integer writers present in the register-list producers."""
 
-    load = decode_load_unsigned(word)
+    load = decode_integer_load_unsigned(word)
     if load is not None and load[0] == register:
         return True
     load = decode_load_register(word)
@@ -1138,7 +1149,7 @@ def trace_g17_register_copy(
     definition_offset, definition = instructions[definition_index]
     copy_offset = instructions[copy_index][0]
 
-    load = decode_load_unsigned(definition)
+    load = decode_integer_load_unsigned(definition)
     if load is not None and load[0] == source and load[1] == 19:
         _destination, base, member, width = load
         return {
@@ -1500,19 +1511,46 @@ def trace_g17_value_expression(
         instructions, use_index, register
     )
     if definition_index is None:
+        if 0 <= register <= 7 and not any(
+            decode_bl_target(offset, word) is not None
+            or word & 0xFFFFFC00 == 0xD73F0800
+            for offset, word in instructions[:use_index]
+        ):
+            names = ("channel", "command", "descriptor")
+            return {
+                "kind": "argument",
+                "register": register,
+                "name": names[register] if register < len(names) else "unknown",
+            }
         return None
     offset, word = instructions[definition_index]
     next_seen = seen | {key}
 
-    load = decode_load_unsigned(word)
-    if load is not None and load[0] == register and load[1] == 19:
-        _destination, _base, member, width = load
+    load = decode_integer_load_unsigned(word)
+    if load is not None and load[0] == register:
+        _destination, base, member, width = load
+        if base == 19:
+            return {
+                "kind": "descriptor_load",
+                "producer_offset": offset,
+                "member": member,
+                "bytes": width,
+                "signed": False,
+            }
+        if base == 31:
+            return None
+        base_value = trace_g17_value_expression(
+            instructions, definition_index, base, depth + 1, next_seen
+        )
+        if base_value is None:
+            return None
         return {
-            "kind": "descriptor_load",
+            "kind": "object_load",
             "producer_offset": offset,
             "member": member,
             "bytes": width,
             "signed": False,
+            "base": base_value,
         }
     if word & 0xFFC0001F == 0xB9800000 | register:
         base = (word >> 5) & 0x1F
@@ -1524,6 +1562,19 @@ def trace_g17_value_expression(
                 "bytes": 4,
                 "signed": True,
             }
+        if base != 31:
+            base_value = trace_g17_value_expression(
+                instructions, definition_index, base, depth + 1, next_seen
+            )
+            if base_value is not None:
+                return {
+                    "kind": "object_load",
+                    "producer_offset": offset,
+                    "member": ((word >> 10) & 0xFFF) * 4,
+                    "bytes": 4,
+                    "signed": True,
+                    "base": base_value,
+                }
 
     if (
         decode_move_wide(word) is not None
@@ -1743,7 +1794,7 @@ def classify_g17_value_argument(
     start = max(0, before - VALUE_ARGUMENT_WINDOW)
     for index in range(before - 1, start - 1, -1):
         offset, word = instructions[index]
-        load = decode_load_unsigned(word)
+        load = decode_integer_load_unsigned(word)
         if load is not None and load[0] == 4:
             _destination, base, member, width = load
             return {

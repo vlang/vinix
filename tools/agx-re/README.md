@@ -134,7 +134,7 @@ not complete yet. The UUID-pinned backwards slice resolves every virtual encoder
 call (314 physical call sites and 234 distinct static selectors together with the
 literal audit). All ten inline forms are located too; two CL selectors remain
 symbolic. Value provenance is classified at every virtual call (209 constants
-or direct descriptor loads plus 41 recovered expression trees); 64 computations
+or direct descriptor loads plus 47 recovered expression trees); 58 computations
 and the control-flow ordering remain to be encoded.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue `_AGFISchedulerState` element, the creating process ID and the app
