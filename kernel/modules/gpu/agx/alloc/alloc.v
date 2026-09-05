@@ -25,6 +25,15 @@ pub const gpu_shared_end = u64(0x200000000) // 8 GB cumulative
 pub const gpu_readonly_start = u64(0x200000000)
 pub const gpu_readonly_end = u64(0x400000000) // 16 GB cumulative
 
+// G13 firmware addresses are sign-extended 39-bit IOVAs. Keep its allocator
+// classes in the exact disjoint ranges expected by the v12.3 firmware ABI.
+pub const g13_private_start = u64(0xffffffa000000000)
+pub const g13_private_end = u64(0xffffffa600000000)
+pub const g13_shared_start = u64(0xffffffa800000000)
+pub const g13_shared_end = u64(0xffffffaa00000000)
+pub const g13_readonly_start = u64(0xffffffaa00000000)
+pub const g13_readonly_end = u64(0xffffffac00000000)
+
 // --- Individual allocation record ---
 
 pub struct Allocation {
