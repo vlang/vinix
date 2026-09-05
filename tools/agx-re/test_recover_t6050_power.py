@@ -172,14 +172,41 @@ def fixture_tree(
         {**nub_properties, "region-base": struct.pack("<Q", 0x284500000)},
         [],
     )
+    wrapper_regs = (
+        (0x84E00000, 0x88000),
+        (0x84850000, 0x4000),
+        (0x84500000, 0x100000),
+        (0x84250000, 0x4000),
+    )
+
+    def wrapper_properties(role: str, die: int) -> dict[str, bytes]:
+        gate_base = die << 28
+        interrupts = (0x18D, 0x18C, 0x18F, 0x18E)
+        if die == 1:
+            interrupts = (0xDAD, 0xDAC, 0xDAF, 0xDAE)
+        return {
+            "compatible": b"iop,ascwrap-v6\0",
+            "role": role.encode() + b"\0",
+            "reg": b"".join(
+                struct.pack("<QQ", base + die * 0x4000000000, size)
+                for base, size in wrapper_regs
+            ),
+            "interrupts": struct.pack("<4I", *interrupts),
+            "power-gates": struct.pack("<2I", gate_base | 0x1B, gate_base | 0x1C),
+            "clock-gates": struct.pack("<2I", gate_base | 0x1B, gate_base | 0x1C),
+            "iop-version": struct.pack("<I", 1),
+            "ptd-update-reg-index": struct.pack("<I", 3),
+            "sram-index": struct.pack("<I", 1),
+        }
+
     pmp = adt_node(
         "pmp1",
-        {"compatible": b"iop,ascwrap-v6\0", "role": b"PMP1\0"},
+        wrapper_properties("PMP1", 1),
         [nub],
     )
     pmp0 = adt_node(
         "pmp0",
-        {"compatible": b"iop,ascwrap-v6\0", "role": b"PMP0\0"},
+        wrapper_properties("PMP0", 0),
         [nub0],
     )
     arm_io = adt_node(
@@ -231,7 +258,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 9)
+        self.assertEqual(result["schema"], 10)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -276,6 +303,14 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(
             [(die["role"], die["region_base"]) for die in result["pmp"]["dies"]],
             [("PMP0", 0x284500000), ("PMP1", 0x4284500000)],
+        )
+        self.assertEqual(
+            [die["wrapper_registers"][0]["base"] for die in result["pmp"]["dies"]],
+            [0x84E00000, 0x4084E00000],
+        )
+        self.assertEqual(
+            [die["ptd_update_reg_index"] for die in result["pmp"]["dies"]],
+            [3, 3],
         )
 
     def test_recovers_pmp_v2_binary_dispatch(self) -> None:

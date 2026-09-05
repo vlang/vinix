@@ -97,8 +97,9 @@ metadata transform. A UUID-pinned AppleT6050PMGR check proves that PTD RegMap
 enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves
 that Device aperture to `0x84240000` and `0x4084240000`. It also proves both
 PMP nubs have identical device/range tables, pins their die-strided shared
-regions, and records the requested-die selection used by ordinary state
-commands. Vinix mirrors the low-level contract with a dormant bounds-checked
+regions, validates every die-strided wrapper register/IRQ/gate binding, and
+records the requested-die selection used by ordinary state commands. Vinix
+mirrors the low-level contract with a dormant bounds-checked
 paired reader and separate write portal. A nonblocking owner serializes one
 transaction across both dies and makes post-write failures sticky, but it is
 not mapped until PMP service and firmware startup can be integrated behind the

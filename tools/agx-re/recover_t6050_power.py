@@ -1536,6 +1536,54 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError(f"unexpected T6050 PMP die roles: {sorted(pmp_wrappers)!r}")
     ptd_die_bases = [ptd_region[0] + die * die_stride for die in range(2)]
 
+    wrapper_registers: dict[str, list[tuple[int, int]]] = {}
+    wrapper_interrupts: dict[str, list[int]] = {}
+    expected_wrapper_regs = [
+        (0x84E00000, 0x88000),
+        (0x84850000, 0x4000),
+        (0x84500000, 0x100000),
+        (0x84250000, 0x4000),
+    ]
+    expected_wrapper_interrupts = {
+        "PMP0": [0x18D, 0x18C, 0x18F, 0x18E],
+        "PMP1": [0xDAD, 0xDAC, 0xDAF, 0xDAE],
+    }
+    expected_wrapper_gates = {
+        "PMP0": [0x1B, 0x1C],
+        "PMP1": [0x1000001B, 0x1000001C],
+    }
+    for die, role in enumerate(("PMP0", "PMP1")):
+        _path, wrapper = pmp_wrappers[role]
+        registers = parse_reg_regions(wrapper.property("reg"), f"{role} reg")
+        expected_registers = [
+            (base + die * die_stride, size) for base, size in expected_wrapper_regs
+        ]
+        interrupts = decode_u32_array(wrapper.property("interrupts"), f"{role} interrupts")
+        power_gates = decode_u32_array(wrapper.property("power-gates"), f"{role} power-gates")
+        clock_gates = decode_u32_array(wrapper.property("clock-gates"), f"{role} clock-gates")
+        if registers != expected_registers:
+            raise ValueError(f"T6050 {role} wrapper registers changed: {registers!r}")
+        if interrupts != expected_wrapper_interrupts[role]:
+            raise ValueError(f"T6050 {role} interrupts changed: {interrupts!r}")
+        if power_gates != expected_wrapper_gates[role] or clock_gates != power_gates:
+            raise ValueError(
+                f"T6050 {role} gate bindings changed: "
+                f"power={power_gates!r}, clock={clock_gates!r}"
+            )
+        if (
+            decode_integer(wrapper.property("iop-version"), f"{role} iop-version") != 1
+            or decode_integer(
+                wrapper.property("ptd-update-reg-index"),
+                f"{role} ptd-update-reg-index",
+            )
+            != 3
+            or decode_integer(wrapper.property("sram-index"), f"{role} sram-index")
+            != 1
+        ):
+            raise ValueError(f"T6050 {role} wrapper control properties changed")
+        wrapper_registers[role] = registers
+        wrapper_interrupts[role] = interrupts
+
     power_handles = decode_u32_array(sgx.property("power-gates"), "sgx power-gates")
     clock_handles = decode_u32_array(sgx.property("clock-gates"), "sgx clock-gates")
     power_gates = [resolve_gate(handle, devices) for handle in power_handles]
@@ -1724,7 +1772,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 9,
+        "schema": 10,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -1756,6 +1804,14 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     "nub_path": pmp0_nub_path,
                     "region_base": pmp_regions[0][0],
                     "region_size": pmp_regions[0][1],
+                    "wrapper_registers": [
+                        {"index": index, "base": base, "size": size}
+                        for index, (base, size) in enumerate(wrapper_registers["PMP0"])
+                    ],
+                    "interrupts": wrapper_interrupts["PMP0"],
+                    "iop_version": 1,
+                    "ptd_update_reg_index": 3,
+                    "sram_index": 1,
                 },
                 {
                     "die": 1,
@@ -1764,6 +1820,14 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                     "nub_path": nub_path,
                     "region_base": pmp_regions[1][0],
                     "region_size": pmp_regions[1][1],
+                    "wrapper_registers": [
+                        {"index": index, "base": base, "size": size}
+                        for index, (base, size) in enumerate(wrapper_registers["PMP1"])
+                    ],
+                    "interrupts": wrapper_interrupts["PMP1"],
+                    "iop_version": 1,
+                    "ptd_update_reg_index": 3,
+                    "sram_index": 1,
                 },
             ],
             "agx_soc_device": agx_device,

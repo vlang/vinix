@@ -497,6 +497,50 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 	return true
 }
 
+fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
+	if die >= 2 {
+		return false
+	}
+	regions := devicetree.get_translated_reg_ranges(wrapper) or {
+		println('agx: t6050 PMP wrapper register table is malformed')
+		return false
+	}
+	if regions.len != 4 {
+		C.printf(c'agx: t6050 PMP%u has %u wrapper registers, expected 4\n', die,
+			u32(regions.len))
+		return false
+	}
+	bases := [u64(0x84e00000), 0x84850000, 0x84500000, 0x84250000]!
+	sizes := [u64(0x88000), 0x4000, 0x100000, 0x4000]!
+	die_offset := u64(die) * t6050_die_stride
+	for index := 0; index < regions.len; index++ {
+		if regions[index].base != bases[index] + die_offset
+			|| regions[index].size != sizes[index] {
+			C.printf(c'agx: t6050 PMP%u wrapper reg[%u] changed\n', die, u32(index))
+			return false
+		}
+	}
+	iop_version := devicetree.get_le_u32(wrapper, 'iop-version') or { return false }
+	ptd_update_reg_index := devicetree.get_le_u32(wrapper, 'ptd-update-reg-index') or {
+		return false
+	}
+	sram_index := devicetree.get_le_u32(wrapper, 'sram-index') or { return false }
+	if iop_version != 1 || ptd_update_reg_index != 3 || sram_index != 1 {
+		C.printf(c'agx: t6050 PMP%u wrapper control properties changed\n', die)
+		return false
+	}
+	if die == 0 {
+		return validate_u32_array(wrapper, 'interrupts', [u32(0x18d), 0x18c, 0x18f,
+			0x18e])
+			&& validate_gate_array(wrapper, 'power-gates', [u32(0x1b), 0x1c])
+			&& validate_gate_array(wrapper, 'clock-gates', [u32(0x1b), 0x1c])
+	}
+	return validate_u32_array(wrapper, 'interrupts', [u32(0xdad), 0xdac, 0xdaf,
+		0xdae])
+		&& validate_gate_array(wrapper, 'power-gates', [u32(0x1000001b), 0x1000001c])
+		&& validate_gate_array(wrapper, 'clock-gates', [u32(0x1000001b), 0x1000001c])
+}
+
 // Validate only the read-only ownership and transport contract here. Apple's
 // initial synchronization can publish a persistent request before readiness,
 // and Vinix has a serialized nonblocking controller for that transaction. The
@@ -538,6 +582,9 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !node_string_contains(pmp_nub, 'compatible', 'iop-nub,rtbuddy-v2')
 		|| !node_string_contains(pmp_nub, 'firmware-name', 't6050pmp') {
 		println('agx: native t6050 PMP ownership changed')
+		return false
+	}
+	if !validate_pmp_wrapper(pmp0, 0) || !validate_pmp_wrapper(pmp, 1) {
 		return false
 	}
 	pmp0_region_base := devicetree.get_le_u64(pmp0_nub, 'region-base') or { return false }
