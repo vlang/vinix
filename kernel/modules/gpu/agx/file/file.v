@@ -275,14 +275,59 @@ fn (mut f GpuFile) mmap_page(page u64) voidptr {
 	return unsafe { nil }
 }
 
+// GEM_CLOSE drops every GPU-VA binding owned by the handle once the target VM
+// is idle. A close racing an in-flight job leaves the binding retained; the
+// next bind into that VM collects it after completion. CPU mmap authorization
+// holds its own reference independently.
+fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
+	if vm_id >= mmu.uat_num_contexts || katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
+		return true
+	}
+	ctx := f.find_vm(vm_id) or { return false }
+	if ctx.pgtable == unsafe { nil } {
+		return false
+	}
+	mut pt := unsafe { ctx.pgtable }
+	mut success := true
+	for index := f.mappings.len - 1; index >= 0; index-- {
+		mapping := f.mappings[index]
+		if mapping.vm_id != vm_id {
+			continue
+		}
+		mut handle_open := false
+		for object in f.objects {
+			if voidptr(object) == voidptr(mapping.obj) {
+				handle_open = true
+				break
+			}
+		}
+		if handle_open {
+			continue
+		}
+		pt.unmap(mapping.addr, mapping.size)
+		if !flush_g13_mapping(ctx, mapping.addr, mapping.size) {
+			success = false
+		}
+		gem.unref(mapping.obj)
+		f.mappings.delete(index)
+	}
+	return success
+}
+
 fn (mut f GpuFile) close_object_handle(handle u32) int {
 	f.lock.acquire()
 	for i, obj in f.objects {
 		if obj.handle == handle {
 			f.objects.delete(i)
+			mut success := true
+			for vm in f.vms {
+				if !f.cleanup_closed_mappings_locked(vm.id) {
+					success = false
+				}
+			}
 			f.lock.release()
 			gem.unref(obj)
-			return 0
+			return if success { 0 } else { -5 }
 		}
 	}
 	f.lock.release()
@@ -600,6 +645,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				pgtable.gpu_prot_gpu_shared_ro
 			}
 			f.lock.acquire()
+			if !f.cleanup_closed_mappings_locked(request.vm_id) {
+				f.lock.release()
+				gem.unref(obj)
+				return -5
+			}
 			for mapping in f.mappings {
 				if mapping.vm_id == request.vm_id
 					&& ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) {
