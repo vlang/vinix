@@ -728,6 +728,21 @@ def decode_integer_load_unsigned(word: int) -> tuple[int, int, int, int] | None:
     return decode_load_unsigned(word)
 
 
+def decode_integer_store_unsigned(word: int) -> tuple[int, int, int, int] | None:
+    if word & 0xFFC00000 not in (
+        0x39000000,
+        0x79000000,
+        0xB9000000,
+        0xF9000000,
+    ):
+        return None
+    source = word & 0x1F
+    base = (word >> 5) & 0x1F
+    width = 1 << ((word >> 30) & 0x3)
+    immediate = ((word >> 10) & 0xFFF) * width
+    return source, base, immediate, width
+
+
 def decode_load_register(word: int) -> tuple[int, int, int, int] | None:
     kinds = {
         0x38600800: 1,
@@ -1131,6 +1146,114 @@ def find_dominating_g17_register_write(
             ):
                 return None
     return definition_index
+
+
+def g17_definition_dominates_use(
+    instructions: list[tuple[int, int]], definition_index: int, use_index: int
+) -> bool:
+    """Reject a definition when an earlier forward edge can skip it."""
+
+    definition_offset = instructions[definition_index][0]
+    use_offset = (
+        instructions[use_index][0]
+        if use_index < len(instructions)
+        else instructions[-1][0] + 4
+    )
+    return not any(
+        target is not None
+        and definition_offset < target <= use_offset
+        and branch_index < definition_index
+        for branch_index, (offset, word) in enumerate(instructions)
+        for target in (decode_local_branch_target(offset, word),)
+    )
+
+
+def trace_g17_stack_load(
+    instructions: list[tuple[int, int]],
+    load_index: int,
+    member: int,
+    width: int,
+    depth: int,
+    seen: frozenset[tuple[int, int]],
+) -> dict[str, object] | None:
+    """Trace a fixed SP-relative reload to one unambiguous integer store."""
+
+    load_end = member + width
+    for index in range(load_index - 1, -1, -1):
+        offset, word = instructions[index]
+
+        # A different SP value makes offsets on the two sides incomparable.
+        arithmetic = decode_add_sub_immediate_value(word)
+        if (
+            arithmetic is not None
+            and arithmetic["bytes"] == 8
+            and arithmetic["destination_register"] == 31
+            and arithmetic["source_register"] == 31
+        ):
+            return None
+
+        stores: list[tuple[int | None, int, int]] = []
+        store = decode_str_unsigned(word)
+        if store is not None and store[1] == 31:
+            source, _base, store_member, store_width = store
+            integer_store = decode_integer_store_unsigned(word)
+            stores.append(
+                (
+                    source if integer_store is not None else None,
+                    store_member,
+                    store_width,
+                )
+            )
+        unscaled = decode_stur_x(word)
+        if unscaled is not None and unscaled[1] == 31:
+            source, _base, store_member = unscaled
+            stores.append((source, store_member, 8))
+        pair = decode_stp_x(word)
+        if pair is not None and pair[2] == 31:
+            first, second, _base, store_member = pair
+            stores.extend(
+                ((first, store_member, 8), (second, store_member + 8, 8))
+            )
+        vector_pair = decode_pair_q(word)
+        if (
+            vector_pair is not None
+            and vector_pair[0] == "store"
+            and vector_pair[3] == 31
+        ):
+            _kind, _first, _second, _base, store_member = vector_pair
+            stores.extend(
+                ((None, store_member, 16), (None, store_member + 16, 16))
+            )
+
+        for source, store_member, store_width in stores:
+            store_end = store_member + store_width
+            if store_member >= load_end or member >= store_end:
+                continue
+            if (
+                source is None
+                or store_member != member
+                or store_width != width
+                or not g17_definition_dominates_use(instructions, index, load_index)
+            ):
+                return None
+            source_value = (
+                {"kind": "constant", "value": 0}
+                if source == 31
+                else trace_g17_value_expression(
+                    instructions, index, source, depth + 1, seen
+                )
+            )
+            if source_value is None:
+                return None
+            return {
+                "kind": "stack_reload",
+                "producer_offset": instructions[load_index][0],
+                "slot": member,
+                "bytes": width,
+                "store_offset": offset,
+                "source": source_value,
+            }
+    return None
 
 
 def trace_g17_register_copy(
@@ -1538,7 +1661,14 @@ def trace_g17_value_expression(
                 "signed": False,
             }
         if base == 31:
-            return None
+            return trace_g17_stack_load(
+                instructions,
+                definition_index,
+                member,
+                width,
+                depth,
+                next_seen,
+            )
         base_value = trace_g17_value_expression(
             instructions, definition_index, base, depth + 1, next_seen
         )

@@ -4685,6 +4685,38 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(source["base"]["source"]["kind"], "argument")
         self.assertEqual(source["base"]["source"]["name"], "command")
 
+    def test_recovers_g17_argument_through_stack_spill(self) -> None:
+        orr_x24_x10_x9_lsl_32 = (
+            0xAA000000 | 9 << 16 | 32 << 10 | 10 << 5 | 24
+        )
+        instructions = [
+            (0x00, str_x(1, 31, 0x38)),
+            (0x04, ldr_x(25, 31, 0x38)),
+            (0x08, ldr_w(10, 25, 0x20)),
+            (0x0C, ldr_w(9, 19, 0x760)),
+            (0x10, orr_x24_x10_x9_lsl_32),
+            (0x14, 0xAA1803E4),  # mov x4, x24
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 6)
+        expression = recovered["expression"]["source"]
+        self.assertEqual(expression["operation"], "orr")
+        stack = expression["first"]["base"]
+        self.assertEqual(stack["kind"], "stack_reload")
+        self.assertEqual(stack["slot"], 0x38)
+        self.assertEqual(stack["store_offset"], 0)
+        self.assertEqual(stack["source"]["name"], "command")
+
+    def test_does_not_trace_g17_stack_spill_across_join(self) -> None:
+        instructions = [
+            (0x00, b(0x00, 0x08)),
+            (0x04, str_x(1, 31, 0x38)),
+            (0x08, ldr_x(8, 31, 0x38)),
+            (0x0C, 0xAA0803E4),  # mov x4, x8
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 4)
+        self.assertEqual(recovered["kind"], "computed")
+        self.assertNotIn("expression", recovered)
+
     def test_recovers_g17_expression_through_value_copy(self) -> None:
         instructions = [
             (0x00, 0xF943B268),  # ldr x8, [x19, #0x760]
