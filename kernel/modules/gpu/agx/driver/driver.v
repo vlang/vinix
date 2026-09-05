@@ -470,8 +470,9 @@ pub fn initialise() {
 			return
 		}
 	}
-	if chip_id == 0x8103 && !regs.validate_g13_identity_decoder() {
-		println('agx: internal G13 identity decoder validation failed')
+	if chip_id == 0x8103
+		&& (!regs.validate_g13_identity_decoder() || !regs.validate_g13_fault_decoder()) {
+		println('agx: internal G13 register decoder validation failed')
 		return
 	}
 	if !drm_ioctl.validate_asahi_25_layouts() {

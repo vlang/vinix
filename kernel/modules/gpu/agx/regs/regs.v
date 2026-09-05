@@ -256,10 +256,14 @@ pub mut:
 // Fault information from GPU fault registers
 pub struct FaultInfo {
 pub:
-	addr      u64
-	write     bool
-	vm_slot   u32
-	unit_code u8
+	address     u64
+	sideband    u8
+	vm_slot     u32
+	unit_code   u8
+	level       u8
+	unknown_5   u8
+	read        bool
+	reason_code u8
 }
 
 // ASC and SGX are separate named resources in the Apple GPU device tree.
@@ -328,6 +332,10 @@ pub fn (r &GpuResources) sgx_read32(offset u32) u32 {
 	return kio.mmin32(unsafe { &u32(r.sgx + offset) })
 }
 
+pub fn (r &GpuResources) sgx_read64(offset u32) u64 {
+	return kio.mmin(unsafe { &u64(r.sgx + offset) })
+}
+
 // Write a 32-bit value to SGX register space
 pub fn (r &GpuResources) sgx_write32(offset u32, value u32) {
 	kio.mmout32(unsafe { &u32(r.sgx + offset) }, value)
@@ -357,18 +365,42 @@ pub fn (r &GpuResources) stop_cpu(role u32) bool {
 	return true
 }
 
-// Read fault info after a GPU fault
-pub fn (r &GpuResources) get_fault_info() FaultInfo {
-	status := r.sgx_read32(sgx_fault_info)
-	addr_lo := r.sgx_read32(sgx_fault_info + 4)
-	addr_hi := r.sgx_read32(sgx_fault_info + 8)
-
-	return FaultInfo{
-		addr: u64(addr_lo) | (u64(addr_hi) << 32)
-		write: (status & (1 << 1)) != 0
-		vm_slot: (status >> 8) & 0xff
-		unit_code: u8(status >> 24)
+// Decode the pre-G14X MMU fault register. G13 stores validity, reason, unit,
+// context, sideband, and the address (in 64-byte units) in one u64.
+pub fn decode_g13_fault_info(raw u64) ?FaultInfo {
+	if raw & 1 == 0 {
+		return none
 	}
+	return FaultInfo{
+		address: (raw >> 30) << 6
+		sideband: u8((raw >> 23) & 0x7f)
+		vm_slot: u32((raw >> 17) & 0x3f)
+		unit_code: u8((raw >> 9) & 0xff)
+		level: u8((raw >> 7) & 3)
+		unknown_5: u8((raw >> 5) & 3)
+		read: raw & (u64(1) << 4) != 0
+		reason_code: u8((raw >> 1) & 7)
+	}
+}
+
+pub fn validate_g13_fault_decoder() bool {
+	address := u64(0x123440)
+	raw := u64(1) | (u64(3) << 1) | (u64(1) << 4) | (u64(2) << 5) | (u64(1) << 7) | (u64(0xa1) << 9) | (u64(5) << 17) | (u64(0x12) << 23) | ((address >> 6) << 30)
+	info := decode_g13_fault_info(raw) or { return false }
+	if info.address != address || info.sideband != 0x12 || info.vm_slot != 5
+		|| info.unit_code != 0xa1 || info.level != 1 || info.unknown_5 != 2 || !info.read
+		|| info.reason_code != 3 {
+		return false
+	}
+	if _ := decode_g13_fault_info(0) {
+		return false
+	}
+	return true
+}
+
+// Read fault info after a G13 GPU fault.
+pub fn (r &GpuResources) get_g13_fault_info() ?FaultInfo {
+	return decode_g13_fault_info(r.sgx_read64(sgx_fault_info))
 }
 
 // Get GPU ID: returns (version, core_count)

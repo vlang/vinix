@@ -623,8 +623,15 @@ pub fn (mut mgr GpuManager) handle_event() {
 			}
 			fw.fw_event_fault {
 				C.printf(c'agx: GPU firmware error event\n')
-				info := mgr.res.get_fault_info()
-				C.printf(c'agx: Fault addr=0x%llx unit=%d\n', info.addr, info.unit_code)
+				if info := mgr.res.get_g13_fault_info() {
+					C.printf(c'agx: Fault addr=0x%llx unit=%u vm=%u reason=%u %s\n', info.address, info.unit_code, info.vm_slot, info.reason_code, if info.read {
+						c'read'
+					} else {
+						c'write'
+					})
+				} else {
+					C.printf(c'agx: fault event without a valid G13 fault register\n')
+				}
 				mgr.state = .error
 			}
 			fw.fw_event_timeout {
