@@ -6938,8 +6938,32 @@ def recover_g17_secondary_performance_block(image: bytes) -> dict[str, object]:
         },
     )
 
+    # The gate byte is chip-info +0x85 relayed through the accelerator.
+    # getProbeScore zeroes the whole chip-info record and neither selected
+    # G17C reader writes that byte -- the same fact the performance-state map
+    # fallback rests on -- so the gate is clear and Apple never fills this
+    # block on G17. The layout is recovered; the contents stay zero.
+    probe_address, probe_code = symbol_code(image, FAMILY_GET_PROBE_SCORE)
+    require_instruction_words_at(
+        probe_code,
+        "G17 chip-info gate relay",
+        {
+            0xC2C: 0x3CC802A0,  # chip info +0x80..0x8f
+            0xC30: 0x3D814260,  # -> accelerator +0x500..0x50f
+        },
+    )
+    gate_source = 0x500 + (0x85 - 0x80)
+    if gate_source != 0x505:
+        raise ValueError("chip-info gate byte no longer lands on accelerator +0x505")
+
     zeroed = 0x848
     block = {
+        "populated_on_g17": False,
+        "gate_chip_info_byte": 0x85,
+        "gate_reason": (
+            "getProbeScore clears the chip-info record and no selected G17C "
+            "reader writes +0x85, so the producer's TBZ always skips"
+        ),
         "offset": 0x1CD8,
         "zeroed_bytes": zeroed,
         "gate_byte": 0x505,

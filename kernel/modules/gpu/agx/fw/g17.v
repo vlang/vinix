@@ -866,10 +866,11 @@ pub mut:
 	performance_state_map_19c8     G17PerformanceStateMapBlock
 	cs_performance_1a48            G17AuxPerformanceBlock
 	afr_performance_1b90           G17AuxPerformanceBlock
-	// Second performance-state block. Apple gates it on accelerator byte
-	// +0x505, zeroes 0x848 bytes and refills them with the same shape as the
-	// primary block at +0xfc4, sourced from the accelerator's SRAM-side
-	// arrays at +0x1bb58/+0x1bb60/+0x1bba0.
+	// Second performance-state block, shaped like the primary one at +0xfc4
+	// and sourced from the accelerator's SRAM-side arrays at
+	// +0x1bb58/+0x1bb60/+0x1bba0. Its producer is gated on accelerator byte
+	// +0x505 and that gate is always clear on G17, so these stay zero; the
+	// fields are typed to record the layout, not to be filled.
 	secondary_performance_max_1cd8 u32
 	secondary_frequency_1cdc       [g17_performance_state_capacity]u32
 	secondary_voltage_1d1c         [g17_performance_state_capacity]G17VoltageTableRow
@@ -989,14 +990,12 @@ pub fn populate_g17_performance_tables(mut config G17HardwareConfig, hardware &h
 				base_sram_voltage
 			}
 		}
-		// The second block repeats the same rows; only its accelerator source
-		// arrays differ, and the parser has already required the two frequency
-		// columns to match.
-		config.secondary_frequency_1cdc[state] = hardware.perf_state_frequencies[state] / 1_000_000
-		config.secondary_voltage_1d1c[state] = config.voltage_table_1008[state]
-		config.secondary_sram_voltage_211c[state] = config.sram_voltage_table_1408[state]
 	}
-	config.secondary_performance_max_1cd8 = hardware.perf_state_count - 1
+	// The second performance-state block stays zero on G17. Its producer is
+	// gated on accelerator byte +0x505, which getProbeScore relays from
+	// chip-info +0x85; that record is cleared and no selected G17C reader
+	// writes the byte, so Apple's TBZ always skips the block. The fields are
+	// typed above to document the layout, not because they are filled.
 	for state := hardware.perf_state_base + 1; state < hardware.perf_state_count; state++ {
 		frequency_delta := u64(hardware.perf_state_frequencies[state] - base_frequency)
 		frequency_range := u64(max_frequency - base_frequency)

@@ -3579,14 +3579,23 @@ class RecoverG17AbiTests(unittest.TestCase):
         }.items():
             struct.pack_into("<I", code, offset, word)
 
+        probe = bytearray(0xC78)
+        struct.pack_into("<I", probe, 0xC2C, 0x3CC802A0)
+        struct.pack_into("<I", probe, 0xC30, 0x3D814260)
+        codes = {
+            recover_g17_abi.INIT_POWER_DATA: (0xB00000, bytes(code)),
+            recover_g17_abi.FAMILY_GET_PROBE_SCORE: (0xB10000, bytes(probe)),
+        }
         with (
             mock.patch.object(
                 recover_g17_abi,
                 "macho_symbols",
-                return_value={recover_g17_abi.INIT_POWER_DATA: 0xB00000},
+                return_value={n: a for n, (a, _c) in codes.items()},
             ),
             mock.patch.object(
-                recover_g17_abi, "symbol_code", return_value=(0xB00000, bytes(code))
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
             ),
         ):
             recovered = recover_g17_abi.recover_g17_secondary_performance_block(b"")
@@ -3600,6 +3609,10 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["gate_byte"], 0x505)
         # The block must fit inside the span the producer clears.
         self.assertEqual(recovered["trailing_bytes"], 4)
+        # The gate is chip-info +0x85, which G17 never sets, so the block is
+        # recovered for its layout but is not filled on this part.
+        self.assertFalse(recovered["populated_on_g17"])
+        self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
 
     def test_recovers_g17_late_controls_from_the_real_producer(self) -> None:
         # This one is checked against the shipped binary rather than a stub:
