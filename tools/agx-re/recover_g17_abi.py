@@ -25,6 +25,13 @@ INIT_BASE_FIRMWARE_DATA = "__ZN11AGXFirmware16initFirmwareDataEv"
 INIT_FIRMWARE_SHARED_DATA = "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
 ALLOC_ARM_FIRMWARE_DATA = "__ZN14AGXArmFirmware17allocFirmwareDataEv"
 PREPARE_FIRMWARE_BOOT = "__ZN14AGXArmFirmware22prepareFirmwareForBootEv"
+NOTIFY_FIRMWARE_STARTED = (
+    "__ZN14AGXArmFirmware21notifyFirmwareStartedE16AGFIFirmwareRole"
+)
+RECEIVED_MESSAGE_FROM_AKF = (
+    "__ZN14AGXArmFirmware22receivedMessageFromAKFEy16AGFIFirmwareRole"
+)
+BOOT_FIRMWARE = "__ZN14AGXArmFirmware12bootFirmwareEv"
 PREPARE_FIRMWARE_DATA = "__ZN14AGXArmFirmware19prepareFirmwareDataEv"
 COMPLETE_FIRMWARE_DATA = "__ZN14AGXArmFirmware20completeFirmwareDataEv"
 ARM_FIRMWARE_PAGE_SHIFT = "__ZNK17AGXArmFirmwareASC14getFWPageShiftEv"
@@ -8921,6 +8928,113 @@ def recover_g17_handoff(code: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_boot_transport(
+    notify_code: bytes, receive_code: bytes, boot_code: bytes
+) -> dict[str, object]:
+    """Recover the dual-role AKF bootstrap and ready-message contract.
+
+    G17C does not expose one interchangeable INIT acknowledgment.  The host
+    owns two role records 0x38 bytes apart, boots both transports, and sends a
+    distinct bootstrap-root address when each role reports that it started.
+    The ready message is decoded from a six-bit type field and acknowledged
+    through both role transports under a one-shot guard.
+    """
+
+    require_instruction_words_at(
+        notify_code,
+        "G17 firmware-start notification",
+        {
+            0x018: 0x52833B08,  # role records start at host +0x19d8
+            0x01C: 0x8B080008,
+            0x020: 0x52800709,  # one role record is 0x38 bytes
+            0x024: 0x9BA97C29,
+            0x02C: 0x8B29C114,
+            0x03C: 0x52800035,
+            0x040: 0x3900A295,  # role started byte at record +0x28
+            0x048: 0xF9001A80,  # start timestamp at record +0x30
+            0x0FC: 0xF9400288,  # role transport at record +0
+            0x100: 0xD2E01021,  # 0x81 << 48
+            0x104: 0xB340AC01,  # insert root IOVA bits 43:0
+            0x12C: 0x91226202,  # transport send-message slot 0x898
+            0x130: 0xF9444E10,
+        },
+    )
+    require_instruction_words_at(
+        receive_code,
+        "G17 AKF message handling",
+        {
+            0x014: 0xD370D428,  # message[53:48]
+            0x018: 0xF100251F,  # ready type 9
+            0x020: 0xF100091F,  # callback type 2
+            0x060: 0x52834908,  # one-shot state at host +0x1a48
+            0x068: 0x8B080000,
+            0x080: 0xB91A4A7F,  # consume the one-shot state
+            0x088: 0xD2E01128,  # 0x89 << 48
+            0x08C: 0xF90003E8,
+            0x090: 0xF94CEE60,  # role 0 transport at +0x19d8
+            0x0A4: 0xD2811611,  # transport send slot 0x8b0
+            0x0A8: 0x8B110210,
+            0x0AC: 0xF9400208,
+            0x0C0: 0xF94D0A60,  # role 1 transport at +0x1a10
+            0x0E8: 0x9122C208,
+            0x0EC: 0xF9445A09,
+        },
+    )
+    require_instruction_words_at(
+        boot_code,
+        "G17 dual-role firmware boot",
+        {
+            0x01C: 0x91400415,
+            0x020: 0x392802BF,  # clear role 0 started (+0x1a00)
+            0x024: 0x3928E2BF,  # clear role 1 started (+0x1a38)
+            0x028: 0x392B16BF,  # clear shared ready flag (+0x1ac5)
+            0x02C: 0xF94CEC00,  # boot role 0 transport (+0x19d8)
+            0x030: 0xF94CFE61,  # with role 0 root mapping (+0x19f8)
+            0x044: 0xD2811111,  # transport boot slot 0x888
+            0x048: 0x8B110210,
+            0x04C: 0xF9400208,
+            0x05C: 0xF94D0A60,  # boot role 1 transport (+0x1a10)
+            0x060: 0xF94D1A61,  # with role 1 root mapping (+0x1a30)
+            0x088: 0x91222208,
+            0x08C: 0xF9444609,
+            0x09C: 0x7100029F,  # first transport result
+            0x0A0: 0x7A401804,  # second transport result
+            0x0A8: 0x396B16A8,  # wait for shared ready flag
+        },
+    )
+
+    role_base = 0x19D8
+    role_stride = 0x38
+    return {
+        "role_count": 2,
+        "role_record_host_member": role_base,
+        "role_record_stride": role_stride,
+        "transport_member": 0,
+        "root_mapping_member": 0x20,
+        "started_member": 0x28,
+        "start_timestamp_member": 0x30,
+        "transport_host_members": [role_base, role_base + role_stride],
+        "root_mapping_host_members": [
+            role_base + 0x20,
+            role_base + role_stride + 0x20,
+        ],
+        "transport_boot_vtable_slot": 0x888,
+        "init_message": 0x81 << 48,
+        "init_address_bits": 44,
+        "init_send_vtable_slot": 0x898,
+        "receive_type_shift": 48,
+        "receive_type_bits": 6,
+        "callback_type": 2,
+        "ready_type": 9,
+        "ready_ack_message": 0x89 << 48,
+        "ready_ack_guard_host_member": 0x1A48,
+        "ready_ack_transport_vtable_slot": 0x8B0,
+        "ready_ack_transport_count": 2,
+        "shared_ready_flag_host_member": 0x1AC5,
+        "requires_both_transport_boots": True,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -8959,6 +9073,12 @@ def main() -> int:
         _address, prepare_data_code = symbol_code(driver, PREPARE_FIRMWARE_DATA)
         _address, complete_data_code = symbol_code(driver, COMPLETE_FIRMWARE_DATA)
         _address, prepare_code = symbol_code(driver, PREPARE_FIRMWARE_BOOT)
+        _address, notify_started_code = symbol_code(driver, NOTIFY_FIRMWARE_STARTED)
+        _address, received_akf_code = symbol_code(driver, RECEIVED_MESSAGE_FROM_AKF)
+        _address, boot_firmware_code = symbol_code(driver, BOOT_FIRMWARE)
+        boot_transport = recover_g17_boot_transport(
+            notify_started_code, received_akf_code, boot_firmware_code
+        )
         _address, page_shift_code = symbol_code(driver, ARM_FIRMWARE_PAGE_SHIFT)
         _address, set_64_pa_code = symbol_code(driver, SET_INIT_REGISTER_64_PA)
         _address, set_64_code = symbol_code(driver, SET_INIT_REGISTER_64)
@@ -9189,6 +9309,7 @@ def main() -> int:
                 "driver_root": driver_root,
                 "firmware_root": firmware_root,
                 "bootstrap_roots": bootstrap_roots,
+                "boot_transport": boot_transport,
                 "bootstrap_region": bootstrap_region,
                 "platform_config": platform_config,
                 "brn_workaround_table": brn_workaround_table,

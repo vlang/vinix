@@ -1770,6 +1770,145 @@ class RecoverG17AbiTests(unittest.TestCase):
                 encode(0x52800042), 1
             )
 
+    def test_recovers_g17_dual_role_boot_transport(self) -> None:
+        notify = bytearray(0x134)
+        receive = bytearray(0xF0)
+        boot = bytearray(0xAC)
+        for offset, word in {
+            0x018: 0x52833B08,
+            0x01C: 0x8B080008,
+            0x020: 0x52800709,
+            0x024: 0x9BA97C29,
+            0x02C: 0x8B29C114,
+            0x03C: 0x52800035,
+            0x040: 0x3900A295,
+            0x048: 0xF9001A80,
+            0x0FC: 0xF9400288,
+            0x100: 0xD2E01021,
+            0x104: 0xB340AC01,
+            0x12C: 0x91226202,
+            0x130: 0xF9444E10,
+        }.items():
+            struct.pack_into("<I", notify, offset, word)
+        for offset, word in {
+            0x014: 0xD370D428,
+            0x018: 0xF100251F,
+            0x020: 0xF100091F,
+            0x060: 0x52834908,
+            0x068: 0x8B080000,
+            0x080: 0xB91A4A7F,
+            0x088: 0xD2E01128,
+            0x08C: 0xF90003E8,
+            0x090: 0xF94CEE60,
+            0x0A4: 0xD2811611,
+            0x0A8: 0x8B110210,
+            0x0AC: 0xF9400208,
+            0x0C0: 0xF94D0A60,
+            0x0E8: 0x9122C208,
+            0x0EC: 0xF9445A09,
+        }.items():
+            struct.pack_into("<I", receive, offset, word)
+        for offset, word in {
+            0x01C: 0x91400415,
+            0x020: 0x392802BF,
+            0x024: 0x3928E2BF,
+            0x028: 0x392B16BF,
+            0x02C: 0xF94CEC00,
+            0x030: 0xF94CFE61,
+            0x044: 0xD2811111,
+            0x048: 0x8B110210,
+            0x04C: 0xF9400208,
+            0x05C: 0xF94D0A60,
+            0x060: 0xF94D1A61,
+            0x088: 0x91222208,
+            0x08C: 0xF9444609,
+            0x09C: 0x7100029F,
+            0x0A0: 0x7A401804,
+            0x0A8: 0x396B16A8,
+        }.items():
+            struct.pack_into("<I", boot, offset, word)
+
+        recovered = recover_g17_abi.recover_g17_boot_transport(
+            bytes(notify), bytes(receive), bytes(boot)
+        )
+        self.assertEqual(recovered["role_count"], 2)
+        self.assertEqual(recovered["role_record_stride"], 0x38)
+        self.assertEqual(
+            recovered["root_mapping_host_members"], [0x19F8, 0x1A30]
+        )
+        self.assertEqual(recovered["init_message"], 0x81 << 48)
+        self.assertEqual(recovered["init_address_bits"], 44)
+        self.assertEqual(recovered["ready_type"], 9)
+        self.assertEqual(recovered["callback_type"], 2)
+        self.assertEqual(recovered["ready_ack_message"], 0x89 << 48)
+        self.assertEqual(recovered["ready_ack_transport_count"], 2)
+        self.assertTrue(recovered["requires_both_transport_boots"])
+
+    def test_rejects_single_role_g17_boot_transport(self) -> None:
+        notify = bytearray(0x134)
+        receive = bytearray(0xF0)
+        boot = bytearray(0xAC)
+        # A changed second-role transport load must fail rather than silently
+        # degrading the G17 contract to the legacy single-ASC model.
+        for offset, word in {
+            0x018: 0x52833B08,
+            0x01C: 0x8B080008,
+            0x020: 0x52800709,
+            0x024: 0x9BA97C29,
+            0x02C: 0x8B29C114,
+            0x03C: 0x52800035,
+            0x040: 0x3900A295,
+            0x048: 0xF9001A80,
+            0x0FC: 0xF9400288,
+            0x100: 0xD2E01021,
+            0x104: 0xB340AC01,
+            0x12C: 0x91226202,
+            0x130: 0xF9444E10,
+        }.items():
+            struct.pack_into("<I", notify, offset, word)
+        for offset, word in {
+            0x014: 0xD370D428,
+            0x018: 0xF100251F,
+            0x020: 0xF100091F,
+            0x060: 0x52834908,
+            0x068: 0x8B080000,
+            0x080: 0xB91A4A7F,
+            0x088: 0xD2E01128,
+            0x08C: 0xF90003E8,
+            0x090: 0xF94CEE60,
+            0x0A4: 0xD2811611,
+            0x0A8: 0x8B110210,
+            0x0AC: 0xF9400208,
+            0x0C0: 0xF94CEE60,
+            0x0E8: 0x9122C208,
+            0x0EC: 0xF9445A09,
+        }.items():
+            struct.pack_into("<I", receive, offset, word)
+        for offset, word in {
+            0x01C: 0x91400415,
+            0x020: 0x392802BF,
+            0x024: 0x3928E2BF,
+            0x028: 0x392B16BF,
+            0x02C: 0xF94CEC00,
+            0x030: 0xF94CFE61,
+            0x044: 0xD2811111,
+            0x048: 0x8B110210,
+            0x04C: 0xF9400208,
+            0x05C: 0xF94D0A60,
+            0x060: 0xF94D1A61,
+            0x088: 0x91222208,
+            0x08C: 0xF9444609,
+            0x09C: 0x7100029F,
+            0x0A0: 0x7A401804,
+            0x0A8: 0x396B16A8,
+        }.items():
+            struct.pack_into("<I", boot, offset, word)
+
+        with self.assertRaisesRegex(ValueError, "AKF message handling"):
+            recover_g17_abi.recover_g17_boot_transport(
+                bytes(notify), bytes(receive), bytes(boot)
+            )
+
     def test_recovers_device_control_copy_size(self) -> None:
         code = encode(
             pair_q("load", 0, 1, 21, 0),

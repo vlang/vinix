@@ -80,6 +80,8 @@ the fixed two-bank performance-state map, the native
 CS/AFR auxiliary performance-state parser and firmware blocks,
 exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,
+the two-transport boot calls, per-role `0x81` root publication, six-bit AKF
+message-type decode, and the one-shot type-9 `0x89` reply to both transports,
 the mapped bootstrap register region and its G17 no-op producer, both
 shared-object address graphs, the per-role ASC power-state records, the shared
 runtime object's control fields and four startup producers, the initial shared
