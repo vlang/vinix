@@ -53,6 +53,7 @@ pub const g17_firmware_event_pm_request_memory = u32(6)
 pub const g17_firmware_event_host_noop_mask = u32(0x20000801)
 pub const g17_firmware_event_channel_error = u32(7)
 pub const g17_firmware_event_metrology_aging = u32(8)
+pub const g17_firmware_event_uma_async_alloc = u32(9)
 pub const g17_firmware_event_shared_event_signal_complete = u32(10)
 pub const g17_firmware_event_process_exit_complete = u32(12)
 pub const g17_firmware_event_uma_grow_pool = u32(13)
@@ -2702,6 +2703,24 @@ pub mut:
 	opaque_008 [0x40]u8
 }
 
+// Event type 9 is copied by Apple into a private host queue and wakes
+// AGXAccelerator::allocateUMAMemoryEvent. In the selected G17 driver that
+// complete callback is exactly `bti c; ret`: it does not drain the queue,
+// allocate memory, or send a firmware response. Vinix therefore validates
+// and consumes the request without constructing the unused private queue.
+@[packed]
+pub struct G17FirmwareUmaAsyncAlloc {
+pub mut:
+	event_type         u32
+	request_index      u32
+	opaque_008         u32
+	required_value_00c u64
+	stamp_slot         i32
+	request_value_018  u32
+	wait_for_host_ring u32
+	opaque_020         [0x28]u8
+}
+
 // Event type 10 acknowledges an Apple IOSurface shared-event signal. Vinix
 // does not expose IOSurface events, but still validates the record before
 // consuming it as the equivalent of Apple's empty-registry path.
@@ -2826,6 +2845,17 @@ pub fn validate_g17_firmware_metrology_aging(entry &G17FirmwareEventRingEntry) b
 	return entry != unsafe { nil }
 		&& entry.event_type == g17_firmware_event_metrology_aging
 		&& sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size
+}
+
+pub fn validate_g17_firmware_uma_async_alloc(entry &G17FirmwareEventRingEntry) bool {
+	if entry == unsafe { nil } || entry.event_type != g17_firmware_event_uma_async_alloc
+		|| sizeof(G17FirmwareUmaAsyncAlloc) != g17_firmware_event_entry_size {
+		return false
+	}
+	event := unsafe { &G17FirmwareUmaAsyncAlloc(entry) }
+	return event.request_index < g17_firmware_event_uma_flist_limit
+		&& event.required_value_00c != 0
+		&& (event.stamp_slot == -1 || u32(event.stamp_slot) < g17_firmware_event_stamp_slots)
 }
 
 @[inline]
@@ -3296,5 +3326,5 @@ pub fn enqueue_g17_device_control_entry(state_buffer voidptr, state_size u64,
 }
 
 pub fn validate_g17_accelerator_layouts() bool {
-	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwarePmRequestMemory) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaGrowPool) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaThresholdInterrupt) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && sizeof(G17DeviceControlAllocatePmMemory) == g17_device_control_entry_size && sizeof(G17DeviceControlUpdateUmaThreshold) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
+	return sizeof(G17AcceleratorRingState) == g17_accelerator_ring_state_size && sizeof(G17AcceleratorRingAddresses) == g17_accelerator_ring_addresses_size && sizeof(G17FirmwareEventRingEntry) == g17_firmware_event_entry_size && sizeof(G17FirmwareCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareGpuRestartEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwarePmRequestMemory) == g17_firmware_event_entry_size && sizeof(G17FirmwareChannelErrorEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareMetrologyAgingEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaAsyncAlloc) == g17_firmware_event_entry_size && sizeof(G17FirmwareSharedEventSignalComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareProcessExitComplete) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaGrowPool) == g17_firmware_event_entry_size && sizeof(G17FirmwareRtCompletionEvent) == g17_firmware_event_entry_size && sizeof(G17FirmwareUmaThresholdInterrupt) == g17_firmware_event_entry_size && sizeof(G17DataMasterEntry) == g17_data_master_entry_size && sizeof(G17DeviceControlEntry) == g17_device_control_entry_size && sizeof(G17DeviceControlAllocatePmMemory) == g17_device_control_entry_size && sizeof(G17DeviceControlUpdateUmaThreshold) == g17_device_control_entry_size && u64(g17_firmware_event_ring_entries) * g17_firmware_event_entry_size == g17_firmware_event_entries_size && u64(g17_accelerator_ring_entries) * g17_data_master_entry_size == g17_data_master_entries_bytes && u64(g17_accelerator_ring_entries) * g17_device_control_entry_size == g17_device_control_entries_size && u64(g17_data_master_priorities) * g17_data_master_priority_record_size == g17_data_master_address_table_size
 }

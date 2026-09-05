@@ -532,6 +532,9 @@ ACCELERATOR_SUBMIT_DEVICE_CONTROL = (
 ALLOCATE_PM_MEMORY_EVENT = (
     "__ZN14AGXAccelerator19allocateMemoryEventEP22IOInterruptEventSourcei"
 )
+ALLOCATE_UMA_MEMORY_EVENT = (
+    "__ZN14AGXAccelerator22allocateUMAMemoryEventEP22IOInterruptEventSourcei"
+)
 HWPB_MANAGER_META_CLASS = "__ZN23AGXHWParamBufferManager10gMetaClassE"
 PARAMETER_MANAGEMENT_VTABLE = "__ZTV22AGXParameterManagement"
 PARAMETER_MANAGEMENT_VIRTUAL_VTABLE = "__ZTV29AGXParameterManagementVirtual"
@@ -15108,6 +15111,156 @@ def recover_g17_uma_flist_event_actions(
     ]
 
 
+def recover_g17_uma_async_alloc_event_action(
+    driver: bytes,
+    role_address: int,
+    role_code: bytes,
+    dispatch_offsets: tuple[int, ...],
+    driver_symbols: dict[str, int],
+) -> dict[str, object]:
+    """Recover G17 event type 9 and prove its selected worker is a no-op."""
+
+    if ALLOCATE_UMA_MEMORY_EVENT not in driver_symbols:
+        raise ValueError("Mach-O is missing the G17 UMA allocation worker")
+    if 0x110 + dispatch_offsets[9] != 0x47C:
+        raise ValueError("G17 UMA async-allocation event dispatch changed")
+
+    # The interrupt handler validates the packed request, then either waits
+    # for room (when +0x1c is nonzero) or drops a full-ring request. A request
+    # that fits is copied into a private 64-entry host ring before +0x470 is
+    # signalled. Event +0x08 is not part of the copied host record.
+    require_instruction_words_at(
+        role_code,
+        "G17 UMA async-allocation event",
+        {
+            0x47C: 0xD503249F,
+            0x480: 0xF9414E68,  # firmware +0x298 -> accelerator
+            0x484: 0x52952C09,
+            0x488: 0x72A00029,  # disabled guard at accelerator +0x1a960
+            0x490: 0x39400108,
+            0x494: 0x35FFE148,  # a set guard consumes the event directly
+            0x498: 0xB94053E8,  # event type at entry +0
+            0x49C: 0x7100251F,  # event type 9
+            0x4A4: 0xF845C3E8,  # required nonzero u64 at entry +0x0c
+            0x4A8: 0xB4007B68,
+            0x4AC: 0xB94057E8,  # request index at entry +0x04
+            0x4B0: 0x7104011F,  # request index below 256
+            0x4B4: 0x54007B02,
+            0x4B8: 0xB94067F6,  # signed stamp slot at entry +0x14
+            0x4D0: 0xD2815611,  # stamp-count vtable slot 0xab0
+            0x4FC: 0x360078C8,
+            0x500: 0xB94057F9,  # request index at entry +0x04
+            0x504: 0xF845C3F7,  # required value at entry +0x0c
+            0x508: 0xFC4643E9,  # packed value at entry +0x14
+            0x50C: 0xB9406FF8,  # wait-for-room flag at entry +0x1c
+            0x510: 0xF9414E7A,
+            0x514: 0x91406B56,  # host-ring control at accelerator +0x1a2f0
+            0x518: 0x34003A38,  # zero flag selects nonblocking full handling
+            0x51C: 0xB942F6C8,
+            0x520: 0x11000508,
+            0x524: 0x12001508,  # 64-entry host-ring wrap
+            0x528: 0xB942F2C9,
+            0x52C: 0x6B09011F,
+            0x534: 0x52800C80,  # wait 100 microseconds while full
+            0xC5C: 0xB942F6C8,
+            0xC60: 0x11000508,
+            0xC64: 0x12001508,
+            0xC68: 0xB942F2C9,
+            0xC6C: 0x6B09011F,
+            0xC70: 0x54FFA260,  # nonblocking mode drops a full-ring request
+            0xC7C: 0x52935E08,
+            0xC80: 0x72A00028,  # entries at accelerator +0x1a9af0
+            0xC88: 0xB942F6C9,
+            0xC8C: 0xD37BE929,  # 0x20-byte record stride
+            0xCA4: 0x29007D59,  # entry +4 and zero -> record +0/+4
+            0xCA8: 0xF9000557,  # entry +0x0c -> record +8
+            0xCAC: 0xFD000949,  # entry +0x14 -> record +0x10
+            0xCB0: 0x29037D58,  # entry +0x1c and zero -> record +0x18/+0x1c
+            0xCB4: 0xB942F6C8,
+            0xCB8: 0x11000508,
+            0xCBC: 0x12001508,
+            0xCC0: 0xB902F6C8,
+            0xCCC: 0xF9414E68,
+            0xCD0: 0xF9423900,  # UMA event source at accelerator +0x470
+            0xCF8: 0x9107E208,
+            0xCFC: 0xF940FE09,  # signal-work-available vtable slot 0x1f8
+            0xD00: 0xD2800001,
+            0xD04: 0xD2800002,
+            0xD08: 0x52800003,
+            0xD14: 0xD73F0931,
+        },
+    )
+
+    # start() binds allocateUMAMemoryEvent to that exact +0x470 source. In
+    # this UUID-pinned G17 binary the complete callback is only `bti c; ret`:
+    # it neither drains the private queue nor allocates or acknowledges
+    # anything. Preserve this surprising result as an executable assertion.
+    start_address, start_code = symbol_code(driver, ACCELERATOR_START)
+    require_instruction_words_at(
+        start_code,
+        "G17 UMA allocation worker registration",
+        {
+            0x38AC: 0xD2825EF1,
+            0x38B0: 0xDAC10230,
+            0x38B4: 0xAA1003E1,
+            0x38B8: 0xAA1303E0,
+            0x38BC: 0xD2800002,
+            0x38C0: 0x52800003,
+            0x38C8: 0xF9023A60,  # event source -> accelerator +0x470
+        },
+    )
+    registered_worker = read_adrp_add_address(
+        start_address, start_code, 0x38A4, 0x38A8
+    )
+    if registered_worker != driver_symbols[ALLOCATE_UMA_MEMORY_EVENT]:
+        raise ValueError("G17 UMA allocation event source worker changed")
+    worker_address, worker_code = symbol_code(driver, ALLOCATE_UMA_MEMORY_EVENT)
+    if worker_address != driver_symbols[ALLOCATE_UMA_MEMORY_EVENT]:
+        raise ValueError("G17 UMA allocation worker symbol moved")
+    if worker_code != struct.pack("<2I", 0xD503245F, 0xD65F03C0):
+        raise ValueError("G17 UMA allocation worker is no longer a no-op")
+
+    return {
+        "type": 9,
+        "record": "AGFIFirmwareEventUMARequestMemory",
+        "request_index_offset": 4,
+        "request_index_limit": 0x100,
+        "ignored_event_offsets": [8],
+        "required_nonzero_u64_offset": 0xC,
+        "stamp_slot_offset": 0x14,
+        "invalid_stamp_slot": -1,
+        "request_value_offset": 0x18,
+        "wait_for_host_ring_offset": 0x1C,
+        "disabled_guard_accelerator_member": 0x1A960,
+        "interrupt_action": "enqueue_host_request_and_wake_worker",
+        "host_request_ring": {
+            "control_accelerator_member": 0x1A2F0,
+            "entries_accelerator_member": 0x1A9AF0,
+            "entries": 64,
+            "entry_bytes": 0x20,
+            "worker_event_source_accelerator_member": 0x470,
+            "full_policy": {
+                "wait_flag_offset": 0x1C,
+                "wait_microseconds": 100,
+                "zero_flag": "drop_request",
+                "nonzero_flag": "wait_for_room",
+            },
+            "record_layout": {
+                "request_index_offset": 0,
+                "reserved_004": 0,
+                "required_value_offset": 8,
+                "stamp_and_request_value_offset": 0x10,
+                "wait_for_host_ring_offset": 0x18,
+                "reserved_01c": 0,
+            },
+        },
+        "registered_worker": ALLOCATE_UMA_MEMORY_EVENT,
+        "worker_implementation": "bti_c_ret",
+        "device_control_response": "none",
+        "vinix_policy": "validate_and_consume_without_private_host_queue",
+    }
+
+
 def recover_g17_firmware_event_actions(
     driver: bytes,
     role_address: int,
@@ -15133,6 +15286,9 @@ def recover_g17_firmware_event_actions(
         driver, role_address, role_code
     )
     pm_memory_event = recover_g17_pm_memory_event_action(
+        driver, role_address, role_code, dispatch_offsets, driver_symbols
+    )
+    uma_async_alloc_event = recover_g17_uma_async_alloc_event_action(
         driver, role_address, role_code, dispatch_offsets, driver_symbols
     )
     uma_flist_events = recover_g17_uma_flist_event_actions(
@@ -15376,7 +15532,7 @@ def recover_g17_firmware_event_actions(
         event_type for event_type in direct_noop_types if event_type not in accepted_types
     ]
     effective_noops = [0, *accepted_direct_noops]
-    implemented = {*effective_noops, 1, 4, 7, 8, 10, 12, 14}
+    implemented = {*effective_noops, 1, 4, 7, 8, 9, 10, 12, 14}
     return {
         "jump_table_function_offsets": {
             str(event_type): dispatch_anchor + offset - role_address
@@ -15468,6 +15624,7 @@ def recover_g17_firmware_event_actions(
                 "vinix_policy": "consume_without_iogpu_object_namespace",
             }
         ],
+        "deferred_host_noop_events": [uma_async_alloc_event],
         "host_resource_events": [pm_memory_event, *uma_flist_events],
         "unimplemented_action_event_types": [
             event_type for event_type in accepted_types if event_type not in implemented

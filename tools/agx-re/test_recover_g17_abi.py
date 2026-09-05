@@ -2261,11 +2261,12 @@ class RecoverG17AbiTests(unittest.TestCase):
         shared_event_call_target: int = 0x150000,
         process_get_call_target: int = 0x160000,
         process_remove_call_target: int = 0x170000,
+        uma_worker_code: bytes = struct.pack("<2I", 0xD503245F, 0xD65F03C0),
         reliability_service: str = "function-reliability_monitor",
         changed_validator_type: int = -1,
     ) -> dict[str, object]:
         role_address = 0x100000
-        role = bytearray(0xD00)
+        role = bytearray(0xD20)
         flist_meta_class_target = 0x210000
         for offset, word in {
             0x120: 0xB94053E8,
@@ -2306,6 +2307,35 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x2D4: 0x910283E1,
             0x2D8: 0xD102C3A2,
             0x2DC: 0xD2800003,
+            0x47C: 0xD503249F,
+            0x480: 0xF9414E68,
+            0x484: 0x52952C09,
+            0x488: 0x72A00029,
+            0x490: 0x39400108,
+            0x494: 0x35FFE148,
+            0x498: 0xB94053E8,
+            0x49C: 0x7100251F,
+            0x4A4: 0xF845C3E8,
+            0x4A8: 0xB4007B68,
+            0x4AC: 0xB94057E8,
+            0x4B0: 0x7104011F,
+            0x4B4: 0x54007B02,
+            0x4B8: 0xB94067F6,
+            0x4D0: 0xD2815611,
+            0x4FC: 0x360078C8,
+            0x500: 0xB94057F9,
+            0x504: 0xF845C3F7,
+            0x508: 0xFC4643E9,
+            0x50C: 0xB9406FF8,
+            0x510: 0xF9414E7A,
+            0x514: 0x91406B56,
+            0x518: 0x34003A38,
+            0x51C: 0xB942F6C8,
+            0x520: 0x11000508,
+            0x524: 0x12001508,
+            0x528: 0xB942F2C9,
+            0x52C: 0x6B09011F,
+            0x534: 0x52800C80,
             0x544: 0xB94053E8,
             0x548: 0x7100291F,
             0x54C: 0x54007BC1,
@@ -2431,6 +2461,32 @@ class RecoverG17AbiTests(unittest.TestCase):
             0xC04: 0xF9423500,
             0xC2C: 0x9107E208,
             0xC30: 0xF940FE09,
+            0xC5C: 0xB942F6C8,
+            0xC60: 0x11000508,
+            0xC64: 0x12001508,
+            0xC68: 0xB942F2C9,
+            0xC6C: 0x6B09011F,
+            0xC70: 0x54FFA260,
+            0xC7C: 0x52935E08,
+            0xC80: 0x72A00028,
+            0xC88: 0xB942F6C9,
+            0xC8C: 0xD37BE929,
+            0xCA4: 0x29007D59,
+            0xCA8: 0xF9000557,
+            0xCAC: 0xFD000949,
+            0xCB0: 0x29037D58,
+            0xCB4: 0xB942F6C8,
+            0xCB8: 0x11000508,
+            0xCBC: 0x12001508,
+            0xCC0: 0xB902F6C8,
+            0xCCC: 0xF9414E68,
+            0xCD0: 0xF9423900,
+            0xCF8: 0x9107E208,
+            0xCFC: 0xF940FE09,
+            0xD00: 0xD2800001,
+            0xD04: 0xD2800002,
+            0xD08: 0x52800003,
+            0xD14: 0xD73F0931,
         }.items():
             struct.pack_into("<I", role, offset, word)
         dispatch_offsets = [0] * 16
@@ -2439,6 +2495,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         dispatch_offsets[6] = -0x70
         dispatch_offsets[7] = 0x480
         dispatch_offsets[8] = 0x180
+        dispatch_offsets[9] = 0x36C
         dispatch_offsets[10] = 0x430
         dispatch_offsets[12] = 0x5E4
         dispatch_offsets[13] = 0x514
@@ -2457,6 +2514,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         role_table_target = 0x1F0000
         retire_grow_target = 0x220000
         update_uma_target = 0x230000
+        uma_worker_target = 0x250000
         driver_symbols = {
             recover_g17_abi.G17_HANDLE_FIRMWARE_CONTROLLER_EVENT: controller_target,
             recover_g17_abi.ALLOCATE_PM_MEMORY_EVENT: allocate_worker_target,
@@ -2470,6 +2528,7 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.IMPLICIT_GROW_ENGINE_VTABLE: 0x240000,
             recover_g17_abi.USC_PRIV_MEM_RETIRE_GROW_REQUEST: retire_grow_target,
             recover_g17_abi.G17_HAL_UPDATE_UMA_DESC: update_uma_target,
+            recover_g17_abi.ALLOCATE_UMA_MEMORY_EVENT: uma_worker_target,
         }
         iogpu_symbols = {
             recover_g17_abi.IOGPU_EVENT_GET_NUM_STAMPS: 0x130000,
@@ -2482,7 +2541,7 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.IOSURFACE_ROOT_SIGNAL_EVENT_ID: 0x150000,
         }
         start_address = 0x200000
-        start = bytearray(0x3870)
+        start = bytearray(0x38CC)
         for offset, word in {
             0x2CA4: 0xB0FF41A1,
             0x2CA8: 0x91378021,
@@ -2498,6 +2557,15 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x3860: 0xD2800002,
             0x3864: 0x52800003,
             0x386C: 0xF9023660,
+            0x38A4: adrp(start_address + 0x38A4, uma_worker_target, 16),
+            0x38A8: add_immediate(16, 16, uma_worker_target & 0xFFF),
+            0x38AC: 0xD2825EF1,
+            0x38B0: 0xDAC10230,
+            0x38B4: 0xAA1003E1,
+            0x38B8: 0xAA1303E0,
+            0x38BC: 0xD2800002,
+            0x38C0: 0x52800003,
+            0x38C8: 0xF9023A60,
         }.items():
             struct.pack_into("<I", start, offset, word)
 
@@ -2588,6 +2656,8 @@ class RecoverG17AbiTests(unittest.TestCase):
                 return start_address, bytes(start)
             if name == recover_g17_abi.ALLOCATE_PM_MEMORY_EVENT:
                 return allocate_worker_target, bytes(worker)
+            if name == recover_g17_abi.ALLOCATE_UMA_MEMORY_EVENT:
+                return uma_worker_target, uma_worker_code
             if name == recover_g17_abi.ARM_SUBMIT_DEVICE_CONTROL:
                 return arm_submit_target, bytes(arm_submit)
             if name == recover_g17_abi.ACCELERATOR_SUBMIT_DEVICE_CONTROL:
@@ -2678,6 +2748,25 @@ class RecoverG17AbiTests(unittest.TestCase):
             [event["type"] for event in recovered["host_lifecycle_events"]], [12]
         )
         self.assertEqual(
+            [event["type"] for event in recovered["deferred_host_noop_events"]],
+            [9],
+        )
+        uma_async = recovered["deferred_host_noop_events"][0]
+        self.assertEqual(uma_async["worker_implementation"], "bti_c_ret")
+        self.assertEqual(uma_async["device_control_response"], "none")
+        self.assertEqual(uma_async["host_request_ring"]["entries"], 64)
+        self.assertEqual(
+            uma_async["host_request_ring"]["record_layout"],
+            {
+                "request_index_offset": 0,
+                "reserved_004": 0,
+                "required_value_offset": 8,
+                "stamp_and_request_value_offset": 0x10,
+                "wait_for_host_ring_offset": 0x18,
+                "reserved_01c": 0,
+            },
+        )
+        self.assertEqual(
             [event["type"] for event in recovered["host_resource_events"]],
             [6, 13, 15],
         )
@@ -2704,12 +2793,16 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(threshold["device_control_response"]["command_type"], 0x21)
         self.assertEqual(
             recovered["unimplemented_action_event_types"],
-            [6, 9, 13, 15],
+            [6, 13, 15],
         )
 
     def test_rejects_non_noop_g17_controller_event_handler(self) -> None:
         with self.assertRaisesRegex(ValueError, "no longer a no-op"):
             self._recover_g17_event_actions(controller_code=bytes(8))
+
+    def test_rejects_non_noop_g17_uma_allocation_worker(self) -> None:
+        with self.assertRaisesRegex(ValueError, "UMA allocation worker is no longer a no-op"):
+            self._recover_g17_event_actions(uma_worker_code=bytes(8))
 
     def test_rejects_wrong_g17_clpc_notification_target(self) -> None:
         with self.assertRaisesRegex(ValueError, "CLPC notification target"):

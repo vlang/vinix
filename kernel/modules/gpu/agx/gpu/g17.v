@@ -893,6 +893,20 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 					|| fw.g17_firmware_completion_has_firing_stamps(&entry)
 				continue
 			}
+			if entry.event_type == fw.g17_firmware_event_uma_async_alloc {
+				// Apple copies this request into a private 64-entry host ring and
+				// signals allocateUMAMemoryEvent. The selected UUID-pinned G17
+				// implementation of that worker is exactly `bti c; ret`: it does
+				// not drain the host ring, allocate, or respond to firmware. Skip
+				// the inert intermediate queue after validating the wire record.
+				if !fw.validate_g17_firmware_uma_async_alloc(&entry) {
+					C.printf(c'agx: invalid G17 UMA async-allocation event on role %d\n',
+						role)
+					mgr.state = .error
+					return false
+				}
+				continue
+			}
 			if entry.event_type == fw.g17_firmware_event_pm_request_memory {
 				if !fw.validate_g17_firmware_pm_request_memory(&entry) {
 					C.printf(c'agx: invalid G17 parameter-memory request on role %d\n', role)
@@ -1002,7 +1016,9 @@ fn (mut mgr GpuManager) handle_g17_akf_callback() bool {
 			// loop. Type 0 resolves through the selected G17 firmware vtable
 			// to an exact `bti c; ret` implementation. Jump-table slots 2,
 			// 3 and 5 are also no-ops, but the validator rejects them before
-			// dispatch. Other accepted records need their response ABIs.
+			// dispatch. Type 9 is handled above because its interrupt arm has
+			// an inert queued-worker side effect. Other accepted records need
+			// their response ABIs.
 			if !fw.g17_firmware_event_is_host_noop(entry.event_type) {
 				C.printf(c'agx: unsupported G17 firmware event %u on role %d\n',
 					entry.event_type, role)
