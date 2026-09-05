@@ -3925,11 +3925,10 @@ class RecoverG17AbiTests(unittest.TestCase):
             registers["accelerator_variant_member"],
         )
 
-    def test_declared_hardware_config_gaps_are_still_justified(self) -> None:
-        # fw.g17_hardware_config_gaps() declares exactly two outstanding
-        # pieces. If the recovery ever shows either is settled, the kernel-side
-        # bitmask is stale and the boot gate would stay shut for no reason --
-        # or worse, someone clears a bit the evidence does not support.
+    def test_cleared_hardware_config_gaps_are_supported(self) -> None:
+        # The hardware-config gap mask is now clear. Keep proof here for the
+        # two formerly open pieces: the power rows remain explicitly
+        # die-dependent and every late-control field is accounted for.
         driver = Path("build/kext/g17c/AGXG17X.macho")
         if not driver.exists():
             self.skipTest("extracted AGXG17X.macho is not available")
@@ -4750,6 +4749,9 @@ class RecoverG17AbiTests(unittest.TestCase):
             },
         )
         self.assertEqual(recovered["leakage_model"]["temperature"], 110.0)
+        self.assertTrue(recovered["leakage_model"]["input_linear"])
+        self.assertEqual(recovered["leakage_model"]["pow_terms"], 4)
+        self.assertIn("max(V-1.06,0)", recovered["leakage_model"]["factor_formula"])
         self.assertEqual(recovered["leakage_model"]["vdd_gpu"]["buckets"], 2)
         self.assertEqual(
             recovered["leakage_model"]["vdd_gpu"]["default_records"][0],

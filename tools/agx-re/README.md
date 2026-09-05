@@ -98,22 +98,21 @@ USC generation 3. Vinix now recognizes that topology.
 See [G17_T6050.md](G17_T6050.md) for the versioned register, user-client, and
 firmware observations recovered during this pass.
 
-Hardware launch remains gated, and the gate is now derived rather than
-asserted: `fw.g17_hardware_config_gaps()` enumerates the outstanding pieces as
-a bitmask, `init_g17_firmware_data` fails closed while any bit is set, and the
-analyzer test suite checks that the declared gap is still justified by the
-recovery output. Vinix now has the native G17 UAT handoff,
+Hardware launch remains gated at the whole-ABI boundary. The narrower hardware
+configuration gate is derived rather than asserted:
+`fw.g17_hardware_config_gaps()` now reaches zero only because every field has a
+producer, and `init_g17_firmware_data` still fails closed if that changes.
+Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and
 runtime policy. Firmware channel
 construction, the work-command ABI, and the userspace command producer still
 need byte-accurate implementations before enabling T6050. The hardware
-configuration's late-control block is now complete, so the only gap left there
-is the two die-dependent power rows. Their three-word eFuse input, selector
-sequence, bitfield descriptors, and G17C scaling are now recovered and decoded
-in integer quarter-units; evaluating the remaining pow-based model without
-hardware floating point is the next step.
+configuration is now complete, including the two die-dependent power rows.
+Their three-word eFuse input is decoded in integer quarter-units and combined
+with version-pinned Q24.40 leakage factors; integer binary32 helpers reproduce
+Apple's rounding points without emitting kernel floating-point instructions.
 
 The channel-command pools are recovered: the slot-ring block layout, the
 allocation scan, and the exact byte size of all twelve named command types.
@@ -126,7 +125,7 @@ per-queue `_AGFISchedulerState` element, the creating process ID and the app
 GPU role are all recovered, so what remains for submission is the work command
 format itself.
 
-The two linear power-transfer tables are the one recovered part that cannot be
-made byte-accurate offline: their rows derive from per-die fuse calibration.
-Vinix reproduces their normalisation exactly, but filling them needs the fuse
-aperture and a freestanding `pow`, since the kernel builds with `-nofloat`.
+`generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
+leakage factor from the pinned AGXG17X binary for every voltage in this
+Mac17,6 DeviceTree. `make check-g17-power-model` verifies that the committed
+kernel tables match both local inputs.

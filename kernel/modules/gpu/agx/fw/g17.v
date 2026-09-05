@@ -904,9 +904,9 @@ pub mut:
 }
 
 // Per-die leakage calibration recovered from the G17 fuse aperture. Values
-// are kept in quarter units so the M5 Max path does not need floating point
-// merely to decode its integer and quarter-integer fuse fields. The later
-// power-model stage converts these values while evaluating Apple's equation.
+// are kept in quarter units so the M5 Max path does not need floating point.
+// g17_power_model.v combines them with generated, version-pinned Q24.40
+// evaluations of Apple's fixed-temperature leakage equation.
 pub struct G17LeakageCalibration {
 pub mut:
 	core_count             u32
@@ -1143,12 +1143,11 @@ pub const g17_gap_late_control_runtime = u32(1 << 1)
 
 // Bits still set for this build. Each has a recovered reason:
 //
-//   linear_power_transfer  Config +0x18c8 and +0x1948 are 0..100 curves
-//                          normalised from power matrices whose leakage term
-//                          is seeded with per-die fuse calibration. The fuse
-//                          fields are decoded above; producing the matrices
-//                          still needs the recovered pow-based leakage model,
-//                          while the kernel builds with -nofloat.
+//   linear_power_transfer  CLEARED. Config +0x18c8 and +0x1948 are built from
+//                          the recovered main/AFR power matrices. The four-pow
+//                          fixed-temperature leakage equation is generated as
+//                          Q24.40 factors and its binary32 rounding boundaries
+//                          are reproduced with integer operations.
 //
 //   late_control_runtime   CLEARED. All 36 fields in +0x2540..+0x270f are
 //                          accounted for: 34 fixed and two computed from the
@@ -1156,7 +1155,7 @@ pub const g17_gap_late_control_runtime = u32(1 << 1)
 //
 // Anything not listed here is recovered and emitted.
 pub fn g17_hardware_config_gaps() u32 {
-	return g17_gap_linear_power_transfer
+	return 0
 }
 
 // The hardware configuration may only be handed to firmware once every gap is

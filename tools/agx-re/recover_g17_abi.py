@@ -6089,6 +6089,16 @@ def recover_g17_linear_power_transfer_tables(
         "leakage_model": {
             "equation": G17_APPLY_LEAKAGE_EQUATION,
             "temperature": 110.0,
+            "input_linear": True,
+            "pow_terms": 4,
+            "factor_formula": (
+                "pow(2,(T-105)/c1) * "
+                "pow(min(V,c7)/min(c7,.75),c4*(1-c5*(T-105)/20)) * "
+                "min(V,c7,c6)/min(c7,c6,.75) * "
+                "pow(1+c2*(1-c3*(T-105)/20),"
+                "(max(V,c6)-max(c6,.75))/.05) * "
+                "pow(c9,c8*max(V-1.06,0)*(1+c10*(T-105)^2/(T+273.15)))"
+            ),
             "vdd_gpu": leakage_table(G17_CALCULATE_VDD_GPU_LEAKAGE),
             "afr": leakage_table(G17_CALCULATE_AFR_LEAKAGE),
         },

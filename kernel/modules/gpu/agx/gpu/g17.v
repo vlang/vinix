@@ -213,7 +213,7 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	// Apple's selected G17 producer maps this separate read-only eFuse
 	// aperture and consumes exactly three words. Snapshot them with volatile
 	// MMIO reads, then keep the decoded values in integer quarter-units for the
-	// still-gated power-model stage.
+	// no-FPU power-model stage.
 	identity := regs.decode_gpu_identity(mgr.res.sgx_read32(regs.gpu_id_clustercfg))
 	chip_variant := regs.decode_gpu_chip_variant(mgr.res.sgx_read32(regs.gpu_id_version)) or {
 		return false
@@ -231,7 +231,13 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	C.printf(c'agx: decoded G17 leakage calibration for %u power columns / %u groups\n',
 		identity.column_count, identity.group_count)
 	// Apple counts enabled cores from the mask registers rather than from a
-	// published topology, so read them the same way.
+	// published topology, so read both the total and each power-column slice
+	// the same way.
+	mut enabled_uscs := [fw.g17_leakage_core_capacity]u32{}
+	for column := u32(0); column < identity.column_count; column++ {
+		enabled_uscs[column] = mgr.res.enabled_gpu_usc_count(column,
+			identity.units_per_column) or { return false }
+	}
 	if !fw.initialize_g17_hardware_config(graph.hardware_config.cpu_address(),
 		fw.g17_hardware_config_size, &mgr.hw_config, uat_mgr.ttbs_base,
 		fw.G17LateControlInputs{
@@ -240,8 +246,22 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	}) {
 		return false
 	}
+	unsafe {
+		mut config := &fw.G17HardwareConfig(graph.hardware_config.cpu_address())
+		if !fw.populate_g17_power_model(mut config, &mgr.hw_config,
+			&graph.leakage_calibration, fw.G17PowerModelInputs{
+			chip_variant: chip_variant
+			group_count: identity.group_count
+			columns_per_group: identity.columns_per_group
+			column_count: identity.column_count
+			units_per_column: identity.units_per_column
+			enabled_uscs: enabled_uscs
+		}) {
+			return false
+		}
+	}
 	// Emitting the config is not the same as it being complete; the gate
-	// tracks the recovered gaps rather than a bare false.
+	// tracks recovered implementation gaps rather than a bare false.
 	graph.hardware_config_ready = fw.g17_hardware_config_complete()
 	if !mgr.map_g17_pio_records(mut graph) {
 		return false
@@ -309,8 +329,8 @@ fn (mut mgr GpuManager) populate_g17_firmware_graph(mut graph G17FirmwareGraph) 
 	return true
 }
 
-// Construct the recovered allocation graph, but fail closed before MSG_INIT.
-// The hardware-config power-model producer remains incomplete.
+// Construct the recovered allocation graph, but fail closed before MSG_INIT
+// while any firmware ABI gap remains.
 fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	mut graph := mgr.allocate_g17_firmware_graph() or {
 		C.printf(c'agx: failed to allocate G17 firmware graph\n')

@@ -79,6 +79,30 @@ pub fn (r &GpuResources) enabled_gpu_core_count() u32 {
 	return u32(popcount64(low | (high << 32)) + popcount64(extended))
 }
 
+// Number of enabled shader units in one internal power-model column. Apple's
+// G17C getEnabledNumUSCs() slices `units_per_column` bits out of the 96-bit
+// hardware mask and population-counts that slice. Keep the register words
+// separate so a column crossing a 32-bit boundary is handled without a
+// language-level 128-bit integer (which the freestanding V toolchain lacks).
+pub fn (r &GpuResources) enabled_gpu_usc_count(column u32, units_per_column u32) ?u32 {
+	if units_per_column == 0 || units_per_column > 32 || column >= 8
+		|| column * units_per_column >= 96
+		|| units_per_column > 96 - column * units_per_column {
+		return none
+	}
+	words := [r.sgx_read32(gpu_core_mask_lo), r.sgx_read32(gpu_core_mask_hi),
+		r.sgx_read32(gpu_core_mask_ext)]!
+	start := column * units_per_column
+	mut count := u32(0)
+	for offset := u32(0); offset < units_per_column; offset++ {
+		bit := start + offset
+		if words[bit / 32] & (u32(1) << (bit % 32)) != 0 {
+			count++
+		}
+	}
+	return count
+}
+
 fn popcount64(value u64) u32 {
 	mut remaining := value
 	mut count := u32(0)
