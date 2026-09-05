@@ -4521,6 +4521,85 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["preserved_template_mask"], 0xFFFC0006)
         self.assertEqual(recovered["value_offset"], 4)
 
+    def test_recovers_g17_constant_virtual_returns(self) -> None:
+        providers = {
+            recover_g17_abi.G17_DUPM_MIN_COUNT: (0x810000, 1),
+            recover_g17_abi.G17_DUPM_MAX_COUNT: (0x81000C, 2),
+        }
+        targets = {
+            0x10F8: 0x810000,
+            0x1100: 0x81000C,
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={
+                    name: address
+                    for name, (address, _value) in providers.items()
+                },
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                side_effect=lambda _image, _vtable, slot: targets[slot],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: (
+                    providers[name][0],
+                    struct.pack(
+                        "<3I",
+                        0xD503245F,
+                        0x52800000 | providers[name][1] << 5,
+                        0xD65F03C0,
+                    ),
+                ),
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_constant_virtual_returns(b"")
+
+        self.assertEqual(
+            recovered["accelerator_vtable"], "__ZTV18AGXAcceleratorG17X"
+        )
+        self.assertEqual(recovered["methods"]["dup_min_count"]["value"], 1)
+        self.assertEqual(
+            recovered["methods"]["dup_min_count"]["vtable_slot"], 0x10F8
+        )
+        self.assertEqual(recovered["methods"]["dup_max_count"]["value"], 2)
+        self.assertEqual(
+            recovered["methods"]["dup_max_count"]["vtable_slot"], 0x1100
+        )
+
+    def test_rejects_changed_g17_constant_virtual_return(self) -> None:
+        providers = {
+            recover_g17_abi.G17_DUPM_MIN_COUNT: 0x810000,
+            recover_g17_abi.G17_DUPM_MAX_COUNT: 0x81000C,
+        }
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=providers
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                side_effect=lambda _image, _vtable, slot: 0x810000
+                if slot == 0x10F8
+                else 0x81000C,
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                return_value=(
+                    0x810000,
+                    struct.pack("<3I", 0xD503245F, 0, 0xD65F03C0),
+                ),
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "not the checked constant stub"):
+                recover_g17_abi.recover_g17_constant_virtual_returns(b"")
+
     def test_decodes_g17_selector_logical_immediate(self) -> None:
         # orr w2, w27, #0x10
         self.assertEqual(
@@ -4682,6 +4761,39 @@ class RecoverG17AbiTests(unittest.TestCase):
                 },
             },
         )
+
+    def test_recovers_g17_dup_count_virtual_call_expression(self) -> None:
+        blraa_x9_x17 = 0xD73F0800 | 9 << 5 | 17
+        orr_x4_x23_x0_lsl_32 = 0xAA000000 | 32 << 10 | 23 << 5 | 4
+        instructions = [
+            (0x00, ldr_x(9, 16, 0x10F8)),
+            (0x04, blraa_x9_x17),
+            (0x08, 0xAA0003F7),  # mov x23, x0
+            (0x0C, ldr_x(9, 16, 0x1100)),
+            (0x10, blraa_x9_x17),
+            (0x14, orr_x4_x23_x0_lsl_32),
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 6)
+        expression = recovered["expression"]
+        self.assertEqual(expression["operation"], "orr")
+        self.assertEqual(expression["first"]["source"]["kind"], "constant_call")
+        self.assertEqual(expression["first"]["source"]["method"], "dup_min_count")
+        self.assertEqual(expression["first"]["source"]["value"], 1)
+        self.assertEqual(expression["second"]["kind"], "constant_call")
+        self.assertEqual(expression["second"]["method"], "dup_max_count")
+        self.assertEqual(expression["second"]["value"], 2)
+
+    def test_explicit_g17_x0_writer_overrides_constant_call(self) -> None:
+        instructions = [
+            (0x00, ldr_x(9, 16, 0x10F8)),
+            (0x04, 0xD73F0800 | 9 << 5 | 17),
+            (0x08, 0x528000E0),  # mov w0, #7
+            (0x0C, 0xAA0003E4),  # mov x4, x0
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(instructions, 4)
+        source = recovered["expression"]["source"]
+        self.assertEqual(source["kind"], "constant")
+        self.assertEqual(source["value"], 7)
 
     def test_g17_bitfield_insert_expression_keeps_old_destination(self) -> None:
         and_x4_x8 = (0x92405D24 & ~0x3E0) | (8 << 5)

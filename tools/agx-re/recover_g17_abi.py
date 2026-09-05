@@ -117,6 +117,16 @@ G17_DEFAULT_MCACHE_WRITES_VTABLE_SLOT = 0xFF0
 G17_GET_ENABLED_NUM_USCS_VTABLE_SLOT = 0xAA0
 G17_READ_CHIP_INFO_VTABLE_SLOT = 0x1210
 G17_PERF_STATE_MAP_VTABLE_SLOT = 0x1218
+G17_DUPM_MIN_COUNT = (
+    "__ZNK31AGX·PI_300·X·A0·Accelerator33halGetAgxCrUmaDefaultDupmMinCountEv.8028"
+)
+G17_DUPM_MAX_COUNT = (
+    "__ZNK31AGX·PI_300·X·A0·Accelerator33halGetAgxCrUmaDefaultDupmMaxCountEv.8027"
+)
+G17_CONSTANT_VIRTUAL_RETURNS = {
+    0x10F8: ("dup_min_count", G17_DUPM_MIN_COUNT, 1),
+    0x1100: ("dup_max_count", G17_DUPM_MAX_COUNT, 2),
+}
 G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT = 0xCC0
 G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT = 0xCB0
 G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT = 0xCF0
@@ -1199,6 +1209,49 @@ def g17_definition_dominates_use(
     )
 
 
+def trace_g17_constant_call_return(
+    instructions: list[tuple[int, int]], use_index: int
+) -> dict[str, object] | None:
+    """Recognize the two UUID-pinned constant G17 accelerator methods."""
+
+    for call_index in range(use_index - 1, -1, -1):
+        call_offset, call_word = instructions[call_index]
+        if g17_register_is_written(call_word, 0):
+            return None
+        direct_call = decode_bl_target(call_offset, call_word)
+        authenticated_call = call_word & 0xFFFFFC00 == 0xD73F0800
+        if direct_call is None and not authenticated_call:
+            continue
+        if not authenticated_call or not g17_definition_dominates_use(
+            instructions, call_index, use_index
+        ):
+            return None
+
+        target_register = (call_word >> 5) & 0x1F
+        target_index = find_dominating_g17_register_write(
+            instructions, call_index, target_register
+        )
+        if target_index is None:
+            return None
+        target_load = decode_integer_load_unsigned(instructions[target_index][1])
+        if target_load is None:
+            return None
+        destination, base, member, width = target_load
+        method = G17_CONSTANT_VIRTUAL_RETURNS.get(member)
+        if destination != target_register or base != 16 or width != 8 or method is None:
+            return None
+        label, provider, value = method
+        return {
+            "kind": "constant_call",
+            "producer_offset": call_offset,
+            "vtable_slot": member,
+            "method": label,
+            "provider": provider,
+            "value": value,
+        }
+    return None
+
+
 def trace_g17_stack_load(
     instructions: list[tuple[int, int]],
     load_index: int,
@@ -1724,6 +1777,10 @@ def trace_g17_value_expression(
     key = (use_index, register)
     if depth > 12 or key in seen:
         return None
+    if register == 0:
+        constant_call = trace_g17_constant_call_return(instructions, use_index)
+        if constant_call is not None:
+            return constant_call
     definition_index = find_dominating_g17_register_write(
         instructions, use_index, register
     )
@@ -2847,6 +2904,41 @@ def recover_vtable_target(image: bytes, vtable_name: str, slot: int) -> int:
         raise ValueError(f"truncated {vtable_name} entry at slot {slot:#x}")
     raw_entry = struct.unpack_from("<Q", image, entry_offset)[0]
     return decode_kernel_auth_rebase(raw_entry)
+
+
+def recover_g17_constant_virtual_returns(image: bytes) -> dict[str, object]:
+    """Validate constant-returning methods used by register value slices."""
+
+    symbols = macho_symbols(image)
+    methods: dict[str, object] = {}
+    for slot, (label, provider, value) in G17_CONSTANT_VIRTUAL_RETURNS.items():
+        if provider not in symbols:
+            raise ValueError(f"Mach-O has no {provider} symbol")
+        target = recover_vtable_target(image, G17_ACCELERATOR_VTABLE, slot)
+        if target != symbols[provider]:
+            raise ValueError(
+                f"unexpected G17 {label} provider {target:#x}; "
+                f"expected {symbols[provider]:#x}"
+            )
+        _address, code = symbol_code(image, provider)
+        expected = struct.pack(
+            "<3I",
+            0xD503245F,  # bti c
+            0x52800000 | value << 5,  # mov w0, #value
+            0xD65F03C0,  # ret
+        )
+        if code != expected:
+            raise ValueError(f"G17 {label} is not the checked constant stub")
+        methods[label] = {
+            "vtable_slot": slot,
+            "provider": provider,
+            "provider_address": target,
+            "value": value,
+        }
+    return {
+        "accelerator_vtable": G17_ACCELERATOR_VTABLE,
+        "methods": methods,
+    }
 
 
 def read_adrp_load(
@@ -11220,6 +11312,9 @@ def main() -> int:
             recover_g17_3d_register_lists(driver)
         )
         channels["register_entry_codec"] = recover_g17_register_entry_codec(driver)
+        channels["constant_virtual_returns"] = (
+            recover_g17_constant_virtual_returns(driver)
+        )
         channels["register_selectors"] = recover_g17_register_selectors(driver)
         channels["inline_register_records"] = (
             recover_g17_inline_register_records(driver)
