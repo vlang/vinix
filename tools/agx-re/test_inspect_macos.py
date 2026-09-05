@@ -25,6 +25,28 @@ class InspectMacOSTests(unittest.TestCase):
             )
         )
 
+    @staticmethod
+    def pmp_node(role: str, base: int, data_iova: int = 0x105E000) -> dict:
+        return {
+            "compatible": b"iop,ascwrap-v6\0",
+            "role": role.encode() + b"\0",
+            "reg": struct.pack("<QQ", 0x84E00000, 0x88000),
+            "segment-names": b"__TEXT;__DATA\0",
+            "segment-ranges": struct.pack(
+                "<QQQIIQQQII",
+                base,
+                0x1000000,
+                base,
+                0x5E000,
+                3,
+                base + 0x5E000,
+                data_iova,
+                base + 0x5E000,
+                0x9A000,
+                6,
+            ),
+        }
+
     def test_decodes_apple_device_tree_little_endian_values(self) -> None:
         perf_states = b"".join(
             struct.pack("<II", frequency, voltage)
@@ -157,8 +179,28 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertEqual(result["segments"][0]["size"], 0x4C000)
         self.assertEqual(result["segments"][1]["physical"], 0x100026F0000)
 
+    def test_decodes_t6050_pmp_preloaded_firmware(self) -> None:
+        result = inspect_macos.parse_pmp(self.pmp_node("PMP0", 0x284500000))
+
+        self.assertEqual(result["role"], "PMP0")
+        self.assertEqual(result["segments"][0]["iova"], 0x1000000)
+        self.assertEqual(result["segments"][1]["physical"], 0x28455E000)
+        self.assertEqual(result["segments"][1]["flags"], 6)
+
+    def test_decodes_active_die_count_from_arm_io(self) -> None:
+        result = inspect_macos.parse_arm_io(
+            {
+                "compatible": b"arm-io,t6050\0",
+                "die-count": struct.pack("<I", 1),
+            }
+        )
+
+        self.assertEqual(result["compatible"], ["arm-io,t6050"])
+        self.assertEqual(result["die_count"], 1)
+
     def test_t6050_manifest_cross_checks_topology(self) -> None:
         manifest = {
+            "platform": {"compatible": ["arm-io,t6050"], "die_count": 2},
             "device_tree": {"compatible": ["gpu,t6050"]},
             "asc": {
                 "compatible": ["iop,ascwrap-v6"],
@@ -188,6 +230,10 @@ class InspectMacOSTests(unittest.TestCase):
                     "role": "GFX1",
                 },
             ],
+            "pmp_roles": [
+                inspect_macos.parse_pmp(self.pmp_node("PMP0", 0x284500000)),
+                inspect_macos.parse_pmp(self.pmp_node("PMP1", 0x4284500000)),
+            ],
             "accelerator": {
                 "gpu_core_count": 40,
                 "configuration": {
@@ -206,6 +252,68 @@ class InspectMacOSTests(unittest.TestCase):
             }
         )
         self.assertEqual(inspect_macos.validate_manifest(manifest), [])
+
+    def test_t6050_manifest_rejects_changed_pmp_preload_mapping(self) -> None:
+        manifest = {
+            "platform": {"compatible": ["arm-io,t6050"], "die_count": 2},
+            "device_tree": {"compatible": ["gpu,t6050"]},
+            "asc_roles": [
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX"},
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX1"},
+            ],
+            "pmp_roles": [
+                inspect_macos.parse_pmp(
+                    self.pmp_node("PMP0", 0x284500000, data_iova=0x105F000)
+                ),
+                inspect_macos.parse_pmp(self.pmp_node("PMP1", 0x4284500000)),
+            ],
+            "accelerator": {
+                "configuration": {"gpu_gen": 17, "gpu_var": "C"}
+            },
+        }
+
+        warnings = inspect_macos.validate_manifest(manifest)
+        self.assertIn("t6050 PMP0 iBoot firmware map changed", warnings)
+
+    def test_t6050_manifest_accepts_one_active_pmp_for_one_die(self) -> None:
+        manifest = {
+            "platform": {"compatible": ["arm-io,t6050"], "die_count": 1},
+            "device_tree": {"compatible": ["gpu,t6050"]},
+            "asc_roles": [
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX"},
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX1"},
+            ],
+            "pmp_roles": [
+                inspect_macos.parse_pmp(self.pmp_node("PMP0", 0x284500000))
+            ],
+            "accelerator": {
+                "configuration": {"gpu_gen": 17, "gpu_var": "C"}
+            },
+        }
+
+        self.assertEqual(inspect_macos.validate_manifest(manifest), [])
+
+    def test_t6050_manifest_rejects_pmp_count_that_differs_from_die_count(self) -> None:
+        manifest = {
+            "platform": {"compatible": ["arm-io,t6050"], "die_count": 1},
+            "device_tree": {"compatible": ["gpu,t6050"]},
+            "asc_roles": [
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX"},
+                {"compatible": ["iop,ascwrap-v6"], "role": "GFX1"},
+            ],
+            "pmp_roles": [
+                inspect_macos.parse_pmp(self.pmp_node("PMP0", 0x284500000)),
+                inspect_macos.parse_pmp(self.pmp_node("PMP1", 0x4284500000)),
+            ],
+            "accelerator": {
+                "configuration": {"gpu_gen": 17, "gpu_var": "C"}
+            },
+        }
+
+        warnings = inspect_macos.validate_manifest(manifest)
+        self.assertIn(
+            "t6050 active PMP wrapper count differs from arm-io die count", warnings
+        )
 
     def test_t6050_manifest_requires_both_firmware_roles(self) -> None:
         manifest = {

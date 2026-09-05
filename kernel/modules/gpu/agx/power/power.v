@@ -38,6 +38,15 @@ const t6050_wrapper_cpu_control_offset = u64(0x44)
 const t6050_wrapper_cpu_run = u32(1) << 4
 const t6050_wrapper_cpu_stop_phase2 = u32(1) << 5
 const t6050_wrapper_iorvbar_lock = u64(1)
+const t6050_pmp_region_base = u64(0x284500000)
+const t6050_pmp_region_size = u64(0x100000)
+const t6050_pmp_segment_record_size = u32(32)
+const t6050_pmp_text_iova = u64(0x1000000)
+const t6050_pmp_text_size = u32(0x5e000)
+const t6050_pmp_text_flags = u32(3)
+const t6050_pmp_data_iova = u64(0x105e000)
+const t6050_pmp_data_size = u32(0x9a000)
+const t6050_pmp_data_flags = u32(6)
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -53,6 +62,7 @@ pub:
 pub struct T6050PtdTransport {
 pub:
 	die_bases [2]u64
+	die_count u32
 }
 
 // Device-memory resources owned by one AppleASCWrapV6 instance. reg[0] is
@@ -65,6 +75,26 @@ pub:
 	iorvbar_base u64
 mut:
 	lock klock.Lock
+}
+
+pub struct T6050PmpSegment {
+pub:
+	physical u64
+	iova     u64
+	remap    u64
+	size     u32
+	flags    u32
+}
+
+// iBoot supplies these two virtually contiguous firmware mappings on every
+// active die. Keeping their address domains explicit prevents an IOP virtual
+// address from being used as an AP physical address during later attachment.
+pub struct T6050PmpPreload {
+pub:
+	die         u32
+	region_base u64
+	region_size u64
+	segments    [2]T6050PmpSegment
 }
 
 enum T6050PowerPhase {
@@ -139,6 +169,68 @@ pub fn t6050_cpu_stop_finalize_value(current u32) u32 {
 	return current & ~t6050_wrapper_cpu_stop_phase2
 }
 
+fn decode_t6050_pmp_preload(node &devicetree.DTNode, die u32) ?T6050PmpPreload {
+	if die >= 2 || !native_string_property_equals(node, 'segment-names',
+		'__TEXT;__DATA') {
+		return none
+	}
+	ranges := devicetree.get_property(node, 'segment-ranges') or { return none }
+	if ranges.len != 2 * t6050_pmp_segment_record_size {
+		return none
+	}
+	base := t6050_pmp_region_base + u64(die) * t6050_die_stride
+	text := T6050PmpSegment{
+		physical: read_native_u64(ranges.data, 0)
+		iova: read_native_u64(ranges.data, 8)
+		remap: read_native_u64(ranges.data, 16)
+		size: read_native_u32(ranges.data, 24)
+		flags: read_native_u32(ranges.data, 28)
+	}
+	data := T6050PmpSegment{
+		physical: read_native_u64(ranges.data, t6050_pmp_segment_record_size)
+		iova: read_native_u64(ranges.data, t6050_pmp_segment_record_size + 8)
+		remap: read_native_u64(ranges.data, t6050_pmp_segment_record_size + 16)
+		size: read_native_u32(ranges.data, t6050_pmp_segment_record_size + 24)
+		flags: read_native_u32(ranges.data, t6050_pmp_segment_record_size + 28)
+	}
+	if text.physical != base || text.iova != t6050_pmp_text_iova
+		|| text.remap != base || text.size != t6050_pmp_text_size
+		|| text.flags != t6050_pmp_text_flags
+		|| data.physical != base + u64(t6050_pmp_text_size)
+		|| data.iova != t6050_pmp_data_iova
+		|| data.remap != base + u64(t6050_pmp_text_size)
+		|| data.size != t6050_pmp_data_size || data.flags != t6050_pmp_data_flags
+		|| u64(text.size) + u64(data.size) != 0xf8000 {
+		return none
+	}
+	return T6050PmpPreload{
+		die: die
+		region_base: base
+		region_size: t6050_pmp_region_size
+		segments: [text, data]!
+	}
+}
+
+// Resolve the iBoot-owned firmware map from the RTBuddy nub without mapping or
+// reading its physical pages. This is an attachment descriptor, not readiness.
+pub fn get_t6050_pmp_preload(die u32) ?T6050PmpPreload {
+	path := if die == 0 {
+		'/arm-io/pmp0/iop-pmp0-nub'
+	} else if die == 1 {
+		'/arm-io/pmp1/iop-pmp1-nub'
+	} else {
+		return none
+	}
+	nub := devicetree.find_node(path) or { return none }
+	preload := decode_t6050_pmp_preload(nub, die) or { return none }
+	region_base := devicetree.get_le_u64(nub, 'region-base') or { return none }
+	region_size := devicetree.get_le_u64(nub, 'region-size') or { return none }
+	if region_base != preload.region_base || region_size != preload.region_size {
+		return none
+	}
+	return preload
+}
+
 fn t6050_ptd_offset(entry u32, base u64, stride u64, width u64) ?u64 {
 	offset := base + u64(entry) * stride
 	if width > t6050_ptd_size || offset > t6050_ptd_size - width {
@@ -147,23 +239,41 @@ fn t6050_ptd_offset(entry u32, base u64, stride u64, width u64) ?u64 {
 	return offset
 }
 
-// Constructing this maps both die apertures as Device-nGnRnE. Keep the call
-// behind the G17 boot gate until one owner can serialize full transactions.
-fn map_t6050_ptd_transport() ?T6050PtdTransport {
+fn t6050_active_die_count() ?u32 {
+	arm_io := devicetree.find_node('/arm-io') or { return none }
+	die_count := devicetree.get_le_u32(arm_io, 'die-count') or { return none }
+	if die_count == 0 || die_count > 2 {
+		return none
+	}
+	return die_count
+}
+
+// Constructing this maps only active die apertures as Device-nGnRnE. The
+// signed tree may contain an inactive die-1 template on a one-die M5 Max.
+// Keep the call behind the G17 boot gate until the complete owner exists.
+fn map_t6050_ptd_transport(die_count u32) ?T6050PtdTransport {
+	if die_count == 0 || die_count > 2 {
+		return none
+	}
 	die0 := memory.map_mmio(t6050_ptd_base, t6050_ptd_size)
-	die1 := memory.map_mmio(t6050_ptd_base + t6050_die_stride, t6050_ptd_size)
-	if die0 == 0 || die1 == 0 {
+	mut die1 := u64(0)
+	if die_count == 2 {
+		die1 = memory.map_mmio(t6050_ptd_base + t6050_die_stride, t6050_ptd_size)
+	}
+	if die0 == 0 || (die_count == 2 && die1 == 0) {
 		return none
 	}
 	return T6050PtdTransport{
 		die_bases: [u64(die0), die1]!
+		die_count: die_count
 	}
 }
 
 // Mapping is a separate, explicit construction step so read-only T6050 probe
 // validation cannot accidentally access ApplePTD.
 pub fn map_t6050_power_controller() ?T6050PowerController {
-	transport := map_t6050_ptd_transport() or { return none }
+	die_count := t6050_active_die_count() or { return none }
+	transport := map_t6050_ptd_transport(die_count) or { return none }
 	return T6050PowerController{
 		transport: transport
 		phase: .idle
@@ -266,7 +376,7 @@ pub fn (mut wrapper T6050PmpWrapper) stop_cpu() bool {
 // supplies ordering; the memory clobber prevents compiler reordering.
 pub fn (transport &T6050PtdTransport) read(die u32, entry u32,
 	caller_tag u8) ?T6050PtdEntry {
-	if die >= transport.die_bases.len {
+	if die >= transport.die_count {
 		return none
 	}
 	offset := t6050_ptd_offset(entry, 0, t6050_ptd_read_stride, 16) or { return none }
@@ -285,7 +395,7 @@ pub fn (transport &T6050PtdTransport) read(die u32, entry u32,
 
 // Match ApplePTD::writePTD's distinct base + 0x10000 + entry*8 portal.
 pub fn (transport &T6050PtdTransport) write(die u32, entry u32, value u64) bool {
-	if die >= transport.die_bases.len {
+	if die >= transport.die_count {
 		return false
 	}
 	offset := t6050_ptd_offset(entry, t6050_ptd_write_base, t6050_ptd_write_stride,
@@ -304,7 +414,7 @@ pub fn (transport &T6050PtdTransport) write(die u32, entry u32, value u64) bool 
 // without reading PS-ACK; otherwise poll() owns acknowledgement completion.
 pub fn (mut controller T6050PowerController) begin(die u32,
 	enabled bool) T6050PowerResult {
-	if die >= controller.transport.die_bases.len {
+	if die >= controller.transport.die_count {
 		return .transport_error
 	}
 	controller.lock.acquire()
@@ -395,6 +505,16 @@ fn validate_t6050_ptd_codec() bool {
 	if _ := unmapped.read(2, 0, 0) {
 		return false
 	}
+	one_die := T6050PtdTransport{
+		die_bases: [u64(0), 0]!
+		die_count: 1
+	}
+	if one_die.write(1, 0, 0) {
+		return false
+	}
+	if _ := one_die.read(1, 0, 0) {
+		return false
+	}
 	mut controller := T6050PowerController{
 		transport: unmapped
 		phase: .idle
@@ -449,6 +569,26 @@ fn read_native_u32(data voidptr, offset u32) u32 {
 		u32(value[0]) | (u32(value[1]) << 8) | (u32(value[2]) << 16) |
 			(u32(value[3]) << 24)
 	}
+}
+
+fn read_native_u64(data voidptr, offset u32) u64 {
+	return u64(read_native_u32(data, offset))
+		| (u64(read_native_u32(data, offset + 4)) << 32)
+}
+
+fn native_string_property_equals(node &devicetree.DTNode, property string,
+	expected string) bool {
+	value := devicetree.get_property(node, property) or { return false }
+	if value.len != u32(expected.len + 1) {
+		return false
+	}
+	bytes := unsafe { &u8(value.data) }
+	for index := 0; index < expected.len; index++ {
+		if unsafe { bytes[index] } != expected[index] {
+			return false
+		}
+	}
+	return unsafe { bytes[expected.len] } == 0
 }
 
 fn fixed_native_name_matches(data voidptr, size u32, expected string) bool {
@@ -698,6 +838,38 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 		&& validate_gate_array(wrapper, 'clock-gates', [u32(0x1000001b), 0x1000001c])
 }
 
+fn validate_t6050_pmp_instance(die u32) ?&devicetree.DTNode {
+	wrapper_path := if die == 0 {
+		'/arm-io/pmp0'
+	} else if die == 1 {
+		'/arm-io/pmp1'
+	} else {
+		return none
+	}
+	nub_path := if die == 0 {
+		'/arm-io/pmp0/iop-pmp0-nub'
+	} else {
+		'/arm-io/pmp1/iop-pmp1-nub'
+	}
+	role := if die == 0 { 'PMP0' } else { 'PMP1' }
+	wrapper := devicetree.find_node(wrapper_path) or { return none }
+	nub := devicetree.find_node(nub_path) or { return none }
+	if !node_string_contains(wrapper, 'compatible', 'iop,ascwrap-v6')
+		|| !node_string_contains(wrapper, 'role', role)
+		|| !node_string_contains(nub, 'compatible', 'iop-nub,rtbuddy-v2')
+		|| !node_string_contains(nub, 'firmware-name', 't6050pmp')
+		|| !validate_pmp_wrapper(wrapper, die) {
+		return none
+	}
+	preload := decode_t6050_pmp_preload(nub, die) or { return none }
+	region_base := devicetree.get_le_u64(nub, 'region-base') or { return none }
+	region_size := devicetree.get_le_u64(nub, 'region-size') or { return none }
+	if region_base != preload.region_base || region_size != preload.region_size {
+		return none
+	}
+	return nub
+}
+
 // Validate only the read-only ownership and transport contract here. Apple's
 // initial synchronization can publish a persistent request before readiness,
 // and Vinix has a serialized nonblocking controller for that transaction. The
@@ -708,54 +880,31 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false
 	}
+	die_count := t6050_active_die_count() or {
+		println('agx: native t6050 active die count is unavailable')
+		return false
+	}
 	pmgr_node := devicetree.find_compatible('pmgr1,t6050') or {
 		println('agx: native t6050 PMGR node not found')
 		return false
 	}
 	gfx_asc := find_native_asc_node(0) or { return false }
 	gfx1_asc := find_native_asc_node(1) or { return false }
-	pmp := devicetree.find_node('/arm-io/pmp1') or {
-		println('agx: native t6050 PMP1 node not found')
+	pmp0_nub := validate_t6050_pmp_instance(0) or {
+		println('agx: native t6050 active PMP0 contract changed')
 		return false
 	}
-	pmp0 := devicetree.find_node('/arm-io/pmp0') or {
-		println('agx: native t6050 PMP0 node not found')
-		return false
-	}
-	pmp_nub := devicetree.find_node('/arm-io/pmp1/iop-pmp1-nub') or {
-		println('agx: native t6050 PMP1 RTKit nub not found')
-		return false
-	}
-	pmp0_nub := devicetree.find_node('/arm-io/pmp0/iop-pmp0-nub') or {
-		println('agx: native t6050 PMP0 RTKit nub not found')
-		return false
-	}
-	if !node_string_contains(pmp0, 'compatible', 'iop,ascwrap-v6')
-		|| !node_string_contains(pmp0, 'role', 'PMP0')
-		|| !node_string_contains(pmp, 'compatible', 'iop,ascwrap-v6')
-		|| !node_string_contains(pmp, 'role', 'PMP1')
-		|| !node_string_contains(pmp0_nub, 'compatible', 'iop-nub,rtbuddy-v2')
-		|| !node_string_contains(pmp0_nub, 'firmware-name', 't6050pmp')
-		|| !node_string_contains(pmp_nub, 'compatible', 'iop-nub,rtbuddy-v2')
-		|| !node_string_contains(pmp_nub, 'firmware-name', 't6050pmp') {
-		println('agx: native t6050 PMP ownership changed')
-		return false
-	}
-	if !validate_pmp_wrapper(pmp0, 0) || !validate_pmp_wrapper(pmp, 1) {
-		return false
-	}
-	pmp0_region_base := devicetree.get_le_u64(pmp0_nub, 'region-base') or { return false }
-	pmp1_region_base := devicetree.get_le_u64(pmp_nub, 'region-base') or { return false }
-	pmp0_region_size := devicetree.get_le_u64(pmp0_nub, 'region-size') or { return false }
-	pmp1_region_size := devicetree.get_le_u64(pmp_nub, 'region-size') or { return false }
-	if pmp0_region_base != 0x284500000 || pmp1_region_base != 0x4284500000
-		|| pmp0_region_size != 0x100000 || pmp1_region_size != 0x100000
-		|| pmp1_region_base - pmp0_region_base != t6050_die_stride
-		|| !native_properties_equal(pmp0_nub, pmp_nub, 'soc-device')
-		|| !native_properties_equal(pmp0_nub, pmp_nub, 'ptd-range')
-		|| !native_properties_equal(pmp0_nub, pmp_nub, 'pm-ptd-ranges') {
-		println('agx: native t6050 PMP die contracts differ')
-		return false
+	if die_count == 2 {
+		pmp1_nub := validate_t6050_pmp_instance(1) or {
+			println('agx: native t6050 active PMP1 contract changed')
+			return false
+		}
+		if !native_properties_equal(pmp0_nub, pmp1_nub, 'soc-device')
+			|| !native_properties_equal(pmp0_nub, pmp1_nub, 'ptd-range')
+			|| !native_properties_equal(pmp0_nub, pmp1_nub, 'pm-ptd-ranges') {
+			println('agx: native t6050 active PMP die contracts differ')
+			return false
+		}
 	}
 	pmp_version := devicetree.get_le_u32(pmgr_node, 'pmp') or {
 		println('agx: t6050 PMGR has no PMP version')
@@ -782,14 +931,14 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !validate_pmgr_device(pmgr_node, 0x16a, 'GFX', 357, 0x02, 0x10, 0) {
 		return false
 	}
-	if !validate_ptd_range(pmp_nub, 'PMP-STATUS', 2, 1, 1, 16)
-		|| !validate_ptd_range(pmp_nub, 'SOC-DEV-PKT', 9, 0x90, 0x150, 0)
-		|| !validate_ptd_range(pmp_nub, 'SOC-DEV-PS-REQ', 10, 0x1e0, 8, 0)
-		|| !validate_ptd_range(pmp_nub, 'SOC-DEV-PS-ACK', 11, 0x1e8, 8, 0)
-		|| !validate_u32_array(pmp_nub, 'pm-ptd-ranges', [u32(1), 2, 3, 4, 5, 6,
+	if !validate_ptd_range(pmp0_nub, 'PMP-STATUS', 2, 1, 1, 16)
+		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PKT', 9, 0x90, 0x150, 0)
+		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PS-REQ', 10, 0x1e0, 8, 0)
+		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PS-ACK', 11, 0x1e8, 8, 0)
+		|| !validate_u32_array(pmp0_nub, 'pm-ptd-ranges', [u32(1), 2, 3, 4, 5, 6,
 			7, 8, 40, 9, 10, 11, 12, 13, 14]) {
 		return false
 	}
-	println('agx: validated native t6050 PMP power ownership (read-only)')
+	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), read-only)\n', die_count)
 	return true
 }

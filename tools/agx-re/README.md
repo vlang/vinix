@@ -4,9 +4,9 @@ This directory contains read-only host tools used to replace guesses in the
 Vinix AGX driver with observations from Apple hardware and software. It does
 not contain or redistribute Apple firmware, kernel collections, or drivers.
 
-`inspect_macos.py` collects a sanitized JSON hardware manifest from the `sgx`
-Apple DeviceTree node, the active AGX accelerator, and the installed driver
-Info.plist:
+`inspect_macos.py` collects a sanitized JSON hardware manifest from `arm-io`,
+the `sgx` Apple DeviceTree node, the active GFX/PMP firmware wrappers, the AGX
+accelerator, and the installed driver Info.plist:
 
 ```sh
 ./inspect_macos.py
@@ -17,6 +17,14 @@ Apple DeviceTree numeric data exposed by `ioreg -a` is native little-endian.
 The Vinix flattened-device-tree parser, in contrast, correctly treats FDT
 cells as big-endian. Keep that distinction when moving observed values into
 the kernel.
+
+On the inspected M5 Max, `arm-io` reports one active die and live IORegistry
+contains only `PMP0`, despite the signed boot DeviceTree containing both PMP0
+and PMP1 hardware templates. The same machine has four GPU partitions, so
+`num_mgpus` is not a die or PMP-wrapper count. Schema 3 records the platform
+die count and warns unless it exactly matches the ordered active PMP roles.
+It also records each live PMP firmware segment so a runtime-preload mapping
+cannot be confused with properties present in the signed template.
 
 The IOKit/IOGPU tracer records external-method selectors and the private
 IOGPU command-buffer segments Apple's Metal driver produces for a matched
@@ -94,12 +102,13 @@ metadata bit, state-match condition, 15-second fatal timeout, and its single
 persistent request write. The same
 ApplePMGR check recovers the asymmetric ApplePTD read and write windows and
 metadata transform. A UUID-pinned AppleT6050PMGR check proves that PTD RegMap
-enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves
-that Device aperture to `0x84240000` and `0x4084240000`. It also proves both
-PMP nubs have identical device/range tables, pins their die-strided shared
-regions, validates every die-strided wrapper register/IRQ/gate binding, and
-records the requested-die selection used by ordinary state commands. The
-UUID-pinned ApplePMPFirmware/RTBuddy pass additionally recovers the nine
+enum 8 maps to DeviceTree `reg[7]` once per die; the signed DeviceTree resolves
+the two template apertures to `0x84240000` and `0x4084240000`. It also proves
+both static PMP templates have identical device/range tables, pins their
+die-strided shared regions, validates every die-strided wrapper register/IRQ/
+gate binding, and records the requested-die selection used by ordinary state
+commands. The live inspector separately determines which templates are active.
+The UUID-pinned ApplePMPFirmware/RTBuddy pass additionally recovers the nine
 mandatory 32-bit PMP patchbay inputs and the exact RTBuddy firmware-fixup
 ordering. Its `firmware-loaded` byte and IORegistry announcement are reported
 as image-preparation bookkeeping, not as a PMP run-state or dashboard-ready
@@ -112,9 +121,9 @@ RTKit transport readiness, not ApplePMGR's separate `PMP-STATUS` or AGX
 dashboard acknowledgement. Vinix
 mirrors the low-level contract with a dormant bounds-checked
 paired reader and separate write portal. A nonblocking owner serializes one
-transaction across both dies and makes post-write failures sticky, but it is
-not mapped until PMP service and firmware startup can be integrated behind the
-G17 boot gate. A separate UUID-pinned
+transaction across the active dies and makes post-write failures sticky, but
+it is not mapped until PMP service and firmware startup can be integrated
+behind the G17 boot gate. A separate UUID-pinned
 ApplePMP check recovers the
 PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated

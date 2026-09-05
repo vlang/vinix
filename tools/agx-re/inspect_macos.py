@@ -74,6 +74,20 @@ def _run_plist(command: list[str]) -> Any:
         raise InspectError(f"{' '.join(command)} did not produce a plist") from error
 
 
+def _run_optional_plist(command: list[str]) -> Any:
+    try:
+        data = subprocess.check_output(command, stderr=subprocess.PIPE)
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", b"").decode("utf-8", "replace").strip()
+        raise InspectError(f"{' '.join(command)} failed: {detail or error}") from error
+    if not data:
+        return None
+    try:
+        return plistlib.loads(data)
+    except plistlib.InvalidFileException as error:
+        raise InspectError(f"{' '.join(command)} did not produce a plist") from error
+
+
 def _load_plist(path: Path) -> Any:
     try:
         with path.open("rb") as stream:
@@ -233,16 +247,17 @@ def parse_sgx(node: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def parse_asc(node: dict[str, Any]) -> dict[str, Any]:
+def parse_firmware_node(node: dict[str, Any], description: str) -> dict[str, Any]:
     required = ("compatible", "reg", "segment-names", "segment-ranges")
     missing = [name for name in required if name not in node]
     if missing:
-        raise InspectError(f"gfx-asc node is missing {', '.join(missing)}")
+        raise InspectError(f"{description} node is missing {', '.join(missing)}")
     names = decode_segment_names(node["segment-names"])
     ranges = decode_segment_ranges(node["segment-ranges"])
     if len(names) != len(ranges):
         raise InspectError(
-            f"gfx-asc names/ranges differ in length ({len(names)} != {len(ranges)})"
+            f"{description} names/ranges differ in length "
+            f"({len(names)} != {len(ranges)})"
         )
     result = {
         "compatible": decode_compatibles(node["compatible"]),
@@ -255,6 +270,26 @@ def parse_asc(node: dict[str, Any]) -> dict[str, Any]:
     if isinstance(role, str):
         result["role"] = role
     return result
+
+
+def parse_asc(node: dict[str, Any]) -> dict[str, Any]:
+    return parse_firmware_node(node, "gfx-asc")
+
+
+def parse_pmp(node: dict[str, Any]) -> dict[str, Any]:
+    result = parse_firmware_node(node, "PMP")
+    if result.get("role") not in ("PMP0", "PMP1"):
+        raise InspectError("PMP node has an unexpected role")
+    return result
+
+
+def parse_arm_io(node: dict[str, Any]) -> dict[str, Any]:
+    if "compatible" not in node or "die-count" not in node:
+        raise InspectError("arm-io node is missing compatible or die-count")
+    return {
+        "compatible": decode_compatibles(node["compatible"]),
+        "die_count": decode_uint(node["die-count"], 32, "die-count"),
+    }
 
 
 def parse_accelerator(node: dict[str, Any]) -> dict[str, Any]:
@@ -376,10 +411,66 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                 warnings.append("gfx-asc DATA physical address differs from gfx-data-base")
             if data.get("size") != sgx.get("gfx_data_size"):
                 warnings.append("gfx-asc DATA size differs from gfx-data-size")
+        platform_info = manifest.get("platform")
+        die_count = (
+            platform_info.get("die_count")
+            if isinstance(platform_info, dict)
+            else None
+        )
+        if not isinstance(platform_info, dict) or "arm-io,t6050" not in platform_info.get(
+            "compatible", []
+        ):
+            warnings.append("t6050 platform is not arm-io,t6050")
+        if die_count not in (1, 2):
+            warnings.append("t6050 arm-io die count is not one or two")
+
+        pmp_roles = manifest.get("pmp_roles")
+        if not isinstance(pmp_roles, list) or not 1 <= len(pmp_roles) <= 2:
+            warnings.append("t6050 does not expose an active PMP firmware wrapper")
+        else:
+            if die_count in (1, 2) and len(pmp_roles) != die_count:
+                warnings.append(
+                    "t6050 active PMP wrapper count differs from arm-io die count"
+                )
+            expected_pmp = (
+                ("PMP0", 0x284500000),
+                ("PMP1", 0x4284500000),
+            )
+            for item, (role, base) in zip(pmp_roles, expected_pmp):
+                if not isinstance(item, dict) or item.get("role") != role:
+                    warnings.append("t6050 PMP firmware roles are not PMP0/PMP1")
+                    break
+                expected_segments = [
+                    {
+                        "name": "__TEXT",
+                        "physical": base,
+                        "iova": 0x1000000,
+                        "remap": base,
+                        "size": 0x5E000,
+                        "flags": 3,
+                    },
+                    {
+                        "name": "__DATA",
+                        "physical": base + 0x5E000,
+                        "iova": 0x105E000,
+                        "remap": base + 0x5E000,
+                        "size": 0x9A000,
+                        "flags": 6,
+                    },
+                ]
+                if item.get("segments") != expected_segments:
+                    warnings.append(f"t6050 {role} iBoot firmware map changed")
     return warnings
 
 
 def collect(args: argparse.Namespace) -> dict[str, Any]:
+    if args.arm_io_plist:
+        arm_io_raw = _load_plist(args.arm_io_plist)
+    else:
+        arm_io_raw = _run_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "arm-io", "-r"]
+        )
+
     if args.sgx_plist:
         sgx_raw = _load_plist(args.sgx_plist)
     else:
@@ -399,6 +490,22 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             ["ioreg", "-a", "-p", "IODeviceTree", "-n", "gfx1-asc", "-r"]
         )
 
+    if args.pmp0_plist:
+        pmp0_raw = _load_plist(args.pmp0_plist)
+    else:
+        pmp0_raw = _run_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "pmp0", "-r"]
+        )
+
+    if args.pmp1_plist:
+        pmp1_raw = _load_plist(args.pmp1_plist)
+    elif args.pmp0_plist:
+        pmp1_raw = None
+    else:
+        pmp1_raw = _run_optional_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "pmp1", "-r"]
+        )
+
     if args.accelerator_plist:
         accelerator_raw = _load_plist(args.accelerator_plist)
     else:
@@ -409,15 +516,20 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     asc_roles = [primary_asc]
     if asc1_raw is not None:
         asc_roles.append(parse_asc(_first_node(asc1_raw, "gfx1-asc plist")))
+    pmp_roles = [parse_pmp(_first_node(pmp0_raw, "pmp0 plist"))]
+    if pmp1_raw is not None:
+        pmp_roles.append(parse_pmp(_first_node(pmp1_raw, "pmp1 plist")))
     manifest = {
-        "schema": 2,
+        "schema": 3,
         "host": {
             "architecture": platform.machine(),
             "macos_version": platform.mac_ver()[0],
         },
+        "platform": parse_arm_io(_first_node(arm_io_raw, "arm-io plist")),
         "device_tree": parse_sgx(_first_node(sgx_raw, "sgx plist")),
         "asc": primary_asc,
         "asc_roles": asc_roles,
+        "pmp_roles": pmp_roles,
         "accelerator": parse_accelerator(_first_node(accelerator_raw, "accelerator plist")),
         "driver": parse_driver_info(_load_plist(driver_path)),
     }
@@ -427,12 +539,21 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--arm-io-plist", type=Path, help="read an ioreg arm-io plist instead of live IORegistry"
+    )
     parser.add_argument("--sgx-plist", type=Path, help="read an ioreg sgx plist instead of live IORegistry")
     parser.add_argument(
         "--asc-plist", type=Path, help="read an ioreg gfx-asc plist instead of live IORegistry"
     )
     parser.add_argument(
         "--asc1-plist", type=Path, help="read an ioreg gfx1-asc plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--pmp0-plist", type=Path, help="read an ioreg pmp0 plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--pmp1-plist", type=Path, help="read an ioreg pmp1 plist instead of live IORegistry"
     )
     parser.add_argument(
         "--accelerator-plist", type=Path, help="read an ioreg accelerator plist instead of live IORegistry"
