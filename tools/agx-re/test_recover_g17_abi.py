@@ -6137,6 +6137,147 @@ class RecoverG17AbiTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 recover_g17_abi.recover_g17_queue_device_inputs(b"d", b"i")
 
+    def test_recovers_g17_channel_runtime_resources(self) -> None:
+        fixtures = {
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: bytearray(0x90),
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: bytearray(0xB4),
+            recover_g17_abi.AGX_COMMAND_QUEUE_INIT: bytearray(0xE4),
+            recover_g17_abi.AGX_WORK_QUEUE_INIT: bytearray(0x3C),
+            recover_g17_abi.ALLOCATE_3D_WORK_QUEUE: bytearray(0x1B0),
+            recover_g17_abi.ALLOCATE_CL_WORK_QUEUE: bytearray(0x11C),
+            recover_g17_abi.TIMESTAMP_QUEUE_INIT: bytearray(0x490),
+            recover_g17_abi.RESET_TIMESTAMP_QUEUE: bytearray(0x38),
+            recover_g17_abi.IOGPU_WORK_QUEUE_INIT: bytearray(0x58),
+        }
+        expected = {
+            recover_g17_abi.PI300_CONFIGURE_DEVICE: {
+                0x084: 0xF9436A68,
+                0x088: 0x52800A09,
+                0x08C: 0xB9071A69,
+            },
+            recover_g17_abi.BASE_ALLOC_FIRMWARE_DATA: {
+                0x038: 0xF9414C01,
+                0x03C: 0x91404428,
+                0x040: 0x91058108,
+                0x044: 0xB9400119,
+                0x048: 0x35000059,
+                0x04C: 0xB9471839,
+                0x050: 0x52825108,
+                0x054: 0x8B080274,
+                0x074: 0xAA1403E0,
+                0x078: 0x52800302,
+                0x07C: 0x52800124,
+                0x080: 0x52800005,
+                0x084: 0xD2800006,
+                0x088: 0x52800007,
+            },
+            recover_g17_abi.AGX_COMMAND_QUEUE_INIT: {
+                0x0C8: 0xF9429E68,
+                0x0CC: 0x91404509,
+                0x0D0: 0x91058129,
+                0x0D4: 0xB9400129,
+                0x0D8: 0x35000049,
+                0x0DC: 0xB9471909,
+                0x0E0: 0xB9088269,
+            },
+            recover_g17_abi.AGX_WORK_QUEUE_INIT: {
+                0x02C: 0xF940A908,
+                0x030: 0xAA0903F1,
+                0x034: 0xF2E76F11,
+                0x038: 0xD73F0911,
+            },
+            recover_g17_abi.ALLOCATE_3D_WORK_QUEUE: {
+                0x058: 0xF9429E81,
+                0x05C: 0xB9488283,
+                0x0A0: 0xF9434288,
+                0x0A4: 0xF9401515,
+                0x12C: 0xAA1503E5,
+                0x1A8: 0xF9434288,
+                0x1AC: 0xF9401501,
+            },
+            recover_g17_abi.ALLOCATE_CL_WORK_QUEUE: {
+                0x04C: 0xF9429E81,
+                0x050: 0xB9488283,
+                0x08C: 0xF9434288,
+                0x090: 0xF9401515,
+                0x118: 0xAA1503E5,
+            },
+            recover_g17_abi.TIMESTAMP_QUEUE_INIT: {
+                0x05C: 0xF942DA95,
+                0x064: 0x8B0802B4,
+                0x24C: 0x8B160008,
+                0x250: 0xF9001668,
+                0x2C0: 0x8B160008,
+                0x2D4: 0xF9001268,
+            },
+            recover_g17_abi.RESET_TIMESTAMP_QUEUE: {
+                0x004: 0xF9401008,
+                0x008: 0xA9007D1F,
+                0x00C: 0xF900091F,
+                0x018: 0xA9422009,
+                0x01C: 0xF9000528,
+                0x020: 0xB9403808,
+                0x024: 0x7100091F,
+                0x028: 0x1A9F17E8,
+                0x02C: 0xF9401009,
+                0x030: 0x29027D28,
+            },
+            recover_g17_abi.IOGPU_WORK_QUEUE_INIT: {
+                0x018: 0xAA0303F7,
+                0x050: 0xF9002268,
+                0x054: 0xB9005677,
+            },
+        }
+        for name, words in expected.items():
+            for offset, word in words.items():
+                struct.pack_into("<I", fixtures[name], offset, word)
+
+        driver_names = set(expected) - {recover_g17_abi.IOGPU_WORK_QUEUE_INIT}
+        driver_codes = {
+            name: (0x600000 + index * 0x10000, bytes(fixtures[name]))
+            for index, name in enumerate(driver_names)
+        }
+        iogpu_codes = {
+            recover_g17_abi.IOGPU_WORK_QUEUE_INIT: (
+                0x800000,
+                bytes(fixtures[recover_g17_abi.IOGPU_WORK_QUEUE_INIT]),
+            )
+        }
+        tables = {
+            b"driver": {name: address for name, (address, _code) in driver_codes.items()},
+            b"iogpu": {name: address for name, (address, _code) in iogpu_codes.items()},
+        }
+        codes = driver_codes | iogpu_codes
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                side_effect=lambda image: tables[image],
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_channel_runtime_resources(
+                b"driver", b"iogpu"
+            )
+
+        self.assertEqual(recovered["configured_queues"]["default"], 80)
+        self.assertEqual(recovered["configured_queues"]["command_queue_member"], 0x880)
+        self.assertEqual(recovered["channel_ring"]["default_entries"], 1280)
+        self.assertEqual(recovered["channel_ring"]["default_pointer_bytes"], 0x2800)
+        self.assertEqual(recovered["timestamp_state"]["bytes"], 0x18)
+        self.assertEqual(recovered["timestamp_state"]["object_gpu_member"], 0x28)
+        self.assertEqual(
+            recovered["timestamp_state"]["context_cookie_state_offset"], 0x10
+        )
+
+    def test_rejects_changed_g17_channel_runtime_resources(self) -> None:
+        with self.assertRaises(ValueError):
+            recover_g17_abi.recover_g17_channel_runtime_resources(b"", b"")
+
     def test_recovers_g17_scheduler_state(self) -> None:
         alloc_address = 0x400000
         stack_init_address = 0x410000

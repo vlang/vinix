@@ -53,6 +53,10 @@ pub const g17_channel_control_header_size = u64(0x70)
 pub const g17_channel_pool_base_size = u64(0x70)
 pub const g17_channel_pool_queue_stride = u64(0x80)
 pub const g17_cached_command_pointer_size = u64(0x08)
+pub const g17_default_configured_work_queues = u32(80)
+pub const g17_maximum_channel_queue_request = u32(0x80)
+pub const g17_channel_pointers_per_queue = u32(16)
+pub const g17_timestamp_state_size = u64(0x18)
 pub const g17_firmware_shared_data_size = u64(0x4c0)
 pub const g17_runtime_data_size = u64(0x1ca0)
 pub const g17_runtime_platform_values_offset = u64(0x54)
@@ -1401,6 +1405,25 @@ pub mut:
 	address u64
 }
 
+// Derive the firmware pointer-ring capacity exactly as AGXChannel::init does.
+// The configured device count is capped before multiplication, so this helper
+// cannot overflow and remains valid for a future device-tree override.
+pub fn g17_channel_ring_entries(configured_queues u32) u32 {
+	request := if configured_queues < g17_maximum_channel_queue_request {
+		configured_queues
+	} else {
+		g17_maximum_channel_queue_request
+	}
+	return request * g17_channel_pointers_per_queue
+}
+
+// The cached and uncached channel pools both use this element geometry.  For
+// T6050's recovered default of 80 it is 0x2870 bytes, of which the cached
+// channel consumes 0x2800 bytes as 1,280 eight-byte command pointers.
+pub fn g17_channel_memory_size(configured_queues u32) u64 {
+	return g17_channel_pool_base_size + u64(configured_queues) * g17_channel_pool_queue_stride
+}
+
 // Byte size of every G17 channel command, from the table
 // AGXFirmware::configurePoolElementSizes installs.
 pub const g17_command_ta_size = u32(0x9c0)
@@ -2059,6 +2082,32 @@ pub const g17_scheduler_state_size = u64(0x40)
 pub const g17_default_app_gpu_role = u8(2)
 pub const g17_max_app_gpu_role = u8(3)
 
+// Per-command-queue timestamp object shared by all of its TA, 3D, and CL
+// channels.  Channel state +0x10 carries this object's GPU address.  Apple
+// also writes that address back into the object itself at +0x08.
+@[packed]
+pub struct G17TimestampState {
+pub mut:
+	value_000        u64
+	self_gpu_address u64
+	update_mode      u32
+	reserved_014     u32
+}
+
+pub fn initialize_g17_timestamp_state(buffer voidptr, size u64, gpu_address u64,
+	update_mode bool) bool {
+	if buffer == unsafe { nil } || size != g17_timestamp_state_size || gpu_address == 0 {
+		return false
+	}
+	unsafe {
+		C.memset(buffer, 0, g17_timestamp_state_size)
+		mut state := &G17TimestampState(buffer)
+		state.self_gpu_address = gpu_address
+		state.update_mode = if update_mode { u32(1) } else { u32(0) }
+	}
+	return true
+}
+
 // One element of Apple's AGFICmdQueueSchedState firmware pool. Every command
 // queue owns exactly one, and its GPU address is what channel state +0x9c
 // carries, which is why initialize_g17_channel takes that address as an input.
@@ -2200,6 +2249,7 @@ pub fn validate_g17_channel_layouts() bool {
 	return sizeof(G17ChannelState) == g17_channel_state_size
 		&& sizeof(G17ChannelControl) == g17_channel_control_header_size
 		&& sizeof(G17CachedCommandPointer) == g17_cached_command_pointer_size
+		&& sizeof(G17TimestampState) == g17_timestamp_state_size
 		&& sizeof(G17ChannelCommandKnownPrefix) == g17_channel_command_known_prefix_size
 		&& sizeof(G17SharedStreamParser) == g17_shared_stream_parser_size
 		&& sizeof(G17ParsedHardwareCommand) == g17_parsed_hardware_command_size

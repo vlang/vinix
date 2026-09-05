@@ -496,8 +496,17 @@ SCHEDULER_STATE_STACK_INIT_SLOT = 0x20
 IOGPU_COMMAND_QUEUE_INIT = (
     "__ZN17IOGPUCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs"
 )
+AGX_COMMAND_QUEUE_INIT = (
+    "__ZN15AGXCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs"
+)
 IOGPU_DEVICE_INIT = "__ZN11IOGPUDevice4initEP5IOGPUP4task"
 IOGPU_CHANNEL_INIT = "__ZN12IOGPUChannel4initEP5IOGPUi"
+IOGPU_WORK_QUEUE_INIT = "__ZN14IOGPUWorkQueue4initEP5IOGPUPK17IOGPUCommandQueuei"
+AGX_WORK_QUEUE_INIT = "__ZN12AGXWorkQueue4initEP5IOGPUPK17IOGPUCommandQueueiiy"
+ALLOCATE_3D_WORK_QUEUE = "__ZN15AGXCommandQueue24allocate3DWorkQueueInnerEbj"
+ALLOCATE_CL_WORK_QUEUE = "__ZN15AGXCommandQueue24allocateCLWorkQueueInnerEj"
+TIMESTAMP_QUEUE_INIT = "__ZN17AGXTimeStampQueue4initEP14AGXAccelerator"
+RESET_TIMESTAMP_QUEUE = "__ZN17AGXTimeStampQueue24resetTimeStampQueueStateEv"
 AGX_SHARED_INIT = "__ZN9AGXShared4initEP5IOGPUP4tasky"
 AGX_SHARED_SET_APP_GPU_ROLE = "__ZN9AGXShared16set_app_gpu_roleEi13eIOGPUAppRole"
 CONFIGURE_POOL_ELEMENT_SIZES = "__ZN11AGXFirmware25configurePoolElementSizesEv"
@@ -12156,6 +12165,212 @@ def recover_g17_queue_device_inputs(
     }
 
 
+def recover_g17_channel_runtime_resources(
+    driver: bytes, iogpu: bytes
+) -> dict[str, object]:
+    """Recover the per-command-queue timestamp and channel ring inputs.
+
+    The channel pool geometry alone does not say how much of each element is
+    live, nor what state +0x10 points at.  This follows the configured queue
+    count through AGXCommandQueue and IOGPUWorkQueue, and follows the shared
+    timestamp allocation which every concrete channel receives as x5.
+    """
+
+    driver_symbols = macho_symbols(driver)
+    iogpu_symbols = macho_symbols(iogpu)
+    driver_required = (
+        PI300_CONFIGURE_DEVICE,
+        BASE_ALLOC_FIRMWARE_DATA,
+        AGX_COMMAND_QUEUE_INIT,
+        AGX_WORK_QUEUE_INIT,
+        ALLOCATE_3D_WORK_QUEUE,
+        ALLOCATE_CL_WORK_QUEUE,
+        TIMESTAMP_QUEUE_INIT,
+        RESET_TIMESTAMP_QUEUE,
+    )
+    missing = [name for name in driver_required if name not in driver_symbols]
+    if missing:
+        raise ValueError(f"AGXG17X is missing channel runtime symbols: {missing}")
+    if IOGPU_WORK_QUEUE_INIT not in iogpu_symbols:
+        raise ValueError("IOGPUFamily is missing IOGPUWorkQueue::init")
+
+    # PI_300 installs 80 as the device default.  Both firmware-pool setup and
+    # command-queue construction prefer the optional device override at
+    # accelerator +0x11160 and otherwise read this +0x718 default.
+    _address, configure_code = symbol_code(driver, PI300_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        configure_code,
+        "G17 configured work-queue default",
+        {
+            0x084: 0xF9436A68,
+            0x088: 0x52800A09,  # mov w9, #80
+            0x08C: 0xB9071A69,  # -> accelerator +0x718
+        },
+    )
+    _address, alloc_code = symbol_code(driver, BASE_ALLOC_FIRMWARE_DATA)
+    require_instruction_words_at(
+        alloc_code,
+        "G17 timestamp-state pool",
+        {
+            0x038: 0xF9414C01,  # accelerator at firmware +0x298
+            0x03C: 0x91404428,
+            0x040: 0x91058108,
+            0x044: 0xB9400119,  # optional +0x11160 queue-count override
+            0x048: 0x35000059,
+            0x04C: 0xB9471839,  # fallback accelerator +0x718
+            0x050: 0x52825108,  # timestamp stack at firmware +0x1288
+            0x054: 0x8B080274,
+            0x074: 0xAA1403E0,
+            0x078: 0x52800302,  # 0x18-byte timestamp state
+            0x07C: 0x52800124,  # alignment shift 9
+            0x080: 0x52800005,  # uncached
+            0x084: 0xD2800006,  # no owning task
+            0x088: 0x52800007,  # no shrinking
+        },
+    )
+
+    _address, queue_code = symbol_code(driver, AGX_COMMAND_QUEUE_INIT)
+    require_instruction_words_at(
+        queue_code,
+        "G17 command-queue ring request",
+        {
+            0x0C8: 0xF9429E68,  # accelerator at queue +0x538
+            0x0CC: 0x91404509,
+            0x0D0: 0x91058129,
+            0x0D4: 0xB9400129,  # optional accelerator +0x11160 override
+            0x0D8: 0x35000049,
+            0x0DC: 0xB9471909,  # fallback accelerator +0x718
+            0x0E0: 0xB9088269,  # -> command queue +0x880
+        },
+    )
+    _address, work_code = symbol_code(driver, AGX_WORK_QUEUE_INIT)
+    require_instruction_words_at(
+        work_code,
+        "G17 AGX work-queue base initialization",
+        {
+            0x02C: 0xF940A908,
+            0x030: 0xAA0903F1,
+            0x034: 0xF2E76F11,
+            0x038: 0xD73F0911,  # forwards x3 to IOGPUWorkQueue::init
+        },
+    )
+    _address, iogpu_work_code = symbol_code(iogpu, IOGPU_WORK_QUEUE_INIT)
+    require_instruction_words_at(
+        iogpu_work_code,
+        "IOGPU work-queue ring request",
+        {
+            0x018: 0xAA0303F7,  # preserve x3
+            0x050: 0xF9002268,
+            0x054: 0xB9005677,  # -> work queue +0x54
+        },
+    )
+
+    # Render and compute work queues both pass command queue +0x880 as x3.
+    # Their concrete channels then receive timestamp_queue->gpu_address (+0x28)
+    # as x5.  The render path has two branches because TA can be allocated
+    # lazily, but both load the same timestamp address.
+    _address, work_3d_code = symbol_code(driver, ALLOCATE_3D_WORK_QUEUE)
+    require_instruction_words_at(
+        work_3d_code,
+        "G17 render work-channel inputs",
+        {
+            0x058: 0xF9429E81,
+            0x05C: 0xB9488283,  # command queue +0x880 -> x3
+            0x0A0: 0xF9434288,  # timestamp object at queue +0x680
+            0x0A4: 0xF9401515,  # timestamp GPU VA at object +0x28
+            0x12C: 0xAA1503E5,  # -> channel initializer x5
+            0x1A8: 0xF9434288,
+            0x1AC: 0xF9401501,  # same address for lazy TA allocation
+        },
+    )
+    _address, work_cl_code = symbol_code(driver, ALLOCATE_CL_WORK_QUEUE)
+    require_instruction_words_at(
+        work_cl_code,
+        "G17 compute work-channel inputs",
+        {
+            0x04C: 0xF9429E81,
+            0x050: 0xB9488283,  # command queue +0x880 -> x3
+            0x08C: 0xF9434288,  # timestamp object at queue +0x680
+            0x090: 0xF9401515,  # timestamp GPU VA at object +0x28
+            0x118: 0xAA1503E5,  # -> channel initializer x5
+        },
+    )
+
+    # The timestamp object keeps CPU and GPU addresses separately.  The GPU
+    # address is the channel context cookie; reset writes that address back
+    # into the shared element at +0x08, while all CPU stores use object +0x20.
+    _address, timestamp_code = symbol_code(driver, TIMESTAMP_QUEUE_INIT)
+    if len(timestamp_code) != 0x490:
+        raise ValueError(f"unexpected timestamp-queue init size {len(timestamp_code):#x}")
+    require_instruction_words_at(
+        timestamp_code,
+        "G17 timestamp-queue mappings",
+        {
+            0x05C: 0xF942DA95,  # firmware object at accelerator +0x5b0
+            0x064: 0x8B0802B4,  # timestamp stack at +0x1288
+            0x24C: 0x8B160008,
+            0x250: 0xF9001668,  # GPU VA -> timestamp object +0x28
+            0x2C0: 0x8B160008,
+            0x2D4: 0xF9001268,  # CPU VA -> timestamp object +0x20
+        },
+    )
+    _address, reset_code = symbol_code(driver, RESET_TIMESTAMP_QUEUE)
+    if len(reset_code) != 0x38:
+        raise ValueError(f"unexpected timestamp reset size {len(reset_code):#x}")
+    require_instruction_words_at(
+        reset_code,
+        "G17 timestamp-state reset",
+        {
+            0x004: 0xF9401008,  # CPU VA at object +0x20
+            0x008: 0xA9007D1F,
+            0x00C: 0xF900091F,  # clear all 0x18 bytes
+            0x018: 0xA9422009,  # CPU/GPU VA pair at +0x20/+0x28
+            0x01C: 0xF9000528,  # self GPU VA -> shared +0x08
+            0x020: 0xB9403808,  # update mode at object +0x38
+            0x024: 0x7100091F,
+            0x028: 0x1A9F17E8,
+            0x02C: 0xF9401009,
+            0x030: 0x29027D28,  # mode flag and zero -> +0x10/+0x14
+        },
+    )
+
+    configured_queues = 80
+    pointers_per_queue = 16
+    maximum_queue_request = 0x80
+    ring_entries = min(configured_queues, maximum_queue_request) * pointers_per_queue
+    return {
+        "configured_queues": {
+            "default": configured_queues,
+            "accelerator_default_member": 0x718,
+            "accelerator_override_member": 0x11160,
+            "command_queue_member": 0x880,
+        },
+        "work_queue": {
+            "request_argument": 3,
+            "request_member": 0x54,
+        },
+        "channel_ring": {
+            "maximum_queue_request": maximum_queue_request,
+            "pointers_per_queue": pointers_per_queue,
+            "default_entries": ring_entries,
+            "pointer_bytes": 8,
+            "default_pointer_bytes": ring_entries * 8,
+        },
+        "timestamp_state": {
+            "firmware_stack_member": 0x1288,
+            "bytes": 0x18,
+            "alignment_shift": 9,
+            "caching": 0,
+            "object_cpu_member": 0x20,
+            "object_gpu_member": 0x28,
+            "self_gpu_address_offset": 0x08,
+            "update_mode_flag_offset": 0x10,
+            "context_cookie_state_offset": 0x10,
+            "command_queue_owner_member": 0x680,
+        },
+    }
+
+
 def recover_g17_scheduler_state(image: bytes) -> dict[str, object]:
     """Recover the per-queue _AGFISchedulerState element and its pool.
 
@@ -12867,6 +13082,9 @@ def main() -> int:
         channels["identity"] = recover_g17_channel_identity(driver, iogpu)
         channels["scheduler_state"] = recover_g17_scheduler_state(driver)
         channels["queue_device_inputs"] = recover_g17_queue_device_inputs(
+            driver, iogpu
+        )
+        channels["runtime_resources"] = recover_g17_channel_runtime_resources(
             driver, iogpu
         )
         channels["command_pools"] = recover_g17_channel_command_pools(driver)

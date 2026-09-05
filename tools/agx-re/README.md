@@ -87,6 +87,9 @@ the two-transport boot calls, per-role `0x81` root publication, six-bit AKF
 message-type decode, and the one-shot type-9 `0x89` reply to both transports,
 plus the version-pinned RTBuddy wrapper's independent `0x20` message and
 `0x21` doorbell endpoint binding and role-aware receive forwarding,
+the configured work-queue count's device override/fallback path, its expansion
+to 1,280 channel command pointers, and the per-command-queue timestamp state's
+self GPU address and use as every work channel's context cookie,
 the mapped bootstrap register region and its G17 no-op producer, both
 shared-object address graphs, the per-role ASC power-state records, the shared
 runtime object's control fields and four startup producers, the initial shared
@@ -145,9 +148,10 @@ also records possible ordering for all 324 virtual and inline sites, and all 21
 ordering predicates have expression trees. The two runtime CL selectors keep
 the finite static set open, but every selector formula is complete.
 Channel and scheduler-state construction no longer needs unknown inputs: the
-per-queue `_AGFISchedulerState` element, the creating process ID and the app
-GPU role are all recovered, so what remains for submission is the work command
-format itself.
+per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
+channel ring geometry, the creating process ID and the app GPU role are all
+recovered. What remains for submission is porting the complete register
+emission graph into the work-command encoder and implementing completion.
 
 `generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this
