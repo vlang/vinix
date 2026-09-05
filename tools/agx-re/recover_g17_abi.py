@@ -606,6 +606,23 @@ PARSE_HARDWARE_KERNEL_COMMAND = (
 PARSE_RENDER_HARDWARE_KERNEL_COMMAND = (
     "__ZN30AGXRenderHardwareKernelCommand16parseAndValidateER21AGXSharedStreamParser"
 )
+COPY_3D_COMMON_PASSTHROUGH = (
+    "__ZN28AGXHardwareKernelCommandUtil27copy3DCommonPassthroughData"
+    "EP22AGX3DCommandDescriptorRK21AGX3DCommandCommonRec"
+)
+PROCESS_RENDER_SETUP = (
+    "__ZN15AGXCommandQueue18processRenderSetupERK24AGXHardwareKernelCommand"
+    "RK30AGXRenderHardwareKernelCommandRK23AGXSegmentKernelCommandyy"
+    "P21CompositeSubtypeStateR22AGXTACommandDescriptorR22AGX3DCommandDescriptor"
+    "P18AGXAllocationList2bP11AGXResourceR10IOGPUEventPPSJ_SM_"
+    "P14AGX3DWorkQueuePPN12AGXWorkQueue9HashEntryEbbR13AGXUMADescRec"
+    "P20AGXUniqueResourceSet"
+)
+ALLOC_3D_COMMAND_DESCRIPTOR = "__ZNK22AGX3DCommandDescriptor9MetaClass5allocEv"
+INIT_3D_COMMAND_DESCRIPTOR = (
+    "__ZN22AGX3DCommandDescriptor4initEP5IOGPUP17IOGPUCommandQueueP9IOGPUTask"
+    "PKcyP19AGXDebugBufferShmem"
+)
 REGISTER_LIST_PRODUCERS = {
     "3D": GENERATE_REGISTER_LIST_3D,
     "FastBlit": (
@@ -11338,6 +11355,248 @@ def recover_g17_render_payload_format(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_3d_common_passthrough(image: bytes) -> dict[str, object]:
+    """Recover the raw render-record fields copied into a 3D descriptor.
+
+    processRenderSetup passes retained_payload + 0x2d0 to the leaf copy
+    helper.  That helper is a fixed scatter-copy into the 0xc40-byte internal
+    descriptor, with eight source bytes reduced to bit zero.  Keep the map
+    explicit because the destination is subsequently consumed by the HAL300
+    register-list producer and is not a firmware wire structure by itself.
+    """
+
+    symbols = macho_symbols(image)
+    required = (
+        COPY_3D_COMMON_PASSTHROUGH,
+        PROCESS_RENDER_SETUP,
+        ALLOC_3D_COMMAND_DESCRIPTOR,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing 3D descriptor producers: {missing}")
+
+    copy_address, copy_code = symbol_code(image, COPY_3D_COMMON_PASSTHROUGH)
+    require_instruction_words_at(
+        copy_code,
+        "G17 3D common passthrough copy",
+        {
+            0x004: 0x9106E029,  # source alias at common record +0x1b8
+            0x008: 0x9117A008,  # destination alias at descriptor +0x5e8
+            0x00C: 0xF940002A,  # first qword from common +0
+            0x010: 0xF902740A,  # -> descriptor +0x4e8
+            0x090: 0x3D800100,  # common +0x80 -> descriptor +0x5e8
+            0x0A8: 0xF9025C0A,  # common +0xe0 -> descriptor +0x4b8
+            0x0AC: 0xF902580B,  # common +0xe8 -> descriptor +0x4b0
+            0x140: 0x3D81D400,  # common +0x1c8 -> descriptor +0x750
+            0x19C: 0x3D81D000,  # common +0x1b8 -> descriptor +0x740
+            0x1A4: 0xB9088809,  # common +0x370 -> descriptor +0x888
+            0x1B4: 0x3D82BC00,  # common +0x3b0 -> descriptor +0xaf0
+            0x1BC: 0x3D82C000,  # common +0x3c0 -> descriptor +0xb00
+            0x1C4: 0x12000129,  # common +0x37f reduced to bit zero
+            0x1C8: 0x391F8009,  # -> descriptor +0x7e0
+            0x20C: 0xB9041009,  # common +0x384 -> descriptor +0x410
+            0x228: 0x3D815101,  # common +0x3d0 -> descriptor +0xb28
+            0x230: 0xFD059C00,  # common +0x3e0 -> descriptor +0xb38
+            0x238: 0xB90B4008,  # common +0x3e8 -> descriptor +0xb40
+            0x24C: 0xD65F03C0,
+        },
+    )
+    if len(copy_code) != 0x250:
+        raise ValueError(f"unexpected 3D passthrough producer length {len(copy_code):#x}")
+
+    setup_address, setup_code = symbol_code(image, PROCESS_RENDER_SETUP)
+    require_instruction_words_at(
+        setup_code,
+        "G17 3D common passthrough source",
+        {
+            0x1F28: 0xF9400F48,  # retained render-payload pointer at command +0x18
+            0x1F70: 0x910B4101,  # common record is payload +0x2d0
+            0x1F74: 0xAA1903E0,  # 3D descriptor argument
+        },
+    )
+    call_word = struct.unpack_from("<I", setup_code, 0x1F78)[0]
+    if decode_bl_target(setup_address + 0x1F78, call_word) != copy_address:
+        raise ValueError("G17 render setup no longer calls the passthrough producer")
+
+    _alloc_address, alloc_code = symbol_code(image, ALLOC_3D_COMMAND_DESCRIPTOR)
+    require_instruction_words_at(
+        alloc_code,
+        "G17 3D descriptor allocation",
+        {0x018: 0x52818801},  # typed allocation size 0xc40
+    )
+
+    copy_ranges = [
+        (0x000, 0x4E8, 0x80),
+        (0x080, 0x5E8, 0x30),
+        (0x0E0, 0x4B8, 0x08),
+        (0x0E8, 0x4B0, 0x08),
+        (0x0F8, 0x648, 0x10),
+        (0x108, 0x658, 0x08),
+        (0x110, 0x660, 0x10),
+        (0x120, 0x698, 0x08),
+        (0x128, 0x6C8, 0x08),
+        (0x130, 0x6E8, 0x08),
+        (0x138, 0x700, 0x08),
+        (0x140, 0x670, 0x08),
+        (0x148, 0x6A0, 0x08),
+        (0x150, 0x6D0, 0x08),
+        (0x158, 0x6F0, 0x08),
+        (0x160, 0x708, 0x08),
+        (0x168, 0x680, 0x08),
+        (0x170, 0x6B0, 0x08),
+        (0x178, 0x6D8, 0x08),
+        (0x180, 0x710, 0x08),
+        (0x188, 0x728, 0x08),
+        (0x190, 0x688, 0x08),
+        (0x198, 0x6B8, 0x08),
+        (0x1A0, 0x6E0, 0x08),
+        (0x1A8, 0x718, 0x08),
+        (0x1B0, 0x730, 0x08),
+        (0x1B8, 0x740, 0x10),
+        (0x1C8, 0x750, 0x10),
+        (0x1D8, 0x738, 0x08),
+        (0x0F0, 0x4E0, 0x08),
+        (0x1E0, 0x7F8, 0x08),
+        (0x1E8, 0xAD0, 0x04),
+        (0x1F0, 0xAD8, 0x08),
+        (0x1F8, 0x7B0, 0x08),
+        (0x200, 0x7C0, 0x04),
+        (0x2A8, 0x7E8, 0x08),
+        (0x368, 0x7A8, 0x08),
+        (0x0B0, 0x790, 0x08),
+        (0x0B8, 0x798, 0x04),
+        (0x0C0, 0x760, 0x10),
+        (0x0D0, 0x770, 0x10),
+        (0x370, 0x888, 0x04),
+        (0x384, 0x410, 0x04),
+        (0x3A0, 0xAE0, 0x10),
+        (0x3B0, 0xAF0, 0x10),
+        (0x3C0, 0xB00, 0x10),
+        (0x3D0, 0xB28, 0x10),
+        (0x3E0, 0xB38, 0x08),
+        (0x3E8, 0xB40, 0x04),
+    ]
+    bit_fields = [
+        (0x375, 0x88C),
+        (0x378, 0x895),
+        (0x379, 0x896),
+        (0x37B, 0x898),
+        (0x37C, 0x962),
+        (0x37D, 0x963),
+        (0x37E, 0x899),
+        (0x37F, 0x7E0),
+    ]
+    source_bytes = 0x3EC
+    descriptor_bytes = 0xC40
+    if any(source + size > source_bytes or destination + size > descriptor_bytes
+           for source, destination, size in copy_ranges):
+        raise ValueError("3D passthrough copy falls outside its source or descriptor")
+    if any(source >= source_bytes or destination >= descriptor_bytes
+           for source, destination in bit_fields):
+        raise ValueError("3D passthrough bit field falls outside its object")
+
+    return {
+        "descriptor_bytes": descriptor_bytes,
+        "source": {
+            "payload_pointer_member": 0x18,
+            "payload_offset": 0x2D0,
+            "bytes": source_bytes,
+        },
+        "copy_ranges": [
+            {
+                "source_offset": source,
+                "descriptor_member": destination,
+                "bytes": size,
+            }
+            for source, destination, size in copy_ranges
+        ],
+        "bit_fields": [
+            {
+                "source_offset": source,
+                "descriptor_member": destination,
+                "mask": 1,
+            }
+            for source, destination in bit_fields
+        ],
+        "producer": COPY_3D_COMMON_PASSTHROUGH,
+        "caller": PROCESS_RENDER_SETUP,
+    }
+
+
+def recover_g17_3d_descriptor_initialization(image: bytes) -> dict[str, object]:
+    """Recover scalar defaults needed by a host-only 3D staging object."""
+
+    symbols = macho_symbols(image)
+    required = (ALLOC_3D_COMMAND_DESCRIPTOR, INIT_3D_COMMAND_DESCRIPTOR)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing 3D descriptor initializers: {missing}")
+
+    _alloc_address, alloc_code = symbol_code(image, ALLOC_3D_COMMAND_DESCRIPTOR)
+    require_instruction_words_at(
+        alloc_code,
+        "G17 3D descriptor allocation defaults",
+        {
+            0x018: 0x52818801,  # typed allocation size 0xc40
+            0x098: 0xB9096808,  # -1 at +0x968
+            0x0A8: 0x2F00E5E1,  # synthesize 0x00000000ffffffff
+            0x0AC: 0xFD055001,  # -> +0xaa0
+            0x0B4: 0xB90B6008,  # -1 at +0xb60
+            0x0D8: 0x3930E01F,  # final allocation-owned byte at +0xc38
+        },
+    )
+
+    _init_address, init_code = symbol_code(image, INIT_3D_COMMAND_DESCRIPTOR)
+    require_instruction_words_at(
+        init_code,
+        "G17 3D descriptor initialization defaults",
+        {
+            0x114: 0x9112C260,  # clear descriptor +0x4b0
+            0x118: 0x52806A01,  # for 0x350 bytes
+            0x128: 0xB9090274,  # -1 at +0x900
+            0x188: 0xB9014674,  # -1 at +0x144
+            0x1D0: 0xF9461668,  # mask existing +0xc28
+            0x1D4: 0x9254A508,
+            0x1D8: 0xF9061668,
+            0x1E0: 0x52802029,  # 0x101
+            0x1E4: 0x79000109,  # -> unaligned halfword +0x1c1
+            0x1EC: 0xB9040275,  # one at +0x400
+            0x230: 0xB9041268,  # two at +0x410
+            0x234: 0xB90C3275,  # one at +0xc30
+            0x238: 0xB902D674,  # -1 at +0x2d4
+        },
+    )
+
+    return {
+        "descriptor_bytes": 0xC40,
+        # Vinix staging does not instantiate the C++ base classes or their
+        # retained OSObject pointers. A full clear is a host-side invariant;
+        # these are the nonzero scalar defaults the selected derived
+        # allocation/init path installs before processRenderSetup.
+        "staging_clear": True,
+        "cleared_range": {"offset": 0x4B0, "bytes": 0x350},
+        "initial_values": [
+            {"member": 0x144, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0x1C1, "bytes": 2, "value": 0x101},
+            {"member": 0x2D4, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0x400, "bytes": 4, "value": 1},
+            {"member": 0x410, "bytes": 4, "value": 2},
+            {"member": 0x900, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0x968, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0xAA0, "bytes": 8, "value": 0xFFFFFFFF},
+            {"member": 0xB60, "bytes": 4, "value": 0xFFFFFFFF},
+            {"member": 0xC30, "bytes": 4, "value": 1},
+        ],
+        "masked_default": {
+            "member": 0xC28,
+            "bytes": 8,
+            "mask": 0xFFFFF000003FFFFF,
+        },
+        "allocator": ALLOC_3D_COMMAND_DESCRIPTOR,
+        "initializer": INIT_3D_COMMAND_DESCRIPTOR,
+    }
+
+
 def recover_g17_channel_command_common_fields(image: bytes) -> dict[str, object]:
     """Recover the common host-written fields in every channel command.
 
@@ -14041,6 +14300,12 @@ def main() -> int:
         )
         channels["render_payload_format"] = (
             recover_g17_render_payload_format(driver)
+        )
+        channels["descriptor_3d_common_passthrough"] = (
+            recover_g17_3d_common_passthrough(driver)
+        )
+        channels["descriptor_3d_initialization"] = (
+            recover_g17_3d_descriptor_initialization(driver)
         )
         _address, base_power_code = symbol_code(driver, INIT_BASE_POWER_DATA)
         _address, power_code = symbol_code(driver, INIT_POWER_DATA)

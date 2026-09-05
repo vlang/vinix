@@ -1800,6 +1800,128 @@ pub fn parse_g17_render_payload(command voidptr, command_bytes u64, payload void
 	return true
 }
 
+// Host-only staging layout allocated by AGX3DCommandDescriptor::MetaClass.
+// Firmware never receives this object directly. The HAL300 work-command
+// producer reads it while building the four firmware-private register lists.
+pub const g17_3d_descriptor_size = u64(0xc40)
+pub const g17_3d_common_payload_offset = u64(0x2d0)
+pub const g17_3d_common_passthrough_size = u64(0x3ec)
+
+@[packed]
+pub struct G17ThreeDDescriptor {
+pub mut:
+	opaque [0xc40]u8
+}
+
+fn write_g17_descriptor_value(destination &u8, member u64, bytes u64, value u64) {
+	unsafe {
+		C.memcpy(voidptr(destination + member), &value, bytes)
+	}
+}
+
+// Initialize the scalar part of Apple's selected derived descriptor without
+// constructing any of its host C++ base classes or retained OSObject pointers.
+// A full clear is a Vinix staging invariant; processRenderSetup-equivalent
+// stages must populate every resource-owned field before command generation.
+pub fn initialize_g17_3d_descriptor(descriptor voidptr, descriptor_bytes u64) bool {
+	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size {
+		return false
+	}
+	unsafe {
+		C.memset(descriptor, 0, g17_3d_descriptor_size)
+		destination := &u8(descriptor)
+		write_g17_descriptor_value(destination, 0x144, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x1c1, 2, 0x101)
+		write_g17_descriptor_value(destination, 0x2d4, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x400, 4, 1)
+		write_g17_descriptor_value(destination, 0x410, 4, 2)
+		write_g17_descriptor_value(destination, 0x900, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0x968, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0xaa0, 8, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0xb60, 4, 0xffff_ffff)
+		write_g17_descriptor_value(destination, 0xc30, 4, 1)
+	}
+	return true
+}
+
+// Copy the common 3D record retained inside a validated render payload into
+// its internal descriptor. The scatter map and the source at payload +0x2d0
+// are recovered independently from processRenderSetup and its leaf helper.
+// This deliberately preserves all descriptor bytes outside the recovered
+// fields: later setup stages own them, and zero is not a proven substitute.
+pub fn populate_g17_3d_common_passthrough(descriptor voidptr, descriptor_bytes u64,
+	payload voidptr, payload_bytes u64) bool {
+	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size
+		|| payload == unsafe { nil }
+		|| payload_bytes < g17_3d_common_payload_offset + g17_3d_common_passthrough_size {
+		return false
+	}
+
+	unsafe {
+		destination := &u8(descriptor)
+		source := &u8(payload) + g17_3d_common_payload_offset
+		C.memcpy(voidptr(destination + 0x4e8), voidptr(source + 0x000), 0x80)
+		C.memcpy(voidptr(destination + 0x5e8), voidptr(source + 0x080), 0x30)
+		C.memcpy(voidptr(destination + 0x4b8), voidptr(source + 0x0e0), 0x08)
+		C.memcpy(voidptr(destination + 0x4b0), voidptr(source + 0x0e8), 0x08)
+		C.memcpy(voidptr(destination + 0x648), voidptr(source + 0x0f8), 0x10)
+		C.memcpy(voidptr(destination + 0x658), voidptr(source + 0x108), 0x08)
+		C.memcpy(voidptr(destination + 0x660), voidptr(source + 0x110), 0x10)
+		C.memcpy(voidptr(destination + 0x698), voidptr(source + 0x120), 0x08)
+		C.memcpy(voidptr(destination + 0x6c8), voidptr(source + 0x128), 0x08)
+		C.memcpy(voidptr(destination + 0x6e8), voidptr(source + 0x130), 0x08)
+		C.memcpy(voidptr(destination + 0x700), voidptr(source + 0x138), 0x08)
+		C.memcpy(voidptr(destination + 0x670), voidptr(source + 0x140), 0x08)
+		C.memcpy(voidptr(destination + 0x6a0), voidptr(source + 0x148), 0x08)
+		C.memcpy(voidptr(destination + 0x6d0), voidptr(source + 0x150), 0x08)
+		C.memcpy(voidptr(destination + 0x6f0), voidptr(source + 0x158), 0x08)
+		C.memcpy(voidptr(destination + 0x708), voidptr(source + 0x160), 0x08)
+		C.memcpy(voidptr(destination + 0x680), voidptr(source + 0x168), 0x08)
+		C.memcpy(voidptr(destination + 0x6b0), voidptr(source + 0x170), 0x08)
+		C.memcpy(voidptr(destination + 0x6d8), voidptr(source + 0x178), 0x08)
+		C.memcpy(voidptr(destination + 0x710), voidptr(source + 0x180), 0x08)
+		C.memcpy(voidptr(destination + 0x728), voidptr(source + 0x188), 0x08)
+		C.memcpy(voidptr(destination + 0x688), voidptr(source + 0x190), 0x08)
+		C.memcpy(voidptr(destination + 0x6b8), voidptr(source + 0x198), 0x08)
+		C.memcpy(voidptr(destination + 0x6e0), voidptr(source + 0x1a0), 0x08)
+		C.memcpy(voidptr(destination + 0x718), voidptr(source + 0x1a8), 0x08)
+		C.memcpy(voidptr(destination + 0x730), voidptr(source + 0x1b0), 0x08)
+		C.memcpy(voidptr(destination + 0x740), voidptr(source + 0x1b8), 0x10)
+		C.memcpy(voidptr(destination + 0x750), voidptr(source + 0x1c8), 0x10)
+		C.memcpy(voidptr(destination + 0x738), voidptr(source + 0x1d8), 0x08)
+		C.memcpy(voidptr(destination + 0x4e0), voidptr(source + 0x0f0), 0x08)
+		C.memcpy(voidptr(destination + 0x7f8), voidptr(source + 0x1e0), 0x08)
+		C.memcpy(voidptr(destination + 0xad0), voidptr(source + 0x1e8), 0x04)
+		C.memcpy(voidptr(destination + 0xad8), voidptr(source + 0x1f0), 0x08)
+		C.memcpy(voidptr(destination + 0x7b0), voidptr(source + 0x1f8), 0x08)
+		C.memcpy(voidptr(destination + 0x7c0), voidptr(source + 0x200), 0x04)
+		C.memcpy(voidptr(destination + 0x7e8), voidptr(source + 0x2a8), 0x08)
+		C.memcpy(voidptr(destination + 0x7a8), voidptr(source + 0x368), 0x08)
+		C.memcpy(voidptr(destination + 0x790), voidptr(source + 0x0b0), 0x08)
+		C.memcpy(voidptr(destination + 0x798), voidptr(source + 0x0b8), 0x04)
+		C.memcpy(voidptr(destination + 0x760), voidptr(source + 0x0c0), 0x10)
+		C.memcpy(voidptr(destination + 0x770), voidptr(source + 0x0d0), 0x10)
+		C.memcpy(voidptr(destination + 0x888), voidptr(source + 0x370), 0x04)
+		C.memcpy(voidptr(destination + 0x410), voidptr(source + 0x384), 0x04)
+		C.memcpy(voidptr(destination + 0xae0), voidptr(source + 0x3a0), 0x10)
+		C.memcpy(voidptr(destination + 0xaf0), voidptr(source + 0x3b0), 0x10)
+		C.memcpy(voidptr(destination + 0xb00), voidptr(source + 0x3c0), 0x10)
+		C.memcpy(voidptr(destination + 0xb28), voidptr(source + 0x3d0), 0x10)
+		C.memcpy(voidptr(destination + 0xb38), voidptr(source + 0x3e0), 0x08)
+		C.memcpy(voidptr(destination + 0xb40), voidptr(source + 0x3e8), 0x04)
+
+		destination[0x88c] = source[0x375] & 1
+		destination[0x895] = source[0x378] & 1
+		destination[0x896] = source[0x379] & 1
+		destination[0x898] = source[0x37b] & 1
+		destination[0x962] = source[0x37c] & 1
+		destination[0x963] = source[0x37d] & 1
+		destination[0x899] = source[0x37e] & 1
+		destination[0x7e0] = source[0x37f] & 1
+	}
+	return true
+}
+
 // Register-list layout inside the 3D channel command.
 // generateRegisterListFor3D runs four passes with a 0x720 stride. Pass i keeps
 // its stream at i * 0x720 + 0xa0 and its metadata at i * 0x720 + 0x7a0, so a
@@ -2324,6 +2446,7 @@ pub fn validate_g17_channel_layouts() bool {
 		&& sizeof(G17SharedStreamParser) == g17_shared_stream_parser_size
 		&& sizeof(G17ParsedHardwareCommand) == g17_parsed_hardware_command_size
 		&& sizeof(G17ParsedRenderCommand) == g17_render_kernel_command_size
+		&& sizeof(G17ThreeDDescriptor) == g17_3d_descriptor_size
 }
 
 // Both G17 device-control and data-master rings use three independently

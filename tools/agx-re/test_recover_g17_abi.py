@@ -4893,6 +4893,190 @@ class RecoverG17AbiTests(unittest.TestCase):
         )
         self.assertEqual(recovered["error_markers"]["validation"], 0xA)
 
+    def test_recovers_g17_3d_common_passthrough(self) -> None:
+        copy_address = 0x930000
+        setup_address = 0x940000
+        copy_code = bytearray(0x250)
+        for offset, word in {
+            0x004: 0x9106E029,
+            0x008: 0x9117A008,
+            0x00C: 0xF940002A,
+            0x010: 0xF902740A,
+            0x090: 0x3D800100,
+            0x0A8: 0xF9025C0A,
+            0x0AC: 0xF902580B,
+            0x140: 0x3D81D400,
+            0x19C: 0x3D81D000,
+            0x1A4: 0xB9088809,
+            0x1B4: 0x3D82BC00,
+            0x1BC: 0x3D82C000,
+            0x1C4: 0x12000129,
+            0x1C8: 0x391F8009,
+            0x20C: 0xB9041009,
+            0x228: 0x3D815101,
+            0x230: 0xFD059C00,
+            0x238: 0xB90B4008,
+            0x24C: 0xD65F03C0,
+        }.items():
+            struct.pack_into("<I", copy_code, offset, word)
+        setup_code = bytearray(0x2000)
+        for offset, word in {
+            0x1F28: 0xF9400F48,
+            0x1F70: 0x910B4101,
+            0x1F74: 0xAA1903E0,
+            0x1F78: bl(setup_address + 0x1F78, copy_address),
+        }.items():
+            struct.pack_into("<I", setup_code, offset, word)
+        alloc_code = bytearray(0x40)
+        struct.pack_into("<I", alloc_code, 0x18, 0x52818801)
+
+        symbols = {
+            recover_g17_abi.COPY_3D_COMMON_PASSTHROUGH: copy_address,
+            recover_g17_abi.PROCESS_RENDER_SETUP: setup_address,
+            recover_g17_abi.ALLOC_3D_COMMAND_DESCRIPTOR: 0x950000,
+        }
+        code_by_symbol = {
+            recover_g17_abi.COPY_3D_COMMON_PASSTHROUGH: (
+                copy_address,
+                bytes(copy_code),
+            ),
+            recover_g17_abi.PROCESS_RENDER_SETUP: (
+                setup_address,
+                bytes(setup_code),
+            ),
+            recover_g17_abi.ALLOC_3D_COMMAND_DESCRIPTOR: (
+                0x950000,
+                bytes(alloc_code),
+            ),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, symbol: code_by_symbol[symbol],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_3d_common_passthrough(b"")
+
+        self.assertEqual(recovered["descriptor_bytes"], 0xC40)
+        self.assertEqual(
+            recovered["source"],
+            {"payload_pointer_member": 0x18, "payload_offset": 0x2D0, "bytes": 0x3EC},
+        )
+        self.assertEqual(len(recovered["copy_ranges"]), 49)
+        self.assertEqual(
+            recovered["copy_ranges"][0],
+            {"source_offset": 0, "descriptor_member": 0x4E8, "bytes": 0x80},
+        )
+        self.assertEqual(
+            recovered["copy_ranges"][-1],
+            {"source_offset": 0x3E8, "descriptor_member": 0xB40, "bytes": 4},
+        )
+        self.assertEqual(len(recovered["bit_fields"]), 8)
+        self.assertEqual(recovered["bit_fields"][-1]["descriptor_member"], 0x7E0)
+
+    def test_rejects_g17_3d_passthrough_call_retarget(self) -> None:
+        copy_code = bytearray(0x250)
+        setup_code = bytearray(0x2000)
+        alloc_code = bytearray(0x40)
+        # Satisfy the fixed anchors, but deliberately branch elsewhere.
+        anchor_words = {
+            0x004: 0x9106E029, 0x008: 0x9117A008, 0x00C: 0xF940002A,
+            0x010: 0xF902740A, 0x090: 0x3D800100, 0x0A8: 0xF9025C0A,
+            0x0AC: 0xF902580B, 0x140: 0x3D81D400, 0x19C: 0x3D81D000,
+            0x1A4: 0xB9088809, 0x1B4: 0x3D82BC00, 0x1BC: 0x3D82C000,
+            0x1C4: 0x12000129, 0x1C8: 0x391F8009, 0x20C: 0xB9041009,
+            0x228: 0x3D815101, 0x230: 0xFD059C00, 0x238: 0xB90B4008,
+            0x24C: 0xD65F03C0,
+        }
+        for offset, word in anchor_words.items():
+            struct.pack_into("<I", copy_code, offset, word)
+        for offset, word in {
+            0x1F28: 0xF9400F48,
+            0x1F70: 0x910B4101,
+            0x1F74: 0xAA1903E0,
+            0x1F78: bl(0x941F78, 0x960000),
+        }.items():
+            struct.pack_into("<I", setup_code, offset, word)
+        struct.pack_into("<I", alloc_code, 0x18, 0x52818801)
+        symbols = {
+            recover_g17_abi.COPY_3D_COMMON_PASSTHROUGH: 0x930000,
+            recover_g17_abi.PROCESS_RENDER_SETUP: 0x940000,
+            recover_g17_abi.ALLOC_3D_COMMAND_DESCRIPTOR: 0x950000,
+        }
+        code_by_symbol = {
+            recover_g17_abi.COPY_3D_COMMON_PASSTHROUGH: (0x930000, bytes(copy_code)),
+            recover_g17_abi.PROCESS_RENDER_SETUP: (0x940000, bytes(setup_code)),
+            recover_g17_abi.ALLOC_3D_COMMAND_DESCRIPTOR: (0x950000, bytes(alloc_code)),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, symbol: code_by_symbol[symbol],
+            ),
+            self.assertRaisesRegex(ValueError, "no longer calls"),
+        ):
+            recover_g17_abi.recover_g17_3d_common_passthrough(b"")
+
+    def test_recovers_g17_3d_descriptor_initialization(self) -> None:
+        alloc_code = bytearray(0x110)
+        for offset, word in {
+            0x018: 0x52818801,
+            0x098: 0xB9096808,
+            0x0A8: 0x2F00E5E1,
+            0x0AC: 0xFD055001,
+            0x0B4: 0xB90B6008,
+            0x0D8: 0x3930E01F,
+        }.items():
+            struct.pack_into("<I", alloc_code, offset, word)
+        init_code = bytearray(0x250)
+        for offset, word in {
+            0x114: 0x9112C260,
+            0x118: 0x52806A01,
+            0x128: 0xB9090274,
+            0x188: 0xB9014674,
+            0x1D0: 0xF9461668,
+            0x1D4: 0x9254A508,
+            0x1D8: 0xF9061668,
+            0x1E0: 0x52802029,
+            0x1E4: 0x79000109,
+            0x1EC: 0xB9040275,
+            0x230: 0xB9041268,
+            0x234: 0xB90C3275,
+            0x238: 0xB902D674,
+        }.items():
+            struct.pack_into("<I", init_code, offset, word)
+        symbols = {
+            recover_g17_abi.ALLOC_3D_COMMAND_DESCRIPTOR: 0x950000,
+            recover_g17_abi.INIT_3D_COMMAND_DESCRIPTOR: 0x960000,
+        }
+        code_by_symbol = {
+            recover_g17_abi.ALLOC_3D_COMMAND_DESCRIPTOR: (0x950000, bytes(alloc_code)),
+            recover_g17_abi.INIT_3D_COMMAND_DESCRIPTOR: (0x960000, bytes(init_code)),
+        }
+        with (
+            mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, symbol: code_by_symbol[symbol],
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_3d_descriptor_initialization(b"")
+
+        self.assertEqual(recovered["descriptor_bytes"], 0xC40)
+        self.assertTrue(recovered["staging_clear"])
+        self.assertEqual(recovered["cleared_range"], {"offset": 0x4B0, "bytes": 0x350})
+        self.assertEqual(len(recovered["initial_values"]), 10)
+        self.assertEqual(
+            recovered["initial_values"][1],
+            {"member": 0x1C1, "bytes": 2, "value": 0x101},
+        )
+        self.assertEqual(recovered["masked_default"]["member"], 0xC28)
+
     def test_recovers_g17_channel_command_common_fields(self) -> None:
         code = bytearray(0x300)
         for offset, word in {

@@ -122,8 +122,7 @@ rings, preserve all five recovered host no-op event types, and translate the
 type-1 128-slot firing mask into fence-completion scans,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and
-runtime policy. Firmware channel
-construction, the work-command ABI, and the userspace command producer still
+runtime policy. The work-command ABI and userspace command producer still
 need byte-accurate implementations before enabling T6050. The hardware
 configuration is now complete, including the two die-dependent power rows.
 Their three-word eFuse input is decoded in integer quarter-units and combined
@@ -157,6 +156,12 @@ recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
 register emission graph into the work-command encoder and implementing
 the remaining callback error/control event types and work-command reclamation.
+The first parser-to-descriptor bridge is executable: the recovery pins the
+retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
+eight masked flags, and the independently allocated `0xc40` descriptor size;
+the kernel applies that map only to staged, bounds-checked buffers. The same
+recovery pins the derived descriptor clear and ten nonzero scalar defaults,
+which the kernel installs without copying Apple's host C++ object pointers.
 
 `generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this
