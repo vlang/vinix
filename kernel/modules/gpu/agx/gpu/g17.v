@@ -80,8 +80,87 @@ fn role0_region_size(index int) ?u64 {
 	}
 }
 
+// Tear down a graph only while firmware is stopped or before its roots have
+// been published. Buffers are released in reverse construction order so the
+// grow-only shared-VA heap can reclaim the complete suffix.
+fn (mut mgr GpuManager) free_g17_firmware_graph(mut graph G17FirmwareGraph) {
+	// PIO mappings point at device apertures rather than owned physical pages.
+	// They use their own canonical-high range, so remove them separately.
+	if uat_mgr != unsafe { nil } && graph.hardware_config.phys != 0 {
+		unsafe {
+			config := &fw.G17HardwareConfig(graph.hardware_config.cpu_address())
+			for index := 0; index < fw.g17_io_mapping_count; index++ {
+				record := config.io_mappings_640[index]
+				if record.virtual_address == 0 || record.total_size == 0 {
+					continue
+				}
+				mapping_base := record.virtual_address & ~pgtable.uat_pg_mask
+				page_offset := record.virtual_address & pgtable.uat_pg_mask
+				span := page_offset + u64(record.total_size)
+				if span >= page_offset && span <= u64(-1) - pgtable.uat_pg_mask {
+					mapping_size := (span + pgtable.uat_pg_mask) & ~pgtable.uat_pg_mask
+					uat_mgr.unmap_kernel(mapping_base, mapping_size)
+				}
+			}
+		}
+	}
+
+	for index := g17_work_command_pool_count - 1; index >= 0; index-- {
+		if graph.command_in_use[index] != unsafe { nil } {
+			memory.free(graph.command_in_use[index])
+			graph.command_in_use[index] = unsafe { nil }
+		}
+		mgr.free_shared_buffer(mut graph.command_backings[index])
+	}
+	for index := 4; index >= 0; index-- {
+		mgr.free_shared_buffer(mut graph.role0_regions[index])
+	}
+	for role := 1; role >= 0; role-- {
+		for index := fw.g17_auxiliary_ring_address_count - 1; index >= 0; index-- {
+			mgr.free_shared_buffer(mut graph.auxiliary[role][index])
+		}
+		mgr.free_shared_buffer(mut graph.accelerator_entries[role])
+		mgr.free_shared_buffer(mut graph.accelerator_state[role])
+		mgr.free_shared_buffer(mut graph.large_regions[role])
+		mgr.free_shared_buffer(mut graph.small_shared[role])
+		mgr.free_shared_buffer(mut graph.firmware_shared[role])
+		mgr.free_shared_buffer(mut graph.roots[role])
+	}
+	mgr.free_shared_buffer(mut graph.role1_secondary)
+	mgr.free_shared_buffer(mut graph.common_control)
+	mgr.free_shared_buffer(mut graph.hardware_config)
+	mgr.free_shared_buffer(mut graph.secondary_aux)
+	mgr.free_shared_buffer(mut graph.secondary_region)
+	mgr.free_shared_buffer(mut graph.primary_region)
+	mgr.free_shared_buffer(mut graph.runtime)
+	mgr.free_shared_buffer(mut graph.bootstrap_region)
+	mgr.allocs.gc()
+}
+
+fn (mut mgr GpuManager) release_g17_firmware_graph() {
+	if mgr.g17_graph == unsafe { nil } {
+		return
+	}
+	mut graph := unsafe { mgr.g17_graph }
+	mgr.g17_graph = unsafe { nil }
+	mgr.free_g17_firmware_graph(mut graph)
+}
+
+fn (mut mgr GpuManager) fail_g17_initialization(started_roles u32) bool {
+	mgr.stop_firmware_cpus(started_roles)
+	mgr.release_g17_firmware_graph()
+	mgr.state = .error
+	return false
+}
+
 fn (mut mgr GpuManager) allocate_g17_firmware_graph() ?&G17FirmwareGraph {
 	mut graph := &G17FirmwareGraph{}
+	mut complete := false
+	defer {
+		if !complete {
+			mgr.free_g17_firmware_graph(mut graph)
+		}
+	}
 
 	graph.bootstrap_region = mgr.alloc_shared_buffer(fw.g17_bootstrap_region_size) or {
 		return none
@@ -157,6 +236,7 @@ fn (mut mgr GpuManager) allocate_g17_firmware_graph() ?&G17FirmwareGraph {
 		}
 	}
 
+	complete = true
 	return graph
 }
 
@@ -385,6 +465,7 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	}
 	if !mgr.populate_g17_firmware_graph(mut graph) {
 		C.printf(c'agx: failed to populate G17 firmware graph\n')
+		mgr.free_g17_firmware_graph(mut graph)
 		return false
 	}
 	mgr.initdata_va = graph.roots[0].va
@@ -400,6 +481,8 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 		&& graph.command_pools_ready
 	if ready {
 		mgr.g17_graph = graph
+	} else {
+		mgr.free_g17_firmware_graph(mut graph)
 	}
 	return ready
 }
@@ -426,23 +509,17 @@ fn (mut mgr GpuManager) init_g17() bool {
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.res.start_cpu(role) {
 			C.printf(c'agx: Failed to start G17 ASC role %u\n', role)
-			mgr.stop_firmware_cpus(role)
-			mgr.state = .error
-			return false
+			return mgr.fail_g17_initialization(role)
 		}
 	}
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
 			C.printf(c'agx: G17 RTKit boot failed for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}
 		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
 			C.printf(c'agx: G17 firmware endpoint failed for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}
 	}
 
@@ -450,33 +527,25 @@ fn (mut mgr GpuManager) init_g17() bool {
 	// it, but before either root is exposed for firmware dereferences.
 	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
 		C.printf(c'agx: G17 UAT firmware handoff failed\n')
-		mgr.stop_firmware_cpus(mgr.firmware_roles)
-		mgr.state = .error
-		return false
+		return mgr.fail_g17_initialization(mgr.firmware_roles)
 	}
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		root_iova := mgr.g17_graph.roots[role].va
 		message := fw.g17_init_message_for_root(root_iova)
 		if !mgr.send_role_message(role, u8(ep_firmware), message) {
 			C.printf(c'agx: Failed to publish G17 root for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}
 	}
 
 	if !mgr.wait_g17_ready() {
 		C.printf(c'agx: G17 firmware ready handshake failed\n')
-		mgr.stop_firmware_cpus(mgr.firmware_roles)
-		mgr.state = .error
-		return false
+		return mgr.fail_g17_initialization(mgr.firmware_roles)
 	}
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
 			C.printf(c'agx: G17 doorbell endpoint failed for role %u\n', role)
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}
 	}
 

@@ -175,6 +175,7 @@ fn (mut mgr GpuManager) stop_firmware_cpus(count u32) {
 }
 
 struct SharedBuffer {
+	mut:
 	va   u64
 	phys u64
 	size u64
@@ -186,9 +187,12 @@ fn pipe_index(priority u32, cmd_type u32) u32 {
 }
 
 fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
-	aligned_size := lib.align_up(size, alloc.gpu_page_size)
+	if size == 0 || size > u64(-1) - (alloc.gpu_page_size - 1) || uat_mgr == unsafe { nil } {
+		return none
+	}
+	aligned_size := (size + alloc.gpu_page_size - 1) & ~(alloc.gpu_page_size - 1)
 	pages := aligned_size / page_size
-	phys := u64(memory.pmm_alloc_aligned(pages, 4))
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
 	if phys == 0 {
 		return none
 	}
@@ -198,13 +202,15 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 	}
 
 	va := mgr.allocs.alloc(size, alloc.gpu_page_size) or {
+		memory.pmm_free(voidptr(phys), pages)
 		return none
 	}
 
-	if uat_mgr != unsafe { nil } {
-		if !uat_mgr.map_kernel(va, phys, aligned_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
-			return none
-		}
+	if !uat_mgr.map_kernel(va, phys, aligned_size, pgtable.gpu_prot_fw_gpu_shared_rw) {
+		mgr.allocs.release(va)
+		mgr.allocs.gc()
+		memory.pmm_free(voidptr(phys), pages)
+		return none
 	}
 
 	return SharedBuffer{
@@ -212,6 +218,22 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 		phys: phys
 		size: aligned_size
 	}
+}
+
+// Release a driver-owned shared allocation after its firmware consumer has
+// stopped. The caller batches heap GC so a complete reverse-order unwind can
+// collapse the whole virtual-address suffix in one pass.
+fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
+	if buffer.va != 0 {
+		if uat_mgr != unsafe { nil } && buffer.size != 0 {
+			uat_mgr.unmap_kernel(buffer.va, buffer.size)
+		}
+		mgr.allocs.release(buffer.va)
+	}
+	if buffer.phys != 0 && buffer.size != 0 {
+		memory.pmm_free(voidptr(buffer.phys), buffer.size / page_size)
+	}
+	buffer = SharedBuffer{}
 }
 
 fn (mut mgr GpuManager) init_channels() bool {
@@ -593,5 +615,6 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_g17_firmware_graph()
 	println('agx: GPU shutdown complete')
 }

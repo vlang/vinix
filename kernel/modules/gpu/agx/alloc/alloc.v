@@ -136,7 +136,9 @@ pub fn (mut h HeapAllocator) release(va u64) {
 
 // Compact free allocations at the top of the heap.
 // Only contiguous free entries ending at `top` can be reclaimed because
-// the heap is grow-only -- we cannot move live allocations.
+// the heap is grow-only -- we cannot move live allocations. Free records
+// below a live allocation must remain tracked: once the allocations above
+// them are released, they may become part of the reclaimable top suffix.
 pub fn (mut h HeapAllocator) gc() {
 	h.lock.acquire()
 	defer {
@@ -171,16 +173,6 @@ fn (mut h HeapAllocator) gc_locked() {
 		}
 	}
 
-	// Remove any remaining non-in_use entries from the list that
-	// are not at the top (cannot reclaim VA but can free bookkeeping).
-	mut new_allocs := []&Allocation{}
-	for a in h.allocations {
-		if a.in_use {
-			new_allocs << a
-		}
-	}
-	unsafe { h.allocations.free() }
-	h.allocations = new_allocs
 }
 
 // Return the total number of bytes currently in use (allocated and not freed).
