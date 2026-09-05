@@ -122,6 +122,7 @@ pub const asahi_render_msaa_zs = u64(1) << 5
 pub const asahi_render_supported_flags = asahi_render_no_clear_pipeline_textures
 	| asahi_render_set_when_reloading_z_or_s | asahi_render_vertex_spills
 	| asahi_render_process_empty_tiles | asahi_render_no_vertex_clustering | asahi_render_msaa_zs
+pub const asahi_compute_no_preemption = u64(1) << 0
 pub const asahi_queue_cap_render = u32(1) << asahi_cmd_render
 pub const asahi_queue_cap_blit = u32(1) << asahi_cmd_blit
 pub const asahi_queue_cap_compute = u32(1) << asahi_cmd_compute

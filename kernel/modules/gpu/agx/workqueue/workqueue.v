@@ -38,18 +38,20 @@ pub mut:
 	id             u32
 	vm_id          u32
 	priority       u32
-		ring_addr      u64 // ring buffer GPU VA
-		ring_phys      u64
-		ring_size      u32
-		slots          [max_job_slots]&WorkItem
+	caps           u32
+	ring_addr      u64 // ring buffer GPU VA
+	ring_phys      u64
+	ring_size      u32
+	slots          [max_job_slots]&WorkItem
 	next_slot      u32
 	completed_slot u32
 	pending_count  u32
 	lock           klock.Lock
 }
 
-// Create a new work queue with the given ID, VM context, and priority level.
-pub fn new_workqueue(id u32, vm_id u32, priority u32) ?&WorkQueue {
+// Create a new work queue with the given ID, VM context, priority, and the
+// command types which userspace selected when creating it.
+pub fn new_workqueue(id u32, vm_id u32, priority u32, caps u32) ?&WorkQueue {
 	// Allocate ring buffer physical memory (one page is sufficient)
 	ring_phys := u64(memory.pmm_alloc_aligned(4, 4))
 	if ring_phys == 0 {
@@ -66,6 +68,7 @@ pub fn new_workqueue(id u32, vm_id u32, priority u32) ?&WorkQueue {
 		id:        id
 		vm_id:     vm_id
 		priority:  priority
+		caps:      caps
 		ring_phys: ring_phys
 		ring_size: max_job_slots
 	}

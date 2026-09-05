@@ -8,6 +8,7 @@ module file
 import drm
 import drm.gem
 import drm.ioctl
+import drm.syncobj
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import gpu.agx.workqueue
@@ -272,8 +273,9 @@ pub fn (f &GpuFile) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 		request.size = supported_size
 		return -14 // EFAULT
 	}
-	unsafe {
-		C.memcpy(voidptr(request.pointer), &params, copy_size)
+	if !usercopy.copy_to_user(request.pointer, voidptr(&params), copy_size) {
+		request.size = supported_size
+		return -14
 	}
 	request.size = supported_size
 	return 0
@@ -453,7 +455,9 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	id := f.next_queue_id
 	f.next_queue_id++
 	f.lock.release()
-	wq := workqueue.new_workqueue(id, request.vm_id, request.priority) or { return -12 }
+	wq := workqueue.new_workqueue(id, request.vm_id, request.priority, request.queue_caps) or {
+		return -12
+	}
 	f.lock.acquire()
 	f.queues << wq
 	f.lock.release()
@@ -508,6 +512,89 @@ fn valid_render_command(command &ioctl.DrmAsahiCmdRender) bool {
 	return true
 }
 
+fn valid_compute_command(command &ioctl.DrmAsahiCmdCompute) bool {
+	if command.extensions != 0 || command.flags & ~ioctl.asahi_compute_no_preemption != 0
+		|| command.pad != 0 || command.attachment_count > max_command_attachments
+		|| (command.attachment_count != 0 && command.attachments == 0) {
+		return false
+	}
+	return true
+}
+
+// Copy every nested sync descriptor once while the submission is being
+// staged. Timeline syncobjs are rejected because GET_CAP deliberately reports
+// no timeline support; binary input syncobjs must already contain a fence.
+fn validate_sync_array(pointer u64, count u32, input bool) int {
+	if count == 0 {
+		return 0
+	}
+	bytes := u64(count) * sizeof(ioctl.DrmAsahiSync)
+	if pointer == 0 || bytes - 1 > ~pointer {
+		return -14
+	}
+	for i := u32(0); i < count; i++ {
+		mut item := ioctl.DrmAsahiSync{}
+		if !usercopy.copy_from_user(voidptr(&item), pointer + u64(i) * sizeof(ioctl.DrmAsahiSync),
+			sizeof(ioctl.DrmAsahiSync)) {
+			return -14
+		}
+		if item.extensions != 0 || item.sync_type != ioctl.asahi_sync_syncobj
+			|| item.timeline_value != 0 {
+			return -22
+		}
+		obj := syncobj.lookup(item.handle) or { return -22 }
+		if input && obj.fence == unsafe { nil } {
+			return -22
+		}
+	}
+	return 0
+}
+
+// Validate attachment records before a future encoder is allowed to consume
+// them. The firmware ABI stores sizes in 128-byte cache lines in a u32.
+fn validate_attachment_array(pointer u64, count u32) int {
+	if count == 0 {
+		return 0
+	}
+	if count > max_command_attachments || pointer == 0 {
+		return -22
+	}
+	bytes := u64(count) * sizeof(ioctl.DrmAsahiAttachment)
+	if bytes - 1 > ~pointer {
+		return -14
+	}
+	for i := u32(0); i < count; i++ {
+		mut attachment := ioctl.DrmAsahiAttachment{}
+		if !usercopy.copy_from_user(voidptr(&attachment),
+			pointer + u64(i) * sizeof(ioctl.DrmAsahiAttachment), sizeof(ioctl.DrmAsahiAttachment)) {
+			return -14
+		}
+		if attachment.flags != 0 || attachment.order < 1 || attachment.order > 6 {
+			return -22
+		}
+		cache_lines := (attachment.size >> 7) + if attachment.size & u64(127) != 0 {
+			u64(1)
+		} else {
+			u64(0)
+		}
+		if cache_lines > u64(~u32(0)) {
+			return -22
+		}
+	}
+	return 0
+}
+
+fn (mut f GpuFile) get_queue_caps(queue_id u32) ?u32 {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	for q in f.queues {
+		if q.id == queue_id {
+			return q.caps
+		}
+	}
+	return none
+}
+
 // Validate the Mesa envelope but do not reinterpret its command buffer as the
 // obsolete v12.3 placeholder. G17/HAL300 work commands have a different,
 // partially recovered layout; rejecting them is the only safe behavior until
@@ -521,20 +608,21 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		|| (request.out_sync_count != 0 && request.out_syncs == 0) {
 		return -22
 	}
-	mut queue_found := false
-	for q in f.queues {
-		if q.id == request.queue_id {
-			queue_found = true
-			break
-		}
+	queue_caps := f.get_queue_caps(request.queue_id) or { return -22 }
+	mut sync_result := validate_sync_array(request.in_syncs, request.in_sync_count, true)
+	if sync_result != 0 {
+		return sync_result
 	}
-	if !queue_found {
-		return -22
+	sync_result = validate_sync_array(request.out_syncs, request.out_sync_count, false)
+	if sync_result != 0 {
+		return sync_result
 	}
 	commands_bytes := u64(request.command_count) * sizeof(ioctl.DrmAsahiCommand)
 	if commands_bytes - 1 > ~request.commands {
 		return -14
 	}
+	mut prior_render_commands := u32(0)
+	mut prior_compute_commands := u32(0)
 	for i := u32(0); i < request.command_count; i++ {
 		mut command := ioctl.DrmAsahiCommand{}
 		if !usercopy.copy_from_user(voidptr(&command), request.commands + u64(i) * sizeof(ioctl.DrmAsahiCommand),
@@ -544,9 +632,16 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		if command.extensions != 0 || command.flags != 0 || command.cmd_buffer == 0 {
 			return -22
 		}
+		if (command.barriers[0] != ioctl.asahi_barrier_none
+			&& command.barriers[0] > prior_render_commands)
+			|| (command.barriers[1] != ioctl.asahi_barrier_none
+			&& command.barriers[1] > prior_compute_commands) {
+			return -22
+		}
 		match command.cmd_type {
 			ioctl.asahi_cmd_render {
-				if command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
+				if queue_caps & ioctl.asahi_queue_cap_render == 0
+					|| command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
 					|| (command.result_size != 0
 					&& command.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
 					return -22
@@ -559,14 +654,39 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				if !valid_render_command(&render) {
 					return -22
 				}
+				mut attachment_result := validate_attachment_array(render.vertex_attachments,
+					render.vertex_attachment_count)
+				if attachment_result != 0 {
+					return attachment_result
+				}
+				attachment_result = validate_attachment_array(render.fragment_attachments,
+					render.fragment_attachment_count)
+				if attachment_result != 0 {
+					return attachment_result
+				}
+				prior_render_commands++
 			}
 			ioctl.asahi_cmd_compute {
-				if (command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
-					&& command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute) - 8)
+				if queue_caps & ioctl.asahi_queue_cap_compute == 0
+					|| command.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
 					|| (command.result_size != 0
 					&& command.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
 					return -22
 				}
+				mut compute := ioctl.DrmAsahiCmdCompute{}
+				if !usercopy.copy_from_user(voidptr(&compute), command.cmd_buffer,
+					sizeof(ioctl.DrmAsahiCmdCompute)) {
+					return -14
+				}
+				if !valid_compute_command(&compute) {
+					return -22
+				}
+				attachment_result := validate_attachment_array(compute.attachments,
+					compute.attachment_count)
+				if attachment_result != 0 {
+					return attachment_result
+				}
+				prior_compute_commands++
 			}
 			else { return -22 }
 		}
