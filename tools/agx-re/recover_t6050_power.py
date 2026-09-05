@@ -46,6 +46,9 @@ PMP_SET_VIRTUAL_DEVICE_STATE = (
 )
 PMP_INIT_V2 = "__ZN9ApplePMGR10_initPMPv2Ev"
 PMP_GET_DEVICE_INDEX = "__ZN9ApplePMGR18_getPMPDeviceIndexEtj"
+PMP_NOTIFY_INITIAL = "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv"
+PMP_ENABLE_DEVICE_GATED = "__ZN9ApplePMGR18_enableDeviceGatedEmmmm"
+PMP_DEVICE_ID_TO_DATA = "__ZN9ApplePMGR21_deviceIDToDeviceDataEt"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
 APPLE_PMP_V2_START = "__ZN10ApplePMPv25startEP9IOService"
@@ -282,6 +285,8 @@ def resolve_gate(handle: int, devices: list[PmgrDevice]) -> dict[str, object]:
         names = ", ".join(device.name for device in matches) or "none"
         raise ValueError(f"power handle {handle:#x} has non-unique PMGR mapping: {names}")
     device = matches[0]
+    virtual_device = bool(device.flags & 0x10 and device.pmp_virtual_class >= 0)
+    emits_device_state = bool(device.flags & 0x02)
     return {
         "handle": handle,
         "name": device.name,
@@ -290,9 +295,9 @@ def resolve_gate(handle: int, devices: list[PmgrDevice]) -> dict[str, object]:
             "flags": device.flags,
             "selector": device.pmp_selector,
             "virtual_class": device.pmp_virtual_class,
-            "virtual_device": bool(
-                device.flags & 0x10 and device.pmp_virtual_class >= 0
-            ),
+            "emits_device_state": emits_device_state,
+            "virtual_device": virtual_device,
+            "route_if_emitted": "virtual" if virtual_device else "ordinary",
         },
     }
 
@@ -437,6 +442,9 @@ def recover_pmp_code_contract(
         PMP_SET_VIRTUAL_DEVICE_STATE,
         PMP_INIT_V2,
         PMP_GET_DEVICE_INDEX,
+        PMP_NOTIFY_INITIAL,
+        PMP_ENABLE_DEVICE_GATED,
+        PMP_DEVICE_ID_TO_DATA,
         APPLE_PTD_READ,
         APPLE_PTD_WRITE,
     )
@@ -450,6 +458,8 @@ def recover_pmp_code_contract(
         PMP_SET_VIRTUAL_DEVICE_STATE,
         PMP_INIT_V2,
         PMP_GET_DEVICE_INDEX,
+        PMP_NOTIFY_INITIAL,
+        PMP_ENABLE_DEVICE_GATED,
     ):
         if name not in functions:
             raise ValueError(f"ApplePMGR has no code body for {name}")
@@ -575,6 +585,43 @@ def recover_pmp_code_contract(
     if symbols[APPLE_PTD_WRITE] not in virtual_targets:
         raise ValueError("PMP virtual-device dashboard no longer writes ApplePTD")
 
+    initial_address, initial_code = functions[PMP_NOTIFY_INITIAL]
+    initial_targets = direct_branch_targets(initial_address, initial_code)
+    for target in (PMP_DEVICE_ID_TO_DATA, PMP_SEND_COMMAND):
+        if symbols[target] not in initial_targets:
+            raise ValueError(f"initial PMP state sync no longer calls {target}")
+    if not _has_ordered_words(
+        initial_code,
+        (
+            0x394002A8,  # ldrb w8, [x21] -- DeviceData flags
+            0x360801A8,  # tbz w8, #1 -- skip records that do not notify PMP
+            0x794036A8,  # ldrh w8, [x21, #0x1a] -- public handle
+            0x35000048,  # cbnz w8 -- prefer a nonzero public handle
+            0x39400EA8,  # ldrb w8, [x21, #3] -- selector fallback
+            0xA900E7E8,  # stp x8, x25, [sp, #8] -- target and state 1
+        ),
+    ):
+        raise ValueError("initial PMP state-notification filter changed")
+
+    enable_address, enable_code = functions[PMP_ENABLE_DEVICE_GATED]
+    enable_targets = direct_branch_targets(enable_address, enable_code)
+    for target in (PMP_DEVICE_ID_TO_DATA, PMP_SEND_COMMAND):
+        if symbols[target] not in enable_targets:
+            raise ValueError(f"dynamic PMP state sync no longer calls {target}")
+    notify_test = struct.pack("<I", 0x360801C8)  # tbz w8, #1
+    if (
+        enable_code.count(notify_test) != 2
+        or not _has_ordered_words(
+            enable_code,
+            (
+                0x794002A1,  # ldrh w1, [x21] -- changed device ID
+                0x39400008,  # ldrb w8, [x0] -- DeviceData flags
+                0x360801C8,  # tbz w8, #1 -- skip non-notifying records
+            ),
+        )
+    ):
+        raise ValueError("dynamic PMP state-notification filter changed")
+
     return {
         "device_state_commands": [14, 15],
         "device_states": [0, 1],
@@ -583,6 +630,13 @@ def recover_pmp_code_contract(
             "virtual_flag": 0x10,
             "virtual_class_field": 15,
             "virtual_class_minimum": 0,
+        },
+        "state_notification": {
+            "flag": 0x02,
+            "flags_field": 0,
+            "initial_sync": PMP_NOTIFY_INITIAL,
+            "dynamic_sync": PMP_ENABLE_DEVICE_GATED,
+            "target": "public handle at +0x1a, selector byte at +3 if zero",
         },
         "device_index_map": {
             "source": "soc-device",
@@ -622,6 +676,8 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
             PMP_SET_VIRTUAL_DEVICE_STATE,
             PMP_INIT_V2,
             PMP_GET_DEVICE_INDEX,
+            PMP_NOTIFY_INITIAL,
+            PMP_ENABLE_DEVICE_GATED,
         )
     }
     return {
@@ -939,8 +995,42 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             )
         gfx_handles[expected_name] = gate
 
+    all_leaf_gates = power_gates + list(gfx_handles.values())
+    for gate in all_leaf_gates:
+        dispatch = gate["pmp_dispatch"]
+        actual = (
+            dispatch["flags"],
+            dispatch["selector"],
+            dispatch["virtual_class"],
+            dispatch["emits_device_state"],
+            dispatch["virtual_device"],
+        )
+        if actual != (0x10, 0, 0, False, True):
+            raise ValueError(
+                f"T6050 {gate['name']} leaf PMP flags changed: {actual!r}"
+            )
+
+    gfx_devices = [device for device in devices if device.name == "GFX"]
+    if len(gfx_devices) != 1:
+        raise ValueError(f"unexpected aggregate GFX PMGR records: {gfx_devices!r}")
+    gfx_device = gfx_devices[0]
+    device_state_target = resolve_gate(gfx_device.handle, devices)
+    target_dispatch = device_state_target["pmp_dispatch"]
+    actual_target = (
+        device_state_target["handle"],
+        target_dispatch["flags"],
+        target_dispatch["selector"],
+        target_dispatch["virtual_class"],
+        target_dispatch["emits_device_state"],
+        target_dispatch["virtual_device"],
+    )
+    if actual_target != (0x16A, 0x02, 0x10, 0, True, False):
+        raise ValueError(f"T6050 aggregate GFX PMP proxy changed: {actual_target!r}")
+    if target_dispatch["selector"] != agx_device["id"]:
+        raise ValueError("aggregate GFX selector no longer targets PMP AGX")
+
     return {
-        "schema": 3,
+        "schema": 4,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -968,6 +1058,8 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
                 "agx_key": agx_device["id"],
                 "agx_value": agx_device["index"],
             },
+            "device_state_target": device_state_target,
+            "leaf_gate_state_notifications": False,
             "device_state_dashboard": dashboard,
         },
     }

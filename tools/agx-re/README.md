@@ -79,8 +79,12 @@ records. It fails closed unless the installed T6050 image maps them, in order,
 to `GFX_SGX` and `GFX_BUSY`, identifies both GFX ASC handles, and proves that
 the AGX SoC-device record and device-state request/ack PTD ranges belong to the
 `t6050pmp` RTKit nub. It also checks the UUID-pinned ApplePMGR binary for the
-command-14/15 PTD-dashboard dispatch, its state/index bounds, and the exact
-host-built selector maps. A separate UUID-pinned ApplePMP check recovers the
+command-14/15 PTD-dashboard dispatch, its state/index bounds, exact host-built
+selector maps, and the flag-`0x02` filter used by initial and dynamic state
+notification. The report distinguishes the four flag-`0x10` GFX leaf records,
+which do not emit PMP state commands, from the aggregate `GFX` proxy whose
+selector `0x10` reaches the ordinary AGX request/ack path. A separate
+UUID-pinned ApplePMP check recovers the
 PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated
 report labels that result as neither global PMP nor AGX-dashboard readiness,

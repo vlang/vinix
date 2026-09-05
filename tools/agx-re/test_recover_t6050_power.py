@@ -24,8 +24,17 @@ def adt_node(name: str, properties: dict[str, bytes], children: list[bytes]) -> 
     )
 
 
-def pmgr_record(handle: int, name: str) -> bytes:
+def pmgr_record(
+    handle: int,
+    name: str,
+    flags: int = 0,
+    selector: int = 0,
+    virtual_class: int = 0,
+) -> bytes:
     record = bytearray(recover_t6050_power.PMGR_DEVICE_BYTES)
+    record[0] = flags
+    record[3] = selector
+    record[15] = virtual_class & 0xFF
     struct.pack_into("<H", record, recover_t6050_power.PMGR_DEVICE_HANDLE_OFFSET, handle)
     encoded_name = name.encode() + b"\0"
     start = recover_t6050_power.PMGR_DEVICE_NAME_OFFSET
@@ -64,13 +73,13 @@ def fixture_tree(
     agx_packet_bytes: int = 1,
 ) -> bytes:
     devices = b"".join(
-        pmgr_record(handle, name)
-        for handle, name in (
-            (0x100, "OTHER"),
-            (0x266, "GFX_ASC"),
-            (0x267, "GFX_BUSY"),
-            (0x268, "GFX_SGX"),
-            (0x291, "GFX_ASC1"),
+        (
+            pmgr_record(0x100, "OTHER"),
+            pmgr_record(0x16A, "GFX", flags=0x02, selector=0x10),
+            pmgr_record(0x266, "GFX_ASC", flags=0x10),
+            pmgr_record(0x267, "GFX_BUSY", flags=0x10),
+            pmgr_record(0x268, "GFX_SGX", flags=0x10),
+            pmgr_record(0x291, "GFX_ASC1", flags=0x10),
         )
     )
     sgx = adt_node(
@@ -186,13 +195,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 3)
+        self.assertEqual(result["schema"], 4)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
         )
         self.assertEqual(result["gfx_asc_gates"]["GFX_ASC"]["handle"], 0x266)
         self.assertEqual(result["gfx_asc_gates"]["GFX_ASC1"]["handle"], 0x291)
+        self.assertFalse(
+            result["sgx"]["power_gates"][0]["pmp_dispatch"]["emits_device_state"]
+        )
         self.assertEqual(result["pmp"]["firmware"], "t6050pmp")
         self.assertEqual(result["pmp"]["region_base"], 0x4284500000)
         self.assertEqual(result["pmp"]["agx_soc_device"]["id"], 0x10)
@@ -200,6 +212,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["pmp"]["agx_soc_device"]["packet_bit_offset"], 0x1C0)
         self.assertEqual(result["pmp"]["agx_soc_device"]["packet_bit_count"], 8)
         self.assertEqual(result["pmp"]["agx_soc_device"]["virtual_state_index"], 3)
+        self.assertEqual(result["pmp"]["device_state_target"]["handle"], 0x16A)
+        self.assertEqual(
+            result["pmp"]["device_state_target"]["pmp_dispatch"]["selector"],
+            result["pmp"]["agx_soc_device"]["id"],
+        )
+        self.assertEqual(
+            result["pmp"]["device_state_target"]["pmp_dispatch"]["route_if_emitted"],
+            "ordinary",
+        )
+        self.assertFalse(result["pmp"]["leaf_gate_state_notifications"])
         self.assertEqual(result["pmp"]["soc_device_packet"]["trailing_reserved_bits"], 16)
         self.assertEqual(
             result["pmp"]["device_state_dashboard"]["SOC-DEV-PS-REQ"]["entry_offset"],
@@ -215,6 +237,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
         write = 0x6000
         init = 0x7000
         lookup = 0x8000
+        initial = 0x9000
+        enable = 0xA000
+        device_data = 0xB000
 
         def branch(source: int, target: int, link: bool = False) -> bytes:
             delta = (target - source) // 4
@@ -293,6 +318,24 @@ class RecoverT6050PowerTests(unittest.TestCase):
                     0x3100041F,
                 ),
             ),
+            recover_t6050_power.PMP_NOTIFY_INITIAL: (
+                initial,
+                struct.pack("<2I", 0x394002A8, 0x360801A8)
+                + branch(initial + 8, device_data, True)
+                + struct.pack(
+                    "<4I", 0x794036A8, 0x35000048, 0x39400EA8, 0xA900E7E8
+                )
+                + branch(initial + 28, send, True),
+            ),
+            recover_t6050_power.PMP_ENABLE_DEVICE_GATED: (
+                enable,
+                struct.pack("<I", 0x794002A1)
+                + branch(enable + 4, device_data, True)
+                + struct.pack("<2I", 0x39400008, 0x360801C8)
+                + struct.pack("<I", 0x794002A1)
+                + branch(enable + 20, send, True)
+                + struct.pack("<2I", 0x39400008, 0x360801C8),
+            ),
         }
         symbols = {
             recover_t6050_power.PMP_SEND_COMMAND: send,
@@ -301,6 +344,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.PMP_SET_VIRTUAL_DEVICE_STATE: virtual,
             recover_t6050_power.PMP_INIT_V2: init,
             recover_t6050_power.PMP_GET_DEVICE_INDEX: lookup,
+            recover_t6050_power.PMP_NOTIFY_INITIAL: initial,
+            recover_t6050_power.PMP_ENABLE_DEVICE_GATED: enable,
+            recover_t6050_power.PMP_DEVICE_ID_TO_DATA: device_data,
             recover_t6050_power.APPLE_PTD_READ: read,
             recover_t6050_power.APPLE_PTD_WRITE: write,
         }
@@ -309,6 +355,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["device_index_field"], 3)
         self.assertEqual(result["device_index_map"]["record_stride"], 124)
         self.assertEqual(result["device_index_map"]["allocated_entries"], 257)
+        self.assertEqual(result["state_notification"]["flag"], 0x02)
 
         bad_functions = dict(functions)
         init_address, init_code = bad_functions[recover_t6050_power.PMP_INIT_V2]
