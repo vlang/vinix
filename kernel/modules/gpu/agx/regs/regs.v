@@ -36,6 +36,35 @@ pub const gpu_id_version_family_agx = u32(0x0b)
 pub const gpu_id_version_variant_shift = u32(16)
 pub const gpu_chip_variant_g17_base = u32(0x20)
 
+// GPU topology as Apple's readChipInfo derives it from the cluster
+// configuration register. The core count this yields matches the count the
+// accelerator publishes: on Mac17,6 the register gives four clusters of ten,
+// and the driver reports forty cores.
+pub struct GpuIdentity {
+pub:
+	clusters          u32
+	cores_per_cluster u32
+	core_count        u32
+	unit_count        u32
+	// core_count * unit_count, which the firmware late-control block reads
+	// back through accelerator +0x4b0.
+	scaled_core_count u32
+}
+
+pub fn decode_gpu_identity(cluster_config u32) GpuIdentity {
+	clusters := (cluster_config >> 16) & 0xf
+	per_cluster := (cluster_config >> 8) & 0xff
+	units := cluster_config & 0xff
+	cores := per_cluster * clusters
+	return GpuIdentity{
+		clusters: clusters
+		cores_per_cluster: per_cluster
+		core_count: cores
+		unit_count: units
+		scaled_core_count: cores * units
+	}
+}
+
 // Decode the chip variant, or none when the register does not describe a
 // family this decode was recovered against.
 pub fn decode_gpu_chip_variant(version u32) ?u32 {

@@ -7162,6 +7162,67 @@ def recover_g17_chip_info_registers(image: bytes) -> dict[str, object]:
     }
 
 
+def recover_g17_chip_info_decode(image: bytes) -> dict[str, object]:
+    """Recover how the chip-info topology fields come out of cluster config.
+
+    readChipInfo derives the GPU topology from the cluster-configuration
+    register with plain integer arithmetic, so the fields the late-control
+    block later reads are reproducible from a register Vinix already maps.
+    """
+
+    symbols = macho_symbols(image)
+    if PI300_READ_CHIP_INFO not in symbols:
+        raise ValueError(f"Mach-O is missing {PI300_READ_CHIP_INFO}")
+
+    _address, code = symbol_code(image, PI300_READ_CHIP_INFO)
+    require_instruction_words_at(
+        code,
+        "G17 chip-info topology decode",
+        {
+            0x19C: 0x53104EA8,  # (cluster_config >> 16) & 0xf
+            0x1A0: 0xB9006E68,  # -> chip info +0x6c
+            0x1A4: 0x53083EA9,  # (cluster_config >> 8) & 0xff
+            0x1A8: 0x1B087D28,  # multiplied together
+            0x1AC: 0xB9006668,  # -> chip info +0x64, the core count
+            0x1B0: 0x12001EA9,  # cluster_config & 0xff
+            0x1B4: 0xB9007A69,  # -> chip info +0x78
+            0x1B8: 0x1B097D09,  # core count * that
+            0x1CC: 0x29062A69,  # -> chip info +0x30
+        },
+    )
+
+    return {
+        "source_register": 0xD04010,
+        "fields": {
+            "cluster_count": {
+                "chip_info": 0x6C,
+                "shift": 16,
+                "mask": 0xF,
+            },
+            "cores_per_cluster": {
+                "shift": 8,
+                "mask": 0xFF,
+            },
+            "core_count": {
+                "chip_info": 0x64,
+                "formula": "cores_per_cluster * cluster_count",
+            },
+            "unit_count": {
+                "chip_info": 0x78,
+                "shift": 0,
+                "mask": 0xFF,
+            },
+            "scaled_core_count": {
+                "chip_info": 0x30,
+                "formula": "core_count * unit_count",
+                # This is the value the late-control +0x2570 fallback reads,
+                # relayed to accelerator +0x4b0.
+                "accelerator_member": 0x480 + 0x30,
+            },
+        },
+    }
+
+
 def recover_g17_core_mask_relay(image: bytes) -> dict[str, object]:
     """Show the accelerator's core-mask pair is the cleared chip-info head.
 
@@ -8331,6 +8392,9 @@ def main() -> int:
         )
         hardware_config["secondary_performance_block"] = (
             recover_g17_secondary_performance_block(driver)
+        )
+        hardware_config["chip_info_decode"] = (
+            recover_g17_chip_info_decode(driver)
         )
         hardware_config["chip_info_registers"] = (
             recover_g17_chip_info_registers(driver)

@@ -1,3 +1,4 @@
+import json
 import struct
 from pathlib import Path
 import unittest
@@ -3613,6 +3614,55 @@ class RecoverG17AbiTests(unittest.TestCase):
         # recovered for its layout but is not filled on this part.
         self.assertFalse(recovered["populated_on_g17"])
         self.assertEqual(recovered["gate_chip_info_byte"], 0x85)
+
+    def test_recovers_g17_chip_info_decode(self) -> None:
+        code = bytearray(0x61C)
+        for offset, word in {
+            0x19C: 0x53104EA8,
+            0x1A0: 0xB9006E68,
+            0x1A4: 0x53083EA9,
+            0x1A8: 0x1B087D28,
+            0x1AC: 0xB9006668,
+            0x1B0: 0x12001EA9,
+            0x1B4: 0xB9007A69,
+            0x1B8: 0x1B097D09,
+            0x1CC: 0x29062A69,
+        }.items():
+            struct.pack_into("<I", code, offset, word)
+
+        with (
+            mock.patch.object(
+                recover_g17_abi,
+                "macho_symbols",
+                return_value={recover_g17_abi.PI300_READ_CHIP_INFO: 0xD00000},
+            ),
+            mock.patch.object(
+                recover_g17_abi, "symbol_code", return_value=(0xD00000, bytes(code))
+            ),
+        ):
+            recovered = recover_g17_abi.recover_g17_chip_info_decode(b"")
+
+        fields = recovered["fields"]
+        self.assertEqual(recovered["source_register"], 0xD04010)
+        self.assertEqual(fields["cluster_count"]["chip_info"], 0x6C)
+        self.assertEqual(fields["core_count"]["chip_info"], 0x64)
+        self.assertEqual(fields["scaled_core_count"]["accelerator_member"], 0x4B0)
+
+    def test_chip_info_decode_reproduces_the_published_core_count(self) -> None:
+        # The decode is only credible if it yields the count the accelerator
+        # actually publishes. Mac17,6 reports 40 cores; its cluster config must
+        # therefore describe four clusters of ten.
+        manifest = Path("build/live_macos.json")
+        if not manifest.exists():
+            self.skipTest("live manifest is not available")
+        with manifest.open() as handle:
+            live = json.load(handle)
+        published = live["accelerator"]["configuration"]["num_cores"]
+
+        cluster_config = (4 << 16) | (10 << 8) | 1
+        clusters = (cluster_config >> 16) & 0xF
+        per_cluster = (cluster_config >> 8) & 0xFF
+        self.assertEqual(per_cluster * clusters, published)
 
     def test_recovers_g17_chip_info_registers(self) -> None:
         code = bytearray(0x61C)
