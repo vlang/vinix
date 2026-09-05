@@ -3338,6 +3338,267 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["type_bytes"], 0x2920)
         self.assertEqual(recovered["static_provider_vtable_slot"], 0xCE0)
 
+    def _linear_power_transfer_fixtures(self) -> tuple[bytes, dict[str, object]]:
+        power_address = 0x600000
+        linear_address = power_address + 0x958 - 0x55734
+        max_power_address = 0x700000
+        cs_power_address = 0x710000
+        leakage_address = 0x720000
+        vdd_address = 0x730000
+        afr_address = 0x740000
+
+        image = bytearray(0x60000)
+        count_va = 0x1000
+        struct.pack_into("<I", image, count_va, 2)
+        tables = {
+            "vdd_default": 0x2000,
+            "vdd_variant": 0x3000,
+            "afr_default": 0x4000,
+            "afr_variant": 0x5000,
+        }
+        for base in tables.values():
+            struct.pack_into("<11d", image, base, 1000.0, *([1.0] * 10))
+            struct.pack_into("<11d", image, base + 0x58, -1.0, *([1.0] * 10))
+
+        arm_power = bytearray(0xC00)
+        for offset, word in {
+            0x948: 0xF9415E68,
+            0x94C: 0x52831909,
+            0x950: 0x8B090101,
+            0x954: 0x52800002,
+            0x958: 0x97FEAA33,
+            0x95C: 0xF9414E68,
+            0x960: 0x91407109,
+            0x964: 0x9113A12A,
+            0x968: 0xF9415E69,
+            0x96C: 0xB940014E,
+            0x974: 0x710041DF,
+            0x97C: 0x5283290B,
+            0x980: 0x8B0B012B,
+            0x984: 0xB944ED0C,
+            0x98C: 0x5299460D,
+            0x990: 0x72A0002D,
+            0x994: 0x510005CF,
+            0x998: 0xD37DF1EE,
+            0xB8C: 0x4B0E01EF,
+            0xB94: 0x52800C91,
+            0xBA0: 0x4B0E0040,
+            0xBA4: 0x1B117C00,
+            0xBA8: 0x1ACF0800,
+            0xBAC: 0xB82C7960,
+            0xBB8: 0x91002210,
+            0xBBC: 0x910021AD,
+        }.items():
+            struct.pack_into("<I", arm_power, offset, word)
+
+        linear = bytearray(0x460)
+        for offset, word in {
+            0x010: 0x91406C08,
+            0x014: 0x910C4108,
+            0x018: 0xB940010B,
+            0x01C: 0x7100417F,
+            0x024: 0x5298C609,
+            0x028: 0x72A00029,
+            0x02C: 0xB944E40D,
+            0x034: 0x5100056C,
+            0x038: 0xD37AE58A,
+            0x2DC: 0x4B0A018B,
+            0x2F0: 0x52800C8E,
+            0x300: 0x1B0E7DEF,
+            0x304: 0x1ACB09EF,
+            0x320: 0xB900022F,
+        }.items():
+            struct.pack_into("<I", linear, offset, word)
+
+        max_power = bytearray(0x3E0)
+        for offset, word in {
+            0x034: 0xB944E415,
+            0x038: 0xB944EC18,
+            0x088: 0x9118C131,
+            0x090: 0x9128C121,
+            0x0A4: 0x52A88F44,
+            0x0A8: 0x529BD065,
+            0x0AC: 0x72A86365,
+            0x0B8: 0x1AD80ABA,
+            0x244: 0x529AE148,
+            0x248: 0x72A7F468,
+            0x258: 0x52866668,
+            0x25C: 0x72A83428,
+            0x278: 0x528E8009,
+            0x27C: 0x72A8E7A9,
+            0x308: 0xB912DB08,
+        }.items():
+            struct.pack_into("<I", max_power, offset, word)
+
+        cs_power = bytearray(0x258)
+        for offset, word in {
+            0x030: 0xB944A009,
+            0x034: 0x7100853F,
+            0x038: 0x52933348,
+            0x03C: 0x72A835A8,
+            0x044: 0x52947AE8,
+            0x048: 0x72A82888,
+            0x068: 0x5292D90A,
+            0x06C: 0x528C1C0B,
+            0x080: 0x9128C14D,
+            0x084: 0x9114E2B7,
+            0x1D0: 0xB90502E8,
+        }.items():
+            struct.pack_into("<I", cs_power, offset, word)
+
+        leakage = bytearray(0x540)
+        for offset, word in {
+            0xB8: 0xD2880000,
+            0xBC: movk(0, 0x8837, 16),
+            0xC0: movk(0, 0x23, 32),
+            0xC4: 0x52820001,
+            0xCC: bl(leakage_address + 0xCC, 0x800000),
+        }.items():
+            struct.pack_into("<I", leakage, offset, word)
+
+        def leakage_reader(address: int, default: int, variant: int) -> bytearray:
+            code = bytearray(0x78)
+            for offset, word in {
+                0x10: adrp(address + 0x10, default, 8),
+                0x14: add_immediate(8, 8, default & 0xFFF),
+                0x1C: adrp(address + 0x1C, count_va, 8),
+                0x20: 0xFD400000 | ((count_va & 0xFFF) // 8) << 10 | (8 << 5) | 3,
+                0x38: adrp(address + 0x38, variant, 8),
+                0x3C: add_immediate(8, 8, variant & 0xFFF),
+            }.items():
+                struct.pack_into("<I", code, offset, word)
+            return code
+
+        codes = {
+            recover_g17_abi.G17_POPULATE_LINEAR_POWER_TRANSFER: (
+                linear_address,
+                bytes(linear),
+            ),
+            recover_g17_abi.G17_POPULATE_MAX_PERF_POWER: (
+                max_power_address,
+                bytes(max_power),
+            ),
+            recover_g17_abi.G17_POPULATE_MAX_PERF_POWER_CS: (
+                cs_power_address,
+                bytes(cs_power),
+            ),
+            recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE: (
+                leakage_address,
+                bytes(leakage),
+            ),
+            recover_g17_abi.G17_CALCULATE_VDD_GPU_LEAKAGE: (
+                vdd_address,
+                bytes(
+                    leakage_reader(
+                        vdd_address, tables["vdd_default"], tables["vdd_variant"]
+                    )
+                ),
+            ),
+            recover_g17_abi.G17_CALCULATE_AFR_LEAKAGE: (
+                afr_address,
+                bytes(
+                    leakage_reader(
+                        afr_address, tables["afr_default"], tables["afr_variant"]
+                    )
+                ),
+            ),
+        }
+        symbols = {
+            recover_g17_abi.INIT_POWER_DATA: power_address,
+            recover_g17_abi.G17_APPLY_LEAKAGE_EQUATION: 0x750000,
+        } | {name: address for name, (address, _code) in codes.items()}
+        slots = {
+            recover_g17_abi.G17_POPULATE_MAX_PERF_POWER_VTABLE_SLOT: max_power_address,
+            recover_g17_abi.G17_POPULATE_MAX_PERF_POWER_CS_VTABLE_SLOT: cs_power_address,
+            recover_g17_abi.G17_CALCULATE_VDD_GPU_LEAKAGE_VTABLE_SLOT: vdd_address,
+            recover_g17_abi.G17_CALCULATE_AFR_LEAKAGE_VTABLE_SLOT: afr_address,
+            recover_g17_abi.G17_APPLY_LEAKAGE_EQUATION_VTABLE_SLOT: 0x750000,
+            recover_g17_abi.G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT: leakage_address,
+        }
+        return bytes(arm_power), {
+            "image": bytes(image),
+            "symbols": symbols,
+            "codes": codes,
+            "slots": slots,
+        }
+
+    def _run_linear_power_transfer(
+        self, arm_power: bytes, fixtures: dict[str, object], slots=None
+    ) -> dict[str, object]:
+        codes = fixtures["codes"]
+        with (
+            mock.patch.object(
+                recover_g17_abi, "macho_symbols", return_value=fixtures["symbols"]
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "symbol_code",
+                side_effect=lambda _image, name: codes[name],
+            ),
+            mock.patch.object(
+                recover_g17_abi, "virtual_to_file", side_effect=lambda _image, a: a
+            ),
+            mock.patch.object(
+                recover_g17_abi,
+                "recover_vtable_target",
+                side_effect=lambda _image, _vtable, slot: (
+                    slots or fixtures["slots"]
+                )[slot],
+            ),
+        ):
+            return recover_g17_abi.recover_g17_linear_power_transfer_tables(
+                fixtures["image"], arm_power
+            )
+
+    def test_recovers_g17_linear_power_transfer_tables(self) -> None:
+        arm_power, fixtures = self._linear_power_transfer_fixtures()
+        recovered = self._run_linear_power_transfer(arm_power, fixtures)
+
+        self.assertTrue(recovered["die_dependent"])
+        self.assertEqual(
+            [table["offset"] for table in recovered["tables"]], [0x18C8, 0x1948]
+        )
+        primary, afr = recovered["tables"]
+        self.assertEqual(primary["matrix_source_offset"], 0x1C630)
+        self.assertEqual(primary["matrix_row_bytes"], 0x40)
+        self.assertEqual(primary["matrix_column_count_offset"], 0x4E4)
+        self.assertEqual(primary["clamp"], 48500.0)
+        self.assertEqual(afr["matrix_source_offset"], 0x1CA30)
+        self.assertEqual(afr["matrix_row_bytes"], 8)
+        self.assertEqual(afr["matrix_column_count_offset"], 0x4EC)
+        self.assertEqual(afr["clamp"], [38600.0, 24800.0])
+        self.assertEqual(recovered["maximum_state_value"], 100)
+        self.assertEqual(
+            recovered["chip_leakage"]["fuse_physical_address"], 0x23_8837_4000
+        )
+        self.assertEqual(recovered["chip_leakage"]["fuse_bytes"], 0x1000)
+        self.assertEqual(recovered["leakage_model"]["temperature"], 110.0)
+        self.assertEqual(recovered["leakage_model"]["vdd_gpu"]["buckets"], 2)
+        self.assertEqual(
+            recovered["leakage_model"]["afr"]["default_thresholds"], [1000.0, -1.0]
+        )
+
+    def test_rejects_g17_linear_power_transfer_stub_selection(self) -> None:
+        arm_power, fixtures = self._linear_power_transfer_fixtures()
+        slots = dict(fixtures["slots"])
+        slots[recover_g17_abi.G17_POPULATE_MAX_PERF_POWER_VTABLE_SLOT] = 0x7F0000
+        with self.assertRaises(ValueError):
+            self._run_linear_power_transfer(arm_power, fixtures, slots)
+
+    def test_rejects_changed_g17_linear_power_transfer_normalization(self) -> None:
+        arm_power, fixtures = self._linear_power_transfer_fixtures()
+        codes = dict(fixtures["codes"])
+        address, linear = codes[recover_g17_abi.G17_POPULATE_LINEAR_POWER_TRANSFER]
+        patched = bytearray(linear)
+        struct.pack_into("<I", patched, 0x2F0, 0x52800C8F)
+        codes[recover_g17_abi.G17_POPULATE_LINEAR_POWER_TRANSFER] = (
+            address,
+            bytes(patched),
+        )
+        fixtures = dict(fixtures) | {"codes": codes}
+        with self.assertRaises(ValueError):
+            self._run_linear_power_transfer(arm_power, fixtures)
+
     def test_recovers_g17_afr_relative_boost_frequency_table(self) -> None:
         afr_address = 0x200000
         afr_config = bytearray(0xE8)

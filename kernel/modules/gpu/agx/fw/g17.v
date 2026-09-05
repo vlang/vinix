@@ -85,6 +85,7 @@ pub const g17_aux_performance_state_cap = u32(14)
 pub const g17_aux_performance_block_size = u64(0x148)
 pub const g17_performance_state_map_block_size = u64(0x80)
 pub const g17_sram_power_scale = u32(0x3f828f5c)
+pub const g17_linear_power_transfer_maximum = u32(100)
 pub const g17_fw_util_pstate_control_count = 4
 pub const g17_fw_util_pstate_control_size = u64(0x06)
 pub const g17_register_override_count = 16
@@ -871,6 +872,68 @@ pub mut:
 
 pub fn validate_g17_bootstrap_allocations() bool {
 	return sizeof(G17BootstrapPage) == g17_bootstrap_page_size && sizeof(G17InitRegisterEntry) == g17_init_register_entry_size && sizeof(G17FirmwareSharedData) == g17_firmware_shared_data_size && sizeof(G17RuntimeData) == g17_runtime_data_size && sizeof(G17FwUtilPStateControl) == g17_fw_util_pstate_control_size && sizeof(G17RegisterOverride) == g17_register_override_size && sizeof(G17SmallSharedData) == g17_small_shared_data_size && sizeof(G17PrimaryRegion) == g17_primary_region_size && sizeof(G17SecondaryRegion) == g17_secondary_region_size && sizeof(G17SecondaryAux) == g17_secondary_aux_size && sizeof(G17Role0Region254) == g17_role0_bootstrap_254_size && sizeof(G17Role0Region25c) == g17_role0_bootstrap_25c_size && sizeof(G17Role0Region264) == g17_role0_bootstrap_264_size && sizeof(G17Role0Region26c) == g17_role0_bootstrap_26c_size && sizeof(G17Role0Region274) == g17_role0_bootstrap_274_size && sizeof(G17SharedControl) == g17_common_control_size && sizeof(G17HardwareConfig) == g17_hardware_config_size && sizeof(G17AddressSpaceLayout) == g17_address_space_layout_size && sizeof(G17FirmwareScalarBlock) == g17_firmware_scalar_block_size && sizeof(G17ColorMatrixRecord) == g17_color_matrix_size && sizeof(G17IoMappingRecord) == g17_io_mapping_size && sizeof(G17VoltageTableRow) == g17_voltage_table_columns * sizeof(u32) && sizeof(G17AuxVoltageTableRow) == g17_aux_voltage_table_columns * sizeof(u32) && sizeof(G17AuxPerformanceBlock) == g17_aux_performance_block_size && sizeof(G17PerformanceStateMapBlock) == g17_performance_state_map_block_size
+}
+
+// G17PowerMatrix carries one Apple power-matrix row per performance state.
+// The primary matrix lives at accelerator +0x1c630 with a 16-column row, the
+// AFR matrix at +0x1ca30 with a 2-column row. Apple fills both from an analog
+// leakage model seeded with per-die fuse calibration, so the rows are machine
+// specific and cannot be embedded here; the caller supplies them.
+pub struct G17PowerMatrix {
+pub mut:
+	state_count u32
+	columns     u32
+	stride      u32
+	values      [g17_performance_state_capacity * g17_voltage_table_columns]u32
+}
+
+fn g17_power_matrix_row_sum(matrix &G17PowerMatrix, state u32) u32 {
+	mut total := u32(0)
+	for column := u32(0); column < matrix.columns; column++ {
+		total += matrix.values[state * matrix.stride + column]
+	}
+	return total
+}
+
+// Reproduce AGXAccelerator::populateLinearPowerTransferTable for one table.
+// Entries below the base state are cleared and the rest are rescaled into
+// 0..100 against the maximum state. Apple sums, subtracts, multiplies and
+// divides in 32 bits, so the wraparound is part of the ABI and this must not
+// be widened to 64-bit arithmetic.
+fn g17_linear_power_transfer_curve(matrix &G17PowerMatrix, base_state u32) ?[g17_performance_state_capacity]u32 {
+	if matrix.state_count == 0 || matrix.state_count > g17_performance_state_capacity {
+		return none
+	}
+	if matrix.columns == 0 || matrix.stride == 0 || matrix.columns > matrix.stride
+		|| matrix.stride > g17_voltage_table_columns {
+		return none
+	}
+	if base_state >= matrix.state_count {
+		return none
+	}
+	base := g17_power_matrix_row_sum(matrix, base_state)
+	maximum := g17_power_matrix_row_sum(matrix, matrix.state_count - 1)
+	if maximum <= base {
+		return none
+	}
+	range := maximum - base
+	mut values := [g17_performance_state_capacity]u32{}
+	for state := base_state; state < matrix.state_count; state++ {
+		delta := g17_power_matrix_row_sum(matrix, state) - base
+		values[state] = delta * g17_linear_power_transfer_maximum / range
+	}
+	return values
+}
+
+// Fill both gated linear power-transfer tables. Apple calls the shared
+// producer for +0x18c8 with the primary matrix and inlines the same
+// normalisation for +0x1948 against the AFR matrix; both use base state 0.
+pub fn populate_g17_linear_power_transfer_tables(mut config G17HardwareConfig, primary &G17PowerMatrix, afr &G17PowerMatrix) bool {
+	primary_curve := g17_linear_power_transfer_curve(primary, 0) or { return false }
+	afr_curve := g17_linear_power_transfer_curve(afr, 0) or { return false }
+	config.firmware_table_18c8 = primary_curve
+	config.firmware_table_1948 = afr_curve
+	return true
 }
 
 fn populate_g17_performance_state_map(mut config G17HardwareConfig) {

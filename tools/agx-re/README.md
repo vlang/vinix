@@ -69,7 +69,9 @@ G17C PIO relative-offset table and its 12 primary-aperture
 firmware records, their physical alignment and GART-10 UAT publication path,
 the primary and SRAM frequency-table sources and conversion and the relative
 boost-frequency transfer table, the per-state SRAM power-scale row and zeroed
-G17 static-power row, the fixed two-bank performance-state map, the native
+G17 static-power row, the two die-dependent linear power-transfer tables
+and their power-matrix, leakage-bucket and fuse-aperture sources,
+the fixed two-bank performance-state map, the native
 CS/AFR auxiliary performance-state parser and firmware blocks,
 exact per-role bootstrap-root bindings, its copied platform
 block, the two root-page CPU/GPU mappings and their prepare/complete lifecycle,
@@ -95,6 +97,11 @@ Hardware launch remains gated. Vinix now has the native G17 UAT handoff,
 two-role bootstrap roots, mapped allocation graph, firmware-only MMIO mappings,
 and the recovered portions
 of its shared/runtime objects, including their initial platform values and
-runtime policy. Remaining hardware-configuration producers, firmware channel
+runtime policy. Firmware channel
 construction, the work-command ABI, and the userspace command producer still
 need byte-accurate implementations before enabling T6050.
+
+The two linear power-transfer tables are the one recovered part that cannot be
+made byte-accurate offline: their rows derive from per-die fuse calibration.
+Vinix reproduces their normalisation exactly, but filling them needs the fuse
+aperture and a freestanding `pow`, since the kernel builds with `-nofloat`.

@@ -104,6 +104,12 @@ G17_POPULATE_POWER_ESTIMATION_VTABLE_SLOT = 0xCC0
 G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT = 0xCB0
 G17_POPULATE_SRAM_POWER_SCALE_VTABLE_SLOT = 0xCF0
 G17_POPULATE_STATIC_POWER_VTABLE_SLOT = 0xCE0
+G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT = 0xCB0
+G17_POPULATE_MAX_PERF_POWER_VTABLE_SLOT = 0xFD0
+G17_POPULATE_MAX_PERF_POWER_CS_VTABLE_SLOT = 0xFD8
+G17_CALCULATE_VDD_GPU_LEAKAGE_VTABLE_SLOT = 0xA28
+G17_CALCULATE_AFR_LEAKAGE_VTABLE_SLOT = 0xA30
+G17_APPLY_LEAKAGE_EQUATION_VTABLE_SLOT = 0xA38
 G17_NEW_SECURE_MONITOR_VTABLE_SLOT = 0xBE0
 G17_GET_GPTBAT_BASE_VTABLE_SLOT = 0x11D0
 SECURE_MONITOR_INIT_VTABLE_SLOT = 0x150
@@ -159,6 +165,23 @@ G17_POPULATE_CHIP_LEAKAGE_DATA = (
 G17_POPULATE_STATIC_POWER_DATA = (
     "__ZN14AGXAccelerator23populateStaticPowerDataEv.8120"
 )
+
+G17_ACCELERATOR_X = "__ZN32AGX·PI_300·X·A0·AcceleratorX"
+G17_POPULATE_LINEAR_POWER_TRANSFER = (
+    "__ZN14AGXAccelerator32populateLinearPowerTransferTableEPjj"
+)
+G17_POPULATE_MAX_PERF_POWER = (
+    G17_ACCELERATOR_X + "31populateMaximumPerformancePowerEv"
+)
+G17_POPULATE_MAX_PERF_POWER_CS = (
+    G17_ACCELERATOR_X + "33populateMaximumPerformancePowerCSEv"
+)
+G17_CALCULATE_VDD_GPU_LEAKAGE = G17_ACCELERATOR_X + "22calculateVddGpuLeakageEddd"
+G17_CALCULATE_AFR_LEAKAGE = G17_ACCELERATOR_X + "19calculateAFRLeakageEddd"
+G17_APPLY_LEAKAGE_EQUATION = (
+    G17_ACCELERATOR_X + "20applyLeakageEquationERK17LeakageParameters"
+)
+G17_POPULATE_CHIP_LEAKAGE = G17_ACCELERATOR_X + "23populateChipLeakageDataEj"
 G17_TPU_CSC_COEFFICIENTS = (
     "__ZZN31AGX·PI_300·X·A0·Accelerator23generateCSCCoefficientsEvE16tpu_coefficients"
 )
@@ -5619,6 +5642,283 @@ def recover_g17_afr_relative_boost_frequency_table(
     }
 
 
+def recover_g17_linear_power_transfer_tables(
+    image: bytes, arm_power_code: bytes
+) -> dict[str, object]:
+    """Recover the two linear power-transfer tables at config +0x18c8/+0x1948.
+
+    Unlike every other recovered hardware-configuration row, these two are not
+    constants.  Both are 0..100 curves normalised from per-state power matrices
+    that Apple computes with an analog leakage model, and that model is seeded
+    with per-die calibration read from an eFuse aperture.  The structure, the
+    normalisation and every model constant are recovered here; the row values
+    themselves can only be produced on the target machine.
+    """
+
+    symbols = macho_symbols(image)
+    required = (
+        G17_POPULATE_LINEAR_POWER_TRANSFER,
+        G17_POPULATE_MAX_PERF_POWER,
+        G17_POPULATE_MAX_PERF_POWER_CS,
+        G17_CALCULATE_VDD_GPU_LEAKAGE,
+        G17_CALCULATE_AFR_LEAKAGE,
+        G17_APPLY_LEAKAGE_EQUATION,
+        G17_POPULATE_CHIP_LEAKAGE,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O is missing G17 power-model symbols: {missing}")
+
+    # G17 selects the real power producers, not the no-op stubs it selects for
+    # the neighbouring static-power row.
+    for slot, name in (
+        (G17_POPULATE_MAX_PERF_POWER_VTABLE_SLOT, G17_POPULATE_MAX_PERF_POWER),
+        (G17_POPULATE_MAX_PERF_POWER_CS_VTABLE_SLOT, G17_POPULATE_MAX_PERF_POWER_CS),
+        (G17_CALCULATE_VDD_GPU_LEAKAGE_VTABLE_SLOT, G17_CALCULATE_VDD_GPU_LEAKAGE),
+        (G17_CALCULATE_AFR_LEAKAGE_VTABLE_SLOT, G17_CALCULATE_AFR_LEAKAGE),
+        (G17_APPLY_LEAKAGE_EQUATION_VTABLE_SLOT, G17_APPLY_LEAKAGE_EQUATION),
+        (G17_POPULATE_CHIP_LEAKAGE_VTABLE_SLOT, G17_POPULATE_CHIP_LEAKAGE),
+    ):
+        target = recover_vtable_target(image, G17_ACCELERATOR_VTABLE, slot)
+        if target != symbols[name]:
+            raise ValueError(
+                f"unexpected G17 power vtable target at {slot:#x}: {target:#x}"
+            )
+
+    # The +0x18c8 row is produced by a direct call that passes the destination
+    # and a base state of zero; the +0x1948 row is the same algorithm inlined
+    # against the AFR matrix.
+    require_instruction_words_at(
+        arm_power_code,
+        "G17 linear power-transfer call",
+        {
+            0x948: 0xF9415E68,  # hardware config CPU address
+            0x94C: 0x52831909,  # mov w9, #0x18c8
+            0x950: 0x8B090101,  # add x1, x8, x9
+            0x954: 0x52800002,  # base state 0
+            0x958: 0x97FEAA33,  # bl populateLinearPowerTransferTable
+        },
+    )
+    call = decode_bl_target(symbols[INIT_POWER_DATA] + 0x958, 0x97FEAA33)
+    if call != symbols[G17_POPULATE_LINEAR_POWER_TRANSFER]:
+        raise ValueError(
+            f"linear power-transfer call does not reach the producer: {call:#x}"
+        )
+
+    require_instruction_words_at(
+        arm_power_code,
+        "G17 inlined AFR linear power-transfer producer",
+        {
+            0x95C: 0xF9414E68,  # accelerator
+            0x960: 0x91407109,  # accelerator +0x1c000
+            0x964: 0x9113A12A,  # AFR state count at +0x1c4e8
+            0x968: 0xF9415E69,  # hardware config CPU address
+            0x96C: 0xB940014E,
+            0x974: 0x710041DF,  # reject more than 16 states
+            0x97C: 0x5283290B,  # mov w11, #0x1948
+            0x980: 0x8B0B012B,  # add x11, x9, x11
+            0x984: 0xB944ED0C,  # AFR column count at +0x4ec
+            0x98C: 0x5299460D,  # mov w13, #0xca30
+            0x990: 0x72A0002D,  # matrix at accelerator +0x1ca30
+            0x994: 0x510005CF,  # maximum state index
+            0x998: 0xD37DF1EE,  # 8-byte row stride
+            0xB8C: 0x4B0E01EF,  # maximum row sum - base row sum
+            0xB94: 0x52800C91,  # mov w17, #100
+            0xBA0: 0x4B0E0040,  # row sum - base row sum
+            0xBA4: 0x1B117C00,  # * 100
+            0xBA8: 0x1ACF0800,  # / (maximum - base)
+            0xBAC: 0xB82C7960,  # str into config +0x1948
+            0xBB8: 0x91002210,
+            0xBBC: 0x910021AD,
+        },
+    )
+
+    # The shared producer sums one matrix row per performance state and scales
+    # the result into 0..100 exactly like the relative boost-frequency tables.
+    _address, linear_code = symbol_code(image, G17_POPULATE_LINEAR_POWER_TRANSFER)
+    require_instruction_words_at(
+        linear_code,
+        "G17 linear power-transfer normalisation",
+        {
+            0x010: 0x91406C08,  # accelerator +0x1b000
+            0x014: 0x910C4108,  # state count at +0x1b310
+            0x018: 0xB940010B,
+            0x01C: 0x7100417F,  # reject more than 16 states
+            0x024: 0x5298C609,  # mov w9, #0xc630
+            0x028: 0x72A00029,  # matrix at accelerator +0x1c630
+            0x02C: 0xB944E40D,  # column count at +0x4e4
+            0x034: 0x5100056C,  # maximum state index
+            0x038: 0xD37AE58A,  # 0x40-byte row stride
+            0x2DC: 0x4B0A018B,  # maximum row sum - base row sum
+            0x2F0: 0x52800C8E,  # mov w14, #100
+            0x300: 0x1B0E7DEF,  # * 100
+            0x304: 0x1ACB09EF,  # / (maximum - base)
+            0x320: 0xB900022F,
+        },
+    )
+
+    # Both matrices are filled by the selected G17X power producers.
+    _address, power_code = symbol_code(image, G17_POPULATE_MAX_PERF_POWER)
+    require_instruction_words_at(
+        power_code,
+        "G17 maximum-performance power matrix",
+        {
+            0x034: 0xB944E415,  # core count at +0x4e4
+            0x038: 0xB944EC18,  # group count at +0x4ec
+            0x088: 0x9118C131,  # destination matrix at +0x1c630
+            0x090: 0x9128C121,  # AFR matrix at +0x1ca30
+            0x0A4: 0x52A88F44,  # 1000.0f millivolt divisor
+            0x0A8: 0x529BD065,  # Hz to MHz reciprocal
+            0x0AC: 0x72A86365,
+            0x0B8: 0x1AD80ABA,  # cores per group
+            0x244: 0x529AE148,  # 1.28f voltage exponent
+            0x248: 0x72A7F468,
+            0x258: 0x52866668,  # 20.15f dynamic-power coefficient
+            0x25C: 0x72A83428,
+            0x278: 0x528E8009,  # 48500.0f clamp
+            0x27C: 0x72A8E7A9,
+            0x308: 0xB912DB08,  # store into the +0x1c630 matrix
+        },
+    )
+    _address, cs_code = symbol_code(image, G17_POPULATE_MAX_PERF_POWER_CS)
+    require_instruction_words_at(
+        cs_code,
+        "G17 CS maximum-performance power matrix",
+        {
+            0x030: 0xB944A009,  # chip variant at +0x4a0
+            0x034: 0x7100853F,
+            0x038: 0x52933348,  # 21.7f default coefficient
+            0x03C: 0x72A835A8,
+            0x044: 0x52947AE8,  # 12.29f variant coefficient
+            0x048: 0x72A82888,
+            0x068: 0x5292D90A,  # 38600 default clamp
+            0x06C: 0x528C1C0B,  # 24800 variant clamp
+            0x080: 0x9128C14D,  # destination matrix at +0x1ca30
+            0x084: 0x9114E2B7,  # AFR voltages at +0x1c538
+            0x1D0: 0xB90502E8,  # store into the +0x1ca30 matrix
+        },
+    )
+
+    # The leakage seed is per-die calibration mapped from a fuse aperture.
+    _leak_address, leak_code = symbol_code(image, G17_POPULATE_CHIP_LEAKAGE)
+    physical = 0
+    for offset in (0xB8, 0xBC, 0xC0):
+        decoded = decode_move_wide(struct.unpack_from("<I", leak_code, offset)[0])
+        if decoded is None:
+            raise ValueError("chip-leakage fuse aperture is no longer materialized")
+        kind, register, immediate, shift = decoded
+        if register != 0:
+            raise ValueError("chip-leakage fuse aperture uses an unexpected register")
+        physical |= immediate << shift
+    aperture_bytes = struct.unpack_from("<I", leak_code, 0xC4)[0]
+    if aperture_bytes != 0x52820001:
+        raise ValueError("chip-leakage fuse aperture size changed")
+    if decode_bl_target(0xCC, struct.unpack_from("<I", leak_code, 0xCC)[0]) is None:
+        raise ValueError("chip-leakage aperture is not mapped by a direct call")
+
+    # Each leakage evaluation selects one bucket from a static parameter table
+    # and returns a value directly proportional to the fused input.
+    def leakage_table(name: str) -> dict[str, object]:
+        address, code = symbol_code(image, name)
+        buckets = []
+        for offset in (0x10, 0x38):
+            adrp = decode_adrp(address + offset, struct.unpack_from("<I", code, offset)[0])
+            add = decode_add_immediate(struct.unpack_from("<I", code, offset + 4)[0])
+            if adrp is None or add is None:
+                raise ValueError(f"{name} no longer references a parameter table")
+            _register, page = adrp
+            _destination, _source, immediate = add
+            buckets.append(page + immediate)
+        count_load = decode_ldr_d(struct.unpack_from("<I", code, 0x20)[0])
+        if count_load is None:
+            raise ValueError(f"{name} no longer loads a bucket count")
+        adrp = decode_adrp(address + 0x1C, struct.unpack_from("<I", code, 0x1C)[0])
+        if adrp is None:
+            raise ValueError(f"{name} no longer references the bucket count")
+        _register, page = adrp
+        _destination, _base, immediate = count_load
+        count_offset = virtual_to_file(image, page + immediate)
+        count = struct.unpack_from("<I", image, count_offset)[0]
+        records = []
+        for table in buckets:
+            offset = virtual_to_file(image, table)
+            records.append(
+                [
+                    list(struct.unpack_from("<11d", image, offset + index * 0x58))
+                    for index in range(count)
+                ]
+            )
+        if records[0][-1][0] != -1.0 or records[1][-1][0] != -1.0:
+            raise ValueError(f"{name} parameter table lost its catch-all bucket")
+        return {
+            "buckets": count,
+            "record_bytes": 0x58,
+            "default_table": buckets[0],
+            "variant_table": buckets[1],
+            "default_thresholds": [record[0] for record in records[0]],
+            "variant_thresholds": [record[0] for record in records[1]],
+        }
+
+    return {
+        "die_dependent": True,
+        "producer": G17_POPULATE_LINEAR_POWER_TRANSFER,
+        "formula": (
+            "100 * (row_sum(state) - row_sum(base_state)) / "
+            "(row_sum(maximum_state) - row_sum(base_state))"
+        ),
+        "maximum_state_value": 100,
+        "state_count_source_offset": 0x1B310,
+        "afr_state_count_source_offset": 0x1C4E8,
+        "tables": [
+            {
+                "offset": 0x18C8,
+                "entries": 16,
+                "base_state": 0,
+                "matrix_source_offset": 0x1C630,
+                "matrix_row_bytes": 0x40,
+                "matrix_column_count_offset": 0x4E4,
+                "matrix_producer": G17_POPULATE_MAX_PERF_POWER,
+                "matrix_producer_vtable_slot": G17_POPULATE_MAX_PERF_POWER_VTABLE_SLOT,
+                "leakage": G17_CALCULATE_VDD_GPU_LEAKAGE,
+                "voltage_exponent": 1.28,
+                "dynamic_coefficient": 20.15,
+                "clamp": 48500.0,
+            },
+            {
+                "offset": 0x1948,
+                "entries": 16,
+                "base_state": 0,
+                "matrix_source_offset": 0x1CA30,
+                "matrix_row_bytes": 8,
+                "matrix_column_count_offset": 0x4EC,
+                "matrix_producer": G17_POPULATE_MAX_PERF_POWER_CS,
+                "matrix_producer_vtable_slot": G17_POPULATE_MAX_PERF_POWER_CS_VTABLE_SLOT,
+                "voltage_source_offset": 0x1C538,
+                "leakage": G17_CALCULATE_AFR_LEAKAGE,
+                "voltage_exponent": 1.0,
+                "dynamic_coefficient": [21.7, 12.29],
+                "clamp": [38600.0, 24800.0],
+                "chip_variant_offset": 0x4A0,
+            },
+        ],
+        "chip_leakage": {
+            "producer": G17_POPULATE_CHIP_LEAKAGE,
+            "fuse_physical_address": physical,
+            "fuse_bytes": 0x1000,
+            "core_leakage_offset": 0xE50,
+            "core_leakage_second_offset": 0xED0,
+            "group_leakage_offset": 0xF20,
+            "holder_member": 0x5B0,
+        },
+        "leakage_model": {
+            "equation": G17_APPLY_LEAKAGE_EQUATION,
+            "temperature": 110.0,
+            "vdd_gpu": leakage_table(G17_CALCULATE_VDD_GPU_LEAKAGE),
+            "afr": leakage_table(G17_CALCULATE_AFR_LEAKAGE),
+        },
+    }
+
+
 def recover_g17_perf_state_map_block(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -6791,6 +7091,9 @@ def main() -> int:
         )
         hardware_config["afr_relative_boost_frequency_table"] = (
             recover_g17_afr_relative_boost_frequency_table(driver, power_code)
+        )
+        hardware_config["linear_power_transfer_tables"] = (
+            recover_g17_linear_power_transfer_tables(driver, power_code)
         )
         hardware_config["performance_state_map_block"] = (
             recover_g17_perf_state_map_block(driver, power_code)
