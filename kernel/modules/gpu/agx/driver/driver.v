@@ -11,6 +11,7 @@ import gpu.agx.hw
 import gpu.agx.regs
 import gpu.agx.mmu
 import gpu.agx.pgtable
+import gpu.agx.power as agx_power
 import gpu.agx.fw
 import gpu.agx.file as agx_file
 import gpu.dcp
@@ -837,7 +838,8 @@ pub fn initialise() {
 		}
 	}
 	if chip_id == 0x6050 {
-		if !load_t6050_chip_info(mut cfg)
+		if !native_adt || !agx_power.validate_t6050_contract(gpu_node)
+			|| !load_t6050_chip_info(mut cfg)
 			|| !load_t6050_power_sample_period(gpu_node, mut cfg)
 			|| !load_t6050_performance_config(gpu_node, mut cfg)
 			|| !load_t6050_aux_performance_config(gpu_node, mut cfg) {
