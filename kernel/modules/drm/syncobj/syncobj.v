@@ -30,9 +30,11 @@ pub mut:
 	handle u32
 	fence  &DmaFence = unsafe { nil }
 	lock   klock.Lock
+mut:
+	owner u64
 }
 
-const syncobj_max_handles = u32(1024)
+const syncobj_max_objects = u32(1024)
 
 __global (
 	syncobj_table   [1024]&SyncObj
@@ -152,19 +154,41 @@ pub fn add_waiter(fence &DmaFence, waiter &FenceWaiter) {
 	f.lock.release()
 }
 
-// Allocate a new sync object and insert it into the global table.
-pub fn new_syncobj() ?&SyncObj {
+fn handle_in_use_locked(owner u64, handle u32) bool {
+	for obj in syncobj_table {
+		if obj != unsafe { nil } && obj.owner == owner && obj.handle == handle {
+			return true
+		}
+	}
+	return false
+}
+
+// Allocate a sync object in one DRM open-file namespace. Different opens may
+// receive the same numeric handle, but never resolve each other's objects.
+pub fn new_syncobj(owner u64) ?&SyncObj {
+	if owner == 0 {
+		return none
+	}
 	syncobj_lock.acquire()
 	defer {
 		syncobj_lock.release()
 	}
 
-	// Recycle freed handles by scanning for an empty slot instead of consuming
-	// a monotonic counter that never resets (which exhausted the table after
-	// 1023 creations regardless of how many were destroyed).
-	mut handle := u32(0)
-	for i := u32(1); i < syncobj_max_handles; i++ {
+	mut slot := u32(syncobj_max_objects)
+	for i := u32(0); i < syncobj_max_objects; i++ {
 		if syncobj_table[i] == unsafe { nil } {
+			slot = i
+			break
+		}
+	}
+	if slot == syncobj_max_objects {
+		return none
+	}
+
+	// Recycle the lowest free handle in this open-file namespace.
+	mut handle := u32(0)
+	for i := u32(1); i < syncobj_max_objects; i++ {
+		if !handle_in_use_locked(owner, i) {
 			handle = i
 			break
 		}
@@ -175,33 +199,57 @@ pub fn new_syncobj() ?&SyncObj {
 
 	mut obj := &SyncObj{
 		handle: handle
+		owner: owner
 	}
 
-	syncobj_table[handle] = obj
+	syncobj_table[slot] = obj
 	return obj
 }
 
-// Look up a sync object by handle.
-pub fn lookup(handle u32) ?&SyncObj {
-	if handle == 0 || handle >= syncobj_max_handles {
+// Look up a sync object by its owner and per-open handle.
+pub fn lookup(owner u64, handle u32) ?&SyncObj {
+	if owner == 0 || handle == 0 || handle >= syncobj_max_objects {
 		return none
 	}
 
 	syncobj_lock.acquire()
-	obj := syncobj_table[handle]
-	syncobj_lock.release()
-
-	if obj == unsafe { nil } {
-		return none
+	defer { syncobj_lock.release() }
+	for i := u32(0); i < syncobj_max_objects; i++ {
+		obj := syncobj_table[i]
+		if obj != unsafe { nil } && obj.owner == owner && obj.handle == handle {
+			return unsafe { obj }
+		}
 	}
-	return obj
+	return none
 }
 
-// Destroy a sync object, removing it from the global table.
-pub fn destroy(handle u32) {
+// Destroy one object only when it belongs to the calling open file.
+pub fn destroy(owner u64, handle u32) bool {
 	syncobj_lock.acquire()
-	if handle > 0 && handle < syncobj_max_handles {
-		syncobj_table[handle] = unsafe { nil }
+	defer { syncobj_lock.release() }
+	for i := u32(0); i < syncobj_max_objects; i++ {
+		obj := syncobj_table[i]
+		if obj != unsafe { nil } && obj.owner == owner && obj.handle == handle {
+			syncobj_table[i] = unsafe { nil }
+			return true
+		}
+	}
+	return false
+}
+
+// Final DRM-file release drops the complete handle namespace. Objects stay
+// allocated for now so an in-flight waiter that already holds a pointer cannot
+// race a free; the table ownership is removed immediately.
+pub fn destroy_owner(owner u64) {
+	if owner == 0 {
+		return
+	}
+	syncobj_lock.acquire()
+	for i := u32(0); i < syncobj_max_objects; i++ {
+		obj := syncobj_table[i]
+		if obj != unsafe { nil } && obj.owner == owner {
+			syncobj_table[i] = unsafe { nil }
+		}
 	}
 	syncobj_lock.release()
 }

@@ -40,6 +40,7 @@ pub mut:
 	objects       []&gem.GemObject
 	mmap_objects  []&gem.GemObject
 	next_queue_id u32
+	owner_key     u64
 	lock          klock.Lock
 }
 
@@ -65,7 +66,7 @@ fn get_or_create_file(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
 	}
 	file_map_lock.release()
 
-	f := new_gpu_file(dev) or { return none }
+	f := new_gpu_file(dev, key) or { return none }
 	file_map_lock.acquire()
 	file_map[key] = f
 	file_map_lock.release()
@@ -89,13 +90,14 @@ pub fn release_handle(_dev &drm.DrmDevice, handle voidptr) {
 	ff.close()
 }
 
-pub fn new_gpu_file(dev &drm.DrmDevice) ?&GpuFile {
-	if dev == unsafe { nil } || uat_mgr == unsafe { nil } {
+pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
+	if dev == unsafe { nil } || uat_mgr == unsafe { nil } || owner_key == 0 {
 		return none
 	}
 	return &GpuFile{
 		dev: unsafe { dev }
 		next_queue_id: 1
+		owner_key: owner_key
 	}
 }
 
@@ -524,7 +526,7 @@ fn valid_compute_command(command &ioctl.DrmAsahiCmdCompute) bool {
 // Copy every nested sync descriptor once while the submission is being
 // staged. Timeline syncobjs are rejected because GET_CAP deliberately reports
 // no timeline support; binary input syncobjs must already contain a fence.
-fn validate_sync_array(pointer u64, count u32, input bool) int {
+fn validate_sync_array(owner u64, pointer u64, count u32, input bool) int {
 	if count == 0 {
 		return 0
 	}
@@ -542,7 +544,7 @@ fn validate_sync_array(pointer u64, count u32, input bool) int {
 			|| item.timeline_value != 0 {
 			return -22
 		}
-		obj := syncobj.lookup(item.handle) or { return -22 }
+		obj := syncobj.lookup(owner, item.handle) or { return -22 }
 		if input && obj.fence == unsafe { nil } {
 			return -22
 		}
@@ -609,11 +611,13 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		return -22
 	}
 	queue_caps := f.get_queue_caps(request.queue_id) or { return -22 }
-	mut sync_result := validate_sync_array(request.in_syncs, request.in_sync_count, true)
+	mut sync_result := validate_sync_array(f.owner_key, request.in_syncs, request.in_sync_count,
+		true)
 	if sync_result != 0 {
 		return sync_result
 	}
-	sync_result = validate_sync_array(request.out_syncs, request.out_sync_count, false)
+	sync_result = validate_sync_array(f.owner_key, request.out_syncs, request.out_sync_count,
+		false)
 	if sync_result != 0 {
 		return sync_result
 	}

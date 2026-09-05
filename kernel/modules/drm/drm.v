@@ -243,6 +243,9 @@ fn (mut this DrmNode) unref(handle voidptr) ? {
 			this.dev.driver.file_close(this.dev, handle)
 		}
 	}
+	if handle != unsafe { nil } {
+		syncobj.destroy_owner(u64(handle))
+	}
 	katomic.dec(mut &this.refcount)
 }
 
@@ -374,15 +377,15 @@ fn ioctl_gem_close(dev &DrmDevice, handle voidptr, data voidptr) int {
 	return 0
 }
 
-fn ioctl_syncobj_create(data voidptr) int {
-	if data == unsafe { nil } {
+fn ioctl_syncobj_create(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjCreate(data) }
 	if request.flags & ~ioctl.drm_syncobj_create_signaled != 0 {
 		return -22
 	}
-	obj := syncobj.new_syncobj() or { return -12 }
+	obj := syncobj.new_syncobj(u64(handle)) or { return -12 }
 	fence := syncobj.new_fence(0, 0)
 	syncobj.replace_fence(obj, fence)
 	if request.flags & ioctl.drm_syncobj_create_signaled != 0 {
@@ -392,27 +395,25 @@ fn ioctl_syncobj_create(data voidptr) int {
 	return 0
 }
 
-fn ioctl_syncobj_destroy(data voidptr) int {
-	if data == unsafe { nil } {
+fn ioctl_syncobj_destroy(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } {
 		return -14
 	}
 	request := unsafe { &ioctl.DrmSyncobjDestroy(data) }
 	if request.pad != 0 {
 		return -22
 	}
-	syncobj.lookup(request.handle) or { return -22 }
-	syncobj.destroy(request.handle)
-	return 0
+	return if syncobj.destroy(u64(handle), request.handle) { 0 } else { -22 }
 }
 
-fn syncobj_wait_ready(request &ioctl.DrmSyncobjWait, wait_all bool) (bool, u32) {
+fn syncobj_wait_ready(owner u64, request &ioctl.DrmSyncobjWait, wait_all bool) (bool, u32) {
 	mut ready_count := u32(0)
 	mut first := u32(0)
 	for i := u32(0); i < request.count_handles; i++ {
 		handle := usercopy.read_u32(request.handles + u64(i) * sizeof(u32)) or {
 			return false, u32(0xffffffff)
 		}
-		obj := syncobj.lookup(handle) or { return false, u32(0xffffffff) }
+		obj := syncobj.lookup(owner, handle) or { return false, u32(0xffffffff) }
 		if obj.fence != unsafe { nil } && syncobj.is_signaled(obj.fence) {
 			if ready_count == 0 {
 				first = i
@@ -423,8 +424,8 @@ fn syncobj_wait_ready(request &ioctl.DrmSyncobjWait, wait_all bool) (bool, u32) 
 	return if wait_all { ready_count == request.count_handles } else { ready_count != 0 }, first
 }
 
-fn ioctl_syncobj_wait(data voidptr) int {
-	if data == unsafe { nil } {
+fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjWait(data) }
@@ -435,8 +436,9 @@ fn ioctl_syncobj_wait(data voidptr) int {
 		return -22
 	}
 	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
+	owner := u64(handle)
 	for {
-		ready, first := syncobj_wait_ready(request, wait_all)
+		ready, first := syncobj_wait_ready(owner, request, wait_all)
 		if first == u32(0xffffffff) {
 			return -22
 		}
@@ -452,7 +454,7 @@ fn ioctl_syncobj_wait(data voidptr) int {
 		remaining := u64(request.timeout_nsec) - now
 		slice := if remaining < 100_000 { remaining } else { u64(100_000) }
 		first_handle := usercopy.read_u32(request.handles) or { return -14 }
-		first_obj := syncobj.lookup(first_handle) or { return -22 }
+		first_obj := syncobj.lookup(owner, first_handle) or { return -22 }
 		if first_obj.fence != unsafe { nil } {
 			syncobj.wait(first_obj.fence, slice)
 		}
@@ -465,9 +467,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		ioctl.drm_ioctl_version { return ioctl_version(dev, data) }
 		ioctl.drm_ioctl_get_cap { return ioctl_get_cap(data) }
 		ioctl.drm_ioctl_gem_close { return ioctl_gem_close(dev, handle, data) }
-		ioctl.drm_ioctl_syncobj_create { return ioctl_syncobj_create(data) }
-		ioctl.drm_ioctl_syncobj_destroy { return ioctl_syncobj_destroy(data) }
-		ioctl.drm_ioctl_syncobj_wait { return ioctl_syncobj_wait(data) }
+		ioctl.drm_ioctl_syncobj_create { return ioctl_syncobj_create(handle, data) }
+		ioctl.drm_ioctl_syncobj_destroy { return ioctl_syncobj_destroy(handle, data) }
+		ioctl.drm_ioctl_syncobj_wait { return ioctl_syncobj_wait(handle, data) }
 		else { return none }
 	}
 }
