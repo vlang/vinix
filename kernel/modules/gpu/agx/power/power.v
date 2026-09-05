@@ -1,10 +1,12 @@
 module power
 
 // Native Apple DeviceTree validation and dormant ApplePTD transport for the
-// T6050 GPU power path. Actual PMP transitions remain disabled until transport
-// serialization, failure recovery, and firmware handoff are implemented.
+// T6050 GPU power path. Actual PMP transitions remain disabled until PMP
+// service integration and the firmware handoff are implemented.
 
 import devicetree
+import aarch64.timer
+import klock
 import memory
 
 const pmgr_device_record_size = u32(48)
@@ -29,6 +31,7 @@ const t6050_agx_record_index = u32(15)
 const t6050_agx_request_entry = u32(0x1e0)
 const t6050_agx_ack_entry = u32(0x1e8)
 const t6050_pmp_status_entry = u32(1)
+const t6050_agx_ack_timeout_us = u64(15_000_000)
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -44,6 +47,36 @@ pub:
 pub struct T6050PtdTransport {
 pub:
 	die_bases [2]u64
+}
+
+enum T6050PowerPhase {
+	idle
+	waiting_for_ack
+	faulted
+}
+
+pub enum T6050PowerResult {
+	idle
+	pending
+	completed
+	published_pre_ready
+	busy
+	transport_error
+	timed_out
+	faulted
+}
+
+// One controller owns both die apertures and admits only one outstanding
+// read-modify-write transaction. Its lock is held for individual MMIO steps,
+// never for the acknowledgement interval between poll() calls.
+pub struct T6050PowerController {
+mut:
+	transport   T6050PtdTransport
+	lock        klock.Lock
+	phase       T6050PowerPhase
+	pending_die u32
+	request     u64
+	started_us  u64
 }
 
 pub fn decode_t6050_ptd_entry(data u64, raw_metadata u64, caller_tag u8) T6050PtdEntry {
@@ -82,7 +115,7 @@ fn t6050_ptd_offset(entry u32, base u64, stride u64, width u64) ?u64 {
 
 // Constructing this maps both die apertures as Device-nGnRnE. Keep the call
 // behind the G17 boot gate until one owner can serialize full transactions.
-pub fn map_t6050_ptd_transport() ?T6050PtdTransport {
+fn map_t6050_ptd_transport() ?T6050PtdTransport {
 	die0 := memory.map_mmio(t6050_ptd_base, t6050_ptd_size)
 	die1 := memory.map_mmio(t6050_ptd_base + t6050_die_stride, t6050_ptd_size)
 	if die0 == 0 || die1 == 0 {
@@ -90,6 +123,16 @@ pub fn map_t6050_ptd_transport() ?T6050PtdTransport {
 	}
 	return T6050PtdTransport{
 		die_bases: [u64(die0), die1]!
+	}
+}
+
+// Mapping is a separate, explicit construction step so read-only T6050 probe
+// validation cannot accidentally access ApplePTD.
+pub fn map_t6050_power_controller() ?T6050PowerController {
+	transport := map_t6050_ptd_transport() or { return none }
+	return T6050PowerController{
+		transport: transport
+		phase: .idle
 	}
 }
 
@@ -131,6 +174,75 @@ pub fn (transport &T6050PtdTransport) write(die u32, entry u32, value u64) bool 
 	return true
 }
 
+// Publish an AGX level request. A pre-ready PMP deliberately completes here
+// without reading PS-ACK; otherwise poll() owns acknowledgement completion.
+pub fn (mut controller T6050PowerController) begin(die u32,
+	enabled bool) T6050PowerResult {
+	if die >= controller.transport.die_bases.len {
+		return .transport_error
+	}
+	controller.lock.acquire()
+	defer {
+		controller.lock.release()
+	}
+	if controller.phase == .waiting_for_ack {
+		return .busy
+	}
+	if controller.phase == .faulted {
+		return .faulted
+	}
+	current := controller.transport.read(die, t6050_agx_request_entry, 0) or {
+		return .transport_error
+	}
+	request := t6050_agx_request_value(current.data, enabled)
+	if !controller.transport.write(die, t6050_agx_request_entry, request) {
+		controller.phase = .faulted
+		return .transport_error
+	}
+	controller.started_us = timer.get_us()
+	status := controller.transport.read(die, t6050_pmp_status_entry, 0) or {
+		controller.phase = .faulted
+		return .transport_error
+	}
+	if status.data == 0 {
+		return .published_pre_ready
+	}
+	controller.pending_die = die
+	controller.request = request
+	controller.phase = .waiting_for_ack
+	return .pending
+}
+
+// Advance one nonblocking acknowledgement step. A timeout or transport error
+// is sticky because the request may already have reached PMP; reconstruction
+// of the controller is the only recovery until a reset protocol is recovered.
+pub fn (mut controller T6050PowerController) poll() T6050PowerResult {
+	controller.lock.acquire()
+	defer {
+		controller.lock.release()
+	}
+	if controller.phase == .idle {
+		return .idle
+	}
+	if controller.phase == .faulted {
+		return .faulted
+	}
+	ack := controller.transport.read(controller.pending_die, t6050_agx_ack_entry,
+		0) or {
+		controller.phase = .faulted
+		return .transport_error
+	}
+	if t6050_agx_acknowledged(&ack, controller.request) {
+		controller.phase = .idle
+		return .completed
+	}
+	if timer.get_us() - controller.started_us >= t6050_agx_ack_timeout_us {
+		controller.phase = .faulted
+		return .timed_out
+	}
+	return .pending
+}
+
 fn validate_t6050_ptd_codec() bool {
 	decoded := decode_t6050_ptd_entry(0x1234, (u64(0x155) << 10) | 3, 0xa5)
 	expected_metadata := (u64(0xa5) << 56) | (u64(3) << 54) | 0x155
@@ -155,6 +267,13 @@ fn validate_t6050_ptd_codec() bool {
 		return false
 	}
 	if _ := unmapped.read(2, 0, 0) {
+		return false
+	}
+	mut controller := T6050PowerController{
+		transport: unmapped
+		phase: .idle
+	}
+	if controller.begin(2, true) != .transport_error || controller.poll() != .idle {
 		return false
 	}
 	return sizeof(T6050PtdEntry) == 16 && decoded.data == 0x1234
@@ -380,9 +499,9 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 
 // Validate only the read-only ownership and transport contract here. Apple's
 // initial synchronization can publish a persistent request before readiness,
-// but Vinix still needs mapping ownership, serialized transactions, timeout
-// cleanup, and the firmware-side handoff. This function therefore performs no
-// mapping or MMIO access.
+// and Vinix has a serialized nonblocking controller for that transaction. The
+// controller remains dormant until the firmware-side handoff owns its startup
+// order. This function therefore performs no mapping or MMIO access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 	if !validate_t6050_ptd_codec() {
 		println('agx: internal t6050 ApplePTD transport validation failed')
