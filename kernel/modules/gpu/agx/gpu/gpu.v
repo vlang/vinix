@@ -38,6 +38,15 @@ const msg_address_mask = (u64(1) << 44) - 1
 pub const doorbell_kick_firmware = u32(0x10)
 pub const doorbell_device_control = u32(0x11)
 
+const g13_channel_allocation_count = 18
+const g13_device_control_index = 0
+const g13_fw_control_index = 1
+const g13_event_index = 2
+const g13_fw_log_index = 3
+const g13_ktrace_index = 4
+const g13_stats_index = 5
+const g13_pipe_base_index = 6
+
 // GPU states
 pub enum GpuState {
 	idle     = 0
@@ -73,8 +82,9 @@ pub mut:
 	state          GpuState
 	lock           klock.Lock
 mut:
-	g17_graph  &G17FirmwareGraph = unsafe { nil }
-	g17_queues []&G17QueueResources
+	g13_channels &G13ChannelAllocations = unsafe { nil }
+	g17_graph    &G17FirmwareGraph = unsafe { nil }
+	g17_queues   []&G17QueueResources
 }
 
 __global (
@@ -187,6 +197,13 @@ mut:
 	size u64
 }
 
+struct G13ChannelAllocations {
+mut:
+	states    [g13_channel_allocation_count]SharedBuffer
+	rings     [g13_channel_allocation_count]SharedBuffer
+	allocated u32
+}
+
 @[inline]
 fn pipe_index(priority u32, cmd_type u32) u32 {
 	return (priority % 4) * 3 + (cmd_type % 3)
@@ -252,54 +269,114 @@ fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 	buffer = SharedBuffer{}
 }
 
+fn (mut mgr GpuManager) alloc_g13_channel_pair(mut allocations G13ChannelAllocations,
+	index u32, state_size u64, ring_size u64) bool {
+	if index != allocations.allocated || index >= g13_channel_allocation_count {
+		return false
+	}
+	mut state := mgr.alloc_shared_buffer(state_size) or { return false }
+	ring := mgr.alloc_shared_buffer(ring_size) or {
+		mgr.free_shared_buffer(mut state)
+		return false
+	}
+	allocations.states[index] = state
+	allocations.rings[index] = ring
+	allocations.allocated++
+	return true
+}
+
+fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelAllocations) {
+	mut count := allocations.allocated
+	for count > 0 {
+		count--
+		mgr.free_shared_buffer(mut allocations.rings[count])
+		mgr.free_shared_buffer(mut allocations.states[count])
+	}
+	mgr.allocs.gc()
+}
+
+fn (mut mgr GpuManager) release_g13_channels() {
+	if mgr.g13_channels == unsafe { nil } {
+		return
+	}
+	mgr.channels = GpuChannels{}
+	mut allocations := unsafe { mgr.g13_channels }
+	mgr.g13_channels = unsafe { nil }
+	mgr.free_g13_channel_allocations(mut allocations)
+}
+
+fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
+	mut allocations := &G13ChannelAllocations{}
+	mut complete := false
+	defer {
+		if !complete {
+			mgr.free_g13_channel_allocations(mut allocations)
+		}
+	}
+
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_device_control_index, sizeof(channel.RingHeader), u64(fw.device_control_size) * sizeof(fw.FwDeviceControlMsg)) {
+		return none
+	}
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_control_index, sizeof(channel.FwCtlRingHeader), u64(fw.fw_ctl_size) * sizeof(fw.FwFwCtlMsg)) {
+		return none
+	}
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_event_index, sizeof(channel.RingHeader), u64(fw.event_size) * sizeof(fw.FwEventMsg)) {
+		return none
+	}
+	// Firmware logging has six independent state/ring subchannels.
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_log_index, 6 * sizeof(channel.RingHeader), 6 * u64(fw.fw_log_size) * sizeof(fw.FwLogMsg)) {
+		return none
+	}
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_ktrace_index, sizeof(channel.RingHeader), u64(fw.ktrace_size) * sizeof(fw.FwKTraceMsg)) {
+		return none
+	}
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * sizeof(fw.FwStatsMsg)) {
+		return none
+	}
+	for pipe := u32(0); pipe < 12; pipe++ {
+		if !mgr.alloc_g13_channel_pair(mut allocations, g13_pipe_base_index + pipe, sizeof(channel.RingHeader), u64(fw.pipe_size) * sizeof(fw.FwRunWorkQueueMsg)) {
+			return none
+		}
+	}
+	complete = true
+	return allocations
+}
+
 fn (mut mgr GpuManager) init_channels() bool {
-	if sizeof(channel.RingHeader) != 0x30 || !fw.validate_g13_channel_layouts() {
+	if sizeof(channel.RingHeader) != 0x30 || sizeof(channel.FwCtlRingHeader) != 0x20
+		|| !fw.validate_g13_channel_layouts() {
 		C.printf(c'agx: G13 channel ABI layout validation failed\n')
 		return false
 	}
-
-	// Device control TX
-	devctl_entry := u32(sizeof(fw.FwDeviceControlMsg))
-	devctl_size := u64(sizeof(channel.RingHeader)) + u64(fw.device_control_size) * u64(devctl_entry)
-	devctl := mgr.alloc_shared_buffer(devctl_size) or { return false }
-	mgr.channels.device_ctrl = channel.new_tx_channel('devctl', devctl.va, devctl.phys, fw.device_control_size, devctl_entry)
-
-	// Firmware control TX
-	fwctl_entry := u32(sizeof(fw.FwFwCtlMsg))
-	fwctl_size := u64(sizeof(channel.RingHeader)) + u64(fw.fw_ctl_size) * u64(fwctl_entry)
-	fwctl := mgr.alloc_shared_buffer(fwctl_size) or { return false }
-	mgr.channels.fw_ctrl = channel.new_tx_channel('fwctl', fwctl.va, fwctl.phys, fw.fw_ctl_size, fwctl_entry)
-
-	// Event RX
-	event_entry := u32(sizeof(fw.FwEventMsg))
-	event_size := u64(sizeof(channel.RingHeader)) + u64(fw.event_size) * u64(event_entry)
-	ev := mgr.alloc_shared_buffer(event_size) or { return false }
-	mgr.channels.event = channel.new_rx_channel('event', ev.va, ev.phys, fw.event_size, event_entry)
-
-	// Log/Ktrace/Stats RX channels
-	log_entry := u32(sizeof(fw.FwLogMsg))
-	log_size := u64(sizeof(channel.RingHeader)) + u64(fw.fw_log_size) * u64(log_entry)
-	log := mgr.alloc_shared_buffer(log_size) or { return false }
-	mgr.channels.fw_log = channel.new_rx_channel('fwlog', log.va, log.phys, fw.fw_log_size, log_entry)
-
-	ktrace_entry := u32(sizeof(fw.FwKTraceMsg))
-	ktrace_size := u64(sizeof(channel.RingHeader)) + u64(fw.ktrace_size) * u64(ktrace_entry)
-	ktrace := mgr.alloc_shared_buffer(ktrace_size) or { return false }
-	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace.va, ktrace.phys, fw.ktrace_size, ktrace_entry)
-
-	stats_entry := u32(sizeof(fw.FwStatsMsg))
-	stats_size := u64(sizeof(channel.RingHeader)) + u64(fw.stats_size) * u64(stats_entry)
-	stats := mgr.alloc_shared_buffer(stats_size) or { return false }
-	mgr.channels.stats = channel.new_rx_channel('stats', stats.va, stats.phys, fw.stats_size, stats_entry)
-
-	// 12 pipe channels: 4 priorities x (vertex, fragment, compute)
-	for i := u32(0); i < 12; i++ {
-		entry_size := u32(sizeof(fw.FwRunWorkQueueMsg))
-		pipe_bytes := u64(sizeof(channel.RingHeader)) + u64(fw.pipe_size) * u64(entry_size)
-		pipe := mgr.alloc_shared_buffer(pipe_bytes) or { return false }
-		mgr.channels.pipes[i] = channel.new_tx_channel('pipe${i}', pipe.va, pipe.phys, fw.pipe_size, entry_size)
+	if mgr.g13_channels != unsafe { nil } {
+		return false
 	}
+	mut allocations := mgr.allocate_g13_channels() or { return false }
 
+	dev_state := &allocations.states[g13_device_control_index]
+	dev_ring := &allocations.rings[g13_device_control_index]
+	mgr.channels.device_ctrl = channel.new_tx_channel('devctl', dev_state.va, dev_state.phys, dev_ring.va, dev_ring.phys, fw.device_control_size, u32(sizeof(fw.FwDeviceControlMsg)))
+	fwctl_state := &allocations.states[g13_fw_control_index]
+	fwctl_ring := &allocations.rings[g13_fw_control_index]
+	mgr.channels.fw_ctrl = channel.new_fwctl_tx_channel('fwctl', fwctl_state.va, fwctl_state.phys, fwctl_ring.va, fwctl_ring.phys, fw.fw_ctl_size, u32(sizeof(fw.FwFwCtlMsg)))
+	event_state := &allocations.states[g13_event_index]
+	event_ring := &allocations.rings[g13_event_index]
+	mgr.channels.event = channel.new_rx_channel('event', event_state.va, event_state.phys, event_ring.va, event_ring.phys, fw.event_size, u32(sizeof(fw.FwEventMsg)))
+	log_state := &allocations.states[g13_fw_log_index]
+	log_ring := &allocations.rings[g13_fw_log_index]
+	mgr.channels.fw_log = channel.new_rx_channel_with_subchannels('fwlog', log_state.va, log_state.phys, log_ring.va, log_ring.phys, fw.fw_log_size, u32(sizeof(fw.FwLogMsg)), 6)
+	ktrace_state := &allocations.states[g13_ktrace_index]
+	ktrace_ring := &allocations.rings[g13_ktrace_index]
+	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace_state.va, ktrace_state.phys, ktrace_ring.va, ktrace_ring.phys, fw.ktrace_size, u32(sizeof(fw.FwKTraceMsg)))
+	stats_state := &allocations.states[g13_stats_index]
+	stats_ring := &allocations.rings[g13_stats_index]
+	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, u32(sizeof(fw.FwStatsMsg)))
+	for pipe := u32(0); pipe < 12; pipe++ {
+		state := &allocations.states[g13_pipe_base_index + pipe]
+		ring := &allocations.rings[g13_pipe_base_index + pipe]
+		mgr.channels.pipes[pipe] = channel.new_tx_channel('pipe${pipe}', state.va, state.phys, ring.va, ring.phys, fw.pipe_size, u32(sizeof(fw.FwRunWorkQueueMsg)))
+	}
+	mgr.g13_channels = allocations
 	return true
 }
 
@@ -672,6 +749,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	mgr.release_g13_channels()
 	mgr.release_all_g17_queue_resources()
 	mgr.release_g17_firmware_graph()
 	println('agx: GPU shutdown complete')

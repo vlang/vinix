@@ -9,7 +9,6 @@ module channel
 
 import klock
 import katomic
-import memory
 
 // Channel type indices
 pub const channel_device_ctrl = u32(0)
@@ -22,8 +21,6 @@ pub const channel_stats = u32(17)
 
 // G13 v12.3 ChannelState. The firmware owns read_ptr for TX channels and
 // write_ptr for RX channels. Both pointers are modulo the ring entry count.
-// The real ABI allocates this state separately from the entry array; the
-// current partial implementation keeps them adjacent until InitData is ported.
 @[packed]
 pub struct RingHeader {
 pub mut:
@@ -33,59 +30,82 @@ pub mut:
 	pad_24    [3]u32
 }
 
+// The firmware-control channel uses a smaller state object with write_ptr at
+// 0x10. Its entry ring is otherwise operated like every other TX channel.
+@[packed]
+pub struct FwCtlRingHeader {
+pub mut:
+	read_ptr  u32
+	pad_04    [3]u32
+	write_ptr u32
+	pad_14    [3]u32
+}
+
 // Generic transmit channel (driver -> firmware)
 pub struct TxChannel {
 pub mut:
 	name       string
+	state_base u64 // VA of state object in GPU address space
+	state_phys u64 // physical address of state object
 	ring_base  u64 // VA of ring buffer in GPU address space
 	ring_phys  u64 // physical address
 	ring_size  u32 // number of entries
 	entry_size u32 // size of each entry in bytes
-	header     &RingHeader = unsafe { nil }
+	write_off  u32 // write_ptr offset in the state object
 	lock       klock.Lock
 }
 
 // Generic receive channel (firmware -> driver)
 pub struct RxChannel {
 pub mut:
-	name       string
-	ring_base  u64
-	ring_phys  u64
-	ring_size  u32
-	entry_size u32
-	header     &RingHeader = unsafe { nil }
-	lock       klock.Lock
+	name        string
+	state_base  u64
+	state_phys  u64
+	ring_base   u64
+	ring_phys   u64
+	ring_size   u32
+	entry_size  u32
+	subchannels u32
+	lock        klock.Lock
 }
 
-pub fn new_tx_channel(name string, ring_va u64, ring_phys u64, ring_size u32, entry_size u32) TxChannel {
-	// Header lives at the start of the ring buffer physical mapping
-	hdr := unsafe { &RingHeader(ring_phys + higher_half) }
-	// Zero-initialize the header
-	unsafe {
-		C.memset(hdr, 0, sizeof(RingHeader))
-	}
+pub fn new_tx_channel(name string, state_va u64, state_phys u64, ring_va u64,
+	ring_phys u64, ring_size u32, entry_size u32) TxChannel {
 	return TxChannel{
 		name: name
+		state_base: state_va
+		state_phys: state_phys
 		ring_base: ring_va
 		ring_phys: ring_phys
 		ring_size: ring_size
 		entry_size: entry_size
-		header: hdr
+		write_off: 0x20
 	}
 }
 
-pub fn new_rx_channel(name string, ring_va u64, ring_phys u64, ring_size u32, entry_size u32) RxChannel {
-	hdr := unsafe { &RingHeader(ring_phys + higher_half) }
-	unsafe {
-		C.memset(hdr, 0, sizeof(RingHeader))
-	}
+pub fn new_fwctl_tx_channel(name string, state_va u64, state_phys u64, ring_va u64,
+	ring_phys u64, ring_size u32, entry_size u32) TxChannel {
+	mut channel := new_tx_channel(name, state_va, state_phys, ring_va, ring_phys, ring_size, entry_size)
+	channel.write_off = 0x10
+	return channel
+}
+
+pub fn new_rx_channel(name string, state_va u64, state_phys u64, ring_va u64,
+	ring_phys u64, ring_size u32, entry_size u32) RxChannel {
+	return new_rx_channel_with_subchannels(name, state_va, state_phys, ring_va, ring_phys, ring_size, entry_size, 1)
+}
+
+pub fn new_rx_channel_with_subchannels(name string, state_va u64, state_phys u64,
+	ring_va u64, ring_phys u64, ring_size u32, entry_size u32, subchannels u32) RxChannel {
 	return RxChannel{
 		name: name
+		state_base: state_va
+		state_phys: state_phys
 		ring_base: ring_va
 		ring_phys: ring_phys
 		ring_size: ring_size
 		entry_size: entry_size
-		header: hdr
+		subchannels: subchannels
 	}
 }
 
@@ -96,8 +116,10 @@ pub fn (mut ch TxChannel) enqueue(data voidptr) bool {
 		ch.lock.release()
 	}
 
-	wp := katomic.load(&ch.header.write_ptr)
-	rp := katomic.load(&ch.header.read_ptr)
+	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
+	mut write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
+	wp := katomic.load(write_ptr)
+	rp := katomic.load(read_ptr)
 	next_wp := (wp + 1) % ch.ring_size
 
 	// One entry stays empty so equal pointers unambiguously mean empty.
@@ -106,52 +128,72 @@ pub fn (mut ch TxChannel) enqueue(data voidptr) bool {
 	}
 
 	offset := u64(wp) * u64(ch.entry_size)
-	// Data area starts after the header
-	dest := unsafe { voidptr(ch.ring_phys + higher_half + sizeof(RingHeader) + offset) }
+	dest := unsafe { voidptr(ch.ring_phys + higher_half + offset) }
 	unsafe {
 		C.memcpy(dest, data, ch.entry_size)
 	}
 
-	katomic.store(mut &ch.header.write_ptr, next_wp)
+	katomic.store(mut write_ptr, next_wp)
 	return true
 }
 
 // Read an entry from the ring buffer, advance read_ptr with wrap
 pub fn (mut ch RxChannel) dequeue(data voidptr) bool {
+	return ch.dequeue_subchannel(data, 0)
+}
+
+// Read one firmware-log subchannel. Other RX channel types use index zero.
+pub fn (mut ch RxChannel) dequeue_subchannel(data voidptr, index u32) bool {
+	if index >= ch.subchannels {
+		return false
+	}
 	ch.lock.acquire()
 	defer {
 		ch.lock.release()
 	}
 
-	rp := katomic.load(&ch.header.read_ptr)
-	wp := katomic.load(&ch.header.write_ptr)
+	state_offset := u64(index) * u64(sizeof(RingHeader))
+	mut read_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset) }
+	write_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset + 0x20) }
+	rp := katomic.load(read_ptr)
+	wp := katomic.load(write_ptr)
 
 	if rp == wp {
 		return false
 	}
 
-	offset := u64(rp) * u64(ch.entry_size)
-	src := unsafe { voidptr(ch.ring_phys + higher_half + sizeof(RingHeader) + offset) }
+	offset := (u64(index) * u64(ch.ring_size) + u64(rp)) * u64(ch.entry_size)
+	src := unsafe { voidptr(ch.ring_phys + higher_half + offset) }
 	unsafe {
 		C.memcpy(data, src, ch.entry_size)
 	}
 
 	new_rp := (rp + 1) % ch.ring_size
-	katomic.store(mut &ch.header.read_ptr, new_rp)
+	katomic.store(mut read_ptr, new_rp)
 	return true
 }
 
 // Read the next entry without advancing the read pointer
 pub fn (ch &RxChannel) peek(data voidptr) bool {
-	rp := katomic.load(&ch.header.read_ptr)
-	wp := katomic.load(&ch.header.write_ptr)
+	return ch.peek_subchannel(data, 0)
+}
+
+pub fn (ch &RxChannel) peek_subchannel(data voidptr, index u32) bool {
+	if index >= ch.subchannels {
+		return false
+	}
+	state_offset := u64(index) * u64(sizeof(RingHeader))
+	read_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset) }
+	write_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset + 0x20) }
+	rp := katomic.load(read_ptr)
+	wp := katomic.load(write_ptr)
 
 	if rp == wp {
 		return false
 	}
 
-	offset := u64(rp) * u64(ch.entry_size)
-	src := unsafe { voidptr(ch.ring_phys + higher_half + sizeof(RingHeader) + offset) }
+	offset := (u64(index) * u64(ch.ring_size) + u64(rp)) * u64(ch.entry_size)
+	src := unsafe { voidptr(ch.ring_phys + higher_half + offset) }
 	unsafe {
 		C.memcpy(data, src, ch.entry_size)
 	}
@@ -160,14 +202,18 @@ pub fn (ch &RxChannel) peek(data voidptr) bool {
 
 // Check if the transmit channel is full
 pub fn (ch &TxChannel) is_full() bool {
-	wp := katomic.load(&ch.header.write_ptr)
-	rp := katomic.load(&ch.header.read_ptr)
+	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
+	write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
+	wp := katomic.load(write_ptr)
+	rp := katomic.load(read_ptr)
 	return (wp + 1) % ch.ring_size == rp
 }
 
 // Check if the receive channel is empty
 pub fn (ch &RxChannel) is_empty() bool {
-	rp := katomic.load(&ch.header.read_ptr)
-	wp := katomic.load(&ch.header.write_ptr)
+	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
+	write_ptr := unsafe { &u32(ch.state_phys + higher_half + 0x20) }
+	rp := katomic.load(read_ptr)
+	wp := katomic.load(write_ptr)
 	return rp == wp
 }

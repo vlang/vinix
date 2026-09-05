@@ -30,6 +30,22 @@ pub mut:
 	pad_24    [3]u32
 }
 
+@[packed]
+pub struct FwCtlChannelState {
+pub mut:
+	read_ptr  u32
+	pad_04    [3]u32
+	write_ptr u32
+	pad_14    [3]u32
+}
+
+@[packed]
+pub struct ChannelRingPointers {
+pub:
+	state u64
+	ring  u64
+}
+
 // G13 v12.3 device-control messages are a 32-bit discriminant followed by a
 // fixed 0x2c-byte payload. Initialize (0x19) carries an all-zero payload.
 pub const device_control_initialize = u32(0x19)
@@ -117,7 +133,8 @@ pub mut:
 // Validate only the channel envelopes already ported from the G13 v12.3
 // source. This is intentionally distinct from the full-ABI boot gate.
 pub fn validate_g13_channel_layouts() bool {
-	return sizeof(FwChannelState) == 0x30 && sizeof(FwDeviceControlMsg) == 0x30
+	return sizeof(FwChannelState) == 0x30 && sizeof(FwCtlChannelState) == 0x20
+		&& sizeof(ChannelRingPointers) == 0x10 && sizeof(FwDeviceControlMsg) == 0x30
 		&& sizeof(FwRunWorkQueueMsg) == 0x38 && sizeof(FwEventMsg) == 0x38
 		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0x38
 		&& sizeof(FwKTraceMsg) == 0x40 && sizeof(FwStatsMsg) == 0x30
