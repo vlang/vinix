@@ -88,8 +88,12 @@ dynamic transitions wait on the per-die `PMP-STATUS` PTD entry before device
 status mutation, while explicitly reporting that the separately scheduled
 initial-status callback has no such local wait. The ordinary request/ack
 report also pins the AGX mask, `newData` metadata bit, state-match condition,
-15-second fatal timeout, and its single persistent request write. A separate
-UUID-pinned ApplePMP check recovers the
+15-second fatal timeout, and its single persistent request write. The same
+ApplePMGR check recovers the asymmetric ApplePTD read and write windows and
+metadata transform. A UUID-pinned AppleT6050PMGR check proves that PTD RegMap
+enum 8 maps to DeviceTree `reg[7]` once per die; the live DeviceTree resolves
+that Device aperture to `0x84240000` and `0x4084240000`. A separate UUID-pinned
+ApplePMP check recovers the
 PMPv2 64-bit mailbox classes and proves that PM subtype 1 is specifically a
 ping completion: it clears and wakes the ping's in-flight byte. The generated
 report labels that result as neither global PMP nor AGX-dashboard readiness,

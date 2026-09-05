@@ -16,7 +16,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from extract_firmware import der_item
-from recover_g17_abi import macho_symbols, macho_uuid, symbol_code
+from recover_g17_abi import (
+    macho_symbols,
+    macho_uuid,
+    recover_vtable_target,
+    symbol_code,
+)
 
 
 DEFAULT_PREBOOT = Path("/System/Volumes/Preboot")
@@ -35,8 +40,10 @@ PMP_SOC_DEVICE_NAME_OFFSET = 116
 PMP_PTD_RANGE_BYTES = 32
 PMP_PTD_RANGE_NAME_OFFSET = 16
 APPLE_PMGR_UUID = "42F1AD20-5320-3803-8A70-05104BD5FBA7"
+APPLE_T6050_PMGR_UUID = "0AEACB61-66C5-3D24-AEA2-0A9DFFCF17E2"
 APPLE_PMP_UUID = "AA65CE02-93C8-33DE-A7BE-B11E1621F739"
 DEFAULT_APPLE_PMGR = Path("build/kext/g17c/driver.ApplePMGR.macho")
+DEFAULT_APPLE_T6050_PMGR = Path("build/kext/g17c/driver.AppleT6050PMGR.macho")
 DEFAULT_APPLE_PMP = Path("build/kext/g17c/driver.ApplePMP.macho")
 PMP_SEND_COMMAND = "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj"
 PMP_WRITE_DASHBOARD = "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj"
@@ -55,6 +62,15 @@ PMP_WAIT_READY_V2 = "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej"
 PMP_READY_GATED = "__ZN9ApplePMGR20_pmpReadyActionGatedEj"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
+PMGR_GET_REG_MAP = "__ZN9ApplePMGR9getRegMapENS_6RegMapEj"
+PMGR_INIT_REG_MAP = "__ZN9ApplePMGR10initRegMapENS_6RegMapEjjb"
+PMGR_WRITE_REG64 = "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj"
+APPLE_T6050_PMGR_VTABLE = "__ZTV14AppleT6050PMGR"
+T6050_INIT_REG_MAPS = "__ZN14AppleT6050PMGR11initRegMapsEv"
+PMGR_PMP_V1 = "__ZN9ApplePMGR6_pmpV1Ev"
+PMGR_PMP_V2 = "__ZN9ApplePMGR6_pmpV2Ev"
+PMGR_GET_NUM_DIES = "__ZN9ApplePMGR10getNumDiesEv"
+PMGR_GET_DIE_COUNT = "__ZN9ApplePMGR11getDieCountEv"
 APPLE_PMP_V2_START = "__ZN10ApplePMPv25startEP9IOService"
 APPLE_PMP_V2_MESSAGE_HANDLER = "__ZN10ApplePMPv214messageHandlerEPvS0_"
 APPLE_PMP_V2_HANDLE_MEMORY = "__ZN10ApplePMPv216handleMemMessageEy"
@@ -234,6 +250,15 @@ def decode_integer(data: bytes, field: str) -> int:
     if len(data) not in (4, 8):
         raise ValueError(f"{field} is neither a 32-bit nor a 64-bit integer")
     return int.from_bytes(data, "little")
+
+
+def parse_reg_regions(data: bytes, field: str) -> list[tuple[int, int]]:
+    if not data or len(data) % 16:
+        raise ValueError(f"{field} is not an array of 64-bit address/size pairs")
+    return [
+        struct.unpack_from("<QQ", data, offset)
+        for offset in range(0, len(data), 16)
+    ]
 
 
 def node_name(node: AdtNode) -> str:
@@ -454,6 +479,109 @@ def _has_ordered_words(code: bytes, expected: tuple[int, ...]) -> bool:
     return True
 
 
+def recover_apple_ptd_code_contract(
+    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+) -> dict[str, object]:
+    """Recover ApplePTD's asymmetric read and write MMIO windows."""
+
+    required = (APPLE_PTD_READ, APPLE_PTD_WRITE, PMGR_GET_REG_MAP, PMGR_WRITE_REG64)
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"ApplePMGR is missing ApplePTD symbols: {missing!r}")
+    for name in (APPLE_PTD_READ, APPLE_PTD_WRITE, PMGR_WRITE_REG64):
+        if name not in functions:
+            raise ValueError(f"ApplePMGR has no code body for {name}")
+
+    read_address, read_code = functions[APPLE_PTD_READ]
+    if (
+        direct_branch_count(read_address, read_code, symbols[PMGR_GET_REG_MAP]) != 1
+        or not _has_ordered_words(
+            read_code,
+            (
+                0xB9400828,  # ldr w8, [x1, #8] -- range entry count
+                0xF9400000,  # ldr x0, [x0] -- owning ApplePMGR
+                0x52800101,  # mov w1, #8 -- PTD RegMap
+                0xAA0403E2,  # mov x2, x4 -- die
+                0xF9400C08,  # ldr x8, [x0, #0x18] -- mapped base
+                0x531C6E89,  # lsl w9, w20, #4 -- entry * 16
+                0x8B090108,  # add x8, x8, x9
+                0xA9402508,  # ldp x8, x9, [x8] -- data and raw metadata
+                0xD341FD2A,  # lsr x10, x9, #1
+                0x39403E6B,  # ldrb w11, [x19, #0xf] -- retained tag
+                0xD34AFD2C,  # lsr x12, x9, #10
+                0xB349012C,  # bfi x12, x9, #55, #1 -- raw bit 0
+                0xAA0BE189,  # orr x9, x12, x11, lsl #56
+                0xB34A0149,  # bfi x9, x10, #54, #1 -- raw bit 1
+                0xA9002668,  # stp x8, x9, [x19] -- decoded Entry
+            ),
+        )
+    ):
+        raise ValueError("ApplePTD read window or metadata decoding changed")
+
+    write_address, write_code = functions[APPLE_PTD_WRITE]
+    if (
+        direct_branch_count(write_address, write_code, symbols[PMGR_WRITE_REG64]) != 1
+        or not _has_ordered_words(
+            write_code,
+            (
+                0xB9400828,  # ldr w8, [x1, #8] -- range entry count
+                0xF9400000,  # ldr x0, [x0] -- owning ApplePMGR
+                0x531D7048,  # lsl w8, w2, #3 -- entry * 8
+                0x11404102,  # add w2, w8, #0x10, lsl #12 -- +0x10000
+                0x52800101,  # mov w1, #8 -- PTD RegMap
+            ),
+        )
+    ):
+        raise ValueError("ApplePTD write portal changed")
+
+    write_reg_address, write_reg_code = functions[PMGR_WRITE_REG64]
+    if (
+        direct_branch_count(write_reg_address, write_reg_code, symbols[PMGR_GET_REG_MAP])
+        != 1
+        or not _has_ordered_words(
+            write_reg_code,
+            (
+                0xAA0303F5,  # mov x21, x3 -- value
+                0xAA0203F3,  # mov x19, x2 -- byte offset
+                0xAA0103F6,  # mov x22, x1 -- RegMap
+                0xAA1403E2,  # mov x2, x20 -- die
+                0xF9400C08,  # ldr x8, [x0, #0x18] -- mapped base
+                0xF8334915,  # str x21, [x8, w19, uxtw]
+            ),
+        )
+    ):
+        raise ValueError("ApplePMGR 64-bit register write changed")
+
+    return {
+        "reg_map": 8,
+        "read": {
+            "base_offset": 0,
+            "entry_stride": 16,
+            "width_bytes": 16,
+            "operation": "one 16-byte load of data and raw metadata",
+        },
+        "write": {
+            "base_offset": 0x10000,
+            "entry_stride": 8,
+            "width_bytes": 8,
+            "operation": "one 64-bit store through ApplePMGR::writeReg64",
+        },
+        "decoded_entry": {
+            "data_word": 0,
+            "metadata_word": 1,
+            "raw_bits_10_63": "decoded metadata bits 0..53",
+            "raw_bit_1": "decoded metadata bit 54 (newData)",
+            "raw_bit_0": "decoded metadata bit 55",
+            "caller_tag": "decoded metadata bits 56..63, retained from output +0xf",
+        },
+        "range_check": "entry_count must be nonzero; callers supply the entry index",
+        "ordering": (
+            "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, "
+            "or final register-store sequence; ordering depends on the Device MMIO mapping"
+        ),
+    }
+
+
 def recover_pmp_code_contract(
     functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
 ) -> dict[str, object]:
@@ -473,6 +601,8 @@ def recover_pmp_code_contract(
         PMP_READY_GATED,
         APPLE_PTD_READ,
         APPLE_PTD_WRITE,
+        PMGR_GET_REG_MAP,
+        PMGR_WRITE_REG64,
     )
     missing = [name for name in required if name not in symbols]
     if missing:
@@ -489,9 +619,14 @@ def recover_pmp_code_contract(
         PMP_WAIT_READY,
         PMP_WAIT_READY_V2,
         PMP_READY_GATED,
+        APPLE_PTD_READ,
+        APPLE_PTD_WRITE,
+        PMGR_WRITE_REG64,
     ):
         if name not in functions:
             raise ValueError(f"ApplePMGR has no code body for {name}")
+
+    ptd_transport = recover_apple_ptd_code_contract(functions, symbols)
 
     send_address, send_code = functions[PMP_SEND_COMMAND]
     if symbols[PMP_WRITE_DASHBOARD] not in direct_branch_targets(send_address, send_code):
@@ -826,6 +961,7 @@ def recover_pmp_code_contract(
             "allocated_entries": 257,
             "table_object_offset": 0x72C4C,
         },
+        "ptd_transport": ptd_transport,
         "transport": "PTD dashboard request/ack bitsets",
     }
 
@@ -849,11 +985,168 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
             PMP_WAIT_READY,
             PMP_WAIT_READY_V2,
             PMP_READY_GATED,
+            APPLE_PTD_READ,
+            APPLE_PTD_WRITE,
+            PMGR_WRITE_REG64,
         )
     }
     return {
         "uuid": identity,
         "pmp_v2": recover_pmp_code_contract(functions, symbols),
+    }
+
+
+def _decode_movz_w(word: int, register: int) -> int | None:
+    if word & 0xFFE0001F != 0x52800000 | register:
+        return None
+    return (word >> 5) & 0xFFFF
+
+
+def recover_t6050_pmgr_code_contract(
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+    apple_pmgr_symbols: dict[str, int],
+    vtable_targets: dict[int, int],
+) -> dict[str, object]:
+    """Recover the T6050-specific PMGR version and RegMap dispatch."""
+
+    required = (
+        T6050_INIT_REG_MAPS,
+        PMGR_PMP_V1,
+        PMGR_PMP_V2,
+        PMGR_GET_NUM_DIES,
+        PMGR_GET_DIE_COUNT,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"AppleT6050PMGR is missing symbols: {missing!r}")
+    for name in (T6050_INIT_REG_MAPS, PMGR_PMP_V1, PMGR_PMP_V2):
+        if name not in functions:
+            raise ValueError(f"AppleT6050PMGR has no code body for {name}")
+    base_required = (PMGR_INIT_REG_MAP, PMP_WAIT_READY)
+    base_missing = [name for name in base_required if name not in apple_pmgr_symbols]
+    if base_missing:
+        raise ValueError(f"ApplePMGR is missing T6050 base symbols: {base_missing!r}")
+
+    expected_slots = {
+        0xAB0: symbols[PMGR_PMP_V1],
+        0xAB8: symbols[PMGR_PMP_V2],
+        0xAC0: apple_pmgr_symbols[PMP_WAIT_READY],
+        0xAC8: symbols[PMGR_GET_NUM_DIES],
+        0xB30: symbols[PMGR_GET_DIE_COUNT],
+    }
+    for slot, expected in expected_slots.items():
+        actual = vtable_targets.get(slot)
+        if actual != expected:
+            raise ValueError(
+                f"AppleT6050PMGR vtable slot {slot:#x} changed: "
+                f"{actual!r} != {expected:#x}"
+            )
+
+    _v1_address, v1_code = functions[PMGR_PMP_V1]
+    _v2_address, v2_code = functions[PMGR_PMP_V2]
+    if v1_code != struct.pack(
+        "<5I", 0xD503245F, 0xB95BD808, 0x7100051F, 0x1A9F17E0, 0xD65F03C0
+    ):
+        raise ValueError("AppleT6050PMGR PMP-v1 predicate changed")
+    if v2_code != struct.pack(
+        "<5I", 0xD503245F, 0xB95BD808, 0x7100091F, 0x1A9F17E0, 0xD65F03C0
+    ):
+        raise ValueError("AppleT6050PMGR PMP-v2 predicate changed")
+
+    init_address, init_code = functions[T6050_INIT_REG_MAPS]
+    words = [
+        struct.unpack_from("<I", init_code, offset)[0]
+        for offset in range(0, len(init_code) - 3, 4)
+    ]
+    reg_map_calls: list[tuple[int, int]] = []
+    for index, word in enumerate(words):
+        if index < 5 or word & 0x7C000000 != 0x14000000:
+            continue
+        immediate = word & 0x03FFFFFF
+        if immediate & 0x02000000:
+            immediate -= 1 << 26
+        target = (init_address + index * 4 + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+        if target != apple_pmgr_symbols[PMGR_INIT_REG_MAP]:
+            continue
+        prefix = words[index - 5 : index]
+        reg_map = _decode_movz_w(prefix[1], 1)
+        reg_index = _decode_movz_w(prefix[2], 2)
+        if (
+            prefix[0] != 0xAA1303E0  # mov x0, x19 -- this
+            or reg_map is None
+            or reg_index is None
+            or prefix[3] != 0xAA1403E3  # mov x3, x20 -- die
+            or prefix[4] != 0x52800004  # mov w4, #0
+        ):
+            raise ValueError("AppleT6050PMGR initRegMap call ABI changed")
+        reg_map_calls.append((reg_map, reg_index))
+
+    if len(reg_map_calls) != 60:
+        raise ValueError(
+            f"AppleT6050PMGR RegMap call count changed: {len(reg_map_calls)}"
+        )
+    if [reg_index for _reg_map, reg_index in reg_map_calls] != list(range(60)):
+        raise ValueError("AppleT6050PMGR DeviceTree reg-index order changed")
+    ptd_calls = [item for item in reg_map_calls if item[0] == 8]
+    if ptd_calls != [(8, 7)]:
+        raise ValueError(f"AppleT6050PMGR PTD RegMap dispatch changed: {ptd_calls!r}")
+    if not _has_ordered_words(
+        init_code,
+        (
+            0xD2816611,  # mov x17, #0xb30 -- getDieCount vtable slot
+            0x52800014,  # mov w20, #0 -- first die
+            0xAA1403E3,  # every initRegMap call receives die in x3
+            0x11000694,  # add w20, w20, #1
+            0x912CC208,  # add x8, x16, #0xb30 -- getDieCount again
+            0xF9459A09,  # ldr x9, [x16, #0xb30]
+            0x54FFD103,  # b.lo -- repeat the complete map table per die
+        ),
+    ):
+        raise ValueError("AppleT6050PMGR per-die RegMap loop changed")
+
+    return {
+        "pmp_version": {
+            "object_offset": 0x1BD8,
+            "v1_value": 1,
+            "v2_value": 2,
+        },
+        "vtable_slots": {
+            "pmp_v1": 0xAB0,
+            "pmp_v2": 0xAB8,
+            "wait_for_ready": 0xAC0,
+            "get_num_dies": 0xAC8,
+            "get_die_count": 0xB30,
+        },
+        "reg_maps": {
+            "initialization_calls_per_die": len(reg_map_calls),
+            "device_tree_indices": [item[1] for item in reg_map_calls],
+            "ptd": {"enum": 8, "device_tree_reg_index": 7},
+            "scope": "the complete 60-call table is repeated for every die",
+        },
+    }
+
+
+def recover_apple_t6050_pmgr(
+    image: bytes, apple_pmgr_symbols: dict[str, int]
+) -> dict[str, object]:
+    identity = macho_uuid(image)
+    if identity != APPLE_T6050_PMGR_UUID:
+        raise ValueError(f"unsupported AppleT6050PMGR UUID {identity}")
+    symbols = macho_symbols(image)
+    functions = {
+        name: symbol_code(image, name)
+        for name in (T6050_INIT_REG_MAPS, PMGR_PMP_V1, PMGR_PMP_V2)
+    }
+    slots = {
+        slot: recover_vtable_target(image, APPLE_T6050_PMGR_VTABLE, slot)
+        for slot in (0xAB0, 0xAB8, 0xAC0, 0xAC8, 0xB30)
+    }
+    return {
+        "uuid": identity,
+        "power": recover_t6050_pmgr_code_contract(
+            functions, symbols, apple_pmgr_symbols, slots
+        ),
     }
 
 
@@ -1065,6 +1358,31 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     ptd_range_ids = decode_u32_array(pmgr.property("ptd-ranges"), "pmgr ptd-ranges")
     if ptd_range_ids != [10, 11, 12, 13, 2, 4]:
         raise ValueError(f"T6050 PMGR PTD range bindings changed: {ptd_range_ids!r}")
+    reg_regions = parse_reg_regions(pmgr.property("reg"), "pmgr reg")
+    if len(reg_regions) != 60:
+        raise ValueError(f"T6050 PMGR register-region count changed: {len(reg_regions)}")
+    ptd_reg_index = 7
+    ptd_region = reg_regions[ptd_reg_index]
+    if ptd_region != (0x84240000, 0x40000):
+        raise ValueError(f"T6050 ApplePTD register region changed: {ptd_region!r}")
+    die_stride = decode_integer(pmgr.property("die-stride"), "pmgr die-stride")
+    if die_stride != 0x4000000000:
+        raise ValueError(f"T6050 PMGR die stride changed: {die_stride:#x}")
+
+    pmp_wrappers: dict[str, tuple[str, AdtNode]] = {}
+    for path, node in walk_adt(root):
+        role_property = node.properties.get("role")
+        if role_property is None or not compatible_with(node, "iop,ascwrap-v6"):
+            continue
+        role = decode_cstring(role_property.data, "PMP role")
+        if role not in ("PMP0", "PMP1"):
+            continue
+        if role in pmp_wrappers:
+            raise ValueError(f"duplicate T6050 {role} wrapper")
+        pmp_wrappers[role] = (path, node)
+    if set(pmp_wrappers) != {"PMP0", "PMP1"}:
+        raise ValueError(f"unexpected T6050 PMP die roles: {sorted(pmp_wrappers)!r}")
+    ptd_die_bases = [ptd_region[0] + die * die_stride for die in range(2)]
 
     power_handles = decode_u32_array(sgx.property("power-gates"), "sgx power-gates")
     clock_handles = decode_u32_array(sgx.property("clock-gates"), "sgx clock-gates")
@@ -1221,7 +1539,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 6,
+        "schema": 7,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
@@ -1229,6 +1547,14 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
             "clock_gates": clock_gates,
         },
         "gfx_asc_gates": gfx_handles,
+        "apple_ptd_mmio": {
+            "reg_map": 8,
+            "device_tree_reg_index": ptd_reg_index,
+            "region_size": ptd_region[1],
+            "die_stride": die_stride,
+            "die_bases": ptd_die_bases,
+            "mapping": "Device MMIO; never normal-cacheable memory",
+        },
         "pmp": {
             "path": pmp_path,
             "nub_path": nub_path,
@@ -1275,6 +1601,9 @@ def main() -> int:
     parser.add_argument("--device-tree", type=Path, help="override devicetree.img4")
     parser.add_argument("--preboot", type=Path, default=DEFAULT_PREBOOT)
     parser.add_argument("--pmgr", type=Path, default=DEFAULT_APPLE_PMGR)
+    parser.add_argument(
+        "--t6050-pmgr", type=Path, default=DEFAULT_APPLE_T6050_PMGR
+    )
     parser.add_argument("--pmp", type=Path, default=DEFAULT_APPLE_PMP)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
@@ -1283,7 +1612,12 @@ def main() -> int:
         payload = device_tree_im4p_payload(source.read_bytes())
         root = parse_adt(decompress_device_tree(payload))
         manifest = recover_t6050_power(root)
-        manifest["apple_pmgr"] = recover_apple_pmgr(args.pmgr.read_bytes())
+        pmgr_image = args.pmgr.read_bytes()
+        pmgr_symbols = macho_symbols(pmgr_image)
+        manifest["apple_pmgr"] = recover_apple_pmgr(pmgr_image)
+        manifest["apple_t6050_pmgr"] = recover_apple_t6050_pmgr(
+            args.t6050_pmgr.read_bytes(), pmgr_symbols
+        )
         manifest["apple_pmp"] = recover_apple_pmp(args.pmp.read_bytes())
     except (OSError, ValueError) as error:
         parser.error(str(error))
