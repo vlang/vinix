@@ -6866,15 +6866,14 @@ def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
 
 
 def recover_g17_3d_register_lists(image: bytes) -> dict[str, object]:
-    """Recover the register-list encoding inside the 0x2240-byte 3D command.
+    """Recover the register-list layout of the 0x2240-byte 3D command.
 
-    generateRegisterListFor3D runs four passes with a 0x720 stride.  Each pass
-    encodes a stream of 12-byte entries -- a selector word then an unaligned
-    64-bit value -- and maintains a GPU address plus 16-bit entry and byte
-    counters.  What is *not* settled is the record framing: the counters sit at
-    stride + 0x88, past the 0x720 stride, so consecutive records cannot simply
-    be 0x720 bytes of independent storage.  Only the proven encoding is
-    reported; no capacity is derived from the stride.
+    generateRegisterListFor3D runs four passes with a 0x720 stride.  Pass i
+    holds its stream at i * 0x720 + 0xa0 and its metadata -- GPU address, then
+    16-bit entry and byte counters -- at i * 0x720 + 0x7a0, so each pass owns
+    0x700 stream bytes and the next pass begins 0x14 bytes after the previous
+    metadata ends.  The function's exit block confirms the spacing by copying
+    all four metadata records into the descriptor as a 0x10-byte array.
     """
 
     symbols = macho_symbols(image)
@@ -6906,34 +6905,64 @@ def recover_g17_3d_register_lists(image: bytes) -> dict[str, object]:
         },
     )
 
+    # The exit block publishes every pass's metadata into the descriptor,
+    # which pins both the stride and the per-pass metadata offset.
+    require_instruction_words_at(
+        code,
+        "G17 3D register-list publication",
+        {
+            0x2560: 0x794F532A,  # pass 0 entry count
+            0x2564: 0x7901032A,  # staged at command +0x80
+            0x275C: 0x7910627F,
+            0x2760: 0xF9041E7F,
+            0x2764: 0x91210268,  # descriptor summary array at +0x840
+            0x277C: 0xF943D329,  # pass 0 GPU address at command +0x7a0
+            0x2780: 0xF9041669,  # -> descriptor +0x828
+            0x2784: 0x79410329,
+            0x2788: 0x79106269,  # -> descriptor +0x830
+            0x278C: 0x913B2329,  # pass 1 metadata at command +0xec8
+            0x2790: 0x5280006A,  # three further passes
+            0x2794: 0xF85F812B,
+            0x2798: 0xF81F810B,
+            0x279C: 0x7940012B,
+            0x27A0: 0x7801050B,  # 0x10-byte summary stride
+            0x27A4: 0x911C8129,  # 0x720 command stride
+        },
+    )
+
     stream_offset = 0xA0
-    counter_offset = 0x7A8
+    metadata_offset = 0x7A0
     stride = 0x720
     passes = 4
-    if passes * stride > G17_COMMAND_3D_BYTES:
-        raise ValueError("G17 3D register-list passes overflow the command")
-    # Record the inconsistency rather than papering over it: the last pass
-    # writes its counters at 3 * 0x720 + 0x7a8, which is past 4 * 0x720.
-    trailing = (passes - 1) * stride + counter_offset + 4
-    if trailing > G17_COMMAND_3D_BYTES:
-        raise ValueError("G17 3D register-list counters fall outside the command")
+    stream_bytes = metadata_offset - stream_offset
+    metadata_bytes = 0xC
+    # Each pass must end before the next one's stream begins.
+    if stream_offset + stream_bytes + metadata_bytes > stride + stream_offset:
+        raise ValueError("G17 3D register-list passes overlap")
+    if (passes - 1) * stride + metadata_offset + metadata_bytes > G17_COMMAND_3D_BYTES:
+        raise ValueError("G17 3D register-list metadata falls outside the command")
 
     return {
         "command_bytes": G17_COMMAND_3D_BYTES,
         "passes": passes,
         "stride": stride,
         "stream_offset": stream_offset,
-        "gpu_address_offset": 0x7A0,
-        "entry_count_offset": counter_offset,
+        "stream_bytes": stream_bytes,
+        "gpu_address_offset": metadata_offset,
+        "entry_count_offset": 0x7A8,
         "byte_length_offset": 0x7AA,
         "entry_bytes": 0xC,
+        "inter_pass_gap": stride + stream_offset - (metadata_offset + metadata_bytes),
         "selector_template_mask": 0xFFFC0006,
         "gpu_base_descriptor_member": 0x440,
-        "record_framing_resolved": False,
-        "framing_note": (
-            "counters live at stride + 0x88, so the 0x720 stride is not the "
-            "size of an independent per-pass record; capacity is unknown"
-        ),
+        "descriptor_summary": {
+            "offset": 0x828,
+            "stride": 0x10,
+            "records": passes,
+            "gpu_address": 0x00,
+            "entry_count": 0x08,
+        },
+        "record_framing_resolved": True,
         "producer": GENERATE_REGISTER_LIST_3D,
     }
 

@@ -3570,6 +3570,22 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x19C: 0x794E110A,
             0x1A0: 0x1100054A,
             0x1A4: 0x790E110A,
+            0x2560: 0x794F532A,
+            0x2564: 0x7901032A,
+            0x275C: 0x7910627F,
+            0x2760: 0xF9041E7F,
+            0x2764: 0x91210268,
+            0x277C: 0xF943D329,
+            0x2780: 0xF9041669,
+            0x2784: 0x79410329,
+            0x2788: 0x79106269,
+            0x278C: 0x913B2329,
+            0x2790: 0x5280006A,
+            0x2794: 0xF85F812B,
+            0x2798: 0xF81F810B,
+            0x279C: 0x7940012B,
+            0x27A0: 0x7801050B,
+            0x27A4: 0x911C8129,
         }.items():
             struct.pack_into("<I", code, offset, word)
 
@@ -3591,10 +3607,14 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(recovered["entry_bytes"], 0xC)
         self.assertEqual(recovered["selector_template_mask"], 0xFFFC0006)
         self.assertEqual(recovered["gpu_base_descriptor_member"], 0x440)
-        # The framing is explicitly unresolved; no capacity may be reported.
-        self.assertFalse(recovered["record_framing_resolved"])
-        self.assertNotIn("entry_capacity", recovered)
-        self.assertNotIn("stream_capacity", recovered)
+        # Framing is settled: a pass owns 0x700 stream bytes and the next pass
+        # begins 0x14 bytes after the previous metadata ends.
+        self.assertTrue(recovered["record_framing_resolved"])
+        self.assertEqual(recovered["stream_bytes"], 0x700)
+        self.assertEqual(recovered["inter_pass_gap"], 0x14)
+        self.assertEqual(recovered["descriptor_summary"]["offset"], 0x828)
+        self.assertEqual(recovered["descriptor_summary"]["stride"], 0x10)
+        self.assertEqual(recovered["descriptor_summary"]["records"], 4)
 
     def test_rejects_changed_g17_3d_register_entry_stride(self) -> None:
         code = bytearray(0x27DC)
@@ -3616,6 +3636,22 @@ class RecoverG17AbiTests(unittest.TestCase):
             0x19C: 0x794E110A,
             0x1A0: 0x1100054A,
             0x1A4: 0x790E110A,
+            0x2560: 0x794F532A,
+            0x2564: 0x7901032A,
+            0x275C: 0x7910627F,
+            0x2760: 0xF9041E7F,
+            0x2764: 0x91210268,
+            0x277C: 0xF943D329,
+            0x2780: 0xF9041669,
+            0x2784: 0x79410329,
+            0x2788: 0x79106269,
+            0x278C: 0x913B2329,
+            0x2790: 0x5280006A,
+            0x2794: 0xF85F812B,
+            0x2798: 0xF81F810B,
+            0x279C: 0x7940012B,
+            0x27A0: 0x7801050B,
+            0x27A4: 0x911C8129,
         }.items():
             struct.pack_into("<I", code, offset, word)
         with (

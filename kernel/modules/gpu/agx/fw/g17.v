@@ -1205,22 +1205,24 @@ pub const g17_command_ksm_add_kicks_size = u32(0x40)
 pub const g17_command_ksm_config_update_size = u32(0xc0)
 pub const g17_command_ksm_kick_queue_size = u32(0x40)
 
-// Register-list encoding inside the 3D channel command.
-// generateRegisterListFor3D runs four passes with a 0x720 stride, encoding a
-// stream of 12-byte entries and maintaining a GPU address plus 16-bit entry
-// and byte counters. The record framing is deliberately NOT modelled: the
-// counters sit at stride + 0x88, so 0x720 is not the size of an independent
-// per-pass record and the usable stream capacity is still unknown. Callers
-// therefore pass the stream limit they have established themselves.
+// Register-list layout inside the 3D channel command.
+// generateRegisterListFor3D runs four passes with a 0x720 stride. Pass i keeps
+// its stream at i * 0x720 + 0xa0 and its metadata at i * 0x720 + 0x7a0, so a
+// pass owns 0x700 stream bytes and the next pass starts 0x14 bytes after the
+// previous metadata ends. Entries are 12 bytes: a selector word then an
+// unaligned 64-bit value. The per-entry selectors are not recovered yet.
 pub const g17_3d_register_passes = u32(4)
 pub const g17_3d_register_stride = u64(0x720)
 pub const g17_3d_register_stream_offset = u64(0xa0)
-pub const g17_3d_register_gpu_address_offset = u64(0x7a0)
+pub const g17_3d_register_stream_bytes = u64(0x700)
+pub const g17_3d_register_metadata_offset = u64(0x7a0)
 pub const g17_3d_register_entry_size = u64(0xc)
 pub const g17_3d_register_selector_mask = u32(0xfffc0006)
+pub const g17_3d_register_summary_offset = u64(0x828)
+pub const g17_3d_register_summary_stride = u64(0x10)
 
-// Trailer maintained per pass: the stream's GPU address followed by its entry
-// and byte counters, both 16-bit.
+// Per-pass metadata: the stream's GPU address followed by its entry and byte
+// counters, both 16-bit.
 @[packed]
 pub struct G17RegisterStreamTrailer {
 pub mut:
@@ -1229,47 +1231,80 @@ pub mut:
 	byte_length u16
 }
 
+// The 0x10-byte record each pass is summarised into inside the descriptor.
+@[packed]
+pub struct G17RegisterPassSummary {
+pub mut:
+	gpu_address u64
+	entry_count u16
+	reserved    [6]u8
+}
+
+fn g17_register_pass(command voidptr, pass u32) &G17RegisterStreamTrailer {
+	return unsafe {
+		&G17RegisterStreamTrailer(&u8(command) + u64(pass) * g17_3d_register_stride +
+			g17_3d_register_metadata_offset)
+	}
+}
+
 // Point one pass's stream at its GPU address and empty it, matching the setup
 // generateRegisterListFor3D does before each pass.
-pub fn bind_g17_register_stream(record voidptr, stream_gpu_address u64) bool {
-	if record == unsafe { nil } || stream_gpu_address == 0 {
+pub fn bind_g17_register_stream(command voidptr, pass u32, stream_gpu_address u64) bool {
+	if command == unsafe { nil } || pass >= g17_3d_register_passes
+		|| stream_gpu_address == 0 {
 		return false
 	}
 
-	unsafe {
-		mut trailer := &G17RegisterStreamTrailer(&u8(record) +
-			g17_3d_register_gpu_address_offset)
-		trailer.gpu_address = stream_gpu_address
-		trailer.entry_count = 0
-		trailer.byte_length = 0
-	}
+	mut trailer := g17_register_pass(command, pass)
+	trailer.gpu_address = stream_gpu_address
+	trailer.entry_count = 0
+	trailer.byte_length = 0
 	return true
 }
 
-// Append one {selector, value} pair. Apple keeps the template bits already
-// present in the selector word and writes the 64-bit value unaligned, four
-// bytes later, so each entry is 12 bytes. `stream_limit` is the caller's
-// established byte budget for the stream, since it is not derivable from the
-// stride.
-pub fn append_g17_register_entry(record voidptr, stream_limit u64, selector u32, value u64) bool {
-	if record == unsafe { nil } || stream_limit < g17_3d_register_entry_size {
+// Append one {selector, value} pair to a pass's stream. Apple keeps the
+// template bits already present in the selector word and writes the 64-bit
+// value unaligned, four bytes later, so each entry is 12 bytes.
+pub fn append_g17_register_entry(command voidptr, pass u32, selector u32, value u64) bool {
+	if command == unsafe { nil } || pass >= g17_3d_register_passes {
+		return false
+	}
+
+	mut trailer := g17_register_pass(command, pass)
+	if u64(trailer.byte_length) + g17_3d_register_entry_size > g17_3d_register_stream_bytes {
 		return false
 	}
 
 	unsafe {
-		base := &u8(record)
-		mut trailer := &G17RegisterStreamTrailer(base + g17_3d_register_gpu_address_offset)
-		if u64(trailer.byte_length) + g17_3d_register_entry_size > stream_limit {
-			return false
-		}
-		entry := base + g17_3d_register_stream_offset + u64(trailer.byte_length)
+		entry := &u8(command) + u64(pass) * g17_3d_register_stride +
+			g17_3d_register_stream_offset + u64(trailer.byte_length)
 		mut selector_word := &u32(entry)
 		*selector_word = (*selector_word & g17_3d_register_selector_mask) |
 			(selector & ~g17_3d_register_selector_mask)
 		mut encoded := value
 		C.memcpy(voidptr(entry + 4), &encoded, 8)
-		trailer.byte_length += u16(g17_3d_register_entry_size)
-		trailer.entry_count++
+	}
+	trailer.byte_length += u16(g17_3d_register_entry_size)
+	trailer.entry_count++
+	return true
+}
+
+// Copy every pass's GPU address and entry count into the descriptor summary
+// array, as the producer's exit block does.
+pub fn publish_g17_register_summaries(command voidptr, descriptor voidptr) bool {
+	if command == unsafe { nil } || descriptor == unsafe { nil } {
+		return false
+	}
+
+	for pass := u32(0); pass < g17_3d_register_passes; pass++ {
+		trailer := g17_register_pass(command, pass)
+		unsafe {
+			mut summary := &G17RegisterPassSummary(&u8(descriptor) +
+				g17_3d_register_summary_offset +
+				u64(pass) * g17_3d_register_summary_stride)
+			summary.gpu_address = trailer.gpu_address
+			summary.entry_count = trailer.entry_count
+		}
 	}
 	return true
 }
