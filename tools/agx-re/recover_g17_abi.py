@@ -1682,6 +1682,40 @@ def trace_g17_value_expression(
             "signed": False,
             "base": base_value,
         }
+    pair = decode_ldp_x(word)
+    if pair is not None and register in pair[:2]:
+        first, _second, base, member = pair
+        member += 8 if register != first else 0
+        if base == 19:
+            return {
+                "kind": "descriptor_load",
+                "producer_offset": offset,
+                "member": member,
+                "bytes": 8,
+                "signed": False,
+            }
+        if base == 31:
+            return trace_g17_stack_load(
+                instructions,
+                definition_index,
+                member,
+                8,
+                depth,
+                next_seen,
+            )
+        base_value = trace_g17_value_expression(
+            instructions, definition_index, base, depth + 1, next_seen
+        )
+        if base_value is None:
+            return None
+        return {
+            "kind": "object_load",
+            "producer_offset": offset,
+            "member": member,
+            "bytes": 8,
+            "signed": False,
+            "base": base_value,
+        }
     if word & 0xFFC0001F == 0xB9800000 | register:
         base = (word >> 5) & 0x1F
         if base == 19:

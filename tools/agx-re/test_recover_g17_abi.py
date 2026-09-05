@@ -48,6 +48,16 @@ def ldp_x(first: int, second: int, base: int, immediate: int) -> int:
     )
 
 
+def stp_x(first: int, second: int, base: int, immediate: int) -> int:
+    return (
+        0xA9000000
+        | ((immediate // 8) & 0x7F) << 15
+        | second << 10
+        | base << 5
+        | first
+    )
+
+
 def str_x(source: int, base: int, immediate: int) -> int:
     return 0xF9000000 | (immediate // 8) << 10 | base << 5 | source
 
@@ -4716,6 +4726,33 @@ class RecoverG17AbiTests(unittest.TestCase):
         recovered = recover_g17_abi.classify_g17_value_argument(instructions, 4)
         self.assertEqual(recovered["kind"], "computed")
         self.assertNotIn("expression", recovered)
+
+    def test_recovers_g17_paired_object_and_stack_loads(self) -> None:
+        object_instructions = [
+            (0x00, 0xAA0103F5),  # mov x21, x1 (command argument)
+            (0x04, ldp_x(8, 9, 21, 0x20)),
+            (0x08, 0x927AE524),  # and x4, x9, #0xffffffffffffffc0
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(
+            object_instructions, 3
+        )
+        source = recovered["expression"]["source"]
+        self.assertEqual(source["kind"], "object_load")
+        self.assertEqual(source["member"], 0x28)
+        self.assertEqual(source["base"]["source"]["name"], "command")
+
+        stack_instructions = [
+            (0x00, stp_x(1, 2, 31, 0x20)),
+            (0x04, ldp_x(8, 9, 31, 0x20)),
+            (0x08, 0xAA0903E4),  # mov x4, x9
+        ]
+        recovered = recover_g17_abi.classify_g17_value_argument(
+            stack_instructions, 3
+        )
+        stack = recovered["expression"]["source"]
+        self.assertEqual(stack["kind"], "stack_reload")
+        self.assertEqual(stack["slot"], 0x28)
+        self.assertEqual(stack["source"]["name"], "descriptor")
 
     def test_recovers_g17_expression_through_value_copy(self) -> None:
         instructions = [
