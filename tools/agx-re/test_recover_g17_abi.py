@@ -1,4 +1,5 @@
 import struct
+from pathlib import Path
 import unittest
 from unittest import mock
 
@@ -3600,55 +3601,55 @@ class RecoverG17AbiTests(unittest.TestCase):
         # The block must fit inside the span the producer clears.
         self.assertEqual(recovered["trailing_bytes"], 4)
 
-    def test_recovers_g17_late_controls(self) -> None:
-        code = bytearray(0x135C)
-        for offset, word in {
-            0x006C: 0xB925F13F,
-            0x03D8: 0xF913555F,
-            0x0514: 0xB925411F,
-            0x0584: 0xB9255D1F,
-            0x0734: 0xB925757F,
-            0x0794: 0xB9257969,
-            0x0838: 0xB925B93F,
-            0x0F2C: 0xB9259D0A,
-            0x0F34: 0xB925A10A,
-            0x0F44: 0xB925ED1F,
-            0x0F50: 0xB925B50A,
-            0x0F70: 0xB925A509,
-            0x0F78: 0xB925A91F,
-            0x1114: 0xB926E11F,
-            0x1278: 0xB926C509,
-            0x1284: 0xFD137900,
-        }.items():
-            struct.pack_into("<I", code, offset, word)
-
-        with (
-            mock.patch.object(
-                recover_g17_abi,
-                "macho_symbols",
-                return_value={recover_g17_abi.ARM_INIT_FIRMWARE_DATA: 0xA00000},
-            ),
-            mock.patch.object(
-                recover_g17_abi, "symbol_code", return_value=(0xA00000, bytes(code))
-            ),
-        ):
-            recovered = recover_g17_abi.recover_g17_late_controls(b"")
+    def test_recovers_g17_late_controls_from_the_real_producer(self) -> None:
+        # This one is checked against the shipped binary rather than a stub:
+        # the point of the derived scan is that a hand-built store list was
+        # wrong, so a hand-built fixture would not exercise it.
+        driver = Path("build/kext/g17c/AGXG17X.macho")
+        if not driver.exists():
+            self.skipTest("extracted AGXG17X.macho is not available")
+        recovered = recover_g17_abi.recover_g17_late_controls(driver.read_bytes())
 
         self.assertEqual(recovered["region"], {"offset": 0x2540, "bytes": 0x1D0})
-        self.assertEqual(recovered["fixed_u32"][0x2578], 1)
-        self.assertEqual(recovered["fixed_u32"][0x25A0], 1)
-        self.assertEqual(recovered["fixed_u64"][0x26F0], 1)
-        # All four feature-mask tests come out zero for G17.
-        for offset in (0x259C, 0x25A4, 0x25B4, 0x26C4):
-            self.assertEqual(recovered["fixed_u32"][offset], 0)
-        # Determined plus run-time dependent must account for every write.
+        # Writes through a computed base must be counted too.
+        self.assertEqual(recovered["written_offsets"], 36)
+        self.assertEqual(recovered["fixed"][0x2578], 1)
+        self.assertEqual(recovered["fixed"][0x25A0], 1)
+        self.assertEqual(recovered["fixed"][0x26F0], 1)
+        for offset in (0x259C, 0x25A4, 0x25B4, 0x26C4, 0x2548):
+            self.assertEqual(recovered["fixed"][offset], 0)
+        for offset in (0x258C, 0x2706, 0x270A, 0x2600):
+            self.assertEqual(recovered["fixed"][offset], 0)
         self.assertEqual(
-            len(recovered["fixed_u32"])
-            + len(recovered["fixed_u64"])
-            + len(recovered["runtime_dependent"]),
-            recovered["written_fields"],
+            len(recovered["fixed"]) + len(recovered["runtime_dependent"]),
+            recovered["written_offsets"],
         )
         self.assertFalse(recovered["complete"])
+
+    def test_config_pointer_stores_ignores_foreign_bases(self) -> None:
+        # A store at the same offset through a register that never held the
+        # config pointer must not be attributed to the config.
+        code = struct.pack(
+            "<3I",
+            0xF9415E68,  # ldr x8, [x19, #0x2b8]
+            0xB9254109,  # str w9, [x8, #0x2540]   (config)
+            0xB92541A9,  # str w9, [x13, #0x2540]  (foreign base)
+        )
+        stores = recover_g17_abi.config_pointer_stores(code, 0x2540, 0x2710)
+        self.assertEqual([store["offset"] for store in stores], [0x2540])
+
+    def test_config_pointer_stores_follows_computed_bases(self) -> None:
+        code = struct.pack(
+            "<4I",
+            0xF9415E68,  # ldr x8, [x19, #0x2b8]
+            0x52854C09,  # mov w9, #0x2a60
+            0x8B090108,  # add x8, x8, x9
+            0xB900011F,  # str wzr, [x8]
+        )
+        stores = recover_g17_abi.config_pointer_stores(code, 0x2540, 0x2B00)
+        self.assertEqual(len(stores), 1)
+        self.assertEqual(stores[0]["offset"], 0x2A60)
+        self.assertTrue(stores[0]["zero_source"])
 
     def test_recovers_g17_command_stream_format(self) -> None:
         code = bytearray(0x3F4)

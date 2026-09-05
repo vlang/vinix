@@ -6966,14 +6966,104 @@ def recover_g17_secondary_performance_block(image: bytes) -> dict[str, object]:
     return block
 
 
-def recover_g17_late_controls(image: bytes) -> dict[str, object]:
-    """Recover the statically determined half of the late-control block.
+def config_pointer_stores(
+    code: bytes, low: int, high: int
+) -> list[dict[str, object]]:
+    """List stores into a hardware-config window, following computed bases.
 
-    AGXArmFirmware::initFirmwareData writes 27 fields into hardware-config
-    offsets 0x2540..0x270f.  Sixteen of them are fixed for G17: literal zeros
-    and ones, one 64-bit literal, and four tests of the fixed feature mask that
-    all come out zero.  The remaining eleven depend on run-time inputs and are
-    listed but not valued, so the block stays incomplete.
+    Matching a store's immediate offset alone is wrong twice over: it
+    attributes other objects' fields to the config, and it misses every write
+    that materializes its offset into a register first.  Both mistakes were
+    made before this existed.  Here the config pointer is tracked from firmware
+    member 0x2b8 and through `add` into scratch registers.
+    """
+
+    config: set[int] = set()
+    immediates: dict[int, int] = {}
+    derived: dict[int, int] = {}
+    found: list[dict[str, object]] = []
+
+    def kill(register: int) -> None:
+        config.discard(register)
+        derived.pop(register, None)
+
+    for offset, word in words(code):
+        load = decode_ldr_x(word)
+        if load is not None and load[1] == 19 and load[2] == 0x2B8:
+            derived.pop(load[0], None)
+            config.add(load[0])
+            continue
+
+        movz = decode_movz_w(word)
+        if movz is not None:
+            immediates[movz[0]] = movz[1]
+            kill(movz[0])
+            continue
+
+        register_add = decode_add_register(word)
+        if register_add is not None:
+            destination, first, second, _shift = register_add
+            if first in config and second in immediates:
+                kill(destination)
+                derived[destination] = immediates[second]
+                continue
+
+        immediate_add = decode_add_immediate(word)
+        if immediate_add is not None:
+            destination, source, immediate = immediate_add
+            if source in config:
+                kill(destination)
+                derived[destination] = immediate
+                continue
+
+        target = None
+        store = decode_str_unsigned(word)
+        if store is not None:
+            source, base, immediate, _width = store
+            target = (source, base, immediate)
+        if target is None:
+            store = decode_str_x(word) or decode_stur_x(word)
+            if store is not None:
+                target = store
+        if target is None:
+            pair = decode_pair_q(word)
+            if pair is not None and pair[0] == "store":
+                target = (pair[1], pair[3], pair[4])
+        if target is not None:
+            source, base, immediate = target
+            position = None
+            if base in config:
+                position = immediate
+            elif base in derived:
+                position = derived[base] + immediate
+            if position is not None and low <= position < high:
+                found.append(
+                    {
+                        "offset": position,
+                        "site": offset,
+                        "zero_source": source == 31,
+                    }
+                )
+            continue
+
+        for decoder in (decode_ldr_x, decode_ldr_w, decode_add_immediate):
+            decoded = decoder(word)
+            if decoded is not None:
+                kill(decoded[0])
+                break
+
+    return found
+
+
+def recover_g17_late_controls(image: bytes) -> dict[str, object]:
+    """Recover the statically determined part of the late-control block.
+
+    AGXArmFirmware::initFirmwareData writes into hardware-config offsets
+    0x2540..0x270f.  The write set is derived here rather than listed, because
+    a hand-built list missed every store that materializes its offset into a
+    register first.  Fields stored straight from a zero register are fixed, as
+    are two ones, a 64-bit literal, and four tests of the fixed feature mask
+    that all come out clear.
     """
 
     symbols = macho_symbols(image)
@@ -6981,28 +7071,10 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         raise ValueError(f"Mach-O is missing {ARM_INIT_FIRMWARE_DATA}")
 
     _address, code = symbol_code(image, ARM_INIT_FIRMWARE_DATA)
-    require_instruction_words_at(
-        code,
-        "G17 late-control block",
-        {
-            0x006C: 0xB925F13F,
-            0x03D8: 0xF913555F,
-            0x0514: 0xB925411F,
-            0x0584: 0xB9255D1F,
-            0x0734: 0xB925757F,
-            0x0794: 0xB9257969,
-            0x0838: 0xB925B93F,
-            0x0F2C: 0xB9259D0A,
-            0x0F34: 0xB925A10A,
-            0x0F44: 0xB925ED1F,
-            0x0F50: 0xB925B50A,
-            0x0F70: 0xB925A509,
-            0x0F78: 0xB925A91F,
-            0x1114: 0xB926E11F,
-            0x1278: 0xB926C509,
-            0x1284: 0xFD137900,
-        },
-    )
+    stores = config_pointer_stores(code, 0x2540, 0x2710)
+    if not stores:
+        raise ValueError("no late-control writes reach the hardware config")
+    offsets = sorted({store["offset"] for store in stores})
 
     if G17_FEATURE_MASK & (1 << 17) == 0:
         raise ValueError("G17 feature mask lost the power-estimation bit")
@@ -7014,25 +7086,39 @@ def recover_g17_late_controls(image: bytes) -> dict[str, object]:
         raise ValueError(
             "a G17 late-control feature bit is now set; its field is no longer zero"
         )
+    # +0x2548 is also a pure function of the mask.
+    low = G17_FEATURE_MASK & 0xFFFFFFFF
+    feature_values[0x2548] = ((low >> 4) & 4) | ((low >> 6) & 2)
 
-    fields = {offset: 0 for offset in (
-        0x2540, 0x255C, 0x2574, 0x25A8, 0x25B8, 0x25EC, 0x25F0, 0x26E0
-    )}
-    fields.update({0x2578: 1, 0x25A0: 1})
-    fields.update(feature_values)
+    # Two more are fixed but store through a vector register, so the scan
+    # cannot see the value; pin the producing instructions instead.
+    require_instruction_words_at(
+        code,
+        "G17 late-control vector constants",
+        {
+            0x00A4: 0x6F00E400,  # movi v0.2d, #0
+            0x00A8: 0xFD130120,  # -> config +0x2600
+            0x1284: 0xFD137900,  # 64-bit literal -> config +0x26f0
+        },
+    )
+    literal = decode_ldr_d(struct.unpack_from("<I", code, 0x1280)[0])
+    if literal is None:
+        raise ValueError("late-control literal is no longer a direct load")
+
+    fixed = {store["offset"]: 0 for store in stores if store["zero_source"]}
+    fixed.update({0x2578: 1, 0x25A0: 1, 0x2600: 0, 0x26F0: 1})
+    fixed.update(feature_values)
+    undetermined = [offset for offset in offsets if offset not in fixed]
 
     return {
         "region": {"offset": 0x2540, "bytes": 0x1D0},
         "producer": ARM_INIT_FIRMWARE_DATA,
-        "written_fields": 27,
+        "written_offsets": len(offsets),
         "feature_mask": G17_FEATURE_MASK,
         "feature_bit_fields": feature_fields,
-        "fixed_u32": dict(sorted(fields.items())),
-        "fixed_u64": {0x26A8: 0, 0x26F0: 1},
-        "runtime_dependent": sorted(
-            [0x2544, 0x2548, 0x2554, 0x2560, 0x2570, 0x25F4, 0x25F8, 0x2600,
-             0x26A4, 0x26BC, 0x26C0]
-        ),
+        "fixed": dict(sorted(fixed.items())),
+        "wide_fixed": {0x2600: 8, 0x26F0: 8},
+        "runtime_dependent": undetermined,
         "complete": False,
     }
 

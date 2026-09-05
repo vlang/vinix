@@ -1079,36 +1079,44 @@ fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig
 pub const g17_late_controls_offset = u64(0x2540)
 pub const g17_late_controls_size = u64(0x1d0)
 
-// The statically determined half of the late-control block. Apple's ARM
-// producer writes 27 fields into config +0x2540..+0x270f; these sixteen are
-// fixed for G17, including four tests of the fixed feature mask that all come
-// out zero. The other eleven depend on run-time inputs and stay zero here, so
-// the block is not complete.
+// The statically determined part of the late-control block. Apple's ARM
+// producer writes 36 fields into config +0x2540..+0x270f; these 21 are fixed
+// for G17, including four tests of the fixed feature mask and one more field
+// derived from it, all of which come out zero. The other fifteen depend on
+// run-time inputs and stay zero here, so the block is not complete.
 fn populate_g17_late_controls(mut config G17HardwareConfig) {
 	fixed_u32 := [
-		[u64(0x2540), 0]!,
-		[u64(0x255c), 0]!,
-		[u64(0x2574), 0]!,
-		[u64(0x2578), 1]!,
-		[u64(0x259c), 0]!,
-		[u64(0x25a0), 1]!,
-		[u64(0x25a4), 0]!,
-		[u64(0x25a8), 0]!,
-		[u64(0x25b4), 0]!,
-		[u64(0x25b8), 0]!,
-		[u64(0x25ec), 0]!,
-		[u64(0x25f0), 0]!,
-		[u64(0x26c4), 0]!,
-		[u64(0x26e0), 0]!,
+		u64(0x2540),
+		0x2548,
+		0x255c,
+		0x2574,
+		0x258c,
+		0x259c,
+		0x25a4,
+		0x25a8,
+		0x25b4,
+		0x25b8,
+		0x25ec,
+		0x25f0,
+		0x26c4,
+		0x26e0,
+		0x2706,
+		0x270a,
 	]!
 	unsafe {
 		base := &u8(&config.firmware_late_controls_2540[0])
-		for entry in fixed_u32 {
-			mut slot := &u32(base + entry[0] - g17_late_controls_offset)
-			*slot = u32(entry[1])
+		for offset in fixed_u32 {
+			mut slot := &u32(base + offset - g17_late_controls_offset)
+			*slot = 0
 		}
-		mut zero := &u64(base + u64(0x26a8) - g17_late_controls_offset)
-		*zero = 0
+		for offset in [u64(0x2578), 0x25a0]! {
+			mut slot := &u32(base + offset - g17_late_controls_offset)
+			*slot = 1
+		}
+		for offset in [u64(0x2600), 0x26a8]! {
+			mut wide := &u64(base + offset - g17_late_controls_offset)
+			*wide = 0
+		}
 		mut one := &u64(base + u64(0x26f0) - g17_late_controls_offset)
 		*one = 1
 	}
