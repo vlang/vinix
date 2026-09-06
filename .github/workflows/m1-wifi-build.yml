@@ -1,0 +1,41 @@
+name: M1 Wi-Fi kernel build
+on:
+  push:
+    branches: [wifi/m1-air-build]
+  pull_request:
+    paths:
+      - 'kernel/**'
+      - 'tests/m1-wifi/**'
+      - 'tools/m1-wifi/**'
+      - '.github/workflows/m1-wifi-build.yml'
+permissions:
+  contents: read
+concurrency:
+  group: m1-wifi-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Snapshot exact source for offline validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/wifi-build-source
+          git archive --format=tar.gz HEAD > /tmp/wifi-build-source/source.tar.gz
+          git rev-parse HEAD > /tmp/wifi-build-source/COMMIT
+          git rev-parse 'HEAD^{tree}' > /tmp/wifi-build-source/TREE
+      - uses: actions/upload-artifact@v7
+        with:
+          name: m1-wifi-build-source
+          path: /tmp/wifi-build-source/
+          retention-days: 7
+      - name: Require integrated driver and build acceptance test
+        run: |
+          test -f kernel/modules/apple/wifi/wifi.v
+          test -f tests/m1-wifi/build.sh
+          sh tests/m1-wifi/build.sh
