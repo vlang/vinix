@@ -128,6 +128,13 @@ fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
 	old_size := u64(this.stat.size)
 
 	mut new_capacity := this.capacity
+	if new_capacity == 0 {
+		// Only regular files are given a buffer at creation; a directory or a
+		// symlink starts at zero capacity. Doubling zero never reaches
+		// new_size, so growing one of those spun here forever and took the
+		// kernel with it.
+		new_capacity = 4096
+	}
 	for new_size > new_capacity {
 		new_capacity *= 2
 	}

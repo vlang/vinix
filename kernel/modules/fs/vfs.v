@@ -7,6 +7,7 @@ import klock
 import proc
 import file
 import errno
+import ioctl
 import usercopy
 
 pub const at_fdcwd = -100
@@ -717,6 +718,47 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 	defer {
 		fd.unref()
 	}
+
+	// A handful of requests belong to the descriptor rather than to whatever it
+	// points at, and Linux settles them in do_vfs_ioctl() before any driver is
+	// consulted. They have to be answered here for the same reason: the file's
+	// own ioctl() knows nothing about descriptor flags. CPython's
+	// _Py_set_inheritable() reaches for FIOCLEX first and only falls back to
+	// fcntl() when it sees ENOTTY or EACCES, so a regular file that rejected
+	// FIOCLEX made every `python3 script.py` fail to open its own script.
+	match request {
+		ioctl.fioclex {
+			fd.flags |= resource.o_cloexec
+			return 0, 0
+		}
+		ioctl.fionclex {
+			fd.flags &= ~resource.o_cloexec
+			return 0, 0
+		}
+		ioctl.fionbio, ioctl.fioasync {
+			if argp == unsafe { nil } {
+				return errno.err, errno.efault
+			}
+			bit := if request == u64(ioctl.fionbio) {
+				resource.o_nonblock
+			} else {
+				resource.o_async
+			}
+			mut on := int(0)
+			if !usercopy.copy_from_user(&on, u64(argp), sizeof(int)) {
+				return errno.err, errno.efault
+			}
+			mut handle := fd.handle
+			if on != 0 {
+				handle.flags |= bit
+			} else {
+				handle.flags &= ~bit
+			}
+			return 0, 0
+		}
+		else {}
+	}
+
 	ret := fd.handle.ioctl(request, argp) or { return errno.err, errno.get() }
 	return u64(ret), 0
 }

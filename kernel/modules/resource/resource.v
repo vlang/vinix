@@ -25,6 +25,7 @@ pub const o_dsync = 0o10000
 pub const o_rsync = 0o4010000
 pub const o_sync = 0o4010000
 pub const o_cloexec = 0o2000000
+pub const o_async = 0o20000
 
 pub const file_creation_flags_mask = o_creat | o_directory | o_excl | o_noctty | o_nofollow | o_trunc
 pub const file_descriptor_flags_mask = o_cloexec
@@ -66,7 +67,9 @@ pub fn default_ioctl(handle voidptr, request u64, _ voidptr) ?int {
 			return none
 		}
 		else {
-			errno.set(errno.einval)
+			// Linux answers an unrecognised ioctl on something that is not a
+			// terminal with ENOTTY, and callers key their fallbacks off it.
+			errno.set(errno.enotty)
 			return none
 		}
 	}

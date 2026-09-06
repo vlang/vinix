@@ -191,27 +191,38 @@ pub fn initialise() {
 				fs.create(vfs_root, full_name, u32(mode | stat.ifdir)) or {}
 			}
 			.regular_file {
-				new_node := fs.create(vfs_root, full_name, u32(mode | stat.ifreg)) or {
-					uart_puts('initramfs: FAIL create ')
-					uart_puts(full_name)
-					uart_putc(`\n`)
-					panic('initramfs: failed to create file ${full_name}')
+				// A name that is already there is not a failure. An archive
+				// built by appending one staging tree to another repeats
+				// whatever both supply, and the last copy is the one meant to
+				// win — the same as unpacking the tar with any other tool.
+				// This used to take the whole kernel down before init ran.
+				mut new_node := fs.create(vfs_root, full_name, u32(mode | stat.ifreg)) or {
+					fs.get_node(vfs_root, full_name, false) or {
+						uart_puts('initramfs: FAIL create ')
+						uart_puts(full_name)
+						uart_putc(`\n`)
+						panic('initramfs: failed to create file ${full_name}')
+					}
 				}
 				mut new_resource := new_node.resource
-				buf := voidptr(u64(current_header) + 512)
-				new_resource.write(0, buf, 0, size) or {
-					panic('initramfs: failed to write file ${full_name}')
+				// Overwrite only what is already a plain file. A name that
+				// arrives as a file over something that is not one — a
+				// directory the earlier tree put there — is left alone.
+				if stat.isreg(new_resource.stat.mode) {
+					buf := voidptr(u64(current_header) + 512)
+					// Resize first, so replacing a longer file does not leave
+					// the tail of the old one behind it.
+					new_resource.grow(unsafe { nil }, size) or {}
+					new_resource.write(0, buf, 0, size) or {
+						panic('initramfs: failed to write file ${full_name}')
+					}
 				}
 			}
 			.hard_link {
-				fs.link(vfs_root, link_name, full_name) or {
-					panic('initramfs: failed to create link ${full_name}')
-				}
+				fs.link(vfs_root, link_name, full_name) or {}
 			}
 			.sym_link {
-				fs.symlink(vfs_root, link_name, full_name) or {
-					panic('initramfs: failed to create symlink ${full_name}')
-				}
+				fs.symlink(vfs_root, link_name, full_name) or {}
 			}
 			else {}
 		}

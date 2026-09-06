@@ -38,3 +38,10 @@ pub fn ioctl_size(ioc u32) u32 {
 pub fn ioctl_nr(ioc u32) u32 {
 	return (ioc >> ioc_nrshift) & ioc_nrmask
 }
+
+// Descriptor-level requests. Linux answers these in do_vfs_ioctl() for every
+// kind of file, before the request reaches the driver.
+pub const fionclex = 0x5450
+pub const fioclex = 0x5451
+pub const fionbio = 0x5421
+pub const fioasync = 0x5452
