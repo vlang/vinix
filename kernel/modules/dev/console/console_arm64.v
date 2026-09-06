@@ -18,6 +18,7 @@ import katomic
 import sched
 import aarch64.uart
 import aarch64.virtio_input
+import apple.wifi
 import apple.spi_keyboard
 import flanterm as _
 
@@ -176,6 +177,7 @@ pub fn poll_uart_input() {
 	if apple_count > 0 {
 		add_to_buf(&apple_input[0], u64(apple_count), true)
 	}
+	wifi.poll()
 }
 
 fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
@@ -244,6 +246,7 @@ pub fn initialise() {
 
 	// Initialize only after console/termios setup and before polling starts.
 	spi_keyboard.initialise()
+	wifi.initialise()
 
 	// Register UART polling callback with the scheduler's await() loop.
 	// Under HVF, IRQ injection is broken, so we can't use a separate
