@@ -58,7 +58,10 @@ fn aic_write(offset u32, value u32) {
 	kio.mmout32(unsafe { &u32(aic_base + offset) }, value)
 }
 
-pub fn initialise(base u64) {
+// Returns false if the controller does not answer plausibly, so the caller can
+// continue without it rather than programming thousands of nonexistent mask
+// registers off a garbage AIC_INFO.
+pub fn initialise(base u64) bool {
 	// Map the AIC register aperture as Device memory (it lives far above the
 	// 4 GiB HHDM window, so plain `base + higher_half` is not valid).
 	// Each step is announced: the AIC is the first MMIO the kernel touches, so
@@ -71,6 +74,13 @@ pub fn initialise(base u64) {
 	info := aic_read(aic_info)
 	println('aic: AIC_INFO=0x${info:x}')
 	aic_nr_irqs = info & 0xffff
+
+	// AICv1 parts carry a few hundred to ~1k IRQs (t8103: 896). 0 means the
+	// register did not respond; all-ones means an unbacked read.
+	if aic_nr_irqs == 0 || aic_nr_irqs > 4096 || info == 0xffffffff {
+		println('aic: implausible AIC_INFO, leaving the AIC uninitialised')
+		return false
+	}
 
 	println('aic: Apple Interrupt Controller at 0x${base:x}')
 	println('aic: ${aic_nr_irqs} hardware IRQs')
@@ -89,6 +99,7 @@ pub fn initialise(base u64) {
 
 	// Register our dispatch handler with the exception system
 	exception.register_irq_dispatch(aic_dispatch)
+	return true
 }
 
 fn aic_dispatch(gpr_state voidptr) {

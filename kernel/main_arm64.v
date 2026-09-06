@@ -447,16 +447,22 @@ fn kmain() {
 		}
 		if aic_phys != 0 {
 			print('init aic...\n')
-			aic.initialise(aic_phys)
-			if timer_irq := parse_aic_guest_virtual_timer_irq() {
-				aic_timer_irq = timer_irq
+			if aic.initialise(aic_phys) {
+				if timer_irq := parse_aic_guest_virtual_timer_irq() {
+					aic_timer_irq = timer_irq
+				}
+				// Timer is FIQ-delivered on Apple Silicon: service it from the FIQ
+				// dispatch path instead of unmasking it as an AIC hardware IRQ.
+				aic.register_fiq_handler(aic_fiq_handler)
+				use_aic = true
+				print('aic: timer via FIQ (dt irq hint ${aic_timer_irq})\n')
+				print('aic done\n')
+			} else {
+				// Keep going on CPU 0 without an interrupt controller: the rest of
+				// bring-up (PMGR, timer, scheduler) still tells us how far the
+				// hardware gets, and the timer is FIQ-delivered regardless.
+				print('aic: unusable, continuing without it\n')
 			}
-			// Timer is FIQ-delivered on Apple Silicon: service it from the FIQ
-			// dispatch path instead of unmasking it as an AIC hardware IRQ.
-			aic.register_fiq_handler(aic_fiq_handler)
-			use_aic = true
-			print('aic: timer via FIQ (dt irq hint ${aic_timer_irq})\n')
-			print('aic done\n')
 		} else {
 			print('no Apple AIC node found in device tree\n')
 		}
