@@ -84,7 +84,13 @@ mut:
 
 fn terminal_input_raw(saved termios.Termios) termios.Termios {
 	mut raw := saved
-	raw.c_lflag &= termios.invert(termios.flag(C.ICANON | C.ECHO | C.ISIG))
+	// Cast each flag before combining them. C.ECHO carries the C header's own
+	// type, which is not int on every platform, and an uncast three-way `or`
+	// leaves the checker with no type for the result at all — which is what
+	// stopped these files building on a macOS host, and with them every test
+	// that stages them.
+	lflags := termios.flag(int(C.ICANON) | int(C.ECHO) | int(C.ISIG))
+	raw.c_lflag &= termios.invert(lflags)
 	raw.c_cc[C.VMIN] = 0
 	raw.c_cc[C.VTIME] = 0
 	return raw

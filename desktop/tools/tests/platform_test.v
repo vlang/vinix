@@ -97,13 +97,19 @@ fn test_platform_terminal_raw_mode_and_restoration() {
 	assert saved.restore_attributes && saved.restore_flags
 	mut raw := termios.Termios{}
 	assert termios.tcgetattr(fd, mut raw) == 0
-	assert raw.c_lflag & termios.flag(C.ICANON | C.ECHO | C.ISIG) == 0
+	// Cast before combining, as terminal_input_raw does: the flags do not all
+	// carry the same C type on every host.
+	assert raw.c_lflag & termios.flag(int(C.ICANON) | int(C.ECHO) | int(C.ISIG)) == 0
 	assert raw.c_cc[C.VMIN] == 0 && raw.c_cc[C.VTIME] == 0
 	assert C.fcntl(fd, C.F_GETFL) == flags | C.O_NONBLOCK
 	desktop_terminal_restore(fd, mut saved)
 	mut restored := termios.Termios{}
 	assert termios.tcgetattr(fd, mut restored) == 0
-	assert restored.c_lflag == original.c_lflag
+	// PENDIN is the tty driver's own bookkeeping, not a setting: macOS raises
+	// it whenever canonical mode is switched back on, however faithfully the
+	// saved flags are written back. Compare the settings, not that.
+	settings := termios.invert(termios.flag(int(C.PENDIN)))
+	assert restored.c_lflag & settings == original.c_lflag & settings
 	assert restored.c_cc[C.VMIN] == original.c_cc[C.VMIN]
 	assert restored.c_cc[C.VTIME] == original.c_cc[C.VTIME]
 	assert C.fcntl(fd, C.F_GETFL) == flags
