@@ -61,9 +61,15 @@ fn aic_write(offset u32, value u32) {
 pub fn initialise(base u64) {
 	// Map the AIC register aperture as Device memory (it lives far above the
 	// 4 GiB HHDM window, so plain `base + higher_half` is not valid).
+	// Each step is announced: the AIC is the first MMIO the kernel touches, so
+	// a fault in map_mmio or in the first register read used to be a silent
+	// hang with no way to tell the two apart.
+	println('aic: base 0x${base:x}, mapping MMIO aperture...')
 	aic_base = memory.map_mmio(base, 0x8000)
+	println('aic: MMIO mapped at 0x${aic_base:x}, reading AIC_INFO...')
 
 	info := aic_read(aic_info)
+	println('aic: AIC_INFO=0x${info:x}')
 	aic_nr_irqs = info & 0xffff
 
 	println('aic: Apple Interrupt Controller at 0x${base:x}')
