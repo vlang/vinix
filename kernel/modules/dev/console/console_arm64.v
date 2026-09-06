@@ -256,8 +256,11 @@ fn (mut this Console) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return 0
 }
 
-fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Console) read(_handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
+
+	handle := unsafe { &file.Handle(_handle) }
+	nonblocking := handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0
 
 	mut buf := &u8(void_buf)
 
@@ -290,6 +293,15 @@ fn (mut this Console) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 			wait = false
 		} else {
 			if wait == true {
+				// A reader that asked not to block gets told there is nothing
+				// rather than being parked here. A compositor polling the
+				// keyboard once a frame depends on this: without it the whole
+				// desktop stops until the next keystroke.
+				if nonblocking {
+					console_read_lock.release()
+					errno.set(errno.ewouldblock)
+					return none
+				}
 				console_read_lock.release()
 				for {
 					mut events := [&console_event]
