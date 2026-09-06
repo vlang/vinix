@@ -48,3 +48,13 @@ pub mut:
 	ws_xpixel u16
 	ws_ypixel u16
 }
+
+// Linux console mode ioctls (linux/kd.h). KD_GRAPHICS tells the kernel that a
+// program owns the framebuffer and the text console must stop drawing.
+pub const kdgetmode = 0x4b3b
+
+pub const kdsetmode = 0x4b3a
+
+pub const kd_text = 0
+
+pub const kd_graphics = 1

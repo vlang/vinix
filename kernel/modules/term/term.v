@@ -16,7 +16,51 @@ __global (
 	framebuffer_tag     = &limine.LimineFramebuffer(unsafe { nil })
 	framebuffer_width   = u64(0)
 	framebuffer_height  = u64(0)
+	// Graphics mode: a userland program owns the framebuffer, so the kernel
+	// terminal must not draw. Without it every console line (a program's
+	// stderr, a kernel message) scrolls flanterm, which repaints every text
+	// cell over the desktop -- the whole boot log reappearing on top of the
+	// GUI. The owner is the process that entered it; text mode returns when
+	// it exits, so a crashed application cannot leave the console dark.
+	terminal_graphics_mode  = false
+	terminal_graphics_owner = int(0)
 )
+
+fn C.flanterm_full_refresh(context voidptr)
+
+pub fn graphics_mode() bool {
+	return terminal_graphics_mode
+}
+
+// Stop drawing to the framebuffer on behalf of `owner_pid`. Idempotent: the
+// framebuffer's mmap path calls it for every page it hands out.
+pub fn enter_graphics_mode(owner_pid int) {
+	terminal_print_lock.acquire()
+	terminal_graphics_mode = true
+	terminal_graphics_owner = owner_pid
+	terminal_print_lock.release()
+}
+
+// Resume drawing and repaint the terminal's own contents, since whatever the
+// application left on screen is not the console.
+pub fn leave_graphics_mode() {
+	terminal_print_lock.acquire()
+	if terminal_graphics_mode {
+		terminal_graphics_mode = false
+		terminal_graphics_owner = 0
+		if flanterm_ctx != unsafe { nil } {
+			C.flanterm_full_refresh(flanterm_ctx)
+		}
+	}
+	terminal_print_lock.release()
+}
+
+// Called when a process exits: only the owner's exit restores text mode.
+pub fn leave_graphics_mode_if_owner(pid int) {
+	if terminal_graphics_mode && terminal_graphics_owner == pid {
+		leave_graphics_mode()
+	}
+}
 
 // Limine hands the framebuffer over as a higher-half address inside the HHDM.
 // Anything below the higher half is not addressable on the page tables in use
@@ -281,6 +325,11 @@ pub fn print(s voidptr, len u64) {
 		return
 	}
 	terminal_print_lock.acquire()
-	C.flanterm_write(flanterm_ctx, s, len)
+	// In graphics mode the bytes are dropped rather than queued: the UART
+	// still carries them (see kprint.kwrite), and replaying a backlog over a
+	// desktop that just exited would be worse than losing it.
+	if !terminal_graphics_mode {
+		C.flanterm_write(flanterm_ctx, s, len)
+	}
 	terminal_print_lock.release()
 }

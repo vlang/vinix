@@ -11,6 +11,8 @@ import dev.fbdev.api
 import katomic
 import errno
 import memory.mmap
+import proc
+import term
 
 pub struct FramebufferNode {
 pub mut:
@@ -39,6 +41,12 @@ fn (mut this FramebufferNode) mmap(_handle voidptr, page u64, flags int) voidptr
 	if offset >= this.info.size {
 		return unsafe { nil }
 	}
+
+	// A program mapping the framebuffer is about to draw the whole screen
+	// itself. Silence the kernel terminal until that program exits, exactly as
+	// KDSETMODE KD_GRAPHICS would; a program that never asks still gets a
+	// display it owns.
+	term.enter_graphics_mode(proc.current_thread().process.pid)
 
 	phys := u64(this.info.base) + offset - higher_half
 

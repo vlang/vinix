@@ -373,6 +373,27 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	mut process := proc.current_thread().process
 
 	match request {
+		// KDSETMODE's argument is the mode itself, not a pointer to it.
+		ioctl.kdsetmode {
+			mode := int(u64(argp) & 0xff)
+			if mode == ioctl.kd_graphics {
+				term.enter_graphics_mode(process.pid)
+			} else if mode == ioctl.kd_text {
+				term.leave_graphics_mode()
+			} else {
+				errno.set(errno.einval)
+				return none
+			}
+			return 0
+		}
+		ioctl.kdgetmode {
+			mode := if term.graphics_mode() { ioctl.kd_graphics } else { ioctl.kd_text }
+			if !usercopy.copy_to_user(u64(argp), voidptr(&mode), sizeof(int)) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
 		ioctl.tiocgwinsz {
 			mut size := ioctl.WinSize{}
 			if this.winsize_explicit {

@@ -14,6 +14,7 @@ import lib
 import memory.mmap
 import proc
 import sched
+import term
 import usercopy
 
 // clone(2) flags. Only the ones that change what we build are listed.
@@ -344,6 +345,10 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	// Get every other thread off the CPUs before the address space goes away.
 	kill_sibling_threads(mut current_process, current_thread)
+
+	// If this process had the framebuffer (the desktop, say), the console is
+	// dark on its account; give it back before the shell that follows prints.
+	term.leave_graphics_mode_if_owner(current_process.pid)
 
 	mut old_pagemap := current_process.pagemap
 
