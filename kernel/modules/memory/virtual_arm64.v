@@ -422,6 +422,20 @@ pub fn vmm_init() {
 	}
 	print('vmm: high RAM mapped (${high_pages} pages above 4GiB)\n')
 
+	// Every page the PMM has consumed or may hand out must be reachable
+	// through the higher half once these tables are live, or the first
+	// allocation afterwards faults. The bitmap lives inside a usable entry and
+	// pmm_init no longer carves it out, so the loop above already covered it;
+	// map it explicitly anyway, so that invariant does not depend on the PMM.
+	if pmm_bitmap_size != 0 {
+		for pg := pmm_bitmap_phys; pg < pmm_bitmap_phys + pmm_bitmap_size; pg += page_size {
+			kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable) or {
+				panic('vmm init failure: pmm bitmap')
+			}
+		}
+	}
+	print('vmm: pmm bitmap 0x${pmm_bitmap_phys:x} +0x${pmm_bitmap_size:x} mapped\n')
+
 	// Remap framebuffer regions as Non-Cacheable.
 	// Normal Write-Back Cacheable (the default) causes writes to stay in CPU cache,
 	// never reaching the actual display device.

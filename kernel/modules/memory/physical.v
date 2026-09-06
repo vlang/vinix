@@ -8,6 +8,8 @@ import limine
 __global (
 	pmm_lock            klock.Lock
 	pmm_bitmap          = unsafe { nil }
+	pmm_bitmap_phys     = u64(0)
+	pmm_bitmap_size     = u64(0)
 	pmm_avl_page_count  = u64(0)
 	pmm_last_used_index = u64(0)
 	free_pages          = u64(0)
@@ -83,20 +85,25 @@ pub fn pmm_init() {
 
 		C.printf(c'pmm: Bitmap size: %llu\n', bitmap_size)
 
-		// Find a hole for the bitmap in the memory map.
+		// Find a hole for the bitmap in the memory map. The entry is NOT
+		// shrunk to exclude it: the memory map is also what vmm_init maps into
+		// the higher half, so carving the bitmap out of it left the bitmap's
+		// own pages unmapped once the kernel's page tables went live. QEMU
+		// never showed it (its RAM is below 4 GiB, which vmm_init maps
+		// wholesale); on Apple Silicon RAM starts at 32 GiB, so the first
+		// pmm_alloc after the switch faulted on the bitmap. The bitmap's pages
+		// are instead marked used in the bitmap itself, below.
 		for i := 0; i < memmap.entry_count; i++ {
 			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
 			if entries[i].length >= bitmap_size {
-				pmm_bitmap = voidptr(entries[i].base + higher_half)
+				pmm_bitmap_phys = entries[i].base
+				pmm_bitmap_size = bitmap_size
+				pmm_bitmap = voidptr(pmm_bitmap_phys + higher_half)
 
 				// Initialise entire bitmap to 1 (non-free)
 				C.memset(pmm_bitmap, 0xff, bitmap_size)
-
-				entries[i].length -= bitmap_size
-				entries[i].base += bitmap_size
-
 				break
 			}
 		}
@@ -115,6 +122,13 @@ pub fn pmm_init() {
 				free_pages++
 				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
 			}
+		}
+
+		// The bitmap occupies the head of a usable entry; take those pages
+		// back so they are never handed out.
+		for j := u64(0); j < pmm_bitmap_size; j += page_size {
+			lib.bitset(pmm_bitmap, (pmm_bitmap_phys + j) / page_size)
+			free_pages--
 		}
 	}
 	if no_usable_entries {
