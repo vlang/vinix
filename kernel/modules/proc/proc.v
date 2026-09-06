@@ -26,6 +26,10 @@ pub mut:
 	children                 []&Process
 	children_lock            klock.Lock
 	mmap_anon_non_fixed_base u64
+	// Program break. It gets its own arena so that growing it can never run
+	// into the anonymous mmap region or the thread stacks.
+	brk_base    u64
+	brk_current u64
 	current_directory        voidptr
 	event                    eventstruct.Event
 	status                   int

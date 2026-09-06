@@ -14,6 +14,7 @@ import errno
 import lib
 import strings
 import resource
+import usercopy
 
 pub const wnohang = 1
 
@@ -156,79 +157,44 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
-@[noreturn]
-pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_arg u64) {
+// rt_sigreturn(2). The handler's stack frame holds the context to go back to,
+// so this writes it straight into the exception frame the syscall path is about
+// to restore. x0 is returned as the syscall result because handle_svc stores it
+// over the frame's x0 slot on the way out.
+pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_arg u64) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	cpu.interrupt_toggle(false)
+
+	mut frame := unsafe { &cpulocal.GPRState(gpr_state_ptr) }
 
 	if t.sigentry != 0 {
 		// Vinix/mlibc mode: context and mask passed as args (user x0, x1)
 		t.gpr_state = unsafe { *&cpulocal.GPRState(context_arg) }
 		t.masked_signals = old_mask_arg
 	} else {
-		// Linux/musl mode: read from signal frame at user SP.
-		// musl's __restore_rt calls svc #139 with SP pointing to the
-		// signal frame we placed during dispatch_a_signal.
+		// Linux/musl mode: read from the signal frame at the user SP. musl's
+		// __restore_rt enters here with SP pointing at the frame dispatch left.
 		// Frame layout: [prev_mask(8)] [pad(8)] [GPRState(sizeof)]
-		gpr := unsafe { &cpulocal.GPRState(gpr_state_ptr) }
-		user_sp := gpr.sp
+		user_sp := frame.sp
 
-		prev_mask := unsafe { *&u64(user_sp) }
-		unsafe { C.memcpy(voidptr(&t.gpr_state), voidptr(user_sp + 16), sizeof(cpulocal.GPRState)) }
+		mut prev_mask := u64(0)
+		if !usercopy.copy_from_user(voidptr(&prev_mask), user_sp, sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		if !usercopy.copy_from_user(voidptr(&t.gpr_state), user_sp + 16, sizeof(cpulocal.GPRState)) {
+			return errno.err, errno.efault
+		}
 		t.masked_signals = prev_mask
 	}
 
-	sched.yield(false)
+	t.on_sigaltstack = false
 
-	for {}
-}
-
-pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
-	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
-		return errno.err, errno.einval
+	unsafe {
+		*frame = t.gpr_state
 	}
 
-	mut t := proc.current_thread()
-
-	if oldact != unsafe { nil } {
-		unsafe {
-			*oldact = t.sigactions[signum]
-		}
-	}
-
-	if act != unsafe { nil } {
-		t.sigactions[signum] = *act
-	}
-
-	return 0, 0
-}
-
-pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
-	mut t := proc.current_thread()
-
-	if oldset != unsafe { nil } {
-		unsafe {
-			*oldset = t.masked_signals
-		}
-	}
-
-	if set != unsafe { nil } {
-		match how {
-			sig_block {
-				t.masked_signals |= *set
-			}
-			sig_unblock {
-				t.masked_signals &= ~*set
-			}
-			sig_setmask {
-				t.masked_signals = *set
-			}
-			else {}
-		}
-	}
-
-	return 0, 0
+	return t.gpr_state.x0, 0
 }
 
 // Dispatch a signal to _self_, called from the scheduler at the
@@ -264,7 +230,13 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		return
 	}
 
-	previous_mask := t.masked_signals
+	// A sigsuspend(2) that installed a temporary mask wants the frame to carry
+	// the mask from before the call, so that sigreturn restores that one.
+	mut previous_mask := t.masked_signals
+	if t.saved_mask_valid {
+		previous_mask = t.saved_mask
+		t.saved_mask_valid = false
+	}
 
 	t.masked_signals |= sigaction.sa_mask
 	// Check SA_NODEFER: Vinix value (0x40) OR Linux value (0x40000000)
@@ -272,12 +244,20 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		t.masked_signals |= u64(1) << which
 	}
 
+	// SA_ONSTACK runs the handler on the stack sigaltstack(2) registered, which
+	// is the only way a SIGSEGV handler can run after a stack overflow.
+	mut stack_top := context.sp
+	if wants_altstack(t, sigaction) {
+		stack_top = lib.align_down(t.sigaltstack_sp + t.sigaltstack_size, 16)
+		t.on_sigaltstack = true
+	}
+
 	if t.sigentry != 0 {
 		// ── Vinix/mlibc mode: dispatch via sigentry trampoline ──
-		// ARM64 has no redzone. Use context.sp (the CURRENT user SP from the
-		// kernel stack frame), NOT t.gpr_state.sp which is stale from the last
-		// timer preemption.
-		mut signal_sp := lib.align_down(context.sp, 16)
+		// ARM64 has no redzone. Use the live user SP from the kernel stack
+		// frame (or the alternate stack), NOT t.gpr_state.sp which is stale
+		// from the last timer preemption.
+		mut signal_sp := lib.align_down(stack_top, 16)
 
 		signal_sp -= sizeof(cpulocal.GPRState)
 		signal_sp = lib.align_down(signal_sp, 16)
@@ -303,12 +283,12 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		t.gpr_state.x3 = u64(return_context)
 		t.gpr_state.x4 = previous_mask
 
-		sched.yield(false)
+		enter_handler(mut t, context)
 	} else if sigaction.sa_restorer != unsafe { nil } {
 		// ── Linux/musl mode: set up signal frame on user stack ──
 		// Frame layout: [prev_mask(8)] [pad(8)] [GPRState(sizeof)]
 		frame_size := u64(16) + sizeof(cpulocal.GPRState)
-		mut signal_sp := lib.align_down(context.sp - frame_size, 16)
+		mut signal_sp := lib.align_down(stack_top - frame_size, 16)
 
 		// Store original context into frame on user stack
 		unsafe {
@@ -324,9 +304,32 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		t.gpr_state.x30 = u64(sigaction.sa_restorer) // LR = __restore_rt
 		t.gpr_state.x0 = u64(which)
 
-		sched.yield(false)
+		enter_handler(mut t, context)
 	}
 	// else: no sigentry and no restorer — silently drop signal
+}
+
+fn wants_altstack(t &proc.Thread, sigaction proc.SigAction) bool {
+	// SA_ONSTACK is 1 << 1 for Vinix and 1 << 27 for Linux.
+	if sigaction.sa_flags & sa_onstack == 0 && sigaction.sa_flags & int(0x08000000) == 0 {
+		return false
+	}
+	// Nesting onto an alternate stack already in use would overwrite the frame
+	// the outer handler is standing on.
+	return t.sigaltstack_sp != 0 && t.sigaltstack_size != 0 && !t.on_sigaltstack
+}
+
+// Enter the handler by rewriting the exception frame that the syscall exit path
+// is about to restore. Handing the thread to the scheduler instead only works
+// while some other thread is runnable: a thread on its own would park in the
+// idle loop still holding its run queue lock, where get_next_thread can never
+// pick it back up, and the handler would never run.
+fn enter_handler(mut t proc.Thread, context &cpulocal.GPRState) {
+	mut frame := unsafe { &cpulocal.GPRState(context) }
+
+	unsafe {
+		*frame = t.gpr_state
+	}
 }
 
 pub fn sendsig(_thread &proc.Thread, signal u8) {

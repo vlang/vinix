@@ -569,11 +569,6 @@ fn syscall_linux_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 	return 0, 0
 }
 
-// brk — return 0 to indicate failure; musl falls back to mmap.
-fn syscall_linux_brk(_ voidptr, addr u64) (u64, u64) {
-	return 0, 0
-}
-
 fn syscall_linux_umask(_ voidptr, mask int) (u64, u64) {
 	return 0o22, 0
 }
@@ -741,51 +736,6 @@ fn syscall_linux_renameat(gpr_state voidptr, olddirfd int, oldpath charptr, newd
 	return 0, 0
 }
 
-// Linux-compatible rt_sigaction wrapper.
-// Linux k_sigaction layout (aarch64): {handler(8), flags(8), restorer(8), mask(8)} = 32 bytes
-// Vinix proc.SigAction layout:         {sa_sigaction(8), sa_mask(8), sa_flags(4)} = 20-24 bytes
-// This wrapper translates between the two formats at the syscall boundary.
-fn syscall_linux_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, sigsetsize u64) (u64, u64) {
-	if signum < 0 || signum > 34 || signum == 9 || signum == 19 {
-		return errno.err, errno.einval
-	}
-
-	mut t := proc.current_thread()
-
-	// Write old sigaction to user memory in Linux format
-	if oldact_ptr != 0 {
-		sa := t.sigactions[signum]
-		unsafe {
-			// Linux k_sigaction offsets: handler=0, flags=8, restorer=16, mask=24
-			*&u64(oldact_ptr + 0) = u64(sa.sa_sigaction)
-			*&u64(oldact_ptr + 8) = u64(sa.sa_flags)
-			*&u64(oldact_ptr + 16) = u64(0) // restorer (unused)
-			*&u64(oldact_ptr + 24) = sa.sa_mask
-		}
-	}
-
-	// Read new sigaction from user memory in Linux format
-	if act_ptr != 0 {
-		unsafe {
-			t.sigactions[signum].sa_sigaction = voidptr(*&u64(act_ptr + 0))
-			t.sigactions[signum].sa_flags = int(*&u64(act_ptr + 8))
-			t.sigactions[signum].sa_restorer = voidptr(*&u64(act_ptr + 16))
-			t.sigactions[signum].sa_mask = *&u64(act_ptr + 24)
-		}
-	}
-
-	return 0, 0
-}
-
-// rt_sigsuspend: atomically set signal mask and wait for a signal.
-// xinit uses this to wait for SIGUSR1 from Xorg. A proper implementation
-// would block until a signal arrives; we yield the CPU and return -EINTR
-// so the caller's retry loop progresses without starving other threads.
-fn syscall_linux_rt_sigsuspend(_ voidptr, mask u64, sigsetsize u64) (u64, u64) {
-	sched.yield(false)
-	return errno.err, errno.eintr
-}
-
 // setpriority / getpriority: stubs.
 fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
 	return 0, 0
@@ -793,11 +743,6 @@ fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64)
 
 fn syscall_linux_getpriority(_ voidptr, which int, who int) (u64, u64) {
 	return 20, 0 // default nice value
-}
-
-// madvise: stub — memory hints are no-ops.
-fn syscall_linux_madvise(_ voidptr, addr u64, length u64, advice int) (u64, u64) {
-	return 0, 0
 }
 
 // ── Syscall table initialization with Linux aarch64 numbers ──
@@ -857,9 +802,11 @@ pub fn init_syscall_table() {
 	syscall_table[129] = voidptr(userland.syscall_kill) // __NR_kill
 	syscall_table[130] = voidptr(userland.syscall_tkill) // __NR_tkill
 	syscall_table[131] = voidptr(userland.syscall_tgkill) // __NR_tgkill
-	syscall_table[133] = voidptr(syscall_linux_rt_sigsuspend) // __NR_rt_sigsuspend
-	syscall_table[134] = voidptr(syscall_linux_rt_sigaction) // __NR_rt_sigaction
-	syscall_table[135] = voidptr(userland.syscall_sigprocmask) // __NR_rt_sigprocmask
+	syscall_table[132] = voidptr(userland.syscall_sigaltstack) // __NR_sigaltstack
+	syscall_table[133] = voidptr(userland.syscall_rt_sigsuspend) // __NR_rt_sigsuspend
+	syscall_table[134] = voidptr(userland.syscall_rt_sigaction) // __NR_rt_sigaction
+	syscall_table[135] = voidptr(userland.syscall_rt_sigprocmask) // __NR_rt_sigprocmask
+	syscall_table[137] = voidptr(userland.syscall_rt_sigtimedwait) // __NR_rt_sigtimedwait
 	syscall_table[139] = voidptr(userland.syscall_sigreturn) // __NR_rt_sigreturn
 	syscall_table[140] = voidptr(syscall_linux_setpriority) // __NR_setpriority
 	syscall_table[141] = voidptr(syscall_linux_getpriority) // __NR_getpriority
@@ -920,13 +867,15 @@ pub fn init_syscall_table() {
 	syscall_table[212] = voidptr(socket.syscall_recvmsg) // __NR_recvmsg
 
 	// Memory
-	syscall_table[214] = voidptr(syscall_linux_brk) // __NR_brk
+	syscall_table[214] = voidptr(mmap.syscall_brk) // __NR_brk
 	syscall_table[215] = voidptr(mmap.syscall_munmap) // __NR_munmap
+	syscall_table[216] = voidptr(mmap.syscall_mremap) // __NR_mremap
 	syscall_table[220] = voidptr(userland.syscall_clone) // __NR_clone
 	syscall_table[221] = voidptr(userland.syscall_execve) // __NR_execve
 	syscall_table[222] = voidptr(syscall_linux_mmap) // __NR_mmap
 	syscall_table[226] = voidptr(mmap.syscall_mprotect) // __NR_mprotect
-	syscall_table[233] = voidptr(syscall_linux_madvise) // __NR_madvise
+	syscall_table[232] = voidptr(mmap.syscall_mincore) // __NR_mincore
+	syscall_table[233] = voidptr(mmap.syscall_madvise) // __NR_madvise
 
 	// Misc
 	syscall_table[260] = voidptr(userland.syscall_wait4) // __NR_wait4

@@ -52,6 +52,15 @@ pub mut:
 	// reclaimed once nothing is executing on them any more.
 	kstack_phys      u64
 	fpu_storage_phys u64
+	// sigaltstack(2): where SA_ONSTACK handlers run.
+	sigaltstack_sp   u64
+	sigaltstack_size u64
+	on_sigaltstack   bool
+	// A mask sigsuspend(2) installed temporarily. The next handler frame has to
+	// carry the mask from before the call, not the one that let it through, so
+	// that sigreturn puts the caller back the way POSIX promises.
+	saved_mask       u64
+	saved_mask_valid bool
 }
 
 pub fn current_thread() &Thread {

@@ -387,13 +387,10 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	proc.free_tid(current_thread.tid)
 
 	katomic.store(mut &current_process.status, encode_exit_status(status))
-	// This is what wakes a parent blocked in wait4()/waitid(). No SIGCHLD is
-	// raised alongside it: dispatch_a_signal() enters a handler by handing the
-	// thread to the scheduler, and a thread that is the only runnable one then
-	// sits in the idle loop holding its own run queue lock, where
-	// get_next_thread() can never pick it up again. Signalling the parent here
-	// wedges it exactly when it has just reaped its last child.
+	// Wakes a parent blocked in wait4()/waitid()...
 	event.trigger(mut &current_process.event, false)
+	// ...and tells one that is not waiting yet, which is how a daemon reaps.
+	notify_parent(current_process)
 
 	sched.dequeue_and_die()
 }
@@ -428,6 +425,34 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	}
 
 	unsafe { victims.free() }
+}
+
+// Raise SIGCHLD in the parent. Only worth doing when it installed a handler:
+// the default disposition is to ignore SIGCHLD, and waking a parent that is
+// blocked in an unrelated syscall would hand it a needless EINTR.
+fn notify_parent(current_process &proc.Process) {
+	mut parent := processes[current_process.ppid]
+	if parent == unsafe { nil } || parent.pid == current_process.pid {
+		return
+	}
+
+	parent.threads_lock.acquire()
+	mut target := &proc.Thread(unsafe { nil })
+	if parent.threads.len > 0 {
+		target = parent.threads[0]
+	}
+	parent.threads_lock.release()
+
+	if target == unsafe { nil } {
+		return
+	}
+
+	handler := target.sigactions[sigchld].sa_sigaction
+	if handler == sig_dfl || handler == sig_ign {
+		return
+	}
+
+	sendsig(target, u8(sigchld))
 }
 
 // ── tid address and robust futex lists ───────────────────────────────────────
