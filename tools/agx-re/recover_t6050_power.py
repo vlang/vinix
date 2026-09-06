@@ -3246,6 +3246,9 @@ def recover_apple_ascwrap_v6_code_contract(
         map_code,
         (
             0x37080243,  # options bit 1 skips this mapping path
+            0x94000EB4,  # _hasiBootFirmware()
+            0x34000140,  # no iBoot firmware: check inherited IORVBAR lock
+            0xF9409E61,  # iBoot firmware: mapper at object +0x138
             0xB9418268,  # register byte offset at this+0x180
             0xF940CA69,  # device-memory index 1 VA at this+0x190
             0x8B080128,
@@ -3340,7 +3343,14 @@ def recover_apple_ascwrap_v6_code_contract(
             "t6050_register_offset": 0,
             "access_width_bits": 64,
             "write_value": "firmware address OR lock bit 0",
-            "map_requirement": "lock bit 0 must already be set",
+            "map_firmware": {
+                "options_skip_bit": 1,
+                "iboot_probe": "_hasiBootFirmware",
+                "iboot_behavior": (
+                    "process segment records through mapper; do not access IORVBAR"
+                ),
+                "non_iboot_requirement": "IORVBAR lock bit 0 must already be set",
+            },
         },
         "cpu_run_control": {
             "device_memory_index": 0,
@@ -3827,7 +3837,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 21,
+        "schema": 22,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,

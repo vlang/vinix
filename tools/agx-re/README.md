@@ -168,6 +168,15 @@ registers 0 and 1, verifies the IORVBAR lock after the 64-bit write, and
 preserves Apple's two-access stop sequence. Probe does not construct it until
 the firmware and RTBuddy owner is complete.
 
+The wrapper firmware path now has an explicit ownership split too. Options
+bit 1 bypasses mapping entirely. Otherwise `_hasiBootFirmware()` selects the
+iBoot segment walker; that branch does not access IORVBAR, and the observed
+PMP records are both skipped as already installed. Only the non-iBoot branch
+requires IORVBAR's write-once lock to be set. Vinix's dormant writer now reads
+before writing, accepts an already-locked register only when its full value is
+an exact idempotent match, and exposes a read-only lock/run-state snapshot for
+the eventual hardware admission sequence.
+
 The same recovery now follows the preloaded PMP image through its mapper
 boundary. The signed DeviceTree binds each PMP wrapper to mapper 0 of a
 die-local `dart,t8110`; the two DART register pairs are separated by the T6050

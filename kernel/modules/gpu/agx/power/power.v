@@ -78,6 +78,20 @@ mut:
 	lock klock.Lock
 }
 
+pub struct T6050PmpWrapperState {
+pub:
+	iorvbar    u64
+	cpu_control u32
+}
+
+pub fn (state &T6050PmpWrapperState) iorvbar_locked() bool {
+	return state.iorvbar & t6050_wrapper_iorvbar_lock != 0
+}
+
+pub fn (state &T6050PmpWrapperState) cpu_running() bool {
+	return state.cpu_control & t6050_wrapper_cpu_run != 0
+}
+
 pub struct T6050PmpSegment {
 pub:
 	physical u64
@@ -167,6 +181,12 @@ pub fn t6050_agx_acknowledged(entry &T6050PtdEntry, request u64) bool {
 
 pub fn t6050_iorvbar_value(firmware_address u64) u64 {
 	return firmware_address | t6050_wrapper_iorvbar_lock
+}
+
+pub fn t6050_iorvbar_matches(value u64, firmware_address u64) bool {
+	return firmware_address != 0
+		&& firmware_address & t6050_wrapper_iorvbar_lock == 0
+		&& value == t6050_iorvbar_value(firmware_address)
 }
 
 pub fn t6050_cpu_run_value(current u32) u32 {
@@ -336,8 +356,32 @@ pub fn (mut wrapper T6050PmpWrapper) set_iorvbar(firmware_address u64) bool {
 		wrapper.lock.release()
 	}
 	address := unsafe { &u64(wrapper.iorvbar_base) }
+	current := kio.mmin(address)
+	if current & t6050_wrapper_iorvbar_lock != 0 {
+		// Hardware makes this write-once. Accept only an exact idempotent
+		// request and never attempt to replace an inherited iBoot value.
+		return t6050_iorvbar_matches(current, firmware_address)
+	}
 	kio.mmout(address, t6050_iorvbar_value(firmware_address))
-	return kio.mmin(address) & t6050_wrapper_iorvbar_lock != 0
+	return t6050_iorvbar_matches(kio.mmin(address), firmware_address)
+}
+
+// Read both inherited wrapper registers under one lock. Hardware bring-up can
+// use this before any run-state transition; it performs no writes and assigns
+// no ownership to an iBoot-preloaded firmware image.
+pub fn (mut wrapper T6050PmpWrapper) snapshot() ?T6050PmpWrapperState {
+	if wrapper.control_base == 0 || wrapper.iorvbar_base == 0 {
+		return none
+	}
+	wrapper.lock.acquire()
+	defer {
+		wrapper.lock.release()
+	}
+	return T6050PmpWrapperState{
+		iorvbar: kio.mmin(unsafe { &u64(wrapper.iorvbar_base) })
+		cpu_control: kio.mmin32(unsafe { &u32(wrapper.control_base +
+			t6050_wrapper_cpu_control_offset) })
+	}
 }
 
 pub fn (mut wrapper T6050PmpWrapper) is_iorvbar_locked() bool {
@@ -562,7 +606,17 @@ fn validate_t6050_wrapper_codec() bool {
 		|| unmapped.start_cpu() || unmapped.stop_cpu() {
 		return false
 	}
+	if _ := unmapped.snapshot() {
+		return false
+	}
+	state := T6050PmpWrapperState{
+		iorvbar: t6050_iorvbar_value(firmware_address)
+		cpu_control: running
+	}
 	return t6050_iorvbar_value(firmware_address) == 0x284500001
+		&& t6050_iorvbar_matches(state.iorvbar, firmware_address)
+		&& !t6050_iorvbar_matches(state.iorvbar, firmware_address + 0x4000)
+		&& state.iorvbar_locked() && state.cpu_running()
 		&& running == 0xa5a55a75 && stop_requested == 0xa5a55a65
 		&& stop_finalized == 0xa5a55a45
 }

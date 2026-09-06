@@ -296,7 +296,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 21)
+        self.assertEqual(result["schema"], 22)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -1622,8 +1622,11 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0xD65F03C0,
         )
         map_code = struct.pack(
-            "<6I",
+            "<9I",
             0x37080243,
+            0x94000EB4,
+            0x34000140,
+            0xF9409E61,
             0xB9418268,
             0xF940CA69,
             0x8B080128,
@@ -1722,6 +1725,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
         )
         self.assertEqual(result["iorvbar"]["device_memory_index"], 1)
         self.assertEqual(result["iorvbar"]["t6050_register_offset"], 0)
+        self.assertEqual(
+            result["iorvbar"]["map_firmware"]["iboot_behavior"],
+            "process segment records through mapper; do not access IORVBAR",
+        )
         self.assertEqual(result["cpu_run_control"]["device_memory_index"], 0)
         self.assertEqual(result["cpu_run_control"]["register_offset"], 0x44)
         self.assertIn("bit 4", result["cpu_run_control"]["run"])
