@@ -61,6 +61,12 @@ const t6050_nub_preloaded_property = 'pre-loaded'
 const t6050_nub_running_property = 'running'
 const t6050_nub_no_firmware_service_property = 'no-firmware-service'
 const t6050_nub_segment_ranges_property = 'segment-ranges'
+const rtk_id_block_magic = u32(0x64697575) // 'uuid' in stored byte order
+const rtk_id_block_size = u32(0x40)
+const rtk_id_block_version_offset = u32(4)
+const rtk_id_block_v4_offset = u32(0x20)
+const rtk_id_block_v5_offset = u32(0x28)
+const rtk_patchbay_header_size = u32(8)
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -154,7 +160,112 @@ pub enum T6050PowerResult {
 	faulted
 }
 
-// Which firmware image an RTBuddy target adopts. RTBuddy::_attemptFirmwareLoad
+// One located patchbay region inside an RTKit image. RTBuddy searches a fixed
+// list of candidate IOP-virtual offsets for a `uuid` identity block and reads
+// the region's offset and size out of it; the region is then aligned down to
+// four bytes and the leftover becomes the first record's offset.
+pub struct T6050PatchBayRegion {
+pub:
+	iop_virtual u64
+	align_pad   u32
+	size        u32
+	padded_size u32
+}
+
+// One `{u32 tag, u32 length, u8 value[length]}` record. There is no padding
+// between records, so a bad length silently reinterprets the whole tail; the
+// walker therefore refuses any record that leaves the declared region.
+pub struct T6050PatchBayRecord {
+pub:
+	tag    u32
+	offset u32
+	length u32
+}
+
+// Apple's fourcc constants spell the tag most-significant byte first, so a
+// little-endian load of a record header compares equal to the constant
+// directly and needs no swapping.
+pub fn t6050_patchbay_tag(name string) ?u32 {
+	if name.len != 4 {
+		return none
+	}
+	return (u32(name[0]) << 24) | (u32(name[1]) << 16) | (u32(name[2]) << 8)
+		| u32(name[3])
+}
+
+// The bytes a tag actually occupies in the image, which read as the printed
+// spelling reversed. Searching an image for the literal characters of a tag
+// name finds nothing; this is the spelling to look for.
+pub fn t6050_patchbay_stored_bytes(tag u32) [4]u8 {
+	return [u8(tag), u8(tag >> 8), u8(tag >> 16), u8(tag >> 24)]!
+}
+
+// Decode the patchbay region from a 0x40-byte RTKit identity block. Only
+// versions 4 and 5 are accepted, matching `version & ~1 == 4`.
+pub fn decode_t6050_patchbay_region(block voidptr, iop_virtual_base u64) ?T6050PatchBayRegion {
+	if read_native_u32(block, 0) != rtk_id_block_magic {
+		return none
+	}
+	version := read_native_u32(block, rtk_id_block_version_offset)
+	if version & ~u32(1) != 4 {
+		return none
+	}
+	field := if version == 4 { rtk_id_block_v4_offset } else { rtk_id_block_v5_offset }
+	offset := read_native_u32(block, field)
+	size := read_native_u32(block, field + 4)
+	if size == 0 {
+		return none
+	}
+	unaligned := iop_virtual_base + u64(offset)
+	pad := u32(unaligned & 3)
+	return T6050PatchBayRegion{
+		iop_virtual: unaligned & ~u64(3)
+		align_pad: pad
+		size: size
+		padded_size: (pad + size + 3) & ~u32(3)
+	}
+}
+
+// Walk one record. `cursor` is relative to the aligned region base, so it
+// starts at the region's alignment pad exactly as RTBuddyPatchBay does.
+pub fn next_t6050_patchbay_record(data voidptr, region &T6050PatchBayRegion,
+	cursor u32) ?T6050PatchBayRecord {
+	end := region.align_pad + region.size
+	if cursor < region.align_pad || cursor + rtk_patchbay_header_size > end {
+		return none
+	}
+	length := read_native_u32(data, cursor + 4)
+	if cursor + rtk_patchbay_header_size + length > end {
+		return none
+	}
+	return T6050PatchBayRecord{
+		tag: read_native_u32(data, cursor)
+		offset: cursor
+		length: length
+	}
+}
+
+pub fn (record &T6050PatchBayRecord) next_cursor() u32 {
+	return record.offset + rtk_patchbay_header_size + record.length
+}
+
+// Locate one tag. Returns none when the tag is absent or any record on the way
+// is malformed, so a partially readable patchbay is never half-applied.
+pub fn find_t6050_patchbay_tag(data voidptr, region &T6050PatchBayRegion,
+	tag u32) ?T6050PatchBayRecord {
+	mut cursor := region.align_pad
+	end := region.align_pad + region.size
+	for cursor + rtk_patchbay_header_size <= end {
+		record := next_t6050_patchbay_record(data, region, cursor) or { return none }
+		if record.tag == tag {
+			return record
+		}
+		cursor = record.next_cursor()
+	}
+	return none
+}
+
+// Which firmware image an RTBuddy target adopts.// Which firmware image an RTBuddy target adopts. RTBuddy::_attemptFirmwareLoad
 // only bypasses its firmware service when the nub declares itself already
 // `running` or opts out with `no-firmware-service`; `pre-loaded` alone is the
 // second gate and never reaches that test on its own.
@@ -718,6 +829,77 @@ fn get_t6050_pmp_firmware_ownership(nub &devicetree.DTNode) T6050PmpFirmwareOwne
 	}
 }
 
+fn validate_t6050_patchbay_codec() bool {
+	mandatory := ['BDID', 'DVID', 'DCAP', 'DCHD', 'PMC_', 'PMCV', 'PMCB',
+		'PMCX', 'CVAR']
+	// Build a version-5 identity block and a patchbay holding the nine
+	// mandatory 32-bit tags, then walk it exactly as RTBuddyPatchBay does.
+	mut records := []u8{}
+	for index, name in mandatory {
+		tag := t6050_patchbay_tag(name) or { return false }
+		stored := t6050_patchbay_stored_bytes(tag)
+		for byte_index in 0 .. 4 {
+			records << stored[byte_index]
+		}
+		records << [u8(4), 0, 0, 0]
+		records << [u8(index), 0, 0, 0]
+	}
+	// The image spells every tag backwards; BDID is stored as the bytes DIDB.
+	bdid := t6050_patchbay_tag('BDID') or { return false }
+	if bdid != 0x42444944 || t6050_patchbay_stored_bytes(bdid) != [u8(`D`), `I`, `D`, `B`]! {
+		return false
+	}
+	mut block := []u8{len: int(rtk_id_block_size)}
+	block[0] = u8(rtk_id_block_magic)
+	block[1] = u8(rtk_id_block_magic >> 8)
+	block[2] = u8(rtk_id_block_magic >> 16)
+	block[3] = u8(rtk_id_block_magic >> 24)
+	block[rtk_id_block_version_offset] = 5
+	block[rtk_id_block_v5_offset] = 0
+	block[rtk_id_block_v5_offset + 4] = u8(records.len)
+	region := decode_t6050_patchbay_region(block.data, 0) or { return false }
+	if region.align_pad != 0 || region.size != u32(records.len)
+		|| region.padded_size != (u32(records.len) + 3) & ~u32(3) {
+		return false
+	}
+	// An unsupported identity-block version must not yield a region at all.
+	block[rtk_id_block_version_offset] = 6
+	if _ := decode_t6050_patchbay_region(block.data, 0) {
+		return false
+	}
+	block[rtk_id_block_version_offset] = 5
+	mut seen := 0
+	for index, name in mandatory {
+		tag := t6050_patchbay_tag(name) or { return false }
+		record := find_t6050_patchbay_tag(records.data, &region, tag) or { return false }
+		if record.length != 4
+			|| read_native_u32(records.data, record.offset + rtk_patchbay_header_size) != u32(index) {
+			return false
+		}
+		seen++
+	}
+	if seen != mandatory.len {
+		return false
+	}
+	if _ := find_t6050_patchbay_tag(records.data, &region, t6050_patchbay_tag('ZZZZ') or {
+		return false
+	}) {
+		return false
+	}
+	if _ := t6050_patchbay_tag('BDI') {
+		return false
+	}
+	// A length that leaves the declared region must abort the whole walk
+	// rather than reinterpret neighbouring bytes.
+	records[4] = 0xff
+	if _ := find_t6050_patchbay_tag(records.data, &region, t6050_patchbay_tag('CVAR') or {
+		return false
+	}) {
+		return false
+	}
+	return true
+}
+
 fn validate_t6050_firmware_ownership_codec() bool {
 	// Mac17,6 publishes segment-ranges and pre-loaded but neither running nor
 	// no-firmware-service, so RTBuddy waits for ApplePMPFirmware and the image
@@ -1264,6 +1446,7 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 	if !validate_t6050_ptd_codec() || !validate_t6050_wrapper_codec()
 		|| !validate_t6050_readiness_codec()
 		|| !validate_t6050_firmware_ownership_codec()
+		|| !validate_t6050_patchbay_codec()
 		|| !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false

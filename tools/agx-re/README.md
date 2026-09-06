@@ -110,7 +110,13 @@ gate binding, and records the requested-die selection used by ordinary state
 commands. The live inspector separately determines which templates are active.
 The UUID-pinned ApplePMPFirmware/RTBuddy pass additionally recovers the nine
 mandatory 32-bit PMP patchbay inputs and the exact RTBuddy firmware-fixup
-ordering. Its `firmware-loaded` byte and IORegistry announcement are reported
+ordering. It also recovers how a patchbay is located at all -- the eight
+candidate identity-block offsets, the `uuid` magic, the version-4/5 field
+pairs, and the `{tag, length, value}` record walk -- and applies that format to
+the extracted `t6050pmp` image, so `recover-t6050-power` now depends on
+`pmp-firmware`. The recovery fails closed if the located records do not tile
+their declared region exactly or if any mandatory tag is absent or not 32 bits
+wide. Its `firmware-loaded` byte and IORegistry announcement are reported
 as image-preparation bookkeeping, not as a PMP run-state or dashboard-ready
 acknowledgement. The same UUID-pinned RTBuddy pass now follows the subsequent
 managed boot path: status 4 precedes `startCPUWithOptions`, a protocol-12 Hello

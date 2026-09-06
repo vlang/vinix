@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from extract_firmware import der_item
+from extract_fileset import LC_SEGMENT_64
 from recover_g17_abi import (
     decode_add_immediate,
     decode_adrp,
@@ -182,6 +183,39 @@ RTBUDDY_FIRMWARE_INIT_SEGMENT_MAP = (
     "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString"
 )
 RTBUDDY_FIRMWARE_IBOOT_LOADED = "__ZNK15RTBuddyFirmware11iBootLoadedEv"
+RTBUDDY_FIRMWARE_COPY_ID_BLOCK = (
+    "__ZN15RTBuddyFirmware11copyIdBlockEP16RTK_uuid_block_t"
+)
+RTBUDDY_FIRMWARE_FIND_PATCHBAY = "__ZN15RTBuddyFirmware12findPatchBayEPyPjS1_Pb"
+RTBUDDY_FIRMWARE_COPY32_FROM_IOP = (
+    "__ZN15RTBuddyFirmware20copy32FromIopVirtualEymPv"
+)
+RTBUDDY_FIRMWARE_SEGMENT_FOR_IOP = (
+    "__ZN15RTBuddyFirmware23getSegmentForIopVirtualEy"
+)
+RTBUDDY_SEGMENT_IS_WRITABLE = "__ZNK14RTBuddySegment10isWritableEv"
+RTBUDDY_PATCHBAY_INIT_WITH_DATA = "__ZN15RTBuddyPatchBay12initWithDataEP6OSDatajb"
+RTBUDDY_PATCHBAY_FIND = "__ZN15RTBuddyPatchBay4findEj"
+RTK_ID_BLOCK_MAGIC = 0x64697575  # "uuid" in stored byte order
+RTK_ID_BLOCK_BYTES = 0x40
+RTK_ID_BLOCK_CANDIDATES = 8
+PATCHBAY_HEADER_BYTES = 8
+# ApplePMPFirmware::patchFirmware writes exactly these, in this order. The name
+# is the u32 constant read most-significant byte first; the image stores the
+# reversed bytes.
+PMP_MANDATORY_PATCHBAY_TAGS = (
+    ("BDID", "board-id", 0xC8),
+    ("DVID", "dram-vendor-id", 0xCC),
+    ("DCAP", "dram-capacity", 0xD0),
+    ("DCHD", "dram-channel-disable", 0xD4),
+    ("PMC_", "pmc", 0xD8),
+    ("PMCV", "pmc-pmgr bit 0", 0xDC),
+    ("PMCB", "pmc-pmgr bit 3", 0xE0),
+    ("PMCX", "pmc-msg-disabled", 0xE4),
+    ("CVAR", "soc-chip-variant", 0xE8),
+)
+T6050_PMP_IMAGE_ID_UUID = "ed70ac9090873857b454318e50a9223f"
+DEFAULT_PMP_IMAGE = Path("build/firmware/t6050pmp.macho")
 RTBUDDY_PRELOADED_PROPERTY = "pre-loaded"
 RTBUDDY_RUNNING_PROPERTY = "running"
 RTBUDDY_NO_FIRMWARE_SERVICE_PROPERTY = "no-firmware-service"
@@ -2428,17 +2462,7 @@ def recover_apple_pmp_firmware_code_contract(
     ):
         raise ValueError("RTBuddy gated firmware-load completion changed")
 
-    mandatory_patches = (
-        ("BDID", "board-id", 0xC8),
-        ("DVID", "dram-vendor-id", 0xCC),
-        ("DCAP", "dram-capacity", 0xD0),
-        ("DCHD", "dram-channel-disable", 0xD4),
-        ("PMC_", "pmc", 0xD8),
-        ("PMCV", "pmc-pmgr bit 0", 0xDC),
-        ("PMCB", "pmc-pmgr bit 3", 0xE0),
-        ("PMCX", "pmc-msg-disabled", 0xE4),
-        ("CVAR", "soc-chip-variant", 0xE8),
-    )
+    mandatory_patches = PMP_MANDATORY_PATCHBAY_TAGS
     return {
         "service": {
             "start_vtable_slot": 0x5F0,
@@ -2477,6 +2501,306 @@ def recover_apple_pmp_firmware_code_contract(
                 "run-state or dashboard-ready acknowledgement is established"
             ),
         },
+    }
+
+
+def recover_rtbuddy_patchbay_contract(
+    image: bytes,
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+) -> dict[str, object]:
+    """Recover how a patchbay is located inside an RTKit image and walked.
+
+    A patchbay is not at a fixed address.  RTBuddy searches a fixed list of
+    candidate IOP-virtual offsets for a `uuid` identity block, then reads the
+    patchbay's own offset and size out of that block.
+    """
+
+    required = (
+        RTBUDDY_FIRMWARE_COPY_ID_BLOCK,
+        RTBUDDY_FIRMWARE_FIND_PATCHBAY,
+        RTBUDDY_FIRMWARE_COPY32_FROM_IOP,
+        RTBUDDY_FIRMWARE_SEGMENT_FOR_IOP,
+        RTBUDDY_SEGMENT_IS_WRITABLE,
+        RTBUDDY_PATCHBAY_INIT_WITH_DATA,
+        RTBUDDY_PATCHBAY_FIND,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"RTBuddy is missing patchbay symbols: {missing!r}")
+
+    id_address, id_code = functions[RTBUDDY_FIRMWARE_COPY_ID_BLOCK]
+    if symbols[RTBUDDY_FIRMWARE_COPY32_FROM_IOP] not in direct_branch_targets(
+        id_address, id_code
+    ) or not _has_ordered_words(
+        id_code,
+        (
+            0x528EAEB8,  # mov w24, #0x7575
+            0x72AC8D38,  # movk w24, #0x6469, lsl #16 -- "uuid"
+            0x52800802,  # mov w2, #0x40 -- identity block size
+            0x121F7908,  # and w8, w8, #0xfffffffe
+            0x7100111F,  # cmp w8, #4 -- version 4 or 5
+            0x910012D6,  # add x22, x22, #4
+            0xF10082DF,  # cmp x22, #0x20 -- eight candidate offsets
+        ),
+    ):
+        raise ValueError("RTKit identity-block search changed")
+    candidate_address = read_adrp_add_address(id_address, id_code, 0x44, 0x48)
+    candidates = list(
+        read_virtual_u32_table(image, candidate_address, RTK_ID_BLOCK_CANDIDATES)
+    )
+    if len(set(candidates)) != RTK_ID_BLOCK_CANDIDATES or candidates != sorted(
+        candidates
+    ):
+        raise ValueError(f"RTKit identity-block candidates changed: {candidates!r}")
+
+    find_address, find_code = functions[RTBUDDY_FIRMWARE_FIND_PATCHBAY]
+    find_targets = direct_branch_targets(find_address, find_code)
+    for name in (
+        RTBUDDY_FIRMWARE_COPY_ID_BLOCK,
+        RTBUDDY_FIRMWARE_SEGMENT_FOR_IOP,
+        RTBUDDY_SEGMENT_IS_WRITABLE,
+    ):
+        if symbols[name] not in find_targets:
+            raise ValueError(f"RTBuddy patchbay lookup no longer calls {name}")
+    if not _has_ordered_words(
+        find_code,
+        (
+            0x7100151F,  # cmp w8, #5
+            0x7100111F,  # cmp w8, #4
+            0x91008309,  # add x9, x24, #0x20 -- v4 offset
+            0x91009308,  # add x8, x24, #0x24 -- v4 size
+            0x9100B308,  # add x8, x24, #0x2c -- v5 size
+            0x9100A309,  # add x9, x24, #0x28 -- v5 offset
+            0x12000528,  # and w8, w9, #3 -- alignment pad
+            0x927EF529,  # and x9, x9, #0xfffffffffffffffc
+            0x11000D29,  # add w9, w9, #3
+            0x121E7529,  # and w9, w9, #0xfffffffc -- padded size
+        ),
+    ):
+        raise ValueError("RTBuddy patchbay lookup changed")
+
+    _init_address, init_code = functions[RTBUDDY_PATCHBAY_INIT_WITH_DATA]
+    if not _has_ordered_words(
+        init_code,
+        (
+            0xF9000A96,  # str x22, [x20, #0x10] -- retained data
+            0xB9001A95,  # str w21, [x20, #0x18] -- first record offset
+            0x39007693,  # strb w19, [x20, #0x1d] -- read-only
+            0x3900729F,  # strb wzr, [x20, #0x1c] -- clean
+        ),
+    ):
+        raise ValueError("RTBuddyPatchBay construction changed")
+
+    _walk_address, walk_code = functions[RTBUDDY_PATCHBAY_FIND]
+    if not _has_ordered_words(
+        walk_code,
+        (
+            0xB9401813,  # ldr w19, [x0, #0x18] -- cursor starts at the pad
+            0xF9400800,  # ldr x0, [x0, #0x10] -- backing data
+            0xD2803411,  # mov x17, #0x1a0 -- OSData::getBytesNoCopy(offset, len)
+            0x52800102,  # mov w2, #8 -- one record header
+            0xB94002C8,  # ldr w8, [x22] -- tag
+            0x6B15011F,  # cmp w8, w21 -- requested tag
+            0xB94006C8,  # ldr w8, [x22, #4] -- value length
+            0x0B080268,  # add w8, w19, w8
+            0x11002113,  # add w19, w8, #8 -- next record
+        ),
+    ):
+        raise ValueError("RTBuddyPatchBay record walk changed")
+
+    return {
+        "identity_block": {
+            "magic": RTK_ID_BLOCK_MAGIC,
+            "magic_bytes": "uuid",
+            "size": RTK_ID_BLOCK_BYTES,
+            "version_offset": 4,
+            "accepted_versions": [4, 5],
+            "version_test": "version & ~1 == 4",
+            "candidate_iop_offsets": candidates,
+            "base": "the coredump map's IOP virtual base, or zero when absent",
+            "patchbay_fields": {
+                "4": {"offset": 0x20, "size": 0x24},
+                "5": {"offset": 0x28, "size": 0x2C},
+            },
+        },
+        "region": {
+            "iop_virtual": "identity base + the block's patchbay offset",
+            "alignment": 4,
+            "align_pad": "the low two bits of the unaligned address",
+            "padded_size": "(pad + size + 3) & ~3",
+            "read_only": "true unless the containing segment is writable",
+            "first_record_offset": "the alignment pad",
+        },
+        "record": {
+            "header_bytes": PATCHBAY_HEADER_BYTES,
+            "tag_offset": 0,
+            "length_offset": 4,
+            "value_offset": PATCHBAY_HEADER_BYTES,
+            "stride": "8 + length, with no inter-record padding",
+            "tag_byte_order": (
+                "the driver's u32 constant spells the tag most-significant "
+                "byte first, so the bytes stored in the image are reversed"
+            ),
+        },
+    }
+
+
+def _macho_segment_table(image: bytes) -> list[dict[str, object]]:
+    """Return the segment table with protection, which extract_fileset drops."""
+    if len(image) < 32:
+        raise ValueError("truncated Mach-O header")
+    count = struct.unpack_from("<I", image, 16)[0]
+    offset = 32
+    segments = []
+    for _index in range(count):
+        command, size = struct.unpack_from("<II", image, offset)
+        if size < 8 or offset + size > len(image):
+            raise ValueError("malformed Mach-O load command")
+        if command == LC_SEGMENT_64:
+            name = image[offset + 8 : offset + 24].rstrip(b"\0").decode("ascii")
+            virtual, virtual_size, file_offset, file_size = struct.unpack_from(
+                "<QQQQ", image, offset + 24
+            )
+            _maximum, initial = struct.unpack_from("<ii", image, offset + 56)
+            segments.append(
+                {
+                    "name": name,
+                    "virtual_address": virtual,
+                    "virtual_size": virtual_size,
+                    "file_offset": file_offset,
+                    "file_size": file_size,
+                    "writable": bool(initial & 2),
+                }
+            )
+        offset += size
+    if not segments:
+        raise ValueError("Mach-O has no segments")
+    return segments
+
+
+def recover_t6050_pmp_patchbay(
+    image: bytes, contract: dict[str, object]
+) -> dict[str, object]:
+    """Apply the recovered patchbay format to the real t6050pmp image.
+
+    Every field used here comes from `recover_rtbuddy_patchbay_contract`, so a
+    changed OS invalidates this result rather than silently re-deriving it.
+    """
+
+    identity = contract["identity_block"]
+    record = contract["record"]
+    segments = _macho_segment_table(image)
+    base = min(segment["virtual_address"] for segment in segments)
+
+    def read(address: int, size: int) -> bytes | None:
+        for segment in segments:
+            start = segment["virtual_address"]
+            if start <= address and address + size <= start + segment["file_size"]:
+                offset = segment["file_offset"] + address - start
+                return image[offset : offset + size]
+        return None
+
+    matches = []
+    for candidate in identity["candidate_iop_offsets"]:
+        block = read(base + candidate, identity["size"])
+        if block is None:
+            continue
+        magic, version = struct.unpack_from("<II", block, 0)
+        if magic != identity["magic"] or version & ~1 != 4:
+            continue
+        matches.append((candidate, version, block))
+    if len(matches) != 1:
+        raise ValueError(
+            f"t6050pmp identity block is ambiguous or absent: "
+            f"{[item[0] for item in matches]!r}"
+        )
+    candidate, version, block = matches[0]
+    if block[0x10:0x20].hex() != T6050_PMP_IMAGE_ID_UUID:
+        raise ValueError(f"t6050pmp image identity changed: {block[0x10:0x20].hex()}")
+
+    fields = identity["patchbay_fields"][str(version)]
+    patch_offset = struct.unpack_from("<I", block, fields["offset"])[0]
+    patch_size = struct.unpack_from("<I", block, fields["size"])[0]
+    unaligned = base + patch_offset
+    pad = unaligned & 3
+    aligned = unaligned & ~3
+    padded_size = (pad + patch_size + 3) & ~3
+
+    owner = next(
+        (
+            segment
+            for segment in segments
+            if segment["virtual_address"]
+            <= aligned
+            < segment["virtual_address"] + segment["file_size"]
+        ),
+        None,
+    )
+    if owner is None:
+        raise ValueError("t6050pmp patchbay is outside every mapped segment")
+
+    blob = read(aligned, padded_size)
+    if blob is None:
+        raise ValueError("t6050pmp patchbay extends past its segment")
+
+    records: list[dict[str, object]] = []
+    cursor = pad
+    header = record["header_bytes"]
+    while cursor + header <= pad + patch_size:
+        tag, length = struct.unpack_from("<II", blob, cursor)
+        if cursor + header + length > pad + patch_size:
+            raise ValueError(f"t6050pmp patchbay record at {cursor:#x} overruns")
+        records.append(
+            {
+                "offset": cursor - pad,
+                "tag": struct.pack(">I", tag).decode("ascii", "replace"),
+                "stored_bytes": struct.pack("<I", tag).decode("ascii", "replace"),
+                "value_bytes": length,
+            }
+        )
+        cursor += header + length
+    if cursor != pad + patch_size:
+        raise ValueError(
+            f"t6050pmp patchbay records do not tile its region: "
+            f"{cursor - pad:#x} != {patch_size:#x}"
+        )
+
+    by_tag = {item["tag"]: item for item in records}
+    if len(by_tag) != len(records):
+        raise ValueError("t6050pmp patchbay repeats a tag")
+    for tag, _source, _offset in PMP_MANDATORY_PATCHBAY_TAGS:
+        entry = by_tag.get(tag)
+        if entry is None:
+            raise ValueError(f"t6050pmp patchbay is missing mandatory tag {tag}")
+        if entry["value_bytes"] != 4:
+            raise ValueError(
+                f"t6050pmp patchbay tag {tag} is not a 32-bit value: "
+                f"{entry['value_bytes']}"
+            )
+
+    return {
+        "image_uuid": T6050_PMP_IMAGE_ID_UUID,
+        "iop_virtual_base": base,
+        "identity_block": {
+            "candidate_offset": candidate,
+            "iop_virtual": base + candidate,
+            "version": version,
+        },
+        "region": {
+            "offset": patch_offset,
+            "iop_virtual": aligned,
+            "align_pad": pad,
+            "size": patch_size,
+            "padded_size": padded_size,
+            "segment": owner["name"],
+            "writable": owner["writable"],
+        },
+        "record_count": len(records),
+        "mandatory_tags_present": [
+            tag for tag, _source, _offset in PMP_MANDATORY_PATCHBAY_TAGS
+        ],
+        "records": records,
     }
 
 
@@ -2982,6 +3306,10 @@ def recover_apple_pmp_firmware(
         RTBUDDY_HANDLE_PRELOAD_FIRMWARE,
         RTBUDDY_FIRMWARE_PRELOADED,
         RTBUDDY_FIRMWARE_IBOOT_LOADED,
+        RTBUDDY_FIRMWARE_COPY_ID_BLOCK,
+        RTBUDDY_FIRMWARE_FIND_PATCHBAY,
+        RTBUDDY_PATCHBAY_INIT_WITH_DATA,
+        RTBUDDY_PATCHBAY_FIND,
     )
     rtbuddy_functions = {
         name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
@@ -3036,6 +3364,9 @@ def recover_apple_pmp_firmware(
             pmp_vtable_targets,
             service_vtable_targets,
             firmware_vtable_targets,
+        ),
+        "patchbay_format": recover_rtbuddy_patchbay_contract(
+            rtbuddy_image, rtbuddy_functions, rtbuddy_symbols
         ),
         "firmware_source": recover_rtbuddy_firmware_source_contract(
             rtbuddy_image,
@@ -4652,6 +4983,7 @@ def main() -> int:
         "--iodart-family", type=Path, default=DEFAULT_IODART_FAMILY
     )
     parser.add_argument("--kernel", type=Path, default=DEFAULT_KERNEL)
+    parser.add_argument("--pmp-image", type=Path, default=DEFAULT_PMP_IMAGE)
     parser.add_argument("--output", type=Path, default=Path("build/t6050-power.json"))
     args = parser.parse_args()
     try:
@@ -4670,6 +5002,10 @@ def main() -> int:
         )
         manifest["apple_pmp_firmware"] = recover_apple_pmp_firmware(
             args.pmp_firmware.read_bytes(), args.rtbuddy.read_bytes()
+        )
+        manifest["t6050pmp_patchbay"] = recover_t6050_pmp_patchbay(
+            args.pmp_image.read_bytes(),
+            manifest["apple_pmp_firmware"]["patchbay_format"],
         )
         manifest["apple_a7iop"] = recover_apple_a7iop(args.apple_a7iop.read_bytes())
         manifest["apple_ascwrap_v6"] = recover_apple_ascwrap_v6(

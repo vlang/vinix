@@ -31,7 +31,7 @@ pmp-firmware:
 kernel-kexts:
 	./extract_fileset.py
 
-recover-t6050-power: kernel-kexts
+recover-t6050-power: kernel-kexts pmp-firmware
 	./recover_t6050_power.py
 
 recover-g17-abi: firmware kernel-kexts
