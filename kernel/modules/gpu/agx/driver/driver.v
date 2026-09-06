@@ -341,13 +341,18 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 // than a rename. G13's hwdata refuses to initialise with a zero max_power_mw,
 // but the Apple GPU node carries only frequency and voltage: on a live M5 Max
 // tree the sgx node's 66 properties include perf-states, perf-states-sram and
-// gpu-pwr-perf-scale0/1, and no per-state power under any spelling. The
-// `opp-microwatt` figures m1n1 writes into its FDT therefore come from
-// somewhere other than this node, and that source has not been located yet.
+// gpu-pwr-perf-scale0/1, and no per-state power under any spelling.
 //
-// Guessing property names for a path whose whole purpose is to open GPU
-// hardware access would be the wrong trade, so report what the node actually
-// carries and let the translation be written from real data.
+// Apple's driver does not read that figure, it computes it: the recovered G17
+// ABI exposes per-domain leakage equations and a fused chip-leakage table
+// (calculateVddGpuLeakage, applyLeakageEquation, populateChipLeakageData) that
+// turn voltage, frequency and per-die fuses into power. Reproducing that for
+// G13 needs the equivalent model out of an M1's AGXG13X kext, which is not
+// available here. So this is not a translation that can be written from the
+// device tree at all, on any chip.
+//
+// Report what the node actually carries instead of guessing property names for
+// a path whose whole purpose is to open GPU hardware access.
 fn report_native_t8103_opp_gap(gpu_node &devicetree.DTNode) {
 	println('agx: native t8103 OPP translation is not implemented')
 	println('agx: expected an m1n1/Linux FDT (apple,agx-g13g) with operating-points-v2;')
