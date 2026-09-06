@@ -865,12 +865,7 @@ pub fn (transport &T6050PtdTransport) write(die u32, entry u32, value u64) bool 
 	offset := t6050_ptd_offset(entry, t6050_ptd_write_base, t6050_ptd_write_stride,
 		8) or { return false }
 	address := unsafe { &u64(transport.die_bases[die] + offset) }
-	asm volatile aarch64 {
-		str value, [address]
-		; ; r (address)
-		  r (value)
-		; memory
-	}
+	kio.mmout64(address, value)
 	return true
 }
 

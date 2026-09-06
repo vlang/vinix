@@ -456,7 +456,7 @@ fn kmain() {
 			// the CPU state, so "nothing after init aic" can be pinned to the
 			// call itself, to the callee, or to the text path.
 			term.early_stage_mark(40)
-			print('aic.0 calling initialise, CurrentEL=${cpu.read_currentel() >> 2} DAIF=0x${cpu.read_daif():x}\n')
+			print('aic.0 calling initialise, CurrentEL=${cpu.read_currentel()} DAIF=0x${cpu.read_daif():x}\n')
 			if aic.initialise(aic_phys) {
 				if timer_irq := parse_aic_guest_virtual_timer_irq() {
 					aic_timer_irq = timer_irq
