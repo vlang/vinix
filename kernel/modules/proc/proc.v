@@ -2,6 +2,7 @@
 module proc
 
 import klock
+import katomic
 import memory
 import event.eventstruct
 
@@ -52,6 +53,13 @@ pub mut:
 	// The controlling terminal's session, from setsid(2). A process is a
 	// session leader when sid == pid.
 	tty_session int
+
+	// Nanoseconds this process' threads have spent on a CPU, summed over the
+	// life of the process and over every thread it has ever had — a thread
+	// pays in what it owes before it is torn down, so an exited thread's time
+	// stays counted. It only ever grows, so a reader that wants a rate takes
+	// two samples and divides the difference by the wall clock between them.
+	cpu_time_ns u64
 }
 
 pub struct SigAction {
@@ -104,6 +112,72 @@ pub fn free_pid(pid int) {
 	processes[pid] = unsafe { nil }
 	// The main thread's tid aliases the pid, so it is released together.
 	threads_by_tid[pid] = unsafe { nil }
+}
+
+// ── CPU time accounting ────────────────────────────────────────────
+// A thread's time is charged to its process at the moment the scheduler takes
+// it off a CPU, so the total is only ever moved forward by a span that has
+// already finished. Both calls sit on the one path every context switch goes
+// through. Neither takes a lock: `scheduled_at_ns` is touched only by the CPU
+// the thread is running on, and the running total is added to atomically —
+// see charge_cpu_time.
+
+// begin_cpu_time marks a thread as having started a turn on a CPU.
+pub fn begin_cpu_time(mut t Thread, now_ns u64) {
+	t.scheduled_at_ns = now_ns
+}
+
+// charge_cpu_time bills the turn that has just ended to the thread's process
+// and clears the mark, so a thread that is switched away twice without running
+// in between is charged once. A clock that has not moved, or has moved
+// backwards because the reading raced a tick, is charged nothing rather than a
+// nonsense span.
+//
+// The addition is a compare-and-swap rather than a `+=`. Two threads of one
+// process can come off two CPUs at the same moment, each holding only its own
+// thread's lock, and a lost update there would undercount exactly the
+// multi-threaded processes worth measuring. Taking the process' lock instead
+// would put it underneath the scheduler, which is not somewhere it can go.
+pub fn charge_cpu_time(mut t Thread, now_ns u64) {
+	started := t.scheduled_at_ns
+	t.scheduled_at_ns = 0
+	if started == 0 || now_ns <= started {
+		return
+	}
+	if unsafe { t.process == nil } {
+		return
+	}
+	span := now_ns - started
+	mut process := t.process
+	for {
+		total := katomic.load(&process.cpu_time_ns)
+		if katomic.cas(mut &process.cpu_time_ns, total, total + span) {
+			return
+		}
+	}
+}
+
+// ── Reading the process table ──────────────────────────────────────
+// The table is a bare array behind a spinlock, and a `&Process` taken out of
+// it is only good for as long as that lock is held — a process that exits has
+// its entry cleared and its memory freed. A reader therefore brackets its
+// whole walk with these rather than collecting pointers to look at later.
+
+pub fn lock_table() {
+	pid_lock.acquire()
+}
+
+pub fn unlock_table() {
+	pid_lock.release()
+}
+
+// process_at answers with the process holding `pid`, or nil. The caller must
+// hold the table lock.
+pub fn process_at(pid int) &Process {
+	if pid <= 0 || pid >= max_pid {
+		return unsafe { nil }
+	}
+	return processes[pid]
 }
 
 pub fn allocate_tid(thrd &Thread) ?int {

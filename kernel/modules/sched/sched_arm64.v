@@ -89,7 +89,11 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// Tick the monotonic/realtime clocks. The interval is measured from the
 	// generic timer's counter rather than assumed, because this handler fires
 	// on a timeslice, not at a fixed frequency.
-	time.advance_to_ns(timer.get_ns())
+	//
+	// The same reading bills the outgoing thread and starts the incoming one,
+	// so a switch neither loses time between the two nor counts it twice.
+	now_ns := timer.get_ns()
+	time.advance_to_ns(now_ns)
 
 	// Tick per-process interval timers (SIGALRM)
 	tick_itimers()
@@ -113,6 +117,10 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 			}
 			return
 		}
+		// Past the early return above, this thread really is coming off the
+		// CPU, so the turn it has just had is charged to its process.
+		proc.charge_cpu_time(mut current_thread, now_ns)
+
 		if unsafe { _gpr_state != nil } {
 			unsafe {
 				current_thread.gpr_state = *gpr_state
@@ -146,6 +154,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 	current_thread = next_thread
 	proc.set_current_thread(cpu_local.cpu_number, current_thread)
+	proc.begin_cpu_time(mut current_thread, now_ns)
 
 	cpu.write_tpidr_el0(current_thread.tpidr_el0)
 
@@ -325,6 +334,11 @@ pub fn dequeue_and_die() {
 	mut t := proc.current_thread()
 	dequeue_thread(t)
 	t.is_dead = true
+	// This thread leaves the CPU here rather than through the switch in
+	// scheduler_timer_handler, so its last turn is charged here or not at all.
+	// A process that runs briefly and exits would otherwise report no CPU time
+	// at all, which is exactly the process worth noticing.
+	proc.charge_cpu_time(mut t, timer.get_ns())
 	// tick_itimers() keeps a raw pointer to every armed thread, so the entry
 	// has to go before the Thread struct can be recycled.
 	set_itimer_real(t, 0, 0)

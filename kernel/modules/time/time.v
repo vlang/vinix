@@ -199,3 +199,21 @@ pub fn new_timer(when TimeSpec) &Timer {
 
 	return timer
 }
+
+// monotonic_ns is the monotonic clock as one nanosecond count, for callers
+// measuring an interval rather than naming an instant. The two fields are read
+// separately and a tick can land between them, which would pair a new second
+// with an old nanosecond and make the reading jump a second backwards; reading
+// the seconds again and retrying once costs nothing and removes that.
+pub fn monotonic_ns() u64 {
+	mut seconds := monotonic_clock.tv_sec
+	mut nanoseconds := monotonic_clock.tv_nsec
+	if monotonic_clock.tv_sec != seconds {
+		seconds = monotonic_clock.tv_sec
+		nanoseconds = monotonic_clock.tv_nsec
+	}
+	if seconds < 0 || nanoseconds < 0 {
+		return 0
+	}
+	return u64(seconds) * 1000000000 + u64(nanoseconds)
+}

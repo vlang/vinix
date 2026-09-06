@@ -34,6 +34,7 @@ import dev.console
 import dev.fbdev
 import dev.fbdev.simple
 import dev.pointerdev
+import dev.procdev
 import dev.streams
 import time
 import userland
@@ -187,6 +188,9 @@ fn kmain_thread() {
 
 	pointerdev.initialise()
 	print('kmain_thread: pointer done\n')
+
+	procdev.initialise()
+	print('kmain_thread: processes done\n')
 
 	console.initialise()
 	print('kmain_thread: console done\n')

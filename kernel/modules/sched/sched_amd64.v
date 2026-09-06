@@ -12,6 +12,7 @@ import memory.mmap
 import elf
 import lib
 import errno
+import time
 
 pub fn initialise() {
 	scheduler_vector = idt.allocate_vector()
@@ -82,6 +83,11 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
 			return
 		}
+		// Past the early return above this thread really is coming off the
+		// CPU, so the turn it has just had is charged to its process. The
+		// monotonic clock is the tick source here rather than a counter read,
+		// which puts the resolution at one timer tick.
+		proc.charge_cpu_time(mut current_thread, time.monotonic_ns())
 		unsafe {
 			current_thread.gpr_state = *gpr_state
 		}
@@ -103,6 +109,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	current_thread = next_thread
+	proc.begin_cpu_time(mut current_thread, time.monotonic_ns())
 
 	cpu.set_gs_base(u64(current_thread))
 	if current_thread.gpr_state.cs == 0x43 {
@@ -282,6 +289,9 @@ pub fn dequeue_and_die() {
 	}
 	mut t := proc.current_thread()
 	dequeue_thread(t)
+	// This thread leaves the CPU here rather than through the switch in
+	// scheduler_isr, so its last turn is charged here or not at all.
+	proc.charge_cpu_time(mut t, time.monotonic_ns())
 	unsafe {
 	}
 	yield(false)

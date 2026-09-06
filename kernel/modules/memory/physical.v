@@ -13,6 +13,10 @@ __global (
 	pmm_avl_page_count  = u64(0)
 	pmm_last_used_index = u64(0)
 	free_pages          = u64(0)
+	// Usable pages the memory map declared, counted once at init. free_pages
+	// falls as memory is handed out; this does not, so the two together say
+	// how much of the machine's RAM is in use.
+	pmm_total_pages     = u64(0)
 	higher_half         = u64(0)
 )
 
@@ -26,6 +30,21 @@ __global (
 
 pub fn get_hhdm_offset() u64 {
 	return higher_half
+}
+
+// total_bytes and free_bytes report the machine's usable RAM and how much of
+// it is unallocated. Both are page counts scaled to bytes, which is what a
+// reader outside this module wants to say to a person.
+pub fn total_bytes() u64 {
+	return pmm_total_pages * page_size
+}
+
+pub fn free_bytes() u64 {
+	pmm_lock.acquire()
+	defer {
+		pmm_lock.release()
+	}
+	return free_pages * page_size
 }
 
 pub fn print_free() {
@@ -123,6 +142,11 @@ pub fn pmm_init() {
 				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
 			}
 		}
+
+		// Every usable page has now been counted. The bitmap's own pages come
+		// off the free count below but are still RAM the machine has, so the
+		// total is taken here rather than after.
+		pmm_total_pages = free_pages
 
 		// The bitmap occupies the head of a usable entry; take those pages
 		// back so they are never handed out.
