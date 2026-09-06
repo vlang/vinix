@@ -462,6 +462,24 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_circle(cx, cy, outer, color)
 			d.canvas.fill_circle(cx, cy, outer / 2, d.surface_under(x, y))
 		}
+		'activity' {
+			// A bar chart: three columns of different heights standing on a
+			// baseline. It is the one shape that reads as "what is happening
+			// right now" at the size a shortcut gets.
+			body := w * 3 / 5
+			tall := h * 3 / 5
+			left := cx - body / 2
+			bottom := cy + tall / 2
+			bar := body / 4
+			// Ascending rather than arbitrary, so the glyph has a direction
+			// and does not read as a barcode.
+			for i, share in [2, 3, 5] {
+				height := tall * share / 5
+				d.canvas.fill_round_rect(left + i * (bar + bar / 2), bottom - height,
+					bar, height, 1, color)
+			}
+			d.canvas.fill_rect(left, bottom, body, 1, color)
+		}
 		'calculator' {
 			body := w * 3 / 5
 			tall := h * 3 / 4

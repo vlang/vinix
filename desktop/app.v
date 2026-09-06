@@ -67,6 +67,16 @@ const available_apps = [
 		height: 410
 		open: open_settings_app
 	},
+	AppFactory{
+		title: 'Activity'
+		icon: 'builtin:activity'
+		// Wide enough for four columns without the process names truncating,
+		// and tall enough that the list is worth scrolling rather than a
+		// glimpse of one.
+		width: 520
+		height: 400
+		open: open_activity
+	},
 ]
 
 fn open_calculator(mut desktop Desktop) !HostedApp {

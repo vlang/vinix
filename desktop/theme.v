@@ -39,6 +39,17 @@ const files_error = u32(0xc0392b)
 const files_folder_icon = u32(0x5b8def)
 const files_file_icon = u32(0x9aa5b5)
 
+// ── Activity monitor ───────────────────────────────────────────────
+// A long list of small numbers, so the stripe is barely there and only the
+// figures worth acting on are given a colour.
+const activity_row_alt = u32(0xf5f7fa)
+const activity_sort_idle = u32(0xe9edf4)
+const activity_busy = u32(0xc0632b)
+// The share of one CPU at which a process is worth pointing at. Below this
+// everything on an idle machine would be marked and the mark would say
+// nothing.
+const activity_busy_percent = 10.0
+
 // ── Settings ───────────────────────────────────────────────────────
 // ── Terminal ───────────────────────────────────────────────────────
 const terminal_bg = u32(0x1b1d23)

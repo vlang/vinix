@@ -20,6 +20,8 @@ What it does:
   launchers, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
   way back up
+- an **activity monitor** listing every process on the machine with the share
+  of a CPU and of RAM it is using, updated once a second
 - a **settings application**: window button side, taskbar style, theme and
   wallpaper, applied to the running desktop as they are chosen
 - **hosted ui2 applications**: ui2's own examples run in windows of their own,
@@ -40,6 +42,7 @@ typing any word with a q in it drop the user back to the console.
     window.v       the Window model and the pages windows show
     app.v          hosting applications in windows, and which ones there are
     files.v        the file browser
+    activity.v     the activity monitor, over /dev/processes
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     settings.v     the preferences: themes, wallpaper, Display and Battery
     settings_app.v the settings application
@@ -119,6 +122,45 @@ entries than the window has room for.
 
 The image carries the desktop's own source at `/root/desktop`, so there is
 something real to browse and so the machine holds the code it is running.
+
+## The activity monitor
+
+`activity.v` lists every process on the machine with the share of one CPU and
+of RAM it is using. Like the file browser it is Vinix's own rather than a ui2
+example, and like it, it reads the real system.
+
+Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
+answers a read with one snapshot of the whole table — a short header, then a
+fixed-size record per process — taken under the process table's own lock, so a
+list cannot be half of one moment and half of the next. The kernel side is
+`kernel/modules/dev/procdev/procdev.v`, and the two halves share an ABI that
+`ProcessTable.version` exists to catch drift in.
+
+Everything in a snapshot is a running total or an absolute quantity, never a
+rate: the kernel has no idea what interval anyone cares about. `cpu_time_ns` is
+nanoseconds this process' threads have spent on a CPU since it started, and
+turning that into a percentage is the monitor's job — it keeps the previous
+sample and divides the difference by the wall clock between the two. Which is
+also why every process reads 0% for the first second a window is open, and why
+a process that appears between two samples is not credited with what it did
+before anyone was watching.
+
+The kernel counts those nanoseconds in the scheduler, charging a thread's turn
+to its process at the moment it is switched away; `dequeue_and_die` charges the
+last one, so a process that runs briefly and exits does not report nothing at
+all. Memory is the sum of a process' mapped ranges, which on this kernel is
+also what it has resident — every mapping is pre-faulted when it is made, so
+there is no second number to report.
+
+Sampling is once a second, not once a frame. A CPU percentage taken over 16 ms
+is mostly noise: a process either did or did not get a timeslice in that
+window, so every figure would read 0% or 100%.
+
+The list sorts by CPU, memory or name, and rows are shown with the basename of
+the program. The kernel stores a process' name as the path it ran with its pid
+appended, and a fork appends again — the shell is `/bin/busybox[2]` and a loop
+it starts is `/bin/busybox[2][3]` — so the monitor strips those suffixes. Every
+number in them is an ancestor's pid, and this process' own has a column.
 
 ## The window switcher
 
