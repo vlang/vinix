@@ -1117,6 +1117,73 @@ class RecoverT6050PowerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ambiguous or absent"):
             recover_t6050_power.recover_t6050_pmp_patchbay(bytes(image), contract)
 
+    def test_recovers_rtbuddy_segment_flag_translation(self) -> None:
+        seg_map = 0x10000
+        with_range = 0x11000
+        writable = 0x12000
+
+        def branch(source: int, target: int) -> bytes:
+            delta = (target - source) // 4
+            return struct.pack("<I", 0x94000000 | delta & 0x3FFFFFF)
+
+        map_code = struct.pack(
+            "<7I",
+            0x29412356,
+            0x53020909,
+            0x331F0109,
+            0x53017D08,
+            0x121E0508,
+            0x2A08013B,
+            0x521F0365,
+        )
+        map_code += branch(seg_map + len(map_code), with_range)
+        writable_code = struct.pack(
+            "<4I", 0xD503245F, 0x39410008, 0x53010500, 0xD65F03C0
+        )
+        functions = {
+            recover_t6050_power.RTBUDDY_GET_SEGMENT_MAP: (seg_map, map_code),
+            recover_t6050_power.RTBUDDY_SEGMENT_IS_WRITABLE: (writable, writable_code),
+        }
+        symbols = {
+            recover_t6050_power.RTBUDDY_GET_SEGMENT_MAP: seg_map,
+            recover_t6050_power.RTBUDDY_SEGMENT_WITH_PHYSICAL_RANGE: with_range,
+            recover_t6050_power.RTBUDDY_SEGMENT_IS_WRITABLE: writable,
+        }
+        result = recover_t6050_power.recover_rtbuddy_segment_flag_contract(
+            functions, symbols
+        )
+        self.assertEqual(result["device_tree_flags_offset"], 0x1C)
+        self.assertEqual(
+            result["translation"]["segment_bit_1"], "DeviceTree bit 0, inverted"
+        )
+        self.assertEqual(
+            result["writable"]["device_tree_rule"],
+            "writable when DeviceTree flag bit 0 is clear",
+        )
+        self.assertEqual(result["dart_skip"]["device_tree_bit"], 1)
+
+        # Losing the inversion would report every read-only segment as
+        # writable, which is exactly what gates the patchbay write-back.
+        bad = dict(functions)
+        bad[recover_t6050_power.RTBUDDY_GET_SEGMENT_MAP] = (
+            seg_map,
+            map_code.replace(
+                struct.pack("<I", 0x521F0365), struct.pack("<I", 0xD503201F), 1
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "flag translation"):
+            recover_t6050_power.recover_rtbuddy_segment_flag_contract(bad, symbols)
+
+        bad = dict(functions)
+        bad[recover_t6050_power.RTBUDDY_SEGMENT_IS_WRITABLE] = (
+            writable,
+            writable_code.replace(
+                struct.pack("<I", 0x53010500), struct.pack("<I", 0x53000400), 1
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "writability predicate"):
+            recover_t6050_power.recover_rtbuddy_segment_flag_contract(bad, symbols)
+
     def test_recovers_rtbuddy_patchbay_write_path(self) -> None:
         get_bay = 0x10000
         copy_data = 0x11000

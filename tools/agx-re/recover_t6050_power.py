@@ -194,6 +194,10 @@ RTBUDDY_FIRMWARE_SEGMENT_FOR_IOP = (
     "__ZN15RTBuddyFirmware23getSegmentForIopVirtualEy"
 )
 RTBUDDY_SEGMENT_IS_WRITABLE = "__ZNK14RTBuddySegment10isWritableEv"
+RTBUDDY_SEGMENT_WITH_PHYSICAL_RANGE = (
+    "__ZN14RTBuddySegment17withPhysicalRangeEyyyyP8OSStringj"
+)
+RTBUDDY_GET_SEGMENT_MAP = "__ZNK7RTBuddy13getSegmentMapEv"
 RTBUDDY_PATCHBAY_INIT_WITH_DATA = "__ZN15RTBuddyPatchBay12initWithDataEP6OSDatajb"
 RTBUDDY_PATCHBAY_FIND = "__ZN15RTBuddyPatchBay4findEj"
 RTBUDDY_PATCHBAY_WITH_DATA = "__ZN15RTBuddyPatchBay8withDataEP6OSDatajb"
@@ -2866,6 +2870,76 @@ def recover_t6050_pmp_patchbay(
     }
 
 
+def recover_rtbuddy_segment_flag_contract(
+    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+) -> dict[str, object]:
+    """Recover what a DeviceTree `segment-ranges` flag word means.
+
+    The same word feeds two different consumers, and they read different bits.
+    `AppleA7IOP::_dartMapiBootFirmware` skips a record whose bit 1 is set,
+    while `RTBuddy::getSegmentMap` translates the word before storing it, so
+    writability is bit 0 inverted rather than any bit read directly.
+    """
+
+    required = (
+        RTBUDDY_GET_SEGMENT_MAP,
+        RTBUDDY_SEGMENT_WITH_PHYSICAL_RANGE,
+        RTBUDDY_SEGMENT_IS_WRITABLE,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"RTBuddy is missing segment-flag symbols: {missing!r}")
+
+    map_address, map_code = functions[RTBUDDY_GET_SEGMENT_MAP]
+    if symbols[RTBUDDY_SEGMENT_WITH_PHYSICAL_RANGE] not in direct_branch_targets(
+        map_address, map_code
+    ):
+        raise ValueError("RTBuddy segment map no longer builds physical ranges")
+    if not _has_ordered_words(
+        map_code,
+        (
+            0x29412356,  # ldp w22, w8, [x26, #8] -- size and DeviceTree flags
+            0x53020909,  # ubfx w9, w8, #2, #1 -- flag bit 2 becomes bit 0
+            0x331F0109,  # bfi w9, w8, #1, #1 -- flag bit 0 becomes bit 1
+            0x53017D08,  # lsr w8, w8, #1
+            0x121E0508,  # and w8, w8, #0xc -- flag bits 3 and 4 become 2 and 3
+            0x2A08013B,  # orr w27, w9, w8
+            0x521F0365,  # eor w5, w27, #2 -- bit 1 is inverted
+        ),
+    ):
+        raise ValueError("RTBuddy segment flag translation changed")
+
+    _writable_address, writable_code = functions[RTBUDDY_SEGMENT_IS_WRITABLE]
+    if writable_code != struct.pack(
+        "<4I", 0xD503245F, 0x39410008, 0x53010500, 0xD65F03C0
+    ):
+        raise ValueError("RTBuddySegment writability predicate changed")
+
+    return {
+        "device_tree_flags_offset": 0x1C,
+        "translation": {
+            "segment_bit_0": "DeviceTree bit 2",
+            "segment_bit_1": "DeviceTree bit 0, inverted",
+            "segment_bit_2": "DeviceTree bit 3",
+            "segment_bit_3": "DeviceTree bit 4",
+            "object_offset": 0x40,
+        },
+        "writable": {
+            "predicate": RTBUDDY_SEGMENT_IS_WRITABLE,
+            "segment_bit": 1,
+            "device_tree_rule": "writable when DeviceTree flag bit 0 is clear",
+        },
+        "dart_skip": {
+            "device_tree_bit": 1,
+            "meaning": "iBoot already installed this mapping; do not insert it",
+        },
+        "scope": (
+            "bit 0 is read-only and bit 1 is iBoot-installed; they are distinct "
+            "and a record commonly sets one without the other"
+        ),
+    }
+
+
 def recover_rtbuddy_patchbay_write_contract(
     functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
 ) -> dict[str, object]:
@@ -3534,6 +3608,8 @@ def recover_apple_pmp_firmware(
         RTBUDDY_FIRMWARE_PATCH_U32,
         RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
         RTBUDDY_MEMCPY_TO32,
+        RTBUDDY_GET_SEGMENT_MAP,
+        RTBUDDY_SEGMENT_IS_WRITABLE,
     )
     rtbuddy_functions = {
         name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
@@ -3588,6 +3664,9 @@ def recover_apple_pmp_firmware(
             pmp_vtable_targets,
             service_vtable_targets,
             firmware_vtable_targets,
+        ),
+        "segment_flags": recover_rtbuddy_segment_flag_contract(
+            rtbuddy_functions, rtbuddy_symbols
         ),
         "patchbay_write": recover_rtbuddy_patchbay_write_contract(
             rtbuddy_functions, rtbuddy_symbols

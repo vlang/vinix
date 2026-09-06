@@ -133,6 +133,14 @@ pub fn (segment &T6050PmpSegment) requires_mapper_insert() bool {
 	return !segment.is_iboot_owned_mapping()
 }
 
+// RTBuddy::getSegmentMap inverts DeviceTree flag bit 0 into RTBuddySegment's
+// writable bit, so bit 0 set means read-only. This is a different bit from the
+// iBoot-owned bit above and the two move independently: on T6050 __TEXT is
+// `0x3` (iBoot-owned, read-only) and __DATA is `0x6` (iBoot-owned, writable).
+pub fn (segment &T6050PmpSegment) is_writable() bool {
+	return segment.flags & 1 == 0
+}
+
 // iBoot supplies these two virtually contiguous firmware mappings on every
 // active die. Keeping their address domains explicit prevents an IOP virtual
 // address from being used as an AP physical address during later attachment.
@@ -142,6 +150,45 @@ pub:
 	region_base u64
 	region_size u64
 	segments    [2]T6050PmpSegment
+}
+
+// Where an address inside the preloaded image actually lives in memory.
+pub struct T6050PmpImageAddress {
+pub:
+	physical u64
+	writable bool
+}
+
+// Map an IOP virtual address inside the preloaded image to the physical
+// address iBoot placed it at. Each segment carries its own physical base, so
+// this never assumes the image is laid out contiguously, and the result is
+// rejected unless the whole span stays inside both the segment and the
+// declared region. This is the bridge from a located patchbay -- whose offsets
+// are IOP virtual -- to memory Vinix could actually map.
+pub fn (preload &T6050PmpPreload) resolve_iop_virtual(iop_virtual u64,
+	size u32) ?T6050PmpImageAddress {
+	if size == 0 {
+		return none
+	}
+	for segment in preload.segments {
+		if segment.size == 0 || iop_virtual < segment.iova {
+			continue
+		}
+		offset := iop_virtual - segment.iova
+		if offset >= u64(segment.size) || offset + u64(size) > u64(segment.size) {
+			continue
+		}
+		physical := segment.physical + offset
+		if physical < preload.region_base
+			|| physical + u64(size) > preload.region_base + preload.region_size {
+			return none
+		}
+		return T6050PmpImageAddress{
+			physical: physical
+			writable: segment.is_writable()
+		}
+	}
+	return none
 }
 
 enum T6050PowerPhase {
@@ -1184,6 +1231,66 @@ fn validate_t6050_patchbay_input_codec() bool {
 		&& derive_t6050_patchbay_value(0x3e, .pmc_pmgr_bit0) == 0
 }
 
+fn validate_t6050_preload_address_codec() bool {
+	// The recovered Mac17,6 layout: one region holding a read-only __TEXT and
+	// a writable __DATA, each with its own physical base.
+	preload := T6050PmpPreload{
+		die: 0
+		region_base: t6050_pmp_region_base
+		region_size: t6050_pmp_region_size
+		segments: [
+			T6050PmpSegment{
+				physical: t6050_pmp_region_base
+				iova: t6050_pmp_text_iova
+				remap: t6050_pmp_region_base
+				size: t6050_pmp_text_size
+				flags: t6050_pmp_text_flags
+			},
+			T6050PmpSegment{
+				physical: t6050_pmp_region_base + u64(t6050_pmp_text_size)
+				iova: t6050_pmp_data_iova
+				remap: t6050_pmp_region_base + u64(t6050_pmp_text_size)
+				size: t6050_pmp_data_size
+				flags: t6050_pmp_data_flags
+			},
+		]!
+	}
+	if preload.segments[0].is_writable() || !preload.segments[1].is_writable() {
+		return false
+	}
+	if !preload.segments[0].is_iboot_owned_mapping()
+		|| !preload.segments[1].is_iboot_owned_mapping() {
+		return false
+	}
+	// The identity block sits in read-only __TEXT; the patchbay it points at
+	// sits in writable __DATA, which is what makes a write-back legal at all.
+	identity := preload.resolve_iop_virtual(t6050_pmp_text_iova + 0x204,
+		rtk_id_block_size) or { return false }
+	if identity.physical != t6050_pmp_region_base + 0x204 || identity.writable {
+		return false
+	}
+	patchbay := preload.resolve_iop_virtual(0x107e570, 0x2f8) or { return false }
+	if patchbay.physical != t6050_pmp_region_base + 0x7e570 || !patchbay.writable {
+		return false
+	}
+	// A span that leaves its segment, an address in neither segment, and a
+	// zero length must all be refused rather than clamped.
+	if _ := preload.resolve_iop_virtual(t6050_pmp_text_iova + u64(t6050_pmp_text_size) - 4,
+		8) {
+		return false
+	}
+	if _ := preload.resolve_iop_virtual(t6050_pmp_text_iova - 4, 4) {
+		return false
+	}
+	if _ := preload.resolve_iop_virtual(t6050_pmp_data_iova + u64(t6050_pmp_data_size), 4) {
+		return false
+	}
+	if _ := preload.resolve_iop_virtual(t6050_pmp_text_iova, 0) {
+		return false
+	}
+	return true
+}
+
 fn validate_t6050_firmware_ownership_codec() bool {
 	// Mac17,6 publishes segment-ranges and pre-loaded but neither running nor
 	// no-firmware-service, so RTBuddy waits for ApplePMPFirmware and the image
@@ -1732,6 +1839,7 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !validate_t6050_firmware_ownership_codec()
 		|| !validate_t6050_patchbay_codec()
 		|| !validate_t6050_patchbay_input_codec()
+		|| !validate_t6050_preload_address_codec()
 		|| !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false

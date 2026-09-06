@@ -286,6 +286,10 @@ def parse_pmp(node: dict[str, Any]) -> dict[str, Any]:
         segment["mapping_owner"] = (
             "apple-driver" if not flags & 0x2 else "iboot-preinstalled"
         )
+        # RTBuddy::getSegmentMap inverts flag bit 0 into RTBuddySegment's
+        # writable bit, so bit 0 set means read-only. This is a different bit
+        # from the mapping-owner bit above and they move independently.
+        segment["writable"] = not bool(flags & 0x1)
     return result
 
 
@@ -572,6 +576,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                         "flags": 3,
                         "apple_driver_mapper_insert": False,
                         "mapping_owner": "iboot-preinstalled",
+                        "writable": False,
                     },
                     {
                         "name": "__DATA",
@@ -582,10 +587,21 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                         "flags": 6,
                         "apple_driver_mapper_insert": False,
                         "mapping_owner": "iboot-preinstalled",
+                        "writable": True,
                     },
                 ]
                 if item.get("segments") != expected_segments:
                     warnings.append(f"t6050 {role} iBoot firmware map changed")
+        for role in manifest.get("pmp_roles", []):
+            for segment in role.get("segments", []):
+                # A patchbay lands in __DATA and cannot be written back unless
+                # that segment is writable, while __TEXT must not be.
+                expected = segment["name"] == "__DATA"
+                if segment["writable"] != expected:
+                    warnings.append(
+                        f"{role.get('role')} {segment['name']} writability "
+                        f"changed: {segment['writable']}"
+                    )
         if "pmp_endpoint_services" in manifest:
             endpoint_services = manifest["pmp_endpoint_services"]
             if not isinstance(endpoint_services, list) or len(endpoint_services) != len(
