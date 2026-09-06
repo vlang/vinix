@@ -12,53 +12,53 @@ mut:
 	handle(event_id string) !
 }
 
-fn C.vd_bl_percent_to_nits(state &C.VdBlState, percent int) int
-
 __global (
-	fixture_state C.VdBlState
-	fixture_result int
-	fixture_write_result int
-	fixture_writes int
-	fixture_percent int
+	fixture_state        BacklightState
+	fixture_result       BacklightResult
+	fixture_write_result BacklightResult
+	fixture_writes       int
+	fixture_percent      int
 )
 
-fn fixture_read(out &C.VdBlState) int {
-	if fixture_result == 0 {
-		unsafe { *out = fixture_state }
+fn fixture_read(mut out BacklightState) BacklightResult {
+	if fixture_result == .ok {
+		out = fixture_state
 	}
 	return fixture_result
 }
 
-fn fixture_write(percent int) int {
+fn fixture_write(percent int) BacklightResult {
 	fixture_writes++
 	fixture_percent = percent
-	if fixture_write_result == 0 {
-		fixture_state.requested_nits = C.vd_bl_percent_to_nits(&fixture_state, percent)
-		fixture_state.pending = 1
+	if fixture_write_result == .ok {
+		fixture_state.requested_nits = backlight_percent_to_nits(&fixture_state, percent) or { panic('percent') }
+		fixture_state.pending = true
 	}
 	return fixture_write_result
 }
 
 fn fixture_app() &SettingsApp {
-	fixture_state = C.VdBlState{
+	fixture_state = BacklightState{
 		requested_nits: 100
 		actual_nits: 99
 		min_nits: 2
 		max_nits: 400
-		online: 1
-		writable: 1
+		online: true
+		writable: true
 	}
-	fixture_result = 0
-	fixture_write_result = 0
+	fixture_result = .ok
+	fixture_write_result = .ok
 	fixture_writes = 0
 	fixture_percent = -1
-	mut app := &SettingsApp{read_state: fixture_read, write_percent: fixture_write}
+	mut app := &SettingsApp{ read_state: fixture_read, write_percent: fixture_write }
 	app.refresh()
 	return app
 }
 
 fn element_named(root ui2.Element, id string) ?ui2.Element {
-	if root.id == id { return root }
+	if root.id == id {
+		return root
+	}
 	for child in root.children {
 		found := element_named(child, id) or { continue }
 		return found
@@ -77,7 +77,7 @@ fn test_settings_display_controls_and_explicit_writes() {
 	app.handle('settings.brightness.75') or { panic(err) }
 	assert fixture_writes == 1 && fixture_percent == 75
 	assert app.state.requested_nits == 301 && app.state.actual_nits == 99
-	assert app.state.pending == 1
+	assert app.state.pending
 	assert app.status_text().contains('pending')
 	app.handle('settings.brightness.invalid') or { panic(err) }
 	assert fixture_writes == 1
@@ -87,9 +87,15 @@ fn test_settings_missing_offline_readonly_and_stale_hits() {
 	for failure in 0 .. 3 {
 		mut app := fixture_app()
 		match failure {
-			0 { fixture_result = settings_bl_unavailable }
-			1 { fixture_state.online = 0 }
-			else { fixture_state.writable = 0 }
+			0 {
+				fixture_result = BacklightResult.unavailable
+			}
+			1 {
+				fixture_state.online = false
+			}
+			else {
+				fixture_state.writable = false
+			}
 		}
 		// Simulate an enabled target from the frame before device loss.
 		app.handle('settings.brightness.50') or { panic(err) }
@@ -113,13 +119,13 @@ fn test_settings_unknown_readback_and_write_errors() {
 	assert app.level_text == 'Unknown'
 	app.handle('settings.increase') or { panic(err) }
 	assert fixture_writes == 0
-	fixture_write_result = 5
+	fixture_write_result = .io
 	app.handle('settings.brightness.50') or { panic(err) }
 	assert fixture_writes == 1
 	assert app.state.requested_nits == -1 && app.state.actual_nits == -1
 	assert app.status_text().contains('failed')
 	app.handle('settings.refresh') or { panic(err) }
-	assert app.write_result == 0 && fixture_writes == 1
+	assert app.write_result == .ok && fixture_writes == 1
 }
 
 fn test_settings_steps_clamp_and_narrow_layout() {

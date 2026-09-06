@@ -33,33 +33,33 @@ positive short write is an error and its suffix is never retried as a command.
 
 ## Implementation and tests
 
-`settings.v` implements the existing `HostedApp` interface; `app.v` registers the
-launcher. `backlight_client.h` is the header-only POSIX bridge, staged by the
-existing `stage_app.py` and desktop build without additional build rules.
-Dynamic labels are cached and replaced only when readback changes. The renderer
-receives explicit `enabled=false` on disabled controls, and event handling also
-checks availability independently of the last drawn frame.
+`settings.v` implements `HostedApp`; `app.v` registers the launcher.
+`backlight_client.v` owns parsing, native `BacklightState`/`BacklightResult`,
+percentage calculations and bounded command I/O. `device_io.v` is the V
+interface used by both the production POSIX backend (`platform.c.v`) and
+V test doubles. There are no handwritten C client or test files.
 
-Run from the repository root:
+Dynamic labels are cached and replaced only when readback changes. Disabled
+controls use `enabled=false`; event handling independently rechecks availability.
 
 ```sh
-sh tools/apple-backlight/test.sh
-sh desktop/tools/test-settings.sh
-CC=clang CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
-    sh desktop/tools/test-settings.sh
-# V UI tests additionally require V and the desktop's existing ui2 checkout:
-REQUIRE_V_TESTS=1 V=/path/to/v sh desktop/tools/test-settings.sh
+V=/path/to/v sh tools/apple-backlight/test.sh
+V=/path/to/v sh desktop/tools/test-settings.sh
+# Without ui2, explicitly select only the client and POSIX tests:
+CLIENTS_ONLY=1 V=/path/to/v sh desktop/tools/test-settings.sh
 ```
 
-The C tests substitute POSIX operations, never access a real display, and include
-an ABI round-trip with the actual kernel backlight core. The V tests inject a
-fake device and exercise Display controls, explicit writes, stale hit targets,
-missing/offline/read-only states, unknown readback, write errors and layout
-bounds. The runner reports V tests as **SKIP**, or fails with `REQUIRE_V_TESTS=1`,
-when their dependencies are absent; C test success is not a full desktop build.
+The runner requires V and, for UI tests, `third_party/ui2`; it does not silently
+skip missing dependencies. `VFLAGS` can select a compiler/backend or sanitizers.
+The tests cover strict snapshots, arithmetic limits, permissions, offline and
+missing devices, short writes, bounded interruptions, exact descriptor cleanup,
+and a round-trip with the actual **V kernel backlight core**. Settings tests
+cover explicit writes, stale hit targets, unknown readback, failed writes,
+category switching, refresh and narrow layouts. The POSIX tests exercise real
+files, shared mapping, directories, `/dev/null`, monotonic clocks and a PTY,
+including restoration of both terminal attributes and descriptor flags.
 
-Manual checks after building the desktop: open Settings in QEMU (disabled
-brightness, no crash); maximise/restore it; open two Settings windows; test
-read-only/offline/error states using a driver fixture. Physical changes and
-firmware completion/readback must be tested on an M1 Air after backend
-integration. Neither the UI nor the driver has been hardware-validated here.
+Host tests and a complete native desktop build have been run. The ARM64 kernel
+also passes V-to-C generation; a linked boot image and real M1 display behavior
+still require validation. The DCP transport/backend is still missing: the port
+to V does not make physical brightness adjustment operational.

@@ -7,8 +7,6 @@
 // through.
 module main
 
-fn C.vd_sleep_ms(milliseconds i64)
-
 // What the loop asks to wait between frames. Vinix wakes a sleeping thread on
 // the scheduler's timeslice, so the shortest sleep that actually happens is
 // around twice this and never less than about 12 ms; 10 settles at roughly 35
@@ -63,7 +61,7 @@ fn parse_options(args []string) Options {
 }
 
 fn sleep_ms(ms i64) {
-	C.vd_sleep_ms(ms)
+	desktop_sleep_ms(ms)
 }
 
 fn sleep_to_next_frame(frame_started i64, interval i64) {
@@ -72,8 +70,6 @@ fn sleep_to_next_frame(frame_started i64, interval i64) {
 		sleep_ms(interval - elapsed)
 	}
 }
-
-
 
 fn main() {
 	options := parse_options(arguments()[1..])
@@ -145,8 +141,7 @@ fn main() {
 		sleep_to_next_frame(frame_started, options.frame_interval)
 
 		if options.stats {
-			stats.add(after_input - frame_started, after_build - after_input, after_render - after_build,
-				after_present - after_render, monotonic_millis() - after_present)
+			stats.add(after_input - frame_started, after_build - after_input, after_render - after_build, after_present - after_render, monotonic_millis() - after_present)
 			stats.report_every(200, monotonic_millis())
 		}
 	}

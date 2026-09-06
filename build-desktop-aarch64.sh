@@ -83,7 +83,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
 echo "==> Translating V to C..."
-"$V" -os linux -gc none -prod \
+"$V" -os linux -gc none -enable-globals -prod \
     -d ui2_headless \
     -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
@@ -140,7 +140,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop"
 # The desktop's own source travels with the image, so the file browser has
 # something real to show and so the machine carries the code it is running.
 mkdir -p "$STAGING/root/desktop"
-cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.h "$SCRIPT_DIR/desktop/README.md" \
+cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop/README.md" \
     "$STAGING/root/desktop/"
 
 # BusyBox comes along so init has a shell to fall back to when the desktop

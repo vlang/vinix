@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+v=${V:-v}
+command -v "$v" >/dev/null 2>&1 || { echo 'ERROR: V is required.' >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-cc=${CC:-cc}
-# shellcheck disable=SC2086
-"$cc" -std=c99 -Wall -Wextra -Werror -Wconversion -pedantic ${CFLAGS:--O2} \
-    -I"$root/desktop" -I"$root/kernel/c" \
-    "$root/desktop/tools/tests/test_battery_client.c" \
-    "$root/kernel/c/apple_smc.c" -o "$work/test-battery"
-"$work/test-battery"
+for name in device_io.v platform.c.v backlight_client.v battery_client.v; do
+    cp "$root/desktop/$name" "$work/"
+done
+cp "$root/desktop/tools/tests/device_io_mock.v" "$root/desktop/tools/tests/battery_client_test.v" "$work/"
+"$v" -gc none -enable-globals -stats "$work/battery_client_test.v"

@@ -1,14 +1,10 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-License-Identifier: GPL-2.0-or-later
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+v=${V:-v}
+command -v "$v" >/dev/null 2>&1 || { echo 'ERROR: V is required.' >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-cc=${CC:-cc}
-# Intentional word splitting allows standard space-separated CFLAGS.
-# shellcheck disable=SC2086
-"$cc" -std=c99 -Wall -Wextra -Werror -Wconversion -pedantic \
-    ${CFLAGS:--O2} -I"$root/kernel/c" \
-    "$root/kernel/c/apple_dcp_backlight.c" \
-    "$root/tools/apple-backlight/test_backlight.c" -o "$work/test"
-"$work/test"
+cp "$root/kernel/modules/gpu/dcp/backlight/core/core.v" "$root/tools/apple-backlight/core_test.v" "$work/"
+"$v" -gc none -stats "$work/core_test.v"

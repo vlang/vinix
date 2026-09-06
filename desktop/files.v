@@ -9,14 +9,6 @@ module main
 
 import ui2
 
-fn C.vd_opendir(path &char) voidptr
-
-fn C.vd_readdir(dir voidptr, name &char, name_size u64, is_dir &int) int
-
-fn C.vd_closedir(dir voidptr)
-
-fn C.vd_stat(path &char, size &u64, is_dir &int) int
-
 // Longer than any name the kernel's Dirent can hold, so a listing never
 // truncates one.
 const max_name_len = 256
@@ -36,10 +28,10 @@ struct FileEntry {
 // list has been scrolled.
 struct FileBrowser {
 mut:
-	path      string = '/'
-	entries   []FileEntry
-	scroll    int
-	error     string
+	path    string = '/'
+	entries []FileEntry
+	scroll  int
+	error   string
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
 	// hover state because rows are the application's, not the chrome's.
 	hover_row int = -1
@@ -67,7 +59,7 @@ fn parent_path(path string) string {
 // open leaves the browser where it was and says so, rather than emptying the
 // window and looking like the directory is empty.
 fn (mut b FileBrowser) read(path string) {
-	dir := C.vd_opendir(&char(path.str))
+	dir := desktop_opendir(path)
 	if dir == unsafe { nil } {
 		b.error = 'cannot open ${path}'
 		return
@@ -75,9 +67,9 @@ fn (mut b FileBrowser) read(path string) {
 
 	mut entries := []FileEntry{}
 	mut buffer := [max_name_len]u8{}
-	mut is_dir := 0
+	mut names := unsafe { (&buffer[0]).vbytes(buffer.len) }
 	for entries.len < max_entries {
-		if C.vd_readdir(dir, &char(&buffer[0]), u64(max_name_len), &is_dir) == 0 {
+		if !desktop_readdir(dir, mut names) {
 			break
 		}
 		name := unsafe { cstring_to_vstring(&char(&buffer[0])) }
@@ -86,20 +78,20 @@ fn (mut b FileBrowser) read(path string) {
 			continue
 		}
 		mut size := u64(0)
-		mut stat_is_dir := is_dir
+		mut is_dir := false
 		full := join_path(path, name)
-		if C.vd_stat(&char(full.str), &size, &stat_is_dir) == 0 {
-			// Unreadable entries are still worth listing; only their size is
-			// unknown, and d_type already said what kind they are.
-			stat_is_dir = is_dir
+		if info := desktop_stat(full) {
+			size = info.size
+			is_dir = info.is_dir
 		}
+		// Unreadable entries remain visible, with unknown type and size.
 		entries << FileEntry{
 			name: name
-			is_dir: stat_is_dir != 0
+			is_dir: is_dir
 			size: size
 		}
 	}
-	C.vd_closedir(dir)
+	desktop_closedir(dir)
 
 	// Directories first, then by name — the order a listing is read in is
 	// whatever the filesystem happens to store, which is no order at all.
@@ -200,8 +192,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 
 	// Header: where we are, and the way back out.
 	up_width := 40
-	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), 8, f64(up_width),
-		22), ui2.BoxStyle{
+	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), 8, f64(up_width), 22), ui2.BoxStyle{
 		bg: if a.browser.path == '/' { files_up_disabled } else { files_up }
 		radius: 5
 	}, ui2.TextStyle{
@@ -209,8 +200,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		size: 12
 		align: .center
 	})
-	children << ui2.label('', a.browser.path, ui2.rect(f64(files_padding + up_width + 10),
-		8, f64(inner - up_width - 10), 22), ui2.TextStyle{
+	children << ui2.label('', a.browser.path, ui2.rect(f64(files_padding + up_width + 10), 8, f64(inner - up_width - 10), 22), ui2.TextStyle{
 		color: body_heading
 		size: 13
 		bold: true
@@ -220,8 +210,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}, [])
 
 	if a.browser.error != '' {
-		children << ui2.label('', a.browser.error, ui2.rect(f64(files_padding), f64(list_top + 8),
-			f64(inner), 20), ui2.TextStyle{
+		children << ui2.label('', a.browser.error, ui2.rect(f64(files_padding), f64(list_top + 8), f64(inner), 20), ui2.TextStyle{
 			color: files_error
 			size: 13
 		})
@@ -229,8 +218,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	if a.browser.entries.len == 0 {
-		children << ui2.label('', 'This directory is empty.', ui2.rect(f64(files_padding),
-			f64(list_top + 8), f64(inner), 20), ui2.TextStyle{
+		children << ui2.label('', 'This directory is empty.', ui2.rect(f64(files_padding), f64(list_top + 8), f64(inner), 20), ui2.TextStyle{
 			color: body_muted
 			size: 13
 		})
@@ -243,24 +231,24 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		entry := a.browser.entries[index]
 		y := list_top + row * files_row_height
 		hovered := a.browser.hover_row == index
-		children << ui2.clickable_view('${files_action_row}${index}', ui2.rect(0, f64(y),
-			f64(width), f64(files_row_height)), ui2.BoxStyle{
+		children << ui2.clickable_view('${files_action_row}${index}', ui2.rect(0, f64(y), f64(width), f64(files_row_height)), ui2.BoxStyle{
 			bg: files_row_hover
 			transparent: !hovered
 		}, [
-			ui2.button_with_image('', '', if entry.is_dir { 'builtin:folder' } else { 'builtin:file' },
-				ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
+			ui2.button_with_image('', '', if entry.is_dir {
+				'builtin:folder'
+			} else {
+				'builtin:file'
+			}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
 				transparent: true
 			}, ui2.TextStyle{
 				color: if entry.is_dir { files_folder_icon } else { files_file_icon }
 			}),
-			ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(inner - 24 - 72),
-				f64(files_row_height)), ui2.TextStyle{
+			ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(inner - 24 - 72), f64(files_row_height)), ui2.TextStyle{
 				color: if entry.is_dir { body_heading } else { body_text }
 				size: 13
 			}),
-			ui2.label('', if entry.is_dir { '' } else { human_size(entry.size) }, ui2.rect(f64(width - files_padding - 70),
-				0, 70, f64(files_row_height)), ui2.TextStyle{
+			ui2.label('', if entry.is_dir { '' } else { human_size(entry.size) }, ui2.rect(f64(width - files_padding - 70), 0, 70, f64(files_row_height)), ui2.TextStyle{
 				color: body_muted
 				size: 11
 				align: .right
@@ -274,8 +262,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	if a.browser.entries.len > a.visible_rows {
 		button_size := 18
 		right := width - files_padding - button_size
-		children << ui2.button(files_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4),
-			8, f64(button_size), 22), ui2.BoxStyle{
+		children << ui2.button(files_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4), 8, f64(button_size), 22), ui2.BoxStyle{
 			bg: files_up
 			radius: 5
 		}, ui2.TextStyle{
@@ -283,8 +270,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			size: 12
 			align: .center
 		})
-		children << ui2.button(files_action_scroll_down, '+', ui2.rect(f64(right), 8,
-			f64(button_size), 22), ui2.BoxStyle{
+		children << ui2.button(files_action_scroll_down, '+', ui2.rect(f64(right), 8, f64(button_size), 22), ui2.BoxStyle{
 			bg: files_up
 			radius: 5
 		}, ui2.TextStyle{

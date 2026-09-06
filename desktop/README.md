@@ -32,6 +32,9 @@ Keys: `Esc` or `q` leaves the desktop, `n` opens a window, `c` a calculator.
     window.v       the Window model and the pages windows show
     app.v          hosting applications in windows, and which ones there are
     files.v        the file browser
+    settings.v     Display and Battery settings
+    backlight_client.v / battery_client.v  native V device clients
+    platform.c.v   V POSIX bindings, terminal state, mmap, clocks and directories
     render.v       a ui2 backend that draws an element tree into a framebuffer
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
     font.v         text, from the coverage atlases in font_data.v
@@ -204,3 +207,19 @@ which reports the pointer's position, button levels, the press and release
 edges since the last read, and any wheel movement. It never blocks: a
 compositor redraws from the latest position anyway, and a queue it drained too
 slowly would only make the cursor lag the hardware.
+
+## Native V platform and device code
+
+All handwritten desktop implementations and tests are V. `platform.c.v` is
+V source using libc declarations and the target headers for constants and
+ABI types; it contains no embedded C implementations. It replaces `shim.h`,
+which previously wrapped framebuffer mapping, descriptors, raw terminal mode,
+clocks and directory iteration. `backlight_client.v` and `battery_client.v`
+replace the other two header-only implementations. Device parsers, percentage
+conversion, retry policies, state and mocks are ordinary V.
+
+Run `V=/path/to/v sh desktop/tools/test-settings.sh` with the existing
+`third_party/ui2` checkout. All client, POSIX and UI tests run; missing V/ui2
+is an error, not a silent C-only success. `CLIENTS_ONLY=1` explicitly selects
+the portable client/POSIX suite without ui2. See `SETTINGS.md`, `BATTERY.md` and
+`../tools/apple-backlight/README.md` for behavior and hardware limitations.

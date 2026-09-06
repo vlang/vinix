@@ -225,7 +225,7 @@ fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	mut sample := this.snapshots[key] or {
 		percent := this.sample
 		if percent < 0 {
-			errno.set(if percent == -4 { errno.enodev } else { errno.eio })
+			errno.set(u64(if percent == -4 { errno.enodev } else { errno.eio }))
 			return none
 		}
 		if C.vinix_smc_counter() - this.sampled_at >= 2 * this.frequency {

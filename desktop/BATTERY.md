@@ -35,23 +35,22 @@ See `../docs/m1-battery.md` for the kernel ABI and limitations.
 
 ## Tests and validation boundary
 
+`battery_client.v` implements the bounded reader and shared cache in V;
+`platform.c.v` supplies the POSIX bindings. No custom C header is involved.
+
 ```sh
-./desktop/tools/test-battery.sh
-CC=clang CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
-    ./desktop/tools/test-battery.sh
-./desktop/tools/test-settings.sh
+V=/path/to/v sh desktop/tools/test-battery.sh
+V=/path/to/v sh desktop/tools/test-settings.sh
 ```
 
-The nine C client test groups pass with strict warnings and ASan/UBSan. They
-cover all 101 percentages round-tripped through the real kernel formatter,
-malformed/oversized input, partial reads, reopen behavior, permissions, I/O,
-bounded EINTR handling, descriptor cleanup, shared polling, failures, clock
-rollback and recovery. A POSIX-header smoke build also passes.
+Native V client tests cover every percentage and short-read chunk size, strict
+malformed/oversized input, read-only opens, reopen behavior, permissions, I/O,
+bounded EINTR handling, descriptor cleanup, cache throttling, forced refresh,
+clock rollback/failure and recovery. The tests use a native V `DeviceIO` mock.
+They validate golden text ABI samples; unlike the removed C test, they do not
+link the unrelated C SMC implementation. Its own driver tests remain separate.
 
-The Settings runner retains its Display tests and adds injectable Battery UI
-tests for category switching, refresh, no hidden brightness writes, 0/100 and
-unavailable states, narrow layouts and taskbar label formatting. These V tests
-were supplied but NOT run here: V and ui2 are unavailable in this environment.
-The complete desktop/kernel build and M1 rendering/hardware validation remain
-outstanding. To make a missing V test dependency fatal, run with
-`REQUIRE_V_TESTS=1` after staging `third_party/ui2` through the normal build.
+Settings tests also cover Battery/Display switching, no hidden brightness
+writes, 0/100/unavailable states, narrow layouts and taskbar text. These tests
+and the complete native desktop build pass. Hardware rendering, the linked
+Vinix image and M1 battery behavior have not been tested by this port.

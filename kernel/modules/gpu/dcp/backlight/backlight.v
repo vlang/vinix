@@ -10,18 +10,7 @@ import katomic
 import errno
 import file
 import event.eventstruct
-import memory
-
-#include "apple_dcp_backlight.h"
-
-fn C.vinix_dcp_bl_state_size() u64
-fn C.vinix_dcp_bl_init(state voidptr, layout u32, maximum u32, scale u32, initial u32, known int) int
-fn C.vinix_dcp_bl_set_online(state voidptr, online int) int
-fn C.vinix_dcp_bl_write(state voidptr, text voidptr, length u64) int
-fn C.vinix_dcp_bl_prepare(state voidptr, swap voidptr, length u64, token &u64) int
-fn C.vinix_dcp_bl_complete(state voidptr, token u64, accepted int) int
-fn C.vinix_dcp_bl_publish(state voidptr, raw_nits u32) int
-fn C.vinix_dcp_bl_format(state voidptr, text voidptr, capacity u64) int
+import gpu.dcp.backlight.core
 
 // Wire-layout families. A DCP backend must select one from an explicitly
 // supported firmware version, not from the model name or a >= comparison.
@@ -39,7 +28,7 @@ pub mut:
 	status   int
 	can_mmap bool
 mut:
-	state   voidptr
+	state   core.State
 	context voidptr
 	notify  fn (voidptr) = unsafe { nil }
 }
@@ -67,7 +56,7 @@ fn set_error(code int) {
 //
 // notify must queue nonblocking work to submit a real brightness-only swap
 // even when no compositor is drawing. It is always called WITHOUT this
-// resource's lock. context, the resource and its C storage have boot lifetime.
+// resource's lock. context, the resource and its V state have boot lifetime.
 //
 // Intentionally NOT called by the existing simplified dcp.initialise().
 // Publishing a device there would advertise hardware support that is absent.
@@ -77,26 +66,22 @@ pub fn register_panel(layout Layout, maximum u32, scale u32, initial_raw u32,
 		errno.set(errno.ebusy)
 		return none
 	}
-	storage := memory.malloc(C.vinix_dcp_bl_state_size())
-	if storage == unsafe { nil } {
-		errno.set(errno.enomem)
+	mut state := core.State{}
+	wire_layout := match layout {
+		.v12_3 { core.Layout.v12_3 }
+		.v13_3 { core.Layout.v13_3 }
+	}
+	result := state.initialise(wire_layout, maximum, scale, initial_raw, initial_known)
+	if result != .ok {
+		set_error(int(result))
 		return none
 	}
-	known := if initial_known { 1 } else { 0 }
-	result := C.vinix_dcp_bl_init(storage, u32(layout), maximum, scale, initial_raw, known)
-	if result != 0 {
-		memory.free(storage)
-		set_error(result)
-		return none
-	}
-	result_online := C.vinix_dcp_bl_set_online(storage, 1)
-	if result_online != 0 {
-		memory.free(storage)
-		set_error(result_online)
+	if state.set_online(true) != .ok {
+		errno.set(errno.eio)
 		return none
 	}
 	mut res := &Backlight{
-		state: storage
+		state: state
 		context: context
 		notify: notify
 	}
@@ -113,12 +98,18 @@ pub fn register_panel(layout Layout, maximum u32, scale u32, initial_raw u32,
 // token. The buffer MUST be the real versioned dcp_swap, not IomfbSwapDesc.
 // The caller must make the modified bytes visible to DCP before sending RPC.
 pub fn (mut this Backlight) prepare_swap(swap voidptr, length u64) ?u64 {
-	mut token := u64(0)
+	if swap == unsafe { nil } {
+		errno.set(errno.einval)
+		return none
+	}
+	// The codec only accesses the versioned swap, never following surfaces.
+	n := if length > 0x468 { 0x468 } else { int(length) }
+	mut bytes := unsafe { (&u8(swap)).vbytes(n) }
 	this.l.acquire()
-	result := C.vinix_dcp_bl_prepare(this.state, swap, length, &token)
+	result, token := this.state.prepare(mut bytes)
 	this.l.release()
-	if result < 0 {
-		set_error(result)
+	if int(result) < 0 {
+		set_error(int(result))
 		return none
 	}
 	return token
@@ -130,17 +121,17 @@ pub fn (mut this Backlight) prepare_swap(swap voidptr, length u64) ?u64 {
 // is safe. This function never retries or schedules work from IRQ context.
 pub fn (mut this Backlight) complete_swap(token u64, accepted bool) bool {
 	this.l.acquire()
-	result := C.vinix_dcp_bl_complete(this.state, token, if accepted { 1 } else { 0 })
+	result := this.state.complete(token, accepted)
 	this.l.release()
-	return result == 0
+	return result == .ok
 }
 
 // Call from the real IOMFB property-15 callback, after decoding its payload.
 pub fn (mut this Backlight) publish_nits(raw_nits u32) bool {
 	this.l.acquire()
-	result := C.vinix_dcp_bl_publish(this.state, raw_nits)
+	result := this.state.publish(raw_nits)
 	this.l.release()
-	return result == 0
+	return result == .ok
 }
 
 // Call offline before suspend/reset/fault. On recovery, restore the transport
@@ -148,9 +139,9 @@ pub fn (mut this Backlight) publish_nits(raw_nits u32) bool {
 // Do not allocate a new state on resume: old transaction tokens must stay stale.
 pub fn (mut this Backlight) set_online(online bool) {
 	this.l.acquire()
-	result := C.vinix_dcp_bl_set_online(this.state, if online { 1 } else { 0 })
+	result := this.state.set_online(online)
 	this.l.release()
-	if result == 0 && online {
+	if result == .ok && online {
 		this.notify(this.context)
 	}
 }
@@ -164,19 +155,22 @@ fn (mut this Backlight) read(handle voidptr, buf voidptr, loc u64, count u64) ?i
 		return 0
 	}
 	mut text := [192]u8{}
+	mut bytes := unsafe { (&text[0]).vbytes(text.len) }
 	this.l.acquire()
-	length := C.vinix_dcp_bl_format(this.state, &text[0], u64(text.len))
-	this.l.release()
-	if length < 0 {
-		set_error(length)
+	length := this.state.format(mut bytes) or {
+		this.l.release()
+		errno.set(errno.eio)
 		return none
 	}
+	this.l.release()
 	if loc >= u64(length) {
 		return 0
 	}
 	remaining := u64(length) - loc
 	n := if count < remaining { count } else { remaining }
-	unsafe { C.memcpy(buf, &text[int(loc)], n) }
+	for i in 0 .. int(n) {
+		unsafe { (&u8(buf))[i] = text[int(loc) + i] }
+	}
 	return i64(n)
 }
 
@@ -193,12 +187,15 @@ fn (mut this Backlight) write(handle voidptr, buf voidptr, loc u64, count u64) ?
 	}
 	// Copy once so parsing does not re-read changing user memory while locked.
 	mut text := [16]u8{}
-	unsafe { C.memcpy(&text[0], buf, count) }
+	for i in 0 .. int(count) {
+		text[i] = unsafe { (&u8(buf))[i] }
+	}
+	bytes := unsafe { (&text[0]).vbytes(int(count)) }
 	this.l.acquire()
-	result := C.vinix_dcp_bl_write(this.state, &text[0], count)
+	result := this.state.write(bytes)
 	this.l.release()
-	if result != 0 {
-		set_error(result)
+	if result != .ok {
+		set_error(int(result))
 		return none
 	}
 	this.notify(this.context)

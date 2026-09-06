@@ -1,21 +1,18 @@
 # Apple DCP backlight: experimental, incomplete integration
 
-**This patch does not yet enable brightness adjustment on an M1 MacBook Air.**
+**This implementation does not yet enable brightness adjustment on an M1 MacBook Air.**
 It provides the backlight state machine, calibration, firmware-layout encoding,
 and a Vinix character-device adapter. The current Vinix DCP implementation does
 not provide the real IOMFB shared-memory RPC transport needed to use them.
 The adapter is deliberately **not registered or imported by the existing DCP
-initialiser**, so this patch does not create `/dev/apple-panel-bl` on boot.
+initialiser**, so this implementation does not create `/dev/apple-panel-bl` on boot.
 
-Base inspected: `vlang/vinix` commit
-`cf9d952376ca96af721a182b3604a07742717050` (2026-09-06).
-No existing files, boot defaults, mailbox paths, GPIOs or display settings are
-changed. The kernel makefile discovers C files under `kernel/c`; the V module
-must be imported by a future, working DCP backend before it is used.
+The implementation and tests are now entirely V. The adapter retains the
+existing registration contract and does not alter boot defaults or turn on DCP.
 
 ## What is implemented
 
-`kernel/c/apple_dcp_backlight.{c,h}` is freestanding C99 with no heap allocation,
+`kernel/modules/gpu/dcp/backlight/core/core.v` is native V with no heap allocation,
 MMIO, firmware messaging, or floating point. It provides:
 
 - Asahi's packed calibration-table interpolation for 2–509 nits, further bounded
@@ -41,13 +38,13 @@ outside its state lock, supports offset-aware text reads, and refuses writes
 while offline. The resource and callback context have boot lifetime. Registration
 is boot-time, single-threaded, for one internal panel; it is not hotplug support.
 
-The C component follows the existing Apple SPI driver's C/V split so protocol
-and failure-path tests can run without a bare-metal V kernel or an M1 machine.
+The core is platform-independent and tested directly with V. State is stored
+inline in the resource; there is no opaque C allocation or custom C ABI.
 
 ## What remains before this can change your screen
 
-The following are not implemented by this patch and are prerequisites, not
-optional hardware verification:
+The following prerequisites remain; they are not merely optional hardware
+verification:
 
 1. A real IOMFB transport: shared-memory setup, DMA mappings/cache visibility,
    reversed-fourcc packet headers, command/callback context stacks, dispatch of
@@ -64,10 +61,10 @@ optional hardware verification:
    callbacks. The existing `IomfbSwapDesc` is **not** a wire `dcp_swap` and must
    never be passed to `prepare_swap`.
 4. An ARM64 kernel build and real M1 Air testing of brightness changes, errors,
-   idle updates and resume. The V adapter is not compiled or hardware-tested in
-   the supplied validation results.
+   idle updates and resume. The full ARM64 kernel has passed V-to-C generation with this adapter,
+   but a linked boot image and hardware behavior are not validated here.
 
-Do not enable `vinix.apple_dcp=1` merely to try this patch. It does not repair the
+Do not enable `vinix.apple_dcp=1` merely to try this implementation. It does not repair the
 existing experimental DCP bring-up. There is no new brightness boot flag, no
 PWM/GPIO fallback and no software dimming masquerading as a backlight driver.
 
@@ -78,7 +75,7 @@ selected a verified wire layout, matched the backlight service, and obtained the
 panel maximum and `Brightness_Scale`, it may call:
 
 ```v
-// API implemented in this patch; currently no upstream caller exists.
+// Implemented API; currently no upstream caller exists.
 register_panel(layout, maximum, scale, initial_raw, initial_known,
     context, notify) ?&Backlight
 ```
@@ -111,7 +108,7 @@ writable calibration range and must not be replaced by the requested value.
 Call `set_online(false)` before suspend, reset or fault. It rejects new writes,
 invalidates actual readback and cancels active software tokens while retaining
 the user's desired value. After transport recovery, call `set_online(true)` and
-schedule a new swap. Do not reinitialise the C state on resume, which would reset
+schedule a new swap. Do not reinitialise the V state on resume, which would reset
 the monotonically increasing transaction-token namespace. The layout and scale
 must remain unchanged for this device lifetime; firmware upgrades require a new
 boot/validated attachment rather than silently reusing an old layout.
@@ -119,7 +116,7 @@ boot/validated attachment rather than silently reusing an old layout.
 ## Userspace interface, AFTER backend integration only
 
 The following commands are the intended implemented device ABI, **not commands
-that will work on current Vinix merely by applying this patch**:
+that will work on current Vinix merely by adding this code**:
 
 ```sh
 cat /dev/apple-panel-bl
@@ -152,28 +149,25 @@ Reads snapshot current state per read operation, not per open file descriptor.
 From the repository root, without kernel dependencies:
 
 ```sh
-sh tools/apple-backlight/test.sh
-CC=clang CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
-  sh tools/apple-backlight/test.sh
+V=/path/to/v sh tools/apple-backlight/test.sh
+V=/path/to/v sh desktop/tools/test-settings.sh
 ```
 
-Tests cover all 508 supported integer-nit inputs for monotonicity and alignment;
-golden transition values around 99–103 nits; all single-byte parser suffixes;
-every truncated buffer size for both layouts; preservation of all non-backlight
-bytes; range and initialization failures; coalescing; retries; stale replies;
-recovery; readback separation; and output-capacity bounds.
+`VFLAGS` can choose the compiler, C backend or sanitizers for generated code.
+V is required; missing tools are errors rather than skipped validation.
+`tools/apple-backlight/core_test.v` is staged beside the real core and run by V.
 
-Validation performed for this patch:
+Eight groups cover all 508 supported nit values, golden calibration transitions,
+all single-byte parser suffixes, packed V reference structs and every short-buffer
+length, unchanged non-backlight bytes, atomic initialization, pending requests,
+coalescing, failed transactions, stale/duplicate completions, recovery, unknown
+readback, capacity bounds and token/generation overflow. The desktop tests also
+round-trip commands and snapshots through this actual V core.
 
-| Check | Result |
-| --- | --- |
-| GCC 14.2, C99, strict warnings | Passed: 7 test groups |
-| GCC AddressSanitizer + UndefinedBehaviorSanitizer | Passed |
-| Clang 17 AddressSanitizer + UndefinedBehaviorSanitizer | Passed |
-| Clang static analyzer, C core | No diagnostics |
-| Freestanding AArch64 C compilation, ARMv8.4-A, general registers only | Passed |
-| Full Vinix/V compilation | **Not run; no V compiler in this environment** |
-| Boot / actual M1 display brightness | **Not run; transport integration is absent** |
+Both the Vinix-pinned V 0.4.10 and the V 0.5.2 bootstrap run the core/client
+tests. The current ui2 checkout needs the newer compiler for UI/full desktop
+builds. A complete native desktop build and ARM64 kernel V-to-C generation
+have passed. This is not a linked/booted Vinix kernel or a hardware test.
 
 ## Source provenance
 
@@ -181,7 +175,7 @@ Primary sources inspected on 2026-09-06:
 
 - Vinix `kernel/modules/gpu/dcp/iomfb.v`, blob
   `3e1d3f9d264fccd685d099a1a31ddb13a9011147`, and `dcp.v`, blob
-  `3dc10b5d1f7beb7c45bef237dede8170bb8f719f` at the base commit above.
+  `3dc10b5d1f7beb7c45bef237dede8170bb8f719f` at the original implementation base `cf9d952376ca96af721a182b3604a07742717050`.
 - Asahi Linux `drivers/gpu/drm/apple/dcp_backlight.c`, blob
   `9eb0c7d4eb5345178f802e55dc8e8a3dbdbea8cd`: calibration tables/interpolation.
 - Asahi Linux `drivers/gpu/drm/apple/iomfb_template.h`, blob
@@ -204,6 +198,6 @@ https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/iomfb_templ
 https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/iomfb.h
 ```
 
-The C core and tests are offered under GPL-2.0-only OR MIT, retaining the
+The V core and tests are offered under GPL-2.0-only OR MIT, retaining the
 Asahi contributor notice. The V adapter is GPL-2.0-or-later, consistent with
 Vinix. The MIT option's text is in `LICENSE.MIT` in this directory.

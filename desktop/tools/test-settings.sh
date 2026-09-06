@@ -1,32 +1,35 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-or-later
+# VFLAGS may select the compiler/backend/sanitizers. No C-only fallback.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+v=${V:-v}
+command -v "$v" >/dev/null 2>&1 || { echo 'ERROR: V is required.' >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-cc=${CC:-cc}
-# Intentional word splitting permits standard CFLAGS such as sanitizers.
-# shellcheck disable=SC2086
-"$cc" -std=c99 -Wall -Wextra -Werror -Wconversion -pedantic ${CFLAGS:--O2} \
-    -I"$root/desktop" -I"$root/kernel/c" \
-    "$root/desktop/tools/tests/test_backlight_client.c" \
-    "$root/kernel/c/apple_dcp_backlight.c" -o "$work/test-client"
-"$work/test-client"
-sh "$root/desktop/tools/test-battery.sh"
-
-v=${V:-v}
-if command -v "$v" >/dev/null 2>&1 && [ -f "$root/third_party/ui2/v.mod" ]; then
-    mkdir "$work/ui"
-    cp "$root/desktop/settings.v" "$root/desktop/backlight_client.h" \
-        "$root/desktop/battery.v" "$root/desktop/battery_client.h" \
-        "$root/desktop/theme.v" "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
-    # Keep shared fixtures and both sets of tests in one test translation unit.
-    sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" \
-        >> "$work/ui/settings_test.v"
-    printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
-    "$v" -gc none -enable-globals -d ui2_headless \
-        -path "@vlib|@vmodules|$root/third_party" test "$work/ui"
-else
-    echo 'SKIP: V Settings/Battery UI tests require V and third_party/ui2.'
-    if [ "${REQUIRE_V_TESTS:-0}" = 1 ]; then exit 1; fi
-fi
+mkdir "$work/clients"
+for name in device_io.v platform.c.v backlight_client.v battery_client.v; do
+    cp "$root/desktop/$name" "$work/clients/"
+done
+cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
+for name in backlight_client battery_client platform; do
+    cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
+    # Invoke the test file directly so older vtest runners cannot lose the
+    # shell quoting around a module path containing '|'. V runs its tests.
+    "$v" -gc none -enable-globals -stats \
+        -path "@vlib|@vmodules|$root/kernel/modules" "$work/clients/${name}_test.v"
+done
+if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
+[ -f "$root/third_party/ui2/v.mod" ] || {
+    echo 'ERROR: Settings UI tests require third_party/ui2.' >&2; exit 1;
+}
+mkdir "$work/ui"
+for name in settings.v battery.v theme.v device_io.v platform.c.v backlight_client.v battery_client.v; do
+    cp "$root/desktop/$name" "$work/ui/"
+done
+cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
+# Both sets share fixture_app and element_named in one translation unit.
+sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
+printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
+"$v" -gc none -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$root/third_party" "$work/ui/settings_test.v"

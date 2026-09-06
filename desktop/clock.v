@@ -5,11 +5,9 @@
 // target's time zone database does or does not contain.
 module main
 
-fn C.vd_realtime_seconds(nanoseconds &i64) i64
-
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
-	'Nov', 'Dec']
+const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+	'Dec']
 
 struct CivilTime {
 	year    int
@@ -67,8 +65,7 @@ fn pad2(value int) string {
 // so composing a frame does not open the device again within that interval.
 fn (d &Desktop) clock_strings() (string, string) {
 	percent := read_battery(false)
-	mut nanoseconds := i64(0)
-	seconds := C.vd_realtime_seconds(&nanoseconds)
+	seconds, _ := desktop_realtime()
 	if seconds < 0 {
 		return battery_clock_label(percent, '--:--:--'), ''
 	}
@@ -82,12 +79,11 @@ fn (d &Desktop) clock_strings() (string, string) {
 
 // monotonic_millis drives the frame pacing and the redraw clock.
 fn monotonic_millis() i64 {
-	mut nanoseconds := i64(0)
-	seconds := C.vd_realtime_seconds(&nanoseconds)
-	if seconds < 0 {
+	now := desktop_monotonic_ms()
+	if now == ~u64(0) || now > u64(0x7fffffffffffffff) {
 		return 0
 	}
-	return seconds * 1000 + nanoseconds / 1000000
+	return i64(now)
 }
 
 // update_clock refreshes the taskbar's two lines and reports a change as
