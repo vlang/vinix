@@ -48,6 +48,8 @@ const t6050_pmp_text_flags = u32(3)
 const t6050_pmp_data_iova = u64(0x105e000)
 const t6050_pmp_data_size = u32(0x9a000)
 const t6050_pmp_data_flags = u32(6)
+const t6050_pmp_ready_slot_absent = u32(0xff)
+const t6050_pmp_die_slots = u32(2)
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -134,10 +136,23 @@ pub enum T6050PowerResult {
 	pending
 	completed
 	published_pre_ready
+	not_ready
 	busy
 	transport_error
 	timed_out
 	faulted
+}
+
+// One latched readiness byte per die, mirroring ApplePMGR's per-die ready-byte
+// array. Two independent producers set it and none ever clears it:
+// _pmpReadyActionGated latches from the per-die PMP interrupt and then wakes
+// every command-gate waiter, and _waitForPMPReadyActionGatedv2 latches the same
+// byte itself once the PTD PMP-STATUS entry reads back nonzero. Treating the
+// interrupt as the only source would deadlock a die whose interrupt is absent.
+pub struct T6050PmpReadiness {
+mut:
+	lock  klock.Lock
+	ready [2]bool
 }
 
 // One controller owns both die apertures and admits only one outstanding
@@ -535,6 +550,119 @@ pub fn (mut controller T6050PowerController) poll() T6050PowerResult {
 		return .timed_out
 	}
 	return .pending
+}
+
+// ApplePMGR::_handleInterruptAll decodes the PMP ready interrupt out of a flat
+// interrupt index: the die is index / interrupts-per-die and the position
+// inside that die is the remainder. Only the remainder that equals the
+// configured ready slot closes the handshake.
+pub fn t6050_pmp_ready_die(interrupt_index u32, interrupts_per_die u32) ?u32 {
+	if interrupts_per_die == 0 {
+		return none
+	}
+	return interrupt_index / interrupts_per_die
+}
+
+// A ready slot of 0xff means the die publishes no ready interrupt at all, so
+// no interrupt may ever be treated as its readiness event.
+pub fn t6050_pmp_ready_interrupt(interrupt_index u32, interrupts_per_die u32,
+	ready_slot u32) bool {
+	if interrupts_per_die == 0 || ready_slot == t6050_pmp_ready_slot_absent {
+		return false
+	}
+	return interrupt_index % interrupts_per_die == ready_slot
+}
+
+// Latch one die from its PMP ready interrupt. A die outside the recovered
+// two-die topology is rejected so a decoded interrupt index can never widen
+// the array.
+pub fn (mut readiness T6050PmpReadiness) notify_ready(die u32) bool {
+	if die >= t6050_pmp_die_slots {
+		return false
+	}
+	readiness.lock.acquire()
+	defer {
+		readiness.lock.release()
+	}
+	readiness.ready[die] = true
+	return true
+}
+
+// Latch one die from an observed PMP-STATUS value. A zero status proves
+// nothing, so it neither latches nor clears.
+pub fn (mut readiness T6050PmpReadiness) observe_status(die u32, status u64) bool {
+	if status == 0 {
+		return false
+	}
+	return readiness.notify_ready(die)
+}
+
+pub fn (mut readiness T6050PmpReadiness) is_ready(die u32) bool {
+	if die >= t6050_pmp_die_slots {
+		return false
+	}
+	readiness.lock.acquire()
+	defer {
+		readiness.lock.release()
+	}
+	return readiness.ready[die]
+}
+
+// Apple splits the two publications deliberately. The initial one runs from
+// ApplePMGR::start, inside _initPMPv2, with no readiness observation in the
+// path at all, which is why begin() may legitimately report
+// published_pre_ready. Every later transition instead goes through
+// _enableDeviceGated, which calls _waitForPMPReadyAction before it mutates
+// device state. Keep that precondition explicit rather than letting a dynamic
+// request race a PMP that has not reported in.
+pub fn (mut controller T6050PowerController) begin_dynamic(die u32, enabled bool,
+	mut readiness T6050PmpReadiness) T6050PowerResult {
+	if !readiness.is_ready(die) {
+		return .not_ready
+	}
+	return controller.begin(die, enabled)
+}
+
+fn validate_t6050_readiness_codec() bool {
+	mut readiness := T6050PmpReadiness{}
+	if readiness.is_ready(0) || readiness.notify_ready(t6050_pmp_die_slots)
+		|| readiness.is_ready(t6050_pmp_die_slots) {
+		return false
+	}
+	if readiness.observe_status(0, 0) || readiness.is_ready(0) {
+		return false
+	}
+	if !readiness.observe_status(0, 1) || !readiness.is_ready(0) {
+		return false
+	}
+	if readiness.is_ready(1) || !readiness.notify_ready(1) || !readiness.is_ready(1) {
+		return false
+	}
+	if _ := t6050_pmp_ready_die(4, 0) {
+		return false
+	}
+	die := t6050_pmp_ready_die(9, 4) or { return false }
+	if die != 2 || !t6050_pmp_ready_interrupt(9, 4, 1)
+		|| t6050_pmp_ready_interrupt(9, 4, 2)
+		|| t6050_pmp_ready_interrupt(9, 4, t6050_pmp_ready_slot_absent)
+		|| t6050_pmp_ready_interrupt(9, 0, 1) {
+		return false
+	}
+	// Exercise both dynamic admission outcomes against an unmapped transport so
+	// the dormant path stays in the generated code without touching an
+	// aperture: an unlatched die is refused before any access, and a latched
+	// one still fails the transport bounds check.
+	mut controller := T6050PowerController{
+		transport: T6050PtdTransport{
+			die_bases: [u64(0), 0]!
+		}
+		phase: .idle
+	}
+	mut unlatched := T6050PmpReadiness{}
+	if controller.begin_dynamic(0, true, mut unlatched) != .not_ready {
+		return false
+	}
+	return controller.begin_dynamic(0, true, mut readiness) == .transport_error
 }
 
 fn validate_t6050_ptd_codec() bool {
@@ -943,13 +1071,15 @@ fn validate_t6050_pmp_instance(die u32) ?&devicetree.DTNode {
 }
 
 // Validate only the read-only ownership and transport contract here. Apple's
-// initial synchronization can publish a persistent request before readiness,
-// and Vinix has a serialized nonblocking controller for that transaction. The
-// controller remains dormant until the firmware-side handoff owns its startup
-// order. This function therefore performs no mapping or MMIO access.
+// initial synchronization publishes a persistent request before readiness --
+// ApplePMGR::start runs the whole walk inside _initPMPv2 -- and Vinix has a
+// serialized nonblocking controller plus a per-die readiness latch for that
+// split. The controller remains dormant until the firmware-side handoff owns
+// its startup order. This function therefore performs no mapping or MMIO
+// access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 	if !validate_t6050_ptd_codec() || !validate_t6050_wrapper_codec()
-		|| !dart.validate_t8110_codec() {
+		|| !validate_t6050_readiness_codec() || !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false
 	}

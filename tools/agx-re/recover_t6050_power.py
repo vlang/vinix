@@ -17,6 +17,8 @@ from pathlib import Path
 
 from extract_firmware import der_item
 from recover_g17_abi import (
+    decode_add_immediate,
+    decode_adrp,
     decode_test_bit_branch,
     macho_symbols,
     macho_uuid,
@@ -86,6 +88,15 @@ PMP_CHECK_NOTIFY = "__ZN9ApplePMGR15_checkNotifyPMPEt"
 PMP_WAIT_READY = "__ZN9ApplePMGR22_waitForPMPReadyActionEm"
 PMP_WAIT_READY_V2 = "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej"
 PMP_READY_GATED = "__ZN9ApplePMGR20_pmpReadyActionGatedEj"
+PMP_READY_ACTION_V2 = "__ZN9ApplePMGR17_pmpReadyActionv2Em"
+PMP_NOTIFY_INITIAL_ENTRY = "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv"
+PMGR_START = "__ZN9ApplePMGR5startEP9IOService"
+PMGR_HANDLE_INTERRUPT_ALL = (
+    "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei"
+)
+PMGR_PM_HIBERNATION_STATE = "__ZN9ApplePMGR18pmHibernationStateEv"
+PMGR_CURRENT_DRIVER_STATE = "__ZN9ApplePMGR21getCurrentDriverStateEv"
+PMGR_UPDATE_HIB_DEVICE_STATUS = "__ZN9ApplePMGR21updateHibDeviceStatusEv"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
 PMGR_GET_REG_MAP = "__ZN9ApplePMGR9getRegMapENS_6RegMapEj"
@@ -93,6 +104,8 @@ PMGR_INIT_REG_MAP = "__ZN9ApplePMGR10initRegMapENS_6RegMapEjjb"
 PMGR_WRITE_REG64 = "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj"
 APPLE_T6050_PMGR_VTABLE = "__ZTV14AppleT6050PMGR"
 T6050_INIT_REG_MAPS = "__ZN14AppleT6050PMGR11initRegMapsEv"
+T6050_RESTORE_HW = "__ZN14AppleT6050PMGR9restoreHWEb"
+T6050_UPDATE_HIB_DEVICE_STATUS = "__ZN14AppleT6050PMGR21updateHibDeviceStatusEv"
 PMGR_PMP_V1 = "__ZN9ApplePMGR6_pmpV1Ev"
 PMGR_PMP_V2 = "__ZN9ApplePMGR6_pmpV2Ev"
 PMGR_GET_NUM_DIES = "__ZN9ApplePMGR10getNumDiesEv"
@@ -560,6 +573,35 @@ def direct_branch_targets(function_address: int, code: bytes) -> set[int]:
     return result
 
 
+def pc_relative_targets(function_address: int, code: bytes) -> set[int]:
+    """Return ADRP+ADD materialized addresses from one function body.
+
+    IOCommandGate actions and registered callbacks are never direct branches,
+    so branch scanning alone cannot observe them.  Any instruction that writes
+    a tracked register without being one half of an ADRP/ADD pair drops that
+    register, so a reused page base cannot fabricate a target.
+    """
+    result: set[int] = set()
+    pages: dict[int, int] = {}
+    for offset in range(0, len(code) - 3, 4):
+        word = struct.unpack_from("<I", code, offset)[0]
+        page = decode_adrp(function_address + offset, word)
+        if page is not None:
+            pages[page[0]] = page[1]
+            continue
+        add = decode_add_immediate(word)
+        if add is not None:
+            destination, source, immediate = add
+            if source in pages:
+                pages[destination] = (pages[source] + immediate) & 0xFFFFFFFFFFFFFFFF
+                result.add(pages[destination])
+            else:
+                pages.pop(destination, None)
+            continue
+        pages.pop(word & 0x1F, None)
+    return result
+
+
 def direct_branch_count(function_address: int, code: bytes, target: int) -> int:
     """Count direct AArch64 B/BL instructions to one target."""
     result = 0
@@ -761,6 +803,164 @@ def recover_apple_ptd_code_contract(
     }
 
 
+def recover_pmp_readiness_handshake(
+    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+) -> dict[str, object]:
+    """Recover the order between the initial PMP publication and readiness.
+
+    ApplePMGR publishes the complete initial device status from `start`, while
+    the PMP itself is still unobservable, and closes the readiness handshake
+    later from the per-die PMP interrupt.  Both halves are pinned mechanically
+    so an OS change cannot silently turn the publication into a ready-gated
+    operation, nor turn the interrupt into the only readiness source.
+    """
+
+    start_address, start_code = functions[PMGR_START]
+    if symbols[PMP_INIT_V2] not in direct_branch_targets(start_address, start_code):
+        raise ValueError("ApplePMGR::start no longer runs the PMP v2 init")
+
+    init_address, init_code = functions[PMP_INIT_V2]
+    if symbols[PMP_NOTIFY_INITIAL] not in pc_relative_targets(init_address, init_code):
+        raise ValueError("PMP v2 init no longer schedules the initial status walk")
+    if not _has_ordered_words(
+        init_code,
+        (
+            0xD2815711,  # mov x17, #0xab8 -- _pmpV2() admission
+            0xF94DC260,  # ldr x0, [x19, #0x1b80] -- command gate
+            0xD2803D11,  # mov x17, #0x1e8 -- runAction
+        ),
+    ):
+        raise ValueError("PMP v2 init no longer gates the walk on its command gate")
+
+    entry_address, entry_code = functions[PMP_NOTIFY_INITIAL_ENTRY]
+    if symbols[PMP_NOTIFY_INITIAL] not in pc_relative_targets(
+        entry_address, entry_code
+    ):
+        raise ValueError("public initial-status entry no longer runs its gated action")
+    if not _has_ordered_words(entry_code, (0xF94DC000, 0xD2803D11)):
+        raise ValueError("public initial-status entry no longer uses the command gate")
+
+    initial_address, initial_code = functions[PMP_NOTIFY_INITIAL]
+    if not _has_ordered_words(
+        initial_code,
+        (
+            0x528C6088,  # mov w8, #0x6304 -- die count
+            0x9140F808,  # add x8, x0, #0x3e, lsl #12
+            0x9105F517,  # add x23, x8, #0x17d -- per-die device-type bytes
+            0x528001D8,  # mov w24, #0xe -- base command
+            0x52800039,  # mov w25, #1 -- published state
+            0x39400108,  # ldrb w8, [x8] -- device type
+            0x71003D1F,  # cmp w8, #0xf -- PMP-managed device type
+            0x13001D08,  # sxtb w8, w8 -- signed DeviceData flag byte
+            0x3100051F,  # cmn w8, #1
+            0x1A98C701,  # cinc w1, w24, le -- command 14 or 15
+            0xF10C7F5F,  # cmp x26, #0x31f -- last scanned device ID
+            0x910C82F7,  # add x23, x23, #0x320 -- next die
+        ),
+    ):
+        raise ValueError("initial PMP status walk changed")
+
+    ready_wait_slot = struct.pack("<I", 0xD2815811)  # mov x17, #0xac0
+    for scope, address, code in (
+        ("PMP v2 init", init_address, init_code),
+        ("initial PMP state sync", initial_address, initial_code),
+    ):
+        if ready_wait_slot in code:
+            raise ValueError(f"{scope} unexpectedly gained a PMP readiness wait")
+        targets = direct_branch_targets(address, code)
+        if symbols[PMP_WAIT_READY] in targets or symbols[PMP_READY_GATED] in targets:
+            raise ValueError(f"{scope} unexpectedly gained a PMP readiness dependency")
+        if symbols[APPLE_PTD_READ] in targets:
+            raise ValueError(f"{scope} unexpectedly gained an ApplePTD status read")
+
+    interrupt_address, interrupt_code = functions[PMGR_HANDLE_INTERRUPT_ALL]
+    if symbols[PMP_READY_GATED] not in pc_relative_targets(
+        interrupt_address, interrupt_code
+    ):
+        raise ValueError("PMP readiness is no longer closed from the PMGR interrupt")
+    if not _has_ordered_words(
+        interrupt_code,
+        (
+            0x9140FE68,  # add x8, x19, #0x3f, lsl #12
+            0x91048117,  # add x23, x8, #0x120 -- interrupt configuration block
+            0xD2815711,  # mov x17, #0xab8 -- _pmpV2() admission
+            0x394042E8,  # ldrb w8, [x23, #0x10] -- PMP ready slot
+            0x7103FD1F,  # cmp w8, #0xff -- an absent slot closes nothing
+            0xB94002E8,  # ldr w8, [x23] -- interrupts per die
+            0x1AC80809,  # udiv w9, w0, w8 -- die
+            0x1B088128,  # msub w8, w9, w8, w0 -- slot within the die
+            0x394042E9,  # ldrb w9, [x23, #0x10]
+            0x6B09011F,  # cmp w8, w9 -- only the PMP ready slot closes it
+            0x9141CA68,  # add x8, x19, #0x72, lsl #12
+            0x91208118,  # add x24, x8, #0x820 -- PMP-STATUS range
+            0xD2803D11,  # mov x17, #0x1e8 -- runAction
+        ),
+    ):
+        raise ValueError("PMP readiness interrupt decode changed")
+
+    ready_v2_address, ready_v2_code = functions[PMP_READY_ACTION_V2]
+    if symbols[PMP_READY_GATED] not in pc_relative_targets(
+        ready_v2_address, ready_v2_code
+    ):
+        raise ValueError("per-die PMP ready entry no longer runs its gated action")
+    if not _has_ordered_words(
+        ready_v2_code,
+        (
+            0xAA0103E2,  # mov x2, x1 -- die becomes the gated argument
+            0xF94DC000,  # ldr x0, [x0, #0x1b80] -- command gate
+            0xD2803D11,  # mov x17, #0x1e8 -- runAction
+        ),
+    ):
+        raise ValueError("per-die PMP ready entry no longer forwards its die")
+
+    return {
+        "initial_publication": {
+            "driver_entry": PMGR_START,
+            "scheduler": PMP_INIT_V2,
+            "public_entry": PMP_NOTIFY_INITIAL_ENTRY,
+            "gated_action": PMP_NOTIFY_INITIAL,
+            "command_gate_action_slot": 0x1E8,
+            "waits_for_ready": False,
+            "reads_ptd_status": False,
+            "device_type": 0x0F,
+            "device_type_table_object_offset": 0x3E17D,
+            "device_type_die_stride": 0x320,
+            "first_device_id": 1,
+            "last_device_id": 0x31F,
+            "die_count_object_offset": 0x6304,
+            "published_state": 1,
+            "command_selection": (
+                "command 14, or 15 when the signed DeviceData flag byte is negative"
+            ),
+            "order": (
+                "ApplePMGR::start runs the whole publication inside _initPMPv2, "
+                "so every initial level request precedes the first readiness "
+                "observation; it is deliberate, not a race"
+            ),
+        },
+        "ready_close": {
+            "source": PMGR_HANDLE_INTERRUPT_ALL,
+            "admission": PMGR_PMP_V2,
+            "config_block_object_offset": 0x3F120,
+            "interrupts_per_die_object_offset": 0x3F120,
+            "ready_slot_object_offset": 0x3F130,
+            "absent_slot_value": 0xFF,
+            "die_selector": "interrupt index / interrupts-per-die",
+            "slot_selector": "interrupt index % interrupts-per-die",
+            "per_die_entry": PMP_READY_ACTION_V2,
+            "gated_action": PMP_READY_GATED,
+            "effect": (
+                "latch the per-die ready byte, then command-gate wake every waiter"
+            ),
+            "secondary_source": (
+                "_waitForPMPReadyActionGatedv2 latches the same byte on its own "
+                "when the PTD PMP-STATUS entry becomes nonzero, so the interrupt "
+                "is not the only way the handshake closes"
+            ),
+        },
+    }
+
+
 def recover_pmp_code_contract(
     functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
 ) -> dict[str, object]:
@@ -772,6 +972,7 @@ def recover_pmp_code_contract(
         PMP_INIT_V2,
         PMP_GET_DEVICE_INDEX,
         PMP_NOTIFY_INITIAL,
+        PMP_NOTIFY_INITIAL_ENTRY,
         PMP_WAIT_CLUSTER_POWER_UP,
         PMP_ENABLE_DEVICE_GATED,
         PMP_DEVICE_ID_TO_DATA,
@@ -779,6 +980,9 @@ def recover_pmp_code_contract(
         PMP_WAIT_READY,
         PMP_WAIT_READY_V2,
         PMP_READY_GATED,
+        PMP_READY_ACTION_V2,
+        PMGR_START,
+        PMGR_HANDLE_INTERRUPT_ALL,
         APPLE_PTD_READ,
         APPLE_PTD_WRITE,
         PMGR_GET_REG_MAP,
@@ -795,11 +999,15 @@ def recover_pmp_code_contract(
         PMP_INIT_V2,
         PMP_GET_DEVICE_INDEX,
         PMP_NOTIFY_INITIAL,
+        PMP_NOTIFY_INITIAL_ENTRY,
         PMP_WAIT_CLUSTER_POWER_UP,
         PMP_ENABLE_DEVICE_GATED,
         PMP_WAIT_READY,
         PMP_WAIT_READY_V2,
         PMP_READY_GATED,
+        PMP_READY_ACTION_V2,
+        PMGR_START,
+        PMGR_HANDLE_INTERRUPT_ALL,
         APPLE_PTD_READ,
         APPLE_PTD_WRITE,
         PMGR_WRITE_REG64,
@@ -1178,8 +1386,7 @@ def recover_pmp_code_contract(
         ),
     ):
         raise ValueError("PMP readiness callback changed")
-    if wait_slot in initial_code:
-        raise ValueError("initial PMP state sync unexpectedly gained a readiness wait")
+    readiness_handshake = recover_pmp_readiness_handshake(functions, symbols)
 
     return {
         "device_state_commands": [14, 15],
@@ -1256,6 +1463,7 @@ def recover_pmp_code_contract(
                 "the ordinary transaction then bypasses PS-ACK while status is zero"
             ),
         },
+        "readiness_handshake": readiness_handshake,
         "device_index_map": {
             "source": "soc-device",
             "key_offset": 0,
@@ -1296,11 +1504,15 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
             PMP_INIT_V2,
             PMP_GET_DEVICE_INDEX,
             PMP_NOTIFY_INITIAL,
+            PMP_NOTIFY_INITIAL_ENTRY,
             PMP_WAIT_CLUSTER_POWER_UP,
             PMP_ENABLE_DEVICE_GATED,
             PMP_WAIT_READY,
             PMP_WAIT_READY_V2,
             PMP_READY_GATED,
+            PMP_READY_ACTION_V2,
+            PMGR_START,
+            PMGR_HANDLE_INTERRUPT_ALL,
             APPLE_PTD_READ,
             APPLE_PTD_WRITE,
             PMGR_WRITE_REG64,
@@ -1336,10 +1548,23 @@ def recover_t6050_pmgr_code_contract(
     missing = [name for name in required if name not in symbols]
     if missing:
         raise ValueError(f"AppleT6050PMGR is missing symbols: {missing!r}")
-    for name in (T6050_INIT_REG_MAPS, PMGR_PMP_V1, PMGR_PMP_V2):
+    for name in (
+        T6050_INIT_REG_MAPS,
+        PMGR_PMP_V1,
+        PMGR_PMP_V2,
+        T6050_RESTORE_HW,
+        T6050_UPDATE_HIB_DEVICE_STATUS,
+    ):
         if name not in functions:
             raise ValueError(f"AppleT6050PMGR has no code body for {name}")
-    base_required = (PMGR_INIT_REG_MAP, PMP_WAIT_READY)
+    base_required = (
+        PMGR_INIT_REG_MAP,
+        PMP_WAIT_READY,
+        PMP_NOTIFY_INITIAL_ENTRY,
+        PMGR_PM_HIBERNATION_STATE,
+        PMGR_CURRENT_DRIVER_STATE,
+        PMGR_UPDATE_HIB_DEVICE_STATUS,
+    )
     base_missing = [name for name in base_required if name not in apple_pmgr_symbols]
     if base_missing:
         raise ValueError(f"ApplePMGR is missing T6050 base symbols: {base_missing!r}")
@@ -1407,6 +1632,40 @@ def recover_t6050_pmgr_code_contract(
     ptd_calls = [item for item in reg_map_calls if item[0] == 8]
     if ptd_calls != [(8, 7)]:
         raise ValueError(f"AppleT6050PMGR PTD RegMap dispatch changed: {ptd_calls!r}")
+    restore_address, restore_code = functions[T6050_RESTORE_HW]
+    restore_targets = direct_branch_targets(restore_address, restore_code)
+    for name in (
+        PMGR_PM_HIBERNATION_STATE,
+        PMGR_CURRENT_DRIVER_STATE,
+        PMGR_UPDATE_HIB_DEVICE_STATUS,
+    ):
+        if apple_pmgr_symbols[name] not in restore_targets:
+            raise ValueError(f"AppleT6050PMGR restoreHW no longer calls {name}")
+    republications = direct_branch_count(
+        restore_address, restore_code, apple_pmgr_symbols[PMP_NOTIFY_INITIAL_ENTRY]
+    )
+    if republications != 2 or not _has_ordered_words(
+        restore_code,
+        (
+            0x7100081F,  # cmp w0, #2 -- hibernation resume
+            0x7100081F,  # cmp w0, #2 -- restored driver state
+        ),
+    ):
+        raise ValueError(
+            "AppleT6050PMGR restoreHW initial-status republication changed: "
+            f"{republications}"
+        )
+
+    hib_address, hib_code = functions[T6050_UPDATE_HIB_DEVICE_STATUS]
+    hib_targets = direct_branch_targets(hib_address, hib_code)
+    if (
+        apple_pmgr_symbols[PMGR_UPDATE_HIB_DEVICE_STATUS] not in hib_targets
+        or apple_pmgr_symbols[PMP_NOTIFY_INITIAL_ENTRY] not in hib_targets
+    ):
+        raise ValueError(
+            "AppleT6050PMGR hibernation status update no longer republishes"
+        )
+
     if not _has_ordered_words(
         init_code,
         (
@@ -1434,6 +1693,24 @@ def recover_t6050_pmgr_code_contract(
             "get_num_dies": 0xAC8,
             "get_die_count": 0xB30,
         },
+        "initial_publication": {
+            "republication_sites": [
+                T6050_RESTORE_HW,
+                T6050_UPDATE_HIB_DEVICE_STATUS,
+            ],
+            "restore_hw_calls": republications,
+            "restore_hw_guards": [
+                PMGR_PM_HIBERNATION_STATE,
+                PMGR_CURRENT_DRIVER_STATE,
+            ],
+            "guard_value": 2,
+            "entry": PMP_NOTIFY_INITIAL_ENTRY,
+            "scope": (
+                "resume republishes the same pre-ready device status that "
+                "ApplePMGR::start published; it is never conditioned on PMP "
+                "readiness"
+            ),
+        },
         "reg_maps": {
             "initialization_calls_per_die": len(reg_map_calls),
             "device_tree_indices": [item[1] for item in reg_map_calls],
@@ -1452,7 +1729,13 @@ def recover_apple_t6050_pmgr(
     symbols = macho_symbols(image)
     functions = {
         name: symbol_code(image, name)
-        for name in (T6050_INIT_REG_MAPS, PMGR_PMP_V1, PMGR_PMP_V2)
+        for name in (
+            T6050_INIT_REG_MAPS,
+            PMGR_PMP_V1,
+            PMGR_PMP_V2,
+            T6050_RESTORE_HW,
+            T6050_UPDATE_HIB_DEVICE_STATUS,
+        )
     }
     slots = {
         slot: recover_vtable_target(image, APPLE_T6050_PMGR_VTABLE, slot)

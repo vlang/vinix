@@ -388,10 +388,22 @@ class RecoverT6050PowerTests(unittest.TestCase):
         get_reg_map = 0x10000
         write_reg64 = 0x11000
         wait_cluster = 0x12000
+        driver_start = 0x13000
+        initial_entry = 0x14000
+        ready_entry = 0x15000
+        interrupt = 0x16000
 
         def branch(source: int, target: int, link: bool = False) -> bytes:
             delta = (target - source) // 4
             return struct.pack("<I", (0x94000000 if link else 0x14000000) | delta & 0x3FFFFFF)
+
+        def adrp_add(source: int, register: int, target: int) -> bytes:
+            page = ((target & ~0xFFF) - (source & ~0xFFF)) >> 12
+            return struct.pack(
+                "<II",
+                0x90000000 | (page & 3) << 29 | (page >> 2 & 0x7FFFF) << 5 | register,
+                0x91000000 | (target & 0xFFF) << 10 | register << 5 | register,
+            )
 
         def tbz(source: int, target: int, register: int, bit: int) -> int:
             delta = (target - source) // 4
@@ -521,7 +533,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
                     0xD503201F,
                     0xB9000189,
                     0x11000529,
-                ),
+                )
+                + struct.pack("<2I", 0xD2815711, 0xF94DC260)
+                + adrp_add(init + 108, 16, initial)
+                + struct.pack("<I", 0xD2803D11),
             ),
             recover_t6050_power.PMP_GET_DEVICE_INDEX: (
                 lookup,
@@ -541,13 +556,68 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
             recover_t6050_power.PMP_NOTIFY_INITIAL: (
                 initial,
-                struct.pack("<2I", 0x394002A8, 0x360801A8)
-                + branch(initial + 8, device_data, True)
-                + branch(initial + 12, wait_cluster, True)
-                + struct.pack(
-                    "<4I", 0x794036A8, 0x35000048, 0x39400EA8, 0xA900E7E8
+                struct.pack(
+                    "<7I",
+                    0x528C6088,
+                    0x9140F808,
+                    0x9105F517,
+                    0x528001D8,
+                    0x52800039,
+                    0x39400108,
+                    0x71003D1F,
                 )
-                + branch(initial + 32, send, True),
+                + branch(initial + 28, device_data, True)
+                + branch(initial + 32, wait_cluster, True)
+                + struct.pack(
+                    "<9I",
+                    0x394002A8,
+                    0x360801A8,
+                    0x13001D08,
+                    0x3100051F,
+                    0x1A98C701,
+                    0x794036A8,
+                    0x35000048,
+                    0x39400EA8,
+                    0xA900E7E8,
+                )
+                + branch(initial + 72, send, True)
+                + struct.pack("<2I", 0xF10C7F5F, 0x910C82F7),
+            ),
+            recover_t6050_power.PMP_NOTIFY_INITIAL_ENTRY: (
+                initial_entry,
+                struct.pack("<I", 0xF94DC000)
+                + adrp_add(initial_entry + 4, 16, initial)
+                + struct.pack("<I", 0xD2803D11),
+            ),
+            recover_t6050_power.PMP_READY_ACTION_V2: (
+                ready_entry,
+                struct.pack("<2I", 0xAA0103E2, 0xF94DC000)
+                + adrp_add(ready_entry + 8, 16, ready_gated)
+                + struct.pack("<I", 0xD2803D11),
+            ),
+            recover_t6050_power.PMGR_START: (
+                driver_start,
+                branch(driver_start, init, True),
+            ),
+            recover_t6050_power.PMGR_HANDLE_INTERRUPT_ALL: (
+                interrupt,
+                struct.pack(
+                    "<12I",
+                    0x9140FE68,
+                    0x91048117,
+                    0xD2815711,
+                    0x394042E8,
+                    0x7103FD1F,
+                    0xB94002E8,
+                    0x1AC80809,
+                    0x1B088128,
+                    0x394042E9,
+                    0x6B09011F,
+                    0x9141CA68,
+                    0x91208118,
+                )
+                + adrp_add(interrupt + 48, 16, ready_gated)
+                + struct.pack("<I", 0xD2803D11),
             ),
             recover_t6050_power.PMP_WAIT_CLUSTER_POWER_UP: (
                 wait_cluster,
@@ -664,6 +734,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.PMP_INIT_V2: init,
             recover_t6050_power.PMP_GET_DEVICE_INDEX: lookup,
             recover_t6050_power.PMP_NOTIFY_INITIAL: initial,
+            recover_t6050_power.PMP_NOTIFY_INITIAL_ENTRY: initial_entry,
+            recover_t6050_power.PMP_READY_ACTION_V2: ready_entry,
+            recover_t6050_power.PMGR_START: driver_start,
+            recover_t6050_power.PMGR_HANDLE_INTERRUPT_ALL: interrupt,
             recover_t6050_power.PMP_WAIT_CLUSTER_POWER_UP: wait_cluster,
             recover_t6050_power.PMP_ENABLE_DEVICE_GATED: enable,
             recover_t6050_power.PMP_DEVICE_ID_TO_DATA: device_data,
@@ -699,6 +773,18 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertIn("never read", result["ordinary_request_ack"]["poll_deadline_observed_use"])
         self.assertEqual(result["readiness"]["virtual_wait_slot"], 0xAC0)
         self.assertEqual(result["readiness"]["status_range_object_offset"], 0x72820)
+        handshake = result["readiness_handshake"]
+        self.assertFalse(handshake["initial_publication"]["waits_for_ready"])
+        self.assertFalse(handshake["initial_publication"]["reads_ptd_status"])
+        self.assertEqual(handshake["initial_publication"]["published_state"], 1)
+        self.assertEqual(handshake["initial_publication"]["device_type"], 0x0F)
+        self.assertEqual(
+            handshake["initial_publication"]["device_type_die_stride"], 0x320
+        )
+        self.assertEqual(handshake["initial_publication"]["last_device_id"], 0x31F)
+        self.assertEqual(handshake["ready_close"]["ready_slot_object_offset"], 0x3F130)
+        self.assertEqual(handshake["ready_close"]["absent_slot_value"], 0xFF)
+        self.assertIn("PTD PMP-STATUS", handshake["ready_close"]["secondary_source"])
         self.assertEqual(result["ptd_transport"]["reg_map"], 8)
         self.assertEqual(result["ptd_transport"]["read"]["entry_stride"], 16)
         self.assertEqual(result["ptd_transport"]["write"]["base_offset"], 0x10000)
@@ -719,6 +805,42 @@ class RecoverT6050PowerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pre-ready acknowledgement bypass"):
             recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
 
+        # A publication that starts waiting on PMP readiness is a different
+        # contract, not a compatible one: reject it instead of reporting the
+        # recovered order.
+        bad_functions = dict(functions)
+        initial_address, initial_code = bad_functions[
+            recover_t6050_power.PMP_NOTIFY_INITIAL
+        ]
+        bad_functions[recover_t6050_power.PMP_NOTIFY_INITIAL] = (
+            initial_address,
+            initial_code + struct.pack("<I", 0xD2815811),
+        )
+        with self.assertRaisesRegex(ValueError, "gained a PMP readiness wait"):
+            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+
+        bad_functions = dict(functions)
+        init_address, init_code = bad_functions[recover_t6050_power.PMP_INIT_V2]
+        bad_functions[recover_t6050_power.PMP_INIT_V2] = (
+            init_address,
+            init_code + branch(init_address + len(init_code), wait_ready, True),
+        )
+        with self.assertRaisesRegex(ValueError, "readiness dependency"):
+            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+
+        bad_functions = dict(functions)
+        interrupt_address, interrupt_code = bad_functions[
+            recover_t6050_power.PMGR_HANDLE_INTERRUPT_ALL
+        ]
+        bad_functions[recover_t6050_power.PMGR_HANDLE_INTERRUPT_ALL] = (
+            interrupt_address,
+            interrupt_code.replace(
+                struct.pack("<I", 0x7103FD1F), struct.pack("<I", 0xD503201F), 1
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "readiness interrupt decode"):
+            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+
     def test_recovers_t6050_pmgr_ptd_regmap_dispatch(self) -> None:
         init = 0x10000
         init_reg_map = 0x20000
@@ -727,6 +849,12 @@ class RecoverT6050PowerTests(unittest.TestCase):
         wait_ready = 0x32000
         get_num_dies = 0x33000
         get_die_count = 0x34000
+        notify_initial = 0x35000
+        hibernation_state = 0x36000
+        driver_state = 0x37000
+        update_hib_status = 0x38000
+        restore_hw = 0x39000
+        t6050_update_hib_status = 0x3A000
 
         def branch(source: int, target: int) -> bytes:
             delta = (target - source) // 4
@@ -756,10 +884,25 @@ class RecoverT6050PowerTests(unittest.TestCase):
         v2_code = struct.pack(
             "<5I", 0xD503245F, 0xB95BD808, 0x7100091F, 0x1A9F17E0, 0xD65F03C0
         )
+        restore_code = branch(restore_hw, hibernation_state)
+        restore_code += struct.pack("<I", 0x7100081F)
+        restore_code += branch(restore_hw + 8, update_hib_status)
+        restore_code += branch(restore_hw + 12, notify_initial)
+        restore_code += branch(restore_hw + 16, driver_state)
+        restore_code += struct.pack("<I", 0x7100081F)
+        restore_code += branch(restore_hw + 24, notify_initial)
+        hib_code = branch(t6050_update_hib_status, update_hib_status)
+        hib_code += struct.pack("<I", 0xD503201F)
+        hib_code += branch(t6050_update_hib_status + 8, notify_initial)
         functions = {
             recover_t6050_power.T6050_INIT_REG_MAPS: (init, init_code),
             recover_t6050_power.PMGR_PMP_V1: (pmp_v1, v1_code),
             recover_t6050_power.PMGR_PMP_V2: (pmp_v2, v2_code),
+            recover_t6050_power.T6050_RESTORE_HW: (restore_hw, restore_code),
+            recover_t6050_power.T6050_UPDATE_HIB_DEVICE_STATUS: (
+                t6050_update_hib_status,
+                hib_code,
+            ),
         }
         symbols = {
             recover_t6050_power.T6050_INIT_REG_MAPS: init,
@@ -771,6 +914,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
         apple_pmgr_symbols = {
             recover_t6050_power.PMGR_INIT_REG_MAP: init_reg_map,
             recover_t6050_power.PMP_WAIT_READY: wait_ready,
+            recover_t6050_power.PMP_NOTIFY_INITIAL_ENTRY: notify_initial,
+            recover_t6050_power.PMGR_PM_HIBERNATION_STATE: hibernation_state,
+            recover_t6050_power.PMGR_CURRENT_DRIVER_STATE: driver_state,
+            recover_t6050_power.PMGR_UPDATE_HIB_DEVICE_STATUS: update_hib_status,
         }
         vtable_targets = {
             0xAB0: pmp_v1,
@@ -787,6 +934,32 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(
             result["reg_maps"]["ptd"], {"enum": 8, "device_tree_reg_index": 7}
         )
+        self.assertEqual(result["initial_publication"]["restore_hw_calls"], 2)
+        self.assertEqual(result["initial_publication"]["guard_value"], 2)
+        self.assertIn(
+            "never conditioned on PMP readiness",
+            result["initial_publication"]["scope"],
+        )
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.T6050_RESTORE_HW] = (
+            restore_hw,
+            restore_code[:-4],
+        )
+        with self.assertRaisesRegex(ValueError, "republication changed"):
+            recover_t6050_power.recover_t6050_pmgr_code_contract(
+                bad_functions, symbols, apple_pmgr_symbols, vtable_targets
+            )
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.T6050_UPDATE_HIB_DEVICE_STATUS] = (
+            t6050_update_hib_status,
+            hib_code[:8],
+        )
+        with self.assertRaisesRegex(ValueError, "no longer republishes"):
+            recover_t6050_power.recover_t6050_pmgr_code_contract(
+                bad_functions, symbols, apple_pmgr_symbols, vtable_targets
+            )
 
         bad_functions = dict(functions)
         bad_functions[recover_t6050_power.T6050_INIT_REG_MAPS] = (
