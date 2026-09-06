@@ -9,6 +9,7 @@ import devicetree
 import aarch64.kio
 import aarch64.timer
 import apple.dart
+import apple.pmp
 import klock
 import memory
 
@@ -2046,6 +2047,7 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !validate_t6050_patchbay_codec()
 		|| !validate_t6050_patchbay_input_codec()
 		|| !validate_t6050_preload_address_codec()
+		|| !pmp.validate_pmp_message_codec()
 		|| !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false
