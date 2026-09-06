@@ -33,3 +33,5 @@ build-support/init-aarch64/initramfs-minimal.tar
 build-support/init-aarch64/initramfs-desktop.tar
 kernel/tmp.c
 kernel/tmp.v
+/build-aarch64-python/
+/.claude/
