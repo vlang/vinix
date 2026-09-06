@@ -89,8 +89,14 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
 echo "==> Translating V to C..."
+# The build stamp the taskbar shows beside the clock. Deploying to real
+# hardware and rebooting looks the same whether the new image landed or not,
+# so the desktop says when it was built.
+BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
+echo "    build stamp: $BUILD_STAMP"
 "$V" -os linux -gc none -enable-globals -prod \
     -d ui2_headless \
+    -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 

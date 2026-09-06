@@ -687,6 +687,16 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		size: 11
 		align: .right
 	})
+	// The build stamp shares the date's row from the other end. A row of its
+	// own would not fit — the two lines already fill the bar's height — and
+	// the date is short enough that the two never meet. The string is a
+	// constant, so unlike the clock it costs nothing to compose each second.
+	children << ui2.label('clock.build', 'built ${build_stamp}', ui2.rect(f64(clock_x), 26,
+		f64(clock_width), 16), ui2.TextStyle{
+		color: theme.clock_date
+		size: 11
+		align: .left
+	})
 	if dock {
 		x = clock_x + clock_width + 6
 	}

@@ -5,6 +5,13 @@
 // target's time zone database does or does not contain.
 module main
 
+// When this desktop was built, stamped in by build-desktop-aarch64.sh. It is
+// shown beside the clock so that a machine booted from a freshly deployed
+// image can be told apart from one still running the last, which is otherwise
+// guesswork: the desktop looks identical either way. A build that did not go
+// through the script — a host test run, say — says `dev`.
+const build_stamp = $d('vinix_build_stamp', 'dev')
+
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
 	'Dec']
