@@ -1,20 +1,27 @@
 #!/bin/bash
 # Deploy Vinix ARM64 boot files to an already-mounted EFI System Partition.
-# Usage: ./deploy-m1-efi.sh [--apple-gpu] /path/to/mounted/esp
+# Usage: ./deploy-m1-efi.sh [--apple-gpu] [--minimal-initramfs] /path/to/mounted/esp
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
+USE_MINIMAL_INITRAMFS=0
 
 for argument in "$@"; do
     case "$argument" in
         --apple-gpu)
             ENABLE_APPLE_GPU=1
             ;;
+        --minimal-initramfs)
+            # Boot with a few-KB initramfs instead of the 120 MB busybox one.
+            # If a hang at Limine's "Loading module" line clears with this, the
+            # problem is reading the large module, not the kernel.
+            USE_MINIMAL_INITRAMFS=1
+            ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -43,6 +50,7 @@ fi
 
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
+MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
 LIMINE_EFI_BUILT="$SCRIPT_DIR/boot-image/limine-9.3.0/bin/BOOTAA64.EFI"
 LIMINE_EFI_BIN="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
 LIMINE_CONF="$SCRIPT_DIR/build-support/limine.conf"
@@ -51,6 +59,15 @@ if [ -f "$LIMINE_EFI_BUILT" ] && { [ ! -f "$LIMINE_EFI_BIN" ] || [ "$LIMINE_EFI_
     LIMINE_EFI="$LIMINE_EFI_BUILT"
 else
     LIMINE_EFI="$LIMINE_EFI_BIN"
+fi
+
+if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
+    if [ ! -f "$MINIMAL_INITRAMFS" ]; then
+        echo "error: minimal initramfs not built: $MINIMAL_INITRAMFS" >&2
+        exit 1
+    fi
+    INITRAMFS="$MINIMAL_INITRAMFS"
+    echo "using minimal initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
 fi
 
 for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do

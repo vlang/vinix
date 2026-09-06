@@ -26,3 +26,4 @@ boot-image/
 /build-aarch64-x11/
 build-support/init-aarch64/init
 build-support/init-aarch64/initramfs.tar
+build-support/init-aarch64/initramfs-minimal.tar
