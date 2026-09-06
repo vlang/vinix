@@ -58,6 +58,16 @@ fi
 
 mkdir -p "$BUILD_DIR"
 
+# ── Stage the sources ──
+# The desktop hosts ui2 applications in its windows, and an application's model
+# is V code that has to be compiled in. The staging step takes each example's
+# source straight from the ui2 checkout — everything but its `fn main()`, which
+# only opens a platform window — so what runs is the example itself.
+echo "==> Staging sources..."
+APP_SRC="$BUILD_DIR/app-src"
+python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
+    "$SCRIPT_DIR/third_party/ui2/examples/calculator"
+
 # ── V -> C ──
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
@@ -65,13 +75,13 @@ echo "==> Translating V to C..."
 "$V" -os linux -gc none -prod \
     -d ui2_headless \
     -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
-    -o "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/"
+    -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
 # ── C -> aarch64 static binary ──
 echo "==> Compiling for aarch64-linux-musl..."
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/include" \
-    -I "$SCRIPT_DIR/desktop" \
+    -I "$APP_SRC" \
     -O2 -fno-stack-protector -w \
     "$SYSROOT/lib/crt1.o" "$SYSROOT/lib/crti.o" "$GCCLIB/crtbegin.o" \
     "$BUILD_DIR/desktop.c" \

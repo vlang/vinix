@@ -11,6 +11,9 @@ enum Page {
 	system
 	palette
 	notes
+	// A window whose contents come from a hosted ui2 application rather than
+	// from one of the pages below.
+	app
 }
 
 struct Window {
@@ -41,6 +44,8 @@ mut:
 	restore_height int
 	maximized bool
 	minimized bool
+	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
+	app_index int = -1
 }
 
 fn (w &Window) frame_rect() ui2.Rect {
@@ -58,6 +63,9 @@ fn (w &Window) content(width int, height int, desktop &Desktop) []ui2.Element {
 		.system { system_page(width, height, desktop) }
 		.palette { palette_page(width, height) }
 		.notes { notes_page(width, height) }
+		// An application's contents are built by the window manager, which is
+		// the only thing holding a mutable reference to it.
+		.app { []ui2.Element{} }
 	}
 }
 

@@ -48,6 +48,10 @@ const taskbar_item_hover = u32(0x27334b)
 const taskbar_item_active = u32(0x2c3d5e)
 const taskbar_item_height = 30
 const taskbar_item_width = 168
+// Entries shrink to share the bar before any of them is dropped, but only
+// down to here — narrower than this and a title says nothing useful.
+const taskbar_item_min_width = 84
+const launcher_width = 88
 const taskbar_item_gap = 6
 const taskbar_padding = 10
 

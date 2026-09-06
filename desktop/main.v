@@ -106,10 +106,13 @@ fn main() {
 	}
 
 	// An opening arrangement, so the desktop has something to show and the
-	// taskbar has more than one entry in it.
-	desktop.spawn('Welcome', .welcome, 96, 74, 396, 250)
-	desktop.spawn('Palette', .palette, 300, 190, 330, 268)
-	desktop.spawn('System', .system, 520, 96, 372, 232)
+	// taskbar has more than one entry in it. The calculator is ui2's own
+	// example, hosted rather than reimplemented.
+	desktop.spawn('Welcome', .welcome, 60, 74, 396, 250)
+	desktop.spawn('System', .system, 480, 74, 372, 232)
+	for factory in available_apps {
+		desktop.launch(factory)
+	}
 
 	mut stats := FrameStats{}
 	for desktop.running {
@@ -201,6 +204,12 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 			}
 			`n`, `N` {
 				d.spawn_scattered()
+			}
+			`c`, `C` {
+				// The first hosted application, for a keyboard-only session.
+				if available_apps.len > 0 {
+					d.launch(available_apps[0])
+				}
 			}
 			else {}
 		}

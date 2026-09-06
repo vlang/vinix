@@ -10,6 +10,11 @@ import ui2
 // lookup table: 'win.<id>.<part>' addresses one window's chrome, 'task.<id>'
 // its taskbar entry.
 const action_new_window = 'taskbar.new'
+// Launcher buttons carry the index of the application they open.
+const action_launch_prefix = 'taskbar.launch.'
+// ui2 gives every event in a hosted document an id starting with this, so an
+// action the desktop does not own is recognisable without parsing it.
+const hosted_action_prefix = '__qml_'
 
 enum DragKind {
 	none_
@@ -53,6 +58,9 @@ mut:
 
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
+
+	// Applications the desktop is hosting. A window points into this by index.
+	apps []HostedApp
 
 	tz_offset_seconds i64
 }
@@ -212,7 +220,7 @@ fn (mut d Desktop) activate(id int) {
 // build_tree describes the whole screen. The root is a transparent view
 // because the wallpaper gradient is painted by the compositor before the tree
 // is rendered, and ui2 has no gradient to declare.
-fn (d &Desktop) build_tree() ui2.Element {
+fn (mut d Desktop) build_tree() ui2.Element {
 	mut children := []ui2.Element{}
 	for window in d.windows {
 		if window.minimized {
@@ -228,7 +236,7 @@ fn (d &Desktop) build_tree() ui2.Element {
 	}, children)
 }
 
-fn (d &Desktop) window_element(window Window) ui2.Element {
+fn (mut d Desktop) window_element(window Window) ui2.Element {
 	active := window.id == d.focus
 	body_height := window.height - title_height
 
@@ -264,17 +272,77 @@ fn (d &Desktop) window_element(window Window) ui2.Element {
 		bg: title_divider
 	}, [])
 
+	background, contents := d.window_contents(window, body_height)
 	// Clickable so that touching a window anywhere brings it to the front,
 	// not only its title bar.
 	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(title_height), f64(window.width),
 		f64(body_height)), ui2.BoxStyle{
-		bg: window_body
-	}, window.content(window.width, body_height, d))
+		bg: background
+	}, contents)
 
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
-		bg: window_body
+		bg: background
 		radius: window_radius
 	}, [title_bar, divider, body])
+}
+
+// window_contents is the body's background colour and its children. A hosted
+// application supplies both: what it returns is its QML `Screen`, which inside
+// someone else's window is a content area rather than a display, so its
+// background becomes the body's and its children are placed straight into it.
+fn (mut d Desktop) window_contents(window Window, body_height int) (u32, []ui2.Element) {
+	if window.app_index < 0 || window.app_index >= d.apps.len {
+		return window_body, window.content(window.width, body_height, d)
+	}
+	size := ui2.rect(0, 0, f64(window.width), f64(body_height))
+	root := d.apps[window.app_index].build(size) or {
+		// An application that cannot lay itself out should say so in its own
+		// window rather than take the desktop down with it.
+		return window_body, [
+			body_line('This application failed to draw:', 18, 18, window.width - 36),
+			muted_line(err.msg(), 18, 40, window.width - 36),
+		]
+	}
+	return root.box.bg, root.children
+}
+
+// launch opens a window for one of the applications the desktop can host.
+fn (mut d Desktop) launch(factory AppFactory) {
+	app := factory.open() or {
+		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
+		return
+	}
+	d.apps << app
+	// Cascade like any other new window, but at the size the application asked
+	// for rather than the desktop's default.
+	step := ((d.next_id - 1) % 6) * 26
+	id := d.spawn(factory.title, .app, 120 + step, 60 + step, factory.width, factory.height)
+	index := d.window_index(id) or { return }
+	d.windows[index].app_index = d.apps.len - 1
+	d.clamp_to_screen(index)
+}
+
+// forward_to_app hands an action the desktop does not recognise to the
+// application under the pointer. Hosted ids are ui2's own — it prefixes them
+// `__qml_` — so rather than parse them the window manager routes by where the
+// click landed, which is also what decides it between two open applications.
+fn (mut d Desktop) forward_to_app(x int, y int, action string) {
+	for i := d.windows.len - 1; i >= 0; i-- {
+		window := d.windows[i]
+		if window.minimized || window.app_index < 0 || window.app_index >= d.apps.len {
+			continue
+		}
+		if x < window.x || y < window.y || x >= window.x + window.width
+			|| y >= window.y + window.height {
+			continue
+		}
+		d.apps[window.app_index].handle(action) or {
+			eprintln('vinix-desktop: ${window.title}: ${err}')
+		}
+		d.raise(window.id)
+		d.dirty = true
+		return
+	}
 }
 
 fn (d &Desktop) title_button(id string, glyph string, x int) ui2.Element {
@@ -319,19 +387,52 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		align: .center
 	})
 
+	// Then a launcher per application the desktop can host, so a ui2
+	// application is one click away rather than something only the startup
+	// arrangement can open.
+	mut launcher_x := taskbar_padding + new_button_width + 8
+	for index, factory in available_apps {
+		id := '${action_launch_prefix}${index}'
+		children << ui2.button(id, factory.title, ui2.rect(f64(launcher_x), f64((taskbar_height - taskbar_item_height) / 2),
+			f64(launcher_width), f64(taskbar_item_height)), ui2.BoxStyle{
+			bg: if d.hover == id { taskbar_item_hover } else { taskbar_item_bg }
+			radius: 6
+		}, ui2.TextStyle{
+			color: taskbar_text
+			size: 12
+			align: .center
+		})
+		launcher_x += launcher_width + 6
+	}
+
 	// Middle: one entry per open window, minimised or not, in the order the
 	// windows were opened. Following the painting order instead would shuffle
 	// the bar every time a window was raised, which is exactly when the user
 	// is looking somewhere else.
-	mut x := taskbar_padding + new_button_width + 14
+	mut x := launcher_x + 8
 	clock_left := width - clock_area_width
 	item_y := (taskbar_height - taskbar_item_height) / 2
+
+	// Entries share whatever room is left rather than each taking a fixed
+	// slot: with a fixed one the last window opened simply had no entry, which
+	// is the opposite of what a list of open windows is for.
+	mut item_width := taskbar_item_width
+	if d.windows.len > 0 {
+		share := (clock_left - taskbar_item_gap - x + taskbar_item_gap) / d.windows.len - taskbar_item_gap
+		if share < item_width {
+			item_width = share
+		}
+		if item_width < taskbar_item_min_width {
+			item_width = taskbar_item_min_width
+		}
+	}
+
 	mut last_id := 0
 	for {
 		index := d.next_window_by_age(last_id) or { break }
 		window := d.windows[index]
 		last_id = window.id
-		if x + taskbar_item_width > clock_left - taskbar_item_gap {
+		if x + item_width > clock_left - taskbar_item_gap {
 			break
 		}
 		active := window.id == d.focus && !window.minimized
@@ -352,7 +453,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			taskbar_text
 		}
 		children << ui2.button(window.id_task, window.title, ui2.rect(f64(x), f64(item_y),
-			f64(taskbar_item_width), f64(taskbar_item_height)), ui2.BoxStyle{
+			f64(item_width), f64(taskbar_item_height)), ui2.BoxStyle{
 			bg: bg
 			radius: 6
 		}, ui2.TextStyle{
@@ -360,7 +461,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			size: 12
 			align: .left
 		})
-		x += taskbar_item_width + taskbar_item_gap
+		x += item_width + taskbar_item_gap
 	}
 
 	// Right: the clock, two lines, hard against the corner.
@@ -471,6 +572,19 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 
 	if action == action_new_window {
 		d.spawn_scattered()
+		return
+	}
+
+	if action.starts_with(hosted_action_prefix) {
+		d.forward_to_app(x, y, action)
+		return
+	}
+
+	if action.starts_with(action_launch_prefix) {
+		index := action[action_launch_prefix.len..].int()
+		if index >= 0 && index < available_apps.len {
+			d.launch(available_apps[index])
+		}
 		return
 	}
 

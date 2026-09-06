@@ -16,14 +16,17 @@ What it does:
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, clicking one to bring it to the front
 - a **New window** button, so the taskbar list can be seen growing and shrinking
+- **hosted ui2 applications**: the taskbar's launchers open ui2's own examples
+  in windows of their own, several at a time, each with its own state
 
-Keys: `Esc` or `q` leaves the desktop, `n` opens a window.
+Keys: `Esc` or `q` leaves the desktop, `n` opens a window, `c` a calculator.
 
 ## How it fits together
 
     main.v         the event loop: poll input, rebuild, render, present
     wm.v           the window manager — window list, the ui2 tree, hit routing
     window.v       the Window model and the pages windows show
+    app.v          hosting ui2 applications in windows
     render.v       a ui2 backend that draws an element tree into a framebuffer
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
     font.v         text, from the coverage atlases in font_data.v
@@ -51,22 +54,58 @@ renderer carries itself, since the target has no image files; and a rounded
 view at the top level of the tree is a floating surface, so it gets a drop
 shadow and a hairline edge.
 
+## Hosting ui2 applications
+
+A ui2 application normally calls `run_qml`, which opens a platform window and
+blocks until it closes. There is no platform here to ask — the desktop *is* the
+window system — so it uses ui2's `QmlApp` instead: the application hands over an
+element tree for a content area of whatever size its window happens to be, and
+gets back the id of whatever the user hit. Because the size is passed in rather
+than taken from a display, an application re-lays-out when its window is
+resized or maximised, which is how the calculator recentres itself.
+
+The applications are ui2's own examples, and they are not copied into this
+repository. `tools/stage_app.py` takes each example's source straight from the
+ui2 checkout at build time and removes exactly one thing: its `fn main()`,
+which exists to open a platform window and block. Everything the application
+is — its model, its methods, its QML document — compiles unmodified, so what
+runs on Vinix is the example rather than a retelling of it. Both it and the
+desktop are `module main`, so they share a directory and V builds them as one
+program.
+
+Hosted event ids are ui2's own, prefixed `__qml_`, so the window manager can
+tell them from its own without parsing them. It routes one by which window the
+click landed in, which is also what decides it between two open copies of the
+same application.
+
+Add an application by listing its example directory in
+`build-desktop-aarch64.sh` and adding an `AppFactory` to `available_apps` in
+`app.v`.
+
 ## Fonts
 
 Vinix has no font files and no rasteriser, so the glyphs travel inside the
-binary. `tools/genfont.py` rasterises four Roboto faces into 8-bit coverage
+binary. `tools/genfont.py` rasterises several Roboto faces into 8-bit coverage
 atlases and writes them to `font_data.v` as base64; `font.v` decodes them at
 startup and blends the coverage, which is the same antialiasing a desktop
 toolkit would give. Roboto is licensed under the SIL Open Font License 1.1 —
 see `FONT-LICENSE.txt`.
 
-Regenerate after changing a size or adding a face:
+Each face is a weight and a pixel size, and the renderer picks the closest one
+to what a text style asks for rather than scaling, because a stretched bitmap
+atlas looks far worse than one a couple of pixels off. The baked sizes are the
+ones the desktop's chrome uses plus those hosted applications ask for.
+
+Runs are decoded as UTF-8. Beyond printable ASCII each face carries the
+supplemental code points in the generator's `EXTRA_RUNES` — `÷` and `±` among
+them, which is what lets ui2's calculator label its keys properly. A candidate
+rune the font has no glyph for is dropped at generation time rather than baked
+as a `.notdef` box; the generator says which. Anything not baked draws as a
+space.
+
+Regenerate after changing a size, a face or the rune list:
 
     python3 desktop/tools/genfont.py
-
-The atlases cover ASCII only. Anything outside that range draws as a space, so
-keep interface strings ASCII — that is why a minimised taskbar entry is dimmed
-rather than marked with a bullet.
 
 ## Memory
 

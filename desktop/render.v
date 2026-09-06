@@ -30,13 +30,26 @@ const text_inset = 10
 
 const clock_area_width = 128
 
+// face_for picks the baked face closest to what a style asks for: the right
+// weight first, then the nearest size. Nothing is scaled — a bitmap atlas
+// stretched looks far worse than one a couple of pixels off — so a style
+// asking for a size nothing was baked at gets the neighbour instead.
 fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
-	index := if style.bold {
-		if style.size >= 15 { int(Face.clock) } else { int(Face.bold) }
-	} else {
-		if style.size <= 11 { int(Face.small) } else { int(Face.ui) }
+	wanted := int(style.size)
+	mut best := 0
+	mut best_score := 1 << 30
+	for i, face in d.fonts {
+		mut score := abs_int(face.size - wanted)
+		if face.bold != style.bold {
+			// Any face of the right weight beats every face of the wrong one.
+			score += 1000
+		}
+		if score < best_score {
+			best_score = score
+			best = i
+		}
 	}
-	return &d.fonts[index]
+	return &d.fonts[best]
 }
 
 // free_tree releases the arrays a frame's element tree was built out of.
