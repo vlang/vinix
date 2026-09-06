@@ -1,13 +1,22 @@
-name: M1 Wi-Fi bring-up
+name: M1 Wi-Fi and IPv4
 on:
   push:
-    branches: [wifi/m1-air]
+    branches: [wifi/m1-air, master]
+    paths:
+      - 'kernel/**'
+      - 'tests/m1-wifi/**'
+      - 'tests/inet/**'
+      - 'tools/m1-wifi/**'
+      - '.github/workflows/m1-wifi.yml'
+      - 'build-limine-aarch64.sh'
   pull_request:
     paths:
-      - 'kernel/c/brcm*'
-      - 'kernel/modules/apple/wifi/**'
+      - 'kernel/**'
       - 'tests/m1-wifi/**'
+      - 'tests/inet/**'
+      - 'tools/m1-wifi/**'
       - '.github/workflows/m1-wifi.yml'
+      - 'build-limine-aarch64.sh'
 permissions:
   contents: read
 concurrency:
@@ -15,19 +24,21 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
     env:
       VFLAGS: -old-compiler -gc none
     steps:
       - uses: actions/checkout@v6
-      - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y clang lld
-      - name: Driver host tests
+        with:
+          persist-credentials: false
+      - name: Require implementation and tests
         run: |
-          if [ -f tests/m1-wifi/run.sh ]; then
-            CC=clang sh tests/m1-wifi/run.sh
-          fi
+          test -f kernel/c/brcm_wifi.c
+          test -f kernel/c/inet/net_stack.c
+          test -f tests/inet/guest.c
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld llvm qemu-system-arm qemu-efi-aarch64 mtools autoconf automake
       - name: Build pinned V1 compiler
         run: |
           git init /tmp/v
@@ -41,21 +52,34 @@ jobs:
           make -C /tmp/v local=1 CC=clang
       - name: Kernel dependencies
         run: cd kernel && ./get-deps
-      - name: Build ARM64 kernel
-        run: make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v VFLAGS=-old-compiler -j2
-      - name: Package offline validation inputs
-        if: always()
+      - name: Sanitizer and packaging tests
         run: |
-          mkdir -p /tmp/offline/v /tmp/offline/vinix
-          if [ -x /tmp/v/v ]; then
-            cp /tmp/v/v /tmp/offline/v/
-            cp -a /tmp/v/vlib /tmp/v/cmd /tmp/v/thirdparty /tmp/offline/v/
-          fi
-          tar --exclude=.git --exclude=kernel/obj -cf - . | tar -xf - -C /tmp/offline/vinix
-          tar --exclude=.git -C /tmp/offline -czf /tmp/m1-wifi-inputs.tar.gz .
+          mkdir -p validation
+          CC=clang sh tests/m1-wifi/run.sh | tee validation/wifi.log
+          CC=clang sh tests/inet/run.sh | tee validation/inet.log
+          CC=clang sh tests/apple-spi-keyboard/run.sh | tee validation/keyboard.log
+          python3 tests/m1-wifi/package_test.py 2>&1 | tee validation/package.log
+          clang -std=c11 -Wall -Wextra -Werror -O2 -iquote kernel/c tools/m1-wifi/wifi-ctl.c -o /tmp/wifi-ctl-host
+      - name: Build ARM64 test kernel
+        run: make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v VFLAGS='-old-compiler -d inet_selftest' -j2 all > validation/kernel-test.log 2>&1
+      - name: Boot real kernel and run socket ABI regression
+        run: |
+          ./build-limine-aarch64.sh
+          sh tests/inet/qemu.sh | tee validation/qemu.log
+      - name: Rebuild production kernel without test hooks
+        run: |
+          make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v VFLAGS=-old-compiler -j2 all > validation/kernel-production.log 2>&1
+          python3 - <<'PY'
+          from pathlib import Path
+          assert b'inet: TEST BUILD' not in Path('kernel/bin/vinix').read_bytes()
+          PY
+          cp kernel/bin/vinix validation/vinix-aarch64.elf
+          sha256sum validation/vinix-aarch64.elf > validation/SHA256SUMS
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: m1-wifi-inputs
-          path: /tmp/m1-wifi-inputs.tar.gz
-          retention-days: 3
+          name: m1-wifi-ipv4-validation
+          path: |
+            validation/
+            tests/inet/out/guest.log
+          retention-days: 7
