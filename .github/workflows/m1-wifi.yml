@@ -43,3 +43,19 @@ jobs:
         run: cd kernel && ./get-deps
       - name: Build ARM64 kernel
         run: make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v VFLAGS=-old-compiler -j2
+      - name: Package offline validation inputs
+        if: always()
+        run: |
+          mkdir -p /tmp/offline/v /tmp/offline/vinix
+          if [ -x /tmp/v/v ]; then
+            cp /tmp/v/v /tmp/offline/v/
+            cp -a /tmp/v/vlib /tmp/v/cmd /tmp/v/thirdparty /tmp/offline/v/
+          fi
+          tar --exclude=.git --exclude=kernel/obj -cf - . | tar -xf - -C /tmp/offline/vinix
+          tar --exclude=.git -C /tmp/offline -czf /tmp/m1-wifi-inputs.tar.gz .
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: m1-wifi-inputs
+          path: /tmp/m1-wifi-inputs.tar.gz
+          retention-days: 3
