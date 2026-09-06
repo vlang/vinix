@@ -18,8 +18,12 @@ if [ -x "$SCRIPT_DIR/link-worktree-build-dirs.sh" ]; then
 fi
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 BOOT_DIR="$SCRIPT_DIR/boot-image"
-BOOT_DISK="$BOOT_DIR/boot.img"
-OVMF_VARS="/tmp/vinix-efivars.fd"
+# Both paths can be overridden so two QEMU runs on this machine (say, a CI
+# check and a developer's boot) never share a disk image or NVRAM file: QEMU
+# takes a write lock on the image, and a second run either fails to start or
+# boots whatever the first one last copied in.
+BOOT_DISK="${VINIX_BOOT_DISK:-$BOOT_DIR/boot.img}"
+OVMF_VARS="${VINIX_EFIVARS:-/tmp/vinix-efivars.fd}"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 LIMINE_VERSION="9.3.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
