@@ -968,6 +968,144 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 interrupt_config_record(1, 0x10, "PMP_STATUS"), "test"
             )
 
+    def test_recovers_rtbuddy_firmware_source_selection(self) -> None:
+        edt = 0x10000
+        attempt = 0x20000
+        preload_handler = 0x30000
+        service_handler = 0x31000
+        matching = 0x32000
+        preloaded = 0x33000
+        segment_map = 0x34000
+        iboot_loaded = 0x35000
+        fixup = 0x36000
+
+        def branch(source: int, target: int) -> bytes:
+            delta = (target - source) // 4
+            return struct.pack("<I", 0x94000000 | delta & 0x3FFFFFF)
+
+        edt_code = struct.pack(
+            "<8I",
+            0xF100001F,
+            0x1A9F07E8,
+            0x3908C2A8,
+            0xF100001F,
+            0x1A9F07E8,
+            0x3908C6A8,
+            0x52800020,
+            0x3908CAA0,
+        )
+        attempt_code = struct.pack(
+            "<6I",
+            0x39434008,
+            0x91400808,
+            0x3948C909,
+            0x3948C108,
+            0xD2813B11,
+            0x39066109,
+        )
+        attempt_code += branch(attempt + len(attempt_code), service_handler)
+        attempt_code += branch(attempt + len(attempt_code), matching)
+        preload_code = struct.pack("<3I", 0xF950C000, 0xF9405E61, 0xD2812511)
+        preload_code += branch(preload_handler + len(preload_code), preloaded)
+        preloaded_code = branch(preloaded, segment_map)
+        preloaded_code += struct.pack("<2I", 0x52800028, 0x39030268)
+        iboot_code = struct.pack(
+            "<4I", 0xD503245F, 0x39430008, 0x12000100, 0xD65F03C0
+        )
+        fixup_code = struct.pack(
+            "<6I",
+            0x39430268,
+            0x37000068,
+            0xF9404E68,
+            0xB40000E8,
+            0x52844628,
+            0x39400108,
+        )
+        functions = {
+            recover_t6050_power.RTBUDDY_INIT_CONFIG_EDT: (edt, edt_code),
+            recover_t6050_power.RTBUDDY_ATTEMPT_FIRMWARE_LOAD: (attempt, attempt_code),
+            recover_t6050_power.RTBUDDY_HANDLE_PRELOAD_FIRMWARE: (
+                preload_handler,
+                preload_code,
+            ),
+            recover_t6050_power.RTBUDDY_FIRMWARE_PRELOADED: (preloaded, preloaded_code),
+            recover_t6050_power.RTBUDDY_FIRMWARE_IBOOT_LOADED: (
+                iboot_loaded,
+                iboot_code,
+            ),
+            recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP: (fixup, fixup_code),
+        }
+        symbols = {
+            recover_t6050_power.RTBUDDY_INIT_CONFIG_EDT: edt,
+            recover_t6050_power.RTBUDDY_ATTEMPT_FIRMWARE_LOAD: attempt,
+            recover_t6050_power.RTBUDDY_HANDLE_PRELOAD_FIRMWARE: preload_handler,
+            recover_t6050_power.RTBUDDY_HANDLE_SERVICE_FIRMWARE: service_handler,
+            recover_t6050_power.RTBUDDY_SERVICE_MATCHING_ROLE: matching,
+            recover_t6050_power.RTBUDDY_FIRMWARE_PRELOADED: preloaded,
+            recover_t6050_power.RTBUDDY_FIRMWARE_INIT_SEGMENT_MAP: segment_map,
+            recover_t6050_power.RTBUDDY_FIRMWARE_IBOOT_LOADED: iboot_loaded,
+            recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP: fixup,
+        }
+        strings = {
+            0x4FC: "pre-loaded",
+            0x54C: "running",
+            0x590: "no-firmware-service",
+        }
+        patch = mock.patch.object(
+            recover_t6050_power,
+            "read_adrp_add_cstring",
+            side_effect=lambda _image, _address, _code, adrp, _add: strings[adrp],
+        )
+        with patch:
+            result = recover_t6050_power.recover_rtbuddy_firmware_source_contract(
+                b"", functions, symbols, preload_handler
+            )
+        self.assertEqual(
+            result["device_tree_properties"],
+            ["pre-loaded", "running", "no-firmware-service"],
+        )
+        self.assertIn(
+            "`pre-loaded` alone never sets it", result["skip_firmware_service_rule"]
+        )
+        self.assertEqual(
+            result["selection"][0]["path"],
+            "wait for an RTBuddyFirmwareService matching the role",
+        )
+        self.assertEqual(result["selection"][2]["vtable_slot"], 0x9D8)
+        self.assertEqual(result["iboot_loaded"]["object_byte_offset"], 0xC0)
+
+        # The preload handler must stay a virtual dispatch: a direct call would
+        # mean the selector no longer guards it.
+        bad = dict(functions)
+        bad[recover_t6050_power.RTBUDDY_ATTEMPT_FIRMWARE_LOAD] = (
+            attempt,
+            attempt_code + branch(attempt + len(attempt_code), preload_handler),
+        )
+        with patch:
+            with self.assertRaisesRegex(ValueError, "virtual dispatch"):
+                recover_t6050_power.recover_rtbuddy_firmware_source_contract(
+                    b"", bad, symbols, preload_handler
+                )
+
+        with patch:
+            with self.assertRaisesRegex(ValueError, "preload handler"):
+                recover_t6050_power.recover_rtbuddy_firmware_source_contract(
+                    b"", functions, symbols, preload_handler + 4
+                )
+
+        bad = dict(functions)
+        bad[recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP] = (
+            fixup,
+            fixup_code.replace(
+                struct.pack("<I", 0x39430268), struct.pack("<I", 0xD503201F), 1
+            ),
+        )
+        with patch:
+            with self.assertRaisesRegex(ValueError, "copy-to-target guard"):
+                recover_t6050_power.recover_rtbuddy_firmware_source_contract(
+                    b"", bad, symbols, preload_handler
+                )
+
     def test_recovers_t6050_pmgr_ptd_regmap_dispatch(self) -> None:
         init = 0x10000
         init_reg_map = 0x20000
@@ -1765,6 +1903,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0xD2805B11,
             0xB4000040,
             0x3904CA9F,
+        ) + struct.pack("<3I", 0xF9009680, 0x3904C29F, 0x3904869F)
+        has_iboot_code = struct.pack(
+            "<5I", 0xD503245F, 0xF9409408, 0xF100011F, 0x1A9F07E0, 0xD65F03C0
         )
         start_cpu_code = struct.pack(
             "<6I",
@@ -1847,13 +1988,40 @@ class RecoverT6050PowerTests(unittest.TestCase):
                 0x9000,
                 dart_map_code,
             ),
+            recover_t6050_power.APPLE_A7IOP_HAS_IBOOT_FIRMWARE: (
+                0xA000,
+                has_iboot_code,
+            ),
         }
         vtable_targets = {
             recover_t6050_power.APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT: 0x8000
         }
-        result = recover_t6050_power.recover_apple_a7iop_code_contract(
-            functions, vtable_targets
+        segment_ranges = mock.patch.object(
+            recover_t6050_power,
+            "read_adrp_add_cstring",
+            return_value="segment-ranges",
         )
+        with segment_ranges:
+            result = recover_t6050_power.recover_apple_a7iop_code_contract(
+                b"", functions, vtable_targets
+            )
+        probe = result["apple_a7iop"]["iboot_firmware_probe"]
+        self.assertEqual(probe["property"], "segment-ranges")
+        self.assertEqual(probe["object_offset"], 0x128)
+        self.assertIn("DART record ownership only", probe["scope"])
+
+        bad_functions = dict(functions)
+        bad_functions[recover_t6050_power.APPLE_A7IOP_HAS_IBOOT_FIRMWARE] = (
+            0xA000,
+            has_iboot_code.replace(
+                struct.pack("<I", 0xF9409408), struct.pack("<I", 0xF9409008), 1
+            ),
+        )
+        with segment_ranges:
+            with self.assertRaisesRegex(ValueError, "iBoot firmware predicate"):
+                recover_t6050_power.recover_apple_a7iop_code_contract(
+                    b"", bad_functions, vtable_targets
+                )
         wrapper = result["wrapper_mailbox"]
         self.assertEqual(wrapper["device_memory_index"], 0)
         self.assertEqual(wrapper["memory_map_object_offset"], 0x140)
@@ -1880,10 +2048,11 @@ class RecoverT6050PowerTests(unittest.TestCase):
             0x2000,
             reg_code.replace(struct.pack("<I", 0xB8614900), struct.pack("<I", 0xF8614900)),
         )
-        with self.assertRaisesRegex(ValueError, "register accessor"):
-            recover_t6050_power.recover_apple_a7iop_code_contract(
-                bad_functions, vtable_targets
-            )
+        with segment_ranges:
+            with self.assertRaisesRegex(ValueError, "register accessor"):
+                recover_t6050_power.recover_apple_a7iop_code_contract(
+                    b"", bad_functions, vtable_targets
+                )
 
     def test_recovers_ascwrap_v6_iorvbar_and_cpu_run_control(self) -> None:
         initialize = 0x1000

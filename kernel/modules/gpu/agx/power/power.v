@@ -57,6 +57,10 @@ const t6050_interrupt_config_name_size = u32(16)
 const t6050_interrupt_config_max_bytes = u32(0x13f)
 const t6050_interrupt_config_kind_limit = u8(0x10)
 const t6050_pmp_ready_interrupt_name = 'PMP_STATUS'
+const t6050_nub_preloaded_property = 'pre-loaded'
+const t6050_nub_running_property = 'running'
+const t6050_nub_no_firmware_service_property = 'no-firmware-service'
+const t6050_nub_segment_ranges_property = 'segment-ranges'
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -148,6 +152,40 @@ pub enum T6050PowerResult {
 	transport_error
 	timed_out
 	faulted
+}
+
+// Which firmware image an RTBuddy target adopts. RTBuddy::_attemptFirmwareLoad
+// only bypasses its firmware service when the nub declares itself already
+// `running` or opts out with `no-firmware-service`; `pre-loaded` alone is the
+// second gate and never reaches that test on its own.
+pub enum T6050PmpFirmwareSource {
+	await_firmware_service
+	service_firmware
+	preload
+}
+
+// The two iBoot ownership questions are distinct and must not be conflated.
+// `segment-ranges` makes AppleA7IOP::_hasiBootFirmware true, which only marks
+// the DART records as iBoot-installed; it says nothing about whether the image
+// itself is inherited.
+pub struct T6050PmpFirmwareOwnership {
+pub:
+	source                T6050PmpFirmwareSource
+	iboot_mapped_segments bool
+	preloaded             bool
+	running               bool
+	no_firmware_service   bool
+}
+
+// True when RTBuddy would skip waiting for an RTBuddyFirmwareService.
+pub fn (ownership &T6050PmpFirmwareOwnership) skips_firmware_service() bool {
+	return ownership.running || ownership.no_firmware_service
+}
+
+// True when the host must supply and patch a firmware image itself, which is
+// the case for every source other than the DeviceTree segment-map preload.
+pub fn (ownership &T6050PmpFirmwareOwnership) needs_host_image() bool {
+	return ownership.source != .preload
 }
 
 // Where the PMP readiness interrupt lives, resolved from PMGR's runtime
@@ -650,6 +688,64 @@ pub fn (mut controller T6050PowerController) begin_dynamic(die u32, enabled bool
 	return controller.begin(die, enabled)
 }
 
+// Classify one PMP nub exactly as RTBuddy::_initConfigEDT plus
+// _attemptFirmwareLoad would. This is read-only classification: it tells a
+// future owner whether it must provide a firmware image, and it never implies
+// that an iBoot-mapped segment list is an inherited image.
+fn get_t6050_pmp_firmware_ownership(nub &devicetree.DTNode) T6050PmpFirmwareOwnership {
+	preloaded := native_flag_property_set(nub, t6050_nub_preloaded_property)
+	running := native_flag_property_set(nub, t6050_nub_running_property)
+	no_firmware_service := native_flag_property_set(nub,
+		t6050_nub_no_firmware_service_property)
+	mut iboot_mapped_segments := false
+	if _ := devicetree.get_property(nub, t6050_nub_segment_ranges_property) {
+		iboot_mapped_segments = true
+	}
+	mut source := T6050PmpFirmwareSource.await_firmware_service
+	if running || no_firmware_service {
+		source = if preloaded {
+			T6050PmpFirmwareSource.preload
+		} else {
+			T6050PmpFirmwareSource.service_firmware
+		}
+	}
+	return T6050PmpFirmwareOwnership{
+		source: source
+		iboot_mapped_segments: iboot_mapped_segments
+		preloaded: preloaded
+		running: running
+		no_firmware_service: no_firmware_service
+	}
+}
+
+fn validate_t6050_firmware_ownership_codec() bool {
+	// Mac17,6 publishes segment-ranges and pre-loaded but neither running nor
+	// no-firmware-service, so RTBuddy waits for ApplePMPFirmware and the image
+	// is host-supplied despite the iBoot-installed DART records.
+	observed := T6050PmpFirmwareOwnership{
+		source: .await_firmware_service
+		iboot_mapped_segments: true
+		preloaded: true
+	}
+	if observed.skips_firmware_service() || !observed.needs_host_image() {
+		return false
+	}
+	inherited := T6050PmpFirmwareOwnership{
+		source: .preload
+		iboot_mapped_segments: true
+		preloaded: true
+		running: true
+	}
+	if !inherited.skips_firmware_service() || inherited.needs_host_image() {
+		return false
+	}
+	opted_out := T6050PmpFirmwareOwnership{
+		source: .service_firmware
+		no_firmware_service: true
+	}
+	return opted_out.skips_firmware_service() && opted_out.needs_host_image()
+}
+
 // ApplePMGR::initDriver decodes this property as 20-byte records whose byte 0
 // is a per-die slot, byte 3 an interrupt kind below 16, and bytes 4..19 a
 // fixed-size name. It rejects a property above 0x13f bytes and a slot at or
@@ -888,6 +984,13 @@ fn node_string_contains(node &devicetree.DTNode, property string, expected strin
 		}
 	}
 	return false
+}
+
+// Apple's EDT flags are presence-tested first and only then read, so an
+// unreadable or non-unit value is not a set flag.
+fn native_flag_property_set(node &devicetree.DTNode, property string) bool {
+	value := devicetree.get_le_u32(node, property) or { return false }
+	return value == 1
 }
 
 fn native_properties_equal(left &devicetree.DTNode, right &devicetree.DTNode,
@@ -1159,7 +1262,9 @@ fn validate_t6050_pmp_instance(die u32) ?&devicetree.DTNode {
 // access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 	if !validate_t6050_ptd_codec() || !validate_t6050_wrapper_codec()
-		|| !validate_t6050_readiness_codec() || !dart.validate_t8110_codec() {
+		|| !validate_t6050_readiness_codec()
+		|| !validate_t6050_firmware_ownership_codec()
+		|| !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false
 	}
@@ -1218,6 +1323,13 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		println('agx: native t6050 PMGR PMP readiness interrupt is unavailable')
 		return false
 	}
+	firmware := get_t6050_pmp_firmware_ownership(pmp0_nub)
+	if firmware.needs_host_image() {
+		// Expected on Mac17,6: iBoot maps the segments but does not hand off a
+		// started image, so bring-up still owes a firmware image and its
+		// patchbay before any PMP transition is legal.
+		println('agx: native t6050 PMP firmware image is host-owned; RTKit handoff still required')
+	}
 	if !validate_ptd_range(pmp0_nub, 'PMP-STATUS', 2, 1, 1, 16)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PKT', 9, 0x90, 0x150, 0)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PS-REQ', 10, 0x1e0, 8, 0)
@@ -1226,7 +1338,8 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 			7, 8, 40, 9, 10, 11, 12, 13, 14]) {
 		return false
 	}
-	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), PMP_STATUS interrupt slot %u of %u per die, read-only)\n',
-		die_count, ready_interrupt.slot, ready_interrupt.interrupts_per_die)
+	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), PMP_STATUS interrupt slot %u of %u per die, iboot-mapped segments %u, read-only)\n',
+		die_count, ready_interrupt.slot, ready_interrupt.interrupts_per_die,
+		u32(firmware.iboot_mapped_segments))
 	return true
 }

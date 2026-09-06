@@ -289,6 +289,43 @@ def parse_pmp(node: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+RTBUDDY_FIRMWARE_SOURCE_PROPERTIES = ("pre-loaded", "running", "no-firmware-service")
+
+
+def parse_pmp_nub(nub: dict[str, Any], role: str) -> dict[str, Any]:
+    """Report which firmware image RTBuddy will adopt for one PMP nub.
+
+    `pre-loaded` and `segment-ranges` do not by themselves make RTBuddy skip
+    its firmware service: `RTBuddy::_attemptFirmwareLoad` only takes the
+    preload path when the nub also declares `running` or `no-firmware-service`.
+    """
+    expected = f"iop-{role.lower()}-nub"
+    if nub.get("IORegistryEntryName") != expected:
+        raise InspectError(f"{role} nub plist is not {expected}")
+    if nub.get("IOObjectClass") != "AppleA7IOPNub":
+        raise InspectError(f"{expected} has an unexpected IOObjectClass")
+    flags = {name: name in nub for name in RTBUDDY_FIRMWARE_SOURCE_PROPERTIES}
+    for name, present in flags.items():
+        if not present:
+            continue
+        value = nub[name]
+        if not isinstance(value, bytes) or decode_uint(value, 32, name) != 1:
+            raise InspectError(f"{expected} {name} is not the expected flag")
+    skip_firmware_service = flags["running"] or flags["no-firmware-service"]
+    if skip_firmware_service:
+        path = "preload" if flags["pre-loaded"] else "service-firmware"
+    else:
+        path = "await-firmware-service"
+    return {
+        "name": expected,
+        "role": role,
+        "properties": flags,
+        "has_segment_ranges": "segment-ranges" in nub,
+        "skip_firmware_service": skip_firmware_service,
+        "firmware_load_path": path,
+    }
+
+
 def parse_pmp_endpoint_service(node: dict[str, Any]) -> dict[str, Any]:
     if node.get("IOObjectClass") != "RTBuddyEndpointService":
         raise InspectError("PMP endpoint service has an unexpected IOObjectClass")
@@ -563,6 +600,24 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             ["ioreg", "-a", "-p", "IODeviceTree", "-n", "pmp1", "-r"]
         )
 
+    if args.pmp0_nub_plist:
+        pmp0_nub_raw = _load_plist(args.pmp0_nub_plist)
+    elif args.pmp0_plist:
+        pmp0_nub_raw = pmp0_raw
+    else:
+        pmp0_nub_raw = _run_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "iop-pmp0-nub", "-r", "-d", "1"]
+        )
+
+    if args.pmp1_nub_plist:
+        pmp1_nub_raw = _load_plist(args.pmp1_nub_plist)
+    elif args.pmp1_plist or pmp1_raw is None:
+        pmp1_nub_raw = None
+    else:
+        pmp1_nub_raw = _run_optional_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "iop-pmp1-nub", "-r", "-d", "1"]
+        )
+
     if args.pmp0_endpoint_plist:
         pmp0_endpoint_raw = _load_plist(args.pmp0_endpoint_plist)
     elif args.pmp0_plist:
@@ -592,8 +647,11 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     if asc1_raw is not None:
         asc_roles.append(parse_asc(_first_node(asc1_raw, "gfx1-asc plist")))
     pmp_roles = [parse_pmp(_first_node(pmp0_raw, "pmp0 plist"))]
+    pmp_nubs = [parse_pmp_nub(_first_node(pmp0_nub_raw, "pmp0 nub plist"), "PMP0")]
     if pmp1_raw is not None:
         pmp_roles.append(parse_pmp(_first_node(pmp1_raw, "pmp1 plist")))
+    if pmp1_nub_raw is not None:
+        pmp_nubs.append(parse_pmp_nub(_first_node(pmp1_nub_raw, "pmp1 nub plist"), "PMP1"))
     pmp_endpoint_services = []
     if pmp0_endpoint_raw is not None:
         pmp_endpoint_services.append(
@@ -608,7 +666,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
     manifest = {
-        "schema": 4,
+        "schema": 5,
         "host": {
             "architecture": platform.machine(),
             "macos_version": platform.mac_ver()[0],
@@ -618,6 +676,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         "asc": primary_asc,
         "asc_roles": asc_roles,
         "pmp_roles": pmp_roles,
+        "pmp_nubs": pmp_nubs,
         "pmp_endpoint_services": pmp_endpoint_services,
         "accelerator": parse_accelerator(_first_node(accelerator_raw, "accelerator plist")),
         "driver": parse_driver_info(_load_plist(driver_path)),
@@ -643,6 +702,12 @@ def main() -> int:
     )
     parser.add_argument(
         "--pmp1-plist", type=Path, help="read an ioreg pmp1 plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--pmp0-nub-plist", type=Path, help="read an ioreg iop-pmp0-nub plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--pmp1-nub-plist", type=Path, help="read an ioreg iop-pmp1-nub plist instead of live IORegistry"
     )
     parser.add_argument(
         "--pmp0-endpoint-plist",

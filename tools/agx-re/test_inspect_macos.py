@@ -201,6 +201,62 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertEqual(result["compatible"], ["arm-io,t6050"])
         self.assertEqual(result["die_count"], 1)
 
+    @staticmethod
+    def pmp_nub(role: str, **properties: bytes) -> dict:
+        node = {
+            "IORegistryEntryName": f"iop-{role.lower()}-nub",
+            "IOObjectClass": "AppleA7IOPNub",
+            "segment-ranges": b"\x00" * 64,
+        }
+        node.update(properties)
+        return node
+
+    def test_preloaded_pmp_nub_still_awaits_a_firmware_service(self) -> None:
+        # `pre-loaded` alone never sets RTBuddy's skip-firmware-service flag.
+        result = inspect_macos.parse_pmp_nub(
+            self.pmp_nub("PMP0", **{"pre-loaded": struct.pack("<I", 1)}), "PMP0"
+        )
+        self.assertTrue(result["has_segment_ranges"])
+        self.assertTrue(result["properties"]["pre-loaded"])
+        self.assertFalse(result["skip_firmware_service"])
+        self.assertEqual(result["firmware_load_path"], "await-firmware-service")
+
+    def test_running_pmp_nub_takes_the_preload_path(self) -> None:
+        result = inspect_macos.parse_pmp_nub(
+            self.pmp_nub(
+                "PMP1",
+                **{
+                    "pre-loaded": struct.pack("<I", 1),
+                    "running": struct.pack("<I", 1),
+                },
+            ),
+            "PMP1",
+        )
+        self.assertTrue(result["skip_firmware_service"])
+        self.assertEqual(result["firmware_load_path"], "preload")
+
+    def test_opted_out_pmp_nub_without_preload_uses_service_firmware(self) -> None:
+        result = inspect_macos.parse_pmp_nub(
+            self.pmp_nub(
+                "PMP0", **{"no-firmware-service": struct.pack("<I", 1)}
+            ),
+            "PMP0",
+        )
+        self.assertTrue(result["skip_firmware_service"])
+        self.assertEqual(result["firmware_load_path"], "service-firmware")
+
+    def test_rejects_mismatched_or_malformed_pmp_nub(self) -> None:
+        with self.assertRaisesRegex(inspect_macos.InspectError, "iop-pmp1-nub"):
+            inspect_macos.parse_pmp_nub(self.pmp_nub("PMP0"), "PMP1")
+        node = self.pmp_nub("PMP0")
+        node["IOObjectClass"] = "IOService"
+        with self.assertRaisesRegex(inspect_macos.InspectError, "IOObjectClass"):
+            inspect_macos.parse_pmp_nub(node, "PMP0")
+        with self.assertRaisesRegex(inspect_macos.InspectError, "expected flag"):
+            inspect_macos.parse_pmp_nub(
+                self.pmp_nub("PMP0", **{"pre-loaded": struct.pack("<I", 2)}), "PMP0"
+            )
+
     def test_decodes_pmp_application_endpoint_service(self) -> None:
         result = inspect_macos.parse_pmp_endpoint_service(
             {

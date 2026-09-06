@@ -167,6 +167,24 @@ RTBUDDY_CALL_PATCHBAY_CALLBACK = (
 )
 RTBUDDY_POWER_ON = "__ZN7RTBuddy7powerOnEv"
 RTBUDDY_LOAD_FIRMWARE = "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware"
+RTBUDDY_VTABLE = "__ZTV7RTBuddy"
+RTBUDDY_INIT_CONFIG_EDT = "__ZN7RTBuddy14_initConfigEDTEv"
+RTBUDDY_ATTEMPT_FIRMWARE_LOAD = "__ZN7RTBuddy20_attemptFirmwareLoadEv"
+RTBUDDY_HANDLE_PRELOAD_FIRMWARE = "__ZN7RTBuddy22_handlePreloadFirmwareEv"
+RTBUDDY_HANDLE_SERVICE_FIRMWARE = "__ZN7RTBuddy22_handleServiceFirmwareEv"
+RTBUDDY_SERVICE_MATCHING_ROLE = (
+    "__ZN22RTBuddyFirmwareService26matchingDictionaryWithRoleEP8OSString"
+)
+RTBUDDY_FIRMWARE_PRELOADED = (
+    "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString"
+)
+RTBUDDY_FIRMWARE_INIT_SEGMENT_MAP = (
+    "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString"
+)
+RTBUDDY_FIRMWARE_IBOOT_LOADED = "__ZNK15RTBuddyFirmware11iBootLoadedEv"
+RTBUDDY_PRELOADED_PROPERTY = "pre-loaded"
+RTBUDDY_RUNNING_PROPERTY = "running"
+RTBUDDY_NO_FIRMWARE_SERVICE_PROPERTY = "no-firmware-service"
 RTBUDDY_LOAD_FIRMWARE_GATED = (
     "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware"
 )
@@ -209,6 +227,8 @@ APPLE_WRAPPER_MAILBOX_PHYSICAL = (
 )
 APPLE_A7IOP_VTABLE = "__ZTV10AppleA7IOP"
 APPLE_A7IOP_START = "__ZN10AppleA7IOP5startEP9IOService"
+APPLE_A7IOP_HAS_IBOOT_FIRMWARE = "__ZN10AppleA7IOP17_hasiBootFirmwareEv"
+APPLE_A7IOP_SEGMENT_RANGES_PROPERTY = "segment-ranges"
 APPLE_A7IOP_START_CPU_OPTIONS = (
     "__ZN10AppleA7IOP19startCPUWithOptionsEP15IOSlaveFirmwarej"
 )
@@ -2460,6 +2480,182 @@ def recover_apple_pmp_firmware_code_contract(
     }
 
 
+def recover_rtbuddy_firmware_source_contract(
+    image: bytes,
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+    preload_vtable_target: int,
+) -> dict[str, object]:
+    """Recover which firmware an RTBuddy target actually loads.
+
+    Two independent ownership questions look alike and are not the same.
+    A nub that publishes `segment-ranges` makes `AppleA7IOP` treat its DART
+    records as iBoot-installed, but that does not make RTBuddy adopt an
+    iBoot-loaded image.  RTBuddy only skips its firmware service when the nub
+    also declares itself already `running`, or opts out with
+    `no-firmware-service`.
+    """
+
+    required = (
+        RTBUDDY_INIT_CONFIG_EDT,
+        RTBUDDY_ATTEMPT_FIRMWARE_LOAD,
+        RTBUDDY_HANDLE_PRELOAD_FIRMWARE,
+        RTBUDDY_HANDLE_SERVICE_FIRMWARE,
+        RTBUDDY_SERVICE_MATCHING_ROLE,
+        RTBUDDY_FIRMWARE_PRELOADED,
+        RTBUDDY_FIRMWARE_INIT_SEGMENT_MAP,
+        RTBUDDY_FIRMWARE_IBOOT_LOADED,
+        RTBUDDY_FIRMWARE_FIXUP,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"RTBuddy is missing firmware-source symbols: {missing!r}")
+
+    edt_address, edt_code = functions[RTBUDDY_INIT_CONFIG_EDT]
+    properties = []
+    for offset, expected in (
+        (0x4FC, RTBUDDY_PRELOADED_PROPERTY),
+        (0x54C, RTBUDDY_RUNNING_PROPERTY),
+        (0x590, RTBUDDY_NO_FIRMWARE_SERVICE_PROPERTY),
+    ):
+        actual = read_adrp_add_cstring(image, edt_address, edt_code, offset, offset + 4)
+        if actual != expected:
+            raise ValueError(
+                f"RTBuddy EDT property at {offset:#x} changed: {actual!r}"
+            )
+        properties.append(actual)
+    if not _has_ordered_words(
+        edt_code,
+        (
+            0xF100001F,  # cmp x0, #0 -- pre-loaded present?
+            0x1A9F07E8,  # cset w8, ne
+            0x3908C2A8,  # strb w8, [x21, #0x230]
+            0xF100001F,  # cmp x0, #0 -- running present?
+            0x1A9F07E8,  # cset w8, ne
+            0x3908C6A8,  # strb w8, [x21, #0x231]
+            0x52800020,  # mov w0, #1
+            0x3908CAA0,  # strb w0, [x21, #0x232] -- running or no-firmware-service
+        ),
+    ):
+        raise ValueError("RTBuddy EDT firmware-source flags changed")
+
+    attempt_address, attempt_code = functions[RTBUDDY_ATTEMPT_FIRMWARE_LOAD]
+    attempt_targets = direct_branch_targets(attempt_address, attempt_code)
+    for name in (RTBUDDY_HANDLE_SERVICE_FIRMWARE, RTBUDDY_SERVICE_MATCHING_ROLE):
+        if symbols[name] not in attempt_targets:
+            raise ValueError(f"RTBuddy firmware-load selection no longer calls {name}")
+    if symbols[RTBUDDY_HANDLE_PRELOAD_FIRMWARE] in attempt_targets:
+        raise ValueError("RTBuddy preload path is no longer a virtual dispatch")
+    if preload_vtable_target != symbols[RTBUDDY_HANDLE_PRELOAD_FIRMWARE]:
+        raise ValueError(
+            f"RTBuddy vtable slot {0x9D8:#x} is no longer the preload handler"
+        )
+    if not _has_ordered_words(
+        attempt_code,
+        (
+            0x39434008,  # ldrb w8, [x0, #0xd0] -- already attempted
+            0x91400808,  # add x8, x0, #0x2, lsl #12
+            0x3948C909,  # ldrb w9, [x8, #0x232] -- running or opted out
+            0x3948C108,  # ldrb w8, [x8, #0x230] -- pre-loaded
+            0xD2813B11,  # mov x17, #0x9d8 -- preload handler
+            0x39066109,  # strb w9, [x8, #0x198] -- awaiting a firmware service
+        ),
+    ):
+        raise ValueError("RTBuddy firmware-load selection changed")
+
+    preload_address, preload_code = functions[RTBUDDY_HANDLE_PRELOAD_FIRMWARE]
+    if symbols[RTBUDDY_FIRMWARE_PRELOADED] not in direct_branch_targets(
+        preload_address, preload_code
+    ) or not _has_ordered_words(
+        preload_code,
+        (
+            0xF950C000,  # ldr x0, [x0, #0x2180] -- segment map
+            0xF9405E61,  # ldr x1, [x19, #0xb8] -- role name
+            0xD2812511,  # mov x17, #0x928 -- loadFirmware
+        ),
+    ):
+        raise ValueError("RTBuddy preload handler changed")
+
+    preloaded_address, preloaded_code = functions[RTBUDDY_FIRMWARE_PRELOADED]
+    if symbols[RTBUDDY_FIRMWARE_INIT_SEGMENT_MAP] not in direct_branch_targets(
+        preloaded_address, preloaded_code
+    ) or not _has_ordered_words(
+        preloaded_code,
+        (
+            0x52800028,  # mov w8, #1
+            0x39030268,  # strb w8, [x19, #0xc0] -- iBoot-loaded
+        ),
+    ):
+        raise ValueError("RTBuddy preloaded-firmware constructor changed")
+
+    _iboot_address, iboot_code = functions[RTBUDDY_FIRMWARE_IBOOT_LOADED]
+    if iboot_code != struct.pack(
+        "<4I", 0xD503245F, 0x39430008, 0x12000100, 0xD65F03C0
+    ):
+        raise ValueError("RTBuddyFirmware iBoot-loaded predicate changed")
+
+    _fixup_address, fixup_code = functions[RTBUDDY_FIRMWARE_FIXUP]
+    if not _has_ordered_words(
+        fixup_code,
+        (
+            0x39430268,  # ldrb w8, [x19, #0xc0] -- iBoot-loaded
+            0x37000068,  # tbnz w8, #0 -- an iBoot image is never recopied
+            0xF9404E68,  # ldr x8, [x19, #0x98] -- existing target map
+            0xB40000E8,  # cbz x8 -- otherwise copy the image to the target
+            0x52844628,  # mov w8, #0x2231 -- RTBuddy running flag
+            0x39400108,  # ldrb w8, [x8]
+        ),
+    ):
+        raise ValueError("RTBuddy firmware copy-to-target guard changed")
+
+    return {
+        "device_tree_properties": properties,
+        "flag_object_offsets": {
+            RTBUDDY_PRELOADED_PROPERTY: 0x2230,
+            RTBUDDY_RUNNING_PROPERTY: 0x2231,
+            "skip_firmware_service": 0x2232,
+        },
+        "skip_firmware_service_rule": (
+            "set when the nub publishes `running` or `no-firmware-service`; "
+            "`pre-loaded` alone never sets it"
+        ),
+        "selection": [
+            {
+                "when": "skip-firmware-service clear",
+                "path": "wait for an RTBuddyFirmwareService matching the role",
+                "awaiting_flag_object_offset": 0x2198,
+            },
+            {
+                "when": "skip-firmware-service set and pre-loaded clear",
+                "path": RTBUDDY_HANDLE_SERVICE_FIRMWARE,
+            },
+            {
+                "when": "skip-firmware-service set and pre-loaded set",
+                "path": RTBUDDY_HANDLE_PRELOAD_FIRMWARE,
+                "vtable_slot": 0x9D8,
+                "segment_map_object_offset": 0x2180,
+                "missing_segment_map_result": 0xE00002F0,
+            },
+        ],
+        "iboot_loaded": {
+            "predicate": RTBUDDY_FIRMWARE_IBOOT_LOADED,
+            "object_byte_offset": 0xC0,
+            "only_producer": RTBUDDY_FIRMWARE_PRELOADED,
+            "requires": RTBUDDY_FIRMWARE_INIT_SEGMENT_MAP,
+            "suppresses": RTBUDDY_FIRMWARE_COPY_TO_TARGET,
+            "scope": (
+                "an image adopted from the DeviceTree segment map; a firmware "
+                "service always produces a non-iBoot image that is copied to "
+                "the target unless one is already mapped"
+            ),
+        },
+        "scope": (
+            "this is the image-provenance decision only; it is independent of "
+            "whether AppleA7IOP treats the nub's DART records as iBoot-owned"
+        ),
+    }
+
+
 def recover_rtbuddy_boot_handshake_code_contract(
     functions: dict[str, tuple[int, bytes]],
     symbols: dict[str, int],
@@ -2781,6 +2977,11 @@ def recover_apple_pmp_firmware(
         RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
         RTBUDDY_CREATE_ENDPOINT,
         RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
+        RTBUDDY_INIT_CONFIG_EDT,
+        RTBUDDY_ATTEMPT_FIRMWARE_LOAD,
+        RTBUDDY_HANDLE_PRELOAD_FIRMWARE,
+        RTBUDDY_FIRMWARE_PRELOADED,
+        RTBUDDY_FIRMWARE_IBOOT_LOADED,
     )
     rtbuddy_functions = {
         name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
@@ -2836,6 +3037,12 @@ def recover_apple_pmp_firmware(
             service_vtable_targets,
             firmware_vtable_targets,
         ),
+        "firmware_source": recover_rtbuddy_firmware_source_contract(
+            rtbuddy_image,
+            rtbuddy_functions,
+            rtbuddy_symbols,
+            recover_vtable_target(rtbuddy_image, RTBUDDY_VTABLE, 0x9D8),
+        ),
         "rtkit_boot": recover_rtbuddy_boot_handshake_code_contract(
             rtbuddy_functions, rtbuddy_symbols
         ),
@@ -2843,6 +3050,7 @@ def recover_apple_pmp_firmware(
 
 
 def recover_apple_a7iop_code_contract(
+    image: bytes,
     functions: dict[str, tuple[int, bytes]],
     vtable_targets: dict[int, int],
 ) -> dict[str, object]:
@@ -2859,6 +3067,7 @@ def recover_apple_a7iop_code_contract(
         APPLE_A7IOP_ENABLE_SRAM,
         APPLE_A7IOP_ENABLE_POWER,
         APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE,
+        APPLE_A7IOP_HAS_IBOOT_FIRMWARE,
     )
     missing = [name for name in required if name not in functions]
     if missing:
@@ -2982,6 +3191,28 @@ def recover_apple_a7iop_code_contract(
     ):
         raise ValueError("AppleA7IOP iBoot firmware DART mapping changed")
 
+    a7_start_property = read_adrp_add_cstring(
+        image, _a7_start_address, a7_start_code, 0x34C, 0x350
+    )
+    if a7_start_property != APPLE_A7IOP_SEGMENT_RANGES_PROPERTY:
+        raise ValueError(
+            f"AppleA7IOP iBoot firmware property changed: {a7_start_property!r}"
+        )
+    if not _has_ordered_words(
+        a7_start_code,
+        (
+            0xF9009680,  # str x0, [x20, #0x128] -- retained segment-ranges data
+            0x3904C29F,  # strb wzr, [x20, #0x130]
+            0x3904869F,  # strb wzr, [x20, #0x121]
+        ),
+    ):
+        raise ValueError("AppleA7IOP iBoot firmware retention changed")
+    _has_iboot_address, has_iboot_code = functions[APPLE_A7IOP_HAS_IBOOT_FIRMWARE]
+    if has_iboot_code != struct.pack(
+        "<5I", 0xD503245F, 0xF9409408, 0xF100011F, 0x1A9F07E0, 0xD65F03C0
+    ):
+        raise ValueError("AppleA7IOP iBoot firmware predicate changed")
+
     _a7_reg_address, a7_reg_code = functions[APPLE_A7IOP_REG]
     if a7_reg_code != expected_reg:
         raise ValueError("AppleA7IOP register accessor changed")
@@ -3068,6 +3299,16 @@ def recover_apple_a7iop_code_contract(
                 "start_cpu_run_vtable_slot": 0xA28,
                 "start_cpu_run_argument": True,
             },
+            "iboot_firmware_probe": {
+                "predicate": APPLE_A7IOP_HAS_IBOOT_FIRMWARE,
+                "property": APPLE_A7IOP_SEGMENT_RANGES_PROPERTY,
+                "object_offset": 0x128,
+                "rule": "true exactly when the nub publishes segment-ranges",
+                "scope": (
+                    "this decides DART record ownership only; RTBuddy chooses "
+                    "its firmware image from separate nub properties"
+                ),
+            },
             "iboot_firmware_mapping": {
                 "mapper_get_page_size_vtable_slot": 0x888,
                 "mapper_reserve_vtable_slot": 0x890,
@@ -3130,6 +3371,7 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
             APPLE_A7IOP_ENABLE_SRAM,
             APPLE_A7IOP_ENABLE_POWER,
             APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE,
+            APPLE_A7IOP_HAS_IBOOT_FIRMWARE,
         )
     }
     a7_start_address, a7_start_code = functions[APPLE_A7IOP_START]
@@ -3152,7 +3394,7 @@ def recover_apple_a7iop(image: bytes) -> dict[str, object]:
     }
     return {
         "uuid": identity,
-        **recover_apple_a7iop_code_contract(functions, vtable_targets),
+        **recover_apple_a7iop_code_contract(image, functions, vtable_targets),
     }
 
 
