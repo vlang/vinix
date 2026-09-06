@@ -301,10 +301,6 @@ fn syscall_linux_fchmodat(_ voidptr, dirfd int, path charptr, mode u32, flags in
 // ── X11 / dynamic-linking syscall stubs ──
 
 // ftruncate: stub — pretend success (mostly used for tmpfiles).
-fn syscall_linux_ftruncate(_ voidptr, fd int, length i64) (u64, u64) {
-	return 0, 0
-}
-
 // sendfile: return ENOSYS so callers fall back to read/write
 fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset &i64, count u64) (u64, u64) {
 	return errno.err, errno.enosys
@@ -612,6 +608,64 @@ fn syscall_linux_dup(gpr_state voidptr, oldfd int) (u64, u64) {
 
 // Convert Vinix stat.Stat (144 bytes, x86_64 layout) to Linux aarch64 struct stat (128 bytes).
 // Field order and sizes differ: mode/nlink are swapped and narrower on aarch64, blksize is i32.
+// struct statx, the 256-byte form statx(2) fills. Its timestamps and its
+// split-out device numbers mean it cannot share the struct stat conversion.
+const statx_basic_stats = u32(0x7ff)
+
+fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
+	unsafe {
+		*&i64(dst + 0) = sec
+		*&u32(dst + 8) = u32(nsec)
+		*&i32(dst + 12) = 0
+	}
+}
+
+fn convert_stat_to_statx(src &stat.Stat, dst u64) {
+	unsafe {
+		C.memset(voidptr(dst), 0, 256)
+
+		*&u32(dst + 0) = statx_basic_stats // stx_mask: what we filled in
+		*&u32(dst + 4) = u32(src.blksize)
+		*&u64(dst + 8) = 0 // stx_attributes
+		*&u32(dst + 16) = u32(src.nlink)
+		*&u32(dst + 20) = src.uid
+		*&u32(dst + 24) = src.gid
+		*&u16(dst + 28) = u16(src.mode)
+		*&u64(dst + 32) = src.ino
+		*&u64(dst + 40) = u64(src.size)
+		*&u64(dst + 48) = u64(src.blocks)
+		*&u64(dst + 56) = 0 // stx_attributes_mask
+
+		write_statx_timestamp(dst + 64, src.atim.tv_sec, src.atim.tv_nsec)
+		write_statx_timestamp(dst + 80, 0, 0) // stx_btime: not tracked
+		write_statx_timestamp(dst + 96, src.ctim.tv_sec, src.ctim.tv_nsec)
+		write_statx_timestamp(dst + 112, src.mtim.tv_sec, src.mtim.tv_nsec)
+
+		*&u32(dst + 128) = u32(src.rdev >> 32) // stx_rdev_major
+		*&u32(dst + 132) = u32(src.rdev & 0xffffffff) // stx_rdev_minor
+		*&u32(dst + 136) = u32(src.dev >> 32) // stx_dev_major
+		*&u32(dst + 140) = u32(src.dev & 0xffffffff) // stx_dev_minor
+	}
+}
+
+// statx(dirfd, path, flags, mask, buf). The mask is a request, and a kernel is
+// free to answer with more than was asked for as long as stx_mask says what it
+// actually filled.
+fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, mask u32, buf u64) (u64, u64) {
+	if buf == 0 {
+		return errno.err, errno.efault
+	}
+
+	mut vinix_stat := stat.Stat{}
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
+	if err != 0 {
+		return ret, err
+	}
+
+	convert_stat_to_statx(&vinix_stat, buf)
+	return 0, 0
+}
+
 fn convert_stat_to_linux(src &stat.Stat, dst u64) {
 	unsafe {
 		*&u64(dst + 0) = src.dev
@@ -729,13 +783,6 @@ fn syscall_linux_fstatfs(_ voidptr, fd int, buf u64) (u64, u64) {
 	return 0, 0
 }
 
-// renameat: stub — return success (Xorg creates temp files and renames them).
-fn syscall_linux_renameat(gpr_state voidptr, olddirfd int, oldpath charptr, newdirfd int, newpath charptr) (u64, u64) {
-	// For now, just return success. A real implementation would need
-	// VFS rename support. Xorg uses this for XKB compiled keymaps.
-	return 0, 0
-}
-
 // setpriority / getpriority: stubs.
 fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
 	return 0, 0
@@ -765,6 +812,7 @@ pub fn init_syscall_table() {
 	syscall_table[29] = voidptr(fs.syscall_ioctl) // __NR_ioctl
 	syscall_table[34] = voidptr(fs.syscall_mkdirat) // __NR_mkdirat
 	syscall_table[35] = voidptr(fs.syscall_unlinkat) // __NR_unlinkat
+	syscall_table[36] = voidptr(fs.syscall_symlinkat) // __NR_symlinkat
 	syscall_table[37] = voidptr(fs.syscall_linkat) // __NR_linkat
 	syscall_table[39] = voidptr(fs.syscall_umount) // __NR_umount2
 	syscall_table[40] = voidptr(fs.syscall_mount) // __NR_mount
@@ -786,6 +834,10 @@ pub fn init_syscall_table() {
 	syscall_table[78] = voidptr(fs.syscall_readlinkat) // __NR_readlinkat
 	syscall_table[79] = voidptr(syscall_linux_fstatat) // __NR_fstatat / newfstatat
 	syscall_table[80] = voidptr(syscall_linux_fstat) // __NR_fstat
+	syscall_table[82] = voidptr(file.syscall_fsync) // __NR_fsync
+	syscall_table[83] = voidptr(file.syscall_fsync) // __NR_fdatasync
+	syscall_table[291] = voidptr(syscall_linux_statx) // __NR_statx
+	syscall_table[436] = voidptr(file.syscall_close_range) // __NR_close_range
 
 	// Process control
 	syscall_table[93] = voidptr(userland.syscall_exit) // __NR_exit
@@ -833,7 +885,7 @@ pub fn init_syscall_table() {
 	syscall_table[22] = voidptr(file.syscall_epoll_pwait) // __NR_epoll_pwait
 
 	syscall_table[32] = voidptr(syscall_linux_flock) // __NR_flock
-	syscall_table[46] = voidptr(syscall_linux_ftruncate) // __NR_ftruncate
+	syscall_table[46] = voidptr(file.syscall_ftruncate) // __NR_ftruncate
 	syscall_table[71] = voidptr(syscall_linux_sendfile) // __NR_sendfile
 	syscall_table[67] = voidptr(syscall_linux_pread64) // __NR_pread64
 	syscall_table[68] = voidptr(syscall_linux_pwrite64) // __NR_pwrite64
@@ -844,7 +896,8 @@ pub fn init_syscall_table() {
 	syscall_table[155] = voidptr(syscall_linux_getpgid) // __NR_getpgid
 	syscall_table[165] = voidptr(syscall_linux_getrusage) // __NR_getrusage
 	syscall_table[167] = voidptr(syscall_linux_prctl) // __NR_prctl
-	syscall_table[38] = voidptr(syscall_linux_renameat) // __NR_renameat
+	syscall_table[38] = voidptr(fs.syscall_renameat) // __NR_renameat
+	syscall_table[276] = voidptr(fs.syscall_renameat2) // __NR_renameat2
 	syscall_table[44] = voidptr(syscall_linux_fstatfs) // __NR_fstatfs
 	syscall_table[278] = voidptr(syscall_linux_getrandom) // __NR_getrandom
 	syscall_table[435] = voidptr(userland.syscall_clone3) // __NR_clone3
@@ -887,6 +940,10 @@ pub fn init_syscall_table() {
 
 	// TLS — on aarch64 musl sets TPIDR_EL0 directly, but keep Vinix's
 	// set_tls available at a high slot for mlibc compat
-	syscall_table[291] = voidptr(cpu.syscall_set_tls) // Vinix extension
-	syscall_table[292] = voidptr(userland.syscall_sigentry) // Vinix extension
+	// Vinix extensions. 245-259 is the block asm-generic sets aside for
+	// arch-specific syscalls and that arm64 never uses, so nothing upstream can
+	// grow into it. They used to sit on 291 and 292, which are statx and
+	// io_pgetevents: a program calling statx got set_tls with statx's arguments.
+	syscall_table[245] = voidptr(cpu.syscall_set_tls)
+	syscall_table[246] = voidptr(userland.syscall_sigentry)
 }

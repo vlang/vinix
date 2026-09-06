@@ -134,6 +134,11 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 
 fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	this.l.acquire()
+	// Both failure paths below used to return with the lock still held, which
+	// wedged every later access to the file.
+	defer {
+		this.l.release()
+	}
 
 	mut current_inode := &EXT2Inode{}
 
@@ -141,7 +146,8 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 
 	current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size) or { return none }
 
-	this.l.release()
+	this.stat.size = i64(new_size)
+	this.stat.blocks = i64(lib.div_roundup(new_size, u64(this.stat.blksize)))
 }
 
 struct EXT2Filesystem {

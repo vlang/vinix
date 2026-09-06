@@ -17,6 +17,9 @@ pub const f_getfd = 1
 pub const f_setfd = 2
 pub const f_getfl = 3
 pub const f_setfl = 4
+
+// close_range(2) flags.
+pub const close_range_cloexec = u32(1) << 2
 pub const f_getlk = 5
 pub const f_setlk = 6
 pub const f_setlkw = 7
@@ -405,10 +408,80 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	// dup2 quietly returns oldfd here; dup3 is required to refuse.
+	if oldfdnum == newfdnum {
+		return errno.err, errno.einval
+	}
+
 	new_fdnum := fdnum_dup(unsafe { nil }, oldfdnum, unsafe { nil }, newfdnum, flags,
 		true, false) or { return errno.err, errno.get() }
 
 	return u64(new_fdnum), 0
+}
+
+// close_range(first, last, flags): close every descriptor in the range, or mark
+// it close-on-exec when CLOSE_RANGE_CLOEXEC is given. Used by libcs and daemons
+// to shed inherited descriptors without walking /proc.
+pub fn syscall_close_range(_ voidptr, first u32, last u32, flags u32) (u64, u64) {
+	if first > last || flags & ~u32(close_range_cloexec) != 0 {
+		return errno.err, errno.einval
+	}
+
+	mut process := proc.current_thread().process
+
+	mut top := u64(last)
+	if top >= u64(proc.max_fds) {
+		top = u64(proc.max_fds) - 1
+	}
+
+	for i := u64(first); i <= top; i++ {
+		if flags & close_range_cloexec != 0 {
+			mut fd := fd_from_fdnum(process, int(i)) or { continue }
+			fd.flags |= resource.o_cloexec
+			fd.unref()
+			continue
+		}
+		fdnum_close(process, int(i), false) or { continue }
+	}
+
+	return 0, 0
+}
+
+// fsync/fdatasync. Writes here reach the resource as they are made — there is
+// no dirty page cache between a write and its backing store — so there is
+// nothing to flush. The descriptor is still validated, because reporting
+// success for a closed one would hide a real bug in the caller.
+pub fn syscall_fsync(_ voidptr, fdnum int) (u64, u64) {
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
+	fd.unref()
+
+	return 0, 0
+}
+
+// ftruncate(fd, length): set the file's size, zero-filling when it grows.
+pub fn syscall_ftruncate(_ voidptr, fdnum int, length i64) (u64, u64) {
+	if length < 0 {
+		return errno.err, errno.einval
+	}
+
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
+	defer {
+		fd.unref()
+	}
+
+	mut handle := fd.handle
+	mut res := handle.resource
+
+	if stat.isdir(res.stat.mode) {
+		return errno.err, errno.eisdir
+	}
+	if handle.flags & resource.o_accmode == resource.o_rdonly {
+		return errno.err, errno.einval
+	}
+
+	res.grow(voidptr(handle), u64(length)) or { return errno.err, errno.get() }
+
+	return 0, 0
 }
 
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
@@ -448,7 +521,11 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			fd.unref()
 		}
 		f_setfl {
-			handle.flags = int(arg)
+			// Only the status flags are settable. Taking the argument whole
+			// would drop the access mode the file was opened with, leaving a
+			// writable handle looking read-only.
+			handle.flags = (handle.flags & ~resource.file_settable_flags_mask)
+				| (int(arg) & resource.file_settable_flags_mask)
 			fd.unref()
 		}
 		else {

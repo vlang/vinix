@@ -563,7 +563,10 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		return errno.err, errno.einval
 	}
 
-	mut to_copy := u64(node.symlink_target.len + 1)
+	// readlink(2) does not terminate the buffer, and reports only the bytes it
+	// placed there. Counting the NUL made every caller see a target one byte
+	// longer than it is.
+	mut to_copy := u64(node.symlink_target.len)
 	if to_copy > limit {
 		to_copy = limit
 	}
@@ -605,14 +608,17 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		new_node
 	}
 
-	if stat.islnk(node.resource.stat.mode) {
+	// A symlink is only an error when the caller asked not to follow one.
+	// This used to return ELOOP for every symlink, before the reduce_node()
+	// below ever got the chance to resolve it, so open() on a symlink could
+	// not work at all.
+	if stat.islnk(node.resource.stat.mode) && !follow_links {
 		return errno.err, errno.eloop
 	}
 
-	// Follow symlinks
 	node = reduce_node(node, true)
 	if unsafe { node == 0 } {
-		return errno.err, errno.get()
+		return errno.err, errno.enoent
 	}
 
 	if !stat.isdir(node.resource.stat.mode) && flags & resource.o_directory != 0 {
@@ -819,7 +825,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	newparent, _, basename = path2node(newparent, newpath)
 
 	// Old and new must be on the same filesystem
-	if voidptr(oldparent.filesystem) != voidptr(newparent.filesystem) {
+	if !same_filesystem(oldparent, newparent) {
 		return errno.err, errno.exdev
 	}
 
@@ -1020,4 +1026,201 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 
 	handle.loc = base
 	return u64(base), 0
+}
+
+// symlinkat(target, newdirfd, linkpath): create `linkpath` pointing at `target`.
+// The target is never resolved here, so a symlink may name something that does
+// not exist yet.
+pub fn syscall_symlinkat(_ voidptr, _target charptr, newdirfd int, _linkpath charptr) (u64, u64) {
+	target := unsafe { cstring_to_vstring(_target) }
+	linkpath := unsafe { cstring_to_vstring(_linkpath) }
+
+	if target.len == 0 || linkpath.len == 0 {
+		return errno.err, errno.enoent
+	}
+
+	parent := get_parent_dir(newdirfd, linkpath) or { return errno.err, errno.get() }
+
+	symlink(parent, target, linkpath) or { return errno.err, errno.get() }
+
+	return 0, 0
+}
+
+// renameat2 flags.
+pub const rename_noreplace = 1
+
+pub const rename_exchange = 2
+
+pub const rename_whiteout = 4
+
+// Move a name from one directory to another. Every VFS operation here works on
+// the in-memory tree — unlink() and link() already do — so a rename is the same
+// kind of edit: the node moves between the two parents' child maps and learns
+// its new name.
+pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath string, flags int) ? {
+	if flags & rename_whiteout != 0 {
+		errno.set(errno.einval)
+		return none
+	}
+	if flags & rename_noreplace != 0 && flags & rename_exchange != 0 {
+		errno.set(errno.einval)
+		return none
+	}
+
+	vfs_lock.acquire()
+	defer {
+		vfs_lock.release()
+	}
+
+	mut old_parent_of, mut old_node, old_basename := path2node(oldparent, oldpath)
+	if unsafe { old_node == 0 } || unsafe { old_parent_of == 0 } {
+		errno.set(errno.enoent)
+		return none
+	}
+
+	mut new_parent_of, mut new_node, new_basename := path2node(newparent, newpath)
+	if unsafe { new_parent_of == 0 } {
+		errno.set(errno.enoent)
+		return none
+	}
+
+	if !same_filesystem(old_parent_of, new_parent_of) {
+		errno.set(errno.exdev)
+		return none
+	}
+
+	if flags & rename_exchange != 0 {
+		if unsafe { new_node == 0 } {
+			errno.set(errno.enoent)
+			return none
+		}
+		if is_ancestor(old_node, new_parent_of) || is_ancestor(new_node, old_parent_of) {
+			errno.set(errno.einval)
+			return none
+		}
+
+		unsafe {
+			old_parent_of.children[old_basename] = new_node
+			new_parent_of.children[new_basename] = old_node
+		}
+		adopt(mut old_node, mut new_parent_of, new_basename)
+		adopt(mut new_node, mut old_parent_of, old_basename)
+		return
+	}
+
+	// Renaming something onto itself is a no-op, not a way to delete it.
+	if voidptr(old_node) == voidptr(new_node) {
+		return
+	}
+
+	// A directory cannot be moved underneath itself; the subtree would be
+	// unreachable and the parent chain would loop.
+	if is_ancestor(old_node, new_parent_of) {
+		errno.set(errno.einval)
+		return none
+	}
+
+	if unsafe { new_node != 0 } {
+		if flags & rename_noreplace != 0 {
+			errno.set(errno.eexist)
+			return none
+		}
+
+		old_is_dir := stat.isdir(old_node.resource.stat.mode)
+		new_is_dir := stat.isdir(new_node.resource.stat.mode)
+		if new_is_dir && !old_is_dir {
+			errno.set(errno.eisdir)
+			return none
+		}
+		if !new_is_dir && old_is_dir {
+			errno.set(errno.enotdir)
+			return none
+		}
+		if new_is_dir && new_node.children.len > 2 {
+			errno.set(errno.enotempty)
+			return none
+		}
+
+		// Replacing drops the destination's last link.
+		new_parent_of.children.delete(new_basename)
+		new_node.resource.unlink(unsafe { nil })?
+		new_node.resource.unref(unsafe { nil })?
+	}
+
+	old_parent_of.children.delete(old_basename)
+	unsafe {
+		new_parent_of.children[new_basename] = old_node
+	}
+	adopt(mut old_node, mut new_parent_of, new_basename)
+}
+
+// Re-parent a node after a move, keeping the "." and ".." entries a directory
+// carries pointed at the right places.
+fn adopt(mut node VFSNode, mut parent VFSNode, name string) {
+	node.name = name
+	node.parent = parent
+
+	if !stat.isdir(node.resource.stat.mode) {
+		return
+	}
+	if unsafe { node.children == 0 } {
+		return
+	}
+	if '..' in node.children {
+		unsafe {
+			node.children['..'] = parent
+		}
+	}
+}
+
+// Two nodes share a filesystem when their interface values name the same
+// underlying object. The &FileSystem pointers cannot be compared directly:
+// create_node boxes the filesystem afresh for every node, so nodes on one
+// filesystem hold different boxes and would look like different mounts.
+fn same_filesystem(a &VFSNode, b &VFSNode) bool {
+	if unsafe { a == 0 } || unsafe { b == 0 } {
+		return false
+	}
+	return unsafe { *&voidptr(a.filesystem) == *&voidptr(b.filesystem) }
+}
+
+// Whether `ancestor` is `node` or sits anywhere above it.
+fn is_ancestor(ancestor &VFSNode, node &VFSNode) bool {
+	if unsafe { ancestor == 0 } || unsafe { node == 0 } {
+		return false
+	}
+
+	mut walk := unsafe { node }
+	for unsafe { walk != 0 } {
+		if voidptr(walk) == voidptr(ancestor) {
+			return true
+		}
+		if voidptr(walk.parent) == voidptr(walk) {
+			break
+		}
+		walk = walk.parent
+	}
+	return false
+}
+
+// renameat2(olddirfd, oldpath, newdirfd, newpath, flags).
+pub fn syscall_renameat2(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {
+	oldpath := unsafe { cstring_to_vstring(_oldpath) }
+	newpath := unsafe { cstring_to_vstring(_newpath) }
+
+	if oldpath.len == 0 || newpath.len == 0 {
+		return errno.err, errno.enoent
+	}
+
+	oldparent := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
+	newparent := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
+
+	rename(oldparent, oldpath, newparent, newpath, flags) or { return errno.err, errno.get() }
+
+	return 0, 0
+}
+
+// renameat(olddirfd, oldpath, newdirfd, newpath) is renameat2 with no flags.
+pub fn syscall_renameat(gpr_state voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr) (u64, u64) {
+	return syscall_renameat2(gpr_state, olddirfd, _oldpath, newdirfd, _newpath, 0)
 }

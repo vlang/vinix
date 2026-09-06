@@ -125,6 +125,8 @@ fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
 		this.l.release()
 	}
 
+	old_size := u64(this.stat.size)
+
 	mut new_capacity := this.capacity
 	for new_size > new_capacity {
 		new_capacity *= 2
@@ -138,6 +140,15 @@ fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
 
 	this.storage = new_storage
 	this.capacity = new_capacity
+
+	// Anything past the old end of the file has to read back as zero, whether
+	// it got there by seeking past the end and writing or by ftruncate. realloc
+	// makes no such promise about the memory it hands back.
+	if new_size > old_size {
+		unsafe {
+			C.memset(voidptr(u64(this.storage) + old_size), 0, new_size - old_size)
+		}
+	}
 
 	this.stat.size = new_size
 	this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
@@ -211,7 +222,8 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 		refcount: 1
 	}
 
-	new_resource.stat.size = u64(target.len)
+	// A symlink's size is the length of the path it holds, not of its own name.
+	new_resource.stat.size = i64(dest.len)
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = this.dev_id

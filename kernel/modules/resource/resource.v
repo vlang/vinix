@@ -17,10 +17,8 @@ pub const o_search = o_path
 pub const o_wronly = 0o01
 pub const o_append = 0o2000
 pub const o_creat = 0o100
-pub const o_directory = 0o200000
 pub const o_excl = 0o200
 pub const o_noctty = 0o400
-pub const o_nofollow = 0o400000
 pub const o_trunc = 0o1000
 pub const o_nonblock = 0o4000
 pub const o_dsync = 0o10000
@@ -31,6 +29,9 @@ pub const o_cloexec = 0o2000000
 pub const file_creation_flags_mask = o_creat | o_directory | o_excl | o_noctty | o_nofollow | o_trunc
 pub const file_descriptor_flags_mask = o_cloexec
 pub const file_status_flags_mask = ~(file_creation_flags_mask | file_descriptor_flags_mask)
+// What fcntl(F_SETFL) may change. The access mode and the creation flags are
+// settled at open time and have to survive it.
+pub const file_settable_flags_mask = o_append | o_nonblock | o_dsync | o_sync
 
 pub interface Resource {
 mut:
