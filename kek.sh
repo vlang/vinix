@@ -15,6 +15,19 @@
 #                               boot test then runs the AGX render test
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
 #
+# Everything below is off by default in the kernel, so these are the only way
+# to exercise it on real hardware. Start narrow: GPU and DCP can hard-reset the
+# machine, and with all three on at once a reset says nothing about which one
+# did it.
+#
+#   sudo ~/code/kek.sh battery  shell + SMC battery only; read-only, the safe
+#                               one to try first. `cat /dev/battery` reports
+#                               the charge
+#   sudo ~/code/kek.sh dcp      shell + display coprocessor only
+#   sudo ~/code/kek.sh drivers  shell + battery, DCP and GPU together
+#   sudo ~/code/kek.sh desktop-drivers   desktop + all three: the battery shows
+#                               beside the clock and Settings drives brightness
+#
 set -euo pipefail
 
 REPO="$HOME/code/vinix"
@@ -55,12 +68,29 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
         ;;
+    battery)
+        FLAGS=(--apple-battery --native-resolution)
+        MODE="shell + SMC battery"
+        ;;
+    dcp)
+        FLAGS=(--apple-dcp --native-resolution)
+        MODE="shell + Apple DCP"
+        ;;
+    drivers)
+        FLAGS=(--all-drivers --native-resolution)
+        MODE="shell + all Apple drivers"
+        ;;
+    desktop-drivers)
+        FLAGS=(--all-drivers --native-resolution --desktop-initramfs)
+        MODE="desktop + all Apple drivers"
+        ;;
     -h|--help)
-        sed -n '2,7p' "$0"
+        # The whole leading comment block, however long it grows.
+        awk 'NR > 1 { if (/^#/) print; else exit }' "$0"
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | battery | dcp | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
@@ -100,6 +130,25 @@ The machine must REBOOT. That proves PSCI works and that a silent machine
 in the other modes is real information rather than a broken signal.
 If it does NOT reboot, PSCI is unavailable and the halt modes mean nothing.
 ST
+    ;;
+*Apple\ drivers|*SMC\ battery|*Apple\ DCP)
+    cat <<'DRV'
+
+All three are off in the kernel unless the cmdline asks for them, so the boot
+log naming them is the first thing to check:
+
+  apple bring-up: GPU=enabled DCP=enabled    <- the line the kernel prints
+  apple-smc: ...                             <- silence here means it probed
+                                                and found its device tree node
+
+Then, on the shell:
+  cat /dev/battery       the charge, as the desktop's taskbar reads it
+  ls /dev/apple-panel-bl the backlight the Settings brightness bar writes
+
+A machine that resets instead of booting means one of these faulted. Re-run
+with `battery` alone first -- it is read-only and touches no display -- then
+`dcp`, and only then `drivers`. Which one resets it is the answer.
+DRV
     ;;
 halt*)
     cat <<'HALT'

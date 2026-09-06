@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploy Vinix ARM64 boot files to an already-mounted EFI System Partition.
-# Usage: ./deploy-m1-efi.sh [--apple-gpu] [--minimal-initramfs] /path/to/mounted/esp
+# Usage: ./deploy-m1-efi.sh [--all-drivers] [--minimal-initramfs] /path/to/mounted/esp
 
 set -euo pipefail
 
@@ -17,6 +17,23 @@ for argument in "$@"; do
         --apple-gpu)
             ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
+            ;;
+        --apple-dcp)
+            # The display coprocessor, and with it the panel backlight that
+            # Settings drives. Separate from the GPU: probing one must not run
+            # the other's sequence.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_dcp=1"
+            ;;
+        --apple-battery)
+            # The read-only SMC battery client behind /dev/battery, which the
+            # desktop shows in Settings and beside the clock.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_battery=1"
+            ;;
+        --all-drivers)
+            # Every Apple subsystem that is off by default, in one switch.
+            # Each is still passed by name, so the cmdline the kernel prints
+            # says exactly what was asked for.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1"
             ;;
         --native-resolution)
             # Drop the resolution request so Limine keeps whatever mode the
@@ -57,7 +74,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--apple-dcp] [--apple-battery] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -75,7 +92,7 @@ for argument in "$@"; do
 done
 
 if [ -z "$ESP_MOUNT" ]; then
-    echo "usage: $0 [--apple-gpu] <mounted_esp_path>"
+    echo "usage: $0 [--all-drivers] <mounted_esp_path>"
     exit 1
 fi
 
