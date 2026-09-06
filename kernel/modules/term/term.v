@@ -18,6 +18,23 @@ __global (
 	framebuffer_height  = u64(0)
 )
 
+// Limine hands the framebuffer over as a higher-half address inside the HHDM.
+// Anything below the higher half is not addressable on the page tables in use
+// at handoff, so storing to it faults on the very first pixel -- which, on a
+// machine with no console, looks exactly like a kernel that never booted.
+// Refusing to draw keeps that case quiet and survivable instead of fatal.
+fn fb_address_usable(fb &limine.LimineFramebuffer) bool {
+	base := u64(fb.address)
+	if base < 0xffff_0000_0000_0000 {
+		return false
+	}
+	span := u64(fb.pitch) * u64(fb.height)
+	if span == 0 || base + span < base {
+		return false
+	}
+	return true
+}
+
 fn stage_color(stage u32) u32 {
 	return match stage & 0x7 {
 		0 { u32(0x00ff0000) } // red
@@ -42,6 +59,9 @@ pub fn early_stage_mark(stage u32) {
 	}
 	fb := unsafe { fb_req.response.framebuffers[0] }
 	if fb == unsafe { nil } || fb.address == unsafe { nil } {
+		return
+	}
+	if !fb_address_usable(fb) {
 		return
 	}
 	if fb.width == 0 || fb.height == 0 || fb.pitch == 0 || fb.bpp < 24 {
@@ -118,6 +138,9 @@ pub fn early_screen_fill(stage u32) {
 	}
 	fb := unsafe { fb_req.response.framebuffers[0] }
 	if fb == unsafe { nil } || fb.address == unsafe { nil } {
+		return
+	}
+	if !fb_address_usable(fb) {
 		return
 	}
 	if fb.width == 0 || fb.height == 0 || fb.pitch == 0 {
