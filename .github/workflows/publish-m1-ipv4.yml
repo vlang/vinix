@@ -1,0 +1,68 @@
+name: Publish validated M1 Wi-Fi IPv4 changes
+on:
+  push:
+    branches: [wifi/m1-air]
+    paths: ['.github/workflows/publish-m1-ipv4.yml']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 77f018d956ab09c3d6628bb5ac7ac664b9ab48df
+          fetch-depth: 0
+      - name: Reconstruct and verify exact tested patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = vlang/vinix
+          test "$(git rev-parse HEAD)" = 77f018d956ab09c3d6628bb5ac7ac664b9ab48df
+          git fetch origin refs/heads/wifi/m1-air-ipv4
+          test "$(git rev-parse FETCH_HEAD)" = 77f018d956ab09c3d6628bb5ac7ac664b9ab48df
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, pathlib, subprocess
+          shas = [
+              '201ace2b120fadd77b5e1f75c0d6805015378174',
+              '1ab924399b401372a8bac0c35f7b12f814324946',
+              '838c394b914d0b6939019da4f685773876bc50cd',
+              '75e354b1e185c516e6b634084df2de1637609f68',
+              'a9e279dd212f4b9bfdb70d25914322b6d8c2f91c9',
+              '0600fe24ef6e786f171bc90b607b6bfe8ccc2bcc',
+              '78d5147caa03c8c97cd3e812c2036e57f4e20050',
+          ]
+          chunks = []
+          for sha in shas:
+              response = json.loads(subprocess.check_output([
+                  'gh', 'api', f'repos/vlang/vinix/git/blobs/{sha}']))
+              if response.get('encoding') != 'base64':
+                  raise SystemExit('Unexpected blob encoding')
+              data = base64.b64decode(response['content'])
+              actual = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+              if actual != sha:
+                  raise SystemExit('Git blob digest mismatch')
+              chunks.append(data)
+          compressed = b''.join(chunks)
+          if len(compressed) != 57168:
+              raise SystemExit('Compressed patch size mismatch')
+          patch = lzma.decompress(compressed)
+          if len(patch) != 215685 or hashlib.sha256(patch).hexdigest() != '9a2fe0b934d08c5ab5a160e00459f2575710a7e4311951988c8fefedb6bc6f58c':
+              raise SystemExit('Tested patch digest mismatch')
+          pathlib.Path('/tmp/m1-wifi.patch').write_bytes(patch)
+          PY
+          git apply --index --whitespace=error-all /tmp/m1-wifi.patch
+          git diff --cached --check
+          test "$(git write-tree)" = e2db53e90a5e2b68d375166706b024fec4c78b2c
+      - name: Publish without rewriting branch history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'aarch64: integrate M1 BCM4378 Wi-Fi and IPv4 sockets' -m 'Add opt-in BCM4378 PCIe/DART transport and WPA2 station mode, pinned lwIP IPv4 networking, Linux AArch64 socket integration, firmware tooling, and host/QEMU regression tests. The source has been build- and simulation-tested; physical M1 Wi-Fi operation still requires hardware validation.'
+          git push origin HEAD:refs/heads/wifi/m1-air-ipv4
+          git rev-parse HEAD
