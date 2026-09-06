@@ -38,9 +38,14 @@ pub fn stop() {
 	cpu.write_cntv_ctl_el0(0x2)
 }
 
-// Get current counter value (monotonic, never resets)
+// Get current counter value (monotonic, never resets).
+// The virtual counter, not the physical one: this kernel runs at EL1, and on
+// Apple Silicon it does so under a VHE EL2 host that Limine cannot switch off
+// (E2H is fixed at 1). In that configuration CNTHCTL_EL2 traps EL1 reads of
+// CNTPCT unless the bootloader opted them in, while CNTVCT is never trapped
+// by default. Limine zeroes CNTVOFF_EL2, so both counters read the same value.
 pub fn get_count() u64 {
-	return cpu.read_cntpct_el0()
+	return cpu.read_cntvct_el0()
 }
 
 // Get current time in nanoseconds
