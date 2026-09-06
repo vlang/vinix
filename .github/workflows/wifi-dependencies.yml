@@ -1,0 +1,24 @@
+name: Wi-Fi network stack dependencies
+on:
+  push:
+    branches: [wifi/m1-air]
+    paths: ['.github/workflows/wifi-dependencies.yml']
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: lwip-tcpip/lwip
+          ref: 77dcd25a72509eb83f72b033d219b1d40cd8eb95
+          persist-credentials: false
+          path: lwip
+      - run: tar --exclude=.git -czf lwip-source.tar.gz lwip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lwip-2.2.1-source
+          path: lwip-source.tar.gz
+          retention-days: 3
