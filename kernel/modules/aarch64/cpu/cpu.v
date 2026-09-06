@@ -316,6 +316,15 @@ pub fn write_cntv_tval_el0(value u64) {
 	}
 }
 
+pub fn read_daif() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, daif
+		; =r (ret)
+	}
+	return ret
+}
+
 pub fn read_currentel() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {

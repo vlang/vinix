@@ -447,6 +447,11 @@ fn kmain() {
 		}
 		if aic_phys != 0 {
 			print('init aic...\n')
+			// Two channels around the call: a red bar (row 40) and a line with
+			// the CPU state, so "nothing after init aic" can be pinned to the
+			// call itself, to the callee, or to the text path.
+			term.early_stage_mark(40)
+			print('aic.0 calling initialise, CurrentEL=${cpu.read_currentel() >> 2} DAIF=0x${cpu.read_daif():x}\n')
 			if aic.initialise(aic_phys) {
 				if timer_irq := parse_aic_guest_virtual_timer_irq() {
 					aic_timer_irq = timer_irq
@@ -463,6 +468,8 @@ fn kmain() {
 				// hardware gets, and the timer is FIQ-delivered regardless.
 				print('aic: unusable, continuing without it\n')
 			}
+			term.early_stage_mark(47) // gray: back in kmain after the AIC
+			print('aic.10 back in kmain\n')
 		} else {
 			print('no Apple AIC node found in device tree\n')
 		}

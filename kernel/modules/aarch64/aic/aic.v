@@ -12,6 +12,7 @@ import aarch64.kio
 import aarch64.exception
 import klock
 import memory
+import term
 
 // AIC registers (offsets from base)
 const aic_info = u32(0x0004)
@@ -61,18 +62,25 @@ fn aic_write(offset u32, value u32) {
 // Returns false if the controller does not answer plausibly, so the caller can
 // continue without it rather than programming thousands of nonexistent mask
 // registers off a garbage AIC_INFO.
+// Every step below is announced on two channels: a numbered text line, and a
+// colour bar drawn straight into the framebuffer by term.early_stage_mark
+// (no lock, no allocation, no flanterm). On the M1 the boot stops somewhere in
+// here with no text at all, so the bars tell execution progress apart from a
+// wedged text path. Bars sit at rows 41..46 (mid-screen), one colour each.
 pub fn initialise(base u64) bool {
+	term.early_stage_mark(41) // green: entered initialise
+	print('aic.1 entered initialise\n')
+	println('aic.2 base 0x${base:x}, mapping MMIO aperture...')
+
 	// Map the AIC register aperture as Device memory (it lives far above the
 	// 4 GiB HHDM window, so plain `base + higher_half` is not valid).
-	// Each step is announced: the AIC is the first MMIO the kernel touches, so
-	// a fault in map_mmio or in the first register read used to be a silent
-	// hang with no way to tell the two apart.
-	println('aic: base 0x${base:x}, mapping MMIO aperture...')
 	aic_base = memory.map_mmio(base, 0x8000)
-	println('aic: MMIO mapped at 0x${aic_base:x}, reading AIC_INFO...')
+	term.early_stage_mark(42) // blue: map_mmio returned
+	println('aic.3 MMIO mapped at 0x${aic_base:x}, reading AIC_INFO...')
 
 	info := aic_read(aic_info)
-	println('aic: AIC_INFO=0x${info:x}')
+	term.early_stage_mark(43) // yellow: first MMIO read returned
+	println('aic.4 AIC_INFO=0x${info:x}')
 	aic_nr_irqs = info & 0xffff
 
 	// AICv1 parts carry a few hundred to ~1k IRQs (t8103: 896). 0 means the
@@ -87,18 +95,26 @@ pub fn initialise(base u64) bool {
 
 	// Mask all IRQs initially
 	nr_regs := (aic_nr_irqs + 31) / 32
+	print('aic.5 masking ${nr_regs} mask registers\n')
 	for i := u32(0); i < nr_regs; i++ {
 		aic_write(aic_mask_set + i * 4, 0xffffffff)
 	}
+	term.early_stage_mark(44) // cyan: mask writes done
+	print('aic.6 masked\n')
 
 	// Clear any pending IPIs
 	aic_write(aic_ipi_clr, aic_ipi_other | aic_ipi_self)
+	print('aic.7 ipi cleared\n')
 
 	// Unmask IPIs
 	aic_write(aic_ipi_mask_clr, aic_ipi_other | aic_ipi_self)
+	term.early_stage_mark(45) // magenta: IPI writes done
+	print('aic.8 ipi unmasked\n')
 
 	// Register our dispatch handler with the exception system
 	exception.register_irq_dispatch(aic_dispatch)
+	term.early_stage_mark(46) // white: dispatch registered
+	print('aic.9 dispatch registered\n')
 	return true
 }
 

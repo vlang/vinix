@@ -8,6 +8,7 @@ import lib
 import memory
 import memory.mmap
 import proc
+import term
 
 fn C.exception_vectors()
 fn C.sc_dump_ring()
@@ -68,6 +69,9 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// hardware. Put the essentials on the framebuffer too (the same print path
 	// the boot log uses), so a kernel fault is visible on a machine with no
 	// serial rather than a silent freeze.
+	// A red bar at row 56, drawn without locks or allocation, marks a fault
+	// even if the text path below cannot run (lock held, allocator wedged).
+	term.early_stage_mark(56)
 	print('\n*** FATAL EXCEPTION ec=0x${ec:x} esr=0x${esr:x} far=0x${far:x} pc=0x${gpr_state.pc:x} ***\n')
 
 	uart.puts(c'FATAL EXCEPTION: ec=0x')
