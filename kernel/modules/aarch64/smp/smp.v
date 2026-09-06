@@ -11,20 +11,18 @@ __global (
 	smp_ready = false
 )
 
-@[_linker_section: '.requests']
-@[cinit]
-__global (
-	volatile smp_req = limine.LimineSMPRequest{
-		flags:    0
-		response: unsafe { nil }
-	}
-)
+// True when the bootloader was asked to start the other cores and answered.
+// The request itself lives in request_d_limine_mp.v, so a build without
+// -d limine_mp never asks: see request_notd_limine_mp.v for why.
+pub fn available() bool {
+	return limine_response() != unsafe { nil }
+}
 
 pub fn initialise() {
-	if smp_req.response == unsafe { nil } {
+	if !available() {
 		panic('SMP bootloader response missing')
 	}
-	smp_tag := smp_req.response
+	smp_tag := limine_response()
 
 	println('smp: BSP MPIDR:       ${smp_tag.bsp_mpidr:x}')
 	println('smp: Total CPU count: ${smp_tag.cpu_count}')
