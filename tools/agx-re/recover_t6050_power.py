@@ -97,6 +97,12 @@ PMGR_HANDLE_INTERRUPT_ALL = (
 PMGR_PM_HIBERNATION_STATE = "__ZN9ApplePMGR18pmHibernationStateEv"
 PMGR_CURRENT_DRIVER_STATE = "__ZN9ApplePMGR21getCurrentDriverStateEv"
 PMGR_UPDATE_HIB_DEVICE_STATUS = "__ZN9ApplePMGR21updateHibDeviceStatusEv"
+PMGR_INIT_DRIVER = "__ZN9ApplePMGR10initDriverEP9IOService"
+PMGR_CONSTRUCTOR = "__ZN9ApplePMGRC2EPK11OSMetaClass"
+PMGR_INTERRUPT_CONFIG_PROPERTY = "interrupt-config"
+PMGR_INTERRUPT_CONFIG_BYTES = 20
+PMGR_INTERRUPT_CONFIG_NAME_OFFSET = 4
+PMP_READY_INTERRUPT_NAME = "PMP_STATUS"
 APPLE_PTD_READ = "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj"
 APPLE_PTD_WRITE = "__ZNK8ApplePTD9_writePTDEPvjyj"
 PMGR_GET_REG_MAP = "__ZN9ApplePMGR9getRegMapENS_6RegMapEj"
@@ -510,6 +516,29 @@ def resolve_gate(handle: int, devices: list[PmgrDevice]) -> dict[str, object]:
     }
 
 
+def parse_pmgr_interrupt_config(data: bytes, field: str) -> list[dict[str, object]]:
+    """Decode ApplePMGR's 20-byte `interrupt-config` records."""
+    if not data or len(data) % PMGR_INTERRUPT_CONFIG_BYTES:
+        raise ValueError(f"{field} is not a whole number of 20-byte records")
+    if len(data) > 0x13F:
+        raise ValueError(f"{field} exceeds ApplePMGR's 0x13f-byte bound")
+    records = []
+    for offset in range(0, len(data), PMGR_INTERRUPT_CONFIG_BYTES):
+        record = data[offset : offset + PMGR_INTERRUPT_CONFIG_BYTES]
+        if record[3] >= 0x10:
+            raise ValueError(f"{field} record kind {record[3]} is out of range")
+        records.append(
+            {
+                "slot": record[0],
+                "kind": record[3],
+                "name": decode_cstring(
+                    record[PMGR_INTERRUPT_CONFIG_NAME_OFFSET:], field
+                ),
+            }
+        )
+    return records
+
+
 def parse_pmp_soc_devices(data: bytes) -> list[dict[str, object]]:
     if not data or len(data) % PMP_SOC_DEVICE_BYTES:
         raise ValueError("PMP soc-device property is not an array of 124-byte records")
@@ -803,8 +832,88 @@ def recover_apple_ptd_code_contract(
     }
 
 
+def recover_pmgr_interrupt_config(
+    image: bytes, functions: dict[str, tuple[int, bytes]]
+) -> dict[str, object]:
+    """Recover where the PMP ready interrupt slot comes from.
+
+    `_handleInterruptAll` compares an interrupt index against two runtime
+    fields.  Both are built in `initDriver` from one DeviceTree property, so
+    the readiness event is a named record rather than a fixed vector number.
+    """
+
+    _constructor_address, constructor_code = functions[PMGR_CONSTRUCTOR]
+    if not _has_ordered_words(
+        constructor_code,
+        (
+            0x9140FC08,  # add x8, x0, #0x3f, lsl #12
+            0x9104C116,  # add x22, x8, #0x130 -- PMP ready slot
+            0x52801FE8,  # mov w8, #0xff -- absent
+            0x390002C8,  # strb w8, [x22]
+        ),
+    ):
+        raise ValueError("ApplePMGR no longer defaults its PMP ready slot to absent")
+
+    init_address, init_code = functions[PMGR_INIT_DRIVER]
+    property_name = read_adrp_add_cstring(image, init_address, init_code, 0x668, 0x66C)
+    if property_name != PMGR_INTERRUPT_CONFIG_PROPERTY:
+        raise ValueError(f"PMGR interrupt property changed: {property_name!r}")
+    ready_name = read_adrp_add_cstring(image, init_address, init_code, 0x728, 0x72C)
+    if ready_name != PMP_READY_INTERRUPT_NAME:
+        raise ValueError(f"PMP readiness interrupt name changed: {ready_name!r}")
+    if not _has_ordered_words(
+        init_code,
+        (
+            0x529999A8,  # mov w8, #0xcccd
+            0x72B99988,  # movk w8, #0xcccc, lsl #16
+            0x9BA87C08,  # umull x8, w0, w8
+            0xD364FD08,  # lsr x8, x8, #36 -- property length / 20
+            0xB9019348,  # str w8, [x26, #0x190] -- interrupts per die
+            0x7104FC1F,  # cmp w0, #0x13f -- property length bound
+            0x39400D49,  # ldrb w9, [x10, #3] -- interrupt kind
+            0xF100413F,  # cmp x9, #0x10 -- at most 16 kinds
+            0x3940014A,  # ldrb w10, [x10] -- per-die slot
+            0x8B151129,  # add x9, x9, x21, lsl #4 -- 16 kinds per die
+            0x1B152908,  # madd w8, w8, w21, w10 -- absolute interrupt index
+            0x39000168,  # strb w8, [x11]
+            0x91001260,  # add x0, x19, #4 -- record name
+            0x39400268,  # ldrb w8, [x19] -- matched per-die slot
+            0x39068348,  # strb w8, [x26, #0x1a0] -- PMP ready slot
+            0x910052F7,  # add x23, x23, #0x14 -- 20-byte record stride
+        ),
+    ):
+        raise ValueError("PMGR interrupt-config decode changed")
+
+    return {
+        "property": property_name,
+        "record_bytes": PMGR_INTERRUPT_CONFIG_BYTES,
+        "slot_field": 0,
+        "kind_field": 3,
+        "kind_limit": 0x10,
+        "name_offset": PMGR_INTERRUPT_CONFIG_NAME_OFFSET,
+        "name_bytes": PMGR_INTERRUPT_CONFIG_BYTES - PMGR_INTERRUPT_CONFIG_NAME_OFFSET,
+        "maximum_property_bytes": 0x13F,
+        "interrupts_per_die": "property length / 20",
+        "interrupts_per_die_object_offset": 0x3F120,
+        "index_table_object_offset": 0x3F100,
+        "index_table_die_stride": 0x10,
+        "index_table_value": "interrupts-per-die * die + record slot",
+        "ready_interrupt_name": ready_name,
+        "ready_slot_object_offset": 0x3F130,
+        "ready_slot_value": "the matched record's slot byte",
+        "ready_slot_default": 0xFF,
+        "scope": (
+            "the runtime property is the boot DeviceTree pmgr property merged "
+            "with its selected variant overlay, so the per-die count must be "
+            "read at run time rather than assumed"
+        ),
+    }
+
+
 def recover_pmp_readiness_handshake(
-    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+    interrupt_config: dict[str, object],
 ) -> dict[str, object]:
     """Recover the order between the initial PMP publication and readiness.
 
@@ -940,6 +1049,7 @@ def recover_pmp_readiness_handshake(
         },
         "ready_close": {
             "source": PMGR_HANDLE_INTERRUPT_ALL,
+            "interrupt_config": interrupt_config,
             "admission": PMGR_PMP_V2,
             "config_block_object_offset": 0x3F120,
             "interrupts_per_die_object_offset": 0x3F120,
@@ -962,7 +1072,9 @@ def recover_pmp_readiness_handshake(
 
 
 def recover_pmp_code_contract(
-    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+    functions: dict[str, tuple[int, bytes]],
+    symbols: dict[str, int],
+    interrupt_config: dict[str, object],
 ) -> dict[str, object]:
     required = (
         PMP_SEND_COMMAND,
@@ -1386,7 +1498,9 @@ def recover_pmp_code_contract(
         ),
     ):
         raise ValueError("PMP readiness callback changed")
-    readiness_handshake = recover_pmp_readiness_handshake(functions, symbols)
+    readiness_handshake = recover_pmp_readiness_handshake(
+        functions, symbols, interrupt_config
+    )
 
     return {
         "device_state_commands": [14, 15],
@@ -1513,14 +1627,17 @@ def recover_apple_pmgr(image: bytes) -> dict[str, object]:
             PMP_READY_ACTION_V2,
             PMGR_START,
             PMGR_HANDLE_INTERRUPT_ALL,
+            PMGR_INIT_DRIVER,
+            PMGR_CONSTRUCTOR,
             APPLE_PTD_READ,
             APPLE_PTD_WRITE,
             PMGR_WRITE_REG64,
         )
     }
+    interrupt_config = recover_pmgr_interrupt_config(image, functions)
     return {
         "uuid": identity,
-        "pmp_v2": recover_pmp_code_contract(functions, symbols),
+        "pmp_v2": recover_pmp_code_contract(functions, symbols, interrupt_config),
     }
 
 
@@ -3866,6 +3983,42 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
     if die_stride != 0x4000000000:
         raise ValueError(f"T6050 PMGR die stride changed: {die_stride:#x}")
 
+    # iBoot merges the selected chip-variant overlay into this node before the
+    # OS reads it, so the base records are a prefix of the runtime property
+    # rather than the whole of it.  Report both instead of guessing the count.
+    base_interrupts = parse_pmgr_interrupt_config(
+        pmgr.property(PMGR_INTERRUPT_CONFIG_PROPERTY), "pmgr interrupt-config"
+    )
+    variant_interrupts: dict[str, list[dict[str, object]]] = {}
+    for child in pmgr.children:
+        if PMGR_INTERRUPT_CONFIG_PROPERTY not in child.properties:
+            continue
+        name = node_name(child)
+        variant_interrupts[name] = parse_pmgr_interrupt_config(
+            child.property(PMGR_INTERRUPT_CONFIG_PROPERTY),
+            f"pmgr {name} interrupt-config",
+        )
+    ready_records = [
+        record
+        for record in base_interrupts
+        if record["name"] == PMP_READY_INTERRUPT_NAME
+    ]
+    if len(ready_records) != 1:
+        raise ValueError(
+            f"T6050 PMGR PMP readiness interrupt records changed: {ready_records!r}"
+        )
+    ready_slot = ready_records[0]["slot"]
+    for name, records in variant_interrupts.items():
+        for record in records:
+            if record["name"] == PMP_READY_INTERRUPT_NAME:
+                raise ValueError(
+                    f"T6050 PMGR variant {name} redefines the PMP readiness interrupt"
+                )
+            if record["slot"] < len(base_interrupts):
+                raise ValueError(
+                    f"T6050 PMGR variant {name} reuses a base interrupt slot"
+                )
+
     pmp_wrappers: dict[str, tuple[str, AdtNode]] = {}
     for path, node in walk_adt(root):
         role_property = node.properties.get("role")
@@ -4120,8 +4273,19 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 22,
+        "schema": 23,
         "chip": "t6050",
+        "pmgr_interrupts": {
+            "property": PMGR_INTERRUPT_CONFIG_PROPERTY,
+            "base_records": base_interrupts,
+            "variant_records": variant_interrupts,
+            "ready_interrupt_name": PMP_READY_INTERRUPT_NAME,
+            "ready_slot": ready_slot,
+            "runtime_interrupts_per_die": (
+                "length of the merged base+variant property / 20; only the "
+                "running system observes the selected variant"
+            ),
+        },
         "sgx": {
             "path": sgx_path,
             "power_gates": power_gates,

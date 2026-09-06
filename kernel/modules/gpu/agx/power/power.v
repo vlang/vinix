@@ -50,6 +50,13 @@ const t6050_pmp_data_size = u32(0x9a000)
 const t6050_pmp_data_flags = u32(6)
 const t6050_pmp_ready_slot_absent = u32(0xff)
 const t6050_pmp_die_slots = u32(2)
+const t6050_interrupt_config_record_size = u32(20)
+const t6050_interrupt_config_kind_offset = u32(3)
+const t6050_interrupt_config_name_offset = u32(4)
+const t6050_interrupt_config_name_size = u32(16)
+const t6050_interrupt_config_max_bytes = u32(0x13f)
+const t6050_interrupt_config_kind_limit = u8(0x10)
+const t6050_pmp_ready_interrupt_name = 'PMP_STATUS'
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -141,6 +148,26 @@ pub enum T6050PowerResult {
 	transport_error
 	timed_out
 	faulted
+}
+
+// Where the PMP readiness interrupt lives, resolved from PMGR's runtime
+// interrupt-config table rather than assumed. The record count is the per-die
+// interrupt stride that ApplePMGR::_handleInterruptAll divides by, and iBoot
+// merges the selected chip-variant overlay into that property before the OS
+// sees it, so neither value may be hardcoded.
+pub struct T6050PmpReadyInterrupt {
+pub:
+	interrupts_per_die u32
+	slot               u32
+}
+
+pub fn (config &T6050PmpReadyInterrupt) matches(interrupt_index u32) bool {
+	return t6050_pmp_ready_interrupt(interrupt_index, config.interrupts_per_die,
+		config.slot)
+}
+
+pub fn (config &T6050PmpReadyInterrupt) die(interrupt_index u32) ?u32 {
+	return t6050_pmp_ready_die(interrupt_index, config.interrupts_per_die)
 }
 
 // One latched readiness byte per die, mirroring ApplePMGR's per-die ready-byte
@@ -623,6 +650,48 @@ pub fn (mut controller T6050PowerController) begin_dynamic(die u32, enabled bool
 	return controller.begin(die, enabled)
 }
 
+// ApplePMGR::initDriver decodes this property as 20-byte records whose byte 0
+// is a per-die slot, byte 3 an interrupt kind below 16, and bytes 4..19 a
+// fixed-size name. It rejects a property above 0x13f bytes and a slot at or
+// above the record count, and it selects the readiness interrupt purely by the
+// `PMP_STATUS` name.
+fn get_t6050_pmp_ready_interrupt(pmgr_node &devicetree.DTNode) ?T6050PmpReadyInterrupt {
+	records := devicetree.get_property(pmgr_node, 'interrupt-config') or { return none }
+	if records.len == 0 || records.len > t6050_interrupt_config_max_bytes
+		|| records.len % t6050_interrupt_config_record_size != 0 {
+		return none
+	}
+	count := records.len / t6050_interrupt_config_record_size
+	mut matches := u32(0)
+	mut slot := u32(0)
+	for offset := u32(0); offset < records.len; offset += t6050_interrupt_config_record_size {
+		if read_native_u8(records.data, offset + t6050_interrupt_config_kind_offset)
+			>= t6050_interrupt_config_kind_limit {
+			return none
+		}
+		record_slot := u32(read_native_u8(records.data, offset))
+		if record_slot >= count {
+			return none
+		}
+		name := unsafe {
+			voidptr(u64(records.data) + offset + t6050_interrupt_config_name_offset)
+		}
+		if !fixed_native_name_matches(name, t6050_interrupt_config_name_size,
+			t6050_pmp_ready_interrupt_name) {
+			continue
+		}
+		matches++
+		slot = record_slot
+	}
+	if matches != 1 || slot >= t6050_pmp_ready_slot_absent {
+		return none
+	}
+	return T6050PmpReadyInterrupt{
+		interrupts_per_die: count
+		slot: slot
+	}
+}
+
 fn validate_t6050_readiness_codec() bool {
 	mut readiness := T6050PmpReadiness{}
 	if readiness.is_ready(0) || readiness.notify_ready(t6050_pmp_die_slots)
@@ -646,6 +715,17 @@ fn validate_t6050_readiness_codec() bool {
 		|| t6050_pmp_ready_interrupt(9, 4, 2)
 		|| t6050_pmp_ready_interrupt(9, 4, t6050_pmp_ready_slot_absent)
 		|| t6050_pmp_ready_interrupt(9, 0, 1) {
+		return false
+	}
+	// Mac17,6 merges two base records with four chip-variant records, so the
+	// readiness interrupt is index 1 on die 0 and index 7 on die 1.
+	config := T6050PmpReadyInterrupt{
+		interrupts_per_die: 6
+		slot: 1
+	}
+	config_die := config.die(7) or { return false }
+	if config_die != 1 || !config.matches(1) || !config.matches(7)
+		|| config.matches(6) || config.matches(2) {
 		return false
 	}
 	// Exercise both dynamic admission outcomes against an unmapped transport so
@@ -1134,6 +1214,10 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !validate_pmgr_device(pmgr_node, 0x16a, 'GFX', 357, 0x02, 0x10, 0) {
 		return false
 	}
+	ready_interrupt := get_t6050_pmp_ready_interrupt(pmgr_node) or {
+		println('agx: native t6050 PMGR PMP readiness interrupt is unavailable')
+		return false
+	}
 	if !validate_ptd_range(pmp0_nub, 'PMP-STATUS', 2, 1, 1, 16)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PKT', 9, 0x90, 0x150, 0)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PS-REQ', 10, 0x1e0, 8, 0)
@@ -1142,6 +1226,7 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 			7, 8, 40, 9, 10, 11, 12, 13, 14]) {
 		return false
 	}
-	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), read-only)\n', die_count)
+	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), PMP_STATUS interrupt slot %u of %u per die, read-only)\n',
+		die_count, ready_interrupt.slot, ready_interrupt.interrupts_per_die)
 	return true
 }

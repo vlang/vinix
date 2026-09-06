@@ -1,5 +1,6 @@
 import struct
 import unittest
+from unittest import mock
 
 import recover_t6050_power
 from test_extract_firmware import der
@@ -13,6 +14,14 @@ def adt_property(name: str, data: bytes, flags: int = 0) -> bytes:
         + data
         + bytes((-len(data)) % 4)
     )
+
+
+def interrupt_config_record(slot: int, kind: int, name: str) -> bytes:
+    record = bytearray(20)
+    record[0] = slot
+    record[3] = kind
+    record[4 : 4 + len(name)] = name.encode()
+    return bytes(record)
 
 
 def adt_node(name: str, properties: dict[str, bytes], children: list[bytes]) -> bytes:
@@ -259,8 +268,20 @@ def fixture_tree(
                         struct.pack("<QQ", base, size) for base, size in reg_regions
                     ),
                     "die-stride": struct.pack("<Q", 0x4000000000),
+                    "interrupt-config": interrupt_config_record(0, 2, "DVFM_COP")
+                    + interrupt_config_record(1, 7, "PMP_STATUS"),
                 },
-                [],
+                [
+                    adt_node(
+                        ":sotra_test_1",
+                        {
+                            "interrupt-config": interrupt_config_record(
+                                2, 3, "MACC0_PWRUP"
+                            )
+                        },
+                        [],
+                    )
+                ],
             ),
             sgx,
             pmp_dart(0),
@@ -296,7 +317,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 22)
+        self.assertEqual(result["schema"], 23)
+        interrupts = result["pmgr_interrupts"]
+        self.assertEqual(interrupts["ready_slot"], 1)
+        self.assertEqual(
+            [record["name"] for record in interrupts["base_records"]],
+            ["DVFM_COP", "PMP_STATUS"],
+        )
+        self.assertEqual(
+            interrupts["variant_records"][":sotra_test_1"][0]["name"], "MACC0_PWRUP"
+        )
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -750,7 +780,10 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.PMGR_GET_REG_MAP: get_reg_map,
             recover_t6050_power.PMGR_WRITE_REG64: write_reg64,
         }
-        result = recover_t6050_power.recover_pmp_code_contract(functions, symbols)
+        interrupt_config = {"ready_slot_object_offset": 0x3F130}
+        result = recover_t6050_power.recover_pmp_code_contract(
+            functions, symbols, interrupt_config
+        )
         self.assertEqual(result["device_state_commands"], [14, 15])
         self.assertEqual(result["device_index_field"], 3)
         self.assertEqual(result["device_index_map"]["record_stride"], 124)
@@ -796,14 +829,18 @@ class RecoverT6050PowerTests(unittest.TestCase):
             init_code.replace(struct.pack("<I", 0x52808082), struct.pack("<I", 0x52808062), 1),
         )
         with self.assertRaisesRegex(ValueError, "device-index table"):
-            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+            recover_t6050_power.recover_pmp_code_contract(
+                bad_functions, symbols, interrupt_config
+            )
 
         bad_functions = dict(functions)
         bad_state = bytearray(state_code)
         struct.pack_into("<I", bad_state, ready_offset + 4, 0xD503201F)
         bad_functions[recover_t6050_power.PMP_SET_DEVICE_STATE] = (state, bytes(bad_state))
         with self.assertRaisesRegex(ValueError, "pre-ready acknowledgement bypass"):
-            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+            recover_t6050_power.recover_pmp_code_contract(
+                bad_functions, symbols, interrupt_config
+            )
 
         # A publication that starts waiting on PMP readiness is a different
         # contract, not a compatible one: reject it instead of reporting the
@@ -817,7 +854,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
             initial_code + struct.pack("<I", 0xD2815811),
         )
         with self.assertRaisesRegex(ValueError, "gained a PMP readiness wait"):
-            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+            recover_t6050_power.recover_pmp_code_contract(
+                bad_functions, symbols, interrupt_config
+            )
 
         bad_functions = dict(functions)
         init_address, init_code = bad_functions[recover_t6050_power.PMP_INIT_V2]
@@ -826,7 +865,9 @@ class RecoverT6050PowerTests(unittest.TestCase):
             init_code + branch(init_address + len(init_code), wait_ready, True),
         )
         with self.assertRaisesRegex(ValueError, "readiness dependency"):
-            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+            recover_t6050_power.recover_pmp_code_contract(
+                bad_functions, symbols, interrupt_config
+            )
 
         bad_functions = dict(functions)
         interrupt_address, interrupt_code = bad_functions[
@@ -839,7 +880,93 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
         )
         with self.assertRaisesRegex(ValueError, "readiness interrupt decode"):
-            recover_t6050_power.recover_pmp_code_contract(bad_functions, symbols)
+            recover_t6050_power.recover_pmp_code_contract(
+                bad_functions, symbols, interrupt_config
+            )
+
+    def test_recovers_pmgr_interrupt_config_source(self) -> None:
+        constructor = 0x1000
+        init_driver = 0x2000
+        constructor_code = struct.pack(
+            "<4I", 0x9140FC08, 0x9104C116, 0x52801FE8, 0x390002C8
+        )
+        decode_words = (
+            0x529999A8,
+            0x72B99988,
+            0x9BA87C08,
+            0xD364FD08,
+            0xB9019348,
+            0x7104FC1F,
+            0x39400D49,
+            0xF100413F,
+            0x3940014A,
+            0x8B151129,
+            0x1B152908,
+            0x39000168,
+            0x91001260,
+            0x39400268,
+            0x39068348,
+            0x910052F7,
+        )
+        init_code = struct.pack(f"<{len(decode_words)}I", *decode_words)
+        functions = {
+            recover_t6050_power.PMGR_CONSTRUCTOR: (constructor, constructor_code),
+            recover_t6050_power.PMGR_INIT_DRIVER: (init_driver, init_code),
+        }
+        strings = {0x668: "interrupt-config", 0x728: "PMP_STATUS"}
+        with mock.patch.object(
+            recover_t6050_power,
+            "read_adrp_add_cstring",
+            side_effect=lambda _image, _address, _code, adrp, _add: strings[adrp],
+        ):
+            result = recover_t6050_power.recover_pmgr_interrupt_config(b"", functions)
+        self.assertEqual(result["record_bytes"], 20)
+        self.assertEqual(result["ready_interrupt_name"], "PMP_STATUS")
+        self.assertEqual(result["ready_slot_object_offset"], 0x3F130)
+        self.assertEqual(result["ready_slot_default"], 0xFF)
+        self.assertEqual(result["index_table_die_stride"], 0x10)
+
+        bad = dict(functions)
+        bad[recover_t6050_power.PMGR_CONSTRUCTOR] = (
+            constructor,
+            constructor_code.replace(
+                struct.pack("<I", 0x52801FE8), struct.pack("<I", 0x52800008), 1
+            ),
+        )
+        with mock.patch.object(
+            recover_t6050_power,
+            "read_adrp_add_cstring",
+            side_effect=lambda _image, _address, _code, adrp, _add: strings[adrp],
+        ):
+            with self.assertRaisesRegex(ValueError, "ready slot to absent"):
+                recover_t6050_power.recover_pmgr_interrupt_config(b"", bad)
+
+        with mock.patch.object(
+            recover_t6050_power,
+            "read_adrp_add_cstring",
+            side_effect=lambda _image, _address, _code, adrp, _add: (
+                "PMP_READY" if adrp == 0x728 else strings[adrp]
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "interrupt name changed"):
+                recover_t6050_power.recover_pmgr_interrupt_config(b"", functions)
+
+    def test_rejects_malformed_pmgr_interrupt_config(self) -> None:
+        good = interrupt_config_record(1, 7, "PMP_STATUS")
+        self.assertEqual(
+            recover_t6050_power.parse_pmgr_interrupt_config(good, "test"),
+            [{"slot": 1, "kind": 7, "name": "PMP_STATUS"}],
+        )
+        with self.assertRaisesRegex(ValueError, "20-byte records"):
+            recover_t6050_power.parse_pmgr_interrupt_config(good[:-1], "test")
+        with self.assertRaisesRegex(ValueError, "20-byte records"):
+            recover_t6050_power.parse_pmgr_interrupt_config(b"", "test")
+        with self.assertRaisesRegex(ValueError, "0x13f-byte bound"):
+            recover_t6050_power.parse_pmgr_interrupt_config(good * 16, "test")
+        with self.assertRaisesRegex(ValueError, "kind"):
+            recover_t6050_power.parse_pmgr_interrupt_config(
+                interrupt_config_record(1, 0x10, "PMP_STATUS"), "test"
+            )
 
     def test_recovers_t6050_pmgr_ptd_regmap_dispatch(self) -> None:
         init = 0x10000
