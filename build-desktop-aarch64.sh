@@ -46,8 +46,7 @@ fi
 # The desktop is built on ui2's declarative element tree. It is not vendored;
 # check it out beside the sources and point V's module path at it.
 if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
-    echo "ERROR: ui2 not found at third_party/ui2."
-    echo "Clone it there, on a branch carrying the ui2_headless build:"
+    echo "ERROR: ui2 not found at third_party/ui2. Clone it there:"
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2"
     exit 1
 fi

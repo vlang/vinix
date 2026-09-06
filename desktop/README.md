@@ -80,7 +80,14 @@ ticks.
 
 ## Building and running
 
-From the repository root, with Homebrew `llvm`, `lld` and `qemu` installed:
+ui2 is not vendored; check it out beside the sources, where the build points
+V's module path. The `ui2_headless` build this needs is upstream, so a plain
+clone will do:
+
+    git clone https://github.com/vlang/ui2 third_party/ui2
+
+Then, from the repository root, with Homebrew `llvm`, `lld` and `qemu`
+installed:
 
     ./build-desktop-aarch64.sh
 
