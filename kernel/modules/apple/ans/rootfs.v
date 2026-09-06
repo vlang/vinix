@@ -60,7 +60,7 @@ fn (mut this AnsRootResource) mmap(_handle voidptr, page u64, flags int) voidptr
 	}
 	this.l.acquire()
 	defer { this.l.release() }
-	if page in this.pages { return this.pages[page] }
+	if page in this.pages { return unsafe { this.pages[page] } }
 	physical := memory.pmm_alloc_fallible(1)
 	if physical == unsafe { nil } { return unsafe { nil } }
 	mut n := u64(this.stat.size) - page * 4096
@@ -140,13 +140,13 @@ fn (mut this AnsRootFS) make_node(parent &fs.VFSNode, name string, ino u32) ?&fs
 	if stat.islnk(mode) {
 		mut text := []u8{len: int(fields[0]) + 1}
 		ans_lock.acquire()
-		n := C.vinix_ans_root_read(ino, &text[0], 0, fields[0])
+		n := C.vinix_ans_root_read(ino, text.data, 0, fields[0])
 		ans_lock.release()
 		if n != i64(fields[0]) { unsafe { text.free() }; return none }
 		for i in 0 .. int(fields[0]) {
 			if text[i] == 0 { unsafe { text.free() }; return none }
 		}
-		node.symlink_target = unsafe { tos(&char(text.data), int(fields[0])).clone() }
+		node.symlink_target = unsafe { tos(&u8(text.data), int(fields[0])).clone() }
 		unsafe { text.free() }
 	}
 	return node

@@ -101,7 +101,7 @@ fn (mut this AnsBlock) write(_handle voidptr, buffer voidptr, loc u64, count u64
 	if result != 0 {
 		C.printf(c'ans: write/flush failed error=%d stage=%u status=0x%x; writes stopped\n',
 			result, C.vinix_ans_stage(), C.vinix_ans_completion_status())
-		errno.set(if result == -12 { errno.erofs } else { errno.eio })
+		errno.set(u64(if result == -12 { errno.erofs } else { errno.eio }))
 		return none
 	}
 	return i64(bytes)
