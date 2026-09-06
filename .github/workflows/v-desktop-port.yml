@@ -1,0 +1,35 @@
+name: V desktop port
+on:
+  push:
+    branches: [work/v-only-desktop-backlight]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build the V compiler and fetch ui2
+        run: |
+          git clone --depth=1 https://github.com/vlang/v.git /tmp/vlang
+          make -C /tmp/vlang -j2
+          mkdir -p third_party
+          git clone --depth=1 https://github.com/vlang/ui2.git third_party/ui2
+          /tmp/vlang/v version
+          git -C /tmp/vlang rev-parse HEAD
+          git -C third_party/ui2 rev-parse HEAD
+      - name: Package offline validation workspace
+        run: |
+          mkdir -p /tmp/v-port-workspace
+          git archive HEAD | tar -x -C /tmp/v-port-workspace
+          mkdir -p /tmp/v-port-workspace/third_party
+          cp -a third_party/ui2 /tmp/v-port-workspace/third_party/
+          tar --exclude=.git -czf /tmp/v-port-workspace.tar.gz -C /tmp vlang v-port-workspace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v-port-workspace
+          path: /tmp/v-port-workspace.tar.gz
+          retention-days: 1
