@@ -248,6 +248,146 @@ fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 	return 0, 0
 }
 
+// prctl(2). Only the operations that mean something here are served; the rest
+// are reported as unsupported rather than answered with a fabricated success,
+// so a caller checking the result learns the truth.
+const pr_set_pdeathsig = 1
+
+const pr_get_pdeathsig = 2
+
+const pr_get_dumpable = 3
+
+const pr_set_dumpable = 4
+
+const pr_set_name = 15
+
+const pr_get_name = 16
+
+const pr_set_no_new_privs = 38
+
+const pr_get_no_new_privs = 39
+
+const task_comm_len = 16
+
+fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
+	mut process := proc.current_thread().process
+
+	match option {
+		pr_set_name {
+			// The name is the thread's, up to 16 bytes including the null.
+			mut raw := [task_comm_len]u8{}
+			if !usercopy.copy_from_user(voidptr(&raw[0]), arg2, task_comm_len) {
+				return errno.err, errno.efault
+			}
+			raw[task_comm_len - 1] = 0
+			process.name = unsafe { cstring_to_vstring(&raw[0]) }
+			return 0, 0
+		}
+		pr_get_name {
+			mut raw := [task_comm_len]u8{}
+			mut length := u64(process.name.len)
+			if length > task_comm_len - 1 {
+				length = task_comm_len - 1
+			}
+			unsafe { C.memcpy(&raw[0], process.name.str, length) }
+			if !usercopy.copy_to_user(arg2, voidptr(&raw[0]), task_comm_len) {
+				return errno.err, errno.efault
+			}
+			return 0, 0
+		}
+		pr_get_dumpable {
+			return 1, 0
+		}
+		pr_set_dumpable, pr_set_pdeathsig, pr_set_no_new_privs {
+			// Accepted and remembered nowhere: there is no core dump to
+			// suppress, no parent death to notice and no privilege to gain.
+			return 0, 0
+		}
+		pr_get_pdeathsig, pr_get_no_new_privs {
+			value := int(0)
+            if !usercopy.copy_to_user(arg2, voidptr(&value), sizeof(int)) {
+				return errno.err, errno.efault
+			}
+			return 0, 0
+		}
+		else {
+			return errno.err, errno.einval
+		}
+	}
+}
+
+// getrusage(2). No per-process CPU time is accounted yet, so the times are
+// zero — but `who` is checked, because a caller passing a bad one should hear
+// about it rather than get a zeroed struct back.
+const rusage_self = 0
+
+const rusage_children = -1
+
+const rusage_thread = 1
+
+fn syscall_linux_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
+	if who != rusage_self && who != rusage_children && who != rusage_thread {
+		return errno.err, errno.einval
+	}
+	if usage == 0 {
+		return errno.err, errno.efault
+	}
+
+	mut blank := [18]i64{}
+	if !usercopy.copy_to_user(usage, voidptr(&blank[0]), sizeof(i64) * 18) {
+		return errno.err, errno.efault
+	}
+
+	return 0, 0
+}
+
+// prlimit64(2). The limits are fixed, but a caller asking about one this kernel
+// does not model should not be told it is unlimited by accident.
+const rlimit_nofile = 7
+
+const rlimit_nlimits = 16
+
+fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
+	if res < 0 || res >= rlimit_nlimits {
+		return errno.err, errno.einval
+	}
+	if pid != 0 {
+		if pid < 0 || pid >= proc.max_pid {
+			return errno.err, errno.esrch
+		}
+		if processes[pid] == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+	}
+
+	if old_rlim != 0 {
+		// RLIMIT_NOFILE has to be a real number, not RLIM_INFINITY: xtrans
+		// casts rlim_cur to int and compares fd >= limit, and infinity becomes
+		// -1 there.
+		mut limits := [2]u64{}
+		if res == rlimit_nofile {
+			limits[0] = u64(proc.max_fds)
+			limits[1] = u64(proc.max_fds)
+		} else {
+			limits[0] = 0xffffffffffffffff
+			limits[1] = 0xffffffffffffffff
+		}
+		if !usercopy.copy_to_user(old_rlim, voidptr(&limits[0]), sizeof(u64) * 2) {
+			return errno.err, errno.efault
+		}
+	}
+
+	// Lowering a limit is accepted and then ignored; nothing here enforces one.
+	if new_rlim != 0 {
+		mut wanted := [2]u64{}
+		if !usercopy.copy_from_user(voidptr(&wanted[0]), new_rlim, sizeof(u64) * 2) {
+			return errno.err, errno.efault
+		}
+	}
+
+	return 0, 0
+}
+
 fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 	current := proc.current_thread()
 	return u64(current.tid), 0
@@ -266,14 +406,6 @@ fn syscall_linux_sysinfo(_ voidptr, info voidptr) (u64, u64) {
 			p[4] = u64(2) * 1024 * 1024 * 1024 // totalram (2GB)
 			p[5] = u64(1) * 1024 * 1024 * 1024 // freeram (1GB)
 		}
-	}
-	return 0, 0
-}
-
-// getrusage: stub — zero out the rusage struct.
-fn syscall_linux_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
-	if usage != 0 {
-		unsafe { C.memset(voidptr(usage), 0, 144) } // sizeof(struct rusage) = 144 on aarch64
 	}
 	return 0, 0
 }
@@ -435,11 +567,6 @@ fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
 	return u64(target.pgid), 0
 }
 
-// prctl: stub — return success for most operations.
-fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
-	return 0, 0
-}
-
 // sendmsg: write iovec data to socket (no ancillary data support).
 fn syscall_linux_sendmsg(gpr_state voidptr, fdnum int, msg_ptr u64, flags int) (u64, u64) {
 	// struct msghdr layout (aarch64):
@@ -483,68 +610,8 @@ fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, fl
 	return fs.syscall_read(gpr_state, fdnum, buf, len)
 }
 
-fn syscall_linux_getuid(_ voidptr) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_geteuid(_ voidptr) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_getgid(_ voidptr) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_getegid(_ voidptr) (u64, u64) {
-	return 0, 0
-}
-
-// setuid/setgid: stubs — everything runs as root.
-// Critical for Xorg's custom Popen which calls setgid(getgid())/setuid(getuid())
-// in the child before exec; failure causes _exit(127).
-fn syscall_linux_setuid(_ voidptr, uid u32) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_setgid(_ voidptr, gid u32) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
-	return 0, 0
-}
-
 fn syscall_linux_umask(_ voidptr, mask int) (u64, u64) {
 	return 0o22, 0
-}
-
-fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_rlim u64, old_rlim u64) (u64, u64) {
-	if old_rlim != 0 {
-		// Return sensible default limits. RLIMIT_NOFILE (7) must return a
-		// reasonable integer, not RLIM_INFINITY — xtrans casts rlim_cur to
-		// int and compares fd >= limit, so infinity → -1 which breaks.
-		mut soft := u64(1024)
-		mut hard := u64(1048576)
-		match resource {
-			7 { // RLIMIT_NOFILE
-				soft = 1024
-				hard = 1048576
-			}
-			else {
-				soft = 0xffffffffffffffff
-				hard = 0xffffffffffffffff
-			}
-		}
-		unsafe {
-			*&u64(old_rlim) = soft
-			*&u64(old_rlim + 8) = hard
-		}
-	}
-	return 0, 0
 }
 
 fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
@@ -860,20 +927,29 @@ pub fn init_syscall_table() {
 	syscall_table[139] = voidptr(userland.syscall_sigreturn) // __NR_rt_sigreturn
 	syscall_table[140] = voidptr(syscall_linux_setpriority) // __NR_setpriority
 	syscall_table[141] = voidptr(syscall_linux_getpriority) // __NR_getpriority
+	syscall_table[156] = voidptr(userland.syscall_getsid) // __NR_getsid
+	syscall_table[157] = voidptr(userland.syscall_setsid) // __NR_setsid
 	syscall_table[158] = voidptr(userland.syscall_getgroups) // __NR_getgroups
+	syscall_table[159] = voidptr(userland.syscall_setgroups) // __NR_setgroups
 	syscall_table[160] = voidptr(syscall_linux_uname) // __NR_uname
 	syscall_table[169] = voidptr(sys.syscall_gettimeofday) // __NR_gettimeofday
 	syscall_table[166] = voidptr(syscall_linux_umask) // __NR_umask
 	syscall_table[172] = voidptr(userland.syscall_getpid) // __NR_getpid
 	syscall_table[173] = voidptr(userland.syscall_getppid) // __NR_getppid
-	syscall_table[144] = voidptr(syscall_linux_setgid) // __NR_setgid
-	syscall_table[145] = voidptr(syscall_linux_setreuid) // __NR_setreuid (Xorg Popen)
-	syscall_table[146] = voidptr(syscall_linux_setuid) // __NR_setuid
-	syscall_table[147] = voidptr(syscall_linux_setregid) // __NR_setregid
-	syscall_table[174] = voidptr(syscall_linux_getuid) // __NR_getuid
-	syscall_table[175] = voidptr(syscall_linux_geteuid) // __NR_geteuid
-	syscall_table[176] = voidptr(syscall_linux_getgid) // __NR_getgid
-	syscall_table[177] = voidptr(syscall_linux_getegid) // __NR_getegid
+	// 143 is setregid and 147 is setresuid. The table used to put setregid at
+	// 147, so a three-argument setresuid landed in a two-argument handler.
+	syscall_table[143] = voidptr(userland.syscall_setregid) // __NR_setregid
+	syscall_table[144] = voidptr(userland.syscall_setgid) // __NR_setgid
+	syscall_table[145] = voidptr(userland.syscall_setreuid) // __NR_setreuid
+	syscall_table[146] = voidptr(userland.syscall_setuid) // __NR_setuid
+	syscall_table[147] = voidptr(userland.syscall_setresuid) // __NR_setresuid
+	syscall_table[148] = voidptr(userland.syscall_getresuid) // __NR_getresuid
+	syscall_table[149] = voidptr(userland.syscall_setresgid) // __NR_setresgid
+	syscall_table[150] = voidptr(userland.syscall_getresgid) // __NR_getresgid
+	syscall_table[174] = voidptr(userland.syscall_getuid) // __NR_getuid
+	syscall_table[175] = voidptr(userland.syscall_geteuid) // __NR_geteuid
+	syscall_table[176] = voidptr(userland.syscall_getgid) // __NR_getgid
+	syscall_table[177] = voidptr(userland.syscall_getegid) // __NR_getegid
 	syscall_table[178] = voidptr(syscall_linux_gettid) // __NR_gettid
 	syscall_table[179] = voidptr(syscall_linux_sysinfo) // __NR_sysinfo
 

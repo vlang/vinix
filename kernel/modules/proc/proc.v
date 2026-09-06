@@ -37,6 +37,21 @@ pub mut:
 	// process down, so late-arriving threads do not try to do it again.
 	exiting bool
 	name    string
+
+	// Credentials: the real, effective and saved sets POSIX names, plus the
+	// supplementary groups. Everything starts as root and is inherited across
+	// fork, which is what a system with no login path and no setuid bits gets.
+	uid    u32
+	euid   u32
+	suid   u32
+	gid    u32
+	egid   u32
+	sgid   u32
+	groups []u32
+
+	// The controlling terminal's session, from setsid(2). A process is a
+	// session leader when sid == pid.
+	tty_session int
 }
 
 pub struct SigAction {

@@ -705,6 +705,13 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.ppid = old_process.pid
 		new_proc.pgid = old_process.pgid
 		new_proc.sid = old_process.sid
+		new_proc.uid = old_process.uid
+		new_proc.euid = old_process.euid
+		new_proc.suid = old_process.suid
+		new_proc.gid = old_process.gid
+		new_proc.egid = old_process.egid
+		new_proc.sgid = old_process.sgid
+		new_proc.groups = old_process.groups.clone()
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base

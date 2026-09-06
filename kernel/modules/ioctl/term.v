@@ -8,9 +8,38 @@ pub const tcsetsw = 0x5403
 
 pub const tcsetsf = 0x5404
 
+pub const tcsbrk = 0x5409
+
+pub const tcxonc = 0x540a
+
+pub const tcflsh = 0x540b
+
+pub const tiocexcl = 0x540c
+
+pub const tiocnxcl = 0x540d
+
 pub const tiocsctty = 0x540e
 
+pub const tiocgpgrp = 0x540f
+
+pub const tiocspgrp = 0x5410
+
+pub const tiocoutq = 0x5411
+
 pub const tiocgwinsz = 0x5413
+
+pub const tiocswinsz = 0x5414
+
+pub const tiocnotty = 0x5422
+
+pub const tiocgsid = 0x5429
+
+// tcflush(3) selectors, the argument to TCFLSH.
+pub const tciflush = 0
+
+pub const tcoflush = 1
+
+pub const tcioflush = 2
 
 pub struct WinSize {
 pub mut:

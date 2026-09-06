@@ -145,10 +145,6 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 	return u64(t.process.ppid), 0
 }
 
-pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
-	return 0, 0
-}
-
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	mut t := proc.current_thread()
 

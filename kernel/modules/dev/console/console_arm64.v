@@ -14,6 +14,7 @@ import termios
 import file
 import userland
 import proc
+import usercopy
 import katomic
 import sched
 import aarch64.uart
@@ -261,6 +262,17 @@ pub mut:
 	can_mmap bool
 
 	termios termios.Termios
+
+	// Controlling-terminal state. A shell needs all three to run job control:
+	// which session owns the terminal, which process group is in the
+	// foreground, and the window size to report.
+	session          int
+	foreground_pgid  int
+	winsize_rows     u16
+	winsize_cols     u16
+	winsize_xpixel   u16
+	winsize_ypixel   u16
+	winsize_explicit bool
 }
 
 fn (mut this Console) mmap(_handle voidptr, page u64, flags int) voidptr {
@@ -350,35 +362,199 @@ fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i6
 	return i64(count)
 }
 
+// How many bytes a reader could take right now.
+fn (this &Console) input_pending() u64 {
+	return console_bigbuf_i
+}
+
 fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	latest_thread = proc.current_thread()
 
+	mut process := proc.current_thread().process
+
 	match request {
 		ioctl.tiocgwinsz {
-			mut w := unsafe { &ioctl.WinSize(argp) }
-			w.ws_row = u16(terminal_rows)
-			w.ws_col = u16(terminal_cols)
-			w.ws_xpixel = u16(framebuffer_width)
-			w.ws_ypixel = u16(framebuffer_height)
+			mut size := ioctl.WinSize{}
+			if this.winsize_explicit {
+				size.ws_row = this.winsize_rows
+				size.ws_col = this.winsize_cols
+				size.ws_xpixel = this.winsize_xpixel
+				size.ws_ypixel = this.winsize_ypixel
+			} else {
+				size.ws_row = u16(terminal_rows)
+				size.ws_col = u16(terminal_cols)
+				size.ws_xpixel = u16(framebuffer_width)
+				size.ws_ypixel = u16(framebuffer_height)
+			}
+			if !usercopy.copy_to_user(u64(argp), voidptr(&size), sizeof(ioctl.WinSize)) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
+		ioctl.tiocswinsz {
+			mut size := ioctl.WinSize{}
+			if !usercopy.copy_from_user(voidptr(&size), u64(argp), sizeof(ioctl.WinSize)) {
+				errno.set(errno.efault)
+				return none
+			}
+			changed := size.ws_row != this.winsize_rows || size.ws_col != this.winsize_cols
+			this.winsize_rows = size.ws_row
+			this.winsize_cols = size.ws_col
+			this.winsize_xpixel = size.ws_xpixel
+			this.winsize_ypixel = size.ws_ypixel
+			this.winsize_explicit = true
+			// A terminal that changes shape tells the foreground group, which
+			// is how an editor learns to redraw.
+			if changed && this.foreground_pgid != 0 {
+				signal_foreground(this.foreground_pgid, u8(userland.sigwinch))
+			}
 			return 0
 		}
 		ioctl.tcgets {
-			mut t := unsafe { &termios.Termios(argp) }
-			unsafe {
-				*t = this.termios
+			settings := this.termios
+			if !usercopy.copy_to_user(u64(argp), voidptr(&settings), sizeof(termios.Termios)) {
+				errno.set(errno.efault)
+				return none
 			}
 			return 0
 		}
-		// TODO: handle these differently
+		// The three differ only in when they take effect. Nothing here buffers
+		// output, so there is nothing to drain and they are the same.
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			mut t := unsafe { &termios.Termios(argp) }
-			unsafe {
-				this.termios = *t
+			mut settings := termios.Termios{}
+			if !usercopy.copy_from_user(voidptr(&settings), u64(argp), sizeof(termios.Termios)) {
+				errno.set(errno.efault)
+				return none
 			}
+			this.termios = settings
+			if request == ioctl.tcsetsf {
+				discard_console_input()
+			}
+			return 0
+		}
+		ioctl.tiocsctty {
+			// Only a session leader may claim a terminal, and only one that is
+			// free or already its own.
+			if process.sid != process.pid {
+				errno.set(errno.eperm)
+				return none
+			}
+			if this.session != 0 && this.session != process.sid {
+				errno.set(errno.eperm)
+				return none
+			}
+			this.session = process.sid
+			this.foreground_pgid = process.pgid
+			process.tty_session = process.sid
+			return 0
+		}
+		ioctl.tiocnotty {
+			if this.session == process.sid {
+				this.session = 0
+				this.foreground_pgid = 0
+			}
+			process.tty_session = 0
+			return 0
+		}
+		ioctl.tiocgsid {
+			if this.session == 0 {
+				errno.set(errno.enotty)
+				return none
+			}
+			value := this.session
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
+		ioctl.tiocgpgrp {
+			// Reporting no foreground group is what made every shell give up on
+			// job control at startup.
+			mut value := this.foreground_pgid
+			if value == 0 {
+				value = process.pgid
+			}
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
+		ioctl.tiocspgrp {
+			mut value := int(0)
+			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(int)) {
+				errno.set(errno.efault)
+				return none
+			}
+			if value <= 0 {
+				errno.set(errno.einval)
+				return none
+			}
+			this.foreground_pgid = value
+			return 0
+		}
+		ioctl.fionread {
+			value := int(this.input_pending())
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
+		ioctl.tiocoutq {
+			// Writes go straight out, so nothing is ever queued.
+			value := int(0)
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
+		ioctl.tcflsh {
+			// argp is the selector itself here, not a pointer to one.
+			selector := int(u64(argp))
+			if selector == ioctl.tciflush || selector == ioctl.tcioflush {
+				discard_console_input()
+			}
+			return 0
+		}
+		// Draining output and flow control have nothing to act on, but a
+		// terminal is expected to accept them.
+		ioctl.tcsbrk, ioctl.tcxonc, ioctl.tiocexcl, ioctl.tiocnxcl {
 			return 0
 		}
 		else {
 			return resource.default_ioctl(handle, request, argp)
+		}
+	}
+}
+
+// Throw away anything typed but not yet read.
+fn discard_console_input() {
+	console_read_lock.acquire()
+	console_bigbuf_i = 0
+	console_buffer_i = 0
+	console_res.status &= ~file.pollin
+	console_read_lock.release()
+}
+
+// Raise a signal in every process of a process group.
+fn signal_foreground(pgid int, signal u8) {
+	for i := 1; i < proc.max_pid; i++ {
+		mut target := processes[i]
+		if target == unsafe { nil } || target.pgid != pgid {
+			continue
+		}
+		target.threads_lock.acquire()
+		mut main_thread := &proc.Thread(unsafe { nil })
+		if target.threads.len > 0 {
+			main_thread = target.threads[0]
+		}
+		target.threads_lock.release()
+		if main_thread != unsafe { nil } {
+			userland.sendsig(main_thread, signal)
 		}
 	}
 }
