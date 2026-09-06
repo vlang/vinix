@@ -316,24 +316,35 @@ fn early_cmdline_contains(needle string) bool {
 }
 
 fn kmain() {
-	// flanterm's init clears the framebuffer, which erases every stage bar
-	// drawn before it. When the screen goes black with no text, that clear is
-	// the last thing known to have happened, so allow skipping it to find out
-	// how far boot actually gets.
-	// First instruction of the kernel, before anything that could fault:
-	// can we drive this display at all? A whole-screen fill cannot be confused
+	// Read the cmdline before touching anything else. The framebuffer used to
+	// be written first, which made it impossible to tell a kernel that never
+	// ran from one that faulted on the very first pixel: both leave the black
+	// screen Limine hands over, and neither reaches the code that could say
+	// otherwise. The cmdline only walks a Limine response, so it is the
+	// cheapest thing that can run before the answer is needed.
+	halt_at_stage = early_cmdline_value('vinix.halt_at=')
+	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
+
+	// Stage 0 deliberately precedes every access to hardware state, so its
+	// halt asks one question and no other: was the kernel entered at all?
+	// Powering off here means Limine's handoff worked and V's globals are
+	// readable, before any assumption about the display can interfere.
+	if halt_at_stage == 0 {
+		cpu.psci_call(cpu.psci_system_off)
+		cpu.psci_call(cpu.psci_system_reset)
+		for {}
+	}
+
+	// Can we drive this display at all? A whole-screen fill cannot be confused
 	// with a dark panel or with leftover bootloader text the way a 16-row bar
-	// can. Nothing here reads the cmdline or touches the allocator, so a green
-	// screen means the kernel started and the framebuffer is live, whatever
-	// happens afterwards. In normal boot flanterm's clear immediately replaces
-	// it, so this costs one frame.
+	// can. Limine clears the framebuffer before handoff, so black is its work,
+	// not evidence about ours; green is. In normal boot flanterm's clear
+	// immediately replaces it, so this costs one frame.
 	term.early_screen_fill(1)
 
-	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
-	halt_at_stage = early_cmdline_value('vinix.halt_at=')
+	// Stage 1 sits after the fill to report whether that fill survived, so
+	// halting on it has to happen here rather than in boot_stage.
 	if halt_at_stage == 1 {
-		// Stage 1 is the screen fill, which happens before the cmdline is
-		// read, so its halt has to be checked here rather than in boot_stage.
 		cpu.psci_call(cpu.psci_system_off)
 		cpu.psci_call(cpu.psci_system_reset)
 		for {}
@@ -469,10 +480,13 @@ fn kmain() {
 	if use_aic {
 		print('skipping SMP (minimal Apple bring-up mode)\n')
 		bootstrap_cpu0()
-	} else if have_dt {
+	} else if have_dt && smp.available() {
 		print('init smp...\n')
 		smp.initialise()
 		print('smp done\n')
+	} else if have_dt {
+		print('skipping SMP (no bootloader MP response; build with -d limine_mp)\n')
+		bootstrap_cpu0()
 	} else {
 		print('skipping SMP (no device tree)\n')
 		bootstrap_cpu0()
