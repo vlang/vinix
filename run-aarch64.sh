@@ -1,6 +1,10 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
 # Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu] [--mem=MB]
+#                         [--replace]
+#
+# --replace stops a VM already using the boot disk. Without it a second run
+# refuses, rather than writing into the disk of a running one.
 #
 # --mem=MB (or VINIX_QEMU_MEM) sizes guest RAM. The virt machine places RAM
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
@@ -24,6 +28,7 @@ LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
 NO_BUILD=0
 SERIAL_ONLY=0
 VIRTIO_GPU=0
+REPLACE_RUNNING=0
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
@@ -31,6 +36,7 @@ for arg in "$@"; do
         --serial)     SERIAL_ONLY=1 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
+        --replace)    REPLACE_RUNNING=1 ;;
     esac
 done
 
@@ -106,6 +112,50 @@ if [ -n "$OVMF_VARS_TEMPLATE" ]; then
 else
     echo "WARNING: edk2-arm-vars.fd template not found, GOP/framebuffer may not work"
     dd if=/dev/zero of="$OVMF_VARS" bs=1m count=64 2>/dev/null
+fi
+
+# ── Refuse to touch a boot disk another VM is using ──
+# QEMU takes a write lock on it and fails to start if it cannot; mtools takes
+# no lock at all. So without this check the mcopy steps below would write a new
+# kernel into the disk of a *running* VM, and only then would QEMU report the
+# lock it could not get. Catching it here says which process to deal with, and
+# says it before anything has been modified.
+if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
+    HOLDERS="$(lsof -t -- "$BOOT_DISK" 2>/dev/null | tr '\n' ' ')"
+    if [ -n "${HOLDERS// /}" ]; then
+        # Only a QEMU is safe to stop on the strength of holding this file.
+        NON_QEMU=""
+        for pid in $HOLDERS; do
+            case "$(ps -o comm= -p "$pid" 2>/dev/null)" in
+                *qemu*) ;;
+                *)      NON_QEMU="$NON_QEMU $pid" ;;
+            esac
+        done
+
+        if [ -n "${NON_QEMU// /}" ] || [ "$REPLACE_RUNNING" -eq 0 ]; then
+            echo "ERROR: $BOOT_DISK is in use, so this VM cannot start." >&2
+            for pid in $HOLDERS; do
+                echo "    pid $pid: $(ps -o command= -p "$pid" 2>/dev/null | cut -c1-70)" >&2
+            done
+            if [ -n "${NON_QEMU// /}" ]; then
+                echo "Something other than QEMU has it open; sort that out first." >&2
+            else
+                echo "Re-run with --replace to stop it, or: kill $HOLDERS" >&2
+            fi
+            exit 1
+        fi
+
+        echo "==> Stopping the VM already using the boot disk (pid $HOLDERS)..."
+        kill $HOLDERS 2>/dev/null || true
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            [ -z "$(lsof -t -- "$BOOT_DISK" 2>/dev/null)" ] && break
+            sleep 0.5
+        done
+        if [ -n "$(lsof -t -- "$BOOT_DISK" 2>/dev/null)" ]; then
+            echo "ERROR: it did not let go of $BOOT_DISK; kill -9 $HOLDERS" >&2
+            exit 1
+        fi
+    fi
 fi
 
 # ── Create/update boot disk (fast: only mcopy the kernel) ──

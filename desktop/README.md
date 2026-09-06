@@ -16,8 +16,12 @@ What it does:
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, clicking one to bring it to the front
 - a **New window** button, so the taskbar list can be seen growing and shrinking
-- **hosted ui2 applications**: the taskbar's launchers open ui2's own examples
-  in windows of their own, several at a time, each with its own state
+- **shortcuts down the left edge of the wallpaper**, and matching taskbar
+  launchers, for every application the desktop can open
+- a **file browser** over the real filesystem: directories first, sizes, and a
+  way back up
+- **hosted ui2 applications**: ui2's own examples run in windows of their own,
+  several at a time, each with its own state
 
 Keys: `Esc` or `q` leaves the desktop, `n` opens a window, `c` a calculator.
 
@@ -26,7 +30,8 @@ Keys: `Esc` or `q` leaves the desktop, `n` opens a window, `c` a calculator.
     main.v         the event loop: poll input, rebuild, render, present
     wm.v           the window manager — window list, the ui2 tree, hit routing
     window.v       the Window model and the pages windows show
-    app.v          hosting ui2 applications in windows
+    app.v          hosting applications in windows, and which ones there are
+    files.v        the file browser
     render.v       a ui2 backend that draws an element tree into a framebuffer
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
     font.v         text, from the coverage atlases in font_data.v
@@ -73,14 +78,33 @@ runs on Vinix is the example rather than a retelling of it. Both it and the
 desktop are `module main`, so they share a directory and V builds them as one
 program.
 
-Hosted event ids are ui2's own, prefixed `__qml_`, so the window manager can
-tell them from its own without parsing them. It routes one by which window the
-click landed in, which is also what decides it between two open copies of the
-same application.
+The window manager owns four action prefixes — `taskbar.`, `task.`, `win.` and
+`shortcut.` — and treats everything else as an application's, routing it to
+whichever window the click landed in. That is also what decides it between two
+open copies of the same application. Because the rule is "not mine", an
+application names its events whatever suits it: ui2's `__qml_...` and the file
+browser's `files.row.3` both arrive without the window manager parsing either.
 
-Add an application by listing its example directory in
-`build-desktop-aarch64.sh` and adding an `AppFactory` to `available_apps` in
-`app.v`.
+Add an application by adding an `AppFactory` to `available_apps` in `app.v`;
+it then has a wallpaper shortcut and a taskbar launcher. A ui2 example also
+needs its directory listed in `build-desktop-aarch64.sh` so the staging step
+compiles it in.
+
+## The file browser
+
+`files.v` is not a ui2 example but Vinix's own, and it reads a real
+filesystem — the listing comes from the kernel's `getdents64` through musl's
+`readdir`, and each entry is `stat`ed for its size. It satisfies the same
+`HostedApp` interface, so the window manager hosts it with the machinery that
+was already there and knows nothing about files.
+
+Directories sort before files and both sort by name, because the order a
+directory is read in is whatever the filesystem happens to store. Clicking a
+directory descends, `Up` goes back, and `-`/`+` scroll when there are more
+entries than the window has room for.
+
+The image carries the desktop's own source at `/root/desktop`, so there is
+something real to browse and so the machine holds the code it is running.
 
 ## Fonts
 
@@ -135,6 +159,10 @@ It builds the kernel, builds the desktop, and starts QEMU on the result.
     --no-kernel     skip the kernel build (the desktop is what you changed)
     --no-desktop    skip the desktop build (the kernel is what you changed)
     --monitor       expose a QEMU monitor and QMP socket (see below)
+    --replace       stop a VM already using the boot disk
+
+A second VM cannot share the boot disk: QEMU takes a write lock on it and
+refuses to start without one. `--replace` stops the one already running.
 
 Anything else is passed through to `run-aarch64.sh`: `--mem=MB`, `--serial`,
 `--virtio-gpu`.

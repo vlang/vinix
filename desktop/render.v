@@ -30,6 +30,9 @@ const text_inset = 10
 
 const clock_area_width = 128
 
+// An icon sharing a control with a label is drawn at this size.
+const button_icon_size = 16
+
 // face_for picks the baked face closest to what a style asks for: the right
 // weight first, then the nearest size. Nothing is scaled — a bitmap atlas
 // stretched looks far worse than one a couple of pixels off — so a style
@@ -213,17 +216,36 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 		}
 	}
 
+	// An icon on its own gets the whole control; an icon with a label gets a
+	// square at the leading edge and the label takes what is left. Without the
+	// second case a glyph drawn across a wide button swamps its text.
+	mut text_x := x + text_inset
+	mut text_w := w - 2 * text_inset
 	if el.image_path.len > 0 {
-		d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+		if el.text.len == 0 {
+			d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+		} else {
+			icon := if h - 8 < button_icon_size { h - 8 } else { button_icon_size }
+			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon,
+				icon, el.text_style.color)
+			text_x += icon + 6
+			text_w -= icon + 6
+		}
 	}
 
 	if el.text.len == 0 {
 		return
 	}
 	face := d.face_for(el.text_style)
-	inner := if el.text_style.align == .center { w } else { w - 2 * text_inset }
+	inner := if el.text_style.align == .center && el.image_path.len == 0 { w } else { text_w }
 	text := face.truncate(el.text, inner)
 	text_y := y + (h - face.line_height) / 2
+	// A label sharing the control with an icon is always placed after it; the
+	// declared alignment only decides where a label on its own sits.
+	if el.image_path.len > 0 {
+		d.canvas.draw_text(face, text_x, text_y, text, el.text_style.color)
+		return
+	}
 	match el.text_style.align {
 		.left { d.canvas.draw_text(face, x + text_inset, text_y, text, el.text_style.color) }
 		.center { d.canvas.draw_text_centered(face, x, text_y, w, text, el.text_style.color) }
@@ -265,6 +287,47 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'close' {
 			d.canvas.draw_line(cx - half, cy - half, cx + half, cy + half, color, 1)
 			d.canvas.draw_line(cx + half, cy - half, cx - half, cy + half, color, 1)
+		}
+		// Application and file icons. These are filled shapes rather than
+		// hairlines: they are read at a glance and at whatever size the
+		// element gives them, not aligned to the pixel grid like the chrome's.
+		'folder' {
+			body := w * 4 / 5
+			tall := h * 5 / 8
+			left := cx - body / 2
+			top := cy - tall / 2
+			// The tab, then the body over it, so the two read as one shape.
+			d.canvas.fill_round_rect(left, top - tall / 5, body * 2 / 5, tall / 2, 2,
+				color)
+			d.canvas.fill_round_rect(left, top, body, tall, 3, color)
+		}
+		'file' {
+			body := w * 3 / 5
+			tall := h * 3 / 4
+			left := cx - body / 2
+			top := cy - tall / 2
+			fold := body / 3
+			d.canvas.fill_round_rect(left, top, body, tall, 2, color)
+			// A dog-ear, punched out of the corner in the surface behind it.
+			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x,
+				y))
+		}
+		'calculator' {
+			body := w * 3 / 5
+			tall := h * 3 / 4
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, color)
+			// The display, and two rows of keys, punched back out.
+			behind := d.surface_under(x, y)
+			d.canvas.fill_rect(left + 3, top + 3, body - 6, tall / 4, behind)
+			key := (body - 6) / 4
+			for row in 0 .. 2 {
+				for column in 0 .. 3 {
+					d.canvas.fill_rect(left + 3 + column * key, top + tall / 2 + row * key,
+						key - 2, key - 2, behind)
+				}
+			}
 		}
 		else {}
 	}

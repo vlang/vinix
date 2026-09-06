@@ -8,11 +8,13 @@
 #ifndef VINIX_DESKTOP_SHIM_H
 #define VINIX_DESKTOP_SHIM_H
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -93,6 +95,48 @@ static inline void vd_sleep_ms(int64_t milliseconds) {
 	request.tv_sec = (time_t)(milliseconds / 1000);
 	request.tv_nsec = (long)((milliseconds % 1000) * 1000000);
 	nanosleep(&request, NULL);
+}
+
+/* Directory listing, for the file browser. struct dirent stays here for the
+ * same reason struct termios does: its layout is the target libc's business,
+ * and V only needs the two things a listing shows. */
+static inline void *vd_opendir(const char *path) {
+	return (void *)opendir(path);
+}
+
+/* Returns 0 at the end of the directory, 1 otherwise. */
+static inline int vd_readdir(void *dir, char *name, uint64_t name_size, int *is_dir) {
+	struct dirent *entry = readdir((DIR *)dir);
+	if (entry == NULL) {
+		return 0;
+	}
+	*is_dir = entry->d_type == DT_DIR;
+	uint64_t i = 0;
+	while (i + 1 < name_size && entry->d_name[i] != '\0') {
+		name[i] = entry->d_name[i];
+		++i;
+	}
+	name[i] = '\0';
+	return 1;
+}
+
+static inline void vd_closedir(void *dir) {
+	if (dir != NULL) {
+		closedir((DIR *)dir);
+	}
+}
+
+/* Size of a regular file, and whether the path is a directory after all —
+ * d_type is right on Vinix, but a listing that stats anyway costs nothing at
+ * these sizes and does not depend on that staying true. */
+static inline int vd_stat(const char *path, uint64_t *size, int *is_dir) {
+	struct stat info;
+	if (stat(path, &info) != 0) {
+		return 0;
+	}
+	*size = (uint64_t)info.st_size;
+	*is_dir = S_ISDIR(info.st_mode) ? 1 : 0;
+	return 1;
 }
 
 #endif /* VINIX_DESKTOP_SHIM_H */

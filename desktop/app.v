@@ -23,21 +23,31 @@ mut:
 	handle(event_id string) !
 }
 
-// AppFactory names an application the desktop can open and the size its window
-// should start at.
+// AppFactory names an application the desktop can open, the size its window
+// should start at, and the builtin glyph that stands for it in the taskbar and
+// on the wallpaper.
 struct AppFactory {
 	title  string
+	icon   string
 	width  int
 	height int
 	open   fn () !HostedApp @[required]
 }
 
-// available_apps is what the taskbar offers. The calculator's window is sized
-// from the constants its own source declares, so the window matches what the
-// example asks for rather than a number guessed here.
+// available_apps is what the taskbar and the wallpaper offer. The calculator's
+// window is sized from the constants its own source declares, so the window
+// matches what the example asks for rather than a number guessed here.
 const available_apps = [
 	AppFactory{
+		title: 'Files'
+		icon: 'builtin:folder'
+		width: 460
+		height: 360
+		open: open_files
+	},
+	AppFactory{
 		title: 'Calculator'
+		icon: 'builtin:calculator'
 		width: window_width
 		height: window_height + title_height
 		open: open_calculator

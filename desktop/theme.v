@@ -35,6 +35,26 @@ const body_heading = u32(0x141c2b)
 const body_rule = u32(0xe8ebf0)
 const body_panel = u32(0xf3f5f9)
 
+// ── File browser ───────────────────────────────────────────────────
+const files_up = u32(0x4a6fa5)
+const files_up_disabled = u32(0xe7eaf0)
+const files_row_hover = u32(0xeaf1fb)
+const files_error = u32(0xc0392b)
+const files_folder_icon = u32(0x5b8def)
+const files_file_icon = u32(0x9aa5b5)
+
+// ── Desktop shortcuts ──────────────────────────────────────────────
+// Icons sit down the left edge of the wallpaper, out of the way of where
+// windows open.
+const shortcut_width = 84
+const shortcut_height = 76
+const shortcut_top = 18
+const shortcut_left = 18
+const shortcut_gap = 6
+const shortcut_icon = 30
+const shortcut_label = u32(0xecf2fb)
+const shortcut_hover = u32(0xffffff)
+
 // ── Taskbar ────────────────────────────────────────────────────────
 const taskbar_height = 46
 const taskbar_bg = u32(0x101726)

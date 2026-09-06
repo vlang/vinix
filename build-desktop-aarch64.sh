@@ -137,6 +137,12 @@ cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop"
 
+# The desktop's own source travels with the image, so the file browser has
+# something real to show and so the machine carries the code it is running.
+mkdir -p "$STAGING/root/desktop"
+cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.h "$SCRIPT_DIR/desktop/README.md" \
+    "$STAGING/root/desktop/"
+
 # BusyBox comes along so init has a shell to fall back to when the desktop
 # exits or fails to start.
 tar xf "$BASE_INITRAMFS" -C "$BUILD_DIR" ./bin/busybox

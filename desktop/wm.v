@@ -10,11 +10,15 @@ import ui2
 // lookup table: 'win.<id>.<part>' addresses one window's chrome, 'task.<id>'
 // its taskbar entry.
 const action_new_window = 'taskbar.new'
-// Launcher buttons carry the index of the application they open.
+// Launcher buttons and wallpaper shortcuts both carry the index of the
+// application they open.
 const action_launch_prefix = 'taskbar.launch.'
-// ui2 gives every event in a hosted document an id starting with this, so an
-// action the desktop does not own is recognisable without parsing it.
-const hosted_action_prefix = '__qml_'
+const action_shortcut_prefix = 'shortcut.'
+// The desktop's own actions all begin with one of these. An action that does
+// not is an application's, and is routed to whichever window it was clicked
+// in — which is what lets a hosted application name its events whatever it
+// likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
+const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.']
 
 enum DragKind {
 	none_
@@ -222,6 +226,8 @@ fn (mut d Desktop) activate(id int) {
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
 	mut children := []ui2.Element{}
+	// Shortcuts first, so every window paints over them.
+	children << d.shortcut_elements()
 	for window in d.windows {
 		if window.minimized {
 			continue
@@ -322,6 +328,24 @@ fn (mut d Desktop) launch(factory AppFactory) {
 	d.clamp_to_screen(index)
 }
 
+// launch_titled opens the application with this title, for a caller that knows
+// which one it wants rather than where it sits in the list.
+fn (mut d Desktop) launch_titled(title string) {
+	for factory in available_apps {
+		if factory.title == title {
+			d.launch(factory)
+			return
+		}
+	}
+	eprintln('vinix-desktop: no application called ${title}')
+}
+
+fn (mut d Desktop) launch_index(index int) {
+	if index >= 0 && index < available_apps.len {
+		d.launch(available_apps[index])
+	}
+}
+
 // forward_to_app hands an action the desktop does not recognise to the
 // application under the pointer. Hosted ids are ui2's own — it prefixes them
 // `__qml_` — so rather than parse them the window manager routes by where the
@@ -343,6 +367,51 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 		d.dirty = true
 		return
 	}
+}
+
+// shortcut_elements lays the application shortcuts down the left edge of the
+// wallpaper, where windows are least likely to sit on top of them. Each is a
+// transparent view that only shows a panel while the pointer is on it, so an
+// idle desktop is just the wallpaper and its icons.
+fn (d &Desktop) shortcut_elements() []ui2.Element {
+	mut out := []ui2.Element{cap: available_apps.len}
+	for index, factory in available_apps {
+		id := '${action_shortcut_prefix}${index}'
+		hovered := d.hover == id
+		y := shortcut_top + index * (shortcut_height + shortcut_gap)
+		icon_x := (shortcut_width - shortcut_icon) / 2
+		out << ui2.clickable_view(id, ui2.rect(f64(shortcut_left), f64(y), f64(shortcut_width),
+			f64(shortcut_height)), ui2.BoxStyle{
+			bg: wallpaper_top
+			radius: 8
+			transparent: !hovered
+		}, [
+			ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon),
+				f64(shortcut_icon)), ui2.BoxStyle{
+				transparent: true
+			}, ui2.TextStyle{
+				color: if hovered { shortcut_hover } else { shortcut_label }
+			}),
+			ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width),
+				18), ui2.TextStyle{
+				color: if hovered { shortcut_hover } else { shortcut_label }
+				size: 12
+				align: .center
+			}),
+		])
+	}
+	return out
+}
+
+// desktop_owns reports whether an action is the window manager's own. Anything
+// else is an application's, wherever it came from.
+fn desktop_owns(action string) bool {
+	for prefix in desktop_action_prefixes {
+		if action.starts_with(prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 fn (d &Desktop) title_button(id string, glyph string, x int) ui2.Element {
@@ -393,8 +462,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	mut launcher_x := taskbar_padding + new_button_width + 8
 	for index, factory in available_apps {
 		id := '${action_launch_prefix}${index}'
-		children << ui2.button(id, factory.title, ui2.rect(f64(launcher_x), f64((taskbar_height - taskbar_item_height) / 2),
-			f64(launcher_width), f64(taskbar_item_height)), ui2.BoxStyle{
+		children << ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(launcher_x),
+			f64((taskbar_height - taskbar_item_height) / 2), f64(launcher_width), f64(taskbar_item_height)),
+			ui2.BoxStyle{
 			bg: if d.hover == id { taskbar_item_hover } else { taskbar_item_bg }
 			radius: 6
 		}, ui2.TextStyle{
@@ -575,16 +645,18 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		return
 	}
 
-	if action.starts_with(hosted_action_prefix) {
+	if !desktop_owns(action) {
 		d.forward_to_app(x, y, action)
 		return
 	}
 
 	if action.starts_with(action_launch_prefix) {
-		index := action[action_launch_prefix.len..].int()
-		if index >= 0 && index < available_apps.len {
-			d.launch(available_apps[index])
-		}
+		d.launch_index(action[action_launch_prefix.len..].int())
+		return
+	}
+
+	if action.starts_with(action_shortcut_prefix) {
+		d.launch_index(action[action_shortcut_prefix.len..].int())
 		return
 	}
 

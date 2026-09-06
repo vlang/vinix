@@ -105,14 +105,12 @@ fn main() {
 		keyboard.close()
 	}
 
-	// An opening arrangement, so the desktop has something to show and the
-	// taskbar has more than one entry in it. The calculator is ui2's own
-	// example, hosted rather than reimplemented.
-	desktop.spawn('Welcome', .welcome, 60, 74, 396, 250)
-	desktop.spawn('System', .system, 480, 74, 372, 232)
-	for factory in available_apps {
-		desktop.launch(factory)
-	}
+	// An opening arrangement, kept clear of the shortcut column down the left
+	// edge. The calculator is not opened: it has a shortcut and a launcher, and
+	// three windows is enough to show what the taskbar is for.
+	desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
+	desktop.spawn('System', .system, 580, 60, 372, 232)
+	desktop.launch_titled('Files')
 
 	mut stats := FrameStats{}
 	for desktop.running {
