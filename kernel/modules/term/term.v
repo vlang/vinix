@@ -177,6 +177,29 @@ __global (
 	}
 )
 
+// Physical span of the first framebuffer, for the page-table build. Limine
+// reports the framebuffer as a higher-half direct-map address, so the physical
+// base is that address minus the HHDM offset. Returns a zero length when there
+// is no usable framebuffer.
+pub fn framebuffer_phys_span() (u64, u64) {
+	if fb_req.response == unsafe { nil } {
+		return 0, 0
+	}
+	if fb_req.response.framebuffer_count == 0 || fb_req.response.framebuffers == unsafe { nil } {
+		return 0, 0
+	}
+	fb := unsafe { fb_req.response.framebuffers[0] }
+	if fb == unsafe { nil } || fb.address == unsafe { nil } || !fb_address_usable(fb) {
+		return 0, 0
+	}
+	hhdm := memory.get_hhdm_offset()
+	base := u64(fb.address)
+	if base < hhdm {
+		return 0, 0
+	}
+	return base - hhdm, fb.pitch * fb.height
+}
+
 pub fn initialise() {
 	if fb_req.response == unsafe { nil } {
 		// No framebuffer available (headless/serial-only mode)

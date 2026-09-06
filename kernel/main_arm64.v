@@ -421,6 +421,11 @@ fn kmain() {
 	}
 	boot_stage(if have_dt { u32(5) } else { u32(6) })
 
+	// The framebuffer must survive the page-table switch: it is the first thing
+	// written afterwards and the only place a panic can be shown. Map it from
+	// its own span so a memory map without a FRAMEBUFFER entry cannot lose it.
+	fb_phys, fb_len := term.framebuffer_phys_span()
+	memory.declare_framebuffer(fb_phys, fb_len)
 	memory.vmm_init()
 	boot_stage(7)
 

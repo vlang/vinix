@@ -330,6 +330,22 @@ __global (
 	}
 )
 
+// The framebuffer's physical span, declared by the caller before vmm_init so it
+// is mapped Non-Cacheable in the kernel tables whether or not the bootloader's
+// memory map carries a FRAMEBUFFER entry for it. On Apple Silicon the
+// framebuffer is iBoot-carved memory outside every RAM entry, and it is also
+// the first thing written after the page-table switch and the only place a
+// panic can be reported, so a missed mapping there is a silent freeze.
+__global (
+	vmm_framebuffer_base = u64(0)
+	vmm_framebuffer_len  = u64(0)
+)
+
+pub fn declare_framebuffer(phys u64, len u64) {
+	vmm_framebuffer_base = phys
+	vmm_framebuffer_len = len
+}
+
 pub fn vmm_init() {
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
@@ -409,9 +425,11 @@ pub fn vmm_init() {
 	// Remap framebuffer regions as Non-Cacheable.
 	// Normal Write-Back Cacheable (the default) causes writes to stay in CPU cache,
 	// never reaching the actual display device.
+	mut fb_entries := u64(0)
 	for k := u64(0); k < memmap.entry_count; k++ {
 		entry := unsafe { entries[k] }
 		if entry.@type == limine.limine_memmap_framebuffer {
+			fb_entries++
 			fb_base := lib.align_down(entry.base, page_size)
 			fb_top := lib.align_up(entry.base + entry.length, page_size)
 			for pg := fb_base; pg < fb_top; pg += page_size {
@@ -421,14 +439,28 @@ pub fn vmm_init() {
 			}
 		}
 	}
-	print('vmm: framebuffer remapped\n')
+
+	// The framebuffer the caller declared, mapped from its own span rather than
+	// from the memory map. Harmless when it duplicates an entry above.
+	if vmm_framebuffer_len != 0 {
+		fb_base := lib.align_down(vmm_framebuffer_base, page_size)
+		fb_top := lib.align_up(vmm_framebuffer_base + vmm_framebuffer_len, page_size)
+		for pg := fb_base; pg < fb_top; pg += page_size {
+			kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | pte_uncached) or {
+				panic('vmm init failure: declared framebuffer')
+			}
+		}
+	}
+	print('vmm: framebuffer 0x${vmm_framebuffer_base:x} +0x${vmm_framebuffer_len:x} mapped (memmap FB entries: ${fb_entries}, HHDM 0x${higher_half:x})\n')
 
 	// Set up MAIR_EL1:
 	//   Index 0: Normal Write-Back Cacheable (0xFF)
 	//   Index 1: Device-nGnRnE (0x00)
 	//   Index 2: Normal Non-Cacheable (0x44)
+	// Written only at the switch below. Limine's live tables use index 1 for
+	// the framebuffer with a different attribute, so nothing may touch the
+	// framebuffer between this write and the new tables going live.
 	mair := u64(0xFF) | (u64(0x00) << 8) | (u64(0x44) << 16)
-	cpu.write_mair_el1(mair)
 
 	// Set up TCR_EL1 for 4KB granule, 48-bit VA and a runtime-detected
 	// physical address size from ID_AA64MMFR0_EL1.PARange.
@@ -461,6 +493,7 @@ pub fn vmm_init() {
 	// in-flight table walk, so it is written only once the correct bases are
 	// already live. Each writer ends in an ISB.
 	print('vmm: activating kernel page tables\n')
+	cpu.write_mair_el1(mair)
 	cpu.write_ttbr0_el1(u64(kernel_pagemap.top_level))
 	cpu.write_ttbr1_el1(u64(kernel_pagemap.top_level))
 	cpu.write_tcr_el1(tcr)
