@@ -48,7 +48,9 @@
 #define REPEAT_PERIOD  33333u
 
 struct key_bytes {
-    uint8_t data[8];
+    /* Long enough for the longest sequence a key can produce, which is the
+     * report that Cmd has been let go rather than anything on a keycap. */
+    uint8_t data[16];
     size_t len;
 };
 
@@ -58,6 +60,11 @@ struct decoder {
     uint8_t fn;
     uint8_t caps;
     uint8_t repeat_key;
+    /* Whether a chord was sent while Cmd was down. The desktop's window
+     * switcher is drawn for as long as Cmd is held, so unlike every other
+     * modifier this one's release has to be reported -- but only to someone
+     * who asked, which is what pressing Cmd-Tab counts as. */
+    uint8_t gui_chorded;
     uint64_t repeat_at;
     uint8_t message[MESSAGE_SIZE];
     size_t message_used;
@@ -125,6 +132,7 @@ static void reset_input(struct decoder *d)
 {
     cancel_repeat(d);
     d->repeat_key = 0;
+    d->gui_chorded = 0;
     d->modifiers = 0;
     d->fn = 0;
     for (unsigned i = 0; i < 6; ++i)
@@ -145,6 +153,7 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     int shift = !!(modifiers & 0x22u);
     int ctrl = !!(modifiers & 0x11u);
     int alt = !!(modifiers & 0x44u);
+    int gui = !!(modifiers & 0x88u);
     uint8_t c = 0;
     int printable = 0;
     const char *s = NULL;
@@ -159,6 +168,15 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 82: key = 75; break; /* Fn-Up: Page Up */
         default: break;
         }
+    }
+
+    /* Cmd-Tab is the window switcher's, not the terminal's, so it goes out as
+     * the CSI-u encoding of Tab -- the key's own code point, then 1 plus a
+     * mask of the modifiers held with it, where super is 8 and shift is 1 --
+     * and the tab itself is not also sent. */
+    if (gui && key == 43) {
+        sequence(&out, shift ? "\033[9;10u" : "\033[9;9u");
+        return out;
     }
 
     if (key >= 4 && key <= 29) {
@@ -248,6 +266,16 @@ static size_t accept_report(struct decoder *d, const uint8_t report[10],
     d->modifiers = report[1];
     d->fn = !!report[9];
     ++d->reports;
+    /* Cmd let go. Nothing on a terminal has ever wanted to hear about a
+     * modifier's release, so this only goes out when a chord was sent while it
+     * was down. It is the left Super key in the CSI-u functional encoding,
+     * with an event type of 3, "released". */
+    if (d->gui_chorded && !(d->modifiers & 0x88u)) {
+        struct key_bytes release = {{0}, 0};
+        d->gui_chorded = 0;
+        sequence(&release, "\033[57444;1:3u");
+        append_key(out, capacity, &used, release);
+    }
     for (unsigned i = 0; i < 6; ++i) {
         uint8_t key = report[i + 3];
         /* ErrorRollOver, POSTFail, ErrorUndefined are not key releases.
@@ -273,6 +301,8 @@ static size_t accept_report(struct decoder *d, const uint8_t report[10],
         if (append_key(out, capacity, &used, bytes)) {
             d->repeat_key = key;
             d->repeat_at = now + REPEAT_DELAY;
+            if (key == 43 && (d->modifiers & 0x88u))
+                d->gui_chorded = 1;
         }
     }
     for (unsigned i = 0; i < 6; ++i)

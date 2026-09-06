@@ -1,7 +1,11 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
 # Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu] [--mem=MB]
-#                         [--replace]
+#                         [--replace] [--grab-keys]
+#
+# --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
+# its own application switcher, so without it the desktop's Cmd-Tab is never
+# seen -- at the price of Cmd-Q no longer quitting QEMU.
 #
 # --replace stops a VM already using the boot disk. Without it a second run
 # refuses, rather than writing into the disk of a running one.
@@ -33,6 +37,7 @@ NO_BUILD=0
 SERIAL_ONLY=0
 VIRTIO_GPU=0
 REPLACE_RUNNING=0
+GRAB_KEYS=0
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
@@ -41,6 +46,7 @@ for arg in "$@"; do
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
         --replace)    REPLACE_RUNNING=1 ;;
+        --grab-keys)  GRAB_KEYS=1 ;;
     esac
 done
 
@@ -224,7 +230,13 @@ if [ "$SERIAL_ONLY" -eq 1 ]; then
 elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
     DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND}"
 elif [ "$(uname -s)" = "Darwin" ]; then
-    DISPLAY_BACKEND_FLAGS="-display cocoa"
+    # System chords -- Cmd-Tab above all -- are the host's until QEMU is told
+    # to capture every key, which is what the desktop's own Cmd-Tab needs.
+    if [ "$GRAB_KEYS" -eq 1 ]; then
+        DISPLAY_BACKEND_FLAGS="-display cocoa,full-grab=on"
+    else
+        DISPLAY_BACKEND_FLAGS="-display cocoa"
+    fi
 else
     DISPLAY_BACKEND_FLAGS="-display default"
 fi

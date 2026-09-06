@@ -18,7 +18,7 @@ const action_shortcut_prefix = 'shortcut.'
 // not is an application's, and is routed to whichever window it was clicked
 // in — which is what lets a hosted application name its events whatever it
 // likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
-const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.']
+const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', action_switch_prefix]
 
 enum DragKind {
 	none_
@@ -67,6 +67,9 @@ mut:
 	apps []HostedApp
 
 	settings Settings
+	// Cmd-Tab's session: which windows it is stepping through and whether it
+	// has been held long enough to show them.
+	switcher Switcher
 	// One screen's worth of wallpaper, scaled once and kept. It only changes
 	// when the setting does, and rescaling a photograph every frame to paint a
 	// backdrop that has not moved would cost more than the rest of a frame.
@@ -242,6 +245,10 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		children << d.window_element(window)
 	}
 	children << d.taskbar_element()
+	// Last, so the switcher is over everything it is a picture of.
+	if d.switcher.shown {
+		children << d.switcher_element()
+	}
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)),
 		ui2.BoxStyle{
@@ -378,6 +385,7 @@ fn (mut d Desktop) launch(factory AppFactory) {
 	id := d.spawn(factory.title, .app, 120 + step, 60 + step, factory.width, factory.height)
 	index := d.window_index(id) or { return }
 	d.windows[index].app_index = d.apps.len - 1
+	d.windows[index].icon = factory.icon
 	d.clamp_to_screen(index)
 }
 
@@ -868,6 +876,16 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	action := d.hit_action(x, y)
 	d.hover = action
 	d.dirty = true
+
+	if d.switcher.active {
+		// A click on a tile switches to that window; a click anywhere else
+		// dismisses the switcher and then means whatever it would have meant.
+		if action.starts_with(action_switch_prefix) {
+			d.switcher_select(action[action_switch_prefix.len..].int())
+			return
+		}
+		d.switcher_close()
+	}
 
 	if action == '' {
 		// Empty desktop: drop focus so no title bar claims to be active.

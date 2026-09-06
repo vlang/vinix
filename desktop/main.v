@@ -136,6 +136,7 @@ fn main() {
 		// Settings only requests a new scale. Apply it after all input from this
 		// frame and before layout so drawing and hit targets share one space.
 		desktop.apply_requested_scale()
+		desktop.update_switcher()
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -211,14 +212,19 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 
 fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	keys := keyboard.poll()
-	if keys.len == 0 {
+
+	// Cmd-Tab is the window manager's whoever is typing, so it comes out of
+	// the stream first. An empty read goes through as well: a sequence the
+	// last read ended inside has to be let go when nothing completes it.
+	switched := d.take_switcher_keys(keys)
+	if switched.len == 0 {
 		return
 	}
 
 	// Brightness is the machine's, not the focused window's: F1 and F2 dim and
 	// brighten the panel whatever is on top, and are taken out of the stream so
 	// a terminal does not also receive them as an escape sequence.
-	rest := d.take_brightness_keys(keys)
+	rest := d.take_brightness_keys(switched)
 	if rest.len == 0 {
 		return
 	}

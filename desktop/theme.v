@@ -77,6 +77,32 @@ const taskbar_padding = 10
 
 
 
+// ── Window switcher ────────────────────────────────────────────────
+// Cmd-Tab's panel, in the middle of the screen. It is the same dark slab under
+// either theme, and translucent: it sits over whatever is open for as long as
+// a key is held, so what it covers should stay legible behind it, and a panel
+// that took the chrome's colour would vanish into a light desktop. The
+// selection is the theme's accent, which is the one part of it that belongs to
+// the desktop's own look rather than to the panel.
+const switcher_panel_id = 'switcher'
+const switcher_bg = u32(0x11151f)
+const switcher_alpha = u32(216)
+const switcher_edge = u32(0x3a425c)
+const switcher_text = u32(0xffffff)
+const switcher_icon = u32(0xdfe6f4)
+const switcher_icon_selected = u32(0xffffff)
+const switcher_icon_minimized = u32(0x7c869c)
+const switcher_tile = 84
+const switcher_icon_size = 44
+const switcher_gap = 6
+const switcher_padding = 18
+const switcher_label_height = 24
+const switcher_radius = 18
+const switcher_select_radius = 12
+// What the panel leaves clear at the screen's edges before it wraps its tiles
+// onto a second row.
+const switcher_margin = 60
+
 // ── Pointer ────────────────────────────────────────────────────────
 const cursor_fill = u32(0xffffff)
 const cursor_edge = u32(0x0d1220)

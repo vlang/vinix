@@ -124,6 +124,37 @@ static void test_navigation_fn_and_function_keys(void)
     expect_bytes(encode_key(69, 4, 0, 0, 0), (const uint8_t *)"\033\033[24~", 6);
     assert(encode_key(255, 0, 0, 0, 0).len == 0);
 }
+/* Cmd-Tab, and the release of Cmd that closes the window switcher. Neither is
+ * a byte a terminal has ever produced, so the whole of what the desktop sees
+ * is checked here rather than only that something came out. */
+static void test_command_tab(void)
+{
+    struct decoder d = {0}; uint8_t out[128];
+    expect_bytes(encode_key(43, 0x08, 0, 0, 0), (const uint8_t *)"\033[9;9u", 6);
+    expect_bytes(encode_key(43, 0x80, 0, 0, 0), (const uint8_t *)"\033[9;9u", 6);
+    expect_bytes(encode_key(43, 0x0a, 0, 0, 0), (const uint8_t *)"\033[9;10u", 7);
+    /* Without Cmd it is still a tab, and Shift-Tab still back-tab. */
+    expect_bytes(encode_key(43, 0, 0, 0, 0), (const uint8_t *)"\t", 1);
+    expect_bytes(encode_key(43, 2, 0, 0, 0), (const uint8_t *)"\033[Z", 3);
+
+    /* Cmd down alone says nothing; each Tab is one chord; letting Cmd go ends
+     * it once, and a Cmd that was never chorded with ends nothing. */
+    assert(single(&d, 100, 0x08, 0, 0, out) == 0);
+    assert(single(&d, 200, 0x08, 0, 43, out) == 6 && !memcmp(out, "\033[9;9u", 6));
+    assert(single(&d, 300, 0x08, 0, 0, out) == 0);
+    assert(single(&d, 400, 0x0a, 0, 43, out) == 7 && !memcmp(out, "\033[9;10u", 7));
+    assert(single(&d, 500, 0, 0, 0, out) == 12
+        && !memcmp(out, "\033[57444;1:3u", 12));
+    assert(single(&d, 600, 0, 0, 0, out) == 0);
+    assert(single(&d, 700, 0x08, 0, 0, out) == 0);
+    assert(single(&d, 800, 0, 0, 0, out) == 0);
+
+    /* Held down, Cmd-Tab repeats like any other key: the switcher walks on. */
+    assert(single(&d, 1000, 0x08, 0, 43, out) == 6);
+    assert(repeat_key(&d, 1000 + REPEAT_DELAY, 0, out, 128) == 6
+        && !memcmp(out, "\033[9;9u", 6));
+}
+
 static void test_repeat(void)
 {
     struct decoder d = {0}; uint8_t out[128];
@@ -404,6 +435,7 @@ int main(void)
     run(test_modifiers_and_caps, "independent modifiers and Caps Lock");
     run(test_ascii_controls, "ASCII, control bytes, Option, NUL");
     run(test_navigation_fn_and_function_keys, "navigation, DECCKM, Fn, function keys");
+    run(test_command_tab, "Cmd-Tab chords and the release that ends them");
     run(test_repeat, "repeat timing, modifiers, no catch-up burst");
     run(test_rollover, "rollover errors and recovery");
     run(test_crc_and_identity_rejection, "packet/message CRC and identity rejection");

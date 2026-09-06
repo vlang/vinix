@@ -177,7 +177,12 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		return
 	}
 	radius := int(el.box.radius)
-	floating := depth == 1 && el.id.starts_with('win.')
+	floating := depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id)
+	// The switcher is drawn through: it covers the middle of the screen for as
+	// long as a key is held, and what it covers should stay legible behind it.
+	// Alpha is not something a ui2 box style can declare, so like the shadow
+	// below it is keyed off the window manager's own id.
+	translucent := el.id == switcher_panel_id
 	if floating {
 		saved := d.canvas.clip
 		d.canvas.clip = Clip{
@@ -189,13 +194,16 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		d.canvas.drop_shadow(x, y, w, h, radius, 7, d.theme().shadow_alpha)
 		d.canvas.restore_clip(saved)
 	}
-	if radius > 0 {
+	if translucent {
+		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, switcher_alpha)
+	} else if radius > 0 {
 		d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
 	} else {
 		d.canvas.fill_rect(x, y, w, h, el.box.bg)
 	}
 	if floating {
-		d.canvas.stroke_round_rect(x, y, w, h, radius, d.theme().window_edge, 190)
+		edge := if translucent { switcher_edge } else { d.theme().window_edge }
+		d.canvas.stroke_round_rect(x, y, w, h, radius, edge, 190)
 	}
 
 	// A title bar is shaded down its height. Like the shadow above, this is
@@ -403,6 +411,19 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_round_rect(left, top, body, tall, 2, color)
 			// A dog-ear, punched out of the corner in the surface behind it.
 			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x,
+				y))
+		}
+		'window' {
+			// What stands for a window with no application behind it to lend
+			// an icon. A frame with a filled title bar: the least that reads as
+			// a window rather than as a plain block.
+			body := w * 3 / 4
+			tall := h * 5 / 8
+			left := cx - body / 2
+			top := cy - tall / 2
+			bar := tall / 3
+			d.canvas.fill_round_rect(left, top, body, tall, 3, color)
+			d.canvas.fill_rect(left + 2, top + bar, body - 4, tall - bar - 2, d.surface_under(x,
 				y))
 		}
 		'menu' {

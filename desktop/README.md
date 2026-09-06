@@ -24,6 +24,8 @@ What it does:
   wallpaper, applied to the running desktop as they are chosen
 - **hosted ui2 applications**: ui2's own examples run in windows of their own,
   several at a time, each with its own state
+- **Cmd-Tab**, which switches windows on a tap and shows all of them in the
+  middle of the screen when it is held
 
 Keys: `Ctrl-Q` leaves the desktop, `Ctrl-N` opens a window, `Ctrl-K` the first
 application. They are chords rather than bare letters because they fire
@@ -38,6 +40,7 @@ typing any word with a q in it drop the user back to the console.
     window.v       the Window model and the pages windows show
     app.v          hosting applications in windows, and which ones there are
     files.v        the file browser
+    switcher.v     Cmd-Tab: the session it opens and the panel it shows
     settings.v     the preferences: themes, wallpaper, Display and Battery
     settings_app.v the settings application
     wallpaper.v    loading and scaling a wallpaper photograph
@@ -116,6 +119,45 @@ entries than the window has room for.
 
 The image carries the desktop's own source at `/root/desktop`, so there is
 something real to browse and so the machine holds the code it is running.
+
+## The window switcher
+
+`Cmd-Tab` moves to the window under the one on top, and pressing it again goes
+back — which is what a tap is for. Holding Cmd down instead asks "what else is
+open?", and after 700 ms the desktop answers: a translucent panel in the middle
+of the screen with a tile for every window, the selection moving along it on
+each further Tab, `Shift` walking back, the arrows moving it too, and the
+window it lands on raised when Cmd is let go. A minimised window is in the
+panel like any other and comes back rather than being switched to invisibly. A
+click on a tile picks it; a click anywhere else puts the panel away.
+
+The delay is the whole of the design. A tap is a gesture people make without
+looking, and flashing a panel up for a tenth of a second would only be noise;
+a hold is a question, and deserves an answer.
+
+A terminal has no way to say "Cmd", so the keyboard drivers say it for it and
+the desktop reads three sequences out of the byte stream before anything else
+sees them:
+
+    \e[9;9u        Cmd-Tab
+    \e[9;10u       Cmd-Shift-Tab
+    \e[57444;1:3u  Cmd let go
+
+The first two are the CSI-u encoding of Tab — the key's own code point, then 1
+plus a mask of the modifiers held with it, where super is 8 and shift is 1 —
+which is what a terminal that reports modified keys at all uses. The third has
+no precedent to follow, because no terminal has ever had a reason to report a
+modifier being released; it is the same encoding's left Super key with an event
+type of 3, "released". A driver only sends it when a chord was sent while Cmd
+was down, so a bare Cmd press still costs a shell nothing.
+
+They are taken out of the stream ahead of the focused application, which is the
+one place the desktop overrules whoever is typing: Cmd-Tab belongs to the window
+manager on the machine this borrows the gesture from, and a terminal that
+swallowed it would strand a keyboard-only session in one window. A sequence
+split across two reads is held back rather than handed over in halves — but
+only from the second byte on, since a lone escape is a key someone pressed and
+delaying it would be felt.
 
 ## Settings
 
@@ -273,6 +315,16 @@ which reports the pointer's position, button levels, the press and release
 edges since the last read, and any wheel movement. It never blocks: a
 compositor redraws from the latest position anyway, and a queue it drained too
 slowly would only make the cursor lag the hardware.
+
+From the keyboard it needs Cmd reported at all, which is new: the console used
+to drop the key. All three keyboard paths now track it and send the three
+sequences above — `dev/console` for PS/2, `aarch64/virtio_input` for QEMU, and
+`c/apple_spi_keyboard.c` for the built-in keyboard on an M1, where Cmd is a key
+someone actually has under a thumb.
+
+Under QEMU on a Mac, `./run-desktop-aarch64.sh --grab-keys` is what lets the
+chord through: macOS keeps Cmd-Tab for its own application switcher until QEMU
+is allowed to capture every key. The price is that Cmd-Q no longer quits QEMU.
 
 ## Native V platform and device code
 

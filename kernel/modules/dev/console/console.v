@@ -31,6 +31,12 @@ const right_shift_rel = 0xb6
 const left_shift_rel = 0xaa
 const ctrl = 0x1d
 const ctrl_rel = 0x9d
+const tab = 0x0f
+// Cmd on a Mac keyboard, Super elsewhere. Both arrive behind the 0xe0 prefix.
+const left_meta = 0x5b
+const right_meta = 0x5c
+const left_meta_rel = 0xdb
+const right_meta_rel = 0xdc
 const console_buffer_size = 1024
 const console_bigbuf_size = 4096
 
@@ -44,6 +50,12 @@ __global (
 	console_shift_active           = bool(false)
 	console_ctrl_active            = bool(false)
 	console_alt_active             = bool(false)
+	// Cmd, and whether a chord was sent while it was down. The desktop's
+	// window switcher is drawn for as long as Cmd is held, so unlike every
+	// other modifier this one's release has to be reported -- but only to
+	// someone who asked, which is what pressing Cmd-Tab counts as.
+	console_meta_active            = bool(false)
+	console_meta_chorded           = bool(false)
 	console_extra_scancodes        = bool(false)
 	console_buffer                 [console_buffer_size]u8
 	console_buffer_i               = u64(0)
@@ -245,6 +257,24 @@ fn keyboard_handler() {
 					console_ctrl_active = false
 					continue
 				}
+				left_meta, right_meta {
+					console_meta_active = true
+					continue
+				}
+				left_meta_rel, right_meta_rel {
+					console_meta_active = false
+					// Cmd let go. Nothing on a terminal has ever wanted to
+					// hear about a modifier's release, so this only goes out
+					// when a chord was sent while it was down and something is
+					// waiting for the end of it. It is the left Super key in
+					// the CSI-u functional encoding, with an event type of 3,
+					// "released".
+					if console_meta_chorded {
+						console_meta_chorded = false
+						add_to_buf(c'\e[57444;1:3u', 12, true)
+					}
+					continue
+				}
 				0x1c {
 					add_to_buf(c'\n', 1, true)
 					continue
@@ -352,6 +382,20 @@ fn keyboard_handler() {
 				continue
 			}
 			else {}
+		}
+
+		// Cmd-Tab is the window switcher's, not the terminal's, so it goes out
+		// as the CSI-u encoding of Tab -- the key's own code point, then 1
+		// plus a mask of the modifiers held with it, where super is 8 and
+		// shift is 1 -- and the tab itself is not also sent.
+		if console_meta_active && input_byte == tab {
+			if console_shift_active {
+				add_to_buf(c'\e[9;10u', 7, true)
+			} else {
+				add_to_buf(c'\e[9;9u', 6, true)
+			}
+			console_meta_chorded = true
+			continue
 		}
 
 		mut c := u8(0)

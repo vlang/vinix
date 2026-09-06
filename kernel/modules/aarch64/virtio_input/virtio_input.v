@@ -79,6 +79,7 @@ const key_pagedown = u16(109)
 const key_delete = u16(111)
 
 // Linux keycodes for modifiers
+const key_tab = u16(15)
 const key_leftshift = u16(42)
 const key_rightshift = u16(54)
 const key_leftctrl = u16(29)
@@ -86,6 +87,8 @@ const key_rightctrl = u16(97)
 const key_leftalt = u16(56)
 const key_rightalt = u16(100)
 const key_capslock = u16(58)
+const key_leftmeta = u16(125)
+const key_rightmeta = u16(126)
 
 // Pointer button codes. The bit a button takes in the reported mask is its
 // distance from BTN_LEFT, so left is bit 0, right bit 1, middle bit 2.
@@ -135,6 +138,12 @@ __global (
 	vi_ctrl_active   = false
 	vi_alt_active    = false
 	vi_caps_active   = false
+	// Cmd, and whether a chord was sent while it was down. The desktop's
+	// window switcher is drawn for as long as Cmd is held, so unlike every
+	// other modifier this one's release has to be reported -- but only to
+	// someone who asked, which is what pressing Cmd-Tab counts as.
+	vi_meta_active   = false
+	vi_meta_chorded  = false
 	vi_outbuf        [64]u8
 	vi_outlen        = u64(0)
 	// Pointer state, shared with /dev/pointer. `x`/`y` are raw device
@@ -159,6 +168,16 @@ fn vi_put(b u8) {
 	if vi_outlen < 64 {
 		vi_outbuf[vi_outlen] = b
 		vi_outlen++
+	}
+}
+
+// vi_puts writes a whole escape sequence, the way the console's own key
+// handling states one.
+fn vi_puts(s &char) {
+	unsafe {
+		for i := 0; s[i] != 0; i++ {
+			vi_put(u8(s[i]))
+		}
 	}
 }
 
@@ -246,11 +265,39 @@ fn process_key(code u16, value u32) {
 			}
 			return
 		}
+		key_leftmeta, key_rightmeta {
+			held := vi_meta_active
+			vi_meta_active = value != 0
+			// Cmd let go. Nothing on a terminal has ever wanted to hear about
+			// a modifier's release, so this only goes out when a chord was
+			// sent while it was down and something is waiting for the end of
+			// it. It is the left Super key in the CSI-u functional encoding,
+			// with an event type of 3, "released".
+			if held && !vi_meta_active && vi_meta_chorded {
+				vi_meta_chorded = false
+				vi_puts(c'\e[57444;1:3u')
+			}
+			return
+		}
 		else {}
 	}
 
 	// Only process on press (1) or repeat (2), not release (0)
 	if value == 0 {
+		return
+	}
+
+	// Cmd-Tab is the window switcher's, not the terminal's, so it goes out as
+	// the CSI-u encoding of Tab -- the key's own code point, then 1 plus a
+	// mask of the modifiers held with it, where super is 8 and shift is 1 --
+	// and the tab itself is not also sent.
+	if vi_meta_active && code == key_tab {
+		if vi_shift_active {
+			vi_puts(c'\e[9;10u')
+		} else {
+			vi_puts(c'\e[9;9u')
+		}
+		vi_meta_chorded = true
 		return
 	}
 

@@ -18,13 +18,16 @@ enum Page {
 
 struct Window {
 mut:
-	id        int
-	title     string
-	page      Page
-	x         int
-	y         int
-	width     int
-	height    int
+	id     int
+	title  string
+	page   Page
+	x      int
+	y      int
+	width  int
+	height int
+	// The glyph that stands for the window in the switcher. An application
+	// lends its own; a built-in page has none of its own to lend.
+	icon string = 'builtin:window'
 	// Element ids, built once when the window opens. The tree is rebuilt every
 	// frame and this target has no garbage collector, so interpolating them
 	// per frame would grow the process for no reason.
