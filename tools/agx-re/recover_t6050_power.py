@@ -210,6 +210,7 @@ IODART_MAPPER_IOVM_INSERT_ONE = (
 APPLE_T8110_DART_ENABLE_TRANSLATION = (
     "__ZN14AppleT8110DART17enableTranslationEjb"
 )
+APPLE_T8110_DART_START = "__ZN14AppleT8110DART5startEP9IOService"
 APPLE_T8110_DART_SETUP = "__ZN14AppleT8110DART10_dartSetupER19t8110dart_init_data"
 APPLE_T8110_DART_GET_SID_PROPERTY = (
     "__ZN14AppleT8110DART15_getSidPropertyEPKcjPm"
@@ -217,6 +218,9 @@ APPLE_T8110_DART_GET_SID_PROPERTY = (
 APPLE_T8110_DART_GET_SID_COUNT = "__ZNK14AppleT8110DART12_getSIDCountEj"
 APPLE_T8110_DART_IS_BYPASSED_SID = "__ZNK14AppleT8110DART13isBypassedSIDEj"
 APPLE_T8110_DART_SET_TRANSLATION = "__ZN14AppleT8110DART14setTranslationEjjjj"
+APPLE_T8110_DART_SET_TRANSLATION_RANGE = (
+    "__ZN14AppleT8110DART14setTranslationEP13IODARTVMSpacejPvjjjjjj"
+)
 APPLE_T8110_DART_INVALIDATE_TLB = (
     "__ZN14AppleT8110DART13invalidateTLBEP13IODARTVMSpacejjj"
 )
@@ -2677,8 +2681,9 @@ def recover_apple_a7iop_code_contract(
                 "text_direction": 1,
                 "data_direction": 3,
                 "meaning": (
-                    "pre-loaded segments are page-aligned and inserted into "
-                    "the supplied IOMapper before the wrapper CPU is released"
+                    "records with flag bit 1 clear are page-aligned and inserted "
+                    "into the supplied IOMapper before wrapper CPU release; bit 1 "
+                    "marks an iBoot-installed mapping that this path preserves"
                 ),
             },
             "scope": (
@@ -2862,17 +2867,33 @@ def recover_apple_t8110_dart_code_contract(
     sid_property_format: str,
 ) -> dict[str, object]:
     required = (
+        APPLE_T8110_DART_START,
         APPLE_T8110_DART_SETUP,
         APPLE_T8110_DART_GET_SID_PROPERTY,
         APPLE_T8110_DART_GET_SID_COUNT,
         APPLE_T8110_DART_IS_BYPASSED_SID,
         APPLE_T8110_DART_ENABLE_TRANSLATION,
         APPLE_T8110_DART_SET_TRANSLATION,
+        APPLE_T8110_DART_SET_TRANSLATION_RANGE,
         APPLE_T8110_DART_INVALIDATE_TLB,
     )
     missing = [name for name in required if name not in functions]
     if missing:
         raise ValueError(f"AppleT8110DART has no code body for {missing!r}")
+
+    _start_address, start_code = functions[APPLE_T8110_DART_START]
+    if not _has_ordered_words(
+        start_code,
+        (
+            0x947625EC,  # _t8110dart_get_desc()
+            0xF9461A61,  # log context at object +0xc30
+            0x9100A3E2,  # t8110dart_init_data on the stack
+            0x91314264,  # output context at object +0xc50
+            0x52812D03,  # init-data bytes = 0x968
+            0x94757EC7,  # _pmap_iommu_init(...)
+        ),
+    ):
+        raise ValueError("AppleT8110DART protected-IOMMU initialization changed")
 
     _setup_address, setup_code = functions[APPLE_T8110_DART_SETUP]
     if not _has_ordered_words(
@@ -2954,12 +2975,40 @@ def recover_apple_t8110_dart_code_contract(
         set_code,
         (
             0xD3727D1A,  # physical page number -> byte address, shift 14
-            0xD3727E9A,  # DVA page number -> byte address, shift 14
-            0x52880002,  # mov w2, #0x4000 -- one DART page
-            0x52800068,  # three translation descriptors in the request
+            0x52880002,  # iovmalloc request bytes = one 0x4000 DART page
+            0xD3727F08,  # DVA page number -> byte address, shift 14
+            0xA905A3FA,  # one ppl_iommu_segm: physical then DVA
+            0xA906FFE8,  # byte length then zeroed protection/reserved pair
+            0xF9003FFF,  # reserved word at segment +0x20
+            0x52800068,  # protection value 3
+            0xB90073E8,  # store protection at segment +0x18
+            0x52800022,  # pmap_iommu_map segment count = 1
         ),
     ):
         raise ValueError("AppleT8110DART 16 KiB translation path changed")
+
+    _range_address, range_code = functions[
+        APPLE_T8110_DART_SET_TRANSLATION_RANGE
+    ]
+    if not _has_ordered_words(
+        range_code,
+        (
+            0xB94C8669,  # byte-range alignment at object +0xc84
+            0x1AC90B48,  # start offset / alignment
+            0x1B09E908,  # require zero start remainder
+            0x1AC9090A,  # inclusive end offset / alignment
+            0x1B09A14A,
+            0x51000529,  # require end remainder == alignment - 1
+            0x6B1A011B,  # byte length minus one = end - start
+            0xD3727EA8,  # physical 16-KiB page number -> byte address
+            0x8B3A4108,  # add byte-range start
+            0xD3727F29,  # DVA 16-KiB page number -> byte address
+            0x8B3A4129,  # add the same byte-range start
+            0x11000768,  # segment byte length = end - start + 1
+            0x52800022,  # pmap_iommu_map segment count = 1
+        ),
+    ):
+        raise ValueError("AppleT8110DART partial-range translation path changed")
 
     _invalidate_address, invalidate_code = functions[
         APPLE_T8110_DART_INVALIDATE_TLB
@@ -2975,6 +3024,31 @@ def recover_apple_t8110_dart_code_contract(
             "sid_payload_bytes": 4,
             "driver_invalidate_method": "no-op",
             "hardware_update_owner": "kernel PPL/SPTM IOMMU request",
+            "protected_context": {
+                "descriptor_source": "_t8110dart_get_desc",
+                "initializer": "_pmap_iommu_init",
+                "init_data_bytes": 0x968,
+                "object_context_offset": 0xC50,
+            },
+            "map_request": {
+                "segment_bytes": 0x28,
+                "segment_count": 1,
+                "physical_offset": 0,
+                "iova_offset": 8,
+                "byte_length_offset": 0x10,
+                "protection_offset": 0x18,
+                "protection": 3,
+                "reserved_offset": 0x20,
+                "meaning_of_3": "read/write protection, not segment count",
+            },
+            "partial_range": {
+                "alignment_object_offset": 0xC84,
+                "start_must_be_aligned": True,
+                "end_is_inclusive": True,
+                "end_remainder": "alignment - 1",
+                "byte_length": "end - start + 1",
+                "entry_encoding_owner": "kernel PPL/SPTM IOMMU request",
+            },
             "mapper_index_semantics": "DART hardware instance, not SID",
             "hardware_instance_stride": 0x70,
             "sid_count_register_offset": 0xC,
@@ -2993,12 +3067,14 @@ def recover_apple_t8110_dart(image: bytes) -> dict[str, object]:
     functions = {
         name: symbol_code(image, name)
         for name in (
+            APPLE_T8110_DART_START,
             APPLE_T8110_DART_SETUP,
             APPLE_T8110_DART_GET_SID_PROPERTY,
             APPLE_T8110_DART_GET_SID_COUNT,
             APPLE_T8110_DART_IS_BYPASSED_SID,
             APPLE_T8110_DART_ENABLE_TRANSLATION,
             APPLE_T8110_DART_SET_TRANSLATION,
+            APPLE_T8110_DART_SET_TRANSLATION_RANGE,
             APPLE_T8110_DART_INVALIDATE_TLB,
         )
     }
@@ -3751,7 +3827,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 20,
+        "schema": 21,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,

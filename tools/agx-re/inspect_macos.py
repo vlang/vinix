@@ -280,6 +280,12 @@ def parse_pmp(node: dict[str, Any]) -> dict[str, Any]:
     result = parse_firmware_node(node, "PMP")
     if result.get("role") not in ("PMP0", "PMP1"):
         raise InspectError("PMP node has an unexpected role")
+    for segment in result["segments"]:
+        flags = segment["flags"]
+        segment["apple_driver_mapper_insert"] = not bool(flags & 0x2)
+        segment["mapping_owner"] = (
+            "apple-driver" if not flags & 0x2 else "iboot-preinstalled"
+        )
     return result
 
 
@@ -476,6 +482,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                         "remap": base,
                         "size": 0x5E000,
                         "flags": 3,
+                        "apple_driver_mapper_insert": False,
+                        "mapping_owner": "iboot-preinstalled",
                     },
                     {
                         "name": "__DATA",
@@ -484,6 +492,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
                         "remap": base + 0x5E000,
                         "size": 0x9A000,
                         "flags": 6,
+                        "apple_driver_mapper_insert": False,
+                        "mapping_owner": "iboot-preinstalled",
                     },
                 ]
                 if item.get("segments") != expected_segments:

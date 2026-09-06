@@ -296,7 +296,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
     def test_recovers_t6050_pmp_power_contract(self) -> None:
         root = recover_t6050_power.parse_adt(fixture_tree())
         result = recover_t6050_power.recover_t6050_power(root)
-        self.assertEqual(result["schema"], 20)
+        self.assertEqual(result["schema"], 21)
         self.assertEqual(
             [(item["handle"], item["name"]) for item in result["sgx"]["power_gates"]],
             [(0x268, "GFX_SGX"), (0x267, "GFX_BUSY")],
@@ -1796,6 +1796,18 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(mapper["page_type"], 2)
 
         t8110_functions = {
+            recover_t6050_power.APPLE_T8110_DART_START: (
+                0x2800,
+                struct.pack(
+                    "<6I",
+                    0x947625EC,
+                    0xF9461A61,
+                    0x9100A3E2,
+                    0x91314264,
+                    0x52812D03,
+                    0x94757EC7,
+                ),
+            ),
             recover_t6050_power.APPLE_T8110_DART_SETUP: (
                 0x3000,
                 struct.pack(
@@ -1829,7 +1841,37 @@ class RecoverT6050PowerTests(unittest.TestCase):
             ),
             recover_t6050_power.APPLE_T8110_DART_SET_TRANSLATION: (
                 0x5000,
-                struct.pack("<4I", 0xD3727D1A, 0xD3727E9A, 0x52880002, 0x52800068),
+                struct.pack(
+                    "<9I",
+                    0xD3727D1A,
+                    0x52880002,
+                    0xD3727F08,
+                    0xA905A3FA,
+                    0xA906FFE8,
+                    0xF9003FFF,
+                    0x52800068,
+                    0xB90073E8,
+                    0x52800022,
+                ),
+            ),
+            recover_t6050_power.APPLE_T8110_DART_SET_TRANSLATION_RANGE: (
+                0x5800,
+                struct.pack(
+                    "<13I",
+                    0xB94C8669,
+                    0x1AC90B48,
+                    0x1B09E908,
+                    0x1AC9090A,
+                    0x1B09A14A,
+                    0x51000529,
+                    0x6B1A011B,
+                    0xD3727EA8,
+                    0x8B3A4108,
+                    0xD3727F29,
+                    0x8B3A4129,
+                    0x11000768,
+                    0x52800022,
+                ),
             ),
             recover_t6050_power.APPLE_T8110_DART_INVALIDATE_TLB: (
                 0x6000,
@@ -1843,6 +1885,25 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(translation["hardware_update_owner"], "kernel PPL/SPTM IOMMU request")
         self.assertEqual(translation["mapper_index_semantics"], "DART hardware instance, not SID")
         self.assertEqual(translation["bypass_bitset_object_offset"], 0x900)
+        self.assertEqual(translation["map_request"]["segment_count"], 1)
+        self.assertEqual(translation["map_request"]["protection"], 3)
+        self.assertEqual(
+            translation["map_request"]["meaning_of_3"],
+            "read/write protection, not segment count",
+        )
+        self.assertTrue(translation["partial_range"]["end_is_inclusive"])
+
+        bad_count = dict(t8110_functions)
+        bad_count[recover_t6050_power.APPLE_T8110_DART_SET_TRANSLATION] = (
+            0x5000,
+            t8110_functions[
+                recover_t6050_power.APPLE_T8110_DART_SET_TRANSLATION
+            ][1].replace(struct.pack("<I", 0x52800022), struct.pack("<I", 0x52800042)),
+        )
+        with self.assertRaisesRegex(ValueError, "16 KiB translation path"):
+            recover_t6050_power.recover_apple_t8110_dart_code_contract(
+                bad_count, "bypass", "%s-%d"
+            )
 
         kernel_functions = {
             recover_t6050_power.T8110_DART_MAX_TRANSLATION_LEVELS: (

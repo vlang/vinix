@@ -186,6 +186,9 @@ class InspectMacOSTests(unittest.TestCase):
         self.assertEqual(result["segments"][0]["iova"], 0x1000000)
         self.assertEqual(result["segments"][1]["physical"], 0x28455E000)
         self.assertEqual(result["segments"][1]["flags"], 6)
+        self.assertFalse(result["segments"][0]["apple_driver_mapper_insert"])
+        self.assertFalse(result["segments"][1]["apple_driver_mapper_insert"])
+        self.assertEqual(result["segments"][0]["mapping_owner"], "iboot-preinstalled")
 
     def test_decodes_active_die_count_from_arm_io(self) -> None:
         result = inspect_macos.parse_arm_io(

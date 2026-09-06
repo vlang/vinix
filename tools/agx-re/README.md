@@ -176,14 +176,19 @@ and 9. Six empty per-SID booleans (`bypass-2`, `-5`, `-6`, `-7`, `-8`, and
 `-9`) leave SIDs 0 and 1 translated. The UUID-pinned AppleT8110DART image
 proves that mapper index 0 selects a DART hardware instance rather than a SID,
 formats those properties as `bypass-${SID}`, and records them in its bypass
-bitset. UUID-pinned AppleA7IOP code inserts each non-skipped 32-byte segment
-record through `IODARTMapper::iovmInsert` before CPU release. The matching
-IODARTFamily image proves that direction 1 becomes read-only protection 2 and
-direction 3 becomes read/write protection 3. AppleT8110DART plus the matching
-kernel entry independently pin 16 KiB page conversion, four table levels,
-valid bit 0, and the T8110 physical-address decode. This is sufficient to
-reject an old T8020-style DART implementation, but not yet sufficient to take
-ownership of bootloader-protected page tables or enable PMP execution.
+bitset. UUID-pinned AppleA7IOP code inserts only 32-byte records whose flag bit
+1 is clear. Both live PMP records have that bit set, so Apple deliberately
+preserves their iBoot-installed translations rather than inserting them again.
+The matching IODARTFamily image proves that a non-skipped direction 1 becomes
+read-only protection 2 and direction 3 becomes read/write protection 3.
+AppleT8110DART's ordinary full-page path passes exactly one 40-byte protected
+mapping segment; its internal value 3 is the protection, not a segment count.
+Partial byte ranges are also handed to the kernel PPL/SPTM mapper. Together
+with the matching kernel entry this pins 16 KiB page conversion, four table
+levels, valid bit 0, and T8110 physical-address decode, but does not disclose
+the protected subpage encoder. This is sufficient to reject an old
+T8020-style DART implementation, but not to take ownership of iBoot's roots or
+enable PMP execution.
 
 `recover_g17_abi.py` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and

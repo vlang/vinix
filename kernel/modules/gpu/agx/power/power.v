@@ -87,6 +87,17 @@ pub:
 	flags    u32
 }
 
+// AppleA7IOP::_dartMapiBootFirmware skips records with flag bit 1. Such a
+// record describes a translation already installed by iBoot; it must never be
+// inserted again or treated as a page-table root owned by Vinix.
+pub fn (segment &T6050PmpSegment) is_iboot_owned_mapping() bool {
+	return segment.flags & u32(1 << 1) != 0
+}
+
+pub fn (segment &T6050PmpSegment) requires_mapper_insert() bool {
+	return !segment.is_iboot_owned_mapping()
+}
+
 // iBoot supplies these two virtually contiguous firmware mappings on every
 // active die. Keeping their address domains explicit prevents an IOP virtual
 // address from being used as an AP physical address during later attachment.
@@ -201,6 +212,8 @@ fn decode_t6050_pmp_preload(node &devicetree.DTNode, die u32) ?T6050PmpPreload {
 		|| data.iova != t6050_pmp_data_iova
 		|| data.remap != base + u64(t6050_pmp_text_size)
 		|| data.size != t6050_pmp_data_size || data.flags != t6050_pmp_data_flags
+		|| !text.is_iboot_owned_mapping() || !data.is_iboot_owned_mapping()
+		|| text.requires_mapper_insert() || data.requires_mapper_insert()
 		|| u64(text.size) + u64(data.size) != 0xf8000 {
 		return none
 	}

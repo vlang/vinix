@@ -79,7 +79,11 @@ pub fn t8110_encode_table_entry(physical u64) ?u64 {
 	return ((physical >> 4) & t8110_pte_physical_mask) | t8110_pte_valid
 }
 
-pub fn t8110_encode_leaf_entry(physical u64, readable bool, writable bool,
+// This encoder is deliberately full-page-only. Apple routes partial byte-range
+// requests through its protected PPL/SPTM mapper; the UUID-pinned public driver
+// does not expose how those requests become DART2 subpage fields. In particular,
+// this must not be used to recreate the iBoot-owned PMP firmware mappings.
+pub fn t8110_encode_full_page_leaf_entry(physical u64, readable bool, writable bool,
 	cacheable bool) ?u64 {
 	if !readable && !writable {
 		return none
@@ -144,7 +148,7 @@ pub fn t8110_page_table_index(iova u64, level u32) ?u64 {
 pub fn validate_t8110_codec() bool {
 	physical := u64(0x284500000)
 	table := t8110_encode_table_entry(physical) or { return false }
-	leaf := t8110_encode_leaf_entry(physical, true, false, false) or {
+	leaf := t8110_encode_full_page_leaf_entry(physical, true, false, false) or {
 		return false
 	}
 	ttbr := t8110_encode_ttbr(physical) or { return false }
