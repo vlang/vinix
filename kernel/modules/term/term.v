@@ -48,16 +48,59 @@ pub fn early_stage_mark(stage u32) {
 		return
 	}
 
-	color := stage_color(stage)
-	bar_h := if fb.height > 48 { u64(48) } else { fb.height }
-	for y := u64(0); y < bar_h; y++ {
+	// These bars are the only boot signal before the terminal exists, so build
+	// the pixel from the framebuffer's own channel masks rather than assuming
+	// 0x00RRGGBB, and step by the real pixel size. Writing 4 bytes per pixel on
+	// a 24-bpp framebuffer both mis-colours the bar and runs past each row.
+	bytes_per_pixel := u64(fb.bpp) / 8
+	if bytes_per_pixel < 3 || bytes_per_pixel > 4 {
+		return
+	}
+	rgb := stage_color(stage)
+	color := encode_pixel(fb, u8(rgb >> 16), u8(rgb >> 8), u8(rgb))
+	// Stack the stages down the screen instead of repainting the same strip.
+	// Every mark used to overwrite the top 48 rows, so only the last one was
+	// ever visible and a hang left no record of how far boot got. Stacked,
+	// the bar count itself reports the last stage reached.
+	bar_h := u64(16)
+	top := u64(stage) * bar_h
+	if top + bar_h > fb.height {
+		return
+	}
+	for y := top; y < top + bar_h; y++ {
 		row := u64(fb.address) + y * fb.pitch
 		for x := u64(0); x < fb.width; x++ {
+			pixel := row + x * bytes_per_pixel
 			unsafe {
-				*&u32(row + x * 4) = color
+				if bytes_per_pixel == 4 {
+					*&u32(pixel) = color
+				} else {
+					*&u8(pixel) = u8(color)
+					*&u8(pixel + 1) = u8(color >> 8)
+					*&u8(pixel + 2) = u8(color >> 16)
+				}
 			}
 		}
 	}
+}
+
+// Place each 8-bit channel according to the framebuffer's reported mask, so a
+// bar is the intended colour on formats other than 8-8-8 (Apple's handover
+// framebuffer is not always plain RGB888).
+fn encode_pixel(fb &limine.LimineFramebuffer, red u8, green u8, blue u8) u32 {
+	if fb.red_mask_size == 0 || fb.green_mask_size == 0 || fb.blue_mask_size == 0 {
+		return (u32(red) << 16) | (u32(green) << 8) | u32(blue)
+	}
+	return (scale_channel(red, fb.red_mask_size) << fb.red_mask_shift)
+		| (scale_channel(green, fb.green_mask_size) << fb.green_mask_shift)
+		| (scale_channel(blue, fb.blue_mask_size) << fb.blue_mask_shift)
+}
+
+fn scale_channel(value u8, mask_size u8) u32 {
+	if mask_size >= 8 {
+		return u32(value) << (mask_size - 8)
+	}
+	return u32(value) >> (8 - mask_size)
 }
 
 @[_linker_section: '.requests']
