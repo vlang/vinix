@@ -11,7 +11,9 @@
 #                               off means the kernel reached that stage
 #   sudo ~/code/kek.sh selftest fault on purpose; the machine MUST reboot.
 #                               run this first: it proves the signal works
-#   sudo ~/code/kek.sh gpu      normal boot + experimental Apple GPU
+#   sudo ~/code/kek.sh gpu      shell userland + experimental Apple GPU; the
+#                               boot test then runs the AGX render test
+#   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
 #
 set -euo pipefail
 
@@ -47,14 +49,18 @@ case "${1:-desktop}" in
         ;;
     gpu)
         FLAGS=(--apple-gpu --native-resolution)
-        MODE="normal + Apple GPU"
+        MODE="shell + Apple GPU"
+        ;;
+    desktop-gpu)
+        FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple GPU"
         ;;
     -h|--help)
         sed -n '2,7p' "$0"
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | full | diag | halt N | selftest | gpu)" >&2
+        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
