@@ -51,6 +51,16 @@ if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
     exit 1
 fi
 
+# The desktop hosts ui2 applications through QmlApp, ui2's embeddable QML host.
+# A checkout without it fails deep inside the V build with an error about an
+# unknown type, which says nothing about the real problem.
+if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/qml_embed.v" ]; then
+    echo "ERROR: this ui2 checkout has no QmlApp (ui/qml_embed.v)."
+    echo "The desktop hosts ui2 applications through it. Update the checkout:"
+    echo "    git -C third_party/ui2 pull"
+    exit 1
+fi
+
 if [ ! -x "$LLVM_BIN/clang" ]; then
     echo "ERROR: Homebrew LLVM not found at $LLVM_BIN (brew install llvm)"
     exit 1
