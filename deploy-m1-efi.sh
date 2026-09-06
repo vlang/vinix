@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
 USE_MINIMAL_INITRAMFS=0
+USE_NATIVE_RESOLUTION=0
 CMDLINE_EXTRA=""
 
 for argument in "$@"; do
@@ -15,6 +16,14 @@ for argument in "$@"; do
         --apple-gpu)
             ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
+            ;;
+        --native-resolution)
+            # Drop the resolution request so Limine keeps whatever mode the
+            # firmware already set. Apple Silicon's display is a fixed
+            # framebuffer m1n1 programmed; U-Boot's GOP exposes essentially
+            # that one mode, and asking for another blanks the panel at the
+            # very moment Limine applies it, just before entering the kernel.
+            USE_NATIVE_RESOLUTION=1
             ;;
         --halt-at=*)
             # Power off once boot reaches this stage. On a machine with no
@@ -36,7 +45,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -128,6 +137,11 @@ if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ]; then
 fi
 
 cp "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"
+if [ "$USE_NATIVE_RESOLUTION" -eq 1 ]; then
+    sed -i '' '/^[[:space:]]*resolution:/d' "$RUNTIME_CONF"
+    echo "NATIVE RESOLUTION: no mode switch requested; Limine keeps the firmware's framebuffer"
+fi
+
 cp "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf"
 cp "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf"
 cp "$RUNTIME_CONF" "$ESP_MOUNT/EFI/BOOT/limine.conf"
