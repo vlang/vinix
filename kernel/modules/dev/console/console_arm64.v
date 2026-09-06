@@ -18,6 +18,7 @@ import katomic
 import sched
 import aarch64.uart
 import aarch64.virtio_input
+import apple.spi_keyboard
 import flanterm as _
 
 const console_buffer_size = 1024
@@ -151,7 +152,7 @@ fn add_to_buf(ptr &u8, count u64, echo bool) {
 	event.trigger(mut console_event, false)
 }
 
-// poll_uart_input checks for UART input and feeds it to the console buffer.
+// Poll UART, VirtIO and the built-in Apple SPI keyboard into the console.
 // Called from the scheduler's await() loop to avoid needing a separate thread.
 pub fn poll_uart_input() {
 	c := uart.getc()
@@ -167,6 +168,13 @@ pub fn poll_uart_input() {
 	if vi_outlen > 0 {
 		add_to_buf(&vi_outbuf[0], vi_outlen, true)
 		vi_outlen = 0
+	}
+
+	// The driver releases its lock before entering the console/termios path.
+	mut apple_input := [128]u8{}
+	apple_count := spi_keyboard.poll(&apple_input[0], u64(apple_input.len), console_decckm)
+	if apple_count > 0 {
+		add_to_buf(&apple_input[0], u64(apple_count), true)
 	}
 }
 
@@ -233,6 +241,9 @@ pub fn initialise() {
 	console_res.status |= file.pollout
 
 	fs.devtmpfs_add_device(console_res, 'console')
+
+	// Initialize only after console/termios setup and before polling starts.
+	spi_keyboard.initialise()
 
 	// Register UART polling callback with the scheduler's await() loop.
 	// Under HVF, IRQ injection is broken, so we can't use a separate
