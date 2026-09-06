@@ -1938,6 +1938,8 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
             recover_t6050_power.RTBUDDY_CREATE_ENDPOINT,
             recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
+            recover_t6050_power.RTBUDDY_BUILD_ROLL_CALL,
+            recover_t6050_power.RTBUDDY_GET_ENDPOINT,
         )
         symbols = {name: 0x1000 + index * 0x1000 for index, name in enumerate(names)}
 
@@ -2081,11 +2083,23 @@ class RecoverT6050PowerTests(unittest.TestCase):
             recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
             recover_t6050_power.RTBUDDY_CREATE_ENDPOINT,
         )
+        # Laid out in the real order: advance the bitmap, build the reply
+        # payload, fold in the preserved group and last bit, send, then move
+        # to status 6.
+        roll_code.extend(struct.pack("<2I", 0x110006B5, 0x53017EF7))
+        call(
+            roll_code,
+            recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+            recover_t6050_power.RTBUDDY_BUILD_ROLL_CALL,
+        )
         roll_code.extend(
             struct.pack(
-                "<6I",
-                0x110006B5,
-                0x53017EF7,
+                "<9I",
+                0x1A9F17E0,
+                0xB69800F4,
+                0x92604E89,
+                0x924DC929,
+                0xB2490108,
                 0xD73F0910,
                 0x35000180,
                 0xF9403A60,
@@ -2096,6 +2110,16 @@ class RecoverT6050PowerTests(unittest.TestCase):
             roll_code,
             recover_t6050_power.RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
             recover_t6050_power.RTBUDDY_SET_IOP_STATUS_PUBLIC,
+        )
+
+        build_code = bytearray()
+        call(
+            build_code,
+            recover_t6050_power.RTBUDDY_BUILD_ROLL_CALL,
+            recover_t6050_power.RTBUDDY_GET_ENDPOINT,
+        )
+        build_code.extend(
+            struct.pack("<4I", 0x0B160261, 0x1AD622E8, 0x2A080294, 0x710082DF)
         )
 
         functions = {
@@ -2146,6 +2170,14 @@ class RecoverT6050PowerTests(unittest.TestCase):
                     recover_t6050_power.RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME
                 ],
                 struct.pack("<2I", 0x51007C33, 0xA9004FE0),
+            ),
+            recover_t6050_power.RTBUDDY_BUILD_ROLL_CALL: (
+                symbols[recover_t6050_power.RTBUDDY_BUILD_ROLL_CALL],
+                bytes(build_code),
+            ),
+            recover_t6050_power.RTBUDDY_GET_ENDPOINT: (
+                symbols[recover_t6050_power.RTBUDDY_GET_ENDPOINT],
+                struct.pack("<I", 0xD65F03C0),
             ),
         }
         result = (

@@ -263,6 +263,8 @@ RTBUDDY_SET_IOP_STATUS_PUBLIC = "__ZN7RTBuddy12setIopStatusE12RtbIopStatus"
 RTBUDDY_MANAGEMENT_HANDLE_HELLO = (
     "__ZN25RTBuddyManagementEndpoint12_handleHelloEy"
 )
+RTBUDDY_BUILD_ROLL_CALL = "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj"
+RTBUDDY_GET_ENDPOINT = "__ZN7RTBuddy11getEndpointEj"
 RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL = (
     "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy"
 )
@@ -3294,6 +3296,8 @@ def recover_rtbuddy_boot_handshake_code_contract(
         RTBUDDY_SET_IOP_STATUS_PUBLIC,
         RTBUDDY_MANAGEMENT_HANDLE_HELLO,
         RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+        RTBUDDY_BUILD_ROLL_CALL,
+        RTBUDDY_GET_ENDPOINT,
         RTBUDDY_CREATE_ENDPOINT,
         RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
     )
@@ -3474,6 +3478,35 @@ def recover_rtbuddy_boot_handshake_code_contract(
         ),
     ):
         raise ValueError("RTBuddy endpoint roll-call bitmap decoder changed")
+    if symbols[RTBUDDY_BUILD_ROLL_CALL] not in direct_branch_targets(
+        roll_address, roll_code
+    ) or not _has_ordered_words(
+        roll_code,
+        (
+            0xB9415808,  # ldr w8, [x0, #0x158] -- IOP status
+            0x7100151F,  # cmp w8, #5 -- a roll call is only legal after Hello
+            0x1A9F17E0,  # cset w0, eq -- group 0 owns the management endpoint
+            0xB69800F4,  # tbz x20, #0x33 -- bit 51 marks the last group
+            0x92604E89,  # and x9, x20, #0xfffff00000000
+            0x924DC929,  # and x9, x9, #0xfff8003fffffffff -- keep group and last
+            0xB2490108,  # orr x8, x8, #0x80000000000000 -- reply type 8
+        ),
+    ):
+        raise ValueError("RTBuddy endpoint roll-call reply changed")
+
+    _build_address, build_code = functions[RTBUDDY_BUILD_ROLL_CALL]
+    if symbols[RTBUDDY_GET_ENDPOINT] not in direct_branch_targets(
+        _build_address, build_code
+    ) or not _has_ordered_words(
+        build_code,
+        (
+            0x0B160261,  # add w1, w19, w22 -- group base plus bit index
+            0x1AD622E8,  # lsl w8, w23, w22
+            0x2A080294,  # orr w20, w20, w8 -- set the bit for a live endpoint
+            0x710082DF,  # cmp w22, #0x20 -- exactly 32 bits per group
+        ),
+    ):
+        raise ValueError("RTBuddy roll-call reply bitmap changed")
 
     _create_name_address, create_name_code = functions[
         RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME
@@ -3550,6 +3583,20 @@ def recover_rtbuddy_boot_handshake_code_contract(
                 "bitmap_word_bits": 32,
                 "group_field": {"shift": 32, "bits": 6},
                 "wire_endpoint": "group * 32 + set-bit index",
+                "reply": {
+                    "preserved_fields": [
+                        "group at bits 32..37",
+                        "last at bit 51",
+                    ],
+                    "management_type": 8,
+                    "payload": (
+                        "a bitmap of the endpoints the host already has in "
+                        "that group, so the first reply sets only bit 0 and "
+                        "only for group 0"
+                    ),
+                    "builder": RTBUDDY_BUILD_ROLL_CALL,
+                    "precondition": "IOP status 5",
+                },
                 "application_service_suffix": "wire endpoint - 0x1f",
                 "endpoint1_wire_endpoint": 0x20,
                 "scope": (
@@ -3592,6 +3639,8 @@ def recover_apple_pmp_firmware(
         RTBUDDY_SET_IOP_STATUS_PUBLIC,
         RTBUDDY_MANAGEMENT_HANDLE_HELLO,
         RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
+        RTBUDDY_BUILD_ROLL_CALL,
+        RTBUDDY_GET_ENDPOINT,
         RTBUDDY_CREATE_ENDPOINT,
         RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
         RTBUDDY_INIT_CONFIG_EDT,

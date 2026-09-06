@@ -33,6 +33,14 @@ const management_type_shift = u32(52)
 const management_type_mask = u64(0xff) << management_type_shift
 const epmap_last = u64(1) << 51
 const epmap_more = u64(1)
+// RTBuddyManagementEndpoint::_handleEPRollCall reads the group with
+// `ubfx x22, x1, #32, #6`. Masking it to three bits instead would fold a
+// group of 8 or more back onto group 0 and mark the wrong endpoints present,
+// so read all six bits and let the endpoint-range check reject the rest.
+const epmap_group_shift = u32(32)
+const epmap_group_mask = u64(0x3f)
+const epmap_group_endpoints = u32(32)
+const max_endpoints = u32(256)
 const start_ep_flag = u64(1) << 1
 const app_endpoint_start = u8(0x20)
 const min_supported_version = u16(11)
@@ -180,17 +188,29 @@ pub fn (mut rtk RTKit) boot() bool {
 			}
 			msg_epmap {
 				bitmap := u32(msg.data0 & 0xffff_ffff)
-				block := u8((msg.data0 >> 32) & 0x7)
+				block := u32((msg.data0 >> epmap_group_shift) & epmap_group_mask)
 				last := msg.data0 & epmap_last != 0
-				for bit := u8(0); bit < 32; bit++ {
-					if bitmap & (u32(1) << bit) != 0 {
-						ep_id := u16(block) * 32 + u16(bit)
-						if ep_id < 256 {
-							rtk.endpoints[ep_id] = true
-						}
+				base := block * epmap_group_endpoints
+				for bit := u32(0); bit < epmap_group_endpoints; bit++ {
+					if bitmap & (u32(1) << bit) == 0 {
+						continue
 					}
+					ep_id := base + bit
+					if ep_id >= max_endpoints {
+						C.printf(c'rtkit[%s]: ignoring out-of-range endpoint %u\n',
+							rtk.name.str, ep_id)
+						continue
+					}
+					rtk.endpoints[ep_id] = true
 				}
-				mut reply := u64(block) << 32
+				// The reply echoes the group and the last flag. Apple's own
+				// AP driver puts a bitmap of the endpoints it already has in
+				// the low 32 bits, so its first reply sets bit 0 only for
+				// group 0; the more/last convention below is what the Linux
+				// driver sends and what this port has been exercised with.
+				// Both are accepted, so this is left alone deliberately
+				// rather than switched on the strength of one binary.
+				mut reply := (u64(block) & epmap_group_mask) << epmap_group_shift
 				if last {
 					reply |= epmap_last
 				} else {
