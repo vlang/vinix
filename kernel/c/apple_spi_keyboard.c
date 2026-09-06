@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Apple SPI boot-keyboard transport and console decoder.
+ * Apple SPI shared keyboard/touchpad transport and console decoder.
  * Register/protocol reference: U-Boot drivers/spi/apple_spi.c and
  * drivers/input/apple_spi_kbd.c, Copyright (C) 2021 Mark Kettenis and
  * Copyright The Asahi Linux Contributors, GPL-2.0-or-later.
@@ -14,6 +14,8 @@
 #include "apple_spi_keyboard.h"
 
 #if defined(__AARCH64__) || defined(VINIX_APPLE_SPI_TEST)
+
+#include "apple_spi_touchpad.h"
 
 #define SPI_CTRL       0x000
 #define SPI_CFG        0x004
@@ -84,6 +86,7 @@ struct spi_keyboard {
     uint64_t next_transfer;
     uint64_t last_transfer;
     struct decoder decoder;
+    struct touchpad touchpad;
 };
 
 static uint16_t read_le16(const uint8_t *p)
@@ -406,50 +409,95 @@ static int start_keyboard(struct spi_keyboard *k, uint32_t input_hz,
     k->last_transfer = 0;
     k->errors = 0;
     reset_input(&k->decoder);
+    tp_init(&k->touchpad, k->next_poll);
     k->active = 1;
     return 1;
 }
 
-static int read_packet(struct spi_keyboard *k, uint8_t packet[PACKET_SIZE])
+/* A single FIFO stage. CS belongs to the caller so a write and its status
+ * read can share one selection, with the required direction-change delay. */
+static int transfer_bytes(struct spi_keyboard *k, const uint8_t *output,
+    uint8_t *input, size_t length)
 {
     size_t tx = 0, rx = 0;
     int ok = 0;
-    reg_write(k, SPI_PIN, 0);
-    k->io.delay_us(k->cookie, 100);
+    if (!length || length > PACKET_SIZE) return 0;
     reg_write(k, SPI_CTRL, SPI_RESET);
-    reg_write(k, SPI_TXCNT, PACKET_SIZE);
-    reg_write(k, SPI_RXCNT, PACKET_SIZE);
-    for (; tx < FIFO_DEPTH; ++tx)
-        reg_write(k, SPI_TXDATA, 0);
+    reg_write(k, SPI_TXCNT, (uint32_t)length);
+    reg_write(k, SPI_RXCNT, (uint32_t)length);
+    for (; tx < FIFO_DEPTH && tx < length; ++tx)
+        reg_write(k, SPI_TXDATA, output ? output[tx] : 0);
     uint64_t start = k->io.now_us(k->cookie);
     reg_write(k, SPI_CTRL, SPI_RUN);
 
-    /* The iteration cap is a second bound in case an emulated timer stalls.
-     * Every FIFO count is checked before arithmetic or register accesses. */
     for (unsigned spins = 0; spins < 100000; ++spins) {
         uint32_t status = reg_read(k, SPI_FIFOSTAT);
         unsigned n = (status >> 24) & 0xffu;
-        if (n > FIFO_DEPTH || n > PACKET_SIZE - rx) break;
-        while (n--) packet[rx++] = (uint8_t)reg_read(k, SPI_RXDATA);
+        if (n > FIFO_DEPTH || n > length - rx) break;
+        while (n--) {
+            uint8_t byte = (uint8_t)reg_read(k, SPI_RXDATA);
+            if (input) input[rx] = byte;
+            ++rx;
+        }
         status = reg_read(k, SPI_FIFOSTAT);
         unsigned level = (status >> 8) & 0xffu;
         if (level > FIFO_DEPTH) break;
         n = FIFO_DEPTH - level;
-        while (n-- && tx < PACKET_SIZE) {
-            reg_write(k, SPI_TXDATA, 0);
+        while (n-- && tx < length) {
+            reg_write(k, SPI_TXDATA, output ? output[tx] : 0);
             ++tx;
         }
-        if (rx == PACKET_SIZE && tx == PACKET_SIZE) { ok = 1; break; }
+        if (rx == length && tx == length) { ok = 1; break; }
         if (k->io.now_us(k->cookie) - start >= TRANSFER_US) break;
     }
-    /* All paths stop the engine and release CS; the next poll enforces the
-     * inactive gap instead of busy-waiting while no useful work can happen. */
+    reg_write(k, SPI_CTRL, 0);
+    return ok;
+}
+
+static void end_transfer(struct spi_keyboard *k, int ok)
+{
     reg_write(k, SPI_CTRL, 0);
     k->io.delay_us(k->cookie, 100);
     reg_write(k, SPI_PIN, SPI_CS_HIGH);
     k->next_transfer = k->io.now_us(k->cookie) + 250;
     if (!ok) reg_write(k, SPI_CTRL, SPI_RESET);
+}
+
+static int read_packet(struct spi_keyboard *k, uint8_t packet[PACKET_SIZE])
+{
+    reg_write(k, SPI_PIN, 0);
+    k->io.delay_us(k->cookie, 100);
+    int ok = transfer_bytes(k, NULL, packet, PACKET_SIZE);
+    end_transfer(k, ok);
     return ok;
+}
+
+static void enable_touchpad(struct spi_keyboard *k, uint64_t now)
+{
+    uint8_t packet[PACKET_SIZE];
+    uint8_t status[4] = {0};
+    tp_mode_packet(&k->touchpad, packet, now);
+    reg_write(k, SPI_PIN, 0);
+    k->io.delay_us(k->cookie, 100);
+    int ok = transfer_bytes(k, packet, NULL, PACKET_SIZE);
+    if (ok) {
+        /* No CS edge here: Asahi's write and status are one SPI message. */
+        k->io.delay_us(k->cookie, 200);
+        ok = transfer_bytes(k, NULL, status, sizeof(status));
+    }
+    end_transfer(k, ok);
+    if (!ok || status[0] != 0xac || status[1] != 0x27 ||
+        status[2] != 0x68 || status[3] != 0xd5)
+        ++k->touchpad.mode_errors;
+    /* A failed feature write does NOT disable keyboard reads. Retries are
+     * bounded independently and native reports can arrive despite bad status. */
+}
+
+static int boot_packet(const uint8_t p[PACKET_SIZE])
+{
+    return read_le16(p + 2) == 0 && read_le16(p + 4) == 0 &&
+        read_le16(p + 6) == 4 && p[8] == 0xa0 && p[9] == 0x80 &&
+        p[10] == 0 && p[11] == 0 && crc16(p, PACKET_SIZE) == 0;
 }
 
 static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
@@ -459,10 +507,17 @@ static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
         return 0;
     size_t used = 0;
     uint64_t now = k->io.now_us(k->cookie);
+    tp_tick(&k->touchpad, now);
     if (k->decoder.message_used && now - k->decoder.fragment_at >= FRAGMENT_US)
         cancel_repeat(&k->decoder);
     if (now >= k->next_poll && now >= k->next_transfer) {
         k->next_poll = now + POLL_US;
+        // Do not insert a feature command in the middle of either report.
+        if (!k->errors && !k->decoder.message_used && tp_mode_due(&k->touchpad, now)) {
+            enable_touchpad(k, now);
+            now = k->io.now_us(k->cookie);
+            return (int)repeat_key(&k->decoder, now, application_cursor, out, capacity);
+        }
         int ready = 1;
         if (k->ready) {
             uint32_t v = k->io.read32(k->cookie, k->ready);
@@ -475,6 +530,7 @@ static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
             k->last_transfer = now;
             if (!read_packet(k, packet)) {
                 reset_input(&k->decoder);
+                tp_discontinuity(&k->touchpad);
                 if (++k->errors >= 3) {
                     k->active = 0;
                     return -2;
@@ -484,8 +540,14 @@ static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
             }
             k->errors = 0;
             now = k->io.now_us(k->cookie);
-            used = decode_packet(&k->decoder, packet, sizeof(packet), now,
-                application_cursor, out, capacity);
+            if (boot_packet(packet)) {
+                reset_input(&k->decoder);
+                tp_restart(&k->touchpad, now);
+            } else {
+                tp_decode(&k->touchpad, packet, sizeof(packet), now);
+                used = decode_packet(&k->decoder, packet, sizeof(packet), now,
+                    application_cursor, out, capacity);
+            }
         }
     }
     used += repeat_key(&k->decoder, now, application_cursor, out + used, capacity - used);
@@ -561,6 +623,12 @@ int vinix_apple_spi_keyboard_poll(uint8_t *out, size_t capacity, int app)
 uint64_t vinix_apple_spi_keyboard_reports(void)
 {
     return keyboard.decoder.reports;
+}
+
+int vinix_apple_spi_touchpad_read(int32_t out[8])
+{
+    if (out) keyboard.touchpad.requested = 1;
+    return tp_snapshot(&keyboard.touchpad, out);
 }
 #endif /* __AARCH64__ */
 #endif /* __AARCH64__ || VINIX_APPLE_SPI_TEST */
