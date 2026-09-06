@@ -2,7 +2,9 @@ module eventstruct
 
 import klock
 
-pub const max_listeners = 32
+// Enough slots for the contention a threaded process generates: musl serialises
+// every pthread_create on one futex, so a thread pool waits on a single event.
+pub const max_listeners = 64
 
 pub struct EventListener {
 pub mut:

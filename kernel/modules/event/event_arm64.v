@@ -22,14 +22,20 @@ fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	return none
 }
 
-fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) {
+// Returns false when the fixed-size listener tables cannot take this waiter.
+// Userspace can reach that with enough threads on one futex, so it has to unwind
+// and report an interruption rather than take the kernel down; every caller here
+// already retries, which is also what a spurious futex wakeup would ask of them.
+fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) bool {
 	t.attached_events_i = 0
 
 	for i := u64(0); i < events.len; i++ {
 		mut e := events[i]
 
-		if e.listeners_i == eventstruct.max_listeners {
-			panic('event listeners exhausted')
+		if e.listeners_i == eventstruct.max_listeners
+			|| t.attached_events_i == proc.max_events {
+			detach_listeners(mut t)
+			return false
 		}
 
 		mut listener := &e.listeners[e.listeners_i]
@@ -39,13 +45,11 @@ fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) {
 
 		e.listeners_i++
 
-		if t.attached_events_i == proc.max_events {
-			panic('listening on too many events')
-		}
-
 		t.attached_events[t.attached_events_i] = e
 		t.attached_events_i++
 	}
+
+	return true
 }
 
 fn detach_listeners(mut t proc.Thread) {
@@ -103,7 +107,12 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 
 	katomic.inc(mut &waiting_event_count)
 
-	attach_listeners(mut events, mut t)
+	if !attach_listeners(mut events, mut t) {
+		katomic.dec(mut &waiting_event_count)
+		unlock_events(mut events)
+		return none
+	}
+
 	defer {
 		cpu.interrupt_toggle(false)
 		lock_events(mut events)

@@ -17,6 +17,14 @@ import time
 
 fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
 fn C.vinix_call_void_fn(f voidptr)
+fn C.yield_dispatch(handler voidptr)
+
+const max_reap_slots = 256
+
+__global (
+	// Per-CPU parking slot for the thread that most recently died there.
+	reap_slots [max_reap_slots]&proc.Thread
+)
 
 pub fn initialise() {
 	kernel_process = &proc.Process{
@@ -162,6 +170,12 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut t := unsafe { _thread }
 
+	// A torn-down thread may still be referenced by event listener slots it
+	// never got to detach; never let it back onto the run queue.
+	if t.is_dead == true {
+		return false
+	}
+
 	if t.is_in_queue == true {
 		return true
 	}
@@ -302,12 +316,66 @@ pub fn dequeue_and_die() {
 	cpu.interrupt_toggle(false)
 	mut t := proc.current_thread()
 	dequeue_thread(t)
+	t.is_dead = true
+	// tick_itimers() keeps a raw pointer to every armed thread, so the entry
+	// has to go before the Thread struct can be recycled.
+	set_itimer_real(t, 0, 0)
+	// A running thread holds its own lock, taken by get_next_thread(). Nothing
+	// will ever deschedule us to release it, and intercept_thread() would spin
+	// on it forever, so hand it back here.
+	katomic.store(mut &t.running_on, u64(-1))
+	t.l.release()
 	// Clear current thread so the scheduler timer handler knows
 	// there is no running thread to save state from.
 	mut cpu_local := cpulocal.current()
 	proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+	hand_over_to_reaper(cpu_local.cpu_number, t)
 	yield(false)
 	for {}
+}
+
+// Reclaiming a dying thread's kernel stack cannot happen while we are still
+// executing on it, so each CPU parks its latest corpse in a slot and frees the
+// previous occupant instead. By the time a CPU reaches this point again it has
+// long since switched off that stack, and no other CPU can ever have run on it:
+// the thread was dequeued before it died, so only the CPU it died on could
+// still be idling there.
+fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
+	if cpu_number >= u64(max_reap_slots) {
+		return
+	}
+
+	mut previous := reap_slots[cpu_number]
+	reap_slots[cpu_number] = unsafe { t }
+
+	if unsafe { previous == nil } {
+		return
+	}
+
+	if previous.kstack_phys != 0 {
+		memory.pmm_free(voidptr(previous.kstack_phys), stack_size / page_size)
+	}
+	if previous.fpu_storage_phys != 0 {
+		memory.pmm_free(voidptr(previous.fpu_storage_phys), lib.div_roundup(fpu_storage_size,
+			page_size))
+	}
+	unsafe { free(voidptr(previous)) }
+}
+
+// Give up the rest of this thread's timeslice without leaving the run queue.
+// The scheduler is dispatched once so another runnable thread can take the CPU;
+// we resume right here when picked again.
+pub fn reschedule() {
+	cpu.interrupt_toggle(false)
+	timer.stop()
+
+	C.yield_dispatch(voidptr(scheduler_timer_handler))
+
+	mut current_thread := proc.current_thread()
+	if unsafe { current_thread != 0 } {
+		timer.oneshot(current_thread.timeslice)
+	}
+	cpu.interrupt_toggle(true)
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
@@ -324,15 +392,18 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		pstate: 0x3c5 // EL1h, DAIF masked
 	}
 
+	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
+
 	mut t := &proc.Thread{
-		process:     kernel_process
-		ttbr0:       u64(kernel_process.pagemap.top_level)
-		gpr_state:   gpr_state
-		timeslice:   5000
-		running_on:  u64(-1)
-		stacks:      stacks
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
-			higher_half)
+		process:          kernel_process
+		ttbr0:            u64(kernel_process.pagemap.top_level)
+		gpr_state:        gpr_state
+		timeslice:        5000
+		running_on:       u64(-1)
+		stacks:           stacks
+		kstack_phys:      u64(stack_phys)
+		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
+		fpu_storage_phys: u64(fpu_storage_phys)
 	}
 
 	unsafe { stacks.free() }
@@ -399,6 +470,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	stacks << kernel_stack_phys
 	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
 
+	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
+
 	gpr_state := cpulocal.GPRState{
 		pc:     u64(pc)
 		x0:     u64(arg)
@@ -407,15 +480,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 
 	mut t := &proc.Thread{
-		process:      process
-		ttbr0:        u64(process.pagemap.top_level)
-		gpr_state:    gpr_state
-		timeslice:    5000
-		running_on:   u64(-1)
-		kernel_stack: kernel_stack
-		stacks:       stacks
-		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
-			higher_half)
+		process:          process
+		ttbr0:            u64(process.pagemap.top_level)
+		gpr_state:        gpr_state
+		timeslice:        5000
+		running_on:       u64(-1)
+		kernel_stack:     kernel_stack
+		kstack_phys:      u64(kernel_stack_phys)
+		stacks:           stacks
+		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
+		fpu_storage_phys: u64(fpu_storage_phys)
 	}
 
 	t.self = voidptr(t)
@@ -529,12 +603,85 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		}
 	}
 
+	attach_thread(mut process, mut t)?
+
 	if autoenqueue == true {
 		enqueue_thread(t, false)
 	}
 
-	t.tid = process.threads.len
+	return t
+}
+
+// Give a thread its id and add it to its process. The first thread of a process
+// is its main thread and, as on Linux, takes the tid that matches the pid;
+// every other thread draws its own id out of the shared namespace.
+fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+
+	if process.threads.len == 0 && process.pid != 0 {
+		t.tid = process.pid
+		proc.bind_tid(t.tid, t)
+	} else {
+		t.tid = proc.allocate_tid(t)?
+	}
+
 	process.threads << t
+	return t.tid
+}
+
+// Create an additional thread inside an existing process, cloning the caller's
+// register state. This is what backs clone()/clone3() with CLONE_VM: the new
+// thread shares the address space and only gets its own stack, TLS and tid.
+pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cpulocal.GPRState, child_sp u64, tls u64, set_tls bool) ?&proc.Thread {
+	mut process := unsafe { _process }
+	mut source := unsafe { _source }
+
+	stack_pages := stack_size / page_size
+	fpu_pages := lib.div_roundup(fpu_storage_size, page_size)
+
+	kernel_stack_phys := memory.pmm_alloc_fallible(stack_pages)
+	if kernel_stack_phys == unsafe { nil } {
+		return none
+	}
+	fpu_storage_phys := memory.pmm_alloc_fallible(fpu_pages)
+	if fpu_storage_phys == unsafe { nil } {
+		memory.pmm_free(kernel_stack_phys, stack_pages)
+		return none
+	}
+
+	mut t := &proc.Thread{
+		process:          process
+		ttbr0:            u64(process.pagemap.top_level)
+		gpr_state:        state
+		timeslice:        source.timeslice
+		running_on:       u64(-1)
+		kernel_stack:     u64(kernel_stack_phys) + stack_size + higher_half
+		kstack_phys:      u64(kernel_stack_phys)
+		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
+		fpu_storage_phys: u64(fpu_storage_phys)
+		sigentry:         source.sigentry
+		sigactions:       source.sigactions
+		masked_signals:   source.masked_signals
+	}
+
+	t.self = voidptr(t)
+
+	unsafe { C.memcpy(t.fpu_storage, source.fpu_storage, fpu_storage_size) }
+
+	// The child resumes right after its svc, returning 0 on its own stack.
+	t.gpr_state.x0 = u64(0)
+	t.gpr_state.sp = child_sp
+	t.tpidr_el0 = if set_tls { tls } else { cpu.read_tpidr_el0() }
+	t.gpr_state.tpidr_el0 = t.tpidr_el0
+
+	attach_thread(mut process, mut t) or {
+		memory.pmm_free(kernel_stack_phys, stack_pages)
+		memory.pmm_free(fpu_storage_phys, fpu_pages)
+		return none
+	}
 
 	return t
 }
@@ -548,12 +695,16 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 
 	if unsafe { old_process != 0 } {
 		new_proc.ppid = old_process.pid
+		new_proc.pgid = old_process.pgid
+		new_proc.sid = old_process.sid
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 	} else {
 		new_proc.ppid = 0
+		new_proc.pgid = new_proc.pid
+		new_proc.sid = new_proc.pid
 		new_proc.pagemap = unsafe { pagemap }
 		new_proc.thread_stack_top = u64(0x70000000000)
 		new_proc.mmap_anon_non_fixed_base = u64(0x80000000000)

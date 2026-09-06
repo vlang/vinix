@@ -280,8 +280,9 @@ handle_svc:
     ldp x5, x6, [sp, #32]
     mov x0, sp
 
-    // Bounds check syscall number (Linux aarch64 numbers, max 300)
-    cmp x9, #300
+    // Bounds check syscall number. Keep in sync with linux_syscall_max in
+    // modules/syscall/table/syscall_table_arm64.v.
+    cmp x9, #512
     b.ge .svc_invalid
     // Dispatch via syscall_table[x9]
     adrp x10, syscall_table

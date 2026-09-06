@@ -50,7 +50,8 @@ __global (
 )
 
 fn segfault_kill_process(gpr_state voidptr, status int) {
-	userland.syscall_exit(gpr_state, status)
+	// A fatal fault takes down the whole process, not just the faulting thread.
+	userland.syscall_exit_group(gpr_state, status)
 }
 
 fn be32(ptr voidptr) u32 {

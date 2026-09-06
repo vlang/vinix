@@ -44,6 +44,14 @@ pub mut:
 	signalfds          []voidptr
 	attached_events    [max_events]&eventstruct.Event
 	attached_events_i  u64
+	// Linux thread bookkeeping
+	clear_child_tid  u64  // set_tid_address()/CLONE_CHILD_CLEARTID futex word
+	robust_list_head u64  // set_robust_list() head, walked on thread exit
+	is_dead          bool // torn down; must never be enqueued again
+	// Physical bases of the pages backing this thread, so that they can be
+	// reclaimed once nothing is executing on them any more.
+	kstack_phys      u64
+	fpu_storage_phys u64
 }
 
 pub fn current_thread() &Thread {

@@ -10,8 +10,6 @@ import proc
 import aarch64.cpu.local as cpulocal
 import aarch64.cpu
 import katomic
-import event
-import event.eventstruct
 import errno
 import lib
 import strings
@@ -340,12 +338,115 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sched.enqueue_thread(t, true)
 }
 
-pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
-	if signal > 0 {
-		sendsig(processes[pid].threads[0], u8(signal))
-	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
+// Deliver to a process' main thread. Signal state is per-thread here, so there
+// is no process-wide pending mask to raise instead.
+fn signal_process(mut target proc.Process, signal int) bool {
+	target.threads_lock.acquire()
+	mut main_thread := &proc.Thread(unsafe { nil })
+	if target.threads.len > 0 {
+		main_thread = target.threads[0]
 	}
+	target.threads_lock.release()
+
+	if main_thread == unsafe { nil } {
+		return false
+	}
+
+	sendsig(main_thread, u8(signal))
+	return true
+}
+
+// kill(2). Signal 0 raises nothing: it is the "does this pid exist?" probe that
+// shells and daemons use, so it must never fail loudly.
+pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
+	if signal < 0 || signal > 64 {
+		return errno.err, errno.einval
+	}
+
+	mut current_process := proc.current_thread().process
+
+	if pid > 0 {
+		if pid >= proc.max_pid {
+			return errno.err, errno.esrch
+		}
+		mut target := processes[pid]
+		if target == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+		if signal == 0 {
+			return 0, 0
+		}
+		if !signal_process(mut target, signal) {
+			// A zombie still owns its pid but has no thread left to signal.
+			return 0, 0
+		}
+		return 0, 0
+	}
+
+	// 0 means our own process group, anything below -1 names a group directly,
+	// and -1 means every process we are allowed to signal.
+	mut pgid := 0
+	if pid == 0 {
+		pgid = current_process.pgid
+	} else if pid < -1 {
+		pgid = -pid
+	}
+
+	mut found := false
+	for i := 1; i < proc.max_pid; i++ {
+		mut target := processes[i]
+		if target == unsafe { nil } {
+			continue
+		}
+		if pgid != 0 && target.pgid != pgid {
+			continue
+		}
+		if pid == -1 && (target.pid == 1 || target.pid == current_process.pid) {
+			continue
+		}
+
+		found = true
+		if signal != 0 {
+			signal_process(mut target, signal)
+		}
+	}
+
+	if !found {
+		return errno.err, errno.esrch
+	}
+
+	return 0, 0
+}
+
+// tkill(2): musl's raise() and pthread_kill() aim at one thread rather than at
+// the process as a whole.
+pub fn syscall_tkill(_ voidptr, tid int, signal int) (u64, u64) {
+	return signal_thread(0, tid, signal)
+}
+
+// tgkill(2): the same, with the thread group checked so that a recycled tid
+// cannot be signalled by mistake.
+pub fn syscall_tgkill(_ voidptr, tgid int, tid int, signal int) (u64, u64) {
+	return signal_thread(tgid, tid, signal)
+}
+
+fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
+	if signal < 0 || signal > 64 || tid <= 0 {
+		return errno.err, errno.einval
+	}
+
+	mut target := proc.thread_by_tid(tid)
+	if target == unsafe { nil } || target.is_dead {
+		return errno.err, errno.esrch
+	}
+	if tgid > 0 && target.process.pid != tgid {
+		return errno.err, errno.esrch
+	}
+	if signal == 0 {
+		return 0, 0
+	}
+
+	sendsig(target, u8(signal))
 
 	return 0, 0
 }
@@ -375,154 +476,6 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		'', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
-}
-
-pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut current_process := current_thread.process
-
-	mut status := unsafe { _status }
-
-	mut events := []&eventstruct.Event{}
-	defer {
-		unsafe { events.free() }
-	}
-	mut child := &proc.Process(unsafe { nil })
-
-	if pid == -1 {
-		if current_process.children.len == 0 {
-			return errno.err, errno.echild
-		}
-		for c in current_process.children {
-			events << &c.event
-		}
-	} else if pid < -1 || pid == 0 {
-		print('\nwaitpid: value of pid not supported\n')
-		return errno.err, errno.einval
-	} else {
-		if current_process.children.len == 0 {
-			return errno.err, errno.echild
-		}
-		child = processes[pid]
-		if child == unsafe { nil } || child.ppid != current_process.pid {
-			return errno.err, errno.echild
-		}
-		events << &child.event
-	}
-
-	block := options & wnohang == 0
-	which := event.await(mut events, block) or { return errno.err, errno.eintr }
-
-	if child == unsafe { nil } {
-		child = current_process.children[which]
-	}
-
-	unsafe {
-		*status = child.status
-	}
-	ret := child.pid
-
-	proc.free_pid(ret)
-
-	current_process.children.delete(current_process.children.index(child))
-
-	return u64(ret), 0
-}
-
-@[noreturn]
-pub fn syscall_exit(_ voidptr, status int) {
-	mut current_thread := proc.current_thread()
-	mut current_process := current_thread.process
-
-	mut old_pagemap := current_process.pagemap
-
-	kernel_pagemap.switch_to()
-	current_thread.process = kernel_process
-
-	// Close all FDs
-	for i := 0; i < proc.max_fds; i++ {
-		if current_process.fds[i] == unsafe { nil } {
-			continue
-		}
-
-		file.fdnum_close(current_process, i, true) or {}
-	}
-
-	// PID 1 inherits children
-	if current_process.pid != 1 {
-		for child_proc in current_process.children {
-			processes[1].children << child_proc
-		}
-	}
-
-	mmap.delete_pagemap(mut old_pagemap) or {}
-
-	katomic.store(mut &current_process.status, int(u32(status) << 8))
-	event.trigger(mut &current_process.event, false)
-
-	sched.dequeue_and_die()
-}
-
-pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
-	old_thread := proc.current_thread()
-	mut old_process := old_thread.process
-
-	mut new_process := sched.new_process(old_process, unsafe { nil }) or {
-		return errno.err, errno.get()
-	}
-
-	new_process.name = '${old_process.name}[${new_process.pid}]'
-
-	// Dup all FDs, preserving O_CLOEXEC flags
-	for i := 0; i < proc.max_fds; i++ {
-		if old_process.fds[i] == unsafe { nil } {
-			continue
-		}
-		old_fd := unsafe { &file.FD(old_process.fds[i]) }
-		file.fdnum_dup(old_process, i, new_process, i, old_fd.flags, true, false) or {
-			panic('')
-		}
-	}
-
-	stack_size := u64(0x200000)
-
-	mut stacks := []voidptr{}
-
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
-
-	mut new_thread := &proc.Thread{
-		gpr_state:      gpr_state
-		process:        new_process
-		timeslice:      old_thread.timeslice
-		tpidr_el0:      cpu.read_tpidr_el0()
-		kernel_stack:   kernel_stack
-		running_on:     u64(-1)
-		ttbr0:          u64(new_process.pagemap.top_level)
-		sigentry:       old_thread.sigentry
-		sigactions:     old_thread.sigactions
-		masked_signals: old_thread.masked_signals
-		stacks:         stacks
-		fpu_storage:    unsafe { malloc(fpu_storage_size) }
-	}
-
-	unsafe { stacks.free() }
-
-	new_thread.self = voidptr(new_thread)
-
-	unsafe { C.memcpy(new_thread.fpu_storage, old_thread.fpu_storage, fpu_storage_size) }
-
-	// Child returns 0 from fork
-	new_thread.gpr_state.x0 = u64(0)
-	new_thread.gpr_state.x1 = u64(0)
-
-	old_process.children << new_process
-	new_process.threads << new_thread
-
-	sched.enqueue_thread(new_thread, false)
-
-	return u64(new_process.pid), u64(0)
 }
 
 pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
@@ -629,6 +582,10 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			}
 		}
 
+		// Every other thread has to be off the CPUs before the address space
+		// they are running in is replaced.
+		kill_sibling_threads(mut curr_process, t)
+
 		mut old_pagemap := curr_process.pagemap
 
 		curr_process.pagemap = new_pagemap
@@ -643,8 +600,16 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		curr_process.thread_stack_top = u64(0x70000000000)
 		curr_process.mmap_anon_non_fixed_base = u64(0x80000000000)
 
-		// TODO: Kill old threads
+		curr_process.threads_lock.acquire()
 		curr_process.threads = []&proc.Thread{}
+		curr_process.threads_lock.release()
+
+		// The program that comes out of exec has one thread and it is the group
+		// leader, so it takes over the pid as its tid. Anything else this
+		// thread was holding goes back to the namespace.
+		if t.tid != curr_process.pid {
+			proc.free_tid(t.tid)
+		}
 
 		sched.new_user_thread(curr_process, true, entry_point, unsafe { nil }, 0, argv, envp,
 			auxval, true)?

@@ -19,8 +19,9 @@ import aarch64.cpu.local as cpulocal
 import aarch64.uart
 
 // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
-// Table size covers all syscalls we map (max used = 281).
-const linux_syscall_max = 300
+// Table size covers all syscalls we map (max used = 435, clone3).
+// Keep in sync with the bounds check in asm/aarch64/vectors.S.
+const linux_syscall_max = 512
 
 __global (
 	syscall_table [linux_syscall_max]voidptr
@@ -152,15 +153,29 @@ fn syscall_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64, fla
 	return file.syscall_mmap(gpr_state, addr, length, prot_and_flags, fdnum, offset)
 }
 
-// Linux futex(uaddr, futex_op, val, ...) — dispatch by op to wait/wake.
-fn syscall_linux_futex(gpr_state voidptr, uaddr u64, futex_op u64, val u64) (u64, u64) {
-	op := futex_op & 0x7f // mask out FUTEX_PRIVATE_FLAG
+// Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
+fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64) (u64, u64) {
+	// Mask off FUTEX_PRIVATE_FLAG and FUTEX_CLOCK_REALTIME; neither changes
+	// what we do, since every futex here is looked up by physical address and
+	// timeouts are not honoured yet.
+	op := futex_op & 0x7f
 	match op {
-		0 { // FUTEX_WAIT
-			return futex.syscall_futex_wait(gpr_state, unsafe { &int(uaddr) }, int(val))
+		0, 9 { // FUTEX_WAIT, FUTEX_WAIT_BITSET
+			return futex.wait(uaddr, int(val))
 		}
-		1 { // FUTEX_WAKE
-			return futex.syscall_futex_wake(gpr_state, unsafe { &int(uaddr) })
+		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
+			return futex.wake(uaddr), 0
+		}
+		3, 4 { // FUTEX_REQUEUE, FUTEX_CMP_REQUEUE
+			// Moving waiters over to uaddr2 would need a real wait queue.
+			// Waking them instead is heavier but still correct: pthread_cond
+			// waiters recheck their sequence and contend for the mutex, which
+			// is exactly what the requeue would have made them do.
+			woken := futex.wake(uaddr)
+			if uaddr2 != 0 {
+				futex.wake(uaddr2)
+			}
+			return woken, 0
 		}
 		else {
 			return u64(-1), errno.enosys
@@ -230,31 +245,6 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 	return offset, 0
 }
 
-// Linux clone(flags, stack, parent_tid, tls, child_tid) — simplified to fork,
-// but respects the child_stack argument so musl posix_spawn works correctly.
-// musl's __clone(fn, stack, flags, arg) stores fn/arg on the new stack via
-// `stp x0, x3, [x1, #-16]!` then calls svc with x1 = stack - 16.
-// After fork, the child resumes at the instruction after svc with SP = child_stack,
-// loads fn/arg via `ldp x1, x0, [sp], #16`, and calls fn(arg).
-fn syscall_linux_clone(gpr_state voidptr) (u64, u64) {
-	mut state := unsafe { &cpulocal.GPRState(gpr_state) }
-	child_stack := state.x1 // new stack from musl __clone (x1 before svc)
-
-	// syscall_fork copies gpr_state to the new thread struct.
-	// Temporarily set SP to child_stack so the child gets the right SP.
-	old_sp := state.sp
-	if child_stack != 0 {
-		state.sp = child_stack
-	}
-
-	ret_val, err_val := userland.syscall_fork(state)
-
-	// Restore parent's SP (child already has its own copy)
-	state.sp = old_sp
-
-	return ret_val, err_val
-}
-
 // Linux uname(buf) — fill utsname (6 x 65-byte fields).
 fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 	unsafe {
@@ -266,18 +256,6 @@ fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 		C.strcpy(charptr(buf + 260), c'aarch64')
 	}
 	return 0, 0
-}
-
-// exit_group — same as exit for single-threaded processes.
-@[noreturn]
-fn syscall_linux_exit_group(gpr_state voidptr, status int) {
-	userland.syscall_exit(gpr_state, status)
-}
-
-// set_tid_address — store tid pointer, return tid.
-fn syscall_linux_set_tid_address(_ voidptr, tidptr u64) (u64, u64) {
-	current := proc.current_thread()
-	return u64(current.tid), 0
 }
 
 fn syscall_linux_gettid(_ voidptr) (u64, u64) {
@@ -433,14 +411,42 @@ fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
 	return 0, 0
 }
 
-// setpgid / getpgid: stubs — process groups not fully implemented.
+// setpgid / getpgid: wait4()/waitid() select on process groups, so these have
+// to be real.
 fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
+	if pid < 0 || pgid < 0 {
+		return errno.err, errno.einval
+	}
+
+	mut target := proc.current_thread().process
+	if pid != 0 {
+		if pid >= proc.max_pid {
+			return errno.err, errno.esrch
+		}
+		target = processes[pid]
+		if target == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+	}
+
+	target.pgid = if pgid == 0 { target.pid } else { pgid }
+
 	return 0, 0
 }
 
 fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
-	current := proc.current_thread()
-	return u64(current.process.pid), 0
+	mut target := proc.current_thread().process
+	if pid != 0 {
+		if pid < 0 || pid >= proc.max_pid {
+			return errno.err, errno.esrch
+		}
+		target = processes[pid]
+		if target == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+	}
+
+	return u64(target.pgid), 0
 }
 
 // prctl: stub — return success for most operations.
@@ -572,10 +578,6 @@ fn syscall_linux_umask(_ voidptr, mask int) (u64, u64) {
 	return 0o22, 0
 }
 
-fn syscall_linux_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
-	return 0, 0
-}
-
 fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_rlim u64, old_rlim u64) (u64, u64) {
 	if old_rlim != 0 {
 		// Return sensible default limits. RLIMIT_NOFILE (7) must return a
@@ -602,7 +604,9 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_rlim u64, old_r
 }
 
 fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
-	sched.yield(false)
+	// yield(false) is the dying-thread path and never returns to the caller;
+	// giving up the timeslice while staying runnable is what is wanted here.
+	sched.reschedule()
 	return 0, 0
 }
 
@@ -840,15 +844,19 @@ pub fn init_syscall_table() {
 
 	// Process control
 	syscall_table[93] = voidptr(userland.syscall_exit) // __NR_exit
-	syscall_table[94] = voidptr(syscall_linux_exit_group) // __NR_exit_group
-	syscall_table[96] = voidptr(syscall_linux_set_tid_address) // __NR_set_tid_address
+	syscall_table[94] = voidptr(userland.syscall_exit_group) // __NR_exit_group
+	syscall_table[95] = voidptr(userland.syscall_waitid) // __NR_waitid
+	syscall_table[96] = voidptr(userland.syscall_set_tid_address) // __NR_set_tid_address
 	syscall_table[98] = voidptr(syscall_linux_futex) // __NR_futex
-	syscall_table[99] = voidptr(syscall_linux_set_robust_list) // __NR_set_robust_list
+	syscall_table[99] = voidptr(userland.syscall_set_robust_list) // __NR_set_robust_list
+	syscall_table[100] = voidptr(userland.syscall_get_robust_list) // __NR_get_robust_list
 	syscall_table[101] = voidptr(sys.syscall_nanosleep) // __NR_nanosleep
 	syscall_table[113] = voidptr(sys.syscall_clock_get) // __NR_clock_gettime
 	syscall_table[114] = voidptr(syscall_linux_clock_getres) // __NR_clock_getres
 	syscall_table[124] = voidptr(syscall_linux_sched_yield) // __NR_sched_yield
 	syscall_table[129] = voidptr(userland.syscall_kill) // __NR_kill
+	syscall_table[130] = voidptr(userland.syscall_tkill) // __NR_tkill
+	syscall_table[131] = voidptr(userland.syscall_tgkill) // __NR_tgkill
 	syscall_table[133] = voidptr(syscall_linux_rt_sigsuspend) // __NR_rt_sigsuspend
 	syscall_table[134] = voidptr(syscall_linux_rt_sigaction) // __NR_rt_sigaction
 	syscall_table[135] = voidptr(userland.syscall_sigprocmask) // __NR_rt_sigprocmask
@@ -892,6 +900,7 @@ pub fn init_syscall_table() {
 	syscall_table[38] = voidptr(syscall_linux_renameat) // __NR_renameat
 	syscall_table[44] = voidptr(syscall_linux_fstatfs) // __NR_fstatfs
 	syscall_table[278] = voidptr(syscall_linux_getrandom) // __NR_getrandom
+	syscall_table[435] = voidptr(userland.syscall_clone3) // __NR_clone3
 
 	// Sockets
 	syscall_table[198] = voidptr(socket.syscall_socket) // __NR_socket
@@ -913,14 +922,14 @@ pub fn init_syscall_table() {
 	// Memory
 	syscall_table[214] = voidptr(syscall_linux_brk) // __NR_brk
 	syscall_table[215] = voidptr(mmap.syscall_munmap) // __NR_munmap
-	syscall_table[220] = voidptr(syscall_linux_clone) // __NR_clone
+	syscall_table[220] = voidptr(userland.syscall_clone) // __NR_clone
 	syscall_table[221] = voidptr(userland.syscall_execve) // __NR_execve
 	syscall_table[222] = voidptr(syscall_linux_mmap) // __NR_mmap
 	syscall_table[226] = voidptr(mmap.syscall_mprotect) // __NR_mprotect
 	syscall_table[233] = voidptr(syscall_linux_madvise) // __NR_madvise
 
 	// Misc
-	syscall_table[260] = voidptr(userland.syscall_waitpid) // __NR_wait4
+	syscall_table[260] = voidptr(userland.syscall_wait4) // __NR_wait4
 	syscall_table[261] = voidptr(syscall_linux_prlimit64) // __NR_prlimit64
 
 	// Networking
