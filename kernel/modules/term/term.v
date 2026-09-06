@@ -201,6 +201,15 @@ pub fn framebuffer_phys_span() (u64, u64) {
 }
 
 pub fn initialise() {
+	// Idempotent. kmain brings the terminal up once before the page-table
+	// switch and would call this again after it. The early context keeps
+	// rendering on the kernel's tables (the framebuffer is mapped there), so a
+	// second flanterm_fb_init is not only redundant, it re-clears and
+	// re-allocates a full-screen canvas -- 16 MB on the M1's 2560x1600 native
+	// panel -- and hangs there. Reuse the live context instead.
+	if flanterm_ctx != unsafe { nil } {
+		return
+	}
 	if fb_req.response == unsafe { nil } {
 		// No framebuffer available (headless/serial-only mode)
 		return
