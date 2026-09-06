@@ -252,6 +252,15 @@ pub fn read_cntpct_el0() u64 {
 	return ret
 }
 
+pub fn read_cntvct_el0() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, cntvct_el0
+		; =r (ret)
+	}
+	return ret
+}
+
 pub fn read_cntp_ctl_el0() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {
@@ -505,4 +514,13 @@ fn C.vinix_psci_smc(function_id u64) u64
 pub fn psci_call(function_id u64) {
 	C.vinix_psci_hvc(function_id)
 	C.vinix_psci_smc(function_id)
+}
+
+fn C.vinix_install_early_fault_vectors()
+
+// Route every early exception to a machine reset. Only meaningful while
+// diagnosing a boot that produces no output at all; the real vectors replace
+// these as soon as exception handling is initialised.
+pub fn install_early_fault_reset() {
+	C.vinix_install_early_fault_vectors()
 }

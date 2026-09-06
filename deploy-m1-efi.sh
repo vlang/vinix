@@ -25,6 +25,12 @@ for argument in "$@"; do
             # very moment Limine applies it, just before entering the kernel.
             USE_NATIVE_RESOLUTION=1
             ;;
+        --force-fault)
+            # Self-test of the signal channel: fault on purpose and expect a
+            # reboot. If the machine does not reboot, PSCI reset is missing
+            # and a quiet machine proves nothing about the kernel.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.force_fault=1"
+            ;;
         --halt-at=*)
             # Power off once boot reaches this stage. On a machine with no
             # console and no usable framebuffer, "did it power off?" is the
@@ -45,7 +51,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -75,7 +81,7 @@ fi
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
-LIMINE_EFI_BUILT="$SCRIPT_DIR/boot-image/limine-9.3.0/bin/BOOTAA64.EFI"
+LIMINE_EFI_BUILT="$SCRIPT_DIR/boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI"
 LIMINE_EFI_BIN="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
 LIMINE_CONF="$SCRIPT_DIR/build-support/limine.conf"
 
@@ -102,6 +108,17 @@ for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
 done
 
 echo "using limine EFI: $LIMINE_EFI"
+
+# The upstream 9.3.0 loader cannot boot this kernel on Apple Silicon: its
+# EL2-to-EL1 hand-off leaves FP/SIMD and the physical timer trapping to EL2
+# on CPUs that keep VHE on. build-limine-aarch64.sh builds the patched one and
+# stamps it with an instruction sequence the upstream binary does not contain.
+if ! xxd -p "$LIMINE_EFI" | tr -d '\n' | grep -q "6806a0d248111cd5"; then
+    echo "error: $LIMINE_EFI is the upstream Limine build, which black-screens on Apple Silicon" >&2
+    echo "hint: run ./build-limine-aarch64.sh first" >&2
+    exit 1
+fi
+echo "limine EFI is the Apple Silicon build (sha256 $(shasum -a 256 "$LIMINE_EFI" | cut -c1-16))"
 
 RUNTIME_CONF="$(mktemp "${TMPDIR:-/tmp}/vinix-limine.XXXXXX")"
 trap 'rm -f "$RUNTIME_CONF"' EXIT
@@ -183,7 +200,12 @@ kernel_sha="$(shasum -a 256 "$KERNEL" | awk '{print $1}')"
 # e_entry is the 8-byte little-endian field at offset 24 of the ELF64 header;
 # od -tx8 already renders it host-order, so no byte swapping is needed.
 kernel_entry="$(od -An -tx8 -j24 -N8 "$KERNEL" | tr -d ' \n')"
+# Limine also prints how many protocol requests it found. Counting the request
+# magic in the image gives the number to expect, so a stale kernel with a
+# different request set is caught at the boot screen too.
+kernel_requests="$(xxd -p "$KERNEL" | tr -d '\n' | grep -o '888b4cdf30ddb1c77bf094a183e8820a' | wc -l | tr -d ' ')"
 echo "  kernel sha256: $kernel_sha"
 echo "  kernel entry:  0x$kernel_entry"
+echo "  kernel limine requests: $kernel_requests (Limine's 'Requests count' line)"
 echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
 echo "Compare the entry point against Limine's 'ELF entry point' line at boot."

@@ -335,6 +335,25 @@ fn kmain() {
 		for {}
 	}
 
+	// From here on a fault resets the machine instead of dying quietly, so the
+	// three outcomes a stage halt can produce stay distinguishable: power off
+	// means the stage was reached, reboot means something faulted before it,
+	// and a black screen means a hang or no entry at all. Only armed while
+	// diagnosing, since a normal boot wants a panic message, not a reset.
+	if halt_at_stage >= 0 {
+		cpu.install_early_fault_reset()
+	}
+
+	// Prove the signal channel itself works before trusting what it reports.
+	// A deliberate null store should reboot the machine; if it does not, PSCI
+	// reset is unavailable here and a quiet machine means nothing.
+	if early_cmdline_contains('vinix.force_fault=1') {
+		fault_probe := unsafe { &u64(voidptr(0)) }
+		unsafe {
+			*fault_probe = 0
+		}
+	}
+
 	// Can we drive this display at all? A whole-screen fill cannot be confused
 	// with a dark panel or with leftover bootloader text the way a 16-row bar
 	// can. Limine clears the framebuffer before handoff, so black is its work,
