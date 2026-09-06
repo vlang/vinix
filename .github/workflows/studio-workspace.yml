@@ -1,0 +1,44 @@
+name: Studio display workspace
+on:
+  push:
+    branches: [work/m1-studio-display]
+    paths: [.github/workflows/studio-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Package current Vinix and pinned reference sources
+        run: |
+          set -eu
+          mkdir -p /tmp/studio-workspace/vinix /tmp/studio-workspace/reference
+          git archive d87e6fea15759f943072611ef357c2170e97f21b | tar -x -C /tmp/studio-workspace/vinix
+          git clone -q https://github.com/AsahiLinux/m1n1.git /tmp/studio-workspace/reference/m1n1
+          git -C /tmp/studio-workspace/reference/m1n1 checkout -q 940439b9a407fbfc499bea933269219f3f62d4c7
+          python3 - <<'PY'
+          import json, pathlib, urllib.request
+          root = pathlib.Path('/tmp/studio-workspace/reference/linux')
+          ref = 'b8810ad6442699f610984f3eceea2e3234a50b77'
+          directories = ['drivers/gpu/drm/apple', 'drivers/phy/apple', 'drivers/usb/typec/tipd', 'arch/arm64/boot/dts/apple']
+          for directory in directories:
+              req = urllib.request.Request(f'https://api.github.com/repos/AsahiLinux/linux/contents/{directory}?ref={ref}', headers={'User-Agent': 'vinix-display-dev'})
+              for entry in json.load(urllib.request.urlopen(req, timeout=30)):
+                  if entry['type'] != 'file': continue
+                  if directory.endswith('/dts/apple') and not ('t8103' in entry['name'] or 't8101' in entry['name']): continue
+                  target = root / entry['path']
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(urllib.request.urlopen(entry['download_url'], timeout=30).read())
+          (root / 'REVISION').write_text(ref + '\n')
+          PY
+          tar --exclude=.git -czf /tmp/studio-workspace.tar.gz -C /tmp studio-workspace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-workspace
+          path: /tmp/studio-workspace.tar.gz
+          retention-days: 1
