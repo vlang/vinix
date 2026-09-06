@@ -200,19 +200,24 @@ RTK_ID_BLOCK_MAGIC = 0x64697575  # "uuid" in stored byte order
 RTK_ID_BLOCK_BYTES = 0x40
 RTK_ID_BLOCK_CANDIDATES = 8
 PATCHBAY_HEADER_BYTES = 8
-# ApplePMPFirmware::patchFirmware writes exactly these, in this order. The name
+PMP_CHOSEN_PATH = "IODeviceTree:/chosen"
+PMP_PMGR_PATH = "IODeviceTree:/arm-io/pmgr"
+PMP_PROVIDER_NODE = "the RTBuddy provider nub"
+# ApplePMPFirmware::patchFirmware writes exactly these, in this order. The tag
 # is the u32 constant read most-significant byte first; the image stores the
-# reversed bytes.
-PMP_MANDATORY_PATCHBAY_TAGS = (
-    ("BDID", "board-id", 0xC8),
-    ("DVID", "dram-vendor-id", 0xCC),
-    ("DCAP", "dram-capacity", 0xD0),
-    ("DCHD", "dram-channel-disable", 0xD4),
-    ("PMC_", "pmc", 0xD8),
-    ("PMCV", "pmc-pmgr bit 0", 0xDC),
-    ("PMCB", "pmc-pmgr bit 3", 0xE0),
-    ("PMCX", "pmc-msg-disabled", 0xE4),
-    ("CVAR", "soc-chip-variant", 0xE8),
+# reversed bytes. `length_checked` records a real asymmetry: only the two
+# path-resolved nodes reject a property that is not exactly four bytes, while
+# the provider reads take the first four bytes of whatever OSData they find.
+PMP_MANDATORY_PATCHBAY_INPUTS = (
+    ("BDID", "board-id", PMP_CHOSEN_PATH, "value", 0xC8, True),
+    ("DVID", "dram-vendor-id", PMP_CHOSEN_PATH, "value", 0xCC, True),
+    ("DCAP", "dram-capacity", PMP_PROVIDER_NODE, "value", 0xD0, False),
+    ("DCHD", "dram-channel-disable", PMP_PROVIDER_NODE, "value", 0xD4, False),
+    ("PMC_", "pmc", PMP_PMGR_PATH, "value", 0xD8, True),
+    ("PMCV", "pmc-pmgr", PMP_PMGR_PATH, "value & 1", 0xDC, True),
+    ("PMCB", "pmc-pmgr", PMP_PMGR_PATH, "(value >> 3) & 1", 0xE0, True),
+    ("PMCX", "pmc-msg-disabled", PMP_PROVIDER_NODE, "value", 0xE4, False),
+    ("CVAR", "soc-chip-variant", PMP_PROVIDER_NODE, "value", 0xE8, False),
 )
 T6050_PMP_IMAGE_ID_UUID = "ed70ac9090873857b454318e50a9223f"
 DEFAULT_PMP_IMAGE = Path("build/firmware/t6050pmp.macho")
@@ -2295,6 +2300,28 @@ def recover_apple_pmp_firmware_code_contract(
     if not _has_ordered_words(
         start_code,
         (
+            0xF9004E80,  # str x0, [x20, #0x98] -- retained RTBuddy
+            0xD280D611,  # mov x17, #0x6b0 -- its provider accessor
+            0xF9005280,  # str x0, [x20, #0xa0] -- retained provider nub
+        ),
+    ):
+        raise ValueError("ApplePMPFirmware provider chain changed")
+    # Only the two path-resolved nodes reject a property that is not exactly
+    # four bytes; the provider reads take the first four bytes unconditionally.
+    if start_code.count(struct.pack("<I", 0x7100101F)) != 4:
+        raise ValueError("ApplePMPFirmware property width checks changed")
+    if not _has_ordered_words(
+        start_code,
+        (
+            0x12000109,  # and w9, w8, #1 -- PMCV
+            0x53030D08,  # ubfx w8, w8, #3, #1 -- PMCB
+            0x291BA289,  # stp w9, w8, [x20, #0xdc]
+        ),
+    ):
+        raise ValueError("ApplePMPFirmware pmc-pmgr split changed")
+    if not _has_ordered_words(
+        start_code,
+        (
             0xB900CA88,  # board-id -> this+0xc8
             0xB900CE88,  # dram-vendor-id -> this+0xcc
             0xB900D288,  # dram-capacity -> this+0xd0
@@ -2462,7 +2489,7 @@ def recover_apple_pmp_firmware_code_contract(
     ):
         raise ValueError("RTBuddy gated firmware-load completion changed")
 
-    mandatory_patches = PMP_MANDATORY_PATCHBAY_TAGS
+    mandatory_patches = PMP_MANDATORY_PATCHBAY_INPUTS
     return {
         "service": {
             "start_vtable_slot": 0x5F0,
@@ -2473,12 +2500,28 @@ def recover_apple_pmp_firmware_code_contract(
         "mandatory_patchbay_writes": [
             {
                 "tag": tag,
-                "source": source,
+                "property": name,
+                "node": node,
+                "derivation": derivation,
                 "service_object_offset": offset,
                 "value_bits": 32,
+                "rejects_wrong_width": checked,
             }
-            for tag, source, offset in mandatory_patches
+            for tag, name, node, derivation, offset, checked in mandatory_patches
         ],
+        "mandatory_patchbay_inputs": {
+            "width_bytes": 4,
+            "width_checked_nodes": [PMP_CHOSEN_PATH, PMP_PMGR_PATH],
+            "unchecked_node": PMP_PROVIDER_NODE,
+            "provider_chain": (
+                "the retained RTBuddy at +0x98, its vtable slot 0x6b0 provider, "
+                "cast and retained at +0xa0"
+            ),
+            "absent_behavior": (
+                "the store is skipped and patchFirmware still writes the "
+                "field, so an absent property publishes the allocator's zero"
+            ),
+        },
         "rtbuddy_fixup": {
             "ordering": [
                 "power on RTBuddy target",
@@ -2769,7 +2812,9 @@ def recover_t6050_pmp_patchbay(
     by_tag = {item["tag"]: item for item in records}
     if len(by_tag) != len(records):
         raise ValueError("t6050pmp patchbay repeats a tag")
-    for tag, _source, _offset in PMP_MANDATORY_PATCHBAY_TAGS:
+    for tag, _property, _node, _derivation, _offset, _checked in (
+        PMP_MANDATORY_PATCHBAY_INPUTS
+    ):
         entry = by_tag.get(tag)
         if entry is None:
             raise ValueError(f"t6050pmp patchbay is missing mandatory tag {tag}")
@@ -2798,7 +2843,7 @@ def recover_t6050_pmp_patchbay(
         },
         "record_count": len(records),
         "mandatory_tags_present": [
-            tag for tag, _source, _offset in PMP_MANDATORY_PATCHBAY_TAGS
+            item[0] for item in PMP_MANDATORY_PATCHBAY_INPUTS
         ],
         "records": records,
     }

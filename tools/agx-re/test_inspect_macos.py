@@ -2,6 +2,7 @@
 
 import importlib.util
 import struct
+import sys
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,16 @@ SPEC = importlib.util.spec_from_file_location("inspect_macos", MODULE_PATH)
 assert SPEC and SPEC.loader
 inspect_macos = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(inspect_macos)
+
+RECOVER_PATH = Path(__file__).with_name("recover_t6050_power.py")
+RECOVER_SPEC = importlib.util.spec_from_file_location(
+    "recover_t6050_power", RECOVER_PATH
+)
+assert RECOVER_SPEC and RECOVER_SPEC.loader
+recover_t6050_power = importlib.util.module_from_spec(RECOVER_SPEC)
+# Dataclasses resolve annotations through sys.modules, so register first.
+sys.modules["recover_t6050_power"] = recover_t6050_power
+RECOVER_SPEC.loader.exec_module(recover_t6050_power)
 
 
 class InspectMacOSTests(unittest.TestCase):
@@ -256,6 +267,91 @@ class InspectMacOSTests(unittest.TestCase):
             inspect_macos.parse_pmp_nub(
                 self.pmp_nub("PMP0", **{"pre-loaded": struct.pack("<I", 2)}), "PMP0"
             )
+
+    def test_patchbay_input_table_matches_the_recovery(self) -> None:
+        # The recovery is the authority; this catches the two drifting apart.
+        node_paths = {
+            "chosen": recover_t6050_power.PMP_CHOSEN_PATH,
+            "pmgr": recover_t6050_power.PMP_PMGR_PATH,
+            "provider": recover_t6050_power.PMP_PROVIDER_NODE,
+        }
+        expected = [
+            (tag, name, node_paths[node_key], derivation, checked)
+            for tag, name, node_key, derivation, checked in (
+                inspect_macos.PMP_PATCHBAY_INPUTS
+            )
+        ]
+        actual = [
+            (tag, name, node, derivation, checked)
+            for tag, name, node, derivation, _offset, checked in (
+                recover_t6050_power.PMP_MANDATORY_PATCHBAY_INPUTS
+            )
+        ]
+        self.assertEqual(expected, actual)
+
+    def test_resolves_patchbay_inputs_and_zero_fills_absent_ones(self) -> None:
+        nodes = {
+            "chosen": {
+                "board-id": struct.pack("<I", 0xE),
+                "dram-vendor-id": struct.pack("<I", 0xFF),
+            },
+            "pmgr": {
+                "pmc": struct.pack("<I", 1),
+                "pmc-pmgr": struct.pack("<I", 0x3F),
+            },
+            "provider": {"soc-chip-variant": struct.pack("<I", 1)},
+        }
+        resolved = {
+            entry["tag"]: entry
+            for entry in inspect_macos.parse_pmp_patchbay_inputs(nodes)
+        }
+        self.assertEqual(len(resolved), 9)
+        self.assertEqual(resolved["BDID"]["value"], 0xE)
+        self.assertEqual(resolved["PMCV"]["value"], 1)
+        self.assertEqual(resolved["PMCB"]["value"], 1)
+        self.assertEqual(resolved["CVAR"]["value"], 1)
+        for tag in ("DCAP", "DCHD", "PMCX"):
+            self.assertFalse(resolved[tag]["present"])
+            self.assertEqual(resolved[tag]["value"], 0)
+            self.assertEqual(resolved[tag]["reason"], "property absent")
+
+        # bit 3 clear must give PMCB zero while PMCV stays set.
+        nodes["pmgr"]["pmc-pmgr"] = struct.pack("<I", 0x37)
+        resolved = {
+            entry["tag"]: entry
+            for entry in inspect_macos.parse_pmp_patchbay_inputs(nodes)
+        }
+        self.assertEqual(resolved["PMCV"]["value"], 1)
+        self.assertEqual(resolved["PMCB"]["value"], 0)
+
+        # A width-checked node rejects a non-4-byte property and publishes
+        # zero; an unchecked provider property is taken as-is.
+        nodes["chosen"]["board-id"] = struct.pack("<Q", 0xE)
+        resolved = {
+            entry["tag"]: entry
+            for entry in inspect_macos.parse_pmp_patchbay_inputs(nodes)
+        }
+        self.assertFalse(resolved["BDID"]["present"])
+        self.assertEqual(resolved["BDID"]["reason"], "rejected width")
+        nodes["provider"]["soc-chip-variant"] = struct.pack("<Q", 7)
+        resolved = {
+            entry["tag"]: entry
+            for entry in inspect_macos.parse_pmp_patchbay_inputs(nodes)
+        }
+        self.assertTrue(resolved["CVAR"]["present"])
+        self.assertEqual(resolved["CVAR"]["value"], 7)
+
+    def test_rejects_short_patchbay_input(self) -> None:
+        nodes = {
+            "chosen": {"board-id": b"\x0e"},
+            "pmgr": {},
+            "provider": {},
+        }
+        nodes["provider"]["soc-chip-variant"] = b"\x01\x02"
+        with self.assertRaisesRegex(
+            inspect_macos.InspectError, "shorter than four bytes"
+        ):
+            inspect_macos.parse_pmp_patchbay_inputs(nodes)
 
     def test_decodes_pmp_application_endpoint_service(self) -> None:
         result = inspect_macos.parse_pmp_endpoint_service(

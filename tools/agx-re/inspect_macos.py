@@ -291,6 +291,57 @@ def parse_pmp(node: dict[str, Any]) -> dict[str, Any]:
 
 RTBUDDY_FIRMWARE_SOURCE_PROPERTIES = ("pre-loaded", "running", "no-firmware-service")
 
+# Mirrors recover_t6050_power.PMP_MANDATORY_PATCHBAY_INPUTS, which is the
+# authority; test_inspect_macos asserts the two stay in step. Entries are
+# (tag, property, node key, derivation, rejects a width other than four).
+PMP_PATCHBAY_INPUTS = (
+    ("BDID", "board-id", "chosen", "value", True),
+    ("DVID", "dram-vendor-id", "chosen", "value", True),
+    ("DCAP", "dram-capacity", "provider", "value", False),
+    ("DCHD", "dram-channel-disable", "provider", "value", False),
+    ("PMC_", "pmc", "pmgr", "value", True),
+    ("PMCV", "pmc-pmgr", "pmgr", "value & 1", True),
+    ("PMCB", "pmc-pmgr", "pmgr", "(value >> 3) & 1", True),
+    ("PMCX", "pmc-msg-disabled", "provider", "value", False),
+    ("CVAR", "soc-chip-variant", "provider", "value", False),
+)
+
+
+def parse_pmp_patchbay_inputs(nodes: dict[str, Any]) -> list[dict[str, Any]]:
+    """Resolve the nine mandatory patchbay values from the live DeviceTree.
+
+    ApplePMPFirmware skips the store for an absent property but patchFirmware
+    still writes the field, so an unresolved input publishes zero rather than
+    leaving the firmware's own default in place.
+    """
+    resolved = []
+    for tag, name, node_key, derivation, checked in PMP_PATCHBAY_INPUTS:
+        node = nodes.get(node_key)
+        if node is None:
+            raise InspectError(f"patchbay input {tag} has no {node_key} node")
+        raw = node.get(name)
+        entry: dict[str, Any] = {
+            "tag": tag,
+            "property": name,
+            "node": node_key,
+            "derivation": derivation,
+        }
+        if raw is None:
+            entry.update(present=False, value=0, reason="property absent")
+        elif not isinstance(raw, bytes) or (checked and len(raw) != 4):
+            entry.update(present=False, value=0, reason="rejected width")
+        elif len(raw) < 4:
+            raise InspectError(f"patchbay input {tag} is shorter than four bytes")
+        else:
+            value = decode_uint(raw[:4], 32, name)
+            if derivation == "value & 1":
+                value &= 1
+            elif derivation == "(value >> 3) & 1":
+                value = (value >> 3) & 1
+            entry.update(present=True, value=value)
+        resolved.append(entry)
+    return resolved
+
 
 def parse_pmp_nub(nub: dict[str, Any], role: str) -> dict[str, Any]:
     """Report which firmware image RTBuddy will adopt for one PMP nub.
@@ -600,6 +651,20 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             ["ioreg", "-a", "-p", "IODeviceTree", "-n", "pmp1", "-r"]
         )
 
+    if args.chosen_plist:
+        chosen_raw = _load_plist(args.chosen_plist)
+    else:
+        chosen_raw = _run_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "chosen", "-r", "-d", "1"]
+        )
+
+    if args.pmgr_plist:
+        pmgr_raw = _load_plist(args.pmgr_plist)
+    else:
+        pmgr_raw = _run_plist(
+            ["ioreg", "-a", "-p", "IODeviceTree", "-n", "pmgr", "-r", "-d", "1"]
+        )
+
     if args.pmp0_nub_plist:
         pmp0_nub_raw = _load_plist(args.pmp0_nub_plist)
     elif args.pmp0_plist:
@@ -666,7 +731,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
     manifest = {
-        "schema": 5,
+        "schema": 6,
         "host": {
             "architecture": platform.machine(),
             "macos_version": platform.mac_ver()[0],
@@ -677,6 +742,13 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         "asc_roles": asc_roles,
         "pmp_roles": pmp_roles,
         "pmp_nubs": pmp_nubs,
+        "pmp_patchbay_inputs": parse_pmp_patchbay_inputs(
+            {
+                "chosen": _first_node(chosen_raw, "chosen plist"),
+                "pmgr": _first_node(pmgr_raw, "pmgr plist"),
+                "provider": _first_node(pmp0_nub_raw, "pmp0 nub plist"),
+            }
+        ),
         "pmp_endpoint_services": pmp_endpoint_services,
         "accelerator": parse_accelerator(_first_node(accelerator_raw, "accelerator plist")),
         "driver": parse_driver_info(_load_plist(driver_path)),
@@ -702,6 +774,12 @@ def main() -> int:
     )
     parser.add_argument(
         "--pmp1-plist", type=Path, help="read an ioreg pmp1 plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--chosen-plist", type=Path, help="read an ioreg chosen plist instead of live IORegistry"
+    )
+    parser.add_argument(
+        "--pmgr-plist", type=Path, help="read an ioreg pmgr plist instead of live IORegistry"
     )
     parser.add_argument(
         "--pmp0-nub-plist", type=Path, help="read an ioreg iop-pmp0-nub plist instead of live IORegistry"

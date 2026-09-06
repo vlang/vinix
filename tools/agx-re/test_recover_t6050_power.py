@@ -982,8 +982,8 @@ class RecoverT6050PowerTests(unittest.TestCase):
             records = b"".join(
                 struct.pack("<II", struct.unpack(">I", tag.encode())[0], 4)
                 + b"\0\0\0\0"
-                for tag, _source, _offset in (
-                    recover_t6050_power.PMP_MANDATORY_PATCHBAY_TAGS
+                for tag, *_rest in (
+                    recover_t6050_power.PMP_MANDATORY_PATCHBAY_INPUTS
                 )
             )
         base = 0x1000000
@@ -1053,7 +1053,7 @@ class RecoverT6050PowerTests(unittest.TestCase):
         self.assertEqual(result["records"][0]["stored_bytes"], "DIDB")
         self.assertEqual(
             result["mandatory_tags_present"],
-            [tag for tag, _s, _o in recover_t6050_power.PMP_MANDATORY_PATCHBAY_TAGS],
+            [item[0] for item in recover_t6050_power.PMP_MANDATORY_PATCHBAY_INPUTS],
         )
 
         # A version-4 block reads its offset and size from different fields.
@@ -1083,13 +1083,13 @@ class RecoverT6050PowerTests(unittest.TestCase):
             },
             "record": {"header_bytes": recover_t6050_power.PATCHBAY_HEADER_BYTES},
         }
-        mandatory = recover_t6050_power.PMP_MANDATORY_PATCHBAY_TAGS
+        mandatory = recover_t6050_power.PMP_MANDATORY_PATCHBAY_INPUTS
 
         def entries(skip: str = "", length: int = 4) -> bytes:
             return b"".join(
                 struct.pack("<II", struct.unpack(">I", tag.encode())[0], length)
                 + bytes(length)
-                for tag, _source, _offset in mandatory
+                for tag, *_rest in mandatory
                 if tag != skip
             )
 
@@ -1586,17 +1586,25 @@ class RecoverT6050PowerTests(unittest.TestCase):
         rtbuddy_symbols[recover_t6050_power.RTBUDDY_FIRMWARE_FIXUP] = fixup
         rtbuddy_symbols[recover_t6050_power.RTBUDDY_LOAD_FIRMWARE_GATED] = load
 
-        start_code = struct.pack(
-            "<9I",
-            0xB900CA88,
-            0xB900CE88,
-            0xB900D288,
-            0xB900D688,
-            0xB900DA88,
-            0x291BA289,
-            0xB900E688,
-            0xB900EA88,
-            0xF9405E82,
+        # Laid out in the real order: the provider chain, then each property
+        # store, with the two width-checked nodes contributing four `cmp w0,#4`
+        # guards and pmc-pmgr splitting into one paired store.
+        width_check = struct.pack("<I", 0x7100101F)
+        start_code = (
+            struct.pack("<3I", 0xF9004E80, 0xD280D611, 0xF9005280)
+            + width_check
+            + struct.pack("<I", 0xB900CA88)  # board-id
+            + width_check
+            + struct.pack("<I", 0xB900CE88)  # dram-vendor-id
+            + struct.pack("<I", 0xB900D288)  # dram-capacity, unchecked
+            + struct.pack("<I", 0xB900D688)  # dram-channel-disable, unchecked
+            + width_check
+            + struct.pack("<I", 0xB900DA88)  # pmc
+            + width_check
+            + struct.pack("<3I", 0x12000109, 0x53030D08, 0x291BA289)
+            + struct.pack("<I", 0xB900E688)  # pmc-msg-disabled, unchecked
+            + struct.pack("<I", 0xB900EA88)  # soc-chip-variant, unchecked
+            + struct.pack("<I", 0xF9405E82)
         )
         patch_code = bytearray(struct.pack("<56I", *([0xD503201F] * 56)))
         mandatory_words = {

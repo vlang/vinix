@@ -67,6 +67,8 @@ const rtk_id_block_version_offset = u32(4)
 const rtk_id_block_v4_offset = u32(0x20)
 const rtk_id_block_v5_offset = u32(0x28)
 const rtk_patchbay_header_size = u32(8)
+const t6050_chosen_path = '/chosen'
+const t6050_pmgr_path = '/arm-io/pmgr'
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
 // readPTD shifts its payload and retains the caller-provided byte at +0xf.
@@ -159,6 +161,54 @@ pub enum T6050PowerResult {
 	timed_out
 	faulted
 }
+
+// Where one mandatory patchbay input comes from. ApplePMPFirmware reads two
+// nodes by path and takes the remaining four from the RTBuddy provider nub.
+pub enum T6050PatchBayInputNode {
+	chosen
+	pmgr
+	provider
+}
+
+// How the raw property becomes the published value.
+pub enum T6050PatchBayInputDerivation {
+	value
+	pmc_pmgr_bit0
+	pmc_pmgr_bit3
+}
+
+pub struct T6050PatchBayInput {
+pub:
+	tag        string
+	property   string
+	node       T6050PatchBayInputNode
+	derivation T6050PatchBayInputDerivation
+	// Only the two path-resolved nodes reject a property that is not exactly
+	// four bytes; the provider reads take the first four bytes regardless.
+	width_checked bool
+}
+
+pub struct T6050PatchBayValue {
+pub:
+	tag     u32
+	value   u32
+	present bool
+}
+
+// ApplePMPFirmware::patchFirmware writes all nine unconditionally, so an
+// absent property publishes zero rather than leaving the firmware's own
+// default in place. Keeping `present` separate lets a caller report that.
+pub const t6050_patchbay_inputs = [
+	T6050PatchBayInput{'BDID', 'board-id', .chosen, .value, true},
+	T6050PatchBayInput{'DVID', 'dram-vendor-id', .chosen, .value, true},
+	T6050PatchBayInput{'DCAP', 'dram-capacity', .provider, .value, false},
+	T6050PatchBayInput{'DCHD', 'dram-channel-disable', .provider, .value, false},
+	T6050PatchBayInput{'PMC_', 'pmc', .pmgr, .value, true},
+	T6050PatchBayInput{'PMCV', 'pmc-pmgr', .pmgr, .pmc_pmgr_bit0, true},
+	T6050PatchBayInput{'PMCB', 'pmc-pmgr', .pmgr, .pmc_pmgr_bit3, true},
+	T6050PatchBayInput{'PMCX', 'pmc-msg-disabled', .provider, .value, false},
+	T6050PatchBayInput{'CVAR', 'soc-chip-variant', .provider, .value, false},
+]
 
 // One located patchbay region inside an RTKit image. RTBuddy searches a fixed
 // list of candidate IOP-virtual offsets for a `uuid` identity block and reads
@@ -799,7 +849,57 @@ pub fn (mut controller T6050PowerController) begin_dynamic(die u32, enabled bool
 	return controller.begin(die, enabled)
 }
 
-// Classify one PMP nub exactly as RTBuddy::_initConfigEDT plus
+fn derive_t6050_patchbay_value(raw u32,
+	derivation T6050PatchBayInputDerivation) u32 {
+	return match derivation {
+		.value { raw }
+		.pmc_pmgr_bit0 { raw & 1 }
+		.pmc_pmgr_bit3 { (raw >> 3) & 1 }
+	}
+}
+
+fn read_t6050_patchbay_property(node &devicetree.DTNode, input &T6050PatchBayInput) ?u32 {
+	value := devicetree.get_property(node, input.property) or { return none }
+	if value.len < 4 || (input.width_checked && value.len != 4) {
+		return none
+	}
+	return derive_t6050_patchbay_value(read_native_u32(value.data, 0),
+		input.derivation)
+}
+
+// Resolve the nine mandatory patchbay inputs from the native DeviceTree.
+// A missing node is fatal because it would silently zero several inputs at
+// once, while a missing individual property is Apple's own behaviour and is
+// reported as an absent zero.
+pub fn get_t6050_patchbay_values(provider &devicetree.DTNode) ?[]T6050PatchBayValue {
+	chosen := devicetree.find_node(t6050_chosen_path) or { return none }
+	pmgr := devicetree.find_node(t6050_pmgr_path) or { return none }
+	mut values := []T6050PatchBayValue{cap: t6050_patchbay_inputs.len}
+	for input in t6050_patchbay_inputs {
+		node := match input.node {
+			.chosen { chosen }
+			.pmgr { pmgr }
+			.provider { provider }
+		}
+		tag := t6050_patchbay_tag(input.tag) or { return none }
+		if raw := read_t6050_patchbay_property(node, &input) {
+			values << T6050PatchBayValue{
+				tag: tag
+				value: raw
+				present: true
+			}
+		} else {
+			values << T6050PatchBayValue{
+				tag: tag
+				value: 0
+				present: false
+			}
+		}
+	}
+	return values
+}
+
+// Classify one PMP nub exactly as RTBuddy::_initConfigEDT plus// Classify one PMP nub exactly as RTBuddy::_initConfigEDT plus
 // _attemptFirmwareLoad would. This is read-only classification: it tells a
 // future owner whether it must provide a firmware image, and it never implies
 // that an iBoot-mapped segment list is an inherited image.
@@ -898,6 +998,32 @@ fn validate_t6050_patchbay_codec() bool {
 		return false
 	}
 	return true
+}
+
+fn validate_t6050_patchbay_input_codec() bool {
+	if t6050_patchbay_inputs.len != 9 {
+		return false
+	}
+	mut checked := 0
+	for input in t6050_patchbay_inputs {
+		if t6050_patchbay_tag(input.tag) == none {
+			return false
+		}
+		if input.width_checked {
+			checked++
+		}
+	}
+	// Only /chosen and /arm-io/pmgr reject a wrong width, and pmc-pmgr
+	// contributes two of those four reads.
+	if checked != 4 {
+		return false
+	}
+	return derive_t6050_patchbay_value(0x3f, .value) == 0x3f
+		&& derive_t6050_patchbay_value(0x3f, .pmc_pmgr_bit0) == 1
+		&& derive_t6050_patchbay_value(0x3f, .pmc_pmgr_bit3) == 1
+		&& derive_t6050_patchbay_value(0x37, .pmc_pmgr_bit0) == 1
+		&& derive_t6050_patchbay_value(0x37, .pmc_pmgr_bit3) == 0
+		&& derive_t6050_patchbay_value(0x3e, .pmc_pmgr_bit0) == 0
 }
 
 fn validate_t6050_firmware_ownership_codec() bool {
@@ -1447,6 +1573,7 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		|| !validate_t6050_readiness_codec()
 		|| !validate_t6050_firmware_ownership_codec()
 		|| !validate_t6050_patchbay_codec()
+		|| !validate_t6050_patchbay_input_codec()
 		|| !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false
@@ -1506,6 +1633,16 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		println('agx: native t6050 PMGR PMP readiness interrupt is unavailable')
 		return false
 	}
+	patchbay_values := get_t6050_patchbay_values(pmp0_nub) or {
+		println('agx: native t6050 PMP patchbay inputs are unavailable')
+		return false
+	}
+	mut resolved_inputs := u32(0)
+	for value in patchbay_values {
+		if value.present {
+			resolved_inputs++
+		}
+	}
 	firmware := get_t6050_pmp_firmware_ownership(pmp0_nub)
 	if firmware.needs_host_image() {
 		// Expected on Mac17,6: iBoot maps the segments but does not hand off a
@@ -1521,8 +1658,9 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 			7, 8, 40, 9, 10, 11, 12, 13, 14]) {
 		return false
 	}
-	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), PMP_STATUS interrupt slot %u of %u per die, iboot-mapped segments %u, read-only)\n',
+	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), PMP_STATUS interrupt slot %u of %u per die, iboot-mapped segments %u, %u/%u patchbay inputs resolved, read-only)\n',
 		die_count, ready_interrupt.slot, ready_interrupt.interrupts_per_die,
-		u32(firmware.iboot_mapped_segments))
+		u32(firmware.iboot_mapped_segments), resolved_inputs,
+		u32(t6050_patchbay_inputs.len))
 	return true
 }
