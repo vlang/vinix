@@ -17,6 +17,12 @@ BUILD_DIR="$SCRIPT_DIR/build"
 SYSROOT="$SCRIPT_DIR/build-aarch64-musl/aarch64-linux-musl-native"
 GCCLIB="$SYSROOT/lib/gcc/aarch64-linux-musl/11.2.1"
 LLVM_BIN="/opt/homebrew/opt/llvm/bin"
+# <stdatomic.h> has to be ours. See build-support/aarch64-cc-shim/stdatomic.h:
+# -nostdinc leaves GCC 11's on the path, whose atomics clang rejects on the
+# _Atomic pointers V generates, and clang's own header forwards straight back
+# to it. This only started to matter when the desktop began importing os and
+# time, which pull in sync.stdatomic.
+CC_SHIM="$SCRIPT_DIR/build-support/aarch64-cc-shim"
 BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 
@@ -91,6 +97,7 @@ echo "==> Translating V to C..."
 # ── C -> aarch64 static binary ──
 echo "==> Compiling for aarch64-linux-musl..."
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
+    -isystem "$CC_SHIM" \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/include" \
     -I "$APP_SRC" \
     -O2 -fno-stack-protector -w \
