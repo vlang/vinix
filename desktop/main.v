@@ -22,6 +22,14 @@ const key_ctrl_k = u8(0x0b)
 const key_ctrl_n = u8(0x0e)
 const key_ctrl_q = u8(0x11)
 
+// F1 and F2, as the Apple SPI keyboard encodes them. They are the brightness
+// keys printed on the machine's own keycaps, so they drive the panel here.
+const key_f1 = '\x1bOP'
+const key_f2 = '\x1bOQ'
+
+// One step of the bar in Settings, so the two agree.
+const brightness_step = 5
+
 struct Options {
 	framebuffer    string = '/dev/fb0'
 	pointer        string = '/dev/pointer'
@@ -207,11 +215,19 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 		return
 	}
 
+	// Brightness is the machine's, not the focused window's: F1 and F2 dim and
+	// brighten the panel whatever is on top, and are taken out of the stream so
+	// a terminal does not also receive them as an escape sequence.
+	rest := d.take_brightness_keys(keys)
+	if rest.len == 0 {
+		return
+	}
+
 	// An application that takes typed input gets it while it is focused, and
 	// the desktop's own shortcuts stand down: a terminal cannot have `q` close
 	// the desktop out from under whoever is typing.
 	if d.focused_app_takes_keys() {
-		d.send_keys_to_focused(keys)
+		d.send_keys_to_focused(rest)
 		return
 	}
 
@@ -220,8 +236,8 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	// is most of the time -- and a plain `q` meaning "close the desktop" then
 	// means typing a word with a q in it drops the user back to the console.
 	// Esc is out for the same reason: it is a key people press.
-	for i := 0; i < keys.len; i++ {
-		match keys[i] {
+	for i := 0; i < rest.len; i++ {
+		match rest[i] {
 			key_ctrl_q {
 				d.running = false
 			}
@@ -236,6 +252,63 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 			}
 			else {}
 		}
+	}
+}
+
+// take_brightness_keys acts on every F1/F2 in the input and returns what is
+// left. The common case is a string containing neither, which is returned as
+// it came rather than rebuilt -- there is no garbage collector here, and this
+// runs on every frame that has input.
+fn (mut d Desktop) take_brightness_keys(keys string) string {
+	if keys.index_u8(0x1b) < 0 {
+		return keys
+	}
+	mut kept := []u8{cap: keys.len}
+	mut i := 0
+	for i < keys.len {
+		if i + key_f1.len <= keys.len {
+			three := keys[i..i + key_f1.len]
+			if three == key_f1 {
+				adjust_brightness(-brightness_step)
+				i += key_f1.len
+				continue
+			}
+			if three == key_f2 {
+				adjust_brightness(brightness_step)
+				i += key_f2.len
+				continue
+			}
+		}
+		kept << keys[i]
+		i++
+	}
+	if kept.len == keys.len {
+		unsafe { kept.free() }
+		return keys
+	}
+	return kept.bytestr()
+}
+
+// adjust_brightness moves the panel by one step, reading first so that a
+// change made in Settings, or by the other key, is where it starts from.
+fn adjust_brightness(delta int) {
+	mut state := BacklightState{}
+	if read_backlight(mut state) != .ok || !state.online || !state.writable {
+		return
+	}
+	current := backlight_percent(&state)
+	if current < 0 {
+		return
+	}
+	mut target := current + delta
+	if target < 0 {
+		target = 0
+	}
+	if target > 100 {
+		target = 100
+	}
+	if target != current {
+		set_backlight_percent(target)
 	}
 }
 
