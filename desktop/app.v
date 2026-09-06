@@ -54,6 +54,13 @@ const available_apps = [
 		open: open_calculator
 	},
 	AppFactory{
+		title: 'Terminal'
+		icon: 'builtin:terminal'
+		width: 560
+		height: 340
+		open: open_terminal
+	},
+	AppFactory{
 		title: 'Settings'
 		icon: 'builtin:settings'
 		width: 620

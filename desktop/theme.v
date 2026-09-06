@@ -40,6 +40,11 @@ const files_folder_icon = u32(0x5b8def)
 const files_file_icon = u32(0x9aa5b5)
 
 // ── Settings ───────────────────────────────────────────────────────
+// ── Terminal ───────────────────────────────────────────────────────
+const terminal_bg = u32(0x1b1d23)
+const terminal_text = u32(0xd8dee9)
+const terminal_button = u32(0x333843)
+
 const settings_sidebar_bg = u32(0xf3f5f9)
 const settings_category_selected = u32(0xdfe7f5)
 const settings_choice_bg = u32(0xe9edf4)

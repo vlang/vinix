@@ -55,10 +55,67 @@ class Monitor:
     def send_input(self, events):
         self.command("input-send-event", events=events)
 
+    def type_text(self, text):
+        """Send a string as key presses, one character at a time.
+
+        A guest reading its keyboard through a driver that polls, as Vinix
+        does, drops characters sent faster than it looks; the pause between
+        them is what makes a typed line arrive whole.
+        """
+        for character in text:
+            events = key_events(character)
+            if events is None:
+                continue
+            for event in events:
+                self.command("input-send-event", events=[event])
+            time.sleep(0.03)
+
 
 def absolute(value, extent):
     scaled = int(round(value * ABS_MAX / max(extent - 1, 1)))
     return max(0, min(ABS_MAX, scaled))
+
+
+# QMP names keys rather than taking characters, so a string has to be spelled
+# out. Only what a shell command needs is here; anything else is skipped rather
+# than guessed at.
+KEY_NAMES = {
+    " ": "spc", "-": "minus", "=": "equal", "[": "bracket_left",
+    "]": "bracket_right", ";": "semicolon", "'": "apostrophe", "`": "grave_accent",
+    "\\": "backslash", ",": "comma", ".": "dot", "/": "slash",
+    "\n": "ret", "\t": "tab",
+}
+SHIFTED = {
+    "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6", "&": "7",
+    "*": "8", "(": "9", ")": "0", "_": "minus", "+": "equal", "{": "bracket_left",
+    "}": "bracket_right", ":": "semicolon", '"': "apostrophe", "~": "grave_accent",
+    "|": "backslash", "<": "comma", ">": "dot", "?": "slash",
+}
+
+
+def key_events(character):
+    """The QMP key event(s) for one character, or None if it has no name."""
+    if character.isalpha() and character.isascii():
+        name = character.lower()
+        shift = character.isupper()
+    elif character.isdigit():
+        name, shift = character, False
+    elif character in SHIFTED:
+        name, shift = SHIFTED[character], True
+    elif character in KEY_NAMES:
+        name, shift = KEY_NAMES[character], False
+    else:
+        return None
+    # A key event carries `down`, and a press with no release leaves the key
+    # held: both halves have to be sent.
+    def press(qcode, down):
+        return {"type": "key",
+                "data": {"down": down, "key": {"type": "qcode", "data": qcode}}}
+
+    if not shift:
+        return [press(name, True), press(name, False)]
+    return [press("shift", True), press(name, True),
+            press(name, False), press("shift", False)]
 
 
 def move_events(x, y, width, height):
@@ -74,8 +131,8 @@ def button_events(down):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["move", "click", "drag"])
-    parser.add_argument("coordinates", type=int, nargs="+")
+    parser.add_argument("action", choices=["move", "click", "drag", "type"])
+    parser.add_argument("coordinates", nargs="+")
     parser.add_argument("--socket", default=os.environ.get("VINIX_QMP_SOCKET",
                                                            "/tmp/vinix-qmp"))
     parser.add_argument("--size", default="1024x768")
@@ -85,7 +142,15 @@ def main():
 
     width, height = (int(part) for part in args.size.split("x"))
     monitor = Monitor(args.socket)
-    coordinates = args.coordinates
+
+    if args.action == "type":
+        # Everything after the verb is the text, rejoined so a command with
+        # spaces survives the shell that invoked this.
+        monitor.type_text(" ".join(args.coordinates))
+        time.sleep(args.settle)
+        return
+
+    coordinates = [int(part) for part in args.coordinates]
 
     if args.action == "move":
         x, y = coordinates[0], coordinates[1]

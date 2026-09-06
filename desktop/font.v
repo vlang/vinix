@@ -26,6 +26,7 @@ struct FontFace {
 mut:
 	// What the face was baked at, which is how a text style picks between them.
 	bold        bool
+	mono        bool
 	size        int
 	ascent      int
 	descent     int
@@ -60,6 +61,7 @@ fn load_face(data FaceBlob) FontFace {
 
 	return FontFace{
 		bold: data.bold
+		mono: data.mono
 		size: data.size
 		ascent: data.ascent
 		descent: data.descent

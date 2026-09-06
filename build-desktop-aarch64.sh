@@ -164,7 +164,13 @@ tar xf "$BASE_INITRAMFS" -C "$BUILD_DIR" ./bin/busybox
 mv "$BUILD_DIR/bin/busybox" "$STAGING/bin/busybox"
 rmdir "$BUILD_DIR/bin" 2>/dev/null || true
 chmod +x "$STAGING/bin/busybox"
-ln -sf busybox "$STAGING/bin/sh"
+# BusyBox dispatches on argv[0], so an applet is a link to it. Without these a
+# terminal can only run `busybox ls`, which is a poor sort of shell.
+for applet in sh ls cat echo pwd cd mkdir rmdir rm cp mv ln touch head tail \
+              grep wc sort uniq find du df date uname ps kill sleep env printf \
+              basename dirname clear true false test more less hexdump; do
+    ln -sf busybox "$STAGING/bin/$applet"
+done
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the
 # kernel's tar reader would try to unpack as real files.

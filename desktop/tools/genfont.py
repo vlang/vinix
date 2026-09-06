@@ -65,8 +65,11 @@ FONT_DIR = os.path.join(
 )
 
 # (name, file, pixel size, bold). The sizes are the ones the desktop's own
-# chrome uses plus those ui2's calculator example asks for (18 for its keys,
-# 28 for its display).
+# chrome uses, those ui2's calculator example asks for (18 for its keys, 28 for
+# its display), and one monospaced face for the terminal.
+#
+# A face whose file name contains "Mono" is marked monospaced in the generated
+# data, which is how a text style asking for that family finds it.
 FACES = [
     ("small", "Roboto-Regular.ttf", 11, False),
     ("ui", "Roboto-Regular.ttf", 13, False),
@@ -75,6 +78,9 @@ FACES = [
     ("large", "Roboto-Regular.ttf", 18, False),
     ("large_bold", "Roboto-Bold.ttf", 18, True),
     ("display", "Roboto-Regular.ttf", 28, False),
+    # Monospaced, for the terminal. A terminal that does not line its columns
+    # up is not a terminal.
+    ("mono", "RobotoMono-Regular.ttf", 13, False),
 ]
 
 
@@ -172,6 +178,7 @@ def main():
     out.append("// exceeds what V's checker will descend into.")
     out.append("struct FaceBlob {")
     out.append("\tbold    bool")
+    out.append("\tmono    bool")
     out.append("\tsize    int")
     out.append("\tascent  int")
     out.append("\tdescent int")
@@ -198,6 +205,7 @@ def main():
         out.append("// %s: %s at %dpx" % (name, file_name, size))
         out.append("const face_%s = FaceBlob{" % name)
         out.append("\tbold:    %s" % ("true" if bold else "false"))
+        out.append("\tmono:    %s" % ("true" if "Mono" in file_name else "false"))
         out.append("\tsize:    %d" % size)
         out.append("\tascent:  %d" % face["ascent"])
         out.append("\tdescent: %d" % face["descent"])

@@ -229,11 +229,9 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	y += 28 + 10
 
 	if settings.theme == .macos {
-		out << settings_note('A menu bar across the top, light grey windows', y, width)
+		out << settings_note('Light grey windows with the title centred, three', y, width)
 		y += 16
-		out << settings_note('with the title centred, three coloured discs at', y, width)
-		y += 16
-		out << settings_note('the leading edge, and a dock.', y, width)
+		out << settings_note('coloured discs at the leading edge, and a dock.', y, width)
 	} else {
 		out << settings_note('Rounded windows with shadows and flat colour,', y, width)
 		y += 16

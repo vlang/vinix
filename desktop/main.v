@@ -115,6 +115,7 @@ fn main() {
 		frame_started := monotonic_millis()
 
 		desktop.update_clock()
+		desktop.poll_apps()
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)
 		// Settings only requests a new scale. Apply it after all input from this
@@ -195,6 +196,18 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 
 fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	keys := keyboard.poll()
+	if keys.len == 0 {
+		return
+	}
+
+	// An application that takes typed input gets it while it is focused, and
+	// the desktop's own shortcuts stand down: a terminal cannot have `q` close
+	// the desktop out from under whoever is typing.
+	if d.focused_app_takes_keys() {
+		d.send_keys_to_focused(keys)
+		return
+	}
+
 	for i := 0; i < keys.len; i++ {
 		match keys[i] {
 			27, `q`, `Q` {

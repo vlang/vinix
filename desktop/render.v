@@ -40,10 +40,17 @@ const button_icon_size = 16
 // asking for a size nothing was baked at gets the neighbour instead.
 fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
 	wanted := int(style.size)
+	// ui2's font_family, honoured for the one family the atlas has a second
+	// set of glyphs for. A terminal that does not line its columns up is not a
+	// terminal, so the match on it outranks both weight and size.
+	want_mono := style.font_family == 'mono'
 	mut best := 0
 	mut best_score := 1 << 30
 	for i, face in d.fonts {
 		mut score := abs_int(face.size - wanted)
+		if face.mono != want_mono {
+			score += 100000
+		}
 		if face.bold != style.bold {
 			// Any face of the right weight beats every face of the wrong one.
 			score += 1000
@@ -398,6 +405,21 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			// no such glyph, and an approximation of someone's logo is worse
 			// than an honest dot.
 			d.canvas.fill_circle(cx, cy, if w < h { w / 3 } else { h / 3 }, color)
+		}
+		'terminal' {
+			body := w * 3 / 4
+			tall := h * 3 / 5
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 2, color)
+			// A prompt chevron and its cursor, punched back out.
+			behind := d.surface_under(x, y)
+			arm := tall / 4
+			d.canvas.draw_line(left + 4, top + arm, left + 4 + arm, top + tall / 2, behind,
+				2)
+			d.canvas.draw_line(left + 4 + arm, top + tall / 2, left + 4, top + tall - arm,
+				behind, 2)
+			d.canvas.fill_rect(left + 6 + 2 * arm, top + tall - arm - 2, body / 3, 2, behind)
 		}
 		'settings' {
 			// A gear: a disc with a hole, and teeth around it.

@@ -20,6 +20,8 @@ import term.termios
 
 #include <sys/stat.h>
 
+#include <sys/wait.h>
+
 #include <termios.h>
 
 #include <time.h>
@@ -168,6 +170,85 @@ fn desktop_read_file(path string, buffer voidptr, max u64) i64 {
 	}
 	C.close(fd)
 	return i64(total)
+}
+
+// A child process and the two pipes the terminal talks to it through.
+struct SpawnedShell {
+	pid        int
+	to_child   int
+	from_child int
+}
+
+// Start a shell for the terminal.
+//
+// Vinix has no pseudo-terminals, so the child is given plain pipes. It sees
+// them as its stdin, stdout and stderr, and because they are not a terminal it
+// neither echoes what is typed nor prints a prompt — the terminal does both
+// itself.
+//
+// from_child comes back non-blocking, so a compositor polling it once a frame
+// never stalls.
+fn desktop_spawn_shell(path string, arg string) ?SpawnedShell {
+	mut in_pipe := [2]int{}
+	mut out_pipe := [2]int{}
+	if C.pipe(&in_pipe[0]) != 0 {
+		return none
+	}
+	if C.pipe(&out_pipe[0]) != 0 {
+		C.close(in_pipe[0])
+		C.close(in_pipe[1])
+		return none
+	}
+
+	// Built before the fork. Between fork and execve the child may call only
+	// async-signal-safe functions, which allocating is not.
+	argv := [&char(path.str), &char(arg.str), &char(unsafe { nil })]
+	envp := [c'PATH=/bin:/sbin:/usr/bin:/usr/sbin', c'HOME=/root', c'TERM=dumb',
+		&char(unsafe { nil })]
+
+	pid := C.fork()
+	if pid < 0 {
+		C.close(in_pipe[0])
+		C.close(in_pipe[1])
+		C.close(out_pipe[0])
+		C.close(out_pipe[1])
+		return none
+	}
+	if pid == 0 {
+		C.dup2(in_pipe[0], 0)
+		C.dup2(out_pipe[1], 1)
+		C.dup2(out_pipe[1], 2)
+		C.close(in_pipe[0])
+		C.close(in_pipe[1])
+		C.close(out_pipe[0])
+		C.close(out_pipe[1])
+		C.execve(&char(path.str), argv.data, envp.data)
+		C._exit(127)
+	}
+
+	C.close(in_pipe[0])
+	C.close(out_pipe[1])
+	C.fcntl(out_pipe[0], C.F_SETFL, C.O_NONBLOCK)
+	return SpawnedShell{
+		pid: pid
+		to_child: in_pipe[1]
+		from_child: out_pipe[0]
+	}
+}
+
+fn desktop_write(fd int, buffer voidptr, count u64) i64 {
+	// vlib's POSIX write declaration returns int, as read's does. A terminal
+	// only ever sends a typed line; refuse a count that could truncate.
+	if count > 0x7fffffff {
+		return -1
+	}
+	return i64(C.write(fd, buffer, usize(count)))
+}
+
+// True once the child has exited, so the terminal can say so.
+fn desktop_child_exited(pid int) bool {
+	mut status := 0
+	return C.waitpid(pid, &status, C.WNOHANG) == pid
 }
 
 fn desktop_opendir(path string) voidptr {

@@ -89,14 +89,6 @@ struct Theme {
 	traffic_minimize u32
 	traffic_zoom     u32
 	traffic_idle     u32
-	// A menu bar across the top of the screen, as macOS has. Windows and
-	// shortcuts start below it.
-	menu_bar        bool
-	menu_bar_height int
-	menu_bar_bg     u32
-	menu_bar_edge   u32
-	menu_bar_text   u32
-	menu_bar_bold   u32
 	// The bar along the bottom: full width like a taskbar, or a centred rounded
 	// panel like a dock.
 	dock         bool
@@ -154,12 +146,6 @@ const theme_default = Theme{
 	traffic_minimize: 0xfebc2e
 	traffic_zoom: 0x28c840
 	traffic_idle: 0xd6d6d6
-	menu_bar: false
-	menu_bar_height: 0
-	menu_bar_bg: 0xf6f6f6
-	menu_bar_edge: 0xd0d0d0
-	menu_bar_text: 0x1c1c1e
-	menu_bar_bold: 0x000000
 	dock: false
 	dock_bg: 0xd8dce4
 	dock_radius: 12
@@ -181,9 +167,9 @@ const theme_default = Theme{
 	shortcut_panel: 0x141d33
 }
 
-// macOS as it looked from Yosemite through Mojave: a menu bar across the top,
-// light grey window chrome with the title centred over it, three coloured
-// discs at the leading edge, and a dock rather than a taskbar.
+// macOS as it looked from Yosemite through Mojave: light grey window chrome
+// with the title centred over it, three coloured discs at the leading edge,
+// and a dock rather than a taskbar.
 const theme_macos = Theme{
 	name: 'macOS'
 	window_body: 0xffffff
@@ -215,12 +201,6 @@ const theme_macos = Theme{
 	traffic_minimize: 0xfebc2e
 	traffic_zoom: 0x28c840
 	traffic_idle: 0xd6d6d6
-	menu_bar: true
-	menu_bar_height: 22
-	menu_bar_bg: 0xf6f6f6
-	menu_bar_edge: 0xcfcfcf
-	menu_bar_text: 0x1c1c1e
-	menu_bar_bold: 0x000000
 	dock: true
 	dock_bg: 0xe8e8ea
 	dock_radius: 12

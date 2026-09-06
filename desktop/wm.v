@@ -128,81 +128,6 @@ fn (d &Desktop) visible_window_count() int {
 	return count
 }
 
-// content_top is the first row a window may occupy. A theme with a menu bar
-// keeps the strip across the top for itself.
-fn (d &Desktop) content_top() int {
-	return d.theme().menu_bar_height
-}
-
-// menu_bar_element is the strip macOS puts across the top: the focused window's
-// name in bold where an application's would be, the menus it would own, and the
-// clock at the far end. The menus do not open — there is nothing behind them
-// yet — but the bar is most of what makes the look recognisable.
-fn (d &Desktop) menu_bar_element() ui2.Element {
-	theme := d.theme()
-	width := d.canvas.width
-
-	mut children := []ui2.Element{}
-	mut x := 12
-
-	// Where the Apple menu sits. A filled circle rather than a logo: the atlas
-	// has no such glyph and inventing one badly would be worse than a mark.
-	children << ui2.button_with_image('', '', 'builtin:menu', ui2.rect(f64(x), 3, 16,
-		16), ui2.BoxStyle{
-		transparent: true
-	}, ui2.TextStyle{
-		color: theme.menu_bar_bold
-	})
-	x += 24
-
-	focused := d.focused_title()
-	titles := [focused, 'File', 'Edit', 'View', 'Window', 'Help']
-	for index, title in titles {
-		if title.len == 0 {
-			continue
-		}
-		bold := index == 0
-		item_width := 14 + title.len * 7
-		children << ui2.label('', title, ui2.rect(f64(x), 0, f64(item_width), f64(theme.menu_bar_height)),
-			ui2.TextStyle{
-			color: if bold { theme.menu_bar_bold } else { theme.menu_bar_text }
-			size: 12
-			bold: bold
-			align: .center
-		})
-		x += item_width
-	}
-
-	// The clock lives here rather than in the bar at the bottom, as it does on
-	// the system this is imitating.
-	children << ui2.label('', '${d.clock_date}  ${d.clock_time}', ui2.rect(f64(width - 200),
-		0, 188, f64(theme.menu_bar_height)), ui2.TextStyle{
-		color: theme.menu_bar_text
-		size: 12
-		align: .right
-	})
-	children << ui2.view('', ui2.rect(0, f64(theme.menu_bar_height - 1), f64(width), 1),
-		ui2.BoxStyle{
-		bg: theme.menu_bar_edge
-	}, [])
-
-	return ui2.view('menubar', ui2.rect(0, 0, f64(width), f64(theme.menu_bar_height)),
-		ui2.BoxStyle{
-		bg: theme.menu_bar_bg
-	}, children)
-}
-
-// focused_title names the window on top, which is what a menu bar shows where
-// an application's name would go.
-fn (d &Desktop) focused_title() string {
-	for i := d.windows.len - 1; i >= 0; i-- {
-		if d.windows[i].id == d.focus && !d.windows[i].minimized {
-			return d.windows[i].title
-		}
-	}
-	return 'Vinix'
-}
-
 // next_window_by_age finds the window opened just after `after_id`. The window
 // list is kept in painting order, which changes whenever one is raised, while
 // the taskbar wants the order they were opened in. Ids only ever increase, so
@@ -261,9 +186,9 @@ fn (mut d Desktop) toggle_maximize(id int) {
 		d.windows[index].restore_width = d.windows[index].width
 		d.windows[index].restore_height = d.windows[index].height
 		d.windows[index].x = 0
-		d.windows[index].y = d.content_top()
+		d.windows[index].y = 0
 		d.windows[index].width = d.canvas.width
-		d.windows[index].height = d.canvas.height - taskbar_height - d.content_top()
+		d.windows[index].height = d.canvas.height - taskbar_height
 		d.windows[index].maximized = true
 	}
 	d.raise(id)
@@ -317,9 +242,6 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		children << d.window_element(window)
 	}
 	children << d.taskbar_element()
-	if d.theme().menu_bar {
-		children << d.menu_bar_element()
-	}
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)),
 		ui2.BoxStyle{
@@ -468,6 +390,48 @@ fn (mut d Desktop) invalidate_wallpaper() {
 	d.dirty = true
 }
 
+// poll_apps gives every application that has something of its own going on a
+// chance to say so, and redraws if any of them did.
+fn (mut d Desktop) poll_apps() {
+	for i := 0; i < d.apps.len; i++ {
+		mut app := d.apps[i]
+		if mut app is PollingApp {
+			if app.poll() {
+				d.dirty = true
+			}
+		}
+	}
+}
+
+// focused_app_takes_keys reports whether the window on top belongs to an
+// application that wants typed input.
+fn (d &Desktop) focused_app_takes_keys() bool {
+	index := d.focused_app_index() or { return false }
+	app := d.apps[index]
+	return app is KeyboardApp
+}
+
+fn (mut d Desktop) send_keys_to_focused(keys string) {
+	index := d.focused_app_index() or { return }
+	mut app := d.apps[index]
+	if mut app is KeyboardApp {
+		app.key_input(keys)
+		d.dirty = true
+	}
+}
+
+// focused_app_index finds the application behind the focused window, if the
+// focused window has one.
+fn (d &Desktop) focused_app_index() ?int {
+	for window in d.windows {
+		if window.id == d.focus && !window.minimized && window.app_index >= 0
+			&& window.app_index < d.apps.len {
+			return window.app_index
+		}
+	}
+	return none
+}
+
 fn (mut d Desktop) launch_titled(title string) {
 	for factory in available_apps {
 		if factory.title == title {
@@ -517,7 +481,7 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		id := '${action_shortcut_prefix}${index}'
 		theme := d.theme()
 		hovered := d.hover == id
-		y := d.content_top() + shortcut_top + index * (shortcut_height + shortcut_gap)
+		y := shortcut_top + index * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
 		out << ui2.clickable_view(id, ui2.rect(f64(shortcut_left), f64(y), f64(shortcut_width),
 			f64(shortcut_height)), ui2.BoxStyle{
@@ -647,9 +611,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// windows it has, the way Windows 7 did.
 	entries := d.taskbar_entries()
 	mut x := launcher_x + 8
-	// A dock stops where its contents do; a taskbar stops at the clock.
+	// Where the entries must stop. A dock stops where its contents do, but no
+	// wider than the screen: it is centred, so a panel that outgrew the display
+	// would hang off both ends at once.
+	room := width - edge_padding - clock_area_width - 12
 	clock_left := if dock {
-		x + entries.len * (dock_item_width + taskbar_item_gap)
+		wanted := x + entries.len * (dock_item_width + taskbar_item_gap)
+		if wanted < room { wanted } else { room }
 	} else {
 		width - clock_area_width
 	}
@@ -658,8 +626,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
 	mut item_width := if dock { dock_item_width } else { taskbar_item_width }
-	if !dock && entries.len > 0 {
-		share := (clock_left - taskbar_item_gap - x + taskbar_item_gap) / entries.len - taskbar_item_gap
+	if entries.len > 0 {
+		limit := if dock { room } else { clock_left }
+		share := (limit - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
 		}
@@ -700,22 +669,26 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		x += item_width + taskbar_item_gap
 	}
 
-	// Right: the clock, two lines, hard against the corner — unless a menu bar
-	// is carrying it, as macOS does.
-	if !theme.menu_bar {
-	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(width - clock_area_width),
-		6, f64(clock_area_width - taskbar_padding), 20), ui2.TextStyle{
+	// The clock. A taskbar pins it to the far corner; a dock carries it as its
+	// last item, so the panel grows to hold it rather than leaving it stranded
+	// off to one side of a centred bar.
+	clock_x := if dock { x + 6 } else { width - clock_area_width }
+	clock_width := clock_area_width - taskbar_padding
+	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(clock_x), 6, f64(clock_width),
+		20), ui2.TextStyle{
 		color: theme.clock_time
 		size: 17
 		bold: true
 		align: .right
 	})
-	children << ui2.label('clock.date', d.clock_date, ui2.rect(f64(width - clock_area_width),
-		26, f64(clock_area_width - taskbar_padding), 16), ui2.TextStyle{
+	children << ui2.label('clock.date', d.clock_date, ui2.rect(f64(clock_x), 26, f64(clock_width),
+		16), ui2.TextStyle{
 		color: theme.clock_date
 		size: 11
 		align: .right
 	})
+	if dock {
+		x = clock_x + clock_width + 6
 	}
 
 	// A hairline along the top edge separates a full-width bar from the
@@ -873,9 +846,8 @@ fn (mut d Desktop) clamp_to_screen(index int) {
 	if d.windows[index].x + d.windows[index].width < margin {
 		d.windows[index].x = margin - d.windows[index].width
 	}
-	top := d.content_top()
-	if d.windows[index].y < top {
-		d.windows[index].y = top
+	if d.windows[index].y < 0 {
+		d.windows[index].y = 0
 	}
 	if d.windows[index].y > max_y {
 		d.windows[index].y = max_y
