@@ -14,6 +14,7 @@ import aarch64.smp
 import aarch64.pmgr
 import aarch64.uart
 import aarch64.virtio_input
+import apple.smc
 import devicetree
 import initramfs
 import fs
@@ -46,6 +47,7 @@ __global (
 	}
 	enable_apple_gpu     = false
 	enable_apple_dcp     = false
+	enable_apple_battery = false
 	force_qemu_platform  = false
 	aic_timer_irq         = u32(3)
 )
@@ -139,6 +141,11 @@ fn kmain_thread() {
 	initramfs.initialise()
 	print('kmain_thread: initramfs done\n')
 
+	// Experimental, read-only SMC battery client; independent of GPU/DCP.
+	if enable_apple_battery {
+		smc.initialise()
+	}
+
 	// GPU and display bring-up are independent experiments. In particular,
 	// probing a newly recognized GPU must not run an unrelated DCP sequence.
 	if devicetree.is_available() {
@@ -221,6 +228,23 @@ fn configure_apple_bringup_from_cmdline() {
 	if cmdline.len == 0 {
 		print('boot cmdline: empty, Apple GPU/DCP disabled\n')
 		return
+	}
+
+	// Exact token matching avoids enabling the probe for '=10' or for a
+	// different parameter containing this name. Last battery option wins.
+	mut option_start := 0
+	for index := 0; index <= cmdline.len; index++ {
+		if index != cmdline.len && cmdline[index] !in [` `, `\t`, `\r`, `\n`] {
+			continue
+		}
+		// Compare in place: command-line parsing does not allocate.
+		option := unsafe { tos(cmdline.str + option_start, index - option_start) }
+		if option == 'vinix.apple_battery=1' {
+			enable_apple_battery = true
+		} else if option == 'vinix.apple_battery=0' {
+			enable_apple_battery = false
+		}
+		option_start = index + 1
 	}
 
 	if cmdline.contains('vinix.apple_gpu=1') {
@@ -409,7 +433,7 @@ fn kmain() {
 		uart.puts(c'\n=== Vinix aarch64 booting (qemu mode) ===\n')
 	}
 
-	// Set up exception vectors (replaces x86 GDT/IDT/ISR)
+	// Set up exception vectors (replaces x86 GDT/IDF/ISR)
 	exception.initialise()
 	boot_stage(4)
 
