@@ -241,7 +241,36 @@ fn configure_apple_bringup_from_cmdline() {
 		if enable_apple_dcp { c'enabled' } else { c'disabled' })
 }
 
+// Scan the boot cmdline without building a V string: this runs before
+// pmm_init, so the allocator is not available yet.
+fn early_cmdline_contains(needle string) bool {
+	if kernel_file_req.response == unsafe { nil } {
+		return false
+	}
+	kernel_file := kernel_file_req.response.kernel_file
+	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+		return false
+	}
+	text := unsafe { &u8(kernel_file.cmdline) }
+	for i := 0; unsafe { text[i] } != 0; i++ {
+		mut j := 0
+		for j < needle.len && unsafe { text[i + j] } == needle[j] {
+			j++
+		}
+		if j == needle.len {
+			return true
+		}
+	}
+	return false
+}
+
 fn kmain() {
+	// flanterm's init clears the framebuffer, which erases every stage bar
+	// drawn before it. When the screen goes black with no text, that clear is
+	// the last thing known to have happened, so allow skipping it to find out
+	// how far boot actually gets.
+	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
+
 	term.early_stage_mark(1)
 
 	// Do not hard-stop on base revision mismatch. Some real-hardware boot
@@ -261,8 +290,14 @@ fn kmain() {
 	term.early_stage_mark(3)
 	// Bring up terminal as early as possible to surface boot progress
 	// before we switch to kernel-owned page tables.
-	term.initialise()
-	print('\n=== Vinix aarch64 (early) ===\n')
+	if !skip_early_term {
+		term.initialise()
+		// 13 proves flanterm_fb_init returned; 14 proves it can render.
+		// Both are drawn after its clear, so they survive on screen.
+		term.early_stage_mark(13)
+		print('\n=== Vinix aarch64 (early) ===\n')
+		term.early_stage_mark(14)
+	}
 
 	configure_apple_bringup_from_cmdline()
 
@@ -294,7 +329,9 @@ fn kmain() {
 	term.early_stage_mark(7)
 
 	// Init terminal (after vmm_init so page tables are active and framebuffer is mapped)
-	term.initialise()
+	if !skip_early_term {
+		term.initialise()
+	}
 	print('\n=== Vinix aarch64 ===\n')
 	if !have_dt {
 		print('WARNING: No usable device tree blob\n')

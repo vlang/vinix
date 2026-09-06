@@ -8,11 +8,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
 USE_MINIMAL_INITRAMFS=0
+CMDLINE_EXTRA=""
 
 for argument in "$@"; do
     case "$argument" in
         --apple-gpu)
             ENABLE_APPLE_GPU=1
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
+            ;;
+        --no-early-term)
+            # Skip flanterm entirely. Its init clears the framebuffer, so a
+            # hang at or just after it looks identical to a kernel that never
+            # ran. Without it the stage bars survive and the bar count is the
+            # last stage reached.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.no_early_term=1"
             ;;
         --minimal-initramfs)
             # Boot with a few-KB initramfs instead of the 120 MB busybox one.
@@ -21,7 +30,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -81,18 +90,14 @@ echo "using limine EFI: $LIMINE_EFI"
 
 RUNTIME_CONF="$(mktemp "${TMPDIR:-/tmp}/vinix-limine.XXXXXX")"
 trap 'rm -f "$RUNTIME_CONF"' EXIT
-if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
-    awk '
-        /^[[:space:]]*cmdline:/ {
-            found = 1
-            if ($0 !~ /vinix\.apple_gpu=1/) $0 = $0 " vinix.apple_gpu=1"
-        }
+CMDLINE_EXTRA="${CMDLINE_EXTRA# }"
+if [ -n "$CMDLINE_EXTRA" ]; then
+    awk -v extra="$CMDLINE_EXTRA" '
+        /^[[:space:]]*cmdline:/ { found = 1; $0 = $0 " " extra }
         { print }
-        END {
-            if (!found) print "    cmdline: vinix.apple_gpu=1"
-        }
+        END { if (!found) print "    cmdline: " extra }
     ' "$LIMINE_CONF" > "$RUNTIME_CONF"
-    echo "Apple GPU bring-up enabled (experimental M1/G13 path)"
+    echo "kernel cmdline additions: $CMDLINE_EXTRA"
 else
     cp "$LIMINE_CONF" "$RUNTIME_CONF"
 fi
