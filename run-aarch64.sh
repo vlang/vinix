@@ -135,8 +135,10 @@ mcopy -o -i "$BOOT_DISK" "$LIMINE_EFI" ::/EFI/BOOT/BOOTAA64.EFI
 
 # ── Build initramfs with /sbin/init ──
 if [ -f "$INITRAMFS" ]; then
-    # Use pre-built initramfs from build-userland-aarch64.sh (busybox)
-    echo "==> Using busybox initramfs..."
+    # Whatever VINIX_INITRAMFS names, or the busybox one from
+    # build-userland-aarch64.sh. Naming it matters: booting the desktop image
+    # and booting the shell one look identical up to this line.
+    echo "==> Using initramfs: $(basename "$INITRAMFS")"
     mcopy -o -i "$BOOT_DISK" "$INITRAMFS" ::/boot/initramfs.tar
 elif [ -f "$INIT_DIR/init" ]; then
     # Fallback: minimal init only

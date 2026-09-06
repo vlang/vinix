@@ -11,11 +11,12 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/build-support/find-v.sh"
+
 BUILD_DIR="$SCRIPT_DIR/build"
 SYSROOT="$SCRIPT_DIR/build-aarch64-musl/aarch64-linux-musl-native"
 GCCLIB="$SYSROOT/lib/gcc/aarch64-linux-musl/11.2.1"
 LLVM_BIN="/opt/homebrew/opt/llvm/bin"
-V="${V:-/Users/alex/code/v/vnew}"
 BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 

@@ -120,23 +120,31 @@ ticks.
 ## Building and running
 
 ui2 is not vendored; check it out beside the sources, where the build points
-V's module path. The `ui2_headless` build this needs is upstream, so a plain
-clone will do:
+V's module path:
 
     git clone https://github.com/vlang/ui2 third_party/ui2
 
 Then, from the repository root, with Homebrew `llvm`, `lld` and `qemu`
-installed:
+installed, one command builds everything and boots into the desktop:
 
-    ./build-desktop-aarch64.sh
+    ./run-desktop-aarch64.sh
 
-That translates the V to C, compiles it for `aarch64-linux-musl` against the
-static sysroot taken from the userland image, and stages
+It builds the kernel, builds the desktop, and starts QEMU on the result.
+
+    --no-build      boot what is already built
+    --no-kernel     skip the kernel build (the desktop is what you changed)
+    --no-desktop    skip the desktop build (the kernel is what you changed)
+    --monitor       expose a QEMU monitor and QMP socket (see below)
+
+Anything else is passed through to `run-aarch64.sh`: `--mem=MB`, `--serial`,
+`--virtio-gpu`.
+
+`build-desktop-aarch64.sh` is the build on its own, if that is all you want. It
+translates the V to C, compiles it for `aarch64-linux-musl` against the static
+sysroot taken from the userland image, and stages
 `build-support/init-aarch64/initramfs-desktop.tar` — an image whose `/sbin/init`
-starts the desktop directly.
-
-    VINIX_INITRAMFS="$PWD/build-support/init-aarch64/initramfs-desktop.tar" \
-        ./run-aarch64.sh
+starts the desktop directly. `run-aarch64.sh` boots any image named by
+`VINIX_INITRAMFS`, and with none boots the ordinary shell.
 
 Options the desktop itself takes:
 
@@ -148,15 +156,14 @@ Options the desktop itself takes:
 
 ## Driving it from a script
 
-Start the VM with a monitor and a QMP socket, and the two tools under `tools/`
-can drive and photograph it without a human at the keyboard:
+`--monitor` starts the VM with a QEMU monitor and a QMP socket, and the two
+tools under `tools/` then drive and photograph it without a human at the
+keyboard:
 
-    VINIX_QEMU_EXTRA="-monitor unix:/tmp/vinix-monitor,server,nowait \
-                      -qmp unix:/tmp/vinix-qmp,server,nowait" \
-    VINIX_INITRAMFS="$PWD/build-support/init-aarch64/initramfs-desktop.tar" \
-        ./run-aarch64.sh --no-build
+    ./run-desktop-aarch64.sh --monitor
 
     python3 desktop/tools/input.py drag 200 90 620 480
+    python3 desktop/tools/input.py click 344 412
     ./desktop/tools/screenshot.sh /tmp/shot.png
 
 `input.py` speaks QMP to the virtio tablet, which takes absolute coordinates,
