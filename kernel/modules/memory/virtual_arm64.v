@@ -379,10 +379,15 @@ pub fn vmm_init() {
 			panic('vmm init failure')
 		}
 	}
+	print('vmm: HHDM 0-4GiB mapped\n')
 
-	// Map remaining physical memory
+	// Map remaining physical memory. On Apple Silicon this is the whole of RAM,
+	// which sits above 4 GiB, so this loop (barely exercised by QEMU, whose RAM
+	// is below 4 GiB) does the real work. Print how much it covered: a runaway
+	// count would explain a stall here rather than at the page-table switch.
 	memmap := memmap_req.response
 	entries := memmap.entries
+	mut high_pages := u64(0)
 	for i := 0; i < memmap.entry_count; i++ {
 		base := unsafe { lib.align_down(entries[i].base, page_size) }
 		top := unsafe { lib.align_up(entries[i].base + entries[i].length, page_size) }
@@ -396,8 +401,10 @@ pub fn vmm_init() {
 			kernel_pagemap.map_page(j + higher_half, j, pte_present | pte_noexec | pte_writable) or {
 				panic('vmm init failure')
 			}
+			high_pages++
 		}
 	}
+	print('vmm: high RAM mapped (${high_pages} pages above 4GiB)\n')
 
 	// Remap framebuffer regions as Non-Cacheable.
 	// Normal Write-Back Cacheable (the default) causes writes to stay in CPU cache,
@@ -414,6 +421,7 @@ pub fn vmm_init() {
 			}
 		}
 	}
+	print('vmm: framebuffer remapped\n')
 
 	// Set up MAIR_EL1:
 	//   Index 0: Normal Write-Back Cacheable (0xFF)
@@ -442,16 +450,30 @@ pub fn vmm_init() {
 	(u64(0b01) << 26) | // ORGN1 = Write-Back
 	(u64(0b01) << 8) | // IRGN0 = Write-Back
 	(u64(0b01) << 24) // IRGN1 = Write-Back
-	cpu.write_tcr_el1(tcr)
-
-	// Load TTBR1 with kernel page tables
-	cpu.write_ttbr1_el1(u64(kernel_pagemap.top_level))
-	// Load TTBR0 with kernel page tables (replaced per-process later)
+	// Activate the kernel page tables. This is a live switch: the MMU is already
+	// on (Limine handed off with it enabled), so the running instruction stream,
+	// stack and framebuffer must stay mapped across it. The kernel's tables map
+	// all three, and its TCR matches Limine's geometry (both 4KB granule, 48-bit,
+	// T0SZ=T1SZ=16), so no fetch changes meaning mid-switch.
+	//
+	// Order matters and follows Limine's own hand-off: install the translation
+	// bases first, write TCR last. TCR is the register that re-interprets an
+	// in-flight table walk, so it is written only once the correct bases are
+	// already live. Each writer ends in an ISB.
+	print('vmm: activating kernel page tables\n')
 	cpu.write_ttbr0_el1(u64(kernel_pagemap.top_level))
+	cpu.write_ttbr1_el1(u64(kernel_pagemap.top_level))
+	cpu.write_tcr_el1(tcr)
 
 	cpu.tlbi_vmalle1()
 	cpu.dsb_sy()
 	cpu.isb()
+
+	// Only reached if the switch did not fault: the framebuffer alias in the
+	// new tables is live and flanterm can still render. On a machine with no
+	// console this line is how a successful switch is told apart from one that
+	// faulted into silence.
+	print('vmm: kernel page tables live\n')
 
 	vmm_initialised = true
 }
