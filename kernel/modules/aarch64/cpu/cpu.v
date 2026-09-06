@@ -511,7 +511,20 @@ pub const psci_system_reset = u64(0x84000009)
 fn C.vinix_psci_hvc(function_id u64) u64
 fn C.vinix_psci_smc(function_id u64) u64
 
+fn C.vinix_current_el() u64
+
+pub fn current_el() u64 {
+	return C.vinix_current_el()
+}
+
 pub fn psci_call(function_id u64) {
+	// hvc issued from EL2 is taken to EL2, which is this kernel itself, so it
+	// would land in the early fault vectors and look like a crash rather than
+	// a PSCI call. Only a kernel at EL1 has a hypervisor below to answer it.
+	if current_el() >= 2 {
+		C.vinix_psci_smc(function_id)
+		return
+	}
 	C.vinix_psci_hvc(function_id)
 	C.vinix_psci_smc(function_id)
 }

@@ -55,11 +55,33 @@ vinix_early_fault_vectors:
     EARLY_FAULT_ENTRY   // EL0 aarch32: fiq
     EARLY_FAULT_ENTRY   // EL0 aarch32: serror
 
+// Report the exception level the kernel is running at. Apple Silicon has no
+// EL3 and m1n1 commonly leaves the kernel at EL2, which changes both of the
+// mechanisms below, so neither may assume EL1.
+.globl vinix_current_el
+.type vinix_current_el, %function
+vinix_current_el:
+    mrs x0, CurrentEL
+    lsr x0, x0, #2
+    ret
+
+// Install the fault vectors at whichever level is current. Writing VBAR_EL1
+// while running at EL2 installs them where nothing will ever look: exceptions
+// would be taken to VBAR_EL2, the table would never run, and a deliberate
+// fault would look like PSCI being unavailable rather than a vector installed
+// at the wrong level.
 .globl vinix_install_early_fault_vectors
 .type vinix_install_early_fault_vectors, %function
 vinix_install_early_fault_vectors:
-    adrp x0, vinix_early_fault_vectors
-    add  x0, x0, :lo12:vinix_early_fault_vectors
-    msr  vbar_el1, x0
+    adrp x1, vinix_early_fault_vectors
+    add  x1, x1, :lo12:vinix_early_fault_vectors
+    mrs  x0, CurrentEL
+    lsr  x0, x0, #2
+    cmp  x0, #2
+    b.lt 2f
+    msr  vbar_el2, x1
+    isb
+    ret
+2:  msr  vbar_el1, x1
     isb
     ret
