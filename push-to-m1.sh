@@ -39,6 +39,15 @@ if [ -f "$EFI" ]; then
     echo "pushed patched loader: $EFI"
 fi
 
+# kek.sh is the command actually typed on the M1, so it has to travel with the
+# tree rather than being copied by hand. Installing it outside the repo keeps
+# the short path the user already uses.
+if [ -f kek.sh ]; then
+    rsync -a kek.sh "$REMOTE:$(dirname "$DEST")/kek.sh"
+    ssh "$REMOTE" "chmod +x '$(dirname "$DEST")/kek.sh'"
+    echo "installed kek.sh -> $(dirname "$DEST")/kek.sh"
+fi
+
 ssh "$REMOTE" "cd '$DEST' && \
     echo \"remote head:  \$(git log --oneline -1 2>/dev/null || echo unknown)\" && \
     echo \"kernel sha:   \$(shasum -a256 kernel/bin/vinix | cut -c1-16)\" && \
