@@ -26,7 +26,21 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 
+	addr := cpu.read_far_el1()
+
+	// Only user mappings can be paged in here. A fault on a kernel address
+	// (HHDM, MMIO aperture, kernel image) has nothing to resolve, and during
+	// early boot there is no current thread at all: dereferencing it from the
+	// fault path re-faults, recursing until the exception stack is gone, and
+	// the report that would have named the real fault never prints. Hand such
+	// faults straight back to the caller's fault reporter.
+	if addr >= higher_half {
+		return none
+	}
 	mut current_thread := proc.current_thread()
+	if current_thread == unsafe { nil } {
+		return none
+	}
 
 	prev := cpu.interrupt_toggle(true)
 	defer {
@@ -35,8 +49,6 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
-
-	addr := cpu.read_far_el1()
 
 	pagemap.l.acquire()
 
