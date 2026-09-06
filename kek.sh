@@ -145,6 +145,16 @@ Then, on the shell:
   cat /dev/battery       the charge, as the desktop's taskbar reads it
   ls /dev/apple-panel-bl the backlight the Settings brightness bar writes
 
+The touchpad needs no flag and comes up in every mode: it rides the SPI
+transport the keyboard already uses, and the first /dev/pointer read asks for
+native mode. It announces itself once:
+
+  apple-spi-tp: first valid touchpad report received
+
+No such line and a cursor that does not move means the reports never arrived.
+Until one does, /dev/pointer falls back to VirtIO, which this machine has none
+of, so the cursor simply stays put rather than misbehaving.
+
 A machine that resets instead of booting means one of these faulted. Re-run
 with `battery` alone first -- it is read-only and touches no display -- then
 `dcp`, and only then `drivers`. Which one resets it is the answer.
