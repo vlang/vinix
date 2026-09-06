@@ -269,16 +269,16 @@ fn kmain() {
 	// drawn before it. When the screen goes black with no text, that clear is
 	// the last thing known to have happened, so allow skipping it to find out
 	// how far boot actually gets.
-	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
+	// First instruction of the kernel, before anything that could fault:
+	// can we drive this display at all? A whole-screen fill cannot be confused
+	// with a dark panel or with leftover bootloader text the way a 16-row bar
+	// can. Nothing here reads the cmdline or touches the allocator, so a green
+	// screen means the kernel started and the framebuffer is live, whatever
+	// happens afterwards. In normal boot flanterm's clear immediately replaces
+	// it, so this costs one frame.
+	term.early_screen_fill(1)
 
-	if skip_early_term {
-		// Answer the prior question first: can the kernel drive this display
-		// at all? A whole-screen fill cannot be confused with a dark panel or
-		// with leftover bootloader text the way a 16-row bar can.
-		term.early_screen_fill(1)
-	} else {
-		term.early_stage_mark(1)
-	}
+	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
 
 	// Do not hard-stop on base revision mismatch. Some real-hardware boot
 	// chains may provide an older Limine build; continue and rely on feature
