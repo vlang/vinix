@@ -122,11 +122,19 @@ as Windows does, left as macOS does, with the inner two swapping order to match
 each convention — and switches the taskbar between one entry per window, as
 Windows XP had, and one per application with a count, as Windows 7 had.
 
-**Theme** chooses between the desktop's own look and *Classic*: square grey
-windows with a hairline border, a pinstriped title bar with the title centred
-on a solid patch over it, and bevelled buttons that are always visible instead
-of appearing under the pointer. It is drawn from memory of Mac OS 8/9's
-Platinum.
+**Theme** chooses between the desktop's own look and *macOS*, as it looked from
+Yosemite through Mojave: a menu bar across the top carrying the focused
+window's name and the clock, light grey window chrome shaded down its height
+with the title centred over it, three coloured discs at the leading edge, and a
+dock — a rounded panel sized to its contents and centred clear of the bottom
+edge — in place of the full-width taskbar.
+
+The discs are grey until a window is focused and show their glyphs only while
+the pointer is over the set, as macOS does. They also keep red-yellow-green
+reading order at whichever end the Appearance setting puts them: that order is
+the whole of what makes them recognisable, so reversing it when they move to
+the right would defeat the point. Flat buttons have no such signature and
+instead put close outermost, which is what both conventions do.
 
 **Wallpaper** offers six colours and ten photographs.
 

@@ -224,18 +224,20 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_choice('${settings_action_theme}0', 'Default', settings_padding, y,
 		half, settings.theme == .default_)
-	out << settings_choice('${settings_action_theme}1', 'Classic', settings_padding + half +
-		settings_row_gap, y, half, settings.theme == .classic)
+	out << settings_choice('${settings_action_theme}1', 'macOS', settings_padding + half +
+		settings_row_gap, y, half, settings.theme == .macos)
 	y += 28 + 10
 
-	out << settings_note(if settings.theme == .classic {
-		'Square grey windows, a pinstriped title bar with the'
-	} else {
-		'Rounded windows with shadows and flat colour.'
-	}, y, width)
-	if settings.theme == .classic {
+	if settings.theme == .macos {
+		out << settings_note('A menu bar across the top, light grey windows', y, width)
 		y += 16
-		out << settings_note('title centred, and bevelled buttons.', y, width)
+		out << settings_note('with the title centred, three coloured discs at', y, width)
+		y += 16
+		out << settings_note('the leading edge, and a dock.', y, width)
+	} else {
+		out << settings_note('Rounded windows with shadows and flat colour,', y, width)
+		y += 16
+		out << settings_note('and a taskbar across the bottom.', y, width)
 	}
 
 	return out
@@ -355,7 +357,7 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	}
 	if event_id.starts_with(settings_action_theme) {
 		a.desktop.settings.theme = if event_id.ends_with('1') {
-			ThemeKind.classic
+			ThemeKind.macos
 		} else {
 			ThemeKind.default_
 		}

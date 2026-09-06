@@ -128,6 +128,81 @@ fn (d &Desktop) visible_window_count() int {
 	return count
 }
 
+// content_top is the first row a window may occupy. A theme with a menu bar
+// keeps the strip across the top for itself.
+fn (d &Desktop) content_top() int {
+	return d.theme().menu_bar_height
+}
+
+// menu_bar_element is the strip macOS puts across the top: the focused window's
+// name in bold where an application's would be, the menus it would own, and the
+// clock at the far end. The menus do not open — there is nothing behind them
+// yet — but the bar is most of what makes the look recognisable.
+fn (d &Desktop) menu_bar_element() ui2.Element {
+	theme := d.theme()
+	width := d.canvas.width
+
+	mut children := []ui2.Element{}
+	mut x := 12
+
+	// Where the Apple menu sits. A filled circle rather than a logo: the atlas
+	// has no such glyph and inventing one badly would be worse than a mark.
+	children << ui2.button_with_image('', '', 'builtin:menu', ui2.rect(f64(x), 3, 16,
+		16), ui2.BoxStyle{
+		transparent: true
+	}, ui2.TextStyle{
+		color: theme.menu_bar_bold
+	})
+	x += 24
+
+	focused := d.focused_title()
+	titles := [focused, 'File', 'Edit', 'View', 'Window', 'Help']
+	for index, title in titles {
+		if title.len == 0 {
+			continue
+		}
+		bold := index == 0
+		item_width := 14 + title.len * 7
+		children << ui2.label('', title, ui2.rect(f64(x), 0, f64(item_width), f64(theme.menu_bar_height)),
+			ui2.TextStyle{
+			color: if bold { theme.menu_bar_bold } else { theme.menu_bar_text }
+			size: 12
+			bold: bold
+			align: .center
+		})
+		x += item_width
+	}
+
+	// The clock lives here rather than in the bar at the bottom, as it does on
+	// the system this is imitating.
+	children << ui2.label('', '${d.clock_date}  ${d.clock_time}', ui2.rect(f64(width - 200),
+		0, 188, f64(theme.menu_bar_height)), ui2.TextStyle{
+		color: theme.menu_bar_text
+		size: 12
+		align: .right
+	})
+	children << ui2.view('', ui2.rect(0, f64(theme.menu_bar_height - 1), f64(width), 1),
+		ui2.BoxStyle{
+		bg: theme.menu_bar_edge
+	}, [])
+
+	return ui2.view('menubar', ui2.rect(0, 0, f64(width), f64(theme.menu_bar_height)),
+		ui2.BoxStyle{
+		bg: theme.menu_bar_bg
+	}, children)
+}
+
+// focused_title names the window on top, which is what a menu bar shows where
+// an application's name would go.
+fn (d &Desktop) focused_title() string {
+	for i := d.windows.len - 1; i >= 0; i-- {
+		if d.windows[i].id == d.focus && !d.windows[i].minimized {
+			return d.windows[i].title
+		}
+	}
+	return 'Vinix'
+}
+
 // next_window_by_age finds the window opened just after `after_id`. The window
 // list is kept in painting order, which changes whenever one is raised, while
 // the taskbar wants the order they were opened in. Ids only ever increase, so
@@ -186,9 +261,9 @@ fn (mut d Desktop) toggle_maximize(id int) {
 		d.windows[index].restore_width = d.windows[index].width
 		d.windows[index].restore_height = d.windows[index].height
 		d.windows[index].x = 0
-		d.windows[index].y = 0
+		d.windows[index].y = d.content_top()
 		d.windows[index].width = d.canvas.width
-		d.windows[index].height = d.canvas.height - taskbar_height
+		d.windows[index].height = d.canvas.height - taskbar_height - d.content_top()
 		d.windows[index].maximized = true
 	}
 	d.raise(id)
@@ -242,6 +317,9 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		children << d.window_element(window)
 	}
 	children << d.taskbar_element()
+	if d.theme().menu_bar {
+		children << d.menu_bar_element()
+	}
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)),
 		ui2.BoxStyle{
@@ -260,32 +338,54 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 	// Close, then zoom, then minimise, laid out from whichever end the setting
 	// puts them at. Ordering close outermost is what both conventions do.
 	buttons_left := d.settings.button_side == .left
-	span := 3 * title_button_size + 2 * title_button_gap
+	span := 3 * theme.button_size + 2 * theme.button_gap
 	mut button_x := if buttons_left {
-		title_button_inset
+		theme.button_inset
 	} else {
-		window.width - title_button_inset - title_button_size
+		window.width - theme.button_inset - theme.button_size
 	}
-	step := if buttons_left { title_button_size + title_button_gap } else { -(title_button_size +
-			title_button_gap) }
+	step := if buttons_left { theme.button_size + theme.button_gap } else { -(theme.button_size +
+			theme.button_gap) }
+
+	// macOS shows the glyphs in all three discs as soon as the pointer is over
+	// any of them, not just the one under it.
+	set_hovered := d.hover == window.id_close || d.hover == window.id_minimize
+		|| d.hover == window.id_maximize
 
 	maximize_glyph := if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
-	close := d.title_button(window.id_close, 'builtin:close', button_x)
-	button_x += step
-	// Inward from close: macOS goes minimise then zoom, Windows zoom then
-	// minimise. Close is outermost either way.
-	middle := if buttons_left { window.id_minimize } else { window.id_maximize }
-	middle_glyph := if buttons_left { 'builtin:minimize' } else { maximize_glyph }
-	inner := if buttons_left { window.id_maximize } else { window.id_minimize }
-	inner_glyph := if buttons_left { maximize_glyph } else { 'builtin:minimize' }
-	maximize := d.title_button(middle, middle_glyph, button_x)
-	button_x += step
-	minimize := d.title_button(inner, inner_glyph, button_x)
+
+	// Traffic lights are read as a group, and red-yellow-green left to right is
+	// the whole of what makes them recognisable — so they keep that order at
+	// either end, rather than reversing when they move to the right. Flat
+	// buttons have no such signature and instead put close outermost, which is
+	// what both conventions do.
+	mut close_x, mut middle_x, mut inner_x := button_x, button_x + step, button_x + 2 * step
+	mut middle, mut inner := window.id_minimize, window.id_maximize
+	mut middle_glyph, mut inner_glyph := 'builtin:minimize', maximize_glyph
+	if theme.button_look == .traffic {
+		left_edge := if buttons_left {
+			theme.button_inset
+		} else {
+			window.width - theme.button_inset - span
+		}
+		stride := theme.button_size + theme.button_gap
+		close_x = left_edge
+		middle_x = left_edge + stride
+		inner_x = left_edge + 2 * stride
+	} else if !buttons_left {
+		// Inward from close on the right: zoom, then minimise.
+		middle, inner = window.id_maximize, window.id_minimize
+		middle_glyph, inner_glyph = maximize_glyph, 'builtin:minimize'
+	}
+
+	close := d.title_button(window.id_close, 'builtin:close', close_x, active, set_hovered)
+	maximize := d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
+	minimize := d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
 
 	// The title takes what the buttons leave. Centred themes centre it over the
 	// whole bar and simply accept a shorter run.
-	text_inset_left := if buttons_left { title_button_inset + span + 10 } else { 14 }
-	title_limit := window.width - span - title_button_inset - text_inset_left - 10
+	text_inset_left := if buttons_left { theme.button_inset + span + 10 } else { 14 }
+	title_limit := window.width - span - theme.button_inset - text_inset_left - 10
 	title := ui2.label(window.id_title, window.title, ui2.rect(f64(if theme.title_centered {
 		0
 	} else {
@@ -293,8 +393,7 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)),
 		ui2.TextStyle{
 		color: title_text_color
-		background_color: if theme.title_fill == .pinstripe { title_bg } else { u32(0) }
-		size: 13
+		size: theme.title_size
 		bold: theme.title_bold
 		align: if theme.title_centered { .center } else { .left }
 		lines: 1
@@ -418,7 +517,7 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		id := '${action_shortcut_prefix}${index}'
 		theme := d.theme()
 		hovered := d.hover == id
-		y := shortcut_top + index * (shortcut_height + shortcut_gap)
+		y := d.content_top() + shortcut_top + index * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
 		out << ui2.clickable_view(id, ui2.rect(f64(shortcut_left), f64(y), f64(shortcut_width),
 			f64(shortcut_height)), ui2.BoxStyle{
@@ -455,41 +554,58 @@ fn desktop_owns(action string) bool {
 	return false
 }
 
-fn (d &Desktop) title_button(id string, glyph string, x int) ui2.Element {
+fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_hovered bool) ui2.Element {
 	theme := d.theme()
-	y := (theme.title_height - title_button_size) / 2
+	y := (theme.title_height - theme.button_size) / 2
 	hovered := d.hover == id
 	is_close := glyph == 'builtin:close'
-	// A classic button is a bevelled square that is always there; a flat one is
-	// a glyph that only grows a background under the pointer.
-	classic := theme.button_look == .classic
-	bg := if classic {
-		if hovered { theme.button_hover } else { theme.button_face }
-	} else if !hovered {
+
+	if theme.button_look == .traffic {
+		// A disc: coloured when the window is focused, grey when it is not, and
+		// carrying its glyph only while the pointer is over the set. Radius is
+		// half the size, which is how a rounded rect becomes a circle.
+		fill := if !active {
+			theme.traffic_idle
+		} else if is_close {
+			theme.traffic_close
+		} else if glyph == 'builtin:minimize' {
+			theme.traffic_minimize
+		} else {
+			theme.traffic_zoom
+		}
+		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x),
+			f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
+			bg: fill
+			radius: theme.button_size / 2
+		}, ui2.TextStyle{
+			color: theme.glyph_color
+		})
+	}
+
+	bg := if !hovered {
 		u32(0)
 	} else if is_close {
 		theme.button_close_hover
 	} else {
 		theme.button_hover
 	}
-	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(title_button_size),
-		f64(title_button_size)), ui2.BoxStyle{
+	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(theme.button_size),
+		f64(theme.button_size)), ui2.BoxStyle{
 		bg: bg
-		radius: if classic { 0 } else { 5 }
-		transparent: !classic && !hovered
+		radius: 5
+		transparent: !hovered
 	}, ui2.TextStyle{
-		color: if !classic && hovered && is_close {
-			theme.glyph_on_close
-		} else {
-			theme.glyph_color
-		}
+		color: if hovered && is_close { theme.glyph_on_close } else { theme.glyph_color }
 	})
 }
 
 fn (d &Desktop) taskbar_element() ui2.Element {
 	theme := d.theme()
-	top := d.canvas.height - taskbar_height
 	width := d.canvas.width
+	// A dock is a panel wide enough for what is in it, centred and floating
+	// clear of the screen's edge. A taskbar is the whole width of the bottom.
+	dock := theme.dock
+	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
 	mut children := []ui2.Element{}
 	item_y := (taskbar_height - taskbar_item_height) / 2
@@ -497,7 +613,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Left: a button that opens another window, so the taskbar list can be
 	// seen growing and shrinking.
 	new_button_width := 96
-	children << ui2.button(action_new_window, 'New window', ui2.rect(f64(taskbar_padding),
+	children << ui2.button(action_new_window, 'New window', ui2.rect(f64(edge_padding),
 		f64(item_y), f64(new_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
 		bg: if d.hover == action_new_window { theme.accent } else { theme.accent_dim }
 		radius: 6
@@ -511,7 +627,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Then a launcher per application the desktop can host, so a ui2
 	// application is one click away rather than something only the startup
 	// arrangement can open.
-	mut launcher_x := taskbar_padding + new_button_width + 8
+	mut launcher_x := edge_padding + new_button_width + 8
 	for index, factory in available_apps {
 		id := '${action_launch_prefix}${index}'
 		children << ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(launcher_x),
@@ -531,13 +647,18 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// windows it has, the way Windows 7 did.
 	entries := d.taskbar_entries()
 	mut x := launcher_x + 8
-	clock_left := width - clock_area_width
+	// A dock stops where its contents do; a taskbar stops at the clock.
+	clock_left := if dock {
+		x + entries.len * (dock_item_width + taskbar_item_gap)
+	} else {
+		width - clock_area_width
+	}
 
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
-	mut item_width := taskbar_item_width
-	if entries.len > 0 {
+	mut item_width := if dock { dock_item_width } else { taskbar_item_width }
+	if !dock && entries.len > 0 {
 		share := (clock_left - taskbar_item_gap - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
@@ -579,7 +700,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		x += item_width + taskbar_item_gap
 	}
 
-	// Right: the clock, two lines, hard against the corner.
+	// Right: the clock, two lines, hard against the corner — unless a menu bar
+	// is carrying it, as macOS does.
+	if !theme.menu_bar {
 	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(width - clock_area_width),
 		6, f64(clock_area_width - taskbar_padding), 20), ui2.TextStyle{
 		color: theme.clock_time
@@ -593,15 +716,31 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		size: 11
 		align: .right
 	})
+	}
 
-	// A hairline along the top edge separates the bar from the wallpaper
-	// without a shadow, which would read as heavy at this size.
-	children << ui2.view('taskbar.edge', ui2.rect(0, 0, f64(width), 1), ui2.BoxStyle{
-		bg: theme.taskbar_edge
-	}, [])
+	// A hairline along the top edge separates a full-width bar from the
+	// wallpaper without a shadow, which would read as heavy at this size. A
+	// dock has its own rounded outline instead.
+	if !dock {
+		children << ui2.view('taskbar.edge', ui2.rect(0, 0, f64(width), 1), ui2.BoxStyle{
+			bg: theme.taskbar_edge
+		}, [])
+	}
 
-	return ui2.view('taskbar', ui2.rect(0, f64(top), f64(width), f64(taskbar_height)),
-		ui2.BoxStyle{
+	if dock {
+		panel_width := x - taskbar_item_gap + theme.dock_padding
+		panel_x := (width - panel_width) / 2
+		// Clear of the bottom edge, the way a dock sits.
+		panel_y := d.canvas.height - taskbar_height - dock_bottom_gap
+		return ui2.view('taskbar', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width),
+			f64(taskbar_height)), ui2.BoxStyle{
+			bg: theme.dock_bg
+			radius: theme.dock_radius
+		}, children)
+	}
+
+	return ui2.view('taskbar', ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width),
+		f64(taskbar_height)), ui2.BoxStyle{
 		bg: theme.taskbar_bg
 	}, children)
 }
@@ -734,8 +873,9 @@ fn (mut d Desktop) clamp_to_screen(index int) {
 	if d.windows[index].x + d.windows[index].width < margin {
 		d.windows[index].x = margin - d.windows[index].width
 	}
-	if d.windows[index].y < 0 {
-		d.windows[index].y = 0
+	top := d.content_top()
+	if d.windows[index].y < top {
+		d.windows[index].y = top
 	}
 	if d.windows[index].y > max_y {
 		d.windows[index].y = max_y

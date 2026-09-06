@@ -191,13 +191,20 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		d.canvas.stroke_round_rect(x, y, w, h, radius, d.theme().window_edge, 190)
 	}
 
-	// A classic title bar is ruled with hairlines. Like the shadow above, this
-	// is keyed off the window manager's own id: the effect belongs to the
-	// chrome, not to anything a view can declare.
+	// A title bar is shaded down its height. Like the shadow above, this is
+	// keyed off the window manager's own id: the effect belongs to the chrome,
+	// not to anything a view can declare. The element carries the top colour
+	// and the theme supplies the one to fade to, so a flat bar is a theme that
+	// names the same colour twice and costs nothing extra.
 	theme := d.theme()
-	if theme.title_fill == .pinstripe && el.id.ends_with('.titlebar') {
-		for line := y + 3; line < y + h - 3; line += 2 {
-			d.canvas.fill_rect(x + 4, line, w - 8, 1, theme.title_pinstripe)
+	if el.id.ends_with('.titlebar') {
+		bottom := if el.box.bg == theme.title_active_bg {
+			theme.title_active_bg2
+		} else {
+			theme.title_inactive_bg2
+		}
+		if bottom != el.box.bg {
+			d.canvas.vertical_gradient(x, y, w, h, el.box.bg, bottom)
 		}
 	}
 }
@@ -385,6 +392,12 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			// A dog-ear, punched out of the corner in the surface behind it.
 			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x,
 				y))
+		}
+		'menu' {
+			// Where the Apple menu's logo would be. A plain mark: the atlas has
+			// no such glyph, and an approximation of someone's logo is worse
+			// than an honest dot.
+			d.canvas.fill_circle(cx, cy, if w < h { w / 3 } else { h / 3 }, color)
 		}
 		'settings' {
 			// A gear: a disc with a hole, and teeth around it.
