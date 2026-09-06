@@ -35,7 +35,9 @@ for arg in "$@"; do
 done
 
 # ── Build init program (fallback if no busybox userland) ──
-INITRAMFS="$INIT_DIR/initramfs.tar"
+# VINIX_INITRAMFS selects a different image, e.g. the one
+# ./build-desktop-aarch64.sh stages to boot straight into the desktop.
+INITRAMFS="${VINIX_INITRAMFS:-$INIT_DIR/initramfs.tar}"
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
     echo "==> Building minimal init program..."
     echo "    (Run ./build-userland-aarch64.sh for full busybox userland)"
@@ -187,7 +189,10 @@ if [ "${USE_TCG:-0}" -eq 1 ]; then
     ACCEL_FLAGS="-accel tcg -cpu cortex-a72"
 fi
 
+# VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
+# screendump from a script.
 exec qemu-system-aarch64 \
+    ${VINIX_QEMU_EXTRA} \
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
     -m "$QEMU_MEM" \

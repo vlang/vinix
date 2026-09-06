@@ -27,3 +27,9 @@ boot-image/
 build-support/init-aarch64/init
 build-support/init-aarch64/initramfs.tar
 build-support/init-aarch64/initramfs-minimal.tar
+/build-aarch64-musl/
+/build/
+/third_party/
+build-support/init-aarch64/initramfs-desktop.tar
+kernel/tmp.c
+kernel/tmp.v
