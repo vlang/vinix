@@ -673,3 +673,59 @@ pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 	}
 	return final_path, final_arg
 }
+
+// execveat(dirfd, path, argv, envp, flags): execve relative to a directory
+// descriptor. AT_EMPTY_PATH with an empty path runs the descriptor itself,
+// which is what fexecve(3) is built from.
+pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _envp &charptr, flags int) (u64, u64) {
+	mut process := proc.current_thread().process
+
+	path := unsafe { cstring_to_vstring(_path) }
+
+	mut directory := &fs.VFSNode(unsafe { nil })
+	mut target := path
+
+	if path.len == 0 {
+		if flags & fs.at_empty_path == 0 {
+			return errno.err, errno.enoent
+		}
+		// Run whatever the descriptor is open on. Its own name and parent are
+		// what a relative interpreter path then resolves against.
+		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
+		node := unsafe { &fs.VFSNode(fd.handle.node) }
+		if node == unsafe { nil } || node.parent == unsafe { nil } {
+			fd.unref()
+			return errno.err, errno.eacces
+		}
+		directory = node.parent
+		target = node.name
+		fd.unref()
+	} else {
+		directory = fs.parent_dir_for(dirfd, path) or { return errno.err, errno.get() }
+	}
+
+	mut argv := []string{}
+	for i := 0; true; i++ {
+		unsafe {
+			if _argv[i] == nil {
+				break
+			}
+			argv << cstring_to_vstring(_argv[i])
+		}
+	}
+	mut envp := []string{}
+	for i := 0; true; i++ {
+		unsafe {
+			if _envp[i] == nil {
+				break
+			}
+			envp << cstring_to_vstring(_envp[i])
+		}
+	}
+
+	start_program(true, directory, target, argv, envp, '', '', '') or {
+		return errno.err, errno.get()
+	}
+
+	return errno.err, errno.get()
+}

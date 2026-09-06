@@ -241,3 +241,31 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 
 	return new_node
 }
+
+// A tmpfs file with no name and no place in the directory tree, for
+// memfd_create(2). It behaves like any other tmpfs file — it can be written,
+// truncated and mapped — and goes away with its last descriptor.
+pub fn create_anonymous(mode u32) &resource.Resource {
+	mut new_resource := &TmpFSResource{
+		storage:  unsafe { nil }
+		refcount: 1
+	}
+
+	new_resource.capacity = 4096
+	new_resource.storage = memory.malloc(new_resource.capacity)
+	new_resource.can_mmap = true
+
+	new_resource.stat.size = 0
+	new_resource.stat.blocks = 0
+	new_resource.stat.blksize = 512
+	new_resource.stat.dev = resource.create_dev_id()
+	new_resource.stat.ino = 1
+	new_resource.stat.mode = stat.ifreg | mode
+	new_resource.stat.nlink = 1
+
+	new_resource.stat.atim = realtime_clock
+	new_resource.stat.ctim = realtime_clock
+	new_resource.stat.mtim = realtime_clock
+
+	return new_resource
+}

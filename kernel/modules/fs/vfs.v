@@ -1418,3 +1418,49 @@ pub fn syscall_syncfs(_ voidptr, fdnum int) (u64, u64) {
 
 	return 0, 0
 }
+
+
+// Resolve the directory an *at() call's path is relative to. get_parent_dir is
+// internal; execveat lives in the userland module, next to execve, and needs
+// the same resolution.
+pub fn parent_dir_for(dirfd int, path string) ?&VFSNode {
+	return get_parent_dir(dirfd, path)
+}
+
+// memfd_create(name, flags): an anonymous file, backed by tmpfs, that exists
+// only as long as a descriptor names it.
+pub const mfd_cloexec = 0x0001
+
+pub const mfd_allow_sealing = 0x0002
+
+pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
+	if flags & ~u32(mfd_cloexec | mfd_allow_sealing) != 0 {
+		return errno.err, errno.einval
+	}
+	if name == 0 {
+		return errno.err, errno.efault
+	}
+
+	// The name is only for show — Linux surfaces it through /proc — but the
+	// pointer still has to be readable, so a caller passing a bad one is told.
+	mut first := u8(0)
+	if !usercopy.copy_from_user(voidptr(&first), name, 1) {
+		return errno.err, errno.efault
+	}
+
+	mut res := create_anonymous(0o600)
+
+	// memfd_create hands back a descriptor open for reading and writing. Saying
+	// so matters: without an access mode the handle looks read-only, and
+	// ftruncate — which is how a caller sizes the thing it just made — refuses.
+	mut open_flags := resource.o_rdwr
+	if flags & u32(mfd_cloexec) != 0 {
+		open_flags |= resource.o_cloexec
+	}
+
+	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
+		return errno.err, errno.get()
+	}
+
+	return u64(fdnum), 0
+}

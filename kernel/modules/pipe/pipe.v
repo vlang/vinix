@@ -226,3 +226,43 @@ fn (mut this Pipe) link(handle voidptr) ? {
 fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {
 	return none
 }
+
+// Copy up to `count` bytes out of the pipe without consuming them, which is
+// what tee(2) needs: the data has to stay readable for the original reader.
+pub fn (mut this Pipe) peek(buf voidptr, count u64) u64 {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+
+	mut to_copy := count
+	if to_copy > this.used {
+		to_copy = this.used
+	}
+	if to_copy == 0 {
+		return 0
+	}
+
+	// The buffer is a ring, so a read that reaches the end wraps.
+	before_wrap := this.capacity - this.read_ptr
+	if to_copy <= before_wrap {
+		unsafe { C.memcpy(buf, voidptr(u64(this.data) + this.read_ptr), to_copy) }
+	} else {
+		after_wrap := to_copy - before_wrap
+		unsafe {
+			C.memcpy(buf, voidptr(u64(this.data) + this.read_ptr), before_wrap)
+			C.memcpy(voidptr(u64(buf) + before_wrap), this.data, after_wrap)
+		}
+	}
+
+	return to_copy
+}
+
+// How much a pipe is holding, and how much room is left.
+pub fn (this &Pipe) available() u64 {
+	return this.used
+}
+
+pub fn (this &Pipe) room() u64 {
+	return this.capacity - this.used
+}

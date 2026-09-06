@@ -901,11 +901,20 @@ pub fn init_syscall_table() {
 	syscall_table[78] = voidptr(fs.syscall_readlinkat) // __NR_readlinkat
 	syscall_table[79] = voidptr(syscall_linux_fstatat) // __NR_fstatat / newfstatat
 	syscall_table[80] = voidptr(syscall_linux_fstat) // __NR_fstat
+	syscall_table[75] = voidptr(pipe.syscall_vmsplice) // __NR_vmsplice
+	syscall_table[76] = voidptr(pipe.syscall_splice) // __NR_splice
+	syscall_table[77] = voidptr(pipe.syscall_tee) // __NR_tee
 	syscall_table[81] = voidptr(fs.syscall_sync) // __NR_sync
 	syscall_table[82] = voidptr(file.syscall_fsync) // __NR_fsync
 	syscall_table[83] = voidptr(file.syscall_fsync) // __NR_fdatasync
 	syscall_table[84] = voidptr(fs.syscall_syncfs) // __NR_sync_file_range
+	syscall_table[85] = voidptr(file.syscall_timerfd_create) // __NR_timerfd_create
+	syscall_table[86] = voidptr(file.syscall_timerfd_settime) // __NR_timerfd_settime
+	syscall_table[87] = voidptr(file.syscall_timerfd_gettime) // __NR_timerfd_gettime
 	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
+	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
+	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
+	syscall_table[285] = voidptr(pipe.syscall_copy_file_range) // __NR_copy_file_range
 	syscall_table[291] = voidptr(syscall_linux_statx) // __NR_statx
 	syscall_table[436] = voidptr(file.syscall_close_range) // __NR_close_range
 

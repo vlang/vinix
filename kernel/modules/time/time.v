@@ -93,6 +93,32 @@ pub fn advance_to_ns(now_ns u64) {
 	advance_clocks(TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)})
 }
 
+// Anything that has to look at the clock every tick registers here. The
+// scheduler cannot call into the file module directly — file reaches sched
+// through event — so a timerfd notices its deadline by leaving a hook behind
+// instead.
+const max_tick_hooks = 8
+
+__global (
+	tick_hooks      [max_tick_hooks]fn ()
+	tick_hooks_len  = int(0)
+	tick_hooks_lock klock.Lock
+)
+
+pub fn register_tick_hook(hook fn ()) bool {
+	tick_hooks_lock.acquire()
+	defer {
+		tick_hooks_lock.release()
+	}
+
+	if tick_hooks_len == max_tick_hooks {
+		return false
+	}
+	tick_hooks[tick_hooks_len] = hook
+	tick_hooks_len++
+	return true
+}
+
 // advance_clocks moves both clocks forward by `interval` and expires every
 // armed timer that interval covers.
 pub fn advance_clocks(interval TimeSpec) {
@@ -112,6 +138,11 @@ pub fn advance_clocks(interval TimeSpec) {
 		}
 
 		timers_lock.release()
+	}
+
+	count := tick_hooks_len
+	for i := 0; i < count; i++ {
+		tick_hooks[i]()
 	}
 }
 
