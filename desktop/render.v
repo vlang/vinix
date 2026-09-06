@@ -249,6 +249,11 @@ fn (mut d Desktop) paint_wallpaper() {
 					d.wallpaper[row + x] = shade
 				}
 			}
+			// White on all of them: no colour offered here is light enough to
+			// need a second answer. The mark is rasterised into the cache with
+			// the gradient, which is why a wallpaper the desktop draws
+			// thousands of times is still one memcpy per frame.
+			draw_logo(mut d.wallpaper, width, height, logo_color)
 		}
 		d.wallpaper_valid = true
 	}
