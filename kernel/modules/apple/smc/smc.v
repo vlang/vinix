@@ -98,8 +98,16 @@ fn enabled(node &devicetree.DTNode) bool {
 
 // Called only after DT parsing, scheduler/timer initialization and /dev mount.
 // Never guess register addresses on a missing or incompatible device tree.
+// Every path out of here says why. A machine that reaches the desktop and
+// shows `--%` has nothing else to go on: the battery is simply absent, and
+// which of the eight steps below declined to register it is not otherwise
+// recoverable without a serial port this machine does not have.
 pub fn initialise() {
-	if battery_device != unsafe { nil } || !devicetree.is_available() {
+	if battery_device != unsafe { nil } {
+		return
+	}
+	if !devicetree.is_available() {
+		println('apple-smc: no device tree; battery not registered')
 		return
 	}
 	node := devicetree.find_compatible('apple,t8103-smc') or {
@@ -107,28 +115,45 @@ pub fn initialise() {
 		return
 	}
 	if !enabled(node) {
+		println('apple-smc: SMC node disabled in the device tree')
 		return
 	}
 	sram := devicetree.get_named_reg(node, 'sram') or {
 		println('apple-smc: missing translated SRAM resource')
 		return
 	}
-	channels := devicetree.get_u32_array(node, 'mboxes') or { return }
+	channels := devicetree.get_u32_array(node, 'mboxes') or {
+		println('apple-smc: SMC node has no mboxes property')
+		return
+	}
 	if channels.len != 1 {
 		println('apple-smc: expected one zero-argument mailbox')
 		return
 	}
-	provider := devicetree.find_phandle(channels[0]) or { return }
-	if !enabled(provider) {
+	provider := devicetree.find_phandle(channels[0]) or {
+		println('apple-smc: mailbox phandle resolves to no node')
 		return
 	}
-	cells := devicetree.get_u32(provider, '#mbox-cells') or { return }
-	compatible := devicetree.get_string_list(provider, 'compatible') or { return }
+	if !enabled(provider) {
+		println('apple-smc: mailbox provider disabled in the device tree')
+		return
+	}
+	cells := devicetree.get_u32(provider, '#mbox-cells') or {
+		println('apple-smc: mailbox provider has no #mbox-cells')
+		return
+	}
+	compatible := devicetree.get_string_list(provider, 'compatible') or {
+		println('apple-smc: mailbox provider has no compatible property')
+		return
+	}
 	if cells != 0 || 'apple,asc-mailbox-v4' !in compatible {
 		println('apple-smc: unsupported mailbox provider')
 		return
 	}
-	regs := devicetree.get_translated_reg_ranges(provider) or { return }
+	regs := devicetree.get_translated_reg_ranges(provider) or {
+		println('apple-smc: mailbox registers do not translate to an address')
+		return
+	}
 	if regs.len != 1 || regs[0].base == 0 || regs[0].size < 0x1000
 		|| regs[0].base > ~u64(0) - 0xfff {
 		println('apple-smc: invalid mailbox register range')
