@@ -68,6 +68,11 @@ const rtk_id_block_v4_offset = u32(0x20)
 const rtk_id_block_v5_offset = u32(0x28)
 const rtk_patchbay_header_size = u32(8)
 const t6050_chosen_path = '/chosen'
+// RTBuddyFirmware::copyIdBlock tries exactly these IOP-virtual offsets from
+// the image base, in order, and takes the first that carries the magic and a
+// supported version.
+const t6050_rtk_id_candidates = [u32(0x20), 0xc0, 0x204, 0xc00, 0x1020, 0x1204,
+	0x4020, 0x4204]
 const t6050_pmgr_path = '/arm-io/pmgr'
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
@@ -271,6 +276,19 @@ pub:
 	// the address at all. writeBackPatchBay refuses to push a region without
 	// it, so an edit to a non-writable region is silently lost.
 	writable bool
+}
+
+// Rebuild a region with its writability decided. The region's own address is
+// what determines which segment it lands in, so the flag can only be settled
+// after the region has been decoded.
+pub fn (region &T6050PatchBayRegion) with_writable(writable bool) T6050PatchBayRegion {
+	return T6050PatchBayRegion{
+		iop_virtual: region.iop_virtual
+		align_pad: region.align_pad
+		size: region.size
+		padded_size: region.padded_size
+		writable: writable
+	}
 }
 
 // A host-side copy of one patchbay region. Apple never edits the target
@@ -1231,6 +1249,145 @@ fn validate_t6050_patchbay_input_codec() bool {
 		&& derive_t6050_patchbay_value(0x3e, .pmc_pmgr_bit0) == 0
 }
 
+// One identity block found inside a preloaded image.
+pub struct T6050RtkIdentity {
+pub:
+	iop_virtual u64
+	physical    u64
+	version     u32
+}
+
+// The lowest segment IOVA is the image base that copyIdBlock adds its
+// candidate offsets to.
+pub fn (preload &T6050PmpPreload) image_base() u64 {
+	mut base := u64(0)
+	mut seen := false
+	for segment in preload.segments {
+		if segment.size == 0 {
+			continue
+		}
+		if !seen || segment.iova < base {
+			base = segment.iova
+			seen = true
+		}
+	}
+	return base
+}
+
+// Search the recovered candidate offsets for the image's identity block.
+// `region` addresses the whole reserved region at preload.region_base. Two
+// matching candidates are ambiguous rather than first-wins, matching the
+// recovery, because a stale block would silently redirect every later offset.
+pub fn locate_t6050_rtk_identity(region voidptr,
+	preload &T6050PmpPreload) ?T6050RtkIdentity {
+	base := preload.image_base()
+	mut found := T6050RtkIdentity{}
+	mut matches := 0
+	for candidate in t6050_rtk_id_candidates {
+		iop := base + u64(candidate)
+		resolved := preload.resolve_iop_virtual(iop, rtk_id_block_size) or { continue }
+		block := unsafe {
+			voidptr(u64(region) + (resolved.physical - preload.region_base))
+		}
+		if read_native_u32(block, 0) != rtk_id_block_magic {
+			continue
+		}
+		version := read_native_u32(block, rtk_id_block_version_offset)
+		if version & ~u32(1) != 4 {
+			continue
+		}
+		found = T6050RtkIdentity{
+			iop_virtual: iop
+			physical: resolved.physical
+			version: version
+		}
+		matches++
+	}
+	if matches != 1 {
+		return none
+	}
+	return found
+}
+
+// What a read-only pass over the preloaded image found.
+pub struct T6050PmpImageProbe {
+pub:
+	die               u32
+	identity          T6050RtkIdentity
+	region            T6050PatchBayRegion
+	patchbay_physical u64
+	record_count      u32
+	mandatory_present u32
+}
+
+// Read the iBoot-preloaded image in place and report what is actually there.
+// This maps the reserved region, so it is deliberately not part of the
+// read-only DeviceTree admission check; it writes nothing and leaves the
+// firmware untouched.
+pub fn probe_t6050_pmp_image(die u32) ?T6050PmpImageProbe {
+	preload := get_t6050_pmp_preload(die) or { return none }
+	if preload.region_size == 0 {
+		return none
+	}
+	// Reserved coprocessor memory: the cacheable alias could hand back stale
+	// bytes once the IOP is running, so read it Normal Non-Cacheable.
+	mapped := memory.map_uncached(preload.region_base, preload.region_size)
+	if mapped == 0 {
+		return none
+	}
+	region_ptr := voidptr(mapped)
+	identity := locate_t6050_rtk_identity(region_ptr, preload) or { return none }
+	block := unsafe {
+		voidptr(u64(region_ptr) + (identity.physical - preload.region_base))
+	}
+	decoded := decode_t6050_patchbay_region(block, preload.image_base(), false) or {
+		return none
+	}
+	placed := preload.resolve_iop_virtual(decoded.iop_virtual, decoded.padded_size) or {
+		return none
+	}
+	patchbay := decoded.with_writable(placed.writable)
+	data := unsafe {
+		voidptr(u64(region_ptr) + (placed.physical - preload.region_base))
+	}
+	mut records := u32(0)
+	mut cursor := patchbay.align_pad
+	for cursor + rtk_patchbay_header_size <= patchbay.align_pad + patchbay.size {
+		record := next_t6050_patchbay_record(data, &patchbay, cursor) or { return none }
+		records++
+		cursor = record.next_cursor()
+	}
+	if cursor != patchbay.align_pad + patchbay.size {
+		return none
+	}
+	mut present := u32(0)
+	for input in t6050_patchbay_inputs {
+		tag := t6050_patchbay_tag(input.tag) or { return none }
+		record := find_t6050_patchbay_tag(data, &patchbay, tag) or { continue }
+		if record.length == 4 {
+			present++
+		}
+	}
+	return T6050PmpImageProbe{
+		die: die
+		identity: identity
+		region: patchbay
+		patchbay_physical: placed.physical
+		record_count: records
+		mandatory_present: present
+	}
+}
+
+// A plain function rather than a closure: V lowers closures onto mmap'd
+// trampolines, which a freestanding kernel cannot link.
+fn write_t6050_test_identity(mut image []u8, offset u32) {
+	image[offset] = u8(rtk_id_block_magic)
+	image[offset + 1] = u8(rtk_id_block_magic >> 8)
+	image[offset + 2] = u8(rtk_id_block_magic >> 16)
+	image[offset + 3] = u8(rtk_id_block_magic >> 24)
+	image[offset + rtk_id_block_version_offset] = 5
+}
+
 fn validate_t6050_preload_address_codec() bool {
 	// The recovered Mac17,6 layout: one region holding a read-only __TEXT and
 	// a writable __DATA, each with its own physical base.
@@ -1286,6 +1443,55 @@ fn validate_t6050_preload_address_codec() bool {
 		return false
 	}
 	if _ := preload.resolve_iop_virtual(t6050_pmp_text_iova, 0) {
+		return false
+	}
+	if preload.image_base() != t6050_pmp_text_iova {
+		return false
+	}
+	// Exercise the identity-block search over a small synthetic region sized so
+	// only the first three candidate offsets resolve, so the walk never reads
+	// past the buffer it is given.
+	small_size := u32(0x300)
+	small := T6050PmpPreload{
+		die: 0
+		region_base: t6050_pmp_region_base
+		region_size: u64(small_size)
+		segments: [
+			T6050PmpSegment{
+				physical: t6050_pmp_region_base
+				iova: t6050_pmp_text_iova
+				remap: t6050_pmp_region_base
+				size: small_size
+				flags: t6050_pmp_text_flags
+			},
+			T6050PmpSegment{},
+		]!
+	}
+	mut image := []u8{len: int(small_size)}
+	if _ := locate_t6050_rtk_identity(image.data, &small) {
+		return false
+	}
+	write_t6050_test_identity(mut image, 0x204)
+	located := locate_t6050_rtk_identity(image.data, &small) or { return false }
+	if located.iop_virtual != t6050_pmp_text_iova + 0x204
+		|| located.physical != t6050_pmp_region_base + 0x204 || located.version != 5 {
+		return false
+	}
+	// A second block is ambiguous, not first-wins: a stale one would redirect
+	// every later offset without any other symptom.
+	write_t6050_test_identity(mut image, 0xc0)
+	if _ := locate_t6050_rtk_identity(image.data, &small) {
+		return false
+	}
+	// An unsupported version is not an identity block at all.
+	image[0xc0 + rtk_id_block_version_offset] = 6
+	image[0x204 + rtk_id_block_version_offset] = 6
+	if _ := locate_t6050_rtk_identity(image.data, &small) {
+		return false
+	}
+	// Keep the dormant hardware probe reachable without mapping anything: an
+	// out-of-range die is rejected before the region is touched.
+	if _ := probe_t6050_pmp_image(t6050_pmp_die_slots) {
 		return false
 	}
 	return true
