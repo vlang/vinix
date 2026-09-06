@@ -824,8 +824,8 @@ fn tick_itimers() {
 		}
 		e.value_us -= elapsed_us
 		if e.value_us <= 0 {
-			// Fire SIGALRM (signal 14)
-			katomic.bts(mut &e.thrd.pending_signals, u8(14))
+			// Fire SIGALRM (signal 14, which is bit 13)
+			katomic.bts(mut &e.thrd.pending_signals, u8(13))
 			enqueue_thread(e.thrd, true)
 			if e.interval_us > 0 {
 				e.value_us = e.interval_us

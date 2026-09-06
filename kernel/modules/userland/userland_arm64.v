@@ -209,7 +209,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 			continue
 		}
 		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = i
+			which = int(i) + 1
 			break
 		}
 	}
@@ -241,7 +241,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	t.masked_signals |= sigaction.sa_mask
 	// Check SA_NODEFER: Vinix value (0x40) OR Linux value (0x40000000)
 	if sigaction.sa_flags & sa_nodefer == 0 && sigaction.sa_flags & int(0x40000000) == 0 {
-		t.masked_signals |= u64(1) << which
+		t.masked_signals |= u64(1) << (which - 1)
 	}
 
 	// SA_ONSTACK runs the handler on the stack sigaltstack(2) registered, which
@@ -332,10 +332,17 @@ fn enter_handler(mut t proc.Thread, context &cpulocal.GPRState) {
 	}
 }
 
+// Signal N lives in bit N-1 of the pending and blocked words, the same layout a
+// userspace sigset_t uses. Keeping the two identical means masks can cross the
+// syscall boundary untouched, and it leaves room for all 64 signals in a u64.
 pub fn sendsig(_thread &proc.Thread, signal u8) {
 	mut t := unsafe { _thread }
 
-	katomic.bts(mut &t.pending_signals, signal)
+	if signal == 0 || signal > 64 {
+		return
+	}
+
+	katomic.bts(mut &t.pending_signals, signal - 1)
 
 	// Try to stop an event_await()
 	sched.enqueue_thread(t, true)

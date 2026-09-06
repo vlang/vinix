@@ -68,6 +68,15 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	}
 	prot := source.prot
 	map_flags := source.flags
+	// A move has to re-establish the mapping against whatever backs it, so the
+	// resource and its handle come along, and the file offset is the source
+	// range's own offset advanced to wherever inside it the move starts.
+	mut global := source.global
+	source_resource := global.resource
+	source_handle := global.handle
+	source_handle_ref := global.handle_ref
+	source_handle_unref := global.handle_unref
+	source_offset := source.offset + i64(old_address - source.base)
 	pagemap.l.release()
 
 	// Shrinking, or asking for what is already there, needs no new mapping.
@@ -84,11 +93,8 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		// Nothing can be done without permission to relocate.
 		return errno.err, errno.enomem
 	}
-	if map_flags & map_anonymous == 0 {
-		// A file mapping would have to be re-established against its resource;
-		// nothing in the port needs it yet.
-		return errno.err, errno.einval
-	}
+
+	anonymous := map_flags & map_anonymous != 0
 
 	mut destination_flags := map_flags
 	mut destination_hint := voidptr(0)
@@ -97,15 +103,27 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		destination_hint = voidptr(new_address)
 	}
 
+	mut destination_offset := i64(0)
+	if !anonymous {
+		destination_offset = source_offset
+	}
+
 	destination := mmap(pagemap, destination_hint, new_length, prot, destination_flags,
-		unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, unsafe { nil }) or {
+		source_resource, destination_offset, source_handle, source_handle_ref,
+		source_handle_unref) or {
 		return errno.err, errno.get()
 	}
 
-	carried := if old_length < new_length { old_length } else { new_length }
-	if !copy_between_mappings(pagemap, u64(destination), old_address, carried) {
-		munmap(mut pagemap, destination, new_length) or {}
-		return errno.err, errno.efault
+	// Only anonymous pages have to be carried over by hand. A file mapping is
+	// rebuilt at the same offset against the same resource, so it comes back
+	// holding the same pages, and copying would be writing them onto
+	// themselves.
+	if anonymous {
+		carried := if old_length < new_length { old_length } else { new_length }
+		if !copy_between_mappings(pagemap, u64(destination), old_address, carried) {
+			munmap(mut pagemap, destination, new_length) or {}
+			return errno.err, errno.efault
+		}
 	}
 
 	munmap(mut pagemap, voidptr(old_address), old_length) or {}

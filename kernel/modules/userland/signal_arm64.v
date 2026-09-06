@@ -12,10 +12,9 @@ import proc
 import time
 import usercopy
 
-// Signal numbers occupy bit N of the pending/blocked words, so the highest one
-// that fits a u64 is 63. Linux allows 64; the last realtime signal is the only
-// casualty and nothing in a musl userland uses it.
-const max_signal = 63
+// Signal N occupies bit N-1 of the pending and blocked words, so all 64 of them
+// fit in a u64.
+const max_signal = 64
 
 // A sigset_t is one 64-bit word on aarch64; the kernel rejects any other size.
 const sigset_size = u64(8)
@@ -44,20 +43,11 @@ const min_sigstack_size = u64(2048)
 
 // Signals that can never be blocked, caught or ignored.
 fn unblockable_mask() u64 {
-	return (u64(1) << sigkill) | (u64(1) << sigstop)
+	return signal_bit(sigkill) | signal_bit(sigstop)
 }
 
-// A userspace sigset_t holds signal N in bit N-1. The kernel's pending and
-// blocked words hold it in bit N instead, so that a set bit is the signal
-// number and indexes sigactions directly. Everything crossing the syscall
-// boundary has to be shifted; signal 64 is the one casualty, and it is already
-// past max_signal.
-fn sigset_from_user(mask u64) u64 {
-	return mask << 1
-}
-
-fn sigset_to_user(mask u64) u64 {
-	return mask >> 1
+fn signal_bit(signum int) u64 {
+	return u64(1) << u64(signum - 1)
 }
 
 fn valid_signal(signum int) bool {
@@ -89,7 +79,7 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 			sa_sigaction: voidptr(raw[0])
 			sa_flags:     int(raw[1])
 			sa_restorer:  voidptr(raw[2])
-			sa_mask:      sigset_from_user(raw[3]) & ~unblockable_mask()
+			sa_mask:      raw[3] & ~unblockable_mask()
 		}
 	}
 
@@ -102,7 +92,7 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 		// way back out of a Linux-style handler, so dropping it here would
 		// wedge the next signal the caller re-installs this action for.
 		raw[2] = u64(previous.sa_restorer)
-		raw[3] = sigset_to_user(previous.sa_mask)
+		raw[3] = previous.sa_mask
 		if !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), k_sigaction_size) {
 			return errno.err, errno.efault
 		}
@@ -128,14 +118,13 @@ pub fn syscall_rt_sigprocmask(_ voidptr, how int, set_ptr u64, oldset_ptr u64, s
 		if !usercopy.copy_from_user(voidptr(&incoming), set_ptr, sigset_size) {
 			return errno.err, errno.efault
 		}
-		incoming = sigset_from_user(incoming)
 		if how != sig_block && how != sig_unblock && how != sig_setmask {
 			return errno.err, errno.einval
 		}
 	}
 
 	if oldset_ptr != 0 {
-		previous := sigset_to_user(current_thread.masked_signals)
+		previous := current_thread.masked_signals
 		if !usercopy.copy_to_user(oldset_ptr, voidptr(&previous), sigset_size) {
 			return errno.err, errno.efault
 		}
@@ -203,7 +192,7 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask_ptr u64, sigsetsize u64) (u64, u64)
 	if !usercopy.copy_from_user(voidptr(&temporary), mask_ptr, sigset_size) {
 		return errno.err, errno.efault
 	}
-	temporary = sigset_from_user(temporary) & ~unblockable_mask()
+	temporary &= ~unblockable_mask()
 
 	original := current_thread.masked_signals
 	current_thread.masked_signals = temporary
@@ -229,11 +218,11 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask_ptr u64, sigsetsize u64) (u64, u64)
 // opposed to a default or ignored disposition that dispatch will drop.
 fn has_handler_for_pending(t &proc.Thread, mask u64) bool {
 	pending := katomic.load(&t.pending_signals) & ~mask
-	for i := 0; i <= max_signal; i++ {
-		if pending & (u64(1) << i) == 0 {
+	for signum := 1; signum <= max_signal; signum++ {
+		if pending & signal_bit(signum) == 0 {
 			continue
 		}
-		handler := t.sigactions[i].sa_sigaction
+		handler := t.sigactions[signum].sa_sigaction
 		if handler != sig_dfl && handler != sig_ign {
 			return true
 		}
@@ -254,7 +243,7 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 	if !usercopy.copy_from_user(voidptr(&wanted), set_ptr, sigset_size) {
 		return errno.err, errno.efault
 	}
-	wanted = sigset_from_user(wanted) & ~unblockable_mask()
+	wanted &= ~unblockable_mask()
 
 	mut deadline := time.TimeSpec{}
 	mut timed := false
@@ -272,7 +261,7 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 		if which := take_pending(mut current_thread, wanted) {
 			if info_ptr != 0 && !write_signal_info(info_ptr, which) {
 				// Hand the signal back rather than losing it.
-				katomic.bts(mut &current_thread.pending_signals, u8(which))
+				katomic.bts(mut &current_thread.pending_signals, u8(which - 1))
 				return errno.err, errno.efault
 			}
 			return u64(which), 0
@@ -304,12 +293,12 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 
 // Claim the lowest-numbered pending signal that is in `wanted`.
 fn take_pending(mut t proc.Thread, wanted u64) ?int {
-	for i := 0; i <= max_signal; i++ {
-		if wanted & (u64(1) << i) == 0 {
+	for signum := 1; signum <= max_signal; signum++ {
+		if wanted & signal_bit(signum) == 0 {
 			continue
 		}
-		if katomic.btr(mut &t.pending_signals, u8(i)) == true {
-			return i
+		if katomic.btr(mut &t.pending_signals, u8(signum - 1)) == true {
+			return signum
 		}
 	}
 	return none
