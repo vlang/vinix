@@ -30,6 +30,7 @@ import syscall.table
 import dev.console
 import dev.fbdev
 import dev.fbdev.simple
+import dev.pointerdev
 import dev.streams
 import time
 import userland
@@ -173,6 +174,9 @@ fn kmain_thread() {
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())
 	print('kmain_thread: fbdev done\n')
+
+	pointerdev.initialise()
+	print('kmain_thread: pointer done\n')
 
 	console.initialise()
 	print('kmain_thread: console done\n')

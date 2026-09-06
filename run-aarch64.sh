@@ -196,5 +196,6 @@ exec qemu-system-aarch64 \
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
     -drive format=raw,file="$BOOT_DISK" \
     -device virtio-keyboard-device \
+    -device virtio-tablet-device \
     $DISPLAY_FLAGS \
     -no-reboot

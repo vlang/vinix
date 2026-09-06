@@ -24,6 +24,17 @@ const reg_guest_page_size = u64(0x028)
 const reg_queue_align = u64(0x03c)
 const reg_queue_pfn = u64(0x040)
 
+// Virtio input configuration space. `select`/`subsel` choose which table the
+// union at `cfg_union` reports, and `cfg_size` is 0 when the device has
+// nothing to say about that selection.
+const cfg_select = u64(0x100)
+const cfg_subsel = u64(0x101)
+const cfg_size = u64(0x102)
+const cfg_union = u64(0x108)
+
+const cfg_ev_bits = u8(0x11)
+const cfg_abs_info = u8(0x12)
+
 // Virtio status bits
 const status_acknowledge = u32(1)
 const status_driver = u32(2)
@@ -46,8 +57,15 @@ const mmio_base = u64(0x0a000000)
 const mmio_slot_size = u64(0x200)
 const mmio_slot_count = u64(32)
 
+// A virt machine is given a keyboard and a tablet; four covers both plus room
+// for whatever else is on the bus without growing the polled set noticeably.
+const max_devices = 4
+
 // Linux input event types
+const ev_syn = u16(0)
 const ev_key = u16(1)
+const ev_rel = u16(2)
+const ev_abs = u16(3)
 
 // Linux keycodes for extended keys
 const key_up = u16(103)
@@ -69,6 +87,18 @@ const key_leftalt = u16(56)
 const key_rightalt = u16(100)
 const key_capslock = u16(58)
 
+// Pointer button codes. The bit a button takes in the reported mask is its
+// distance from BTN_LEFT, so left is bit 0, right bit 1, middle bit 2.
+const btn_left = u16(0x110)
+const btn_last = u16(0x117)
+
+// Pointer axes
+const abs_x = u16(0)
+const abs_y = u16(1)
+const rel_x = u16(0)
+const rel_y = u16(1)
+const rel_wheel = u16(8)
+
 // MMIO accessors with compiler barriers to prevent LDP/STP generation.
 // STP (store pair) doesn't set ESR_EL2.ISV, crashing QEMU's HVF handler.
 fn mmio_r32(addr u64) u32 {
@@ -82,18 +112,47 @@ fn mmio_w32(addr u64, val u32) {
 	unsafe { *&u32(addr) = val }
 }
 
+fn mmio_r8(addr u64) u8 {
+	val := unsafe { *&u8(addr) }
+	cpu.dmb_ish()
+	return val
+}
+
+fn mmio_w8(addr u64, val u8) {
+	cpu.dmb_ish()
+	unsafe { *&u8(addr) = val }
+}
+
 __global (
-	vi_dev_base      = u64(0)
-	vi_vq_avail_virt = u64(0)
-	vi_vq_used_virt  = u64(0)
-	vi_events_virt   = u64(0)
-	vi_last_used_idx = u16(0)
+	vi_dev_count     = int(0)
+	vi_dev_base      [4]u64
+	vi_vq_avail_virt [4]u64
+	vi_vq_used_virt  [4]u64
+	vi_events_virt   [4]u64
+	vi_last_used_idx [4]u16
+	vi_dev_qsize     [4]u16
 	vi_shift_active  = false
 	vi_ctrl_active   = false
 	vi_alt_active    = false
 	vi_caps_active   = false
 	vi_outbuf        [64]u8
 	vi_outlen        = u64(0)
+	// Pointer state, shared with /dev/pointer. `x`/`y` are raw device
+	// coordinates spanning 0..max, which is what an absolute device reports;
+	// a relative device is integrated into the same span so both kinds reach
+	// userland as one position.
+	vi_ptr_present  = false
+	vi_ptr_absolute = false
+	vi_ptr_x        = int(0)
+	vi_ptr_y        = int(0)
+	vi_ptr_max_x    = int(0)
+	vi_ptr_max_y    = int(0)
+	vi_ptr_buttons  = u32(0)
+	// Edges latched between two reads, so a click shorter than the reader's
+	// frame interval is still seen.
+	vi_ptr_pressed  = u32(0)
+	vi_ptr_released = u32(0)
+	vi_ptr_scroll   = int(0)
 )
 
 fn vi_put(b u8) {
@@ -114,6 +173,56 @@ fn vi_emit_tilde(num u8) {
 	vi_put(u8(`[`))
 	vi_put(num)
 	vi_put(u8(`~`))
+}
+
+fn clamp_axis(value int, max int) int {
+	if value < 0 {
+		return 0
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+fn process_button(code u16, value u32) {
+	bit := u32(1) << u32(code - btn_left)
+	if value != 0 {
+		vi_ptr_buttons |= bit
+		vi_ptr_pressed |= bit
+	} else {
+		vi_ptr_buttons &= ~bit
+		vi_ptr_released |= bit
+	}
+}
+
+fn process_abs(code u16, value u32) {
+	match code {
+		abs_x {
+			vi_ptr_x = clamp_axis(int(value), vi_ptr_max_x)
+		}
+		abs_y {
+			vi_ptr_y = clamp_axis(int(value), vi_ptr_max_y)
+		}
+		else {}
+	}
+}
+
+fn process_rel(code u16, value u32) {
+	// Relative axes arrive as a signed 32-bit delta.
+	delta := int(i32(value))
+	match code {
+		rel_x {
+			vi_ptr_x = clamp_axis(vi_ptr_x + delta, vi_ptr_max_x)
+		}
+		rel_y {
+			vi_ptr_y = clamp_axis(vi_ptr_y + delta, vi_ptr_max_y)
+		}
+		rel_wheel {
+			vi_ptr_scroll += delta
+		}
+		else {}
+	}
 }
 
 fn process_key(code u16, value u32) {
@@ -194,8 +303,62 @@ fn process_key(code u16, value u32) {
 	vi_put(c)
 }
 
+// config_size reports how many bytes the device has for a selection, which is
+// also how a driver asks whether the device supports it at all.
+fn config_size(base u64, sel u8, subsel u8) u8 {
+	mmio_w8(base + cfg_select, sel)
+	mmio_w8(base + cfg_subsel, subsel)
+	return mmio_r8(base + cfg_size)
+}
+
+// abs_axis_max is the top of an absolute axis' range. The axis' `min` sits at
+// the head of the union and `max` right after it.
+fn abs_axis_max(base u64, axis u16) int {
+	if config_size(base, cfg_abs_info, u8(axis)) < 8 {
+		return 0
+	}
+	return int(mmio_r32(base + cfg_union + 4))
+}
+
+// classify_pointer records a device that reports pointer axes. An absolute
+// device brings its own coordinate span; a relative one is integrated over a
+// span this driver picks, and userland scales either to the screen.
+fn classify_pointer(base u64) {
+	if config_size(base, cfg_ev_bits, u8(ev_abs)) > 0 {
+		max_x := abs_axis_max(base, abs_x)
+		max_y := abs_axis_max(base, abs_y)
+		if max_x > 0 && max_y > 0 {
+			vi_ptr_present = true
+			vi_ptr_absolute = true
+			vi_ptr_max_x = max_x
+			vi_ptr_max_y = max_y
+			vi_ptr_x = max_x / 2
+			vi_ptr_y = max_y / 2
+			uart.puts(c'virtio-input: absolute pointer, range ')
+			uart.put_dec(u64(max_x))
+			uart.puts(c'x')
+			uart.put_dec(u64(max_y))
+			uart.puts(c'\n')
+			return
+		}
+	}
+
+	if config_size(base, cfg_ev_bits, u8(ev_rel)) > 0 && !vi_ptr_absolute {
+		vi_ptr_present = true
+		vi_ptr_max_x = 32767
+		vi_ptr_max_y = 32767
+		vi_ptr_x = vi_ptr_max_x / 2
+		vi_ptr_y = vi_ptr_max_y / 2
+		uart.puts(c'virtio-input: relative pointer\n')
+	}
+}
+
 pub fn initialise(hhdm u64) {
 	for i := u64(0); i < mmio_slot_count; i++ {
+		if vi_dev_count == max_devices {
+			break
+		}
+
 		base := hhdm + mmio_base + i * mmio_slot_size
 
 		if mmio_r32(base + reg_magic) != virtio_magic_val {
@@ -239,9 +402,11 @@ pub fn initialise(hhdm u64) {
 
 		avail_off := u64(qsz) * 16
 		used_off := (avail_off + 4 + 2 * u64(qsz) + 2 + queue_align - 1) & ~(queue_align - 1)
-		vi_vq_avail_virt = page_virt + avail_off
-		vi_vq_used_virt = page_virt + used_off
-		vi_events_virt = page_virt + 0x300
+
+		idx := vi_dev_count
+		vi_vq_avail_virt[idx] = page_virt + avail_off
+		vi_vq_used_virt[idx] = page_virt + used_off
+		vi_events_virt[idx] = page_virt + 0x300
 
 		mmio_w32(base + reg_queue_pfn, u32(page_phys / 4096))
 
@@ -258,72 +423,97 @@ pub fn initialise(hhdm u64) {
 
 		// Fill available ring with all descriptors
 		for j := u64(0); j < qsz; j++ {
-			unsafe { *&u16(vi_vq_avail_virt + 4 + j * 2) = u16(j) }
+			unsafe { *&u16(vi_vq_avail_virt[idx] + 4 + j * 2) = u16(j) }
 		}
 		cpu.dmb_ish()
-		unsafe { *&u16(vi_vq_avail_virt + 2) = u16(qsz) } // avail.idx
+		unsafe { *&u16(vi_vq_avail_virt[idx] + 2) = u16(qsz) } // avail.idx
 
 		mmio_w32(base + reg_status, status_acknowledge | status_driver | status_driver_ok)
 		mmio_w32(base + reg_queue_notify, 0) // Notify: buffers available
 
-		vi_dev_base = base
-		vi_last_used_idx = 0
+		vi_dev_base[idx] = base
+		vi_dev_qsize[idx] = u16(qsz)
+		vi_last_used_idx[idx] = 0
+		vi_dev_count++
+
+		classify_pointer(base)
 
 		uart.puts(c'virtio-input: ready, queue=')
 		uart.put_dec(qsz)
 		uart.puts(c'\n')
-		return
 	}
 
-	uart.puts(c'virtio-input: no device found\n')
+	if vi_dev_count == 0 {
+		uart.puts(c'virtio-input: no device found\n')
+	}
 }
 
-pub fn poll() {
-	if vi_dev_base == 0 {
-		return
-	}
-
-	vi_outlen = 0
+fn poll_device(idx int) {
+	base := vi_dev_base[idx]
+	qsize := u16(vi_dev_qsize[idx])
+	avail_virt := vi_vq_avail_virt[idx]
+	used_virt := vi_vq_used_virt[idx]
 
 	cpu.dmb_ish()
 
-	new_idx := unsafe { *&u16(vi_vq_used_virt + 2) }
-	if vi_last_used_idx == new_idx {
+	new_idx := unsafe { *&u16(used_virt + 2) }
+	if vi_last_used_idx[idx] == new_idx {
 		return
 	}
 
-	mut avail_idx := unsafe { *&u16(vi_vq_avail_virt + 2) }
+	mut avail_idx := unsafe { *&u16(avail_virt + 2) }
 
-	for vi_last_used_idx != new_idx {
-		ring_idx := u64(vi_last_used_idx % u16(queue_size))
-		used_entry := vi_vq_used_virt + 4 + ring_idx * 8
+	for vi_last_used_idx[idx] != new_idx {
+		ring_idx := u64(vi_last_used_idx[idx] % qsize)
+		used_entry := used_virt + 4 + ring_idx * 8
 		desc_id := unsafe { *&u32(used_entry) }
 
-		event_addr := vi_events_virt + u64(desc_id) * 8
+		event_addr := vi_events_virt[idx] + u64(desc_id) * 8
 		ev_type := unsafe { *&u16(event_addr) }
 		ev_code := unsafe { *&u16(event_addr + 2) }
 		ev_value := unsafe { *&u32(event_addr + 4) }
 
-		if ev_type == ev_key {
-			process_key(ev_code, ev_value)
+		match ev_type {
+			ev_key {
+				if ev_code >= btn_left && ev_code <= btn_last {
+					process_button(ev_code, ev_value)
+				} else {
+					process_key(ev_code, ev_value)
+				}
+			}
+			ev_abs {
+				process_abs(ev_code, ev_value)
+			}
+			ev_rel {
+				process_rel(ev_code, ev_value)
+			}
+			else {}
 		}
 
 		// Re-add descriptor to available ring
-		avail_ring_pos := u64(avail_idx % u16(queue_size))
-		unsafe { *&u16(vi_vq_avail_virt + 4 + avail_ring_pos * 2) = u16(desc_id) }
+		avail_ring_pos := u64(avail_idx % qsize)
+		unsafe { *&u16(avail_virt + 4 + avail_ring_pos * 2) = u16(desc_id) }
 		avail_idx++
 
-		vi_last_used_idx++
+		vi_last_used_idx[idx]++
 	}
 
 	// Update avail index and notify device
 	cpu.dmb_ish()
-	unsafe { *&u16(vi_vq_avail_virt + 2) = avail_idx }
-	mmio_w32(vi_dev_base + reg_queue_notify, 0)
+	unsafe { *&u16(avail_virt + 2) = avail_idx }
+	mmio_w32(base + reg_queue_notify, 0)
 
 	// Acknowledge any pending interrupts
-	isr := mmio_r32(vi_dev_base + reg_interrupt_status)
+	isr := mmio_r32(base + reg_interrupt_status)
 	if isr != 0 {
-		mmio_w32(vi_dev_base + reg_interrupt_ack, isr)
+		mmio_w32(base + reg_interrupt_ack, isr)
+	}
+}
+
+pub fn poll() {
+	vi_outlen = 0
+
+	for i := 0; i < vi_dev_count; i++ {
+		poll_device(i)
 	}
 }

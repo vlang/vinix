@@ -220,6 +220,7 @@ override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'modules/devicetree/*' \
     ! -path 'modules/drm/*' \
     ! -path 'modules/gpu/*' \
+    ! -path 'modules/dev/pointerdev/*' \
     ! -path 'modules/syscall/common.v' \
     ! -name '*_aarch64.v' \
     ! -name '*_arm64.v' \
