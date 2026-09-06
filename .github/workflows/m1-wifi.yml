@@ -17,6 +17,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VFLAGS: -old-compiler
     steps:
       - uses: actions/checkout@v6
       - name: Install tools
@@ -26,9 +28,18 @@ jobs:
           if [ -f tests/m1-wifi/run.sh ]; then
             CC=clang sh tests/m1-wifi/run.sh
           fi
-      - name: Build V
-        run: git clone --depth=1 https://github.com/vlang/v.git /tmp/v && make -C /tmp/v
+      - name: Build pinned V1 compiler
+        run: |
+          git init /tmp/v
+          git -C /tmp/v remote add origin https://github.com/vlang/v.git
+          git -C /tmp/v fetch --depth=1 origin 71437d263bfc57f99e27588781f34bfc91746910
+          git -C /tmp/v checkout --detach FETCH_HEAD
+          git init /tmp/v/vc
+          git -C /tmp/v/vc remote add origin https://github.com/vlang/vc.git
+          git -C /tmp/v/vc fetch --depth=1 origin 99e94ae6099edabce1c6d621eca4c4904e3c2324
+          git -C /tmp/v/vc checkout --detach FETCH_HEAD
+          make -C /tmp/v local=1 CC=clang
       - name: Kernel dependencies
         run: cd kernel && ./get-deps
       - name: Build ARM64 kernel
-        run: make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v -j2
+        run: make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v VFLAGS=-old-compiler -j2
