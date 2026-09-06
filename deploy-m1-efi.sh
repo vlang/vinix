@@ -16,6 +16,12 @@ for argument in "$@"; do
             ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
             ;;
+        --halt-at=*)
+            # Power off once boot reaches this stage. On a machine with no
+            # console and no usable framebuffer, "did it power off?" is the
+            # only observable bit, so this turns each stage into a yes/no test.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.halt_at=${argument#*=}"
+            ;;
         --no-early-term)
             # Skip flanterm entirely. Its init clears the framebuffer, so a
             # hang at or just after it looks identical to a kernel that never
@@ -30,7 +36,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] <mounted_esp_path>"
             exit 0
             ;;
         --*)

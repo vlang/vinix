@@ -113,7 +113,7 @@ fn bootstrap_cpu0() {
 }
 
 fn kmain_thread() {
-	term.early_stage_mark(11)
+	boot_stage(11)
 	print('kmain_thread: started\n')
 
 	term.framebuffer_init()
@@ -175,7 +175,7 @@ fn kmain_thread() {
 
 	console.initialise()
 	print('kmain_thread: console done\n')
-	term.early_stage_mark(12)
+	boot_stage(12)
 
 	print('\n*** aarch64: Kernel initialisation complete ***\n')
 	print('*** Starting /sbin/init ***\n')
@@ -241,6 +241,57 @@ fn configure_apple_bringup_from_cmdline() {
 		if enable_apple_dcp { c'enabled' } else { c'disabled' })
 }
 
+// Power off at a chosen stage. On a machine with no console and no usable
+// framebuffer, "did it power off?" is the only bit of information available,
+// so vinix.halt_at=N turns each stage marker into an observable event.
+__global (
+	halt_at_stage = int(-1)
+)
+
+fn boot_stage(stage u32) {
+	term.early_stage_mark(stage)
+	if halt_at_stage >= 0 && int(stage) == halt_at_stage {
+		cpu.psci_call(cpu.psci_system_off)
+		cpu.psci_call(cpu.psci_system_reset)
+		// Both conduits returned, so PSCI is unavailable: nothing more can be
+		// signalled from here.
+		for {}
+	}
+}
+
+// Read a decimal value from the boot cmdline. Like the scan above this runs
+// before pmm_init, so it parses digits in place rather than allocating.
+fn early_cmdline_value(prefix string) int {
+	if kernel_file_req.response == unsafe { nil } {
+		return -1
+	}
+	kernel_file := kernel_file_req.response.kernel_file
+	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+		return -1
+	}
+	text := unsafe { &u8(kernel_file.cmdline) }
+	for i := 0; unsafe { text[i] } != 0; i++ {
+		mut j := 0
+		for j < prefix.len && unsafe { text[i + j] } == prefix[j] {
+			j++
+		}
+		if j != prefix.len {
+			continue
+		}
+		mut value := 0
+		mut digits := 0
+		for k := i + prefix.len; unsafe { text[k] } >= `0` && unsafe { text[k] } <= `9`; k++ {
+			value = value * 10 + int(unsafe { text[k] } - `0`)
+			digits++
+		}
+		if digits == 0 {
+			return -1
+		}
+		return value
+	}
+	return -1
+}
+
 // Scan the boot cmdline without building a V string: this runs before
 // pmm_init, so the allocator is not available yet.
 fn early_cmdline_contains(needle string) bool {
@@ -279,6 +330,14 @@ fn kmain() {
 	term.early_screen_fill(1)
 
 	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
+	halt_at_stage = early_cmdline_value('vinix.halt_at=')
+	if halt_at_stage == 1 {
+		// Stage 1 is the screen fill, which happens before the cmdline is
+		// read, so its halt has to be checked here rather than in boot_stage.
+		cpu.psci_call(cpu.psci_system_off)
+		cpu.psci_call(cpu.psci_system_reset)
+		for {}
+	}
 
 	// Do not hard-stop on base revision mismatch. Some real-hardware boot
 	// chains may provide an older Limine build; continue and rely on feature
@@ -290,20 +349,20 @@ fn kmain() {
 
 	// Initialize the memory allocator.
 	memory.pmm_init()
-	term.early_stage_mark(2)
+	boot_stage(2)
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
-	term.early_stage_mark(3)
+	boot_stage(3)
 	// Bring up terminal as early as possible to surface boot progress
 	// before we switch to kernel-owned page tables.
 	if !skip_early_term {
 		term.initialise()
 		// 13 proves flanterm_fb_init returned; 14 proves it can render.
 		// Both are drawn after its clear, so they survive on screen.
-		term.early_stage_mark(13)
+		boot_stage(13)
 		print('\n=== Vinix aarch64 (early) ===\n')
-		term.early_stage_mark(14)
+		boot_stage(14)
 	}
 
 	configure_apple_bringup_from_cmdline()
@@ -317,7 +376,7 @@ fn kmain() {
 
 	// Set up exception vectors (replaces x86 GDT/IDT/ISR)
 	exception.initialise()
-	term.early_stage_mark(4)
+	boot_stage(4)
 
 	_ = stubs.toupper(0)
 
@@ -330,10 +389,10 @@ fn kmain() {
 			have_dt = true
 		}
 	}
-	term.early_stage_mark(if have_dt { u32(5) } else { u32(6) })
+	boot_stage(if have_dt { u32(5) } else { u32(6) })
 
 	memory.vmm_init()
-	term.early_stage_mark(7)
+	boot_stage(7)
 
 	// Init terminal (after vmm_init so page tables are active and framebuffer is mapped)
 	if !skip_early_term {
@@ -377,7 +436,7 @@ fn kmain() {
 	} else {
 		print('skipping Apple-specific HW init (no device tree)\n')
 	}
-	term.early_stage_mark(8)
+	boot_stage(8)
 
 	// Virtio-input keyboard probe/GIC setup is for the QEMU virt machine.
 	if !use_aic && force_qemu_platform {
@@ -394,7 +453,7 @@ fn kmain() {
 	print('init timer...\n')
 	timer.initialise()
 	print('timer done\n')
-	term.early_stage_mark(9)
+	boot_stage(9)
 
 	// Interrupt controller: GIC for QEMU virt, AIC for Apple Silicon
 	if !use_aic && force_qemu_platform {
@@ -430,7 +489,7 @@ fn kmain() {
 		gic.set_timer_handler(sched.get_timer_handler())
 	}
 	print('sched done\n')
-	term.early_stage_mark(10)
+	boot_stage(10)
 
 	print('spawning kmain_thread via scheduler...\n')
 	spawn kmain_thread()

@@ -486,3 +486,23 @@ pub fn init_fpu_globals() {
 fn dummy_fpu_save(_ voidptr) {}
 
 fn dummy_fpu_restore(_ voidptr) {}
+
+// PSCI calls, used as a boot signal on machines with no usable console.
+// A power-off or reset is observable without a display, which a framebuffer
+// write is not. Apple Silicon reaches PSCI through m1n1/U-Boot at EL2, so try
+// hvc first and fall back to smc for firmware that routes it to EL3. If
+// neither is implemented both return and the caller spins.
+//
+// The conduit instructions live in asm/aarch64/psci.S: V's inline assembler
+// does not accept aarch64 register names, and PSCI requires the function id
+// in x0 specifically.
+pub const psci_system_off = u64(0x84000008)
+pub const psci_system_reset = u64(0x84000009)
+
+fn C.vinix_psci_hvc(function_id u64) u64
+fn C.vinix_psci_smc(function_id u64) u64
+
+pub fn psci_call(function_id u64) {
+	C.vinix_psci_hvc(function_id)
+	C.vinix_psci_smc(function_id)
+}
