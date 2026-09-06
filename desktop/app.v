@@ -6,9 +6,8 @@
 // application hands over an element tree for a content area of whatever size
 // its window happens to be, and gets back the id of whatever the user hit.
 //
-// The applications themselves are ui2's own examples, compiled in verbatim by
-// the build's staging step (see tools/stage_app.py). Nothing about them is
-// rewritten for Vinix.
+// Applications can be built in (Files and Settings) or ui2 examples, compiled
+// in verbatim by the build's staging step (see tools/stage_app.py).
 module main
 
 import ui2
@@ -51,6 +50,13 @@ const available_apps = [
 		width: window_width
 		height: window_height + title_height
 		open: open_calculator
+	},
+	AppFactory{
+		title: 'Settings'
+		icon: 'builtin:maximize'
+		width: 620
+		height: 410
+		open: open_settings
 	},
 ]
 
