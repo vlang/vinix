@@ -881,8 +881,11 @@ pub fn init_syscall_table() {
 	syscall_table[40] = voidptr(fs.syscall_mount) // __NR_mount
 	syscall_table[48] = voidptr(fs.syscall_faccessat) // __NR_faccessat
 	syscall_table[49] = voidptr(fs.syscall_chdir) // __NR_chdir
+	syscall_table[50] = voidptr(fs.syscall_fchdir) // __NR_fchdir
 	syscall_table[52] = voidptr(fs.syscall_fchmod) // __NR_fchmod
 	syscall_table[53] = voidptr(syscall_linux_fchmodat) // __NR_fchmodat
+	syscall_table[54] = voidptr(fs.syscall_fchownat) // __NR_fchownat
+	syscall_table[55] = voidptr(fs.syscall_fchown) // __NR_fchown
 	syscall_table[56] = voidptr(fs.syscall_openat) // __NR_openat
 	syscall_table[57] = voidptr(fs.syscall_close) // __NR_close
 	syscall_table[59] = voidptr(pipe.syscall_pipe) // __NR_pipe2
@@ -898,8 +901,11 @@ pub fn init_syscall_table() {
 	syscall_table[78] = voidptr(fs.syscall_readlinkat) // __NR_readlinkat
 	syscall_table[79] = voidptr(syscall_linux_fstatat) // __NR_fstatat / newfstatat
 	syscall_table[80] = voidptr(syscall_linux_fstat) // __NR_fstat
+	syscall_table[81] = voidptr(fs.syscall_sync) // __NR_sync
 	syscall_table[82] = voidptr(file.syscall_fsync) // __NR_fsync
 	syscall_table[83] = voidptr(file.syscall_fsync) // __NR_fdatasync
+	syscall_table[84] = voidptr(fs.syscall_syncfs) // __NR_sync_file_range
+	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
 	syscall_table[291] = voidptr(syscall_linux_statx) // __NR_statx
 	syscall_table[436] = voidptr(file.syscall_close_range) // __NR_close_range
 
@@ -915,7 +921,15 @@ pub fn init_syscall_table() {
 	syscall_table[113] = voidptr(sys.syscall_clock_get) // __NR_clock_gettime
 	syscall_table[114] = voidptr(sys.syscall_clock_getres) // __NR_clock_getres
 	syscall_table[115] = voidptr(sys.syscall_clock_nanosleep) // __NR_clock_nanosleep
+	syscall_table[118] = voidptr(syscall_linux_sched_setparam) // __NR_sched_setparam
+	syscall_table[119] = voidptr(syscall_linux_sched_setscheduler) // __NR_sched_setscheduler
+	syscall_table[120] = voidptr(syscall_linux_sched_getscheduler) // __NR_sched_getscheduler
+	syscall_table[121] = voidptr(syscall_linux_sched_getparam) // __NR_sched_getparam
+	syscall_table[122] = voidptr(syscall_linux_sched_setaffinity) // __NR_sched_setaffinity
+	syscall_table[123] = voidptr(syscall_linux_sched_getaffinity) // __NR_sched_getaffinity
 	syscall_table[124] = voidptr(syscall_linux_sched_yield) // __NR_sched_yield
+	syscall_table[125] = voidptr(syscall_linux_sched_get_priority_max) // __NR_sched_get_priority_max
+	syscall_table[126] = voidptr(syscall_linux_sched_get_priority_min) // __NR_sched_get_priority_min
 	syscall_table[129] = voidptr(userland.syscall_kill) // __NR_kill
 	syscall_table[130] = voidptr(userland.syscall_tkill) // __NR_tkill
 	syscall_table[131] = voidptr(userland.syscall_tgkill) // __NR_tgkill
@@ -923,6 +937,7 @@ pub fn init_syscall_table() {
 	syscall_table[133] = voidptr(userland.syscall_rt_sigsuspend) // __NR_rt_sigsuspend
 	syscall_table[134] = voidptr(userland.syscall_rt_sigaction) // __NR_rt_sigaction
 	syscall_table[135] = voidptr(userland.syscall_rt_sigprocmask) // __NR_rt_sigprocmask
+	syscall_table[136] = voidptr(syscall_linux_rt_sigpending) // __NR_rt_sigpending
 	syscall_table[137] = voidptr(userland.syscall_rt_sigtimedwait) // __NR_rt_sigtimedwait
 	syscall_table[139] = voidptr(userland.syscall_sigreturn) // __NR_rt_sigreturn
 	syscall_table[140] = voidptr(syscall_linux_setpriority) // __NR_setpriority
@@ -965,15 +980,18 @@ pub fn init_syscall_table() {
 	syscall_table[67] = voidptr(syscall_linux_pread64) // __NR_pread64
 	syscall_table[68] = voidptr(syscall_linux_pwrite64) // __NR_pwrite64
 	syscall_table[88] = voidptr(syscall_linux_utimensat) // __NR_utimensat
+	syscall_table[102] = voidptr(syscall_linux_getitimer) // __NR_getitimer
 	syscall_table[103] = voidptr(syscall_linux_setitimer) // __NR_setitimer
-	syscall_table[104] = voidptr(syscall_linux_getitimer) // __NR_getitimer
+	syscall_table[153] = voidptr(syscall_linux_times) // __NR_times
 	syscall_table[154] = voidptr(syscall_linux_setpgid) // __NR_setpgid
 	syscall_table[155] = voidptr(syscall_linux_getpgid) // __NR_getpgid
 	syscall_table[165] = voidptr(syscall_linux_getrusage) // __NR_getrusage
 	syscall_table[167] = voidptr(syscall_linux_prctl) // __NR_prctl
 	syscall_table[38] = voidptr(fs.syscall_renameat) // __NR_renameat
 	syscall_table[276] = voidptr(fs.syscall_renameat2) // __NR_renameat2
+	syscall_table[43] = voidptr(fs.syscall_statfs) // __NR_statfs
 	syscall_table[44] = voidptr(syscall_linux_fstatfs) // __NR_fstatfs
+	syscall_table[45] = voidptr(fs.syscall_truncate) // __NR_truncate
 	syscall_table[278] = voidptr(syscall_linux_getrandom) // __NR_getrandom
 	syscall_table[435] = voidptr(userland.syscall_clone3) // __NR_clone3
 
@@ -993,6 +1011,7 @@ pub fn init_syscall_table() {
 	syscall_table[210] = voidptr(socket.syscall_shutdown) // __NR_shutdown
 	syscall_table[211] = voidptr(syscall_linux_sendmsg) // __NR_sendmsg
 	syscall_table[212] = voidptr(socket.syscall_recvmsg) // __NR_recvmsg
+	syscall_table[242] = voidptr(syscall_linux_accept4) // __NR_accept4
 
 	// Memory
 	syscall_table[214] = voidptr(mmap.syscall_brk) // __NR_brk
@@ -1003,7 +1022,13 @@ pub fn init_syscall_table() {
 	syscall_table[222] = voidptr(syscall_linux_mmap) // __NR_mmap
 	syscall_table[226] = voidptr(mmap.syscall_mprotect) // __NR_mprotect
 	syscall_table[232] = voidptr(mmap.syscall_mincore) // __NR_mincore
+	syscall_table[227] = voidptr(syscall_linux_msync) // __NR_msync
+	syscall_table[228] = voidptr(syscall_linux_mlock) // __NR_mlock
+	syscall_table[229] = voidptr(syscall_linux_mlock) // __NR_munlock
+	syscall_table[230] = voidptr(syscall_linux_mlockall) // __NR_mlockall
+	syscall_table[231] = voidptr(syscall_linux_munlockall) // __NR_munlockall
 	syscall_table[233] = voidptr(mmap.syscall_madvise) // __NR_madvise
+	syscall_table[284] = voidptr(syscall_linux_mlock2) // __NR_mlock2
 
 	// Misc
 	syscall_table[260] = voidptr(userland.syscall_wait4) // __NR_wait4

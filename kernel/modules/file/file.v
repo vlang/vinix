@@ -581,3 +581,21 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 
 	return u64(ret), 0
 }
+
+// Apply descriptor and status flags to an already-open fd. accept4(2) and
+// pipe2(2) take them alongside the operation itself rather than needing a
+// separate fcntl.
+pub fn set_fd_flags(fdnum int, flags int) {
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return }
+	defer {
+		fd.unref()
+	}
+
+	if flags & resource.o_cloexec != 0 {
+		fd.flags |= resource.o_cloexec
+	}
+	if flags & resource.o_nonblock != 0 {
+		mut handle := fd.handle
+		handle.flags |= resource.o_nonblock
+	}
+}

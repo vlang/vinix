@@ -7,6 +7,7 @@ import klock
 import proc
 import file
 import errno
+import usercopy
 
 pub const at_fdcwd = -100
 pub const at_empty_path = 0x1000
@@ -1256,4 +1257,164 @@ pub fn syscall_renameat2(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int
 // renameat(olddirfd, oldpath, newdirfd, newpath) is renameat2 with no flags.
 pub fn syscall_renameat(gpr_state voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr) (u64, u64) {
 	return syscall_renameat2(gpr_state, olddirfd, _oldpath, newdirfd, _newpath, 0)
+}
+
+// fchdir(fd): change directory to an already-open one. A shell walking a tree
+// keeps a descriptor rather than a path, so that a rename underneath it cannot
+// send it somewhere else.
+pub fn syscall_fchdir(_ voidptr, fdnum int) (u64, u64) {
+	mut process := proc.current_thread().process
+
+	mut fd := file.fd_from_fdnum(process, fdnum) or { return errno.err, errno.ebadf }
+	defer {
+		fd.unref()
+	}
+
+	node := unsafe { &VFSNode(fd.handle.node) }
+	if node == unsafe { nil } {
+		return errno.err, errno.enotdir
+	}
+	if !stat.isdir(fd.handle.resource.stat.mode) {
+		return errno.err, errno.enotdir
+	}
+
+	process.current_directory = voidptr(node)
+
+	return 0, 0
+}
+
+// truncate(path, length): ftruncate's by-name twin.
+pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
+	if length < 0 {
+		return errno.err, errno.einval
+	}
+
+	path := unsafe { cstring_to_vstring(_path) }
+	if path.len == 0 {
+		return errno.err, errno.enoent
+	}
+
+	mut process := proc.current_thread().process
+
+	mut node := get_node(process.current_directory, path, true) or {
+		return errno.err, errno.get()
+	}
+	mut res := node.resource
+
+	if stat.isdir(res.stat.mode) {
+		return errno.err, errno.eisdir
+	}
+
+	res.grow(unsafe { nil }, u64(length)) or { return errno.err, errno.get() }
+
+	return 0, 0
+}
+
+// fchownat / fchown. Ownership is recorded and nothing consults it yet, but a
+// caller that sets it and reads it back should see what it wrote rather than be
+// told the call worked and find nothing changed.
+fn set_owner(mut res resource.Resource, uid u32, gid u32) {
+	// -1 means "leave this one alone", as it does for chown(2) everywhere.
+	if uid != u32(0xffffffff) {
+		res.stat.uid = uid
+	}
+	if gid != u32(0xffffffff) {
+		res.stat.gid = gid
+	}
+}
+
+pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+
+	mut process := proc.current_thread().process
+
+	if path.len == 0 {
+		if flags & at_empty_path == 0 {
+			return errno.err, errno.enoent
+		}
+		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
+		defer {
+			fd.unref()
+		}
+		mut res := fd.handle.resource
+		set_owner(mut res, uid, gid)
+		return 0, 0
+	}
+
+	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+
+	follow_links := flags & at_symlink_nofollow == 0
+	mut node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
+	mut res := node.resource
+
+	set_owner(mut res, uid, gid)
+
+	return 0, 0
+}
+
+pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
+	defer {
+		fd.unref()
+	}
+
+	mut res := fd.handle.resource
+	set_owner(mut res, uid, gid)
+
+	return 0, 0
+}
+
+// statfs(path, buf). Its by-descriptor twin already existed; both describe the
+// one filesystem this kernel has anything to say about.
+pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+	if path.len == 0 {
+		return errno.err, errno.enoent
+	}
+	if buf == 0 {
+		return errno.err, errno.efault
+	}
+
+	mut process := proc.current_thread().process
+
+	// The path has to exist even though the answer does not depend on it.
+	get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
+
+	if !fill_statfs(buf) {
+		return errno.err, errno.efault
+	}
+
+	return 0, 0
+}
+
+// Describe the one filesystem this kernel has anything to say about. Shared
+// with fstatfs so the two cannot drift apart.
+pub fn fill_statfs(buf u64) bool {
+	mut raw := [15]u64{}
+	raw[0] = 0x01021994 // f_type: TMPFS_MAGIC
+	raw[1] = 4096 // f_bsize
+	raw[2] = 262144 // f_blocks
+	raw[3] = 131072 // f_bfree
+	raw[4] = 131072 // f_bavail
+	raw[5] = 65536 // f_files
+	raw[6] = 65536 // f_ffree
+	raw[8] = 255 // f_namelen
+	raw[9] = 4096 // f_frsize
+
+	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
+}
+
+// sync(2) and syncfs(2). Writes reach their resource as they are made, so there
+// is nothing held back to push out.
+pub fn syscall_sync(_ voidptr) (u64, u64) {
+	return 0, 0
+}
+
+// Serves both syncfs(2) and sync_file_range(2): the extra arguments of the
+// latter describe a range to push out, and there is nothing held back to push.
+pub fn syscall_syncfs(_ voidptr, fdnum int) (u64, u64) {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
+	fd.unref()
+
+	return 0, 0
 }
