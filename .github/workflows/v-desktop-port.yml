@@ -12,22 +12,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Build the compiler pinned by recipes/v and fetch ui2
+      - name: Build the upstream V bootstrap and fetch ui2
         run: |
-          mkdir -p /tmp/vlang
-          git -C /tmp/vlang init
-          git -C /tmp/vlang fetch --depth=1 https://github.com/vlang/v.git dd859eae55cf4e69346851fe285b9af104c8ffb7
-          git -C /tmp/vlang checkout --detach FETCH_HEAD
-          mkdir /tmp/vlang/vc
-          git -C /tmp/vlang/vc init
-          git -C /tmp/vlang/vc fetch --depth=1 https://github.com/vlang/vc.git 216b1cdc8b1acad5b03e9cf8767f44f2742bf8f5
-          git -C /tmp/vlang/vc checkout --detach FETCH_HEAD
+          git clone --depth=1 https://github.com/vlang/v.git /tmp/vlang
+          git clone --depth=1 https://github.com/vlang/vc.git /tmp/vlang/vc
           cc -std=gnu99 -w -o /tmp/vlang/v /tmp/vlang/vc/v.c -lm -lpthread
           mkdir -p third_party
           git clone --depth=1 https://github.com/vlang/ui2.git third_party/ui2
           /tmp/vlang/v version
           git -C /tmp/vlang rev-parse HEAD
+          git -C /tmp/vlang/vc rev-parse HEAD
           git -C third_party/ui2 rev-parse HEAD
+          printf 'fn main() { println("bootstrap OK") }\n' > /tmp/smoke.v
+          /tmp/vlang/v -old-compiler -cc gcc -gc none run /tmp/smoke.v
       - name: Package offline validation workspace
         run: |
           mkdir -p /tmp/v-port-workspace
