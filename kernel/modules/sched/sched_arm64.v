@@ -86,8 +86,10 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	gpr_state := unsafe { &cpulocal.GPRState(_gpr_state) }
 	timer.stop()
 
-	// Tick the monotonic/realtime clocks
-	time.timer_handler()
+	// Tick the monotonic/realtime clocks. The interval is measured from the
+	// generic timer's counter rather than assumed, because this handler fires
+	// on a timeslice, not at a fixed frequency.
+	time.advance_to_ns(timer.get_ns())
 
 	// Tick per-process interval timers (SIGALRM)
 	tick_itimers()
@@ -262,8 +264,14 @@ pub fn yield(save_ctx bool) {
 	// GPRState on the stack and switches to any runnable thread. When this
 	// thread is later re-enqueued and re-scheduled, sched_switch_context
 	// restores our kernel context and we resume here.
+	// The same rate as the idle loop, and for the same reason: this poll is
+	// what expires the timer a sleeping thread is waiting on, so its period is
+	// the floor on how long any sleep can take.
 	freq := cpu.read_cntfrq_el0()
-	ticks := freq / 20 // 50ms ticks
+	mut ticks := freq / idle_tick_hz
+	if ticks == 0 {
+		ticks = 1
+	}
 	cpu.write_cntv_tval_el0(ticks)
 	cpu.write_cntv_ctl_el0(1)
 
@@ -714,10 +722,20 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	return new_proc
 }
 
+// idle_tick_hz is how often the idle loop dispatches the scheduler. It bounds
+// the wakeup latency of every sleeping thread: nothing that is waiting on a
+// timer can run again sooner than the next tick, so a 20 Hz idle tick made
+// *every* nanosleep cost about 50 ms however short it asked for. The loop
+// already polls rather than waiting on an interrupt, so ticking a thousand
+// times a second costs it nothing it was not already spending.
+const idle_tick_hz = u64(1000)
+
 pub fn await() {
-	// Arm virtual timer for scheduler tick (50ms)
 	freq := cpu.read_cntfrq_el0()
-	ticks := freq / 20
+	mut ticks := freq / idle_tick_hz
+	if ticks == 0 {
+		ticks = 1
+	}
 	cpu.write_cntv_tval_el0(ticks)
 	cpu.write_cntv_ctl_el0(1)
 
