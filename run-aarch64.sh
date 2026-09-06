@@ -1,6 +1,11 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
-# Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu]
+# Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu] [--mem=MB]
+#
+# --mem=MB (or VINIX_QEMU_MEM) sizes guest RAM. The virt machine places RAM
+# from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
+# where all of an Apple Silicon machine's RAM lives. 8192 exercises the same
+# high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -19,11 +24,13 @@ LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
 NO_BUILD=0
 SERIAL_ONLY=0
 VIRTIO_GPU=0
+QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
         --no-build)   NO_BUILD=1 ;;
         --serial)     SERIAL_ONLY=1 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
+        --mem=*)      QEMU_MEM="${arg#*=}" ;;
     esac
 done
 
@@ -183,7 +190,7 @@ fi
 exec qemu-system-aarch64 \
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
-    -m 2048 \
+    -m "$QEMU_MEM" \
     -smp 2 \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
