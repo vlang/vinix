@@ -104,8 +104,44 @@ cp "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf"
 cp "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf"
 cp "$RUNTIME_CONF" "$ESP_MOUNT/EFI/BOOT/limine.conf"
 cp "$RUNTIME_CONF" "$ESP_MOUNT/limine/limine.conf"
+# Refuse to start a copy that cannot finish. A half-written initramfs or
+# kernel leaves the ESP looking deployed while the machine will not boot.
+needed=$(( $(wc -c < "$KERNEL") + $(wc -c < "$INITRAMFS") ))
+avail=$(df -k "$ESP_MOUNT" | awk 'NR==2 {print $4 * 1024}')
+if [ -n "$avail" ] && [ "$avail" -lt "$needed" ]; then
+    echo "error: ESP has ${avail} bytes free, needs ${needed}" >&2
+    echo "hint: remove stale files from $ESP_MOUNT/boot" >&2
+    exit 1
+fi
+
 cp "$KERNEL" "$ESP_MOUNT/boot/vinix"
 cp "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar"
 
 sync
+
+# Verify what actually landed. cp can fail silently enough that the next
+# symptom is an unbootable machine rather than an error here.
+verify_copy() {
+    src="$1"
+    dst="$2"
+    if ! cmp -s "$src" "$dst"; then
+        echo "error: $dst does not match $src after copy" >&2
+        exit 1
+    fi
+}
+verify_copy "$KERNEL" "$ESP_MOUNT/boot/vinix"
+verify_copy "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar"
+verify_copy "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"
+
 echo "Deployed Vinix boot files to: $ESP_MOUNT"
+
+# Limine prints the ELF entry point on the boot screen. Printing it here too
+# is the only easy way to confirm which build actually booted.
+kernel_sha="$(shasum -a 256 "$KERNEL" | awk '{print $1}')"
+# e_entry is the 8-byte little-endian field at offset 24 of the ELF64 header;
+# od -tx8 already renders it host-order, so no byte swapping is needed.
+kernel_entry="$(od -An -tx8 -j24 -N8 "$KERNEL" | tr -d ' \n')"
+echo "  kernel sha256: $kernel_sha"
+echo "  kernel entry:  0x$kernel_entry"
+echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
+echo "Compare the entry point against Limine's 'ELF entry point' line at boot."
