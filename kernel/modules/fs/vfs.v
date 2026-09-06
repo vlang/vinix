@@ -18,7 +18,7 @@ pub const seek_cur = 1
 pub const seek_end = 2
 pub const seek_set = 0
 
-interface FileSystem {
+pub interface FileSystem {
 mut:
 	instantiate() &FileSystem
 	populate(&VFSNode)
@@ -38,6 +38,8 @@ pub mut:
 	parent         &VFSNode             = unsafe { nil }
 	children       &map[string]&VFSNode = unsafe { nil }
 	symlink_target string
+	// Enforced independently of mount flags for immutable on-disk trees.
+	read_only bool
 }
 
 __global (
@@ -79,33 +81,45 @@ pub fn initialise() {
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
+	return reduce_node_bounded(node, follow_symlinks, 0)
+}
+
+fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int) &VFSNode {
+	if depth > 64 { errno.set(errno.eloop); return unsafe { nil } }
+	if node == unsafe { nil } { errno.set(errno.enoent); return unsafe { nil } }
 	if unsafe { node.redir != 0 } {
-		return reduce_node(node.redir, follow_symlinks)
+		return reduce_node_bounded(node.redir, follow_symlinks, depth + 1)
 	}
 	if unsafe { node.mountpoint != 0 } {
-		return reduce_node(node.mountpoint, follow_symlinks)
+		return reduce_node_bounded(node.mountpoint, follow_symlinks, depth + 1)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
-		_, next_node, _ := path2node(node.parent, node.symlink_target)
+		_, next_node, _ := path2node_bounded(node.parent, node.symlink_target, depth + 1)
 		if unsafe { next_node == 0 } {
 			return 0
 		}
-		return reduce_node(next_node, follow_symlinks)
+		return reduce_node_bounded(next_node, follow_symlinks, depth + 1)
 	}
 	return unsafe { node }
 }
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
+	return path2node_bounded(parent, path, 0)
+}
+
+fn path2node_bounded(parent &VFSNode, path string, depth int) (&VFSNode, &VFSNode, string) {
+	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
+	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
 		errno.set(errno.enoent)
 		return 0, 0, ''
 	}
 
 	mut index := u64(0)
-	mut current_node := reduce_node(parent, false)
+	mut current_node := reduce_node_bounded(parent, false, depth + 1)
 
 	if path[index] == `/` {
-		current_node = reduce_node(vfs_root, false)
+		current_node = reduce_node_bounded(vfs_root, false, depth + 1)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
@@ -135,8 +149,13 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 
 		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
-		current_node = reduce_node(current_node, false)
+		current_node = reduce_node_bounded(current_node, false, depth + 1)
 
+		if current_node == unsafe { nil } || current_node.resource == unsafe { nil }
+			|| current_node.children == unsafe { nil } || !stat.isdir(current_node.resource.stat.mode) {
+			errno.set(errno.enotdir)
+			return 0, 0, ''
+		}
 		if elem_str !in current_node.children {
 			errno.set(errno.enoent)
 			if last == true {
@@ -145,20 +164,20 @@ fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
 			return 0, 0, ''
 		}
 
-		mut new_node := reduce_node(unsafe { current_node.children[elem_str] }, false)
+		mut new_node := reduce_node_bounded(unsafe { current_node.children[elem_str] }, false, depth + 1)
 
 		if last == true {
 			return current_node, new_node, elem_str
 		}
 
+		if new_node == unsafe { nil } { return 0, 0, '' }
 		current_node = new_node
 
 		if stat.islnk(current_node.resource.stat.mode) {
-			_, current_node, _ = path2node(current_node.parent, current_node.symlink_target)
+			current_node = reduce_node_bounded(current_node, true, depth + 1)
 			if voidptr(current_node) == unsafe { nil } {
 				return 0, 0, ''
 			}
-			continue
 		}
 
 		if !stat.isdir(current_node.resource.stat.mode) {
@@ -331,7 +350,9 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
+	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
+	if target_node == unsafe { nil } { return none }
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -348,8 +369,12 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	}
 
 	_, mut dest_node, _ := path2node(vfs_root, dest)
+	if dest_node == unsafe { nil } { return none }
+	if dest_node.read_only { errno.set(errno.erofs); return none }
 
+	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
 	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
+	if target_node == unsafe { nil } { return none }
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -359,21 +384,16 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
-	if voidptr(node) == unsafe { nil } {
-		return none
-	}
-
+	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
+	if node.read_only || parent_of_tgt.read_only { errno.set(errno.erofs); return none }
+	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	if stat.isdir(node.resource.stat.mode) {
-		if remove_dir == false {
-			errno.set(errno.eisdir)
-			return none
-		}
-
-		if node.children.len > 2 {
-			errno.set(errno.enotempty)
-			return none
-		}
-
+		if !remove_dir { errno.set(errno.eisdir); return none }
+		if node.children.len > 2 { errno.set(errno.enotempty); return none }
+	}
+	// A read-only or failing backend must leave the namespace intact.
+	node.resource.unlink(unsafe { nil })?
+	if stat.isdir(node.resource.stat.mode) {
 		unsafe {
 			free(node.children['.'].children)
 			free(node.children['.'])
@@ -382,10 +402,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 			free(node.children)
 		}
 	}
-
 	parent_of_tgt.children.delete(basename)
-
-	node.resource.unlink(unsafe { nil })?
 	node.resource.unref(unsafe { nil })?
 }
 
@@ -410,7 +427,9 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 		return none
 	}
 
+	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
+	if target_node == unsafe { nil } { return none }
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -489,7 +508,8 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 		return errno.err, errno.enotempty
 	}
 
-	target_node.resource.unlink(unsafe { nil }) or {}
+	if target_node.read_only || parent_of_tgt_node.read_only { return errno.err, errno.erofs }
+	target_node.resource.unlink(unsafe { nil }) or { return errno.err, errno.get() }
 	target_node.resource.unref(unsafe { nil }) or {}
 
 	unsafe {
@@ -625,6 +645,9 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		return errno.err, errno.enotdir
 	}
 
+	if node.read_only && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
+		return errno.err, errno.erofs
+	}
 	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or { return errno.err, errno.get() }
 
 	return u64(fdnum), 0
@@ -833,6 +856,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 
 	mut old_node := get_node(oldparent, oldpath, follow_links) or { return errno.err, errno.get() }
 
+	if newparent.read_only || old_node.read_only { return errno.err, errno.erofs }
 	mut new_node := newparent.filesystem.link(newparent, newpath, mut old_node) or {
 		return errno.err, errno.get()
 	}
@@ -859,6 +883,10 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 		fd.unref()
 	}
 
+	if fd.handle.node != unsafe { nil } {
+		node := unsafe { &VFSNode(fd.handle.node) }
+		if node.read_only { return errno.err, errno.erofs }
+	}
 	// Preserve file type bits (upper 4 bits), only change permission bits
 	fd.handle.resource.stat.mode = (fd.handle.resource.stat.mode & stat.ifmt) | (mode & ~u32(stat.ifmt))
 	return 0, 0
@@ -1084,6 +1112,11 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		return none
 	}
 
+	if old_parent_of.read_only || new_parent_of.read_only || old_node.read_only
+		|| (new_node != unsafe { nil } && new_node.read_only) {
+		errno.set(errno.erofs)
+		return none
+	}
 	if !same_filesystem(old_parent_of, new_parent_of) {
 		errno.set(errno.exdev)
 		return none
@@ -1142,8 +1175,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		}
 
 		// Replacing drops the destination's last link.
-		new_parent_of.children.delete(new_basename)
 		new_node.resource.unlink(unsafe { nil })?
+		new_parent_of.children.delete(new_basename)
 		new_node.resource.unref(unsafe { nil })?
 	}
 

@@ -15,6 +15,7 @@ import aarch64.pmgr
 import aarch64.uart
 import aarch64.virtio_input
 import apple.smc
+import apple.ans
 import devicetree
 import initramfs
 import fs
@@ -169,6 +170,7 @@ fn kmain_thread() {
 	}
 
 	table.init_syscall_table()
+	table.init_storage_syscalls()
 	print('kmain_thread: syscall table done\n')
 
 	// Register segfault handler so user-space crashes kill the process
@@ -187,6 +189,18 @@ fn kmain_thread() {
 
 	console.initialise()
 	print('kmain_thread: console done\n')
+
+	// ANS is independent of the GPU, and disabled unless explicitly requested.
+	// Keep the initramfs root and recovery console even if storage bring-up fails.
+	if kernel_file_req.response != unsafe { nil } {
+		kernel_file := kernel_file_req.response.kernel_file
+		if kernel_file != unsafe { nil } && kernel_file.cmdline != unsafe { nil } {
+			ans.initialise(unsafe { cstring_to_vstring(kernel_file.cmdline) })
+		}
+	}
+	if !ans.select_root() {
+		panic('Requested ANS SSD root could not be selected safely')
+	}
 	boot_stage(12)
 
 	print('\n*** aarch64: Kernel initialisation complete ***\n')
