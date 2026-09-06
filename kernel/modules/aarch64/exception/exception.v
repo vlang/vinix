@@ -18,7 +18,63 @@ fn C.sc_dump_ring()
 // would be garbage. 32 KiB is enough for the deep fault dump.
 __global (
 	exception_stack [32768]u8
+	// Static line buffer for the fatal report. The report must not allocate:
+	// a fault inside the allocator (or on memory it relies on) would otherwise
+	// re-fault while being reported, recursing into silence. That is exactly
+	// what happened on the M1 when the PMM bitmap was left unmapped.
+	fatal_line     [256]u8
+	fatal_line_len = int(0)
 )
+
+fn fatal_put_str(s string) {
+	for i := 0; i < s.len; i++ {
+		if fatal_line_len < 255 {
+			fatal_line[fatal_line_len] = s[i]
+			fatal_line_len++
+		}
+	}
+}
+
+fn fatal_put_hex(v u64) {
+	digits := '0123456789abcdef'
+	if v == 0 {
+		fatal_put_str('0')
+		return
+	}
+	mut tmp := [16]u8{}
+	mut i := 16
+	mut x := v
+	for x > 0 && i > 0 {
+		i--
+		tmp[i] = digits[x & 0xf]
+		x >>= 4
+	}
+	for j := i; j < 16; j++ {
+		if fatal_line_len < 255 {
+			fatal_line[fatal_line_len] = tmp[j]
+			fatal_line_len++
+		}
+	}
+}
+
+// Framebuffer-visible fatal report built in a static buffer, no heap.
+fn emit_fatal_line(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
+	fatal_line_len = 0
+	fatal_put_str('\n*** FATAL EXCEPTION ec=0x')
+	fatal_put_hex(ec)
+	fatal_put_str(' esr=0x')
+	fatal_put_hex(esr)
+	fatal_put_str(' far=0x')
+	fatal_put_hex(far)
+	fatal_put_str(' pc=0x')
+	fatal_put_hex(gpr_state.pc)
+	fatal_put_str(' lr=0x')
+	fatal_put_hex(gpr_state.x30)
+	fatal_put_str(' sp=0x')
+	fatal_put_hex(gpr_state.sp)
+	fatal_put_str(' ***\n')
+	term.print(voidptr(&fatal_line[0]), u64(fatal_line_len))
+}
 
 pub fn initialise() {
 	irq_dispatch_fn = default_irq_dispatch
@@ -72,7 +128,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// A red bar at row 56, drawn without locks or allocation, marks a fault
 	// even if the text path below cannot run (lock held, allocator wedged).
 	term.early_stage_mark(56)
-	print('\n*** FATAL EXCEPTION ec=0x${ec:x} esr=0x${esr:x} far=0x${far:x} pc=0x${gpr_state.pc:x} ***\n')
+	emit_fatal_line(ec, esr, far, gpr_state)
 
 	uart.puts(c'FATAL EXCEPTION: ec=0x')
 	uart_put_hex(ec)
