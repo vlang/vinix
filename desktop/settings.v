@@ -55,8 +55,15 @@ fn settings_write_percent(percent int) int {
 	return C.vd_bl_set_percent(percent)
 }
 
+enum SettingsCategory {
+	display
+	battery
+}
+
 struct SettingsApp {
 mut:
+	category     SettingsCategory = .display
+	battery_read fn (bool) int = read_battery
 	state        C.VdBlState
 	read_result  int = settings_bl_unavailable
 	write_result int
@@ -184,28 +191,43 @@ fn settings_label(text string, x int, y int, width int, color u32) ui2.Element {
 	})
 }
 
+fn settings_category_button(id string, text string, y int, selected bool) ui2.Element {
+	return ui2.button(id, text, ui2.rect(10, f64(y), 98, 30), ui2.BoxStyle{
+		bg: if selected { accent } else { files_up }
+		radius: 5
+	}, ui2.TextStyle{color: taskbar_text_active, size: 13, align: .center})
+}
+
 fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	// The desktop already redraws for its clock once a second. Poll at most
 	// that often, including pending changes made by another Settings window.
 	now := C.vd_bl_now_ms()
-	if !a.initialized || (now != 0 && (now < a.last_poll_ms || now - a.last_poll_ms >= 1000)) {
+	if a.category == .display && (!a.initialized
+		|| (now != 0 && (now < a.last_poll_ms || now - a.last_poll_ms >= 1000))) {
 		a.refresh()
 	}
 	width := int(size.width)
 	height := int(size.height)
 	if width < 460 || height < 338 {
 		return ui2.screen(window_body, [
-			settings_label('Enlarge Settings to show Display controls.', 12, 12, width - 24, body_text),
+			settings_label('Enlarge Settings to show its controls.', 12, 12, width - 24, body_text),
 		])
 	}
 	x := 136
 	inner := width - x - 18
-	active := a.can_change()
-	percent := if a.read_result == settings_bl_ok { C.vd_bl_percent(&a.state) } else { -1 }
 	mut children := [
 		ui2.view('', ui2.rect(0, 0, 118, f64(height)), ui2.BoxStyle{bg: body_panel}, []),
 		settings_label('Categories', 12, 14, 100, body_muted),
-		settings_button('settings.display', 'Display', ui2.rect(10, 46, 98, 30), true),
+		settings_category_button('settings.display', 'Display', 46, a.category == .display),
+		settings_category_button('settings.battery', 'Battery', 84, a.category == .battery),
+	]
+	if a.category == .battery {
+		children << battery_settings_elements(a.battery_read(false), x, inner)
+		return ui2.screen(window_body, children)
+	}
+	active := a.can_change()
+	percent := if a.read_result == settings_bl_ok { C.vd_bl_percent(&a.state) } else { -1 }
+	children << [
 		ui2.label('', 'Display', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
 			color: body_heading
 			size: 20
@@ -252,9 +274,28 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a SettingsApp) handle(event_id string) ! {
-	if event_id == 'settings.refresh' || event_id == 'settings.display' {
+	if event_id == 'settings.battery' {
+		a.category = .battery
+		a.battery_read(true)
+		return
+	}
+	if event_id == 'settings.display' {
+		a.category = .display
 		a.write_result = settings_bl_ok
 		a.refresh()
+		return
+	}
+	if event_id == 'settings.refresh' {
+		if a.category == .battery {
+			a.battery_read(true)
+		} else {
+			a.write_result = settings_bl_ok
+			a.refresh()
+		}
+		return
+	}
+	// Ignore stale brightness hit targets while the Battery page is selected.
+	if a.category != .display {
 		return
 	}
 	mut target := -1

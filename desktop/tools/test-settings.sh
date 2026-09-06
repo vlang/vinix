@@ -12,16 +12,21 @@ cc=${CC:-cc}
     "$root/desktop/tools/tests/test_backlight_client.c" \
     "$root/kernel/c/apple_dcp_backlight.c" -o "$work/test-client"
 "$work/test-client"
+sh "$root/desktop/tools/test-battery.sh"
 
 v=${V:-v}
 if command -v "$v" >/dev/null 2>&1 && [ -f "$root/third_party/ui2/v.mod" ]; then
     mkdir "$work/ui"
     cp "$root/desktop/settings.v" "$root/desktop/backlight_client.h" \
+        "$root/desktop/battery.v" "$root/desktop/battery_client.h" \
         "$root/desktop/theme.v" "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
+    # Keep shared fixtures and both sets of tests in one test translation unit.
+    sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" \
+        >> "$work/ui/settings_test.v"
     printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
     "$v" -gc none -enable-globals -d ui2_headless \
         -path "@vlib|@vmodules|$root/third_party" test "$work/ui"
 else
-    echo 'SKIP: V Settings UI tests require V and third_party/ui2.'
+    echo 'SKIP: V Settings/Battery UI tests require V and third_party/ui2.'
     if [ "${REQUIRE_V_TESTS:-0}" = 1 ]; then exit 1; fi
 fi

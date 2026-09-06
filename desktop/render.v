@@ -28,7 +28,8 @@ struct HitTarget {
 // text_inset is the gap between a control's edge and text aligned against it.
 const text_inset = 10
 
-const clock_area_width = 128
+// Reserve room for "100%  |  HH:MM:SS" as well as the date below it.
+const clock_area_width = 208
 
 // An icon sharing a control with a label is drawn at this size.
 const button_icon_size = 16

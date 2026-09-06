@@ -62,18 +62,22 @@ fn pad2(value int) string {
 	return if value < 10 { '0${value}' } else { '${value}' }
 }
 
-// clock_strings returns the two lines the taskbar shows: the time above and
-// the date below.
+// The first line puts battery percentage immediately to the left of the time;
+// the second keeps the existing date. Settings shares the five-second cache,
+// so composing a frame does not open the device again within that interval.
 fn (d &Desktop) clock_strings() (string, string) {
+	percent := read_battery(false)
 	mut nanoseconds := i64(0)
 	seconds := C.vd_realtime_seconds(&nanoseconds)
 	if seconds < 0 {
-		return '--:--:--', ''
+		return battery_clock_label(percent, '--:--:--'), ''
 	}
 	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
 	time_text := '${pad2(civil.hour)}:${pad2(civil.minute)}:${pad2(civil.second)}'
 	date_text := '${weekday_names[civil.weekday]} ${civil.day} ${month_names[civil.month - 1]}'
-	return time_text, date_text
+	label := battery_clock_label(percent, time_text)
+	unsafe { time_text.free() }
+	return label, date_text
 }
 
 // monotonic_millis drives the frame pacing and the redraw clock.
