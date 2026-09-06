@@ -5,10 +5,15 @@ module main
 import ui2
 
 // Runs alongside settings_test.v against the real Settings/Battery UI code.
+// Battery is a category of the desktop's one Settings application now, so the
+// page is chosen through the shared sidebar rather than by an id of its own.
 __global (
 	battery_fixture_value int
 	battery_fixture_forces int
 )
+
+const battery_category_action = '${settings_action_category}${settings_categories.index(SettingsCategory.battery)}'
+const display_category_action = '${settings_action_category}${settings_categories.index(SettingsCategory.display)}'
 
 fn battery_fixture_read(force bool) int {
 	if force { battery_fixture_forces++ }
@@ -26,9 +31,9 @@ fn battery_fixture_app() &SettingsApp {
 fn test_battery_category_refresh_and_display_preserved() {
 	mut app := battery_fixture_app()
 	initial := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
-	category := element_named(initial, 'settings.battery') or { panic('missing Battery category') }
-	assert category.text == 'Battery'
-	app.handle('settings.battery') or { panic(err) }
+	element_named(initial, battery_category_action) or { panic('missing Battery category') }
+	assert SettingsCategory.battery.title() == 'Battery'
+	app.handle(battery_category_action) or { panic(err) }
 	assert battery_fixture_forces == 1
 	root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	value := element_named(root, 'settings.battery.percent') or { panic('missing percentage') }
@@ -44,7 +49,7 @@ fn test_battery_category_refresh_and_display_preserved() {
 	updated := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	updated_value := element_named(updated, 'settings.battery.percent') or { panic('missing percentage') }
 	assert updated_value.text == '42%'
-	app.handle('settings.display') or { panic(err) }
+	app.handle(display_category_action) or { panic(err) }
 	display := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	control := element_named(display, 'settings.brightness.50') or { panic('missing brightness') }
 	assert control.enabled && fixture_writes == 0
@@ -52,7 +57,7 @@ fn test_battery_category_refresh_and_display_preserved() {
 
 fn test_battery_zero_full_and_unavailable_states() {
 	mut app := battery_fixture_app()
-	app.handle('settings.battery') or { panic(err) }
+	app.handle(battery_category_action) or { panic(err) }
 	for sample in [0, 100, battery_unavailable, battery_permission, battery_invalid, battery_io, 101] {
 		battery_fixture_value = sample
 		root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
@@ -64,7 +69,7 @@ fn test_battery_zero_full_and_unavailable_states() {
 		}
 		if sample == 100 {
 			fill := element_named(root, 'settings.battery.fill') or { panic('missing full bar') }
-			assert fill.frame.width == 466
+			assert fill.frame.width == 455
 		} else {
 			if _ := element_named(root, 'settings.battery.fill') {
 				assert false, 'empty/invalid samples must not have a filled bar'
@@ -81,7 +86,7 @@ fn test_battery_taskbar_labels_and_narrow_settings() {
 	assert battery_clock_label(battery_io, '--:--:--') == '--%  |  --:--:--'
 	assert battery_percentage_text(101) == '--%'
 	mut app := battery_fixture_app()
-	app.handle('settings.battery') or { panic(err) }
+	app.handle(battery_category_action) or { panic(err) }
 	root := app.build(ui2.rect(0, 0, 320, 200)) or { panic(err) }
 	if _ := element_named(root, 'settings.battery.percent') {
 		assert false, 'offscreen battery elements must not be built'

@@ -4,13 +4,13 @@ module main
 
 import ui2
 
-// Only the real Settings implementation and theme are staged for these tests.
-// This is the same interface as app.v, without the unrelated calculator model.
-interface HostedApp {
-mut:
-	build(size ui2.Rect) !ui2.Element
-	handle(event_id string) !
-}
+// The whole desktop is staged for these tests, so HostedApp and the rest come
+// from the application itself rather than being restated here.
+//
+// Display and Battery are two categories of the desktop's one Settings
+// application now. They report a device rather than changing the desktop, so
+// they build and handle with no desktop behind them, which is what lets these
+// tests drive them without standing a window manager up.
 
 __global (
 	fixture_state        BacklightState
@@ -52,7 +52,11 @@ fn fixture_app() &SettingsApp {
 	fixture_percent = -1
 	desktop_scale_factor = desktop_scale_100
 	desktop_applied_scale = desktop_scale_100
-	mut app := &SettingsApp{ read_state: fixture_read, write_percent: fixture_write }
+	mut app := &SettingsApp{
+		category: .display
+		read_state: fixture_read
+		write_percent: fixture_write
+	}
 	app.refresh()
 	return app
 }
@@ -71,8 +75,12 @@ fn element_named(root ui2.Element, id string) ?ui2.Element {
 fn test_settings_display_controls_and_explicit_writes() {
 	mut app := fixture_app()
 	root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
-	category := element_named(root, 'settings.display') or { panic('missing Display category') }
-	assert category.text == 'Display'
+	display_index := settings_categories.index(SettingsCategory.display)
+	assert display_index >= 0
+	element_named(root, '${settings_action_category}${display_index}') or {
+		panic('missing Display category')
+	}
+	assert SettingsCategory.display.title() == 'Display'
 	assert fixture_writes == 0
 	app.handle('settings.refresh') or { panic(err) }
 	assert fixture_writes == 0
@@ -92,16 +100,18 @@ fn test_settings_scale_choices_and_stale_hits() {
 	mut scale_200 := element_named(root, settings_scale_200_action) or { panic('missing 200% scale') }
 	assert scale_100.text == '100%'
 	assert scale_200.text == '200%'
-	assert scale_100.box.bg == accent
+	assert scale_100.box.bg == app_accent
 	assert scale_200.box.bg == files_up
 
 	app.handle(settings_scale_200_action) or { panic(err) }
 	assert desktop_scale_factor == desktop_scale_200
 	root = app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	scale_200 = element_named(root, settings_scale_200_action) or { panic('missing selected 200% scale') }
-	assert scale_200.box.bg == accent
+	assert scale_200.box.bg == app_accent
 
-	app.handle('settings.battery') or { panic(err) }
+	battery_index := settings_categories.index(SettingsCategory.battery)
+	assert battery_index >= 0
+	app.handle('${settings_action_category}${battery_index}') or { panic(err) }
 	app.handle(settings_scale_100_action) or { panic(err) }
 	assert desktop_scale_factor == desktop_scale_200
 }

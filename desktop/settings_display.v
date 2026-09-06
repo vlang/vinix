@@ -257,7 +257,16 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 }
 
 fn (a &SettingsApp) battery_pane(width int) []ui2.Element {
-	return battery_settings_elements(a.battery_read(false), settings_padding, width - 2 * settings_padding)
+	inner := width - 2 * settings_padding
+	// As the Display pane does: nothing offscreen, so nothing offscreen can
+	// become a hit target.
+	if inner < 300 {
+		return [
+			settings_label('Enlarge Settings to show its controls.', settings_padding,
+				settings_padding, if inner > 0 { inner } else { 1 }, body_text),
+		]
+	}
+	return battery_settings_elements(a.battery_read(false), settings_padding, inner)
 }
 
 // The Display and Battery actions. The sidebar has already dealt with choosing

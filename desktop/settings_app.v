@@ -107,17 +107,31 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 
 	children << ui2.view('', ui2.rect(f64(pane_x), 0, f64(pane_width), f64(height)), ui2.BoxStyle{
 		bg: app_surface
-	}, match a.category {
-		.appearance { a.appearance_pane(pane_width) }
-		.theme { a.theme_pane(pane_width) }
-		.wallpaper { a.wallpaper_pane(pane_width, height) }
-		.display { a.display_pane(pane_width) }
-		.battery { a.battery_pane(pane_width) }
-	})
+	}, a.pane(pane_width, height))
 
 	// The screen's own background never shows; the two panes cover it. It is
 	// the application surface so that a window resized oddly still looks whole.
 	return ui2.screen(app_surface, children)
+}
+
+// Display and Battery report a device and change nothing here, so they draw
+// without a desktop behind them. The other three are the desktop's own
+// preferences and have nothing to show without one.
+fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
+	match a.category {
+		.display { return a.display_pane(width) }
+		.battery { return a.battery_pane(width) }
+		else {}
+	}
+	if a.desktop == unsafe { nil } {
+		return []ui2.Element{}
+	}
+	return match a.category {
+		.appearance { a.appearance_pane(width) }
+		.theme { a.theme_pane(width) }
+		.wallpaper { a.wallpaper_pane(width, height) }
+		else { []ui2.Element{} }
+	}
 }
 
 fn (a &SettingsApp) category_rows(height int) []ui2.Element {
@@ -313,9 +327,6 @@ fn (a &SettingsApp) wallpaper_pane(width int, height int) []ui2.Element {
 }
 
 fn (mut a SettingsApp) handle(event_id string) ! {
-	if a.desktop == unsafe { nil } {
-		return
-	}
 	if event_id.starts_with(settings_action_category) {
 		index := event_id[settings_action_category.len..].int()
 		if index >= 0 && index < settings_categories.len {
@@ -335,6 +346,10 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	}
 	if a.category == .display || a.category == .battery {
 		a.handle_device(event_id)
+		return
+	}
+	// Everything below writes a preference, which needs a desktop to write to.
+	if a.desktop == unsafe { nil } {
 		return
 	}
 	if event_id.starts_with(settings_action_side) {
