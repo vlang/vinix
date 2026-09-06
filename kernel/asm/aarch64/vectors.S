@@ -164,15 +164,20 @@
 .balign 0x800
 exception_vectors:
 
-// --- Current EL with SP_EL0 (not used in kernel, we use SP_ELx) ---
+// --- Current EL with SP_EL0 ---
+// Early boot runs at EL1t (Limine enters on SP_EL0 and nothing switches), so a
+// kernel fault before the scheduler is taken through THIS group, not the SP_ELx
+// one below. Route it to the same handlers; exception init points SP_EL1 at a
+// real stack so they have somewhere to save state. Without this a fault here
+// (e.g. the first MMIO access) span-locked on `b .` with no output.
 .balign 0x80    // 0x000: Synchronous
-    b .
+    b handle_spx_sync
 .balign 0x80    // 0x080: IRQ
-    b .
+    b handle_spx_irq
 .balign 0x80    // 0x100: FIQ
-    b .
+    b handle_spx_fiq
 .balign 0x80    // 0x180: SError
-    b .
+    b handle_spx_serror
 
 // --- Current EL with SP_ELx (kernel exceptions) ---
 .balign 0x80    // 0x200: Synchronous

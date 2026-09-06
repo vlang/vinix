@@ -512,9 +512,15 @@ fn C.vinix_psci_hvc(function_id u64) u64
 fn C.vinix_psci_smc(function_id u64) u64
 
 fn C.vinix_current_el() u64
+fn C.vinix_set_sp_el1(value u64)
 
 pub fn current_el() u64 {
 	return C.vinix_current_el()
+}
+
+// Give EL1 a valid SP_EL1 (exception stack). See vinix_set_sp_el1 in psci.S.
+pub fn set_sp_el1(value u64) {
+	C.vinix_set_sp_el1(value)
 }
 
 pub fn psci_call(function_id u64) {

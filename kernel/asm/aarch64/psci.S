@@ -85,3 +85,23 @@ vinix_install_early_fault_vectors:
 2:  msr  vbar_el1, x1
     isb
     ret
+
+// Set SP_EL1 from EL1 while running on SP_EL0. Used to give early boot (which
+// Limine leaves at EL1t, on SP_EL0) a valid exception stack, so a fault taken
+// to EL1 -- where the CPU switches to SP_EL1 -- lands on real memory instead of
+// an uninitialised pointer.
+//
+// `msr SP_EL1, x0` faults under HVF (EC=0, "unknown reason"), the same quirk the
+// scheduler documents for `msr SP_EL0`. Set it the way the rest of the kernel
+// does: select SP_EL1 with SPSel, write it with `mov sp`, then switch back to
+// SP_EL0 (the running stack, left untouched). This leaf function spills nothing
+// to the stack, so it is safe across the SPSel change.
+.globl vinix_set_sp_el1
+.type vinix_set_sp_el1, %function
+vinix_set_sp_el1:
+    msr spsel, #1
+    isb
+    mov sp, x0
+    msr spsel, #0
+    isb
+    ret

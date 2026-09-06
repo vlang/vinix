@@ -12,9 +12,24 @@ import proc
 fn C.exception_vectors()
 fn C.sc_dump_ring()
 
+// Dedicated stack for exceptions taken while early boot runs on SP_EL0. When a
+// fault is taken to EL1 the CPU switches to SP_EL1; Limine never set it, so it
+// would be garbage. 32 KiB is enough for the deep fault dump.
+__global (
+	exception_stack [32768]u8
+)
+
 pub fn initialise() {
 	irq_dispatch_fn = default_irq_dispatch
 	cpu.write_vbar_el1(u64(voidptr(C.exception_vectors)))
+	cpu.isb()
+
+	// Give SP_EL1 a real stack so a Current-EL/SP_EL0 fault (anything before the
+	// scheduler, which runs at EL1t) reaches the handler instead of faulting
+	// again on an uninitialised stack. 16-byte aligned per the ABI.
+	mut sp_top := u64(voidptr(&exception_stack[0])) + u64(sizeof(exception_stack))
+	sp_top &= ~u64(0xf)
+	cpu.set_sp_el1(sp_top)
 	cpu.isb()
 }
 
@@ -49,6 +64,12 @@ fn dump_reg(name &u8, val u64) {
 }
 
 fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
+	// The full register dump below goes to the UART, which is dead on Apple
+	// hardware. Put the essentials on the framebuffer too (the same print path
+	// the boot log uses), so a kernel fault is visible on a machine with no
+	// serial rather than a silent freeze.
+	print('\n*** FATAL EXCEPTION ec=0x${ec:x} esr=0x${esr:x} far=0x${far:x} pc=0x${gpr_state.pc:x} ***\n')
+
 	uart.puts(c'FATAL EXCEPTION: ec=0x')
 	uart_put_hex(ec)
 	uart.puts(c' esr=0x')
