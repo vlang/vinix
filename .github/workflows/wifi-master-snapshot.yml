@@ -1,0 +1,21 @@
+name: Wi-Fi master snapshot
+on:
+  push:
+    branches: [wifi/m1-air]
+    paths: ['.github/workflows/wifi-master-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 77f018d956ab09c3d6628bb5ac7ac664b9ab48df
+      - run: git archive --format=tar.gz HEAD > /tmp/vinix-master-source.tar.gz
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vinix-master-source
+          path: /tmp/vinix-master-source.tar.gz
+          retention-days: 3
