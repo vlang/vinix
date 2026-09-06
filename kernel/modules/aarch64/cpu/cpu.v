@@ -326,21 +326,21 @@ pub fn isb() {
 
 pub fn dsb_sy() {
 	asm volatile aarch64 {
-		dsb sy
+		dsb 15
 		; ; ; memory
 	}
 }
 
 pub fn dsb_st() {
 	asm volatile aarch64 {
-		dsb st
+		dsb 14
 		; ; ; memory
 	}
 }
 
 pub fn dsb_ld() {
 	asm volatile aarch64 {
-		dsb ld
+		dsb 13
 		; ; ; memory
 	}
 }
@@ -361,7 +361,7 @@ pub fn dsb_ishst() {
 
 pub fn dmb_sy() {
 	asm volatile aarch64 {
-		dmb sy
+		dmb 15
 		; ; ; memory
 	}
 }
