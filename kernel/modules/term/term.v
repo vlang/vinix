@@ -103,6 +103,49 @@ fn scale_channel(value u8, mask_size u8) u32 {
 	return u32(value) >> (8 - mask_size)
 }
 
+// Fill the entire framebuffer with one colour. A 16-row bar is easy to miss
+// or to mistake for a dark screen; a whole-screen fill answers a single
+// question unambiguously: can the kernel put pixels on this display at all.
+// If the screen keeps showing the bootloader's text, the kernel never wrote.
+// If it turns the fill colour, the framebuffer works and later bars are
+// meaningful. If it is black, the panel is not showing our writes.
+pub fn early_screen_fill(stage u32) {
+	if fb_req.response == unsafe { nil } {
+		return
+	}
+	if fb_req.response.framebuffer_count == 0 || fb_req.response.framebuffers == unsafe { nil } {
+		return
+	}
+	fb := unsafe { fb_req.response.framebuffers[0] }
+	if fb == unsafe { nil } || fb.address == unsafe { nil } {
+		return
+	}
+	if fb.width == 0 || fb.height == 0 || fb.pitch == 0 {
+		return
+	}
+	bytes_per_pixel := u64(fb.bpp) / 8
+	if bytes_per_pixel < 3 || bytes_per_pixel > 4 {
+		return
+	}
+	rgb := stage_color(stage)
+	color := encode_pixel(fb, u8(rgb >> 16), u8(rgb >> 8), u8(rgb))
+	for y := u64(0); y < fb.height; y++ {
+		row := u64(fb.address) + y * fb.pitch
+		for x := u64(0); x < fb.width; x++ {
+			pixel := row + x * bytes_per_pixel
+			unsafe {
+				if bytes_per_pixel == 4 {
+					*&u32(pixel) = color
+				} else {
+					*&u8(pixel) = u8(color)
+					*&u8(pixel + 1) = u8(color >> 8)
+					*&u8(pixel + 2) = u8(color >> 16)
+				}
+			}
+		}
+	}
+}
+
 @[_linker_section: '.requests']
 @[cinit]
 __global (

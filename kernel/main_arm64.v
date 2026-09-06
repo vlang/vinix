@@ -271,7 +271,14 @@ fn kmain() {
 	// how far boot actually gets.
 	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
 
-	term.early_stage_mark(1)
+	if skip_early_term {
+		// Answer the prior question first: can the kernel drive this display
+		// at all? A whole-screen fill cannot be confused with a dark panel or
+		// with leftover bootloader text the way a 16-row bar can.
+		term.early_screen_fill(1)
+	} else {
+		term.early_stage_mark(1)
+	}
 
 	// Do not hard-stop on base revision mismatch. Some real-hardware boot
 	// chains may provide an older Limine build; continue and rely on feature
