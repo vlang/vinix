@@ -1,4 +1,4 @@
-name: Wi-Fi network stack dependencies
+name: Wi-Fi validation tools
 on:
   push:
     branches: [wifi/m1-air]
@@ -7,18 +7,33 @@ permissions:
   contents: read
 jobs:
   dependencies:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
-          repository: lwip-tcpip/lwip
-          ref: 77dcd25a72509eb83f72b033d219b1d40cd8eb95
           persist-credentials: false
-          path: lwip
-      - run: tar --exclude=.git -czf lwip-source.tar.gz lwip
+      - name: Install emulation and boot tools
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-arm qemu-efi-aarch64 mtools clang lld llvm autoconf automake
+      - name: Build bootloader
+        run: |
+          # Avoid grep -q with pipefail cutting off xxd on a successful match.
+          sed -i 's/grep -q "$PATCH_MARKER"/grep "$PATCH_MARKER" >\/dev\/null/' build-limine-aarch64.sh
+          ./build-limine-aarch64.sh
+      - name: Package tools and linked libraries
+        run: |
+          mkdir -p /tmp/qemu-tools/lib /tmp/qemu-tools/bin /tmp/qemu-tools/share
+          for tool in qemu-system-aarch64 mformat mmd mcopy; do
+            binary=$(command -v "$tool")
+            cp "$binary" /tmp/qemu-tools/bin/
+            ldd "$binary" | awk '/=> \/|^\s*\// { for (i=1;i<=NF;i++) if ($i ~ /^\//) print $i }' | while read library; do cp -L "$library" /tmp/qemu-tools/lib/; done
+          done
+          cp -a /usr/share/qemu /tmp/qemu-tools/share/
+          cp -a /usr/share/AAVMF /tmp/qemu-tools/share/
+          cp boot-image/limine-bin/BOOTAA64.EFI /tmp/qemu-tools/
+          tar -C /tmp -czf qemu-tools.tar.gz qemu-tools
       - uses: actions/upload-artifact@v7
         with:
-          name: lwip-2.2.1-source
-          path: lwip-source.tar.gz
+          name: qemu-aarch64-offline
+          path: qemu-tools.tar.gz
           retention-days: 3
