@@ -53,6 +53,22 @@ pub mut:
 	connected        bool
 	peer             &UnixSocket = unsafe { nil }
 
+	// shutdown(2) state. `read_closed` and `write_closed` are this socket's own
+	// halves; `peer_finished` records that the other end promised to send
+	// nothing further, so a reader drains what is buffered and only then sees
+	// end of file.
+	read_closed   bool
+	write_closed  bool
+	peer_finished bool
+
+	// Remembered so getsockopt(SO_TYPE) and friends have something true to say.
+	socktype int
+	// Options this kernel accepts but does not act on, kept so that a program
+	// that sets one and reads it back is not told it failed.
+	reuseaddr int
+	keepalive int
+	broadcast int
+
 	data      &u8 = unsafe { nil }
 	read_ptr  u64
 	write_ptr u64
@@ -74,8 +90,18 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 
 	handle := unsafe { &file.Handle(_handle) }
 
+	// shutdown(SHUT_RD) here: reads report end of file whatever is buffered.
+	if this.read_closed {
+		return 0
+	}
+
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(&this.used) == 0 {
+		// The peer shut its write half: drain first, then end of file. Without
+		// this a reader waits for data that can never arrive.
+		if this.peer_finished {
+			return 0
+		}
 		// Return EOF if the pipe was closed
 		//		if this.refcount <= 1 {
 		//			return 0
@@ -135,7 +161,20 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
 	mut count := _count
 
+	if this.write_closed {
+		errno.set(errno.epipe)
+		return none
+	}
+
 	mut peer := this.peer
+	if peer == unsafe { nil } {
+		errno.set(errno.enotconn)
+		return none
+	}
+	if peer.read_closed {
+		errno.set(errno.epipe)
+		return none
+	}
 
 	peer.l.acquire()
 	defer {
@@ -238,14 +277,88 @@ fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u32) ?
 		return none
 	}
 
-	mut actual_size := unsafe { *addrlen }
-	if actual_size < sizeof(SockaddrUn) {
-		actual_size = sizeof(SockaddrUn)
+	// This used to round the copy *up* to the full struct when the caller
+	// offered a smaller buffer, writing past the end of it.
+	sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&this.peer.name), sizeof(SockaddrUn))
+}
+
+fn (mut this UnixSocket) sockname(handle voidptr, _addr voidptr, addrlen &u32) ? {
+	// An unbound socket has no path, and getsockname(2) reports just the family.
+	mut full := u32(sizeof(SockaddrUn))
+	if this.name.sun_path[0] == 0 {
+		full = u32(sizeof(u16))
 	}
 
-	unsafe { C.memcpy(_addr, voidptr(&this.peer.name), actual_size) }
-	unsafe {
-		*addrlen = actual_size
+	sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&this.name), full)
+}
+
+// shutdown(2). Closing the write half is how a peer is told that nothing more
+// is coming, which is the only way a reader blocked on this socket ever learns
+// to stop waiting.
+fn (mut this UnixSocket) shutdown(handle voidptr, how int) ? {
+	if how != sock_pub.shut_rd && how != sock_pub.shut_wr && how != sock_pub.shut_rdwr {
+		errno.set(errno.einval)
+		return none
+	}
+
+	if how == sock_pub.shut_rd || how == sock_pub.shut_rdwr {
+		this.read_closed = true
+		this.status |= file.pollin
+		event.trigger(mut &this.event, false)
+	}
+
+	if how == sock_pub.shut_wr || how == sock_pub.shut_rdwr {
+		this.write_closed = true
+
+		mut peer := this.peer
+		if this.connected && peer != unsafe { nil } {
+			peer.peer_finished = true
+			peer.status |= file.pollin
+			event.trigger(mut &peer.event, false)
+		}
+	}
+}
+
+fn (mut this UnixSocket) getsockopt(handle voidptr, level int, optname int) ?int {
+	if level != sock_pub.sol_socket {
+		errno.set(errno.enoprotoopt)
+		return none
+	}
+
+	match optname {
+		sock_pub.so_type { return this.socktype }
+		sock_pub.so_error { return 0 }
+		sock_pub.so_acceptconn { return if this.listening { 1 } else { 0 } }
+		sock_pub.so_domain { return sock_pub.af_unix }
+		sock_pub.so_protocol { return 0 }
+		sock_pub.so_sndbuf, sock_pub.so_rcvbuf { return int(this.capacity) }
+		sock_pub.so_reuseaddr { return this.reuseaddr }
+		sock_pub.so_keepalive { return this.keepalive }
+		sock_pub.so_broadcast { return this.broadcast }
+		else {
+			errno.set(errno.enoprotoopt)
+			return none
+		}
+	}
+}
+
+fn (mut this UnixSocket) setsockopt(handle voidptr, level int, optname int, value int) ? {
+	if level != sock_pub.sol_socket {
+		errno.set(errno.enoprotoopt)
+		return none
+	}
+
+	// The options below change nothing about how a unix socket behaves here,
+	// but a program that sets one and reads it back should see what it wrote.
+	match optname {
+		sock_pub.so_reuseaddr, sock_pub.so_reuseport { this.reuseaddr = value }
+		sock_pub.so_keepalive { this.keepalive = value }
+		sock_pub.so_broadcast { this.broadcast = value }
+		sock_pub.so_sndbuf, sock_pub.so_rcvbuf, sock_pub.so_linger, sock_pub.so_oobinline {}
+		else {
+			errno.set(errno.enoprotoopt)
+			return none
+		}
 	}
 }
 
@@ -557,6 +670,8 @@ pub fn create(@type int) ?&UnixSocket {
 		capacity: sock_buf
 	}
 	ret.name.sun_family = sock_pub.af_unix
+	ret.socktype = @type & sock_pub.sock_type_mask
+	ret.status |= file.pollout
 	return ret
 }
 
@@ -568,6 +683,8 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 		capacity: sock_buf
 	}
 	a.name.sun_family = sock_pub.af_unix
+	a.socktype = @type & sock_pub.sock_type_mask
+	a.status |= file.pollout
 	mut b := &UnixSocket{
 		refcount: 1
 		peer:     unsafe { nil }
@@ -575,5 +692,16 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 		capacity: sock_buf
 	}
 	b.name.sun_family = sock_pub.af_unix
+	b.socktype = @type & sock_pub.sock_type_mask
+	b.status |= file.pollout
+
+	// The two ends were never joined up, so socketpair(2) handed back a pair
+	// that was not connected to anything: a write dereferenced a nil peer and a
+	// read waited for data that had nowhere to come from.
+	a.peer = b
+	b.peer = a
+	a.connected = true
+	b.connected = true
+
 	return a, b
 }

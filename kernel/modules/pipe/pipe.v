@@ -37,6 +37,10 @@ pub fn create() ?&Pipe {
 		capacity: pipe_buf
 	}
 	p.stat.mode = stat.ifpipe
+	// An empty pipe is writable. pollout was only ever raised by read(), when
+	// it freed space, so until something had been read a fresh pipe reported
+	// itself unwritable and anything waiting for room to write blocked for good.
+	p.status |= file.pollout
 
 	return p
 }

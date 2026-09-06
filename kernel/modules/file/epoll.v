@@ -114,10 +114,18 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, _event &EpollEvent
 		epoll_fd.unref()
 	}
 
-	// V interface struct layout: { union { void* _object; ... }; u32 _typ; field_ptrs... }
-	// The object pointer is at offset 0 of the interface struct.
-	// Cannot simply cast &Resource to &EpollResource — must extract the object pointer.
-	mut epoll_res := unsafe { &EpollResource(*&voidptr(epoll_fd.handle.resource)) }
+	// Reach the concrete resource through V's own type test. Reading the
+	// interface's first word by hand, as this used to, assumed a layout this
+	// compiler does not use: it picked up the type tag instead of the object
+	// pointer, so every access landed near address zero. It also let any
+	// descriptor at all be treated as an epoll set.
+	mut res := epoll_fd.handle.resource
+	mut epoll_res := &EpollResource(unsafe { nil })
+	if mut res is EpollResource {
+		epoll_res = res
+	} else {
+		return errno.err, errno.einval
+	}
 
 	match op {
 		epoll_ctl_add {
@@ -185,7 +193,13 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf &EpollEvent, maxevent
 		epoll_fd.unref()
 	}
 
-	mut epoll_res := unsafe { &EpollResource(*&voidptr(epoll_fd.handle.resource)) }
+	mut res := epoll_fd.handle.resource
+	mut epoll_res := &EpollResource(unsafe { nil })
+	if mut res is EpollResource {
+		epoll_res = res
+	} else {
+		return errno.err, errno.einval
+	}
 
 	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {

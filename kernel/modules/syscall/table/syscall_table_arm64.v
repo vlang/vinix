@@ -13,6 +13,7 @@ import time.sys
 import net
 import sched
 import errno
+import usercopy
 import proc
 import stat
 import aarch64.cpu.local as cpulocal
@@ -131,17 +132,6 @@ pub fn sc_dump_ring() {
 		uart.puts(c'\n')
 	}
 	uart.puts(c'=== END RING BUFFER ===\n')
-}
-
-// clock_getres: return 1ns resolution for all clocks.
-fn syscall_linux_clock_getres(_ voidptr, clk_id int, res u64) (u64, u64) {
-	if res != 0 {
-		unsafe {
-			*&i64(res) = 0         // tv_sec = 0
-			*&i64(res + 8) = 1     // tv_nsec = 1 (1ns resolution)
-		}
-	}
-	return 0, 0
 }
 
 // ── Wrapper / stub syscalls for Linux compatibility ──
@@ -450,43 +440,6 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, arg3 u64, arg4 u64, arg5
 	return 0, 0
 }
 
-// getsockname: return local socket address.
-fn syscall_linux_getsockname(_ voidptr, fdnum int, _addr voidptr, addrlen voidptr) (u64, u64) {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer { fd.unref() }
-	// Return a minimal AF_UNIX sockaddr
-	alen := unsafe { *&u32(addrlen) }
-	if alen >= 2 {
-		unsafe { *&u16(_addr) = 1 } // AF_UNIX
-	}
-	if alen > 2 {
-		unsafe { C.memset(voidptr(u64(_addr) + 2), 0, u64(alen) - 2) }
-	}
-	return 0, 0
-}
-
-// setsockopt / getsockopt: stubs — return success.
-fn syscall_linux_setsockopt(_ voidptr, fd int, level int, optname int, optval voidptr, optlen u32) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_getsockopt(_ voidptr, fd int, level int, optname int, optval voidptr, optlen voidptr) (u64, u64) {
-	// For SO_ERROR and similar, return 0
-	if optval != unsafe { nil } && optlen != unsafe { nil } {
-		len := unsafe { *&u32(optlen) }
-		if len >= 4 {
-			unsafe { *&int(optval) = 0 }
-			unsafe { *&u32(optlen) = 4 }
-		}
-	}
-	return 0, 0
-}
-
-// shutdown: stub — just return success.
-fn syscall_linux_shutdown(_ voidptr, fd int, how int) (u64, u64) {
-	return 0, 0
-}
-
 // sendmsg: write iovec data to socket (no ancillary data support).
 fn syscall_linux_sendmsg(gpr_state voidptr, fdnum int, msg_ptr u64, flags int) (u64, u64) {
 	// struct msghdr layout (aarch64):
@@ -735,32 +688,75 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 	return total, 0
 }
 
-// getrandom: fill buffer with pseudo-random bytes.
-// Uses a simple xorshift64 PRNG seeded from the timer counter.
-fn syscall_linux_getrandom(_ voidptr, buf voidptr, count u64, flags u32) (u64, u64) {
-	if buf == unsafe { nil } || count == 0 {
+// getrandom(2). The pool is stirred with the cycle counter on every call and
+// carried across calls, so two calls landing in the same timer tick no longer
+// produce the same bytes — which the old per-call xorshift seeded straight from
+// the counter did, and which stack canaries and ASLR are handed.
+//
+// This is not a cryptographic generator and does not claim to be; it is the
+// best available before an entropy source is wired up.
+__global (
+	random_pool = u64(0x9e3779b97f4a7c15)
+)
+
+const grnd_nonblock = 0x0001
+
+const grnd_random = 0x0002
+
+const grnd_insecure = 0x0004
+
+fn random_counter() u64 {
+	mut counter := u64(0)
+	asm volatile aarch64 {
+		mrs counter, CNTVCT_EL0
+		; =r (counter)
+	}
+	return counter
+}
+
+// splitmix64: cheap, and unlike a raw xorshift it does not leak its state in
+// the low bits of consecutive outputs.
+fn random_next() u64 {
+	random_pool += 0x9e3779b97f4a7c15
+	mut z := random_pool
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb
+	return z ^ (z >> 31)
+}
+
+fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) {
+	if flags & ~u32(grnd_nonblock | grnd_random | grnd_insecure) != 0 {
+		return errno.err, errno.einval
+	}
+	if count == 0 {
 		return 0, 0
 	}
-	// Seed from architectural counter
-	mut state := u64(0)
-	asm volatile aarch64 {
-		mrs state, CNTVCT_EL0
-		; =r (state)
+	if buf == 0 {
+		return errno.err, errno.efault
 	}
-	if state == 0 {
-		state = 0xdeadbeef12345678
-	}
-	mut p := &u8(buf)
-	for i := u64(0); i < count; i++ {
-		state ^= state << 13
-		state ^= state >> 7
-		state ^= state << 17
-		unsafe {
-			p[i] = u8(state & 0xff)
+
+	random_pool ^= random_counter()
+
+	mut written := u64(0)
+	for written < count {
+		word := random_next()
+		mut chunk := count - written
+		if chunk > sizeof(u64) {
+			chunk = sizeof(u64)
 		}
+		if !usercopy.copy_to_user(buf + written, voidptr(&word), chunk) {
+			// Report the bytes that did land, as the manual page requires.
+			if written > 0 {
+				return written, 0
+			}
+			return errno.err, errno.efault
+		}
+		written += chunk
 	}
-	return count, 0
+
+	return written, 0
 }
+
 
 // fstatfs: return filesystem statistics for an open fd.
 // Stub: report a tmpfs-like filesystem.
@@ -829,6 +825,7 @@ pub fn init_syscall_table() {
 	syscall_table[64] = voidptr(fs.syscall_write) // __NR_write
 	syscall_table[65] = voidptr(syscall_linux_readv) // __NR_readv
 	syscall_table[66] = voidptr(syscall_linux_writev) // __NR_writev
+	syscall_table[72] = voidptr(file.syscall_pselect6) // __NR_pselect6
 	syscall_table[73] = voidptr(file.syscall_ppoll) // __NR_ppoll
 	syscall_table[74] = voidptr(userland.syscall_signalfd) // __NR_signalfd4
 	syscall_table[78] = voidptr(fs.syscall_readlinkat) // __NR_readlinkat
@@ -849,7 +846,8 @@ pub fn init_syscall_table() {
 	syscall_table[100] = voidptr(userland.syscall_get_robust_list) // __NR_get_robust_list
 	syscall_table[101] = voidptr(sys.syscall_nanosleep) // __NR_nanosleep
 	syscall_table[113] = voidptr(sys.syscall_clock_get) // __NR_clock_gettime
-	syscall_table[114] = voidptr(syscall_linux_clock_getres) // __NR_clock_getres
+	syscall_table[114] = voidptr(sys.syscall_clock_getres) // __NR_clock_getres
+	syscall_table[115] = voidptr(sys.syscall_clock_nanosleep) // __NR_clock_nanosleep
 	syscall_table[124] = voidptr(syscall_linux_sched_yield) // __NR_sched_yield
 	syscall_table[129] = voidptr(userland.syscall_kill) // __NR_kill
 	syscall_table[130] = voidptr(userland.syscall_tkill) // __NR_tkill
@@ -864,6 +862,7 @@ pub fn init_syscall_table() {
 	syscall_table[141] = voidptr(syscall_linux_getpriority) // __NR_getpriority
 	syscall_table[158] = voidptr(userland.syscall_getgroups) // __NR_getgroups
 	syscall_table[160] = voidptr(syscall_linux_uname) // __NR_uname
+	syscall_table[169] = voidptr(sys.syscall_gettimeofday) // __NR_gettimeofday
 	syscall_table[166] = voidptr(syscall_linux_umask) // __NR_umask
 	syscall_table[172] = voidptr(userland.syscall_getpid) // __NR_getpid
 	syscall_table[173] = voidptr(userland.syscall_getppid) // __NR_getppid
@@ -909,13 +908,13 @@ pub fn init_syscall_table() {
 	syscall_table[201] = voidptr(socket.syscall_listen) // __NR_listen
 	syscall_table[202] = voidptr(socket.syscall_accept) // __NR_accept
 	syscall_table[203] = voidptr(socket.syscall_connect) // __NR_connect
-	syscall_table[204] = voidptr(syscall_linux_getsockname) // __NR_getsockname
+	syscall_table[204] = voidptr(socket.syscall_getsockname) // __NR_getsockname
 	syscall_table[205] = voidptr(socket.syscall_getpeername) // __NR_getpeername
 	syscall_table[206] = voidptr(syscall_linux_sendto) // __NR_sendto
 	syscall_table[207] = voidptr(syscall_linux_recvfrom) // __NR_recvfrom
-	syscall_table[208] = voidptr(syscall_linux_setsockopt) // __NR_setsockopt
-	syscall_table[209] = voidptr(syscall_linux_getsockopt) // __NR_getsockopt
-	syscall_table[210] = voidptr(syscall_linux_shutdown) // __NR_shutdown
+	syscall_table[208] = voidptr(socket.syscall_setsockopt) // __NR_setsockopt
+	syscall_table[209] = voidptr(socket.syscall_getsockopt) // __NR_getsockopt
+	syscall_table[210] = voidptr(socket.syscall_shutdown) // __NR_shutdown
 	syscall_table[211] = voidptr(syscall_linux_sendmsg) // __NR_sendmsg
 	syscall_table[212] = voidptr(socket.syscall_recvmsg) // __NR_recvmsg
 

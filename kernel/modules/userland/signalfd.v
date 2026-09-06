@@ -105,7 +105,17 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 	} else {
 		mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 
-		signalfd = unsafe { &SignalFD(*&voidptr(fd.handle.resource)) }
+		// Same layout assumption epoll made, and the same fix: let V find the
+		// concrete type rather than reading into the interface by hand.
+		mut res := fd.handle.resource
+		if mut res is SignalFD {
+			signalfd = res
+		} else {
+			// signalfds_lock is dropped by the defer above; only the fd
+			// reference taken here has to be handed back.
+			fd.unref()
+			return errno.err, errno.einval
+		}
 
 		fd.unref()
 

@@ -18,9 +18,81 @@ mut:
 	bind(handle voidptr, _addr voidptr, addrlen u32) ?
 	connect(handle voidptr, _addr voidptr, addrlen u32) ?
 	peername(handle voidptr, _addr voidptr, addrlen &u32) ?
+	sockname(handle voidptr, _addr voidptr, addrlen &u32) ?
+	shutdown(handle voidptr, how int) ?
 	listen(handle voidptr, backlog int) ?
 	accept(handle voidptr) ?&Resource
 	recvmsg(handle voidptr, msg &MsgHdr, flags int) ?u64
+	getsockopt(handle voidptr, level int, optname int) ?int
+	setsockopt(handle voidptr, level int, optname int, value int) ?
+}
+
+// shutdown(2).
+pub const shut_rd = 0
+
+pub const shut_wr = 1
+
+pub const shut_rdwr = 2
+
+// Socket types, as they appear in the low bits of socket(2)'s type argument.
+pub const sock_type_mask = 0xf
+
+pub const sock_stream = 1
+
+pub const sock_dgram = 2
+
+pub const sock_seqpacket = 5
+
+// getsockopt(2)/setsockopt(2).
+pub const sol_socket = 1
+
+pub const so_reuseaddr = 2
+
+pub const so_type = 3
+
+pub const so_error = 4
+
+pub const so_broadcast = 6
+
+pub const so_sndbuf = 7
+
+pub const so_rcvbuf = 8
+
+pub const so_keepalive = 9
+
+pub const so_oobinline = 10
+
+pub const so_linger = 13
+
+pub const so_reuseport = 15
+
+pub const so_acceptconn = 30
+
+pub const so_domain = 39
+
+pub const so_protocol = 38
+
+// Copy an address out the way getsockname(2) and getpeername(2) ask for it:
+// write no more than the caller's buffer holds, but report the length the
+// address actually needs, so a short buffer is reported as truncated rather
+// than being overrun.
+pub fn copy_out_sockaddr(dest voidptr, addrlen &u32, source voidptr, full_size u32) {
+	if addrlen == unsafe { nil } {
+		return
+	}
+
+	capacity := unsafe { *addrlen }
+	if dest != unsafe { nil } && capacity > 0 {
+		mut to_copy := full_size
+		if to_copy > capacity {
+			to_copy = capacity
+		}
+		unsafe { C.memcpy(dest, source, to_copy) }
+	}
+
+	unsafe {
+		*addrlen = full_size
+	}
 }
 
 pub struct IoVec {
