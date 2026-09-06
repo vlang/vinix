@@ -70,31 +70,13 @@ else
 ' "$LIMINE_CONF_QEMU"
 fi
 
-# ── Ensure Limine BOOTAA64.EFI is available ──
+# ── Ensure the patched Limine BOOTAA64.EFI is available ──
+# build-limine-aarch64.sh applies the Apple Silicon hand-off patch; the same
+# loader is what deploy-m1-efi.sh ships, so QEMU exercises the deployed build.
 LIMINE_EFI="$BOOT_DIR/limine-bin/BOOTAA64.EFI"
-if [ ! -f "$LIMINE_EFI" ]; then
-    echo "==> BOOTAA64.EFI not found, building Limine ${LIMINE_VERSION}..."
-    LIMINE_SRC_DIR="$BOOT_DIR/limine-src-${LIMINE_VERSION}"
-    if [ ! -d "$LIMINE_SRC_DIR" ]; then
-        LIMINE_DOWNLOAD_DIR="$(mktemp -d)"
-        curl -sL "https://github.com/limine-bootloader/limine/releases/download/v${LIMINE_VERSION}/limine-${LIMINE_VERSION}.tar.gz" | tar xz -C "$LIMINE_DOWNLOAD_DIR"
-        mv "$LIMINE_DOWNLOAD_DIR/limine-${LIMINE_VERSION}" "$LIMINE_SRC_DIR"
-        rm -rf "$LIMINE_DOWNLOAD_DIR"
-    fi
-
-    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-    (
-        cd "$LIMINE_SRC_DIR"
-        ./configure --enable-uefi-aarch64 --disable-uefi-cd --disable-bios --disable-bios-cd --disable-bios-pxe >/tmp/vinix-limine-config.log 2>&1
-        make -j"$(sysctl -n hw.ncpu)" >/tmp/vinix-limine-make.log 2>&1
-    ) || {
-        echo "ERROR: Failed to build Limine BOOTAA64.EFI"
-        echo "See logs: /tmp/vinix-limine-config.log and /tmp/vinix-limine-make.log"
-        exit 1
-    }
-
-    mkdir -p "$BOOT_DIR/limine-bin"
-    cp "$LIMINE_SRC_DIR/bin/BOOTAA64.EFI" "$LIMINE_EFI"
+if [ ! -f "$LIMINE_EFI" ] || ! "$SCRIPT_DIR/build-limine-aarch64.sh" --check | grep -q "patched for Apple Silicon"; then
+    echo "==> Building patched Limine ${LIMINE_VERSION}..."
+    "$SCRIPT_DIR/build-limine-aarch64.sh" || exit 1
 fi
 
 # ── Find UEFI firmware from QEMU installation ──
@@ -137,6 +119,10 @@ if [ ! -f "$BOOT_DISK" ]; then
     tar cf /tmp/vinix-initramfs.tar --files-from /dev/null
     mcopy -i "$BOOT_DISK" /tmp/vinix-initramfs.tar ::/boot/initramfs.tar
 fi
+
+# The loader is refreshed on every run, not only when the disk is created, so
+# a rebuilt Limine is what actually boots.
+mcopy -o -i "$BOOT_DISK" "$LIMINE_EFI" ::/EFI/BOOT/BOOTAA64.EFI
 
 # ── Build initramfs with /sbin/init ──
 if [ -f "$INITRAMFS" ]; then
