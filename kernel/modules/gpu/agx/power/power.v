@@ -8,6 +8,7 @@ module power
 import devicetree
 import aarch64.kio
 import aarch64.timer
+import apple.dart
 import klock
 import memory
 
@@ -861,6 +862,10 @@ fn validate_t6050_pmp_instance(die u32) ?&devicetree.DTNode {
 		|| !validate_pmp_wrapper(wrapper, die) {
 		return none
 	}
+	if _ := dart.get_t6050_pmp_dart_contract(die, wrapper) {
+	} else {
+		return none
+	}
 	preload := decode_t6050_pmp_preload(nub, die) or { return none }
 	region_base := devicetree.get_le_u64(nub, 'region-base') or { return none }
 	region_size := devicetree.get_le_u64(nub, 'region-size') or { return none }
@@ -876,7 +881,8 @@ fn validate_t6050_pmp_instance(die u32) ?&devicetree.DTNode {
 // controller remains dormant until the firmware-side handoff owns its startup
 // order. This function therefore performs no mapping or MMIO access.
 pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
-	if !validate_t6050_ptd_codec() || !validate_t6050_wrapper_codec() {
+	if !validate_t6050_ptd_codec() || !validate_t6050_wrapper_codec()
+		|| !dart.validate_t8110_codec() {
 		println('agx: internal t6050 PMP transport validation failed')
 		return false
 	}

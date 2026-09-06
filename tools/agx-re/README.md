@@ -172,7 +172,11 @@ The same recovery now follows the preloaded PMP image through its mapper
 boundary. The signed DeviceTree binds each PMP wrapper to mapper 0 of a
 die-local `dart,t8110`; the two DART register pairs are separated by the T6050
 die stride, use 16 KiB pages, and advertise active SIDs 0, 1, 2, 5, 6, 7, 8,
-and 9. UUID-pinned AppleA7IOP code inserts each non-skipped 32-byte segment
+and 9. Six empty per-SID booleans (`bypass-2`, `-5`, `-6`, `-7`, `-8`, and
+`-9`) leave SIDs 0 and 1 translated. The UUID-pinned AppleT8110DART image
+proves that mapper index 0 selects a DART hardware instance rather than a SID,
+formats those properties as `bypass-${SID}`, and records them in its bypass
+bitset. UUID-pinned AppleA7IOP code inserts each non-skipped 32-byte segment
 record through `IODARTMapper::iovmInsert` before CPU release. The matching
 IODARTFamily image proves that direction 1 becomes read-only protection 2 and
 direction 3 becomes read/write protection 3. AppleT8110DART plus the matching

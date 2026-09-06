@@ -210,6 +210,12 @@ IODART_MAPPER_IOVM_INSERT_ONE = (
 APPLE_T8110_DART_ENABLE_TRANSLATION = (
     "__ZN14AppleT8110DART17enableTranslationEjb"
 )
+APPLE_T8110_DART_SETUP = "__ZN14AppleT8110DART10_dartSetupER19t8110dart_init_data"
+APPLE_T8110_DART_GET_SID_PROPERTY = (
+    "__ZN14AppleT8110DART15_getSidPropertyEPKcjPm"
+)
+APPLE_T8110_DART_GET_SID_COUNT = "__ZNK14AppleT8110DART12_getSIDCountEj"
+APPLE_T8110_DART_IS_BYPASSED_SID = "__ZNK14AppleT8110DART13isBypassedSIDEj"
 APPLE_T8110_DART_SET_TRANSLATION = "__ZN14AppleT8110DART14setTranslationEjjjj"
 APPLE_T8110_DART_INVALIDATE_TLB = (
     "__ZN14AppleT8110DART13invalidateTLBEP13IODARTVMSpacejjj"
@@ -2852,8 +2858,14 @@ def recover_iodart_family(image: bytes) -> dict[str, object]:
 
 def recover_apple_t8110_dart_code_contract(
     functions: dict[str, tuple[int, bytes]],
+    bypass_property_prefix: str,
+    sid_property_format: str,
 ) -> dict[str, object]:
     required = (
+        APPLE_T8110_DART_SETUP,
+        APPLE_T8110_DART_GET_SID_PROPERTY,
+        APPLE_T8110_DART_GET_SID_COUNT,
+        APPLE_T8110_DART_IS_BYPASSED_SID,
         APPLE_T8110_DART_ENABLE_TRANSLATION,
         APPLE_T8110_DART_SET_TRANSLATION,
         APPLE_T8110_DART_INVALIDATE_TLB,
@@ -2861,6 +2873,69 @@ def recover_apple_t8110_dart_code_contract(
     missing = [name for name in required if name not in functions]
     if missing:
         raise ValueError(f"AppleT8110DART has no code body for {missing!r}")
+
+    _setup_address, setup_code = functions[APPLE_T8110_DART_SETUP]
+    if not _has_ordered_words(
+        setup_code,
+        (
+            0x52800108,  # eight-byte optional bypass-address result
+            0xF9004FE8,
+            0x910263E3,
+            0xAA1803E2,  # current SID
+            0x94000FDF,  # _getSidProperty("bypass", SID, &size)
+            0x3900A2E8,  # mark the per-SID record bypassed
+            0xAA1A0108,  # add the SID to the bypass bitset
+        ),
+    ):
+        raise ValueError("AppleT8110DART per-SID bypass setup changed")
+    if bypass_property_prefix != "bypass":
+        raise ValueError(
+            f"AppleT8110DART bypass property prefix changed: {bypass_property_prefix!r}"
+        )
+
+    _property_address, property_code = functions[
+        APPLE_T8110_DART_GET_SID_PROPERTY
+    ]
+    if not _has_ordered_words(
+        property_code,
+        (
+            0xA9000BE1,  # property prefix and SID are snprintf arguments
+            0x910083E0,  # 32-byte formatted-property buffer
+            0x52800401,
+        ),
+    ):
+        raise ValueError("AppleT8110DART SID-property formatter changed")
+    if sid_property_format != "%s-%d":
+        raise ValueError(
+            f"AppleT8110DART SID-property format changed: {sid_property_format!r}"
+        )
+
+    _count_address, count_code = functions[APPLE_T8110_DART_GET_SID_COUNT]
+    if not _has_ordered_words(
+        count_code,
+        (
+            0x91008108,  # first hardware-instance record at owner +0x20
+            0x52800E09,  # hardware-instance stride 0x70
+            0x9BA97C29,  # mapper index selects that instance
+            0xB9400D08,  # PARAMS4 at instance MMIO +0xc
+            0x12002100,  # SID count is PARAMS4[8:0]
+        ),
+    ):
+        raise ValueError("AppleT8110DART mapper/SID-count selection changed")
+
+    _bypassed_address, bypassed_code = functions[
+        APPLE_T8110_DART_IS_BYPASSED_SID
+    ]
+    if not _has_ordered_words(
+        bypassed_code,
+        (
+            0x7100803F,  # SID 32 boundary for extended-bypass support
+            0xF9448129,  # per-SID bypass bitset at object +0x900
+            0x9AC82528,
+            0x12000100,
+        ),
+    ):
+        raise ValueError("AppleT8110DART bypass lookup changed")
 
     _enable_address, enable_code = functions[APPLE_T8110_DART_ENABLE_TRANSLATION]
     if not _has_ordered_words(
@@ -2900,6 +2975,13 @@ def recover_apple_t8110_dart_code_contract(
             "sid_payload_bytes": 4,
             "driver_invalidate_method": "no-op",
             "hardware_update_owner": "kernel PPL/SPTM IOMMU request",
+            "mapper_index_semantics": "DART hardware instance, not SID",
+            "hardware_instance_stride": 0x70,
+            "sid_count_register_offset": 0xC,
+            "sid_count_mask": 0x1FF,
+            "sid_property_format": sid_property_format,
+            "bypass_property_prefix": bypass_property_prefix,
+            "bypass_bitset_object_offset": 0x900,
         }
     }
 
@@ -2911,14 +2993,30 @@ def recover_apple_t8110_dart(image: bytes) -> dict[str, object]:
     functions = {
         name: symbol_code(image, name)
         for name in (
+            APPLE_T8110_DART_SETUP,
+            APPLE_T8110_DART_GET_SID_PROPERTY,
+            APPLE_T8110_DART_GET_SID_COUNT,
+            APPLE_T8110_DART_IS_BYPASSED_SID,
             APPLE_T8110_DART_ENABLE_TRANSLATION,
             APPLE_T8110_DART_SET_TRANSLATION,
             APPLE_T8110_DART_INVALIDATE_TLB,
         )
     }
+    setup_address, setup_code = functions[APPLE_T8110_DART_SETUP]
+    bypass_property_prefix = read_adrp_add_cstring(
+        image, setup_address, setup_code, 0xDE8, 0xDEC
+    )
+    property_address, property_code = functions[
+        APPLE_T8110_DART_GET_SID_PROPERTY
+    ]
+    sid_property_format = read_adrp_add_cstring(
+        image, property_address, property_code, 0x3C, 0x40
+    )
     return {
         "uuid": identity,
-        **recover_apple_t8110_dart_code_contract(functions),
+        **recover_apple_t8110_dart_code_contract(
+            functions, bypass_property_prefix, sid_property_format
+        ),
     }
 
 
@@ -3266,6 +3364,8 @@ def recover_t6050_pmp_darts(
     die_stride: int,
 ) -> list[dict[str, object]]:
     expected_sids = [0, 1, 2, 5, 6, 7, 8, 9]
+    expected_bypassed_sids = [2, 5, 6, 7, 8, 9]
+    expected_translated_sids = [0, 1]
     result = []
     for die, role in enumerate(("PMP0", "PMP1")):
         dart_name = f"dart-pmp{die}"
@@ -3290,9 +3390,20 @@ def recover_t6050_pmp_darts(
         )
         vm_base = decode_integer(dart.property("vm-base"), f"{dart_name} vm-base")
         vm_size = decode_integer(dart.property("vm-size"), f"{dart_name} vm-size")
+        bypassed_sids = [
+            sid for sid in range(sid_count) if f"bypass-{sid}" in dart.properties
+        ]
+        for sid in bypassed_sids:
+            if dart.property(f"bypass-{sid}"):
+                raise ValueError(
+                    f"T6050 {dart_name} bypass-{sid} is no longer an empty boolean"
+                )
+        translated_sids = [sid for sid in sids if sid not in bypassed_sids]
         if (
             registers != expected_registers
             or sids != expected_sids
+            or bypassed_sids != expected_bypassed_sids
+            or translated_sids != expected_translated_sids
             or page_size != 0x4000
             or sid_count != 16
             or options != 0x65
@@ -3302,7 +3413,8 @@ def recover_t6050_pmp_darts(
         ):
             raise ValueError(
                 f"T6050 {dart_name} contract changed: regs={registers!r}, "
-                f"sids={sids!r}, page={page_size:#x}, count={sid_count}, "
+                f"sids={sids!r}, bypassed={bypassed_sids!r}, "
+                f"translated={translated_sids!r}, page={page_size:#x}, count={sid_count}, "
                 f"options={options:#x}, flush={flush_by_dva}, "
                 f"vm={vm_base:#x}+{vm_size:#x}"
             )
@@ -3343,6 +3455,8 @@ def recover_t6050_pmp_darts(
                 "page_size": page_size,
                 "sid_count": sid_count,
                 "active_sids": sids,
+                "bypassed_sids": bypassed_sids,
+                "translated_sids": translated_sids,
                 "mapper": {
                     "path": mapper_path,
                     "index": mapper_index,
@@ -3637,7 +3751,7 @@ def recover_t6050_power(root: AdtNode) -> dict[str, object]:
         raise ValueError("aggregate GFX selector no longer targets PMP AGX")
 
     return {
-        "schema": 19,
+        "schema": 20,
         "chip": "t6050",
         "sgx": {
             "path": sgx_path,
