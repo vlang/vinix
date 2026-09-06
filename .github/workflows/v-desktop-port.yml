@@ -15,10 +15,10 @@ jobs:
       - name: Build the V compiler and fetch ui2
         run: |
           git clone --depth=1 https://github.com/vlang/v.git /tmp/vlang
-          make -C /tmp/vlang -j2
+          make -C /tmp/vlang -j2 VFLAGS='-old-compiler' POST_BOOTSTRAP_CCOMPILER_VFLAG='-old-compiler'
           mkdir -p third_party
           git clone --depth=1 https://github.com/vlang/ui2.git third_party/ui2
-          /tmp/vlang/v version
+          /tmp/vlang/v -old-compiler version
           git -C /tmp/vlang rev-parse HEAD
           git -C third_party/ui2 rev-parse HEAD
       - name: Package offline validation workspace
