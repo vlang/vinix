@@ -96,7 +96,7 @@ fn welcome_page(width int, _height int) []ui2.Element {
 	inner := width - 2 * pad
 	return [
 		ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
-			bg: accent
+			bg: app_accent
 			radius: 2
 		}, []),
 		heading('Welcome to Vinix', pad, 32, inner),

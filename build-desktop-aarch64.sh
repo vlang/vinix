@@ -137,6 +137,21 @@ cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop"
 
+# ── Wallpapers ──
+# Vinix has no JPEG decoder, so the photographs are downloaded and decoded here
+# and shipped as raw pixels. Downloads are cached, so this costs nothing after
+# the first build; with neither network nor cache it writes none and the
+# desktop offers only its colours.
+echo "==> Wallpapers..."
+python3 "$SCRIPT_DIR/desktop/tools/fetch_wallpapers.py" "$BUILD_DIR/wallpapers" \
+    --cache "$BUILD_DIR/wallpapers-cache" || true
+
+mkdir -p "$STAGING/usr/share/vinix/wallpapers"
+if [ -d "$BUILD_DIR/wallpapers" ]; then
+    cp "$BUILD_DIR/wallpapers"/*.vwp "$BUILD_DIR/wallpapers"/index.txt \
+        "$BUILD_DIR/wallpapers"/SOURCES.txt "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
+fi
+
 # The desktop's own source travels with the image, so the file browser has
 # something real to show and so the machine carries the code it is running.
 mkdir -p "$STAGING/root/desktop"

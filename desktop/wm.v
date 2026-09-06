@@ -66,6 +66,13 @@ mut:
 	// Applications the desktop is hosting. A window points into this by index.
 	apps []HostedApp
 
+	settings Settings
+	// One screen's worth of wallpaper, scaled once and kept. It only changes
+	// when the setting does, and rescaling a photograph every frame to paint a
+	// backdrop that has not moved would cost more than the rest of a frame.
+	wallpaper       []u32
+	wallpaper_valid bool
+
 	tz_offset_seconds i64
 }
 
@@ -243,52 +250,77 @@ fn (mut d Desktop) build_tree() ui2.Element {
 }
 
 fn (mut d Desktop) window_element(window Window) ui2.Element {
+	theme := d.theme()
 	active := window.id == d.focus
-	body_height := window.height - title_height
+	body_height := window.height - theme.title_height
 
-	title_text_color := if active { title_text_active } else { title_text_inactive }
-	title_bg := if active { title_active_bg } else { title_inactive_bg }
+	title_text_color := if active { theme.title_text_active } else { theme.title_text_inactive }
+	title_bg := if active { theme.title_active_bg } else { theme.title_inactive_bg }
 
-	// Buttons are laid out from the right edge inwards: close, then maximise,
-	// then minimise.
-	mut button_x := window.width - title_button_inset - title_button_size
-	close := d.title_button(window.id_close, 'builtin:close', button_x)
-	button_x -= title_button_size + title_button_gap
+	// Close, then zoom, then minimise, laid out from whichever end the setting
+	// puts them at. Ordering close outermost is what both conventions do.
+	buttons_left := d.settings.button_side == .left
+	span := 3 * title_button_size + 2 * title_button_gap
+	mut button_x := if buttons_left {
+		title_button_inset
+	} else {
+		window.width - title_button_inset - title_button_size
+	}
+	step := if buttons_left { title_button_size + title_button_gap } else { -(title_button_size +
+			title_button_gap) }
+
 	maximize_glyph := if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
-	maximize := d.title_button(window.id_maximize, maximize_glyph, button_x)
-	button_x -= title_button_size + title_button_gap
-	minimize := d.title_button(window.id_minimize, 'builtin:minimize', button_x)
+	close := d.title_button(window.id_close, 'builtin:close', button_x)
+	button_x += step
+	// Inward from close: macOS goes minimise then zoom, Windows zoom then
+	// minimise. Close is outermost either way.
+	middle := if buttons_left { window.id_minimize } else { window.id_maximize }
+	middle_glyph := if buttons_left { 'builtin:minimize' } else { maximize_glyph }
+	inner := if buttons_left { window.id_maximize } else { window.id_minimize }
+	inner_glyph := if buttons_left { maximize_glyph } else { 'builtin:minimize' }
+	maximize := d.title_button(middle, middle_glyph, button_x)
+	button_x += step
+	minimize := d.title_button(inner, inner_glyph, button_x)
 
-	title_limit := button_x - 2 * title_button_gap - 14
-	title := ui2.label(window.id_title, window.title, ui2.rect(14, 0, f64(title_limit),
-		f64(title_height)), ui2.TextStyle{
+	// The title takes what the buttons leave. Centred themes centre it over the
+	// whole bar and simply accept a shorter run.
+	text_inset_left := if buttons_left { title_button_inset + span + 10 } else { 14 }
+	title_limit := window.width - span - title_button_inset - text_inset_left - 10
+	title := ui2.label(window.id_title, window.title, ui2.rect(f64(if theme.title_centered {
+		0
+	} else {
+		text_inset_left
+	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)),
+		ui2.TextStyle{
 		color: title_text_color
+		background_color: if theme.title_fill == .pinstripe { title_bg } else { u32(0) }
 		size: 13
-		bold: true
+		bold: theme.title_bold
+		align: if theme.title_centered { .center } else { .left }
 		lines: 1
 	})
 
 	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width),
-		f64(title_height)), ui2.BoxStyle{
+		f64(theme.title_height)), ui2.BoxStyle{
 		bg: title_bg
 	}, [title, minimize, maximize, close])
 
-	divider := ui2.view(window.id_divider, ui2.rect(0, f64(title_height - 1), f64(window.width),
+	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width),
 		1), ui2.BoxStyle{
-		bg: title_divider
+		bg: theme.title_divider
 	}, [])
 
 	background, contents := d.window_contents(window, body_height)
 	// Clickable so that touching a window anywhere brings it to the front,
 	// not only its title bar.
-	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(title_height), f64(window.width),
+	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(theme.title_height), f64(window.width),
 		f64(body_height)), ui2.BoxStyle{
 		bg: background
 	}, contents)
 
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
 		bg: background
-		radius: window_radius
+		radius: theme.window_radius
 	}, [title_bar, divider, body])
 }
 
@@ -298,13 +330,13 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 // background becomes the body's and its children are placed straight into it.
 fn (mut d Desktop) window_contents(window Window, body_height int) (u32, []ui2.Element) {
 	if window.app_index < 0 || window.app_index >= d.apps.len {
-		return window_body, window.content(window.width, body_height, d)
+		return d.theme().window_body, window.content(window.width, body_height, d)
 	}
 	size := ui2.rect(0, 0, f64(window.width), f64(body_height))
 	root := d.apps[window.app_index].build(size) or {
 		// An application that cannot lay itself out should say so in its own
 		// window rather than take the desktop down with it.
-		return window_body, [
+		return d.theme().window_body, [
 			body_line('This application failed to draw:', 18, 18, window.width - 36),
 			muted_line(err.msg(), 18, 40, window.width - 36),
 		]
@@ -314,7 +346,7 @@ fn (mut d Desktop) window_contents(window Window, body_height int) (u32, []ui2.E
 
 // launch opens a window for one of the applications the desktop can host.
 fn (mut d Desktop) launch(factory AppFactory) {
-	app := factory.open() or {
+	app := factory.open(mut d) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
 	}
@@ -330,6 +362,13 @@ fn (mut d Desktop) launch(factory AppFactory) {
 
 // launch_titled opens the application with this title, for a caller that knows
 // which one it wants rather than where it sits in the list.
+// invalidate_wallpaper throws away the scaled backdrop so the next frame
+// paints the newly chosen one.
+fn (mut d Desktop) invalidate_wallpaper() {
+	d.wallpaper_valid = false
+	d.dirty = true
+}
+
 fn (mut d Desktop) launch_titled(title string) {
 	for factory in available_apps {
 		if factory.title == title {
@@ -377,12 +416,13 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 	mut out := []ui2.Element{cap: available_apps.len}
 	for index, factory in available_apps {
 		id := '${action_shortcut_prefix}${index}'
+		theme := d.theme()
 		hovered := d.hover == id
 		y := shortcut_top + index * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
 		out << ui2.clickable_view(id, ui2.rect(f64(shortcut_left), f64(y), f64(shortcut_width),
 			f64(shortcut_height)), ui2.BoxStyle{
-			bg: wallpaper_top
+			bg: theme.shortcut_panel
 			radius: 8
 			transparent: !hovered
 		}, [
@@ -390,11 +430,12 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 				f64(shortcut_icon)), ui2.BoxStyle{
 				transparent: true
 			}, ui2.TextStyle{
-				color: if hovered { shortcut_hover } else { shortcut_label }
+				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
 			}),
 			ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width),
 				18), ui2.TextStyle{
-				color: if hovered { shortcut_hover } else { shortcut_label }
+				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+				shadow: true
 				size: 12
 				align: .center
 			}),
@@ -415,42 +456,53 @@ fn desktop_owns(action string) bool {
 }
 
 fn (d &Desktop) title_button(id string, glyph string, x int) ui2.Element {
-	y := (title_height - title_button_size) / 2
+	theme := d.theme()
+	y := (theme.title_height - title_button_size) / 2
 	hovered := d.hover == id
 	is_close := glyph == 'builtin:close'
-	bg := if !hovered {
+	// A classic button is a bevelled square that is always there; a flat one is
+	// a glyph that only grows a background under the pointer.
+	classic := theme.button_look == .classic
+	bg := if classic {
+		if hovered { theme.button_hover } else { theme.button_face }
+	} else if !hovered {
 		u32(0)
 	} else if is_close {
-		title_button_close_hover
+		theme.button_close_hover
 	} else {
-		title_button_hover
+		theme.button_hover
 	}
 	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(title_button_size),
 		f64(title_button_size)), ui2.BoxStyle{
 		bg: bg
-		radius: 5
-		transparent: !hovered
+		radius: if classic { 0 } else { 5 }
+		transparent: !classic && !hovered
 	}, ui2.TextStyle{
-		color: if hovered && is_close { glyph_color_on_close } else { glyph_color }
+		color: if !classic && hovered && is_close {
+			theme.glyph_on_close
+		} else {
+			theme.glyph_color
+		}
 	})
 }
 
 fn (d &Desktop) taskbar_element() ui2.Element {
+	theme := d.theme()
 	top := d.canvas.height - taskbar_height
 	width := d.canvas.width
 
 	mut children := []ui2.Element{}
+	item_y := (taskbar_height - taskbar_item_height) / 2
 
 	// Left: a button that opens another window, so the taskbar list can be
 	// seen growing and shrinking.
 	new_button_width := 96
 	children << ui2.button(action_new_window, 'New window', ui2.rect(f64(taskbar_padding),
-		f64((taskbar_height - taskbar_item_height) / 2), f64(new_button_width), f64(taskbar_item_height)),
-		ui2.BoxStyle{
-		bg: if d.hover == action_new_window { accent } else { accent_dim }
+		f64(item_y), f64(new_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
+		bg: if d.hover == action_new_window { theme.accent } else { theme.accent_dim }
 		radius: 6
 	}, ui2.TextStyle{
-		color: taskbar_text_active
+		color: theme.taskbar_text_active
 		size: 12
 		bold: true
 		align: .center
@@ -463,32 +515,30 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	for index, factory in available_apps {
 		id := '${action_launch_prefix}${index}'
 		children << ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(launcher_x),
-			f64((taskbar_height - taskbar_item_height) / 2), f64(launcher_width), f64(taskbar_item_height)),
-			ui2.BoxStyle{
-			bg: if d.hover == id { taskbar_item_hover } else { taskbar_item_bg }
+			f64(item_y), f64(launcher_width), f64(taskbar_item_height)), ui2.BoxStyle{
+			bg: if d.hover == id { theme.taskbar_item_hover } else { theme.taskbar_item_bg }
 			radius: 6
 		}, ui2.TextStyle{
-			color: taskbar_text
+			color: theme.taskbar_text
 			size: 12
 			align: .center
 		})
 		launcher_x += launcher_width + 6
 	}
 
-	// Middle: one entry per open window, minimised or not, in the order the
-	// windows were opened. Following the painting order instead would shuffle
-	// the bar every time a window was raised, which is exactly when the user
-	// is looking somewhere else.
+	// Middle: what is open. `standard` gives every window an entry, the way
+	// Windows XP did; `combined` gives each application one entry however many
+	// windows it has, the way Windows 7 did.
+	entries := d.taskbar_entries()
 	mut x := launcher_x + 8
 	clock_left := width - clock_area_width
-	item_y := (taskbar_height - taskbar_item_height) / 2
 
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
 	mut item_width := taskbar_item_width
-	if d.windows.len > 0 {
-		share := (clock_left - taskbar_item_gap - x + taskbar_item_gap) / d.windows.len - taskbar_item_gap
+	if entries.len > 0 {
+		share := (clock_left - taskbar_item_gap - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
 		}
@@ -497,33 +547,28 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		}
 	}
 
-	mut last_id := 0
-	for {
-		index := d.next_window_by_age(last_id) or { break }
-		window := d.windows[index]
-		last_id = window.id
+	for entry in entries {
 		if x + item_width > clock_left - taskbar_item_gap {
 			break
 		}
-		active := window.id == d.focus && !window.minimized
-		bg := if active {
-			taskbar_item_active
-		} else if d.hover == window.id_task {
-			taskbar_item_hover
+		bg := if entry.active {
+			theme.taskbar_item_active
+		} else if d.hover == entry.id {
+			theme.taskbar_item_hover
 		} else {
-			taskbar_item_bg
+			theme.taskbar_item_bg
 		}
 		// A minimised window is dimmed rather than marked with a character:
 		// the baked faces are ASCII, so a nice bullet would come out blank.
-		text_color := if active {
-			taskbar_text_active
-		} else if window.minimized {
-			taskbar_text_minimized
+		text_color := if entry.active {
+			theme.taskbar_text_active
+		} else if entry.minimized {
+			theme.taskbar_muted
 		} else {
-			taskbar_text
+			theme.taskbar_text
 		}
-		children << ui2.button(window.id_task, window.title, ui2.rect(f64(x), f64(item_y),
-			f64(item_width), f64(taskbar_item_height)), ui2.BoxStyle{
+		children << ui2.button(entry.id, entry.label, ui2.rect(f64(x), f64(item_y), f64(item_width),
+			f64(taskbar_item_height)), ui2.BoxStyle{
 			bg: bg
 			radius: 6
 		}, ui2.TextStyle{
@@ -537,14 +582,14 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Right: the clock, two lines, hard against the corner.
 	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(width - clock_area_width),
 		6, f64(clock_area_width - taskbar_padding), 20), ui2.TextStyle{
-		color: clock_time_color
+		color: theme.clock_time
 		size: 17
 		bold: true
 		align: .right
 	})
 	children << ui2.label('clock.date', d.clock_date, ui2.rect(f64(width - clock_area_width),
 		26, f64(clock_area_width - taskbar_padding), 16), ui2.TextStyle{
-		color: clock_date_color
+		color: theme.clock_date
 		size: 11
 		align: .right
 	})
@@ -552,13 +597,83 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// A hairline along the top edge separates the bar from the wallpaper
 	// without a shadow, which would read as heavy at this size.
 	children << ui2.view('taskbar.edge', ui2.rect(0, 0, f64(width), 1), ui2.BoxStyle{
-		bg: taskbar_edge
+		bg: theme.taskbar_edge
 	}, [])
 
 	return ui2.view('taskbar', ui2.rect(0, f64(top), f64(width), f64(taskbar_height)),
 		ui2.BoxStyle{
-		bg: taskbar_bg
+		bg: theme.taskbar_bg
 	}, children)
+}
+
+// TaskbarEntry is one button in the middle of the bar. In standard mode it is
+// a window; in combined mode it is an application, and its id names the window
+// clicking it should raise.
+struct TaskbarEntry {
+	id        string
+	label     string
+	active    bool
+	minimized bool
+}
+
+fn (d &Desktop) taskbar_entries() []TaskbarEntry {
+	mut out := []TaskbarEntry{}
+	if d.settings.taskbar_mode == .standard {
+		mut last_id := 0
+		for {
+			index := d.next_window_by_age(last_id) or { break }
+			window := d.windows[index]
+			last_id = window.id
+			out << TaskbarEntry{
+				id: window.id_task
+				label: window.title
+				active: window.id == d.focus && !window.minimized
+				minimized: window.minimized
+			}
+		}
+		return out
+	}
+
+	// Combined: one entry per title, labelled with how many windows share it.
+	// Clicking it activates the most recently raised of them, which is what
+	// makes a second click minimise the one you just brought up.
+	mut seen := []string{}
+	for window in d.windows {
+		if window.title in seen {
+			continue
+		}
+		seen << window.title
+		mut count := 0
+		mut newest := window.id
+		mut active := false
+		mut all_minimized := true
+		for other in d.windows {
+			if other.title != window.title {
+				continue
+			}
+			count++
+			if other.id == d.focus && !other.minimized {
+				active = true
+			}
+			if !other.minimized {
+				all_minimized = false
+			}
+		}
+		// The last in painting order is the one on top.
+		for i := d.windows.len - 1; i >= 0; i-- {
+			if d.windows[i].title == window.title {
+				newest = d.windows[i].id
+				break
+			}
+		}
+		out << TaskbarEntry{
+			id: 'task.${newest}'
+			label: if count > 1 { '${window.title}  (${count})' } else { window.title }
+			active: active
+			minimized: all_minimized
+		}
+	}
+	return out
 }
 
 // ── Pointer handling ───────────────────────────────────────────────
@@ -589,7 +704,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.toggle_maximize(d.drag.window_id)
 			new_index := d.window_index(d.drag.window_id) or { return }
 			d.drag.offset_x = int(ratio * f64(d.windows[new_index].width))
-			d.drag.offset_y = title_height / 2
+			d.drag.offset_y = d.theme().title_height / 2
 		}
 		moved := d.window_index(d.drag.window_id) or { return }
 		d.windows[moved].x = x - d.drag.offset_x
@@ -612,7 +727,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 fn (mut d Desktop) clamp_to_screen(index int) {
 	margin := 60
 	max_x := d.canvas.width - margin
-	max_y := d.canvas.height - taskbar_height - title_height
+	max_y := d.canvas.height - taskbar_height - d.theme().title_height
 	if d.windows[index].x > max_x {
 		d.windows[index].x = max_x
 	}

@@ -20,6 +20,8 @@ What it does:
   launchers, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
   way back up
+- a **settings application**: window button side, taskbar style, theme and
+  wallpaper, applied to the running desktop as they are chosen
 - **hosted ui2 applications**: ui2's own examples run in windows of their own,
   several at a time, each with its own state
 
@@ -32,7 +34,9 @@ Keys: `Esc` or `q` leaves the desktop, `n` opens a window, `c` a calculator.
     window.v       the Window model and the pages windows show
     app.v          hosting applications in windows, and which ones there are
     files.v        the file browser
-    settings.v     Display and Battery settings
+    settings.v     the preferences: themes, wallpaper, Display and Battery
+    settings_app.v the settings application
+    wallpaper.v    loading and scaling a wallpaper photograph
     backlight_client.v / battery_client.v  native V device clients
     platform.c.v   V POSIX bindings, terminal state, mmap, clocks and directories
     render.v       a ui2 backend that draws an element tree into a framebuffer
@@ -108,6 +112,56 @@ entries than the window has room for.
 
 The image carries the desktop's own source at `/root/desktop`, so there is
 something real to browse and so the machine holds the code it is running.
+
+## Settings
+
+Categories down the left, the chosen category's settings on the right.
+
+**Appearance** puts the window buttons at either end of the title bar — right
+as Windows does, left as macOS does, with the inner two swapping order to match
+each convention — and switches the taskbar between one entry per window, as
+Windows XP had, and one per application with a count, as Windows 7 had.
+
+**Theme** chooses between the desktop's own look and *Classic*: square grey
+windows with a hairline border, a pinstriped title bar with the title centred
+on a solid patch over it, and bevelled buttons that are always visible instead
+of appearing under the pointer. It is drawn from memory of Mac OS 8/9's
+Platinum.
+
+**Wallpaper** offers six colours and ten photographs.
+
+Settings is the one application that holds a pointer back to the `Desktop`. It
+writes preferences straight into it, and since the window manager composes the
+whole screen from those preferences on the next frame, a choice takes effect
+immediately and everywhere without anything being told to refresh.
+
+Everything that varies between themes is a field of `Theme` in `settings.v`;
+anything that does not stays a plain constant in `theme.v`. Application
+interiors deliberately do not follow the theme — an application draws its own
+inside, as ui2's calculator plainly does — so they use the `app_*` constants.
+
+## Wallpapers
+
+Vinix has no JPEG or PNG decoder, and writing one to show a backdrop would be a
+strange place to spend the effort. So `tools/fetch_wallpapers.py` downloads the
+photographs at build time, decodes them, and writes each as a `.vwp`: a nine
+byte header and packed RGB, stored at half the display's resolution and scaled
+up when drawn. A photograph survives that at the size a wallpaper is looked at,
+and it keeps ten of them to about six megabytes rather than twenty-three.
+
+Downloads are cached, so a rebuild costs nothing and an offline build works
+once the cache is warm. With neither network nor cache the build says so and
+ships none; the desktop then offers only its colours.
+
+The scaled result is kept in a buffer and blitted, because it only changes when
+the setting does. Rescaling three quarters of a million pixels every frame to
+paint a backdrop that has not moved would cost more than everything else the
+compositor does put together.
+
+The photographs come from [Lorem Picsum](https://picsum.photos), which serves
+them from Unsplash under the [Unsplash License](https://unsplash.com/license).
+The ids are pinned so a build is reproducible, and each image's source URL is
+recorded in `SOURCES.txt` beside it on the image.
 
 ## Fonts
 

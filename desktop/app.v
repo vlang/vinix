@@ -30,7 +30,9 @@ struct AppFactory {
 	icon   string
 	width  int
 	height int
-	open   fn () !HostedApp @[required]
+	// Given the desktop, because an application may need to read it or change
+	// it — Settings does both. Most ignore the argument.
+	open fn (mut desktop Desktop) !HostedApp @[required]
 }
 
 // available_apps is what the taskbar and the wallpaper offer. The calculator's
@@ -48,18 +50,22 @@ const available_apps = [
 		title: 'Calculator'
 		icon: 'builtin:calculator'
 		width: window_width
-		height: window_height + title_height
+		height: window_height + default_title_height
 		open: open_calculator
 	},
 	AppFactory{
 		title: 'Settings'
-		icon: 'builtin:maximize'
+		icon: 'builtin:settings'
 		width: 620
 		height: 410
-		open: open_settings
+		open: open_settings_app
 	},
 ]
 
-fn open_calculator() !HostedApp {
+fn open_calculator(mut desktop Desktop) !HostedApp {
 	return ui2.new_qml_app[Calculator](calculator_qml_source, initial_calculator())!
+}
+
+fn open_settings_app(mut desktop Desktop) !HostedApp {
+	return desktop.open_settings()!
 }

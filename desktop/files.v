@@ -165,7 +165,7 @@ mut:
 	visible_rows int = 1
 }
 
-fn open_files() !HostedApp {
+fn open_files(mut desktop Desktop) !HostedApp {
 	mut app := &FileBrowserApp{}
 	app.browser.read('/')
 	if app.browser.error != '' {
@@ -196,7 +196,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		bg: if a.browser.path == '/' { files_up_disabled } else { files_up }
 		radius: 5
 	}, ui2.TextStyle{
-		color: if a.browser.path == '/' { body_muted } else { taskbar_text_active }
+		color: if a.browser.path == '/' { body_muted } else { app_on_accent }
 		size: 12
 		align: .center
 	})
@@ -214,7 +214,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			color: files_error
 			size: 13
 		})
-		return ui2.screen(window_body, children)
+		return ui2.screen(app_surface, children)
 	}
 
 	if a.browser.entries.len == 0 {
@@ -222,7 +222,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			color: body_muted
 			size: 13
 		})
-		return ui2.screen(window_body, children)
+		return ui2.screen(app_surface, children)
 	}
 
 	// Rows.
@@ -266,7 +266,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			bg: files_up
 			radius: 5
 		}, ui2.TextStyle{
-			color: taskbar_text_active
+			color: app_on_accent
 			size: 12
 			align: .center
 		})
@@ -274,13 +274,13 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			bg: files_up
 			radius: 5
 		}, ui2.TextStyle{
-			color: taskbar_text_active
+			color: app_on_accent
 			size: 12
 			align: .center
 		})
 	}
 
-	return ui2.screen(window_body, children)
+	return ui2.screen(app_surface, children)
 }
 
 fn (mut a FileBrowserApp) clamp_scroll() {

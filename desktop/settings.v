@@ -1,362 +1,217 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
-// Settings is a hosted desktop application. Opening/repainting it only reads
-// the device; a brightness write requires an explicit, enabled user action.
+// What the desktop looks like and how its chrome behaves, and the two themes
+// it can wear.
+//
+// Everything the Settings application changes lives here. The window manager
+// reads `Desktop.settings` for behaviour and `Desktop.theme()` for colour, so
+// a preference takes effect on the next frame without anything being rebuilt
+// or reopened — the tree is composed from scratch each time anyway.
 module main
 
-import ui2
-
-// Static ids/labels: the framebuffer renderer frees child arrays, not strings.
-const settings_scale_100_action = 'settings.scale.100'
-const settings_scale_200_action = 'settings.scale.200'
-const settings_brightness_actions = [
-	'settings.brightness.0',
-	'settings.brightness.5',
-	'settings.brightness.10',
-	'settings.brightness.15',
-	'settings.brightness.20',
-	'settings.brightness.25',
-	'settings.brightness.30',
-	'settings.brightness.35',
-	'settings.brightness.40',
-	'settings.brightness.45',
-	'settings.brightness.50',
-	'settings.brightness.55',
-	'settings.brightness.60',
-	'settings.brightness.65',
-	'settings.brightness.70',
-	'settings.brightness.75',
-	'settings.brightness.80',
-	'settings.brightness.85',
-	'settings.brightness.90',
-	'settings.brightness.95',
-	'settings.brightness.100',
-]
-const settings_brightness_labels = [
-	'0%',
-	'5%',
-	'10%',
-	'15%',
-	'20%',
-	'25%',
-	'30%',
-	'35%',
-	'40%',
-	'45%',
-	'50%',
-	'55%',
-	'60%',
-	'65%',
-	'70%',
-	'75%',
-	'80%',
-	'85%',
-	'90%',
-	'95%',
-	'100%',
-]
-
-enum SettingsCategory {
-	display
-	battery
+// Which end of the title bar the close, zoom and minimise buttons sit at.
+// Right is what Windows does; left is what macOS does.
+enum ButtonSide {
+	right
+	left
 }
 
-struct SettingsApp {
+// How the taskbar lists what is open. `standard` gives every window its own
+// entry, the way Windows XP did. `combined` gives each application one entry
+// however many windows it has, the way Windows 7 did.
+enum TaskbarMode {
+	standard
+	combined
+}
+
+enum ThemeKind {
+	default_
+	classic
+}
+
+struct Settings {
 mut:
-	category     SettingsCategory = .display
-	battery_read fn (bool) int = read_battery
-	state        BacklightState
-	read_result  BacklightResult = .unavailable
-	write_result BacklightResult
-	last_poll_ms u64
-	initialized  bool
-	// Injectable for host tests; production always uses the fixed device path.
-	read_state    fn (mut BacklightState) BacklightResult = read_backlight
-	write_percent fn (int) BacklightResult = set_backlight_percent
-	// Owned, cached labels. Replace only when readback changes, never per frame.
-	level_text     string
-	requested_text string
-	actual_text    string
-	range_text     string
+	button_side  ButtonSide
+	taskbar_mode TaskbarMode
+	theme        ThemeKind
+	// Index into wallpaper_colors, used when no image is chosen.
+	wallpaper_color int
+	// Index into the wallpaper images, or -1 for the colour above.
+	wallpaper_image int = -1
 }
 
-fn open_settings() !HostedApp {
-	mut app := &SettingsApp{}
-	app.refresh()
-	// An absent device is a normal, visible state, not a failure to open Settings.
-	return app
+// ── Themes ─────────────────────────────────────────────────────────
+
+// TitleFill says how a title bar is painted. `pinstripe` is the horizontal
+// hairline pattern Mac OS 8 and 9 drew across theirs, which is most of what
+// makes that look recognisable.
+enum TitleFill {
+	flat
+	pinstripe
 }
 
-fn settings_same_state(a &BacklightState, b &BacklightState) bool {
-	return a.requested_nits == b.requested_nits && a.actual_nits == b.actual_nits
-		&& a.min_nits == b.min_nits && a.max_nits == b.max_nits && a.pending == b.pending
-		&& a.online == b.online && a.writable == b.writable
+// ButtonLook says how the title bar buttons are drawn. `flat` is a glyph that
+// only shows a background under the pointer; `classic` is a raised bevelled
+// square that is always visible, which is what those systems had.
+enum ButtonLook {
+	flat
+	classic
 }
 
-fn (mut a SettingsApp) refresh() {
-	mut next := BacklightState{}
-	result := a.read_state(mut next)
-	a.last_poll_ms = desktop_monotonic_ms()
-	if a.initialized && result == a.read_result && settings_same_state(&a.state, &next) {
-		return
-	}
-	if a.initialized {
-		unsafe {
-			a.level_text.free()
-			a.requested_text.free()
-			a.actual_text.free()
-			a.range_text.free()
-		}
-	}
-	a.initialized = true
-	a.state = next
-	a.read_result = result
-	if result != .ok {
-		a.level_text = 'Unavailable'.clone()
-		a.requested_text = 'Requested: unknown'.clone()
-		a.actual_text = 'Actual: unknown'.clone()
-		a.range_text = 'Panel brightness range is unavailable.'.clone()
-		return
-	}
-	percent := backlight_percent(&a.state)
-	a.level_text = if percent >= 0 { '${percent}%' } else { 'Unknown'.clone() }
-	a.requested_text = if next.requested_nits >= 0 {
-		'Requested: ${next.requested_nits} nits'
-	} else {
-		'Requested: unchanged since boot'.clone()
-	}
-	a.actual_text = if next.actual_nits >= 0 {
-		'Actual: ${next.actual_nits} nits (driver report)'
-	} else {
-		'Actual: waiting for a driver report'.clone()
-	}
-	a.range_text = '${next.min_nits} - ${next.max_nits} nits; 0% keeps the display on.'
+// Theme is every colour and measurement that changes between looks. Anything
+// the same in both stays a plain constant in theme.v.
+struct Theme {
+	name string
+	// Windows
+	window_body   u32
+	window_edge   u32
+	window_radius int
+	shadow_alpha  u32
+	// Title bar
+	title_height        int
+	title_active_bg     u32
+	title_inactive_bg   u32
+	title_divider       u32
+	title_text_active   u32
+	title_text_inactive u32
+	title_fill          TitleFill
+	title_pinstripe     u32
+	title_centered      bool
+	title_bold          bool
+	// Title bar buttons
+	button_look        ButtonLook
+	button_hover       u32
+	button_close_hover u32
+	button_face        u32
+	button_edge        u32
+	glyph_color        u32
+	glyph_on_close     u32
+	// Taskbar
+	taskbar_bg          u32
+	taskbar_edge        u32
+	taskbar_text        u32
+	taskbar_text_active u32
+	taskbar_muted       u32
+	taskbar_item_bg     u32
+	taskbar_item_hover  u32
+	taskbar_item_active u32
+	accent              u32
+	accent_dim          u32
+	clock_time          u32
+	clock_date          u32
+	// Wallpaper shortcuts
+	shortcut_label u32
+	shortcut_hover u32
+	shortcut_panel u32
 }
 
-fn (a &SettingsApp) can_change() bool {
-	return a.read_result == BacklightResult.ok && a.state.online && a.state.writable
+// The desktop's own look: rounded, shadowed, flat-coloured.
+const theme_default = Theme{
+	name: 'Default'
+	window_body: 0xfbfcfe
+	window_edge: 0xb9c2d0
+	window_radius: 9
+	shadow_alpha: 150
+	title_height: 34
+	title_active_bg: 0xffffff
+	title_inactive_bg: 0xf1f3f6
+	title_divider: 0xe4e8ee
+	title_text_active: 0x18202f
+	title_text_inactive: 0x99a2b1
+	title_fill: .flat
+	title_pinstripe: 0xffffff
+	title_centered: false
+	title_bold: true
+	button_look: .flat
+	button_hover: 0xe7eaf0
+	button_close_hover: 0xe5484d
+	button_face: 0xe7eaf0
+	button_edge: 0xb9c2d0
+	glyph_color: 0x3b465a
+	glyph_on_close: 0xffffff
+	taskbar_bg: 0x101726
+	taskbar_edge: 0x28344e
+	taskbar_text: 0xc3cddf
+	taskbar_text_active: 0xffffff
+	taskbar_muted: 0x76839a
+	taskbar_item_bg: 0x1b2436
+	taskbar_item_hover: 0x27334b
+	taskbar_item_active: 0x2c3d5e
+	accent: 0x5b9cf8
+	accent_dim: 0x27436e
+	clock_time: 0xffffff
+	clock_date: 0x8fa0bd
+	shortcut_label: 0xecf2fb
+	shortcut_hover: 0xffffff
+	shortcut_panel: 0x141d33
 }
 
-fn settings_error_text(result BacklightResult) string {
-	return match result {
-		.unavailable { 'Brightness driver not available.' }
-		.permission { 'Permission denied. Brightness control requires write access.' }
-		.offline { 'Display brightness device is offline.' }
-		.invalid { 'Invalid brightness response.' }
-		else { 'Brightness I/O failed. Refresh to try again.' }
+// Mac OS 8/9's Platinum: square grey windows with a hairline border, a
+// pinstriped title bar with the title centred over it, and bevelled buttons
+// that are always visible rather than appearing under the pointer.
+const theme_classic = Theme{
+	name: 'Classic'
+	window_body: 0xdddddd
+	window_edge: 0x000000
+	window_radius: 0
+	shadow_alpha: 90
+	title_height: 22
+	title_active_bg: 0xcccccc
+	title_inactive_bg: 0xdddddd
+	title_divider: 0x000000
+	title_text_active: 0x000000
+	title_text_inactive: 0x888888
+	title_fill: .pinstripe
+	title_pinstripe: 0xffffff
+	title_centered: true
+	title_bold: true
+	button_look: .classic
+	button_hover: 0xbbbbbb
+	button_close_hover: 0xbbbbbb
+	button_face: 0xcccccc
+	button_edge: 0x000000
+	glyph_color: 0x000000
+	glyph_on_close: 0x000000
+	taskbar_bg: 0xbbbbbb
+	taskbar_edge: 0x000000
+	taskbar_text: 0x000000
+	taskbar_text_active: 0x000000
+	taskbar_muted: 0x777777
+	taskbar_item_bg: 0xcccccc
+	taskbar_item_hover: 0xdddddd
+	taskbar_item_active: 0xaaaaaa
+	accent: 0x9999cc
+	accent_dim: 0xcccccc
+	clock_time: 0x000000
+	clock_date: 0x444444
+	shortcut_label: 0x000000
+	shortcut_hover: 0x000000
+	shortcut_panel: 0xcccccc
+}
+
+const themes = [theme_default, theme_classic]
+
+fn (d &Desktop) theme() Theme {
+	return match d.settings.theme {
+		.default_ { theme_default }
+		.classic { theme_classic }
 	}
 }
 
-fn (a &SettingsApp) status_text() string {
-	if a.read_result != .ok {
-		return settings_error_text(a.read_result)
-	}
-	if a.write_result != .ok {
-		return settings_error_text(a.write_result)
-	}
-	if !a.state.online {
-		return settings_error_text(BacklightResult.offline)
-	}
-	if !a.state.writable {
-		return 'Read-only access; brightness controls are disabled.'
-	}
-	if a.state.pending {
-		return 'Brightness request pending in the display driver.'
-	}
-	return 'Brightness read from /dev/apple-panel-bl.'
+// ── Wallpaper ──────────────────────────────────────────────────────
+
+// WallpaperColor is a flat backdrop. Each is a pair, because the desktop
+// paints a vertical gradient; a colour that wants to be flat names itself
+// twice.
+struct WallpaperColor {
+	name   string
+	top    u32
+	bottom u32
 }
 
-fn settings_button(id string, text string, frame ui2.Rect, enabled bool) ui2.Element {
-	return ui2.Element{
-		kind: .button
-		id: id
-		text: text
-		frame: frame
-		enabled: enabled
-		box: ui2.BoxStyle{
-			bg: if enabled { files_up } else { files_up_disabled }
-			radius: 5
-		}
-		text_style: ui2.TextStyle{
-			color: if enabled { taskbar_text_active } else { body_muted }
-			size: 13
-			align: .center
-		}
-	}
-}
-
-fn settings_scale_button(id string, text string, x int, selected bool) ui2.Element {
-	return ui2.button(id, text, ui2.rect(f64(x), 40, 60, 30), ui2.BoxStyle{
-		bg: if selected { accent } else { files_up }
-		radius: 5
-	}, ui2.TextStyle{
-		color: taskbar_text_active
-		size: 13
-		bold: selected
-		align: .center
-	})
-}
-
-fn settings_label(text string, x int, y int, width int, color u32) ui2.Element {
-	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 22), ui2.TextStyle{
-		color: color
-		size: 13
-	})
-}
-
-fn settings_category_button(id string, text string, y int, selected bool) ui2.Element {
-	return ui2.button(id, text, ui2.rect(10, f64(y), 98, 30), ui2.BoxStyle{
-		bg: if selected { accent } else { files_up }
-		radius: 5
-	}, ui2.TextStyle{ color: taskbar_text_active, size: 13, align: .center })
-}
-
-fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
-	// The desktop already redraws for its clock once a second. Poll at most
-	// that often, including pending changes made by another Settings window.
-	now := desktop_monotonic_ms()
-	if a.category == .display && (!a.initialized
-		|| (now != ~u64(0) && (now < a.last_poll_ms || now - a.last_poll_ms >= 1000))) {
-		a.refresh()
-	}
-	width := int(size.width)
-	height := int(size.height)
-	if width < 460 || height < 338 {
-		return ui2.screen(window_body, [
-			settings_label('Enlarge Settings to show its controls.', 12, 12, width - 24, body_text),
-		])
-	}
-	x := 136
-	inner := width - x - 18
-	mut children := [
-		ui2.view('', ui2.rect(0, 0, 118, f64(height)), ui2.BoxStyle{ bg: body_panel }, []),
-		settings_label('Categories', 12, 14, 100, body_muted),
-		settings_category_button('settings.display', 'Display', 46, a.category == .display),
-		settings_category_button('settings.battery', 'Battery', 84, a.category == .battery),
-	]
-	if a.category == .battery {
-		children << battery_settings_elements(a.battery_read(false), x, inner)
-		return ui2.screen(window_body, children)
-	}
-	active := a.can_change()
-	percent := if a.read_result == .ok { backlight_percent(&a.state) } else { -1 }
-	children << [
-		ui2.label('', 'Display', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
-			color: body_heading
-			size: 20
-			bold: true
-		}),
-		settings_label('Scale', x, 46, 42, body_muted),
-		settings_scale_button(settings_scale_100_action, '100%', x + 50,
-			desktop_scale_factor == desktop_scale_100),
-		settings_scale_button(settings_scale_200_action, '200%', x + 116,
-			desktop_scale_factor == desktop_scale_200),
-		settings_label('Built-in display', x + 190, 46, inner - 190, body_muted),
-		ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{ bg: body_rule }, []),
-		settings_label('Brightness', x, 90, inner - 100, body_heading),
-		settings_label(a.level_text, x + inner - 100, 90, 100, body_heading),
-	]
-	// A click-to-set stepped bar, not a pretend draggable slider: HostedApp
-	// receives action ids, not pointer coordinates. Every step is 5%.
-	for i, id in settings_brightness_actions {
-		left := x + inner * i / settings_brightness_actions.len
-		right := x + inner * (i + 1) / settings_brightness_actions.len
-		children << ui2.Element{
-			kind: .button
-			id: id
-			frame: ui2.rect(f64(left), 122, f64(right - left - 1), 28)
-			enabled: active
-			accessibility_label: settings_brightness_labels[i]
-			box: ui2.BoxStyle{
-				bg: if !active {
-					files_up_disabled
-				} else if percent >= i * 5 { accent } else { body_rule }
-				radius: 3
-			}
-		}
-	}
-	children << settings_label(a.range_text, x, 160, inner, body_muted)
-	children << settings_button('settings.decrease', '- 5%', ui2.rect(f64(x), 192, 62, 30), active && percent > 0)
-	children << settings_button('settings.increase', '+ 5%', ui2.rect(f64(x + 70), 192, 62, 30), active && percent >= 0 && percent < 100)
-	children << settings_button('settings.refresh', 'Refresh', ui2.rect(f64(x + inner - 80), 192, 80, 30), true)
-	children << settings_label(a.requested_text, x, 236, inner, body_text)
-	children << settings_label(a.actual_text, x, 258, inner, body_text)
-	children << settings_label(a.status_text(), x, 290, inner, if a.read_result != .ok || a.write_result != .ok {
-		files_error
-	} else {
-		body_muted
-	})
-	if a.read_result == .unavailable {
-		children << settings_label('DCP backend integration is still required.', x, 312, inner, body_muted)
-	} else {
-		children << settings_label('Click the bar to set brightness in 5% steps.', x, 312, inner, body_muted)
-	}
-	return ui2.screen(window_body, children)
-}
-
-fn (mut a SettingsApp) handle(event_id string) ! {
-	if event_id == 'settings.battery' {
-		a.category = .battery
-		a.battery_read(true)
-		return
-	}
-	if event_id == 'settings.display' {
-		a.category = .display
-		a.write_result = BacklightResult.ok
-		a.refresh()
-		return
-	}
-	if event_id == 'settings.refresh' {
-		if a.category == .battery {
-			a.battery_read(true)
-		} else {
-			a.write_result = BacklightResult.ok
-			a.refresh()
-		}
-		return
-	}
-	// Ignore stale Display hit targets while the Battery page is selected.
-	if a.category != .display {
-		return
-	}
-	if event_id == settings_scale_100_action {
-		desktop_scale_factor = desktop_scale_100
-		return
-	}
-	if event_id == settings_scale_200_action {
-		desktop_scale_factor = desktop_scale_200
-		return
-	}
-	mut target := -1
-	for i, id in settings_brightness_actions {
-		if event_id == id {
-			target = i * 5
-			break
-		}
-	}
-	step := event_id == 'settings.decrease' || event_id == 'settings.increase'
-	if target < 0 && !step {
-		return
-	}
-	// Defend even against stale hit targets: never write after the device has
-	// disappeared, gone offline, or become read-only since the last frame.
-	a.refresh()
-	if !a.can_change() {
-		return
-	}
-	if step {
-		current := backlight_percent(&a.state)
-		if current < 0 {
-			return
-		}
-		target = current + if event_id == 'settings.increase' { 5 } else { -5 }
-		if target < 0 {
-			target = 0
-		}
-		if target > 100 {
-			target = 100
-		}
-	}
-	a.write_result = a.write_percent(target)
-	// A successful write only queues work. Read actual/pending from the driver.
-	a.refresh()
-}
+const wallpaper_colors = [
+	WallpaperColor{'Midnight', 0x141d33, 0x3c5a86},
+	WallpaperColor{'Slate', 0x2b3038, 0x4d545e},
+	WallpaperColor{'Forest', 0x11301f, 0x2f6b46},
+	WallpaperColor{'Plum', 0x2a1533, 0x5d3a70},
+	WallpaperColor{'Ember', 0x33190f, 0x8a4426},
+	WallpaperColor{'Classic teal', 0x5f8f8f, 0x5f8f8f},
+]

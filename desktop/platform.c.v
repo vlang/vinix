@@ -146,6 +146,30 @@ fn desktop_sleep_ms(milliseconds i64) {
 	}
 }
 
+// Read a whole file into a caller-supplied buffer, returning the byte count or
+// -1. The desktop only ever does this for a wallpaper, whose size it has
+// already asked for with desktop_stat().
+fn desktop_read_file(path string, buffer voidptr, max u64) i64 {
+	fd := C.open(&char(path.str), C.O_RDONLY)
+	if fd < 0 {
+		return -1
+	}
+	mut total := u64(0)
+	for total < max {
+		got := desktop_read(fd, unsafe { voidptr(&u8(buffer) + total) }, max - total)
+		if got < 0 {
+			C.close(fd)
+			return -1
+		}
+		if got == 0 {
+			break
+		}
+		total += u64(got)
+	}
+	C.close(fd)
+	return i64(total)
+}
+
 fn desktop_opendir(path string) voidptr {
 	return C.opendir(&char(path.str))
 }

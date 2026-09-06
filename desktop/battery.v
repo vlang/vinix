@@ -162,7 +162,7 @@ fn battery_settings_elements(percent int, x int, inner int) []ui2.Element {
 		settings_label('Read-only. Updates every 5 seconds.', x, 280, inner, body_muted),
 	]
 	if available && percent > 0 {
-		children << ui2.view('settings.battery.fill', ui2.rect(f64(x), 172, f64(inner * percent / 100), 12), ui2.BoxStyle{ bg: accent, radius: 4 }, [])
+		children << ui2.view('settings.battery.fill', ui2.rect(f64(x), 172, f64(inner * percent / 100), 12), ui2.BoxStyle{ bg: app_accent, radius: 4 }, [])
 	}
 	if percent == battery_unavailable {
 		children << settings_label('M1: boot with vinix.apple_battery=1.', x, 308, inner, body_muted)

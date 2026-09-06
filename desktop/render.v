@@ -80,8 +80,7 @@ fn (mut d Desktop) render(root ui2.Element) {
 		w: d.canvas.width
 		h: d.canvas.height
 	}
-	d.canvas.vertical_gradient(0, 0, d.canvas.width, d.canvas.height, wallpaper_top,
-		wallpaper_bottom)
+	d.paint_wallpaper()
 	d.render_element(root, 0, 0, 0)
 	d.draw_cursor()
 }
@@ -171,7 +170,7 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		return
 	}
 	radius := int(el.box.radius)
-	floating := depth == 1 && radius > 0
+	floating := depth == 1 && el.id.starts_with('win.')
 	if floating {
 		saved := d.canvas.clip
 		d.canvas.clip = Clip{
@@ -180,16 +179,68 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 			w: d.canvas.width
 			h: d.canvas.height
 		}
-		d.canvas.drop_shadow(x, y, w, h, radius, 7, 150)
+		d.canvas.drop_shadow(x, y, w, h, radius, 7, d.theme().shadow_alpha)
 		d.canvas.restore_clip(saved)
 	}
 	if radius > 0 {
 		d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
-		if floating {
-			d.canvas.stroke_round_rect(x, y, w, h, radius, window_edge, 190)
-		}
 	} else {
 		d.canvas.fill_rect(x, y, w, h, el.box.bg)
+	}
+	if floating {
+		d.canvas.stroke_round_rect(x, y, w, h, radius, d.theme().window_edge, 190)
+	}
+
+	// A classic title bar is ruled with hairlines. Like the shadow above, this
+	// is keyed off the window manager's own id: the effect belongs to the
+	// chrome, not to anything a view can declare.
+	theme := d.theme()
+	if theme.title_fill == .pinstripe && el.id.ends_with('.titlebar') {
+		for line := y + 3; line < y + h - 3; line += 2 {
+			d.canvas.fill_rect(x + 4, line, w - 8, 1, theme.title_pinstripe)
+		}
+	}
+}
+
+// paint_wallpaper blits the cached backdrop, building it first if the setting
+// changed. Both kinds end up in the same buffer, so the frame after is a
+// straight copy whichever was chosen.
+fn (mut d Desktop) paint_wallpaper() {
+	width := d.canvas.width
+	height := d.canvas.height
+	if !d.wallpaper_valid || d.wallpaper.len != width * height {
+		d.wallpaper = []u32{len: width * height}
+		mut done := false
+		if d.settings.wallpaper_image >= 0 {
+			images := list_wallpapers()
+			if d.settings.wallpaper_image < images.len {
+				if image := load_raw_image(images[d.settings.wallpaper_image].file) {
+					image.scale_into(mut d.wallpaper, width, height)
+					done = true
+				}
+			}
+		}
+		if !done {
+			// A colour, or the fallback when an image will not load.
+			index := if d.settings.wallpaper_color < wallpaper_colors.len {
+				d.settings.wallpaper_color
+			} else {
+				0
+			}
+			color := wallpaper_colors[index]
+			for y in 0 .. height {
+				shade := mix(color.top, color.bottom, u32(y * 255 / height))
+				row := y * width
+				for x in 0 .. width {
+					d.wallpaper[row + x] = shade
+				}
+			}
+		}
+		d.wallpaper_valid = true
+	}
+
+	unsafe {
+		C.memcpy(d.canvas.pixels, d.wallpaper.data, usize(width * height * 4))
 	}
 }
 
@@ -200,11 +251,33 @@ fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
 	face := d.face_for(el.text_style)
 	text := face.truncate(el.text, w)
 	baseline_y := y + (h - face.line_height) / 2
+	text_width := face.text_width(text)
+	mut text_x := x
 	match el.text_style.align {
-		.left { d.canvas.draw_text(face, x, baseline_y, text, el.text_style.color) }
-		.center { d.canvas.draw_text_centered(face, x, baseline_y, w, text, el.text_style.color) }
-		.right { d.canvas.draw_text_right(face, x + w, baseline_y, text, el.text_style.color) }
+		.left { text_x = x }
+		.center { text_x = x + (w - text_width) / 2 }
+		.right { text_x = x + w - text_width }
 	}
+	if el.text_style.background_color != 0 {
+		// Padded, so the run is not touched by whatever it is sitting on.
+		d.canvas.fill_rect(text_x - 6, y + 2, text_width + 12, h - 4, el.text_style.background_color)
+	}
+	if el.text_style.shadow {
+		// A shortcut's label sits on a wallpaper that could be any photograph,
+		// so it cannot rely on contrast with what is behind it. The shadow's
+		// colour comes from the text's own: dark text is backed with light and
+		// light text with dark, which keeps one of the two legible whatever the
+		// picture does.
+		d.canvas.draw_text(face, text_x + 1, baseline_y + 1, text, shadow_for(el.text_style.color))
+	}
+	d.canvas.draw_text(face, text_x, baseline_y, text, el.text_style.color)
+}
+
+// shadow_for picks a backing colour from a text colour's brightness. The
+// weights are the usual approximation of perceived luminance.
+fn shadow_for(color u32) u32 {
+	luminance := (77 * ((color >> 16) & 0xff) + 151 * ((color >> 8) & 0xff) + 28 * (color & 0xff)) >> 8
+	return if luminance > 128 { u32(0x000000) } else { u32(0xffffff) }
 }
 
 fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
@@ -313,6 +386,21 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x,
 				y))
 		}
+		'settings' {
+			// A gear: a disc with a hole, and teeth around it.
+			outer := if w < h { w * 3 / 8 } else { h * 3 / 8 }
+			tooth := outer / 2
+			for i in 0 .. 4 {
+				// Four teeth on the axes, and four on the diagonals at 3/4 the
+				// reach, which is close enough to a gear at icon size.
+				dx := [1, 0, -1, 0][i] * outer
+				dy := [0, 1, 0, -1][i] * outer
+				d.canvas.fill_rect(cx + dx - tooth / 2, cy + dy - tooth / 2, tooth, tooth,
+					color)
+			}
+			d.canvas.fill_circle(cx, cy, outer, color)
+			d.canvas.fill_circle(cx, cy, outer / 2, d.surface_under(x, y))
+		}
 		'calculator' {
 			body := w * 3 / 5
 			tall := h * 3 / 4
@@ -338,7 +426,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 // mask the back one without knowing which title bar shade is behind it.
 fn (d &Desktop) surface_under(x int, y int) u32 {
 	if x < 0 || y < 0 || x >= d.canvas.width || y >= d.canvas.height {
-		return title_active_bg
+		return d.theme().title_active_bg
 	}
 	return unsafe { d.canvas.pixels[y * d.canvas.stride + x] }
 }
