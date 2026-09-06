@@ -196,6 +196,20 @@ RTBUDDY_FIRMWARE_SEGMENT_FOR_IOP = (
 RTBUDDY_SEGMENT_IS_WRITABLE = "__ZNK14RTBuddySegment10isWritableEv"
 RTBUDDY_PATCHBAY_INIT_WITH_DATA = "__ZN15RTBuddyPatchBay12initWithDataEP6OSDatajb"
 RTBUDDY_PATCHBAY_FIND = "__ZN15RTBuddyPatchBay4findEj"
+RTBUDDY_PATCHBAY_WITH_DATA = "__ZN15RTBuddyPatchBay8withDataEP6OSDatajb"
+RTBUDDY_PATCHBAY_GET_BYTES = "__ZN15RTBuddyPatchBay14getBytesNoCopyEv"
+RTBUDDY_FIRMWARE_GET_PATCHBAY = "__ZN15RTBuddyFirmware11getPatchBayEv"
+RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA = (
+    "__ZN15RTBuddyFirmware16copyPatchBayDataEPjPb"
+)
+RTBUDDY_FIRMWARE_COPY32_REGION = "__ZN15RTBuddyFirmware20copy32FromIopVirtualEym"
+RTBUDDY_COREDUMP_READWRITE_MAP = (
+    "__ZN18RTBuddyCoredumpMap25readwriteMapForIopVirtualEyPy"
+)
+RTBUDDY_MEMCPY_TO32 = (
+    "__Z11memcpy_to32NSt3__14spanISt4byteLm18446744073709551615EEE"
+    "NS0_IKS1_Lm18446744073709551615EEEm"
+)
 RTK_ID_BLOCK_MAGIC = 0x64697575  # "uuid" in stored byte order
 RTK_ID_BLOCK_BYTES = 0x40
 RTK_ID_BLOCK_CANDIDATES = 8
@@ -2629,7 +2643,7 @@ def recover_rtbuddy_patchbay_contract(
         (
             0xF9000A96,  # str x22, [x20, #0x10] -- retained data
             0xB9001A95,  # str w21, [x20, #0x18] -- first record offset
-            0x39007693,  # strb w19, [x20, #0x1d] -- read-only
+            0x39007693,  # strb w19, [x20, #0x1d] -- writable
             0x3900729F,  # strb wzr, [x20, #0x1c] -- clean
         ),
     ):
@@ -2672,7 +2686,10 @@ def recover_rtbuddy_patchbay_contract(
             "alignment": 4,
             "align_pad": "the low two bits of the unaligned address",
             "padded_size": "(pad + size + 3) & ~3",
-            "read_only": "true unless the containing segment is writable",
+            "writable": (
+                "the containing segment is writable, or no segment claims the "
+                "address at all"
+            ),
             "first_record_offset": "the alignment pad",
         },
         "record": {
@@ -2846,6 +2863,163 @@ def recover_t6050_pmp_patchbay(
             item[0] for item in PMP_MANDATORY_PATCHBAY_INPUTS
         ],
         "records": records,
+    }
+
+
+def recover_rtbuddy_patchbay_write_contract(
+    functions: dict[str, tuple[int, bytes]], symbols: dict[str, int]
+) -> dict[str, object]:
+    """Recover how a patchbay edit reaches the target image.
+
+    Writing is three steps with different failure rules: a cached host copy,
+    an in-place edit that marks it dirty, and a write-back that happens only
+    for a writable region and only through 32-bit stores.
+    """
+
+    required = (
+        RTBUDDY_FIRMWARE_GET_PATCHBAY,
+        RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA,
+        RTBUDDY_FIRMWARE_COPY32_REGION,
+        RTBUDDY_FIRMWARE_FIND_PATCHBAY,
+        RTBUDDY_FIRMWARE_PATCH_U32,
+        RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
+        RTBUDDY_PATCHBAY_FIND,
+        RTBUDDY_PATCHBAY_WITH_DATA,
+        RTBUDDY_PATCHBAY_GET_BYTES,
+        RTBUDDY_COREDUMP_READWRITE_MAP,
+        RTBUDDY_MEMCPY_TO32,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"RTBuddy is missing patchbay-write symbols: {missing!r}")
+
+    copy_address, copy_code = functions[RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA]
+    copy_targets = direct_branch_targets(copy_address, copy_code)
+    for name in (RTBUDDY_FIRMWARE_FIND_PATCHBAY, RTBUDDY_FIRMWARE_COPY32_REGION):
+        if symbols[name] not in copy_targets:
+            raise ValueError(f"RTBuddy patchbay copy no longer calls {name}")
+    if not _has_ordered_words(
+        copy_code,
+        (
+            0xF94007E1,  # ldr x1, [sp, #8] -- located IOP virtual address
+            0xB94007E2,  # ldr w2, [sp, #4] -- padded size
+        ),
+    ):
+        raise ValueError("RTBuddy patchbay copy arguments changed")
+
+    get_address, get_code = functions[RTBUDDY_FIRMWARE_GET_PATCHBAY]
+    get_targets = direct_branch_targets(get_address, get_code)
+    for name in (RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA, RTBUDDY_PATCHBAY_WITH_DATA):
+        if symbols[name] not in get_targets:
+            raise ValueError(f"RTBuddy patchbay accessor no longer calls {name}")
+    if not _has_ordered_words(
+        get_code,
+        (
+            0xF9406400,  # ldr x0, [x0, #0xc8] -- cached patchbay
+            0x39003FFF,  # strb wzr, [sp, #0xf] -- assume not writable
+            0xB9000BFF,  # str wzr, [sp, #8] -- assume no alignment pad
+            0xF9006660,  # str x0, [x19, #0xc8] -- cache the constructed bay
+        ),
+    ):
+        raise ValueError("RTBuddy patchbay caching changed")
+
+    write_address, write_code = functions[RTBUDDY_FIRMWARE_PATCH_U32]
+    write_targets = direct_branch_targets(write_address, write_code)
+    for name in (RTBUDDY_FIRMWARE_GET_PATCHBAY, RTBUDDY_PATCHBAY_FIND):
+        if symbols[name] not in write_targets:
+            raise ValueError(f"RTBuddy patchbay write no longer calls {name}")
+    if not _has_ordered_words(
+        write_code,
+        (
+            0xD2802C11,  # mov x17, #0x160 -- OSData::getLength
+            0x7100101F,  # cmp w0, #4 -- a wrong width is fatal here
+            0xD2803311,  # mov x17, #0x198 -- OSData::getBytesNoCopy
+            0xB9400288,  # ldr w8, [x20] -- the requested value
+            0xB9000008,  # str w8, [x0] -- edited in place
+            0x52800020,  # mov w0, #1
+            0x39007260,  # strb w0, [x19, #0x1c] -- mark dirty
+        ),
+    ):
+        raise ValueError("RTBuddy patchbay write changed")
+
+    back_address, back_code = functions[RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY]
+    back_targets = direct_branch_targets(back_address, back_code)
+    for name in (
+        RTBUDDY_FIRMWARE_FIND_PATCHBAY,
+        RTBUDDY_COREDUMP_READWRITE_MAP,
+        RTBUDDY_PATCHBAY_GET_BYTES,
+        RTBUDDY_MEMCPY_TO32,
+    ):
+        if symbols[name] not in back_targets:
+            raise ValueError(f"RTBuddy patchbay write-back no longer calls {name}")
+    if not _has_ordered_words(
+        back_code,
+        (
+            0xF9406408,  # ldr x8, [x0, #0xc8] -- cached patchbay
+            0x39407509,  # ldrb w9, [x8, #0x1d] -- writable
+            0x36001089,  # tbz w9, #0 -- a non-writable region writes nothing
+            0x39407108,  # ldrb w8, [x8, #0x1c] -- dirty
+            0x36001048,  # tbz w8, #0 -- an unedited patchbay writes nothing
+            0xF9405660,  # ldr x0, [x19, #0xa8] -- coredump map
+            0xEB1702DF,  # cmp x22, x23 -- region starts inside the mapping
+            0x54000F83,  # b.lo -- otherwise abort
+            0xEB08031F,  # cmp x24, x8 -- region ends inside the mapping
+            0x54000DE8,  # b.hi -- otherwise abort
+        ),
+    ):
+        raise ValueError("RTBuddy patchbay write-back guards changed")
+
+    _memcpy_address, memcpy_code = functions[RTBUDDY_MEMCPY_TO32]
+    if not _has_ordered_words(
+        memcpy_code,
+        (
+            0x2A000088,  # orr w8, w4, w0 -- length and destination
+            0xF240051F,  # tst x8, #3 -- both must be 4-byte aligned
+            0x54000541,  # b.ne -- otherwise fatal
+            0xB840458D,  # ldr w13, [x12], #4
+            0xB800456D,  # str w13, [x11], #4 -- 32-bit stores only
+        ),
+    ):
+        raise ValueError("RTBuddy 32-bit patchbay copy changed")
+
+    return {
+        "host_copy": {
+            "accessor": RTBUDDY_FIRMWARE_GET_PATCHBAY,
+            "cache_object_offset": 0xC8,
+            "reader": RTBUDDY_FIRMWARE_COPY32_REGION,
+            "constructor": RTBUDDY_PATCHBAY_WITH_DATA,
+            "scope": (
+                "the whole padded region is copied into host memory once and "
+                "cached; edits never touch the target directly"
+            ),
+        },
+        "edit": {
+            "writer": RTBUDDY_FIRMWARE_PATCH_U32,
+            "lookup": RTBUDDY_PATCHBAY_FIND,
+            "required_value_bytes": 4,
+            "wrong_width_is_fatal": True,
+            "dirty_object_offset": 0x1C,
+            "ignores_writable_flag": True,
+            "scope": (
+                "the record value is edited in place in the host copy and the "
+                "bay is marked dirty; a record whose length is not four is "
+                "fatal here rather than skipped"
+            ),
+        },
+        "write_back": {
+            "function": RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
+            "writable_object_offset": 0x1D,
+            "requires": ["writable", "dirty"],
+            "mapping": RTBUDDY_COREDUMP_READWRITE_MAP,
+            "bounds": "the padded region must lie wholly inside the read-write map",
+            "copy": RTBUDDY_MEMCPY_TO32,
+            "copy_width_bits": 32,
+            "copy_alignment": 4,
+            "scope": (
+                "the entire region is pushed back with 32-bit stores, which is "
+                "why the located region is aligned down and padded up to four"
+            ),
+        },
     }
 
 
@@ -3355,6 +3529,11 @@ def recover_apple_pmp_firmware(
         RTBUDDY_FIRMWARE_FIND_PATCHBAY,
         RTBUDDY_PATCHBAY_INIT_WITH_DATA,
         RTBUDDY_PATCHBAY_FIND,
+        RTBUDDY_FIRMWARE_GET_PATCHBAY,
+        RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA,
+        RTBUDDY_FIRMWARE_PATCH_U32,
+        RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
+        RTBUDDY_MEMCPY_TO32,
     )
     rtbuddy_functions = {
         name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
@@ -3409,6 +3588,9 @@ def recover_apple_pmp_firmware(
             pmp_vtable_targets,
             service_vtable_targets,
             firmware_vtable_targets,
+        ),
+        "patchbay_write": recover_rtbuddy_patchbay_write_contract(
+            rtbuddy_functions, rtbuddy_symbols
         ),
         "patchbay_format": recover_rtbuddy_patchbay_contract(
             rtbuddy_image, rtbuddy_functions, rtbuddy_symbols

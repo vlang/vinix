@@ -220,6 +220,21 @@ pub:
 	align_pad   u32
 	size        u32
 	padded_size u32
+	// Set when the containing segment is writable, or when no segment claims
+	// the address at all. writeBackPatchBay refuses to push a region without
+	// it, so an edit to a non-writable region is silently lost.
+	writable bool
+}
+
+// A host-side copy of one patchbay region. Apple never edits the target
+// directly: the padded region is copied out once, edited in place, and pushed
+// back only if it was writable and something actually changed.
+pub struct T6050PatchBayCopy {
+pub:
+	region T6050PatchBayRegion
+pub mut:
+	data  []u8
+	dirty bool
 }
 
 // One `{u32 tag, u32 length, u8 value[length]}` record. There is no padding
@@ -252,7 +267,8 @@ pub fn t6050_patchbay_stored_bytes(tag u32) [4]u8 {
 
 // Decode the patchbay region from a 0x40-byte RTKit identity block. Only
 // versions 4 and 5 are accepted, matching `version & ~1 == 4`.
-pub fn decode_t6050_patchbay_region(block voidptr, iop_virtual_base u64) ?T6050PatchBayRegion {
+pub fn decode_t6050_patchbay_region(block voidptr, iop_virtual_base u64,
+	writable bool) ?T6050PatchBayRegion {
 	if read_native_u32(block, 0) != rtk_id_block_magic {
 		return none
 	}
@@ -273,6 +289,7 @@ pub fn decode_t6050_patchbay_region(block voidptr, iop_virtual_base u64) ?T6050P
 		align_pad: pad
 		size: size
 		padded_size: (pad + size + 3) & ~u32(3)
+		writable: writable
 	}
 }
 
@@ -315,7 +332,89 @@ pub fn find_t6050_patchbay_tag(data voidptr, region &T6050PatchBayRegion,
 	return none
 }
 
-// Which firmware image an RTBuddy target adopts.// Which firmware image an RTBuddy target adopts. RTBuddy::_attemptFirmwareLoad
+// Take the host-side copy of a located region. The copy spans the whole
+// padded region because the write-back pushes all of it, not just the edited
+// record.
+pub fn copy_t6050_patchbay(data voidptr, region &T6050PatchBayRegion) ?T6050PatchBayCopy {
+	if region.padded_size == 0 || region.align_pad + region.size > region.padded_size {
+		return none
+	}
+	mut bytes := []u8{len: int(region.padded_size)}
+	for index := u32(0); index < region.padded_size; index++ {
+		bytes[index] = read_native_u8(data, index)
+	}
+	return T6050PatchBayCopy{
+		region: *region
+		data: bytes
+		dirty: false
+	}
+}
+
+// Edit one record in place. Apple treats a record whose length is not four as
+// fatal rather than skipping it, so refuse instead of writing a partial value.
+// The writable flag is deliberately not consulted here: Apple's writer does
+// not check it either, and the region-level write-back is what enforces it.
+pub fn (mut bay T6050PatchBayCopy) set_value(tag u32, value u32) bool {
+	record := find_t6050_patchbay_tag(bay.data.data, &bay.region, tag) or {
+		return false
+	}
+	if record.length != 4 {
+		return false
+	}
+	offset := record.offset + rtk_patchbay_header_size
+	bay.data[offset] = u8(value)
+	bay.data[offset + 1] = u8(value >> 8)
+	bay.data[offset + 2] = u8(value >> 16)
+	bay.data[offset + 3] = u8(value >> 24)
+	bay.dirty = true
+	return true
+}
+
+// Apply the resolved DeviceTree inputs. Every tag must already exist as a
+// 32-bit record; an image missing one is a different image, not a partially
+// patchable one, so nothing is written unless all of them resolve first.
+pub fn (mut bay T6050PatchBayCopy) apply_values(values []T6050PatchBayValue) bool {
+	for value in values {
+		record := find_t6050_patchbay_tag(bay.data.data, &bay.region, value.tag) or {
+			return false
+		}
+		if record.length != 4 {
+			return false
+		}
+	}
+	for value in values {
+		if !bay.set_value(value.tag, value.value) {
+			return false
+		}
+	}
+	return true
+}
+
+// Push the edited region back. Apple copies the whole region with 32-bit
+// stores, which is why the located region is aligned down and padded up, and
+// it writes nothing unless the region is writable and something changed.
+// `destination` is the mapped read-write target of region.iop_virtual.
+pub fn (bay &T6050PatchBayCopy) write_back(destination voidptr) bool {
+	if !bay.region.writable || !bay.dirty {
+		return false
+	}
+	if bay.region.padded_size & 3 != 0 || u64(destination) & 3 != 0 {
+		return false
+	}
+	if bay.data.len != int(bay.region.padded_size) {
+		return false
+	}
+	for offset := u32(0); offset < bay.region.padded_size; offset += 4 {
+		word := read_native_u32(bay.data.data, offset)
+		target := unsafe { &u32(u64(destination) + offset) }
+		unsafe {
+			*target = word
+		}
+	}
+	return true
+}
+
+// Which firmware image an RTBuddy target adopts. RTBuddy::_attemptFirmwareLoad
 // only bypasses its firmware service when the nub declares itself already
 // `running` or opts out with `no-firmware-service`; `pre-loaded` alone is the
 // second gate and never reaches that test on its own.
@@ -957,14 +1056,14 @@ fn validate_t6050_patchbay_codec() bool {
 	block[rtk_id_block_version_offset] = 5
 	block[rtk_id_block_v5_offset] = 0
 	block[rtk_id_block_v5_offset + 4] = u8(records.len)
-	region := decode_t6050_patchbay_region(block.data, 0) or { return false }
+	region := decode_t6050_patchbay_region(block.data, 0, true) or { return false }
 	if region.align_pad != 0 || region.size != u32(records.len)
 		|| region.padded_size != (u32(records.len) + 3) & ~u32(3) {
 		return false
 	}
 	// An unsupported identity-block version must not yield a region at all.
 	block[rtk_id_block_version_offset] = 6
-	if _ := decode_t6050_patchbay_region(block.data, 0) {
+	if _ := decode_t6050_patchbay_region(block.data, 0, true) {
 		return false
 	}
 	block[rtk_id_block_version_offset] = 5
@@ -987,6 +1086,65 @@ fn validate_t6050_patchbay_codec() bool {
 		return false
 	}
 	if _ := t6050_patchbay_tag('BDI') {
+		return false
+	}
+	// The host copy spans the whole padded region, and an edit is refused
+	// unless every requested tag already exists as a 32-bit record.
+	mut bay := copy_t6050_patchbay(records.data, &region) or { return false }
+	if bay.data.len != int(region.padded_size) || bay.dirty {
+		return false
+	}
+	mut target := []u8{len: int(region.padded_size)}
+	// Nothing is pushed before an edit, and nothing is pushed for a region
+	// whose segment is not writable.
+	if bay.write_back(target.data) {
+		return false
+	}
+	if !bay.set_value(bdid, 0x1234abcd) || !bay.dirty {
+		return false
+	}
+	if bay.set_value(t6050_patchbay_tag('ZZZZ') or { return false }, 1) {
+		return false
+	}
+	mut values := []T6050PatchBayValue{}
+	for index, name in mandatory {
+		values << T6050PatchBayValue{
+			tag: t6050_patchbay_tag(name) or { return false }
+			value: u32(0x100 + index)
+			present: true
+		}
+	}
+	if !bay.apply_values(values) {
+		return false
+	}
+	values << T6050PatchBayValue{
+		tag: t6050_patchbay_tag('ZZZZ') or { return false }
+		value: 0
+		present: false
+	}
+	if bay.apply_values(values) {
+		return false
+	}
+	if !bay.write_back(target.data) {
+		return false
+	}
+	// The pushed copy must read back through the same walker.
+	for index, name in mandatory {
+		tag := t6050_patchbay_tag(name) or { return false }
+		record := find_t6050_patchbay_tag(target.data, &region, tag) or { return false }
+		if read_native_u32(target.data, record.offset + rtk_patchbay_header_size) != u32(0x100 + index) {
+			return false
+		}
+	}
+	unwritable := T6050PatchBayRegion{
+		iop_virtual: region.iop_virtual
+		align_pad: region.align_pad
+		size: region.size
+		padded_size: region.padded_size
+		writable: false
+	}
+	mut locked := copy_t6050_patchbay(records.data, &unwritable) or { return false }
+	if !locked.set_value(bdid, 1) || locked.write_back(target.data) {
 		return false
 	}
 	// A length that leaves the declared region must abort the whole walk

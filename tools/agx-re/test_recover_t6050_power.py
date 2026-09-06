@@ -1117,6 +1117,117 @@ class RecoverT6050PowerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ambiguous or absent"):
             recover_t6050_power.recover_t6050_pmp_patchbay(bytes(image), contract)
 
+    def test_recovers_rtbuddy_patchbay_write_path(self) -> None:
+        get_bay = 0x10000
+        copy_data = 0x11000
+        copy32 = 0x12000
+        find_bay = 0x13000
+        write = 0x14000
+        write_back = 0x15000
+        bay_find = 0x16000
+        with_data = 0x17000
+        bay_bytes = 0x18000
+        rw_map = 0x19000
+        memcpy32 = 0x1A000
+
+        def branch(source: int, target: int) -> bytes:
+            delta = (target - source) // 4
+            return struct.pack("<I", 0x94000000 | delta & 0x3FFFFFF)
+
+        copy_code = branch(copy_data, find_bay)
+        copy_code += struct.pack("<2I", 0xF94007E1, 0xB94007E2)
+        copy_code += branch(copy_data + len(copy_code), copy32)
+        get_code = struct.pack("<3I", 0xF9406400, 0x39003FFF, 0xB9000BFF)
+        get_code += branch(get_bay + len(get_code), copy_data)
+        get_code += branch(get_bay + len(get_code), with_data)
+        get_code += struct.pack("<I", 0xF9006660)
+        write_code = branch(write, get_bay) + branch(write + 4, bay_find)
+        write_code += struct.pack(
+            "<7I",
+            0xD2802C11,
+            0x7100101F,
+            0xD2803311,
+            0xB9400288,
+            0xB9000008,
+            0x52800020,
+            0x39007260,
+        )
+        back_code = struct.pack(
+            "<5I", 0xF9406408, 0x39407509, 0x36001089, 0x39407108, 0x36001048
+        )
+        back_code += branch(write_back + len(back_code), find_bay)
+        back_code += struct.pack("<I", 0xF9405660)
+        back_code += branch(write_back + len(back_code), rw_map)
+        back_code += struct.pack("<4I", 0xEB1702DF, 0x54000F83, 0xEB08031F, 0x54000DE8)
+        back_code += branch(write_back + len(back_code), bay_bytes)
+        back_code += branch(write_back + len(back_code), memcpy32)
+        memcpy_code = struct.pack(
+            "<5I", 0x2A000088, 0xF240051F, 0x54000541, 0xB840458D, 0xB800456D
+        )
+
+        functions = {
+            recover_t6050_power.RTBUDDY_FIRMWARE_GET_PATCHBAY: (get_bay, get_code),
+            recover_t6050_power.RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA: (
+                copy_data,
+                copy_code,
+            ),
+            recover_t6050_power.RTBUDDY_FIRMWARE_PATCH_U32: (write, write_code),
+            recover_t6050_power.RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY: (
+                write_back,
+                back_code,
+            ),
+            recover_t6050_power.RTBUDDY_MEMCPY_TO32: (memcpy32, memcpy_code),
+        }
+        symbols = {
+            recover_t6050_power.RTBUDDY_FIRMWARE_GET_PATCHBAY: get_bay,
+            recover_t6050_power.RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA: copy_data,
+            recover_t6050_power.RTBUDDY_FIRMWARE_COPY32_REGION: copy32,
+            recover_t6050_power.RTBUDDY_FIRMWARE_FIND_PATCHBAY: find_bay,
+            recover_t6050_power.RTBUDDY_FIRMWARE_PATCH_U32: write,
+            recover_t6050_power.RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY: write_back,
+            recover_t6050_power.RTBUDDY_PATCHBAY_FIND: bay_find,
+            recover_t6050_power.RTBUDDY_PATCHBAY_WITH_DATA: with_data,
+            recover_t6050_power.RTBUDDY_PATCHBAY_GET_BYTES: bay_bytes,
+            recover_t6050_power.RTBUDDY_COREDUMP_READWRITE_MAP: rw_map,
+            recover_t6050_power.RTBUDDY_MEMCPY_TO32: memcpy32,
+        }
+        result = recover_t6050_power.recover_rtbuddy_patchbay_write_contract(
+            functions, symbols
+        )
+        self.assertEqual(result["host_copy"]["cache_object_offset"], 0xC8)
+        self.assertEqual(result["edit"]["dirty_object_offset"], 0x1C)
+        self.assertTrue(result["edit"]["wrong_width_is_fatal"])
+        self.assertTrue(result["edit"]["ignores_writable_flag"])
+        self.assertEqual(result["write_back"]["writable_object_offset"], 0x1D)
+        self.assertEqual(result["write_back"]["requires"], ["writable", "dirty"])
+        self.assertEqual(result["write_back"]["copy_width_bits"], 32)
+
+        # Losing either write-back precondition would let an edit reach a
+        # non-writable region or push an unedited one.
+        for word, label in ((0x39407509, "write-back guards"), (0x39407108, "write-back guards")):
+            bad = dict(functions)
+            bad[recover_t6050_power.RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY] = (
+                write_back,
+                back_code.replace(
+                    struct.pack("<I", word), struct.pack("<I", 0xD503201F), 1
+                ),
+            )
+            with self.assertRaisesRegex(ValueError, label):
+                recover_t6050_power.recover_rtbuddy_patchbay_write_contract(
+                    bad, symbols
+                )
+
+        # A byte-wise copy would corrupt a device-memory target.
+        bad = dict(functions)
+        bad[recover_t6050_power.RTBUDDY_MEMCPY_TO32] = (
+            memcpy32,
+            memcpy_code.replace(
+                struct.pack("<I", 0xB800456D), struct.pack("<I", 0x3800456D), 1
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "32-bit patchbay copy"):
+            recover_t6050_power.recover_rtbuddy_patchbay_write_contract(bad, symbols)
+
     def test_recovers_rtbuddy_firmware_source_selection(self) -> None:
         edt = 0x10000
         attempt = 0x20000
