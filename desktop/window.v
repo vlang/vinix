@@ -127,7 +127,7 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 			body_line('Windows   ${open_windows} open, ${visible} on screen', 12, 52,
 				inner - 24),
 			body_line('Frames    ${desktop.frames}', 12, 72, inner - 24),
-			muted_line('Press Esc or q to leave the desktop.', 12, 96, inner - 24),
+			muted_line('Ctrl-Q leaves the desktop, Ctrl-N opens a window.', 12, 96, inner - 24),
 		]),
 	]
 }

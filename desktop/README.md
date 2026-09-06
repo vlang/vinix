@@ -25,7 +25,11 @@ What it does:
 - **hosted ui2 applications**: ui2's own examples run in windows of their own,
   several at a time, each with its own state
 
-Keys: `Esc` or `q` leaves the desktop, `n` opens a window, `c` a calculator.
+Keys: `Ctrl-Q` leaves the desktop, `Ctrl-N` opens a window, `Ctrl-K` the first
+application. They are chords rather than bare letters because they fire
+whenever no application holds the keyboard, which on a machine whose pointer
+does not work is most of the time -- and `q` meaning "close the desktop" makes
+typing any word with a q in it drop the user back to the console.
 
 ## How it fits together
 

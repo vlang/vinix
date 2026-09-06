@@ -15,6 +15,13 @@ module main
 // worse, not better: each one pays that floor again.
 const default_frame_interval_ms = i64(16)
 
+// The desktop's own shortcuts, as a raw terminal delivers them. The keyboard
+// is read in raw mode, so a control chord arrives as one byte and nothing else
+// can be mistaken for it.
+const key_ctrl_k = u8(0x0b)
+const key_ctrl_n = u8(0x0e)
+const key_ctrl_q = u8(0x11)
+
 struct Options {
 	framebuffer    string = '/dev/fb0'
 	pointer        string = '/dev/pointer'
@@ -208,15 +215,20 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 		return
 	}
 
+	// Control chords rather than bare letters. These fire whenever no
+	// application has the keyboard, which on a machine with no working pointer
+	// is most of the time -- and a plain `q` meaning "close the desktop" then
+	// means typing a word with a q in it drops the user back to the console.
+	// Esc is out for the same reason: it is a key people press.
 	for i := 0; i < keys.len; i++ {
 		match keys[i] {
-			27, `q`, `Q` {
+			key_ctrl_q {
 				d.running = false
 			}
-			`n`, `N` {
+			key_ctrl_n {
 				d.spawn_scattered()
 			}
-			`c`, `C` {
+			key_ctrl_k {
 				// The first hosted application, for a keyboard-only session.
 				if available_apps.len > 0 {
 					d.launch(available_apps[0])
