@@ -337,6 +337,44 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 	return true
 }
 
+// The native Apple DeviceTree carries no OPP-v2 table, and the gap is larger
+// than a rename. G13's hwdata refuses to initialise with a zero max_power_mw,
+// but the Apple GPU node carries only frequency and voltage: on a live M5 Max
+// tree the sgx node's 66 properties include perf-states, perf-states-sram and
+// gpu-pwr-perf-scale0/1, and no per-state power under any spelling. The
+// `opp-microwatt` figures m1n1 writes into its FDT therefore come from
+// somewhere other than this node, and that source has not been located yet.
+//
+// Guessing property names for a path whose whole purpose is to open GPU
+// hardware access would be the wrong trade, so report what the node actually
+// carries and let the translation be written from real data.
+fn report_native_t8103_opp_gap(gpu_node &devicetree.DTNode) {
+	println('agx: native t8103 OPP translation is not implemented')
+	println('agx: expected an m1n1/Linux FDT (apple,agx-g13g) with operating-points-v2;')
+	println('agx: this boot supplied the Apple DeviceTree (gpu,t8103) instead.')
+	C.printf(c'agx: native t8103 GPU node exposes %u properties:\n',
+		u32(gpu_node.properties.len))
+	for property in gpu_node.properties {
+		if property.len == 4 {
+			C.printf(c'agx:   %s len=%u value=0x%x\n', property.name.str, property.len,
+				read_le_u32_at(property.data, 0))
+		} else if property.len >= 8 && property.len % 4 == 0 {
+			C.printf(c'agx:   %s len=%u first=0x%x,0x%x\n', property.name.str,
+				property.len, read_le_u32_at(property.data, 0),
+				read_le_u32_at(property.data, 4))
+		} else {
+			C.printf(c'agx:   %s len=%u\n', property.name.str, property.len)
+		}
+	}
+}
+
+fn read_le_u32_at(data voidptr, offset u32) u32 {
+	value := unsafe { &u8(u64(data) + offset) }
+	return unsafe {
+		u32(value[0]) | (u32(value[1]) << 8) | (u32(value[2]) << 16) | (u32(value[3]) << 24)
+	}
+}
+
 // G13 receives its operating points through the standard OPP-v2 FDT binding.
 // m1n1 derives this table from the machine's Apple DeviceTree, so it reflects
 // the exact voltage and power data for both seven- and eight-core t8103 parts.
@@ -831,7 +869,7 @@ pub fn initialise() {
 	mut g13_performance_config_complete := false
 	if chip_id == 0x8103 {
 		if native_adt {
-			println('agx: native t8103 OPP translation is not implemented')
+			report_native_t8103_opp_gap(gpu_node)
 		} else {
 			g13_performance_config_complete = load_t8103_performance_config(gpu_node, mut cfg)
 				&& load_t8103_power_controller_config(gpu_node, mut cfg)
