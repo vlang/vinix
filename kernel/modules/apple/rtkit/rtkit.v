@@ -34,11 +34,15 @@ const management_type_mask = u64(0xff) << management_type_shift
 const epmap_last = u64(1) << 51
 const epmap_more = u64(1)
 // RTBuddyManagementEndpoint::_handleEPRollCall reads the group with
-// `ubfx x22, x1, #32, #6`. Masking it to three bits instead would fold a
-// group of 8 or more back onto group 0 and mark the wrong endpoints present,
-// so read all six bits and let the endpoint-range check reject the rest.
+// `ubfx x22, x1, #32, #6`, and echoes bits 32..37 back in its reply, so the
+// field is six bits wide. Only groups 0..7 are reachable though: an RTKit
+// endpoint is a byte, so group 8 would name endpoint 256. The Linux driver
+// this port follows masks three bits, and that is what has actually been run
+// on this hardware, so placement uses three bits and a wider group is
+// reported rather than acted on.
 const epmap_group_shift = u32(32)
 const epmap_group_mask = u64(0x3f)
+const epmap_addressable_group_mask = u32(0x7)
 const epmap_group_endpoints = u32(32)
 const max_endpoints = u32(256)
 const start_ep_flag = u64(1) << 1
@@ -78,6 +82,9 @@ pub mut:
 	system_sizes     [16]u64
 	syslog_entries   u32
 	syslog_msg_size  u32
+	// Latches the first out-of-range endpoint-map group so a repeating roll
+	// call cannot flood the console during boot.
+	epmap_group_warned bool
 }
 
 pub fn new_rtkit(mbox_base u64, name string) RTKit {
@@ -188,7 +195,15 @@ pub fn (mut rtk RTKit) boot() bool {
 			}
 			msg_epmap {
 				bitmap := u32(msg.data0 & 0xffff_ffff)
-				block := u32((msg.data0 >> epmap_group_shift) & epmap_group_mask)
+				group := u32((msg.data0 >> epmap_group_shift) & epmap_group_mask)
+				block := group & epmap_addressable_group_mask
+				if group != block && !rtk.epmap_group_warned {
+					// Never observed. If it ever fires, the upper group bits
+					// carry something this decoder does not model.
+					rtk.epmap_group_warned = true
+					C.printf(c'rtkit[%s]: endpoint-map group %u exceeds the addressable range\n',
+						rtk.name.str, group)
+				}
 				last := msg.data0 & epmap_last != 0
 				base := block * epmap_group_endpoints
 				for bit := u32(0); bit < epmap_group_endpoints; bit++ {
@@ -197,20 +212,18 @@ pub fn (mut rtk RTKit) boot() bool {
 					}
 					ep_id := base + bit
 					if ep_id >= max_endpoints {
-						C.printf(c'rtkit[%s]: ignoring out-of-range endpoint %u\n',
-							rtk.name.str, ep_id)
 						continue
 					}
 					rtk.endpoints[ep_id] = true
 				}
-				// The reply echoes the group and the last flag. Apple's own
-				// AP driver puts a bitmap of the endpoints it already has in
-				// the low 32 bits, so its first reply sets bit 0 only for
-				// group 0; the more/last convention below is what the Linux
-				// driver sends and what this port has been exercised with.
-				// Both are accepted, so this is left alone deliberately
-				// rather than switched on the strength of one binary.
-				mut reply := (u64(block) & epmap_group_mask) << epmap_group_shift
+				// Echo the group and last bit back verbatim, as Apple does.
+				// Apple's own AP driver then puts a bitmap of the endpoints it
+				// already owns in the low 32 bits, so its first reply sets bit
+				// 0 only for group 0; the more/last convention used here is
+				// what the Linux driver sends and what this port has actually
+				// been run with. Both are accepted, so the difference is left
+				// alone rather than switched on the strength of one binary.
+				mut reply := (u64(group) & epmap_group_mask) << epmap_group_shift
 				if last {
 					reply |= epmap_last
 				} else {
