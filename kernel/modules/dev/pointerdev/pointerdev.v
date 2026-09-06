@@ -10,6 +10,7 @@ import errno
 import file
 import event.eventstruct
 import aarch64.virtio_input as _
+import apple.spi_keyboard
 
 // PointerPacket is the whole of what /dev/pointer reports, and a read always
 // answers with the current state rather than replaying a queue: a compositor
@@ -61,22 +62,35 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i6
 
 	this.l.acquire()
 
-	packet := PointerPacket{
-		x: vi_ptr_x
-		y: vi_ptr_y
-		max_x: vi_ptr_max_x
-		max_y: vi_ptr_max_y
-		buttons: vi_ptr_buttons
-		pressed: vi_ptr_pressed
-		released: vi_ptr_released
-		scroll: vi_ptr_scroll
+	mut apple := [8]int{}
+	mut packet := PointerPacket{}
+	if spi_keyboard.read_pointer(&apple[0]) {
+		packet = PointerPacket{
+			x: apple[0]
+			y: apple[1]
+			max_x: apple[2]
+			max_y: apple[3]
+			buttons: u32(apple[4])
+			pressed: u32(apple[5])
+			released: u32(apple[6])
+			scroll: apple[7]
+		}
+	} else {
+		// No verified Apple report: preserve the existing QEMU/VirtIO source.
+		packet = PointerPacket{
+			x: vi_ptr_x
+			y: vi_ptr_y
+			max_x: vi_ptr_max_x
+			max_y: vi_ptr_max_y
+			buttons: vi_ptr_buttons
+			pressed: vi_ptr_pressed
+			released: vi_ptr_released
+			scroll: vi_ptr_scroll
+		}
+		vi_ptr_pressed = 0
+		vi_ptr_released = 0
+		vi_ptr_scroll = 0
 	}
-
-	// The edges belong to the interval that just ended, so they are consumed
-	// by the read that reports them.
-	vi_ptr_pressed = 0
-	vi_ptr_released = 0
-	vi_ptr_scroll = 0
 
 	this.l.release()
 
