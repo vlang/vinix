@@ -4,8 +4,8 @@
 # Installed on the M1 by push-to-m1.sh; edit it in the repo, not in place, or
 # the next push overwrites your changes.
 #
-#   sudo ~/code/kek.sh          normal boot (default now that the VHE, timer
-#                               and Limine MP blockers are fixed)
+#   sudo ~/code/kek.sh          boot into the desktop (default)
+#   sudo ~/code/kek.sh full     BusyBox shell userland + terminal
 #   sudo ~/code/kek.sh diag     minimal initramfs, no terminal, stage bars only
 #   sudo ~/code/kek.sh halt N   power off at stage N -- machine turning itself
 #                               off means the kernel reached that stage
@@ -20,7 +20,11 @@ REPO="$HOME/code/vinix"
 DISK="disk0s4"
 ESP="/Volumes/EFI - FEDOR"
 
-case "${1:-full}" in
+case "${1:-desktop}" in
+    desktop)
+        FLAGS=(--native-resolution --desktop-initramfs)
+        MODE="desktop"
+        ;;
     diag)
         FLAGS=(--native-resolution --minimal-initramfs --no-early-term)
         MODE="diagnostic"
@@ -37,9 +41,9 @@ case "${1:-full}" in
         FLAGS=(--native-resolution --minimal-initramfs --no-early-term --halt-at=99 --force-fault)
         MODE="selftest"
         ;;
-    full|"")
+    full)
         FLAGS=(--native-resolution)
-        MODE="normal"
+        MODE="shell"
         ;;
     gpu)
         FLAGS=(--apple-gpu --native-resolution)
@@ -50,7 +54,7 @@ case "${1:-full}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: diag | halt N | selftest | full | gpu)" >&2
+        echo "error: unknown mode '$1' (use: desktop | full | diag | halt N | selftest | gpu)" >&2
         exit 1
         ;;
 esac

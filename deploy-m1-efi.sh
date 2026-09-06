@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
 USE_MINIMAL_INITRAMFS=0
+USE_DESKTOP_INITRAMFS=0
 USE_NATIVE_RESOLUTION=0
 CMDLINE_EXTRA=""
 
@@ -44,6 +45,11 @@ for argument in "$@"; do
             # last stage reached.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.no_early_term=1"
             ;;
+        --desktop-initramfs)
+            # Boot into the desktop image (desktop-init + vinix-desktop +
+            # BusyBox fallback) built by build-desktop-aarch64.sh.
+            USE_DESKTOP_INITRAMFS=1
+            ;;
         --minimal-initramfs)
             # Boot with a few-KB initramfs instead of the 120 MB busybox one.
             # If a hang at Limine's "Loading module" line clears with this, the
@@ -51,7 +57,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -81,6 +87,7 @@ fi
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
+DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 LIMINE_EFI_BUILT="$SCRIPT_DIR/boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI"
 LIMINE_EFI_BIN="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
 LIMINE_CONF="$SCRIPT_DIR/build-support/limine.conf"
@@ -91,6 +98,15 @@ else
     LIMINE_EFI="$LIMINE_EFI_BIN"
 fi
 
+if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
+    if [ ! -f "$DESKTOP_INITRAMFS" ]; then
+        echo "error: desktop initramfs not built: $DESKTOP_INITRAMFS" >&2
+        echo "hint: run ./build-desktop-aarch64.sh" >&2
+        exit 1
+    fi
+    INITRAMFS="$DESKTOP_INITRAMFS"
+    echo "using desktop initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
+fi
 if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
     if [ ! -f "$MINIMAL_INITRAMFS" ]; then
         echo "error: minimal initramfs not built: $MINIMAL_INITRAMFS" >&2

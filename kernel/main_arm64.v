@@ -12,6 +12,7 @@ import aarch64.gic
 import aarch64.timer
 import aarch64.smp
 import aarch64.pmgr
+import aarch64.wdt
 import aarch64.uart
 import aarch64.virtio_input
 import apple.smc
@@ -523,6 +524,17 @@ fn kmain() {
 			print('init pmgr...\n')
 			pmgr.initialise(pmgr_addr)
 			print('pmgr done\n')
+		}
+
+		// Apple watchdog: U-Boot leaves it armed with about a minute on the
+		// clock, which is why a working boot reset into macOS at the shell.
+		wdt_addr := get_dt_base('apple,wdt', 0)
+		if wdt_addr != 0 {
+			print('init wdt...\n')
+			wdt.initialise(wdt_addr)
+			print('wdt done\n')
+		} else {
+			print('no Apple watchdog node in device tree\n')
 		}
 	} else {
 		print('skipping Apple-specific HW init (no device tree)\n')
