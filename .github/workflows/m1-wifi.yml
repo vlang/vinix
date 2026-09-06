@@ -1,0 +1,34 @@
+name: M1 Wi-Fi bring-up
+on:
+  push:
+    branches: [wifi/m1-air]
+  pull_request:
+    paths:
+      - 'kernel/c/brcm*'
+      - 'kernel/modules/apple/wifi/**'
+      - 'tests/m1-wifi/**'
+      - '.github/workflows/m1-wifi.yml'
+permissions:
+  contents: read
+concurrency:
+  group: m1-wifi-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld
+      - name: Driver host tests
+        run: |
+          if [ -f tests/m1-wifi/run.sh ]; then
+            CC=clang sh tests/m1-wifi/run.sh
+          fi
+      - name: Build V
+        run: git clone --depth=1 https://github.com/vlang/v.git /tmp/v && make -C /tmp/v
+      - name: Kernel dependencies
+        run: cd kernel && ./get-deps
+      - name: Build ARM64 kernel
+        run: make -C kernel ARCH=aarch64 CC=clang V=/tmp/v/v -j2
