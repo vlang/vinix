@@ -12,6 +12,7 @@ SYSROOT="$BUILD_DIR/sysroot"
 STAGING="$BUILD_DIR/staging"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
+RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 
 MUSL_VERSION="1.2.5"
 BUSYBOX_VERSION="1.36.1"
@@ -789,6 +790,13 @@ if [ -x "$PYTHON_STAGING/usr/bin/python3" ]; then
     cp -a "$PYTHON_STAGING/." "$STAGING/"
 else
     echo "==> Python 3 staging not found, skipping (run build-python-aarch64.sh first)"
+fi
+
+if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
+    echo "==> Integrating Ruby runtime..."
+    cp -a "$RUBY_STAGING/." "$STAGING/"
+else
+    echo "==> Ruby staging not found, skipping (run build-ruby-aarch64.sh first)"
 fi
 
 echo "==> Packaging initramfs..."

@@ -9,6 +9,7 @@ import futex
 import pipe
 import socket
 import memory.mmap
+import time
 import time.sys
 import net
 import sched
@@ -144,14 +145,43 @@ fn syscall_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64, fla
 }
 
 // Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
-fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64) (u64, u64) {
-	// Mask off FUTEX_PRIVATE_FLAG and FUTEX_CLOCK_REALTIME; neither changes
-	// what we do, since every futex here is looked up by physical address and
-	// timeouts are not honoured yet.
+fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64, val3 u64) (u64, u64) {
+	// FUTEX_PRIVATE_FLAG does not change the lookup: futexes are keyed by their
+	// physical address already. FUTEX_CLOCK_REALTIME selects the clock used by
+	// absolute FUTEX_WAIT_BITSET deadlines.
 	op := futex_op & 0x7f
 	match op {
 		0, 9 { // FUTEX_WAIT, FUTEX_WAIT_BITSET
-			return futex.wait(uaddr, int(val))
+			if op == 9 && val3 == 0 {
+				return errno.err, errno.einval
+			}
+			if timeout == 0 {
+				return futex.wait(uaddr, int(val))
+			}
+
+			mut duration := time.TimeSpec{}
+			if !usercopy.copy_from_user(voidptr(&duration), timeout, sizeof(time.TimeSpec)) {
+				return errno.err, errno.efault
+			}
+			if duration.tv_sec < 0 || duration.tv_nsec < 0 || duration.tv_nsec >= 1000000000 {
+				return errno.err, errno.einval
+			}
+
+			// FUTEX_WAIT has a relative timeout. FUTEX_WAIT_BITSET names an
+			// absolute deadline, so turn it into the relative duration used by
+			// the Vinix timer queue.
+			if op == 9 {
+				clock_id := if futex_op & 0x100 != 0 {
+					time.clock_type_realtime
+				} else {
+					time.clock_type_monotonic
+				}
+				now := time.clock_now(clock_id) or { return errno.err, errno.einval }
+				if duration.sub(now) {
+					return errno.err, errno.etimedout
+				}
+			}
+			return futex.wait_timeout(uaddr, int(val), duration)
 		}
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
 			return futex.wake(uaddr), 0

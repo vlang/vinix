@@ -138,6 +138,21 @@ Both aarch64 userland builders automatically merge
 also installs `/root/python3-smoke.py`; the ARM64 VM image runs this test during
 its boot suite and it can be rerun manually with `python3`.
 
+### Ruby on aarch64
+
+Ruby 3.3, RubyGems, Bundler, Rake, and the native standard-library dependencies
+can be staged and merged into the same aarch64 image:
+
+```sh
+./build-ruby-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+The userland builders merge `build-aarch64-ruby/staging` when present. Set
+`VINIX_RUBY_STAGING=/path/to/staging` to override it. The runtime includes
+`/root/ruby-smoke.rb`, which the ARM64 VM boot suite runs automatically and
+which can also be invoked manually with `ruby`.
+
 ### Apple M1 GPU test image
 
 Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It

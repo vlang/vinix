@@ -60,6 +60,22 @@ __global (
 	clock_tick_lock klock.Lock
 )
 
+// Return a stable snapshot of a clock for interfaces, such as absolute futex
+// deadlines, that need to translate a point in time into a timer duration.
+pub fn clock_now(clock_id int) ?TimeSpec {
+	match clock_id {
+		clock_type_realtime {
+			return realtime_clock
+		}
+		clock_type_monotonic {
+			return monotonic_clock
+		}
+		else {
+			return none
+		}
+	}
+}
+
 fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
 
 // timer_handler is the fixed frequency case: a tick source that really does

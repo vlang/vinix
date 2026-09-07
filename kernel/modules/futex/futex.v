@@ -6,6 +6,7 @@ import event.eventstruct
 import klock
 import errno
 import proc
+import time
 import usercopy
 
 __global (
@@ -55,6 +56,39 @@ pub fn wait(virt u64, expected int) (u64, u64) {
 		unsafe { events.free() }
 	}
 	event.await(mut events, true) or { return errno.err, errno.eintr }
+
+	return 0, 0
+}
+
+// Block until the futex is woken or a relative timeout expires. Linux libc
+// uses timed futex waits to implement pthread condition variables and sleep,
+// so ignoring the timeout can leave an otherwise healthy process asleep
+// forever.
+pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
+	// Match wait(): validate and compare the userspace word before deciding that
+	// even a zero-length wait has timed out.
+	current := usercopy.read_u32(virt) or { return errno.err, errno.efault }
+	if current != u32(expected) {
+		return errno.err, errno.eagain
+	}
+	if duration.tv_sec == 0 && duration.tv_nsec == 0 {
+		return errno.err, errno.etimedout
+	}
+
+	e := event_for(virt, true) or { return errno.err, errno.efault }
+	mut timer := time.new_timer(duration)
+	defer {
+		timer.disarm()
+	}
+
+	mut events := [e, &timer.event]
+	defer {
+		unsafe { events.free() }
+	}
+	which := event.await(mut events, true) or { return errno.err, errno.eintr }
+	if which == 1 {
+		return errno.err, errno.etimedout
+	}
 
 	return 0, 0
 }
