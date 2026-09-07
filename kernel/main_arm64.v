@@ -37,6 +37,7 @@ import dev.fbdev
 import dev.fbdev.simple
 import dev.pointerdev
 import dev.procdev
+import dev.pty
 import dev.random
 import dev.streams
 import time
@@ -239,6 +240,8 @@ fn kmain_thread(qemu_platform bool) {
 
 	procdev.initialise()
 	print('kmain_thread: processes done\n')
+	pty.initialise()
+	print('kmain_thread: pty done\n')
 
 	console.initialise()
 	print('kmain_thread: console done\n')

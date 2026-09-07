@@ -34,6 +34,15 @@ pub const tiocnotty = 0x5422
 
 pub const tiocgsid = 0x5429
 
+// Unix98 pseudo-terminal allocation and peer discovery.
+pub const tiocgptn = u64(0x80045430)
+
+pub const tiocsptlck = 0x40045431
+
+pub const tiocgptlck = u64(0x80045439)
+
+pub const tiocgptpeer = 0x5441
+
 // tcflush(3) selectors, the argument to TCFLSH.
 pub const tciflush = 0
 

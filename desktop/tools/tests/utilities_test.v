@@ -103,52 +103,44 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 	assert clock.elapsed(2_500) == 1_750
 }
 
-fn test_terminal_waits_for_the_shell_before_showing_another_prompt() {
+fn test_terminal_sends_every_keystroke_through_the_pty_master() {
 	mut input_pipe := [2]int{}
 	assert C.pipe(&input_pipe[0]) == 0
 	mut terminal := TerminalApp{
-		to_child: input_pipe[1]
+		terminal: input_pipe[1]
 	}
 
-	// PS1 may straddle two non-blocking reads. It becomes state, not output.
-	terminal.ingest_output([terminal_prompt_marker_start])
-	assert !terminal.ready
-	terminal.ingest_output([terminal_primary_prompt_code, terminal_prompt_marker_end])
-	assert terminal.ready
-	assert terminal.partial.len == 0
-
-	terminal.key_input('pkg install gtk\n')
-	assert !terminal.ready
-	assert terminal.lines.len == 1
-	assert terminal.lines[0] == '\$ pkg install gtk'
-
-	mut sent := []u8{len: 32}
+	// There is no private prompt state or local line buffering: type-ahead and
+	// control characters belong to the tty line discipline. Backspace is
+	// normalized to the default VERASE byte.
+	terminal.key_input('ab\b\n\x03')
+	mut sent := []u8{len: 8}
 	count := C.read(input_pipe[0], sent.data, sent.len)
-	assert count == 16
-	assert sent[..count].bytestr() == 'pkg install gtk\n'
-
-	// Keystrokes while the foreground command runs no longer manufacture
-	// prompts or queue accidental shells behind the installer.
-	terminal.key_input('zsh\n\n')
-	assert terminal.lines.len == 1
-	assert terminal.input.len == 0
-
-	terminal.ingest_output('installed\n'.bytes())
-	assert !terminal.ready
-	terminal.ingest_output(terminal_primary_prompt_marker.bytes())
-	assert terminal.ready
-	assert terminal.lines == ['\$ pkg install gtk', 'installed']
+	assert count == 5
+	assert sent[..count] == [u8(`a`), `b`, 0x7f, `\n`, 0x03]
+	assert terminal.lines.len == 0
 
 	C.close(input_pipe[0])
 	C.close(input_pipe[1])
 }
 
-fn test_terminal_tracks_shell_continuation_prompts() {
+fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	mut terminal := TerminalApp{}
-	terminal.ingest_output(terminal_continuation_prompt_marker.bytes())
-	assert terminal.ready
-	assert terminal.continuation
-	assert terminal.prompt_text == '> _'
+	terminal.ingest_output('progress 10%\rprogress 20%\r\n\$ '.bytes())
+	assert terminal.lines == ['progress 20%']
+	assert terminal.partial.bytestr() == '\$ '
+	assert terminal.partial_text == '\$ _'
+
+	// Canonical erase echo is backspace-space-backspace. Interpret it as cursor
+	// movement and overwrite, just as a terminal display does.
+	terminal.ingest_output('abc\b \bD'.bytes())
+	assert terminal.partial.bytestr() == '\$ abD'
+
+	// BusyBox's line editor emits clear-to-end even under TERM=dumb, and an
+	// escape sequence may straddle two non-blocking reads.
+	terminal.ingest_output('\x1b['.bytes())
+	terminal.ingest_output('J'.bytes())
+	assert terminal.partial.bytestr() == '\$ abD'
 }
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {

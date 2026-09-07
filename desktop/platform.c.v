@@ -25,6 +25,8 @@ import term.termios
 
 #include <signal.h>
 
+#include <stdlib.h>
+
 #include <termios.h>
 
 #include <time.h>
@@ -32,6 +34,16 @@ import term.termios
 #include <unistd.h>
 
 fn C.fstat(fd int, buf &C.stat) int
+
+fn C.posix_openpt(flags int) int
+
+fn C.grantpt(fd int) int
+
+fn C.unlockpt(fd int) int
+
+fn C.ptsname(fd int) &char
+
+fn C.setsid() int
 
 fn C.mmap(base voidptr, length usize, prot int, flags int, fd int, offset i64) voidptr
 
@@ -222,11 +234,20 @@ fn desktop_write_file(path string, buffer voidptr, count u64) bool {
 	return C.close(fd) == 0
 }
 
-// A child process and the two pipes the terminal talks to it through.
+// A child process and its pseudo-terminal master.
 struct SpawnedShell {
-	pid        int
-	to_child   int
-	from_child int
+	pid      int
+	terminal int
+}
+
+// Linux/Vinix's struct winsize is four unsigned shorts. Keep the ABI shape in
+// V because the Vinix C backend does not import tagged C struct declarations.
+struct DesktopWinSize {
+mut:
+	rows    u16
+	columns u16
+	width   u16
+	height  u16
 }
 
 // Keep the built-in terminal on the same command path as the full ARM64
@@ -282,66 +303,98 @@ fn desktop_run_external(path string) ExternalProgramResult {
 
 // Start a shell for the terminal.
 //
-// Vinix has no pseudo-terminals, so the child is given plain pipes. It sees
-// them as its stdin, stdout and stderr. Interactive mode makes BusyBox publish
-// PS1/PS2 at the exact points where it can accept input; private marker values
-// let the terminal draw those prompts without leaking protocol text into the
-// scrollback. Job control stays off because pipes are not a controlling tty.
+// The master is retained by the desktop. The child starts a new session,
+// claims the slave as its controlling terminal and attaches it to all three
+// standard streams. This is what gives the shell normal echo, signals and job
+// control instead of requiring a private prompt protocol over pipes.
 //
-// from_child comes back non-blocking, so a compositor polling it once a frame
+// The master comes back non-blocking, so polling it once per compositor frame
 // never stalls.
-fn desktop_spawn_shell(path string, arg string, primary_prompt string, continuation_prompt string) ?SpawnedShell {
-	mut in_pipe := [2]int{}
-	mut out_pipe := [2]int{}
-	if C.pipe(&in_pipe[0]) != 0 {
+fn desktop_spawn_shell(path string, arg string, rows int, columns int, width int, height int) ?SpawnedShell {
+	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
+	if master < 0 {
 		return none
 	}
-	if C.pipe(&out_pipe[0]) != 0 {
-		C.close(in_pipe[0])
-		C.close(in_pipe[1])
+	if C.grantpt(master) != 0 || C.unlockpt(master) != 0 {
+		C.close(master)
+		return none
+	}
+	slave_name := C.ptsname(master)
+	if slave_name == unsafe { nil } {
+		C.close(master)
+		return none
+	}
+	slave := C.open(slave_name, C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
+	if slave < 0 {
+		C.close(master)
+		return none
+	}
+	// Set geometry before the shell starts. Starting at 0x0 and resizing after
+	// the first prompt makes a real shell handle SIGWINCH by drawing that prompt
+	// twice, which is precisely the synthetic-looking behavior PTYs remove.
+	if !desktop_terminal_winsize(slave, rows, columns, width, height) {
+		C.close(slave)
+		C.close(master)
 		return none
 	}
 
 	// Built before the fork. Between fork and execve the child may call only
 	// async-signal-safe functions, which allocating is not.
-	argv := [&char(path.str), &char(arg.str), c'-i', c'+m', &char(unsafe { nil })]
+	argv := [&char(path.str), &char(arg.str), c'-i', &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	primary_prompt_entry := 'PS1=${primary_prompt}'
-	continuation_prompt_entry := 'PS2=${continuation_prompt}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/busybox', &char(primary_prompt_entry.str), &char(continuation_prompt_entry.str),
-		c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
 	pid := C.fork()
 	if pid < 0 {
-		C.close(in_pipe[0])
-		C.close(in_pipe[1])
-		C.close(out_pipe[0])
-		C.close(out_pipe[1])
+		C.close(slave)
+		C.close(master)
 		return none
 	}
 	if pid == 0 {
-		C.dup2(in_pipe[0], 0)
-		C.dup2(out_pipe[1], 1)
-		C.dup2(out_pipe[1], 2)
-		C.close(in_pipe[0])
-		C.close(in_pipe[1])
-		C.close(out_pipe[0])
-		C.close(out_pipe[1])
+		C.close(master)
+		if C.setsid() < 0 || desktop_ioctl(slave, u64(C.TIOCSCTTY), unsafe { nil }) != 0 {
+			C._exit(126)
+		}
+		C.dup2(slave, 0)
+		C.dup2(slave, 1)
+		C.dup2(slave, 2)
+		if slave > 2 {
+			C.close(slave)
+		}
 		C.execve(&char(path.str), argv.data, envp.data)
 		C._exit(127)
 	}
 
-	C.close(in_pipe[0])
-	C.close(out_pipe[1])
-	C.fcntl(out_pipe[0], C.F_SETFL, C.O_NONBLOCK)
+	C.close(slave)
+	flags := C.fcntl(master, C.F_GETFL)
+	if flags < 0 || C.fcntl(master, C.F_SETFL, flags | C.O_NONBLOCK) != 0 {
+		C.close(master)
+		desktop_terminate_child(pid)
+		return none
+	}
 	return SpawnedShell{
 		pid: pid
-		to_child: in_pipe[1]
-		from_child: out_pipe[0]
+		terminal: master
 	}
+}
+
+fn desktop_terminal_winsize(fd int, rows int, columns int, width int, height int) bool {
+	if fd < 0 || rows <= 0 || columns <= 0 {
+		return false
+	}
+	mut size := DesktopWinSize{
+		rows: u16(rows)
+		columns: u16(columns)
+		width: u16(width)
+		height: u16(height)
+	}
+	// Darwin's encoded request has its high bit set and its header macro is a
+	// signed int. Cast through u32 so conversion to the wrapper's u64 does not
+	// sign-extend it; Linux/Vinix requests are preserved by the same cast.
+	return desktop_ioctl(fd, u64(u32(C.TIOCSWINSZ)), &size) == 0
 }
 
 fn desktop_write(fd int, buffer voidptr, count u64) i64 {

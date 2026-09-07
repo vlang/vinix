@@ -274,6 +274,11 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 }
 
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
+	vfs_lock.acquire()
+	defer {
+		vfs_lock.release()
+	}
+
 	mut parent := devtmpfs_root
 	mut leaf := name
 
@@ -315,6 +320,61 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	unsafe {
 		parent.children[leaf] = new_node
 	}
+}
+
+// Remove a dynamically-created device node. The resource held one reference
+// on behalf of the node; open file descriptions keep their own references and
+// can therefore drain normally after the pathname disappears.
+pub fn devtmpfs_remove_device(name string) bool {
+	vfs_lock.acquire()
+	defer {
+		vfs_lock.release()
+	}
+
+	mut parent := devtmpfs_root
+	mut leaf := name
+	if name.contains('/') {
+		parts := name.split('/')
+		mut path_parts := []string{}
+		defer {
+			unsafe { path_parts.free() }
+		}
+		for part in parts {
+			if part.len > 0 {
+				path_parts << part
+			}
+		}
+		if path_parts.len == 0 {
+			return false
+		}
+
+		for i, part in path_parts {
+			if i == path_parts.len - 1 {
+				leaf = part
+				break
+			}
+			if parent.children == unsafe { nil } || part !in parent.children {
+				return false
+			}
+			parent = unsafe { parent.children[part] }
+		}
+	}
+
+	if parent == unsafe { nil } || parent.children == unsafe { nil } || leaf !in parent.children {
+		return false
+	}
+	mut node := unsafe { parent.children[leaf] }
+	parent.children.delete(leaf)
+	node.resource.stat.nlink = 0
+	mut removed_resource := node.resource
+	removed_resource.unref(unsafe { nil }) or {}
+	unsafe {
+		if node.name.len > 0 {
+			node.name.free()
+		}
+		free(node)
+	}
+	return true
 }
 
 pub fn devtmpfs_get_root() &VFSNode {

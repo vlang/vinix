@@ -469,9 +469,19 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 
 fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool) ?int {
 	current_process := proc.current_thread().process
-	mut fd := file.fd_create_from_resource(mut node.resource, flags) or { return none }
+	mut opened_resource := node.resource
+	mut node_resource := node.resource
+	if mut node_resource is resource.OpenableResource {
+		opened_resource = node_resource.open(flags)?
+	}
+	mut fd := file.fd_create_from_resource(mut opened_resource, flags) or { return none }
 	fd.handle.node = voidptr(node)
-	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific)
+	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
+		// In particular, roll back a /dev/ptmx allocation or slave-open count if
+		// the process descriptor table is full.
+		fd.unref()
+		return none
+	}
 }
 
 pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u64) {
@@ -605,6 +615,44 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		if target.len == 0 {
 			return errno.err, errno.enoent
 		}
+		mut to_copy := u64(target.len)
+		if to_copy > limit {
+			to_copy = limit
+		}
+		if !usercopy.copy_to_user(u64(buf), target.str, to_copy) {
+			return errno.err, errno.efault
+		}
+		return to_copy, 0
+	}
+	proc_fd_prefix := '/proc/self/fd/'
+	if path.starts_with(proc_fd_prefix) {
+		fd_text := path[proc_fd_prefix.len..]
+		if fd_text.len == 0 {
+			return errno.err, errno.enoent
+		}
+
+		mut fdnum := 0
+		for digit in fd_text {
+			if digit < `0` || digit > `9` {
+				return errno.err, errno.enoent
+			}
+			fdnum = fdnum * 10 + int(digit - `0`)
+			if fdnum >= proc.max_fds {
+				return errno.err, errno.enoent
+			}
+		}
+
+		mut fd := file.fd_from_fdnum(process, fdnum) or {
+			return errno.err, errno.enoent
+		}
+		defer {
+			fd.unref()
+		}
+		if fd.handle.node == unsafe { nil } {
+			return errno.err, errno.enoent
+		}
+
+		target := pathname(unsafe { &VFSNode(fd.handle.node) })
 		mut to_copy := u64(target.len)
 		if to_copy > limit {
 			to_copy = limit

@@ -117,6 +117,25 @@ fn test_platform_terminal_raw_mode_and_restoration() {
 	assert !saved.restore_attributes && !saved.restore_flags
 }
 
+fn test_platform_sets_pty_window_size() {
+	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
+	assert master >= 0
+	defer { desktop_close(master) }
+	assert C.grantpt(master) == 0 && C.unlockpt(master) == 0
+	name := C.ptsname(master)
+	assert name != unsafe { nil }
+	slave := C.open(name, C.O_RDWR | C.O_NOCTTY)
+	assert slave >= 0
+	defer { desktop_close(slave) }
+	// Darwin's /dev/ptmx only accepts this request through its slave. Vinix
+	// and Linux accept it through either end, and the desktop owns the master.
+	assert desktop_terminal_winsize(slave, 31, 97, 776, 496)
+	mut size := C.winsize{}
+	assert desktop_ioctl(slave, u64(u32(C.TIOCGWINSZ)), &size) == 0
+	assert size.ws_row == 31 && size.ws_col == 97
+	assert size.ws_xpixel == 776 && size.ws_ypixel == 496
+}
+
 fn test_platform_clocks_and_sleep() {
 	seconds, nanoseconds := desktop_realtime()
 	assert seconds > 0 && nanoseconds >= 0 && nanoseconds < 1_000_000_000

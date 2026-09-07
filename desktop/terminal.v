@@ -2,17 +2,13 @@
 // Copyright (c) 2026 Alexander Medvednikov
 // A terminal, built into the desktop.
 //
-// It runs the real shell that is on the image — BusyBox's — rather than
-// interpreting commands itself, so what it can do is whatever the system can
-// do. Vinix has no pseudo-terminals, so the shell is given plain pipes; since
-// those are not a terminal it neither echoes what is typed nor prints a
-// visible prompt. The terminal echoes input itself and turns private BusyBox
-// prompt markers into the visible prompt. That keeps the prompt behind the
-// foreground command even though there is no pty to provide that state.
+// It runs the shell on a Unix98 pseudo-terminal. The kernel line discipline
+// owns echo, canonical editing and terminal-generated signals; this process is
+// only the display and keyboard side of the PTY master.
 //
 // Like the file browser it satisfies NativeApp, so its process speaks the same
-// compositor protocol. It additionally satisfies
-// KeyboardApp, which is how the keystrokes reach it.
+// compositor protocol. It additionally satisfies KeyboardApp, which is how
+// keystrokes reach it.
 module main
 
 import ui2
@@ -44,74 +40,55 @@ mut:
 }
 
 const terminal_shell = '/bin/busybox'
-// `sh -i` rather than plain `sh`: without a terminal on its stdin the shell
-// would otherwise decide it is running a script.
 const terminal_shell_arg = 'sh'
 
 // How much output is kept. A terminal that remembered everything would grow
 // without bound on a system with no garbage collector.
 const terminal_scrollback = 400
 
-// Read this much of the shell's output per frame. Enough that `ls` of a large
-// directory arrives in one or two frames, small enough that a program printing
-// without pause cannot hold up the compositor.
+// Read this much of the shell's output at a time. poll() drains several chunks
+// but caps the work per frame so a noisy command cannot hold the compositor.
 const terminal_read_chunk = 4096
+const terminal_reads_per_frame = 8
 
 const terminal_action_scroll_up = 'term.scroll.up'
 const terminal_action_scroll_down = 'term.scroll.down'
 
 const terminal_row_height = 16
+const terminal_column_width = 8
 const terminal_padding = 8
-const terminal_prompt = '\$ '
-const terminal_continuation_prompt = '> '
-
-// BusyBox writes these as PS1/PS2. They are deliberately control-delimited:
-// the output parser consumes them instead of putting them in scrollback, and
-// either marker can be split across two non-blocking pipe reads.
-const terminal_prompt_marker_start = u8(0x1e)
-const terminal_prompt_marker_end = u8(0x1f)
-const terminal_primary_prompt_code = u8(`P`)
-const terminal_continuation_prompt_code = u8(`C`)
-const terminal_primary_prompt_marker = '\x1eP\x1f'
-const terminal_continuation_prompt_marker = '\x1eC\x1f'
 
 struct TerminalApp {
 mut:
 	// Finished lines, oldest first.
 	lines []string
-	// The line arriving from the shell and the line being typed, held as bytes
-	// rather than strings. `s += c` once per character allocates a new string
-	// per character, and on a target with no garbage collector that is how a
-	// machine is run out of memory by something as ordinary as `ls`. These two
-	// are cleared and refilled, so a steady terminal stops allocating.
+	// The current terminal row is held as bytes. Reusing it avoids allocating
+	// once per incoming character on this no-GC target.
 	partial []u8
-	input   []u8
+	cursor  int
+	// Escape-sequence parser state is retained across non-blocking reads.
+	escape_state       u8
+	csi_value          int
+	csi_has_value      bool
+	csi_parameter_done bool
+	saved_cursor       int
 	// Reused across reads, for the same reason.
 	read_buf []u8
-	// The two buffers rendered as strings, rebuilt only when their bytes
-	// change. build() runs on every frame the desktop redraws, and turning
-	// bytes into a string there would allocate once a frame for as long as the
-	// window is open.
-	partial_text string
-	input_text   string
-	// The prompt line as drawn, cursor and all. Same reason.
-	prompt_text string = terminal_prompt + '_'
-	// Input is accepted only while BusyBox is actually asking for another
-	// command. Without this state the synthetic `$` prompt used to reappear on
-	// every Return while a package install was still running.
-	ready        bool
-	continuation bool
-	marker_state u8
-	marker_code  u8
+	// The current row as rendered, rebuilt only when output changes.
+	partial_text string = '_'
 
-	pid        int = -1
-	to_child   int = -1
-	from_child int = -1
-	exited     bool
-	error      string
+	pid      int = -1
+	terminal int = -1
+	started  bool
+	exited   bool
+	error    string
 
-	// Rows from the bottom the view is scrolled back by. Zero follows the
-	// output, which is what a terminal does unless told otherwise.
+	// Last geometry sent through TIOCSWINSZ. Zero forces the first build to
+	// publish the actual window size to the shell.
+	terminal_rows    int
+	terminal_columns int
+
+	// Rows from the bottom the view is scrolled back by. Zero follows output.
 	scroll       int
 	visible_rows int = 1
 }
@@ -120,133 +97,238 @@ fn open_terminal(mut _ Desktop) !NativeApp {
 	mut app := &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
-	shell := desktop_spawn_shell(terminal_shell, terminal_shell_arg, terminal_primary_prompt_marker, terminal_continuation_prompt_marker) or {
-		app.error = 'cannot start ${terminal_shell}'
-		app.lines << app.error
-		return app
-	}
-	app.pid = shell.pid
-	app.to_child = shell.to_child
-	app.from_child = shell.from_child
 	app.lines << 'Vinix terminal — ${terminal_shell} ${terminal_shell_arg}'
 	app.lines << ''
 	return app
 }
 
-// poll reads whatever the shell has produced and folds it into the scrollback,
-// reporting whether anything changed. The desktop calls it every frame, which
-// is what makes a command's output appear without the user having to move the
-// mouse to provoke a redraw.
-//
-// Carriage returns are dropped rather than interpreted: without a pty there is
-// no cursor for them to move, and a program that uses them to redraw a line is
-// beyond what a minimal terminal promises.
-fn (mut a TerminalApp) poll() bool {
-	if a.from_child < 0 {
-		return false
+fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int) {
+	a.started = true
+	shell := desktop_spawn_shell(terminal_shell, terminal_shell_arg, rows, columns, width, height) or {
+		a.error = 'cannot start ${terminal_shell}'
+		a.push_line(a.error)
+		a.exited = true
+		a.refresh_partial()
+		return
 	}
-	got := desktop_read(a.from_child, a.read_buf.data, u64(terminal_read_chunk))
-	if got <= 0 {
-		if !a.exited && a.pid >= 0 && desktop_child_exited(a.pid) {
-			a.exited = true
-			a.push_line('[${terminal_shell} exited]')
-			return true
-		}
-		return false
-	}
-
-	a.ingest_output(a.read_buf[..int(got)])
-	return true
+	a.pid = shell.pid
+	a.terminal = shell.terminal
+	a.terminal_rows = rows
+	a.terminal_columns = columns
 }
 
-// ingest_output separates the private prompt protocol from ordinary command
-// output. Keeping the marker state on TerminalApp makes a marker that straddles
-// two poll() reads just as reliable as one delivered in a single read.
+// poll drains output waiting on the non-blocking PTY master and folds it into
+// scrollback. Prompts and input echo are ordinary slave output now, so there
+// is no separate readiness or prompt protocol to synchronize.
+fn (mut a TerminalApp) poll() bool {
+	if a.terminal < 0 {
+		return false
+	}
+
+	mut changed := false
+	for _ in 0 .. terminal_reads_per_frame {
+		got := desktop_read(a.terminal, a.read_buf.data, u64(terminal_read_chunk))
+		if got <= 0 {
+			break
+		}
+		a.ingest_output(a.read_buf[..int(got)])
+		changed = true
+		if got < terminal_read_chunk {
+			break
+		}
+	}
+
+	if !a.exited && a.pid >= 0 && desktop_child_exited(a.pid) {
+		a.exited = true
+		if a.partial.len != 0 {
+			a.push_line(a.partial.bytestr())
+			a.partial.clear()
+			a.cursor = 0
+		}
+		a.push_line('[${terminal_shell} exited]')
+		desktop_close(a.terminal)
+		a.terminal = -1
+		a.pid = -1
+		a.refresh_partial()
+		changed = true
+	}
+	return changed
+}
+
+// Output-side terminal emulation. The shell is deliberately told TERM=dumb,
+// so line feed, carriage return, tab and backspace are the cursor operations
+// required for its prompt, line editor and ordinary command output.
 fn (mut a TerminalApp) ingest_output(output []u8) {
 	for ch in output {
-		if a.marker_state == 0 {
-			if ch == terminal_prompt_marker_start {
-				a.marker_state = 1
-				continue
-			}
-			a.ingest_visible_byte(ch)
+		if a.escape_state != 0 {
+			a.ingest_escape_byte(ch)
 			continue
 		}
-
-		if a.marker_state == 1 {
-			if ch == terminal_primary_prompt_code || ch == terminal_continuation_prompt_code {
-				a.marker_code = ch
-				a.marker_state = 2
-				continue
-			}
-			a.marker_state = 0
-			// The leading record separator was invisible under the old parser
-			// too. Preserve the byte after it, including another marker start.
-			if ch == terminal_prompt_marker_start {
-				a.marker_state = 1
-			} else {
-				a.ingest_visible_byte(ch)
-			}
+		if ch == 0x1b {
+			a.escape_state = 1
 			continue
 		}
-
-		if ch == terminal_prompt_marker_end {
-			a.ready = true
-			a.continuation = a.marker_code == terminal_continuation_prompt_code
-			a.marker_state = 0
-			a.refresh_prompt()
-			continue
-		}
-
-		// It looked like a marker but was ordinary output. The printable code
-		// remains visible; the control delimiter remains filtered as before.
-		code := a.marker_code
-		a.marker_state = 0
-		a.ingest_visible_byte(code)
-		if ch == terminal_prompt_marker_start {
-			a.marker_state = 1
-		} else {
-			a.ingest_visible_byte(ch)
-		}
+		a.ingest_terminal_byte(ch)
 	}
-	a.partial_text = replaced(a.partial_text, a.partial.bytestr())
+	a.refresh_partial()
 }
 
-fn (mut a TerminalApp) ingest_visible_byte(ch u8) {
+fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
 	match ch {
 		`\n` {
 			a.push_line(a.partial.bytestr())
 			a.partial.clear()
+			a.cursor = 0
 		}
-		`\r` {}
+		`\r` {
+			a.cursor = 0
+		}
 		`\t` {
-			// Tabs to the next multiple of eight, which is what a terminal
-			// would have done and what keeps `ls -l` in columns.
-			for _ in 0 .. 8 - a.partial.len % 8 {
-				a.partial << ` `
+			next_tab := (a.cursor + 8) & ~7
+			for a.cursor < next_tab {
+				a.put_visible_byte(` `)
 			}
 		}
 		8 {
-			if a.partial.len > 0 {
-				a.partial.delete_last()
+			if a.cursor > 0 {
+				a.cursor--
 			}
 		}
 		else {
-			if ch >= 0x20 {
-				a.partial << ch
+			if ch >= 0x20 && ch != 0x7f {
+				a.put_visible_byte(ch)
 			}
 		}
 	}
+}
+
+// Consume the small ANSI surface that interactive line editors use even with
+// TERM=dumb. Unknown CSI and OSC sequences remain invisible rather than
+// leaking their payload into the terminal as literal "[J"-style text.
+fn (mut a TerminalApp) ingest_escape_byte(ch u8) {
+	match a.escape_state {
+		1 {
+			match ch {
+				`[` {
+					a.escape_state = 2
+					a.csi_value = 0
+					a.csi_has_value = false
+					a.csi_parameter_done = false
+				}
+				`]` {
+					a.escape_state = 3
+				}
+				`7` {
+					a.saved_cursor = a.cursor
+					a.escape_state = 0
+				}
+				`8` {
+					a.cursor = a.saved_cursor
+					a.escape_state = 0
+				}
+				else {
+					a.escape_state = 0
+				}
+			}
+		}
+		2 {
+			if ch >= `0` && ch <= `9` {
+				if !a.csi_parameter_done {
+					a.csi_value = a.csi_value * 10 + int(ch - `0`)
+					a.csi_has_value = true
+				}
+				return
+			}
+			if ch == `;` {
+				a.csi_parameter_done = true
+				return
+			}
+			// Private-mode prefixes are part of the sequence, not display text.
+			if ch == `?` || ch == `>` {
+				return
+			}
+			if ch >= 0x40 && ch <= 0x7e {
+				a.apply_csi(ch)
+				a.escape_state = 0
+			}
+		}
+		3 {
+			if ch == 0x07 {
+				a.escape_state = 0
+			} else if ch == 0x1b {
+				a.escape_state = 4
+			}
+		}
+		4 {
+			a.escape_state = if ch == `\\` { u8(0) } else { u8(3) }
+		}
+		else {
+			a.escape_state = 0
+		}
+	}
+}
+
+fn (mut a TerminalApp) apply_csi(command u8) {
+	amount := if a.csi_has_value && a.csi_value > 0 { a.csi_value } else { 1 }
+	match command {
+		`C` {
+			a.cursor += amount
+		}
+		`D` {
+			a.cursor = if amount < a.cursor { a.cursor - amount } else { 0 }
+		}
+		`G` {
+			a.cursor = amount - 1
+		}
+		`s` {
+			a.saved_cursor = a.cursor
+		}
+		`u` {
+			a.cursor = a.saved_cursor
+		}
+		`J`, `K` {
+			mode := if a.csi_has_value { a.csi_value } else { 0 }
+			if mode == 2 {
+				a.partial.clear()
+				a.cursor = 0
+			} else if mode == 0 {
+				for a.partial.len > a.cursor {
+					a.partial.delete_last()
+				}
+			}
+		}
+		else {}
+	}
+}
+
+fn (mut a TerminalApp) put_visible_byte(ch u8) {
+	if a.cursor < a.partial.len {
+		a.partial[a.cursor] = ch
+	} else {
+		for a.partial.len < a.cursor {
+			a.partial << ` `
+		}
+		a.partial << ch
+	}
+	a.cursor++
+}
+
+fn (mut a TerminalApp) refresh_partial() {
+	if !a.exited {
+		// Appending the cursor only for bytestr() avoids a second temporary
+		// allocation from string concatenation.
+		a.partial << `_`
+		a.partial_text = replaced(a.partial_text, a.partial.bytestr())
+		a.partial.delete_last()
+		return
+	}
+	a.partial_text = replaced(a.partial_text, a.partial.bytestr())
 }
 
 fn (mut a TerminalApp) push_line(line string) {
 	a.lines << line
 	// Evicted lines are freed rather than dropped. With no garbage collector a
-	// terminal left running leaks one string per line of output otherwise, and
-	// a shell loop printing flat out gets through a lot of lines. Every string
-	// that reaches here came from bytestr or an interpolation, both of which
-	// allocate; the only ones that did not are the empty literals, which the
-	// length check skips.
+	// terminal left running leaks one string per line of output otherwise.
 	for a.lines.len > terminal_scrollback {
 		evicted := a.lines[0]
 		a.lines.delete(0)
@@ -267,68 +349,25 @@ fn replaced(old string, next string) string {
 	return next
 }
 
-// key_input takes what was typed. The shell is on the far side of a pipe and
-// cannot echo, so the terminal shows the line as it is built and only hands it
-// over when Return completes it. While a foreground command owns the shell,
-// there is intentionally no editable prompt: type-ahead cannot masquerade as
-// commands the shell has already accepted.
+// Feed keystrokes directly to the PTY master. DEL is the slave's default
+// VERASE, so normalize the desktop keyboard's Backspace byte to it. Echo,
+// command submission and control-character signals all happen in the kernel.
 fn (mut a TerminalApp) key_input(text string) {
-	if !a.ready || a.exited {
+	if a.terminal < 0 || a.exited || text.len == 0 {
 		return
 	}
+	mut input := []u8{cap: text.len}
 	for ch in text {
-		match ch {
-			`\n`, `\r` {
-				line := a.input.bytestr()
-				prompt := if a.continuation {
-					terminal_continuation_prompt
-				} else {
-					terminal_prompt
-				}
-				a.push_line('${prompt}${line}')
-				if a.send('${line}\n') {
-					a.ready = false
-				}
-				a.input.clear()
-				a.refresh_prompt()
-				return
-			}
-			8, 127 {
-				if a.input.len > 0 {
-					a.input.delete_last()
-				}
-			}
-			else {
-				if ch >= 0x20 && ch < 0x7f {
-					a.input << ch
-				}
-			}
-		}
+		input << if ch == 8 { u8(0x7f) } else { ch }
 	}
-	a.refresh_prompt()
-}
-
-fn (mut a TerminalApp) refresh_prompt() {
-	prompt := if a.continuation { terminal_continuation_prompt } else { terminal_prompt }
-	a.input_text = replaced(a.input_text, a.input.bytestr())
-	a.prompt_text = replaced(a.prompt_text, '${prompt}${a.input_text}_')
-}
-
-fn (mut a TerminalApp) send(line string) bool {
-	if a.to_child < 0 || a.exited {
-		return false
-	}
-	return desktop_write_all(a.to_child, line.str, u64(line.len))
+	desktop_write_all(a.terminal, input.data, u64(input.len))
+	unsafe { input.free() }
 }
 
 fn (mut a TerminalApp) close_app() {
-	if a.to_child >= 0 {
-		desktop_close(a.to_child)
-		a.to_child = -1
-	}
-	if a.from_child >= 0 {
-		desktop_close(a.from_child)
-		a.from_child = -1
+	if a.terminal >= 0 {
+		desktop_close(a.terminal)
+		a.terminal = -1
 	}
 	if a.pid >= 0 && !a.exited {
 		desktop_terminate_child(a.pid)
@@ -345,14 +384,26 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	} else {
 		1
 	}
+	columns := if width > 2 * terminal_padding + terminal_column_width {
+		(width - 2 * terminal_padding) / terminal_column_width
+	} else {
+		1
+	}
+	if !a.started && !a.exited {
+		a.start_shell(a.visible_rows, columns, width, height)
+	}
+	if a.terminal >= 0
+		&& (a.visible_rows != a.terminal_rows || columns != a.terminal_columns) {
+		if desktop_terminal_winsize(a.terminal, a.visible_rows, columns, width, height) {
+			a.terminal_rows = a.visible_rows
+			a.terminal_columns = columns
+		}
+	}
 
-	// The output, then the partial line the shell has not finished, then the
-	// line being typed. Counted rather than gathered into one array: copying
-	// the whole scrollback every frame would allocate as fast as the old
-	// per-character concatenation did.
-	partial_rows := if a.partial.len > 0 { 1 } else { 0 }
-	prompt_rows := if a.exited || !a.ready { 0 } else { 1 }
-	total := a.lines.len + partial_rows + prompt_rows
+	// The output followed by the current row. Count rather than gather into a
+	// new array: copying the scrollback every frame would allocate continuously.
+	partial_rows := if !a.exited || a.partial.len > 0 { 1 } else { 0 }
+	total := a.lines.len + partial_rows
 
 	max_scroll := if total > a.visible_rows { total - a.visible_rows } else { 0 }
 	if a.scroll > max_scroll {
@@ -369,16 +420,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 		if index < 0 || index >= total {
 			continue
 		}
-		text := if index < a.lines.len {
-			a.lines[index]
-		} else if index == a.lines.len && partial_rows == 1 {
-			a.partial_text
-		} else {
-			// The cursor is a trailing underscore: there is no blink, and a
-			// terminal that cannot show where typing goes is worse than one
-			// whose cursor does not flash.
-			a.prompt_text
-		}
+		text := if index < a.lines.len { a.lines[index] } else { a.partial_text }
 		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding + row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
 			color: terminal_text
 			font_family: 'mono'

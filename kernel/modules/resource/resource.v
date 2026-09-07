@@ -52,6 +52,14 @@ mut:
 	mmap(handle voidptr, page u64, flags int) voidptr
 }
 
+// Device nodes such as /dev/ptmx manufacture a distinct resource for every
+// open file description. Keeping this separate from Resource means ordinary
+// files and fixed devices do not need a meaningless open callback.
+pub interface OpenableResource {
+mut:
+	open(flags int) ?&Resource
+}
+
 __global (
 	dev_id_counter = u64(1)
 )

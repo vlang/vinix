@@ -30,6 +30,7 @@ import dev.hda
 import dev.random
 import dev.mouse
 import dev.procdev
+import dev.pty
 import syscall.table
 import socket
 import time
@@ -56,6 +57,7 @@ fn kmain_thread() {
 	streams.initialise()
 	random.initialise()
 	procdev.initialise()
+	pty.initialise()
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())
 	console.initialise()
