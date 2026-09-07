@@ -250,7 +250,10 @@ pub fn (mut rtk RTKit) boot() bool {
 			}
 		}
 
-		if endpoint_map_done && !ap_power_requested {
+		// AP power-up must follow the IOP ON acknowledgment. Firmware is free
+		// to deliver that acknowledgment after the final endpoint-map message.
+		if endpoint_map_done && (rtk.iop_power_state & 0xff) == power_state_on
+			&& !ap_power_requested {
 			if !rtk.send_management(msg_set_ap_power, u64(power_state_on)) {
 				return rtk.fail(c'failed to request AP power state')
 			}

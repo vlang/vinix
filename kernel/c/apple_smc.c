@@ -9,6 +9,7 @@
 #define APP_EP 0x20u
 #define TYPE_SHIFT 52u
 #define EPMAP_LAST (UINT64_C(1) << 51)
+#define KEY_BUIC UINT32_C(0x42554943)
 #define KEY_BRSC UINT32_C(0x42525343)
 #define CMD_READ 0x10u
 #define CMD_SRAM 0x17u
@@ -26,9 +27,10 @@ struct smc_state {
     uint64_t frequency, sram_base, sram_size;
     uint64_t buffer_addr[9], buffer_size[9];
     uint32_t endpoints[8];
+    uint32_t capacity_key;
     uint64_t sample_time;
     int sample, sampled, ready, failed;
-    uint8_t next_id;
+    uint8_t next_id, capacity_length;
 };
 
 size_t vinix_smc_state_size(void) { return sizeof(struct smc_state); }
@@ -55,7 +57,7 @@ static int expired(struct smc_state *s, uint64_t start, uint64_t ticks)
 
 static uint64_t command_ticks(const struct smc_state *s)
 {
-    return s->frequency / 10 + (s->frequency % 10 != 0); /* 100 ms */
+    return s->frequency / 2 + (s->frequency % 2 != 0); /* 500 ms */
 }
 
 static int send_msg(struct smc_state *s, uint8_t endpoint, uint64_t word)
@@ -200,7 +202,10 @@ static int transaction(struct smc_state *s, unsigned cmd, uint32_t key,
         unsigned status = (unsigned)(word & 0xff);
         if (status)
             return status == 0x84 ? VINIX_SMC_NO_KEY : VINIX_SMC_IO;
-        if (((word >> 16) & 0xffff) != length)
+        /* Response SIZE is eight bits. Bits 31:24 are the firmware WSIZE
+         * field and are not part of the returned payload length.
+         */
+        if (((word >> 16) & 0xff) != length)
             return fail(s, VINIX_SMC_PROTOCOL);
         *result = word;
         return 0;
@@ -275,8 +280,10 @@ int vinix_smc_boot(void *state, void *context,
                 return s->failed;
             if (word & EPMAP_LAST) {
                 map_done = 1;
-                /* Only start system endpoints whose traffic we service. */
-                const unsigned system_eps[] = {1, 2, 4, 8};
+                /* RTKit will not finish booting unless every standard system
+                 * endpoint it advertises is started, including debug (3).
+                 */
+                const unsigned system_eps[] = {1, 2, 3, 4, 8};
                 for (unsigned j = 0; j < sizeof(system_eps)/sizeof(system_eps[0]); ++j)
                     if (has_endpoint(s, system_eps[j]) &&
                         start_endpoint(s, system_eps[j]) < 0)
@@ -294,7 +301,10 @@ int vinix_smc_boot(void *state, void *context,
         default:
             break;
         }
-        if (map_done && !ap_requested) {
+        /* AP power may only be requested after the IOP has acknowledged ON.
+         * Real firmware does not guarantee that ACK arrives with EPMAP.
+         */
+        if (map_done && iop_on && !ap_requested) {
             if (management(s, 11, 0x20) < 0)
                 return s->failed;
             ap_requested = 1;
@@ -357,12 +367,26 @@ int vinix_smc_refresh(void *state)
     if (result < 0)
         return result;
     uint64_t word = 0;
-    result = transaction(s, CMD_READ, KEY_BRSC, 2, &word);
-    if (result == 0) {
-        /* BRSC is ui16, little endian; the mailbox payload is also LE.
-         * B0RM has different byte order and is deliberately not a fallback.
+    uint32_t key = s->capacity_key;
+    unsigned length = s->capacity_length;
+    if (!key) {
+        /* Current Apple firmware exposes charge percentage as BUIC/u8.
+         * BRSC/ui16 remains a read-only fallback for older firmware.
          */
-        unsigned capacity = (unsigned)((word >> 32) & 0xffff);
+        key = KEY_BUIC;
+        length = 1;
+    }
+    result = transaction(s, CMD_READ, key, length, &word);
+    if (result == VINIX_SMC_NO_KEY && !s->capacity_key) {
+        key = KEY_BRSC;
+        length = 2;
+        result = transaction(s, CMD_READ, key, length, &word);
+    }
+    if (result == 0) {
+        s->capacity_key = key;
+        s->capacity_length = (uint8_t)length;
+        unsigned mask = length == 1 ? 0xff : 0xffff;
+        unsigned capacity = (unsigned)((word >> 32) & mask);
         result = capacity <= 100 ? (int)capacity : VINIX_SMC_RANGE;
     }
     if (!s->failed) {
@@ -411,7 +435,7 @@ const char *vinix_smc_error(int result)
     case VINIX_SMC_IO: return "mailbox/firmware I/O error";
     case VINIX_SMC_TIMEOUT: return "SMC timeout (no retry after an in-flight timeout)";
     case VINIX_SMC_PROTOCOL: return "invalid SMC/RTKit message or SRAM range";
-    case VINIX_SMC_NO_KEY: return "BRSC key unavailable";
+    case VINIX_SMC_NO_KEY: return "BUIC/BRSC keys unavailable";
     case VINIX_SMC_UNSUPPORTED: return "unsupported RTKit version, endpoint, or DMA request";
     case VINIX_SMC_RANGE: return "battery percentage outside 0..100";
     case VINIX_SMC_NOT_READY: return "battery sample unavailable";

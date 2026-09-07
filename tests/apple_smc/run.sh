@@ -5,12 +5,12 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 build=$(mktemp -d)
 trap 'rm -rf "$build"' EXIT HUP INT TERM
 cc=${CC:-cc}
-"$cc" -std=gnu99 -O2 -Wall -Wextra -Werror -I"$root/kernel/c" \
+"$cc" -std=gnu99 -O2 -Wall -Wextra -Werror -iquote "$root/kernel/c" \
     "$root/kernel/c/apple_smc.c" "$root/tests/apple_smc/test_smc.c" -o "$build/test"
 "$build/test"
 if [ "${SANITIZE:-0}" = 1 ]; then
     "$cc" -std=gnu99 -O1 -g -Wall -Wextra -Werror \
-        -fsanitize=address,undefined -fno-omit-frame-pointer -I"$root/kernel/c" \
+        -fsanitize=address,undefined -fno-omit-frame-pointer -iquote "$root/kernel/c" \
         "$root/kernel/c/apple_smc.c" "$root/tests/apple_smc/test_smc.c" -o "$build/sanitized"
     "$build/sanitized"
 fi

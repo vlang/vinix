@@ -184,7 +184,7 @@ pub fn initialise() {
 	dev.frequency = cpu.read_cntfrq_el0()
 	battery_device = dev
 	if initial == -4 { // VINIX_SMC_NO_KEY: no supported battery on this machine.
-		println('apple-smc: BRSC unavailable; battery not registered')
+		println('apple-smc: BUIC/BRSC unavailable; battery not registered')
 		spawn service()
 		return
 	}

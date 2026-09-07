@@ -18,22 +18,23 @@
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
 #                               boot firmware; connect it before powering on
 #
-# Everything below is off by default in the kernel, so these are the only way
-# to exercise it on real hardware. Start narrow: GPU and DCP can hard-reset the
-# machine, and with several on at once a reset says nothing about which one
-# did it.
+# GPU, DCP and Wi-Fi below are off by default in the kernel. The read-only SMC
+# battery client is enabled in every ARM64 mode and safely declines non-Apple
+# device trees. Start narrow: GPU and DCP can hard-reset the machine, and with
+# several on at once a reset says nothing about which one did it.
 #
-#   sudo ~/code/kek.sh battery  shell + SMC battery only; read-only, the safe
-#                               one to try first. `cat /dev/battery` reports
-#                               the charge
-#   sudo ~/code/kek.sh dcp      shell + display coprocessor only
+#   sudo ~/code/kek.sh battery  shell + explicit SMC battery flag; read-only.
+#                               `cat /dev/battery` reports the charge
+#   sudo ~/code/kek.sh dcp      shell + incomplete display-coprocessor probe;
+#                               it does not provide panel brightness yet
 #   sudo ~/code/kek.sh storage  shell + the SSD, read-only. Nothing is written:
 #                               authorising that needs a partition named by
 #                               PARTUUID, which deploy-m1-efi.sh takes as
 #                               --ans-rw= and this mode deliberately does not
 #   sudo ~/code/kek.sh drivers  shell + battery, DCP, GPU and Wi-Fi together
-#   sudo ~/code/kek.sh desktop-drivers   desktop + all four: Settings includes
-#                               brightness and Wi-Fi controls
+#   sudo ~/code/kek.sh desktop-drivers   desktop + all four; Settings exposes
+#                               Wi-Fi, but brightness stays disabled until a
+#                               real IOMFB backend creates its device
 #
 set -euo pipefail
 
@@ -179,16 +180,15 @@ STUDIO
 *Apple\ drivers|*SMC\ battery|*Apple\ DCP|*Apple\ Wi-Fi)
     cat <<'DRV'
 
-These drivers are off in the kernel unless the cmdline asks for them, so the boot
-log naming them is the first thing to check:
+The boot log names both default and explicitly selected drivers, so it is the
+first thing to check:
 
-  apple bring-up: GPU=enabled DCP=enabled    <- the line the kernel prints
-  apple-smc: ...                             <- silence here means it probed
-                                                and found its device tree node
+  apple bring-up: GPU=... DCP=... battery=enabled
+  apple-smc: /dev/battery: 73%               <- a successful battery probe
 
 Then, on the shell:
   cat /dev/battery       the charge, as the desktop's taskbar reads it
-  ls /dev/apple-panel-bl the backlight the Settings brightness bar writes
+  ls /dev/apple-panel-bl absent until the real DCP/IOMFB backend is implemented
   ls /dev/wlan0          the Wi-Fi control/raw Ethernet device
   wifi-ctl status        chip identity and firmware/radio state
 

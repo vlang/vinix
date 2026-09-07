@@ -166,7 +166,7 @@ fn battery_settings_elements(percent int, x int, inner int) []ui2.Element {
 		children << ui2.view('settings.battery.fill', ui2.rect(f64(x), 172, f64(inner * percent / 100), 12), ui2.BoxStyle{ bg: app_accent, radius: 4 }, [])
 	}
 	if percent == battery_unavailable {
-		children << settings_label('M1: boot with vinix.apple_battery=1.', x, 308, inner, body_muted)
+		children << settings_label('M1: inspect apple-smc boot diagnostics.', x, 308, inner, body_muted)
 	} else {
 		children << settings_label('Source: /dev/battery', x, 308, inner, body_muted)
 	}

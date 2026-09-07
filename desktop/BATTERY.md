@@ -27,11 +27,11 @@ Static percentage labels avoid per-frame allocation of Settings text.
 ## Enable on an M1
 
 Build and deploy the kernel and desktop using your existing working procedure.
-Keep a known-good boot entry and add `vinix.apple_battery=1` to the test kernel
-command line. The experimental driver remains off by default and independent of
-GPU/DCP. Confirm `cat /dev/battery` succeeds, then open Settings > Battery.
-Without the driver, the desktop still starts and displays unavailable status.
-See `../docs/m1-battery.md` for the kernel ABI and limitations.
+Keep a known-good boot entry. The read-only battery driver is enabled by default
+and remains independent of GPU/DCP; `vinix.apple_battery=0` disables it. Confirm
+`cat /dev/battery` succeeds, then open Settings > Battery. Without the driver,
+the desktop still starts and displays unavailable status. See
+`../docs/m1-battery.md` for the kernel ABI and limitations.
 
 ## Tests and validation boundary
 

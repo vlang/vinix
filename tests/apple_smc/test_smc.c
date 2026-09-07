@@ -9,17 +9,21 @@
 #define SIZE UINT64_C(0x100000)
 #define M(kind, payload) (((uint64_t)(kind) << 52) | (uint64_t)(payload))
 #define LAST (UINT64_C(1) << 51)
+#define KEY_BUIC UINT32_C(0x42554943)
+#define KEY_BRSC UINT32_C(0x42525343)
 
 struct message { uint64_t word; uint8_t ep; };
 struct fake {
     struct message queue[512];
     unsigned head, tail;
     uint64_t ticks, step, sram_reply, buffer_address;
-    unsigned min_version, max_version, map_group, percent, length, smc_status;
-    unsigned sends, reads, log_acks, report_acks, last_id, hello_version;
+    unsigned min_version, max_version, map_group, percent, reply_length, smc_status;
+    unsigned sends, reads, buic_reads, brsc_reads, log_acks, report_acks;
+    unsigned last_id, hello_version, reply_wsize;
     int no_smc, no_boot, drop_sram, drop_read, wrong_id, notifications;
-    int recv_error, send_error, flood, zero_buffer;
-    int iop_received, ap_received, app_started, boot_ack_first;
+    int recv_error, send_error, flood, zero_buffer, override_length;
+    int no_buic, no_brsc, iop_received, ap_received, app_started;
+    int debug_started, boot_ack_first;
 };
 
 static void enqueue(struct fake *f, uint8_t ep, uint64_t word)
@@ -48,7 +52,7 @@ static int tx(void *context, uint64_t word, uint8_t ep)
         case 2:
             f->hello_version = (unsigned)(word & 0xffff);
             assert(f->hello_version == ((word >> 16) & 0xffff));
-            enqueue(f, 0, M(8, 0x117)); /* mgmt, crashlog, syslog, IOReport, OSLog */
+            enqueue(f, 0, M(8, 0x11f)); /* management and all standard system endpoints */
             enqueue(f, 0, M(8, LAST | ((uint64_t)f->map_group << 32) | !f->no_smc));
             if (!f->boot_ack_first)
                 enqueue(f, 0, M(7, 0x220));
@@ -67,7 +71,12 @@ static int tx(void *context, uint64_t word, uint8_t ep)
                 assert(f->iop_received && f->ap_received);
                 f->app_started = 1;
             } else {
-                assert(started == 1 || started == 2 || started == 4 || started == 8);
+                assert(started == 1 || started == 2 || started == 3 ||
+                       started == 4 || started == 8);
+                if (started == 3) {
+                    f->debug_started = 1;
+                    break;
+                }
                 uint64_t address = f->zero_buffer ? 0 : f->buffer_address + started * 0x4000;
                 uint64_t announcement = started == 8
                     ? (UINT64_C(1) << 56) | (UINT64_C(4096) << 36) | (address >> 12)
@@ -78,6 +87,7 @@ static int tx(void *context, uint64_t word, uint8_t ep)
         }
         case 11:
             assert((word & 0xffff) == 0x20);
+            assert(f->iop_received);
             enqueue(f, 0, M(11, 0x20));
             break;
         default:
@@ -97,12 +107,22 @@ static int tx(void *context, uint64_t word, uint8_t ep)
             if (!f->drop_sram)
                 enqueue(f, 32, f->sram_reply);
         } else {
-            assert((uint32_t)(word >> 32) == 0x42525343);
-            assert(((word >> 16) & 0xffff) == 2);
+            uint32_t key = (uint32_t)(word >> 32);
+            unsigned request_length = (unsigned)((word >> 16) & 0xff);
+            assert(key == KEY_BUIC || key == KEY_BRSC);
+            assert(request_length == (key == KEY_BUIC ? 1 : 2));
             ++f->reads;
+            if (key == KEY_BUIC)
+                ++f->buic_reads;
+            else
+                ++f->brsc_reads;
             f->last_id = (unsigned)((word >> 12) & 15);
+            unsigned status = ((key == KEY_BUIC && f->no_buic) ||
+                               (key == KEY_BRSC && f->no_brsc)) ? 0x84 : f->smc_status;
+            unsigned length = f->override_length ? f->reply_length : request_length;
             uint64_t reply = ((uint64_t)f->percent << 32) |
-                ((uint64_t)f->length << 16) | ((uint64_t)f->last_id << 12) | f->smc_status;
+                ((uint64_t)f->reply_wsize << 24) | ((uint64_t)length << 16) |
+                ((uint64_t)f->last_id << 12) | status;
             if (f->wrong_id)
                 enqueue(f, 32, (reply & ~UINT64_C(0xf000)) |
                         ((uint64_t)((f->last_id + 1) & 15) << 12));
@@ -156,7 +176,7 @@ static void relax_cpu(void *context) { (void)context; }
 static struct fake defaults(void)
 {
     return (struct fake){.step=1, .min_version=11, .max_version=12,
-        .map_group=1, .percent=73, .length=2,
+        .map_group=1, .percent=73, .reply_wsize=4,
         .sram_reply=BASE+0x80000, .buffer_address=BASE};
 }
 
@@ -180,7 +200,8 @@ static void test_boot_and_read(void)
     assert(vinix_smc_cached_capacity(s)==VINIX_SMC_NOT_READY);
     assert(vinix_smc_refresh(s)==73);
     assert(vinix_smc_cached_capacity(s)==73);
-    assert(f.reads==1 && f.last_id==1);
+    assert(f.reads==1 && f.buic_reads==1 && f.brsc_reads==0 && f.last_id==1);
+    assert(f.debug_started);
     free(s);
 }
 
@@ -266,7 +287,7 @@ static void test_percentages_and_formatting(void)
 
 static void test_invalid_percentages(void)
 {
-    unsigned invalid[]={101,255,0x4900,0xffff}; /* Includes an endian regression. */
+    unsigned invalid[]={101,255};
     struct fake f=defaults(); void *s=new_state(); assert(boot(s,&f)==0);
     for(unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
         f.percent=invalid[i]; f.ticks+=1000;
@@ -274,6 +295,27 @@ static void test_invalid_percentages(void)
         assert(vinix_smc_cached_capacity(s)==VINIX_SMC_RANGE);
     }
     f.percent=50; f.ticks+=1000; assert(vinix_smc_refresh(s)==50); free(s);
+
+    /* Preserve the ui16 byte-order/range regression coverage on BRSC. */
+    f=defaults(); s=new_state(); f.no_buic=1; assert(boot(s,&f)==0);
+    unsigned invalid_brsc[]={0x4900,0xffff};
+    for(unsigned i=0;i<sizeof(invalid_brsc)/sizeof(invalid_brsc[0]);++i) {
+        f.percent=invalid_brsc[i]; f.ticks+=1000;
+        assert(vinix_smc_refresh(s)==VINIX_SMC_RANGE);
+    }
+    free(s);
+}
+
+static void test_brsc_fallback(void)
+{
+    struct fake f=defaults(); void *s=new_state(); f.no_buic=1;
+    assert(boot(s,&f)==0);
+    assert(vinix_smc_refresh(s)==73);
+    assert(f.buic_reads==1 && f.brsc_reads==1);
+    f.percent=51; f.ticks+=1000;
+    assert(vinix_smc_refresh(s)==51);
+    assert(f.buic_reads==1 && f.brsc_reads==2);
+    free(s);
 }
 
 static void test_wrong_id_and_notifications(void)
@@ -284,10 +326,11 @@ static void test_wrong_id_and_notifications(void)
 
 static void test_reply_size_mismatch(void)
 {
-    unsigned lengths[]={0,1,3,4,256};
+    unsigned lengths[]={0,2,3,4,255};
     for(unsigned i=0;i<sizeof(lengths)/sizeof(lengths[0]);++i) {
         struct fake f=defaults(); void *s=new_state(); assert(boot(s,&f)==0);
-        f.length=lengths[i]; assert(vinix_smc_refresh(s)==VINIX_SMC_PROTOCOL);
+        f.override_length=1; f.reply_length=lengths[i];
+        assert(vinix_smc_refresh(s)==VINIX_SMC_PROTOCOL);
         unsigned sent=f.sends;
         assert(vinix_smc_refresh(s)==VINIX_SMC_PROTOCOL && f.sends==sent); free(s);
     }
@@ -298,6 +341,7 @@ static void test_missing_key_and_completed_error(void)
     struct fake f=defaults(); void *s=new_state(); assert(boot(s,&f)==0);
     f.smc_status=0x84;
     assert(vinix_smc_refresh(s)==VINIX_SMC_NO_KEY);
+    assert(f.buic_reads==1 && f.brsc_reads==1);
     unsigned reads=f.reads; assert(vinix_smc_refresh(s)==VINIX_SMC_NO_KEY && f.reads==reads);
     f.smc_status=0x85; f.ticks+=1000; assert(vinix_smc_refresh(s)==VINIX_SMC_IO);
     f.smc_status=0; f.ticks+=1000; assert(vinix_smc_refresh(s)==73); free(s);
@@ -323,7 +367,7 @@ static void test_timeout_poison_and_late_response(void)
     assert(vinix_smc_refresh(s)==73); f.ticks+=1000; f.drop_read=1;
     assert(vinix_smc_refresh(s)==VINIX_SMC_TIMEOUT);
     assert(vinix_smc_cached_capacity(s)==VINIX_SMC_TIMEOUT);
-    enqueue(&f,32,(UINT64_C(90)<<32)|(UINT64_C(2)<<16)|((uint64_t)f.last_id<<12));
+    enqueue(&f,32,(UINT64_C(90)<<32)|(UINT64_C(1)<<16)|((uint64_t)f.last_id<<12));
     f.drop_read=0; f.ticks+=20000; unsigned sends=f.sends;
     assert(vinix_smc_refresh(s)==VINIX_SMC_TIMEOUT && f.sends==sends); free(s);
 }
@@ -417,6 +461,7 @@ int main(void)
     RUN(test_sram_bounds);
     RUN(test_percentages_and_formatting);
     RUN(test_invalid_percentages);
+    RUN(test_brsc_fallback);
     RUN(test_wrong_id_and_notifications);
     RUN(test_reply_size_mismatch);
     RUN(test_missing_key_and_completed_error);

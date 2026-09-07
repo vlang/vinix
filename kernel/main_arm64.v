@@ -49,7 +49,8 @@ __global (
 	}
 	enable_apple_gpu     = false
 	enable_apple_dcp     = false
-	enable_apple_battery = false
+	// The SMC client is read-only and safely declines non-Apple device trees.
+	enable_apple_battery = true
 	external_display_handoff = false
 	force_qemu_platform  = false
 	aic_timer_irq         = u32(3)
@@ -300,9 +301,10 @@ fn configure_apple_bringup_from_cmdline() {
 		print('display: external GOP handoff active; native DCP probe disabled\n')
 	}
 
-	C.printf(c'apple bring-up: GPU=%s DCP=%s\n',
+	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s\n',
 		if enable_apple_gpu { c'enabled' } else { c'disabled' },
-		if enable_apple_dcp { c'enabled' } else { c'disabled' })
+		if enable_apple_dcp { c'enabled' } else { c'disabled' },
+		if enable_apple_battery { c'enabled' } else { c'disabled' })
 }
 
 // Power off at a chosen stage. On a machine with no console and no usable

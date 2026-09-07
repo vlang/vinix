@@ -20,14 +20,14 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
             ;;
         --apple-dcp)
-            # The display coprocessor, and with it the panel backlight that
-            # Settings drives. Separate from the GPU: probing one must not run
-            # the other's sequence.
+            # Experimental display-coprocessor probe. The current simplified
+            # IOMFB transport does not create /dev/apple-panel-bl. Separate
+            # from the GPU: probing one must not run the other's sequence.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_dcp=1"
             ;;
         --apple-battery)
-            # The read-only SMC battery client behind /dev/battery, which the
-            # desktop shows in Settings and beside the clock.
+            # Explicitly enable the read-only SMC battery client (it is also
+            # the safe ARM64 default) behind /dev/battery.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_battery=1"
             ;;
         --apple-wifi)
@@ -52,9 +52,8 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.root=PARTUUID=${argument#*=} vinix.rootfstype=ext2 vinix.rootmode=ro vinix.rootfallback=initramfs"
             ;;
         --all-drivers)
-            # Every Apple subsystem that is off by default, in one switch.
-            # Each is still passed by name, so the cmdline the kernel prints
-            # says exactly what was asked for.
+            # Enable every optional Apple subsystem in one switch. Battery is
+            # already the safe default but remains explicit in this mode.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1 vinix.apple_wifi=1"
             ;;
         --native-resolution)
