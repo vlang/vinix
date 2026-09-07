@@ -307,10 +307,10 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
     merge_staging_tree "$PYTHON_STAGING"
 
-    # Scripts in the Firefox/X11 closure use ordinary command names. The
+    # Scripts in the Firefox/X11/package closure use ordinary command names. The
     # compact image carries BusyBox but not the full userland's applet links,
-    # so provide the small set needed by run-firefox and Vinix's startx.
-    for applet in sh mkdir ln chmod sleep rm; do
+    # so provide the small set needed by pkg, run-firefox and Vinix's startx.
+    for applet in sh cat chmod dirname id ln mkdir rm sed sleep; do
         ln -sf busybox "$STAGING/bin/$applet"
     done
     # This stripped toolchain intentionally carries static libc and libgcc.
@@ -394,7 +394,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/mkdir bin/sleep usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
+    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
