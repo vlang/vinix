@@ -28,6 +28,21 @@ if [ "${VINIX_M1_EXCLUDE_BASE_INITRAMFS:-0}" = "1" ]; then
     echo "skipping unused base initramfs"
 fi
 
+# QEMU uses these local scratch disks, but an M1 deployment never does. They
+# are normally left alone: the remote checkout may also be a QEMU workspace.
+# A full data volume is the explicit exception. The caller must opt in, and
+# this deliberately matches only the generated disks, interrupted rsync
+# temporaries, and the QEMU firmware -- never source or M1 boot inputs.
+if [ "${VINIX_M1_PRUNE_QEMU_ARTIFACTS:-0}" = "1" ]; then
+    echo "==> Removing remote QEMU-only boot artifacts..."
+    ssh "$REMOTE" "
+if [ -d '$DEST/boot-image' ]; then
+    find '$DEST/boot-image' -maxdepth 1 -type f \
+        \( -name 'boot*.img' -o -name '.boot*.img.*' -o \
+           -name 'edk2-aarch64-code-*.fd' \) -print -delete
+fi"
+fi
+
 # macOS ships OpenRSYNC 2.6.9, which has --progress but not rsync 3's
 # --info=progress2.  --progress therefore keeps this usable on both: a large
 # desktop initramfs shows a live percentage instead of looking hung, and
@@ -67,7 +82,7 @@ left partial files, inspect the remote QEMU artifacts before removing them:
     ssh $REMOTE 'find "$DEST/boot-image" -maxdepth 1 -type f \\( -name "boot*.img" -o -name ".boot*.img.*" -o -name "edk2-aarch64-code-*.fd" \\) -print'
 
 They are not used by the M1 deployment. Remove only the listed stale or
-partial artifacts, then re-run this command.
+partial artifacts, then re-run with VINIX_M1_PRUNE_QEMU_ARTIFACTS=1.
 EOF
     exit 1
 fi
