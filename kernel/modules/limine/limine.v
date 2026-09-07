@@ -257,6 +257,24 @@ pub mut:
 	response &LimineKernelFileResponse
 }
 
+// The kernel-file request is shared boot information, so it must have exactly
+// one owner. Limine rejects an executable containing multiple requests with
+// this ID, even when every copy has the same revision and fields.
+@[_linker_section: '.requests']
+@[cinit]
+__global (
+	volatile kernel_file_req = LimineKernelFileRequest{
+		response: unsafe { nil }
+	}
+)
+
+pub fn kernel_file() &LimineFile {
+	if kernel_file_req.response == unsafe { nil } {
+		return unsafe { nil }
+	}
+	return kernel_file_req.response.kernel_file
+}
+
 // Module
 
 pub struct LimineModuleResponse {

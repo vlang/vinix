@@ -4,7 +4,7 @@ from pathlib import Path
 import struct
 import sys
 import unittest
-from verify_build import elf_symbols, verify_hooks
+from verify_build import KERNEL_FILE_REQUEST_ID, elf_symbols, verify_hooks
 
 elf = Path(sys.argv.pop(1)).read_bytes()
 source = Path(sys.argv.pop(1)).read_text()
@@ -41,6 +41,10 @@ class BuildVerifierTests(unittest.TestCase):
                 struct.pack_into('<I', changed, offset + i * 64 + 4, 0)
         with self.assertRaisesRegex(ValueError, 'missing linked Wi-Fi symbols'):
             elf_symbols(changed)
+
+    def test_duplicate_kernel_file_request(self):
+        with self.assertRaisesRegex(ValueError, 'exactly one Limine kernel-file request'):
+            elf_symbols(elf + KERNEL_FILE_REQUEST_ID)
 
     def test_dynamic_loader(self):
         offset = struct.unpack_from('<Q', elf, 32)[0]

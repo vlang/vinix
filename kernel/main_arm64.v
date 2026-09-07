@@ -45,9 +45,6 @@ __global (
 	volatile dtb_req = limine.LimineDTBRequest{
 		response: unsafe { nil }
 	}
-	volatile kernel_file_req = limine.LimineKernelFileRequest{
-		response: unsafe { nil }
-	}
 	enable_apple_gpu     = false
 	enable_apple_dcp     = false
 	enable_apple_battery = false
@@ -197,11 +194,9 @@ fn kmain_thread() {
 
 	// ANS is independent of the GPU, and disabled unless explicitly requested.
 	// Keep the initramfs root and recovery console even if storage bring-up fails.
-	if kernel_file_req.response != unsafe { nil } {
-		kernel_file := kernel_file_req.response.kernel_file
-		if kernel_file != unsafe { nil } && kernel_file.cmdline != unsafe { nil } {
-			ans.initialise(unsafe { cstring_to_vstring(kernel_file.cmdline) })
-		}
+	kernel_file := limine.kernel_file()
+	if kernel_file != unsafe { nil } && kernel_file.cmdline != unsafe { nil } {
+		ans.initialise(unsafe { cstring_to_vstring(kernel_file.cmdline) })
 	}
 	if !ans.select_root() {
 		panic('Requested ANS SSD root could not be selected safely')
@@ -233,12 +228,12 @@ fn get_dt_base(compat string, default_base u64) u64 {
 // cmdline "vinix.apple_gpu=1" and/or "vinix.apple_dcp=1". The legacy
 // "vinix.minimal_apple=0" spelling explicitly enables both.
 fn configure_apple_bringup_from_cmdline() {
-	if kernel_file_req.response == unsafe { nil } {
+	kernel_file := limine.kernel_file()
+	if kernel_file == unsafe { nil } {
 		print('boot cmdline: unavailable, Apple GPU/DCP disabled\n')
 		return
 	}
-	kernel_file := kernel_file_req.response.kernel_file
-	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+	if kernel_file.cmdline == unsafe { nil } {
 		print('boot cmdline: empty, Apple GPU/DCP disabled\n')
 		return
 	}
@@ -310,11 +305,11 @@ fn boot_stage(stage u32) {
 // Read a decimal value from the boot cmdline. Like the scan above this runs
 // before pmm_init, so it parses digits in place rather than allocating.
 fn early_cmdline_value(prefix string) int {
-	if kernel_file_req.response == unsafe { nil } {
+	kernel_file := limine.kernel_file()
+	if kernel_file == unsafe { nil } {
 		return -1
 	}
-	kernel_file := kernel_file_req.response.kernel_file
-	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+	if kernel_file.cmdline == unsafe { nil } {
 		return -1
 	}
 	text := unsafe { &u8(kernel_file.cmdline) }
@@ -343,11 +338,11 @@ fn early_cmdline_value(prefix string) int {
 // Scan the boot cmdline without building a V string: this runs before
 // pmm_init, so the allocator is not available yet.
 fn early_cmdline_contains(needle string) bool {
-	if kernel_file_req.response == unsafe { nil } {
+	kernel_file := limine.kernel_file()
+	if kernel_file == unsafe { nil } {
 		return false
 	}
-	kernel_file := kernel_file_req.response.kernel_file
-	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+	if kernel_file.cmdline == unsafe { nil } {
 		return false
 	}
 	text := unsafe { &u8(kernel_file.cmdline) }

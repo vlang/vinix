@@ -20,6 +20,14 @@ REQUIRED = {
     'bw_probe', 'bw_start', 'bw_poll', 'bw_join_wpa2',
 }
 
+KERNEL_FILE_REQUEST_ID = struct.pack(
+    '<4Q',
+    0xc7b1dd30df4c8b88,
+    0x0a82e883a194f07b,
+    0xad97e90e83f1ed67,
+    0x31eb5d1c5ff23b69,
+)
+
 
 def require(ok: bool, message: str) -> None:
     if not ok:
@@ -45,6 +53,8 @@ def elf_symbols(data: bytes) -> set[str]:
             require(filesz <= memsz and offset + filesz <= len(data), 'invalid PT_LOAD extent')
             executable_entry |= bool(flags & 1 and va <= entry < va + memsz)
     require(executable_entry, 'entry point is outside executable load segments')
+    require(data.count(KERNEL_FILE_REQUEST_ID) == 1,
+            'kernel must contain exactly one Limine kernel-file request')
     sections = [struct.unpack_from('<IIQQQQIIQQ', data, shoff + i * shsize) for i in range(shnum)]
     names = set()
     undefined = set()

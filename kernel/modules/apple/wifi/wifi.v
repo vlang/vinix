@@ -64,11 +64,6 @@ fn C.brcm_m1_write(input &u8, count usize) int
 
 fn C.brcm_m1_stop()
 
-@[_linker_section: '.requests']
-@[cinit]
-__global (
-	wifi_kernel_req = limine.LimineKernelFileRequest{ response: unsafe { nil } }
-)
 __global (
 	wifi_lock klock.Lock
 	wifi_res  = &WifiDevice(unsafe { nil })
@@ -427,10 +422,7 @@ fn setup(mut p Plan) bool {
 }
 
 fn requested() bool {
-	if wifi_kernel_req.response == unsafe { nil } {
-		return false
-	}
-	f := wifi_kernel_req.response.kernel_file
+	f := limine.kernel_file()
 	if f == unsafe { nil } || f.cmdline == unsafe { nil } {
 		return false
 	}
