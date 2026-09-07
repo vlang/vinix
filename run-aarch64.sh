@@ -296,8 +296,12 @@ elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
 elif [ "$(uname -s)" = "Darwin" ]; then
     # System chords -- Cmd-Tab above all -- are the host's until QEMU is told
     # to capture every key, which is what the desktop's own Cmd-Tab needs.
+    COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-}"
     if [ "$GRAB_KEYS" -eq 1 ]; then
-        DISPLAY_BACKEND_FLAGS="-display cocoa,full-grab=on"
+        COCOA_OPTIONS="${COCOA_OPTIONS:+${COCOA_OPTIONS},}full-grab=on"
+    fi
+    if [ -n "$COCOA_OPTIONS" ]; then
+        DISPLAY_BACKEND_FLAGS="-display cocoa,$COCOA_OPTIONS"
     else
         DISPLAY_BACKEND_FLAGS="-display cocoa"
     fi

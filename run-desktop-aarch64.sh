@@ -39,6 +39,8 @@ export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),
 # giving it 2048x1536 pixels without changing the standard shell runner.
 export VINIX_QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-2048x1536x32}"
+# Cocoa otherwise shrinks the larger framebuffer to fit its initial window.
+export VINIX_QEMU_COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-zoom-to-fit=off}"
 MONITOR_SOCKET="${VINIX_MONITOR_SOCKET:-/tmp/vinix-monitor}"
 QMP_SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 
