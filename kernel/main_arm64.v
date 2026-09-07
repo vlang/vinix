@@ -113,6 +113,7 @@ fn bootstrap_cpu0() {
 	cpu_local.timer_freq = cpu.read_cntfrq_el0()
 	cpu_locals << cpu_local
 	cpu.write_tpidr_el1(0)
+	cpu.enable_el0_cache_access()
 	cpu.init_fpu_globals()
 	print('CPU 0 bootstrap done\n')
 }

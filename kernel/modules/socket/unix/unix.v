@@ -15,6 +15,11 @@ import ioctl
 
 pub const sock_buf = 0x100000
 
+const msg_cmsg_cloexec = 0x40000000
+const msg_ctrunc = 0x08
+const cmsg_header_size = u64(16)
+const cmsg_align = u64(8)
+
 pub struct SockaddrUn {
 pub mut:
 	sun_family u16
@@ -74,6 +79,11 @@ pub mut:
 	write_ptr u64
 	capacity  u64
 	used      u64
+
+	// Open-file descriptions waiting to be delivered by recvmsg(SCM_RIGHTS).
+	// The queued FD objects each own one Handle reference until they are either
+	// installed in the receiver's descriptor table or discarded.
+	pending_fds []&file.FD
 }
 
 fn (mut this UnixSocket) mmap(_handle voidptr, page u64, flags int) voidptr {
@@ -159,6 +169,13 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 }
 
 fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+	return this.write_with_fds(_handle, buf, _count, []&file.FD{})
+}
+
+// Write stream data and attach descriptor rights to the same wakeup. Queuing
+// the rights while the peer lock is held prevents recvmsg() from consuming the
+// bytes before their ancillary data has become visible.
+pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count u64, fds []&file.FD) ?i64 {
 	mut count := _count
 
 	if this.write_closed {
@@ -204,6 +221,10 @@ fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64
 	if peer.used + count > peer.capacity {
 		count = peer.capacity - peer.used
 	}
+	if count == 0 && fds.len != 0 {
+		errno.set(errno.eagain)
+		return none
+	}
 
 	// Calculate sizes before and after wrap-around and new ptr location
 	mut before_wrap := u64(0)
@@ -229,6 +250,9 @@ fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64
 
 	peer.write_ptr = new_ptr_loc
 	peer.used += count
+	if fds.len != 0 {
+		peer.pending_fds << fds
+	}
 
 	peer.status |= file.pollin
 	event.trigger(mut peer.event, false)
@@ -581,8 +605,9 @@ fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
 }
 
 fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags int) ?u64 {
-	if flags != 0 {
-		panic('UNIX socket recv does not support flags')
+	if flags & ~msg_cmsg_cloexec != 0 {
+		errno.set(errno.eopnotsupp)
+		return none
 	}
 
 	this.l.acquire()
@@ -668,6 +693,80 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	this.read_ptr = new_ptr_loc
 	this.used -= transferred
+
+	// Linux cmsghdr is 16 bytes on aarch64: size_t, level, type. Return as
+	// many queued SCM_RIGHTS descriptors as fit in the caller's control buffer.
+	control_capacity := msg.msg_controllen
+	unsafe {
+		msg.msg_controllen = 0
+		msg.msg_flags = 0
+	}
+	if this.pending_fds.len != 0 {
+		mut capacity_fds := u64(0)
+		if msg.msg_control != unsafe { nil } && control_capacity >= cmsg_header_size + sizeof(int) {
+			capacity_fds = (control_capacity - cmsg_header_size) / sizeof(int)
+			// msg_controllen includes the cmsghdr's trailing alignment. A
+			// CMSG_LEN-sized buffer can hold the bytes but cannot represent a
+			// complete ancillary record, so report truncation instead.
+			for capacity_fds > 0 {
+				cmsg_len := cmsg_header_size + capacity_fds * sizeof(int)
+				cmsg_space := (cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
+				if cmsg_space <= control_capacity {
+					break
+				}
+				capacity_fds--
+			}
+		}
+		mut deliver := u64(this.pending_fds.len)
+		if deliver > capacity_fds {
+			deliver = capacity_fds
+			unsafe { msg.msg_flags |= msg_ctrunc }
+		}
+
+		if deliver != 0 {
+			control := unsafe { &u8(msg.msg_control) }
+			unsafe {
+				*(&u64(control)) = cmsg_header_size + deliver * sizeof(int)
+				*(&int(voidptr(u64(control) + 8))) = sock_pub.sol_socket
+				*(&int(voidptr(u64(control) + 12))) = sock_pub.scm_rights
+			}
+
+			mut installed := u64(0)
+			for installed < deliver {
+				mut passed_fd := this.pending_fds[int(installed)]
+				if flags & msg_cmsg_cloexec != 0 {
+					passed_fd.flags |= resource.o_cloexec
+				}
+				new_fdnum := file.fdnum_create_from_fd(unsafe { nil }, passed_fd, 0,
+					false) or {
+					unsafe { msg.msg_flags |= msg_ctrunc }
+					break
+				}
+				unsafe {
+					*(&int(voidptr(u64(control) + cmsg_header_size + installed * sizeof(int)))) = new_fdnum
+				}
+				installed++
+			}
+
+			if installed != 0 {
+				cmsg_len := cmsg_header_size + installed * sizeof(int)
+				unsafe {
+					*(&u64(control)) = cmsg_len
+					msg.msg_controllen = (cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
+				}
+			}
+			deliver = installed
+		}
+
+		// Ancillary data accompanies the bytes just consumed. Descriptors that
+		// did not fit are discarded with MSG_CTRUNC, matching recvmsg semantics.
+		for i in int(deliver) .. this.pending_fds.len {
+			mut dropped := this.pending_fds[i]
+			dropped.unref()
+			unsafe { free(voidptr(dropped)) }
+		}
+		this.pending_fds.clear()
+	}
 
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)

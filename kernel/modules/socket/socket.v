@@ -9,6 +9,67 @@ import socket.unix as sock_unix
 import socket.inet as sock_inet
 import proc
 
+const cmsg_header_size = u64(16)
+const cmsg_align = u64(8)
+
+struct CMsgHdr {
+	cmsg_len   u64
+	cmsg_level int
+	cmsg_type  int
+}
+
+fn release_passed_fds(mut fds []&file.FD) {
+	for mut fd in fds {
+		fd.unref()
+		unsafe { free(voidptr(fd)) }
+	}
+	unsafe { fds.free() }
+}
+
+fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
+	mut result := []&file.FD{}
+	mut offset := u64(0)
+	for offset < msg.msg_controllen {
+		remaining := msg.msg_controllen - offset
+		if remaining < cmsg_header_size {
+			release_passed_fds(mut result)
+			errno.set(errno.einval)
+			return none
+		}
+		header := unsafe { &CMsgHdr(voidptr(u64(msg.msg_control) + offset)) }
+		if header.cmsg_len < cmsg_header_size || header.cmsg_len > remaining
+			|| header.cmsg_level != sock_pub.sol_socket || header.cmsg_type != sock_pub.scm_rights
+			|| (header.cmsg_len - cmsg_header_size) % sizeof(int) != 0 {
+			release_passed_fds(mut result)
+			errno.set(errno.einval)
+			return none
+		}
+
+		fd_count := (header.cmsg_len - cmsg_header_size) / sizeof(int)
+		for i := u64(0); i < fd_count; i++ {
+			fdnum := unsafe { *(&int(voidptr(u64(header) + cmsg_header_size + i * sizeof(int)))) }
+			mut source := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+				release_passed_fds(mut result)
+				return none
+			}
+			// fd_from_fdnum() acquired the Handle reference now owned by this
+			// queued descriptor. Do not unref the source on the success path.
+			mut passed := &file.FD{
+				handle: source.handle
+				flags: 0
+			}
+			result << passed
+		}
+
+		next := (header.cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
+		if next > remaining {
+			break
+		}
+		offset += next
+	}
+	return result
+}
+
 pub fn initialise() {
 	sock_inet.initialise()
 }
@@ -240,7 +301,10 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 	defer {
 		fd.handle.flags = old_flags
 	}
-	remaining_flags := flags & ~0x40000040 // MSG_CMSG_CLOEXEC | MSG_DONTWAIT
+	mut remaining_flags := flags & ~0x40000040 // MSG_CMSG_CLOEXEC | MSG_DONTWAIT
+	if mut res is sock_unix.UnixSocket {
+		remaining_flags = flags & ~0x40 // Unix recvmsg consumes MSG_CMSG_CLOEXEC.
+	}
 	ret := sock.recvmsg(fd.handle, msg, remaining_flags) or { return errno.err, errno.get() }
 
 	return ret, 0
@@ -314,8 +378,8 @@ pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags
 	if msg == unsafe { nil } {
 		return errno.err, errno.efault
 	}
-	if msg.msg_control != unsafe { nil } && msg.msg_controllen != 0 {
-		return errno.err, errno.eopnotsupp
+	if msg.msg_control == unsafe { nil } && msg.msg_controllen != 0 {
+		return errno.err, errno.efault
 	}
 	mut total := u64(0)
 	for i := u64(0); i < msg.msg_iovlen; i++ {
@@ -338,6 +402,35 @@ pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags
 			unsafe { C.memcpy(voidptr(u64(buffer) + copied), iov.iov_base, iov.iov_len) }
 			copied += iov.iov_len
 		}
+	}
+
+	if msg.msg_controllen != 0 {
+		if flags & ~0x4040 != 0 || msg.msg_name != unsafe { nil } {
+			return errno.err, errno.eopnotsupp
+		}
+		mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+			return errno.err, errno.get()
+		}
+		defer { fd.unref() }
+		mut res := fd.handle.resource
+		if mut res is sock_unix.UnixSocket {
+			mut passed_fds := collect_passed_fds(msg) or {
+				return errno.err, errno.get()
+			}
+			old_flags := fd.handle.flags
+			if flags & 0x40 != 0 {
+				fd.handle.flags |= resource.o_nonblock
+			}
+			ret := res.write_with_fds(fd.handle, buffer, total, passed_fds) or {
+				fd.handle.flags = old_flags
+				release_passed_fds(mut passed_fds)
+				return errno.err, errno.get()
+			}
+			fd.handle.flags = old_flags
+			unsafe { passed_fds.free() }
+			return u64(ret), 0
+		}
+		return errno.err, errno.eopnotsupp
 	}
 	return syscall_sendto(gpr_state, fdnum, buffer, total, flags, msg.msg_name, msg.msg_namelen)
 }

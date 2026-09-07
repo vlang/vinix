@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
 # Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu] [--mem=MB]
-#                         [--replace] [--grab-keys]
+#                         [--disk=MB] [--replace] [--grab-keys]
 #
 # --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
 # its own application switcher, so without it the desktop's Cmd-Tab is never
@@ -27,6 +27,7 @@ BOOT_DIR="$SCRIPT_DIR/boot-image"
 # takes a write lock on the image, and a second run either fails to start or
 # boots whatever the first one last copied in.
 BOOT_DISK="${VINIX_BOOT_DISK:-$BOOT_DIR/boot.img}"
+BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
 OVMF_VARS="${VINIX_EFIVARS:-/tmp/vinix-efivars.fd}"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 LIMINE_VERSION="9.3.0"
@@ -45,10 +46,18 @@ for arg in "$@"; do
         --serial)     SERIAL_ONLY=1 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
+        --disk=*)     BOOT_DISK_SIZE_MB="${arg#*=}" ;;
         --replace)    REPLACE_RUNNING=1 ;;
         --grab-keys)  GRAB_KEYS=1 ;;
     esac
 done
+
+case "$BOOT_DISK_SIZE_MB" in
+    ''|*[!0-9]*)
+        echo "ERROR: --disk must be a size in MiB" >&2
+        exit 1
+        ;;
+esac
 
 # ── Build init program (fallback if no busybox userland) ──
 # VINIX_INITRAMFS selects a different image, e.g. the one
@@ -168,10 +177,52 @@ if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
     fi
 fi
 
+# A browser image is much larger than the old 512 MiB development disk. Do not
+# let mcopy fail later with a cryptic FAT error or overwrite an existing image;
+# tell the caller how to create a larger generated disk alongside it.
+if [ -f "$INITRAMFS" ]; then
+    if stat -f%z "$INITRAMFS" >/dev/null 2>&1; then
+        initramfs_bytes="$(stat -f%z "$INITRAMFS")"
+    else
+        initramfs_bytes="$(stat -c%s "$INITRAMFS")"
+    fi
+    required_bytes=$((initramfs_bytes + 128 * 1024 * 1024))
+    required_mb=$(((required_bytes + 1024 * 1024 - 1) / (1024 * 1024)))
+
+    if [ -f "$BOOT_DISK" ]; then
+        if stat -f%z "$BOOT_DISK" >/dev/null 2>&1; then
+            boot_disk_bytes="$(stat -f%z "$BOOT_DISK")"
+        else
+            boot_disk_bytes="$(stat -c%s "$BOOT_DISK")"
+        fi
+    else
+        boot_disk_bytes=$((BOOT_DISK_SIZE_MB * 1024 * 1024))
+    fi
+
+    if [ "$boot_disk_bytes" -lt "$required_bytes" ]; then
+        echo "ERROR: $BOOT_DISK is too small for this initramfs." >&2
+        echo "       Need at least ${required_mb} MiB." >&2
+        if [ -f "$BOOT_DISK" ]; then
+            echo "       Keep the existing disk and choose a new path, for example:" >&2
+            echo "       VINIX_BOOT_DISK=/tmp/vinix-large.img $0 --disk=$BOOT_DISK_SIZE_MB" >&2
+        else
+            echo "       Re-run with --disk=$required_mb or larger." >&2
+        fi
+        exit 1
+    fi
+fi
+
 # ── Create/update boot disk (fast: only mcopy the kernel) ──
 if [ ! -f "$BOOT_DISK" ]; then
-    echo "==> Creating boot disk image (one-time)..."
-    dd if=/dev/zero of="$BOOT_DISK" bs=1m count=512 2>/dev/null
+    echo "==> Creating ${BOOT_DISK_SIZE_MB} MiB boot disk image (one-time)..."
+    disk_bytes=$((BOOT_DISK_SIZE_MB * 1024 * 1024))
+    if command -v truncate >/dev/null 2>&1; then
+        truncate -s "$disk_bytes" "$BOOT_DISK"
+    elif command -v mkfile >/dev/null 2>&1; then
+        mkfile -n "$disk_bytes" "$BOOT_DISK"
+    else
+        dd if=/dev/zero of="$BOOT_DISK" bs=1m count="$BOOT_DISK_SIZE_MB" 2>/dev/null
+    fi
     mformat -F -i "$BOOT_DISK" ::
     mmd -i "$BOOT_DISK" ::/EFI
     mmd -i "$BOOT_DISK" ::/EFI/BOOT

@@ -307,8 +307,13 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 
 		munmap(mut pagemap, voidptr(base), length)?
 	} else {
+		// More than one thread may ask for anonymous address space at once.
+		// Reserve each span under the pagemap lock so two allocator threads can
+		// never receive overlapping virtual addresses from the shared cursor.
+		pagemap.l.acquire()
 		base = process.mmap_anon_non_fixed_base
 		process.mmap_anon_non_fixed_base += length + page_size
+		pagemap.l.release()
 	}
 
 	mut range_local := &MmapRangeLocal{
@@ -362,24 +367,31 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		handle_ref(range_handle)
 	}
 
-	// Pre-fault all pages immediately to avoid demand-paging page faults.
+	// PROT_NONE mappings are address-space reservations, not committed memory.
+	// Large runtimes (notably Firefox's allocators) reserve far more virtual
+	// memory than they will ever touch. Leave those pages absent; mprotect()
+	// commits only the subset made accessible later.
+	//
+	// Pre-fault other mappings to avoid demand-paging page faults.
 	// On QEMU+HVF, LDP/STP instructions on unmapped pages cause data aborts
 	// without ISV bit set, which crashes HVF.
-	for i := u64(0); i < length; i += page_size {
-		mut page := unsafe { nil }
-		if flags & map_anonymous != 0 {
-			page = memory.pmm_alloc(1)
-		} else if voidptr(resource_) != unsafe { nil } {
-			file_page := u64((offset + i64(i)) / i64(page_size))
-			page = resource_.mmap(handle, file_page, flags)
-		}
-		if flags & map_anonymous == 0 && page == unsafe { nil } {
-			munmap(mut pagemap, voidptr(base), length) or {}
-			errno.set(errno.einval)
-			return none
-		}
-		if page != unsafe { nil } {
-			map_page_in_range(range_global, base + i, u64(page), prot) or {}
+	if prot != prot_none {
+		for i := u64(0); i < length; i += page_size {
+			mut page := unsafe { nil }
+			if flags & map_anonymous != 0 {
+				page = memory.pmm_alloc(1)
+			} else if voidptr(resource_) != unsafe { nil } {
+				file_page := u64((offset + i64(i)) / i64(page_size))
+				page = resource_.mmap(handle, file_page, flags)
+			}
+			if flags & map_anonymous == 0 && page == unsafe { nil } {
+				munmap(mut pagemap, voidptr(base), length) or {}
+				errno.set(errno.einval)
+				return none
+			}
+			if page != unsafe { nil } {
+				map_page_in_range(range_global, base + i, u64(page), prot) or {}
+			}
 		}
 	}
 
@@ -410,12 +422,60 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 }
 
 pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
+	// mmap() deliberately leaves PROT_NONE reservations without physical pages.
+	// ARM64 HVF cannot reliably resume every paired load/store page fault, so
+	// populate pages here, before an application can touch a newly accessible
+	// part of the reservation.
+	if prot != prot_none {
+		populate_missing_pages(mut pagemap, u64(addr), len, prot)?
+	}
+
 	pagemap.l.acquire()
 	defer {
 		pagemap.l.release()
 	}
 
 	mprotect_unlocked(mut pagemap, addr, len, prot)?
+}
+
+fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, prot int) ? {
+	length := lib.align_up(_length, page_size)
+	for virt := address; virt < address + length; virt += page_size {
+		pagemap.l.acquire()
+		local_range, _, file_page := addr2range(pagemap, virt) or {
+			pagemap.l.release()
+			errno.set(errno.enomem)
+			return none
+		}
+		if _ := pagemap.virt2phys(virt) {
+			pagemap.l.release()
+			continue
+		}
+
+		flags := local_range.flags
+		global_range := local_range.global
+		mut resource_ := global_range.resource
+		handle := global_range.handle
+		pagemap.l.release()
+
+		mut page := unsafe { nil }
+		if flags & map_anonymous != 0 {
+			page = memory.pmm_alloc(1)
+		} else if voidptr(resource_) != unsafe { nil } {
+			page = resource_.mmap(handle, file_page, flags)
+		}
+		if page == unsafe { nil } {
+			errno.set(errno.enomem)
+			return none
+		}
+		map_page_in_range(global_range, virt, u64(page), prot) or {
+			if flags & map_anonymous != 0 {
+				memory.pmm_free(page, 1)
+			}
+			errno.set(errno.enomem)
+			return none
+		}
+	}
 }
 
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
@@ -427,12 +487,17 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 
 	length := lib.align_up(_length, page_size)
 
-	for i := u64(addr); i < u64(addr) + length; i += page_size {
-		mut local_range, _, _ := addr2range(pagemap, i) or { continue }
+	mut i := u64(addr)
+	for i < u64(addr) + length {
+		mut local_range, _, _ := addr2range(pagemap, i) or {
+			i += page_size
+			continue
+		}
 
 		mut global_range := local_range.global
 
 		if local_range.prot == prot {
+			i += page_size
 			continue
 		}
 
@@ -520,8 +585,12 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 
 	length := lib.align_up(_length, page_size)
 
-	for i := u64(addr); i < u64(addr) + length; i += page_size {
-		mut local_range, _, _ := addr2range(pagemap, i) or { continue }
+	mut i := u64(addr)
+	for i < u64(addr) + length {
+		mut local_range, _, _ := addr2range(pagemap, i) or {
+			i += page_size
+			continue
+		}
 
 		mut global_range := local_range.global
 

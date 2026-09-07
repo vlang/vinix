@@ -46,6 +46,8 @@ pub const sock_seqpacket = 5
 // getsockopt(2)/setsockopt(2).
 pub const sol_socket = 1
 
+pub const scm_rights = 1
+
 pub const so_reuseaddr = 2
 
 pub const so_type = 3

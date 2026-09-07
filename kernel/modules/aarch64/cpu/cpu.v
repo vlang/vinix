@@ -23,6 +23,16 @@ pub fn write_sctlr_el1(value u64) {
 	}
 }
 
+// Linux userspace libraries inspect cache-line geometry and may use DC ZVA or
+// user cache maintenance for their optimized memory routines. SCTLR_EL1 keeps
+// those EL0 operations trapped unless the kernel explicitly enables them.
+pub fn enable_el0_cache_access() {
+	sctlr_dze := u64(1) << 14
+	sctlr_uct := u64(1) << 15
+	sctlr_uci := u64(1) << 26
+	write_sctlr_el1(read_sctlr_el1() | sctlr_dze | sctlr_uct | sctlr_uci)
+}
+
 pub fn read_ttbr0_el1() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {

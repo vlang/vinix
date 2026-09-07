@@ -1,0 +1,12 @@
+{
+  "policies": {
+    "DisableAppUpdate": true,
+    "DisableDefaultBrowserAgent": true,
+    "DisableFirefoxStudies": true,
+    "DisableTelemetry": true,
+    "DontCheckDefaultBrowser": true,
+    "NoDefaultBookmarks": true,
+    "OverrideFirstRunPage": "file:///root/firefox-smoke.html",
+    "OverridePostUpdatePage": ""
+  }
+}

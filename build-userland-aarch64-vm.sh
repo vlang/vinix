@@ -13,6 +13,7 @@ ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
 
 BUSYBOX_VERSION=1.36.1
@@ -264,6 +265,13 @@ fi
 exec /bin/sh -l
 BOOT_TEST
 chmod +x "$STAGING/etc/vinix-boot-test.sh"
+
+if [ -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
+    echo "==> Integrating Firefox ESR runtime"
+    cp -a "$FIREFOX_STAGING/." "$STAGING/"
+else
+    echo "==> Firefox staging not found, packaging without Firefox"
+fi
 
 if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
     echo "==> Integrating Mesa/Asahi runtime"

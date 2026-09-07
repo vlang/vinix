@@ -1,0 +1,72 @@
+#!/bin/sh
+# Launch the Alpine Firefox ESR build on Vinix's framebuffer-backed Xorg.
+set -eu
+
+if [ -x /usr/lib/firefox-esr/firefox-esr ] && [ -x /usr/bin/firefox-esr ]; then
+    browser=/usr/bin/firefox-esr
+    browser_binary=/usr/lib/firefox-esr/firefox-esr
+elif [ -x /usr/lib/firefox/firefox ] && [ -x /usr/bin/firefox ]; then
+    browser=/usr/bin/firefox
+    browser_binary=/usr/lib/firefox/firefox
+else
+    echo "run-firefox: Firefox is not installed" >&2
+    exit 1
+fi
+
+# Mozilla discovers its application directory through /proc/self/exe on Linux.
+# Until Vinix grows procfs, provide the one process link Firefox needs. Its
+# content processes execute this same binary, so the static target remains
+# correct for the complete browser process tree.
+if [ ! -e /proc/self/exe ]; then
+    mkdir -p /proc/self
+    ln -sf "$browser_binary" /proc/self/exe
+fi
+
+export HOME="${HOME:-/root}"
+export TMPDIR="${TMPDIR:-/tmp}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+export VINIX_FIREFOX_PROFILE="${VINIX_FIREFOX_PROFILE:-$HOME/.mozilla/firefox/vinix}"
+mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_RUNTIME_DIR" \
+    "$VINIX_FIREFOX_PROFILE" /dev/shm
+chmod 700 "$XDG_RUNTIME_DIR"
+chmod 1777 /dev/shm
+
+# GTK is only a packaged client library here; Xorg owns the framebuffer. Avoid
+# its Wayland, accessibility-bus and MIT-SHM paths, none of which Vinix needs.
+export GDK_BACKEND=x11
+export MOZ_ENABLE_WAYLAND=0
+export NO_AT_BRIDGE=1
+export MOZ_DISABLE_XSHM=1
+
+# Vinix does not implement Linux namespaces/seccomp yet. Firefox's individual
+# process sandboxes must be disabled explicitly until those kernel ABIs exist.
+export MOZ_DISABLE_CONTENT_SANDBOX=1
+export MOZ_DISABLE_GMP_SANDBOX=1
+export MOZ_DISABLE_GPU_SANDBOX=1
+export MOZ_DISABLE_RDD_SANDBOX=1
+export MOZ_DISABLE_SOCKET_PROCESS_SANDBOX=1
+export MOZ_CRASHREPORTER_DISABLE=1
+
+# The Xorg fbdev server is software-rendered. Keep Firefox off DRI/GBM paths
+# while preserving WebRender's supported software backend.
+export LIBGL_ALWAYS_SOFTWARE=1
+export MOZ_X11_EGL=0
+
+if [ "$#" -eq 0 ]; then
+    set -- file:///root/firefox-smoke.html
+fi
+
+if [ -n "${DISPLAY:-}" ]; then
+    exec "$browser" --no-remote --new-instance \
+        --profile "$VINIX_FIREFOX_PROFILE" "$@"
+fi
+
+if [ ! -x /usr/bin/Xorg ] || [ ! -x /usr/bin/startx ]; then
+    echo "run-firefox: Xorg is required; stage it with build-x11-aarch64.sh" >&2
+    exit 1
+fi
+
+exec /usr/bin/startx "$browser" --no-remote --new-instance \
+    --profile "$VINIX_FIREFOX_PROFILE" "$@"

@@ -153,6 +153,42 @@ The userland builders merge `build-aarch64-ruby/staging` when present. Set
 `/root/ruby-smoke.rb`, which the ARM64 VM boot suite runs automatically and
 which can also be invoked manually with `ruby`.
 
+### Firefox on aarch64
+
+Firefox ESR can run as a stock Alpine musl application on Vinix's existing
+framebuffer-backed Xorg server. Firefox draws its own interface with Gecko/XUL;
+GTK 3 is staged as a userspace dependency for Linux window-system integration,
+not implemented in the kernel or in `vinix-desktop`.
+
+Build the X server and stage Firefox before assembling the full userland:
+
+```sh
+./build-x11-aarch64.sh
+./build-firefox-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Boot with at least 8 GiB of RAM, then launch the browser. The first command
+creates a 2 GiB sparse boot disk when one does not already exist. With no URL,
+Firefox opens the bundled smoke page; pass a URL to browse normally:
+
+```sh
+./run-aarch64.sh --mem=8192 --disk=2048
+run-firefox
+run-firefox https://example.com
+```
+
+`build-firefox-aarch64.sh` resolves and stages the complete Alpine runtime
+dependency closure, including GTK/X11, fonts, TLS certificates, and media
+libraries. It defaults to Alpine 3.22's Firefox 140 ESR: newer Alpine builds
+currently link Scudo, whose virtual-memory contract Vinix does not yet provide.
+Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
+`ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
+
+Firefox runs with software rendering and its Linux namespace/seccomp sandboxes
+disabled because Vinix does not implement those kernel facilities yet. The
+browser displays Firefox's reduced-protection warning accordingly.
+
 ### Apple M1 GPU test image
 
 Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It

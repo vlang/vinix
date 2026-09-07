@@ -14,6 +14,7 @@ INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 
 MUSL_VERSION="1.2.5"
 BUSYBOX_VERSION="1.36.1"
@@ -756,6 +757,15 @@ FONTALIAS
     echo "    X11 files integrated ($X11_SIZE)"
 else
     echo "==> X11 staging not found, skipping (run build-x11-aarch64.sh first)"
+fi
+
+# Firefox brings its GTK/X11 client-side dependency closure. Merge it before
+# Asahi so the hardware-specific Mesa runtime remains authoritative on M1.
+if [ -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
+    echo "==> Integrating Firefox ESR runtime..."
+    cp -a "$FIREFOX_STAGING/." "$STAGING/"
+else
+    echo "==> Firefox staging not found, skipping (run build-firefox-aarch64.sh first)"
 fi
 
 # The native Asahi build is produced in the Debian ARM64 VM. Once its staging

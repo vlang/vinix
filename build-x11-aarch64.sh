@@ -33,17 +33,26 @@ fi
 if [ ! -x "$LLVM_CLANGXX" ]; then
     LLVM_CLANGXX="clang++"
 fi
-GCC_TC="$SCRIPT_DIR/build-aarch64-userland/staging/aarch64-linux-musl-native"
+GCC_TC=""
+for candidate in \
+    "$SCRIPT_DIR/build-aarch64-userland/staging/aarch64-linux-musl-native" \
+    "$SCRIPT_DIR/build-aarch64-userland/aarch64-linux-musl-native" \
+    "$SCRIPT_DIR/build-aarch64-musl/aarch64-linux-musl-native"; do
+    if [ -d "$candidate/lib/gcc/aarch64-linux-musl" ]; then
+        GCC_TC="$candidate"
+        break
+    fi
+done
 GCC_TC_FLAG=""
-if [ -d "$GCC_TC" ]; then
+if [ -n "$GCC_TC" ]; then
     GCC_TC_FLAG="--gcc-toolchain=${GCC_TC}"
 fi
 CC="$LLVM_CLANG --target=aarch64-linux-musl --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
 LD="ld.lld"
-AR="llvm-ar"
-RANLIB="llvm-ranlib"
-STRIP="llvm-strip"
-NM="llvm-nm"
+AR="/opt/homebrew/opt/llvm/bin/llvm-ar"
+RANLIB="/opt/homebrew/opt/llvm/bin/llvm-ranlib"
+STRIP="/opt/homebrew/opt/llvm/bin/llvm-strip"
+NM="/opt/homebrew/opt/llvm/bin/llvm-nm"
 PKG_CONFIG="pkg-config"
 
 mkdir -p "$BUILD_DIR" "$SYSROOT" "$STAGING" "$DOWNLOADS" "$SOURCES"
@@ -243,6 +252,7 @@ export PKG_CONFIG_LIBDIR="${SYSROOT}/usr/lib/pkgconfig:${SYSROOT}/usr/share/pkgc
 # Cross-compilation flags
 export CC="$LLVM_CLANG --target=aarch64-linux-musl --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
 export CXX="$LLVM_CLANGXX --target=aarch64-linux-musl --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
+export AR RANLIB STRIP NM PKG_CONFIG
 export CFLAGS="-O2 -I${SYSROOT}/usr/include -D__vinix__"
 export CPPFLAGS="-I${SYSROOT}/usr/include"
 export LDFLAGS="-fuse-ld=lld -L${SYSROOT}/usr/lib -L${SYSROOT}/lib -rdynamic"
