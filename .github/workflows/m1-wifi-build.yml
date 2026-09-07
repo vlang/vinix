@@ -1,0 +1,57 @@
+name: M1 Wi-Fi kernel build
+on:
+  push:
+    branches: [wifi/m1-air-build]
+  pull_request:
+    paths:
+      - 'kernel/**'
+      - 'tests/m1-wifi/**'
+      - 'tools/m1-wifi/**'
+      - '.github/workflows/m1-wifi-build.yml'
+permissions:
+  contents: read
+concurrency:
+  group: m1-wifi-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld gcc make git curl python3
+      - name: Driver sanitizer and optimized tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tests/m1-wifi/out
+          CC=clang SANITIZE=1 sh tests/m1-wifi/run.sh | tee tests/m1-wifi/out/wifi-sanitizers.log
+          CC=gcc SANITIZE=0 sh tests/m1-wifi/run.sh | tee tests/m1-wifi/out/wifi-gcc.log
+          CC=clang sh tests/apple-spi-keyboard/run.sh | tee tests/m1-wifi/out/keyboard.log
+          clang -std=c11 -O2 -Wall -Wextra -Werror -iquote kernel/c tools/m1-wifi/wifi-ctl.c -o tests/m1-wifi/out/wifi-ctl-host
+          python3 -m py_compile tools/m1-wifi/package.py tests/m1-wifi/verify_build.py tests/m1-wifi/verify_test.py
+      - name: Bootstrap pinned V1 compiler
+        run: sh tools/m1-wifi/get-v.sh /tmp/vinix-wifi-v
+      - name: Fetch pinned kernel dependencies
+        run: cd kernel && ./get-deps
+      - name: Clean debug and production ARM64 links
+        shell: bash
+        run: |
+          set -euo pipefail
+          V=/tmp/vinix-wifi-v/v JOBS=2 sh tests/m1-wifi/build.sh 2>&1 | tee tests/m1-wifi/out/build-acceptance.log
+      - name: Record source identity
+        if: always()
+        run: |
+          mkdir -p tests/m1-wifi/out
+          git rev-parse HEAD > tests/m1-wifi/out/SOURCE_COMMIT
+          git rev-parse 'HEAD:kernel' > tests/m1-wifi/out/KERNEL_TREE
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: m1-wifi-kernel-build
+          path: tests/m1-wifi/out/
+          retention-days: 7
+          if-no-files-found: error

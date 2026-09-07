@@ -56,7 +56,71 @@ __global (
 	sc_ring_idx = u64(0)
 	sc_trace_pid = u64(0) // PID to trace (0 = all)
 	sc_trace_gpr_state = u64(0)
+	sc_fail_trace = bool(false)
 )
+
+// TEMPORARY DEBUG: print every failing syscall once the guest opens
+// /VINIX_TRACE_ON. Remove before committing.
+fn dbg_user_str(ptr u64) {
+	if ptr == 0 {
+		uart.puts(c'(null)')
+		return
+	}
+	unsafe {
+		p := &u8(ptr)
+		for i := 0; i < 96; i++ {
+			c := p[i]
+			if c == 0 {
+				break
+			}
+			if c < 32 || c > 126 {
+				uart.putc(`?`)
+			} else {
+				uart.putc(c)
+			}
+		}
+	}
+}
+
+fn dbg_trace_toggle(nr u64, ptr u64) {
+	if nr != 56 || ptr == 0 {
+		return
+	}
+	unsafe {
+		p := &u8(ptr)
+		on := c'/VINIX_TRACE_ON'
+		off := c'/VINIX_TRACE_OFF'
+		mut match_on := true
+		for i := 0; i < 16; i++ {
+			if p[i] != (&u8(on))[i] {
+				match_on = false
+				break
+			}
+			if p[i] == 0 {
+				break
+			}
+		}
+		if match_on {
+			sc_fail_trace = true
+			uart.puts(c'\n=== SC FAIL TRACE ON ===\n')
+			return
+		}
+		mut match_off := true
+		for i := 0; i < 17; i++ {
+			if p[i] != (&u8(off))[i] {
+				match_off = false
+				break
+			}
+			if p[i] == 0 {
+				break
+			}
+		}
+		if match_off {
+			uart.puts(c'\n=== SC FAIL TRACE OFF ===\n')
+			sc_fail_trace = false
+		}
+	}
+}
 
 @[export: 'syscall_trace']
 pub fn syscall_trace(gpr_state voidptr) {
@@ -90,6 +154,7 @@ pub fn syscall_trace(gpr_state voidptr) {
 	sc_ring[idx].pid = pid
 	sc_trace_gpr_state = u64(gpr_state)
 	sc_trace_active = true
+	dbg_trace_toggle(nr, gpr.x1)
 }
 
 @[export: 'syscall_trace_ret']
@@ -100,6 +165,27 @@ pub fn syscall_trace_ret(ret u64, err u64) {
 	idx := sc_ring_idx % 64
 	sc_ring[idx].ret = ret
 	sc_ring[idx].err = err
+	if sc_fail_trace && err != 0 {
+		e := sc_ring[idx]
+		uart.puts(c'!SC P')
+		uart.put_dec(e.pid)
+		uart.puts(c' nr=')
+		uart.put_dec(e.nr)
+		uart.puts(c' err=')
+		uart.put_dec(err)
+		uart.puts(c' a=(')
+		uart.put_hex(e.x0)
+		uart.puts(c',')
+		uart.put_hex(e.x1)
+		uart.puts(c',')
+		uart.put_hex(e.x2)
+		uart.puts(c')')
+		if e.nr == 56 || e.nr == 79 || e.nr == 78 || e.nr == 48 {
+			uart.puts(c' path=')
+			dbg_user_str(e.x1)
+		}
+		uart.putc(`\n`)
+	}
 	sc_ring_idx++
 	sc_trace_active = false
 }
