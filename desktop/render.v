@@ -155,13 +155,21 @@ fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
 // free_tree releases the arrays a frame's element tree was built out of.
 // There is no garbage collector on this target, so a tree rebuilt whenever the
 // screen changes would otherwise grow the process without bound. Only the
-// child arrays are freed: every string inside an element is either a literal
-// or owned by the window list, and both outlive the tree on purpose.
+// strings copied from a remote application are frame-owned; local strings are
+// literals or model-owned caches and outlive the tree on purpose.
 fn free_tree(el ui2.Element) {
 	for child in el.children {
 		free_tree(child)
 	}
-	if el.id == frame_owned_text_id {
+	if el.key == remote_owned_element_key {
+		unsafe {
+			if el.id.len > 0 { el.id.free() }
+			if el.action_id.len > 0 { el.action_id.free() }
+			if el.text.len > 0 { el.text.free() }
+			if el.image_path.len > 0 { el.image_path.free() }
+			if el.text_style.font_family.len > 0 { el.text_style.font_family.free() }
+		}
+	} else if el.id == frame_owned_text_id {
 		unsafe { el.text.free() }
 	}
 	if el.children.cap > 0 {

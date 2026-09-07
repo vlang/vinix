@@ -3,12 +3,11 @@
 // The Settings application: categories down the left, the chosen category's
 // settings on the right.
 //
-// It is a hosted application like any other, but unlike the file browser it
-// changes the desktop rather than reading it, so it holds a pointer back to
-// the Desktop and writes preferences straight into it. The window manager
-// composes the whole screen from those preferences on the next frame, which is
-// why a choice made here shows up immediately and everywhere without anything
-// being told to refresh.
+// It is a native application like any other, but unlike the file browser it
+// changes compositor state. Its process writes a synchronized Desktop proxy;
+// app_process.v returns those preferences with the action response, and the
+// compositor uses them on the next frame. A choice therefore still appears
+// immediately and everywhere without sharing an address space.
 module main
 
 import ui2
@@ -49,9 +48,10 @@ const settings_row_gap = 8
 
 struct SettingsApp {
 mut:
-	// The desktop this is changing. A hosted application usually knows nothing
-	// about the desktop; this one is the exception, and is the reason
-	// HostedApp's build takes only a size — everything else it needs, it holds.
+	// The synchronized desktop-state proxy this is changing. A native app
+	// usually knows nothing about compositor state; this one is the exception,
+	// and is the reason
+	// NativeApp's build takes only a size — everything else it needs, it holds.
 	desktop  &Desktop = unsafe { nil }
 	category SettingsCategory = .appearance
 	images   []WallpaperImage
@@ -86,7 +86,7 @@ mut:
 	range_text     string
 }
 
-fn (mut d Desktop) open_settings() !HostedApp {
+fn (mut d Desktop) open_settings() !NativeApp {
 	return &SettingsApp{
 		desktop: d
 		images: list_wallpapers()

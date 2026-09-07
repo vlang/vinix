@@ -5,8 +5,8 @@
 // Unlike the calculator it is not a ui2 example but Vinix's own, and it reads
 // a real filesystem: the listing comes from the kernel's getdents64 through
 // musl's readdir, and each entry is stat'd for its size. It satisfies the same
-// HostedApp interface a ui2 application does, so the window manager hosts it
-// with the machinery that was already there and knows nothing about files.
+// NativeApp interface a ui2 application does, so its process speaks the same
+// compositor protocol and the window manager knows nothing about files.
 module main
 
 import ui2
@@ -203,7 +203,7 @@ fn human_size(size u64) string {
 
 const file_size_units = ['KB', 'MB', 'GB', 'TB']
 
-// ── The hosted application ────────────────────────────────────────
+// ── The native application ────────────────────────────────────────
 
 const files_action_up = 'files.up'
 const files_action_row = 'files.row.'
@@ -222,7 +222,7 @@ mut:
 	visible_rows int = 1
 }
 
-fn open_files(mut _ Desktop) !HostedApp {
+fn open_files(mut _ Desktop) !NativeApp {
 	mut app := &FileBrowserApp{}
 	app.browser.read('/')
 	if app.browser.error != '' {

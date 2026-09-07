@@ -90,6 +90,11 @@ fn sleep_to_next_frame(frame_started i64, interval i64) {
 }
 
 fn main() {
+	if app_options := app_process_options(arguments()[1..]) {
+		run_app_process(app_options)
+		return
+	}
+	desktop_ignore_broken_pipe()
 	options := parse_options(arguments()[1..])
 
 	mut fb := open_framebuffer(options.framebuffer) or {
@@ -102,8 +107,7 @@ fn main() {
 
 	scale := desktop_configure_scale(fb.width, fb.height)
 	mut desktop := Desktop{
-		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height,
-			scale))
+		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale))
 		fonts: load_fonts()
 		tz_offset_seconds: options.tz_offset
 	}
@@ -136,7 +140,7 @@ fn main() {
 		desktop.poll_apps()
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)
-		// Xorg, unlike a hosted ui2 application, needs the physical display and
+		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
 		// console, and reopen everything after Firefox exits.
 		if desktop.pending_external != '' {
@@ -193,6 +197,7 @@ fn main() {
 
 	// Leave the console the way it was found rather than on top of a desktop
 	// that is no longer being redrawn.
+	desktop.close_apps()
 	desktop.canvas.clip = Clip{
 		x: 0
 		y: 0
@@ -274,7 +279,7 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 				d.spawn_scattered()
 			}
 			key_ctrl_k {
-				// The first hosted application, for a keyboard-only session.
+				// The first native application, for a keyboard-only session.
 				if available_apps.len > 0 {
 					d.launch(available_apps[0])
 				}

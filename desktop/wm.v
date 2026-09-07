@@ -21,7 +21,7 @@ const action_launch_prefix = 'taskbar.launch.'
 const action_shortcut_prefix = 'shortcut.'
 // The desktop's own actions all begin with one of these. An action that does
 // not is an application's, and is routed to whichever window it was clicked
-// in — which is what lets a hosted application name its events whatever it
+// in — which is what lets a native application name its events whatever it
 // likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', action_switch_prefix]
 
@@ -74,8 +74,9 @@ mut:
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
 
-	// Applications the desktop is hosting. A window points into this by index.
-	apps []HostedApp
+	// Application clients. Native apps live in separate processes; a window
+	// points to its compositor-side proxy by index.
+	apps []NativeApp
 	// An exclusive application is started by the main loop after it has
 	// released the framebuffer, pointer and raw console keyboard.
 	pending_external string
@@ -183,6 +184,13 @@ fn (mut d Desktop) raise(id int) {
 
 fn (mut d Desktop) close_window(id int) {
 	index := d.window_index(id) or { return }
+	app_index := d.windows[index].app_index
+	if app_index >= 0 && app_index < d.apps.len {
+		mut app := d.apps[app_index]
+		if mut app is RemoteApp {
+			app.close()
+		}
+	}
 	d.windows.delete(index)
 	if d.focus == id {
 		d.focus = if d.windows.len > 0 { d.windows.last().id } else { 0 }
@@ -413,7 +421,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}, window_children)
 }
 
-// window_contents is the body's background colour and its children. A hosted
+// window_contents is the body's background colour and its children. A native
 // application supplies both: what it returns is its QML `Screen`, which inside
 // someone else's window is a content area rather than a display, so its
 // background becomes the body's and its children are placed straight into it.
@@ -434,7 +442,7 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 	return root.box.bg, root.children
 }
 
-// launch opens a hosted window or queues an external application for the main
+// launch starts a native app process or queues an external application for the main
 // loop to run after releasing the physical display and input devices.
 fn (mut d Desktop) launch(factory AppFactory) {
 	if factory.exclusive_command != '' {
@@ -442,11 +450,11 @@ fn (mut d Desktop) launch(factory AppFactory) {
 		d.dirty = true
 		return
 	}
-	if factory.open == unsafe { nil } {
+	if factory.open == unsafe { nil } || factory.process_name == '' {
 		eprintln('vinix-desktop: ${factory.title} has no launcher')
 		return
 	}
-	app := factory.open(mut d) or {
+	app := start_remote_app(factory, mut d) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
 	}
@@ -520,15 +528,37 @@ fn (mut d Desktop) poll_apps() {
 fn (d &Desktop) focused_app_takes_keys() bool {
 	index := d.focused_app_index() or { return false }
 	app := d.apps[index]
+	if app is RemoteApp {
+		return app.keyboard
+	}
 	return app is KeyboardApp
 }
 
 fn (mut d Desktop) send_keys_to_focused(keys string) {
 	index := d.focused_app_index() or { return }
 	mut app := d.apps[index]
+	if mut app is RemoteApp {
+		if app.keyboard {
+			app.key_input(keys)
+			d.dirty = true
+		}
+		return
+	}
 	if mut app is KeyboardApp {
 		app.key_input(keys)
 		d.dirty = true
+	}
+}
+
+// close_apps shuts every native client down before the compositor exits. App
+// slots are intentionally stable while windows are open, so walk the slots
+// themselves: a closed window has already closed its process and is harmless.
+fn (mut d Desktop) close_apps() {
+	for index in 0 .. d.apps.len {
+		mut app := d.apps[index]
+		if mut app is RemoteApp {
+			app.close()
+		}
 	}
 }
 
@@ -712,7 +742,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		align: .center
 	})
 
-	// Then a launcher per available application, hosted or external, so each is
+	// Then a launcher per available application, native or external, so each is
 	// one click away rather than something only a terminal can open.
 	mut launcher_x := edge_padding + new_button_width + 8
 	launcher_item_width := taskbar_launcher_width(width, launcher_x, available_apps.len)

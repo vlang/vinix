@@ -24,7 +24,7 @@ mut:
 	last_refresh_ms u64
 }
 
-fn open_clock(mut desktop Desktop) !HostedApp {
+fn open_clock(mut desktop Desktop) !NativeApp {
 	mut app := &ClockApp{
 		tz_offset: desktop.tz_offset_seconds
 	}

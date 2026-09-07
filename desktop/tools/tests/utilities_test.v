@@ -105,9 +105,14 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps.len == 9
+	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == '/usr/bin/run-firefox'
+	assert available_apps[1].process_name == ''
+	assert available_apps[3].process_name == 'vinix-terminal'
+	assert available_apps[3].keyboard && available_apps[3].polling
 	assert available_apps[5].title == 'Activity Monitor'
+	assert available_apps[5].process_name == 'vinix-activity'
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert taskbar_launcher_width(1280, 114, available_apps.len) == 87
@@ -178,35 +183,55 @@ fn test_external_display_handoff_redraws_and_reports_failures() {
 	unsafe { free(voidptr(desktop.canvas.pixels)) }
 }
 
-fn test_activity_monitor_counts_hosted_apps_without_fake_process_rows() {
-	mut desktop := Desktop{}
-	desktop.spawn('Welcome', .welcome, 0, 0, 100, 100)
-	calculator_id := desktop.spawn('Calculator', .app, 0, 0, 100, 100)
-	desktop.spawn('Text Editor', .app, 0, 0, 100, 100)
-
-	mut monitor := ActivityMonitor{}
-	assert monitor.sync_open_app_count(desktop)
-	assert !monitor.sync_open_app_count(desktop)
-	assert monitor.app_count == 2
-	assert monitor.rows.len == 0
-
-	desktop.close_window(calculator_id)
-	assert monitor.sync_open_app_count(desktop)
-	assert monitor.app_count == 1
-	assert monitor.rows.len == 0
-}
-
-fn test_activity_monitor_does_not_render_hosted_apps_as_processes() {
-	mut desktop := Desktop{}
-	desktop.spawn('Calculator', .app, 0, 0, 100, 100)
-	mut app := ActivityApp{
-		desktop: &desktop
-	}
+fn test_activity_monitor_uses_only_real_process_rows() {
+	mut app := ActivityApp{}
 	tree := app.build(ui2.rect(0, 0, 520, 360))!
-	assert !utility_tree_has_text(tree, 'Calculator')
-	assert !utility_tree_has_text(tree, 'Activity Monitor')
-	assert !utility_tree_has_text(tree, 'PROCESS / OPEN APP')
 	assert utility_tree_has_text(tree, 'MB')
 	free_tree(tree)
 	app.monitor.free_rows()
+}
+
+fn test_native_process_names_are_presented_as_app_names() {
+	mut sample := ActivitySample{}
+	name := '/usr/bin/vinix-activity[42]'
+	for index := 0; index < name.len; index++ {
+		sample.name[index] = name[index]
+	}
+	display := activity_name_of(&sample)
+	assert display == 'Activity Monitor'
+	unsafe { display.free() }
+}
+
+fn test_application_tree_protocol_round_trip() {
+	child := ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
+		bg: 0x123456
+		radius: 6
+	}, ui2.TextStyle{
+		color: 0xfefefe
+		background_color: 0x010203
+		size: 13
+		font_family: 'mono'
+		bold: true
+		shadow: true
+		align: .center
+	})
+	root := ui2.screen(0xabcdef, [child])
+	mut encoded := []u8{}
+	encode_app_element(root, mut encoded)!
+	decoded := decode_app_tree(encoded)!
+	assert decoded.box.bg == 0xabcdef
+	assert decoded.children.len == 1
+	button := decoded.children[0]
+	assert button.kind == .button
+	assert button.id == 'save'
+	assert button.text == 'Save'
+	assert button.image_path == 'builtin:editor'
+	assert button.frame.x == 7 && button.frame.y == 9
+	assert button.box.bg == 0x123456 && button.box.radius == 6
+	assert button.text_style.font_family == 'mono'
+	assert button.text_style.bold && button.text_style.shadow
+	assert button.text_style.align == .center
+	free_tree(root)
+	free_tree(decoded)
+	unsafe { encoded.free() }
 }

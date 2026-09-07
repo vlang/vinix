@@ -67,13 +67,13 @@ const activity_mb_bytes = u64(1_000_000)
 // collector to clean up the difference.
 struct ActivityRow {
 mut:
-	pid         int
-	cpu_percent f64
+	pid          int
+	cpu_percent  f64
 	memory_bytes u64
-	name        string
-	pid_text    string
-	cpu_text    string
-	mem_text    string
+	name         string
+	pid_text     string
+	cpu_text     string
+	mem_text     string
 }
 
 // previous holds what a pid's CPU counter read last time round, so the next
@@ -109,7 +109,6 @@ mut:
 	process_total u32
 	used_memory   u64
 	total_memory  u64
-	app_count     int
 	// The buffer a read lands in, allocated once. A snapshot is a few tens of
 	// kilobytes and reading it into a fresh allocation every second would be a
 	// steady leak.
@@ -237,45 +236,17 @@ fn replace_activity_text(current string, next string) string {
 	return next
 }
 
-// sync_open_app_count keeps the footer informative without manufacturing
-// process rows. Files, Settings, and other hosted apps live inside the one
-// vinix-desktop process, so the kernel has no true per-window CPU or memory
-// figure for them. Showing the process once is accurate; repeating its values
-// (or a misleading "shared") alongside every hosted window is not.
-fn (mut m ActivityMonitor) sync_open_app_count(desktop &Desktop) bool {
-	count := activity_hosted_window_count(desktop)
-	if m.app_count == count {
-		return false
-	}
-	m.app_count = count
-	m.update_summary()
-	return true
-}
-
-fn activity_hosted_window_count(desktop &Desktop) int {
-	mut count := 0
-	for window in desktop.windows {
-		if window.page == .app {
-			count++
-		}
-	}
-	return count
-}
-
 fn (mut m ActivityMonitor) update_summary() {
 	process_noun := if m.process_total == 1 { 'process' } else { 'processes' }
-	app_noun := if m.app_count == 1 { 'app' } else { 'apps' }
 	// The values are named rather than interpolated in place so every owned
 	// string can be released explicitly on the manual-free desktop target.
 	process_count := m.process_total.str()
-	app_count := m.app_count.str()
 	used_text := human_size(m.used_memory)
 	total_text := human_size(m.total_memory)
 	unsafe { m.summary.free() }
-	m.summary = '${process_count} ${process_noun}   ${app_count} open ${app_noun}   ${used_text} of ${total_text} used'
+	m.summary = '${process_count} ${process_noun}   ${used_text} of ${total_text} used'
 	unsafe {
 		process_count.free()
-		app_count.free()
 		used_text.free()
 		total_text.free()
 	}
@@ -422,7 +393,25 @@ fn activity_name_of(record &ActivitySample) string {
 	if length <= start {
 		return '(unnamed)'
 	}
-	return unsafe { tos(&u8(&record.name[start]), length - start).clone() }
+	name := unsafe { tos(&u8(&record.name[start]), length - start).clone() }
+	// Native apps are exec'd through these stable binary names so the kernel
+	// can account for them independently. Present their user-facing names while
+	// retaining their real PID, CPU and memory columns.
+	display := match name {
+		'vinix-files' { 'Files' }
+		'vinix-calculator' { 'Calculator' }
+		'vinix-terminal' { 'Terminal' }
+		'vinix-settings' { 'Settings' }
+		'vinix-activity' { 'Activity Monitor' }
+		'vinix-editor' { 'Text Editor' }
+		'vinix-calendar' { 'Calendar' }
+		'vinix-clock' { 'Clock' }
+		else {
+			return name
+		}
+	}
+	unsafe { name.free() }
+	return display.clone()
 }
 
 // percent_text renders a share to one decimal place, which is as fine as a
@@ -515,7 +504,7 @@ fn (mut m ActivityMonitor) clamp_scroll() {
 	}
 }
 
-// ── The hosted application ────────────────────────────────────────
+// ── The native application ────────────────────────────────────────
 
 const activity_action_cpu = 'activity.sort.cpu'
 const activity_action_memory = 'activity.sort.memory'
@@ -536,14 +525,11 @@ const activity_pid_column = 52
 
 struct ActivityApp {
 mut:
-	desktop &Desktop = unsafe { nil }
 	monitor ActivityMonitor
 }
 
-fn open_activity(mut desktop Desktop) !HostedApp {
-	mut app := &ActivityApp{
-		desktop: desktop
-	}
+fn open_activity(mut _ Desktop) !NativeApp {
+	mut app := &ActivityApp{}
 	app.monitor.buffer = []u8{len: activity_buffer_size()}
 	app.monitor.sample()
 	// A missing device is worth refusing to open for: the window would have
@@ -552,7 +538,6 @@ fn open_activity(mut desktop Desktop) !HostedApp {
 	if app.monitor.error != '' {
 		return error(app.monitor.error)
 	}
-	app.monitor.sync_open_app_count(desktop)
 	app.monitor.last_poll_ms = monotonic_millis()
 	return app
 }
@@ -565,21 +550,10 @@ fn (mut a ActivityApp) poll() bool {
 		return false
 	}
 	a.monitor.last_poll_ms = now
-	sampled := a.monitor.sample()
-	apps_changed := if unsafe { a.desktop != nil } {
-		a.monitor.sync_open_app_count(a.desktop)
-	} else {
-		false
-	}
-	return sampled || apps_changed
+	return a.monitor.sample()
 }
 
 fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
-	// Keep the footer's hosted-app count current in the same frame a window is
-	// opened or closed. The table itself contains only kernel processes.
-	if unsafe { a.desktop != nil } {
-		a.monitor.sync_open_app_count(a.desktop)
-	}
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * activity_padding

@@ -28,8 +28,8 @@ What it does:
 - a **clock** with a large local-time display and a tenth-second stopwatch
 - a **settings application**: window button side, taskbar style, theme,
   wallpaper, display, battery and experimental M1 Wi-Fi controls
-- **hosted ui2 applications**: ui2's own examples run in windows of their own,
-  several at a time, each with its own state
+- **native ui2 applications**: every Files, Calculator, Terminal, Settings and
+  utility window is backed by its own OS process, PID and memory accounting
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the
   middle of the screen when it is held
 
@@ -44,7 +44,8 @@ typing any word with a q in it drop the user back to the console.
     main.v         the event loop: poll input, rebuild, render, present
     wm.v           the window manager — window list, the ui2 tree, hit routing
     window.v       the Window model and the pages windows show
-    app.v          hosting applications in windows, and which ones there are
+    app.v          native application metadata and factories
+    app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
     editor.v       the plain-text editor and its keyboard editing model
@@ -84,24 +85,37 @@ renderer carries itself, since the target has no image files; and a rounded
 view at the top level of the tree is a floating surface, so it gets a drop
 shadow and a hairline edge.
 
-## Hosting ui2 applications
+## Native ui2 applications
 
 A ui2 application normally calls `run_qml`, which opens a platform window and
-blocks until it closes. There is no platform here to ask — the desktop *is* the
-window system — so it uses ui2's `QmlApp` instead: the application hands over an
-element tree for a content area of whatever size its window happens to be, and
-gets back the id of whatever the user hit. Because the size is passed in rather
-than taken from a display, an application re-lays-out when its window is
-resized or maximised, which is how the calculator recentres itself.
+blocks until it closes. Here the desktop *is* the window system, but the app is
+still a separate process. The compositor starts `vinix-files`,
+`vinix-calculator`, `vinix-terminal`, and the other installed app names with
+two private pipes. The app builds a ui2 element tree and sends the
+renderer-relevant fields to the compositor; click actions and keyboard input
+travel back over the request pipe. Because the compositor supplies the content
+size, an app re-lays-out when its window is resized or maximised.
+
+Only the compositor opens the framebuffer, pointer and raw keyboard. All
+unrelated descriptors are closed before an app is exec'd, so the app processes
+are ordinary display clients rather than competing display owners. Closing a
+window asks its process to exit and reaps it; leaving the desktop closes every
+remaining client. Settings returns its synchronized preference state with each
+response, allowing theme, wallpaper and scale changes to cross the boundary
+immediately.
+
+The app names are relative symlinks to one static multicall executable. This
+keeps the initramfs small, while each exec creates an independent address space
+and Vinix records the per-app exec path as its process name. Consequently
+`/dev/processes` reports truthful CPU and mapped-memory values for every app.
 
 The applications are ui2's own examples, and they are not copied into this
 repository. `tools/stage_app.py` takes each example's source straight from the
 ui2 checkout at build time and removes exactly one thing: its `fn main()`,
 which exists to open a platform window and block. Everything the application
 is — its model, its methods, its QML document — compiles unmodified, so what
-runs on Vinix is the example rather than a retelling of it. Both it and the
-desktop are `module main`, so they share a directory and V builds them as one
-program.
+runs on Vinix is the example rather than a retelling of it. The multicall
+executable selects the requested app factory before opening any display device.
 
 The window manager owns four action prefixes — `taskbar.`, `task.`, `win.` and
 `shortcut.` — and treats everything else as an application's, routing it to
@@ -116,7 +130,7 @@ needs its directory listed in `build-desktop-aarch64.sh` so the staging step
 compiles it in.
 
 Firefox is the deliberately different case. It is an upstream X11/GTK
-application rather than a ui2 application the compositor can host. Its
+application rather than a native ui2 client. Its
 `AppFactory` names `/usr/bin/run-firefox` as an exclusive command. At a frame
 boundary the desktop restores the console and closes its framebuffer and
 pointer descriptors, waits while Xorg and Firefox own them, then reopens the
@@ -137,8 +151,8 @@ this Xorg session intentionally uses software rendering.
 `files.v` is not a ui2 example but Vinix's own, and it reads a real
 filesystem — the listing comes from the kernel's `getdents64` through musl's
 `readdir`, and each entry is `stat`ed for its size. It satisfies the same
-`HostedApp` interface, so the window manager hosts it with the machinery that
-was already there and knows nothing about files.
+`NativeApp` interface in its client process, so the window manager's protocol
+proxy knows nothing about files.
 
 Directories sort before files and both sort by name, because the order a
 directory is read in is whatever the filesystem happens to store. Clicking a
@@ -173,11 +187,11 @@ the clock.
 ## The activity monitor
 
 `activity.v` lists every process on the machine with the share of one CPU and
-of RAM it is using. It also lists every open hosted application; applications
-such as Calculator and Text Editor live inside `vinix-desktop`, so their CPU
-and RAM columns are honestly shown as shared rather than counted a second
-time. Like the file browser it is Vinix's own rather than a ui2 example, and
-like it, it reads the real system.
+of RAM it is using. Native apps such as Calculator and Text Editor appear as
+ordinary kernel records with their own PID and measured CPU and RAM. It maps
+their stable executable names (`vinix-calculator`, `vinix-editor`, and so on)
+to the labels shown elsewhere in the desktop. Like the file browser it is
+Vinix's own rather than a ui2 example, and like it, it reads the real system.
 
 Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
 answers a read with one snapshot of the whole table — a short header, then a
@@ -328,7 +342,7 @@ see `FONT-LICENSE.txt`.
 Each face is a weight and a pixel size, and the renderer picks the closest one
 to what a text style asks for rather than scaling, because a stretched bitmap
 atlas looks far worse than one a couple of pixels off. The baked sizes are the
-ones the desktop's chrome uses plus those hosted applications ask for.
+ones the desktop's chrome uses plus those native applications ask for.
 
 Runs are decoded as UTF-8. Beyond printable ASCII each face carries the
 supplemental code points in the generator's `EXTRA_RUNES` — `÷` and `±` among

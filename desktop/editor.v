@@ -45,7 +45,7 @@ mut:
 	modified     bool
 }
 
-fn open_editor(mut _ Desktop) !HostedApp {
+fn open_editor(mut _ Desktop) !NativeApp {
 	mut app := &TextEditorApp{}
 	app.set_path(editor_default_path)
 	app.set_status('New document')

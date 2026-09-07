@@ -40,7 +40,7 @@ mut:
 	selection    string
 }
 
-fn open_calendar(mut desktop Desktop) !HostedApp {
+fn open_calendar(mut desktop Desktop) !NativeApp {
 	mut app := &CalendarApp{
 		tz_offset: desktop.tz_offset_seconds
 	}

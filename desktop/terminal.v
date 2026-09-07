@@ -10,8 +10,8 @@
 // difference from a terminal with a pty behind it, and for a minimal one it is
 // a fair trade.
 //
-// Like the file browser it satisfies HostedApp, so the window manager hosts it
-// with the machinery that was already there. It additionally satisfies
+// Like the file browser it satisfies NativeApp, so its process speaks the same
+// compositor protocol. It additionally satisfies
 // KeyboardApp, which is how the keystrokes reach it.
 module main
 
@@ -33,6 +33,14 @@ mut:
 interface PollingApp {
 mut:
 	poll() bool
+}
+
+// ClosingApp releases subprocesses an application owns before its own process
+// leaves. Ordinary app resources are closed by exit; Terminal also owns a
+// shell process, which must not be orphaned when its window closes.
+interface ClosingApp {
+mut:
+	close_app()
 }
 
 const terminal_shell = '/bin/busybox'
@@ -90,7 +98,7 @@ mut:
 	visible_rows int = 1
 }
 
-fn open_terminal(mut _ Desktop) !HostedApp {
+fn open_terminal(mut _ Desktop) !NativeApp {
 	mut app := &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
@@ -221,6 +229,22 @@ fn (mut a TerminalApp) send(line string) {
 		return
 	}
 	desktop_write(a.to_child, line.str, u64(line.len))
+}
+
+fn (mut a TerminalApp) close_app() {
+	if a.to_child >= 0 {
+		desktop_close(a.to_child)
+		a.to_child = -1
+	}
+	if a.from_child >= 0 {
+		desktop_close(a.from_child)
+		a.from_child = -1
+	}
+	if a.pid >= 0 && !a.exited {
+		desktop_terminate_child(a.pid)
+	}
+	a.pid = -1
+	a.exited = true
 }
 
 fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {

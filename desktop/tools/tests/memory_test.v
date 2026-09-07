@@ -208,6 +208,34 @@ fn test_activity_samples_release_replaced_rows() {
 	assert live == 0, 'activity samples retained ${live} bytes'
 }
 
+fn test_remote_application_trees_release_copied_strings_and_arrays() {
+	root := ui2.screen(0x102030, [
+		ui2.view('panel', ui2.rect(0, 0, 320, 200), ui2.BoxStyle{
+			bg: 0xffffff
+		}, [
+			ui2.label('title', 'Separate process', ui2.rect(8, 8, 200, 20), ui2.TextStyle{
+				color: 0x111111
+				font_family: 'mono'
+			}),
+		]),
+	])
+	mut encoded := []u8{}
+	encode_app_element(root, mut encoded)!
+	free_tree(root)
+
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		decoded := decode_app_tree(encoded)!
+		free_tree(decoded)
+	}
+	live := C.vinix_heap_end()
+	if live != 0 {
+		print_heap_sizes('remote application tree allocations by size')
+	}
+	assert live == 0, 'remote application trees retained ${live} bytes'
+	unsafe { encoded.free() }
+}
+
 fn element_exists(root ui2.Element, id string) bool {
 	if root.id == id {
 		return true

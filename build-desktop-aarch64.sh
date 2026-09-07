@@ -109,7 +109,7 @@ if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
     exit 1
 fi
 
-# The desktop hosts ui2 applications through QmlApp, ui2's embeddable QML host.
+# Native app processes use QmlApp to build declarative trees for the compositor.
 # A checkout without it fails deep inside the V build with an error about an
 # unknown type, which says nothing about the real problem.
 if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/qml_embed.v" ]; then
@@ -127,10 +127,11 @@ fi
 mkdir -p "$BUILD_DIR"
 
 # ── Stage the sources ──
-# The desktop hosts ui2 applications in its windows, and an application's model
-# is V code that has to be compiled in. The staging step takes each example's
-# source straight from the ui2 checkout — everything but its `fn main()`, which
-# only opens a platform window — so what runs is the example itself.
+# Native ui2 applications exec this multicall binary under per-app names, and
+# an application's model is V code that has to be compiled in. The staging
+# step takes each example's source straight from the ui2 checkout — everything
+# but its `fn main()`, which only opens a platform window — so what runs is the
+# example itself.
 echo "==> Staging sources..."
 APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
@@ -357,6 +358,15 @@ cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 cp "$BUILD_DIR/wifi-ctl" "$STAGING/usr/bin/wifi-ctl"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
     "$STAGING/usr/bin/wifi-ctl"
+
+# One immutable multicall image, one exec name and process per application.
+# Vinix records the path passed to execve, so these relative symlinks produce
+# distinct names and truthful per-app accounting without storing eight copies
+# of the same static executable in the initramfs.
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
+    vinix-activity vinix-editor vinix-calendar vinix-clock; do
+    ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
+done
 
 if [ -n "$WIFI_BUNDLE" ]; then
     echo "==> Staging the selected Wi-Fi firmware bundle..."

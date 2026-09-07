@@ -211,7 +211,7 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 	}, [])
 	out << settings_label('Brightness', x, 90, inner - 100, body_heading)
 	out << settings_label(a.level_text, x + inner - 100, 90, 100, body_heading)
-	// A click-to-set stepped bar, not a pretend draggable slider: HostedApp
+	// A click-to-set stepped bar, not a pretend draggable slider: NativeApp
 	// receives action ids, not pointer coordinates. Every step is 5%.
 	for i, id in settings_brightness_actions {
 		left := x + inner * i / settings_brightness_actions.len

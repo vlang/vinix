@@ -89,7 +89,7 @@ positive short write is an error and its suffix is never retried as a command.
 
 ## Implementation and tests
 
-`settings_app.v` implements `HostedApp`; `app.v` registers the launcher, and
+`settings_app.v` implements `NativeApp`; `app.v` registers the launcher, and
 `settings.v` stores the desktop preferences and themes. `scale.v`
 owns the requested/applied integer scale and default policy. `scale_wm.v` swaps
 the compositor's logical canvas between physical size and half size, remaps

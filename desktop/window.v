@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
 // Windows and what they show. Native windows contain a built-in page or a
-// hosted ui2 application. External display-owning programs are launched by
+// ui2 tree received from an application process. External display-owning programs are launched by
 // the window manager and only use a native window to report a startup error.
 module main
 
@@ -13,7 +13,7 @@ enum Page {
 	palette
 	notes
 	external_error
-	// A window whose contents come from a hosted ui2 application rather than
+	// A window whose contents come from a native application process rather than
 	// from one of the pages below.
 	app
 }
