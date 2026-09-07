@@ -1088,6 +1088,7 @@ pub fn init_syscall_table() {
 	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
 	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
 	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
+	syscall_table[283] = voidptr(syscall_linux_membarrier) // __NR_membarrier
 	syscall_table[285] = voidptr(pipe.syscall_copy_file_range) // __NR_copy_file_range
 	syscall_table[286] = voidptr(syscall_linux_preadv2) // __NR_preadv2
 	syscall_table[287] = voidptr(syscall_linux_pwritev2) // __NR_pwritev2

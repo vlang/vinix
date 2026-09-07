@@ -284,3 +284,17 @@ fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u6
 	}
 	return 0, 0
 }
+
+// membarrier is first and foremost a feature-discovery ABI.  Vinix does not
+// yet have the cross-CPU rendezvous needed to promise any of Linux's barrier
+// commands, so report an empty supported-command mask.  This is preferable to
+// ENOSYS: runtimes can cache the result and select their documented fallback.
+fn syscall_linux_membarrier(_ voidptr, command int, flags u32, _cpu_id int) (u64, u64) {
+	if command == 0 { // MEMBARRIER_CMD_QUERY
+		if flags != 0 {
+			return errno.err, errno.einval
+		}
+		return 0, 0
+	}
+	return errno.err, errno.einval
+}

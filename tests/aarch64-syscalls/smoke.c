@@ -16,6 +16,7 @@
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
+#include <sys/membarrier.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -164,6 +165,8 @@ int main(void) {
     struct timespec interval;
     check(sched_rr_get_interval(0, &interval) == 0 && interval.tv_nsec > 0,
           "sched_rr_get_interval");
+    check(membarrier(MEMBARRIER_CMD_QUERY, 0) == 0,
+          "membarrier feature query");
 
     check(sethostname("syscall-smoke", 13) == 0, "sethostname");
     check(syscall(SYS_setdomainname, "vinix.test", 10) == 0, "setdomainname");
