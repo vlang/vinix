@@ -33,6 +33,7 @@ INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 LIMINE_VERSION="9.3.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
+QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 
 NO_BUILD=0
 SERIAL_ONLY=0
@@ -102,6 +103,18 @@ else
     sed -i '' '/^[[:space:]]*kaslr:/a\
     cmdline: vinix.qemu_platform=1
 ' "$LIMINE_CONF_QEMU"
+fi
+
+# A caller may request a QEMU-only GOP mode without changing the hardware-safe
+# repository configuration. The desktop runner uses this for its 2x display.
+if [ -n "$QEMU_RESOLUTION" ]; then
+    if grep -Eq '^[[:space:]]*resolution:' "$LIMINE_CONF_QEMU"; then
+        sed -E -i '' "s#^[[:space:]]*resolution:.*#    resolution: $QEMU_RESOLUTION#" "$LIMINE_CONF_QEMU"
+    else
+        sed -i '' '/^[[:space:]]*kaslr:/a\
+    resolution: '"$QEMU_RESOLUTION"'
+' "$LIMINE_CONF_QEMU"
+    fi
 fi
 
 # ── Ensure the patched Limine BOOTAA64.EFI is available ──
