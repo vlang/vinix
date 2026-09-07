@@ -4,6 +4,10 @@ set -eu
 
 APK=${VINIX_PKG_APK:-/sbin/apk}
 ROOT=${VINIX_PKG_ROOT:-}
+RESOLV_CONF=${VINIX_PKG_RESOLV_CONF:-$ROOT/etc/resolv.conf}
+NETWORK_RETRIES=${VINIX_PKG_NETWORK_RETRIES:-3}
+NETWORK_RETRY_DELAY=${VINIX_PKG_NETWORK_RETRY_DELAY:-1}
+NETWORK_WAIT_SECONDS=${VINIX_PKG_NETWORK_WAIT_SECONDS:-60}
 
 usage() {
 	cat <<'EOF'
@@ -35,6 +39,69 @@ apk() {
 	fi
 }
 
+wait_for_network() {
+	case "$NETWORK_RETRIES" in
+		''|*[!0-9]*|0)
+			echo "pkg: VINIX_PKG_NETWORK_RETRIES must be a positive integer" >&2
+			exit 1
+			;;
+	esac
+	case "$NETWORK_WAIT_SECONDS" in
+		''|*[!0-9]*)
+			echo "pkg: VINIX_PKG_NETWORK_WAIT_SECONDS must be a non-negative integer" >&2
+			exit 1
+			;;
+	esac
+
+	i=0
+	while [ ! -s "$RESOLV_CONF" ] && [ "$i" -lt "$NETWORK_WAIT_SECONDS" ]; do
+		if [ "$i" -eq 0 ]; then
+			echo "pkg: waiting for DHCP"
+		fi
+		sleep 1
+		i=$((i + 1))
+	done
+	if [ ! -s "$RESOLV_CONF" ]; then
+		echo "pkg: network is not ready: DHCP did not create $RESOLV_CONF" >&2
+		return 1
+	fi
+}
+
+# A package command can arrive just as DHCP or QEMU's DNS proxy comes up. apk
+# reports that as a temporary repository error, then follows it with a long and
+# misleading list of missing packages. Retry the whole safe/idempotent network
+# transaction so a momentary miss cannot poison the first package install.
+apk_network() {
+	attempt=1
+	while ! apk "$@"; do
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: package network operation failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: package network operation failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		sleep "$NETWORK_RETRY_DELAY"
+		attempt=$((attempt + 1))
+	done
+}
+
+have_repository_indexes() {
+	for index in "$(root_path /var/cache/apk)"/APKINDEX.*.tar.gz; do
+		[ -f "$index" ] && return 0
+	done
+	return 1
+}
+
+refresh_repository_indexes() {
+	wait_for_network
+	apk_network update
+}
+
+ensure_repository_indexes() {
+	have_repository_indexes && return 0
+	echo "pkg: refreshing Alpine repository indexes"
+	refresh_repository_indexes
+}
+
 require_root() {
 	if [ -z "$ROOT" ] && [ "$(id -u)" != 0 ]; then
 		echo "pkg: package changes require root" >&2
@@ -60,7 +127,7 @@ bootstrap_database() {
 	# Package names cannot contain whitespace. Expanding this generated file is
 	# intentional and preserves one package name per line as separate arguments.
 	# shellcheck disable=SC2046
-	apk --no-cache --no-progress --no-scripts add $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$base_world")
+	apk_network --no-progress --no-scripts add $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$base_world")
 	mkdir -p "$(dirname "$marker")"
 	: > "$marker"
 }
@@ -88,13 +155,13 @@ install_packages() {
 	for requested in "$@"; do
 		case "$requested" in
 			gtk)
-				apk --no-cache --no-progress --no-scripts add \
+				apk_network --no-progress --no-scripts add \
 					adwaita-icon-theme font-dejavu gtk+3.0 libarchive-tools
 				install_gtk_demo
 				finalize_desktop
 				;;
 			gtk+3.0-demo)
-				apk --no-cache --no-progress --no-scripts add gtk+3.0 libarchive-tools
+				apk_network --no-progress --no-scripts add gtk+3.0 libarchive-tools
 				install_gtk_demo
 				finalize_desktop
 				;;
@@ -102,12 +169,12 @@ install_packages() {
 				# Gnumeric's Alpine dependencies provide GTK itself, while these
 				# theme/font packages make the application usable on a fresh Vinix
 				# image that deliberately contains no desktop toolkit.
-				apk --no-cache --no-progress --no-scripts add \
+				apk_network --no-progress --no-scripts add \
 					adwaita-icon-theme font-dejavu gnumeric
 				finalize_gnumeric
 				;;
 			*)
-				apk --no-cache --no-progress --no-scripts add "$requested"
+				apk_network --no-progress --no-scripts add "$requested"
 				;;
 		esac
 	done
@@ -115,7 +182,7 @@ install_packages() {
 
 install_gtk_demo() {
 	if [ -n "$ROOT" ]; then
-		apk --no-cache --no-progress --no-scripts add gtk+3.0-demo
+		apk_network --no-progress --no-scripts add gtk+3.0-demo
 		return
 	fi
 
@@ -132,7 +199,7 @@ install_gtk_demo() {
 	temp=$(/bin/busybox mktemp -d /tmp/vinix-pkg-gtk-demo.XXXXXX)
 	trap 'rm -rf "$temp"' EXIT INT TERM
 	mkdir "$temp/payload"
-	apk --no-cache --no-progress fetch --output "$temp" gtk+3.0-demo
+	apk_network --no-progress fetch --output "$temp" gtk+3.0-demo
 	set -- "$temp"/gtk+3.0-demo-*.apk
 	if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
 		echo "pkg: apk did not fetch one GTK demo archive" >&2
@@ -233,12 +300,14 @@ case "$command_name" in
 	install|add)
 		[ "$#" -gt 0 ] || { echo "pkg: install needs a package name" >&2; exit 1; }
 		require_root
+		ensure_repository_indexes
 		bootstrap_database
 		install_packages "$@"
 		;;
 	remove|delete|del)
 		[ "$#" -gt 0 ] || { echo "pkg: remove needs a package name" >&2; exit 1; }
 		require_root
+		ensure_repository_indexes
 		bootstrap_database
 		for requested in "$@"; do
 			case "$requested" in
@@ -254,16 +323,18 @@ case "$command_name" in
 	update)
 		[ "$#" -eq 0 ] || { echo "pkg: update takes no packages" >&2; exit 1; }
 		require_root
-		apk update
+		refresh_repository_indexes
 		;;
 	upgrade)
 		[ "$#" -eq 0 ] || { echo "pkg: upgrade takes no packages" >&2; exit 1; }
 		require_root
+		refresh_repository_indexes
 		bootstrap_database
-		apk --no-cache --no-progress --no-scripts upgrade
+		apk_network --no-progress --no-scripts upgrade
 		;;
 	search)
 		[ "$#" -gt 0 ] || { echo "pkg: search needs a query" >&2; exit 1; }
+		ensure_repository_indexes
 		apk search "$@"
 		;;
 	info)
