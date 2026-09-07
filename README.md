@@ -10,12 +10,16 @@ Join the [Discord chat](https://discord.gg/S5Nm6ZDU38).
 performance and prioritising code correctness.
 - Making a *usable* OS which can *run on real hardware*, not just on emulators or
 virtual machines.
-- Targeting modern 64-bit architectures, CPU features, and multi-core computing.
-- Maintaining good source-level compatibility with Linux to allow to easily port programs over.
+- Targeting modern 64-bit amd/arm architectures, CPU features, and multi-core computing.
+- Maintaining good source-level compatibility with Linux to allow to easily port programs over. On arm64 Vinix runs Alpine binaries.
+- Running on Apple Silicon Macbooks. Only M1 for now.
 - Exploring V capabilities in bare metal programming and improving the compiler in response to the uncommon needs of bare metal programming.
 - Having fun.
 
 **Note: Vinix is still pre-alpha software not meant for daily or production usage!**
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/d2277e43-e088-4b8c-a9aa-c688c07bd439" />
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/60d421d7-664b-4249-b084-d4417bed8522" />
 
 ![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
 ![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
@@ -39,10 +43,10 @@ on real hardware.
 - [x] ext2
 - [x] X.org
 - [x] X window manager
-- [ ] Networking
+- [x] Networking
 - [ ] Wayland 
 - [ ] Hypervisor
-- [ ] V-UI
+- [x] V-UI 2
 - [ ] Intel HD graphics driver (Linux port)
 ## Build instructions
 
