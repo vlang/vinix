@@ -12,6 +12,14 @@ done
 display=":$d"
 export DISPLAY="$display"
 
+run_client() {
+    if [ -n "${STARTX_CLIENT_LOG:-}" ]; then
+        "$@" >"$STARTX_CLIENT_LOG" 2>&1
+    else
+        "$@"
+    fi
+}
+
 SERVER_PID=
 INPUT_PID=
 stop_session() {
@@ -54,14 +62,14 @@ if [ "$#" -gt 0 ]; then
     if [ -f "$1" ]; then
         client="$1"
         shift
-        /bin/sh "$client" "$@"
+        run_client /bin/sh "$client" "$@"
     else
-        "$@"
+        run_client "$@"
     fi
 elif [ -f "$HOME/.xinitrc" ]; then
-    /bin/sh "$HOME/.xinitrc"
+    run_client /bin/sh "$HOME/.xinitrc"
 else
-    xclock -geometry 400x400+50+50
+    run_client xclock -geometry 400x400+50+50
 fi
 client_status=$?
 set -e

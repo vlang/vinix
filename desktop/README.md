@@ -128,6 +128,9 @@ or udev compatibility layer. The desktop image builder refreshes this bridge,
 the direct `startx` launcher, and Firefox's Vinix policy files even when its
 base userland image is older. It refuses to publish an image with an incomplete
 Firefox/Xorg runtime; the native error window remains as a runtime fallback.
+Firefox's upstream graphics and GTK diagnostics are written to
+`/var/log/firefox.log`; failed hardware-GL probes there are expected because
+this Xorg session intentionally uses software rendering.
 
 ## The file browser
 

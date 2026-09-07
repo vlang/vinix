@@ -68,5 +68,10 @@ if [ ! -x /usr/bin/Xorg ] || [ ! -x /usr/bin/startx ]; then
     exit 1
 fi
 
+# Firefox's early glxtest still prints hardware GL/PCI failures even when the
+# browser is deliberately using software rendering. Keep those and other GTK
+# diagnostics available without making a healthy graphical launch look like a
+# boot failure on the serial console.
+export STARTX_CLIENT_LOG="${VINIX_FIREFOX_LOG:-/var/log/firefox.log}"
 exec /usr/bin/startx "$browser" --no-remote --new-instance \
     --profile "$VINIX_FIREFOX_PROFILE" "$@"
