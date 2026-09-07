@@ -236,9 +236,17 @@ pkg install gnumeric
 
 `pkg` disables Alpine maintainer scripts that assume a complete Alpine init
 system.
-The package database and installed files live in the running root filesystem;
-with the standard initramfs they last until reboot. Direct Alpine package names
-also work, for example `pkg install nano`.
+When started with `run-aarch64.sh` (including through
+`run-desktop-aarch64.sh`), successful package changes are saved in
+an archive next to the selected boot disk and layered over the initramfs on
+every later launch. Thus `pkg install gtk`, shutting down QEMU, and starting it
+again keeps GTK installed. The default shell store is
+`boot-image/boot.img.packages.tar`; the desktop store is
+`boot-image/boot-desktop.img.packages.tar`. Override its path with
+`VINIX_QEMU_PACKAGE_STORE`, or delete it to reset installed packages.
+Boot methods that do not use the QEMU runner retain package changes only in the
+running root filesystem. Direct Alpine package names also work, for example
+`pkg install nano`.
 
 GTK and Gnumeric are deliberately not included in the base or network-tools
 package layer. GTK is downloaded only when it or an application that needs it

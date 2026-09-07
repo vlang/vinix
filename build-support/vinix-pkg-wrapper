@@ -1,0 +1,25 @@
+#!/bin/sh
+# QEMU-aware wrapper around the package frontend. The real frontend remains a
+# standalone script so hardware images and host-side tests can use it directly.
+set -eu
+
+CORE=${VINIX_PKG_CORE:-/usr/libexec/vinix-pkg-core}
+PERSIST=${VINIX_PKG_PERSIST_HELPER:-/usr/libexec/vinix-persist-packages}
+
+if [ "$#" -eq 0 ]; then
+	exec "$CORE"
+fi
+
+command_name=$1
+"$CORE" "$@"
+
+case "$command_name" in
+	install|add|remove|delete|del|upgrade)
+		if [ -x "$PERSIST" ]; then
+			if ! "$PERSIST" save; then
+				echo "pkg: package transaction succeeded, but saving the QEMU overlay failed" >&2
+				exit 1
+			fi
+		fi
+		;;
+esac

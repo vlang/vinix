@@ -98,20 +98,8 @@ fn check_ustar(hdr &USTARHeader) bool {
 }
 
 @[manualfree]
-pub fn initialise() {
-	if module_req.response == unsafe { nil } {
-		panic('Modules bootloader response missing')
-	}
-
-	if module_req.response.module_count < 1 {
-		panic('No initramfs')
-	}
-
-	mut modules := module_req.response.modules
-
-	initramfs_begin := unsafe { modules[0].address }
-	initramfs_size := unsafe { modules[0].size }
-
+fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
+	println('initramfs: Module:  ${module_index + 1}')
 	println('initramfs: Address: 0x${voidptr(initramfs_begin):x}')
 	println('initramfs: Size:    ${u32(initramfs_size):u}')
 
@@ -238,4 +226,24 @@ pub fn initialise() {
 	uart_puts('initramfs: Done (')
 	uart_put_dec(entry_count)
 	uart_puts(' entries)\n')
+}
+
+@[manualfree]
+pub fn initialise() {
+	if module_req.response == unsafe { nil } {
+		panic('Modules bootloader response missing')
+	}
+
+	if module_req.response.module_count < 1 {
+		panic('No initramfs')
+	}
+
+	modules := module_req.response.modules
+	for module_index := u64(0); module_index < module_req.response.module_count; module_index++ {
+		archive_module := unsafe { modules[module_index] }
+		if archive_module == unsafe { nil } || archive_module.size < 512 {
+			panic('Invalid initramfs module')
+		}
+		unpack(archive_module.address, archive_module.size, module_index)
+	}
 }

@@ -36,6 +36,23 @@ LIMINE_VERSION="9.3.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
 QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
+PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-${BOOT_DISK}.packages.tar}"
+PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
+PACKAGE_RUNTIME_DIR=""
+PACKAGE_SERVER_PID=""
+
+cleanup_package_store() {
+    if [ -n "$PACKAGE_SERVER_PID" ]; then
+        kill "$PACKAGE_SERVER_PID" 2>/dev/null || true
+        wait "$PACKAGE_SERVER_PID" 2>/dev/null || true
+        PACKAGE_SERVER_PID=""
+    fi
+    if [ -n "$PACKAGE_RUNTIME_DIR" ]; then
+        rm -rf "$PACKAGE_RUNTIME_DIR"
+        PACKAGE_RUNTIME_DIR=""
+    fi
+}
+trap cleanup_package_store EXIT INT TERM
 
 NO_BUILD=0
 SERIAL_ONLY=0
@@ -61,6 +78,16 @@ case "$BOOT_DISK_SIZE_MB" in
         exit 1
         ;;
 esac
+case "$PACKAGE_STORE_PORT" in
+    ''|*[!0-9]*|0)
+        echo "ERROR: VINIX_QEMU_PACKAGE_STORE_PORT must be between 1 and 65535" >&2
+        exit 1
+        ;;
+esac
+if [ "$PACKAGE_STORE_PORT" -gt 65535 ]; then
+    echo "ERROR: VINIX_QEMU_PACKAGE_STORE_PORT must be between 1 and 65535" >&2
+    exit 1
+fi
 
 # ── Build init program (fallback if no busybox userland) ──
 # VINIX_INITRAMFS selects a different image, e.g. the one
@@ -119,6 +146,14 @@ if [ -n "$QEMU_RESOLUTION" ]; then
 ' "$LIMINE_CONF_QEMU"
     fi
 fi
+
+# Limine supplies modules in configuration order. The kernel unpacks the base,
+# the last successfully saved package overlay, and this run's small control
+# layer into the same RAM-backed root.
+if [ -s "$PACKAGE_STORE" ]; then
+    printf '%s\n' '    module_path: boot():/boot/packages.tar' >> "$LIMINE_CONF_QEMU"
+fi
+printf '%s\n' '    module_path: boot():/boot/qemu-runtime.tar' >> "$LIMINE_CONF_QEMU"
 
 # ── Ensure the patched Limine BOOTAA64.EFI is available ──
 # build-limine-aarch64.sh applies the Apple Silicon hand-off patch; the same
@@ -207,7 +242,15 @@ if [ -f "$INITRAMFS" ]; then
     else
         initramfs_bytes="$(stat -c%s "$INITRAMFS")"
     fi
-    required_bytes=$((initramfs_bytes + 128 * 1024 * 1024))
+    package_overlay_bytes=0
+    if [ -s "$PACKAGE_STORE" ]; then
+        if stat -f%z "$PACKAGE_STORE" >/dev/null 2>&1; then
+            package_overlay_bytes="$(stat -f%z "$PACKAGE_STORE")"
+        else
+            package_overlay_bytes="$(stat -c%s "$PACKAGE_STORE")"
+        fi
+    fi
+    required_bytes=$((initramfs_bytes + package_overlay_bytes + 128 * 1024 * 1024))
     required_mb=$(((required_bytes + 1024 * 1024 - 1) / (1024 * 1024)))
 
     if [ -f "$BOOT_DISK" ]; then
@@ -221,7 +264,7 @@ if [ -f "$INITRAMFS" ]; then
     fi
 
     if [ "$boot_disk_bytes" -lt "$required_bytes" ]; then
-        echo "ERROR: $BOOT_DISK is too small for this initramfs." >&2
+        echo "ERROR: $BOOT_DISK is too small for this initramfs and package overlay." >&2
         echo "       Need at least ${required_mb} MiB." >&2
         if [ -f "$BOOT_DISK" ]; then
             echo "       Keep the existing disk and choose a new path, for example:" >&2
@@ -272,6 +315,7 @@ if [ -f "$INITRAMFS" ]; then
     # and booting the shell one look identical up to this line.
     echo "==> Using initramfs: $(basename "$INITRAMFS")"
     mcopy -o -i "$BOOT_DISK" "$INITRAMFS" ::/boot/initramfs.tar
+    ACTIVE_INITRAMFS="$INITRAMFS"
 elif [ -f "$INIT_DIR/init" ]; then
     # Fallback: minimal init only
     echo "==> Creating minimal initramfs with /sbin/init..."
@@ -283,6 +327,57 @@ elif [ -f "$INIT_DIR/init" ]; then
     COPYFILE_DISABLE=1 tar --format=ustar -cf /tmp/vinix-initramfs.tar -C "$INITRAMFS_STAGING" .
     mcopy -o -i "$BOOT_DISK" /tmp/vinix-initramfs.tar ::/boot/initramfs.tar
     rm -rf "$INITRAMFS_STAGING"
+    ACTIVE_INITRAMFS=/tmp/vinix-initramfs.tar
+else
+    echo "ERROR: no initramfs or fallback init program is available" >&2
+    exit 1
+fi
+
+# Build a tiny per-run module containing the package frontend, persistence
+# helper, store address and a manifest of the immutable base archive. Injecting
+# it here makes persistence work with an already-built desktop initramfs.
+PACKAGE_RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vinix-qemu-runtime.XXXXXX")"
+PACKAGE_RUNTIME_ROOT="$PACKAGE_RUNTIME_DIR/root"
+PACKAGE_RUNTIME_TAR="$PACKAGE_RUNTIME_DIR/qemu-runtime.tar"
+PACKAGE_SERVER_READY="$PACKAGE_RUNTIME_DIR/server.ready"
+PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
+PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
+mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
+
+if ! tar -tf "$ACTIVE_INITRAMFS" > "$PACKAGE_BASE_FILES_RAW"; then
+    echo "ERROR: cannot read the initramfs while building its package manifest" >&2
+    exit 1
+fi
+sed -e 's#^\./##' -e 's#/$##' -e '/^\.$/d' -e '/^$/d' \
+    "$PACKAGE_BASE_FILES_RAW" | LC_ALL=C sort -u \
+    > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+# These parent directories belong to the injected runtime module. Treating
+# them as part of the immutable base prevents recursive tar from pulling the
+# control files themselves into an installed-package overlay.
+printf '%s\n' etc/vinix-pkg usr/bin usr/libexec \
+    >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" \
+    "$PACKAGE_RUNTIME_ROOT/usr/libexec/vinix-pkg-core"
+install -m755 "$SCRIPT_DIR/build-support/vinix-pkg-wrapper" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/pkg"
+install -m755 "$SCRIPT_DIR/build-support/vinix-persist-packages" \
+    "$PACKAGE_RUNTIME_ROOT/usr/libexec/vinix-persist-packages"
+printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
+    > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
+    -C "$PACKAGE_RUNTIME_ROOT" .
+mcopy -o -i "$BOOT_DISK" "$PACKAGE_RUNTIME_TAR" ::/boot/qemu-runtime.tar
+
+if [ -s "$PACKAGE_STORE" ]; then
+    if ! tar -tf "$PACKAGE_STORE" >/dev/null 2>&1; then
+        echo "ERROR: saved QEMU package overlay is not a readable tar: $PACKAGE_STORE" >&2
+        exit 1
+    fi
+    echo "==> Loading saved package overlay: $PACKAGE_STORE"
+    mcopy -o -i "$BOOT_DISK" "$PACKAGE_STORE" ::/boot/packages.tar
 fi
 
 # ── Update kernel (the only step on rebuilds) ──
@@ -293,6 +388,28 @@ echo "==> Copying kernel to boot disk..."
 mcopy -o -i "$BOOT_DISK" "$KERNEL_DIR/bin/vinix" ::/boot/vinix
 
 # ── Launch QEMU ──
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for QEMU package persistence" >&2
+    exit 1
+fi
+python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
+    --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
+    --ready-file "$PACKAGE_SERVER_READY" >"$PACKAGE_SERVER_LOG" 2>&1 &
+PACKAGE_SERVER_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -s "$PACKAGE_SERVER_READY" ] && break
+    if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
+        break
+    fi
+    sleep 0.05
+done
+if [ ! -s "$PACKAGE_SERVER_READY" ]; then
+    cat "$PACKAGE_SERVER_LOG" >&2
+    echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
+    exit 1
+fi
+
+echo "==> Package installs persist in: $PACKAGE_STORE"
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
 if [ "$SERIAL_ONLY" -eq 1 ]; then
@@ -334,8 +451,10 @@ if [ "${USE_TCG:-0}" -eq 1 ]; then
 fi
 
 # VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
-# screendump from a script.
-exec qemu-system-aarch64 \
+# screendump from a script. Keep the runner alive to own the loopback package
+# store for the lifetime of the VM.
+set +e
+qemu-system-aarch64 \
     ${VINIX_QEMU_EXTRA} \
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
@@ -346,7 +465,10 @@ exec qemu-system-aarch64 \
     -drive format=raw,file="$BOOT_DISK" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
-    -netdev user,id=net0 \
+    -netdev "user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT}" \
     -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 \
     $DISPLAY_FLAGS \
     -no-reboot
+qemu_status=$?
+set -e
+exit "$qemu_status"

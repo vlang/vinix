@@ -1,0 +1,133 @@
+#!/bin/sh
+# Save package-owned additions and package database changes outside QEMU's
+# RAM-backed root. run-aarch64.sh layers the resulting USTAR archive over the
+# base initramfs on the next boot.
+set -eu
+LC_ALL=C
+export LC_ALL
+
+ROOT=${VINIX_PERSIST_ROOT:-/}
+STORE_FILE=${VINIX_PKG_STORE_FILE:-${ROOT%/}/etc/vinix-pkg/qemu-store-url}
+CURL=${VINIX_PERSIST_CURL:-/usr/bin/curl}
+BUSYBOX=${VINIX_PERSIST_BUSYBOX-/bin/busybox}
+
+bb() {
+	if [ -n "$BUSYBOX" ]; then
+		"$BUSYBOX" "$@"
+	else
+		"$@"
+	fi
+}
+
+if [ "${1:-}" != save ] || [ "$#" -ne 1 ]; then
+	echo "usage: vinix-persist-packages save" >&2
+	exit 1
+fi
+
+# Hardware boots and QEMU runs made without the package-store module retain
+# their old behaviour. Package installation must not depend on a host service.
+if [ ! -s "$STORE_FILE" ]; then
+	exit 0
+fi
+
+BASE_FILES=${VINIX_PKG_BASE_FILES:-${ROOT%/}/etc/vinix-pkg/base-files}
+if [ ! -s "$BASE_FILES" ]; then
+	echo "pkg: QEMU package base manifest is missing" >&2
+	exit 1
+fi
+work=$(bb mktemp -d /tmp/vinix-persist.XXXXXX)
+trap 'bb rm -rf "$work"' EXIT INT TERM
+current="$work/current"
+added="$work/added"
+members="$work/members"
+archive="$work/packages.tar"
+
+# Package payloads can live in any of these trees. Runtime-only state and apk's
+# downloadable index cache do not belong in the persistent archive.
+echo "pkg: collecting package changes"
+set --
+for tree in etc lib usr var; do
+	[ -e "${ROOT%/}/$tree" ] && set -- "$@" "$tree"
+done
+(
+	cd "$ROOT"
+	bb find "$@" \
+		\( -path var/cache/apk -o -path var/log -o -path var/run -o -path var/tmp \) -prune -o \
+		\( -type d -o -type f -o -type l \) -print
+) | bb sort -u >"$current"
+
+# Most installed-package paths were absent from the immutable base image. Keep
+# those, plus the small set of existing files apk and GTK's cache builders are
+# expected to rewrite during a transaction.
+bb comm -13 "$BASE_FILES" "$current" >"$added"
+
+{
+	bb cat "$added"
+	printf '%s\n' \
+		etc/apk/world \
+		lib/apk/db/installed \
+		lib/apk/db/scripts.tar \
+		lib/apk/db/triggers \
+		usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache \
+		usr/share/glib-2.0/schemas/gschemas.compiled \
+		usr/share/mime/mime.cache
+	bb grep '/icon-theme\.cache$' "$current" || true
+} | bb sort -u | {
+	# tar recurses into directories. Keep only the first (highest) member of
+	# each newly added subtree so a large package is not archived repeatedly.
+	last=
+	while IFS= read -r path; do
+		case "$path" in
+			"$last"/*) continue ;;
+		esac
+		last=$path
+		case "$path" in
+			''|/*|..|../*|*/../*|*/..)
+				continue
+				;;
+			etc/resolv.conf|etc/vinix-pkg|etc/vinix-pkg/*|usr/bin/pkg|usr/libexec/vinix-pkg-core|usr/libexec/vinix-persist-packages)
+				continue
+				;;
+		esac
+		if [ -e "${ROOT%/}/$path" ] || [ -L "${ROOT%/}/$path" ]; then
+			printf '%s\n' "$path"
+		fi
+	done
+} >"$members"
+
+if [ ! -s "$members" ]; then
+	echo "pkg: no package state to save" >&2
+	exit 1
+fi
+
+echo "pkg: archiving package changes"
+(
+	cd "$ROOT"
+	COPYFILE_DISABLE=1 bb tar -cf "$archive" -T "$members"
+)
+
+store_url=$(bb cat "$STORE_FILE")
+case "$store_url" in
+	http://*) ;;
+	*)
+		echo "pkg: invalid QEMU package store URL" >&2
+		exit 1
+		;;
+esac
+
+# apk can replace curl while registering the preinstalled base packages before
+# Vinix has restored its executable mode. BusyBox chmod already supports the
+# same repair for GTK's manually extracted demos, so make the transport usable
+# immediately before invoking it.
+if [ -f "$CURL" ] && [ ! -x "$CURL" ]; then
+	bb chmod 0755 "$CURL"
+fi
+if [ ! -x "$CURL" ]; then
+	echo "pkg: curl is unavailable; cannot save the QEMU package overlay" >&2
+	exit 1
+fi
+bytes=$(bb wc -c <"$archive" | bb tr -d ' ')
+echo "pkg: uploading QEMU package overlay ($bytes bytes)"
+"$CURL" --fail --silent --show-error --connect-timeout 5 --max-time 300 \
+	-H 'Expect:' -X PUT --data-binary "@$archive" "${store_url%/}/packages"
+echo "pkg: saved QEMU package overlay ($bytes bytes); it will load on the next boot"
