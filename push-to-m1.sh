@@ -18,6 +18,16 @@ cd "$SCRIPT_DIR"
 
 echo "pushing $(git log --oneline -1) to $REMOTE:$DEST"
 
+# Desktop and diagnostic M1 deployments boot a separate, small image.  The
+# base initramfs can be several GB and is often being rebuilt independently;
+# do not make those deployments read (and potentially race) an image they do
+# not use.  Keep the default intact for direct push-to-m1.sh callers.
+set --
+if [ "${VINIX_M1_EXCLUDE_BASE_INITRAMFS:-0}" = "1" ]; then
+    set -- --exclude 'build-support/init-aarch64/initramfs.tar'
+    echo "skipping unused base initramfs"
+fi
+
 rsync -a --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
@@ -28,6 +38,7 @@ rsync -a --stats \
     --exclude 'kernel/obj/' \
     --exclude 'kernel/tmp.*' \
     --exclude '.DS_Store' \
+    "$@" \
     ./ "$REMOTE:$DEST/"
 echo "rsync exit: $?"
 
