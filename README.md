@@ -266,6 +266,9 @@ browser exits:
 The X11 session uses a small Vinix-specific input bridge for the native
 absolute pointer packets and console keyboard. This keeps Linux evdev and udev
 out of the system while giving Firefox normal X11 mouse and keyboard events.
+The desktop builder overlays the current bridge and Firefox configuration onto
+the full userland too, so an older base image cannot contain `startx` without
+its required input bridge. If the compiled bridge is absent, rebuild X11 first.
 
 `build-firefox-aarch64.sh` resolves and stages the complete Alpine runtime
 dependency closure, including GTK/X11, fonts, TLS certificates, and media

@@ -182,6 +182,11 @@ if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
 fi
+if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
+    echo "ERROR: desktop needs $X11_STAGING/usr/bin/vinix-xinput" >&2
+    echo "Run ./build-x11-aarch64.sh first." >&2
+    exit 1
+fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     if [ ! -x "$PYTHON_STAGING/usr/bin/python3" ]; then
         echo "ERROR: compact desktop needs $PYTHON_STAGING/usr/bin/python3" >&2
@@ -275,12 +280,51 @@ mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
 chmod 1777 "$STAGING/tmp"
 
-# The X11 staging tree contains Alpine's stock startx. Vinix uses a direct
-# launcher that avoids xinit/VT assumptions and tears Xorg down with its client.
+# Keep the display handoff pieces in sync with the desktop source even when the
+# full base userland predates them. The bridge is a cross-compiled executable;
+# the launcher and Firefox policy files can be installed directly from source.
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
+install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
+install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" "$STAGING/root/firefox-smoke.html"
+mkdir -p "$STAGING/etc/firefox/policies"
+install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
+    "$STAGING/etc/firefox/policies/policies.json"
+
+firefox_app_found=0
+for firefox_app_dir in "$STAGING/usr/lib/firefox" "$STAGING/usr/lib/firefox-esr"; do
+    if [ -d "$firefox_app_dir" ]; then
+        firefox_app_found=1
+        mkdir -p "$firefox_app_dir/defaults/pref" "$firefox_app_dir/distribution"
+        install -m644 "$SCRIPT_DIR/build-support/firefox/vinix.js" \
+            "$firefox_app_dir/defaults/pref/vinix.js"
+        install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
+            "$firefox_app_dir/distribution/policies.json"
+    fi
+done
 
 if [ ! -x "$STAGING/bin/busybox" ]; then
     echo "ERROR: base userland has no executable /bin/busybox" >&2
+    exit 1
+fi
+for runtime_path in usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox; do
+    if [ ! -x "$STAGING/$runtime_path" ]; then
+        echo "ERROR: desktop Firefox runtime is missing /$runtime_path" >&2
+        echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the userland." >&2
+        exit 1
+    fi
+done
+if [ "$firefox_app_found" -ne 1 ]; then
+    echo "ERROR: desktop image has no Firefox application directory" >&2
+    echo "Run ./build-firefox-aarch64.sh and ./build-userland-aarch64.sh first." >&2
+    exit 1
+fi
+if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+       [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
+   ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
+       [ -x "$STAGING/usr/bin/firefox" ]; }; then
+    echo "ERROR: desktop image has no complete Firefox executable pair" >&2
+    echo "Run ./build-firefox-aarch64.sh and ./build-userland-aarch64.sh first." >&2
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then

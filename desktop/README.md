@@ -124,9 +124,10 @@ devices and redraws when Firefox exits. This keeps GTK confined to Firefox's
 packaged userspace runtime; `vinix-desktop` itself does not link or implement
 GTK. The small `/usr/bin/vinix-xinput` bridge translates Vinix's native pointer
 packets and console keyboard bytes into ordinary X11 input, avoiding an evdev
-or udev compatibility layer. A desktop image without the Firefox/Xorg runtime
-still shows the launcher and reports the missing runtime in a native error
-window.
+or udev compatibility layer. The desktop image builder refreshes this bridge,
+the direct `startx` launcher, and Firefox's Vinix policy files even when its
+base userland image is older. It refuses to publish an image with an incomplete
+Firefox/Xorg runtime; the native error window remains as a runtime fallback.
 
 ## The file browser
 
