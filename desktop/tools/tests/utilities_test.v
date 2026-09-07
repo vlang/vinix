@@ -3,6 +3,19 @@
 module main
 
 import os
+import ui2
+
+fn utility_tree_has_text(element ui2.Element, text string) bool {
+	if element.text == text {
+		return true
+	}
+	for child in element.children {
+		if utility_tree_has_text(child, text) {
+			return true
+		}
+	}
+	return false
+}
 
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
@@ -81,6 +94,7 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps.len == 8
+	assert available_apps[4].title == 'Activity Monitor'
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert taskbar_launcher_width(1280, 114, available_apps.len) == launcher_width
@@ -88,4 +102,38 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert taskbar_launcher_width(1024, 114, available_apps.len) == 66
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
+}
+
+fn test_activity_monitor_includes_live_hosted_apps() {
+	mut desktop := Desktop{}
+	desktop.spawn('Welcome', .welcome, 0, 0, 100, 100)
+	calculator_id := desktop.spawn('Calculator', .app, 0, 0, 100, 100)
+	desktop.spawn('Text Editor', .app, 0, 0, 100, 100)
+
+	mut monitor := ActivityMonitor{}
+	assert monitor.sync_open_apps(desktop)
+	assert !monitor.sync_open_apps(desktop)
+	assert monitor.app_count == 2
+	assert monitor.rows.any(it.is_app && it.name == 'Calculator')
+	assert monitor.rows.any(it.is_app && it.name == 'Text Editor')
+	assert !monitor.rows.any(it.is_app && it.name == 'Welcome')
+
+	desktop.close_window(calculator_id)
+	assert monitor.sync_open_apps(desktop)
+	assert monitor.app_count == 1
+	assert !monitor.rows.any(it.is_app && it.name == 'Calculator')
+	assert monitor.rows.any(it.is_app && it.name == 'Text Editor')
+}
+
+fn test_activity_monitor_uses_only_the_window_title_as_its_heading() {
+	mut desktop := Desktop{}
+	desktop.spawn('Calculator', .app, 0, 0, 100, 100)
+	mut app := ActivityApp{
+		desktop: &desktop
+	}
+	tree := app.build(ui2.rect(0, 0, 520, 360))!
+	assert utility_tree_has_text(tree, 'Calculator')
+	assert !utility_tree_has_text(tree, 'Activity Monitor')
+	free_tree(tree)
+	app.monitor.free_rows()
 }

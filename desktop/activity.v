@@ -73,6 +73,11 @@ mut:
 	pid_text    string
 	cpu_text    string
 	mem_text    string
+	// Hosted applications share the desktop process, so the kernel cannot
+	// account for them separately. They still get a row, marked here so an
+	// updated window list can replace them without touching process samples.
+	is_app    bool
+	window_id int
 }
 
 // previous holds what a pid's CPU counter read last time round, so the next
@@ -102,8 +107,12 @@ mut:
 	scroll       int
 	visible_rows int = 1
 	// Summary text, rebuilt with the rows for the same reason.
-	summary string
-	error   string
+	summary       string
+	error         string
+	process_total u32
+	used_memory   u64
+	total_memory  u64
+	app_count     int
 	// The buffer a read lands in, allocated once. A snapshot is a few tens of
 	// kilobytes and reading it into a fresh allocation every second would be a
 	// steady leak.
@@ -187,21 +196,113 @@ fn (mut m ActivityMonitor) sample() bool {
 	} else {
 		u64(0)
 	}
-	noun := if header.total == 1 { 'process' } else { 'processes' }
-	// The two sizes are named rather than interpolated in place so that the
-	// strings human_size() builds can be handed back. Interpolating a call
-	// copies its result into the sentence and drops the original on the
-	// floor, which on a target with no garbage collector is a leak that
-	// happens once a second for as long as the window is open.
-	used_text := human_size(used)
-	total_text := human_size(header.total_memory)
-	m.summary = '${header.total} ${noun}   ${used_text} of ${total_text} used'
+	m.process_total = header.total
+	m.used_memory = used
+	m.total_memory = header.total_memory
+	m.app_count = 0
+	m.update_summary()
+	m.set_error('')
+	return true
+}
+
+// sync_open_apps adds the applications hosted inside vinix-desktop. They are
+// real open applications, but not separate kernel processes, so /dev/processes
+// cannot discover Calculator, Text Editor, or the other hosted windows on its
+// own. CPU and RAM remain labelled as shared instead of duplicating the
+// desktop process' figures and pretending they can be attributed per app.
+fn (mut m ActivityMonitor) sync_open_apps(desktop &Desktop) bool {
+	if m.open_apps_match(desktop) {
+		return false
+	}
+
+	for index := m.rows.len - 1; index >= 0; index-- {
+		if !m.rows[index].is_app {
+			continue
+		}
+		m.free_row(index)
+		m.rows.delete(index)
+	}
+
+	desktop_pid := m.desktop_process_pid()
+	for window in desktop.windows {
+		if window.page != .app {
+			continue
+		}
+		m.rows << ActivityRow{
+			pid: desktop_pid
+			name: window.title.clone()
+			pid_text: if desktop_pid > 0 { desktop_pid.str() } else { '-'.clone() }
+			cpu_text: 'shared'.clone()
+			mem_text: 'shared'.clone()
+			is_app: true
+			window_id: window.id
+		}
+	}
+
+	m.app_count = activity_hosted_window_count(desktop)
+	m.update_summary()
+	m.sort_rows()
+	m.clamp_scroll()
+	return true
+}
+
+fn (m &ActivityMonitor) open_apps_match(desktop &Desktop) bool {
+	mut count := 0
+	for row in m.rows {
+		if !row.is_app {
+			continue
+		}
+		mut found := false
+		for window in desktop.windows {
+			if window.page == .app && window.id == row.window_id && window.title == row.name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+		count++
+	}
+	return count == activity_hosted_window_count(desktop)
+}
+
+fn activity_hosted_window_count(desktop &Desktop) int {
+	mut count := 0
+	for window in desktop.windows {
+		if window.page == .app {
+			count++
+		}
+	}
+	return count
+}
+
+fn (m &ActivityMonitor) desktop_process_pid() int {
+	for row in m.rows {
+		if !row.is_app && row.name == 'vinix-desktop' {
+			return row.pid
+		}
+	}
+	return 0
+}
+
+fn (mut m ActivityMonitor) update_summary() {
+	process_noun := if m.process_total == 1 { 'process' } else { 'processes' }
+	app_noun := if m.app_count == 1 { 'app' } else { 'apps' }
+	// The values are named rather than interpolated in place so every owned
+	// string can be released explicitly on the manual-free desktop target.
+	process_count := m.process_total.str()
+	app_count := m.app_count.str()
+	used_text := human_size(m.used_memory)
+	total_text := human_size(m.total_memory)
+	unsafe { m.summary.free() }
+	m.summary = '${process_count} ${process_noun}   ${app_count} open ${app_noun}   ${used_text} of ${total_text} used'
 	unsafe {
+		process_count.free()
+		app_count.free()
 		used_text.free()
 		total_text.free()
 	}
-	m.set_error('')
-	return true
 }
 
 // set_error replaces the reason the window is empty, releasing the one before
@@ -267,19 +368,23 @@ fn (mut m ActivityMonitor) fail(message string) bool {
 // them: the element tree is thrown away every frame and free_tree does not
 // touch the text it was handed.
 fn (mut m ActivityMonitor) free_rows() {
-	for row in m.rows {
-		unsafe {
-			row.name.free()
-			row.pid_text.free()
-			row.cpu_text.free()
-			row.mem_text.free()
-		}
+	for index in 0 .. m.rows.len {
+		m.free_row(index)
 	}
 	unsafe {
 		m.rows.free()
 		m.summary.free()
 	}
 	m.summary = ''
+}
+
+fn (mut m ActivityMonitor) free_row(index int) {
+	unsafe {
+		m.rows[index].name.free()
+		m.rows[index].pid_text.free()
+		m.rows[index].cpu_text.free()
+		m.rows[index].mem_text.free()
+	}
 }
 
 // activity_name_of copies a record's name out of its fixed field and reduces
@@ -397,7 +502,7 @@ const activity_action_scroll_up = 'activity.scroll.up'
 const activity_action_scroll_down = 'activity.scroll.down'
 
 const activity_row_height = 22
-const activity_header_height = 62
+const activity_header_height = 46
 const activity_footer_height = 26
 const activity_padding = 10
 
@@ -409,11 +514,14 @@ const activity_pid_column = 52
 
 struct ActivityApp {
 mut:
+	desktop &Desktop = unsafe { nil }
 	monitor ActivityMonitor
 }
 
-fn open_activity(mut _ Desktop) !HostedApp {
-	mut app := &ActivityApp{}
+fn open_activity(mut desktop Desktop) !HostedApp {
+	mut app := &ActivityApp{
+		desktop: desktop
+	}
 	app.monitor.buffer = []u8{len: activity_buffer_size()}
 	app.monitor.sample()
 	// A missing device is worth refusing to open for: the window would have
@@ -422,6 +530,7 @@ fn open_activity(mut _ Desktop) !HostedApp {
 	if app.monitor.error != '' {
 		return error(app.monitor.error)
 	}
+	app.monitor.sync_open_apps(desktop)
 	app.monitor.last_poll_ms = monotonic_millis()
 	return app
 }
@@ -434,10 +543,21 @@ fn (mut a ActivityApp) poll() bool {
 		return false
 	}
 	a.monitor.last_poll_ms = now
-	return a.monitor.sample()
+	sampled := a.monitor.sample()
+	apps_changed := if unsafe { a.desktop != nil } {
+		a.monitor.sync_open_apps(a.desktop)
+	} else {
+		false
+	}
+	return sampled || apps_changed
 }
 
 fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
+	// Opening, closing, or renaming a window already caused this build. Sync
+	// here as well as on the timer so the app list changes in that same frame.
+	if unsafe { a.desktop != nil } {
+		a.monitor.sync_open_apps(a.desktop)
+	}
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * activity_padding
@@ -452,20 +572,14 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	a.monitor.clamp_scroll()
 
 	mut children := []ui2.Element{}
-	children << ui2.label('', 'Activity Monitor', ui2.rect(f64(activity_padding), 10,
-		f64(inner), 22), ui2.TextStyle{
-		color: body_heading
-		size: 16
-		bold: true
-	})
 
 	// What the list is ordered by. Three buttons rather than clickable column
 	// headings: a heading that is also a button has to look like one, and at
 	// eleven point there is no room to show that it does.
-	mut sort_x := width - activity_padding - 3 * activity_sort_width - 2 * 4
+	mut sort_x := activity_padding
 	for option in [ActivitySort.cpu, .memory, .name] {
 		children << ui2.button(activity_action_of(option), activity_sort_title(option),
-			ui2.rect(f64(sort_x), 12, f64(activity_sort_width), 20), ui2.BoxStyle{
+			ui2.rect(f64(sort_x), 5, f64(activity_sort_width), 20), ui2.BoxStyle{
 			bg: if a.monitor.sort == option { app_accent } else { activity_sort_idle }
 			radius: 5
 		}, ui2.TextStyle{
@@ -511,7 +625,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		button_size := 18
 		right := width - activity_padding - button_size
 		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4),
-			f64(activity_header_height - 22), f64(button_size), 18), ui2.BoxStyle{
+			6, f64(button_size), 18), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -519,8 +633,8 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 			size: 11
 			align: .center
 		})
-		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right),
-			f64(activity_header_height - 22), f64(button_size), 18), ui2.BoxStyle{
+		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), 6,
+			f64(button_size), 18), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -580,8 +694,8 @@ fn activity_headings(width int) []ui2.Element {
 	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column -
 		activity_mem_column
 	return [
-		ui2.label('', 'PROCESS', ui2.rect(f64(activity_padding), y, f64(name_width), 14),
-			style),
+		ui2.label('', 'PROCESS / OPEN APP', ui2.rect(f64(activity_padding), y, f64(name_width),
+			14), style),
 		ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column),
 			14), right),
 		ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column),

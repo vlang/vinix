@@ -78,7 +78,7 @@ const available_apps = [
 		open: open_settings_app
 	},
 	AppFactory{
-		title: 'Activity'
+		title: 'Activity Monitor'
 		icon: 'builtin:activity'
 		// Wide enough for four columns without the process names truncating,
 		// and tall enough that the list is worth scrolling rather than a

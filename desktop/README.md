@@ -156,8 +156,11 @@ the clock.
 ## The activity monitor
 
 `activity.v` lists every process on the machine with the share of one CPU and
-of RAM it is using. Like the file browser it is Vinix's own rather than a ui2
-example, and like it, it reads the real system.
+of RAM it is using. It also lists every open hosted application; applications
+such as Calculator and Text Editor live inside `vinix-desktop`, so their CPU
+and RAM columns are honestly shown as shared rather than counted a second
+time. Like the file browser it is Vinix's own rather than a ui2 example, and
+like it, it reads the real system.
 
 Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
 answers a read with one snapshot of the whole table — a short header, then a
