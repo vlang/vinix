@@ -47,22 +47,26 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 
 fn (mut this TmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
-
-	mut actual_count := count
-
-	if loc + count > this.stat.size {
-		actual_count = u64(count - ((loc + count) - this.stat.size))
+	defer {
+		this.l.release()
 	}
 
-	unsafe { C.memcpy(buf, &this.storage[loc], actual_count) }
+	file_size := u64(this.stat.size)
+	if loc >= file_size {
+		return 0
+	}
+	actual_count := if count > file_size - loc { file_size - loc } else { count }
 
-	this.l.release()
+	unsafe { C.memcpy(buf, &this.storage[loc], actual_count) }
 
 	return i64(actual_count)
 }
 
 fn (mut this TmpFSResource) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
+	defer {
+		this.l.release()
+	}
 
 	if loc + count > this.capacity {
 		mut new_capacity := this.capacity
@@ -81,14 +85,17 @@ fn (mut this TmpFSResource) write(handle voidptr, buf voidptr, loc u64, count u6
 		this.capacity = new_capacity
 	}
 
+	old_size := u64(this.stat.size)
+	if loc > old_size {
+		// A write after a seek beyond EOF creates a zero-filled sparse hole.
+		unsafe { C.memset(&this.storage[old_size], 0, loc - old_size) }
+	}
 	unsafe { C.memcpy(&this.storage[loc], buf, count) }
 
 	if loc + count > this.stat.size {
 		this.stat.size = loc + count
 		this.stat.blocks = lib.div_roundup(this.stat.size, this.stat.blksize)
 	}
-
-	this.l.release()
 
 	return i64(count)
 }

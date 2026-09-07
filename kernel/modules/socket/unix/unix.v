@@ -256,7 +256,11 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this UnixSocket) unref(handle voidptr) ? {
-	return none
+	// Dropping a handle or a VFS name is a successful release operation. The
+	// old implementation returned an Option failure unconditionally, so close
+	// and unlink completed their side effects but leaked a stale errno back to
+	// userspace.
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this UnixSocket) link(handle voidptr) ? {

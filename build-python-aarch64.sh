@@ -77,6 +77,10 @@ for pkg in "${PKGS[@]}"; do
     download_apk main "$pkg" || download_apk community "$pkg" || true
 done
 
+mkdir -p "$STAGING/root"
+install -m644 "$SCRIPT_DIR/tests/python3/smoke.py" \
+    "$STAGING/root/python3-smoke.py"
+
 # Alpine ships some libraries as absolute symlinks, which resolve on the host
 # rather than in the guest. Replace them with the file they name.
 find "$STAGING" -type l | while IFS= read -r link; do

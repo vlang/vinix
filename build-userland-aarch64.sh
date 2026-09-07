@@ -11,6 +11,7 @@ BUILD_DIR="$SCRIPT_DIR/build-aarch64-userland"
 SYSROOT="$BUILD_DIR/sysroot"
 STAGING="$BUILD_DIR/staging"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
+PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 
 MUSL_VERSION="1.2.5"
 BUSYBOX_VERSION="1.36.1"
@@ -781,6 +782,13 @@ if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
     done
 else
     echo "==> Asahi staging not found, skipping (run build-asahi-aarch64.sh in the ARM64 VM first)"
+fi
+
+if [ -x "$PYTHON_STAGING/usr/bin/python3" ]; then
+    echo "==> Integrating Python 3 runtime..."
+    cp -a "$PYTHON_STAGING/." "$STAGING/"
+else
+    echo "==> Python 3 staging not found, skipping (run build-python-aarch64.sh first)"
 fi
 
 echo "==> Packaging initramfs..."

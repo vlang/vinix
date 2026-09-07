@@ -122,6 +122,22 @@ Use `run-gl-triangle --rebuild` to compile the same demo with GCC inside Vinix
 before launching it. On amd64 this currently uses Mesa softpipe on the Limine
 framebuffer.
 
+### Python 3 on aarch64
+
+The aarch64 image can include Alpine's musl CPython 3.12 runtime and its native
+standard-library dependencies. Stage it before assembling the userland:
+
+```sh
+./build-python-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Both aarch64 userland builders automatically merge
+`build-aarch64-python/staging` when it is present. Set
+`VINIX_PYTHON_STAGING=/path/to/staging` to use another tree. The staging script
+also installs `/root/python3-smoke.py`; the ARM64 VM image runs this test during
+its boot suite and it can be rerun manually with `python3`.
+
 ### Apple M1 GPU test image
 
 Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It

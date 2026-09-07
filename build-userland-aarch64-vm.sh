@@ -10,6 +10,7 @@ STAGING="$BUILD_DIR/staging"
 DOWNLOADS="$BUILD_DIR/downloads"
 INITRAMFS="${VINIX_ARM64_INITRAMFS:-$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
+PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
 
 BUSYBOX_VERSION=1.36.1
@@ -236,6 +237,13 @@ else
     echo "Apple GPU render node absent (expected on QEMU virt)"
 fi
 
+if command -v python3 >/dev/null 2>&1; then
+    echo "VINIX ARM64 PYTHON 3 BOOT TEST"
+    python3 /root/python3-smoke.py
+else
+    echo "Python 3 staging absent; skipping the Python boot test"
+fi
+
 exec /bin/sh -l
 BOOT_TEST
 chmod +x "$STAGING/etc/vinix-boot-test.sh"
@@ -245,6 +253,13 @@ if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
     cp -a "$ASAHI_STAGING/." "$STAGING/"
 else
     echo "==> Mesa/Asahi staging not found, packaging without GPU userspace"
+fi
+
+if [ -x "$PYTHON_STAGING/usr/bin/python3" ]; then
+    echo "==> Integrating Python 3 runtime"
+    cp -a "$PYTHON_STAGING/." "$STAGING/"
+else
+    echo "==> Python 3 staging not found, packaging without Python"
 fi
 
 echo "==> Verifying staged ARM64 executables"

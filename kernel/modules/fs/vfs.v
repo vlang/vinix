@@ -1091,10 +1091,8 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	if base > handle.resource.stat.size {
-		handle.resource.grow(voidptr(handle), u64(base)) or { return errno.err, errno.einval }
-	}
-
+	// Seeking beyond EOF only moves the open-file position. The file grows if a
+	// later write occurs there, with the intervening hole reading back as zero.
 	handle.loc = base
 	return u64(base), 0
 }
