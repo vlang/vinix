@@ -16,8 +16,9 @@ int vinix_apple_spi_keyboard_init(uint64_t spi_base, uint64_t enable_reg,
 
 /* Non-reentrant: the V wrapper serializes calls. At most one bounded SPI
  * transaction per call (a feature write includes its 4-byte status stage).
- * Returns bytes produced, -1 for a recoverable transfer timeout/error, or -2
- * when repeated transfer errors disable the device. */
+ * Returns bytes produced, -1 for a recoverable transfer/protocol error, -2
+ * when repeated errors temporarily disable the device, or -3 after it has
+ * been reset and recovered. */
 int vinix_apple_spi_keyboard_poll(uint8_t *out, size_t capacity,
     int application_cursor);
 uint64_t vinix_apple_spi_keyboard_reports(void);

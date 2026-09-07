@@ -129,9 +129,11 @@ A valid native report stops retries; controller boot or touch reset report
 
 Each FIFO stage has a 5 ms time bound and a separate iteration cap. Every
 exit stops the engine and releases chip select at the transaction boundary.
-Existing keyboard read-error backoff/disable behavior is preserved. Known
-input discontinuities clear the motion baseline and release held buttons;
-quiet stationary clicks do not time out artificially.
+The ready GPIO gates packet reads when the device tree supplies one; an idle
+controller is not clocked by a periodic fallback. Transfer failures and invalid
+packets received under an asserted ready line share bounded backoff and reset
+recovery. Known input discontinuities clear the motion baseline and release
+held buttons; quiet stationary clicks do not time out artificially.
 
 ## Cursor calibration
 
@@ -167,9 +169,9 @@ clang --target=aarch64-none-elf -D__AARCH64__ -D__vinix__ \
 The last command uses Clang's freestanding headers. It verifies C target code
 generation, not the V adapter, the full kernel link, or MMIO behavior on M1.
 
-The unchanged upstream keyboard suite has 17 groups and 100,000 mutated
-packets. The new touchpad suite has 19 groups and 100,000 mutated messages.
-It checks an independently specified feature-command byte vector; signed
+The keyboard suite has 19 groups and 100,000 mutated packets. The touchpad
+suite has 19 groups and 100,000 mutated messages. It checks an independently
+specified feature-command byte vector; signed
 coordinates; lifting and discontinuities; button edges; all splits of a
 one-finger message; maximum-size three-packet reports; device interleaving;
 bad lengths/CRCs; retry/reset rules; and the actual shared PIO implementation

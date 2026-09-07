@@ -42,7 +42,6 @@
 #define MESSAGE_SIZE   20u /* 8-byte header + 10-byte report + 2-byte CRC */
 #define TRANSFER_US    5000u
 #define POLL_US        2000u
-#define FALLBACK_US    20000u
 /* How long the transport stays down before it is brought back up. Long enough
  * that genuinely dead hardware is not hammered, short enough that a user who
  * looked away does not come back to a machine that takes no input. */
@@ -101,7 +100,6 @@ struct spi_keyboard {
     uint64_t revive_at;
     uint64_t next_poll;
     uint64_t next_transfer;
-    uint64_t last_transfer;
     struct decoder decoder;
     struct touchpad touchpad;
 };
@@ -448,7 +446,6 @@ static int start_keyboard(struct spi_keyboard *k, uint32_t input_hz,
     /* Let the controller boot without a 50-ms busy wait in kernel init. */
     k->next_poll = k->io.now_us(k->cookie) + 50000;
     k->next_transfer = k->next_poll;
-    k->last_transfer = 0;
     k->errors = 0;
     reset_input(&k->decoder);
     tp_init(&k->touchpad, k->next_poll);
@@ -542,6 +539,31 @@ static int boot_packet(const uint8_t p[PACKET_SIZE])
         p[10] == 0 && p[11] == 0 && crc16(p, PACKET_SIZE) == 0;
 }
 
+static int packet_envelope_valid(const uint8_t p[PACKET_SIZE])
+{
+    /* A completed PIO transaction is not necessarily a packet: an idle or
+     * wedged HID controller can clock a buffer full of zeroes. Keep unknown
+     * device/report IDs forward-compatible, but require the Apple read flag,
+     * a payload that fits this packet and a valid outer CRC. */
+    size_t n = read_le16(p + 6);
+    return p[0] == 0x20 && n != 0 && n <= PACKET_SIZE - 10 &&
+        crc16(p, PACKET_SIZE) == 0;
+}
+
+static int read_error(struct spi_keyboard *k)
+{
+    reset_input(&k->decoder);
+    tp_discontinuity(&k->touchpad);
+    if (++k->errors >= 3) {
+        /* Down, but not for good: both devices share this transport. */
+        k->active = 0;
+        k->revive_at = k->io.now_us(k->cookie) + REVIVE_US;
+        return -2;
+    }
+    k->next_poll = k->io.now_us(k->cookie) + 20000;
+    return -1;
+}
+
 static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
     size_t capacity, int application_cursor)
 {
@@ -577,28 +599,18 @@ static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
             uint32_t v = k->io.read32(k->cookie, k->ready);
             ready = !!(v & 1u) ^ !!k->ready_low;
         }
-        /* A slow unconditional read also tolerates a bootloader DT with an
-         * edge-triggered or stale ready line. U-Boot uses unconditional PIO. */
-        if (ready || now - k->last_transfer >= FALLBACK_US) {
+        /* The ready line is the HID interrupt. Do not periodically clock the
+         * controller while it is inactive; timer-only polling is reserved for
+         * device trees that do not supply the line at all. */
+        if (ready) {
             uint8_t packet[PACKET_SIZE];
-            k->last_transfer = now;
-            if (!read_packet(k, packet)) {
-                reset_input(&k->decoder);
-                tp_discontinuity(&k->touchpad);
-                if (++k->errors >= 3) {
-                    /* Down, but not for good: nothing used to clear this, so
-                     * three bad reads cost the machine its keyboard and its
-                     * touchpad together for the rest of the boot while the
-                     * desktop carried on drawing. */
-                    k->active = 0;
-                    k->revive_at = k->io.now_us(k->cookie) + REVIVE_US;
-                    return -2;
-                }
-                /* A whole second of no input for one bad packet is what the
-                 * cursor moving in steps actually was. */
-                k->next_poll = k->io.now_us(k->cookie) + 20000;
-                return -1;
-            }
+            if (!read_packet(k, packet))
+                return read_error(k);
+            /* With a ready line, a successful transfer that did not return a
+             * valid packet is a transport failure too. Previously all-zero
+             * reads cleared the error count and left input dead indefinitely. */
+            if (k->ready && !packet_envelope_valid(packet))
+                return read_error(k);
             k->errors = 0;
             now = k->io.now_us(k->cookie);
             if (boot_packet(packet)) {

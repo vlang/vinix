@@ -399,7 +399,7 @@ static void test_spi_invalid_fifo_and_recovery(void)
     f.invalid_fifo = 0; packet(f.incoming, 0, 0, keys); f.now = k.next_poll;
     assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a' && k.errors == 0);
 }
-static void test_ready_gpio_fallback_and_repeat(void)
+static void test_ready_gpio_gates_reads_and_repeat(void)
 {
     struct fake f; struct spi_keyboard k = setup(&f, 0); uint8_t out[128], keys[6] = {4};
     k.ready = FAKE_READY; k.ready_low = 1;
@@ -408,9 +408,36 @@ static void test_ready_gpio_fallback_and_repeat(void)
     assert(poll_keyboard(&k, out, 128, 0) == 1);
     f.ready = 1; f.now = k.next_poll; unsigned assertions = f.assertions;
     assert(poll_keyboard(&k, out, 128, 0) == 0 && f.assertions == assertions);
-    f.now = k.last_transfer + FALLBACK_US;
-    assert(poll_keyboard(&k, out, 128, 0) == 0 && f.assertions == assertions + 1);
     f.now = k.decoder.repeat_at;
+    assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a' &&
+        f.assertions == assertions);
+
+    /* Even after a minute idle, an inactive ready line must not cause an
+     * unsolicited transfer. */
+    f.now += 60000000u;
+    assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a' &&
+        f.assertions == assertions);
+}
+static void test_ready_gpio_invalid_packet_recovery(void)
+{
+    struct fake f; struct spi_keyboard k = setup(&f, 0); uint8_t out[128];
+    k.ready = FAKE_READY;
+    start_keyboard(&k, 120000000, 8000000); f.ready = 1;
+
+    /* FIFO progress and the byte count both succeed, but an all-zero response
+     * is not an Apple packet and must participate in bounded recovery. */
+    for (unsigned i = 1; i <= 3; ++i) {
+        memset(f.incoming, 0, sizeof(f.incoming));
+        f.now = k.next_poll;
+        assert(poll_keyboard(&k, out, 128, 0) == (i == 3 ? -2 : -1));
+        assert(k.errors == i && f.cursor == 256);
+    }
+    assert(!k.active);
+
+    f.now += REVIVE_US + 1;
+    assert(poll_keyboard(&k, out, 128, 0) == -3 && k.active && k.errors == 0);
+    uint8_t keys[6] = {4};
+    packet(f.incoming, 0, 0, keys); f.now = k.next_poll;
     assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a');
 }
 static uint32_t random_state = 0x75c29631;
@@ -458,7 +485,8 @@ int main(void)
     run(test_spi_end_to_end, "mock-MMIO SPI to console bytes");
     run(test_spi_timeout_backoff_disable, "bounded timeout, CS cleanup, backoff, disable");
     run(test_spi_invalid_fifo_and_recovery, "invalid FIFO count and recovery");
-    run(test_ready_gpio_fallback_and_repeat, "ready GPIO, fallback polling and repeat");
+    run(test_ready_gpio_gates_reads_and_repeat, "ready GPIO gates idle reads and repeat");
+    run(test_ready_gpio_invalid_packet_recovery, "invalid ready packet resets and recovers");
     run(test_seeded_mutation_fuzz, "100000 deterministic mutated packets");
     printf("PASS: %u test groups\n", tests);
     return 0;

@@ -405,7 +405,7 @@ pub fn poll(output &u8, capacity u64, application_cursor bool) int {
 			-2 {
 				if apple_spi_keyboard_enabled {
 					apple_spi_keyboard_enabled = false
-					println('apple-spi-kbd: repeated SPI errors; resetting the transport')
+					println('apple-spi-kbd: repeated SPI packet errors; resetting the transport')
 				}
 			}
 			-3 {
@@ -413,7 +413,7 @@ pub fn poll(output &u8, capacity u64, application_cursor bool) int {
 				println('apple-spi-kbd: transport recovered')
 			}
 			else {
-				println('apple-spi-kbd: SPI transfer error; retrying after backoff')
+				println('apple-spi-kbd: SPI packet error; retrying after backoff')
 			}
 		}
 		return 0
