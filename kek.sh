@@ -16,7 +16,7 @@
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
 #   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
-#                               boot firmware; connect it before powering on
+#                               boot firmware; post-boot attach reboots once
 #
 # GPU, DCP and Wi-Fi below are off by default in the kernel. The read-only SMC
 # battery client is enabled in every ARM64 mode and safely declines non-Apple
@@ -166,15 +166,17 @@ ST
 *Studio\ Display*)
     cat <<'STUDIO'
 
-The display must already be active before U-Boot starts. Connect it before
-power-on and use clamshell mode if the firmware keeps selecting the Air panel.
-The kernel log should contain:
+Boot Vinix with the cable disconnected, then connect the Studio Display after
+the internal-panel desktop starts. The kernel should detect the Type-C mode and
+warm-reboot once; leave the cable attached so firmware can train the link. Use
+clamshell mode if firmware keeps selecting the Air panel. Look for:
 
-  framebuffer: selected GOP ... (external handoff)
-  display: external GOP handoff active; native DCP probe disabled
+  apple-typec: external display attached (debounced Type-C mode)
+  display: first post-boot Studio Display attach; rebooting once ...
 
-This mode deliberately owns one firmware framebuffer. Unplug/replug and
-switching back to the internal panel require a reboot.
+After recovery, the next boot should select a 5120x2880 external framebuffer.
+This mode owns one firmware framebuffer. Reconnecting that established output
+works live; switching between the internal and external outputs crosses a boot.
 STUDIO
     ;;
 *Apple\ drivers|*SMC\ battery|*Apple\ DCP|*Apple\ Wi-Fi)

@@ -21,8 +21,7 @@ int vinix_display_hotplug_candidate(uint32_t status, uint32_t data_status)
 
     return !!((status & VINIX_CD321X_STATUS_PLUG_PRESENT) &&
               (data_status & VINIX_CD321X_DATA_CONNECTION) &&
-              (data_status & display_mode) &&
-              (data_status & VINIX_CD321X_DATA_HPD_LEVEL));
+              (data_status & display_mode));
 }
 
 int vinix_display_hotplug_sample(struct vinix_display_hotplug_state *state,

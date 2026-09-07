@@ -301,9 +301,10 @@ still fail-closed until its firmware command ABI is complete.
 
 Vinix can preserve a Studio Display scanout that the Apple firmware and
 m1n1/U-Boot chain established before the kernel starts. This is deliberately a
-single-output framebuffer handoff. An inherited output reconnects live; if
-Vinix booted on the M1 Air panel, a first post-boot connection performs one
-ANS-ordered warm reboot so firmware can establish the external scanout.
+single-output framebuffer handoff. Both USB-C ports are monitored, so an
+inherited output reconnects live. If Vinix booted on the M1 Air panel, a first
+post-boot connection performs one ANS-ordered warm reboot so firmware can
+establish the external scanout.
 
 ```sh
 ./build-desktop-aarch64.sh

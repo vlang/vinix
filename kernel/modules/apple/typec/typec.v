@@ -3,7 +3,7 @@
 @[has_globals]
 module typec
 
-// Apple CD321x display hot-plug monitor for the base M1 (t8103).  The port
+// Apple CD321x display hot-plug monitor for the base M1 (t8103). Both ports
 // controller uses the P.A. Semi I2C FIFO protocol and TPS6598x-style,
 // length-prefixed registers.  We poll instead of claiming the shared GPIO 106
 // interrupt: both CD321x controllers use that line, while Vinix does not yet
@@ -29,10 +29,15 @@ import usercopy
 #include "apple_display_hotplug.h"
 
 fn C.vinix_display_hotplug_reset(state voidptr)
+
 fn C.vinix_display_hotplug_state_size() u64
+
 fn C.vinix_display_hotplug_sample(state voidptr, status u32, data_status u32,
 	now_ms u64, debounce_ms u64) int
+
 fn C.vinix_display_hotplug_connected(state voidptr) int
+
+fn C.vinix_display_hotplug_candidate(status u32, data_status u32) int
 
 const fifo_tx = u32(0x00)
 const tx_read = u32(1 << 10)
@@ -50,6 +55,7 @@ const cd321x_status = u8(0x1a)
 const cd321x_data_status = u8(0x5f)
 const poll_interval_ns = i64(100_000_000)
 const debounce_ms = u64(500)
+const max_ports = 2
 
 struct Domain {
 	phandle u32
@@ -59,24 +65,30 @@ struct Domain {
 
 struct Plan {
 mut:
-	i2c     devicetree.DTReg
-	address u8
-	power   []Domain
+	i2c           devicetree.DTReg
+	addresses     [max_ports]u8
+	address_count int
+	power         []Domain
+	power_planned bool
 }
 
 struct Controller {
 mut:
-	stat     stat.Stat
-	refcount int
-	event    eventstruct.Event
-	status   int
-	can_mmap bool
-	base     u64
-	address  u8
-	state    voidptr
-	io_lock  klock.Lock
-	l        klock.Lock
-	failed   bool
+	stat          stat.Stat
+	refcount      int
+	event         eventstruct.Event
+	status        int
+	can_mmap      bool
+	base          u64
+	addresses     [max_ports]u8
+	address_count int
+	port_status   [max_ports]u32
+	port_data     [max_ports]u32
+	port_seen     [max_ports]bool
+	state         voidptr
+	io_lock       klock.Lock
+	l             klock.Lock
+	failed        bool
 }
 
 fn (mut controller Controller) read(_handle voidptr, buffer voidptr, offset u64,
@@ -140,51 +152,27 @@ __global (
 fn enabled(node &devicetree.DTNode) bool {
 	_ := devicetree.get_property(node, 'status') or { return true }
 	values := devicetree.get_string_list(node, 'status') or { return false }
-	defer { unsafe { values.free() } }
+	defer {
+		unsafe { values.free() }
+	}
 	return values.len == 1 && (values[0] == 'okay' || values[0] == 'ok')
 }
 
 fn compatible(node &devicetree.DTNode, wanted string) bool {
 	values := devicetree.get_string_list(node, 'compatible') or { return false }
-	defer { unsafe { values.free() } }
+	defer {
+		unsafe { values.free() }
+	}
 	return wanted in values
 }
 
-fn has_property(node &devicetree.DTNode, name string) bool {
-	_ := devicetree.get_property(node, name) or { return false }
-	return true
-}
-
-fn display_connector(node &devicetree.DTNode) bool {
+fn typec_connector(node &devicetree.DTNode) bool {
 	for child in node.children {
-		if !compatible(child, 'usb-c-connector') || !has_property(child, 'displayport') {
-			continue
-		}
-		handles := devicetree.get_u32_array(child, 'displayport') or { continue }
-		defer { unsafe { handles.free() } }
-		if handles.len != 1 {
-			continue
-		}
-		display := devicetree.find_phandle(handles[0]) or { continue }
-		if enabled(display) && compatible(display, 'apple,dcpext') {
+		if compatible(child, 'usb-c-connector') {
 			return true
 		}
 	}
 	return false
-}
-
-fn find_display_hpm(node &devicetree.DTNode, depth int) ?&devicetree.DTNode {
-	if depth > 64 || !enabled(node) {
-		return none
-	}
-	if compatible(node, 'apple,cd321x') && display_connector(node) {
-		return node
-	}
-	for child in node.children {
-		found := find_display_hpm(child, depth + 1) or { continue }
-		return found
-	}
-	return none
 }
 
 fn valid_region(region devicetree.DTReg, minimum u64) bool {
@@ -194,7 +182,9 @@ fn valid_region(region devicetree.DTReg, minimum u64) bool {
 
 fn single_region(node &devicetree.DTNode, minimum u64) ?devicetree.DTReg {
 	regions := devicetree.get_translated_reg_ranges(node) or { return none }
-	defer { unsafe { regions.free() } }
+	defer {
+		unsafe { regions.free() }
+	}
 	if regions.len != 1 || !valid_region(regions[0], minimum) {
 		return none
 	}
@@ -214,15 +204,17 @@ fn domain(handle u32) ?Domain {
 	}
 	region := single_region(parent, 4) or { return none }
 	reg := devicetree.get_u32_array(node, 'reg') or { return none }
-	defer { unsafe { reg.free() } }
+	defer {
+		unsafe { reg.free() }
+	}
 	if reg.len != 2 || reg[0] & 3 != 0 || reg[1] < 4 || u64(reg[0]) > region.size - 4
 		|| u64(reg[1]) > region.size - u64(reg[0]) {
 		return none
 	}
 	return Domain{
 		phandle: handle
-		region:  region
-		offset:  reg[0]
+		region: region
+		offset: reg[0]
 	}
 }
 
@@ -232,7 +224,9 @@ fn plan_power(node &devicetree.DTNode, depth int, mut plan Plan) bool {
 	}
 	_ := devicetree.get_property(node, 'power-domains') or { return true }
 	handles := devicetree.get_u32_array(node, 'power-domains') or { return false }
-	defer { unsafe { handles.free() } }
+	defer {
+		unsafe { handles.free() }
+	}
 	if handles.len > 8 {
 		return false
 	}
@@ -257,19 +251,56 @@ fn plan_power(node &devicetree.DTNode, depth int, mut plan Plan) bool {
 	return true
 }
 
-fn discover(node &devicetree.DTNode, mut plan Plan) bool {
-	i2c := node.parent
-	if i2c == unsafe { nil } || !enabled(i2c) || !compatible(i2c, 'apple,t8103-i2c') {
+fn collect_ports(node &devicetree.DTNode, depth int, mut plan Plan) bool {
+	if depth > 64 {
 		return false
 	}
-	plan.i2c = single_region(i2c, 0x20) or { return false }
-	address := devicetree.get_u32_array(node, 'reg') or { return false }
-	defer { unsafe { address.free() } }
-	if address.len != 1 || address[0] > 0x7f {
-		return false
+	if !enabled(node) {
+		return true
 	}
-	plan.address = u8(address[0])
-	return plan_power(i2c, 0, mut plan)
+	if compatible(node, 'apple,cd321x') && typec_connector(node) {
+		i2c := node.parent
+		if i2c == unsafe { nil } || !enabled(i2c)
+			|| !compatible(i2c, 'apple,t8103-i2c') {
+			return false
+		}
+		region := single_region(i2c, 0x20) or { return false }
+		if plan.address_count == 0 {
+			plan.i2c = region
+			if !plan_power(i2c, 0, mut plan) {
+				return false
+			}
+			plan.power_planned = true
+		} else if region.base != plan.i2c.base || region.size != plan.i2c.size {
+			// The base M1 Air's two CD321x controllers share i2c0. Refuse a
+			// topology that would need independently locked controller state.
+			return false
+		}
+		address := devicetree.get_u32_array(node, 'reg') or { return false }
+		defer {
+			unsafe { address.free() }
+		}
+		if address.len != 1 || address[0] > 0x7f || plan.address_count >= max_ports {
+			return false
+		}
+		for index in 0 .. plan.address_count {
+			if plan.addresses[index] == u8(address[0]) {
+				return false
+			}
+		}
+		plan.addresses[plan.address_count] = u8(address[0])
+		plan.address_count++
+	}
+	for child in node.children {
+		if !collect_ports(child, depth + 1, mut plan) {
+			return false
+		}
+	}
+	return true
+}
+
+fn discover(root &devicetree.DTNode, mut plan Plan) bool {
+	return collect_ports(root, 0, mut plan) && plan.address_count > 0 && plan.power_planned
 }
 
 @[inline]
@@ -292,9 +323,10 @@ fn (controller &Controller) wait_ended() bool {
 	return false
 }
 
-fn (controller &Controller) write_bytes(bytes &u8, length int, start bool, stop bool) bool {
+fn (controller &Controller) write_bytes(address u8, bytes &u8, length int, start bool,
+	stop bool) bool {
 	if start {
-		controller.write_reg(fifo_tx, tx_start | (u32(controller.address) << 1))
+		controller.write_reg(fifo_tx, tx_start | (u32(address) << 1))
 	}
 	for index in 0 .. length {
 		mut value := u32(unsafe { bytes[index] })
@@ -331,15 +363,22 @@ fn (controller &Controller) read_bytes(mut output &u8, length int) bool {
 // CD321x SMBus registers put a byte count in front of their payload.  Reject
 // both short and long replies: consuming only part of an unexpected response
 // leaves the controller FIFO out of phase for the next status read.
-fn (mut controller Controller) smbus_read(reg u8, mut output &u8, length int) bool {
+fn (mut controller Controller) smbus_read(address u8, reg u8, mut output &u8,
+	length int) bool {
 	controller.io_lock.acquire()
 	defer { controller.io_lock.release() }
-	controller.write_reg(control_reg, clear_tx | clear_rx)
+	// MTR/MRR are FIFO reset bits, not the whole control register. Preserve
+	// the bootloader-programmed clock divider in bits 7:0.
+	controller.write_reg(control_reg, controller.read_reg(control_reg) | clear_tx | clear_rx)
 	controller.write_reg(status_reg, 0xffff_ffff)
-	if !controller.write_bytes(&reg, 1, true, false) {
+	// CD321x register reads use two complete PASEMI transactions. Ending the
+	// register-address write is required by the controller and matches the
+	// sequence used by m1n1; a repeated start here left real hardware silent.
+	if !controller.write_bytes(address, &reg, 1, true, true) {
 		return false
 	}
-	controller.write_reg(fifo_tx, tx_start | (u32(controller.address) << 1) | 1)
+	controller.write_reg(status_reg, 0xffff_ffff)
+	controller.write_reg(fifo_tx, tx_start | (u32(address) << 1) | 1)
 	controller.write_reg(fifo_tx, tx_read | tx_stop | u32(length + 1))
 	mut reply_length := u8(0)
 	if !controller.read_bytes(mut &reply_length, 1) || int(reply_length) != length {
@@ -358,16 +397,43 @@ fn read_le32(bytes &u8) u32 {
 }
 
 fn (mut controller Controller) sample() int {
-	mut status := [4]u8{}
-	mut data := [4]u8{}
-	if !controller.smbus_read(cd321x_status, mut &status[0], 4)
-		|| !controller.smbus_read(cd321x_data_status, mut &data[0], 4) {
+	mut attached := false
+	mut successful := 0
+	for index in 0 .. controller.address_count {
+		mut status_bytes := [4]u8{}
+		mut data_bytes := [4]u8{}
+		if !controller.smbus_read(controller.addresses[index], cd321x_status, mut &status_bytes[0], 4)
+			|| !controller.smbus_read(controller.addresses[index], cd321x_data_status, mut &data_bytes[0], 4) {
+			continue
+		}
+		status := read_le32(&status_bytes[0])
+		data := read_le32(&data_bytes[0])
+		successful++
+		controller.l.acquire()
+		changed := !controller.port_seen[index] || controller.port_status[index] != status
+			|| controller.port_data[index] != data
+		controller.port_seen[index] = true
+		controller.port_status[index] = status
+		controller.port_data[index] = data
+		controller.l.release()
+		if changed {
+			C.printf(c'apple-typec: port 0x%x status=0x%08x data=0x%08x\n', controller.addresses[index], status, data)
+		}
+		if C.vinix_display_hotplug_candidate(status, data) != 0 {
+			attached = true
+		}
+	}
+	if successful == 0 {
 		return -1
 	}
 	now_ms := timer.get_ns() / 1_000_000
 	controller.l.acquire()
-	result := C.vinix_display_hotplug_sample(controller.state, read_le32(&status[0]),
-		read_le32(&data[0]), now_ms, debounce_ms)
+	// Feed the debouncer a normalized aggregate. A display on either physical
+	// port is the one supported external output; per-port raw values remain in
+	// the controller for diagnostics.
+	aggregate_status := if attached { u32(1) } else { u32(0) }
+	aggregate_data := if attached { u32((1 << 0) | (1 << 8)) } else { u32(0) }
+	result := C.vinix_display_hotplug_sample(controller.state, aggregate_status, aggregate_data, now_ms, debounce_ms)
 	controller.l.release()
 	return result
 }
@@ -394,13 +460,13 @@ fn service() {
 		} else {
 			failures = 0
 			if result == 1 {
-				println('apple-typec: external display connected (debounced HPD)')
+				println('apple-typec: external display attached (debounced Type-C mode)')
 				event.trigger(mut controller.event, false)
 				if hotplug_handler != unsafe { nil } {
 					hotplug_handler(true)
 				}
 			} else if result == 2 {
-				println('apple-typec: external display disconnected (debounced HPD)')
+				println('apple-typec: external display detached (debounced Type-C mode)')
 				event.trigger(mut controller.event, false)
 				if hotplug_handler != unsafe { nil } {
 					hotplug_handler(false)
@@ -449,14 +515,12 @@ pub fn initialise() bool {
 		println('apple-typec: hot-plug is currently limited to base M1/t8103')
 		return false
 	}
-	node := find_display_hpm(root, 0) or {
-		println('apple-typec: no display-linked CD321x port in the device tree')
-		return false
-	}
 	mut plan := Plan{}
-	defer { unsafe { plan.power.free() } }
-	if !discover(node, mut plan) {
-		println('apple-typec: incomplete CD321x/I2C resources; not probing')
+	defer {
+		unsafe { plan.power.free() }
+	}
+	if !discover(root, mut plan) {
+		println('apple-typec: incomplete M1 Air CD321x/I2C topology; not probing')
 		return false
 	}
 	base := memory.map_mmio(plan.i2c.base, plan.i2c.size)
@@ -471,10 +535,11 @@ pub fn initialise() bool {
 		}
 	}
 	mut controller := &Controller{
-		base:    base
-		address: plan.address
-		state:   memory.malloc(C.vinix_display_hotplug_state_size())
-		status:  file.pollin
+		base: base
+		addresses: plan.addresses
+		address_count: plan.address_count
+		state: memory.malloc(C.vinix_display_hotplug_state_size())
+		status: file.pollin
 	}
 	if controller.state == unsafe { nil } {
 		println('apple-typec: state allocation failed')
@@ -496,8 +561,7 @@ pub fn initialise() bool {
 	controller.stat.rdev = resource.create_dev_id()
 	controller.stat.mode = 0o444 | stat.ifchr
 	fs.devtmpfs_add_device(controller, 'display-hpd')
-	C.printf(c'apple-typec: polling display port 0x%x on I2C 0x%llx\n', controller.address,
-		plan.i2c.base)
+	C.printf(c'apple-typec: polling %d Type-C ports on I2C 0x%llx\n', controller.address_count, plan.i2c.base)
 	spawn service()
 	return true
 }

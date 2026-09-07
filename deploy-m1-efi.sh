@@ -74,7 +74,7 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.display_hotplug=1 vinix.display_coldplug=reboot vinix.apple_dcp=0"
             ;;
         --apple-display-hotplug)
-            # Monitor the display-linked CD321x controller. This is useful when
+            # Monitor both CD321x Type-C controllers. This is useful when
             # testing reconnect independently of GOP selection; it does not
             # enable the first-attach reboot policy.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display_hotplug=1"

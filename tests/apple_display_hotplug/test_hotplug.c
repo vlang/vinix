@@ -28,7 +28,14 @@ int main(void)
     CHECK(!vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,
           display_status(0)));
     CHECK(!vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,
+          VINIX_CD321X_DATA_DP_CONNECTION));
+    /* A cold attach has no DCP to produce HPD yet. */
+    CHECK(vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,
           VINIX_CD321X_DATA_CONNECTION | VINIX_CD321X_DATA_DP_CONNECTION));
+    CHECK(vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,
+          VINIX_CD321X_DATA_CONNECTION | VINIX_CD321X_DATA_TBT_CONNECTION));
+    CHECK(vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,
+          VINIX_CD321X_DATA_CONNECTION | VINIX_CD321X_DATA_USB4_CONNECTION));
     CHECK(vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,
           display_status(VINIX_CD321X_DATA_DP_CONNECTION)));
     CHECK(vinix_display_hotplug_candidate(VINIX_CD321X_STATUS_PLUG_PRESENT,

@@ -5,9 +5,11 @@ Apple boot firmware and the m1n1/U-Boot chain have established the
 Thunderbolt/USB-C scanout. The kernel deliberately preserves that scanout; it
 does not attempt a display mode change after taking control.
 
-The kernel monitors the display-linked CD321x Type-C controller after boot.
-It polls the negotiated transport and DisplayPort HPD state every 100 ms and
-debounces transitions for 500 ms. The current state is also readable from
+The kernel monitors both CD321x Type-C controllers after boot. It polls cable
+presence and the negotiated DP, Thunderbolt, or USB4 mode every 100 ms and
+debounces transitions for 500 ms. First attach deliberately does not require
+DisplayPort HPD, because HPD may remain low until firmware starts the external
+DCP. The current aggregate state is also readable from
 `/dev/display-hpd` as `connected`, `disconnected`, or `unavailable`.
 
 Two attach cases are supported:
@@ -61,8 +63,8 @@ sudo ~/code/kek.sh studio
   not disturbed;
 - add `vinix.display=external` to make Vinix choose the largest valid GOP
   framebuffer (the later GOP wins a resolution tie);
-- add `vinix.display_hotplug=1` to monitor the display-linked CD321x port and
-  publish its debounced HPD state as `/dev/display-hpd`;
+- add `vinix.display_hotplug=1` to monitor both CD321x Type-C ports and publish
+  their aggregate debounced display-attach state as `/dev/display-hpd`;
 - add `vinix.display_coldplug=reboot` so a first connection after booting on
   the M1 Air panel restarts once with the cable present; use
   `vinix.display_coldplug=off` as a later command-line token to disable this;
@@ -77,7 +79,9 @@ The expected kernel lines are:
 ```text
 framebuffer: selected GOP 1/1, 5120x2880x32 (external handoff)
 display: external GOP handoff active; native DCP probe disabled
-apple-typec: polling display port 0x3f on I2C 0x235010000
+apple-typec: port 0x38 status=0x........ data=0x........
+apple-typec: port 0x3f status=0x........ data=0x........
+apple-typec: polling 2 Type-C ports on I2C 0x235010000
 ```
 
 The GOP number and mode depend on what firmware exposes. When both panel and
@@ -86,13 +90,19 @@ external GOP handles exist, the first number should identify the 5K surface.
 If Vinix initially boots on the internal panel, the expected attach lines are:
 
 ```text
-apple-typec: external display connected (debounced HPD)
+apple-typec: external display attached (debounced Type-C mode)
 display: first post-boot Studio Display attach; rebooting once for firmware link training
 ```
 
 The next boot should report a 5120x2880 external GOP. If it returns to the
 internal panel, the boot firmware did not select the attached display; close
 the lid or select the external display in the boot environment and try again.
+
+If connecting after boot produces no attach line, compare the two raw `port`
+lines before and after connecting. At least one must change. If neither changes,
+or only one port was logged before the `polling 2` line, capture those exact
+lines: they distinguish an I2C/controller failure from an unrecognized Type-C
+negotiation.
 
 ## Current boundaries
 

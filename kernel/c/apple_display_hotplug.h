@@ -6,10 +6,13 @@
 #include <stdint.h>
 
 /* The CD321x Type-C controller reports cable presence separately from its
- * negotiated data mode and DisplayPort hot-plug level.  Treat a sink as usable
- * only when all three agree, and debounce the combined value.  This small core
- * is deliberately free of MMIO, allocation, locks and timing primitives so it
- * can be tested on the host and driven by the kernel's polling worker.
+ * negotiated data mode and DisplayPort hot-plug level.  First attach must not
+ * wait for HPD: HPD can remain low until an external DCP has been started,
+ * which is exactly what the firmware-assisted reboot is meant to arrange.
+ * Treat physical presence plus a negotiated display-capable mode as attached
+ * and debounce that combined value. This small core is deliberately free of
+ * MMIO, allocation, locks and timing primitives so it can be tested on the
+ * host and driven by the kernel's polling worker.
  */
 enum vinix_display_hotplug_event {
     VINIX_DISPLAY_HOTPLUG_NONE = 0,
