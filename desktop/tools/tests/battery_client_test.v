@@ -94,3 +94,58 @@ fn test_battery_cache_throttle_force_expiry_and_clock_failure() {
 		assert cache.poll(14, true, cache_reader) == failure
 	}
 }
+
+fn test_battery_history_graph_samples_and_remaining_time() {
+	mut history := BatteryHistory{}
+	history.observe(0, battery_unavailable)
+	assert !history.initialized && history.count == 0
+	history.observe(0, 80)
+	history.observe(300_000, 80)
+	assert history.count == 1
+	assert history.remaining_hours(80) == battery_estimate_calculating
+	history.observe(600_000, 79)
+	assert history.remaining_hours(79) == battery_estimate_calculating
+	history.observe(3_900_000, 70)
+	assert history.count == 3
+	assert history.sample(0) == BatterySample{ at_ms: 0, percent: 80 }
+	assert history.sample(2) == BatterySample{
+		at_ms: 3_900_000
+		percent: 70
+		connected: true
+	}
+	assert history.remaining_hours(70) == 7
+
+	// Any observed rise suppresses a discharge estimate until a new falling
+	// trend has enough duration and range of its own.
+	history.observe(4_000_000, 71)
+	assert history.remaining_hours(71) == battery_estimate_charging
+	history.observe(4_600_000, 70)
+	assert history.remaining_hours(70) == battery_estimate_calculating
+	history.observe(8_200_000, 60)
+	assert history.remaining_hours(60) == 6
+	assert history.remaining_hours(battery_io) == battery_estimate_unavailable
+	history.observe(8_300_000, battery_io)
+	assert history.observed_ms == 8_300_000
+	assert history.last_valid_ms == 8_200_000
+	assert !history.contiguous
+	history.observe(8_400_000, 60)
+	assert history.count == 7
+	assert !history.sample(6).connected
+	assert history.remaining_hours(60) == battery_estimate_calculating
+
+	mut full := BatteryHistory{}
+	full.observe(10, 100)
+	assert full.remaining_hours(100) == battery_estimate_full
+}
+
+fn test_battery_history_is_bounded_and_resets_on_clock_reversal() {
+	mut history := BatteryHistory{}
+	for index in 0 .. battery_history_capacity + 7 {
+		history.observe(u64(index * 1000), 50 + index % 2)
+	}
+	assert history.count == battery_history_capacity
+	assert history.sample(0).at_ms == 7_000
+	history.observe(1, 42)
+	assert history.initialized && history.count == 1
+	assert history.sample(0) == BatterySample{ at_ms: 1, percent: 42 }
+}

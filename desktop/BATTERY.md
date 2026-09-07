@@ -1,9 +1,9 @@
 # Battery percentage in the desktop
 
-Settings has Display and Battery categories. Battery shows remaining charge,
-its numeric percentage, a read-only level bar, status and a Refresh button.
-Display brightness controls are unchanged. Battery does not expose charging
-controls or infer charging state from a percentage.
+Settings has Display and Battery categories. Battery shows current charge, its
+numeric percentage, a read-only level bar, a 24-hour level graph, estimated
+remaining time, status and a Refresh button. Display brightness controls are
+unchanged. Battery does not expose charging controls.
 
 The bottom-right taskbar shows percentage immediately before the clock, for
 example `73%  |  18:54:22`, with the existing date beneath it. The reserved clock
@@ -19,10 +19,20 @@ ABI. A failed poll replaces the previous percentage rather than retaining it
 indefinitely. A monotonic-clock failure also invalidates the cache. No read is
 performed on every repaint within the cache interval.
 
+The session history retains the most recent 64 percentage changes in a fixed
+allocation-free ring. The graph places those samples on a real 24-hour time
+axis and does not invent data before the desktop began sampling. History is not
+persisted across reboots. The remaining-time estimate uses only the current
+falling trend and appears after at least a 2% drop over 10 minutes. A rise is
+shown as charging and resets the discharge estimate; because `/dev/battery`
+currently reports percentage only, that state is inferred from the trend.
+Implausibly slow estimates above 48 hours remain in `Calculating…` state.
+
 Absent devices, access denial, malformed text and I/O/stale-sample errors have
 separate Settings messages. The parser accepts only one to three decimal digits
 in 0..100 followed by LF, rejects trailing data, and bounds EINTR retries.
-Static percentage labels avoid per-frame allocation of Settings text.
+Static percentage and remaining-hour labels avoid per-frame allocation of
+Settings text.
 
 ## Enable on an M1
 
@@ -51,6 +61,7 @@ They validate golden text ABI samples; unlike the removed C test, they do not
 link the unrelated C SMC implementation. Its own driver tests remain separate.
 
 Settings tests also cover Battery/Display switching, no hidden brightness
-writes, 0/100/unavailable states, narrow layouts and taskbar text. These tests
-and the complete native desktop build pass. Hardware rendering, the linked
-Vinix image and M1 battery behavior have not been tested by this port.
+writes, 0/100/unavailable states, narrow layouts, graph geometry, remaining-time
+presentation and taskbar text. Client tests cover bounded history, charge trend,
+estimate gating and clock rollback. Hardware rendering, the linked Vinix image
+and M1 battery behavior require validation on the target machine.

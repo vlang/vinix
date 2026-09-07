@@ -26,6 +26,10 @@ const body_heading = u32(0x141c2b)
 const body_rule = u32(0xe8ebf0)
 const body_panel = u32(0xf3f5f9)
 
+// ── Battery ───────────────────────────────────────────────────────
+const battery_level = u32(0x42a766)
+const battery_graph_rule = u32(0xdde3e9)
+
 // ── File browser ───────────────────────────────────────────────────
 const files_up = u32(0x4a6fa5)
 const files_up_disabled = u32(0xe7eaf0)

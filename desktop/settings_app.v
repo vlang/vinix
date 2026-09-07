@@ -58,7 +58,8 @@ mut:
 	// Display, Battery and Wi-Fi read devices rather than the desktop's own
 	// preferences, so they carry the last readback and the labels made from
 	// it. The reads are injectable so host tests can drive them.
-	battery_read  fn (bool) int         = read_battery
+	battery_read    fn (bool) int        = read_battery
+	battery_history fn () BatteryHistory = battery_history_snapshot
 	state         BacklightState
 	read_result   BacklightResult       = .unavailable
 	write_result  BacklightResult
@@ -143,7 +144,7 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
 		.wifi { return a.wifi_pane(width, height) }
 		.display { return a.display_pane(width) }
-		.battery { return a.battery_pane(width) }
+		.battery { return a.battery_pane(width, height) }
 		else {}
 	}
 	if a.desktop == unsafe { nil } {
