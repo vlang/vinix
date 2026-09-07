@@ -17,6 +17,7 @@ fn C.vinix_apple_spi_keyboard_reports() u64
 __global (
 	apple_spi_keyboard_lock klock.Lock
 	apple_spi_keyboard_enabled = false
+	apple_spi_keyboard_probed = false
 	apple_spi_keyboard_reported = false
 )
 
@@ -375,6 +376,9 @@ fn initialise_hardware() {
 		println('apple-spi-kbd: controller initialization failed')
 		return
 	}
+	// `probed` says the hardware was found and is ours to poll; `enabled` says
+	// the transport is currently up. They part company while it is recovering.
+	apple_spi_keyboard_probed = true
 	apple_spi_keyboard_enabled = true
 	C.printf(c'apple-spi-kbd: SPI at 0x%llx, input %u Hz, limit %u Hz; awaiting reports\n',
 		plan.spi.base, plan.input_hz, plan.maximum_hz)
@@ -388,18 +392,34 @@ pub fn poll(output &u8, capacity u64, application_cursor bool) int {
 		return 0
 	}
 	defer { apple_spi_keyboard_lock.release() }
-	if !apple_spi_keyboard_enabled {
+	if !apple_spi_keyboard_probed {
 		return 0
 	}
+	// Polling continues even while the transport is down: the driver holds the
+	// cool-off itself and answers immediately until it has passed, and if it
+	// never gets called again it can never come back. Not calling it is what
+	// used to make three bad reads permanent.
 	count := C.vinix_apple_spi_keyboard_poll(output, capacity, int(application_cursor))
 	if count < 0 {
-		if count == -2 {
-			apple_spi_keyboard_enabled = false
-			println('apple-spi-kbd: repeated SPI errors; disabled (UART/VirtIO unaffected)')
-		} else {
-			println('apple-spi-kbd: SPI transfer error; retrying after backoff')
+		match count {
+			-2 {
+				if apple_spi_keyboard_enabled {
+					apple_spi_keyboard_enabled = false
+					println('apple-spi-kbd: repeated SPI errors; resetting the transport')
+				}
+			}
+			-3 {
+				apple_spi_keyboard_enabled = true
+				println('apple-spi-kbd: transport recovered')
+			}
+			else {
+				println('apple-spi-kbd: SPI transfer error; retrying after backoff')
+			}
 		}
 		return 0
+	}
+	if !apple_spi_keyboard_enabled {
+		apple_spi_keyboard_enabled = true
 	}
 	if !apple_spi_keyboard_reported && C.vinix_apple_spi_keyboard_reports() != 0 {
 		apple_spi_keyboard_reported = true

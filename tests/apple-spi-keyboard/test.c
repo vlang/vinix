@@ -374,9 +374,22 @@ static void test_spi_timeout_backoff_disable(void)
         assert(poll_keyboard(&k, out, 128, 0) == 0 && f.writes == writes);
     }
     assert(!k.active);
-    f.now += 10000000;
+    /* Down, and staying down while the cool-off runs. */
     unsigned reads = f.reads;
     assert(poll_keyboard(&k, out, 128, 0) == 0 && f.reads == reads);
+    /* Past it, brought back rather than left dead for the rest of the boot.
+     * Nothing used to clear `active`, so three bad reads cost the machine its
+     * keyboard and its touchpad together while the desktop carried on drawing
+     * -- input simply stopped and never returned. */
+    f.stall = 0;
+    f.now += REVIVE_US + 1;
+    assert(poll_keyboard(&k, out, 128, 0) == -3);
+    assert(k.active && k.errors == 0 && k.revive_at == 0);
+    /* And it works afterwards, rather than merely claiming to be up. */
+    uint8_t keys[6] = {4};
+    packet(f.incoming, 0, 0, keys);
+    f.now = k.next_poll;
+    assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a');
 }
 static void test_spi_invalid_fifo_and_recovery(void)
 {

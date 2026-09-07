@@ -43,6 +43,10 @@
 #define TRANSFER_US    5000u
 #define POLL_US        2000u
 #define FALLBACK_US    20000u
+/* How long the transport stays down before it is brought back up. Long enough
+ * that genuinely dead hardware is not hammered, short enough that a user who
+ * looked away does not come back to a machine that takes no input. */
+#define REVIVE_US      2000000u
 #define FRAGMENT_US    100000u
 #define REPEAT_DELAY   500000u
 #define REPEAT_PERIOD  33333u
@@ -89,6 +93,12 @@ struct spi_keyboard {
     int ready_low;
     int active;
     unsigned errors;
+    /* What start_keyboard was given, so the transport can be brought back
+     * without the device-tree work being done again. */
+    uint32_t input_hz;
+    uint32_t maximum_hz;
+    /* When to try that, or 0 for not scheduled. */
+    uint64_t revive_at;
     uint64_t next_poll;
     uint64_t next_transfer;
     uint64_t last_transfer;
@@ -405,6 +415,8 @@ static int start_keyboard(struct spi_keyboard *k, uint32_t input_hz,
 {
     if (!input_hz || !maximum_hz || maximum_hz > 8000000u)
         return 0;
+    k->input_hz = input_hz;
+    k->maximum_hz = maximum_hz;
     uint64_t divider = ((uint64_t)input_hz + maximum_hz - 1) / maximum_hz;
     if (divider < 2) divider = 2;
     if (divider > 0x7ff) return 0; /* Do not silently exceed the DT maximum. */
@@ -533,8 +545,20 @@ static int boot_packet(const uint8_t p[PACKET_SIZE])
 static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
     size_t capacity, int application_cursor)
 {
-    if (!k->active || !out || capacity == 0)
+    if (!out || capacity == 0)
         return 0;
+    if (!k->active) {
+        /* Bring it back when the cool-off has passed. Re-running the start
+         * sequence reprograms a controller that may itself have reset. */
+        if (!k->revive_at || k->io.now_us(k->cookie) < k->revive_at)
+            return 0;
+        if (!start_keyboard(k, k->input_hz, k->maximum_hz)) {
+            k->revive_at = k->io.now_us(k->cookie) + REVIVE_US;
+            return 0;
+        }
+        k->revive_at = 0;
+        return -3;
+    }
     size_t used = 0;
     uint64_t now = k->io.now_us(k->cookie);
     tp_tick(&k->touchpad, now);
@@ -562,10 +586,17 @@ static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
                 reset_input(&k->decoder);
                 tp_discontinuity(&k->touchpad);
                 if (++k->errors >= 3) {
+                    /* Down, but not for good: nothing used to clear this, so
+                     * three bad reads cost the machine its keyboard and its
+                     * touchpad together for the rest of the boot while the
+                     * desktop carried on drawing. */
                     k->active = 0;
+                    k->revive_at = k->io.now_us(k->cookie) + REVIVE_US;
                     return -2;
                 }
-                k->next_poll = k->io.now_us(k->cookie) + 1000000;
+                /* A whole second of no input for one bad packet is what the
+                 * cursor moving in steps actually was. */
+                k->next_poll = k->io.now_us(k->cookie) + 20000;
                 return -1;
             }
             k->errors = 0;
