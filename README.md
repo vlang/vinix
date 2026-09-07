@@ -246,6 +246,16 @@ is requested. The GTK smoke test first checks that the base image is GTK-free,
 installs it, then opens both `gtk3-demo` and `gtk3-widget-factory` against the
 Vinix Xorg server. Gnumeric is likewise absent until explicitly installed.
 
+### macOS compatibility on aarch64
+
+The desktop image includes an experimental all-V Mach-O and Objective-C/AppKit
+compatibility runtime. Its **Cocoa Calculator** test application is compiled
+from Objective-C as a normal AArch64 Mach-O bundle, loaded in userspace, and
+drawn by the Vinix compositor without shipping Apple frameworks. This is an
+initial compatibility slice, not general macOS application support; the exact
+supported ABI and reproducible host/Vinix tests are documented in
+[`compat/macos/README.md`](compat/macos/README.md).
+
 ### Firefox on aarch64
 
 Firefox ESR can run as a stock Alpine musl application on Vinix's existing

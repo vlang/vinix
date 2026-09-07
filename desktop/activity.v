@@ -400,6 +400,7 @@ fn activity_name_of(record &ActivitySample) string {
 	display := match name {
 		'vinix-files' { 'Files' }
 		'vinix-calculator' { 'Calculator' }
+		'vinix-cocoa-calculator' { 'Cocoa Calculator' }
 		'vinix-terminal' { 'Terminal' }
 		'vinix-settings' { 'Settings' }
 		'vinix-activity' { 'Activity Monitor' }

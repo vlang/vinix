@@ -139,6 +139,13 @@ APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$SCRIPT_DIR/third_party/ui2/examples/calculator"
 
+# Build the test application as a normal Apple AArch64 Mach-O. A macOS host
+# records standard Cocoa dylib imports; ld64.lld records flat imports elsewhere.
+# The Vinix image contains no Apple framework binaries: its V runtime resolves
+# the narrow AppKit/Objective-C surface used by this application.
+echo "==> Building Cocoa compatibility fixture..."
+"$SCRIPT_DIR/compat/macos/apps/Calculator/build.sh" "$BUILD_DIR/Calculator.app"
+
 # ── V -> C ──
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
@@ -151,7 +158,7 @@ echo "    build stamp: $BUILD_STAMP"
 "$V" -os linux -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
-    -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
+    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
 # ── C -> aarch64 static binary ──
@@ -185,7 +192,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
     "$V" -os linux -gc none -manualfree -enable-globals -prod \
         -d ui2_headless -d vinix_gpu_present \
         -d "vinix_build_stamp=$BUILD_STAMP" \
-        -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
+        -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
         -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
 
     echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
@@ -414,12 +421,18 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 
 # One immutable multicall image, one exec name and process per application.
 # Vinix records the path passed to execve, so these relative symlinks produce
-# distinct names and truthful per-app accounting without storing eight copies
-# of the same static executable in the initramfs.
+# distinct names and truthful per-app accounting without storing a copy of the
+# same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-activity vinix-editor vinix-calendar vinix-clock; do
+    vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
+
+mkdir -p "$STAGING/Applications/Calculator.app/Contents/MacOS"
+install -m644 "$BUILD_DIR/Calculator.app/Contents/Info.plist" \
+    "$STAGING/Applications/Calculator.app/Contents/Info.plist"
+install -m755 "$BUILD_DIR/Calculator.app/Contents/MacOS/Calculator" \
+    "$STAGING/Applications/Calculator.app/Contents/MacOS/Calculator"
 
 if [ -n "$WIFI_BUNDLE" ]; then
     echo "==> Staging the selected Wi-Fi firmware bundle..."

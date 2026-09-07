@@ -152,7 +152,7 @@ fn test_terminal_tracks_shell_continuation_prompts() {
 }
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
-	assert available_apps.len == 9
+	assert available_apps.len == 10
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == '/usr/bin/run-firefox'
@@ -161,11 +161,12 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps[3].keyboard && available_apps[3].polling
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
+	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	assert taskbar_launcher_width(1280, 114, available_apps.len) == 87
-	assert taskbar_launcher_width(1152, 114, available_apps.len) == 72
-	assert taskbar_launcher_width(1024, 114, available_apps.len) == 58
+	assert taskbar_launcher_width(1280, 114, available_apps.len) == 77
+	assert taskbar_launcher_width(1152, 114, available_apps.len) == 65
+	assert taskbar_launcher_width(1024, 114, available_apps.len) == 52
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
 }

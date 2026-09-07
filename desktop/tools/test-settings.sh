@@ -41,7 +41,7 @@ sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
 for name in settings switcher; do
     "$v" -gc none -manualfree -enable-globals -stats -d ui2_headless \
-        -path "@vlib|@vmodules|$root/third_party" "$work/ui/${name}_test.v"
+        -path "@vlib|@vmodules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done
 "$v" -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
-    -path "@vlib|@vmodules|$root/third_party" "$work/ui/memory_test.v"
+    -path "@vlib|@vmodules|$root|$root/third_party" "$work/ui/memory_test.v"
