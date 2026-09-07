@@ -74,11 +74,6 @@ mut:
 	pid_text    string
 	cpu_text    string
 	mem_text    string
-	// Hosted applications share the desktop process, so the kernel cannot
-	// account for them separately. They still get a row, marked here so an
-	// updated window list can replace them without touching process samples.
-	is_app    bool
-	window_id int
 }
 
 // previous holds what a pid's CPU counter read last time round, so the next
@@ -199,16 +194,6 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 		m.scratch_rows << row
 	}
 
-	// Hosted applications are independent of the kernel snapshot. Carry them
-	// across unchanged so sync_open_apps can see that the window set still
-	// matches instead of cloning the same four strings every second.
-	for index in 0 .. m.rows.len {
-		if !m.rows[index].is_app {
-			continue
-		}
-		m.scratch_rows << m.rows[index]
-		m.rows[index] = ActivityRow{}
-	}
 	for index in 0 .. m.rows.len {
 		m.free_row(index)
 	}
@@ -236,7 +221,7 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 
 fn (m &ActivityMonitor) process_row_index(pid int) int {
 	for index, row in m.rows {
-		if !row.is_app && row.pid == pid {
+		if row.pid == pid {
 			return index
 		}
 	}
@@ -252,66 +237,19 @@ fn replace_activity_text(current string, next string) string {
 	return next
 }
 
-// sync_open_apps adds the applications hosted inside vinix-desktop. They are
-// real open applications, but not separate kernel processes, so /dev/processes
-// cannot discover Calculator, Text Editor, or the other hosted windows on its
-// own. CPU and RAM remain labelled as shared instead of duplicating the
-// desktop process' figures and pretending they can be attributed per app.
-fn (mut m ActivityMonitor) sync_open_apps(desktop &Desktop) bool {
-	if m.open_apps_match(desktop) {
+// sync_open_app_count keeps the footer informative without manufacturing
+// process rows. Files, Settings, and other hosted apps live inside the one
+// vinix-desktop process, so the kernel has no true per-window CPU or memory
+// figure for them. Showing the process once is accurate; repeating its values
+// (or a misleading "shared") alongside every hosted window is not.
+fn (mut m ActivityMonitor) sync_open_app_count(desktop &Desktop) bool {
+	count := activity_hosted_window_count(desktop)
+	if m.app_count == count {
 		return false
 	}
-
-	for index := m.rows.len - 1; index >= 0; index-- {
-		if !m.rows[index].is_app {
-			continue
-		}
-		m.free_row(index)
-		m.rows.delete(index)
-	}
-
-	desktop_pid := m.desktop_process_pid()
-	for window in desktop.windows {
-		if window.page != .app {
-			continue
-		}
-		m.rows << ActivityRow{
-			pid: desktop_pid
-			name: window.title.clone()
-			pid_text: if desktop_pid > 0 { desktop_pid.str() } else { '-'.clone() }
-			cpu_text: 'shared'.clone()
-			mem_text: 'shared'.clone()
-			is_app: true
-			window_id: window.id
-		}
-	}
-
-	m.app_count = activity_hosted_window_count(desktop)
+	m.app_count = count
 	m.update_summary()
-	m.sort_rows()
-	m.clamp_scroll()
 	return true
-}
-
-fn (m &ActivityMonitor) open_apps_match(desktop &Desktop) bool {
-	mut count := 0
-	for row in m.rows {
-		if !row.is_app {
-			continue
-		}
-		mut found := false
-		for window in desktop.windows {
-			if window.page == .app && window.id == row.window_id && window.title == row.name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-		count++
-	}
-	return count == activity_hosted_window_count(desktop)
 }
 
 fn activity_hosted_window_count(desktop &Desktop) int {
@@ -322,15 +260,6 @@ fn activity_hosted_window_count(desktop &Desktop) int {
 		}
 	}
 	return count
-}
-
-fn (m &ActivityMonitor) desktop_process_pid() int {
-	for row in m.rows {
-		if !row.is_app && row.name == 'vinix-desktop' {
-			return row.pid
-		}
-	}
-	return 0
 }
 
 fn (mut m ActivityMonitor) update_summary() {
@@ -623,7 +552,7 @@ fn open_activity(mut desktop Desktop) !HostedApp {
 	if app.monitor.error != '' {
 		return error(app.monitor.error)
 	}
-	app.monitor.sync_open_apps(desktop)
+	app.monitor.sync_open_app_count(desktop)
 	app.monitor.last_poll_ms = monotonic_millis()
 	return app
 }
@@ -638,7 +567,7 @@ fn (mut a ActivityApp) poll() bool {
 	a.monitor.last_poll_ms = now
 	sampled := a.monitor.sample()
 	apps_changed := if unsafe { a.desktop != nil } {
-		a.monitor.sync_open_apps(a.desktop)
+		a.monitor.sync_open_app_count(a.desktop)
 	} else {
 		false
 	}
@@ -646,10 +575,10 @@ fn (mut a ActivityApp) poll() bool {
 }
 
 fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
-	// Opening, closing, or renaming a window already caused this build. Sync
-	// here as well as on the timer so the app list changes in that same frame.
+	// Keep the footer's hosted-app count current in the same frame a window is
+	// opened or closed. The table itself contains only kernel processes.
 	if unsafe { a.desktop != nil } {
-		a.monitor.sync_open_apps(a.desktop)
+		a.monitor.sync_open_app_count(a.desktop)
 	}
 	width := int(size.width)
 	height := int(size.height)

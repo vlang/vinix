@@ -178,35 +178,32 @@ fn test_external_display_handoff_redraws_and_reports_failures() {
 	unsafe { free(voidptr(desktop.canvas.pixels)) }
 }
 
-fn test_activity_monitor_includes_live_hosted_apps() {
+fn test_activity_monitor_counts_hosted_apps_without_fake_process_rows() {
 	mut desktop := Desktop{}
 	desktop.spawn('Welcome', .welcome, 0, 0, 100, 100)
 	calculator_id := desktop.spawn('Calculator', .app, 0, 0, 100, 100)
 	desktop.spawn('Text Editor', .app, 0, 0, 100, 100)
 
 	mut monitor := ActivityMonitor{}
-	assert monitor.sync_open_apps(desktop)
-	assert !monitor.sync_open_apps(desktop)
+	assert monitor.sync_open_app_count(desktop)
+	assert !monitor.sync_open_app_count(desktop)
 	assert monitor.app_count == 2
-	assert monitor.rows.any(it.is_app && it.name == 'Calculator')
-	assert monitor.rows.any(it.is_app && it.name == 'Text Editor')
-	assert !monitor.rows.any(it.is_app && it.name == 'Welcome')
+	assert monitor.rows.len == 0
 
 	desktop.close_window(calculator_id)
-	assert monitor.sync_open_apps(desktop)
+	assert monitor.sync_open_app_count(desktop)
 	assert monitor.app_count == 1
-	assert !monitor.rows.any(it.is_app && it.name == 'Calculator')
-	assert monitor.rows.any(it.is_app && it.name == 'Text Editor')
+	assert monitor.rows.len == 0
 }
 
-fn test_activity_monitor_uses_only_the_window_title_as_its_heading() {
+fn test_activity_monitor_does_not_render_hosted_apps_as_processes() {
 	mut desktop := Desktop{}
 	desktop.spawn('Calculator', .app, 0, 0, 100, 100)
 	mut app := ActivityApp{
 		desktop: &desktop
 	}
 	tree := app.build(ui2.rect(0, 0, 520, 360))!
-	assert utility_tree_has_text(tree, 'Calculator')
+	assert !utility_tree_has_text(tree, 'Calculator')
 	assert !utility_tree_has_text(tree, 'Activity Monitor')
 	assert !utility_tree_has_text(tree, 'PROCESS / OPEN APP')
 	assert utility_tree_has_text(tree, 'MB')
