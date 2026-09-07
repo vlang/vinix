@@ -79,7 +79,7 @@ const available_apps = [
 	},
 ]
 
-fn open_calculator(mut desktop Desktop) !HostedApp {
+fn open_calculator(mut _ Desktop) !HostedApp {
 	return ui2.new_qml_app[Calculator](calculator_qml_source, initial_calculator())!
 }
 

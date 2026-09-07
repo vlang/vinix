@@ -76,8 +76,8 @@ fn load_raw_image(path string) ?RawImage {
 			return none
 		}
 	}
-	width := int(buffer[4]) | int(buffer[5]) << 8
-	height := int(buffer[6]) | int(buffer[7]) << 8
+	width := int(u16(buffer[4]) | u16(buffer[5]) << 8)
+	height := int(u16(buffer[6]) | u16(buffer[7]) << 8)
 	if width <= 0 || height <= 0 {
 		return none
 	}
@@ -103,8 +103,8 @@ fn (image &RawImage) scale_into(mut out []u32, width int, height int) {
 	if width <= 0 || height <= 0 {
 		return
 	}
-	step_x := if width > 1 { ((image.width - 1) << 16) / (width - 1) } else { 0 }
-	step_y := if height > 1 { ((image.height - 1) << 16) / (height - 1) } else { 0 }
+	step_x := if width > 1 { (image.width - 1) * 65536 / (width - 1) } else { 0 }
+	step_y := if height > 1 { (image.height - 1) * 65536 / (height - 1) } else { 0 }
 
 	for y in 0 .. height {
 		fixed_y := y * step_y

@@ -222,8 +222,6 @@ const theme_macos = Theme{
 	shortcut_panel: 0x000000
 }
 
-const themes = [theme_default, theme_macos]
-
 fn (d &Desktop) theme() Theme {
 	return match d.settings.theme {
 		.default_ { theme_default }

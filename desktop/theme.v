@@ -11,12 +11,6 @@ const default_title_height = 34
 // ── Windows ────────────────────────────────────────────────────────
 
 
-// Title bar buttons. Each is a rounded square that only shows a fill while the
-// pointer is on it, so an idle title bar stays quiet.
-const title_button_size = 22
-const title_button_gap = 4
-const title_button_inset = 8
-
 // ── Window contents ────────────────────────────────────────────────
 // ── Application interiors ──────────────────────────────────────────
 // These do not follow the chrome's theme: an application draws its own inside,

@@ -410,7 +410,7 @@ mut:
 	monitor ActivityMonitor
 }
 
-fn open_activity(mut desktop Desktop) !HostedApp {
+fn open_activity(mut _ Desktop) !HostedApp {
 	mut app := &ActivityApp{}
 	app.monitor.buffer = []u8{len: activity_buffer_size()}
 	app.monitor.sample()

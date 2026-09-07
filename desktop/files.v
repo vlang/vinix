@@ -165,7 +165,7 @@ mut:
 	visible_rows int = 1
 }
 
-fn open_files(mut desktop Desktop) !HostedApp {
+fn open_files(mut _ Desktop) !HostedApp {
 	mut app := &FileBrowserApp{}
 	app.browser.read('/')
 	if app.browser.error != '' {

@@ -100,7 +100,7 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	children << ui2.view('', ui2.rect(0, 0, f64(settings_sidebar_width), f64(height)),
 		ui2.BoxStyle{
 		bg: settings_sidebar_bg
-	}, a.category_rows(height))
+	}, a.category_rows())
 	children << ui2.view('', ui2.rect(f64(settings_sidebar_width), 0, 1, f64(height)),
 		ui2.BoxStyle{
 		bg: body_rule
@@ -150,12 +150,12 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	return match a.category {
 		.appearance { a.appearance_pane(width) }
 		.theme { a.theme_pane(width) }
-		.wallpaper { a.wallpaper_pane(width, height) }
+		.wallpaper { a.wallpaper_pane(width) }
 		else { []ui2.Element{} }
 	}
 }
 
-fn (a &SettingsApp) category_rows(height int) []ui2.Element {
+fn (a &SettingsApp) category_rows() []ui2.Element {
 	mut rows := []ui2.Element{cap: settings_categories.len}
 	for index, category in settings_categories {
 		selected := category == a.category
@@ -276,7 +276,7 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	return out
 }
 
-fn (a &SettingsApp) wallpaper_pane(width int, height int) []ui2.Element {
+fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 	settings := a.desktop.settings
 	inner := width - 2 * settings_padding
 

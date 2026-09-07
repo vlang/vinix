@@ -88,7 +88,7 @@ mut:
 	visible_rows int = 1
 }
 
-fn open_terminal(mut desktop Desktop) !HostedApp {
+fn open_terminal(mut _ Desktop) !HostedApp {
 	mut app := &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
