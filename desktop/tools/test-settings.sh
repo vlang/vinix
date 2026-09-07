@@ -24,7 +24,7 @@ if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
     echo 'ERROR: Settings UI tests require third_party/ui2.' >&2; exit 1;
 }
 mkdir "$work/ui"
-for name in settings.v battery.v theme.v device_io.v platform.c.v backlight_client.v battery_client.v; do
+for name in settings.v scale.v battery.v theme.v device_io.v platform.c.v backlight_client.v battery_client.v; do
     cp "$root/desktop/$name" "$work/ui/"
 done
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"

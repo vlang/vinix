@@ -82,8 +82,10 @@ fn main() {
 		fb.close()
 	}
 
+	scale := desktop_configure_scale(fb.width, fb.height)
 	mut desktop := Desktop{
-		canvas: new_canvas(fb.width, fb.height)
+		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height,
+			scale))
 		fonts: load_fonts()
 		tz_offset_seconds: options.tz_offset
 	}
@@ -93,8 +95,8 @@ fn main() {
 		pointer.close()
 	}
 	desktop.pointer_present = pointer.available()
-	desktop.pointer_x = fb.width / 2
-	desktop.pointer_y = fb.height / 2
+	desktop.pointer_x = desktop.canvas.width / 2
+	desktop.pointer_y = desktop.canvas.height / 2
 
 	mut keyboard := open_keyboard()
 	defer {
@@ -113,8 +115,11 @@ fn main() {
 		frame_started := monotonic_millis()
 
 		desktop.update_clock()
-		desktop.pump_pointer(mut pointer, fb.width, fb.height)
+		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)
+		// Settings only requests a new scale. Apply it after all input from this
+		// frame and before layout so drawing and hit targets share one space.
+		desktop.apply_requested_scale()
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -133,7 +138,7 @@ fn main() {
 		desktop.render(tree)
 		after_render := monotonic_millis()
 
-		fb.present(&desktop.canvas)
+		fb.present(&desktop.canvas, desktop_applied_scale)
 		after_present := monotonic_millis()
 
 		free_tree(tree)
@@ -155,7 +160,7 @@ fn main() {
 		h: desktop.canvas.height
 	}
 	desktop.canvas.clear(0x000000)
-	fb.present(&desktop.canvas)
+	fb.present(&desktop.canvas, desktop_applied_scale)
 	println('vinix-desktop: ${desktop.frames} frames')
 }
 

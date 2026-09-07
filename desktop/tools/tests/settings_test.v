@@ -50,6 +50,8 @@ fn fixture_app() &SettingsApp {
 	fixture_write_result = .ok
 	fixture_writes = 0
 	fixture_percent = -1
+	desktop_scale_factor = desktop_scale_100
+	desktop_applied_scale = desktop_scale_100
 	mut app := &SettingsApp{ read_state: fixture_read, write_percent: fixture_write }
 	app.refresh()
 	return app
@@ -81,6 +83,38 @@ fn test_settings_display_controls_and_explicit_writes() {
 	assert app.status_text().contains('pending')
 	app.handle('settings.brightness.invalid') or { panic(err) }
 	assert fixture_writes == 1
+}
+
+fn test_settings_scale_choices_and_stale_hits() {
+	mut app := fixture_app()
+	mut root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	scale_100 := element_named(root, settings_scale_100_action) or { panic('missing 100% scale') }
+	mut scale_200 := element_named(root, settings_scale_200_action) or { panic('missing 200% scale') }
+	assert scale_100.text == '100%'
+	assert scale_200.text == '200%'
+	assert scale_100.box.bg == accent
+	assert scale_200.box.bg == files_up
+
+	app.handle(settings_scale_200_action) or { panic(err) }
+	assert desktop_scale_factor == desktop_scale_200
+	root = app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	scale_200 = element_named(root, settings_scale_200_action) or { panic('missing selected 200% scale') }
+	assert scale_200.box.bg == accent
+
+	app.handle('settings.battery') or { panic(err) }
+	app.handle(settings_scale_100_action) or { panic(err) }
+	assert desktop_scale_factor == desktop_scale_200
+}
+
+fn test_desktop_scale_defaults_and_extents() {
+	assert desktop_default_scale(2304, 1440) == desktop_scale_200
+	assert desktop_default_scale(2560, 1600) == desktop_scale_200
+	assert desktop_default_scale(3024, 1964) == desktop_scale_200
+	assert desktop_default_scale(1920, 1080) == desktop_scale_100
+	assert desktop_default_scale(1024, 768) == desktop_scale_100
+	assert desktop_scaled_extent(2560, desktop_scale_200) == 1280
+	assert desktop_scaled_extent(2559, desktop_scale_200) == 1280
+	assert desktop_scaled_extent(1920, desktop_scale_100) == 1920
 }
 
 fn test_settings_missing_offline_readonly_and_stale_hits() {

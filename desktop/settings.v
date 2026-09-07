@@ -6,6 +6,8 @@ module main
 import ui2
 
 // Static ids/labels: the framebuffer renderer frees child arrays, not strings.
+const settings_scale_100_action = 'settings.scale.100'
+const settings_scale_200_action = 'settings.scale.200'
 const settings_brightness_actions = [
 	'settings.brightness.0',
 	'settings.brightness.5',
@@ -182,6 +184,18 @@ fn settings_button(id string, text string, frame ui2.Rect, enabled bool) ui2.Ele
 	}
 }
 
+fn settings_scale_button(id string, text string, x int, selected bool) ui2.Element {
+	return ui2.button(id, text, ui2.rect(f64(x), 40, 60, 30), ui2.BoxStyle{
+		bg: if selected { accent } else { files_up }
+		radius: 5
+	}, ui2.TextStyle{
+		color: taskbar_text_active
+		size: 13
+		bold: selected
+		align: .center
+	})
+}
+
 fn settings_label(text string, x int, y int, width int, color u32) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 22), ui2.TextStyle{
 		color: color
@@ -231,7 +245,12 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 			size: 20
 			bold: true
 		}),
-		settings_label('Built-in display', x, 46, inner, body_muted),
+		settings_label('Scale', x, 46, 42, body_muted),
+		settings_scale_button(settings_scale_100_action, '100%', x + 50,
+			desktop_scale_factor == desktop_scale_100),
+		settings_scale_button(settings_scale_200_action, '200%', x + 116,
+			desktop_scale_factor == desktop_scale_200),
+		settings_label('Built-in display', x + 190, 46, inner - 190, body_muted),
 		ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{ bg: body_rule }, []),
 		settings_label('Brightness', x, 90, inner - 100, body_heading),
 		settings_label(a.level_text, x + inner - 100, 90, 100, body_heading),
@@ -295,8 +314,16 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		}
 		return
 	}
-	// Ignore stale brightness hit targets while the Battery page is selected.
+	// Ignore stale Display hit targets while the Battery page is selected.
 	if a.category != .display {
+		return
+	}
+	if event_id == settings_scale_100_action {
+		desktop_scale_factor = desktop_scale_100
+		return
+	}
+	if event_id == settings_scale_200_action {
+		desktop_scale_factor = desktop_scale_200
 		return
 	}
 	mut target := -1

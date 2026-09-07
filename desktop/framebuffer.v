@@ -135,9 +135,52 @@ fn open_framebuffer(path string) !Framebuffer {
 	}
 }
 
-// present copies a finished frame out in one pass. On the usual XRGB8888
-// framebuffer that is a single memcpy per frame; anything else costs a repack.
-fn (mut fb Framebuffer) present(canvas &Canvas) {
+@[inline]
+fn (fb &Framebuffer) pack_pixel(pixel u32) u32 {
+	if fb.direct {
+		return pixel
+	}
+	return ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift |
+		(pixel & 0xff) << fb.b_shift
+}
+
+// present copies a finished frame out in one pass. At 200% the desktop composes
+// at half resolution and each logical pixel is expanded to a crisp 2x2 block.
+// On the usual XRGB8888 framebuffer the 100% path remains one memcpy per frame.
+fn (mut fb Framebuffer) present(canvas &Canvas, scale int) {
+	if scale == desktop_scale_200 {
+		for source_y := 0; source_y < canvas.height; source_y++ {
+			physical_y := source_y * desktop_scale_200
+			if physical_y >= fb.height {
+				break
+			}
+			source := source_y * canvas.stride
+			destination := physical_y * fb.stride
+			mut physical_x := 0
+			for source_x := 0; source_x < canvas.width; source_x++ {
+				if physical_x >= fb.width {
+					break
+				}
+				pixel := unsafe { canvas.pixels[source + source_x] }
+				packed := fb.pack_pixel(pixel)
+				unsafe {
+					fb.base[destination + physical_x] = packed
+					if physical_x + 1 < fb.width {
+						fb.base[destination + physical_x + 1] = packed
+					}
+				}
+				physical_x += desktop_scale_200
+			}
+			if physical_y + 1 < fb.height {
+				unsafe {
+					vmemcpy(&fb.base[(physical_y + 1) * fb.stride], &fb.base[destination],
+						usize(fb.width * 4))
+				}
+			}
+		}
+		return
+	}
+
 	if fb.direct {
 		if canvas.stride == fb.stride {
 			unsafe {
@@ -157,10 +200,8 @@ fn (mut fb Framebuffer) present(canvas &Canvas) {
 		src := y * canvas.stride
 		dst := y * fb.stride
 		for x := 0; x < fb.width; x++ {
-			unsafe {
-				pixel := canvas.pixels[src + x]
-				fb.base[dst + x] = ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift | (pixel & 0xff) << fb.b_shift
-			}
+			pixel := unsafe { canvas.pixels[src + x] }
+			unsafe { fb.base[dst + x] = fb.pack_pixel(pixel) }
 		}
 	}
 }
