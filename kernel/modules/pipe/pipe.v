@@ -26,6 +26,8 @@ pub mut:
 	write_ptr u64
 	capacity  u64
 	used      u64
+	readers   int
+	writers   int
 	event     eventstruct.Event
 }
 
@@ -35,6 +37,11 @@ pub fn create() ?&Pipe {
 	mut p := &Pipe{
 		data: unsafe { malloc(pipe_buf) }
 		capacity: pipe_buf
+		// A pipe starts with one read-side and one write-side open-file
+		// description. dup() and fork() share those descriptions, so their
+		// lifetime is already accounted for by file.Handle.refcount.
+		readers: 1
+		writers: 1
 	}
 	p.stat.mode = stat.ifpipe
 	// An empty pipe is writable. pollout was only ever raised by read(), when
@@ -87,12 +94,15 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(&this.used) == 0 {
-		// Return EOF if the pipe was closed
-		if this.refcount <= 1 {
+		// EOF begins only after the last write-side open-file description is
+		// gone. The resource refcount also includes readers, so it cannot tell
+		// this apart once shells have made more than one pipe endpoint.
+		if this.writers == 0 {
 			return 0
 		}
 		if handle.flags & resource.o_nonblock != 0 {
-			return 0
+			errno.set(errno.eagain)
+			return none
 		}
 		this.l.release()
 		mut events := [&this.event]
@@ -153,9 +163,23 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 		this.l.release()
 	}
 
+	open_handle := unsafe { &file.Handle(handle) }
+
+	if this.readers == 0 {
+		errno.set(errno.epipe)
+		return none
+	}
+
 	// If pipe is full, block or return if nonblock
 	for katomic.load(&this.used) == this.capacity {
-		// We don't do nonblock yet
+		if this.readers == 0 {
+			errno.set(errno.epipe)
+			return none
+		}
+		if open_handle.flags & resource.o_nonblock != 0 {
+			errno.set(errno.eagain)
+			return none
+		}
 		this.l.release()
 		mut events := [&this.event]
 		event.await(mut events, true) or {
@@ -211,12 +235,39 @@ fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 
 fn (mut this Pipe) unref(handle voidptr) ? {
 	open_handle := unsafe { &file.Handle(handle) }
-	if open_handle.flags & resource.o_accmode == resource.o_wronly {
-		// EOF is a readiness condition. Wake poll/select/epoll waiters when the
-		// final descriptor sharing the write-side open description disappears.
-		this.status |= file.pollhup
+
+	this.l.acquire()
+	match open_handle.flags & resource.o_accmode {
+		resource.o_rdonly {
+			this.readers--
+			if this.readers == 0 {
+				this.status &= ~file.pollout
+				this.status |= file.pollerr
+			}
+		}
+		resource.o_wronly {
+			this.writers--
+			if this.writers == 0 {
+				// EOF is a readiness condition. Wake poll/select/epoll waiters
+				// after the final write-side open description disappears.
+				this.status |= file.pollhup
+			}
+		}
+		resource.o_rdwr {
+			this.readers--
+			this.writers--
+			if this.readers == 0 {
+				this.status &= ~file.pollout
+				this.status |= file.pollerr
+			}
+			if this.writers == 0 {
+				this.status |= file.pollhup
+			}
+		}
+		else {}
 	}
 	katomic.dec(mut &this.refcount)
+	this.l.release()
 	event.trigger(mut this.event, false)
 }
 

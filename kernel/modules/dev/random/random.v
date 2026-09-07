@@ -7,14 +7,7 @@ import stat
 import klock
 import event.eventstruct
 import memory
-import x86.cpu
 import katomic
-
-__global (
-	ur_initialized = false
-	ur_rdrand      = false
-	ur_rdseed      = false
-)
 
 struct URandom {
 mut:
@@ -138,30 +131,10 @@ fn (mut this URandom) grow(handle voidptr, new_size u64) ? {
 }
 
 fn (mut this URandom) reseed() {
-	if ur_rdseed {
-		for i in 0 .. this.key.len {
-			this.key[i] ^= cpu.rdseed32()
-		}
-	} else if ur_rdrand {
-		for i in 0 .. this.key.len {
-			this.key[i] ^= cpu.rdrand32()
-		}
-	}
+	architecture_reseed(mut this)
 }
 
 pub fn initialise() {
-	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
-	if success && (c & (1 << 30)) != 0 {
-		println('urandom: rdrand available')
-		ur_rdrand = true
-	}
-
-	success, _, b, _, _ = cpu.cpuid(7, 0)
-	if success && (b & (1 << 18)) != 0 {
-		println('urandom: rdseed available')
-		ur_rdseed = true
-	}
-
 	// todo improve entropy via interrupts and other random events
 	mut rng := &URandom{}
 
@@ -173,14 +146,7 @@ pub fn initialise() {
 
 	rng.can_mmap = true
 
-	mut seed := cpu.rdtsc()
-	rng.key[0] = u32(seed)
-	rng.key[2] = u32(seed >> 32)
-	seed = cpu.rdtsc()
-	rng.buffer[0] = u32(seed)
-	rng.buffer[2] = u32(seed >> 32)
-
-	rng.reseed()
+	architecture_seed(mut rng)
 
 	fs.devtmpfs_add_device(rng, 'urandom')
 }

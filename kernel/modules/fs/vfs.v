@@ -1072,6 +1072,22 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 	return 0, 0
 }
 
+// Put back the last entry returned by syscall_readdir(). Linux getdents64
+// needs this when the next variable-length record does not fit in the caller's
+// remaining buffer; consuming it would make directory enumeration skip one
+// name at every buffer boundary.
+pub fn readdir_unread(fdnum int) {
+	mut dir_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return }
+	defer {
+		dir_fd.unref()
+	}
+
+	mut dir_handle := dir_fd.handle
+	if dir_handle.dirlist_index > 0 {
+		dir_handle.dirlist_index--
+	}
+}
+
 pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process

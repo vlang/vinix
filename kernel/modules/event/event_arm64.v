@@ -178,12 +178,24 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 		return 0
 	}
 
+	mut preserve_pending := false
 	for i := u64(0); i < e.listeners_i; i++ {
 		mut t := unsafe { &proc.Thread(e.listeners[i].thrd) }
 
+		// A thread may listen to several events. Once one has made it runnable,
+		// do not overwrite that selection; retain this event for its next await.
+		if t.is_in_queue {
+			preserve_pending = true
+			continue
+		}
 		t.which_event = e.listeners[i].which
 
-		sched.enqueue_thread(t, false)
+		if !sched.enqueue_thread(t, false) {
+			preserve_pending = true
+		}
+	}
+	if preserve_pending && drop == false {
+		e.pending++
 	}
 
 	ret := e.listeners_i

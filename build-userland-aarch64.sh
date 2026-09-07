@@ -14,8 +14,27 @@ INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
+
+merge_staging_tree() {
+    local overlay="$1"
+    local source relative destination
+
+    # macOS cp follows an existing destination symlink. BusyBox installs many
+    # command names as symlinks, so replacing one with a real GNU executable
+    # would otherwise overwrite /bin/busybox itself.
+    while IFS= read -r -d '' source; do
+        relative="${source#"$overlay/"}"
+        destination="$STAGING/$relative"
+        if [ -L "$destination" ]; then
+            rm -f "$destination"
+        fi
+    done < <(find "$overlay" -mindepth 1 -print0)
+
+    cp -a "$overlay/." "$STAGING/"
+}
 
 MUSL_VERSION="1.2.5"
 BUSYBOX_VERSION="1.36.1"
@@ -293,6 +312,7 @@ if [ ! -d "$GCC_TC_STAGING/bin" ]; then
     mkdir -p "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/include"
     mkdir -p "$GCC_TC_STAGING/libexec/gcc/aarch64-linux-musl/$GCC_VER"
     mkdir -p "$GCC_TC_STAGING/include"
+    mkdir -p "$GCC_TC_STAGING/lib"
 
     # Binaries: gcc driver + binutils essentials
     for bin in gcc as ld ld.bfd ar ranlib nm strip objdump readelf; do
@@ -324,7 +344,9 @@ if [ ! -d "$GCC_TC_STAGING/bin" ]; then
        "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/" 2>/dev/null || true
 
     # musl C library (static) and CRT files
-    for f in libc.a libm.a libpthread.a librt.a libdl.a libcrypt.a libresolv.a libutil.a; do
+    for f in libc.a libm.a libpthread.a librt.a libdl.a libcrypt.a libresolv.a \
+        libutil.a libgcc_s.so libgcc_s.so.1 libatomic.a libatomic.so \
+        libatomic.so.1 libatomic.so.1.2.0; do
         [ -f "$GCC_TC_DIR/lib/$f" ] && cp "$GCC_TC_DIR/lib/$f" "$GCC_TC_STAGING/lib/"
     done
     # CRT files: crt1.o, crti.o, crtn.o, rcrt1.o (static PIE), Scrt1.o (shared PIE)
@@ -818,6 +840,13 @@ if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
     cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
 else
     echo "==> Network tools staging not found, skipping (run build-network-tools-aarch64.sh first)"
+fi
+
+if [ -x "$DEVELOPER_TOOLS_STAGING/usr/bin/cmake" ]; then
+    echo "==> Integrating native developer tools..."
+    merge_staging_tree "$DEVELOPER_TOOLS_STAGING"
+else
+    echo "==> Developer tools staging not found, skipping (run build-developer-tools-aarch64.sh first)"
 fi
 
 if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then

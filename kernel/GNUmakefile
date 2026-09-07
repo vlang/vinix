@@ -199,7 +199,6 @@ override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'modules/dev/hda/*' \
     ! -path 'modules/dev/mouse/*' \
     ! -path 'modules/dev/nvme/*' \
-    ! -path 'modules/dev/random/*' \
     ! -path 'modules/dev/serial/*' \
     ! -path 'modules/time/pit.v' \
     ! -path 'modules/syscall/syscall.v' \

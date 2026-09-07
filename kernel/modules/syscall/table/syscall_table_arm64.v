@@ -317,6 +317,9 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 		// Record length: d_ino(8) + d_off(8) + d_reclen(2) + d_type(1) + name + null, aligned to 8
 		reclen := (u64(19) + name_len + u64(1) + u64(7)) & ~u64(7)
 		if offset + reclen > count {
+			// syscall_readdir() advances the shared directory position. Leave
+			// this entry for the next getdents64 call instead of losing it.
+			fs.readdir_unread(fdnum)
 			break
 		}
 		// Write linux_dirent64 to user buffer

@@ -13,6 +13,7 @@ ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
@@ -25,6 +26,24 @@ TOOLCHAIN_URL=https://musl.cc/aarch64-linux-musl-native.tgz
 V_COMMIT=dd859eae55cf4e69346851fe285b9af104c8ffb7
 VC_COMMIT=216b1cdc8b1acad5b03e9cf8767f44f2742bf8f5
 NPROC="${NPROC:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
+
+merge_staging_tree() {
+    local overlay="$1"
+    local source relative destination
+
+    # macOS cp follows an existing destination symlink. BusyBox installs many
+    # command names as symlinks, so replacing one with a real GNU executable
+    # would otherwise overwrite /bin/busybox itself.
+    while IFS= read -r -d '' source; do
+        relative="${source#"$overlay/"}"
+        destination="$STAGING/$relative"
+        if [ -L "$destination" ]; then
+            rm -f "$destination"
+        fi
+    done < <(find "$overlay" -mindepth 1 -print0)
+
+    cp -a "$overlay/." "$STAGING/"
+}
 
 if [ "$(uname -s)" != Linux ] || [ "$(uname -m)" != aarch64 ]; then
     echo "build-userland-aarch64-vm.sh must run in the Debian ARM64 VM" >&2
@@ -138,7 +157,8 @@ for library in libgcc.a libgcc_eh.a crtbegin.o crtbeginS.o crtbeginT.o \
         "$GUEST_TOOLCHAIN/lib/gcc/aarch64-linux-musl/$GCC_VERSION/"
 done
 for library in libc.a libm.a libpthread.a librt.a libdl.a libcrypt.a \
-    libresolv.a libutil.a libgcc_s.so libgcc_s.so.1 \
+    libresolv.a libutil.a libgcc_s.so libgcc_s.so.1 libatomic.a \
+    libatomic.so libatomic.so.1 libatomic.so.1.2.0 \
     crt1.o crti.o crtn.o rcrt1.o Scrt1.o; do
     [ ! -f "$TOOLCHAIN/lib/$library" ] || \
         cp "$TOOLCHAIN/lib/$library" "$GUEST_TOOLCHAIN/lib/"
@@ -263,6 +283,12 @@ else
     echo "Network tools staging absent; skipping the network client boot test"
 fi
 
+if command -v cmake >/dev/null 2>&1; then
+    /root/developer-tools-smoke.sh
+else
+    echo "Developer tools staging absent; skipping the native build test"
+fi
+
 if command -v codex >/dev/null 2>&1; then
     echo "VINIX ARM64 CODEX CLI BOOT TEST"
     if command -v python3 >/dev/null 2>&1; then
@@ -313,6 +339,13 @@ if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
     cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
 else
     echo "==> Network tools staging not found, packaging without network clients"
+fi
+
+if [ -x "$DEVELOPER_TOOLS_STAGING/usr/bin/cmake" ]; then
+    echo "==> Integrating native developer tools"
+    merge_staging_tree "$DEVELOPER_TOOLS_STAGING"
+else
+    echo "==> Developer tools staging not found, packaging without native build tools"
 fi
 
 if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then

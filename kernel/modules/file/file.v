@@ -14,6 +14,7 @@ import usercopy
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
+pub const f_getpipe_sz = 1032
 pub const f_getfd = 1
 pub const f_setfd = 2
 pub const f_getfl = 3
@@ -670,10 +671,30 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 
 	match cmd {
 		f_dupfd {
-			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, false) or { return errno.err, errno.get() })
+			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, false) or {
+				fd.unref()
+				return errno.err, errno.get()
+			})
+			// fd_from_fdnum() retained the source open-file description for
+			// this syscall. The duplicate has its own descriptor reference;
+			// release the temporary lookup just as the other fcntl paths do.
+			fd.unref()
 		}
 		f_dupfd_cloexec {
-			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, true) or { return errno.err, errno.get() })
+			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, true) or {
+				fd.unref()
+				return errno.err, errno.get()
+			})
+			fd.unref()
+		}
+		f_getpipe_sz {
+			if handle.resource.stat.mode & stat.ifmt != stat.ifpipe {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			// Pipes currently have one fixed page-sized circular buffer.
+			ret = 4096
+			fd.unref()
 		}
 		f_getfd {
 			ret = if fd.flags & resource.o_cloexec != 0 { u64(fd_cloexec) } else { 0 }

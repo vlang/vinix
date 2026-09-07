@@ -36,6 +36,7 @@ import dev.fbdev
 import dev.fbdev.simple
 import dev.pointerdev
 import dev.procdev
+import dev.random
 import dev.streams
 import time
 import userland
@@ -183,6 +184,8 @@ fn kmain_thread(qemu_platform bool) {
 
 	streams.initialise()
 	print('kmain_thread: streams done\n')
+	random.initialise()
+	print('kmain_thread: random done\n')
 
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())

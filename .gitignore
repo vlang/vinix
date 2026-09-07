@@ -36,6 +36,7 @@ kernel/tmp.v
 /build-aarch64-python/
 /build-aarch64-ruby/
 /build-aarch64-network-tools/
+/build-aarch64-developer-tools/
 /build-aarch64-firefox/
 /build-aarch64-codex/
 /.claude/
