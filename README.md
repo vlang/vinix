@@ -206,6 +206,10 @@ requires this layer):
 ./build-userland-aarch64.sh
 ```
 
+The desktop builder also overlays the current network-tools layer directly,
+so rebuilding the desktop refreshes `pkg` even when its base userland archive
+was created before package support was added.
+
 Inside Vinix, use `pkg` to search, install, remove, and upgrade Alpine packages.
 The friendly `gtk` name installs GTK 3, its two demonstration programs, the
 Adwaita icons, and DejaVu fonts:

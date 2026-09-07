@@ -187,6 +187,13 @@ if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
     echo "Run ./build-x11-aarch64.sh first." >&2
     exit 1
 fi
+if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/pkg" ] ||
+   [ ! -x "$NETWORK_TOOLS_STAGING/sbin/apk" ] ||
+   [ ! -s "$NETWORK_TOOLS_STAGING/etc/vinix-pkg/base-world" ]; then
+    echo "ERROR: desktop needs the package layer in $NETWORK_TOOLS_STAGING" >&2
+    echo "Run ./build-network-tools-aarch64.sh first." >&2
+    exit 1
+fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     if [ ! -x "$PYTHON_STAGING/usr/bin/python3" ]; then
         echo "ERROR: compact desktop needs $PYTHON_STAGING/usr/bin/python3" >&2
@@ -275,6 +282,9 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     chmod +x "$STAGING/aarch64-linux-musl-native/bin/gcc"
 else
     tar xf "$BASE_INITRAMFS" -C "$STAGING"
+    # The base archive may predate package support. Always refresh this small
+    # layer so the terminal gets pkg/apk without rebuilding the full userland.
+    merge_staging_tree "$NETWORK_TOOLS_STAGING"
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
@@ -282,7 +292,9 @@ chmod 1777 "$STAGING/tmp"
 
 # Keep the display handoff pieces in sync with the desktop source even when the
 # full base userland predates them. The bridge is a cross-compiled executable;
-# the launcher and Firefox policy files can be installed directly from source.
+# package/Firefox launchers and policy files can be installed directly from
+# source.
+install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
@@ -305,6 +317,10 @@ done
 
 if [ ! -x "$STAGING/bin/busybox" ]; then
     echo "ERROR: base userland has no executable /bin/busybox" >&2
+    exit 1
+fi
+if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
+    echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
 for runtime_path in usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox; do
