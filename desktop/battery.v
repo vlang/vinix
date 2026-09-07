@@ -209,11 +209,22 @@ fn battery_graph_y(percent int, height int) int {
 	return 2 + (100 - percent) * (height - 4) / 100
 }
 
+fn battery_graph_x(at_ms u64, end_ms u64, width int) int {
+	if width <= 1 || at_ms > end_ms {
+		return -1
+	}
+	age_ms := end_ms - at_ms
+	if age_ms > battery_history_window_ms {
+		return -1
+	}
+	return int((battery_history_window_ms - age_ms) * u64(width - 1) / battery_history_window_ms)
+}
+
 // A 24-hour step graph mirrors what the integer-only battery device actually
 // knows: horizontal segments between observed percentage changes. It does not
 // invent intermediate precision or turn gaps into zero charge.
 fn battery_graph(history &BatteryHistory, x int, y int, width int, height int) ui2.Element {
-	mut lines := []ui2.Element{cap: battery_history_capacity * 2 + 8}
+	mut lines := frame_elements(battery_history_capacity * 2 + 8)
 	for quarter in 1 .. 4 {
 		grid_y := quarter * height / 4
 		lines << ui2.view('', ui2.rect(0, f64(grid_y), f64(width), 1), ui2.BoxStyle{
@@ -229,25 +240,19 @@ fn battery_graph(history &BatteryHistory, x int, y int, width int, height int) u
 
 	if history.initialized && history.count > 0 {
 		end_ms := history.observed_ms
-		start_ms := if end_ms > battery_history_window_ms {
-			end_ms - battery_history_window_ms
-		} else {
-			u64(0)
-		}
-		span_ms := if end_ms > start_ms { end_ms - start_ms } else { u64(1) }
 		mut previous_percent := -1
 		mut previous_x := 0
 		for index in 0 .. history.count {
 			sample := history.sample(index)
-			if sample.at_ms <= start_ms {
+			sample_x := battery_graph_x(sample.at_ms, end_ms, width)
+			if sample_x < 0 && sample.at_ms <= end_ms {
 				previous_percent = sample.percent
 				previous_x = 0
 				continue
 			}
-			if sample.at_ms > end_ms {
+			if sample_x < 0 {
 				continue
 			}
-			sample_x := int((sample.at_ms - start_ms) * u64(width - 1) / span_ms)
 			if previous_percent < 0 {
 				previous_percent = sample.percent
 				previous_x = sample_x
@@ -272,8 +277,8 @@ fn battery_graph(history &BatteryHistory, x int, y int, width int, height int) u
 		}
 		if previous_percent >= 0 {
 			line_end_ms := if history.contiguous { end_ms } else { history.last_valid_ms }
-			if line_end_ms > start_ms {
-				line_end_x := int((line_end_ms - start_ms) * u64(width - 1) / span_ms)
+			line_end_x := battery_graph_x(line_end_ms, end_ms, width)
+			if line_end_x >= 0 {
 				previous_y := battery_graph_y(previous_percent, height)
 				segment_width := if line_end_x > previous_x {
 					line_end_x - previous_x + 1
@@ -300,7 +305,7 @@ fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner 
 	available := percent >= 0 && percent <= 100
 	estimate := history.remaining_hours(percent)
 	stat_width := (inner - 16) / 2
-	mut children := []ui2.Element{cap: 16}
+	mut children := frame_elements(16)
 	children << ui2.label('settings.battery.title', 'Battery', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{ color: body_heading, size: 20, bold: true })
 	children << settings_label('Built-in battery', x, 46, inner, body_muted)
 	children << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{

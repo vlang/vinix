@@ -72,13 +72,13 @@ level, but relative +/- controls remain disabled until a level is known.
 
 ### Current hardware limitation
 
-The experimental backlight core is not yet connected to a working DCP backend.
-Consequently current Vinix boots do **not** create `/dev/apple-panel-bl`, and
-Settings shows **Brightness driver not available** with disabled controls.
-Adding this UI does not complete that driver integration. Do not enable the
-experimental DCP boot option just to test the UI. See
+The real t8103 internal-panel backend is opt-in with `vinix.apple_dcp=1` (or the
+deployment script's `--apple-dcp` switch). After its RTKit/IOMFB handshake,
+Vinix creates `/dev/apple-panel-bl` and Settings enables these controls. Without
+that option, on unsupported firmware/topology, or after a transport fault,
+Settings shows **Brightness driver not available** with disabled controls. See
 [`../tools/apple-backlight/README.md`](../tools/apple-backlight/README.md) for
-what the backend still needs.
+the hardware scope and diagnostic boot messages.
 
 The device is mode 0600. A process with read-only access can see the values but
 cannot change them. Missing devices, permissions, offline state, malformed
@@ -89,7 +89,7 @@ positive short write is an error and its suffix is never retried as a command.
 
 ## Implementation and tests
 
-`settings_app.v` implements `HostedApp`; `app.v` registers the launcher, and
+`settings_app.v` implements `NativeApp`; `app.v` registers the launcher, and
 `settings.v` stores the desktop preferences and themes. `scale.v`
 owns the requested/applied integer scale and default policy. `scale_wm.v` swaps
 the compositor's logical canvas between physical size and half size, remaps
@@ -128,5 +128,5 @@ with the actual **V kernel backlight core**. The POSIX tests exercise real files
 shared mapping, directories, `/dev/null`, monotonic clocks and a PTY, including
 restoration of both terminal attributes and descriptor flags.
 
-The DCP transport/backend is still missing: desktop scaling does not change the
-status of physical brightness adjustment.
+Desktop scaling is independent of the DCP backlight transport and never changes
+the status of physical brightness adjustment.

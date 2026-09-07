@@ -86,6 +86,7 @@ mut:
 	r_shift u32
 	g_shift u32
 	b_shift u32
+	gpu     GpuPresenter
 }
 
 fn open_framebuffer(path string) !Framebuffer {
@@ -150,6 +151,13 @@ fn (fb &Framebuffer) pack_pixel(pixel u32) u32 {
 // at half resolution and each logical pixel is expanded to a crisp 2x2 block.
 // On the usual XRGB8888 framebuffer the 100% path remains one memcpy per frame.
 fn (mut fb Framebuffer) present(canvas &Canvas, scale int) {
+	// On an M1 build this creates a surfaceless EGL context lazily and lets AGX
+	// scale/composite the CPU canvas into the firmware framebuffer. The static
+	// desktop and any failed GPU initialization continue through this file's
+	// existing software paths.
+	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+		return
+	}
 	if scale == desktop_scale_200 {
 		for source_y := 0; source_y < canvas.height; source_y++ {
 			physical_y := source_y * desktop_scale_200
@@ -209,6 +217,7 @@ fn (mut fb Framebuffer) present(canvas &Canvas, scale int) {
 }
 
 fn (mut fb Framebuffer) close() {
+	fb.gpu.close()
 	if fb.base != unsafe { nil } {
 		desktop_munmap(fb.base, fb.size)
 		fb.base = unsafe { nil }

@@ -17,6 +17,17 @@ fn utility_tree_has_text(element ui2.Element, text string) bool {
 	return false
 }
 
+fn utility_element_named(element ui2.Element, id string) ?ui2.Element {
+	if element.id == id {
+		return element
+	}
+	for child in element.children {
+		found := utility_element_named(child, id) or { continue }
+		return found
+	}
+	return none
+}
+
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
 		visible_rows: 4
@@ -93,47 +104,134 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 }
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
-	assert available_apps.len == 8
-	assert available_apps[4].title == 'Activity Monitor'
+	assert available_apps.len == 9
+	assert available_apps[0].process_name == 'vinix-files'
+	assert available_apps[1].title == 'Firefox'
+	assert available_apps[1].exclusive_command == '/usr/bin/run-firefox'
+	assert available_apps[1].process_name == ''
+	assert available_apps[3].process_name == 'vinix-terminal'
+	assert available_apps[3].keyboard && available_apps[3].polling
+	assert available_apps[5].title == 'Activity Monitor'
+	assert available_apps[5].process_name == 'vinix-activity'
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	assert taskbar_launcher_width(1280, 114, available_apps.len) == launcher_width
-	assert taskbar_launcher_width(1152, 114, available_apps.len) == 82
-	assert taskbar_launcher_width(1024, 114, available_apps.len) == 66
+	assert taskbar_launcher_width(1280, 114, available_apps.len) == 87
+	assert taskbar_launcher_width(1152, 114, available_apps.len) == 72
+	assert taskbar_launcher_width(1024, 114, available_apps.len) == 58
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
 }
 
-fn test_activity_monitor_includes_live_hosted_apps() {
-	mut desktop := Desktop{}
-	desktop.spawn('Welcome', .welcome, 0, 0, 100, 100)
-	calculator_id := desktop.spawn('Calculator', .app, 0, 0, 100, 100)
-	desktop.spawn('Text Editor', .app, 0, 0, 100, 100)
+fn test_show_desktop_button_minimizes_every_window() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1280
+			height: 720
+		}
+	}
+	first := desktop.spawn('One', .welcome, 10, 10, 300, 200)
+	desktop.spawn('Two', .system, 20, 20, 300, 200)
+	desktop.minimize(first)
+	desktop.dirty = false
 
-	mut monitor := ActivityMonitor{}
-	assert monitor.sync_open_apps(desktop)
-	assert !monitor.sync_open_apps(desktop)
-	assert monitor.app_count == 2
-	assert monitor.rows.any(it.is_app && it.name == 'Calculator')
-	assert monitor.rows.any(it.is_app && it.name == 'Text Editor')
-	assert !monitor.rows.any(it.is_app && it.name == 'Welcome')
+	root := desktop.build_tree()
+	button := utility_element_named(root, action_show_desktop) or {
+		panic('missing Show desktop button')
+	}
+	assert int(button.frame.x) == 1280 - show_desktop_button_width
+	assert int(button.frame.y) == 720 - taskbar_height
+	assert int(button.frame.width) == show_desktop_button_width
+	assert int(button.frame.height) == taskbar_height
+	free_tree(root)
 
-	desktop.close_window(calculator_id)
-	assert monitor.sync_open_apps(desktop)
-	assert monitor.app_count == 1
-	assert !monitor.rows.any(it.is_app && it.name == 'Calculator')
-	assert monitor.rows.any(it.is_app && it.name == 'Text Editor')
+	desktop.targets << HitTarget{
+		action_id: action_show_desktop
+		x: 1280 - show_desktop_button_width
+		y: 720 - taskbar_height
+		width: show_desktop_button_width
+		height: taskbar_height
+	}
+	desktop.on_pointer_down(1279, 719)
+	assert desktop.visible_window_count() == 0
+	assert desktop.focus == 0
+	assert desktop.dirty
 }
 
-fn test_activity_monitor_uses_only_the_window_title_as_its_heading() {
+fn test_firefox_requests_an_exclusive_display_handoff() {
 	mut desktop := Desktop{}
-	desktop.spawn('Calculator', .app, 0, 0, 100, 100)
-	mut app := ActivityApp{
-		desktop: &desktop
+	desktop.launch(available_apps[1])
+	assert desktop.pending_external == '/usr/bin/run-firefox'
+	assert desktop.apps.len == 0
+	assert desktop.windows.len == 0
+}
+
+fn test_external_display_handoff_redraws_and_reports_failures() {
+	mut desktop := Desktop{
+		canvas: new_canvas(800, 600)
 	}
+	desktop.wallpaper_valid = true
+	desktop.external_finished(.success)
+	assert desktop.dirty
+	assert !desktop.wallpaper_valid
+	assert desktop.windows.len == 0
+
+	desktop.external_finished(.unavailable)
+	assert desktop.windows.len == 1
+	assert desktop.windows[0].title == 'Firefox'
+	assert desktop.windows[0].page == .external_error
+	assert desktop.external_error.contains('not installed')
+	unsafe { free(voidptr(desktop.canvas.pixels)) }
+}
+
+fn test_activity_monitor_uses_only_real_process_rows() {
+	mut app := ActivityApp{}
 	tree := app.build(ui2.rect(0, 0, 520, 360))!
-	assert utility_tree_has_text(tree, 'Calculator')
-	assert !utility_tree_has_text(tree, 'Activity Monitor')
+	assert utility_tree_has_text(tree, 'MB')
 	free_tree(tree)
 	app.monitor.free_rows()
+}
+
+fn test_native_process_names_are_presented_as_app_names() {
+	mut sample := ActivitySample{}
+	name := '/usr/bin/vinix-activity[42]'
+	for index := 0; index < name.len; index++ {
+		sample.name[index] = name[index]
+	}
+	display := activity_name_of(&sample)
+	assert display == 'Activity Monitor'
+	unsafe { display.free() }
+}
+
+fn test_application_tree_protocol_round_trip() {
+	child := ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
+		bg: 0x123456
+		radius: 6
+	}, ui2.TextStyle{
+		color: 0xfefefe
+		background_color: 0x010203
+		size: 13
+		font_family: 'mono'
+		bold: true
+		shadow: true
+		align: .center
+	})
+	root := ui2.screen(0xabcdef, [child])
+	mut encoded := []u8{}
+	encode_app_element(root, mut encoded)!
+	decoded := decode_app_tree(encoded)!
+	assert decoded.box.bg == 0xabcdef
+	assert decoded.children.len == 1
+	button := decoded.children[0]
+	assert button.kind == .button
+	assert button.id == 'save'
+	assert button.text == 'Save'
+	assert button.image_path == 'builtin:editor'
+	assert button.frame.x == 7 && button.frame.y == 9
+	assert button.box.bg == 0x123456 && button.box.radius == 6
+	assert button.text_style.font_family == 'mono'
+	assert button.text_style.bold && button.text_style.shadow
+	assert button.text_style.align == .center
+	free_tree(root)
+	free_tree(decoded)
+	unsafe { encoded.free() }
 }

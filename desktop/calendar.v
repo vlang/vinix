@@ -40,7 +40,7 @@ mut:
 	selection    string
 }
 
-fn open_calendar(mut desktop Desktop) !HostedApp {
+fn open_calendar(mut desktop Desktop) !NativeApp {
 	mut app := &CalendarApp{
 		tz_offset: desktop.tz_offset_seconds
 	}
@@ -135,7 +135,7 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * calendar_padding
-	mut children := []ui2.Element{}
+	mut children := frame_elements(45)
 
 	children << ui2.button(calendar_action_previous, '<', ui2.rect(f64(calendar_padding), 14, 34, 28), ui2.BoxStyle{
 		bg: calendar_button
@@ -189,14 +189,12 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 			} else if today { calendar_today } else { app_surface }
 			radius: 7
 			transparent: !selected && !today
-		}, [
-			ui2.label('', calendar_days[day - 1], ui2.rect(0, 0, f64(cell_width - 4), f64(cell_height - 4)), ui2.TextStyle{
-				color: if selected { app_on_accent } else { body_text }
-				size: 13
-				bold: selected || today
-				align: .center
-			}),
-		])
+		}, frame_child(ui2.label('', calendar_days[day - 1], ui2.rect(0, 0, f64(cell_width - 4), f64(cell_height - 4)), ui2.TextStyle{
+			color: if selected { app_on_accent } else { body_text }
+			size: 13
+			bold: selected || today
+			align: .center
+		})))
 	}
 
 	footer_y := height - calendar_footer_height

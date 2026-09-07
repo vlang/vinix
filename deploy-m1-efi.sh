@@ -20,9 +20,9 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
             ;;
         --apple-dcp)
-            # Experimental display-coprocessor probe. The current simplified
-            # IOMFB transport does not create /dev/apple-panel-bl. Separate
-            # from the GPU: probing one must not run the other's sequence.
+            # Experimental t8103 internal-panel IOMFB/backlight transport.
+            # Separate from the GPU: probing one must not run the other's
+            # sequence.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_dcp=1"
             ;;
         --apple-battery)
@@ -54,6 +54,7 @@ for argument in "$@"; do
         --all-drivers)
             # Enable every optional Apple subsystem in one switch. Battery is
             # already the safe default but remains explicit in this mode.
+            ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1 vinix.apple_wifi=1"
             ;;
         --native-resolution)
@@ -71,7 +72,13 @@ for argument in "$@"; do
             # different connector and can reset the shared display fabric.
             USE_EXTERNAL_DISPLAY=1
             USE_NATIVE_RESOLUTION=1
-            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.apple_dcp=0"
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.display_hotplug=1 vinix.display_coldplug=reboot vinix.apple_dcp=0"
+            ;;
+        --apple-display-hotplug)
+            # Monitor both CD321x Type-C controllers. This is useful when
+            # testing reconnect independently of GOP selection; it does not
+            # enable the first-attach reboot policy.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display_hotplug=1"
             ;;
         --force-fault)
             # Self-test of the signal channel: fault on purpose and expect a
@@ -104,7 +111,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -122,7 +129,7 @@ for argument in "$@"; do
 done
 
 if [ -z "$ESP_MOUNT" ]; then
-    echo "usage: $0 [--apple-studio-display|--external-display] [options] <mounted_esp_path>"
+    echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [options] <mounted_esp_path>"
     exit 1
 fi
 
@@ -169,6 +176,35 @@ for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
         exit 1
     fi
 done
+
+if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
+    echo "APPLE GPU: kernel AGX probe enabled"
+    # The render node proves the kernel driver initialized, but desktop and GL
+    # acceleration additionally need the exact Mesa build matching its UAPI.
+    # Inspect the image being copied, rather than a possibly stale host staging
+    # directory, so this warning describes what the M1 will actually boot.
+    if tar -tf "$INITRAMFS" | awk -v desktop="$USE_DESKTOP_INITRAMFS" '
+        {
+            path = $0
+            sub(/^\.\//, "", path)
+            if (path == "usr/lib/dri/asahi_dri.so") asahi = 1
+            if (path == "usr/share/vinix/asahi-x11-egl") marker = 1
+            if (path == "usr/bin/gl-triangle-agx") triangle = 1
+            if (path == "usr/bin/vinix-desktop-gpu") gpu_desktop = 1
+        }
+        END {
+            ready = asahi && marker && triangle
+            if (desktop) ready = ready && gpu_desktop
+            exit !ready
+        }
+    '; then
+        echo "APPLE GPU: matching Asahi Mesa and hardware test are present in the initramfs"
+    else
+        echo "WARNING: AGX is enabled, but the selected initramfs lacks the complete Asahi runtime." >&2
+        echo "         The kernel render-node probe can still be tested; desktop/GL acceleration cannot." >&2
+        echo "         Rebuild build-aarch64-asahi/staging in the ARM64 VM, then rebuild this image." >&2
+    fi
+fi
 
 echo "using limine EFI: $LIMINE_EFI"
 
@@ -278,13 +314,14 @@ echo "Compare the entry point against Limine's 'ELF entry point' line at boot."
 if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
     cat <<'EXTERNAL_DISPLAY'
 
-Apple Studio Display handoff is enabled. Before powering on the M1 Air:
-  1. Connect power and the Studio Display.
-  2. Make the firmware boot UI appear on the Studio Display (clamshell mode is
-     the most reliable way to make it the single boot output).
-  3. Leave the display attached through the complete boot.
+Apple Studio Display handoff is enabled. You can either boot with the display
+already connected, or connect it after Vinix starts on the M1 Air panel. A
+first post-boot connection causes one warm reboot; leave the cable attached so
+iBoot/m1n1 can train the link. Clamshell mode is the most reliable way to make
+firmware choose the Studio Display as its single output.
 
 Vinix will print "framebuffer: selected GOP ... (external handoff)" once the
-kernel owns the selected surface. Post-boot hot-plug is not supported yet.
+kernel owns the selected surface. Unplug/replug of an already handed-off
+output is detected and repainted without another reboot.
 EXTERNAL_DISPLAY
 fi

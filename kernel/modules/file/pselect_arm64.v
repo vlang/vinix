@@ -143,7 +143,10 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 			mut sleep_events := [&timer.event]
 			defer {
 				timer.disarm()
-				unsafe { sleep_events.free() }
+				unsafe {
+					free(timer)
+					sleep_events.free()
+				}
 			}
 			event.await(mut sleep_events, true) or { return errno.err, errno.eintr }
 		}
@@ -155,8 +158,7 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 		timeout_ptr = &deadline
 	}
 
-	ready, err := syscall_ppoll(unsafe { nil }, unsafe { &polls[0] }, u64(polls.len),
-		timeout_ptr, unsafe { nil })
+	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil })
 	if err != 0 {
 		return ready, err
 	}

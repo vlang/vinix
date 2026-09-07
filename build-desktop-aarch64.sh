@@ -2,7 +2,7 @@
 # Cross-compile the Vinix desktop environment for aarch64 and stage it into an
 # initramfs that boots straight into it.
 #
-# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--wifi-bundle=DIR]
+# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]
 #
 # V translates the program to C; clang compiles that C against the static musl
 # sysroot extracted from the userland image. The result is a freestanding
@@ -26,15 +26,42 @@ LLVM_BIN="/opt/homebrew/opt/llvm/bin"
 CC_SHIM="$SCRIPT_DIR/build-support/aarch64-cc-shim"
 BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
+PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
+NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
+FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
+ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
+GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
+
+merge_staging_tree() {
+    local overlay="$1"
+    local source relative destination
+
+    # macOS cp follows an existing destination symlink. The Python and network
+    # closures share a few libraries, so remove a destination link before the
+    # later overlay replaces it instead of overwriting its target.
+    while IFS= read -r -d '' source; do
+        relative="${source#"$overlay/"}"
+        destination="$STAGING/$relative"
+        if [ -L "$destination" ]; then
+            rm -f "$destination"
+        fi
+    done < <(find "$overlay" -mindepth 1 -print0)
+
+    cp -a "$overlay/." "$STAGING/"
+}
 
 MAKE_INITRAMFS=1
+COMPACT_INITRAMFS=0
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
         --no-initramfs) MAKE_INITRAMFS=0 ;;
+        --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]"
+            echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
             ;;
@@ -84,7 +111,7 @@ if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
     exit 1
 fi
 
-# The desktop hosts ui2 applications through QmlApp, ui2's embeddable QML host.
+# Native app processes use QmlApp to build declarative trees for the compositor.
 # A checkout without it fails deep inside the V build with an error about an
 # unknown type, which says nothing about the real problem.
 if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/qml_embed.v" ]; then
@@ -102,10 +129,11 @@ fi
 mkdir -p "$BUILD_DIR"
 
 # ── Stage the sources ──
-# The desktop hosts ui2 applications in its windows, and an application's model
-# is V code that has to be compiled in. The staging step takes each example's
-# source straight from the ui2 checkout — everything but its `fn main()`, which
-# only opens a platform window — so what runs is the example itself.
+# Native ui2 applications exec this multicall binary under per-app names, and
+# an application's model is V code that has to be compiled in. The staging
+# step takes each example's source straight from the ui2 checkout — everything
+# but its `fn main()`, which only opens a platform window — so what runs is the
+# example itself.
 echo "==> Staging sources..."
 APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
@@ -120,7 +148,7 @@ echo "==> Translating V to C..."
 # so the desktop says when it was built.
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
 echo "    build stamp: $BUILD_STAMP"
-"$V" -os linux -gc none -enable-globals -prod \
+"$V" -os linux -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
@@ -143,19 +171,95 @@ echo "==> Compiling for aarch64-linux-musl..."
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
 echo "    $BUILD_DIR/vinix-desktop ($(stat -f%z "$BUILD_DIR/vinix-desktop") bytes)"
 
+# Mesa is a dynamic runtime, so keep the always-bootable static desktop and
+# build a second executable only when the exact Asahi userspace is available.
+# desktop-init selects this executable when the M1 render node exists. The UI
+# is still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
+# presentation to AGX before the unavoidable firmware-framebuffer readback.
+GPU_DESKTOP_BUILT=0
+if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
+   [ -f "$ASAHI_STAGING/usr/lib/libGLESv2.so" ] &&
+   [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
+   [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
+    echo "==> Translating the GPU-enabled desktop to C..."
+    "$V" -os linux -gc none -manualfree -enable-globals -prod \
+        -d ui2_headless -d vinix_gpu_present \
+        -d "vinix_build_stamp=$BUILD_STAMP" \
+        -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
+        -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
+
+    echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
+    "$LLVM_BIN/clang" --target=aarch64-linux-musl \
+        --sysroot="$GPU_SYSROOT" --gcc-toolchain="$SYSROOT" -static-libgcc \
+        -isystem "$CC_SHIM" \
+        -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
+        -O2 -fPIE -pie -fno-stack-protector -w \
+        "$BUILD_DIR/desktop-gpu.c" "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+        -L"$ASAHI_STAGING/usr/lib" \
+        -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
+        -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
+        -lEGL -lGLESv2 -ldl -lpthread -lm \
+        -fuse-ld=lld -B"$LLVM_BIN" \
+        -o "$BUILD_DIR/vinix-desktop-gpu"
+    "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
+    echo "    $BUILD_DIR/vinix-desktop-gpu ($(stat -f%z "$BUILD_DIR/vinix-desktop-gpu") bytes)"
+    GPU_DESKTOP_BUILT=1
+    if [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
+        echo "    NOTE: this Asahi staging predates X11/GBM support; rebuild it for Firefox acceleration"
+    fi
+else
+    echo "==> Asahi EGL staging not found; keeping the static software desktop only"
+fi
+
 if [ "$MAKE_INITRAMFS" -eq 0 ]; then
     exit 0
 fi
 
 # ── Stage an initramfs that boots into the desktop ──
-# Extract the full userland, then replace its init before repacking it. Appending
-# an overlay tar would leave duplicate paths that the kernel's initramfs
-# unpacker rejects; replacing files in a staging tree gives the output one
-# entry per path while retaining Python, Git, GCC and every other installed
-# userland component.
+# Appending an overlay tar would leave duplicate paths that the kernel's
+# initramfs unpacker rejects, so stage before repacking it. A full userland is
+# useful for development but can exceed an M1 EFI partition. Compact mode keeps
+# the native GCC toolchain plus the packaged Python, network-tool and Firefox
+# closures, while leaving out unrelated large runtimes.
 if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
+fi
+if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
+    echo "ERROR: desktop needs $X11_STAGING/usr/bin/vinix-xinput" >&2
+    echo "Run ./build-x11-aarch64.sh first." >&2
+    exit 1
+fi
+if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/pkg" ] ||
+   [ ! -x "$NETWORK_TOOLS_STAGING/sbin/apk" ] ||
+   [ ! -s "$NETWORK_TOOLS_STAGING/etc/vinix-pkg/base-world" ]; then
+    echo "ERROR: desktop needs the package layer in $NETWORK_TOOLS_STAGING" >&2
+    echo "Run ./build-network-tools-aarch64.sh first." >&2
+    exit 1
+fi
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    if [ ! -x "$PYTHON_STAGING/usr/bin/python3" ]; then
+        echo "ERROR: compact desktop needs $PYTHON_STAGING/usr/bin/python3" >&2
+        echo "Run ./build-python-aarch64.sh first." >&2
+        exit 1
+    fi
+    if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/git" ]; then
+        echo "ERROR: compact desktop needs $NETWORK_TOOLS_STAGING/usr/bin/git" >&2
+        echo "Run ./build-network-tools-aarch64.sh first." >&2
+        exit 1
+    fi
+    if [ ! -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
+        echo "ERROR: compact desktop needs $FIREFOX_STAGING/usr/bin/run-firefox" >&2
+        echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh first." >&2
+        exit 1
+    fi
+    if [ ! -x "$X11_STAGING/usr/bin/Xorg" ] ||
+        [ ! -x "$X11_STAGING/usr/bin/startx" ] ||
+        [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
+        echo "ERROR: compact desktop needs Xorg, startx and vinix-xinput in $X11_STAGING" >&2
+        echo "Run ./build-x11-aarch64.sh first." >&2
+        exit 1
+    fi
 fi
 
 # `package.py` produces the only supported bundle format. Its manifest binds
@@ -194,20 +298,128 @@ echo "==> Staging the desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
-tar xf "$BASE_INITRAMFS" -C "$STAGING"
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
+    tar xf "$BASE_INITRAMFS" -C "$STAGING" \
+        ./bin/busybox ./aarch64-linux-musl-native
+    merge_staging_tree "$X11_STAGING"
+    merge_staging_tree "$FIREFOX_STAGING"
+    merge_staging_tree "$NETWORK_TOOLS_STAGING"
+    merge_staging_tree "$PYTHON_STAGING"
+
+    # Scripts in the Firefox/X11/package closure use ordinary command names. The
+    # compact image carries BusyBox but not the full userland's applet links,
+    # so provide the small set needed by pkg, run-firefox and Vinix's startx.
+    for applet in sh cat chmod dirname id ln mkdir rm sed sleep; do
+        ln -sf busybox "$STAGING/bin/$applet"
+    done
+    # This stripped toolchain intentionally carries static libc and libgcc.
+    # Its stock driver still prefers libgcc_s for an ordinary link, so wrap it
+    # with the matching static-libgcc default. Callers can otherwise use GCC as
+    # normal, and `cc` already resolves through the gcc symlink.
+    mv "$STAGING/aarch64-linux-musl-native/bin/gcc" \
+        "$STAGING/aarch64-linux-musl-native/bin/gcc.bin"
+    printf '%s\n' '#!/bin/busybox sh' \
+        'exec /aarch64-linux-musl-native/bin/gcc.bin -static-libgcc "$@"' \
+        > "$STAGING/aarch64-linux-musl-native/bin/gcc"
+    chmod +x "$STAGING/aarch64-linux-musl-native/bin/gcc"
+else
+    tar xf "$BASE_INITRAMFS" -C "$STAGING"
+    # The base archive may predate package support. Always refresh this small
+    # layer so the terminal gets pkg/apk without rebuilding the full userland.
+    merge_staging_tree "$NETWORK_TOOLS_STAGING"
+fi
+
+# Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
+# exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
+# unrelated Mesa build.
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+    merge_staging_tree "$ASAHI_STAGING"
+fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
-    "$STAGING/root"
+    "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
+chmod 1777 "$STAGING/tmp"
+
+# Keep the display handoff pieces in sync with the desktop source even when the
+# full base userland predates them. The bridge is a cross-compiled executable;
+# package/Firefox launchers and policy files can be installed directly from
+# source.
+install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
+install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
+install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
+install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" "$STAGING/root/firefox-smoke.html"
+mkdir -p "$STAGING/etc/firefox/policies"
+install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
+    "$STAGING/etc/firefox/policies/policies.json"
+
+firefox_app_found=0
+for firefox_app_dir in "$STAGING/usr/lib/firefox" "$STAGING/usr/lib/firefox-esr"; do
+    if [ -d "$firefox_app_dir" ]; then
+        firefox_app_found=1
+        mkdir -p "$firefox_app_dir/defaults/pref" "$firefox_app_dir/distribution"
+        install -m644 "$SCRIPT_DIR/build-support/firefox/vinix.js" \
+            "$firefox_app_dir/defaults/pref/vinix.js"
+        install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
+            "$firefox_app_dir/distribution/policies.json"
+    fi
+done
 
 if [ ! -x "$STAGING/bin/busybox" ]; then
     echo "ERROR: base userland has no executable /bin/busybox" >&2
     exit 1
 fi
+if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
+    echo "ERROR: desktop image is missing pkg or apk" >&2
+    exit 1
+fi
+for runtime_path in usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox; do
+    if [ ! -x "$STAGING/$runtime_path" ]; then
+        echo "ERROR: desktop Firefox runtime is missing /$runtime_path" >&2
+        echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the userland." >&2
+        exit 1
+    fi
+done
+if [ "$firefox_app_found" -ne 1 ]; then
+    echo "ERROR: desktop image has no Firefox application directory" >&2
+    echo "Run ./build-firefox-aarch64.sh and ./build-userland-aarch64.sh first." >&2
+    exit 1
+fi
+if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+       [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
+   ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
+       [ -x "$STAGING/usr/bin/firefox" ]; }; then
+    echo "ERROR: desktop image has no complete Firefox executable pair" >&2
+    echo "Run ./build-firefox-aarch64.sh and ./build-userland-aarch64.sh first." >&2
+    exit 1
+fi
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
+        if [ ! -x "$STAGING/$command_path" ]; then
+            echo "ERROR: compact desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
+fi
 
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+    cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
+    chmod +x "$STAGING/usr/bin/vinix-desktop-gpu"
+fi
 cp "$BUILD_DIR/wifi-ctl" "$STAGING/usr/bin/wifi-ctl"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
     "$STAGING/usr/bin/wifi-ctl"
+
+# One immutable multicall image, one exec name and process per application.
+# Vinix records the path passed to execve, so these relative symlinks produce
+# distinct names and truthful per-app accounting without storing eight copies
+# of the same static executable in the initramfs.
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
+    vinix-activity vinix-editor vinix-calendar vinix-clock; do
+    ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
+done
 
 if [ -n "$WIFI_BUNDLE" ]; then
     echo "==> Staging the selected Wi-Fi firmware bundle..."
@@ -238,7 +450,8 @@ fi
 # The desktop's own source travels with the image, so the file browser has
 # something real to show and so the machine carries the code it is running.
 mkdir -p "$STAGING/root/desktop"
-cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop/README.md" \
+cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
+    "$SCRIPT_DIR/desktop/README.md" \
     "$STAGING/root/desktop/"
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the

@@ -281,11 +281,11 @@ export LD="ld.lld"
     --disable-config-udev \
     --disable-dri \
     --disable-dri2 \
-    --disable-dri3 \
+    --enable-dri3 \
     --disable-int10-module \
     --disable-vgahw \
-    --disable-libdrm \
-    --disable-glamor \
+    --enable-libdrm \
+    --enable-glamor \
     --enable-glx \
     --disable-xinerama \
     --enable-screensaver \
@@ -368,6 +368,17 @@ mkdir -p "$STAGING/usr/bin"
 for bin in xclock xinit startx xauth xmodmap xrdb xset xkbcomp glxinfo glxgears tri glxdemo; do
     [ -f "$SYSROOT/usr/bin/$bin" ] && cp -a "$SYSROOT/usr/bin/$bin" "$STAGING/usr/bin/"
 done
+install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+
+# Vinix exposes its pointer as one small absolute-coordinate packet and its
+# keyboard through the console. Translate both into XTEST events rather than
+# importing Linux's evdev/udev input stack just to run X11 applications.
+echo "  Building Vinix X11 input bridge..."
+$CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-xinput.c" \
+    -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
+    -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
+    -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-xinput"
 
 # Copy XKB data
 if [ -d "$SYSROOT/usr/share/X11/xkb" ]; then

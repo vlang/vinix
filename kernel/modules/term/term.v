@@ -116,6 +116,18 @@ pub fn report_framebuffer_selection() {
 	println('framebuffer: selected GOP ${framebuffer_index + 1}/${count}, ${fb.width}x${fb.height}x${fb.bpp} (${mode})')
 }
 
+// Dimensions of the one framebuffer chosen during the Limine handoff.  The
+// Type-C first-attach policy uses the exact 2560x1600 built-in M1 Air mode as
+// its fail-closed discriminator; it does not guess that an unknown surface is
+// safe to replace.
+pub fn selected_framebuffer_dimensions() (u64, u64) {
+	fb := selected_framebuffer()
+	if fb == unsafe { nil } || !fb_address_usable(fb) {
+		return 0, 0
+	}
+	return fb.width, fb.height
+}
+
 // Stop drawing to the framebuffer on behalf of `owner_pid`. Idempotent: the
 // framebuffer's mmap path calls it for every page it hands out.
 pub fn enter_graphics_mode(owner_pid int) {
@@ -144,6 +156,22 @@ pub fn leave_graphics_mode_if_owner(pid int) {
 	if terminal_graphics_mode && terminal_graphics_owner == pid {
 		leave_graphics_mode()
 	}
+}
+
+// The boot firmware owns link training for a handed-off external scanout.  A
+// reconnect exposes the same framebuffer again; repaint the saved terminal so
+// a console that was idle while unplugged becomes visible immediately.  A
+// graphics owner keeps its pixels in that framebuffer and will present on its
+// own schedule, so do not paint over it.
+pub fn display_hotplug(connected bool) {
+	if !connected {
+		return
+	}
+	terminal_print_lock.acquire()
+	if !terminal_graphics_mode && flanterm_ctx != unsafe { nil } {
+		C.flanterm_full_refresh(flanterm_ctx)
+	}
+	terminal_print_lock.release()
 }
 
 // Limine hands the framebuffer over as a higher-half address inside the HHDM.

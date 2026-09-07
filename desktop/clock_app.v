@@ -24,7 +24,7 @@ mut:
 	last_refresh_ms u64
 }
 
-fn open_clock(mut desktop Desktop) !HostedApp {
+fn open_clock(mut desktop Desktop) !NativeApp {
 	mut app := &ClockApp{
 		tz_offset: desktop.tz_offset_seconds
 	}
@@ -144,7 +144,7 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 	height := int(size.height)
 	pad := 24
 	inner := width - 2 * pad
-	mut children := []ui2.Element{}
+	mut children := frame_elements(8)
 
 	children << ui2.label('', a.time_text, ui2.rect(f64(pad), 28, f64(inner), 72), ui2.TextStyle{
 		color: body_heading

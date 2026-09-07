@@ -195,6 +195,51 @@ codex --dangerously-bypass-approvals-and-sandbox
 codex exec --dangerously-bypass-approvals-and-sandbox "your task"
 ```
 
+### Packages on aarch64
+
+Vinix uses Alpine 3.21's aarch64/musl repositories for optional software. Build
+the network-tools layer before the userland (the desktop's compact image already
+requires this layer):
+
+```sh
+./build-network-tools-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+The desktop builder also overlays the current network-tools layer directly,
+so rebuilding the desktop refreshes `pkg` even when its base userland archive
+was created before package support was added.
+
+Inside Vinix, use `pkg` to search, install, remove, and upgrade Alpine packages.
+The friendly `gtk` name installs GTK 3, its two demonstration programs, the
+Adwaita icons, and DejaVu fonts:
+
+```sh
+pkg update
+pkg search gtk
+pkg install gtk
+./gtk-package-smoke.sh
+```
+
+Gnumeric is also installed on demand with its GTK theme and fonts:
+
+```sh
+pkg install gnumeric
+./gnumeric-package-smoke.sh
+```
+
+`pkg` disables Alpine maintainer scripts that assume a complete Alpine init
+system.
+The package database and installed files live in the running root filesystem;
+with the standard initramfs they last until reboot. Direct Alpine package names
+also work, for example `pkg install nano`.
+
+GTK and Gnumeric are deliberately not included in the base or network-tools
+package layer. GTK is downloaded only when it or an application that needs it
+is requested. The GTK smoke test first checks that the base image is GTK-free,
+installs it, then opens both `gtk3-demo` and `gtk3-widget-factory` against the
+Vinix Xorg server. Gnumeric is likewise absent until explicitly installed.
+
 ### Firefox on aarch64
 
 Firefox ESR can run as a stock Alpine musl application on Vinix's existing
@@ -220,22 +265,48 @@ run-firefox
 run-firefox https://example.com
 ```
 
+After rebuilding the desktop image, its wallpaper and taskbar also contain a
+Firefox launcher. Clicking it hands the framebuffer, pointer and keyboard to
+Xorg for the lifetime of Firefox, then returns to the native desktop when the
+browser exits:
+
+```sh
+./build-desktop-aarch64.sh
+./run-desktop-aarch64.sh --no-build --mem=8192
+```
+
+The X11 session uses a small Vinix-specific input bridge for the native
+absolute pointer packets and console keyboard. This keeps Linux evdev and udev
+out of the system while giving Firefox normal X11 mouse and keyboard events.
+The desktop builder overlays the current bridge and Firefox configuration onto
+the full userland too, so an older base image cannot contain `startx` without
+its required input bridge. If the compiled bridge is absent, rebuild X11 first.
+
 `build-firefox-aarch64.sh` resolves and stages the complete Alpine runtime
 dependency closure, including GTK/X11, fonts, TLS certificates, and media
 libraries. It defaults to Alpine 3.22's Firefox 140 ESR: newer Alpine builds
 currently link Scudo, whose virtual-memory contract Vinix does not yet provide.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
+The compact desktop image used by the default M1 deployment merges the Firefox
+and X11 staging trees directly, alongside Python, Git and GCC, so its launcher
+works without shipping the much larger complete userland image.
 
-Firefox runs with software rendering and its Linux namespace/seccomp sandboxes
-disabled because Vinix does not implement those kernel facilities yet. The
-browser displays Firefox's reduced-protection warning accordingly.
+On M1, Firefox automatically enables WebRender over X11 EGL when the native
+render node and exact Asahi Mesa runtime are present. Xorg imports those AGX
+buffers through DRI3 and uses glamor; all other targets keep the software
+renderer, as does `VINIX_FORCE_SOFTWARE_GL=1`. Firefox's Linux namespace and
+seccomp sandboxes remain disabled because Vinix does not implement those
+kernel facilities yet, so the browser displays its reduced-protection warning.
 
 ### Apple M1 GPU test image
 
 Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It
-uses the Mesa 25.0.5 Asahi Gallium driver for surfaceless EGL/GLES2 rendering,
-then copies the completed GPU frame to the Limine framebuffer. The private GPU
+uses the Mesa 25.0.5 Asahi Gallium driver for desktop OpenGL and GLES through
+EGL, with surfaceless, GBM and X11 platform support. The native desktop uses a
+surfaceless GPU presenter, while Xorg/Firefox share GPU buffers through PRIME
+and DRI3. Both still copy the completed image to the Limine framebuffer because
+Vinix does not yet have a native DCP/KMS scanout driver. The private GPU
 firmware structures are currently pinned to Apple firmware ABI 12.3.0; the
 driver refuses other firmware ABIs before touching GPU hardware.
 
@@ -269,6 +340,26 @@ VINIX_MUSL_SYSROOT="$PWD/build-aarch64-asahi/sysroot" \
 This produces `build-support/init-aarch64/initramfs.tar`; copy that file and
 `kernel/bin/vinix` back to the macOS checkout before deploying.
 
+To put the accelerated native desktop and Firefox in the M1 image, rebuild the
+desktop after copying the Asahi staging tree, then select both the GPU and that
+image at deployment:
+
+```sh
+./build-desktop-aarch64.sh --compact-initramfs
+./deploy-m1-efi.sh --apple-gpu --desktop-initramfs /Volumes/EFI
+```
+
+The installed M1 deployment helper enables the GPU in its default desktop mode,
+alongside Wi-Fi, so the normal hardware test is simply:
+
+```sh
+sudo ~/code/kek.sh
+```
+
+Use `sudo ~/code/kek.sh gpu` to isolate the driver with the shell test image,
+or `sudo ~/code/kek.sh desktop-wifi` to boot the same desktop with AGX disabled
+if the experimental probe resets before reaching userspace.
+
 Deploy to an already-mounted M1 EFI system partition with the explicit GPU
 opt-in, then boot through m1n1 so Vinix receives the patched device tree:
 
@@ -300,10 +391,11 @@ still fail-closed until its firmware command ABI is complete.
 ### Apple Studio Display on an M1 Air
 
 Vinix can preserve a Studio Display scanout that the Apple firmware and
-m1n1/U-Boot chain established before the kernel starts. This is a deliberately
-single-output, boot-time framebuffer handoff: connect the display before
-power-on and make sure the startup UI is visible there (clamshell mode is the
-most reliable choice on an Air).
+m1n1/U-Boot chain established before the kernel starts. This is deliberately a
+single-output framebuffer handoff. Both USB-C ports are monitored, so an
+inherited output reconnects live. If Vinix booted on the M1 Air panel, a first
+post-boot connection performs one ANS-ordered warm reboot so firmware can
+establish the external scanout.
 
 ```sh
 ./build-desktop-aarch64.sh
@@ -312,9 +404,11 @@ make -C kernel ARCH=aarch64 CC=clang
 ```
 
 The deploy flag keeps the firmware's native mode, selects the largest GOP
-surface when multiple outputs are present, and prevents the internal-panel DCP
-experiment from resetting the inherited external scanout. Post-boot hot-plug
-and the Studio Display's audio/camera/USB devices are not included yet. See
+surface when multiple outputs are present, prevents the internal-panel DCP
+experiment from resetting the inherited external scanout, and enables the
+post-boot recovery. Vinix does not yet switch the output in place because it
+lacks native ATC/external-DCP modesetting. The Studio Display's
+audio/camera/USB devices are not included. See
 [docs/apple-studio-display.md](docs/apple-studio-display.md) for the boot
 procedure, expected log lines, and failure diagnosis.
 

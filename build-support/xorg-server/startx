@@ -1,0 +1,93 @@
+#!/bin/sh
+# Direct X11 launcher for Vinix on aarch64. The upstream startx script relies
+# on VT discovery, xauth helpers and xinit behaviour that Vinix does not have.
+set -eu
+
+mkdir -p /tmp/.X11-unix /var/log
+
+# The exact Mesa build is used as a capability marker as well as the runtime.
+# With it and the render node present, fbdev loads glamor and X11 EGL clients
+# use Asahi. Otherwise Xorg keeps its existing CPU shadow-framebuffer path.
+if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
+   [ -e /dev/dri/renderD128 ] &&
+   [ -e /usr/lib/libgbm.so.1 ] &&
+   [ -f /usr/share/vinix/asahi-x11-egl ]; then
+    unset LIBGL_ALWAYS_SOFTWARE
+    export MESA_LOADER_DRIVER_OVERRIDE=asahi
+    echo "startx: enabling AGX glamor/DRI3 acceleration"
+else
+    export VINIX_FORCE_SOFTWARE_GL=1
+fi
+
+d=0
+while [ -e "/tmp/.X11-unix/X$d" ] || [ -e "/tmp/.X$d-lock" ]; do
+    d=$((d + 1))
+done
+display=":$d"
+export DISPLAY="$display"
+
+run_client() {
+    if [ -n "${STARTX_CLIENT_LOG:-}" ]; then
+        "$@" >"$STARTX_CLIENT_LOG" 2>&1
+    else
+        "$@"
+    fi
+}
+
+SERVER_PID=
+INPUT_PID=
+stop_session() {
+    if [ -n "$INPUT_PID" ]; then
+        kill "$INPUT_PID" 2>/dev/null || true
+        wait "$INPUT_PID" 2>/dev/null || true
+        INPUT_PID=
+    fi
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+        SERVER_PID=
+    fi
+}
+trap 'stop_session; exit 1' HUP INT TERM
+trap stop_session EXIT
+
+echo "startx: launching Xorg on $display"
+/usr/bin/Xorg "$display" +iglx -noreset \
+    </dev/null >/var/log/Xorg.startx.log 2>&1 &
+SERVER_PID=$!
+echo "startx: Xorg PID=$SERVER_PID (sleeping 1s for init)"
+sleep 1
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    wait "$SERVER_PID" 2>/dev/null || true
+    SERVER_PID=
+    echo "startx: Xorg exited during startup" >&2
+    exit 1
+fi
+
+if [ ! -x /usr/bin/vinix-xinput ]; then
+    echo "startx: /usr/bin/vinix-xinput is required" >&2
+    exit 1
+fi
+/usr/bin/vinix-xinput >/var/log/vinix-xinput.log 2>&1 &
+INPUT_PID=$!
+
+set +e
+if [ "$#" -gt 0 ]; then
+    if [ -f "$1" ]; then
+        client="$1"
+        shift
+        run_client /bin/sh "$client" "$@"
+    else
+        run_client "$@"
+    fi
+elif [ -f "$HOME/.xinitrc" ]; then
+    run_client /bin/sh "$HOME/.xinitrc"
+else
+    run_client xclock -geometry 400x400+50+50
+fi
+client_status=$?
+set -e
+
+stop_session
+trap - EXIT HUP INT TERM
+exit "$client_status"

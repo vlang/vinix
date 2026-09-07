@@ -977,6 +977,25 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 	return 0, 0
 }
 
+pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
+	path := unsafe { cstring_to_vstring(_path) }
+	if path.len == 0 {
+		return errno.err, errno.enoent
+	}
+
+	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	mut node := get_node(parent, path, true) or { return errno.err, errno.get() }
+	if node.read_only {
+		return errno.err, errno.erofs
+	}
+
+	// Preserve the object type and update only permission/special bits, just as
+	// fchmod does. Archive extractors use fchmodat after creating each file.
+	mut node_resource := node.resource
+	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & ~u32(stat.ifmt))
+	return 0, 0
+}
+
 pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process

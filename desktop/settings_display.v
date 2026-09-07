@@ -185,31 +185,33 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 	x := settings_padding
 	inner := width - 2 * settings_padding
 	if inner < 300 {
-		return [
-			settings_label('Enlarge Settings to show its controls.', x, settings_padding,
-				if inner > 0 { inner } else { 1 }, body_text),
-		]
+		mut narrow := frame_elements(1)
+		narrow << settings_label('Enlarge Settings to show its controls.', x, settings_padding, if inner > 0 {
+			inner
+		} else {
+			1
+		}, body_text)
+		return narrow
 	}
 
 	active := a.can_change()
 	percent := if a.read_result == .ok { backlight_percent(&a.state) } else { -1 }
-	mut out := [
-		ui2.label('', 'Display', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
-			color: body_heading
-			size: 20
-			bold: true
-		}),
-		settings_label('Scale', x, 46, 42, body_muted),
-		settings_scale_button(settings_scale_100_action, '100%', x + 50,
-			desktop_requested_scale() == desktop_scale_100),
-		settings_scale_button(settings_scale_200_action, '200%', x + 116,
-			desktop_requested_scale() == desktop_scale_200),
-		settings_label('Built-in display', x + 190, 46, inner - 190, body_muted),
-		ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{ bg: body_rule }, []),
-		settings_label('Brightness', x, 90, inner - 100, body_heading),
-		settings_label(a.level_text, x + inner - 100, 90, 100, body_heading),
-	]
-	// A click-to-set stepped bar, not a pretend draggable slider: HostedApp
+	mut out := frame_elements(settings_brightness_actions.len + 16)
+	out << ui2.label('', 'Display', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
+		color: body_heading
+		size: 20
+		bold: true
+	})
+	out << settings_label('Scale', x, 46, 42, body_muted)
+	out << settings_scale_button(settings_scale_100_action, '100%', x + 50, desktop_requested_scale() == desktop_scale_100)
+	out << settings_scale_button(settings_scale_200_action, '200%', x + 116, desktop_requested_scale() == desktop_scale_200)
+	out << settings_label('Built-in display', x + 190, 46, inner - 190, body_muted)
+	out << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{
+		bg: body_rule
+	}, [])
+	out << settings_label('Brightness', x, 90, inner - 100, body_heading)
+	out << settings_label(a.level_text, x + inner - 100, 90, 100, body_heading)
+	// A click-to-set stepped bar, not a pretend draggable slider: NativeApp
 	// receives action ids, not pointer coordinates. Every step is 5%.
 	for i, id in settings_brightness_actions {
 		left := x + inner * i / settings_brightness_actions.len
@@ -235,10 +237,8 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 	out << settings_label(a.range_text, x, 160, inner, body_muted)
 	out << settings_button('settings.decrease', '- 5%', ui2.rect(f64(x), 192, 62, 30), active
 		&& percent > 0)
-	out << settings_button('settings.increase', '+ 5%', ui2.rect(f64(x + 70), 192, 62, 30),
-		active && percent >= 0 && percent < 100)
-	out << settings_button('settings.refresh', 'Refresh', ui2.rect(f64(x + inner - 80), 192,
-		80, 30), true)
+	out << settings_button('settings.increase', '+ 5%', ui2.rect(f64(x + 70), 192, 62, 30), active && percent >= 0 && percent < 100)
+	out << settings_button('settings.refresh', 'Refresh', ui2.rect(f64(x + inner - 80), 192, 80, 30), true)
 	out << settings_label(a.requested_text, x, 236, inner, body_text)
 	out << settings_label(a.actual_text, x, 258, inner, body_text)
 	out << settings_label(a.status_text(), x, 290, inner, if a.read_result != .ok
@@ -248,11 +248,9 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 		body_muted
 	})
 	if a.read_result == .unavailable {
-		out << settings_label('DCP backend integration is still required.', x, 312, inner,
-			body_muted)
+		out << settings_label('DCP backend integration is still required.', x, 312, inner, body_muted)
 	} else {
-		out << settings_label('Click the bar to set brightness in 5% steps.', x, 312, inner,
-			body_muted)
+		out << settings_label('Click the bar to set brightness in 5% steps.', x, 312, inner, body_muted)
 	}
 	return out
 }
@@ -261,10 +259,13 @@ fn (a &SettingsApp) battery_pane(width int, height int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	// Nothing offscreen is built, so nothing offscreen can become a hit target.
 	if inner < 300 || height < 360 {
-		return [
-			settings_label('Enlarge Settings to show its controls.', settings_padding,
-				settings_padding, if inner > 0 { inner } else { 1 }, body_text),
-		]
+		mut narrow := frame_elements(1)
+		narrow << settings_label('Enlarge Settings to show its controls.', settings_padding, settings_padding, if inner > 0 {
+			inner
+		} else {
+			1
+		}, body_text)
+		return narrow
 	}
 	percent := a.battery_read(false)
 	history := a.battery_history()

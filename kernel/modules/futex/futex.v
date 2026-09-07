@@ -79,6 +79,7 @@ pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
 	mut timer := time.new_timer(duration)
 	defer {
 		timer.disarm()
+		unsafe { free(timer) }
 	}
 
 	mut events := [e, &timer.event]

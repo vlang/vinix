@@ -151,7 +151,10 @@ for package in \
     musl musl-dev linux-headers libgcc libstdc++ libstdc++-dev libatomic \
     zlib zlib-dev zstd-libs zstd-dev \
     libdrm libdrm-dev libpciaccess libpciaccess-dev \
-    expat libexpat expat-dev hwdata-pci; do
+    expat libexpat expat-dev hwdata-pci \
+    xorgproto xcb-proto libxau libxau-dev libxdmcp libxdmcp-dev \
+    libxcb libxcb-dev libx11 libx11-dev libxext libxext-dev \
+    libxfixes libxfixes-dev libxshmfence libxshmfence-dev; do
     extract_apk main "$package"
 done
 # Alpine's runtime package carries the SONAME file but not the linker name.
@@ -200,35 +203,39 @@ EOF
 
 echo "==> Building Mesa $MESA_VERSION Asahi for Vinix"
 export PATH="$HOST_TOOLS/bin:$PATH"
+TARGET_MESON_OPTIONS=(
+    --prefix=/usr
+    --libdir=lib
+    --buildtype=release
+    -Dstrip=true
+    -Dplatforms=x11
+    -Dglx=disabled
+    -Degl=enabled
+    -Dgbm=enabled
+    -Dopengl=true
+    -Dgles1=disabled
+    -Dgles2=enabled
+    -Dshared-glapi=enabled
+    -Dgallium-drivers=asahi
+    -Dvulkan-drivers=
+    -Dllvm=disabled
+    -Ddraw-use-llvm=false
+    -Dmesa-clc=system
+    -Dprecomp-compiler=system
+    -Dshader-cache=disabled
+    -Dxmlconfig=disabled
+    -Dvalgrind=disabled
+    -Dlibunwind=disabled
+    -Dbuild-tests=false
+    -Dtools=
+    -Dvideo-codecs=
+)
 if [ -f "$TARGET_BUILD/build.ninja" ]; then
-    meson setup --reconfigure "$TARGET_BUILD" "$MESA_SRC" --cross-file "$CROSS_FILE"
+    meson setup --reconfigure "$TARGET_BUILD" "$MESA_SRC" \
+        --cross-file "$CROSS_FILE" "${TARGET_MESON_OPTIONS[@]}"
 else
     meson setup "$TARGET_BUILD" "$MESA_SRC" --cross-file "$CROSS_FILE" \
-        --prefix=/usr \
-        --libdir=lib \
-        --buildtype=release \
-        -Dstrip=true \
-        -Dplatforms= \
-        -Dglx=disabled \
-        -Degl=enabled \
-        -Dgbm=disabled \
-        -Dopengl=false \
-        -Dgles1=disabled \
-        -Dgles2=enabled \
-        -Dshared-glapi=enabled \
-        -Dgallium-drivers=asahi \
-        -Dvulkan-drivers= \
-        -Dllvm=disabled \
-        -Ddraw-use-llvm=false \
-        -Dmesa-clc=system \
-        -Dprecomp-compiler=system \
-        -Dshader-cache=disabled \
-        -Dxmlconfig=disabled \
-        -Dvalgrind=disabled \
-        -Dlibunwind=disabled \
-        -Dbuild-tests=false \
-        -Dtools= \
-        -Dvideo-codecs=
+        "${TARGET_MESON_OPTIONS[@]}"
 fi
 ninja -C "$TARGET_BUILD" -j"$NPROC"
 rm -rf "$STAGING"
@@ -236,7 +243,8 @@ DESTDIR="$STAGING" ninja -C "$TARGET_BUILD" install
 
 echo "==> Installing Asahi runtime and hardware triangle"
 mkdir -p "$STAGING/lib" "$STAGING/etc" "$STAGING/usr/lib" \
-    "$STAGING/usr/bin" "$STAGING/usr/share/examples/gl-triangle"
+    "$STAGING/usr/bin" "$STAGING/usr/share/examples/gl-triangle" \
+    "$STAGING/usr/share/vinix"
 # The base ARM64 userland uses a static musl build. The Asahi libraries need
 # Alpine's dynamic loader from the same pinned sysroot as Mesa.
 install -m755 "$SYSROOT/lib/ld-musl-aarch64.so.1" \
@@ -244,7 +252,10 @@ install -m755 "$SYSROOT/lib/ld-musl-aarch64.so.1" \
 printf '%s\n' /lib /usr/lib > "$STAGING/etc/ld-musl-aarch64.path"
 for pattern in \
     'libdrm.so*' 'libpciaccess.so*' 'libstdc++.so*' 'libgcc_s.so*' \
-    'libatomic.so*' 'libz.so*' 'libzstd.so*' 'libexpat.so*'; do
+    'libatomic.so*' 'libz.so*' 'libzstd.so*' 'libexpat.so*' \
+    'libX11.so*' 'libX11-xcb.so*' 'libXau.so*' 'libXdmcp.so*' \
+    'libxcb.so*' 'libxcb-*.so*' 'libXext.so*' 'libXfixes.so*' \
+    'libxshmfence.so*'; do
     for library in "$SYSROOT/usr/lib"/$pattern; do
         [ -e "$library" ] || continue
         cp -a "$library" "$STAGING/usr/lib/"
@@ -261,6 +272,8 @@ install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     "$STAGING/usr/share/examples/gl-triangle/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" "$STAGING/usr/bin/"
+printf '%s\n' "mesa=$MESA_VERSION platforms=x11,surfaceless gbm=enabled" \
+    > "$STAGING/usr/share/vinix/asahi-x11-egl"
 
 X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging"
 if [ -d "$X11_STAGING/usr/lib" ]; then

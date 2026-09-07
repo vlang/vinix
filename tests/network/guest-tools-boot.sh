@@ -47,6 +47,9 @@ echo "PASS OpenSSH TCP client"
 
 apk update
 echo "PASS APK repository sync"
+pkg search gtk+3.0 >/tmp/pkg-search
+grep -q 'gtk+3.0' /tmp/pkg-search
+echo "PASS Vinix package search"
 xbps-install -S
 echo "PASS XBPS repository sync"
 

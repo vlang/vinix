@@ -6,8 +6,11 @@ A small desktop environment for Vinix, written in V and built on
 ![The desktop running under QEMU](screenshot.png)
 
 It maps `/dev/fb0`, reads the pointer from `/dev/pointer` and the keyboard from
-its controlling terminal, and composes every frame itself: there is no display
-server, no GPU and no toolkit underneath it.
+its controlling terminal, and composes every frame itself without a display
+server or toolkit underneath it. The normal binary is entirely software. An
+M1 image that contains the Asahi Mesa runtime also carries a GPU-enabled binary
+which uses AGX to scale and present that canvas when `/dev/dri/renderD128`
+exists, with an automatic fallback to the static software binary.
 
 What it does:
 
@@ -28,8 +31,8 @@ What it does:
 - a **clock** with a large local-time display and a tenth-second stopwatch
 - a **settings application**: window button side, taskbar style, theme,
   wallpaper, display, battery and experimental M1 Wi-Fi controls
-- **hosted ui2 applications**: ui2's own examples run in windows of their own,
-  several at a time, each with its own state
+- **native ui2 applications**: every Files, Calculator, Terminal, Settings and
+  utility window is backed by its own OS process, PID and memory accounting
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the
   middle of the screen when it is held
 
@@ -44,7 +47,8 @@ typing any word with a q in it drop the user back to the console.
     main.v         the event loop: poll input, rebuild, render, present
     wm.v           the window manager — window list, the ui2 tree, hit routing
     window.v       the Window model and the pages windows show
-    app.v          hosting applications in windows, and which ones there are
+    app.v          native application metadata and factories
+    app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
     editor.v       the plain-text editor and its keyboard editing model
@@ -61,6 +65,7 @@ typing any word with a q in it drop the user back to the console.
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
     font.v         text, from the coverage atlases in font_data.v
     framebuffer.v  /dev/fb0: geometry over ioctl, pixels over mmap
+    gpu_present.v / gpu_present_egl.c  optional M1 EGL/GLES presenter
     input.v        /dev/pointer, and the terminal in raw mode
     clock.v        CLOCK_REALTIME and the calendar arithmetic on top of it
     theme.v        every colour and measurement in one place
@@ -74,9 +79,10 @@ routed by hit-testing those records. So what is on screen and what responds to
 the pointer come from one description and cannot drift apart.
 
 ui2's element tree is platform independent, which is what makes this possible:
-the target has no `gg`, no Sokol and no OpenGL, so `-d ui2_headless` compiles
-ui2's declarative core without its renderer, and this program supplies the
-renderer instead.
+the target has no `gg` or Sokol, so `-d ui2_headless` compiles ui2's
+declarative core without its renderer, and this program supplies the renderer
+instead. The optional EGL path is a presenter around that renderer rather than
+a replacement for its element-tree rasterizer.
 
 Two conventions extend ui2 for this backend, both documented at the top of
 `render.v`: an `image_path` of `builtin:<name>` draws a vector glyph the
@@ -84,24 +90,37 @@ renderer carries itself, since the target has no image files; and a rounded
 view at the top level of the tree is a floating surface, so it gets a drop
 shadow and a hairline edge.
 
-## Hosting ui2 applications
+## Native ui2 applications
 
 A ui2 application normally calls `run_qml`, which opens a platform window and
-blocks until it closes. There is no platform here to ask — the desktop *is* the
-window system — so it uses ui2's `QmlApp` instead: the application hands over an
-element tree for a content area of whatever size its window happens to be, and
-gets back the id of whatever the user hit. Because the size is passed in rather
-than taken from a display, an application re-lays-out when its window is
-resized or maximised, which is how the calculator recentres itself.
+blocks until it closes. Here the desktop *is* the window system, but the app is
+still a separate process. The compositor starts `vinix-files`,
+`vinix-calculator`, `vinix-terminal`, and the other installed app names with
+two private pipes. The app builds a ui2 element tree and sends the
+renderer-relevant fields to the compositor; click actions and keyboard input
+travel back over the request pipe. Because the compositor supplies the content
+size, an app re-lays-out when its window is resized or maximised.
+
+Only the compositor opens the framebuffer, pointer and raw keyboard. All
+unrelated descriptors are closed before an app is exec'd, so the app processes
+are ordinary display clients rather than competing display owners. Closing a
+window asks its process to exit and reaps it; leaving the desktop closes every
+remaining client. Settings returns its synchronized preference state with each
+response, allowing theme, wallpaper and scale changes to cross the boundary
+immediately.
+
+The app names are relative symlinks to one static multicall executable. This
+keeps the initramfs small, while each exec creates an independent address space
+and Vinix records the per-app exec path as its process name. Consequently
+`/dev/processes` reports truthful CPU and mapped-memory values for every app.
 
 The applications are ui2's own examples, and they are not copied into this
 repository. `tools/stage_app.py` takes each example's source straight from the
 ui2 checkout at build time and removes exactly one thing: its `fn main()`,
 which exists to open a platform window and block. Everything the application
 is — its model, its methods, its QML document — compiles unmodified, so what
-runs on Vinix is the example rather than a retelling of it. Both it and the
-desktop are `module main`, so they share a directory and V builds them as one
-program.
+runs on Vinix is the example rather than a retelling of it. The multicall
+executable selects the requested app factory before opening any display device.
 
 The window manager owns four action prefixes — `taskbar.`, `task.`, `win.` and
 `shortcut.` — and treats everything else as an application's, routing it to
@@ -115,13 +134,34 @@ it then has a wallpaper shortcut and a taskbar launcher. A ui2 example also
 needs its directory listed in `build-desktop-aarch64.sh` so the staging step
 compiles it in.
 
+Firefox is the deliberately different case. It is an upstream X11/GTK
+application rather than a native ui2 client. Its
+`AppFactory` names `/usr/bin/run-firefox` as an exclusive command. At a frame
+boundary the desktop restores the console and closes its framebuffer and
+pointer descriptors, waits while Xorg and Firefox own them, then reopens the
+devices and redraws when Firefox exits. This keeps GTK confined to Firefox's
+packaged userspace runtime; `vinix-desktop` itself does not link or implement
+GTK. The small `/usr/bin/vinix-xinput` bridge translates Vinix's native pointer
+packets and console keyboard bytes into ordinary X11 input, avoiding an evdev
+or udev compatibility layer. The desktop image builder refreshes this bridge,
+the direct `startx` launcher, and Firefox's Vinix policy files even when its
+base userland image is older. It refuses to publish an image with an incomplete
+Firefox/Xorg runtime; the native error window remains as a runtime fallback.
+Firefox's upstream graphics and GTK diagnostics are written to
+`/var/log/firefox.log`. On an M1 image with the Asahi runtime, Xorg enables
+glamor/DRI3 and Firefox enables WebRender over X11 EGL. Without the render node,
+or with `VINIX_FORCE_SOFTWARE_GL=1`, both retain their software paths. Because
+the display is still a firmware framebuffer rather than a DCP/KMS scanout,
+hardware-rendered client buffers ultimately make one CPU-visible copy to
+`/dev/fb0`.
+
 ## The file browser
 
 `files.v` is not a ui2 example but Vinix's own, and it reads a real
 filesystem — the listing comes from the kernel's `getdents64` through musl's
 `readdir`, and each entry is `stat`ed for its size. It satisfies the same
-`HostedApp` interface, so the window manager hosts it with the machinery that
-was already there and knows nothing about files.
+`NativeApp` interface in its client process, so the window manager's protocol
+proxy knows nothing about files.
 
 Directories sort before files and both sort by name, because the order a
 directory is read in is whatever the filesystem happens to store. Clicking a
@@ -156,11 +196,11 @@ the clock.
 ## The activity monitor
 
 `activity.v` lists every process on the machine with the share of one CPU and
-of RAM it is using. It also lists every open hosted application; applications
-such as Calculator and Text Editor live inside `vinix-desktop`, so their CPU
-and RAM columns are honestly shown as shared rather than counted a second
-time. Like the file browser it is Vinix's own rather than a ui2 example, and
-like it, it reads the real system.
+of RAM it is using. Native apps such as Calculator and Text Editor appear as
+ordinary kernel records with their own PID and measured CPU and RAM. It maps
+their stable executable names (`vinix-calculator`, `vinix-editor`, and so on)
+to the labels shown elsewhere in the desktop. Like the file browser it is
+Vinix's own rather than a ui2 example, and like it, it reads the real system.
 
 Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
 answers a read with one snapshot of the whole table — a short header, then a
@@ -311,7 +351,7 @@ see `FONT-LICENSE.txt`.
 Each face is a weight and a pixel size, and the renderer picks the closest one
 to what a text style asks for rather than scaling, because a stretched bitmap
 atlas looks far worse than one a couple of pixels off. The baked sizes are the
-ones the desktop's chrome uses plus those hosted applications ask for.
+ones the desktop's chrome uses plus those native applications ask for.
 
 Runs are decoded as UTF-8. Beyond printable ASCII each face carries the
 supplemental code points in the generator's `EXTRA_RUNES` — `÷` and `±` among
@@ -347,6 +387,11 @@ installed, one command builds everything and boots into the desktop:
     ./run-desktop-aarch64.sh
 
 It builds the kernel, builds the desktop, and starts QEMU on the result.
+The desktop launcher uses its own `boot-image/boot-desktop.img` disk, created
+as a sparse 2 GiB image on its first run. This leaves the ordinary
+`boot-image/boot.img` available for the smaller shell image. Set
+`VINIX_BOOT_DISK` (and, for a new disk, `VINIX_BOOT_DISK_SIZE_MB` or
+`--disk=MB`) to choose another disk.
 
     --no-build      boot what is already built
     --no-kernel     skip the kernel build (the desktop is what you changed)
@@ -358,7 +403,9 @@ A second VM cannot share the boot disk: QEMU takes a write lock on it and
 refuses to start without one. `--replace` stops the one already running.
 
 Anything else is passed through to `run-aarch64.sh`: `--mem=MB`, `--serial`,
-`--virtio-gpu`.
+`--virtio-gpu`. The desktop launcher supplies 8 GiB of guest RAM by default:
+the root filesystem is loaded into memory during boot. Use `--mem=MB` or
+`VINIX_QEMU_MEM` to override it.
 
 `build-desktop-aarch64.sh` is the build on its own, if that is all you want. It
 translates the V to C, compiles it for `aarch64-linux-musl` against the static

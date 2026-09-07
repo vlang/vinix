@@ -49,10 +49,25 @@ export MOZ_DISABLE_RDD_SANDBOX=1
 export MOZ_DISABLE_SOCKET_PROCESS_SANDBOX=1
 export MOZ_CRASHREPORTER_DISABLE=1
 
-# The Xorg fbdev server is software-rendered. Keep Firefox off DRI/GBM paths
-# while preserving WebRender's supported software backend.
-export LIBGL_ALWAYS_SOFTWARE=1
-export MOZ_X11_EGL=0
+# Prefer WebRender/EGL only when both halves of the M1 graphics stack are
+# present. Xorg imports Firefox's AGX buffers through DRI3, then glamor copies
+# the completed image to the firmware framebuffer. QEMU and incomplete images
+# retain the known-good software path, which can also be forced for debugging.
+if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
+   [ -e /dev/dri/renderD128 ] &&
+   [ -e /usr/lib/libgbm.so.1 ] &&
+   [ -f /usr/share/vinix/asahi-x11-egl ]; then
+    unset LIBGL_ALWAYS_SOFTWARE MOZ_WEBRENDER_SOFTWARE
+    export MESA_LOADER_DRIVER_OVERRIDE=asahi
+    export MOZ_X11_EGL=1
+    export MOZ_WEBRENDER=1
+    export MOZ_ACCELERATED=1
+    echo "run-firefox: enabling AGX WebRender/EGL"
+else
+    export LIBGL_ALWAYS_SOFTWARE=1
+    export MOZ_X11_EGL=0
+    export MOZ_WEBRENDER_SOFTWARE=1
+fi
 
 if [ "$#" -eq 0 ]; then
     set -- file:///root/firefox-smoke.html
@@ -68,5 +83,10 @@ if [ ! -x /usr/bin/Xorg ] || [ ! -x /usr/bin/startx ]; then
     exit 1
 fi
 
+# Firefox's early glxtest still prints hardware GL/PCI failures even when the
+# browser is deliberately using software rendering. Keep those and other GTK
+# diagnostics available without making a healthy graphical launch look like a
+# boot failure on the serial console.
+export STARTX_CLIENT_LOG="${VINIX_FIREFOX_LOG:-/var/log/firefox.log}"
 exec /usr/bin/startx "$browser" --no-remote --new-instance \
     --profile "$VINIX_FIREFOX_PROFILE" "$@"

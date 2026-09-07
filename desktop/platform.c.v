@@ -23,6 +23,8 @@ import term.termios
 
 #include <sys/wait.h>
 
+#include <signal.h>
+
 #include <termios.h>
 
 #include <time.h>
@@ -35,7 +37,7 @@ fn C.mmap(base voidptr, length usize, prot int, flags int, fd int, offset i64) v
 
 fn C.munmap(base voidptr, length usize) int
 
-// Match vlib/net's declaration if a hosted application also imports it.
+// Match vlib/net's declaration if a native application also imports it.
 fn C.fcntl(fd int, cmd int, arg ...voidptr) int
 
 fn desktop_open_rw(path string) int {
@@ -232,6 +234,52 @@ struct SpawnedShell {
 // its toolchain prefix rather than /usr/bin.
 const desktop_command_path = '/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin'
 
+enum ExternalProgramResult {
+	success
+	unavailable
+	spawn_failed
+	wait_failed
+	failed
+}
+
+// Run a framebuffer application as a child of the desktop and wait until it
+// gives the display back. The caller closes the desktop's device descriptors
+// first; inheriting the console is intentional, as Xorg uses it for its VT.
+fn desktop_run_external(path string) ExternalProgramResult {
+	if path == '' || C.access(&char(path.str), C.X_OK) != 0 {
+		return .unavailable
+	}
+
+	argv := [&char(path.str), &char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
+
+	pid := C.fork()
+	if pid < 0 {
+		return .spawn_failed
+	}
+	if pid == 0 {
+		C.execve(&char(path.str), argv.data, envp.data)
+		C._exit(127)
+	}
+
+	mut status := 0
+	for {
+		waited := C.waitpid(pid, &status, 0)
+		if waited == pid {
+			return if status == 0 { .success } else { .failed }
+		}
+		if waited < 0 && C.errno == C.EINTR {
+			continue
+		}
+		return .wait_failed
+	}
+	return .wait_failed
+}
+
 // Start a shell for the terminal.
 //
 // Vinix has no pseudo-terminals, so the child is given plain pipes. It sees
@@ -299,6 +347,166 @@ fn desktop_write(fd int, buffer voidptr, count u64) i64 {
 		return -1
 	}
 	return i64(C.write(fd, buffer, usize(count)))
+}
+
+// Exact pipe I/O for compositor/application messages. Unlike device reads,
+// pipes may legally return a short count; a protocol frame is complete only
+// after every byte has crossed.
+fn desktop_read_all(fd int, buffer voidptr, count u64) bool {
+	mut done := u64(0)
+	for done < count {
+		got := desktop_read(fd, unsafe { voidptr(&u8(buffer) + done) }, count - done)
+		if got > 0 {
+			done += u64(got)
+			continue
+		}
+		if got < 0 && C.errno == C.EINTR {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+fn desktop_write_all(fd int, buffer voidptr, count u64) bool {
+	mut done := u64(0)
+	for done < count {
+		wrote := desktop_write(fd, unsafe { voidptr(&u8(buffer) + done) }, count - done)
+		if wrote > 0 {
+			done += u64(wrote)
+			continue
+		}
+		if wrote < 0 && C.errno == C.EINTR {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+fn desktop_set_cloexec(fd int, enabled bool) bool {
+	flags := C.fcntl(fd, C.F_GETFD)
+	if flags < 0 {
+		return false
+	}
+	next := if enabled { flags | C.FD_CLOEXEC } else { flags & ~C.FD_CLOEXEC }
+	return C.fcntl(fd, C.F_SETFD, next) == 0
+}
+
+fn desktop_ignore_broken_pipe() {
+	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+}
+
+// A native application is another invocation of the desktop executable via a
+// per-app symlink. Vinix records the exec path as the process name, so these
+// are distinct `vinix-files`, `vinix-terminal`, ... processes even though the
+// immutable program image is shared on disk.
+struct SpawnedAppProcess {
+	pid        int
+	to_child   int
+	from_child int
+}
+
+fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppProcess {
+	if C.access(&char(path.str), C.X_OK) != 0 {
+		return none
+	}
+	mut request := [2]int{}
+	mut response := [2]int{}
+	if C.pipe(&request[0]) != 0 {
+		return none
+	}
+	if C.pipe(&response[0]) != 0 {
+		C.close(request[0])
+		C.close(request[1])
+		return none
+	}
+	desktop_set_cloexec(request[0], true)
+	desktop_set_cloexec(request[1], true)
+	desktop_set_cloexec(response[0], true)
+	desktop_set_cloexec(response[1], true)
+
+	mode_arg := '--vinix-app=${app_name}'
+	request_arg := '--request-fd=${request[0]}'
+	response_arg := '--response-fd=${response[1]}'
+	tz_arg := '--app-tz=${tz_offset}'
+	argv := [&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
+		&char(tz_arg.str), &char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
+
+	pid := C.fork()
+	if pid < 0 {
+		C.close(request[0])
+		C.close(request[1])
+		C.close(response[0])
+		C.close(response[1])
+		unsafe {
+			mode_arg.free()
+			request_arg.free()
+			response_arg.free()
+			tz_arg.free()
+			path_entry.free()
+			argv.free()
+			envp.free()
+		}
+		return none
+	}
+	if pid == 0 {
+		// Do not lend the app the compositor's framebuffer, pointer, or any
+		// existing app channels. The two protocol ends are the only descriptors
+		// above stderr that survive exec.
+		for fd := 3; fd < 4096; fd++ {
+			if fd != request[0] && fd != response[1] {
+				C.close(fd)
+			}
+		}
+		desktop_set_cloexec(request[0], false)
+		desktop_set_cloexec(response[1], false)
+		C.execve(&char(path.str), argv.data, envp.data)
+		C._exit(127)
+	}
+
+	C.close(request[0])
+	C.close(response[1])
+	unsafe {
+		mode_arg.free()
+		request_arg.free()
+		response_arg.free()
+		tz_arg.free()
+		path_entry.free()
+		argv.free()
+		envp.free()
+	}
+	return SpawnedAppProcess{
+		pid: pid
+		to_child: request[1]
+		from_child: response[0]
+	}
+}
+
+fn desktop_wait_child(pid int) {
+	if pid <= 0 {
+		return
+	}
+	mut status := 0
+	for {
+		waited := C.waitpid(pid, &status, 0)
+		if waited == pid || (waited < 0 && C.errno != C.EINTR) {
+			return
+		}
+	}
+}
+
+fn desktop_terminate_child(pid int) {
+	if pid <= 0 {
+		return
+	}
+	C.kill(pid, C.SIGTERM)
+	desktop_wait_child(pid)
 }
 
 // True once the child has exited, so the terminal can say so.

@@ -35,7 +35,7 @@ def stage_desktop(staging, desktop_dir):
         source = os.path.join(desktop_dir, name)
         if not os.path.isfile(source):
             continue
-        if not name.endswith(".v"):
+        if not (name.endswith(".v") or name.endswith(".h")):
             continue
         link = os.path.join(staging, name)
         if os.path.lexists(link):

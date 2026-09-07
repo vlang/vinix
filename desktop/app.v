@@ -1,49 +1,53 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-// Hosting ui2 applications in the desktop's windows.
+// Native ui2 applications shown in the desktop's windows.
 //
-// A ui2 application normally calls `run_qml`, which opens a platform window
-// and blocks until it closes. There is no platform here to ask — the desktop
-// *is* the window system — so it uses ui2's embeddable host instead: the
-// application hands over an element tree for a content area of whatever size
-// its window happens to be, and gets back the id of whatever the user hit.
+// A ui2 application normally calls `run_qml`, which opens a platform window.
+// Here the desktop is the window system: each application runs as its own
+// process, hands its element tree to the compositor over app_process.v's pipe
+// protocol, and gets back the id of whatever the user hit.
 //
-// Applications can be built in (Files and Settings) or ui2 examples, compiled
-// in verbatim by the build's staging step (see tools/stage_app.py).
+// Applications can be native Vinix utilities (Files and Settings) or ui2
+// examples compiled in verbatim by the build's staging step.
 module main
 
 import ui2
 
-// HostedApp is the whole of what the desktop needs from an application to give
-// it a window. ui2's QmlApp satisfies it, so any QML document with a V model
-// behind it can be put in a window without the window manager knowing the
-// first thing about what it does.
-interface HostedApp {
+// NativeApp is the client process' local application contract. ui2's QmlApp
+// satisfies it, so any QML document with a V model can be served to the
+// compositor without the window manager knowing what it does.
+interface NativeApp {
 mut:
 	build(size ui2.Rect) !ui2.Element
 	handle(event_id string) !
 }
 
-// AppFactory names an application the desktop can open, the size its window
-// should start at, and the builtin glyph that stands for it in the taskbar and
-// on the wallpaper.
+// AppFactory names an application the desktop can open and the builtin glyph
+// that stands for it in the taskbar and on the wallpaper. A native app has an
+// exec name and a factory used by its child process. A large external GUI can
+// instead ask for exclusive ownership of the display while its command runs.
 struct AppFactory {
-	title  string
-	icon   string
-	width  int
-	height int
-	// Given the desktop, because an application may need to read it or change
-	// it — Settings does both. Most ignore the argument.
-	open fn (mut desktop Desktop) !HostedApp @[required]
+	title             string
+	icon              string
+	width             int
+	height            int
+	process_name      string
+	polling           bool
+	keyboard          bool
+	exclusive_command string
+	// Used only after exec, in the application process. Settings receives that
+	// process' synchronized desktop-state proxy; most apps ignore it.
+	open fn (mut desktop Desktop) !NativeApp = unsafe { nil }
 }
 
 // Action ids are literals because launchers and shortcuts are rebuilt on
 // every redraw and Vinix runs without a garbage collector. Keep them parallel
 // with available_apps; their numeric suffix is what launch_index reads back.
 const app_launcher_actions = ['taskbar.launch.0', 'taskbar.launch.1', 'taskbar.launch.2',
-	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7']
+	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7',
+	'taskbar.launch.8']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
-	'shortcut.5', 'shortcut.6', 'shortcut.7']
+	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8']
 
 // available_apps is what the taskbar and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
@@ -54,13 +58,23 @@ const available_apps = [
 		icon: 'builtin:folder'
 		width: 460
 		height: 360
+		process_name: 'vinix-files'
 		open: open_files
+	},
+	AppFactory{
+		title: 'Firefox'
+		icon: 'builtin:browser'
+		// Firefox is an X11/GTK application. Xorg must own the framebuffer and
+		// input devices while it runs, so it is deliberately not embedded in a
+		// native desktop window.
+		exclusive_command: '/usr/bin/run-firefox'
 	},
 	AppFactory{
 		title: 'Calculator'
 		icon: 'builtin:calculator'
 		width: window_width
 		height: window_height + default_title_height
+		process_name: 'vinix-calculator'
 		open: open_calculator
 	},
 	AppFactory{
@@ -68,6 +82,9 @@ const available_apps = [
 		icon: 'builtin:terminal'
 		width: 560
 		height: 340
+		process_name: 'vinix-terminal'
+		polling: true
+		keyboard: true
 		open: open_terminal
 	},
 	AppFactory{
@@ -75,6 +92,7 @@ const available_apps = [
 		icon: 'builtin:settings'
 		width: 620
 		height: 410
+		process_name: 'vinix-settings'
 		open: open_settings_app
 	},
 	AppFactory{
@@ -85,6 +103,8 @@ const available_apps = [
 		// glimpse of one.
 		width: 520
 		height: 400
+		process_name: 'vinix-activity'
+		polling: true
 		open: open_activity
 	},
 	AppFactory{
@@ -92,6 +112,8 @@ const available_apps = [
 		icon: 'builtin:editor'
 		width: 700
 		height: 500
+		process_name: 'vinix-editor'
+		keyboard: true
 		open: open_editor
 	},
 	AppFactory{
@@ -99,6 +121,7 @@ const available_apps = [
 		icon: 'builtin:calendar'
 		width: 640
 		height: 500
+		process_name: 'vinix-calendar'
 		open: open_calendar
 	},
 	AppFactory{
@@ -106,14 +129,16 @@ const available_apps = [
 		icon: 'builtin:clock'
 		width: 560
 		height: 410
+		process_name: 'vinix-clock'
+		polling: true
 		open: open_clock
 	},
 ]
 
-fn open_calculator(mut _ Desktop) !HostedApp {
+fn open_calculator(mut _ Desktop) !NativeApp {
 	return ui2.new_qml_app[Calculator](calculator_qml_source, initial_calculator())!
 }
 
-fn open_settings_app(mut desktop Desktop) !HostedApp {
+fn open_settings_app(mut desktop Desktop) !NativeApp {
 	return desktop.open_settings()!
 }

@@ -112,6 +112,9 @@ fn test_battery_taskbar_labels_and_narrow_settings() {
 }
 
 fn test_battery_history_graph_and_estimate_are_rendered() {
+	assert battery_graph_x(0, 3_600_000, 455) == 435
+	assert battery_graph_x(3_600_000, 3_600_000, 455) == 454
+	assert battery_graph_x(3_600_001, 3_600_000, 455) == -1
 	mut history := BatteryHistory{}
 	history.observe(0, 80)
 	history.observe(300_000, 80)

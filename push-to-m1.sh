@@ -28,13 +28,23 @@ if [ "${VINIX_M1_EXCLUDE_BASE_INITRAMFS:-0}" = "1" ]; then
     echo "skipping unused base initramfs"
 fi
 
-rsync -a --stats \
+# macOS ships OpenRSYNC 2.6.9, which has --progress but not rsync 3's
+# --info=progress2.  --progress therefore keeps this usable on both: a large
+# desktop initramfs shows a live percentage instead of looking hung, and
+# --partial lets the next invocation resume after an interrupted Wi-Fi push.
+echo "==> Comparing files; changed files show a live percentage..."
+# The build workspaces are host-side intermediates, not boot inputs. The
+# kernel and selected initramfs remain included below, while their staging
+# trees are deliberately left out of an M1 deployment.
+rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
     --exclude 'vinix.iso' \
     --exclude 'boot-image/boot.img' \
     --exclude 'boot-image/limine-src-9.3.0/' \
     --exclude 'tools/agx-re/build/' \
+    --exclude 'build/' \
+    --exclude 'build-aarch64-*/' \
     --exclude 'kernel/obj/' \
     --exclude 'kernel/tmp.*' \
     --exclude '.DS_Store' \

@@ -5,7 +5,7 @@ module main
 
 import ui2
 
-// The whole desktop is staged for these tests, so HostedApp and the rest come
+// The whole desktop is staged for these tests, so NativeApp and the rest come
 // from the application itself rather than being restated here.
 //
 // Display and Battery are two categories of the desktop's one Settings

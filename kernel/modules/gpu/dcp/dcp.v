@@ -12,11 +12,8 @@ module dcp
 import apple.rtkit
 import apple.dart
 import drm.mode
-import drm.gem
-import devicetree
 import klock
 import memory
-import aarch64.cpu
 
 // Default shared memory region size for DCP communication
 const dcp_shmem_size = u64(0x100000) // 1 MiB
@@ -319,62 +316,12 @@ pub fn (mut dcp AppleDCP) vblank_handler() {
 	}
 }
 
-// Top-level DCP initialization: discover from device tree, create, and boot.
+// Top-level opt-in DCP initialization. Full modesetting above remains
+// experimental; the real t8103 path owns only internal-panel brightness and
+// preserves m1n1's inherited scanout.
 pub fn initialise() {
-	println('dcp: Probing Apple Display Controller')
-
-	// Find DCP node in device tree
-	dcp_node := devicetree.find_compatible('apple,dcp') or {
-		println('dcp: DCP not found in device tree')
-		return
+	println('dcp: probing real internal-panel backlight transport')
+	if !initialise_real_backlight() {
+		println('dcp: internal-panel backlight transport unavailable')
 	}
-
-	dcp_regs := devicetree.get_reg(dcp_node) or {
-		println('dcp: Failed to get DCP registers from device tree')
-		return
-	}
-
-	if dcp_regs.len < 2 {
-		println('dcp: Insufficient register ranges')
-		return
-	}
-
-	// Find DCP mailbox and DART
-	mbox_node := devicetree.find_compatible('apple,dcp-mailbox') or {
-		// Fall back to generic ASC mailbox for DCP
-		devicetree.find_compatible('apple,asc4') or {
-			println('dcp: DCP mailbox not found in device tree')
-			return
-		}
-	}
-	mbox_regs := devicetree.get_reg(mbox_node) or {
-		println('dcp: Failed to get DCP mailbox registers')
-		return
-	}
-	mbox_base := mbox_regs[0]
-
-	dart_node := devicetree.find_compatible('apple,t8103-dcp-dart') or {
-		// Try generic DART compatible
-		devicetree.find_compatible('apple,t8103-dart-dcp') or {
-			println('dcp: DCP DART not found in device tree')
-			return
-		}
-	}
-	dart_regs := devicetree.get_reg(dart_node) or {
-		println('dcp: Failed to get DCP DART registers')
-		return
-	}
-	dart_base := dart_regs[0]
-
-	mut inst := new_dcp(mbox_base, dart_base) or {
-		println('dcp: Failed to create DCP instance')
-		return
-	}
-
-	if !inst.initialise() {
-		println('dcp: DCP initialization failed')
-		return
-	}
-
-	println('dcp: Apple Display Controller initialized successfully')
 }

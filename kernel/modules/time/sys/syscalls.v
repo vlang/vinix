@@ -15,6 +15,7 @@ pub fn nsleep(ns i64) {
 	mut timer := time.new_timer(interval)
 	defer {
 		timer.disarm()
+		unsafe { free(timer) }
 	}
 
 	mut events := []&eventstruct.Event{}
@@ -87,6 +88,7 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 
 	defer {
 		timer.disarm()
+		unsafe { free(timer) }
 	}
 
 	event.await(mut events, true) or {

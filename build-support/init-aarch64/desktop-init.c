@@ -58,6 +58,15 @@ static void print(const char *text) {
 	syscall3(64 /* write */, 1, (u64)text, string_length(text));
 }
 
+static int gpu_available(void) {
+	i64 fd = syscall4(56 /* openat */, (u64)(i64)-100 /* AT_FDCWD */,
+	                  (u64)"/dev/dri/renderD128", 2 /* O_RDWR */, 0);
+	if (fd < 0)
+		return 0;
+	syscall1(57 /* close */, (u64)fd);
+	return 1;
+}
+
 static char *environment[] = {
 	"PATH=/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin",
 	"HOME=/root",
@@ -74,6 +83,7 @@ static char *environment[] = {
 
 void _start(void) {
 	char *desktop[] = { "/usr/bin/vinix-desktop", (char *)0 };
+	char *gpu_desktop[] = { "/usr/bin/vinix-desktop-gpu", (char *)0 };
 	char *shell[] = { "/bin/busybox", "sh", (char *)0 };
 
 #ifdef VINIX_WIFI_BUNDLE
@@ -93,6 +103,13 @@ void _start(void) {
 	if (child < 0 || syscall4(260 /* wait4 */, (u64)child, (u64)&status, 0, 0) < 0 || status != 0)
 		print("init: Wi-Fi firmware load failed; continuing without wireless\n");
 #endif
+
+	if (gpu_available()) {
+		print("\nVinix: starting the GPU-enabled desktop\n");
+		syscall3(221 /* execve */, (u64)gpu_desktop[0], (u64)gpu_desktop,
+		         (u64)environment);
+		print("init: GPU desktop unavailable; using the static software desktop\n");
+	}
 
 	print("\nVinix: starting the desktop\n");
 	syscall3(221 /* execve */, (u64)desktop[0], (u64)desktop, (u64)environment);

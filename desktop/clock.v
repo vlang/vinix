@@ -13,6 +13,7 @@ module main
 // guesswork: the desktop looks identical either way. A build that did not go
 // through the script — a host test run, say — says `dev`.
 const build_stamp = $d('vinix_build_stamp', 'dev')
+const taskbar_build_label = 'built ${build_stamp}'
 
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
@@ -66,21 +67,35 @@ fn civil_from_epoch(epoch i64) CivilTime {
 
 @[inline]
 fn pad2(value int) string {
-	return if value < 10 { '0${value}' } else { '${value}' }
+	text := value.str()
+	if value >= 10 {
+		return text
+	}
+	padded := '0${text}'
+	unsafe { text.free() }
+	return padded
 }
 
 // The first line puts battery percentage immediately to the left of the time;
 // the second keeps the existing date. Settings shares the five-second cache,
 // so composing a frame does not open the device again within that interval.
-fn (d &Desktop) clock_strings() (string, string) {
-	percent := read_battery(false)
-	seconds, _ := desktop_realtime()
+fn (d &Desktop) clock_strings_at(seconds i64, percent int) (string, string) {
 	if seconds < 0 {
 		return battery_clock_label(percent, '--:--:--'), ''
 	}
 	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
-	time_text := '${pad2(civil.hour)}:${pad2(civil.minute)}:${pad2(civil.second)}'
-	date_text := '${weekday_names[civil.weekday]} ${civil.day} ${month_names[civil.month - 1]}'
+	hour := pad2(civil.hour)
+	minute := pad2(civil.minute)
+	second := pad2(civil.second)
+	time_text := '${hour}:${minute}:${second}'
+	unsafe {
+		hour.free()
+		minute.free()
+		second.free()
+	}
+	day := civil.day.str()
+	date_text := '${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'
+	unsafe { day.free() }
 	label := battery_clock_label(percent, time_text)
 	unsafe { time_text.free() }
 	return label, date_text
@@ -99,10 +114,27 @@ fn monotonic_millis() i64 {
 // something worth redrawing for. It is what makes an otherwise idle desktop
 // recompose once a second instead of sixty times.
 fn (mut d Desktop) update_clock() {
-	time_text, date_text := d.clock_strings()
-	if time_text != d.clock_time || date_text != d.clock_date {
-		d.clock_time = time_text
-		d.clock_date = date_text
-		d.dirty = true
+	percent := read_battery(false)
+	seconds, _ := desktop_realtime()
+	d.update_clock_at(seconds, percent)
+}
+
+// update_clock_at is split from the two device reads so the allocation rule
+// can be tested without racing the wall clock. The compositor calls it on
+// every pass; the common path for an unchanged second is allocation-free.
+fn (mut d Desktop) update_clock_at(seconds i64, percent int) {
+	if d.clock_sampled && d.clock_seconds == seconds && d.clock_battery == percent {
+		return
 	}
+	time_text, date_text := d.clock_strings_at(seconds, percent)
+	unsafe {
+		d.clock_time.free()
+		d.clock_date.free()
+	}
+	d.clock_time = time_text
+	d.clock_date = date_text
+	d.clock_seconds = seconds
+	d.clock_battery = percent
+	d.clock_sampled = true
+	d.dirty = true
 }

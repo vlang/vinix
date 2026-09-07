@@ -10,8 +10,8 @@
 // difference from a terminal with a pty behind it, and for a minimal one it is
 // a fair trade.
 //
-// Like the file browser it satisfies HostedApp, so the window manager hosts it
-// with the machinery that was already there. It additionally satisfies
+// Like the file browser it satisfies NativeApp, so its process speaks the same
+// compositor protocol. It additionally satisfies
 // KeyboardApp, which is how the keystrokes reach it.
 module main
 
@@ -35,6 +35,14 @@ mut:
 	poll() bool
 }
 
+// ClosingApp releases subprocesses an application owns before its own process
+// leaves. Ordinary app resources are closed by exit; Terminal also owns a
+// shell process, which must not be orphaned when its window closes.
+interface ClosingApp {
+mut:
+	close_app()
+}
+
 const terminal_shell = '/bin/busybox'
 // `sh -i` rather than plain `sh`: without a terminal on its stdin the shell
 // would otherwise decide it is running a script.
@@ -54,7 +62,7 @@ const terminal_action_scroll_down = 'term.scroll.down'
 
 const terminal_row_height = 16
 const terminal_padding = 8
-const terminal_prompt = '$ '
+const terminal_prompt = '\$ '
 
 struct TerminalApp {
 mut:
@@ -78,11 +86,11 @@ mut:
 	// The prompt line as drawn, cursor and all. Same reason.
 	prompt_text string = terminal_prompt + '_'
 
-	pid       int = -1
-	to_child  int = -1
+	pid        int = -1
+	to_child   int = -1
 	from_child int = -1
-	exited    bool
-	error     string
+	exited     bool
+	error      string
 
 	// Rows from the bottom the view is scrolled back by. Zero follows the
 	// output, which is what a terminal does unless told otherwise.
@@ -90,7 +98,7 @@ mut:
 	visible_rows int = 1
 }
 
-fn open_terminal(mut _ Desktop) !HostedApp {
+fn open_terminal(mut _ Desktop) !NativeApp {
 	mut app := &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
@@ -223,6 +231,22 @@ fn (mut a TerminalApp) send(line string) {
 	desktop_write(a.to_child, line.str, u64(line.len))
 }
 
+fn (mut a TerminalApp) close_app() {
+	if a.to_child >= 0 {
+		desktop_close(a.to_child)
+		a.to_child = -1
+	}
+	if a.from_child >= 0 {
+		desktop_close(a.from_child)
+		a.from_child = -1
+	}
+	if a.pid >= 0 && !a.exited {
+		desktop_terminate_child(a.pid)
+	}
+	a.pid = -1
+	a.exited = true
+}
+
 fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
@@ -249,7 +273,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	}
 	first := max_scroll - a.scroll
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(a.visible_rows + 2)
 	for row := 0; row < a.visible_rows; row++ {
 		index := first + row
 		if index < 0 || index >= total {
@@ -265,9 +289,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			// whose cursor does not flash.
 			a.prompt_text
 		}
-		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding +
-			row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)),
-			ui2.TextStyle{
+		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding + row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
 			color: terminal_text
 			font_family: 'mono'
 			size: 13
@@ -279,8 +301,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	if max_scroll > 0 {
 		button := 18
 		right := width - terminal_padding - button
-		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4),
-			f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
+		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
 			bg: terminal_button
 			radius: 4
 		}, ui2.TextStyle{
@@ -288,8 +309,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			size: 12
 			align: .center
 		})
-		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right),
-			f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
+		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
 			bg: terminal_button
 			radius: 4
 		}, ui2.TextStyle{
@@ -304,8 +324,12 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a TerminalApp) handle(event_id string) ! {
 	match event_id {
-		terminal_action_scroll_up { a.scroll += a.visible_rows }
-		terminal_action_scroll_down { a.scroll -= a.visible_rows }
+		terminal_action_scroll_up {
+			a.scroll += a.visible_rows
+		}
+		terminal_action_scroll_down {
+			a.scroll -= a.visible_rows
+		}
 		else {}
 	}
 }

@@ -14,6 +14,8 @@
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
 # where all of an Apple Silicon machine's RAM lives. 8192 exercises the same
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
+# QEMU supplies two CPUs, and its kernel build enables the Limine MP request
+# needed for Vinix to bring both of them online.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -33,6 +35,7 @@ INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 LIMINE_VERSION="9.3.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
+QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 
 NO_BUILD=0
 SERIAL_ONLY=0
@@ -76,7 +79,8 @@ fi
 # ── Build kernel ──
 if [ "$NO_BUILD" -eq 0 ]; then
     echo "==> Building kernel..."
-    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 -j$(sysctl -n hw.ncpu) 2>&1 | tail -3
+    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 LIMINE_MP=1 \
+        -j$(sysctl -n hw.ncpu) 2>&1 | tail -3
 fi
 
 if [ ! -f "$KERNEL_DIR/bin/vinix" ]; then
@@ -104,6 +108,18 @@ else
 ' "$LIMINE_CONF_QEMU"
 fi
 
+# A caller may request a QEMU-only GOP mode without changing the hardware-safe
+# repository configuration. The desktop runner uses this for its 2x display.
+if [ -n "$QEMU_RESOLUTION" ]; then
+    if grep -Eq '^[[:space:]]*resolution:' "$LIMINE_CONF_QEMU"; then
+        sed -E -i '' "s#^[[:space:]]*resolution:.*#    resolution: $QEMU_RESOLUTION#" "$LIMINE_CONF_QEMU"
+    else
+        sed -i '' '/^[[:space:]]*kaslr:/a\
+    resolution: '"$QEMU_RESOLUTION"'
+' "$LIMINE_CONF_QEMU"
+    fi
+fi
+
 # ── Ensure the patched Limine BOOTAA64.EFI is available ──
 # build-limine-aarch64.sh applies the Apple Silicon hand-off patch; the same
 # loader is what deploy-m1-efi.sh ships, so QEMU exercises the deployed build.
@@ -113,11 +129,16 @@ if [ ! -f "$LIMINE_EFI" ] || ! "$SCRIPT_DIR/build-limine-aarch64.sh" --check | g
     "$SCRIPT_DIR/build-limine-aarch64.sh" || exit 1
 fi
 
-# ── Find UEFI firmware from QEMU installation ──
-OVMF=$(find /opt/homebrew -name "edk2-aarch64-code.fd" 2>/dev/null | head -1)
+# ── Find UEFI firmware ──
+# Desktop QEMU can supply a custom OVMF with a larger ramfb GOP mode. Keep the
+# packaged firmware as the default for the ordinary shell runner.
+OVMF="${VINIX_OVMF_CODE:-}"
 if [ -z "$OVMF" ]; then
-    echo "ERROR: edk2-aarch64-code.fd not found."
-    echo "Install: brew install qemu"
+    OVMF=$(find /opt/homebrew -name "edk2-aarch64-code.fd" 2>/dev/null | head -1)
+fi
+if [ -z "$OVMF" ] || [ ! -f "$OVMF" ]; then
+    echo "ERROR: AArch64 OVMF firmware not found: ${OVMF:-edk2-aarch64-code.fd}."
+    echo "Install QEMU (brew install qemu), or set VINIX_OVMF_CODE."
     exit 1
 fi
 
@@ -283,8 +304,12 @@ elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
 elif [ "$(uname -s)" = "Darwin" ]; then
     # System chords -- Cmd-Tab above all -- are the host's until QEMU is told
     # to capture every key, which is what the desktop's own Cmd-Tab needs.
+    COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-}"
     if [ "$GRAB_KEYS" -eq 1 ]; then
-        DISPLAY_BACKEND_FLAGS="-display cocoa,full-grab=on"
+        COCOA_OPTIONS="${COCOA_OPTIONS:+${COCOA_OPTIONS},}full-grab=on"
+    fi
+    if [ -n "$COCOA_OPTIONS" ]; then
+        DISPLAY_BACKEND_FLAGS="-display cocoa,$COCOA_OPTIONS"
     else
         DISPLAY_BACKEND_FLAGS="-display cocoa"
     fi

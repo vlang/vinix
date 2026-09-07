@@ -1,14 +1,24 @@
-# Apple DCP backlight: experimental, incomplete integration
+# Apple DCP internal-panel backlight
 
-**This implementation does not yet enable brightness adjustment on an M1 MacBook Air.**
-It provides the backlight state machine, calibration, firmware-layout encoding,
-and a Vinix character-device adapter. The current Vinix DCP implementation does
-not provide the real IOMFB shared-memory RPC transport needed to use them.
-The adapter is deliberately **not registered or imported by the existing DCP
-initialiser**, so this implementation does not create `/dev/apple-panel-bl` on boot.
+Vinix has a real, opt-in backlight transport for base M1/t8103 machines. It
+boots DCP through RTKit, completes the versioned IOMFB shared-memory handshake,
+preserves m1n1's inherited framebuffer and locked display-DART mappings, and
+submits brightness-only swaps. Once firmware publishes the internal backlight
+service and `Brightness_Scale`, the driver creates `/dev/apple-panel-bl` for the
+desktop Display settings page.
 
-The implementation and tests are now entirely V. The adapter retains the
-existing registration contract and does not alter boot defaults or turn on DCP.
+The driver remains disabled by default because DCP takeover is hardware-facing
+and has not been exercised from this checkout on a physical machine. Enable it
+with `vinix.apple_dcp=1`, or deploy a desktop image with:
+
+```sh
+./deploy-m1-efi.sh --desktop-initramfs --apple-dcp /path/to/mounted/esp
+```
+
+The current transport intentionally supports only t8103 internal panels and
+the 12.3 and 13.3/13.5-compatible IOMFB layouts advertised by the m1n1 device
+tree. It does not modeset, replace the boot framebuffer, probe external
+displays, or provide a software-dimming fallback.
 
 ## What is implemented
 
@@ -32,50 +42,49 @@ MMIO, firmware messaging, or floating point. It provides:
   `Brightness_Scale` supplied by the transport.
 
 `kernel/modules/gpu/dcp/backlight/backlight.v` adapts the core to Vinix's resource
-and devtmpfs interfaces. Registration is an explicit call by a working DCP
-backend. It creates a mode-0600 character device, invokes the scheduling hook
-outside its state lock, supports offset-aware text reads, and refuses writes
-while offline. The resource and callback context have boot lifetime. Registration
-is boot-time, single-threaded, for one internal panel; it is not hotplug support.
+and devtmpfs interfaces. The real t8103 transport registers it only after a
+successful firmware handshake. It creates a mode-0600 character device, invokes
+the scheduling hook outside its state lock, supports offset-aware text reads,
+and refuses writes while offline. The resource and callback context have boot
+lifetime. Registration is boot-time, single-threaded, for one internal panel;
+it is not hotplug support.
 
 The core is platform-independent and tested directly with V. State is stored
 inline in the resource; there is no opaque C allocation or custom C ABI.
 
-## What remains before this can change your screen
+`kernel/modules/gpu/dcp/backlight_transport.v` provides the hardware backend. It
+discovers both DCP and PIODMA DARTs from DT relationships, adopts locked m1n1
+page tables, installs reserved firmware mappings, services RTKit buffers and
+IOMFB callbacks, validates firmware-requested MMIO mappings, and runs a polling
+worker so a brightness write does not depend on compositor activity. Any
+protocol error poisons the session and takes the character device offline.
 
-The following prerequisites remain; they are not merely optional hardware
-verification:
+## Hardware status and scope
 
-1. A real IOMFB transport: shared-memory setup, DMA mappings/cache visibility,
-   reversed-fourcc packet headers, command/callback context stacks, dispatch of
-   RTKit system messages, correlated responses and bounded timeouts. The current
-   `iomfb.v` sends simplified message types in bits 55:48; the upstream protocol
-   uses a different mailbox format and shared-memory packets. Adding another
-   simplified message would not implement brightness.
-2. A working DCP takeover/lifecycle: discovery of the correct mailbox and IOMMU
-   through device-tree relationships, preservation of existing mappings and
-   scanout, firmware-version selection, initialization callbacks (including
-   backlight-service matching), panel capabilities and brightness-scale data.
-3. Real `swap_start`/`swap_submit` integration, including a brightness-only swap
-   when the console/compositor is idle, and publication of actual-brightness
-   callbacks. The existing `IomfbSwapDesc` is **not** a wire `dcp_swap` and must
-   never be passed to `prepare_swap`.
-4. An ARM64 kernel build and real M1 Air testing of brightness changes, errors,
-   idle updates and resume. The full ARM64 kernel has passed V-to-C generation with this adapter,
-   but a linked boot image and hardware behavior are not validated here.
+The linked ARM64 kernel builds, and the platform-independent protocol/layout
+tests pass. Physical M1 validation is still required for brightness changes,
+readback, idle updates, failure handling, and resume. On a successful boot the
+kernel prints:
 
-Do not enable `vinix.apple_dcp=1` merely to try this implementation. It does not repair the
-existing experimental DCP bring-up. There is no new brightness boot flag, no
-PWM/GPIO fallback and no software dimming masquerading as a backlight driver.
+```text
+dcp-backlight: /dev/apple-panel-bl online (max ... nits, scale ...)
+```
 
-## Backend integration contract
+If that line is absent, retain the preceding `dcp-backlight:`, `dart:`, and
+`rtkit[dcp-backlight]:` messages; they identify whether DT discovery, DART
+handoff, RTKit boot, or the IOMFB callback handshake failed.
 
-After an independently working backend has identified the M1 Air internal panel,
-selected a verified wire layout, matched the backlight service, and obtained the
-panel maximum and `Brightness_Scale`, it may call:
+There is no PWM/GPIO fallback and no software dimming masquerading as hardware
+brightness. External-display handoff explicitly keeps this internal-panel DCP
+path disabled.
+
+## Driver contract
+
+After identifying the internal panel, selecting a verified wire layout,
+matching the backlight service, and obtaining the panel maximum and
+`Brightness_Scale`, the transport calls:
 
 ```v
-// Implemented API; currently no upstream caller exists.
 register_panel(layout, maximum, scale, initial_raw, initial_known,
     context, notify) ?&Backlight
 ```
@@ -113,10 +122,9 @@ the monotonically increasing transaction-token namespace. The layout and scale
 must remain unchanged for this device lifetime; firmware upgrades require a new
 boot/validated attachment rather than silently reusing an old layout.
 
-## Userspace interface, AFTER backend integration only
+## Userspace interface
 
-The following commands are the intended implemented device ABI, **not commands
-that will work on current Vinix merely by adding this code**:
+With the opt-in driver online, the device ABI is:
 
 ```sh
 cat /dev/apple-panel-bl
@@ -166,8 +174,8 @@ round-trip commands and snapshots through this actual V core.
 
 Both the Vinix-pinned V 0.4.10 and the V 0.5.2 bootstrap run the core/client
 tests. The current ui2 checkout needs the newer compiler for UI/full desktop
-builds. A complete native desktop build and ARM64 kernel V-to-C generation
-have passed. This is not a linked/booted Vinix kernel or a hardware test.
+builds. A complete native desktop build and linked ARM64 kernel build have
+passed. This is not a physical-hardware test.
 
 ## Source provenance
 
@@ -185,6 +193,11 @@ Primary sources inspected on 2026-09-06:
   `bl_unk=1`, `bl_value=dac`, `bl_power=0x40`, property/scale handling.
 - Asahi Linux `drivers/gpu/drm/apple/iomfb.h`, blob
   `7903fad4040677d971c1691657e56a3e3e5ee831`: message fields and property 15.
+- Asahi Linux `drivers/gpu/drm/apple/iomfb.c`, `iomfb_v12_3.c` and
+  `iomfb_v13_3.c`: shared-memory channel layout, nested RPC/callback handling,
+  boot sequencing and versioned callback tables.
+- Asahi Linux `drivers/iommu/apple-dart.c` and m1n1 `src/dart.c`/`src/kboot.c`:
+  t8103 PTE encoding, locked-DART handoff and reserved display mappings.
 - Vinix `kernel/modules/dev/pointerdev/pointerdev.v`, blob
   `67c3eab401ff4c071543101e4ff90efd7b847030`: resource method signatures.
 
@@ -196,6 +209,10 @@ https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/dcp_backlig
 https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/iomfb_template.h
 https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/iomfb_template.c
 https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/iomfb.h
+https://github.com/AsahiLinux/linux/blob/asahi/drivers/gpu/drm/apple/iomfb.c
+https://github.com/AsahiLinux/linux/blob/asahi/drivers/iommu/apple-dart.c
+https://github.com/AsahiLinux/m1n1/blob/main/src/dart.c
+https://github.com/AsahiLinux/m1n1/blob/main/src/kboot.c
 ```
 
 The V core and tests are offered under GPL-2.0-only OR MIT, retaining the

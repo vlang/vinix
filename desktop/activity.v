@@ -57,6 +57,7 @@ mut:
 // window, so every figure would read 0% or 100%. A second is long enough to
 // average several timeslices and short enough to feel live.
 const activity_interval_ms = i64(1000)
+const activity_mb_bytes = u64(1_000_000)
 
 // ── The model ──────────────────────────────────────────────────────
 
@@ -66,18 +67,13 @@ const activity_interval_ms = i64(1000)
 // collector to clean up the difference.
 struct ActivityRow {
 mut:
-	pid         int
-	cpu_percent f64
-	mem_percent f64
-	name        string
-	pid_text    string
-	cpu_text    string
-	mem_text    string
-	// Hosted applications share the desktop process, so the kernel cannot
-	// account for them separately. They still get a row, marked here so an
-	// updated window list can replace them without touching process samples.
-	is_app    bool
-	window_id int
+	pid          int
+	cpu_percent  f64
+	memory_bytes u64
+	name         string
+	pid_text     string
+	cpu_text     string
+	mem_text     string
 }
 
 // previous holds what a pid's CPU counter read last time round, so the next
@@ -97,8 +93,9 @@ enum ActivitySort {
 
 struct ActivityMonitor {
 mut:
-	rows     []ActivityRow
-	previous []ActivityPrevious
+	rows         []ActivityRow
+	scratch_rows []ActivityRow
+	previous     []ActivityPrevious
 	// The reading the last sample was taken at, and the clock then, so the
 	// next one knows how wide the interval was.
 	sampled_ns   u64
@@ -112,7 +109,6 @@ mut:
 	process_total u32
 	used_memory   u64
 	total_memory  u64
-	app_count     int
 	// The buffer a read lands in, allocated once. A snapshot is a few tens of
 	// kilobytes and reading it into a fresh allocation every second would be a
 	// steady leak.
@@ -154,6 +150,14 @@ fn (mut m ActivityMonitor) sample() bool {
 	}
 
 	records := unsafe { &ActivitySample(voidptr(&u8(m.buffer.data) + sizeof(ActivityTable))) }
+	m.apply_snapshot(header, records, count)
+	return true
+}
+
+// apply_snapshot owns the allocation-heavy half of sampling separately from
+// the device read. Besides making the lifetime rules explicit, this lets the
+// manual-free regression feed it deterministic kernel records.
+fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &ActivitySample, count int) {
 
 	// The width of the interval these rates are measured over. The first
 	// sample has nothing before it, so every process reads 0% until the second
@@ -164,30 +168,41 @@ fn (mut m ActivityMonitor) sample() bool {
 		u64(0)
 	}
 
-	m.free_rows()
-	mut rows := []ActivityRow{cap: count}
+	m.scratch_rows.clear()
+	unsafe { m.scratch_rows.flags.set(.noslices) }
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
 		cpu_percent := m.rate_for(record.pid, record.cpu_time_ns, elapsed_ns)
-		mem_percent := if header.total_memory > 0 {
-			f64(record.memory_bytes) * 100.0 / f64(header.total_memory)
+		old_index := m.process_row_index(record.pid)
+		mut row := ActivityRow{}
+		if old_index >= 0 {
+			// Transfer the strings to the scratch row. Clearing the source makes
+			// the final unmatched-row sweep safe under manual memory management.
+			row = m.rows[old_index]
+			m.rows[old_index] = ActivityRow{}
 		} else {
-			0.0
+			row.pid = record.pid
+			row.pid_text = record.pid.str()
 		}
-		rows << ActivityRow{
-			pid:         record.pid
-			cpu_percent: cpu_percent
-			mem_percent: mem_percent
-			name:        activity_name_of(record)
-			pid_text:    record.pid.str()
-			cpu_text:    percent_text(cpu_percent)
-			mem_text:    percent_text(mem_percent)
-		}
+		row.pid = record.pid
+		row.cpu_percent = cpu_percent
+		row.memory_bytes = record.memory_bytes
+		row.name = replace_activity_text(row.name, activity_name_of(record))
+		row.cpu_text = replace_activity_text(row.cpu_text, percent_text(cpu_percent))
+		row.mem_text = replace_activity_text(row.mem_text, memory_mb_text(record.memory_bytes))
+		m.scratch_rows << row
 	}
+
+	for index in 0 .. m.rows.len {
+		m.free_row(index)
+	}
+	m.rows.clear()
+	old_rows := m.rows
+	m.rows = m.scratch_rows
+	m.scratch_rows = old_rows
 
 	m.remember(records, count)
 	m.sampled_ns = header.sample_ns
-	m.rows = rows
 	m.sort_rows()
 	m.clamp_scroll()
 
@@ -199,107 +214,39 @@ fn (mut m ActivityMonitor) sample() bool {
 	m.process_total = header.total
 	m.used_memory = used
 	m.total_memory = header.total_memory
-	m.app_count = 0
 	m.update_summary()
 	m.set_error('')
-	return true
 }
 
-// sync_open_apps adds the applications hosted inside vinix-desktop. They are
-// real open applications, but not separate kernel processes, so /dev/processes
-// cannot discover Calculator, Text Editor, or the other hosted windows on its
-// own. CPU and RAM remain labelled as shared instead of duplicating the
-// desktop process' figures and pretending they can be attributed per app.
-fn (mut m ActivityMonitor) sync_open_apps(desktop &Desktop) bool {
-	if m.open_apps_match(desktop) {
-		return false
-	}
-
-	for index := m.rows.len - 1; index >= 0; index-- {
-		if !m.rows[index].is_app {
-			continue
-		}
-		m.free_row(index)
-		m.rows.delete(index)
-	}
-
-	desktop_pid := m.desktop_process_pid()
-	for window in desktop.windows {
-		if window.page != .app {
-			continue
-		}
-		m.rows << ActivityRow{
-			pid: desktop_pid
-			name: window.title.clone()
-			pid_text: if desktop_pid > 0 { desktop_pid.str() } else { '-'.clone() }
-			cpu_text: 'shared'.clone()
-			mem_text: 'shared'.clone()
-			is_app: true
-			window_id: window.id
+fn (m &ActivityMonitor) process_row_index(pid int) int {
+	for index, row in m.rows {
+		if row.pid == pid {
+			return index
 		}
 	}
-
-	m.app_count = activity_hosted_window_count(desktop)
-	m.update_summary()
-	m.sort_rows()
-	m.clamp_scroll()
-	return true
+	return -1
 }
 
-fn (m &ActivityMonitor) open_apps_match(desktop &Desktop) bool {
-	mut count := 0
-	for row in m.rows {
-		if !row.is_app {
-			continue
-		}
-		mut found := false
-		for window in desktop.windows {
-			if window.page == .app && window.id == row.window_id && window.title == row.name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-		count++
+fn replace_activity_text(current string, next string) string {
+	if current == next {
+		unsafe { next.free() }
+		return current
 	}
-	return count == activity_hosted_window_count(desktop)
-}
-
-fn activity_hosted_window_count(desktop &Desktop) int {
-	mut count := 0
-	for window in desktop.windows {
-		if window.page == .app {
-			count++
-		}
-	}
-	return count
-}
-
-fn (m &ActivityMonitor) desktop_process_pid() int {
-	for row in m.rows {
-		if !row.is_app && row.name == 'vinix-desktop' {
-			return row.pid
-		}
-	}
-	return 0
+	unsafe { current.free() }
+	return next
 }
 
 fn (mut m ActivityMonitor) update_summary() {
 	process_noun := if m.process_total == 1 { 'process' } else { 'processes' }
-	app_noun := if m.app_count == 1 { 'app' } else { 'apps' }
 	// The values are named rather than interpolated in place so every owned
 	// string can be released explicitly on the manual-free desktop target.
 	process_count := m.process_total.str()
-	app_count := m.app_count.str()
 	used_text := human_size(m.used_memory)
 	total_text := human_size(m.total_memory)
 	unsafe { m.summary.free() }
-	m.summary = '${process_count} ${process_noun}   ${app_count} open ${app_noun}   ${used_text} of ${total_text} used'
+	m.summary = '${process_count} ${process_noun}   ${used_text} of ${total_text} used'
 	unsafe {
 		process_count.free()
-		app_count.free()
 		used_text.free()
 		total_text.free()
 	}
@@ -343,10 +290,11 @@ fn (m &ActivityMonitor) rate_for(pid int, cpu_time_ns u64, elapsed_ns u64) f64 {
 // is reused rather than reallocated: it is rewritten once a second forever.
 fn (mut m ActivityMonitor) remember(records &ActivitySample, count int) {
 	m.previous.clear()
+	unsafe { m.previous.flags.set(.noslices) }
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
 		m.previous << ActivityPrevious{
-			pid:         record.pid
+			pid: record.pid
 			cpu_time_ns: record.cpu_time_ns
 		}
 	}
@@ -371,10 +319,21 @@ fn (mut m ActivityMonitor) free_rows() {
 	for index in 0 .. m.rows.len {
 		m.free_row(index)
 	}
+	for index in 0 .. m.scratch_rows.len {
+		unsafe {
+			m.scratch_rows[index].name.free()
+			m.scratch_rows[index].pid_text.free()
+			m.scratch_rows[index].cpu_text.free()
+			m.scratch_rows[index].mem_text.free()
+		}
+	}
 	unsafe {
 		m.rows.free()
+		m.scratch_rows.free()
 		m.summary.free()
 	}
+	m.rows = []ActivityRow{}
+	m.scratch_rows = []ActivityRow{}
 	m.summary = ''
 }
 
@@ -434,7 +393,25 @@ fn activity_name_of(record &ActivitySample) string {
 	if length <= start {
 		return '(unnamed)'
 	}
-	return unsafe { tos(&u8(&record.name[start]), length - start).clone() }
+	name := unsafe { tos(&u8(&record.name[start]), length - start).clone() }
+	// Native apps are exec'd through these stable binary names so the kernel
+	// can account for them independently. Present their user-facing names while
+	// retaining their real PID, CPU and memory columns.
+	display := match name {
+		'vinix-files' { 'Files' }
+		'vinix-calculator' { 'Calculator' }
+		'vinix-terminal' { 'Terminal' }
+		'vinix-settings' { 'Settings' }
+		'vinix-activity' { 'Activity Monitor' }
+		'vinix-editor' { 'Text Editor' }
+		'vinix-calendar' { 'Calendar' }
+		'vinix-clock' { 'Clock' }
+		else {
+			return name
+		}
+	}
+	unsafe { name.free() }
+	return display.clone()
 }
 
 // percent_text renders a share to one decimal place, which is as fine as a
@@ -446,9 +423,43 @@ fn percent_text(value f64) string {
 		return '0'
 	}
 	if value >= 100.0 {
-		return '${int(value)}'
+		return int(value).str()
 	}
-	return '${value:.1f}'
+	// V's generic floating-point formatter keeps scratch storage alive under
+	// `-manualfree`. Percentages need only one decimal, so fixed-point integer
+	// formatting is both cheaper and has explicit ownership.
+	tenths := int(value * 10.0 + 0.5)
+	whole := (tenths / 10).str()
+	fraction := (tenths % 10).str()
+	text := '${whole}.${fraction}'
+	unsafe {
+		whole.free()
+		fraction.free()
+	}
+	return text
+}
+
+// memory_mb_text keeps the process list useful at both ends of the scale:
+// small processes retain one decimal place while larger figures fit cleanly
+// in the narrow numeric column. The monitor deliberately uses decimal MB,
+// matching the label displayed to the user.
+fn memory_mb_text(bytes u64) string {
+	whole := bytes / activity_mb_bytes
+	tenths := (bytes % activity_mb_bytes) * 10 / activity_mb_bytes
+	if whole < 10 && tenths > 0 {
+		whole_text := whole.str()
+		tenths_text := tenths.str()
+		text := '${whole_text}.${tenths_text} MB'
+		unsafe {
+			whole_text.free()
+			tenths_text.free()
+		}
+		return text
+	}
+	whole_text := whole.str()
+	text := '${whole_text} MB'
+	unsafe { whole_text.free() }
+	return text
 }
 
 fn (mut m ActivityMonitor) sort_rows() {
@@ -460,16 +471,16 @@ fn (mut m ActivityMonitor) sort_rows() {
 				if a.cpu_percent != b.cpu_percent {
 					return if a.cpu_percent > b.cpu_percent { -1 } else { 1 }
 				}
-				if a.mem_percent != b.mem_percent {
-					return if a.mem_percent > b.mem_percent { -1 } else { 1 }
+				if a.memory_bytes != b.memory_bytes {
+					return if a.memory_bytes > b.memory_bytes { -1 } else { 1 }
 				}
 				return a.pid - b.pid
 			})
 		}
 		.memory {
 			m.rows.sort_with_compare(fn (a &ActivityRow, b &ActivityRow) int {
-				if a.mem_percent != b.mem_percent {
-					return if a.mem_percent > b.mem_percent { -1 } else { 1 }
+				if a.memory_bytes != b.memory_bytes {
+					return if a.memory_bytes > b.memory_bytes { -1 } else { 1 }
 				}
 				return a.pid - b.pid
 			})
@@ -493,7 +504,7 @@ fn (mut m ActivityMonitor) clamp_scroll() {
 	}
 }
 
-// ── The hosted application ────────────────────────────────────────
+// ── The native application ────────────────────────────────────────
 
 const activity_action_cpu = 'activity.sort.cpu'
 const activity_action_memory = 'activity.sort.memory'
@@ -514,14 +525,11 @@ const activity_pid_column = 52
 
 struct ActivityApp {
 mut:
-	desktop &Desktop = unsafe { nil }
 	monitor ActivityMonitor
 }
 
-fn open_activity(mut desktop Desktop) !HostedApp {
-	mut app := &ActivityApp{
-		desktop: desktop
-	}
+fn open_activity(mut _ Desktop) !NativeApp {
+	mut app := &ActivityApp{}
 	app.monitor.buffer = []u8{len: activity_buffer_size()}
 	app.monitor.sample()
 	// A missing device is worth refusing to open for: the window would have
@@ -530,7 +538,6 @@ fn open_activity(mut desktop Desktop) !HostedApp {
 	if app.monitor.error != '' {
 		return error(app.monitor.error)
 	}
-	app.monitor.sync_open_apps(desktop)
 	app.monitor.last_poll_ms = monotonic_millis()
 	return app
 }
@@ -543,21 +550,10 @@ fn (mut a ActivityApp) poll() bool {
 		return false
 	}
 	a.monitor.last_poll_ms = now
-	sampled := a.monitor.sample()
-	apps_changed := if unsafe { a.desktop != nil } {
-		a.monitor.sync_open_apps(a.desktop)
-	} else {
-		false
-	}
-	return sampled || apps_changed
+	return a.monitor.sample()
 }
 
 fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
-	// Opening, closing, or renaming a window already caused this build. Sync
-	// here as well as on the timer so the app list changes in that same frame.
-	if unsafe { a.desktop != nil } {
-		a.monitor.sync_open_apps(a.desktop)
-	}
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * activity_padding
@@ -571,15 +567,14 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.monitor.clamp_scroll()
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(a.monitor.visible_rows + 11)
 
 	// What the list is ordered by. Three buttons rather than clickable column
 	// headings: a heading that is also a button has to look like one, and at
 	// eleven point there is no room to show that it does.
 	mut sort_x := activity_padding
-	for option in [ActivitySort.cpu, .memory, .name] {
-		children << ui2.button(activity_action_of(option), activity_sort_title(option),
-			ui2.rect(f64(sort_x), 5, f64(activity_sort_width), 20), ui2.BoxStyle{
+	for option in activity_sort_options {
+		children << ui2.button(activity_action_of(option), activity_sort_title(option), ui2.rect(f64(sort_x), 5, f64(activity_sort_width), 20), ui2.BoxStyle{
 			bg: if a.monitor.sort == option { app_accent } else { activity_sort_idle }
 			radius: 5
 		}, ui2.TextStyle{
@@ -591,16 +586,17 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	// Column headings, then the rule the list hangs from.
-	for heading in activity_headings(width) {
+	headings := activity_headings(width)
+	for heading in headings {
 		children << heading
 	}
+	unsafe { headings.free() }
 	children << ui2.view('', ui2.rect(0, f64(list_top - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
 
 	if a.monitor.error != '' {
-		children << ui2.label('', a.monitor.error, ui2.rect(f64(activity_padding), f64(list_top +
-			10), f64(inner), 40), ui2.TextStyle{
+		children << ui2.label('', a.monitor.error, ui2.rect(f64(activity_padding), f64(list_top + 10), f64(inner), 40), ui2.TextStyle{
 			color: files_error
 			size: 12
 		})
@@ -613,8 +609,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		y := list_top + row * activity_row_height
 		// A quiet stripe every other row. With twenty-odd rows of four columns
 		// it is the difference between reading across a line and losing it.
-		children << ui2.view('', ui2.rect(0, f64(y), f64(width), f64(activity_row_height)),
-			ui2.BoxStyle{
+		children << ui2.view('', ui2.rect(0, f64(y), f64(width), f64(activity_row_height)), ui2.BoxStyle{
 			bg: activity_row_alt
 			transparent: index % 2 == 0
 		}, activity_row_cells(entry, width))
@@ -624,8 +619,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	if a.monitor.rows.len > a.monitor.visible_rows {
 		button_size := 18
 		right := width - activity_padding - button_size
-		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4),
-			6, f64(button_size), 18), ui2.BoxStyle{
+		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4), 6, f64(button_size), 18), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -633,8 +627,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 			size: 11
 			align: .center
 		})
-		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), 6,
-			f64(button_size), 18), ui2.BoxStyle{
+		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), 6, f64(button_size), 18), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -645,12 +638,10 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	// The footer: what the machine as a whole is doing.
-	children << ui2.view('', ui2.rect(0, f64(height - activity_footer_height), f64(width),
-		1), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(0, f64(height - activity_footer_height), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
-	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(height -
-		activity_footer_height + 5), f64(inner), 16), ui2.TextStyle{
+	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(height - activity_footer_height + 5), f64(inner), 16), ui2.TextStyle{
 		color: body_muted
 		size: 11
 	})
@@ -659,6 +650,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 }
 
 const activity_sort_width = 52
+const activity_sort_options = [ActivitySort.cpu, .memory, .name]
 
 fn activity_action_of(sort ActivitySort) string {
 	return match sort {
@@ -680,36 +672,24 @@ fn activity_sort_title(sort ActivitySort) string {
 // these each frame allocates nothing.
 fn activity_headings(width int) []ui2.Element {
 	y := f64(activity_header_height - 19)
-	style := ui2.TextStyle{
-		color: body_muted
-		size: 10
-		bold: true
-	}
 	right := ui2.TextStyle{
 		color: body_muted
 		size: 10
 		bold: true
 		align: .right
 	}
-	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column -
-		activity_mem_column
-	return [
-		ui2.label('', 'PROCESS / OPEN APP', ui2.rect(f64(activity_padding), y, f64(name_width),
-			14), style),
-		ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column),
-			14), right),
-		ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column),
-			y, f64(activity_cpu_column), 14), right),
-		ui2.label('', '% RAM', ui2.rect(f64(activity_padding + name_width + activity_pid_column +
-			activity_cpu_column), y, f64(activity_mem_column), 14), right),
-	]
+	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+	mut headings := frame_elements(3)
+	headings << ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column), 14), right)
+	headings << ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column), y, f64(activity_cpu_column), 14), right)
+	headings << ui2.label('', 'MB', ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
+	return headings
 }
 
 // activity_row_cells lays one process across the same four columns the
 // headings above use.
 fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
-	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column -
-		activity_mem_column
+	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
 	number := ui2.TextStyle{
 		color: body_text
 		size: 11
@@ -718,31 +698,25 @@ fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
 	// The busiest processes are the point of the window, so a process using a
 	// real share of a CPU is marked rather than left to be found by reading.
 	busy := entry.cpu_percent >= activity_busy_percent
-	return [
-		ui2.label('', entry.name, ui2.rect(f64(activity_padding), 0, f64(name_width),
-			f64(activity_row_height)), ui2.TextStyle{
-			color: body_heading
-			size: 11
-			bold: busy
-		}),
-		ui2.label('', entry.pid_text, ui2.rect(f64(activity_padding + name_width), 0,
-			f64(activity_pid_column), f64(activity_row_height)), ui2.TextStyle{
-			color: body_muted
-			size: 11
-			align: .right
-		}),
-		ui2.label('', entry.cpu_text, ui2.rect(f64(activity_padding + name_width +
-			activity_pid_column), 0, f64(activity_cpu_column), f64(activity_row_height)),
-			ui2.TextStyle{
-			color: if busy { activity_busy } else { body_text }
-			size: 11
-			bold: busy
-			align: .right
-		}),
-		ui2.label('', entry.mem_text, ui2.rect(f64(activity_padding + name_width +
-			activity_pid_column + activity_cpu_column), 0, f64(activity_mem_column),
-			f64(activity_row_height)), number),
-	]
+	mut cells := frame_elements(4)
+	cells << ui2.label('', entry.name, ui2.rect(f64(activity_padding), 0, f64(name_width), f64(activity_row_height)), ui2.TextStyle{
+		color: body_heading
+		size: 11
+		bold: busy
+	})
+	cells << ui2.label('', entry.pid_text, ui2.rect(f64(activity_padding + name_width), 0, f64(activity_pid_column), f64(activity_row_height)), ui2.TextStyle{
+		color: body_muted
+		size: 11
+		align: .right
+	})
+	cells << ui2.label('', entry.cpu_text, ui2.rect(f64(activity_padding + name_width + activity_pid_column), 0, f64(activity_cpu_column), f64(activity_row_height)), ui2.TextStyle{
+		color: if busy { activity_busy } else { body_text }
+		size: 11
+		bold: busy
+		align: .right
+	})
+	cells << ui2.label('', entry.mem_text, ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), 0, f64(activity_mem_column), f64(activity_row_height)), number)
+	return cells
 }
 
 fn (mut a ActivityApp) handle(event_id string) ! {
