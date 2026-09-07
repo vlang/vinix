@@ -153,6 +153,23 @@ The userland builders merge `build-aarch64-ruby/staging` when present. Set
 `/root/ruby-smoke.rb`, which the ARM64 VM boot suite runs automatically and
 which can also be invoked manually with `ruby`.
 
+### Go on aarch64
+
+The Go compiler, linker, formatter and standard library can be staged for
+native development inside Vinix:
+
+```sh
+./build-go-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Both aarch64 userland builders merge `build-aarch64-go/staging` when present.
+Set `VINIX_GO_STAGING=/path/to/staging` to use another tree. The ARM64 VM boot
+suite compiles `/root/go-smoke.go` with the native Go compiler, then runs it to
+exercise goroutines, filesystem operations, subprocesses, cryptography and TCP
+loopback networking. It also builds a cgo program through the native GCC
+toolchain when GCC is installed.
+
 ### Codex CLI on aarch64
 
 The aarch64 image can include the official ARM64/musl Codex CLI together with

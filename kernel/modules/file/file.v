@@ -245,6 +245,12 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	defer {
 		this.l.release()
 	}
+	// O_APPEND chooses the end of the file for every write, rather than only
+	// setting the descriptor's initial offset. Go's builder relies on this when
+	// it adds native objects to the archive produced by the compiler.
+	if this.flags & resource.o_append != 0 {
+		this.loc = this.resource.stat.size
+	}
 	ret := this.resource.write(voidptr(this), buf, u64(this.loc), count) or { return none }
 	this.loc += ret
 	return ret

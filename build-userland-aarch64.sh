@@ -13,6 +13,7 @@ STAGING="$BUILD_DIR/staging"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
+GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
@@ -833,6 +834,13 @@ if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
     cp -a "$RUBY_STAGING/." "$STAGING/"
 else
     echo "==> Ruby staging not found, skipping (run build-ruby-aarch64.sh first)"
+fi
+
+if [ -x "$GO_STAGING/usr/bin/go" ] || [ -x "$GO_STAGING/usr/lib/go/bin/go" ]; then
+    echo "==> Integrating Go toolchain..."
+    merge_staging_tree "$GO_STAGING"
+else
+    echo "==> Go staging not found, skipping (run build-go-aarch64.sh first)"
 fi
 
 if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then

@@ -680,6 +680,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	if node.read_only && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
+	if flags & resource.o_trunc != 0 && stat.isreg(node.resource.stat.mode) {
+		mut res := node.resource
+		res.grow(unsafe { nil }, 0) or { return errno.err, errno.get() }
+	}
 	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or { return errno.err, errno.get() }
 
 	return u64(fdnum), 0

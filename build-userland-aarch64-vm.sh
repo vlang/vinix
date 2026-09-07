@@ -12,6 +12,7 @@ INITRAMFS="${VINIX_ARM64_INITRAMFS:-$SCRIPT_DIR/build-support/init-aarch64/initr
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
+GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
@@ -277,6 +278,13 @@ else
     echo "Ruby staging absent; skipping the Ruby boot test"
 fi
 
+if command -v go >/dev/null 2>&1; then
+    echo "VINIX ARM64 GO BOOT TEST"
+    /root/go-smoke.sh
+else
+    echo "Go staging absent; skipping the Go boot test"
+fi
+
 if command -v curl >/dev/null 2>&1; then
     /root/network-tools-smoke.sh
 else
@@ -332,6 +340,13 @@ if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
     cp -a "$RUBY_STAGING/." "$STAGING/"
 else
     echo "==> Ruby staging not found, packaging without Ruby"
+fi
+
+if [ -x "$GO_STAGING/usr/bin/go" ] || [ -x "$GO_STAGING/usr/lib/go/bin/go" ]; then
+    echo "==> Integrating Go toolchain"
+    merge_staging_tree "$GO_STAGING"
+else
+    echo "==> Go staging not found, packaging without Go"
 fi
 
 if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
