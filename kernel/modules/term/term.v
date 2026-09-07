@@ -146,6 +146,22 @@ pub fn leave_graphics_mode_if_owner(pid int) {
 	}
 }
 
+// The boot firmware owns link training for a handed-off external scanout.  A
+// reconnect exposes the same framebuffer again; repaint the saved terminal so
+// a console that was idle while unplugged becomes visible immediately.  A
+// graphics owner keeps its pixels in that framebuffer and will present on its
+// own schedule, so do not paint over it.
+pub fn display_hotplug(connected bool) {
+	if !connected {
+		return
+	}
+	terminal_print_lock.acquire()
+	if !terminal_graphics_mode && flanterm_ctx != unsafe { nil } {
+		C.flanterm_full_refresh(flanterm_ctx)
+	}
+	terminal_print_lock.release()
+}
+
 // Limine hands the framebuffer over as a higher-half address inside the HHDM.
 // Anything below the higher half is not addressable on the page tables in use
 // at handoff, so storing to it faults on the very first pixel -- which, on a

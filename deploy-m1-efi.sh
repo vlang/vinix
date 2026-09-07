@@ -71,7 +71,12 @@ for argument in "$@"; do
             # different connector and can reset the shared display fabric.
             USE_EXTERNAL_DISPLAY=1
             USE_NATIVE_RESOLUTION=1
-            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.apple_dcp=0"
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.display_hotplug=1 vinix.apple_dcp=0"
+            ;;
+        --apple-display-hotplug)
+            # Monitor the display-linked CD321x controller. This is useful when
+            # testing the reconnect path independently of GOP selection.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display_hotplug=1"
             ;;
         --force-fault)
             # Self-test of the signal channel: fault on purpose and expect a
@@ -104,7 +109,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -122,7 +127,7 @@ for argument in "$@"; do
 done
 
 if [ -z "$ESP_MOUNT" ]; then
-    echo "usage: $0 [--apple-studio-display|--external-display] [options] <mounted_esp_path>"
+    echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [options] <mounted_esp_path>"
     exit 1
 fi
 
@@ -285,6 +290,7 @@ Apple Studio Display handoff is enabled. Before powering on the M1 Air:
   3. Leave the display attached through the complete boot.
 
 Vinix will print "framebuffer: selected GOP ... (external handoff)" once the
-kernel owns the selected surface. Post-boot hot-plug is not supported yet.
+kernel owns the selected surface. It also monitors the display-linked Type-C
+port so unplug/replug of that handed-off output is detected and repainted.
 EXTERNAL_DISPLAY
 fi

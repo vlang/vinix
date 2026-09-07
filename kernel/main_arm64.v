@@ -18,6 +18,7 @@ import aarch64.virtio_input
 import aarch64.virtio_net
 import apple.smc
 import apple.ans
+import apple.typec
 import devicetree
 import initramfs
 import fs
@@ -51,6 +52,7 @@ __global (
 	enable_apple_dcp     = false
 	// The SMC client is read-only and safely declines non-Apple device trees.
 	enable_apple_battery = true
+	enable_apple_display_hotplug = false
 	external_display_handoff = false
 	force_qemu_platform  = false
 	aic_timer_irq         = u32(3)
@@ -59,6 +61,10 @@ __global (
 fn segfault_kill_process(gpr_state voidptr, status int) {
 	// A fatal fault takes down the whole process, not just the faulting thread.
 	userland.syscall_exit_group(gpr_state, status)
+}
+
+fn apple_display_hotplug(connected bool) {
+	term.display_hotplug(connected)
 }
 
 fn be32(ptr voidptr) u32 {
@@ -152,6 +158,13 @@ fn kmain_thread(qemu_platform bool) {
 	// Experimental, read-only SMC battery client; independent of GPU/DCP.
 	if enable_apple_battery {
 		smc.initialise()
+	}
+
+	if enable_apple_display_hotplug {
+		typec.register_hotplug_handler(apple_display_hotplug)
+		if !typec.initialise() {
+			println('apple-typec: display hot-plug unavailable')
+		}
 	}
 
 	// GPU and display bring-up are independent experiments. In particular,
@@ -275,6 +288,10 @@ fn configure_apple_bringup_from_cmdline() {
 			enable_apple_dcp = true
 		} else if option == 'vinix.apple_dcp=0' {
 			enable_apple_dcp = false
+		} else if option == 'vinix.display_hotplug=1' {
+			enable_apple_display_hotplug = true
+		} else if option == 'vinix.display_hotplug=0' {
+			enable_apple_display_hotplug = false
 		} else if option == 'vinix.display=external' {
 			external_display_handoff = true
 		}
@@ -301,10 +318,11 @@ fn configure_apple_bringup_from_cmdline() {
 		print('display: external GOP handoff active; native DCP probe disabled\n')
 	}
 
-	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s\n',
+	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s\n',
 		if enable_apple_gpu { c'enabled' } else { c'disabled' },
 		if enable_apple_dcp { c'enabled' } else { c'disabled' },
-		if enable_apple_battery { c'enabled' } else { c'disabled' })
+		if enable_apple_battery { c'enabled' } else { c'disabled' },
+		if enable_apple_display_hotplug { c'enabled' } else { c'disabled' })
 }
 
 // Power off at a chosen stage. On a machine with no console and no usable
