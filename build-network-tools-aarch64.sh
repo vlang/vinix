@@ -94,6 +94,8 @@ install -m755 "$SCRIPT_DIR/tests/network/tools-smoke.sh" \
     "$STAGING/root/network-tools-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gtk-smoke.sh" \
     "$STAGING/root/gtk-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/gnumeric-smoke.sh" \
+    "$STAGING/root/gnumeric-package-smoke.sh"
 clang -target aarch64-linux-musl -fPIC -ffreestanding -fno-stack-protector \
     -nostdlib -c "$SCRIPT_DIR/tests/packages/gtk-smoke-auto-close.c" \
     -o "$BUILD_DIR/gtk-smoke-auto-close.o"
@@ -131,9 +133,10 @@ if [ ! -s "$STAGING/root/libgtk-smoke-auto-close.so" ]; then
 fi
 
 if [ -e "$STAGING/usr/bin/gtk3-demo" ] \
+    || [ -e "$STAGING/usr/bin/gnumeric" ] \
     || find "$STAGING/lib" "$STAGING/usr/lib" -name 'libgtk-3.so*' \
         -print -quit 2>/dev/null | grep -q .; then
-    echo "GTK must not be preinstalled in the network/package layer" >&2
+    echo "GTK and Gnumeric must not be preinstalled in the network/package layer" >&2
     exit 1
 fi
 

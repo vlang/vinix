@@ -45,13 +45,21 @@ run_pkg install nano
 test "$(wc -l < "$log" | tr -d ' ')" = 4
 sed -n '4p' "$log" | grep -q -- '--no-cache --no-progress --no-scripts add nano$'
 
-run_pkg remove gtk
+run_pkg install gnumeric
 sed -n '5p' "$log" | grep -q -- \
-	'--no-progress --no-scripts del gtk+3.0-demo$'
+	'--no-cache --no-progress --no-scripts add adwaita-icon-theme font-dejavu gnumeric$'
+
+run_pkg remove gnumeric
 sed -n '6p' "$log" | grep -q -- \
+	'--no-progress --no-scripts del gnumeric adwaita-icon-theme font-dejavu$'
+
+run_pkg remove gtk
+sed -n '7p' "$log" | grep -q -- \
+	'--no-progress --no-scripts del gtk+3.0-demo$'
+sed -n '8p' "$log" | grep -q -- \
 	'--no-progress --no-scripts del gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools$'
 
 run_pkg update
-sed -n '7p' "$log" | grep -q -- ' update$'
+sed -n '9p' "$log" | grep -q -- ' update$'
 
 echo "VINIX PACKAGE COMMAND TEST: PASS"

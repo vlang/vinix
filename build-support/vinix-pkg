@@ -10,7 +10,7 @@ usage() {
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages ("gtk" installs GTK 3 and its demos)
+  install PACKAGE...  install packages (includes Vinix-ready GTK and Gnumeric)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -74,6 +74,9 @@ resolve_packages() {
 				# produce a complete, demonstrably useful desktop install.
 				resolved="$resolved gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools"
 				;;
+			gnumeric)
+				resolved="$resolved gnumeric adwaita-icon-theme font-dejavu"
+				;;
 			gtk+3.0-demo) ;;
 			*) resolved="$resolved $requested" ;;
 		esac
@@ -88,12 +91,20 @@ install_packages() {
 				apk --no-cache --no-progress --no-scripts add \
 					adwaita-icon-theme font-dejavu gtk+3.0 libarchive-tools
 				install_gtk_demo
-				finalize_gtk
+				finalize_desktop
 				;;
 			gtk+3.0-demo)
 				apk --no-cache --no-progress --no-scripts add gtk+3.0 libarchive-tools
 				install_gtk_demo
-				finalize_gtk
+				finalize_desktop
+				;;
+			gnumeric)
+				# Gnumeric's Alpine dependencies provide GTK itself, while these
+				# theme/font packages make the application usable on a fresh Vinix
+				# image that deliberately contains no desktop toolkit.
+				apk --no-cache --no-progress --no-scripts add \
+					adwaita-icon-theme font-dejavu gnumeric
+				finalize_gnumeric
 				;;
 			*)
 				apk --no-cache --no-progress --no-scripts add "$requested"
@@ -154,7 +165,7 @@ install_gtk_demo() {
 	echo "pkg: GTK demos installed"
 }
 
-finalize_gtk() {
+finalize_desktop() {
 	[ -n "$ROOT" ] && return 0
 	# These are the deterministic cache updates from Alpine's triggers. General
 	# maintainer scripts stay disabled because they assume Alpine's init system.
@@ -163,6 +174,32 @@ finalize_gtk() {
 	/usr/bin/update-mime-database /usr/share/mime
 	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+}
+
+finalize_gnumeric() {
+	[ -n "$ROOT" ] && return 0
+	# Alpine exposes the versioned executable through a relative symlink. apk's
+	# fchmodat(2) mode restoration is not yet effective on Vinix, so restore the
+	# package's executable bits and materialise its small command launcher.
+	if [ ! -x /usr/bin/gnumeric ]; then
+		set -- /usr/bin/gnumeric-[0-9]*
+		if [ "$#" -ne 1 ] || [ ! -s "$1" ]; then
+			echo "pkg: Gnumeric package has no executable launcher" >&2
+			exit 1
+		fi
+		# Keep all of Gnumeric's command-line tools usable too, as the GTK demo
+		# installer does for its extracted archive.
+		/bin/busybox chmod 0755 "$1" /usr/bin/ssconvert /usr/bin/ssdiff \
+			/usr/bin/ssgrep /usr/bin/ssindex
+		/bin/busybox rm -f /usr/bin/gnumeric
+		/bin/busybox cp "$1" /usr/bin/gnumeric
+		/bin/busybox chmod 0755 /usr/bin/gnumeric
+	fi
+	# Loader and schema caches are required for application startup. Gnumeric
+	# does not require rebuilding the desktop MIME/icon indexes, whose scanners
+	# can monopolise Vinix's sole QEMU CPU after this much larger transaction.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
 }
 
 remove_gtk_demo() {

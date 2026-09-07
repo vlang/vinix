@@ -217,16 +217,24 @@ pkg install gtk
 ./gtk-package-smoke.sh
 ```
 
+Gnumeric is also installed on demand with its GTK theme and fonts:
+
+```sh
+pkg install gnumeric
+./gnumeric-package-smoke.sh
+```
+
 `pkg` disables Alpine maintainer scripts that assume a complete Alpine init
 system.
 The package database and installed files live in the running root filesystem;
 with the standard initramfs they last until reboot. Direct Alpine package names
 also work, for example `pkg install nano`.
 
-GTK is deliberately not included in the base or network-tools package layer.
-It is downloaded only by `pkg install gtk`. The GTK smoke test first checks
-that the base image is GTK-free, installs it, then opens both `gtk3-demo` and
-`gtk3-widget-factory` against the Vinix Xorg server.
+GTK and Gnumeric are deliberately not included in the base or network-tools
+package layer. GTK is downloaded only when it or an application that needs it
+is requested. The GTK smoke test first checks that the base image is GTK-free,
+installs it, then opens both `gtk3-demo` and `gtk3-widget-factory` against the
+Vinix Xorg server. Gnumeric is likewise absent until explicitly installed.
 
 ### Firefox on aarch64
 
