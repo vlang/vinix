@@ -122,6 +122,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64, 
 	events << &timer.event
 	defer {
 		timer.disarm()
+		unsafe { free(timer) }
 	}
 
 	event.await(mut events, true) or {

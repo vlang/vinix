@@ -204,6 +204,9 @@ pub fn (mut this Timer) arm() {
 	timers_lock.release()
 }
 
+// The caller owns the returned timer. After the wait has detached every event
+// listener, it must disarm and free the timer; disarming only removes it from
+// the global schedule and does not release the heap allocation.
 pub fn new_timer(when TimeSpec) &Timer {
 	mut timer := &Timer{
 		when:  when

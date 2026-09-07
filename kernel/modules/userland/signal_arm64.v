@@ -171,6 +171,7 @@ fn sleep_for_signal(timeout &time.TimeSpec) bool {
 	defer {
 		if timer != unsafe { nil } {
 			timer.disarm()
+			unsafe { free(timer) }
 		}
 	}
 

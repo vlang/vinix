@@ -143,7 +143,10 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 			mut sleep_events := [&timer.event]
 			defer {
 				timer.disarm()
-				unsafe { sleep_events.free() }
+				unsafe {
+					free(timer)
+					sleep_events.free()
+				}
 			}
 			event.await(mut sleep_events, true) or { return errno.err, errno.eintr }
 		}
