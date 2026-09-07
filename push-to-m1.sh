@@ -35,12 +35,18 @@ fi
 echo "==> Comparing files; changed files show a live percentage..."
 # The build workspaces are host-side intermediates, not boot inputs. The
 # kernel and selected initramfs remain included below, while their staging
-# trees are deliberately left out of an M1 deployment.
-rsync -a --partial --progress --stats \
+# trees are deliberately left out of an M1 deployment.  The boot-image disk
+# files are QEMU scratch disks, too: boot-desktop.img is a sparse 2 GiB disk
+# created by run-desktop-aarch64.sh, and the edk2 file is QEMU firmware.  An
+# M1 starts through its existing m1n1/U-Boot chain and deploy-m1-efi.sh only
+# needs the separately copied Limine EFI below.  Sending either artifact can
+# fill the Mac's data volume before the actual desktop initramfs is reached.
+if ! rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
     --exclude 'vinix.iso' \
-    --exclude 'boot-image/boot.img' \
+    --exclude 'boot-image/boot*.img' \
+    --exclude 'boot-image/edk2-aarch64-code-*.fd' \
     --exclude 'boot-image/limine-src-9.3.0/' \
     --exclude 'tools/agx-re/build/' \
     --exclude 'build/' \
@@ -49,8 +55,23 @@ rsync -a --partial --progress --stats \
     --exclude 'kernel/tmp.*' \
     --exclude '.DS_Store' \
     "$@" \
-    ./ "$REMOTE:$DEST/"
-echo "rsync exit: $?"
+    ./ "$REMOTE:$DEST/"; then
+    echo >&2
+    echo "ERROR: push to $REMOTE ran out of space or was interrupted." >&2
+    echo "Remote free space:" >&2
+    ssh "$REMOTE" "df -h '$DEST'" >&2 || true
+    cat >&2 <<EOF
+
+M1 pushes now skip QEMU-only boot-image disks and firmware. If a prior push
+left partial files, inspect the remote QEMU artifacts before removing them:
+    ssh $REMOTE 'find "$DEST/boot-image" -maxdepth 1 -type f \\( -name "boot*.img" -o -name ".boot*.img.*" -o -name "edk2-aarch64-code-*.fd" \\) -print'
+
+They are not used by the M1 deployment. Remove only the listed stale or
+partial artifacts, then re-run this command.
+EOF
+    exit 1
+fi
+echo "rsync exit: 0"
 
 # The one path excluded above that must still arrive.
 EFI="boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI"
