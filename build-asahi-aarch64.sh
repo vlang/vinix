@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the Mesa 25.0.5 Asahi userspace used by Vinix/aarch64.
+# Build the Mesa 25.0.5 Asahi and VirGL userspace used by Vinix/aarch64.
 #
 # Run this in the Debian aarch64 build VM. Native Mesa helper programs are
 # built for the VM; the installed driver is linked against an Alpine musl
@@ -149,12 +149,15 @@ echo "==> Preparing pinned Alpine 3.21 musl sysroot"
 download_index main
 for package in \
     musl musl-dev linux-headers libgcc libstdc++ libstdc++-dev libatomic \
+    libmd libmd-dev libbsd libbsd-dev \
     zlib zlib-dev zstd-libs zstd-dev \
     libdrm libdrm-dev libpciaccess libpciaccess-dev \
     expat libexpat expat-dev hwdata-pci \
     xorgproto xcb-proto libxau libxau-dev libxdmcp libxdmcp-dev \
     libxcb libxcb-dev libx11 libx11-dev libxext libxext-dev \
-    libxfixes libxfixes-dev libxshmfence libxshmfence-dev; do
+    libxfixes libxfixes-dev libxrender libxrender-dev \
+    libxrandr libxrandr-dev \
+    libxshmfence libxshmfence-dev; do
     extract_apk main "$package"
 done
 # Alpine's runtime package carries the SONAME file but not the linker name.
@@ -201,7 +204,7 @@ c_link_args = ['-fuse-ld=lld', '--rtlib=compiler-rt', '--unwindlib=none']
 cpp_link_args = ['-fuse-ld=lld', '--rtlib=compiler-rt', '--unwindlib=libgcc']
 EOF
 
-echo "==> Building Mesa $MESA_VERSION Asahi for Vinix"
+echo "==> Building Mesa $MESA_VERSION Asahi/VirGL for Vinix"
 export PATH="$HOST_TOOLS/bin:$PATH"
 TARGET_MESON_OPTIONS=(
     --prefix=/usr
@@ -216,7 +219,7 @@ TARGET_MESON_OPTIONS=(
     -Dgles1=disabled
     -Dgles2=enabled
     -Dshared-glapi=enabled
-    -Dgallium-drivers=asahi
+    -Dgallium-drivers=asahi,virgl,softpipe
     -Dvulkan-drivers=
     -Dllvm=disabled
     -Ddraw-use-llvm=false
@@ -241,7 +244,7 @@ ninja -C "$TARGET_BUILD" -j"$NPROC"
 rm -rf "$STAGING"
 DESTDIR="$STAGING" ninja -C "$TARGET_BUILD" install
 
-echo "==> Installing Asahi runtime and hardware triangle"
+echo "==> Installing Mesa hardware runtime and triangle test"
 mkdir -p "$STAGING/lib" "$STAGING/etc" "$STAGING/usr/lib" \
     "$STAGING/usr/bin" "$STAGING/usr/share/examples/gl-triangle" \
     "$STAGING/usr/share/vinix"
@@ -252,10 +255,11 @@ install -m755 "$SYSROOT/lib/ld-musl-aarch64.so.1" \
 printf '%s\n' /lib /usr/lib > "$STAGING/etc/ld-musl-aarch64.path"
 for pattern in \
     'libdrm.so*' 'libpciaccess.so*' 'libstdc++.so*' 'libgcc_s.so*' \
+    'libmd.so*' 'libbsd.so*' \
     'libatomic.so*' 'libz.so*' 'libzstd.so*' 'libexpat.so*' \
     'libX11.so*' 'libX11-xcb.so*' 'libXau.so*' 'libXdmcp.so*' \
     'libxcb.so*' 'libxcb-*.so*' 'libXext.so*' 'libXfixes.so*' \
-    'libxshmfence.so*'; do
+    'libXrender.so*' 'libXrandr.so*' 'libxshmfence.so*'; do
     for library in "$SYSROOT/usr/lib"/$pattern; do
         [ -e "$library" ] || continue
         cp -a "$library" "$STAGING/usr/lib/"
@@ -272,14 +276,19 @@ install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     "$STAGING/usr/share/examples/gl-triangle/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" "$STAGING/usr/bin/"
-printf '%s\n' "mesa=$MESA_VERSION platforms=x11,surfaceless gbm=enabled" \
-    > "$STAGING/usr/share/vinix/asahi-x11-egl"
+install -m755 "$SCRIPT_DIR/gl-triangle/run-virgl-smoke" "$STAGING/usr/bin/"
+printf '%s\n' "mesa=$MESA_VERSION drivers=asahi,virgl,softpipe platforms=x11,surfaceless gbm=enabled" \
+    > "$STAGING/usr/share/vinix/mesa-x11-egl"
+# Keep the old marker for deployment scripts and images built before the
+# virtual GPU path was added.
+cp "$STAGING/usr/share/vinix/mesa-x11-egl" \
+    "$STAGING/usr/share/vinix/asahi-x11-egl"
 
 X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging"
 if [ -d "$X11_STAGING/usr/lib" ]; then
-    echo "==> Overlaying exact Asahi runtime onto ARM64 X11 staging"
+    echo "==> Overlaying exact Mesa GPU runtime onto ARM64 X11 staging"
     cp -a "$STAGING/." "$X11_STAGING/"
 fi
 
-echo "==> Asahi userspace ready: $STAGING"
+echo "==> Mesa GPU userspace ready: $STAGING"
 file "$STAGING/usr/bin/gl-triangle-agx"

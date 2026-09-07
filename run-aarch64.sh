@@ -1,6 +1,7 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
-# Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu] [--mem=MB]
+# Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu|--virgl]
+#                         [--mem=MB]
 #                         [--disk=MB] [--replace] [--grab-keys]
 #
 # --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
@@ -65,6 +66,7 @@ for arg in "$@"; do
         --no-build)   NO_BUILD=1 ;;
         --serial)     SERIAL_ONLY=1 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
+        --virgl)      VIRTIO_GPU=2 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
         --disk=*)     BOOT_DISK_SIZE_MB="${arg#*=}" ;;
         --replace)    REPLACE_RUNNING=1 ;;
@@ -388,31 +390,45 @@ echo "==> Copying kernel to boot disk..."
 mcopy -o -i "$BOOT_DISK" "$KERNEL_DIR/bin/vinix" ::/boot/vinix
 
 # ── Launch QEMU ──
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is required for QEMU package persistence" >&2
-    exit 1
-fi
-python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
-    --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
-    --ready-file "$PACKAGE_SERVER_READY" >"$PACKAGE_SERVER_LOG" 2>&1 &
-PACKAGE_SERVER_PID=$!
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    [ -s "$PACKAGE_SERVER_READY" ] && break
-    if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
-        break
+if [ "$VIRTIO_GPU" -eq 2 ]; then
+    # KekVM's compact VirGL build omits libslirp. Keep this mode offline rather
+    # than failing QEMU startup on the normal user-network backend.
+    NETWORK_FLAGS="-nic none"
+    echo "==> VirGL VM is offline (KekVM QEMU has no libslirp backend)"
+else
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "ERROR: python3 is required for QEMU package persistence" >&2
+        exit 1
     fi
-    sleep 0.05
-done
-if [ ! -s "$PACKAGE_SERVER_READY" ]; then
-    cat "$PACKAGE_SERVER_LOG" >&2
-    echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
-    exit 1
+    python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
+        --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
+        --ready-file "$PACKAGE_SERVER_READY" >"$PACKAGE_SERVER_LOG" 2>&1 &
+    PACKAGE_SERVER_PID=$!
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        [ -s "$PACKAGE_SERVER_READY" ] && break
+        if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
+            break
+        fi
+        sleep 0.05
+    done
+    if [ ! -s "$PACKAGE_SERVER_READY" ]; then
+        cat "$PACKAGE_SERVER_LOG" >&2
+        echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
+        exit 1
+    fi
+    NETWORK_FLAGS="-netdev user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT} -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
+    echo "==> Package installs persist in: $PACKAGE_STORE"
 fi
-
-echo "==> Package installs persist in: $PACKAGE_STORE"
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
-if [ "$SERIAL_ONLY" -eq 1 ]; then
+if [ "$VIRTIO_GPU" -eq 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
+    echo "ERROR: --virgl needs a GL-capable display; do not combine it with --serial" >&2
+    exit 1
+elif [ "$VIRTIO_GPU" -eq 2 ]; then
+    # KekVM's QEMU build provides a Cocoa OpenGL context backed by Metal.
+    # virglrenderer uses that context to execute the guest's Gallium commands.
+    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+elif [ "$SERIAL_ONLY" -eq 1 ]; then
     # Use -display none (not -nographic) to keep ramfb for framebuffer/GOP
     # while hiding the QEMU window. -nographic removes display devices entirely.
     DISPLAY_BACKEND_FLAGS="-display none"
@@ -434,10 +450,12 @@ else
     DISPLAY_BACKEND_FLAGS="-display default"
 fi
 
-if [ "$VIRTIO_GPU" -eq 1 ]; then
+if [ "$VIRTIO_GPU" -eq 2 ]; then
+    DISPLAY_DEVICE_FLAGS="-device ramfb -device virtio-gpu-gl-device,max_outputs=1"
+elif [ "$VIRTIO_GPU" -eq 1 ]; then
     # Keep ramfb as primary scanout so firmware/GOP always exposes a visible
-    # framebuffer, then add virtio-gpu for future guest-side acceleration.
-    DISPLAY_DEVICE_FLAGS="-device ramfb -device virtio-gpu-pci,max_outputs=1"
+    # framebuffer, then expose the MMIO transport used by the ARM64 driver.
+    DISPLAY_DEVICE_FLAGS="-device ramfb -device virtio-gpu-device,max_outputs=1"
 else
     DISPLAY_DEVICE_FLAGS="-device ramfb"
 fi
@@ -453,8 +471,18 @@ fi
 # VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
 # screendump from a script. Keep the runner alive to own the loopback package
 # store for the lifetime of the VM.
+QEMU_BIN="${VINIX_QEMU_BIN:-qemu-system-aarch64}"
+if [ "$VIRTIO_GPU" -eq 2 ]; then
+    QEMU_BIN="${VINIX_VIRGL_QEMU:-$SCRIPT_DIR/../kekvm/.tools/qemu-virgl/bin/qemu-system-aarch64}"
+    if [ ! -x "$QEMU_BIN" ]; then
+        echo "ERROR: KekVM's VirGL QEMU was not found at $QEMU_BIN" >&2
+        echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2
+        exit 1
+    fi
+fi
+
 set +e
-qemu-system-aarch64 \
+"$QEMU_BIN" \
     ${VINIX_QEMU_EXTRA} \
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
@@ -465,8 +493,7 @@ qemu-system-aarch64 \
     -drive format=raw,file="$BOOT_DISK" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
-    -netdev "user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT}" \
-    -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 \
+    $NETWORK_FLAGS \
     $DISPLAY_FLAGS \
     -no-reboot
 qemu_status=$?

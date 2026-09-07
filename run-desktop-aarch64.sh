@@ -12,9 +12,9 @@
 #   --help
 #
 # Anything else is passed through to run-aarch64.sh, which is what actually
-# starts QEMU: --mem=MB, --serial, --virtio-gpu, --grab-keys. The last of
-# those is what Cmd-Tab needs on a Mac: macOS keeps the chord for its own
-# application switcher unless QEMU is allowed to capture every key.
+# starts QEMU: --mem=MB, --serial, --virtio-gpu, --virgl, --grab-keys. The
+# last of those is what Cmd-Tab needs on a Mac: macOS keeps the chord for its
+# own application switcher unless QEMU is allowed to capture every key.
 #
 # The two builds are done here rather than left to run-aarch64.sh so that a
 # failure in either is reported plainly, and so the kernel build gets a V it

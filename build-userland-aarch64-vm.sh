@@ -250,18 +250,18 @@ echo "VINIX ARM64 GCC/V BOOT TEST"
 echo "VINIX ARM64 GCC/V BOOT TEST: PASS"
 
 if [ -e /dev/dri/renderD128 ] && [ -x /usr/bin/run-gl-triangle-agx ]; then
-    echo "Apple GPU render node detected; starting the M1 render test"
+    echo "GPU render node detected; starting the hardware render test"
     if timeout -k 5 120 /usr/bin/run-gl-triangle-agx --rebuild; then
-        echo "VINIX M1 AGX RENDER TEST: PASS"
+        echo "VINIX HARDWARE RENDER TEST: PASS"
     else
         status=$?
-        echo "VINIX M1 AGX RENDER TEST: FAIL ($status)" >&2
+        echo "VINIX HARDWARE RENDER TEST: FAIL ($status)" >&2
         echo "A recovery shell will remain available for diagnostics." >&2
     fi
 elif [ -e /dev/dri/renderD128 ]; then
-    echo "VINIX M1 AGX RENDER TEST: FAIL (Mesa runtime unavailable)" >&2
+    echo "VINIX HARDWARE RENDER TEST: FAIL (Mesa runtime unavailable)" >&2
 else
-    echo "Apple GPU render node absent (expected on QEMU virt)"
+    echo "GPU render node absent"
 fi
 
 if command -v python3 >/dev/null 2>&1; then
@@ -322,7 +322,7 @@ else
 fi
 
 if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
-    echo "==> Integrating Mesa/Asahi runtime"
+    echo "==> Integrating Mesa hardware runtime"
     cp -a "$ASAHI_STAGING/." "$STAGING/"
 else
     echo "==> Mesa/Asahi staging not found, packaging without GPU userspace"

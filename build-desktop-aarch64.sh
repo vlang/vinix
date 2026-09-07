@@ -211,8 +211,9 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
     "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
     echo "    $BUILD_DIR/vinix-desktop-gpu ($(stat -f%z "$BUILD_DIR/vinix-desktop-gpu") bytes)"
     GPU_DESKTOP_BUILT=1
-    if [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
-        echo "    NOTE: this Asahi staging predates X11/GBM support; rebuild it for Firefox acceleration"
+    if [ ! -f "$ASAHI_STAGING/usr/share/vinix/mesa-x11-egl" ] &&
+       [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
+        echo "    NOTE: this Mesa staging predates X11/GBM support; rebuild it for Firefox acceleration"
     fi
 else
     echo "==> Asahi EGL staging not found; keeping the static software desktop only"

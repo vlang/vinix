@@ -3,9 +3,9 @@
  *
  * GPU presenter for the native framebuffer desktop.
  *
- * The M1 display is still a firmware framebuffer rather than a KMS scanout
+ * The display is still a firmware framebuffer rather than a KMS scanout
  * object, so the final image must return to CPU-visible /dev/fb0.  This path
- * nevertheless moves scaling and format-preserving composition to AGX. */
+ * nevertheless moves scaling and format-preserving composition to the GPU. */
 #include "gpu_present.h"
 
 #include <EGL/egl.h>
@@ -141,9 +141,6 @@ void *vinix_gpu_present_create(int width, int height)
     if (render_fd < 0)
         return NULL;
     close(render_fd);
-    if (!getenv("MESA_LOADER_DRIVER_OVERRIDE"))
-        setenv("MESA_LOADER_DRIVER_OVERRIDE", "asahi", 0);
-
     presenter = calloc(1, sizeof(*presenter));
     if (!presenter)
         return NULL;

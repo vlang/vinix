@@ -15,6 +15,7 @@ import aarch64.pmgr
 import aarch64.wdt
 import aarch64.uart
 import aarch64.virtio_input
+import aarch64.virtio_gpu
 import aarch64.virtio_net
 import apple.smc
 import apple.ans
@@ -230,6 +231,9 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: streams done\n')
 	random.initialise()
 	print('kmain_thread: random done\n')
+	if qemu_platform {
+		virtio_gpu.initialise(memory.get_hhdm_offset())
+	}
 
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())

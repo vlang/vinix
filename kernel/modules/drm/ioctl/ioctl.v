@@ -20,6 +20,20 @@ pub const drm_ioctl_syncobj_fd_to_handle = u32(0xc2)
 pub const drm_ioctl_syncobj_wait = u32(0xc3)
 pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
 
+// ---- VirtIO-GPU driver ioctls (DRM_COMMAND_BASE + command) ----
+pub const drm_virtgpu_base = u32(0x40)
+pub const drm_virtgpu_map = drm_virtgpu_base + u32(0x01)
+pub const drm_virtgpu_execbuffer = drm_virtgpu_base + u32(0x02)
+pub const drm_virtgpu_getparam = drm_virtgpu_base + u32(0x03)
+pub const drm_virtgpu_resource_create = drm_virtgpu_base + u32(0x04)
+pub const drm_virtgpu_resource_info = drm_virtgpu_base + u32(0x05)
+pub const drm_virtgpu_transfer_from_host = drm_virtgpu_base + u32(0x06)
+pub const drm_virtgpu_transfer_to_host = drm_virtgpu_base + u32(0x07)
+pub const drm_virtgpu_wait = drm_virtgpu_base + u32(0x08)
+pub const drm_virtgpu_get_caps = drm_virtgpu_base + u32(0x09)
+pub const drm_virtgpu_resource_create_blob = drm_virtgpu_base + u32(0x0a)
+pub const drm_virtgpu_context_init = drm_virtgpu_base + u32(0x0b)
+
 pub const drm_cap_syncobj = u64(0x13)
 pub const drm_cap_syncobj_timeline = u64(0x14)
 pub const drm_cap_prime = u64(0x5)
@@ -101,6 +115,132 @@ pub mut:
 	pad            u32
 	deadline_nsec  u64
 }
+
+// include/uapi/drm/virtgpu_drm.h. Mesa's VirGL winsys consumes these layouts
+// directly, so keep natural 64-bit alignment and the Linux field order.
+pub struct DrmVirtgpuMap {
+pub mut:
+	offset u64
+	handle u32
+	pad    u32
+}
+
+pub struct DrmVirtgpuExecbuffer {
+pub mut:
+	flags            u32
+	size             u32
+	command          u64
+	bo_handles       u64
+	num_bo_handles   u32
+	fence_fd         i32
+	ring_idx         u32
+	syncobj_stride   u32
+	num_in_syncobjs  u32
+	num_out_syncobjs u32
+	in_syncobjs      u64
+	out_syncobjs     u64
+}
+
+pub struct DrmVirtgpuGetparam {
+pub mut:
+	param u64
+	value u64
+}
+
+pub struct DrmVirtgpuResourceCreate {
+pub mut:
+	target     u32
+	format     u32
+	bind       u32
+	width      u32
+	height     u32
+	depth      u32
+	array_size u32
+	last_level u32
+	nr_samples u32
+	flags      u32
+	bo_handle  u32
+	res_handle u32
+	size       u32
+	stride     u32
+}
+
+pub struct DrmVirtgpuResourceInfo {
+pub mut:
+	bo_handle  u32
+	res_handle u32
+	size       u32
+	blob_mem   u32
+}
+
+pub struct DrmVirtgpuBox {
+pub mut:
+	x u32
+	y u32
+	z u32
+	w u32
+	h u32
+	d u32
+}
+
+pub struct DrmVirtgpuTransfer {
+pub mut:
+	bo_handle    u32
+	box          DrmVirtgpuBox
+	level        u32
+	offset       u32
+	stride       u32
+	layer_stride u32
+}
+
+pub struct DrmVirtgpuWait {
+pub mut:
+	handle u32
+	flags  u32
+}
+
+pub struct DrmVirtgpuGetCaps {
+pub mut:
+	cap_set_id  u32
+	cap_set_ver u32
+	addr        u64
+	size        u32
+	pad         u32
+}
+
+pub struct DrmVirtgpuResourceCreateBlob {
+pub mut:
+	blob_mem   u32
+	blob_flags u32
+	bo_handle  u32
+	res_handle u32
+	size       u64
+	pad        u32
+	cmd_size   u32
+	cmd        u64
+	blob_id    u64
+}
+
+pub struct DrmVirtgpuContextInit {
+pub mut:
+	num_params     u32
+	pad            u32
+	ctx_set_params u64
+}
+
+pub const virtgpu_execbuf_fence_fd_in = u32(1) << 0
+pub const virtgpu_execbuf_fence_fd_out = u32(1) << 1
+pub const virtgpu_execbuf_ring_idx = u32(1) << 2
+pub const virtgpu_wait_nowait = u32(1)
+
+pub const virtgpu_param_3d_features = u64(1)
+pub const virtgpu_param_capset_query_fix = u64(2)
+pub const virtgpu_param_resource_blob = u64(3)
+pub const virtgpu_param_host_visible = u64(4)
+pub const virtgpu_param_cross_device = u64(5)
+pub const virtgpu_param_context_init = u64(6)
+pub const virtgpu_param_supported_capset_ids = u64(7)
+pub const virtgpu_param_explicit_debug_name = u64(8)
 
 // ---- Mesa 25.0.5 unstable Asahi UAPI ----
 pub const drm_asahi_unstable_uabi_version = u32(0xdeadbeef)

@@ -316,12 +316,47 @@ The compact desktop image used by the default M1 deployment merges the Firefox
 and X11 staging trees directly, alongside Python, Git and GCC, so its launcher
 works without shipping the much larger complete userland image.
 
-On M1, Firefox automatically enables WebRender over X11 EGL when the native
-render node and exact Asahi Mesa runtime are present. Xorg imports those AGX
-buffers through DRI3 and uses glamor; all other targets keep the software
+On M1 and in a VirGL VM, Firefox automatically enables WebRender over X11 EGL
+when a render node and the matching Mesa runtime are present. Xorg imports the
+GPU buffers through DRI3 and uses glamor. Other targets keep the software
 renderer, as does `VINIX_FORCE_SOFTWARE_GL=1`. Firefox's Linux namespace and
 seccomp sandboxes remain disabled because Vinix does not implement those
 kernel facilities yet, so the browser displays its reduced-protection warning.
+
+### VirtIO-GPU acceleration with KekVM
+
+The ARM64 QEMU platform has a render-only VirtIO-GPU DRM driver for VirGL. It
+uses the MMIO transport, so it does not depend on the still-unimplemented ARM64
+PCI ECAM path. The firmware `ramfb` remains the visible framebuffer while Mesa
+submits rendering to `/dev/dri/renderD128` and copies completed frames to
+`/dev/fb0`.
+
+Build the shared Asahi/VirGL Mesa runtime in the Debian ARM64 build VM, copy
+`build-aarch64-asahi/staging` back to this checkout, then assemble and boot the
+desktop through KekVM's Metal-enabled QEMU:
+
+```sh
+./build-asahi-aarch64.sh
+./build-desktop-aarch64.sh
+./run-desktop-aarch64.sh --no-build --virgl
+```
+
+Inside Vinix, the hardware smoke test prints the selected renderer and rejects
+software rasterizers:
+
+```sh
+run-gl-triangle-agx --rebuild
+run-virgl-smoke
+run-firefox
+```
+
+`--virgl` selects KekVM's `.tools/qemu-virgl` binary and a Cocoa core-OpenGL
+display. Override its location with `VINIX_VIRGL_QEMU`. The simpler
+`--virtio-gpu` option exposes the unaccelerated MMIO device and is useful for
+transport probing, but it does not create a render node. KekVM's compact QEMU
+currently omits libslirp, so this launch mode is offline; Firefox can exercise
+its bundled local smoke page, while browsing needs a VirGL QEMU build with a
+network backend.
 
 ### Apple M1 GPU test image
 

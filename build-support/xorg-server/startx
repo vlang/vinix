@@ -7,14 +7,15 @@ mkdir -p /tmp/.X11-unix /var/log
 
 # The exact Mesa build is used as a capability marker as well as the runtime.
 # With it and the render node present, fbdev loads glamor and X11 EGL clients
-# use Asahi. Otherwise Xorg keeps its existing CPU shadow-framebuffer path.
+# use the DRM node's Mesa driver. Otherwise Xorg keeps its existing CPU
+# shadow-framebuffer path.
 if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
    [ -e /dev/dri/renderD128 ] &&
    [ -e /usr/lib/libgbm.so.1 ] &&
-   [ -f /usr/share/vinix/asahi-x11-egl ]; then
+   { [ -f /usr/share/vinix/mesa-x11-egl ] ||
+     [ -f /usr/share/vinix/asahi-x11-egl ]; }; then
     unset LIBGL_ALWAYS_SOFTWARE
-    export MESA_LOADER_DRIVER_OVERRIDE=asahi
-    echo "startx: enabling AGX glamor/DRI3 acceleration"
+    echo "startx: enabling Mesa glamor/DRI3 acceleration"
 else
     export VINIX_FORCE_SOFTWARE_GL=1
 fi

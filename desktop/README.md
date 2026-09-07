@@ -403,9 +403,10 @@ A second VM cannot share the boot disk: QEMU takes a write lock on it and
 refuses to start without one. `--replace` stops the one already running.
 
 Anything else is passed through to `run-aarch64.sh`: `--mem=MB`, `--serial`,
-`--virtio-gpu`. The desktop launcher supplies 8 GiB of guest RAM by default:
-the root filesystem is loaded into memory during boot. Use `--mem=MB` or
-`VINIX_QEMU_MEM` to override it.
+`--virtio-gpu`, and `--virgl`. The latter uses KekVM's Metal/VirGL-enabled
+QEMU and Vinix's accelerated VirtIO-GPU render node. The desktop launcher
+supplies 8 GiB of guest RAM by default: the root filesystem is loaded into
+memory during boot. Use `--mem=MB` or `VINIX_QEMU_MEM` to override it.
 
 `build-desktop-aarch64.sh` is the build on its own, if that is all you want. It
 translates the V to C, compiles it for `aarch64-linux-musl` against the static

@@ -33,18 +33,19 @@ pub:
 
 pub struct DrmDriver {
 pub mut:
-	name       string
-	desc       string
-	major      int
-	minor      int
-	patchlevel int
-	features   u32
-	ioctls     []DrmIoctl
-	file_close fn (&DrmDevice, voidptr) = unsafe { nil }
-	gem_close  fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
-	gem_export fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
-	gem_import fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
-	mmap       fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
+	name           string
+	desc           string
+	major          int
+	minor          int
+	patchlevel     int
+	features       u32
+	ioctls         []DrmIoctl
+	file_close     fn (&DrmDevice, voidptr)                      = unsafe { nil }
+	gem_close      fn (&DrmDevice, voidptr, u32) int             = unsafe { nil }
+	gem_export     fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
+	gem_export_put fn (&DrmDevice, &gem.GemObject)               = unsafe { nil }
+	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
+	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr    = unsafe { nil }
 }
 
 pub struct DrmDevice {
@@ -104,12 +105,19 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
-	dev      &DrmDevice = unsafe { nil }
+	dev      &DrmDevice     = unsafe { nil }
 	obj      &gem.GemObject = unsafe { nil }
 }
 
-fn (mut this GemPrimeResource) mmap(_handle voidptr, _page u64, _flags int) voidptr {
-	return unsafe { nil }
+fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, _flags int) voidptr {
+	if this.obj == unsafe { nil } || page > u64(-1) / page_size {
+		return unsafe { nil }
+	}
+	offset := page * page_size
+	if offset >= this.obj.size {
+		return unsafe { nil }
+	}
+	return voidptr(this.obj.phys_addr + offset)
 }
 
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -131,7 +139,12 @@ fn (mut this GemPrimeResource) unref(_handle voidptr) ? {
 		return
 	}
 	if this.obj != unsafe { nil } {
-		gem.unref(this.obj)
+		if this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
+			&& this.dev.driver.gem_export_put != unsafe { nil } {
+			this.dev.driver.gem_export_put(this.dev, this.obj)
+		} else {
+			gem.unref(this.obj)
+		}
 	}
 	unsafe { free(voidptr(this)) }
 }
@@ -236,6 +249,66 @@ fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		ioctl.drm_ioctl_syncobj_wait {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read }
 		}
+		ioctl.drm_virtgpu_map {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuMap))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_execbuffer {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuExecbuffer))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_getparam {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuGetparam))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_resource_create {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuResourceCreate))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_resource_info {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuResourceInfo))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_transfer_from_host, ioctl.drm_virtgpu_transfer_to_host {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuTransfer))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_wait {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuWait))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_get_caps {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuGetCaps))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_resource_create_blob {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuResourceCreateBlob))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_virtgpu_context_init {
+			DrmIoctlLayout{
+				size:      u32(sizeof(ioctl.DrmVirtgpuContextInit))
+				direction: ioctl_write | ioctl_read
+			}
+		}
 		ioctl.drm_asahi_get_params {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: ioctl_write | ioctl_read }
 		}
@@ -279,13 +352,16 @@ fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
 
 	mut node := &DrmNode{
-		dev: unsafe { dev }
+		dev:    unsafe { dev }
 		render: render
 	}
 	node.stat.size = 0
 	node.stat.blocks = 0
 	node.stat.blksize = 4096
-	node.stat.rdev = resource.create_dev_id()
+	// libdrm identifies primary and render nodes from Linux's DRM major and
+	// minor ranges before scanning /dev/dri for the matching pathname.
+	minor := if render { 128 + int(dev.dev_id) } else { int(dev.dev_id) }
+	node.stat.rdev = u64((226 << 8) | minor)
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
@@ -539,8 +615,9 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 			blksize: i64(4096)
 			blocks: i64(obj.size / 512)
 		}
-		dev: unsafe { dev }
-		obj: unsafe { obj }
+		dev:      unsafe { dev }
+		obj:      unsafe { obj }
+		can_mmap: true
 	}
 	mut fd_flags := 0
 	if flags & ioctl.drm_cloexec != 0 {
@@ -550,7 +627,11 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 		fd_flags |= resource.o_rdwr
 	}
 	mut fd := file.fd_create_from_resource(mut wrapper, fd_flags) or {
-		gem.unref(obj)
+		if dev.driver.gem_export_put != unsafe { nil } {
+			dev.driver.gem_export_put(dev, obj)
+		} else {
+			gem.unref(obj)
+		}
 		unsafe { free(voidptr(wrapper)) }
 		return none
 	}
