@@ -1,0 +1,143 @@
+diff --git a/abis/linux/vm-flags.h b/abis/linux/vm-flags.h
+index 930289b6..f85f4fa0 100644
+--- a/abis/linux/vm-flags.h
++++ b/abis/linux/vm-flags.h
+@@ -16,6 +16,10 @@
+ #define MAP_ANON      0x20
+ #define MAP_ANONYMOUS 0x20
+ 
++#if defined(__vinix__)
++#define MAP_FIXED_NOREPLACE 0x100000
++#endif
++
+ #if __MLIBC_LINUX_OPTION
+ 
+ #define MAP_GROWSDOWN 0x100
+diff --git a/abis/vinix/signal.h b/abis/vinix/signal.h
+index 86264001..7eda6ed1 100644
+--- a/abis/vinix/signal.h
++++ b/abis/vinix/signal.h
+@@ -147,7 +147,40 @@ struct sigaction {
+ 	int sa_flags;
+ };
+ 
+-#if defined(__x86_64__) || defined(__aarch64__)
++#if defined(__x86_64__)
++
++#define REG_R8 0
++#define REG_R9 1
++#define REG_R10 2
++#define REG_R11 3
++#define REG_R12 4
++#define REG_R13 5
++#define REG_R14 6
++#define REG_R15 7
++#define REG_RDI 8
++#define REG_RSI 9
++#define REG_RBP 10
++#define REG_RBX 11
++#define REG_RDX 12
++#define REG_RAX 13
++#define REG_RCX 14
++#define REG_RSP 15
++#define REG_RIP 16
++#define REG_EFL 17
++#define REG_CSGSFS 18
++#define REG_ERR 19
++#define REG_TRAPNO 20
++#define REG_OLDMASK 21
++#define REG_CR2 22
++#define NGREG 23
++
++typedef struct {
++	unsigned long gregs[NGREG];
++	void *fpregs;
++	unsigned long __reserved1[8];
++} mcontext_t;
++
++#elif defined(__aarch64__)
+ /* TODO: This is wrong for AArch64. */
+ 
+ typedef struct {
+@@ -160,6 +193,10 @@ typedef struct {
+ 	unsigned int fpscr, fpul, ownedfp;
+ } mcontext_t;
+ 
++#else
++#error "Missing architecture specific code."
++#endif
++
+ typedef struct __ucontext {
+ 	unsigned long uc_flags;
+ 	struct __ucontext *uc_link;
+@@ -168,10 +205,6 @@ typedef struct __ucontext {
+ 	sigset_t uc_sigmask;
+ } ucontext_t;
+ 
+-#else
+-#error "Missing architecture specific code."
+-#endif
+-
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/sysdeps/vinix/generic/entry.cpp b/sysdeps/vinix/generic/entry.cpp
+index e92186a1..6a98345b 100644
+--- a/sysdeps/vinix/generic/entry.cpp
++++ b/sysdeps/vinix/generic/entry.cpp
+@@ -82,7 +82,55 @@ static void __mlibc_sigentry(int which, siginfo_t *siginfo,
+ 		case (uintptr_t)(-3):
+ 			break;
+ 		default:
++#if defined(__x86_64__)
++			ucontext_t ucontext = {};
++			ucontext.uc_sigmask = prev_mask;
++			ucontext.uc_mcontext.gregs[REG_R8] = ret_context->r8;
++			ucontext.uc_mcontext.gregs[REG_R9] = ret_context->r9;
++			ucontext.uc_mcontext.gregs[REG_R10] = ret_context->r10;
++			ucontext.uc_mcontext.gregs[REG_R11] = ret_context->r11;
++			ucontext.uc_mcontext.gregs[REG_R12] = ret_context->r12;
++			ucontext.uc_mcontext.gregs[REG_R13] = ret_context->r13;
++			ucontext.uc_mcontext.gregs[REG_R14] = ret_context->r14;
++			ucontext.uc_mcontext.gregs[REG_R15] = ret_context->r15;
++			ucontext.uc_mcontext.gregs[REG_RDI] = ret_context->rdi;
++			ucontext.uc_mcontext.gregs[REG_RSI] = ret_context->rsi;
++			ucontext.uc_mcontext.gregs[REG_RBP] = ret_context->rbp;
++			ucontext.uc_mcontext.gregs[REG_RBX] = ret_context->rbx;
++			ucontext.uc_mcontext.gregs[REG_RDX] = ret_context->rdx;
++			ucontext.uc_mcontext.gregs[REG_RAX] = ret_context->rax;
++			ucontext.uc_mcontext.gregs[REG_RCX] = ret_context->rcx;
++			ucontext.uc_mcontext.gregs[REG_RSP] = ret_context->rsp;
++			ucontext.uc_mcontext.gregs[REG_RIP] = ret_context->rip;
++			ucontext.uc_mcontext.gregs[REG_EFL] = ret_context->rflags;
++			ucontext.uc_mcontext.gregs[REG_CSGSFS] = ret_context->cs;
++			ucontext.uc_mcontext.gregs[REG_ERR] = ret_context->err & 0xffffffff;
++			ucontext.uc_mcontext.gregs[REG_TRAPNO] = ret_context->err >> 32;
++			ucontext.uc_mcontext.gregs[REG_CR2] = (uintptr_t)siginfo->si_addr;
++
++			sa(which, siginfo, &ucontext);
++
++			ret_context->r8 = ucontext.uc_mcontext.gregs[REG_R8];
++			ret_context->r9 = ucontext.uc_mcontext.gregs[REG_R9];
++			ret_context->r10 = ucontext.uc_mcontext.gregs[REG_R10];
++			ret_context->r11 = ucontext.uc_mcontext.gregs[REG_R11];
++			ret_context->r12 = ucontext.uc_mcontext.gregs[REG_R12];
++			ret_context->r13 = ucontext.uc_mcontext.gregs[REG_R13];
++			ret_context->r14 = ucontext.uc_mcontext.gregs[REG_R14];
++			ret_context->r15 = ucontext.uc_mcontext.gregs[REG_R15];
++			ret_context->rdi = ucontext.uc_mcontext.gregs[REG_RDI];
++			ret_context->rsi = ucontext.uc_mcontext.gregs[REG_RSI];
++			ret_context->rbp = ucontext.uc_mcontext.gregs[REG_RBP];
++			ret_context->rbx = ucontext.uc_mcontext.gregs[REG_RBX];
++			ret_context->rdx = ucontext.uc_mcontext.gregs[REG_RDX];
++			ret_context->rax = ucontext.uc_mcontext.gregs[REG_RAX];
++			ret_context->rcx = ucontext.uc_mcontext.gregs[REG_RCX];
++			ret_context->rsp = ucontext.uc_mcontext.gregs[REG_RSP];
++			ret_context->rip = ucontext.uc_mcontext.gregs[REG_RIP];
++			ret_context->rflags = ucontext.uc_mcontext.gregs[REG_EFL];
++#else
+ 			sa(which, siginfo, NULL);
++#endif
+ 			break;
+ 	}
+ 

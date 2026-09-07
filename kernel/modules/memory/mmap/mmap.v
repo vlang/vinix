@@ -13,6 +13,7 @@ pub const prot_exec = 0x04
 pub const map_private = 0x02
 pub const map_shared = 0x01
 pub const map_fixed = 0x10
+pub const map_fixed_noreplace = 0x100000
 pub const map_anon = 0x20
 pub const map_anonymous = 0x20
 
@@ -91,6 +92,49 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 			file_page := u64(r.offset) / page_size + (memory_page - r.base / page_size)
 			return r, memory_page, file_page
 		}
+	}
+	return none
+}
+
+// The caller must hold pagemap.l. MAP_FIXED_NOREPLACE and non-fixed address
+// hints need this check to reserve Windows' preferred image addresses without
+// destroying an existing mapping.
+fn range_is_free_unlocked(pagemap &memory.Pagemap, base u64, length u64) bool {
+	end := base + length
+	if end < base {
+		return false
+	}
+	for ptr in pagemap.mmap_ranges {
+		range_local := unsafe { &MmapRangeLocal(ptr) }
+		range_end := range_local.base + range_local.length
+		if base < range_end && end > range_local.base {
+			return false
+		}
+	}
+	return true
+}
+
+// Find a hole at or above start. The guard page retained between ordinary
+// allocations matches the old monotonic mmap cursor's behaviour.
+fn find_free_base_unlocked(pagemap &memory.Pagemap, start u64, length u64) ?u64 {
+	mut base := lib.align_up(start, page_size)
+	for {
+		if base + length < base {
+			errno.set(errno.enomem)
+			return none
+		}
+		mut next := u64(0)
+		for ptr in pagemap.mmap_ranges {
+			range_local := unsafe { &MmapRangeLocal(ptr) }
+			range_end := range_local.base + range_local.length
+			if base < range_end && base + length > range_local.base && range_end > next {
+				next = range_end
+			}
+		}
+		if next == 0 {
+			return base
+		}
+		base = lib.align_up(next + page_size, page_size)
 	}
 	return none
 }
@@ -345,18 +389,12 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	mut process := current_thread.process
 
 	mut base := u64(0)
-	if flags & map_fixed != 0 {
-		base = u64(addr)
-
-		munmap(mut pagemap, voidptr(base), length)?
-	} else {
-		// More than one thread may ask for anonymous address space at once.
-		// Reserve each span under the pagemap lock so two allocator threads can
-		// never receive overlapping virtual addresses from the shared cursor.
-		pagemap.l.acquire()
-		base = process.mmap_anon_non_fixed_base
-		process.mmap_anon_non_fixed_base += length + page_size
-		pagemap.l.release()
+	fixed := flags & map_fixed != 0
+	fixed_noreplace := flags & map_fixed_noreplace != 0
+	hint := lib.align_down(u64(addr), page_size)
+	if (fixed || fixed_noreplace) && (u64(addr) == 0 || u64(addr) != hint) {
+		errno.set(errno.einval)
+		return none
 	}
 
 	mut range_local := &MmapRangeLocal{
@@ -402,7 +440,53 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	range_global.locals << range_local
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
+	// Choose and claim the virtual span as one locked operation. Wine first
+	// probes preferred PE addresses with MAP_FIXED_NOREPLACE, while POSIX mmap
+	// callers commonly pass the same addresses as best-effort hints.
 	pagemap.l.acquire()
+	if fixed_noreplace {
+		base = hint
+		if !range_is_free_unlocked(pagemap, base, length) {
+			pagemap.l.release()
+			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+			unsafe {
+				range_global.locals.free()
+				free(range_global)
+				free(range_local)
+			}
+			errno.set(errno.eexist)
+			return none
+		}
+	} else if fixed {
+		base = u64(addr)
+		munmap_unlocked(mut pagemap, addr, length) or {
+			pagemap.l.release()
+			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+			unsafe {
+				range_global.locals.free()
+				free(range_global)
+				free(range_local)
+			}
+			return none
+		}
+	} else if hint != 0 && range_is_free_unlocked(pagemap, hint, length) {
+		base = hint
+	} else {
+		base = find_free_base_unlocked(pagemap, process.mmap_anon_non_fixed_base,
+			length) or {
+			pagemap.l.release()
+			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+			unsafe {
+				range_global.locals.free()
+				free(range_global)
+				free(range_local)
+			}
+			return none
+		}
+		process.mmap_anon_non_fixed_base = base + length + page_size
+	}
+	range_local.base = base
+	range_global.base = base
 	pagemap.mmap_ranges << voidptr(range_local)
 	pagemap.l.release()
 

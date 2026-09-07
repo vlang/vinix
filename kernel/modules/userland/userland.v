@@ -269,9 +269,7 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 	return 0, 0
 }
 
-// Dispatch a signal to _self_, this is called from the scheduler, at the
-// end of syscalls, or from exception handlers.
-pub fn dispatch_a_signal(context &cpulocal.GPRState) {
+fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	if t.sigentry == 0 {
@@ -303,6 +301,10 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		t.masked_signals |= u64(1) << which
 	}
 
+	// Work from the live syscall/interrupt frame. t.gpr_state is only updated
+	// by the scheduler and can otherwise describe an older timeslice.
+	t.gpr_state = *context
+
 	// Respect the redzone
 	t.gpr_state.rsp -= 128
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
@@ -315,7 +317,6 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	unsafe {
 		*return_context = *context
 	}
-	t.gpr_state = *context
 	// Siginfo
 	t.gpr_state.rsp -= sizeof(SigInfo)
 	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
@@ -323,6 +324,10 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 
 	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
 	siginfo.si_signo = which
+	if info_signum == which {
+		siginfo.si_code = info_code
+		siginfo.si_addr = voidptr(info_addr)
+	}
 
 	// Alignment
 	t.gpr_state.rsp -= 8
@@ -337,6 +342,18 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	t.gpr_state.r8 = previous_mask
 
 	sched.yield(false)
+}
+
+// Dispatch a signal to _self_, this is called from the scheduler or at the
+// end of syscalls.
+pub fn dispatch_a_signal(context &cpulocal.GPRState) {
+	dispatch_signal(context, 0, 0, 0)
+}
+
+// Synchronous CPU faults carry information that Wine's exception dispatcher
+// reads from siginfo and ucontext.
+pub fn dispatch_a_signal_info(context &cpulocal.GPRState, signal int, code int, addr u64) {
+	dispatch_signal(context, signal, code, addr)
 }
 
 pub fn sendsig(_thread &proc.Thread, signal u8) {

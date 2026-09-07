@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+prefix="${TMPDIR:-/tmp}/vinix-wine-smoke.$$"
+
+cleanup() {
+    WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver -k >/dev/null 2>&1 || :
+    rm -r -- "${prefix}"
+}
+trap cleanup EXIT HUP INT TERM
+
+mkdir -p "${prefix}"
+output=$(WINEPREFIX="${prefix}" WINEDEBUG=-all \
+    /usr/bin/wine64 /usr/share/wine/vinix-wine-smoke.exe)
+WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver -w
+
+case "${output}" in
+    *"VINIX WINE SMOKE: PASS"*)
+        printf '%s\n' 'Wine Win64 smoke test passed.'
+        ;;
+    *)
+        printf '%s\n' 'Wine ran the test but returned unexpected output:' >&2
+        printf '%s\n' "${output}" >&2
+        exit 1
+        ;;
+esac

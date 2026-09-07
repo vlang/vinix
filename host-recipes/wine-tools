@@ -1,0 +1,67 @@
+#! /bin/sh
+
+name=wine-tools
+from_source=wine
+revision=1
+imagedeps="build-essential flex bison"
+
+configure() {
+        CFLAGS="$HOST_CFLAGS" \
+        CXXFLAGS="$HOST_CXXFLAGS" \
+        LDFLAGS="$HOST_LDFLAGS" \
+    "${source_dir}"/configure \
+        --prefix="${prefix}" \
+        --enable-win64 \
+        --disable-tests \
+        --without-alsa \
+        --without-capi \
+        --without-coreaudio \
+        --without-cups \
+        --without-dbus \
+        --without-ffmpeg \
+        --without-fontconfig \
+        --without-freetype \
+        --without-gettext \
+        --without-gettextpo \
+        --without-gphoto \
+        --without-gnutls \
+        --without-gssapi \
+        --without-gstreamer \
+        --without-inotify \
+        --without-krb5 \
+        --without-mingw \
+        --without-netapi \
+        --without-opencl \
+        --without-opengl \
+        --without-osmesa \
+        --without-oss \
+        --without-pcap \
+        --without-pcsclite \
+        --without-pulse \
+        --without-sane \
+        --without-sdl \
+        --without-udev \
+        --without-unwind \
+        --without-usb \
+        --without-v4l2 \
+        --without-vulkan \
+        --without-wayland \
+        --without-x
+}
+
+build() {
+    make -j${parallelism} __tooldeps__
+}
+
+package() {
+    tools_dest="${dest_dir}${prefix}/lib/wine-tools/tools"
+
+    install -D -m755 tools/makedep "${tools_dest}/makedep"
+    install -D -m755 tools/make_xftmpl "${tools_dest}/make_xftmpl"
+    for tool in sfnt2fon widl winebuild winegcc wmc wrc; do
+        install -D -m755 "tools/${tool}/${tool}" "${tools_dest}/${tool}/${tool}"
+    done
+
+        strip_command=strip \
+    post_package_strip
+}

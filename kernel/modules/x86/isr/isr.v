@@ -5,6 +5,7 @@ import x86.idt
 import event
 import event.eventstruct
 import x86.apic
+import x86.cpu
 import x86.cpu.local as cpulocal
 import memory.mmap
 import katomic
@@ -55,8 +56,8 @@ const exception_names = [
 	c'Security',
 ]
 
-fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
-	mmap.pf_handler(gpr_state) or { exception_handler(num, gpr_state) }
+fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
+	mmap.pf_handler(gpr_state) or { exception_handler(num, mut gpr_state) }
 }
 
 fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
@@ -69,21 +70,48 @@ fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
 	}
 }
 
-fn exception_handler(num u32, gpr_state &cpulocal.GPRState) {
+fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 	if gpr_state.cs == user_code_seg {
 		mut signal := u8(0)
 
 		match num {
-			13, 14 {
+			0, 16, 19 {
+				signal = userland.sigfpe
+			}
+			1, 3 {
+				signal = userland.sigtrap
+			}
+			4, 5, 10, 11, 12, 13, 14 {
 				signal = userland.sigsegv
+			}
+			6 {
+				signal = userland.sigill
+			}
+			17 {
+				signal = userland.sigbus
 			}
 			else {
 				lib.kpanic(gpr_state, exception_names[num])
 			}
 		}
 
+		// Preserve both pieces of x86 exception state in the existing frame.
+		// Hardware error codes occupy the low bits; mlibc exposes the vector in
+		// the high half as uc_mcontext.gregs[REG_TRAPNO].
+		gpr_state.err = (gpr_state.err & u64(0xffffffff)) | (u64(num) << 32)
+		fault_addr := if num == 14 { cpu.read_cr2() } else { u64(0) }
+		fault_code := match num {
+			0 { 1 } // FPE_INTDIV
+			1 { 2 } // TRAP_TRACE
+			3 { 1 } // TRAP_BRKPT
+			14 { if gpr_state.err & 1 != 0 { 2 } else { 1 } } // SEGV_ACCERR / SEGV_MAPERR
+			else { 128 } // SI_KERNEL
+		}
 		userland.sendsig(proc.current_thread(), signal)
-		// userland.dispatch_a_signal(gpr_state)
+		userland.dispatch_a_signal_info(gpr_state, int(signal), fault_code, fault_addr)
+		// dispatch_a_signal() switches away when it delivered the exception. If
+		// no userspace signal entry exists (or SIGSEGV was blocked), do not retry
+		// the same fault forever.
 		userland.syscall_exit(unsafe { nil }, 128 + signal)
 	} else {
 		lib.kpanic(gpr_state, exception_names[num])
@@ -104,6 +132,10 @@ pub fn initialise() {
 			14 { // Page fault
 				unsafe { idt.register_handler(i, voidptr(thunks[i]), 3, 0x8e) }
 				interrupt_table[i] = voidptr(pf_handler)
+			}
+			3 { // User-mode INT3 breakpoint
+				unsafe { idt.register_handler(i, voidptr(thunks[i]), 0, 0xee) }
+				interrupt_table[i] = voidptr(exception_handler)
 			}
 			else {
 				unsafe { idt.register_handler(i, voidptr(thunks[i]), 0, 0x8e) }

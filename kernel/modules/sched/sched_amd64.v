@@ -357,6 +357,14 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array,
 		empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
 
+	// POSIX threads inherit the creating thread's signal mask, while signal
+	// dispositions are shared by the process. Vinix stores both on Thread, so
+	// copy the current values before the new thread can be scheduled. Wine
+	// installs its exception handlers before creating Windows threads.
+	new_thread.sigentry = current_thread.sigentry
+	new_thread.sigactions = current_thread.sigactions
+	new_thread.masked_signals = current_thread.masked_signals
+
 	enqueue_thread(new_thread, false)
 
 	return u64(new_thread.tid), 0

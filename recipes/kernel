@@ -3,7 +3,7 @@
 name=kernel
 skip_pkg_check=yes
 version=0.0git
-revision=1
+revision=2
 source_dir="kernel"
 source_imagedeps="git"
 source_allow_network="yes"

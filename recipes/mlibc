@@ -3,7 +3,7 @@
 name=mlibc
 skip_pkg_check=yes
 version=0.0git
-revision=2
+revision=3
 git_url="https://github.com/managarm/mlibc.git"
 commit=1183d85f914f3c7cea56961edbf472b49b22d92b
 imagedeps="meson ninja-build"
