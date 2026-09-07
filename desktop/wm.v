@@ -250,8 +250,7 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		children << d.switcher_element()
 	}
 
-	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)),
-		ui2.BoxStyle{
+	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
 		transparent: true
 	}, children)
 }
@@ -273,8 +272,11 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 	} else {
 		window.width - theme.button_inset - theme.button_size
 	}
-	step := if buttons_left { theme.button_size + theme.button_gap } else { -(theme.button_size +
-			theme.button_gap) }
+	step := if buttons_left {
+		theme.button_size + theme.button_gap
+	} else {
+		-(theme.button_size + theme.button_gap)
+	}
 
 	// macOS shows the glyphs in all three discs as soon as the pointer is over
 	// any of them, not just the one under it.
@@ -319,8 +321,7 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 		0
 	} else {
 		text_inset_left
-	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)),
-		ui2.TextStyle{
+	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)), ui2.TextStyle{
 		color: title_text_color
 		size: theme.title_size
 		bold: theme.title_bold
@@ -328,21 +329,18 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 		lines: 1
 	})
 
-	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width),
-		f64(theme.title_height)), ui2.BoxStyle{
+	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width), f64(theme.title_height)), ui2.BoxStyle{
 		bg: title_bg
 	}, [title, minimize, maximize, close])
 
-	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width),
-		1), ui2.BoxStyle{
+	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width), 1), ui2.BoxStyle{
 		bg: theme.title_divider
 	}, [])
 
 	background, contents := d.window_contents(window, body_height)
 	// Clickable so that touching a window anywhere brings it to the front,
 	// not only its title bar.
-	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(theme.title_height), f64(window.width),
-		f64(body_height)), ui2.BoxStyle{
+	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(theme.title_height), f64(window.width), f64(body_height)), ui2.BoxStyle{
 		bg: background
 	}, contents)
 
@@ -401,8 +399,15 @@ fn (mut d Desktop) invalidate_wallpaper() {
 // poll_apps gives every application that has something of its own going on a
 // chance to say so, and redraws if any of them did.
 fn (mut d Desktop) poll_apps() {
-	for i := 0; i < d.apps.len; i++ {
-		mut app := d.apps[i]
+	// Walk live windows rather than the backing store. Application slots
+	// stay stable after a window closes, but a closed terminal or clock should
+	// not keep doing background work forever. Minimized applications do keep
+	// polling: a shell pipe must still be drained while its window is hidden.
+	for window in d.windows {
+		if window.app_index < 0 || window.app_index >= d.apps.len {
+			continue
+		}
+		mut app := d.apps[window.app_index]
 		if mut app is PollingApp {
 			if app.poll() {
 				d.dirty = true
@@ -485,26 +490,27 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 // idle desktop is just the wallpaper and its icons.
 fn (d &Desktop) shortcut_elements() []ui2.Element {
 	mut out := []ui2.Element{cap: available_apps.len}
+	rows := shortcut_rows_for_height(d.canvas.height)
 	for index, factory in available_apps {
-		id := '${action_shortcut_prefix}${index}'
+		id := app_shortcut_actions[index]
 		theme := d.theme()
 		hovered := d.hover == id
-		y := shortcut_top + index * (shortcut_height + shortcut_gap)
+		column := index / rows
+		row := index % rows
+		x := shortcut_left + column * (shortcut_width + shortcut_gap)
+		y := shortcut_top + row * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
-		out << ui2.clickable_view(id, ui2.rect(f64(shortcut_left), f64(y), f64(shortcut_width),
-			f64(shortcut_height)), ui2.BoxStyle{
+		out << ui2.clickable_view(id, ui2.rect(f64(x), f64(y), f64(shortcut_width), f64(shortcut_height)), ui2.BoxStyle{
 			bg: theme.shortcut_panel
 			radius: 8
 			transparent: !hovered
 		}, [
-			ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon),
-				f64(shortcut_icon)), ui2.BoxStyle{
+			ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon), f64(shortcut_icon)), ui2.BoxStyle{
 				transparent: true
 			}, ui2.TextStyle{
 				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
 			}),
-			ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width),
-				18), ui2.TextStyle{
+			ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
 				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
 				shadow: true
 				size: 12
@@ -513,6 +519,18 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		])
 	}
 	return out
+}
+
+// Shortcuts fill the usable height, then continue in another column. The
+// current eight fit in one column on a MacBook's 720 logical pixels, while a
+// deliberately short display still keeps every utility above the taskbar.
+fn shortcut_rows_for_height(height int) int {
+	usable := height - taskbar_height - shortcut_top
+	mut rows := usable / (shortcut_height + shortcut_gap)
+	if rows < 1 {
+		rows = 1
+	}
+	return rows
 }
 
 // desktop_owns reports whether an action is the window manager's own. Anything
@@ -545,8 +563,7 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 		} else {
 			theme.traffic_zoom
 		}
-		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x),
-			f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
+		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
 			bg: fill
 			radius: theme.button_size / 2
 		}, ui2.TextStyle{
@@ -561,8 +578,7 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 	} else {
 		theme.button_hover
 	}
-	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(theme.button_size),
-		f64(theme.button_size)), ui2.BoxStyle{
+	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
 		bg: bg
 		radius: 5
 		transparent: !hovered
@@ -585,8 +601,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Left: a button that opens another window, so the taskbar list can be
 	// seen growing and shrinking.
 	new_button_width := 96
-	children << ui2.button(action_new_window, 'New window', ui2.rect(f64(edge_padding),
-		f64(item_y), f64(new_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
+	children << ui2.button(action_new_window, 'New window', ui2.rect(f64(edge_padding), f64(item_y), f64(new_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
 		bg: if d.hover == action_new_window { theme.accent } else { theme.accent_dim }
 		radius: 6
 	}, ui2.TextStyle{
@@ -600,10 +615,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// application is one click away rather than something only the startup
 	// arrangement can open.
 	mut launcher_x := edge_padding + new_button_width + 8
+	launcher_item_width := taskbar_launcher_width(width, launcher_x, available_apps.len)
 	for index, factory in available_apps {
-		id := '${action_launch_prefix}${index}'
-		children << ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(launcher_x),
-			f64(item_y), f64(launcher_width), f64(taskbar_item_height)), ui2.BoxStyle{
+		id := app_launcher_actions[index]
+		// On a narrow logical display the icon is still useful after a label no
+		// longer is. MacBook-sized desktops retain the full labelled controls.
+		label := if launcher_item_width >= 58 { factory.title } else { '' }
+		children << ui2.button_with_image(id, label, factory.icon, ui2.rect(f64(launcher_x), f64(item_y), f64(launcher_item_width), f64(taskbar_item_height)), ui2.BoxStyle{
 			bg: if d.hover == id { theme.taskbar_item_hover } else { theme.taskbar_item_bg }
 			radius: 6
 		}, ui2.TextStyle{
@@ -611,7 +629,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			size: 12
 			align: .center
 		})
-		launcher_x += launcher_width + 6
+		launcher_x += launcher_item_width + 6
 	}
 
 	// Middle: what is open. `standard` gives every window an entry, the way
@@ -665,8 +683,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		} else {
 			theme.taskbar_text
 		}
-		children << ui2.button(entry.id, entry.label, ui2.rect(f64(x), f64(item_y), f64(item_width),
-			f64(taskbar_item_height)), ui2.BoxStyle{
+		children << ui2.button(entry.id, entry.label, ui2.rect(f64(x), f64(item_y), f64(item_width), f64(taskbar_item_height)), ui2.BoxStyle{
 			bg: bg
 			radius: 6
 		}, ui2.TextStyle{
@@ -682,15 +699,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// off to one side of a centred bar.
 	clock_x := if dock { x + 6 } else { width - clock_area_width }
 	clock_width := clock_area_width - taskbar_padding
-	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(clock_x), 6, f64(clock_width),
-		20), ui2.TextStyle{
+	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(clock_x), 6, f64(clock_width), 20), ui2.TextStyle{
 		color: theme.clock_time
 		size: 17
 		bold: true
 		align: .right
 	})
-	children << ui2.label('clock.date', d.clock_date, ui2.rect(f64(clock_x), 26, f64(clock_width),
-		16), ui2.TextStyle{
+	children << ui2.label('clock.date', d.clock_date, ui2.rect(f64(clock_x), 26, f64(clock_width), 16), ui2.TextStyle{
 		color: theme.clock_date
 		size: 11
 		align: .right
@@ -699,8 +714,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// own would not fit — the two lines already fill the bar's height — and
 	// the date is short enough that the two never meet. The string is a
 	// constant, so unlike the clock it costs nothing to compose each second.
-	children << ui2.label('clock.build', 'built ${build_stamp}', ui2.rect(f64(clock_x), 26,
-		f64(clock_width), 16), ui2.TextStyle{
+	children << ui2.label('clock.build', 'built ${build_stamp}', ui2.rect(f64(clock_x), 26, f64(clock_width), 16), ui2.TextStyle{
 		color: theme.clock_date
 		size: 11
 		align: .left
@@ -723,17 +737,37 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		panel_x := (width - panel_width) / 2
 		// Clear of the bottom edge, the way a dock sits.
 		panel_y := d.canvas.height - taskbar_height - dock_bottom_gap
-		return ui2.view('taskbar', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width),
-			f64(taskbar_height)), ui2.BoxStyle{
+		return ui2.view('taskbar', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(taskbar_height)), ui2.BoxStyle{
 			bg: theme.dock_bg
 			radius: theme.dock_radius
 		}, children)
 	}
 
-	return ui2.view('taskbar', ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width),
-		f64(taskbar_height)), ui2.BoxStyle{
+	return ui2.view('taskbar', ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width), f64(taskbar_height)), ui2.BoxStyle{
 		bg: theme.taskbar_bg
 	}, children)
+}
+
+// Leave room for at least one open-window entry and the clock. The preferred
+// width is used on the roomy MacBook desktop; only narrower logical canvases
+// compress launchers, down to an icon-sized button.
+fn taskbar_launcher_width(screen_width int, start int, count int) int {
+	if count <= 0 {
+		return 0
+	}
+	// The floating dock has padding and a gap before its clock in addition to
+	// what the full-width taskbar needs, so reserve the stricter of the two.
+	limit := screen_width - clock_area_width - taskbar_padding - 12 - taskbar_item_gap -
+		8 - taskbar_item_min_width
+	available := limit - start - count * 6
+	mut width := available / count
+	if width > launcher_width {
+		width = launcher_width
+	}
+	if width < 36 {
+		width = 36
+	}
+	return width
 }
 
 // TaskbarEntry is one button in the middle of the bar. In standard mode it is

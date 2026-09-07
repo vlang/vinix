@@ -191,6 +191,34 @@ fn desktop_read_file(path string, buffer voidptr, max u64) i64 {
 	return i64(total)
 }
 
+// Replace a regular file with a caller-supplied buffer. The text editor is
+// deliberately built on this small POSIX boundary instead of importing os:
+// the desktop already has to control exactly which libc surface is available
+// in the static Vinix build, and a whole-file save is all the editor needs.
+fn desktop_write_file(path string, buffer voidptr, count u64) bool {
+	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_TRUNC, 0o644)
+	if fd < 0 {
+		return false
+	}
+	mut total := u64(0)
+	for total < count {
+		wrote := desktop_write(fd, unsafe { voidptr(&u8(buffer) + total) }, count - total)
+		if wrote < 0 {
+			if C.errno == C.EINTR {
+				continue
+			}
+			C.close(fd)
+			return false
+		}
+		if wrote == 0 {
+			C.close(fd)
+			return false
+		}
+		total += u64(wrote)
+	}
+	return C.close(fd) == 0
+}
+
 // A child process and the two pipes the terminal talks to it through.
 struct SpawnedShell {
 	pid        int

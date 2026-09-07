@@ -35,6 +35,14 @@ struct AppFactory {
 	open fn (mut desktop Desktop) !HostedApp @[required]
 }
 
+// Action ids are literals because launchers and shortcuts are rebuilt on
+// every redraw and Vinix runs without a garbage collector. Keep them parallel
+// with available_apps; their numeric suffix is what launch_index reads back.
+const app_launcher_actions = ['taskbar.launch.0', 'taskbar.launch.1', 'taskbar.launch.2',
+	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7']
+const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
+	'shortcut.5', 'shortcut.6', 'shortcut.7']
+
 // available_apps is what the taskbar and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
 // matches what the example asks for rather than a number guessed here.
@@ -76,6 +84,27 @@ const available_apps = [
 		width: 520
 		height: 400
 		open: open_activity
+	},
+	AppFactory{
+		title: 'Text Editor'
+		icon: 'builtin:editor'
+		width: 700
+		height: 500
+		open: open_editor
+	},
+	AppFactory{
+		title: 'Calendar'
+		icon: 'builtin:calendar'
+		width: 640
+		height: 500
+		open: open_calendar
+	},
+	AppFactory{
+		title: 'Clock'
+		icon: 'builtin:clock'
+		width: 560
+		height: 410
+		open: open_clock
 	},
 ]
 

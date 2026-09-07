@@ -10,7 +10,6 @@ const default_title_height = 34
 
 // ── Windows ────────────────────────────────────────────────────────
 
-
 // ── Window contents ────────────────────────────────────────────────
 // ── Application interiors ──────────────────────────────────────────
 // These do not follow the chrome's theme: an application draws its own inside,
@@ -43,6 +42,19 @@ const activity_busy = u32(0xc0632b)
 // everything on an idle machine would be marked and the mark would say
 // nothing.
 const activity_busy_percent = 10.0
+
+// ── Desktop utilities ─────────────────────────────────────────────
+const editor_button = u32(0x4a6fa5)
+const editor_path_focus = u32(0xdfeafb)
+const editor_cursor = u32(0x2563a6)
+const editor_modified = u32(0xb45f06)
+
+const calendar_button = u32(0xe9edf4)
+const calendar_today = u32(0xdfeafb)
+
+const clock_stopwatch = u32(0x2563a6)
+const clock_button = u32(0xe9edf4)
+const clock_stop = u32(0xc94c4c)
 
 // ── Settings ───────────────────────────────────────────────────────
 // ── Terminal ───────────────────────────────────────────────────────
@@ -79,8 +91,6 @@ const dock_item_width = 122
 const dock_bottom_gap = 6
 const taskbar_item_gap = 6
 const taskbar_padding = 10
-
-
 
 // ── Window switcher ────────────────────────────────────────────────
 // Cmd-Tab's panel, in the middle of the screen. It is the same dark slab under

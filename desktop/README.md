@@ -22,6 +22,10 @@ What it does:
   way back up
 - an **activity monitor** listing every process on the machine with the share
   of a CPU and of RAM it is using, updated once a second
+- a **text editor** for plain files, with an editable path, open/save controls,
+  cursor navigation and keyboard shortcuts
+- a **calendar** with month navigation, date selection and a jump back to today
+- a **clock** with a large local-time display and a tenth-second stopwatch
 - a **settings application**: window button side, taskbar style, theme,
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **hosted ui2 applications**: ui2's own examples run in windows of their own,
@@ -43,6 +47,9 @@ typing any word with a q in it drop the user back to the console.
     app.v          hosting applications in windows, and which ones there are
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
+    editor.v       the plain-text editor and its keyboard editing model
+    calendar.v     Gregorian month layout and the calendar application
+    clock_app.v    the large clock and stopwatch application
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     settings.v     preferences shared by the desktop and Settings application
     settings_app.v the settings application
@@ -123,6 +130,28 @@ entries than the window has room for.
 
 The image carries the desktop's own source at `/root/desktop`, so there is
 something real to browse and so the machine holds the code it is running.
+
+## Desktop utilities
+
+The text editor reads and writes real files. Click the path in its toolbar to
+edit it, press Return or **Open** to load it, and click the document to send
+typing back to the page. The usual `Ctrl-N`, `Ctrl-O` and `Ctrl-S` shortcuts
+create, open and save; arrows, Home, End, Backspace and Delete move or edit at
+the insertion point. Files are limited to 64 KB so one accidental open cannot
+consume the desktop on a small system image. New documents default to
+`/root/notes.txt`.
+
+The calendar uses the same local offset as the taskbar clock and lays out a
+full six-week Gregorian month. Its arrow buttons cross year boundaries, a day
+can be selected for a full date in the footer, and **Today** returns to the
+current month. The Clock expands the same local time into an across-the-room
+display and adds a start/stop/reset stopwatch with tenth-second updates.
+
+Utility windows are sized for the logical MacBook desktop rather than the old
+1024×768 QEMU screenshot. Shortcuts fill the available height and flow into a
+second column when needed; taskbar launchers retain their full labels when
+there is room and shrink only far enough to preserve an open-window entry and
+the clock.
 
 ## The activity monitor
 

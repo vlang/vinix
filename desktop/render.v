@@ -281,9 +281,15 @@ fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
 	text_width := face.text_width(text)
 	mut text_x := x
 	match el.text_style.align {
-		.left { text_x = x }
-		.center { text_x = x + (w - text_width) / 2 }
-		.right { text_x = x + w - text_width }
+		.left {
+			text_x = x
+		}
+		.center {
+			text_x = x + (w - text_width) / 2
+		}
+		.right {
+			text_x = x + w - text_width
+		}
 	}
 	if el.text_style.background_color != 0 {
 		// Padded, so the run is not touched by whatever it is sitting on.
@@ -327,8 +333,7 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 			d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
 		} else {
 			icon := if h - 8 < button_icon_size { h - 8 } else { button_icon_size }
-			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon,
-				icon, el.text_style.color)
+			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon, el.text_style.color)
 			text_x += icon + 6
 			text_w -= icon + 6
 		}
@@ -350,7 +355,9 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	match el.text_style.align {
 		.left { d.canvas.draw_text(face, x + text_inset, text_y, text, el.text_style.color) }
 		.center { d.canvas.draw_text_centered(face, x, text_y, w, text, el.text_style.color) }
-		.right { d.canvas.draw_text_right(face, x + w - text_inset, text_y, text, el.text_style.color) }
+		.right {
+			d.canvas.draw_text_right(face, x + w - text_inset, text_y, text, el.text_style.color)
+		}
 	}
 }
 
@@ -373,22 +380,19 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_rect(cx - half, cy, 2 * half, 1, color)
 		}
 		'maximize' {
-			d.canvas.stroke_round_rect(cx - half, cy - half, 2 * half, 2 * half, 1, color,
-				255)
+			d.canvas.stroke_round_rect(cx - half, cy - half, 2 * half, 2 * half, 1, color, 255)
 		}
 		'restore' {
 			// Two offset outlines, the back one clipped by the front's fill.
-			d.canvas.stroke_round_rect(cx - half + 2, cy - half - 1, 2 * half - 1, 2 * half - 1,
-				1, color, 255)
-			d.canvas.fill_rect(cx - half, cy - half + 2, 2 * half - 1, 2 * half - 1,
-				d.surface_under(x, y))
-			d.canvas.stroke_round_rect(cx - half, cy - half + 2, 2 * half - 1, 2 * half - 1,
-				1, color, 255)
+			d.canvas.stroke_round_rect(cx - half + 2, cy - half - 1, 2 * half - 1, 2 * half - 1, 1, color, 255)
+			d.canvas.fill_rect(cx - half, cy - half + 2, 2 * half - 1, 2 * half - 1, d.surface_under(x, y))
+			d.canvas.stroke_round_rect(cx - half, cy - half + 2, 2 * half - 1, 2 * half - 1, 1, color, 255)
 		}
 		'close' {
 			d.canvas.draw_line(cx - half, cy - half, cx + half, cy + half, color, 1)
 			d.canvas.draw_line(cx + half, cy - half, cx - half, cy + half, color, 1)
 		}
+
 		// Application and file icons. These are filled shapes rather than
 		// hairlines: they are read at a glance and at whatever size the
 		// element gives them, not aligned to the pixel grid like the chrome's.
@@ -398,8 +402,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			left := cx - body / 2
 			top := cy - tall / 2
 			// The tab, then the body over it, so the two read as one shape.
-			d.canvas.fill_round_rect(left, top - tall / 5, body * 2 / 5, tall / 2, 2,
-				color)
+			d.canvas.fill_round_rect(left, top - tall / 5, body * 2 / 5, tall / 2, 2, color)
 			d.canvas.fill_round_rect(left, top, body, tall, 3, color)
 		}
 		'file' {
@@ -410,8 +413,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			fold := body / 3
 			d.canvas.fill_round_rect(left, top, body, tall, 2, color)
 			// A dog-ear, punched out of the corner in the surface behind it.
-			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x,
-				y))
+			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x, y))
 		}
 		'window' {
 			// What stands for a window with no application behind it to lend
@@ -423,8 +425,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			top := cy - tall / 2
 			bar := tall / 3
 			d.canvas.fill_round_rect(left, top, body, tall, 3, color)
-			d.canvas.fill_rect(left + 2, top + bar, body - 4, tall - bar - 2, d.surface_under(x,
-				y))
+			d.canvas.fill_rect(left + 2, top + bar, body - 4, tall - bar - 2, d.surface_under(x, y))
 		}
 		'menu' {
 			// Where the Apple menu's logo would be. A plain mark: the atlas has
@@ -441,10 +442,8 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			// A prompt chevron and its cursor, punched back out.
 			behind := d.surface_under(x, y)
 			arm := tall / 4
-			d.canvas.draw_line(left + 4, top + arm, left + 4 + arm, top + tall / 2, behind,
-				2)
-			d.canvas.draw_line(left + 4 + arm, top + tall / 2, left + 4, top + tall - arm,
-				behind, 2)
+			d.canvas.draw_line(left + 4, top + arm, left + 4 + arm, top + tall / 2, behind, 2)
+			d.canvas.draw_line(left + 4 + arm, top + tall / 2, left + 4, top + tall - arm, behind, 2)
 			d.canvas.fill_rect(left + 6 + 2 * arm, top + tall - arm - 2, body / 3, 2, behind)
 		}
 		'settings' {
@@ -456,8 +455,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 				// reach, which is close enough to a gear at icon size.
 				dx := [1, 0, -1, 0][i] * outer
 				dy := [0, 1, 0, -1][i] * outer
-				d.canvas.fill_rect(cx + dx - tooth / 2, cy + dy - tooth / 2, tooth, tooth,
-					color)
+				d.canvas.fill_rect(cx + dx - tooth / 2, cy + dy - tooth / 2, tooth, tooth, color)
 			}
 			d.canvas.fill_circle(cx, cy, outer, color)
 			d.canvas.fill_circle(cx, cy, outer / 2, d.surface_under(x, y))
@@ -475,8 +473,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			// and does not read as a barcode.
 			for i, share in [2, 3, 5] {
 				height := tall * share / 5
-				d.canvas.fill_round_rect(left + i * (bar + bar / 2), bottom - height,
-					bar, height, 1, color)
+				d.canvas.fill_round_rect(left + i * (bar + bar / 2), bottom - height, bar, height, 1, color)
 			}
 			d.canvas.fill_rect(left, bottom, body, 1, color)
 		}
@@ -492,10 +489,43 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			key := (body - 6) / 4
 			for row in 0 .. 2 {
 				for column in 0 .. 3 {
-					d.canvas.fill_rect(left + 3 + column * key, top + tall / 2 + row * key,
-						key - 2, key - 2, behind)
+					d.canvas.fill_rect(left + 3 + column * key, top + tall / 2 + row * key, key - 2, key - 2, behind)
 				}
 			}
+		}
+		'editor' {
+			body := w * 3 / 5
+			tall := h * 3 / 4
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 2, color)
+			behind := d.surface_under(x, y)
+			for row in 0 .. 3 {
+				line_width := if row == 2 { body / 2 } else { body - 8 }
+				d.canvas.fill_rect(left + 4, top + 5 + row * (tall - 7) / 4, line_width, 2, behind)
+			}
+		}
+		'calendar' {
+			body := w * 3 / 4
+			tall := h * 2 / 3
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, color)
+			behind := d.surface_under(x, y)
+			d.canvas.fill_rect(left + 2, top + tall / 3, body - 4, tall - tall / 3 - 2, behind)
+			for column in 0 .. 3 {
+				for row in 0 .. 2 {
+					d.canvas.fill_rect(left + 4 + column * (body - 6) / 3, top + tall / 2 + row * (tall - 5) / 4, 2, 2, color)
+				}
+			}
+		}
+		'clock' {
+			radius := if w < h { w * 3 / 8 } else { h * 3 / 8 }
+			d.canvas.fill_circle(cx, cy, radius, color)
+			d.canvas.fill_circle(cx, cy, radius - 2, d.surface_under(x, y))
+			d.canvas.draw_line(cx, cy, cx, cy - radius / 2, color, 2)
+			d.canvas.draw_line(cx, cy, cx + radius / 2, cy + radius / 3, color, 2)
+			d.canvas.fill_circle(cx, cy, 2, color)
 		}
 		else {}
 	}
