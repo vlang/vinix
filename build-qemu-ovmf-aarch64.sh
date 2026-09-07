@@ -63,8 +63,11 @@ if [ -z "$STOCK_FIRMWARE" ]; then
 fi
 
 echo "==> Installing the driver into QEMU's AArch64 OVMF image..."
-PATH="$SOURCE_DIR/BaseTools/Source/C/bin:$PATH" PYTHON_COMMAND=python3 \
-    "$SOURCE_DIR/BaseTools/BinWrappers/PosixLike/FMMT" \
-    -r "$STOCK_FIRMWARE" dce1b094-7dc6-45d0-9fdd-d7fc3cc3e4ef \
-    "$RAMFB_FFS" "$FIRMWARE"
+(
+    cd "$SOURCE_DIR"
+    PATH="$SOURCE_DIR/BaseTools/Source/C/bin:$PATH" PYTHON_COMMAND=python3 \
+        "$SOURCE_DIR/BaseTools/BinWrappers/PosixLike/FMMT" \
+        -r "$STOCK_FIRMWARE" dce1b094-7dc6-45d0-9fdd-d7fc3cc3e4ef \
+        "$RAMFB_FFS" "$FIRMWARE"
+)
 echo "==> Wrote $FIRMWARE"
