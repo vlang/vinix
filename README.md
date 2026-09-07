@@ -349,6 +349,17 @@ image at deployment:
 ./deploy-m1-efi.sh --apple-gpu --desktop-initramfs /Volumes/EFI
 ```
 
+The installed M1 deployment helper enables the GPU in its default desktop mode,
+alongside Wi-Fi, so the normal hardware test is simply:
+
+```sh
+sudo ~/code/kek.sh
+```
+
+Use `sudo ~/code/kek.sh gpu` to isolate the driver with the shell test image,
+or `sudo ~/code/kek.sh desktop-wifi` to boot the same desktop with AGX disabled
+if the experimental probe resets before reaching userspace.
+
 Deploy to an already-mounted M1 EFI system partition with the explicit GPU
 opt-in, then boot through m1n1 so Vinix receives the patched device tree:
 

@@ -54,6 +54,7 @@ for argument in "$@"; do
         --all-drivers)
             # Enable every optional Apple subsystem in one switch. Battery is
             # already the safe default but remains explicit in this mode.
+            ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1 vinix.apple_wifi=1"
             ;;
         --native-resolution)
@@ -175,6 +176,35 @@ for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
         exit 1
     fi
 done
+
+if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
+    echo "APPLE GPU: kernel AGX probe enabled"
+    # The render node proves the kernel driver initialized, but desktop and GL
+    # acceleration additionally need the exact Mesa build matching its UAPI.
+    # Inspect the image being copied, rather than a possibly stale host staging
+    # directory, so this warning describes what the M1 will actually boot.
+    if tar -tf "$INITRAMFS" | awk -v desktop="$USE_DESKTOP_INITRAMFS" '
+        {
+            path = $0
+            sub(/^\.\//, "", path)
+            if (path == "usr/lib/dri/asahi_dri.so") asahi = 1
+            if (path == "usr/share/vinix/asahi-x11-egl") marker = 1
+            if (path == "usr/bin/gl-triangle-agx") triangle = 1
+            if (path == "usr/bin/vinix-desktop-gpu") gpu_desktop = 1
+        }
+        END {
+            ready = asahi && marker && triangle
+            if (desktop) ready = ready && gpu_desktop
+            exit !ready
+        }
+    '; then
+        echo "APPLE GPU: matching Asahi Mesa and hardware test are present in the initramfs"
+    else
+        echo "WARNING: AGX is enabled, but the selected initramfs lacks the complete Asahi runtime." >&2
+        echo "         The kernel render-node probe can still be tested; desktop/GL acceleration cannot." >&2
+        echo "         Rebuild build-aarch64-asahi/staging in the ARM64 VM, then rebuild this image." >&2
+    fi
+fi
 
 echo "using limine EFI: $LIMINE_EFI"
 

@@ -4,7 +4,8 @@
 # Installed on the M1 by push-to-m1.sh; edit it in the repo, not in place, or
 # the next push overwrites your changes.
 #
-#   sudo ~/code/kek.sh          boot into the desktop with Wi-Fi (default)
+#   sudo ~/code/kek.sh          boot into the desktop with Wi-Fi and the
+#                               experimental Apple GPU (default)
 #   sudo ~/code/kek.sh full     BusyBox shell userland + terminal
 #   sudo ~/code/kek.sh diag     minimal initramfs, no terminal, stage bars only
 #   sudo ~/code/kek.sh halt N   power off at stage N -- machine turning itself
@@ -18,10 +19,12 @@
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
 #                               boot firmware; post-boot attach reboots once
 #
-# GPU, DCP and Wi-Fi below are off by default in the kernel. The read-only SMC
-# battery client is enabled in every ARM64 mode and safely declines non-Apple
-# device trees. Start narrow: GPU and DCP can hard-reset the machine, and with
-# several on at once a reset says nothing about which one did it.
+# GPU, DCP and Wi-Fi below are off by default in the kernel. This M1 deployment
+# helper explicitly enables GPU and Wi-Fi for its normal desktop mode so that
+# the accelerated desktop and Firefox paths are exercised on hardware. The
+# read-only SMC battery client is enabled in every ARM64 mode and safely
+# declines non-Apple device trees. Use `desktop-wifi` to recover the previous
+# software-desktop mode if the experimental GPU probe resets the machine.
 #
 #   sudo ~/code/kek.sh battery  shell + explicit SMC battery flag; read-only.
 #                               `cat /dev/battery` reports the charge
@@ -51,8 +54,8 @@ ESP="/Volumes/EFI - FEDOR"
 
 case "${1:-desktop}" in
     desktop)
-        FLAGS=(--apple-wifi --native-resolution --desktop-initramfs)
-        MODE="desktop + Apple Wi-Fi"
+        FLAGS=(--apple-gpu --apple-wifi --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple GPU + Wi-Fi"
         ;;
     diag)
         FLAGS=(--native-resolution --minimal-initramfs --no-early-term)
@@ -178,6 +181,26 @@ After recovery, the next boot should select a 5120x2880 external framebuffer.
 This mode owns one firmware framebuffer. Reconnecting that established output
 works live; switching between the internal and external outputs crosses a boot.
 STUDIO
+    ;;
+*Apple\ GPU*)
+    cat <<'GPU'
+
+The M1 GPU probe is enabled. The serial/early console should reach all of:
+
+  apple bring-up: GPU=enabled
+  drm: created device node /dev/dri/renderD128
+  agx: Apple GPU driver initialized successfully
+
+The desktop image then prints "Vinix: starting the GPU-enabled desktop" and
+the compositor reports its renderer. In a terminal, verify and rerun the
+hardware-only render test with:
+
+  ls -l /dev/dri/renderD128
+  run-gl-triangle-agx --rebuild
+
+Use `sudo ~/code/kek.sh desktop-wifi` if the GPU probe prevents the desktop
+from starting; that keeps Wi-Fi and the same desktop image but disables AGX.
+GPU
     ;;
 *Apple\ drivers|*SMC\ battery|*Apple\ DCP|*Apple\ Wi-Fi)
     cat <<'DRV'
