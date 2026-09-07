@@ -287,6 +287,9 @@ fn (mut this EXT2Filesystem) symlink(parent &fs.VFSNode, dest string, target str
 	return new_node
 }
 
+fn (mut this EXT2Filesystem) rename(_old_parent &fs.VFSNode, _old_name string,
+	_new_parent &fs.VFSNode, _new_name string, _flags int) ? {}
+
 fn (mut this EXT2Filesystem) create(parent &fs.VFSNode, name string, mode u32) &fs.VFSNode {
 	mut new_node := fs.create_node(this, parent, name, stat.isdir(mode))
 

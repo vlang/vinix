@@ -632,6 +632,23 @@ static int a_open_root(struct ans *a, void *context, size_t size)
     return vinix_ext2_open(context, size, a_root_disk, a,
         ns->parts[a->root_part].blocks * ns->sector);
 }
+#ifdef __AARCH64__
+static int a_data_disk(void *cookie, void *buffer, uint64_t offset, size_t count)
+{
+    struct ans *a = cookie;
+    if (!a->live || !a->write_enabled) return -ANS_STOPPED;
+    struct ans_namespace *ns = &a->ns[a->write_ns];
+    struct ans_partition *p = &ns->parts[a->write_part];
+    uint64_t bytes = p->blocks * ns->sector;
+    if (offset > bytes || count > bytes - offset) return -ANS_RANGE;
+    return a_read_bytes(a, a->write_ns, buffer, p->start * ns->sector + offset, count);
+}
+static int a_data_store(void *cookie, const void *buffer, uint64_t offset, size_t count)
+{
+    struct ans *a = cookie;
+    return a_write_partition(a, a->write_ns, a->write_part, buffer, offset, count);
+}
+#endif
 
 #ifdef __AARCH64__
 extern uint32_t vinix_mmio_read32(void *);
@@ -727,6 +744,7 @@ int vinix_ans_root_part(void) { return controller.root_selected ? (int)controlle
 /* Only this adapter turns an ext2 byte offset into a namespace offset. It
  * cannot read beyond the selected root partition, including during mount. */
 static uint8_t a_root_context[256] __attribute__((aligned(16)));
+static uint8_t a_data_context[256] __attribute__((aligned(16)));
 int vinix_ans_root_open(void)
 { return a_open_root(&controller, a_root_context, sizeof(a_root_context)); }
 int vinix_ans_root_stat(uint32_t ino, uint64_t fields[10])
@@ -735,6 +753,41 @@ int64_t vinix_ans_root_read(uint32_t ino, void *buffer, uint64_t offset, size_t 
 { return controller.live ? vinix_ext2_read(a_root_context, ino, buffer, offset, count) : -ANS_STOPPED; }
 int vinix_ans_root_next(uint32_t dir, uint64_t *offset, uint32_t *ino, char *name, size_t cap)
 { return controller.live ? vinix_ext2_next(a_root_context, dir, offset, ino, name, cap) : -ANS_STOPPED; }
+int vinix_ans_data_open(void)
+{
+    if (!controller.live || !controller.write_enabled ||
+        vinix_ext2_context_size() > sizeof(a_data_context)) return -ANS_STOPPED;
+    const struct ans_namespace *ns = &controller.ns[controller.write_ns];
+    return vinix_ext2_open_rw(a_data_context, sizeof(a_data_context), a_data_disk,
+        a_data_store, &controller, ns->parts[controller.write_part].blocks * ns->sector);
+}
+int vinix_ans_data_begin(void) { return vinix_ext2_begin_write(a_data_context); }
+int vinix_ans_data_close(void) { return vinix_ext2_close_clean(a_data_context); }
+int vinix_ans_data_stat(uint32_t ino, uint64_t fields[10])
+{ return controller.live ? vinix_ext2_stat(a_data_context, ino, fields) : -ANS_STOPPED; }
+int64_t vinix_ans_data_read(uint32_t ino, void *buffer, uint64_t offset, size_t count)
+{ return controller.live ? vinix_ext2_read(a_data_context, ino, buffer, offset, count) : -ANS_STOPPED; }
+int64_t vinix_ans_data_write(uint32_t ino, void *buffer, uint64_t offset, size_t count)
+{ return controller.live ? vinix_ext2_write(a_data_context, ino, buffer, offset, count) : -ANS_STOPPED; }
+int vinix_ans_data_truncate(uint32_t ino, uint64_t size)
+{ return controller.live ? vinix_ext2_truncate(a_data_context, ino, size) : -ANS_STOPPED; }
+int vinix_ans_data_next(uint32_t dir, uint64_t *offset, uint32_t *ino, char *name, size_t cap)
+{ return controller.live ? vinix_ext2_next(a_data_context, dir, offset, ino, name, cap) : -ANS_STOPPED; }
+int vinix_ans_data_create(uint32_t parent, char *name, size_t n, uint32_t mode, uint32_t *ino)
+{ return controller.live ? vinix_ext2_create(a_data_context, parent, name, n, mode, ino) : -ANS_STOPPED; }
+int vinix_ans_data_symlink(uint32_t parent, char *name, size_t n,
+    char *target, size_t target_n, uint32_t *ino)
+{ return controller.live ? vinix_ext2_symlink(a_data_context, parent, name, n, target, target_n, ino) : -ANS_STOPPED; }
+int vinix_ans_data_link(uint32_t parent, char *name, size_t n, uint32_t ino)
+{ return controller.live ? vinix_ext2_link(a_data_context, parent, name, n, ino) : -ANS_STOPPED; }
+int vinix_ans_data_unlink(uint32_t parent, char *name, size_t n, int directory)
+{ return controller.live ? vinix_ext2_unlink(a_data_context, parent, name, n, directory) : -ANS_STOPPED; }
+int vinix_ans_data_drop_link(uint32_t ino)
+{ return controller.live ? vinix_ext2_drop_link(a_data_context, ino) : -ANS_STOPPED; }
+int vinix_ans_data_rename(uint32_t old_parent, char *old_name, size_t old_n,
+    uint32_t new_parent, char *new_name, size_t new_n, int replace)
+{ return controller.live ? vinix_ext2_rename(a_data_context, old_parent, old_name,
+    old_n, new_parent, new_name, new_n, replace) : -ANS_STOPPED; }
 int vinix_ans_error(void) { return controller.error; }
 unsigned vinix_ans_stage(void) { return controller.stage; }
 uint16_t vinix_ans_completion_status(void) { return controller.last_status; }

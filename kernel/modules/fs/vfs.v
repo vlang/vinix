@@ -28,6 +28,7 @@ mut:
 	create(&VFSNode, string, u32) &VFSNode
 	symlink(&VFSNode, string, string) &VFSNode
 	link(&VFSNode, string, mut VFSNode) ?&VFSNode
+	rename(&VFSNode, string, &VFSNode, string, int) ?
 }
 
 pub struct VFSNode {
@@ -304,6 +305,13 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 	}
 }
 
+// Kernel subsystems that discover boot-time storage do not receive a process
+// working directory. Keep the root pointer private and expose only the scoped
+// mount operation they need.
+pub fn mount_at_root(source string, target string, filesystem string) ? {
+	return mount(vfs_root, source, target, filesystem)
+}
+
 fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	// Create . and .. entries
 	mut dot := create_node(node.filesystem, node, '.', false)
@@ -394,7 +402,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 		if node.children.len > 2 { errno.set(errno.enotempty); return none }
 	}
 	// A read-only or failing backend must leave the namespace intact.
-	node.resource.unlink(unsafe { nil })?
+	node.resource.unlink(voidptr(node))?
 	if stat.isdir(node.resource.stat.mode) {
 		unsafe {
 			free(node.children['.'].children)
@@ -527,7 +535,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	}
 
 	if target_node.read_only || parent_of_tgt_node.read_only { return errno.err, errno.erofs }
-	target_node.resource.unlink(unsafe { nil }) or { return errno.err, errno.get() }
+	target_node.resource.unlink(voidptr(target_node)) or { return errno.err, errno.get() }
 	target_node.resource.unref(unsafe { nil }) or {}
 
 	unsafe {
@@ -1172,10 +1180,9 @@ pub const rename_exchange = 2
 
 pub const rename_whiteout = 4
 
-// Move a name from one directory to another. Every VFS operation here works on
-// the in-memory tree — unlink() and link() already do — so a rename is the same
-// kind of edit: the node moves between the two parents' child maps and learns
-// its new name.
+// Move a name from one directory to another. The filesystem hook commits any
+// durable namespace change first; only then does the VFS mirror it in the eager
+// child maps and update the node's parent/name.
 pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath string, flags int) ? {
 	if flags & rename_whiteout != 0 {
 		errno.set(errno.einval)
@@ -1222,6 +1229,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 			errno.set(errno.einval)
 			return none
 		}
+		old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
+			new_basename, flags)?
 
 		unsafe {
 			old_parent_of.children[old_basename] = new_node
@@ -1232,8 +1241,12 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		return
 	}
 
-	// Renaming something onto itself is a no-op, not a way to delete it.
-	if voidptr(old_node) == voidptr(new_node) {
+	// Renaming something onto itself, including through another hard link, is a
+	// no-op and must not delete either name.
+	if unsafe { new_node != 0 }
+		&& (voidptr(old_node) == voidptr(new_node)
+		|| (old_node.resource.stat.dev == new_node.resource.stat.dev
+		&& old_node.resource.stat.ino == new_node.resource.stat.ino)) {
 		return
 	}
 
@@ -1264,9 +1277,17 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 			errno.set(errno.enotempty)
 			return none
 		}
+	}
 
-		// Replacing drops the destination's last link.
-		new_node.resource.unlink(unsafe { nil })?
+	// Give an on-disk filesystem the complete validated operation before the
+	// in-memory namespace changes. RAM filesystems use a no-op implementation.
+	old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
+		new_basename, flags)?
+
+	if unsafe { new_node != 0 } {
+		// The filesystem rename hook already removed the destination name. Drop
+		// the VFS link without invoking a second backend unlink.
+		if new_node.resource.stat.nlink > 0 { new_node.resource.stat.nlink-- }
 		new_parent_of.children.delete(new_basename)
 		new_node.resource.unref(unsafe { nil })?
 	}

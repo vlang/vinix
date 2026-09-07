@@ -14,6 +14,7 @@
 #define VINIX_ANS_WRITE 2u
 #define VINIX_ANS_ROOT 4u
 #define VINIX_ANS_FALLBACK 8u
+#define VINIX_ANS_PERSIST 16u
 
 int vinix_ans_init(uint64_t nvme, uint64_t asc, uint64_t mailbox,
     uint64_t sart, uint64_t reset, void *dma, uint64_t dma_phys, size_t dma_size);
@@ -42,6 +43,22 @@ int vinix_ans_root_stat(uint32_t inode, uint64_t fields[10]);
 int64_t vinix_ans_root_read(uint32_t inode, void *, uint64_t offset, size_t count);
 int vinix_ans_root_next(uint32_t directory, uint64_t *offset, uint32_t *inode,
     char *name, size_t capacity);
+int vinix_ans_data_open(void);
+int vinix_ans_data_begin(void);
+int vinix_ans_data_close(void);
+int vinix_ans_data_stat(uint32_t inode, uint64_t fields[10]);
+int64_t vinix_ans_data_read(uint32_t inode, void *, uint64_t offset, size_t count);
+int64_t vinix_ans_data_write(uint32_t inode, void *, uint64_t offset, size_t count);
+int vinix_ans_data_truncate(uint32_t inode, uint64_t size);
+int vinix_ans_data_next(uint32_t directory, uint64_t *offset, uint32_t *inode,
+    char *name, size_t capacity);
+int vinix_ans_data_create(uint32_t parent, char *, size_t, uint32_t mode, uint32_t *inode);
+int vinix_ans_data_symlink(uint32_t parent, char *, size_t, char *, size_t, uint32_t *inode);
+int vinix_ans_data_link(uint32_t parent, char *, size_t, uint32_t inode);
+int vinix_ans_data_unlink(uint32_t parent, char *, size_t, int directory);
+int vinix_ans_data_drop_link(uint32_t inode);
+int vinix_ans_data_rename(uint32_t old_parent, char *, size_t,
+    uint32_t new_parent, char *, size_t, int replace);
 int vinix_ans_error(void);
 unsigned vinix_ans_stage(void);
 uint16_t vinix_ans_completion_status(void);

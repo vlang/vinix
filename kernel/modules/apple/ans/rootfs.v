@@ -114,6 +114,11 @@ fn (mut this AnsRootFS) link(_parent &fs.VFSNode, _name string, mut _node fs.VFS
 	errno.set(errno.erofs)
 	return none
 }
+fn (mut this AnsRootFS) rename(_old_parent &fs.VFSNode, _old_name string,
+	_new_parent &fs.VFSNode, _new_name string, _flags int) ? {
+	errno.set(errno.erofs)
+	return none
+}
 
 fn (mut this AnsRootFS) make_node(parent &fs.VFSNode, name string, ino u32) ?&fs.VFSNode {
 	mut fields := [10]u64{}

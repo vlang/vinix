@@ -211,6 +211,9 @@ fn kmain_thread(qemu_platform bool) {
 	if !ans.select_root() {
 		panic('Requested ANS SSD root could not be selected safely')
 	}
+	if !ans.mount_persistent() {
+		panic('Requested ANS persistent data filesystem could not be mounted safely')
+	}
 	boot_stage(12)
 
 	print('\n*** aarch64: Kernel initialisation complete ***\n')

@@ -228,6 +228,9 @@ fn (mut this TmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) ?&V
 	return new_node
 }
 
+fn (mut this TmpFS) rename(_old_parent &VFSNode, _old_name string,
+	_new_parent &VFSNode, _new_name string, _flags int) ? {}
+
 fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
 	mut new_node := create_node(this, parent, target, false)
 

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../kernel/c/apple_ans_ext2.c"
-struct image { uint8_t *data; size_t bytes; unsigned bs, isize, reads; int fail; struct e2_fs fs; };
+struct image { uint8_t *data; size_t bytes; unsigned bs, isize, reads, writes; int fail, fail_write; struct e2_fs fs; };
 static void p16(uint8_t *p, unsigned x) { p[0]=(uint8_t)x; p[1]=(uint8_t)(x>>8); }
 static void p32(uint8_t *p, uint32_t x) { p16(p,x); p16(p+2,x>>16); }
 static int disk_read(void *cookie, void *p, uint64_t off, size_t n)
@@ -14,6 +14,14 @@ static int disk_read(void *cookie, void *p, uint64_t off, size_t n)
     ++im->reads;
     if(im->fail) return -1;
     memcpy(p,im->data+off,n); return 0;
+}
+static int disk_write(void *cookie,const void *p,uint64_t off,size_t n)
+{
+    struct image *im=cookie;
+    assert(off<=im->bytes && n<=im->bytes-off);
+    ++im->writes;
+    if(im->fail_write) return -1;
+    memcpy(im->data+off,p,n); return 0;
 }
 static uint8_t *inode(struct image *im,unsigned n) { return im->data+5*im->bs+(n-1)*im->isize; }
 static void set_inode(struct image *im,unsigned n,unsigned mode,uint64_t size,unsigned block)
@@ -51,6 +59,19 @@ static void setup(struct image *im,unsigned bs,unsigned isize)
     assert(!vinix_ext2_open(&im->fs,sizeof(im->fs),disk_read,im,im->bytes));
 }
 static void destroy(struct image *im) { free(im->data); }
+static void setup_rw(struct image *im,unsigned bs)
+{
+    setup(im,bs,128);
+    uint8_t *s=im->data+1024,*g=im->data+(bs==1024?2:1)*bs;
+    p32(s+84,11); p32(s+92,8); /* ext_attr only; no resize inode or dir index */
+    p32(s+12,236); p32(s+16,17);
+    p32(g,3); p32(g+4,4); p32(g+8,5); p16(g+12,236); p16(g+14,17); p16(g+16,1);
+    memset(im->data+3*bs,0,bs); memset(im->data+4*bs,0,bs);
+    for(unsigned block=(bs==1024);block<=19;++block) im->data[3*bs+(block-(bs==1024)) / 8] |= (uint8_t)(1u<<((block-(bs==1024))&7));
+    for(unsigned ino=1;ino<=15;++ino) im->data[4*bs+(ino-1)/8] |= (uint8_t)(1u<<((ino-1)&7));
+    p16(inode(im,2)+26,2);
+    assert(!vinix_ext2_open_rw(&im->fs,sizeof(im->fs),disk_read,disk_write,im,im->bytes));
+}
 static void t_layout(void)
 {
     for(unsigned bs=1024;bs<=4096;bs*=2) for(unsigned is=128;is<=256;is*=2) {
@@ -147,10 +168,87 @@ static void t_mutation(void)
     }
     destroy(&im);
 }
+static void t_rw_persistence(void)
+{
+    for(unsigned bs=1024;bs<=4096;bs*=2) {
+        struct image im; setup_rw(&im,bs); uint32_t ino=0; char name[256];
+        assert(!vinix_ext2_begin_write(&im.fs)); assert(e2_u16(im.data+1024+58)==2);
+        assert(!vinix_ext2_create(&im.fs,2,"notes.txt",9,E2_REGULAR|0644,&ino));
+        assert(vinix_ext2_write(&im.fs,ino,"saved on ssd",0,12)==12);
+        assert(!vinix_ext2_close_clean(&im.fs)); assert(e2_u16(im.data+1024+58)==1);
+        assert(!vinix_ext2_open_rw(&im.fs,sizeof(im.fs),disk_read,disk_write,&im,im.bytes));
+        uint64_t off=0; uint32_t found=0;
+        while(vinix_ext2_next(&im.fs,2,&off,&found,name,sizeof(name))==1)
+            if(!strcmp(name,"notes.txt")) break;
+        assert(found==ino); char text[16]={0};
+        assert(vinix_ext2_read(&im.fs,found,text,0,sizeof(text))==12);
+        assert(!memcmp(text,"saved on ssd",12));
+        assert(!vinix_ext2_begin_write(&im.fs)); assert(!vinix_ext2_close_clean(&im.fs));
+        destroy(&im);
+    }
+}
+static void t_rw_sparse_truncate(void)
+{
+    struct image im; setup_rw(&im,1024); uint32_t ino, block; uint8_t data[1040];
+    assert(!vinix_ext2_begin_write(&im.fs));
+    assert(!vinix_ext2_create(&im.fs,2,"sparse",6,E2_REGULAR|0600,&ino));
+    assert(vinix_ext2_write(&im.fs,ino,"q",0,1)==1);
+    block=e2_u32(inode(&im,ino)+40); assert(block);
+    memset(im.data+block*im.bs+1,0x7e,7); /* unspecified old on-disk tail */
+    assert(vinix_ext2_write(&im.fs,ino,"x",5,1)==1);
+    memset(data,0xa5,8); assert(vinix_ext2_read(&im.fs,ino,data,0,8)==6);
+    assert(data[0]=='q'); for(unsigned i=1;i<5;++i) assert(data[i]==0); assert(data[5]=='x');
+    assert(!vinix_ext2_truncate(&im.fs,ino,0));
+    assert(vinix_ext2_write(&im.fs,ino,"abc",1027,3)==3);
+    memset(data,0xa5,sizeof(data)); assert(vinix_ext2_read(&im.fs,ino,data,0,sizeof(data))==1030);
+    for(unsigned i=0;i<1027;++i) assert(data[i]==0); assert(!memcmp(data+1027,"abc",3));
+    assert(!vinix_ext2_truncate(&im.fs,ino,2));
+    assert(vinix_ext2_write(&im.fs,ino,"z",5,1)==1);
+    memset(data,0xa5,8); assert(vinix_ext2_read(&im.fs,ino,data,0,8)==6);
+    for(unsigned i=0;i<5;++i) assert(data[i]==0); assert(data[5]=='z');
+    assert(!vinix_ext2_close_clean(&im.fs)); destroy(&im);
+}
+static void t_rw_directories_links(void)
+{
+    struct image im; setup_rw(&im,2048); uint32_t dir,file,link;
+    assert(!vinix_ext2_begin_write(&im.fs));
+    assert(!vinix_ext2_create(&im.fs,2,"docs",4,E2_DIRECTORY|0755,&dir));
+    assert(!vinix_ext2_create(&im.fs,dir,"a",1,E2_REGULAR|0644,&file));
+    assert(!vinix_ext2_link(&im.fs,dir,"b",1,file));
+    assert(!vinix_ext2_rename(&im.fs,dir,"a",1,dir,"b",1,1));
+    uint32_t found; uint64_t fields[10];
+    assert(!e2_lookup(&im.fs,dir,"a",1,&found,NULL) && found==file);
+    assert(!e2_lookup(&im.fs,dir,"b",1,&found,NULL) && found==file);
+    assert(!vinix_ext2_stat(&im.fs,file,fields) && fields[4]==2);
+    assert(!vinix_ext2_symlink(&im.fs,dir,"latest",6,"a",1,&link));
+    char target[4]={0}; assert(vinix_ext2_read(&im.fs,link,target,0,sizeof(target))==1 && target[0]=='a');
+    assert(!vinix_ext2_rename(&im.fs,dir,"a",1,dir,"renamed",7,0));
+    assert(!vinix_ext2_unlink(&im.fs,dir,"renamed",7,0));
+    assert(!vinix_ext2_unlink(&im.fs,dir,"b",1,0));
+    assert(!vinix_ext2_unlink(&im.fs,dir,"latest",6,0));
+    assert(!vinix_ext2_unlink(&im.fs,2,"docs",4,1));
+    assert(!vinix_ext2_close_clean(&im.fs));
+    assert(!vinix_ext2_open(&im.fs,sizeof(im.fs),disk_read,&im,im.bytes));
+    assert(e2_lookup(&im.fs,2,"docs",4,&dir,NULL)==-2); destroy(&im);
+}
+static void t_rw_dirty_and_failure(void)
+{
+    struct image im; setup_rw(&im,4096); uint32_t ino;
+    assert(!vinix_ext2_begin_write(&im.fs));
+    struct e2_fs second;
+    assert(vinix_ext2_open_rw(&second,sizeof(second),disk_read,disk_write,&im,im.bytes)<0);
+    assert(!vinix_ext2_create(&im.fs,2,"failure",7,E2_REGULAR|0644,&ino));
+    im.fail_write=1; assert(vinix_ext2_write(&im.fs,ino,"x",0,1)==E2_IO);
+    im.fail_write=0; assert(vinix_ext2_write(&im.fs,ino,"x",0,1)==E2_ROFS);
+    assert(vinix_ext2_close_clean(&im.fs)==E2_IO);
+    assert(e2_u16(im.data+1024+58)==2);
+    assert(vinix_ext2_open_rw(&second,sizeof(second),disk_read,disk_write,&im,im.bytes)<0);
+    destroy(&im);
+}
 int main(void)
 {
-    void (*tests[])(void)={t_layout,t_reads,t_links_dirs,t_indirect,t_corruption,t_failures,t_mutation};
-    const char *names[]={"superblock at byte 1024; block/inode sizes and metadata","unaligned reads, sparse holes, EOF and buffer guards","inline/block symlinks and unused directory entries","single/double/triple indirection and large sparse files","unsupported features, dirty roots and malformed directories","I/O, null, allocation-size and inode bounds","10000 bounded superblock mutations"};
+    void (*tests[])(void)={t_layout,t_reads,t_links_dirs,t_indirect,t_corruption,t_failures,t_mutation,t_rw_persistence,t_rw_sparse_truncate,t_rw_directories_links,t_rw_dirty_and_failure};
+    const char *names[]={"superblock at byte 1024; block/inode sizes and metadata","unaligned reads, sparse holes, EOF and buffer guards","inline/block symlinks and unused directory entries","single/double/triple indirection and large sparse files","unsupported features, dirty roots and malformed directories","I/O, null, allocation-size and inode bounds","10000 bounded superblock mutations","create, write, clean shutdown and cold-open persistence","sparse writes, truncate and zero-fill semantics","persistent directories, hard links, symlinks, rename and unlink","dirty-mount refusal and write failure propagation"};
     for(unsigned i=0;i<sizeof(tests)/sizeof(*tests);++i) { tests[i](); printf("ok ext2 %u - %s\n",i+1,names[i]); }
-    puts("PASS: 7 read-only ext2 test groups"); return 0;
+    puts("PASS: 11 ext2 test groups (7 read-only, 4 persistent-write)"); return 0;
 }

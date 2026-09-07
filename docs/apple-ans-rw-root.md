@@ -3,9 +3,9 @@
 This extends `ans/m1-air` at
 `f206531c044022cbccf7e7566a4c1a686547fc6f`. It is an experimental implementation,
 not a hardware-qualified storage stack. Host tests and production-C AArch64
-cross-compilation have been run; the complete V/kernel build and physical M1
-acceptance tests have **not** been run. The V filesystem/syscall integration
-therefore remains a bring-up candidate, not a verified boot result.
+cross-compilation have been run; the complete ARM64 V/C kernel compiles, but
+physical M1 acceptance tests have **not** been run. The filesystem integration
+therefore remains a bring-up candidate, not a verified hardware result.
 
 ## Supported behavior
 
@@ -22,14 +22,15 @@ therefore remains a bring-up candidate, not a verified boot result.
   and an iteration bound. Failure prevents the normal reboot/poweroff call.
 * Explicit read-only ext2 root selection by PARTUUID, before launching
   `/sbin/init`, preserving `/dev` and providing RAM-backed `/tmp` and `/run`.
+* Explicit writable ext2 data selection by PARTUUID, mounted over `/root` so
+  editor and shell files are stored on SSD and read back after a clean reboot.
 * A read-only SHA-256 reference-comparison utility for hardware acceptance.
 
-**Not included:** writable ext2/root filesystem support, APFS access, an SSD
-installer, formatting/partitioning, TRIM/discard, raw NVMe passthrough, suspend
-and resume, crash recovery, or power-loss qualification. Raw writable block
-access is not a claim that a writable filesystem has been implemented. The
-legacy ext2 allocator is deliberately not used: its allocation/bitmap paths
-are not suitable for enabling writes to an internal SSD.
+**Not included:** a writable SSD *root*, APFS access, an SSD installer,
+formatting/partitioning, TRIM/discard, raw NVMe passthrough, suspend and resume,
+in-kernel fsck/journal replay, or power-loss qualification. The writable data
+path uses a new bounded C implementation; the unsafe legacy V ext2 allocator
+remains unused.
 
 Keep a complete backup and a known-working boot entry without ANS enabled.
 Only authorize a disposable test partition. Do not use macOS, Recovery, iSC,
@@ -74,15 +75,57 @@ To enable writes while retaining the initramfs root:
 vinix.apple_ans=1 vinix.ans_rw=PARTUUID=<scratch-partition-uuid>
 ```
 
+That form exposes a raw writable scratch partition but does not mount it. To
+mount a dedicated persistent ext2 data volume over `/root`, use:
+
+```text
+vinix.apple_ans=1 vinix.persist=PARTUUID=<data-partition-uuid>
+```
+
+`vinix.persist` implies the same single-partition authorization as
+`vinix.ans_rw`; specifying both is rejected. If the explicitly requested
+persistent filesystem cannot be validated, boot stops rather than silently
+placing `/root` back in RAM.
+
 To select the SSD root without enabling any writes:
 
 ```text
 vinix.apple_ans=1 vinix.root=PARTUUID=<root-partition-uuid> vinix.rootfstype=ext2 vinix.rootmode=ro
 ```
 
-Both may be specified, but the root and writable UUIDs must be **different**.
-For example, a readonly root and a separate raw scratch partition may share
-one namespace. There is no automatic mount of a writable data filesystem.
+The read-only root and persistent/writable data options may be combined, but
+their UUIDs must be **different**. The selected read-only root must contain a
+`/root` mountpoint when `vinix.persist` is also used.
+
+## Preparing the persistent ext2 volume
+
+Create the filesystem from a trusted OS while the dedicated partition is
+unmounted. A 4 KiB block size gives writable files a limit of about 4 MiB (the
+desktop editor itself limits documents to 64 KiB). Disable metadata features
+that this deliberately small writer does not mutate:
+
+```sh
+sudo mke2fs -t ext2 -b 4096 -I 256 \
+  -O filetype,sparse_super,large_file,^has_journal,^resize_inode,^dir_index \
+  /dev/<dedicated-vinix-data-partition>
+sudo e2fsck -f /dev/<dedicated-vinix-data-partition>
+```
+
+Writable mounts accept clean revision-0/1 ext2 with 1/2/4 KiB blocks, FILETYPE,
+sparse-super/large-file read compatibility and optional extended attributes.
+They support regular-file create/read/write/truncate, sparse holes, directories,
+short inline symlinks, hard links, same-directory rename and unlink/rmdir.
+Cross-directory directory rename, indexed directories, files beyond direct plus
+single-indirect addressing, unlinking an open file, persistent chmod/chown/time
+updates and replacing a directory by rename are not supported. Operations whose
+on-disk semantics are implemented return explicit errors instead of becoming
+RAM-only namespace changes.
+
+The superblock is marked dirty immediately before VFS publication and clean
+only during Vinix's orderly PID-1 reboot/poweroff path. After a reset, crash or
+power loss, the next writable mount is refused; run `e2fsck` from the trusted OS
+before trying again. Each ANS write still uses FUA and a controller Flush, but
+classic ext2 metadata updates are not transactions.
 
 Optional, explicit recovery fallback:
 
@@ -232,12 +275,13 @@ acceptance run. Abrupt-power-loss testing is not implemented or automated.
 * 27 ANS host groups, including the original 18, partition policy, 512/4096-byte
   RMW writes, PRP authorization, failed writes/flushes, shutdown order/timeouts,
   GPT redundancy/hybrid exclusion, and ANS DMA-to-ext2 partition-boundary tests.
-* 7 standalone readonly-ext2 groups, including all indirection levels, sparse
-  files, symlinks, unsupported/unclean formats and 10,000 superblock mutations.
+* 11 standalone ext2 groups: the original 7 read-only groups plus create/write,
+  clean-close/cold-open persistence, sparse/truncate zeroing, directories,
+  links, rename/unlink, dirty-mount refusal and write-failure propagation.
 * 7 Python verification-tool tests using regular-file fixtures only.
 * Clang ASan/UBSan and optimized GCC C runs; freestanding AArch64 compilation.
 
 The original namespace/GPT mutation tests remain in the ANS suite. All tests
-operate on allocated fake media or temporary regular files. There is no
-hardware, complete V/kernel build, boot, writable-filesystem or persistence
-claim in these results.
+operate on allocated fake media or temporary regular files. The ARM64 kernel
+compiles, but there is no physical-hardware boot or persistence claim in these
+results.

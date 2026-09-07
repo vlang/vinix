@@ -49,7 +49,8 @@ static int a_prefix(const char *s, size_t n, const char *p, size_t bytes)
 static int a_parse_policy(const char *s, size_t n, struct ans_policy *out)
 {
     struct ans_policy p = {0}; unsigned disabled = 0, write = 0, root = 0, type = 0, mode = 0;
-    static const char wp[] = "vinix.ans_rw=PARTUUID=", rp[] = "vinix.root=PARTUUID=";
+    static const char wp[] = "vinix.ans_rw=PARTUUID=", pp[] = "vinix.persist=PARTUUID=";
+    static const char rp[] = "vinix.root=PARTUUID=";
     if (!out || (!s && n) || n > 16384) return -ANS_CONFIG;
     for (size_t i = 0; i < n;) {
         while (i < n && a_space(s[i])) ++i;
@@ -63,6 +64,10 @@ static int a_parse_policy(const char *s, size_t n, struct ans_policy *out)
             if (write++ || !A_PREFIX(t,len,wp) ||
                 !a_guid_parse(t + sizeof(wp)-1, len - (sizeof(wp)-1), p.write_guid)) return -ANS_CONFIG;
             p.flags |= VINIX_ANS_WRITE;
+        } else if (A_PREFIX(t,len,"vinix.persist=")) {
+            if (write++ || !A_PREFIX(t,len,pp) ||
+                !a_guid_parse(t + sizeof(pp)-1, len - (sizeof(pp)-1), p.write_guid)) return -ANS_CONFIG;
+            p.flags |= VINIX_ANS_WRITE | VINIX_ANS_PERSIST;
         } else if (A_PREFIX(t,len,"vinix.root=")) {
             if (root++ || !A_PREFIX(t,len,rp) ||
                 !a_guid_parse(t + sizeof(rp)-1, len - (sizeof(rp)-1), p.root_guid)) return -ANS_CONFIG;
@@ -75,7 +80,8 @@ static int a_parse_policy(const char *s, size_t n, struct ans_policy *out)
         } else if (A_TOKEN(t,len,"vinix.rootfallback=initramfs")) {
             if (p.flags & VINIX_ANS_FALLBACK) return -ANS_CONFIG;
             p.flags |= VINIX_ANS_FALLBACK;
-        } else if (A_PREFIX(t,len,"vinix.apple_ans=") || A_PREFIX(t,len,"vinix.rootfallback="))
+        } else if (A_PREFIX(t,len,"vinix.apple_ans=") || A_PREFIX(t,len,"vinix.rootfallback=") ||
+            A_PREFIX(t,len,"vinix.persist="))
             return -ANS_CONFIG;
     }
     if (disabled) p.flags &= ~VINIX_ANS_ENABLE;

@@ -21,6 +21,7 @@ fn C.vinix_ans_partition_writable(index u32, partition u32) int
 fn C.vinix_ans_partition_uuid(index u32, partition u32, out &char, capacity u64) int
 fn C.vinix_ans_write(index u32, partition u32, buffer voidptr, offset u64, count u64) int
 fn C.vinix_ans_flush() int
+fn C.vinix_ans_data_close() int
 fn C.vinix_ans_shutdown() int
 fn C.vinix_ans_root_ns() int
 fn C.vinix_ans_root_part() int
@@ -44,6 +45,7 @@ __global (
 	ans_boot_flags = int(0)
 	ans_policy_invalid = false
 	ans_read_error_reported = false
+	ans_data_mounted = false
 )
 
 struct AnsBlock {
@@ -231,6 +233,10 @@ pub fn flush() bool {
 pub fn shutdown() bool {
 	ans_lock.acquire()
 	defer { ans_lock.release() }
+	if ans_data_mounted && C.vinix_ans_data_close() != 0 {
+		println('ans-data: could not mark ext2 clean; shutdown refused')
+		return false
+	}
 	result := C.vinix_ans_shutdown()
 	if result != 0 {
 		C.printf(c'ans: shutdown refused error=%d stage=%u status=0x%x\n',
