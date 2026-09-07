@@ -42,6 +42,11 @@ import dev.streams
 import time
 import userland
 
+#include "apple_display_hotplug.h"
+
+fn C.vinix_display_hotplug_choose_action(connected int, reboot_enabled int,
+	reboot_attempted int, framebuffer_width u64, framebuffer_height u64) int
+
 @[_linker_section: '.requests']
 @[cinit]
 __global (
@@ -53,6 +58,8 @@ __global (
 	// The SMC client is read-only and safely declines non-Apple device trees.
 	enable_apple_battery = true
 	enable_apple_display_hotplug = false
+	apple_display_coldplug_reboot = false
+	apple_display_reboot_attempted = false
 	external_display_handoff = false
 	force_qemu_platform  = false
 	aic_timer_irq         = u32(3)
@@ -64,6 +71,27 @@ fn segfault_kill_process(gpr_state voidptr, status int) {
 }
 
 fn apple_display_hotplug(connected bool) {
+	width, height := term.selected_framebuffer_dimensions()
+	action := C.vinix_display_hotplug_choose_action(int(connected),
+		int(apple_display_coldplug_reboot), int(apple_display_reboot_attempted), width,
+		height)
+	if action == 2 {
+		apple_display_reboot_attempted = true
+		println('display: first post-boot Studio Display attach; rebooting once for firmware link training')
+		// Persistent ANS writes use FUA, but shut the controller down in order
+		// before resetting. If it cannot be made safe, retain the internal
+		// display and decline the recovery instead of risking stored data.
+		if !ans.shutdown() {
+			println('display: cold-attach reboot cancelled; storage shutdown failed')
+			return
+		}
+		cpu.psci_call(cpu.psci_system_reset)
+		// A successful PSCI reset does not return. Storage is already stopped,
+		// so a failed conduit cannot safely resume the running desktop.
+		println('display: PSCI reset failed after storage shutdown; powering off')
+		cpu.psci_call(cpu.psci_system_off)
+		for {}
+	}
 	term.display_hotplug(connected)
 }
 
@@ -292,6 +320,10 @@ fn configure_apple_bringup_from_cmdline() {
 			enable_apple_display_hotplug = true
 		} else if option == 'vinix.display_hotplug=0' {
 			enable_apple_display_hotplug = false
+		} else if option == 'vinix.display_coldplug=reboot' {
+			apple_display_coldplug_reboot = true
+		} else if option == 'vinix.display_coldplug=off' {
+			apple_display_coldplug_reboot = false
 		} else if option == 'vinix.display=external' {
 			external_display_handoff = true
 		}
@@ -309,6 +341,9 @@ fn configure_apple_bringup_from_cmdline() {
 	if cmdline.contains('vinix.qemu_platform=1') {
 		force_qemu_platform = true
 	}
+	if apple_display_coldplug_reboot {
+		enable_apple_display_hotplug = true
+	}
 	// The current DCP driver binds the M1 Air's internal panel. Starting it
 	// while an external framebuffer inherited from firmware is scanning out can
 	// reset the display fabric and blank the only usable output. Handoff mode
@@ -318,11 +353,12 @@ fn configure_apple_bringup_from_cmdline() {
 		print('display: external GOP handoff active; native DCP probe disabled\n')
 	}
 
-	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s\n',
+	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s cold-attach=%s\n',
 		if enable_apple_gpu { c'enabled' } else { c'disabled' },
 		if enable_apple_dcp { c'enabled' } else { c'disabled' },
 		if enable_apple_battery { c'enabled' } else { c'disabled' },
-		if enable_apple_display_hotplug { c'enabled' } else { c'disabled' })
+		if enable_apple_display_hotplug { c'enabled' } else { c'disabled' },
+		if apple_display_coldplug_reboot { c'firmware reboot' } else { c'disabled' })
 }
 
 // Power off at a chosen stage. On a machine with no console and no usable

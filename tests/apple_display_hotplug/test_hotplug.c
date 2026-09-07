@@ -90,6 +90,20 @@ int main(void)
           VINIX_CD321X_STATUS_PLUG_PRESENT, data, 299, 500) ==
           VINIX_DISPLAY_HOTPLUG_CONNECTED);
 
+    /* First attach recovery is deliberately narrow and one-shot. */
+    CHECK(vinix_display_hotplug_choose_action(0, 1, 0, 2560, 1600) ==
+          VINIX_DISPLAY_HOTPLUG_IGNORE);
+    CHECK(vinix_display_hotplug_choose_action(1, 0, 0, 2560, 1600) ==
+          VINIX_DISPLAY_HOTPLUG_REPAINT);
+    CHECK(vinix_display_hotplug_choose_action(1, 1, 0, 2560, 1600) ==
+          VINIX_DISPLAY_HOTPLUG_REBOOT);
+    CHECK(vinix_display_hotplug_choose_action(1, 1, 1, 2560, 1600) ==
+          VINIX_DISPLAY_HOTPLUG_REPAINT);
+    CHECK(vinix_display_hotplug_choose_action(1, 1, 0, 5120, 2880) ==
+          VINIX_DISPLAY_HOTPLUG_REPAINT);
+    CHECK(vinix_display_hotplug_choose_action(1, 1, 0, 0, 0) ==
+          VINIX_DISPLAY_HOTPLUG_REPAINT);
+
     puts("apple display hotplug state tests passed");
     return 0;
 }

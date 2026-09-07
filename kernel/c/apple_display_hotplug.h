@@ -17,6 +17,16 @@ enum vinix_display_hotplug_event {
     VINIX_DISPLAY_HOTPLUG_DISCONNECTED = 2,
 };
 
+/* Action selected after a debounced event.  The only cold-attach recovery
+ * currently available on a base M1 is to let iBoot/m1n1 retrain the link on a
+ * warm boot.  Restrict that recovery to the M1 Air's exact built-in panel
+ * mode; an unknown or already-external framebuffer must never be rebooted. */
+enum vinix_display_hotplug_action {
+    VINIX_DISPLAY_HOTPLUG_IGNORE = 0,
+    VINIX_DISPLAY_HOTPLUG_REPAINT = 1,
+    VINIX_DISPLAY_HOTPLUG_REBOOT = 2,
+};
+
 enum {
     VINIX_CD321X_STATUS_PLUG_PRESENT = 1u << 0,
     VINIX_CD321X_DATA_CONNECTION = 1u << 0,
@@ -42,5 +52,9 @@ int vinix_display_hotplug_sample(struct vinix_display_hotplug_state *state,
                                  uint64_t now_ms, uint64_t debounce_ms);
 int vinix_display_hotplug_connected(const struct vinix_display_hotplug_state *state);
 int vinix_display_hotplug_candidate(uint32_t status, uint32_t data_status);
+int vinix_display_hotplug_choose_action(int connected, int reboot_enabled,
+                                        int reboot_attempted,
+                                        uint64_t framebuffer_width,
+                                        uint64_t framebuffer_height);
 
 #endif

@@ -71,11 +71,12 @@ for argument in "$@"; do
             # different connector and can reset the shared display fabric.
             USE_EXTERNAL_DISPLAY=1
             USE_NATIVE_RESOLUTION=1
-            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.display_hotplug=1 vinix.apple_dcp=0"
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.display_hotplug=1 vinix.display_coldplug=reboot vinix.apple_dcp=0"
             ;;
         --apple-display-hotplug)
             # Monitor the display-linked CD321x controller. This is useful when
-            # testing the reconnect path independently of GOP selection.
+            # testing reconnect independently of GOP selection; it does not
+            # enable the first-attach reboot policy.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display_hotplug=1"
             ;;
         --force-fault)
@@ -283,14 +284,14 @@ echo "Compare the entry point against Limine's 'ELF entry point' line at boot."
 if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
     cat <<'EXTERNAL_DISPLAY'
 
-Apple Studio Display handoff is enabled. Before powering on the M1 Air:
-  1. Connect power and the Studio Display.
-  2. Make the firmware boot UI appear on the Studio Display (clamshell mode is
-     the most reliable way to make it the single boot output).
-  3. Leave the display attached through the complete boot.
+Apple Studio Display handoff is enabled. You can either boot with the display
+already connected, or connect it after Vinix starts on the M1 Air panel. A
+first post-boot connection causes one warm reboot; leave the cable attached so
+iBoot/m1n1 can train the link. Clamshell mode is the most reliable way to make
+firmware choose the Studio Display as its single output.
 
 Vinix will print "framebuffer: selected GOP ... (external handoff)" once the
-kernel owns the selected surface. It also monitors the display-linked Type-C
-port so unplug/replug of that handed-off output is detected and repainted.
+kernel owns the selected surface. Unplug/replug of an already handed-off
+output is detected and repainted without another reboot.
 EXTERNAL_DISPLAY
 fi

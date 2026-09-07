@@ -66,3 +66,19 @@ int vinix_display_hotplug_connected(const struct vinix_display_hotplug_state *st
 {
     return state && state->initialized && state->stable;
 }
+
+int vinix_display_hotplug_choose_action(int connected, int reboot_enabled,
+                                        int reboot_attempted,
+                                        uint64_t framebuffer_width,
+                                        uint64_t framebuffer_height)
+{
+    if (!connected)
+        return VINIX_DISPLAY_HOTPLUG_IGNORE;
+
+    if (reboot_enabled && !reboot_attempted &&
+        framebuffer_width == UINT64_C(2560) &&
+        framebuffer_height == UINT64_C(1600))
+        return VINIX_DISPLAY_HOTPLUG_REBOOT;
+
+    return VINIX_DISPLAY_HOTPLUG_REPAINT;
+}

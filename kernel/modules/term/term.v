@@ -116,6 +116,18 @@ pub fn report_framebuffer_selection() {
 	println('framebuffer: selected GOP ${framebuffer_index + 1}/${count}, ${fb.width}x${fb.height}x${fb.bpp} (${mode})')
 }
 
+// Dimensions of the one framebuffer chosen during the Limine handoff.  The
+// Type-C first-attach policy uses the exact 2560x1600 built-in M1 Air mode as
+// its fail-closed discriminator; it does not guess that an unknown surface is
+// safe to replace.
+pub fn selected_framebuffer_dimensions() (u64, u64) {
+	fb := selected_framebuffer()
+	if fb == unsafe { nil } || !fb_address_usable(fb) {
+		return 0, 0
+	}
+	return fb.width, fb.height
+}
+
 // Stop drawing to the framebuffer on behalf of `owner_pid`. Idempotent: the
 // framebuffer's mmap path calls it for every page it hands out.
 pub fn enter_graphics_mode(owner_pid int) {

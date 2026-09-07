@@ -300,10 +300,10 @@ still fail-closed until its firmware command ABI is complete.
 ### Apple Studio Display on an M1 Air
 
 Vinix can preserve a Studio Display scanout that the Apple firmware and
-m1n1/U-Boot chain established before the kernel starts. This is a deliberately
-single-output framebuffer handoff with hot-reconnect monitoring: connect the
-display before power-on and make sure the startup UI is visible there
-(clamshell mode is the most reliable choice on an Air).
+m1n1/U-Boot chain established before the kernel starts. This is deliberately a
+single-output framebuffer handoff. An inherited output reconnects live; if
+Vinix booted on the M1 Air panel, a first post-boot connection performs one
+ANS-ordered warm reboot so firmware can establish the external scanout.
 
 ```sh
 ./build-desktop-aarch64.sh
@@ -312,10 +312,11 @@ make -C kernel ARCH=aarch64 CC=clang
 ```
 
 The deploy flag keeps the firmware's native mode, selects the largest GOP
-surface when multiple outputs are present, and prevents the internal-panel DCP
-experiment from resetting the inherited external scanout. Unplug/replug of the
-handed-off output is monitored; a first attach after an internal-panel boot and
-the Studio Display's audio/camera/USB devices are not included yet. See
+surface when multiple outputs are present, prevents the internal-panel DCP
+experiment from resetting the inherited external scanout, and enables the
+post-boot recovery. Vinix does not yet switch the output in place because it
+lacks native ATC/external-DCP modesetting. The Studio Display's
+audio/camera/USB devices are not included. See
 [docs/apple-studio-display.md](docs/apple-studio-display.md) for the boot
 procedure, expected log lines, and failure diagnosis.
 
