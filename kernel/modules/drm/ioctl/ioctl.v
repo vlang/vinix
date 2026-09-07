@@ -22,6 +22,9 @@ pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
 
 pub const drm_cap_syncobj = u64(0x13)
 pub const drm_cap_syncobj_timeline = u64(0x14)
+pub const drm_cap_prime = u64(0x5)
+pub const drm_prime_cap_import = u64(1) << 0
+pub const drm_prime_cap_export = u64(1) << 1
 pub const drm_syncobj_create_signaled = u32(1) << 0
 pub const drm_syncobj_fd_to_handle_import_sync_file = u32(1) << 0
 pub const drm_syncobj_handle_to_fd_export_sync_file = u32(1) << 0
@@ -29,6 +32,19 @@ pub const drm_syncobj_wait_all = u32(1) << 0
 pub const drm_syncobj_wait_for_submit = u32(1) << 1
 pub const drm_syncobj_wait_available = u32(1) << 2
 pub const drm_syncobj_wait_deadline = u32(1) << 3
+// These UAPI flags intentionally reuse fcntl's O_CLOEXEC/O_RDWR values.
+pub const drm_cloexec = u32(0o2000000)
+pub const drm_rdwr = u32(0o2)
+
+// Shared by DRM_IOCTL_PRIME_HANDLE_TO_FD and DRM_IOCTL_PRIME_FD_TO_HANDLE.
+// Linux deliberately uses the same in/out layout for both directions.
+@[packed]
+pub struct DrmPrimeHandle {
+pub mut:
+	handle u32
+	flags  u32
+	fd     i32
+}
 
 pub struct DrmVersion {
 pub mut:
@@ -471,6 +487,7 @@ pub fn validate_asahi_25_layouts() bool {
 	return sizeof(DrmVersion) == 64
 		&& sizeof(DrmGetCap) == 16
 		&& sizeof(DrmGemClose) == 8
+		&& sizeof(DrmPrimeHandle) == 12
 		&& sizeof(DrmSyncobjCreate) == 8
 		&& sizeof(DrmSyncobjDestroy) == 8
 		&& sizeof(DrmSyncobjHandle) == 16

@@ -281,11 +281,11 @@ export LD="ld.lld"
     --disable-config-udev \
     --disable-dri \
     --disable-dri2 \
-    --disable-dri3 \
+    --enable-dri3 \
     --disable-int10-module \
     --disable-vgahw \
-    --disable-libdrm \
-    --disable-glamor \
+    --enable-libdrm \
+    --enable-glamor \
     --enable-glx \
     --disable-xinerama \
     --enable-screensaver \

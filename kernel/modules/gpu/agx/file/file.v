@@ -241,6 +241,25 @@ fn (mut f GpuFile) get_object_ref(handle u32) ?&gem.GemObject {
 	return none
 }
 
+fn (mut f GpuFile) import_object(obj &gem.GemObject) ?u32 {
+	if obj == unsafe { nil } {
+		return none
+	}
+	f.lock.acquire()
+	for existing in f.objects {
+		if voidptr(existing) == voidptr(obj) {
+			handle := existing.handle
+			f.lock.release()
+			return handle
+		}
+	}
+	gem.ref_obj(obj)
+	f.objects << obj
+	handle := obj.handle
+	f.lock.release()
+	return handle
+}
+
 fn (mut f GpuFile) authorize_mmap(handle u32) ?u64 {
 	f.lock.acquire()
 	defer { f.lock.release() }
@@ -1702,6 +1721,16 @@ fn ioctl_submit_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	f := dispatch(handle, dev) or { return -19 }
 	mut file := unsafe { f }
 	return file.ioctl_submit(unsafe { &ioctl.DrmAsahiSubmit(data) })
+}
+
+pub fn gem_export_handler(dev &drm.DrmDevice, handle voidptr, object_handle u32) ?&gem.GemObject {
+	mut file := get_or_create_file(handle, dev) or { return none }
+	return file.get_object_ref(object_handle)
+}
+
+pub fn gem_import_handler(dev &drm.DrmDevice, handle voidptr, obj &gem.GemObject) ?u32 {
+	mut file := get_or_create_file(handle, dev) or { return none }
+	return file.import_object(obj)
 }
 
 fn ioctl_get_time_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {

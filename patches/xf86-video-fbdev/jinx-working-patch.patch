@@ -47,3 +47,117 @@ diff -urN --no-dereference xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-w
  #else
  	if (fPtr->pEnt->location.type == BUS_PCI)
  	    pci_dev = fPtr->pEnt->location.id.pci;
+--- xf86-video-fbdev-workdir/src/fbdev.c
++++ xf86-video-fbdev-gpu/src/fbdev.c
+@@ -8,6 +8,9 @@
+ #endif
+ 
+ #include <string.h>
++#include <stdlib.h>
++#include <fcntl.h>
++#include <unistd.h>
+ 
+ /* all driver need this */
+ #include "xf86.h"
+@@ -118,6 +121,8 @@
+ 	OPTION_SHADOW_FB,
+ 	OPTION_ROTATE,
+ 	OPTION_FBDEV,
++	OPTION_ACCEL_METHOD,
++	OPTION_RENDER_NODE,
+ 	OPTION_DEBUG
+ } FBDevOpts;
+ 
+@@ -125,6 +130,8 @@
+ 	{ OPTION_SHADOW_FB,	"ShadowFB",	OPTV_BOOLEAN,	{0},	FALSE },
+ 	{ OPTION_ROTATE,	"Rotate",	OPTV_STRING,	{0},	FALSE },
+ 	{ OPTION_FBDEV,		"fbdev",	OPTV_STRING,	{0},	FALSE },
++	{ OPTION_ACCEL_METHOD,	"AccelMethod",	OPTV_STRING,	{0},	FALSE },
++	{ OPTION_RENDER_NODE,	"RenderNode",	OPTV_STRING,	{0},	FALSE },
+ 	{ OPTION_DEBUG,		"debug",	OPTV_BOOLEAN,	{0},	FALSE },
+ 	{ -1,			NULL,		OPTV_NONE,	{0},	FALSE }
+ };
+@@ -188,6 +195,10 @@
+ 	DGAModePtr			pDGAMode;
+ 	int				nDGAMode;
+ 	OptionInfoPtr			Options;
++	Bool                            glamor;
++	int                             renderFD;
++	Bool                            (*glamorEglInit)(ScrnInfoPtr, int);
++	Bool                            (*glamorInit)(ScreenPtr, unsigned int);
+ } FBDevRec, *FBDevPtr;
+ 
+ #define FBDEVPTR(p) ((FBDevPtr)((p)->driverPrivate))
+@@ -199,7 +210,51 @@
+ 		return TRUE;
+ 	
+ 	pScrn->driverPrivate = XNFcallocarray(sizeof(FBDevRec), 1);
++	FBDEVPTR(pScrn)->renderFD = -1;
+ 	return TRUE;
++}
++
++static void
++FBDevTryGlamor(ScrnInfoPtr pScrn)
++{
++	FBDevPtr fPtr = FBDEVPTR(pScrn);
++	const char *method = xf86GetOptValString(fPtr->Options, OPTION_ACCEL_METHOD);
++	const char *node = xf86GetOptValString(fPtr->Options, OPTION_RENDER_NODE);
++	const char *force_software = getenv("VINIX_FORCE_SOFTWARE_GL");
++	void *module;
++
++	if ((method && !xf86NameCmp(method, "none")) ||
++	    (force_software && !strcmp(force_software, "1")))
++		return;
++	if (!node)
++		node = "/dev/dri/renderD128";
++	fPtr->renderFD = open(node, O_RDWR | O_CLOEXEC);
++	if (fPtr->renderFD < 0)
++		return;
++
++	module = xf86LoadSubModule(pScrn, "glamoregl");
++	if (!module)
++		goto fail;
++	fPtr->glamorEglInit = LoaderSymbolFromModule(module, "glamor_egl_init");
++	fPtr->glamorInit = LoaderSymbolFromModule(module, "glamor_init");
++	if (!fPtr->glamorEglInit || !fPtr->glamorInit)
++		goto fail;
++	if (!fPtr->glamorEglInit(pScrn, fPtr->renderFD))
++		goto fail;
++
++	fPtr->glamor = TRUE;
++	/* The framebuffer remains firmware-owned. DRI3 pixmaps render on AGX and
++	 * glamor downloads the completed root image before shadowfb copies it. */
++	fPtr->shadowFB = TRUE;
++	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
++	           "using glamor/DRI3 acceleration through %s\n", node);
++	return;
++
++fail:
++	close(fPtr->renderFD);
++	fPtr->renderFD = -1;
++	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++	           "M1 render node is present but glamor initialization failed; using software\n");
+ }
+ 
+ static void
+@@ -529,6 +584,7 @@
+         }
+ 
+ 	debug = xf86ReturnOptValBool(fPtr->Options, OPTION_DEBUG, FALSE);
++	FBDevTryGlamor(pScrn);
+ 
+ 	/* rotation */
+ 	fPtr->rotate = FBDEV_ROTATE_NONE;
+@@ -915,6 +971,12 @@
+ 	if (init_picture && !fbPictureInit(pScreen, NULL, 0))
+ 		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+ 			   "Render extension initialisation failed\n");
++
++	if (fPtr->glamor && !fPtr->glamorInit(pScreen, 1 /* GLAMOR_USE_EGL_SCREEN */)) {
++		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++		           "glamor screen initialization failed; using software\n");
++		fPtr->glamor = FALSE;
++	}
+ 
+ 	if (fPtr->shadowFB && !FBDevShadowInit(pScreen)) {
+ 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,

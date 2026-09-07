@@ -1031,6 +1031,8 @@ pub fn initialise() {
 		ioctls: agx_file.drm_ioctls()
 		file_close: agx_file.release_handle
 		gem_close: agx_file.close_gem_handle
+		gem_export: agx_file.gem_export_handler
+		gem_import: agx_file.gem_import_handler
 		mmap: agx_file.mmap_handle
 	}
 

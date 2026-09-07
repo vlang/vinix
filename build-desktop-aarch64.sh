@@ -30,6 +30,8 @@ PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
+ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
+GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
 merge_staging_tree() {
     local overlay="$1"
@@ -169,6 +171,46 @@ echo "==> Compiling for aarch64-linux-musl..."
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
 echo "    $BUILD_DIR/vinix-desktop ($(stat -f%z "$BUILD_DIR/vinix-desktop") bytes)"
 
+# Mesa is a dynamic runtime, so keep the always-bootable static desktop and
+# build a second executable only when the exact Asahi userspace is available.
+# desktop-init selects this executable when the M1 render node exists. The UI
+# is still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
+# presentation to AGX before the unavoidable firmware-framebuffer readback.
+GPU_DESKTOP_BUILT=0
+if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
+   [ -f "$ASAHI_STAGING/usr/lib/libGLESv2.so" ] &&
+   [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
+   [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
+    echo "==> Translating the GPU-enabled desktop to C..."
+    "$V" -os linux -gc none -manualfree -enable-globals -prod \
+        -d ui2_headless -d vinix_gpu_present \
+        -d "vinix_build_stamp=$BUILD_STAMP" \
+        -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \
+        -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
+
+    echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
+    "$LLVM_BIN/clang" --target=aarch64-linux-musl \
+        --sysroot="$GPU_SYSROOT" --gcc-toolchain="$SYSROOT" -static-libgcc \
+        -isystem "$CC_SHIM" \
+        -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
+        -O2 -fPIE -pie -fno-stack-protector -w \
+        "$BUILD_DIR/desktop-gpu.c" "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+        -L"$ASAHI_STAGING/usr/lib" \
+        -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
+        -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
+        -lEGL -lGLESv2 -ldl -lpthread -lm \
+        -fuse-ld=lld -B"$LLVM_BIN" \
+        -o "$BUILD_DIR/vinix-desktop-gpu"
+    "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
+    echo "    $BUILD_DIR/vinix-desktop-gpu ($(stat -f%z "$BUILD_DIR/vinix-desktop-gpu") bytes)"
+    GPU_DESKTOP_BUILT=1
+    if [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
+        echo "    NOTE: this Asahi staging predates X11/GBM support; rebuild it for Firefox acceleration"
+    fi
+else
+    echo "==> Asahi EGL staging not found; keeping the static software desktop only"
+fi
+
 if [ "$MAKE_INITRAMFS" -eq 0 ]; then
     exit 0
 fi
@@ -287,6 +329,13 @@ else
     # layer so the terminal gets pkg/apk without rebuilding the full userland.
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
 fi
+
+# Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
+# exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
+# unrelated Mesa build.
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+    merge_staging_tree "$ASAHI_STAGING"
+fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
 chmod 1777 "$STAGING/tmp"
@@ -355,6 +404,10 @@ fi
 
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+    cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
+    chmod +x "$STAGING/usr/bin/vinix-desktop-gpu"
+fi
 cp "$BUILD_DIR/wifi-ctl" "$STAGING/usr/bin/wifi-ctl"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
     "$STAGING/usr/bin/wifi-ctl"
@@ -397,7 +450,8 @@ fi
 # The desktop's own source travels with the image, so the file browser has
 # something real to show and so the machine carries the code it is running.
 mkdir -p "$STAGING/root/desktop"
-cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop/README.md" \
+cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
+    "$SCRIPT_DIR/desktop/README.md" \
     "$STAGING/root/desktop/"
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the

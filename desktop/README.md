@@ -6,8 +6,11 @@ A small desktop environment for Vinix, written in V and built on
 ![The desktop running under QEMU](screenshot.png)
 
 It maps `/dev/fb0`, reads the pointer from `/dev/pointer` and the keyboard from
-its controlling terminal, and composes every frame itself: there is no display
-server, no GPU and no toolkit underneath it.
+its controlling terminal, and composes every frame itself without a display
+server or toolkit underneath it. The normal binary is entirely software. An
+M1 image that contains the Asahi Mesa runtime also carries a GPU-enabled binary
+which uses AGX to scale and present that canvas when `/dev/dri/renderD128`
+exists, with an automatic fallback to the static software binary.
 
 What it does:
 
@@ -62,6 +65,7 @@ typing any word with a q in it drop the user back to the console.
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
     font.v         text, from the coverage atlases in font_data.v
     framebuffer.v  /dev/fb0: geometry over ioctl, pixels over mmap
+    gpu_present.v / gpu_present_egl.c  optional M1 EGL/GLES presenter
     input.v        /dev/pointer, and the terminal in raw mode
     clock.v        CLOCK_REALTIME and the calendar arithmetic on top of it
     theme.v        every colour and measurement in one place
@@ -75,9 +79,10 @@ routed by hit-testing those records. So what is on screen and what responds to
 the pointer come from one description and cannot drift apart.
 
 ui2's element tree is platform independent, which is what makes this possible:
-the target has no `gg`, no Sokol and no OpenGL, so `-d ui2_headless` compiles
-ui2's declarative core without its renderer, and this program supplies the
-renderer instead.
+the target has no `gg` or Sokol, so `-d ui2_headless` compiles ui2's
+declarative core without its renderer, and this program supplies the renderer
+instead. The optional EGL path is a presenter around that renderer rather than
+a replacement for its element-tree rasterizer.
 
 Two conventions extend ui2 for this backend, both documented at the top of
 `render.v`: an `image_path` of `builtin:<name>` draws a vector glyph the
@@ -143,8 +148,12 @@ the direct `startx` launcher, and Firefox's Vinix policy files even when its
 base userland image is older. It refuses to publish an image with an incomplete
 Firefox/Xorg runtime; the native error window remains as a runtime fallback.
 Firefox's upstream graphics and GTK diagnostics are written to
-`/var/log/firefox.log`; failed hardware-GL probes there are expected because
-this Xorg session intentionally uses software rendering.
+`/var/log/firefox.log`. On an M1 image with the Asahi runtime, Xorg enables
+glamor/DRI3 and Firefox enables WebRender over X11 EGL. Without the render node,
+or with `VINIX_FORCE_SOFTWARE_GL=1`, both retain their software paths. Because
+the display is still a firmware framebuffer rather than a DCP/KMS scanout,
+hardware-rendered client buffers ultimately make one CPU-visible copy to
+`/dev/fb0`.
 
 ## The file browser
 

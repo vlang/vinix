@@ -5,9 +5,6 @@ pref("security.sandbox.gpu.level", 0);
 pref("security.sandbox.rdd.level", 0);
 pref("security.sandbox.socket.process.level", 0);
 pref("media.rdd-process.enabled", false);
-pref("layers.acceleration.disabled", true);
-pref("gfx.webrender.software", true);
-pref("gfx.x11-egl.force-disabled", true);
 // Vinix has no desktop accessibility bus. Avoid asking GTK to create one.
 pref("accessibility.force_disabled", 1);
 

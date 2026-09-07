@@ -292,15 +292,21 @@ The compact desktop image used by the default M1 deployment merges the Firefox
 and X11 staging trees directly, alongside Python, Git and GCC, so its launcher
 works without shipping the much larger complete userland image.
 
-Firefox runs with software rendering and its Linux namespace/seccomp sandboxes
-disabled because Vinix does not implement those kernel facilities yet. The
-browser displays Firefox's reduced-protection warning accordingly.
+On M1, Firefox automatically enables WebRender over X11 EGL when the native
+render node and exact Asahi Mesa runtime are present. Xorg imports those AGX
+buffers through DRI3 and uses glamor; all other targets keep the software
+renderer, as does `VINIX_FORCE_SOFTWARE_GL=1`. Firefox's Linux namespace and
+seccomp sandboxes remain disabled because Vinix does not implement those
+kernel facilities yet, so the browser displays its reduced-protection warning.
 
 ### Apple M1 GPU test image
 
 Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It
-uses the Mesa 25.0.5 Asahi Gallium driver for surfaceless EGL/GLES2 rendering,
-then copies the completed GPU frame to the Limine framebuffer. The private GPU
+uses the Mesa 25.0.5 Asahi Gallium driver for desktop OpenGL and GLES through
+EGL, with surfaceless, GBM and X11 platform support. The native desktop uses a
+surfaceless GPU presenter, while Xorg/Firefox share GPU buffers through PRIME
+and DRI3. Both still copy the completed image to the Limine framebuffer because
+Vinix does not yet have a native DCP/KMS scanout driver. The private GPU
 firmware structures are currently pinned to Apple firmware ABI 12.3.0; the
 driver refuses other firmware ABIs before touching GPU hardware.
 
@@ -333,6 +339,15 @@ VINIX_MUSL_SYSROOT="$PWD/build-aarch64-asahi/sysroot" \
 
 This produces `build-support/init-aarch64/initramfs.tar`; copy that file and
 `kernel/bin/vinix` back to the macOS checkout before deploying.
+
+To put the accelerated native desktop and Firefox in the M1 image, rebuild the
+desktop after copying the Asahi staging tree, then select both the GPU and that
+image at deployment:
+
+```sh
+./build-desktop-aarch64.sh --compact-initramfs
+./deploy-m1-efi.sh --apple-gpu --desktop-initramfs /Volumes/EFI
+```
 
 Deploy to an already-mounted M1 EFI system partition with the explicit GPU
 opt-in, then boot through m1n1 so Vinix receives the patched device tree:
