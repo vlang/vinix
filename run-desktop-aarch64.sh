@@ -65,7 +65,7 @@ done
 # The desktop needs /dev/fb0 and /dev/pointer, both of which live in it.
 if [ "$BUILD_KERNEL" -eq 1 ]; then
     echo "==> Building the kernel..."
-    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 V="$V" \
+    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 V="$V" LIMINE_MP=1 \
         -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
 fi
 

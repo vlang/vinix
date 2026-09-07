@@ -30,6 +30,16 @@ CPPFLAGS :=
 # User controllable V flags. We set none by default.
 VFLAGS :=
 
+# Emit Limine's multiprocessor request when the boot environment can start
+# secondary CPUs safely. This stays off by default because Limine's current
+# ARM64 trampoline cannot start the Apple Silicon cores correctly.
+LIMINE_MP ?= 0
+ifneq ($(LIMINE_MP),0)
+ifneq ($(LIMINE_MP),1)
+    $(error LIMINE_MP must be 0 or 1)
+endif
+endif
+
 # User controllable linker flags. We set none by default.
 LDFLAGS :=
 
@@ -171,7 +181,16 @@ override VFLAGS += \
 
 ifeq ($(ARCH),aarch64)
     override VFLAGS += -d aarch64
+    ifeq ($(LIMINE_MP),1)
+        override VFLAGS += -d limine_mp
+    endif
 endif
+
+# V build tags change the generated kernel C even though no source timestamp
+# changes. Keep the selected configuration in the prerequisite name so moving
+# between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
+# stale obj/blob.c.o.
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)
 
 ifeq ($(PROD),false)
     override VFLAGS += -warn-about-allocs
@@ -269,7 +288,12 @@ else
 endif
 endif
 
-obj/blob.c.o: GNUmakefile $(VFILES)
+$(V_CONFIG_STAMP):
+	mkdir -p obj
+	rm -f obj/.v-config-*
+	touch $@
+
+obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"
 	rm -rf obj/vsrc
 	for f in $(VFILES); do mkdir -p "obj/vsrc/$$(dirname $$f)" && ln -sf "$(CURDIR)/$$f" "obj/vsrc/$$f"; done

@@ -6,8 +6,9 @@ module limine
 pub struct LimineSMPInfo {
 pub mut:
 	processor_id   u32
-	gic_iface_no   u32
+	reserved1      u32
 	mpidr          u64
+	reserved       u64
 	goto_address   fn (&LimineSMPInfo) = unsafe { nil }
 	extra_argument u64
 }
@@ -15,7 +16,7 @@ pub mut:
 pub struct LimineSMPResponse {
 pub mut:
 	revision  u64
-	flags     u32
+	flags     u64
 	bsp_mpidr u64
 	cpu_count u64
 	cpus      &&LimineSMPInfo

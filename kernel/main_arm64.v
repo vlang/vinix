@@ -682,11 +682,14 @@ fn kmain() {
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
 	print('skipping PCI (ARM64 ECAM setup not implemented)\n')
 
-	// SMP (requires spin-table addresses from device tree)
+	// Limine has already released every CPU represented by an MP response, so
+	// the kernel does not need a device tree to finish their initialisation.
+	// This matters for QEMU's UEFI boot, which exposes the CPUs to Limine but
+	// does not give the kernel a usable DTB.
 	if use_aic {
 		print('skipping SMP (minimal Apple bring-up mode)\n')
 		bootstrap_cpu0()
-	} else if have_dt && smp.available() {
+	} else if smp.available() {
 		print('init smp...\n')
 		smp.initialise()
 		print('smp done\n')

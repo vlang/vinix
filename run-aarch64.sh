@@ -14,6 +14,8 @@
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
 # where all of an Apple Silicon machine's RAM lives. 8192 exercises the same
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
+# QEMU supplies two CPUs, and its kernel build enables the Limine MP request
+# needed for Vinix to bring both of them online.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -77,7 +79,8 @@ fi
 # ── Build kernel ──
 if [ "$NO_BUILD" -eq 0 ]; then
     echo "==> Building kernel..."
-    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 -j$(sysctl -n hw.ncpu) 2>&1 | tail -3
+    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 LIMINE_MP=1 \
+        -j$(sysctl -n hw.ncpu) 2>&1 | tail -3
 fi
 
 if [ ! -f "$KERNEL_DIR/bin/vinix" ]; then

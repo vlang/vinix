@@ -20,8 +20,8 @@ import limine
 // hours.
 //
 // The kernel does not need the request on Apple hardware, where the AIC path
-// runs on CPU 0 alone, and QEMU works with one CPU. Pass -d limine_mp to get
-// the request back for QEMU multi-core testing.
+// runs on CPU 0 alone. The QEMU runners build with LIMINE_MP=1, which supplies
+// -d limine_mp and lets QEMU bring every configured virtual CPU online.
 fn limine_response() &limine.LimineSMPResponse {
 	return unsafe { nil }
 }
