@@ -9,6 +9,7 @@ import errno
 import event
 import event.eventstruct
 import time
+import usercopy
 
 // epoll_event struct — on aarch64, NOT packed (unlike x86)
 // Layout: events (u32) + padding (u32) + data (u64) = 16 bytes
@@ -45,7 +46,7 @@ pub const epolloneshot = u32(0x40000000)
 struct EpollResource {
 mut:
 	stat     statmod.Stat
-	refcount int = 1
+	refcount int
 	l        klock.Lock
 	event    eventstruct.Event
 	status   int
@@ -70,7 +71,13 @@ fn (mut this EpollResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 }
 
 fn (mut this EpollResource) unref(handle voidptr) ? {
-	katomic.dec(mut &this.refcount)
+	if katomic.dec(mut &this.refcount) {
+		return
+	}
+	unsafe {
+		this.entries.free()
+		free(voidptr(this))
+	}
 }
 
 fn (mut this EpollResource) link(handle voidptr) ? {
@@ -91,6 +98,10 @@ fn (mut this EpollResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 }
 
 pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
+	if flags & ~epoll_cloexec != 0 {
+		return errno.err, errno.einval
+	}
+
 	mut res := &EpollResource{}
 	res.stat.mode = 0o600
 
@@ -105,7 +116,14 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 	return u64(fdnum), 0
 }
 
-pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, _event &EpollEvent) (u64, u64) {
+pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u64, u64) {
+	mut requested := EpollEvent{}
+	if op == epoll_ctl_add || op == epoll_ctl_mod {
+		if !usercopy.copy_from_user(voidptr(&requested), event_ptr, sizeof(EpollEvent)) {
+			return errno.err, errno.efault
+		}
+	}
+
 	// Get the epoll fd
 	mut epoll_fd := fd_from_fdnum(unsafe { nil }, epfd) or {
 		return errno.err, errno.ebadf
@@ -126,6 +144,13 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, _event &EpollEvent
 	} else {
 		return errno.err, errno.einval
 	}
+	if epfd == fd {
+		return errno.err, errno.einval
+	}
+	mut watched_fd := fd_from_fdnum(unsafe { nil }, fd) or {
+		return errno.err, errno.ebadf
+	}
+	watched_fd.unref()
 
 	match op {
 		epoll_ctl_add {
@@ -135,11 +160,10 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, _event &EpollEvent
 					return errno.err, errno.eexist
 				}
 			}
-			ev := unsafe { *_event }
 			epoll_res.entries << EpollEntry{
 				fd:     fd
-				events: ev.events
-				data:   ev.data
+				events: requested.events
+				data:   requested.data
 			}
 		}
 		epoll_ctl_del {
@@ -157,11 +181,10 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, _event &EpollEvent
 		}
 		epoll_ctl_mod {
 			mut found := false
-			ev := unsafe { *_event }
 			for mut entry in epoll_res.entries {
 				if entry.fd == fd {
-					entry.events = ev.events
-					entry.data = ev.data
+					entry.events = requested.events
+					entry.data = requested.data
 					found = true
 					break
 				}
@@ -178,10 +201,13 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, _event &EpollEvent
 	return 0, 0
 }
 
-pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf &EpollEvent, maxevents int, timeout int, sigmask &u64) (u64, u64) {
+pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, timeout int, sigmask u64, sigsetsize u64) (u64, u64) {
 	mut t := proc.current_thread()
 
-	if maxevents <= 0 {
+	if maxevents <= 0 || timeout < -1 {
+		return errno.err, errno.einval
+	}
+	if sigmask != 0 && sigsetsize != sizeof(u64) {
 		return errno.err, errno.einval
 	}
 
@@ -202,8 +228,12 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf &EpollEvent, maxevent
 	}
 
 	oldmask := t.masked_signals
-	if voidptr(sigmask) != unsafe { nil } {
-		t.masked_signals = *sigmask
+	if sigmask != 0 {
+		mut incoming_mask := u64(0)
+		if !usercopy.copy_from_user(voidptr(&incoming_mask), sigmask, sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		t.masked_signals = incoming_mask
 	}
 	defer {
 		t.masked_signals = oldmask
@@ -241,9 +271,14 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf &EpollEvent, maxevent
 		}
 
 		if revents != 0 {
-			mut out_event := unsafe { &events_buf[ret] }
-			out_event.events = revents
-			out_event.data = entry.data
+			out_event := EpollEvent{
+				events: revents
+				data:   entry.data
+			}
+			if !usercopy.copy_to_user(events_buf + ret * sizeof(EpollEvent),
+				voidptr(&out_event), sizeof(EpollEvent)) {
+				return errno.err, errno.efault
+			}
 			ret++
 		}
 
@@ -355,9 +390,14 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf &EpollEvent, maxevent
 			}
 
 			if revents != 0 {
-				mut out_event := unsafe { &events_buf[ret] }
-				out_event.events = revents
-				out_event.data = entry.data
+				out_event := EpollEvent{
+					events: revents
+					data:   entry.data
+				}
+				if !usercopy.copy_to_user(events_buf + ret * sizeof(EpollEvent),
+					voidptr(&out_event), sizeof(EpollEvent)) {
+					return errno.err, errno.efault
+				}
 				ret++
 			}
 		}
@@ -370,4 +410,34 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf &EpollEvent, maxevent
 	}
 
 	return 0, 0
+}
+
+// epoll_pwait2 is epoll_pwait with a nanosecond timespec instead of a
+// millisecond integer.  The event core currently schedules at millisecond
+// granularity, so round a non-zero fractional millisecond up rather than
+// returning before the requested deadline.
+pub fn syscall_epoll_pwait2(gpr_state voidptr, epfd int, events_buf u64, maxevents int, timeout_ptr u64, sigmask u64, sigsetsize u64) (u64, u64) {
+	mut timeout := -1
+	if timeout_ptr != 0 {
+		mut requested := time.TimeSpec{}
+		if !usercopy.copy_from_user(voidptr(&requested), timeout_ptr, sizeof(time.TimeSpec)) {
+			return errno.err, errno.efault
+		}
+		if requested.tv_sec < 0 || requested.tv_nsec < 0 || requested.tv_nsec >= 1000000000 {
+			return errno.err, errno.einval
+		}
+
+		seconds := u64(requested.tv_sec)
+		mut milliseconds := u64(0x7fffffff)
+		if seconds <= u64(0x7fffffff) / 1000 {
+			milliseconds = seconds * 1000 + u64(requested.tv_nsec + 999999) / 1000000
+			if milliseconds > u64(0x7fffffff) {
+				milliseconds = u64(0x7fffffff)
+			}
+		}
+		timeout = int(milliseconds)
+	}
+
+	return syscall_epoll_pwait(gpr_state, epfd, events_buf, maxevents, timeout, sigmask,
+		sigsetsize)
 }

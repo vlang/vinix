@@ -1,5 +1,6 @@
 import hashlib
 import os
+import resource
 import select
 import socket
 import subprocess
@@ -169,12 +170,55 @@ positioned_path = os.path.join(workdir, "positioned-io")
 fd = os.open(positioned_path, os.O_CREAT | os.O_RDWR, 0o600)
 os.pwrite(fd, b"SQLite format 3\0", 0)
 check(os.pread(fd, 16, 0) == b"SQLite format 3\0", "positioned file I/O")
+original_position = os.lseek(fd, 7, os.SEEK_SET)
+check(os.pwritev(fd, [b"vector", b" write"], 32) == 12, "positioned vector write")
+first = bytearray(6)
+second = bytearray(6)
+check(
+    os.preadv(fd, [first, second], 32) == 12
+    and bytes(first + second) == b"vector write"
+    and os.lseek(fd, 0, os.SEEK_CUR) == original_position,
+    "positioned vector read preserves offset",
+)
+os.posix_fallocate(fd, 0, 128)
+check(os.fstat(fd).st_size >= 128, "posix_fallocate")
+os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_NORMAL)
+check(True, "posix_fadvise")
 os.ftruncate(fd, 0)
 os.lseek(fd, 24, os.SEEK_SET)
 check(os.fstat(fd).st_size == 0 and os.read(fd, 1) == b"", "seek/read beyond EOF")
 os.write(fd, b"x")
 check(os.pread(fd, 25, 0) == b"\0" * 24 + b"x", "zero-filled sparse write")
 os.close(fd)
+
+# Descriptor-oriented primitives used by contemporary event loops and servers.
+event_fd = os.eventfd(0, os.EFD_NONBLOCK | os.EFD_CLOEXEC)
+event_poller = select.epoll()
+event_poller.register(event_fd, select.EPOLLIN)
+check(event_poller.poll(0) == [], "eventfd starts unreadable")
+os.eventfd_write(event_fd, 7)
+check(len(event_poller.poll(1)) == 1 and os.eventfd_read(event_fd) == 7, "eventfd and epoll")
+event_poller.close()
+os.close(event_fd)
+
+sendfile_source = os.path.join(workdir, "sendfile-source")
+sendfile_target = os.path.join(workdir, "sendfile-target")
+with open(sendfile_source, "wb") as output:
+    output.write(b"0123456789")
+with open(sendfile_source, "rb") as source, open(sendfile_target, "wb") as target:
+    source.seek(8)
+    check(os.sendfile(target.fileno(), source.fileno(), 2, 5) == 5, "sendfile")
+    check(source.tell() == 8, "sendfile explicit offset is positioned")
+with open(sendfile_target, "rb") as copied:
+    check(copied.read() == b"23456", "sendfile contents")
+
+soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+check(soft_limit > 0 and hard_limit >= soft_limit, "getrlimit")
+if hasattr(os, "sched_getcpu"):
+    check(os.sched_getcpu() >= 0, "getcpu")
+if hasattr(os, "sched_rr_get_interval"):
+    check(os.sched_rr_get_interval(0) > 0, "sched_rr_get_interval")
+check(os.uname().machine == "aarch64", "uname Linux layout")
 
 import sqlite3
 

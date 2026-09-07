@@ -503,6 +503,156 @@ pub fn syscall_ftruncate(_ voidptr, fdnum int, length i64) (u64, u64) {
 	return 0, 0
 }
 
+// pread64/pwrite64 operate at an explicit offset without changing the open
+// file description's position.  Keeping the operation under Handle.l makes
+// this atomic with ordinary read/write/lseek on a shared descriptor.
+pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
+	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
+		return errno.err, errno.einval
+	}
+
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	mut handle := fd.handle
+	handle.l.acquire()
+	defer {
+		handle.l.release()
+	}
+
+	mode := handle.resource.stat.mode
+	if stat.ischr(mode) || stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+		return errno.err, errno.espipe
+	}
+	if stat.isdir(mode) {
+		return errno.err, errno.eisdir
+	}
+	access := handle.flags & resource.o_accmode
+	if access != resource.o_rdonly && access != resource.o_rdwr {
+		return errno.err, errno.ebadf
+	}
+
+	ret := handle.resource.read(voidptr(handle), buf, u64(offset), count) or {
+		return errno.err, errno.get()
+	}
+	return u64(ret), 0
+}
+
+pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
+	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
+		return errno.err, errno.einval
+	}
+
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	mut handle := fd.handle
+	handle.l.acquire()
+	defer {
+		handle.l.release()
+	}
+
+	mut res := handle.resource
+	mode := res.stat.mode
+	if stat.ischr(mode) || stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+		return errno.err, errno.espipe
+	}
+	if stat.isdir(mode) {
+		return errno.err, errno.eisdir
+	}
+	access := handle.flags & resource.o_accmode
+	if access != resource.o_wronly && access != resource.o_rdwr {
+		return errno.err, errno.ebadf
+	}
+
+	ret := res.write(voidptr(handle), buf, u64(offset), count) or {
+		return errno.err, errno.get()
+	}
+	return u64(ret), 0
+}
+
+// fallocate(mode=0) guarantees that the requested range exists.  Vinix has no
+// delayed allocation or hole-punching yet, so extending the resource provides
+// that guarantee; unsupported Linux mode bits are rejected explicitly.
+pub fn syscall_fallocate(_ voidptr, fdnum int, mode int, offset i64, length i64) (u64, u64) {
+	if mode != 0 {
+		return errno.err, errno.eopnotsupp
+	}
+	if offset < 0 || length <= 0 || u64(length) > u64(0x7fffffffffffffff) - u64(offset) {
+		return errno.err, errno.einval
+	}
+
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	mut handle := fd.handle
+	access := handle.flags & resource.o_accmode
+	if access != resource.o_wronly && access != resource.o_rdwr {
+		return errno.err, errno.ebadf
+	}
+	mut res := handle.resource
+	if !stat.isreg(res.stat.mode) {
+		if stat.isdir(res.stat.mode) {
+			return errno.err, errno.eisdir
+		}
+		if stat.isifo(res.stat.mode) || res.stat.mode & stat.ifmt == stat.ifpipe {
+			return errno.err, errno.espipe
+		}
+		return errno.err, errno.enodev
+	}
+
+	end := u64(offset) + u64(length)
+	if end > u64(res.stat.size) {
+		res.grow(voidptr(handle), end) or { return errno.err, errno.get() }
+	}
+	return 0, 0
+}
+
+// There is no page cache whose policy can be changed yet.  Validate the call
+// exactly where Linux would, then accept the advice as a harmless hint.
+pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice int) (u64, u64) {
+	if offset < 0 || length < 0 || advice < 0 || advice > 5 {
+		return errno.err, errno.einval
+	}
+
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+
+	mode := fd.handle.resource.stat.mode
+	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+		return errno.err, errno.espipe
+	}
+	return 0, 0
+}
+
+pub fn syscall_sync_file_range(_ voidptr, fdnum int, offset i64, count i64, flags u32) (u64, u64) {
+	if offset < 0 || count < 0 || flags & ~u32(0x7) != 0 {
+		return errno.err, errno.einval
+	}
+
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+	access := fd.handle.flags & resource.o_accmode
+	if access != resource.o_wronly && access != resource.o_rdwr {
+		return errno.err, errno.ebadf
+	}
+	if !stat.isreg(fd.handle.resource.stat.mode) {
+		return errno.err, errno.espipe
+	}
+	// Writes are synchronous today, so every valid range is already durable.
+	return 0, 0
+}
+
 pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	mut t := proc.current_thread()
 	mut process := t.process

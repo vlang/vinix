@@ -21,7 +21,7 @@ import aarch64.cpu.local as cpulocal
 import aarch64.uart
 
 // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
-// Table size covers all syscalls we map (max used = 435, clone3).
+// Table size covers all syscalls we map (max used = 441, epoll_pwait2).
 // Keep in sync with the bounds check in asm/aarch64/vectors.S.
 const linux_syscall_max = 512
 
@@ -203,17 +203,72 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 	}
 }
 
-// Linux writev(fd, iov, iovcnt) — write each iovec entry sequentially.
-fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+struct LinuxIOVec {
+mut:
+	base u64
+	len  u64
+}
+
+const linux_iov_max = 1024
+
+// Validate the complete vector before doing any I/O.  Linux rejects a bad
+// iovcnt, pointer, or aggregate length without partially consuming the file.
+fn validate_linux_iov(iov_ptr u64, iovcnt int) (u64, u64) {
+	if iovcnt < 0 || iovcnt > linux_iov_max {
+		return 0, errno.einval
+	}
+	if iovcnt == 0 {
+		return 0, 0
+	}
+	if iov_ptr == 0 {
+		return 0, errno.efault
+	}
+
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
-		entry := iov_ptr + u64(i) * 16
-		iov_base := unsafe { *&u64(entry) }
-		iov_len := unsafe { *&u64(entry + 8) }
-		if iov_len == 0 {
+		mut iov := LinuxIOVec{}
+		if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(i) * sizeof(LinuxIOVec),
+			sizeof(LinuxIOVec)) {
+			return 0, errno.efault
+		}
+		if iov.len > u64(0x7fffffffffffffff) - total {
+			return 0, errno.einval
+		}
+		total += iov.len
+	}
+	return total, 0
+}
+
+fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
+	mut iov := LinuxIOVec{}
+	if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(index) * sizeof(LinuxIOVec),
+		sizeof(LinuxIOVec)) {
+		return none
+	}
+	return iov
+}
+
+// Linux writev(fd, iov, iovcnt) — write each iovec entry sequentially.
+fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
+	if validation_error != 0 {
+		return errno.err, validation_error
+	}
+	if iovcnt == 0 {
+		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+			return errno.err, errno.get()
+		}
+		checked_fd.unref()
+		return 0, 0
+	}
+
+	mut total := u64(0)
+	for i := 0; i < iovcnt; i++ {
+		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
+		if iov.len == 0 {
 			continue
 		}
-		ret, err := fs.syscall_write(gpr_state, fdnum, voidptr(iov_base), iov_len)
+		ret, err := fs.syscall_write(gpr_state, fdnum, voidptr(iov.base), iov.len)
 		if err != 0 {
 			if total > 0 {
 				return total, 0
@@ -221,6 +276,9 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 			return ret, err
 		}
 		total += ret
+		if ret < iov.len {
+			break
+		}
 	}
 	return total, 0
 }
@@ -267,13 +325,18 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 
 // Linux uname(buf) — fill utsname (6 x 65-byte fields).
 fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
+	mut uts := [390]u8{}
 	unsafe {
-		C.memset(voidptr(buf), 0, 390)
-		C.strcpy(charptr(buf), c'Vinix')
-		C.strcpy(charptr(buf + 65), c'vinix')
-		C.strcpy(charptr(buf + 130), c'0.1.0')
-		C.strcpy(charptr(buf + 195), c'Vinix 0.1.0 aarch64')
-		C.strcpy(charptr(buf + 260), c'aarch64')
+		C.strcpy(charptr(&uts[0]), c'Vinix')
+		C.strcpy(charptr(&uts[65]), c'vinix')
+		C.strcpy(charptr(&uts[130]), c'0.1.0')
+		C.strcpy(charptr(&uts[195]), c'Vinix 0.1.0 aarch64')
+		C.strcpy(charptr(&uts[260]), c'aarch64')
+	}
+	net.copy_hostname(u64(&uts[65]))
+	net.copy_domainname(u64(&uts[325]))
+	if !usercopy.copy_to_user(buf, voidptr(&uts[0]), u64(uts.len)) {
+		return errno.err, errno.efault
 	}
 	return 0, 0
 }
@@ -452,42 +515,105 @@ fn syscall_linux_fchmodat(_ voidptr, dirfd int, path charptr, mode u32, flags in
 
 // ── X11 / dynamic-linking syscall stubs ──
 
-// ftruncate: stub — pretend success (mostly used for tmpfiles).
-// sendfile: return ENOSYS so callers fall back to read/write
-fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset &i64, count u64) (u64, u64) {
-	return errno.err, errno.enosys
+// sendfile(out, in, offset, count).  A page-sized bounce buffer keeps the
+// transfer bounded; an explicit offset leaves the input descriptor position
+// alone, while a null offset consumes it just like read(2).
+fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u64, count u64) (u64, u64) {
+	mut input_offset := i64(0)
+	positioned := offset_ptr != 0
+	if positioned {
+		if !usercopy.copy_from_user(voidptr(&input_offset), offset_ptr, sizeof(i64)) {
+			return errno.err, errno.efault
+		}
+		if input_offset < 0 {
+			return errno.err, errno.einval
+		}
+		// Check that the offset is writable before consuming either descriptor.
+		if !usercopy.copy_to_user(offset_ptr, voidptr(&input_offset), sizeof(i64)) {
+			return errno.err, errno.efault
+		}
+	}
+
+	// Linux validates both descriptors even for a zero-byte transfer.
+	mut input_fd := file.fd_from_fdnum(unsafe { nil }, in_fd) or {
+		return errno.err, errno.get()
+	}
+	input_fd.unref()
+	mut output_fd := file.fd_from_fdnum(unsafe { nil }, out_fd) or {
+		return errno.err, errno.get()
+	}
+	output_fd.unref()
+	if count == 0 {
+		return 0, 0
+	}
+
+	buffer := unsafe { malloc(page_size) }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		unsafe { free(buffer) }
+	}
+
+	mut total := u64(0)
+	for total < count {
+		mut chunk := count - total
+		if chunk > page_size {
+			chunk = page_size
+		}
+
+		got, read_error := if positioned {
+			file.syscall_pread(gpr_state, in_fd, buffer, chunk, input_offset)
+		} else {
+			fs.syscall_read(gpr_state, in_fd, buffer, chunk)
+		}
+		if read_error != 0 {
+			if total > 0 {
+				break
+			}
+			return got, read_error
+		}
+		if got == 0 {
+			break
+		}
+
+		written, write_error := fs.syscall_write(gpr_state, out_fd, buffer, got)
+		if written < got && !positioned {
+			// read() already advanced the shared input position.  Put back the
+			// suffix the output did not accept.
+			fs.syscall_seek(gpr_state, in_fd, -i64(got - written), 1)
+		}
+		if write_error != 0 {
+			if total == 0 {
+				return written, write_error
+			}
+			break
+		}
+
+		total += written
+		if positioned {
+			input_offset += i64(written)
+		}
+		if written < got {
+			break
+		}
+	}
+
+	if positioned
+		&& !usercopy.copy_to_user(offset_ptr, voidptr(&input_offset), sizeof(i64)) {
+		return errno.err, errno.efault
+	}
+	return total, 0
 }
 
 // pread64: read at offset without changing file position.
 fn syscall_linux_pread64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	// Save current position, seek to offset, read, seek back.
-	old_pos, err1 := fs.syscall_seek(gpr_state, fdnum, 0, 1) // SEEK_CUR
-	if err1 != 0 {
-		return old_pos, err1
-	}
-	_, err2 := fs.syscall_seek(gpr_state, fdnum, offset, 0) // SEEK_SET
-	if err2 != 0 {
-		return errno.err, err2
-	}
-	ret, err3 := fs.syscall_read(gpr_state, fdnum, buf, count)
-	// Restore position regardless of read result
-	fs.syscall_seek(gpr_state, fdnum, i64(old_pos), 0) // SEEK_SET
-	return ret, err3
+	return file.syscall_pread(gpr_state, fdnum, buf, count, offset)
 }
 
 // pwrite64: write at offset without changing file position.
 fn syscall_linux_pwrite64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	old_pos, err1 := fs.syscall_seek(gpr_state, fdnum, 0, 1)
-	if err1 != 0 {
-		return old_pos, err1
-	}
-	_, err2 := fs.syscall_seek(gpr_state, fdnum, offset, 0)
-	if err2 != 0 {
-		return errno.err, err2
-	}
-	ret, err3 := fs.syscall_write(gpr_state, fdnum, buf, count)
-	fs.syscall_seek(gpr_state, fdnum, i64(old_pos), 0)
-	return ret, err3
+	return file.syscall_pwrite(gpr_state, fdnum, buf, count, offset)
 }
 
 // utimensat: stub — timestamps not tracked.
@@ -765,15 +891,25 @@ fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
 
 // readv(fd, iov, iovcnt)
 fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
+	if validation_error != 0 {
+		return errno.err, validation_error
+	}
+	if iovcnt == 0 {
+		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+			return errno.err, errno.get()
+		}
+		checked_fd.unref()
+		return 0, 0
+	}
+
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
-		entry := iov_ptr + u64(i) * 16
-		iov_base := unsafe { *&u64(entry) }
-		iov_len := unsafe { *&u64(entry + 8) }
-		if iov_len == 0 {
+		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
+		if iov.len == 0 {
 			continue
 		}
-		ret, err := fs.syscall_read(gpr_state, fdnum, voidptr(iov_base), iov_len)
+		ret, err := fs.syscall_read(gpr_state, fdnum, voidptr(iov.base), iov.len)
 		if err != 0 {
 			if total > 0 {
 				return total, 0
@@ -781,6 +917,9 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 			return ret, err
 		}
 		total += ret
+		if ret < iov.len {
+			break
+		}
 	}
 	return total, 0
 }
@@ -897,6 +1036,7 @@ pub fn init_syscall_table() {
 
 	// File I/O
 	syscall_table[17] = voidptr(fs.syscall_getcwd) // __NR_getcwd
+	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup
 	syscall_table[24] = voidptr(file.syscall_dup3) // __NR_dup3
 	syscall_table[25] = voidptr(file.syscall_fcntl) // __NR_fcntl
@@ -908,7 +1048,8 @@ pub fn init_syscall_table() {
 	syscall_table[37] = voidptr(fs.syscall_linkat) // __NR_linkat
 	syscall_table[39] = voidptr(fs.syscall_umount) // __NR_umount2
 	syscall_table[40] = voidptr(fs.syscall_mount) // __NR_mount
-	syscall_table[48] = voidptr(fs.syscall_faccessat) // __NR_faccessat
+	syscall_table[47] = voidptr(file.syscall_fallocate) // __NR_fallocate
+	syscall_table[48] = voidptr(syscall_linux_faccessat) // __NR_faccessat
 	syscall_table[49] = voidptr(fs.syscall_chdir) // __NR_chdir
 	syscall_table[50] = voidptr(fs.syscall_fchdir) // __NR_fchdir
 	syscall_table[52] = voidptr(fs.syscall_fchmod) // __NR_fchmod
@@ -924,6 +1065,10 @@ pub fn init_syscall_table() {
 	syscall_table[64] = voidptr(fs.syscall_write) // __NR_write
 	syscall_table[65] = voidptr(syscall_linux_readv) // __NR_readv
 	syscall_table[66] = voidptr(syscall_linux_writev) // __NR_writev
+	syscall_table[67] = voidptr(syscall_linux_pread64) // __NR_pread64
+	syscall_table[68] = voidptr(syscall_linux_pwrite64) // __NR_pwrite64
+	syscall_table[69] = voidptr(syscall_linux_preadv) // __NR_preadv
+	syscall_table[70] = voidptr(syscall_linux_pwritev) // __NR_pwritev
 	syscall_table[72] = voidptr(file.syscall_pselect6) // __NR_pselect6
 	syscall_table[73] = voidptr(file.syscall_ppoll) // __NR_ppoll
 	syscall_table[74] = voidptr(userland.syscall_signalfd) // __NR_signalfd4
@@ -936,7 +1081,7 @@ pub fn init_syscall_table() {
 	syscall_table[81] = voidptr(fs.syscall_sync) // __NR_sync
 	syscall_table[82] = voidptr(file.syscall_fsync) // __NR_fsync
 	syscall_table[83] = voidptr(file.syscall_fsync) // __NR_fdatasync
-	syscall_table[84] = voidptr(fs.syscall_syncfs) // __NR_sync_file_range
+	syscall_table[84] = voidptr(file.syscall_sync_file_range) // __NR_sync_file_range
 	syscall_table[85] = voidptr(file.syscall_timerfd_create) // __NR_timerfd_create
 	syscall_table[86] = voidptr(file.syscall_timerfd_settime) // __NR_timerfd_settime
 	syscall_table[87] = voidptr(file.syscall_timerfd_gettime) // __NR_timerfd_gettime
@@ -944,8 +1089,13 @@ pub fn init_syscall_table() {
 	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
 	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
 	syscall_table[285] = voidptr(pipe.syscall_copy_file_range) // __NR_copy_file_range
+	syscall_table[286] = voidptr(syscall_linux_preadv2) // __NR_preadv2
+	syscall_table[287] = voidptr(syscall_linux_pwritev2) // __NR_pwritev2
 	syscall_table[291] = voidptr(syscall_linux_statx) // __NR_statx
 	syscall_table[436] = voidptr(file.syscall_close_range) // __NR_close_range
+	syscall_table[437] = voidptr(syscall_linux_openat2) // __NR_openat2
+	syscall_table[439] = voidptr(syscall_linux_faccessat2) // __NR_faccessat2
+	syscall_table[441] = voidptr(file.syscall_epoll_pwait2) // __NR_epoll_pwait2
 
 	// Process control
 	syscall_table[93] = voidptr(userland.syscall_exit) // __NR_exit
@@ -968,6 +1118,7 @@ pub fn init_syscall_table() {
 	syscall_table[124] = voidptr(syscall_linux_sched_yield) // __NR_sched_yield
 	syscall_table[125] = voidptr(syscall_linux_sched_get_priority_max) // __NR_sched_get_priority_max
 	syscall_table[126] = voidptr(syscall_linux_sched_get_priority_min) // __NR_sched_get_priority_min
+	syscall_table[127] = voidptr(syscall_linux_sched_rr_get_interval) // __NR_sched_rr_get_interval
 	syscall_table[129] = voidptr(userland.syscall_kill) // __NR_kill
 	syscall_table[130] = voidptr(userland.syscall_tkill) // __NR_tkill
 	syscall_table[131] = voidptr(userland.syscall_tgkill) // __NR_tgkill
@@ -985,6 +1136,8 @@ pub fn init_syscall_table() {
 	syscall_table[158] = voidptr(userland.syscall_getgroups) // __NR_getgroups
 	syscall_table[159] = voidptr(userland.syscall_setgroups) // __NR_setgroups
 	syscall_table[160] = voidptr(syscall_linux_uname) // __NR_uname
+	syscall_table[163] = voidptr(syscall_linux_getrlimit) // __NR_getrlimit
+	syscall_table[164] = voidptr(syscall_linux_setrlimit) // __NR_setrlimit
 	syscall_table[169] = voidptr(sys.syscall_gettimeofday) // __NR_gettimeofday
 	syscall_table[166] = voidptr(syscall_linux_umask) // __NR_umask
 	syscall_table[172] = voidptr(userland.syscall_getpid) // __NR_getpid
@@ -1005,6 +1158,7 @@ pub fn init_syscall_table() {
 	syscall_table[177] = voidptr(userland.syscall_getegid) // __NR_getegid
 	syscall_table[178] = voidptr(syscall_linux_gettid) // __NR_gettid
 	syscall_table[179] = voidptr(syscall_linux_sysinfo) // __NR_sysinfo
+	syscall_table[168] = voidptr(syscall_linux_getcpu) // __NR_getcpu
 
 	// Resource / file locking
 	// epoll
@@ -1015,8 +1169,6 @@ pub fn init_syscall_table() {
 	syscall_table[32] = voidptr(syscall_linux_flock) // __NR_flock
 	syscall_table[46] = voidptr(file.syscall_ftruncate) // __NR_ftruncate
 	syscall_table[71] = voidptr(syscall_linux_sendfile) // __NR_sendfile
-	syscall_table[67] = voidptr(syscall_linux_pread64) // __NR_pread64
-	syscall_table[68] = voidptr(syscall_linux_pwrite64) // __NR_pwrite64
 	syscall_table[88] = voidptr(syscall_linux_utimensat) // __NR_utimensat
 	syscall_table[102] = voidptr(syscall_linux_getitimer) // __NR_getitimer
 	syscall_table[103] = voidptr(syscall_linux_setitimer) // __NR_setitimer
@@ -1032,6 +1184,7 @@ pub fn init_syscall_table() {
 	syscall_table[45] = voidptr(fs.syscall_truncate) // __NR_truncate
 	syscall_table[278] = voidptr(syscall_linux_getrandom) // __NR_getrandom
 	syscall_table[435] = voidptr(userland.syscall_clone3) // __NR_clone3
+	syscall_table[223] = voidptr(file.syscall_fadvise64) // __NR_fadvise64
 
 	// Sockets
 	syscall_table[198] = voidptr(socket.syscall_socket) // __NR_socket
@@ -1073,8 +1226,8 @@ pub fn init_syscall_table() {
 	syscall_table[261] = voidptr(syscall_linux_prlimit64) // __NR_prlimit64
 
 	// Networking
-	syscall_table[161] = voidptr(net.syscall_gethostname) // __NR_sethostname (close enough)
-	syscall_table[162] = voidptr(net.syscall_sethostname) // __NR_setdomainname → sethostname
+	syscall_table[161] = voidptr(net.syscall_sethostname) // __NR_sethostname
+	syscall_table[162] = voidptr(net.syscall_setdomainname) // __NR_setdomainname
 
 	// TLS — on aarch64 musl sets TPIDR_EL0 directly, but keep Vinix's
 	// set_tls available at a high slot for mlibc compat
