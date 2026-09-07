@@ -26,12 +26,20 @@ pub const at_euid = 12
 pub const at_gid = 13
 pub const at_egid = 14
 pub const at_base = 7
+pub const at_hwcap = 16
 pub const at_secure = 23
 pub const at_random = 25
+pub const at_hwcap2 = 26
 
 pub const pt_load = 0x00000001
 pub const pt_interp = 0x00000003
 pub const pt_phdr = 0x00000006
+
+// Keep ordinary binaries on the compact contiguous allocation path. Larger
+// segments are assembled from modest chunks so they do not depend on finding
+// hundreds of MiB of physically contiguous RAM after initramfs extraction.
+const contiguous_page_limit = u64(4096)
+const allocation_chunk_pages = u64(256)
 
 pub const abi_sysv = 0x00
 pub const arch_x86_64 = 0x3e
@@ -168,15 +176,6 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		misalign := phdr.p_vaddr & (page_size - 1)
 		page_count := lib.div_roundup(misalign + phdr.p_memsz, page_size)
 
-		addr := memory.pmm_alloc(page_count)
-		if addr == 0 {
-			return error('elf: Allocation failure')
-		}
-		// ELF requires the portion of a LOAD segment beyond p_filesz to be
-		// zero-filled. Clear the complete allocation before copying file data;
-		// PMM pages can contain data left by an earlier allocation.
-		unsafe { C.memset(byteptr(addr) + higher_half, 0, page_count * page_size) }
-
 		pf := mmap.prot_read | mmap.prot_exec | if phdr.p_flags & pf_w != 0 {
 			mmap.prot_write
 		} else {
@@ -184,15 +183,78 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		}
 
 		virt := lib.align_down(base + phdr.p_vaddr, page_size)
-		phys := u64(addr)
+		if page_count > contiguous_page_limit {
+			mut phys_pages := []u64{cap: int(page_count)}
+			mut first_page := u64(0)
+			file_begin := misalign
+			file_end := misalign + phdr.p_filesz
 
-		mmap.map_range(mut pagemap, virt, phys, page_count * page_size, pf, mmap.map_anonymous) or {
-			return error('')
+			for first_page < page_count {
+				remaining := page_count - first_page
+				chunk_pages := if remaining > allocation_chunk_pages {
+					allocation_chunk_pages
+				} else {
+					remaining
+				}
+				chunk_addr := memory.pmm_alloc_nozero(chunk_pages)
+				if chunk_addr == 0 {
+					unsafe { phys_pages.free() }
+					return error('elf: Allocation failure')
+				}
+
+				chunk_size := chunk_pages * page_size
+				unsafe { C.memset(byteptr(chunk_addr) + higher_half, 0, chunk_size) }
+				for page := u64(0); page < chunk_pages; page++ {
+					phys_pages << u64(chunk_addr) + page * page_size
+				}
+
+				chunk_begin := first_page * page_size
+				chunk_end := chunk_begin + chunk_size
+				copy_begin := if chunk_begin > file_begin { chunk_begin } else { file_begin }
+				copy_end := if chunk_end < file_end { chunk_end } else { file_end }
+				if copy_begin < copy_end {
+					destination := unsafe {
+						byteptr(chunk_addr) + higher_half + copy_begin - chunk_begin
+					}
+					file_offset := phdr.p_offset + copy_begin - file_begin
+					res.read(0, destination, file_offset, copy_end - copy_begin) or {
+						unsafe { phys_pages.free() }
+						return error('')
+					}
+				}
+				first_page += chunk_pages
+			}
+
+			mmap.map_pages(mut pagemap, virt, phys_pages, pf, mmap.map_anonymous) or {
+				unsafe { phys_pages.free() }
+				return error('')
+			}
+			unsafe { phys_pages.free() }
+		} else {
+			// The file data is about to overwrite most executable segments. Avoid
+			// clearing that memory twice by initialising only bytes not populated
+			// from the ELF image.
+			addr := memory.pmm_alloc_nozero(page_count)
+			if addr == 0 {
+				return error('elf: Allocation failure')
+			}
+			allocation_size := page_count * page_size
+			mmap.map_range(mut pagemap, virt, u64(addr), allocation_size, pf, mmap.map_anonymous) or {
+				return error('')
+			}
+
+			buf := unsafe { byteptr(addr) + misalign + higher_half }
+			res.read(0, buf, phdr.p_offset, phdr.p_filesz) or { return error('') }
+			unsafe {
+				if misalign != 0 {
+					C.memset(byteptr(addr) + higher_half, 0, misalign)
+				}
+				tail := allocation_size - misalign - phdr.p_filesz
+				if tail != 0 {
+					C.memset(buf + phdr.p_filesz, 0, tail)
+				}
+			}
 		}
-
-		buf := unsafe { byteptr(addr) + misalign + higher_half }
-
-		res.read(0, buf, phdr.p_offset, phdr.p_filesz) or { return error('') }
 	}
 
 	// If no PT_PHDR segment was found, compute AT_PHDR from the first

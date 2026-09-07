@@ -277,6 +277,49 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 	}
 }
 
+// map_pages creates one virtual range backed by an arbitrary list of physical
+// pages. Large executable images do not require physically contiguous RAM;
+// keeping one range also lets munmap/mprotect treat the mapping normally.
+pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, prot int, _flags int) ? {
+	if phys_pages.len == 0 || virt_addr != lib.align_down(virt_addr, page_size) {
+		return none
+	}
+
+	flags := _flags | map_anonymous
+	length := u64(phys_pages.len) * page_size
+	mut range_local := &MmapRangeLocal{
+		pagemap: unsafe { pagemap }
+		base:    virt_addr
+		length:  length
+		prot:    prot
+		flags:   flags
+		global:  unsafe { nil }
+	}
+	mut range_global := &MmapRangeGlobal{
+		locals:         []&MmapRangeLocal{}
+		base:           virt_addr
+		length:         length
+		resource:       unsafe { nil }
+		shadow_pagemap: memory.Pagemap{
+			top_level: unsafe { &u64(0) }
+		}
+	}
+
+	range_local.global = range_global
+	range_global.locals << range_local
+	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+
+	pagemap.l.acquire()
+	pagemap.mmap_ranges << voidptr(range_local)
+	pagemap.l.release()
+
+	for i, phys in phys_pages {
+		map_page_in_range(range_global, virt_addr + u64(i) * page_size, phys, prot) or {
+			return none
+		}
+	}
+}
+
 pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags int, _resource &resource.Resource, offset i64, handle voidptr, handle_ref fn (voidptr), handle_unref fn (voidptr)) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }

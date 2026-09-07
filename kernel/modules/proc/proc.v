@@ -38,6 +38,9 @@ pub mut:
 	// process down, so late-arriving threads do not try to do it again.
 	exiting bool
 	name    string
+	// Resolved program path used by the Linux /proc/self/exe compatibility
+	// link. Keep it separate from name, which prctl(PR_SET_NAME) may change.
+	executable_path string
 
 	// Credentials: the real, effective and saved sets POSIX names, plus the
 	// supplementary groups. Everything starts as root and is inherited across

@@ -15,6 +15,7 @@ PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
+CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
 
 MUSL_VERSION="1.2.5"
 BUSYBOX_VERSION="1.36.1"
@@ -817,6 +818,13 @@ if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
     cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
 else
     echo "==> Network tools staging not found, skipping (run build-network-tools-aarch64.sh first)"
+fi
+
+if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
+    echo "==> Integrating Codex CLI runtime..."
+    cp -a "$CODEX_STAGING/." "$STAGING/"
+else
+    echo "==> Codex staging not found, skipping (run build-codex-aarch64.sh first)"
 fi
 
 echo "==> Packaging initramfs..."

@@ -22,9 +22,12 @@ mut:
 // Watched fd entry
 struct EpollEntry {
 mut:
-	fd     int
-	events u32
-	data   u64
+	fd         int
+	events     u32
+	data       u64
+	ready      u32
+	generation u64
+	disabled   bool
 }
 
 // epoll constants
@@ -185,6 +188,11 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 				if entry.fd == fd {
 					entry.events = requested.events
 					entry.data = requested.data
+					// EPOLL_CTL_MOD rearms EPOLLONESHOT and establishes a new
+					// baseline for edge-triggered readiness.
+					entry.ready = 0
+					entry.generation = 0
+					entry.disabled = false
 					found = true
 					break
 				}
@@ -199,6 +207,49 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 	}
 
 	return 0, 0
+}
+
+// Translate a resource's poll status and apply the delivery mode requested by
+// this registration. EPOLLET reports only newly-ready bits, while
+// EPOLLONESHOT remains disabled until an EPOLL_CTL_MOD rearms it.
+fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
+	if entry.disabled {
+		return 0
+	}
+
+	mut current := u32(0)
+	if status & pollin != 0 && entry.events & epollin != 0 {
+		current |= epollin
+	}
+	if status & pollout != 0 && entry.events & epollout != 0 {
+		current |= epollout
+	}
+	if status & pollhup != 0 {
+		current |= epollhup
+	}
+	if status & pollerr != 0 {
+		current |= epollerr
+	}
+	if status & pollrdhup != 0 && entry.events & epollrdhup != 0 {
+		current |= epollrdhup
+	}
+
+	mut deliverable := current
+	if entry.events & epollet != 0 {
+		deliverable &= ~entry.ready
+		// A resource may become not-ready and ready again between two
+		// epoll waits. Its event generation preserves that intervening edge
+		// even when the sampled status bits are identical.
+		if current != 0 && generation != entry.generation {
+			deliverable = current
+		}
+		entry.ready = current
+		entry.generation = generation
+	}
+	if deliverable != 0 && entry.events & epolloneshot != 0 {
+		entry.disabled = true
+	}
+	return deliverable
 }
 
 pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, timeout int, sigmask u64, sigsetsize u64) (u64, u64) {
@@ -226,7 +277,6 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	} else {
 		return errno.err, errno.einval
 	}
-
 	oldmask := t.masked_signals
 	if sigmask != 0 {
 		mut incoming_mask := u64(0)
@@ -241,7 +291,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 
 	// First pass: check if any fds are already ready
 	mut ret := u64(0)
-	for entry in epoll_res.entries {
+	for mut entry in epoll_res.entries {
 		if ret >= u64(maxevents) {
 			break
 		}
@@ -251,24 +301,9 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		}
 
 		status := fd_obj.handle.resource.status
+		generation := fd_obj.handle.resource.event.generation
 
-		// Map resource status to epoll events
-		mut revents := u32(0)
-		if status & pollin != 0 && entry.events & epollin != 0 {
-			revents |= epollin
-		}
-		if status & pollout != 0 && entry.events & epollout != 0 {
-			revents |= epollout
-		}
-		if status & pollhup != 0 {
-			revents |= epollhup
-		}
-		if status & pollerr != 0 {
-			revents |= epollerr
-		}
-		if status & pollrdhup != 0 && entry.events & epollrdhup != 0 {
-			revents |= epollrdhup
-		}
+		revents := epoll_ready_events(mut entry, status, generation)
 
 		if revents != 0 {
 			out_event := EpollEvent{
@@ -359,7 +394,9 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 
 	// Wait for any event
 	for {
-		which := event.await(mut ev_list, true) or { return errno.err, errno.eintr }
+		which := event.await(mut ev_list, true) or {
+			return errno.err, errno.eintr
+		}
 
 		// Check if timer expired
 		if voidptr(timer) != unsafe { nil } && which == u64(ev_list.len) - 1 {
@@ -372,22 +409,11 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 			if ret >= u64(maxevents) {
 				break
 			}
-			entry := epoll_res.entries[entry_idx]
+			mut entry := epoll_res.entries[entry_idx]
 			status := fd_objs[i].handle.resource.status
-
-			mut revents := u32(0)
-			if status & pollin != 0 && entry.events & epollin != 0 {
-				revents |= epollin
-			}
-			if status & pollout != 0 && entry.events & epollout != 0 {
-				revents |= epollout
-			}
-			if status & pollhup != 0 {
-				revents |= epollhup
-			}
-			if status & pollerr != 0 {
-				revents |= epollerr
-			}
+			generation := fd_objs[i].handle.resource.event.generation
+			revents := epoll_ready_events(mut entry, status, generation)
+			epoll_res.entries[entry_idx] = entry
 
 			if revents != 0 {
 				out_event := EpollEvent{

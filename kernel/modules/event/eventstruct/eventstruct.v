@@ -16,6 +16,7 @@ pub struct Event {
 pub mut:
 	@lock       klock.Lock
 	pending     u64
+	generation  u64
 	listeners_i u64
 	listeners   [max_listeners]EventListener
 }

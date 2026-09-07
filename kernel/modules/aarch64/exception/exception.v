@@ -9,6 +9,7 @@ import memory
 import memory.mmap
 import proc
 import term
+import userland
 
 fn C.exception_vectors()
 fn C.sc_dump_ring()
@@ -96,6 +97,13 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	ec := (esr >> 26) & 0x3f // Exception Class
 
 	match ec {
+		0x00, 0x07, 0x19, 0x1d { // Undefined or unavailable FP/SVE/SME instruction
+			if gpr_state.pc < higher_half
+				&& userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {
+				return
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
 		0x20, 0x21 { // Instruction Abort from lower/same EL
 			mmap.pf_handler(gpr_state) or { fault_handler(ec, esr, far, gpr_state) }
 		}
@@ -104,9 +112,6 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 		}
 		0x15 { // SVC from AArch64 (syscall)
 			// Handled separately
-		}
-		0x07 { // SVE/SIMD/FP trap
-			fault_handler(ec, esr, far, gpr_state)
 		}
 		else {
 			fault_handler(ec, esr, far, gpr_state)

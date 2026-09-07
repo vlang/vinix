@@ -592,6 +592,20 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
+	if path == '/proc/self/exe' {
+		target := process.executable_path
+		if target.len == 0 {
+			return errno.err, errno.enoent
+		}
+		mut to_copy := u64(target.len)
+		if to_copy > limit {
+			to_copy = limit
+		}
+		if !usercopy.copy_to_user(u64(buf), target.str, to_copy) {
+			return errno.err, errno.efault
+		}
+		return to_copy, 0
+	}
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 

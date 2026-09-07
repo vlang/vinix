@@ -154,6 +154,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	defer {
 		e.@lock.release()
 	}
+	e.generation++
 
 	if e.listeners_i == 0 {
 		if drop == false {

@@ -11,6 +11,15 @@ __global (
 	waiting_event_count = u64(0)
 )
 
+fn duplicate_event_before(events []&eventstruct.Event, index u64) bool {
+	for previous := u64(0); previous < index; previous++ {
+		if events[previous] == events[index] {
+			return true
+		}
+	}
+	return false
+}
+
 fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	for i := u64(0); i < events.len; i++ {
 		if events[i].pending > 0 {
@@ -30,6 +39,12 @@ fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) bool {
 	t.attached_events_i = 0
 
 	for i := u64(0); i < events.len; i++ {
+		// poll/select callers may name the same underlying resource more than
+		// once. One listener is sufficient and avoids enqueueing a thread
+		// repeatedly when that shared event fires.
+		if duplicate_event_before(events, i) {
+			continue
+		}
 		mut e := events[i]
 
 		if e.listeners_i == eventstruct.max_listeners
@@ -74,14 +89,18 @@ fn detach_listeners(mut t proc.Thread) {
 }
 
 fn lock_events(mut events []&eventstruct.Event) {
-	for mut e in events {
-		e.@lock.acquire()
+	for i := u64(0); i < events.len; i++ {
+		if !duplicate_event_before(events, i) {
+			events[i].@lock.acquire()
+		}
 	}
 }
 
 fn unlock_events(mut events []&eventstruct.Event) {
-	for mut e in events {
-		e.@lock.release()
+	for i := u64(0); i < events.len; i++ {
+		if !duplicate_event_before(events, i) {
+			events[i].@lock.release()
+		}
 	}
 }
 
@@ -150,6 +169,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	defer {
 		e.@lock.release()
 	}
+	e.generation++
 
 	if e.listeners_i == 0 {
 		if drop == false {

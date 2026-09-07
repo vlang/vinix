@@ -153,6 +153,31 @@ The userland builders merge `build-aarch64-ruby/staging` when present. Set
 `/root/ruby-smoke.rb`, which the ARM64 VM boot suite runs automatically and
 which can also be invoked manually with `ruby`.
 
+### Codex CLI on aarch64
+
+The aarch64 image can include the official ARM64/musl Codex CLI together with
+Alpine's musl builds of its `rg` and `zsh` helpers. Stage it before assembling
+the userland:
+
+```sh
+./build-codex-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Both userland builders merge `build-aarch64-codex/staging` when present. Set
+`VINIX_CODEX_STAGING=/path/to/staging` to use another tree. When Python is also
+installed, the VM boot suite runs `/root/codex-smoke.py`, which drives
+`codex exec` against a local Responses API server without requiring credentials
+or Internet access.
+
+Vinix does not yet implement Linux namespaces, so interactive and non-interactive
+Codex sessions must currently opt out of the upstream sandbox:
+
+```sh
+codex --dangerously-bypass-approvals-and-sandbox
+codex exec --dangerously-bypass-approvals-and-sandbox "your task"
+```
+
 ### Firefox on aarch64
 
 Firefox ESR can run as a stock Alpine musl application on Vinix's existing

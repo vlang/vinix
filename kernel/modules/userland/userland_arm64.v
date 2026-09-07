@@ -305,6 +305,21 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	// else: no sigentry and no restorer — silently drop signal
 }
 
+// Deliver a fault raised by the current userspace instruction immediately.
+// Unlike sendsig(), this must not enqueue the thread which is already running.
+// The return value tells the exception path whether a usable handler replaced
+// the faulting PC; otherwise the normal fatal handling still applies.
+pub fn dispatch_sync_signal(context &cpulocal.GPRState, signal u8) bool {
+	if signal == 0 || signal > 64 {
+		return false
+	}
+	mut current_thread := proc.current_thread()
+	original_pc := context.pc
+	katomic.bts(mut &current_thread.pending_signals, signal - 1)
+	dispatch_a_signal(context)
+	return context.pc != original_pc
+}
+
 fn wants_altstack(t &proc.Thread, sigaction proc.SigAction) bool {
 	// SA_ONSTACK is 1 << 1 for Vinix and 1 << 27 for Linux.
 	if sigaction.sa_flags & sa_onstack == 0 && sigaction.sa_flags & int(0x08000000) == 0 {
@@ -532,6 +547,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
 		new_process.name = '${path}[${new_process.pid}]'
+		new_process.executable_path = path.clone()
 
 		stdin_node := fs.get_node(vfs_root, stdin, true)?
 		stdin_handle := &file.Handle{
@@ -597,6 +613,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		curr_process.pagemap = new_pagemap
 
 		curr_process.name = '${path}[${curr_process.pid}]'
+		curr_process.executable_path = path.clone()
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process

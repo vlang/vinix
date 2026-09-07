@@ -222,7 +222,8 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	mut pte_p := pagemap.virt2pte(virt, false) or { return none }
 	phys := unsafe { *pte_p } & pte_flags_mask
 	new_pte := portable_to_arm64_pte(phys, flags)
-	install_arm64_pte(mut pte_p, virt, new_pte)
+	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
+	install_arm64_pte(mut pte_p, virt, new_pte, active)
 }
 
 // Install a page descriptor in an active page table. Replacing a valid
@@ -230,12 +231,17 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 // otherwise a CPU may combine the old address or memory type with the new
 // descriptor. During vmm_init the new table is not active yet, so the final
 // whole-VM invalidation is sufficient and avoids a barrier per HHDM page.
-fn install_arm64_pte(mut entry &u64, virt u64, new_pte u64) {
+fn install_arm64_pte(mut entry &u64, virt u64, new_pte u64, active bool) {
 	old_pte := unsafe { *entry }
 	if old_pte == new_pte {
 		return
 	}
-	if !vmm_initialised {
+	// A page table which is not installed in TTBR0 cannot have cached
+	// translations. ELF loading builds a fresh table and can contain tens of
+	// thousands of pages, so issuing TLBI and barrier instructions per page is
+	// both unnecessary and prohibitively expensive for large static binaries.
+	// switch_to() performs the required whole-VM invalidation before use.
+	if !vmm_initialised || !active {
 		unsafe {
 			*entry = new_pte
 		}
@@ -283,7 +289,8 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 
 	new_pte := portable_to_arm64_pte(phys, flags)
-	install_arm64_pte(mut entry, virt, new_pte)
+	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
+	install_arm64_pte(mut entry, virt, new_pte, active)
 }
 
 fn remap_hhdm_span(phys u64, len u64, flags u64, failure string) u64 {

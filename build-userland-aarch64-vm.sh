@@ -14,6 +14,7 @@ PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
+CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
 
 BUSYBOX_VERSION=1.36.1
@@ -262,6 +263,19 @@ else
     echo "Network tools staging absent; skipping the network client boot test"
 fi
 
+if command -v codex >/dev/null 2>&1; then
+    echo "VINIX ARM64 CODEX CLI BOOT TEST"
+    if command -v python3 >/dev/null 2>&1; then
+        python3 /root/codex-smoke.py
+    else
+        codex --version
+        codex --help >/dev/null
+        echo "VINIX ARM64 CODEX CLI BOOT TEST: PASS (startup only; Python unavailable)"
+    fi
+else
+    echo "Codex CLI staging absent; skipping the Codex boot test"
+fi
+
 exec /bin/sh -l
 BOOT_TEST
 chmod +x "$STAGING/etc/vinix-boot-test.sh"
@@ -299,6 +313,13 @@ if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
     cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
 else
     echo "==> Network tools staging not found, packaging without network clients"
+fi
+
+if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
+    echo "==> Integrating Codex CLI runtime"
+    cp -a "$CODEX_STAGING/." "$STAGING/"
+else
+    echo "==> Codex staging not found, packaging without Codex"
 fi
 
 echo "==> Verifying staged ARM64 executables"

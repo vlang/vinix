@@ -375,7 +375,7 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 	}
 
 	if previous.kstack_phys != 0 {
-		memory.pmm_free(voidptr(previous.kstack_phys), stack_size / page_size)
+		memory.pmm_free(voidptr(previous.kstack_phys), kernel_stack_size / page_size)
 	}
 	if previous.fpu_storage_phys != 0 {
 		memory.pmm_free(voidptr(previous.fpu_storage_phys), lib.div_roundup(fpu_storage_size,
@@ -403,9 +403,9 @@ pub fn reschedule() {
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
 	mut stacks := []voidptr{}
 
-	stack_phys := memory.pmm_alloc(stack_size / page_size)
+	stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
 	stacks << stack_phys
-	stack := u64(stack_phys) + stack_size + higher_half
+	stack := u64(stack_phys) + kernel_stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
 		pc:     u64(pc) // elr_el1 = entry point
@@ -488,9 +488,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		stack_vma = _stack
 	}
 
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	kernel_stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
 	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
+	kernel_stack := u64(kernel_stack_phys) + kernel_stack_size + higher_half
 
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
 
@@ -568,6 +568,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack = &stack[-2]
 			stack[0] = elf.at_secure
 			stack[1] = 0
+			// Linux always publishes the ARM capability words. Their absence
+			// makes crypto libraries fall back to executing optional instructions
+			// under SIGILL probes. Advertise the mandatory FP/ASIMD baseline and
+			// no optional extensions until Vinix enumerates ID registers itself.
+			stack = &stack[-2]
+			stack[0] = elf.at_hwcap2
+			stack[1] = 0
+			stack = &stack[-2]
+			stack[0] = elf.at_hwcap
+			stack[1] = 0x3
 			stack = &stack[-2]
 			stack[0] = elf.at_random
 			stack[1] = random_vma
@@ -661,7 +671,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	mut process := unsafe { _process }
 	mut source := unsafe { _source }
 
-	stack_pages := stack_size / page_size
+	stack_pages := kernel_stack_size / page_size
 	fpu_pages := lib.div_roundup(fpu_storage_size, page_size)
 
 	kernel_stack_phys := memory.pmm_alloc_fallible(stack_pages)
@@ -680,7 +690,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		gpr_state:        state
 		timeslice:        source.timeslice
 		running_on:       u64(-1)
-		kernel_stack:     u64(kernel_stack_phys) + stack_size + higher_half
+		kernel_stack:     u64(kernel_stack_phys) + kernel_stack_size + higher_half
 		kstack_phys:      u64(kernel_stack_phys)
 		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
@@ -726,6 +736,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.egid = old_process.egid
 		new_proc.sgid = old_process.sgid
 		new_proc.groups = old_process.groups.clone()
+		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
