@@ -26,6 +26,26 @@ LLVM_BIN="/opt/homebrew/opt/llvm/bin"
 CC_SHIM="$SCRIPT_DIR/build-support/aarch64-cc-shim"
 BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
+PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
+NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+
+merge_staging_tree() {
+    local overlay="$1"
+    local source relative destination
+
+    # macOS cp follows an existing destination symlink. The Python and network
+    # closures share a few libraries, so remove a destination link before the
+    # later overlay replaces it instead of overwriting its target.
+    while IFS= read -r -d '' source; do
+        relative="${source#"$overlay/"}"
+        destination="$STAGING/$relative"
+        if [ -L "$destination" ]; then
+            rm -f "$destination"
+        fi
+    done < <(find "$overlay" -mindepth 1 -print0)
+
+    cp -a "$overlay/." "$STAGING/"
+}
 
 MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
@@ -37,7 +57,7 @@ for arg in "$@"; do
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
             echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]"
-            echo "  --compact-initramfs stages only BusyBox and desktop boot inputs for a small EFI partition"
+            echo "  --compact-initramfs stages the desktop and core developer tools for a small EFI partition"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
             ;;
@@ -153,11 +173,24 @@ fi
 # ── Stage an initramfs that boots into the desktop ──
 # Appending an overlay tar would leave duplicate paths that the kernel's
 # initramfs unpacker rejects, so stage before repacking it. A full userland is
-# useful for development but can exceed an M1 EFI partition; compact mode uses
-# only BusyBox alongside the desktop's own boot inputs.
+# useful for development but can exceed an M1 EFI partition. Compact mode keeps
+# the native GCC toolchain plus the packaged Python and network-tool closures,
+# which includes Git, while leaving out unrelated large runtimes.
 if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
+fi
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    if [ ! -x "$PYTHON_STAGING/usr/bin/python3" ]; then
+        echo "ERROR: compact desktop needs $PYTHON_STAGING/usr/bin/python3" >&2
+        echo "Run ./build-python-aarch64.sh first." >&2
+        exit 1
+    fi
+    if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/git" ]; then
+        echo "ERROR: compact desktop needs $NETWORK_TOOLS_STAGING/usr/bin/git" >&2
+        echo "Run ./build-network-tools-aarch64.sh first." >&2
+        exit 1
+    fi
 fi
 
 # `package.py` produces the only supported bundle format. Its manifest binds
@@ -197,17 +230,39 @@ STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    echo "    compact image: staging BusyBox and desktop boot inputs only"
-    tar xf "$BASE_INITRAMFS" -C "$STAGING" ./bin/busybox
+    echo "    compact image: staging BusyBox, Python, Git and GCC"
+    tar xf "$BASE_INITRAMFS" -C "$STAGING" \
+        ./bin/busybox ./aarch64-linux-musl-native
+    merge_staging_tree "$NETWORK_TOOLS_STAGING"
+    merge_staging_tree "$PYTHON_STAGING"
+    # This stripped toolchain intentionally carries static libc and libgcc.
+    # Its stock driver still prefers libgcc_s for an ordinary link, so wrap it
+    # with the matching static-libgcc default. Callers can otherwise use GCC as
+    # normal, and `cc` already resolves through the gcc symlink.
+    mv "$STAGING/aarch64-linux-musl-native/bin/gcc" \
+        "$STAGING/aarch64-linux-musl-native/bin/gcc.bin"
+    printf '%s\n' '#!/bin/busybox sh' \
+        'exec /aarch64-linux-musl-native/bin/gcc.bin -static-libgcc "$@"' \
+        > "$STAGING/aarch64-linux-musl-native/bin/gcc"
+    chmod +x "$STAGING/aarch64-linux-musl-native/bin/gcc"
 else
     tar xf "$BASE_INITRAMFS" -C "$STAGING"
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
-    "$STAGING/root"
+    "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
+chmod 1777 "$STAGING/tmp"
 
 if [ ! -x "$STAGING/bin/busybox" ]; then
     echo "ERROR: base userland has no executable /bin/busybox" >&2
     exit 1
+fi
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    for command_path in usr/bin/python3 usr/bin/git aarch64-linux-musl-native/bin/gcc; do
+        if [ ! -x "$STAGING/$command_path" ]; then
+            echo "ERROR: compact desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
 fi
 
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
