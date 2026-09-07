@@ -78,11 +78,11 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	return 0, 0
 }
 
-fn (mut this Pipe) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this Pipe) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
-fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	this.l.acquire()
@@ -155,7 +155,7 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 
 	return i64(count)
 }
 
-fn (mut this Pipe) write(handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	this.l.acquire()
@@ -271,15 +271,15 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 	event.trigger(mut this.event, false)
 }
 
-fn (mut this Pipe) unlink(handle voidptr) ? {
+fn (mut this Pipe) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this Pipe) link(handle voidptr) ? {
+fn (mut this Pipe) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this Pipe) grow(handle voidptr, new_size u64) ? {
+fn (mut this Pipe) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 

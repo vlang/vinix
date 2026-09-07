@@ -75,15 +75,15 @@ pub fn create_device(device &OssAudioDevice) {
 	oss_devices << oss_device
 }
 
-fn (mut dev OssDevice) grow(handle voidptr, new_size u64) ? {
+fn (mut dev OssDevice) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut dev OssDevice) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut dev OssDevice) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
-fn (mut dev OssDevice) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut dev OssDevice) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	mut stream := dev.device.get_output_stream()
 	if !stream.is_playing() {
 		stream.setup_params(dev.fmt, dev.sample_rate, dev.channels)
@@ -150,7 +150,7 @@ fn (mut dev OssDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 }
 
-fn (mut dev OssDevice) unref(handle voidptr) ? {
+fn (mut dev OssDevice) unref(_handle voidptr) ? {
 	katomic.dec(mut dev.refcount)
 
 	mut stream := dev.device.get_output_stream()
@@ -159,14 +159,14 @@ fn (mut dev OssDevice) unref(handle voidptr) ? {
 	stream.reset()
 }
 
-fn (mut dev OssDevice) link(handle voidptr) ? {
+fn (mut dev OssDevice) link(_handle voidptr) ? {
 	katomic.inc(mut dev.stat.nlink)
 }
 
-fn (mut dev OssDevice) unlink(handle voidptr) ? {
+fn (mut dev OssDevice) unlink(_handle voidptr) ? {
 	katomic.dec(mut dev.stat.nlink)
 }
 
-fn (mut dev OssDevice) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut dev OssDevice) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }

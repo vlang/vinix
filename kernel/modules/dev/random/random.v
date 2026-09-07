@@ -66,11 +66,11 @@ fn (mut this URandom) do_salsa20_block(mut out [16]u32) {
 	}
 }
 
-fn (mut this URandom) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this URandom) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return memory.pmm_alloc(1)
 }
 
-fn (mut this URandom) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this URandom) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	if count == 0 {
 		return i64(0)
 	}
@@ -107,7 +107,7 @@ fn (mut this URandom) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	return i64(count)
 }
 
-fn (mut this URandom) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this URandom) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
@@ -115,19 +115,19 @@ fn (mut this URandom) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this URandom) unref(handle voidptr) ? {
+fn (mut this URandom) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this URandom) link(handle voidptr) ? {
+fn (mut this URandom) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this URandom) unlink(handle voidptr) ? {
+fn (mut this URandom) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this URandom) grow(handle voidptr, new_size u64) ? {
+fn (mut this URandom) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn (mut this URandom) reseed() {

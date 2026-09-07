@@ -179,7 +179,7 @@ __global (
 	ahci_controller_list []&AHCIController
 )
 
-fn (mut dev AHCIDevice) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+fn (mut dev AHCIDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
 		errno.set(errno.eio)
 		return none
@@ -203,7 +203,7 @@ fn (mut dev AHCIDevice) read(handle voidptr, buffer voidptr, loc u64, count u64)
 	return i64(count)
 }
 
-fn (mut dev AHCIDevice) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+fn (mut dev AHCIDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
 		errno.set(errno.eio)
 		return none
@@ -230,23 +230,23 @@ fn (mut dev AHCIDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut dev AHCIDevice) unref(handle voidptr) ? {
+fn (mut dev AHCIDevice) unref(_handle voidptr) ? {
 	katomic.dec(mut &dev.refcount)
 }
 
-fn (mut dev AHCIDevice) link(handle voidptr) ? {
+fn (mut dev AHCIDevice) link(_handle voidptr) ? {
 	katomic.inc(mut &dev.stat.nlink)
 }
 
-fn (mut dev AHCIDevice) unlink(handle voidptr) ? {
+fn (mut dev AHCIDevice) unlink(_handle voidptr) ? {
 	katomic.dec(mut &dev.stat.nlink)
 }
 
-fn (mut dev AHCIDevice) grow(handle voidptr, new_size u64) ? {
+fn (mut dev AHCIDevice) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut dev AHCIDevice) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut dev AHCIDevice) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 

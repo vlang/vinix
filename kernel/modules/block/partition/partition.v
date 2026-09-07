@@ -88,10 +88,10 @@ fn (mut this Partition) unref(handle voidptr) ? {
 	return this.parent_device.unref(handle)
 }
 
-fn (mut this Partition) link(handle voidptr) ? {
+fn (mut this Partition) link(_handle voidptr) ? {
 }
 
-fn (mut this Partition) unlink(handle voidptr) ? {
+fn (mut this Partition) unlink(_handle voidptr) ? {
 }
 
 fn (mut this Partition) grow(handle voidptr, new_size u64) ? {

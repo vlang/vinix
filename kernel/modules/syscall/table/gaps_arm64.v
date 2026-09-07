@@ -37,7 +37,7 @@ fn syscall_linux_sched_getscheduler(_ voidptr, pid int) (u64, u64) {
 	return sched_other, 0
 }
 
-fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (u64, u64) {
+fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, _param u64) (u64, u64) {
 	if pid < 0 {
 		return errno.err, errno.einval
 	}
@@ -260,7 +260,7 @@ const resource_o_cloexec = 0o2000000
 // Nothing here pages anything out, so a mapping is always resident and always
 // synchronised. These exist so that a program asking for the guarantee is told
 // it has it rather than that the call does not exist.
-fn syscall_linux_msync(_ voidptr, addr u64, length u64, flags int) (u64, u64) {
+fn syscall_linux_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
 	// MS_ASYNC | MS_INVALIDATE | MS_SYNC
 	if flags & ~0x7 != 0 {
 		return errno.err, errno.einval
@@ -271,11 +271,11 @@ fn syscall_linux_msync(_ voidptr, addr u64, length u64, flags int) (u64, u64) {
 	return 0, 0
 }
 
-fn syscall_linux_mlock(_ voidptr, addr u64, length u64) (u64, u64) {
+fn syscall_linux_mlock(_ voidptr, _addr u64, _length u64) (u64, u64) {
 	return 0, 0
 }
 
-fn syscall_linux_mlock2(_ voidptr, addr u64, length u64, flags int) (u64, u64) {
+fn syscall_linux_mlock2(_ voidptr, _addr u64, _length u64, flags int) (u64, u64) {
 	if flags & ~0x1 != 0 {
 		return errno.err, errno.einval
 	}

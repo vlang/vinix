@@ -66,11 +66,11 @@ pub mut:
 	packet     MousePacket
 }
 
-fn (mut this Mouse) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this Mouse) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	panic('')
 }
 
-fn (mut this Mouse) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Mouse) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	if count != sizeof(MousePacket) {
 		errno.set(errno.einval)
 		return none
@@ -107,7 +107,7 @@ fn (mut this Mouse) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 
 	return sizeof(MousePacket)
 }
 
-fn (mut this Mouse) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Mouse) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
@@ -115,19 +115,19 @@ fn (mut this Mouse) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this Mouse) unref(handle voidptr) ? {
+fn (mut this Mouse) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this Mouse) link(handle voidptr) ? {
+fn (mut this Mouse) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this Mouse) unlink(handle voidptr) ? {
+fn (mut this Mouse) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this Mouse) grow(handle voidptr, new_size u64) ? {
+fn (mut this Mouse) grow(_handle voidptr, _new_size u64) ? {
 }
 
 __global (

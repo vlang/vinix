@@ -35,7 +35,7 @@ __global (
 	fbdev_nodes [fbdev_max_device_count]FramebufferNode
 )
 
-fn (mut this FramebufferNode) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this FramebufferNode) mmap(_handle voidptr, page u64, _flags int) voidptr {
 	offset := page * page_size
 
 	if offset >= this.info.size {
@@ -55,7 +55,7 @@ fn (mut this FramebufferNode) mmap(_handle voidptr, page u64, flags int) voidptr
 	}
 }
 
-fn (mut this FramebufferNode) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this FramebufferNode) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if count == 0 {
 		return i64(0)
 	}
@@ -72,7 +72,7 @@ fn (mut this FramebufferNode) read(handle voidptr, buf voidptr, loc u64, count u
 	return i64(actual_count)
 }
 
-fn (mut this FramebufferNode) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this FramebufferNode) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if count == 0 {
 		return i64(0)
 	}
@@ -121,19 +121,19 @@ fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?
 	}
 }
 
-fn (mut this FramebufferNode) unref(handle voidptr) ? {
+fn (mut this FramebufferNode) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this FramebufferNode) link(handle voidptr) ? {
+fn (mut this FramebufferNode) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this FramebufferNode) unlink(handle voidptr) ? {
+fn (mut this FramebufferNode) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this FramebufferNode) grow(handle voidptr, new_size u64) ? {
+fn (mut this FramebufferNode) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn create_device_node(index u64) ? {

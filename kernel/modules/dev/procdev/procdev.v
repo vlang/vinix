@@ -194,7 +194,7 @@ fn (mut this Processes) read(_handle voidptr, buf voidptr, _loc u64, count u64) 
 	return i64(u64(sizeof(ProcessTable)) + u64(header.count) * u64(sizeof(ProcessSample)))
 }
 
-fn (mut this Processes) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
+fn (mut this Processes) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.eperm)
 	return none
 }

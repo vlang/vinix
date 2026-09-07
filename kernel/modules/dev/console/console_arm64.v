@@ -187,7 +187,7 @@ pub fn poll_uart_input() {
 	wifi.poll()
 }
 
-fn dec_private(esc_val_count u64, esc_values &u32, final u64) {
+fn dec_private(_esc_val_count u64, esc_values &u32, final u64) {
 	C.printf(c'dec private: ? %llu %c\n', unsafe { esc_values[0] }, final)
 	match unsafe { esc_values[0] } {
 		1 {
@@ -284,11 +284,11 @@ pub mut:
 	winsize_explicit bool
 }
 
-fn (mut this Console) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this Console) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
-fn (mut this Console) read(_handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
 
 	handle := unsafe { &file.Handle(_handle) }
@@ -358,7 +358,7 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, loc u64, count u64
 	return i64(count)
 }
 
-fn (mut this Console) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Console) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
 
 	copy := unsafe { malloc(count) }
@@ -589,18 +589,18 @@ fn signal_foreground(pgid int, signal u8) {
 	}
 }
 
-fn (mut this Console) unref(handle voidptr) ? {
+fn (mut this Console) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this Console) link(handle voidptr) ? {
+fn (mut this Console) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this Console) unlink(handle voidptr) ? {
+fn (mut this Console) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this Console) grow(handle voidptr, new_size u64) ? {
+fn (mut this Console) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }

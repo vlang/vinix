@@ -86,11 +86,11 @@ pub mut:
 	pending_fds []&file.FD
 }
 
-fn (mut this UnixSocket) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
-fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	mut count := _count
 
 	this.l.acquire()
@@ -168,7 +168,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, loc u64, _count u64)
 	return i64(count)
 }
 
-fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, loc u64, _count u64) ?i64 {
+fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	return this.write_with_fds(_handle, buf, _count, []&file.FD{})
 }
 
@@ -279,7 +279,7 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 }
 
-fn (mut this UnixSocket) unref(handle voidptr) ? {
+fn (mut this UnixSocket) unref(_handle voidptr) ? {
 	// Dropping a handle or a VFS name is a successful release operation. The
 	// old implementation returned an Option failure unconditionally, so close
 	// and unlink completed their side effects but leaked a stale errno back to
@@ -287,21 +287,21 @@ fn (mut this UnixSocket) unref(handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this UnixSocket) link(handle voidptr) ? {
+fn (mut this UnixSocket) link(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this UnixSocket) unlink(handle voidptr) ? {
+fn (mut this UnixSocket) unlink(_handle voidptr) ? {
 	// The VFS owns the socket path. Once it has passed its namespace checks,
 	// there is no backing store operation left for a UNIX socket to perform.
 	return
 }
 
-fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
+fn (mut this UnixSocket) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u32) ? {
+fn (mut this UnixSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) ? {
 	if this.connected == false {
 		errno.set(errno.enotconn)
 		return none
@@ -312,7 +312,7 @@ fn (mut this UnixSocket) peername(handle voidptr, _addr voidptr, addrlen &u32) ?
 	sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&this.peer.name), sizeof(SockaddrUn))
 }
 
-fn (mut this UnixSocket) sockname(handle voidptr, _addr voidptr, addrlen &u32) ? {
+fn (mut this UnixSocket) sockname(_handle voidptr, _addr voidptr, addrlen &u32) ? {
 	// An unbound socket has no path, and getsockname(2) reports just the family.
 	mut full := u32(sizeof(SockaddrUn))
 	if this.name.sun_path[0] == 0 {
@@ -325,7 +325,7 @@ fn (mut this UnixSocket) sockname(handle voidptr, _addr voidptr, addrlen &u32) ?
 // shutdown(2). Closing the write half is how a peer is told that nothing more
 // is coming, which is the only way a reader blocked on this socket ever learns
 // to stop waiting.
-fn (mut this UnixSocket) shutdown(handle voidptr, how int) ? {
+fn (mut this UnixSocket) shutdown(_handle voidptr, how int) ? {
 	if how != sock_pub.shut_rd && how != sock_pub.shut_wr && how != sock_pub.shut_rdwr {
 		errno.set(errno.einval)
 		return none
@@ -349,7 +349,7 @@ fn (mut this UnixSocket) shutdown(handle voidptr, how int) ? {
 	}
 }
 
-fn (mut this UnixSocket) getsockopt(handle voidptr, level int, optname int) ?int {
+fn (mut this UnixSocket) getsockopt(_handle voidptr, level int, optname int) ?int {
 	if level != sock_pub.sol_socket {
 		errno.set(errno.enoprotoopt)
 		return none
@@ -390,7 +390,7 @@ fn (mut this UnixSocket) getsockopt(handle voidptr, level int, optname int) ?int
 	}
 }
 
-fn (mut this UnixSocket) setsockopt(handle voidptr, level int, optname int, value int) ? {
+fn (mut this UnixSocket) setsockopt(_handle voidptr, level int, optname int, value int) ? {
 	if level != sock_pub.sol_socket {
 		errno.set(errno.enoprotoopt)
 		return none
@@ -466,7 +466,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	return connection_socket
 }
 
-fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
+fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	addr := unsafe { &SockaddrUn(_addr) }
 
 	if addr.sun_family != sock_pub.af_unix {
@@ -545,7 +545,7 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 	event.trigger(mut this.event, false)
 }
 
-fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u32) ? {
+fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	addr := unsafe { &SockaddrUn(_addr) }
 
 	if addr.sun_family != sock_pub.af_unix {
@@ -599,7 +599,7 @@ fn (mut this UnixSocket) bind(handle voidptr, _addr voidptr, addrlen u32) ? {
 	this.name = *addr
 }
 
-fn (mut this UnixSocket) listen(handle voidptr, backlog int) ? {
+fn (mut this UnixSocket) listen(_handle voidptr, backlog int) ? {
 	this.backlog = []&UnixSocket{cap: backlog}
 	this.listening = true
 }

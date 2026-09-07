@@ -192,7 +192,7 @@ fn (s HDAStream) is_playing() bool {
 	return s.regs.ctl0 & sdctl0_run != 0
 }
 
-fn (mut s HDAStream) sync_write(buf voidptr, loc u64, count u64) ?i64 {
+fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	mut first_write := false
 
 	mut i := u64(0)

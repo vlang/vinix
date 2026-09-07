@@ -52,11 +52,11 @@ __global (
 	pointer_res = &Pointer(unsafe { nil })
 )
 
-fn (mut this Pointer) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this Pointer) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-fn (mut this Pointer) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	if count < sizeof(PointerPacket) {
 		errno.set(errno.einval)
 		return none
@@ -103,7 +103,7 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i6
 	return i64(sizeof(PointerPacket))
 }
 
-fn (mut this Pointer) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Pointer) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
@@ -111,19 +111,19 @@ fn (mut this Pointer) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this Pointer) unref(handle voidptr) ? {
+fn (mut this Pointer) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this Pointer) link(handle voidptr) ? {
+fn (mut this Pointer) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this Pointer) unlink(handle voidptr) ? {
+fn (mut this Pointer) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this Pointer) grow(handle voidptr, new_size u64) ? {
+fn (mut this Pointer) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 

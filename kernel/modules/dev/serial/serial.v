@@ -141,11 +141,11 @@ pub mut:
 	port_vector int
 }
 
-fn (mut this COMPort) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this COMPort) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
-fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this COMPort) read(_handle voidptr, void_buf voidptr, _loc u64, count u64) ?i64 {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -172,7 +172,7 @@ fn (mut this COMPort) read(handle voidptr, void_buf voidptr, loc u64, count u64)
 	return i64(count)
 }
 
-fn (mut this COMPort) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this COMPort) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -189,18 +189,18 @@ fn (mut this COMPort) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this COMPort) unref(handle voidptr) ? {
+fn (mut this COMPort) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this COMPort) link(handle voidptr) ? {
+fn (mut this COMPort) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this COMPort) unlink(handle voidptr) ? {
+fn (mut this COMPort) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this COMPort) grow(handle voidptr, new_size u64) ? {
+fn (mut this COMPort) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }

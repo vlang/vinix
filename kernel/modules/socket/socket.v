@@ -74,7 +74,7 @@ pub fn initialise() {
 	sock_inet.initialise()
 }
 
-fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, &resource.Resource) {
+fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource, &resource.Resource) {
 	match domain {
 		sock_pub.af_unix {
 			socket0, socket1 := sock_unix.create_pair(@type)?

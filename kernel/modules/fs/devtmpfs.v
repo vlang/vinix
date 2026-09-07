@@ -46,7 +46,7 @@ fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidpt
 	return copy_page
 }
 
-fn (mut this DevTmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevTmpFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
 	mut actual_count := count
@@ -61,7 +61,7 @@ fn (mut this DevTmpFSResource) read(handle voidptr, buf voidptr, loc u64, count 
 	return i64(actual_count)
 }
 
-fn (mut this DevTmpFSResource) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevTmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 
 	if loc + count > this.capacity {
@@ -97,7 +97,7 @@ fn (mut this DevTmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) 
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this DevTmpFSResource) unref(handle voidptr) ? {
+fn (mut this DevTmpFSResource) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 
 	if this.refcount != 0 {
@@ -111,15 +111,15 @@ fn (mut this DevTmpFSResource) unref(handle voidptr) ? {
 	unsafe { free(this) }
 }
 
-fn (mut this DevTmpFSResource) link(handle voidptr) ? {
+fn (mut this DevTmpFSResource) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this DevTmpFSResource) unlink(handle voidptr) ? {
+fn (mut this DevTmpFSResource) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this DevTmpFSResource) grow(handle voidptr, new_size u64) ? {
+fn (mut this DevTmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -156,9 +156,9 @@ fn (this DevTmpFS) instantiate() &FileSystem {
 	return new
 }
 
-fn (this DevTmpFS) populate(node &VFSNode) {}
+fn (this DevTmpFS) populate(_node &VFSNode) {}
 
-fn (mut this DevTmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+fn (mut this DevTmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSNode {
 	if devtmpfs_dev_id == 0 {
 		devtmpfs_dev_id = resource.create_dev_id()
 	}

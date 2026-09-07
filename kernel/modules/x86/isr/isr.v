@@ -59,7 +59,7 @@ fn pf_handler(num u32, gpr_state &cpulocal.GPRState) {
 	mmap.pf_handler(gpr_state) or { exception_handler(num, gpr_state) }
 }
 
-fn abort_handler(num u32, gpr_state &cpulocal.GPRState) {
+fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
 	mut aborted := &cpulocal.current().aborted
 	katomic.store(mut aborted, true)
 	for {

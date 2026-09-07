@@ -58,22 +58,22 @@ mut:
 	entries []EpollEntry
 }
 
-fn (mut this EpollResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this EpollResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.einval)
 	return none
 }
 
-fn (mut this EpollResource) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this EpollResource) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.einval)
 	return none
 }
 
-fn (mut this EpollResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+fn (mut this EpollResource) ioctl(_handle voidptr, _request u64, _argp voidptr) ?int {
 	errno.set(errno.einval)
 	return none
 }
 
-fn (mut this EpollResource) unref(handle voidptr) ? {
+fn (mut this EpollResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
@@ -83,20 +83,20 @@ fn (mut this EpollResource) unref(handle voidptr) ? {
 	}
 }
 
-fn (mut this EpollResource) link(handle voidptr) ? {
+fn (mut this EpollResource) link(_handle voidptr) ? {
 	katomic.inc(mut &this.refcount)
 }
 
-fn (mut this EpollResource) unlink(handle voidptr) ? {
+fn (mut this EpollResource) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this EpollResource) grow(handle voidptr, new_size u64) ? {
+fn (mut this EpollResource) grow(_handle voidptr, _new_size u64) ? {
 	errno.set(errno.einval)
 	return none
 }
 
-fn (mut this EpollResource) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this EpollResource) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 

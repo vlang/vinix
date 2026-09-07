@@ -374,7 +374,7 @@ const pr_get_no_new_privs = 39
 
 const task_comm_len = 16
 
-fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
+fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
 	mut process := proc.current_thread().process
 
 	match option {
@@ -516,7 +516,7 @@ fn syscall_linux_sysinfo(_ voidptr, info voidptr) (u64, u64) {
 }
 
 // flock: stub — pretend it works.
-fn syscall_linux_flock(_ voidptr, fd int, operation int) (u64, u64) {
+fn syscall_linux_flock(_ voidptr, _fd int, _operation int) (u64, u64) {
 	return 0, 0
 }
 
@@ -624,7 +624,7 @@ fn syscall_linux_pwrite64(gpr_state voidptr, fdnum int, buf voidptr, count u64, 
 }
 
 // utimensat: stub — timestamps not tracked.
-fn syscall_linux_utimensat(_ voidptr, dirfd int, path charptr, times u64, flags int) (u64, u64) {
+fn syscall_linux_utimensat(_ voidptr, _dirfd int, _path charptr, _times u64, _flags int) (u64, u64) {
 	return 0, 0
 }
 
@@ -745,7 +745,7 @@ fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, fl
 		unsafe { &u32(addrlen) })
 }
 
-fn syscall_linux_umask(_ voidptr, mask int) (u64, u64) {
+fn syscall_linux_umask(_ voidptr, _mask int) (u64, u64) {
 	return 0o22, 0
 }
 
@@ -806,7 +806,7 @@ fn convert_stat_to_statx(src &stat.Stat, dst u64) {
 // statx(dirfd, path, flags, mask, buf). The mask is a request, and a kernel is
 // free to answer with more than was asked for as long as stx_mask says what it
 // actually filled.
-fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, mask u32, buf u64) (u64, u64) {
+fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _mask u32, buf u64) (u64, u64) {
 	if buf == 0 {
 		return errno.err, errno.efault
 	}
@@ -974,7 +974,7 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 
 // fstatfs: return filesystem statistics for an open fd.
 // Stub: report a tmpfs-like filesystem.
-fn syscall_linux_fstatfs(_ voidptr, fd int, buf u64) (u64, u64) {
+fn syscall_linux_fstatfs(_ voidptr, _fd int, buf u64) (u64, u64) {
 	if buf == 0 {
 		return errno.err, errno.efault
 	}
@@ -994,11 +994,11 @@ fn syscall_linux_fstatfs(_ voidptr, fd int, buf u64) (u64, u64) {
 }
 
 // setpriority / getpriority: stubs.
-fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
+fn syscall_linux_setpriority(_ voidptr, _which int, _who int, _prio int) (u64, u64) {
 	return 0, 0
 }
 
-fn syscall_linux_getpriority(_ voidptr, which int, who int) (u64, u64) {
+fn syscall_linux_getpriority(_ voidptr, _which int, _who int) (u64, u64) {
 	return 20, 0 // default nice value
 }
 

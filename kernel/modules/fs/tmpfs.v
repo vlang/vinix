@@ -45,7 +45,7 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return copy_page
 }
 
-fn (mut this TmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this TmpFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -62,7 +62,7 @@ fn (mut this TmpFSResource) read(handle voidptr, buf voidptr, loc u64, count u64
 	return i64(actual_count)
 }
 
-fn (mut this TmpFSResource) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -104,7 +104,7 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this TmpFSResource) unref(handle voidptr) ? {
+fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 
 	if this.refcount != 0 {
@@ -118,15 +118,15 @@ fn (mut this TmpFSResource) unref(handle voidptr) ? {
 	unsafe { free(this) }
 }
 
-fn (mut this TmpFSResource) link(handle voidptr) ? {
+fn (mut this TmpFSResource) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this TmpFSResource) unlink(handle voidptr) ? {
+fn (mut this TmpFSResource) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this TmpFSResource) grow(handle voidptr, new_size u64) ? {
+fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -179,9 +179,9 @@ fn (this TmpFS) instantiate() &FileSystem {
 	return new
 }
 
-fn (this TmpFS) populate(node &VFSNode) {}
+fn (this TmpFS) populate(_node &VFSNode) {}
 
-fn (mut this TmpFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+fn (mut this TmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSNode {
 	this.dev_id = resource.create_dev_id()
 	return this.create(parent, name, 0o644 | stat.ifdir)
 }

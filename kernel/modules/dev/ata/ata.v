@@ -185,11 +185,11 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	return dev
 }
 
-fn (mut this ATADrive) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this ATADrive) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
-fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+fn (mut dev ATADrive) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
 	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
 		errno.set(errno.eio)
@@ -251,7 +251,7 @@ fn (mut dev ATADrive) read(handle voidptr, buffer voidptr, loc u64, count u64) ?
 	return i64(count)
 }
 
-fn (mut dev ATADrive) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
 	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
 		errno.set(errno.eio)
@@ -333,18 +333,18 @@ fn (mut dev ATADrive) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut dev ATADrive) unref(handle voidptr) ? {
+fn (mut dev ATADrive) unref(_handle voidptr) ? {
 	katomic.dec(mut &dev.refcount)
 }
 
-fn (mut dev ATADrive) link(handle voidptr) ? {
+fn (mut dev ATADrive) link(_handle voidptr) ? {
 	katomic.inc(mut &dev.stat.nlink)
 }
 
-fn (mut dev ATADrive) unlink(handle voidptr) ? {
+fn (mut dev ATADrive) unlink(_handle voidptr) ? {
 	katomic.dec(mut &dev.stat.nlink)
 }
 
-fn (mut dev ATADrive) grow(handle voidptr, new_size u64) ? {
+fn (mut dev ATADrive) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }

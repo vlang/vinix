@@ -19,15 +19,15 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this INotify) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this INotify) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-fn (mut this INotify) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this INotify) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
-fn (mut this INotify) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this INotify) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
@@ -35,19 +35,19 @@ fn (mut this INotify) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this INotify) unref(handle voidptr) ? {
+fn (mut this INotify) unref(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this INotify) link(handle voidptr) ? {
+fn (mut this INotify) link(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this INotify) unlink(handle voidptr) ? {
+fn (mut this INotify) unlink(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this INotify) grow(handle voidptr, new_size u64) ? {
+fn (mut this INotify) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 

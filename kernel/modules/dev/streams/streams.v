@@ -22,15 +22,15 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevNull) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this DevNull) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	panic('')
 }
 
-fn (mut this DevNull) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevNull) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return 0
 }
 
-fn (mut this DevNull) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevNull) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
@@ -38,19 +38,19 @@ fn (mut this DevNull) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this DevNull) unref(handle voidptr) ? {
+fn (mut this DevNull) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this DevNull) link(handle voidptr) ? {
+fn (mut this DevNull) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this DevNull) unlink(handle voidptr) ? {
+fn (mut this DevNull) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this DevNull) grow(handle voidptr, new_size u64) ? {
+fn (mut this DevNull) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn init_null() {
@@ -78,16 +78,16 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevZero) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this DevZero) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return memory.pmm_alloc(1)
 }
 
-fn (mut this DevZero) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevZero) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	unsafe { C.memset(buf, 0, count) }
 	return i64(count)
 }
 
-fn (mut this DevZero) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevZero) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(count)
 }
 
@@ -95,19 +95,19 @@ fn (mut this DevZero) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this DevZero) unref(handle voidptr) ? {
+fn (mut this DevZero) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this DevZero) link(handle voidptr) ? {
+fn (mut this DevZero) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this DevZero) unlink(handle voidptr) ? {
+fn (mut this DevZero) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this DevZero) grow(handle voidptr, new_size u64) ? {
+fn (mut this DevZero) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn init_zero() {
@@ -137,16 +137,16 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevFull) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this DevFull) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return memory.pmm_alloc(1)
 }
 
-fn (mut this DevFull) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevFull) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	unsafe { C.memset(buf, 0, count) }
 	return i64(count)
 }
 
-fn (mut this DevFull) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this DevFull) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.enospc)
 	return none
 }
@@ -155,19 +155,19 @@ fn (mut this DevFull) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this DevFull) unref(handle voidptr) ? {
+fn (mut this DevFull) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this DevFull) link(handle voidptr) ? {
+fn (mut this DevFull) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this DevFull) unlink(handle voidptr) ? {
+fn (mut this DevFull) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this DevFull) grow(handle voidptr, new_size u64) ? {
+fn (mut this DevFull) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn init_full() {

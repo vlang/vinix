@@ -111,13 +111,13 @@ fn register_timerfd(mut t TimerFD) bool {
 	return false
 }
 
-fn (mut this TimerFD) mmap(handle voidptr, page u64, flags int) voidptr {
+fn (mut this TimerFD) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
 // A read hands over the number of times the timer has gone off since the last
 // one, and resets the count.
-fn (mut this TimerFD) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this TimerFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	if count < sizeof(u64) {
 		errno.set(errno.einval)
 		return none
@@ -160,7 +160,7 @@ fn (mut this TimerFD) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i6
 	return 0
 }
 
-fn (mut this TimerFD) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this TimerFD) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.einval)
 	return none
 }
@@ -169,7 +169,7 @@ fn (mut this TimerFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this TimerFD) unref(handle voidptr) ? {
+fn (mut this TimerFD) unref(_handle voidptr) ? {
 	this.refcount--
 	if this.refcount > 0 {
 		return
@@ -186,17 +186,17 @@ fn (mut this TimerFD) unref(handle voidptr) ? {
 	timerfd_lock.release()
 }
 
-fn (mut this TimerFD) link(handle voidptr) ? {
+fn (mut this TimerFD) link(_handle voidptr) ? {
 	errno.set(errno.einval)
 	return none
 }
 
-fn (mut this TimerFD) unlink(handle voidptr) ? {
+fn (mut this TimerFD) unlink(_handle voidptr) ? {
 	errno.set(errno.einval)
 	return none
 }
 
-fn (mut this TimerFD) grow(handle voidptr, new_size u64) ? {
+fn (mut this TimerFD) grow(_handle voidptr, _new_size u64) ? {
 	errno.set(errno.einval)
 	return none
 }

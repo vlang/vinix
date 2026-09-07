@@ -4,7 +4,7 @@ import x86.cpu.local as cpulocal
 // import userland
 
 @[markused]
-fn leave(context &cpulocal.GPRState) {
+fn leave(_context &cpulocal.GPRState) {
 	asm volatile amd64 {
 		cli
 	}

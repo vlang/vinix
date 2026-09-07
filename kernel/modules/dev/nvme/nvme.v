@@ -336,7 +336,7 @@ __global (
 	controller_list []&NVMEController
 )
 
-fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+fn (mut dev NVMENamespace) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
 		errno.set(errno.eio)
 		return none
@@ -360,7 +360,7 @@ fn (mut dev NVMENamespace) read(handle voidptr, buffer voidptr, loc u64, count u
 	return i64(count)
 }
 
-fn (mut dev NVMENamespace) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+fn (mut dev NVMENamespace) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
 		errno.set(errno.eio)
 		return none
@@ -387,23 +387,23 @@ fn (mut dev NVMENamespace) ioctl(handle voidptr, request u64, argp voidptr) ?int
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut dev NVMENamespace) unref(handle voidptr) ? {
+fn (mut dev NVMENamespace) unref(_handle voidptr) ? {
 	katomic.dec(mut &dev.refcount)
 }
 
-fn (mut dev NVMENamespace) link(handle voidptr) ? {
+fn (mut dev NVMENamespace) link(_handle voidptr) ? {
 	katomic.inc(mut &dev.stat.nlink)
 }
 
-fn (mut dev NVMENamespace) unlink(handle voidptr) ? {
+fn (mut dev NVMENamespace) unlink(_handle voidptr) ? {
 	katomic.dec(mut &dev.stat.nlink)
 }
 
-fn (mut dev NVMENamespace) grow(handle voidptr, new_size u64) ? {
+fn (mut dev NVMENamespace) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut dev NVMENamespace) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut dev NVMENamespace) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 

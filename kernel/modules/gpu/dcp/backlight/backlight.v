@@ -147,11 +147,11 @@ pub fn (mut this Backlight) set_online(online bool) {
 	}
 }
 
-fn (mut this Backlight) mmap(handle voidptr, page u64, flags int) voidptr {
+fn (mut this Backlight) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-fn (mut this Backlight) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Backlight) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if count == 0 {
 		return 0
 	}
@@ -178,7 +178,7 @@ fn (mut this Backlight) read(handle voidptr, buf voidptr, loc u64, count u64) ?i
 // A successful write means the request was QUEUED, not measured/applied.
 // Read actual_nits for the latest firmware report. Each write must contain
 // one whole decimal value in nits, with at most one trailing newline.
-fn (mut this Backlight) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this Backlight) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	if count == 0 {
 		return 0
 	}
@@ -207,19 +207,19 @@ fn (mut this Backlight) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
-fn (mut this Backlight) unref(handle voidptr) ? {
+fn (mut this Backlight) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 }
 
-fn (mut this Backlight) link(handle voidptr) ? {
+fn (mut this Backlight) link(_handle voidptr) ? {
 	katomic.inc(mut &this.stat.nlink)
 }
 
-fn (mut this Backlight) unlink(handle voidptr) ? {
+fn (mut this Backlight) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this Backlight) grow(handle voidptr, new_size u64) ? {
+fn (mut this Backlight) grow(_handle voidptr, _new_size u64) ? {
 	errno.set(errno.einval)
 	return none
 }

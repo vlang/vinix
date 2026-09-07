@@ -41,35 +41,35 @@ pub mut:
 	queue []&SFDSiginfo
 }
 
-fn (mut this SignalFD) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut this SignalFD) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	panic('')
 }
 
-fn (mut this SignalFD) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this SignalFD) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
-fn (mut this SignalFD) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this SignalFD) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
-fn (mut this SignalFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+fn (mut this SignalFD) ioctl(_handle voidptr, _request u64, _argp voidptr) ?int {
 	return none
 }
 
-fn (mut this SignalFD) unref(handle voidptr) ? {
+fn (mut this SignalFD) unref(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this SignalFD) link(handle voidptr) ? {
+fn (mut this SignalFD) link(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this SignalFD) unlink(handle voidptr) ? {
+fn (mut this SignalFD) unlink(_handle voidptr) ? {
 	return none
 }
 
-fn (mut this SignalFD) grow(handle voidptr, new_size u64) ? {
+fn (mut this SignalFD) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 

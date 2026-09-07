@@ -151,15 +151,15 @@ fn create_mixer(main_device &OssDevice, index int) {
 	oss_mixers << oss_mixer
 }
 
-fn (mut dev OssMixerDevice) grow(handle voidptr, new_size u64) ? {
+fn (mut dev OssMixerDevice) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut dev OssMixerDevice) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut dev OssMixerDevice) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
-fn (mut dev OssMixerDevice) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut dev OssMixerDevice) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	return none
 }
 
@@ -263,18 +263,18 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 	return -1
 }
 
-fn (mut dev OssMixerDevice) unref(handle voidptr) ? {
+fn (mut dev OssMixerDevice) unref(_handle voidptr) ? {
 	katomic.dec(mut dev.refcount)
 }
 
-fn (mut dev OssMixerDevice) link(handle voidptr) ? {
+fn (mut dev OssMixerDevice) link(_handle voidptr) ? {
 	katomic.inc(mut dev.stat.nlink)
 }
 
-fn (mut dev OssMixerDevice) unlink(handle voidptr) ? {
+fn (mut dev OssMixerDevice) unlink(_handle voidptr) ? {
 	katomic.dec(mut dev.stat.nlink)
 }
 
-fn (mut dev OssMixerDevice) mmap(_handle voidptr, page u64, flags int) voidptr {
+fn (mut dev OssMixerDevice) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
