@@ -12,6 +12,9 @@ import ui2
 // lookup table: 'win.<id>.<part>' addresses one window's chrome, 'task.<id>'
 // its taskbar entry.
 const action_new_window = 'taskbar.new'
+// A narrow control at the screen edge, like Windows' Show desktop button.
+const action_show_desktop = 'taskbar.show_desktop'
+const show_desktop_button_width = 10
 // Launcher buttons and wallpaper shortcuts both carry the index of the
 // application they open.
 const action_launch_prefix = 'taskbar.launch.'
@@ -220,6 +223,25 @@ fn (mut d Desktop) minimize(id int) {
 	}
 }
 
+// minimize_all_windows clears the workspace without closing anything. Each
+// window remains in the taskbar, where its normal entry restores it.
+fn (mut d Desktop) minimize_all_windows() {
+	mut changed := false
+	for i in 0 .. d.windows.len {
+		if !d.windows[i].minimized {
+			d.windows[i].minimized = true
+			changed = true
+		}
+	}
+	if d.focus != 0 {
+		d.focus = 0
+		changed = true
+	}
+	if changed {
+		d.dirty = true
+	}
+}
+
 // activate is what a taskbar entry does: restore a minimised window, or
 // minimise the one already on top, which is the behaviour a taskbar button is
 // expected to have.
@@ -244,7 +266,7 @@ fn (mut d Desktop) activate(id int) {
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
 	begin_frame_elements()
-	mut children := frame_elements(available_apps.len + d.windows.len + 2)
+	mut children := frame_elements(available_apps.len + d.windows.len + 3)
 	// Shortcuts first, so every window paints over them.
 	shortcuts := d.shortcut_elements()
 	children << shortcuts
@@ -258,6 +280,9 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		children << d.window_element(window_index)
 	}
 	children << d.taskbar_element()
+	// Keep this outside the taskbar so it remains in the literal lower-right
+	// corner when a centred dock is selected.
+	children << d.show_desktop_button_element()
 	// Last, so the switcher is over everything it is a picture of.
 	if d.switcher.shown {
 		children << d.switcher_element()
@@ -266,6 +291,17 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
 		transparent: true
 	}, children)
+}
+
+// show_desktop_button_element mirrors the slim button at the far right of a
+// Windows taskbar. It deliberately has no label or glyph: it should stay out
+// of the way until the pointer reaches the screen edge.
+fn (d &Desktop) show_desktop_button_element() ui2.Element {
+	theme := d.theme()
+	return ui2.button(action_show_desktop, '', ui2.rect(f64(d.canvas.width - show_desktop_button_width), f64(d.canvas.height - taskbar_height), f64(show_desktop_button_width), f64(taskbar_height)), ui2.BoxStyle{
+		bg: theme.taskbar_item_hover
+		transparent: d.hover != action_show_desktop
+	}, ui2.TextStyle{})
 }
 
 fn (mut d Desktop) window_element(window_index int) ui2.Element {
@@ -968,6 +1004,11 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 
 	if action == action_new_window {
 		d.spawn_scattered()
+		return
+	}
+
+	if action == action_show_desktop {
+		d.minimize_all_windows()
 		return
 	}
 

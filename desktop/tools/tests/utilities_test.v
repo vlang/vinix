@@ -17,6 +17,17 @@ fn utility_tree_has_text(element ui2.Element, text string) bool {
 	return false
 }
 
+fn utility_element_named(element ui2.Element, id string) ?ui2.Element {
+	if element.id == id {
+		return element
+	}
+	for child in element.children {
+		found := utility_element_named(child, id) or { continue }
+		return found
+	}
+	return none
+}
+
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
 		visible_rows: 4
@@ -102,6 +113,41 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert taskbar_launcher_width(1024, 114, available_apps.len) == 66
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
+}
+
+fn test_show_desktop_button_minimizes_every_window() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1280
+			height: 720
+		}
+	}
+	first := desktop.spawn('One', .welcome, 10, 10, 300, 200)
+	desktop.spawn('Two', .system, 20, 20, 300, 200)
+	desktop.minimize(first)
+	desktop.dirty = false
+
+	root := desktop.build_tree()
+	button := utility_element_named(root, action_show_desktop) or {
+		panic('missing Show desktop button')
+	}
+	assert int(button.frame.x) == 1280 - show_desktop_button_width
+	assert int(button.frame.y) == 720 - taskbar_height
+	assert int(button.frame.width) == show_desktop_button_width
+	assert int(button.frame.height) == taskbar_height
+	free_tree(root)
+
+	desktop.targets << HitTarget{
+		action_id: action_show_desktop
+		x: 1280 - show_desktop_button_width
+		y: 720 - taskbar_height
+		width: show_desktop_button_width
+		height: taskbar_height
+	}
+	desktop.on_pointer_down(1279, 719)
+	assert desktop.visible_window_count() == 0
+	assert desktop.focus == 0
+	assert desktop.dirty
 }
 
 fn test_activity_monitor_includes_live_hosted_apps() {
