@@ -227,6 +227,11 @@ struct SpawnedShell {
 	from_child int
 }
 
+// Keep the built-in terminal on the same command path as the full ARM64
+// userland. In particular, the native GCC driver is deliberately installed in
+// its toolchain prefix rather than /usr/bin.
+const desktop_command_path = '/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin'
+
 // Start a shell for the terminal.
 //
 // Vinix has no pseudo-terminals, so the child is given plain pipes. It sees
@@ -251,8 +256,11 @@ fn desktop_spawn_shell(path string, arg string) ?SpawnedShell {
 	// Built before the fork. Between fork and execve the child may call only
 	// async-signal-safe functions, which allocating is not.
 	argv := [&char(path.str), &char(arg.str), &char(unsafe { nil })]
-	envp := [c'PATH=/bin:/sbin:/usr/bin:/usr/sbin', c'HOME=/root', c'TERM=dumb',
-		&char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
 	pid := C.fork()
 	if pid < 0 {

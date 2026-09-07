@@ -59,10 +59,16 @@ static void print(const char *text) {
 }
 
 static char *environment[] = {
-	"PATH=/bin:/sbin:/usr/bin:/usr/sbin",
+	"PATH=/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin",
 	"HOME=/root",
 	"TERM=linux",
 	"PS1=vinix# ",
+	"USER=root",
+	"LOGNAME=root",
+	"SHELL=/bin/busybox",
+	"LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules",
+	"LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri",
+	"SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt",
 	(char *)0,
 };
 

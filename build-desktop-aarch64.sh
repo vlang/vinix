@@ -6,8 +6,9 @@
 #
 # V translates the program to C; clang compiles that C against the static musl
 # sysroot extracted from the userland image. The result is a freestanding
-# static binary that needs nothing from the target but /dev/fb0 and
-# /dev/pointer.
+# static binary. The bootable desktop image is the full userland with that
+# binary and its desktop init overlaid, so opening a terminal exposes the same
+# preinstalled commands as booting the userland directly.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -147,12 +148,13 @@ if [ "$MAKE_INITRAMFS" -eq 0 ]; then
 fi
 
 # ── Stage an initramfs that boots into the desktop ──
-# A purpose-built image rather than an overlay on the full userland: the
-# kernel's initramfs unpacker panics on a duplicate path, so a tar that
-# appended a second /etc or /sbin/init could not be booted at all. Building
-# the image from scratch also keeps it at a couple of megabytes.
+# Extract the full userland, then replace its init before repacking it. Appending
+# an overlay tar would leave duplicate paths that the kernel's initramfs
+# unpacker rejects; replacing files in a staging tree gives the output one
+# entry per path while retaining Python, Git, GCC and every other installed
+# userland component.
 if [ ! -f "$BASE_INITRAMFS" ]; then
-    echo "ERROR: $BASE_INITRAMFS not found; it is where BusyBox comes from."
+    echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
 fi
 
@@ -191,8 +193,15 @@ fi
 echo "==> Staging the desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
-mkdir -p "$STAGING/sbin" "$STAGING/bin" "$STAGING/usr/bin" "$STAGING/dev" \
-    "$STAGING/tmp" "$STAGING/root"
+mkdir -p "$STAGING"
+tar xf "$BASE_INITRAMFS" -C "$STAGING"
+mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
+    "$STAGING/root"
+
+if [ ! -x "$STAGING/bin/busybox" ]; then
+    echo "ERROR: base userland has no executable /bin/busybox" >&2
+    exit 1
+fi
 
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
@@ -231,20 +240,6 @@ fi
 mkdir -p "$STAGING/root/desktop"
 cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop/README.md" \
     "$STAGING/root/desktop/"
-
-# BusyBox comes along so init has a shell to fall back to when the desktop
-# exits or fails to start.
-tar xf "$BASE_INITRAMFS" -C "$BUILD_DIR" ./bin/busybox
-mv "$BUILD_DIR/bin/busybox" "$STAGING/bin/busybox"
-rmdir "$BUILD_DIR/bin" 2>/dev/null || true
-chmod +x "$STAGING/bin/busybox"
-# BusyBox dispatches on argv[0], so an applet is a link to it. Without these a
-# terminal can only run `busybox ls`, which is a poor sort of shell.
-for applet in sh ls cat echo pwd cd mkdir rmdir rm cp mv ln touch head tail \
-              grep wc sort uniq find du df date uname ps kill sleep env printf \
-              basename dirname clear true false test more less hexdump; do
-    ln -sf busybox "$STAGING/bin/$applet"
-done
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the
 # kernel's tar reader would try to unpack as real files.

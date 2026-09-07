@@ -84,8 +84,8 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.no_early_term=1"
             ;;
         --desktop-initramfs)
-            # Boot into the desktop image (desktop-init + vinix-desktop +
-            # BusyBox fallback) built by build-desktop-aarch64.sh.
+            # Boot into the full userland image with desktop-init and
+            # vinix-desktop overlaid by build-desktop-aarch64.sh.
             USE_DESKTOP_INITRAMFS=1
             ;;
         --minimal-initramfs)

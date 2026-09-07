@@ -129,6 +129,13 @@ fn test_platform_clocks_and_sleep() {
 	desktop_sleep_ms(-1)
 }
 
+fn test_terminal_command_path_contains_installed_userland_tools() {
+	parts := desktop_command_path.split(':')
+	assert '/aarch64-linux-musl-native/bin' in parts
+	assert '/usr/local/bin' in parts
+	assert '/usr/bin' in parts
+}
+
 fn test_frame_wait_always_yields_after_an_overrun() {
 	assert desktop_frame_wait_ms(4, 16) == 12
 	assert desktop_frame_wait_ms(15, 16) == 1
