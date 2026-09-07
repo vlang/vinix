@@ -192,6 +192,7 @@ fn test_activity_samples_release_replaced_rows() {
 		record.name[index] = name[index]
 	}
 	monitor.apply_snapshot(&header, &record, 1)
+	assert monitor.rows[0].mem_text == '1 MB'
 
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {

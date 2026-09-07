@@ -134,6 +134,8 @@ fn test_activity_monitor_uses_only_the_window_title_as_its_heading() {
 	tree := app.build(ui2.rect(0, 0, 520, 360))!
 	assert utility_tree_has_text(tree, 'Calculator')
 	assert !utility_tree_has_text(tree, 'Activity Monitor')
+	assert !utility_tree_has_text(tree, 'PROCESS / OPEN APP')
+	assert utility_tree_has_text(tree, 'MB')
 	free_tree(tree)
 	app.monitor.free_rows()
 }

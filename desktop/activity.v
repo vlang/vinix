@@ -57,6 +57,7 @@ mut:
 // window, so every figure would read 0% or 100%. A second is long enough to
 // average several timeslices and short enough to feel live.
 const activity_interval_ms = i64(1000)
+const activity_mb_bytes = u64(1_000_000)
 
 // ── The model ──────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ struct ActivityRow {
 mut:
 	pid         int
 	cpu_percent f64
-	mem_percent f64
+	memory_bytes u64
 	name        string
 	pid_text    string
 	cpu_text    string
@@ -178,11 +179,6 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
 		cpu_percent := m.rate_for(record.pid, record.cpu_time_ns, elapsed_ns)
-		mem_percent := if header.total_memory > 0 {
-			f64(record.memory_bytes) * 100.0 / f64(header.total_memory)
-		} else {
-			0.0
-		}
 		old_index := m.process_row_index(record.pid)
 		mut row := ActivityRow{}
 		if old_index >= 0 {
@@ -196,10 +192,10 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 		}
 		row.pid = record.pid
 		row.cpu_percent = cpu_percent
-		row.mem_percent = mem_percent
+		row.memory_bytes = record.memory_bytes
 		row.name = replace_activity_text(row.name, activity_name_of(record))
 		row.cpu_text = replace_activity_text(row.cpu_text, percent_text(cpu_percent))
-		row.mem_text = replace_activity_text(row.mem_text, percent_text(mem_percent))
+		row.mem_text = replace_activity_text(row.mem_text, memory_mb_text(record.memory_bytes))
 		m.scratch_rows << row
 	}
 
@@ -525,6 +521,29 @@ fn percent_text(value f64) string {
 	return text
 }
 
+// memory_mb_text keeps the process list useful at both ends of the scale:
+// small processes retain one decimal place while larger figures fit cleanly
+// in the narrow numeric column. The monitor deliberately uses decimal MB,
+// matching the label displayed to the user.
+fn memory_mb_text(bytes u64) string {
+	whole := bytes / activity_mb_bytes
+	tenths := (bytes % activity_mb_bytes) * 10 / activity_mb_bytes
+	if whole < 10 && tenths > 0 {
+		whole_text := whole.str()
+		tenths_text := tenths.str()
+		text := '${whole_text}.${tenths_text} MB'
+		unsafe {
+			whole_text.free()
+			tenths_text.free()
+		}
+		return text
+	}
+	whole_text := whole.str()
+	text := '${whole_text} MB'
+	unsafe { whole_text.free() }
+	return text
+}
+
 fn (mut m ActivityMonitor) sort_rows() {
 	match m.sort {
 		.cpu {
@@ -534,16 +553,16 @@ fn (mut m ActivityMonitor) sort_rows() {
 				if a.cpu_percent != b.cpu_percent {
 					return if a.cpu_percent > b.cpu_percent { -1 } else { 1 }
 				}
-				if a.mem_percent != b.mem_percent {
-					return if a.mem_percent > b.mem_percent { -1 } else { 1 }
+				if a.memory_bytes != b.memory_bytes {
+					return if a.memory_bytes > b.memory_bytes { -1 } else { 1 }
 				}
 				return a.pid - b.pid
 			})
 		}
 		.memory {
 			m.rows.sort_with_compare(fn (a &ActivityRow, b &ActivityRow) int {
-				if a.mem_percent != b.mem_percent {
-					return if a.mem_percent > b.mem_percent { -1 } else { 1 }
+				if a.memory_bytes != b.memory_bytes {
+					return if a.memory_bytes > b.memory_bytes { -1 } else { 1 }
 				}
 				return a.pid - b.pid
 			})
@@ -750,11 +769,6 @@ fn activity_sort_title(sort ActivitySort) string {
 // these each frame allocates nothing.
 fn activity_headings(width int) []ui2.Element {
 	y := f64(activity_header_height - 19)
-	style := ui2.TextStyle{
-		color: body_muted
-		size: 10
-		bold: true
-	}
 	right := ui2.TextStyle{
 		color: body_muted
 		size: 10
@@ -762,11 +776,10 @@ fn activity_headings(width int) []ui2.Element {
 		align: .right
 	}
 	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
-	mut headings := frame_elements(4)
-	headings << ui2.label('', 'PROCESS / OPEN APP', ui2.rect(f64(activity_padding), y, f64(name_width), 14), style)
+	mut headings := frame_elements(3)
 	headings << ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column), 14), right)
 	headings << ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column), y, f64(activity_cpu_column), 14), right)
-	headings << ui2.label('', '% RAM', ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
+	headings << ui2.label('', 'MB', ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
 	return headings
 }
 

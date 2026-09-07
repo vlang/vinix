@@ -107,14 +107,12 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if unsafe { next_thread == nil } {
-			// No thread to switch to. If the current thread is still in
-			// the run queue, re-arm the timer for its next timeslice.
-			// Either way, return without modifying thread state — the
-			// caller (yield_dispatch or interrupt) continues running.
-			if current_thread.is_in_queue {
-				timer.oneshot(current_thread.timeslice)
-			}
+		if unsafe { next_thread == nil } && current_thread.is_in_queue {
+			// No other thread is runnable, so the current one keeps its CPU.
+			// A blocked current thread must instead fall through: otherwise a
+			// later wakeup selects that same stale current thread and charges
+			// its entire sleep interval as CPU time.
+			timer.oneshot(current_thread.timeslice)
 			return
 		}
 		// Past the early return above, this thread really is coming off the
