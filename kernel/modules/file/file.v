@@ -550,104 +550,97 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				return errno.err, errno.efault
 			}
 
-			lock  {
-				Flock{}
-				if !usercopy.copy_from_user(voidptr(&lock , arg, sizeof(Flock) {
-					{
-						fd.unref()
-						return errno.err, errno.efault
-					}
-					if lock .l_type != f_rdlck && lock .l_type != f_wrlck && lock .l_type != f_unlck {
-						fd.unref()
-						return errno.err, errno.einval
-					} {
+			mut flock := Flock{}
+			if !usercopy.copy_from_user(voidptr(&flock), arg, sizeof(Flock)) {
+				fd.unref()
+				return errno.err, errno.efault
+			}
+			if flock.l_type != f_rdlck && flock.l_type != f_wrlck && flock.l_type != f_unlck {
+				fd.unref()
+				return errno.err, errno.einval
+			}
 
-						// Vinix has no advisory-lock owner table yet. With no locks to
-						// conflict, F_GETLK reports F_UNLCK and the setters succeed. This is
-						// the observable result for the uncontended locks used by SQLite.
-						if cmd == f_getlk {
-							lock .l_type {
-								f_unlck
-								lock .l_pid {
-									0
-									if !usercopy.copy_to_user(arg, voidptr(&lock , sizeof(Flock) {
-										{
-											fd.unref()
-											return errno.err, errno.efault
-										}
-									}), fd.unref(), , , {
-										print('\nfcntl: Unhandled command: ${cmd}\n'): 
-										fd.unref():                                    
-										:                                         errno.err
-										errno.einval:                                  
-									}, , , ret, 0, , , fn (syscall_mmap (_), voidptr voidptr, addr voidptr, length u64, prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
-										mut current_thread := proc.current_thread()
-										mut process := current_thread.process
-
-										C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str, addr, length, prot_and_flags, fdnum, offset)
-										defer {
-											C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-										}
-
-										mut resource_ := &resource.Resource(unsafe { nil })
-										mut fd := &FD(unsafe { nil })
-
-										if fdnum != -1 {
-											fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-											resource_ = fd.handle.resource
-										}
-
-										defer {
-											if fdnum != -1 {
-												fd.unref()
-											}
-										}
-
-										prot := int((prot_and_flags >> 32) & 0xffffffff)
-										flags := int(prot_and_flags & 0xffffffff)
-
-										if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
-											return errno.err, errno.ebadf
-										}
-
-										mut mapping_handle := voidptr(0)
-										if fdnum != -1 {
-											mapping_handle = voidptr(fd.handle)
-										}
-										ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {
-											return errno.err, errno.get()
-										}
-
-										return u64(ret), 0
-									}, 
-
-									// Apply descriptor and status flags to an already-open fd. accept4(2) and
-									// pipe2(2) take them alongside the operation itself rather than needing a
-									// separate fcntl.
-									, fn (set_fd_flags (fdnum), int int, flags int) {
-										mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return }
-										defer {
-											fd.unref()
-										}
-
-										if flags & resource.o_cloexec != 0 {
-											fd.flags |= resource.o_cloexec
-										}
-										if flags & resource.o_nonblock != 0 {
-											mut handle := fd.handle
-											handle.flags |= resource.o_nonblock
-										}
-									}) {
-									}
-								}
-							}
-						}
-					} {
-					} {
-					}
-				})) {
+			// Vinix has no advisory-lock owner table yet. With no locks to
+			// conflict, F_GETLK reports F_UNLCK and the setters succeed. This is
+			// the observable result for the uncontended locks used by SQLite.
+			if cmd == f_getlk {
+				flock.l_type = f_unlck
+				flock.l_pid = 0
+				if !usercopy.copy_to_user(arg, voidptr(&flock), sizeof(Flock)) {
+					fd.unref()
+					return errno.err, errno.efault
 				}
 			}
+			fd.unref()
 		}
+		else {
+			print('\nfcntl: Unhandled command: ${cmd}\n')
+			fd.unref()
+			return errno.err, errno.einval
+		}
+	}
+
+	return ret, 0
+}
+
+pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
+	mut current_thread := proc.current_thread()
+	mut process := current_thread.process
+
+	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str,
+		addr, length, prot_and_flags, fdnum, offset)
+	defer {
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	}
+
+	mut resource_ := &resource.Resource(unsafe { nil })
+	mut fd := &FD(unsafe { nil })
+
+	if fdnum != -1 {
+		fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+		resource_ = fd.handle.resource
+	}
+
+	defer {
+		if fdnum != -1 {
+			fd.unref()
+		}
+	}
+
+	prot := int((prot_and_flags >> 32) & 0xffffffff)
+	flags := int(prot_and_flags & 0xffffffff)
+
+	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
+		return errno.err, errno.ebadf
+	}
+
+	mut mapping_handle := voidptr(0)
+	if fdnum != -1 {
+		mapping_handle = voidptr(fd.handle)
+	}
+	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset,
+		mapping_handle,
+		retain_mmap_handle, release_mmap_handle) or {
+		return errno.err, errno.get()
+	}
+
+	return u64(ret), 0
+}
+
+// Apply descriptor and status flags to an already-open fd. accept4(2) and
+// pipe2(2) take them alongside the operation itself rather than needing a
+// separate fcntl.
+pub fn set_fd_flags(fdnum int, flags int) {
+	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return }
+	defer {
+		fd.unref()
+	}
+
+	if flags & resource.o_cloexec != 0 {
+		fd.flags |= resource.o_cloexec
+	}
+	if flags & resource.o_nonblock != 0 {
+		mut handle := fd.handle
+		handle.flags |= resource.o_nonblock
 	}
 }
