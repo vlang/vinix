@@ -28,7 +28,12 @@ if [ "${VINIX_M1_EXCLUDE_BASE_INITRAMFS:-0}" = "1" ]; then
     echo "skipping unused base initramfs"
 fi
 
-rsync -a --stats \
+# macOS ships OpenRSYNC 2.6.9, which has --progress but not rsync 3's
+# --info=progress2.  --progress therefore keeps this usable on both: a large
+# desktop initramfs shows a live percentage instead of looking hung, and
+# --partial lets the next invocation resume after an interrupted Wi-Fi push.
+echo "==> Comparing files; changed files show a live percentage..."
+rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
     --exclude 'vinix.iso' \
