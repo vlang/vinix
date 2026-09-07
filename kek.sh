@@ -137,7 +137,13 @@ if [ "$built" != "$landed" ]; then
     exit 1
 fi
 
-diskutil unmount "$DISK"
+# The filesystem was copied and verified above. macOS may have auto-unmounted
+# removable EFI media after sync; that makes this cleanup return non-zero even
+# though the deploy completed, so leave it as a warning rather than rejecting
+# an otherwise verified image.
+if ! diskutil unmount "$DISK"; then
+    echo "WARNING: $DISK was already unmounted after deployment." >&2
+fi
 echo
 echo "OK. Reboot: hold power -> startup options -> the Asahi/Linux disk."
 
