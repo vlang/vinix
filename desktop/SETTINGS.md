@@ -9,8 +9,15 @@ on or off, start an asynchronous scan, and list the networks found. Results are
 shown strongest first with security, channel and RSSI. **Refresh** rereads the
 driver without starting a scan.
 
-Firmware is not included. Firmware packaging/loading and WPA2 credential entry
-remain in `wifi-ctl`; selecting a network in Settings does not join it. The
+The normal `desktop` deployment enables Wi-Fi without the other optional Apple
+drivers; `desktop-drivers` enables them all. The desktop image includes
+`wifi-ctl`.
+
+Firmware is not included, but a package created with `tools/m1-wifi/package.py`
+can be staged and loaded before the desktop starts by building with
+`--wifi-bundle=/path/to/wifi-bundle` (or the `VINIX_WIFI_BUNDLE` environment
+variable). Firmware packaging/manual loading and WPA2 credential entry remain
+in `wifi-ctl`; selecting a network in Settings does not join it. The
 device currently provides raw Ethernet rather than IPv4/IPv6 sockets, so a
 successful association is not yet ordinary Internet connectivity. See
 [`../tests/m1-wifi/README.md`](../tests/m1-wifi/README.md) for bring-up and

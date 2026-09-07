@@ -116,7 +116,7 @@ fn (mut a SettingsApp) refresh_wifi() {
 
 fn wifi_result_text(result WifiResult) string {
 	return match result {
-		.unavailable { 'Wi-Fi device not available.' }
+		.unavailable { 'Wi-Fi device not available. Boot with vinix.apple_wifi=1.' }
 		.permission { 'Permission denied. Wi-Fi controls require write access.' }
 		.not_ready { 'Load the matching BCM4378 firmware before turning Wi-Fi on.' }
 		.disabled { 'Turn Wi-Fi on before scanning.' }
@@ -203,9 +203,15 @@ fn (a &SettingsApp) wifi_pane(width int, height int) []ui2.Element {
 		}, ui2.rect(f64(x + inner - 80), 158, 80, 30), a.wifi_can_scan()),
 	]
 	if a.wifi_read_result != .ok || a.wifi_state.count == 0 {
-		message := if a.wifi_state.scanning {
+		message := if a.wifi_read_result != .ok {
+			'Network scanning is unavailable until the Wi-Fi device is present.'
+		} else if a.wifi_state.driver_state < 3 {
+			'Load the matching Wi-Fi firmware to scan for networks.'
+		} else if a.wifi_state.driver_state > 5 {
+			'Wi-Fi stopped after a driver error; reboot to retry.'
+		} else if a.wifi_state.scanning {
 			'Searching for wireless networks...'
-		} else if a.wifi_read_result == .ok && !a.wifi_state.radio_on {
+		} else if !a.wifi_state.radio_on {
 			'Turn Wi-Fi on to scan for networks.'
 		} else {
 			'No wireless networks found. Select Scan to search.'

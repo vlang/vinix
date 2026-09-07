@@ -303,7 +303,7 @@ fn test_settings_wifi_failures_stale_targets_and_narrow_layout() {
 	app.handle(settings_wifi_refresh) or { panic(err) }
 	missing := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	toggle := element_named(missing, settings_wifi_toggle) or { panic('missing Wi-Fi toggle') }
-	assert !toggle.enabled && app.wifi_status_text().contains('not available')
+	assert !toggle.enabled && app.wifi_status_text().contains('vinix.apple_wifi=1')
 	narrow := app.build(ui2.rect(0, 0, 320, 200)) or { panic(err) }
 	if _ := element_named(narrow, settings_wifi_toggle) {
 		assert false, 'offscreen Wi-Fi controls must not become hit targets'

@@ -2,7 +2,7 @@
 # Cross-compile the Vinix desktop environment for aarch64 and stage it into an
 # initramfs that boots straight into it.
 #
-# Usage: ./build-desktop-aarch64.sh [--no-initramfs]
+# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--wifi-bundle=DIR]
 #
 # V translates the program to C; clang compiles that C against the static musl
 # sysroot extracted from the userland image. The result is a freestanding
@@ -27,11 +27,36 @@ BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 
 MAKE_INITRAMFS=1
+WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
         --no-initramfs) MAKE_INITRAMFS=0 ;;
+        --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
+        --help|-h)
+            echo "usage: $0 [--no-initramfs] [--wifi-bundle=DIR]"
+            echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown option: $arg" >&2
+            exit 1
+            ;;
     esac
 done
+
+if [ "$MAKE_INITRAMFS" -eq 0 ] && [ -n "$WIFI_BUNDLE" ]; then
+    echo "ERROR: --wifi-bundle requires initramfs generation" >&2
+    exit 1
+fi
+
+if [ -n "$WIFI_BUNDLE" ]; then
+    for name in manifest.bin firmware.bin nvram.txt clm.blob txcap.blob; do
+        if [ ! -f "$WIFI_BUNDLE/$name" ]; then
+            echo "ERROR: Wi-Fi bundle is missing $WIFI_BUNDLE/$name" >&2
+            exit 1
+        fi
+    done
+fi
 
 # ── The musl sysroot ──
 # The aarch64 userland image carries a complete native musl toolchain; its
@@ -131,8 +156,31 @@ if [ ! -f "$BASE_INITRAMFS" ]; then
     exit 1
 fi
 
+# `package.py` produces the only supported bundle format. Its manifest binds
+# the opaque vendor files to identity captured from the target, and wifi-ctl
+# repeats that identity check on the M1 before uploading a byte.
+echo "==> Building wifi-ctl for aarch64-linux-musl..."
+"$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
+    -isystem "$CC_SHIM" \
+    -isystem "$GCCLIB/include" -isystem "$SYSROOT/include" \
+    -iquote "$SCRIPT_DIR/kernel/c" \
+    -std=c11 -O2 -fno-stack-protector -Wall -Wextra -Werror \
+    "$SYSROOT/lib/crt1.o" "$SYSROOT/lib/crti.o" "$GCCLIB/crtbegin.o" \
+    "$SCRIPT_DIR/tools/m1-wifi/wifi-ctl.c" \
+    -L"$SYSROOT/lib" -L"$GCCLIB" -lc -lgcc \
+    "$GCCLIB/crtend.o" "$SYSROOT/lib/crtn.o" \
+    -fuse-ld=lld -B"$LLVM_BIN" \
+    -o "$BUILD_DIR/wifi-ctl"
+"$LLVM_BIN/llvm-strip" "$BUILD_DIR/wifi-ctl"
+echo "    $BUILD_DIR/wifi-ctl ($(stat -f%z "$BUILD_DIR/wifi-ctl") bytes)"
+
 echo "==> Building the desktop init..."
+INIT_DEFINES=()
+if [ -n "$WIFI_BUNDLE" ]; then
+    INIT_DEFINES=(-DVINIX_WIFI_BUNDLE=1)
+fi
 "$LLVM_BIN/clang" --target=aarch64-linux-none -nostdlib -ffreestanding -O2 -c \
+    "${INIT_DEFINES[@]}" \
     -o "$BUILD_DIR/desktop-init.o" \
     "$SCRIPT_DIR/build-support/init-aarch64/desktop-init.c"
 # lld is installed as a separate formula, so it is on PATH rather than in
@@ -148,7 +196,20 @@ mkdir -p "$STAGING/sbin" "$STAGING/bin" "$STAGING/usr/bin" "$STAGING/dev" \
 
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
-chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop"
+cp "$BUILD_DIR/wifi-ctl" "$STAGING/usr/bin/wifi-ctl"
+chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
+    "$STAGING/usr/bin/wifi-ctl"
+
+if [ -n "$WIFI_BUNDLE" ]; then
+    echo "==> Staging the selected Wi-Fi firmware bundle..."
+    mkdir -p "$STAGING/usr/share/vinix/wifi"
+    for name in manifest.bin firmware.bin nvram.txt clm.blob txcap.blob; do
+        cp "$WIFI_BUNDLE/$name" "$STAGING/usr/share/vinix/wifi/$name"
+    done
+    if [ -f "$WIFI_BUNDLE/provenance.json" ]; then
+        cp "$WIFI_BUNDLE/provenance.json" "$STAGING/usr/share/vinix/wifi/provenance.json"
+    fi
+fi
 
 # ── Wallpapers ──
 # Vinix has no JPEG decoder, so the photographs are downloaded and decoded here

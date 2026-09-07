@@ -9,6 +9,19 @@ does not yet have an IP stack behind this device.
 See [build, validation and hardware bring-up instructions](../tests/m1-wifi/README.md).
 
 Hardware probing remains opt-in with `vinix.apple_wifi=1`; firmware is not
-included. `/dev/wlan0` is a raw Ethernet/control interface, not AF_INET sockets.
-Once matching firmware has been loaded, the desktop's **Settings > Wi-Fi** pane
-can turn the radio on or off, start a scan and list the networks it found.
+included. The normal `desktop` and `desktop-drivers` deployments now supply
+that argument, and `kek.sh desktop-wifi` names the Wi-Fi-only choice explicitly.
+Direct deployments can pass `deploy-m1-efi.sh --apple-wifi`. A boot without one
+of those choices intentionally has no `/dev/wlan0`.
+
+The desktop initramfs includes the target `wifi-ctl` utility. To make a locally
+packaged, matching bundle available at boot, build with
+`VINIX_WIFI_BUNDLE=/path/to/wifi-bundle ./build-desktop-aarch64.sh` or pass
+`--wifi-bundle=/path/to/wifi-bundle`. The build requires all five package files,
+and init runs `wifi-ctl load /usr/share/vinix/wifi` before starting the desktop.
+The loader rechecks the bundle manifest against the detected chip and refuses a
+mismatch. Without a bundle, Settings reports that firmware still needs loading.
+
+`/dev/wlan0` is a raw Ethernet/control interface, not AF_INET sockets. Once
+matching firmware has loaded, the desktop's **Settings > Wi-Fi** pane can turn
+the radio on or off, start a scan and list the networks it found.

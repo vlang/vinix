@@ -29,6 +29,11 @@ for argument in "$@"; do
             # desktop shows in Settings and beside the clock.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_battery=1"
             ;;
+        --apple-wifi)
+            # The BCM4378 probe and /dev/wlan0 are deliberately opt-in because
+            # the driver takes over PCIe/DART state left by the bootloader.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_wifi=1"
+            ;;
         --apple-ans)
             # ANS2 storage: discovery, namespace reads and validated GPT views.
             # Read-only on its own -- writing needs --ans-rw to name a target.
@@ -49,7 +54,7 @@ for argument in "$@"; do
             # Every Apple subsystem that is off by default, in one switch.
             # Each is still passed by name, so the cmdline the kernel prints
             # says exactly what was asked for.
-            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1"
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1 vinix.apple_wifi=1"
             ;;
         --native-resolution)
             # Drop the resolution request so Limine keeps whatever mode the
@@ -90,7 +95,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)

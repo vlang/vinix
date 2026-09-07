@@ -4,7 +4,7 @@
 # Installed on the M1 by push-to-m1.sh; edit it in the repo, not in place, or
 # the next push overwrites your changes.
 #
-#   sudo ~/code/kek.sh          boot into the desktop (default)
+#   sudo ~/code/kek.sh          boot into the desktop with Wi-Fi (default)
 #   sudo ~/code/kek.sh full     BusyBox shell userland + terminal
 #   sudo ~/code/kek.sh diag     minimal initramfs, no terminal, stage bars only
 #   sudo ~/code/kek.sh halt N   power off at stage N -- machine turning itself
@@ -14,10 +14,11 @@
 #   sudo ~/code/kek.sh gpu      shell userland + experimental Apple GPU; the
 #                               boot test then runs the AGX render test
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
+#   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
 #
 # Everything below is off by default in the kernel, so these are the only way
 # to exercise it on real hardware. Start narrow: GPU and DCP can hard-reset the
-# machine, and with all three on at once a reset says nothing about which one
+# machine, and with several on at once a reset says nothing about which one
 # did it.
 #
 #   sudo ~/code/kek.sh battery  shell + SMC battery only; read-only, the safe
@@ -28,9 +29,9 @@
 #                               authorising that needs a partition named by
 #                               PARTUUID, which deploy-m1-efi.sh takes as
 #                               --ans-rw= and this mode deliberately does not
-#   sudo ~/code/kek.sh drivers  shell + battery, DCP and GPU together
-#   sudo ~/code/kek.sh desktop-drivers   desktop + all three: the battery shows
-#                               beside the clock and Settings drives brightness
+#   sudo ~/code/kek.sh drivers  shell + battery, DCP, GPU and Wi-Fi together
+#   sudo ~/code/kek.sh desktop-drivers   desktop + all four: Settings includes
+#                               brightness and Wi-Fi controls
 #
 set -euo pipefail
 
@@ -41,8 +42,8 @@ ESP="/Volumes/EFI - FEDOR"
 
 case "${1:-desktop}" in
     desktop)
-        FLAGS=(--native-resolution --desktop-initramfs)
-        MODE="desktop"
+        FLAGS=(--apple-wifi --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple Wi-Fi"
         ;;
     diag)
         FLAGS=(--native-resolution --minimal-initramfs --no-early-term)
@@ -72,6 +73,10 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
         ;;
+    desktop-wifi)
+        FLAGS=(--apple-wifi --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple Wi-Fi"
+        ;;
     storage)
         FLAGS=(--apple-ans --native-resolution)
         MODE="shell + ANS storage (read-only)"
@@ -98,7 +103,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
@@ -139,10 +144,10 @@ in the other modes is real information rather than a broken signal.
 If it does NOT reboot, PSCI is unavailable and the halt modes mean nothing.
 ST
     ;;
-*Apple\ drivers|*SMC\ battery|*Apple\ DCP)
+*Apple\ drivers|*SMC\ battery|*Apple\ DCP|*Apple\ Wi-Fi)
     cat <<'DRV'
 
-All three are off in the kernel unless the cmdline asks for them, so the boot
+These drivers are off in the kernel unless the cmdline asks for them, so the boot
 log naming them is the first thing to check:
 
   apple bring-up: GPU=enabled DCP=enabled    <- the line the kernel prints
@@ -152,6 +157,8 @@ log naming them is the first thing to check:
 Then, on the shell:
   cat /dev/battery       the charge, as the desktop's taskbar reads it
   ls /dev/apple-panel-bl the backlight the Settings brightness bar writes
+  ls /dev/wlan0          the Wi-Fi control/raw Ethernet device
+  wifi-ctl status        chip identity and firmware/radio state
 
 The touchpad needs no flag and comes up in every mode: it rides the SPI
 transport the keyboard already uses, and the first /dev/pointer read asks for
@@ -165,7 +172,7 @@ of, so the cursor simply stays put rather than misbehaving.
 
 A machine that resets instead of booting means one of these faulted. Re-run
 with `battery` alone first -- it is read-only and touches no display -- then
-`dcp`, and only then `drivers`. Which one resets it is the answer.
+`dcp`, `desktop-wifi`, and only then `drivers`. Which one resets it is the answer.
 DRV
     ;;
 halt*)

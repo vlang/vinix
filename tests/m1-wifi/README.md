@@ -54,8 +54,9 @@ Other validation: 26 protocol groups (including 100,000 parser mutations) and
 Both driver C files separately compile using the kernel's freestanding headers
 with `-Wall -Wextra -Werror`. All 17 SPI keyboard regression groups pass. The
 full kernel still emits existing V notices and third-party warnings; this is
-not a claim that the whole tree is warning-free. The control utility is
-host-compiled; target userspace execution has not been validated.
+not a claim that the whole tree is warning-free. The control utility is tested
+on the host and cross-built as a static AArch64 binary for the desktop image;
+target userspace execution has not been validated on hardware.
 
 Build fixes include typed user-copy addresses in the V adapter, removal of
 unavailable `strlen` dependencies, host tests using `-iquote` rather than
@@ -121,7 +122,10 @@ Do not substitute files from a different Mac or bypass power/regulatory limits.
    script does not guess a firmware filename hierarchy. Its identity manifest
    does not prove that the supplied files are appropriate; correct selection
    remains required. SHA-256 provenance records are provided for auditing.
-3. Include the resulting directory in the test initramfs, then use
+3. For a desktop image, run `./build-desktop-aarch64.sh
+   --wifi-bundle=/path/to/wifi-bundle`; the image includes `wifi-ctl`, stages
+   the bundle, and runs its identity-checked loader before the desktop. For a
+   different test image, include the utility and bundle yourself, then use
    `wifi-ctl load /path/to/wifi-bundle`. Use `wifi-ctl scan` to start a bounded
    asynchronous scan and `wifi-ctl networks` to show its results. `wifi-ctl off`
    and `wifi-ctl on` reversibly control the firmware radio. To associate, run

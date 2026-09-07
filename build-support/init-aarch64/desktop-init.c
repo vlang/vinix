@@ -19,6 +19,27 @@ static inline i64 syscall3(u64 nr, u64 a0, u64 a1, u64 a2) {
 	return (i64)x0;
 }
 
+static inline i64 syscall4(u64 nr, u64 a0, u64 a1, u64 a2, u64 a3) {
+	register u64 x8 __asm__("x8") = nr;
+	register u64 x0 __asm__("x0") = a0;
+	register u64 x1 __asm__("x1") = a1;
+	register u64 x2 __asm__("x2") = a2;
+	register u64 x3 __asm__("x3") = a3;
+	__asm__ volatile("svc #0" : "+r"(x0) : "r"(x8), "r"(x1), "r"(x2), "r"(x3) : "memory");
+	return (i64)x0;
+}
+
+static inline i64 syscall5(u64 nr, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4) {
+	register u64 x8 __asm__("x8") = nr;
+	register u64 x0 __asm__("x0") = a0;
+	register u64 x1 __asm__("x1") = a1;
+	register u64 x2 __asm__("x2") = a2;
+	register u64 x3 __asm__("x3") = a3;
+	register u64 x4 __asm__("x4") = a4;
+	__asm__ volatile("svc #0" : "+r"(x0) : "r"(x8), "r"(x1), "r"(x2), "r"(x3), "r"(x4) : "memory");
+	return (i64)x0;
+}
+
 static inline i64 syscall1(u64 nr, u64 a0) {
 	register u64 x8 __asm__("x8") = nr;
 	register u64 x0 __asm__("x0") = a0;
@@ -48,6 +69,24 @@ static char *environment[] = {
 void _start(void) {
 	char *desktop[] = { "/usr/bin/vinix-desktop", (char *)0 };
 	char *shell[] = { "/bin/busybox", "sh", (char *)0 };
+
+#ifdef VINIX_WIFI_BUNDLE
+	char *wifi[] = {
+		"/usr/bin/wifi-ctl", "load", "/usr/share/vinix/wifi", (char *)0,
+	};
+	int status = 0;
+	i64 child;
+
+	print("\nVinix: loading the selected Wi-Fi firmware\n");
+	child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		syscall3(221 /* execve */, (u64)wifi[0], (u64)wifi, (u64)environment);
+		print("init: could not start /usr/bin/wifi-ctl\n");
+		syscall1(93 /* exit */, 127);
+	}
+	if (child < 0 || syscall4(260 /* wait4 */, (u64)child, (u64)&status, 0, 0) < 0 || status != 0)
+		print("init: Wi-Fi firmware load failed; continuing without wireless\n");
+#endif
 
 	print("\nVinix: starting the desktop\n");
 	syscall3(221 /* execve */, (u64)desktop[0], (u64)desktop, (u64)environment);
