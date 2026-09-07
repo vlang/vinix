@@ -347,6 +347,11 @@ installed, one command builds everything and boots into the desktop:
     ./run-desktop-aarch64.sh
 
 It builds the kernel, builds the desktop, and starts QEMU on the result.
+The desktop launcher uses its own `boot-image/boot-desktop.img` disk, created
+as a sparse 2 GiB image on its first run. This leaves the ordinary
+`boot-image/boot.img` available for the smaller shell image. Set
+`VINIX_BOOT_DISK` (and, for a new disk, `VINIX_BOOT_DISK_SIZE_MB` or
+`--disk=MB`) to choose another disk.
 
     --no-build      boot what is already built
     --no-kernel     skip the kernel build (the desktop is what you changed)
