@@ -33,6 +33,9 @@ fi
 # desktop initramfs shows a live percentage instead of looking hung, and
 # --partial lets the next invocation resume after an interrupted Wi-Fi push.
 echo "==> Comparing files; changed files show a live percentage..."
+# The build workspaces are host-side intermediates, not boot inputs. The
+# kernel and selected initramfs remain included below, while their staging
+# trees are deliberately left out of an M1 deployment.
 rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
@@ -40,6 +43,8 @@ rsync -a --partial --progress --stats \
     --exclude 'boot-image/boot.img' \
     --exclude 'boot-image/limine-src-9.3.0/' \
     --exclude 'tools/agx-re/build/' \
+    --exclude 'build/' \
+    --exclude 'build-aarch64-*/' \
     --exclude 'kernel/obj/' \
     --exclude 'kernel/tmp.*' \
     --exclude '.DS_Store' \
