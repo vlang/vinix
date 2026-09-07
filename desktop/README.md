@@ -166,7 +166,7 @@ number in them is an ancestor's pid, and this process' own has a column.
 
 `Cmd-Tab` moves to the window under the one on top, and pressing it again goes
 back — which is what a tap is for. Holding Cmd down instead asks "what else is
-open?", and after 700 ms the desktop answers: a translucent panel in the middle
+open?", and after 400 ms the desktop answers: a translucent panel in the middle
 of the screen with a tile for every window, the selection moving along it on
 each further Tab, `Shift` walking back, the arrows moving it too, and the
 window it lands on raised when Cmd is let go. A minimised window is in the

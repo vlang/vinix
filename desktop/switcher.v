@@ -20,7 +20,7 @@ import ui2
 
 // How long Cmd must stay down before the panel appears. A tap is a switch and
 // shows nothing; holding on is a question, and gets the answer.
-const switcher_reveal_ms = i64(700)
+const switcher_reveal_ms = i64(400)
 
 // The action ids of the tiles. A click on one switches to that window, which
 // is the one thing the panel can do that the keyboard cannot say faster.
