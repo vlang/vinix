@@ -384,7 +384,7 @@ fn editor_toolbar_button(id string, text string, x int, width int) ui2.Element {
 fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	mut children := []ui2.Element{}
+	mut children := frame_elements(8)
 
 	button_width := 54
 	children << editor_toolbar_button(editor_action_new, 'New', editor_padding, button_width)
@@ -400,13 +400,11 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	children << ui2.clickable_view(editor_action_path, ui2.rect(f64(path_x), 8, f64(path_width), 28), ui2.BoxStyle{
 		bg: if a.focus == .path { editor_path_focus } else { body_panel }
 		radius: 5
-	}, [
-		ui2.label('', editor_bytes_text(a.path), ui2.rect(0, 0, f64(path_width), 28), ui2.TextStyle{
-			color: body_text
-			font_family: 'mono'
-			size: 13
-		}),
-	])
+	}, frame_child(ui2.label('', editor_bytes_text(a.path), ui2.rect(0, 0, f64(path_width), 28), ui2.TextStyle{
+		color: body_text
+		font_family: 'mono'
+		size: 13
+	})))
 	children << ui2.view('', ui2.rect(0, f64(editor_toolbar_height - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
@@ -423,7 +421,7 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.follow_cursor()
 
-	mut lines := []ui2.Element{}
+	mut lines := frame_elements(a.visible_rows * 2)
 	mut position := a.offset_for_line(a.scroll)
 	for row := 0; row < a.visible_rows; row++ {
 		if position > a.text.len {

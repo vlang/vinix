@@ -167,42 +167,43 @@ fn (a &SettingsApp) wifi_pane(width int, height int) []ui2.Element {
 	x := settings_padding
 	inner := width - 2 * settings_padding
 	if inner < 300 || height < 266 {
-		return [
-			settings_label('Enlarge Settings to show its controls.', x, settings_padding, if inner > 0 {
-				inner
-			} else {
-				1
-			}, body_text),
-		]
+		mut narrow := frame_elements(1)
+		narrow << settings_label('Enlarge Settings to show its controls.', x, settings_padding, if inner > 0 {
+			inner
+		} else {
+			1
+		}, body_text)
+		return narrow
 	}
-	mut out := [
-		ui2.label('', 'Wi-Fi', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
-			color: body_heading
-			size: 20
-			bold: true
-		}),
-		settings_label('Broadcom BCM4378 wireless', x, 46, inner, body_muted),
-		ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{ bg: body_rule }, []),
-		settings_label('Wi-Fi', x, 92, inner - 100, body_heading),
-		settings_button(settings_wifi_toggle, if a.wifi_state.radio_on {
-			'Turn off'
-		} else {
-			'Turn on'
-		}, ui2.rect(f64(x + inner - 86), 86, 86, 30), a.wifi_can_toggle()),
-		settings_label(a.wifi_status_text(), x, 126, inner, if a.wifi_read_result != .ok
-			|| a.wifi_action_result != .ok || a.wifi_state.scan_error != 0 {
-			files_error
-		} else {
-			body_muted
-		}),
-		settings_label('Available networks', x, 164, inner - 180, body_heading),
-		settings_button(settings_wifi_refresh, 'Refresh', ui2.rect(f64(x + inner - 158), 158, 72, 30), true),
-		settings_button(settings_wifi_scan, if a.wifi_state.scanning {
-			'Scanning...'
-		} else {
-			'Scan'
-		}, ui2.rect(f64(x + inner - 80), 158, 80, 30), a.wifi_can_scan()),
-	]
+	mut out := frame_elements(12 + a.wifi_state.count * 3)
+	out << ui2.label('', 'Wi-Fi', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
+		color: body_heading
+		size: 20
+		bold: true
+	})
+	out << settings_label('Broadcom BCM4378 wireless', x, 46, inner, body_muted)
+	out << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{
+		bg: body_rule
+	}, [])
+	out << settings_label('Wi-Fi', x, 92, inner - 100, body_heading)
+	out << settings_button(settings_wifi_toggle, if a.wifi_state.radio_on {
+		'Turn off'
+	} else {
+		'Turn on'
+	}, ui2.rect(f64(x + inner - 86), 86, 86, 30), a.wifi_can_toggle())
+	out << settings_label(a.wifi_status_text(), x, 126, inner, if a.wifi_read_result != .ok
+		|| a.wifi_action_result != .ok || a.wifi_state.scan_error != 0 {
+		files_error
+	} else {
+		body_muted
+	})
+	out << settings_label('Available networks', x, 164, inner - 180, body_heading)
+	out << settings_button(settings_wifi_refresh, 'Refresh', ui2.rect(f64(x + inner - 158), 158, 72, 30), true)
+	out << settings_button(settings_wifi_scan, if a.wifi_state.scanning {
+		'Scanning...'
+	} else {
+		'Scan'
+	}, ui2.rect(f64(x + inner - 80), 158, 80, 30), a.wifi_can_scan())
 	if a.wifi_read_result != .ok || a.wifi_state.count == 0 {
 		message := if a.wifi_read_result != .ok {
 			'Network scanning is unavailable until the Wi-Fi device is present.'

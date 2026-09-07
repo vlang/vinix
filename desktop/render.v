@@ -36,6 +36,93 @@ const clock_area_width = 208
 // An icon sharing a control with a label is drawn at this size.
 const button_icon_size = 16
 
+// Geometry tables used by builtin glyphs. Keeping them at module scope avoids
+// constructing heap-backed array literals for every icon on every redraw.
+const gear_tooth_x = [1, 0, -1, 0]
+const gear_tooth_y = [0, 1, 0, -1]
+const activity_bar_shares = [2, 3, 5]
+
+// Text carrying this private id was formatted solely for the current element
+// tree. free_tree releases it after the frame; all other element strings are
+// literals or model-owned caches.
+const frame_owned_text_id = '__vinix.frame.owned_text'
+
+// The largest builders today are bounded by the battery-history capacity.
+// Keep enough power-of-two buckets for those arrays (up to 1024 elements), so
+// an unusually tall window cannot outgrow the last slot and allocate while it
+// appends on every frame.
+const frame_element_pool_buckets = 11
+
+struct FrameElementSlot {
+mut:
+	elements []ui2.Element
+}
+
+struct FrameElementPool {
+mut:
+	slots [frame_element_pool_buckets][]FrameElementSlot
+	used  [frame_element_pool_buckets]int
+}
+
+__global frame_element_pool = FrameElementPool{}
+
+// begin_frame_elements makes every backing array from the preceding frame
+// available again. Element trees are strictly frame-local: rendering and hit
+// collection finish before the next tree is built.
+fn begin_frame_elements() {
+	for bucket in 0 .. frame_element_pool_buckets {
+		frame_element_pool.used[bucket] = 0
+	}
+}
+
+// Element lists are short-lived frame builders. Reuse their backing storage
+// instead of asking libc to mmap and munmap the same large Element arrays once
+// per second forever. Capacities are bucketed by powers of two so a window
+// being hidden does not make later call sites inherit an undersized slot.
+fn frame_elements(capacity int) []ui2.Element {
+	mut bucket := 0
+	mut bucket_capacity := 1
+	for bucket + 1 < frame_element_pool_buckets && bucket_capacity < capacity {
+		bucket++
+		bucket_capacity *= 2
+	}
+	index := frame_element_pool.used[bucket]
+	frame_element_pool.used[bucket]++
+	if index >= frame_element_pool.slots[bucket].len {
+		if frame_element_pool.slots[bucket].cap == 0 {
+			unsafe { frame_element_pool.slots[bucket].flags.set(.noslices) }
+		}
+		frame_element_pool.slots[bucket] << FrameElementSlot{
+			elements: []ui2.Element{cap: bucket_capacity}
+		}
+	}
+	// The final bucket is also the escape hatch for a builder larger than its
+	// nominal power of two. Grow the pool-owned array itself, once, so appends
+	// cannot move only the borrowed copy and leave the pool pointing at the old
+	// storage.
+	if frame_element_pool.slots[bucket][index].elements.cap < capacity {
+		unsafe { frame_element_pool.slots[bucket][index].elements.free() }
+		frame_element_pool.slots[bucket][index].elements = []ui2.Element{cap: capacity}
+	}
+	mut elements := []ui2.Element{}
+	unsafe {
+		elements = frame_element_pool.slots[bucket][index].elements
+		elements.len = 0
+		elements.flags.set(.nofree)
+	}
+	// The pool owns this buffer. free_tree still walks it to release strings,
+	// but array_free must leave the backing storage for the next frame.
+	return elements
+}
+
+// frame_child covers the common nested-control case without constructing a
+// fresh one-element array literal every time the parent is rebuilt.
+fn frame_child(element ui2.Element) []ui2.Element {
+	mut children := frame_elements(1)
+	children << element
+	return children
+}
+
 // face_for picks the baked face closest to what a style asks for: the right
 // weight first, then the nearest size. Nothing is scaled — a bitmap atlas
 // stretched looks far worse than one a couple of pixels off — so a style
@@ -74,7 +161,10 @@ fn free_tree(el ui2.Element) {
 	for child in el.children {
 		free_tree(child)
 	}
-	if el.children.len > 0 {
+	if el.id == frame_owned_text_id {
+		unsafe { el.text.free() }
+	}
+	if el.children.cap > 0 {
 		unsafe { el.children.free() }
 	}
 }
@@ -278,7 +368,7 @@ fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
 		return
 	}
 	face := d.face_for(el.text_style)
-	text := face.truncate(el.text, w)
+	text, text_owned := face.truncate(el.text, w)
 	baseline_y := y + (h - face.line_height) / 2
 	text_width := face.text_width(text)
 	mut text_x := x
@@ -306,6 +396,9 @@ fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
 		d.canvas.draw_text(face, text_x + 1, baseline_y + 1, text, shadow_for(el.text_style.color))
 	}
 	d.canvas.draw_text(face, text_x, baseline_y, text, el.text_style.color)
+	if text_owned {
+		unsafe { text.free() }
+	}
 }
 
 // shadow_for picks a backing colour from a text colour's brightness. The
@@ -346,12 +439,15 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	}
 	face := d.face_for(el.text_style)
 	inner := if el.text_style.align == .center && el.image_path.len == 0 { w } else { text_w }
-	text := face.truncate(el.text, inner)
+	text, text_owned := face.truncate(el.text, inner)
 	text_y := y + (h - face.line_height) / 2
 	// A label sharing the control with an icon is always placed after it; the
 	// declared alignment only decides where a label on its own sits.
 	if el.image_path.len > 0 {
 		d.canvas.draw_text(face, text_x, text_y, text, el.text_style.color)
+		if text_owned {
+			unsafe { text.free() }
+		}
 		return
 	}
 	match el.text_style.align {
@@ -360,6 +456,9 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 		.right {
 			d.canvas.draw_text_right(face, x + w - text_inset, text_y, text, el.text_style.color)
 		}
+	}
+	if text_owned {
+		unsafe { text.free() }
 	}
 }
 
@@ -371,6 +470,10 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		return
 	}
 	name := path[8..]
+	defer {
+		// String slicing owns its result in V's manual-free mode.
+		unsafe { name.free() }
+	}
 	cx := x + w / 2
 	cy := y + h / 2
 	// The glyph box is a fixed fraction of the button so the three symbols
@@ -455,8 +558,8 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			for i in 0 .. 4 {
 				// Four teeth on the axes, and four on the diagonals at 3/4 the
 				// reach, which is close enough to a gear at icon size.
-				dx := [1, 0, -1, 0][i] * outer
-				dy := [0, 1, 0, -1][i] * outer
+				dx := gear_tooth_x[i] * outer
+				dy := gear_tooth_y[i] * outer
 				d.canvas.fill_rect(cx + dx - tooth / 2, cy + dy - tooth / 2, tooth, tooth, color)
 			}
 			d.canvas.fill_circle(cx, cy, outer, color)
@@ -473,7 +576,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			bar := body / 4
 			// Ascending rather than arbitrary, so the glyph has a direction
 			// and does not read as a barcode.
-			for i, share in [2, 3, 5] {
+			for i, share in activity_bar_shares {
 				height := tall * share / 5
 				d.canvas.fill_round_rect(left + i * (bar + bar / 2), bottom - height, bar, height, 1, color)
 			}

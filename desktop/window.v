@@ -47,8 +47,8 @@ mut:
 	restore_y      int
 	restore_width  int
 	restore_height int
-	maximized bool
-	minimized bool
+	maximized      bool
+	minimized      bool
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1
 }
@@ -89,6 +89,15 @@ fn body_line(text string, x int, y int, width int) ui2.Element {
 	})
 }
 
+// owned_body_line takes ownership of a string formatted for this frame. Its
+// marker is understood by free_tree, after rendering has finished with it.
+fn owned_body_line(text string, x int, y int, width int) ui2.Element {
+	return ui2.label(frame_owned_text_id, text, ui2.rect(f64(x), f64(y), f64(width), 18), ui2.TextStyle{
+		color: body_text
+		size: 13
+	})
+}
+
 fn muted_line(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 16), ui2.TextStyle{
 		color: body_muted
@@ -99,44 +108,60 @@ fn muted_line(text string, x int, y int, width int) ui2.Element {
 fn welcome_page(width int, _height int) []ui2.Element {
 	pad := 18
 	inner := width - 2 * pad
-	return [
-		ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
-			bg: app_accent
-			radius: 2
-		}, []),
-		heading('Welcome to Vinix', pad, 32, inner),
-		body_line('A desktop written from scratch in V,', pad, 60, inner),
-		body_line('drawing straight into the framebuffer.', pad, 78, inner),
-		ui2.view('', ui2.rect(f64(pad), 104, f64(inner), 1), ui2.BoxStyle{
-			bg: body_rule
-		}, []),
-		muted_line('Drag a title bar to move a window.', pad, 116, inner),
-		muted_line('The taskbar lists everything that is open.', pad, 134, inner),
-	]
+	mut children := frame_elements(7)
+	children << ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
+		bg: app_accent
+		radius: 2
+	}, [])
+	children << heading('Welcome to Vinix', pad, 32, inner)
+	children << body_line('A desktop written from scratch in V,', pad, 60, inner)
+	children << body_line('drawing straight into the framebuffer.', pad, 78, inner)
+	children << ui2.view('', ui2.rect(f64(pad), 104, f64(inner), 1), ui2.BoxStyle{
+		bg: body_rule
+	}, [])
+	children << muted_line('Drag a title bar to move a window.', pad, 116, inner)
+	children << muted_line('The taskbar lists everything that is open.', pad, 134, inner)
+	return children
 }
 
 fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	pad := 18
 	inner := width - 2 * pad
-	open_windows := desktop.windows.len
-	visible := desktop.visible_window_count()
-	return [
-		heading('System', pad, 18, inner),
-		ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{
-			bg: body_panel
-			radius: 6
-		}, [
-			body_line('Display   ${desktop.canvas.width} x ${desktop.canvas.height}',
-				12, 12, inner - 24),
-			body_line('Pointer   ${desktop.pointer_description()}', 12, 32, inner - 24),
-			body_line('Windows   ${open_windows} open, ${visible} on screen', 12, 52,
-				inner - 24),
-			body_line('Frames    ${desktop.frames}', 12, 72, inner - 24),
-			body_line('Battery   ${device_state('/dev/battery')}', 12, 92, inner - 24),
-			body_line('Backlight ${device_state('/dev/apple-panel-bl')}', 12, 112, inner - 24),
-			muted_line('Ctrl-Q leaves the desktop, Ctrl-N opens a window.', 12, 136, inner - 24),
-		]),
-	]
+	display_width := desktop.canvas.width.str()
+	display_height := desktop.canvas.height.str()
+	display := 'Display   ${display_width} x ${display_height}'
+	unsafe {
+		display_width.free()
+		display_height.free()
+	}
+	pointer := 'Pointer   ${desktop.pointer_description()}'
+	open_windows := desktop.windows.len.str()
+	visible_windows := desktop.visible_window_count().str()
+	windows := 'Windows   ${open_windows} open, ${visible_windows} on screen'
+	unsafe {
+		open_windows.free()
+		visible_windows.free()
+	}
+	frame_count := desktop.frames.str()
+	frames := 'Frames    ${frame_count}'
+	unsafe { frame_count.free() }
+	battery := device_line('Battery   ', '/dev/battery')
+	backlight := device_line('Backlight ', '/dev/apple-panel-bl')
+	mut panel_children := frame_elements(7)
+	panel_children << owned_body_line(display, 12, 12, inner - 24)
+	panel_children << owned_body_line(pointer, 12, 32, inner - 24)
+	panel_children << owned_body_line(windows, 12, 52, inner - 24)
+	panel_children << owned_body_line(frames, 12, 72, inner - 24)
+	panel_children << owned_body_line(battery, 12, 92, inner - 24)
+	panel_children << owned_body_line(backlight, 12, 112, inner - 24)
+	panel_children << muted_line('Ctrl-Q leaves the desktop, Ctrl-N opens a window.', 12, 136, inner - 24)
+	mut children := frame_elements(2)
+	children << heading('System', pad, 18, inner)
+	children << ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{
+		bg: body_panel
+		radius: 6
+	}, panel_children)
+	return children
 }
 
 // Whether a device node is there at all, which is the difference between a
@@ -144,9 +169,9 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 // port paints the boot log over with this desktop, so "the battery reads --%"
 // and "F1 changes no brightness" otherwise look like desktop bugs when both
 // are really the kernel never having registered the device.
-fn device_state(path string) string {
-	desktop_stat(path) or { return 'absent (driver did not register it)' }
-	return 'present at ${path}'
+fn device_line(label string, path string) string {
+	desktop_stat(path) or { return '${label}absent (driver did not register it)' }
+	return '${label}present at ${path}'
 }
 
 fn palette_page(width int, height int) []ui2.Element {
@@ -170,14 +195,12 @@ fn palette_page(width int, height int) []ui2.Element {
 	cell_height := (height - top - pad - (rows - 1) * gap) / rows
 	cell := if cell_width < cell_height { cell_width } else { cell_height }
 
-	mut children := [
-		heading('Palette', pad, 18, inner),
-	]
+	mut children := frame_elements(swatches.len + 1)
+	children << heading('Palette', pad, 18, inner)
 	for i, color in swatches {
 		column := i % columns
 		row := i / columns
-		children << ui2.view('', ui2.rect(f64(pad + column * (cell + gap)), f64(top +
-			row * (cell + gap)), f64(cell), f64(cell)), ui2.BoxStyle{
+		children << ui2.view('', ui2.rect(f64(pad + column * (cell + gap)), f64(top + row * (cell + gap)), f64(cell), f64(cell)), ui2.BoxStyle{
 			bg: color
 			radius: 6
 		}, [])
@@ -195,9 +218,8 @@ fn notes_page(width int, _height int) []ui2.Element {
 		'Layout and hit testing come from a',
 		'ui2 element tree, rebuilt each frame.',
 	]
-	mut children := [
-		heading('Notes', pad, 18, inner),
-	]
+	mut children := frame_elements(lines.len + 1)
+	children << heading('Notes', pad, 18, inner)
 	for i, line in lines {
 		children << body_line(line, pad, 50 + i * 19, inner)
 	}

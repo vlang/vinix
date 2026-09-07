@@ -144,7 +144,7 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 	height := int(size.height)
 	pad := 24
 	inner := width - 2 * pad
-	mut children := []ui2.Element{}
+	mut children := frame_elements(8)
 
 	children << ui2.label('', a.time_text, ui2.rect(f64(pad), 28, f64(inner), 72), ui2.TextStyle{
 		color: body_heading

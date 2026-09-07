@@ -224,7 +224,7 @@ fn battery_graph_x(at_ms u64, end_ms u64, width int) int {
 // knows: horizontal segments between observed percentage changes. It does not
 // invent intermediate precision or turn gaps into zero charge.
 fn battery_graph(history &BatteryHistory, x int, y int, width int, height int) ui2.Element {
-	mut lines := []ui2.Element{cap: battery_history_capacity * 2 + 8}
+	mut lines := frame_elements(battery_history_capacity * 2 + 8)
 	for quarter in 1 .. 4 {
 		grid_y := quarter * height / 4
 		lines << ui2.view('', ui2.rect(0, f64(grid_y), f64(width), 1), ui2.BoxStyle{
@@ -305,7 +305,7 @@ fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner 
 	available := percent >= 0 && percent <= 100
 	estimate := history.remaining_hours(percent)
 	stat_width := (inner - 16) / 2
-	mut children := []ui2.Element{cap: 16}
+	mut children := frame_elements(16)
 	children << ui2.label('settings.battery.title', 'Battery', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{ color: body_heading, size: 20, bold: true })
 	children << settings_label('Built-in battery', x, 46, inner, body_muted)
 	children << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{

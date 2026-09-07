@@ -284,10 +284,9 @@ fn (d &Desktop) switcher_element() ui2.Element {
 	rows := (count + columns - 1) / columns
 
 	panel_width := columns * switcher_tile + (columns - 1) * switcher_gap + 2 * switcher_padding
-	panel_height := rows * switcher_tile + (rows - 1) * switcher_gap + 2 * switcher_padding +
-		switcher_label_height
+	panel_height := rows * switcher_tile + (rows - 1) * switcher_gap + 2 * switcher_padding + switcher_label_height
 
-	mut children := []ui2.Element{cap: count + 1}
+	mut children := frame_elements(count + 1)
 	for i, id in d.switcher.order {
 		index := d.window_index(id) or { continue }
 		window := d.windows[index]
@@ -305,24 +304,18 @@ fn (d &Desktop) switcher_element() ui2.Element {
 		} else {
 			switcher_icon
 		}
-		children << ui2.clickable_view(d.switcher.ids[i], ui2.rect(f64(x), f64(y), f64(switcher_tile),
-			f64(switcher_tile)), ui2.BoxStyle{
+		children << ui2.clickable_view(d.switcher.ids[i], ui2.rect(f64(x), f64(y), f64(switcher_tile), f64(switcher_tile)), ui2.BoxStyle{
 			bg: theme.accent
 			radius: switcher_select_radius
 			transparent: !selected
-		}, [
-			ui2.button_with_image('', '', window.icon, ui2.rect(f64(icon_inset), f64(icon_inset),
-				f64(switcher_icon_size), f64(switcher_icon_size)), ui2.BoxStyle{
-				transparent: true
-			}, ui2.TextStyle{
-				color: icon_color
-			}),
-		])
+		}, frame_child(ui2.button_with_image('', '', window.icon, ui2.rect(f64(icon_inset), f64(icon_inset), f64(switcher_icon_size), f64(switcher_icon_size)), ui2.BoxStyle{
+			transparent: true
+		}, ui2.TextStyle{
+			color: icon_color
+		})))
 	}
 
-	children << ui2.label('switcher.title', d.switcher_title(), ui2.rect(0, f64(panel_height -
-		switcher_label_height - switcher_padding / 2), f64(panel_width), f64(switcher_label_height)),
-		ui2.TextStyle{
+	children << ui2.label('switcher.title', d.switcher_title(), ui2.rect(0, f64(panel_height - switcher_label_height - switcher_padding / 2), f64(panel_width), f64(switcher_label_height)), ui2.TextStyle{
 		color: switcher_text
 		size: 15
 		bold: true
@@ -330,9 +323,7 @@ fn (d &Desktop) switcher_element() ui2.Element {
 		lines: 1
 	})
 
-	return ui2.view(switcher_panel_id, ui2.rect(f64((d.canvas.width - panel_width) / 2),
-		f64((d.canvas.height - panel_height) / 2), f64(panel_width), f64(panel_height)),
-		ui2.BoxStyle{
+	return ui2.view(switcher_panel_id, ui2.rect(f64((d.canvas.width - panel_width) / 2), f64((d.canvas.height - panel_height) / 2), f64(panel_width), f64(panel_height)), ui2.BoxStyle{
 		bg: switcher_bg
 		radius: switcher_radius
 	}, children)

@@ -34,10 +34,14 @@ python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
 rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/switcher_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/memory_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 # Both sets share fixture_app and element_named in one translation unit.
 sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
 for name in settings switcher; do
-    "$v" -gc none -enable-globals -stats -d ui2_headless \
+    "$v" -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$root/third_party" "$work/ui/${name}_test.v"
 done
+"$v" -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
+    -path "@vlib|@vmodules|$root/third_party" "$work/ui/memory_test.v"

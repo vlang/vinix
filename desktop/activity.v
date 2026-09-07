@@ -97,8 +97,9 @@ enum ActivitySort {
 
 struct ActivityMonitor {
 mut:
-	rows     []ActivityRow
-	previous []ActivityPrevious
+	rows         []ActivityRow
+	scratch_rows []ActivityRow
+	previous     []ActivityPrevious
 	// The reading the last sample was taken at, and the clock then, so the
 	// next one knows how wide the interval was.
 	sampled_ns   u64
@@ -154,6 +155,14 @@ fn (mut m ActivityMonitor) sample() bool {
 	}
 
 	records := unsafe { &ActivitySample(voidptr(&u8(m.buffer.data) + sizeof(ActivityTable))) }
+	m.apply_snapshot(header, records, count)
+	return true
+}
+
+// apply_snapshot owns the allocation-heavy half of sampling separately from
+// the device read. Besides making the lifetime rules explicit, this lets the
+// manual-free regression feed it deterministic kernel records.
+fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &ActivitySample, count int) {
 
 	// The width of the interval these rates are measured over. The first
 	// sample has nothing before it, so every process reads 0% until the second
@@ -164,8 +173,8 @@ fn (mut m ActivityMonitor) sample() bool {
 		u64(0)
 	}
 
-	m.free_rows()
-	mut rows := []ActivityRow{cap: count}
+	m.scratch_rows.clear()
+	unsafe { m.scratch_rows.flags.set(.noslices) }
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
 		cpu_percent := m.rate_for(record.pid, record.cpu_time_ns, elapsed_ns)
@@ -174,20 +183,46 @@ fn (mut m ActivityMonitor) sample() bool {
 		} else {
 			0.0
 		}
-		rows << ActivityRow{
-			pid:         record.pid
-			cpu_percent: cpu_percent
-			mem_percent: mem_percent
-			name:        activity_name_of(record)
-			pid_text:    record.pid.str()
-			cpu_text:    percent_text(cpu_percent)
-			mem_text:    percent_text(mem_percent)
+		old_index := m.process_row_index(record.pid)
+		mut row := ActivityRow{}
+		if old_index >= 0 {
+			// Transfer the strings to the scratch row. Clearing the source makes
+			// the final unmatched-row sweep safe under manual memory management.
+			row = m.rows[old_index]
+			m.rows[old_index] = ActivityRow{}
+		} else {
+			row.pid = record.pid
+			row.pid_text = record.pid.str()
 		}
+		row.pid = record.pid
+		row.cpu_percent = cpu_percent
+		row.mem_percent = mem_percent
+		row.name = replace_activity_text(row.name, activity_name_of(record))
+		row.cpu_text = replace_activity_text(row.cpu_text, percent_text(cpu_percent))
+		row.mem_text = replace_activity_text(row.mem_text, percent_text(mem_percent))
+		m.scratch_rows << row
 	}
+
+	// Hosted applications are independent of the kernel snapshot. Carry them
+	// across unchanged so sync_open_apps can see that the window set still
+	// matches instead of cloning the same four strings every second.
+	for index in 0 .. m.rows.len {
+		if !m.rows[index].is_app {
+			continue
+		}
+		m.scratch_rows << m.rows[index]
+		m.rows[index] = ActivityRow{}
+	}
+	for index in 0 .. m.rows.len {
+		m.free_row(index)
+	}
+	m.rows.clear()
+	old_rows := m.rows
+	m.rows = m.scratch_rows
+	m.scratch_rows = old_rows
 
 	m.remember(records, count)
 	m.sampled_ns = header.sample_ns
-	m.rows = rows
 	m.sort_rows()
 	m.clamp_scroll()
 
@@ -199,10 +234,26 @@ fn (mut m ActivityMonitor) sample() bool {
 	m.process_total = header.total
 	m.used_memory = used
 	m.total_memory = header.total_memory
-	m.app_count = 0
 	m.update_summary()
 	m.set_error('')
-	return true
+}
+
+fn (m &ActivityMonitor) process_row_index(pid int) int {
+	for index, row in m.rows {
+		if !row.is_app && row.pid == pid {
+			return index
+		}
+	}
+	return -1
+}
+
+fn replace_activity_text(current string, next string) string {
+	if current == next {
+		unsafe { next.free() }
+		return current
+	}
+	unsafe { current.free() }
+	return next
 }
 
 // sync_open_apps adds the applications hosted inside vinix-desktop. They are
@@ -343,10 +394,11 @@ fn (m &ActivityMonitor) rate_for(pid int, cpu_time_ns u64, elapsed_ns u64) f64 {
 // is reused rather than reallocated: it is rewritten once a second forever.
 fn (mut m ActivityMonitor) remember(records &ActivitySample, count int) {
 	m.previous.clear()
+	unsafe { m.previous.flags.set(.noslices) }
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
 		m.previous << ActivityPrevious{
-			pid:         record.pid
+			pid: record.pid
 			cpu_time_ns: record.cpu_time_ns
 		}
 	}
@@ -371,10 +423,21 @@ fn (mut m ActivityMonitor) free_rows() {
 	for index in 0 .. m.rows.len {
 		m.free_row(index)
 	}
+	for index in 0 .. m.scratch_rows.len {
+		unsafe {
+			m.scratch_rows[index].name.free()
+			m.scratch_rows[index].pid_text.free()
+			m.scratch_rows[index].cpu_text.free()
+			m.scratch_rows[index].mem_text.free()
+		}
+	}
 	unsafe {
 		m.rows.free()
+		m.scratch_rows.free()
 		m.summary.free()
 	}
+	m.rows = []ActivityRow{}
+	m.scratch_rows = []ActivityRow{}
 	m.summary = ''
 }
 
@@ -446,9 +509,20 @@ fn percent_text(value f64) string {
 		return '0'
 	}
 	if value >= 100.0 {
-		return '${int(value)}'
+		return int(value).str()
 	}
-	return '${value:.1f}'
+	// V's generic floating-point formatter keeps scratch storage alive under
+	// `-manualfree`. Percentages need only one decimal, so fixed-point integer
+	// formatting is both cheaper and has explicit ownership.
+	tenths := int(value * 10.0 + 0.5)
+	whole := (tenths / 10).str()
+	fraction := (tenths % 10).str()
+	text := '${whole}.${fraction}'
+	unsafe {
+		whole.free()
+		fraction.free()
+	}
+	return text
 }
 
 fn (mut m ActivityMonitor) sort_rows() {
@@ -571,15 +645,14 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.monitor.clamp_scroll()
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(a.monitor.visible_rows + 11)
 
 	// What the list is ordered by. Three buttons rather than clickable column
 	// headings: a heading that is also a button has to look like one, and at
 	// eleven point there is no room to show that it does.
 	mut sort_x := activity_padding
-	for option in [ActivitySort.cpu, .memory, .name] {
-		children << ui2.button(activity_action_of(option), activity_sort_title(option),
-			ui2.rect(f64(sort_x), 5, f64(activity_sort_width), 20), ui2.BoxStyle{
+	for option in activity_sort_options {
+		children << ui2.button(activity_action_of(option), activity_sort_title(option), ui2.rect(f64(sort_x), 5, f64(activity_sort_width), 20), ui2.BoxStyle{
 			bg: if a.monitor.sort == option { app_accent } else { activity_sort_idle }
 			radius: 5
 		}, ui2.TextStyle{
@@ -591,16 +664,17 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	// Column headings, then the rule the list hangs from.
-	for heading in activity_headings(width) {
+	headings := activity_headings(width)
+	for heading in headings {
 		children << heading
 	}
+	unsafe { headings.free() }
 	children << ui2.view('', ui2.rect(0, f64(list_top - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
 
 	if a.monitor.error != '' {
-		children << ui2.label('', a.monitor.error, ui2.rect(f64(activity_padding), f64(list_top +
-			10), f64(inner), 40), ui2.TextStyle{
+		children << ui2.label('', a.monitor.error, ui2.rect(f64(activity_padding), f64(list_top + 10), f64(inner), 40), ui2.TextStyle{
 			color: files_error
 			size: 12
 		})
@@ -613,8 +687,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		y := list_top + row * activity_row_height
 		// A quiet stripe every other row. With twenty-odd rows of four columns
 		// it is the difference between reading across a line and losing it.
-		children << ui2.view('', ui2.rect(0, f64(y), f64(width), f64(activity_row_height)),
-			ui2.BoxStyle{
+		children << ui2.view('', ui2.rect(0, f64(y), f64(width), f64(activity_row_height)), ui2.BoxStyle{
 			bg: activity_row_alt
 			transparent: index % 2 == 0
 		}, activity_row_cells(entry, width))
@@ -624,8 +697,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	if a.monitor.rows.len > a.monitor.visible_rows {
 		button_size := 18
 		right := width - activity_padding - button_size
-		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4),
-			6, f64(button_size), 18), ui2.BoxStyle{
+		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4), 6, f64(button_size), 18), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -633,8 +705,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 			size: 11
 			align: .center
 		})
-		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), 6,
-			f64(button_size), 18), ui2.BoxStyle{
+		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), 6, f64(button_size), 18), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -645,12 +716,10 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	// The footer: what the machine as a whole is doing.
-	children << ui2.view('', ui2.rect(0, f64(height - activity_footer_height), f64(width),
-		1), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(0, f64(height - activity_footer_height), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
-	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(height -
-		activity_footer_height + 5), f64(inner), 16), ui2.TextStyle{
+	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(height - activity_footer_height + 5), f64(inner), 16), ui2.TextStyle{
 		color: body_muted
 		size: 11
 	})
@@ -659,6 +728,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 }
 
 const activity_sort_width = 52
+const activity_sort_options = [ActivitySort.cpu, .memory, .name]
 
 fn activity_action_of(sort ActivitySort) string {
 	return match sort {
@@ -691,25 +761,19 @@ fn activity_headings(width int) []ui2.Element {
 		bold: true
 		align: .right
 	}
-	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column -
-		activity_mem_column
-	return [
-		ui2.label('', 'PROCESS / OPEN APP', ui2.rect(f64(activity_padding), y, f64(name_width),
-			14), style),
-		ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column),
-			14), right),
-		ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column),
-			y, f64(activity_cpu_column), 14), right),
-		ui2.label('', '% RAM', ui2.rect(f64(activity_padding + name_width + activity_pid_column +
-			activity_cpu_column), y, f64(activity_mem_column), 14), right),
-	]
+	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+	mut headings := frame_elements(4)
+	headings << ui2.label('', 'PROCESS / OPEN APP', ui2.rect(f64(activity_padding), y, f64(name_width), 14), style)
+	headings << ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column), 14), right)
+	headings << ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column), y, f64(activity_cpu_column), 14), right)
+	headings << ui2.label('', '% RAM', ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
+	return headings
 }
 
 // activity_row_cells lays one process across the same four columns the
 // headings above use.
 fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
-	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column -
-		activity_mem_column
+	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
 	number := ui2.TextStyle{
 		color: body_text
 		size: 11
@@ -718,31 +782,25 @@ fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
 	// The busiest processes are the point of the window, so a process using a
 	// real share of a CPU is marked rather than left to be found by reading.
 	busy := entry.cpu_percent >= activity_busy_percent
-	return [
-		ui2.label('', entry.name, ui2.rect(f64(activity_padding), 0, f64(name_width),
-			f64(activity_row_height)), ui2.TextStyle{
-			color: body_heading
-			size: 11
-			bold: busy
-		}),
-		ui2.label('', entry.pid_text, ui2.rect(f64(activity_padding + name_width), 0,
-			f64(activity_pid_column), f64(activity_row_height)), ui2.TextStyle{
-			color: body_muted
-			size: 11
-			align: .right
-		}),
-		ui2.label('', entry.cpu_text, ui2.rect(f64(activity_padding + name_width +
-			activity_pid_column), 0, f64(activity_cpu_column), f64(activity_row_height)),
-			ui2.TextStyle{
-			color: if busy { activity_busy } else { body_text }
-			size: 11
-			bold: busy
-			align: .right
-		}),
-		ui2.label('', entry.mem_text, ui2.rect(f64(activity_padding + name_width +
-			activity_pid_column + activity_cpu_column), 0, f64(activity_mem_column),
-			f64(activity_row_height)), number),
-	]
+	mut cells := frame_elements(4)
+	cells << ui2.label('', entry.name, ui2.rect(f64(activity_padding), 0, f64(name_width), f64(activity_row_height)), ui2.TextStyle{
+		color: body_heading
+		size: 11
+		bold: busy
+	})
+	cells << ui2.label('', entry.pid_text, ui2.rect(f64(activity_padding + name_width), 0, f64(activity_pid_column), f64(activity_row_height)), ui2.TextStyle{
+		color: body_muted
+		size: 11
+		align: .right
+	})
+	cells << ui2.label('', entry.cpu_text, ui2.rect(f64(activity_padding + name_width + activity_pid_column), 0, f64(activity_cpu_column), f64(activity_row_height)), ui2.TextStyle{
+		color: if busy { activity_busy } else { body_text }
+		size: 11
+		bold: busy
+		align: .right
+	})
+	cells << ui2.label('', entry.mem_text, ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), 0, f64(activity_mem_column), f64(activity_row_height)), number)
+	return cells
 }
 
 fn (mut a ActivityApp) handle(event_id string) ! {

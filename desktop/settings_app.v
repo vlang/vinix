@@ -22,8 +22,8 @@ enum SettingsCategory {
 	battery
 }
 
-const settings_categories = [SettingsCategory.appearance, .theme, .wallpaper, .wifi,
-	.display, .battery]
+const settings_categories = [SettingsCategory.appearance, .theme, .wallpaper, .wifi, .display,
+	.battery]
 
 fn (c SettingsCategory) title() string {
 	return match c {
@@ -58,15 +58,15 @@ mut:
 	// Display, Battery and Wi-Fi read devices rather than the desktop's own
 	// preferences, so they carry the last readback and the labels made from
 	// it. The reads are injectable so host tests can drive them.
-	battery_read    fn (bool) int        = read_battery
-	battery_history fn () BatteryHistory = battery_history_snapshot
-	state         BacklightState
-	read_result   BacklightResult       = .unavailable
-	write_result  BacklightResult
-	last_poll_ms  u64
-	initialized   bool
-	read_state    fn (mut BacklightState) BacklightResult = read_backlight
-	write_percent fn (int) BacklightResult = set_backlight_percent
+	battery_read       fn (bool) int = read_battery
+	battery_history    fn () BatteryHistory = battery_history_snapshot
+	state              BacklightState
+	read_result        BacklightResult = .unavailable
+	write_result       BacklightResult
+	last_poll_ms       u64
+	initialized        bool
+	read_state         fn (mut BacklightState) BacklightResult = read_backlight
+	write_percent      fn (int) BacklightResult = set_backlight_percent
 	wifi_state         WifiState
 	wifi_read_result   WifiResult = .unavailable
 	wifi_action_result WifiResult
@@ -97,15 +97,13 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(3)
 
 	// The sidebar, and a hairline between it and the pane.
-	children << ui2.view('', ui2.rect(0, 0, f64(settings_sidebar_width), f64(height)),
-		ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(0, 0, f64(settings_sidebar_width), f64(height)), ui2.BoxStyle{
 		bg: settings_sidebar_bg
 	}, a.category_rows())
-	children << ui2.view('', ui2.rect(f64(settings_sidebar_width), 0, 1, f64(height)),
-		ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(f64(settings_sidebar_width), 0, 1, f64(height)), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
 
@@ -142,9 +140,15 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 // preferences and have nothing to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
-		.wifi { return a.wifi_pane(width, height) }
-		.display { return a.display_pane(width) }
-		.battery { return a.battery_pane(width, height) }
+		.wifi {
+			return a.wifi_pane(width, height)
+		}
+		.display {
+			return a.display_pane(width)
+		}
+		.battery {
+			return a.battery_pane(width, height)
+		}
 		else {}
 	}
 	if a.desktop == unsafe { nil } {
@@ -159,23 +163,19 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 }
 
 fn (a &SettingsApp) category_rows() []ui2.Element {
-	mut rows := []ui2.Element{cap: settings_categories.len}
+	mut rows := frame_elements(settings_categories.len)
 	for index, category in settings_categories {
 		selected := category == a.category
 		y := settings_padding + index * 32
-		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(6, f64(y),
-			f64(settings_sidebar_width - 12), 28), ui2.BoxStyle{
+		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(6, f64(y), f64(settings_sidebar_width - 12), 28), ui2.BoxStyle{
 			bg: settings_category_selected
 			radius: 6
 			transparent: !selected
-		}, [
-			ui2.label('', category.title(), ui2.rect(12, 0, f64(settings_sidebar_width - 24),
-				28), ui2.TextStyle{
-				color: if selected { body_heading } else { body_text }
-				size: 13
-				bold: selected
-			}),
-		])
+		}, frame_child(ui2.label('', category.title(), ui2.rect(12, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
+			color: if selected { body_heading } else { body_text }
+			size: 13
+			bold: selected
+		})))
 	}
 	return rows
 }
@@ -183,8 +183,7 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 // heading_row and option_row give every pane the same shape: a heading, a
 // sentence saying what the choice means, then the choices themselves.
 fn settings_heading(text string, y int, width int) ui2.Element {
-	return ui2.label('', text, ui2.rect(f64(settings_padding), f64(y), f64(width - 2 * settings_padding),
-		20), ui2.TextStyle{
+	return ui2.label('', text, ui2.rect(f64(settings_padding), f64(y), f64(width - 2 * settings_padding), 20), ui2.TextStyle{
 		color: body_heading
 		size: 13
 		bold: true
@@ -192,8 +191,7 @@ fn settings_heading(text string, y int, width int) ui2.Element {
 }
 
 fn settings_note(text string, y int, width int) ui2.Element {
-	return ui2.label('', text, ui2.rect(f64(settings_padding), f64(y), f64(width - 2 * settings_padding),
-		16), ui2.TextStyle{
+	return ui2.label('', text, ui2.rect(f64(settings_padding), f64(y), f64(width - 2 * settings_padding), 16), ui2.TextStyle{
 		color: body_muted
 		size: 11
 	})
@@ -217,27 +215,23 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	half := (inner - settings_row_gap) / 2
 
-	mut out := []ui2.Element{}
+	mut out := frame_elements(12)
 	mut y := settings_padding
 
 	out << settings_heading('Window buttons', y, width)
 	y += 22
 	out << settings_note('Which end of the title bar close and zoom sit at.', y, width)
 	y += 22
-	out << settings_choice('${settings_action_side}0', 'Right', settings_padding, y, half,
-		settings.button_side == .right)
-	out << settings_choice('${settings_action_side}1', 'Left (macOS)', settings_padding +
-		half + settings_row_gap, y, half, settings.button_side == .left)
+	out << settings_choice('${settings_action_side}0', 'Right', settings_padding, y, half, settings.button_side == .right)
+	out << settings_choice('${settings_action_side}1', 'Left (macOS)', settings_padding + half + settings_row_gap, y, half, settings.button_side == .left)
 	y += 28 + 22
 
 	out << settings_heading('Taskbar', y, width)
 	y += 22
 	out << settings_note('One entry per window, or one per application.', y, width)
 	y += 22
-	out << settings_choice('${settings_action_taskbar}0', 'Standard', settings_padding,
-		y, half, settings.taskbar_mode == .standard)
-	out << settings_choice('${settings_action_taskbar}1', 'Combined', settings_padding +
-		half + settings_row_gap, y, half, settings.taskbar_mode == .combined)
+	out << settings_choice('${settings_action_taskbar}0', 'Standard', settings_padding, y, half, settings.taskbar_mode == .standard)
+	out << settings_choice('${settings_action_taskbar}1', 'Combined', settings_padding + half + settings_row_gap, y, half, settings.taskbar_mode == .combined)
 	y += 28 + 6
 	out << settings_note(if settings.taskbar_mode == .combined {
 		'Windows 7 style: one button per application.'
@@ -253,17 +247,15 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	half := (inner - settings_row_gap) / 2
 
-	mut out := []ui2.Element{}
+	mut out := frame_elements(8)
 	mut y := settings_padding
 
 	out << settings_heading('Theme', y, width)
 	y += 22
 	out << settings_note('How windows and the taskbar are drawn.', y, width)
 	y += 22
-	out << settings_choice('${settings_action_theme}0', 'Default', settings_padding, y,
-		half, settings.theme == .default_)
-	out << settings_choice('${settings_action_theme}1', 'macOS', settings_padding + half +
-		settings_row_gap, y, half, settings.theme == .macos)
+	out << settings_choice('${settings_action_theme}0', 'Default', settings_padding, y, half, settings.theme == .default_)
+	out << settings_choice('${settings_action_theme}1', 'macOS', settings_padding + half + settings_row_gap, y, half, settings.theme == .macos)
 	y += 28 + 10
 
 	if settings.theme == .macos {
@@ -283,7 +275,7 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 	settings := a.desktop.settings
 	inner := width - 2 * settings_padding
 
-	mut out := []ui2.Element{}
+	mut out := frame_elements(wallpaper_colors.len + a.images.len + 4)
 	mut y := settings_padding
 
 	out << settings_heading('Colour', y, width)
@@ -296,18 +288,15 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 		column := index % columns
 		row := index / columns
 		selected := settings.wallpaper_image < 0 && settings.wallpaper_color == index
-		out << ui2.clickable_view('${settings_action_color}${index}', ui2.rect(f64(settings_padding +
-			column * (swatch + settings_row_gap)), f64(y + row * (swatch + settings_row_gap)),
-			f64(swatch), f64(swatch)), ui2.BoxStyle{
+		out << ui2.clickable_view('${settings_action_color}${index}', ui2.rect(f64(settings_padding + column * (swatch + settings_row_gap)), f64(y + row * (swatch + settings_row_gap)), f64(swatch), f64(swatch)), ui2.BoxStyle{
 			bg: if selected { app_accent } else { settings_choice_bg }
 			radius: 6
-		}, [
-			// The swatch proper, inset so the selected ring shows around it.
-			ui2.view('', ui2.rect(3, 3, f64(swatch - 6), f64(swatch - 6)), ui2.BoxStyle{
-				bg: color.top
-				radius: 4
-			}, []),
-		])
+		}, frame_child(
+		// The swatch proper, inset so the selected ring shows around it.
+		ui2.view('', ui2.rect(3, 3, f64(swatch - 6), f64(swatch - 6)), ui2.BoxStyle{
+			bg: color.top
+			radius: 4
+		}, [])))
 	}
 	rows := (wallpaper_colors.len + columns - 1) / columns
 	y += rows * (swatch + settings_row_gap) + 6
@@ -332,19 +321,14 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 		column := index % photo_columns
 		row := index / photo_columns
 		selected := settings.wallpaper_image == index
-		out << ui2.clickable_view('${settings_action_image}${index}', ui2.rect(f64(settings_padding +
-			column * (tile_width + settings_row_gap)), f64(y + row * (tile_height + settings_row_gap)),
-			f64(tile_width), f64(tile_height)), ui2.BoxStyle{
+		out << ui2.clickable_view('${settings_action_image}${index}', ui2.rect(f64(settings_padding + column * (tile_width + settings_row_gap)), f64(y + row * (tile_height + settings_row_gap)), f64(tile_width), f64(tile_height)), ui2.BoxStyle{
 			bg: if selected { app_accent } else { settings_choice_bg }
 			radius: 6
-		}, [
-			ui2.label('', '${index + 1}', ui2.rect(0, 0, f64(tile_width), f64(tile_height)),
-				ui2.TextStyle{
-				color: if selected { app_on_accent } else { body_text }
-				size: 12
-				align: .center
-			}),
-		])
+		}, frame_child(ui2.label('', '${index + 1}', ui2.rect(0, 0, f64(tile_width), f64(tile_height)), ui2.TextStyle{
+			color: if selected { app_on_accent } else { body_text }
+			size: 12
+			align: .center
+		})))
 	}
 
 	return out

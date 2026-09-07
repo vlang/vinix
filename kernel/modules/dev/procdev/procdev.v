@@ -44,14 +44,14 @@ pub const table_version = u32(1)
 // the number of processes it will ever run at once.
 pub const max_records = 512
 
-// ProcessSample is one process. `memory_bytes` is the sum of its mapped
-// ranges: this kernel pre-faults every mapping it makes, so that sum is also
-// what the process has resident, and there is no second number to report.
+// ProcessSample is one process. `memory_bytes` is the sum of its committed
+// mapped ranges. Accessible mappings are pre-faulted by this kernel, while a
+// PROT_NONE range is only an address-space reservation and owns no pages.
 pub struct ProcessSample {
 pub mut:
-	pid          int
-	ppid         int
-	threads      int
+	pid     int
+	ppid    int
+	threads int
 	// Explicit, so that the two u64s below land on an eight byte boundary
 	// under any compiler rather than by the good luck of the fields above.
 	reserved     int
@@ -93,7 +93,11 @@ fn (mut this Processes) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-// resident_bytes sums a process' mapped ranges.
+// resident_bytes sums a process' committed mapped ranges. mmap() pre-faults
+// every accessible range, so its length is resident; PROT_NONE reservations
+// deliberately have no pages and must not be reported as RAM. Allocators use
+// those reservations for metadata arenas, and counting them made an idle
+// process appear to leak even while its actual allocations were all freed.
 //
 // The pagemap lock is taken without blocking on purpose. This runs with the
 // process table locked, and a process in the middle of an mmap holds its
@@ -112,7 +116,7 @@ fn resident_bytes(process &proc.Process) u64 {
 	mut total := u64(0)
 	for i := 0; i < pagemap.mmap_ranges.len; i++ {
 		range := unsafe { &mmap.MmapRangeLocal(pagemap.mmap_ranges[i]) }
-		if unsafe { range == nil } {
+		if unsafe { range == nil } || range.prot == mmap.prot_none {
 			continue
 		}
 		total += range.length
@@ -149,11 +153,11 @@ fn (mut this Processes) read(_handle voidptr, buf voidptr, _loc u64, count u64) 
 	}
 
 	mut header := ProcessTable{
-		version:      table_version
-		record_size:  u32(sizeof(ProcessSample))
-		sample_ns:    time.monotonic_ns()
+		version: table_version
+		record_size: u32(sizeof(ProcessSample))
+		sample_ns: time.monotonic_ns()
 		total_memory: memory.total_bytes()
-		free_memory:  memory.free_bytes()
+		free_memory: memory.free_bytes()
 	}
 
 	records := unsafe { &ProcessSample(voidptr(&u8(buf) + sizeof(ProcessTable))) }

@@ -120,7 +120,7 @@ echo "==> Translating V to C..."
 # so the desktop says when it was built.
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
 echo "    build stamp: $BUILD_STAMP"
-"$V" -os linux -gc none -enable-globals -prod \
+"$V" -os linux -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|@vmodules|$SCRIPT_DIR/third_party" \

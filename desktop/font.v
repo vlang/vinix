@@ -136,9 +136,9 @@ fn (f &FontFace) text_width(text string) int {
 // it does not. Window titles are user text of any length and the taskbar gives
 // them a fixed slot, so something has to give. The cut lands on a rune
 // boundary because the scan advances one whole sequence at a time.
-fn (f &FontFace) truncate(text string, limit int) string {
+fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 	if f.text_width(text) <= limit {
-		return text
+		return text, false
 	}
 	ellipsis := '...'
 	tail := f.text_width(ellipsis)
@@ -156,9 +156,12 @@ fn (f &FontFace) truncate(text string, limit int) string {
 		cut = i
 	}
 	if cut == 0 {
-		return ellipsis
+		return ellipsis, false
 	}
-	return text[..cut] + ellipsis
+	prefix := text[..cut]
+	truncated := prefix + ellipsis
+	unsafe { prefix.free() }
+	return truncated, true
 }
 
 // draw_text places the run's line box at (x, y) and returns the pen position

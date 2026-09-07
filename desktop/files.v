@@ -21,9 +21,14 @@ const max_name_len = 256
 const max_entries = 4096
 
 struct FileEntry {
+mut:
 	name   string
 	is_dir bool
 	size   u64
+	// Cached because these two strings are stable until a new directory is
+	// read, while the element tree is rebuilt every second for the clock.
+	row_action string
+	size_text  string
 }
 
 // FileBrowser is the model: where it is, what is there, and how far down the
@@ -68,6 +73,7 @@ fn (mut b FileBrowser) read(path string) {
 	}
 
 	mut entries := []FileEntry{}
+	unsafe { entries.flags.set(.noslices) }
 	mut buffer := [max_name_len]u8{}
 	mut names := unsafe { (&buffer[0]).vbytes(buffer.len) }
 	for entries.len < max_entries {
@@ -77,6 +83,7 @@ fn (mut b FileBrowser) read(path string) {
 		name := unsafe { cstring_to_vstring(&char(&buffer[0])) }
 		// `.` says nothing, and `..` is the Up button's job.
 		if name == '.' || name == '..' {
+			unsafe { name.free() }
 			continue
 		}
 		mut size := u64(0)
@@ -86,6 +93,7 @@ fn (mut b FileBrowser) read(path string) {
 			size = info.size
 			is_dir = info.is_dir
 		}
+		unsafe { full.free() }
 		// Unreadable entries remain visible, with unknown type and size.
 		entries << FileEntry{
 			name: name
@@ -103,12 +111,44 @@ fn (mut b FileBrowser) read(path string) {
 		}
 		return compare_strings(a.name, b.name)
 	})
+	prepare_file_rows(mut entries)
 
+	b.free_entries()
+	unsafe {
+		b.path.free()
+		b.error.free()
+	}
 	b.path = path
 	b.entries = entries
 	b.scroll = 0
 	b.error = ''
 	b.hover_row = -1
+}
+
+fn prepare_file_rows(mut entries []FileEntry) {
+	for index in 0 .. entries.len {
+		if entries[index].row_action.len == 0 {
+			index_text := index.str()
+			entries[index].row_action = files_action_row + index_text
+			unsafe { index_text.free() }
+		}
+		if !entries[index].is_dir && entries[index].size_text.len == 0 {
+			entries[index].size_text = human_size(entries[index].size)
+		}
+	}
+}
+
+fn (mut b FileBrowser) free_entries() {
+	for index in 0 .. b.entries.len {
+		unsafe {
+			b.entries[index].name.free()
+			b.entries[index].row_action.free()
+			b.entries[index].size_text.free()
+		}
+	}
+	if b.entries.cap > 0 {
+		unsafe { b.entries.free() }
+	}
 }
 
 fn (mut b FileBrowser) enter(index int) {
@@ -133,20 +173,35 @@ fn (mut b FileBrowser) go_up() {
 // significant figures at most, which is as much as anyone reads at a glance.
 fn human_size(size u64) string {
 	if size < 1024 {
-		return '${size} B'
+		bytes := size.str()
+		text := '${bytes} B'
+		unsafe { bytes.free() }
+		return text
 	}
-	units := ['KB', 'MB', 'GB', 'TB']
 	mut value := f64(size) / 1024.0
 	mut unit := 0
-	for value >= 1024.0 && unit + 1 < units.len {
+	for value >= 1024.0 && unit + 1 < file_size_units.len {
 		value /= 1024.0
 		unit++
 	}
 	if value < 10.0 {
-		return '${value:.1f} ${units[unit]}'
+		tenths := int(value * 10.0 + 0.5)
+		whole := (tenths / 10).str()
+		fraction := (tenths % 10).str()
+		text := '${whole}.${fraction} ${file_size_units[unit]}'
+		unsafe {
+			whole.free()
+			fraction.free()
+		}
+		return text
 	}
-	return '${int(value)} ${units[unit]}'
+	whole := int(value).str()
+	text := '${whole} ${file_size_units[unit]}'
+	unsafe { whole.free() }
+	return text
 }
+
+const file_size_units = ['KB', 'MB', 'GB', 'TB']
 
 // ── The hosted application ────────────────────────────────────────
 
@@ -177,6 +232,7 @@ fn open_files(mut _ Desktop) !HostedApp {
 }
 
 fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
+	prepare_file_rows(mut a.browser.entries)
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * files_padding
@@ -190,7 +246,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.clamp_scroll()
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(a.visible_rows + 5)
 
 	// Header: where we are, and the way back out.
 	up_width := 40
@@ -230,32 +286,32 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	// Rows.
 	mut row := 0
 	for index := a.browser.scroll; index < a.browser.entries.len && row < a.visible_rows; index++ {
-		entry := a.browser.entries[index]
+		entry := &a.browser.entries[index]
 		y := list_top + row * files_row_height
 		hovered := a.browser.hover_row == index
-		children << ui2.clickable_view('${files_action_row}${index}', ui2.rect(0, f64(y), f64(width), f64(files_row_height)), ui2.BoxStyle{
+		mut row_children := frame_elements(3)
+		row_children << ui2.button_with_image('', '', if entry.is_dir {
+			'builtin:folder'
+		} else {
+			'builtin:file'
+		}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
+			transparent: true
+		}, ui2.TextStyle{
+			color: if entry.is_dir { files_folder_icon } else { files_file_icon }
+		})
+		row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(inner - 24 - 72), f64(files_row_height)), ui2.TextStyle{
+			color: if entry.is_dir { body_heading } else { body_text }
+			size: 13
+		})
+		row_children << ui2.label('', entry.size_text, ui2.rect(f64(width - files_padding - 70), 0, 70, f64(files_row_height)), ui2.TextStyle{
+			color: body_muted
+			size: 11
+			align: .right
+		})
+		children << ui2.clickable_view(entry.row_action, ui2.rect(0, f64(y), f64(width), f64(files_row_height)), ui2.BoxStyle{
 			bg: files_row_hover
 			transparent: !hovered
-		}, [
-			ui2.button_with_image('', '', if entry.is_dir {
-				'builtin:folder'
-			} else {
-				'builtin:file'
-			}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
-				transparent: true
-			}, ui2.TextStyle{
-				color: if entry.is_dir { files_folder_icon } else { files_file_icon }
-			}),
-			ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(inner - 24 - 72), f64(files_row_height)), ui2.TextStyle{
-				color: if entry.is_dir { body_heading } else { body_text }
-				size: 13
-			}),
-			ui2.label('', if entry.is_dir { '' } else { human_size(entry.size) }, ui2.rect(f64(width - files_padding - 70), 0, 70, f64(files_row_height)), ui2.TextStyle{
-				color: body_muted
-				size: 11
-				align: .right
-			}),
-		])
+		}, row_children)
 		row++
 	}
 

@@ -61,6 +61,12 @@ mut:
 
 	clock_time string
 	clock_date string
+	// The clock is checked every compositor pass, but formatted only when its
+	// inputs change. With manual memory management, formatting an unchanged
+	// second would otherwise allocate strings that never reach the screen.
+	clock_sampled bool
+	clock_seconds i64
+	clock_battery int
 
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
@@ -237,14 +243,19 @@ fn (mut d Desktop) activate(id int) {
 // because the wallpaper gradient is painted by the compositor before the tree
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
-	mut children := []ui2.Element{}
+	begin_frame_elements()
+	mut children := frame_elements(available_apps.len + d.windows.len + 2)
 	// Shortcuts first, so every window paints over them.
-	children << d.shortcut_elements()
-	for window in d.windows {
-		if window.minimized {
+	shortcuts := d.shortcut_elements()
+	children << shortcuts
+	// The elements (and their nested child arrays) were copied into children;
+	// only this temporary outer array is no longer needed.
+	unsafe { shortcuts.free() }
+	for window_index in 0 .. d.windows.len {
+		if d.windows[window_index].minimized {
 			continue
 		}
-		children << d.window_element(window)
+		children << d.window_element(window_index)
 	}
 	children << d.taskbar_element()
 	// Last, so the switcher is over everything it is a picture of.
@@ -257,7 +268,8 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	}, children)
 }
 
-fn (mut d Desktop) window_element(window Window) ui2.Element {
+fn (mut d Desktop) window_element(window_index int) ui2.Element {
+	window := &d.windows[window_index]
 	theme := d.theme()
 	active := window.id == d.focus
 	body_height := window.height - theme.title_height
@@ -331,32 +343,42 @@ fn (mut d Desktop) window_element(window Window) ui2.Element {
 		lines: 1
 	})
 
+	mut title_children := frame_elements(4)
+	title_children << title
+	title_children << minimize
+	title_children << maximize
+	title_children << close
 	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width), f64(theme.title_height)), ui2.BoxStyle{
 		bg: title_bg
-	}, [title, minimize, maximize, close])
+	}, title_children)
 
 	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width), 1), ui2.BoxStyle{
 		bg: theme.title_divider
 	}, [])
 
-	background, contents := d.window_contents(window, body_height)
+	background, contents := d.window_contents(window_index, body_height)
 	// Clickable so that touching a window anywhere brings it to the front,
 	// not only its title bar.
 	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(theme.title_height), f64(window.width), f64(body_height)), ui2.BoxStyle{
 		bg: background
 	}, contents)
 
+	mut window_children := frame_elements(3)
+	window_children << title_bar
+	window_children << divider
+	window_children << body
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
 		bg: background
 		radius: theme.window_radius
-	}, [title_bar, divider, body])
+	}, window_children)
 }
 
 // window_contents is the body's background colour and its children. A hosted
 // application supplies both: what it returns is its QML `Screen`, which inside
 // someone else's window is a content area rather than a display, so its
 // background becomes the body's and its children are placed straight into it.
-fn (mut d Desktop) window_contents(window Window, body_height int) (u32, []ui2.Element) {
+fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui2.Element) {
+	window := &d.windows[window_index]
 	if window.app_index < 0 || window.app_index >= d.apps.len {
 		return d.theme().window_body, window.content(window.width, body_height, d)
 	}
@@ -364,10 +386,10 @@ fn (mut d Desktop) window_contents(window Window, body_height int) (u32, []ui2.E
 	root := d.apps[window.app_index].build(size) or {
 		// An application that cannot lay itself out should say so in its own
 		// window rather than take the desktop down with it.
-		return d.theme().window_body, [
-			body_line('This application failed to draw:', 18, 18, window.width - 36),
-			muted_line(err.msg(), 18, 40, window.width - 36),
-		]
+		mut error_children := frame_elements(2)
+		error_children << body_line('This application failed to draw:', 18, 18, window.width - 36)
+		error_children << muted_line(err.msg(), 18, 40, window.width - 36)
+		return d.theme().window_body, error_children
 	}
 	return root.box.bg, root.children
 }
@@ -491,9 +513,10 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 // transparent view that only shows a panel while the pointer is on it, so an
 // idle desktop is just the wallpaper and its icons.
 fn (d &Desktop) shortcut_elements() []ui2.Element {
-	mut out := []ui2.Element{cap: available_apps.len}
+	mut out := frame_elements(available_apps.len)
 	rows := shortcut_rows_for_height(d.canvas.height)
-	for index, factory in available_apps {
+	for index in 0 .. available_apps.len {
+		factory := &available_apps[index]
 		id := app_shortcut_actions[index]
 		theme := d.theme()
 		hovered := d.hover == id
@@ -502,23 +525,23 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		x := shortcut_left + column * (shortcut_width + shortcut_gap)
 		y := shortcut_top + row * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
+		mut shortcut_children := frame_elements(2)
+		shortcut_children << ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon), f64(shortcut_icon)), ui2.BoxStyle{
+			transparent: true
+		}, ui2.TextStyle{
+			color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+		})
+		shortcut_children << ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
+			color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+			shadow: true
+			size: 12
+			align: .center
+		})
 		out << ui2.clickable_view(id, ui2.rect(f64(x), f64(y), f64(shortcut_width), f64(shortcut_height)), ui2.BoxStyle{
 			bg: theme.shortcut_panel
 			radius: 8
 			transparent: !hovered
-		}, [
-			ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon), f64(shortcut_icon)), ui2.BoxStyle{
-				transparent: true
-			}, ui2.TextStyle{
-				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
-			}),
-			ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
-				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
-				shadow: true
-				size: 12
-				align: .center
-			}),
-		])
+		}, shortcut_children)
 	}
 	return out
 }
@@ -597,7 +620,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	dock := theme.dock
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(available_apps.len + d.windows.len + 6)
 	item_y := (taskbar_height - taskbar_item_height) / 2
 
 	// Left: a button that opens another window, so the taskbar list can be
@@ -618,7 +641,8 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// arrangement can open.
 	mut launcher_x := edge_padding + new_button_width + 8
 	launcher_item_width := taskbar_launcher_width(width, launcher_x, available_apps.len)
-	for index, factory in available_apps {
+	for index in 0 .. available_apps.len {
+		factory := &available_apps[index]
 		id := app_launcher_actions[index]
 		// On a narrow logical display the icon is still useful after a label no
 		// longer is. MacBook-sized desktops retain the full labelled controls.
@@ -638,6 +662,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Windows XP did; `combined` gives each application one entry however many
 	// windows it has, the way Windows 7 did.
 	entries := d.taskbar_entries()
+	defer {
+		unsafe { entries.free() }
+	}
 	mut x := launcher_x + 8
 	// Where the entries must stop. A dock stops where its contents do, but no
 	// wider than the screen: it is centred, so a panel that outgrew the display
@@ -716,7 +743,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// own would not fit — the two lines already fill the bar's height — and
 	// the date is short enough that the two never meet. The string is a
 	// constant, so unlike the clock it costs nothing to compose each second.
-	children << ui2.label('clock.build', 'built ${build_stamp}', ui2.rect(f64(clock_x), 26, f64(clock_width), 16), ui2.TextStyle{
+	children << ui2.label('clock.build', taskbar_build_label, ui2.rect(f64(clock_x), 26, f64(clock_width), 16), ui2.TextStyle{
 		color: theme.clock_date
 		size: 11
 		align: .left
@@ -759,8 +786,7 @@ fn taskbar_launcher_width(screen_width int, start int, count int) int {
 	}
 	// The floating dock has padding and a gap before its clock in addition to
 	// what the full-width taskbar needs, so reserve the stricter of the two.
-	limit := screen_width - clock_area_width - taskbar_padding - 12 - taskbar_item_gap -
-		8 - taskbar_item_min_width
+	limit := screen_width - clock_area_width - taskbar_padding - 12 - taskbar_item_gap - 8 - taskbar_item_min_width
 	available := limit - start - count * 6
 	mut width := available / count
 	if width > launcher_width {
@@ -783,12 +809,13 @@ struct TaskbarEntry {
 }
 
 fn (d &Desktop) taskbar_entries() []TaskbarEntry {
-	mut out := []TaskbarEntry{}
+	mut out := []TaskbarEntry{cap: d.windows.len}
+	unsafe { out.flags.set(.noslices) }
 	if d.settings.taskbar_mode == .standard {
 		mut last_id := 0
 		for {
 			index := d.next_window_by_age(last_id) or { break }
-			window := d.windows[index]
+			window := &d.windows[index]
 			last_id = window.id
 			out << TaskbarEntry{
 				id: window.id_task
@@ -803,14 +830,16 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 	// Combined: one entry per title, labelled with how many windows share it.
 	// Clicking it activates the most recently raised of them, which is what
 	// makes a second click minimise the one you just brought up.
-	mut seen := []string{}
-	for window in d.windows {
+	mut seen := []string{cap: d.windows.len}
+	unsafe { seen.flags.set(.noslices) }
+	for window_index in 0 .. d.windows.len {
+		window := &d.windows[window_index]
 		if window.title in seen {
 			continue
 		}
 		seen << window.title
 		mut count := 0
-		mut newest := window.id
+		mut newest_index := window_index
 		mut active := false
 		mut all_minimized := true
 		for other in d.windows {
@@ -828,17 +857,18 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		// The last in painting order is the one on top.
 		for i := d.windows.len - 1; i >= 0; i-- {
 			if d.windows[i].title == window.title {
-				newest = d.windows[i].id
+				newest_index = i
 				break
 			}
 		}
 		out << TaskbarEntry{
-			id: 'task.${newest}'
+			id: d.windows[newest_index].id_task
 			label: if count > 1 { '${window.title}  (${count})' } else { window.title }
 			active: active
 			minimized: all_minimized
 		}
 	}
+	unsafe { seen.free() }
 	return out
 }
 

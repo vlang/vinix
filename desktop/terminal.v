@@ -54,7 +54,7 @@ const terminal_action_scroll_down = 'term.scroll.down'
 
 const terminal_row_height = 16
 const terminal_padding = 8
-const terminal_prompt = '$ '
+const terminal_prompt = '\$ '
 
 struct TerminalApp {
 mut:
@@ -78,11 +78,11 @@ mut:
 	// The prompt line as drawn, cursor and all. Same reason.
 	prompt_text string = terminal_prompt + '_'
 
-	pid       int = -1
-	to_child  int = -1
+	pid        int = -1
+	to_child   int = -1
 	from_child int = -1
-	exited    bool
-	error     string
+	exited     bool
+	error      string
 
 	// Rows from the bottom the view is scrolled back by. Zero follows the
 	// output, which is what a terminal does unless told otherwise.
@@ -249,7 +249,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	}
 	first := max_scroll - a.scroll
 
-	mut children := []ui2.Element{}
+	mut children := frame_elements(a.visible_rows + 2)
 	for row := 0; row < a.visible_rows; row++ {
 		index := first + row
 		if index < 0 || index >= total {
@@ -265,9 +265,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			// whose cursor does not flash.
 			a.prompt_text
 		}
-		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding +
-			row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)),
-			ui2.TextStyle{
+		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding + row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
 			color: terminal_text
 			font_family: 'mono'
 			size: 13
@@ -279,8 +277,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	if max_scroll > 0 {
 		button := 18
 		right := width - terminal_padding - button
-		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4),
-			f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
+		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
 			bg: terminal_button
 			radius: 4
 		}, ui2.TextStyle{
@@ -288,8 +285,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			size: 12
 			align: .center
 		})
-		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right),
-			f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
+		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
 			bg: terminal_button
 			radius: 4
 		}, ui2.TextStyle{
@@ -304,8 +300,12 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a TerminalApp) handle(event_id string) ! {
 	match event_id {
-		terminal_action_scroll_up { a.scroll += a.visible_rows }
-		terminal_action_scroll_down { a.scroll -= a.visible_rows }
+		terminal_action_scroll_up {
+			a.scroll += a.visible_rows
+		}
+		terminal_action_scroll_down {
+			a.scroll -= a.visible_rows
+		}
 		else {}
 	}
 }
