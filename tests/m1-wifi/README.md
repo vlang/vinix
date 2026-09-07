@@ -16,7 +16,8 @@ that this patch supplies.
 
 * `kernel/c/brcm_wifi.{c,h}`: BCM4378 core inventory/OTP, firmware bootstrap,
   board NVRAM packing, CLM/TXCAP/calibration loading, PCIe message rings,
-  completion ownership, firmware commands, WPA2-PSK/CCMP, and raw Ethernet.
+  completion ownership, firmware commands, radio control, network scanning,
+  WPA2-PSK/CCMP, and raw Ethernet.
 * `kernel/c/brcm_m1.{c,h}`: Apple PCIe port reset/clock sequencing, BAR allocation,
   a bounded 4 MiB DART mapping, exact-width MMIO and cache maintenance, loader
   staging, diagnostics and a bounded receive queue.
@@ -48,7 +49,7 @@ symbols and missing console hooks. It checks 18 retained Wi-Fi symbols after
 linker garbage collection, plus initialization and polling call sites. Ten
 negative/positive verifier tests run against the linked production image.
 
-Other validation: 24 protocol groups (including 100,000 parser mutations) and
+Other validation: 26 protocol groups (including 100,000 parser mutations) and
 7 simulated-platform groups pass with Clang ASan/UBSan and optimized GCC.
 Both driver C files separately compile using the kernel's freestanding headers
 with `-Wall -Wextra -Werror`. All 17 SPI keyboard regression groups pass. The
@@ -121,7 +122,10 @@ Do not substitute files from a different Mac or bypass power/regulatory limits.
    does not prove that the supplied files are appropriate; correct selection
    remains required. SHA-256 provenance records are provided for auditing.
 3. Include the resulting directory in the test initramfs, then use
-   `wifi-ctl load /path/to/wifi-bundle` and `wifi-ctl join 'SSID'`.
+   `wifi-ctl load /path/to/wifi-bundle`. Use `wifi-ctl scan` to start a bounded
+   asynchronous scan and `wifi-ctl networks` to show its results. `wifi-ctl off`
+   and `wifi-ctl on` reversibly control the firmware radio. To associate, run
+   `wifi-ctl join 'SSID'`.
    The utility prompts with terminal echo disabled; it does not take a password
    through argv or write one to a configuration file.
 
@@ -131,10 +135,16 @@ keys are established. There is no open-network or weaker-security fallback.
 
 The receive/transmit ABI is raw Ethernet through `/dev/wlan0`; readers must
 handle EAGAIN and preserve complete frames. It is not a socket/IP interface.
-The fixed-size ioctl ABI is documented in `kernel/c/brcm_m1.h`; it exposes no
-kernel pointers or arbitrary register access. Device permissions are 0600. Vinix does not yet have a complete credential/
-capability model; the mode is not a substitute for enforcing a multi-user
-security boundary. Use a controlled, single-user bring-up image.
+The fixed-size status, radio, scan and network-list ioctl ABI is documented in
+`kernel/c/brcm_m1.h`; it exposes no kernel pointers or arbitrary register
+access. Device permissions are 0600. Vinix does not yet have a complete
+credential/capability model; the mode is not a substitute for enforcing a
+multi-user security boundary. Use a controlled, single-user bring-up image.
+
+The desktop's **Settings > Wi-Fi** pane uses the same bounded ABI. It can turn
+the radio on or off, request a scan and list the strongest result for each
+SSID/security pair. Firmware loading and WPA2 credential entry intentionally
+remain in `wifi-ctl`.
 
 ## Failure and unsupported behavior
 
@@ -142,15 +152,17 @@ Timeouts, malformed completions, DART faults, link loss, unexpected deep-sleep
 requests, unsupported firmware, or unsupported security stop the driver.
 Bus mastering is disabled and the Wi-Fi DART stream is revoked; allocations are
 quarantined for the rest of the boot rather than reusing memory that may have
-outstanding DMA. Initialization is one-shot. Reboot to retry after a fatal error,
-interrupted upload, disconnect, or stopped state.
+outstanding DMA. Initialization is one-shot. `wifi-ctl off` is reversible;
+reboot to retry after a fatal error, interrupted upload, disconnect, or the
+one-way `wifi-ctl stop` command.
 
 This is not a suspend/resume implementation. Bluetooth shares the physical
 combo-chip reset and may be affected; takeover is refused when it is observed
 bus-mastering. Trackpad/keyboard drivers are unrelated. WPA3, enterprise Wi-Fi,
-AP mode, scanning UI, roaming, reconnect, powersave, and IPv4/IPv6/socket support
-are not implemented. These limitations are substantial: this bundle is a
-bring-up contribution, not a completed answer to making normal networking work.
+AP mode, joining from Settings, roaming, reconnect, powersave, and
+IPv4/IPv6/socket support are not implemented. These limitations are
+substantial: this bundle is a bring-up contribution, not a completed answer to
+making normal networking work.
 
 ## Primary implementation references and licensing
 

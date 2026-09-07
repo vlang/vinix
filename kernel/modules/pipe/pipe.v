@@ -33,7 +33,7 @@ pub fn initialise() {}
 
 pub fn create() ?&Pipe {
 	mut p := &Pipe{
-		data:     unsafe { malloc(pipe_buf) }
+		data: unsafe { malloc(pipe_buf) }
 		capacity: pipe_buf
 	}
 	p.stat.mode = stat.ifpipe
@@ -49,19 +49,18 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: pipe(0x%llx, 0x%x)\n', process.name.str, voidptr(pipefds),
-		flags)
+	C.printf(c'\n\e[32m%s\e[m: pipe(0x%llx, 0x%x)\n', process.name.str, voidptr(pipefds), flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
 	mut new_pipe := create() or { return errno.err, errno.get() }
 
-	rd_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags, 0, false) or {
+	rd_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags | resource.o_rdonly, 0, false) or {
 		return errno.err, errno.get()
 	}
 
-	wr_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags, 0, false) or {
+	wr_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags | resource.o_wronly, 0, false) or {
 		return errno.err, errno.get()
 	}
 
@@ -211,6 +210,12 @@ fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this Pipe) unref(handle voidptr) ? {
+	open_handle := unsafe { &file.Handle(handle) }
+	if open_handle.flags & resource.o_accmode == resource.o_wronly {
+		// EOF is a readiness condition. Wake poll/select/epoll waiters when the
+		// final descriptor sharing the write-side open description disappears.
+		this.status |= file.pollhup
+	}
 	katomic.dec(mut &this.refcount)
 	event.trigger(mut this.event, false)
 }

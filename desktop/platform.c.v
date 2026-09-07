@@ -336,6 +336,18 @@ fn (mut io PosixDeviceIO) write(fd int, buffer []u8) (int, DeviceError) {
 	return count, DeviceError.none
 }
 
+fn (mut io PosixDeviceIO) ioctl(fd int, request u64, mut buffer []u8) DeviceError {
+	result := if buffer.len > 0 {
+		desktop_ioctl(fd, request, buffer.data)
+	} else {
+		desktop_ioctl(fd, request, unsafe { nil })
+	}
+	if result < 0 {
+		return device_errno(C.errno)
+	}
+	return .none
+}
+
 fn (mut io PosixDeviceIO) close(fd int) DeviceError {
 	if C.close(fd) < 0 {
 		return device_errno(C.errno)

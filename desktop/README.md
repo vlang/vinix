@@ -22,8 +22,8 @@ What it does:
   way back up
 - an **activity monitor** listing every process on the machine with the share
   of a CPU and of RAM it is using, updated once a second
-- a **settings application**: window button side, taskbar style, theme and
-  wallpaper, applied to the running desktop as they are chosen
+- a **settings application**: window button side, taskbar style, theme,
+  wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **hosted ui2 applications**: ui2's own examples run in windows of their own,
   several at a time, each with its own state
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the
@@ -44,10 +44,11 @@ typing any word with a q in it drop the user back to the console.
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
-    settings.v     the preferences: themes, wallpaper, Display and Battery
+    settings.v     preferences shared by the desktop and Settings application
     settings_app.v the settings application
+    settings_wifi.v the Wi-Fi pane: radio control, scan and network list
     wallpaper.v    loading and scaling a wallpaper photograph
-    backlight_client.v / battery_client.v  native V device clients
+    backlight_client.v / battery_client.v / wifi_client.v  V device clients
     platform.c.v   V POSIX bindings, terminal state, mmap, clocks and directories
     render.v       a ui2 backend that draws an element tree into a framebuffer
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
@@ -226,6 +227,13 @@ instead put close outermost, which is what both conventions do.
 
 **Wallpaper** offers six colours and ten photographs.
 
+**Display** reports and controls the experimental Apple panel backlight, while
+**Battery** reports the Apple SMC battery device. **Wi-Fi** reads the optional
+BCM4378 driver, controls its firmware radio, starts scans and lists the networks
+found. Firmware loading and network credentials remain in `wifi-ctl`, and the
+raw Ethernet device is not an IP stack. See `SETTINGS.md` for the exact device
+and hardware limitations.
+
 Settings is the one application that holds a pointer back to the `Desktop`. It
 writes preferences straight into it, and since the window manager composes the
 whole screen from those preferences on the next frame, a choice takes effect
@@ -374,9 +382,10 @@ All handwritten desktop implementations and tests are V. `platform.c.v` is
 V source using libc declarations and the target headers for constants and
 ABI types; it contains no embedded C implementations. It replaces `shim.h`,
 which previously wrapped framebuffer mapping, descriptors, raw terminal mode,
-clocks and directory iteration. `backlight_client.v` and `battery_client.v`
-replace the other two header-only implementations. Device parsers, percentage
-conversion, retry policies, state and mocks are ordinary V.
+clocks and directory iteration. `backlight_client.v`, `battery_client.v` and
+`wifi_client.v` replace the other header-only implementations and provide the
+Wi-Fi ioctl client. Device parsers, percentage conversion, retry policies,
+state and mocks are ordinary V.
 
 Run `V=/path/to/v sh desktop/tools/test-settings.sh` with the existing
 `third_party/ui2` checkout. All client, POSIX and UI tests run; missing V/ui2

@@ -22,8 +22,8 @@ struct fake {
     struct posted ctl[1024],event[1024],rx[2048];unsigned ctl_n,event_n,rx_n;
     uint32_t shared,info,desc;uint16_t consumed[3],produced[3];
     uint64_t idx[4],flow_dma;uint16_t flow_count;
-    uint64_t time;unsigned stopped,received,syncs,commands,tx,keys;
-    int model,boot_timeout,no_reply,no_ack,unsupported_supplicant,withhold_key,bad_shared,version;
+    uint64_t time;unsigned stopped,received,syncs,commands,tx,keys,radio_up,radio_down,scans;
+    int model,boot_timeout,no_reply,no_ack,unsupported_supplicant,withhold_key,bad_shared,malformed_scan,version;
 };
 static uint8_t *dma(struct fake *f,uint64_t a,size_t n){assert(a>=0x10000000&&a-0x10000000<=BW_POOL_MIN&&n<=BW_POOL_MIN-(a-0x10000000));return f->pool+(size_t)(a-0x10000000);}
 static void finish(struct fake *f,unsigned ring,const uint8_t *m,size_t n){
@@ -33,11 +33,20 @@ static void finish(struct fake *f,unsigned ring,const uint8_t *m,size_t n){
     memset(dma(f,addr+(uint64_t)p*size,size),0,size);memcpy(dma(f,addr+(uint64_t)p*size,size),m,n);
     f->produced[ring]=(uint16_t)((p+1)%count);w16(dma(f,f->idx[2]+ring*2,2),f->produced[ring]);
 }
-static void send_event(struct fake *f,uint32_t type,uint32_t status,uint16_t flags){
-    assert(f->event_n);struct posted p=f->event[--f->event_n];uint8_t *frame=dma(f,p.dma,72);memset(frame,0,72);
-    be16(frame+12,0x886c);be16(frame+14,0x8001);be16(frame+16,54);frame[18]=0;memcpy(frame+19,"\x00\x10\x18",3);be16(frame+22,1);be16(frame+24,2);
-    be16(frame+26,flags);be32(frame+28,type);be32(frame+32,status);memcpy(frame+48,"\x02\xaa\xbb\xcc\xdd\xee",6);
-    uint8_t c[24]={0x0e};w32(c+4,p.token);w16(c+12,72);finish(f,0,c,24);
+static void send_event_data(struct fake *f,uint32_t type,uint32_t status,uint16_t flags,const uint8_t *data,size_t n){
+    assert(f->event_n&&n<=8192-72);struct posted p=f->event[--f->event_n];uint8_t *frame=dma(f,p.dma,72+n);memset(frame,0,72+n);
+    be16(frame+12,0x886c);be16(frame+14,0x8001);be16(frame+16,(uint16_t)(54+n));frame[18]=0;memcpy(frame+19,"\x00\x10\x18",3);be16(frame+22,1);be16(frame+24,2);
+    be16(frame+26,flags);be32(frame+28,type);be32(frame+32,status);be32(frame+44,(uint32_t)n);memcpy(frame+48,"\x02\xaa\xbb\xcc\xdd\xee",6);if(n)memcpy(frame+72,data,n);
+    uint8_t c[24]={0x0e};w32(c+4,p.token);w16(c+12,(uint16_t)(72+n));finish(f,0,c,24);
+}
+static void send_event(struct fake *f,uint32_t type,uint32_t status,uint16_t flags){send_event_data(f,type,status,flags,NULL,0);}
+static void send_scan_bss(struct fake *f,uint16_t sync,const char *ssid,int rssi,unsigned channel,int secure,unsigned address){
+    uint8_t data[140]={0},*bss=data+12;size_t n=strlen(ssid);assert(n<=32);
+    w32(data,sizeof(data));w32(data+4,1);w16(data+8,sync);w16(data+10,1);
+    w32(bss,109);w32(bss+4,128);bss[8]=2;bss[13]=(uint8_t)address;w16(bss+16,secure?0x10:0);
+    bss[18]=(uint8_t)n;memcpy(bss+19,ssid,n);w16(bss+72,(uint16_t)channel);w16(bss+78,(uint16_t)rssi);bss[88]=(uint8_t)channel;
+    if(f->malformed_scan)w32(bss+4,1024);
+    send_event_data(f,69,8,0,data,sizeof(data));
 }
 static void handle_control(struct fake *f,const uint8_t *m){
     unsigned type=m[0];
@@ -48,10 +57,17 @@ static void handle_control(struct fake *f,const uint8_t *m){
     assert(type==9);f->commands++;uint32_t cmd=le32(m+8);size_t len=le16(m+14);uint8_t *input=dma(f,le64(m+24),len);
     int16_t status=0;
     if(cmd==263){assert(len&&memchr(input,0,len));if(!strcmp((char *)input,"sup_wpa")&&f->unsupported_supplicant)status=-23;}
+    if(cmd==2)f->radio_up++;
+    if(cmd==3)f->radio_down++;
     if(cmd==268){assert(len==68&&le16(input)==12&&le16(input+2)==1);assert(!memcmp(input+4,"correct-pass",12));f->keys++;}
     if(!f->no_ack){uint8_t ack[24]={0x0a};w32(ack+4,le32(m+4));finish(f,0,ack,24);}
     if(!f->no_reply){assert(f->ctl_n);struct posted p=f->ctl[--f->ctl_n];uint8_t c[24]={0x0c};w32(c+4,p.token);w16(c+8,(uint16_t)status);w16(c+14,le16(m+12));w32(c+16,cmd);finish(f,0,c,24);}
     if(cmd==26){assert(f->keys);assert(le32(input)==4&&!memcmp(input+4,"test",4));send_event(f,0,0,0);if(!f->withhold_key)send_event(f,46,6,0);}
+    if(cmd==263&&!strcmp((char *)input,"escan")){
+        const uint8_t *q=input+6;assert(len==78&&le32(q)==1&&le16(q+4)==1&&q[50]==2&&q[51]==0xff);f->scans++;
+        send_scan_bss(f,le16(q+6),"Vinix",-55,36,1,1);
+        if(!f->malformed_scan){send_scan_bss(f,le16(q+6),"Vinix",-42,44,1,2);send_scan_bss(f,le16(q+6),"Guest",-67,6,0,3);send_event(f,69,0,0);}
+    }
 }
 static void pump(struct fake *f){
     if(!f->model||!f->desc||!le64(f->tcm+f->info+20))return;
@@ -145,12 +161,14 @@ static void test_tx_flow(void){struct fake *f=fixture();assert(!start(f));join(f
 static void test_bad_index(void){struct fake *f=fixture();assert(!start(f));w16(dma(f,f->idx[2],2),UINT16_MAX);assert(bw_poll(f->d,64)==BW_EPROTO&&f->stopped==1);destroy(f);}
 static void test_unknown_packet_id(void){struct fake *f=fixture();assert(!start(f));uint8_t m[40]={0x12};w32(m+4,0xdeadbeef);finish(f,2,m,32);assert(bw_poll(f->d,64)==BW_EPROTO);destroy(f);}
 static void test_bad_credentials(void){struct fake *f=fixture();assert(!start(f));assert(bw_join_wpa2(f->d,(uint8_t *)"test",33,(uint8_t *)"123",3)==BW_EINVAL&&f->d->state==BW_READY);destroy(f);}
+static void test_radio_and_scan(void){struct fake *f=fixture();assert(!start(f)&&f->d->radio_on&&f->radio_up==1);assert(!bw_scan(f->d)&&f->scans==1&&!f->d->scan_pending&&f->d->network_count==2);uint8_t out[BW_NETWORKS_SIZE];assert(!bw_networks(f->d,out,sizeof(out)));assert(le32(out)==1&&le32(out+4)==2&&!le32(out+8)&&!le32(out+12));assert(out[16]==5&&out[17]==1&&le16(out+18)==44&&(int16_t)le16(out+20)==-42&&!memcmp(out+32,"Vinix",5));assert(out[64]==5&&out[65]==0&&le16(out+66)==6);assert(!bw_radio(f->d,0)&&!f->d->radio_on&&f->radio_down==1&&bw_scan(f->d)==BW_EINVAL);assert(!bw_radio(f->d,1)&&f->d->radio_on&&f->radio_up==2);destroy(f);}
+static void test_scan_bounds(void){struct fake *f=fixture();assert(!start(f));f->malformed_scan=1;assert(bw_scan(f->d)==BW_EPROTO&&f->d->state==BW_FAULT&&!f->d->radio_on&&!f->d->scan_pending&&f->stopped==1);destroy(f);}
 static void test_link_loss(void){struct fake *f=fixture();assert(!start(f));join(f);send_event(f,16,0,0);assert(bw_poll(f->d,64)==BW_ENOLINK&&f->stopped==1);destroy(f);}
 static void test_parser_mutations(void){uint32_t rng=0x98765432;uint8_t b[1024],out[2048];struct bw_otp otp;size_t used;for(unsigned t=0;t<100000;t++){rng^=rng<<13;rng^=rng>>17;rng^=rng<<5;size_t n=rng%sizeof(b);for(size_t i=0;i<n;i++){rng^=rng<<13;rng^=rng>>17;rng^=rng<<5;b[i]=(uint8_t)rng;}(void)bw_nvram_pack(b,n,out,sizeof(out),&used);(void)bw_otp_parse(b,n,&otp);}}
 int main(void){
  TEST(test_nvram_golden);TEST(test_nvram_reject);TEST(test_otp);TEST(test_otp_bounds);TEST(test_device_gate);TEST(test_bad_erom);TEST(test_probe_revision);
  TEST(test_boot_and_rings);TEST(test_firmware_timeout);TEST(test_shared_pointer);TEST(test_protocol_version);TEST(test_ioctl_timeout);TEST(test_ack_required);
  TEST(test_wpa2_authorization);TEST(test_assoc_not_authorized);TEST(test_unsupported_supplicant);TEST(test_receive);TEST(test_rx_bounds);TEST(test_tx_flow);
- TEST(test_bad_index);TEST(test_unknown_packet_id);TEST(test_bad_credentials);TEST(test_link_loss);TEST(test_parser_mutations);
+ TEST(test_bad_index);TEST(test_unknown_packet_id);TEST(test_bad_credentials);TEST(test_radio_and_scan);TEST(test_scan_bounds);TEST(test_link_loss);TEST(test_parser_mutations);
  printf("%u groups passed; 100000 parser mutations\n",tests);return 0;
 }

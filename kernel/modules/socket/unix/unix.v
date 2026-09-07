@@ -264,7 +264,9 @@ fn (mut this UnixSocket) link(handle voidptr) ? {
 }
 
 fn (mut this UnixSocket) unlink(handle voidptr) ? {
-	return none
+	// The VFS owns the socket path. Once it has passed its namespace checks,
+	// there is no backing store operation left for a UNIX socket to perform.
+	return
 }
 
 fn (mut this UnixSocket) grow(handle voidptr, new_size u64) ? {
@@ -326,15 +328,33 @@ fn (mut this UnixSocket) getsockopt(handle voidptr, level int, optname int) ?int
 	}
 
 	match optname {
-		sock_pub.so_type { return this.socktype }
-		sock_pub.so_error { return 0 }
-		sock_pub.so_acceptconn { return if this.listening { 1 } else { 0 } }
-		sock_pub.so_domain { return sock_pub.af_unix }
-		sock_pub.so_protocol { return 0 }
-		sock_pub.so_sndbuf, sock_pub.so_rcvbuf { return int(this.capacity) }
-		sock_pub.so_reuseaddr { return this.reuseaddr }
-		sock_pub.so_keepalive { return this.keepalive }
-		sock_pub.so_broadcast { return this.broadcast }
+		sock_pub.so_type {
+			return this.socktype
+		}
+		sock_pub.so_error {
+			return 0
+		}
+		sock_pub.so_acceptconn {
+			return if this.listening { 1 } else { 0 }
+		}
+		sock_pub.so_domain {
+			return sock_pub.af_unix
+		}
+		sock_pub.so_protocol {
+			return 0
+		}
+		sock_pub.so_sndbuf, sock_pub.so_rcvbuf {
+			return int(this.capacity)
+		}
+		sock_pub.so_reuseaddr {
+			return this.reuseaddr
+		}
+		sock_pub.so_keepalive {
+			return this.keepalive
+		}
+		sock_pub.so_broadcast {
+			return this.broadcast
+		}
 		else {
 			errno.set(errno.enoprotoopt)
 			return none
@@ -351,9 +371,15 @@ fn (mut this UnixSocket) setsockopt(handle voidptr, level int, optname int, valu
 	// The options below change nothing about how a unix socket behaves here,
 	// but a program that sets one and reads it back should see what it wrote.
 	match optname {
-		sock_pub.so_reuseaddr, sock_pub.so_reuseport { this.reuseaddr = value }
-		sock_pub.so_keepalive { this.keepalive = value }
-		sock_pub.so_broadcast { this.broadcast = value }
+		sock_pub.so_reuseaddr, sock_pub.so_reuseport {
+			this.reuseaddr = value
+		}
+		sock_pub.so_keepalive {
+			this.keepalive = value
+		}
+		sock_pub.so_broadcast {
+			this.broadcast = value
+		}
 		sock_pub.so_sndbuf, sock_pub.so_rcvbuf, sock_pub.so_linger, sock_pub.so_oobinline {}
 		else {
 			errno.set(errno.enoprotoopt)
@@ -395,27 +421,18 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 
 	print('unix accept: got connection, setting up peer\n')
 
-	mut peer := this.backlog.pop()
-
-	mut connection_socket := &UnixSocket{
-		refcount:  1
-		peer:      peer
-		connected: true
-		name:      peer.name
-		data:      unsafe { malloc(sock_buf) }
-		capacity:  sock_buf
-	}
-
-	peer.refcount++
-	peer.peer = connection_socket
-	peer.connected = true
+	// connect() builds both ends before it returns, then queues the server end
+	// here. Waiting until accept() to join the pair made a normal single-threaded
+	// connect-then-accept sequence deadlock.
+	mut connection_socket := this.backlog[0]
+	this.backlog.delete(0)
 
 	if this.backlog.len == 0 {
 		this.status &= ~file.pollin
 	}
 
-	print('unix accept: triggering client connection_event\n')
-	event.trigger(mut peer.connection_event, false)
+	// A blocked connect may now have room in the listening queue.
+	event.trigger(mut this.event, false)
 
 	print('unix accept: done\n')
 	return connection_socket
@@ -472,23 +489,31 @@ fn (mut this UnixSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 	}
 
 	socket.l.acquire()
+	defer {
+		socket.l.release()
+	}
 
-	socket.backlog << this
+	// A connected UNIX stream is established when connect() places it in the
+	// listener's queue, not when accept() eventually removes it. This permits a
+	// client to connect and send before the server calls accept(), as Linux does.
+	mut connection_socket := &UnixSocket{
+		refcount: 1
+		peer: this
+		connected: true
+		name: socket.name
+		data: unsafe { malloc(sock_buf) }
+		capacity: sock_buf
+		status: file.pollout
+		socktype: this.socktype
+	}
+
+	this.peer = connection_socket
+	this.connected = true
+	this.status |= file.pollout
+	socket.backlog << connection_socket
 
 	socket.status |= file.pollin
 	event.trigger(mut socket.event, false)
-
-	socket.l.release()
-
-	mut events := [&this.connection_event]
-	event.await(mut events, true) or {
-		unsafe { events.free() }
-		errno.set(errno.eintr)
-		return none
-	}
-	unsafe { events.free() }
-
-	this.status |= file.pollout
 	event.trigger(mut this.event, false)
 }
 
@@ -665,8 +690,8 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 pub fn create(@type int) ?&UnixSocket {
 	mut ret := &UnixSocket{
 		refcount: 1
-		peer:     unsafe { nil }
-		data:     unsafe { malloc(sock_buf) }
+		peer: unsafe { nil }
+		data: unsafe { malloc(sock_buf) }
 		capacity: sock_buf
 	}
 	ret.name.sun_family = sock_pub.af_unix
@@ -678,8 +703,8 @@ pub fn create(@type int) ?&UnixSocket {
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount: 1
-		peer:     unsafe { nil }
-		data:     unsafe { malloc(sock_buf) }
+		peer: unsafe { nil }
+		data: unsafe { malloc(sock_buf) }
 		capacity: sock_buf
 	}
 	a.name.sun_family = sock_pub.af_unix
@@ -687,8 +712,8 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	a.status |= file.pollout
 	mut b := &UnixSocket{
 		refcount: 1
-		peer:     unsafe { nil }
-		data:     unsafe { malloc(sock_buf) }
+		peer: unsafe { nil }
+		data: unsafe { malloc(sock_buf) }
 		capacity: sock_buf
 	}
 	b.name.sun_family = sock_pub.af_unix

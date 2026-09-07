@@ -15,18 +15,20 @@ enum SettingsCategory {
 	appearance
 	theme
 	wallpaper
+	wifi
 	display
 	battery
 }
 
-const settings_categories = [SettingsCategory.appearance, .theme, .wallpaper, .display,
-	.battery]
+const settings_categories = [SettingsCategory.appearance, .theme, .wallpaper, .wifi,
+	.display, .battery]
 
 fn (c SettingsCategory) title() string {
 	return match c {
 		.appearance { 'Appearance' }
 		.theme { 'Theme' }
 		.wallpaper { 'Wallpaper' }
+		.wifi { 'Wi-Fi' }
 		.display { 'Display' }
 		.battery { 'Battery' }
 	}
@@ -51,7 +53,7 @@ mut:
 	desktop  &Desktop = unsafe { nil }
 	category SettingsCategory = .appearance
 	images   []WallpaperImage
-	// Display and Battery read a device rather than the desktop's own
+	// Display, Battery and Wi-Fi read devices rather than the desktop's own
 	// preferences, so they carry the last readback and the labels made from
 	// it. The reads are injectable so host tests can drive them.
 	battery_read  fn (bool) int         = read_battery
@@ -62,6 +64,17 @@ mut:
 	initialized   bool
 	read_state    fn (mut BacklightState) BacklightResult = read_backlight
 	write_percent fn (int) BacklightResult = set_backlight_percent
+	wifi_state         WifiState
+	wifi_read_result   WifiResult = .unavailable
+	wifi_action_result WifiResult
+	wifi_last_poll_ms  u64
+	wifi_initialized   bool
+	wifi_read          fn (mut WifiState) WifiResult = read_wifi
+	wifi_radio         fn (bool) WifiResult = set_wifi_radio
+	wifi_scan          fn () WifiResult = scan_wifi
+	wifi_names         [32]string
+	wifi_details       [32]string
+	wifi_offset        int
 	// Owned, cached labels. Replaced only when a readback changes, never per
 	// frame: the framebuffer renderer frees child arrays, not strings.
 	level_text     string
@@ -104,6 +117,13 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 			a.refresh()
 		}
 	}
+	if a.category == .wifi {
+		now := desktop_monotonic_ms()
+		if !a.wifi_initialized || (now != ~u64(0) && (now < a.wifi_last_poll_ms
+			|| now - a.wifi_last_poll_ms >= 1000)) {
+			a.refresh_wifi()
+		}
+	}
 
 	children << ui2.view('', ui2.rect(f64(pane_x), 0, f64(pane_width), f64(height)), ui2.BoxStyle{
 		bg: app_surface
@@ -119,6 +139,7 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 // preferences and have nothing to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
+		.wifi { return a.wifi_pane(width, height) }
 		.display { return a.display_pane(width) }
 		.battery { return a.battery_pane(width) }
 		else {}
@@ -335,6 +356,10 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 			// the pane blank until the next poll comes round.
 			match a.category {
 				.battery { a.battery_read(true) }
+				.wifi {
+					a.wifi_action_result = WifiResult.ok
+					a.refresh_wifi()
+				}
 				.display {
 					a.write_result = BacklightResult.ok
 					a.refresh()
@@ -342,6 +367,10 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 				else {}
 			}
 		}
+		return
+	}
+	if a.category == .wifi {
+		a.handle_wifi(event_id)
 		return
 	}
 	if a.category == .display || a.category == .battery {

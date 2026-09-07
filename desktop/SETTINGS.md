@@ -1,9 +1,33 @@
-# Settings / Display
+# Settings
+
+## Wi-Fi
+
+Select **Wi-Fi** to inspect `/dev/wlan0`. After the experimental Apple Wi-Fi
+driver has been enabled with the exact kernel argument `vinix.apple_wifi=1` and
+matching BCM4378 firmware has been loaded, Settings can turn the firmware radio
+on or off, start an asynchronous scan, and list the networks found. Results are
+shown strongest first with security, channel and RSSI. **Refresh** rereads the
+driver without starting a scan.
+
+Firmware is not included. Firmware packaging/loading and WPA2 credential entry
+remain in `wifi-ctl`; selecting a network in Settings does not join it. The
+device currently provides raw Ethernet rather than IPv4/IPv6 sockets, so a
+successful association is not yet ordinary Internet connectivity. See
+[`../tests/m1-wifi/README.md`](../tests/m1-wifi/README.md) for bring-up and
+hardware limitations.
+
+The Wi-Fi client validates the fixed-size ioctl responses, bounds SSIDs and the
+network count, retries interrupted calls, and falls back to read-only access for
+displaying state. Mutating controls require write access and re-read device
+state immediately before acting, so stale buttons cannot mutate a device that
+has since disappeared or changed state.
+
+## Display
 
 Open **Settings** from its wallpaper shortcut or taskbar launcher, then select
 **Display**.
 
-## Scale
+### Scale
 
 Display scale has two integer choices: **100%** and **200%**. Changing it takes
 effect immediately for the whole desktop. At 200%, the compositor lays the UI
@@ -24,7 +48,7 @@ screen, maximized windows are refit, and old hit targets are discarded before
 the next frame. Oversized windows are kept at the top-left so Settings remains
 reachable even after manually selecting 200% on a small framebuffer.
 
-## Brightness
+### Brightness
 
 The click-to-set bar has 5% steps; **- 5%** and **+ 5%** adjust the current
 requested level (or the actual level before the first request). **Refresh**
@@ -58,7 +82,8 @@ positive short write is an error and its suffix is never retried as a command.
 
 ## Implementation and tests
 
-`settings.v` implements `HostedApp`; `app.v` registers the launcher. `scale.v`
+`settings_app.v` implements `HostedApp`; `app.v` registers the launcher, and
+`settings.v` stores the desktop preferences and themes. `scale.v`
 owns the requested/applied integer scale and default policy. `scale_wm.v` swaps
 the compositor's logical canvas between physical size and half size, remaps
 window/pointer positions and invalidates stale hit targets. `framebuffer.v`
@@ -67,8 +92,9 @@ keeps its existing 100% fast path and expands the half-size canvas at 200%.
 `backlight_client.v` owns brightness parsing, native
 `BacklightState`/`BacklightResult`, percentage calculations and bounded command
 I/O. `device_io.v` is the V interface used by both the production POSIX backend
-(`platform.c.v`) and V test doubles. There are no handwritten C client or test
-files.
+(`platform.c.v`) and V test doubles. `wifi_client.v` owns the Wi-Fi ioctl parser
+and actions, while `settings_wifi.v` owns the corresponding pane. There are no
+handwritten C desktop client or test files.
 
 Dynamic brightness labels are cached and replaced only when readback changes.
 Disabled controls use `enabled=false`; event handling independently rechecks
@@ -87,8 +113,9 @@ skip missing dependencies. `VFLAGS` can select the compiler/backend or
 sanitizers. Settings regression cases cover both scale choices, stale scale hit
 targets, MacBook/low-density defaults, odd-size logical extents, explicit
 brightness writes, stale brightness hit targets, unknown readback, failed
-writes, category switching, refresh and narrow layouts. The client tests cover
-strict snapshots, arithmetic limits, permissions, offline and missing devices,
+writes, category switching, Wi-Fi radio and scan actions, network sorting,
+refresh and narrow layouts. The client tests cover strict snapshots and ioctl
+records, arithmetic and parser limits, permissions, offline and missing devices,
 short writes, bounded interruptions, exact descriptor cleanup, and a round-trip
 with the actual **V kernel backlight core**. The POSIX tests exercise real files,
 shared mapping, directories, `/dev/null`, monotonic clocks and a PTY, including

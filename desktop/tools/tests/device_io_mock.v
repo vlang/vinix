@@ -13,21 +13,28 @@ mut:
 	rw_error           DeviceError
 	read_error         DeviceError
 	write_error        DeviceError
+	ioctl_error        DeviceError
 	close_error        DeviceError
 	stat_error         DeviceError
 	character          bool = true
 	interrupted_opens  int
 	interrupted_reads  int
 	interrupted_writes int
+	interrupted_ioctls int
 	short_write        bool
 	opens              int
 	closes             int
 	reads              int
 	writes             int
+	ioctls             int
 	stats              int
 	live               bool
 	write_open         bool
 	written            []u8
+	ioctl_written      []u8
+	ioctl_request      u64
+	wifi_status_reply  []u8
+	wifi_network_reply []u8
 }
 
 fn (mut m MockDevice) open(path string, writable bool) (int, DeviceError) {
@@ -87,6 +94,35 @@ fn (mut m MockDevice) write(fd int, buffer []u8) (int, DeviceError) {
 	}
 	m.written = buffer.clone()
 	return buffer.len - if m.short_write { 1 } else { 0 }, DeviceError.none
+}
+
+fn (mut m MockDevice) ioctl(fd int, request u64, mut buffer []u8) DeviceError {
+	assert fd == 42 && m.live
+	m.ioctls++
+	m.ioctl_request = request
+	if m.interrupted_ioctls > 0 {
+		m.interrupted_ioctls--
+		return .interrupted
+	}
+	if m.ioctl_error != .none {
+		return m.ioctl_error
+	}
+	if request == wifi_ioctl_status || request == wifi_ioctl_networks {
+		reply := if request == wifi_ioctl_status {
+			m.wifi_status_reply
+		} else {
+			m.wifi_network_reply
+		}
+		if reply.len != buffer.len {
+			return .io
+		}
+		for i, byte in reply {
+			buffer[i] = byte
+		}
+	} else {
+		m.ioctl_written = buffer.clone()
+	}
+	return .none
 }
 
 fn (mut m MockDevice) close(fd int) DeviceError {

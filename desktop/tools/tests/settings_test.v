@@ -18,6 +18,12 @@ __global (
 	fixture_write_result BacklightResult
 	fixture_writes       int
 	fixture_percent      int
+	fixture_wifi_state   WifiState
+	fixture_wifi_result  WifiResult
+	fixture_wifi_action  WifiResult
+	fixture_wifi_radios  int
+	fixture_wifi_enabled bool
+	fixture_wifi_scans   int
 )
 
 fn fixture_read(mut out BacklightState) BacklightResult {
@@ -35,6 +41,72 @@ fn fixture_write(percent int) BacklightResult {
 		fixture_state.pending = true
 	}
 	return fixture_write_result
+}
+
+fn fixture_wifi_read(mut out WifiState) WifiResult {
+	if fixture_wifi_result == .ok {
+		out = fixture_wifi_state
+	}
+	return fixture_wifi_result
+}
+
+fn fixture_wifi_radio(enabled bool) WifiResult {
+	fixture_wifi_radios++
+	fixture_wifi_enabled = enabled
+	if fixture_wifi_action == .ok {
+		fixture_wifi_state.radio_on = enabled
+		if !enabled {
+			fixture_wifi_state.scanning = false
+		}
+	}
+	return fixture_wifi_action
+}
+
+fn fixture_wifi_scan() WifiResult {
+	fixture_wifi_scans++
+	if fixture_wifi_action == .ok {
+		fixture_wifi_state.scanning = true
+	}
+	return fixture_wifi_action
+}
+
+fn wifi_fixture_app() &SettingsApp {
+	mut app := fixture_app()
+	mut state := WifiState{
+		driver_state: 3
+		radio_on: true
+		writable: true
+		count: 2
+	}
+	state.networks[0] = WifiNetwork{ ssid_len: 4, secure: false, channel: 6, rssi: -70 }
+	state.networks[1] = WifiNetwork{ ssid_len: 6, secure: true, channel: 44, rssi: -38 }
+	for i, byte in 'Open'.bytes() {
+		state.networks[0].ssid[i] = byte
+	}
+	for i, byte in 'Strong'.bytes() {
+		state.networks[1].ssid[i] = byte
+	}
+	state.count = 7
+	for index in 2 .. state.count {
+		state.networks[index] = WifiNetwork{
+			ssid_len: 2
+			secure: index % 2 == 0
+			channel: index + 1
+			rssi: -80 - index
+		}
+		state.networks[index].ssid[0] = `N`
+		state.networks[index].ssid[1] = u8(`0` + index)
+	}
+	fixture_wifi_state = state
+	fixture_wifi_result = .ok
+	fixture_wifi_action = .ok
+	fixture_wifi_radios = 0
+	fixture_wifi_enabled = true
+	fixture_wifi_scans = 0
+	app.wifi_read = fixture_wifi_read
+	app.wifi_radio = fixture_wifi_radio
+	app.wifi_scan = fixture_wifi_scan
+	return app
 }
 
 fn fixture_app() &SettingsApp {
@@ -183,5 +255,58 @@ fn test_settings_steps_clamp_and_narrow_layout() {
 	root := app.build(ui2.rect(0, 0, 320, 200)) or { panic(err) }
 	if _ := element_named(root, 'settings.brightness.50') {
 		assert false, 'offscreen controls must not become hit targets'
+	}
+}
+
+fn test_settings_wifi_toggle_scan_and_network_list() {
+	mut app := wifi_fixture_app()
+	wifi_index := settings_categories.index(SettingsCategory.wifi)
+	assert wifi_index >= 0 && SettingsCategory.wifi.title() == 'Wi-Fi'
+	app.handle('${settings_action_category}${wifi_index}') or { panic(err) }
+	root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	toggle := element_named(root, settings_wifi_toggle) or { panic('missing Wi-Fi toggle') }
+	scan := element_named(root, settings_wifi_scan) or { panic('missing Wi-Fi scan') }
+	strong := element_named(root, 'settings.wifi.network.0') or { panic('missing strongest network') }
+	detail := element_named(root, 'settings.wifi.detail.0') or { panic('missing network detail') }
+	assert toggle.enabled && toggle.text == 'Turn off' && scan.enabled
+	assert strong.text == 'Strong' && detail.text.contains('Secured') && detail.text.contains('-38 dBm')
+	next := element_named(root, settings_wifi_next) or { panic('missing Wi-Fi next button') }
+	assert next.enabled
+	app.handle(settings_wifi_next) or { panic(err) }
+	assert app.wifi_offset > 0
+	paged := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	previous := element_named(paged, settings_wifi_previous) or { panic('missing Wi-Fi previous button') }
+	assert previous.enabled
+	app.handle(settings_wifi_toggle) or { panic(err) }
+	assert fixture_wifi_radios == 1 && !fixture_wifi_enabled && !app.wifi_state.radio_on
+	off := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	off_toggle := element_named(off, settings_wifi_toggle) or { panic('missing off toggle') }
+	off_scan := element_named(off, settings_wifi_scan) or { panic('missing disabled scan') }
+	assert off_toggle.text == 'Turn on' && !off_scan.enabled
+	app.handle(settings_wifi_toggle) or { panic(err) }
+	app.handle(settings_wifi_scan) or { panic(err) }
+	assert fixture_wifi_radios == 2 && fixture_wifi_enabled && fixture_wifi_scans == 1
+	assert app.wifi_state.scanning
+}
+
+fn test_settings_wifi_failures_stale_targets_and_narrow_layout() {
+	mut app := wifi_fixture_app()
+	wifi_index := settings_categories.index(SettingsCategory.wifi)
+	app.handle('${settings_action_category}${wifi_index}') or { panic(err) }
+	fixture_wifi_state.writable = false
+	app.handle(settings_wifi_toggle) or { panic(err) }
+	assert fixture_wifi_radios == 0
+	fixture_wifi_state.writable = true
+	fixture_wifi_action = .io
+	app.handle(settings_wifi_scan) or { panic(err) }
+	assert fixture_wifi_scans == 1 && app.wifi_status_text().contains('failed')
+	fixture_wifi_result = .unavailable
+	app.handle(settings_wifi_refresh) or { panic(err) }
+	missing := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	toggle := element_named(missing, settings_wifi_toggle) or { panic('missing Wi-Fi toggle') }
+	assert !toggle.enabled && app.wifi_status_text().contains('not available')
+	narrow := app.build(ui2.rect(0, 0, 320, 200)) or { panic(err) }
+	if _ := element_named(narrow, settings_wifi_toggle) {
+		assert false, 'offscreen Wi-Fi controls must not become hit targets'
 	}
 }

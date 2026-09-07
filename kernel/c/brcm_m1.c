@@ -196,7 +196,8 @@ int brcm_m1_status(uint8_t *out){
     put32(out,host.dev.state);put32(out+4,(uint32_t)host.dev.error);put32(out+8,host.dev.revision);put32(out+12,host.dart_error);
     put64(out+16,host.dev.rx_frames);put64(out+24,host.dev.tx_frames);memcpy(out+32,host.p.mac,6);
     memcpy(out+40,host.dev.otp.module,16);memcpy(out+56,host.dev.otp.vendor,16);memcpy(out+72,host.dev.otp.revision,16);memcpy(out+88,host.dev.otp.silicon,16);
-    memcpy(out+104,host.p.antenna,16);memcpy(out+120,"apple,shikoku",13);put64(out+152,host.drops);return 0;
+    memcpy(out+104,host.p.antenna,16);memcpy(out+120,"apple,shikoku",13);put64(out+152,host.drops);
+    put32(out+160,host.dev.radio_on);put32(out+164,host.dev.scan_pending);put32(out+168,host.dev.network_count);put32(out+172,(uint32_t)host.dev.scan_error);return 0;
 }
 static uint8_t *part(unsigned k){return k==0?host.firmware:(k==1?host.nvram:(k==2?host.clm:host.txcap));}
 static size_t part_capacity(unsigned k){return k==0?sizeof(host.firmware):(k==1?sizeof(host.nvram):sizeof(host.clm));}
@@ -223,6 +224,9 @@ int brcm_m1_boot(const uint8_t *q){
     return e;
 }
 int brcm_m1_join(const uint8_t *q){if(!q)return BW_EINVAL;return bw_join_wpa2(&host.dev,q+8,get32(q),q+40,get32(q+4));}
+int brcm_m1_radio(const uint8_t *q){if(!q)return BW_EINVAL;uint32_t enabled=get32(q);return enabled<=1?bw_radio(&host.dev,(int)enabled):BW_EINVAL;}
+int brcm_m1_scan(void){return bw_scan(&host.dev);}
+int brcm_m1_networks(uint8_t *out){return bw_networks(&host.dev,out,BW_NETWORKS_SIZE);}
 int brcm_m1_poll(void){
     if(!host.prepared)return 0;
     if(host.dev.state>=BW_READY&&host.dev.state!=BW_FAULT){uint32_t err=r32(host.p.dart+0x40);

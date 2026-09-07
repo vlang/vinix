@@ -8,11 +8,11 @@ command -v "$v" >/dev/null 2>&1 || { echo 'ERROR: V is required.' >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir "$work/clients"
-for name in device_io.v platform.c.v backlight_client.v battery_client.v; do
+for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_client.v; do
     cp "$root/desktop/$name" "$work/clients/"
 done
 cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
-for name in backlight_client battery_client platform; do
+for name in backlight_client battery_client wifi_client platform; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
     # Invoke the test file directly so older vtest runners cannot lose the
     # shell quoting around a module path containing '|'. V runs its tests.

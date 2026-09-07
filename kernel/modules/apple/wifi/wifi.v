@@ -56,6 +56,12 @@ fn C.brcm_m1_boot(input &u8) int
 
 fn C.brcm_m1_join(input &u8) int
 
+fn C.brcm_m1_radio(input &u8) int
+
+fn C.brcm_m1_scan() int
+
+fn C.brcm_m1_networks(output &u8) int
+
 fn C.brcm_m1_poll() int
 
 fn C.brcm_m1_read(output &u8, capacity usize) int
@@ -585,6 +591,23 @@ fn (mut d WifiDevice) ioctl(_ voidptr, request u64, arg voidptr) ?int {
 			result = C.brcm_m1_join(&data[0])
 		}
 		0x5704 { C.brcm_m1_stop() }
+		0x5705 {
+			mut data := [4]u8{}
+			if !usercopy.copy_from_user(&data[0], u64(arg), 4) {
+				errno.set(errno.efault)
+				return none
+			}
+			result = C.brcm_m1_radio(&data[0])
+		}
+		0x5706 { result = C.brcm_m1_scan() }
+		0x5707 {
+			mut data := [1552]u8{}
+			result = C.brcm_m1_networks(&data[0])
+			if result == 0 && !usercopy.copy_to_user(u64(arg), &data[0], 1552) {
+				errno.set(errno.efault)
+				return none
+			}
+		}
 		else {
 			errno.set(errno.enotty)
 			return none

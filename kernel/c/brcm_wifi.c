@@ -47,7 +47,7 @@ static int range(uint32_t p,size_t n,uint32_t low,uint32_t high) { return p>=low
 static int mac_ok(const uint8_t *m) { unsigned any=0;for(unsigned i=0;i<6;i++)any|=m[i];return any && !(m[0]&1); }
 static int fail(struct bw_device *d,int e) {
     if(d->state!=BW_FAULT)d->ops.stop_dma(d->cookie);
-    d->state=BW_FAULT;d->associated=d->keyed=0;d->error=e;return e;
+    d->state=BW_FAULT;d->associated=d->keyed=d->radio_on=d->scan_pending=0;d->error=e;return e;
 }
 static uint32_t rd(struct bw_device *d,unsigned s,uint32_t o,unsigned w) { return d->ops.read(d->cookie,s,o,w); }
 static void wr(struct bw_device *d,unsigned s,uint32_t o,unsigned w,uint32_t v) { d->ops.write(d->cookie,s,o,w,v); }
@@ -371,9 +371,54 @@ static int mailbox(struct bw_device *d,uint32_t data){
     if(data&2u)return fail(d,BW_ENOTSUP);
     return 0;
 }
+static int same_network(const struct bw_network *a,const uint8_t *ssid,size_t n,const uint8_t *bssid,int secure){
+    if(a->ssid_len!=n||a->secure!=(uint8_t)secure)return 0;
+    return n?memcmp(a->ssid,ssid,n)==0:memcmp(a->bssid,bssid,6)==0;
+}
+static int scan_bss(struct bw_device *d,const uint8_t *p,size_t n){
+    /* brcmf_bss_info_le version 109. Check the record's own length before
+     * touching its fixed fields; information elements after byte 126 are not
+     * needed by this deliberately small station UI. */
+    if(n<126||l32(p)!=109)return BW_EPROTO;
+    size_t length=l32(p+4),ssid_len=p[18];
+    if(length<126||length>n||ssid_len>32||!mac_ok(p+8))return BW_EPROTO;
+    int secure=(l16(p+16)&0x10)!=0;
+    int16_t rssi=(int16_t)l16(p+78);
+    uint16_t channel=p[88]?p[88]:(uint16_t)(l16(p+72)&0xff);
+    if(!channel||channel>233||rssi>0||rssi<-127)return BW_EPROTO;
+    for(unsigned i=0;i<d->network_count;i++){
+        struct bw_network *network=&d->networks[i];
+        if(!same_network(network,p+19,ssid_len,p+8,secure))continue;
+        if(rssi>network->rssi){network->rssi=rssi;network->channel=channel;memcpy(network->bssid,p+8,6);}
+        return 0;
+    }
+    if(d->network_count==BW_NETWORK_MAX)return 0;
+    struct bw_network *network=&d->networks[d->network_count++];
+    memset(network,0,sizeof(*network));network->ssid_len=(uint8_t)ssid_len;
+    network->secure=(uint8_t)secure;network->channel=channel;network->rssi=rssi;
+    memcpy(network->bssid,p+8,6);memcpy(network->ssid,p+19,ssid_len);return 0;
+}
+static int scan_event(struct bw_device *d,uint32_t status,const uint8_t *p,size_t n){
+    if(!d->scan_pending)return 0; /* a stale event from an aborted scan */
+    if(status!=8){
+        d->scan_pending=0;d->scan_error=status?(status<=0x7fffffffu?-(int)status:BW_EIO):0;return 0;
+    }
+    if(n<12||l16(p+8)!=d->scan_sync)return BW_EPROTO;
+    size_t length=l32(p);unsigned count=l16(p+10);
+    if(length<12||length>n||!count||count>BW_NETWORK_MAX)return BW_EPROTO;
+    size_t off=12;
+    for(unsigned i=0;i<count;i++){
+        if(off>length||length-off<8)return BW_EPROTO;
+        size_t record=l32(p+off+4);
+        if(!record||record>length-off)return BW_EPROTO;
+        int e=scan_bss(d,p+off,record);if(e)return e;off+=record;
+    }
+    return 0;
+}
 static int event_message(struct bw_device *d,const uint8_t *p,size_t n){
     if(n<72||b16(p+12)!=0x886c||b16(p+14)!=0x8001||p[18]!=0||memcmp(p+19,"\x00\x10\x18",3)||b16(p+22)!=1||b16(p+24)!=2||p[70]!=0||p[71]!=0||b32(p+44)>n-72)return BW_EPROTO;
-    unsigned type=b32(p+28),status=b32(p+32),flags=b16(p+26);
+    unsigned type=b32(p+28),status=b32(p+32),flags=b16(p+26),data_len=b32(p+44);
+    if(type==69)return scan_event(d,status,p+72,data_len);
     if(d->state!=BW_JOINING&&d->state!=BW_LINK)return 0;
     if(type==0){
         if(status)return fail(d,BW_ENOLINK);
@@ -445,6 +490,7 @@ int bw_poll(struct bw_device *d,unsigned budget){
         index_write(d,r,0,r->read);
     }
     uint64_t now=d->ops.time_us(d->cookie);
+    if(d->scan_pending&&now>=d->scan_deadline){d->scan_pending=0;d->scan_error=BW_ETIME;}
     if((d->state==BW_JOINING&&now>=d->join_deadline)||(d->flow_pending&&now>=d->flow_deadline))return fail(d,BW_ETIME);
     int e=replenish(d);return e?e:(int)done;
 }
@@ -508,11 +554,47 @@ int bw_start(struct bw_device *d,const struct bw_firmware *f){
        (e=cmd_int(d,20,1)))return fail(d,e);
     uint8_t events[16]={0};const unsigned types[]={0,5,6,11,12,16,46};
     for(unsigned i=0;i<sizeof(types)/sizeof(types[0]);i++)events[types[i]/8]|=(uint8_t)(1u<<(types[i]%8));
+    events[69/8]|=(uint8_t)(1u<<(69%8));
     if((e=var_set(d,"event_msgs",events,sizeof(events)))||(e=cmd_int(d,2,1)))return fail(d,e);
+    d->radio_on=1;
+    return 0;
+}
+int bw_radio(struct bw_device *d,int enabled){
+    if(!d||(enabled!=0&&enabled!=1)||d->state<BW_READY||d->state==BW_FAULT)return BW_EINVAL;
+    if(d->radio_on==(uint8_t)enabled)return 0;
+    if(!enabled){
+        /* Ignore link-loss events caused by taking the radio down. The firmware
+         * and rings stay alive, so WLC_UP can reverse this without a reboot. */
+        d->state=BW_READY;d->associated=d->keyed=d->scan_pending=0;d->radio_on=0;
+        int e=cmd_int(d,3,1);return e?fail(d,e):0;
+    }
+    int e=cmd_int(d,2,1);if(e)return fail(d,e);d->radio_on=1;return 0;
+}
+int bw_scan(struct bw_device *d){
+    if(!d||(d->state!=BW_READY&&d->state!=BW_LINK)||!d->radio_on||d->scan_pending)return BW_EINVAL;
+    uint8_t p[72]={0};
+    if(++d->scan_sync==0)d->scan_sync++;
+    s32(p,1);s16(p+4,1);s16(p+6,d->scan_sync);
+    memset(p+44,0xff,6);p[50]=2;p[51]=0xff;
+    s32(p+52,UINT32_MAX);s32(p+56,UINT32_MAX);s32(p+60,UINT32_MAX);s32(p+64,UINT32_MAX);
+    memset(d->networks,0,sizeof(d->networks));d->network_count=0;d->scan_error=0;
+    d->scan_pending=1;d->scan_deadline=d->ops.time_us(d->cookie)+15000000;
+    int e=var_set(d,"escan",p,sizeof(p));erase(p,sizeof(p));
+    if(e){d->scan_pending=0;d->scan_error=e;}return e;
+}
+int bw_networks(struct bw_device *d,uint8_t *out,size_t capacity){
+    if(!d||!out||capacity<BW_NETWORKS_SIZE)return BW_EINVAL;
+    memset(out,0,BW_NETWORKS_SIZE);s32(out,1);s32(out+4,d->network_count);
+    s32(out+8,d->scan_pending);s32(out+12,(uint32_t)d->scan_error);
+    for(unsigned i=0;i<d->network_count;i++){
+        const struct bw_network *network=&d->networks[i];uint8_t *entry=out+16+i*BW_NETWORK_ENTRY_SIZE;
+        entry[0]=network->ssid_len;entry[1]=network->secure;s16(entry+2,network->channel);
+        s16(entry+4,(uint16_t)network->rssi);memcpy(entry+8,network->bssid,6);memcpy(entry+16,network->ssid,network->ssid_len);
+    }
     return 0;
 }
 int bw_join_wpa2(struct bw_device *d,const uint8_t *ssid,size_t sn,const uint8_t *pass,size_t pn){
-    if(!d||d->state!=BW_READY||!ssid||!sn||sn>32||!pass||pn<8||pn>63)return BW_EINVAL;
+    if(!d||d->state!=BW_READY||!d->radio_on||d->scan_pending||!ssid||!sn||sn>32||!pass||pn<8||pn>63)return BW_EINVAL;
     for(size_t i=0;i<pn;i++)if(pass[i]<32||pass[i]>126)return BW_EINVAL;
     /* RSN IE: WPA2-PSK + CCMP only; never fall back to an open network. */
     static const uint8_t rsn[]={0x30,20,1,0,0,0x0f,0xac,4,1,0,0,0x0f,0xac,4,1,0,0,0x0f,0xac,2,0,0};
@@ -548,7 +630,7 @@ int bw_disconnect(struct bw_device *d){
     if(!d||d->state<BW_READY||d->state==BW_FAULT)return BW_EINVAL;
     int e=command(d,52,NULL,0,NULL,0,NULL);bw_stop(d);return e;
 }
-void bw_stop(struct bw_device *d){if(!d)return;d->ops.stop_dma(d->cookie);d->associated=d->keyed=0;d->state=BW_FAULT;d->error=BW_ENOLINK;}
+void bw_stop(struct bw_device *d){if(!d)return;d->ops.stop_dma(d->cookie);d->associated=d->keyed=d->radio_on=d->scan_pending=0;d->state=BW_FAULT;d->error=BW_ENOLINK;}
 const char *bw_state_name(enum bw_state s){
     static const char *const names[]={"off","chip detected","firmware boot","firmware ready","authenticating","authenticated link","stopped"};
     return (unsigned)s<sizeof(names)/sizeof(names[0])?names[s]:"invalid";

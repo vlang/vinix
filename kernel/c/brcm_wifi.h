@@ -16,6 +16,9 @@
 #define BW_CTL_SIZE 8192u
 #define BW_PACKET_COUNT (BW_RX_COUNT + 2u * BW_CTL_COUNT)
 #define BW_MAX_CORES 32u
+#define BW_NETWORK_MAX 32u
+#define BW_NETWORK_ENTRY_SIZE 48u
+#define BW_NETWORKS_SIZE (16u + BW_NETWORK_MAX * BW_NETWORK_ENTRY_SIZE)
 
 enum bw_space { BW_CONFIG, BW_REGS, BW_TCM };
 enum bw_state { BW_OFF, BW_CHIP, BW_BOOTING, BW_READY, BW_JOINING, BW_LINK, BW_FAULT };
@@ -53,6 +56,12 @@ struct bw_firmware {
     uint8_t silicon_revision;
     uint8_t mac[6];
 };
+struct bw_network {
+    uint8_t ssid_len, secure;
+    uint16_t channel;
+    int16_t rssi;
+    uint8_t bssid[6], ssid[32];
+};
 struct bw_device {
     struct bw_ops ops;
     void *cookie;
@@ -76,7 +85,12 @@ struct bw_device {
     uint32_t reply_command;
     uint8_t request_busy, reply_ready, flow_pending, flow_open;
     uint8_t associated, keyed, mac[6], bssid[6];
-    uint64_t join_deadline, flow_deadline, rx_frames, tx_frames, bad_completions;
+    uint8_t radio_on, scan_pending;
+    uint16_t scan_sync;
+    int scan_error;
+    unsigned network_count;
+    struct bw_network networks[BW_NETWORK_MAX];
+    uint64_t join_deadline, flow_deadline, scan_deadline, rx_frames, tx_frames, bad_completions;
     uint8_t reply[BW_CTL_SIZE];
 };
 
@@ -89,6 +103,9 @@ int bw_init(struct bw_device *, const struct bw_ops *, void *cookie,
  * it does not upload firmware or turn on the radio. */
 int bw_probe(struct bw_device *);
 int bw_start(struct bw_device *, const struct bw_firmware *);
+int bw_radio(struct bw_device *, int enabled);
+int bw_scan(struct bw_device *);
+int bw_networks(struct bw_device *, uint8_t *output, size_t capacity);
 int bw_join_wpa2(struct bw_device *, const uint8_t *ssid, size_t ssid_len,
     const uint8_t *passphrase, size_t passphrase_len);
 int bw_disconnect(struct bw_device *);

@@ -10,6 +10,7 @@ import event
 import event.eventstruct
 import memory.mmap
 import time
+import usercopy
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
@@ -25,6 +26,19 @@ pub const f_setlk = 6
 pub const f_setlkw = 7
 pub const f_getown = 8
 pub const f_setown = 9
+
+const f_rdlck = i16(0)
+const f_wrlck = i16(1)
+const f_unlck = i16(2)
+
+struct Flock {
+mut:
+	l_type   i16
+	l_whence i16
+	l_start  i64
+	l_len    i64
+	l_pid    int
+}
 
 pub const fd_cloexec = 1
 
@@ -86,12 +100,18 @@ pub const pollrdhup = 0x2000
 pub const pollnval = 0x20
 pub const pollwrnorm = 0x100
 
+// POLLERR and POLLHUP are reported even when userspace did not ask for them.
+// In particular, readers use POLLHUP to notice that the final writer of a
+// pipe has gone away and drain it to EOF.
+fn poll_revents(status int, requested i16) i16 {
+	return (i16(status) & requested) | (i16(status) & i16(pollerr | pollhup))
+}
+
 pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut t := proc.current_thread()
 	mut process := t.process
 
-	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str,
-		voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
+	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str, voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -148,8 +168,9 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 		status := resource_.status
 
-		if i16(status) & fdd.events != 0 {
-			fdd.revents = i16(status) & fdd.events
+		revents := poll_revents(status, fdd.events)
+		if revents != 0 {
+			fdd.revents = revents
 			C.printf(c'Poll detected event on fdnum %d, events %llx\n', fdd.fd, fdd.events)
 			ret++
 			fd.unref()
@@ -195,11 +216,11 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 
 		mut fdd := unsafe { &fds[fdnums[which]] }
 
-		if i16(status) & fdd.events != 0 {
+		revents := poll_revents(status, fdd.events)
+		if revents != 0 {
 			C.printf(c'Poll exiting on fdnum %d, events %llx\n', fdd.fd, fdd.events)
 
-			fdd.revents = 0
-			fdd.revents = i16(status) & fdd.events
+			fdd.revents = revents
 			ret++
 			break
 		}
@@ -402,8 +423,7 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 	mut t := proc.current_thread()
 	mut process := t.process
 
-	C.printf(c'\n\e[32m%s\e[m: dup3(%d, %d, %d)\n', process.name.str, oldfdnum, newfdnum,
-		flags)
+	C.printf(c'\n\e[32m%s\e[m: dup3(%d, %d, %d)\n', process.name.str, oldfdnum, newfdnum, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -413,8 +433,7 @@ pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64)
 		return errno.err, errno.einval
 	}
 
-	new_fdnum := fdnum_dup(unsafe { nil }, oldfdnum, unsafe { nil }, newfdnum, flags,
-		true, false) or { return errno.err, errno.get() }
+	new_fdnum := fdnum_dup(unsafe { nil }, oldfdnum, unsafe { nil }, newfdnum, flags, true, false) or { return errno.err, errno.get() }
 
 	return u64(new_fdnum), 0
 }
@@ -501,12 +520,10 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 
 	match cmd {
 		f_dupfd {
-			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false,
-				false) or { return errno.err, errno.get() })
+			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, false) or { return errno.err, errno.get() })
 		}
 		f_dupfd_cloexec {
-			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false,
-				true) or { return errno.err, errno.get() })
+			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, true) or { return errno.err, errno.get() })
 		}
 		f_getfd {
 			ret = if fd.flags & resource.o_cloexec != 0 { u64(fd_cloexec) } else { 0 }
@@ -524,78 +541,113 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			// Only the status flags are settable. Taking the argument whole
 			// would drop the access mode the file was opened with, leaving a
 			// writable handle looking read-only.
-			handle.flags = (handle.flags & ~resource.file_settable_flags_mask)
-				| (int(arg) & resource.file_settable_flags_mask)
+			handle.flags = (handle.flags & ~resource.file_settable_flags_mask) | (int(arg) & resource.file_settable_flags_mask)
 			fd.unref()
 		}
-		else {
-			print('\nfcntl: Unhandled command: ${cmd}\n')
-			fd.unref()
-			return errno.err, errno.einval
+		f_getlk, f_setlk, f_setlkw {
+			if arg == 0 {
+				fd.unref()
+				return errno.err, errno.efault
+			}
+
+			lock  {
+				Flock{}
+				if !usercopy.copy_from_user(voidptr(&lock , arg, sizeof(Flock) {
+					{
+						fd.unref()
+						return errno.err, errno.efault
+					}
+					if lock .l_type != f_rdlck && lock .l_type != f_wrlck && lock .l_type != f_unlck {
+						fd.unref()
+						return errno.err, errno.einval
+					} {
+
+						// Vinix has no advisory-lock owner table yet. With no locks to
+						// conflict, F_GETLK reports F_UNLCK and the setters succeed. This is
+						// the observable result for the uncontended locks used by SQLite.
+						if cmd == f_getlk {
+							lock .l_type {
+								f_unlck
+								lock .l_pid {
+									0
+									if !usercopy.copy_to_user(arg, voidptr(&lock , sizeof(Flock) {
+										{
+											fd.unref()
+											return errno.err, errno.efault
+										}
+									}), fd.unref(), , , {
+										print('\nfcntl: Unhandled command: ${cmd}\n'): 
+										fd.unref():                                    
+										:                                         errno.err
+										errno.einval:                                  
+									}, , , ret, 0, , , fn (syscall_mmap (_), voidptr voidptr, addr voidptr, length u64, prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
+										mut current_thread := proc.current_thread()
+										mut process := current_thread.process
+
+										C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str, addr, length, prot_and_flags, fdnum, offset)
+										defer {
+											C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+										}
+
+										mut resource_ := &resource.Resource(unsafe { nil })
+										mut fd := &FD(unsafe { nil })
+
+										if fdnum != -1 {
+											fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+											resource_ = fd.handle.resource
+										}
+
+										defer {
+											if fdnum != -1 {
+												fd.unref()
+											}
+										}
+
+										prot := int((prot_and_flags >> 32) & 0xffffffff)
+										flags := int(prot_and_flags & 0xffffffff)
+
+										if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
+											return errno.err, errno.ebadf
+										}
+
+										mut mapping_handle := voidptr(0)
+										if fdnum != -1 {
+											mapping_handle = voidptr(fd.handle)
+										}
+										ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {
+											return errno.err, errno.get()
+										}
+
+										return u64(ret), 0
+									}, 
+
+									// Apply descriptor and status flags to an already-open fd. accept4(2) and
+									// pipe2(2) take them alongside the operation itself rather than needing a
+									// separate fcntl.
+									, fn (set_fd_flags (fdnum), int int, flags int) {
+										mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return }
+										defer {
+											fd.unref()
+										}
+
+										if flags & resource.o_cloexec != 0 {
+											fd.flags |= resource.o_cloexec
+										}
+										if flags & resource.o_nonblock != 0 {
+											mut handle := fd.handle
+											handle.flags |= resource.o_nonblock
+										}
+									}) {
+									}
+								}
+							}
+						}
+					} {
+					} {
+					}
+				})) {
+				}
+			}
 		}
-	}
-
-	return ret, 0
-}
-
-pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdnum int, offset i64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str,
-		addr, length, prot_and_flags, fdnum, offset)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut resource_ := &resource.Resource(unsafe { nil })
-	mut fd := &FD(unsafe { nil })
-
-	if fdnum != -1 {
-		fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-		resource_ = fd.handle.resource
-	}
-
-	defer {
-		if fdnum != -1 {
-			fd.unref()
-		}
-	}
-
-	prot := int((prot_and_flags >> 32) & 0xffffffff)
-	flags := int(prot_and_flags & 0xffffffff)
-
-	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
-		return errno.err, errno.ebadf
-	}
-
-	mut mapping_handle := voidptr(0)
-	if fdnum != -1 {
-		mapping_handle = voidptr(fd.handle)
-	}
-	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset,
-		mapping_handle,
-		retain_mmap_handle, release_mmap_handle) or {
-		return errno.err, errno.get()
-	}
-
-	return u64(ret), 0
-}
-
-// Apply descriptor and status flags to an already-open fd. accept4(2) and
-// pipe2(2) take them alongside the operation itself rather than needing a
-// separate fcntl.
-pub fn set_fd_flags(fdnum int, flags int) {
-	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return }
-	defer {
-		fd.unref()
-	}
-
-	if flags & resource.o_cloexec != 0 {
-		fd.flags |= resource.o_cloexec
-	}
-	if flags & resource.o_nonblock != 0 {
-		mut handle := fd.handle
-		handle.flags |= resource.o_nonblock
 	}
 }

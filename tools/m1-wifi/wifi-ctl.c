@@ -23,6 +23,7 @@ static void wipe(void *p,size_t n){volatile uint8_t *q=p;while(n--)*q++=0;}
 static void restore(void){if(changed&&tty>=0)(void)tcsetattr(tty,TCSANOW,&saved);changed=0;wipe(password,sizeof(password));}
 static void interrupted(int sig){restore();_exit(128+sig);}
 static uint32_t le32(const uint8_t *p){return p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
+static uint16_t le16(const uint8_t *p){return (uint16_t)(p[0]|(uint16_t)p[1]<<8);}
 static uint64_t le64(const uint8_t *p){return le32(p)|(uint64_t)le32(p+4)<<32;}
 static void put32(uint8_t *p,uint32_t x){for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(x>>(8*i));}
 static void die(const char *what){perror(what);exit(1);}
@@ -34,7 +35,25 @@ static void show(int fd){
     unsigned st=le32(s);printf("state: %s; error: %d; chip revision: %u; DART error: 0x%08x\n",st<7?names[st]:"invalid",(int32_t)le32(s+4),le32(s+8),le32(s+12));
     printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",s[32],s[33],s[34],s[35],s[36],s[37]);
     printf("module: %.15s; vendor: %.15s; module revision: %.15s; antenna: %.15s; board: %.31s\n",s+40,s+56,s+72,s+104,s+120);
+    printf("radio: %s; scan: %s; networks: %u; scan error: %d\n",le32(s+160)?"on":"off",le32(s+164)?"running":"idle",le32(s+168),(int32_t)le32(s+172));
     printf("RX: %llu; TX: %llu; queue drops: %llu\n",(unsigned long long)le64(s+16),(unsigned long long)le64(s+24),(unsigned long long)le64(s+152));
+}
+static void print_ssid(const uint8_t *p,size_t n){putchar('"');for(size_t i=0;i<n;i++){if(p[i]>=32&&p[i]<=126&&p[i]!='\\'&&p[i]!='"')putchar(p[i]);else printf("\\x%02x",p[i]);}putchar('"');}
+static int valid_networks(const uint8_t *out){
+    unsigned count=le32(out+4);if(le32(out)!=1||count>BW_NETWORK_MAX||le32(out+8)>1)return 0;
+    for(unsigned i=0;i<count;i++){const uint8_t *e=out+16+i*BW_NETWORK_ENTRY_SIZE;uint16_t channel=le16(e+2);int rssi=(int16_t)le16(e+4);if(e[0]>32||e[1]>1||!channel||channel>233||rssi>0||rssi<-127)return 0;}
+    return 1;
+}
+static int networks(int fd,int begin){
+    if(begin&&ioctl(fd,BW_IOCTL_SCAN,0)<0)die("Wi-Fi scan");
+    for(unsigned attempt=0;;attempt++){
+        uint8_t out[BW_NETWORKS_SIZE];memset(out,0,sizeof(out));if(ioctl(fd,BW_IOCTL_NETWORKS,out)<0)die("Wi-Fi networks");
+        if(!valid_networks(out)){fprintf(stderr,"Invalid Wi-Fi network response.\n");return 1;}
+        if(le32(out+8)&&begin&&attempt<160){pause_ms(100);continue;}
+        unsigned count=le32(out+4);printf("scan: %s; error: %d; %u network%s\n",le32(out+8)?"running":"idle",(int32_t)le32(out+12),count,count==1?"":"s");
+        for(unsigned i=0;i<count;i++){const uint8_t *e=out+16+i*BW_NETWORK_ENTRY_SIZE;print_ssid(e+16,e[0]);printf("  %s  channel %u  %d dBm  %02x:%02x:%02x:%02x:%02x:%02x\n",e[1]?"secured":"open",le16(e+2),(int16_t)le16(e+4),e[8],e[9],e[10],e[11],e[12],e[13]);}
+        return le32(out+12)?1:0;
+    }
 }
 static size_t read_password(void){
     tty=open("/dev/tty",O_RDWR|O_CLOEXEC);if(tty<0)tty=dup(STDIN_FILENO);if(tty<0)die("terminal");
@@ -68,11 +87,14 @@ static void load(int fd,const char *dir){
 }
 int main(int argc,char **argv){
     atexit(restore);signal(SIGINT,interrupted);signal(SIGTERM,interrupted);signal(SIGHUP,interrupted);
-    if(argc<2){fprintf(stderr,"Usage: %s status | status-raw FILE | load DIRECTORY | join SSID | stop\n",argv[0]);return 2;}
+    if(argc<2){fprintf(stderr,"Usage: %s status | status-raw FILE | load DIRECTORY | on | off | scan | networks | join SSID | stop\n",argv[0]);return 2;}
     int fd=open("/dev/wlan0",O_RDWR|O_NONBLOCK|O_CLOEXEC);if(fd<0)die("/dev/wlan0 (requires vinix.apple_wifi=1 and a supported J313 DT)");
     if(!strcmp(argv[1],"status")&&argc==2)show(fd);
     else if(!strcmp(argv[1],"status-raw")&&argc==3){uint8_t s[256];status(fd,s);FILE *out=fopen(argv[2],"wb");if(!out)die("status output");if(fwrite(s,1,sizeof(s),out)!=sizeof(s)||fclose(out))die("status write");}
     else if(!strcmp(argv[1],"load")&&argc==3)load(fd,argv[2]);
+    else if((!strcmp(argv[1],"on")||!strcmp(argv[1],"off"))&&argc==2){uint8_t q[4]={0};put32(q,!strcmp(argv[1],"on"));if(ioctl(fd,BW_IOCTL_RADIO,q)<0)die("Wi-Fi radio");show(fd);}
+    else if(!strcmp(argv[1],"scan")&&argc==2){int result=networks(fd,1);close(fd);return result;}
+    else if(!strcmp(argv[1],"networks")&&argc==2){int result=networks(fd,0);close(fd);return result;}
     else if(!strcmp(argv[1],"join")&&argc==3){
         size_t sn=strlen(argv[2]);if(!sn||sn>32){fprintf(stderr,"SSID must contain 1–32 bytes.\n");return 2;}
         size_t pn=read_password();uint8_t q[BW_JOIN_SIZE]={0};put32(q,(uint32_t)sn);put32(q+4,(uint32_t)pn);memcpy(q+8,argv[2],sn);memcpy(q+40,password,pn);

@@ -16,6 +16,7 @@ mut:
 	open(path string, writable bool) (int, DeviceError)
 	read(fd int, mut buffer []u8) (int, DeviceError)
 	write(fd int, buffer []u8) (int, DeviceError)
+	ioctl(fd int, request u64, mut buffer []u8) DeviceError
 	close(fd int) DeviceError
 	is_character(fd int) (bool, DeviceError)
 }
