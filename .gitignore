@@ -35,3 +35,4 @@ kernel/tmp.c
 kernel/tmp.v
 /build-aarch64-python/
 /.claude/
+/deploy-to-m1.sh
