@@ -37,11 +37,19 @@ export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop.i
 export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
 export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),
-# giving it 2048x1536 pixels without changing the standard shell runner.
+# giving it a native 2048x1536 framebuffer without changing the standard
+# shell runner.
 export VINIX_QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-2048x1536x32}"
-# OVMF may fall back to a small initial framebuffer. Fullscreen with Cocoa's
-# scaling enabled still gives the desktop a large, usable display in that case.
-export VINIX_QEMU_COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-full-screen=on,zoom-to-fit=on}"
+# Do not scale the guest display: the custom OVMF below exposes 2048x1536 to
+# Limine and the kernel. On Retina Macs this naturally occupies 1024x768
+# points while retaining all 2048x1536 guest pixels.
+export VINIX_QEMU_COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-zoom-to-fit=off}"
+if [ -z "${VINIX_OVMF_CODE:-}" ]; then
+    export VINIX_OVMF_CODE="$SCRIPT_DIR/boot-image/edk2-aarch64-code-2048x1536.fd"
+    if [ ! -f "$VINIX_OVMF_CODE" ]; then
+        "$SCRIPT_DIR/build-qemu-ovmf-aarch64.sh"
+    fi
+fi
 MONITOR_SOCKET="${VINIX_MONITOR_SOCKET:-/tmp/vinix-monitor}"
 QMP_SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 

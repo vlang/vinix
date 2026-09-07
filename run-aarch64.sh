@@ -129,11 +129,16 @@ if [ ! -f "$LIMINE_EFI" ] || ! "$SCRIPT_DIR/build-limine-aarch64.sh" --check | g
     "$SCRIPT_DIR/build-limine-aarch64.sh" || exit 1
 fi
 
-# ── Find UEFI firmware from QEMU installation ──
-OVMF=$(find /opt/homebrew -name "edk2-aarch64-code.fd" 2>/dev/null | head -1)
+# ── Find UEFI firmware ──
+# Desktop QEMU can supply a custom OVMF with a larger ramfb GOP mode. Keep the
+# packaged firmware as the default for the ordinary shell runner.
+OVMF="${VINIX_OVMF_CODE:-}"
 if [ -z "$OVMF" ]; then
-    echo "ERROR: edk2-aarch64-code.fd not found."
-    echo "Install: brew install qemu"
+    OVMF=$(find /opt/homebrew -name "edk2-aarch64-code.fd" 2>/dev/null | head -1)
+fi
+if [ -z "$OVMF" ] || [ ! -f "$OVMF" ]; then
+    echo "ERROR: AArch64 OVMF firmware not found: ${OVMF:-edk2-aarch64-code.fd}."
+    echo "Install QEMU (brew install qemu), or set VINIX_OVMF_CODE."
     exit 1
 fi
 
