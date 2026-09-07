@@ -700,43 +700,10 @@ GLRUN
     # /var/lib/xkb needed for XKB compiled keymaps
     mkdir -p "$STAGING/var/lib/xkb"
 
-    # Direct X11 launcher — bypasses xinit (which has a UDF crash on aarch64).
-    cat > "$STAGING/usr/bin/startx" << 'STARTX'
-#!/bin/sh
-# Direct X11 launcher for Vinix on aarch64.
-set -e
-
-mkdir -p /tmp/.X11-unix
-
-d=0
-while [ -e "/tmp/.X11-unix/X$d" ] || [ -e "/tmp/.X$d-lock" ]; do
-    d=$((d + 1))
-done
-display=":$d"
-export DISPLAY="$display"
-
-echo "startx: launching Xorg on $display"
-/usr/bin/Xorg "$display" +iglx -noreset \
-    </dev/null >/var/log/Xorg.startx.log 2>&1 &
-SERVER_PID=$!
-echo "startx: Xorg PID=$SERVER_PID (sleeping 1s for init)"
-sleep 1
-
-if [ "$#" -gt 0 ]; then
-    if [ -f "$1" ]; then
-        client="$1"
-        shift
-        exec /bin/sh "$client" "$@"
-    else
-        exec "$@"
-    fi
-elif [ -f "$HOME/.xinitrc" ]; then
-    exec /bin/sh "$HOME/.xinitrc"
-else
-    exec xclock -geometry 400x400+50+50
-fi
-STARTX
-    chmod +x "$STAGING/usr/bin/startx"
+    # Direct launcher — bypasses xinit (which has a UDF crash on aarch64) and
+    # stops Xorg when its client exits so a native compositor can reclaim fb0.
+    install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" \
+        "$STAGING/usr/bin/startx"
 
     # musl dynamic linker library search path config
     # Xorg modules (libfbdevhw.so etc.) live in /usr/lib/xorg/modules/

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-// Windows and what they show. The desktop has no way to launch other
-// programs yet, so a window's contents come from a small set of built-in
-// pages; everything about the frame, the title bar and the taskbar entry
-// works the same whichever page is inside.
+// Windows and what they show. Native windows contain a built-in page or a
+// hosted ui2 application. External display-owning programs are launched by
+// the window manager and only use a native window to report a startup error.
 module main
 
 import ui2
@@ -13,6 +12,7 @@ enum Page {
 	system
 	palette
 	notes
+	external_error
 	// A window whose contents come from a hosted ui2 application rather than
 	// from one of the pages below.
 	app
@@ -68,10 +68,26 @@ fn (w &Window) content(width int, height int, desktop &Desktop) []ui2.Element {
 		.system { system_page(width, height, desktop) }
 		.palette { palette_page(width, height) }
 		.notes { notes_page(width, height) }
+		.external_error { external_error_page(width, desktop) }
 		// An application's contents are built by the window manager, which is
 		// the only thing holding a mutable reference to it.
 		.app { []ui2.Element{} }
 	}
+}
+
+fn external_error_page(width int, desktop &Desktop) []ui2.Element {
+	pad := 18
+	inner := width - 2 * pad
+	mut children := frame_elements(5)
+	children << ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
+		bg: app_accent
+		radius: 2
+	}, [])
+	children << heading('Firefox could not start', pad, 34, inner)
+	children << body_line(desktop.external_error, pad, 68, inner)
+	children << muted_line('Firefox uses its packaged GTK/X11 runtime; the native desktop stays GTK-free.', pad, 100, inner)
+	children << muted_line('Build Firefox/Xorg, then rebuild the userland and desktop image.', pad, 120, inner)
+	return children
 }
 
 fn heading(text string, x int, y int, width int) ui2.Element {

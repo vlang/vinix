@@ -551,6 +551,18 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(left + 4 + arm, top + tall / 2, left + 4, top + tall - arm, behind, 2)
 			d.canvas.fill_rect(left + 6 + 2 * arm, top + tall - arm - 2, body / 3, 2, behind)
 		}
+		'browser' {
+			// A generic globe rather than an approximation of Mozilla's mark. The
+			// application name supplies the identity; the glyph only says web.
+			radius := if w < h { w * 3 / 8 } else { h * 3 / 8 }
+			behind := d.surface_under(x, y)
+			d.canvas.fill_circle(cx, cy, radius, color)
+			d.canvas.fill_circle(cx, cy, radius - 2, behind)
+			d.canvas.draw_line(cx - radius + 2, cy, cx + radius - 2, cy, color, 1)
+			d.canvas.draw_line(cx, cy - radius + 2, cx, cy + radius - 2, color, 1)
+			d.canvas.draw_line(cx - radius / 2, cy - radius + 3, cx - radius / 2, cy + radius - 3, color, 1)
+			d.canvas.draw_line(cx + radius / 2, cy - radius + 3, cx + radius / 2, cy + radius - 3, color, 1)
+		}
 		'settings' {
 			// A gear: a disc with a hole, and teeth around it.
 			outer := if w < h { w * 3 / 8 } else { h * 3 / 8 }

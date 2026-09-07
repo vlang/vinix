@@ -136,6 +136,11 @@ fn test_terminal_command_path_contains_installed_userland_tools() {
 	assert '/usr/bin' in parts
 }
 
+fn test_external_program_runner_reports_success_and_missing_commands() {
+	assert desktop_run_external('/usr/bin/true') == .success
+	assert desktop_run_external('/definitely/missing/vinix-program') == .unavailable
+}
+
 fn test_frame_wait_always_yields_after_an_overrun() {
 	assert desktop_frame_wait_ms(4, 16) == 12
 	assert desktop_frame_wait_ms(15, 16) == 1

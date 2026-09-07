@@ -28,6 +28,8 @@ BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
+FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 
 merge_staging_tree() {
     local overlay="$1"
@@ -57,7 +59,7 @@ for arg in "$@"; do
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
             echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]"
-            echo "  --compact-initramfs stages the desktop and core developer tools for a small EFI partition"
+            echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
             ;;
@@ -174,8 +176,8 @@ fi
 # Appending an overlay tar would leave duplicate paths that the kernel's
 # initramfs unpacker rejects, so stage before repacking it. A full userland is
 # useful for development but can exceed an M1 EFI partition. Compact mode keeps
-# the native GCC toolchain plus the packaged Python and network-tool closures,
-# which includes Git, while leaving out unrelated large runtimes.
+# the native GCC toolchain plus the packaged Python, network-tool and Firefox
+# closures, while leaving out unrelated large runtimes.
 if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
@@ -189,6 +191,18 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/git" ]; then
         echo "ERROR: compact desktop needs $NETWORK_TOOLS_STAGING/usr/bin/git" >&2
         echo "Run ./build-network-tools-aarch64.sh first." >&2
+        exit 1
+    fi
+    if [ ! -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
+        echo "ERROR: compact desktop needs $FIREFOX_STAGING/usr/bin/run-firefox" >&2
+        echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh first." >&2
+        exit 1
+    fi
+    if [ ! -x "$X11_STAGING/usr/bin/Xorg" ] ||
+        [ ! -x "$X11_STAGING/usr/bin/startx" ] ||
+        [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
+        echo "ERROR: compact desktop needs Xorg, startx and vinix-xinput in $X11_STAGING" >&2
+        echo "Run ./build-x11-aarch64.sh first." >&2
         exit 1
     fi
 fi
@@ -230,11 +244,20 @@ STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    echo "    compact image: staging BusyBox, Python, Git and GCC"
+    echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
     tar xf "$BASE_INITRAMFS" -C "$STAGING" \
         ./bin/busybox ./aarch64-linux-musl-native
+    merge_staging_tree "$X11_STAGING"
+    merge_staging_tree "$FIREFOX_STAGING"
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
     merge_staging_tree "$PYTHON_STAGING"
+
+    # Scripts in the Firefox/X11 closure use ordinary command names. The
+    # compact image carries BusyBox but not the full userland's applet links,
+    # so provide the small set needed by run-firefox and Vinix's startx.
+    for applet in sh mkdir ln chmod sleep rm; do
+        ln -sf busybox "$STAGING/bin/$applet"
+    done
     # This stripped toolchain intentionally carries static libc and libgcc.
     # Its stock driver still prefers libgcc_s for an ordinary link, so wrap it
     # with the matching static-libgcc default. Callers can otherwise use GCC as
@@ -252,12 +275,16 @@ mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
 chmod 1777 "$STAGING/tmp"
 
+# The X11 staging tree contains Alpine's stock startx. Vinix uses a direct
+# launcher that avoids xinit/VT assumptions and tears Xorg down with its client.
+install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+
 if [ ! -x "$STAGING/bin/busybox" ]; then
     echo "ERROR: base userland has no executable /bin/busybox" >&2
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in usr/bin/python3 usr/bin/git aarch64-linux-musl-native/bin/gcc; do
+    for command_path in bin/sh bin/mkdir bin/sleep usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1

@@ -220,12 +220,29 @@ run-firefox
 run-firefox https://example.com
 ```
 
+After rebuilding the desktop image, its wallpaper and taskbar also contain a
+Firefox launcher. Clicking it hands the framebuffer, pointer and keyboard to
+Xorg for the lifetime of Firefox, then returns to the native desktop when the
+browser exits:
+
+```sh
+./build-desktop-aarch64.sh
+./run-desktop-aarch64.sh --no-build --mem=8192
+```
+
+The X11 session uses a small Vinix-specific input bridge for the native
+absolute pointer packets and console keyboard. This keeps Linux evdev and udev
+out of the system while giving Firefox normal X11 mouse and keyboard events.
+
 `build-firefox-aarch64.sh` resolves and stages the complete Alpine runtime
 dependency closure, including GTK/X11, fonts, TLS certificates, and media
 libraries. It defaults to Alpine 3.22's Firefox 140 ESR: newer Alpine builds
 currently link Scudo, whose virtual-memory contract Vinix does not yet provide.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
+The compact desktop image used by the default M1 deployment merges the Firefox
+and X11 staging trees directly, alongside Python, Git and GCC, so its launcher
+works without shipping the much larger complete userland image.
 
 Firefox runs with software rendering and its Linux namespace/seccomp sandboxes
 disabled because Vinix does not implement those kernel facilities yet. The

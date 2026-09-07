@@ -115,6 +115,19 @@ it then has a wallpaper shortcut and a taskbar launcher. A ui2 example also
 needs its directory listed in `build-desktop-aarch64.sh` so the staging step
 compiles it in.
 
+Firefox is the deliberately different case. It is an upstream X11/GTK
+application rather than a ui2 application the compositor can host. Its
+`AppFactory` names `/usr/bin/run-firefox` as an exclusive command. At a frame
+boundary the desktop restores the console and closes its framebuffer and
+pointer descriptors, waits while Xorg and Firefox own them, then reopens the
+devices and redraws when Firefox exits. This keeps GTK confined to Firefox's
+packaged userspace runtime; `vinix-desktop` itself does not link or implement
+GTK. The small `/usr/bin/vinix-xinput` bridge translates Vinix's native pointer
+packets and console keyboard bytes into ordinary X11 input, avoiding an evdev
+or udev compatibility layer. A desktop image without the Firefox/Xorg runtime
+still shows the launcher and reports the missing runtime in a native error
+window.
+
 ## The file browser
 
 `files.v` is not a ui2 example but Vinix's own, and it reads a real

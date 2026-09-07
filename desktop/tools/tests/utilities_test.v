@@ -104,13 +104,15 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 }
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
-	assert available_apps.len == 8
-	assert available_apps[4].title == 'Activity Monitor'
+	assert available_apps.len == 9
+	assert available_apps[1].title == 'Firefox'
+	assert available_apps[1].exclusive_command == '/usr/bin/run-firefox'
+	assert available_apps[5].title == 'Activity Monitor'
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	assert taskbar_launcher_width(1280, 114, available_apps.len) == launcher_width
-	assert taskbar_launcher_width(1152, 114, available_apps.len) == 82
-	assert taskbar_launcher_width(1024, 114, available_apps.len) == 66
+	assert taskbar_launcher_width(1280, 114, available_apps.len) == 87
+	assert taskbar_launcher_width(1152, 114, available_apps.len) == 72
+	assert taskbar_launcher_width(1024, 114, available_apps.len) == 58
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
 }
@@ -148,6 +150,32 @@ fn test_show_desktop_button_minimizes_every_window() {
 	assert desktop.visible_window_count() == 0
 	assert desktop.focus == 0
 	assert desktop.dirty
+}
+
+fn test_firefox_requests_an_exclusive_display_handoff() {
+	mut desktop := Desktop{}
+	desktop.launch(available_apps[1])
+	assert desktop.pending_external == '/usr/bin/run-firefox'
+	assert desktop.apps.len == 0
+	assert desktop.windows.len == 0
+}
+
+fn test_external_display_handoff_redraws_and_reports_failures() {
+	mut desktop := Desktop{
+		canvas: new_canvas(800, 600)
+	}
+	desktop.wallpaper_valid = true
+	desktop.external_finished(.success)
+	assert desktop.dirty
+	assert !desktop.wallpaper_valid
+	assert desktop.windows.len == 0
+
+	desktop.external_finished(.unavailable)
+	assert desktop.windows.len == 1
+	assert desktop.windows[0].title == 'Firefox'
+	assert desktop.windows[0].page == .external_error
+	assert desktop.external_error.contains('not installed')
+	unsafe { free(voidptr(desktop.canvas.pixels)) }
 }
 
 fn test_activity_monitor_includes_live_hosted_apps() {

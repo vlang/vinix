@@ -136,6 +136,26 @@ fn main() {
 		desktop.poll_apps()
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)
+		// Xorg, unlike a hosted ui2 application, needs the physical display and
+		// input devices. Stop the compositor at a frame boundary, restore the
+		// console, and reopen everything after Firefox exits.
+		if desktop.pending_external != '' {
+			command := desktop.pending_external
+			desktop.pending_external = ''
+			keyboard.close()
+			pointer.close()
+			fb.close()
+			result := desktop_run_external(command)
+			fb = open_framebuffer(options.framebuffer) or {
+				eprintln('vinix-desktop: cannot reclaim the framebuffer: ${err}')
+				exit(1)
+			}
+			pointer = open_pointer(options.pointer)
+			keyboard = open_keyboard()
+			desktop.pointer_present = pointer.available()
+			desktop.external_finished(result)
+			continue
+		}
 		// Settings only requests a new scale. Apply it after all input from this
 		// frame and before layout so drawing and hit targets share one space.
 		desktop.apply_requested_scale()

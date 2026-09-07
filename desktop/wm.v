@@ -76,6 +76,10 @@ mut:
 
 	// Applications the desktop is hosting. A window points into this by index.
 	apps []HostedApp
+	// An exclusive application is started by the main loop after it has
+	// released the framebuffer, pointer and raw console keyboard.
+	pending_external string
+	external_error   string
 
 	settings Settings
 	// Cmd-Tab's session: which windows it is stepping through and whether it
@@ -430,8 +434,18 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 	return root.box.bg, root.children
 }
 
-// launch opens a window for one of the applications the desktop can host.
+// launch opens a hosted window or queues an external application for the main
+// loop to run after releasing the physical display and input devices.
 fn (mut d Desktop) launch(factory AppFactory) {
+	if factory.exclusive_command != '' {
+		d.pending_external = factory.exclusive_command
+		d.dirty = true
+		return
+	}
+	if factory.open == unsafe { nil } {
+		eprintln('vinix-desktop: ${factory.title} has no launcher')
+		return
+	}
 	app := factory.open(mut d) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
@@ -444,6 +458,31 @@ fn (mut d Desktop) launch(factory AppFactory) {
 	index := d.window_index(id) or { return }
 	d.windows[index].app_index = d.apps.len - 1
 	d.windows[index].icon = factory.icon
+	d.clamp_to_screen(index)
+}
+
+// external_finished restores the native desktop after an exclusive program.
+// Successful exits need only a redraw. Failures get a visible window because
+// the console log is hidden as soon as the compositor takes the display back.
+fn (mut d Desktop) external_finished(result ExternalProgramResult) {
+	d.buttons = 0
+	d.drag = Drag{}
+	d.hover = ''
+	d.wallpaper_valid = false
+	d.dirty = true
+	if result == .success {
+		return
+	}
+	d.external_error = match result {
+		.unavailable { 'Firefox and Xorg are not installed in this desktop image.' }
+		.spawn_failed { 'Vinix could not create the Firefox launcher process.' }
+		.wait_failed { 'Vinix lost track of the Firefox launcher process.' }
+		.failed { 'Firefox or Xorg exited with an error.' }
+		.success { '' }
+	}
+	id := d.spawn('Firefox', .external_error, 180, 120, 500, 220)
+	index := d.window_index(id) or { return }
+	d.windows[index].icon = 'builtin:browser'
 	d.clamp_to_screen(index)
 }
 
@@ -583,8 +622,9 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 }
 
 // Shortcuts fill the usable height, then continue in another column. The
-// current eight fit in one column on a MacBook's 720 logical pixels, while a
-// deliberately short display still keeps every utility above the taskbar.
+// Eight fit in one column on a MacBook's 720 logical pixels; the ninth begins
+// a second column. A deliberately short display still keeps every utility
+// above the taskbar.
 fn shortcut_rows_for_height(height int) int {
 	usable := height - taskbar_height - shortcut_top
 	mut rows := usable / (shortcut_height + shortcut_gap)
@@ -672,9 +712,8 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		align: .center
 	})
 
-	// Then a launcher per application the desktop can host, so a ui2
-	// application is one click away rather than something only the startup
-	// arrangement can open.
+	// Then a launcher per available application, hosted or external, so each is
+	// one click away rather than something only a terminal can open.
 	mut launcher_x := edge_padding + new_button_width + 8
 	launcher_item_width := taskbar_launcher_width(width, launcher_x, available_apps.len)
 	for index in 0 .. available_apps.len {

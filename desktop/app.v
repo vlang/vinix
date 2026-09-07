@@ -24,26 +24,29 @@ mut:
 	handle(event_id string) !
 }
 
-// AppFactory names an application the desktop can open, the size its window
-// should start at, and the builtin glyph that stands for it in the taskbar and
-// on the wallpaper.
+// AppFactory names an application the desktop can open and the builtin glyph
+// that stands for it in the taskbar and on the wallpaper. Most applications
+// are hosted in a native desktop window. A large external GUI can instead ask
+// for exclusive ownership of the display while its command runs.
 struct AppFactory {
-	title  string
-	icon   string
-	width  int
-	height int
+	title             string
+	icon              string
+	width             int
+	height            int
+	exclusive_command string
 	// Given the desktop, because an application may need to read it or change
 	// it — Settings does both. Most ignore the argument.
-	open fn (mut desktop Desktop) !HostedApp @[required]
+	open fn (mut desktop Desktop) !HostedApp = unsafe { nil }
 }
 
 // Action ids are literals because launchers and shortcuts are rebuilt on
 // every redraw and Vinix runs without a garbage collector. Keep them parallel
 // with available_apps; their numeric suffix is what launch_index reads back.
 const app_launcher_actions = ['taskbar.launch.0', 'taskbar.launch.1', 'taskbar.launch.2',
-	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7']
+	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7',
+	'taskbar.launch.8']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
-	'shortcut.5', 'shortcut.6', 'shortcut.7']
+	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8']
 
 // available_apps is what the taskbar and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
@@ -55,6 +58,14 @@ const available_apps = [
 		width: 460
 		height: 360
 		open: open_files
+	},
+	AppFactory{
+		title: 'Firefox'
+		icon: 'builtin:browser'
+		// Firefox is an X11/GTK application. Xorg must own the framebuffer and
+		// input devices while it runs, so it is deliberately not embedded in a
+		// native desktop window.
+		exclusive_command: '/usr/bin/run-firefox'
 	},
 	AppFactory{
 		title: 'Calculator'

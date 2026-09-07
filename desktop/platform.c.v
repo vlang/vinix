@@ -232,6 +232,52 @@ struct SpawnedShell {
 // its toolchain prefix rather than /usr/bin.
 const desktop_command_path = '/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin'
 
+enum ExternalProgramResult {
+	success
+	unavailable
+	spawn_failed
+	wait_failed
+	failed
+}
+
+// Run a framebuffer application as a child of the desktop and wait until it
+// gives the display back. The caller closes the desktop's device descriptors
+// first; inheriting the console is intentional, as Xorg uses it for its VT.
+fn desktop_run_external(path string) ExternalProgramResult {
+	if path == '' || C.access(&char(path.str), C.X_OK) != 0 {
+		return .unavailable
+	}
+
+	argv := [&char(path.str), &char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
+
+	pid := C.fork()
+	if pid < 0 {
+		return .spawn_failed
+	}
+	if pid == 0 {
+		C.execve(&char(path.str), argv.data, envp.data)
+		C._exit(127)
+	}
+
+	mut status := 0
+	for {
+		waited := C.waitpid(pid, &status, 0)
+		if waited == pid {
+			return if status == 0 { .success } else { .failed }
+		}
+		if waited < 0 && C.errno == C.EINTR {
+			continue
+		}
+		return .wait_failed
+	}
+	return .wait_failed
+}
+
 // Start a shell for the terminal.
 //
 // Vinix has no pseudo-terminals, so the child is given plain pipes. It sees
