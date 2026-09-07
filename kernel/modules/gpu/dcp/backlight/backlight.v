@@ -59,8 +59,8 @@ fn set_error(code int) {
 // even when no compositor is drawing. It is always called WITHOUT this
 // resource's lock. context, the resource and its V state have boot lifetime.
 //
-// Intentionally NOT called by the existing simplified dcp.initialise().
-// Publishing a device there would advertise hardware support that is absent.
+// Called by the opt-in t8103 IOMFB transport only after its firmware handshake
+// has found the real internal-panel backlight service and scale.
 pub fn register_panel(layout Layout, maximum u32, scale u32, initial_raw u32,
 	initial_known bool, context voidptr, notify fn (voidptr)) ?&Backlight {
 	if panel_registered || notify == unsafe { nil } {

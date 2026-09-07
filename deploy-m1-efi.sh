@@ -20,9 +20,9 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
             ;;
         --apple-dcp)
-            # Experimental display-coprocessor probe. The current simplified
-            # IOMFB transport does not create /dev/apple-panel-bl. Separate
-            # from the GPU: probing one must not run the other's sequence.
+            # Experimental t8103 internal-panel IOMFB/backlight transport.
+            # Separate from the GPU: probing one must not run the other's
+            # sequence.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_dcp=1"
             ;;
         --apple-battery)
