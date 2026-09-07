@@ -130,9 +130,21 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 			body_line('Windows   ${open_windows} open, ${visible} on screen', 12, 52,
 				inner - 24),
 			body_line('Frames    ${desktop.frames}', 12, 72, inner - 24),
-			muted_line('Ctrl-Q leaves the desktop, Ctrl-N opens a window.', 12, 96, inner - 24),
+			body_line('Battery   ${device_state('/dev/battery')}', 12, 92, inner - 24),
+			body_line('Backlight ${device_state('/dev/apple-panel-bl')}', 12, 112, inner - 24),
+			muted_line('Ctrl-Q leaves the desktop, Ctrl-N opens a window.', 12, 136, inner - 24),
 		]),
 	]
+}
+
+// Whether a device node is there at all, which is the difference between a
+// driver that failed and a feature that does nothing. A machine with no serial
+// port paints the boot log over with this desktop, so "the battery reads --%"
+// and "F1 changes no brightness" otherwise look like desktop bugs when both
+// are really the kernel never having registered the device.
+fn device_state(path string) string {
+	desktop_stat(path) or { return 'absent (driver did not register it)' }
+	return 'present at ${path}'
 }
 
 fn palette_page(width int, height int) []ui2.Element {
