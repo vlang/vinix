@@ -29,6 +29,22 @@ for argument in "$@"; do
             # desktop shows in Settings and beside the clock.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_battery=1"
             ;;
+        --apple-ans)
+            # ANS2 storage: discovery, namespace reads and validated GPT views.
+            # Read-only on its own -- writing needs --ans-rw to name a target.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1"
+            ;;
+        --ans-rw=*)
+            # Authorises writes to exactly one Linux-data GPT partition, by
+            # PARTUUID. Nothing else on the disk becomes writable, which is the
+            # whole of what makes this safe to boot on a machine that still has
+            # macOS on it. There is no default and there must not be one.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.ans_rw=PARTUUID=${argument#*=}"
+            ;;
+        --ans-root=*)
+            # Boot root from that partition instead of the initramfs, read-only.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.root=PARTUUID=${argument#*=} vinix.rootfstype=ext2 vinix.rootmode=ro vinix.rootfallback=initramfs"
+            ;;
         --all-drivers)
             # Every Apple subsystem that is off by default, in one switch.
             # Each is still passed by name, so the cmdline the kernel prints
@@ -74,7 +90,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--apple-dcp] [--apple-battery] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)

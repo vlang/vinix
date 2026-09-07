@@ -24,6 +24,10 @@
 #                               one to try first. `cat /dev/battery` reports
 #                               the charge
 #   sudo ~/code/kek.sh dcp      shell + display coprocessor only
+#   sudo ~/code/kek.sh storage  shell + the SSD, read-only. Nothing is written:
+#                               authorising that needs a partition named by
+#                               PARTUUID, which deploy-m1-efi.sh takes as
+#                               --ans-rw= and this mode deliberately does not
 #   sudo ~/code/kek.sh drivers  shell + battery, DCP and GPU together
 #   sudo ~/code/kek.sh desktop-drivers   desktop + all three: the battery shows
 #                               beside the clock and Settings drives brightness
@@ -68,6 +72,10 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
         ;;
+    storage)
+        FLAGS=(--apple-ans --native-resolution)
+        MODE="shell + ANS storage (read-only)"
+        ;;
     battery)
         FLAGS=(--apple-battery --native-resolution)
         MODE="shell + SMC battery"
@@ -90,7 +98,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | battery | dcp | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
