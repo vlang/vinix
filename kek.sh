@@ -35,8 +35,14 @@
 #
 set -euo pipefail
 
-REPO="$HOME/code/vinix"
-[ "$(id -u)" -eq 0 ] && REPO="$(eval echo ~"${SUDO_USER:-$USER}")/code/vinix"
+# A deploy wrapper may use a non-default remote checkout. Keep the historic
+# user-home default for direct invocations, but honour the explicit checkout
+# passed by that wrapper even though this script runs under sudo.
+REPO="${VINIX_REPO:-}"
+if [ -z "$REPO" ]; then
+    REPO="$HOME/code/vinix"
+    [ "$(id -u)" -eq 0 ] && REPO="$(eval echo ~"${SUDO_USER:-$USER}")/code/vinix"
+fi
 DISK="disk0s4"
 ESP="/Volumes/EFI - FEDOR"
 
