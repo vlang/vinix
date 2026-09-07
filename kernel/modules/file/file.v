@@ -108,7 +108,7 @@ fn poll_revents(status int, requested i16) i16 {
 	return (i16(status) & requested) | (i16(status) & i16(pollerr | pollhup))
 }
 
-pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
+fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut t := proc.current_thread()
 	mut process := t.process
 
@@ -227,6 +227,58 @@ pub fn syscall_ppoll(_ voidptr, fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sig
 		}
 	}
 
+	return ret, 0
+}
+
+// ppoll may sleep while a socket or pipe becomes ready. Keep the poll array,
+// timeout and signal mask in kernel memory across that wait: dereferencing the
+// caller's virtual addresses after the scheduler has run can fault in EL1, and
+// malformed userspace pointers must return EFAULT rather than crash the kernel.
+pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_sigmask u64) (u64, u64) {
+	if nfds > 4096 {
+		return errno.err, errno.einval
+	}
+	pagemap := proc.current_thread().process.pagemap
+
+	mut pollfds := []PollFD{len: int(nfds)}
+	defer {
+		unsafe { pollfds.free() }
+	}
+	if nfds != 0
+		&& !usercopy.copy_from_user(unsafe { voidptr(&pollfds[0]) }, user_fds, nfds * sizeof(PollFD)) {
+		return errno.err, errno.efault
+	}
+
+	mut timeout := time.TimeSpec{}
+	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
+	if user_timeout != 0 {
+		if !usercopy.copy_from_user(voidptr(&timeout), user_timeout, sizeof(time.TimeSpec)) {
+			return errno.err, errno.efault
+		}
+		timeout_ptr = &timeout
+	}
+
+	mut sigmask := u64(0)
+	mut sigmask_ptr := &u64(unsafe { nil })
+	if user_sigmask != 0 {
+		if !usercopy.copy_from_user(voidptr(&sigmask), user_sigmask, sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		sigmask_ptr = &sigmask
+	}
+
+	mut fds_ptr := &PollFD(unsafe { nil })
+	if nfds != 0 {
+		fds_ptr = unsafe { &pollfds[0] }
+	}
+	ret, err := ppoll(fds_ptr, nfds, timeout_ptr, sigmask_ptr)
+	if err != 0 {
+		return ret, err
+	}
+	if nfds != 0
+		&& !usercopy.copy_to_pagemap(pagemap, user_fds, unsafe { voidptr(&pollfds[0]) }, nfds * sizeof(PollFD)) {
+		return errno.err, errno.efault
+	}
 	return ret, 0
 }
 

@@ -158,8 +158,7 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 		timeout_ptr = &deadline
 	}
 
-	ready, err := syscall_ppoll(unsafe { nil }, unsafe { &polls[0] }, u64(polls.len),
-		timeout_ptr, unsafe { nil })
+	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil })
 	if err != 0 {
 		return ready, err
 	}

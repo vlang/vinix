@@ -1,0 +1,247 @@
+#!/bin/sh
+# Small Vinix frontend for Alpine's apk package manager.
+set -eu
+
+APK=${VINIX_PKG_APK:-/sbin/apk}
+ROOT=${VINIX_PKG_ROOT:-}
+
+usage() {
+	cat <<'EOF'
+usage: pkg <command> [package ...]
+
+commands:
+  install PACKAGE...  install packages ("gtk" installs GTK 3 and its demos)
+  remove PACKAGE...   remove packages
+  update              refresh Alpine repository indexes
+  upgrade             upgrade installed packages
+  search QUERY...     search available packages
+  info PACKAGE...     show package information
+  list                list installed packages
+
+Alpine package names can be used directly. Vinix currently tracks Alpine 3.21
+for aarch64; package changes affect the running root filesystem.
+EOF
+}
+
+root_path() {
+	printf '%s%s\n' "$ROOT" "$1"
+}
+
+apk() {
+	if [ -n "$ROOT" ]; then
+		"$APK" --root "$ROOT" "$@"
+	else
+		"$APK" "$@"
+	fi
+}
+
+require_root() {
+	if [ -z "$ROOT" ] && [ "$(id -u)" != 0 ]; then
+		echo "pkg: package changes require root" >&2
+		exit 1
+	fi
+}
+
+# The userland builder extracts these packages so networking and apk work on
+# the first boot. Register them as explicitly installed before the first
+# transaction, otherwise removing an application could garbage-collect libc or
+# apk itself as an apparently orphaned dependency.
+bootstrap_database() {
+	marker=$(root_path /var/lib/vinix-pkg/base-ready)
+	[ -f "$marker" ] && return 0
+
+	base_world=$(root_path /etc/vinix-pkg/base-world)
+	if [ ! -s "$base_world" ]; then
+		echo "pkg: missing $base_world" >&2
+		exit 1
+	fi
+
+	echo "pkg: registering the Vinix base packages"
+	# Package names cannot contain whitespace. Expanding this generated file is
+	# intentional and preserves one package name per line as separate arguments.
+	# shellcheck disable=SC2046
+	apk --no-cache --no-progress --no-scripts add $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$base_world")
+	mkdir -p "$(dirname "$marker")"
+	: > "$marker"
+}
+
+resolve_packages() {
+	resolved=
+	for requested in "$@"; do
+		case "$requested" in
+			gtk)
+				# Keep GTK out of the image while making the obvious command
+				# produce a complete, demonstrably useful desktop install.
+				resolved="$resolved gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools"
+				;;
+			gtk+3.0-demo) ;;
+			*) resolved="$resolved $requested" ;;
+		esac
+	done
+	printf '%s\n' "${resolved# }"
+}
+
+install_packages() {
+	for requested in "$@"; do
+		case "$requested" in
+			gtk)
+				apk --no-cache --no-progress --no-scripts add \
+					adwaita-icon-theme font-dejavu gtk+3.0 libarchive-tools
+				install_gtk_demo
+				finalize_gtk
+				;;
+			gtk+3.0-demo)
+				apk --no-cache --no-progress --no-scripts add gtk+3.0 libarchive-tools
+				install_gtk_demo
+				finalize_gtk
+				;;
+			*)
+				apk --no-cache --no-progress --no-scripts add "$requested"
+				;;
+		esac
+	done
+}
+
+install_gtk_demo() {
+	if [ -n "$ROOT" ]; then
+		apk --no-cache --no-progress --no-scripts add gtk+3.0-demo
+		return
+	fi
+
+	manifest=/var/lib/vinix-pkg/gtk+3.0-demo.files
+	if [ -s "$manifest" ] \
+		&& [ -x /usr/bin/gtk3-demo ] \
+		&& [ -x /usr/bin/gtk3-widget-factory ]; then
+		return 0
+	fi
+
+	# apk fetch verifies the repository signature and package checksum, but does
+	# not enter apk's Vinix-incompatible large-file-list cleanup path. Extract
+	# this data-only examples package and keep a manifest for symmetric removal.
+	temp=$(/bin/busybox mktemp -d /tmp/vinix-pkg-gtk-demo.XXXXXX)
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	mkdir "$temp/payload"
+	apk --no-cache --no-progress fetch --output "$temp" gtk+3.0-demo
+	set -- "$temp"/gtk+3.0-demo-*.apk
+	if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+		echo "pkg: apk did not fetch one GTK demo archive" >&2
+		exit 1
+	fi
+	/usr/bin/bsdtar --ignore-zeros -xzf "$1" -C "$temp/payload"
+	# Vinix creates regular files as 0644 and archive tools restore their final
+	# modes with fchmodat. Make the package's application entries explicit too,
+	# so a partial extractor cannot silently leave unusable examples behind.
+	/bin/busybox chmod 0755 "$temp/payload"/usr/bin/gtk3-*
+	if [ ! -x "$temp/payload/usr/bin/gtk3-demo" ] \
+		|| [ ! -x "$temp/payload/usr/bin/gtk3-widget-factory" ]; then
+		echo "pkg: GTK demo archive is missing its examples" >&2
+		exit 1
+	fi
+
+	(
+		cd "$temp/payload"
+		/bin/busybox find . -type f
+		/bin/busybox find . -type l
+	) >"$temp/manifest"
+	for entry in "$temp/payload"/*; do
+		[ -e "$entry" ] || continue
+		/bin/busybox cp -a "$entry" /
+	done
+	mkdir -p /var/lib/vinix-pkg
+	/bin/busybox cp "$temp/manifest" "$manifest"
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: GTK demos installed"
+}
+
+finalize_gtk() {
+	[ -n "$ROOT" ] && return 0
+	# These are the deterministic cache updates from Alpine's triggers. General
+	# maintainer scripts stay disabled because they assume Alpine's init system.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+}
+
+remove_gtk_demo() {
+	if [ -n "$ROOT" ]; then
+		apk --no-progress --no-scripts del gtk+3.0-demo
+		return
+	fi
+
+	manifest=/var/lib/vinix-pkg/gtk+3.0-demo.files
+	[ -s "$manifest" ] || return 0
+	while IFS= read -r path; do
+		case "$path" in
+			./usr/*|./etc/*) rm -f "/${path#./}" ;;
+		esac
+	done <"$manifest"
+	rm -f "$manifest"
+}
+
+if [ "$#" -eq 0 ]; then
+	usage
+	exit 1
+fi
+
+command_name=$1
+shift
+
+case "$command_name" in
+	help|-h|--help)
+		usage
+		;;
+	install|add)
+		[ "$#" -gt 0 ] || { echo "pkg: install needs a package name" >&2; exit 1; }
+		require_root
+		bootstrap_database
+		install_packages "$@"
+		;;
+	remove|delete|del)
+		[ "$#" -gt 0 ] || { echo "pkg: remove needs a package name" >&2; exit 1; }
+		require_root
+		bootstrap_database
+		for requested in "$@"; do
+			case "$requested" in
+				gtk|gtk+3.0-demo) remove_gtk_demo ;;
+			esac
+		done
+		packages=$(resolve_packages "$@")
+		if [ -n "$packages" ]; then
+			# shellcheck disable=SC2086
+			apk --no-progress --no-scripts del $packages
+		fi
+		;;
+	update)
+		[ "$#" -eq 0 ] || { echo "pkg: update takes no packages" >&2; exit 1; }
+		require_root
+		apk update
+		;;
+	upgrade)
+		[ "$#" -eq 0 ] || { echo "pkg: upgrade takes no packages" >&2; exit 1; }
+		require_root
+		bootstrap_database
+		apk --no-cache --no-progress --no-scripts upgrade
+		;;
+	search)
+		[ "$#" -gt 0 ] || { echo "pkg: search needs a query" >&2; exit 1; }
+		apk search "$@"
+		;;
+	info)
+		[ "$#" -gt 0 ] || { echo "pkg: info needs a package name" >&2; exit 1; }
+		apk info "$@"
+		;;
+	list)
+		[ "$#" -eq 0 ] || { echo "pkg: list takes no packages" >&2; exit 1; }
+		apk info
+		[ ! -s "$(root_path /var/lib/vinix-pkg/gtk+3.0-demo.files)" ] \
+			|| echo gtk+3.0-demo
+		;;
+	*)
+		echo "pkg: unknown command: $command_name" >&2
+		usage >&2
+		exit 1
+		;;
+esac

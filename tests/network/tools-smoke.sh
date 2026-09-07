@@ -6,6 +6,7 @@ curl --version
 git --version
 ssh -V
 apk --version
+pkg --help
 xbps-query --version
 
 if [ -n "${VINIX_NETWORK_SMOKE_URL:-}" ]; then

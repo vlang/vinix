@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <poll.h>
 #include <sched.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -137,12 +138,23 @@ int main(void) {
 
     int blocking_counter = eventfd(0, EFD_CLOEXEC);
     pthread_t writer;
+    struct pollfd blocking_poll = {
+        .fd = blocking_counter,
+        .events = POLLIN,
+    };
     check(blocking_counter >= 0 &&
               pthread_create(&writer, NULL, eventfd_writer, &blocking_counter) == 0 &&
+              ppoll(&blocking_poll, 1, &(struct timespec){.tv_sec = 1}, NULL) == 1 &&
+              (blocking_poll.revents & POLLIN) != 0 &&
               eventfd_read(blocking_counter, &value) == 0 && value == 11 &&
               pthread_join(writer, NULL) == 0,
-          "blocking eventfd cross-thread wakeup");
+          "ppoll cross-thread wakeup");
     close(blocking_counter);
+
+    errno = 0;
+    check(syscall(SYS_ppoll, (void *)1, 1, NULL, NULL, 8) == -1 &&
+              errno == EFAULT,
+          "ppoll rejects invalid poll array");
 
     struct open_how_abi how = {.flags = O_RDONLY | O_CLOEXEC};
     int opened = syscall(SYS_openat2, AT_FDCWD, path, &how, sizeof(how));
@@ -153,6 +165,9 @@ int main(void) {
           "legacy faccessat ABI");
     check(syscall(SYS_faccessat2, fd, "", F_OK, AT_EMPTY_PATH) == 0,
           "faccessat2 AT_EMPTY_PATH");
+    check(fchmodat(AT_FDCWD, path, 0751, 0) == 0 &&
+              stat(path, &file_stat) == 0 && (file_stat.st_mode & 07777) == 0751,
+          "fchmodat updates file mode");
 
     struct rlimit limit;
     check(syscall(SYS_getrlimit, RLIMIT_NOFILE, &limit) == 0 &&

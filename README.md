@@ -195,6 +195,39 @@ codex --dangerously-bypass-approvals-and-sandbox
 codex exec --dangerously-bypass-approvals-and-sandbox "your task"
 ```
 
+### Packages on aarch64
+
+Vinix uses Alpine 3.21's aarch64/musl repositories for optional software. Build
+the network-tools layer before the userland (the desktop's compact image already
+requires this layer):
+
+```sh
+./build-network-tools-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Inside Vinix, use `pkg` to search, install, remove, and upgrade Alpine packages.
+The friendly `gtk` name installs GTK 3, its two demonstration programs, the
+Adwaita icons, and DejaVu fonts:
+
+```sh
+pkg update
+pkg search gtk
+pkg install gtk
+./gtk-package-smoke.sh
+```
+
+`pkg` disables Alpine maintainer scripts that assume a complete Alpine init
+system.
+The package database and installed files live in the running root filesystem;
+with the standard initramfs they last until reboot. Direct Alpine package names
+also work, for example `pkg install nano`.
+
+GTK is deliberately not included in the base or network-tools package layer.
+It is downloaded only by `pkg install gtk`. The GTK smoke test first checks
+that the base image is GTK-free, installs it, then opens both `gtk3-demo` and
+`gtk3-widget-factory` against the Vinix Xorg server.
+
 ### Firefox on aarch64
 
 Firefox ESR can run as a stock Alpine musl application on Vinix's existing

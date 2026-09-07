@@ -520,11 +520,6 @@ fn syscall_linux_flock(_ voidptr, fd int, operation int) (u64, u64) {
 	return 0, 0
 }
 
-// fchmodat: stub — return success (permissions are ignored on tmpfs).
-fn syscall_linux_fchmodat(_ voidptr, dirfd int, path charptr, mode u32, flags int) (u64, u64) {
-	return 0, 0
-}
-
 // ── X11 / dynamic-linking syscall stubs ──
 
 // sendfile(out, in, offset, count).  A page-sized bounce buffer keeps the
@@ -1037,7 +1032,7 @@ pub fn init_syscall_table() {
 	syscall_table[49] = voidptr(fs.syscall_chdir) // __NR_chdir
 	syscall_table[50] = voidptr(fs.syscall_fchdir) // __NR_fchdir
 	syscall_table[52] = voidptr(fs.syscall_fchmod) // __NR_fchmod
-	syscall_table[53] = voidptr(syscall_linux_fchmodat) // __NR_fchmodat
+	syscall_table[53] = voidptr(fs.syscall_fchmodat) // __NR_fchmodat
 	syscall_table[54] = voidptr(fs.syscall_fchownat) // __NR_fchownat
 	syscall_table[55] = voidptr(fs.syscall_fchown) // __NR_fchown
 	syscall_table[56] = voidptr(fs.syscall_openat) // __NR_openat

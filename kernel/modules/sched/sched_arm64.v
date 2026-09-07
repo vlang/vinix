@@ -315,6 +315,26 @@ pub fn yield(save_ctx bool) {
 		}
 	}
 
+	// With no other runnable thread, scheduler_timer_handler parks the CPU by
+	// clearing its current-thread slot and switching to the kernel pagemap, then
+	// returns to this polling loop. If an interrupt wakes this same thread, there
+	// is no sched_switch_context round trip to restore that per-CPU state for us.
+	// Reclaim the CPU here before the blocking syscall resumes.
+	if proc.current_thread() == unsafe { nil } {
+		mut cpu_local := cpulocal.current()
+		current_thread.l.acquire()
+		proc.set_current_thread(cpu_local.cpu_number, current_thread)
+		proc.begin_cpu_time(mut current_thread, timer.get_ns())
+		cpu.write_tpidr_el0(current_thread.tpidr_el0)
+		if cpu.read_ttbr0_el1() != current_thread.ttbr0 {
+			cpu.write_ttbr0_el1(current_thread.ttbr0)
+			cpu.isb()
+			cpu.tlbi_vmalle1()
+		}
+		fpu_restore(current_thread.fpu_storage)
+		katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
+	}
+
 	// Thread re-enqueued. Re-arm timer for normal scheduling.
 	timer.oneshot(current_thread.timeslice)
 	cpu.interrupt_toggle(true)
