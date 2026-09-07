@@ -40,6 +40,33 @@ fn title_of(desktop &Desktop, id int) string {
 	return desktop.windows[index].title
 }
 
+fn test_drag_redraws_only_after_pointer_motion() {
+	mut desktop := fixture_desktop()
+	id := desktop.focus
+	index := desktop.window_index(id) or { panic('missing focused window') }
+	desktop.pointer_x = 100
+	desktop.pointer_y = 90
+	desktop.buttons = button_left
+	desktop.drag = Drag{
+		kind: .move
+		window_id: id
+		offset_x: desktop.pointer_x - desktop.windows[index].x
+		offset_y: desktop.pointer_y - desktop.windows[index].y
+	}
+	desktop.dirty = false
+
+	// Re-reading the same held-click snapshot must not force another full
+	// frame. The resulting sleep is what lets ARM64 poll the next input report.
+	desktop.on_pointer_move(100, 90)
+	assert !desktop.dirty
+	assert desktop.windows[index].x == 30 && desktop.windows[index].y == 30
+
+	desktop.on_pointer_move(120, 105)
+	assert desktop.dirty
+	assert desktop.pointer_x == 120 && desktop.pointer_y == 105
+	assert desktop.windows[index].x == 50 && desktop.windows[index].y == 45
+}
+
 // hold_past_reveal takes the session back in time rather than sleeping for
 // most of a second: what is being tested is that the panel waits for the hold,
 // not that the clock runs.

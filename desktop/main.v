@@ -81,8 +81,9 @@ fn sleep_ms(ms i64) {
 
 fn sleep_to_next_frame(frame_started i64, interval i64) {
 	elapsed := monotonic_millis() - frame_started
-	if elapsed < interval {
-		sleep_ms(interval - elapsed)
+	wait := desktop_frame_wait_ms(elapsed, interval)
+	if wait > 0 {
+		sleep_ms(wait)
 	}
 }
 
@@ -195,18 +196,18 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	}
 	d.pointer_present = true
 
-	d.pointer_x = int(i64(packet.x) * i64(width - 1) / i64(packet.max_x))
-	d.pointer_y = int(i64(packet.y) * i64(height - 1) / i64(packet.max_y))
+	pointer_x := int(i64(packet.x) * i64(width - 1) / i64(packet.max_x))
+	pointer_y := int(i64(packet.y) * i64(height - 1) / i64(packet.max_y))
 	// The level goes in before the move is handled, so a drag can see that the
 	// button is no longer held.
 	d.buttons = packet.buttons
-	d.on_pointer_move(d.pointer_x, d.pointer_y)
+	d.on_pointer_move(pointer_x, pointer_y)
 
 	if packet.pressed & button_left != 0 {
-		d.on_pointer_down(d.pointer_x, d.pointer_y)
+		d.on_pointer_down(pointer_x, pointer_y)
 	}
 	if packet.released & button_left != 0 {
-		d.on_pointer_up(d.pointer_x, d.pointer_y)
+		d.on_pointer_up(pointer_x, pointer_y)
 	}
 }
 

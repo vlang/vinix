@@ -809,7 +809,8 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 // ── Pointer handling ───────────────────────────────────────────────
 
 fn (mut d Desktop) on_pointer_move(x int, y int) {
-	if x != d.pointer_x || y != d.pointer_y {
+	pointer_moved := x != d.pointer_x || y != d.pointer_y
+	if pointer_moved {
 		d.dirty = true
 	}
 	d.pointer_x = x
@@ -837,10 +838,14 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.drag.offset_y = d.theme().title_height / 2
 		}
 		moved := d.window_index(d.drag.window_id) or { return }
+		old_x := d.windows[moved].x
+		old_y := d.windows[moved].y
 		d.windows[moved].x = x - d.drag.offset_x
 		d.windows[moved].y = y - d.drag.offset_y
 		d.clamp_to_screen(moved)
-		d.dirty = true
+		if d.windows[moved].x != old_x || d.windows[moved].y != old_y {
+			d.dirty = true
+		}
 		return
 	}
 

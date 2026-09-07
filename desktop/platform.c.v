@@ -140,6 +140,19 @@ fn desktop_monotonic_ms() u64 {
 	return u64(stamp.tv_sec) * 1000 + u64(stamp.tv_nsec) / 1_000_000
 }
 
+// A positive frame interval must always produce a real sleep, even when the
+// render already consumed the budget. On Vinix/ARM64 the blocking scheduler
+// path also pumps polled console devices, including the shared Apple
+// keyboard/touchpad transport. Returning zero for an over-budget drag can
+// therefore starve the input needed to end that same drag.
+fn desktop_frame_wait_ms(elapsed i64, interval i64) i64 {
+	if interval <= 0 {
+		return 0
+	}
+	remaining := interval - elapsed
+	return if remaining > 0 { remaining } else { 1 }
+}
+
 fn desktop_sleep_ms(milliseconds i64) {
 	if milliseconds <= 0 {
 		return

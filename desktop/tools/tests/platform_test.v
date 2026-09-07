@@ -127,3 +127,13 @@ fn test_platform_clocks_and_sleep() {
 	desktop_sleep_ms(0)
 	desktop_sleep_ms(-1)
 }
+
+fn test_frame_wait_always_yields_after_an_overrun() {
+	assert desktop_frame_wait_ms(4, 16) == 12
+	assert desktop_frame_wait_ms(15, 16) == 1
+	assert desktop_frame_wait_ms(16, 16) == 1
+	assert desktop_frame_wait_ms(200, 16) == 1
+	// --frame-ms=0 deliberately remains the unpaced benchmarking mode.
+	assert desktop_frame_wait_ms(0, 0) == 0
+	assert desktop_frame_wait_ms(200, -1) == 0
+}
