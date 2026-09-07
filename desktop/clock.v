@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // The taskbar clock. Vinix has a real time clock only in the sense that
 // Limine hands the kernel a boot epoch, so the time comes from
 // clock_gettime(CLOCK_REALTIME) and the calendar arithmetic is done here

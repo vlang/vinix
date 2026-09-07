@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // A ui2 backend that draws into a framebuffer.
 //
 // ui2's element tree is platform independent — frames, box styles and text

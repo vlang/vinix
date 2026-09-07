@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module dart
 
 // Apple T8110-family DART2 format used by the T6050 PMP wrappers. This file

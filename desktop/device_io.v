@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Native V seam for bounded device transactions. Tests implement this
 // interface directly; production's POSIX implementation lives in .c.v.
 module main

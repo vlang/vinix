@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Input sources: /dev/pointer for the mouse and the controlling terminal for
 // the keyboard. Both are polled once per frame and never block, so a quiet
 // input device cannot hold up the clock.

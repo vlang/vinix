@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module sys
 
 // Time syscalls the Linux ABI expects that the Vinix-native set never had.

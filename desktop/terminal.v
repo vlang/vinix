@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // A terminal, built into the desktop.
 //
 // It runs the real shell that is on the image — BusyBox's — rather than

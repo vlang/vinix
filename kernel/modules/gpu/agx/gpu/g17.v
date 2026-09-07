@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module gpu
 
 // Ownership graph for the dual-role G17 firmware bootstrap. Every allocation

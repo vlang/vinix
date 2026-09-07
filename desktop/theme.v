@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // One place for every color and measurement the desktop draws with, so the
 // look can be changed without going through the layout code.
 module main

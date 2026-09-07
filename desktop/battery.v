@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // One read-only client shared by Settings and the bottom-right taskbar clock.
 module main
 

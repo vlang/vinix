@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // V implementation of the desktop's POSIX boundary. Only declarations and
 // constants come from libc headers; there are no custom C function bodies.
 // Import vlib's declarations rather than inventing incompatible duplicates.

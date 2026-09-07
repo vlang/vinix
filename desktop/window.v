@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Windows and what they show. The desktop has no way to launch other
 // programs yet, so a window's contents come from a small set of built-in
 // pages; everything about the frame, the title bar and the taskbar entry

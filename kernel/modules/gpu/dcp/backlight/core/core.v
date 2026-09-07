@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
+// Copyright (c) 2026 Alexander Medvednikov
 // Copyright (C) The Asahi Linux Contributors
 //
 // Calibration and wire layouts follow AsahiLinux/linux dcp_backlight.c

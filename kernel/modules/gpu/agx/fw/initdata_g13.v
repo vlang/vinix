@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module fw
 
 // Exact outer layouts for the macOS 12.3 G13 firmware object graph. Opaque

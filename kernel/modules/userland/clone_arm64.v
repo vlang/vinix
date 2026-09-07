@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module userland
 
 // Linux process and thread lifecycle syscalls: clone/clone3, wait4/waitid,

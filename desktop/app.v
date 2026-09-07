@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Hosting ui2 applications in the desktop's windows.
 //
 // A ui2 application normally calls `run_qml`, which opens a platform window

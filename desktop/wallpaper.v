@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Wallpapers: a flat gradient, or one of the photographs the build downloaded.
 //
 // Vinix has no JPEG or PNG decoder, so the photographs arrive already decoded:

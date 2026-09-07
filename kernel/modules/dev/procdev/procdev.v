@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // /dev/processes — one read, one picture of every process on the machine.
 //
 // Vinix has no procfs, and a monitor that had to open a file per process would

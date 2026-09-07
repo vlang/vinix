@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // A full clock and stopwatch utility. The taskbar clock is intentionally
 // compact; this window gives the time room to be read across a desk and adds
 // the one timing tool that does not belong in desktop chrome.

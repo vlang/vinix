@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // The Settings application: categories down the left, the chosen category's
 // settings on the right.
 //

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // The software renderer. Everything the desktop puts on screen goes through
 // these primitives: there is no GPU on the machines Vinix boots on yet, so the
 // compositor owns every pixel it draws.

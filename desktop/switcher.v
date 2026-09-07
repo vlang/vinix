@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Cmd-Tab: the window switcher.
 //
 // A tap moves to the window under the one on top, the way Alt-Tab and Cmd-Tab

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module file
 
 // pselect6(2), and through it select(2), which musl implements on top of it.

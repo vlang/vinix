@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module fw
 
 // G13 v12.3 notifier objects shared by all native subqueues belonging to one

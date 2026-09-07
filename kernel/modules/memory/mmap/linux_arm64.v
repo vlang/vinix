@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module mmap
 
 // The Linux VM syscalls that need to reach inside the range bookkeeping:

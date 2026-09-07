@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 fn wifi_fixture_put_at(mut bytes []u8, offset int, value u32) {

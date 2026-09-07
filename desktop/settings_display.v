@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // The two Settings categories that read a device rather than the desktop's own
 // preferences: Display, which drives the panel backlight, and Battery, which
 // only reports. They were a Settings application of their own before the two

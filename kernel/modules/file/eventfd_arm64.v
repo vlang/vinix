@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module file
 
 // Linux eventfd(2): a pollable 64-bit counter used by runtimes and event

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // The display side of the desktop: /dev/fb0 is queried for its geometry and
 // then mapped, so a frame reaches the screen as one memcpy out of the back
 // buffer instead of a write syscall per scanline.

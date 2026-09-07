@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // An activity monitor, built into the desktop.
 //
 // Like the file browser this is Vinix's own rather than a ui2 example, and it

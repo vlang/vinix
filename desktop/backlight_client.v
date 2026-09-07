@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // Userspace client for /dev/apple-panel-bl. No hardware access, C structs,
 // C helper implementations, text splitting allocations or optimistic state.
 module main

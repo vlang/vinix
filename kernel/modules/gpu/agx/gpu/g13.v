@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module gpu
 
 // Queue-owned object graph for the G13/macOS 12.3 firmware ABI. All buffers

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module table
 
 // Linux AArch64 compatibility calls which do not map one-for-one onto an

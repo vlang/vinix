@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 module resource
 
 // Open flags aarch64 does not take from asm-generic. Linux gives arm64 its own

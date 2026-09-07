@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
 // The window manager. It keeps the window list, turns it into a ui2 element
 // tree once per frame, and routes pointer events back to the elements that
 // tree produced — so what is drawn and what is clickable can never drift
