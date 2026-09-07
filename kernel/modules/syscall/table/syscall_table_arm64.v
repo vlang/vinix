@@ -8,6 +8,7 @@ import userland
 import futex
 import pipe
 import socket
+import socket.public as sock_pub
 import memory.mmap
 import time
 import time.sys
@@ -723,47 +724,19 @@ fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
 	return u64(target.pgid), 0
 }
 
-// sendmsg: write iovec data to socket (no ancillary data support).
+// sendmsg is implemented by the socket layer so AF_INET datagrams retain their
+// destination and stream writes remain one operation.
 fn syscall_linux_sendmsg(gpr_state voidptr, fdnum int, msg_ptr u64, flags int) (u64, u64) {
-	// struct msghdr layout (aarch64):
-	//   0: msg_name (8)
-	//   8: msg_namelen (4) + pad(4)
-	//  16: msg_iov (8)
-	//  24: msg_iovlen (8)
-	//  32: msg_control (8)
-	//  40: msg_controllen (8)
-	//  48: msg_flags (4)
-	iov_ptr := unsafe { *&u64(msg_ptr + 16) }
-	iovcnt := unsafe { *&u64(msg_ptr + 24) }
-
-	mut total := u64(0)
-	for i := u64(0); i < iovcnt; i++ {
-		entry := iov_ptr + i * 16
-		iov_base := unsafe { *&u64(entry) }
-		iov_len := unsafe { *&u64(entry + 8) }
-		if iov_len == 0 {
-			continue
-		}
-		ret, err := fs.syscall_write(gpr_state, fdnum, voidptr(iov_base), iov_len)
-		if err != 0 {
-			if total > 0 {
-				return total, 0
-			}
-			return ret, err
-		}
-		total += ret
-	}
-	return total, 0
+	return socket.syscall_sendmsg(gpr_state, fdnum, unsafe { &sock_pub.MsgHdr(msg_ptr) }, flags)
 }
 
-// sendto: for SOCK_STREAM, just write the data.
 fn syscall_linux_sendto(gpr_state voidptr, fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr, addrlen u32) (u64, u64) {
-	return fs.syscall_write(gpr_state, fdnum, buf, len)
+	return socket.syscall_sendto(gpr_state, fdnum, buf, len, flags, dest_addr, addrlen)
 }
 
-// recvfrom: for SOCK_STREAM, just read the data.
 fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen voidptr) (u64, u64) {
-	return fs.syscall_read(gpr_state, fdnum, buf, len)
+	return socket.syscall_recvfrom(gpr_state, fdnum, buf, len, flags, src_addr,
+		unsafe { &u32(addrlen) })
 }
 
 fn syscall_linux_umask(_ voidptr, mask int) (u64, u64) {

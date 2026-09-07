@@ -270,5 +270,7 @@ exec qemu-system-aarch64 \
     -drive format=raw,file="$BOOT_DISK" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
+    -netdev user,id=net0 \
+    -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 \
     $DISPLAY_FLAGS \
     -no-reboot

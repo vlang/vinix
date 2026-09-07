@@ -17,6 +17,7 @@ import limine
 import memory
 import resource
 import stat
+import socket.inet
 import usercopy
 
 #include "brcm_m1.h"
@@ -75,6 +76,7 @@ __global (
 	wifi_lock klock.Lock
 	wifi_res  = &WifiDevice(unsafe { nil })
 	wifi_seed [256]u8
+	wifi_network_attached = false
 )
 
 struct PowerDomain {
@@ -469,12 +471,56 @@ pub fn poll() {
 	if wifi_res == unsafe { nil } || !wifi_lock.test_and_acquire() {
 		return
 	}
-	defer { wifi_lock.release() }
 	result := C.brcm_m1_poll()
-	if result != 0 {
+	mut status := [256]u8{}
+	status_ok := C.brcm_m1_status(&status[0]) == 0
+	wifi_lock.release()
+
+	mut state := u32(0)
+	if status_ok {
+		unsafe { C.memcpy(&state, &status[0], sizeof(u32)) }
+	}
+	if state == 5 && !wifi_network_attached {
+		mut mac := [6]u8{}
+		unsafe { C.memcpy(&mac[0], &status[32], 6) }
+		wifi_network_attached = inet.attach(&mac, inet.driver_apple_wifi)
+		if wifi_network_attached {
+			println('wifi: authenticated link attached to IPv4 stack; DHCP requested')
+		}
+	} else if state != 5 && wifi_network_attached {
+		inet.detach()
+		wifi_network_attached = false
+	}
+
+	if wifi_network_attached {
+		// The IP stack owns frames once the authenticated link is attached.
+		// Pull each frame under the driver lock, then release it before entering
+		// lwIP so outbound replies can safely take the lock in network_send().
+		for _ in 0 .. 64 {
+			mut frame := [1514]u8{}
+			wifi_lock.acquire()
+			got := C.brcm_m1_read(&frame[0], usize(frame.len))
+			wifi_lock.release()
+			if got <= 0 {
+				break
+			}
+			inet.receive(&frame[0], u64(got))
+		}
+	} else if result != 0 {
 		wifi_res.status |= file.pollin
 		event.trigger(mut wifi_res.event, false)
 	}
+}
+
+@[export: 'vinix_apple_wifi_send']
+pub fn network_send(frame voidptr, length u64) int {
+	if !wifi_network_attached || frame == unsafe { nil } || length < 14 || length > 1514 {
+		return -1
+	}
+	wifi_lock.acquire()
+	result := C.brcm_m1_write(unsafe { &u8(frame) }, usize(length))
+	wifi_lock.release()
+	return result
 }
 
 fn error_code(value int) {

@@ -35,5 +35,6 @@ kernel/tmp.c
 kernel/tmp.v
 /build-aarch64-python/
 /build-aarch64-ruby/
+/build-aarch64-network-tools/
 /.claude/
 /deploy-to-m1.sh

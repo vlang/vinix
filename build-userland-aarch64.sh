@@ -13,6 +13,7 @@ STAGING="$BUILD_DIR/staging"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
+NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 
 MUSL_VERSION="1.2.5"
 BUSYBOX_VERSION="1.36.1"
@@ -435,6 +436,8 @@ export TERM=linux
 export PS1='vinix# '
 export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
 export LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri
+export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+export XBPS_ARCH=aarch64
 EOF
 
 # Add test hello.c
@@ -797,6 +800,13 @@ if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
     cp -a "$RUBY_STAGING/." "$STAGING/"
 else
     echo "==> Ruby staging not found, skipping (run build-ruby-aarch64.sh first)"
+fi
+
+if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
+    echo "==> Integrating network developer tools..."
+    cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
+else
+    echo "==> Network tools staging not found, skipping (run build-network-tools-aarch64.sh first)"
 fi
 
 echo "==> Packaging initramfs..."

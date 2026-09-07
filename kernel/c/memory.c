@@ -52,3 +52,22 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
     return 0;
 }
+
+int atoi(const char *text) {
+    int sign = 1;
+    int value = 0;
+
+    while (*text == ' ' || *text == '\t' || *text == '\n' ||
+           *text == '\r' || *text == '\f' || *text == '\v') {
+        text++;
+    }
+    if (*text == '-' || *text == '+') {
+        if (*text++ == '-') {
+            sign = -1;
+        }
+    }
+    while (*text >= '0' && *text <= '9') {
+        value = value * 10 + (*text++ - '0');
+    }
+    return value * sign;
+}

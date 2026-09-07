@@ -12,6 +12,7 @@ INITRAMFS="${VINIX_ARM64_INITRAMFS:-$SCRIPT_DIR/build-support/init-aarch64/initr
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
+NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
 
 BUSYBOX_VERSION=1.36.1
@@ -202,6 +203,8 @@ printf '%s\n' \
     'export TERM=linux' \
     "export PS1='vinix# '" \
     'export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules' \
+    'export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt' \
+    'export XBPS_ARCH=aarch64' \
     > "$STAGING/etc/profile"
 printf '%s\n' 'root:x:0:0:root:/root:/bin/sh' > "$STAGING/etc/passwd"
 printf '%s\n' 'root:x:0:' > "$STAGING/etc/group"
@@ -252,6 +255,12 @@ else
     echo "Ruby staging absent; skipping the Ruby boot test"
 fi
 
+if command -v curl >/dev/null 2>&1; then
+    /root/network-tools-smoke.sh
+else
+    echo "Network tools staging absent; skipping the network client boot test"
+fi
+
 exec /bin/sh -l
 BOOT_TEST
 chmod +x "$STAGING/etc/vinix-boot-test.sh"
@@ -275,6 +284,13 @@ if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
     cp -a "$RUBY_STAGING/." "$STAGING/"
 else
     echo "==> Ruby staging not found, packaging without Ruby"
+fi
+
+if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
+    echo "==> Integrating network developer tools"
+    cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
+else
+    echo "==> Network tools staging not found, packaging without network clients"
 fi
 
 echo "==> Verifying staged ARM64 executables"

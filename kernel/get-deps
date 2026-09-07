@@ -95,3 +95,16 @@ rm -rf c/uacpi
 mkdir -p c/uacpi
 cp -rp uacpi-repository/include/uacpi/* c/uacpi/
 cp -rp uacpi-repository/source/* c/uacpi/
+
+# 2.2.1.  Keep the third-party tree generated so security updates remain a
+# one-line pin change and the Vinix-specific port stays reviewable.
+clone_repo_commit \
+    https://git.savannah.nongnu.org/git/lwip.git \
+    lwip-repository \
+    77dcd25a72509eb83f72b033d219b1d40cd8eb95
+rm -rf c/lwip
+mkdir -p c/lwip/core/ipv4 c/lwip/netif
+cp -rp lwip-repository/src/include c/lwip/
+cp -p lwip-repository/src/core/*.c c/lwip/core/
+cp -p lwip-repository/src/core/ipv4/*.c c/lwip/core/ipv4/
+cp -p lwip-repository/src/netif/ethernet.c c/lwip/netif/

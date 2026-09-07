@@ -41,7 +41,7 @@ PROD :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/nanoprintf.h ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/nanoprintf.h || ! test -f c/lwip/include/lwip/init.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
 endif
@@ -150,6 +150,7 @@ endif # ARCH
 # Internal C preprocessor flags that should not be changed by the user.
 override CPPFLAGS := \
     -I c \
+    -I c/lwip/include \
     -isystem freestnd-c-hdrs \
     $(CPPFLAGS) \
     -MMD \
@@ -296,7 +297,7 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean: clean
-	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/nanoprintf* c/uacpi uacpi-repository
+	rm -rf freestnd-c-hdrs cc-runtime c/flanterm c/nanoprintf* c/uacpi uacpi-repository c/lwip lwip-repository
 
 # Install the final built executable to its final on-root location.
 .PHONY: install

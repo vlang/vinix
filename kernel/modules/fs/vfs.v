@@ -416,6 +416,22 @@ pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	return internal_create(parent, name, mode)
 }
 
+// Replace a small regular file from a kernel service.  DHCP uses this after
+// the initramfs is mounted to publish its resolver list to libc; keeping the
+// VFS mechanics here avoids exposing vfs_root outside the fs module.
+pub fn write_kernel_file(path string, data voidptr, length u64) bool {
+	mut node := get_node(vfs_root, path, false) or {
+		create(vfs_root, path, stat.ifreg | 0o644) or { return false }
+	}
+	mut res := node.resource
+	if !stat.isreg(res.stat.mode) {
+		return false
+	}
+	res.grow(unsafe { nil }, length) or { return false }
+	res.write(unsafe { nil }, data, 0, length) or { return false }
+	return true
+}
+
 pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 

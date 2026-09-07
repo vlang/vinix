@@ -15,6 +15,7 @@ import aarch64.pmgr
 import aarch64.wdt
 import aarch64.uart
 import aarch64.virtio_input
+import aarch64.virtio_net
 import apple.smc
 import apple.ans
 import devicetree
@@ -116,7 +117,7 @@ fn bootstrap_cpu0() {
 	print('CPU 0 bootstrap done\n')
 }
 
-fn kmain_thread() {
+fn kmain_thread(qemu_platform bool) {
 	boot_stage(11)
 	print('kmain_thread: started\n')
 
@@ -125,6 +126,9 @@ fn kmain_thread() {
 
 	socket.initialise()
 	print('kmain_thread: socket done\n')
+	if qemu_platform {
+		virtio_net.initialise(memory.get_hhdm_offset())
+	}
 	pipe.initialise()
 	print('kmain_thread: pipe done\n')
 	futex.initialise()
@@ -597,7 +601,9 @@ fn kmain() {
 	boot_stage(10)
 
 	print('spawning kmain_thread via scheduler...\n')
-	spawn kmain_thread()
+	// Capture the early platform decision before the scheduler handoff. Limine's
+	// response storage is bootloader-owned and must not be re-read later.
+	spawn kmain_thread(force_qemu_platform)
 	print('spawn done, calling await...\n')
 
 	sched.await()

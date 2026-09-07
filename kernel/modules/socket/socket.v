@@ -6,9 +6,12 @@ import errno
 import usercopy
 import socket.public as sock_pub
 import socket.unix as sock_unix
+import socket.inet as sock_inet
 import proc
 
-pub fn initialise() {}
+pub fn initialise() {
+	sock_inet.initialise()
+}
 
 fn socketpair_create(domain int, @type int, protocol int) ?(&resource.Resource, &resource.Resource) {
 	match domain {
@@ -28,6 +31,10 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	match domain {
 		sock_pub.af_unix {
 			ret := sock_unix.create(@type)?
+			return ret
+		}
+		sock_pub.af_inet {
+			ret := sock_inet.create(@type, protocol)?
 			return ret
 		}
 		else {
@@ -121,6 +128,8 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 
 	if mut res is sock_unix.UnixSocket {
 		sock = res
+	} else if mut res is sock_inet.InetSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
@@ -154,6 +163,8 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 
 	if mut res is sock_unix.UnixSocket {
 		sock = res
+	} else if mut res is sock_inet.InetSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
@@ -182,6 +193,8 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if mut res is sock_unix.UnixSocket {
+		sock = res
+	} else if mut res is sock_inet.InetSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -213,13 +226,120 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 
 	if mut res is sock_unix.UnixSocket {
 		sock = res
+	} else if mut res is sock_inet.InetSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
 
-	ret := sock.recvmsg(fd.handle, msg, flags) or { return errno.err, errno.get() }
+	// MSG_DONTWAIT is a per-call override, not a permanent descriptor flag.
+	old_flags := fd.handle.flags
+	if flags & 0x40 != 0 {
+		fd.handle.flags |= resource.o_nonblock
+	}
+	defer {
+		fd.handle.flags = old_flags
+	}
+	remaining_flags := flags & ~0x40000040 // MSG_CMSG_CLOEXEC | MSG_DONTWAIT
+	ret := sock.recvmsg(fd.handle, msg, remaining_flags) or { return errno.err, errno.get() }
 
 	return ret, 0
+}
+
+// sendto(2), including connected UDP when no destination is supplied.  The
+// old aarch64 compatibility wrapper reduced every call to write(2), losing the
+// destination that DNS and DHCP clients need.
+pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr, addrlen u32) (u64, u64) {
+	if flags & ~0x4040 != 0 { // MSG_DONTWAIT | MSG_NOSIGNAL
+		return errno.err, errno.eopnotsupp
+	}
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+	mut res := fd.handle.resource
+	if mut res is sock_inet.InetSocket {
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
+		}
+		defer {
+			fd.handle.flags = old_flags
+		}
+		ret := res.sendto(fd.handle, buf, len, dest_addr, addrlen) or {
+			return errno.err, errno.get()
+		}
+		return u64(ret), 0
+	}
+	if mut res is sock_unix.UnixSocket {
+		if dest_addr != unsafe { nil } {
+			return errno.err, errno.eopnotsupp
+		}
+		ret := fd.handle.write(buf, len) or { return errno.err, errno.get() }
+		return u64(ret), 0
+	}
+	return errno.err, errno.enotsock
+}
+
+pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen &u32) (u64, u64) {
+	if flags & ~0x40 != 0 { // MSG_DONTWAIT
+		return errno.err, errno.eopnotsupp
+	}
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+	mut res := fd.handle.resource
+	if mut res is sock_inet.InetSocket {
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
+		}
+		defer {
+			fd.handle.flags = old_flags
+		}
+		ret := res.recvfrom(fd.handle, buf, len, src_addr, addrlen) or {
+			return errno.err, errno.get()
+		}
+		return u64(ret), 0
+	}
+	if mut res is sock_unix.UnixSocket {
+		ret := fd.handle.read(buf, len) or { return errno.err, errno.get() }
+		return u64(ret), 0
+	}
+	return errno.err, errno.enotsock
+}
+
+pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
+	if msg == unsafe { nil } {
+		return errno.err, errno.efault
+	}
+	if msg.msg_control != unsafe { nil } && msg.msg_controllen != 0 {
+		return errno.err, errno.eopnotsupp
+	}
+	mut total := u64(0)
+	for i := u64(0); i < msg.msg_iovlen; i++ {
+		total += unsafe { msg.msg_iov[i].iov_len }
+		if total > u64(0x7fffffff) {
+			return errno.err, errno.emsgsize
+		}
+	}
+	buffer := unsafe { malloc(if total > 0 { total } else { 1 }) }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		unsafe { free(buffer) }
+	}
+	mut copied := u64(0)
+	for i := u64(0); i < msg.msg_iovlen; i++ {
+		iov := unsafe { msg.msg_iov[i] }
+		if iov.iov_len != 0 {
+			unsafe { C.memcpy(voidptr(u64(buffer) + copied), iov.iov_base, iov.iov_len) }
+			copied += iov.iov_len
+		}
+	}
+	return syscall_sendto(gpr_state, fdnum, buffer, total, flags, msg.msg_name, msg.msg_namelen)
 }
 
 pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64) {
@@ -242,6 +362,8 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 	mut sock := &sock_pub.Socket(unsafe { nil })
 
 	if mut res is sock_unix.UnixSocket {
+		sock = res
+	} else if mut res is sock_inet.InetSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -273,6 +395,8 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 
 	if mut res is sock_unix.UnixSocket {
 		sock = res
+	} else if mut res is sock_inet.InetSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
@@ -289,6 +413,9 @@ fn socket_from_fdnum(fdnum int) ?(&file.FD, &sock_pub.Socket) {
 
 	mut res := fd.handle.resource
 	if mut res is sock_unix.UnixSocket {
+		return fd, &sock_pub.Socket(res)
+	}
+	if mut res is sock_inet.InetSocket {
 		return fd, &sock_pub.Socket(res)
 	}
 
