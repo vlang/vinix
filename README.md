@@ -47,7 +47,7 @@ on real hardware.
 - [x] X window manager
 - [x] Networking
 - [ ] Wayland 
-- [ ] Hypervisor
+- [x] Hypervisor (Intel VT-x; see [documentation](docs/hypervisor.md))
 - [x] V-UI 2
 - [ ] Intel HD graphics driver (Linux port)
 ## Build instructions

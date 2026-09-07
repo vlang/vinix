@@ -11,6 +11,7 @@ import x86.apic
 import katomic
 import sched
 import memory
+import x86.hypervisor
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
@@ -125,6 +126,11 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		fpu_save = cpu.fxsave
 		fpu_restore = cpu.fxrstor
 	}
+
+	// VMXON is local to each logical CPU. Failure is deliberately non-fatal:
+	// Vinix must still boot when firmware disables VT-x or a host does not
+	// expose nested virtualisation.
+	hypervisor.initialise_cpu(cpu_number)
 
 	apic.lapic_enable(0xff)
 

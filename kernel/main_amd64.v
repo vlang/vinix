@@ -34,6 +34,7 @@ import syscall.table
 import socket
 import time
 import x86.hpet
+import x86.hypervisor
 import limine
 
 fn kmain_thread() {
@@ -48,6 +49,7 @@ fn kmain_thread() {
 	fs.mount(vfs_root, '', '/', 'tmpfs') or {}
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
+	hypervisor.initialise()
 
 	initramfs.initialise()
 
