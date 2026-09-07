@@ -2,7 +2,7 @@
 # Cross-compile the Vinix desktop environment for aarch64 and stage it into an
 # initramfs that boots straight into it.
 #
-# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--wifi-bundle=DIR]
+# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]
 #
 # V translates the program to C; clang compiles that C against the static musl
 # sysroot extracted from the userland image. The result is a freestanding
@@ -28,13 +28,16 @@ BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 
 MAKE_INITRAMFS=1
+COMPACT_INITRAMFS=0
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
         --no-initramfs) MAKE_INITRAMFS=0 ;;
+        --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]"
+            echo "  --compact-initramfs stages only BusyBox and desktop boot inputs for a small EFI partition"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
             ;;
@@ -148,11 +151,10 @@ if [ "$MAKE_INITRAMFS" -eq 0 ]; then
 fi
 
 # ── Stage an initramfs that boots into the desktop ──
-# Extract the full userland, then replace its init before repacking it. Appending
-# an overlay tar would leave duplicate paths that the kernel's initramfs
-# unpacker rejects; replacing files in a staging tree gives the output one
-# entry per path while retaining Python, Git, GCC and every other installed
-# userland component.
+# Appending an overlay tar would leave duplicate paths that the kernel's
+# initramfs unpacker rejects, so stage before repacking it. A full userland is
+# useful for development but can exceed an M1 EFI partition; compact mode uses
+# only BusyBox alongside the desktop's own boot inputs.
 if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
@@ -194,7 +196,12 @@ echo "==> Staging the desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
-tar xf "$BASE_INITRAMFS" -C "$STAGING"
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    echo "    compact image: staging BusyBox and desktop boot inputs only"
+    tar xf "$BASE_INITRAMFS" -C "$STAGING" ./bin/busybox
+else
+    tar xf "$BASE_INITRAMFS" -C "$STAGING"
+fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root"
 
