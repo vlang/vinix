@@ -298,5 +298,12 @@ file "$STAGING/bin/busybox" "$GUEST_TOOLCHAIN/bin/gcc" \
     "$STAGING/usr/v/v" "$STAGING/sbin/init"
 
 mkdir -p "$(dirname "$INITRAMFS")"
-(cd "$STAGING" && tar --format=ustar -cf "$INITRAMFS" .)
+# Publish atomically so a host-side rsync cannot open this image halfway
+# through packaging.
+INITRAMFS_TMP="$(mktemp "$(dirname "$INITRAMFS")/.initramfs.tar.XXXXXX")"
+if ! (cd "$STAGING" && tar --format=ustar -cf "$INITRAMFS_TMP" .); then
+    rm -f "$INITRAMFS_TMP"
+    exit 1
+fi
+mv -f "$INITRAMFS_TMP" "$INITRAMFS"
 echo "==> ARM64 initramfs ready: $INITRAMFS ($(du -h "$INITRAMFS" | cut -f1))"

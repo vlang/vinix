@@ -248,5 +248,12 @@ done
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the
 # kernel's tar reader would try to unpack as real files.
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$DESKTOP_INITRAMFS" -C "$STAGING" .
+# The deploy script may start rsync as soon as this build exits. Publish the
+# completed image in one rename so parallel pushes never read a partial tar.
+DESKTOP_INITRAMFS_TMP="$(mktemp "$(dirname "$DESKTOP_INITRAMFS")/.initramfs-desktop.tar.XXXXXX")"
+if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$DESKTOP_INITRAMFS_TMP" -C "$STAGING" .; then
+    rm -f "$DESKTOP_INITRAMFS_TMP"
+    exit 1
+fi
+mv -f "$DESKTOP_INITRAMFS_TMP" "$DESKTOP_INITRAMFS"
 echo "    $DESKTOP_INITRAMFS ($(stat -f%z "$DESKTOP_INITRAMFS") bytes)"

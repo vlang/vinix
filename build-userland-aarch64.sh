@@ -813,7 +813,15 @@ echo "==> Packaging initramfs..."
 INITRAMFS="$INIT_DIR/initramfs.tar"
 mkdir -p "$INIT_DIR"
 cd "$STAGING"
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$INITRAMFS" .
+# Write beside the published image and rename only once tar has finished.
+# deploy/push can run while this build is in progress; writing INITRAMFS
+# directly lets rsync observe a truncated tar and abort mid-transfer.
+INITRAMFS_TMP="$(mktemp "$INIT_DIR/.initramfs.tar.XXXXXX")"
+if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$INITRAMFS_TMP" .; then
+    rm -f "$INITRAMFS_TMP"
+    exit 1
+fi
+mv -f "$INITRAMFS_TMP" "$INITRAMFS"
 echo "    initramfs: $(du -h "$INITRAMFS" | cut -f1)"
 echo ""
 echo "=== Build complete ==="
