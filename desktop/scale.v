@@ -23,6 +23,28 @@ fn desktop_scale_valid(scale int) bool {
 	return scale == desktop_scale_100 || scale == desktop_scale_200
 }
 
+// Centralize scale state access so Settings, the compositor, the presenter and
+// tests all use the same request/apply transition.
+fn desktop_requested_scale() int {
+	return desktop_scale_factor
+}
+
+fn desktop_current_scale() int {
+	return desktop_applied_scale
+}
+
+fn desktop_request_scale(scale int) {
+	desktop_scale_factor = scale
+}
+
+fn desktop_restore_requested_scale() {
+	desktop_scale_factor = desktop_applied_scale
+}
+
+fn desktop_commit_scale(scale int) {
+	desktop_applied_scale = scale
+}
+
 fn desktop_default_scale(width int, height int) int {
 	if width >= desktop_hidpi_min_width && height >= desktop_hidpi_min_height {
 		return desktop_scale_200
@@ -37,6 +59,11 @@ fn desktop_scaled_extent(pixels int, scale int) int {
 		return pixels
 	}
 	return (pixels + desktop_scale_200 - 1) / desktop_scale_200
+}
+
+fn desktop_scaled_physical_extents(scale int) (int, int) {
+	return desktop_scaled_extent(desktop_physical_width, scale),
+		desktop_scaled_extent(desktop_physical_height, scale)
 }
 
 fn desktop_configure_scale(width int, height int) int {

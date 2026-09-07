@@ -155,7 +155,7 @@ fn main() {
 		desktop.render(tree)
 		after_render := monotonic_millis()
 
-		fb.present(&desktop.canvas, desktop_applied_scale)
+		fb.present(&desktop.canvas, desktop_current_scale())
 		after_present := monotonic_millis()
 
 		free_tree(tree)
@@ -177,7 +177,7 @@ fn main() {
 		h: desktop.canvas.height
 	}
 	desktop.canvas.clear(0x000000)
-	fb.present(&desktop.canvas, desktop_applied_scale)
+	fb.present(&desktop.canvas, desktop_current_scale())
 	println('vinix-desktop: ${desktop.frames} frames')
 }
 

@@ -200,9 +200,9 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 		}),
 		settings_label('Scale', x, 46, 42, body_muted),
 		settings_scale_button(settings_scale_100_action, '100%', x + 50,
-			desktop_scale_factor == desktop_scale_100),
+			desktop_requested_scale() == desktop_scale_100),
 		settings_scale_button(settings_scale_200_action, '200%', x + 116,
-			desktop_scale_factor == desktop_scale_200),
+			desktop_requested_scale() == desktop_scale_200),
 		settings_label('Built-in display', x + 190, 46, inner - 190, body_muted),
 		ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{ bg: body_rule }, []),
 		settings_label('Brightness', x, 90, inner - 100, body_heading),
@@ -286,11 +286,11 @@ fn (mut a SettingsApp) handle_device(event_id string) {
 		return
 	}
 	if event_id == settings_scale_100_action {
-		desktop_scale_factor = desktop_scale_100
+		desktop_request_scale(desktop_scale_100)
 		return
 	}
 	if event_id == settings_scale_200_action {
-		desktop_scale_factor = desktop_scale_200
+		desktop_request_scale(desktop_scale_200)
 		return
 	}
 	mut target := -1

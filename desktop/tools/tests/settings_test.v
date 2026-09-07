@@ -122,8 +122,7 @@ fn fixture_app() &SettingsApp {
 	fixture_write_result = .ok
 	fixture_writes = 0
 	fixture_percent = -1
-	desktop_scale_factor = desktop_scale_100
-	desktop_applied_scale = desktop_scale_100
+	desktop_configure_scale(1920, 1080)
 	mut app := &SettingsApp{
 		category: .display
 		read_state: fixture_read
@@ -176,7 +175,7 @@ fn test_settings_scale_choices_and_stale_hits() {
 	assert scale_200.box.bg == files_up
 
 	app.handle(settings_scale_200_action) or { panic(err) }
-	assert desktop_scale_factor == desktop_scale_200
+	assert desktop_requested_scale() == desktop_scale_200
 	root = app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	scale_200 = element_named(root, settings_scale_200_action) or { panic('missing selected 200% scale') }
 	assert scale_200.box.bg == app_accent
@@ -185,7 +184,7 @@ fn test_settings_scale_choices_and_stale_hits() {
 	assert battery_index >= 0
 	app.handle('${settings_action_category}${battery_index}') or { panic(err) }
 	app.handle(settings_scale_100_action) or { panic(err) }
-	assert desktop_scale_factor == desktop_scale_200
+	assert desktop_requested_scale() == desktop_scale_200
 }
 
 fn test_desktop_scale_defaults_and_extents() {

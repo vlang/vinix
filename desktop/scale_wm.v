@@ -12,7 +12,7 @@ fn desktop_rescale_coordinate(value int, old_extent int, new_extent int) int {
 
 fn desktop_usable_height(screen_height int) int {
 	usable := screen_height - taskbar_height
-	if usable >= title_height {
+	if usable >= default_title_height {
 		return usable
 	}
 	return screen_height
@@ -38,7 +38,7 @@ fn desktop_clamp_scaled_position(x int, y int, width int, height int, screen_wid
 	if height >= usable_height {
 		next_y = 0
 	} else {
-		max_y := usable_height - title_height
+		max_y := usable_height - default_title_height
 		if next_y < 0 {
 			next_y = 0
 		}
@@ -54,21 +54,20 @@ fn desktop_clamp_scaled_position(x int, y int, width int, height int, screen_wid
 // spaces. Windows retain their logical sizes (therefore doubling physically at
 // 200%) while their positions track the same place on the panel.
 fn (mut d Desktop) apply_requested_scale() {
-	target := desktop_scale_factor
+	target := desktop_requested_scale()
 	if !desktop_scale_valid(target) {
-		desktop_scale_factor = desktop_applied_scale
+		desktop_restore_requested_scale()
 		return
 	}
-	if target == desktop_applied_scale {
+	if target == desktop_current_scale() {
 		return
 	}
 
 	old_width := d.canvas.width
 	old_height := d.canvas.height
-	new_width := desktop_scaled_extent(desktop_physical_width, target)
-	new_height := desktop_scaled_extent(desktop_physical_height, target)
+	new_width, new_height := desktop_scaled_physical_extents(target)
 	if new_width <= 0 || new_height <= 0 {
-		desktop_scale_factor = desktop_applied_scale
+		desktop_restore_requested_scale()
 		return
 	}
 
@@ -121,6 +120,6 @@ fn (mut d Desktop) apply_requested_scale() {
 	d.targets.clear()
 	d.hover = ''
 	d.drag = Drag{}
-	desktop_applied_scale = target
+	desktop_commit_scale(target)
 	d.dirty = true
 }
