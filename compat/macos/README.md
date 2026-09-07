@@ -11,6 +11,8 @@ intentionally the test input: it is a real Objective-C Cocoa application, compil
 Mach-O and linked with normal AppKit imports. No Apple library or framework is
 copied into the Vinix image.
 
+![Objective-C Cocoa calculator running on Vinix in QEMU](apps/Calculator/screenshot-qemu.png)
+
 ## Supported today
 
 - thin AArch64 Mach-O executables and AArch64 slices in fat Mach-O containers
