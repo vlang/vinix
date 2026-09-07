@@ -8,6 +8,7 @@
 #   --no-desktop    skip the desktop build (the kernel is what you changed)
 #   --monitor       open a QEMU monitor and QMP socket, so the tools under
 #                   desktop/tools can drive and photograph the running desktop
+#   --mem=MB        guest RAM (default: 8192 MiB for the desktop image)
 #   --help
 #
 # Anything else is passed through to run-aarch64.sh, which is what actually
@@ -18,6 +19,9 @@
 # The two builds are done here rather than left to run-aarch64.sh so that a
 # failure in either is reported plainly, and so the kernel build gets a V it
 # can actually find.
+# The desktop's root filesystem is loaded into RAM during boot.  The generic
+# runner defaults to 2 GiB for small shell images, whereas this image needs at
+# least 8 GiB.  An explicit environment setting or --mem=MB still wins.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -31,6 +35,7 @@ DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 # Honour an explicit path so callers can still run more than one desktop VM.
 export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop.img}"
 export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
+export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 MONITOR_SOCKET="${VINIX_MONITOR_SOCKET:-/tmp/vinix-monitor}"
 QMP_SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 
