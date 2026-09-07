@@ -6,9 +6,9 @@
 // interpreting commands itself, so what it can do is whatever the system can
 // do. Vinix has no pseudo-terminals, so the shell is given plain pipes; since
 // those are not a terminal it neither echoes what is typed nor prints a
-// prompt, and the terminal does both itself. That is the whole of the
-// difference from a terminal with a pty behind it, and for a minimal one it is
-// a fair trade.
+// visible prompt. The terminal echoes input itself and turns private BusyBox
+// prompt markers into the visible prompt. That keeps the prompt behind the
+// foreground command even though there is no pty to provide that state.
 //
 // Like the file browser it satisfies NativeApp, so its process speaks the same
 // compositor protocol. It additionally satisfies
@@ -63,6 +63,17 @@ const terminal_action_scroll_down = 'term.scroll.down'
 const terminal_row_height = 16
 const terminal_padding = 8
 const terminal_prompt = '\$ '
+const terminal_continuation_prompt = '> '
+
+// BusyBox writes these as PS1/PS2. They are deliberately control-delimited:
+// the output parser consumes them instead of putting them in scrollback, and
+// either marker can be split across two non-blocking pipe reads.
+const terminal_prompt_marker_start = u8(0x1e)
+const terminal_prompt_marker_end = u8(0x1f)
+const terminal_primary_prompt_code = u8(`P`)
+const terminal_continuation_prompt_code = u8(`C`)
+const terminal_primary_prompt_marker = '\x1eP\x1f'
+const terminal_continuation_prompt_marker = '\x1eC\x1f'
 
 struct TerminalApp {
 mut:
@@ -85,6 +96,13 @@ mut:
 	input_text   string
 	// The prompt line as drawn, cursor and all. Same reason.
 	prompt_text string = terminal_prompt + '_'
+	// Input is accepted only while BusyBox is actually asking for another
+	// command. Without this state the synthetic `$` prompt used to reappear on
+	// every Return while a package install was still running.
+	ready        bool
+	continuation bool
+	marker_state u8
+	marker_code  u8
 
 	pid        int = -1
 	to_child   int = -1
@@ -102,7 +120,7 @@ fn open_terminal(mut _ Desktop) !NativeApp {
 	mut app := &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
-	shell := desktop_spawn_shell(terminal_shell, terminal_shell_arg) or {
+	shell := desktop_spawn_shell(terminal_shell, terminal_shell_arg, terminal_primary_prompt_marker, terminal_continuation_prompt_marker) or {
 		app.error = 'cannot start ${terminal_shell}'
 		app.lines << app.error
 		return app
@@ -137,35 +155,88 @@ fn (mut a TerminalApp) poll() bool {
 		return false
 	}
 
-	for i := 0; i < int(got); i++ {
-		ch := a.read_buf[i]
-		match ch {
-			`\n` {
-				a.push_line(a.partial.bytestr())
-				a.partial.clear()
+	a.ingest_output(a.read_buf[..int(got)])
+	return true
+}
+
+// ingest_output separates the private prompt protocol from ordinary command
+// output. Keeping the marker state on TerminalApp makes a marker that straddles
+// two poll() reads just as reliable as one delivered in a single read.
+fn (mut a TerminalApp) ingest_output(output []u8) {
+	for ch in output {
+		if a.marker_state == 0 {
+			if ch == terminal_prompt_marker_start {
+				a.marker_state = 1
+				continue
 			}
-			`\r` {}
-			`\t` {
-				// Tabs to the next multiple of eight, which is what a terminal
-				// would have done and what keeps `ls -l` in columns.
-				for _ in 0 .. 8 - a.partial.len % 8 {
-					a.partial << ` `
-				}
+			a.ingest_visible_byte(ch)
+			continue
+		}
+
+		if a.marker_state == 1 {
+			if ch == terminal_primary_prompt_code || ch == terminal_continuation_prompt_code {
+				a.marker_code = ch
+				a.marker_state = 2
+				continue
 			}
-			8 {
-				if a.partial.len > 0 {
-					a.partial.delete_last()
-				}
+			a.marker_state = 0
+			// The leading record separator was invisible under the old parser
+			// too. Preserve the byte after it, including another marker start.
+			if ch == terminal_prompt_marker_start {
+				a.marker_state = 1
+			} else {
+				a.ingest_visible_byte(ch)
 			}
-			else {
-				if ch >= 0x20 {
-					a.partial << ch
-				}
-			}
+			continue
+		}
+
+		if ch == terminal_prompt_marker_end {
+			a.ready = true
+			a.continuation = a.marker_code == terminal_continuation_prompt_code
+			a.marker_state = 0
+			a.refresh_prompt()
+			continue
+		}
+
+		// It looked like a marker but was ordinary output. The printable code
+		// remains visible; the control delimiter remains filtered as before.
+		code := a.marker_code
+		a.marker_state = 0
+		a.ingest_visible_byte(code)
+		if ch == terminal_prompt_marker_start {
+			a.marker_state = 1
+		} else {
+			a.ingest_visible_byte(ch)
 		}
 	}
 	a.partial_text = replaced(a.partial_text, a.partial.bytestr())
-	return true
+}
+
+fn (mut a TerminalApp) ingest_visible_byte(ch u8) {
+	match ch {
+		`\n` {
+			a.push_line(a.partial.bytestr())
+			a.partial.clear()
+		}
+		`\r` {}
+		`\t` {
+			// Tabs to the next multiple of eight, which is what a terminal
+			// would have done and what keeps `ls -l` in columns.
+			for _ in 0 .. 8 - a.partial.len % 8 {
+				a.partial << ` `
+			}
+		}
+		8 {
+			if a.partial.len > 0 {
+				a.partial.delete_last()
+			}
+		}
+		else {
+			if ch >= 0x20 {
+				a.partial << ch
+			}
+		}
+	}
 }
 
 fn (mut a TerminalApp) push_line(line string) {
@@ -198,15 +269,29 @@ fn replaced(old string, next string) string {
 
 // key_input takes what was typed. The shell is on the far side of a pipe and
 // cannot echo, so the terminal shows the line as it is built and only hands it
-// over when Return completes it.
+// over when Return completes it. While a foreground command owns the shell,
+// there is intentionally no editable prompt: type-ahead cannot masquerade as
+// commands the shell has already accepted.
 fn (mut a TerminalApp) key_input(text string) {
+	if !a.ready || a.exited {
+		return
+	}
 	for ch in text {
 		match ch {
 			`\n`, `\r` {
 				line := a.input.bytestr()
-				a.push_line('${terminal_prompt}${line}')
-				a.send('${line}\n')
+				prompt := if a.continuation {
+					terminal_continuation_prompt
+				} else {
+					terminal_prompt
+				}
+				a.push_line('${prompt}${line}')
+				if a.send('${line}\n') {
+					a.ready = false
+				}
 				a.input.clear()
+				a.refresh_prompt()
+				return
 			}
 			8, 127 {
 				if a.input.len > 0 {
@@ -220,15 +305,20 @@ fn (mut a TerminalApp) key_input(text string) {
 			}
 		}
 	}
-	a.input_text = replaced(a.input_text, a.input.bytestr())
-	a.prompt_text = replaced(a.prompt_text, '${terminal_prompt}${a.input_text}_')
+	a.refresh_prompt()
 }
 
-fn (mut a TerminalApp) send(line string) {
+fn (mut a TerminalApp) refresh_prompt() {
+	prompt := if a.continuation { terminal_continuation_prompt } else { terminal_prompt }
+	a.input_text = replaced(a.input_text, a.input.bytestr())
+	a.prompt_text = replaced(a.prompt_text, '${prompt}${a.input_text}_')
+}
+
+fn (mut a TerminalApp) send(line string) bool {
 	if a.to_child < 0 || a.exited {
-		return
+		return false
 	}
-	desktop_write(a.to_child, line.str, u64(line.len))
+	return desktop_write_all(a.to_child, line.str, u64(line.len))
 }
 
 fn (mut a TerminalApp) close_app() {
@@ -261,7 +351,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	// the whole scrollback every frame would allocate as fast as the old
 	// per-character concatenation did.
 	partial_rows := if a.partial.len > 0 { 1 } else { 0 }
-	prompt_rows := if a.exited { 0 } else { 1 }
+	prompt_rows := if a.exited || !a.ready { 0 } else { 1 }
 	total := a.lines.len + partial_rows + prompt_rows
 
 	max_scroll := if total > a.visible_rows { total - a.visible_rows } else { 0 }

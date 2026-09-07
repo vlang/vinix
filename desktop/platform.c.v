@@ -283,13 +283,14 @@ fn desktop_run_external(path string) ExternalProgramResult {
 // Start a shell for the terminal.
 //
 // Vinix has no pseudo-terminals, so the child is given plain pipes. It sees
-// them as its stdin, stdout and stderr, and because they are not a terminal it
-// neither echoes what is typed nor prints a prompt — the terminal does both
-// itself.
+// them as its stdin, stdout and stderr. Interactive mode makes BusyBox publish
+// PS1/PS2 at the exact points where it can accept input; private marker values
+// let the terminal draw those prompts without leaking protocol text into the
+// scrollback. Job control stays off because pipes are not a controlling tty.
 //
 // from_child comes back non-blocking, so a compositor polling it once a frame
 // never stalls.
-fn desktop_spawn_shell(path string, arg string) ?SpawnedShell {
+fn desktop_spawn_shell(path string, arg string, primary_prompt string, continuation_prompt string) ?SpawnedShell {
 	mut in_pipe := [2]int{}
 	mut out_pipe := [2]int{}
 	if C.pipe(&in_pipe[0]) != 0 {
@@ -303,10 +304,13 @@ fn desktop_spawn_shell(path string, arg string) ?SpawnedShell {
 
 	// Built before the fork. Between fork and execve the child may call only
 	// async-signal-safe functions, which allocating is not.
-	argv := [&char(path.str), &char(arg.str), &char(unsafe { nil })]
+	argv := [&char(path.str), &char(arg.str), c'-i', c'+m', &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
+	primary_prompt_entry := 'PS1=${primary_prompt}'
+	continuation_prompt_entry := 'PS2=${continuation_prompt}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/busybox', &char(primary_prompt_entry.str), &char(continuation_prompt_entry.str),
+		c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
