@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploy Vinix ARM64 boot files to an already-mounted EFI System Partition.
-# Usage: ./deploy-m1-efi.sh [--all-drivers] [--minimal-initramfs] /path/to/mounted/esp
+# Usage: ./deploy-m1-efi.sh [--apple-studio-display] [--desktop-initramfs] /path/to/mounted/esp
 
 set -euo pipefail
 
@@ -10,6 +10,7 @@ ENABLE_APPLE_GPU=0
 USE_MINIMAL_INITRAMFS=0
 USE_DESKTOP_INITRAMFS=0
 USE_NATIVE_RESOLUTION=0
+USE_EXTERNAL_DISPLAY=0
 CMDLINE_EXTRA=""
 
 for argument in "$@"; do
@@ -64,6 +65,15 @@ for argument in "$@"; do
             # very moment Limine applies it, just before entering the kernel.
             USE_NATIVE_RESOLUTION=1
             ;;
+        --apple-studio-display|--external-display)
+            # Preserve the GOP scanout selected by iBoot/m1n1 and ask Vinix
+            # to choose the largest output if firmware exposes more than one.
+            # The native internal-panel DCP probe must stay off: it owns a
+            # different connector and can reset the shared display fabric.
+            USE_EXTERNAL_DISPLAY=1
+            USE_NATIVE_RESOLUTION=1
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.apple_dcp=0"
+            ;;
         --force-fault)
             # Self-test of the signal channel: fault on purpose and expect a
             # reboot. If the machine does not reboot, PSCI reset is missing
@@ -95,7 +105,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -113,7 +123,7 @@ for argument in "$@"; do
 done
 
 if [ -z "$ESP_MOUNT" ]; then
-    echo "usage: $0 [--all-drivers] <mounted_esp_path>"
+    echo "usage: $0 [--apple-studio-display|--external-display] [options] <mounted_esp_path>"
     exit 1
 fi
 
@@ -212,6 +222,9 @@ if [ "$USE_NATIVE_RESOLUTION" -eq 1 ]; then
     sed -i '' '/^[[:space:]]*resolution:/d' "$RUNTIME_CONF"
     echo "NATIVE RESOLUTION: no mode switch requested; Limine keeps the firmware's framebuffer"
 fi
+if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
+    echo "EXTERNAL DISPLAY: preserving firmware scanout; Vinix will select the largest GOP framebuffer"
+fi
 
 cp "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf"
 cp "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf"
@@ -263,3 +276,16 @@ echo "  kernel entry:  0x$kernel_entry"
 echo "  kernel limine requests: $kernel_requests (Limine's 'Requests count' line)"
 echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
 echo "Compare the entry point against Limine's 'ELF entry point' line at boot."
+if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
+    cat <<'EXTERNAL_DISPLAY'
+
+Apple Studio Display handoff is enabled. Before powering on the M1 Air:
+  1. Connect power and the Studio Display.
+  2. Make the firmware boot UI appear on the Studio Display (clamshell mode is
+     the most reliable way to make it the single boot output).
+  3. Leave the display attached through the complete boot.
+
+Vinix will print "framebuffer: selected GOP ... (external handoff)" once the
+kernel owns the selected surface. Post-boot hot-plug is not supported yet.
+EXTERNAL_DISPLAY
+fi

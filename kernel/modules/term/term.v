@@ -16,6 +16,14 @@ __global (
 	framebuffer_tag     = &limine.LimineFramebuffer(unsafe { nil })
 	framebuffer_width   = u64(0)
 	framebuffer_height  = u64(0)
+	// Limine can expose one GOP framebuffer per output. Apple Silicon usually
+	// has only the framebuffer selected by m1n1/iBoot, but a UEFI stage that
+	// keeps both the internal panel and a USB-C display produces more than one.
+	// Keep one scanout for now and make every early/late framebuffer user agree
+	// on it; mixing index 0 here with another /dev/fb0 later corrupts memory.
+	framebuffer_index       = u64(0)
+	framebuffer_selected    = false
+	framebuffer_external    = false
 	// Graphics mode: a userland program owns the framebuffer, so the kernel
 	// terminal must not draw. Without it every console line (a program's
 	// stderr, a kernel message) scrolls flanterm, which repaints every text
@@ -30,6 +38,82 @@ fn C.flanterm_full_refresh(context voidptr)
 
 pub fn graphics_mode() bool {
 	return terminal_graphics_mode
+}
+
+// Pick the framebuffer used by the console and /dev/fb0. In external-display
+// handoff mode there is no connector metadata in the Limine protocol, so the
+// largest valid GOP surface is the useful discriminator: the M1 Air panel is
+// 2560x1600 while a Studio Display surface is 5120x2880. Ties prefer the later
+// GOP handle, which is normally the hot-plug output rather than the panel.
+//
+// This runs before V's runtime initialisation and therefore deliberately does
+// not allocate or construct strings.
+pub fn select_framebuffer(prefer_external bool) bool {
+	framebuffer_index = 0
+	framebuffer_selected = false
+	framebuffer_external = prefer_external
+	if fb_req.response == unsafe { nil }
+		|| fb_req.response.framebuffer_count == 0
+		|| fb_req.response.framebuffers == unsafe { nil } {
+		return false
+	}
+
+	mut best_area := u64(0)
+	for index := u64(0); index < fb_req.response.framebuffer_count; index++ {
+		candidate := unsafe { fb_req.response.framebuffers[index] }
+		if candidate == unsafe { nil } || candidate.address == unsafe { nil }
+			|| candidate.width == 0 || candidate.height == 0 || candidate.pitch == 0 {
+			continue
+		}
+		// Do not let a larger but unmapped GOP handle displace the firmware
+		// default. The selected address is touched during the earliest boot
+		// stages, before a fault can be reported anywhere useful.
+		if !fb_address_usable(candidate) {
+			continue
+		}
+		if candidate.width > ~u64(0) / candidate.height {
+			continue
+		}
+		area := candidate.width * candidate.height
+		if !framebuffer_selected || (prefer_external && area >= best_area) {
+			framebuffer_index = index
+			best_area = area
+			framebuffer_selected = true
+		}
+		if framebuffer_selected && !prefer_external {
+			break
+		}
+	}
+	return framebuffer_selected
+}
+
+fn selected_framebuffer() &limine.LimineFramebuffer {
+	if !framebuffer_selected && !select_framebuffer(false) {
+		return unsafe { nil }
+	}
+	if fb_req.response == unsafe { nil }
+		|| framebuffer_index >= fb_req.response.framebuffer_count {
+		return unsafe { nil }
+	}
+	return unsafe { fb_req.response.framebuffers[framebuffer_index] }
+}
+
+// Emit this after the terminal exists. It makes a hardware boot unambiguous:
+// the log says which GOP surface Vinix owns and whether external preference
+// was requested, instead of requiring a guess from the visible panel.
+pub fn report_framebuffer_selection() {
+	fb := selected_framebuffer()
+	if fb == unsafe { nil } {
+		println('framebuffer: no usable GOP output')
+		return
+	}
+	count := if fb_req.response == unsafe { nil } {
+		u64(0)
+	} else {
+		fb_req.response.framebuffer_count
+	}
+	mode := if framebuffer_external { 'external handoff' } else { 'firmware default' }
+	println('framebuffer: selected GOP ${framebuffer_index + 1}/${count}, ${fb.width}x${fb.height}x${fb.bpp} (${mode})')
 }
 
 // Stop drawing to the framebuffer on behalf of `owner_pid`. Idempotent: the
@@ -92,16 +176,10 @@ fn stage_color(stage u32) u32 {
 	}
 }
 
-// Early boot marker that writes directly to the first Limine framebuffer.
+// Early boot marker that writes directly to the selected Limine framebuffer.
 // Safe to call before terminal initialisation; no allocations performed.
 pub fn early_stage_mark(stage u32) {
-	if fb_req.response == unsafe { nil } {
-		return
-	}
-	if fb_req.response.framebuffer_count == 0 || fb_req.response.framebuffers == unsafe { nil } {
-		return
-	}
-	fb := unsafe { fb_req.response.framebuffers[0] }
+	fb := selected_framebuffer()
 	if fb == unsafe { nil } || fb.address == unsafe { nil } {
 		return
 	}
@@ -174,13 +252,7 @@ fn scale_channel(value u8, mask_size u8) u32 {
 // If it turns the fill colour, the framebuffer works and later bars are
 // meaningful. If it is black, the panel is not showing our writes.
 pub fn early_screen_fill(stage u32) {
-	if fb_req.response == unsafe { nil } {
-		return
-	}
-	if fb_req.response.framebuffer_count == 0 || fb_req.response.framebuffers == unsafe { nil } {
-		return
-	}
-	fb := unsafe { fb_req.response.framebuffers[0] }
+	fb := selected_framebuffer()
 	if fb == unsafe { nil } || fb.address == unsafe { nil } {
 		return
 	}
@@ -221,18 +293,12 @@ __global (
 	}
 )
 
-// Physical span of the first framebuffer, for the page-table build. Limine
+// Physical span of the selected framebuffer, for the page-table build. Limine
 // reports the framebuffer as a higher-half direct-map address, so the physical
 // base is that address minus the HHDM offset. Returns a zero length when there
 // is no usable framebuffer.
 pub fn framebuffer_phys_span() (u64, u64) {
-	if fb_req.response == unsafe { nil } {
-		return 0, 0
-	}
-	if fb_req.response.framebuffer_count == 0 || fb_req.response.framebuffers == unsafe { nil } {
-		return 0, 0
-	}
-	fb := unsafe { fb_req.response.framebuffers[0] }
+	fb := selected_framebuffer()
 	if fb == unsafe { nil } || fb.address == unsafe { nil } || !fb_address_usable(fb) {
 		return 0, 0
 	}
@@ -254,15 +320,7 @@ pub fn initialise() {
 	if flanterm_ctx != unsafe { nil } {
 		return
 	}
-	if fb_req.response == unsafe { nil } {
-		// No framebuffer available (headless/serial-only mode)
-		return
-	}
-	if fb_req.response.framebuffer_count == 0 || fb_req.response.framebuffers == unsafe { nil } {
-		// No framebuffer available (headless/serial-only mode)
-		return
-	}
-	framebuffer_tag = unsafe { fb_req.response.framebuffers[0] }
+	framebuffer_tag = selected_framebuffer()
 	if framebuffer_tag == unsafe { nil } || framebuffer_tag.address == unsafe { nil } {
 		framebuffer_tag = unsafe { nil }
 		return

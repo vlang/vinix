@@ -15,6 +15,8 @@
 #                               boot test then runs the AGX render test
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
 #   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
+#   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
+#                               boot firmware; connect it before powering on
 #
 # Everything below is off by default in the kernel, so these are the only way
 # to exercise it on real hardware. Start narrow: GPU and DCP can hard-reset the
@@ -83,6 +85,10 @@ case "${1:-desktop}" in
         FLAGS=(--apple-wifi --native-resolution --desktop-initramfs)
         MODE="desktop + Apple Wi-Fi"
         ;;
+    studio)
+        FLAGS=(--apple-studio-display --apple-wifi --desktop-initramfs)
+        MODE="Apple Studio Display desktop + Apple Wi-Fi"
+        ;;
     storage)
         FLAGS=(--apple-ans --native-resolution)
         MODE="shell + ANS storage (read-only)"
@@ -109,7 +115,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | full | gpu | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
@@ -155,6 +161,20 @@ The machine must REBOOT. That proves PSCI works and that a silent machine
 in the other modes is real information rather than a broken signal.
 If it does NOT reboot, PSCI is unavailable and the halt modes mean nothing.
 ST
+    ;;
+*Studio\ Display*)
+    cat <<'STUDIO'
+
+The display must already be active before U-Boot starts. Connect it before
+power-on and use clamshell mode if the firmware keeps selecting the Air panel.
+The kernel log should contain:
+
+  framebuffer: selected GOP ... (external handoff)
+  display: external GOP handoff active; native DCP probe disabled
+
+This mode deliberately owns one firmware framebuffer. Unplug/replug and
+switching back to the internal panel require a reboot.
+STUDIO
     ;;
 *Apple\ drivers|*SMC\ battery|*Apple\ DCP|*Apple\ Wi-Fi)
     cat <<'DRV'

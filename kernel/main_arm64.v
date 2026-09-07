@@ -50,6 +50,7 @@ __global (
 	enable_apple_gpu     = false
 	enable_apple_dcp     = false
 	enable_apple_battery = false
+	external_display_handoff = false
 	force_qemu_platform  = false
 	aic_timer_irq         = u32(3)
 )
@@ -252,8 +253,8 @@ fn configure_apple_bringup_from_cmdline() {
 		return
 	}
 
-	// Exact token matching avoids enabling the probe for '=10' or for a
-	// different parameter containing this name. Last battery option wins.
+	// Exact token matching avoids enabling a probe for '=10' or for a
+	// different parameter containing this name. Last explicit option wins.
 	mut option_start := 0
 	for index := 0; index <= cmdline.len; index++ {
 		if index != cmdline.len && cmdline[index] !in [` `, `\t`, `\r`, `\n`] {
@@ -265,16 +266,20 @@ fn configure_apple_bringup_from_cmdline() {
 			enable_apple_battery = true
 		} else if option == 'vinix.apple_battery=0' {
 			enable_apple_battery = false
+		} else if option == 'vinix.apple_gpu=1' {
+			enable_apple_gpu = true
+		} else if option == 'vinix.apple_gpu=0' {
+			enable_apple_gpu = false
+		} else if option == 'vinix.apple_dcp=1' {
+			enable_apple_dcp = true
+		} else if option == 'vinix.apple_dcp=0' {
+			enable_apple_dcp = false
+		} else if option == 'vinix.display=external' {
+			external_display_handoff = true
 		}
 		option_start = index + 1
 	}
 
-	if cmdline.contains('vinix.apple_gpu=1') {
-		enable_apple_gpu = true
-	}
-	if cmdline.contains('vinix.apple_dcp=1') {
-		enable_apple_dcp = true
-	}
 	if cmdline.contains('vinix.minimal_apple=0') {
 		enable_apple_gpu = true
 		enable_apple_dcp = true
@@ -285,6 +290,14 @@ fn configure_apple_bringup_from_cmdline() {
 	}
 	if cmdline.contains('vinix.qemu_platform=1') {
 		force_qemu_platform = true
+	}
+	// The current DCP driver binds the M1 Air's internal panel. Starting it
+	// while an external framebuffer inherited from firmware is scanning out can
+	// reset the display fabric and blank the only usable output. Handoff mode
+	// therefore owns the selected GOP surface and leaves DCP untouched.
+	if external_display_handoff {
+		enable_apple_dcp = false
+		print('display: external GOP handoff active; native DCP probe disabled\n')
 	}
 
 	C.printf(c'apple bring-up: GPU=%s DCP=%s\n',
@@ -366,6 +379,41 @@ fn early_cmdline_contains(needle string) bool {
 	return false
 }
 
+// Allocation-free exact token lookup for decisions made before _vinit. Unlike
+// a substring search, `vinix.display=external-test` must not change scanout.
+fn early_cmdline_has_token(token string) bool {
+	kernel_file := limine.kernel_file()
+	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+		return false
+	}
+	text := unsafe { &u8(kernel_file.cmdline) }
+	mut start := 0
+	for index := 0; ; index++ {
+		value := unsafe { text[index] }
+		if value != 0 && value !in [` `, `\t`, `\r`, `\n`] {
+			continue
+		}
+		length := index - start
+		if length == token.len {
+			mut matches := true
+			for offset := 0; offset < length; offset++ {
+				if unsafe { text[start + offset] } != token[offset] {
+					matches = false
+					break
+				}
+			}
+			if matches {
+				return true
+			}
+		}
+		if value == 0 {
+			return false
+		}
+		start = index + 1
+	}
+	return false
+}
+
 fn kmain() {
 	// Read the cmdline before touching anything else. The framebuffer used to
 	// be written first, which made it impossible to tell a kernel that never
@@ -375,6 +423,8 @@ fn kmain() {
 	// cheapest thing that can run before the answer is needed.
 	halt_at_stage = early_cmdline_value('vinix.halt_at=')
 	skip_early_term := early_cmdline_contains('vinix.no_early_term=1')
+	external_display := early_cmdline_has_token('vinix.display=external')
+	term.select_framebuffer(external_display)
 
 	// Stage 0 deliberately precedes every access to hardware state, so its
 	// halt asks one question and no other: was the kernel entered at all?
@@ -443,6 +493,7 @@ fn kmain() {
 		// Both are drawn after its clear, so they survive on screen.
 		boot_stage(13)
 		print('\n=== Vinix aarch64 (early) ===\n')
+		term.report_framebuffer_selection()
 		boot_stage(14)
 	}
 
