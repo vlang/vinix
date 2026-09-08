@@ -25,6 +25,13 @@ produced the expected bytes and that the ordinary Vinix queue/fence lifecycle
 handles success and failure. It cannot prove firmware boot, real UAT mappings,
 hardware register semantics, or acceptance by G17 firmware.
 
+`gpu.agx.render` is the generation-neutral boundary immediately below the
+Asahi ioctl. It validates the Mesa render record, copies both nested attachment
+arrays exactly once, and converts byte sizes to the cache-line count required
+by G13 while retaining the original byte sizes used for fake-VM bounds checks.
+Both native G13 and fake G17 consume the same immutable `render.Command`; a
+backend never follows the userspace attachment pointers again.
+
 ## Verification contract
 
 `kernel/c/agx_fake_g17.c` checks the four-pass 3D register-list layout already
@@ -172,10 +179,12 @@ At the Vinix prompt, select lifecycle-only validation:
 ```
 
 Mesa should identify the renderer as `Apple M5 Max (G17C C0)` and report that
-the render submit and fence completed successfully. This exercises the Asahi
-DRM ioctl layout, per-file GEM and VM ownership, mappings, contexts, queues,
-sync objects, the generated G17 encoder, the independent verifier, synthetic
-completion, fence waiting, and process teardown.
+the render submit and fence completed successfully. The first kernel message
+also includes the staged Mesa fragment command ID and framebuffer dimensions.
+This exercises the Asahi DRM ioctl layout, shared render-command normalization,
+immutable attachment staging, per-file GEM and VM ownership, mappings,
+contexts, queues, sync objects, the generated G17 encoder, the independent
+verifier, synthetic completion, fence waiting, and process teardown.
 
 `--submit-only` is intentional: fake G17 does not rasterize pixels. Running the
 same binary without that option retains the normal framebuffer pixel check for
@@ -187,8 +196,11 @@ actual write count remains descriptor- and path-dependent; 392 is not a
 required-write invariant for a job.
 
 The fake driver's current descriptor contains deterministic recovered scalar
-defaults. Translating every Mesa resource and command field into a native G17
-descriptor remains the next software integration step. Native PMP/RTKit boot,
-DART/UAT page tables, completion IRQs, and actual firmware acceptance remain
-physical-hardware gates. The fake driver has no import of or route to those
-hardware facilities.
+defaults. The complete, validated Mesa render command is now available at the
+backend boundary, but translating its semantic fields into native G17
+descriptor members remains the next software integration step. The recovered
+nine-field Apple normalized-command copy is not used as an offset shortcut:
+that source is Apple's proprietary payload, not Mesa's UAPI. Native PMP/RTKit
+boot, DART/UAT page tables, completion IRQs, and actual firmware acceptance
+remain physical-hardware gates. The fake driver has no import of or route to
+those hardware facilities.

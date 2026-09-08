@@ -11,6 +11,7 @@ import drm.ioctl
 import drm.syncobj
 import gpu.agx.mmu
 import gpu.agx.pgtable
+import gpu.agx.render as agxrender
 import gpu.agx.workqueue
 import gpu.agx.gpu
 import klock
@@ -22,10 +23,8 @@ import aarch64.timer
 
 const max_submission_commands = u32(64)
 const max_submission_syncs = u32(64)
-const max_command_attachments = u32(16)
 const max_g13_submission_commands = u32(2)
-const max_render_dimension = u32(16384)
-const max_render_layers = u32(2048)
+const max_command_attachments = u32(16)
 
 struct GpuMapping {
 mut:
@@ -65,7 +64,7 @@ mut:
 struct StagedG13Command {
 mut:
 	descriptor ioctl.DrmAsahiCommand
-	render     gpu.G13RenderCommand
+	render     agxrender.Command
 	compute    gpu.G13ComputeCommand
 }
 
@@ -981,36 +980,6 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	return -22
 }
 
-// Validate the fixed render payload fields consumed by Mesa 25.0.5. These are
-// the same limits enforced by the matching downstream Asahi UAPI. Extensions
-// remain disabled until Vinix can copy and walk their userspace linked list
-// without faulting in the kernel.
-fn valid_render_command(command &ioctl.DrmAsahiCmdRender) bool {
-	if command.extensions != 0 || command.flags & ~ioctl.asahi_render_supported_flags != 0 {
-		return false
-	}
-	if command.fb_width == 0 || command.fb_width > max_render_dimension
-		|| command.fb_height == 0 || command.fb_height > max_render_dimension
-		|| command.layers == 0 || command.layers > max_render_layers {
-		return false
-	}
-	if !((command.utile_width == 32 && command.utile_height == 32)
-		|| (command.utile_width == 32 && command.utile_height == 16)
-		|| (command.utile_width == 16 && command.utile_height == 16)) {
-		return false
-	}
-	if command.samples != 1 && command.samples != 2 && command.samples != 4 {
-		return false
-	}
-	if command.vertex_attachment_count > max_command_attachments
-		|| command.fragment_attachment_count > max_command_attachments
-		|| (command.vertex_attachment_count != 0 && command.vertex_attachments == 0)
-		|| (command.fragment_attachment_count != 0 && command.fragment_attachments == 0) {
-		return false
-	}
-	return true
-}
-
 fn valid_compute_command(command &ioctl.DrmAsahiCmdCompute) bool {
 	if command.extensions != 0 || command.flags & ~ioctl.asahi_compute_no_preemption != 0
 		|| command.pad != 0 || command.attachment_count > max_command_attachments
@@ -1150,90 +1119,6 @@ fn install_output_syncs(staged &StagedSyncArray, fence &syncobj.DmaFence) bool {
 	return true
 }
 
-fn make_g13_render_command(command &ioctl.DrmAsahiCmdRender,
-	vertex_attachments [16]gpu.G13ComputeAttachment,
-	fragment_attachments [16]gpu.G13ComputeAttachment, has_result bool) gpu.G13RenderCommand {
-	return gpu.G13RenderCommand{
-		flags: command.flags
-		encoder_ptr: command.encoder_ptr
-		vertex_usc_base: command.vertex_usc_base
-		fragment_usc_base: command.fragment_usc_base
-		vertex_helper_program: command.vertex_helper_program
-		fragment_helper_program: command.fragment_helper_program
-		vertex_helper_cfg: command.vertex_helper_cfg
-		fragment_helper_cfg: command.fragment_helper_cfg
-		vertex_helper_arg: command.vertex_helper_arg
-		fragment_helper_arg: command.fragment_helper_arg
-		depth_buffer_load: command.depth_buffer_load
-		depth_buffer_load_stride: command.depth_buffer_load_stride
-		depth_buffer_store: command.depth_buffer_store
-		depth_buffer_store_stride: command.depth_buffer_store_stride
-		depth_buffer_partial: command.depth_buffer_partial
-		depth_buffer_partial_stride: command.depth_buffer_partial_stride
-		depth_meta_buffer_load: command.depth_meta_buffer_load
-		depth_meta_buffer_load_stride: command.depth_meta_buffer_load_stride
-		depth_meta_buffer_store: command.depth_meta_buffer_store
-		depth_meta_buffer_store_stride: command.depth_meta_buffer_store_stride
-		depth_meta_buffer_partial: command.depth_meta_buffer_partial
-		depth_meta_buffer_partial_stride: command.depth_meta_buffer_partial_stride
-		stencil_buffer_load: command.stencil_buffer_load
-		stencil_buffer_load_stride: command.stencil_buffer_load_stride
-		stencil_buffer_store: command.stencil_buffer_store
-		stencil_buffer_store_stride: command.stencil_buffer_store_stride
-		stencil_buffer_partial: command.stencil_buffer_partial
-		stencil_buffer_partial_stride: command.stencil_buffer_partial_stride
-		stencil_meta_buffer_load: command.stencil_meta_buffer_load
-		stencil_meta_buffer_load_stride: command.stencil_meta_buffer_load_stride
-		stencil_meta_buffer_store: command.stencil_meta_buffer_store
-		stencil_meta_buffer_store_stride: command.stencil_meta_buffer_store_stride
-		stencil_meta_buffer_partial: command.stencil_meta_buffer_partial
-		stencil_meta_buffer_partial_stride: command.stencil_meta_buffer_partial_stride
-		scissor_array: command.scissor_array
-		depth_bias_array: command.depth_bias_array
-		visibility_result_buffer: command.visibility_result_buffer
-		vertex_sampler_array: command.vertex_sampler_array
-		vertex_sampler_count: command.vertex_sampler_count
-		vertex_sampler_max: command.vertex_sampler_max
-		fragment_sampler_array: command.fragment_sampler_array
-		fragment_sampler_count: command.fragment_sampler_count
-		fragment_sampler_max: command.fragment_sampler_max
-		zls_control: command.zls_ctrl
-		ppp_multisamplectl: command.ppp_multisamplectl
-		ppp_control: command.ppp_ctrl
-		framebuffer_width: command.fb_width
-		framebuffer_height: command.fb_height
-		utile_width: command.utile_width
-		utile_height: command.utile_height
-		samples: command.samples
-		layers: command.layers
-		encoder_id: command.encoder_id
-		vertex_command_id: command.cmd_ta_id
-		fragment_command_id: command.cmd_3d_id
-		sample_size: command.sample_size
-		tib_blocks: command.tib_blocks
-		iogpu_unk_214: command.iogpu_unk_214
-		merge_upper_x: command.merge_upper_x
-		merge_upper_y: command.merge_upper_y
-		load_pipeline: command.load_pipeline
-		load_pipeline_bind: command.load_pipeline_bind
-		store_pipeline: command.store_pipeline
-		store_pipeline_bind: command.store_pipeline_bind
-		partial_reload_pipeline: command.partial_reload_pipeline
-		partial_reload_pipeline_bind: command.partial_reload_pipeline_bind
-		partial_store_pipeline: command.partial_store_pipeline
-		partial_store_pipeline_bind: command.partial_store_pipeline_bind
-		depth_dimensions: command.depth_dimensions
-		isp_bgobjdepth: command.isp_bgobjdepth
-		isp_bgobjvals: command.isp_bgobjvals
-		vertex_attachment_count: command.vertex_attachment_count
-		fragment_attachment_count: command.fragment_attachment_count
-		vertex_attachments: vertex_attachments
-		fragment_attachments: fragment_attachments
-		has_result: has_result
-		flush_stamps: true
-	}
-}
-
 fn make_g13_compute_command(command &ioctl.DrmAsahiCmdCompute,
 	attachments [16]gpu.G13ComputeAttachment, has_result bool) gpu.G13ComputeCommand {
 	return gpu.G13ComputeCommand{
@@ -1296,18 +1181,11 @@ fn stage_g13_commands(pointer u64, count u32) (int, [2]StagedG13Command) {
 				if !usercopy.copy_from_user(voidptr(&render), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
 					return -14, staged
 				}
-				if !valid_render_command(&render) {
-					return -22, staged
+				render_result, render_command := agxrender.stage_uapi(&render, descriptor.result_size != 0)
+				if render_result != 0 {
+					return render_result, staged
 				}
-				vertex_result, vertex_attachments := stage_attachment_array(render.vertex_attachments, render.vertex_attachment_count)
-				if vertex_result != 0 {
-					return vertex_result, staged
-				}
-				fragment_result, fragment_attachments := stage_attachment_array(render.fragment_attachments, render.fragment_attachment_count)
-				if fragment_result != 0 {
-					return fragment_result, staged
-				}
-				staged[i].render = make_g13_render_command(&render, vertex_attachments, fragment_attachments, descriptor.result_size != 0)
+				staged[i].render = render_command
 			}
 			ioctl.asahi_cmd_compute {
 				// Mesa 25.0.5 reports sizeof - 8 for compatibility with 6.11.8,

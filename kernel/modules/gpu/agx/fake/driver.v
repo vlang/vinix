@@ -12,6 +12,7 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import gpu.agx.render as agxrender
 import gpu.agx.workqueue
 import klock
 import sched
@@ -21,8 +22,6 @@ import aarch64.timer
 const max_submission_syncs = u32(64)
 const max_submission_commands = u32(2)
 const max_command_attachments = u32(16)
-const max_render_dimension = u32(16384)
-const max_render_layers = u32(2048)
 
 struct StagedSyncArray {
 mut:
@@ -36,7 +35,7 @@ mut:
 struct StagedCommand {
 mut:
 	descriptor ioctl.DrmAsahiCommand
-	render     ioctl.DrmAsahiCmdRender
+	render     agxrender.Command
 	compute    ioctl.DrmAsahiCmdCompute
 }
 
@@ -62,7 +61,7 @@ mut:
 }
 
 __global (
-	fake_driver_state FakeG17DriverState
+	fake_driver_state  FakeG17DriverState
 	fake_file_map_lock klock.Lock
 	fake_file_map      = map[u64]&FakeG17File{}
 )
@@ -319,8 +318,7 @@ fn (file &FakeG17File) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 fn (mut file FakeG17File) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	mut request := unsafe { data }
 	if request.extensions != 0 || request.pad != 0 {
-		C.printf(c'fake-g17: rejected VM request extensions=0x%llx pad=%u start=0x%llx end=0x%llx\n',
-			request.extensions, request.pad, request.kernel_start, request.kernel_end)
+		C.printf(c'fake-g17: rejected VM request extensions=0x%llx pad=%u start=0x%llx end=0x%llx\n', request.extensions, request.pad, request.kernel_start, request.kernel_end)
 		return -22
 	}
 	file.lock.acquire()
@@ -329,8 +327,7 @@ fn (mut file FakeG17File) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 		return -24
 	}
 	vm := new_vm(id, request.kernel_start, request.kernel_end) or {
-		C.printf(c'fake-g17: rejected VM range start=0x%llx end=0x%llx pad=%u\n',
-			request.kernel_start, request.kernel_end, request.pad)
+		C.printf(c'fake-g17: rejected VM range start=0x%llx end=0x%llx pad=%u\n', request.kernel_start, request.kernel_end, request.pad)
 		file.lock.release()
 		return -22
 	}
@@ -412,8 +409,11 @@ fn (mut file FakeG17File) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				return -22
 			}
 			object := file.get_object_ref(request.handle) or { return -2 }
-			flags := (if request.flags & ioctl.asahi_bind_read != 0 { vm_read } else { u32(0) })
-				| (if request.flags & ioctl.asahi_bind_write != 0 { vm_write } else { u32(0) })
+			flags := (if request.flags & ioctl.asahi_bind_read != 0 { vm_read } else { u32(0) }) | (if request.flags & ioctl.asahi_bind_write != 0 {
+				vm_write
+			} else {
+				u32(0)
+			})
 			result := vm.bind(object, request.addr, request.range, request.offset, flags)
 			gem.unref(object)
 			return result
@@ -442,8 +442,7 @@ fn (mut file FakeG17File) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 
 fn (mut file FakeG17File) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	mut request := unsafe { data }
-	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit
-		| ioctl.asahi_queue_cap_compute
+	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit | ioctl.asahi_queue_cap_compute
 	if request.extensions != 0 || request.flags != 0 || request.pad != 0
 		|| request.priority > 3 || request.queue_caps == 0
 		|| request.queue_caps & ~known_caps != 0 {
@@ -455,8 +454,7 @@ fn (mut file FakeG17File) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) in
 		file.lock.release()
 		return -24
 	}
-	queue := workqueue.new_workqueue(id, request.vm_id, request.priority,
-		request.queue_caps) or {
+	queue := workqueue.new_workqueue(id, request.vm_id, request.priority, request.queue_caps) or {
 		file.lock.release()
 		return -12
 	}
@@ -487,27 +485,6 @@ fn (mut file FakeG17File) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) 
 	}
 	file.lock.release()
 	return -22
-}
-
-fn valid_render_command(command &ioctl.DrmAsahiCmdRender) bool {
-	if command.extensions != 0 || command.flags & ~ioctl.asahi_render_supported_flags != 0
-		|| command.fb_width == 0 || command.fb_width > max_render_dimension
-		|| command.fb_height == 0 || command.fb_height > max_render_dimension
-		|| command.layers == 0 || command.layers > max_render_layers {
-		return false
-	}
-	if !((command.utile_width == 32 && command.utile_height == 32)
-		|| (command.utile_width == 32 && command.utile_height == 16)
-		|| (command.utile_width == 16 && command.utile_height == 16)) {
-		return false
-	}
-	if command.samples != 1 && command.samples != 2 && command.samples != 4 {
-		return false
-	}
-	return command.vertex_attachment_count <= max_command_attachments
-		&& command.fragment_attachment_count <= max_command_attachments
-		&& (command.vertex_attachment_count == 0 || command.vertex_attachments != 0)
-		&& (command.fragment_attachment_count == 0 || command.fragment_attachments != 0)
 }
 
 fn valid_compute_command(command &ioctl.DrmAsahiCmdCompute) bool {
@@ -547,11 +524,15 @@ fn stage_commands(pointer u64, count u32) (int, [2]StagedCommand) {
 						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
 					return -22, staged
 				}
-				if !usercopy.copy_from_user(voidptr(&staged[index].render),
-					descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender))
-					|| !valid_render_command(&staged[index].render) {
-					return -22, staged
+				mut render := ioctl.DrmAsahiCmdRender{}
+				if !usercopy.copy_from_user(voidptr(&render), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
+					return -14, staged
 				}
+				render_result, render_command := agxrender.stage_uapi(&render, descriptor.result_size != 0)
+				if render_result != 0 {
+					return render_result, staged
+				}
+				staged[index].render = render_command
 			}
 			ioctl.asahi_cmd_compute {
 				if (descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
@@ -560,8 +541,7 @@ fn stage_commands(pointer u64, count u32) (int, [2]StagedCommand) {
 						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
 					return -22, staged
 				}
-				if !usercopy.copy_from_user(voidptr(&staged[index].compute),
-					descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute))
+				if !usercopy.copy_from_user(voidptr(&staged[index].compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute))
 					|| !valid_compute_command(&staged[index].compute) {
 					return -22, staged
 				}
@@ -570,6 +550,12 @@ fn stage_commands(pointer u64, count u32) (int, [2]StagedCommand) {
 				return -95, staged
 			}
 		}
+	}
+	if count == 2 && (staged[0].descriptor.cmd_type != ioctl.asahi_cmd_compute
+		|| staged[1].descriptor.cmd_type != ioctl.asahi_cmd_render
+		|| staged[1].descriptor.barriers[0] != ioctl.asahi_barrier_none
+		|| staged[1].descriptor.barriers[1] != 1) {
+		return -22, staged
 	}
 	return 0, staged
 }
@@ -652,13 +638,28 @@ fn mapped(mut vm FakeG17Vm, address u64, bytes u64, writable bool) bool {
 	if address == 0 {
 		return true
 	}
-	resolved := vm.resolve(address, if bytes == 0 { u64(1) } else { bytes },
-		writable) or { return false }
+	resolved := vm.resolve(address, if bytes == 0 { u64(1) } else { bytes }, writable) or { return false }
 	resolved.release()
 	return true
 }
 
-fn validate_attachments(mut vm FakeG17Vm, pointer u64, count u32) int {
+fn validate_render_attachments(mut vm FakeG17Vm,
+	attachments [16]agxrender.Attachment, count u32) int {
+	if count > agxrender.max_attachments {
+		return -22
+	}
+	for index := u32(0); index < count; index++ {
+		attachment := attachments[index]
+		if attachment.order < 1 || attachment.order > 6
+			|| attachment.address == 0 || attachment.size_bytes == 0
+			|| !mapped(mut vm, attachment.address, attachment.size_bytes, false) {
+			return -22
+		}
+	}
+	return 0
+}
+
+fn validate_compute_attachments(mut vm FakeG17Vm, pointer u64, count u32) int {
 	if count == 0 {
 		return 0
 	}
@@ -683,7 +684,7 @@ fn validate_attachments(mut vm FakeG17Vm, pointer u64, count u32) int {
 	return 0
 }
 
-fn validate_render_mappings(mut vm FakeG17Vm, command &ioctl.DrmAsahiCmdRender) int {
+fn validate_render_mappings(mut vm FakeG17Vm, command &agxrender.Command) int {
 	if command.encoder_ptr == 0 || !mapped(mut vm, command.encoder_ptr, 4, false)
 		|| !vm.contains_address(command.vertex_usc_base)
 		|| !vm.contains_address(command.fragment_usc_base)
@@ -704,33 +705,39 @@ fn validate_render_mappings(mut vm FakeG17Vm, command &ioctl.DrmAsahiCmdRender) 
 		|| !mapped(mut vm, command.scissor_array, 8, false)
 		|| !mapped(mut vm, command.depth_bias_array, 8, false)
 		|| !mapped(mut vm, command.visibility_result_buffer, 8, true)
-		|| !mapped(mut vm, command.vertex_sampler_array,
-			if command.vertex_sampler_count == 0 { u64(1) } else { u64(command.vertex_sampler_count) }, false)
-		|| !mapped(mut vm, command.fragment_sampler_array,
-			if command.fragment_sampler_count == 0 { u64(1) } else { u64(command.fragment_sampler_count) }, false) {
+		|| !mapped(mut vm, command.vertex_sampler_array, if command.vertex_sampler_count == 0 {
+			u64(1)
+		} else {
+			u64(command.vertex_sampler_count)
+		}, false)
+		|| !mapped(mut vm, command.fragment_sampler_array, if command.fragment_sampler_count == 0 {
+			u64(1)
+		} else {
+			u64(command.fragment_sampler_count)
+		}, false) {
 		return -22
 	}
-	result := validate_attachments(mut vm, command.vertex_attachments,
-		command.vertex_attachment_count)
+	result := validate_render_attachments(mut vm, command.vertex_attachments, command.vertex_attachment_count)
 	if result != 0 {
 		return result
 	}
-	return validate_attachments(mut vm, command.fragment_attachments,
-		command.fragment_attachment_count)
+	return validate_render_attachments(mut vm, command.fragment_attachments, command.fragment_attachment_count)
 }
 
 fn validate_compute_mappings(mut vm FakeG17Vm,
 	command &ioctl.DrmAsahiCmdCompute) int {
 	if command.encoder_ptr == 0 || command.encoder_end <= command.encoder_ptr
-		|| !mapped(mut vm, command.encoder_ptr, command.encoder_end - command.encoder_ptr,
-			false)
+		|| !mapped(mut vm, command.encoder_ptr, command.encoder_end - command.encoder_ptr, false)
 		|| !vm.contains_address(command.usc_base)
 		|| !mapped(mut vm, command.helper_arg, 8, false)
-		|| !mapped(mut vm, command.sampler_array,
-			if command.sampler_count == 0 { u64(1) } else { u64(command.sampler_count) }, false) {
+		|| !mapped(mut vm, command.sampler_array, if command.sampler_count == 0 {
+			u64(1)
+		} else {
+			u64(command.sampler_count)
+		}, false) {
 		return -22
 	}
-	return validate_attachments(mut vm, command.attachments, command.attachment_count)
+	return validate_compute_attachments(mut vm, command.attachments, command.attachment_count)
 }
 
 fn write_results(commands [2]StagedCommand, count u32, object &gem.GemObject,
@@ -755,8 +762,7 @@ fn write_results(commands [2]StagedCommand, count u32, object &gem.GemObject,
 			result.fragment_ts_start = started
 			result.fragment_ts_end = ended
 			unsafe {
-				C.memcpy(voidptr(object.virt_addr + descriptor.result_offset),
-					voidptr(&result), sizeof(ioctl.DrmAsahiResultRender))
+				C.memcpy(voidptr(object.virt_addr + descriptor.result_offset), voidptr(&result), sizeof(ioctl.DrmAsahiResultRender))
 			}
 		} else {
 			mut result := ioctl.DrmAsahiResultCompute{}
@@ -768,8 +774,7 @@ fn write_results(commands [2]StagedCommand, count u32, object &gem.GemObject,
 			result.ts_start = started
 			result.ts_end = ended
 			unsafe {
-				C.memcpy(voidptr(object.virt_addr + descriptor.result_offset),
-					voidptr(&result), sizeof(ioctl.DrmAsahiResultCompute))
+				C.memcpy(voidptr(object.virt_addr + descriptor.result_offset), voidptr(&result), sizeof(ioctl.DrmAsahiResultCompute))
 			}
 		}
 	}
@@ -787,7 +792,7 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 			unsafe { free(descriptor) }
 		}
 		syncobj.signal_error(fence, -12)
-		return FakeG17Verification{error: fake_g17_invalid_argument}
+		return FakeG17Verification{ error: fake_g17_invalid_argument }
 	}
 	unsafe { C.memset(command, 0, g17_command_bytes) }
 	if !initialize_render_descriptor(descriptor, g17_descriptor_bytes) {
@@ -796,12 +801,11 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 			free(descriptor)
 		}
 		syncobj.signal_error(fence, -5)
-		return FakeG17Verification{error: fake_g17_invalid_argument}
+		return FakeG17Verification{ error: fake_g17_invalid_argument }
 	}
 	mut inputs := FakeG17EncoderInputs{}
 	mut writes := []FakeG17ExpectedWrite{len: int(fake_g17_max_writes)}
-	encoding := encode_fake_g17_3d(command, g17_command_bytes, descriptor,
-		g17_descriptor_bytes, vm.kernel_start, &inputs, mut writes)
+	encoding := encode_fake_g17_3d(command, g17_command_bytes, descriptor, g17_descriptor_bytes, vm.kernel_start, &inputs, mut writes)
 	if !encoding.succeeded() {
 		unsafe {
 			writes.free()
@@ -809,7 +813,7 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 			free(descriptor)
 		}
 		syncobj.signal_error(fence, -5)
-		return FakeG17Verification{error: encoding.error}
+		return FakeG17Verification{ error: encoding.error }
 	}
 	mut ranges := vm.address_ranges()
 	mut item := workqueue.WorkItem{
@@ -860,22 +864,17 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	command_result, commands := stage_commands(request.commands, request.command_count)
 	if command_result != 0 {
-		C.printf(c'fake-g17: submit rejected while staging commands error=%d count=%u\n',
-			command_result, request.command_count)
+		C.printf(c'fake-g17: submit rejected while staging commands error=%d count=%u\n', command_result, request.command_count)
 		return command_result
 	}
-	input_result, input_syncs := stage_sync_array(file.owner_key, request.in_syncs,
-		request.in_sync_count, true)
+	input_result, input_syncs := stage_sync_array(file.owner_key, request.in_syncs, request.in_sync_count, true)
 	if input_result != 0 {
-		C.printf(c'fake-g17: submit rejected while staging input syncs error=%d count=%u\n',
-			input_result, request.in_sync_count)
+		C.printf(c'fake-g17: submit rejected while staging input syncs error=%d count=%u\n', input_result, request.in_sync_count)
 		return input_result
 	}
-	output_result, output_syncs := stage_sync_array(file.owner_key, request.out_syncs,
-		request.out_sync_count, false)
+	output_result, output_syncs := stage_sync_array(file.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 {
-		C.printf(c'fake-g17: submit rejected while staging output syncs error=%d count=%u\n',
-			output_result, request.out_sync_count)
+		C.printf(c'fake-g17: submit rejected while staging output syncs error=%d count=%u\n', output_result, request.out_sync_count)
 		return output_result
 	}
 	dependency_result := wait_staged_syncs(&input_syncs)
@@ -901,7 +900,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		file.lock.release()
 		return -22
 	}
-	mut has_render := false
+	mut render_index := -1
 	for index := u32(0); index < request.command_count; index++ {
 		descriptor := commands[index].descriptor
 		if descriptor.cmd_type == ioctl.asahi_cmd_render {
@@ -909,16 +908,11 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				file.lock.release()
 				return -22
 			}
-			has_render = true
+			render_index = int(index)
 			mapping_result := validate_render_mappings(mut vm, &commands[index].render)
 			if mapping_result != 0 {
 				file.lock.release()
-				C.printf(c'fake-g17: render mappings rejected error=%d encoder=0x%llx vusc=0x%llx fusc=0x%llx va=%u fa=%u\n',
-					mapping_result, commands[index].render.encoder_ptr,
-					commands[index].render.vertex_usc_base,
-					commands[index].render.fragment_usc_base,
-					commands[index].render.vertex_attachment_count,
-					commands[index].render.fragment_attachment_count)
+				C.printf(c'fake-g17: render mappings rejected error=%d encoder=0x%llx vusc=0x%llx fusc=0x%llx va=%u fa=%u\n', mapping_result, commands[index].render.encoder_ptr, commands[index].render.vertex_usc_base, commands[index].render.fragment_usc_base, commands[index].render.vertex_attachment_count, commands[index].render.fragment_attachment_count)
 				return mapping_result
 			}
 		} else {
@@ -926,13 +920,10 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				file.lock.release()
 				return -22
 			}
-			mapping_result := validate_compute_mappings(mut vm,
-				&commands[index].compute)
+			mapping_result := validate_compute_mappings(mut vm, &commands[index].compute)
 			if mapping_result != 0 {
 				file.lock.release()
-				C.printf(c'fake-g17: compute mappings rejected error=%d encoder=0x%llx end=0x%llx\n',
-					mapping_result, commands[index].compute.encoder_ptr,
-					commands[index].compute.encoder_end)
+				C.printf(c'fake-g17: compute mappings rejected error=%d encoder=0x%llx end=0x%llx\n', mapping_result, commands[index].compute.encoder_ptr, commands[index].compute.encoder_end)
 				return mapping_result
 			}
 		}
@@ -974,7 +965,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	started := timer.get_count()
 	mut successful := true
-	if has_render {
+	if render_index >= 0 {
 		report := run_fake_render(mut queue, mut vm, fence)
 		successful = report.succeeded()
 		if !successful {
@@ -982,16 +973,15 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		} else {
 			file.verified_jobs++
 			if file.verified_jobs == 1 {
-				C.printf(c'fake-g17: first Mesa render verified; actual writes=%u capacity=%u\n',
-					report.expected_writes, fake_g17_max_writes)
+				render_command := commands[render_index].render
+				C.printf(c'fake-g17: first Mesa render verified; id=%u size=%ux%u actual writes=%u capacity=%u\n', render_command.fragment_command_id, render_command.framebuffer_width, render_command.framebuffer_height, report.expected_writes, fake_g17_max_writes)
 			}
 		}
 	} else {
 		successful = run_fake_compute(mut queue, fence)
 	}
 	ended := timer.get_count()
-	write_results(commands, request.command_count, result_object, successful,
-		started, ended)
+	write_results(commands, request.command_count, result_object, successful, started, ended)
 	file.lock.release()
 	return if successful { 0 } else { -5 }
 }
@@ -1108,17 +1098,17 @@ pub fn gem_import_handler(dev &drm.DrmDevice, handle voidptr,
 
 fn drm_ioctls() []drm.DrmIoctl {
 	return [
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_params_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: vm_create_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: vm_destroy_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_create_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_mmap_offset_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: gem_bind_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: queue_create_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: queue_destroy_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: submit_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_time_handler},
-		drm.DrmIoctl{cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: unsupported_bind_object},
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_params_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: vm_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: vm_destroy_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_mmap_offset_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: gem_bind_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: queue_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: queue_destroy_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: submit_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_time_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: unsupported_bind_object },
 	]
 }
 

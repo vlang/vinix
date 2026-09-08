@@ -11,6 +11,7 @@ import gpu.agx.alloc
 import gpu.agx.pgtable
 import gpu.agx.event
 import gpu.agx.mmu
+import gpu.agx.render as agxrender
 import katomic
 import klock
 
@@ -19,14 +20,6 @@ pub const g13_queue_channel_fragment = u32(1) << 1
 pub const g13_queue_channel_compute = u32(1) << 2
 const g13_queue_channel_mask = g13_queue_channel_vertex | g13_queue_channel_fragment | g13_queue_channel_compute
 const g13_compute_no_preemption = u64(1) << 0
-const g13_render_no_clear_pipeline_textures = u64(1) << 0
-const g13_render_set_when_reloading_z_or_s = u64(1) << 1
-const g13_render_vertex_spills = u64(1) << 2
-const g13_render_process_empty_tiles = u64(1) << 3
-const g13_render_no_vertex_clustering = u64(1) << 4
-const g13_render_msaa_zs = u64(1) << 5
-const g13_render_no_preemption = u64(1) << 6
-const g13_render_supported_flags = g13_render_no_clear_pipeline_textures | g13_render_set_when_reloading_z_or_s | g13_render_vertex_spills | g13_render_process_empty_tiles | g13_render_no_vertex_clustering | g13_render_msaa_zs | g13_render_no_preemption
 const g13_tvb_max_size = u64(862_322_688)
 const g13_tvb_max_blocks = u32(g13_tvb_max_size / fw.g13_tvb_block_size)
 const g13_tvb_max_blocks_nomemless = g13_tvb_max_blocks / u32(3)
@@ -133,87 +126,6 @@ pub mut:
 	completion_data    voidptr
 	completion_result  fw.G13JobTimestamps
 	completion_ready   bool
-}
-
-pub struct G13RenderCommand {
-pub:
-	flags                              u64
-	encoder_ptr                        u64
-	vertex_usc_base                    u64
-	fragment_usc_base                  u64
-	vertex_helper_program              u32
-	fragment_helper_program            u32
-	vertex_helper_cfg                  u32
-	fragment_helper_cfg                u32
-	vertex_helper_arg                  u64
-	fragment_helper_arg                u64
-	depth_buffer_load                  u64
-	depth_buffer_load_stride           u64
-	depth_buffer_store                 u64
-	depth_buffer_store_stride          u64
-	depth_buffer_partial               u64
-	depth_buffer_partial_stride        u64
-	depth_meta_buffer_load             u64
-	depth_meta_buffer_load_stride      u64
-	depth_meta_buffer_store            u64
-	depth_meta_buffer_store_stride     u64
-	depth_meta_buffer_partial          u64
-	depth_meta_buffer_partial_stride   u64
-	stencil_buffer_load                u64
-	stencil_buffer_load_stride         u64
-	stencil_buffer_store               u64
-	stencil_buffer_store_stride        u64
-	stencil_buffer_partial             u64
-	stencil_buffer_partial_stride      u64
-	stencil_meta_buffer_load           u64
-	stencil_meta_buffer_load_stride    u64
-	stencil_meta_buffer_store          u64
-	stencil_meta_buffer_store_stride   u64
-	stencil_meta_buffer_partial        u64
-	stencil_meta_buffer_partial_stride u64
-	scissor_array                      u64
-	depth_bias_array                   u64
-	visibility_result_buffer           u64
-	vertex_sampler_array               u64
-	vertex_sampler_count               u32
-	vertex_sampler_max                 u32
-	fragment_sampler_array             u64
-	fragment_sampler_count             u32
-	fragment_sampler_max               u32
-	zls_control                        u64
-	ppp_multisamplectl                 u64
-	ppp_control                        u32
-	framebuffer_width                  u32
-	framebuffer_height                 u32
-	utile_width                        u32
-	utile_height                       u32
-	samples                            u32
-	layers                             u32
-	encoder_id                         u32
-	vertex_command_id                  u32
-	fragment_command_id                u32
-	sample_size                        u32
-	tib_blocks                         u32
-	iogpu_unk_214                      u32
-	merge_upper_x                      u32
-	merge_upper_y                      u32
-	load_pipeline                      u32
-	load_pipeline_bind                 u32
-	store_pipeline                     u32
-	store_pipeline_bind                u32
-	partial_reload_pipeline            u32
-	partial_reload_pipeline_bind       u32
-	partial_store_pipeline             u32
-	partial_store_pipeline_bind        u32
-	depth_dimensions                   u32
-	isp_bgobjdepth                     u32
-	isp_bgobjvals                      u32
-	vertex_attachment_count            u32
-	fragment_attachment_count          u32
-	vertex_attachments                 [fw.g13_max_attachments]G13ComputeAttachment
-	fragment_attachments               [fw.g13_max_attachments]G13ComputeAttachment
-	has_result                         bool
-	flush_stamps                       bool
 }
 
 struct G13RenderSceneResources {
@@ -937,6 +849,28 @@ fn build_g13_attachments(count u32,
 	return attachments
 }
 
+fn build_g13_render_attachments(count u32,
+	input [16]agxrender.Attachment) ?fw.G13MicroseqAttachments {
+	if count > fw.g13_max_attachments {
+		return none
+	}
+	mut attachments := fw.G13MicroseqAttachments{}
+	for index := u32(0); index < count; index++ {
+		attachment := input[index]
+		if attachment.order < 1 || attachment.order > 6 {
+			return none
+		}
+		attachments.list[index] = fw.G13MicroseqAttachment{
+			address: attachment.address
+			size: attachment.cache_lines
+			unk_c: 0x17
+			unk_e: attachment.order
+		}
+	}
+	attachments.count = count
+	return attachments
+}
+
 fn (mut mgr GpuManager) release_g13_render_scene_backing_locked(mut scene G13RenderSceneResources,
 	ctx &mmu.UatContext, unmapped bool) {
 	if ctx != unsafe { nil } {
@@ -1102,17 +1036,17 @@ fn complete_g13_render_job(mut job G13RenderJobResources, successful bool) {
 // single-cluster G13 render pass. It remains unpublished until
 // submit_g13_render_job() transfers both queue batches to firmware.
 pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
-	input &G13RenderCommand) ?&G13RenderJobResources {
+	input &agxrender.Command) ?&G13RenderJobResources {
 	if resources == unsafe { nil } || resources.released || resources.vm == unsafe { nil }
 		|| !resources.vm.active || resources.channel_mask & g13_queue_channel_vertex == 0
 		|| resources.channel_mask & g13_queue_channel_fragment == 0
-		|| input.flags & ~g13_render_supported_flags != 0 || mgr.hw_config.num_clusters != 1
+		|| input.flags & ~agxrender.supported_flags != 0 || mgr.hw_config.num_clusters != 1
 		|| !fw.validate_g13_vertex_layouts() || !fw.validate_g13_fragment_layouts()
 		|| !fw.validate_g13_buffer_layouts() || !fw.validate_g13_microsequence_layouts() {
 		return none
 	}
-	vertex_attachments := build_g13_attachments(input.vertex_attachment_count, input.vertex_attachments) or { return none }
-	fragment_attachments := build_g13_attachments(input.fragment_attachment_count, input.fragment_attachments) or { return none }
+	vertex_attachments := build_g13_render_attachments(input.vertex_attachment_count, input.vertex_attachments) or { return none }
+	fragment_attachments := build_g13_render_attachments(input.fragment_attachment_count, input.fragment_attachments) or { return none }
 	tile := g13_tile_info(input.framebuffer_width, input.framebuffer_height, input.layers, input.utile_width, input.utile_height, input.samples, input.ppp_control, input.vertex_helper_cfg) or { return none }
 
 	mgr.lock.acquire()
@@ -1170,7 +1104,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		|| mgr.g13_channels.stats_fragment.va == 0 {
 		return none
 	}
-	tile_config := u64(0x280) | if input.layers > 1 { u64(1) } else { u64(0) } | if input.flags & g13_render_process_empty_tiles != 0 {
+	tile_config := u64(0x280) | if input.layers > 1 { u64(1) } else { u64(0) } | if input.flags & agxrender.process_empty_tiles != 0 {
 		u64(0x10000)
 	} else {
 		u64(0)
@@ -1253,9 +1187,9 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				sampler_count: input.vertex_sampler_count
 				sampler_max: input.vertex_sampler_max
 			}
-			spills: if input.flags & g13_render_vertex_spills != 0 { u32(1) } else { u32(0) }
+			spills: if input.flags & agxrender.vertex_spills != 0 { u32(1) } else { u32(0) }
 			meta: fw.G13JobMeta{
-				no_preemption: if input.flags & g13_render_no_preemption != 0 {
+				no_preemption: if input.flags & agxrender.no_preemption != 0 {
 					u8(1)
 				} else {
 					u8(0)
@@ -1387,7 +1321,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				depth_dimensions: input.depth_dimensions
 			}
 			encoder_params: fw.G13EncoderParams{
-				unk_8: if input.flags & g13_render_set_when_reloading_z_or_s != 0 {
+				unk_8: if input.flags & agxrender.set_when_reloading_z_or_s != 0 {
 					u32(1)
 				} else {
 					u32(0)
@@ -1398,19 +1332,19 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				sampler_count: input.fragment_sampler_count
 				sampler_max: input.fragment_sampler_max
 			}
-			process_empty_tiles: if input.flags & g13_render_process_empty_tiles != 0 {
+			process_empty_tiles: if input.flags & agxrender.process_empty_tiles != 0 {
 				u32(1)
 			} else {
 				u32(0)
 			}
-			no_clear_pipeline_textures: if input.flags & g13_render_no_clear_pipeline_textures != 0 {
+			no_clear_pipeline_textures: if input.flags & agxrender.no_clear_pipeline_textures != 0 {
 				u32(1)
 			} else {
 				u32(0)
 			}
-			msaa_zs: if input.flags & g13_render_msaa_zs != 0 { u32(1) } else { u32(0) }
+			msaa_zs: if input.flags & agxrender.msaa_zs != 0 { u32(1) } else { u32(0) }
 			meta: fw.G13JobMeta{
-				no_preemption: if input.flags & g13_render_no_preemption != 0 {
+				no_preemption: if input.flags & agxrender.no_preemption != 0 {
 					u8(1)
 				} else {
 					u8(0)
