@@ -38,6 +38,7 @@ make -f GNUmakefile inspect
 make -f GNUmakefile trace
 make -f GNUmakefile trace-resources
 make -f GNUmakefile trace-depth-resources
+make -f GNUmakefile trace-stencil-resources
 make -f GNUmakefile layout
 make -f GNUmakefile firmware
 make -f GNUmakefile pmp-firmware
@@ -63,6 +64,12 @@ names recovered from the local
 `depth-clear` and `depth-triangle` passes with a private `Depth32Float` target,
 so depth-related resource identities can be recovered without changing or
 overwriting the baseline color-only trace.
+
+`trace-stencil-resources` similarly writes
+`build/agx_trace_stencil_resources.jsonl`. Its matched passes use a private
+combined `Depth32Float_Stencil8` target and enable stencil replacement, keeping
+the stencil recovery artifact separate from both color-only and depth-only
+captures.
 
 `trace_diff.py` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and

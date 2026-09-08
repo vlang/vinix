@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources clean
+.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -89,6 +89,16 @@ trace-depth-resources: all
 		$(CURDIR)/$(BUILD)/metal_triangle depth-pair
 	./trace_diff.py $(BUILD)/agx_trace_depth_resources.jsonl \
 		--left depth-clear --right depth-triangle
+
+trace-stencil-resources: all
+	rm -f $(BUILD)/agx_trace_stencil_resources.jsonl
+	AGX_TRACE_FILE=$(CURDIR)/$(BUILD)/agx_trace_stencil_resources.jsonl \
+		AGX_TRACE_BYTES=65536 \
+		AGX_TRACE_RESOURCES=1 \
+		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
+		$(CURDIR)/$(BUILD)/metal_triangle stencil-pair
+	./trace_diff.py $(BUILD)/agx_trace_stencil_resources.jsonl \
+		--left stencil-clear --right stencil-triangle
 
 clean:
 	rm -rf $(BUILD)
