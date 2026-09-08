@@ -35,10 +35,10 @@ What it does:
   utility window is backed by its own OS process, PID and memory accounting
 - an embedded **Wine Calculator**: its translated Win64 process renders into
   Xvfb and is composited as a normal Vinix window without hiding the desktop
+- embedded **Minecraft**: the native C++ Minetest client renders into Xvfb and
+  is composited as a movable, resizable Vinix window with forwarded input
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the
   middle of the screen when it is held
-- a **Minecraft** launcher for the optional native C++ Minetest runtime; like
-  Firefox, it temporarily hands the framebuffer and input devices to Xorg
 
 Keys: `Ctrl-Q` leaves the desktop, `Ctrl-N` opens a window, `Ctrl-K` the first
 application. They are chords rather than bare letters because they fire
@@ -138,13 +138,12 @@ it then has a wallpaper shortcut and a taskbar launcher. A ui2 example also
 needs its directory listed in `build-desktop-aarch64.sh` so the staging step
 compiles it in.
 
-Firefox and Minecraft are deliberately different cases. They are upstream
-X11 applications rather than native ui2 clients. Their `AppFactory` entries
-name `/usr/bin/run-firefox` and `/usr/bin/minecraft` as exclusive commands. At
-a frame boundary the desktop restores the console and closes its framebuffer
-and pointer descriptors, waits while Xorg and the application own them, then
-reopens the devices and redraws when it exits. This keeps their packaged
-userspace dependencies outside `vinix-desktop`. The small
+Firefox is an upstream X11 application rather than a native ui2 client. Its
+`AppFactory` entry names `/usr/bin/run-firefox` as an exclusive command. At a
+frame boundary the desktop restores the console and closes its framebuffer and
+pointer descriptors, waits while Xorg and Firefox own them, then reopens the
+devices and redraws when it exits. This keeps Firefox's packaged userspace
+dependencies outside `vinix-desktop`. The small
 `/usr/bin/vinix-xinput` bridge translates Vinix's native pointer
 packets and console keyboard bytes into ordinary X11 input, avoiding an evdev
 or udev compatibility layer. The desktop image builder refreshes this bridge,
@@ -163,9 +162,12 @@ The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages
 Alpine's AArch64/musl Minetest 5.9.1 executable and its runtime closure, plus a
 pinned Minetest Game release. `/usr/bin/minecraft` starts a persistent default
 world with settings kept under `$HOME/.minetest`; its conservative
-software-OpenGL profile keeps the client usable on framebuffer Xorg. The
+software-OpenGL profile keeps the client usable on framebuffer Xorg. From the
+desktop, Minecraft uses the same Xvfb/XWD bridge as translated Wine apps and is
+scaled into a native window without surrendering the desktop framebuffer.
+Keyboard and pointer events are forwarded into the private X11 display. The
 desktop builder picks up this layer when present and otherwise leaves a working
-launcher whose error window explains which build is missing.
+launcher whose window explains which build is missing.
 
 ## The file browser
 

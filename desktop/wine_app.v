@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-// A translated Win64 application embedded in a native Vinix window.
+// X11 applications embedded in native Vinix windows. Xvfb owns the upstream
+// application's display while the Vinix compositor maps its live XWD surface.
 module main
 
 import ui2
 
 const wine_surface_width = 326
 const wine_surface_height = 430
+const minecraft_surface_width = 1280
+const minecraft_surface_height = 720
+const minecraft_window_width = 760
+const minecraft_window_height = 428
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -24,22 +29,42 @@ struct WineHostEvent {
 	length u32
 }
 
-struct WineApp {
+struct HostedX11App {
 mut:
-	host_pid      int = -1
-	input_fd      int = -1
-	directory     string
-	xwd_path      string
-	image_path    string
-	ready         bool
-	failed        bool
-	error_message string
+	host_pid       int = -1
+	input_fd       int = -1
+	directory      string
+	xwd_path       string
+	image_path     string
+	surface_width  int
+	surface_height int
+	icon           string
+	starting_text  string
+	exited_text    string
+	ready          bool
+	failed         bool
+	error_message  string
 }
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {
-	mut app := &WineApp{}
+	return open_hosted_x11_app('wine', '/usr/bin/calculator', wine_surface_width, wine_surface_height, 'builtin:calculator', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+}
+
+fn open_minecraft(mut _ Desktop) !NativeApp {
+	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
+}
+
+fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
+	icon string, starting_text string, missing_text string, exited_text string) &HostedX11App {
+	mut app := &HostedX11App{
+		surface_width: surface_width
+		surface_height: surface_height
+		icon: icon
+		starting_text: starting_text
+		exited_text: exited_text
+	}
 	process_id := C.getpid()
-	app.directory = '/tmp/vinix-wine-${process_id}'
+	app.directory = '/tmp/vinix-${name}-${process_id}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'
 
@@ -48,14 +73,14 @@ fn open_wine_calculator(mut _ Desktop) !NativeApp {
 		app.error_message = 'Xvfb is not installed. Rebuild the Vinix X11 layer.'
 		return app
 	}
-	if C.access(c'/usr/bin/calculator', C.X_OK) != 0 {
+	if C.access(&char(command.str), C.X_OK) != 0 {
 		app.failed = true
-		app.error_message = 'The translated Wine runtime is not installed.'
+		app.error_message = missing_text
 		return app
 	}
-	host := desktop_spawn_wine_host(app.directory, wine_surface_width, wine_surface_height, '/usr/bin/calculator') or {
+	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command) or {
 		app.failed = true
-		app.error_message = 'Vinix could not start the embedded Wine host.'
+		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app
 	}
 	app.host_pid = host.pid
@@ -63,15 +88,15 @@ fn open_wine_calculator(mut _ Desktop) !NativeApp {
 	return app
 }
 
-fn (mut app WineApp) build(size ui2.Rect) !ui2.Element {
+fn (mut app HostedX11App) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 	mut children := frame_elements(2)
 	if app.ready {
 		children << ui2.image('', app.image_path, ui2.rect(0, 0, f64(width), f64(height)))
 	} else {
-		message := if app.failed { app.error_message } else { 'Starting Windows application…' }
-		children << ui2.button_with_image('', '', 'builtin:calculator', ui2.rect(f64((width - 48) / 2), f64((height - 82) / 2), 48, 48), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: app_accent })
+		message := if app.failed { app.error_message } else { app.starting_text }
+		children << ui2.button_with_image('', '', app.icon, ui2.rect(f64((width - 48) / 2), f64((height - 82) / 2), 48, 48), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: app_accent })
 		children << ui2.label('', message, ui2.rect(16, f64((height - 82) / 2 + 58), f64(width - 32), 20), ui2.TextStyle{
 			color: if app.failed { u32(0xb42318) } else { body_muted }
 			size: 12
@@ -81,9 +106,9 @@ fn (mut app WineApp) build(size ui2.Rect) !ui2.Element {
 	return ui2.screen(0xf3f4f6, children)
 }
 
-fn (mut app WineApp) handle(_ string) ! {}
+fn (mut app HostedX11App) handle(_ string) ! {}
 
-fn (mut app WineApp) poll() bool {
+fn (mut app HostedX11App) poll() bool {
 	if app.host_pid > 0 && desktop_child_exited(app.host_pid) {
 		app.host_pid = -1
 		if app.input_fd >= 0 {
@@ -92,7 +117,7 @@ fn (mut app WineApp) poll() bool {
 		}
 		app.ready = false
 		app.failed = true
-		app.error_message = 'The Windows application exited.'
+		app.error_message = app.exited_text
 		return true
 	}
 	if !app.ready {
@@ -105,11 +130,11 @@ fn (mut app WineApp) poll() bool {
 	return true
 }
 
-fn (mut app WineApp) pointer_input_enabled() bool {
+fn (mut app HostedX11App) pointer_input_enabled() bool {
 	return app.ready && app.input_fd >= 0
 }
 
-fn (mut app WineApp) send_host_event(kind WineHostEventKind, x int, y int, keys string) {
+fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, keys string) {
 	if app.input_fd < 0 || keys.len > 4096 {
 		return
 	}
@@ -128,23 +153,23 @@ fn (mut app WineApp) send_host_event(kind WineHostEventKind, x int, y int, keys 
 	}
 }
 
-fn (mut app WineApp) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
+fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
 	if !app.pointer_input_enabled() || width <= 0 || height <= 0 {
 		return
 	}
-	mut surface_x := x * wine_surface_width / width
-	mut surface_y := y * wine_surface_height / height
+	mut surface_x := x * app.surface_width / width
+	mut surface_y := y * app.surface_height / height
 	if surface_x < 0 {
 		surface_x = 0
 	}
 	if surface_y < 0 {
 		surface_y = 0
 	}
-	if surface_x >= wine_surface_width {
-		surface_x = wine_surface_width - 1
+	if surface_x >= app.surface_width {
+		surface_x = app.surface_width - 1
 	}
-	if surface_y >= wine_surface_height {
-		surface_y = wine_surface_height - 1
+	if surface_y >= app.surface_height {
+		surface_y = app.surface_height - 1
 	}
 	kind := match phase {
 		.move { WineHostEventKind.motion }
@@ -154,13 +179,13 @@ fn (mut app WineApp) pointer_event(phase AppPointerPhase, x int, y int, width in
 	app.send_host_event(kind, surface_x, surface_y, '')
 }
 
-fn (mut app WineApp) key_input(text string) {
+fn (mut app HostedX11App) key_input(text string) {
 	if text.len > 0 {
 		app.send_host_event(.keys, 0, 0, text)
 	}
 }
 
-fn (mut app WineApp) close_app() {
+fn (mut app HostedX11App) close_app() {
 	if app.input_fd >= 0 {
 		desktop_close(app.input_fd)
 		app.input_fd = -1

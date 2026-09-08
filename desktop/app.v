@@ -145,9 +145,13 @@ const available_apps = [
 	AppFactory{
 		title: 'Minecraft'
 		icon: 'builtin:block'
-		// The C++ client owns Xorg, OpenGL and the input devices for the
-		// duration of the game, just like the external Firefox session.
-		exclusive_command: '/usr/bin/minecraft'
+		width: minecraft_window_width
+		height: minecraft_window_height + default_title_height
+		process_name: 'vinix-minecraft'
+		polling: true
+		keyboard: true
+		pointer: true
+		open: open_minecraft
 	},
 	AppFactory{
 		title: 'Wine Calculator'

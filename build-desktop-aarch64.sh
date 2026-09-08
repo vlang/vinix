@@ -477,7 +477,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
-    vinix-wine-calculator; do
+    vinix-minecraft vinix-wine-calculator; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 

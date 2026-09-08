@@ -506,11 +506,7 @@ fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	}
 	d.external_error_title = '${title} could not start'
 	d.external_error_note = '${title} runs in an exclusive X11 session; the native desktop resumes when it exits.'
-	d.external_error_hint = if title == 'Minecraft' {
-		'Build its runtime with build-minecraft-aarch64.sh, then rebuild the desktop image.'
-	} else {
-		'Build Firefox/Xorg, then rebuild the userland and desktop image.'
-	}
+	d.external_error_hint = 'Build Firefox/Xorg, then rebuild the userland and desktop image.'
 	id := d.spawn(title, .external_error, 180, 120, 560, 220)
 	index := d.window_index(id) or { return }
 	d.windows[index].icon = icon

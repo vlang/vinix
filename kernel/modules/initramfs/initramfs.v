@@ -49,6 +49,20 @@ fn octal_to_int(s string) u64 {
 	return ret
 }
 
+// USTAR fields fill their complete fixed-width array when a value is exactly
+// as long as the field, in which case there is no trailing NUL. tos2() would
+// then continue into the following field (a 100-byte name became
+// "name0000644" by reading its mode), so every header string must be bounded.
+fn ustar_field_string(field &u8, capacity int) string {
+	mut length := 0
+	unsafe {
+		for length < capacity && field[length] != 0 {
+			length++
+		}
+		return tos(field, length)
+	}
+}
+
 @[_linker_section: '.requests']
 @[cinit]
 __global (
@@ -134,21 +148,21 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 		uart_putc(`+`)
 
 		name := if name_override == '' {
-			unsafe { tos2(&current_header.name[0]) }
+			ustar_field_string(&current_header.name[0], current_header.name.len)
 		} else {
 			name_override
 		}
 
 		// Prefix support for USTAR (paths >100 chars split into prefix + name)
 		mut full_name := name
-		prefix := unsafe { tos2(&current_header.prefix[0]) }
+		prefix := ustar_field_string(&current_header.prefix[0], current_header.prefix.len)
 		if prefix.len > 0 && name_override == '' {
 			full_name = '${prefix}/${name}'
 		}
 
-		link_name := unsafe { tos2(&current_header.link_name[0]) }
-		size := unsafe { octal_to_int(tos2(&current_header.size[0])) }
-		mode := unsafe { octal_to_int(tos2(&current_header.mode[0])) }
+		link_name := ustar_field_string(&current_header.link_name[0], current_header.link_name.len)
+		size := octal_to_int(ustar_field_string(&current_header.size[0], current_header.size.len))
+		mode := octal_to_int(ustar_field_string(&current_header.mode[0], current_header.mode.len))
 
 		// Debug: print first 20 and every 200th entry
 		if entry_count <= 20 || entry_count % 200 == 0 {

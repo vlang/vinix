@@ -155,7 +155,10 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps[5].process_name == 'vinix-activity'
 	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
 	assert available_apps[10].title == 'Minecraft'
-	assert available_apps[10].exclusive_command == '/usr/bin/minecraft'
+	assert available_apps[10].process_name == 'vinix-minecraft'
+	assert available_apps[10].exclusive_command == ''
+	assert available_apps[10].keyboard && available_apps[10].polling
+	assert available_apps[10].pointer
 	assert available_apps[11].title == 'Wine Calculator'
 	assert available_apps[11].process_name == 'vinix-wine-calculator'
 	assert available_apps[11].keyboard && available_apps[11].polling
@@ -231,14 +234,6 @@ fn test_external_display_handoff_redraws_and_reports_failures() {
 	assert desktop.external_error.contains('not installed')
 	assert desktop.external_error_title == 'External application could not start'
 
-	// The same handoff reports Minecraft rather than reusing Firefox-specific
-	// text and preserves the voxel icon on its error window.
-	desktop.launch(available_apps[10])
-	desktop.external_finished(.failed)
-	assert desktop.windows[1].title == 'Minecraft'
-	assert desktop.windows[1].icon == 'builtin:block'
-	assert desktop.external_error_title == 'Minecraft could not start'
-	assert desktop.external_error_hint.contains('build-minecraft-aarch64.sh')
 	unsafe { free(voidptr(desktop.canvas.pixels)) }
 }
 
