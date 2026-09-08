@@ -6,6 +6,8 @@ import aarch64.cpu
 import aarch64.uart
 import dev.keyboard
 
+fn C.vinix_call_void_fn(callback voidptr)
+
 // Virtio MMIO register offsets (legacy v1 + shared)
 const reg_magic = u64(0x000)
 const reg_version = u64(0x004)
@@ -162,7 +164,21 @@ __global (
 	vi_ptr_pressed  = u32(0)
 	vi_ptr_released = u32(0)
 	vi_ptr_scroll   = int(0)
+	vi_ptr_callback = voidptr(0)
 )
+
+// /dev/pointer owns readiness and registers this after publishing its resource.
+// Keeping the callback here avoids a dependency cycle between the device node
+// and the VirtIO state it snapshots.
+pub fn set_pointer_event_callback(callback voidptr) {
+	vi_ptr_callback = callback
+}
+
+fn notify_pointer_event() {
+	if vi_ptr_callback != voidptr(0) {
+		C.vinix_call_void_fn(vi_ptr_callback)
+	}
+}
 
 fn vi_put(b u8) {
 	if vi_outlen < 64 {
@@ -235,15 +251,18 @@ fn process_button(code u16, value u32) {
 		vi_ptr_buttons &= ~bit
 		vi_ptr_released |= bit
 	}
+	notify_pointer_event()
 }
 
 fn process_abs(code u16, value u32) {
 	match code {
 		abs_x {
 			vi_ptr_x = clamp_axis(int(value), vi_ptr_max_x)
+			notify_pointer_event()
 		}
 		abs_y {
 			vi_ptr_y = clamp_axis(int(value), vi_ptr_max_y)
+			notify_pointer_event()
 		}
 		else {}
 	}
@@ -255,12 +274,15 @@ fn process_rel(code u16, value u32) {
 	match code {
 		rel_x {
 			vi_ptr_x = clamp_axis(vi_ptr_x + delta, vi_ptr_max_x)
+			notify_pointer_event()
 		}
 		rel_y {
 			vi_ptr_y = clamp_axis(vi_ptr_y + delta, vi_ptr_max_y)
+			notify_pointer_event()
 		}
 		rel_wheel {
 			vi_ptr_scroll += delta
+			notify_pointer_event()
 		}
 		else {}
 	}

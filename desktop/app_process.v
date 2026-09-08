@@ -804,6 +804,12 @@ fn (mut a RemoteApp) poll() bool {
 		return true
 	}
 	changed := reply.payload.len == 1 && reply.payload[0] != 0
+	// A quiet interactive client can use a long interval without making command
+	// output crawl: typing already forces the first poll, and a changed reply
+	// keeps polling on subsequent rendered frames until the output is drained.
+	if changed && a.keyboard && a.poll_interval_ms > 0 {
+		a.poll_sampled = false
+	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}

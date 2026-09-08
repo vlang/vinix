@@ -35,7 +35,7 @@ fn main() {
 	// Remote polling is paced before a pipe request is sent. In particular,
 	// the once-a-second Activity Monitor must not wake itself and the compositor
 	// on every 16 ms desktop pass just to answer "not yet".
-	assert available_apps[3].poll_interval_ms == 50
+	assert available_apps[3].poll_interval_ms == 1000
 	assert available_apps[5].poll_interval_ms == 1000
 	assert available_apps[8].poll_interval_ms == 100
 	assert available_apps[10].poll_interval_ms == 0
@@ -44,6 +44,19 @@ fn main() {
 	assert remote_app_poll_due(50, true, 1_000, 1_050)
 	assert remote_app_poll_due(50, true, 1_000, 999)
 	assert remote_app_poll_due(50, true, 1_000, ~u64(0))
+	mut cadence_desktop := Desktop{}
+	mut cadence_app := &RemoteApp{
+		polling: true
+		poll_interval_ms: 1000
+		poll_sampled: true
+	}
+	cadence_desktop.apps << cadence_app
+	cadence_desktop.windows << Window{app_index: 0}
+	assert cadence_desktop.idle_wait_interval(1000, 16) == 1000
+	cadence_app.poll_interval_ms = 100
+	assert cadence_desktop.idle_wait_interval(1000, 16) == 100
+	cadence_app.poll_sampled = false
+	assert cadence_desktop.idle_wait_interval(1000, 16) == 16
 
 	mut desktop := Desktop{}
 	mut files := start_remote_app_at(arguments()[0], available_apps[0], mut desktop) or {

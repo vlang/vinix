@@ -14,13 +14,23 @@ import memory
 fn C.vinix_apple_spi_keyboard_init(spi u64, enable u64, enable_low int, ready u64, ready_low int, input_hz u32, maximum_hz u32) int
 fn C.vinix_apple_spi_keyboard_poll(output &u8, capacity u64, application_cursor int) int
 fn C.vinix_apple_spi_keyboard_reports() u64
+fn C.vinix_apple_spi_touchpad_reports() u64
+fn C.vinix_call_void_fn(callback voidptr)
 
 __global (
 	apple_spi_keyboard_lock klock.Lock
 	apple_spi_keyboard_enabled = false
 	apple_spi_keyboard_probed = false
 	apple_spi_keyboard_reported = false
+	apple_spi_pointer_callback = voidptr(0)
 )
+
+// /dev/pointer registers this after it has published its event resource. The
+// callback boundary avoids making the shared SPI transport depend on a device
+// that already imports it for snapshots.
+pub fn set_pointer_event_callback(callback voidptr) {
+	apple_spi_pointer_callback = callback
+}
 
 struct Gpio {
 	region     devicetree.DTReg
@@ -400,7 +410,12 @@ pub fn poll(output &u8, capacity u64, application_cursor bool) int {
 	// cool-off itself and answers immediately until it has passed, and if it
 	// never gets called again it can never come back. Not calling it is what
 	// used to make three bad reads permanent.
+	pointer_reports := C.vinix_apple_spi_touchpad_reports()
 	count := C.vinix_apple_spi_keyboard_poll(output, capacity, int(application_cursor))
+	if C.vinix_apple_spi_touchpad_reports() != pointer_reports
+		&& apple_spi_pointer_callback != voidptr(0) {
+		C.vinix_call_void_fn(apple_spi_pointer_callback)
+	}
 	if count < 0 {
 		match count {
 			-2 {

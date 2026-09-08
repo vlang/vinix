@@ -162,6 +162,8 @@ fn test_external_program_runner_reports_success_and_missing_commands() {
 
 fn test_frame_wait_always_yields_after_an_overrun() {
 	assert desktop_frame_wait_ms(4, 16) == 12
+	// The same helper paces the compositor's quiet path at its longer default.
+	assert desktop_frame_wait_ms(4, 1000) == 996
 	assert desktop_frame_wait_ms(15, 16) == 1
 	assert desktop_frame_wait_ms(16, 16) == 1
 	assert desktop_frame_wait_ms(200, 16) == 1

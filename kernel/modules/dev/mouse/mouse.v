@@ -114,6 +114,7 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 		return none
 	}
 
+	this.l.acquire()
 	mouse_res.l.acquire()
 	packet := PointerPacket{
 		x: mouse_res.pointer_x
@@ -127,6 +128,8 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	mouse_res.pointer_pressed = 0
 	mouse_res.pointer_released = 0
 	mouse_res.l.release()
+	this.status &= ~file.pollin
+	this.l.release()
 
 	unsafe {
 		C.memcpy(buf, &packet, sizeof(PointerPacket))
@@ -309,6 +312,16 @@ fn handler() {
 
 		mouse_res.status |= file.pollin
 		event.trigger(mut mouse_res.event, false)
+		mut notify_pointer := false
+		pointer_res.l.acquire()
+		if pointer_res.status & file.pollin == 0 {
+			pointer_res.status |= file.pollin
+			notify_pointer = true
+		}
+		pointer_res.l.release()
+		if notify_pointer {
+			event.trigger(mut pointer_res.event, false)
+		}
 	}
 }
 
@@ -334,9 +347,9 @@ pub fn initialise() {
 	pointer_res.stat.blksize = u64(sizeof(PointerPacket))
 	pointer_res.stat.rdev = resource.create_dev_id()
 	pointer_res.stat.mode = 0o666 | stat.ifchr
-	// Reads return the current absolute state and never wait for a fresh PS/2
-	// interrupt, matching the ARM64 /dev/pointer contract.
-	pointer_res.status |= file.pollin | file.pollout
+	// Reads return the current absolute state immediately. POLLIN is raised by
+	// the PS/2 handler only when a fresh packet makes the snapshot change.
+	pointer_res.status |= file.pollout
 	fs.devtmpfs_add_device(&pointer_res, 'pointer')
 
 	ps2_mouse_vector = idt.allocate_vector()

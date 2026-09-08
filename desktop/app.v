@@ -94,7 +94,7 @@ const available_apps = [
 		height: 340
 		process_name: 'vinix-terminal'
 		polling: true
-		poll_interval_ms: 50
+		poll_interval_ms: 1000
 		keyboard: true
 		open: open_terminal
 	},

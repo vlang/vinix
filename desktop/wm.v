@@ -556,6 +556,35 @@ fn (mut d Desktop) poll_apps() {
 	}
 }
 
+// The event-driven idle wait needs a timeout only for work that cannot signal
+// a descriptor. Most desktops therefore wake once a second for their clock;
+// opening a stopwatch or a continuously hosted framebuffer lowers the timeout
+// to that application's requested cadence.
+fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
+	mut interval := maximum
+	for window in d.windows {
+		if window.app_index < 0 || window.app_index >= d.apps.len {
+			continue
+		}
+		app := d.apps[window.app_index]
+		if app is RemoteApp && app.polling {
+			// Keyboard and pointer delivery can invalidate the normal deadline.
+			// Come back on the active cadence so the forced poll happens promptly.
+			if !app.poll_sampled {
+				return frame_interval
+			}
+			if app.poll_interval_ms == 0 {
+				return frame_interval
+			}
+			candidate := i64(app.poll_interval_ms)
+			if candidate < interval {
+				interval = candidate
+			}
+		}
+	}
+	return interval
+}
+
 // focused_app_takes_keys reports whether the window on top belongs to an
 // application that wants typed input.
 fn (d &Desktop) focused_app_takes_keys() bool {

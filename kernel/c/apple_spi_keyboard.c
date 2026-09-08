@@ -724,6 +724,11 @@ uint64_t vinix_apple_spi_keyboard_reports(void)
     return keyboard.decoder.reports;
 }
 
+uint64_t vinix_apple_spi_touchpad_reports(void)
+{
+    return keyboard.touchpad.reports;
+}
+
 int vinix_apple_spi_touchpad_read(int32_t out[8])
 {
     if (out) keyboard.touchpad.requested = 1;

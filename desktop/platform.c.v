@@ -15,6 +15,8 @@ import term.termios
 
 #include <fcntl.h>
 
+#include <poll.h>
+
 #include <sys/ioctl.h>
 
 #include <sys/mman.h>
@@ -48,6 +50,14 @@ fn C.setsid() int
 fn C.mmap(base voidptr, length usize, prot int, flags int, fd int, offset i64) voidptr
 
 fn C.munmap(base voidptr, length usize) int
+
+struct C.pollfd {
+	fd      int
+	events  i16
+	revents i16
+}
+
+fn C.poll(fds &C.pollfd, count usize, timeout int) int
 
 // Match vlib/net's declaration if a native application also imports it.
 fn C.fcntl(fd int, cmd int, arg ...voidptr) int
@@ -188,6 +198,37 @@ fn desktop_sleep_ms(milliseconds i64) {
 		}
 		request = remainder
 	}
+}
+
+// Wait until either input source has something new, or until the compositor's
+// next housekeeping deadline. Both descriptors remain nonblocking: readiness
+// only parks this thread efficiently instead of changing read semantics.
+fn desktop_wait_for_input(pointer_fd int, keyboard_fd int, milliseconds i64) {
+	if milliseconds <= 0 {
+		return
+	}
+	mut fds := [2]C.pollfd{}
+	mut count := 0
+	if pointer_fd >= 0 {
+		fds[count] = C.pollfd{
+			fd: pointer_fd
+			events: i16(C.POLLIN)
+		}
+		count++
+	}
+	if keyboard_fd >= 0 {
+		fds[count] = C.pollfd{
+			fd: keyboard_fd
+			events: i16(C.POLLIN)
+		}
+		count++
+	}
+	if count == 0 {
+		desktop_sleep_ms(milliseconds)
+		return
+	}
+	timeout := if milliseconds > 0x7fffffff { 0x7fffffff } else { int(milliseconds) }
+	C.poll(&fds[0], usize(count), timeout)
 }
 
 // Read a whole file into a caller-supplied buffer, returning the byte count or

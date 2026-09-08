@@ -9,13 +9,17 @@
 // through.
 module main
 
-// What the loop asks to wait between frames. Vinix wakes a sleeping thread on
-// the scheduler's timeslice, so the shortest sleep that actually happens is
-// around twice this and never less than about 12 ms; 10 settles at roughly 35
-// frames a second, which tracks a dragged window closely while leaving most of
-// the CPU to everything else. Splitting the wait into shorter sleeps makes it
-// worse, not better: each one pays that floor again.
+// What the loop asks to wait after a frame changed. Vinix wakes a sleeping
+// thread on the scheduler's timeslice, so the shortest sleep that actually
+// happens is around twice this and never less than about 12 ms. This cadence
+// tracks a dragged window closely.
 const default_frame_interval_ms = i64(16)
+
+// This is the longest the quiet path waits before checking clocks and hosted
+// applications. Pointer and keyboard readiness end the wait immediately, so
+// input does not inherit this latency. A terminal keystroke also makes its next
+// refresh immediate; only genuinely background output waits for the cadence.
+const default_idle_interval_ms = i64(1000)
 
 // The desktop's own shortcuts, as a raw terminal delivers them. The keyboard
 // is read in raw mode, so a control chord arrives as one byte and nothing else
@@ -37,6 +41,7 @@ struct Options {
 	pointer        string = '/dev/pointer'
 	tz_offset      i64
 	frame_interval i64 = default_frame_interval_ms
+	idle_interval  i64 = default_idle_interval_ms
 	stats          bool
 }
 
@@ -55,10 +60,13 @@ fn parse_options(args []string) Options {
 			}
 		} else if arg.starts_with('--frame-ms=') {
 			// 0 runs the loop flat out, which is how the cost of a frame is
-			// measured separately from the cost of waiting between frames.
+			// measured separately from the cost of waiting between frames. An
+			// explicit value also disables the distinct idle cadence.
+			interval := arg[11..].i64()
 			options = Options{
 				...options
-				frame_interval: arg[11..].i64()
+				frame_interval: interval
+				idle_interval: interval
 			}
 		} else if arg == '--stats' {
 			options = Options{
@@ -167,10 +175,15 @@ fn main() {
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
-		// picture, so the frame is skipped entirely rather than recomposed
-		// into the same pixels.
+		// picture, so the frame is skipped entirely rather than recomposed into
+		// the same pixels. The wait is interruptible by either input descriptor;
+		// its timeout only drives application and clock housekeeping.
 		if !desktop.dirty {
-			sleep_to_next_frame(frame_started, options.frame_interval)
+			elapsed := monotonic_millis() - frame_started
+			interval := desktop.idle_wait_interval(options.idle_interval,
+				options.frame_interval)
+			wait := desktop_frame_wait_ms(elapsed, interval)
+			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue
 		}
 		desktop.dirty = false

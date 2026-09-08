@@ -110,12 +110,6 @@ fn poll_revents(status int, requested i16) i16 {
 
 fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut t := proc.current_thread()
-	mut process := t.process
-
-	C.printf(c'\n\e[32m%s\e[m: ppoll(0x%llx, %llu, 0x%llx, 0x%llx)\n', process.name.str, voidptr(fds), nfds, voidptr(tmo_p), voidptr(sigmask))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
 
 	if nfds == 0 {
 		return 0, 0
@@ -146,14 +140,10 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 	mut ret := u64(0)
 
-	C.printf(c'Polling on %d FDs\n', nfds)
-
 	for i := u64(0); i < nfds; i++ {
 		mut fdd := unsafe { &fds[i] }
 
 		fdd.revents = 0
-
-		C.printf(c'fdnum %d, events %llx\n', fdd.fd, fdd.events)
 
 		if fdd.fd < 0 {
 			continue
@@ -172,7 +162,6 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		revents := poll_revents(status, fdd.events)
 		if revents != 0 {
 			fdd.revents = revents
-			C.printf(c'Poll detected event on fdnum %d, events %llx\n', fdd.fd, fdd.events)
 			ret++
 			fd.unref()
 			continue
@@ -219,8 +208,6 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 		revents := poll_revents(status, fdd.events)
 		if revents != 0 {
-			C.printf(c'Poll exiting on fdnum %d, events %llx\n', fdd.fd, fdd.events)
-
 			fdd.revents = revents
 			ret++
 			break

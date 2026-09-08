@@ -10,8 +10,9 @@ import klock
 import katomic
 import errno
 import file
+import event
 import event.eventstruct
-import aarch64.virtio_input as _
+import aarch64.virtio_input
 import apple.spi_keyboard
 
 // PointerPacket is the whole of what /dev/pointer reports, and a read always
@@ -93,6 +94,7 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 		vi_ptr_released = 0
 		vi_ptr_scroll = 0
 	}
+	this.status &= ~file.pollin
 
 	this.l.release()
 
@@ -101,6 +103,22 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	}
 
 	return i64(sizeof(PointerPacket))
+}
+
+fn pointer_changed() {
+	if pointer_res == unsafe { nil } {
+		return
+	}
+	mut notify := false
+	pointer_res.l.acquire()
+	if pointer_res.status & file.pollin == 0 {
+		pointer_res.status |= file.pollin
+		notify = true
+	}
+	pointer_res.l.release()
+	if notify {
+		event.trigger(mut pointer_res.event, false)
+	}
 }
 
 fn (mut this Pointer) write(_handle voidptr, _buf voidptr, _loc u64, count u64) ?i64 {
@@ -139,10 +157,13 @@ pub fn initialise() {
 	res.stat.rdev = resource.create_dev_id()
 	res.stat.mode = 0o666 | stat.ifchr
 
-	// A read never blocks, so the node is always ready in both directions.
-	res.status |= file.pollin | file.pollout
+	// Reads still return the current snapshot immediately. POLLIN now means a
+	// fresh input report arrived, allowing compositors to sleep between events.
+	res.status |= file.pollout
 
 	pointer_res = res
+	virtio_input.set_pointer_event_callback(voidptr(pointer_changed))
+	spi_keyboard.set_pointer_event_callback(voidptr(pointer_changed))
 
 	fs.devtmpfs_add_device(res, 'pointer')
 }
