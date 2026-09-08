@@ -90,6 +90,10 @@ pub fn initialize_render_descriptor(descriptor voidptr, descriptor_bytes u64,
 			depth_buffer_store: command.depth_buffer_store
 			depth_meta_load: command.depth_meta_buffer_load
 			depth_meta_store: command.depth_meta_buffer_store
+			stencil_buffer_load: command.stencil_buffer_load
+			stencil_buffer_store: command.stencil_buffer_store
+			stencil_meta_load: command.stencil_meta_buffer_load
+			stencil_meta_store: command.stencil_meta_buffer_store
 		})
 }
 
@@ -183,11 +187,19 @@ pub fn stage_render_resource_references(command &agxrender.Command) []FakeG17Res
 		command.depth_meta_buffer_store, 8, fake_g17_vm_write,
 		fw.g17_render_depth_meta_buffer_store_member)
 	append_render_resource(mut resources, .depth_meta_buffer_partial, .gpu_va, command.depth_meta_buffer_partial, 8, fake_g17_vm_write)
-	append_render_resource(mut resources, .stencil_buffer_load, .gpu_va, command.stencil_buffer_load, 8, fake_g17_vm_read)
-	append_render_resource(mut resources, .stencil_buffer_store, .gpu_va, command.stencil_buffer_store, 8, fake_g17_vm_write)
+	append_render_resource_at(mut resources, .stencil_buffer_load, .gpu_va,
+		command.stencil_buffer_load, 8, fake_g17_vm_read,
+		fw.g17_render_stencil_buffer_load_member)
+	append_render_resource_at(mut resources, .stencil_buffer_store, .gpu_va,
+		command.stencil_buffer_store, 8, fake_g17_vm_write,
+		fw.g17_render_stencil_buffer_store_member)
 	append_render_resource(mut resources, .stencil_buffer_partial, .gpu_va, command.stencil_buffer_partial, 8, fake_g17_vm_write)
-	append_render_resource(mut resources, .stencil_meta_buffer_load, .gpu_va, command.stencil_meta_buffer_load, 8, fake_g17_vm_read)
-	append_render_resource(mut resources, .stencil_meta_buffer_store, .gpu_va, command.stencil_meta_buffer_store, 8, fake_g17_vm_write)
+	append_render_resource_at(mut resources, .stencil_meta_buffer_load, .gpu_va,
+		command.stencil_meta_buffer_load, 8, fake_g17_vm_read,
+		fw.g17_render_stencil_meta_buffer_load_member)
+	append_render_resource_at(mut resources, .stencil_meta_buffer_store, .gpu_va,
+		command.stencil_meta_buffer_store, 8, fake_g17_vm_write,
+		fw.g17_render_stencil_meta_buffer_store_member)
 	append_render_resource(mut resources, .stencil_meta_buffer_partial, .gpu_va, command.stencil_meta_buffer_partial, 8, fake_g17_vm_write)
 	append_render_resource(mut resources, .scissor_array, .gpu_va, command.scissor_array, 8, fake_g17_vm_read)
 	append_render_resource(mut resources, .depth_bias_array, .gpu_va, command.depth_bias_array, 8, fake_g17_vm_read)

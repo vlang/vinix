@@ -756,7 +756,19 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				} else {
 					u32(0)
 				}
-				C.printf(c'fake-g17: first Mesa render verified; id=%u size=%ux%u resources=%u depth=%u depth-meta=%u actual writes=%u capacity=%u\n', render_command.fragment_command_id, render_command.framebuffer_width, render_command.framebuffer_height, u32(render_resources.len), depth_bound, depth_meta_bound, report.expected_writes, fake_g17_max_writes)
+				stencil_bound := if render_command.stencil_buffer_load != 0
+					|| render_command.stencil_buffer_store != 0 {
+					u32(1)
+				} else {
+					u32(0)
+				}
+				stencil_meta_bound := if render_command.stencil_meta_buffer_load != 0
+					|| render_command.stencil_meta_buffer_store != 0 {
+					u32(1)
+				} else {
+					u32(0)
+				}
+				C.printf(c'fake-g17: first Mesa render verified; id=%u size=%ux%u resources=%u depth=%u depth-meta=%u stencil=%u stencil-meta=%u actual writes=%u capacity=%u\n', render_command.fragment_command_id, render_command.framebuffer_width, render_command.framebuffer_height, u32(render_resources.len), depth_bound, depth_meta_bound, stencil_bound, stencil_meta_bound, report.expected_writes, fake_g17_max_writes)
 			}
 		}
 	} else {

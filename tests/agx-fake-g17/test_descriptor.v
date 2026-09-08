@@ -23,6 +23,10 @@ fn main() {
 		depth_buffer_store: 0x7777_7777_7777_7777
 		depth_meta_load: 0x8888_8888_8888_8888
 		depth_meta_store: 0x9999_9999_9999_9999
+		stencil_buffer_load: 0xaaaa_aaaa_aaaa_aaaa
+		stencil_buffer_store: 0xbbbb_bbbb_bbbb_bbbb
+		stencil_meta_load: 0xcccc_cccc_cccc_cccc
+		stencil_meta_store: 0xdddd_dddd_dddd_dddd
 	}
 
 	assert fw.initialize_g17_3d_descriptor(descriptor.data, u64(descriptor.len))
@@ -36,6 +40,10 @@ fn main() {
 	assert read_le_u64(descriptor, fw.g17_render_depth_buffer_store_member) == fields.depth_buffer_store
 	assert read_le_u64(descriptor, fw.g17_render_depth_meta_buffer_load_member) == fields.depth_meta_load
 	assert read_le_u64(descriptor, fw.g17_render_depth_meta_buffer_store_member) == fields.depth_meta_store
+	assert read_le_u64(descriptor, fw.g17_render_stencil_buffer_load_member) == fields.stencil_buffer_load
+	assert read_le_u64(descriptor, fw.g17_render_stencil_buffer_store_member) == fields.stencil_buffer_store
+	assert read_le_u64(descriptor, fw.g17_render_stencil_meta_buffer_load_member) == fields.stencil_meta_load
+	assert read_le_u64(descriptor, fw.g17_render_stencil_meta_buffer_store_member) == fields.stencil_meta_store
 	assert !fw.populate_g17_render_resource_fields(descriptor.data, fw.g17_3d_descriptor_size - 1, fields)
 
 	println('G17 render descriptor bridge tests passed')

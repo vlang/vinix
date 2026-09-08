@@ -93,17 +93,18 @@ while their native G17 descriptor members remain `PENDING`. Sampler-array
 ranges cover all eight bytes of every AGX sampler descriptor rather than only
 one byte per sampler.
 
-Seven resource identities now cross the final descriptor boundary as a
+Eleven resource identities now cross the final descriptor boundary as a
 deliberately scoped bridge. The TA encoder pointer is written at `0xfe0`; the
 fragment load/store pipeline addresses are written at `0x610`/`0x768` with
 their bind values at `0x608`/`0x760`; and depth load/store planes are written
-at `0x668`/`0x670` with their metadata planes at `0x6e8`/`0x6f0`. Each resource
-value is checked both against its live FakeG17VM binding and against the exact
-descriptor member. These mappings agree across the recovered G17
-selector/value graph, the color/depth resource traces, and m1n1 `940439`'s
-independent Asahi register-list producer. This does not identify the global
-selector address space, and no partial-pipeline or partial-depth member is
-promoted by analogy.
+at `0x668`/`0x670` with their metadata planes at `0x6e8`/`0x6f0`. Stencil
+load/store planes use `0x680`/`0x688`, with metadata at `0x710`/`0x718`. Each
+resource value is checked both against its live FakeG17VM binding and against
+the exact descriptor member. These mappings agree across the recovered G17
+selector/value graph, the color/depth/stencil resource traces, and m1n1
+`940439`'s independent Asahi register-list producer. This does not identify the
+global selector address space, and no partial-pipeline, partial-depth, or
+partial-stencil member is promoted by analogy.
 
 The expected-write list is deliberately path-specific. The recovered 314
 virtual encoder call sites cover 3D, TA, FastBlit, and CL; they are not 314
@@ -277,7 +278,7 @@ required-write invariant for a job.
 The fake driver's current descriptor contains manifest-driven recovered scalar
 defaults. Every Mesa BO/GPU-VA input now crosses the backend boundary with
 explicit provenance and must resolve through FakeG17VM before both encoding and
-synthetic completion. Encoder, load/store pipeline, and depth load/store plane
+synthetic completion. Encoder, load/store pipeline, depth, and stencil plane
 references now also cross proven native G17 descriptor members. Translating
 the remaining references plus the Mesa-command and format/stride values remains
 the next software integration step. The resource-correlation recovery tool
