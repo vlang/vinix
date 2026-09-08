@@ -1839,6 +1839,34 @@ pub mut:
 	opaque [0x15b0]u8
 }
 
+struct G17DescriptorScalar {
+	member u32
+	bytes  u32
+	value  u64
+}
+
+// Recovered nonzero defaults for the selected AGXTACommandDescriptor. Keep
+// this manifest as the single source used by native and fake G17 staging.
+const g17_descriptor_scalars = [
+	G17DescriptorScalar{ member: 0x144, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x1c1, bytes: 2, value: 0x101 },
+	G17DescriptorScalar{ member: 0x2d4, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x400, bytes: 4, value: 1 },
+	G17DescriptorScalar{ member: 0x410, bytes: 4, value: 2 },
+	G17DescriptorScalar{ member: 0x900, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x968, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0xaa0, bytes: 8, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0xb60, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0xc30, bytes: 4, value: 1 },
+	G17DescriptorScalar{ member: 0xe18, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0xf60, bytes: 4, value: 2 },
+	G17DescriptorScalar{ member: 0x1208, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x1264, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x126c, bytes: 4, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x13a8, bytes: 8, value: 0xffff_ffff },
+	G17DescriptorScalar{ member: 0x13e8, bytes: 4, value: 0xffff_ffff },
+]
+
 fn write_g17_descriptor_value(destination &u8, member u64, bytes u64, value u64) {
 	unsafe {
 		C.memcpy(voidptr(destination + member), &value, bytes)
@@ -1859,6 +1887,24 @@ fn copy_g17_descriptor_bit(destination &u8, member u64, bytes u64, source &u8,
 	}
 }
 
+fn g17_descriptor_scalar_manifest_valid() bool {
+	for index, field in g17_descriptor_scalars {
+		if (field.bytes != 1 && field.bytes != 2 && field.bytes != 4 && field.bytes != 8)
+			|| u64(field.member) > g17_3d_descriptor_size
+			|| u64(field.bytes) > g17_3d_descriptor_size - u64(field.member) {
+			return false
+		}
+		for previous := 0; previous < index; previous++ {
+			other := g17_descriptor_scalars[previous]
+			if field.member < other.member + other.bytes
+				&& other.member < field.member + field.bytes {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // Initialize the scalar part of Apple's selected derived descriptor without
 // constructing any of its host C++ base classes or retained OSObject pointers.
 // A full clear is a Vinix staging invariant; processRenderSetup-equivalent
@@ -1867,26 +1913,15 @@ pub fn initialize_g17_3d_descriptor(descriptor voidptr, descriptor_bytes u64) bo
 	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size {
 		return false
 	}
+	if !g17_descriptor_scalar_manifest_valid() {
+		return false
+	}
 	unsafe {
 		C.memset(descriptor, 0, g17_3d_descriptor_size)
 		destination := &u8(descriptor)
-		write_g17_descriptor_value(destination, 0x144, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x1c1, 2, 0x101)
-		write_g17_descriptor_value(destination, 0x2d4, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x400, 4, 1)
-		write_g17_descriptor_value(destination, 0x410, 4, 2)
-		write_g17_descriptor_value(destination, 0x900, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x968, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0xaa0, 8, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0xb60, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0xc30, 4, 1)
-		write_g17_descriptor_value(destination, 0xe18, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0xf60, 4, 2)
-		write_g17_descriptor_value(destination, 0x1208, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x1264, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x126c, 4, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x13a8, 8, 0xffff_ffff)
-		write_g17_descriptor_value(destination, 0x13e8, 4, 0xffff_ffff)
+		for field in g17_descriptor_scalars {
+			write_g17_descriptor_value(destination, field.member, field.bytes, field.value)
+		}
 	}
 	return true
 }
