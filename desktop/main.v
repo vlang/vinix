@@ -142,7 +142,7 @@ fn main() {
 		desktop.pump_keyboard(mut keyboard)
 		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
-		// console, and reopen everything after Firefox exits.
+		// console, and reopen everything after the external application exits.
 		if desktop.pending_external != '' {
 			command := desktop.pending_external
 			desktop.pending_external = ''

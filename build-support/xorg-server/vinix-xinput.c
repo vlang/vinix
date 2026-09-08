@@ -331,7 +331,11 @@ static int pump_pointer(Display *display, int pointer_fd, uint32_t *sent_buttons
     if (x >= width) x = width - 1;
     if (y >= height) y = height - 1;
     if (x != *last_x || y != *last_y) {
-        XTestFakeMotionEvent(display, screen, x, y, CurrentTime);
+        // Vinix reports absolute display coordinates. Warp the root pointer
+        // directly instead of routing them through XTEST's synthetic motion
+        // device; the warp still emits the MotionNotify clients expect.
+        XWarpPointer(display, None, RootWindow(display, screen),
+                     0, 0, 0, 0, x, y);
         *last_x = x;
         *last_y = y;
         sent = 1;

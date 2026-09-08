@@ -79,8 +79,13 @@ mut:
 	apps []NativeApp
 	// An exclusive application is started by the main loop after it has
 	// released the framebuffer, pointer and raw console keyboard.
-	pending_external string
-	external_error   string
+	pending_external       string
+	pending_external_title string
+	pending_external_icon  string
+	external_error         string
+	external_error_title   string
+	external_error_note    string
+	external_error_hint    string
 
 	settings Settings
 	// Cmd-Tab's session: which windows it is stepping through and whether it
@@ -447,6 +452,8 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 fn (mut d Desktop) launch(factory AppFactory) {
 	if factory.exclusive_command != '' {
 		d.pending_external = factory.exclusive_command
+		d.pending_external_title = factory.title
+		d.pending_external_icon = factory.icon
 		d.dirty = true
 		return
 	}
@@ -478,19 +485,34 @@ fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	d.hover = ''
 	d.wallpaper_valid = false
 	d.dirty = true
+	title := if d.pending_external_title == '' {
+		'External application'
+	} else {
+		d.pending_external_title
+	}
+	icon := if d.pending_external_icon == '' { 'builtin:window' } else { d.pending_external_icon }
+	d.pending_external_title = ''
+	d.pending_external_icon = ''
 	if result == .success {
 		return
 	}
 	d.external_error = match result {
-		.unavailable { 'Firefox and Xorg are not installed in this desktop image.' }
-		.spawn_failed { 'Vinix could not create the Firefox launcher process.' }
-		.wait_failed { 'Vinix lost track of the Firefox launcher process.' }
-		.failed { 'Firefox or Xorg exited with an error.' }
+		.unavailable { '${title} is not installed in this desktop image.' }
+		.spawn_failed { 'Vinix could not create the ${title} launcher process.' }
+		.wait_failed { 'Vinix lost track of the ${title} launcher process.' }
+		.failed { '${title} or Xorg exited with an error.' }
 		.success { '' }
 	}
-	id := d.spawn('Firefox', .external_error, 180, 120, 500, 220)
+	d.external_error_title = '${title} could not start'
+	d.external_error_note = '${title} runs in an exclusive X11 session; the native desktop resumes when it exits.'
+	d.external_error_hint = if title == 'Minecraft' {
+		'Build its runtime with build-minecraft-aarch64.sh, then rebuild the desktop image.'
+	} else {
+		'Build Firefox/Xorg, then rebuild the userland and desktop image.'
+	}
+	id := d.spawn(title, .external_error, 180, 120, 560, 220)
 	index := d.window_index(id) or { return }
-	d.windows[index].icon = 'builtin:browser'
+	d.windows[index].icon = icon
 	d.clamp_to_screen(index)
 }
 

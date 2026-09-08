@@ -83,10 +83,10 @@ fn external_error_page(width int, desktop &Desktop) []ui2.Element {
 		bg: app_accent
 		radius: 2
 	}, [])
-	children << heading('Firefox could not start', pad, 34, inner)
+	children << heading(desktop.external_error_title, pad, 34, inner)
 	children << body_line(desktop.external_error, pad, 68, inner)
-	children << muted_line('Firefox uses its packaged GTK/X11 runtime; the native desktop stays GTK-free.', pad, 100, inner)
-	children << muted_line('Build Firefox/Xorg, then rebuild the userland and desktop image.', pad, 120, inner)
+	children << muted_line(desktop.external_error_note, pad, 100, inner)
+	children << muted_line(desktop.external_error_hint, pad, 120, inner)
 	return children
 }
 

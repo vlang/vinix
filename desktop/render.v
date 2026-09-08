@@ -571,6 +571,19 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx - radius / 2, cy - radius + 3, cx - radius / 2, cy + radius - 3, color, 1)
 			d.canvas.draw_line(cx + radius / 2, cy - radius + 3, cx + radius / 2, cy + radius - 3, color, 1)
 		}
+		'block' {
+			// A compact voxel: the outer square is a block face and the three
+			// interior edges hint at its top and two sides at every icon size.
+			body := if w < h { w * 3 / 4 } else { h * 3 / 4 }
+			left := cx - body / 2
+			top := cy - body / 2
+			behind := d.surface_under(x, y)
+			d.canvas.fill_round_rect(left, top, body, body, 2, color)
+			d.canvas.fill_rect(left + 2, top + 2, body - 4, body - 4, behind)
+			d.canvas.draw_line(left + 1, top + body / 3, cx, top + 2 * body / 3, color, 2)
+			d.canvas.draw_line(left + body - 1, top + body / 3, cx, top + 2 * body / 3, color, 2)
+			d.canvas.draw_line(cx, top + 2 * body / 3, cx, top + body - 1, color, 2)
+		}
 		'settings' {
 			// A gear: a disc with a hole, and teeth around it.
 			outer := if w < h { w * 3 / 8 } else { h * 3 / 8 }

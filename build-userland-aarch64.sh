@@ -17,6 +17,7 @@ GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
+MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
 
 merge_staging_tree() {
@@ -757,6 +758,15 @@ if [ -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
     cp -a "$FIREFOX_STAGING/." "$STAGING/"
 else
     echo "==> Firefox staging not found, skipping (run build-firefox-aarch64.sh first)"
+fi
+
+# Minetest is a native C++/SDL/OpenGL client. Merge it before Asahi so the
+# hardware-specific Mesa userspace remains the final graphics implementation.
+if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+    echo "==> Integrating C++ Minecraft runtime..."
+    merge_staging_tree "$MINECRAFT_STAGING"
+else
+    echo "==> Minecraft staging not found, skipping (run build-minecraft-aarch64.sh first)"
 fi
 
 # The native Asahi build is produced in the Debian ARM64 VM. Once its staging

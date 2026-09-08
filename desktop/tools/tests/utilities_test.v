@@ -144,7 +144,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 }
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
-	assert available_apps.len == 10
+	assert available_apps.len == 11
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == '/usr/bin/run-firefox'
@@ -154,11 +154,13 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
 	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
+	assert available_apps[10].title == 'Minecraft'
+	assert available_apps[10].exclusive_command == '/usr/bin/minecraft'
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	assert taskbar_launcher_width(1280, 114, available_apps.len) == 77
-	assert taskbar_launcher_width(1152, 114, available_apps.len) == 65
-	assert taskbar_launcher_width(1024, 114, available_apps.len) == 52
+	assert taskbar_launcher_width(1280, 114, available_apps.len) == 70
+	assert taskbar_launcher_width(1152, 114, available_apps.len) == 58
+	assert taskbar_launcher_width(1024, 114, available_apps.len) == 46
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
 }
@@ -202,6 +204,8 @@ fn test_firefox_requests_an_exclusive_display_handoff() {
 	mut desktop := Desktop{}
 	desktop.launch(available_apps[1])
 	assert desktop.pending_external == '/usr/bin/run-firefox'
+	assert desktop.pending_external_title == 'Firefox'
+	assert desktop.pending_external_icon == 'builtin:browser'
 	assert desktop.apps.len == 0
 	assert desktop.windows.len == 0
 }
@@ -218,9 +222,19 @@ fn test_external_display_handoff_redraws_and_reports_failures() {
 
 	desktop.external_finished(.unavailable)
 	assert desktop.windows.len == 1
-	assert desktop.windows[0].title == 'Firefox'
+	assert desktop.windows[0].title == 'External application'
 	assert desktop.windows[0].page == .external_error
 	assert desktop.external_error.contains('not installed')
+	assert desktop.external_error_title == 'External application could not start'
+
+	// The same handoff reports Minecraft rather than reusing Firefox-specific
+	// text and preserves the voxel icon on its error window.
+	desktop.launch(available_apps[10])
+	desktop.external_finished(.failed)
+	assert desktop.windows[1].title == 'Minecraft'
+	assert desktop.windows[1].icon == 'builtin:block'
+	assert desktop.external_error_title == 'Minecraft could not start'
+	assert desktop.external_error_hint.contains('build-minecraft-aarch64.sh')
 	unsafe { free(voidptr(desktop.canvas.pixels)) }
 }
 

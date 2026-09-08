@@ -30,6 +30,7 @@ PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
+MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
@@ -337,6 +338,13 @@ else
     # The base archive may predate package support. Always refresh this small
     # layer so the terminal gets pkg/apk without rebuilding the full userland.
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
+fi
+
+# Keep the game optional like Firefox, but pick up a newly built layer even
+# when the base userland archive predates it.
+if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+    echo "==> Staging C++ Minecraft runtime"
+    merge_staging_tree "$MINECRAFT_STAGING"
 fi
 
 # Hyprland is an optional build layer because its patched Aquamarine library

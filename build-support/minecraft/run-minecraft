@@ -1,0 +1,90 @@
+#!/bin/sh
+# Launch the C++ Minetest client with conservative defaults for Vinix's X11
+# and software-OpenGL stack.
+set -eu
+
+engine=${VINIX_MINECRAFT_BIN:-/usr/bin/minetest}
+startx=${VINIX_MINECRAFT_STARTX:-/usr/bin/startx}
+xinitrc=${VINIX_MINECRAFT_XINITRC:-/usr/share/vinix/minecraft-xinitrc}
+game_path=${VINIX_MINECRAFT_GAME_PATH:-/usr/share/minetest/games/minetest_game}
+user_path=${VINIX_MINECRAFT_USER_PATH:-${HOME:-/root}/.minetest}
+defaults=${VINIX_MINECRAFT_DEFAULTS:-/usr/share/vinix/minecraft.conf}
+
+usage() {
+	cat <<'EOF'
+usage: minecraft [--menu | --check | --help]
+
+With no option, start the persistent "Vinix World" using Minetest Game.
+--menu opens Minetest's main menu instead. Worlds and settings are kept below
+$HOME/.minetest.
+EOF
+}
+
+mode=world
+case "${1:-}" in
+	'') ;;
+	--menu) mode=menu ;;
+	--check) mode=check ;;
+	--x11-client) mode=${VINIX_MINECRAFT_MODE:-world} ;;
+	--help|-h) usage; exit 0 ;;
+	*)
+		echo "minecraft: unknown option: $1" >&2
+		usage >&2
+		exit 2
+		;;
+esac
+
+if [ ! -x "$engine" ]; then
+	echo "minecraft: Minetest is not installed; run ./build-minecraft-aarch64.sh and rebuild the desktop image" >&2
+	exit 1
+fi
+if [ ! -f "$game_path/game.conf" ]; then
+	echo "minecraft: Minetest Game is missing from $game_path" >&2
+	exit 1
+fi
+if [ "$mode" = check ]; then
+	"$engine" --version
+	echo "minecraft: C++ client and game data are ready"
+	exit 0
+fi
+
+mkdir -p "$user_path/worlds/Vinix World"
+config=$user_path/minetest.conf
+world="$user_path/worlds/Vinix World"
+if [ ! -f "$config" ]; then
+	cp "$defaults" "$config"
+fi
+if [ ! -f "$world/world.mt" ]; then
+	cat > "$world/world.mt" <<'EOF'
+gameid = minetest
+backend = sqlite3
+player_backend = sqlite3
+auth_backend = sqlite3
+creative_mode = false
+enable_damage = true
+EOF
+fi
+
+# Keep rendering in Minetest's process. Mesa's direct software path presents
+# through Xorg without requiring GPU support, while indirect GLX would execute
+# the renderer inside the X server and is not supported by Vinix yet.
+if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
+	export LIBGL_ALWAYS_SOFTWARE=1
+	unset LIBGL_ALWAYS_INDIRECT
+fi
+export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}
+export MINETEST_USER_PATH=$user_path
+
+if [ -n "${DISPLAY:-}" ] || [ "${1:-}" = --x11-client ]; then
+	if [ "$mode" = menu ]; then
+		exec "$engine" --config "$config"
+	fi
+	exec "$engine" --config "$config" --world "$world" --gameid minetest --go
+fi
+
+if [ ! -x "$startx" ] || [ ! -x "$xinitrc" ]; then
+	echo "minecraft: Xorg launcher is not installed" >&2
+	exit 1
+fi
+export VINIX_MINECRAFT_MODE=$mode
+exec "$startx" "$xinitrc"

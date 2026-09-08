@@ -53,7 +53,10 @@ trap 'stop_session; exit 1' HUP INT TERM
 trap stop_session EXIT
 
 echo "startx: launching Xorg on $display"
-/usr/bin/Xorg "$display" +iglx -noreset \
+# Vinix injects input through XTEST from a normal process. Keep Xorg on its
+# main event loop: its optional Linux input thread races software-GL setup on
+# Vinix and is not needed by this bridge.
+/usr/bin/Xorg "$display" +iglx -noreset -dumbSched \
     </dev/null >/var/log/Xorg.startx.log 2>&1 &
 SERVER_PID=$!
 echo "startx: Xorg PID=$SERVER_PID (sleeping 1s for init)"

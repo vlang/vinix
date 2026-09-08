@@ -250,6 +250,26 @@ Boot methods that do not use the QEMU runner retain package changes only in the
 running root filesystem. Direct Alpine package names also work, for example
 `pkg install nano`.
 
+### C++ Minecraft client on aarch64
+
+Vinix can run the native AArch64 Minetest 5.9.1 client, a C++ Minecraft-style
+voxel sandbox, through its SDL2/X11/OpenGL compatibility stack. The optional
+layer also bundles Minetest Game, so the default world works without fetching
+content after boot:
+
+```sh
+./build-x11-aarch64.sh
+./build-minecraft-aarch64.sh
+./build-desktop-aarch64.sh
+./run-desktop-aarch64.sh --no-desktop
+```
+
+Open **Minecraft** from the desktop or run `minecraft` in a terminal. The
+launcher creates and reuses `$HOME/.minetest/worlds/Vinix World`; use
+`minecraft --menu` for Minetest's main menu and `minecraft --check` for a
+display-free runtime check. Software OpenGL and muted audio are the safe
+defaults. Set `VINIX_MINECRAFT_HARDWARE_GL=1` to experiment with hardware GL.
+
 GTK and Gnumeric are deliberately not included in the base or network-tools
 package layer. GTK is downloaded only when it or an application that needs it
 is requested. The GTK smoke test first checks that the base image is GTK-free,
