@@ -3,6 +3,7 @@ set -eu
 
 test -x /usr/bin/Hyprland
 test -x /usr/bin/start-hyprland-vinix
+test -x /usr/bin/hyprland-demo
 test -r /root/.config/hypr/hyprland.conf
 test -r /usr/share/X11/xkb/rules/evdev
 test -e /dev/fb0

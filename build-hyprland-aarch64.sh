@@ -196,6 +196,8 @@ mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/sys/dev/char/226:128/device/drm/renderD128"
 install -m755 "$SCRIPT_DIR/build-support/hyprland/start-hyprland-vinix" \
     "$STAGING/usr/bin/start-hyprland-vinix"
+install -m755 "$SCRIPT_DIR/build-support/hyprland/demo.sh" \
+    "$STAGING/usr/bin/hyprland-demo"
 install -m644 "$SCRIPT_DIR/build-support/hyprland/hyprland.conf" \
     "$STAGING/root/.config/hypr/hyprland.conf"
 install -m644 "$SCRIPT_DIR/build-support/hyprland/foot.ini" \
