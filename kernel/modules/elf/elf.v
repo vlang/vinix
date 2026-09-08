@@ -99,6 +99,25 @@ pub mut:
 	sh_entsize    u64
 }
 
+// architecture reports the ELF machine without mapping any part of the file.
+// The ARM64 exec path uses this to hand x86-64 programs to the userspace
+// translator instead of jumping directly into foreign instructions.
+pub fn architecture(_res &resource.Resource) !u16 {
+	mut res := unsafe { _res }
+	mut header := &Header{}
+
+	res.read(0, header, 0, sizeof(Header)) or { return error('') }
+	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
+		return error('elf: Invalid magic')
+	}
+	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
+		|| header.ident[ei_osabi] != abi_sysv {
+		return error('elf: Unsupported ELF file')
+	}
+
+	return header.machine
+}
+
 pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxval, string) {
 	mut res := unsafe { _res }
 	mut pagemap := unsafe { _pagemap }

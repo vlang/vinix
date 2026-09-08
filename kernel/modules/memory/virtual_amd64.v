@@ -11,6 +11,10 @@ __global (
 	la57 = bool(false)
 )
 
+pub fn user_address_limit() u64 {
+	return if la57 { u64(1) << 56 } else { u64(1) << 47 }
+}
+
 pub fn new_pagemap() &Pagemap {
 	mut top_level := &u64(pmm_alloc(1))
 	if top_level == 0 {
@@ -63,7 +67,7 @@ pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 // pagemap lock while using the returned physical address so munmap/mprotect
 // cannot invalidate the access between validation and memcpy.
 pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
-	user_limit := if la57 { u64(1) << 56 } else { u64(1) << 47 }
+	user_limit := user_address_limit()
 	if virt >= user_limit {
 		return none
 	}

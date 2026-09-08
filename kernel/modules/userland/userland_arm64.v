@@ -196,6 +196,13 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 // Dispatch a signal to _self_, called from the scheduler at the
 // end of syscalls, or from exception handlers.
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
+	dispatch_a_signal_with_fault(context, false, 0, 0)
+}
+
+// Linux SA_SIGINFO handlers need the fault address and a usable ucontext. QEMU
+// user mode depends on both: translated memory accesses deliberately fault in
+// the host and its SIGSEGV handler turns that host context into a guest fault.
+fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fault_address u64, fault_esr u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	mut which := -1
@@ -283,14 +290,61 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	} else if sigaction.sa_restorer != unsafe { nil } {
 		// ── Linux/musl mode: set up signal frame on user stack ──
 		// Frame layout: [prev_mask(8)] [pad(8)] [GPRState(sizeof)]
-		frame_size := u64(16) + sizeof(cpulocal.GPRState)
+		// A three-argument SA_SIGINFO handler appends siginfo_t and an AArch64
+		// ucontext_t. Synchronous faults always require those objects as well.
+		// rt_sigreturn still consumes the compact private header at the front;
+		// the appended ABI objects are for three-argument handlers.
+		wants_siginfo := synchronous || sigaction.sa_flags & sa_siginfo != 0
+			|| sigaction.sa_flags & 4 != 0 // Linux SA_SIGINFO
+		context_offset := u64(16)
+		info_offset := lib.align_up(context_offset + sizeof(cpulocal.GPRState), 16)
+		ucontext_offset := info_offset + 128
+		ucontext_size := u64(4560)
+		frame_size := if wants_siginfo {
+			ucontext_offset + ucontext_size
+		} else {
+			context_offset + sizeof(cpulocal.GPRState)
+		}
 		mut signal_sp := lib.align_down(stack_top - frame_size, 16)
 
 		// Store original context into frame on user stack
 		unsafe {
 			*&u64(signal_sp) = previous_mask
 			*&u64(signal_sp + 8) = 0
-			C.memcpy(voidptr(signal_sp + 16), context, sizeof(cpulocal.GPRState))
+			C.memcpy(voidptr(signal_sp + context_offset), context, sizeof(cpulocal.GPRState))
+		}
+
+		if wants_siginfo {
+			info_address := signal_sp + info_offset
+			uc_address := signal_sp + ucontext_offset
+			unsafe {
+				C.memset(voidptr(info_address), 0, 128)
+				C.memset(voidptr(uc_address), 0, ucontext_size)
+
+				// siginfo_t: signo, errno, positive si_code, then si_addr.
+				*&int(info_address) = which
+				*&int(info_address + 8) = if synchronous { 1 } else { 0 }
+				*&u64(info_address + 16) = fault_address
+
+				// musl AArch64 ucontext_t offsets. The signal mask begins at 40;
+				// its 128 bytes are followed by eight bytes of alignment before
+				// mcontext at 176. The reserved extension records are 16-byte
+				// aligned after pstate.
+				*&u64(uc_address + 40) = previous_mask
+				*&u64(uc_address + 176) = fault_address
+				C.memcpy(voidptr(uc_address + 184), context, 31 * sizeof(u64))
+				*&u64(uc_address + 432) = context.sp
+				*&u64(uc_address + 440) = context.pc
+				*&u64(uc_address + 448) = context.pstate
+
+				// esr_context lets QEMU distinguish reads from writes without
+				// decoding the faulting AArch64 instruction.
+				*&u32(uc_address + 464) = 0x45535201
+				*&u32(uc_address + 468) = 16
+				*&u64(uc_address + 472) = fault_esr
+				// A zero header terminates the extension-record chain.
+				*&u64(uc_address + 480) = 0
+			}
 		}
 
 		// Set up handler invocation
@@ -299,6 +353,10 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 		t.gpr_state.pc = u64(handler)
 		t.gpr_state.x30 = u64(sigaction.sa_restorer) // LR = __restore_rt
 		t.gpr_state.x0 = u64(which)
+		if wants_siginfo {
+			t.gpr_state.x1 = signal_sp + info_offset
+			t.gpr_state.x2 = signal_sp + ucontext_offset
+		}
 
 		enter_handler(mut t, context)
 	}
@@ -316,7 +374,17 @@ pub fn dispatch_sync_signal(context &cpulocal.GPRState, signal u8) bool {
 	mut current_thread := proc.current_thread()
 	original_pc := context.pc
 	katomic.bts(mut &current_thread.pending_signals, signal - 1)
-	dispatch_a_signal(context)
+	dispatch_a_signal_with_fault(context, true, context.pc, 0)
+	return context.pc != original_pc
+}
+
+// Deliver a synchronous memory fault with the host address and ESR preserved
+// for an SA_SIGINFO handler.
+pub fn dispatch_sync_fault(context &cpulocal.GPRState, fault_address u64, fault_esr u64) bool {
+	mut current_thread := proc.current_thread()
+	original_pc := context.pc
+	katomic.bts(mut &current_thread.pending_signals, u8(sigsegv - 1))
+	dispatch_a_signal_with_fault(context, true, fault_address, fault_esr)
 	return context.pc != original_pc
 }
 
@@ -503,8 +571,6 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 	prog_node := fs.get_node(dir, path, true)?
 	mut prog := prog_node.resource
 
-	mut new_pagemap := memory.new_pagemap()
-
 	// Check for shebang before proceeding as if it was an ELF.
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2)?
@@ -521,6 +587,37 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			stderr)
 	}
 
+	// ARM64 cannot enter an x86-64 ELF directly. Re-exec it through the native
+	// QEMU user-mode translator and its private x86-64 musl root. Doing this in
+	// the kernel exec path also catches helper programs that Wine starts itself,
+	// rather than only binaries launched through the shell wrapper.
+	architecture := elf.architecture(prog) or { return none }
+	if architecture == elf.arch_x86_64 {
+		translator := '/usr/bin/qemu-x86_64'
+		guest_root := '/usr/libexec/vinix-x86_64/root'
+		mut translated_argv := [translator, '-B', '0x100000000', '-L', guest_root,
+			path]
+		if argv.len > 1 {
+			translated_argv << argv[1..]
+		}
+
+		mut translated_envp := envp.clone()
+		mut has_library_path := false
+		for environment_entry in translated_envp {
+			if environment_entry.starts_with('LD_LIBRARY_PATH=') {
+				has_library_path = true
+				break
+			}
+		}
+		if !has_library_path {
+			translated_envp << 'LD_LIBRARY_PATH=${guest_root}/lib:${guest_root}/usr/lib'
+		}
+
+		return start_program(execve, vfs_root, translator, translated_argv,
+			translated_envp, stdin, stdout, stderr)
+	}
+
+	mut new_pagemap := memory.new_pagemap()
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
 
 	mut entry_point := unsafe { nil }

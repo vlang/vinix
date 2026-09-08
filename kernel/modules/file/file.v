@@ -331,7 +331,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 		process = unsafe { _process }
 	}
 
-	if fdnum >= proc.max_fds {
+	if fdnum < 0 || fdnum >= proc.max_fds {
 		errno.set(errno.ebadf)
 		return none
 	}

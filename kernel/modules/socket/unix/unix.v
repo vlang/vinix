@@ -36,6 +36,11 @@ mut:
 	socket   &UnixSocket = unsafe { nil }
 }
 
+struct PendingFdGroup {
+mut:
+	fds []&file.FD
+}
+
 __global (
 	abstract_sockets      [64]AbstractSocketEntry
 	abstract_sockets_lock klock.Lock
@@ -88,10 +93,11 @@ pub mut:
 	capacity  u64
 	used      u64
 
-	// Open-file descriptions waiting to be delivered by recvmsg(SCM_RIGHTS).
-	// The queued FD objects each own one Handle reference until they are either
-	// installed in the receiver's descriptor table or discarded.
-	pending_fds []&file.FD
+	// Open-file descriptions waiting to be delivered by recvmsg(SCM_RIGHTS),
+	// kept in sendmsg-sized groups. The boundary matters: Wine sends its request
+	// and reply pipe ends in consecutive messages and expects one descriptor
+	// from each corresponding recvmsg call.
+	pending_fd_groups []PendingFdGroup
 }
 
 fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -259,7 +265,11 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	peer.write_ptr = new_ptr_loc
 	peer.used += count
 	if fds.len != 0 {
-		peer.pending_fds << fds
+		mut group := PendingFdGroup{
+			fds: []&file.FD{}
+		}
+		group.fds << fds
+		peer.pending_fd_groups << group
 	}
 
 	peer.status |= file.pollin
@@ -731,7 +741,8 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		msg.msg_controllen = 0
 		msg.msg_flags = 0
 	}
-	if this.pending_fds.len != 0 {
+	if this.pending_fd_groups.len != 0 {
+		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 		mut capacity_fds := u64(0)
 		if msg.msg_control != unsafe { nil } && control_capacity >= cmsg_header_size + sizeof(int) {
 			capacity_fds = (control_capacity - cmsg_header_size) / sizeof(int)
@@ -747,7 +758,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 				capacity_fds--
 			}
 		}
-		mut deliver := u64(this.pending_fds.len)
+		mut deliver := u64(pending_fds.len)
 		if deliver > capacity_fds {
 			deliver = capacity_fds
 			unsafe { msg.msg_flags |= msg_ctrunc }
@@ -763,7 +774,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 			mut installed := u64(0)
 			for installed < deliver {
-				mut passed_fd := this.pending_fds[int(installed)]
+				mut passed_fd := pending_fds[int(installed)]
 				if flags & msg_cmsg_cloexec != 0 {
 					passed_fd.flags |= resource.o_cloexec
 				}
@@ -790,12 +801,13 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 		// Ancillary data accompanies the bytes just consumed. Descriptors that
 		// did not fit are discarded with MSG_CTRUNC, matching recvmsg semantics.
-		for i in int(deliver) .. this.pending_fds.len {
-			mut dropped := this.pending_fds[i]
+		for i in int(deliver) .. pending_fds.len {
+			mut dropped := pending_fds[i]
 			dropped.unref()
 			unsafe { free(voidptr(dropped)) }
 		}
-		this.pending_fds.clear()
+		unsafe { pending_fds.free() }
+		this.pending_fd_groups.delete(0)
 	}
 
 	this.peer.status |= file.pollout

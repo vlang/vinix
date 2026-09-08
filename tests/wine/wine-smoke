@@ -2,14 +2,23 @@
 set -eu
 
 prefix="${TMPDIR:-/tmp}/vinix-wine-smoke.$$"
+remove_prefix=1
+if [ -f /root/.wine-x86_64/.update-timestamp ]; then
+    prefix=/root/.wine-x86_64
+    remove_prefix=0
+fi
 
 cleanup() {
     WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver -k >/dev/null 2>&1 || :
-    rm -r -- "${prefix}"
+    if [ "${remove_prefix}" -eq 1 ]; then
+        /bin/busybox rm -r -- "${prefix}"
+    fi
 }
 trap cleanup EXIT HUP INT TERM
 
-mkdir -p "${prefix}"
+if [ "${remove_prefix}" -eq 1 ]; then
+    /bin/busybox mkdir -p "${prefix}"
+fi
 output=$(WINEPREFIX="${prefix}" WINEDEBUG=-all \
     /usr/bin/wine64 /usr/share/wine/vinix-wine-smoke.exe)
 WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver -w

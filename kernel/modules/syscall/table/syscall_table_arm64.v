@@ -46,6 +46,14 @@ fn syscall_linux_inotify_init1(_ voidptr, _flags int) (u64, u64) {
 	return errno.err, errno.enosys
 }
 
+// Vinix filesystems do not expose extended attributes yet. Linux software
+// probes every xattr entry point during prefix and cache setup; ENOTSUP is the
+// defined filesystem answer and avoids treating each harmless probe as an
+// unknown syscall.
+fn syscall_linux_xattr_unsupported(_ voidptr) (u64, u64) {
+	return errno.err, errno.enotsup
+}
+
 // Ring buffer for last N syscalls before a crash
 // Ring buffer for last N syscalls before crash
 struct SyscallTraceEntry {
@@ -1014,6 +1022,9 @@ pub fn init_syscall_table() {
 	// Reference: include/uapi/asm-generic/unistd.h
 
 	// File I/O
+	for i := 5; i <= 16; i++ {
+		syscall_table[i] = voidptr(syscall_linux_xattr_unsupported)
+	}
 	syscall_table[17] = voidptr(fs.syscall_getcwd) // __NR_getcwd
 	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup

@@ -105,10 +105,22 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 		0x20, 0x21 { // Instruction Abort from lower/same EL
-			mmap.pf_handler(gpr_state) or { fault_handler(ec, esr, far, gpr_state) }
+			mmap.pf_handler(gpr_state) or {
+				if gpr_state.pc < higher_half
+					&& userland.dispatch_sync_fault(gpr_state, far, esr) {
+					return
+				}
+				fault_handler(ec, esr, far, gpr_state)
+			}
 		}
 		0x24, 0x25 { // Data Abort from lower/same EL
-			mmap.pf_handler(gpr_state) or { fault_handler(ec, esr, far, gpr_state) }
+			mmap.pf_handler(gpr_state) or {
+				if gpr_state.pc < higher_half
+					&& userland.dispatch_sync_fault(gpr_state, far, esr) {
+					return
+				}
+				fault_handler(ec, esr, far, gpr_state)
+			}
 		}
 		0x15 { // SVC from AArch64 (syscall)
 			// Handled separately

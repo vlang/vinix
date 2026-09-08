@@ -17,6 +17,7 @@ NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
+X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
 
 BUSYBOX_VERSION=1.36.1
@@ -310,6 +311,12 @@ else
     echo "Codex CLI staging absent; skipping the Codex boot test"
 fi
 
+if [ -x /root/x86-translation-smoke.sh ]; then
+    /root/x86-translation-smoke.sh
+else
+    echo "x86-64 translation staging absent; skipping the translation boot test"
+fi
+
 exec /bin/sh -l
 BOOT_TEST
 chmod +x "$STAGING/etc/vinix-boot-test.sh"
@@ -368,6 +375,13 @@ if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
     cp -a "$CODEX_STAGING/." "$STAGING/"
 else
     echo "==> Codex staging not found, packaging without Codex"
+fi
+
+if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+    echo "==> Integrating x86-64 translation and Wine runtime"
+    merge_staging_tree "$X86_TRANSLATION_STAGING"
+else
+    echo "==> x86-64 translation staging not found, packaging without translated applications"
 fi
 
 echo "==> Verifying staged ARM64 executables"

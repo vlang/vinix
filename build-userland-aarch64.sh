@@ -19,6 +19,7 @@ DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarc
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
+X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 
 merge_staging_tree() {
     local overlay="$1"
@@ -839,6 +840,13 @@ if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
     cp -a "$CODEX_STAGING/." "$STAGING/"
 else
     echo "==> Codex staging not found, skipping (run build-codex-aarch64.sh first)"
+fi
+
+if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+    echo "==> Integrating x86-64 translation and Wine runtime..."
+    merge_staging_tree "$X86_TRANSLATION_STAGING"
+else
+    echo "==> x86-64 translation staging not found, skipping (run build-x86-translation-aarch64.sh first)"
 fi
 
 echo "==> Packaging initramfs..."

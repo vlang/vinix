@@ -8,6 +8,10 @@ import aarch64.cpu
 // ARM64 output address mask: bits [47:12]
 pub const pte_flags_mask = u64(0x0000_FFFF_FFFF_F000)
 
+pub fn user_address_limit() u64 {
+	return u64(1) << 48
+}
+
 // ARM64-internal PTE bits
 const arm64_pte_valid = u64(0b11)
 const arm64_pte_af = u64(1) << 10

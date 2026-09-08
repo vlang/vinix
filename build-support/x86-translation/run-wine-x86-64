@@ -1,0 +1,45 @@
+#!/bin/sh
+# Multicall launcher for the x86-64 Wine runtime kept outside native /usr.
+set -eu
+
+runtime="${VINIX_X86_64_ROOT:-/usr/libexec/vinix-x86_64/root}"
+wine="$runtime/usr/bin/wine"
+tool="${0##*/}"
+
+if [ ! -x "$wine" ]; then
+    echo "$tool: x86-64 Wine is not installed" >&2
+    echo "build the layer with ./build-x86-translation-aarch64.sh" >&2
+    exit 127
+fi
+
+export WINEARCH=win64
+export WINEPREFIX="${WINEPREFIX:-${HOME:-/root}/.wine-x86_64}"
+export WINEDLLPATH="$runtime/usr/lib/wine/x86_64-unix:$runtime/usr/lib/wine/x86_64-windows"
+# Wine normally re-execs through wine-preloader. The preloader is another
+# x86-64 ELF, so keep execution inside the QEMU process that is already active.
+export WINELOADERNOEXEC=1
+# Child Wine processes must cross the architecture boundary through these
+# native shell launchers instead of asking the Vinix kernel to exec x86 ELF.
+export WINELOADER=/usr/bin/wine64
+export WINESERVER=/usr/bin/wineserver
+
+case "$tool" in
+    wine|wine64|run-wine-x86-64)
+        set -- "$wine" "$@"
+        ;;
+    wineserver)
+        set -- "$runtime/usr/bin/wineserver" "$@"
+        ;;
+    calculator)
+        set -- "$wine" /usr/share/wine/vinix-calculator.exe "$@"
+        ;;
+    msiexec|notepad|regedit|regsvr32|wineboot|winecfg|wineconsole|winefile|winemine|winepath)
+        set -- "$wine" "$tool.exe" "$@"
+        ;;
+    *)
+        echo "run-wine-x86-64: unsupported launcher name: $tool" >&2
+        exit 2
+        ;;
+esac
+
+exec /usr/bin/run-x86-64 "$@"

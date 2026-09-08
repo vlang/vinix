@@ -33,6 +33,7 @@ FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/stag
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
+X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
 merge_staging_tree() {
@@ -345,6 +346,13 @@ fi
 if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
     echo "==> Staging C++ Minecraft runtime"
     merge_staging_tree "$MINECRAFT_STAGING"
+fi
+
+# Keep the translator as an optional, architecture-isolated layer. Its x86-64
+# libraries live below /usr/libexec, so they cannot replace native ARM64 libs.
+if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+    echo "==> Staging x86-64 translation and Wine runtime"
+    merge_staging_tree "$X86_TRANSLATION_STAGING"
 fi
 
 # Hyprland is an optional build layer because its patched Aquamarine library

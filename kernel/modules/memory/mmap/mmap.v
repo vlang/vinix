@@ -379,6 +379,15 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	}
 
 	length := lib.align_up(_length, page_size)
+	fixed := flags & map_fixed != 0
+	fixed_noreplace := flags & map_fixed_noreplace != 0
+	user_limit := memory.user_address_limit()
+	requested := u64(addr)
+	if (fixed || fixed_noreplace)
+		&& (requested >= user_limit || length > user_limit - requested) {
+		errno.set(errno.enomem)
+		return none
+	}
 
 	if flags & map_anonymous == 0 && resource_.can_mmap == false {
 		errno.set(errno.enodev)
@@ -389,9 +398,11 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	mut process := current_thread.process
 
 	mut base := u64(0)
-	fixed := flags & map_fixed != 0
-	fixed_noreplace := flags & map_fixed_noreplace != 0
-	hint := lib.align_down(u64(addr), page_size)
+	mut hint := lib.align_down(requested, page_size)
+	if !fixed && !fixed_noreplace
+		&& (hint >= user_limit || length > user_limit - hint) {
+		hint = 0
+	}
 	if (fixed || fixed_noreplace) && (u64(addr) == 0 || u64(addr) != hint) {
 		errno.set(errno.einval)
 		return none

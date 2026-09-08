@@ -257,6 +257,17 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 	mut process := proc.current_thread().process
 
 	if process.brk_base == 0 {
+		// Reserve the arena once and commit pages with mprotect as the break
+		// grows. Building the heap from adjacent MAP_FIXED mappings exposed
+		// separate backing ranges to libc and corrupted QEMU's allocator under
+		// repeated growth. A single stable reservation also prevents unrelated
+		// mappings from occupying future heap pages.
+		mut pagemap := process.pagemap
+		mmap(pagemap, voidptr(brk_arena_base), brk_arena_size, prot_none,
+			map_anonymous | map_private | map_fixed_noreplace, unsafe { nil }, 0,
+			unsafe { nil }, unsafe { nil }, unsafe { nil }) or {
+			return 0, 0
+		}
 		process.brk_base = brk_arena_base
 		process.brk_current = brk_arena_base
 	}
@@ -273,14 +284,13 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 
 	if wanted_page > current_page {
 		mut pagemap := process.pagemap
-		mmap(pagemap, voidptr(current_page), wanted_page - current_page, prot_read | prot_write,
-			map_anonymous | map_private | map_fixed, unsafe { nil }, 0, unsafe { nil },
-			unsafe { nil }, unsafe { nil }) or {
+		mprotect(mut pagemap, voidptr(current_page), wanted_page - current_page,
+			prot_read | prot_write) or {
 			return process.brk_current, 0
 		}
 	} else if wanted_page < current_page {
 		mut pagemap := process.pagemap
-		munmap(mut pagemap, voidptr(wanted_page), current_page - wanted_page) or {
+		mprotect(mut pagemap, voidptr(wanted_page), current_page - wanted_page, prot_none) or {
 			return process.brk_current, 0
 		}
 	}
