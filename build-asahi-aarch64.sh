@@ -66,14 +66,17 @@ if [ ! -d "$MESA_SRC" ]; then
     tar -xJf "$MESA_ARCHIVE" -C "$BUILD_DIR"
 fi
 
-MESA_PATCH="$SCRIPT_DIR/patches/mesa/jinx-working-patch.patch"
-if patch --dry-run -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
-    echo "==> Applying Vinix Mesa compatibility patch"
-    patch -p1 -d "$MESA_SRC" < "$MESA_PATCH"
-elif ! patch --dry-run -R -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
-    echo "Mesa source is neither clean nor patched as expected" >&2
-    exit 1
-fi
+for MESA_PATCH in \
+    "$SCRIPT_DIR/patches/mesa/jinx-working-patch.patch" \
+    "$SCRIPT_DIR/patches/mesa/vinix-fake-g17-renderer.patch"; do
+    if patch --dry-run -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
+        echo "==> Applying $(basename "$MESA_PATCH")"
+        patch -p1 -d "$MESA_SRC" < "$MESA_PATCH"
+    elif ! patch --dry-run -R -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
+        echo "Mesa source is neither clean nor patched for $(basename "$MESA_PATCH")" >&2
+        exit 1
+    fi
+done
 
 if [ ! -x "$HOST_TOOLS/bin/mesa_clc" ] \
     || [ ! -x "$HOST_TOOLS/bin/vtn_bindgen" ] \

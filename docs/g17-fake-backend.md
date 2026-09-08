@@ -228,10 +228,14 @@ shell, checks the exact Mesa renderer and render/fence completion messages,
 and exits QEMU. Set `VINIX_BOOT_DISK` to reuse an existing test image or
 `VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second deadline.
 
-Mesa should identify the renderer as `Apple M5 Max (G17C C0)` and report that
-the render submit and fence completed successfully. The first kernel message
-also includes the staged Mesa fragment command ID, framebuffer dimensions, and
-number of independently checked resource references.
+Mesa should identify the renderer as `Vinix Fake G17C (M5 Max ABI)` and report
+that the render submit and fence completed successfully. The fake kernel sets a
+Vinix-private compatible feature bit; stock Mesa safely ignores compatible bits
+it does not know, while the pinned Vinix Mesa patch uses this bit only to change
+the public renderer string. M5-compatible parameters remain in place so Asahi
+can initialize. The first kernel message also includes the staged Mesa fragment
+command ID, framebuffer dimensions, and number of independently checked
+resource references.
 This exercises the Asahi DRM ioctl layout, shared render/compute command
 normalization, immutable attachment staging, per-file GEM and VM ownership,
 mappings, contexts, queues, sync objects, the generated G17 encoder, the

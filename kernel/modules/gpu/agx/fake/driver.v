@@ -216,7 +216,7 @@ fn next_unused_queue_id(file &FakeG17File) ?u32 {
 fn fake_global_params() ioctl.DrmAsahiParamsGlobal {
 	mut params := ioctl.DrmAsahiParamsGlobal{
 		unstable_uabi_version: ioctl.drm_asahi_unstable_uabi_version
-		feat_compat: ioctl.asahi_feat_gettime
+		feat_compat: ioctl.asahi_feat_gettime | ioctl.asahi_feat_vinix_fake_g17
 		gpu_generation: 17
 		gpu_variant: u32(`C`)
 		gpu_revision: 0x20

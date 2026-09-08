@@ -394,6 +394,12 @@ if [ "$FAKE_G17" -eq 1 ]; then
         echo "       Re-run build-asahi-aarch64.sh in the ARM64 build VM." >&2
         exit 1
     fi
+    if ! LC_ALL=C grep -aFq 'Vinix Fake G17C (M5 Max ABI)' \
+        "$ASAHI_STAGING/usr/lib/libgallium-25.0.5.so"; then
+        echo "ERROR: the staged Mesa runtime predates fake-G17 identification." >&2
+        echo "       Re-run build-asahi-aarch64.sh in the ARM64 build VM." >&2
+        exit 1
+    fi
     mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle"
     install -m755 "$ASAHI_STAGING/usr/bin/gl-triangle-agx" \
         "$PACKAGE_RUNTIME_ROOT/usr/bin/"

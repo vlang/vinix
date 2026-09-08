@@ -1,0 +1,42 @@
+diff --git a/src/asahi/lib/agx_device.c b/src/asahi/lib/agx_device.c
+--- a/src/asahi/lib/agx_device.c
++++ b/src/asahi/lib/agx_device.c
+@@ -578,10 +578,15 @@ agx_open_device(void *memctx, struct agx_device *dev)
+       variant = " Ultra";
+       break;
+    }
+-   snprintf(dev->name, sizeof(dev->name), "Apple M%d%s (G%d%c %02X)",
+-            dev->params.gpu_generation - 12, variant,
+-            dev->params.gpu_generation, dev->params.gpu_variant,
+-            dev->params.gpu_revision + 0xA0);
++   if (dev->params.feat_compat & DRM_ASAHI_FEAT_VINIX_FAKE_G17) {
++      snprintf(dev->name, sizeof(dev->name),
++               "Vinix Fake G17C (M5 Max ABI)");
++   } else {
++      snprintf(dev->name, sizeof(dev->name), "Apple M%d%s (G%d%c %02X)",
++               dev->params.gpu_generation - 12, variant,
++               dev->params.gpu_generation, dev->params.gpu_variant,
++               dev->params.gpu_revision + 0xA0);
++   }
+-
++
+    /* We need a large chunk of VA space carved out for robustness. Hardware
+     * loads can shift an i32 by up to 2, for a total shift of 4. If the base
+diff --git a/src/asahi/lib/unstable_asahi_drm.h b/src/asahi/lib/unstable_asahi_drm.h
+--- a/src/asahi/lib/unstable_asahi_drm.h
++++ b/src/asahi/lib/unstable_asahi_drm.h
+@@ -128,6 +128,10 @@ enum drm_asahi_feat_compat {
+-	DRM_ASAHI_FEAT_SOFT_FAULTS = (1UL) << 0,
+-	DRM_ASAHI_FEAT_GETTIME = (1UL) << 1, /* Remove for upstream */
+-	DRM_ASAHI_FEAT_USER_TIMESTAMPS = (1UL) << 2,
++	DRM_ASAHI_FEAT_SOFT_FAULTS = (1UL) << 0,
++	DRM_ASAHI_FEAT_GETTIME = (1UL) << 1, /* Remove for upstream */
++	DRM_ASAHI_FEAT_USER_TIMESTAMPS = (1UL) << 2,
++
++	/* Vinix-private compatible marker. Other Mesa builds safely ignore it;
++	 * Vinix uses it only to keep fake-G17 logs distinct from hardware. */
++	DRM_ASAHI_FEAT_VINIX_FAKE_G17 = (1ULL) << 63,
+ };
+-
++
+ /** Incompatible feature bits */

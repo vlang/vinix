@@ -294,6 +294,9 @@ pub const drm_asahi_gem_bind_object = drm_asahi_base + u32(0x0a)
 pub const asahi_feat_soft_faults = u64(1) << 0
 pub const asahi_feat_gettime = u64(1) << 1
 pub const asahi_feat_user_timestamps = u64(1) << 2
+// Vinix-private compatible marker. Stock Mesa safely ignores unknown
+// compatible bits; the Vinix Mesa build uses this only to label fake G17.
+pub const asahi_feat_vinix_fake_g17 = u64(1) << 63
 pub const asahi_feat_mandatory_zs_compression = u64(1) << 0
 
 pub const asahi_gem_writeback = u32(1) << 0

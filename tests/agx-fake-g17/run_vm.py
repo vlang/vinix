@@ -22,7 +22,7 @@ PASS_LINE = re.compile(rb"(?:^|\r*\n)VINIX_FAKE_G17_VM_PASS\r*(?:\n|$)")
 FAIL_LINE = re.compile(
     rb"(?:^|\r*\n)VINIX_FAKE_G17_VM_FAIL:[0-9]+\r*(?:\n|$)"
 )
-RENDERER_MARKER = b"GL_RENDERER=Apple M5 Max (G17C C0)"
+RENDERER_MARKER = b"GL_RENDERER=Vinix Fake G17C (M5 Max ABI)"
 COMPLETION_MARKER = (
     b"render submit and fence completed successfully; pixels unchecked"
 )
