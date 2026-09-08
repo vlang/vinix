@@ -26,9 +26,25 @@ RENDERER_MARKER = b"GL_RENDERER=Vinix Fake G17C (M5 Max ABI)"
 COMPLETION_MARKER = (
     b"render submit and fence completed successfully; pixels unchecked"
 )
+ATTACHMENT_MARKERS = (
+    b"attachment mode=depth depth=16 stencil=0",
+    b"attachment mode=stencil depth=0 stencil=8",
+    b"attachment mode=depth-stencil depth=24 stencil=8",
+)
+RESOURCE_MARKER = re.compile(
+    rb"fake-g17: first Mesa render verified;[^\r\n]* "
+    rb"depth=([01]) depth-meta=([01]) stencil=([01]) stencil-meta=([01])"
+)
+EXPECTED_RESOURCES = (
+    (b"1", b"1", b"0", b"0"),
+    (b"0", b"0", b"1", b"1"),
+    (b"1", b"1", b"1", b"1"),
+)
 SHELL_PROMPT = re.compile(rb"(?:^|\r*\n)[^\r\n]{0,96}# $")
 GUEST_COMMAND = (
-    b"/usr/bin/run-gl-triangle-agx --submit-only; status=$?; "
+    b"status=0; for mode in --depth --stencil --depth-stencil; do "
+    b"/usr/bin/run-gl-triangle-agx --submit-only \"$mode\" || "
+    b"{ status=$?; break; }; done; "
     b"if [ \"$status\" -eq 0 ]; then "
     b"printf 'VINIX_FAKE_G17_VM_%s\\n' PASS; "
     b"else printf 'VINIX_FAKE_G17_VM_FAIL:%s\\n' \"$status\"; fi\n"
@@ -167,10 +183,21 @@ def run_vm(root: Path, timeout: int) -> int:
         missing = []
         if not command_sent:
             missing.append("guest shell prompt")
-        if RENDERER_MARKER not in output:
-            missing.append("Mesa G17 renderer")
-        if COMPLETION_MARKER not in output:
-            missing.append("render/fence completion")
+        if output.count(RENDERER_MARKER) != len(ATTACHMENT_MARKERS):
+            missing.append("Mesa G17 renderer for all three cases")
+        for marker in ATTACHMENT_MARKERS:
+            if marker not in output:
+                missing.append(marker.decode("ascii"))
+        if output.count(COMPLETION_MARKER) != len(ATTACHMENT_MARKERS):
+            missing.append("render/fence completion for all three cases")
+        resource_states = RESOURCE_MARKER.findall(output)
+        if tuple(resource_states) != EXPECTED_RESOURCES:
+            observed = [b"/".join(state).decode("ascii")
+                        for state in resource_states]
+            missing.append(
+                "depth/stencil descriptor resources "
+                f"(observed {observed or 'none'})"
+            )
         if not pass_seen:
             missing.append("guest PASS marker")
         if fail_seen:
@@ -186,7 +213,10 @@ def run_vm(root: Path, timeout: int) -> int:
             )
             return 1
 
-        print("\nPASS Mesa fake-G17 render submission and fence lifecycle")
+        print(
+            "\nPASS Mesa fake-G17 depth, stencil, and combined descriptor "
+            "submission/fence lifecycle"
+        )
         return 0
 
 

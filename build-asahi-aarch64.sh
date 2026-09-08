@@ -68,7 +68,8 @@ fi
 
 for MESA_PATCH in \
     "$SCRIPT_DIR/patches/mesa/jinx-working-patch.patch" \
-    "$SCRIPT_DIR/patches/mesa/vinix-fake-g17-renderer.patch"; do
+    "$SCRIPT_DIR/patches/mesa/vinix-fake-g17-renderer.patch" \
+    "$SCRIPT_DIR/patches/mesa/vinix-libagx-link-names.patch"; do
     if patch --dry-run -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
         echo "==> Applying $(basename "$MESA_PATCH")"
         patch -p1 -d "$MESA_SRC" < "$MESA_PATCH"
@@ -78,37 +79,41 @@ for MESA_PATCH in \
     fi
 done
 
-if [ ! -x "$HOST_TOOLS/bin/mesa_clc" ] \
-    || [ ! -x "$HOST_TOOLS/bin/vtn_bindgen" ] \
-    || [ ! -x "$HOST_TOOLS/bin/asahi_clc" ]; then
-    echo "==> Building native Asahi shader tools"
-    NATIVE_BUILD="$BUILD_DIR/native-tools-build"
+echo "==> Building native Asahi shader tools"
+NATIVE_BUILD="$BUILD_DIR/native-tools-build"
+NATIVE_MESON_OPTIONS=(
+    --buildtype=release
+    -Dplatforms=
+    -Dglx=disabled
+    -Degl=disabled
+    -Dgbm=disabled
+    -Dopengl=false
+    -Dgles1=disabled
+    -Dgles2=disabled
+    -Dgallium-drivers=asahi
+    -Dvulkan-drivers=
+    -Dllvm=enabled
+    -Dshared-llvm=enabled
+    -Dmesa-clc=enabled
+    -Dprecomp-compiler=enabled
+    -Dbuild-tests=false
+    -Dtools=
+    -Dvideo-codecs=
+)
+if [ -f "$NATIVE_BUILD/build.ninja" ]; then
+    meson setup --reconfigure "$NATIVE_BUILD" "$MESA_SRC" \
+        "${NATIVE_MESON_OPTIONS[@]}"
+else
     meson setup "$NATIVE_BUILD" "$MESA_SRC" \
-        --buildtype=release \
-        -Dplatforms= \
-        -Dglx=disabled \
-        -Degl=disabled \
-        -Dgbm=disabled \
-        -Dopengl=false \
-        -Dgles1=disabled \
-        -Dgles2=disabled \
-        -Dgallium-drivers=asahi \
-        -Dvulkan-drivers= \
-        -Dllvm=enabled \
-        -Dshared-llvm=enabled \
-        -Dmesa-clc=enabled \
-        -Dprecomp-compiler=enabled \
-        -Dbuild-tests=false \
-        -Dtools= \
-        -Dvideo-codecs=
-    ninja -C "$NATIVE_BUILD" -j"$NPROC" \
-        src/compiler/clc/mesa_clc \
-        src/compiler/spirv/vtn_bindgen \
-        src/asahi/clc/asahi_clc
-    install -m755 "$NATIVE_BUILD/src/compiler/clc/mesa_clc" "$HOST_TOOLS/bin/"
-    install -m755 "$NATIVE_BUILD/src/compiler/spirv/vtn_bindgen" "$HOST_TOOLS/bin/"
-    install -m755 "$NATIVE_BUILD/src/asahi/clc/asahi_clc" "$HOST_TOOLS/bin/"
+        "${NATIVE_MESON_OPTIONS[@]}"
 fi
+ninja -C "$NATIVE_BUILD" -j"$NPROC" \
+    src/compiler/clc/mesa_clc \
+    src/compiler/spirv/vtn_bindgen \
+    src/asahi/clc/asahi_clc
+install -m755 "$NATIVE_BUILD/src/compiler/clc/mesa_clc" "$HOST_TOOLS/bin/"
+install -m755 "$NATIVE_BUILD/src/compiler/spirv/vtn_bindgen" "$HOST_TOOLS/bin/"
+install -m755 "$NATIVE_BUILD/src/asahi/clc/asahi_clc" "$HOST_TOOLS/bin/"
 
 APK_DIR="$BUILD_DIR/downloads/apk"
 mkdir -p "$APK_DIR"

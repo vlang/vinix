@@ -232,10 +232,12 @@ the desktop initramfs and the staged Mesa Asahi runtime:
 ./run-aarch64.sh --serial --fake-g17 --mem=8192
 ```
 
-At the Vinix prompt, select lifecycle-only validation:
+At the Vinix prompt, run the three lifecycle-only depth/stencil cases:
 
 ```sh
-/usr/bin/run-gl-triangle-agx --submit-only
+/usr/bin/run-gl-triangle-agx --submit-only --depth
+/usr/bin/run-gl-triangle-agx --submit-only --stencil
+/usr/bin/run-gl-triangle-agx --submit-only --depth-stencil
 ```
 
 The same check can be run non-interactively from the host after building the
@@ -246,9 +248,11 @@ python3 tests/agx-fake-g17/run_vm.py
 ```
 
 The runner creates scratch disk/NVRAM files by default, waits for the guest
-shell, checks the exact Mesa renderer and render/fence completion messages,
-and exits QEMU. Set `VINIX_BOOT_DISK` to reuse an existing test image or
-`VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second deadline.
+shell, and runs depth-only, stencil-only, and packed depth/stencil FBOs. It
+checks the exact Mesa renderer, requested attachment bits, depth/stencil plane
+and metadata presence reported by the kernel, and render/fence completion for
+all three cases before exiting QEMU. Set `VINIX_BOOT_DISK` to reuse an existing
+test image or `VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second deadline.
 
 Mesa should identify the renderer as `Vinix Fake G17C (M5 Max ABI)` and report
 that the render submit and fence completed successfully. The fake kernel sets a
@@ -257,9 +261,10 @@ it does not know, while the pinned Vinix Mesa patch uses this bit only to change
 the public renderer string. M5-compatible parameters remain in place so Asahi
 can initialize. Fake submissions call the same recovered descriptor initializer
 as the native G17 backend, so the VM covers its bounds/overlap-checked scalar
-manifest instead of a fake-only copy. The first kernel message also includes
-the staged Mesa fragment command ID, framebuffer dimensions, and number of
-independently checked resource references.
+manifest instead of a fake-only copy. The first kernel message for each case
+also includes the staged Mesa fragment command ID, framebuffer dimensions,
+number of independently checked resource references, and whether depth/stencil
+data and metadata addresses crossed the proven descriptor members.
 This exercises the Asahi DRM ioctl layout, shared render/compute command
 normalization, immutable attachment staging, per-file GEM and VM ownership,
 mappings, contexts, queues, sync objects, the generated G17 encoder, the

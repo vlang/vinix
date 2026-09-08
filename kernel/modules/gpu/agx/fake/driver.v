@@ -768,7 +768,10 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				} else {
 					u32(0)
 				}
-				C.printf(c'fake-g17: first Mesa render verified; id=%u size=%ux%u resources=%u depth=%u depth-meta=%u stencil=%u stencil-meta=%u actual writes=%u capacity=%u\n', render_command.fragment_command_id, render_command.framebuffer_width, render_command.framebuffer_height, u32(render_resources.len), depth_bound, depth_meta_bound, stencil_bound, stencil_meta_bound, report.expected_writes, fake_g17_max_writes)
+				// C.printf is deliberately compiled out in production kernels.  This
+				// lifecycle marker is consumed by the VM integration test, so route it
+				// through the kernel console instead.
+				println('fake-g17: first Mesa render verified; id=${render_command.fragment_command_id} size=${render_command.framebuffer_width}x${render_command.framebuffer_height} resources=${render_resources.len} depth=${depth_bound} depth-meta=${depth_meta_bound} stencil=${stencil_bound} stencil-meta=${stencil_meta_bound} actual writes=${report.expected_writes} capacity=${fake_g17_max_writes}')
 			}
 		}
 	} else {

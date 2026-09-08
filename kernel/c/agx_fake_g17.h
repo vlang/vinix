@@ -94,6 +94,17 @@ enum vinix_fake_g17_render_resource_field {
 enum {
     /* No recovered native member is claimed for this input yet. */
     VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING = UINT32_MAX,
+
+    /* Evidence-backed G17 depth/stencil members.  Keep these in lockstep with
+     * the g17_render_*_member constants in fw/g17.v. */
+    VINIX_FAKE_G17_DESCRIPTOR_DEPTH_BUFFER_LOAD = 0x668,
+    VINIX_FAKE_G17_DESCRIPTOR_DEPTH_BUFFER_STORE = 0x670,
+    VINIX_FAKE_G17_DESCRIPTOR_STENCIL_BUFFER_LOAD = 0x680,
+    VINIX_FAKE_G17_DESCRIPTOR_STENCIL_BUFFER_STORE = 0x688,
+    VINIX_FAKE_G17_DESCRIPTOR_DEPTH_META_BUFFER_LOAD = 0x6e8,
+    VINIX_FAKE_G17_DESCRIPTOR_DEPTH_META_BUFFER_STORE = 0x6f0,
+    VINIX_FAKE_G17_DESCRIPTOR_STENCIL_META_BUFFER_LOAD = 0x710,
+    VINIX_FAKE_G17_DESCRIPTOR_STENCIL_META_BUFFER_STORE = 0x718,
 };
 
 enum vinix_fake_g17_write_flags {

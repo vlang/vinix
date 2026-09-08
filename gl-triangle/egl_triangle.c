@@ -1,6 +1,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -20,6 +21,27 @@
 
 #define TRIANGLE_WIDTH 800
 #define TRIANGLE_HEIGHT 600
+
+enum attachment_mode {
+    ATTACHMENT_COLOR_ONLY,
+    ATTACHMENT_DEPTH,
+    ATTACHMENT_STENCIL,
+    ATTACHMENT_DEPTH_STENCIL,
+};
+
+static const char *attachment_mode_name(enum attachment_mode mode) {
+    switch (mode) {
+    case ATTACHMENT_DEPTH:
+        return "depth";
+    case ATTACHMENT_STENCIL:
+        return "stencil";
+    case ATTACHMENT_DEPTH_STENCIL:
+        return "depth-stencil";
+    case ATTACHMENT_COLOR_ONLY:
+        return "color";
+    }
+    return "unknown";
+}
 
 static void fail_egl(const char *operation) {
     fprintf(stderr, "gl-triangle-agx: %s failed (EGL 0x%04x)\n",
@@ -197,11 +219,26 @@ static void destroy_render_state(GLuint program, EGLDisplay display,
 
 int main(int argc, char **argv) {
     int submit_only = 0;
-    if (argc == 2 && strcmp(argv[1], "--submit-only") == 0) {
-        submit_only = 1;
-    } else if (argc != 1) {
-        fprintf(stderr, "usage: %s [--submit-only]\n", argv[0]);
-        return 2;
+    enum attachment_mode attachment_mode = ATTACHMENT_COLOR_ONLY;
+    for (int argument = 1; argument < argc; ++argument) {
+        enum attachment_mode requested_mode = ATTACHMENT_COLOR_ONLY;
+        if (strcmp(argv[argument], "--submit-only") == 0) {
+            if (submit_only)
+                goto usage;
+            submit_only = 1;
+            continue;
+        } else if (strcmp(argv[argument], "--depth") == 0) {
+            requested_mode = ATTACHMENT_DEPTH;
+        } else if (strcmp(argv[argument], "--stencil") == 0) {
+            requested_mode = ATTACHMENT_STENCIL;
+        } else if (strcmp(argv[argument], "--depth-stencil") == 0) {
+            requested_mode = ATTACHMENT_DEPTH_STENCIL;
+        } else {
+            goto usage;
+        }
+        if (attachment_mode != ATTACHMENT_COLOR_ONLY)
+            goto usage;
+        attachment_mode = requested_mode;
     }
 
     static const GLfloat vertices[] = {
@@ -273,15 +310,109 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    GLuint framebuffer = 0;
+    GLuint color_renderbuffer = 0;
+    GLuint depth_stencil_renderbuffer = 0;
+    if (attachment_mode != ATTACHMENT_COLOR_ONLY) {
+        glGenFramebuffers(1, &framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+        glGenRenderbuffers(1, &color_renderbuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, color_renderbuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA4,
+                              TRIANGLE_WIDTH, TRIANGLE_HEIGHT);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                  GL_RENDERBUFFER, color_renderbuffer);
+
+        glGenRenderbuffers(1, &depth_stencil_renderbuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, depth_stencil_renderbuffer);
+        if (attachment_mode == ATTACHMENT_DEPTH) {
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16,
+                                  TRIANGLE_WIDTH, TRIANGLE_HEIGHT);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                      GL_RENDERBUFFER,
+                                      depth_stencil_renderbuffer);
+        } else if (attachment_mode == ATTACHMENT_STENCIL) {
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
+                                  TRIANGLE_WIDTH, TRIANGLE_HEIGHT);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+                                      GL_RENDERBUFFER,
+                                      depth_stencil_renderbuffer);
+        } else {
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES,
+                                  TRIANGLE_WIDTH, TRIANGLE_HEIGHT);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                      GL_RENDERBUFFER,
+                                      depth_stencil_renderbuffer);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+                                      GL_RENDERBUFFER,
+                                      depth_stencil_renderbuffer);
+        }
+
+        GLenum framebuffer_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        GLenum setup_error = glGetError();
+        if (setup_error != GL_NO_ERROR ||
+            framebuffer_status != GL_FRAMEBUFFER_COMPLETE) {
+            fprintf(stderr,
+                    "gl-triangle-agx: %s framebuffer setup failed "
+                    "(GL 0x%04x, status 0x%04x)\n",
+                    attachment_mode_name(attachment_mode), setup_error,
+                    framebuffer_status);
+            return 1;
+        }
+    }
+
+    GLint depth_bits = 0;
+    GLint stencil_bits = 0;
+    glGetIntegerv(GL_DEPTH_BITS, &depth_bits);
+    glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
+    if ((attachment_mode == ATTACHMENT_DEPTH &&
+         (depth_bits < 16 || stencil_bits != 0)) ||
+        (attachment_mode == ATTACHMENT_STENCIL &&
+         (depth_bits != 0 || stencil_bits < 8)) ||
+        (attachment_mode == ATTACHMENT_DEPTH_STENCIL &&
+         (depth_bits < 16 || stencil_bits < 8))) {
+        fprintf(stderr,
+                "gl-triangle-agx: %s attachment mismatch "
+                "(depth=%d stencil=%d)\n",
+                attachment_mode_name(attachment_mode), depth_bits,
+                stencil_bits);
+        return 1;
+    }
+    printf("gl-triangle-agx: attachment mode=%s depth=%d stencil=%d\n",
+           attachment_mode_name(attachment_mode), depth_bits, stencil_bits);
+
     GLuint program = create_program();
     glUseProgram(program);
+    GLuint vertex_buffer = 0;
+    glGenBuffers(1, &vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     glViewport(0, 0, TRIANGLE_WIDTH, TRIANGLE_HEIGHT);
     glClearColor(0.035f, 0.045f, 0.075f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    GLbitfield clear_mask = GL_COLOR_BUFFER_BIT;
+    if (attachment_mode == ATTACHMENT_DEPTH ||
+        attachment_mode == ATTACHMENT_DEPTH_STENCIL) {
+        glClearDepthf(1.0f);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        glDepthMask(GL_TRUE);
+        clear_mask |= GL_DEPTH_BUFFER_BIT;
+    }
+    if (attachment_mode == ATTACHMENT_STENCIL ||
+        attachment_mode == ATTACHMENT_DEPTH_STENCIL) {
+        glClearStencil(0);
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(0xff);
+        glStencilFunc(GL_ALWAYS, 1, 0xff);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        clear_mask |= GL_STENCIL_BUFFER_BIT;
+    }
+    glClear(clear_mask);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
-                          vertices);
+                          (const void *)0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
-                          vertices + 2);
+                          (const void *)(2 * sizeof(GLfloat)));
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -295,7 +426,22 @@ int main(int argc, char **argv) {
     // without rasterizing. This mode proves the Mesa/DRM lifecycle while keeping
     // the normal test's rendered-pixel check intact for real hardware and VirGL.
     if (submit_only) {
+        // An otherwise private renderbuffer has no externally observable result,
+        // so Gallium may discard its batch even after glFinish().  A one-pixel
+        // readback makes Mesa submit and wait without treating fake pixels as a
+        // rendering correctness result.
+        uint8_t probe[4];
+        glReadPixels(TRIANGLE_WIDTH / 2, TRIANGLE_HEIGHT / 2, 1, 1,
+                     GL_RGBA, GL_UNSIGNED_BYTE, probe);
+        if (glGetError() != GL_NO_ERROR) {
+            fprintf(stderr, "gl-triangle-agx: submit probe readback failed\n");
+            return 1;
+        }
         printf("gl-triangle-agx: render submit and fence completed successfully; pixels unchecked\n");
+        glDeleteBuffers(1, &vertex_buffer);
+        glDeleteRenderbuffers(1, &depth_stencil_renderbuffer);
+        glDeleteRenderbuffers(1, &color_renderbuffer);
+        glDeleteFramebuffers(1, &framebuffer);
         destroy_render_state(program, display, surface, context);
         return 0;
     }
@@ -327,6 +473,17 @@ int main(int argc, char **argv) {
     fflush(stdout);
 
     free(pixels);
+    glDeleteBuffers(1, &vertex_buffer);
+    glDeleteRenderbuffers(1, &depth_stencil_renderbuffer);
+    glDeleteRenderbuffers(1, &color_renderbuffer);
+    glDeleteFramebuffers(1, &framebuffer);
     destroy_render_state(program, display, surface, context);
     return 0;
+
+usage:
+    fprintf(stderr,
+            "usage: %s [--submit-only] "
+            "[--depth|--stencil|--depth-stencil]\n",
+            argv[0]);
+    return 2;
 }

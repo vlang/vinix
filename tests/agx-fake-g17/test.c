@@ -320,6 +320,83 @@ static int test_descriptor_resource_provenance(void)
     return 0;
 }
 
+static int test_depth_stencil_resource_rejections(void)
+{
+    struct fixture fixture;
+    struct vinix_fake_g17_expected_write writes[4];
+    struct vinix_fake_g17_address_range ranges[] = {
+        {ADDRESS_BASE, 0x1000, VINIX_FAKE_G17_VM_READ, 29},
+    };
+    struct vinix_fake_g17_resource_reference resources[] = {
+        {
+            .address = ADDRESS_BASE + 0x200,
+            .size = 0x80,
+            .field = VINIX_FAKE_G17_RESOURCE_DEPTH_META_BUFFER_LOAD,
+            .provenance = VINIX_FAKE_G17_PROVENANCE_GPU_VA,
+            .descriptor_member =
+                VINIX_FAKE_G17_DESCRIPTOR_DEPTH_META_BUFFER_LOAD,
+            .descriptor_bytes = 8,
+            .access = VINIX_FAKE_G17_VM_READ,
+        },
+        {
+            .address = ADDRESS_BASE + 0x400,
+            .size = 0x80,
+            .field = VINIX_FAKE_G17_RESOURCE_STENCIL_META_BUFFER_STORE,
+            .provenance = VINIX_FAKE_G17_PROVENANCE_GPU_VA,
+            .descriptor_member =
+                VINIX_FAKE_G17_DESCRIPTOR_STENCIL_META_BUFFER_STORE,
+            .descriptor_bytes = 8,
+            .access = VINIX_FAKE_G17_VM_WRITE,
+        },
+    };
+    struct vinix_fake_g17_report report;
+    const uint16_t counts[] = {1, 1, 1, 1};
+
+    build_fixture(&fixture, writes, counts);
+    write_le64(fixture.descriptor + resources[0].descriptor_member,
+               resources[0].address);
+    write_le64(fixture.descriptor + resources[1].descriptor_member,
+               resources[1].address);
+
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              resources, 1, &report) == VINIX_FAKE_G17_OK);
+
+    /* A descriptor address alone is insufficient: an unbound depth metadata
+     * BO must be rejected before the recovered command can complete. */
+    resources[0].address = ADDRESS_BASE + 0x2000;
+    write_le64(fixture.descriptor + resources[0].descriptor_member,
+               resources[0].address);
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              resources, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS);
+
+    resources[0].address = ADDRESS_BASE + 0x200;
+    write_le64(fixture.descriptor + resources[0].descriptor_member,
+               resources[0].address);
+
+    /* Store metadata requires a writable VM binding; read-only provenance is
+     * not upgraded just because the descriptor member is otherwise exact. */
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              resources, 2, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS);
+    ranges[0].access |= VINIX_FAKE_G17_VM_WRITE;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              resources, 2, &report) == VINIX_FAKE_G17_OK);
+
+    fixture.descriptor[resources[1].descriptor_member] ^= 1;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              resources, 2, &report) == VINIX_FAKE_G17_RESOURCE_VALUE);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(vinix_fake_g17_expected_write_size() ==
@@ -333,6 +410,7 @@ int main(void)
     CHECK(test_exact_trace() == 0);
     CHECK(test_recovered_call_site_scale() == 0);
     CHECK(test_descriptor_resource_provenance() == 0);
+    CHECK(test_depth_stencil_resource_rejections() == 0);
     puts("fake G17 HAL300 verifier tests passed");
     return 0;
 }
