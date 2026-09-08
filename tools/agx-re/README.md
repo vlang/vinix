@@ -45,6 +45,10 @@ make -f GNUmakefile recover-t6050-power
 make -f GNUmakefile recover-g17-abi
 ```
 
+`recover-g17-abi` atomically writes the current UUID-pinned report to
+`build/recovered-g17-abi.json`; downstream generators and correlation tools
+consume that canonical path.
+
 The normal trace is written to `build/agx_trace.jsonl`; the larger resource
 trace goes to `build/agx_trace_resources.jsonl`. `AGX_TRACE_BYTES` caps each
 snapshot at 64 KiB. These traces contain process-specific addresses and must
@@ -67,6 +71,21 @@ It can also select a shared allocation by an observed JSON field:
   --event resource_snapshot \
   --where resource_gpu_address=0x10000138000
 ```
+
+`map_g17_resource_descriptors.py` propagates resource-valued qwords observed
+in the private Apple render payload through the independently recovered TA and
+3D-common copy maps:
+
+```sh
+./map_g17_resource_descriptors.py build/agx_trace_resources.jsonl \
+  --abi build/recovered-g17-abi.json
+```
+
+The report deliberately calls its output descriptor-member *candidates*. It
+proves that a value inside a traced `IOGPUMetalResource` range was copied to a
+member, but does not equate that private Metal payload value with any Mesa
+Asahi UAPI field. `PENDING` may be replaced in the fake backend only after that
+last semantic correspondence is independently established.
 
 `objc_layout` records class, method, and ivar metadata exposed by the local
 Objective-C runtime. `extract_firmware.py` extracts only the matching G17C

@@ -258,8 +258,11 @@ defaults. Every Mesa BO/GPU-VA input now crosses the backend boundary with
 explicit provenance and must resolve through FakeG17VM before both encoding and
 synthetic completion. Translating those references plus the Mesa-command and
 format/stride values into proven native G17 descriptor members remains the next
-software integration step. The recovered nine-field Apple normalized-command
-copy is not used as an offset shortcut: that source is Apple's proprietary
-payload, not Mesa's UAPI. Native PMP/RTKit boot, DART/UAT page tables,
+software integration step. The resource-correlation recovery tool narrows that
+work to descriptor-member candidates copied from observed Apple resource
+ranges, but does not label them as Mesa fields. The recovered nine-field Apple
+normalized-command copy is likewise not used as an offset shortcut: those
+sources are Apple's proprietary payload, not Mesa's UAPI. Native PMP/RTKit
+boot, DART/UAT page tables,
 completion IRQs, and actual firmware acceptance remain physical-hardware
 gates. The fake driver has no import of or route to those hardware facilities.

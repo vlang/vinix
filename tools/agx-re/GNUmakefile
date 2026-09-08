@@ -35,7 +35,8 @@ recover-t6050-power: kernel-kexts pmp-firmware
 	./recover_t6050_power.py
 
 recover-g17-abi: firmware kernel-kexts
-	./recover_g17_abi.py
+	./recover_g17_abi.py > $(BUILD)/recovered-g17-abi.json.tmp
+	mv $(BUILD)/recovered-g17-abi.json.tmp $(BUILD)/recovered-g17-abi.json
 
 generate-g17-power-model:
 	./generate_g17_power_model.py
@@ -56,6 +57,7 @@ test:
 		test_generate_g17_power_model.py \
 		test_generate_fake_g17_3d_encoder.py \
 		test_compile_fake_g17_plan.py \
+		test_map_g17_resource_descriptors.py \
 		test_trace_diff.py
 
 layout: all
