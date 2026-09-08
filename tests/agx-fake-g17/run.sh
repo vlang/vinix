@@ -28,3 +28,23 @@ fi
     "$repo/kernel/c/agx_fake_g17.c" \
     -o "$work/test-encode"
 "$work/test-encode"
+
+# Check the V-side native descriptor bridge at its recovered member offsets.
+case $(uname -m) in
+    arm64|aarch64)
+        v -exclude "$repo/kernel/modules/klock/klock_amd64.v" \
+            -exclude "$repo/kernel/modules/katomic/katomic_amd64.v" \
+            -path "$repo/kernel/modules|@vlib|@vmodules" run \
+            "$repo/tests/agx-fake-g17/test_descriptor.v"
+        ;;
+    x86_64|amd64)
+        v -exclude "$repo/kernel/modules/klock/klock_arm64.v" \
+            -exclude "$repo/kernel/modules/katomic/katomic_arm64.v" \
+            -path "$repo/kernel/modules|@vlib|@vmodules" run \
+            "$repo/tests/agx-fake-g17/test_descriptor.v"
+        ;;
+    *)
+        echo "unsupported host architecture for V descriptor test" >&2
+        exit 1
+        ;;
+esac

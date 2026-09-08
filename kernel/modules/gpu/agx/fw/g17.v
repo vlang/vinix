@@ -1926,24 +1926,29 @@ pub fn initialize_g17_3d_descriptor(descriptor voidptr, descriptor_bytes u64) bo
 	return true
 }
 
-// The first scoped Mesa-to-G17 descriptor bridge. These five members are
+// The scoped Mesa-to-G17 descriptor bridge. These nine members are
 // triangulated rather than inferred from selector numbers alone:
 //
 // - the recovered G17 graph loads them for selectors 0x1c880, 0x15368,
-//   0x15370, 0x15378, and 0x15380 respectively;
-// - the clear/triangle resource trace carries the encoder, load-pipeline, and
-//   store-pipeline GPU VAs through members 0xfe0, 0x610, and 0x768; and
+//   0x15370, 0x15378, 0x15380, 0x15328, 0x15330, 0x153c0, and 0x153c8;
+// - the color and depth resource traces carry the corresponding GPU VAs
+//   through members 0xfe0, 0x610, 0x768, 0x668, 0x670, 0x6e8, and 0x6f0; and
 // - m1n1 commit 940439's independent register-list producer assigns those
 //   selector pairs to the matching Asahi command fields.
 //
 // This is deliberately a narrow field identity. It does not claim that the
 // still-unidentified selector address space is SGX MMIO, nor does it assign
-// the adjacent partial-pipeline members without equivalent evidence.
+// adjacent partial-pipeline or partial-depth members without equivalent
+// evidence.
 pub const g17_render_encoder_member = u32(0xfe0)
 pub const g17_render_load_pipeline_bind_member = u32(0x608)
 pub const g17_render_load_pipeline_member = u32(0x610)
 pub const g17_render_store_pipeline_bind_member = u32(0x760)
 pub const g17_render_store_pipeline_member = u32(0x768)
+pub const g17_render_depth_buffer_load_member = u32(0x668)
+pub const g17_render_depth_buffer_store_member = u32(0x670)
+pub const g17_render_depth_meta_buffer_load_member = u32(0x6e8)
+pub const g17_render_depth_meta_buffer_store_member = u32(0x6f0)
 
 pub struct G17RenderDescriptorFields {
 pub:
@@ -1952,6 +1957,10 @@ pub:
 	load_pipeline       u64
 	store_pipeline_bind u64
 	store_pipeline      u64
+	depth_buffer_load   u64
+	depth_buffer_store  u64
+	depth_meta_load     u64
+	depth_meta_store    u64
 }
 
 // Populate normalized values only after initialize_g17_3d_descriptor has
@@ -1974,6 +1983,14 @@ pub fn populate_g17_render_resource_fields(descriptor voidptr,
 			g17_render_store_pipeline_bind_member, 8, fields.store_pipeline_bind)
 		write_g17_descriptor_value(destination, g17_render_store_pipeline_member,
 			8, fields.store_pipeline)
+		write_g17_descriptor_value(destination,
+			g17_render_depth_buffer_load_member, 8, fields.depth_buffer_load)
+		write_g17_descriptor_value(destination,
+			g17_render_depth_buffer_store_member, 8, fields.depth_buffer_store)
+		write_g17_descriptor_value(destination,
+			g17_render_depth_meta_buffer_load_member, 8, fields.depth_meta_load)
+		write_g17_descriptor_value(destination,
+			g17_render_depth_meta_buffer_store_member, 8, fields.depth_meta_store)
 	}
 	return true
 }

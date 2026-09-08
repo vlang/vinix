@@ -86,6 +86,10 @@ pub fn initialize_render_descriptor(descriptor voidptr, descriptor_bytes u64,
 			load_pipeline: load_pipeline
 			store_pipeline_bind: u64(command.store_pipeline_bind)
 			store_pipeline: store_pipeline
+			depth_buffer_load: command.depth_buffer_load
+			depth_buffer_store: command.depth_buffer_store
+			depth_meta_load: command.depth_meta_buffer_load
+			depth_meta_store: command.depth_meta_buffer_store
 		})
 }
 
@@ -165,11 +169,19 @@ pub fn stage_render_resource_references(command &agxrender.Command) []FakeG17Res
 	append_usc_resource(mut resources, .partial_store_pipeline,
 		command.fragment_usc_base, command.partial_store_pipeline, u32(7),
 		g17_descriptor_member_pending)
-	append_render_resource(mut resources, .depth_buffer_load, .gpu_va, command.depth_buffer_load, 8, fake_g17_vm_read)
-	append_render_resource(mut resources, .depth_buffer_store, .gpu_va, command.depth_buffer_store, 8, fake_g17_vm_write)
+	append_render_resource_at(mut resources, .depth_buffer_load, .gpu_va,
+		command.depth_buffer_load, 8, fake_g17_vm_read,
+		fw.g17_render_depth_buffer_load_member)
+	append_render_resource_at(mut resources, .depth_buffer_store, .gpu_va,
+		command.depth_buffer_store, 8, fake_g17_vm_write,
+		fw.g17_render_depth_buffer_store_member)
 	append_render_resource(mut resources, .depth_buffer_partial, .gpu_va, command.depth_buffer_partial, 8, fake_g17_vm_write)
-	append_render_resource(mut resources, .depth_meta_buffer_load, .gpu_va, command.depth_meta_buffer_load, 8, fake_g17_vm_read)
-	append_render_resource(mut resources, .depth_meta_buffer_store, .gpu_va, command.depth_meta_buffer_store, 8, fake_g17_vm_write)
+	append_render_resource_at(mut resources, .depth_meta_buffer_load, .gpu_va,
+		command.depth_meta_buffer_load, 8, fake_g17_vm_read,
+		fw.g17_render_depth_meta_buffer_load_member)
+	append_render_resource_at(mut resources, .depth_meta_buffer_store, .gpu_va,
+		command.depth_meta_buffer_store, 8, fake_g17_vm_write,
+		fw.g17_render_depth_meta_buffer_store_member)
 	append_render_resource(mut resources, .depth_meta_buffer_partial, .gpu_va, command.depth_meta_buffer_partial, 8, fake_g17_vm_write)
 	append_render_resource(mut resources, .stencil_buffer_load, .gpu_va, command.stencil_buffer_load, 8, fake_g17_vm_read)
 	append_render_resource(mut resources, .stencil_buffer_store, .gpu_va, command.stencil_buffer_store, 8, fake_g17_vm_write)
