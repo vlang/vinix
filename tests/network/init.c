@@ -87,6 +87,15 @@ static void pause(void) {
     call2(101, (u64)&duration, 0);
 }
 
+static int monotonic_raw_clock(void) {
+    struct timespec before = {0}, after = {0};
+    if (call2(113, 4, (u64)&before) != 0) return 0;
+    pause();
+    if (call2(113, 4, (u64)&after) != 0) return 0;
+    return after.seconds > before.seconds ||
+           (after.seconds == before.seconds && after.nanoseconds > before.nanoseconds);
+}
+
 static u16 network_short(u16 value) { return (u16)((value << 8) | (value >> 8)); }
 static u32 ipv4(u8 a, u8 b, u8 c, u8 d) {
     return (u32)a | (u32)b << 8 | (u32)c << 16 | (u32)d << 24;
@@ -124,7 +133,9 @@ static int loopback_udp(void) {
     struct sockaddr_in source = {0};
     u32 source_length = sizeof(source);
     char input[8] = {0};
-    int server = (int)call3(198, 2, 2, 0);
+    /* A nonblocking receiver proves sendto delivers the lwIP loop queue
+     * synchronously instead of depending on the scheduler becoming idle. */
+    int server = (int)call3(198, 2, 2 | 0x800, 0);
     int client = -1;
     if (server < 0 || call3(200, server, (u64)&destination, sizeof(destination)) < 0) goto fail;
     client = (int)call3(198, 2, 2, 0);
@@ -202,6 +213,8 @@ void _start(void) {
     else { print("FAIL udp loopback\n"); failures++; }
     if (socket_options()) print("PASS IPv4 socket options\n");
     else { print("FAIL IPv4 socket options\n"); failures++; }
+    if (monotonic_raw_clock()) print("PASS monotonic raw clock\n");
+    else { print("FAIL monotonic raw clock\n"); failures++; }
     if (dns_query()) print("PASS dhcp dns udp\n");
     else { print("FAIL dhcp dns udp\n"); failures++; }
     print(failures ? "NET TEST FAILED\n" : "NET TEST PASSED\n");

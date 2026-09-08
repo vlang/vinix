@@ -1086,7 +1086,7 @@ pub fn init_syscall_table() {
 	syscall_table[99] = voidptr(userland.syscall_set_robust_list) // __NR_set_robust_list
 	syscall_table[100] = voidptr(userland.syscall_get_robust_list) // __NR_get_robust_list
 	syscall_table[101] = voidptr(sys.syscall_nanosleep) // __NR_nanosleep
-	syscall_table[113] = voidptr(sys.syscall_clock_get) // __NR_clock_gettime
+	syscall_table[113] = voidptr(sys.syscall_clock_gettime) // __NR_clock_gettime
 	syscall_table[114] = voidptr(sys.syscall_clock_getres) // __NR_clock_getres
 	syscall_table[115] = voidptr(sys.syscall_clock_nanosleep) // __NR_clock_nanosleep
 	syscall_table[118] = voidptr(syscall_linux_sched_setparam) // __NR_sched_setparam

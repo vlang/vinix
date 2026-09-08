@@ -43,6 +43,20 @@ fn read_clock(clock_id int) ?time.TimeSpec {
 	}
 }
 
+// Linux clock_gettime accepts the raw, boot-time and coarse clock ids used by
+// portable C++ runtimes. Keep the ABI pointer in userspace and copy the stable
+// snapshot out explicitly.
+pub fn syscall_clock_gettime(_ voidptr, clock_id int, result u64) (u64, u64) {
+	if result == 0 {
+		return errno.err, errno.efault
+	}
+	now := read_clock(clock_id) or { return errno.err, errno.get() }
+	if !usercopy.copy_to_user(result, voidptr(&now), sizeof(time.TimeSpec)) {
+		return errno.err, errno.efault
+	}
+	return 0, 0
+}
+
 // gettimeofday(tv, tz). The timezone argument has been meaningless for decades;
 // Linux still accepts it and fills it with zeroes.
 pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {

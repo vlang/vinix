@@ -515,6 +515,16 @@ int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t
             socket->connecting = 0;
             return linux_error(error);
         }
+        /* NO_SYS loopback queues packets until netif_poll_all().  A busy
+         * nonblocking client may never let the scheduler reach its idle
+         * poller, so complete the in-kernel handshake synchronously. */
+        netif_poll_all();
+        if (socket->error) {
+            return socket->error;
+        }
+        if (socket->connected) {
+            return 0;
+        }
         return 115;
     }
     error = udp_connect(socket->udp, &ip, lwip_ntohs(port));
@@ -597,6 +607,7 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
         if (error != ERR_OK) {
             return -linux_error(error);
         }
+        netif_poll_all();
         return amount;
     } else {
         struct pbuf *p;
@@ -624,6 +635,9 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
         if (error != ERR_OK) {
             return -linux_error(error);
         }
+        /* Deliver loopback datagrams before returning.  External packets do
+         * not use a loop queue, so polling here is a cheap no-op for them. */
+        netif_poll_all();
         return (int)length;
     }
 }

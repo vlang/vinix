@@ -119,6 +119,19 @@ fn unregister(socket &InetSocket) {
 	sockets_lock.release()
 }
 
+// Refresh every descriptor after an operation that can synchronously deliver
+// loopback traffic. The caller holds net_lock, matching the normal poll path.
+fn refresh_registered_sockets() {
+	sockets_lock.acquire()
+	for i := 0; i < max_sockets; i++ {
+		if sockets[i] != unsafe { nil } {
+			mut socket := unsafe { &InetSocket(sockets[i]) }
+			socket.refresh_status()
+		}
+	}
+	sockets_lock.release()
+}
+
 fn (mut this InetSocket) refresh_status() {
 	ready := C.vinix_socket_ready(this.handle)
 	mut status := int(0)
@@ -151,14 +164,7 @@ pub fn poll() {
 	net_lock.acquire()
 	C.vinix_net_poll(u32(time.monotonic_ns() / 1000000))
 	has_configuration := C.vinix_net_config(&address, &netmask, &gateway, &dns[0]) != 0
-	sockets_lock.acquire()
-	for i := 0; i < max_sockets; i++ {
-		if sockets[i] != unsafe { nil } {
-			mut socket := unsafe { &InetSocket(sockets[i]) }
-			socket.refresh_status()
-		}
-	}
-	sockets_lock.release()
+	refresh_registered_sockets()
 	net_lock.release()
 
 	if has_configuration && (!network_ready || address != last_address) {
@@ -326,7 +332,7 @@ fn (mut this InetSocket) write(handle voidptr, buf voidptr, _loc u64, count u64)
 	for {
 		net_lock.acquire()
 		ret := C.vinix_socket_send(this.handle, buf, count, 0, 0, 0)
-		this.refresh_status()
+		refresh_registered_sockets()
 		net_lock.release()
 		if ret >= 0 {
 			return i64(ret)
@@ -359,7 +365,7 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 		ret := C.vinix_socket_send(this.handle, buf, count,
 			if has_address != 0 { addr.sin_addr } else { u32(0) },
 			if has_address != 0 { addr.sin_port } else { u16(0) }, has_address)
-		this.refresh_status()
+		refresh_registered_sockets()
 		net_lock.release()
 		if ret >= 0 {
 			return i64(ret)
@@ -425,7 +431,7 @@ fn (mut this InetSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 	}
 	net_lock.acquire()
 	ret := C.vinix_socket_connect(this.handle, addr.sin_addr, addr.sin_port)
-	this.refresh_status()
+	refresh_registered_sockets()
 	net_lock.release()
 	if ret == 0 {
 		return
