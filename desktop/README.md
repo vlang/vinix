@@ -33,8 +33,9 @@ What it does:
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
-- an embedded **Wine Calculator**: its translated Win64 process renders into
-  Xvfb and is composited as a normal Vinix window without hiding the desktop
+- embedded **Wine Calculator and Notepad**: their translated Win64 processes
+  render into private Xvfb displays and are composited as normal Vinix windows
+  without hiding the desktop
 - embedded **Minecraft**: the native C++ Minetest client renders into Xvfb and
   is composited as a movable, resizable Vinix window with forwarded input
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the

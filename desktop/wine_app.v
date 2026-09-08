@@ -8,6 +8,8 @@ import ui2
 
 const wine_surface_width = 326
 const wine_surface_height = 430
+const wine_notepad_surface_width = 310
+const wine_notepad_surface_height = 230
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
 const minecraft_window_width = 760
@@ -48,6 +50,10 @@ mut:
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('wine', '/usr/bin/calculator', wine_surface_width, wine_surface_height, 'builtin:calculator', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+}
+
+fn open_wine_notepad(mut _ Desktop) !NativeApp {
+	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
 }
 
 fn open_minecraft(mut _ Desktop) !NativeApp {

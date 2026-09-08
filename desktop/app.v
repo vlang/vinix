@@ -46,9 +46,11 @@ struct AppFactory {
 // with available_apps; their numeric suffix is what launch_index reads back.
 const app_launcher_actions = ['taskbar.launch.0', 'taskbar.launch.1', 'taskbar.launch.2',
 	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7',
-	'taskbar.launch.8', 'taskbar.launch.9', 'taskbar.launch.10', 'taskbar.launch.11']
+	'taskbar.launch.8', 'taskbar.launch.9', 'taskbar.launch.10', 'taskbar.launch.11',
+	'taskbar.launch.12']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
-	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11']
+	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
+	'shortcut.12']
 
 // available_apps is what the taskbar and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
@@ -163,6 +165,17 @@ const available_apps = [
 		keyboard: true
 		pointer: true
 		open: open_wine_calculator
+	},
+	AppFactory{
+		title: 'Wine Notepad'
+		icon: 'builtin:editor'
+		width: wine_notepad_surface_width
+		height: wine_notepad_surface_height + default_title_height
+		process_name: 'vinix-wine-notepad'
+		polling: true
+		keyboard: true
+		pointer: true
+		open: open_wine_notepad
 	},
 ]
 

@@ -403,6 +403,7 @@ fn activity_name_of(record &ActivitySample) string {
 		'vinix-cocoa-calculator' { 'Cocoa Calculator' }
 		'vinix-minecraft' { 'Minecraft' }
 		'vinix-wine-calculator' { 'Wine Calculator' }
+		'vinix-wine-notepad' { 'Wine Notepad' }
 		'vinix-terminal' { 'Terminal' }
 		'vinix-settings' { 'Settings' }
 		'vinix-activity' { 'Activity Monitor' }
