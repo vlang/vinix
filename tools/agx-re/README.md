@@ -296,6 +296,13 @@ recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
 register emission graph into the work-command encoder, implementing the four
 remaining callback error/control event actions, and work-command reclamation.
+`compile_fake_g17_plan.py` now consumes the recovered 3D emission CFG together
+with a raw HAL300 command and its staged descriptor. It rejects selector/mode
+sequences that are not a recovered execution path and independently evaluates
+constant and descriptor-rooted value expressions into the golden format used
+by Vinix's fake-G17 verifier. External object roots remain visibly
+unconstrained. See [the fake backend guide](../../docs/g17-fake-backend.md) for
+the command line and exact trust boundary.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
 eight masked flags, and the independently allocated `0xc40` base prefix; the

@@ -42,9 +42,16 @@ recovered and ported in `gpu.agx.fw`:
 
 The expected-write list is deliberately path-specific. The recovered 314
 virtual encoder call sites cover 3D, TA, FastBlit, and CL; they are not 314
-writes that every render must execute. Once the recovered predicates and value
-expressions are ported into the command builder, that builder must supply the
-selected golden trace for the concrete job.
+writes that every render must execute.
+
+`tools/agx-re/compile_fake_g17_plan.py` independently compiles a concrete 3D
+trace from the UUID-pinned recovery output, an encoded command, and its staged
+descriptor. Each pass must be an exact path through the recovered emission
+CFG. Constant and descriptor-rooted expression values become full-mask golden
+values. Values rooted in external channel/accelerator objects remain explicit
+zero-mask entries instead of being guessed. The command-pool template bits are
+recorded for diagnosis but remain unconstrained until their initial contents
+are independently recovered.
 
 `gpu.verify_fake_g17` is the V adapter. `gpu.submit_fake_g17` first installs a
 normal `WorkItem` in the shared `WorkQueue`, verifies the encoded command, and
@@ -69,12 +76,27 @@ Compile the kernel-side V adapter as part of the normal AArch64 build:
 make -C kernel ARCH=aarch64
 ```
 
+Compile a verifier plan for a captured or Vinix-generated command with:
+
+```sh
+python3 tools/agx-re/compile_fake_g17_plan.py \
+    --abi tools/agx-re/build/recovered-g17-abi.json \
+    --command command-3d.bin \
+    --descriptor descriptor-3d.bin \
+    --command-gpu-address 0x700000000 \
+    --output fake-g17-plan.json
+```
+
+The output includes source UUIDs and SHA-256 hashes, the selected producer
+offsets for every pass, C-verifier-compatible expected-write fields, and an
+honest recovered/external value coverage count.
+
 ## Remaining path to a Mesa triangle
 
 The Mesa submit ioctl remains fail-closed for G17 today because Vinix does not
 yet emit the recovered HAL300 graph. The next integration step is to port the
-3D/TA graph evaluator and its descriptor expressions, generate an independent
-path-specific expected trace, and route G17 queues to `submit_fake_g17` when a
-test-only backend is selected. Only after that can a VM Mesa triangle exercise
-the full native G17 software path. Native PMP/RTKit boot and actual firmware
-acceptance remain hardware-only gates.
+3D encoder, compare its output with the independently compiled plan, and route
+G17 queues to `submit_fake_g17` when a test-only backend is selected. Only
+after that can a VM Mesa triangle exercise the full native G17 software path.
+Native PMP/RTKit boot and actual firmware acceptance remain hardware-only
+gates.
