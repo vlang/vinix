@@ -275,11 +275,16 @@ for pattern in \
 done
 
 TARGET_CC=(clang --target=aarch64-linux-musl --sysroot="$SYSROOT" -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none)
+"${TARGET_CC[@]}" -O2 -Wall -Wextra -Werror -fPIC -shared \
+    "$SCRIPT_DIR/tests/agx-fake-g17/ioctl_fault.c" \
+    -o "$STAGING/usr/lib/libvinix-agx-fault.so" -ldl
 "${TARGET_CC[@]}" -O2 -D__vinix__ \
     -I"$STAGING/usr/include" \
     "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     -L"$STAGING/usr/lib" -Wl,-rpath-link,"$STAGING/usr/lib" \
-    -o "$STAGING/usr/bin/gl-triangle-agx" -lEGL -lGLESv2 -ldl -lpthread -lm
+    -o "$STAGING/usr/bin/gl-triangle-agx" -lEGL -lGLESv2 \
+    -Wl,--no-as-needed -lvinix-agx-fault -Wl,--as-needed \
+    -ldl -lpthread -lm
 install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     "$STAGING/usr/share/examples/gl-triangle/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" "$STAGING/usr/bin/"

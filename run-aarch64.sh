@@ -382,7 +382,8 @@ fi
 # test, even when the selected desktop archive predates --submit-only.
 if [ "$FAKE_G17" -eq 1 ]; then
     ASAHI_STAGING="$SCRIPT_DIR/build-aarch64-asahi/staging"
-    if [ ! -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
+    if [ ! -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ] \
+        || [ ! -f "$ASAHI_STAGING/usr/lib/libvinix-agx-fault.so" ]; then
         echo "ERROR: --fake-g17 needs the staged Mesa lifecycle test." >&2
         echo "       Run build-asahi-aarch64.sh in the ARM64 build VM first." >&2
         exit 1
@@ -403,6 +404,8 @@ if [ "$FAKE_G17" -eq 1 ]; then
     mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle"
     install -m755 "$ASAHI_STAGING/usr/bin/gl-triangle-agx" \
         "$PACKAGE_RUNTIME_ROOT/usr/bin/"
+    install -m755 "$ASAHI_STAGING/usr/lib/libvinix-agx-fault.so" \
+        "$PACKAGE_RUNTIME_ROOT/usr/lib/"
     install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
         "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle/"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \

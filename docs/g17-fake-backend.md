@@ -251,8 +251,16 @@ The runner creates scratch disk/NVRAM files by default, waits for the guest
 shell, and runs depth-only, stencil-only, and packed depth/stencil FBOs. It
 checks the exact Mesa renderer, requested attachment bits, depth/stencil plane
 and metadata presence reported by the kernel, and render/fence completion for
-all three cases before exiting QEMU. Set `VINIX_BOOT_DISK` to reuse an existing
-test image or `VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second deadline.
+all three cases. It then interposes Mesa's real Asahi ioctls in four adversarial
+runs: an overlapping bind must fail, bind/unbind/reuse must preserve a valid
+submission, and a referenced depth-metadata BO must be rejected when it is
+either unbound or rebound read-only. The interposer lives entirely in the test
+process; the fake kernel exposes no fault-injection UAPI. After observing the
+expected `EINVAL`, it exits the faulting process before Mesa can wait forever
+for a fence that was intentionally never created. This also leaves the damaged
+mapping state to normal fd/process teardown. Set `VINIX_BOOT_DISK` to reuse an
+existing test image or `VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second
+deadline.
 
 Mesa should identify the renderer as `Vinix Fake G17C (M5 Max ABI)` and report
 that the render submit and fence completed successfully. The fake kernel sets a
@@ -270,6 +278,11 @@ normalization, immutable attachment staging, per-file GEM and VM ownership,
 mappings, contexts, queues, sync objects, the generated G17 encoder, the
 independent verifier, synthetic completion, fence waiting, and process
 teardown.
+
+The fake verifier currently completes accepted work synchronously, so this
+suite cannot yet hold a valid job in flight while destroying one of its
+resources. That race remains deferred until the fake backend has a controllable
+completion point; these tests do not claim to cover it.
 
 `--submit-only` is intentional: fake G17 does not rasterize pixels. Running the
 same binary without that option retains the normal framebuffer pixel check for
