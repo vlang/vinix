@@ -303,6 +303,14 @@ constant and descriptor-rooted value expressions into the golden format used
 by Vinix's fake-G17 verifier. External object roots remain visibly
 unconstrained. See [the fake backend guide](../../docs/g17-fake-backend.md) for
 the command line and exact trust boundary.
+`encode_fake_g17_3d.py` is the matching host reference producer. It chooses a
+concrete path by evaluating the recovered predicates, emits all four register
+streams while preserving a supplied pool template, and compiles its own output
+back into a verifier plan. Unresolved channel/accelerator branches and values
+must be supplied explicitly; `--zero-template` is intentionally limited to
+fake execution. The full recovered ABI's zero-descriptor fallthrough fixture
+currently emits 376 writes, of which 356 have independently reproducible
+values and 20 remain explicit external inputs.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
 eight masked flags, and the independently allocated `0xc40` base prefix; the

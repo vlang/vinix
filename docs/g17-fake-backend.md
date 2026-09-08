@@ -53,6 +53,15 @@ zero-mask entries instead of being guessed. The command-pool template bits are
 recorded for diagnosis but remain unconstrained until their initial contents
 are independently recovered.
 
+`tools/agx-re/encode_fake_g17_3d.py` is the host reference encoder. It evaluates
+the recovered predicates into one concrete 3D path per pass, encodes recovered
+selector/mode/value formulas, publishes the four descriptor summaries, and
+then round-trips the result through the plan compiler. Expressions rooted in
+the channel or accelerator are never guessed: the caller must provide their
+branch outcomes or values explicitly. A captured command-pool template is
+preserved under the recovered template mask. A zero template is available for
+fake execution only and is not evidence that those bits are valid on hardware.
+
 `gpu.verify_fake_g17` is the V adapter. `gpu.submit_fake_g17` first installs a
 normal `WorkItem` in the shared `WorkQueue`, verifies the encoded command, and
 then injects either a successful completion or a channel-error completion.
@@ -91,12 +100,48 @@ The output includes source UUIDs and SHA-256 hashes, the selected producer
 offsets for every pass, C-verifier-compatible expected-write fields, and an
 honest recovered/external value coverage count.
 
+Build a fake-only command directly from the recovered graph with:
+
+```sh
+python3 tools/agx-re/encode_fake_g17_3d.py \
+    --abi tools/agx-re/build/recovered-g17-abi.json \
+    --descriptor descriptor-input.bin \
+    --command-gpu-address 0x700000000 \
+    --zero-template \
+    --externals fake-g17-externals.json \
+    --command-output command-3d.bin \
+    --descriptor-output descriptor-3d.bin \
+    --plan-output fake-g17-plan.json
+```
+
+Use `--template captured-command-pool-slot.bin` instead of `--zero-template`
+when validating captured template bits. External inputs are keyed by recovered
+producer offset and may be a scalar shared by all passes or a four-item array:
+
+```json
+{
+  "decisions": { "0x2410": "fallthrough" },
+  "values": {
+    "0x1964": 0,
+    "0x1b04": 0,
+    "0x1bc4": 0,
+    "0x2148": 0,
+    "0x2394": [0, 0, 0, 0]
+  }
+}
+```
+
+With a zero descriptor and the fallthrough path above, the current recovered
+ABI emits 94 entries per pass: 376 writes total, 356 with recovered values and
+20 explicitly external values. These zeros make a deterministic verifier
+fixture; they are not recovered hardware values.
+
 ## Remaining path to a Mesa triangle
 
-The Mesa submit ioctl remains fail-closed for G17 today because Vinix does not
-yet emit the recovered HAL300 graph. The next integration step is to port the
-3D encoder, compare its output with the independently compiled plan, and route
-G17 queues to `submit_fake_g17` when a test-only backend is selected. Only
-after that can a VM Mesa triangle exercise the full native G17 software path.
-Native PMP/RTKit boot and actual firmware acceptance remain hardware-only
-gates.
+The Mesa submit ioctl remains fail-closed for G17 today. The host reference
+encoder now proves that the recovered 3D graph can produce a path-exact command
+accepted by the fake verifier plan compiler. The next integration step is an
+allocation-free kernel form of the same state machine and routing G17 queues to
+`submit_fake_g17` when a test-only backend is selected. Only after that can a
+VM Mesa triangle exercise the full native G17 software path. Native PMP/RTKit
+boot and actual firmware acceptance remain hardware-only gates.

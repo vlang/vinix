@@ -120,6 +120,8 @@ def _condition(
         outcomes = {
             "eq": source == other,
             "ne": source != other,
+            "zero": source == other,
+            "nonzero": source != other,
             "hi": source > other,
             "ls": source <= other,
         }
@@ -387,6 +389,105 @@ def _match_path(
             f"observed register pass matches {len(value_matches)} recovered paths"
         )
     return list(value_matches[0])
+
+
+def derive_3d_path(
+    abi: dict[str, Any],
+    descriptor: bytes,
+    command: bytes,
+    decision_overrides: dict[int, bool] | None = None,
+) -> list[int]:
+    """Evaluate the recovered branch graph into one concrete event path."""
+    graph = abi["channels"]["register_emission_cfg"]["producers"]["3D"]
+    catalog = _event_catalog(abi, "3D")
+    nodes = {
+        _integer(node["producer_offset"], "CFG node offset"): node
+        for node in graph["nodes"]
+    }
+    decisions = sorted(graph["decisions"], key=lambda item: item["producer_offset"])
+    overrides = decision_overrides or {}
+
+    def choose(decision: dict[str, Any]) -> dict[str, Any]:
+        offset = _integer(decision["producer_offset"], "decision offset")
+        taken_next = set(decision["taken"]["next"])
+        fallthrough_next = set(decision["fallthrough"]["next"])
+        if taken_next == fallthrough_next:
+            return decision["taken"]
+        try:
+            taken = _condition(
+                decision["predicate"],
+                decision["condition"],
+                descriptor,
+                command,
+            )
+        except UnresolvedValue as error:
+            if offset not in overrides:
+                raise PlanError(
+                    f"decision {offset:#x} needs an explicit taken/fallthrough "
+                    f"override: {error}"
+                ) from error
+            taken = overrides[offset]
+        return decision["taken"] if taken else decision["fallthrough"]
+
+    entries = set(graph["entry"])
+    if len(entries) != 1:
+        raise PlanError(f"3D graph has {len(entries)} entry events")
+    first = next(iter(entries))
+    for decision in decisions:
+        if decision["producer_offset"] >= first:
+            break
+        possible = set(decision["taken"]["next"]) | set(
+            decision["fallthrough"]["next"]
+        )
+        if possible != entries:
+            continue
+        outcome = choose(decision)
+        if not outcome["next"]:
+            if outcome.get("can_return"):
+                return []
+            raise PlanError(f"decision {decision['producer_offset']:#x} has no successor")
+        entries = set(outcome["next"])
+
+    current = next(iter(entries))
+    path: list[int] = []
+    while True:
+        if current not in nodes or current not in catalog:
+            raise PlanError(f"3D graph references unknown event {current:#x}")
+        if current in path:
+            raise PlanError(f"3D graph loops before a pass return at {current:#x}")
+        path.append(current)
+        node = nodes[current]
+        if node.get("can_return"):
+            return path
+
+        allowed = set(node["next"])
+        while len(allowed) > 1:
+            candidates = []
+            for decision in decisions:
+                if decision["producer_offset"] <= current:
+                    continue
+                possible = set(decision["taken"]["next"]) | set(
+                    decision["fallthrough"]["next"]
+                )
+                if possible == allowed:
+                    candidates.append(decision)
+            if not candidates:
+                raise PlanError(
+                    f"events after {current:#x} remain ambiguous: "
+                    + ", ".join(f"{offset:#x}" for offset in sorted(allowed))
+                )
+            decision = min(candidates, key=lambda item: item["producer_offset"])
+            outcome = choose(decision)
+            allowed = set(outcome["next"])
+            if not allowed:
+                if outcome.get("can_return"):
+                    return path
+                raise PlanError(
+                    f"decision {decision['producer_offset']:#x} has no successor"
+                )
+        if not allowed:
+            raise PlanError(f"event {current:#x} cannot reach a recovered return")
+        current = next(iter(allowed))
 
 
 def compile_plan(

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 import compile_fake_g17_plan as fake
+import encode_fake_g17_3d as encoder
 
 
 GPU_BASE = 0x700000000
@@ -126,6 +127,36 @@ def recovered_abi():
                         "entry": [0x50],
                         "empty_return_path": False,
                         "predicates_complete": True,
+                        "decisions": [
+                            {
+                                "producer_offset": 0x80,
+                                "condition": "bit_set",
+                                "predicate": {
+                                    "kind": "condition",
+                                    "operation": "test_bit",
+                                    "bytes": 4,
+                                    "bit": 0,
+                                    "source": {
+                                        "kind": "object_load",
+                                        "base": {
+                                            "kind": "argument",
+                                            "name": "channel",
+                                        },
+                                        "member": 4,
+                                        "bytes": 4,
+                                        "signed": False,
+                                    },
+                                },
+                                "taken": {
+                                    "next": [0x100],
+                                    "can_return": False,
+                                },
+                                "fallthrough": {
+                                    "next": [0x200],
+                                    "can_return": False,
+                                },
+                            }
+                        ],
                         "nodes": nodes,
                     }
                 },
@@ -234,6 +265,19 @@ class FakeG17PlanTests(unittest.TestCase):
         }
         self.assertEqual(fake._evaluate(conditional, descriptor, command), 0xAA)
 
+        zero_predicate = {
+            "kind": "condition",
+            "operation": "compare_zero",
+            "bytes": 4,
+            "source": {"kind": "constant", "value": 0},
+        }
+        self.assertTrue(
+            fake._condition(zero_predicate, "zero", descriptor, command)
+        )
+        self.assertFalse(
+            fake._condition(zero_predicate, "nonzero", descriptor, command)
+        )
+
         movk = {
             "kind": "expression",
             "operation": "movk",
@@ -262,6 +306,114 @@ class FakeG17PlanTests(unittest.TestCase):
         self.assertEqual(plan["writes"][2]["value_mask"], fake.UINT64_MASK)
         self.assertEqual(plan["writes"][4]["value_mask"], 0)
         self.assertEqual(plan["writes"][4]["value_status"], "external")
+
+    def test_reference_encoder_round_trips_through_plan_compiler(self):
+        _, descriptor = encoded_buffers()
+        template = bytearray(0x2240)
+        for pass_index in range(4):
+            base = pass_index * 0x720 + 0xA0
+            for entry_index in range(5):
+                offset = base + entry_index * 12
+                template[offset : offset + 4] = TEMPLATE.to_bytes(4, "little")
+        external_values = [0xDEADBEEF000 + pass_index for pass_index in range(4)]
+
+        command, output_descriptor, plan = encoder.encode_3d(
+            recovered_abi(),
+            descriptor,
+            GPU_BASE,
+            template,
+            {
+                "decisions": {"0x80": "taken"},
+                "values": {"0x400": external_values},
+            },
+        )
+
+        self.assertEqual(plan["coverage"]["total_writes"], 20)
+        self.assertEqual(plan["encoder"]["external_event_offsets"], [0x400])
+        self.assertFalse(plan["encoder"]["zero_template"])
+        self.assertEqual(plan["passes"][0]["producer_offsets"], [
+            0x50, 0x100, 0x200, 0x300, 0x400,
+        ])
+        first_word = int.from_bytes(command[0xA0 : 0xA4], "little")
+        self.assertEqual(first_word & 0xFFFC0006, TEMPLATE & 0xFFFC0006)
+        self.assertEqual(
+            int.from_bytes(command[0xA0 + 4 * 12 + 4 : 0xA0 + 5 * 12], "little"),
+            external_values[0],
+        )
+        self.assertEqual(
+            int.from_bytes(output_descriptor[0x828 : 0x830], "little"),
+            GPU_BASE + 0xA0,
+        )
+
+    def test_reference_encoder_fails_closed_without_external_inputs(self):
+        _, descriptor = encoded_buffers()
+        with self.assertRaisesRegex(fake.PlanError, "decision 0x80"):
+            encoder.encode_3d(
+                recovered_abi(), descriptor, GPU_BASE, None, None
+            )
+        with self.assertRaisesRegex(fake.PlanError, "event 0x400"):
+            encoder.encode_3d(
+                recovered_abi(),
+                descriptor,
+                GPU_BASE,
+                None,
+                {"decisions": {"0x80": True}},
+            )
+
+    def test_reference_encoder_selects_fallthrough_path(self):
+        _, descriptor = encoded_buffers()
+        _, _, plan = encoder.encode_3d(
+            recovered_abi(),
+            descriptor,
+            GPU_BASE,
+            None,
+            {
+                "decisions": {"0x80": "fallthrough"},
+                "values": {"0x400": 0},
+            },
+        )
+
+        self.assertEqual(plan["coverage"]["total_writes"], 16)
+        self.assertTrue(plan["encoder"]["zero_template"])
+        self.assertEqual(
+            plan["passes"][0]["producer_offsets"],
+            [0x50, 0x200, 0x300, 0x400],
+        )
+
+    def test_reference_encoder_cli_writes_buffers_and_plan(self):
+        _, descriptor = encoded_buffers()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            abi_path = root / "abi.json"
+            descriptor_path = root / "descriptor.bin"
+            externals_path = root / "externals.json"
+            command_path = root / "command.bin"
+            output_descriptor_path = root / "output-descriptor.bin"
+            plan_path = root / "plan.json"
+            abi_path.write_text(json.dumps(recovered_abi()))
+            descriptor_path.write_bytes(descriptor)
+            externals_path.write_text(json.dumps({
+                "decisions": {"0x80": "taken"},
+                "values": {"0x400": "0x123456789abcdef0"},
+            }))
+
+            status = encoder.main([
+                "--abi", str(abi_path),
+                "--descriptor", str(descriptor_path),
+                "--command-gpu-address", hex(GPU_BASE),
+                "--zero-template",
+                "--externals", str(externals_path),
+                "--command-output", str(command_path),
+                "--descriptor-output", str(output_descriptor_path),
+                "--plan-output", str(plan_path),
+            ])
+
+            self.assertEqual(status, 0)
+            self.assertEqual(len(command_path.read_bytes()), 0x2240)
+            self.assertEqual(len(output_descriptor_path.read_bytes()), 0x15B0)
+            plan = json.loads(plan_path.read_text())
+            self.assertEqual(plan["schema"], fake.PLAN_SCHEMA)
+            self.assertEqual(plan["coverage"]["total_writes"], 20)
 
     def test_rejects_non_recovered_order(self):
         command, descriptor = encoded_buffers()
