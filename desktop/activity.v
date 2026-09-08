@@ -364,8 +364,8 @@ fn activity_name_of(record &ActivitySample) string {
 	}
 	// Drop the trailing `[pid]` groups. There can be more than one: a fork
 	// names the child after its parent and appends again, so the shell the
-	// terminal starts is `/bin/busybox[2]`, and the loop it runs is
-	// `/bin/busybox[2][3]`. Every one of those numbers is an ancestor's pid
+	// terminal starts can be `/bin/sh[2]`, and the loop it runs can be
+	// `/bin/sh[2][3]`. Every one of those numbers is an ancestor's pid
 	// and none of them is this process', which has a column of its own — so
 	// they all come off, and two copies of a program showing the same name is
 	// exactly what a process list should do.

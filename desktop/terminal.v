@@ -54,8 +54,9 @@ mut:
 	close_app()
 }
 
-const terminal_shell = '/bin/busybox'
-const terminal_shell_arg = 'sh'
+// Both userlands provide the POSIX shell here. ARM64 resolves it to BusyBox;
+// amd64 resolves it to the mlibc distro's shell.
+const terminal_shell = '/bin/sh'
 
 // How much output is kept. A terminal that remembered everything would grow
 // without bound on a system with no garbage collector.
@@ -112,14 +113,14 @@ fn open_terminal(mut _ Desktop) !NativeApp {
 	mut app := &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
-	app.lines << 'Vinix terminal — ${terminal_shell} ${terminal_shell_arg}'
+	app.lines << 'Vinix terminal — ${terminal_shell}'
 	app.lines << ''
 	return app
 }
 
 fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int) {
 	a.started = true
-	shell := desktop_spawn_shell(terminal_shell, terminal_shell_arg, rows, columns, width, height) or {
+	shell := desktop_spawn_shell(terminal_shell, rows, columns, width, height) or {
 		a.error = 'cannot start ${terminal_shell}'
 		a.push_line(a.error)
 		a.exited = true

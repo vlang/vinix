@@ -45,8 +45,22 @@ jobs:
       - name: Build full desktop distro and ISO
         run: ARCHITECTURE=${{ matrix.architecture }} JINX_CLEAN_WORKDIRS=yes PKGS_TO_INSTALL='*' make all
 
+      - name: Build native amd64 desktop ISO
+        if: matrix.architecture == 'x86_64'
+        shell: bash
+        run: |
+          git clone https://github.com/vlang/ui2 third_party/ui2
+          git -C third_party/ui2 checkout efaff281161384cb2729e11dceedcf2613237a9c
+          V="$PWD/host-pkgs/v/usr/local/bin/v" ./build-desktop-amd64.sh
+
       - name: Rename ISO
-        run: mv vinix.iso vinix-nightly-${{ matrix.release_arch }}-desktop-$(date +'%Y%m%d').iso
+        shell: bash
+        run: |
+          image=vinix.iso
+          if [ "${{ matrix.architecture }}" = x86_64 ]; then
+            image=vinix-desktop-amd64.iso
+          fi
+          mv "$image" "vinix-nightly-${{ matrix.release_arch }}-desktop-$(date +'%Y%m%d').iso"
 
       - name: Upload ISO
         uses: actions/upload-artifact@v4

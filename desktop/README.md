@@ -397,7 +397,7 @@ V's module path:
     git clone https://github.com/vlang/ui2 third_party/ui2
 
 Then, from the repository root, with Homebrew `llvm`, `lld` and `qemu`
-installed, one command builds everything and boots into the desktop:
+installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
@@ -429,6 +429,17 @@ sysroot taken from the userland image, and stages
 `build-support/init-aarch64/initramfs-desktop.tar` — an image whose `/sbin/init`
 starts the desktop directly. `run-aarch64.sh` boots any image named by
 `VINIX_INITRAMFS`, and with none boots the ordinary shell.
+
+On a Linux host, the equivalent amd64 workflow is:
+
+    ./run-desktop-amd64.sh
+
+It first builds the normal mlibc distro and its cross-toolchain, then creates a
+dedicated `vinix-desktop-amd64.iso`. The PS/2 mouse driver publishes the same
+absolute `/dev/pointer` ABI as the aarch64 input drivers, so the compositor and
+its applications use the same input path on both architectures. Pass
+`--no-build` to boot an existing image; this also allows an image built on
+Linux to run under QEMU TCG on an Apple Silicon host.
 
 An existing `build-aarch64-hyprland/staging` layer changes the first session to
 Hyprland while keeping this desktop as the recovery session. Produce that layer

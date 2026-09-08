@@ -16,6 +16,7 @@ import errno
 import lib
 import strings
 import resource
+import term
 
 pub const wnohang = 1
 
@@ -492,6 +493,10 @@ pub fn syscall_exit(_ voidptr, status int) {
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
 	}
+
+	// A framebuffer owner can exit without issuing a console ioctl. Restore
+	// the saved text console before its address space and descriptors vanish.
+	term.leave_graphics_mode_if_owner(current_process.pid)
 
 	mut old_pagemap := current_process.pagemap
 

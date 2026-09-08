@@ -56,6 +56,14 @@ run-lingemu: vinix.iso
 run: vinix.iso
 	qemu-system-x86_64 $(QEMUFLAGS)
 
+.PHONY: desktop-amd64
+desktop-amd64: vinix.iso
+	./build-desktop-amd64.sh
+
+.PHONY: run-desktop-amd64
+run-desktop-amd64:
+	./run-desktop-amd64.sh
+
 .PHONY: clean
 clean:
 	rm -rf iso_root sysroot vinix.iso initramfs.tar

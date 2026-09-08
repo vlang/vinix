@@ -29,8 +29,10 @@ build-support/init-aarch64/initramfs.tar
 build-support/init-aarch64/initramfs-minimal.tar
 /build-aarch64-musl/
 /build/
+/build-amd64-desktop/
 /third_party/
 build-support/init-aarch64/initramfs-desktop.tar
+/vinix-desktop-amd64.iso
 kernel/tmp.c
 kernel/tmp.v
 /build-aarch64-python/

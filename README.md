@@ -130,6 +130,23 @@ Use `run-gl-triangle --rebuild` to compile the same demo with GCC inside Vinix
 before launching it. On amd64 this currently uses Mesa softpipe on the Limine
 framebuffer.
 
+### Native desktop on amd64
+
+The framebuffer-native desktop has an amd64 build and QEMU launcher matching
+the aarch64 workflow. After checking out ui2, run this on a Linux build host:
+
+```sh
+git clone https://github.com/vlang/ui2 third_party/ui2
+./run-desktop-amd64.sh
+```
+
+This builds the regular mlibc distro, compiles `vinix-desktop` with its amd64
+cross-toolchain, and creates `vinix-desktop-amd64.iso`, whose init starts the
+desktop directly. The runner uses KVM when available and otherwise falls back
+to QEMU TCG; `--no-build`, `--monitor`, and `--mem=MB` are supported. A desktop
+ISO built on Linux can also be booted on an Apple Silicon host with
+`./run-desktop-amd64.sh --no-build`.
+
 ### Python 3 on aarch64
 
 The aarch64 image can include Alpine's musl CPython 3.12 runtime and its native

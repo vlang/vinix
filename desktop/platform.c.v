@@ -258,10 +258,10 @@ mut:
 	height  u16
 }
 
-// Keep the built-in terminal on the same command path as the full ARM64
-// userland. In particular, the native GCC driver is deliberately installed in
-// its toolchain prefix rather than /usr/bin.
-const desktop_command_path = '/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin'
+// Keep the built-in terminal on the command paths used by both distributions.
+// The ARM64 native GCC driver lives in its toolchain prefix; the amd64 mlibc
+// image installs its compiler in /usr/bin.
+const desktop_command_path = '/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin:/aarch64-linux-musl-native/bin'
 
 enum ExternalProgramResult {
 	success
@@ -282,7 +282,7 @@ fn desktop_run_external(path string) ExternalProgramResult {
 	argv := [&char(path.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -318,7 +318,7 @@ fn desktop_run_external(path string) ExternalProgramResult {
 //
 // The master comes back non-blocking, so polling it once per compositor frame
 // never stalls.
-fn desktop_spawn_shell(path string, arg string, rows int, columns int, width int, height int) ?SpawnedShell {
+fn desktop_spawn_shell(path string, rows int, columns int, width int, height int) ?SpawnedShell {
 	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
 	if master < 0 {
 		return none
@@ -348,10 +348,10 @@ fn desktop_spawn_shell(path string, arg string, rows int, columns int, width int
 
 	// Built before the fork. Between fork and execve the child may call only
 	// async-signal-safe functions, which allocating is not.
-	argv := [&char(path.str), &char(arg.str), c'-i', &char(unsafe { nil })]
+	argv := [&char(path.str), c'-i', &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -499,7 +499,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 		&char(tz_arg.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -592,7 +592,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		&char(command.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri', &char(unsafe { nil })]
 
 	pid := C.fork()

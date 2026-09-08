@@ -1,0 +1,21 @@
+#!/bin/sh
+# PID 1 for the amd64 desktop image. The regular distro already supplies the
+# shell and runtime libraries; this only selects the framebuffer desktop as the
+# initial program and leaves an interactive recovery shell if it exits.
+
+export HOME=/root
+export TERM=linux
+export PATH=/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin
+export USER=root
+export LOGNAME=root
+export SHELL=/bin/sh
+export XDG_RUNTIME_DIR=/run
+
+cd /root || exit 1
+
+while :; do
+	/usr/bin/vinix-desktop
+	status=$?
+	echo "vinix-desktop exited with status $status; starting a recovery shell"
+	/bin/sh -i
+done
