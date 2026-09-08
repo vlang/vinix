@@ -195,6 +195,22 @@ exercise goroutines, filesystem operations, subprocesses, cryptography and TCP
 loopback networking. It also builds a cgo program through the native GCC
 toolchain when GCC is installed.
 
+### OpenJDK on aarch64
+
+The aarch64 image supports the complete OpenJDK 25 JDK and JRE from Alpine
+Linux 3.24, the latest stable Alpine branch:
+
+```sh
+./build-java-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Both userland builders merge `build-aarch64-java/staging` when present. Set
+`VINIX_JAVA_STAGING=/path/to/staging` to override it. The VM boot suite uses
+`javac` and `jar`, then runs the compiled smoke program with `java` to exercise
+the HotSpot runtime, threads, files, cryptography and loopback sockets.
+`JAVA_HOME` is `/usr/lib/jvm/java-25-openjdk`.
+
 ### Codex CLI on aarch64
 
 The aarch64 image can include the official ARM64/musl Codex CLI together with

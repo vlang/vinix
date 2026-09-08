@@ -14,6 +14,7 @@ INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
+JAVA_STAGING="${VINIX_JAVA_STAGING:-$SCRIPT_DIR/build-aarch64-java/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
@@ -819,6 +820,13 @@ if [ -x "$GO_STAGING/usr/bin/go" ] || [ -x "$GO_STAGING/usr/lib/go/bin/go" ]; th
     merge_staging_tree "$GO_STAGING"
 else
     echo "==> Go staging not found, skipping (run build-go-aarch64.sh first)"
+fi
+
+if [ -x "$JAVA_STAGING/usr/bin/java" ] && [ -x "$JAVA_STAGING/usr/bin/javac" ]; then
+    echo "==> Integrating OpenJDK runtime and toolchain..."
+    merge_staging_tree "$JAVA_STAGING"
+else
+    echo "==> OpenJDK staging not found, skipping (run build-java-aarch64.sh first)"
 fi
 
 if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then

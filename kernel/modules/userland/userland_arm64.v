@@ -171,15 +171,35 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 	} else {
 		// Linux/musl mode: read from the signal frame at the user SP. musl's
 		// __restore_rt enters here with SP pointing at the frame dispatch left.
-		// Frame layout: [prev_mask(8)] [pad(8)] [GPRState(sizeof)]
+		// Frame layout: [prev_mask(8)] [ucontext address(8)]
+		//               [GPRState(sizeof)] [optional siginfo and ucontext]
 		user_sp := frame.sp
 
 		mut prev_mask := u64(0)
+		mut public_context := u64(0)
 		if !usercopy.copy_from_user(voidptr(&prev_mask), user_sp, sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		if !usercopy.copy_from_user(voidptr(&public_context), user_sp + 8, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
 		if !usercopy.copy_from_user(voidptr(&t.gpr_state), user_sp + 16, sizeof(cpulocal.GPRState)) {
 			return errno.err, errno.efault
+		}
+		// SA_SIGINFO handlers receive a real AArch64 ucontext and are allowed to
+		// edit it. HotSpot's guard-page handler, for example, redirects the saved
+		// PC to its stack-overflow continuation. Restore those edits instead of
+		// blindly resuming the private snapshot and faulting forever.
+		if public_context != 0 {
+			if !usercopy.copy_from_user(voidptr(&t.gpr_state.x0), public_context + 184, 31 * sizeof(u64)) {
+				return errno.err, errno.efault
+			}
+			if !usercopy.copy_from_user(voidptr(&t.gpr_state.sp), public_context + 432, 3 * sizeof(u64)) {
+				return errno.err, errno.efault
+			}
+			if !usercopy.copy_from_user(voidptr(&prev_mask), public_context + 40, sizeof(u64)) {
+				return errno.err, errno.efault
+			}
 		}
 		t.masked_signals = prev_mask
 	}
@@ -318,12 +338,22 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			info_address := signal_sp + info_offset
 			uc_address := signal_sp + ucontext_offset
 			unsafe {
+				// The private header points rt_sigreturn at the public context so
+				// changes made by a three-argument handler are not discarded.
+				*&u64(signal_sp + 8) = uc_address
 				C.memset(voidptr(info_address), 0, 128)
 				C.memset(voidptr(uc_address), 0, ucontext_size)
 
-				// siginfo_t: signo, errno, positive si_code, then si_addr.
+				// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
+				// distinguishes an unmapped page from a permission-protected one.
 				*&int(info_address) = which
-				*&int(info_address + 8) = if synchronous { 1 } else { 0 }
+				*&int(info_address + 8) = if synchronous && (fault_esr & 0x3f) >= 0x0c {
+					2 // SEGV_ACCERR
+				} else if synchronous {
+					1 // SEGV_MAPERR (also the first positive code for other faults)
+				} else {
+					0
+				}
 				*&u64(info_address + 16) = fault_address
 
 				// musl AArch64 ucontext_t offsets. The signal mask begins at 40;

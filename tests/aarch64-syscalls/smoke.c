@@ -20,6 +20,7 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <sys/membarrier.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -39,10 +40,23 @@ struct open_how_abi {
 
 static int failures;
 static volatile sig_atomic_t saw_sigchld;
+static volatile sig_atomic_t saw_context_redirect;
+static volatile sig_atomic_t saw_segv_accerr;
+static void *protected_page;
 
 static void sigchld_handler(int signal_number) {
     (void)signal_number;
     saw_sigchld = 1;
+}
+
+static void redirect_segv_handler(int signal_number, siginfo_t *info,
+                                  void *context_argument) {
+    ucontext_t *context = context_argument;
+    if (signal_number == SIGSEGV && info->si_addr == protected_page) {
+        saw_context_redirect = 1;
+        saw_segv_accerr = info->si_code == SEGV_ACCERR;
+        context->uc_mcontext.pc += 4;
+    }
 }
 
 static void check(int condition, const char *description) {
@@ -186,6 +200,23 @@ int main(void) {
     check(child > 0 && waited == child && WIFEXITED(child_status) &&
               WEXITSTATUS(child_status) == 23 && saw_sigchld,
           "waitpid event plus SIGCHLD wakeup");
+
+    struct sigaction fault_action = {
+        .sa_sigaction = redirect_segv_handler,
+        .sa_flags = SA_SIGINFO,
+    };
+    sigemptyset(&fault_action.sa_mask);
+    protected_page = mmap(NULL, 4096, PROT_NONE,
+                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    check(protected_page != MAP_FAILED &&
+              sigaction(SIGSEGV, &fault_action, NULL) == 0,
+          "install SIGSEGV context handler");
+    if (protected_page != MAP_FAILED) {
+        __asm__ volatile("ldr xzr, [%0]" : : "r"(protected_page) : "memory");
+        check(saw_context_redirect && saw_segv_accerr,
+              "SIGSEGV ucontext PC redirect");
+        munmap(protected_page, 4096);
+    }
 
     errno = 0;
     check(syscall(SYS_ppoll, (void *)1, 1, NULL, NULL, 8) == -1 &&

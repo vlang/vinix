@@ -13,6 +13,7 @@ ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
+JAVA_STAGING="${VINIX_JAVA_STAGING:-$SCRIPT_DIR/build-aarch64-java/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
@@ -286,6 +287,13 @@ else
     echo "Go staging absent; skipping the Go boot test"
 fi
 
+if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
+    echo "VINIX ARM64 OPENJDK BOOT TEST"
+    /root/java-smoke.sh
+else
+    echo "OpenJDK staging absent; skipping the Java boot test"
+fi
+
 if command -v curl >/dev/null 2>&1; then
     /root/network-tools-smoke.sh
 else
@@ -354,6 +362,13 @@ if [ -x "$GO_STAGING/usr/bin/go" ] || [ -x "$GO_STAGING/usr/lib/go/bin/go" ]; th
     merge_staging_tree "$GO_STAGING"
 else
     echo "==> Go staging not found, packaging without Go"
+fi
+
+if [ -x "$JAVA_STAGING/usr/bin/java" ] && [ -x "$JAVA_STAGING/usr/bin/javac" ]; then
+    echo "==> Integrating OpenJDK runtime and toolchain"
+    merge_staging_tree "$JAVA_STAGING"
+else
+    echo "==> OpenJDK staging not found, packaging without Java"
 fi
 
 if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
