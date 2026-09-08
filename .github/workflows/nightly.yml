@@ -5,18 +5,36 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  contents: write
+
 jobs:
-  vinix-build:
+  check-build-needed:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Unshallow repo tags
-        run: git fetch --prune --unshallow --tags
+        with:
+          fetch-depth: 0
 
       - name: Check if build is necessary
         run: test "$(git tag --points-at HEAD)" = ""
+
+  vinix-build:
+    needs: check-build-needed
+    name: Build ${{ matrix.release_arch }} desktop ISO
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64
+            release_arch: amd64
+          - architecture: aarch64
+            release_arch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install make diffutils curl git rsync xorriso -y
@@ -24,17 +42,32 @@ jobs:
       - name: Enable user namespaces
         run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
 
-      #- name: Build full distro and ISO
-      #  run: JINX_CLEAN_WORKDIRS=yes PKGS_TO_INSTALL='*' make all
+      - name: Build full desktop distro and ISO
+        run: ARCHITECTURE=${{ matrix.architecture }} JINX_CLEAN_WORKDIRS=yes PKGS_TO_INSTALL='*' make all
 
-      #- name: Rename vinix.iso
-      #  run: mv vinix.iso vinix-nightly-full-$(date +'%Y%m%d').iso
+      - name: Rename ISO
+        run: mv vinix.iso vinix-nightly-${{ matrix.release_arch }}-desktop-$(date +'%Y%m%d').iso
 
-      - name: Build base distro and ISO
-        run: JINX_CLEAN_WORKDIRS=yes make all
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinix-${{ matrix.release_arch }}-desktop
+          path: vinix-nightly-${{ matrix.release_arch }}-desktop-*.iso
+          if-no-files-found: error
 
-      - name: Rename vinix.iso
-        run: mv vinix.iso vinix-nightly-base-$(date +'%Y%m%d').iso
+  publish-nightly:
+    needs: vinix-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download desktop ISOs
+        uses: actions/download-artifact@v4
+        with:
+          path: nightly-artifacts
 
       - name: Set TAG_DATE variable
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
@@ -45,10 +78,9 @@ jobs:
       - name: Create nightly release
         uses: softprops/action-gh-release@v2
         with:
-          name: Nightly build ${{ env.TAG_DATE }}
+          name: Nightly desktop build ${{ env.TAG_DATE }}
           tag_name: nightly-${{ env.TAG_DATE }}
-          body: Image of an up to date Vinix nightly build.
-          files: |
-            vinix-nightly-*.iso
+          body: Desktop-enabled AMD64 and ARM64 images of the current Vinix nightly build.
+          files: nightly-artifacts/**/*.iso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
