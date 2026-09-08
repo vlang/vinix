@@ -12,6 +12,7 @@ import drm.syncobj
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import gpu.agx.submission as agxsubmission
+import gpu.agx.vm as agxvm
 import gpu.agx.workqueue
 import gpu.agx.gpu
 import klock
@@ -474,7 +475,7 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 		vm_page_size: u32(pgtable.uat_pgsz)
 		vm_user_start: mmu.uat_user_va_start
 		vm_user_end: mmu.uat_unknown_page
-		vm_kernel_min_size: u64(0x20000000)
+		vm_kernel_min_size: agxvm.kernel_min_size
 		max_syncs_per_submission: max_submission_syncs
 		max_commands_per_submission: if cfg.gpu_gen == .g13 {
 			max_g13_submission_commands
@@ -534,12 +535,8 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 		return -19
 	}
 	address_limit := u64(1) << mgr.ias
-	if request.extensions != 0 || request.pad != 0 || request.kernel_start >= request.kernel_end
-		|| request.kernel_start < mmu.uat_user_va_start
-		|| request.kernel_start & pgtable.uat_pg_mask != 0
-		|| request.kernel_end & pgtable.uat_pg_mask != 0
-		|| request.kernel_end > mmu.uat_unknown_page
-		|| request.kernel_end - request.kernel_start < 0x20000000
+	if request.extensions != 0 || request.pad != 0
+		|| !agxvm.valid_window(request.kernel_start, request.kernel_end)
 		|| request.kernel_end > address_limit {
 		return -22
 	}
@@ -611,33 +608,17 @@ pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) 
 
 pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
-	if request.extensions != 0 || request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) != 0
-		|| request.addr & pgtable.uat_pg_mask != 0 || request.range == 0
-		|| request.range & pgtable.uat_pg_mask != 0
-		|| request.range > u64(-1) - request.addr
-		|| request.addr < mmu.uat_user_va_start
-		|| request.addr >= mmu.uat_unknown_page
-		|| request.range > mmu.uat_unknown_page - request.addr {
-		return -22
-	}
 	ctx := f.find_vm(request.vm_id) or { return -22 }
-	if ctx.pgtable == unsafe { nil } {
+	if ctx.pgtable == unsafe { nil }
+		|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) {
 		return -22
 	}
 	mut pt := unsafe { ctx.pgtable }
-	end := request.addr + request.range
-	if request.addr < ctx.kernel_end && end > ctx.kernel_start {
-		return -22
-	}
 
 	match request.op {
 		ioctl.asahi_bind_op_bind {
-			if request.flags == 0 {
-				return -22
-			}
 			obj := f.get_object_ref(request.handle) or { return -2 }
-			if request.offset & pgtable.uat_pg_mask != 0 || request.offset > obj.size
-				|| request.range > obj.size - request.offset {
+			if request.offset > obj.size || request.range > obj.size - request.offset {
 				gem.unref(obj)
 				return -22
 			}
@@ -682,9 +663,6 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			return 0
 		}
 		ioctl.asahi_bind_op_unbind {
-			if request.handle != 0 || request.flags != 0 || request.offset != 0 {
-				return -22
-			}
 			f.lock.acquire()
 			if request.vm_id >= mmu.uat_num_contexts
 				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
@@ -706,9 +684,6 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			return -22
 		}
 		ioctl.asahi_bind_op_unbind_all {
-			if request.handle == 0 || request.flags != 0 || request.offset != 0 || request.addr != 0 {
-				return -22
-			}
 			obj := f.get_object_ref(request.handle) or { return -2 }
 			f.lock.acquire()
 			if request.vm_id >= mmu.uat_num_contexts

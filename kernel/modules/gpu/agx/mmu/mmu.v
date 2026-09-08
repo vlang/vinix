@@ -10,6 +10,7 @@ module mmu
 
 import gpu.agx.pgtable
 import gpu.agx.alloc as gpu_alloc
+import gpu.agx.vm as agxvm
 import klock
 import katomic
 import aarch64.cpu
@@ -18,9 +19,9 @@ import aarch64.timer
 
 pub const uat_num_contexts = 64
 pub const uat_kernel_flush_slot = 64
-pub const uat_user_va_start = u64(0x4000)
-pub const uat_user_va_end = u64(1) << 39
-pub const uat_unknown_page = uat_user_va_end - 2 * pgtable.uat_pgsz
+pub const uat_user_va_start = agxvm.user_start
+pub const uat_user_va_end = agxvm.address_space_end
+pub const uat_unknown_page = agxvm.user_end
 pub const uat_kernel_va_start = u64(0xffffffa000000000)
 pub const uat_kernel_va_end = u64(0xffffffb000000000)
 
@@ -326,9 +327,7 @@ fn (mut mgr UatManager) publish_initial_context_roots() {
 }
 
 pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&UatContext {
-	if kernel_start < uat_user_va_start || kernel_start >= kernel_end
-		|| kernel_end > uat_unknown_page || kernel_start & pgtable.uat_pg_mask != 0
-		|| kernel_end & pgtable.uat_pg_mask != 0 {
+	if !agxvm.valid_window(kernel_start, kernel_end) {
 		return none
 	}
 	mgr.lock.acquire()

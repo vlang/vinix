@@ -16,6 +16,7 @@ import gpu.agx.command as agxcommand
 import gpu.agx.compute as agxcompute
 import gpu.agx.render as agxrender
 import gpu.agx.submission as agxsubmission
+import gpu.agx.vm as agxvm
 import gpu.agx.workqueue
 import klock
 import sched
@@ -385,16 +386,12 @@ fn (mut file FakeG17File) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffse
 
 fn (mut file FakeG17File) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
-	if request.extensions != 0 {
+	mut vm := file.find_vm(request.vm_id) or { return -22 }
+	if !agxvm.valid_bind_request(request, vm.kernel_start, vm.kernel_end) {
 		return -22
 	}
-	mut vm := file.find_vm(request.vm_id) or { return -22 }
 	match request.op {
 		ioctl.asahi_bind_op_bind {
-			if request.flags == 0
-				|| request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) != 0 {
-				return -22
-			}
 			object := file.get_object_ref(request.handle) or { return -2 }
 			flags := (if request.flags & ioctl.asahi_bind_read != 0 { vm_read } else { u32(0) }) | (if request.flags & ioctl.asahi_bind_write != 0 {
 				vm_write
@@ -406,16 +403,9 @@ fn (mut file FakeG17File) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			return result
 		}
 		ioctl.asahi_bind_op_unbind {
-			if request.handle != 0 || request.flags != 0 || request.offset != 0 {
-				return -22
-			}
 			return vm.unbind(request.addr, request.range)
 		}
 		ioctl.asahi_bind_op_unbind_all {
-			if request.handle == 0 || request.flags != 0 || request.offset != 0
-				|| request.addr != 0 || request.range != 0 {
-				return -22
-			}
 			object := file.get_object_ref(request.handle) or { return -2 }
 			result := vm.unbind_object(object)
 			gem.unref(object)

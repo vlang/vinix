@@ -8,13 +8,14 @@ module fake
 // native AGX global manager.
 
 import drm.gem
+import gpu.agx.vm as agxvm
 import klock
 
-pub const vm_page_size = u64(0x4000)
-pub const vm_page_mask = vm_page_size - 1
-pub const vm_user_start = u64(0x4000)
-pub const vm_user_end = (u64(1) << 39) - 2 * vm_page_size
-pub const vm_kernel_min_size = u64(0x20000000)
+pub const vm_page_size = agxvm.page_size
+pub const vm_page_mask = agxvm.page_mask
+pub const vm_user_start = agxvm.user_start
+pub const vm_user_end = agxvm.user_end
+pub const vm_kernel_min_size = agxvm.kernel_min_size
 
 pub const vm_read = u32(1) << 0
 pub const vm_write = u32(1) << 1
@@ -56,9 +57,7 @@ mut:
 }
 
 pub fn new_vm(id u32, kernel_start u64, kernel_end u64) ?&FakeG17Vm {
-	if id == 0 || kernel_start < vm_user_start || kernel_start >= kernel_end
-		|| kernel_start & vm_page_mask != 0 || kernel_end & vm_page_mask != 0
-		|| kernel_end > vm_user_end || kernel_end - kernel_start < vm_kernel_min_size {
+	if id == 0 || !agxvm.valid_window(kernel_start, kernel_end) {
 		return none
 	}
 	return &FakeG17Vm{
@@ -74,16 +73,6 @@ fn ranges_overlap(first_address u64, first_size u64, second_address u64,
 		&& second_address < first_address + first_size
 }
 
-fn (vm &FakeG17Vm) valid_user_range(address u64, size u64) bool {
-	if size == 0 || address & vm_page_mask != 0 || size & vm_page_mask != 0
-		|| address < vm_user_start || address >= vm_user_end
-		|| size > vm_user_end - address {
-		return false
-	}
-	end := address + size
-	return address >= vm.kernel_end || end <= vm.kernel_start
-}
-
 // USC base values identify a VM region, not necessarily a BO-backed byte.
 pub fn (vm &FakeG17Vm) contains_address(address u64) bool {
 	return address >= vm_user_start && address < vm_user_end
@@ -95,7 +84,8 @@ pub fn (vm &FakeG17Vm) contains_address(address u64) bool {
 pub fn (mut vm FakeG17Vm) bind(object &gem.GemObject, address u64, size u64,
 	object_offset u64, flags u32) int {
 	if object == unsafe { nil } || flags == 0 || flags & ~(vm_read | vm_write) != 0
-		|| !vm.valid_user_range(address, size) || object_offset & vm_page_mask != 0
+		|| !agxvm.valid_user_range(address, size, vm.kernel_start, vm.kernel_end)
+		|| object_offset & vm_page_mask != 0
 		|| object_offset > object.size || size > object.size - object_offset {
 		return -22 // EINVAL
 	}
@@ -120,7 +110,7 @@ pub fn (mut vm FakeG17Vm) bind(object &gem.GemObject, address u64, size u64,
 }
 
 pub fn (mut vm FakeG17Vm) unbind(address u64, size u64) int {
-	if !vm.valid_user_range(address, size) {
+	if !agxvm.valid_user_range(address, size, vm.kernel_start, vm.kernel_end) {
 		return -22
 	}
 	vm.lock.acquire()

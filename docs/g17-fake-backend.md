@@ -35,6 +35,13 @@ the original byte sizes used for fake-VM bounds checks. Both backends consume
 the same immutable command and sync types and never follow userspace pointers
 after staging; waiting and execution remain backend-specific.
 
+`gpu.agx.vm` separately owns the pure 16 KiB, 39-bit AGX address-space
+contract and operation-specific GEM_BIND validation. `FakeG17Vm` implements it
+with retained software mappings and bounds checks; native UAT implements it
+with real page tables and firmware-visible invalidation. The common module has
+no import of either implementation or any hardware facility, so using it does
+not create a route from fake G17 to MMIO, DART, PMP, or RTKit.
+
 ## Verification contract
 
 `kernel/c/agx_fake_g17.c` checks the four-pass 3D register-list layout already
@@ -105,6 +112,7 @@ Compile the kernel-side V adapter as part of the normal AArch64 build:
 
 ```sh
 make -C kernel ARCH=aarch64
+./tests/agx-vm/run.sh
 ```
 
 Regenerate or verify the checked-in freestanding encoder after recovering a
