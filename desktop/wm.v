@@ -11,7 +11,6 @@ import ui2
 // Action ids are structured so the handler can read them back without a
 // lookup table: 'win.<id>.<part>' addresses one window's chrome, 'task.<id>'
 // its taskbar entry.
-const action_new_window = 'taskbar.new'
 // A narrow control at the screen edge, like Windows' Show desktop button.
 const action_show_desktop = 'taskbar.show_desktop'
 const show_desktop_button_width = 10
@@ -23,7 +22,8 @@ const action_shortcut_prefix = 'shortcut.'
 // not is an application's, and is routed to whichever window it was clicked
 // in — which is what lets a native application name its events whatever it
 // likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
-const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', action_switch_prefix]
+const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
+	action_switch_prefix]
 
 enum DragKind {
 	none_
@@ -55,6 +55,9 @@ mut:
 	buttons         u32
 	pointer_present bool
 	pointer_capture int
+	// A Start-menu press is consumed through its release even when the press
+	// launches something and closes the menu before that release arrives.
+	start_menu_pointer bool
 
 	frames  int
 	running bool = true
@@ -92,6 +95,12 @@ mut:
 	// Cmd-Tab's session: which windows it is stepping through and whether it
 	// has been held long enough to show them.
 	switcher Switcher
+	// The Start menu is compositor UI rather than a window. Search is kept on
+	// the desktop so typed input can filter applications without an app process.
+	start_menu_open      bool
+	start_menu_all_apps  bool
+	start_menu_searching bool
+	start_menu_query     []u8
 	// One screen's worth of wallpaper, scaled once and kept. It only changes
 	// when the setting does, and rescaling a photograph every frame to paint a
 	// backdrop that has not moved would cost more than the rest of a frame.
@@ -284,7 +293,7 @@ fn (mut d Desktop) activate(id int) {
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
 	begin_frame_elements()
-	mut children := frame_elements(available_apps.len + d.windows.len + 3)
+	mut children := frame_elements(available_apps.len + d.windows.len + 4)
 	// Shortcuts first, so every window paints over them.
 	shortcuts := d.shortcut_elements()
 	children << shortcuts
@@ -301,6 +310,11 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	// Keep this outside the taskbar so it remains in the literal lower-right
 	// corner when a centred dock is selected.
 	children << d.show_desktop_button_element()
+	// The Start menu paints over windows and the taskbar, and its panel consumes
+	// clicks in otherwise empty areas so they do not reach the window below.
+	if d.start_menu_open {
+		children << d.start_menu_element()
+	}
 	// Last, so the switcher is over everything it is a picture of.
 	if d.switcher.shown {
 		children << d.switcher_element()
@@ -808,22 +822,22 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	mut children := frame_elements(available_apps.len + d.windows.len + 6)
 	item_y := (taskbar_height - taskbar_item_height) / 2
 
-	// Left: a button that opens another window, so the taskbar list can be
-	// seen growing and shrinking.
-	new_button_width := 96
-	children << ui2.button(action_new_window, 'New window', ui2.rect(f64(edge_padding), f64(item_y), f64(new_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
-		bg: if d.hover == action_new_window { theme.accent } else { theme.accent_dim }
-		radius: 6
+	// The Start orb is the taskbar's anchor. Its standalone V is the first
+	// letterform of the wallpaper wordmark, not a font-dependent character.
+	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
+		bg: if d.start_menu_open || d.hover == action_start_toggle {
+			theme.accent
+		} else {
+			theme.accent_dim
+		}
+		radius: taskbar_item_height / 2
 	}, ui2.TextStyle{
 		color: theme.taskbar_text_active
-		size: 12
-		bold: true
-		align: .center
 	})
 
 	// Then a launcher per available application, native or external, so each is
 	// one click away rather than something only a terminal can open.
-	mut launcher_x := edge_padding + new_button_width + 8
+	mut launcher_x := edge_padding + start_button_width + 8
 	launcher_item_width := taskbar_launcher_width(width, launcher_x, available_apps.len)
 	for index in 0 .. available_apps.len {
 		factory := &available_apps[index]
@@ -1098,7 +1112,9 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		}
 		return
 	}
-	d.forward_pointer_to_app(x, y, .move)
+	if !d.start_menu_open && !d.start_menu_pointer {
+		d.forward_pointer_to_app(x, y, .move)
+	}
 
 	hover := d.hit_action(x, y)
 	if hover != d.hover {
@@ -1132,7 +1148,6 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	action := d.hit_action(x, y)
 	d.hover = action
 	d.dirty = true
-	d.forward_pointer_to_app(x, y, .down)
 
 	if d.switcher.active {
 		// A click on a tile switches to that window; a click anywhere else
@@ -1144,16 +1159,30 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.switcher_close()
 	}
 
+	if action == action_start_toggle {
+		d.start_menu_pointer = true
+		d.toggle_start_menu()
+		return
+	}
+
+	if d.start_menu_open {
+		d.start_menu_pointer = true
+		if action.starts_with('start.') {
+			d.handle_start_action(action)
+			return
+		}
+		// Clicking anywhere outside the panel dismisses it, then performs the
+		// action underneath, matching the Windows menu's click-away behavior.
+		d.close_start_menu()
+	}
+
+	d.forward_pointer_to_app(x, y, .down)
+
 	if action == '' {
 		// Empty desktop: drop focus so no title bar claims to be active.
 		if y < d.canvas.height - taskbar_height {
 			d.focus = 0
 		}
-		return
-	}
-
-	if action == action_new_window {
-		d.spawn_scattered()
 		return
 	}
 
@@ -1216,7 +1245,11 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 }
 
 fn (mut d Desktop) on_pointer_up(x int, y int) {
-	d.forward_pointer_to_app(x, y, .up)
+	if d.start_menu_pointer {
+		d.start_menu_pointer = false
+	} else {
+		d.forward_pointer_to_app(x, y, .up)
+	}
 	d.drag = Drag{}
 	d.hover = d.hit_action(x, y)
 	d.dirty = true

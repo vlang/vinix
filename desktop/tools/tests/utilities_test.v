@@ -172,12 +172,84 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
 	assert app_launcher_actions.len == available_apps.len
+	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	assert taskbar_launcher_width(1280, 114, available_apps.len) == 53
-	assert taskbar_launcher_width(1152, 114, available_apps.len) == 44
-	assert taskbar_launcher_width(1024, 114, available_apps.len) == 36
+	launcher_start := taskbar_padding + start_button_width + 8
+	assert taskbar_launcher_width(1280, launcher_start, available_apps.len) == 57
+	assert taskbar_launcher_width(1152, launcher_start, available_apps.len) == 48
+	assert taskbar_launcher_width(1024, launcher_start, available_apps.len) == 39
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
+}
+
+fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1024
+			height: 768
+		}
+	}
+
+	root := desktop.build_tree()
+	start := utility_element_named(root, action_start_toggle) or { panic('missing Start button') }
+	assert start.text == ''
+	assert start.image_path == 'builtin:vinix'
+	assert int(start.frame.x) == taskbar_padding
+	assert int(start.frame.width) == start_button_width
+	assert !utility_tree_has_text(root, 'New window')
+	free_tree(root)
+
+	desktop.toggle_start_menu()
+	assert desktop.start_menu_open
+	menu := desktop.build_tree()
+	panel := utility_element_named(menu, action_start_panel) or { panic('missing Start menu') }
+	assert panel.clickable
+	assert int(panel.frame.x) == taskbar_padding
+	assert int(panel.frame.y + panel.frame.height) == 768 - taskbar_height
+	assert utility_tree_has_text(menu, 'All Programs  >')
+	assert utility_tree_has_text(menu, 'Shut down')
+	free_tree(menu)
+
+	desktop.handle_start_action(action_start_all)
+	assert desktop.start_menu_all_apps
+	all_programs := desktop.build_tree()
+	assert utility_tree_has_text(all_programs, '<  Back')
+	assert utility_tree_has_text(all_programs, 'Microsoft Word 2010')
+	free_tree(all_programs)
+
+	desktop.start_menu_key_input('note')
+	assert desktop.start_menu_query.bytestr() == 'note'
+	assert !desktop.start_menu_all_apps
+	results := desktop.build_tree()
+	programs := utility_element_named(results, 'start.programs') or {
+		panic('missing Start program pane')
+	}
+	assert utility_tree_has_text(programs, 'Wine Notepad')
+	assert !utility_tree_has_text(programs, 'Calculator')
+	free_tree(results)
+
+	desktop.start_menu_key_input('\x7f')
+	assert desktop.start_menu_query.bytestr() == 'not'
+	desktop.start_menu_key_input('\x1b')
+	assert !desktop.start_menu_open
+	assert desktop.start_menu_query.len == 0
+	assert start_menu_matches('Activity Monitor', 'MON')
+	assert !start_menu_matches('Terminal', 'file')
+}
+
+fn test_start_menu_system_link_opens_system_window() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1024
+			height: 768
+		}
+	}
+	desktop.toggle_start_menu()
+	desktop.handle_start_action(action_start_system)
+	assert !desktop.start_menu_open
+	assert desktop.windows.len == 1
+	assert desktop.windows[0].title == 'System'
+	assert desktop.windows[0].page == .system
 }
 
 fn test_show_desktop_button_minimizes_every_window() {

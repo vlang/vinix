@@ -282,7 +282,8 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		return
 	}
 	radius := int(el.box.radius)
-	floating := depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id)
+	floating := depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id
+		|| el.id == action_start_panel)
 	// The switcher is drawn through: it covers the middle of the screen for as
 	// long as a key is held, and what it covers should stay legible behind it.
 	// Alpha is not something a ui2 box style can declare, so like the shadow
@@ -307,7 +308,13 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		d.canvas.fill_rect(x, y, w, h, el.box.bg)
 	}
 	if floating {
-		edge := if translucent { switcher_edge } else { d.theme().window_edge }
+		edge := if translucent {
+			switcher_edge
+		} else if el.id == action_start_panel {
+			u32(0x9db3cc)
+		} else {
+			d.theme().window_edge
+		}
 		d.canvas.stroke_round_rect(x, y, w, h, radius, edge, 190)
 	}
 
@@ -494,6 +501,21 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 	half := if w < h { w / 5 } else { h / 5 }
 
 	match name {
+		'vinix' {
+			// The standalone V is the first polygon of the VINIX wordmark,
+			// simplified to two sturdy strokes so it stays crisp in the small
+			// taskbar orb as well as the larger Start-menu user tile.
+			size := if w < h { w } else { h }
+			span := size * 7 / 24
+			top := cy - size * 7 / 24
+			bottom := cy + size * 7 / 24
+			mut thickness := size / 7
+			if thickness < 2 {
+				thickness = 2
+			}
+			d.canvas.draw_line(cx - span, top, cx, bottom, color, thickness)
+			d.canvas.draw_line(cx + span - thickness + 1, top, cx, bottom, color, thickness)
+		}
 		'minimize' {
 			d.canvas.fill_rect(cx - half, cy, 2 * half, 1, color)
 		}
@@ -669,6 +691,14 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx, cy, cx, cy - radius / 2, color, 2)
 			d.canvas.draw_line(cx, cy, cx + radius / 2, cy + radius / 3, color, 2)
 			d.canvas.fill_circle(cx, cy, 2, color)
+		}
+		'search' {
+			radius := if w < h { w / 4 } else { h / 4 }
+			d.canvas.fill_circle(cx - 2, cy - 2, radius, color)
+			if radius > 2 {
+				d.canvas.fill_circle(cx - 2, cy - 2, radius - 2, d.surface_under(x, y))
+			}
+			d.canvas.draw_line(cx + radius / 2, cy + radius / 2, cx + radius, cy + radius, color, 2)
 		}
 		else {}
 	}

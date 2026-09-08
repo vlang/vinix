@@ -102,6 +102,31 @@ fn test_an_idle_redraw_releases_all_temporary_allocations() {
 	assert live == 0, 'idle redraws retained ${live} bytes'
 }
 
+fn test_start_menu_search_and_redraw_release_temporary_allocations() {
+	mut desktop := memory_fixture_desktop()
+	// Warm the persistent frame pools for both menu layouts before measuring.
+	desktop.toggle_start_menu()
+	render_and_release(mut desktop)
+	desktop.start_menu_key_input('term')
+	render_and_release(mut desktop)
+	desktop.close_start_menu()
+
+	desktop.toggle_start_menu()
+	C.vinix_heap_begin()
+	desktop.start_menu_key_input('term')
+	for _ in 0 .. 8 {
+		render_and_release(mut desktop)
+	}
+	desktop.start_menu_key_input('\x7f')
+	render_and_release(mut desktop)
+	desktop.close_start_menu()
+	live := C.vinix_heap_end()
+	if live != 0 {
+		print_heap_sizes('Start menu allocations by size')
+	}
+	assert live == 0, 'Start menu retained ${live} bytes'
+}
+
 fn test_idle_compositor_poll_releases_all_temporary_allocations() {
 	mut desktop := memory_fixture_desktop()
 	// The production loop executes these calls even when no redraw is needed.

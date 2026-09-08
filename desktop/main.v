@@ -257,6 +257,13 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 		return
 	}
 
+	// An open Start menu owns typing before the focused application does:
+	// printable keys search, Backspace edits, Return launches and Escape closes.
+	if d.start_menu_open {
+		d.start_menu_key_input(rest)
+		return
+	}
+
 	// An application that takes typed input gets it while it is focused, and
 	// the desktop's own shortcuts stand down: a terminal cannot have `q` close
 	// the desktop out from under whoever is typing.

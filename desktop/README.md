@@ -18,7 +18,8 @@ What it does:
 - a clock in the bottom right corner — time above, date below
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, clicking one to bring it to the front
-- a **New window** button, so the taskbar list can be seen growing and shrinking
+- a **V Start button** and Windows 7-style two-column Start menu, with recent
+  programs, All Programs, type-to-search, system links and a session button
 - **shortcuts down the left edge of the wallpaper**, and matching taskbar
   launchers, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
@@ -127,12 +128,13 @@ is — its model, its methods, its QML document — compiles unmodified, so what
 runs on Vinix is the example rather than a retelling of it. The multicall
 executable selects the requested app factory before opening any display device.
 
-The window manager owns four action prefixes — `taskbar.`, `task.`, `win.` and
-`shortcut.` — and treats everything else as an application's, routing it to
-whichever window the click landed in. That is also what decides it between two
-open copies of the same application. Because the rule is "not mine", an
-application names its events whatever suits it: ui2's `__qml_...` and the file
-browser's `files.row.3` both arrive without the window manager parsing either.
+The window manager owns five action prefixes — `taskbar.`, `task.`, `win.`,
+`shortcut.` and `start.` — and treats everything else as an application's,
+routing it to whichever window the click landed in. That is also what decides
+it between two open copies of the same application. Because the rule is "not
+mine", an application names its events whatever suits it: ui2's `__qml_...`
+and the file browser's `files.row.3` both arrive without the window manager
+parsing either.
 
 Add an application by adding an `AppFactory` to `available_apps` in `app.v`;
 it then has a wallpaper shortcut and a taskbar launcher. A ui2 example also
