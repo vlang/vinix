@@ -9,10 +9,9 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
-import gpu.agx.compute as agxcompute
 import gpu.agx.mmu
 import gpu.agx.pgtable
-import gpu.agx.render as agxrender
+import gpu.agx.submission as agxsubmission
 import gpu.agx.workqueue
 import gpu.agx.gpu
 import klock
@@ -23,8 +22,8 @@ import usercopy
 import aarch64.timer
 
 const max_submission_commands = u32(64)
-const max_submission_syncs = u32(64)
-const max_g13_submission_commands = u32(2)
+const max_submission_syncs = agxsubmission.max_syncs
+const max_g13_submission_commands = agxsubmission.max_commands
 const max_command_attachments = u32(16)
 
 struct GpuMapping {
@@ -51,22 +50,6 @@ struct TimestampObject {
 	va   u64
 	size u64
 	obj  &gem.GemObject = unsafe { nil }
-}
-
-struct StagedSyncArray {
-mut:
-	count           u32
-	objects         [64]&syncobj.SyncObj
-	fences          [64]&syncobj.DmaFence
-	timeline        [64]bool
-	timeline_values [64]u64
-}
-
-struct StagedG13Command {
-mut:
-	descriptor ioctl.DrmAsahiCommand
-	render     agxrender.Command
-	compute    agxcompute.Command
 }
 
 @[heap]
@@ -981,52 +964,6 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	return -22
 }
 
-// Copy every nested sync descriptor exactly once while the submission is
-// staged and retain stable object/fence pointers. The Asahi UAPI uses timeline
-// points for its cross-context flush sync even though generic DRM timeline
-// ioctls are not exposed by Vinix yet.
-fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, StagedSyncArray) {
-	mut staged := StagedSyncArray{
-		count: count
-	}
-	if count == 0 {
-		return 0, staged
-	}
-	bytes := u64(count) * sizeof(ioctl.DrmAsahiSync)
-	if pointer == 0 || bytes - 1 > ~pointer {
-		return -14, staged
-	}
-	for i := u32(0); i < count; i++ {
-		mut item := ioctl.DrmAsahiSync{}
-		if !usercopy.copy_from_user(voidptr(&item), pointer + u64(i) * sizeof(ioctl.DrmAsahiSync), sizeof(ioctl.DrmAsahiSync)) {
-			return -14, staged
-		}
-		if item.extensions != 0
-			|| (item.sync_type != ioctl.asahi_sync_syncobj
-				&& item.sync_type != ioctl.asahi_sync_timeline_syncobj)
-			|| (item.sync_type == ioctl.asahi_sync_syncobj && item.timeline_value != 0)
-			|| (item.sync_type == ioctl.asahi_sync_timeline_syncobj
-				&& item.timeline_value == 0) {
-			return -22, staged
-		}
-		obj := syncobj.lookup(owner, item.handle) or { return -22, staged }
-		staged.objects[i] = obj
-		staged.timeline[i] = item.sync_type == ioctl.asahi_sync_timeline_syncobj
-		staged.timeline_values[i] = item.timeline_value
-		if input {
-			fence := if staged.timeline[i] {
-				syncobj.get_timeline_fence(obj, item.timeline_value) or {
-					return -22, staged
-				}
-			} else {
-				syncobj.get_fence(obj) or { return -22, staged }
-			}
-			staged.fences[i] = fence
-		}
-	}
-	return 0, staged
-}
-
 fn wait_g13_fence(fence &syncobj.DmaFence) int {
 	if fence == unsafe { nil } {
 		return -22
@@ -1045,7 +982,7 @@ fn wait_g13_fence(fence &syncobj.DmaFence) int {
 	return 0
 }
 
-fn wait_staged_syncs(staged &StagedSyncArray) int {
+fn wait_staged_syncs(staged &agxsubmission.SyncArray) int {
 	for i := u32(0); i < staged.count; i++ {
 		result := wait_g13_fence(staged.fences[i])
 		if result != 0 {
@@ -1053,100 +990,6 @@ fn wait_staged_syncs(staged &StagedSyncArray) int {
 		}
 	}
 	return 0
-}
-
-fn install_output_syncs(staged &StagedSyncArray, fence &syncobj.DmaFence) bool {
-	for i := u32(0); i < staged.count; i++ {
-		obj := staged.objects[i]
-		if obj == unsafe { nil } {
-			return false
-		}
-		if staged.timeline[i] {
-			if !syncobj.add_timeline_point(obj, staged.timeline_values[i], fence) {
-				return false
-			}
-		} else {
-			syncobj.replace_fence(obj, fence)
-		}
-	}
-	return true
-}
-
-// Copy the complete Mesa command array before acquiring any driver locks.
-// G13 accepts the render-only/compute-only cases plus Mesa's ordered
-// compute-then-render pair. Serial execution below provides the pair's
-// compute-to-render barrier without exposing partially submitted work.
-fn stage_g13_commands(pointer u64, count u32) (int, [2]StagedG13Command) {
-	mut staged := [2]StagedG13Command{}
-	if pointer == 0 || count == 0 || count > max_g13_submission_commands {
-		return -22, staged
-	}
-	bytes := u64(count) * sizeof(ioctl.DrmAsahiCommand)
-	if bytes - 1 > ~pointer {
-		return -14, staged
-	}
-	for i := u32(0); i < count; i++ {
-		mut descriptor := ioctl.DrmAsahiCommand{}
-		if !usercopy.copy_from_user(voidptr(&descriptor), pointer + u64(i) * sizeof(ioctl.DrmAsahiCommand), sizeof(ioctl.DrmAsahiCommand)) {
-			return -14, staged
-		}
-		if descriptor.extensions != 0 || descriptor.flags != 0 || descriptor.cmd_buffer == 0 {
-			return -22, staged
-		}
-		for barrier in descriptor.barriers {
-			if barrier != ioctl.asahi_barrier_none && barrier > i {
-				return -22, staged
-			}
-		}
-		staged[i].descriptor = descriptor
-		match descriptor.cmd_type {
-			ioctl.asahi_cmd_render {
-				if descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
-					|| (descriptor.result_size != 0
-						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
-					return -22, staged
-				}
-				mut render := ioctl.DrmAsahiCmdRender{}
-				if !usercopy.copy_from_user(voidptr(&render), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
-					return -14, staged
-				}
-				render_result, render_command := agxrender.stage_uapi(&render, descriptor.result_size != 0)
-				if render_result != 0 {
-					return render_result, staged
-				}
-				staged[i].render = render_command
-			}
-			ioctl.asahi_cmd_compute {
-				// Mesa 25.0.5 reports sizeof - 8 for compatibility with 6.11.8,
-				// while the userspace pointer still addresses the current struct.
-				if (descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
-					&& descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute) - u64(8))
-					|| (descriptor.result_size != 0
-						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
-					return -22, staged
-				}
-				mut compute := ioctl.DrmAsahiCmdCompute{}
-				if !usercopy.copy_from_user(voidptr(&compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
-					return -14, staged
-				}
-				compute_result, compute_command := agxcompute.stage_uapi(&compute, descriptor.result_size != 0)
-				if compute_result != 0 {
-					return compute_result, staged
-				}
-				staged[i].compute = compute_command
-			}
-			else {
-				return -22, staged
-			}
-		}
-	}
-	if count == 2 && (staged[0].descriptor.cmd_type != ioctl.asahi_cmd_compute
-		|| staged[1].descriptor.cmd_type != ioctl.asahi_cmd_render
-		|| staged[1].descriptor.barriers[0] != ioctl.asahi_barrier_none
-		|| staged[1].descriptor.barriers[1] != 1) {
-		return -22, staged
-	}
-	return 0, staged
 }
 
 fn discard_g13_completion(mut state G13SubmitCompletion) {
@@ -1241,15 +1084,15 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		|| (request.out_sync_count != 0 && request.out_syncs == 0) {
 		return -22
 	}
-	command_result, commands := stage_g13_commands(request.commands, request.command_count)
+	command_result, commands := agxsubmission.stage_commands(request.commands, request.command_count)
 	if command_result != 0 {
 		return command_result
 	}
-	sync_result, input_syncs := stage_sync_array(f.owner_key, request.in_syncs, request.in_sync_count, true)
+	sync_result, input_syncs := agxsubmission.stage_sync_array(f.owner_key, request.in_syncs, request.in_sync_count, true)
 	if sync_result != 0 {
 		return sync_result
 	}
-	output_result, output_syncs := stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
+	output_result, output_syncs := agxsubmission.stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 {
 		return output_result
 	}
@@ -1416,7 +1259,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 			return -5
 		}
 	}
-	if !install_output_syncs(&output_syncs, final_fence) {
+	if !agxsubmission.install_output_syncs(&output_syncs, final_fence) {
 		if compute_job != unsafe { nil } {
 			gpu_manager.release_g13_compute_job(compute_job)
 		}

@@ -25,13 +25,15 @@ produced the expected bytes and that the ordinary Vinix queue/fence lifecycle
 handles success and failure. It cannot prove firmware boot, real UAT mappings,
 hardware register semantics, or acceptance by G17 firmware.
 
-`gpu.agx.render` and `gpu.agx.compute` are the generation-neutral command
-boundaries immediately below the Asahi ioctl. Their shared `gpu.agx.command`
-attachment staging copies every nested attachment array exactly once and
-converts byte sizes to the cache-line count required by G13 while retaining
-the original byte sizes used for fake-VM bounds checks. Both native G13 and
-fake G17 consume the same immutable render and compute command types; a
-backend never follows the userspace attachment pointers again.
+`gpu.agx.submission` is the generation-neutral boundary immediately below the
+Asahi ioctl. It gives native G13 and fake G17 identical command-array framing,
+barrier and size validation, sync-object lookup, and output-fence installation.
+Its `gpu.agx.render` and `gpu.agx.compute` payloads share `gpu.agx.command`
+attachment staging, which copies every nested attachment array exactly once
+and converts byte sizes to the cache-line count required by G13 while retaining
+the original byte sizes used for fake-VM bounds checks. Both backends consume
+the same immutable command and sync types and never follow userspace pointers
+after staging; waiting and execution remain backend-specific.
 
 ## Verification contract
 
