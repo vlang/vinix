@@ -64,6 +64,14 @@ desktop-amd64: vinix.iso
 run-desktop-amd64:
 	./run-desktop-amd64.sh
 
+.PHONY: macos-installer
+macos-installer:
+	./build-macos-installer.sh
+
+.PHONY: test-macos-installer
+test-macos-installer:
+	./installer/macos/test.sh
+
 .PHONY: clean
 clean:
 	rm -rf iso_root sysroot vinix.iso initramfs.tar
