@@ -542,7 +542,8 @@ fn write_results(commands [2]agxsubmission.Command, count u32, object &gem.GemOb
 }
 
 fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
-	fence &syncobj.DmaFence, resources []FakeG17ResourceReference) FakeG17Verification {
+	fence &syncobj.DmaFence, render_command &agxrender.Command,
+	resources []FakeG17ResourceReference) FakeG17Verification {
 	command := unsafe { malloc(g17_command_bytes) }
 	descriptor := unsafe { malloc(g17_descriptor_bytes) }
 	if command == unsafe { nil } || descriptor == unsafe { nil } {
@@ -556,7 +557,8 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 		return FakeG17Verification{ error: fake_g17_invalid_argument }
 	}
 	unsafe { C.memset(command, 0, g17_command_bytes) }
-	if !initialize_render_descriptor(descriptor, g17_descriptor_bytes) {
+	if !initialize_render_descriptor(descriptor, g17_descriptor_bytes,
+		render_command) {
 		unsafe {
 			free(command)
 			free(descriptor)
@@ -733,7 +735,8 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	started := timer.get_count()
 	mut successful := true
 	if render_index >= 0 {
-		report := run_fake_render(mut queue, mut vm, fence, render_resources)
+		report := run_fake_render(mut queue, mut vm, fence,
+			&commands[render_index].render, render_resources)
 		successful = report.succeeded()
 		if !successful {
 			C.printf(c'fake-g17: verifier failed error=%u pass=%u entry=%u observed=%u expected=%u\n', report.error, report.pass, report.entry, report.observed_writes, report.expected_writes)

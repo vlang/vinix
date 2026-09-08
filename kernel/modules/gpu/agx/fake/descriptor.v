@@ -59,13 +59,39 @@ pub enum G17RenderResourceField as u32 {
 	partial_store_pipeline
 }
 
-pub fn initialize_render_descriptor(descriptor voidptr, descriptor_bytes u64) bool {
-	return fw.initialize_g17_3d_descriptor(descriptor, descriptor_bytes)
+fn usc_resource_address(base u64, encoded_offset u32, flag_mask u32) ?u64 {
+	if encoded_offset == 0 {
+		return u64(0)
+	}
+	offset := u64(encoded_offset & ~flag_mask)
+	if base > ~u64(0) - offset {
+		return none
+	}
+	return base + offset
 }
 
-fn append_render_resource(mut resources []FakeG17ResourceReference,
+pub fn initialize_render_descriptor(descriptor voidptr, descriptor_bytes u64,
+	command &agxrender.Command) bool {
+	load_pipeline := usc_resource_address(command.fragment_usc_base,
+		command.load_pipeline, u32(7)) or { return false }
+	store_pipeline := usc_resource_address(command.fragment_usc_base,
+		command.store_pipeline, u32(7)) or { return false }
+	if !fw.initialize_g17_3d_descriptor(descriptor, descriptor_bytes) {
+		return false
+	}
+	return fw.populate_g17_render_resource_fields(descriptor, descriptor_bytes,
+		fw.G17RenderDescriptorFields{
+			encoder: command.encoder_ptr
+			load_pipeline_bind: u64(command.load_pipeline_bind)
+			load_pipeline: load_pipeline
+			store_pipeline_bind: u64(command.store_pipeline_bind)
+			store_pipeline: store_pipeline
+		})
+}
+
+fn append_render_resource_at(mut resources []FakeG17ResourceReference,
 	field G17RenderResourceField, provenance G17DescriptorProvenance,
-	address u64, size u64, access u32) {
+	address u64, size u64, access u32, descriptor_member u32) {
 	if address == 0 {
 		return
 	}
@@ -74,10 +100,21 @@ fn append_render_resource(mut resources []FakeG17ResourceReference,
 		size: if size == 0 { u64(1) } else { size }
 		field: u32(field)
 		provenance: u32(provenance)
-		descriptor_member: g17_descriptor_member_pending
-		descriptor_bytes: 0
+		descriptor_member: descriptor_member
+		descriptor_bytes: if descriptor_member == g17_descriptor_member_pending {
+			u32(0)
+		} else {
+			u32(8)
+		}
 		access: access
 	}
+}
+
+fn append_render_resource(mut resources []FakeG17ResourceReference,
+	field G17RenderResourceField, provenance G17DescriptorProvenance,
+	address u64, size u64, access u32) {
+	append_render_resource_at(mut resources, field, provenance, address, size,
+		access, g17_descriptor_member_pending)
 }
 
 // Mesa's helper and clear/store pipeline fields are USC-heap-relative u32
@@ -86,13 +123,13 @@ fn append_render_resource(mut resources []FakeG17ResourceReference,
 // this UAPI translation separate from native descriptor-member recovery.
 fn append_usc_resource(mut resources []FakeG17ResourceReference,
 	field G17RenderResourceField, base u64, encoded_offset u32,
-	flag_mask u32) {
+	flag_mask u32, descriptor_member u32) {
 	if encoded_offset == 0 {
 		return
 	}
-	offset := u64(encoded_offset & ~flag_mask)
-	append_render_resource(mut resources, field, .gpu_va, base + offset, 1,
-		fake_g17_vm_read)
+	address := usc_resource_address(base, encoded_offset, flag_mask) or { return }
+	append_render_resource_at(mut resources, field, .gpu_va, address, 1,
+		fake_g17_vm_read, descriptor_member)
 }
 
 fn sampler_array_bytes(count u32) u64 {
@@ -108,21 +145,26 @@ fn sampler_array_bytes(count u32) u64 {
 // that member before it allows synthetic completion.
 pub fn stage_render_resource_references(command &agxrender.Command) []FakeG17ResourceReference {
 	mut resources := []FakeG17ResourceReference{cap: 64}
-	append_render_resource(mut resources, .encoder, .gpu_va, command.encoder_ptr, 4, fake_g17_vm_read)
+	append_render_resource_at(mut resources, .encoder, .gpu_va,
+		command.encoder_ptr, 4, fake_g17_vm_read, fw.g17_render_encoder_member)
 	append_render_resource(mut resources, .vertex_helper_argument, .gpu_va, command.vertex_helper_arg, 8, fake_g17_vm_read)
 	append_render_resource(mut resources, .fragment_helper_argument, .gpu_va, command.fragment_helper_arg, 8, fake_g17_vm_read)
 	append_usc_resource(mut resources, .vertex_helper_program,
-		command.vertex_usc_base, command.vertex_helper_program, u32(1))
+		command.vertex_usc_base, command.vertex_helper_program, u32(1),
+		g17_descriptor_member_pending)
 	append_usc_resource(mut resources, .fragment_helper_program,
-		command.fragment_usc_base, command.fragment_helper_program, u32(1))
+		command.fragment_usc_base, command.fragment_helper_program, u32(1),
+		g17_descriptor_member_pending)
 	append_usc_resource(mut resources, .load_pipeline, command.fragment_usc_base,
-		command.load_pipeline, u32(7))
+		command.load_pipeline, u32(7), fw.g17_render_load_pipeline_member)
 	append_usc_resource(mut resources, .store_pipeline, command.fragment_usc_base,
-		command.store_pipeline, u32(7))
+		command.store_pipeline, u32(7), fw.g17_render_store_pipeline_member)
 	append_usc_resource(mut resources, .partial_reload_pipeline,
-		command.fragment_usc_base, command.partial_reload_pipeline, u32(7))
+		command.fragment_usc_base, command.partial_reload_pipeline, u32(7),
+		g17_descriptor_member_pending)
 	append_usc_resource(mut resources, .partial_store_pipeline,
-		command.fragment_usc_base, command.partial_store_pipeline, u32(7))
+		command.fragment_usc_base, command.partial_store_pipeline, u32(7),
+		g17_descriptor_member_pending)
 	append_render_resource(mut resources, .depth_buffer_load, .gpu_va, command.depth_buffer_load, 8, fake_g17_vm_read)
 	append_render_resource(mut resources, .depth_buffer_store, .gpu_va, command.depth_buffer_store, 8, fake_g17_vm_write)
 	append_render_resource(mut resources, .depth_buffer_partial, .gpu_va, command.depth_buffer_partial, 8, fake_g17_vm_write)

@@ -1926,6 +1926,58 @@ pub fn initialize_g17_3d_descriptor(descriptor voidptr, descriptor_bytes u64) bo
 	return true
 }
 
+// The first scoped Mesa-to-G17 descriptor bridge. These five members are
+// triangulated rather than inferred from selector numbers alone:
+//
+// - the recovered G17 graph loads them for selectors 0x1c880, 0x15368,
+//   0x15370, 0x15378, and 0x15380 respectively;
+// - the clear/triangle resource trace carries the encoder, load-pipeline, and
+//   store-pipeline GPU VAs through members 0xfe0, 0x610, and 0x768; and
+// - m1n1 commit 940439's independent register-list producer assigns those
+//   selector pairs to the matching Asahi command fields.
+//
+// This is deliberately a narrow field identity. It does not claim that the
+// still-unidentified selector address space is SGX MMIO, nor does it assign
+// the adjacent partial-pipeline members without equivalent evidence.
+pub const g17_render_encoder_member = u32(0xfe0)
+pub const g17_render_load_pipeline_bind_member = u32(0x608)
+pub const g17_render_load_pipeline_member = u32(0x610)
+pub const g17_render_store_pipeline_bind_member = u32(0x760)
+pub const g17_render_store_pipeline_member = u32(0x768)
+
+pub struct G17RenderDescriptorFields {
+pub:
+	encoder             u64
+	load_pipeline_bind  u64
+	load_pipeline       u64
+	store_pipeline_bind u64
+	store_pipeline      u64
+}
+
+// Populate normalized values only after initialize_g17_3d_descriptor has
+// installed the recovered base-class defaults. The caller owns UAPI-specific
+// address translation; this layer owns the recovered native member layout.
+pub fn populate_g17_render_resource_fields(descriptor voidptr,
+	descriptor_bytes u64, fields G17RenderDescriptorFields) bool {
+	if descriptor == unsafe { nil } || descriptor_bytes < g17_3d_descriptor_size {
+		return false
+	}
+	unsafe {
+		destination := &u8(descriptor)
+		write_g17_descriptor_value(destination, g17_render_encoder_member, 8,
+			fields.encoder)
+		write_g17_descriptor_value(destination,
+			g17_render_load_pipeline_bind_member, 8, fields.load_pipeline_bind)
+		write_g17_descriptor_value(destination, g17_render_load_pipeline_member,
+			8, fields.load_pipeline)
+		write_g17_descriptor_value(destination,
+			g17_render_store_pipeline_bind_member, 8, fields.store_pipeline_bind)
+		write_g17_descriptor_value(destination, g17_render_store_pipeline_member,
+			8, fields.store_pipeline)
+	}
+	return true
+}
+
 // Copy the common 3D record retained inside a validated render payload into
 // its internal descriptor. The scatter map and the source at payload +0x2d0
 // are recovered independently from processRenderSetup and its leaf helper.
