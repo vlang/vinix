@@ -37,8 +37,10 @@ for tool in curl python3 tar clang ld.lld file; do
         exit 1
     fi
 done
-if [ "$WITH_WINE" -eq 1 ] && ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
-    echo "missing build tool: x86_64-w64-mingw32-gcc" >&2
+if [ "$WITH_WINE" -eq 1 ] &&
+   { ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 ||
+     ! command -v i686-w64-mingw32-gcc >/dev/null 2>&1; }; then
+    echo "missing build tools: x86_64-w64-mingw32-gcc and i686-w64-mingw32-gcc" >&2
     echo "install mingw-w64, or use --translator-only" >&2
     exit 1
 fi
@@ -177,6 +179,8 @@ if [ "$WITH_WINE" -eq 1 ]; then
     # runtime's canonical path.
     ln -snf /usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows \
         "$STAGING/usr/share/wine/x86_64-windows"
+    ln -snf /usr/libexec/vinix-x86_64/root/usr/lib/wine/i386-windows \
+        "$STAGING/usr/share/wine/i386-windows"
     for prefix in "$STAGING/root/.wine-x86_64" \
         "$STAGING/root/.wine-office2010-x86_64"; do
         mkdir -p "$prefix/drive_c/windows/system32" "$prefix/dosdevices"
@@ -192,6 +196,15 @@ if [ "$WITH_WINE" -eq 1 ]; then
             ln -snf "/usr/share/wine/x86_64-windows/${builtin##*/}" \
                 "$prefix/drive_c/windows/system32/${builtin##*/}"
         done
+        # Wine's new WoW64 mode executes PE32 code through the same translated
+        # x86-64 Unix process, so it needs the i386 PE modules but no i386 Linux
+        # runtime or second architecture translator.
+        mkdir -p "$prefix/drive_c/windows/syswow64"
+        for builtin in "$X86_ROOT/usr/lib/wine/i386-windows/"*; do
+            [ -f "$builtin" ] || continue
+            ln -snf "/usr/share/wine/i386-windows/${builtin##*/}" \
+                "$prefix/drive_c/windows/syswow64/${builtin##*/}"
+        done
     done
     x86_64-w64-mingw32-gcc -Os -s -mwindows \
         "$SCRIPT_DIR/tests/wine/calculator.c" \
@@ -199,9 +212,12 @@ if [ "$WITH_WINE" -eq 1 ]; then
     x86_64-w64-mingw32-gcc -Os -s \
         "$SCRIPT_DIR/tests/wine/smoke.c" \
         -o "$STAGING/usr/share/wine/vinix-wine-smoke.exe"
+    i686-w64-mingw32-gcc -Os -s \
+        "$SCRIPT_DIR/tests/wine/smoke.c" \
+        -o "$STAGING/usr/share/wine/vinix-wine-smoke32.exe"
     install -m755 "$SCRIPT_DIR/build-support/x86-translation/run-wine-x86-64" \
         "$STAGING/usr/bin/run-wine-x86-64"
-    for launcher in wine wine64 wineserver msiexec notepad regedit regsvr32 \
+    for launcher in wine wine32 wine64 wineserver msiexec notepad regedit regsvr32 \
         wineboot winecfg wineconsole winefile winemine winepath calculator \
         office2010-setup word2010; do
         install -m755 "$SCRIPT_DIR/build-support/x86-translation/run-wine-x86-64" \
@@ -209,6 +225,8 @@ if [ "$WITH_WINE" -eq 1 ]; then
     done
     install -m755 "$SCRIPT_DIR/tests/wine/wine-smoke" \
         "$STAGING/usr/bin/wine-smoke"
+    install -m755 "$SCRIPT_DIR/tests/wine/wine-smoke32" \
+        "$STAGING/usr/bin/wine-smoke32"
 
     if [ -n "$OFFICE2010_MEDIA" ]; then
         echo "=== staging licensed Office 2010 media ==="
@@ -229,7 +247,7 @@ echo
 echo "x86-64 translation layer staged: $(du -sh "$STAGING" | cut -f1)"
 echo "output: $STAGING"
 if [ "$WITH_WINE" -eq 1 ]; then
-    echo "guest commands: x86-translation-smoke.sh, wine-smoke, calculator, word2010"
+    echo "guest commands: x86-translation-smoke.sh, wine-smoke, wine-smoke32, calculator, word2010"
     echo "Office 2010 setup: office2010-setup /path/to/x64/setup.exe"
 else
     echo "guest command: x86-translation-smoke.sh"

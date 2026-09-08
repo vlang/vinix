@@ -23,7 +23,7 @@ case "$tool" in
         ;;
 esac
 export WINEPREFIX="${WINEPREFIX:-$default_prefix}"
-export WINEDLLPATH="$runtime/usr/lib/wine/x86_64-unix:$runtime/usr/lib/wine/x86_64-windows"
+export WINEDLLPATH="$runtime/usr/lib/wine/x86_64-unix:$runtime/usr/lib/wine/x86_64-windows:$runtime/usr/lib/wine/i386-windows"
 # Wine normally re-execs through wine-preloader. The preloader is another
 # x86-64 ELF, so keep execution inside the QEMU process that is already active.
 export WINELOADERNOEXEC=1
@@ -33,7 +33,7 @@ export WINELOADER=/usr/bin/wine64
 export WINESERVER=/usr/bin/wineserver
 
 case "$tool" in
-    wine|wine64|run-wine-x86-64)
+    wine|wine32|wine64|run-wine-x86-64)
         set -- "$wine" "$@"
         ;;
     wineserver)

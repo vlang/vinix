@@ -25,8 +25,9 @@ This native port is Win64-only and does not run 32-bit Windows binaries.
 ## AArch64 through x86-64 translation
 
 The AArch64 image can run the Alpine x86-64 Wine build through QEMU user-mode
-translation. Build the optional layer before assembling the userland or desktop
-image:
+translation. Wine's new WoW64 mode also runs 32-bit Windows PE applications
+without an i386 Linux runtime. Build the optional layer before assembling the
+userland or desktop image:
 
 ```sh
 ./build-x86-translation-aarch64.sh
@@ -43,6 +44,7 @@ syscalls, the x86-64 musl loader, and Wine with:
 ```sh
 /root/x86-translation-smoke.sh
 wine-smoke
+wine-smoke32
 ```
 
 Open **Wine Calculator** or **Wine Notepad** from the Vinix desktop to run the
@@ -94,5 +96,7 @@ launcher verifies that `Office14/WINWORD.EXE` exists before starting Word.
 Use `./build-x86-translation-aarch64.sh --translator-only` for the small Linux
 translation layer without Wine. The Wine bundle is much larger because it
 includes a complete private x86-64 graphics and multimedia dependency closure.
-This path remains Win64-only; it does not include an i386 translator or the
-32-bit half of Wine/WoW64, so the x64 Office media is required.
+The translated runtime includes Wine's i386 PE modules and verifies them with
+`wine-smoke32`; it does not need a second i386 Linux translator. Office 2010
+still requires x64 media because that launcher intentionally validates and
+isolates the 64-bit edition.
