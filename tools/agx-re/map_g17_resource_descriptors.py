@@ -177,13 +177,23 @@ def traced_resource_ranges(
 ) -> list[dict[str, int]]:
     unique: dict[tuple[int, int], dict[str, int]] = {}
     for record in records:
-        if (
-            record.get("event") != "resource_snapshot"
-            or record.get("phase") != phase
-        ):
+        event = record.get("event")
+        if event == "resource_snapshot":
+            if record.get("phase") != phase:
+                continue
+            address_value = record.get("resource_gpu_address")
+            size_value = record.get("resource_bytes")
+        elif event == "resource":
+            # Resource creation may precede the first trace marker, and private
+            # Metal textures deliberately have no CPU address to snapshot.
+            # Their IOGPUMetalResource GPU range is still sufficient for the
+            # read-only pointer correlation performed below.
+            address_value = record.get("gpu_address")
+            size_value = record.get("bytes")
+        else:
             continue
-        base = integer(record.get("resource_gpu_address"), "resource GPU address")
-        size = integer(record.get("resource_bytes"), "resource size")
+        base = integer(address_value, "resource GPU address")
+        size = integer(size_value, "resource size")
         if base == 0 or size == 0 or base > (1 << 64) - size:
             raise ValueError(f"phase {phase!r} contains an invalid resource range")
         unique[(base, size)] = {"address": base, "size": size}
@@ -277,7 +287,8 @@ def correlate_phase(
         "unmapped_occurrences": unmapped,
         "interpretation": (
             "candidate Apple payload-to-descriptor copies only; no Mesa semantic "
-            "field mapping is claimed"
+            "field mapping is claimed; private resources contribute ranges but "
+            "are never CPU-read"
         ),
     }
 

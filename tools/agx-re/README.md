@@ -37,6 +37,7 @@ make -f GNUmakefile test
 make -f GNUmakefile inspect
 make -f GNUmakefile trace
 make -f GNUmakefile trace-resources
+make -f GNUmakefile trace-depth-resources
 make -f GNUmakefile layout
 make -f GNUmakefile firmware
 make -f GNUmakefile pmp-firmware
@@ -56,6 +57,12 @@ not be committed. Set `AGX_TRACE_ALL=1` only when calls on non-GPU IOKit
 connections are relevant. Selectors `0x100` through `0x112` are annotated with
 names recovered from the local
 `AGXDeviceUserClient::getTargetAndMethodForIndex` table.
+
+`trace-depth-resources` writes a separate
+`build/agx_trace_depth_resources.jsonl` capture. It submits matched
+`depth-clear` and `depth-triangle` passes with a private `Depth32Float` target,
+so depth-related resource identities can be recovered without changing or
+overwriting the baseline color-only trace.
 
 `trace_diff.py` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and
@@ -85,7 +92,9 @@ The report deliberately calls its output descriptor-member *candidates*. It
 proves that a value inside a traced `IOGPUMetalResource` range was copied to a
 member, but does not equate that private Metal payload value with any Mesa
 Asahi UAPI field. `PENDING` may be replaced in the fake backend only after that
-last semantic correspondence is independently established.
+last semantic correspondence is independently established. Private Metal
+resources participate through the GPU range recorded at creation time; the
+tool never attempts to read their absent CPU mapping.
 
 `objc_layout` records class, method, and ivar metadata exposed by the local
 Objective-C runtime. `extract_firmware.py` extracts only the matching G17C

@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources clean
+.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -79,6 +79,16 @@ trace-resources: all
 		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
 		$(CURDIR)/$(BUILD)/metal_triangle pair
 	./trace_diff.py $(BUILD)/agx_trace_resources.jsonl
+
+trace-depth-resources: all
+	rm -f $(BUILD)/agx_trace_depth_resources.jsonl
+	AGX_TRACE_FILE=$(CURDIR)/$(BUILD)/agx_trace_depth_resources.jsonl \
+		AGX_TRACE_BYTES=65536 \
+		AGX_TRACE_RESOURCES=1 \
+		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
+		$(CURDIR)/$(BUILD)/metal_triangle depth-pair
+	./trace_diff.py $(BUILD)/agx_trace_depth_resources.jsonl \
+		--left depth-clear --right depth-triangle
 
 clean:
 	rm -rf $(BUILD)

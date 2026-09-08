@@ -119,6 +119,34 @@ class G17ResourceDescriptorMappingTests(unittest.TestCase):
             [("ta-pre", 0x100), ("ta-post", 0x500)],
         )
 
+    def test_correlates_private_resource_without_cpu_snapshot(self) -> None:
+        records, _ = self.records()
+        # Replace the snapshot for 0x3000 with the creation record emitted for
+        # a private Metal texture. It has no CPU mapping, but its exact GPU
+        # range can still classify the payload pointer without reading it.
+        records = [
+            record
+            for record in records
+            if record.get("resource_gpu_address") != hex(0x3000)
+        ]
+        records.append(
+            {
+                "event": "resource",
+                "gpu_address": hex(0x3000),
+                "cpu_address": "0x0",
+                "bytes": 0x100,
+            }
+        )
+
+        report = mapper.correlate_phase(records, self.abi(), "triangle")
+
+        self.assertEqual(report["traced_resource_ranges"], 3)
+        self.assertEqual(
+            [item["payload_offset"] for item in report["unmapped_occurrences"]],
+            [0x500],
+        )
+        self.assertIn("private resources", report["interpretation"])
+
     def test_loaders_reject_truncated_segment_snapshot(self) -> None:
         records, _ = self.records()
         records[0]["data_prefix"] = records[0]["data_prefix"][:-2]
