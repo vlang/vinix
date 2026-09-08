@@ -262,6 +262,20 @@ static int test_descriptor_resource_provenance(void)
               sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
               &resource, 1, &report) == VINIX_FAKE_G17_OK);
 
+    /* The last USC-derived resource identifier is part of the stable V/C
+     * sidecar ABI; the following value is not. */
+    resource.field = VINIX_FAKE_G17_RESOURCE_PARTIAL_STORE_PIPELINE;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_OK);
+    resource.field = VINIX_FAKE_G17_RESOURCE_FIELD_COUNT;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA);
+    resource.field = VINIX_FAKE_G17_RESOURCE_DEPTH_BUFFER_LOAD;
+
     resource.access = VINIX_FAKE_G17_VM_WRITE;
     ranges[0].access = VINIX_FAKE_G17_VM_READ;
     CHECK(vinix_fake_g17_verify(

@@ -84,6 +84,15 @@ payload layout. They still have executable bounds, BO identity, and access
 checks. When a native member is recovered, replacing `PENDING` with that member
 automatically turns on descriptor-value verification.
 
+The sidecar also normalizes Mesa's USC-relative program fields before VM
+validation. Vertex and fragment helper programs are their respective USC base
+plus the UAPI offset with bit zero removed; load, store, partial-reload, and
+partial-store pipelines use the fragment USC base with their low three flag
+bits removed. These derived addresses must resolve to live read bindings even
+while their native G17 descriptor members remain `PENDING`. Sampler-array
+ranges cover all eight bytes of every AGX sampler descriptor rather than only
+one byte per sampler.
+
 The expected-write list is deliberately path-specific. The recovered 314
 virtual encoder call sites cover 3D, TA, FastBlit, and CL; they are not 314
 writes that every render must execute.
