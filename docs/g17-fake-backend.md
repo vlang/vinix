@@ -25,11 +25,12 @@ produced the expected bytes and that the ordinary Vinix queue/fence lifecycle
 handles success and failure. It cannot prove firmware boot, real UAT mappings,
 hardware register semantics, or acceptance by G17 firmware.
 
-`gpu.agx.render` is the generation-neutral boundary immediately below the
-Asahi ioctl. It validates the Mesa render record, copies both nested attachment
-arrays exactly once, and converts byte sizes to the cache-line count required
-by G13 while retaining the original byte sizes used for fake-VM bounds checks.
-Both native G13 and fake G17 consume the same immutable `render.Command`; a
+`gpu.agx.render` and `gpu.agx.compute` are the generation-neutral command
+boundaries immediately below the Asahi ioctl. Their shared `gpu.agx.command`
+attachment staging copies every nested attachment array exactly once and
+converts byte sizes to the cache-line count required by G13 while retaining
+the original byte sizes used for fake-VM bounds checks. Both native G13 and
+fake G17 consume the same immutable render and compute command types; a
 backend never follows the userspace attachment pointers again.
 
 ## Verification contract
@@ -193,10 +194,11 @@ and exits QEMU. Set `VINIX_BOOT_DISK` to reuse an existing test image or
 Mesa should identify the renderer as `Apple M5 Max (G17C C0)` and report that
 the render submit and fence completed successfully. The first kernel message
 also includes the staged Mesa fragment command ID and framebuffer dimensions.
-This exercises the Asahi DRM ioctl layout, shared render-command normalization,
-immutable attachment staging, per-file GEM and VM ownership, mappings,
-contexts, queues, sync objects, the generated G17 encoder, the independent
-verifier, synthetic completion, fence waiting, and process teardown.
+This exercises the Asahi DRM ioctl layout, shared render/compute command
+normalization, immutable attachment staging, per-file GEM and VM ownership,
+mappings, contexts, queues, sync objects, the generated G17 encoder, the
+independent verifier, synthetic completion, fence waiting, and process
+teardown.
 
 `--submit-only` is intentional: fake G17 does not rasterize pixels. Running the
 same binary without that option retains the normal framebuffer pixel check for

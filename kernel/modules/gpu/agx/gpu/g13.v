@@ -8,6 +8,8 @@ module gpu
 
 import gpu.agx.fw
 import gpu.agx.alloc
+import gpu.agx.command as agxcommand
+import gpu.agx.compute as agxcompute
 import gpu.agx.pgtable
 import gpu.agx.event
 import gpu.agx.mmu
@@ -19,7 +21,6 @@ pub const g13_queue_channel_vertex = u32(1) << 0
 pub const g13_queue_channel_fragment = u32(1) << 1
 pub const g13_queue_channel_compute = u32(1) << 2
 const g13_queue_channel_mask = g13_queue_channel_vertex | g13_queue_channel_fragment | g13_queue_channel_compute
-const g13_compute_no_preemption = u64(1) << 0
 const g13_tvb_max_size = u64(862_322_688)
 const g13_tvb_max_blocks = u32(g13_tvb_max_size / fw.g13_tvb_block_size)
 const g13_tvb_max_blocks_nomemless = g13_tvb_max_blocks / u32(3)
@@ -74,35 +75,6 @@ mut:
 	min_tvb_blocks     u32
 	utile_config       u32
 	params             fw.G13TilingParameters
-}
-
-pub struct G13ComputeAttachment {
-pub:
-	address u64
-	size    u32
-	order   u16
-}
-
-pub struct G13ComputeCommand {
-pub:
-	flags            u64
-	encoder_ptr      u64
-	encoder_end      u64
-	usc_base         u64
-	helper_program   u32
-	helper_cfg       u32
-	helper_arg       u64
-	encoder_id       u32
-	cmd_id           u32
-	sampler_array    u64
-	sampler_count    u32
-	sampler_max      u32
-	iogpu_unk_40     u32
-	unk_mask         u32
-	attachment_count u32
-	attachments      [fw.g13_max_attachments]G13ComputeAttachment
-	has_result       bool
-	flush_stamps     bool
 }
 
 pub struct G13ComputeJobResources {
@@ -828,29 +800,7 @@ fn (mut mgr GpuManager) submit_g13_queue_command(resources &G13QueueResources,
 }
 
 fn build_g13_attachments(count u32,
-	input [fw.g13_max_attachments]G13ComputeAttachment) ?fw.G13MicroseqAttachments {
-	if count > fw.g13_max_attachments {
-		return none
-	}
-	mut attachments := fw.G13MicroseqAttachments{}
-	for index := u32(0); index < count; index++ {
-		attachment := input[index]
-		if attachment.order < 1 || attachment.order > 6 {
-			return none
-		}
-		attachments.list[index] = fw.G13MicroseqAttachment{
-			address: attachment.address
-			size: attachment.size
-			unk_c: 0x17
-			unk_e: attachment.order
-		}
-	}
-	attachments.count = count
-	return attachments
-}
-
-fn build_g13_render_attachments(count u32,
-	input [16]agxrender.Attachment) ?fw.G13MicroseqAttachments {
+	input [16]agxcommand.Attachment) ?fw.G13MicroseqAttachments {
 	if count > fw.g13_max_attachments {
 		return none
 	}
@@ -1045,8 +995,8 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		|| !fw.validate_g13_buffer_layouts() || !fw.validate_g13_microsequence_layouts() {
 		return none
 	}
-	vertex_attachments := build_g13_render_attachments(input.vertex_attachment_count, input.vertex_attachments) or { return none }
-	fragment_attachments := build_g13_render_attachments(input.fragment_attachment_count, input.fragment_attachments) or { return none }
+	vertex_attachments := build_g13_attachments(input.vertex_attachment_count, input.vertex_attachments) or { return none }
+	fragment_attachments := build_g13_attachments(input.fragment_attachment_count, input.fragment_attachments) or { return none }
 	tile := g13_tile_info(input.framebuffer_width, input.framebuffer_height, input.layers, input.utile_width, input.utile_height, input.samples, input.ppp_control, input.vertex_helper_cfg) or { return none }
 
 	mgr.lock.acquire()
@@ -1915,9 +1865,9 @@ fn complete_g13_compute_job(mut job G13ComputeJobResources, successful bool) {
 // This prepares owned backing only; the caller must retain it through event
 // completion and explicitly publish it with submit_g13_compute_job().
 pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources,
-	ctx &mmu.UatContext, input &G13ComputeCommand) ?&G13ComputeJobResources {
+	ctx &mmu.UatContext, input &agxcompute.Command) ?&G13ComputeJobResources {
 	if resources == unsafe { nil } || resources.released || ctx == unsafe { nil }
-		|| !ctx.active || ctx.id == 0 || input.flags & ~g13_compute_no_preemption != 0
+		|| !ctx.active || ctx.id == 0 || input.flags & ~agxcompute.supported_flags != 0
 		|| resources.channel_mask & g13_queue_channel_compute == 0
 		|| mgr.hw_config.compute_preempt1_size == 0 || !fw.validate_g13_compute_layouts()
 		|| !fw.validate_g13_microsequence_layouts() || !fw.validate_g13_job_layouts() {
@@ -2006,7 +1956,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 				sampler_max: input.sampler_max
 			}
 			meta: fw.G13JobMeta{
-				no_preemption: if input.flags & g13_compute_no_preemption != 0 {
+				no_preemption: if input.flags & agxcompute.no_preemption != 0 {
 					u8(1)
 				} else {
 					u8(0)
@@ -2016,7 +1966,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 				stamp_value: job.stamp_value
 				stamp_slot: job.event_slot
 				flush_stamps: if input.flush_stamps { u32(1) } else { u32(0) }
-				uuid: input.cmd_id
+				uuid: input.command_id
 				event_sequence: u32(job.event_sequence)
 			}
 			start_ts: job.timestamps.va
@@ -2035,7 +1985,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 			event_generation: resources.queue_id
 			event_sequence: job.event_sequence
 			job_params_2: job.command.va + fw.g13_compute_job_params_2_offset
-			uuid: input.cmd_id
+			uuid: input.command_id
 			attachments: attachments
 		}
 		mut micro_offset := u64(0)
@@ -2048,7 +1998,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 				start_ts: job.command.va + fw.g13_compute_start_ts_offset
 				update_ts: job.command.va + fw.g13_compute_start_ts_offset
 				work_queue: compute_queue.info.va
-				uuid: input.cmd_id
+				uuid: input.command_id
 			}
 			C.memcpy(voidptr(job.microsequence.phys + higher_half + micro_offset), voidptr(&start_timestamp), sizeof(fw.G13MicroseqTimestamp))
 			micro_offset += sizeof(fw.G13MicroseqTimestamp)
@@ -2065,7 +2015,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 				start_ts: job.command.va + fw.g13_compute_start_ts_offset
 				update_ts: job.command.va + fw.g13_compute_end_ts_offset
 				work_queue: compute_queue.info.va
-				uuid: input.cmd_id
+				uuid: input.command_id
 			}
 			C.memcpy(voidptr(job.microsequence.phys + higher_half + micro_offset), voidptr(&end_timestamp), sizeof(fw.G13MicroseqTimestamp))
 			micro_offset += sizeof(fw.G13MicroseqTimestamp)
@@ -2076,7 +2026,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 			work_queue: compute_queue.info.va
 			vm_slot: ctx.id
 			job_params_2: job.command.va + fw.g13_compute_job_params_2_offset
-			uuid: input.cmd_id
+			uuid: input.command_id
 			fw_stamp: event.firmware_stamp_address(job.event_slot)
 			stamp_value: job.stamp_value
 			restart_branch_offset: -i32(micro_offset)

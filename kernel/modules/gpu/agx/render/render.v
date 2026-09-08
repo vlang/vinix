@@ -7,9 +7,8 @@ module render
 // backend code never follows userspace pointers or reparses attachments.
 
 import drm.ioctl
-import usercopy
+import gpu.agx.command as agxcommand
 
-pub const max_attachments = u32(16)
 pub const max_dimension = u32(16384)
 pub const max_layers = u32(2048)
 pub const no_clear_pipeline_textures = u64(1) << 0
@@ -20,14 +19,6 @@ pub const no_vertex_clustering = u64(1) << 4
 pub const msaa_zs = u64(1) << 5
 pub const no_preemption = u64(1) << 6
 pub const supported_flags = no_clear_pipeline_textures | set_when_reloading_z_or_s | vertex_spills | process_empty_tiles | no_vertex_clustering | msaa_zs | no_preemption
-
-pub struct Attachment {
-pub:
-	address     u64
-	size_bytes  u64
-	cache_lines u32
-	order       u16
-}
 
 pub struct Command {
 pub:
@@ -104,8 +95,8 @@ pub:
 	isp_bgobjvals                      u32
 	vertex_attachment_count            u32
 	fragment_attachment_count          u32
-	vertex_attachments                 [16]Attachment
-	fragment_attachments               [16]Attachment
+	vertex_attachments                 [16]agxcommand.Attachment
+	fragment_attachments               [16]agxcommand.Attachment
 	has_result                         bool
 	flush_stamps                       bool
 }
@@ -125,49 +116,10 @@ pub fn valid_uapi(command &ioctl.DrmAsahiCmdRender) bool {
 	if command.samples != 1 && command.samples != 2 && command.samples != 4 {
 		return false
 	}
-	return command.vertex_attachment_count <= max_attachments
-		&& command.fragment_attachment_count <= max_attachments
+	return command.vertex_attachment_count <= agxcommand.max_attachments
+		&& command.fragment_attachment_count <= agxcommand.max_attachments
 		&& (command.vertex_attachment_count == 0 || command.vertex_attachments != 0)
 		&& (command.fragment_attachment_count == 0 || command.fragment_attachments != 0)
-}
-
-fn stage_attachments(pointer u64, count u32) (int, [16]Attachment) {
-	mut staged := [16]Attachment{}
-	if count == 0 {
-		return 0, staged
-	}
-	if count > max_attachments || pointer == 0 {
-		return -22, staged
-	}
-	bytes := u64(count) * sizeof(ioctl.DrmAsahiAttachment)
-	if bytes - 1 > ~pointer {
-		return -14, staged
-	}
-	for index := u32(0); index < count; index++ {
-		mut attachment := ioctl.DrmAsahiAttachment{}
-		if !usercopy.copy_from_user(voidptr(&attachment), pointer + u64(index) * sizeof(ioctl.DrmAsahiAttachment), sizeof(ioctl.DrmAsahiAttachment)) {
-			return -14, staged
-		}
-		if attachment.flags != 0 || attachment.order < 1 || attachment.order > 6
-			|| attachment.pointer == 0 || attachment.size == 0 {
-			return -22, staged
-		}
-		cache_lines := (attachment.size >> 7) + if attachment.size & u64(127) != 0 {
-			u64(1)
-		} else {
-			u64(0)
-		}
-		if cache_lines > u64(~u32(0)) {
-			return -22, staged
-		}
-		staged[index] = Attachment{
-			address: attachment.pointer
-			size_bytes: attachment.size
-			cache_lines: u32(cache_lines)
-			order: u16(attachment.order)
-		}
-	}
-	return 0, staged
 }
 
 // Snapshot the nested attachment arrays before any driver lock is acquired.
@@ -178,11 +130,11 @@ pub fn stage_uapi(command &ioctl.DrmAsahiCmdRender, has_result bool) (int, Comma
 	if !valid_uapi(command) {
 		return -22, staged
 	}
-	vertex_result, vertex_attachments := stage_attachments(command.vertex_attachments, command.vertex_attachment_count)
+	vertex_result, vertex_attachments := agxcommand.stage_attachments(command.vertex_attachments, command.vertex_attachment_count)
 	if vertex_result != 0 {
 		return vertex_result, staged
 	}
-	fragment_result, fragment_attachments := stage_attachments(command.fragment_attachments, command.fragment_attachment_count)
+	fragment_result, fragment_attachments := agxcommand.stage_attachments(command.fragment_attachments, command.fragment_attachment_count)
 	if fragment_result != 0 {
 		return fragment_result, staged
 	}

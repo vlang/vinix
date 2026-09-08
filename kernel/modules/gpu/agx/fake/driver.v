@@ -12,6 +12,8 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import gpu.agx.command as agxcommand
+import gpu.agx.compute as agxcompute
 import gpu.agx.render as agxrender
 import gpu.agx.workqueue
 import klock
@@ -36,7 +38,7 @@ struct StagedCommand {
 mut:
 	descriptor ioctl.DrmAsahiCommand
 	render     agxrender.Command
-	compute    ioctl.DrmAsahiCmdCompute
+	compute    agxcompute.Command
 }
 
 @[heap]
@@ -487,13 +489,6 @@ fn (mut file FakeG17File) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) 
 	return -22
 }
 
-fn valid_compute_command(command &ioctl.DrmAsahiCmdCompute) bool {
-	return command.extensions == 0
-		&& command.flags & ~ioctl.asahi_compute_no_preemption == 0 && command.pad == 0
-		&& command.attachment_count <= max_command_attachments
-		&& (command.attachment_count == 0 || command.attachments != 0)
-}
-
 fn stage_commands(pointer u64, count u32) (int, [2]StagedCommand) {
 	mut staged := [2]StagedCommand{}
 	if pointer == 0 || count == 0 || count > max_submission_commands {
@@ -541,10 +536,15 @@ fn stage_commands(pointer u64, count u32) (int, [2]StagedCommand) {
 						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
 					return -22, staged
 				}
-				if !usercopy.copy_from_user(voidptr(&staged[index].compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute))
-					|| !valid_compute_command(&staged[index].compute) {
-					return -22, staged
+				mut compute := ioctl.DrmAsahiCmdCompute{}
+				if !usercopy.copy_from_user(voidptr(&compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
+					return -14, staged
 				}
+				compute_result, compute_command := agxcompute.stage_uapi(&compute, descriptor.result_size != 0)
+				if compute_result != 0 {
+					return compute_result, staged
+				}
+				staged[index].compute = compute_command
 			}
 			else {
 				return -95, staged
@@ -643,9 +643,9 @@ fn mapped(mut vm FakeG17Vm, address u64, bytes u64, writable bool) bool {
 	return true
 }
 
-fn validate_render_attachments(mut vm FakeG17Vm,
-	attachments [16]agxrender.Attachment, count u32) int {
-	if count > agxrender.max_attachments {
+fn validate_attachments(mut vm FakeG17Vm,
+	attachments [16]agxcommand.Attachment, count u32) int {
+	if count > agxcommand.max_attachments {
 		return -22
 	}
 	for index := u32(0); index < count; index++ {
@@ -653,31 +653,6 @@ fn validate_render_attachments(mut vm FakeG17Vm,
 		if attachment.order < 1 || attachment.order > 6
 			|| attachment.address == 0 || attachment.size_bytes == 0
 			|| !mapped(mut vm, attachment.address, attachment.size_bytes, false) {
-			return -22
-		}
-	}
-	return 0
-}
-
-fn validate_compute_attachments(mut vm FakeG17Vm, pointer u64, count u32) int {
-	if count == 0 {
-		return 0
-	}
-	if pointer == 0 {
-		return -22
-	}
-	bytes := u64(count) * sizeof(ioctl.DrmAsahiAttachment)
-	if bytes - 1 > ~pointer {
-		return -14
-	}
-	for index := u32(0); index < count; index++ {
-		mut attachment := ioctl.DrmAsahiAttachment{}
-		if !usercopy.copy_from_user(voidptr(&attachment), pointer + u64(index) * sizeof(ioctl.DrmAsahiAttachment), sizeof(ioctl.DrmAsahiAttachment)) {
-			return -14
-		}
-		if attachment.flags != 0 || attachment.order < 1 || attachment.order > 6
-			|| attachment.pointer == 0 || attachment.size == 0
-			|| !mapped(mut vm, attachment.pointer, attachment.size, false) {
 			return -22
 		}
 	}
@@ -717,15 +692,15 @@ fn validate_render_mappings(mut vm FakeG17Vm, command &agxrender.Command) int {
 		}, false) {
 		return -22
 	}
-	result := validate_render_attachments(mut vm, command.vertex_attachments, command.vertex_attachment_count)
+	result := validate_attachments(mut vm, command.vertex_attachments, command.vertex_attachment_count)
 	if result != 0 {
 		return result
 	}
-	return validate_render_attachments(mut vm, command.fragment_attachments, command.fragment_attachment_count)
+	return validate_attachments(mut vm, command.fragment_attachments, command.fragment_attachment_count)
 }
 
 fn validate_compute_mappings(mut vm FakeG17Vm,
-	command &ioctl.DrmAsahiCmdCompute) int {
+	command &agxcompute.Command) int {
 	if command.encoder_ptr == 0 || command.encoder_end <= command.encoder_ptr
 		|| !mapped(mut vm, command.encoder_ptr, command.encoder_end - command.encoder_ptr, false)
 		|| !vm.contains_address(command.usc_base)
@@ -737,7 +712,7 @@ fn validate_compute_mappings(mut vm FakeG17Vm,
 		}, false) {
 		return -22
 	}
-	return validate_compute_attachments(mut vm, command.attachments, command.attachment_count)
+	return validate_attachments(mut vm, command.attachments, command.attachment_count)
 }
 
 fn write_results(commands [2]StagedCommand, count u32, object &gem.GemObject,

@@ -9,6 +9,7 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import gpu.agx.compute as agxcompute
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import gpu.agx.render as agxrender
@@ -65,7 +66,7 @@ struct StagedG13Command {
 mut:
 	descriptor ioctl.DrmAsahiCommand
 	render     agxrender.Command
-	compute    gpu.G13ComputeCommand
+	compute    agxcompute.Command
 }
 
 @[heap]
@@ -980,15 +981,6 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	return -22
 }
 
-fn valid_compute_command(command &ioctl.DrmAsahiCmdCompute) bool {
-	if command.extensions != 0 || command.flags & ~ioctl.asahi_compute_no_preemption != 0
-		|| command.pad != 0 || command.attachment_count > max_command_attachments
-		|| (command.attachment_count != 0 && command.attachments == 0) {
-		return false
-	}
-	return true
-}
-
 // Copy every nested sync descriptor exactly once while the submission is
 // staged and retain stable object/fence pointers. The Asahi UAPI uses timeline
 // points for its cross-context flush sync even though generic DRM timeline
@@ -1030,45 +1022,6 @@ fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, StagedS
 				syncobj.get_fence(obj) or { return -22, staged }
 			}
 			staged.fences[i] = fence
-		}
-	}
-	return 0, staged
-}
-
-// Copy attachment records once and translate byte sizes into the firmware's
-// 128-byte cache-line unit.
-fn stage_attachment_array(pointer u64, count u32) (int, [16]gpu.G13ComputeAttachment) {
-	mut staged := [16]gpu.G13ComputeAttachment{}
-	if count == 0 {
-		return 0, staged
-	}
-	if count > max_command_attachments || pointer == 0 {
-		return -22, staged
-	}
-	bytes := u64(count) * sizeof(ioctl.DrmAsahiAttachment)
-	if bytes - 1 > ~pointer {
-		return -14, staged
-	}
-	for i := u32(0); i < count; i++ {
-		mut attachment := ioctl.DrmAsahiAttachment{}
-		if !usercopy.copy_from_user(voidptr(&attachment), pointer + u64(i) * sizeof(ioctl.DrmAsahiAttachment), sizeof(ioctl.DrmAsahiAttachment)) {
-			return -14, staged
-		}
-		if attachment.flags != 0 || attachment.order < 1 || attachment.order > 6 {
-			return -22, staged
-		}
-		cache_lines := (attachment.size >> 7) + if attachment.size & u64(127) != 0 {
-			u64(1)
-		} else {
-			u64(0)
-		}
-		if cache_lines > u64(~u32(0)) {
-			return -22, staged
-		}
-		staged[i] = gpu.G13ComputeAttachment{
-			address: attachment.pointer
-			size: u32(cache_lines)
-			order: u16(attachment.order)
 		}
 	}
 	return 0, staged
@@ -1117,30 +1070,6 @@ fn install_output_syncs(staged &StagedSyncArray, fence &syncobj.DmaFence) bool {
 		}
 	}
 	return true
-}
-
-fn make_g13_compute_command(command &ioctl.DrmAsahiCmdCompute,
-	attachments [16]gpu.G13ComputeAttachment, has_result bool) gpu.G13ComputeCommand {
-	return gpu.G13ComputeCommand{
-		flags: command.flags
-		encoder_ptr: command.encoder_ptr
-		encoder_end: command.encoder_end
-		usc_base: command.usc_base
-		helper_program: command.helper_program
-		helper_cfg: command.helper_cfg
-		helper_arg: command.helper_arg
-		encoder_id: command.encoder_id
-		cmd_id: command.cmd_id
-		sampler_array: command.sampler_array
-		sampler_count: command.sampler_count
-		sampler_max: command.sampler_max
-		iogpu_unk_40: command.iogpu_unk_40
-		unk_mask: command.unk_mask
-		attachment_count: command.attachment_count
-		attachments: attachments
-		has_result: has_result
-		flush_stamps: true
-	}
 }
 
 // Copy the complete Mesa command array before acquiring any driver locks.
@@ -1200,14 +1129,11 @@ fn stage_g13_commands(pointer u64, count u32) (int, [2]StagedG13Command) {
 				if !usercopy.copy_from_user(voidptr(&compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
 					return -14, staged
 				}
-				if !valid_compute_command(&compute) {
-					return -22, staged
+				compute_result, compute_command := agxcompute.stage_uapi(&compute, descriptor.result_size != 0)
+				if compute_result != 0 {
+					return compute_result, staged
 				}
-				attachment_result, attachments := stage_attachment_array(compute.attachments, compute.attachment_count)
-				if attachment_result != 0 {
-					return attachment_result, staged
-				}
-				staged[i].compute = make_g13_compute_command(&compute, attachments, descriptor.result_size != 0)
+				staged[i].compute = compute_command
 			}
 			else {
 				return -22, staged
