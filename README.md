@@ -469,7 +469,10 @@ The demo prints the EGL and GL renderer strings, rejects software renderers,
 validates a rendered pixel, and reports when the frame reaches `/dev/fb0`.
 The base M1 Air (`t8103`/G13G, including its 7-core fuse configuration) is the
 first hardware target. The M5 Max (`t6050`/G17C) work remains separate and is
-still fail-closed until its firmware command ABI is complete.
+still fail-closed until its firmware command ABI is complete. The
+[fake G17 backend](docs/g17-fake-backend.md) can already validate encoded
+HAL300 3D register streams and drive synthetic workqueue/fence completions on
+the host or in a VM, without claiming to emulate G17 firmware.
 
 ### Apple Studio Display on an M1 Air
 
