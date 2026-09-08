@@ -48,6 +48,11 @@ mut:
 	initialized bool
 }
 
+// Lock order is global file map -> per-file -> fake VM. The global map lock is
+// always released before close() takes the file lock, and no VM operation may
+// call back into the file or common BO table. VM methods drop their lock before
+// final GEM unrefs, so backend mapping teardown remains outside common BO code.
+
 __global (
 	fake_driver_state  FakeG17DriverState
 	fake_file_map_lock klock.Lock
@@ -462,44 +467,22 @@ fn validate_attachments(mut vm FakeG17Vm,
 	return 0
 }
 
-fn validate_render_mappings(mut vm FakeG17Vm, command &agxrender.Command) int {
-	if command.encoder_ptr == 0 || !mapped(mut vm, command.encoder_ptr, 4, false)
-		|| !vm.contains_address(command.vertex_usc_base)
-		|| !vm.contains_address(command.fragment_usc_base)
-		|| !mapped(mut vm, command.vertex_helper_arg, 8, false)
-		|| !mapped(mut vm, command.fragment_helper_arg, 8, false)
-		|| !mapped(mut vm, command.depth_buffer_load, 8, false)
-		|| !mapped(mut vm, command.depth_buffer_store, 8, true)
-		|| !mapped(mut vm, command.depth_buffer_partial, 8, true)
-		|| !mapped(mut vm, command.depth_meta_buffer_load, 8, false)
-		|| !mapped(mut vm, command.depth_meta_buffer_store, 8, true)
-		|| !mapped(mut vm, command.depth_meta_buffer_partial, 8, true)
-		|| !mapped(mut vm, command.stencil_buffer_load, 8, false)
-		|| !mapped(mut vm, command.stencil_buffer_store, 8, true)
-		|| !mapped(mut vm, command.stencil_buffer_partial, 8, true)
-		|| !mapped(mut vm, command.stencil_meta_buffer_load, 8, false)
-		|| !mapped(mut vm, command.stencil_meta_buffer_store, 8, true)
-		|| !mapped(mut vm, command.stencil_meta_buffer_partial, 8, true)
-		|| !mapped(mut vm, command.scissor_array, 8, false)
-		|| !mapped(mut vm, command.depth_bias_array, 8, false)
-		|| !mapped(mut vm, command.visibility_result_buffer, 8, true)
-		|| !mapped(mut vm, command.vertex_sampler_array, if command.vertex_sampler_count == 0 {
-			u64(1)
-		} else {
-			u64(command.vertex_sampler_count)
-		}, false)
-		|| !mapped(mut vm, command.fragment_sampler_array, if command.fragment_sampler_count == 0 {
-			u64(1)
-		} else {
-			u64(command.fragment_sampler_count)
-		}, false) {
+fn validate_render_mappings(mut vm FakeG17Vm, command &agxrender.Command,
+	resources []FakeG17ResourceReference) int {
+	if command.encoder_ptr == 0 || !vm.contains_address(command.vertex_usc_base)
+		|| !vm.contains_address(command.fragment_usc_base) {
 		return -22
 	}
-	result := validate_attachments(mut vm, command.vertex_attachments, command.vertex_attachment_count)
-	if result != 0 {
-		return result
+	for resource in resources {
+		if resource.provenance != u32(G17DescriptorProvenance.gpu_va)
+			&& resource.provenance != u32(G17DescriptorProvenance.bo_resource) {
+			return -22
+		}
+		if !mapped(mut vm, resource.address, resource.size, resource.access & fake_g17_vm_write != 0) {
+			return -22
+		}
 	}
-	return validate_attachments(mut vm, command.fragment_attachments, command.fragment_attachment_count)
+	return 0
 }
 
 fn validate_compute_mappings(mut vm FakeG17Vm,
@@ -559,7 +542,7 @@ fn write_results(commands [2]agxsubmission.Command, count u32, object &gem.GemOb
 }
 
 fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
-	fence &syncobj.DmaFence) FakeG17Verification {
+	fence &syncobj.DmaFence, resources []FakeG17ResourceReference) FakeG17Verification {
 	command := unsafe { malloc(g17_command_bytes) }
 	descriptor := unsafe { malloc(g17_descriptor_bytes) }
 	if command == unsafe { nil } || descriptor == unsafe { nil } {
@@ -606,6 +589,7 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 		command_gpu_address: vm.kernel_start
 		writes: unsafe { writes[..int(encoding.write_count)] }
 		address_ranges: ranges
+		resources: resources
 	}
 	report := submit_fake_g17(mut queue, &item, &submission)
 	unsafe {
@@ -660,6 +644,16 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		C.printf(c'fake-g17: submit input dependency failed error=%d\n', dependency_result)
 		return dependency_result
 	}
+	mut render_resources := []FakeG17ResourceReference{}
+	for index := u32(0); index < request.command_count; index++ {
+		if commands[index].descriptor.cmd_type == ioctl.asahi_cmd_render {
+			render_resources = stage_render_resource_references(&commands[index].render)
+			break
+		}
+	}
+	defer {
+		unsafe { render_resources.free() }
+	}
 
 	file.lock.acquire()
 	mut queue := &workqueue.WorkQueue(unsafe { nil })
@@ -687,7 +681,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				return -22
 			}
 			render_index = int(index)
-			mapping_result := validate_render_mappings(mut vm, &commands[index].render)
+			mapping_result := validate_render_mappings(mut vm, &commands[index].render, render_resources)
 			if mapping_result != 0 {
 				file.lock.release()
 				C.printf(c'fake-g17: render mappings rejected error=%d encoder=0x%llx vusc=0x%llx fusc=0x%llx va=%u fa=%u\n', mapping_result, commands[index].render.encoder_ptr, commands[index].render.vertex_usc_base, commands[index].render.fragment_usc_base, commands[index].render.vertex_attachment_count, commands[index].render.fragment_attachment_count)
@@ -739,7 +733,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	started := timer.get_count()
 	mut successful := true
 	if render_index >= 0 {
-		report := run_fake_render(mut queue, mut vm, fence)
+		report := run_fake_render(mut queue, mut vm, fence, render_resources)
 		successful = report.succeeded()
 		if !successful {
 			C.printf(c'fake-g17: verifier failed error=%u pass=%u entry=%u observed=%u expected=%u\n', report.error, report.pass, report.entry, report.observed_writes, report.expected_writes)
@@ -747,7 +741,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 			file.verified_jobs++
 			if file.verified_jobs == 1 {
 				render_command := commands[render_index].render
-				C.printf(c'fake-g17: first Mesa render verified; id=%u size=%ux%u actual writes=%u capacity=%u\n', render_command.fragment_command_id, render_command.framebuffer_width, render_command.framebuffer_height, report.expected_writes, fake_g17_max_writes)
+				C.printf(c'fake-g17: first Mesa render verified; id=%u size=%ux%u resources=%u actual writes=%u capacity=%u\n', render_command.fragment_command_id, render_command.framebuffer_width, render_command.framebuffer_height, u32(render_resources.len), report.expected_writes, fake_g17_max_writes)
 			}
 		}
 	} else {

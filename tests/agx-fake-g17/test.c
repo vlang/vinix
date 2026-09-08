@@ -129,6 +129,7 @@ static int verify(struct fixture *fixture,
                                  fixture->descriptor,
                                  sizeof(fixture->descriptor), GPU_BASE,
                                  writes, write_count, ranges, range_count,
+                                 NULL, 0,
                                  report);
 }
 
@@ -137,7 +138,8 @@ static int test_exact_trace(void)
     struct fixture fixture;
     struct vinix_fake_g17_expected_write writes[4];
     struct vinix_fake_g17_address_range ranges[] = {
-        {ADDRESS_BASE, 0x100000},
+        {ADDRESS_BASE, 0x100000,
+         VINIX_FAKE_G17_VM_READ | VINIX_FAKE_G17_VM_WRITE, 7},
     };
     struct vinix_fake_g17_report report;
     const uint16_t counts[] = {1, 1, 1, 1};
@@ -188,14 +190,17 @@ static int test_exact_trace(void)
     CHECK(vinix_fake_g17_verify(fixture.command,
           VINIX_FAKE_G17_COMMAND_BYTES - 1, fixture.descriptor,
           sizeof(fixture.descriptor), GPU_BASE, writes, write_count,
-          ranges, 1, &report) == VINIX_FAKE_G17_COMMAND_TOO_SMALL);
+          ranges, 1, NULL, 0,
+          &report) == VINIX_FAKE_G17_COMMAND_TOO_SMALL);
     CHECK(vinix_fake_g17_verify(fixture.command, sizeof(fixture.command),
           fixture.descriptor, VINIX_FAKE_G17_DESCRIPTOR_BYTES - 1,
           GPU_BASE, writes, write_count, ranges, 1,
+          NULL, 0,
           &report) == VINIX_FAKE_G17_DESCRIPTOR_TOO_SMALL);
     CHECK(vinix_fake_g17_verify(fixture.command, sizeof(fixture.command),
           fixture.descriptor, sizeof(fixture.descriptor), UINT64_MAX - 0x50,
           writes, write_count, ranges, 1,
+          NULL, 0,
           &report) == VINIX_FAKE_G17_STREAM_ADDRESS);
 
     return 0;
@@ -211,7 +216,8 @@ static int test_recovered_call_site_scale(void)
     struct vinix_fake_g17_expected_write *writes =
         calloc(recovered_calls, sizeof(*writes));
     struct vinix_fake_g17_address_range ranges[] = {
-        {ADDRESS_BASE, 0x100000},
+        {ADDRESS_BASE, 0x100000,
+         VINIX_FAKE_G17_VM_READ | VINIX_FAKE_G17_VM_WRITE, 7},
     };
     struct vinix_fake_g17_report report;
     const uint16_t counts[] = {79, 79, 78, 78};
@@ -231,16 +237,88 @@ static int test_recovered_call_site_scale(void)
     return 0;
 }
 
+static int test_descriptor_resource_provenance(void)
+{
+    struct fixture fixture;
+    struct vinix_fake_g17_expected_write writes[4];
+    struct vinix_fake_g17_address_range ranges[] = {
+        {ADDRESS_BASE, 0x1000,
+         VINIX_FAKE_G17_VM_READ | VINIX_FAKE_G17_VM_WRITE, 19},
+    };
+    struct vinix_fake_g17_resource_reference resource = {
+        .address = ADDRESS_BASE + 0x100,
+        .size = 0x80,
+        .field = VINIX_FAKE_G17_RESOURCE_DEPTH_BUFFER_LOAD,
+        .provenance = VINIX_FAKE_G17_PROVENANCE_GPU_VA,
+        .descriptor_member = VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING,
+        .access = VINIX_FAKE_G17_VM_READ,
+    };
+    struct vinix_fake_g17_report report;
+    const uint16_t counts[] = {1, 1, 1, 1};
+
+    build_fixture(&fixture, writes, counts);
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_OK);
+
+    resource.access = VINIX_FAKE_G17_VM_WRITE;
+    ranges[0].access = VINIX_FAKE_G17_VM_READ;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS);
+
+    resource.access = VINIX_FAKE_G17_VM_READ;
+    ranges[0].access |= VINIX_FAKE_G17_VM_WRITE;
+    resource.address = ADDRESS_BASE + 0xff0;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS);
+
+    resource.address = ADDRESS_BASE + 0x100;
+    resource.descriptor_member = 0x100;
+    resource.descriptor_bytes = 8;
+    write_le64(fixture.descriptor + resource.descriptor_member,
+               resource.address);
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_OK);
+    fixture.descriptor[resource.descriptor_member] ^= 1;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_VALUE);
+
+    resource.descriptor_member = VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA);
+    resource.descriptor_bytes = 0;
+    resource.provenance = VINIX_FAKE_G17_PROVENANCE_CONSTANT;
+    CHECK(vinix_fake_g17_verify(
+              fixture.command, sizeof(fixture.command), fixture.descriptor,
+              sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1,
+              &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(vinix_fake_g17_expected_write_size() ==
           sizeof(struct vinix_fake_g17_expected_write));
     CHECK(vinix_fake_g17_address_range_size() ==
           sizeof(struct vinix_fake_g17_address_range));
+    CHECK(vinix_fake_g17_resource_reference_size() ==
+          sizeof(struct vinix_fake_g17_resource_reference));
     CHECK(vinix_fake_g17_report_size() ==
           sizeof(struct vinix_fake_g17_report));
     CHECK(test_exact_trace() == 0);
     CHECK(test_recovered_call_site_scale() == 0);
+    CHECK(test_descriptor_resource_provenance() == 0);
     puts("fake G17 HAL300 verifier tests passed");
     return 0;
 }

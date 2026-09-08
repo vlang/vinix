@@ -187,6 +187,8 @@ pub fn (mut vm FakeG17Vm) address_ranges() []FakeG17AddressRange {
 		ranges << FakeG17AddressRange{
 			address: mapping.address
 			size: mapping.size
+			access: mapping.flags
+			object_handle: mapping.object_handle
 		}
 	}
 	vm.lock.release()

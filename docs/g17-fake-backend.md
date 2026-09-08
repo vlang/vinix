@@ -49,6 +49,12 @@ handle close and backend-specific mapping cleanup stay atomic. Fake G17 drops
 software mappings immediately; native G13 retains mappings that an in-flight
 firmware job may still dereference.
 
+The fake path has one documented lock direction: global file map, per-file,
+then fake VM. The global lock is released before file teardown starts; VM
+methods never call back into the file or common BO table and release their VM
+lock before final GEM references are dropped. The common BO layer therefore
+does not acquire a backend mapping lock or decide when a mapping disappears.
+
 ## Verification contract
 
 `kernel/c/agx_fake_g17.c` checks the four-pass 3D register-list layout already
@@ -61,8 +67,22 @@ recovered and ported in `gpu.agx.fw`:
 - exact path-specific pass and entry ordering;
 - HAL300 selector and mode fields;
 - template-preserved bits under an explicit mask;
-- encoded values under an explicit 64-bit mask; and
-- address-valued entries against live GPU-VA ranges and alignment.
+- encoded values under an explicit 64-bit mask;
+- address-valued entries against live GPU-VA ranges and alignment;
+- every Mesa-derived descriptor resource against one live FakeG17VM BO range,
+  including the binding's read/write permission; and
+- every resource with a recovered native member against the exact GPU VA
+  stored in that descriptor member.
+
+Descriptor provenance is an explicit kernel/verifier ABI. Scalar defaults are
+`constant`; direct UAPI state is `Mesa-command`; attachment ownership is
+`BO/resource`; translated pointers are `GPU-VA`; layout values are
+`format/stride`; and scheduler, firmware, or physical-only values are
+`external-hardware`. The current Mesa resource references use a `PENDING`
+descriptor member rather than inventing a mapping from Apple's proprietary
+payload layout. They still have executable bounds, BO identity, and access
+checks. When a native member is recovered, replacing `PENDING` with that member
+automatically turns on descriptor-value verification.
 
 The expected-write list is deliberately path-specific. The recovered 314
 virtual encoder call sites cover 3D, TA, FastBlit, and CL; they are not 314
@@ -210,7 +230,8 @@ and exits QEMU. Set `VINIX_BOOT_DISK` to reuse an existing test image or
 
 Mesa should identify the renderer as `Apple M5 Max (G17C C0)` and report that
 the render submit and fence completed successfully. The first kernel message
-also includes the staged Mesa fragment command ID and framebuffer dimensions.
+also includes the staged Mesa fragment command ID, framebuffer dimensions, and
+number of independently checked resource references.
 This exercises the Asahi DRM ioctl layout, shared render/compute command
 normalization, immutable attachment staging, per-file GEM and VM ownership,
 mappings, contexts, queues, sync objects, the generated G17 encoder, the
@@ -226,12 +247,13 @@ The generated encoder's output buffer has a fixed capacity of 392 writes. The
 actual write count remains descriptor- and path-dependent; 392 is not a
 required-write invariant for a job.
 
-The fake driver's current descriptor contains deterministic recovered scalar
-defaults. The complete, validated Mesa render command is now available at the
-backend boundary, but translating its semantic fields into native G17
-descriptor members remains the next software integration step. The recovered
-nine-field Apple normalized-command copy is not used as an offset shortcut:
-that source is Apple's proprietary payload, not Mesa's UAPI. Native PMP/RTKit
-boot, DART/UAT page tables, completion IRQs, and actual firmware acceptance
-remain physical-hardware gates. The fake driver has no import of or route to
-those hardware facilities.
+The fake driver's current descriptor contains manifest-driven recovered scalar
+defaults. Every Mesa BO/GPU-VA input now crosses the backend boundary with
+explicit provenance and must resolve through FakeG17VM before both encoding and
+synthetic completion. Translating those references plus the Mesa-command and
+format/stride values into proven native G17 descriptor members remains the next
+software integration step. The recovered nine-field Apple normalized-command
+copy is not used as an offset shortcut: that source is Apple's proprietary
+payload, not Mesa's UAPI. Native PMP/RTKit boot, DART/UAT page tables,
+completion IRQs, and actual firmware acceptance remain physical-hardware
+gates. The fake driver has no import of or route to those hardware facilities.

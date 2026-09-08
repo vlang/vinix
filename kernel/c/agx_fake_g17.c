@@ -63,6 +63,31 @@ static int address_allowed(uint64_t address, uint32_t alignment,
     return 0;
 }
 
+static int range_allowed(uint64_t address, uint64_t size, uint32_t access,
+                         const struct vinix_fake_g17_address_range *ranges,
+                         uint32_t range_count)
+{
+    uint32_t i;
+
+    if (!address || !size || address > UINT64_MAX - size || !access ||
+        (access & ~(VINIX_FAKE_G17_VM_READ | VINIX_FAKE_G17_VM_WRITE)))
+        return 0;
+
+    for (i = 0; i < range_count; i++) {
+        const struct vinix_fake_g17_address_range *range = &ranges[i];
+
+        if (range->size && range->object_handle && range->access &&
+            !(range->access &
+              ~(VINIX_FAKE_G17_VM_READ | VINIX_FAKE_G17_VM_WRITE)) &&
+            address >= range->address &&
+            address - range->address <= range->size &&
+            size <= range->size - (address - range->address) &&
+            (range->access & access) == access)
+            return 1;
+    }
+    return 0;
+}
+
 size_t vinix_fake_g17_expected_write_size(void)
 {
     return sizeof(struct vinix_fake_g17_expected_write);
@@ -71,6 +96,11 @@ size_t vinix_fake_g17_expected_write_size(void)
 size_t vinix_fake_g17_address_range_size(void)
 {
     return sizeof(struct vinix_fake_g17_address_range);
+}
+
+size_t vinix_fake_g17_resource_reference_size(void)
+{
+    return sizeof(struct vinix_fake_g17_resource_reference);
 }
 
 size_t vinix_fake_g17_report_size(void)
@@ -86,6 +116,8 @@ int vinix_fake_g17_verify(const void *command_pointer, size_t command_bytes,
                           uint32_t write_count,
                           const struct vinix_fake_g17_address_range *ranges,
                           uint32_t range_count,
+                          const struct vinix_fake_g17_resource_reference *resources,
+                          uint32_t resource_count,
                           struct vinix_fake_g17_report *report)
 {
     const uint8_t *command = command_pointer;
@@ -98,7 +130,8 @@ int vinix_fake_g17_verify(const void *command_pointer, size_t command_bytes,
     clear_report(report, write_count);
 
     if (!command || !descriptor || !command_gpu_address ||
-        (write_count && !writes) || (range_count && !ranges))
+        (write_count && !writes) || (range_count && !ranges) ||
+        (resource_count && !resources))
         return fail(report, VINIX_FAKE_G17_INVALID_ARGUMENT, 0, 0, 0, 0);
     if (command_bytes < VINIX_FAKE_G17_COMMAND_BYTES)
         return fail(report, VINIX_FAKE_G17_COMMAND_TOO_SMALL, 0, 0,
@@ -106,6 +139,37 @@ int vinix_fake_g17_verify(const void *command_pointer, size_t command_bytes,
     if (descriptor_bytes < VINIX_FAKE_G17_DESCRIPTOR_BYTES)
         return fail(report, VINIX_FAKE_G17_DESCRIPTOR_TOO_SMALL, 0, 0,
                     descriptor_bytes, VINIX_FAKE_G17_DESCRIPTOR_BYTES);
+
+    for (pass = 0; pass < resource_count; pass++) {
+        const struct vinix_fake_g17_resource_reference *resource =
+            &resources[pass];
+
+        if (resource->reserved ||
+            resource->field >= VINIX_FAKE_G17_RESOURCE_FIELD_COUNT ||
+            (resource->provenance != VINIX_FAKE_G17_PROVENANCE_BO_RESOURCE &&
+             resource->provenance != VINIX_FAKE_G17_PROVENANCE_GPU_VA) ||
+            (resource->descriptor_member ==
+                 VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING
+                 ? resource->descriptor_bytes != 0
+                 : resource->descriptor_bytes != 8 ||
+                   resource->descriptor_member > descriptor_bytes ||
+                   resource->descriptor_bytes >
+                       descriptor_bytes - resource->descriptor_member))
+            return fail(report, VINIX_FAKE_G17_RESOURCE_METADATA, 0,
+                        pass, resource->field, resource->provenance);
+        if (!range_allowed(resource->address, resource->size,
+                           resource->access, ranges, range_count))
+            return fail(report, VINIX_FAKE_G17_RESOURCE_ADDRESS, 0,
+                        pass, resource->address, resource->size);
+        if (resource->descriptor_member !=
+                VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING &&
+            read_le64(descriptor + resource->descriptor_member) !=
+                resource->address)
+            return fail(report, VINIX_FAKE_G17_RESOURCE_VALUE, 0,
+                        pass,
+                        read_le64(descriptor + resource->descriptor_member),
+                        resource->address);
+    }
 
     for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {
         size_t stream_offset = (size_t)pass * VINIX_FAKE_G17_REGISTER_STRIDE +
@@ -233,6 +297,10 @@ const char *vinix_fake_g17_error_string(int error)
         "register template bits mismatch",
         "register value mismatch",
         "GPU address is outside the allowed ranges",
+        "descriptor resource metadata is invalid",
+        "descriptor resource is outside its permitted VM binding",
+        "descriptor resource value does not match its Mesa GPU VA",
+        "fake G17 work queue is full",
     };
 
     if (error < 0 || (size_t)error >= sizeof(errors) / sizeof(errors[0]))

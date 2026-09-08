@@ -11,24 +11,34 @@ import drm.syncobj
 import gpu.agx.workqueue
 
 #include "agx_fake_g17.h"
+
 #include "agx_fake_g17_encode.h"
 
 fn C.vinix_fake_g17_expected_write_size() u64
+
 fn C.vinix_fake_g17_address_range_size() u64
+
+fn C.vinix_fake_g17_resource_reference_size() u64
+
 fn C.vinix_fake_g17_report_size() u64
+
 fn C.vinix_fake_g17_encoder_inputs_size() u64
+
 fn C.vinix_fake_g17_verify(command voidptr, command_bytes u64,
 	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
 	writes voidptr, write_count u32, ranges voidptr, range_count u32,
-	report voidptr) int
+	resources voidptr, resource_count u32, report voidptr) int
+
 fn C.vinix_fake_g17_encode_3d(command voidptr, command_bytes u64,
 	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
 	inputs voidptr, writes voidptr, write_capacity u32, write_count &u32) int
 
 pub const fake_g17_ok = u32(0)
 pub const fake_g17_invalid_argument = u32(1)
-pub const fake_g17_queue_full = u32(14)
+pub const fake_g17_queue_full = u32(17)
 pub const fake_g17_value_is_address = u32(1) << 0
+pub const fake_g17_vm_read = u32(1) << 0
+pub const fake_g17_vm_write = u32(1) << 1
 pub const fake_g17_external_event_count = 5
 pub const fake_g17_external_decision_count = 1
 // Fixed output capacity for the recovered encoder. This is not the number of
@@ -69,7 +79,9 @@ pub fn (mut inputs FakeG17EncoderInputs) set_value(pass u32,
 		0x1bc4 { 2 }
 		0x2148 { 3 }
 		0x2394 { 4 }
-		else { return false }
+		else {
+			return false
+		}
 	}
 	inputs.values[pass][index] = value
 	return true
@@ -103,8 +115,22 @@ pub:
 
 pub struct FakeG17AddressRange {
 pub:
-	address u64
-	size    u64
+	address       u64
+	size          u64
+	access        u32
+	object_handle u32
+}
+
+pub struct FakeG17ResourceReference {
+pub:
+	address           u64
+	size              u64
+	field             u32
+	provenance        u32
+	descriptor_member u32
+	descriptor_bytes  u32
+	access            u32
+	reserved          u32
 }
 
 pub struct FakeG17Submission {
@@ -116,6 +142,7 @@ pub:
 	command_gpu_address u64
 	writes              []FakeG17ExpectedWrite
 	address_ranges      []FakeG17AddressRange
+	resources           []FakeG17ResourceReference
 }
 
 pub struct FakeG17Verification {
@@ -157,9 +184,7 @@ pub fn encode_fake_g17_3d(command voidptr, command_bytes u64,
 		}
 	}
 	mut write_count := u32(0)
-	error := C.vinix_fake_g17_encode_3d(command, command_bytes, descriptor,
-		descriptor_bytes, command_gpu_address, voidptr(inputs), write_pointer,
-		u32(writes.len), &write_count)
+	error := C.vinix_fake_g17_encode_3d(command, command_bytes, descriptor, descriptor_bytes, command_gpu_address, voidptr(inputs), write_pointer, u32(writes.len), &write_count)
 	return FakeG17Encoding{
 		error: u32(error)
 		write_count: write_count
@@ -177,6 +202,7 @@ pub fn verify_fake_g17(submission &FakeG17Submission) FakeG17Verification {
 	}
 	if sizeof(FakeG17ExpectedWrite) != C.vinix_fake_g17_expected_write_size()
 		|| sizeof(FakeG17AddressRange) != C.vinix_fake_g17_address_range_size()
+		|| sizeof(FakeG17ResourceReference) != C.vinix_fake_g17_resource_reference_size()
 		|| sizeof(FakeG17Verification) != C.vinix_fake_g17_report_size() {
 		report.error = fake_g17_invalid_argument
 		return report
@@ -190,10 +216,11 @@ pub fn verify_fake_g17(submission &FakeG17Submission) FakeG17Verification {
 	if submission.address_ranges.len != 0 {
 		ranges = voidptr(&submission.address_ranges[0])
 	}
-	C.vinix_fake_g17_verify(submission.command, submission.command_bytes,
-		submission.descriptor, submission.descriptor_bytes,
-		submission.command_gpu_address, writes, u32(submission.writes.len),
-		ranges, u32(submission.address_ranges.len), voidptr(&report))
+	mut resources := voidptr(0)
+	if submission.resources.len != 0 {
+		resources = voidptr(&submission.resources[0])
+	}
+	C.vinix_fake_g17_verify(submission.command, submission.command_bytes, submission.descriptor, submission.descriptor_bytes, submission.command_gpu_address, writes, u32(submission.writes.len), ranges, u32(submission.address_ranges.len), resources, u32(submission.resources.len), voidptr(&report))
 	return report
 }
 

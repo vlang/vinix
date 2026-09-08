@@ -153,6 +153,7 @@ static int run_branch_matrix(void)
                         fixture.command, sizeof(fixture.command),
                         fixture.descriptor, sizeof(fixture.descriptor),
                         GPU_BASE, fixture.writes, write_count, NULL, 0,
+                        NULL, 0,
                         &report) == VINIX_FAKE_G17_OK);
                     CHECK(report.observed_writes == write_count);
                 }
@@ -196,13 +197,15 @@ static int run_failure_checks(void)
     CHECK(vinix_fake_g17_verify(
         fixture.command, sizeof(fixture.command), fixture.descriptor,
         sizeof(fixture.descriptor), GPU_BASE, fixture.writes, write_count,
-        NULL, 0, &report) == VINIX_FAKE_G17_TEMPLATE_BITS);
+        NULL, 0, NULL, 0,
+        &report) == VINIX_FAKE_G17_TEMPLATE_BITS);
     fixture.command[VINIX_FAKE_G17_STREAM_OFFSET] ^= 2;
     fixture.command[VINIX_FAKE_G17_STREAM_OFFSET + 4] ^= 1;
     CHECK(vinix_fake_g17_verify(
         fixture.command, sizeof(fixture.command), fixture.descriptor,
         sizeof(fixture.descriptor), GPU_BASE, fixture.writes, write_count,
-        NULL, 0, &report) == VINIX_FAKE_G17_VALUE);
+        NULL, 0, NULL, 0,
+        &report) == VINIX_FAKE_G17_VALUE);
     return 0;
 }
 
@@ -237,7 +240,7 @@ static int run_dense_reference(void)
     CHECK(vinix_fake_g17_verify(
         fixture.command, sizeof(fixture.command), fixture.descriptor,
         sizeof(fixture.descriptor), GPU_BASE, fixture.writes, write_count,
-        NULL, 0, &report) == VINIX_FAKE_G17_OK);
+        NULL, 0, NULL, 0, &report) == VINIX_FAKE_G17_OK);
     return 0;
 }
 
