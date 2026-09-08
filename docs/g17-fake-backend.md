@@ -42,6 +42,13 @@ with real page tables and firmware-visible invalidation. The common module has
 no import of either implementation or any hardware facility, so using it does
 not create a route from fake G17 to MMIO, DART, PMP, or RTKit.
 
+`gpu.agx.bo` owns the per-open GEM handle table, PRIME import references, and
+mmap authorization shared by both backends. It intentionally has no internal
+lock: the owning DRM file serializes table changes with its existing lock so a
+handle close and backend-specific mapping cleanup stay atomic. Fake G17 drops
+software mappings immediately; native G13 retains mappings that an in-flight
+firmware job may still dereference.
+
 ## Verification contract
 
 `kernel/c/agx_fake_g17.c` checks the four-pass 3D register-list layout already

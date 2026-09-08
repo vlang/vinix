@@ -12,6 +12,7 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import gpu.agx.bo as agxbo
 import gpu.agx.command as agxcommand
 import gpu.agx.compute as agxcompute
 import gpu.agx.render as agxrender
@@ -33,8 +34,7 @@ mut:
 	dev           &drm.DrmDevice = unsafe { nil }
 	vms           []&FakeG17Vm
 	queues        []&workqueue.WorkQueue
-	objects       []&gem.GemObject
-	mmap_objects  []&gem.GemObject
+	objects       agxbo.Table
 	next_vm_id    u32
 	next_queue_id u32
 	owner_key     u64
@@ -98,14 +98,7 @@ fn (mut file FakeG17File) close() {
 		vm.destroy()
 	}
 	file.vms.clear()
-	for object in file.mmap_objects {
-		gem.unref(object)
-	}
-	file.mmap_objects.clear()
-	for object in file.objects {
-		gem.unref(object)
-	}
-	file.objects.clear()
+	file.objects.release_all()
 	file.lock.release()
 }
 
@@ -137,13 +130,7 @@ fn (file &FakeG17File) find_vm(id u32) ?&FakeG17Vm {
 fn (mut file FakeG17File) get_object_ref(handle u32) ?&gem.GemObject {
 	file.lock.acquire()
 	defer { file.lock.release() }
-	for object in file.objects {
-		if object.handle == handle {
-			gem.ref_obj(object)
-			return object
-		}
-	}
-	return none
+	return file.objects.get_ref(handle)
 }
 
 fn (mut file FakeG17File) import_object(object &gem.GemObject) ?u32 {
@@ -151,16 +138,10 @@ fn (mut file FakeG17File) import_object(object &gem.GemObject) ?u32 {
 		return none
 	}
 	file.lock.acquire()
-	for existing in file.objects {
-		if voidptr(existing) == voidptr(object) {
-			handle := existing.handle
-			file.lock.release()
-			return handle
-		}
+	handle := file.objects.import_object(object) or {
+		file.lock.release()
+		return none
 	}
-	gem.ref_obj(object)
-	file.objects << object
-	handle := object.handle
 	file.lock.release()
 	return handle
 }
@@ -168,35 +149,13 @@ fn (mut file FakeG17File) import_object(object &gem.GemObject) ?u32 {
 fn (mut file FakeG17File) authorize_mmap(handle u32) ?u64 {
 	file.lock.acquire()
 	defer { file.lock.release() }
-	mut found := &gem.GemObject(unsafe { nil })
-	for object in file.objects {
-		if object.handle == handle {
-			found = object
-			break
-		}
-	}
-	if found == unsafe { nil } {
-		return none
-	}
-	for object in file.mmap_objects {
-		if voidptr(object) == voidptr(found) {
-			return gem.create_mmap_offset(found)
-		}
-	}
-	gem.ref_obj(found)
-	file.mmap_objects << found
-	return gem.create_mmap_offset(found)
+	return file.objects.authorize_mmap(handle)
 }
 
 fn (mut file FakeG17File) mmap_page(page u64) voidptr {
 	file.lock.acquire()
 	defer { file.lock.release() }
-	for object in file.mmap_objects {
-		if address := gem.get_object_mmap_page(object, page) {
-			return address
-		}
-	}
-	return unsafe { nil }
+	return file.objects.mmap_page(page)
 }
 
 fn next_unused_vm_id(file &FakeG17File) ?u32 {
@@ -368,7 +327,7 @@ fn (mut file FakeG17File) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	}
 	object := gem.create_aligned(request.size, vm_page_size) or { return -12 }
 	file.lock.acquire()
-	file.objects << object
+	file.objects.add_created(object)
 	file.lock.release()
 	request.size = object.size
 	request.handle = object.handle
@@ -763,12 +722,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 			return -22
 		}
 		if result_object == unsafe { nil } {
-			for object in file.objects {
-				if object.handle == request.result_handle {
-					result_object = object
-					break
-				}
-			}
+			result_object = file.objects.find(request.result_handle) or { unsafe { nil } }
 		}
 		if result_object == unsafe { nil } || descriptor.result_offset > result_object.size
 			|| descriptor.result_size > result_object.size - descriptor.result_offset {
@@ -817,19 +771,16 @@ fn (file &FakeG17File) ioctl_get_time(data &ioctl.DrmAsahiGetTime) int {
 
 fn (mut file FakeG17File) close_object_handle(handle u32) int {
 	file.lock.acquire()
-	for index, object in file.objects {
-		if object.handle == handle {
-			for mut vm in file.vms {
-				vm.unbind_object(object)
-			}
-			file.objects.delete(index)
-			file.lock.release()
-			gem.unref(object)
-			return 0
-		}
+	object := file.objects.remove(handle) or {
+		file.lock.release()
+		return -2
+	}
+	for mut vm in file.vms {
+		vm.unbind_object(object)
 	}
 	file.lock.release()
-	return -2
+	gem.unref(object)
+	return 0
 }
 
 fn dispatch(handle voidptr, dev &drm.DrmDevice) ?&FakeG17File {

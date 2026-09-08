@@ -9,6 +9,7 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import gpu.agx.bo as agxbo
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import gpu.agx.submission as agxsubmission
@@ -69,8 +70,7 @@ pub mut:
 	vms               []&mmu.UatContext
 	queues            []&workqueue.WorkQueue
 	mappings          []GpuMapping
-	objects           []&gem.GemObject
-	mmap_objects      []&gem.GemObject
+	objects           agxbo.Table
 	g17_queues        []G17QueueOwnership
 	g13_queues        []G13QueueOwnership
 	timestamp_objects []TimestampObject
@@ -202,27 +202,14 @@ pub fn (mut f GpuFile) close() {
 		gem.unref(mapping.obj)
 	}
 	f.mappings.clear()
-	for obj in f.mmap_objects {
-		gem.unref(obj)
-	}
-	f.mmap_objects.clear()
-	for obj in f.objects {
-		gem.unref(obj)
-	}
-	f.objects.clear()
+	f.objects.release_all()
 	f.lock.release()
 }
 
 fn (mut f GpuFile) get_object_ref(handle u32) ?&gem.GemObject {
 	f.lock.acquire()
 	defer { f.lock.release() }
-	for obj in f.objects {
-		if obj.handle == handle {
-			gem.ref_obj(obj)
-			return obj
-		}
-	}
-	return none
+	return f.objects.get_ref(handle)
 }
 
 fn (mut f GpuFile) import_object(obj &gem.GemObject) ?u32 {
@@ -230,16 +217,10 @@ fn (mut f GpuFile) import_object(obj &gem.GemObject) ?u32 {
 		return none
 	}
 	f.lock.acquire()
-	for existing in f.objects {
-		if voidptr(existing) == voidptr(obj) {
-			handle := existing.handle
-			f.lock.release()
-			return handle
-		}
+	handle := f.objects.import_object(obj) or {
+		f.lock.release()
+		return none
 	}
-	gem.ref_obj(obj)
-	f.objects << obj
-	handle := obj.handle
 	f.lock.release()
 	return handle
 }
@@ -247,35 +228,13 @@ fn (mut f GpuFile) import_object(obj &gem.GemObject) ?u32 {
 fn (mut f GpuFile) authorize_mmap(handle u32) ?u64 {
 	f.lock.acquire()
 	defer { f.lock.release() }
-	mut found := &gem.GemObject(unsafe { nil })
-	for obj in f.objects {
-		if obj.handle == handle {
-			found = obj
-			break
-		}
-	}
-	if voidptr(found) == unsafe { nil } {
-		return none
-	}
-	for obj in f.mmap_objects {
-		if voidptr(obj) == voidptr(found) {
-			return gem.create_mmap_offset(found)
-		}
-	}
-	gem.ref_obj(found)
-	f.mmap_objects << found
-	return gem.create_mmap_offset(found)
+	return f.objects.authorize_mmap(handle)
 }
 
 fn (mut f GpuFile) mmap_page(page u64) voidptr {
 	f.lock.acquire()
 	defer { f.lock.release() }
-	for obj in f.mmap_objects {
-		if phys := gem.get_object_mmap_page(obj, page) {
-			return phys
-		}
-	}
-	return unsafe { nil }
+	return f.objects.mmap_page(page)
 }
 
 // GEM_CLOSE drops every GPU-VA binding owned by the handle once the target VM
@@ -297,14 +256,7 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
 		if mapping.vm_id != vm_id {
 			continue
 		}
-		mut handle_open := false
-		for object in f.objects {
-			if voidptr(object) == voidptr(mapping.obj) {
-				handle_open = true
-				break
-			}
-		}
-		if handle_open {
+		if f.objects.contains(mapping.obj) {
 			continue
 		}
 		pt.unmap(mapping.addr, mapping.size)
@@ -319,22 +271,19 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
 
 fn (mut f GpuFile) close_object_handle(handle u32) int {
 	f.lock.acquire()
-	for i, obj in f.objects {
-		if obj.handle == handle {
-			f.objects.delete(i)
-			mut success := true
-			for vm in f.vms {
-				if !f.cleanup_closed_mappings_locked(vm.id) {
-					success = false
-				}
-			}
-			f.lock.release()
-			gem.unref(obj)
-			return if success { 0 } else { -5 }
+	obj := f.objects.remove(handle) or {
+		f.lock.release()
+		return -2 // ENOENT
+	}
+	mut success := true
+	for vm in f.vms {
+		if !f.cleanup_closed_mappings_locked(vm.id) {
+			success = false
 		}
 	}
 	f.lock.release()
-	return -2 // ENOENT
+	gem.unref(obj)
+	return if success { 0 } else { -5 }
 }
 
 // Reserve a nonzero per-open queue ID. Failed queue construction may leave a
@@ -591,7 +540,7 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	}
 	obj := gem.create_aligned(request.size, pgtable.uat_pgsz) or { return -12 }
 	f.lock.acquire()
-	f.objects << obj
+	f.objects.add_created(obj)
 	f.lock.release()
 	request.handle = obj.handle
 	return 0
@@ -1136,12 +1085,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				return -22
 			}
 			if result_object == unsafe { nil } {
-				for object in f.objects {
-					if object.handle == request.result_handle {
-						result_object = object
-						break
-					}
-				}
+				result_object = f.objects.find(request.result_handle) or { unsafe { nil } }
 			}
 			if result_object == unsafe { nil } || descriptor.result_offset > result_object.size
 				|| descriptor.result_size > result_object.size - descriptor.result_offset {
