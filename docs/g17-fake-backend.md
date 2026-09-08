@@ -68,10 +68,10 @@ graph into the freestanding, allocation-free
 or dynamic expression interpreter: descriptor/command expressions are emitted
 as checked integer operations, graph successors are direct branches, and the
 five external values plus the one external decision live in a fixed input
-structure. `gpu.encode_fake_g17_3d` exposes it to the V backend and returns the
+structure. `gpu.agx.fake.encode_fake_g17_3d` exposes it to the V backend and returns the
 exact golden writes consumed by `submit_fake_g17`.
 
-`gpu.verify_fake_g17` is the V adapter. `gpu.submit_fake_g17` first installs a
+`gpu.agx.fake.verify_fake_g17` is the V adapter. `gpu.agx.fake.submit_fake_g17` first installs a
 normal `WorkItem` in the shared `WorkQueue`, verifies the encoded command, and
 then injects either a successful completion or a channel-error completion.
 That signals the same `DmaFence` objects and exercises the same queue teardown

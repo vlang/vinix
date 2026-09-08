@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-module gpu
+module fake
 
 // Fake G17 execution stops at the firmware boundary: it verifies the encoded
 // HAL300 3D register streams, then generates a host-side completion through the
@@ -31,6 +31,8 @@ pub const fake_g17_queue_full = u32(14)
 pub const fake_g17_value_is_address = u32(1) << 0
 pub const fake_g17_external_event_count = 5
 pub const fake_g17_external_decision_count = 1
+// Fixed output capacity for the recovered encoder. This is not the number of
+// writes required by every job: write_count is descriptor/path dependent.
 pub const fake_g17_max_writes = 392
 pub const fake_g17_encode_ok = u32(0)
 pub const fake_g17_encode_invalid_argument = u32(1)
