@@ -1,5 +1,7 @@
 # Vinix
 
+**Website:** [vinix-os.org](https://vinix-os.org/)
+
 Vinix is an effort to write a modern, fast, and useful operating system in [the V programming language](https://vlang.io).
 
 Join the [Discord chat](https://discord.gg/S5Nm6ZDU38).
