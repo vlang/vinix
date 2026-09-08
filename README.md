@@ -4,6 +4,8 @@
 
 Vinix is an effort to write a modern, fast, and useful operating system in [the V programming language](https://vlang.io).
 
+[![Sponsor][SponsorBadge]][SponsorUrl]
+
 Join the [Discord chat](https://discord.gg/S5Nm6ZDU38).
 
 ## What is Vinix all about?
@@ -530,3 +532,6 @@ make run
   initramfs
   → *** aarch64: Kernel initialisation complete ***
 ```
+
+[SponsorBadge]: https://img.shields.io/github/sponsors/medvednikov?style=flat&logo=github&logoColor=white
+[SponsorUrl]: https://github.com/sponsors/medvednikov
