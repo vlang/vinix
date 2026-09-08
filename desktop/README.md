@@ -415,6 +415,11 @@ sysroot taken from the userland image, and stages
 starts the desktop directly. `run-aarch64.sh` boots any image named by
 `VINIX_INITRAMFS`, and with none boots the ordinary shell.
 
+An existing `build-aarch64-hyprland/staging` layer changes the first session to
+Hyprland while keeping this desktop as the recovery session. Produce that layer
+with `build-hyprland-aarch64.sh` on an ARM64 host, then use
+`run-hyprland-aarch64.sh`; `Super`+`M` exits Hyprland and returns here.
+
 Options the desktop itself takes:
 
     --fb=PATH         framebuffer device (default /dev/fb0)

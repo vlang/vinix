@@ -68,11 +68,22 @@ pub const so_linger = 13
 
 pub const so_reuseport = 15
 
+pub const so_peercred = 17
+
 pub const so_acceptconn = 30
 
 pub const so_domain = 39
 
 pub const so_protocol = 38
+
+// Linux's SO_PEERCRED payload. Wayland authenticates every newly accepted
+// client with this record before it creates the wl_client.
+pub struct UCred {
+pub:
+	pid int
+	uid u32
+	gid u32
+}
 
 // Copy an address out the way getsockname(2) and getpeername(2) ask for it:
 // write no more than the caller's buffer holds, but report the length the

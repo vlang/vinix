@@ -46,7 +46,7 @@ on real hardware.
 - [x] X.org
 - [x] X window manager
 - [x] Networking
-- [ ] Wayland 
+- [x] Wayland (Hyprland on aarch64)
 - [x] Hypervisor (Intel VT-x; see [documentation](docs/hypervisor.md))
 - [x] V-UI 2
 - [ ] Intel HD graphics driver (Linux port)
@@ -357,6 +357,30 @@ transport probing, but it does not create a render node. KekVM's compact QEMU
 currently omits libslirp, so this launch mode is offline; Firefox can exercise
 its bundled local smoke page, while browsing needs a VirGL QEMU build with a
 network backend.
+
+### Hyprland on aarch64
+
+Vinix can boot Hyprland 0.54.3 on QEMU and Apple Silicon. Aquamarine uses a
+Vinix backend that presents rendered GBM buffers through `/dev/fb0` and feeds
+Hyprland from `/dev/pointer` plus the raw console keyboard. On M1 it renders
+with AGX; QEMU uses Mesa's `kms_swrast` through Vinix's render-only dumb-buffer
+DRM node. This does not pretend the firmware framebuffer is a KMS display.
+
+Build the musl runtime and patched Aquamarine library on an ARM64 Linux or
+macOS host. If using the Debian ARM64 build VM, copy its staging directory back
+to the checkout used to assemble the desktop image:
+
+```sh
+./build-hyprland-aarch64.sh
+# copy build-aarch64-hyprland/staging to the macOS checkout when needed
+./build-desktop-aarch64.sh
+./run-hyprland-aarch64.sh --no-build --grab-keys
+```
+
+When the layer is present, desktop init starts Hyprland automatically. `Super`+
+`Return` opens Foot, `Super`+`Q` closes a window, and `Super`+`M` exits to the
+native Vinix recovery desktop. The runtime smoke check is available inside the
+guest as `/root/hyprland-smoke.sh`.
 
 ### Apple M1 GPU test image
 

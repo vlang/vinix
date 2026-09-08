@@ -57,6 +57,14 @@ pub mut:
 	connection_event eventstruct.Event
 	connected        bool
 	peer             &UnixSocket = unsafe { nil }
+	// Credentials are captured when the connection is established, matching
+	// Linux SO_PEERCRED rather than whatever identity the peer has later.
+	owner_pid int
+	owner_uid u32
+	owner_gid u32
+	peer_pid  int
+	peer_uid  u32
+	peer_gid  u32
 
 	// shutdown(2) state. `read_closed` and `write_closed` are this socket's own
 	// halves; `peer_finished` records that the other end promised to send
@@ -390,6 +398,18 @@ fn (mut this UnixSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 	}
 }
 
+pub fn (this &UnixSocket) peer_credentials() ?sock_pub.UCred {
+	if !this.connected || this.peer == unsafe { nil } {
+		errno.set(errno.enotconn)
+		return none
+	}
+	return sock_pub.UCred{
+		pid: this.peer_pid
+		uid: this.peer_uid
+		gid: this.peer_gid
+	}
+}
+
 fn (mut this UnixSocket) setsockopt(_handle voidptr, level int, optname int, value int) ? {
 	if level != sock_pub.sol_socket {
 		errno.set(errno.enoprotoopt)
@@ -533,10 +553,20 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		capacity: sock_buf
 		status: file.pollout
 		socktype: this.socktype
+		owner_pid: socket.owner_pid
+		owner_uid: socket.owner_uid
+		owner_gid: socket.owner_gid
 	}
+	client := proc.current_thread().process
+	connection_socket.peer_pid = client.pid
+	connection_socket.peer_uid = client.euid
+	connection_socket.peer_gid = client.egid
 
 	this.peer = connection_socket
 	this.connected = true
+	this.peer_pid = socket.owner_pid
+	this.peer_uid = socket.owner_uid
+	this.peer_gid = socket.owner_gid
 	this.status |= file.pollout
 	socket.backlog << connection_socket
 
@@ -791,11 +821,15 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 }
 
 pub fn create(@type int) ?&UnixSocket {
+	process := proc.current_thread().process
 	mut ret := &UnixSocket{
 		refcount: 1
 		peer: unsafe { nil }
 		data: unsafe { malloc(sock_buf) }
 		capacity: sock_buf
+		owner_pid: process.pid
+		owner_uid: process.euid
+		owner_gid: process.egid
 	}
 	ret.name.sun_family = sock_pub.af_unix
 	ret.socktype = @type & sock_pub.sock_type_mask
@@ -804,11 +838,15 @@ pub fn create(@type int) ?&UnixSocket {
 }
 
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
+	process := proc.current_thread().process
 	mut a := &UnixSocket{
 		refcount: 1
 		peer: unsafe { nil }
 		data: unsafe { malloc(sock_buf) }
 		capacity: sock_buf
+		owner_pid: process.pid
+		owner_uid: process.euid
+		owner_gid: process.egid
 	}
 	a.name.sun_family = sock_pub.af_unix
 	a.socktype = @type & sock_pub.sock_type_mask
@@ -818,6 +856,9 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 		peer: unsafe { nil }
 		data: unsafe { malloc(sock_buf) }
 		capacity: sock_buf
+		owner_pid: process.pid
+		owner_uid: process.euid
+		owner_gid: process.egid
 	}
 	b.name.sun_family = sock_pub.af_unix
 	b.socktype = @type & sock_pub.sock_type_mask
@@ -830,6 +871,12 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	b.peer = a
 	a.connected = true
 	b.connected = true
+	a.peer_pid = b.owner_pid
+	a.peer_uid = b.owner_uid
+	a.peer_gid = b.owner_gid
+	b.peer_pid = a.owner_pid
+	b.peer_uid = a.owner_uid
+	b.peer_gid = a.owner_gid
 
 	return a, b
 }

@@ -67,6 +67,15 @@ static int gpu_available(void) {
 	return 1;
 }
 
+static int executable_available(const char *path) {
+	i64 fd = syscall4(56 /* openat */, (u64)(i64)-100 /* AT_FDCWD */,
+	                  (u64)path, 0 /* O_RDONLY */, 0);
+	if (fd < 0)
+		return 0;
+	syscall1(57 /* close */, (u64)fd);
+	return 1;
+}
+
 static char *environment[] = {
 	"PATH=/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin",
 	"HOME=/root",
@@ -74,9 +83,12 @@ static char *environment[] = {
 	"PS1=vinix# ",
 	"USER=root",
 	"LOGNAME=root",
-	"SHELL=/bin/busybox",
+	"SHELL=/bin/sh",
 	"LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules",
 	"LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri",
+	"XDG_RUNTIME_DIR=/run/user/0",
+	"XDG_CONFIG_HOME=/root/.config",
+	"XDG_CACHE_HOME=/root/.cache",
 	"SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt",
 	(char *)0,
 };
@@ -84,15 +96,15 @@ static char *environment[] = {
 void _start(void) {
 	char *desktop[] = { "/usr/bin/vinix-desktop", (char *)0 };
 	char *gpu_desktop[] = { "/usr/bin/vinix-desktop-gpu", (char *)0 };
+	char *hyprland[] = { "/usr/bin/start-hyprland-vinix", (char *)0 };
 	char *shell[] = { "/bin/busybox", "sh", (char *)0 };
+	int status = 0;
+	i64 child;
 
 #ifdef VINIX_WIFI_BUNDLE
 	char *wifi[] = {
 		"/usr/bin/wifi-ctl", "load", "/usr/share/vinix/wifi", (char *)0,
 	};
-	int status = 0;
-	i64 child;
-
 	print("\nVinix: loading the selected Wi-Fi firmware\n");
 	child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
 	if (child == 0) {
@@ -103,6 +115,20 @@ void _start(void) {
 	if (child < 0 || syscall4(260 /* wait4 */, (u64)child, (u64)&status, 0, 0) < 0 || status != 0)
 		print("init: Wi-Fi firmware load failed; continuing without wireless\n");
 #endif
+
+	if (executable_available(hyprland[0])) {
+		print("\nVinix: starting Hyprland\n");
+		child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+		if (child == 0) {
+			syscall3(221 /* execve */, (u64)hyprland[0], (u64)hyprland,
+			         (u64)environment);
+			print("init: could not start Hyprland\n");
+			syscall1(93 /* exit */, 127);
+		}
+		if (child > 0)
+			syscall4(260 /* wait4 */, (u64)child, (u64)&status, 0, 0);
+		print("init: Hyprland exited; starting the native recovery desktop\n");
+	}
 
 	if (gpu_available()) {
 		print("\nVinix: starting the GPU-enabled desktop\n");

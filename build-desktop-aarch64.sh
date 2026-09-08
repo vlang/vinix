@@ -31,6 +31,7 @@ NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
+HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
 merge_staging_tree() {
@@ -338,11 +339,31 @@ else
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
 fi
 
+# Hyprland is an optional build layer because its patched Aquamarine library
+# is produced in the native ARM64 build VM. When present, desktop-init starts
+# it first and retains the native Vinix desktop as a recovery fallback.
+if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+    echo "==> Staging Hyprland and the Vinix Aquamarine backend"
+    merge_staging_tree "$HYPRLAND_STAGING"
+fi
+
 # Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
 # exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
 # unrelated Mesa build.
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     merge_staging_tree "$ASAHI_STAGING"
+fi
+# Hyprland edge uses libstdc++ formatting entry points newer than the base and
+# Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;
+# use regular files because Vinix's musl loader opens DT_NEEDED objects with
+# O_NOFOLLOW.
+if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+    for runtime in libstdc++.so.6 libgcc_s.so.1; do
+        if [ -f "$HYPRLAND_STAGING/usr/lib/$runtime" ]; then
+            rm -f "$STAGING/usr/lib/$runtime"
+            cp -L "$HYPRLAND_STAGING/usr/lib/$runtime" "$STAGING/usr/lib/$runtime"
+        fi
+    done
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
@@ -405,6 +426,15 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
+fi
+
+if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+    for runtime_path in usr/bin/Hyprland usr/bin/start-hyprland-vinix usr/bin/foot usr/lib/libaquamarine.so.11 root/.config/hypr/hyprland.conf; do
+        if [ ! -e "$STAGING/$runtime_path" ]; then
+            echo "ERROR: staged Hyprland runtime is missing /$runtime_path" >&2
             exit 1
         fi
     done

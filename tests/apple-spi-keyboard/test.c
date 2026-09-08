@@ -155,6 +155,22 @@ static void test_command_tab(void)
         && !memcmp(out, "\033[9;9u", 6));
 }
 
+static void test_command_chords(void)
+{
+    struct decoder d = {0}; uint8_t out[128];
+    expect_bytes(encode_key(20, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[113;9u", 8); /* Cmd-Q */
+    expect_bytes(encode_key(40, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[13;9u", 7); /* Cmd-Return */
+    expect_bytes(encode_key(20, 0x0f, 0, 0, 0),
+        (const uint8_t *)"\033[81;16u", 8); /* Shift-Ctrl-Alt-Cmd-Q */
+
+    assert(single(&d, 100, 0x08, 0, 20, out) == 8
+        && !memcmp(out, "\033[113;9u", 8));
+    assert(single(&d, 200, 0, 0, 0, out) == 12
+        && !memcmp(out, "\033[57444;1:3u", 12));
+}
+
 static void test_repeat(void)
 {
     struct decoder d = {0}; uint8_t out[128];
@@ -476,6 +492,7 @@ int main(void)
     run(test_ascii_controls, "ASCII, control bytes, Option, NUL");
     run(test_navigation_fn_and_function_keys, "navigation, DECCKM, Fn, function keys");
     run(test_command_tab, "Cmd-Tab chords and the release that ends them");
+    run(test_command_chords, "CSI-u preserves general Cmd chords");
     run(test_repeat, "repeat timing, modifiers, no catch-up burst");
     run(test_rollover, "rollover errors and recovery");
     run(test_crc_and_identity_rejection, "packet/message CRC and identity rejection");

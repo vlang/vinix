@@ -181,6 +181,28 @@ fn vi_puts(s &char) {
 	}
 }
 
+fn vi_put_uint(value u32) {
+	mut divisor := u32(1)
+	for divisor <= value / 10 {
+		divisor *= 10
+	}
+	for divisor > 0 {
+		vi_put(u8(`0`) + u8((value / divisor) % 10))
+		divisor /= 10
+	}
+}
+
+// CSI-u preserves the Super modifier which a traditional terminal byte
+// stream otherwise discards. The Vinix Aquamarine backend turns these chords
+// back into ordinary key events for Hyprland.
+fn vi_emit_csi_u(codepoint u32, modifiers u32) {
+	vi_puts(c'\e[')
+	vi_put_uint(codepoint)
+	vi_put(u8(`;`))
+	vi_put_uint(1 + modifiers)
+	vi_put(u8(`u`))
+}
+
 fn vi_emit_arrow(final u8) {
 	vi_put(0x1b)
 	vi_put(u8(`[`))
@@ -287,16 +309,10 @@ fn process_key(code u16, value u32) {
 		return
 	}
 
-	// Cmd-Tab is the window switcher's, not the terminal's, so it goes out as
-	// the CSI-u encoding of Tab -- the key's own code point, then 1 plus a
-	// mask of the modifiers held with it, where super is 8 and shift is 1 --
-	// and the tab itself is not also sent.
+	// Preserve GUI chords in the terminal stream for graphical compositors.
+	// Native vinix-desktop consumes Cmd-Tab and ignores the other sequences.
 	if vi_meta_active && code == key_tab {
-		if vi_shift_active {
-			vi_puts(c'\e[9;10u')
-		} else {
-			vi_puts(c'\e[9;9u')
-		}
+		vi_emit_csi_u(9, 8 | if vi_shift_active { u32(1) } else { u32(0) })
 		vi_meta_chorded = true
 		return
 	}
@@ -342,7 +358,24 @@ fn process_key(code u16, value u32) {
 		else {}
 	}
 
-	// Regular keys — use shared conversion tables
+	// Regular keys — use shared conversion tables. GUI chords are encoded
+	// before Ctrl turns letters into control bytes.
+	base := keyboard.translate(u8(code), vi_shift_active, vi_caps_active, false)
+	if vi_meta_active && base != 0 {
+		mut modifiers := u32(8)
+		if vi_shift_active {
+			modifiers |= 1
+		}
+		if vi_alt_active {
+			modifiers |= 2
+		}
+		if vi_ctrl_active {
+			modifiers |= 4
+		}
+		vi_emit_csi_u(u32(base), modifiers)
+		vi_meta_chorded = true
+		return
+	}
 	c := keyboard.translate(u8(code), vi_shift_active, vi_caps_active, vi_ctrl_active)
 	if c == 0 {
 		return

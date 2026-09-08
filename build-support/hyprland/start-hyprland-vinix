@@ -1,0 +1,42 @@
+#!/bin/busybox sh
+set -eu
+
+mkdir -p /run/user/0 /tmp /dev/shm /root/.cache
+chmod 700 /run/user/0
+chmod 1777 /tmp
+chmod 1777 /dev/shm
+
+export HOME=/root
+export USER=root
+export LOGNAME=root
+export SHELL=/bin/sh
+export XDG_RUNTIME_DIR=/run/user/0
+export XDG_CONFIG_HOME=/root/.config
+export XDG_CACHE_HOME=/root/.cache
+export XDG_CURRENT_DESKTOP=Hyprland
+export XDG_SESSION_DESKTOP=Hyprland
+export XDG_SESSION_TYPE=wayland
+export XKB_CONFIG_ROOT=/usr/share/X11/xkb
+export XCURSOR_THEME=capitaine-cursors-dark
+export HYPRLAND_NO_CRASHREPORTER=1
+export HYPRLAND_NO_SD_NOTIFY=1
+export HYPRLAND_NO_SD_VARS=1
+export WLR_NO_HARDWARE_CURSORS=1
+
+if [ -e /dev/dri/renderD128 ]; then
+    export LIBGL_DRIVERS_PATH=/usr/lib/dri:/usr/lib/gallium-pipe:/usr/lib/xorg/modules/dri
+    export GBM_BACKENDS_PATH=/usr/lib/gbm
+    export MESA_LOADER_DRIVER_OVERRIDE=asahi
+else
+    software_mesa=/usr/lib/vinix-hyprland-software
+    export LD_LIBRARY_PATH="$software_mesa${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export LIBGL_DRIVERS_PATH="$software_mesa/dri"
+    export GBM_BACKENDS_PATH="$software_mesa/gbm"
+    export MESA_LOADER_DRIVER_OVERRIDE=kms_swrast
+    export GBM_ALWAYS_SOFTWARE=1
+    export LIBGL_ALWAYS_SOFTWARE=1
+fi
+
+export GBM_BACKEND=dri
+
+exec /usr/bin/Hyprland --i-am-really-stupid --config /root/.config/hypr/hyprland.conf "$@"

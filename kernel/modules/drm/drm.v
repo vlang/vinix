@@ -4,7 +4,6 @@ module drm
 // Minimal DRM (Direct Rendering Manager) subsystem for Vinix
 // Implements only what Asahi GPU and DCP display drivers need.
 // Skips legacy mode setting, DRM leases, writeback connectors.
-
 import klock
 import katomic
 import fs
@@ -21,6 +20,7 @@ import usercopy
 
 // DRM driver feature flags
 pub const driver_gem = u32(0x1)
+pub const driver_dumb_buffer = u32(0x2)
 pub const driver_render = u32(0x8)
 pub const driver_compute = u32(0x10)
 
@@ -40,12 +40,12 @@ pub mut:
 	patchlevel     int
 	features       u32
 	ioctls         []DrmIoctl
-	file_close     fn (&DrmDevice, voidptr)                      = unsafe { nil }
-	gem_close      fn (&DrmDevice, voidptr, u32) int             = unsafe { nil }
+	file_close     fn (&DrmDevice, voidptr) = unsafe { nil }
+	gem_close      fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
 	gem_export     fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
-	gem_export_put fn (&DrmDevice, &gem.GemObject)               = unsafe { nil }
+	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
-	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr    = unsafe { nil }
+	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
 }
 
 pub struct DrmDevice {
@@ -105,7 +105,7 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
-	dev      &DrmDevice     = unsafe { nil }
+	dev      &DrmDevice = unsafe { nil }
 	obj      &gem.GemObject = unsafe { nil }
 }
 
@@ -226,121 +226,193 @@ const ioctl_direction_mask = u32(0x3)
 fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
 	return match cmd {
 		ioctl.drm_ioctl_version {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmVersion)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmVersion))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_ioctl_get_cap {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmGetCap)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmGetCap))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_ioctl_gem_close {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmGemClose)), direction: ioctl_write }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmGemClose))
+				direction: ioctl_write
+			}
 		}
 		ioctl.drm_ioctl_prime_handle_to_fd, ioctl.drm_ioctl_prime_fd_to_handle {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmPrimeHandle)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmPrimeHandle))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_ioctl_syncobj_create {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjCreate)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmSyncobjCreate))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_ioctl_syncobj_destroy {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjDestroy)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmSyncobjDestroy))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjHandle)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmSyncobjHandle))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_ioctl_syncobj_wait {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read }
 		}
+		ioctl.drm_ioctl_mode_create_dumb {
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmModeCreateDumb))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_ioctl_mode_map_dumb {
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmModeMapDumb))
+				direction: ioctl_write | ioctl_read
+			}
+		}
+		ioctl.drm_ioctl_mode_destroy_dumb {
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmModeDestroyDumb))
+				direction: ioctl_write
+			}
+		}
 		ioctl.drm_virtgpu_map {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuMap))
+				size: u32(sizeof(ioctl.DrmVirtgpuMap))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_execbuffer {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuExecbuffer))
+				size: u32(sizeof(ioctl.DrmVirtgpuExecbuffer))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_getparam {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuGetparam))
+				size: u32(sizeof(ioctl.DrmVirtgpuGetparam))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_resource_create {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuResourceCreate))
+				size: u32(sizeof(ioctl.DrmVirtgpuResourceCreate))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_resource_info {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuResourceInfo))
+				size: u32(sizeof(ioctl.DrmVirtgpuResourceInfo))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_transfer_from_host, ioctl.drm_virtgpu_transfer_to_host {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuTransfer))
+				size: u32(sizeof(ioctl.DrmVirtgpuTransfer))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_wait {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuWait))
+				size: u32(sizeof(ioctl.DrmVirtgpuWait))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_get_caps {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuGetCaps))
+				size: u32(sizeof(ioctl.DrmVirtgpuGetCaps))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_resource_create_blob {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuResourceCreateBlob))
+				size: u32(sizeof(ioctl.DrmVirtgpuResourceCreateBlob))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_virtgpu_context_init {
 			DrmIoctlLayout{
-				size:      u32(sizeof(ioctl.DrmVirtgpuContextInit))
+				size: u32(sizeof(ioctl.DrmVirtgpuContextInit))
 				direction: ioctl_write | ioctl_read
 			}
 		}
 		ioctl.drm_asahi_get_params {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiGetParams))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_asahi_vm_create {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiVmCreate))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_asahi_vm_destroy {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: ioctl_write }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiVmDestroy))
+				direction: ioctl_write
+			}
 		}
 		ioctl.drm_asahi_gem_create {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiGemCreate))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_asahi_gem_mmap_offset {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_asahi_gem_bind {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: ioctl_write }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiGemBind))
+				direction: ioctl_write
+			}
 		}
 		ioctl.drm_asahi_queue_create {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiQueueCreate))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_asahi_queue_destroy {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: ioctl_write }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiQueueDestroy))
+				direction: ioctl_write
+			}
 		}
 		ioctl.drm_asahi_submit {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: ioctl_write }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiSubmit))
+				direction: ioctl_write
+			}
 		}
 		ioctl.drm_asahi_get_time {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiGetTime))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		ioctl.drm_asahi_gem_bind_object {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmAsahiGemBindObject))
+				direction: ioctl_write | ioctl_read
+			}
 		}
 		else {
 			return none
@@ -352,7 +424,7 @@ fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
 
 	mut node := &DrmNode{
-		dev:    unsafe { dev }
+		dev: unsafe { dev }
 		render: render
 	}
 	node.stat.size = 0
@@ -371,8 +443,7 @@ fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 
 fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 	if handle == unsafe { nil } || voidptr(this.dev) == unsafe { nil }
-		|| voidptr(this.dev.driver) == unsafe { nil }
-		|| this.dev.driver.mmap == unsafe { nil } {
+		|| voidptr(this.dev.driver) == unsafe { nil } || this.dev.driver.mmap == unsafe { nil } {
 		return unsafe { nil }
 	}
 	return this.dev.driver.mmap(this.dev, handle, page, flags)
@@ -478,13 +549,9 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 		registered: true
 	}
 
-	dev.node = create_device_node(dev, 'card${id}', false) or {
-		return none
-	}
+	dev.node = create_device_node(dev, 'card${id}', false) or { return none }
 	if driver.features & driver_render != 0 {
-		dev.render_node = create_device_node(dev, 'renderD${128 + id}', true) or {
-			return none
-		}
+		dev.render_node = create_device_node(dev, 'renderD${128 + id}', true) or { return none }
 	}
 	registered_devices[id] = dev
 
@@ -544,12 +611,24 @@ fn ioctl_version(dev &DrmDevice, data voidptr) int {
 	return 0
 }
 
-fn ioctl_get_cap(data voidptr) int {
+fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 	if data == unsafe { nil } {
 		return -14
 	}
 	mut cap := unsafe { &ioctl.DrmGetCap(data) }
 	match cap.capability {
+		ioctl.drm_cap_dumb_buffer {
+			cap.value = if dev.driver.features & driver_dumb_buffer != 0 { u64(1) } else { u64(0) }
+			return 0
+		}
+		ioctl.drm_cap_dumb_preferred_depth {
+			cap.value = 32
+			return 0
+		}
+		ioctl.drm_cap_dumb_prefer_shadow {
+			cap.value = 0
+			return 0
+		}
 		ioctl.drm_cap_prime {
 			cap.value = ioctl.drm_prime_cap_import | ioctl.drm_prime_cap_export
 			return 0
@@ -615,8 +694,8 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 			blksize: i64(4096)
 			blocks: i64(obj.size / 512)
 		}
-		dev:      unsafe { dev }
-		obj:      unsafe { obj }
+		dev: unsafe { dev }
+		obj: unsafe { obj }
 		can_mmap: true
 	}
 	mut fd_flags := 0
@@ -671,9 +750,7 @@ fn ioctl_prime_handle_to_fd(dev &DrmDevice, handle voidptr, data voidptr) int {
 		return -22
 	}
 	obj := dev.driver.gem_export(dev, handle, request.handle) or { return -2 }
-	fdnum := create_prime_fd(dev, obj, request.flags) or {
-		return -24
-	}
+	fdnum := create_prime_fd(dev, obj, request.flags) or { return -24 }
 	request.fd = i32(fdnum)
 	return 0
 }
@@ -832,7 +909,7 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 			return ioctl_version(dev, data)
 		}
 		ioctl.drm_ioctl_get_cap {
-			return ioctl_get_cap(data)
+			return ioctl_get_cap(dev, data)
 		}
 		ioctl.drm_ioctl_gem_close {
 			return ioctl_gem_close(dev, handle, data)

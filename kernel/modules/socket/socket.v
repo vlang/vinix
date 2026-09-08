@@ -548,8 +548,8 @@ pub fn syscall_shutdown(_ voidptr, fdnum int, how int) (u64, u64) {
 	return 0, 0
 }
 
-// getsockopt(2). Only the integer-valued options are served; anything else is
-// reported as unknown rather than answered with a fabricated zero.
+// getsockopt(2). Most options are integer-valued; SO_PEERCRED carries Linux's
+// three-field ucred record and is handled before the generic path.
 pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u64, optlen u64) (u64, u64) {
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
@@ -563,6 +563,22 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 	mut capacity := u32(0)
 	if !usercopy.copy_from_user(voidptr(&capacity), optlen, sizeof(u32)) {
 		return errno.err, errno.efault
+	}
+	if level == sock_pub.sol_socket && optname == sock_pub.so_peercred {
+		if capacity < sizeof(sock_pub.UCred) {
+			return errno.err, errno.einval
+		}
+		mut res := fd.handle.resource
+		if mut res is sock_unix.UnixSocket {
+			credentials := res.peer_credentials() or { return errno.err, errno.get() }
+			written := u32(sizeof(sock_pub.UCred))
+			if !usercopy.copy_to_user(optval, voidptr(&credentials), sizeof(sock_pub.UCred))
+				|| !usercopy.copy_to_user(optlen, voidptr(&written), sizeof(u32)) {
+				return errno.err, errno.efault
+			}
+			return 0, 0
+		}
+		return errno.err, errno.enoprotoopt
 	}
 	if capacity < sizeof(int) {
 		return errno.err, errno.einval

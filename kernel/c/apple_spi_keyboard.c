@@ -154,6 +154,29 @@ static void sequence(struct key_bytes *out, const char *s)
         out->data[out->len++] = (uint8_t)*s++;
 }
 
+static void decimal(struct key_bytes *out, unsigned value)
+{
+    unsigned divisor = 1;
+    while (divisor <= value / 10)
+        divisor *= 10;
+    do {
+        if (out->len >= sizeof(out->data))
+            return;
+        out->data[out->len++] = (uint8_t)('0' + value / divisor % 10);
+        divisor /= 10;
+    } while (divisor);
+}
+
+static void csi_u(struct key_bytes *out, unsigned codepoint,
+    unsigned modifiers)
+{
+    sequence(out, "\033[");
+    decimal(out, codepoint);
+    sequence(out, ";");
+    decimal(out, 1 + modifiers);
+    sequence(out, "u");
+}
+
 static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     int caps, int fn, int application_cursor)
 {
@@ -178,12 +201,9 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         }
     }
 
-    /* Cmd-Tab is the window switcher's, not the terminal's, so it goes out as
-     * the CSI-u encoding of Tab -- the key's own code point, then 1 plus a
-     * mask of the modifiers held with it, where super is 8 and shift is 1 --
-     * and the tab itself is not also sent. */
+    /* Preserve GUI chords in the console stream for graphical compositors. */
     if (gui && key == 43) {
-        sequence(&out, shift ? "\033[9;10u" : "\033[9;9u");
+        csi_u(&out, 9, 8u | (unsigned)shift);
         return out;
     }
 
@@ -236,6 +256,12 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 82: s = application_cursor ? "\033OA" : "\033[A"; break;
         default: return out; /* Unknown/reserved/lock/media keys */
         }
+    }
+    if (gui && c) {
+        unsigned mods = 8u | (unsigned)shift | ((unsigned)alt << 1) |
+            ((unsigned)ctrl << 2);
+        csi_u(&out, c, mods);
+        return out;
     }
     if (alt)
         out.data[out.len++] = 0x1b;
@@ -309,7 +335,7 @@ static size_t accept_report(struct decoder *d, const uint8_t report[10],
         if (append_key(out, capacity, &used, bytes)) {
             d->repeat_key = key;
             d->repeat_at = now + REPEAT_DELAY;
-            if (key == 43 && (d->modifiers & 0x88u))
+            if (d->modifiers & 0x88u)
                 d->gui_chorded = 1;
         }
     }

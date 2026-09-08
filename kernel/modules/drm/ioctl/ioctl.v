@@ -19,6 +19,9 @@ pub const drm_ioctl_syncobj_handle_to_fd = u32(0xc1)
 pub const drm_ioctl_syncobj_fd_to_handle = u32(0xc2)
 pub const drm_ioctl_syncobj_wait = u32(0xc3)
 pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
+pub const drm_ioctl_mode_create_dumb = u32(0xb2)
+pub const drm_ioctl_mode_map_dumb = u32(0xb3)
+pub const drm_ioctl_mode_destroy_dumb = u32(0xb4)
 
 // ---- VirtIO-GPU driver ioctls (DRM_COMMAND_BASE + command) ----
 pub const drm_virtgpu_base = u32(0x40)
@@ -34,6 +37,9 @@ pub const drm_virtgpu_get_caps = drm_virtgpu_base + u32(0x09)
 pub const drm_virtgpu_resource_create_blob = drm_virtgpu_base + u32(0x0a)
 pub const drm_virtgpu_context_init = drm_virtgpu_base + u32(0x0b)
 
+pub const drm_cap_dumb_buffer = u64(0x1)
+pub const drm_cap_dumb_preferred_depth = u64(0x3)
+pub const drm_cap_dumb_prefer_shadow = u64(0x4)
 pub const drm_cap_syncobj = u64(0x13)
 pub const drm_cap_syncobj_timeline = u64(0x14)
 pub const drm_cap_prime = u64(0x5)
@@ -114,6 +120,31 @@ pub mut:
 	first_signaled u32
 	pad            u32
 	deadline_nsec  u64
+}
+
+// include/uapi/drm/drm_mode.h. Keep the field order exact: libdrm builds the
+// ioctl number with sizeof() and the DRM core validates that encoded size.
+pub struct DrmModeCreateDumb {
+pub mut:
+	height u32
+	width  u32
+	bpp    u32
+	flags  u32
+	handle u32
+	pitch  u32
+	size   u64
+}
+
+pub struct DrmModeMapDumb {
+pub mut:
+	handle u32
+	pad    u32
+	offset u64
+}
+
+pub struct DrmModeDestroyDumb {
+pub mut:
+	handle u32
 }
 
 // include/uapi/drm/virtgpu_drm.h. Mesa's VirGL winsys consumes these layouts
@@ -624,32 +655,18 @@ pub mut:
 // Keep these assertions executable in the freestanding build: V does not have
 // C11 _Static_assert, and callers validate this before registering the device.
 pub fn validate_asahi_25_layouts() bool {
-	return sizeof(DrmVersion) == 64
-		&& sizeof(DrmGetCap) == 16
-		&& sizeof(DrmGemClose) == 8
-		&& sizeof(DrmPrimeHandle) == 12
-		&& sizeof(DrmSyncobjCreate) == 8
-		&& sizeof(DrmSyncobjDestroy) == 8
-		&& sizeof(DrmSyncobjHandle) == 16
-		&& sizeof(DrmSyncobjWait) == 40
-		&& sizeof(DrmAsahiParamsGlobal) == 432
-		&& sizeof(DrmAsahiGetParams) == 32
-		&& sizeof(DrmAsahiVmCreate) == 32
-		&& sizeof(DrmAsahiVmDestroy) == 16
-		&& sizeof(DrmAsahiGemCreate) == 32
-		&& sizeof(DrmAsahiGemMmapOffset) == 24
-		&& sizeof(DrmAsahiGemBind) == 48
-		&& sizeof(DrmAsahiGemBindObject) == 48
-		&& sizeof(DrmAsahiQueueCreate) == 32
-		&& sizeof(DrmAsahiQueueDestroy) == 16
-		&& sizeof(DrmAsahiSync) == 24
-		&& sizeof(DrmAsahiCommand) == 56
-		&& sizeof(DrmAsahiSubmit) == 56
-		&& sizeof(DrmAsahiAttachment) == 24
-		&& sizeof(DrmAsahiCmdRender) == 464
-		&& sizeof(DrmAsahiCmdCompute) == 104
-		&& sizeof(DrmAsahiResultInfo) == 32
-		&& sizeof(DrmAsahiResultRender) == 96
-		&& sizeof(DrmAsahiResultCompute) == 56
+	return sizeof(DrmVersion) == 64 && sizeof(DrmGetCap) == 16 && sizeof(DrmGemClose) == 8
+		&& sizeof(DrmPrimeHandle) == 12 && sizeof(DrmSyncobjCreate) == 8
+		&& sizeof(DrmSyncobjDestroy) == 8 && sizeof(DrmSyncobjHandle) == 16
+		&& sizeof(DrmSyncobjWait) == 40 && sizeof(DrmAsahiParamsGlobal) == 432
+		&& sizeof(DrmAsahiGetParams) == 32 && sizeof(DrmAsahiVmCreate) == 32
+		&& sizeof(DrmAsahiVmDestroy) == 16 && sizeof(DrmAsahiGemCreate) == 32
+		&& sizeof(DrmAsahiGemMmapOffset) == 24 && sizeof(DrmAsahiGemBind) == 48
+		&& sizeof(DrmAsahiGemBindObject) == 48 && sizeof(DrmAsahiQueueCreate) == 32
+		&& sizeof(DrmAsahiQueueDestroy) == 16 && sizeof(DrmAsahiSync) == 24
+		&& sizeof(DrmAsahiCommand) == 56 && sizeof(DrmAsahiSubmit) == 56
+		&& sizeof(DrmAsahiAttachment) == 24 && sizeof(DrmAsahiCmdRender) == 464
+		&& sizeof(DrmAsahiCmdCompute) == 104 && sizeof(DrmAsahiResultInfo) == 32
+		&& sizeof(DrmAsahiResultRender) == 96 && sizeof(DrmAsahiResultCompute) == 56
 		&& sizeof(DrmAsahiGetTime) == 24
 }
