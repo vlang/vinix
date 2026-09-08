@@ -1746,16 +1746,16 @@ fn ioctl_gem_bind_object_handler(dev &drm.DrmDevice, handle voidptr, data voidpt
 
 pub fn drm_ioctls() []drm.DrmIoctl {
 	return [
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, handler: ioctl_get_params_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, handler: ioctl_vm_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, handler: ioctl_vm_destroy_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, handler: ioctl_gem_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, handler: ioctl_gem_mmap_offset_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, handler: ioctl_gem_bind_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, handler: ioctl_queue_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, handler: ioctl_queue_destroy_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, handler: ioctl_submit_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, handler: ioctl_get_time_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, handler: ioctl_gem_bind_object_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_get_params_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_vm_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: ioctl_vm_destroy_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_mmap_offset_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: ioctl_gem_bind_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_queue_create_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: ioctl_queue_destroy_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: ioctl_submit_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_get_time_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_bind_object_handler },
 	]
 }

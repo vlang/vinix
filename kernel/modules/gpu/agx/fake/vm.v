@@ -84,6 +84,12 @@ fn (vm &FakeG17Vm) valid_user_range(address u64, size u64) bool {
 	return address >= vm.kernel_end || end <= vm.kernel_start
 }
 
+// USC base values identify a VM region, not necessarily a BO-backed byte.
+pub fn (vm &FakeG17Vm) contains_address(address u64) bool {
+	return address >= vm_user_start && address < vm_user_end
+		&& (address < vm.kernel_start || address >= vm.kernel_end)
+}
+
 // Bind one complete, non-overlapping VA range. The VM takes an independent
 // GEM reference on success.
 pub fn (mut vm FakeG17Vm) bind(object &gem.GemObject, address u64, size u64,

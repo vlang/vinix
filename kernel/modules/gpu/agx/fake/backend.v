@@ -142,8 +142,10 @@ pub fn (report &FakeG17Verification) succeeded() bool {
 pub fn encode_fake_g17_3d(command voidptr, command_bytes u64,
 	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
 	inputs &FakeG17EncoderInputs, mut writes []FakeG17ExpectedWrite) FakeG17Encoding {
+	// The normal call uses the fixed 392-write capacity. Compare unusually large
+	// slices as u64: int(~u32(0)) is -1 because V's int is signed.
 	if sizeof(FakeG17EncoderInputs) != C.vinix_fake_g17_encoder_inputs_size()
-		|| writes.len > int(~u32(0)) {
+		|| u64(writes.len) > u64(~u32(0)) {
 		return FakeG17Encoding{
 			error: fake_g17_encode_invalid_argument
 		}

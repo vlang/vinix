@@ -1,6 +1,7 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
 # Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu|--virgl]
+#                         [--fake-g17]
 #                         [--mem=MB]
 #                         [--disk=MB] [--replace] [--grab-keys]
 #
@@ -58,6 +59,7 @@ trap cleanup_package_store EXIT INT TERM
 NO_BUILD=0
 SERIAL_ONLY=0
 VIRTIO_GPU=0
+FAKE_G17=0
 REPLACE_RUNNING=0
 GRAB_KEYS=0
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
@@ -67,6 +69,7 @@ for arg in "$@"; do
         --serial)     SERIAL_ONLY=1 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --virgl)      VIRTIO_GPU=2 ;;
+        --fake-g17)   FAKE_G17=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
         --disk=*)     BOOT_DISK_SIZE_MB="${arg#*=}" ;;
         --replace)    REPLACE_RUNNING=1 ;;
@@ -135,6 +138,10 @@ else
     sed -i '' '/^[[:space:]]*kaslr:/a\
     cmdline: vinix.qemu_platform=1
 ' "$LIMINE_CONF_QEMU"
+fi
+
+if [ "$FAKE_G17" -eq 1 ]; then
+    sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.fake_g17=1#' "$LIMINE_CONF_QEMU"
 fi
 
 # A caller may request a QEMU-only GOP mode without changing the hardware-safe
@@ -346,6 +353,55 @@ PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
 PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
 mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
+
+# Old full-userland archives can contain the Asahi Gallium library and smoke
+# test while missing the tiny DRI loader symlink.  A fake-G17 boot is useful
+# only when Mesa can open that loader, so carry the matching staged pair in
+# the per-run overlay instead of requiring a 1+ GiB userland rebuild.
+if [ "$FAKE_G17" -eq 1 ] \
+    && ! tar -tf "$ACTIVE_INITRAMFS" \
+        | sed 's#^\./##' \
+        | grep -qx 'usr/lib/dri/asahi_dri.so'; then
+    ASAHI_RUNTIME="$SCRIPT_DIR/build-aarch64-asahi/staging/usr/lib"
+    if [ ! -f "$ASAHI_RUNTIME/libgallium-25.0.5.so" ] \
+        || [ ! -f "$ASAHI_RUNTIME/dri/libdril_dri.so" ]; then
+        echo "ERROR: --fake-g17 needs the staged Mesa Asahi runtime." >&2
+        echo "       Run build-asahi-aarch64.sh in the ARM64 build VM first." >&2
+        exit 1
+    fi
+    mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/lib/dri"
+    install -m755 "$ASAHI_RUNTIME/libgallium-25.0.5.so" \
+        "$PACKAGE_RUNTIME_ROOT/usr/lib/"
+    install -m755 "$ASAHI_RUNTIME/dri/libdril_dri.so" \
+        "$PACKAGE_RUNTIME_ROOT/usr/lib/dri/"
+    ln -sf libdril_dri.so "$PACKAGE_RUNTIME_ROOT/usr/lib/dri/asahi_dri.so"
+    echo "==> Injecting Mesa Asahi DRI runtime for fake G17"
+fi
+
+# Keep the fake-backend lifecycle smoke test in sync with the kernel under
+# test, even when the selected desktop archive predates --submit-only.
+if [ "$FAKE_G17" -eq 1 ]; then
+    ASAHI_STAGING="$SCRIPT_DIR/build-aarch64-asahi/staging"
+    if [ ! -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
+        echo "ERROR: --fake-g17 needs the staged Mesa lifecycle test." >&2
+        echo "       Run build-asahi-aarch64.sh in the ARM64 build VM first." >&2
+        exit 1
+    fi
+    if ! LC_ALL=C grep -aFq \
+        'render submit and fence completed successfully; pixels unchecked' \
+        "$ASAHI_STAGING/usr/bin/gl-triangle-agx"; then
+        echo "ERROR: the staged Mesa lifecycle test predates --submit-only." >&2
+        echo "       Re-run build-asahi-aarch64.sh in the ARM64 build VM." >&2
+        exit 1
+    fi
+    mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle"
+    install -m755 "$ASAHI_STAGING/usr/bin/gl-triangle-agx" \
+        "$PACKAGE_RUNTIME_ROOT/usr/bin/"
+    install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
+        "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle/"
+    install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \
+        "$PACKAGE_RUNTIME_ROOT/usr/bin/"
+fi
 
 if ! tar -tf "$ACTIVE_INITRAMFS" > "$PACKAGE_BASE_FILES_RAW"; then
     echo "ERROR: cannot read the initramfs while building its package manifest" >&2

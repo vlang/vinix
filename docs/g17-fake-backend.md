@@ -156,14 +156,39 @@ ABI emits 94 entries per pass: 376 writes total, 356 with recovered values and
 20 explicitly external values. These zeros make a deterministic verifier
 fixture; they are not recovered hardware values.
 
-## Remaining path to a Mesa triangle
+## Run the Mesa lifecycle smoke test in a VM
 
-The Mesa submit ioctl remains fail-closed for G17 today. Both the reference and
-kernel encoders now prove that the recovered 3D graph produces the same
-path-exact command accepted by the verifier. The next integration step is to
-finish converting Mesa's render ioctl into the staged G17 descriptor/resource
-values, provide CPU-backed command/VM objects when a VM-only fake AGX device is
-selected, and route that queue to `submit_fake_g17`. Only after those ownership
-pieces are connected can a VM Mesa triangle exercise the full native G17
-software path. Native PMP/RTKit boot and actual firmware acceptance remain
-hardware-only gates.
+The fake render node is opt-in and software-only. Boot it with enough RAM for
+the desktop initramfs and the staged Mesa Asahi runtime:
+
+```sh
+./run-aarch64.sh --serial --fake-g17 --mem=8192
+```
+
+At the Vinix prompt, select lifecycle-only validation:
+
+```sh
+/usr/bin/run-gl-triangle-agx --submit-only
+```
+
+Mesa should identify the renderer as `Apple M5 Max (G17C C0)` and report that
+the render submit and fence completed successfully. This exercises the Asahi
+DRM ioctl layout, per-file GEM and VM ownership, mappings, contexts, queues,
+sync objects, the generated G17 encoder, the independent verifier, synthetic
+completion, fence waiting, and process teardown.
+
+`--submit-only` is intentional: fake G17 does not rasterize pixels. Running the
+same binary without that option retains the normal framebuffer pixel check for
+VirGL and physical hardware, and therefore reports an image-validation failure
+on fake G17 after the otherwise successful submit.
+
+The generated encoder's output buffer has a fixed capacity of 392 writes. The
+actual write count remains descriptor- and path-dependent; 392 is not a
+required-write invariant for a job.
+
+The fake driver's current descriptor contains deterministic recovered scalar
+defaults. Translating every Mesa resource and command field into a native G17
+descriptor remains the next software integration step. Native PMP/RTKit boot,
+DART/UAT page tables, completion IRQs, and actual firmware acceptance remain
+physical-hardware gates. The fake driver has no import of or route to those
+hardware facilities.

@@ -186,7 +186,24 @@ static int copy_to_framebuffer(const uint8_t *pixels, int width, int height) {
     return 1;
 }
 
-int main(void) {
+static void destroy_render_state(GLuint program, EGLDisplay display,
+                                 EGLSurface surface, EGLContext context) {
+    glDeleteProgram(program);
+    eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    eglDestroyContext(display, context);
+    eglDestroySurface(display, surface);
+    eglTerminate(display);
+}
+
+int main(int argc, char **argv) {
+    int submit_only = 0;
+    if (argc == 2 && strcmp(argv[1], "--submit-only") == 0) {
+        submit_only = 1;
+    } else if (argc != 1) {
+        fprintf(stderr, "usage: %s [--submit-only]\n", argv[0]);
+        return 2;
+    }
+
     static const GLfloat vertices[] = {
         -0.72f, -0.58f, 1.00f, 0.18f, 0.16f,
          0.72f, -0.58f, 0.16f, 1.00f, 0.30f,
@@ -269,6 +286,19 @@ int main(void) {
     glEnableVertexAttribArray(1);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glFinish();
+    if (glGetError() != GL_NO_ERROR) {
+        fprintf(stderr, "gl-triangle-agx: render submit or wait failed\n");
+        return 1;
+    }
+
+    // Fake G17 intentionally validates command generation and fence completion
+    // without rasterizing. This mode proves the Mesa/DRM lifecycle while keeping
+    // the normal test's rendered-pixel check intact for real hardware and VirGL.
+    if (submit_only) {
+        printf("gl-triangle-agx: render submit and fence completed successfully; pixels unchecked\n");
+        destroy_render_state(program, display, surface, context);
+        return 0;
+    }
 
     size_t image_size = (size_t)TRIANGLE_WIDTH * TRIANGLE_HEIGHT * 4;
     uint8_t *pixels = malloc(image_size);
@@ -297,10 +327,6 @@ int main(void) {
     fflush(stdout);
 
     free(pixels);
-    glDeleteProgram(program);
-    eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-    eglDestroyContext(display, context);
-    eglDestroySurface(display, surface);
-    eglTerminate(display);
+    destroy_render_state(program, display, surface, context);
     return 0;
 }

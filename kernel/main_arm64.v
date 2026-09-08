@@ -30,6 +30,7 @@ import futex
 import socket
 import limine
 import gpu.agx.driver as agx_driver
+import gpu.agx.fake as fake_agx
 import gpu.dcp
 import syscall as _
 import syscall.table
@@ -56,6 +57,7 @@ __global (
 		response: unsafe { nil }
 	}
 	enable_apple_gpu     = false
+	enable_fake_g17      = false
 	enable_apple_dcp     = false
 	// The SMC client is read-only and safely declines non-Apple device trees.
 	enable_apple_battery = true
@@ -184,6 +186,13 @@ fn kmain_thread(qemu_platform bool) {
 
 	initramfs.initialise()
 	print('kmain_thread: initramfs done\n')
+
+	if enable_fake_g17 {
+		print('kmain_thread: init fake G17 DRM driver...\n')
+		if !fake_agx.initialise() {
+			print('kmain_thread: fake G17 DRM driver failed\n')
+		}
+	}
 
 	// Experimental, read-only SMC battery client; independent of GPU/DCP.
 	if enable_apple_battery {
@@ -322,6 +331,10 @@ fn configure_apple_bringup_from_cmdline() {
 			enable_apple_gpu = true
 		} else if option == 'vinix.apple_gpu=0' {
 			enable_apple_gpu = false
+		} else if option == 'vinix.fake_g17=1' {
+			enable_fake_g17 = true
+		} else if option == 'vinix.fake_g17=0' {
+			enable_fake_g17 = false
 		} else if option == 'vinix.apple_dcp=1' {
 			enable_apple_dcp = true
 		} else if option == 'vinix.apple_dcp=0' {

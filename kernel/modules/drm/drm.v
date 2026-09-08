@@ -26,9 +26,11 @@ pub const driver_compute = u32(0x10)
 
 pub struct DrmIoctl {
 pub:
-	cmd     u32
-	handler fn (&DrmDevice, voidptr, voidptr) int = unsafe { nil }
-	flags   u32
+	cmd       u32
+	size      u32
+	direction u32
+	handler   fn (&DrmDevice, voidptr, voidptr) int = unsafe { nil }
+	flags     u32
 }
 
 pub struct DrmDriver {
@@ -216,14 +218,14 @@ pub:
 
 // Linux ioctl direction bits describe userspace's view: WRITE copies the
 // request into the kernel and READ copies the result back to userspace.
-const ioctl_write = u32(1)
-const ioctl_read = u32(2)
+pub const ioctl_write = u32(1)
+pub const ioctl_read = u32(2)
 const ioctl_size_shift = u32(16)
 const ioctl_size_mask = u32(0x3fff)
 const ioctl_direction_shift = u32(30)
 const ioctl_direction_mask = u32(0x3)
 
-fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
+fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 	return match cmd {
 		ioctl.drm_ioctl_version {
 			DrmIoctlLayout{
@@ -420,6 +422,24 @@ fn ioctl_layout(cmd u32) ?DrmIoctlLayout {
 	}
 }
 
+// Driver-private commands all start at DRM_COMMAND_BASE and intentionally
+// reuse the same numbers across drivers. Prefer layout metadata from the
+// device's own table so, for example, Asahi 0x41 is never decoded as VirtIO's
+// unrelated 0x41 request.
+fn ioctl_layout(dev &DrmDevice, cmd u32) ?DrmIoctlLayout {
+	if dev.driver != unsafe { nil } {
+		for entry in dev.driver.ioctls {
+			if entry.cmd == cmd && entry.size != 0 && entry.direction != 0 {
+				return DrmIoctlLayout{
+					size: entry.size
+					direction: entry.direction
+				}
+			}
+		}
+	}
+	return common_ioctl_layout(cmd)
+}
+
 fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
 
@@ -464,7 +484,7 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 
 	raw := u32(request & 0xffffffff)
-	layout := ioctl_layout(cmd) or {
+	layout := ioctl_layout(this.dev, cmd) or {
 		errno.set(errno.einval)
 		return none
 	}
