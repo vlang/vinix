@@ -21,10 +21,9 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// Configure timer frequency
 	cpu_local.timer_freq = cpu.read_cntfrq_el0()
 
-	// FPU is not used in kernel (mgeneral-regs-only), just set defaults
-	fpu_storage_size = 512
-	fpu_save = cpu.dummy_fpu_save
-	fpu_restore = cpu.dummy_fpu_restore
+	// The kernel itself uses integer registers only, but EL0 NEON/FP state is
+	// architectural thread state and must be switched on every CPU.
+	cpu.init_fpu_globals()
 
 	print('smp: CPU ${cpu_local.cpu_number} online!\n')
 

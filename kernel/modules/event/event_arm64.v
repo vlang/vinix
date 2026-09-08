@@ -104,7 +104,8 @@ fn unlock_events(mut events []&eventstruct.Event) {
 	}
 }
 
-pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
+fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
+	watched_index u64, generation u64) ?u64 {
 	mut t := proc.current_thread()
 
 	cpu.interrupt_toggle(false)
@@ -118,6 +119,12 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 		unlock_events(mut events)
 		return i
 	}
+	// A futex wake between sampling its word and attaching the listener is a
+	// valid spurious wake, and must not turn into an indefinite sleep.
+	if watch_generation && events[watched_index].generation != generation {
+		unlock_events(mut events)
+		return watched_index
+	}
 
 	if block == false {
 		unlock_events(mut events)
@@ -125,6 +132,7 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	}
 
 	katomic.inc(mut &waiting_event_count)
+	t.which_event = u64(-1)
 
 	if !attach_listeners(mut events, mut t) {
 		katomic.dec(mut &waiting_event_count)
@@ -142,17 +150,51 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 
 	sched.dequeue_thread(t)
 
+	interrupted_before_yield := katomic.load(&t.enqueued_by_signal)
+	if interrupted_before_yield {
+		sched.enqueue_thread(t, false)
+	}
+
 	unlock_events(mut events)
 
-	sched.yield(true)
+	if !interrupted_before_yield {
+		sched.yield(true)
+	}
 
 	katomic.dec(mut &waiting_event_count)
 
-	if t.enqueued_by_signal {
+	interrupted_by_signal := katomic.load(&t.enqueued_by_signal)
+	if interrupted_by_signal {
+		katomic.store(mut &t.enqueued_by_signal, false)
+	}
+	// Child exit raises an event and SIGCHLD together. If both wake this wait,
+	// retain the consumed event; otherwise waitpid loses the zombie forever.
+	if interrupted_by_signal && t.which_event == u64(-1) {
 		return none
 	}
 
 	return t.which_event
+}
+
+pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
+	return await_internal(mut events, block, false, 0, 0)
+}
+
+pub fn await_from_generation(mut events []&eventstruct.Event, block bool, watched_index u64,
+	generation u64) ?u64 {
+	return await_internal(mut events, block, true, watched_index, generation)
+}
+
+pub fn generation(mut e eventstruct.Event) u64 {
+	interrupts := cpu.interrupt_state()
+	cpu.interrupt_toggle(false)
+	e.@lock.acquire()
+	value := e.generation
+	e.@lock.release()
+	if interrupts {
+		cpu.interrupt_toggle(true)
+	}
+	return value
 }
 
 pub fn trigger(mut e eventstruct.Event, drop bool) u64 {

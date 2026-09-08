@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <poll.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 #include <sys/membarrier.h>
 #include <time.h>
 #include <unistd.h>
@@ -36,6 +38,12 @@ struct open_how_abi {
 };
 
 static int failures;
+static volatile sig_atomic_t saw_sigchld;
+
+static void sigchld_handler(int signal_number) {
+    (void)signal_number;
+    saw_sigchld = 1;
+}
 
 static void check(int condition, const char *description) {
     printf("%-42s %s\n", description, condition ? "ok" : "FAIL");
@@ -55,6 +63,7 @@ static void *eventfd_writer(void *argument) {
 int main(void) {
     const char *path = "/tmp/aarch64-syscall-smoke";
     const char *copy_path = "/tmp/aarch64-syscall-copy";
+    mkdir("/tmp", 0777);
     unlink(path);
     unlink(copy_path);
 
@@ -62,6 +71,10 @@ int main(void) {
     check(fd >= 0, "open test file");
     if (fd < 0)
         return 1;
+
+    struct stat file_stat;
+    check(fstat(fd, &file_stat) == 0 && (file_stat.st_mode & 07777) == 0600,
+          "open O_CREAT preserves file mode");
 
     check(pwrite(fd, "scalar", 6, 0) == 6, "pwrite64");
     char scalar[7] = {0};
@@ -99,9 +112,17 @@ int main(void) {
           "readv validates fd with zero vectors");
 
     check(posix_fallocate(fd, 0, 128) == 0, "fallocate");
-    struct stat file_stat;
     check(fstat(fd, &file_stat) == 0 && file_stat.st_size >= 128,
           "fallocate extends file");
+
+    FILE *stream = fopen(path, "rb");
+    char stream_data[128] = {0};
+    check(stream != NULL && fread(stream_data, 1, sizeof(stream_data), stream) ==
+              sizeof(stream_data) && !memcmp(stream_data, "scalar", 6),
+          "fread buffered readv path");
+    if (stream != NULL)
+        fclose(stream);
+
     check(posix_fadvise(fd, 0, 0, POSIX_FADV_NORMAL) == 0, "fadvise64");
     check(sync_file_range(fd, 0, 128, SYNC_FILE_RANGE_WRITE) == 0,
           "sync_file_range");
@@ -150,6 +171,21 @@ int main(void) {
               pthread_join(writer, NULL) == 0,
           "ppoll cross-thread wakeup");
     close(blocking_counter);
+
+    struct sigaction child_action = {
+        .sa_handler = sigchld_handler,
+    };
+    sigemptyset(&child_action.sa_mask);
+    check(sigaction(SIGCHLD, &child_action, NULL) == 0,
+          "install SIGCHLD handler");
+    pid_t child = fork();
+    if (child == 0)
+        _exit(23);
+    int child_status = 0;
+    pid_t waited = child > 0 ? waitpid(child, &child_status, 0) : -1;
+    check(child > 0 && waited == child && WIFEXITED(child_status) &&
+              WEXITSTATUS(child_status) == 23 && saw_sigchld,
+          "waitpid event plus SIGCHLD wakeup");
 
     errno = 0;
     check(syscall(SYS_ppoll, (void *)1, 1, NULL, NULL, 8) == -1 &&

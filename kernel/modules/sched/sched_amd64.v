@@ -172,11 +172,13 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut t := unsafe { _thread }
 
+	if by_signal {
+		katomic.store(mut &t.enqueued_by_signal, true)
+	}
+
 	if t.is_in_queue == true {
 		return true
 	}
-
-	katomic.store(mut &t.enqueued_by_signal, by_signal)
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil },

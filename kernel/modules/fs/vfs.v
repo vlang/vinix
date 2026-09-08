@@ -709,8 +709,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		if creat_flags & resource.o_creat == 0 {
 			return errno.err, errno.get()
 		}
-		// XXX: mlibc does not pass mode? OK... force regular file with 644
-		new_node := internal_create(parent, path, stat.ifreg | 0o644) or {
+		// The Alpine package database creates executables directly with openat;
+		// preserve the requested permission bits instead of forcing every new
+		// regular file to 0644.
+		new_node := internal_create(parent, path, stat.ifreg | (mode & 0o7777)) or {
 			return errno.err, errno.get()
 		}
 		new_node

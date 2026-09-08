@@ -227,7 +227,14 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 	}
 
 	if act != unsafe { nil } {
-		t.sigactions[signum] = *act
+		// Dispositions belong to the process; masks and pending signals remain
+		// per-thread. Keep existing helpers synchronized with the caller.
+		mut target_process := t.process
+		target_process.threads_lock.acquire()
+		for mut target_thread in target_process.threads {
+			target_thread.sigactions[signum] = *act
+		}
+		target_process.threads_lock.release()
 	}
 
 	return 0, 0

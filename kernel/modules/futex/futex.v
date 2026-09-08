@@ -42,6 +42,9 @@ fn event_for(virt u64, create bool) ?&eventstruct.Event {
 
 // Block until woken, unless the word no longer holds the expected value.
 pub fn wait(virt u64, expected int) (u64, u64) {
+	mut e := event_for(virt, true) or { return errno.err, errno.efault }
+	generation := event.generation(mut e)
+
 	// Read through the pagemap rather than dereferencing the user pointer: a
 	// bad address must come back as EFAULT, not as a fault in kernel mode.
 	current := usercopy.read_u32(virt) or { return errno.err, errno.efault }
@@ -49,13 +52,13 @@ pub fn wait(virt u64, expected int) (u64, u64) {
 		return errno.err, errno.eagain
 	}
 
-	e := event_for(virt, true) or { return errno.err, errno.efault }
-
 	mut events := [e]
 	defer {
 		unsafe { events.free() }
 	}
-	event.await(mut events, true) or { return errno.err, errno.eintr }
+	event.await_from_generation(mut events, true, 0, generation) or {
+		return errno.err, errno.eintr
+	}
 
 	return 0, 0
 }
@@ -65,6 +68,9 @@ pub fn wait(virt u64, expected int) (u64, u64) {
 // so ignoring the timeout can leave an otherwise healthy process asleep
 // forever.
 pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
+	mut e := event_for(virt, true) or { return errno.err, errno.efault }
+	generation := event.generation(mut e)
+
 	// Match wait(): validate and compare the userspace word before deciding that
 	// even a zero-length wait has timed out.
 	current := usercopy.read_u32(virt) or { return errno.err, errno.efault }
@@ -75,7 +81,6 @@ pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
 		return errno.err, errno.etimedout
 	}
 
-	e := event_for(virt, true) or { return errno.err, errno.efault }
 	mut timer := time.new_timer(duration)
 	defer {
 		timer.disarm()
@@ -86,7 +91,9 @@ pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
 	defer {
 		unsafe { events.free() }
 	}
-	which := event.await(mut events, true) or { return errno.err, errno.eintr }
+	which := event.await_from_generation(mut events, true, 0, generation) or {
+		return errno.err, errno.eintr
+	}
 	if which == 1 {
 		return errno.err, errno.etimedout
 	}

@@ -494,7 +494,7 @@ pub fn sev() {
 }
 
 __global (
-	fpu_storage_size = u64(512)
+	fpu_storage_size = u64(520)
 	fpu_save         fn (voidptr)
 	fpu_restore      fn (voidptr)
 )
@@ -507,13 +507,23 @@ pub fn syscall_set_tls(_ voidptr, addr u64) (u64, u64) {
 }
 
 pub fn init_fpu_globals() {
-	fpu_save = dummy_fpu_save
-	fpu_restore = dummy_fpu_restore
+	C.vinix_aarch64_fpu_enable()
+	fpu_storage_size = 520
+	fpu_save = save_fpu_state
+	fpu_restore = restore_fpu_state
 }
 
-fn dummy_fpu_save(_ voidptr) {}
+fn C.vinix_aarch64_fpu_enable()
+fn C.vinix_aarch64_fpu_save(state voidptr)
+fn C.vinix_aarch64_fpu_restore(state voidptr)
 
-fn dummy_fpu_restore(_ voidptr) {}
+fn save_fpu_state(state voidptr) {
+	C.vinix_aarch64_fpu_save(state)
+}
+
+fn restore_fpu_state(state voidptr) {
+	C.vinix_aarch64_fpu_restore(state)
+}
 
 // PSCI calls, used as a boot signal on machines with no usable console.
 // A power-off or reset is observable without a display, which a framebuffer

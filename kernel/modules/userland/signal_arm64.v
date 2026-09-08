@@ -101,7 +101,15 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 	}
 
 	if act_ptr != 0 {
-		current_thread.sigactions[signum] = incoming
+		// Linux shares signal dispositions across every thread in a process.
+		// Musl installs its dynamic-TLS barrier handler after worker threads may
+		// already exist, so updating only the caller deadlocks GTK applications.
+		mut process := current_thread.process
+		process.threads_lock.acquire()
+		for mut target_thread in process.threads {
+			target_thread.sigactions[signum] = incoming
+		}
+		process.threads_lock.release()
 	}
 
 	return 0, 0
@@ -401,7 +409,12 @@ pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &pro
 		}
 	}
 	if act != unsafe { nil } {
-		current_thread.sigactions[signum] = *act
+		mut process := current_thread.process
+		process.threads_lock.acquire()
+		for mut target_thread in process.threads {
+			target_thread.sigactions[signum] = *act
+		}
+		process.threads_lock.release()
 	}
 
 	return 0, 0

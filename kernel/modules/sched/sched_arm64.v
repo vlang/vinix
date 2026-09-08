@@ -185,11 +185,16 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		return false
 	}
 
+	// A signal can arrive while the target is running immediately before it
+	// removes itself from the run queue in event.await(). Publish the reason
+	// first so the waiter can observe it after dequeuing itself.
+	if by_signal {
+		katomic.store(mut &t.enqueued_by_signal, true)
+	}
+
 	if t.is_in_queue == true {
 		return true
 	}
-
-	katomic.store(mut &t.enqueued_by_signal, by_signal)
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil },
@@ -719,6 +724,9 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 
 	t.self = voidptr(t)
 
+	// The saved copy belongs to the last scheduler switch; clone/fork must copy
+	// the caller's live SIMD state as it exists at this syscall boundary.
+	fpu_save(source.fpu_storage)
 	unsafe { C.memcpy(t.fpu_storage, source.fpu_storage, fpu_storage_size) }
 
 	// The child resumes right after its svc, returning 0 on its own stack.

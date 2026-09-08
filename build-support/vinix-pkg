@@ -5,7 +5,7 @@ set -eu
 APK=${VINIX_PKG_APK:-/sbin/apk}
 ROOT=${VINIX_PKG_ROOT:-}
 RESOLV_CONF=${VINIX_PKG_RESOLV_CONF:-$ROOT/etc/resolv.conf}
-NETWORK_RETRIES=${VINIX_PKG_NETWORK_RETRIES:-3}
+NETWORK_RETRIES=${VINIX_PKG_NETWORK_RETRIES:-10}
 NETWORK_RETRY_DELAY=${VINIX_PKG_NETWORK_RETRY_DELAY:-1}
 NETWORK_WAIT_SECONDS=${VINIX_PKG_NETWORK_WAIT_SECONDS:-60}
 
@@ -52,6 +52,12 @@ wait_for_network() {
 			exit 1
 			;;
 	esac
+	case "$NETWORK_RETRY_DELAY" in
+		''|*[!0-9]*)
+			echo "pkg: VINIX_PKG_NETWORK_RETRY_DELAY must be a non-negative integer" >&2
+			exit 1
+			;;
+	esac
 
 	i=0
 	while [ ! -s "$RESOLV_CONF" ] && [ "$i" -lt "$NETWORK_WAIT_SECONDS" ]; do
@@ -79,10 +85,43 @@ apk_network() {
 			return 1
 		fi
 		echo "pkg: package network operation failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
-		sleep "$NETWORK_RETRY_DELAY"
+		# Give QEMU's DNS proxy and the Alpine mirror progressively more time
+		# without making the common first-boot retry feel like a long pause.
+		sleep $((NETWORK_RETRY_DELAY * attempt))
 		attempt=$((attempt + 1))
 	done
 }
+
+# Download the complete dependency closure before changing the live root. A
+# transient mirror failure near the end no longer leaves a half-installed GTK
+# stack, and successful archives are retained across network retries. The final
+# apk transaction is deliberately offline and keeps maintainer scripts disabled
+# because they assume Alpine's init system.
+apk_install() (
+	wait_for_network
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	cache=$(mktemp -d "$cache_parent/vinix-pkg.XXXXXX")
+	trap 'rm -rf "$cache"' EXIT INT TERM
+	for index in "$(root_path /var/cache/apk)"/APKINDEX.*.tar.gz; do
+		[ ! -f "$index" ] || cp "$index" "$cache/"
+	done
+	install_attempt=1
+	while :; do
+		apk_network --cache-dir "$cache" --no-progress cache download "$@"
+		if apk --cache-dir "$cache" --no-network --no-progress --no-scripts add "$@"; then
+			return 0
+		fi
+		if [ "$install_attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: package installation failed after $install_attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: package installation failed; refreshing downloads ($install_attempt/$NETWORK_RETRIES)" >&2
+		rm -f "$cache"/*.apk
+		sleep $((NETWORK_RETRY_DELAY * install_attempt))
+		install_attempt=$((install_attempt + 1))
+	done
+)
 
 have_repository_indexes() {
 	for index in "$(root_path /var/cache/apk)"/APKINDEX.*.tar.gz; do
@@ -127,7 +166,7 @@ bootstrap_database() {
 	# Package names cannot contain whitespace. Expanding this generated file is
 	# intentional and preserves one package name per line as separate arguments.
 	# shellcheck disable=SC2046
-	apk_network --no-progress --no-scripts add $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$base_world")
+	apk_install $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$base_world")
 	mkdir -p "$(dirname "$marker")"
 	: > "$marker"
 }
@@ -155,13 +194,13 @@ install_packages() {
 	for requested in "$@"; do
 		case "$requested" in
 			gtk)
-				apk_network --no-progress --no-scripts add \
+				apk_install \
 					adwaita-icon-theme font-dejavu gtk+3.0 libarchive-tools
 				install_gtk_demo
 				finalize_desktop
 				;;
 			gtk+3.0-demo)
-				apk_network --no-progress --no-scripts add gtk+3.0 libarchive-tools
+				apk_install gtk+3.0 libarchive-tools
 				install_gtk_demo
 				finalize_desktop
 				;;
@@ -169,12 +208,12 @@ install_packages() {
 				# Gnumeric's Alpine dependencies provide GTK itself, while these
 				# theme/font packages make the application usable on a fresh Vinix
 				# image that deliberately contains no desktop toolkit.
-				apk_network --no-progress --no-scripts add \
+				apk_install \
 					adwaita-icon-theme font-dejavu gnumeric
 				finalize_gnumeric
 				;;
 			*)
-				apk_network --no-progress --no-scripts add "$requested"
+				apk_install "$requested"
 				;;
 		esac
 	done
@@ -182,7 +221,7 @@ install_packages() {
 
 install_gtk_demo() {
 	if [ -n "$ROOT" ]; then
-		apk_network --no-progress --no-scripts add gtk+3.0-demo
+		apk_install gtk+3.0-demo
 		return
 	fi
 
@@ -267,6 +306,7 @@ finalize_gnumeric() {
 	# can monopolise Vinix's sole QEMU CPU after this much larger transaction.
 	/usr/bin/gdk-pixbuf-query-loaders --update-cache
 	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
 }
 
 remove_gtk_demo() {
