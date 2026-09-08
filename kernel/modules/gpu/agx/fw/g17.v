@@ -2107,7 +2107,9 @@ pub fn populate_g17_render_descriptor_fields(descriptor voidptr, descriptor_byte
 // and nested forward merges are represented without guessing; the CL runtime
 // random and post-increment counter roots are pinned too. The complete emission
 // graph and all semantic ordering predicates are recovered by the UUID-pinned
-// tooling, but that declarative graph is not yet ported into this kernel encoder.
+// tooling. The generated allocation-free implementation lives in
+// kernel/c/agx_fake_g17_encode.c and is exposed through gpu.encode_fake_g17_3d;
+// these low-level append helpers remain useful for structural tests.
 pub const g17_3d_register_passes = u32(4)
 pub const g17_3d_register_stride = u64(0x720)
 pub const g17_3d_register_stream_offset = u64(0xa0)

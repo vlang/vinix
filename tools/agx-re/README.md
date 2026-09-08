@@ -311,6 +311,13 @@ must be supplied explicitly; `--zero-template` is intentionally limited to
 fake execution. The full recovered ABI's zero-descriptor fallthrough fixture
 currently emits 376 writes, of which 356 have independently reproducible
 values and 20 remain explicit external inputs.
+`generate_fake_g17_3d_encoder.py` lowers the same UUID-pinned graph into the
+checked-in, freestanding C encoder used by the kernel. It emits direct bounded
+integer expressions and graph branches, not a runtime JSON interpreter, and
+returns a fixed-capacity verifier trace alongside the command. Its host test
+checks all 16 branch combinations against byte-exact hashes from the separate
+Python reference. Use `make -f GNUmakefile check-fake-g17-encoder` after a new
+recovery to catch any stale generated source.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
 eight masked flags, and the independently allocated `0xc40` base prefix; the

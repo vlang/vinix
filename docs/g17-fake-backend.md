@@ -62,6 +62,15 @@ branch outcomes or values explicitly. A captured command-pool template is
 preserved under the recovered template mask. A zero template is available for
 fake execution only and is not evidence that those bits are valid on hardware.
 
+`tools/agx-re/generate_fake_g17_3d_encoder.py` translates that same recovered
+graph into the freestanding, allocation-free
+`kernel/c/agx_fake_g17_encode.c`. The generated encoder contains no JSON parser
+or dynamic expression interpreter: descriptor/command expressions are emitted
+as checked integer operations, graph successors are direct branches, and the
+five external values plus the one external decision live in a fixed input
+structure. `gpu.encode_fake_g17_3d` exposes it to the V backend and returns the
+exact golden writes consumed by `submit_fake_g17`.
+
 `gpu.verify_fake_g17` is the V adapter. `gpu.submit_fake_g17` first installs a
 normal `WorkItem` in the shared `WorkQueue`, verifies the encoded command, and
 then injects either a successful completion or a channel-error completion.
@@ -71,8 +80,11 @@ bookkeeping as a hardware completion.
 ## Run the host test
 
 The host test compiles the exact allocation-free C verifier linked into the
-kernel. It covers successful traces, every validation class, and a 314-entry
-stress trace:
+kernel together with the recovered encoder. It covers successful traces, every
+validation class, a 314-entry stress trace, and all 16 combinations of the
+three descriptor-controlled branches and external channel branch. Stable
+whole-buffer hashes produced by the separate Python reference make the C
+encoder comparison byte-exact:
 
 ```sh
 ./tests/agx-fake-g17/run.sh
@@ -83,6 +95,14 @@ Compile the kernel-side V adapter as part of the normal AArch64 build:
 
 ```sh
 make -C kernel ARCH=aarch64
+```
+
+Regenerate or verify the checked-in freestanding encoder after recovering a
+new ABI:
+
+```sh
+make -C tools/agx-re -f GNUmakefile generate-fake-g17-encoder
+make -C tools/agx-re -f GNUmakefile check-fake-g17-encoder
 ```
 
 Compile a verifier plan for a captured or Vinix-generated command with:
@@ -138,10 +158,12 @@ fixture; they are not recovered hardware values.
 
 ## Remaining path to a Mesa triangle
 
-The Mesa submit ioctl remains fail-closed for G17 today. The host reference
-encoder now proves that the recovered 3D graph can produce a path-exact command
-accepted by the fake verifier plan compiler. The next integration step is an
-allocation-free kernel form of the same state machine and routing G17 queues to
-`submit_fake_g17` when a test-only backend is selected. Only after that can a
-VM Mesa triangle exercise the full native G17 software path. Native PMP/RTKit
-boot and actual firmware acceptance remain hardware-only gates.
+The Mesa submit ioctl remains fail-closed for G17 today. Both the reference and
+kernel encoders now prove that the recovered 3D graph produces the same
+path-exact command accepted by the verifier. The next integration step is to
+finish converting Mesa's render ioctl into the staged G17 descriptor/resource
+values, provide CPU-backed command/VM objects when a VM-only fake AGX device is
+selected, and route that queue to `submit_fake_g17`. Only after those ownership
+pieces are connected can a VM Mesa triangle exercise the full native G17
+software path. Native PMP/RTKit boot and actual firmware acceptance remain
+hardware-only gates.
