@@ -41,12 +41,13 @@ current="$work/current"
 added="$work/added"
 members="$work/members"
 archive="$work/packages.tar"
+package_files=${VINIX_PKG_FILE_MANIFEST:-${ROOT%/}/var/lib/vinix-pkg/package-files}
 
 # Package payloads can live in any of these trees. Runtime-only state and apk's
 # downloadable index cache do not belong in the persistent archive.
 echo "pkg: collecting package changes"
 set --
-for tree in etc lib usr var; do
+for tree in bin etc lib opt sbin usr var; do
 	[ -e "${ROOT%/}/$tree" ] && set -- "$@" "$tree"
 done
 (
@@ -63,6 +64,10 @@ bb comm -13 "$BASE_FILES" "$current" >"$added"
 
 {
 	bb cat "$added"
+	# apk may replace a path that was already present in the immutable desktop
+	# image. The package frontend records files owned by each newly installed
+	# dependency so those replacements survive the next QEMU boot too.
+	[ ! -s "$package_files" ] || bb cat "$package_files"
 	printf '%s\n' \
 		etc/apk/world \
 		lib/apk/db/installed \

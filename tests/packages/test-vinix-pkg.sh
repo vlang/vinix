@@ -8,7 +8,10 @@ trap 'rm -rf "$work"' EXIT INT TERM
 
 root="$work/root"
 log="$work/apk.log"
-mkdir -p "$root/etc/vinix-pkg" "$work/bin"
+installed="$work/installed-packages"
+mkdir -p "$root/etc/vinix-pkg" "$root/lib/apk/db" "$work/bin"
+: >"$installed"
+: >"$root/lib/apk/db/installed"
 printf '%s\n' 'nameserver 10.0.2.3' > "$root/etc/resolv.conf"
 cat > "$root/etc/vinix-pkg/base-world" <<'EOF'
 apk-tools
@@ -17,6 +20,12 @@ EOF
 
 cat > "$work/bin/apk" <<'EOF'
 #!/bin/sh
+case "$*" in
+	*' info')
+		cat "$VINIX_TEST_INSTALLED_PACKAGES"
+		exit 0
+		;;
+esac
 printf '%s\n' "$*" >> "$VINIX_TEST_APK_LOG"
 case "$*" in
 	*' update')
@@ -77,6 +86,28 @@ case "$*" in
 			echo 'ERROR: damaged-install: BAD signature' >&2
 			exit 1
 		fi
+		seen_add=false
+		for argument in "$@"; do
+			if [ "$seen_add" = true ]; then
+				printf '%s\n' "$argument" >>"$VINIX_TEST_INSTALLED_PACKAGES"
+				case "$argument" in
+					gtk+3.0)
+						printf 'P:%s\nF:usr/lib\nR:libgtk-3.so.0\n\n' "$argument"
+						;;
+					gnumeric)
+						printf 'P:%s\nF:usr/bin\nR:gnumeric\n\n' "$argument"
+						;;
+					*)
+						printf 'P:%s\nF:usr/share/%s\nR:payload\n\n' \
+							"$argument" "$argument"
+						;;
+				esac >>"$VINIX_TEST_ROOT/lib/apk/db/installed"
+			elif [ "$argument" = add ]; then
+				seen_add=true
+			fi
+		done
+		LC_ALL=C sort -u -o "$VINIX_TEST_INSTALLED_PACKAGES" \
+			"$VINIX_TEST_INSTALLED_PACKAGES"
 		;;
 esac
 exit 0
@@ -89,6 +120,7 @@ run_pkg() {
 	VINIX_PKG_RESOLV_CONF="${VINIX_PKG_RESOLV_CONF:-$root/etc/resolv.conf}" \
 	VINIX_TEST_APK_LOG="$log" \
 	VINIX_TEST_ROOT="$root" \
+	VINIX_TEST_INSTALLED_PACKAGES="$installed" \
 		"$repo/build-support/vinix-pkg" "$@"
 }
 
@@ -108,6 +140,7 @@ sed -n '7p' "$log" | grep -q -- \
 	'--cache-dir .* --no-network --no-progress --no-scripts add gtk+3.0-demo$'
 sed -n '1p' "$log" | grep -q -- ' update$'
 test -f "$root/var/lib/vinix-pkg/base-ready"
+grep -qx usr/lib/libgtk-3.so.0 "$root/var/lib/vinix-pkg/package-files"
 
 run_pkg install nano
 sed -n '8p' "$log" | grep -q -- \
@@ -116,6 +149,7 @@ sed -n '9p' "$log" | grep -q -- \
 	'--cache-dir .* --no-network --no-progress --no-scripts add nano$'
 
 run_pkg install gnumeric
+grep -qx usr/bin/gnumeric "$root/var/lib/vinix-pkg/package-files"
 sed -n '10p' "$log" | grep -q -- \
 	'--cache-dir .* --no-progress cache download adwaita-icon-theme font-dejavu gnumeric$'
 sed -n '11p' "$log" | grep -q -- \

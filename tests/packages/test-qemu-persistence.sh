@@ -16,6 +16,7 @@ ready="$work/ready"
 mkdir -p "$root/etc/apk" "$root/etc/vinix-pkg" "$root/lib/apk/db" \
 	"$root/usr/share/base" "$root/var/cache/apk"
 printf 'base\n' >"$root/usr/share/base/unchanged"
+printf 'old library\n' >"$root/usr/share/base/replaced"
 printf 'busybox\n' >"$root/etc/apk/world"
 printf 'base database\n' >"$root/lib/apk/db/installed"
 (
@@ -33,6 +34,8 @@ printf 'nameserver 10.0.2.3\n' >"$root/etc/resolv.conf"
 printf 'cache\n' >"$root/usr/share/icons/Adwaita/icon-theme.cache"
 printf 'index\n' >"$root/var/cache/apk/APKINDEX.test"
 printf 'ready\n' >"$root/var/lib/vinix-pkg/base-ready"
+printf 'usr/share/base/replaced\n' >"$root/var/lib/vinix-pkg/package-files"
+printf 'new package library\n' >"$root/usr/share/base/replaced"
 
 python3 "$repo/tools/qemu-package-store.py" \
 	--store "$store" --port 0 --ready-file "$ready" \
@@ -60,6 +63,8 @@ grep -qx 'etc/apk/world' "$work/members"
 grep -qx 'lib/apk/db/installed' "$work/members"
 grep -qx 'usr/share/icons/Adwaita/icon-theme.cache' "$work/members"
 grep -qx 'var/lib/vinix-pkg/base-ready' "$work/members"
+grep -qx 'usr/share/base/replaced' "$work/members"
+test "$(tar -xOf "$store" usr/share/base/replaced)" = 'new package library'
 test "$(grep -cx 'usr/lib/libgtk-3.so' "$work/members")" = 1
 test "$(grep -cx 'usr/share/icons/Adwaita/icon-theme.cache' "$work/members")" = 1
 if grep -q 'usr/share/base/unchanged\|var/cache/apk\|qemu-store-url\|etc/resolv.conf' "$work/members"; then

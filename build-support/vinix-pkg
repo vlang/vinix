@@ -103,6 +103,11 @@ apk_install() (
 	mkdir -p "$cache_parent"
 	cache=$(mktemp -d "$cache_parent/vinix-pkg.XXXXXX")
 	trap 'rm -rf "$cache"' EXIT INT TERM
+	installed_before="$cache/installed-before"
+	installed_after="$cache/installed-after"
+	new_packages="$cache/new-packages"
+	owned_files="$cache/owned-files"
+	LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_before"
 	for index in "$(root_path /var/cache/apk)"/APKINDEX.*.tar.gz; do
 		[ ! -f "$index" ] || cp "$index" "$cache/"
 	done
@@ -110,6 +115,34 @@ apk_install() (
 	while :; do
 		apk_network --cache-dir "$cache" --no-progress cache download "$@"
 		if apk --cache-dir "$cache" --no-network --no-progress --no-scripts add "$@"; then
+			LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_after"
+			LC_ALL=C comm -13 "$installed_before" "$installed_after" >"$new_packages"
+			if [ -s "$new_packages" ]; then
+				# The installed database already contains every owned path. Read it
+				# once instead of launching `apk info -L` for dozens of dependencies;
+				# repeated short-lived processes are expensive on a first Vinix boot.
+				LC_ALL=C awk '
+					NR == FNR { wanted[$0] = 1; next }
+					/^P:/ { keep = substr($0, 3) in wanted; directory = ""; next }
+					keep && /^F:/ { directory = substr($0, 3); next }
+					keep && /^R:/ {
+						path = (directory == "" ? "" : directory "/") substr($0, 3)
+						if (path ~ /^(bin|etc|lib|opt|sbin|usr|var)\//) print path
+					}
+				' "$new_packages" "$(root_path /lib/apk/db/installed)" \
+					| LC_ALL=C sort -u >"$owned_files"
+			else
+				: >"$owned_files"
+			fi
+			if [ -s "$owned_files" ]; then
+				manifest=$(root_path /var/lib/vinix-pkg/package-files)
+				mkdir -p "$(dirname "$manifest")"
+				{
+					[ ! -f "$manifest" ] || cat "$manifest"
+					cat "$owned_files"
+				} | LC_ALL=C sort -u >"$manifest.new"
+				mv "$manifest.new" "$manifest"
+			fi
 			return 0
 		fi
 		if [ "$install_attempt" -ge "$NETWORK_RETRIES" ]; then
