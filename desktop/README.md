@@ -170,6 +170,11 @@ Keyboard and pointer events are forwarded into the private X11 display. The
 desktop builder picks up this layer when present and otherwise leaves a working
 launcher whose window explains which build is missing.
 
+Wine Calculator, Wine Notepad, and Microsoft Word 2010 use that same private
+Xvfb bridge, so translated Windows programs remain ordinary movable Vinix
+windows. Word uses a dedicated Win64 Wine prefix; if it is not installed, the
+launcher starts staged licensed Office 2010 x64 media or explains how to add it.
+
 ## The file browser
 
 `files.v` is not a ui2 example but Vinix's own, and it reads a real

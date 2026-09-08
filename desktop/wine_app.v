@@ -10,6 +10,10 @@ const wine_surface_width = 326
 const wine_surface_height = 430
 const wine_notepad_surface_width = 310
 const wine_notepad_surface_height = 230
+const wine_word2010_surface_width = 1024
+const wine_word2010_surface_height = 768
+const wine_word2010_window_width = 760
+const wine_word2010_window_height = 570
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
 const minecraft_window_width = 760
@@ -54,6 +58,26 @@ fn open_wine_calculator(mut _ Desktop) !NativeApp {
 
 fn open_wine_notepad(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+}
+
+fn open_wine_word2010(mut _ Desktop) !NativeApp {
+	word := '/root/.wine-office2010-x86_64/drive_c/Program Files/Microsoft Office/Office14/WINWORD.EXE'
+	if C.access(&char(word.str), 0) == 0 {
+		return open_hosted_x11_app('wine-word2010', '/usr/bin/word2010', wine_word2010_surface_width, wine_word2010_surface_height, 'builtin:editor', 'Starting Microsoft Word 2010…', 'The Win64 Wine runtime is not installed.', 'Microsoft Word 2010 exited.')
+	}
+	for setup in ['/root/office2010-media/x64/setup.exe', '/root/office2010-media/x64/SETUP.EXE',
+		'/root/office2010-media/X64/setup.exe', '/root/office2010-media/X64/SETUP.EXE'] {
+		if C.access(&char(setup.str), 0) == 0 {
+			return open_hosted_x11_app('wine-office2010-setup', '/usr/bin/office2010-setup', wine_word2010_surface_width, wine_word2010_surface_height, 'builtin:editor', 'Starting Office 2010 setup…', 'The Win64 Wine runtime is not installed.', 'Office 2010 setup closed. Launch Word again after installation.')
+		}
+	}
+	return &HostedX11App{
+		surface_width: wine_word2010_surface_width
+		surface_height: wine_word2010_surface_height
+		icon: 'builtin:editor'
+		failed: true
+		error_message: 'Stage licensed Office 2010 x64 media, then launch Word again.'
+	}
 }
 
 fn open_minecraft(mut _ Desktop) !NativeApp {

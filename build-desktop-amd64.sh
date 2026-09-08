@@ -101,7 +101,7 @@ install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/usr/
 # the aarch64 desktop image.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
-    vinix-minecraft vinix-wine-calculator vinix-wine-notepad; do
+    vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 

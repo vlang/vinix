@@ -8,6 +8,8 @@ BUILD_DIR="${VINIX_X86_64_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-x86-translation}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
 X86_ROOT="$STAGING/usr/libexec/vinix-x86_64/root"
+OFFICE2010_MEDIA="${VINIX_OFFICE2010_MEDIA:-}"
+OFFICE2010_PREFIX="${VINIX_OFFICE2010_PREFIX:-}"
 
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
 NATIVE_ARCH=aarch64
@@ -29,7 +31,7 @@ case "${1:-}" in
         ;;
 esac
 
-for tool in curl python3 tar clang ld.lld; do
+for tool in curl python3 tar clang ld.lld file; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -39,6 +41,39 @@ if [ "$WITH_WINE" -eq 1 ] && ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1
     echo "missing build tool: x86_64-w64-mingw32-gcc" >&2
     echo "install mingw-w64, or use --translator-only" >&2
     exit 1
+fi
+for directory in "$OFFICE2010_MEDIA" "$OFFICE2010_PREFIX"; do
+    if [ -n "$directory" ] && [ ! -d "$directory" ]; then
+        echo "Office 2010 input is not a directory: $directory" >&2
+        exit 1
+    fi
+done
+if [ -n "$OFFICE2010_MEDIA" ]; then
+    office_setup=''
+    for candidate in x64/setup.exe x64/SETUP.EXE X64/setup.exe X64/SETUP.EXE; do
+        if [ -f "$OFFICE2010_MEDIA/$candidate" ]; then
+            office_setup="$OFFICE2010_MEDIA/$candidate"
+            break
+        fi
+    done
+    if [ -z "$office_setup" ]; then
+        echo "Office 2010 media does not contain x64/setup.exe: $OFFICE2010_MEDIA" >&2
+        exit 1
+    fi
+fi
+if [ -n "$OFFICE2010_PREFIX" ]; then
+    office_word="$OFFICE2010_PREFIX/drive_c/Program Files/Microsoft Office/Office14/WINWORD.EXE"
+    if [ ! -f "$office_word" ]; then
+        echo "Office 2010 prefix does not contain Office14/WINWORD.EXE: $OFFICE2010_PREFIX" >&2
+        exit 1
+    fi
+    case "$(file -b "$office_word")" in
+        *PE32+*x86-64*) ;;
+        *)
+            echo "Office 2010 WINWORD.EXE is not an x86-64 PE binary: $office_word" >&2
+            exit 1
+            ;;
+    esac
 fi
 
 mkdir -p "$DOWNLOADS"
@@ -137,19 +172,26 @@ if [ "$WITH_WINE" -eq 1 ]; then
     # not expose yet and can wait forever during first boot. Wine explicitly
     # supports a "disable" update stamp; the built-in DLLs remain available from
     # WINEDLLPATH, so seed a lightweight Win64 prefix with that update disabled.
-    prefix="$STAGING/root/.wine-x86_64"
-    mkdir -p "$prefix/drive_c/windows/system32" "$prefix/dosdevices"
-    install -m644 "$SCRIPT_DIR/build-support/x86-translation/wine-update-disabled" \
-        "$prefix/.update-timestamp"
-    ln -snf ../drive_c "$prefix/dosdevices/c:"
-    ln -snf / "$prefix/dosdevices/z:"
-    # The skipped INF pass normally copies Wine's built-in PE modules here.
-    # Link them from the immutable private runtime instead, keeping one copy of
-    # the several-hundred-megabyte DLL set in the image.
-    for builtin in "$X86_ROOT/usr/lib/wine/x86_64-windows/"*; do
-        [ -f "$builtin" ] || continue
-        ln -snf "/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows/${builtin##*/}" \
-            "$prefix/drive_c/windows/system32/${builtin##*/}"
+    # Keep prefix link targets below ustar's 100-byte link-name limit: several
+    # Windows Runtime DLL names are long enough to exceed it with the private
+    # runtime's canonical path.
+    ln -snf /usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows \
+        "$STAGING/usr/share/wine/x86_64-windows"
+    for prefix in "$STAGING/root/.wine-x86_64" \
+        "$STAGING/root/.wine-office2010-x86_64"; do
+        mkdir -p "$prefix/drive_c/windows/system32" "$prefix/dosdevices"
+        install -m644 "$SCRIPT_DIR/build-support/x86-translation/wine-update-disabled" \
+            "$prefix/.update-timestamp"
+        ln -snf ../drive_c "$prefix/dosdevices/c:"
+        ln -snf / "$prefix/dosdevices/z:"
+        # The skipped INF pass normally copies Wine's built-in PE modules here.
+        # Link them from the immutable private runtime instead, keeping one copy
+        # of the several-hundred-megabyte DLL set in the image.
+        for builtin in "$X86_ROOT/usr/lib/wine/x86_64-windows/"*; do
+            [ -f "$builtin" ] || continue
+            ln -snf "/usr/share/wine/x86_64-windows/${builtin##*/}" \
+                "$prefix/drive_c/windows/system32/${builtin##*/}"
+        done
     done
     x86_64-w64-mingw32-gcc -Os -s -mwindows \
         "$SCRIPT_DIR/tests/wine/calculator.c" \
@@ -160,12 +202,25 @@ if [ "$WITH_WINE" -eq 1 ]; then
     install -m755 "$SCRIPT_DIR/build-support/x86-translation/run-wine-x86-64" \
         "$STAGING/usr/bin/run-wine-x86-64"
     for launcher in wine wine64 wineserver msiexec notepad regedit regsvr32 \
-        wineboot winecfg wineconsole winefile winemine winepath calculator; do
+        wineboot winecfg wineconsole winefile winemine winepath calculator \
+        office2010-setup word2010; do
         install -m755 "$SCRIPT_DIR/build-support/x86-translation/run-wine-x86-64" \
             "$STAGING/usr/bin/$launcher"
     done
     install -m755 "$SCRIPT_DIR/tests/wine/wine-smoke" \
         "$STAGING/usr/bin/wine-smoke"
+
+    if [ -n "$OFFICE2010_MEDIA" ]; then
+        echo "=== staging licensed Office 2010 media ==="
+        mkdir -p "$STAGING/root/office2010-media"
+        cp -a "$OFFICE2010_MEDIA/." "$STAGING/root/office2010-media/"
+    fi
+    if [ -n "$OFFICE2010_PREFIX" ]; then
+        echo "=== staging the supplied Office 2010 Wine prefix ==="
+        cp -a "$OFFICE2010_PREFIX/." "$STAGING/root/.wine-office2010-x86_64/"
+        install -m644 "$SCRIPT_DIR/build-support/x86-translation/wine-update-disabled" \
+            "$STAGING/root/.wine-office2010-x86_64/.update-timestamp"
+    fi
 fi
 
 file "$STAGING/usr/bin/qemu-x86_64" \
@@ -174,7 +229,8 @@ echo
 echo "x86-64 translation layer staged: $(du -sh "$STAGING" | cut -f1)"
 echo "output: $STAGING"
 if [ "$WITH_WINE" -eq 1 ]; then
-    echo "guest commands: x86-translation-smoke.sh, wine-smoke, calculator"
+    echo "guest commands: x86-translation-smoke.sh, wine-smoke, calculator, word2010"
+    echo "Office 2010 setup: office2010-setup /path/to/x64/setup.exe"
 else
     echo "guest command: x86-translation-smoke.sh"
 fi

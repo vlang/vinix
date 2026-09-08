@@ -3,6 +3,7 @@
 set -eu
 
 runtime="${VINIX_X86_64_ROOT:-/usr/libexec/vinix-x86_64/root}"
+runner="${VINIX_X86_64_RUNNER:-/usr/bin/run-x86-64}"
 wine="$runtime/usr/bin/wine"
 tool="${0##*/}"
 
@@ -13,7 +14,15 @@ if [ ! -x "$wine" ]; then
 fi
 
 export WINEARCH=win64
-export WINEPREFIX="${WINEPREFIX:-${HOME:-/root}/.wine-x86_64}"
+case "$tool" in
+    office2010-setup|word2010)
+        default_prefix="${HOME:-/root}/.wine-office2010-x86_64"
+        ;;
+    *)
+        default_prefix="${HOME:-/root}/.wine-x86_64"
+        ;;
+esac
+export WINEPREFIX="${WINEPREFIX:-$default_prefix}"
 export WINEDLLPATH="$runtime/usr/lib/wine/x86_64-unix:$runtime/usr/lib/wine/x86_64-windows"
 # Wine normally re-execs through wine-preloader. The preloader is another
 # x86-64 ELF, so keep execution inside the QEMU process that is already active.
@@ -33,6 +42,41 @@ case "$tool" in
     calculator)
         set -- "$wine" /usr/share/wine/vinix-calculator.exe "$@"
         ;;
+    office2010-setup)
+        if [ "$#" -gt 0 ]; then
+            setup="$1"
+            shift
+        else
+            setup=''
+            media_root="${VINIX_OFFICE2010_MEDIA_ROOT:-/root/office2010-media}"
+            for candidate in \
+                "$media_root/x64/setup.exe" \
+                "$media_root/x64/SETUP.EXE" \
+                "$media_root/X64/setup.exe" \
+                "$media_root/X64/SETUP.EXE"; do
+                if [ -f "$candidate" ]; then
+                    setup="$candidate"
+                    break
+                fi
+            done
+        fi
+        if [ -z "$setup" ] || [ ! -f "$setup" ]; then
+            echo 'office2010-setup: 64-bit Office 2010 setup was not found' >&2
+            echo 'usage: office2010-setup /path/to/x64/setup.exe [ARGUMENT ...]' >&2
+            exit 127
+        fi
+        set -- "$wine" "$setup" "$@"
+        ;;
+    word2010)
+        office_home="${OFFICE2010_HOME:-$WINEPREFIX/drive_c/Program Files/Microsoft Office/Office14}"
+        word="$office_home/WINWORD.EXE"
+        if [ ! -f "$word" ]; then
+            echo 'word2010: 64-bit Microsoft Word 2010 is not installed' >&2
+            echo 'run: office2010-setup /path/to/x64/setup.exe' >&2
+            exit 127
+        fi
+        set -- "$wine" "$word" "$@"
+        ;;
     msiexec|notepad|regedit|regsvr32|wineboot|winecfg|wineconsole|winefile|winemine|winepath)
         set -- "$wine" "$tool.exe" "$@"
         ;;
@@ -42,4 +86,4 @@ case "$tool" in
         ;;
 esac
 
-exec /usr/bin/run-x86-64 "$@"
+exec "$runner" "$@"
