@@ -31,7 +31,16 @@ enum AppCommand as u8 {
 	handle
 	key_input
 	poll
+	pointer
 	close
+}
+
+struct AppPointerPayload {
+	kind   int
+	x      int
+	y      int
+	width  int
+	height int
 }
 
 struct AppProcessOptions {
@@ -570,6 +579,28 @@ fn run_app_process(options AppProcessOptions) {
 					break
 				}
 			}
+			.pointer {
+				if payload.len != sizeof(AppPointerPayload) {
+					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer event')
+					free_app_payload(payload)
+					continue
+				}
+				mut pointer := AppPointerPayload{}
+				unsafe { C.memcpy(&pointer, payload.str, sizeof(AppPointerPayload)) }
+				if pointer.kind < int(AppPointerPhase.move) || pointer.kind > int(AppPointerPhase.up)
+					|| pointer.width <= 0 || pointer.height <= 0 {
+					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer geometry')
+					free_app_payload(payload)
+					continue
+				}
+				if mut app is PointerApp {
+					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, pointer.x, pointer.y, pointer.width, pointer.height)
+				}
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+					free_app_payload(payload)
+					break
+				}
+			}
 			.close {
 				if mut app is ClosingApp {
 					app.close_app()
@@ -594,6 +625,7 @@ mut:
 	response_fd int
 	polling     bool
 	keyboard    bool
+	pointer     bool
 	closed      bool
 	desktop     &Desktop = unsafe { nil }
 }
@@ -620,6 +652,7 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 		response_fd: process.from_child
 		polling: factory.polling
 		keyboard: factory.keyboard
+		pointer: factory.pointer
 		desktop: desktop
 	}
 	reply := receive_app_response(remote.response_fd) or {
@@ -691,6 +724,28 @@ fn (mut a RemoteApp) key_input(text string) {
 		return
 	}
 	reply := a.transact(.key_input, 0, 0, text) or { return }
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+}
+
+fn (a &RemoteApp) pointer_input_enabled() bool {
+	return a.pointer && !a.closed
+}
+
+fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
+	if !a.pointer || a.closed {
+		return
+	}
+	pointer := AppPointerPayload{
+		kind: int(phase)
+		x: x
+		y: y
+		width: width
+		height: height
+	}
+	payload := unsafe { tos(&u8(&pointer), int(sizeof(AppPointerPayload))) }
+	reply := a.transact(.pointer, 0, 0, payload) or { return }
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}

@@ -31,6 +31,21 @@ mut:
 	poll() bool
 }
 
+enum AppPointerPhase {
+	move
+	down
+	up
+}
+
+// PointerApp is used by pixel surfaces such as an embedded X server. Ordinary
+// ui2 applications receive semantic action ids; a foreign toolkit needs the
+// pointer position and button edges that produced those actions.
+interface PointerApp {
+mut:
+	pointer_input_enabled() bool
+	pointer_event(phase AppPointerPhase, x int, y int, width int, height int)
+}
+
 // ClosingApp releases subprocesses an application owns before its own process
 // leaves. Ordinary app resources are closed by exit; Terminal also owns a
 // shell process, which must not be orphaned when its window closes.

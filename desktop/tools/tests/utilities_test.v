@@ -144,7 +144,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 }
 
 fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
-	assert available_apps.len == 11
+	assert available_apps.len == 12
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == '/usr/bin/run-firefox'
@@ -156,11 +156,15 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
 	assert available_apps[10].title == 'Minecraft'
 	assert available_apps[10].exclusive_command == '/usr/bin/minecraft'
+	assert available_apps[11].title == 'Wine Calculator'
+	assert available_apps[11].process_name == 'vinix-wine-calculator'
+	assert available_apps[11].keyboard && available_apps[11].polling
+	assert available_apps[11].pointer
 	assert app_launcher_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	assert taskbar_launcher_width(1280, 114, available_apps.len) == 70
-	assert taskbar_launcher_width(1152, 114, available_apps.len) == 58
-	assert taskbar_launcher_width(1024, 114, available_apps.len) == 46
+	assert taskbar_launcher_width(1280, 114, available_apps.len) == 63
+	assert taskbar_launcher_width(1152, 114, available_apps.len) == 53
+	assert taskbar_launcher_width(1024, 114, available_apps.len) == 42
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
 }

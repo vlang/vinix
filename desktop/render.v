@@ -11,7 +11,8 @@
 // Two conventions extend ui2 for this backend:
 //
 //   - `image_path` of the form `builtin:<name>` draws a vector glyph the
-//     renderer carries itself, because the target has no image files.
+//     renderer carries itself, because the target has no image files. `xwd:`
+//     names a live off-screen Xvfb surface hosted inside a native window.
 //   - a rounded view at the top level of the tree is a floating surface and is
 //     given a drop shadow.
 module main
@@ -216,7 +217,11 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 			d.draw_button(el, x, y, w, h)
 		}
 		.image {
-			d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+			if el.image_path.starts_with(xwd_image_prefix) {
+				d.canvas.draw_xwd_surface(el.image_path[xwd_image_prefix.len..], x, y, w, h)
+			} else {
+				d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+			}
 		}
 	}
 

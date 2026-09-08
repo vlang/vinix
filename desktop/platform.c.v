@@ -85,6 +85,14 @@ fn desktop_mmap_shared(fd int, length u64) voidptr {
 	return mapping
 }
 
+fn desktop_mmap_readonly(fd int, length u64) voidptr {
+	mapping := C.mmap(unsafe { nil }, usize(length), C.PROT_READ, C.MAP_SHARED, fd, 0)
+	if mapping == C.MAP_FAILED {
+		return unsafe { nil }
+	}
+	return mapping
+}
+
 fn desktop_munmap(base voidptr, length u64) int {
 	return C.munmap(base, usize(length))
 }
@@ -555,6 +563,69 @@ fn desktop_wait_child(pid int) {
 		if waited == pid || (waited < 0 && C.errno != C.EINTR) {
 			return
 		}
+	}
+}
+
+struct SpawnedWineHost {
+	pid   int
+	input int
+}
+
+// Start the native Xvfb/Wine bridge with a private input pipe. The application
+// process retains only the write end; the host receives it as stdin and owns
+// every X11 and translated Wine child for the lifetime of the Vinix window.
+fn desktop_spawn_wine_host(directory string, width int, height int, command string) ?SpawnedWineHost {
+	host := '/usr/bin/vinix-wine-host'
+	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
+		return none
+	}
+	mut input := [2]int{}
+	if C.pipe(&input[0]) != 0 {
+		return none
+	}
+	desktop_set_cloexec(input[0], true)
+	desktop_set_cloexec(input[1], true)
+
+	display_name := ':${C.getpid()}'
+	geometry := '${width}x${height}x24'
+	argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
+		&char(command.str), &char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/busybox', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri', &char(unsafe { nil })]
+
+	pid := C.fork()
+	if pid < 0 {
+		C.close(input[0])
+		C.close(input[1])
+		unsafe {
+			display_name.free()
+			geometry.free()
+			path_entry.free()
+			argv.free()
+			envp.free()
+		}
+		return none
+	}
+	if pid == 0 {
+		C.dup2(input[0], C.STDIN_FILENO)
+		C.close(input[0])
+		C.close(input[1])
+		C.execve(&char(host.str), argv.data, envp.data)
+		C._exit(127)
+	}
+	C.close(input[0])
+	unsafe {
+		display_name.free()
+		geometry.free()
+		path_entry.free()
+		argv.free()
+		envp.free()
+	}
+	return SpawnedWineHost{
+		pid: pid
+		input: input[1]
 	}
 }
 

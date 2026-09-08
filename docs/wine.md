@@ -45,8 +45,16 @@ syscalls, the x86-64 musl loader, and Wine with:
 wine-smoke
 ```
 
-Start the bundled Win64 calculator with `calculator`. Other Win64 PE files run
-with `wine64 program.exe`. A generic x86-64 Linux ELF can be launched with
+Open **Wine Calculator** from the Vinix desktop to run the bundled Win64
+calculator as a normal Vinix window. Its private Xvfb display is composited
+inside the window, so the wallpaper, taskbar, native applications, window
+controls and switching all remain available; Xorg no longer replaces the
+whole screen with a black root window. Pointer and keyboard events are scoped
+to the Wine window and forwarded through XTEST.
+
+The terminal command `calculator` still starts the direct X11 form when an
+ordinary `DISPLAY` is already available. Other Win64 PE files run with
+`wine64 program.exe`. A generic x86-64 Linux ELF can be launched with
 `run-x86-64 program [arguments...]`.
 
 ![Win64 calculator running through Wine and x86-64 translation on Vinix AArch64](../wine-calculator-aarch64.png)

@@ -228,9 +228,13 @@ echo ""
 echo "=== Step 3: Building xorg-server ${XORG_SERVER_VERSION} ==="
 
 XORG_SRC="$SOURCES/xorg-server-${XORG_SERVER_VERSION}"
+XORG_ARCHIVE="$DOWNLOADS/xorg-server-${XORG_SERVER_VERSION}.tar.xz"
+if [ ! -f "$XORG_ARCHIVE" ]; then
+    echo "  Downloading xorg-server source archive..."
+    curl -sL -o "$XORG_ARCHIVE" "$XORG_SERVER_URL"
+fi
 if [ ! -d "$XORG_SRC" ]; then
-    echo "  Downloading xorg-server source..."
-    curl -sL "$XORG_SERVER_URL" | tar xJ -C "$SOURCES"
+    tar xJf "$XORG_ARCHIVE" -C "$SOURCES"
 fi
 
 # Apply Vinix patches
@@ -298,6 +302,63 @@ sed -i.bak 's/^export_dynamic_flag_spec=""$/export_dynamic_flag_spec="\${wl}--ex
 echo "  Building xorg-server..."
 make -j$(sysctl -n hw.ncpu) 2>&1 | tail -5
 make install DESTDIR="$STAGING" 2>&1 | tail -5
+
+# Xorg keeps GLX for Firefox, but an off-screen Wine surface only needs the
+# 2D framebuffer DDX. Build its Xvfb from a separate clean source tree with
+# every GL/DRI path disabled. Alpine's monolithic libGL otherwise pulls the
+# 138 MiB LLVM runtime into even a headless server before -extension GLX can
+# take effect.
+echo "  Building lean headless Xvfb..."
+XORG_XVFB_SRC="$SOURCES/xorg-server-${XORG_SERVER_VERSION}-xvfb"
+XORG_XVFB_TMP="$SOURCES/.xorg-server-${XORG_SERVER_VERSION}-xvfb"
+# This tree has a different configure result from Xorg's in-tree build. Start
+# from the cached release archive each time so neither config.status nor an
+# already-applied Vinix patch can leak between the two variants.
+rm -rf "$XORG_XVFB_SRC" "$XORG_XVFB_TMP"
+mkdir -p "$XORG_XVFB_TMP"
+tar xJf "$XORG_ARCHIVE" -C "$XORG_XVFB_TMP"
+mv "$XORG_XVFB_TMP/xorg-server-${XORG_SERVER_VERSION}" "$XORG_XVFB_SRC"
+rmdir "$XORG_XVFB_TMP"
+if [ -f "$PATCH_FILE" ]; then
+    cd "$XORG_XVFB_SRC"
+    patch -p1 -N < "$PATCH_FILE" 2>/dev/null || true
+fi
+cd "$XORG_XVFB_SRC"
+make distclean >/dev/null 2>&1 || true
+./configure \
+    --host=aarch64-linux-musl \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --with-xkb-bin-directory=/usr/bin \
+    --with-xkb-path=/usr/share/X11/xkb \
+    --with-xkb-output=/var/lib/xkb \
+    --with-fontrootdir=/usr/share/fonts/X11 \
+    --disable-xorg \
+    --enable-xvfb \
+    --disable-xephyr \
+    --disable-xnest \
+    --disable-suid-wrapper \
+    --disable-pciaccess \
+    --disable-dpms \
+    --disable-xres \
+    --disable-xvmc \
+    --disable-systemd-logind \
+    --disable-secure-rpc \
+    --disable-config-udev \
+    --disable-dri \
+    --disable-dri2 \
+    --disable-dri3 \
+    --disable-int10-module \
+    --disable-vgahw \
+    --disable-libdrm \
+    --disable-glamor \
+    --disable-glx \
+    --disable-xinerama \
+    --enable-screensaver \
+    2>&1 | tail -20
+make -j$(sysctl -n hw.ncpu) 2>&1 | tail -5
+install -m755 "$XORG_XVFB_SRC/hw/vfb/Xvfb" "$STAGING/usr/bin/Xvfb"
 
 # ── Step 4: Build xf86-video-fbdev ──
 echo ""
@@ -379,6 +440,16 @@ $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
     -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
     -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-xinput"
+
+# Wine windows stay inside the native compositor by rendering into Xvfb. This
+# companion owns that private X server and translates the compositor's scoped
+# input records into XTEST events; it never opens the physical input devices.
+echo "  Building Vinix embedded Wine host..."
+$CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c" \
+    -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
+    -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
+    -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-wine-host"
 
 # Copy XKB data
 if [ -d "$SYSROOT/usr/share/X11/xkb" ]; then

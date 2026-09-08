@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
+// Xvfb surfaces embedded in compositor-managed Vinix windows.
+module main
+
+const xwd_image_prefix = 'xwd:'
+const xwd_fixed_header_size = u64(100)
+const xwd_color_size = u64(12)
+const xwd_file_version = u32(7)
+const xwd_zpixmap = u32(2)
+const xwd_max_surface_bytes = u64(64 * 1024 * 1024)
+
+struct XwdSurface {
+	mapping        voidptr
+	size           u64
+	pixels         &u8 = unsafe { nil }
+	width          int
+	height         int
+	bytes_per_line int
+	byte_order     u32
+	red_mask       u32
+	green_mask     u32
+	blue_mask      u32
+	red_shift      int
+	green_shift    int
+	blue_shift     int
+	red_max        u32
+	green_max      u32
+	blue_max       u32
+}
+
+@[inline]
+fn xwd_be32(bytes &u8, offset int) u32 {
+	return unsafe {
+		u32(bytes[offset]) << 24 | u32(bytes[offset + 1]) << 16 | u32(bytes[offset + 2]) << 8 | u32(bytes[offset + 3])
+	}
+}
+
+fn xwd_mask_parts(mask u32) (int, u32) {
+	mut shift := 0
+	mut value := mask
+	for shift < 32 && value & 1 == 0 {
+		value >>= 1
+		shift++
+	}
+	return shift, value
+}
+
+fn open_xwd_surface(path string) ?XwdSurface {
+	info := desktop_stat(path) or { return none }
+	if info.size < xwd_fixed_header_size || info.size > xwd_max_surface_bytes {
+		return none
+	}
+	fd := desktop_open_ro_nonblock(path)
+	if fd < 0 {
+		return none
+	}
+	mapping := desktop_mmap_readonly(fd, info.size)
+	desktop_close(fd)
+	if mapping == unsafe { nil } {
+		return none
+	}
+	bytes := unsafe { &u8(mapping) }
+	header_size := u64(xwd_be32(bytes, 0))
+	version := xwd_be32(bytes, 4)
+	format := xwd_be32(bytes, 8)
+	width := u64(xwd_be32(bytes, 16))
+	height := u64(xwd_be32(bytes, 20))
+	byte_order := xwd_be32(bytes, 28)
+	bits_per_pixel := xwd_be32(bytes, 44)
+	bytes_per_line := u64(xwd_be32(bytes, 48))
+	red_mask := xwd_be32(bytes, 56)
+	green_mask := xwd_be32(bytes, 60)
+	blue_mask := xwd_be32(bytes, 64)
+	ncolors := u64(xwd_be32(bytes, 76))
+	pixel_offset := header_size + ncolors * xwd_color_size
+	valid := version == xwd_file_version && format == xwd_zpixmap && width > 0
+		&& height > 0 && width <= 8192 && height <= 8192 && bits_per_pixel == 32
+		&& byte_order <= 1 && header_size >= xwd_fixed_header_size
+		&& ncolors <= 65536 && pixel_offset <= info.size
+		&& bytes_per_line >= width * 4 && height <= (info.size - pixel_offset) / bytes_per_line
+		&& red_mask != 0 && green_mask != 0 && blue_mask != 0
+	if !valid {
+		desktop_munmap(mapping, info.size)
+		return none
+	}
+	red_shift, red_max := xwd_mask_parts(red_mask)
+	green_shift, green_max := xwd_mask_parts(green_mask)
+	blue_shift, blue_max := xwd_mask_parts(blue_mask)
+	if red_max == 0 || green_max == 0 || blue_max == 0 {
+		desktop_munmap(mapping, info.size)
+		return none
+	}
+	return XwdSurface{
+		mapping: mapping
+		size: info.size
+		pixels: unsafe { &u8(usize(mapping) + usize(pixel_offset)) }
+		width: int(width)
+		height: int(height)
+		bytes_per_line: int(bytes_per_line)
+		byte_order: byte_order
+		red_mask: red_mask
+		green_mask: green_mask
+		blue_mask: blue_mask
+		red_shift: red_shift
+		green_shift: green_shift
+		blue_shift: blue_shift
+		red_max: red_max
+		green_max: green_max
+		blue_max: blue_max
+	}
+}
+
+fn (surface &XwdSurface) close() {
+	if surface.mapping != unsafe { nil } {
+		desktop_munmap(surface.mapping, surface.size)
+	}
+}
+
+@[inline]
+fn xwd_channel(pixel u32, mask u32, shift int, maximum u32) u32 {
+	value := (pixel & mask) >> shift
+	return if maximum == 255 { value } else { value * 255 / maximum }
+}
+
+@[inline]
+fn (surface &XwdSurface) pixel(x int, y int) u32 {
+	offset := y * surface.bytes_per_line + x * 4
+	raw := unsafe {
+		if surface.byte_order == 0 {
+			u32(surface.pixels[offset]) | u32(surface.pixels[offset + 1]) << 8 | u32(surface.pixels[offset + 2]) << 16 | u32(surface.pixels[offset + 3]) << 24
+		} else {
+			u32(surface.pixels[offset]) << 24 | u32(surface.pixels[offset + 1]) << 16 | u32(surface.pixels[offset + 2]) << 8 | u32(surface.pixels[offset + 3])
+		}
+	}
+	red := xwd_channel(raw, surface.red_mask, surface.red_shift, surface.red_max)
+	green := xwd_channel(raw, surface.green_mask, surface.green_shift, surface.green_max)
+	blue := xwd_channel(raw, surface.blue_mask, surface.blue_shift, surface.blue_max)
+	return red << 16 | green << 8 | blue
+}
+
+// draw_xwd_surface scales the live mmap directly into the compositor canvas.
+// Xvfb and the desktop share the kernel page cache, so no screenshot file is
+// copied or rewritten for each frame.
+fn (mut canvas Canvas) draw_xwd_surface(path string, x int, y int, width int, height int) bool {
+	if width <= 0 || height <= 0 {
+		return false
+	}
+	surface := open_xwd_surface(path) or { return false }
+	defer {
+		surface.close()
+	}
+	for destination_y := 0; destination_y < height; destination_y++ {
+		source_y := destination_y * surface.height / height
+		for destination_x := 0; destination_x < width; destination_x++ {
+			source_x := destination_x * surface.width / width
+			canvas.blend_pixel(x + destination_x, y + destination_y, surface.pixel(source_x, source_y), 255)
+		}
+	}
+	return true
+}

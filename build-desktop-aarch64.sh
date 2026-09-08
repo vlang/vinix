@@ -236,8 +236,10 @@ if [ ! -f "$BASE_INITRAMFS" ]; then
     echo "ERROR: $BASE_INITRAMFS not found; it is the desktop's base userland."
     exit 1
 fi
-if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
-    echo "ERROR: desktop needs $X11_STAGING/usr/bin/vinix-xinput" >&2
+if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
+   [ ! -x "$X11_STAGING/usr/bin/vinix-wine-host" ] ||
+   [ ! -x "$X11_STAGING/usr/bin/Xvfb" ]; then
+    echo "ERROR: desktop needs Xvfb and the Vinix X11 input bridges in $X11_STAGING" >&2
     echo "Run ./build-x11-aarch64.sh first." >&2
     exit 1
 fi
@@ -265,9 +267,11 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
         exit 1
     fi
     if [ ! -x "$X11_STAGING/usr/bin/Xorg" ] ||
+        [ ! -x "$X11_STAGING/usr/bin/Xvfb" ] ||
         [ ! -x "$X11_STAGING/usr/bin/startx" ] ||
-        [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ]; then
-        echo "ERROR: compact desktop needs Xorg, startx and vinix-xinput in $X11_STAGING" >&2
+        [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
+        [ ! -x "$X11_STAGING/usr/bin/vinix-wine-host" ]; then
+        echo "ERROR: compact desktop needs Xorg, Xvfb, startx and the input bridges in $X11_STAGING" >&2
         echo "Run ./build-x11-aarch64.sh first." >&2
         exit 1
     fi
@@ -392,6 +396,7 @@ chmod 1777 "$STAGING/tmp"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
+install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" "$STAGING/root/firefox-smoke.html"
 mkdir -p "$STAGING/etc/firefox/policies"
@@ -418,7 +423,7 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
-for runtime_path in usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox; do
+for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop Firefox runtime is missing /$runtime_path" >&2
         echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the userland." >&2
@@ -439,7 +444,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/startx usr/bin/vinix-xinput usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
+    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -471,7 +476,8 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator; do
+    vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
+    vinix-wine-calculator; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 

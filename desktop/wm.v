@@ -54,6 +54,7 @@ mut:
 	pointer_y       int
 	buttons         u32
 	pointer_present bool
+	pointer_capture int
 
 	frames  int
 	running bool = true
@@ -635,6 +636,66 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 	}
 }
 
+// forward_pointer_to_app routes raw pointer input only to applications that
+// explicitly request it. A press captures the surface until release so a drag
+// does not get lost merely because it crossed the content edge.
+fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) bool {
+	mut selected := -1
+	if d.pointer_capture != 0 {
+		selected = d.window_index(d.pointer_capture) or { -1 }
+	} else {
+		for i := d.windows.len - 1; i >= 0; i-- {
+			window := &d.windows[i]
+			body_top := window.y + d.theme().title_height
+			if !window.minimized && window.app_index >= 0 && x >= window.x
+				&& x < window.x + window.width && y >= body_top
+				&& y < window.y + window.height {
+				selected = i
+				break
+			}
+		}
+	}
+	if selected < 0 || selected >= d.windows.len {
+		if phase == .up {
+			d.pointer_capture = 0
+		}
+		return false
+	}
+	window := &d.windows[selected]
+	if window.app_index < 0 || window.app_index >= d.apps.len {
+		return false
+	}
+	mut app := d.apps[window.app_index]
+	if mut app is PointerApp {
+		if !app.pointer_input_enabled() {
+			return false
+		}
+		body_height := window.height - d.theme().title_height
+		mut local_x := x - window.x
+		mut local_y := y - window.y - d.theme().title_height
+		if local_x < 0 {
+			local_x = 0
+		}
+		if local_y < 0 {
+			local_y = 0
+		}
+		if local_x >= window.width {
+			local_x = window.width - 1
+		}
+		if local_y >= body_height {
+			local_y = body_height - 1
+		}
+		app.pointer_event(phase, local_x, local_y, window.width, body_height)
+		if phase == .down {
+			d.pointer_capture = window.id
+		} else if phase == .up {
+			d.pointer_capture = 0
+		}
+		return true
+	}
+	return false
+}
+
 // shortcut_elements lays the application shortcuts down the left edge of the
 // wallpaper, where windows are least likely to sit on top of them. Each is a
 // transparent view that only shows a panel while the pointer is on it, so an
@@ -1041,6 +1102,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		}
 		return
 	}
+	d.forward_pointer_to_app(x, y, .move)
 
 	hover := d.hit_action(x, y)
 	if hover != d.hover {
@@ -1074,6 +1136,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	action := d.hit_action(x, y)
 	d.hover = action
 	d.dirty = true
+	d.forward_pointer_to_app(x, y, .down)
 
 	if d.switcher.active {
 		// A click on a tile switches to that window; a click anywhere else
@@ -1157,6 +1220,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 }
 
 fn (mut d Desktop) on_pointer_up(x int, y int) {
+	d.forward_pointer_to_app(x, y, .up)
 	d.drag = Drag{}
 	d.hover = d.hit_action(x, y)
 	d.dirty = true
