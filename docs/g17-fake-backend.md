@@ -178,6 +178,18 @@ At the Vinix prompt, select lifecycle-only validation:
 /usr/bin/run-gl-triangle-agx --submit-only
 ```
 
+The same check can be run non-interactively from the host after building the
+AArch64 kernel:
+
+```sh
+python3 tests/agx-fake-g17/run_vm.py
+```
+
+The runner creates scratch disk/NVRAM files by default, waits for the guest
+shell, checks the exact Mesa renderer and render/fence completion messages,
+and exits QEMU. Set `VINIX_BOOT_DISK` to reuse an existing test image or
+`VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second deadline.
+
 Mesa should identify the renderer as `Apple M5 Max (G17C C0)` and report that
 the render submit and fence completed successfully. The first kernel message
 also includes the staged Mesa fragment command ID and framebuffer dimensions.
