@@ -546,12 +546,17 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 
 	if unsafe { old_process != 0 } {
 		new_proc.ppid = old_process.pid
+		new_proc.pgid = old_process.pgid
+		new_proc.sid = old_process.sid
+		new_proc.tty_session = old_process.tty_session
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 	} else {
 		new_proc.ppid = 0
+		new_proc.pgid = new_proc.pid
+		new_proc.sid = new_proc.pid
 		new_proc.pagemap = unsafe { pagemap }
 		new_proc.thread_stack_top = u64(0x70000000000)
 		new_proc.mmap_anon_non_fixed_base = u64(0x80000000000)

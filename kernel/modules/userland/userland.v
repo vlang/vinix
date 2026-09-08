@@ -173,6 +173,20 @@ pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
 	return 0, 0
 }
 
+// Become the leader of a new session and process group. The desktop terminal
+// uses this before claiming its PTY slave as the controlling terminal.
+pub fn syscall_setsid(_ voidptr) (u64, u64) {
+	mut process := proc.current_thread().process
+	if process.pgid == process.pid {
+		return errno.err, errno.eperm
+	}
+
+	process.sid = process.pid
+	process.pgid = process.pid
+	process.tty_session = 0
+	return u64(process.pid), 0
+}
+
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process

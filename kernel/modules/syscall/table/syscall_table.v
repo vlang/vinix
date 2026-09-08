@@ -78,7 +78,7 @@ pub fn init_syscall_table() {
 	syscall_table[51] = voidptr(net.syscall_gethostname)
 	syscall_table[52] = voidptr(net.syscall_sethostname)
 	syscall_table[53] = voidptr(sys.syscall_nanosleep)
-	syscall_table[54] = voidptr(syscall_vacant)
+	syscall_table[54] = voidptr(userland.syscall_setsid)
 	syscall_table[55] = voidptr(syscall_vacant)
 	syscall_table[56] = voidptr(syscall_vacant)
 	syscall_table[57] = voidptr(fs.syscall_fchmod)
