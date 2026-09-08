@@ -31,8 +31,8 @@ CPPFLAGS :=
 VFLAGS :=
 
 # Emit Limine's multiprocessor request when the boot environment can start
-# secondary CPUs safely. This stays off by default because Limine's current
-# ARM64 trampoline cannot start the Apple Silicon cores correctly.
+# secondary CPUs safely. This stays off by default until Limine 12.x's revised
+# ARM64 trampoline has been validated with Vinix on Apple Silicon hardware.
 LIMINE_MP ?= 0
 ifneq ($(LIMINE_MP),0)
 ifneq ($(LIMINE_MP),1)

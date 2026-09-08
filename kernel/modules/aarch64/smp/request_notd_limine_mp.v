@@ -7,7 +7,7 @@ import limine
 // No Limine MP request in the default build. On Apple Silicon the request is
 // not merely useless, it is what keeps the machine on a black screen:
 //
-// Limine 9.3.0 releases each secondary core through the device tree's
+// Limine 9.3.0 released each secondary core through the device tree's
 // spin-table and runs its AP trampoline at EL2, where it writes the EL1 page
 // table registers by their EL1 names. Apple cores have HCR_EL2.E2H fixed at 1
 // (Linux arch/arm64/kernel/head.S calls them "fruity CPUs" for it), so under
@@ -19,9 +19,11 @@ import limine
 // boot services have been exited. The kernel is entered after roughly eight
 // hours.
 //
-// The kernel does not need the request on Apple hardware, where the AIC path
-// runs on CPU 0 alone. The QEMU runners build with LIMINE_MP=1, which supplies
-// -d limine_mp and lets QEMU bring every configured virtual CPU online.
+// Limine 12.x replaced that path with a VHE-aware trampoline. Keep the request
+// disabled on Apple hardware until that new path is validated with Vinix; the
+// AIC path can run on CPU 0 alone. The QEMU runners build with LIMINE_MP=1,
+// which supplies -d limine_mp and lets QEMU bring every configured virtual CPU
+// online.
 fn limine_response() &limine.LimineSMPResponse {
 	return unsafe { nil }
 }

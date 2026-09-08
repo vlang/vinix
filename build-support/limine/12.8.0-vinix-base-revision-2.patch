@@ -1,0 +1,15 @@
+--- a/common/protos/limine.c
++++ b/common/protos/limine.c
+@@ -687,12 +687,6 @@ noreturn void limine_load(char *config, char *cmdline) {
+         *base_rev_p2_ptr = 0;
+     }
+
+-#if defined (__aarch64__)
+-    if (base_revision < 6) {
+-        panic(true, "limine: Base revision %u is no longer supported for aarch64 (minimum: 6)", base_revision);
+-    }
+-#endif
+-
+     // Load requests
+     requests_top = physical_base + image_size_before_bss;
+     uint64_t *limine_reqs = NULL;

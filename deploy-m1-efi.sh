@@ -142,15 +142,10 @@ KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
-LIMINE_EFI_BUILT="$SCRIPT_DIR/boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI"
+LIMINE_VERSION="12.8.0"
 LIMINE_EFI_BIN="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
 LIMINE_CONF="$SCRIPT_DIR/build-support/limine.conf"
-
-if [ -f "$LIMINE_EFI_BUILT" ] && { [ ! -f "$LIMINE_EFI_BIN" ] || [ "$LIMINE_EFI_BUILT" -nt "$LIMINE_EFI_BIN" ]; }; then
-    LIMINE_EFI="$LIMINE_EFI_BUILT"
-else
-    LIMINE_EFI="$LIMINE_EFI_BIN"
-fi
+LIMINE_EFI="$LIMINE_EFI_BIN"
 
 if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
     if [ ! -f "$DESKTOP_INITRAMFS" ]; then
@@ -208,16 +203,17 @@ fi
 
 echo "using limine EFI: $LIMINE_EFI"
 
-# The upstream 9.3.0 loader cannot boot this kernel on Apple Silicon: its
-# EL2-to-EL1 hand-off leaves FP/SIMD and the physical timer trapping to EL2
-# on CPUs that keep VHE on. build-limine-aarch64.sh builds the patched one and
-# stamps it with an instruction sequence the upstream binary does not contain.
-if ! xxd -p "$LIMINE_EFI" | tr -d '\n' | grep -q "6806a0d248111cd5"; then
-    echo "error: $LIMINE_EFI is the upstream Limine build, which black-screens on Apple Silicon" >&2
+# Limine 12.x contains the upstream VHE-aware Apple Silicon hand-off. Reject a
+# stale loader and the unpatched build that requires protocol base revision 6.
+if ! LC_ALL=C grep -aF "Limine ${LIMINE_VERSION} (aarch64, UEFI)" \
+    "$LIMINE_EFI" >/dev/null \
+    || LC_ALL=C grep -aF "Base revision %u is no longer supported for aarch64" \
+        "$LIMINE_EFI" >/dev/null; then
+    echo "error: $LIMINE_EFI is not the Vinix-compatible Limine ${LIMINE_VERSION} build" >&2
     echo "hint: run ./build-limine-aarch64.sh first" >&2
     exit 1
 fi
-echo "limine EFI is the Apple Silicon build (sha256 $(shasum -a 256 "$LIMINE_EFI" | cut -c1-16))"
+echo "limine EFI is ${LIMINE_VERSION} with Apple VHE and Vinix base revision 2 support (sha256 $(shasum -a 256 "$LIMINE_EFI" | cut -c1-16))"
 
 RUNTIME_CONF="$(mktemp "${TMPDIR:-/tmp}/vinix-limine.XXXXXX")"
 trap 'rm -f "$RUNTIME_CONF"' EXIT

@@ -34,7 +34,7 @@ BOOT_DISK="${VINIX_BOOT_DISK:-$BOOT_DIR/boot.img}"
 BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
 OVMF_VARS="${VINIX_EFIVARS:-/tmp/vinix-efivars.fd}"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
-LIMINE_VERSION="9.3.0"
+LIMINE_VERSION="12.8.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
 QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
@@ -164,12 +164,13 @@ if [ -s "$PACKAGE_STORE" ]; then
 fi
 printf '%s\n' '    module_path: boot():/boot/qemu-runtime.tar' >> "$LIMINE_CONF_QEMU"
 
-# ── Ensure the patched Limine BOOTAA64.EFI is available ──
-# build-limine-aarch64.sh applies the Apple Silicon hand-off patch; the same
-# loader is what deploy-m1-efi.sh ships, so QEMU exercises the deployed build.
+# ── Ensure the selected Limine BOOTAA64.EFI is available ──
+# The same source-built loader is what deploy-m1-efi.sh ships, so QEMU
+# exercises the deployed build.
 LIMINE_EFI="$BOOT_DIR/limine-bin/BOOTAA64.EFI"
-if [ ! -f "$LIMINE_EFI" ] || ! "$SCRIPT_DIR/build-limine-aarch64.sh" --check | grep -q "patched for Apple Silicon"; then
-    echo "==> Building patched Limine ${LIMINE_VERSION}..."
+if [ ! -f "$LIMINE_EFI" ] || ! "$SCRIPT_DIR/build-limine-aarch64.sh" --check \
+    | grep -Fq "Vinix base revision 2 compatibility"; then
+    echo "==> Building Limine ${LIMINE_VERSION}..."
     "$SCRIPT_DIR/build-limine-aarch64.sh" || exit 1
 fi
 

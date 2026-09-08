@@ -1,15 +1,16 @@
 #! /bin/sh
 
 name=limine
-version=9.3.0
+version=12.8.0
 revision=1
 tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.gz"
-tarball_blake2b="09db8fde9b1d3a78cbf9a7f5c29c295c658bc521db5f0dcf00497d191b942549eb7d8b4eb747904420f1fa8dad70ef09343d0139ed6f0ee1aba0d1b7c626a904"
+tarball_blake2b="ae56d8f31a2d86c9d3e02627853cbc3b366a9528f469caf683443daa10f615c4bed9398eebc425d4cedbf0b6df527c4ff99fc2d0dd7e9623f879914504badc07"
 imagedeps="mtools nasm"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
 prepare() {
+    patch -p1 <"${base_dir}"/build-support/limine/12.8.0-vinix-base-revision-2.patch
     autotools_recursive_regen
 }
 
@@ -26,7 +27,7 @@ configure() {
         $X86_FLAGS \
         --enable-uefi-$ARCHITECTURE \
         --enable-uefi-cd \
-        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}
+        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}-
 }
 
 build() {

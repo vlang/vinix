@@ -1,18 +1,15 @@
 #!/bin/sh
 # Push this tree to the M1 and prove what landed.
 #
-# Deployment is only meaningful if the patched Limine arrives with it: the
-# loader carrying the VHE hand-off fix is built into
-# boot-image/limine-src-9.3.0/bin, which is inside a directory that is
-# otherwise far too large to copy. Excluding the whole tree silently leaves
-# the machine on whatever loader it already had, so the build output is
-# included explicitly and checked on the far side rather than assumed.
+# Deployment is only meaningful if the current Limine arrives with it. The
+# installed loader lives in boot-image/limine-bin; source build directories
+# are excluded and the installed artifact is checked on the far side.
 set -eu
 
 REMOTE="${1:-sergey@192.168.0.3}"
 DEST="${2:-/Users/sergey/code/vinix}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PATCH_SIG="6806a0d248111cd5"
+LIMINE_VERSION="12.8.0"
 
 cd "$SCRIPT_DIR"
 
@@ -62,7 +59,7 @@ if ! rsync -a --partial --progress --stats \
     --exclude 'vinix.iso' \
     --exclude 'boot-image/boot*.img' \
     --exclude 'boot-image/edk2-aarch64-code-*.fd' \
-    --exclude 'boot-image/limine-src-9.3.0/' \
+    --exclude 'boot-image/limine-src-*/' \
     --exclude 'tools/agx-re/build/' \
     --exclude 'build/' \
     --exclude 'build-aarch64-*/' \
@@ -88,14 +85,6 @@ EOF
 fi
 echo "rsync exit: 0"
 
-# The one path excluded above that must still arrive.
-EFI="boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI"
-if [ -f "$EFI" ]; then
-    ssh "$REMOTE" "mkdir -p '$DEST/boot-image/limine-src-9.3.0/bin'"
-    rsync -a "$EFI" "$REMOTE:$DEST/$EFI"
-    echo "pushed patched loader: $EFI"
-fi
-
 # kek.sh is the command actually typed on the M1, so it has to travel with the
 # tree rather than being copied by hand. Installing it outside the repo keeps
 # the short path the user already uses.
@@ -108,9 +97,9 @@ fi
 ssh "$REMOTE" "cd '$DEST' && \
     echo \"remote head:  \$(git log --oneline -1 2>/dev/null || echo unknown)\" && \
     echo \"kernel sha:   \$(shasum -a256 kernel/bin/vinix | cut -c1-16)\" && \
-    for f in boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI boot-image/limine-bin/BOOTAA64.EFI; do \
+    for f in boot-image/limine-bin/BOOTAA64.EFI; do \
         if [ -f \"\$f\" ]; then \
-            if xxd -p \"\$f\" | tr -d '\n' | grep -q '$PATCH_SIG'; then s=PATCHED; else s='UPSTREAM (would black-screen)'; fi; \
+            if LC_ALL=C grep -aF 'Limine $LIMINE_VERSION (aarch64, UEFI)' \"\$f\" >/dev/null && ! LC_ALL=C grep -aF 'Base revision %u is no longer supported for aarch64' \"\$f\" >/dev/null; then s='Limine $LIMINE_VERSION (Vinix compatible)'; else s='STALE/UNEXPECTED'; fi; \
             printf '%-50s %s\n' \"\$f\" \"\$s\"; \
         fi; \
     done"

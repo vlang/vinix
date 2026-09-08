@@ -20,7 +20,7 @@ configure() {
         LDFLAGS="$HOST_LDFLAGS -static" \
     "${source_dir}"/configure \
         --prefix="${prefix}" \
-        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET} \
+        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}- \
         $X86_FLAGS \
         --enable-uefi-$ARCHITECTURE \
         --enable-uefi-cd
