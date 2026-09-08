@@ -26,6 +26,18 @@ const app_protocol_max_depth = 64
 const remote_owned_element_key = '__vinix.remote.owned'
 const native_app_directory = '/usr/bin/'
 
+// A local PollingApp can cheaply answer "nothing changed" on every compositor
+// pass. Across the process boundary that same answer costs two pipe messages,
+// two blocking waits and several scheduler hand-offs. On ARM64 those hand-offs
+// are particularly visible because the scheduler's blocking path polls the
+// virtual timer. Pace remote clients before sending anything over the pipe.
+fn remote_app_poll_due(interval u64, sampled bool, last_poll_ms u64, now_ms u64) bool {
+	if interval == 0 || !sampled || now_ms == ~u64(0) || now_ms < last_poll_ms {
+		return true
+	}
+	return now_ms - last_poll_ms >= interval
+}
+
 enum AppCommand as u8 {
 	build = 1
 	handle
@@ -620,14 +632,17 @@ fn run_app_process(options AppProcessOptions) {
 @[heap]
 struct RemoteApp {
 mut:
-	pid         int
-	request_fd  int
-	response_fd int
-	polling     bool
-	keyboard    bool
-	pointer     bool
-	closed      bool
-	desktop     &Desktop = unsafe { nil }
+	pid              int
+	request_fd       int
+	response_fd      int
+	polling          bool
+	poll_interval_ms u64
+	poll_sampled     bool
+	last_poll_ms     u64
+	keyboard         bool
+	pointer          bool
+	closed           bool
+	desktop          &Desktop = unsafe { nil }
 }
 
 fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
@@ -651,6 +666,7 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 		request_fd: process.to_child
 		response_fd: process.from_child
 		polling: factory.polling
+		poll_interval_ms: factory.poll_interval_ms
 		keyboard: factory.keyboard
 		pointer: factory.pointer
 		desktop: desktop
@@ -665,6 +681,14 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
+	}
+	// Opening each of these applications already performs its initial refresh.
+	// Start its next interval here instead of immediately sending a redundant
+	// poll on the compositor pass that follows the launch.
+	now := desktop_monotonic_ms()
+	if remote.poll_interval_ms > 0 && now != ~u64(0) {
+		remote.poll_sampled = true
+		remote.last_poll_ms = now
 	}
 	return remote
 }
@@ -727,6 +751,10 @@ fn (mut a RemoteApp) key_input(text string) {
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
+	// The terminal's slave will echo or answer this input asynchronously. Let
+	// the next compositor pass check for that output instead of making typed
+	// characters wait for the normal idle polling interval.
+	a.poll_sampled = false
 }
 
 fn (a &RemoteApp) pointer_input_enabled() bool {
@@ -755,7 +783,20 @@ fn (mut a RemoteApp) poll() bool {
 	if !a.polling || a.closed {
 		return false
 	}
+	now := desktop_monotonic_ms()
+	if !remote_app_poll_due(a.poll_interval_ms, a.poll_sampled, a.last_poll_ms, now) {
+		return false
+	}
 	reply := a.transact(.poll, 0, 0, '') or { return true }
+	// Measure the next interval from the completed response. Activity and Clock
+	// also pace their work inside the child; starting before the request could
+	// make their next check land a few milliseconds early and skip a whole
+	// additional interval.
+	completed := desktop_monotonic_ms()
+	if a.poll_interval_ms > 0 && completed != ~u64(0) {
+		a.poll_sampled = true
+		a.last_poll_ms = completed
+	}
 	if !reply.ok {
 		if reply.payload.cap > 0 {
 			unsafe { reply.payload.free() }

@@ -27,12 +27,15 @@ mut:
 // exec name and a factory used by its child process. A large external GUI can
 // instead ask for exclusive ownership of the display while its command runs.
 struct AppFactory {
-	title             string
-	icon              string
-	width             int
-	height            int
-	process_name      string
-	polling           bool
+	title        string
+	icon         string
+	width        int
+	height       int
+	process_name string
+	polling      bool
+	// Minimum time between remote poll requests. Zero keeps per-frame
+	// polling for hosted framebuffers whose pixels can always change.
+	poll_interval_ms  u64
 	keyboard          bool
 	pointer           bool
 	exclusive_command string
@@ -87,6 +90,7 @@ const available_apps = [
 		height: 340
 		process_name: 'vinix-terminal'
 		polling: true
+		poll_interval_ms: 50
 		keyboard: true
 		open: open_terminal
 	},
@@ -108,6 +112,7 @@ const available_apps = [
 		height: 400
 		process_name: 'vinix-activity'
 		polling: true
+		poll_interval_ms: 1000
 		open: open_activity
 	},
 	AppFactory{
@@ -134,6 +139,7 @@ const available_apps = [
 		height: 410
 		process_name: 'vinix-clock'
 		polling: true
+		poll_interval_ms: 100
 		open: open_clock
 	},
 	AppFactory{
