@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-export PATH=/aarch64-linux-musl-native/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOME=/root
 export TERM=linux
 export CC=gcc

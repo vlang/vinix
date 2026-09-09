@@ -7,10 +7,11 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 v=${V:-v}
 llvm_bin=${LLVM_BIN:-/opt/homebrew/opt/llvm/bin}
-sysroot=${VINIX_MUSL_SYSROOT:-"$root/build-aarch64-musl/aarch64-linux-musl-native"}
-gcclib="$sysroot/lib/gcc/aarch64-linux-musl/11.2.1"
+sysroot=${VINIX_AARCH64_SYSROOT:-${VINIX_MUSL_SYSROOT:-"$root/build-aarch64-userland/staging"}}
+gcclib=$(find "$sysroot/usr/lib/gcc/aarch64-alpine-linux-musl" \
+    -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort | tail -n1)
 
-for path in "$v" "$llvm_bin/clang" "$sysroot/lib/libc.a" "$root/kernel/bin/vinix"; do
+for path in "$v" "$llvm_bin/clang" "$sysroot/usr/lib/libc.a" "$gcclib/libgcc.a" "$root/kernel/bin/vinix"; do
     [ -e "$path" ] || {
         echo "ERROR: missing Vinix test prerequisite: $path" >&2
         exit 1
@@ -38,11 +39,11 @@ printf "Module { name: 'cocoa_vinix_test' }\n" > "$work/runtime/v.mod"
     -o "$work/runtime.c" "$work/runtime"
 "$llvm_bin/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$root/build-support/aarch64-cc-shim" \
-    -isystem "$gcclib/include" -isystem "$sysroot/include" \
+    -isystem "$gcclib/include" -isystem "$sysroot/usr/include" \
     -O2 -fno-stack-protector -w \
-    "$sysroot/lib/crt1.o" "$sysroot/lib/crti.o" "$gcclib/crtbegin.o" \
-    "$work/runtime.c" -L"$sysroot/lib" -L"$gcclib" -lc -lgcc -lm \
-    "$gcclib/crtend.o" "$sysroot/lib/crtn.o" \
+    "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$gcclib/crtbeginT.o" \
+    "$work/runtime.c" -L"$sysroot/usr/lib" -L"$gcclib" -lc -lgcc -lm \
+    "$gcclib/crtend.o" "$sysroot/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$llvm_bin" -o "$work/runtime-aarch64"
 
 "$root/compat/macos/apps/Calculator/build.sh" "$work/Calculator.app" >/dev/null

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-export PATH=/usr/lib/go/bin:/aarch64-linux-musl-native/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export PATH=/usr/lib/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOME=/root
 export GOROOT=/usr/lib/go
 export GOCACHE=/tmp/go-cache

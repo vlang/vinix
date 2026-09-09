@@ -1,0 +1,16 @@
+#!/bin/sh
+
+echo
+echo "VINIX_ALPINE_AARCH64_OK"
+echo "Vinix aarch64 started Alpine Linux userland"
+echo
+
+export HOME=/root
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export TERM=${TERM:-linux}
+export PS1='vinix# '
+export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
+export LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri
+export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+exec /bin/sh -l

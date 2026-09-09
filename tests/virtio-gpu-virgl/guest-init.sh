@@ -2,7 +2,7 @@
 # Test-only PID 1, overlaid by run-aarch64.sh for one VM boot.
 set -u
 
-export PATH=/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOME=/root
 export TERM=linux
 export USER=root

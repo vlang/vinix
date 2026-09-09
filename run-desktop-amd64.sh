@@ -35,12 +35,6 @@ for arg in "$@"; do
 done
 
 if [ "$BUILD" -eq 1 ]; then
-    if [ "$(uname -s)" != Linux ]; then
-        echo "ERROR: building the amd64 distro requires a Linux host." >&2
-        echo "Build it on Linux, then use '$0 --no-build' here." >&2
-        exit 1
-    fi
-    ARCHITECTURE=x86_64 make -C "$SCRIPT_DIR" all
     "$SCRIPT_DIR/build-desktop-amd64.sh"
 fi
 if [ ! -f "$ISO" ]; then
@@ -52,7 +46,30 @@ command -v "$QEMU" >/dev/null 2>&1 || {
     exit 1
 }
 
-QEMU_OPTIONS=(-M q35,smm=off -m "$MEMORY" -smp 4 -vga std -cdrom "$ISO" -serial stdio)
+QEMU_BIN="$(command -v "$QEMU")"
+if [ -n "${VINIX_OVMF_CODE:-}" ]; then
+    OVMF_CODE="$VINIX_OVMF_CODE"
+else
+    QEMU_PREFIX="$(cd "$(dirname "$QEMU_BIN")/.." && pwd)"
+    OVMF_CODE=''
+    for candidate in \
+        "$QEMU_PREFIX/share/qemu/edk2-x86_64-code.fd" \
+        /usr/share/OVMF/OVMF_CODE.fd \
+        /usr/share/edk2/x64/OVMF_CODE.fd; do
+        if [ -f "$candidate" ]; then
+            OVMF_CODE="$candidate"
+            break
+        fi
+    done
+fi
+if [ -z "$OVMF_CODE" ] || [ ! -f "$OVMF_CODE" ]; then
+    echo "ERROR: x86_64 UEFI firmware not found; set VINIX_OVMF_CODE." >&2
+    exit 1
+fi
+
+QEMU_OPTIONS=(-M q35,smm=off -m "$MEMORY" -smp 4 -vga std \
+    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE" \
+    -cdrom "$ISO" -serial stdio)
 if [ -n "${VINIX_QEMU_ACCEL:-}" ]; then
     QEMU_OPTIONS+=(-accel "$VINIX_QEMU_ACCEL")
 elif [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
@@ -71,4 +88,4 @@ if [ "$WITH_MONITOR" -eq 1 ]; then
 fi
 
 echo "==> Starting the amd64 desktop (Ctrl-A X to quit)..."
-exec "$QEMU" "${QEMU_OPTIONS[@]}" "${PASSTHROUGH[@]}"
+exec "$QEMU_BIN" "${QEMU_OPTIONS[@]}" "${PASSTHROUGH[@]}"

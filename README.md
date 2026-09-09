@@ -38,7 +38,7 @@ on real hardware.
 
 ## Roadmap
 
-- [x] mlibc
+- [x] Alpine Linux/musl userland
 - [x] bash
 - [x] gcc/g++
 - [x] V
@@ -60,92 +60,69 @@ The following is a distro-agnostic list of packages needed to build Vinix.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU make`, `findutils`, `curl`, `git`, `xz`, `rsync`, `xorriso`, `qemu`
-to test it, and a working C compiler (`cc`) needs to be present.
+`GNU make`, `findutils`, `curl`, `git`, `file`, `xz`, `rsync`, `xorriso`,
+`qemu` to test it, Python 3, Clang/LLVM/LLD, and a current V compiler need to
+be present.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install -y build-essential make findutils curl git xz-utils rsync xorriso qemu-system-x86
+sudo apt install -y clang llvm lld make findutils curl git file xz-utils rsync xorriso qemu-system-x86 python3
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed gcc make findutils curl git xz rsync xorriso qemu
+sudo pacman -S --needed clang llvm lld make findutils curl git file xz rsync xorriso qemu python
 ```
 
 ### Build prerequisites for Red Hat Linux and derivatives
 ```bash
-sudo yum install -y gcc make findutils curl git xz rsync xorriso qemu
+sudo yum install -y clang llvm lld make findutils curl git file xz rsync xorriso qemu python3
 ```
 ### Build prerequisites for Void Linux and derivatives
 ```bash
-sudo xbps-install -Suv gcc make findutils curl git xz rsync xorriso qemu
+sudo xbps-install -Suv clang llvm lld make findutils curl git file xz rsync xorriso qemu python3
 ```
 ### Building the distro
 
-To build the distro, which includes the cross toolchain necessary
-to build kernel and ports, as well as the kernel itself, run:
+The normal build downloads Alpine's pinned minirootfs, builds the kernel
+directly with the host compiler, and assembles a UEFI ISO:
 
 ```bash
-make all     # Build the base distro and make filesystem and ISO.
+make all
+# Or build the ARM64 image instead of the default AMD64 image:
+make ARCHITECTURE=aarch64 all
 ```
 
-*Note:* on certain distros, like Ubuntu 24.04, one may get an error like:
-```
-.../.jinx-cache/rbrt: failed to open or write to /proc/self/setgroups at line 186: Permission denied
-```
-In that case, it likely means apparmor is preventing the use of user namespaces,
-causing `jinx` to fail to work. One can enable user namespaces by running:
-```sh
-sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
-```
-This is not permanent across reboots. To make it so, one can do:
-```sh
-sudo sh -c 'echo "kernel.apparmor_restrict_unprivileged_userns = 0" >/etc/sysctl.d/99-userns.conf'
-```
-
-This will build the base distro image. Setting the `PKGS_TO_INSTALL` env
-variable will allow one to specify a custom set of packages to build/install.
-For example:
+This path does not bootstrap binutils, GCC, mlibc, or the userland from source.
+Set `VINIX_ALPINE_DEVTOOLS=1` to include Alpine's prebuilt C/C++ toolchain in
+the guest image:
 
 ```bash
-PKGS_TO_INSTALL='*' make all
+VINIX_ALPINE_DEVTOOLS=1 make all
 ```
-This will build all packages (may take some time). Or:
+
+Port maintainers can still build the historical source-based mlibc distro
+explicitly:
 
 ```bash
-PKGS_TO_INSTALL='python sqlite' make all
+PKGS_TO_INSTALL='python sqlite' make legacy-distro
 ```
-This will build the base system (like `make all`) plus the `python` and `sqlite`
-packages.
-
-The amd64 base image includes GCC, V, Xorg, and a framebuffer-backed OpenGL
-demo. Boot the image and run:
-
-```sh
-run-gl-triangle
-```
-
-Use `run-gl-triangle --rebuild` to compile the same demo with GCC inside Vinix
-before launching it. On amd64 this currently uses Mesa softpipe on the Limine
-framebuffer.
 
 ### Native desktop on amd64
 
 The framebuffer-native desktop has an amd64 build and QEMU launcher matching
-the aarch64 workflow. After checking out ui2, run this on a Linux build host:
+the aarch64 workflow. After checking out ui2, run:
 
 ```sh
 git clone https://github.com/vlang/ui2 third_party/ui2
 ./run-desktop-amd64.sh
 ```
 
-This builds the regular mlibc distro, compiles `vinix-desktop` with its amd64
-cross-toolchain, and creates `vinix-desktop-amd64.iso`, whose init starts the
-desktop directly. The runner uses KVM when available and otherwise falls back
-to QEMU TCG; `--no-build`, `--monitor`, and `--mem=MB` are supported. A desktop
-ISO built on Linux can also be booted on an Apple Silicon host with
-`./run-desktop-amd64.sh --no-build`.
+This stages Alpine's prebuilt musl development packages, compiles
+`vinix-desktop` with Clang, and creates `vinix-desktop-amd64.iso`, whose init
+starts the desktop directly. The runner uses KVM when available and otherwise
+falls back to QEMU TCG; `--no-build`, `--monitor`, and `--mem=MB` are supported.
+The same build works on Apple Silicon and cross-compiles the amd64 executable.
 
 ### Python 3 on aarch64
 
@@ -531,12 +508,12 @@ Homebrew LLVM tools (`brew install llvm`):
 make -C kernel ARCH=aarch64 CC=clang
 ```
 
-Alternatively, build the GCC/V userland in the same ARM64 VM without copying
-the Mesa staging directory first:
+The userland builder is host-independent: it extracts Alpine's AArch64
+minirootfs and prebuilt `build-base` packages rather than compiling musl,
+BusyBox, or GCC. The old VM entry point remains as a compatibility wrapper:
 
 ```sh
 VINIX_ASAHI_STAGING="$PWD/build-aarch64-asahi/staging" \
-VINIX_MUSL_SYSROOT="$PWD/build-aarch64-asahi/sysroot" \
     ./build-userland-aarch64-vm.sh
 ```
 

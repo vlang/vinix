@@ -62,7 +62,7 @@ while IFS=$'\t' read -r repository filename; do
     # An apk contains concatenated tar streams (signature, metadata, payload).
     # bsdtar extracts the payload but can return non-zero after it; validate the
     # resulting tools below instead of treating that final warning as failure.
-    tar xzf "$archive" -C "$STAGING" 2>/dev/null || true
+    tar -ixzf "$archive" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* "$STAGING/.trigger"* \
         "$STAGING/.pre-"* "$STAGING/.post-"*
 done < "$BUILD_DIR/packages"

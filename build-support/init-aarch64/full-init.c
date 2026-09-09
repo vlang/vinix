@@ -43,7 +43,7 @@ void _start(void) {
 	};
 #endif
     char *environment[] = {
-        "PATH=/aarch64-linux-musl-native/bin:/bin:/sbin:/usr/bin:/usr/sbin",
+        "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         "HOME=/root",
         "TERM=linux",
         "PS1=vinix# ",

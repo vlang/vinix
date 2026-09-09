@@ -301,10 +301,8 @@ mut:
 	height  u16
 }
 
-// Keep the built-in terminal on the command paths used by both distributions.
-// The ARM64 native GCC driver lives in its toolchain prefix; the amd64 mlibc
-// image installs its compiler in /usr/bin.
-const desktop_command_path = '/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin:/aarch64-linux-musl-native/bin'
+// Both architecture images follow Alpine's standard command layout.
+const desktop_command_path = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 
 enum ExternalProgramResult {
 	success

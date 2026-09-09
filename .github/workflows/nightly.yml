@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
+  V_COMMIT: 9fd548810f09e5b49f0b06e500ef5d6845cc8142
+
 jobs:
   check-build-needed:
     runs-on: ubuntu-latest
@@ -37,21 +41,38 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install make diffutils curl git rsync xorriso -y
+        run: sudo apt-get update && sudo apt-get install -y clang lld llvm make diffutils curl git rsync xorriso xz-utils python3 pkg-config meson ninja-build bison flex
 
-      - name: Enable user namespaces
-        run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Build pinned V compiler and ui2
+        run: |
+          git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
+          git -C "$RUNNER_TEMP/v" checkout "$V_COMMIT"
+          make -C "$RUNNER_TEMP/v"
+          git clone https://github.com/vlang/ui2 third_party/ui2
+          git -C third_party/ui2 checkout "$UI2_COMMIT"
 
-      - name: Build full desktop distro and ISO
-        run: ARCHITECTURE=${{ matrix.architecture }} JINX_CLEAN_WORKDIRS=yes PKGS_TO_INSTALL='*' make all
-
-      - name: Build native amd64 desktop ISO
+      - name: Build amd64 Alpine desktop ISO
         if: matrix.architecture == 'x86_64'
         shell: bash
+        run: V="$RUNNER_TEMP/v/v" ./build-desktop-amd64.sh
+
+      - name: Build aarch64 Alpine desktop ISO
+        if: matrix.architecture == 'aarch64'
+        shell: bash
         run: |
-          git clone https://github.com/vlang/ui2 third_party/ui2
-          git -C third_party/ui2 checkout efaff281161384cb2729e11dceedcf2613237a9c
-          V="$PWD/host-pkgs/v/usr/local/bin/v" ./build-desktop-amd64.sh
+          set -euo pipefail
+          export V="$RUNNER_TEMP/v/v"
+          export LLVM_BIN=/usr/bin
+          ./build-aarch64.sh --no-iso
+          ./build-x11-aarch64.sh
+          ./build-network-tools-aarch64.sh
+          ./build-python-aarch64.sh
+          ./build-firefox-aarch64.sh
+          ./build-desktop-aarch64.sh --compact-initramfs
+          VINIX_AARCH64_KERNEL="$PWD/build-aarch64-kernel/bin/vinix" \
+          VINIX_AARCH64_INITRAMFS="$PWD/build-support/init-aarch64/initramfs-desktop.tar" \
+          VINIX_AARCH64_ISO="$PWD/vinix-aarch64.iso" \
+            ./build-support/build-aarch64-iso.sh
 
       - name: Rename ISO
         shell: bash
@@ -59,6 +80,8 @@ jobs:
           image=vinix.iso
           if [ "${{ matrix.architecture }}" = x86_64 ]; then
             image=vinix-desktop-amd64.iso
+          else
+            image=vinix-aarch64.iso
           fi
           mv "$image" "vinix-nightly-${{ matrix.release_arch }}-desktop-$(date +'%Y%m%d').iso"
 

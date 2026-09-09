@@ -150,9 +150,9 @@ fn test_platform_clocks_and_sleep() {
 
 fn test_terminal_command_path_contains_installed_userland_tools() {
 	parts := desktop_command_path.split(':')
-	assert '/aarch64-linux-musl-native/bin' in parts
 	assert '/usr/local/bin' in parts
 	assert '/usr/bin' in parts
+	assert '/bin' in parts
 }
 
 fn test_external_program_runner_reports_success_and_missing_commands() {

@@ -433,16 +433,17 @@ sysroot taken from the userland image, and stages
 starts the desktop directly. `run-aarch64.sh` boots any image named by
 `VINIX_INITRAMFS`, and with none boots the ordinary shell.
 
-On a Linux host, the equivalent amd64 workflow is:
+The equivalent amd64 workflow is:
 
     ./run-desktop-amd64.sh
 
-It first builds the normal mlibc distro and its cross-toolchain, then creates a
-dedicated `vinix-desktop-amd64.iso`. The PS/2 mouse driver publishes the same
+It extracts Alpine's prebuilt x86_64 userland and toolchain packages, then
+creates a dedicated `vinix-desktop-amd64.iso`; no mlibc or custom GCC bootstrap
+is involved. The PS/2 mouse driver publishes the same
 absolute `/dev/pointer` ABI as the aarch64 input drivers, so the compositor and
 its applications use the same input path on both architectures. Pass
-`--no-build` to boot an existing image; this also allows an image built on
-Linux to run under QEMU TCG on an Apple Silicon host.
+`--no-build` to boot an existing image. Clang cross-compiles the same image on
+Apple Silicon, where QEMU runs it with TCG.
 
 An existing `build-aarch64-hyprland/staging` layer remains available without
 changing the ordinary desktop session. Produce that layer with

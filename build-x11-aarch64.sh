@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+NPROC="${NPROC:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)}"
+
 # Build X11 stack for aarch64 Vinix
 # Downloads Alpine aarch64 packages for libraries/tools,
 # cross-compiles xorg-server + fbdev driver with Vinix patches using clang.
@@ -33,26 +35,25 @@ fi
 if [ ! -x "$LLVM_CLANGXX" ]; then
     LLVM_CLANGXX="clang++"
 fi
-GCC_TC=""
-for candidate in \
-    "$SCRIPT_DIR/build-aarch64-userland/staging/aarch64-linux-musl-native" \
-    "$SCRIPT_DIR/build-aarch64-userland/aarch64-linux-musl-native" \
-    "$SCRIPT_DIR/build-aarch64-musl/aarch64-linux-musl-native"; do
-    if [ -d "$candidate/lib/gcc/aarch64-linux-musl" ]; then
-        GCC_TC="$candidate"
-        break
-    fi
-done
+GCCLIB="$(find "$SCRIPT_DIR/build-aarch64-userland/staging/usr/lib/gcc/aarch64-alpine-linux-musl" \
+    -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort | tail -n1)"
 GCC_TC_FLAG=""
-if [ -n "$GCC_TC" ]; then
-    GCC_TC_FLAG="--gcc-toolchain=${GCC_TC}"
+if [ -n "$GCCLIB" ]; then
+    GCC_TC_FLAG="--gcc-install-dir=${GCCLIB}"
 fi
 CC="$LLVM_CLANG --target=aarch64-linux-musl --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
 LD="ld.lld"
-AR="/opt/homebrew/opt/llvm/bin/llvm-ar"
-RANLIB="/opt/homebrew/opt/llvm/bin/llvm-ranlib"
-STRIP="/opt/homebrew/opt/llvm/bin/llvm-strip"
-NM="/opt/homebrew/opt/llvm/bin/llvm-nm"
+LLVM_TOOL_DIR="$(dirname "$LLVM_CLANG")"
+AR="$LLVM_TOOL_DIR/llvm-ar"
+RANLIB="$LLVM_TOOL_DIR/llvm-ranlib"
+STRIP="$LLVM_TOOL_DIR/llvm-strip"
+NM="$LLVM_TOOL_DIR/llvm-nm"
+for llvm_tool in "$AR" "$RANLIB" "$STRIP" "$NM"; do
+    if [ ! -x "$llvm_tool" ]; then
+        echo "ERROR: missing LLVM tool: $llvm_tool" >&2
+        exit 1
+    fi
+done
 PKG_CONFIG="pkg-config"
 
 mkdir -p "$BUILD_DIR" "$SYSROOT" "$STAGING" "$DOWNLOADS" "$SOURCES"
@@ -97,7 +98,7 @@ download_apk() {
 
     # Extract to sysroot (APK files are just gzipped tars)
     echo "  Extracting ${filename} -> sysroot/"
-    tar xzf "$local_file" -C "$SYSROOT" 2>/dev/null || true
+    tar -ixzf "$local_file" -C "$SYSROOT" 2>/dev/null || true
     # Clean up APK metadata
     rm -f "$SYSROOT/.PKGINFO" "$SYSROOT/.SIGN"*
 }
@@ -300,7 +301,7 @@ export LD="ld.lld"
 sed -i.bak 's/^export_dynamic_flag_spec=""$/export_dynamic_flag_spec="\${wl}--export-dynamic"/' libtool
 
 echo "  Building xorg-server..."
-make -j$(sysctl -n hw.ncpu) 2>&1 | tail -5
+make -j"$NPROC" 2>&1 | tail -5
 make install DESTDIR="$STAGING" 2>&1 | tail -5
 
 # Xorg keeps GLX for Firefox, but an off-screen Wine surface only needs the
@@ -357,7 +358,7 @@ make distclean >/dev/null 2>&1 || true
     --disable-xinerama \
     --enable-screensaver \
     2>&1 | tail -20
-make -j$(sysctl -n hw.ncpu) 2>&1 | tail -5
+make -j"$NPROC" 2>&1 | tail -5
 install -m755 "$XORG_XVFB_SRC/hw/vfb/Xvfb" "$STAGING/usr/bin/Xvfb"
 
 # ── Step 4: Build xf86-video-fbdev ──
@@ -394,7 +395,7 @@ export LDFLAGS="-fuse-ld=lld -L${STAGING}/usr/lib/xorg/modules -Wl,-rpath-link,$
     2>&1 | tail -10
 
 echo "  Building fbdev driver..."
-make -j$(sysctl -n hw.ncpu) 2>&1 | tail -5
+make -j"$NPROC" 2>&1 | tail -5
 make install DESTDIR="$STAGING" 2>&1 | tail -5
 
 # ── Step 5: Collect runtime files ──

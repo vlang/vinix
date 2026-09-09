@@ -17,9 +17,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
 BUILD_DIR="$SCRIPT_DIR/build"
-SYSROOT="$SCRIPT_DIR/build-aarch64-musl/aarch64-linux-musl-native"
-GCCLIB="$SYSROOT/lib/gcc/aarch64-linux-musl/11.2.1"
-LLVM_BIN="/opt/homebrew/opt/llvm/bin"
+USERLAND_BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
+SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_BUILD_DIR/staging}"
+DEVTOOLS_ARCHIVE="${VINIX_AARCH64_DEVTOOLS_ARCHIVE:-$USERLAND_BUILD_DIR/alpine-devtools.tar}"
+LLVM_BIN="${LLVM_BIN:-/opt/homebrew/opt/llvm/bin}"
+if [ ! -x "$LLVM_BIN/clang" ]; then
+    LLVM_CLANG="$(command -v clang || true)"
+    if [ -n "$LLVM_CLANG" ]; then
+        LLVM_BIN="$(dirname "$LLVM_CLANG")"
+    fi
+fi
 # <stdatomic.h> has to be ours. See build-support/aarch64-cc-shim/stdatomic.h:
 # -nostdinc leaves GCC 11's on the path, whose atomics clang rejects on the
 # _Atomic pointers V generates, and clang's own header forwards straight back
@@ -37,6 +44,14 @@ ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
+
+file_size() {
+    if stat -f%z "$1" >/dev/null 2>&1; then
+        stat -f%z "$1"
+    else
+        stat -c%s "$1"
+    fi
+}
 
 merge_staging_tree() {
     local overlay="$1"
@@ -91,20 +106,17 @@ if [ -n "$WIFI_BUNDLE" ]; then
     done
 fi
 
-# ── The musl sysroot ──
-# The aarch64 userland image carries a complete native musl toolchain; its
-# headers and libraries are all a cross build needs, so they are unpacked here
-# instead of rebuilding musl from source.
-if [ ! -f "$SYSROOT/lib/libc.a" ]; then
-    if [ ! -f "$BASE_INITRAMFS" ]; then
-        echo "ERROR: $BASE_INITRAMFS not found."
-        echo "Run ./build-userland-aarch64.sh first, or link the one from the main checkout."
-        exit 1
-    fi
-    echo "==> Extracting the musl sysroot from the userland image..."
-    mkdir -p "$SCRIPT_DIR/build-aarch64-musl"
-    tar xf "$BASE_INITRAMFS" -C "$SCRIPT_DIR/build-aarch64-musl" \
-        ./aarch64-linux-musl-native/include ./aarch64-linux-musl-native/lib
+# ── The Alpine musl sysroot ──
+if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
+    echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT"
+    echo "Run ./build-userland-aarch64.sh first."
+    exit 1
+fi
+GCCLIB="$(find "$SYSROOT/usr/lib/gcc/aarch64-alpine-linux-musl" \
+    -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort | tail -n1)"
+if [ -z "$GCCLIB" ] || [ ! -f "$GCCLIB/libgcc.a" ]; then
+    echo "ERROR: Alpine GCC runtime not found below $SYSROOT/usr/lib/gcc"
+    exit 1
 fi
 
 # ── ui2 ──
@@ -126,8 +138,8 @@ if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/vml_compiled.v" ] || \
     exit 1
 fi
 
-if [ ! -x "$LLVM_BIN/clang" ]; then
-    echo "ERROR: Homebrew LLVM not found at $LLVM_BIN (brew install llvm)"
+if [ ! -x "$LLVM_BIN/clang" ] || [ ! -x "$LLVM_BIN/llvm-strip" ]; then
+    echo "ERROR: LLVM clang and llvm-strip not found in $LLVM_BIN"
     exit 1
 fi
 
@@ -163,27 +175,27 @@ echo "==> Building Cocoa compatibility fixture..."
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
 echo "==> Translating V to C..."
-"$V" -new-compiler -os linux -gc none -manualfree -enable-globals -prod \
+"$V" -new-compiler -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
-    -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+    -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
 # ── C -> aarch64 static binary ──
 echo "==> Compiling for aarch64-linux-musl..."
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$CC_SHIM" \
-    -isystem "$GCCLIB/include" -isystem "$SYSROOT/include" \
+    -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
     -I "$APP_SRC" \
     -O2 -fno-stack-protector -w \
-    "$SYSROOT/lib/crt1.o" "$SYSROOT/lib/crti.o" "$GCCLIB/crtbegin.o" \
+    "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
     "$BUILD_DIR/desktop.c" \
-    -L"$SYSROOT/lib" -L"$GCCLIB" -lc -lgcc -lm \
-    "$GCCLIB/crtend.o" "$SYSROOT/lib/crtn.o" \
+    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc -lm \
+    "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" \
     -o "$BUILD_DIR/vinix-desktop"
 
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
-echo "    $BUILD_DIR/vinix-desktop ($(stat -f%z "$BUILD_DIR/vinix-desktop") bytes)"
+echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") bytes)"
 
 # Mesa is a dynamic runtime, so keep the always-bootable static desktop and
 # build a second executable only when the exact Asahi userspace is available.
@@ -196,14 +208,14 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
    [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
    [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
     echo "==> Translating the GPU-enabled desktop to C..."
-    "$V" -new-compiler -os linux -gc none -manualfree -enable-globals -prod \
+    "$V" -new-compiler -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
         -d ui2_headless -d vinix_gpu_present \
-        -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+        -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
         -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
 
     echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
     "$LLVM_BIN/clang" --target=aarch64-linux-musl \
-        --sysroot="$GPU_SYSROOT" --gcc-toolchain="$SYSROOT" -static-libgcc \
+        --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
         -isystem "$CC_SHIM" \
         -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
         -O2 -fPIE -pie -fno-stack-protector -w \
@@ -215,7 +227,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
         -fuse-ld=lld -B"$LLVM_BIN" \
         -o "$BUILD_DIR/vinix-desktop-gpu"
     "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
-    echo "    $BUILD_DIR/vinix-desktop-gpu ($(stat -f%z "$BUILD_DIR/vinix-desktop-gpu") bytes)"
+    echo "    $BUILD_DIR/vinix-desktop-gpu ($(file_size "$BUILD_DIR/vinix-desktop-gpu") bytes)"
     GPU_DESKTOP_BUILT=1
     if [ ! -f "$ASAHI_STAGING/usr/share/vinix/mesa-x11-egl" ] &&
        [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
@@ -286,17 +298,17 @@ fi
 echo "==> Building wifi-ctl for aarch64-linux-musl..."
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$CC_SHIM" \
-    -isystem "$GCCLIB/include" -isystem "$SYSROOT/include" \
+    -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
     -iquote "$SCRIPT_DIR/kernel/c" \
     -std=c11 -O2 -fno-stack-protector -Wall -Wextra -Werror \
-    "$SYSROOT/lib/crt1.o" "$SYSROOT/lib/crti.o" "$GCCLIB/crtbegin.o" \
+    "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
     "$SCRIPT_DIR/tools/m1-wifi/wifi-ctl.c" \
-    -L"$SYSROOT/lib" -L"$GCCLIB" -lc -lgcc \
-    "$GCCLIB/crtend.o" "$SYSROOT/lib/crtn.o" \
+    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc \
+    "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" \
     -o "$BUILD_DIR/wifi-ctl"
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/wifi-ctl"
-echo "    $BUILD_DIR/wifi-ctl ($(stat -f%z "$BUILD_DIR/wifi-ctl") bytes)"
+echo "    $BUILD_DIR/wifi-ctl ($(file_size "$BUILD_DIR/wifi-ctl") bytes)"
 
 echo "==> Building the desktop init..."
 INIT_DEFINES=()
@@ -318,8 +330,13 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING"
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
-    tar xf "$BASE_INITRAMFS" -C "$STAGING" \
-        ./bin/busybox ./aarch64-linux-musl-native
+    if [ ! -f "$DEVTOOLS_ARCHIVE" ]; then
+        echo "ERROR: compact desktop needs $DEVTOOLS_ARCHIVE" >&2
+        echo "Run ./build-userland-aarch64.sh first." >&2
+        exit 1
+    fi
+    tar xf "$BASE_INITRAMFS" -C "$STAGING" ./bin/busybox
+    tar xf "$DEVTOOLS_ARCHIVE" -C "$STAGING"
     merge_staging_tree "$X11_STAGING"
     merge_staging_tree "$FIREFOX_STAGING"
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
@@ -331,16 +348,6 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     for applet in sh cat chmod dirname id ln mkdir rm sed sleep; do
         ln -sf busybox "$STAGING/bin/$applet"
     done
-    # This stripped toolchain intentionally carries static libc and libgcc.
-    # Its stock driver still prefers libgcc_s for an ordinary link, so wrap it
-    # with the matching static-libgcc default. Callers can otherwise use GCC as
-    # normal, and `cc` already resolves through the gcc symlink.
-    mv "$STAGING/aarch64-linux-musl-native/bin/gcc" \
-        "$STAGING/aarch64-linux-musl-native/bin/gcc.bin"
-    printf '%s\n' '#!/bin/busybox sh' \
-        'exec /aarch64-linux-musl-native/bin/gcc.bin -static-libgcc "$@"' \
-        > "$STAGING/aarch64-linux-musl-native/bin/gcc"
-    chmod +x "$STAGING/aarch64-linux-musl-native/bin/gcc"
 else
     tar xf "$BASE_INITRAMFS" -C "$STAGING"
     # The base archive may predate package support. Always refresh this small
@@ -448,7 +455,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox aarch64-linux-musl-native/bin/gcc; do
+    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -535,4 +542,4 @@ if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$DESKTOP_INITRAMFS_TMP" -C "$STA
     exit 1
 fi
 mv -f "$DESKTOP_INITRAMFS_TMP" "$DESKTOP_INITRAMFS"
-echo "    $DESKTOP_INITRAMFS ($(stat -f%z "$DESKTOP_INITRAMFS") bytes)"
+echo "    $DESKTOP_INITRAMFS ($(file_size "$DESKTOP_INITRAMFS") bytes)"

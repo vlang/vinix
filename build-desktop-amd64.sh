@@ -1,19 +1,17 @@
 #!/bin/bash
 # Build the native Vinix desktop for amd64 and assemble a dedicated boot ISO.
 #
-# The amd64 distribution uses its mlibc cross-toolchain, unlike the Linux/musl
-# ABI used by the aarch64 image. Run `make all` first so sysroot, the host cross
-# compiler, Limine and the base ISO tree are available.
+# The desktop is linked against the same official Alpine/musl packages as the
+# base image. No Vinix-specific GCC, libc, or userspace build is required.
 #
 # Usage: ./build-desktop-amd64.sh [--no-iso]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${VINIX_AMD64_DESKTOP_BUILD_DIR:-$SCRIPT_DIR/build-amd64-desktop}"
-SYSROOT="${VINIX_AMD64_SYSROOT:-$SCRIPT_DIR/sysroot}"
-CROSS_CC="${VINIX_AMD64_CC:-$SCRIPT_DIR/host-pkgs/gcc/usr/local/bin/x86_64-vinix-mlibc-gcc}"
-BASE_ISO_ROOT="${VINIX_AMD64_BASE_ISO_ROOT:-$SCRIPT_DIR/iso_root}"
-LIMINE="${VINIX_AMD64_LIMINE:-$SCRIPT_DIR/host-pkgs/limine/usr/local/bin/limine}"
+USERLAND_DIR="${VINIX_AMD64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-amd64-userland}"
+SYSROOT="${VINIX_AMD64_SYSROOT:-$USERLAND_DIR/staging}"
+KERNEL_BUILD_DIR="${VINIX_AMD64_BUILD_DIR:-$SCRIPT_DIR/build-amd64-kernel}"
 OUTPUT_ISO="${VINIX_AMD64_DESKTOP_ISO:-$SCRIPT_DIR/vinix-desktop-amd64.iso}"
 MAKE_ISO=1
 
@@ -32,25 +30,29 @@ for arg in "$@"; do
 done
 
 V="${V:-}"
-if [ -z "$V" ] && [ -x "$SCRIPT_DIR/host-pkgs/v/usr/local/bin/v" ]; then
-    V="$SCRIPT_DIR/host-pkgs/v/usr/local/bin/v"
-fi
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
-if [ "$(uname -s)" != Linux ]; then
-    echo "ERROR: the amd64 distro toolchain is built by Jinx on a Linux host." >&2
-    echo "Run this script on Linux after 'make all'." >&2
-    exit 1
-fi
 case "$BUILD_DIR" in
     ''|/|"$SCRIPT_DIR")
         echo "ERROR: refusing unsafe desktop build directory: $BUILD_DIR" >&2
         exit 1
         ;;
 esac
-if [ ! -x "$CROSS_CC" ] || [ ! -d "$SYSROOT/usr/include" ]; then
-    echo "ERROR: the amd64 cross-toolchain and sysroot are not built." >&2
-    echo "Run 'make all' first, or set VINIX_AMD64_CC and VINIX_AMD64_SYSROOT." >&2
+
+CLANG="${VINIX_AMD64_CLANG:-}"
+LLVM_STRIP="${VINIX_AMD64_STRIP:-}"
+for llvm_prefix in /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin; do
+    if [ -z "$CLANG" ] && [ -x "$llvm_prefix/clang" ]; then
+        CLANG="$llvm_prefix/clang"
+    fi
+    if [ -z "$LLVM_STRIP" ] && [ -x "$llvm_prefix/llvm-strip" ]; then
+        LLVM_STRIP="$llvm_prefix/llvm-strip"
+    fi
+done
+CLANG="${CLANG:-$(command -v clang || true)}"
+LLVM_STRIP="${LLVM_STRIP:-$(command -v llvm-strip || command -v strip || true)}"
+if [ -z "$CLANG" ] || [ -z "$LLVM_STRIP" ] || ! command -v ld.lld >/dev/null 2>&1; then
+    echo "ERROR: clang, ld.lld, and llvm-strip (or strip) are required." >&2
     exit 1
 fi
 if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
@@ -61,6 +63,20 @@ fi
 if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/vml_compiled.v" ] || \
    [ ! -f "$SCRIPT_DIR/third_party/ui2/examples/calculator/calculator.vml" ]; then
     echo "ERROR: this ui2 checkout has no compile-time VML support; update it." >&2
+    exit 1
+fi
+
+echo "==> Staging Alpine's prebuilt amd64 userland and toolchain..."
+VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" VINIX_ALPINE_DEVTOOLS=1 \
+    "$SCRIPT_DIR/build-userland-amd64.sh"
+if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
+    echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT" >&2
+    exit 1
+fi
+GCCLIB="$(find "$SYSROOT/usr/lib/gcc/x86_64-alpine-linux-musl" \
+    -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort | tail -n1)"
+if [ -z "$GCCLIB" ] || [ ! -f "$GCCLIB/libgcc.a" ]; then
+    echo "ERROR: Alpine GCC runtime not found below $SYSROOT/usr/lib/gcc" >&2
     exit 1
 fi
 
@@ -75,22 +91,26 @@ APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$SCRIPT_DIR/third_party/ui2/examples/calculator"
 
-echo "==> Building vinix-desktop for x86_64-vinix-mlibc..."
+echo "==> Translating the amd64 desktop to C..."
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
-VCROSS_COMPILER_NAME="$CROSS_CC" "$V" -new-compiler \
-    -os vinix -arch x64 -cc "$CROSS_CC" \
+"$V" -new-compiler -os linux -arch x64 \
     -gc none -manualfree -enable-globals -prod \
-    -cflags "--sysroot=$SYSROOT" -ldflags "--sysroot=$SYSROOT" \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
-    -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
-    -o "$BUILD_DIR/vinix-desktop" "$APP_SRC"
-STRIP="${VINIX_AMD64_STRIP:-$SCRIPT_DIR/host-pkgs/binutils/usr/local/bin/x86_64-vinix-mlibc-strip}"
-if [ ! -x "$STRIP" ]; then
-    echo "ERROR: amd64 cross-strip tool not found at $STRIP" >&2
-    exit 1
-fi
-"$STRIP" "$BUILD_DIR/vinix-desktop"
+    -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+    -o "$BUILD_DIR/desktop.c" "$APP_SRC"
+
+echo "==> Compiling for x86_64-linux-musl..."
+"$CLANG" --target=x86_64-linux-musl -static -nostdinc -nostdlib \
+    -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
+    -I "$APP_SRC" \
+    -O2 -fno-stack-protector -w \
+    "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
+    "$BUILD_DIR/desktop.c" \
+    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc -lm \
+    "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
+    -fuse-ld=lld -o "$BUILD_DIR/vinix-desktop"
+"$LLVM_STRIP" "$BUILD_DIR/vinix-desktop"
 
 echo "==> Staging the amd64 desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
@@ -100,7 +120,8 @@ cp -a "$SYSROOT/." "$STAGING/"
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
-install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/usr/bin/init"
+rm -f "$STAGING/sbin/init"
+install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
 
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.
@@ -132,31 +153,10 @@ echo "    $INITRAMFS ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
 if [ "$MAKE_ISO" -eq 0 ]; then
     exit 0
 fi
-if [ ! -f "$BASE_ISO_ROOT/boot/limine-bios-cd.bin" ] || [ ! -x "$LIMINE" ]; then
-    echo "ERROR: the base ISO tree or Limine host tool is missing." >&2
-    echo "Run 'make all' first, or use --no-iso." >&2
-    exit 1
-fi
-command -v xorriso >/dev/null 2>&1 || {
-    echo "ERROR: xorriso is required to assemble $OUTPUT_ISO" >&2
-    exit 1
-}
-
-echo "==> Assembling $OUTPUT_ISO..."
-DESKTOP_ISO_ROOT="$BUILD_DIR/iso-root"
-rm -rf "$DESKTOP_ISO_ROOT"
-mkdir -p "$DESKTOP_ISO_ROOT"
-cp -a "$BASE_ISO_ROOT/." "$DESKTOP_ISO_ROOT/"
-install -m644 "$INITRAMFS" "$DESKTOP_ISO_ROOT/boot/initramfs.tar"
-
-OUTPUT_ISO_TMP="$(mktemp "$(dirname "$OUTPUT_ISO")/.vinix-desktop-amd64.iso.XXXXXX")"
-trap 'rm -f "$OUTPUT_ISO_TMP"' EXIT
-xorriso -as mkisofs -R -r -J -b boot/limine-bios-cd.bin \
-    -no-emul-boot -boot-load-size 4 -boot-info-table -hfsplus \
-    -apm-block-size 2048 --efi-boot boot/limine-uefi-cd.bin \
-    -efi-boot-part --efi-boot-image --protective-msdos-label \
-    "$DESKTOP_ISO_ROOT" -o "$OUTPUT_ISO_TMP"
-"$LIMINE" bios-install "$OUTPUT_ISO_TMP"
-mv -f "$OUTPUT_ISO_TMP" "$OUTPUT_ISO"
-trap - EXIT
-echo "    $OUTPUT_ISO ($(wc -c < "$OUTPUT_ISO" | tr -d ' ') bytes)"
+VINIX_AMD64_BUILD_DIR="$KERNEL_BUILD_DIR" \
+    "$SCRIPT_DIR/build-amd64.sh" --no-userland --no-iso
+VINIX_AMD64_KERNEL="$KERNEL_BUILD_DIR/bin/vinix" \
+VINIX_AMD64_INITRAMFS="$INITRAMFS" \
+VINIX_AMD64_ISO="$OUTPUT_ISO" \
+VINIX_AMD64_ISO_BUILD_DIR="$BUILD_DIR/iso" \
+    "$SCRIPT_DIR/build-support/build-amd64-iso.sh"

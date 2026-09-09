@@ -122,7 +122,7 @@ extract_package() {
         echo "  using cached $filename"
     fi
 
-    tar xzf "$local_file" -C "$STAGING" 2>/dev/null || true
+    tar -ixzf "$local_file" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.INSTALL" "$STAGING/.trigger"* \
         "$STAGING/.SIGN"*
 }

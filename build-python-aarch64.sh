@@ -47,7 +47,7 @@ download_apk() {
     fi
 
     echo "  extracting ${filename}"
-    tar xzf "$local_file" -C "$STAGING" 2>/dev/null || true
+    tar -ixzf "$local_file" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* "$STAGING/.trigger"*
 }
 

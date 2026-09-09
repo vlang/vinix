@@ -1,16 +1,35 @@
 #!/bin/bash
-# Cross-compile musl + busybox + GCC toolchain for aarch64 Vinix on macOS
-# Produces: build-support/init-aarch64/initramfs.tar
-set -e
+# Assemble the aarch64 Vinix userland from official Alpine binaries.
+#
+# The base filesystem, BusyBox, musl, Linux headers, and optional guest GCC
+# come from Alpine packages. Nothing in this script builds a libc, compiler,
+# or base command suite from source.
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -x "$SCRIPT_DIR/link-worktree-build-dirs.sh" ]; then
     "$SCRIPT_DIR/link-worktree-build-dirs.sh"
 fi
-BUILD_DIR="$SCRIPT_DIR/build-aarch64-userland"
-SYSROOT="$BUILD_DIR/sysroot"
+
+BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
+DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
+DEVTOOLS_STAGING="$BUILD_DIR/alpine-devtools"
+DEVTOOLS_ARCHIVE="$BUILD_DIR/alpine-devtools.tar"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
+INITRAMFS="${VINIX_AARCH64_INITRAMFS:-$INIT_DIR/initramfs.tar}"
+
+ALPINE_VERSION="${ALPINE_VERSION:-3.21.7}"
+ALPINE_BRANCH="${ALPINE_BRANCH:-v3.21}"
+ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
+ALPINE_ARCH=aarch64
+ALPINE_SHA256="${ALPINE_SHA256:-d1d1a3fae5f4d6146e9742790a47fcb116199622cfb8439f218a4d5fbe5000da}"
+ALPINE_DEVTOOLS="${VINIX_ALPINE_DEVTOOLS:-1}"
+ALPINE_BASE_ONLY="${VINIX_ALPINE_BASE_ONLY:-0}"
+ARCHIVE="alpine-minirootfs-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz"
+ARCHIVE_PATH="$DOWNLOADS/$ARCHIVE"
+REPOSITORY_ROOT="$ALPINE_MIRROR/$ALPINE_BRANCH"
+
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 RUBY_STAGING="${VINIX_RUBY_STAGING:-$SCRIPT_DIR/build-aarch64-ruby/staging}"
 GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
@@ -22,6 +41,20 @@ MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraf
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
 CLAUDE_STAGING="${VINIX_CLAUDE_STAGING:-$SCRIPT_DIR/build-aarch64-claude/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
+
+case "$BUILD_DIR" in
+    ''|/|"$SCRIPT_DIR")
+        echo "ERROR: refusing unsafe aarch64 userland build directory: $BUILD_DIR" >&2
+        exit 1
+        ;;
+esac
+
+for tool in curl file python3 tar; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "missing build tool: $tool" >&2
+        exit 1
+    fi
+done
 
 merge_staging_tree() {
     local overlay="$1"
@@ -41,425 +74,108 @@ merge_staging_tree() {
     cp -a "$overlay/." "$STAGING/"
 }
 
-MUSL_VERSION="1.2.5"
-BUSYBOX_VERSION="1.36.1"
-LINUX_VERSION="6.6.72"
-COMPILER_RT_VERSION="21.1.5"
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
 
-NPROC=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
+fetch_alpine_indexes() {
+    local repository archive index
+    for repository in main community; do
+        archive="$DOWNLOADS/${repository}_APKINDEX.tar.gz"
+        index="$DOWNLOADS/${repository}_APKINDEX"
+        if [ ! -f "$index" ]; then
+            echo "    fetching Alpine ${repository} index"
+            curl -fL --retry 3 \
+                "$REPOSITORY_ROOT/$repository/$ALPINE_ARCH/APKINDEX.tar.gz" \
+                -o "$archive"
+            tar xOf "$archive" APKINDEX > "$index"
+        fi
+    done
+}
 
-# LLVM tools (from Homebrew)
-LLVM_BIN="/opt/homebrew/opt/llvm/bin"
-if [ ! -x "$LLVM_BIN/llvm-ar" ]; then
-    echo "ERROR: LLVM tools not found at $LLVM_BIN"
-    echo "Install: brew install llvm"
+stage_alpine_packages() {
+    local destination="$1" repository filename package_archive
+    shift
+
+    fetch_alpine_indexes
+    python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+        --index main "$DOWNLOADS/main_APKINDEX" \
+        --index community "$DOWNLOADS/community_APKINDEX" \
+        "$@" > "$BUILD_DIR/packages"
+
+    while IFS=$'\t' read -r repository filename; do
+        [ -n "$filename" ] || continue
+        package_archive="$DOWNLOADS/$filename"
+        if [ ! -f "$package_archive" ]; then
+            echo "    downloading $filename"
+            curl -fL --retry 3 \
+                "$REPOSITORY_ROOT/$repository/$ALPINE_ARCH/$filename" \
+                -o "$package_archive"
+        fi
+        echo "    extracting $filename"
+        # APK signatures, metadata, and payload are concatenated tar streams.
+        # bsdtar can report the trailing stream after extracting the payload.
+        tar -ixzf "$package_archive" -C "$destination" 2>/dev/null || true
+        rm -f "$destination/.PKGINFO" "$destination/.SIGN"* \
+            "$destination/.trigger"* "$destination/.pre-"* "$destination/.post-"*
+    done < "$BUILD_DIR/packages"
+}
+
+mkdir -p "$DOWNLOADS"
+if [ ! -f "$ARCHIVE_PATH" ]; then
+    echo "==> Fetching Alpine ${ALPINE_VERSION} aarch64 minirootfs..."
+    curl -fL --retry 3 \
+        "$REPOSITORY_ROOT/releases/$ALPINE_ARCH/$ARCHIVE" \
+        -o "$ARCHIVE_PATH"
+fi
+
+ARCHIVE_ACTUAL_SHA256="$(sha256_file "$ARCHIVE_PATH")"
+if [ "$ARCHIVE_ACTUAL_SHA256" != "$ALPINE_SHA256" ]; then
+    echo "ERROR: Alpine minirootfs checksum mismatch." >&2
+    echo "Expected: $ALPINE_SHA256" >&2
+    echo "Actual:   $ARCHIVE_ACTUAL_SHA256" >&2
     exit 1
 fi
 
-TARGET=aarch64-linux-gnu
-CC="clang --target=$TARGET"
-AR="$LLVM_BIN/llvm-ar"
-RANLIB="$LLVM_BIN/llvm-ranlib"
-NM="$LLVM_BIN/llvm-nm"
-STRIP="$LLVM_BIN/llvm-strip"
-OBJCOPY="$LLVM_BIN/llvm-objcopy"
+echo "==> Staging the Alpine aarch64 userland..."
+rm -rf "$STAGING"
+mkdir -p "$STAGING"
+tar -xzf "$ARCHIVE_PATH" -C "$STAGING"
 
-mkdir -p "$BUILD_DIR" "$SYSROOT"
-
-# ── Step 1: Build musl ──
-if [ ! -f "$SYSROOT/lib/libc.a" ]; then
-    echo "==> Building musl $MUSL_VERSION..."
-
-    cd "$BUILD_DIR"
-    if [ ! -d "musl-$MUSL_VERSION" ]; then
-        if [ ! -f "musl-$MUSL_VERSION.tar.gz" ]; then
-            echo "    Downloading musl..."
-            curl -LO "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz"
-        fi
-        tar xf "musl-$MUSL_VERSION.tar.gz"
+if [ "$ALPINE_DEVTOOLS" = 1 ]; then
+    echo "==> Staging Alpine's prebuilt C/C++ toolchain..."
+    rm -rf "$DEVTOOLS_STAGING"
+    mkdir -p "$DEVTOOLS_STAGING"
+    stage_alpine_packages "$DEVTOOLS_STAGING" build-base
+    merge_staging_tree "$DEVTOOLS_STAGING"
+    DEVTOOLS_ARCHIVE_TMP="$(mktemp "$BUILD_DIR/.alpine-devtools.tar.XXXXXX")"
+    if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$DEVTOOLS_ARCHIVE_TMP" \
+        -C "$DEVTOOLS_STAGING" .; then
+        rm -f "$DEVTOOLS_ARCHIVE_TMP"
+        exit 1
     fi
-
-    cd "musl-$MUSL_VERSION"
-    [ -f config.mak ] && make clean 2>/dev/null || true
-
-    CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-        ./configure \
-        --prefix="$SYSROOT" \
-        --target=aarch64 \
-        --disable-shared \
-        CFLAGS="-O2 -fPIC"
-
-    make -j"$NPROC" AR="$AR" RANLIB="$RANLIB"
-    make install
-
-    echo "    musl installed to $SYSROOT"
+    mv -f "$DEVTOOLS_ARCHIVE_TMP" "$DEVTOOLS_ARCHIVE"
 else
-    echo "==> musl already built, skipping"
+    echo "==> Skipping guest development tools (VINIX_ALPINE_DEVTOOLS=0)"
+    : > "$BUILD_DIR/packages"
+    rm -f "$DEVTOOLS_ARCHIVE"
 fi
 
-if [ ! -f "$SYSROOT/lib/libc.a" ]; then
-    echo "ERROR: musl build failed"
-    exit 1
-fi
-
-# ── Step 2: Install Linux kernel headers ──
-if [ ! -f "$SYSROOT/include/linux/types.h" ]; then
-    echo "==> Installing Linux kernel headers..."
-
-    cd "$BUILD_DIR"
-    if [ ! -d "linux-$LINUX_VERSION" ]; then
-        if [ ! -f "linux-$LINUX_VERSION.tar.xz" ]; then
-            echo "    Downloading Linux kernel..."
-            curl -LO "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$LINUX_VERSION.tar.xz"
-        fi
-        tar xf "linux-$LINUX_VERSION.tar.xz"
-    fi
-
-    LINUX_SRC="$BUILD_DIR/linux-$LINUX_VERSION"
-
-    # Copy UAPI headers (musl doesn't provide linux/ headers)
-    mkdir -p "$SYSROOT/include/linux" "$SYSROOT/include/asm" "$SYSROOT/include/asm-generic" "$SYSROOT/include/mtd"
-    cp -r "$LINUX_SRC/include/uapi/linux/"* "$SYSROOT/include/linux/"
-    cp -r "$LINUX_SRC/include/uapi/asm-generic/"* "$SYSROOT/include/asm-generic/"
-    cp -r "$LINUX_SRC/arch/arm64/include/uapi/asm/"* "$SYSROOT/include/asm/"
-    cp -r "$LINUX_SRC/include/uapi/mtd/"* "$SYSROOT/include/mtd/"
-
-    # Generate asm/ fallback wrappers for headers not in arch/arm64
-    for f in "$SYSROOT/include/asm-generic/"*.h; do
-        name=$(basename "$f")
-        if [ ! -f "$SYSROOT/include/asm/$name" ]; then
-            echo "#include <asm-generic/$name>" > "$SYSROOT/include/asm/$name"
-        fi
-    done
-
-    # Sanitize: strip kernel-internal includes and annotations
-    find "$SYSROOT/include/linux" "$SYSROOT/include/asm" "$SYSROOT/include/asm-generic" "$SYSROOT/include/mtd" \
-        -name "*.h" -exec sed -i '' \
-        -e '/#include <linux\/compiler_types.h>/d' \
-        -e '/#include <linux\/compiler.h>/d' \
-        -e 's/ __user / /g' -e 's/ __user$//g' -e 's/__user //g' \
-        -e 's/ __force / /g' -e 's/__force //g' \
-        -e 's/ __iomem / /g' -e 's/__iomem //g' \
-        -e 's/ __rcu / /g' -e 's/__rcu //g' \
-        -e 's/ __bitwise / /g' -e 's/__bitwise //g' \
-        -e 's/ __percpu / /g' -e 's/__percpu //g' \
-        -e 's/__attribute_const__//g' \
-        {} +
-
-    # Create stub headers for kernel internals
-    cat > "$SYSROOT/include/linux/compiler_types.h" << 'STUB'
-#ifndef _LINUX_COMPILER_TYPES_H
-#define _LINUX_COMPILER_TYPES_H
-#define __user
-#define __kernel
-#define __iomem
-#define __force
-#define __bitwise
-#define __rcu
-#define __percpu
-#endif
-STUB
-
-    cat > "$SYSROOT/include/linux/compiler.h" << 'STUB'
-#ifndef _LINUX_COMPILER_H
-#define _LINUX_COMPILER_H
-#include <linux/compiler_types.h>
-#endif
-STUB
-
-    cat > "$SYSROOT/include/linux/version.h" << 'STUB'
-#ifndef _LINUX_VERSION_H
-#define _LINUX_VERSION_H
-#define LINUX_VERSION_CODE 393800
-#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#endif
-STUB
-
-    echo "    kernel headers installed"
-else
-    echo "==> kernel headers already installed, skipping"
-fi
-
-# ── Step 3: Build compiler-rt builtins (libgcc substitute) ──
-if [ ! -s "$SYSROOT/lib/libgcc.a" ] || [ "$(wc -c < "$SYSROOT/lib/libgcc.a")" -lt 1000 ]; then
-    echo "==> Building compiler-rt builtins..."
-
-    cd "$BUILD_DIR"
-    if [ ! -d "compiler-rt-$COMPILER_RT_VERSION.src" ]; then
-        if [ ! -f "compiler-rt-$COMPILER_RT_VERSION.src.tar.xz" ]; then
-            echo "    Downloading compiler-rt..."
-            curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-$COMPILER_RT_VERSION/compiler-rt-$COMPILER_RT_VERSION.src.tar.xz"
-        fi
-        tar xf "compiler-rt-$COMPILER_RT_VERSION.src.tar.xz"
-    fi
-
-    BUILTINS_SRC="$BUILD_DIR/compiler-rt-$COMPILER_RT_VERSION.src/lib/builtins"
-    BUILTINS_OUT="$BUILD_DIR/builtins-obj"
-    mkdir -p "$BUILTINS_OUT"
-
-    for f in "$BUILTINS_SRC"/*.c; do
-        name=$(basename "$f" .c)
-        clang --target=aarch64-linux-gnu -O2 -fPIC -ffreestanding \
-            -I"$BUILTINS_SRC" \
-            -c "$f" -o "$BUILTINS_OUT/$name.o" 2>/dev/null || true
-    done
-    for f in "$BUILTINS_SRC/aarch64/"*.c; do
-        name=$(basename "$f" .c)
-        clang --target=aarch64-linux-gnu -O2 -fPIC -ffreestanding \
-            -I"$BUILTINS_SRC" \
-            -c "$f" -o "$BUILTINS_OUT/$name.o" 2>/dev/null || true
-    done
-
-    "$AR" rcs "$SYSROOT/lib/libgcc.a" "$BUILTINS_OUT"/*.o
-
-    # Create empty stubs for other gcc libs
-    "$AR" rcs "$SYSROOT/lib/libgcc_eh.a"
-
-    echo "    compiler-rt builtins built"
-else
-    echo "==> compiler-rt builtins already built, skipping"
-fi
-
-# Create stub CRT files (clang -static needs crtbeginT.o, crtend.o)
-if [ ! -f "$SYSROOT/lib/crtbeginT.o" ]; then
-    echo '.text' | clang --target=aarch64-linux-gnu -c -x assembler - -o "$SYSROOT/lib/crtbeginT.o"
-    echo '.text' | clang --target=aarch64-linux-gnu -c -x assembler - -o "$SYSROOT/lib/crtend.o"
-fi
-
-# ── Step 4: Build busybox ──
-if [ ! -f "$STAGING/bin/busybox" ]; then
-    echo "==> Building busybox $BUSYBOX_VERSION..."
-
-    cd "$BUILD_DIR"
-    if [ ! -d "busybox-$BUSYBOX_VERSION" ]; then
-        if [ ! -f "busybox-$BUSYBOX_VERSION.tar.bz2" ]; then
-            echo "    Downloading busybox..."
-            curl -LO "https://busybox.net/downloads/busybox-$BUSYBOX_VERSION.tar.bz2"
-        fi
-        tar xf "busybox-$BUSYBOX_VERSION.tar.bz2"
-    fi
-
-    cd "busybox-$BUSYBOX_VERSION"
-    make HOSTCC=cc defconfig
-
-    # Configure for cross-compilation
-    sed -i '' 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
-    sed -i '' "s|CONFIG_SYSROOT=\"\"|CONFIG_SYSROOT=\"$SYSROOT\"|" .config
-    sed -i '' "s|CONFIG_EXTRA_CFLAGS=\"\"|CONFIG_EXTRA_CFLAGS=\"-I$SYSROOT/include\"|" .config
-    sed -i '' "s|CONFIG_EXTRA_LDFLAGS=\"\"|CONFIG_EXTRA_LDFLAGS=\"-L$SYSROOT/lib -fuse-ld=lld\"|" .config
-    sed -i '' "s|CONFIG_PREFIX=\"./_install\"|CONFIG_PREFIX=\"$STAGING\"|" .config
-    sed -i '' 's/CONFIG_STATIC_LIBGCC=y/# CONFIG_STATIC_LIBGCC is not set/' .config
-
-    # Disable console-tools (need Linux VT ioctls we don't support)
-    for opt in KBD_MODE LOADFONT OPENVT SETCONSOLE SETKEYCODES SETLOGCONS \
-               RESET RESIZE SHOWKEY FGCONSOLE CHVT DEALLOCVT DUMPKMAP LOADKMAP \
-               SETFONT FEATURE_SETFONT_TEXTUAL_MAP FEATURE_LOADFONT_PSF2 FEATURE_LOADFONT_RAW \
-               INIT LINUXRC; do
-        sed -i '' "s/CONFIG_${opt}=y/# CONFIG_${opt} is not set/" .config 2>/dev/null || true
-    done
-
-    # Disable features not needed on Vinix
-    for opt in FEATURE_HAVE_RPC FEATURE_INETD_RPC SELINUX PAM FEATURE_SYSTEMD \
-               FEATURE_MOUNT_NFS SWAPON SWAPOFF; do
-        sed -i '' "s/CONFIG_${opt}=y/# CONFIG_${opt} is not set/" .config 2>/dev/null || true
-    done
-
-    make -j"$NPROC" \
-        HOSTCC=cc \
-        CC="clang --target=$TARGET" \
-        AR="$AR" NM="$NM" STRIP="$STRIP" OBJCOPY="$OBJCOPY" \
-        SKIP_STRIP=y
-
-    make install \
-        HOSTCC=cc \
-        CC="clang --target=$TARGET" \
-        AR="$AR" NM="$NM" STRIP="$STRIP" OBJCOPY="$OBJCOPY" \
-        SKIP_STRIP=y
-
-    echo "    busybox installed to $STAGING"
-else
-    echo "==> busybox already built, skipping"
-fi
-
-if [ ! -f "$STAGING/bin/busybox" ]; then
-    echo "ERROR: busybox build failed"
-    exit 1
-fi
-
-echo "==> Verifying busybox binary..."
-file "$STAGING/bin/busybox"
-
-# ── Step 5: Download and strip GCC toolchain ──
-GCC_TC_DIR="$BUILD_DIR/aarch64-linux-musl-native"
-GCC_TC_STAGING="$STAGING/aarch64-linux-musl-native"
-
-if [ ! -d "$GCC_TC_STAGING/bin" ]; then
-    echo "==> Setting up GCC toolchain..."
-
-    # Download pre-built static toolchain from musl.cc
-    cd "$BUILD_DIR"
-    if [ ! -d "aarch64-linux-musl-native" ]; then
-        if [ ! -f "aarch64-linux-musl-native.tgz" ]; then
-            echo "    Downloading aarch64-linux-musl-native.tgz (85MB)..."
-            curl -LO "https://musl.cc/aarch64-linux-musl-native.tgz"
-        fi
-        echo "    Extracting toolchain..."
-        tar xf "aarch64-linux-musl-native.tgz"
-    fi
-
-    # Detect GCC version inside the toolchain
-    GCC_VER=$(ls "$GCC_TC_DIR/lib/gcc/aarch64-linux-musl/" | head -1)
-    echo "    GCC version: $GCC_VER"
-
-    # Copy to staging, stripping non-essential files
-    echo "    Stripping toolchain to C-only essentials..."
-    mkdir -p "$GCC_TC_STAGING/bin"
-    mkdir -p "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/include"
-    mkdir -p "$GCC_TC_STAGING/libexec/gcc/aarch64-linux-musl/$GCC_VER"
-    mkdir -p "$GCC_TC_STAGING/include"
-    mkdir -p "$GCC_TC_STAGING/lib"
-
-    # Binaries: gcc driver + binutils essentials
-    for bin in gcc as ld ld.bfd ar ranlib nm strip objdump readelf; do
-        [ -f "$GCC_TC_DIR/bin/$bin" ] && cp "$GCC_TC_DIR/bin/$bin" "$GCC_TC_STAGING/bin/"
-    done
-    # cc symlink
-    ln -sf gcc "$GCC_TC_STAGING/bin/cc"
-
-    # GCC compiler proper (cc1, collect2)
-    for f in cc1 collect2 lto-wrapper; do
-        [ -f "$GCC_TC_DIR/libexec/gcc/aarch64-linux-musl/$GCC_VER/$f" ] && \
-            cp "$GCC_TC_DIR/libexec/gcc/aarch64-linux-musl/$GCC_VER/$f" \
-               "$GCC_TC_STAGING/libexec/gcc/aarch64-linux-musl/$GCC_VER/"
-    done
-    # liblto_plugin if present
-    cp "$GCC_TC_DIR/libexec/gcc/aarch64-linux-musl/$GCC_VER"/liblto_plugin.so* \
-       "$GCC_TC_STAGING/libexec/gcc/aarch64-linux-musl/$GCC_VER/" 2>/dev/null || true
-
-    # GCC internal headers (stddef.h, stdarg.h, stdbool.h, etc.)
-    cp -r "$GCC_TC_DIR/lib/gcc/aarch64-linux-musl/$GCC_VER/include/"* \
-       "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/include/"
-
-    # GCC runtime libraries and CRT files
-    cp "$GCC_TC_DIR/lib/gcc/aarch64-linux-musl/$GCC_VER"/libgcc.a \
-       "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/" 2>/dev/null || true
-    cp "$GCC_TC_DIR/lib/gcc/aarch64-linux-musl/$GCC_VER"/libgcc_eh.a \
-       "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/" 2>/dev/null || true
-    cp "$GCC_TC_DIR/lib/gcc/aarch64-linux-musl/$GCC_VER"/crt*.o \
-       "$GCC_TC_STAGING/lib/gcc/aarch64-linux-musl/$GCC_VER/" 2>/dev/null || true
-
-    # musl C library (static) and CRT files
-    for f in libc.a libm.a libpthread.a librt.a libdl.a libcrypt.a libresolv.a \
-        libutil.a libgcc_s.so libgcc_s.so.1 libatomic.a libatomic.so \
-        libatomic.so.1 libatomic.so.1.2.0; do
-        [ -f "$GCC_TC_DIR/lib/$f" ] && cp "$GCC_TC_DIR/lib/$f" "$GCC_TC_STAGING/lib/"
-    done
-    # CRT files: crt1.o, crti.o, crtn.o, rcrt1.o (static PIE), Scrt1.o (shared PIE)
-    for f in crt1.o crti.o crtn.o rcrt1.o Scrt1.o; do
-        [ -f "$GCC_TC_DIR/lib/$f" ] && cp "$GCC_TC_DIR/lib/$f" "$GCC_TC_STAGING/lib/"
-    done
-
-    # musl + Linux headers (strip C++ headers — not needed and paths too long for ustar tar)
-    cp -r "$GCC_TC_DIR/include/"* "$GCC_TC_STAGING/include/"
-    rm -rf "$GCC_TC_STAGING/include/c++"
-
-    # GCC searches for system headers at:
-    #   <sysroot>/aarch64-linux-musl/include  (primary)
-    #   <sysroot>/usr/include                  (fallback)
-    # Copy headers there (real copies, not symlinks — avoids VFS edge cases)
-    mkdir -p "$GCC_TC_STAGING/aarch64-linux-musl"
-    cp -r "$GCC_TC_STAGING/include" "$GCC_TC_STAGING/aarch64-linux-musl/include"
-    mkdir -p "$GCC_TC_STAGING/usr"
-    cp -r "$GCC_TC_STAGING/include" "$GCC_TC_STAGING/usr/include"
-
-    # Report sizes
-    TC_SIZE=$(du -sh "$GCC_TC_STAGING" | cut -f1)
-    echo "    Stripped toolchain size: $TC_SIZE"
-    echo "    Toolchain installed to initramfs at /aarch64-linux-musl-native/"
-else
-    echo "==> GCC toolchain already staged, skipping"
-fi
-
-# ── Step 6: Build init (small ELF that execs /bin/sh) ──
-# (init just execs /bin/sh with proper environment)
-echo "==> Building init..."
-
-cat > "$BUILD_DIR/init.c" << 'INIT_EOF'
-typedef unsigned long u64;
-typedef long i64;
-
-static inline i64 syscall3(u64 nr, u64 a0, u64 a1, u64 a2) {
-    register u64 x8 __asm__("x8") = nr;
-    register u64 x0 __asm__("x0") = a0;
-    register u64 x1 __asm__("x1") = a1;
-    register u64 x2 __asm__("x2") = a2;
-    __asm__ volatile("svc #0"
-        : "+r"(x0)
-        : "r"(x8), "r"(x1), "r"(x2)
-        : "memory");
-    return (i64)x0;
-}
-
-static inline i64 syscall1(u64 nr, u64 a0) {
-    register u64 x8 __asm__("x8") = nr;
-    register u64 x0 __asm__("x0") = a0;
-    __asm__ volatile("svc #0" : "+r"(x0) : "r"(x8) : "memory");
-    return (i64)x0;
-}
-
-#define SYS_write  64
-#define SYS_execve 221
-#define SYS_exit   93
-
-static u64 strlen(const char *s) { u64 n = 0; while (s[n]) n++; return n; }
-static void puts(const char *s) { syscall3(SYS_write, 1, (u64)s, strlen(s)); }
-
-void _start(void) {
-    puts("\n  Vinix (aarch64) — starting /bin/sh\n\n");
-
-    char *argv[] = {"/bin/sh", (char *)0};
-    char *envp[] = {
-        "PATH=/aarch64-linux-musl-native/bin:/bin:/sbin:/usr/bin:/usr/sbin",
-        "HOME=/root",
-        "TERM=linux",
-        "PS1=vinix# ",
-        "LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules",
-        "LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri",
-        (char *)0
-    };
-
-    syscall3(SYS_execve, (u64)argv[0], (u64)argv, (u64)envp);
-
-    puts("init: execve /bin/sh failed\n");
-    syscall1(SYS_exit, 1);
-    for (;;) ;
-}
-INIT_EOF
-
-mkdir -p "$STAGING/sbin"
-clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 -c \
-    -o "$BUILD_DIR/init.o" "$BUILD_DIR/init.c"
-ld.lld -m aarch64elf --nostdlib -static \
-    -o "$STAGING/sbin/init" "$BUILD_DIR/init.o"
-
-echo "    init binary built"
-
-# ── Step 7: Create filesystem and package initramfs ──
-echo "==> Setting up filesystem..."
-mkdir -p "$STAGING"/{dev,proc,sys,tmp,etc,var/log,var/run,root}
-
-cat > "$STAGING/etc/passwd" << 'EOF'
-root:x:0:0:root:/root:/bin/sh
-EOF
-
-cat > "$STAGING/etc/group" << 'EOF'
-root:x:0:
-EOF
-
-echo "vinix" > "$STAGING/etc/hostname"
+# Vinix starts /sbin/init directly. Keep the base userland entirely Alpine:
+# this shell script is interpreted by Alpine's stock /bin/busybox.
+rm -f "$STAGING/sbin/init"
+install -m755 "$SCRIPT_DIR/build-support/init-aarch64/alpine-init" \
+    "$STAGING/sbin/init"
+mkdir -p "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp" \
+    "$STAGING/root" "$STAGING/var/log" "$STAGING/var/run"
+chmod 1777 "$STAGING/tmp"
 
 cat > "$STAGING/etc/profile" << 'EOF'
-export PATH=/aarch64-linux-musl-native/bin:/bin:/sbin:/usr/bin:/usr/sbin
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOME=/root
 export TERM=linux
 export PS1='vinix# '
@@ -469,16 +185,28 @@ export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 export XBPS_ARCH=aarch64
 EOF
 
-# Add test hello.c
 cat > "$STAGING/root/hello.c" << 'EOF'
 #include <stdio.h>
 int main(void) {
-    printf("Hello from GCC on Vinix!\n");
+    printf("Hello from Alpine GCC on Vinix!\n");
     return 0;
 }
 EOF
 
-# ── Step 8: Integrate X11 (Xorg + xclock) ──
+if [ ! -x "$STAGING/bin/busybox" ] ||
+   [ ! -e "$STAGING/lib/ld-musl-aarch64.so.1" ]; then
+    echo "ERROR: Alpine base userland is incomplete" >&2
+    exit 1
+fi
+if [ "$ALPINE_DEVTOOLS" = 1 ] && [ ! -x "$STAGING/usr/bin/gcc" ]; then
+    echo "ERROR: Alpine build-base did not provide /usr/bin/gcc" >&2
+    exit 1
+fi
+
+file "$STAGING/bin/busybox" "$STAGING/lib/ld-musl-aarch64.so.1"
+
+# ── Optional runtime overlays ──
+if [ "$ALPINE_BASE_ONLY" != 1 ]; then
 X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging"
 X11_SYSROOT="$SCRIPT_DIR/build-aarch64-x11/sysroot"
 if [ -d "$X11_STAGING/usr/bin" ] && [ -f "$X11_STAGING/usr/bin/Xorg" ]; then
@@ -864,15 +592,17 @@ if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
 else
     echo "==> x86-64 translation staging not found, skipping (run build-x86-translation-aarch64.sh first)"
 fi
+else
+    echo "==> Skipping optional runtime overlays (VINIX_ALPINE_BASE_ONLY=1)"
+fi
 
 echo "==> Packaging initramfs..."
-INITRAMFS="$INIT_DIR/initramfs.tar"
-mkdir -p "$INIT_DIR"
+mkdir -p "$(dirname "$INITRAMFS")"
 cd "$STAGING"
 # Write beside the published image and rename only once tar has finished.
 # deploy/push can run while this build is in progress; writing INITRAMFS
 # directly lets rsync observe a truncated tar and abort mid-transfer.
-INITRAMFS_TMP="$(mktemp "$INIT_DIR/.initramfs.tar.XXXXXX")"
+INITRAMFS_TMP="$(mktemp "$(dirname "$INITRAMFS")/.initramfs.tar.XXXXXX")"
 if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$INITRAMFS_TMP" .; then
     rm -f "$INITRAMFS_TMP"
     exit 1
