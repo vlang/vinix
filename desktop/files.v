@@ -73,7 +73,7 @@ fn (mut b FileBrowser) read(path string) {
 	}
 
 	mut entries := []FileEntry{}
-	unsafe { entries.flags.set(.noslices) }
+	unsafe { entries.flags |= .noslices }
 	mut buffer := [max_name_len]u8{}
 	mut names := unsafe { (&buffer[0]).vbytes(buffer.len) }
 	for entries.len < max_entries {

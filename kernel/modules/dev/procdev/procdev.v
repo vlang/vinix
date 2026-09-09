@@ -49,12 +49,12 @@ pub const max_records = 512
 // PROT_NONE range is only an address-space reservation and owns no pages.
 pub struct ProcessSample {
 pub mut:
-	pid     int
-	ppid    int
-	threads int
+	pid     i32
+	ppid    i32
+	threads i32
 	// Explicit, so that the two u64s below land on an eight byte boundary
 	// under any compiler rather than by the good luck of the fields above.
-	reserved     int
+	reserved     i32
 	memory_bytes u64
 	cpu_time_ns  u64
 	name         [name_len]u8
@@ -176,9 +176,9 @@ fn (mut this Processes) read(_handle voidptr, buf voidptr, _loc u64, count u64) 
 			continue
 		}
 		mut sample := unsafe { &records[header.count] }
-		sample.pid = process.pid
-		sample.ppid = process.ppid
-		sample.threads = process.threads.len
+		sample.pid = i32(process.pid)
+		sample.ppid = i32(process.ppid)
+		sample.threads = i32(process.threads.len)
 		sample.reserved = 0
 		sample.memory_bytes = resident_bytes(process)
 		sample.cpu_time_ns = process.cpu_time_ns

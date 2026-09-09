@@ -91,7 +91,11 @@ fn frame_elements(capacity int) []ui2.Element {
 	frame_element_pool.used[bucket]++
 	if index >= frame_element_pool.slots[bucket].len {
 		if frame_element_pool.slots[bucket].cap == 0 {
-			unsafe { frame_element_pool.slots[bucket].flags.set(.noslices) }
+			// A fixed array of dynamic arrays is zero-initialized by V3, so its
+			// entries do not yet carry FrameElementSlot's element size. Give the
+			// bucket a real array before its first append.
+			frame_element_pool.slots[bucket] = []FrameElementSlot{cap: 4}
+			unsafe { frame_element_pool.slots[bucket].flags |= .noslices }
 		}
 		frame_element_pool.slots[bucket] << FrameElementSlot{
 			elements: []ui2.Element{cap: bucket_capacity}
@@ -109,7 +113,7 @@ fn frame_elements(capacity int) []ui2.Element {
 	unsafe {
 		elements = frame_element_pool.slots[bucket][index].elements
 		elements.len = 0
-		elements.flags.set(.nofree)
+		elements.flags |= .nofree
 	}
 	// The pool owns this buffer. free_tree still walks it to release strings,
 	// but array_free must leave the backing storage for the next frame.

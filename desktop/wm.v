@@ -1037,7 +1037,7 @@ struct TaskbarEntry {
 
 fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 	mut out := []TaskbarEntry{cap: d.windows.len}
-	unsafe { out.flags.set(.noslices) }
+	unsafe { out.flags |= .noslices }
 	if d.settings.taskbar_mode == .standard {
 		mut last_id := 0
 		for {
@@ -1058,7 +1058,7 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 	// Clicking it activates the most recently raised of them, which is what
 	// makes a second click minimise the one you just brought up.
 	mut seen := []string{cap: d.windows.len}
-	unsafe { seen.flags.set(.noslices) }
+	unsafe { seen.flags |= .noslices }
 	for window_index in 0 .. d.windows.len {
 		window := &d.windows[window_index]
 		if window.title in seen {

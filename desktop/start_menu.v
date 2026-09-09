@@ -91,7 +91,7 @@ fn (mut d Desktop) toggle_start_menu() {
 	d.start_menu_query = []u8{cap: start_menu_max_query}
 	// Search only appends and removes bytes; no slices escape from this buffer.
 	// Marking that fact lets V release an old allocation if this ever grows.
-	unsafe { d.start_menu_query.flags.set(.noslices) }
+	unsafe { d.start_menu_query.flags |= .noslices }
 	d.dirty = true
 }
 

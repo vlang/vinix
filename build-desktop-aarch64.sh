@@ -168,7 +168,7 @@ echo "==> Translating V to C..."
 # so the desktop says when it was built.
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
 echo "    build stamp: $BUILD_STAMP"
-"$V" -os linux -gc none -manualfree -enable-globals -prod \
+"$V" -new-compiler -os linux -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
@@ -202,7 +202,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
    [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
    [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
     echo "==> Translating the GPU-enabled desktop to C..."
-    "$V" -os linux -gc none -manualfree -enable-globals -prod \
+    "$V" -new-compiler -os linux -gc none -manualfree -enable-globals -prod \
         -d ui2_headless -d vinix_gpu_present \
         -d "vinix_build_stamp=$BUILD_STAMP" \
         -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \

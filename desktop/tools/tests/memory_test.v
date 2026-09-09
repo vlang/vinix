@@ -233,6 +233,11 @@ fn test_activity_samples_release_replaced_rows() {
 	assert live == 0, 'activity samples retained ${live} bytes'
 }
 
+fn test_activity_device_layout_stays_fixed_across_compilers() {
+	assert sizeof(ActivityTable) == 40
+	assert sizeof(ActivitySample) == 96
+}
+
 fn test_remote_application_trees_release_copied_strings_and_arrays() {
 	root := ui2.screen(0x102030, [
 		ui2.view('panel', ui2.rect(0, 0, 320, 200), ui2.BoxStyle{

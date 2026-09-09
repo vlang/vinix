@@ -31,10 +31,10 @@ const activity_max_records = 512
 
 struct ActivitySample {
 mut:
-	pid          int
-	ppid         int
-	threads      int
-	reserved     int
+	pid          i32
+	ppid         i32
+	threads      i32
+	reserved     i32
 	memory_bytes u64
 	cpu_time_ns  u64
 	name         [activity_name_len]u8
@@ -169,11 +169,12 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 	}
 
 	m.scratch_rows.clear()
-	unsafe { m.scratch_rows.flags.set(.noslices) }
+	unsafe { m.scratch_rows.flags |= .noslices }
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
-		cpu_percent := m.rate_for(record.pid, record.cpu_time_ns, elapsed_ns)
-		old_index := m.process_row_index(record.pid)
+		pid := int(record.pid)
+		cpu_percent := m.rate_for(pid, record.cpu_time_ns, elapsed_ns)
+		old_index := m.process_row_index(pid)
 		mut row := ActivityRow{}
 		if old_index >= 0 {
 			// Transfer the strings to the scratch row. Clearing the source makes
@@ -181,10 +182,10 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 			row = m.rows[old_index]
 			m.rows[old_index] = ActivityRow{}
 		} else {
-			row.pid = record.pid
-			row.pid_text = record.pid.str()
+			row.pid = pid
+			row.pid_text = pid.str()
 		}
-		row.pid = record.pid
+		row.pid = pid
 		row.cpu_percent = cpu_percent
 		row.memory_bytes = record.memory_bytes
 		row.name = replace_activity_text(row.name, activity_name_of(record))
@@ -290,11 +291,11 @@ fn (m &ActivityMonitor) rate_for(pid int, cpu_time_ns u64, elapsed_ns u64) f64 {
 // is reused rather than reallocated: it is rewritten once a second forever.
 fn (mut m ActivityMonitor) remember(records &ActivitySample, count int) {
 	m.previous.clear()
-	unsafe { m.previous.flags.set(.noslices) }
+	unsafe { m.previous.flags |= .noslices }
 	for i := 0; i < count; i++ {
 		record := unsafe { &records[i] }
 		m.previous << ActivityPrevious{
-			pid: record.pid
+			pid: int(record.pid)
 			cpu_time_ns: record.cpu_time_ns
 		}
 	}

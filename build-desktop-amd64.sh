@@ -77,7 +77,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop
 
 echo "==> Building vinix-desktop for x86_64-vinix-mlibc..."
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
-VCROSS_COMPILER_NAME="$CROSS_CC" "$V" \
+VCROSS_COMPILER_NAME="$CROSS_CC" "$V" -new-compiler \
     -os vinix -arch x64 -cc "$CROSS_CC" \
     -gc none -manualfree -enable-globals -prod \
     -cflags "--sysroot=$SYSROOT" -ldflags "--sysroot=$SYSROOT" \
