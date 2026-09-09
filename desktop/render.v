@@ -159,6 +159,12 @@ fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
 // strings copied from a remote application are frame-owned; local strings are
 // literals or model-owned caches and outlive the tree on purpose.
 fn free_tree(el ui2.Element) {
+	// The Calculator owns and reuses its compile-time VML tree. Its child
+	// process releases that tree explicitly on close; per-build shallow copies
+	// must leave it intact.
+	if el.accessibility_value == calculator_compiled_tree_key {
+		return
+	}
 	for child in el.children {
 		free_tree(child)
 	}

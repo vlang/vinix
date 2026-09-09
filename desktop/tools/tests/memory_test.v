@@ -261,6 +261,24 @@ fn test_remote_application_trees_release_copied_strings_and_arrays() {
 	unsafe { encoded.free() }
 }
 
+fn test_compiled_calculator_vml_releases_every_frame_allocation() {
+	mut calculator := new_calculator_app()
+	warm := calculator.build(ui2.rect(0, 0, window_width, window_height))!
+	free_tree(warm)
+
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		frame := calculator.build(ui2.rect(0, 0, window_width, window_height))!
+		free_tree(frame)
+	}
+	live := C.vinix_heap_end()
+	if live != 0 {
+		print_heap_sizes('compiled Calculator VML allocations by size')
+	}
+	assert live == 0, 'compiled Calculator VML retained ${live} bytes'
+	calculator.close_app()
+}
+
 fn element_exists(root ui2.Element, id string) bool {
 	if root.id == id {
 		return true

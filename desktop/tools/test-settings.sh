@@ -23,6 +23,9 @@ if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
 [ -f "$root/third_party/ui2/v.mod" ] || {
     echo 'ERROR: Settings UI tests require third_party/ui2.' >&2; exit 1;
 }
+python3 "$root/desktop/tools/stage_ui2.py" \
+    "$work/modules/ui2" "$root/third_party/ui2" \
+    "$root/desktop/tools/ui2_headless_bounds.v"
 # Settings is a category of the whole desktop application now, so the UI tests
 # build against the real thing rather than a hand-picked subset.
 # Staged exactly as the real build stages it, ui2 example and all, so the
@@ -41,7 +44,7 @@ sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
 for name in settings switcher; do
     "$v" -gc none -manualfree -enable-globals -stats -d ui2_headless \
-        -path "@vlib|@vmodules|$root|$root/third_party" "$work/ui/${name}_test.v"
+        -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done
 "$v" -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
-    -path "@vlib|@vmodules|$root|$root/third_party" "$work/ui/memory_test.v"
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/memory_test.v"

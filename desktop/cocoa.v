@@ -466,7 +466,7 @@ fn load_macho(parsed &macho.Image) !LoadedMachO {
 	}
 	size := maximum - minimum
 	base := C.mmap(unsafe { nil }, usize(size), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANON, -1, 0)
-	if base == C.MAP_FAILED {
+	if base == voidptr(C.MAP_FAILED) {
 		return error('cannot allocate Mach-O address space')
 	}
 	mut loaded := LoadedMachO{ base: base, size: size, minimum_vm: minimum }

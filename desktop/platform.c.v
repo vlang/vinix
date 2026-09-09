@@ -35,6 +35,8 @@ import term.termios
 
 #include <unistd.h>
 
+#include "libc_compat.h"
+
 fn C.fstat(fd int, buf &C.stat) int
 
 fn C.posix_openpt(flags int) int
@@ -89,7 +91,7 @@ fn desktop_ioctl(fd int, request u64, argument voidptr) int {
 
 fn desktop_mmap_shared(fd int, length u64) voidptr {
 	mapping := C.mmap(unsafe { nil }, usize(length), C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0)
-	if mapping == C.MAP_FAILED {
+	if mapping == voidptr(C.MAP_FAILED) {
 		return unsafe { nil }
 	}
 	return mapping
@@ -97,7 +99,7 @@ fn desktop_mmap_shared(fd int, length u64) voidptr {
 
 fn desktop_mmap_readonly(fd int, length u64) voidptr {
 	mapping := C.mmap(unsafe { nil }, usize(length), C.PROT_READ, C.MAP_SHARED, fd, 0)
-	if mapping == C.MAP_FAILED {
+	if mapping == voidptr(C.MAP_FAILED) {
 		return unsafe { nil }
 	}
 	return mapping
@@ -517,8 +519,9 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	if C.access(&char(path.str), C.X_OK) != 0 {
 		return none
 	}
-	mut request := [2]int{}
-	mut response := [2]int{}
+	// C pipe descriptors are always 32-bit even when V3's `int` is 64-bit.
+	mut request := [2]i32{}
+	mut response := [2]i32{}
 	if C.pipe(&request[0]) != 0 {
 		return none
 	}
@@ -589,8 +592,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	}
 	return SpawnedAppProcess{
 		pid: pid
-		to_child: request[1]
-		from_child: response[0]
+		to_child: int(request[1])
+		from_child: int(response[0])
 	}
 }
 
@@ -620,7 +623,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
 		return none
 	}
-	mut input := [2]int{}
+	mut input := [2]i32{}
 	if C.pipe(&input[0]) != 0 {
 		return none
 	}
@@ -666,7 +669,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	}
 	return SpawnedWineHost{
 		pid: pid
-		input: input[1]
+		input: int(input[1])
 	}
 }
 

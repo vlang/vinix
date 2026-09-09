@@ -114,12 +114,12 @@ if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
     exit 1
 fi
 
-# Native app processes use QmlApp to build declarative trees for the compositor.
-# A checkout without it fails deep inside the V build with an error about an
-# unknown type, which says nothing about the real problem.
-if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/qml_embed.v" ]; then
-    echo "ERROR: this ui2 checkout has no QmlApp (ui/qml_embed.v)."
-    echo "The desktop hosts ui2 applications through it. Update the checkout:"
+# Calculator uses the v3 compiler's direct `$vml` lowering. Check the renamed
+# API explicitly so an old QML checkout fails before the compiler does.
+if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/vml_compiled.v" ] || \
+   [ ! -f "$SCRIPT_DIR/third_party/ui2/examples/calculator/calculator.vml" ]; then
+    echo "ERROR: this ui2 checkout has no compile-time VML support."
+    echo "Update the checkout:"
     echo "    git -C third_party/ui2 pull"
     exit 1
 fi
@@ -130,6 +130,14 @@ if [ ! -x "$LLVM_BIN/clang" ]; then
 fi
 
 mkdir -p "$BUILD_DIR"
+
+# `$vml` starts from ui2.bounds(), while a Linux-headless module deliberately
+# has no platform window. Build against a disposable module overlay that adds
+# Vinix's bounds bridge without modifying the upstream checkout.
+UI2_MODULES="$BUILD_DIR/vmodules"
+python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
+    "$UI2_MODULES/ui2" "$SCRIPT_DIR/third_party/ui2" \
+    "$SCRIPT_DIR/desktop/tools/ui2_headless_bounds.v"
 
 # ── Stage the sources ──
 # Native ui2 applications exec this multicall binary under per-app names, and
@@ -161,7 +169,7 @@ echo "    build stamp: $BUILD_STAMP"
 "$V" -os linux -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
-    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+    -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
 # ── C -> aarch64 static binary ──
@@ -195,7 +203,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
     "$V" -os linux -gc none -manualfree -enable-globals -prod \
         -d ui2_headless -d vinix_gpu_present \
         -d "vinix_build_stamp=$BUILD_STAMP" \
-        -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+        -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
         -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
 
     echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."

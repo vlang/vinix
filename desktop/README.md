@@ -98,7 +98,7 @@ shadow and a hairline edge.
 
 ## Native ui2 applications
 
-A ui2 application normally calls `run_qml`, which opens a platform window and
+A ui2 application normally calls `run_vml`, which opens a platform window and
 blocks until it closes. Here the desktop *is* the window system, but the app is
 still a separate process. The compositor starts `vinix-files`,
 `vinix-calculator`, `vinix-terminal`, and the other installed app names with
@@ -120,19 +120,20 @@ keeps the initramfs small, while each exec creates an independent address space
 and Vinix records the per-app exec path as its process name. Consequently
 `/dev/processes` reports truthful CPU and mapped-memory values for every app.
 
-The applications are ui2's own examples, and they are not copied into this
-repository. `tools/stage_app.py` takes each example's source straight from the
-ui2 checkout at build time and removes exactly one thing: its `fn main()`,
-which exists to open a platform window and block. Everything the application
-is — its model, its methods, its QML document — compiles unmodified, so what
-runs on Vinix is the example rather than a retelling of it. The multicall
-executable selects the requested app factory before opening any display device.
+The Calculator model comes from ui2's own example and is not copied into this
+repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
+build time, removes the platform `fn main()` and its now-unused embedded source
+constant, and leaves the model and methods unmodified. Vinix's hosted view uses
+V3's `$vml` expression, so the VML is parsed and lowered to direct Element
+constructors at compile time; no document parser or expression interpreter
+runs in the Calculator process. The compiled tree is reused between requests
+and only its display text changes.
 
 The window manager owns five action prefixes — `taskbar.`, `task.`, `win.`,
 `shortcut.` and `start.` — and treats everything else as an application's,
 routing it to whichever window the click landed in. That is also what decides
 it between two open copies of the same application. Because the rule is "not
-mine", an application names its events whatever suits it: ui2's `__qml_...`
+mine", an application names its events whatever suits it: the Calculator's `+`
 and the file browser's `files.row.3` both arrive without the window manager
 parsing either.
 
@@ -398,10 +399,13 @@ ticks.
 
 ## Building and running
 
-ui2 is not vendored; check it out beside the sources, where the build points
-V's module path:
+ui2 is not vendored; check out its current VML version beside the sources,
+where the build points V's module path. Compile-time `$vml` also requires a
+current V3 compiler; set `V=/path/to/current/v3` when it is not your default:
 
     git clone https://github.com/vlang/ui2 third_party/ui2
+
+    V=/path/to/current/v3 ./run-desktop-aarch64.sh
 
 Then, from the repository root, with Homebrew `llvm`, `lld` and `qemu`
 installed, one command builds the aarch64 image and boots into the desktop:

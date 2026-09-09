@@ -28,6 +28,17 @@ fn utility_element_named(element ui2.Element, id string) ?ui2.Element {
 	return none
 }
 
+fn utility_button_with_text(element ui2.Element, text string) ?ui2.Element {
+	if element.kind == .button && element.text == text {
+		return element
+	}
+	for child in element.children {
+		found := utility_button_with_text(child, text) or { continue }
+		return found
+	}
+	return none
+}
+
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
 		visible_rows: 4
@@ -104,33 +115,42 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 }
 
 fn test_native_calculator_matches_the_example_layout_and_actions() {
-	mut calculator := CalculatorApp{
-		calculator: initial_calculator()
-	}
+	mut calculator := new_calculator_app()
 	begin_frame_elements()
 	tree := calculator.build(ui2.rect(0, 0, window_width, window_height))!
 	panel := utility_element_named(tree, 'calculator') or { panic('missing calculator panel') }
-	display := utility_element_named(tree, 'calculator.display') or {
+	display := utility_element_named(tree, 'display') or {
 		panic('missing calculator display')
 	}
-	clear := utility_element_named(tree, calculator_actions[0]) or { panic('missing clear key') }
-	equals := utility_element_named(tree, calculator_actions[19]) or { panic('missing equals key') }
+	clear := utility_button_with_text(tree, 'C') or { panic('missing clear key') }
+	equals := utility_button_with_text(tree, '=') or { panic('missing equals key') }
 	assert panel.children.len == 21
 	assert display.text == '0'
 	assert clear.text == 'C'
-	assert clear.box.bg == calculator_clear
+	assert clear.action_id == 'C'
+	assert clear.box.bg == 0xef4444
 	assert clear.native_style
 	assert equals.text == '='
-	assert equals.box.bg == calculator_operator
+	assert equals.action_id == '='
+	assert equals.box.bg == 0x3478d4
 	assert equals.text_style.bold
-	free_tree(tree)
+	two := utility_button_with_text(tree, '2') or { panic('missing 2 key') }
+	plus := utility_button_with_text(tree, '+') or { panic('missing + key') }
+	three := utility_button_with_text(tree, '3') or { panic('missing 3 key') }
 
-	// 2 + 3 = 5, routed through the exact stable ids the compositor receives.
-	calculator.handle(calculator_actions[13])!
-	calculator.handle(calculator_actions[15])!
-	calculator.handle(calculator_actions[14])!
-	calculator.handle(calculator_actions[19])!
+	// 2 + 3 = 5, routed through the action ids `$vml` put in the tree.
+	calculator.handle(two.action_id)!
+	calculator.handle(plus.action_id)!
+	calculator.handle(three.action_id)!
+	calculator.handle(equals.action_id)!
 	assert calculator.calculator.display == '5'
+	free_tree(tree)
+	updated := calculator.build(ui2.rect(0, 0, window_width, window_height))!
+	updated_display := utility_element_named(updated, 'display') or {
+		panic('missing updated calculator display')
+	}
+	assert updated_display.text == '5'
+	free_tree(updated)
 
 	// The application-process request loop resets this pool before every
 	// build. Repeated interaction must reuse the warmed slots, not retain one
@@ -152,13 +172,14 @@ fn test_native_calculator_matches_the_example_layout_and_actions() {
 		final_slots += frame_element_pool.slots[bucket].len
 	}
 	assert final_slots == warmed_slots
+	calculator.close_app()
 }
 
 fn test_terminal_sends_every_keystroke_through_the_pty_master() {
-	mut input_pipe := [2]int{}
+	mut input_pipe := [2]i32{}
 	assert C.pipe(&input_pipe[0]) == 0
 	mut terminal := TerminalApp{
-		terminal: input_pipe[1]
+		terminal: int(input_pipe[1])
 	}
 
 	// There is no private prompt state or local line buffering: type-ahead and

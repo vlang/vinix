@@ -2,20 +2,20 @@
 // Copyright (c) 2026 Alexander Medvednikov
 // Native ui2 applications shown in the desktop's windows.
 //
-// A ui2 application normally calls `run_qml`, which opens a platform window.
+// A ui2 application normally calls `run_vml`, which opens a platform window.
 // Here the desktop is the window system: each application runs as its own
 // process, hands its element tree to the compositor over app_process.v's pipe
 // protocol, and gets back the id of whatever the user hit.
 //
-// Applications can be native Vinix utilities (Files and Settings) or ui2
-// examples compiled in verbatim by the build's staging step.
+// Applications can be native Vinix utilities or adapters around ui2 example
+// models compiled by the build's staging step.
 module main
 
 import ui2
 
-// NativeApp is the client process' local application contract. ui2's QmlApp
-// satisfies it, so any QML document with a V model can be served to the
-// compositor without the window manager knowing what it does.
+// NativeApp is the client process' local application contract. A VML-backed
+// adapter satisfies it, so a declarative document with a V model can be served
+// to the compositor without the window manager knowing what it does.
 interface NativeApp {
 mut:
 	build(size ui2.Rect) !ui2.Element

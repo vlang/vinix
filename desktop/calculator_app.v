@@ -1,113 +1,87 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-// The built-in calculator's lightweight desktop adapter.
+// The built-in calculator's compile-time VML desktop adapter.
 //
-// The calculator model still comes verbatim from ui2's calculator example.
-// Its fixed, twenty-button view is built directly here instead of starting the
-// generic QML parser and expression runtime in every calculator process. That
-// keeps a tiny utility tiny while preserving the example's layout and actions.
+// The model comes from ui2's calculator example. The view is parsed and
+// type-checked by V's `$vml` expression, which emits direct Element
+// constructors; no VML parser or expression interpreter ships in the process.
 module main
 
 import ui2
 
-const calculator_actions = ['calculator.key.0', 'calculator.key.1', 'calculator.key.2',
-	'calculator.key.3', 'calculator.key.4', 'calculator.key.5', 'calculator.key.6', 'calculator.key.7',
-	'calculator.key.8', 'calculator.key.9', 'calculator.key.10', 'calculator.key.11',
-	'calculator.key.12', 'calculator.key.13', 'calculator.key.14', 'calculator.key.15',
-	'calculator.key.16', 'calculator.key.17', 'calculator.key.18', 'calculator.key.19']
-
-const calculator_surface = u32(0xf1f5f9)
-const calculator_panel = u32(0x1f2937)
-const calculator_display = u32(0xffffff)
-const calculator_text = u32(0x111827)
-const calculator_clear = u32(0xef4444)
-const calculator_operator = u32(0x3478d4)
-const calculator_utility = u32(0xcbd5e1)
-const calculator_digit = u32(0xf8fafc)
+const calculator_compiled_tree_key = 'vinix.compiled-vml-tree'
 
 @[heap]
 struct CalculatorApp {
 mut:
-	calculator Calculator
+	calculator  Calculator
+	tree        ui2.Element
+	tree_ready  bool
+	width       f64
+	height      f64
+	panel_width f64
+	panel_x     f64
+	panel_y     f64
 }
 
-fn open_native_calculator() NativeApp {
+fn new_calculator_app() &CalculatorApp {
 	return &CalculatorApp{
 		calculator: initial_calculator()
 	}
 }
 
-fn calculator_key_background(role string) u32 {
-	return match role {
-		'clear' { calculator_clear }
-		'operator' { calculator_operator }
-		'utility' { calculator_utility }
-		else { calculator_digit }
+fn open_native_calculator() NativeApp {
+	return new_calculator_app()
+}
+
+fn build_compiled_calculator(app &CalculatorApp) ui2.Element {
+	return $vml('calculator_vinix.vml')
+}
+
+fn release_compiled_calculator_tree(element ui2.Element) {
+	for child in element.children {
+		release_compiled_calculator_tree(child)
+	}
+	if element.children.cap > 0 {
+		unsafe { element.children.free() }
 	}
 }
 
-fn calculator_key_text(role string) u32 {
-	return if role == 'clear' || role == 'operator' {
-		calculator_display
+fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
+	rebuild := !app.tree_ready || app.width != size.width || app.height != size.height
+	if !rebuild {
+		// The display is the only dynamic view property. The returned Element is
+		// a shallow copy whose child arrays are the persistent compiled tree.
+		if !ui2.set_element_text_by_id(mut app.tree, 'display', app.calculator.display) {
+			return error('compiled Calculator VML has no display')
+		}
+		return app.tree
+	}
+	if app.tree_ready {
+		release_compiled_calculator_tree(app.tree)
+	}
+	app.width = size.width
+	app.height = size.height
+	available_width := size.width - 24
+	app.panel_width = if available_width < 260 { available_width } else { 260 }
+	app.panel_x = if size.width > app.panel_width {
+		(size.width - app.panel_width) / 2
 	} else {
-		calculator_text
+		0
 	}
+	app.panel_y = if size.height > 340 { (size.height - 340) / 2 } else { 0 }
+	app.tree = build_compiled_calculator(&app)
+	app.tree_ready = true
+	return app.tree
 }
 
-fn (mut a CalculatorApp) build(size ui2.Rect) !ui2.Element {
-	width := int(size.width)
-	height := int(size.height)
-	available_width := width - 24
-	panel_width := if available_width < 260 { available_width } else { 260 }
-	panel_height := 340
-	panel_x := if width > panel_width { (width - panel_width) / 2 } else { 0 }
-	panel_y := if height > panel_height { (height - panel_height) / 2 } else { 0 }
-	padding := 12
-	spacing := 8
-	content_width := panel_width - padding * 2
-	button_width := (content_width - spacing * 3) / 4
-	button_height := 44
-
-	mut panel_children := frame_elements(a.calculator.keys.len + 1)
-	panel_children << ui2.view('calculator.display.panel', ui2.rect(f64(padding), f64(padding), f64(content_width), 56), ui2.BoxStyle{
-		bg: calculator_display
-		radius: 8
-	}, frame_child(ui2.label('calculator.display', a.calculator.display, ui2.rect(10, 0, f64(content_width - 20), 56), ui2.TextStyle{
-		color: calculator_text
-		size: 28
-		align: .right
-	})))
-
-	for index, key in a.calculator.keys {
-		if index >= calculator_actions.len {
-			break
-		}
-		x := padding + key.column * (button_width + spacing)
-		y := 76 + key.row * (button_height + spacing)
-		panel_children << ui2.with_native_style(ui2.button(calculator_actions[index], key.text, ui2.rect(f64(x), f64(y), f64(button_width), f64(button_height)), ui2.BoxStyle{
-			bg: calculator_key_background(key.role)
-			radius: 8
-		}, ui2.TextStyle{
-			color: calculator_key_text(key.role)
-			size: 18
-			bold: key.text == '='
-			align: .center
-		}))
-	}
-
-	mut children := frame_elements(1)
-	children << ui2.view('calculator', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(panel_height)), ui2.BoxStyle{
-		bg: calculator_panel
-		radius: 12
-	}, panel_children)
-	return ui2.screen(calculator_surface, children)
+fn (mut app CalculatorApp) handle(event_id string) ! {
+	app.calculator.press(event_id)
 }
 
-fn (mut a CalculatorApp) handle(event_id string) ! {
-	for index, action in calculator_actions {
-		if event_id == action && index < a.calculator.keys.len {
-			a.calculator.press(a.calculator.keys[index].text)
-			return
-		}
+fn (mut app CalculatorApp) close_app() {
+	if app.tree_ready {
+		release_compiled_calculator_tree(app.tree)
+		app.tree_ready = false
 	}
 }

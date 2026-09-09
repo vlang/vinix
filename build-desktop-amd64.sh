@@ -58,12 +58,17 @@ if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2" >&2
     exit 1
 fi
-if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/qml_embed.v" ]; then
-    echo "ERROR: this ui2 checkout has no QmlApp (ui/qml_embed.v); update it." >&2
+if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/vml_compiled.v" ] || \
+   [ ! -f "$SCRIPT_DIR/third_party/ui2/examples/calculator/calculator.vml" ]; then
+    echo "ERROR: this ui2 checkout has no compile-time VML support; update it." >&2
     exit 1
 fi
 
 mkdir -p "$BUILD_DIR"
+UI2_MODULES="$BUILD_DIR/vmodules"
+python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
+    "$UI2_MODULES/ui2" "$SCRIPT_DIR/third_party/ui2" \
+    "$SCRIPT_DIR/desktop/tools/ui2_headless_bounds.v"
 
 echo "==> Staging desktop sources..."
 APP_SRC="$BUILD_DIR/app-src"
@@ -78,7 +83,7 @@ VCROSS_COMPILER_NAME="$CROSS_CC" "$V" \
     -cflags "--sysroot=$SYSROOT" -ldflags "--sysroot=$SYSROOT" \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
-    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+    -path "@vlib|@vmodules|$UI2_MODULES|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/vinix-desktop" "$APP_SRC"
 STRIP="${VINIX_AMD64_STRIP:-$SCRIPT_DIR/host-pkgs/binutils/usr/local/bin/x86_64-vinix-mlibc-strip}"
 if [ ! -x "$STRIP" ]; then

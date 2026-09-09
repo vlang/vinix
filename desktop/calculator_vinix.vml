@@ -1,0 +1,72 @@
+Screen {
+    id: root
+    width: app.width
+    height: app.height
+    background: #F1F5F9
+    accessibility_value: "vinix.compiled-vml-tree"
+    property f64 panel_width: app.panel_width
+    property f64 panel_height: 340
+    property f64 panel_x: app.panel_x
+    property f64 panel_y: app.panel_y
+    property f64 padding: 12
+    property f64 spacing: 8
+    property f64 content_width: root.panel_width - root.padding * 2
+    property f64 button_width: (root.content_width - root.spacing * 3) / 4
+    property f64 button_height: 44
+
+    Rectangle {
+        id: calculator
+        x: root.panel_x
+        y: root.panel_y
+        width: root.panel_width
+        height: root.panel_height
+        background: #1F2937
+        corner_radius: 12
+
+        Rectangle {
+            x: root.padding
+            y: root.padding
+            width: root.content_width
+            height: 56
+            background: #FFFFFF
+            corner_radius: 8
+
+            Label {
+                id: display
+                text: app.calculator.display
+                x: 10
+                y: 0
+                width: root.content_width - 20
+                height: 56
+                color: #111827
+                font_size: 28
+                align: right
+            }
+        }
+
+        Button { text: "C" on_tap: "C" native: true x: root.padding y: 76 width: root.button_width height: root.button_height background: #EF4444 color: #FFFFFF font_size: 18 align: center corner_radius: 8 }
+        Button { text: "%" on_tap: "%" native: true x: root.padding + root.button_width + root.spacing y: 76 width: root.button_width height: root.button_height background: #CBD5E1 color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "^" on_tap: "^" native: true x: root.padding + 2 * (root.button_width + root.spacing) y: 76 width: root.button_width height: root.button_height background: #CBD5E1 color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "÷" on_tap: "÷" native: true x: root.padding + 3 * (root.button_width + root.spacing) y: 76 width: root.button_width height: root.button_height background: #3478D4 color: #FFFFFF font_size: 18 align: center corner_radius: 8 }
+
+        Button { text: "7" on_tap: "7" native: true x: root.padding y: 76 + root.button_height + root.spacing width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "8" on_tap: "8" native: true x: root.padding + root.button_width + root.spacing y: 76 + root.button_height + root.spacing width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "9" on_tap: "9" native: true x: root.padding + 2 * (root.button_width + root.spacing) y: 76 + root.button_height + root.spacing width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "*" on_tap: "*" native: true x: root.padding + 3 * (root.button_width + root.spacing) y: 76 + root.button_height + root.spacing width: root.button_width height: root.button_height background: #3478D4 color: #FFFFFF font_size: 18 align: center corner_radius: 8 }
+
+        Button { text: "4" on_tap: "4" native: true x: root.padding y: 76 + 2 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "5" on_tap: "5" native: true x: root.padding + root.button_width + root.spacing y: 76 + 2 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "6" on_tap: "6" native: true x: root.padding + 2 * (root.button_width + root.spacing) y: 76 + 2 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "-" on_tap: "-" native: true x: root.padding + 3 * (root.button_width + root.spacing) y: 76 + 2 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #3478D4 color: #FFFFFF font_size: 18 align: center corner_radius: 8 }
+
+        Button { text: "1" on_tap: "1" native: true x: root.padding y: 76 + 3 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "2" on_tap: "2" native: true x: root.padding + root.button_width + root.spacing y: 76 + 3 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "3" on_tap: "3" native: true x: root.padding + 2 * (root.button_width + root.spacing) y: 76 + 3 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "+" on_tap: "+" native: true x: root.padding + 3 * (root.button_width + root.spacing) y: 76 + 3 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #3478D4 color: #FFFFFF font_size: 18 align: center corner_radius: 8 }
+
+        Button { text: "0" on_tap: "0" native: true x: root.padding y: 76 + 4 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "." on_tap: "." native: true x: root.padding + root.button_width + root.spacing y: 76 + 4 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #F8FAFC color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "±" on_tap: "±" native: true x: root.padding + 2 * (root.button_width + root.spacing) y: 76 + 4 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #CBD5E1 color: #111827 font_size: 18 align: center corner_radius: 8 }
+        Button { text: "=" on_tap: "=" native: true x: root.padding + 3 * (root.button_width + root.spacing) y: 76 + 4 * (root.button_height + root.spacing) width: root.button_width height: root.button_height background: #3478D4 color: #FFFFFF font_size: 18 bold: true align: center corner_radius: 8 }
+    }
+}
