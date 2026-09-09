@@ -393,7 +393,10 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 	// async-signal-safe functions, which allocating is not.
 	argv := [&char(path.str), c'-i', &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+	// A valid terminal type is required by terminal applications such as tmux.
+	// `linux` is available in ncurses-terminfo-base, including when tmux is
+	// installed through pkg, and the terminal parser accepts its ANSI output.
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]

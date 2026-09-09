@@ -208,7 +208,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	terminal.ingest_output('abc\b \bD'.bytes())
 	assert terminal.partial.bytestr() == '\$ abD'
 
-	// BusyBox's line editor emits clear-to-end even under TERM=dumb, and an
+	// BusyBox's line editor emits clear-to-end under TERM=linux, and an
 	// escape sequence may straddle two non-blocking reads.
 	terminal.ingest_output('\x1b['.bytes())
 	terminal.ingest_output('J'.bytes())

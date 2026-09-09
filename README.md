@@ -305,6 +305,16 @@ Boot methods that do not use the QEMU runner retain package changes only in the
 running root filesystem. Direct Alpine package names also work, for example
 `pkg install nano`.
 
+`tmux` is included in the optional native developer-tools overlay. Build that
+overlay before the userland to have tmux and its terminal definitions available
+from first boot:
+
+```sh
+./build-developer-tools-aarch64.sh
+./build-userland-aarch64.sh
+tmux
+```
+
 ### C++ Minecraft client on aarch64
 
 Vinix can run the native AArch64 Minetest 5.9.1 client, a C++ Minecraft-style

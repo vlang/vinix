@@ -171,9 +171,9 @@ fn (mut a TerminalApp) poll() bool {
 	return changed
 }
 
-// Output-side terminal emulation. The shell is deliberately told TERM=dumb,
-// so line feed, carriage return, tab and backspace are the cursor operations
-// required for its prompt, line editor and ordinary command output.
+// Output-side terminal emulation. The shell is told TERM=linux so terminal
+// applications such as tmux can start; line feed, carriage return, tab,
+// backspace, and the ANSI cursor operations below cover its interactive output.
 fn (mut a TerminalApp) ingest_output(output []u8) {
 	for ch in output {
 		if a.escape_state != 0 {
@@ -218,8 +218,8 @@ fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
 	}
 }
 
-// Consume the small ANSI surface that interactive line editors use even with
-// TERM=dumb. Unknown CSI and OSC sequences remain invisible rather than
+// Consume the small ANSI surface that interactive applications use with
+// TERM=linux. Unknown CSI and OSC sequences remain invisible rather than
 // leaking their payload into the terminal as literal "[J"-style text.
 fn (mut a TerminalApp) ingest_escape_byte(ch u8) {
 	match a.escape_state {

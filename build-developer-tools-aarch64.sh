@@ -58,6 +58,7 @@ ROOT_PACKAGES=(
     sed
     strace
     tar
+    tmux
     xz
 )
 
@@ -120,7 +121,7 @@ while IFS= read -r link; do
 done
 
 for binary in autoconf automake cmake diff file find gdb git grep \
-    libtool m4 make meson ninja patch pkg-config sed strace tar xz; do
+    libtool m4 make meson ninja patch pkg-config sed strace tar tmux xz; do
     if [ ! -x "$STAGING/usr/bin/$binary" ] \
         && [ ! -x "$STAGING/bin/$binary" ]; then
         echo "missing staged binary: $binary" >&2

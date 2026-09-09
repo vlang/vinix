@@ -118,6 +118,33 @@ diff -u hello.c hello.patched.c > hello.diff || test $? -eq 1
 test -s hello.diff
 echo "PASS patch and diffutils"
 
+tmux_socket=vinix-smoke-$$
+tmux -L "$tmux_socket" -f /dev/null new-session -d -s smoke \
+    'printf "tmux pane ready\\n"; exec sleep 30'
+
+# Starting a detached server exercises the UNIX-domain control socket. Its
+# first pane also makes tmux allocate a Unix98 PTY and launch a shell command
+# behind it. Wait for the command's output rather than relying on a scheduler
+# race between the server and this client.
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    pane_output="$(tmux -L "$tmux_socket" capture-pane -p -t smoke 2>/dev/null || true)"
+    case "$pane_output" in
+        *'tmux pane ready'*) break ;;
+    esac
+    sleep 1
+done
+case "$pane_output" in
+    *'tmux pane ready'*) ;;
+    *)
+        tmux -L "$tmux_socket" kill-server 2>/dev/null || true
+        echo "tmux pane did not produce its expected output" >&2
+        exit 1
+        ;;
+esac
+tmux -L "$tmux_socket" has-session -t smoke
+tmux -L "$tmux_socket" kill-server
+echo "PASS tmux server, UNIX socket, and PTY pane"
+
 echo "PASS file, GDB, and strace startup"
 
 echo "VINIX NATIVE DEVELOPER TOOLS TEST: PASS"

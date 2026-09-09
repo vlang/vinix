@@ -2,12 +2,14 @@
 
 `smoke.sh` runs inside the aarch64 Vinix userland. It validates the packaged
 Git, GNU make, CMake, Ninja, Meson, pkg-config, Autoconf, Automake, Libtool,
-patch/diffutils, file, GDB and strace programs.
+patch/diffutils, file, GDB, strace, and tmux programs.
 
 The test creates and commits a local Git repository, compiles and executes C
 programs through GNU make, CMake/Ninja and Meson/Ninja, has Autoconf generate a
 configure script, checks Automake, Libtool, `file`, GDB and strace startup,
-resolves a local `.pc` file, and applies and verifies a patch.
+resolves a local `.pc` file, applies and verifies a patch, and starts a
+detached tmux session. The tmux check verifies its control socket, server
+lifecycle, and PTY-backed pane.
 
 Build the package overlay with:
 
