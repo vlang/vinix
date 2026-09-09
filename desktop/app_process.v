@@ -545,6 +545,11 @@ fn run_app_process(options AppProcessOptions) {
 		desktop_request_scale(state.requested_scale)
 		match command {
 			.build {
+				// Each application process owns its own frame-array pool. Make the
+				// preceding response's slots reusable before constructing this one;
+				// only the compositor's copy was reset previously, so every click
+				// left another set of child-process arrays committed.
+				begin_frame_elements()
 				tree := app.build(ui2.rect(0, 0, f64(width), f64(height))) or {
 					send_app_error(options.response_fd, app_current_state(desktop), err.msg())
 					free_app_payload(payload)

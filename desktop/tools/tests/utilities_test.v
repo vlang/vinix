@@ -103,6 +103,57 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 	assert clock.elapsed(2_500) == 1_750
 }
 
+fn test_native_calculator_matches_the_example_layout_and_actions() {
+	mut calculator := CalculatorApp{
+		calculator: initial_calculator()
+	}
+	begin_frame_elements()
+	tree := calculator.build(ui2.rect(0, 0, window_width, window_height))!
+	panel := utility_element_named(tree, 'calculator') or { panic('missing calculator panel') }
+	display := utility_element_named(tree, 'calculator.display') or {
+		panic('missing calculator display')
+	}
+	clear := utility_element_named(tree, calculator_actions[0]) or { panic('missing clear key') }
+	equals := utility_element_named(tree, calculator_actions[19]) or { panic('missing equals key') }
+	assert panel.children.len == 21
+	assert display.text == '0'
+	assert clear.text == 'C'
+	assert clear.box.bg == calculator_clear
+	assert clear.native_style
+	assert equals.text == '='
+	assert equals.box.bg == calculator_operator
+	assert equals.text_style.bold
+	free_tree(tree)
+
+	// 2 + 3 = 5, routed through the exact stable ids the compositor receives.
+	calculator.handle(calculator_actions[13])!
+	calculator.handle(calculator_actions[15])!
+	calculator.handle(calculator_actions[14])!
+	calculator.handle(calculator_actions[19])!
+	assert calculator.calculator.display == '5'
+
+	// The application-process request loop resets this pool before every
+	// build. Repeated interaction must reuse the warmed slots, not retain one
+	// new set of arrays for every result shown.
+	begin_frame_elements()
+	warm := calculator.build(ui2.rect(0, 0, window_width, window_height))!
+	free_tree(warm)
+	mut warmed_slots := 0
+	for bucket in 0 .. frame_element_pool_buckets {
+		warmed_slots += frame_element_pool.slots[bucket].len
+	}
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		frame := calculator.build(ui2.rect(0, 0, window_width, window_height))!
+		free_tree(frame)
+	}
+	mut final_slots := 0
+	for bucket in 0 .. frame_element_pool_buckets {
+		final_slots += frame_element_pool.slots[bucket].len
+	}
+	assert final_slots == warmed_slots
+}
+
 fn test_terminal_sends_every_keystroke_through_the_pty_master() {
 	mut input_pipe := [2]int{}
 	assert C.pipe(&input_pipe[0]) == 0

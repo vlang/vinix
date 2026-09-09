@@ -201,7 +201,7 @@ const available_apps = [
 ]
 
 fn open_calculator(mut _ Desktop) !NativeApp {
-	return ui2.new_qml_app[Calculator](calculator_qml_source, initial_calculator())!
+	return open_native_calculator()
 }
 
 fn open_settings_app(mut desktop Desktop) !NativeApp {
