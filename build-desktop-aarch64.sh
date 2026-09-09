@@ -348,16 +348,17 @@ else
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
 fi
 
-# Keep the game optional like Firefox, but pick up a newly built layer even
-# when the base userland archive predates it.
-if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+# Full images pick up locally built optional application layers even when the
+# base archive predates them. Compact images deliberately stop at the GPU,
+# desktop and Firefox qualification closure so they still fit an M1 ESP.
+if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
     echo "==> Staging C++ Minecraft runtime"
     merge_staging_tree "$MINECRAFT_STAGING"
 fi
 
-# Keep the translator as an optional, architecture-isolated layer. Its x86-64
-# libraries live below /usr/libexec, so they cannot replace native ARM64 libs.
-if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+# The translator is architecture-isolated: its x86-64 libraries live below
+# /usr/libexec, so they cannot replace native ARM64 libraries.
+if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "==> Staging x86-64 translation and Wine runtime"
     merge_staging_tree "$X86_TRANSLATION_STAGING"
 fi
@@ -365,7 +366,7 @@ fi
 # Hyprland is an optional build layer because its patched Aquamarine library
 # is produced in the native ARM64 build VM. Its dedicated launcher selects it
 # at boot; simply having the layer installed leaves the native desktop first.
-if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     echo "==> Staging Hyprland and the Vinix Aquamarine backend"
     merge_staging_tree "$HYPRLAND_STAGING"
 fi
@@ -380,7 +381,7 @@ fi
 # Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;
 # use regular files because Vinix's musl loader opens DT_NEEDED objects with
 # O_NOFOLLOW.
-if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     for runtime in libstdc++.so.6 libgcc_s.so.1; do
         if [ -f "$HYPRLAND_STAGING/usr/lib/$runtime" ]; then
             rm -f "$STAGING/usr/lib/$runtime"
@@ -455,7 +456,7 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     done
 fi
 
-if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     for runtime_path in usr/bin/Hyprland usr/bin/start-hyprland-vinix usr/bin/foot usr/lib/libaquamarine.so.11 root/.config/hypr/hyprland.conf; do
         if [ ! -e "$STAGING/$runtime_path" ]; then
             echo "ERROR: staged Hyprland runtime is missing /$runtime_path" >&2

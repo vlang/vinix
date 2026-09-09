@@ -470,6 +470,10 @@ int main(int argc, char **argv) {
     int displayed = copy_to_framebuffer(pixels, TRIANGLE_WIDTH, TRIANGLE_HEIGHT);
     printf("gl-triangle-agx: hardware frame rendered successfully%s\n",
            displayed ? " and copied to /dev/fb0" : "");
+    // This marker is deliberately hardware-specific. VirGL, software Mesa and
+    // the fake G17 backend must never be reported as an M1 hardware pass.
+    if (renderer && contains_ignoring_case(renderer, "apple m1"))
+        printf("VINIX M1 AGX RENDER TEST: PASS\n");
     fflush(stdout);
 
     free(pixels);

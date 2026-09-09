@@ -13,7 +13,9 @@
 #   sudo ~/code/kek.sh selftest fault on purpose; the machine MUST reboot.
 #                               run this first: it proves the signal works
 #   sudo ~/code/kek.sh gpu      shell userland + experimental Apple GPU; the
-#                               boot test then runs the AGX render test
+#                               AGX render test is available from the shell
+#   sudo ~/code/kek.sh gpu-probe  kernel/RTKit probe only; allows an image
+#                               without Mesa for early bring-up diagnostics
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
 #   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
@@ -81,6 +83,10 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --native-resolution)
         MODE="shell + Apple GPU"
         ;;
+    gpu-probe)
+        FLAGS=(--apple-gpu --gpu-probe-only --native-resolution)
+        MODE="shell + Apple GPU probe only"
+        ;;
     desktop-gpu)
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
@@ -119,7 +125,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | gpu-probe | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac

@@ -7,6 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
+GPU_PROBE_ONLY=0
 USE_MINIMAL_INITRAMFS=0
 USE_DESKTOP_INITRAMFS=0
 USE_NATIVE_RESOLUTION=0
@@ -18,6 +19,12 @@ for argument in "$@"; do
         --apple-gpu)
             ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
+            ;;
+        --gpu-probe-only)
+            # Allow a deliberately kernel-only AGX probe. Normal GPU deploys
+            # fail if Mesa or the hardware smoke test is absent, because such
+            # an image cannot answer whether acceleration works.
+            GPU_PROBE_ONLY=1
             ;;
         --apple-dcp)
             # Experimental t8103 internal-panel IOMFB/backlight transport.
@@ -111,7 +118,7 @@ for argument in "$@"; do
             USE_MINIMAL_INITRAMFS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -130,6 +137,11 @@ done
 
 if [ -z "$ESP_MOUNT" ]; then
     echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [options] <mounted_esp_path>"
+    exit 1
+fi
+
+if [ "$GPU_PROBE_ONLY" -eq 1 ] && [ "$ENABLE_APPLE_GPU" -ne 1 ]; then
+    echo "error: --gpu-probe-only requires --apple-gpu or --all-drivers" >&2
     exit 1
 fi
 
@@ -174,30 +186,21 @@ done
 
 if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
     echo "APPLE GPU: kernel AGX probe enabled"
-    # The render node proves the kernel driver initialized, but desktop and GL
-    # acceleration additionally need the exact Mesa build matching its UAPI.
-    # Inspect the image being copied, rather than a possibly stale host staging
-    # directory, so this warning describes what the M1 will actually boot.
-    if tar -tf "$INITRAMFS" | awk -v desktop="$USE_DESKTOP_INITRAMFS" '
-        {
-            path = $0
-            sub(/^\.\//, "", path)
-            if (path == "usr/lib/dri/asahi_dri.so") asahi = 1
-            if (path == "usr/share/vinix/asahi-x11-egl") marker = 1
-            if (path == "usr/bin/gl-triangle-agx") triangle = 1
-            if (path == "usr/bin/vinix-desktop-gpu") gpu_desktop = 1
-        }
-        END {
-            ready = asahi && marker && triangle
-            if (desktop) ready = ready && gpu_desktop
-            exit !ready
-        }
-    '; then
-        echo "APPLE GPU: matching Asahi Mesa and hardware test are present in the initramfs"
+    if [ "$GPU_PROBE_ONLY" -eq 1 ]; then
+        echo "APPLE GPU: probe-only override selected; userspace acceleration is not required"
     else
-        echo "WARNING: AGX is enabled, but the selected initramfs lacks the complete Asahi runtime." >&2
-        echo "         The kernel render-node probe can still be tested; desktop/GL acceleration cannot." >&2
-        echo "         Rebuild build-aarch64-asahi/staging in the ARM64 VM, then rebuild this image." >&2
+        gpu_check=("$SCRIPT_DIR/build-support/check-m1-gpu-image.sh" \
+            --kernel "$KERNEL" \
+            --triangle-source "$SCRIPT_DIR/gl-triangle/egl_triangle.c")
+        if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
+            gpu_check+=(--desktop)
+        fi
+        if ! "${gpu_check[@]}" "$INITRAMFS"; then
+            echo "error: refusing to deploy an M1 GPU image that cannot run the hardware test" >&2
+            echo "hint: rebuild build-aarch64-asahi/staging in the ARM64 VM, then rebuild the selected image" >&2
+            echo "hint: use --gpu-probe-only only when deliberately testing kernel probe/RTKit without Mesa" >&2
+            exit 1
+        fi
     fi
 fi
 

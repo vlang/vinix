@@ -524,6 +524,12 @@ Use `sudo ~/code/kek.sh gpu` to isolate the driver with the shell test image,
 or `sudo ~/code/kek.sh desktop-wifi` to boot the same desktop with AGX disabled
 if the experimental probe resets before reaching userspace.
 
+GPU deployments now run an archive preflight before touching the ESP. It
+checks the native AArch64 kernel, Mesa 25.0.5 Asahi loader and Gallium library,
+the in-guest test source, and—in desktop mode—the accelerated compositor and
+Firefox/X11 closure. Use `sudo ~/code/kek.sh gpu-probe` only when deliberately
+testing the kernel/RTKit probe without a complete Mesa image.
+
 Deploy to an already-mounted M1 EFI system partition with the explicit GPU
 opt-in, then boot through m1n1 so Vinix receives the patched device tree:
 
@@ -531,15 +537,16 @@ opt-in, then boot through m1n1 so Vinix receives the patched device tree:
 ./deploy-m1-efi.sh --apple-gpu /Volumes/EFI
 ```
 
-The test image automatically rebuilds and runs the hardware-only demo when it
-finds the M1 render node. A successful first-hardware boot prints:
+After the desktop starts, open Terminal and run the hardware-only demo below.
+It rebuilds against the libraries in the booted image, rejects software,
+validates a rendered pixel, and reserves this pass marker for Mesa's real
+`Apple M1` renderer (VirGL and fake G17 cannot produce it):
 
 ```text
 VINIX M1 AGX RENDER TEST: PASS
 ```
 
-It applies a two-minute watchdog and always leaves a recovery shell after a
-failure. To rerun it manually or collect the renderer output again:
+To run it or collect the renderer output again:
 
 ```sh
 ls -l /dev/dri/renderD128
