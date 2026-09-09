@@ -132,11 +132,9 @@ fn test_idle_compositor_poll_releases_all_temporary_allocations() {
 	// The production loop executes these calls even when no redraw is needed.
 	// Keep them under the heap tracker independently from tree construction so
 	// a quiet desktop cannot leak through interface dispatch or window scans.
-	desktop.update_clock_at(1_789_000_000, 73)
 	desktop.poll_apps()
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
-		desktop.update_clock_at(1_789_000_000, 73)
 		desktop.poll_apps()
 		desktop.update_switcher()
 	}
@@ -145,58 +143,6 @@ fn test_idle_compositor_poll_releases_all_temporary_allocations() {
 		print_heap_sizes('idle compositor poll allocations by size')
 	}
 	assert live == 0, 'idle compositor polls retained ${live} bytes'
-}
-
-fn test_unchanged_clock_update_does_not_allocate() {
-	mut desktop := Desktop{}
-	// The production helper is deterministic here; unlike waiting for wall
-	// clock ticks this cannot cross a second while the test is running.
-	desktop.update_clock_at(1_789_000_000, 73)
-	C.vinix_heap_begin()
-	for _ in 0 .. 100 {
-		desktop.update_clock_at(1_789_000_000, 73)
-	}
-	live := C.vinix_heap_end()
-	assert live == 0, 'unchanged clock updates retained ${live} bytes'
-}
-
-fn test_changing_clock_releases_replaced_strings() {
-	mut desktop := Desktop{}
-	desktop.update_clock_at(1_789_000_000, 73)
-	C.vinix_heap_begin()
-	for offset in 1 .. 101 {
-		desktop.update_clock_at(1_789_000_000 + offset, 73)
-	}
-	unsafe {
-		desktop.clock_time.free()
-		desktop.clock_date.free()
-	}
-	live := C.vinix_heap_end()
-	assert live == 0, 'changing clock updates retained ${live} bytes'
-}
-
-fn test_once_per_second_redraw_releases_clock_and_frame_allocations() {
-	mut desktop := memory_fixture_desktop()
-	// This is the production idle cadence: the clock changes, marks the
-	// compositor dirty, and the complete visible desktop is rebuilt once.
-	// Testing the clock and frame separately can miss an ownership error at
-	// their boundary.
-	render_and_release(mut desktop)
-	desktop.update_clock_at(1_789_000_000, 73)
-	C.vinix_heap_begin()
-	for offset in 1 .. 101 {
-		desktop.update_clock_at(1_789_000_000 + offset, 73)
-		render_and_release(mut desktop)
-	}
-	unsafe {
-		desktop.clock_time.free()
-		desktop.clock_date.free()
-	}
-	live := C.vinix_heap_end()
-	if live != 0 {
-		print_heap_sizes('once-per-second redraw allocations by size')
-	}
-	assert live == 0, 'once-per-second redraws retained ${live} bytes'
 }
 
 fn test_activity_samples_release_replaced_rows() {

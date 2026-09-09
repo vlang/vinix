@@ -91,11 +91,7 @@ fn test_battery_zero_full_and_unavailable_states() {
 	assert fixture_writes == 0
 }
 
-fn test_battery_taskbar_labels_and_narrow_settings() {
-	assert battery_clock_label(73, '18:54:22') == '73%  |  18:54:22'
-	assert battery_clock_label(0, '00:00:00') == '0%  |  00:00:00'
-	assert battery_clock_label(100, '23:59:59') == '100%  |  23:59:59'
-	assert battery_clock_label(battery_io, '--:--:--') == '--%  |  --:--:--'
+fn test_battery_percentage_and_narrow_settings() {
 	assert battery_percentage_text(101) == '--%'
 	mut app := battery_fixture_app()
 	app.handle(battery_category_action) or { panic(err) }

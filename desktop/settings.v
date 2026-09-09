@@ -108,8 +108,6 @@ struct Theme {
 	taskbar_item_active u32
 	accent              u32
 	accent_dim          u32
-	clock_time          u32
-	clock_date          u32
 	// Wallpaper shortcuts
 	shortcut_label u32
 	shortcut_hover u32
@@ -162,8 +160,6 @@ const theme_default = Theme{
 	taskbar_item_active: 0x2c3d5e
 	accent: 0x5b9cf8
 	accent_dim: 0x27436e
-	clock_time: 0xffffff
-	clock_date: 0x8fa0bd
 	shortcut_label: 0xecf2fb
 	shortcut_hover: 0xffffff
 	shortcut_panel: 0x141d33
@@ -217,8 +213,6 @@ const theme_macos = Theme{
 	taskbar_item_active: 0xc0c0c6
 	accent: 0x3478d4
 	accent_dim: 0xc9d6ea
-	clock_time: 0x1c1c1e
-	clock_date: 0x6b6b70
 	shortcut_label: 0xffffff
 	shortcut_hover: 0xffffff
 	shortcut_panel: 0x000000

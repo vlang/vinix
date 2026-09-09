@@ -14,14 +14,13 @@ exists, with an automatic fallback to the static software binary.
 
 What it does:
 
-- a wallpaper, and a taskbar along the bottom listing every open window
-- a clock in the bottom right corner — time above, date below
+- a wallpaper, and a taskbar containing only Start and the open windows
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, clicking one to bring it to the front
 - a **V Start button** and Windows 7-style two-column Start menu, with recent
   programs, All Programs, type-to-search, system links and a session button
-- **shortcuts down the left edge of the wallpaper**, and matching taskbar
-  launchers, for every application the desktop can open
+- **shortcuts down the left edge of the wallpaper**, and matching Start-menu
+  entries, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
   way back up
 - an **activity monitor** listing every process on the machine with the share
@@ -138,7 +137,7 @@ and the file browser's `files.row.3` both arrive without the window manager
 parsing either.
 
 Add an application by adding an `AppFactory` to `available_apps` in `app.v`;
-it then has a wallpaper shortcut and a taskbar launcher. A ui2 example also
+it then has a wallpaper shortcut and a Start-menu entry. A ui2 example also
 needs its directory listed in `build-desktop-aarch64.sh` so the staging step
 compiles it in.
 
@@ -204,7 +203,7 @@ the insertion point. Files are limited to 64 KB so one accidental open cannot
 consume the desktop on a small system image. New documents default to
 `/root/notes.txt`.
 
-The calendar uses the same local offset as the taskbar clock and lays out a
+The calendar uses the same local offset as the Clock application and lays out a
 full six-week Gregorian month. Its arrow buttons cross year boundaries, a day
 can be selected for a full date in the footer, and **Today** returns to the
 current month. The Clock expands the same local time into an across-the-room
@@ -212,9 +211,8 @@ display and adds a start/stop/reset stopwatch with tenth-second updates.
 
 Utility windows are sized for the logical MacBook desktop rather than the old
 1024×768 QEMU screenshot. Shortcuts fill the available height and flow into a
-second column when needed; taskbar launchers retain their full labels when
-there is room and shrink only far enough to preserve an open-window entry and
-the clock.
+second column when needed; open-window taskbar entries share the available
+space and shrink only as far as a useful title.
 
 ## The activity monitor
 
@@ -307,9 +305,8 @@ each convention — and switches the taskbar between one entry per window, as
 Windows XP had, and one per application with a count, as Windows 7 had.
 
 **Theme** chooses between the desktop's own look and *macOS*, as it looked from
-Yosemite through Mojave: a menu bar across the top carrying the focused
-window's name and the clock, light grey window chrome shaded down its height
-with the title centred over it, three coloured discs at the leading edge, and a
+Yosemite through Mojave: light grey window chrome shaded down its height with
+the title centred over it, three coloured discs at the leading edge, and a
 dock — a rounded panel sized to its contents and centred clear of the bottom
 edge — in place of the full-width taskbar.
 
@@ -393,9 +390,8 @@ The target has no garbage collector, and the element tree is rebuilt whenever
 the screen changes. Two things keep that from growing the process without
 bound: every element id a window needs is built once when the window opens and
 reused, and `free_tree` releases each frame's child arrays after it has been
-presented. The screen is also only recomposed when something it shows has
-actually changed, so an idle desktop rebuilds once a second, when the clock
-ticks.
+presented. An idle desktop is not recomposed until input or application state
+changes.
 
 ## Building and running
 

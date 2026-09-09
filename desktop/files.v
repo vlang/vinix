@@ -26,7 +26,7 @@ mut:
 	is_dir bool
 	size   u64
 	// Cached because these two strings are stable until a new directory is
-	// read, while the element tree is rebuilt every second for the clock.
+	// read, while the element tree is rebuilt whenever desktop state changes.
 	row_action string
 	size_text  string
 }

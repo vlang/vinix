@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-// The taskbar clock. Vinix has a real time clock only in the sense that
-// Limine hands the kernel a boot epoch, so the time comes from
+// Civil-time helpers shared by the clock application. Vinix has a real time
+// clock only in the sense that Limine hands the kernel a boot epoch, so it comes from
 // clock_gettime(CLOCK_REALTIME) and the calendar arithmetic is done here
 // rather than through libc, which keeps the desktop independent of what the
 // target's time zone database does or does not contain.
 module main
-
-// When this desktop was built, stamped in by build-desktop-aarch64.sh. It is
-// shown beside the clock so that a machine booted from a freshly deployed
-// image can be told apart from one still running the last, which is otherwise
-// guesswork: the desktop looks identical either way. A build that did not go
-// through the script — a host test run, say — says `dev`.
-const build_stamp = $d('vinix_build_stamp', 'dev')
-const taskbar_build_label = 'built ${build_stamp}'
 
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
@@ -76,65 +68,11 @@ fn pad2(value int) string {
 	return padded
 }
 
-// The first line puts battery percentage immediately to the left of the time;
-// the second keeps the existing date. Settings shares the five-second cache,
-// so composing a frame does not open the device again within that interval.
-fn (d &Desktop) clock_strings_at(seconds i64, percent int) (string, string) {
-	if seconds < 0 {
-		return battery_clock_label(percent, '--:--:--'), ''
-	}
-	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
-	hour := pad2(civil.hour)
-	minute := pad2(civil.minute)
-	second := pad2(civil.second)
-	time_text := '${hour}:${minute}:${second}'
-	unsafe {
-		hour.free()
-		minute.free()
-		second.free()
-	}
-	day := civil.day.str()
-	date_text := '${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'
-	unsafe { day.free() }
-	label := battery_clock_label(percent, time_text)
-	unsafe { time_text.free() }
-	return label, date_text
-}
-
-// monotonic_millis drives the frame pacing and the redraw clock.
+// monotonic_millis drives frame pacing.
 fn monotonic_millis() i64 {
 	now := desktop_monotonic_ms()
 	if now == ~u64(0) || now > u64(0x7fffffffffffffff) {
 		return 0
 	}
 	return i64(now)
-}
-
-// update_clock refreshes the taskbar's two lines and reports a change as
-// something worth redrawing for. It is what makes an otherwise idle desktop
-// recompose once a second instead of sixty times.
-fn (mut d Desktop) update_clock() {
-	percent := read_battery(false)
-	seconds, _ := desktop_realtime()
-	d.update_clock_at(seconds, percent)
-}
-
-// update_clock_at is split from the two device reads so the allocation rule
-// can be tested without racing the wall clock. The compositor calls it on
-// every pass; the common path for an unchanged second is allocation-free.
-fn (mut d Desktop) update_clock_at(seconds i64, percent int) {
-	if d.clock_sampled && d.clock_seconds == seconds && d.clock_battery == percent {
-		return
-	}
-	time_text, date_text := d.clock_strings_at(seconds, percent)
-	unsafe {
-		d.clock_time.free()
-		d.clock_date.free()
-	}
-	d.clock_time = time_text
-	d.clock_date = date_text
-	d.clock_seconds = seconds
-	d.clock_battery = percent
-	d.clock_sampled = true
-	d.dirty = true
 }

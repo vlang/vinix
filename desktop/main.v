@@ -138,8 +138,8 @@ fn main() {
 	}
 
 	// An opening arrangement, kept clear of the shortcut column down the left
-	// edge. The calculator is not opened: it has a shortcut and a launcher, and
-	// three windows is enough to show what the taskbar is for.
+	// edge. The calculator is not opened: it remains available from its shortcut
+	// and the Start menu, and three windows is enough to show what the taskbar is for.
 	desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
 	desktop.spawn('System', .system, 580, 60, 372, 232)
 	desktop.launch_titled('Files')
@@ -148,7 +148,6 @@ fn main() {
 	for desktop.running {
 		frame_started := monotonic_millis()
 
-		desktop.update_clock()
 		desktop.poll_apps()
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)
@@ -181,11 +180,10 @@ fn main() {
 		// Nothing has changed: the framebuffer already holds the right
 		// picture, so the frame is skipped entirely rather than recomposed into
 		// the same pixels. The wait is interruptible by either input descriptor;
-		// its timeout only drives application and clock housekeeping.
+		// its timeout only drives application housekeeping.
 		if !desktop.dirty {
 			elapsed := monotonic_millis() - frame_started
-			interval := desktop.idle_wait_interval(options.idle_interval,
-				options.frame_interval)
+			interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
 			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue

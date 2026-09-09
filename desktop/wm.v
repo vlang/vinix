@@ -11,12 +11,7 @@ import ui2
 // Action ids are structured so the handler can read them back without a
 // lookup table: 'win.<id>.<part>' addresses one window's chrome, 'task.<id>'
 // its taskbar entry.
-// A narrow control at the screen edge, like Windows' Show desktop button.
-const action_show_desktop = 'taskbar.show_desktop'
-const show_desktop_button_width = 10
-// Launcher buttons and wallpaper shortcuts both carry the index of the
-// application they open.
-const action_launch_prefix = 'taskbar.launch.'
+// Wallpaper shortcuts carry the index of the application they open.
 const action_shortcut_prefix = 'shortcut.'
 // The desktop's own actions all begin with one of these. An action that does
 // not is an application's, and is routed to whichever window it was clicked
@@ -65,15 +60,6 @@ mut:
 	// idle desktop then costs almost nothing, and — with no garbage collector
 	// on this target — stops rebuilding a tree it would only throw away.
 	dirty bool = true
-
-	clock_time string
-	clock_date string
-	// The clock is checked every compositor pass, but formatted only when its
-	// inputs change. With manual memory management, formatting an unchanged
-	// second would otherwise allocate strings that never reach the screen.
-	clock_sampled bool
-	clock_seconds i64
-	clock_battery int
 
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
@@ -250,25 +236,6 @@ fn (mut d Desktop) minimize(id int) {
 	}
 }
 
-// minimize_all_windows clears the workspace without closing anything. Each
-// window remains in the taskbar, where its normal entry restores it.
-fn (mut d Desktop) minimize_all_windows() {
-	mut changed := false
-	for i in 0 .. d.windows.len {
-		if !d.windows[i].minimized {
-			d.windows[i].minimized = true
-			changed = true
-		}
-	}
-	if d.focus != 0 {
-		d.focus = 0
-		changed = true
-	}
-	if changed {
-		d.dirty = true
-	}
-}
-
 // activate is what a taskbar entry does: restore a minimised window, or
 // minimise the one already on top, which is the behaviour a taskbar button is
 // expected to have.
@@ -293,7 +260,7 @@ fn (mut d Desktop) activate(id int) {
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
 	begin_frame_elements()
-	mut children := frame_elements(available_apps.len + d.windows.len + 4)
+	mut children := frame_elements(available_apps.len + d.windows.len + 3)
 	// Shortcuts first, so every window paints over them.
 	shortcuts := d.shortcut_elements()
 	children << shortcuts
@@ -306,15 +273,7 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		}
 		children << d.window_element(window_index)
 	}
-	// The desktop itself stays clean once the last window is closed. In
-	// particular, do not leave a row of launchers, a clock, or a show-desktop
-	// target painted along the bottom with nothing left for them to manage.
-	if d.windows.len > 0 {
-		children << d.taskbar_element()
-		// Keep this outside the taskbar so it remains in the literal lower-right
-		// corner when a centred dock is selected.
-		children << d.show_desktop_button_element()
-	}
+	children << d.taskbar_element()
 	// The Start menu paints over windows and the taskbar, and its panel consumes
 	// clicks in otherwise empty areas so they do not reach the window below.
 	if d.start_menu_open {
@@ -328,17 +287,6 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
 		transparent: true
 	}, children)
-}
-
-// show_desktop_button_element mirrors the slim button at the far right of a
-// Windows taskbar. It deliberately has no label or glyph: it should stay out
-// of the way until the pointer reaches the screen edge.
-fn (d &Desktop) show_desktop_button_element() ui2.Element {
-	theme := d.theme()
-	return ui2.button(action_show_desktop, '', ui2.rect(f64(d.canvas.width - show_desktop_button_width), f64(d.canvas.height - taskbar_height), f64(show_desktop_button_width), f64(taskbar_height)), ui2.BoxStyle{
-		bg: theme.taskbar_item_hover
-		transparent: d.hover != action_show_desktop
-	}, ui2.TextStyle{})
 }
 
 fn (mut d Desktop) window_element(window_index int) ui2.Element {
@@ -853,7 +801,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	dock := theme.dock
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(available_apps.len + d.windows.len + 6)
+	mut children := frame_elements(d.windows.len + 2)
 	item_y := (taskbar_height - taskbar_item_height) / 2
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
@@ -869,53 +817,22 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		color: theme.taskbar_text_active
 	})
 
-	// Then a launcher per available application, native or external, so each is
-	// one click away rather than something only a terminal can open.
-	mut launcher_x := edge_padding + start_button_width + 8
-	launcher_item_width := taskbar_launcher_width(width, launcher_x, available_apps.len)
-	for index in 0 .. available_apps.len {
-		factory := &available_apps[index]
-		id := app_launcher_actions[index]
-		// On a narrow logical display the icon is still useful after a label no
-		// longer is. MacBook-sized desktops retain the full labelled controls.
-		label := if launcher_item_width >= 58 { factory.title } else { '' }
-		children << ui2.button_with_image(id, label, factory.icon, ui2.rect(f64(launcher_x), f64(item_y), f64(launcher_item_width), f64(taskbar_item_height)), ui2.BoxStyle{
-			bg: if d.hover == id { theme.taskbar_item_hover } else { theme.taskbar_item_bg }
-			radius: 6
-		}, ui2.TextStyle{
-			color: theme.taskbar_text
-			size: 12
-			align: .center
-		})
-		launcher_x += launcher_item_width + 6
-	}
-
-	// Middle: what is open. `standard` gives every window an entry, the way
+	// After Start, show only what is open. `standard` gives every window an entry, the way
 	// Windows XP did; `combined` gives each application one entry however many
 	// windows it has, the way Windows 7 did.
 	entries := d.taskbar_entries()
 	defer {
 		unsafe { entries.free() }
 	}
-	mut x := launcher_x + 8
-	// Where the entries must stop. A dock stops where its contents do, but no
-	// wider than the screen: it is centred, so a panel that outgrew the display
-	// would hang off both ends at once.
-	room := width - edge_padding - clock_area_width - 12
-	clock_left := if dock {
-		wanted := x + entries.len * (dock_item_width + taskbar_item_gap)
-		if wanted < room { wanted } else { room }
-	} else {
-		width - clock_area_width
-	}
+	mut x := edge_padding + start_button_width + 8
+	entry_right := width - edge_padding
 
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
 	mut item_width := if dock { dock_item_width } else { taskbar_item_width }
 	if entries.len > 0 {
-		limit := if dock { room } else { clock_left }
-		share := (limit - x + taskbar_item_gap) / entries.len - taskbar_item_gap
+		share := (entry_right - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
 		}
@@ -925,7 +842,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}
 
 	for entry in entries {
-		if x + item_width > clock_left - taskbar_item_gap {
+		if x + item_width > entry_right {
 			break
 		}
 		bg := if entry.active {
@@ -955,35 +872,6 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		x += item_width + taskbar_item_gap
 	}
 
-	// The clock. A taskbar pins it to the far corner; a dock carries it as its
-	// last item, so the panel grows to hold it rather than leaving it stranded
-	// off to one side of a centred bar.
-	clock_x := if dock { x + 6 } else { width - clock_area_width }
-	clock_width := clock_area_width - taskbar_padding
-	children << ui2.label('clock.time', d.clock_time, ui2.rect(f64(clock_x), 6, f64(clock_width), 20), ui2.TextStyle{
-		color: theme.clock_time
-		size: 17
-		bold: true
-		align: .right
-	})
-	children << ui2.label('clock.date', d.clock_date, ui2.rect(f64(clock_x), 26, f64(clock_width), 16), ui2.TextStyle{
-		color: theme.clock_date
-		size: 11
-		align: .right
-	})
-	// The build stamp shares the date's row from the other end. A row of its
-	// own would not fit — the two lines already fill the bar's height — and
-	// the date is short enough that the two never meet. The string is a
-	// constant, so unlike the clock it costs nothing to compose each second.
-	children << ui2.label('clock.build', taskbar_build_label, ui2.rect(f64(clock_x), 26, f64(clock_width), 16), ui2.TextStyle{
-		color: theme.clock_date
-		size: 11
-		align: .left
-	})
-	if dock {
-		x = clock_x + clock_width + 6
-	}
-
 	// A hairline along the top edge separates a full-width bar from the
 	// wallpaper without a shadow, which would read as heavy at this size. A
 	// dock has its own rounded outline instead.
@@ -1007,27 +895,6 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	return ui2.view('taskbar', ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width), f64(taskbar_height)), ui2.BoxStyle{
 		bg: theme.taskbar_bg
 	}, children)
-}
-
-// Leave room for at least one open-window entry and the clock. The preferred
-// width is used on the roomy MacBook desktop; only narrower logical canvases
-// compress launchers, down to an icon-sized button.
-fn taskbar_launcher_width(screen_width int, start int, count int) int {
-	if count <= 0 {
-		return 0
-	}
-	// The floating dock has padding and a gap before its clock in addition to
-	// what the full-width taskbar needs, so reserve the stricter of the two.
-	limit := screen_width - clock_area_width - taskbar_padding - 12 - taskbar_item_gap - 8 - taskbar_item_min_width
-	available := limit - start - count * 6
-	mut width := available / count
-	if width > launcher_width {
-		width = launcher_width
-	}
-	if width < 36 {
-		width = 36
-	}
-	return width
 }
 
 // TaskbarEntry is one button in the middle of the bar. In standard mode it is
@@ -1220,18 +1087,8 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		return
 	}
 
-	if action == action_show_desktop {
-		d.minimize_all_windows()
-		return
-	}
-
 	if !desktop_owns(action) {
 		d.forward_to_app(x, y, action)
-		return
-	}
-
-	if action.starts_with(action_launch_prefix) {
-		d.launch_index(action[action_launch_prefix.len..].int())
 		return
 	}
 

@@ -67,19 +67,19 @@ fn test_cursor_is_painted_before_the_first_pointer_report() {
 	assert unsafe { desktop.canvas.pixels[11 * desktop.canvas.stride + 9] } == blend(cursor_fill, cursor_halo, 232)
 }
 
-fn test_taskbar_disappears_after_the_last_window_closes() {
+fn test_taskbar_keeps_start_after_the_last_window_closes() {
 	mut desktop := fixture_desktop()
 	mut root := desktop.build_tree()
 	assert switcher_element_named(root, 'taskbar') != none
-	assert switcher_element_named(root, action_show_desktop) != none
+	assert switcher_element_named(root, action_start_toggle) != none
 	free_tree(root)
 
 	for desktop.windows.len > 0 {
 		desktop.close_window(desktop.focus)
 	}
 	root = desktop.build_tree()
-	assert switcher_element_named(root, 'taskbar') == none
-	assert switcher_element_named(root, action_show_desktop) == none
+	assert switcher_element_named(root, 'taskbar') != none
+	assert switcher_element_named(root, action_start_toggle) != none
 	free_tree(root)
 }
 

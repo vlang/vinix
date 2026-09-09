@@ -366,7 +366,7 @@ run-firefox
 run-firefox https://example.com
 ```
 
-After rebuilding the desktop image, its wallpaper and taskbar also contain a
+After rebuilding the desktop image, its wallpaper and Start menu contain a
 Firefox launcher. Clicking it hands the framebuffer, pointer and keyboard to
 Xorg for the lifetime of Firefox, then returns to the native desktop when the
 browser exits:
@@ -387,6 +387,8 @@ its required input bridge. If the compiled bridge is absent, rebuild X11 first.
 dependency closure, including GTK/X11, fonts, TLS certificates, and media
 libraries. It defaults to Alpine 3.22's Firefox 140 ESR: newer Alpine builds
 currently link Scudo, whose virtual-memory contract Vinix does not yet provide.
+Firefox uses the system GTK installation directly, without launcher-local GTK
+backend or accessibility overrides.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
 The compact desktop image used by the default M1 deployment merges the Firefox

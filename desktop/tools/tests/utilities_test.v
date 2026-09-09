@@ -215,7 +215,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	assert terminal.partial.bytestr() == '\$ abD'
 }
 
-fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
+fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps.len == 14
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
@@ -243,13 +243,8 @@ fn test_utility_launchers_fit_macbook_and_fallback_layouts() {
 	assert available_apps[13].process_name == 'vinix-wine-word2010'
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
-	assert app_launcher_actions.len == available_apps.len
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
-	launcher_start := taskbar_padding + start_button_width + 8
-	assert taskbar_launcher_width(1280, launcher_start, available_apps.len) == 57
-	assert taskbar_launcher_width(1152, launcher_start, available_apps.len) == 48
-	assert taskbar_launcher_width(1024, launcher_start, available_apps.len) == 39
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
 }
@@ -324,39 +319,33 @@ fn test_start_menu_system_link_opens_system_window() {
 	assert desktop.windows[0].page == .system
 }
 
-fn test_show_desktop_button_minimizes_every_window() {
+fn test_taskbar_contains_only_start_and_open_windows() {
 	mut desktop := Desktop{
 		canvas: Canvas{
 			width: 1280
 			height: 720
 		}
 	}
-	first := desktop.spawn('One', .welcome, 10, 10, 300, 200)
+	desktop.spawn('One', .welcome, 10, 10, 300, 200)
 	desktop.spawn('Two', .system, 20, 20, 300, 200)
-	desktop.minimize(first)
-	desktop.dirty = false
 
 	root := desktop.build_tree()
-	button := utility_element_named(root, action_show_desktop) or {
-		panic('missing Show desktop button')
-	}
-	assert int(button.frame.x) == 1280 - show_desktop_button_width
-	assert int(button.frame.y) == 720 - taskbar_height
-	assert int(button.frame.width) == show_desktop_button_width
-	assert int(button.frame.height) == taskbar_height
+	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
+	assert taskbar.children.len == 4
+	assert utility_element_named(taskbar, action_start_toggle) != none
+	assert utility_element_named(taskbar, 'task.1') != none
+	assert utility_element_named(taskbar, 'task.2') != none
+	assert utility_element_named(taskbar, 'clock.time') == none
+	assert utility_element_named(taskbar, 'clock.date') == none
 	free_tree(root)
 
-	desktop.targets << HitTarget{
-		action_id: action_show_desktop
-		x: 1280 - show_desktop_button_width
-		y: 720 - taskbar_height
-		width: show_desktop_button_width
-		height: taskbar_height
-	}
-	desktop.on_pointer_down(1279, 719)
-	assert desktop.visible_window_count() == 0
-	assert desktop.focus == 0
-	assert desktop.dirty
+	desktop.close_window(2)
+	desktop.close_window(1)
+	empty := desktop.build_tree()
+	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
+	assert empty_taskbar.children.len == 2
+	assert utility_element_named(empty_taskbar, action_start_toggle) != none
+	free_tree(empty)
 }
 
 fn test_firefox_requests_an_exclusive_display_handoff() {

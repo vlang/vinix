@@ -44,14 +44,10 @@ struct AppFactory {
 	open fn (mut desktop Desktop) !NativeApp = unsafe { nil }
 }
 
-// Action ids are literals because taskbar launchers, Start-menu entries and
-// shortcuts are rebuilt on every redraw and Vinix runs without a garbage
+// Action ids are literals because Start-menu entries and shortcuts are rebuilt
+// on every redraw and Vinix runs without a garbage
 // collector. Keep them parallel with available_apps; their numeric suffix is
 // what launch_index reads back.
-const app_launcher_actions = ['taskbar.launch.0', 'taskbar.launch.1', 'taskbar.launch.2',
-	'taskbar.launch.3', 'taskbar.launch.4', 'taskbar.launch.5', 'taskbar.launch.6', 'taskbar.launch.7',
-	'taskbar.launch.8', 'taskbar.launch.9', 'taskbar.launch.10', 'taskbar.launch.11',
-	'taskbar.launch.12', 'taskbar.launch.13']
 const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2', 'start.launch.3',
 	'start.launch.4', 'start.launch.5', 'start.launch.6', 'start.launch.7', 'start.launch.8',
 	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13']
@@ -59,7 +55,7 @@ const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcu
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
 	'shortcut.12', 'shortcut.13']
 
-// available_apps is what the taskbar and the wallpaper offer. The calculator's
+// available_apps is what the Start menu and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
 // matches what the example asks for rather than a number guessed here.
 const available_apps = [

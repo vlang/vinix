@@ -31,7 +31,7 @@ has since disappeared or changed state.
 
 ## Display
 
-Open **Settings** from its wallpaper shortcut or taskbar launcher, then select
+Open **Settings** from its wallpaper shortcut or the Start menu, then select
 **Display**.
 
 ### Scale

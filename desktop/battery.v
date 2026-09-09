@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
-// One read-only client shared by Settings and the bottom-right taskbar clock.
+// Battery presentation shared by Settings and the device-backed client.
 module main
 
 import ui2
@@ -171,10 +171,6 @@ fn battery_percentage_text(percent int) string {
 		return '--%'
 	}
 	return battery_percentage_labels[percent]
-}
-
-fn battery_clock_label(percent int, clock string) string {
-	return '${battery_percentage_text(percent)}  |  ${clock}'
 }
 
 fn battery_status_text(percent int) string {

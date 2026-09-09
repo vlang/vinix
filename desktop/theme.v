@@ -90,7 +90,6 @@ const taskbar_item_width = 168
 // Entries shrink to share the bar before any of them is dropped, but only
 // down to here — narrower than this and a title says nothing useful.
 const taskbar_item_min_width = 84
-const launcher_width = 88
 // A dock's entries are narrower than a taskbar's, and the panel floats this
 // far clear of the screen's bottom edge.
 const dock_item_width = 122

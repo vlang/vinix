@@ -33,11 +33,9 @@ mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_RUNTIME_DIR" \
 chmod 700 "$XDG_RUNTIME_DIR"
 chmod 1777 /dev/shm
 
-# GTK is only a packaged client library here; Xorg owns the framebuffer. Avoid
-# its Wayland, accessibility-bus and MIT-SHM paths, none of which Vinix needs.
-export GDK_BACKEND=x11
-export MOZ_ENABLE_WAYLAND=0
-export NO_AT_BRIDGE=1
+# Firefox's X11 compositor otherwise uses MIT-SHM, which Vinix's Xorg does not
+# expose yet. This is independent of GTK selection; GTK now uses the system-wide
+# configuration shared by every desktop application.
 export MOZ_DISABLE_XSHM=1
 
 # Vinix does not implement Linux namespaces/seccomp yet. Firefox's individual
