@@ -72,7 +72,15 @@ if [ "$#" -eq 0 ]; then
 fi
 
 if [ -n "${DISPLAY:-}" ]; then
+    # The native desktop supplies a private 1280x900 Xvfb display with no X11
+    # window manager. Firefox otherwise chooses a toplevel around 90% of that
+    # display, leaving the X root background visible along the right and bottom
+    # edges of the Vinix window. Match the hosted surface explicitly; callers
+    # using a different surface can override both dimensions.
+    hosted_width="${VINIX_FIREFOX_WINDOW_WIDTH:-1280}"
+    hosted_height="${VINIX_FIREFOX_WINDOW_HEIGHT:-900}"
     exec "$browser" --no-remote --new-instance \
+        --width "$hosted_width" --height "$hosted_height" \
         --profile "$VINIX_FIREFOX_PROFILE" "$@"
 fi
 
