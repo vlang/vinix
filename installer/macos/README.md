@@ -51,6 +51,22 @@ rolling `m1-installer-latest` release. The permanent download URL is:
 The app is ad-hoc signed for local development. Public distribution still
 requires signing with a Developer ID certificate and Apple notarization.
 
+## First app launch
+
+Apple does not provide Developer ID distribution or notarization with a free
+developer account; eligible organizations can separately apply for a program
+fee waiver. The DMG therefore includes `READ ME FIRST.txt` with Apple's
+supported one-time override for an app from an unidentified developer:
+
+1. Try to open **Vinix Installer**, then dismiss the warning.
+2. Open **System Settings > Privacy & Security**.
+3. Scroll to **Security**, click **Open Anyway** next to Vinix Installer, and
+   confirm **Open**.
+
+macOS saves the exception for later launches. Do not instruct users to disable
+Gatekeeper globally or remove quarantine attributes; the per-app override keeps
+the rest of the Mac's protections enabled.
+
 ## What changes on disk
 
 An internal install shrinks only the APFS container that contains the booted

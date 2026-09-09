@@ -1,0 +1,23 @@
+VINIX INSTALLER — FIRST OPEN
+
+Vinix is free and open-source software. This build is not notarized because
+Apple requires Developer Program membership (normally paid) for Developer ID
+distribution. macOS therefore needs one manual approval before it will open
+the app.
+
+1. Double-click “Vinix Installer”. When macOS says it was not opened, click
+   Done.
+2. Open Apple menu > System Settings > Privacy & Security.
+3. Scroll down to Security and click Open Anyway next to “Vinix Installer”.
+   Apple makes this button available for about one hour after step 1.
+4. Confirm by clicking Open and enter your Mac login password if requested.
+
+macOS saves this exception, so later launches work by double-clicking normally.
+Only approve the app if you downloaded it from the official Vinix GitHub
+release:
+
+https://github.com/vlang/vinix/releases/tag/m1-installer-latest
+
+Apple's guide to this built-in override:
+
+https://support.apple.com/102445

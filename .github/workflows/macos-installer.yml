@@ -65,10 +65,14 @@ jobs:
       - name: Create compressed DMG and checksum
         run: |
           set -euo pipefail
-          mkdir -p dist
+          mkdir -p dist/dmg-root
+          ditto \
+            "build/vinix-installer/Vinix Installer.app" \
+            "dist/dmg-root/Vinix Installer.app"
+          cp "installer/macos/READ ME FIRST.txt" "dist/dmg-root/READ ME FIRST.txt"
           hdiutil create \
             -volname "Vinix Installer" \
-            -srcfolder "build/vinix-installer/Vinix Installer.app" \
+            -srcfolder "dist/dmg-root" \
             -format UDZO \
             "dist/$INSTALLER_ASSET"
           shasum -a 256 "dist/$INSTALLER_ASSET" > "dist/$INSTALLER_ASSET.sha256"
@@ -90,7 +94,7 @@ jobs:
           test "$published_payload_sha" = "$expected_payload_sha"
           gh release edit "$INSTALLER_TAG" \
             --title "Vinix Installer for Apple M1" \
-            --notes "Small network installer for original Apple M1 Macs. The app downloads and verifies the separate Vinix boot image before making disk changes."
+            --notes "Small network installer for original Apple M1 Macs. The app downloads and verifies the separate Vinix boot image before making disk changes. This free build is ad-hoc signed, not Apple-notarized. On first launch, try to open the app, then go to System Settings > Privacy & Security and click Open Anyway. See READ ME FIRST.txt in the DMG."
           gh release upload "$INSTALLER_TAG" \
             "dist/$INSTALLER_ASSET" \
             "dist/$INSTALLER_ASSET.sha256" \
