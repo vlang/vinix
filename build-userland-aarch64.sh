@@ -20,6 +20,7 @@ DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarc
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
+CLAUDE_STAGING="${VINIX_CLAUDE_STAGING:-$SCRIPT_DIR/build-aarch64-claude/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 
 merge_staging_tree() {
@@ -848,6 +849,13 @@ if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
     cp -a "$CODEX_STAGING/." "$STAGING/"
 else
     echo "==> Codex staging not found, skipping (run build-codex-aarch64.sh first)"
+fi
+
+if [ -x "$CLAUDE_STAGING/usr/bin/claude" ]; then
+    echo "==> Integrating Claude Code CLI runtime..."
+    cp -a "$CLAUDE_STAGING/." "$STAGING/"
+else
+    echo "==> Claude Code staging not found, skipping (run build-claude-aarch64.sh first)"
 fi
 
 if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then

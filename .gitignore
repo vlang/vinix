@@ -43,6 +43,7 @@ kernel/tmp.v
 /build-aarch64-java/
 /build-aarch64-firefox/
 /build-aarch64-codex/
+/build-aarch64-claude/
 /build-aarch64-hyprland/
 /build-aarch64-x86-translation/
 /build-aarch64-minecraft/

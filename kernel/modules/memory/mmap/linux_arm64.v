@@ -211,11 +211,9 @@ pub fn syscall_mincore(_ voidptr, address u64, length u64, vec u64) (u64, u64) {
 // madvise(addr, length, advice).
 //
 // MADV_DONTNEED and MADV_FREE promise that the next read of an anonymous page
-// gives back zeroes. That is done by zeroing in place rather than by dropping
-// the pages: mmap() deliberately pre-faults everything because an LDP/STP into
-// an unmapped page aborts without ISV under HVF, which the fault path cannot
-// recover from. Zeroing keeps that invariant and still gives callers the
-// contents they are promised. Every other advice is a hint with nothing to do.
+// gives back zeroes. Resident pages are zeroed in place; sparse large mappings
+// stay absent and the fault path supplies a fresh zeroed page on first access.
+// Every other advice is a hint with nothing to do.
 pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64) {
 	if address % page_size != 0 {
 		return errno.err, errno.einval

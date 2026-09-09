@@ -17,6 +17,11 @@ pub const map_fixed_noreplace = 0x100000
 pub const map_anon = 0x20
 pub const map_anonymous = 0x20
 
+// Runtimes such as JavaScriptCore reserve multi-gigabyte anonymous arenas but
+// commit only a small fraction of them. Keep large reservations sparse and let
+// the existing page-fault path allocate the pages that are actually touched.
+const lazy_anonymous_threshold = u64(64 * 1024 * 1024)
+
 // Resources that need uncached page table mappings (e.g., framebuffers).
 // On ARM64, device memory must be Non-Cacheable so writes reach hardware.
 __global (
@@ -505,15 +510,16 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 		handle_ref(range_handle)
 	}
 
-	// PROT_NONE mappings are address-space reservations, not committed memory.
-	// Large runtimes (notably Firefox's allocators) reserve far more virtual
-	// memory than they will ever touch. Leave those pages absent; mprotect()
-	// commits only the subset made accessible later.
+	// PROT_NONE and large anonymous mappings are address-space reservations, not
+	// committed memory. Large runtimes reserve far more virtual memory than they
+	// will ever touch, so let the page-fault path commit accessible pages on
+	// demand. mprotect() commits a PROT_NONE subset before making it accessible.
 	//
-	// Pre-fault other mappings to avoid demand-paging page faults.
+	// Pre-fault smaller and file-backed mappings to avoid demand-paging faults.
 	// On QEMU+HVF, LDP/STP instructions on unmapped pages cause data aborts
 	// without ISV bit set, which crashes HVF.
-	if prot != prot_none {
+	lazy_anonymous := flags & map_anonymous != 0 && length >= lazy_anonymous_threshold
+	if prot != prot_none && !lazy_anonymous {
 		for i := u64(0); i < length; i += page_size {
 			mut page := unsafe { nil }
 			if flags & map_anonymous != 0 {

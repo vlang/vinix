@@ -18,6 +18,7 @@ NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
+CLAUDE_STAGING="${VINIX_CLAUDE_STAGING:-$SCRIPT_DIR/build-aarch64-claude/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 MUSL_SYSROOT="${VINIX_MUSL_SYSROOT:-$SCRIPT_DIR/build-aarch64-asahi/sysroot}"
 
@@ -319,6 +320,19 @@ else
     echo "Codex CLI staging absent; skipping the Codex boot test"
 fi
 
+if command -v claude >/dev/null 2>&1; then
+    echo "VINIX ARM64 CLAUDE CODE CLI BOOT TEST"
+    if command -v python3 >/dev/null 2>&1; then
+        python3 /root/claude-smoke.py
+    else
+        claude --version
+        claude --help >/dev/null
+        echo "VINIX ARM64 CLAUDE CODE CLI BOOT TEST: PASS (startup only; Python unavailable)"
+    fi
+else
+    echo "Claude Code CLI staging absent; skipping the Claude boot test"
+fi
+
 if [ -x /root/x86-translation-smoke.sh ]; then
     /root/x86-translation-smoke.sh
 else
@@ -390,6 +404,13 @@ if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
     cp -a "$CODEX_STAGING/." "$STAGING/"
 else
     echo "==> Codex staging not found, packaging without Codex"
+fi
+
+if [ -x "$CLAUDE_STAGING/usr/bin/claude" ]; then
+    echo "==> Integrating Claude Code CLI runtime"
+    cp -a "$CLAUDE_STAGING/." "$STAGING/"
+else
+    echo "==> Claude Code staging not found, packaging without Claude"
 fi
 
 if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then

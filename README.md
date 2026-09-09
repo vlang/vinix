@@ -236,6 +236,28 @@ codex --dangerously-bypass-approvals-and-sandbox
 codex exec --dangerously-bypass-approvals-and-sandbox "your task"
 ```
 
+### Claude Code CLI on aarch64
+
+The aarch64 image can also include Anthropic's native ARM64/musl Claude Code
+CLI. The staging layer supplies the Alpine `libgcc`, `libstdc++`, and `ripgrep`
+dependencies required by the musl build:
+
+```sh
+./build-claude-aarch64.sh
+./build-userland-aarch64.sh
+```
+
+Both userland builders merge `build-aarch64-claude/staging` when present. Set
+`VINIX_CLAUDE_STAGING=/path/to/staging` to use another tree. When Python is
+also installed, the VM boot suite runs `/root/claude-smoke.py`, which drives
+`claude --print` against a local Messages API server without requiring
+credentials or Internet access. Start an authenticated session with:
+
+```sh
+claude
+claude --print "your task"
+```
+
 ### Packages on aarch64
 
 Vinix uses Alpine 3.21's aarch64/musl repositories for optional software. Build
