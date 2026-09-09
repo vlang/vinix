@@ -60,9 +60,18 @@ case "$APP" in "$BUILD_DIR"/*.app) /bin/rm -rf -- "$APP" ;; *) exit 1 ;; esac
     "$APP/Contents/Resources/fetch-vinix-payload.sh"
 
 echo "==> Compiling native ui2 installer"
-"$V" -prod -path "@vlib|@vmodules|$ROOT/third_party" \
+"$V" -prod -gc none -path "@vlib|@vmodules|$ROOT/third_party" \
     -d "vinix_source_root=$ROOT" \
     -o "$APP/Contents/MacOS/vinix-installer" "$SCRIPT_DIR"
+
+# Boehm's dyld image callback aborts when recent macOS releases dynamically
+# load WritingToolsUILibrary during AppKit startup. Keep this small app on V's
+# native lifetime management and fail packaging if Boehm is linked back in.
+if /usr/bin/nm "$APP/Contents/MacOS/vinix-installer" \
+    | /usr/bin/grep -q '_GC_add_roots'; then
+    echo "ERROR: installer unexpectedly contains the incompatible Boehm GC runtime" >&2
+    exit 1
+fi
 
 if [ "$BUNDLE_PAYLOAD" -eq 1 ]; then
     echo "==> Bundling Vinix desktop payload"
