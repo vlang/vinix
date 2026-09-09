@@ -269,7 +269,7 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	// Brightness is the machine's, not the focused window's: F1 and F2 dim and
 	// brighten the panel whatever is on top, and are taken out of the stream so
 	// a terminal does not also receive them as an escape sequence.
-	rest := d.take_brightness_keys(switched)
+	mut rest := d.take_brightness_keys(switched)
 	if rest.len == 0 {
 		return
 	}
