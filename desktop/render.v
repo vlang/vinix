@@ -748,9 +748,10 @@ const cursor_mask = [
 ]
 
 fn (mut d Desktop) draw_cursor() {
-	if !d.pointer_present {
-		return
-	}
+	// Keep a visible cursor even while /dev/pointer is between reports (or is
+	// temporarily unavailable). The desktop has a useful initial position at
+	// its centre, and hiding that position makes a working QEMU tablet appear
+	// to have no cursor at all until its next complete report arrives.
 	for row, line in cursor_mask {
 		for col := 0; col < line.len; col++ {
 			match line[col] {

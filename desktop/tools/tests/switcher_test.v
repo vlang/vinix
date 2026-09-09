@@ -11,6 +11,7 @@ import ui2
 const cmd_tab = '\x1b[9;9u'
 const cmd_shift_tab = '\x1b[9;10u'
 const cmd_released = '\x1b[57444;1:3u'
+const cmd_w = '\x1b[119;9u'
 
 // Three windows, opened oldest first, so the painting order is One, Two,
 // Three and the switcher's own order -- most recently raised first -- is the
@@ -39,6 +40,28 @@ fn switcher_element_named(root ui2.Element, id string) ?ui2.Element {
 fn title_of(desktop &Desktop, id int) string {
 	index := desktop.window_index(id) or { return '' }
 	return desktop.windows[index].title
+}
+
+fn test_cmd_w_closes_the_focused_window_before_app_key_delivery() {
+	mut desktop := fixture_desktop()
+	closed := desktop.focus
+
+	// Ordinary bytes in the same read survive, while the CSI-u chord is taken
+	// by the window manager and the former top window is removed.
+	assert desktop.take_window_shortcuts('a${cmd_w}b') == 'ab'
+	assert desktop.window_index(closed) == none
+	assert title_of(desktop, desktop.focus) == 'Two'
+}
+
+fn test_cursor_is_painted_before_the_first_pointer_report() {
+	mut desktop := Desktop{
+		canvas: new_canvas(64, 64)
+		pointer_x: 10
+		pointer_y: 12
+	}
+	assert !desktop.pointer_present
+	desktop.draw_cursor()
+	assert unsafe { desktop.canvas.pixels[12 * desktop.canvas.stride + 10] } == cursor_edge
 }
 
 fn test_drag_redraws_only_after_pointer_motion() {
