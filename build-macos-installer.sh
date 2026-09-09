@@ -7,6 +7,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SCRIPT_DIR="$ROOT/installer/macos"
 BUILD_DIR=${VINIX_INSTALLER_BUILD_DIR:-"$ROOT/build/vinix-installer"}
 APP="$BUILD_DIR/Vinix Installer.app"
+PAYLOAD_DIR=${VINIX_INSTALLER_PAYLOAD_DIR:-}
 THIN=0
 
 case "${1:-}" in
@@ -27,19 +28,27 @@ V=${V:-}
     exit 1
 }
 
-PAYLOAD_FILES="
-boot-image/limine-bin/BOOTAA64.EFI
-build-support/limine.conf
-kernel/bin/vinix
-build-support/init-aarch64/initramfs-desktop.tar
-"
-for relative in $PAYLOAD_FILES; do
-    [ -f "$ROOT/$relative" ] || {
-        echo "ERROR: missing $relative" >&2
-        echo "Build Limine and the compact ARM64 desktop before packaging the installer." >&2
-        exit 1
-    }
-done
+if [ "$THIN" -eq 0 ]; then
+    if [ -n "$PAYLOAD_DIR" ]; then
+        BOOT_EFI="$PAYLOAD_DIR/BOOTAA64.EFI"
+        LIMINE_CONF="$PAYLOAD_DIR/limine.conf"
+        VINIX_KERNEL="$PAYLOAD_DIR/vinix"
+        INITRAMFS="$PAYLOAD_DIR/initramfs.tar"
+    else
+        BOOT_EFI="$ROOT/boot-image/limine-bin/BOOTAA64.EFI"
+        LIMINE_CONF="$ROOT/build-support/limine.conf"
+        VINIX_KERNEL="$ROOT/kernel/bin/vinix"
+        INITRAMFS="$ROOT/build-support/init-aarch64/initramfs-desktop.tar"
+    fi
+
+    for payload_file in "$BOOT_EFI" "$LIMINE_CONF" "$VINIX_KERNEL" "$INITRAMFS"; do
+        [ -f "$payload_file" ] || {
+            echo "ERROR: missing installer payload file: $payload_file" >&2
+            echo "Build Limine and the compact ARM64 desktop, or set VINIX_INSTALLER_PAYLOAD_DIR." >&2
+            exit 1
+        }
+    done
+fi
 
 case "$APP" in "$BUILD_DIR"/*.app) /bin/rm -rf -- "$APP" ;; *) exit 1 ;; esac
 /bin/mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -55,11 +64,10 @@ echo "==> Compiling native ui2 installer"
 if [ "$THIN" -eq 0 ]; then
     echo "==> Bundling Vinix desktop payload"
     /bin/mkdir -p "$APP/Contents/Resources/payload"
-    /bin/cp "$ROOT/boot-image/limine-bin/BOOTAA64.EFI" "$APP/Contents/Resources/payload/"
-    /bin/cp "$ROOT/build-support/limine.conf" "$APP/Contents/Resources/payload/"
-    /bin/cp "$ROOT/kernel/bin/vinix" "$APP/Contents/Resources/payload/"
-    /bin/cp "$ROOT/build-support/init-aarch64/initramfs-desktop.tar" \
-        "$APP/Contents/Resources/payload/initramfs.tar"
+    /bin/cp "$BOOT_EFI" "$APP/Contents/Resources/payload/BOOTAA64.EFI"
+    /bin/cp "$LIMINE_CONF" "$APP/Contents/Resources/payload/limine.conf"
+    /bin/cp "$VINIX_KERNEL" "$APP/Contents/Resources/payload/vinix"
+    /bin/cp "$INITRAMFS" "$APP/Contents/Resources/payload/initramfs.tar"
 fi
 
 /usr/bin/codesign --force --deep --sign - "$APP" >/dev/null

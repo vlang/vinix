@@ -1,0 +1,111 @@
+name: Build M1 installer
+
+on:
+  push:
+    paths:
+      - .github/workflows/macos-installer.yml
+      - build-macos-installer.sh
+      - build-support/find-v.sh
+      - installer/macos/**
+  pull_request:
+    paths:
+      - .github/workflows/macos-installer.yml
+      - build-macos-installer.sh
+      - build-support/find-v.sh
+      - installer/macos/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m1-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  INSTALLER_ASSET: Vinix-Installer-M1.dmg
+  INSTALLER_TAG: m1-installer-latest
+  UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
+  V_COMMIT: 9fd548810f09e5b49f0b06e500ef5d6845cc8142
+
+jobs:
+  build:
+    name: Build self-contained DMG
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out Vinix
+        uses: actions/checkout@v6
+
+      - name: Restore the published boot payload
+        env:
+          PAYLOAD_URL: https://github.com/vlang/vinix/releases/download/${{ env.INSTALLER_TAG }}/${{ env.INSTALLER_ASSET }}
+        run: |
+          set -euo pipefail
+          previous_dmg="$RUNNER_TEMP/previous-$INSTALLER_ASSET"
+          mount_dir="$RUNNER_TEMP/previous-installer"
+          payload_dir="$RUNNER_TEMP/vinix-installer-payload"
+          mkdir -p "$mount_dir" "$payload_dir"
+          curl --fail --location --retry 5 --retry-all-errors \
+            "$PAYLOAD_URL" --output "$previous_dmg"
+          hdiutil attach "$previous_dmg" -readonly -nobrowse -mountpoint "$mount_dir"
+          trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true' EXIT
+          ditto \
+            "$mount_dir/Vinix Installer.app/Contents/Resources/payload" \
+            "$payload_dir"
+          for file in BOOTAA64.EFI limine.conf vinix initramfs.tar; do
+            test -s "$payload_dir/$file"
+          done
+
+      - name: Build pinned V compiler and ui2
+        run: |
+          set -euo pipefail
+          git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
+          git -C "$RUNNER_TEMP/v" checkout "$V_COMMIT"
+          make -C "$RUNNER_TEMP/v"
+          git clone https://github.com/vlang/ui2 third_party/ui2
+          git -C third_party/ui2 checkout "$UI2_COMMIT"
+
+      - name: Test and build the installer app
+        env:
+          V: ${{ runner.temp }}/v/v
+          VINIX_INSTALLER_PAYLOAD_DIR: ${{ runner.temp }}/vinix-installer-payload
+        run: |
+          set -euo pipefail
+          ./installer/macos/test.sh
+          ./build-macos-installer.sh
+          test "$(uname -m)" = arm64
+          file "build/vinix-installer/Vinix Installer.app/Contents/MacOS/vinix-installer" | grep -q arm64
+
+      - name: Create compressed DMG and checksum
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          hdiutil create \
+            -volname "Vinix Installer" \
+            -srcfolder "build/vinix-installer/Vinix Installer.app" \
+            -format UDZO \
+            "dist/$INSTALLER_ASSET"
+          shasum -a 256 "dist/$INSTALLER_ASSET" > "dist/$INSTALLER_ASSET.sha256"
+          test "$(stat -f %z "dist/$INSTALLER_ASSET")" -lt 2147483648
+
+      - name: Publish rolling GitHub release
+        if: github.repository == 'vlang/vinix' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$INSTALLER_TAG" >/dev/null 2>&1; then
+            gh release create "$INSTALLER_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Vinix Installer for Apple M1" \
+              --notes "Rolling build of the self-contained Vinix installer for original Apple M1 Macs." \
+              --prerelease
+          fi
+          gh release upload "$INSTALLER_TAG" \
+            "dist/$INSTALLER_ASSET" \
+            "dist/$INSTALLER_ASSET.sha256" \
+            --clobber
