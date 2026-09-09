@@ -355,6 +355,21 @@ PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
 mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
+# Hyprland is an explicit alternate desktop session. Keep the selection in
+# this per-run module rather than the image itself: a staged Hyprland runtime
+# must not turn the ordinary desktop launcher into its full-screen terminal.
+case "${VINIX_BOOT_HYPRLAND:-0}" in
+    0|'') ;;
+    1)
+        mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix"
+        : > "$PACKAGE_RUNTIME_ROOT/etc/vinix/boot-hyprland"
+        ;;
+    *)
+        echo "ERROR: VINIX_BOOT_HYPRLAND must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
+
 # Old full-userland archives can contain the Asahi Gallium library and smoke
 # test while missing the tiny DRI loader symlink.  A fake-G17 boot is useful
 # only when Mesa can open that loader, so carry the matching staged pair in

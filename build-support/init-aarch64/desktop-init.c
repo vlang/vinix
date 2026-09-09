@@ -76,6 +76,18 @@ static int executable_available(const char *path) {
 	return 1;
 }
 
+/* Hyprland is an optional alternate session. The QEMU runner adds this
+ * per-boot marker for run-hyprland-aarch64.sh, so merely staging its runtime
+ * never replaces the native desktop with a full-screen terminal. */
+static int hyprland_requested(void) {
+	i64 fd = syscall4(56 /* openat */, (u64)(i64)-100 /* AT_FDCWD */,
+	                  (u64)"/etc/vinix/boot-hyprland", 0 /* O_RDONLY */, 0);
+	if (fd < 0)
+		return 0;
+	syscall1(57 /* close */, (u64)fd);
+	return 1;
+}
+
 static char *environment[] = {
 	"PATH=/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin",
 	"HOME=/root",
@@ -116,7 +128,7 @@ void _start(void) {
 		print("init: Wi-Fi firmware load failed; continuing without wireless\n");
 #endif
 
-	if (executable_available(hyprland[0])) {
+	if (hyprland_requested() && executable_available(hyprland[0])) {
 		print("\nVinix: starting Hyprland\n");
 		child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
 		if (child == 0) {

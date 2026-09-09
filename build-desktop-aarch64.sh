@@ -370,8 +370,8 @@ if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
 fi
 
 # Hyprland is an optional build layer because its patched Aquamarine library
-# is produced in the native ARM64 build VM. When present, desktop-init starts
-# it first and retains the native Vinix desktop as a recovery fallback.
+# is produced in the native ARM64 build VM. Its dedicated launcher selects it
+# at boot; simply having the layer installed leaves the native desktop first.
 if [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     echo "==> Staging Hyprland and the Vinix Aquamarine backend"
     merge_staging_tree "$HYPRLAND_STAGING"

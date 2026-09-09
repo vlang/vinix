@@ -455,10 +455,11 @@ its applications use the same input path on both architectures. Pass
 `--no-build` to boot an existing image; this also allows an image built on
 Linux to run under QEMU TCG on an Apple Silicon host.
 
-An existing `build-aarch64-hyprland/staging` layer changes the first session to
-Hyprland while keeping this desktop as the recovery session. Produce that layer
-with `build-hyprland-aarch64.sh` on an ARM64 host, then use
-`run-hyprland-aarch64.sh`; `Super`+`M` exits Hyprland and returns here.
+An existing `build-aarch64-hyprland/staging` layer remains available without
+changing the ordinary desktop session. Produce that layer with
+`build-hyprland-aarch64.sh` on an ARM64 host, then use
+`run-hyprland-aarch64.sh` to select it for that boot; `Super`+`M` exits
+Hyprland and returns here.
 
 Options the desktop itself takes:
 

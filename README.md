@@ -432,11 +432,12 @@ to the checkout used to assemble the desktop image:
 ./run-hyprland-aarch64.sh --no-build --grab-keys
 ```
 
-When the layer is present, desktop init starts Hyprland automatically. `Super`+
-`Return` opens Foot, `Super`+`Q` closes a window, and `Super`+`M` exits to the
-native Vinix recovery desktop. The runtime smoke check is available inside the
-guest as `/root/hyprland-smoke.sh`. Press `Super`+`D` for a full-screen,
-dependency-free dashboard intended for live demonstrations and screenshots.
+`run-hyprland-aarch64.sh` selects Hyprland for that boot; the ordinary desktop
+launcher always starts the native Vinix desktop. In Hyprland, `Super`+`Return`
+opens Foot, `Super`+`Q` closes a window, and `Super`+`M` exits to the native
+Vinix desktop. The runtime smoke check is available inside the guest as
+`/root/hyprland-smoke.sh`. Press `Super`+`D` for a full-screen, dependency-free
+dashboard intended for live demonstrations and screenshots.
 
 ### Apple M1 GPU test image
 

@@ -16,4 +16,5 @@ if [ ! -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ] || \
 fi
 
 export VINIX_HYPRLAND_STAGING="$HYPRLAND_STAGING"
+export VINIX_BOOT_HYPRLAND=1
 exec "$SCRIPT_DIR/run-desktop-aarch64.sh" "$@"
