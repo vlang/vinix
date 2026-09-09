@@ -281,7 +281,7 @@ pub fn initialise(hhdm u64) {
 		mut device := &VirtioBlockDevice{
 			base: base
 			hhdm: hhdm
-			name: 'vd${u8(`a` + index)}'
+			name: 'vd' + rune(`a` + index).str()
 		}
 		mmio_w32(base + reg_status, 0)
 		mmio_w32(base + reg_status, status_acknowledge)
@@ -339,10 +339,12 @@ pub fn mount_persistent_home() bool {
 		node := fs.get_node(vfs_root, '/dev/${device.name}', true) or { continue }
 		filesystem, ok := ext2.ext2_init(node)
 		if !ok {
+			println('virtio-blk: /dev/${device.name} is not a readable ext2 volume')
 			continue
 		}
 		fs.add_filesystem(filesystem, 'qemu-persist')
 		fs.mount_at_root('/dev/${device.name}', '/root', 'qemu-persist') or {
+			println('virtio-blk: ext2 volume /dev/${device.name} could not mount at /root')
 			return false
 		}
 		println('virtio-blk: persistent ext2 mounted at /root from /dev/${device.name}')
