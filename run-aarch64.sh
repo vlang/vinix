@@ -3,7 +3,7 @@
 # Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu|--virgl]
 #                         [--fake-g17]
 #                         [--mem=MB]
-#                         [--disk=MB] [--replace] [--grab-keys]
+#                         [--disk=MB] [--persist[=MB]] [--replace] [--grab-keys]
 #
 # --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
 # its own application switcher, so without it the desktop's Cmd-Tab is never
@@ -11,6 +11,10 @@
 #
 # --replace stops a VM already using the boot disk. Without it a second run
 # refuses, rather than writing into the disk of a running one.
+#
+# --persist attaches a separate ext2 volume and mounts it at /root. The base
+# system still comes from the initramfs, while files below /root survive QEMU
+# restarts. --persist=MB chooses its one-time image size.
 #
 # --mem=MB (or VINIX_QEMU_MEM) sizes guest RAM. The virt machine places RAM
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
@@ -42,6 +46,8 @@ LIMINE_CONF_QEMU="$(mktemp -t vinix-limine-qemu)"
 QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-${BOOT_DISK}.packages.tar}"
 PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
+PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-${BOOT_DISK}.root.ext2}"
+PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-1024}"
 PACKAGE_RUNTIME_DIR=""
 PACKAGE_SERVER_PID=""
 
@@ -65,6 +71,7 @@ VIRTIO_GPU=0
 FAKE_G17=0
 REPLACE_RUNNING=0
 GRAB_KEYS=0
+PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-0}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
@@ -75,6 +82,8 @@ for arg in "$@"; do
         --fake-g17)   FAKE_G17=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
         --disk=*)     BOOT_DISK_SIZE_MB="${arg#*=}" ;;
+        --persist)    PERSIST_ENABLED=1 ;;
+        --persist=*)  PERSIST_ENABLED=1; PERSIST_SIZE_MB="${arg#*=}" ;;
         --replace)    REPLACE_RUNNING=1 ;;
         --grab-keys)  GRAB_KEYS=1 ;;
     esac
@@ -83,6 +92,19 @@ done
 case "$BOOT_DISK_SIZE_MB" in
     ''|*[!0-9]*)
         echo "ERROR: --disk must be a size in MiB" >&2
+        exit 1
+        ;;
+esac
+case "$PERSIST_ENABLED" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_PERSIST must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
+case "$PERSIST_SIZE_MB" in
+    ''|*[!0-9]*|0)
+        echo "ERROR: --persist must be a non-zero size in MiB" >&2
         exit 1
         ;;
 esac
@@ -143,8 +165,63 @@ else
 ' "$LIMINE_CONF_QEMU"
 fi
 
+if [ "$PERSIST_ENABLED" -eq 1 ]; then
+    if grep -Eq '^[[:space:]]*cmdline:' "$LIMINE_CONF_QEMU"; then
+        if ! grep -Eq '^[[:space:]]*cmdline:.*vinix\.qemu_persist=1' "$LIMINE_CONF_QEMU"; then
+            sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.qemu_persist=1#' "$LIMINE_CONF_QEMU"
+        fi
+    else
+        sed -i '' '/^[[:space:]]*kaslr:/a\
+    cmdline: vinix.qemu_persist=1
+' "$LIMINE_CONF_QEMU"
+    fi
+fi
+
 if [ "$FAKE_G17" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.fake_g17=1#' "$LIMINE_CONF_QEMU"
+fi
+
+# ── Create the opt-in persistent ext2 home volume ──
+# It is deliberately a different image from the UEFI/FAT boot disk: the
+# kernel's persistent block driver only considers an ext2 volume, so firmware
+# updates and rebuilds cannot accidentally become user-data writes.
+PERSIST_DEVICE_ARGS=()
+if [ "$PERSIST_ENABLED" -eq 1 ]; then
+    if [ -e "$PERSIST_DISK" ] && [ ! -f "$PERSIST_DISK" ]; then
+        echo "ERROR: persistent disk is not a regular file: $PERSIST_DISK" >&2
+        exit 1
+    fi
+    if [ ! -f "$PERSIST_DISK" ]; then
+        if command -v mke2fs >/dev/null 2>&1; then
+            MKFS_EXT2=mke2fs
+        elif command -v mkfs.ext2 >/dev/null 2>&1; then
+            MKFS_EXT2=mkfs.ext2
+        else
+            echo "ERROR: --persist needs mke2fs (install e2fsprogs)." >&2
+            exit 1
+        fi
+        mkdir -p "$(dirname "$PERSIST_DISK")"
+        echo "==> Creating ${PERSIST_SIZE_MB} MiB persistent ext2 volume (one-time)..."
+        persist_bytes=$((PERSIST_SIZE_MB * 1024 * 1024))
+        if command -v truncate >/dev/null 2>&1; then
+            truncate -s "$persist_bytes" "$PERSIST_DISK"
+        elif command -v mkfile >/dev/null 2>&1; then
+            mkfile -n "$persist_bytes" "$PERSIST_DISK"
+        else
+            dd if=/dev/zero of="$PERSIST_DISK" bs=1m count="$PERSIST_SIZE_MB" 2>/dev/null
+        fi
+        # Vinix's ext2 implementation uses the classic 128-byte inode layout.
+        # Disable newer ext4-era features rather than creating an image it may
+        # mount but cannot update correctly.
+        "$MKFS_EXT2" -q -F -t ext2 -b 4096 -I 128 \
+            -O filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum \
+            "$PERSIST_DISK"
+    fi
+    PERSIST_DEVICE_ARGS=(
+        -drive "if=none,format=raw,file=$PERSIST_DISK,id=vinix-persist"
+        -device virtio-blk-device,drive=vinix-persist
+    )
+    echo "==> Persistent /root volume: $PERSIST_DISK"
 fi
 
 # A caller may request a QEMU-only GOP mode without changing the hardware-safe
@@ -243,6 +320,18 @@ if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
             echo "ERROR: it did not let go of $BOOT_DISK; kill -9 $HOLDERS" >&2
             exit 1
         fi
+    fi
+fi
+
+if [ "$PERSIST_ENABLED" -eq 1 ] && command -v lsof >/dev/null 2>&1; then
+    PERSIST_HOLDERS="$(lsof -t -- "$PERSIST_DISK" 2>/dev/null | tr '\n' ' ')"
+    if [ -n "${PERSIST_HOLDERS// /}" ]; then
+        echo "ERROR: persistent disk is already in use: $PERSIST_DISK" >&2
+        for pid in $PERSIST_HOLDERS; do
+            echo "    pid $pid: $(ps -o command= -p "$pid" 2>/dev/null | cut -c1-70)" >&2
+        done
+        echo "Stop the VM using it before starting another one." >&2
+        exit 1
     fi
 fi
 
@@ -575,6 +664,7 @@ set +e
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
     -drive format=raw,file="$BOOT_DISK" \
+    "${PERSIST_DEVICE_ARGS[@]}" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     $NETWORK_FLAGS \

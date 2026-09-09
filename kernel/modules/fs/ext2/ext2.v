@@ -132,6 +132,14 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 	this.refcount--
 }
 
+fn (mut this EXT2Resource) link(_handle voidptr) ? {
+	return none
+}
+
+fn (mut this EXT2Resource) unlink(_handle voidptr) ? {
+	return none
+}
+
 fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	this.l.acquire()
 	// Both failure paths below used to return with the lock still held, which
@@ -337,6 +345,13 @@ fn (mut this EXT2Filesystem) create(parent &fs.VFSNode, name string, mode u32) &
 	new_node.resource = resource
 
 	return new_node
+}
+
+// The on-disk hard-link operation has not been implemented by this small ext2
+// writer.  Keep the VFS contract explicit rather than manufacturing a link
+// that would disappear after the next mount.
+fn (mut this EXT2Filesystem) link(_parent &fs.VFSNode, _path string, mut _old_node fs.VFSNode) ?&fs.VFSNode {
+	return none
 }
 
 fn (mut this EXT2Filesystem) mount(parent &fs.VFSNode, name string, source &fs.VFSNode) ?&fs.VFSNode {

@@ -16,6 +16,7 @@ import aarch64.wdt
 import aarch64.uart
 import aarch64.virtio_input
 import aarch64.virtio_gpu
+import aarch64.virtio_blk
 import aarch64.virtio_net
 import apple.smc
 import apple.ans
@@ -183,9 +184,15 @@ fn kmain_thread(qemu_platform bool) {
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
 	print('kmain_thread: devtmpfs done\n')
+	if qemu_platform {
+		virtio_blk.initialise(memory.get_hhdm_offset())
+	}
 
 	initramfs.initialise()
 	print('kmain_thread: initramfs done\n')
+	if qemu_platform && !virtio_blk.mount_persistent_home() {
+		panic('QEMU persistent storage was requested but could not be mounted')
+	}
 
 	if enable_fake_g17 {
 		print('kmain_thread: init fake G17 DRM driver...\n')

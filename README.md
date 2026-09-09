@@ -305,6 +305,25 @@ Boot methods that do not use the QEMU runner retain package changes only in the
 running root filesystem. Direct Alpine package names also work, for example
 `pkg install nano`.
 
+### Persistent files in aarch64 QEMU
+
+The QEMU runner normally keeps the base system in its initramfs-backed tmpfs.
+Pass `--persist` to attach a separate ext2 disk and mount it at `/root`:
+
+```sh
+./run-aarch64.sh --persist
+```
+
+The disk is created once beside the boot disk as `boot.img.root.ext2` (1 GiB by
+default). Use `--persist=4096` for a 4 GiB new disk, or set
+`VINIX_QEMU_PERSIST_DISK` and `VINIX_QEMU_PERSIST_SIZE_MB` to choose its path
+and initial size. Existing disks are never reformatted. Creating a disk needs
+`mke2fs` from e2fsprogs; on macOS, install it with `brew install e2fsprogs`.
+The system files and package overlay continue to use their existing boot-image
+paths; only `/root` is persistent. As with other writable ext2 experiments,
+shut down the VM cleanly and use `e2fsck` from the host after an interrupted
+run.
+
 `tmux` is included in the optional native developer-tools overlay. Build that
 overlay before the userland to have tmux and its terminal definitions available
 from first boot:
