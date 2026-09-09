@@ -42,6 +42,7 @@ fn kmain_thread() {
 	term.framebuffer_init()
 
 	table.init_syscall_table()
+	table.init_linux_syscall_table()
 	socket.initialise()
 	pipe.initialise()
 	futex.initialise()

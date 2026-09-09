@@ -636,7 +636,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			stderr)
 	}
 
-	auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
+	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
+	// Vinix's mlibc toolchain uses /usr/lib/ld.so. Everything else accepted by
+	// the amd64 ELF loader follows the Linux syscall ABI; this includes Alpine's
+	// /lib/ld-musl-x86_64.so.1 and static Linux executables.
+	linux_abi := ld_path != '/usr/lib/ld.so'
 
 	mut entry_point := unsafe { nil }
 
@@ -653,6 +657,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		}
 
 		entry_point = voidptr(ld_auxval.at_entry)
+		auxval.at_base = ld_auxval.at_base
 
 		unsafe { ld_path.free() }
 	}
@@ -661,6 +666,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
 		new_process.name = '${path}[${new_process.pid}]'
+		new_process.executable_path = path.clone()
+		new_process.linux_abi = linux_abi
 
 		stdin_node := fs.get_node(vfs_root, stdin, true)?
 		stdin_handle := &file.Handle{
@@ -708,6 +715,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		process.pagemap = new_pagemap
 
 		process.name = '${path}[${process.pid}]'
+		process.executable_path = path.clone()
+		process.linux_abi = linux_abi
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process

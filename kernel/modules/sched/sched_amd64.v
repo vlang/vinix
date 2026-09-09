@@ -300,6 +300,12 @@ pub fn dequeue_and_die() {
 	for {}
 }
 
+// Give up the rest of this thread's timeslice without leaving the run queue.
+// This mirrors the ARM scheduler helper used by shared kernel wait loops.
+pub fn reschedule() {
+	yield(true)
+}
+
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
 	mut stacks := []voidptr{}
 
@@ -456,9 +462,13 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	fpu_save(t.fpu_storage)
 
-	// Set all sigactions to default
+	// Linux spells SIG_DFL as zero. The original Vinix/mlibc ABI uses -2.
 	for mut sa in t.sigactions {
-		sa.sa_sigaction = voidptr(-2)
+		if process.linux_abi {
+			sa.sa_sigaction = voidptr(0)
+		} else {
+			sa.sa_sigaction = voidptr(-2)
+		}
 	}
 
 	if want_elf == true {
@@ -482,6 +492,14 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 				stack = &stack[-1]
 			}
 
+			// Linux libcs use AT_RANDOM for their stack canary. It is also harmless
+			// for the legacy mlibc loader, which ignores unknown entries.
+			stack = &u64(u64(stack) - 16)
+			random_kernel_addr := u64(stack)
+			*&u64(random_kernel_addr) = cpu.rdtsc() ^ random_kernel_addr
+			*&u64(random_kernel_addr + 8) = cpu.rdtsc() ^ u64(process)
+			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
+
 			// Zero auxiliary vector entry
 			stack[-1] = 0
 			stack = &stack[-1]
@@ -491,6 +509,30 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack = &stack[-2]
 			stack[0] = elf.at_secure
 			stack[1] = 0
+			stack = &stack[-2]
+			stack[0] = elf.at_hwcap2
+			stack[1] = 0
+			stack = &stack[-2]
+			stack[0] = elf.at_hwcap
+			stack[1] = 0
+			stack = &stack[-2]
+			stack[0] = elf.at_random
+			stack[1] = random_vma
+			stack = &stack[-2]
+			stack[0] = elf.at_pagesz
+			stack[1] = page_size
+			stack = &stack[-2]
+			stack[0] = elf.at_uid
+			stack[1] = u64(process.uid)
+			stack = &stack[-2]
+			stack[0] = elf.at_euid
+			stack[1] = u64(process.euid)
+			stack = &stack[-2]
+			stack[0] = elf.at_gid
+			stack[1] = u64(process.gid)
+			stack = &stack[-2]
+			stack[0] = elf.at_egid
+			stack[1] = u64(process.egid)
 			stack = &stack[-2]
 			stack[0] = elf.at_entry
 			stack[1] = auxval.at_entry
@@ -503,6 +545,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack = &stack[-2]
 			stack[0] = elf.at_phnum
 			stack[1] = auxval.at_phnum
+			stack = &stack[-2]
+			stack[0] = elf.at_base
+			stack[1] = auxval.at_base
 
 			stack[-1] = 0
 			stack = &stack[-1]
@@ -553,6 +598,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
+		new_proc.linux_abi = old_process.linux_abi
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid

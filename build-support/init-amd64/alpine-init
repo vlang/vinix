@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Keep the QEMU smoke test observable even when its UEFI firmware does not
+# expose a framebuffer to Limine. /dev/com1 is Vinix's first serial port.
+exec >/dev/com1 2>&1
+
+echo "VINIX_AMD64_ALPINE_OK"
+echo "Alpine busybox: $(/bin/busybox | /bin/busybox head -n 1)"
+echo "Machine: $(/bin/uname -m)"
+echo "Shell arithmetic: $((20 + 26))"
+
+exec /bin/sh

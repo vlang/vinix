@@ -7,8 +7,8 @@ module syncobj
 
 import klock
 import katomic
-import aarch64.timer
 import sched
+import time
 
 pub struct FenceWaiter {
 pub mut:
@@ -129,14 +129,13 @@ pub fn wait(fence &DmaFence, timeout_ns u64) bool {
 		return true
 	}
 
-	deadline := timer.get_ns() + timeout_ns
+	deadline := time.monotonic_ns() + timeout_ns
 
-	for timer.get_ns() < deadline {
+	for time.monotonic_ns() < deadline {
 		if is_signaled(fence) {
 			return true
 		}
-		// The ARM YIELD instruction is only a CPU hint and does not dispatch
-		// Vinix's cooperative scheduler under HVF. Let completion workers run.
+		// Let completion workers run while this kernel-side wait is pending.
 		sched.reschedule()
 	}
 
@@ -145,7 +144,7 @@ pub fn wait(fence &DmaFence, timeout_ns u64) bool {
 }
 
 pub fn now_ns() u64 {
-	return timer.get_ns()
+	return time.monotonic_ns()
 }
 
 // Register a waiter callback on a fence. If the fence is already

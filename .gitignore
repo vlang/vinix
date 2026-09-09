@@ -30,6 +30,8 @@ build-support/init-aarch64/initramfs-minimal.tar
 /build-aarch64-musl/
 /build/
 /build-amd64-desktop/
+/build-amd64-qemu/
+/build-amd64-userland/
 /third_party/
 build-support/init-aarch64/initramfs-desktop.tar
 /vinix-desktop-amd64.iso

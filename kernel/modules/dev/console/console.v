@@ -463,7 +463,12 @@ pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 }
 
 pub fn initialise() {
-	C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
+	// A serial-only QEMU boot can legitimately have no Limine framebuffer.
+	// The console device still provides stdin/stdout; only the terminal callback
+	// depends on a live flanterm context.
+	if flanterm_ctx != unsafe { nil } {
+		C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
+	}
 
 	console_res = &Console{}
 	console_res.stat.size = 0
