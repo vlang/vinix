@@ -725,6 +725,10 @@ fn (d &Desktop) surface_under(x int, y int) u32 {
 
 // The pointer is drawn last, over everything, from a small mask: '#' is the
 // outline that keeps the arrow visible on a light window, '.' the fill.
+// A one-pixel dark halo goes around that outline. It makes the guest cursor
+// unmissable over both the pale wordmark and the dark wallpaper without
+// changing its hit position or needing a host-side cursor.
+const cursor_halo = u32(0x000000)
 const cursor_mask = [
 	'#           ',
 	'##          ',
@@ -752,6 +756,24 @@ fn (mut d Desktop) draw_cursor() {
 	// temporarily unavailable). The desktop has a useful initial position at
 	// its centre, and hiding that position makes a working QEMU tablet appear
 	// to have no cursor at all until its next complete report arrives.
+	// Paint the halo first so the arrow retains its crisp dark outline. The
+	// framebuffer can be presented at 200%, where this becomes a useful
+	// two-physical-pixel boundary instead of a faint single-pixel glyph.
+	for row, line in cursor_mask {
+		for col := 0; col < line.len; col++ {
+			if line[col] == ` ` {
+				continue
+			}
+			for halo_y in -1 .. 2 {
+				for halo_x in -1 .. 2 {
+					if halo_x == 0 && halo_y == 0 {
+						continue
+					}
+					d.canvas.blend_pixel(d.pointer_x + col + halo_x, d.pointer_y + row + halo_y, cursor_halo, 232)
+				}
+			}
+		}
+	}
 	for row, line in cursor_mask {
 		for col := 0; col < line.len; col++ {
 			match line[col] {

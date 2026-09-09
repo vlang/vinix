@@ -306,10 +306,15 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		}
 		children << d.window_element(window_index)
 	}
-	children << d.taskbar_element()
-	// Keep this outside the taskbar so it remains in the literal lower-right
-	// corner when a centred dock is selected.
-	children << d.show_desktop_button_element()
+	// The desktop itself stays clean once the last window is closed. In
+	// particular, do not leave a row of launchers, a clock, or a show-desktop
+	// target painted along the bottom with nothing left for them to manage.
+	if d.windows.len > 0 {
+		children << d.taskbar_element()
+		// Keep this outside the taskbar so it remains in the literal lower-right
+		// corner when a centred dock is selected.
+		children << d.show_desktop_button_element()
+	}
 	// The Start menu paints over windows and the taskbar, and its panel consumes
 	// clicks in otherwise empty areas so they do not reach the window below.
 	if d.start_menu_open {

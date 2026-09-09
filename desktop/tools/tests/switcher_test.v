@@ -60,8 +60,27 @@ fn test_cursor_is_painted_before_the_first_pointer_report() {
 		pointer_y: 12
 	}
 	assert !desktop.pointer_present
+	desktop.canvas.clear(cursor_fill)
 	desktop.draw_cursor()
 	assert unsafe { desktop.canvas.pixels[12 * desktop.canvas.stride + 10] } == cursor_edge
+	// The dark halo keeps the white cursor readable against a white surface.
+	assert unsafe { desktop.canvas.pixels[11 * desktop.canvas.stride + 9] } == blend(cursor_fill, cursor_halo, 232)
+}
+
+fn test_taskbar_disappears_after_the_last_window_closes() {
+	mut desktop := fixture_desktop()
+	mut root := desktop.build_tree()
+	assert switcher_element_named(root, 'taskbar') != none
+	assert switcher_element_named(root, action_show_desktop) != none
+	free_tree(root)
+
+	for desktop.windows.len > 0 {
+		desktop.close_window(desktop.focus)
+	}
+	root = desktop.build_tree()
+	assert switcher_element_named(root, 'taskbar') == none
+	assert switcher_element_named(root, action_show_desktop) == none
+	free_tree(root)
 }
 
 fn test_drag_redraws_only_after_pointer_motion() {
