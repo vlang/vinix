@@ -156,6 +156,17 @@ pub mut:
 	expected_writes u32
 }
 
+// A successfully verified job remains installed in the common WorkQueue until
+// its synthetic completion is delivered.  Keeping the slot explicit lets the
+// fake driver exercise the same mapping/queue lifetime rules as asynchronous
+// firmware without moving completion policy into the verifier.
+pub struct FakeG17QueuedVerification {
+pub:
+	report  FakeG17Verification
+	slot    u32
+	pending bool
+}
+
 pub fn (report &FakeG17Verification) succeeded() bool {
 	return report.error == fake_g17_ok
 }
@@ -224,26 +235,48 @@ pub fn verify_fake_g17(submission &FakeG17Submission) FakeG17Verification {
 	return report
 }
 
-// Submit to the common host queue and immediately inject the completion event
-// produced by verification.  Queue ownership, fence wakeups, and teardown are
-// therefore exercised without pretending that G17 firmware ran the command.
+// Verify and install a job in the common host queue. Successful verification
+// deliberately leaves the slot pending for the backend completion policy;
+// verifier failures retire immediately with a fence error.
 @[markused]
-pub fn submit_fake_g17(mut queue workqueue.WorkQueue, item &workqueue.WorkItem,
-	submission &FakeG17Submission) FakeG17Verification {
+pub fn queue_fake_g17(mut queue workqueue.WorkQueue,
+	item &workqueue.WorkItem,
+	submission &FakeG17Submission) FakeG17QueuedVerification {
 	slot := queue.submit(item) or {
 		if item.fence != unsafe { nil } {
 			syncobj.signal_error(item.fence, -16)
 		}
-		return FakeG17Verification{
-			error: fake_g17_queue_full
-			expected_writes: u32(submission.writes.len)
+		return FakeG17QueuedVerification{
+			report: FakeG17Verification{
+				error: fake_g17_queue_full
+				expected_writes: u32(submission.writes.len)
+			}
 		}
 	}
 	report := verify_fake_g17(submission)
-	queue.complete(slot, if report.succeeded() {
-		workqueue.work_err_none
-	} else {
-		workqueue.work_err_channel_error
-	})
-	return report
+	if !report.succeeded() {
+		queue.complete(slot, workqueue.work_err_channel_error)
+		return FakeG17QueuedVerification{
+			report: report
+			slot: slot
+		}
+	}
+	return FakeG17QueuedVerification{
+		report: report
+		slot: slot
+		pending: true
+	}
+}
+
+// Compatibility helper for callers that want immediate synthetic completion.
+// The Mesa fake driver uses queue_fake_g17() so its valid work retires
+// asynchronously and can exercise in-flight lifetime rules.
+@[markused]
+pub fn submit_fake_g17(mut queue workqueue.WorkQueue, item &workqueue.WorkItem,
+	submission &FakeG17Submission) FakeG17Verification {
+	queued := queue_fake_g17(mut queue, item, submission)
+	if queued.pending {
+		queue.complete(queued.slot, workqueue.work_err_none)
+	}
+	return queued.report
 }

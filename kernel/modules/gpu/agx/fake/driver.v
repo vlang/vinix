@@ -21,25 +21,49 @@ import gpu.agx.vm as agxvm
 import gpu.agx.workqueue
 import klock
 import sched
+import time.sys
 import usercopy
 import aarch64.timer
 
 const max_submission_syncs = agxsubmission.max_syncs
 const max_submission_commands = agxsubmission.max_commands
 const max_command_attachments = u32(16)
+const fake_completion_delay_ns = i64(100_000_000)
 
 @[heap]
 struct FakeG17File {
 mut:
-	dev           &drm.DrmDevice = unsafe { nil }
-	vms           []&FakeG17Vm
-	queues        []&workqueue.WorkQueue
-	objects       agxbo.Table
-	next_vm_id    u32
-	next_queue_id u32
-	owner_key     u64
-	verified_jobs u64
-	lock          klock.Lock
+	dev            &drm.DrmDevice = unsafe { nil }
+	vms            []&FakeG17Vm
+	queues         []&workqueue.WorkQueue
+	objects        agxbo.Table
+	next_vm_id     u32
+	next_queue_id  u32
+	owner_key      u64
+	verified_jobs  u64
+	inflight_jobs  u32
+	closed_objects []&gem.GemObject
+	closing        bool
+	closed         bool
+	lock           klock.Lock
+}
+
+@[heap]
+struct FakeG17PendingCompletion {
+mut:
+	file  &FakeG17File = unsafe { nil }
+	vm    &FakeG17Vm = unsafe { nil }
+	queue &workqueue.WorkQueue = unsafe { nil }
+	item  &workqueue.WorkItem = unsafe { nil }
+	slot  u32
+}
+
+struct FakeG17RenderRun {
+pub:
+	report  FakeG17Verification
+	slot    u32
+	item    &workqueue.WorkItem = unsafe { nil }
+	pending bool
 }
 
 struct FakeG17DriverState {
@@ -93,8 +117,10 @@ fn lookup_file(handle voidptr) ?&FakeG17File {
 	return fake_file_map[u64(handle)] or { return none }
 }
 
-fn (mut file FakeG17File) close() {
-	file.lock.acquire()
+fn (mut file FakeG17File) finish_close_locked() {
+	if file.closed {
+		return
+	}
 	for mut queue in file.queues {
 		queue.destroy()
 	}
@@ -103,7 +129,20 @@ fn (mut file FakeG17File) close() {
 		vm.destroy()
 	}
 	file.vms.clear()
+	for object in file.closed_objects {
+		gem.unref(object)
+	}
+	file.closed_objects.clear()
 	file.objects.release_all()
+	file.closed = true
+}
+
+fn (mut file FakeG17File) close() {
+	file.lock.acquire()
+	file.closing = true
+	if file.inflight_jobs == 0 {
+		file.finish_close_locked()
+	}
 	file.lock.release()
 }
 
@@ -161,6 +200,49 @@ fn (mut file FakeG17File) mmap_page(page u64) voidptr {
 	file.lock.acquire()
 	defer { file.lock.release() }
 	return file.objects.mmap_page(page)
+}
+
+// Drop mappings whose GEM handle was closed while a job was in flight. The
+// removed table reference is retained in closed_objects until every VM allows
+// the corresponding mapping to disappear.
+fn (mut file FakeG17File) cleanup_closed_objects_locked() {
+	for index := file.closed_objects.len - 1; index >= 0; index-- {
+		object := file.closed_objects[index]
+		mut busy := false
+		for mut vm in file.vms {
+			if vm.unbind_object(object) == -16 {
+				busy = true
+			}
+		}
+		if !busy {
+			gem.unref(object)
+			file.closed_objects.delete(index)
+		}
+	}
+}
+
+fn (mut file FakeG17File) finish_pending_job(mut vm FakeG17Vm) {
+	file.lock.acquire()
+	vm.finish_job()
+	if file.inflight_jobs != 0 {
+		file.inflight_jobs--
+	}
+	file.cleanup_closed_objects_locked()
+	if file.closing && file.inflight_jobs == 0 {
+		file.finish_close_locked()
+	}
+	file.lock.release()
+}
+
+fn fake_completion_worker(mut completion FakeG17PendingCompletion) {
+	sys.nsleep(fake_completion_delay_ns)
+	completion.queue.complete(completion.slot, workqueue.work_err_none)
+	completion.file.finish_pending_job(mut completion.vm)
+	unsafe {
+		free(voidptr(completion.item))
+		free(voidptr(completion))
+	}
+	sched.dequeue_and_die()
 }
 
 fn next_unused_vm_id(file &FakeG17File) ?u32 {
@@ -350,32 +432,49 @@ fn (mut file FakeG17File) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffse
 
 fn (mut file FakeG17File) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
-	mut vm := file.find_vm(request.vm_id) or { return -22 }
-	if !agxvm.valid_bind_request(request, vm.kernel_start, vm.kernel_end) {
+	file.lock.acquire()
+	mut vm := file.find_vm(request.vm_id) or {
+		file.lock.release()
 		return -22
 	}
+	if !agxvm.valid_bind_request(request, vm.kernel_start, vm.kernel_end) {
+		file.lock.release()
+		return -22
+	}
+	file.cleanup_closed_objects_locked()
 	match request.op {
 		ioctl.asahi_bind_op_bind {
-			object := file.get_object_ref(request.handle) or { return -2 }
+			object := file.objects.get_ref(request.handle) or {
+				file.lock.release()
+				return -2
+			}
 			flags := (if request.flags & ioctl.asahi_bind_read != 0 { vm_read } else { u32(0) }) | (if request.flags & ioctl.asahi_bind_write != 0 {
 				vm_write
 			} else {
 				u32(0)
 			})
 			result := vm.bind(object, request.addr, request.range, request.offset, flags)
+			file.lock.release()
 			gem.unref(object)
 			return result
 		}
 		ioctl.asahi_bind_op_unbind {
-			return vm.unbind(request.addr, request.range)
+			result := vm.unbind(request.addr, request.range)
+			file.lock.release()
+			return result
 		}
 		ioctl.asahi_bind_op_unbind_all {
-			object := file.get_object_ref(request.handle) or { return -2 }
+			object := file.objects.get_ref(request.handle) or {
+				file.lock.release()
+				return -2
+			}
 			result := vm.unbind_object(object)
+			file.lock.release()
 			gem.unref(object)
 			return result
 		}
 		else {
+			file.lock.release()
 			return -22
 		}
 	}
@@ -543,7 +642,7 @@ fn write_results(commands [2]agxsubmission.Command, count u32, object &gem.GemOb
 
 fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 	fence &syncobj.DmaFence, render_command &agxrender.Command,
-	resources []FakeG17ResourceReference) FakeG17Verification {
+	resources []FakeG17ResourceReference) FakeG17RenderRun {
 	command := unsafe { malloc(g17_command_bytes) }
 	descriptor := unsafe { malloc(g17_descriptor_bytes) }
 	if command == unsafe { nil } || descriptor == unsafe { nil } {
@@ -554,17 +653,20 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 			unsafe { free(descriptor) }
 		}
 		syncobj.signal_error(fence, -12)
-		return FakeG17Verification{ error: fake_g17_invalid_argument }
+		return FakeG17RenderRun{
+			report: FakeG17Verification{ error: fake_g17_invalid_argument }
+		}
 	}
 	unsafe { C.memset(command, 0, g17_command_bytes) }
-	if !initialize_render_descriptor(descriptor, g17_descriptor_bytes,
-		render_command) {
+	if !initialize_render_descriptor(descriptor, g17_descriptor_bytes, render_command) {
 		unsafe {
 			free(command)
 			free(descriptor)
 		}
 		syncobj.signal_error(fence, -5)
-		return FakeG17Verification{ error: fake_g17_invalid_argument }
+		return FakeG17RenderRun{
+			report: FakeG17Verification{ error: fake_g17_invalid_argument }
+		}
 	}
 	mut inputs := FakeG17EncoderInputs{}
 	mut writes := []FakeG17ExpectedWrite{len: int(fake_g17_max_writes)}
@@ -576,10 +678,12 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 			free(descriptor)
 		}
 		syncobj.signal_error(fence, -5)
-		return FakeG17Verification{ error: encoding.error }
+		return FakeG17RenderRun{
+			report: FakeG17Verification{ error: encoding.error }
+		}
 	}
 	mut ranges := vm.address_ranges()
-	mut item := workqueue.WorkItem{
+	mut item := &workqueue.WorkItem{
 		cmd_type: ioctl.asahi_cmd_render
 		fence: unsafe { fence }
 	}
@@ -593,14 +697,22 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 		address_ranges: ranges
 		resources: resources
 	}
-	report := submit_fake_g17(mut queue, &item, &submission)
+	queued := queue_fake_g17(mut queue, item, &submission)
 	unsafe {
 		ranges.free()
 		writes.free()
 		free(command)
 		free(descriptor)
 	}
-	return report
+	if !queued.pending {
+		unsafe { free(voidptr(item)) }
+	}
+	return FakeG17RenderRun{
+		report: queued.report
+		slot: queued.slot
+		item: if queued.pending { item } else { &workqueue.WorkItem(unsafe { nil }) }
+		pending: queued.pending
+	}
 }
 
 fn run_fake_compute(mut queue workqueue.WorkQueue, fence &syncobj.DmaFence) bool {
@@ -727,20 +839,45 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		}
 	}
 
+	mut vm_pinned := false
+	if render_index >= 0 {
+		if file.inflight_jobs == ~u32(0) || !vm.begin_job() {
+			file.lock.release()
+			return -16
+		}
+		file.inflight_jobs++
+		vm_pinned = true
+	}
 	fence := syncobj.new_fence(file.owner_key, timer.get_ns())
 	if !agxsubmission.install_output_syncs(&output_syncs, fence) {
+		if vm_pinned {
+			vm.finish_job()
+			file.inflight_jobs--
+		}
 		file.lock.release()
 		return -22
 	}
 	started := timer.get_count()
 	mut successful := true
+	mut completion := &FakeG17PendingCompletion(unsafe { nil })
 	if render_index >= 0 {
-		report := run_fake_render(mut queue, mut vm, fence,
-			&commands[render_index].render, render_resources)
+		run := run_fake_render(mut queue, mut vm, fence, &commands[render_index].render, render_resources)
+		report := run.report
 		successful = report.succeeded()
-		if !successful {
+		if !successful || !run.pending {
+			vm.finish_job()
+			file.inflight_jobs--
+			vm_pinned = false
 			C.printf(c'fake-g17: verifier failed error=%u pass=%u entry=%u observed=%u expected=%u\n', report.error, report.pass, report.entry, report.observed_writes, report.expected_writes)
 		} else {
+			completion = &FakeG17PendingCompletion{
+				file: unsafe { &file }
+				vm: unsafe { vm }
+				queue: unsafe { queue }
+				item: run.item
+				slot: run.slot
+			}
+			vm_pinned = false // The completion worker now owns this pin.
 			file.verified_jobs++
 			if file.verified_jobs == 1 {
 				render_command := commands[render_index].render
@@ -779,6 +916,13 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	ended := timer.get_count()
 	write_results(commands, request.command_count, result_object, successful, started, ended)
+	if completion != unsafe { nil } {
+		spawn fake_completion_worker(mut completion)
+	}
+	if vm_pinned {
+		vm.finish_job()
+		file.inflight_jobs--
+	}
 	file.lock.release()
 	return if successful { 0 } else { -5 }
 }
@@ -799,11 +943,21 @@ fn (mut file FakeG17File) close_object_handle(handle u32) int {
 		file.lock.release()
 		return -2
 	}
+	mut deferred := false
 	for mut vm in file.vms {
-		vm.unbind_object(object)
+		if vm.unbind_object(object) == -16 {
+			deferred = true
+		}
+	}
+	if deferred {
+		// Move the handle table's reference into this list. It keeps the object
+		// valid even if userspace also removes a mapping before retirement.
+		file.closed_objects << object
 	}
 	file.lock.release()
-	gem.unref(object)
+	if !deferred {
+		gem.unref(object)
+	}
 	return 0
 }
 

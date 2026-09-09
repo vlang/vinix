@@ -251,16 +251,22 @@ The runner creates scratch disk/NVRAM files by default, waits for the guest
 shell, and runs depth-only, stencil-only, and packed depth/stencil FBOs. It
 checks the exact Mesa renderer, requested attachment bits, depth/stencil plane
 and metadata presence reported by the kernel, and render/fence completion for
-all three cases. It then interposes Mesa's real Asahi ioctls in four adversarial
+all three cases. It then interposes Mesa's real Asahi ioctls in five adversarial
 runs: an overlapping bind must fail, bind/unbind/reuse must preserve a valid
-submission, and a referenced depth-metadata BO must be rejected when it is
-either unbound or rebound read-only. The interposer lives entirely in the test
-process; the fake kernel exposes no fault-injection UAPI. After observing the
-expected `EINVAL`, it exits the faulting process before Mesa can wait forever
-for a fence that was intentionally never created. This also leaves the damaged
-mapping state to normal fd/process teardown. Set `VINIX_BOOT_DISK` to reuse an
-existing test image or `VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second
-deadline.
+submission, a referenced depth-metadata BO must be rejected when it is either
+unbound or rebound read-only, and a valid in-flight job must retain its mapping
+after the corresponding GEM handle is closed. In the lifetime run, unbind,
+queue destruction, and reuse of the occupied GPU VA must return `EBUSY`; the
+same VA is then rebound to a different BO after synthetic completion retires
+the old mapping. The interposer lives entirely in the test process; the fake
+kernel exposes no fault-injection UAPI.
+
+After observing the expected `EINVAL` in either invalid-resource run, the
+interposer exits the faulting process before Mesa can wait forever for a fence
+that was intentionally never created. Those runs prove kernel rejection and
+fd/process teardown safety; they do not claim Mesa gracefully returns from a
+rejected submission. Set `VINIX_BOOT_DISK` to reuse an existing test image or
+`VINIX_FAKE_G17_VM_TIMEOUT` to change its 180-second deadline.
 
 Mesa should identify the renderer as `Vinix Fake G17C (M5 Max ABI)` and report
 that the render submit and fence completed successfully. The fake kernel sets a
@@ -279,10 +285,14 @@ mappings, contexts, queues, sync objects, the generated G17 encoder, the
 independent verifier, synthetic completion, fence waiting, and process
 teardown.
 
-The fake verifier currently completes accepted work synchronously, so this
-suite cannot yet hold a valid job in flight while destroying one of its
-resources. That race remains deferred until the fake backend has a controllable
-completion point; these tests do not claim to cover it.
+Verification remains synchronous, but a verified render now stays installed in
+the common WorkQueue until a delayed completion worker signals its DMA fence.
+During that interval the fake VM pins its mapping graph, GEM_CLOSE retains the
+closed object's backing reference, and unbind and queue destruction are
+rejected. Completion releases the VM pin, retires mappings belonging only to
+closed handles, and wakes Mesa's normal fence wait. This deliberately exercises
+handle, mapping, job, queue, and process lifetime ordering without pretending
+that firmware executed or rasterized the command.
 
 `--submit-only` is intentional: fake G17 does not rasterize pixels. Running the
 same binary without that option retains the normal framebuffer pixel check for

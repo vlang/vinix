@@ -17,7 +17,10 @@
 #include <sys/ioctl.h>
 
 #define DRM_IOCTL_TYPE 'd'
+#define DRM_GEM_CLOSE_NR 0x09
+#define DRM_ASAHI_GEM_CREATE_NR 0x43
 #define DRM_ASAHI_GEM_BIND_NR 0x45
+#define DRM_ASAHI_QUEUE_DESTROY_NR 0x47
 #define DRM_ASAHI_SUBMIT_NR 0x48
 #define DRM_IOCTL_NR(request) ((unsigned int)(request) & 0xffu)
 #define DRM_IOCTL_REQUEST_TYPE(request) (((unsigned int)(request) >> 8) & 0xffu)
@@ -49,6 +52,26 @@ struct drm_asahi_gem_bind {
     uint64_t offset;
     uint64_t range;
     uint64_t addr;
+};
+
+struct drm_gem_close {
+    uint32_t handle;
+    uint32_t pad;
+};
+
+struct drm_asahi_gem_create {
+    uint64_t extensions;
+    uint64_t size;
+    uint32_t flags;
+    uint32_t vm_id;
+    uint32_t handle;
+    uint32_t pad;
+};
+
+struct drm_asahi_queue_destroy {
+    uint64_t extensions;
+    uint32_t queue_id;
+    uint32_t pad;
 };
 
 struct drm_asahi_command {
@@ -110,6 +133,12 @@ struct tracked_binding {
 
 _Static_assert(sizeof(struct drm_asahi_gem_bind) == 48,
                "Asahi GEM_BIND ABI mismatch");
+_Static_assert(sizeof(struct drm_gem_close) == 8,
+               "DRM GEM_CLOSE ABI mismatch");
+_Static_assert(sizeof(struct drm_asahi_gem_create) == 32,
+               "Asahi GEM_CREATE ABI mismatch");
+_Static_assert(sizeof(struct drm_asahi_queue_destroy) == 16,
+               "Asahi QUEUE_DESTROY ABI mismatch");
 _Static_assert(sizeof(struct drm_asahi_command) == 56,
                "Asahi command ABI mismatch");
 _Static_assert(sizeof(struct drm_asahi_submit) == 56,
@@ -122,6 +151,23 @@ static struct tracked_binding bindings[MAX_TRACKED_BINDINGS];
 static size_t binding_count;
 static ioctl_request_t gem_bind_request;
 static int fault_done;
+static int lifetime_fd = -1;
+static uint32_t lifetime_closed_handle;
+static struct drm_asahi_gem_bind lifetime_replacement;
+static int lifetime_reuse_pending;
+
+#define DRM_IOCTL_GEM_CLOSE_REQUEST                                         \
+    ((ioctl_request_t)_IOW(DRM_IOCTL_TYPE, DRM_GEM_CLOSE_NR,                \
+                           struct drm_gem_close))
+#define DRM_IOCTL_ASAHI_GEM_CREATE_REQUEST                                  \
+    ((ioctl_request_t)_IOWR(DRM_IOCTL_TYPE, DRM_ASAHI_GEM_CREATE_NR,        \
+                            struct drm_asahi_gem_create))
+#define DRM_IOCTL_ASAHI_GEM_BIND_REQUEST                                    \
+    ((ioctl_request_t)_IOW(DRM_IOCTL_TYPE, DRM_ASAHI_GEM_BIND_NR,           \
+                           struct drm_asahi_gem_bind))
+#define DRM_IOCTL_ASAHI_QUEUE_DESTROY_REQUEST                               \
+    ((ioctl_request_t)_IOW(DRM_IOCTL_TYPE, DRM_ASAHI_QUEUE_DESTROY_NR,      \
+                           struct drm_asahi_queue_destroy))
 
 static const char *fault_mode(void)
 {
@@ -257,11 +303,98 @@ static uint64_t depth_metadata_store(const struct drm_asahi_submit *submit)
     return 0;
 }
 
+static void lifetime_failure(const char *operation, int result, int error)
+{
+    fprintf(stderr,
+            "vinix-agx-fault: lifetime check failed at %s result=%d errno=%d\n",
+            operation, result, error);
+    fault_done = 1;
+    fflush(stderr);
+    _Exit(87);
+}
+
+static void require_busy(const char *operation, int result, int error)
+{
+    if (result != -1 || error != EBUSY)
+        lifetime_failure(operation, result, error);
+}
+
+static void inject_lifetime_after_submit(
+    int fd, const struct drm_asahi_submit *submit,
+    const struct drm_asahi_gem_bind *original)
+{
+    struct drm_gem_close close_request = {.handle = original->handle};
+    errno = 0;
+    int result = call_next(fd, DRM_IOCTL_GEM_CLOSE_REQUEST, &close_request);
+    if (result != 0)
+        lifetime_failure("GEM_CLOSE", result, errno);
+    fprintf(stderr,
+            "vinix-agx-fault: referenced GEM handle closed while job pending\n");
+
+    struct drm_asahi_gem_create create = {.size = original->range};
+    errno = 0;
+    result = call_next(fd, DRM_IOCTL_ASAHI_GEM_CREATE_REQUEST, &create);
+    if (result != 0 || create.handle == 0)
+        lifetime_failure("replacement GEM_CREATE", result, errno);
+
+    struct drm_asahi_gem_bind replacement = {
+        .op = ASAHI_BIND_OP_BIND,
+        .flags = ASAHI_BIND_READ | ASAHI_BIND_WRITE,
+        .handle = create.handle,
+        .vm_id = original->vm_id,
+        .range = original->range,
+        .addr = original->addr,
+    };
+    errno = 0;
+    result = call_next(fd, DRM_IOCTL_ASAHI_GEM_BIND_REQUEST, &replacement);
+    require_busy("early GPU VA reuse", result, errno);
+    fprintf(stderr,
+            "vinix-agx-fault: GPU VA reuse blocked while job pending\n");
+
+    struct drm_asahi_gem_bind unbind = unbind_request(original);
+    errno = 0;
+    result = call_next(fd, DRM_IOCTL_ASAHI_GEM_BIND_REQUEST, &unbind);
+    require_busy("in-flight GEM unbind", result, errno);
+    fprintf(stderr, "vinix-agx-fault: in-flight unbind rejected\n");
+
+    struct drm_asahi_queue_destroy destroy = {.queue_id = submit->queue_id};
+    errno = 0;
+    result = call_next(fd, DRM_IOCTL_ASAHI_QUEUE_DESTROY_REQUEST, &destroy);
+    require_busy("in-flight queue destroy", result, errno);
+    fprintf(stderr,
+            "vinix-agx-fault: in-flight queue destroy rejected\n");
+
+    /* Return to Mesa so its genuine fence wait drives the cooperative kernel
+     * scheduler.  The first ioctl after that wait is our retirement point. */
+    lifetime_fd = fd;
+    lifetime_closed_handle = original->handle;
+    lifetime_replacement = replacement;
+    lifetime_reuse_pending = 1;
+}
+
+static void try_retired_reuse(int fd)
+{
+    if (!lifetime_reuse_pending || fd != lifetime_fd)
+        return;
+    errno = 0;
+    int result = call_next(fd, DRM_IOCTL_ASAHI_GEM_BIND_REQUEST,
+                           &lifetime_replacement);
+    if (result == 0) {
+        fprintf(stderr,
+                "vinix-agx-fault: GPU VA reused after retirement\n");
+        lifetime_reuse_pending = 0;
+        fault_done = 1;
+    } else if (errno != EBUSY) {
+        lifetime_failure("retired GPU VA reuse", result, errno);
+    }
+}
+
 static int inject_submit_fault(int fd, ioctl_request_t request,
                                struct drm_asahi_submit *submit)
 {
     const char *mode = fault_mode();
-    if (fault_done || (strcmp(mode, "unbind") != 0 &&
+    int lifetime = strcmp(mode, "lifetime") == 0;
+    if (fault_done || (!lifetime && strcmp(mode, "unbind") != 0 &&
                        strcmp(mode, "readonly") != 0))
         return call_next(fd, request, submit);
 
@@ -277,6 +410,17 @@ static int inject_submit_fault(int fd, ioctl_request_t request,
     }
 
     struct drm_asahi_gem_bind original = tracked->request;
+    if (lifetime) {
+        errno = 0;
+        int result = call_next(fd, request, submit);
+        int submit_errno = errno;
+        if (result != 0)
+            lifetime_failure("valid Mesa submit", result, submit_errno);
+        inject_lifetime_after_submit(fd, submit, &original);
+        errno = submit_errno;
+        return result;
+    }
+
     struct drm_asahi_gem_bind unbind = unbind_request(&original);
     if (call_next(fd, gem_bind_request, &unbind) != 0) {
         fprintf(stderr,
@@ -336,6 +480,11 @@ int ioctl(int fd, ioctl_request_t request, ...)
     if (DRM_IOCTL_REQUEST_TYPE(request) != DRM_IOCTL_TYPE)
         return call_next(fd, request, argument);
 
+    if (DRM_IOCTL_NR(request) == DRM_GEM_CLOSE_NR && fault_done &&
+        fd == lifetime_fd && argument &&
+        ((struct drm_gem_close *)argument)->handle == lifetime_closed_handle)
+        return 0;
+
     if (DRM_IOCTL_NR(request) == DRM_ASAHI_GEM_BIND_NR) {
         struct drm_asahi_gem_bind *binding = argument;
         gem_bind_request = request;
@@ -356,5 +505,9 @@ int ioctl(int fd, ioctl_request_t request, ...)
     if (DRM_IOCTL_NR(request) == DRM_ASAHI_SUBMIT_NR)
         return inject_submit_fault(fd, request, argument);
 
-    return call_next(fd, request, argument);
+    int result = call_next(fd, request, argument);
+    int saved_errno = errno;
+    try_retired_reuse(fd);
+    errno = saved_errno;
+    return result;
 }

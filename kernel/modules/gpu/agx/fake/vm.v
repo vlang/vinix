@@ -53,6 +53,7 @@ pub:
 	kernel_end   u64
 mut:
 	mappings []FakeG17VmMapping
+	inflight u32
 	lock     klock.Lock
 }
 
@@ -114,6 +115,10 @@ pub fn (mut vm FakeG17Vm) unbind(address u64, size u64) int {
 		return -22
 	}
 	vm.lock.acquire()
+	if vm.inflight != 0 {
+		vm.lock.release()
+		return -16 // EBUSY: a queued job may still dereference this VM.
+	}
 	for index, mapping in vm.mappings {
 		if mapping.address == address && mapping.size == size {
 			vm.mappings.delete(index)
@@ -131,6 +136,10 @@ pub fn (mut vm FakeG17Vm) unbind_object(object &gem.GemObject) int {
 		return -22
 	}
 	vm.lock.acquire()
+	if vm.inflight != 0 {
+		vm.lock.release()
+		return -16
+	}
 	mut removed := []&gem.GemObject{}
 	for index := vm.mappings.len - 1; index >= 0; index-- {
 		mapping := vm.mappings[index]
@@ -144,6 +153,28 @@ pub fn (mut vm FakeG17Vm) unbind_object(object &gem.GemObject) int {
 		gem.unref(mapped_object)
 	}
 	return 0
+}
+
+// Pin the mapping graph for one accepted job. The fake backend performs the
+// verifier synchronously, but completion is asynchronous so UAPI teardown can
+// exercise the same no-unmap-while-in-flight rule as native UAT mappings.
+pub fn (mut vm FakeG17Vm) begin_job() bool {
+	vm.lock.acquire()
+	if vm.inflight == ~u32(0) {
+		vm.lock.release()
+		return false
+	}
+	vm.inflight++
+	vm.lock.release()
+	return true
+}
+
+pub fn (mut vm FakeG17Vm) finish_job() {
+	vm.lock.acquire()
+	if vm.inflight != 0 {
+		vm.inflight--
+	}
+	vm.lock.release()
 }
 
 // Resolve a range wholly contained in one binding and retain the BO until the
@@ -209,6 +240,7 @@ pub fn (mut vm FakeG17Vm) destroy() {
 		objects << mapping.object
 	}
 	vm.mappings.clear()
+	vm.inflight = 0
 	vm.lock.release()
 	for object in objects {
 		gem.unref(object)

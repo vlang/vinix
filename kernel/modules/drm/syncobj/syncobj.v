@@ -8,6 +8,7 @@ module syncobj
 import klock
 import katomic
 import aarch64.timer
+import sched
 
 pub struct FenceWaiter {
 pub mut:
@@ -134,11 +135,9 @@ pub fn wait(fence &DmaFence, timeout_ns u64) bool {
 		if is_signaled(fence) {
 			return true
 		}
-		// Yield the CPU briefly while spinning
-		asm volatile aarch64 {
-			yield
-			; ; ; memory
-		}
+		// The ARM YIELD instruction is only a CPU hint and does not dispatch
+		// Vinix's cooperative scheduler under HVF. Let completion workers run.
+		sched.reschedule()
 	}
 
 	// Final check after timeout

@@ -36,7 +36,9 @@ OVMF_VARS="${VINIX_EFIVARS:-/tmp/vinix-efivars.fd}"
 INIT_DIR="$SCRIPT_DIR/build-support/init-aarch64"
 LIMINE_VERSION="12.8.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
-LIMINE_CONF_QEMU="/tmp/vinix-limine-qemu.conf"
+# Keep command-line mutations private to this VM; concurrent runs may select
+# different backends and must not overwrite each other's generated config.
+LIMINE_CONF_QEMU="$(mktemp -t vinix-limine-qemu)"
 QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-${BOOT_DISK}.packages.tar}"
 PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
@@ -53,6 +55,7 @@ cleanup_package_store() {
         rm -rf "$PACKAGE_RUNTIME_DIR"
         PACKAGE_RUNTIME_DIR=""
     fi
+    rm -f "$LIMINE_CONF_QEMU"
 }
 trap cleanup_package_store EXIT INT TERM
 

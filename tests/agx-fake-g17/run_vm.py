@@ -41,12 +41,18 @@ EXPECTED_RESOURCES = (
     (b"1", b"1", b"1", b"1"),
     (b"1", b"1", b"1", b"1"),
     (b"1", b"1", b"1", b"1"),
+    (b"1", b"1", b"1", b"1"),
 )
 FAULT_MARKERS = (
     b"vinix-agx-fault: overlapping Mesa binding rejected",
     b"vinix-agx-fault: Mesa binding unbound and reused",
     b"vinix-agx-fault: referenced depth metadata unbound",
     b"vinix-agx-fault: referenced depth metadata made read-only",
+    b"vinix-agx-fault: referenced GEM handle closed while job pending",
+    b"vinix-agx-fault: GPU VA reuse blocked while job pending",
+    b"vinix-agx-fault: in-flight unbind rejected",
+    b"vinix-agx-fault: in-flight queue destroy rejected",
+    b"vinix-agx-fault: GPU VA reused after retirement",
 )
 FAULT_REJECTION_MARKER = (
     b"vinix-agx-fault: invalid Mesa resource submission rejected"
@@ -56,7 +62,7 @@ GUEST_COMMAND = (
     b"status=0; for mode in --depth --stencil --depth-stencil; do "
     b"/usr/bin/run-gl-triangle-agx --submit-only \"$mode\" || "
     b"{ status=$?; break; }; done; "
-    b"if [ \"$status\" -eq 0 ]; then for fault in overlap rebind; do "
+    b"if [ \"$status\" -eq 0 ]; then for fault in overlap rebind lifetime; do "
     b"env VINIX_AGX_FAULT=\"$fault\" /usr/bin/run-gl-triangle-agx "
     b"--submit-only --depth-stencil || { status=$?; break; }; done; fi; "
     b"if [ \"$status\" -eq 0 ]; then for fault in unbind readonly; do "
@@ -200,17 +206,17 @@ def run_vm(root: Path, timeout: int) -> int:
         missing = []
         if not command_sent:
             missing.append("guest shell prompt")
-        if output.count(RENDERER_MARKER) != 7:
-            missing.append("Mesa G17 renderer for all seven cases")
-        expected_attachment_counts = (1, 1, 5)
+        if output.count(RENDERER_MARKER) != 8:
+            missing.append("Mesa G17 renderer for all eight cases")
+        expected_attachment_counts = (1, 1, 6)
         for marker, count in zip(ATTACHMENT_MARKERS,
                                  expected_attachment_counts):
             if output.count(marker) != count:
                 missing.append(
                     f"{marker.decode('ascii')} exactly {count} time(s)"
                 )
-        if output.count(COMPLETION_MARKER) != 5:
-            missing.append("render/fence completion for five valid cases")
+        if output.count(COMPLETION_MARKER) != 6:
+            missing.append("render/fence completion for six valid cases")
         resource_states = RESOURCE_MARKER.findall(output)
         if tuple(resource_states) != EXPECTED_RESOURCES:
             observed = [b"/".join(state).decode("ascii")
@@ -241,7 +247,7 @@ def run_vm(root: Path, timeout: int) -> int:
 
         print(
             "\nPASS Mesa fake-G17 depth/stencil descriptor lifecycle and "
-            "adversarial GEM binding checks"
+            "adversarial in-flight GEM/VM lifetime checks"
         )
         return 0
 
