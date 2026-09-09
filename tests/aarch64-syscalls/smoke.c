@@ -15,6 +15,7 @@
 #include <sys/resource.h>
 #include <sys/sendfile.h>
 #include <sys/shm.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
@@ -250,6 +251,13 @@ int main(void) {
           "sched_rr_get_interval");
     check(membarrier(MEMBARRIER_CMD_QUERY, 0) == 0,
           "membarrier feature query");
+
+    struct sockaddr_storage peer_address;
+    socklen_t peer_length = sizeof(peer_address);
+    errno = 0;
+    check(getpeername(STDERR_FILENO, (struct sockaddr *)&peer_address,
+                      &peer_length) == -1 && errno == ENOTSOCK,
+          "getpeername rejects non-sockets with ENOTSOCK");
 
     __asm__ volatile("wfe");
     check(1, "trapped userspace WFE resumes");

@@ -468,30 +468,13 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 }
 
 pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getpeername(%d, 0x%llx, 0x%llx)\n', process.name.str, fdnum,
-		_addr, addrlen)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
 	}
 
-	mut res := fd.handle.resource
-
-	mut sock := &sock_pub.Socket(unsafe { nil })
-
-	if mut res is sock_unix.UnixSocket {
-		sock = res
-	} else if mut res is sock_inet.InetSocket {
-		sock = res
-	} else {
-		return errno.err, errno.einval
+	if addrlen == unsafe { nil } {
+		return errno.err, errno.efault
 	}
 
 	sock.peername(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
