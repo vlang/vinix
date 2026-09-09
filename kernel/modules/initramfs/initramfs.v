@@ -212,11 +212,17 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 				// directory the earlier tree put there — is left alone.
 				if stat.isreg(new_resource.stat.mode) {
 					buf := voidptr(u64(current_header) + 512)
-					// Resize first, so replacing a longer file does not leave
-					// the tail of the old one behind it.
-					new_resource.grow(unsafe { nil }, size) or {}
-					new_resource.write(0, buf, 0, size) or {
-						panic('initramfs: failed to write file ${full_name}')
+					// Limine module memory remains reserved and mapped after
+					// boot.  Let tmpfs read straight from it until a process
+					// modifies the file, instead of duplicating the entire root
+					// filesystem while the archive is still resident.
+					if !fs.tmpfs_borrow_storage(mut new_resource, buf, size) {
+						// Keep the generic path for a regular file supplied by some
+						// other root filesystem implementation.
+						new_resource.grow(unsafe { nil }, size) or {}
+						new_resource.write(0, buf, 0, size) or {
+							panic('initramfs: failed to write file ${full_name}')
+						}
 					}
 				}
 			}

@@ -21,6 +21,81 @@ pub mut:
 
 	storage  &u8
 	capacity u64
+	// Initramfs files initially point straight into the Limine module.  The
+	// module remains reserved for the life of the kernel, so keeping that
+	// pointer avoids allocating and copying the whole root filesystem during
+	// boot.  The first operation which can modify the backing store turns it
+	// into an ordinary tmpfs allocation.
+	storage_owned bool
+}
+
+// materialize_locked gives a borrowed (or as-yet empty) file writable tmpfs
+// storage.  The caller holds this.l.  Keep the minimum allocation at one page:
+// tmpfs.mmap returns physical pages and therefore needs a page-aligned big
+// allocation rather than a small slab object.
+fn (mut this TmpFSResource) materialize_locked(min_capacity u64) bool {
+	if this.storage_owned && min_capacity <= this.capacity {
+		return true
+	}
+
+	mut new_capacity := if this.storage_owned { this.capacity } else { u64(this.stat.size) }
+	if new_capacity < page_size {
+		new_capacity = page_size
+	}
+	for min_capacity > new_capacity {
+		if new_capacity > u64(-1) / 2 {
+			new_capacity = min_capacity
+			break
+		}
+		new_capacity *= 2
+	}
+	// malloc's large allocations occupy complete physical pages. Record that
+	// usable tail as capacity too, so mapping the last partial file page does
+	// not trigger a needless second allocation (and exponential growth).
+	if new_capacity <= u64(-1) - (page_size - 1) {
+		new_capacity = lib.align_up(new_capacity, page_size)
+	}
+
+	new_storage := memory.malloc(new_capacity)
+	if new_storage == unsafe { nil } {
+		return false
+	}
+	old_size := u64(this.stat.size)
+	copy_size := if old_size < new_capacity { old_size } else { new_capacity }
+	if copy_size != 0 && this.storage != unsafe { nil } {
+		unsafe { C.memcpy(new_storage, this.storage, copy_size) }
+	}
+	if this.storage_owned {
+		memory.free(this.storage)
+	}
+
+	this.storage = new_storage
+	this.capacity = new_capacity
+	this.storage_owned = true
+	return true
+}
+
+// tmpfs_borrow_storage installs immutable backing supplied by an initramfs
+// module.  Limine keeps executable-and-module memory reserved, and Vinix maps
+// it in the HHDM, so the bytes remain valid after boot.  Writes, truncation and
+// shared mappings transparently copy the file into owned tmpfs memory.
+pub fn tmpfs_borrow_storage(mut res resource.Resource, storage voidptr, size u64) bool {
+	if mut res is TmpFSResource {
+		res.l.acquire()
+		defer {
+			res.l.release()
+		}
+		if res.storage_owned {
+			memory.free(res.storage)
+		}
+		res.storage = unsafe { &u8(storage) }
+		res.capacity = size
+		res.storage_owned = false
+		res.stat.size = size
+		res.stat.blocks = lib.div_roundup(size, u64(res.stat.blksize))
+		return true
+	}
+	return false
 }
 
 fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
@@ -28,18 +103,27 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	defer {
 		this.l.release()
 	}
+	if page > u64(-1) / page_size {
+		return unsafe { nil }
+	}
+	offset := page * page_size
 
 	if flags & mmap.map_shared != 0 {
+		if offset > u64(-1) - page_size || !this.materialize_locked(offset + page_size) {
+			return unsafe { nil }
+		}
 		unsafe {
-			return voidptr(u64(&this.storage[page * page_size]) - higher_half)
+			return voidptr(u64(&this.storage[offset]) - higher_half)
 		}
 	}
 
 	copy_page := memory.pmm_alloc(1)
-
-	unsafe {
-		C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[page * page_size],
-			page_size)
+	file_size := u64(this.stat.size)
+	if offset < file_size && this.storage != unsafe { nil } {
+		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
+		unsafe {
+			C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
+		}
 	}
 
 	return copy_page
@@ -68,21 +152,17 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 		this.l.release()
 	}
 
-	if loc + count > this.capacity {
-		mut new_capacity := this.capacity
-
-		for loc + count > new_capacity {
-			new_capacity *= 2
-		}
-
-		new_storage := memory.realloc(this.storage, new_capacity)
-
-		if new_storage == 0 {
+	if count > u64(-1) - loc {
+		return none
+	}
+	if count == 0 {
+		return 0
+	}
+	write_end := loc + count
+	if !this.storage_owned || write_end > this.capacity {
+		if !this.materialize_locked(write_end) {
 			return none
 		}
-
-		this.storage = new_storage
-		this.capacity = new_capacity
 	}
 
 	old_size := u64(this.stat.size)
@@ -92,8 +172,8 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 	}
 	unsafe { C.memcpy(&this.storage[loc], buf, count) }
 
-	if loc + count > this.stat.size {
-		this.stat.size = loc + count
+	if write_end > this.stat.size {
+		this.stat.size = write_end
 		this.stat.blocks = lib.div_roundup(this.stat.size, this.stat.blksize)
 	}
 
@@ -111,7 +191,7 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 		return
 	}
 
-	if stat.isreg(this.stat.mode) {
+	if stat.isreg(this.stat.mode) && this.storage_owned {
 		memory.free(this.storage)
 	}
 
@@ -133,27 +213,18 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	}
 
 	old_size := u64(this.stat.size)
-
-	mut new_capacity := this.capacity
-	if new_capacity == 0 {
-		// Only regular files are given a buffer at creation; a directory or a
-		// symlink starts at zero capacity. Doubling zero never reaches
-		// new_size, so growing one of those spun here forever and took the
-		// kernel with it.
-		new_capacity = 4096
-	}
-	for new_size > new_capacity {
-		new_capacity *= 2
+	if new_size <= old_size {
+		// Borrowed storage can stay borrowed when truncated. If the file grows
+		// again, materialisation copies only the still-visible prefix and its
+		// zero-filled allocation supplies the truncated tail correctly.
+		this.stat.size = new_size
+		this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
+		return
 	}
 
-	new_storage := memory.realloc(this.storage, new_capacity)
-
-	if new_storage == 0 {
+	if !this.materialize_locked(new_size) {
 		return none
 	}
-
-	this.storage = new_storage
-	this.capacity = new_capacity
 
 	// Anything past the old end of the file has to read back as zero, whether
 	// it got there by seeking past the end and writing or by ftruncate. realloc
@@ -190,13 +261,11 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &TmpFSResource{
-		storage:  unsafe { nil }
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
 	if stat.isreg(mode) {
-		new_resource.capacity = 4096
-		new_resource.storage = memory.malloc(new_resource.capacity)
 		new_resource.can_mmap = true
 	}
 
@@ -235,7 +304,7 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 	mut new_node := create_node(this, parent, target, false)
 
 	mut new_resource := &TmpFSResource{
-		storage:  unsafe { nil }
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
@@ -264,12 +333,10 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 // truncated and mapped — and goes away with its last descriptor.
 pub fn create_anonymous(mode u32) &resource.Resource {
 	mut new_resource := &TmpFSResource{
-		storage:  unsafe { nil }
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
-	new_resource.capacity = 4096
-	new_resource.storage = memory.malloc(new_resource.capacity)
 	new_resource.can_mmap = true
 
 	new_resource.stat.size = 0
