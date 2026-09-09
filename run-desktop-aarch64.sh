@@ -34,8 +34,11 @@ DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 # small boot-image/boot.img remains usable for fast non-desktop QEMU boots.
 # A caller's explicit size still wins, including when using a separate disk
 # for an unusually large package overlay.
+# A prior launcher made boot-desktop.img only 2 GiB. Use a new default name
+# rather than resizing or replacing that disk, so an argument-free launch
+# migrates safely and the old image remains available for inspection.
 # Honour an explicit path so callers can still run more than one desktop VM.
-export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop.img}"
+export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-4096.img}"
 export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-4096}"
 export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),

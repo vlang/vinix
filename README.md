@@ -277,7 +277,7 @@ an archive next to the selected boot disk and layered over the initramfs on
 every later launch. Thus `pkg install gtk`, shutting down QEMU, and starting it
 again keeps GTK installed. The default shell store is
 `boot-image/boot.img.packages.tar`; the desktop store is
-`boot-image/boot-desktop.img.packages.tar`. Override its path with
+`boot-image/boot-desktop-4096.img.packages.tar`. Override its path with
 `VINIX_QEMU_PACKAGE_STORE`, or delete it to reset installed packages.
 Boot methods that do not use the QEMU runner retain package changes only in the
 running root filesystem. Direct Alpine package names also work, for example
