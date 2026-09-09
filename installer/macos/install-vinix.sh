@@ -14,11 +14,14 @@ STUB_BYTES=2499805184
 
 usage() {
     cat <<'EOF'
-usage: install-vinix.sh --confirmed --disk diskN --space-gb N --payload PATH
+usage: install-vinix.sh --confirmed --disk diskN --space-gb N [--payload PATH]
 
 This support command is normally launched by Vinix Installer.app. It downloads
-and verifies the upstream Asahi/m1n1 components, prepares the Vinix ESP, and
-then asks for administrator and Apple machine-owner authentication.
+and verifies the Vinix image and upstream Asahi/m1n1 components, prepares the
+Vinix ESP, and then asks for administrator and Apple machine-owner authentication.
+
+The optional payload path selects locally built files for development or an
+offline installer. Normal installations download the pinned Vinix image.
 EOF
 }
 
@@ -92,8 +95,6 @@ DISK_NUMBER=${TARGET_DISK#disk}
 case "$DISK_NUMBER" in ''|*[!0-9]*) fail "invalid whole-disk identifier: $TARGET_DISK" ;; esac
 case "$SPACE_GB" in ''|*[!0-9]*) fail "space must be a whole number of GB" ;; esac
 [ "$SPACE_GB" -ge "$MINIMUM_GB" ] || fail "Vinix needs at least ${MINIMUM_GB} GB"
-[ -n "$PAYLOAD" ] || fail "payload path is empty"
-
 [ "$(uname -s)" = Darwin ] || fail "this installer runs only on macOS"
 [ "$(uname -m)" = arm64 ] || fail "run natively on Apple Silicon, not under Rosetta"
 BRAND=$(/usr/sbin/sysctl -n machdep.cpu.brand_string)
@@ -102,15 +103,6 @@ BRAND=$(/usr/sbin/sysctl -n machdep.cpu.brand_string)
 command -v curl >/dev/null 2>&1 || fail "curl is missing"
 command -v zip >/dev/null 2>&1 || fail "zip is missing"
 command -v unzip >/dev/null 2>&1 || fail "unzip is missing"
-
-resolve_payload
-SPACE_BYTES=$((SPACE_GB * 1000000000))
-EFI_BYTES=$((SPACE_BYTES - STUB_BYTES))
-PAYLOAD_BYTES=$(( $(stat -f %z "$LOADER") + $(stat -f %z "$CONFIG") + $(stat -f %z "$KERNEL") + $(stat -f %z "$INITRAMFS") ))
-[ "$(stat -f %z "$INITRAMFS")" -lt 4294967295 ] \
-    || fail "initramfs.tar exceeds FAT32's 4 GB per-file limit"
-[ "$PAYLOAD_BYTES" -lt $((EFI_BYTES - 500000000)) ] \
-    || fail "the ${SPACE_GB} GB allocation is too small for this Vinix image"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/vinix-install.XXXXXX")
@@ -121,8 +113,24 @@ echo
 echo "Vinix Installer"
 echo "  target:     $TARGET_DISK"
 echo "  allocation: ${SPACE_GB} GB"
-echo "  payload:    $PAYLOAD"
 echo
+
+if [ -z "$PAYLOAD" ]; then
+    PAYLOAD="$WORK/payload"
+    "$SCRIPT_DIR/fetch-vinix-payload.sh" "$PAYLOAD"
+else
+    echo "Using local Vinix image: $PAYLOAD"
+fi
+
+resolve_payload
+SPACE_BYTES=$((SPACE_GB * 1000000000))
+EFI_BYTES=$((SPACE_BYTES - STUB_BYTES))
+PAYLOAD_BYTES=$(( $(stat -f %z "$LOADER") + $(stat -f %z "$CONFIG") + $(stat -f %z "$KERNEL") + $(stat -f %z "$INITRAMFS") ))
+[ "$(stat -f %z "$INITRAMFS")" -lt 4294967295 ] \
+    || fail "initramfs.tar exceeds FAT32's 4 GB per-file limit"
+[ "$PAYLOAD_BYTES" -lt $((EFI_BYTES - 500000000)) ] \
+    || fail "the ${SPACE_GB} GB allocation is too small for this Vinix image"
+
 echo "Downloading verified m1n1/Asahi installer components..."
 /usr/bin/curl --no-progress-meter --fail --location --retry 3 \
     --output "$INSTALLER_ARCHIVE" "$INSTALLER_URL"

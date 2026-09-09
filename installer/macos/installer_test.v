@@ -71,7 +71,7 @@ fn test_installer_screen_has_valid_ui2_identity() {
 	state.space_text = '32'
 	state.acknowledged = true
 	state.supported = true
-	state.payload_dir = '/test/payload'
+	state.payload_dir = ''
 	state.status = 'Ready.'
 	state.status_error = false
 	root := build_screen()

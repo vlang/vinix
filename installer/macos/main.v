@@ -281,7 +281,7 @@ fn acknowledgement_text(disk InstallDisk) string {
 }
 
 fn install_ready(state &InstallerState) bool {
-	if !state.supported || state.payload_dir.len == 0 || !state.acknowledged {
+	if !state.supported || !state.acknowledged {
 		return false
 	}
 	disk := current_disk(state) or { return false }
@@ -310,7 +310,7 @@ fn build_screen() ui2.Element {
 			size: 24
 			bold: true
 		}),
-		ui2.label('subtitle', 'Set up m1n1, U-Boot, Limine, and the Vinix desktop beside macOS.', ui2.rect(24, 60, width - 96, 22), ui2.TextStyle{
+		ui2.label('subtitle', 'Downloads Vinix, then sets up m1n1, U-Boot, and Limine beside macOS.', ui2.rect(24, 60, width - 96, 22), ui2.TextStyle{
 			color: 0x64748b
 			size: 13
 		}),
@@ -383,7 +383,7 @@ fn build_screen() ui2.Element {
 		lines: 2
 	})
 	children << ui2.with_native_style(ui2.button('refresh', 'Refresh disks', ui2.rect(48, 454, 116, 34), ui2.BoxStyle{}, ui2.TextStyle{}))
-	install_button := ui2.with_native_style(ui2.button('install', 'Install Vinix…', ui2.rect(width - 180, 454, 132, 34), ui2.BoxStyle{}, ui2.TextStyle{}))
+	install_button := ui2.with_native_style(ui2.button('install', 'Download & Install…', ui2.rect(width - 218, 454, 170, 34), ui2.BoxStyle{}, ui2.TextStyle{}))
 	children << enabled_element(install_button, install_ready(state))
 	return ui2.screen(0xf1f5f9, children)
 }
@@ -394,7 +394,8 @@ fn shell_quote(value string) string {
 
 fn launch_installer(support string, disk InstallDisk, space int, payload string) ! {
 	command_path := os.join_path(os.temp_dir(), 'vinix-installer-${os.getpid()}.command')
-	command := '#!/bin/sh\nexec ${shell_quote(support)} --confirmed --disk ${shell_quote(disk.id)} --space-gb ${space} --payload ${shell_quote(payload)}\n'
+	payload_argument := if payload.len > 0 { ' --payload ${shell_quote(payload)}' } else { '' }
+	command := '#!/bin/sh\nexec ${shell_quote(support)} --confirmed --disk ${shell_quote(disk.id)} --space-gb ${space}${payload_argument}\n'
 	os.write_file(command_path, command)!
 	os.chmod(command_path, 0o700)!
 	mut process := os.new_process('/usr/bin/open')
@@ -415,7 +416,11 @@ fn refresh_disks(mut state InstallerState) {
 	}
 	state.selected = 0
 	state.acknowledged = false
-	state.status = 'Ready. Installation continues in Terminal for administrator authentication and progress.'
+	state.status = if state.payload_dir.len > 0 {
+		'Ready. A local Vinix image is available; installation continues in Terminal.'
+	} else {
+		'Ready. About 1 GB will be downloaded and verified in Terminal before disk changes.'
+	}
 	state.status_error = false
 }
 
@@ -449,7 +454,7 @@ fn begin_install(mut state InstallerState) {
 		state.status_error = true
 		return
 	}
-	state.status = 'Installer opened in Terminal. Keep this Mac connected to power and follow the authentication prompt.'
+	state.status = 'Download and installer opened in Terminal. Keep this Mac connected to power.'
 	state.status_error = false
 }
 
@@ -500,10 +505,6 @@ fn main() {
 	} else {
 		state.supported = true
 		refresh_disks(mut state)
-	}
-	if state.payload_dir.len == 0 {
-		state.status = 'Vinix boot payload is missing. Build the desktop image, then rebuild this app.'
-		state.status_error = true
 	}
 	ui2.run_window('Vinix Installer', installer_width, installer_height, build_screen, handle_event)
 }

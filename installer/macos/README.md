@@ -10,31 +10,37 @@ M2, M3, M4, M5, Intel, virtual disks, and unsupported external-disk topologies.
 
 ## Build
 
-Build the ARM64 desktop image and Limine first:
+Only V and ui2 are needed to build the small network installer:
 
 ```sh
 git clone https://github.com/vlang/ui2 third_party/ui2
-./build-limine-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs
 make macos-installer
 open "build/vinix-installer/Vinix Installer.app"
 ```
 
-The normal build copies the loader, kernel, Limine configuration, and desktop
-initramfs into the app, so the result can be moved to another M1 Mac. Use
-`./build-macos-installer.sh --thin` for a small developer build that refers to
-the current checkout instead. A previously packaged payload can be supplied
-without rebuilding the desktop:
+The normal build contains only the app and its support scripts. During
+installation it downloads the approximately 1 GB `Vinix-M1-Payload.zip` from
+the rolling GitHub release and verifies its pinned SHA-256 checksum before any
+disk changes. A local checkout automatically supplies its existing boot files
+for development. To create an offline app instead, build the ARM64 desktop and
+Limine and explicitly bundle the payload:
 
 ```sh
-VINIX_INSTALLER_PAYLOAD_DIR=/path/to/payload ./build-macos-installer.sh
+./build-limine-aarch64.sh
+./build-desktop-aarch64.sh --compact-initramfs
+./build-macos-installer.sh --with-payload
 ```
 
-That directory must contain `BOOTAA64.EFI`, `limine.conf`, `vinix`, and
-`initramfs.tar`. The GitHub Actions release job uses this interface to rebuild
-the native app while preserving the last published boot payload.
+Set `VINIX_INSTALLER_PAYLOAD_DIR` with `--with-payload` to bundle a previously
+packaged directory containing `BOOTAA64.EFI`, `limine.conf`, `vinix`, and
+`initramfs.tar`.
 
-Every installer-source change on GitHub builds on an Apple Silicon runner.
+After rebuilding the OS image, package its downloadable payload with
+`make macos-installer-payload`. Copy the printed checksum to `PAYLOAD_SHA256`
+in `fetch-vinix-payload.sh`, rebuild the small app, then replace the payload
+asset and its `.sha256` file on the rolling release.
+
+Every installer-source change on GitHub builds the small DMG on an Apple Silicon runner.
 Commits to `master` replace `Vinix-Installer-M1.dmg` and its checksum on the
 rolling `m1-installer-latest` release. The permanent download URL is:
 
@@ -81,5 +87,5 @@ one stage, it offers a restart and still prints the startup-options instruction.
 
 ```sh
 V=/path/to/v ./installer/macos/test.sh
-./build-macos-installer.sh --thin
+./build-macos-installer.sh
 ```

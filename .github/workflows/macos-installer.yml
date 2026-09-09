@@ -25,12 +25,14 @@ concurrency:
 env:
   INSTALLER_ASSET: Vinix-Installer-M1.dmg
   INSTALLER_TAG: m1-installer-latest
+  PAYLOAD_ASSET: Vinix-M1-Payload.zip
+  PAYLOAD_CHECKSUM_ASSET: Vinix-M1-Payload.zip.sha256
   UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
   V_COMMIT: 9fd548810f09e5b49f0b06e500ef5d6845cc8142
 
 jobs:
   build:
-    name: Build self-contained DMG
+    name: Build network installer DMG
     runs-on: macos-15
     timeout-minutes: 60
     permissions:
@@ -39,26 +41,6 @@ jobs:
     steps:
       - name: Check out Vinix
         uses: actions/checkout@v6
-
-      - name: Restore the published boot payload
-        env:
-          PAYLOAD_URL: https://github.com/vlang/vinix/releases/download/${{ env.INSTALLER_TAG }}/${{ env.INSTALLER_ASSET }}
-        run: |
-          set -euo pipefail
-          previous_dmg="$RUNNER_TEMP/previous-$INSTALLER_ASSET"
-          mount_dir="$RUNNER_TEMP/previous-installer"
-          payload_dir="$RUNNER_TEMP/vinix-installer-payload"
-          mkdir -p "$mount_dir" "$payload_dir"
-          curl --fail --location --retry 5 --retry-all-errors \
-            "$PAYLOAD_URL" --output "$previous_dmg"
-          hdiutil attach "$previous_dmg" -readonly -nobrowse -mountpoint "$mount_dir"
-          trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true' EXIT
-          ditto \
-            "$mount_dir/Vinix Installer.app/Contents/Resources/payload" \
-            "$payload_dir"
-          for file in BOOTAA64.EFI limine.conf vinix initramfs.tar; do
-            test -s "$payload_dir/$file"
-          done
 
       - name: Build pinned V compiler and ui2
         run: |
@@ -72,11 +54,11 @@ jobs:
       - name: Test and build the installer app
         env:
           V: ${{ runner.temp }}/v/v
-          VINIX_INSTALLER_PAYLOAD_DIR: ${{ runner.temp }}/vinix-installer-payload
         run: |
           set -euo pipefail
           ./installer/macos/test.sh
           ./build-macos-installer.sh
+          test ! -e "build/vinix-installer/Vinix Installer.app/Contents/Resources/payload"
           test "$(uname -m)" = arm64
           file "build/vinix-installer/Vinix Installer.app/Contents/MacOS/vinix-installer" | grep -q arm64
 
@@ -90,7 +72,7 @@ jobs:
             -format UDZO \
             "dist/$INSTALLER_ASSET"
           shasum -a 256 "dist/$INSTALLER_ASSET" > "dist/$INSTALLER_ASSET.sha256"
-          test "$(stat -f %z "dist/$INSTALLER_ASSET")" -lt 2147483648
+          test "$(stat -f %z "dist/$INSTALLER_ASSET")" -lt 50000000
 
       - name: Publish rolling GitHub release
         if: github.repository == 'vlang/vinix' && github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -98,13 +80,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if ! gh release view "$INSTALLER_TAG" >/dev/null 2>&1; then
-            gh release create "$INSTALLER_TAG" \
-              --target "$GITHUB_SHA" \
-              --title "Vinix Installer for Apple M1" \
-              --notes "Rolling build of the self-contained Vinix installer for original Apple M1 Macs." \
-              --prerelease
-          fi
+          gh release view "$INSTALLER_TAG" >/dev/null
+          release_assets=$(gh release view "$INSTALLER_TAG" --json assets --jq '.assets[].name')
+          grep -Fx "$PAYLOAD_ASSET" <<<"$release_assets"
+          grep -Fx "$PAYLOAD_CHECKSUM_ASSET" <<<"$release_assets"
+          expected_payload_sha=$(sed -n 's/^PAYLOAD_SHA256=//p' installer/macos/fetch-vinix-payload.sh)
+          published_payload_sha=$(curl --fail --location --silent --show-error \
+            "https://github.com/vlang/vinix/releases/download/$INSTALLER_TAG/$PAYLOAD_CHECKSUM_ASSET" | awk 'NR == 1 { print $1 }')
+          test "$published_payload_sha" = "$expected_payload_sha"
+          gh release edit "$INSTALLER_TAG" \
+            --title "Vinix Installer for Apple M1" \
+            --notes "Small network installer for original Apple M1 Macs. The app downloads and verifies the separate Vinix boot image before making disk changes."
           gh release upload "$INSTALLER_TAG" \
             "dist/$INSTALLER_ASSET" \
             "dist/$INSTALLER_ASSET.sha256" \

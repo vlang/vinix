@@ -68,6 +68,10 @@ run-desktop-amd64:
 macos-installer:
 	./build-macos-installer.sh
 
+.PHONY: macos-installer-payload
+macos-installer-payload:
+	./build-macos-installer-payload.sh
+
 .PHONY: test-macos-installer
 test-macos-installer:
 	./installer/macos/test.sh
