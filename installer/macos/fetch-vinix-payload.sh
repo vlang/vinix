@@ -11,7 +11,8 @@ fail() {
     exit 1
 }
 
-[ "$#" -eq 1 ] || fail "usage: fetch-vinix-payload.sh DESTINATION"
+[ "$#" -ge 1 ] && [ "$#" -le 2 ] \
+    || fail "usage: fetch-vinix-payload.sh DESTINATION [PROGRESS_ARCHIVE]"
 DESTINATION=$1
 [ -n "$DESTINATION" ] || fail "payload destination is empty"
 
@@ -19,11 +20,20 @@ EXPECTED_SHA256=${VINIX_PAYLOAD_SHA256:-$PAYLOAD_SHA256}
 [ "${#EXPECTED_SHA256}" -eq 64 ] || fail "invalid Vinix image checksum"
 case "$EXPECTED_SHA256" in *[!0-9a-f]*) fail "invalid Vinix image checksum" ;; esac
 
-ARCHIVE=$(mktemp "${TMPDIR:-/tmp}/vinix-payload-download.XXXXXX")
+REMOVE_ARCHIVE=0
+if [ "$#" -eq 2 ]; then
+    ARCHIVE=$2
+    [ -n "$ARCHIVE" ] || fail "progress archive path is empty"
+else
+    ARCHIVE=$(mktemp "${TMPDIR:-/tmp}/vinix-payload-download.XXXXXX")
+    REMOVE_ARCHIVE=1
+fi
 cleanup() {
-    case "$ARCHIVE" in
-        "${TMPDIR:-/tmp}"/vinix-payload-download.*) /bin/rm -f -- "$ARCHIVE" ;;
-    esac
+    if [ "$REMOVE_ARCHIVE" -eq 1 ]; then
+        case "$ARCHIVE" in
+            "${TMPDIR:-/tmp}"/vinix-payload-download.*) /bin/rm -f -- "$ARCHIVE" ;;
+        esac
+    fi
 }
 trap cleanup EXIT HUP INT TERM
 

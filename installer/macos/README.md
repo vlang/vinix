@@ -19,9 +19,10 @@ open "build/vinix-installer/Vinix Installer.app"
 ```
 
 The normal build contains only the app and its support scripts. During
-installation it downloads the approximately 1 GB `Vinix-M1-Payload.zip` from
-the rolling GitHub release and verifies its pinned SHA-256 checksum before any
-disk changes. A local checkout automatically supplies its existing boot files
+installation it displays byte and percentage progress while downloading the
+approximately 1 GB `Vinix-M1-Payload.zip` from the rolling GitHub release, then
+verifies its pinned SHA-256 checksum before any disk changes. A local checkout
+automatically supplies its existing boot files
 for development. To create an offline app instead, build the ARM64 desktop and
 Limine and explicitly bundle the payload:
 
@@ -37,8 +38,9 @@ packaged directory containing `BOOTAA64.EFI`, `limine.conf`, `vinix`, and
 
 After rebuilding the OS image, package its downloadable payload with
 `make macos-installer-payload`. Copy the printed checksum to `PAYLOAD_SHA256`
-in `fetch-vinix-payload.sh`, rebuild the small app, then replace the payload
-asset and its `.sha256` file on the rolling release.
+in `fetch-vinix-payload.sh` and the printed byte count to
+`payload_download_bytes` in `main.v`, rebuild the small app, then replace the
+payload asset and its `.sha256` file on the rolling release.
 
 Every installer-source change on GitHub builds the small DMG on an Apple Silicon runner.
 Commits to `master` replace `Vinix-Installer-M1.dmg` and its checksum on the

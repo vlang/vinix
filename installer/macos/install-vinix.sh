@@ -14,7 +14,7 @@ STUB_BYTES=2499805184
 
 usage() {
     cat <<'EOF'
-usage: install-vinix.sh --confirmed --disk diskN --space-gb N [--payload PATH]
+usage: install-vinix.sh --confirmed --disk diskN --space-gb N [--payload PATH] [--cleanup-payload]
 
 This support command is normally launched by Vinix Installer.app. It downloads
 and verifies the Vinix image and upstream Asahi/m1n1 components, prepares the
@@ -78,12 +78,14 @@ CONFIRMED=0
 TARGET_DISK=
 SPACE_GB=
 PAYLOAD=
+CLEANUP_PAYLOAD=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --confirmed) CONFIRMED=1; shift ;;
         --disk) [ "$#" -ge 2 ] || fail "--disk needs a value"; TARGET_DISK=$2; shift 2 ;;
         --space-gb) [ "$#" -ge 2 ] || fail "--space-gb needs a value"; SPACE_GB=$2; shift 2 ;;
         --payload) [ "$#" -ge 2 ] || fail "--payload needs a value"; PAYLOAD=$2; shift 2 ;;
+        --cleanup-payload) CLEANUP_PAYLOAD=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) fail "unknown argument: $1" ;;
     esac
@@ -162,6 +164,15 @@ echo "Preparing Vinix boot package..."
         if (!found) print "    cmdline: vinix.apple_gpu=1 vinix.apple_wifi=1"
     }
 ' "$CONFIG" > "$WORK/package/esp/boot/limine.conf"
+if [ "$CLEANUP_PAYLOAD" -eq 1 ]; then
+    PAYLOAD_ROOT=${PAYLOAD%/payload}
+    TEMP_ROOT=${TMPDIR:-/tmp}
+    TEMP_ROOT=${TEMP_ROOT%/}
+    case "$PAYLOAD_ROOT" in
+        "$TEMP_ROOT"/vinix-installer-payload-*) /bin/rm -rf -- "$PAYLOAD_ROOT" ;;
+        *) fail "refusing to clean an unexpected payload path: $PAYLOAD_ROOT" ;;
+    esac
+fi
 (cd "$WORK/package" && /usr/bin/zip -0 -q -r "$WORK/os/vinix.zip" .)
 
 cat > "$WORK/installer_data.json" <<'EOF'

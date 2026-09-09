@@ -3,6 +3,8 @@ module main
 import json2
 import os
 import strconv
+import sync
+import time
 import ui2
 
 const installer_width = 680
@@ -10,6 +12,7 @@ const installer_height = 556
 const default_space_gb = 32
 const minimum_space_gb = 16
 const decimal_gb = i64(1_000_000_000)
+const payload_download_bytes = u64(1_120_849_665)
 const compiled_source_root = $d('vinix_source_root', '')
 
 struct DiskList {
@@ -70,11 +73,34 @@ mut:
 	acknowledged bool
 	supported    bool
 	payload_dir  string
+	downloading  bool
+	downloaded   u64
 	status       string
 	status_error bool
 }
 
 const installer_state = &InstallerState{}
+const installer_state_lock = &sync.Mutex{}
+
+fn installer_state_snapshot() InstallerState {
+	mut guard := unsafe { installer_state_lock }
+	guard.lock()
+	state := unsafe { installer_state }
+	snapshot := InstallerState{
+		disks: state.disks
+		selected: state.selected
+		space_text: state.space_text
+		acknowledged: state.acknowledged
+		supported: state.supported
+		payload_dir: state.payload_dir
+		downloading: state.downloading
+		downloaded: state.downloaded
+		status: state.status
+		status_error: state.status_error
+	}
+	guard.unlock()
+	return snapshot
+}
 
 fn shell_output(command string) !string {
 	mut process := os.new_process('/bin/sh')
@@ -281,12 +307,24 @@ fn acknowledgement_text(disk InstallDisk) string {
 }
 
 fn install_ready(state &InstallerState) bool {
-	if !state.supported || !state.acknowledged {
+	if !state.supported || !state.acknowledged || state.downloading {
 		return false
 	}
 	disk := current_disk(state) or { return false }
 	allocation_gb(state.space_text, disk) or { return false }
 	return true
+}
+
+fn download_percent(downloaded u64) f64 {
+	if downloaded >= payload_download_bytes {
+		return 100
+	}
+	return f64(downloaded) * 100.0 / f64(payload_download_bytes)
+}
+
+fn download_progress_text(downloaded u64) string {
+	bounded := if downloaded > payload_download_bytes { payload_download_bytes } else { downloaded }
+	return '${download_percent(bounded):.0f}% — ${f64(bounded) / 1_000_000.0:.0f} of ${f64(payload_download_bytes) / 1_000_000.0:.0f} MB'
 }
 
 fn enabled_element(element ui2.Element, enabled bool) ui2.Element {
@@ -297,7 +335,7 @@ fn enabled_element(element ui2.Element, enabled bool) ui2.Element {
 }
 
 fn build_screen() ui2.Element {
-	state := unsafe { installer_state }
+	state := installer_state_snapshot()
 	frame := ui2.bounds()
 	width := if frame.width > 0 { frame.width } else { f64(installer_width) }
 	mut children := []ui2.Element{}
@@ -334,7 +372,7 @@ fn build_screen() ui2.Element {
 	children << enabled_element(ui2.dropdown('disk', selected_text, options, ui2.rect(48, 160, width - 96, 38), ui2.BoxStyle{ bg: 0xf8fafc, radius: 7 }, ui2.TextStyle{
 		color: 0x0f172a
 		size: 13
-	}), options.len > 0)
+	}), options.len > 0 && !state.downloading)
 
 	detail := if disk := current_disk(state) {
 		disk.detail()
@@ -356,10 +394,10 @@ fn build_screen() ui2.Element {
 		size: 13
 		bold: true
 	})
-	children << ui2.text_field_with_change('space', '32', state.space_text, ui2.rect(48, 284, 132, 38), ui2.BoxStyle{ bg: 0xf8fafc, radius: 7 }, ui2.TextStyle{
+	children << enabled_element(ui2.text_field_with_change('space', '32', state.space_text, ui2.rect(48, 284, 132, 38), ui2.BoxStyle{ bg: 0xf8fafc, radius: 7 }, ui2.TextStyle{
 		color: 0x0f172a
 		size: 14
-	}, ui2.keyboard_decimal)
+	}, ui2.keyboard_decimal), !state.downloading)
 	children << ui2.label('space_unit', 'GB', ui2.rect(190, 293, 36, 20), ui2.TextStyle{
 		color: 0x475569
 		size: 13
@@ -371,19 +409,35 @@ fn build_screen() ui2.Element {
 	})
 
 	if disk := current_disk(state) {
-		children << ui2.checkbox('acknowledge', acknowledgement_text(disk), state.acknowledged, ui2.rect(48, 344, width - 96, 28), ui2.TextStyle{
+		children << enabled_element(ui2.checkbox('acknowledge', acknowledgement_text(disk), state.acknowledged, ui2.rect(48, 344, width - 96, 28), ui2.TextStyle{
 			color: 0x334155
 			size: 13
-		})
+		}), !state.downloading)
 	}
 	status_color := if state.status_error { u32(0xb91c1c) } else { u32(0x166534) }
-	children << ui2.label('status', state.status, ui2.rect(48, 386, width - 96, 46), ui2.TextStyle{
+	children << ui2.label('status', state.status, ui2.rect(48, 382, width - 96, 38), ui2.TextStyle{
 		color: status_color
 		size: 12
 		lines: 2
 	})
-	children << ui2.with_native_style(ui2.button('refresh', 'Refresh disks', ui2.rect(48, 454, 116, 34), ui2.BoxStyle{}, ui2.TextStyle{}))
-	install_button := ui2.with_native_style(ui2.button('install', 'Download & Install…', ui2.rect(width - 218, 454, 170, 34), ui2.BoxStyle{}, ui2.TextStyle{}))
+	if state.downloading {
+		children << ui2.progress_bar(ui2.ProgressBarConfig{
+			id: 'download_progress'
+			frame: ui2.rect(48, 428, width - 96, 10)
+			value: download_percent(state.downloaded)
+			max: 100
+			background: 0xe2e8f0
+			color: 0x2563eb
+			radius: 5
+		})
+		children << ui2.label('download_progress_text', download_progress_text(state.downloaded), ui2.rect(48, 442, width - 96, 18), ui2.TextStyle{
+			color: 0x475569
+			size: 11
+			align: .center
+		})
+	}
+	children << enabled_element(ui2.with_native_style(ui2.button('refresh', 'Refresh disks', ui2.rect(48, 470, 116, 34), ui2.BoxStyle{}, ui2.TextStyle{})), !state.downloading)
+	install_button := ui2.with_native_style(ui2.button('install', 'Download & Install…', ui2.rect(width - 218, 470, 170, 34), ui2.BoxStyle{}, ui2.TextStyle{}))
 	children << enabled_element(install_button, install_ready(state))
 	return ui2.screen(0xf1f5f9, children)
 }
@@ -392,10 +446,11 @@ fn shell_quote(value string) string {
 	return "'" + value.replace("'", '\'"\'"\'') + "'"
 }
 
-fn launch_installer(support string, disk InstallDisk, space int, payload string) ! {
+fn launch_installer(support string, disk InstallDisk, space int, payload string, cleanup_payload bool) ! {
 	command_path := os.join_path(os.temp_dir(), 'vinix-installer-${os.getpid()}.command')
 	payload_argument := if payload.len > 0 { ' --payload ${shell_quote(payload)}' } else { '' }
-	command := '#!/bin/sh\nexec ${shell_quote(support)} --confirmed --disk ${shell_quote(disk.id)} --space-gb ${space}${payload_argument}\n'
+	cleanup_argument := if cleanup_payload { ' --cleanup-payload' } else { '' }
+	command := '#!/bin/sh\nexec ${shell_quote(support)} --confirmed --disk ${shell_quote(disk.id)} --space-gb ${space}${payload_argument}${cleanup_argument}\n'
 	os.write_file(command_path, command)!
 	os.chmod(command_path, 0o700)!
 	mut process := os.new_process('/usr/bin/open')
@@ -405,6 +460,84 @@ fn launch_installer(support string, disk InstallDisk, space int, payload string)
 	if process.code != 0 {
 		return error('Terminal could not be opened (exit ${process.code}).')
 	}
+}
+
+fn set_download_failure(message string) {
+	mut guard := unsafe { installer_state_lock }
+	guard.lock()
+	mut state := unsafe { installer_state }
+	state.downloading = false
+	state.status = message
+	state.status_error = true
+	guard.unlock()
+	ui2.request_refresh()
+}
+
+fn remove_download_root(root string) {
+	temporary_root := os.temp_dir().trim_right(os.path_separator)
+	if root.starts_with(os.join_path(temporary_root, 'vinix-installer-payload-')) {
+		os.rmdir_all(root) or {}
+	}
+}
+
+fn download_payload_and_launch(fetch string, support string, disk InstallDisk, space int, root string) {
+	payload := os.join_path(root, 'payload')
+	archive := os.join_path(root, 'Vinix-M1-Payload.zip')
+	mut process := os.new_process(fetch)
+	process.set_args([payload, archive])
+	process.run()
+	if process.pid <= 0 {
+		remove_download_root(root)
+		set_download_failure('Could not start the Vinix image download.')
+		return
+	}
+	for process.is_alive() {
+		downloaded := if os.is_file(archive) { os.file_size(archive) } else { u64(0) }
+		mut guard := unsafe { installer_state_lock }
+		guard.lock()
+		mut state := unsafe { installer_state }
+		state.downloaded = downloaded
+		state.status = if downloaded >= payload_download_bytes {
+			'Verifying and unpacking the Vinix image…'
+		} else {
+			'Downloading the Vinix image… Keep this window open.'
+		}
+		state.status_error = false
+		guard.unlock()
+		ui2.request_refresh()
+		time.sleep(100 * time.millisecond)
+	}
+	process.wait()
+	result := process.code
+	process.close()
+	os.rm(archive) or {}
+	if result != 0 || !payload_files_exist(payload) {
+		remove_download_root(root)
+		set_download_failure('Vinix image download failed. Check your connection and try again.')
+		return
+	}
+
+	mut guard := unsafe { installer_state_lock }
+	guard.lock()
+	mut state := unsafe { installer_state }
+	state.downloaded = payload_download_bytes
+	state.payload_dir = payload
+	state.status = 'Vinix image verified. Opening the installer in Terminal…'
+	state.status_error = false
+	guard.unlock()
+	ui2.request_refresh()
+	launch_installer(support, disk, space, payload, true) or {
+		remove_download_root(root)
+		set_download_failure(err.msg())
+		return
+	}
+	guard.lock()
+	state.downloading = false
+	state.acknowledged = false
+	state.payload_dir = ''
+	state.status = 'Installer opened in Terminal. Keep this Mac connected to power.'
+	guard.unlock()
+	ui2.request_refresh()
 }
 
 fn refresh_disks(mut state InstallerState) {
@@ -419,7 +552,7 @@ fn refresh_disks(mut state InstallerState) {
 	state.status = if state.payload_dir.len > 0 {
 		'Ready. A local Vinix image is available; installation continues in Terminal.'
 	} else {
-		'Ready. About 1 GB will be downloaded and verified in Terminal before disk changes.'
+		'Ready. About 1 GB will be downloaded and verified here before disk changes.'
 	}
 	state.status_error = false
 }
@@ -449,16 +582,44 @@ fn begin_install(mut state InstallerState) {
 		state.status_error = true
 		return
 	}
-	launch_installer(support, disk, space, state.payload_dir) or {
+	if state.payload_dir.len > 0 {
+		launch_installer(support, disk, space, state.payload_dir, false) or {
+			state.status = err.msg()
+			state.status_error = true
+			return
+		}
+		state.acknowledged = false
+		state.status = 'Installer opened in Terminal. Keep this Mac connected to power.'
+		state.status_error = false
+		return
+	}
+	fetch := support_file('fetch-vinix-payload.sh')
+	if !os.is_file(fetch) {
+		state.status = 'Downloader support file is missing: ${fetch}'
+		state.status_error = true
+		return
+	}
+	download_root := os.join_path(os.temp_dir(), 'vinix-installer-payload-${os.getpid()}-${time.ticks()}')
+	os.mkdir_all(download_root) or {
 		state.status = err.msg()
 		state.status_error = true
 		return
 	}
-	state.status = 'Download and installer opened in Terminal. Keep this Mac connected to power.'
+	state.downloading = true
+	state.downloaded = 0
+	state.status = 'Starting Vinix image download…'
 	state.status_error = false
+	spawn download_payload_and_launch(fetch, support, disk, space, download_root)
 }
 
 fn handle_event(event string) {
+	mut guard := unsafe { installer_state_lock }
+	guard.lock()
+	downloading := unsafe { installer_state }.downloading
+	guard.unlock()
+	if downloading {
+		return
+	}
 	mut state := unsafe { installer_state }
 	match event {
 		'disk' {

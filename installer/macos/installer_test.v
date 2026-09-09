@@ -2,6 +2,18 @@ module main
 
 import ui2
 
+fn find_installer_element(element ui2.Element, id string) ?ui2.Element {
+	if element.id == id {
+		return element
+	}
+	for child in element.children {
+		if found := find_installer_element(child, id) {
+			return found
+		}
+	}
+	return none
+}
+
 fn sample_list_json() string {
 	return '{"WholeDisks":["disk0","disk4","disk5"],"AllDisksAndPartitions":[{"DeviceIdentifier":"disk0","Size":500000000000,"Partitions":[{"Content":"Apple_APFS_ISC"}]},{"DeviceIdentifier":"disk4","Size":128000000000,"Partitions":[]},{"DeviceIdentifier":"disk5","Size":64000000000,"Partitions":[]}]}'
 }
@@ -58,6 +70,13 @@ fn test_shell_quote_handles_spaces_and_apostrophes() {
 	assert shell_quote("/Volumes/Alex's Disk") == '\'/Volumes/Alex\'"\'"\'s Disk\''
 }
 
+fn test_download_progress_is_bounded_and_readable() {
+	assert download_percent(0) == 0
+	assert download_percent(payload_download_bytes / 2) > 49.9
+	assert download_percent(payload_download_bytes * 2) == 100
+	assert download_progress_text(payload_download_bytes / 2).starts_with('50%')
+}
+
 fn test_installer_screen_has_valid_ui2_identity() {
 	mut state := unsafe { installer_state }
 	state.disks = [InstallDisk{
@@ -77,4 +96,16 @@ fn test_installer_screen_has_valid_ui2_identity() {
 	root := build_screen()
 	ui2.validate_element_tree(root) or { panic(err) }
 	assert install_ready(state)
+
+	state.downloading = true
+	state.downloaded = payload_download_bytes / 2
+	downloading_root := build_screen()
+	ui2.validate_element_tree(downloading_root) or { panic(err) }
+	progress := find_installer_element(downloading_root, 'download_progress') or {
+		panic('missing download progress bar')
+	}
+	assert progress.accessibility_role == 'progressbar'
+	assert progress.accessibility_value.ends_with('of 100')
+	assert !install_ready(state)
+	state.downloading = false
 }

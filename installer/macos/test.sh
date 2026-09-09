@@ -44,7 +44,9 @@ PAYLOAD_FIXTURE_SHA=$(/usr/bin/shasum -a 256 "$PAYLOAD_FIXTURE/payload.zip" \
     | /usr/bin/awk '{print $1}')
 VINIX_PAYLOAD_URL="file://$PAYLOAD_FIXTURE/payload.zip" \
 VINIX_PAYLOAD_SHA256="$PAYLOAD_FIXTURE_SHA" \
-    "$SCRIPT_DIR/fetch-vinix-payload.sh" "$PAYLOAD_RESULT" >/dev/null
+    "$SCRIPT_DIR/fetch-vinix-payload.sh" "$PAYLOAD_RESULT" \
+    "$PAYLOAD_FIXTURE/progress.zip" >/dev/null
+[ -s "$PAYLOAD_FIXTURE/progress.zip" ]
 for file in BOOTAA64.EFI limine.conf vinix initramfs.tar; do
     /usr/bin/cmp "$PAYLOAD_FIXTURE/$file" "$PAYLOAD_RESULT/$file"
 done

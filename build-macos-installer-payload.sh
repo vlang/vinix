@@ -50,4 +50,5 @@ echo "==> Compressing Vinix M1 payload"
 
 echo "==> Built $ARCHIVE"
 /bin/cat "$CHECKSUM"
-echo "Update PAYLOAD_SHA256 in installer/macos/fetch-vinix-payload.sh before publishing a changed payload."
+echo "Payload size: $(stat -f %z "$ARCHIVE") bytes"
+echo "Update PAYLOAD_SHA256 in fetch-vinix-payload.sh and payload_download_bytes in main.v before publishing a changed payload."
