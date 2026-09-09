@@ -70,10 +70,14 @@ const available_apps = [
 	AppFactory{
 		title: 'Firefox'
 		icon: 'builtin:browser'
-		// Firefox is an X11/GTK application. Xorg must own the framebuffer and
-		// input devices while it runs, so it is deliberately not embedded in a
-		// native desktop window.
-		exclusive_command: '/usr/bin/run-firefox'
+		width: firefox_window_width
+		height: firefox_window_height + default_title_height
+		process_name: 'vinix-firefox'
+		polling: true
+		poll_interval_ms: 50
+		keyboard: true
+		pointer: true
+		open: open_firefox
 	},
 	AppFactory{
 		title: 'Calculator'

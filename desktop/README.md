@@ -141,25 +141,18 @@ it then has a wallpaper shortcut and a Start-menu entry. A ui2 example also
 needs its directory listed in `build-desktop-aarch64.sh` so the staging step
 compiles it in.
 
-Firefox is an upstream X11 application rather than a native ui2 client. Its
-`AppFactory` entry names `/usr/bin/run-firefox` as an exclusive command. At a
-frame boundary the desktop restores the console and closes its framebuffer and
-pointer descriptors, waits while Xorg and Firefox own them, then reopens the
-devices and redraws when it exits. This keeps Firefox's packaged userspace
-dependencies outside `vinix-desktop`. The small
-`/usr/bin/vinix-xinput` bridge translates Vinix's native pointer
-packets and console keyboard bytes into ordinary X11 input, avoiding an evdev
-or udev compatibility layer. The desktop image builder refreshes this bridge,
-the direct `startx` launcher, and Firefox's Vinix policy files even when its
-base userland image is older. It refuses to publish an image with an incomplete
-Firefox/Xorg runtime; the native error window remains as a runtime fallback.
-Firefox's upstream graphics and GTK diagnostics are written to
-`/var/log/firefox.log`. On an M1 image with the Asahi runtime, Xorg enables
-glamor/DRI3 and Firefox enables WebRender over X11 EGL. Without the render node,
-or with `VINIX_FORCE_SOFTWARE_GL=1`, both retain their software paths. Because
-the display is still a firmware framebuffer rather than a DCP/KMS scanout,
-hardware-rendered client buffers ultimately make one CPU-visible copy to
-`/dev/fb0`.
+Firefox is an upstream GTK/X11 application rather than a native ui2 client. It
+runs on a private Xvfb display whose live XWD framebuffer is composited into a
+normal movable Vinix window. Pointer and keyboard events cross the same compact
+input bridge used by the other hosted X11 applications, so the native desktop
+and taskbar remain active while Firefox runs. The desktop image builder includes
+Xvfb, the input bridge, the direct `startx` launcher, and Firefox's Vinix policy
+files. A native error window remains as a runtime fallback when the browser or
+X11 layer is missing.
+The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
+`/var/log/firefox.log`. On an M1 image with the Asahi runtime, direct Xorg can
+enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses
+Xvfb's software surface so the native compositor can copy it into the desktop.
 
 The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages
 Alpine's AArch64/musl Minetest 5.9.1 executable and its runtime closure, plus a

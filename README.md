@@ -367,9 +367,8 @@ run-firefox https://example.com
 ```
 
 After rebuilding the desktop image, its wallpaper and Start menu contain a
-Firefox launcher. Clicking it hands the framebuffer, pointer and keyboard to
-Xorg for the lifetime of Firefox, then returns to the native desktop when the
-browser exits:
+Firefox launcher. Clicking it opens Firefox in a normal movable Vinix window;
+the native desktop and taskbar remain visible around its private Xvfb display:
 
 ```sh
 ./build-desktop-aarch64.sh
@@ -388,7 +387,8 @@ dependency closure, including GTK/X11, fonts, TLS certificates, and media
 libraries. It defaults to Alpine 3.22's Firefox 140 ESR: newer Alpine builds
 currently link Scudo, whose virtual-memory contract Vinix does not yet provide.
 Firefox uses the system GTK installation directly, without launcher-local GTK
-backend or accessibility overrides.
+backend or accessibility overrides. Running `run-firefox` directly still starts
+the browser on the physical Xorg display for command-line debugging.
 Set `VINIX_FIREFOX_STAGING` to merge a different completed staging tree, or
 `ALPINE_BRANCH`/`VINIX_FIREFOX_PACKAGE` to select another compatible build.
 The compact desktop image used by the default M1 deployment merges the Firefox
