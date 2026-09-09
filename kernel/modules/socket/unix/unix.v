@@ -38,7 +38,13 @@ mut:
 
 struct PendingFdGroup {
 mut:
-	fds []&file.FD
+	// Number of unread stream bytes before the first byte carrying these
+	// descriptor rights, and the number of bytes from that sendmsg(). UNIX
+	// stream ancillary data forms a boundary after the descriptor-bearing
+	// message: recvmsg returns any preceding bytes plus this span and its rights.
+	offset u64
+	span   u64
+	fds    []&file.FD
 }
 
 __global (
@@ -149,6 +155,19 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		count = this.used
 	}
 
+	// Do not cross the end of an ancillary-bearing sendmsg. A plain read that
+	// reaches the first byte carrying rights consumes and discards the group,
+	// just like recvmsg with no control buffer.
+	mut discard_fd_group := false
+	if count != 0 && this.pending_fd_groups.len != 0 {
+		group := this.pending_fd_groups[0]
+		boundary := group.offset + group.span
+		if count > boundary {
+			count = boundary
+		}
+		discard_fd_group = count > group.offset
+	}
+
 	// Calculate sizes before and after wrap-around and new ptr location
 	mut before_wrap := u64(0)
 	mut after_wrap := u64(0)
@@ -174,10 +193,25 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 	this.read_ptr = new_ptr_loc
 	this.used -= count
 
+	if discard_fd_group {
+		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
+		for mut dropped in pending_fds {
+			dropped.unref()
+			unsafe { free(voidptr(dropped)) }
+		}
+		unsafe { pending_fds.free() }
+		this.pending_fd_groups.delete(0)
+	}
+	for i in 0 .. this.pending_fd_groups.len {
+		this.pending_fd_groups[i].offset -= count
+	}
+
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)
 
-	this.status &= ~file.pollin
+	if this.used == 0 {
+		this.status &= ~file.pollin
+	}
 
 	return i64(count)
 }
@@ -240,6 +274,10 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		return none
 	}
 
+	// Descriptor rights are attached to the first byte written by this
+	// sendmsg(), after any data already queued on the peer.
+	fd_offset := peer.used
+
 	// Calculate sizes before and after wrap-around and new ptr location
 	mut before_wrap := u64(0)
 	mut after_wrap := u64(0)
@@ -266,6 +304,8 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	peer.used += count
 	if fds.len != 0 {
 		mut group := PendingFdGroup{
+			offset: fd_offset
+			span: count
 			fds: []&file.FD{}
 		}
 		group.fds << fds
@@ -691,6 +731,19 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		count = this.used
 	}
 
+	// SCM_RIGHTS is associated with one sendmsg in the byte stream. Linux
+	// returns any data before it plus that sendmsg's bytes and descriptors, then
+	// stops before subsequently queued data.
+	mut deliver_fd_group := false
+	if count != 0 && this.pending_fd_groups.len != 0 {
+		group := this.pending_fd_groups[0]
+		boundary := group.offset + group.span
+		if count > boundary {
+			count = boundary
+		}
+		deliver_fd_group = count > group.offset
+	}
+
 	// Calculate sizes before and after wrap-around and new ptr location
 	mut before_wrap := u64(0)
 	mut after_wrap := u64(0)
@@ -741,7 +794,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		msg.msg_controllen = 0
 		msg.msg_flags = 0
 	}
-	if this.pending_fd_groups.len != 0 {
+	if deliver_fd_group {
 		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 		mut capacity_fds := u64(0)
 		if msg.msg_control != unsafe { nil } && control_capacity >= cmsg_header_size + sizeof(int) {
@@ -809,6 +862,9 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		unsafe { pending_fds.free() }
 		this.pending_fd_groups.delete(0)
 	}
+	for i in 0 .. this.pending_fd_groups.len {
+		this.pending_fd_groups[i].offset -= transferred
+	}
 
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)
@@ -827,7 +883,9 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	C.printf(c'Successfully received %llu bytes\n', transferred)
 
-	this.status &= ~file.pollin
+	if this.used == 0 {
+		this.status &= ~file.pollin
+	}
 
 	return transferred
 }

@@ -1,3 +1,4 @@
+import array
 import hashlib
 import os
 import resource
@@ -112,6 +113,33 @@ os.close(write_fd)
 left, right = socket.socketpair()
 left.send(b"ping")
 check(right.recv(16) == b"ping", "socketpair round trip")
+left.close()
+right.close()
+
+# Stream ancillary data is a barrier: recvmsg returns preceding bytes and the
+# descriptor-bearing sendmsg together, but leaves later bytes for the next
+# receive. Firefox IPC relies on this association remaining intact.
+left, right = socket.socketpair()
+passed_fd = os.open("/dev/null", os.O_RDONLY)
+left.sendall(b"before")
+left.sendmsg(
+    [b"rights"],
+    [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", [passed_fd]))],
+)
+left.sendall(b"after")
+payload, ancillary, message_flags, _ = right.recvmsg(
+    64, socket.CMSG_SPACE(array.array("i").itemsize)
+)
+received_fds = array.array("i")
+for level, kind, data in ancillary:
+    if level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS:
+        received_fds.frombytes(data[: len(data) - len(data) % received_fds.itemsize])
+check(payload == b"beforerights", "SCM_RIGHTS stream boundary")
+check(message_flags == 0 and len(received_fds) == 1, "SCM_RIGHTS descriptor delivery")
+check(right.recv(64) == b"after", "SCM_RIGHTS leaves following bytes")
+for received_fd in received_fds:
+    os.close(received_fd)
+os.close(passed_fd)
 left.close()
 right.close()
 
