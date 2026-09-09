@@ -96,6 +96,10 @@ install -m755 "$SCRIPT_DIR/tests/packages/gtk-smoke.sh" \
     "$STAGING/root/gtk-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gnumeric-smoke.sh" \
     "$STAGING/root/gnumeric-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
+    "$STAGING/root/sublime-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
+    "$STAGING/root/x-window-check.py"
 clang -target aarch64-linux-musl -fPIC -ffreestanding -fno-stack-protector \
     -nostdlib -c "$SCRIPT_DIR/tests/packages/gtk-smoke-auto-close.c" \
     -o "$BUILD_DIR/gtk-smoke-auto-close.o"

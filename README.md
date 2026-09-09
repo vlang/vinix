@@ -291,6 +291,16 @@ pkg install gnumeric
 ./gnumeric-package-smoke.sh
 ```
 
+Sublime Text is available through the same package frontend. This installs its
+Alpine `gcompat`/GTK dependencies and a checksum-verified official ARM64 build,
+including an application-menu entry:
+
+```sh
+pkg install sublime-text
+subl
+./sublime-package-smoke.sh
+```
+
 `pkg` disables Alpine maintainer scripts that assume a complete Alpine init
 system.
 When started with `run-aarch64.sh` (including through

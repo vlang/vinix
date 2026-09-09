@@ -5,16 +5,24 @@ set -eu
 APK=${VINIX_PKG_APK:-/sbin/apk}
 ROOT=${VINIX_PKG_ROOT:-}
 RESOLV_CONF=${VINIX_PKG_RESOLV_CONF:-$ROOT/etc/resolv.conf}
+CURL=${VINIX_PKG_CURL:-/usr/bin/curl}
+BSDTAR=${VINIX_PKG_BSDTAR:-/usr/bin/bsdtar}
+SHA256SUM=${VINIX_PKG_SHA256SUM:-/bin/busybox sha256sum}
+BUSYBOX=${VINIX_PKG_BUSYBOX-/bin/busybox}
 NETWORK_RETRIES=${VINIX_PKG_NETWORK_RETRIES:-10}
 NETWORK_RETRY_DELAY=${VINIX_PKG_NETWORK_RETRY_DELAY:-1}
 NETWORK_WAIT_SECONDS=${VINIX_PKG_NETWORK_WAIT_SECONDS:-60}
+
+SUBLIME_BUILD=${VINIX_SUBLIME_BUILD:-4200}
+SUBLIME_URL=${VINIX_SUBLIME_URL:-https://download.sublimetext.com/sublime_text_build_${SUBLIME_BUILD}_arm64.tar.xz}
+SUBLIME_SHA256=${VINIX_SUBLIME_SHA256:-cf4b6aa74ea2a2aab02e144599cf9e4a423cbb9543c221f7da1095a95495566a}
 
 usage() {
 	cat <<'EOF'
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes Vinix-ready GTK and Gnumeric)
+  install PACKAGE...  install packages (includes GTK, Gnumeric, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -29,6 +37,14 @@ EOF
 
 root_path() {
 	printf '%s%s\n' "$ROOT" "$1"
+}
+
+bb() {
+	if [ -n "$BUSYBOX" ]; then
+		"$BUSYBOX" "$@"
+	else
+		"$@"
+	fi
 }
 
 apk() {
@@ -216,6 +232,9 @@ resolve_packages() {
 			gnumeric)
 				resolved="$resolved gnumeric adwaita-icon-theme font-dejavu"
 				;;
+			sublime|sublime-text)
+				resolved="$resolved gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs"
+				;;
 			gtk+3.0-demo) ;;
 			*) resolved="$resolved $requested" ;;
 		esac
@@ -245,11 +264,162 @@ install_packages() {
 					adwaita-icon-theme font-dejavu gnumeric
 				finalize_gnumeric
 				;;
+			sublime|sublime-text)
+				apk_install \
+					adwaita-icon-theme font-dejavu gcompat gtk+3.0 libarchive-tools \
+					llvm19-libs
+				materialize_gcompat_links
+				install_sublime
+				finalize_desktop
+				;;
 			*)
 				apk_install "$requested"
 				;;
 		esac
 	done
+}
+
+materialize_link() {
+	link=$(root_path "$1")
+	[ -L "$link" ] || return 0
+	target=$(readlink "$link")
+	case "$target" in
+		/*) real=$(root_path "$target") ;;
+		*) real=$(dirname "$link")/$target ;;
+	esac
+	if [ ! -f "$real" ]; then
+		echo "pkg: compatibility loader link has no target: $1" >&2
+		exit 1
+	fi
+	bb cp "$real" "$link.vinix"
+	bb chmod 0755 "$link.vinix"
+	bb rm -f "$link"
+	bb mv "$link.vinix" "$link"
+}
+
+materialize_gcompat_links() {
+	# Vinix's musl loader deliberately opens shared objects with O_NOFOLLOW.
+	# gcompat represents glibc's loader and compatibility sonames as symlinks,
+	# so turn only those known links into regular files after apk installs them.
+	for path in \
+		/lib/ld-linux-aarch64.so.1 \
+		/lib/libc.so.6 \
+		/lib/libcrypt.so.1 \
+		/lib/libdl.so.2 \
+		/lib/libm.so.6 \
+		/lib/libpthread.so.0 \
+		/lib/libresolv.so.2 \
+		/lib/librt.so.1 \
+		/lib/libutil.so.1
+	do
+		materialize_link "$path"
+	done
+}
+
+download_sublime() {
+	destination=$1
+	attempt=1
+	while ! "$CURL" --fail --location --output "$destination" "$SUBLIME_URL"; do
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: Sublime Text download failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: Sublime Text download failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		sleep $((NETWORK_RETRY_DELAY * attempt))
+		attempt=$((attempt + 1))
+	done
+}
+
+install_sublime() {
+	manifest=$(root_path /var/lib/vinix-pkg/sublime-text.files)
+	if [ -s "$manifest" ] \
+		&& [ -x "$(root_path /opt/sublime_text/sublime_text)" ] \
+		&& [ -x "$(root_path /usr/bin/subl)" ]; then
+		return 0
+	fi
+
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	temp=$(mktemp -d "$cache_parent/vinix-sublime.XXXXXX")
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	archive="$temp/sublime-text.tar.xz"
+	download_sublime "$archive"
+	# SHA256SUM may contain a command plus arguments (BusyBox's applet form).
+	# shellcheck disable=SC2086
+	actual=$($SHA256SUM "$archive" | awk '{print $1}')
+	if [ "$actual" != "$SUBLIME_SHA256" ]; then
+		echo "pkg: Sublime Text archive checksum mismatch" >&2
+		exit 1
+	fi
+
+	mkdir -p "$temp/payload"
+	"$BSDTAR" -xJf "$archive" -C "$temp/payload"
+	if [ ! -s "$temp/payload/sublime_text/sublime_text" ] \
+		|| [ ! -s "$temp/payload/sublime_text/plugin_host-3.8" ]; then
+		echo "pkg: Sublime Text archive is missing its ARM64 executables" >&2
+		exit 1
+	fi
+	bb chmod 0755 \
+		"$temp/payload/sublime_text/sublime_text" \
+		"$temp/payload/sublime_text/plugin_host-3.3" \
+		"$temp/payload/sublime_text/plugin_host-3.8" \
+		"$temp/payload/sublime_text/crash_handler"
+
+	remove_sublime
+	mkdir -p "$(root_path /opt)" "$(root_path /usr/bin)" \
+		"$(root_path /usr/share/applications)" \
+		"$(root_path /var/lib/vinix-pkg)" "$(root_path /dev/shm)"
+	bb chmod 1777 "$(root_path /dev/shm)"
+	bb mv "$temp/payload/sublime_text" "$(root_path /opt/sublime_text)"
+
+	cat >"$(root_path /usr/bin/subl)" <<'EOF'
+#!/bin/sh
+if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+	export LD_LIBRARY_PATH="/opt/sublime_text:$LD_LIBRARY_PATH"
+else
+	export LD_LIBRARY_PATH=/opt/sublime_text
+fi
+exec /opt/sublime_text/sublime_text "$@"
+EOF
+	bb chmod 0755 "$(root_path /usr/bin/subl)"
+
+	cat >"$(root_path /usr/share/applications/sublime_text.desktop)" <<'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sublime Text
+GenericName=Text Editor
+Comment=Sophisticated text editor for code, markup and prose
+Exec=/usr/bin/subl %F
+Terminal=false
+MimeType=text/plain;
+Icon=sublime-text
+Categories=TextEditor;Development;
+StartupNotify=true
+EOF
+	for size in 16 32 48 128 256; do
+		icon_dir=$(root_path "/usr/share/icons/hicolor/${size}x${size}/apps")
+		mkdir -p "$icon_dir"
+		bb cp \
+			"$(root_path /opt/sublime_text)/Icon/${size}x${size}/sublime-text.png" \
+			"$icon_dir/sublime-text.png"
+	done
+
+	{
+		printf '%s\n' ./usr/bin/subl ./usr/share/applications/sublime_text.desktop
+		for size in 16 32 48 128 256; do
+			printf '%s\n' "./usr/share/icons/hicolor/${size}x${size}/apps/sublime-text.png"
+		done
+		(
+			cd "$(root_path /)"
+			bb find ./opt/sublime_text -type f
+			bb find ./opt/sublime_text -type l
+		)
+	} >"$manifest"
+
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: Sublime Text $SUBLIME_BUILD installed"
 }
 
 install_gtk_demo() {
@@ -358,6 +528,21 @@ remove_gtk_demo() {
 	rm -f "$manifest"
 }
 
+remove_sublime() {
+	manifest=$(root_path /var/lib/vinix-pkg/sublime-text.files)
+	if [ -s "$manifest" ]; then
+		while IFS= read -r path; do
+			case "$path" in
+				./opt/sublime_text/*|./usr/bin/subl|./usr/share/applications/sublime_text.desktop|./usr/share/icons/hicolor/*/apps/sublime-text.png)
+					rm -f "$(root_path "/${path#./}")"
+					;;
+			esac
+		done <"$manifest"
+	fi
+	rm -f "$manifest"
+	bb rm -rf "$(root_path /opt/sublime_text)"
+}
+
 if [ "$#" -eq 0 ]; then
 	usage
 	exit 1
@@ -385,6 +570,7 @@ case "$command_name" in
 		for requested in "$@"; do
 			case "$requested" in
 				gtk|gtk+3.0-demo) remove_gtk_demo ;;
+				sublime|sublime-text) remove_sublime ;;
 			esac
 		done
 		packages=$(resolve_packages "$@")
@@ -419,6 +605,8 @@ case "$command_name" in
 		apk info
 		[ ! -s "$(root_path /var/lib/vinix-pkg/gtk+3.0-demo.files)" ] \
 			|| echo gtk+3.0-demo
+		[ ! -s "$(root_path /var/lib/vinix-pkg/sublime-text.files)" ] \
+			|| echo sublime-text
 		;;
 	*)
 		echo "pkg: unknown command: $command_name" >&2

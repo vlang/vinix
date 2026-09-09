@@ -14,6 +14,7 @@
 #include <sys/eventfd.h>
 #include <sys/resource.h>
 #include <sys/sendfile.h>
+#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
@@ -249,6 +250,32 @@ int main(void) {
           "sched_rr_get_interval");
     check(membarrier(MEMBARRIER_CMD_QUERY, 0) == 0,
           "membarrier feature query");
+
+    __asm__ volatile("wfe");
+    check(1, "trapped userspace WFE resumes");
+
+    int shmid = shmget(IPC_PRIVATE, 4096, IPC_CREAT | 0600);
+    char *shared = shmid >= 0 ? shmat(shmid, NULL, 0) : (void *)-1;
+    if (shared != (void *)-1)
+        strcpy(shared, "parent");
+    int shm_removed = shared != (void *)-1 ? shmctl(shmid, IPC_RMID, NULL) : -1;
+    pid_t shm_child = shm_removed == 0 ? fork() : -1;
+    if (shm_child == 0) {
+        char *second = shmat(shmid, NULL, 0);
+        if (second == (void *)-1 || strcmp(second, "parent"))
+            _exit(1);
+        strcpy(second, "child");
+        _exit(shmdt(second) == 0 ? 0 : 2);
+    }
+    int shm_status = 0;
+    struct shmid_ds shm_info;
+    check(shmid >= 0 && shared != (void *)-1 && shm_child > 0 &&
+              waitpid(shm_child, &shm_status, 0) == shm_child &&
+              WIFEXITED(shm_status) && WEXITSTATUS(shm_status) == 0 &&
+              !strcmp(shared, "child") &&
+              shmctl(shmid, IPC_STAT, &shm_info) == 0 &&
+              shm_info.shm_segsz == 4096 && shmdt(shared) == 0,
+          "System V shared memory after IPC_RMID");
 
     check(sethostname("syscall-smoke", 13) == 0, "sethostname");
     check(syscall(SYS_setdomainname, "vinix.test", 10) == 0, "setdomainname");

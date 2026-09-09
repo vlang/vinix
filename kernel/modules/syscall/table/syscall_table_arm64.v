@@ -20,6 +20,7 @@ import proc
 import stat
 import aarch64.cpu.local as cpulocal
 import aarch64.uart
+import sysvshm
 
 // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
 // Table size covers all syscalls we map (max used = 441, epoll_pwait2).
@@ -1196,6 +1197,10 @@ pub fn init_syscall_table() {
 	syscall_table[242] = voidptr(syscall_linux_accept4) // __NR_accept4
 
 	// Memory
+	syscall_table[194] = voidptr(sysvshm.syscall_shmget) // __NR_shmget
+	syscall_table[195] = voidptr(sysvshm.syscall_shmctl) // __NR_shmctl
+	syscall_table[196] = voidptr(sysvshm.syscall_shmat) // __NR_shmat
+	syscall_table[197] = voidptr(sysvshm.syscall_shmdt) // __NR_shmdt
 	syscall_table[214] = voidptr(mmap.syscall_brk) // __NR_brk
 	syscall_table[215] = voidptr(mmap.syscall_munmap) // __NR_munmap
 	syscall_table[216] = voidptr(mmap.syscall_mremap) // __NR_mremap

@@ -97,6 +97,16 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	ec := (esr >> 26) & 0x3f // Exception Class
 
 	match ec {
+		0x01 { // Trapped WFI/WFE from userspace
+			// WFI and WFE are architectural hints at EL0. Hypervisors may trap
+			// them to EL1, but userspace must be allowed to resume afterwards.
+			if gpr_state.pc < higher_half {
+				mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+				state.pc += 4
+				return
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
 		0x00, 0x07, 0x19, 0x1d { // Undefined or unavailable FP/SVE/SME instruction
 			if gpr_state.pc < higher_half
 				&& userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {

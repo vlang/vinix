@@ -13,6 +13,34 @@ mkdir -p "$root/etc/vinix-pkg" "$root/lib/apk/db" "$work/bin"
 : >"$installed"
 : >"$root/lib/apk/db/installed"
 printf '%s\n' 'nameserver 10.0.2.3' > "$root/etc/resolv.conf"
+
+# Tiny deterministic stand-in for the proprietary download. The package
+# frontend still exercises archive extraction, checksum verification, desktop
+# integration, manifests, and removal without contacting Sublime's servers.
+sublime_fixture="$work/sublime-fixture"
+mkdir -p "$sublime_fixture/sublime_text/Icon"
+for size in 16 32 48 128 256; do
+	mkdir -p "$sublime_fixture/sublime_text/Icon/${size}x${size}"
+	printf 'icon %s\n' "$size" \
+		>"$sublime_fixture/sublime_text/Icon/${size}x${size}/sublime-text.png"
+done
+for executable in sublime_text plugin_host-3.3 plugin_host-3.8 crash_handler; do
+	printf '#!/bin/sh\nexit 0\n' >"$sublime_fixture/sublime_text/$executable"
+done
+sublime_archive="$work/sublime-text.tar.xz"
+tar -cJf "$sublime_archive" -C "$sublime_fixture" sublime_text
+
+cat >"$work/bin/sha256sum" <<'EOF'
+#!/bin/sh
+if command -v sha256sum >/dev/null 2>&1; then
+	exec sha256sum "$@"
+fi
+exec shasum -a 256 "$@"
+EOF
+chmod +x "$work/bin/sha256sum"
+sublime_sha=$("$work/bin/sha256sum" "$sublime_archive" | awk '{print $1}')
+host_curl=$(command -v curl)
+host_tar=$(command -v bsdtar || command -v tar)
 cat > "$root/etc/vinix-pkg/base-world" <<'EOF'
 apk-tools
 curl
@@ -106,6 +134,11 @@ case "$*" in
 				seen_add=true
 			fi
 		done
+		if printf '%s\n' "$*" | grep -q ' gcompat '; then
+			mkdir -p "$VINIX_TEST_ROOT/lib"
+			printf 'gcompat\n' >"$VINIX_TEST_ROOT/lib/libgcompat.so.0"
+			ln -sf libgcompat.so.0 "$VINIX_TEST_ROOT/lib/ld-linux-aarch64.so.1"
+		fi
 		LC_ALL=C sort -u -o "$VINIX_TEST_INSTALLED_PACKAGES" \
 			"$VINIX_TEST_INSTALLED_PACKAGES"
 		;;
@@ -118,6 +151,10 @@ run_pkg() {
 	VINIX_PKG_APK="$work/bin/apk" \
 	VINIX_PKG_ROOT="$root" \
 	VINIX_PKG_RESOLV_CONF="${VINIX_PKG_RESOLV_CONF:-$root/etc/resolv.conf}" \
+	VINIX_PKG_CURL="${VINIX_PKG_CURL:-$host_curl}" \
+	VINIX_PKG_BSDTAR="${VINIX_PKG_BSDTAR:-$host_tar}" \
+	VINIX_PKG_SHA256SUM="${VINIX_PKG_SHA256SUM:-$work/bin/sha256sum}" \
+	VINIX_PKG_BUSYBOX= \
 	VINIX_TEST_APK_LOG="$log" \
 	VINIX_TEST_ROOT="$root" \
 	VINIX_TEST_INSTALLED_PACKAGES="$installed" \
@@ -224,5 +261,42 @@ if VINIX_PKG_RESOLV_CONF="$work/missing-resolv.conf" \
 fi
 grep -q 'network is not ready' "$work/no-network.log"
 test "$(wc -l < "$log" | tr -d ' ')" = 24
+unset VINIX_PKG_RESOLV_CONF VINIX_PKG_NETWORK_WAIT_SECONDS
+
+if VINIX_SUBLIME_URL="file://$sublime_archive" \
+	VINIX_SUBLIME_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
+	run_pkg install sublime-text >"$work/sublime-bad-checksum.log" 2>&1; then
+	echo "pkg accepted a Sublime Text archive with the wrong checksum" >&2
+	exit 1
+fi
+if ! grep -q 'archive checksum mismatch' "$work/sublime-bad-checksum.log"; then
+	cat "$work/sublime-bad-checksum.log" >&2
+	exit 1
+fi
+test ! -e "$root/opt/sublime_text"
+
+VINIX_SUBLIME_URL="file://$sublime_archive" \
+VINIX_SUBLIME_SHA256="$sublime_sha" run_pkg install sublime-text
+test -x "$root/opt/sublime_text/sublime_text"
+test -x "$root/opt/sublime_text/plugin_host-3.8"
+test -x "$root/usr/bin/subl"
+test -f "$root/usr/share/applications/sublime_text.desktop"
+test -f "$root/usr/share/icons/hicolor/256x256/apps/sublime-text.png"
+test -d "$root/dev/shm"
+test -f "$root/lib/ld-linux-aarch64.so.1"
+test ! -L "$root/lib/ld-linux-aarch64.so.1"
+grep -qx './opt/sublime_text/sublime_text' \
+	"$root/var/lib/vinix-pkg/sublime-text.files"
+run_pkg list | grep -qx sublime-text
+grep -q -- \
+	'--cache-dir .* --no-progress cache download adwaita-icon-theme font-dejavu gcompat gtk+3.0 libarchive-tools llvm19-libs$' \
+	"$log"
+
+run_pkg remove sublime-text
+test ! -e "$root/opt/sublime_text"
+test ! -e "$root/usr/bin/subl"
+test ! -e "$root/var/lib/vinix-pkg/sublime-text.files"
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs$'
 
 echo "VINIX PACKAGE COMMAND TEST: PASS"
