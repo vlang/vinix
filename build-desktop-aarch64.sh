@@ -3,6 +3,8 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]
+# Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
+# a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
 # V translates the program to C; clang compiles that C against the static musl
 # sysroot extracted from the userland image. The result is a freestanding

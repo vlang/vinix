@@ -9,6 +9,7 @@
 #   --monitor       open a QEMU monitor and QMP socket, so the tools under
 #                   desktop/tools can drive and photograph the running desktop
 #   --mem=MB        guest RAM (default: 8192 MiB for the desktop image)
+#   --v=PATH        V compiler executable or checkout (for example ~/code/v7)
 #   --help
 #
 # Anything else is passed through to run-aarch64.sh, which is what actually
@@ -25,7 +26,6 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$SCRIPT_DIR/build-support/find-v.sh"
 
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
@@ -58,16 +58,33 @@ BUILD_DESKTOP=1
 WITH_MONITOR=0
 PASSTHROUGH=()
 
-for arg in "$@"; do
+while [ "$#" -gt 0 ]; do
+    arg="$1"
     case "$arg" in
         --no-build)   BUILD_KERNEL=0; BUILD_DESKTOP=0 ;;
         --no-kernel)  BUILD_KERNEL=0 ;;
         --no-desktop) BUILD_DESKTOP=0 ;;
         --monitor)    WITH_MONITOR=1 ;;
+        --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
+        --v)
+            shift
+            if [ "$#" -eq 0 ]; then
+                echo "ERROR: --v requires a compiler executable or checkout path" >&2
+                exit 1
+            fi
+            VINIX_V_COMPILER="$1"
+            ;;
         --help|-h)    awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
         *)            PASSTHROUGH+=("$arg") ;;
     esac
+    shift
 done
+
+# Keep the chosen compiler in the environment so build-desktop-aarch64.sh
+# resolves the same compiler after this runner invokes it.
+if [ "$BUILD_KERNEL" -eq 1 ] || [ "$BUILD_DESKTOP" -eq 1 ]; then
+    . "$SCRIPT_DIR/build-support/find-v.sh"
+fi
 
 # ── The kernel ──
 # The desktop needs /dev/fb0 and /dev/pointer, both of which live in it.
