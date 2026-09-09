@@ -30,11 +30,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 # The desktop archive is deliberately independent of the ordinary shell image
-# and can be much larger.  Give it its own 2 GiB sparse disk so an existing
+# and can be much larger. Give it its own 4 GiB sparse disk so an existing
 # small boot-image/boot.img remains usable for fast non-desktop QEMU boots.
+# A caller's explicit size still wins, including when using a separate disk
+# for an unusually large package overlay.
 # Honour an explicit path so callers can still run more than one desktop VM.
 export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop.img}"
-export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
+export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-4096}"
 export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),
 # giving it a native 2048x1536 framebuffer without changing the standard

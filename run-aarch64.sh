@@ -278,7 +278,7 @@ if [ -f "$INITRAMFS" ]; then
         echo "       Need at least ${required_mb} MiB." >&2
         if [ -f "$BOOT_DISK" ]; then
             echo "       Keep the existing disk and choose a new path, for example:" >&2
-            echo "       VINIX_BOOT_DISK=/tmp/vinix-large.img $0 --disk=$BOOT_DISK_SIZE_MB" >&2
+            echo "       VINIX_BOOT_DISK=/tmp/vinix-large.img $0 --disk=$required_mb" >&2
         else
             echo "       Re-run with --disk=$required_mb or larger." >&2
         fi

@@ -414,10 +414,16 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
 It builds the kernel, builds the desktop, and starts QEMU on the result.
 The desktop launcher uses its own `boot-image/boot-desktop.img` disk, created
-as a sparse 2 GiB image on its first run. This leaves the ordinary
+as a sparse 4 GiB image on its first run. This leaves the ordinary
 `boot-image/boot.img` available for the smaller shell image. Set
 `VINIX_BOOT_DISK` (and, for a new disk, `VINIX_BOOT_DISK_SIZE_MB` or
 `--disk=MB`) to choose another disk.
+
+If a desktop disk created by an older launcher is too small, preserve it and
+start with a new path instead. The error prints the minimum size needed for
+the current initramfs and saved package overlay:
+
+    VINIX_BOOT_DISK=/tmp/vinix-desktop-large.img ./run-desktop-aarch64.sh --disk=4096
 
     --no-build      boot what is already built
     --no-kernel     skip the kernel build (the desktop is what you changed)
