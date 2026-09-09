@@ -2,6 +2,7 @@
 # Fast build + run cycle for Vinix aarch64 in QEMU
 # Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu|--virgl]
 #                         [--fake-g17]
+#                         [--guest-init=PATH]
 #                         [--mem=MB]
 #                         [--disk=MB] [--persist[=MB]] [--replace] [--grab-keys]
 #
@@ -15,6 +16,10 @@
 # --persist attaches a separate ext2 volume and mounts it at /root. The base
 # system still comes from the initramfs, while files below /root survive QEMU
 # restarts. --persist=MB chooses its one-time image size.
+#
+# --guest-init=PATH overlays /sbin/init for this boot only. It is intended for
+# automated VM tests: neither the selected initramfs nor a persistent volume is
+# modified.
 #
 # --mem=MB (or VINIX_QEMU_MEM) sizes guest RAM. The virt machine places RAM
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
@@ -69,6 +74,8 @@ NO_BUILD=0
 SERIAL_ONLY=0
 VIRTIO_GPU=0
 FAKE_G17=0
+GUEST_INIT="${VINIX_QEMU_GUEST_INIT:-}"
+GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
 GRAB_KEYS=0
 PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-0}"
@@ -80,14 +87,34 @@ for arg in "$@"; do
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --virgl)      VIRTIO_GPU=2 ;;
         --fake-g17)   FAKE_G17=1 ;;
+        --guest-init=*) GUEST_INIT="${arg#*=}"; GUEST_INIT_REQUESTED=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
         --disk=*)     BOOT_DISK_SIZE_MB="${arg#*=}" ;;
         --persist)    PERSIST_ENABLED=1 ;;
         --persist=*)  PERSIST_ENABLED=1; PERSIST_SIZE_MB="${arg#*=}" ;;
         --replace)    REPLACE_RUNNING=1 ;;
         --grab-keys)  GRAB_KEYS=1 ;;
+        --help|-h)
+            awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+            exit 0
+            ;;
     esac
 done
+
+if [ "$GUEST_INIT_REQUESTED" -eq 1 ] && [ -z "$GUEST_INIT" ]; then
+    echo "ERROR: --guest-init needs a path" >&2
+    exit 1
+fi
+if [ -n "$GUEST_INIT" ]; then
+    case "$GUEST_INIT" in
+        /*) ;;
+        *) GUEST_INIT="$PWD/$GUEST_INIT" ;;
+    esac
+    if [ ! -f "$GUEST_INIT" ] || [ ! -x "$GUEST_INIT" ]; then
+        echo "ERROR: --guest-init must name an executable regular file: $GUEST_INIT" >&2
+        exit 1
+    fi
+fi
 
 case "$BOOT_DISK_SIZE_MB" in
     ''|*[!0-9]*)
@@ -446,6 +473,15 @@ PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
 PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
 mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
+
+# Tests may replace PID 1 without copying and rewriting a multi-gigabyte base
+# image. Limine loads this per-run module last, so the override exists only in
+# the guest's RAM-backed root for this boot.
+if [ -n "$GUEST_INIT" ]; then
+    mkdir -p "$PACKAGE_RUNTIME_ROOT/sbin"
+    install -m755 "$GUEST_INIT" "$PACKAGE_RUNTIME_ROOT/sbin/init"
+    echo "==> Injecting test init: $GUEST_INIT"
+fi
 
 # Hyprland is an explicit alternate desktop session. Keep the selection in
 # this per-run module rather than the image itself: a staged Hyprland runtime
