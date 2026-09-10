@@ -217,7 +217,10 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	}
 
 	// Drop any TLB caching of the intermediate walks we just tore down.
-	cpu.tlbi_vmalle1()
+	// Intermediate translation-table walk caches can exist on any CPU which
+	// ran this user pagemap. Broadcast before returning the reclaimed table
+	// pages to the PMM.
+	cpu.tlbi_vmalle1is()
 	cpu.dsb_sy()
 	cpu.isb()
 }

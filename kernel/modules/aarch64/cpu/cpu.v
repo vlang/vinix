@@ -415,10 +415,27 @@ pub fn dmb_ishld() {
 	}
 }
 
-// TLB invalidation
+// Whole-TLB invalidation for switching the executing CPU to another pagemap.
+// A context switch only needs to affect this PE; broadcasting every switch
+// would needlessly evict unrelated processes running on the other CPUs.
 pub fn tlbi_vmalle1() {
 	asm volatile aarch64 {
+		dsb ishst
 		tlbi vmalle1
+		dsb ish
+		isb
+		; ; ; memory
+	}
+}
+
+// Page-table edits must invalidate every CPU which could be running the
+// pagemap. The non-IS forms only affect the executing PE. After enabling a
+// second M1 CPU, that let a migrated process retain stale translations from
+// the other CPU. Use the inner-shareable forms for those edits.
+pub fn tlbi_vmalle1is() {
+	asm volatile aarch64 {
+		dsb ishst
+		tlbi vmalle1is
 		dsb ish
 		isb
 		; ; ; memory
@@ -427,7 +444,8 @@ pub fn tlbi_vmalle1() {
 
 pub fn tlbi_vale1(addr u64) {
 	asm volatile aarch64 {
-		tlbi vale1, addr
+		dsb ishst
+		tlbi vale1is, addr
 		dsb ish
 		isb
 		; ; r (addr)
@@ -437,7 +455,8 @@ pub fn tlbi_vale1(addr u64) {
 
 pub fn tlbi_vaae1(addr u64) {
 	asm volatile aarch64 {
-		tlbi vaae1, addr
+		dsb ishst
+		tlbi vaae1is, addr
 		dsb ish
 		isb
 		; ; r (addr)
