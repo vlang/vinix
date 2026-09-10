@@ -49,6 +49,9 @@ pub mut:
 	// Linux convention used by unmodified Alpine binaries. exec sets this from
 	// the ELF interpreter; fork inherits it with the rest of the process ABI.
 	linux_abi bool
+	// Reset by fork; set when amd64 exec commits a replacement image.
+	// Protected by the process-table lock for parent setpgid checks.
+	execed_since_fork bool
 
 	// Credentials: the real, effective and saved sets POSIX names, plus the
 	// supplementary groups. Everything starts as root and is inherited across
