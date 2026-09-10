@@ -40,6 +40,18 @@ const gear_tooth_x = [1, 0, -1, 0]
 const gear_tooth_y = [0, 1, 0, -1]
 const activity_bar_shares = [2, 3, 5]
 
+// Word 2013's unselected tabs are the only text drawn into its missing
+// Direct2D backing layer. Their source-space centres are stable because Word
+// opens in a fixed private X desktop. Repainting the labels after the XWD has
+// been scaled gives them Vinix's native antialiased text at every window size.
+const office2013_tab_labels = ['INSERT', 'DESIGN', 'PAGE LAYOUT', 'REFERENCES', 'MAILINGS', 'REVIEW',
+	'VIEW']
+const office2013_tab_centers = [157, 224, 310, 411, 499, 580, 638]
+const office2013_tab_top = 27
+const office2013_tab_height = 22
+const office2013_tab_font_size = 11
+const office2013_tab_color = u32(0x303030)
+
 // Text carrying this private id was formatted solely for the current element
 // tree. free_tree releases it after the frame; all other element strings are
 // literals or model-owned caches.
@@ -219,7 +231,10 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 		}
 		.image {
 			if el.image_path.starts_with(office_xwd_image_prefix) {
-				d.canvas.draw_office_xwd_surface(el.image_path[office_xwd_image_prefix.len..], x, y, w, h)
+				drawn, has_ribbon := d.canvas.draw_office_xwd_surface(el.image_path[office_xwd_image_prefix.len..], x, y, w, h)
+				if drawn && has_ribbon {
+					d.draw_office2013_tab_labels(x, y, w, h)
+				}
 			} else if el.image_path.starts_with(xwd_image_prefix) {
 				d.canvas.draw_xwd_surface(el.image_path[xwd_image_prefix.len..], x, y, w, h)
 			} else {
@@ -255,6 +270,23 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 
 	if pushed {
 		d.canvas.restore_clip(saved)
+	}
+}
+
+fn (mut d Desktop) draw_office2013_tab_labels(x int, y int, width int, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+	requested_size := (office2013_tab_font_size * height + wine_word2013_surface_height / 2) / wine_word2013_surface_height
+	face := d.face_for(ui2.TextStyle{
+		size: f64(requested_size)
+	})
+	top := y + office2013_tab_top * height / wine_word2013_surface_height
+	strip_height := office2013_tab_height * height / wine_word2013_surface_height
+	text_y := top + (strip_height - face.line_height) / 2
+	for index, label in office2013_tab_labels {
+		center := x + office2013_tab_centers[index] * width / wine_word2013_surface_width
+		d.canvas.draw_text(face, center - face.text_width(label) / 2, text_y, label, office2013_tab_color)
 	}
 }
 

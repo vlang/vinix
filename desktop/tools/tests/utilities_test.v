@@ -282,10 +282,58 @@ fn test_xwd_bilinear_filter_preserves_edges_and_blends_the_middle() {
 }
 
 fn test_office_xwd_repairs_only_transparent_ui_pixels() {
-	assert office2013_presented_color(0x000000, 0) == 0xffffff
-	assert office2013_presented_color(0x000000, office2013_transparent_ui_height - 1) == 0xffffff
-	assert office2013_presented_color(0x010101, 50) == 0x010101
-	assert office2013_presented_color(0x000000, office2013_transparent_ui_height) == 0x000000
+	assert office2013_is_artifact_pixel(0x000000)
+	assert office2013_is_artifact_pixel(0x3c3c3c)
+	assert office2013_is_artifact_pixel(0x2d2d2d)
+	assert !office2013_is_artifact_pixel(0x3d3d3d)
+	assert !office2013_is_artifact_pixel(0x003c3c)
+	assert office2013_has_transparent_backing(140, 35)
+	assert office2013_presented_color(0x000000, 122, 26) == 0xffffff
+	assert office2013_presented_color(0x2d2d2d, 140, 35) == 0xffffff
+	assert office2013_presented_color(0x161616, 140, 35) == 0xffffff
+	assert office2013_presented_color(0x3c3c3c, 140, 35) == 0xffffff
+	assert office2013_presented_color(0x16406a, 140, 35) == 0xffffff
+	assert office2013_presented_color(0x000000, 100, 35) == 0x000000
+	assert office2013_presented_color(0x000000, 100, 62) == 0xffffff
+	assert office2013_presented_color(0x000000, 100, 70) == 0x000000
+	assert office2013_presented_color(0x000000, 160, 70) == 0xffffff
+	assert office2013_presented_color(0x000000, 500, 70) == 0x000000
+	assert office2013_presented_color(0x000000, 567, 70) == 0xffffff
+	assert office2013_presented_color(0x000000, 600, 56) == 0xffffff
+	assert office2013_presented_color(0x000000, 640, 70) == 0xffffff
+	assert office2013_presented_color(0x000000, 600, 145) == 0x000000
+}
+
+fn test_office_ribbon_repaints_every_damaged_tab_with_native_text() {
+	mut desktop := Desktop{
+		canvas: new_canvas(wine_word2013_surface_width, wine_word2013_surface_height)
+		fonts: load_fonts()
+	}
+	desktop.canvas.fill_rect(0, 0, desktop.canvas.width, desktop.canvas.height, 0xffffff)
+	desktop.draw_office2013_tab_labels(0, 0, desktop.canvas.width, desktop.canvas.height)
+	for index, center in office2013_tab_centers {
+		left := if index == 0 {
+			122
+		} else {
+			(office2013_tab_centers[index - 1] + center) / 2
+		}
+		right := if index + 1 == office2013_tab_centers.len {
+			660
+		} else {
+			(center + office2013_tab_centers[index + 1]) / 2
+		}
+		mut ink := 0
+		for y in office2013_tab_top .. office2013_tab_top + office2013_tab_height {
+			for x in left .. right {
+				if unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] } != 0xffffff {
+					ink++
+				}
+			}
+		}
+		assert ink > 10
+	}
+	assert unsafe { desktop.canvas.pixels[26 * desktop.canvas.stride + 157] } == 0xffffff
+	unsafe { free(voidptr(desktop.canvas.pixels)) }
 }
 
 fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {

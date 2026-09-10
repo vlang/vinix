@@ -7,9 +7,14 @@ const xwd_image_prefix = 'xwd:'
 const office_xwd_image_prefix = 'xwd-office:'
 // Office 2013 draws its ribbon and start-page controls through transparent
 // Direct2D layers. Xvfb's 24-bit root pixmap has nowhere to retain the alpha
-// channel, so fully transparent texels arrive as pure black. The document
-// canvas begins below this band and must remain byte-for-byte untouched.
+// channel, so a few transparent controls arrive on a near-black backing. Keep
+// the repair within the stable Office 2013 ribbon rectangles; inspecting and
+// flood-filling the whole ribbon for every frame is prohibitively expensive
+// under the x86-to-ARM translation layer.
 const office2013_transparent_ui_height = 145
+const office2013_artifact_dark_limit = u32(60)
+const office2013_tab_probe_x = [130, 450, 700]
+const office2013_tab_probe_y = [28, 38, 47]
 const xwd_fixed_header_size = u64(100)
 const xwd_color_size = u64(12)
 const xwd_file_version = u32(7)
@@ -146,17 +151,68 @@ fn (surface &XwdSurface) pixel(x int, y int) u32 {
 }
 
 @[inline]
-fn office2013_presented_color(color u32, source_y int) u32 {
-	if source_y < office2013_transparent_ui_height && color == 0 {
+fn office2013_is_artifact_pixel(color u32) bool {
+	red := (color >> 16) & 0xff
+	green := (color >> 8) & 0xff
+	blue := color & 0xff
+	minimum := if red < green {
+		if red < blue { red } else { blue }
+	} else {
+		if green < blue { green } else { blue }
+	}
+	maximum := if red > green {
+		if red > blue { red } else { blue }
+	} else {
+		if green > blue { green } else { blue }
+	}
+	return maximum <= office2013_artifact_dark_limit && maximum - minimum <= 2
+}
+
+@[inline]
+fn office2013_has_transparent_backing(x int, y int) bool {
+	// Unselected ribbon tabs.
+	if y >= 25 && y <= 49 && x >= 122 {
+		return true
+	}
+	// The stray right edge of the blue File tab.
+	if y >= 25 && y <= 49 && x >= 59 && x <= 62 {
+		return true
+	}
+	// Font name and font size frames. Their interiors contain legitimate
+	// solid-black glyphs, so repair only the connected frame pixels.
+	font_frame := (x >= 76 && x <= 161 && ((y >= 61 && y <= 64) || (y >= 80 && y <= 84)))
+		|| (((x >= 76 && x <= 78) || (x >= 159 && x <= 161)) && y >= 65 && y <= 79)
+	size_frame := (x >= 174 && x <= 200 && ((y >= 61 && y <= 64) || (y >= 80 && y <= 84)))
+		|| (((x >= 174 && x <= 176) || (x >= 198 && x <= 200)) && y >= 65 && y <= 79)
+	// The connected Styles-gallery frame changes width with the X desktop,
+	// while its left edge and column separators remain fixed.
+	styles_frame := (x >= 566 && ((y >= 56 && y <= 61) || (y >= 110 && y <= 116)))
+		|| (y >= 62 && y <= 109 && ((x >= 566 && x <= 568) || (x >= 639 && x <= 643)
+			|| (x >= 707 && x <= 715)))
+	return font_frame || size_frame || styles_frame
+}
+
+@[inline]
+fn office2013_presented_color(color u32, source_x int, source_y int) u32 {
+	if source_y >= 25 && source_y <= 49
+		&& (source_x >= 122 || (source_x >= 59 && source_x <= 62)) {
 		return 0xffffff
 	}
-	return color
+	if source_y >= office2013_transparent_ui_height
+		|| !office2013_has_transparent_backing(source_x, source_y)
+		|| !office2013_is_artifact_pixel(color) {
+		return color
+	}
+	// The tab glyphs were premultiplied into the missing layer too, so their
+	// original coverage cannot be reconstructed. Clear the entire damaged
+	// layer here; the renderer replaces those seven labels after scaling.
+	return 0xffffff
 }
 
 @[inline]
 fn (surface &XwdSurface) presented_pixel(x int, y int, repair_office_ui bool) u32 {
 	color := surface.pixel(x, y)
-	return if repair_office_ui { office2013_presented_color(color, y) } else { color }
+	return if repair_office_ui { office2013_presented_color(color, x, y) } else { color }
 }
 
 // Interpolate four opaque XWD pixels with 8-bit fractional coordinates.  The
@@ -174,17 +230,9 @@ fn xwd_bilinear_color(top_left u32, top_right u32, bottom_left u32, bottom_right
 	bottom_left_weight := inverse_x * fraction_y
 	bottom_right_weight := fraction_x * fraction_y
 
-	red := (((top_left >> 16) & 0xff) * top_left_weight +
-		((top_right >> 16) & 0xff) * top_right_weight +
-		((bottom_left >> 16) & 0xff) * bottom_left_weight +
-		((bottom_right >> 16) & 0xff) * bottom_right_weight + 32768) >> 16
-	green := (((top_left >> 8) & 0xff) * top_left_weight +
-		((top_right >> 8) & 0xff) * top_right_weight +
-		((bottom_left >> 8) & 0xff) * bottom_left_weight +
-		((bottom_right >> 8) & 0xff) * bottom_right_weight + 32768) >> 16
-	blue := ((top_left & 0xff) * top_left_weight + (top_right & 0xff) * top_right_weight +
-		(bottom_left & 0xff) * bottom_left_weight + (bottom_right & 0xff) * bottom_right_weight +
-		32768) >> 16
+	red := (((top_left >> 16) & 0xff) * top_left_weight + ((top_right >> 16) & 0xff) * top_right_weight + ((bottom_left >> 16) & 0xff) * bottom_left_weight + ((bottom_right >> 16) & 0xff) * bottom_right_weight + 32768) >> 16
+	green := (((top_left >> 8) & 0xff) * top_left_weight + ((top_right >> 8) & 0xff) * top_right_weight + ((bottom_left >> 8) & 0xff) * bottom_left_weight + ((bottom_right >> 8) & 0xff) * bottom_right_weight + 32768) >> 16
+	blue := ((top_left & 0xff) * top_left_weight + (top_right & 0xff) * top_right_weight + (bottom_left & 0xff) * bottom_left_weight + (bottom_right & 0xff) * bottom_right_weight + 32768) >> 16
 	return red << 16 | green << 8 | blue
 }
 
@@ -192,30 +240,31 @@ fn xwd_bilinear_color(top_left u32, top_right u32, bottom_left u32, bottom_right
 // Xvfb and the desktop share the kernel page cache, so no screenshot file is
 // copied or rewritten for each frame.
 fn (mut canvas Canvas) draw_xwd_surface(path string, x int, y int, width int, height int) bool {
-	return canvas.draw_presented_xwd_surface(path, x, y, width, height, false)
+	drawn, _ := canvas.draw_presented_xwd_surface(path, x, y, width, height, false)
+	return drawn
 }
 
-fn (mut canvas Canvas) draw_office_xwd_surface(path string, x int, y int, width int, height int) bool {
+fn (mut canvas Canvas) draw_office_xwd_surface(path string, x int, y int, width int, height int) (bool, bool) {
 	return canvas.draw_presented_xwd_surface(path, x, y, width, height, true)
 }
 
 fn (mut canvas Canvas) draw_presented_xwd_surface(path string, x int, y int, width int, height int,
-	repair_office_ui bool) bool {
+	repair_office_ui bool) (bool, bool) {
 	if width <= 0 || height <= 0 {
-		return false
+		return false, false
 	}
-	surface := open_xwd_surface(path) or { return false }
+	surface := open_xwd_surface(path) or { return false, false }
 	defer {
 		surface.close()
 	}
+	has_office_ribbon := repair_office_ui && surface.office2013_has_tab_backing()
 	if width == surface.width && height == surface.height {
 		for destination_y := 0; destination_y < height; destination_y++ {
 			for destination_x := 0; destination_x < width; destination_x++ {
-				canvas.blend_pixel(x + destination_x, y + destination_y, surface.presented_pixel(destination_x,
-					destination_y, repair_office_ui), 255)
+				canvas.blend_pixel(x + destination_x, y + destination_y, surface.presented_pixel(destination_x, destination_y, has_office_ribbon), 255)
 			}
 		}
-		return true
+		return true, has_office_ribbon
 	}
 
 	step_x := if width > 1 { (surface.width - 1) * 65536 / (width - 1) } else { 0 }
@@ -237,13 +286,28 @@ fn (mut canvas Canvas) draw_presented_xwd_surface(path string, x int, y int, wid
 			source_x := fixed_x >> 16
 			next_x := if source_x + 1 < surface.width { source_x + 1 } else { source_x }
 			fraction_x := u32(fixed_x & 0xffff) >> 8
-			color := xwd_bilinear_color(surface.presented_pixel(source_x, source_y, repair_office_ui),
-				surface.presented_pixel(next_x, source_y, repair_office_ui),
-				surface.presented_pixel(source_x, next_y, repair_office_ui),
-				surface.presented_pixel(next_x, next_y, repair_office_ui), fraction_x, fraction_y)
+			color := xwd_bilinear_color(surface.presented_pixel(source_x, source_y, has_office_ribbon), surface.presented_pixel(next_x, source_y, has_office_ribbon), surface.presented_pixel(source_x, next_y, has_office_ribbon), surface.presented_pixel(next_x, next_y, has_office_ribbon), fraction_x, fraction_y)
 			canvas.blend_pixel(x + destination_x, y + destination_y, color, 255)
 			fixed_x += step_x
 		}
 	}
-	return true
+	return true, has_office_ribbon
+}
+
+fn (surface &XwdSurface) office2013_has_tab_backing() bool {
+	if surface.width <= 700 || surface.height <= 47 {
+		return false
+	}
+	// A document ribbon has a near-black Direct2D backing across this whole
+	// strip. Word's start page is blue on the left and white on the right, so
+	// requiring most of these dispersed probes avoids painting tabs there.
+	mut matches := 0
+	for source_y in office2013_tab_probe_y {
+		for source_x in office2013_tab_probe_x {
+			if office2013_is_artifact_pixel(surface.pixel(source_x, source_y)) {
+				matches++
+			}
+		}
+	}
+	return matches >= 6
 }
