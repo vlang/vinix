@@ -361,12 +361,20 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     # retaining gcc, cc1 and lto1.
     rm -f "$STAGING/usr/bin/lto-dump"
 
-    # Scripts in the Firefox/X11/package closure use ordinary command names. The
-    # compact image carries BusyBox but not the full userland's applet links,
-    # so provide the small set needed by pkg, run-firefox and Vinix's startx.
-    for applet in sh cat chmod dirname id ln mkdir rm sed sleep; do
+    # The full userland has GNU coreutils, which replaces some of Alpine's
+    # BusyBox links.  Compact images omit that package, so make its complete
+    # everyday BusyBox command set available explicitly instead of exposing
+    # only the few helpers needed by the desktop launchers.  This keeps df,
+    # ls, du, find-like shell tooling, archive tools, and process/filesystem
+    # inspection commands preinstalled without bringing the GNU package in.
+    for applet in \
+        ash basename cat chgrp chmod chown cp cut date dd df dirname dmesg du \
+        echo env expr false find grep head hostname id kill ln ls mkdir mknod mount \
+        mv ping ps pwd rm rmdir sed sh sleep sort stat sync tail tar touch true \
+        uname wc which whoami xargs; do
         ln -sf busybox "$STAGING/bin/$applet"
     done
+
 else
     tar xf "$BASE_INITRAMFS" -C "$STAGING"
     # The base archive may predate package support. Always refresh this small
@@ -503,7 +511,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/gcc; do
+    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
