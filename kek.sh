@@ -205,7 +205,15 @@ the compositor reports its renderer. In a terminal, verify and rerun the
 hardware-only render test with:
 
   ls -l /dev/dri/renderD128
-  run-gl-triangle-agx --rebuild
+  run-m1-agx-smoke --rebuild
+
+Only "VINIX M1 AGX RENDER TEST: PASS" is proof of native GPU execution: the
+test rejects software/VirGL/fake renderers and validates pixels after glFinish.
+The boot should also report exactly two Vinix CPUs online:
+
+  smp: Discovered CPUs: 8
+  smp: Starting CPUs:   2
+  smp: 2 CPUs online
 
 Use `sudo ~/code/kek.sh desktop-wifi` if the GPU probe prevents the desktop
 from starting; that keeps Wi-Fi and the same desktop image but disables AGX.

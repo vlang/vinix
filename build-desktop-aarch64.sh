@@ -427,6 +427,10 @@ fi
 # unrelated Mesa build.
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     merge_staging_tree "$ASAHI_STAGING"
+    # Keep the native hardware proof in sync with the source tree even when
+    # the Mesa staging directory was built before this desktop image.
+    install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
+        "$STAGING/usr/bin/run-m1-agx-smoke"
 fi
 # Hyprland edge uses libstdc++ formatting entry points newer than the base and
 # Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;

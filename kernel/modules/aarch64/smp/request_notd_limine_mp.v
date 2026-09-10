@@ -19,11 +19,10 @@ import limine
 // boot services have been exited. The kernel is entered after roughly eight
 // hours.
 //
-// Limine 12.x replaced that path with a VHE-aware trampoline. Keep the request
-// disabled on Apple hardware until that new path is validated with Vinix; the
-// AIC path can run on CPU 0 alone. The QEMU runners build with LIMINE_MP=1,
-// which supplies -d limine_mp and lets QEMU bring every configured virtual CPU
-// online.
+// Limine 12.x replaced that path with a VHE-aware trampoline. Vinix's pinned
+// M1 deployment now builds with LIMINE_MP=1 and caps the native AIC path at two
+// online CPUs. Generic direct builds retain this request-free fallback, while
+// the QEMU runners also select LIMINE_MP=1 for their configured virtual CPUs.
 fn limine_response() &limine.LimineSMPResponse {
 	return unsafe { nil }
 }

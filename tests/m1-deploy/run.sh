@@ -22,7 +22,10 @@ header[:7] = b"\x7fELF\x02\x01\x01"
 struct.pack_into("<HHI", header, 16, 2, 183, 1)
 with open(sys.argv[1], "wb") as output:
     output.write(header)
-    output.write(bytes.fromhex("888b4cdf30ddb1c77bf094a183e8820a"))
+    output.write(bytes.fromhex(
+        "888b4cdf30ddb1c77bf094a183e8820a"
+        "7e851b9a817ba695e0736a3b721bb6a0"
+    ))
 PY
 
 printf '%s\n' 'Limine 12.8.0 (aarch64, UEFI)' \
@@ -40,6 +43,19 @@ tar --format=ustar -cf "$work/initramfs-desktop.tar" -C "$work/root" .
 gzip -n -6 -c "$work/initramfs-desktop.tar" \
     > "$fixture/build-support/init-aarch64/initramfs-desktop.tar.gz"
 printf '%s\n' old > "$esp/boot/initramfs.tar"
+
+# A direct/default kernel build omits the MP request. It must be rejected
+# before the old single-core image can be copied to a real M1.
+cp "$fixture/kernel/bin/vinix" "$work/vinix-with-mp"
+dd if="$work/vinix-with-mp" of="$fixture/kernel/bin/vinix" bs=64 count=1 \
+    2>/dev/null
+if "$fixture/deploy-m1-efi.sh" --desktop-initramfs "$esp" \
+    >"$work/single-core.log" 2>&1; then
+    echo "deployment accepted an M1 kernel without the MP request" >&2
+    exit 1
+fi
+grep -Fq 'M1 kernel has no Limine MP request' "$work/single-core.log"
+cp "$work/vinix-with-mp" "$fixture/kernel/bin/vinix"
 
 "$fixture/deploy-m1-efi.sh" --desktop-initramfs "$esp" >/dev/null
 cmp -s "$fixture/build-support/init-aarch64/initramfs-desktop.tar.gz" \

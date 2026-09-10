@@ -712,17 +712,21 @@ fn kmain() {
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
 	print('skipping PCI (ARM64 ECAM setup not implemented)\n')
 
-	// Limine has already released every CPU represented by an MP response, so
-	// the kernel does not need a device tree to finish their initialisation.
-	// This matters for QEMU's UEFI boot, which exposes the CPUs to Limine but
-	// does not give the kernel a usable DTB.
-	if use_aic {
-		print('skipping SMP (minimal Apple bring-up mode)\n')
-		bootstrap_cpu0()
-	} else if smp.available() {
-		print('init smp...\n')
-		smp.initialise()
+	// Limine 12.8's VHE-aware trampoline can safely park Apple APs at EL2. Use
+	// two logical CPUs for the first hardware validation while retaining the
+	// existing all-CPU behaviour in virtual machines (currently configured
+	// with two vCPUs). Limine leaves every AP above the limit parked.
+	if smp.available() {
+		if use_aic {
+			print('init smp (Apple hardware, 2 CPU limit)...\n')
+		} else {
+			print('init smp...\n')
+		}
+		smp.initialise(if use_aic { u64(2) } else { u64(0) })
 		print('smp done\n')
+	} else if use_aic {
+		print('skipping SMP (no bootloader MP response)\n')
+		bootstrap_cpu0()
 	} else if have_dt {
 		print('skipping SMP (no bootloader MP response; build with -d limine_mp)\n')
 		bootstrap_cpu0()

@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+if [ ! -e /dev/dri/renderD128 ]; then
+    echo "VINIX M1 AGX RENDER TEST: FAIL (render node unavailable)" >&2
+    exit 1
+fi
+
+output="$(/usr/bin/run-gl-triangle-agx "$@" 2>&1)" || {
+    status=$?
+    printf '%s\n' "$output" >&2
+    echo "VINIX M1 AGX RENDER TEST: FAIL ($status)" >&2
+    exit "$status"
+}
+printf '%s\n' "$output"
+
+# The triangle checks real rendered pixels before emitting this marker. Fake
+# G17 returns before pixel validation, VirGL has a different renderer, and the
+# demo rejects Mesa's software rasterizers, so this cannot be a submit-only
+# or CPU-rendered success.
+case "$output" in
+    *"GL_RENDERER="*"Apple M1"*"VINIX M1 AGX RENDER TEST: PASS"*) ;;
+    *)
+        echo "VINIX M1 AGX RENDER TEST: FAIL (native renderer/pixel proof missing)" >&2
+        exit 1
+        ;;
+esac

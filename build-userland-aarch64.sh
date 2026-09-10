@@ -511,6 +511,8 @@ if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
         "$STAGING/usr/bin/run-gl-triangle"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \
         "$STAGING/usr/bin/run-gl-triangle-agx"
+    install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
+        "$STAGING/usr/bin/run-m1-agx-smoke"
 
     # Make copied library links self-contained in the initramfs. Some links
     # in the Alpine packages are absolute and otherwise resolve on the host.

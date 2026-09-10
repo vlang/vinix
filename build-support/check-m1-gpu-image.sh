@@ -77,6 +77,7 @@ for path in \
     lib/ld-musl-aarch64.so.1 \
     usr/bin/gl-triangle-agx \
     usr/bin/run-gl-triangle-agx \
+    usr/bin/run-m1-agx-smoke \
     usr/lib/dri/asahi_dri.so \
     usr/lib/dri/libdril_dri.so \
     usr/lib/libEGL.so.1 \

@@ -7,9 +7,18 @@ import memory
 import katomic
 import sched
 
+fn C.exception_vectors()
+
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
 	cpu_number := cpu_local.cpu_number
+
+	// Limine deliberately leaves VBAR undefined on every CPU. The BSP installs
+	// Vinix's table during early exception setup; APs enter here directly from
+	// Limine's parked trampoline and must install the same table themselves
+	// before a scheduled EL0 thread can unmask IRQ/FIQ delivery.
+	cpu.write_vbar_el1(u64(voidptr(C.exception_vectors)))
+	cpu.isb()
 
 	// Set TPIDR_EL1 to cpu_number for per-CPU data access
 	cpu.write_tpidr_el1(cpu_number)

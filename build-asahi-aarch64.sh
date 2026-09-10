@@ -289,6 +289,7 @@ install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     "$STAGING/usr/share/examples/gl-triangle/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" "$STAGING/usr/bin/"
+install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-virgl-smoke" "$STAGING/usr/bin/"
 printf '%s\n' "mesa=$MESA_VERSION drivers=asahi,virgl,softpipe platforms=x11,surfaceless gbm=enabled" \
     > "$STAGING/usr/share/vinix/mesa-x11-egl"
