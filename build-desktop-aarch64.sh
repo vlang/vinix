@@ -36,6 +36,7 @@ fi
 CC_SHIM="$SCRIPT_DIR/build-support/aarch64-cc-shim"
 BASE_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
+DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
@@ -594,3 +595,27 @@ if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$DESKTOP_INITRAMFS_TMP" -C "$STA
 fi
 mv -f "$DESKTOP_INITRAMFS_TMP" "$DESKTOP_INITRAMFS"
 echo "    $DESKTOP_INITRAMFS ($(file_size "$DESKTOP_INITRAMFS") bytes)"
+
+# Limine can transparently decompress a module whose resource path starts
+# with '$'. The Asahi ESP is only 500 MiB, so the compact M1 image also needs
+# a deterministic gzip representation; the uncompressed tar remains the QEMU
+# input. Publish it atomically so a failed compression cannot leave a valid-
+# looking partial image for deploy-m1-efi.sh.
+if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+    DESKTOP_INITRAMFS_GZ_TMP="$(mktemp "$(dirname "$DESKTOP_INITRAMFS_GZ")/.initramfs-desktop.tar.gz.XXXXXX")"
+    if ! gzip -n -6 -c "$DESKTOP_INITRAMFS" > "$DESKTOP_INITRAMFS_GZ_TMP"; then
+        rm -f "$DESKTOP_INITRAMFS_GZ_TMP"
+        exit 1
+    fi
+    if ! gzip -t "$DESKTOP_INITRAMFS_GZ_TMP"; then
+        rm -f "$DESKTOP_INITRAMFS_GZ_TMP"
+        echo "ERROR: compressed desktop initramfs failed verification" >&2
+        exit 1
+    fi
+    mv -f "$DESKTOP_INITRAMFS_GZ_TMP" "$DESKTOP_INITRAMFS_GZ"
+    echo "    compressed EFI image: $DESKTOP_INITRAMFS_GZ ($(file_size "$DESKTOP_INITRAMFS_GZ") bytes)"
+else
+    # A full rebuild makes any compressed compact image stale. Refuse to let a
+    # later hardware deployment mistake it for this newly published archive.
+    rm -f "$DESKTOP_INITRAMFS_GZ"
+fi

@@ -540,6 +540,12 @@ image at deployment:
 ./deploy-m1-efi.sh --apple-gpu --desktop-initramfs /Volumes/EFI
 ```
 
+The compact build publishes both the uncompressed tar used by QEMU and a
+deterministic `.tar.gz` used on Apple hardware. Limine expands the latter
+before handing the module to Vinix. This is required because the Asahi EFI
+System Partition is only 500 MiB; free space reported for the macOS APFS data
+volume is unrelated to ESP capacity.
+
 The installed M1 deployment helper enables the GPU in its default desktop mode,
 alongside Wi-Fi, so the normal hardware test is simply:
 

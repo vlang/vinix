@@ -10,6 +10,7 @@ ENABLE_APPLE_GPU=0
 GPU_PROBE_ONLY=0
 USE_MINIMAL_INITRAMFS=0
 USE_DESKTOP_INITRAMFS=0
+INITRAMFS_COMPRESSED=0
 USE_NATIVE_RESOLUTION=0
 USE_EXTERNAL_DISPLAY=0
 CMDLINE_EXTRA=""
@@ -154,19 +155,25 @@ KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
+DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
 LIMINE_VERSION="12.8.0"
 LIMINE_EFI_BIN="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
 LIMINE_CONF="$SCRIPT_DIR/build-support/limine.conf"
 LIMINE_EFI="$LIMINE_EFI_BIN"
 
 if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
-    if [ ! -f "$DESKTOP_INITRAMFS" ]; then
-        echo "error: desktop initramfs not built: $DESKTOP_INITRAMFS" >&2
-        echo "hint: run ./build-desktop-aarch64.sh" >&2
+    if [ ! -f "$DESKTOP_INITRAMFS_GZ" ]; then
+        echo "error: compressed desktop initramfs not built: $DESKTOP_INITRAMFS_GZ" >&2
+        echo "hint: run ./build-desktop-aarch64.sh --compact-initramfs" >&2
         exit 1
     fi
-    INITRAMFS="$DESKTOP_INITRAMFS"
-    echo "using desktop initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
+    if ! gzip -t "$DESKTOP_INITRAMFS_GZ"; then
+        echo "error: compressed desktop initramfs is corrupt: $DESKTOP_INITRAMFS_GZ" >&2
+        exit 1
+    fi
+    INITRAMFS="$DESKTOP_INITRAMFS_GZ"
+    INITRAMFS_COMPRESSED=1
+    echo "using compressed desktop initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes on ESP)"
 fi
 if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
     if [ ! -f "$MINIMAL_INITRAMFS" ]; then
@@ -219,7 +226,17 @@ fi
 echo "limine EFI is ${LIMINE_VERSION} with Apple VHE and Vinix base revision 2 support (sha256 $(shasum -a 256 "$LIMINE_EFI" | cut -c1-16))"
 
 RUNTIME_CONF="$(mktemp "${TMPDIR:-/tmp}/vinix-limine.XXXXXX")"
-trap 'rm -f "$RUNTIME_CONF"' EXIT
+cleanup() {
+    rm -f "$RUNTIME_CONF" "$RUNTIME_CONF.next"
+    rm -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.vinix-new" \
+        "$ESP_MOUNT/boot/vinix.vinix-new" \
+        "$ESP_MOUNT/boot/initramfs.tar.vinix-new" \
+        "$ESP_MOUNT/boot/limine.conf.vinix-new" \
+        "$ESP_MOUNT/limine.conf.vinix-new" \
+        "$ESP_MOUNT/limine/limine.conf.vinix-new" \
+        "$ESP_MOUNT/EFI/BOOT/limine.conf.vinix-new"
+}
+trap cleanup EXIT
 CMDLINE_EXTRA="${CMDLINE_EXTRA# }"
 if [ -n "$CMDLINE_EXTRA" ]; then
     awk -v extra="$CMDLINE_EXTRA" '
@@ -230,6 +247,25 @@ if [ -n "$CMDLINE_EXTRA" ]; then
     echo "kernel cmdline additions: $CMDLINE_EXTRA"
 else
     cp "$LIMINE_CONF" "$RUNTIME_CONF"
+fi
+
+# Limine, not the kernel, expands the compact gzip module. Keep its on-disk
+# name stable so existing verification and recovery tooling still has one
+# canonical payload path.
+if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    RUNTIME_CONF_NEXT="$RUNTIME_CONF.next"
+    awk '
+        /^[[:space:]]*module_path:/ && !replaced {
+            print "    module_path: $boot():/boot/initramfs.tar"
+            replaced = 1
+            next
+        }
+        { print }
+        END {
+            if (!replaced) print "    module_path: $boot():/boot/initramfs.tar"
+        }
+    ' "$RUNTIME_CONF" > "$RUNTIME_CONF_NEXT"
+    mv -f "$RUNTIME_CONF_NEXT" "$RUNTIME_CONF"
 fi
 
 KERNEL_FILE_INFO="$(file -b "$KERNEL" || true)"
@@ -250,8 +286,6 @@ mkdir -p "$ESP_MOUNT/limine"
 if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ]; then
     cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
 fi
-
-cp "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"
 if [ "$USE_NATIVE_RESOLUTION" -eq 1 ]; then
     sed -i '' '/^[[:space:]]*resolution:/d' "$RUNTIME_CONF"
     echo "NATIVE RESOLUTION: no mode switch requested; Limine keeps the firmware's framebuffer"
@@ -260,27 +294,6 @@ if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
     echo "EXTERNAL DISPLAY: preserving firmware scanout; Vinix will select the largest GOP framebuffer"
 fi
 
-cp "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf"
-cp "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf"
-cp "$RUNTIME_CONF" "$ESP_MOUNT/EFI/BOOT/limine.conf"
-cp "$RUNTIME_CONF" "$ESP_MOUNT/limine/limine.conf"
-# Refuse to start a copy that cannot finish. A half-written initramfs or
-# kernel leaves the ESP looking deployed while the machine will not boot.
-needed=$(( $(wc -c < "$KERNEL") + $(wc -c < "$INITRAMFS") ))
-avail=$(df -k "$ESP_MOUNT" | awk 'NR==2 {print $4 * 1024}')
-if [ -n "$avail" ] && [ "$avail" -lt "$needed" ]; then
-    echo "error: ESP has ${avail} bytes free, needs ${needed}" >&2
-    echo "hint: remove stale files from $ESP_MOUNT/boot" >&2
-    exit 1
-fi
-
-cp "$KERNEL" "$ESP_MOUNT/boot/vinix"
-cp "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar"
-
-sync
-
-# Verify what actually landed. cp can fail silently enough that the next
-# symptom is an unbootable machine rather than an error here.
 verify_copy() {
     src="$1"
     dst="$2"
@@ -289,6 +302,72 @@ verify_copy() {
         exit 1
     fi
 }
+
+# Prefer a same-filesystem temporary and rename, which keeps the previous boot
+# file intact if the copy fails. A 500 MiB ESP cannot hold two successive
+# compressed desktop images; after the first deployment, fall back to an
+# in-place replacement only when reclaiming the current target makes it fit.
+install_verified() {
+    src="$1"
+    dst="$2"
+    label="$3"
+    stage="$dst.vinix-new"
+    rm -f "$stage"
+
+    size="$(wc -c < "$src" | tr -d ' ')"
+    if [ "$size" -gt 4294967295 ]; then
+        echo "error: $label is ${size} bytes, above FAT32's single-file limit" >&2
+        exit 1
+    fi
+    avail="$(df -Pk "$ESP_MOUNT" | awk 'NR==2 {print $4 * 1024}')"
+    old_size=0
+    if [ -f "$dst" ]; then
+        old_size="$(wc -c < "$dst" | tr -d ' ')"
+    fi
+
+    if [ -n "$avail" ] && [ "$avail" -ge "$size" ]; then
+        if ! COPYFILE_DISABLE=1 cp "$src" "$stage"; then
+            rm -f "$stage"
+            echo "error: failed to stage $label on the ESP" >&2
+            exit 1
+        fi
+        if ! cmp -s "$src" "$stage"; then
+            rm -f "$stage"
+            echo "error: staged $label does not match its source" >&2
+            exit 1
+        fi
+        sync
+        mv -f "$stage" "$dst"
+    elif [ -f "$dst" ] && [ -n "$avail" ] && [ $((avail + old_size)) -ge "$size" ]; then
+        echo "updating $label in place (ESP is too small to retain the previous copy)"
+        if ! COPYFILE_DISABLE=1 cp "$src" "$dst"; then
+            echo "error: failed to replace $label on the ESP; the previous copy may be incomplete" >&2
+            exit 1
+        fi
+    else
+        echo "error: ESP has ${avail:-unknown} bytes free; cannot install ${size}-byte $label" >&2
+        if [ "$old_size" -gt 0 ]; then
+            echo "       replacing the existing ${old_size}-byte file would still not fit" >&2
+        fi
+        echo "hint: macOS data-volume free space is separate from the 500 MiB ESP" >&2
+        exit 1
+    fi
+    verify_copy "$src" "$dst"
+}
+
+# Commit boot inputs before configuration. The EFI-app-local configuration is
+# installed last because it is Limine's first choice; until that rename, the
+# previous configuration continues to name the previous complete payload.
+install_verified "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "Limine EFI"
+install_verified "$KERNEL" "$ESP_MOUNT/boot/vinix" "kernel"
+install_verified "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar" "initramfs"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf" "boot configuration"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf" "root boot configuration"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/limine/limine.conf" "Limine boot configuration"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/EFI/BOOT/limine.conf" "EFI boot configuration"
+
+sync
+
 verify_copy "$KERNEL" "$ESP_MOUNT/boot/vinix"
 verify_copy "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar"
 verify_copy "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"
@@ -308,7 +387,11 @@ kernel_requests="$(xxd -p "$KERNEL" | tr -d '\n' | grep -o '888b4cdf30ddb1c77bf0
 echo "  kernel sha256: $kernel_sha"
 echo "  kernel entry:  0x$kernel_entry"
 echo "  kernel limine requests: $kernel_requests (Limine's 'Requests count' line)"
-echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
+if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    echo "  initramfs:     $(wc -c < "$INITRAMFS") compressed bytes (Limine expands it)"
+else
+    echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
+fi
 echo "Compare the entry point against Limine's 'ELF entry point' line at boot."
 if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
     cat <<'EXTERNAL_DISPLAY'

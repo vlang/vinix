@@ -1,5 +1,8 @@
 #!/bin/bash
-# Deploy Vinix to the M1 ESP, verify it landed, and say what to look for.
+# Deploy Vinix to the M1 ESP, verify it landed, and say what to look for. The
+# desktop modes use Limine's transparent gzip loading so the full image fits
+# the M1's separate 500 MiB ESP; free space on the macOS data volume does not
+# increase that partition.
 #
 # Installed on the M1 by push-to-m1.sh; edit it in the repo, not in place, or
 # the next push overwrites your changes.

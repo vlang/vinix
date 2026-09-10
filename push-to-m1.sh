@@ -24,6 +24,13 @@ if [ "${VINIX_M1_EXCLUDE_BASE_INITRAMFS:-0}" = "1" ]; then
     set -- --exclude 'build-support/init-aarch64/initramfs.tar'
     echo "skipping unused base initramfs"
 fi
+if [ "${VINIX_M1_EXCLUDE_DESKTOP_TAR:-0}" = "1" ]; then
+    set -- "$@" --exclude 'build-support/init-aarch64/initramfs-desktop.tar'
+    echo "skipping uncompressed desktop initramfs (Limine will load its gzip image)"
+fi
+if [ "${VINIX_M1_EXCLUDE_DESKTOP_GZIP:-0}" = "1" ]; then
+    set -- "$@" --exclude 'build-support/init-aarch64/initramfs-desktop.tar.gz'
+fi
 
 # QEMU uses these local scratch disks, but an M1 deployment never does. They
 # are normally left alone: the remote checkout may also be a QEMU workspace.
@@ -114,5 +121,7 @@ ssh "$REMOTE" "cd '$DEST' && \
         fi; \
     done"
 
-echo
-echo "now on the M1:  sudo ~/code/kek.sh selftest"
+if [ "${VINIX_M1_WRAPPED:-0}" != "1" ]; then
+    echo
+    echo "now on the M1:  sudo ~/code/kek.sh selftest"
+fi
