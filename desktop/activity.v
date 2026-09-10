@@ -403,6 +403,7 @@ fn activity_name_of(record &ActivitySample) string {
 		'vinix-calculator' { 'Calculator' }
 		'vinix-cocoa-calculator' { 'Cocoa Calculator' }
 		'vinix-minecraft' { 'Minecraft' }
+		'vinix-blender' { 'Blender' }
 		'vinix-wine-calculator' { 'Wine Calculator' }
 		'vinix-wine-notepad' { 'Wine Notepad' }
 		'vinix-wine-word2013' { 'Microsoft Word 2013' }

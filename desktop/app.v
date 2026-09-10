@@ -50,10 +50,11 @@ struct AppFactory {
 // what launch_index reads back.
 const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2', 'start.launch.3',
 	'start.launch.4', 'start.launch.5', 'start.launch.6', 'start.launch.7', 'start.launch.8',
-	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13']
+	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13',
+	'start.launch.14']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
-	'shortcut.12', 'shortcut.13']
+	'shortcut.12', 'shortcut.13', 'shortcut.14']
 
 // available_apps is what the Start menu and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
@@ -197,6 +198,18 @@ const available_apps = [
 		keyboard: true
 		pointer: true
 		open: open_wine_word2013
+	},
+	AppFactory{
+		title: 'Blender'
+		icon: 'builtin:block'
+		width: blender_window_width
+		height: blender_window_height + default_title_height
+		process_name: 'vinix-blender'
+		polling: true
+		poll_interval_ms: 50
+		keyboard: true
+		pointer: true
+		open: open_blender
 	},
 ]
 

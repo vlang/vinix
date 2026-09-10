@@ -25,6 +25,10 @@ const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
 const minecraft_window_width = 760
 const minecraft_window_height = 428
+const blender_surface_width = 1280
+const blender_surface_height = 900
+const blender_window_width = 1280
+const blender_window_height = 900
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -35,8 +39,8 @@ enum WineHostEventKind as u32 {
 }
 
 struct WineHostEvent {
-	magic  u32
-	kind   u32
+	magic u32
+	kind  u32
 	// The receiving C host uses int32_t and asserts a 20-byte wire record.
 	x      i32
 	y      i32
@@ -100,6 +104,10 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 
 fn open_minecraft(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
+}
+
+fn open_blender(mut _ Desktop) !NativeApp {
+	return open_hosted_x11_app('blender', '/usr/bin/blender', blender_surface_width, blender_surface_height, 'builtin:block', 'Starting Blender…', 'Blender is not installed. Run pkg install blender in Terminal first.', 'Blender exited.')
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,

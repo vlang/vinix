@@ -230,7 +230,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 14
+	assert available_apps.len == 15
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -261,6 +261,12 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[13].process_name == 'vinix-wine-word2013'
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
+	assert available_apps[14].title == 'Blender'
+	assert available_apps[14].process_name == 'vinix-blender'
+	assert available_apps[14].width == blender_window_width
+	assert available_apps[14].height == blender_window_height + default_title_height
+	assert available_apps[14].keyboard && available_apps[14].polling
+	assert available_apps[14].pointer
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
