@@ -4,7 +4,8 @@
 #                         [--fake-g17]
 #                         [--guest-init=PATH]
 #                         [--mem=MB]
-#                         [--disk=MB] [--persist[=MB]] [--replace] [--grab-keys]
+#                         [--disk=MB] [--persist[=MB]|--no-persist]
+#                         [--ephemeral] [--replace] [--grab-keys]
 #
 # --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
 # its own application switcher, so without it the desktop's Cmd-Tab is never
@@ -16,6 +17,10 @@
 # --persist attaches a separate ext2 volume and mounts it at /root. The base
 # system still comes from the initramfs, while files below /root survive QEMU
 # restarts. --persist=MB chooses its one-time image size.
+#
+# --ephemeral gives this run an isolated temporary boot image and deletes it
+# when QEMU exits. Newly created boot images below the host's temporary
+# directory receive the same cleanup unless VINIX_KEEP_TEMP_BOOT_DISK=1.
 #
 # --guest-init=PATH overlays /sbin/init for this boot only. It is intended for
 # automated VM tests: neither the selected initramfs nor a persistent volume is
@@ -30,15 +35,15 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/build-support/qemu-storage.sh"
 if [ -x "$SCRIPT_DIR/link-worktree-build-dirs.sh" ]; then
     "$SCRIPT_DIR/link-worktree-build-dirs.sh"
 fi
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 BOOT_DIR="$SCRIPT_DIR/boot-image"
-# Both paths can be overridden so two QEMU runs on this machine (say, a CI
-# check and a developer's boot) never share a disk image or NVRAM file: QEMU
-# takes a write lock on the image, and a second run either fails to start or
-# boots whatever the first one last copied in.
+# The normal path is deliberately stable and is reused across launches.
+# Isolated tests should use --ephemeral; an explicit path remains available
+# for callers that manage their own image lifecycle.
 BOOT_DISK="${VINIX_BOOT_DISK:-$BOOT_DIR/boot.img}"
 BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-2048}"
 OVMF_VARS="${VINIX_EFIVARS:-/tmp/vinix-efivars.fd}"
@@ -49,14 +54,20 @@ LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 # different backends and must not overwrite each other's generated config.
 LIMINE_CONF_QEMU="$(mktemp -t vinix-limine-qemu)"
 QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
-PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-${BOOT_DISK}.packages.tar}"
+# Package state and persistent /root have stable defaults independent of an
+# ephemeral boot image. Desktop runs select their own fixed profile paths.
+PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$BOOT_DIR/boot.img.packages.tar}"
 PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
-PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-${BOOT_DISK}.root.ext2}"
+PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$BOOT_DIR/boot.img.root.ext2}"
 PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-1024}"
+PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-}"
 PACKAGE_RUNTIME_DIR=""
 PACKAGE_SERVER_PID=""
+EPHEMERAL_RUNTIME_DIR=""
+CLEANUP_BOOT_DISK=0
+KEEP_TEMP_BOOT_DISK="${VINIX_KEEP_TEMP_BOOT_DISK:-0}"
 
-cleanup_package_store() {
+cleanup_runtime() {
     if [ -n "$PACKAGE_SERVER_PID" ]; then
         kill "$PACKAGE_SERVER_PID" 2>/dev/null || true
         wait "$PACKAGE_SERVER_PID" 2>/dev/null || true
@@ -66,9 +77,21 @@ cleanup_package_store() {
         rm -rf "$PACKAGE_RUNTIME_DIR"
         PACKAGE_RUNTIME_DIR=""
     fi
+    if [ -n "$EPHEMERAL_RUNTIME_DIR" ]; then
+        if vinix_storage_is_temporary_path "$EPHEMERAL_RUNTIME_DIR"; then
+            case "$(basename "$EPHEMERAL_RUNTIME_DIR")" in
+                vinix-qemu.*)
+                    rm -rf "$EPHEMERAL_RUNTIME_DIR"
+                    ;;
+            esac
+        fi
+        EPHEMERAL_RUNTIME_DIR=""
+    elif [ "$CLEANUP_BOOT_DISK" -eq 1 ]; then
+        rm -f "$BOOT_DISK"
+    fi
     rm -f "$LIMINE_CONF_QEMU"
 }
-trap cleanup_package_store EXIT INT TERM
+trap cleanup_runtime EXIT INT TERM
 
 NO_BUILD=0
 SERIAL_ONLY=0
@@ -78,6 +101,7 @@ GUEST_INIT="${VINIX_QEMU_GUEST_INIT:-}"
 GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
 GRAB_KEYS=0
+EPHEMERAL_BOOT=0
 PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-0}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
@@ -92,6 +116,8 @@ for arg in "$@"; do
         --disk=*)     BOOT_DISK_SIZE_MB="${arg#*=}" ;;
         --persist)    PERSIST_ENABLED=1 ;;
         --persist=*)  PERSIST_ENABLED=1; PERSIST_SIZE_MB="${arg#*=}" ;;
+        --no-persist) PERSIST_ENABLED=0 ;;
+        --ephemeral)  EPHEMERAL_BOOT=1 ;;
         --replace)    REPLACE_RUNNING=1 ;;
         --grab-keys)  GRAB_KEYS=1 ;;
         --help|-h)
@@ -100,6 +126,36 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+if [ "$EPHEMERAL_BOOT" -eq 1 ]; then
+    if [ -n "${VINIX_BOOT_DISK:-}" ]; then
+        echo "ERROR: --ephemeral cannot be combined with VINIX_BOOT_DISK" >&2
+        exit 1
+    fi
+    EPHEMERAL_RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vinix-qemu.XXXXXX")"
+    BOOT_DISK="$EPHEMERAL_RUNTIME_DIR/boot.img"
+    if [ -z "${VINIX_EFIVARS:-}" ]; then
+        OVMF_VARS="$EPHEMERAL_RUNTIME_DIR/efivars.fd"
+    fi
+    if [ -z "${VINIX_QEMU_PACKAGE_STORE:-}" ]; then
+        PACKAGE_STORE="$EPHEMERAL_RUNTIME_DIR/packages.tar"
+    fi
+    if [ "$PERSIST_ENABLED" -eq 1 ] && [ -z "${VINIX_QEMU_PERSIST_DISK:-}" ]; then
+        PERSIST_DISK="$EPHEMERAL_RUNTIME_DIR/root.ext2"
+    fi
+    if [ -z "${VINIX_QEMU_PACKAGE_STORE_PORT:-}" ]; then
+        if ! command -v python3 >/dev/null 2>&1; then
+            echo "ERROR: --ephemeral needs python3 to allocate an isolated package-store port" >&2
+            exit 1
+        fi
+        PACKAGE_STORE_PORT="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+    fi
+fi
+
+if [ ! -e "$BOOT_DISK" ] && [ "$KEEP_TEMP_BOOT_DISK" -eq 0 ] &&
+   vinix_storage_is_temporary_path "$BOOT_DISK"; then
+    CLEANUP_BOOT_DISK=1
+fi
 
 if [ "$GUEST_INIT_REQUESTED" -eq 1 ] && [ -z "$GUEST_INIT" ]; then
     echo "ERROR: --guest-init needs a path" >&2
@@ -117,8 +173,15 @@ if [ -n "$GUEST_INIT" ]; then
 fi
 
 case "$BOOT_DISK_SIZE_MB" in
-    ''|*[!0-9]*)
+    ''|*[!0-9]*|0)
         echo "ERROR: --disk must be a size in MiB" >&2
+        exit 1
+        ;;
+esac
+case "$KEEP_TEMP_BOOT_DISK" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_KEEP_TEMP_BOOT_DISK must be 0 or 1" >&2
         exit 1
         ;;
 esac
@@ -219,30 +282,14 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
         exit 1
     fi
     if [ ! -f "$PERSIST_DISK" ]; then
-        if command -v mke2fs >/dev/null 2>&1; then
-            MKFS_EXT2=mke2fs
-        elif command -v mkfs.ext2 >/dev/null 2>&1; then
-            MKFS_EXT2=mkfs.ext2
-        else
-            echo "ERROR: --persist needs mke2fs (install e2fsprogs)." >&2
+        echo "==> Creating ${PERSIST_SIZE_MB} MiB persistent ext2 volume (one-time)..."
+        if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$PERSIST_SIZE_MB" "$PERSIST_SEED"; then
+            echo "ERROR: could not create persistent volume: $PERSIST_DISK" >&2
             exit 1
         fi
-        mkdir -p "$(dirname "$PERSIST_DISK")"
-        echo "==> Creating ${PERSIST_SIZE_MB} MiB persistent ext2 volume (one-time)..."
-        persist_bytes=$((PERSIST_SIZE_MB * 1024 * 1024))
-        if command -v truncate >/dev/null 2>&1; then
-            truncate -s "$persist_bytes" "$PERSIST_DISK"
-        elif command -v mkfile >/dev/null 2>&1; then
-            mkfile -n "$persist_bytes" "$PERSIST_DISK"
-        else
-            dd if=/dev/zero of="$PERSIST_DISK" bs=1m count="$PERSIST_SIZE_MB" 2>/dev/null
+        if [ -n "$PERSIST_SEED" ]; then
+            echo "    seeded from $PERSIST_SEED"
         fi
-        # Vinix's ext2 implementation uses the classic 128-byte inode layout.
-        # Disable newer ext4-era features rather than creating an image it may
-        # mount but cannot update correctly.
-        "$MKFS_EXT2" -q -F -t ext2 -b 4096 -I 128 \
-            -O filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum \
-            "$PERSIST_DISK"
     fi
     PERSIST_DEVICE_ARGS=(
         -drive "if=none,format=raw,file=$PERSIST_DISK,id=vinix-persist"
@@ -362,14 +409,19 @@ if [ "$PERSIST_ENABLED" -eq 1 ] && command -v lsof >/dev/null 2>&1; then
     fi
 fi
 
-# A browser image is much larger than the old 512 MiB development disk. Do not
-# let mcopy fail later with a cryptic FAT error or overwrite an existing image;
-# tell the caller how to create a larger generated disk alongside it.
+# Size a new boot disk from the actual initramfs and package archive. Existing
+# disks are never reformatted behind the caller's back; an undersized legacy
+# image gets a direct migration error instead of a cryptic mcopy failure.
 if [ -f "$INITRAMFS" ]; then
     if stat -f%z "$INITRAMFS" >/dev/null 2>&1; then
         initramfs_bytes="$(stat -f%z "$INITRAMFS")"
     else
         initramfs_bytes="$(stat -c%s "$INITRAMFS")"
+    fi
+    if [ "$initramfs_bytes" -gt 4294967295 ]; then
+        echo "ERROR: $INITRAMFS exceeds FAT32's 4 GiB single-file limit." >&2
+        echo "       Use a split initramfs and persistent volume, as run-desktop-aarch64.sh does." >&2
+        exit 1
     fi
     package_overlay_bytes=0
     if [ -s "$PACKAGE_STORE" ]; then
@@ -377,6 +429,10 @@ if [ -f "$INITRAMFS" ]; then
             package_overlay_bytes="$(stat -f%z "$PACKAGE_STORE")"
         else
             package_overlay_bytes="$(stat -c%s "$PACKAGE_STORE")"
+        fi
+        if [ "$package_overlay_bytes" -gt 4294967295 ]; then
+            echo "ERROR: $PACKAGE_STORE exceeds FAT32's 4 GiB single-file limit." >&2
+            exit 1
         fi
     fi
     required_bytes=$((initramfs_bytes + package_overlay_bytes + 128 * 1024 * 1024))
@@ -392,15 +448,14 @@ if [ -f "$INITRAMFS" ]; then
         boot_disk_bytes=$((BOOT_DISK_SIZE_MB * 1024 * 1024))
     fi
 
-    if [ "$boot_disk_bytes" -lt "$required_bytes" ]; then
+    if [ ! -f "$BOOT_DISK" ] && [ "$boot_disk_bytes" -lt "$required_bytes" ]; then
+        echo "==> Increasing new boot disk to ${required_mb} MiB for the selected initramfs"
+        BOOT_DISK_SIZE_MB="$required_mb"
+        boot_disk_bytes=$((BOOT_DISK_SIZE_MB * 1024 * 1024))
+    elif [ "$boot_disk_bytes" -lt "$required_bytes" ]; then
         echo "ERROR: $BOOT_DISK is too small for this initramfs and package overlay." >&2
         echo "       Need at least ${required_mb} MiB." >&2
-        if [ -f "$BOOT_DISK" ]; then
-            echo "       Keep the existing disk and choose a new path, for example:" >&2
-            echo "       VINIX_BOOT_DISK=/tmp/vinix-large.img $0 --disk=$required_mb" >&2
-        else
-            echo "       Re-run with --disk=$required_mb or larger." >&2
-        fi
+        echo "       Remove or archive that old image, then rerun with --disk=$required_mb." >&2
         exit 1
     fi
 fi

@@ -401,20 +401,26 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
-It builds the kernel, builds the desktop, and starts QEMU on the result.
-The desktop launcher uses its own `boot-image/boot-desktop-4096.img` disk,
-created as a sparse 4 GiB image on its first run. This leaves the ordinary
-`boot-image/boot.img` available for the smaller shell image. Set
-`VINIX_BOOT_DISK` (and, for a new disk, `VINIX_BOOT_DISK_SIZE_MB` or
-`--disk=MB`) to choose another disk.
+It builds the kernel, builds the desktop, and starts QEMU on the result. The
+launcher reuses `boot-image/boot-desktop-qemu.img` for the immutable system and
+mounts `boot-image/desktop-root.ext2` at `/root`. On the first run it derives a
+smaller QEMU initramfs from the self-contained hardware image and seeds the
+persistent volume with the desktop files and Wine prefixes. Later runs reuse
+those files instead of copying them into another boot image.
 
-An older 2 GiB `boot-image/boot-desktop.img` is preserved and automatically
-left behind; simply run `./run-desktop-aarch64.sh` to use the new disk.
+Set `VINIX_BOOT_DISK` to manage another long-lived boot disk, or use
+`--ephemeral` for a concurrent test whose temporary boot disk and package store
+should be deleted automatically. Ephemeral desktop runs seed a private ext2
+volume, so they do not share the normal writable desktop volume. Newly created
+images below the host temporary directory are also cleaned up automatically; set
+`VINIX_KEEP_TEMP_BOOT_DISK=1` only when one must be inspected after shutdown.
 
     --no-build      boot what is already built
     --no-kernel     skip the kernel build (the desktop is what you changed)
     --no-desktop    skip the desktop build (the kernel is what you changed)
     --monitor       expose a QEMU monitor and QMP socket (see below)
+    --no-persist    boot the self-contained RAM-backed desktop image
+    --ephemeral     use and automatically delete an isolated boot image
     --replace       stop a VM already using the boot disk
 
 A second VM cannot share the boot disk: QEMU takes a write lock on it and
@@ -423,8 +429,9 @@ refuses to start without one. `--replace` stops the one already running.
 Anything else is passed through to `run-aarch64.sh`: `--mem=MB`, `--serial`,
 `--virtio-gpu`, and `--virgl`. The latter uses KekVM's Metal/VirGL-enabled
 QEMU and Vinix's accelerated VirtIO-GPU render node. The desktop launcher
-supplies 8 GiB of guest RAM by default: the root filesystem is loaded into
-memory during boot. Use `--mem=MB` or `VINIX_QEMU_MEM` to override it.
+supplies 8 GiB of guest RAM by default; the immutable system is loaded into
+memory while `/root` is backed by the persistent ext2 volume. Use `--mem=MB`
+or `VINIX_QEMU_MEM` to override it.
 
 `build-desktop-aarch64.sh` is the build on its own, if that is all you want. It
 translates the V to C, compiles it for `aarch64-linux-musl` against the static

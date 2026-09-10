@@ -8,6 +8,8 @@
 #   --no-desktop    skip the desktop build (the kernel is what you changed)
 #   --monitor       open a QEMU monitor and QMP socket, so the tools under
 #                   desktop/tools can drive and photograph the running desktop
+#   --no-persist    use the full RAM-backed desktop instead of persistent /root
+#   --ephemeral     isolate and automatically delete this run's boot image
 #   --mem=MB        guest RAM (default: 8192 MiB for the desktop image)
 #   --v=PATH        V compiler executable or checkout (for example ~/code/v7)
 #   --help
@@ -20,26 +22,19 @@
 # The two builds are done here rather than left to run-aarch64.sh so that a
 # failure in either is reported plainly, and so the kernel build gets a V it
 # can actually find.
-# The desktop's root filesystem is loaded into RAM during boot.  The generic
-# runner defaults to 2 GiB for small shell images, whereas this image needs at
-# least 8 GiB.  An explicit environment setting or --mem=MB still wins.
+# The immutable desktop system is loaded into RAM during boot, while the normal
+# QEMU profile mounts a persistent /root. The generic runner defaults to 2 GiB
+# for small shell images, whereas this image needs at least 8 GiB. An explicit
+# environment setting or --mem=MB still wins.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
-# The desktop archive is deliberately independent of the ordinary shell image
-# and can be much larger. Give it its own 4 GiB sparse disk so an existing
-# small boot-image/boot.img remains usable for fast non-desktop QEMU boots.
-# A caller's explicit size still wins, including when using a separate disk
-# for an unusually large package overlay.
-# A prior launcher made boot-desktop.img only 2 GiB. Use a new default name
-# rather than resizing or replacing that disk, so an argument-free launch
-# migrates safely and the old image remains available for inspection.
-# Honour an explicit path so callers can still run more than one desktop VM.
-export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-4096.img}"
-export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-4096}"
+QEMU_DESKTOP_INITRAMFS="$SCRIPT_DIR/build/initramfs-desktop-qemu.tar"
+DESKTOP_ROOT_SEED="$SCRIPT_DIR/build/desktop-root-seed.tar.gz"
+DESKTOP_STORAGE_MANIFEST="$SCRIPT_DIR/build/desktop-qemu-storage.json"
 export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),
 # giving it a native 2048x1536 framebuffer without changing the standard
@@ -61,6 +56,8 @@ QMP_SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 BUILD_KERNEL=1
 BUILD_DESKTOP=1
 WITH_MONITOR=0
+PERSIST_DESKTOP="${VINIX_QEMU_PERSIST:-1}"
+EPHEMERAL_DESKTOP=0
 PASSTHROUGH=()
 
 while [ "$#" -gt 0 ]; do
@@ -70,6 +67,9 @@ while [ "$#" -gt 0 ]; do
         --no-kernel)  BUILD_KERNEL=0 ;;
         --no-desktop) BUILD_DESKTOP=0 ;;
         --monitor)    WITH_MONITOR=1 ;;
+        --persist|--persist=*) PERSIST_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
+        --no-persist) PERSIST_DESKTOP=0; PASSTHROUGH+=("$arg") ;;
+        --ephemeral)  EPHEMERAL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
         --v)
             shift
@@ -84,6 +84,14 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+case "$PERSIST_DESKTOP" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_PERSIST must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
 
 # Keep the chosen compiler in the environment so build-desktop-aarch64.sh
 # resolves the same compiler after this runner invokes it.
@@ -115,6 +123,36 @@ if [ ! -f "$DESKTOP_INITRAMFS" ]; then
     exit 1
 fi
 
+# QEMU keeps mutable desktop data on one stable ext2 volume. The hardware
+# initramfs remains self-contained; this cached QEMU view removes /root from
+# the boot payload and turns it into the one-time seed for that volume.
+if [ "$PERSIST_DESKTOP" -eq 1 ]; then
+    python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
+        "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
+        "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"
+    export VINIX_INITRAMFS="$QEMU_DESKTOP_INITRAMFS"
+    export VINIX_QEMU_PERSIST=1
+    if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
+        export VINIX_QEMU_PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$SCRIPT_DIR/boot-image/desktop-root.ext2}"
+    fi
+    export VINIX_QEMU_PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-3072}"
+    export VINIX_QEMU_PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-$DESKTOP_ROOT_SEED}"
+    if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
+        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-qemu.img}"
+    fi
+    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-3072}"
+else
+    export VINIX_INITRAMFS="$DESKTOP_INITRAMFS"
+    export VINIX_QEMU_PERSIST=0
+    if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
+        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-full.img}"
+    fi
+    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-4096}"
+fi
+if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
+    export VINIX_QEMU_PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$SCRIPT_DIR/boot-image/boot-desktop-4096.img.packages.tar}"
+fi
+
 # ── Boot ──
 # run-aarch64.sh owns the QEMU invocation — the loader, the firmware, the boot
 # disk and the devices. It is told not to build, because both builds are
@@ -128,6 +166,5 @@ if [ "$WITH_MONITOR" -eq 1 ]; then
     echo "    ./desktop/tools/screenshot.sh /tmp/shot.png"
 fi
 
-export VINIX_INITRAMFS="$DESKTOP_INITRAMFS"
 echo "==> Starting the desktop (Ctrl-A X to quit)..."
 exec "$SCRIPT_DIR/run-aarch64.sh" --no-build "${PASSTHROUGH[@]}"
