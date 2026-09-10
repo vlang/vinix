@@ -62,7 +62,7 @@ while IFS=$'\t' read -r repository filename; do
     # An apk contains concatenated tar streams (signature, metadata, payload).
     # bsdtar extracts the payload but can return non-zero after it; validate the
     # resulting tools below instead of treating that final warning as failure.
-    tar -ixzf "$archive" -C "$STAGING" 2>/dev/null || true
+    tar --ignore-zeros -xzf "$archive" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* "$STAGING/.trigger"* \
         "$STAGING/.pre-"* "$STAGING/.post-"*
 done < "$BUILD_DIR/packages"
@@ -96,6 +96,8 @@ install -m755 "$SCRIPT_DIR/tests/packages/gtk-smoke.sh" \
     "$STAGING/root/gtk-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gnumeric-smoke.sh" \
     "$STAGING/root/gnumeric-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/blender-smoke.sh" \
+    "$STAGING/root/blender-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
     "$STAGING/root/sublime-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
@@ -138,9 +140,10 @@ fi
 
 if [ -e "$STAGING/usr/bin/gtk3-demo" ] \
     || [ -e "$STAGING/usr/bin/gnumeric" ] \
+    || [ -e "$STAGING/usr/bin/blender" ] \
     || find "$STAGING/lib" "$STAGING/usr/lib" -name 'libgtk-3.so*' \
         -print -quit 2>/dev/null | grep -q .; then
-    echo "GTK and Gnumeric must not be preinstalled in the network/package layer" >&2
+    echo "GTK, Gnumeric, and Blender must not be preinstalled in the network/package layer" >&2
     exit 1
 fi
 

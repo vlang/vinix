@@ -22,7 +22,7 @@ usage() {
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes GTK, Gnumeric, and Sublime Text)
+  install PACKAGE...  install packages (includes GTK, Gnumeric, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -108,6 +108,41 @@ apk_network() {
 	done
 }
 
+materialize_runtime_library_links() {
+	# Vinix's musl loader opens shared objects with O_NOFOLLOW. Alpine packages
+	# commonly provide an ABI soname as a symlink to a versioned library, so turn
+	# installed library links into regular files just as the base-image builder
+	# does. Restrict the scan to the transaction's owned paths; Blender pulls in
+	# many libraries, but there is no reason to revisit the whole base image.
+	owned_files=$1
+	[ -s "$owned_files" ] || return 0
+	# A redirected shell `read` can block on Vinix regular files. Package library
+	# paths contain no newlines, so split a filtered command substitution on
+	# newlines and disable pathname expansion while iterating it.
+	old_ifs=$IFS
+	IFS='
+'
+	case $- in
+		*f*) restore_glob=false ;;
+		*) restore_glob=true; set -f ;;
+	esac
+	for path in $(LC_ALL=C awk '/^(lib|usr\/lib)\/.*\.so(\..*)?$/' "$owned_files"); do
+		link=$(root_path "/$path")
+		if [ -L "$link" ]; then
+			real=$(bb readlink -f "$link")
+			[ -f "$real" ] || continue
+			# A hard link is a regular directory entry from the loader's point of
+			# view and avoids duplicating Blender's large library dependencies.
+			bb ln -f "$real" "$link.vinix"
+			# Replace the native musl interpreter atomically too; removing that
+			# symlink before invoking mv would prevent mv itself from starting.
+			bb mv "$link.vinix" "$link"
+		fi
+	done
+	IFS=$old_ifs
+	[ "$restore_glob" = false ] || set +f
+}
+
 # Download the complete dependency closure before changing the live root. A
 # transient mirror failure near the end no longer leaves a half-installed GTK
 # stack, and successful archives are retained across network retries. The final
@@ -129,7 +164,12 @@ apk_install() (
 	done
 	install_attempt=1
 	while :; do
-		apk_network --cache-dir "$cache" --no-progress cache download "$@"
+		# Some Alpine packages use install_if providers that are considered only
+		# during the add transaction. Callers can name those cache-only packages
+		# so the final offline transaction still has every selected archive.
+		# shellcheck disable=SC2086
+		apk_network --cache-dir "$cache" --no-progress cache download \
+			"$@" ${VINIX_PKG_CACHE_EXTRAS:-}
 		if apk --cache-dir "$cache" --no-network --no-progress --no-scripts add "$@"; then
 			LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_after"
 			LC_ALL=C comm -13 "$installed_before" "$installed_after" >"$new_packages"
@@ -159,6 +199,7 @@ apk_install() (
 				} | LC_ALL=C sort -u >"$manifest.new"
 				mv "$manifest.new" "$manifest"
 			fi
+			materialize_runtime_library_links "$owned_files"
 			return 0
 		fi
 		if [ "$install_attempt" -ge "$NETWORK_RETRIES" ]; then
@@ -263,6 +304,11 @@ install_packages() {
 				apk_install \
 					adwaita-icon-theme font-dejavu gnumeric
 				finalize_gnumeric
+				;;
+			blender)
+				VINIX_PKG_CACHE_EXTRAS=python3-pycache-pyc0 \
+					apk_install blender
+				finalize_blender
 				;;
 			sublime|sublime-text)
 				apk_install \
@@ -512,6 +558,42 @@ finalize_gnumeric() {
 	/usr/bin/update-mime-database /usr/share/mime
 }
 
+finalize_blender() {
+	launcher=$(root_path /usr/bin/blender)
+	real_binary=$(root_path /usr/libexec/vinix-blender)
+
+	# Blender's PulseAudio backend currently reaches pthread operations Vinix
+	# does not implement. Keep the Alpine executable intact under libexec and
+	# make the normal command select Blender's supported no-audio backend.
+	if [ -s "$launcher" ] \
+		&& ! grep -q '^# Vinix Blender launcher$' "$launcher" 2>/dev/null; then
+		mkdir -p "$(dirname "$real_binary")"
+		bb rm -f "$real_binary"
+		bb mv "$launcher" "$real_binary"
+	fi
+	if [ ! -s "$real_binary" ]; then
+		echo "pkg: Blender package has no executable" >&2
+		exit 1
+	fi
+	bb chmod 0755 "$real_binary"
+	cat >"$launcher" <<'EOF'
+#!/bin/sh
+# Vinix Blender launcher
+exec /usr/libexec/vinix-blender -noaudio "$@"
+EOF
+	bb chmod 0755 "$launcher"
+
+	# apk owns the public launcher path, while this additional path must also be
+	# included when the QEMU package layer is persisted across boots.
+	manifest=$(root_path /var/lib/vinix-pkg/package-files)
+	mkdir -p "$(dirname "$manifest")"
+	{
+		[ ! -f "$manifest" ] || cat "$manifest"
+		printf '%s\n' usr/libexec/vinix-blender
+	} | LC_ALL=C sort -u >"$manifest.new"
+	mv "$manifest.new" "$manifest"
+}
+
 remove_gtk_demo() {
 	if [ -n "$ROOT" ]; then
 		apk --no-progress --no-scripts del gtk+3.0-demo
@@ -543,6 +625,17 @@ remove_sublime() {
 	bb rm -rf "$(root_path /opt/sublime_text)"
 }
 
+remove_blender() {
+	launcher=$(root_path /usr/bin/blender)
+	real_binary=$(root_path /usr/libexec/vinix-blender)
+	if [ -s "$real_binary" ]; then
+		# Restore apk's owned path before deletion. If apk del fails, the original
+		# application remains runnable instead of leaving a broken wrapper.
+		bb rm -f "$launcher"
+		bb mv "$real_binary" "$launcher"
+	fi
+}
+
 if [ "$#" -eq 0 ]; then
 	usage
 	exit 1
@@ -570,6 +663,7 @@ case "$command_name" in
 		for requested in "$@"; do
 			case "$requested" in
 				gtk|gtk+3.0-demo) remove_gtk_demo ;;
+				blender) remove_blender ;;
 				sublime|sublime-text) remove_sublime ;;
 			esac
 		done
@@ -590,6 +684,12 @@ case "$command_name" in
 		refresh_repository_indexes
 		bootstrap_database
 		apk_network --no-progress --no-scripts upgrade
+		materialize_runtime_library_links \
+			"$(root_path /var/lib/vinix-pkg/package-files)"
+		if [ -e "$(root_path /usr/bin/blender)" ] \
+			|| [ -e "$(root_path /usr/libexec/vinix-blender)" ]; then
+			finalize_blender
+		fi
 		;;
 	search)
 		[ "$#" -gt 0 ] || { echo "pkg: search needs a query" >&2; exit 1; }

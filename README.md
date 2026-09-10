@@ -268,6 +268,16 @@ pkg install gnumeric
 ./gnumeric-package-smoke.sh
 ```
 
+Blender is installed directly from Alpine's aarch64 package, including its
+shared data and desktop entry. Vinix starts it with audio disabled until the
+remaining PulseAudio threading primitives are available:
+
+```sh
+pkg install blender
+blender
+./blender-package-smoke.sh
+```
+
 Sublime Text is available through the same package frontend. This installs its
 Alpine `gcompat`/GTK dependencies and a checksum-verified official ARM64 build,
 including an application-menu entry:

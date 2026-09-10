@@ -119,6 +119,23 @@ case "$*" in
 			if [ "$seen_add" = true ]; then
 				printf '%s\n' "$argument" >>"$VINIX_TEST_INSTALLED_PACKAGES"
 				case "$argument" in
+					blender)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin" \
+							"$VINIX_TEST_ROOT/usr/lib" \
+							"$VINIX_TEST_ROOT/usr/share/applications" \
+							"$VINIX_TEST_ROOT/usr/share/blender/4.3"
+						printf '#!/bin/sh\nprintf "Blender 4.3.0\\n"\n' \
+							>"$VINIX_TEST_ROOT/usr/bin/blender"
+						chmod 0755 "$VINIX_TEST_ROOT/usr/bin/blender"
+						printf 'Blender dependency\n' \
+							>"$VINIX_TEST_ROOT/usr/lib/libblender-dependency.so.1.0"
+						ln -sf libblender-dependency.so.1.0 \
+							"$VINIX_TEST_ROOT/usr/lib/libblender-dependency.so.1"
+						: >"$VINIX_TEST_ROOT/usr/share/applications/blender.desktop"
+						: >"$VINIX_TEST_ROOT/usr/share/blender/4.3/payload"
+						printf 'P:%s\nF:usr/bin\nR:blender\nF:usr/lib\nR:libblender-dependency.so.1\nR:libblender-dependency.so.1.0\nF:usr/share/applications\nR:blender.desktop\nF:usr/share/blender/4.3\nR:payload\n\n' \
+							"$argument"
+						;;
 					gtk+3.0)
 						printf 'P:%s\nF:usr/lib\nR:libgtk-3.so.0\n\n' "$argument"
 						;;
@@ -298,5 +315,27 @@ test ! -e "$root/usr/bin/subl"
 test ! -e "$root/var/lib/vinix-pkg/sublime-text.files"
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs$'
+
+run_pkg install blender
+test -x "$root/usr/bin/blender"
+test -x "$root/usr/libexec/vinix-blender"
+test -f "$root/usr/lib/libblender-dependency.so.1"
+test ! -L "$root/usr/lib/libblender-dependency.so.1"
+test -f "$root/usr/share/applications/blender.desktop"
+test -f "$root/usr/share/blender/4.3/payload"
+grep -q '^# Vinix Blender launcher$' "$root/usr/bin/blender"
+grep -q 'vinix-blender -noaudio' "$root/usr/bin/blender"
+grep -qx usr/libexec/vinix-blender \
+	"$root/var/lib/vinix-pkg/package-files"
+test "$("$root/usr/libexec/vinix-blender" --version)" = 'Blender 4.3.0'
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download blender python3-pycache-pyc0$'
+tail -n 1 "$log" | grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add blender$'
+
+run_pkg remove blender
+test ! -e "$root/usr/libexec/vinix-blender"
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del blender$'
 
 echo "VINIX PACKAGE COMMAND TEST: PASS"

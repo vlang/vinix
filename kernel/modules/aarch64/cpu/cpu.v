@@ -253,6 +253,31 @@ pub fn read_cntfrq_el0() u64 {
 	return ret
 }
 
+pub fn read_cntkctl_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, cntkctl_el1
+		; =r (ret)
+	}
+	return ret
+}
+
+pub fn write_cntkctl_el1(value u64) {
+	asm volatile aarch64 {
+		msr cntkctl_el1, value
+		isb
+		; ; r (value)
+		; memory
+	}
+}
+
+// CNTKCTL_EL1 is local to each CPU. Native Linux applications expect the
+// virtual counter itself (but not its timer control registers) to be readable
+// from EL0 for inexpensive monotonic timestamps.
+pub fn enable_el0_virtual_counter() {
+	write_cntkctl_el1(read_cntkctl_el1() | u64(1 << 1)) // EL0VCTEN
+}
+
 pub fn read_cntpct_el0() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {

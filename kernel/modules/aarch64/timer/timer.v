@@ -16,6 +16,10 @@ __global (
 pub fn initialise() {
 	timer_freq = cpu.read_cntfrq_el0()
 	println('timer: ARM Generic Timer frequency: ${timer_freq} Hz')
+	// Optimized native libraries use the architectural virtual counter for
+	// cheap timing. Linux exposes CNTVCT_EL0 to userspace, so do the same while
+	// leaving the virtual timer control registers privileged.
+	cpu.enable_el0_virtual_counter()
 
 	// Disable timer initially
 	stop()

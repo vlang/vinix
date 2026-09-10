@@ -23,6 +23,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// Set TPIDR_EL1 to cpu_number for per-CPU data access
 	cpu.write_tpidr_el1(cpu_number)
 	cpu.enable_el0_cache_access()
+	cpu.enable_el0_virtual_counter()
 
 	// Switch to kernel page tables
 	kernel_pagemap.switch_to()
