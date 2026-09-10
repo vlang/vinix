@@ -14,7 +14,8 @@ exists, with an automatic fallback to the static software binary.
 
 What it does:
 
-- a wallpaper, and a taskbar containing only Start and the open windows
+- a wallpaper, and a taskbar with Start, open windows and a clock in its
+  bottom-right status area
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, clicking one to bring it to the front
 - a **V Start button** and Windows 7-style two-column Start menu, with recent

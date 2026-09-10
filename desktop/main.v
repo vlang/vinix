@@ -149,6 +149,7 @@ fn main() {
 	for desktop.running {
 		frame_started := monotonic_millis()
 
+		desktop.update_taskbar_clock()
 		desktop.poll_apps()
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)

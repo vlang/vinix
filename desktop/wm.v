@@ -60,6 +60,13 @@ mut:
 	// idle desktop then costs almost nothing, and — with no garbage collector
 	// on this target — stops rebuilding a tree it would only throw away.
 	dirty bool = true
+	// The taskbar clock owns its text so unchanged seconds do not allocate. It
+	// occupies a fixed logical status area, which the framebuffer presenter
+	// scales together with every other desktop coordinate.
+	taskbar_clock_time    string
+	taskbar_clock_date    string
+	taskbar_clock_sampled bool
+	taskbar_clock_seconds i64
 
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
@@ -236,19 +243,13 @@ fn (mut d Desktop) minimize(id int) {
 	}
 }
 
-// activate is what a taskbar entry does: restore a minimised window, or
-// minimise the one already on top, which is the behaviour a taskbar button is
-// expected to have.
+// activate is what a taskbar entry does: restore a minimised window, then put
+// that window on top. A taskbar button is a focus target; only the window's
+// explicit minimise control hides an already focused window.
 fn (mut d Desktop) activate(id int) {
 	index := d.window_index(id) or { return }
 	if d.windows[index].minimized {
 		d.windows[index].minimized = false
-		d.raise(id)
-		return
-	}
-	if d.focus == id && d.windows.last().id == id {
-		d.minimize(id)
-		return
 	}
 	d.raise(id)
 }
@@ -807,7 +808,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	dock := theme.dock
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(d.windows.len + 2)
+	mut children := frame_elements(d.windows.len + 4)
 	item_y := (taskbar_height - taskbar_item_height) / 2
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
@@ -831,7 +832,11 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		unsafe { entries.free() }
 	}
 	mut x := edge_padding + start_button_width + 8
-	entry_right := width - edge_padding
+	// Reserve this space before sizing entries. The clock is therefore visible
+	// at the physical lower-right corner after 2x M1 presentation as well as
+	// on an unscaled framebuffer.
+	clock_width := taskbar_clock_width
+	entry_right := width - edge_padding - clock_width - taskbar_item_gap
 
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
@@ -876,6 +881,25 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			align: .left
 		})
 		x += item_width + taskbar_item_gap
+	}
+
+	// A regular taskbar pins the status area to the lower-right corner. A dock
+	// keeps the same clock immediately after its task buttons so it remains
+	// inside the floating panel instead of being stranded at the screen edge.
+	clock_x := if dock { x } else { width - edge_padding - clock_width }
+	children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
+		color: theme.taskbar_text_active
+		size: 17
+		bold: true
+		align: .right
+	})
+	children << ui2.label('clock.date', d.taskbar_clock_date, ui2.rect(f64(clock_x), 25, f64(clock_width), 17), ui2.TextStyle{
+		color: theme.taskbar_muted
+		size: 11
+		align: .right
+	})
+	if dock {
+		x = clock_x + clock_width + taskbar_item_gap
 	}
 
 	// A hairline along the top edge separates a full-width bar from the

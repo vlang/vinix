@@ -351,7 +351,7 @@ fn test_start_menu_system_link_opens_system_window() {
 	assert desktop.windows[0].page == .system
 }
 
-fn test_taskbar_contains_only_start_and_open_windows() {
+fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	mut desktop := Desktop{
 		canvas: Canvas{
 			width: 1280
@@ -360,24 +360,79 @@ fn test_taskbar_contains_only_start_and_open_windows() {
 	}
 	desktop.spawn('One', .welcome, 10, 10, 300, 200)
 	desktop.spawn('Two', .system, 20, 20, 300, 200)
+	desktop.update_taskbar_clock_at(0)
 
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
-	assert taskbar.children.len == 4
+	assert taskbar.children.len == 6
 	assert utility_element_named(taskbar, action_start_toggle) != none
 	assert utility_element_named(taskbar, 'task.1') != none
 	assert utility_element_named(taskbar, 'task.2') != none
-	assert utility_element_named(taskbar, 'clock.time') == none
-	assert utility_element_named(taskbar, 'clock.date') == none
+	clock_time := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
+	clock_date := utility_element_named(taskbar, 'clock.date') or { panic('missing taskbar date') }
+	assert clock_time.text == '00:00:00'
+	assert clock_date.text == 'Thu 1 Jan'
+	assert int(clock_time.frame.x + clock_time.frame.width) == 1280 - taskbar_padding
 	free_tree(root)
 
 	desktop.close_window(2)
 	desktop.close_window(1)
 	empty := desktop.build_tree()
 	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
-	assert empty_taskbar.children.len == 2
+	assert empty_taskbar.children.len == 4
 	assert utility_element_named(empty_taskbar, action_start_toggle) != none
+	assert utility_element_named(empty_taskbar, 'clock.time') != none
 	free_tree(empty)
+}
+
+fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 800
+			height: 600
+		}
+	}
+	first := desktop.spawn('One', .welcome, 10, 10, 300, 200)
+	second := desktop.spawn('Two', .system, 20, 20, 300, 200)
+	assert desktop.focus == second
+	desktop.targets << HitTarget{
+		action_id: 'task.${first}'
+		x: 60
+		y: 560
+		width: 150
+		height: 30
+	}
+
+	desktop.on_pointer_down(80, 575)
+	assert desktop.focus == first
+	assert desktop.windows.last().id == first
+	assert !desktop.windows.last().minimized
+
+	// Re-clicking the selected taskbar button keeps the window focused instead
+	// of hiding it; minimize remains an explicit title-bar action.
+	desktop.on_pointer_down(80, 575)
+	assert desktop.focus == first
+	assert !desktop.windows.last().minimized
+}
+
+fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
+	// The 3024×1964 M1 framebuffer becomes a 1512×982 logical desktop. The
+	// taskbar reserves a logical status area before allocating task buttons,
+	// which maps back to the physical lower-right corner during presentation.
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: desktop_scaled_extent(3024, desktop_scale_200)
+			height: desktop_scaled_extent(1964, desktop_scale_200)
+		}
+	}
+	desktop.update_taskbar_clock_at(0)
+	root := desktop.build_tree()
+	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
+	clock := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
+	assert int(clock.frame.x + clock.frame.width) == desktop.canvas.width - taskbar_padding
+	assert int(clock.frame.x + clock.frame.width) * desktop_scale_200 == 3024 - 2 * taskbar_padding
+	assert int(taskbar.frame.y) * desktop_scale_200 == 1964 - 2 * taskbar_height
+	free_tree(root)
 }
 
 fn test_firefox_uses_the_hosted_x11_window_path() {
