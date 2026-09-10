@@ -31,13 +31,18 @@ fi
 # this deliberately matches only the generated disks, interrupted rsync
 # temporaries, and the QEMU firmware -- never source or M1 boot inputs.
 if [ "${VINIX_M1_PRUNE_QEMU_ARTIFACTS:-0}" = "1" ]; then
-    echo "==> Removing remote QEMU-only boot artifacts..."
+    echo "==> Removing remote QEMU-only artifacts..."
     ssh "$REMOTE" "
 if [ -d '$DEST/boot-image' ]; then
     find '$DEST/boot-image' -maxdepth 1 -type f \
         \( -name 'boot*.img' -o -name '.boot*.img.*' -o \
            -name 'edk2-aarch64-code-*.fd' \) -print -delete
 fi"
+    ssh "$REMOTE" "
+for artifact_dir in '$DEST'/build-*-probe '$DEST'/build-amd64-*; do
+    [ -d \"\$artifact_dir\" ] || continue
+    find \"\$artifact_dir\" -maxdepth 1 -type f -name '*.img' -print -delete
+done"
 fi
 
 # macOS ships OpenRSYNC 2.6.9, which has --progress but not rsync 3's
@@ -53,12 +58,17 @@ echo "==> Comparing files; changed files show a live percentage..."
 # M1 starts through its existing m1n1/U-Boot chain and deploy-m1-efi.sh only
 # needs the separately copied Limine EFI below.  Sending either artifact can
 # fill the Mac's data volume before the actual desktop initramfs is reached.
+# The amd64 build trees and application-probe disk images are QEMU-only too;
+# in particular, partially transferring a multi-GB probe disk can strand an
+# M1 with no room for the deployment inputs that it actually needs.
 if ! rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
     --exclude 'vinix.iso' \
     --exclude 'boot-image/boot*.img' \
     --exclude 'boot-image/edk2-aarch64-code-*.fd' \
+    --exclude 'build-*-probe/*.img' \
+    --exclude 'build-amd64-*/' \
     --exclude 'boot-image/limine-src-*/' \
     --exclude 'tools/agx-re/build/' \
     --exclude 'build/' \
