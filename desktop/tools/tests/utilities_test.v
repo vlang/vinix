@@ -281,6 +281,13 @@ fn test_xwd_bilinear_filter_preserves_edges_and_blends_the_middle() {
 	assert xwd_bilinear_color(0xff0000, 0x00ff00, 0x0000ff, 0xffffff, 128, 128) == 0x808080
 }
 
+fn test_office_xwd_repairs_only_transparent_ui_pixels() {
+	assert office2013_presented_color(0x000000, 0) == 0xffffff
+	assert office2013_presented_color(0x000000, office2013_transparent_ui_height - 1) == 0xffffff
+	assert office2013_presented_color(0x010101, 50) == 0x010101
+	assert office2013_presented_color(0x000000, office2013_transparent_ui_height) == 0x000000
+}
+
 fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
 	mut desktop := Desktop{
 		canvas: Canvas{

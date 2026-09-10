@@ -4,6 +4,12 @@
 module main
 
 const xwd_image_prefix = 'xwd:'
+const office_xwd_image_prefix = 'xwd-office:'
+// Office 2013 draws its ribbon and start-page controls through transparent
+// Direct2D layers. Xvfb's 24-bit root pixmap has nowhere to retain the alpha
+// channel, so fully transparent texels arrive as pure black. The document
+// canvas begins below this band and must remain byte-for-byte untouched.
+const office2013_transparent_ui_height = 145
 const xwd_fixed_header_size = u64(100)
 const xwd_color_size = u64(12)
 const xwd_file_version = u32(7)
@@ -139,6 +145,20 @@ fn (surface &XwdSurface) pixel(x int, y int) u32 {
 	return red << 16 | green << 8 | blue
 }
 
+@[inline]
+fn office2013_presented_color(color u32, source_y int) u32 {
+	if source_y < office2013_transparent_ui_height && color == 0 {
+		return 0xffffff
+	}
+	return color
+}
+
+@[inline]
+fn (surface &XwdSurface) presented_pixel(x int, y int, repair_office_ui bool) u32 {
+	color := surface.pixel(x, y)
+	return if repair_office_ui { office2013_presented_color(color, y) } else { color }
+}
+
 // Interpolate four opaque XWD pixels with 8-bit fractional coordinates.  The
 // hosted X server is deliberately independent from a Vinix window, so moving
 // to a larger screen or maximising the window often makes their dimensions
@@ -172,6 +192,15 @@ fn xwd_bilinear_color(top_left u32, top_right u32, bottom_left u32, bottom_right
 // Xvfb and the desktop share the kernel page cache, so no screenshot file is
 // copied or rewritten for each frame.
 fn (mut canvas Canvas) draw_xwd_surface(path string, x int, y int, width int, height int) bool {
+	return canvas.draw_presented_xwd_surface(path, x, y, width, height, false)
+}
+
+fn (mut canvas Canvas) draw_office_xwd_surface(path string, x int, y int, width int, height int) bool {
+	return canvas.draw_presented_xwd_surface(path, x, y, width, height, true)
+}
+
+fn (mut canvas Canvas) draw_presented_xwd_surface(path string, x int, y int, width int, height int,
+	repair_office_ui bool) bool {
 	if width <= 0 || height <= 0 {
 		return false
 	}
@@ -182,8 +211,8 @@ fn (mut canvas Canvas) draw_xwd_surface(path string, x int, y int, width int, he
 	if width == surface.width && height == surface.height {
 		for destination_y := 0; destination_y < height; destination_y++ {
 			for destination_x := 0; destination_x < width; destination_x++ {
-				canvas.blend_pixel(x + destination_x, y + destination_y, surface.pixel(destination_x,
-					destination_y), 255)
+				canvas.blend_pixel(x + destination_x, y + destination_y, surface.presented_pixel(destination_x,
+					destination_y, repair_office_ui), 255)
 			}
 		}
 		return true
@@ -208,9 +237,10 @@ fn (mut canvas Canvas) draw_xwd_surface(path string, x int, y int, width int, he
 			source_x := fixed_x >> 16
 			next_x := if source_x + 1 < surface.width { source_x + 1 } else { source_x }
 			fraction_x := u32(fixed_x & 0xffff) >> 8
-			color := xwd_bilinear_color(surface.pixel(source_x, source_y), surface.pixel(next_x,
-				source_y), surface.pixel(source_x, next_y), surface.pixel(next_x, next_y),
-				fraction_x, fraction_y)
+			color := xwd_bilinear_color(surface.presented_pixel(source_x, source_y, repair_office_ui),
+				surface.presented_pixel(next_x, source_y, repair_office_ui),
+				surface.presented_pixel(source_x, next_y, repair_office_ui),
+				surface.presented_pixel(next_x, next_y, repair_office_ui), fraction_x, fraction_y)
 			canvas.blend_pixel(x + destination_x, y + destination_y, color, 255)
 			fixed_x += step_x
 		}

@@ -78,7 +78,9 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 		'/root/.wine-word2013-x86_64/drive_c/Program Files/Microsoft Office/Office15/WINWORD.EXE',
 	] {
 		if C.access(&char(word.str), 0) == 0 {
-			return open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting Microsoft Word 2013…', 'The translated Win64 Wine runtime is not installed.', 'Microsoft Word 2013 exited.')
+			mut app := open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting Microsoft Word 2013…', 'The translated Win64 Wine runtime is not installed.', 'Microsoft Word 2013 exited.')
+			app.image_path = '${office_xwd_image_prefix}${app.xwd_path}'
+			return app
 		}
 	}
 	for setup in ['/root/word2013-media/office/setup64.exe', '/root/word2013-media/office/SETUP64.EXE',

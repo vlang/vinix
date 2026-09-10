@@ -218,7 +218,9 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 			d.draw_button(el, x, y, w, h)
 		}
 		.image {
-			if el.image_path.starts_with(xwd_image_prefix) {
+			if el.image_path.starts_with(office_xwd_image_prefix) {
+				d.canvas.draw_office_xwd_surface(el.image_path[office_xwd_image_prefix.len..], x, y, w, h)
+			} else if el.image_path.starts_with(xwd_image_prefix) {
 				d.canvas.draw_xwd_surface(el.image_path[xwd_image_prefix.len..], x, y, w, h)
 			} else {
 				d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
