@@ -39,6 +39,22 @@ fn utility_button_with_text(element ui2.Element, text string) ?ui2.Element {
 	return none
 }
 
+fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
+	// These coordinates are inside the left arm, the open notch and the right
+	// arm of the V in vinix-logo.svg. Keeping this assertion on the shared
+	// polygon prevents the Start mark from quietly becoming a generic stroked V.
+	assert vinix_v_contains(11.0, 12.0)
+	assert !vinix_v_contains(26.3, 12.0)
+	assert vinix_v_contains(41.0, 12.0)
+
+	mut canvas := new_canvas(48, 48)
+	defer { unsafe { free(canvas.pixels) }
+	 }
+	canvas.clear(0x000000)
+	canvas.draw_vinix_v(0, 0, 48, 48, 0xffffff)
+	assert unsafe { canvas.pixels[24 * canvas.stride + 24] } == 0xffffff
+}
+
 struct PointerFocusTestApp {}
 
 fn (mut app PointerFocusTestApp) build(size ui2.Rect) !ui2.Element {

@@ -537,19 +537,10 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 
 	match name {
 		'vinix' {
-			// The standalone V is the first polygon of the VINIX wordmark,
-			// simplified to two sturdy strokes so it stays crisp in the small
-			// taskbar orb as well as the larger Start-menu user tile.
-			size := if w < h { w } else { h }
-			span := size * 7 / 24
-			top := cy - size * 7 / 24
-			bottom := cy + size * 7 / 24
-			mut thickness := size / 7
-			if thickness < 2 {
-				thickness = 2
-			}
-			d.canvas.draw_line(cx - span, top, cx, bottom, color, thickness)
-			d.canvas.draw_line(cx + span - thickness + 1, top, cx, bottom, color, thickness)
+			// The brand mark is the exact V polygon from vinix-logo.svg. In
+			// particular, its outer taper and narrow inner notch carry through
+			// to the lower-left Start button.
+			d.canvas.draw_vinix_v(x, y, w, h, color)
 		}
 		'minimize' {
 			d.canvas.fill_rect(cx - half, cy, 2 * half, 1, color)
