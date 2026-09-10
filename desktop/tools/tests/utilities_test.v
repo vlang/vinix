@@ -275,6 +275,12 @@ fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {
 	assert sizeof(WineHostEvent) == 20
 }
 
+fn test_xwd_bilinear_filter_preserves_edges_and_blends_the_middle() {
+	assert xwd_bilinear_color(0x123456, 0xffffff, 0xffffff, 0xffffff, 0, 0) == 0x123456
+	assert xwd_bilinear_color(0x000000, 0xffffff, 0xffffff, 0xffffff, 128, 0) == 0x808080
+	assert xwd_bilinear_color(0xff0000, 0x00ff00, 0x0000ff, 0xffffff, 128, 128) == 0x808080
+}
+
 fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
 	mut desktop := Desktop{
 		canvas: Canvas{

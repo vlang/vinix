@@ -18,6 +18,9 @@ fi
 export WINEARCH=win32
 default_prefix="${HOME:-/root}/.wine-x86_32"
 export WINEPREFIX="${WINEPREFIX:-$default_prefix}"
+export FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
+export FONTCONFIG_PATH="$runtime/etc/fonts"
+export FONTCONFIG_SYSROOT="$runtime"
 export WINEDLLPATH="$runtime/usr/lib/wine/i386-unix:$runtime/usr/lib/wine/i386-windows"
 export WINELOADERNOEXEC=1
 export WINELOADER=/usr/bin/wine32

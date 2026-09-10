@@ -26,6 +26,13 @@ case "$tool" in
         ;;
 esac
 export WINEPREFIX="${WINEPREFIX:-$default_prefix}"
+# The translated process is not chrooted: QEMU's -L redirects its loader, but
+# fontconfig would still look in native /etc and /usr without an explicit
+# sysroot. Point it at the fonts shipped inside the matching x86 runtime so
+# Wine gets scalable TrueType faces instead of its emergency bitmap fonts.
+export FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
+export FONTCONFIG_PATH="$runtime/etc/fonts"
+export FONTCONFIG_SYSROOT="$runtime"
 case "$tool" in
     word2013|word2013-setup)
         # Wine's built-in sppc exports abort on Office's licensing-policy
@@ -190,7 +197,7 @@ case "$tool" in
         registry_file="${VINIX_WORD2013_REGISTRY_FILE:-/usr/share/wine/word2013-wine.reg}"
         registry_path="${VINIX_WORD2013_REGISTRY_PATH:-Z:\\usr\\share\\wine\\word2013-wine.reg}"
         registry_marker="$WINEPREFIX/.vinix-word2013-settings"
-        registry_version=4
+        registry_version=5
         if [ -f "$registry_file" ] &&
            ! grep -qx "$registry_version" "$registry_marker" 2>/dev/null; then
             "$runner" "$wine" reg.exe import "$registry_path"

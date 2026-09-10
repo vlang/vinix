@@ -139,6 +139,35 @@ fn (surface &XwdSurface) pixel(x int, y int) u32 {
 	return red << 16 | green << 8 | blue
 }
 
+// Interpolate four opaque XWD pixels with 8-bit fractional coordinates.  The
+// hosted X server is deliberately independent from a Vinix window, so moving
+// to a larger screen or maximising the window often makes their dimensions
+// differ.  Nearest-neighbour sampling turned every one-pixel font edge into a
+// conspicuous block in that case.
+@[inline]
+fn xwd_bilinear_color(top_left u32, top_right u32, bottom_left u32, bottom_right u32,
+	fraction_x u32, fraction_y u32) u32 {
+	inverse_x := 256 - fraction_x
+	inverse_y := 256 - fraction_y
+	top_left_weight := inverse_x * inverse_y
+	top_right_weight := fraction_x * inverse_y
+	bottom_left_weight := inverse_x * fraction_y
+	bottom_right_weight := fraction_x * fraction_y
+
+	red := (((top_left >> 16) & 0xff) * top_left_weight +
+		((top_right >> 16) & 0xff) * top_right_weight +
+		((bottom_left >> 16) & 0xff) * bottom_left_weight +
+		((bottom_right >> 16) & 0xff) * bottom_right_weight + 32768) >> 16
+	green := (((top_left >> 8) & 0xff) * top_left_weight +
+		((top_right >> 8) & 0xff) * top_right_weight +
+		((bottom_left >> 8) & 0xff) * bottom_left_weight +
+		((bottom_right >> 8) & 0xff) * bottom_right_weight + 32768) >> 16
+	blue := ((top_left & 0xff) * top_left_weight + (top_right & 0xff) * top_right_weight +
+		(bottom_left & 0xff) * bottom_left_weight + (bottom_right & 0xff) * bottom_right_weight +
+		32768) >> 16
+	return red << 16 | green << 8 | blue
+}
+
 // draw_xwd_surface scales the live mmap directly into the compositor canvas.
 // Xvfb and the desktop share the kernel page cache, so no screenshot file is
 // copied or rewritten for each frame.
@@ -150,11 +179,40 @@ fn (mut canvas Canvas) draw_xwd_surface(path string, x int, y int, width int, he
 	defer {
 		surface.close()
 	}
+	if width == surface.width && height == surface.height {
+		for destination_y := 0; destination_y < height; destination_y++ {
+			for destination_x := 0; destination_x < width; destination_x++ {
+				canvas.blend_pixel(x + destination_x, y + destination_y, surface.pixel(destination_x,
+					destination_y), 255)
+			}
+		}
+		return true
+	}
+
+	step_x := if width > 1 { (surface.width - 1) * 65536 / (width - 1) } else { 0 }
+	step_y := if height > 1 { (surface.height - 1) * 65536 / (height - 1) } else { 0 }
 	for destination_y := 0; destination_y < height; destination_y++ {
-		source_y := destination_y * surface.height / height
+		fixed_y := if destination_y + 1 == height {
+			(surface.height - 1) * 65536
+		} else {
+			destination_y * step_y
+		}
+		source_y := fixed_y >> 16
+		next_y := if source_y + 1 < surface.height { source_y + 1 } else { source_y }
+		fraction_y := u32(fixed_y & 0xffff) >> 8
+		mut fixed_x := 0
 		for destination_x := 0; destination_x < width; destination_x++ {
-			source_x := destination_x * surface.width / width
-			canvas.blend_pixel(x + destination_x, y + destination_y, surface.pixel(source_x, source_y), 255)
+			if destination_x + 1 == width {
+				fixed_x = (surface.width - 1) * 65536
+			}
+			source_x := fixed_x >> 16
+			next_x := if source_x + 1 < surface.width { source_x + 1 } else { source_x }
+			fraction_x := u32(fixed_x & 0xffff) >> 8
+			color := xwd_bilinear_color(surface.pixel(source_x, source_y), surface.pixel(next_x,
+				source_y), surface.pixel(source_x, next_y), surface.pixel(next_x, next_y),
+				fraction_x, fraction_y)
+			canvas.blend_pixel(x + destination_x, y + destination_y, color, 255)
+			fixed_x += step_x
 		}
 	}
 	return true

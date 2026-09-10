@@ -201,7 +201,7 @@ if [ "$WITH_WINE" -eq 1 ]; then
     # Direct software rendering is required by newer Office releases.  Wine is
     # an x86-64 process, so it must load an x86-64 DRI driver even though the
     # X server and desktop compositor are native AArch64 processes.
-    guest_packages+=(font-liberation gnutls libxcomposite libxinerama \
+    guest_packages+=(font-carlito font-liberation gnutls libxcomposite libxinerama \
         mesa-dri-gallium wine)
 fi
 
@@ -382,6 +382,11 @@ if [ "$WITH_WINE" -eq 1 ]; then
     install -m644 \
         "$SCRIPT_DIR/build-support/x86-translation/word2013-wine.reg" \
         "$STAGING/usr/share/wine/word2013-wine.reg"
+    for root in "$X86_ROOT" "$I386_ROOT"; do
+        install -m644 \
+            "$SCRIPT_DIR/build-support/x86-translation/vinix-fonts.conf" \
+            "$root/etc/fonts/conf.d/35-vinix-wine.conf"
+    done
     install -m755 "$SCRIPT_DIR/build-support/x86-translation/run-wine-x86-64" \
         "$STAGING/usr/bin/run-wine-x86-64"
     for launcher in wine wine64 wineserver msiexec notepad regedit regsvr32 \
@@ -453,15 +458,11 @@ if [ "$WITH_WINE" -eq 1 ]; then
             ln -snf "/usr/share/wine/x86_64-windows/$builtin" \
                 "$word2013_target/drive_c/windows/system32/$builtin"
         done
-        if grep -q '^"max_version_factory"=dword:00000000$' \
-                "$word2013_target/user.reg" &&
-           grep -q '^"csmt"=dword:00000000$' "$word2013_target/user.reg" &&
-           grep -q '^"renderer"="gl"$' "$word2013_target/user.reg" &&
-           grep -q '^"DisableHardwareAcceleration"=dword:00000000$' \
-                "$word2013_target/user.reg"; then
-            printf '%s\n' '4' \
-                > "$word2013_target/.vinix-word2013-settings"
-        fi
+        # Apply the current runtime settings on first boot. In particular,
+        # imported prefixes can contain font-cache paths from the machine on
+        # which Office was installed; the launcher replaces those paths only
+        # after it knows the final Vinix runtime root.
+        rm -f "$word2013_target/.vinix-word2013-settings"
     fi
     # Wine's generated sppc.dll export aborts Word at startup. Replace it only
     # in Word's isolated prefix with a non-activating compatibility DLL that

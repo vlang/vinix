@@ -1,5 +1,18 @@
 Windows Registry Editor Version 5.00
 
+; Imported prefixes remember absolute Unix paths for the fonts available on
+; their build host. Remove that cache so Wine enumerates the scalable fonts in
+; Vinix's translated runtime, whose fontconfig sysroot is set by the launcher.
+[-HKEY_CURRENT_USER\Software\Wine\Fonts\External Fonts]
+
+; Carlito is OFL-licensed and metric-compatible with Calibri. Office 2013's
+; MSI does not necessarily install the regular Calibri and Segoe UI families,
+; so use Carlito for those missing base faces while retaining any licensed
+; Light/Semilight variants that the user's Office media did provide.
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\FontSubstitutes]
+"Calibri"="Carlito"
+"Segoe UI"="Carlito"
+
 ; Office 2013 asks for Direct2D 1.1 and otherwise renders an opaque black
 ; client area in Wine.  Factory version 0 makes it use Wine's implemented
 ; Direct2D 1.0 path. OpenGL 3.2 provides the required feature level, while a

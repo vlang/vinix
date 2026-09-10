@@ -33,6 +33,9 @@ printf '%s\n' '#!/bin/sh' \
     'printf "WINEPREFIX=%s\n" "$WINEPREFIX"' \
     'printf "WINEDLLOVERRIDES=%s\n" "$WINEDLLOVERRIDES"' \
     'printf "MESA_GLTHREAD=%s\n" "${MESA_GLTHREAD:-}"' \
+    'printf "FONTCONFIG_FILE=%s\n" "${FONTCONFIG_FILE:-}"' \
+    'printf "FONTCONFIG_PATH=%s\n" "${FONTCONFIG_PATH:-}"' \
+    'printf "FONTCONFIG_SYSROOT=%s\n" "${FONTCONFIG_SYSROOT:-}"' \
     'printf "TEMP=%s\n" "$TEMP"' \
     'for argument do printf "ARG=%s\n" "$argument"; done' \
     '} >> "$VINIX_WORD_TEST_LOG"' > "$runner"
@@ -79,11 +82,14 @@ grep -Fx 'ARG=custom.msp' "$VINIX_WORD_TEST_LOG"
 "$work/bin/word2013"
 grep -Fx 'WINEDLLOVERRIDES=sppc=n;mscoree,mshtml=;' "$VINIX_WORD_TEST_LOG"
 grep -Fx 'MESA_GLTHREAD=false' "$VINIX_WORD_TEST_LOG"
+grep -Fx "FONTCONFIG_FILE=$runtime/etc/fonts/fonts.conf" "$VINIX_WORD_TEST_LOG"
+grep -Fx "FONTCONFIG_PATH=$runtime/etc/fonts" "$VINIX_WORD_TEST_LOG"
+grep -Fx "FONTCONFIG_SYSROOT=$runtime" "$VINIX_WORD_TEST_LOG"
 grep -Fx 'ARG=reg.exe' "$VINIX_WORD_TEST_LOG"
 grep -Fx 'ARG=import' "$VINIX_WORD_TEST_LOG"
 grep -Fx 'ARG=Z:\word2013-wine.reg' "$VINIX_WORD_TEST_LOG"
 test -f "$prefix/.vinix-word2013-settings"
-test "$(cat "$prefix/.vinix-word2013-settings")" = 3
+test "$(cat "$prefix/.vinix-word2013-settings")" = 5
 grep -Fx 'ARG=explorer.exe' "$VINIX_WORD_TEST_LOG"
 grep -Fx 'ARG=/desktop=root,768x576' "$VINIX_WORD_TEST_LOG"
 grep -Fx 'ARG=C:\Program Files\Microsoft Office 15\root\office15\WINWORD.EXE' "$VINIX_WORD_TEST_LOG"
