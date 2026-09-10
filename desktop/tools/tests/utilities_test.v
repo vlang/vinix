@@ -130,6 +130,7 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 
 fn test_native_calculator_matches_the_example_layout_and_actions() {
 	mut calculator := new_calculator_app()
+	defer { calculator.close_app() }
 	begin_frame_elements()
 	tree := calculator.build(ui2.rect(0, 0, window_width, window_height))!
 	panel := utility_element_named(tree, 'calculator') or { panic('missing calculator panel') }
@@ -166,9 +167,9 @@ fn test_native_calculator_matches_the_example_layout_and_actions() {
 	assert updated_display.text == '5'
 	free_tree(updated)
 
-	// The application-process request loop resets this pool before every
-	// build. Repeated interaction must reuse the warmed slots, not retain one
-	// new set of arrays for every result shown.
+	// The application-process request loop resets the pool before every build.
+	// Repeated interaction must not grow it while each compile-time VML tree is
+	// released with its frame.
 	begin_frame_elements()
 	warm := calculator.build(ui2.rect(0, 0, window_width, window_height))!
 	free_tree(warm)
@@ -186,7 +187,6 @@ fn test_native_calculator_matches_the_example_layout_and_actions() {
 		final_slots += frame_element_pool.slots[bucket].len
 	}
 	assert final_slots == warmed_slots
-	calculator.close_app()
 }
 
 fn test_terminal_sends_every_keystroke_through_the_pty_master() {

@@ -5,6 +5,8 @@
 // Import vlib's declarations rather than inventing incompatible duplicates.
 module main
 
+#flag -I @VMODROOT
+
 import os as _
 import time as _
 import term.termios

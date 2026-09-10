@@ -3,6 +3,7 @@
 module main
 
 import os
+import term
 import term.termios
 
 // Only system declarations; the implementation under test is platform.c.v.

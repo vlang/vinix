@@ -25,7 +25,10 @@ rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/utilities_test.v" "$work/ui/"
 printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
 
-"$v" -gc none -manualfree -enable-globals -stats -d ui2_headless \
+# The staged Calculator uses ui2's compile-time `$vml` lowering, which is
+# provided by V's current compiler. Keep test and production compilation on
+# the same frontend.
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utilities_test.v"
 
 # Build a real executable as well as V's generated test runner. It execs
@@ -33,6 +36,6 @@ printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
 # clean shutdown across actual process boundaries.
 rm -f "$work/ui/utilities_test.v"
 cp "$root/desktop/tools/tests/app_process_integration.v" "$work/ui/main.v"
-"$v" -gc none -manualfree -enable-globals -d ui2_headless \
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/app-process-integration" "$work/ui"
 "$work/app-process-integration"

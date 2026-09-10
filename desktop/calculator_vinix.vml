@@ -3,7 +3,6 @@ Screen {
     width: app.width
     height: app.height
     background: #F1F5F9
-    accessibility_value: "vinix.compiled-vml-tree"
     property f64 panel_width: app.panel_width
     property f64 panel_height: 340
     property f64 panel_x: app.panel_x
@@ -33,7 +32,7 @@ Screen {
 
             Label {
                 id: display
-                text: app.calculator.display
+                text: "0"
                 x: 10
                 y: 0
                 width: root.content_width - 20

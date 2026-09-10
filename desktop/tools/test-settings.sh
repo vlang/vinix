@@ -11,12 +11,13 @@ mkdir "$work/clients"
 for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_client.v; do
     cp "$root/desktop/$name" "$work/clients/"
 done
+cp "$root/desktop/libc_compat.h" "$work/clients/"
 cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
 for name in backlight_client battery_client wifi_client platform; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
     # Invoke the test file directly so older vtest runners cannot lose the
     # shell quoting around a module path containing '|'. V runs its tests.
-    "$v" -gc none -enable-globals -stats \
+    "$v" -new-compiler -nocache -gc none -enable-globals -stats \
         -path "@vlib|@vmodules|$root/kernel/modules" "$work/clients/${name}_test.v"
 done
 if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
@@ -43,8 +44,8 @@ cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
 for name in settings switcher; do
-    "$v" -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done
-"$v" -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/memory_test.v"
