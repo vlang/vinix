@@ -14,10 +14,13 @@ const wine_surface_width = 326
 const wine_surface_height = 430
 const wine_notepad_surface_width = 310
 const wine_notepad_surface_height = 230
-const wine_word2010_surface_width = 1024
-const wine_word2010_surface_height = 768
-const wine_word2010_window_width = 760
-const wine_word2010_window_height = 570
+// Office 2013 restores a 768x576 top-level window in a fresh prefix. Matching
+// the private X server to it avoids unused root-window bands, and its 4:3
+// aspect ratio maps exactly into the native 680x510 Vinix frame.
+const wine_word2013_surface_width = 768
+const wine_word2013_surface_height = 576
+const wine_word2013_window_width = 680
+const wine_word2013_window_height = 510
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
 const minecraft_window_width = 760
@@ -34,8 +37,9 @@ enum WineHostEventKind as u32 {
 struct WineHostEvent {
 	magic  u32
 	kind   u32
-	x      int
-	y      int
+	// The receiving C host uses int32_t and asserts a 20-byte wire record.
+	x      i32
+	y      i32
 	length u32
 }
 
@@ -68,23 +72,27 @@ fn open_wine_notepad(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
 }
 
-fn open_wine_word2010(mut _ Desktop) !NativeApp {
-	word := '/root/.wine-office2010-x86_64/drive_c/Program Files/Microsoft Office/Office14/WINWORD.EXE'
-	if C.access(&char(word.str), 0) == 0 {
-		return open_hosted_x11_app('wine-word2010', '/usr/bin/word2010', wine_word2010_surface_width, wine_word2010_surface_height, 'builtin:editor', 'Starting Microsoft Word 2010…', 'The Win64 Wine runtime is not installed.', 'Microsoft Word 2010 exited.')
+fn open_wine_word2013(mut _ Desktop) !NativeApp {
+	for word in [
+		'/root/.wine-word2013-x86_64/drive_c/Program Files/Microsoft Office 15/root/office15/WINWORD.EXE',
+		'/root/.wine-word2013-x86_64/drive_c/Program Files/Microsoft Office/Office15/WINWORD.EXE',
+	] {
+		if C.access(&char(word.str), 0) == 0 {
+			return open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting Microsoft Word 2013…', 'The translated Win64 Wine runtime is not installed.', 'Microsoft Word 2013 exited.')
+		}
 	}
-	for setup in ['/root/office2010-media/x64/setup.exe', '/root/office2010-media/x64/SETUP.EXE',
-		'/root/office2010-media/X64/setup.exe', '/root/office2010-media/X64/SETUP.EXE'] {
+	for setup in ['/root/word2013-media/office/setup64.exe', '/root/word2013-media/office/SETUP64.EXE',
+		'/root/word2013-media/setup.exe', '/root/word2013-media/SETUP.EXE'] {
 		if C.access(&char(setup.str), 0) == 0 {
-			return open_hosted_x11_app('wine-office2010-setup', '/usr/bin/office2010-setup', wine_word2010_surface_width, wine_word2010_surface_height, 'builtin:editor', 'Starting Office 2010 setup…', 'The Win64 Wine runtime is not installed.', 'Office 2010 setup closed. Launch Word again after installation.')
+			return open_hosted_x11_app('wine-word2013-setup', '/usr/bin/word2013-setup', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting 64-bit Word 2013 setup…', 'The translated Win64 Wine runtime is not installed.', 'Word 2013 setup closed. Launch Word again after installation.')
 		}
 	}
 	return &HostedX11App{
-		surface_width: wine_word2010_surface_width
-		surface_height: wine_word2010_surface_height
+		surface_width: wine_word2013_surface_width
+		surface_height: wine_word2013_surface_height
 		icon: 'builtin:editor'
 		failed: true
-		error_message: 'Stage licensed Office 2010 x64 media, then launch Word again.'
+		error_message: 'Stage licensed Word 2013 x64 media, then launch Word again.'
 	}
 }
 
@@ -179,8 +187,8 @@ fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, 
 	event := WineHostEvent{
 		magic: wine_host_event_magic
 		kind: u32(kind)
-		x: x
-		y: y
+		x: i32(x)
+		y: i32(y)
 		length: u32(keys.len)
 	}
 	if !desktop_write_all(app.input_fd, &event, sizeof(WineHostEvent)) {
@@ -225,11 +233,14 @@ fn (mut app HostedX11App) key_input(text string) {
 
 fn (mut app HostedX11App) close_app() {
 	if app.input_fd >= 0 {
+		// The host treats EOF as its shutdown request and owns the Wine and Xvfb
+		// process tree. Do not synchronously wait for that cleanup here: under
+		// translation a Windows process can take long enough to stop that it
+		// would freeze the compositor while an otherwise ordinary Vinix window
+		// is being closed. The app process exits after replying to the close
+		// request, and init reaps the now-orphaned host when it finishes.
 		desktop_close(app.input_fd)
 		app.input_fd = -1
 	}
-	if app.host_pid > 0 {
-		desktop_wait_child(app.host_pid)
-		app.host_pid = -1
-	}
+	app.host_pid = -1
 }

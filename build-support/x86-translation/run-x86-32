@@ -1,0 +1,53 @@
+#!/bin/sh
+# Run an i386 Linux ELF through Vinix's AArch64 user-mode translator.
+set -eu
+
+runtime="${VINIX_I386_ROOT:-/usr/libexec/vinix-i386/root}"
+emulator="${VINIX_I386_EMULATOR:-/usr/bin/qemu-i386}"
+loader="$runtime/lib/ld-musl-i386.so.1"
+
+if [ "$#" -eq 0 ]; then
+    echo "usage: run-x86-32 PROGRAM [ARGUMENT ...]" >&2
+    exit 2
+fi
+if [ ! -x "$emulator" ]; then
+    echo "run-x86-32: translator is not installed: $emulator" >&2
+    exit 127
+fi
+if [ ! -e "$loader" ]; then
+    echo "run-x86-32: i386 runtime is not installed: $runtime" >&2
+    exit 127
+fi
+
+program="$1"
+shift
+case "$program" in
+    */*) ;;
+    *)
+        for directory in "$runtime/usr/bin" "$runtime/bin"; do
+            if [ -x "$directory/$program" ]; then
+                program="$directory/$program"
+                break
+            fi
+        done
+        ;;
+esac
+if [ ! -e "$program" ]; then
+    echo "run-x86-32: program not found: $program" >&2
+    exit 127
+fi
+
+guest_library_path="$runtime/lib:$runtime/usr/lib"
+if [ -n "${VINIX_I386_LD_LIBRARY_PATH:-}" ]; then
+    guest_library_path="$VINIX_I386_LD_LIBRARY_PATH:$guest_library_path"
+fi
+
+guest_argv0="${VINIX_I386_ARGV0:-$program}"
+
+# Keep the i386 library path private to the guest loader. Wine32 processes can
+# spawn native Vinix helpers, and exporting this path makes the AArch64 loader
+# try to relocate guest libraries before a helper wrapper can sanitize it.
+unset LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV
+exec "$emulator" -L "$runtime" "$loader" \
+    --library-path "$guest_library_path" --argv0 "$guest_argv0" -- \
+    "$program" "$@"

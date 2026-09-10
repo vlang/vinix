@@ -79,6 +79,10 @@ __global (
 
 @[export: 'syscall_trace']
 pub fn syscall_trace(gpr_state voidptr) {
+	// A busy userspace workload can keep the HVF scheduler out of its normal
+	// idle polling loop. This throttled, input-only call keeps the desktop
+	// responsive while translated applications occupy every virtual CPU.
+	sched.poll_syscall_input()
 	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
 	nr := gpr.x8
 	mut current_thread := proc.current_thread()
@@ -266,13 +270,16 @@ fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
 	return iov
 }
 
-// Linux writev(fd, iov, iovcnt) — write each iovec entry sequentially.
+// Linux writev(fd, iov, iovcnt) is one write operation.  In particular, a
+// protocol header and its payload must reach a stream socket together; issuing
+// one resource write per iovec lets the peer consume an incomplete message and
+// close before the payload is written.
 fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
-	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
+	total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
 	if validation_error != 0 {
 		return errno.err, validation_error
 	}
-	if iovcnt == 0 {
+	if total == 0 {
 		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
 			return errno.err, errno.get()
 		}
@@ -280,25 +287,26 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 		return 0, 0
 	}
 
-	mut total := u64(0)
+	buffer := unsafe { malloc(total) }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		unsafe { free(buffer) }
+	}
+
+	mut offset := u64(0)
 	for i := 0; i < iovcnt; i++ {
 		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
 		if iov.len == 0 {
 			continue
 		}
-		ret, err := fs.syscall_write(gpr_state, fdnum, voidptr(iov.base), iov.len)
-		if err != 0 {
-			if total > 0 {
-				return total, 0
-			}
-			return ret, err
+		if !usercopy.copy_from_user(voidptr(u64(buffer) + offset), iov.base, iov.len) {
+			return errno.err, errno.efault
 		}
-		total += ret
-		if ret < iov.len {
-			break
-		}
+		offset += iov.len
 	}
-	return total, 0
+	return fs.syscall_write(gpr_state, fdnum, buffer, total)
 }
 
 // Linux getdents64(fd, dirp, count) — fill buffer with directory entries.

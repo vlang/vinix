@@ -26,6 +26,7 @@ const default_idle_interval_ms = i64(1000)
 // can be mistaken for it.
 const key_ctrl_k = u8(0x0b)
 const key_ctrl_n = u8(0x0e)
+const key_ctrl_p = u8(0x10)
 const key_ctrl_q = u8(0x11)
 // Cmd-W is CSI-u's lower-case W codepoint plus the Super modifier (8, then
 // one-based in the protocol). The ARM64 keyboard driver emits this for the
@@ -302,6 +303,9 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	// Esc is out for the same reason: it is a key people press.
 	for i := 0; i < rest.len; i++ {
 		match rest[i] {
+			key_ctrl_p {
+				d.toggle_start_menu()
+			}
 			key_ctrl_q {
 				d.running = false
 			}

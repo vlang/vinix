@@ -248,11 +248,19 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 
 	handle := unsafe { &file.Handle(_handle) }
 
-	// If pipe is full, block or return if nonblock
-	for katomic.load(&peer.used) == peer.capacity {
+	// A blocking stream write that fits in the socket buffer must not return a
+	// short count merely because the peer has not drained enough space yet.
+	// Wine relies on this for its writev()-based request protocol and treats a
+	// short request as fatal.  Large writes can still make partial progress once
+	// any room is available, matching the existing stream behaviour.
+	requested_room := if count <= peer.capacity { count } else { u64(1) }
+	for peer.capacity - katomic.load(&peer.used) < requested_room {
 		if handle.flags & resource.o_nonblock != 0 {
-			errno.set(errno.ewouldblock)
-			return none
+			if peer.used == peer.capacity {
+				errno.set(errno.ewouldblock)
+				return none
+			}
+			break
 		}
 
 		peer.l.release()
@@ -264,6 +272,10 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		}
 		unsafe { events.free() }
 		peer.l.acquire()
+		if peer.read_closed {
+			errno.set(errno.epipe)
+			return none
+		}
 	}
 
 	if peer.used + count > peer.capacity {
@@ -831,8 +843,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 				if flags & msg_cmsg_cloexec != 0 {
 					passed_fd.flags |= resource.o_cloexec
 				}
-				new_fdnum := file.fdnum_create_from_fd(unsafe { nil }, passed_fd, 0,
-					false) or {
+				new_fdnum := file.fdnum_create_from_fd(unsafe { nil }, passed_fd, 0, false) or {
 					unsafe { msg.msg_flags |= msg_ctrunc }
 					break
 				}

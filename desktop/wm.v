@@ -662,6 +662,7 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) b
 		if !app.pointer_input_enabled() {
 			return false
 		}
+		window_id := window.id
 		body_height := window.height - d.theme().title_height
 		mut local_x := x - window.x
 		mut local_y := y - window.y - d.theme().title_height
@@ -679,7 +680,12 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) b
 		}
 		app.pointer_event(phase, local_x, local_y, window.width, body_height)
 		if phase == .down {
-			d.pointer_capture = window.id
+			d.pointer_capture = window_id
+			// A foreign surface has no ui2 action id to focus through the
+			// ordinary click path. Treat its content like any other window:
+			// clicking it raises the native frame and gives its keyboard bridge
+			// focus for shortcuts and typing.
+			d.raise(window_id)
 		} else if phase == .up {
 			d.pointer_capture = 0
 		}
@@ -1024,11 +1030,26 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 }
 
-// clamp_to_screen keeps enough of a window reachable that it can always be
-// dragged back: the title bar may not leave the screen or slide under the
-// taskbar.
+// clamp_to_screen keeps a window wholly visible when it fits. Oversized
+// windows retain the looser reachable-title-bar rule so they can still be
+// dragged to every clipped edge.
 fn (mut d Desktop) clamp_to_screen(index int) {
 	margin := 60
+	available_width := d.canvas.width
+	available_height := d.canvas.height - taskbar_height
+	if d.windows[index].width <= available_width {
+		if d.windows[index].x < 0 {
+			d.windows[index].x = 0
+		}
+		if d.windows[index].x + d.windows[index].width > available_width {
+			d.windows[index].x = available_width - d.windows[index].width
+		}
+	}
+	if d.windows[index].height <= available_height {
+		if d.windows[index].y + d.windows[index].height > available_height {
+			d.windows[index].y = available_height - d.windows[index].height
+		}
+	}
 	max_x := d.canvas.width - margin
 	max_y := d.canvas.height - taskbar_height - d.theme().title_height
 	if d.windows[index].x > max_x {
@@ -1077,7 +1098,12 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	d.forward_pointer_to_app(x, y, .down)
+	if d.forward_pointer_to_app(x, y, .down) {
+		// Raw-surface clicks were already delivered and focused above. Falling
+		// through would interpret their deliberately action-less content as an
+		// empty-desktop click and immediately clear that focus again.
+		return
+	}
 
 	if action == '' {
 		// Empty desktop: drop focus so no title bar claims to be active.

@@ -2,7 +2,8 @@
 # Cross-compile the Vinix desktop environment for aarch64 and stage it into an
 # initramfs that boots straight into it.
 #
-# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]
+# Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
+#        [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
@@ -73,15 +74,18 @@ merge_staging_tree() {
 
 MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
+WITH_X86_TRANSLATION=0
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
         --no-initramfs) MAKE_INITRAMFS=0 ;;
         --compact-initramfs) COMPACT_INITRAMFS=1 ;;
+        --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-x86-translation] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
+            echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
             ;;
@@ -92,8 +96,9 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$MAKE_INITRAMFS" -eq 0 ] && [ -n "$WIFI_BUNDLE" ]; then
-    echo "ERROR: --wifi-bundle requires initramfs generation" >&2
+if [ "$MAKE_INITRAMFS" -eq 0 ] &&
+   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; }; then
+    echo "ERROR: --wifi-bundle and --with-x86-translation require initramfs generation" >&2
     exit 1
 fi
 
@@ -291,6 +296,12 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
         exit 1
     fi
 fi
+if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
+   [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+    echo "ERROR: --with-x86-translation needs $X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" >&2
+    echo "Run ./build-x86-translation-aarch64.sh first." >&2
+    exit 1
+fi
 
 # `package.py` produces the only supported bundle format. Its manifest binds
 # the opaque vendor files to identity captured from the target, and wifi-ctl
@@ -342,6 +353,13 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
     merge_staging_tree "$PYTHON_STAGING"
 
+    # GCC's lto-dump is a standalone compiler-internals inspection utility,
+    # not part of compiling or linking programs. Keeping its second 32 MiB
+    # copy of the LTO frontend can push a Word-enabled compact initramfs above
+    # FAT32's 4 GiB per-file limit, so omit it from the bootable image while
+    # retaining gcc, cc1 and lto1.
+    rm -f "$STAGING/usr/bin/lto-dump"
+
     # Scripts in the Firefox/X11/package closure use ordinary command names. The
     # compact image carries BusyBox but not the full userland's applet links,
     # so provide the small set needed by pkg, run-firefox and Vinix's startx.
@@ -357,7 +375,8 @@ fi
 
 # Full images pick up locally built optional application layers even when the
 # base archive predates them. Compact images deliberately stop at the GPU,
-# desktop and Firefox qualification closure so they still fit an M1 ESP.
+# desktop and Firefox qualification closure unless one optional layer is
+# explicitly requested.
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
     echo "==> Staging C++ Minecraft runtime"
     merge_staging_tree "$MINECRAFT_STAGING"
@@ -365,9 +384,33 @@ fi
 
 # The translator is architecture-isolated: its x86-64 libraries live below
 # /usr/libexec, so they cannot replace native ARM64 libraries.
-if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
+   [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "==> Staging x86-64 translation and Wine runtime"
     merge_staging_tree "$X86_TRANSLATION_STAGING"
+
+    # Wine's desktop integration invokes the native shared-mime-info updater.
+    # Wine may add its private x86 library directory to the child environment,
+    # which makes the AArch64 loader try to relocate guest GLib libraries.
+    # Keep the real helper behind the same environment-sanitizing trampoline
+    # used for ntlm_auth.
+    if [ -x "$STAGING/usr/bin/update-mime-database" ]; then
+        mkdir -p "$STAGING/usr/libexec/vinix-native-helpers"
+        mv "$STAGING/usr/bin/update-mime-database" \
+            "$STAGING/usr/libexec/vinix-native-helpers/update-mime-database"
+        install -m755 \
+            "$SCRIPT_DIR/build-support/x86-translation/run-native-ntlm-auth" \
+            "$STAGING/usr/bin/update-mime-database"
+    fi
+
+    # Office populates this disposable cache with generated names that can
+    # exceed ustar's pathname limit after the prefix is exercised. It is not
+    # application state and Word recreates it when needed, so keep it out of
+    # the boot image without modifying the source prefix.
+    office_web_cache="$STAGING/root/.wine-word2013-x86_64/drive_c/users/root/AppData/Local/Microsoft/Office/15.0/WebServiceCache"
+    if [ -d "$office_web_cache" ]; then
+        rm -rf "$office_web_cache"
+    fi
 fi
 
 # Hyprland is an optional build layer because its patched Aquamarine library
@@ -462,6 +505,14 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
         fi
     done
 fi
+if [ "$WITH_X86_TRANSLATION" -eq 1 ]; then
+    for command_path in usr/bin/qemu-x86_64 usr/bin/run-x86-64 usr/bin/wine64; do
+        if [ ! -x "$STAGING/$command_path" ]; then
+            echo "ERROR: x86 translation desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
+fi
 
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     for runtime_path in usr/bin/Hyprland usr/bin/start-hyprland-vinix usr/bin/foot usr/lib/libaquamarine.so.11 root/.config/hypr/hyprland.conf; do
@@ -489,7 +540,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
     vinix-firefox vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
-    vinix-wine-word2010; do
+    vinix-wine-word2013; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 

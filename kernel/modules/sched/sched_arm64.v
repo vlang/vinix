@@ -5,6 +5,7 @@ import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.timer
 import aarch64.uart
+import aarch64.virtio_input
 import katomic
 import klock
 import proc
@@ -23,7 +24,9 @@ const max_reap_slots = 256
 
 __global (
 	// Per-CPU parking slot for the thread that most recently died there.
-	reap_slots [max_reap_slots]&proc.Thread
+	reap_slots                  [max_reap_slots]&proc.Thread
+	syscall_input_poll_lock     klock.Lock
+	last_syscall_input_poll_ns  u64
 )
 
 pub fn initialise() {
@@ -38,6 +41,29 @@ pub fn initialise() {
 // Used by the console module to poll UART without a separate thread.
 pub fn set_uart_poll_callback(cb voidptr) {
 	uart_poll_callback = cb
+}
+
+// Keep the syscall fallback narrower than the scheduler's normal platform
+// callback. Polling networking or the console from an arbitrary syscall can
+// recurse into facilities that syscall is about to use; VirtIO input has no
+// such dependency and is all a CPU-bound translated GUI needs here.
+pub fn poll_syscall_input() {
+	ints := cpu.interrupt_toggle(false)
+	defer {
+		cpu.interrupt_toggle(ints)
+	}
+	if !syscall_input_poll_lock.test_and_acquire() {
+		return
+	}
+	defer {
+		syscall_input_poll_lock.release()
+	}
+	now_ns := timer.get_ns()
+	if now_ns - last_syscall_input_poll_ns < 1_000_000 {
+		return
+	}
+	last_syscall_input_poll_ns = now_ns
+	virtio_input.poll()
 }
 
 // Returns the scheduler's timer interrupt handler for use by the
@@ -99,6 +125,14 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	tick_itimers()
 
 	mut cpu_local := cpulocal.current()
+	// The idle loop normally polls UART, VirtIO input and networking. A busy
+	// userspace workload can keep every CPU runnable indefinitely, so relying
+	// on idle time alone strands keyboard and pointer reports in their VirtIO
+	// queues. Poll once per CPU-0 timeslice as well; using one CPU preserves the
+	// drivers' single-poller assumption while keeping the desktop interactive.
+	if cpu_local.cpu_number == 0 && uart_poll_callback != voidptr(0) {
+		C.vinix_call_void_fn(uart_poll_callback)
+	}
 	katomic.store(mut &cpu_local.is_idle, false)
 
 	mut current_thread := proc.current_thread()
@@ -304,7 +338,7 @@ pub fn yield(save_ctx bool) {
 			cpu.write_cntv_ctl_el0(1)
 		}
 
-		// Poll UART for console input
+		// Poll UART for console input.
 		if uart_poll_callback != voidptr(0) {
 			C.vinix_call_void_fn(uart_poll_callback)
 		}

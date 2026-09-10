@@ -170,7 +170,7 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	panel_children << owned_body_line(frames, 12, 72, inner - 24)
 	panel_children << owned_body_line(battery, 12, 92, inner - 24)
 	panel_children << owned_body_line(backlight, 12, 112, inner - 24)
-	panel_children << muted_line('Ctrl-Q leaves the desktop, Ctrl-N opens a window.', 12, 136, inner - 24)
+	panel_children << muted_line('Ctrl-P opens Start, Ctrl-Q leaves the desktop.', 12, 136, inner - 24)
 	mut children := frame_elements(2)
 	children << heading('System', pad, 18, inner)
 	children << ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{

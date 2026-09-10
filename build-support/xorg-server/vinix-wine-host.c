@@ -64,12 +64,22 @@ static void sleep_10ms(void) {
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
                         const char *geometry) {
     pid_t pid = fork();
+    const char *xvfb;
     if (pid != 0)
         return pid;
 
     setenv("LD_LIBRARY_PATH", "/usr/lib:/usr/lib/xorg/modules", 1);
-    execl("/usr/bin/Xvfb", "Xvfb", display_name, "-screen", "0", geometry,
+    setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
+    setenv("LIBGL_DRIVERS_PATH", "/usr/lib/xorg/modules/dri", 1);
+    setenv("GALLIUM_DRIVER", "softpipe", 1);
+    xvfb = access("/usr/bin/Xvfb-glx", X_OK) == 0
+               ? "/usr/bin/Xvfb-glx" : "/usr/bin/Xvfb";
+    /* Vinix does not provide SysV shared memory. Do not advertise MIT-SHM to
+     * clients only to make every attachment fail with ENOSYS; ordinary X11
+     * image transport is reliable for this private local display. */
+    execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
           "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
+          "-extension", "MIT-SHM", "+extension", "GLX", "+iglx",
           (char *)NULL);
     _exit(127);
 }
@@ -95,6 +105,9 @@ static pid_t spawn_wine(const char *display_name, const char *command) {
         return pid;
 
     setenv("DISPLAY", display_name, 1);
+    setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
+    unsetenv("LIBGL_ALWAYS_INDIRECT");
+    setenv("GALLIUM_DRIVER", "llvmpipe", 1);
     setenv("WINEDEBUG", "-all", 0);
     execl(command, command, (char *)NULL);
     _exit(127);
@@ -206,6 +219,60 @@ static void focus_pointer_window(Display *display) {
         XSetInputFocus(display, child_return, RevertToPointerRoot, CurrentTime);
 }
 
+static Window topmost_substantial_child(Display *display, Window parent) {
+    Window root_return;
+    Window parent_return;
+    Window *children = NULL;
+    unsigned int count = 0;
+    unsigned int index;
+    Window result = None;
+
+    if (!XQueryTree(display, parent, &root_return, &parent_return, &children,
+                    &count))
+        return None;
+    for (index = count; index > 0; --index) {
+        XWindowAttributes attributes;
+        Window candidate = children[index - 1];
+        if (XGetWindowAttributes(display, candidate, &attributes) &&
+            attributes.map_state == IsViewable &&
+            attributes.class == InputOutput && attributes.width >= 32 &&
+            attributes.height >= 32 &&
+            attributes.width <= DisplayWidth(display, DefaultScreen(display)) * 2 &&
+            attributes.height <= DisplayHeight(display, DefaultScreen(display)) * 2) {
+            result = candidate;
+            break;
+        }
+    }
+    if (children != NULL)
+        XFree(children);
+    return result;
+}
+
+static Window topmost_input_window(Display *display, Window parent) {
+    Window candidate = topmost_substantial_child(display, parent);
+    Window descendant;
+
+    if (candidate == None)
+        return None;
+    descendant = topmost_input_window(display, candidate);
+    return descendant == None ? candidate : descendant;
+}
+
+static void focus_top_window(Display *display) {
+    Window root = DefaultRootWindow(display);
+    Window target;
+
+    /* Xvfb has no window manager to assign keyboard focus. Wine nests its
+     * application windows and dialogs below Explorer's virtual-desktop root
+     * child. Tiny IME, device and decoration windows can sit above them; they
+     * must not receive focus. Descend through substantial input/output
+     * children until the real application control or modal dialog is reached.
+     */
+    target = topmost_input_window(display, root);
+    if (target != None)
+        XSetInputFocus(display, target, RevertToPointerRoot, CurrentTime);
+}
+
 static int process_event(Display *display, const struct wine_host_event *event,
                          const unsigned char *payload) {
     switch (event->kind) {
@@ -221,6 +288,7 @@ static int process_event(Display *display, const struct wine_host_event *event,
         XTestFakeButtonEvent(display, 1, False, CurrentTime);
         break;
     case WINE_HOST_KEYS:
+        focus_top_window(display);
         send_keys(display, payload, event->length);
         break;
     default:

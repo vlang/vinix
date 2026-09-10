@@ -1,0 +1,37 @@
+Windows Registry Editor Version 5.00
+
+; Office 2013 asks for Direct2D 1.1 and otherwise renders an opaque black
+; client area in Wine.  Factory version 0 makes it use Wine's implemented
+; Direct2D 1.0 path. OpenGL 3.2 provides the required feature level, while a
+; single-threaded command stream avoids a translated WineD3D/llvmpipe lock
+; inversion during Word's startup.
+[HKEY_CURRENT_USER\Software\Wine\Direct2D]
+"max_version_factory"=dword:00000000
+
+[HKEY_CURRENT_USER\Software\Wine\Direct3D]
+"MaxVersionGL"=dword:00030002
+"csmt"=dword:00000000
+"renderer"="gl"
+
+; Licensed Office media has already presented its EULA.  Suppressing the
+; first-run opt-in canvas avoids another Direct2D-only modal on Wine.  These
+; values do not activate Office or alter its licensing status.
+[HKEY_CURRENT_USER\Software\Microsoft\Office\15.0\Registration]
+"AcceptAllEulas"=dword:00000001
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\15.0\FirstRun]
+"BootedRTM"=dword:00000001
+"DisableMovie"=dword:00000001
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\15.0\Common\General]
+"ShownFirstRunOptin"=dword:00000001
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\15.0\Common\Graphics]
+"DisableAnimations"=dword:00000001
+; Office's software fallback is Windows WARP, which Wine does not implement.
+; Keep Office acceleration enabled so Direct2D reaches the llvmpipe-backed
+; WineD3D device configured above instead of leaving the ribbon unpainted.
+"DisableHardwareAcceleration"=dword:00000000
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\15.0\Word\Options]
+"DisableBootToOfficeStart"=dword:00000000

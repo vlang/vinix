@@ -1,0 +1,39 @@
+#!/bin/sh
+# Launch Wine32 in a genuine translated i386 Linux process. QEMU x86-64 user
+# mode cannot follow Wine's in-process switch into 32-bit compatibility mode.
+set -eu
+
+runtime="${VINIX_I386_ROOT:-/usr/libexec/vinix-i386/root}"
+runner="${VINIX_I386_RUNNER:-/usr/bin/run-x86-32}"
+wine="$runtime/usr/bin/wine-bin"
+preloader="$runtime/usr/bin/wine-preloader-bin"
+tool="${0##*/}"
+
+if [ ! -x "$wine" ] || [ ! -x "$preloader" ]; then
+    echo "$tool: i386 Wine is not installed" >&2
+    echo "build the layer with ./build-x86-translation-aarch64.sh" >&2
+    exit 127
+fi
+
+export WINEARCH=win32
+default_prefix="${HOME:-/root}/.wine-x86_32"
+export WINEPREFIX="${WINEPREFIX:-$default_prefix}"
+export WINEDLLPATH="$runtime/usr/lib/wine/i386-unix:$runtime/usr/lib/wine/i386-windows"
+export WINELOADERNOEXEC=1
+export WINELOADER=/usr/bin/wine32
+export WINESERVER=/usr/bin/wineserver32
+
+case "$tool" in
+    wine32|run-wine-x86-32)
+        set -- "$preloader" "$wine" "$@"
+        ;;
+    wineserver32)
+        set -- "$runtime/usr/bin/wineserver" "$@"
+        ;;
+    *)
+        echo "run-wine-x86-32: unsupported launcher name: $tool" >&2
+        exit 2
+        ;;
+esac
+
+exec "$runner" "$@"

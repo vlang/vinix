@@ -29,14 +29,16 @@ import apple.spi_keyboard
 // delta accumulated over the same interval.
 pub struct PointerPacket {
 pub mut:
-	x        int
-	y        int
-	max_x    int
-	max_y    int
+	// /dev/pointer is a userspace ABI. Fixed-width fields keep it stable across
+	// the kernel's legacy V compiler and userspace's v3 compiler.
+	x        i32
+	y        i32
+	max_x    i32
+	max_y    i32
 	buttons  u32
 	pressed  u32
 	released u32
-	scroll   int
+	scroll   i32
 }
 
 struct Pointer {
@@ -69,26 +71,26 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	mut packet := PointerPacket{}
 	if spi_keyboard.read_pointer(&apple[0]) {
 		packet = PointerPacket{
-			x: apple[0]
-			y: apple[1]
-			max_x: apple[2]
-			max_y: apple[3]
+			x: i32(apple[0])
+			y: i32(apple[1])
+			max_x: i32(apple[2])
+			max_y: i32(apple[3])
 			buttons: u32(apple[4])
 			pressed: u32(apple[5])
 			released: u32(apple[6])
-			scroll: apple[7]
+			scroll: i32(apple[7])
 		}
 	} else {
 		// No verified Apple report: preserve the existing QEMU/VirtIO source.
 		packet = PointerPacket{
-			x: vi_ptr_x
-			y: vi_ptr_y
-			max_x: vi_ptr_max_x
-			max_y: vi_ptr_max_y
+			x: i32(vi_ptr_x)
+			y: i32(vi_ptr_y)
+			max_x: i32(vi_ptr_max_x)
+			max_y: i32(vi_ptr_max_y)
 			buttons: vi_ptr_buttons
 			pressed: vi_ptr_pressed
 			released: vi_ptr_released
-			scroll: vi_ptr_scroll
+			scroll: i32(vi_ptr_scroll)
 		}
 		vi_ptr_pressed = 0
 		vi_ptr_released = 0

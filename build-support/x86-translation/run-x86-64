@@ -4,6 +4,7 @@ set -eu
 
 runtime="${VINIX_X86_64_ROOT:-/usr/libexec/vinix-x86_64/root}"
 emulator="${VINIX_X86_64_EMULATOR:-/usr/bin/qemu-x86_64}"
+loader="$runtime/lib/ld-musl-x86_64.so.1"
 
 if [ "$#" -eq 0 ]; then
     echo "usage: run-x86-64 PROGRAM [ARGUMENT ...]" >&2
@@ -13,7 +14,7 @@ if [ ! -x "$emulator" ]; then
     echo "run-x86-64: translator is not installed: $emulator" >&2
     exit 127
 fi
-if [ ! -e "$runtime/lib/ld-musl-x86_64.so.1" ]; then
+if [ ! -e "$loader" ]; then
     echo "run-x86-64: x86-64 runtime is not installed: $runtime" >&2
     exit 127
 fi
@@ -42,5 +43,13 @@ if [ -n "${VINIX_X86_64_LD_LIBRARY_PATH:-}" ]; then
     guest_library_path="$VINIX_X86_64_LD_LIBRARY_PATH:$guest_library_path"
 fi
 
-exec "$emulator" -B "$guest_base" -L "$runtime" \
-    -E "LD_LIBRARY_PATH=$guest_library_path" "$program" "$@"
+# Give the private library search path to musl itself instead of exporting it
+# to the translated process. Windows applications can spawn native Vinix
+# helpers; an inherited x86-64 LD_LIBRARY_PATH makes the AArch64 loader try to
+# relocate guest libraries before any helper wrapper gets a chance to clear
+# the environment. Starting the guest loader explicitly preserves the same
+# x86 dependency resolution without contaminating native descendants.
+unset LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV
+exec "$emulator" -B "$guest_base" -L "$runtime" "$loader" \
+    --library-path "$guest_library_path" --argv0 "$program" -- \
+    "$program" "$@"

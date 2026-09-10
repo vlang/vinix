@@ -10,14 +10,18 @@ module main
 // them to the screen, so the driver need not know the resolution.
 struct PointerPacket {
 mut:
-	x        int
-	y        int
-	max_x    int
-	max_y    int
+	// This is a kernel ABI, so keep its scalar widths explicit. The desktop's
+	// v3 compiler represents `int` as 64 bits while the kernel compiler uses a
+	// 32-bit C int; spelling these as i32 keeps both sides at the same 32-byte
+	// packet layout.
+	x        i32
+	y        i32
+	max_x    i32
+	max_y    i32
 	buttons  u32
 	pressed  u32
 	released u32
-	scroll   int
+	scroll   i32
 }
 
 // Button bits, in the order the driver reports them.

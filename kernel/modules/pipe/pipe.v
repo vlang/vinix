@@ -156,77 +156,109 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 }
 
 fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
-	mut count := _count
-
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
 
 	open_handle := unsafe { &file.Handle(handle) }
+	if _count == 0 {
+		return 0
+	}
 
 	if this.readers == 0 {
 		errno.set(errno.epipe)
 		return none
 	}
 
-	// If pipe is full, block or return if nonblock
-	for katomic.load(&this.used) == this.capacity {
+	mut written := u64(0)
+	for written < _count {
+		remaining := _count - written
+		// Writes no larger than PIPE_BUF are atomic: wait for the complete
+		// write to fit instead of exposing a partial record to the reader.
+		// A larger blocking write may be consumed in chunks internally, but
+		// write(2) still reports the full count once all chunks are queued.
+		required_room := if remaining <= this.capacity { remaining } else { u64(1) }
+		for this.capacity - katomic.load(&this.used) < required_room {
+			if this.readers == 0 {
+				if written != 0 {
+					return i64(written)
+				}
+				errno.set(errno.epipe)
+				return none
+			}
+			if open_handle.flags & resource.o_nonblock != 0 {
+				if written != 0 {
+					return i64(written)
+				}
+				errno.set(errno.eagain)
+				return none
+			}
+			this.l.release()
+			mut events := [&this.event]
+			event.await(mut events, true) or {
+				unsafe { events.free() }
+				this.l.acquire()
+				if written != 0 {
+					return i64(written)
+				}
+				errno.set(errno.eintr)
+				return none
+			}
+			unsafe { events.free() }
+			this.l.acquire()
+		}
+
 		if this.readers == 0 {
+			if written != 0 {
+				return i64(written)
+			}
 			errno.set(errno.epipe)
 			return none
 		}
-		if open_handle.flags & resource.o_nonblock != 0 {
-			errno.set(errno.eagain)
-			return none
+
+		mut count := remaining
+		room := this.capacity - this.used
+		if count > room {
+			count = room
 		}
-		this.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
-			errno.set(errno.eintr)
-			return none
+
+		// Calculate sizes before and after wrap-around and new ptr location.
+		mut before_wrap := u64(0)
+		mut after_wrap := u64(0)
+		mut new_ptr_loc := u64(0)
+		if this.write_ptr + count > this.capacity {
+			before_wrap = this.capacity - this.write_ptr
+			after_wrap = count - before_wrap
+			new_ptr_loc = after_wrap
+		} else {
+			before_wrap = count
+			after_wrap = 0
+			new_ptr_loc = this.write_ptr + count
+			if new_ptr_loc == this.capacity {
+				new_ptr_loc = 0
+			}
 		}
-		unsafe { events.free() }
-		this.l.acquire()
-	}
 
-	if this.used + count > this.capacity {
-		count = this.capacity - this.used
-	}
-
-	// Calculate sizes before and after wrap-around and new ptr location
-	mut before_wrap := u64(0)
-	mut after_wrap := u64(0)
-	mut new_ptr_loc := u64(0)
-	if this.write_ptr + count > this.capacity {
-		before_wrap = this.capacity - this.write_ptr
-		after_wrap = count - before_wrap
-		new_ptr_loc = after_wrap
-	} else {
-		before_wrap = count
-		after_wrap = 0
-		new_ptr_loc = this.write_ptr + count
-		if new_ptr_loc == this.capacity {
-			new_ptr_loc = 0
+		unsafe { C.memcpy(&this.data[this.write_ptr], voidptr(u64(buf) + written), before_wrap) }
+		if after_wrap != 0 {
+			unsafe {
+				C.memcpy(this.data, voidptr(u64(buf) + written + before_wrap), after_wrap)
+			}
 		}
+
+		this.write_ptr = new_ptr_loc
+		this.used += count
+		written += count
+
+		if this.used == this.capacity {
+			this.status &= ~file.pollout
+		}
+		this.status |= file.pollin
+		event.trigger(mut this.event, false)
 	}
 
-	unsafe { C.memcpy(&this.data[this.write_ptr], buf, before_wrap) }
-	if after_wrap != 0 {
-		unsafe { C.memcpy(this.data, voidptr(u64(buf) + before_wrap), after_wrap) }
-	}
-
-	this.write_ptr = new_ptr_loc
-	this.used += count
-
-	if this.used == this.capacity {
-		this.status &= ~file.pollout
-	}
-	this.status |= file.pollin
-	event.trigger(mut this.event, false)
-
-	return i64(count)
+	return i64(written)
 }
 
 fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {

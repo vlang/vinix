@@ -188,15 +188,15 @@ const available_apps = [
 		open: open_wine_notepad
 	},
 	AppFactory{
-		title: 'Microsoft Word 2010'
+		title: 'Microsoft Word 2013'
 		icon: 'builtin:editor'
-		width: wine_word2010_window_width
-		height: wine_word2010_window_height + default_title_height
-		process_name: 'vinix-wine-word2010'
+		width: wine_word2013_window_width
+		height: wine_word2013_window_height + default_title_height
+		process_name: 'vinix-wine-word2013'
 		polling: true
 		keyboard: true
 		pointer: true
-		open: open_wine_word2010
+		open: open_wine_word2013
 	},
 ]
 

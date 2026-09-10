@@ -16,9 +16,18 @@ SYSROOT="$BUILD_DIR/sysroot"
 STAGING="$BUILD_DIR/staging"  # final output
 DOWNLOADS="$BUILD_DIR/downloads"
 SOURCES="$BUILD_DIR/sources"
+LEGACY_GLX_ROOT="$BUILD_DIR/legacy-glx"
 
 ALPINE_MIRROR="https://dl-cdn.alpinelinux.org/alpine/v3.21"
 ALPINE_ARCH="aarch64"
+# Mesa 24.1 replaced indirect DRI contexts with a compatibility stub. Wine's
+# embedded Xvfb needs a real server-side software context, so keep the last
+# Alpine Mesa release before that change alongside the current client stack.
+LEGACY_GLX_MIRROR="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/${ALPINE_ARCH}"
+LEGACY_MESA_APK="mesa-dri-gallium-24.0.9-r1.apk"
+LEGACY_MESA_GL_APK="mesa-gl-24.0.9-r1.apk"
+LEGACY_MESA_GLAPI_APK="mesa-glapi-24.0.9-r1.apk"
+LEGACY_LLVM_APK="llvm17-libs-17.0.6-r2.apk"
 
 # xorg-server and fbdev versions (matching x86 Vinix recipes)
 XORG_SERVER_VERSION="21.1.16"
@@ -103,6 +112,20 @@ download_apk() {
     rm -f "$SYSROOT/.PKGINFO" "$SYSROOT/.SIGN"*
 }
 
+download_legacy_glx_apk() {
+    local filename="$1"
+    local local_file="$DOWNLOADS/$filename"
+
+    if [ ! -f "$local_file" ]; then
+        echo "  Downloading legacy GLX runtime ${filename}..."
+        curl -fL -o "$local_file" "$LEGACY_GLX_MIRROR/$filename"
+    fi
+
+    echo "  Extracting ${filename} -> legacy-glx/"
+    tar -ixzf "$local_file" -C "$LEGACY_GLX_ROOT" 2>/dev/null || true
+    rm -f "$LEGACY_GLX_ROOT/.PKGINFO" "$LEGACY_GLX_ROOT/.SIGN"*
+}
+
 # ── Step 1: Download Alpine packages ──
 echo "=== Step 1: Downloading Alpine aarch64 packages ==="
 
@@ -159,6 +182,11 @@ MAIN_PKGS=(
     mesa-osmesa
     mesa-xatracker
     mesa-dri-gallium
+    elfutils
+    libxml2
+    zstd-libs
+    libstdc++
+    libgcc
     glu
     glu-dev
     xkbcomp
@@ -182,6 +210,7 @@ COMMUNITY_PKGS=(
     freeglut
     freeglut-dev
     mesa-demos
+    mesa-utils
 )
 
 echo "--- Downloading main packages ---"
@@ -193,6 +222,12 @@ echo "--- Downloading community packages ---"
 for pkg in "${COMMUNITY_PKGS[@]}"; do
     download_apk "community" "$pkg" || true
 done
+
+mkdir -p "$LEGACY_GLX_ROOT"
+download_legacy_glx_apk "$LEGACY_MESA_APK"
+download_legacy_glx_apk "$LEGACY_MESA_GL_APK"
+download_legacy_glx_apk "$LEGACY_MESA_GLAPI_APK"
+download_legacy_glx_apk "$LEGACY_LLVM_APK"
 
 # ── Step 2: Fix up sysroot ──
 echo ""
@@ -296,6 +331,13 @@ export LD="ld.lld"
     --enable-screensaver \
     2>&1 | tail -20
 
+# pkg-config needs sysrooted prefixes while linking, but Xorg also copies the
+# dri.pc driver directory into the server as a runtime constant. Keep that one
+# path guest-native so Xvfb can find swrast after booting Vinix.
+sed -i.bak \
+    's|^#define DRI_DRIVER_PATH .*|#define DRI_DRIVER_PATH "/usr/lib/xorg/modules/dri"|' \
+    include/dix-config.h
+
 # Fix libtool: cross-compile leaves export_dynamic_flag_spec empty, so -export-dynamic
 # (needed for dlopen'd modules to resolve symbols from the Xorg binary) gets silently dropped.
 sed -i.bak 's/^export_dynamic_flag_spec=""$/export_dynamic_flag_spec="\${wl}--export-dynamic"/' libtool
@@ -303,6 +345,10 @@ sed -i.bak 's/^export_dynamic_flag_spec=""$/export_dynamic_flag_spec="\${wl}--ex
 echo "  Building xorg-server..."
 make -j"$NPROC" 2>&1 | tail -5
 make install DESTDIR="$STAGING" 2>&1 | tail -5
+# Keep the GLX-capable Xvfb for embedded applications such as Office, which
+# need a software OpenGL feature level even though their pixels ultimately go
+# to the native Vinix compositor. The lean server below remains the default.
+install -m755 "$XORG_SRC/hw/vfb/Xvfb" "$STAGING/usr/bin/Xvfb-glx"
 
 # Xorg keeps GLX for Firefox, but an off-screen Wine surface only needs the
 # 2D framebuffer DDX. Build its Xvfb from a separate clean source tree with
@@ -415,6 +461,25 @@ done
 for lib in "$SYSROOT"/lib/*.so*; do
     [ -f "$lib" ] || [ -L "$lib" ] || continue
     cp -a "$lib" "$STAGING/lib/"
+done
+# Mesa 24.1+ deliberately provides no indirect contexts. Install the isolated
+# Mesa 24.0 software renderer used by Xvfb and replace any artifacts left by a
+# previous build. Native GL clients still use the current libGL above; only the
+# server-side DRI module and its versioned LLVM dependency come from v3.20.
+rm -rf "$STAGING/usr/lib/gallium-pipe" "$STAGING/usr/lib/xorg/modules/dri"
+rm -f "$STAGING/usr/lib/libgallium-"*.so \
+    "$STAGING/usr/lib/libLLVM-19.so" "$STAGING/usr/lib/libLLVM.so.19.1"
+mkdir -p "$STAGING/usr/lib/xorg/modules"
+cp -a "$LEGACY_GLX_ROOT/usr/lib/xorg/modules/dri" \
+    "$STAGING/usr/lib/xorg/modules/"
+for lib in "$LEGACY_GLX_ROOT"/usr/lib/libGL.so* \
+    "$LEGACY_GLX_ROOT"/usr/lib/libglapi.so*; do
+    [ -f "$lib" ] || [ -L "$lib" ] || continue
+    cp -a "$lib" "$STAGING/usr/lib/"
+done
+for lib in "$LEGACY_GLX_ROOT"/usr/lib/libLLVM-17*.so; do
+    [ -f "$lib" ] || [ -L "$lib" ] || continue
+    cp -a "$lib" "$STAGING/usr/lib/"
 done
 
 # Copy OpenGL/X11 headers for in-guest builds (e.g. triangle demo via gcc)

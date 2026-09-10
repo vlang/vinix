@@ -3,13 +3,13 @@ set -eu
 
 prefix="${TMPDIR:-/tmp}/vinix-wine-smoke32.$$"
 remove_prefix=1
-if [ -f /root/.wine-x86_64/.update-timestamp ]; then
-    prefix=/root/.wine-x86_64
+if [ -f /root/.wine-x86_32/.update-timestamp ]; then
+    prefix=/root/.wine-x86_32
     remove_prefix=0
 fi
 
 cleanup() {
-    WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver -k >/dev/null 2>&1 || :
+    WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver32 -k >/dev/null 2>&1 || :
     if [ "${remove_prefix}" -eq 1 ]; then
         /bin/busybox rm -r -- "${prefix}"
     fi
@@ -20,12 +20,12 @@ if [ "${remove_prefix}" -eq 1 ]; then
     /bin/busybox mkdir -p "${prefix}"
 fi
 output=$(WINEPREFIX="${prefix}" WINEDEBUG=-all \
-    /usr/bin/wine /usr/share/wine/vinix-wine-smoke32.exe)
-WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver -w
+    /usr/bin/wine32 /usr/share/wine/vinix-wine-smoke32.exe)
+WINEPREFIX="${prefix}" WINEDEBUG=-all /usr/bin/wineserver32 -w
 
 case "${output}" in
     *"VINIX WINE SMOKE: PASS"*)
-        printf '%s\n' 'Wine WoW64 PE32 smoke test passed.'
+        printf '%s\n' 'Wine32 PE32 smoke test passed.'
         ;;
     *)
         printf '%s\n' 'Wine ran the PE32 test but returned unexpected output:' >&2

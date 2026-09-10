@@ -6,7 +6,11 @@ import katomic
 import memory
 import event.eventstruct
 
-pub const max_fds = 256
+// Match the conventional Linux soft RLIMIT_NOFILE. Large compatibility
+// processes such as Wine's server keep a descriptor for every translated
+// process, message queue, and X11 connection; 256 slots can be exhausted while
+// a complex application is still creating its UI threads.
+pub const max_fds = 1024
 
 pub const max_events = 32
 

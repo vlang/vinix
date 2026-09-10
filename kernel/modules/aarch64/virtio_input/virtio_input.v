@@ -5,8 +5,13 @@ import memory
 import aarch64.cpu
 import aarch64.uart
 import dev.keyboard
+import klock
 
 fn C.vinix_call_void_fn(callback voidptr)
+
+__global (
+	vi_poll_lock klock.Lock
+)
 
 // Virtio MMIO register offsets (legacy v1 + shared)
 const reg_magic = u64(0x000)
@@ -574,7 +579,6 @@ fn poll_device(idx int) {
 		ev_type := unsafe { *&u16(event_addr) }
 		ev_code := unsafe { *&u16(event_addr + 2) }
 		ev_value := unsafe { *&u32(event_addr + 4) }
-
 		match ev_type {
 			ev_key {
 				if ev_code >= btn_left && ev_code <= btn_last {
@@ -613,6 +617,14 @@ fn poll_device(idx int) {
 }
 
 pub fn poll() {
+	// The normal idle poll and the syscall fallback may run on different CPUs.
+	// Only one may walk and recycle the shared VirtIO descriptors at a time.
+	if !vi_poll_lock.test_and_acquire() {
+		return
+	}
+	defer {
+		vi_poll_lock.release()
+	}
 	vi_outlen = 0
 
 	for i := 0; i < vi_dev_count; i++ {

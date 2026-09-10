@@ -39,6 +39,20 @@ fn utility_button_with_text(element ui2.Element, text string) ?ui2.Element {
 	return none
 }
 
+struct PointerFocusTestApp {}
+
+fn (mut app PointerFocusTestApp) build(size ui2.Rect) !ui2.Element {
+	return ui2.screen(0, [])
+}
+
+fn (mut app PointerFocusTestApp) handle(_ string) ! {}
+
+fn (mut app PointerFocusTestApp) pointer_input_enabled() bool {
+	return true
+}
+
+fn (mut app PointerFocusTestApp) pointer_event(_ AppPointerPhase, _ int, _ int, _ int, _ int) {}
+
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
 		visible_rows: 4
@@ -243,14 +257,22 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[12].process_name == 'vinix-wine-notepad'
 	assert available_apps[12].keyboard && available_apps[12].polling
 	assert available_apps[12].pointer
-	assert available_apps[13].title == 'Microsoft Word 2010'
-	assert available_apps[13].process_name == 'vinix-wine-word2010'
+	assert available_apps[13].title == 'Microsoft Word 2013'
+	assert available_apps[13].process_name == 'vinix-wine-word2013'
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
+}
+
+fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {
+	// The kernel is built with the established compiler while the desktop uses
+	// v3, whose `int` has a different width. These records cross into kernel and
+	// C code and must therefore retain their explicit ABI sizes.
+	assert sizeof(PointerPacket) == 32
+	assert sizeof(WineHostEvent) == 20
 }
 
 fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
@@ -285,7 +307,7 @@ fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
 	assert desktop.start_menu_all_apps
 	all_programs := desktop.build_tree()
 	assert utility_tree_has_text(all_programs, '<  Back')
-	assert utility_tree_has_text(all_programs, 'Microsoft Word 2010')
+	assert utility_tree_has_text(all_programs, 'Microsoft Word 2013')
 	free_tree(all_programs)
 
 	desktop.start_menu_key_input('note')
@@ -358,6 +380,28 @@ fn test_firefox_uses_the_hosted_x11_window_path() {
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
 	assert factory.polling && factory.keyboard && factory.pointer
+}
+
+fn test_clicking_a_hosted_surface_raises_and_focuses_its_vinix_window() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 800
+			height: 600
+		}
+	}
+	desktop.apps << PointerFocusTestApp{}
+	hosted_id := desktop.spawn('Hosted', .app, 20, 20, 300, 220)
+	desktop.windows[0].app_index = 0
+	desktop.spawn('Other', .welcome, 400, 40, 300, 220)
+	assert desktop.focus != hosted_id
+
+	desktop.on_pointer_down(80, 100)
+	assert desktop.focus == hosted_id
+	assert desktop.windows.last().id == hosted_id
+	assert desktop.pointer_capture == hosted_id
+
+	desktop.on_pointer_up(80, 100)
+	assert desktop.pointer_capture == 0
 }
 
 fn test_external_display_handoff_redraws_and_reports_failures() {

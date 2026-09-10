@@ -18,12 +18,34 @@ case "$tool" in
     office2010-setup|word2010)
         default_prefix="${HOME:-/root}/.wine-office2010-x86_64"
         ;;
+    word2013-setup|word2013)
+        default_prefix="${HOME:-/root}/.wine-word2013-x86_64"
+        ;;
     *)
         default_prefix="${HOME:-/root}/.wine-x86_64"
         ;;
 esac
 export WINEPREFIX="${WINEPREFIX:-$default_prefix}"
+case "$tool" in
+    word2013|word2013-setup)
+        # Wine's built-in sppc exports abort on Office's licensing-policy
+        # probe. The prefix contains Vinix's native replacement, which reports
+        # the unavailable policy without claiming that Office is activated.
+        # Office also probes the legacy CLR and HTML engines during startup.
+        # Neither is needed by Word itself, and letting mscoree enter its
+        # missing-runtime path can deadlock Wine while the loader lock is held.
+        export WINEDLLOVERRIDES="sppc=n;mscoree,mshtml=;${WINEDLLOVERRIDES:-}"
+        ;;
+esac
 export WINEDLLPATH="$runtime/usr/lib/wine/x86_64-unix:$runtime/usr/lib/wine/x86_64-windows:$runtime/usr/lib/wine/i386-windows"
+# The lightweight prefixes skip wine.inf, which would normally create the
+# per-user Windows temporary directory and define TEMP/TMP.  Some installers
+# (notably Office Click-to-Run) use %TEMP% before doing anything else.
+wine_user="${USER:-${LOGNAME:-root}}"
+wine_temp="$WINEPREFIX/drive_c/users/$wine_user/Temp"
+mkdir -p "$wine_temp"
+export TEMP="C:\\users\\$wine_user\\Temp"
+export TMP="$TEMP"
 # Wine normally re-execs through wine-preloader. The preloader is another
 # x86-64 ELF, so keep execution inside the QEMU process that is already active.
 export WINELOADERNOEXEC=1
@@ -31,6 +53,14 @@ export WINELOADERNOEXEC=1
 # native shell launchers instead of asking the Vinix kernel to exec x86 ELF.
 export WINELOADER=/usr/bin/wine64
 export WINESERVER=/usr/bin/wineserver
+
+# On its first process Wine finishes constructing the deliberately lightweight
+# prefix and replaces drive_c/users.  Let that happen before an Office setup,
+# then restore the Windows temp directory the bootstrapper needs.
+if [ "$tool" = word2013-setup ] && [ ! -f "$WINEPREFIX/system.reg" ]; then
+    "$runner" "$wine" cmd.exe /c exit
+    mkdir -p "$wine_temp"
+fi
 
 case "$tool" in
     wine|wine32|wine64|run-wine-x86-64)
@@ -77,6 +107,133 @@ case "$tool" in
         fi
         set -- "$wine" "$word" "$@"
         ;;
+    word2013-setup)
+        if [ "$#" -gt 0 ]; then
+            setup="$1"
+            shift
+        else
+            setup=''
+            media_root="${VINIX_WORD2013_MEDIA_ROOT:-/root/word2013-media}"
+            for candidate in \
+                "$media_root/office/setup64.exe" \
+                "$media_root/office/SETUP64.EXE" \
+                "$media_root/setup.exe" \
+                "$media_root/SETUP.EXE"; do
+                if [ -f "$candidate" ]; then
+                    setup="$candidate"
+                    break
+                fi
+            done
+        fi
+        if [ -z "$setup" ] || [ ! -f "$setup" ]; then
+            echo 'word2013-setup: 64-bit Microsoft Word 2013 setup was not found' >&2
+            echo 'usage: word2013-setup /path/to/x64/setup.exe [ARGUMENT ...]' >&2
+            exit 127
+        fi
+        # The retail Click-to-Run bootstrapper discovers its adjacent data/
+        # directory relative to the process working directory.  When it is
+        # started from elsewhere it ignores the complete offline payload and
+        # falls back to officecdn.microsoft.com instead.
+        setup_dir=${setup%/*}
+        if [ "$setup_dir" = "$setup" ]; then
+            setup_dir=.
+        fi
+        setup_name=${setup##*/}
+        cd "$setup_dir"
+        # Office's bootstrapper cannot copy itself when GetModuleFileNameW
+        # reports Wine's \\?\unix path.  Present the same licensed media through
+        # C: so its self-copy and adjacent data/ lookup both use DOS paths.
+        # Preserve the retail image's required ...\Office\Data suffix.  The
+        # bootstrapper rejects an otherwise valid local source when Data's
+        # parent directory is not literally named Office.
+        if [ "$setup_name" = setup64.exe ] || [ "$setup_name" = SETUP64.EXE ]; then
+            media_link="$WINEPREFIX/drive_c/vinix-word2013-media/Office"
+            mkdir -p "$media_link"
+            cp "$PWD/$setup_name" "$media_link/$setup_name"
+            if [ -d "$PWD/data" ]; then
+                ln -snf "$PWD/data" "$media_link/data"
+            fi
+            setup="C:\\vinix-word2013-media\\Office\\$setup_name"
+        else
+            # The x64 MSI volume image has setup.exe at its root and needs all
+            # adjacent product directories. Expose that licensed media as one
+            # C: directory without duplicating it into the mutable prefix.
+            media_link="$WINEPREFIX/drive_c/vinix-word2013-media"
+            if [ -e "$media_link" ] && [ ! -L "$media_link" ]; then
+                echo 'word2013-setup: C:\vinix-word2013-media is not a symlink' >&2
+                exit 1
+            fi
+            ln -snf "$PWD" "$media_link"
+            setup="C:\\vinix-word2013-media\\$setup_name"
+        fi
+        # The lightweight Vinix prefix intentionally skips wine.inf. Exporting
+        # TEMP from Unix is not sufficient in that case: cmd.exe and the Office
+        # bootstrapper can inherit a literal, unexpanded %TEMP%. Define both
+        # variables in the Windows command environment that directly launches
+        # the x64 bootstrapper.
+        setup_command="set TEMP=$TEMP&&set TMP=$TMP&&$setup"
+        set -- "$wine" cmd.exe /d /c "$setup_command" "$@"
+        wait_for_wine=1
+        ;;
+    word2013)
+        # Office's Direct3D probe needs a modern GL feature level, but the
+        # embedded X server has no hardware render node.  Use Mesa's direct
+        # software renderer: indirect GLX only exposes OpenGL 1.0 and leaves
+        # newer WineD3D entry points unavailable.
+        export LIBGL_ALWAYS_SOFTWARE=1
+        unset LIBGL_ALWAYS_INDIRECT
+        export GALLIUM_DRIVER=llvmpipe
+        # Office creates several D3D devices on different threads. Mesa's own
+        # GL worker adds another producer around Wine's serialized command
+        # stream and can invert the two locks under translated execution.
+        export MESA_GLTHREAD=false
+        registry_file="${VINIX_WORD2013_REGISTRY_FILE:-/usr/share/wine/word2013-wine.reg}"
+        registry_path="${VINIX_WORD2013_REGISTRY_PATH:-Z:\\usr\\share\\wine\\word2013-wine.reg}"
+        registry_marker="$WINEPREFIX/.vinix-word2013-settings"
+        registry_version=4
+        if [ -f "$registry_file" ] &&
+           ! grep -qx "$registry_version" "$registry_marker" 2>/dev/null; then
+            "$runner" "$wine" reg.exe import "$registry_path"
+            printf '%s\n' "$registry_version" > "$registry_marker"
+        fi
+        word=''
+        word_dos=''
+        for candidate in \
+            "$WINEPREFIX/drive_c/Program Files/Microsoft Office 15/root/office15/WINWORD.EXE" \
+            "$WINEPREFIX/drive_c/Program Files/Microsoft Office/Office15/WINWORD.EXE"; do
+            if [ -f "$candidate" ]; then
+                word="$candidate"
+                case "$candidate" in
+                    *'/Microsoft Office 15/root/office15/'*)
+                        word_dos='C:\Program Files\Microsoft Office 15\root\office15\WINWORD.EXE'
+                        ;;
+                    *)
+                        word_dos='C:\Program Files\Microsoft Office\Office15\WINWORD.EXE'
+                        ;;
+                esac
+                break
+            fi
+        done
+        if [ -z "$word" ]; then
+            echo 'word2013: 64-bit Microsoft Word 2013 is not installed' >&2
+            echo 'run: word2013-setup /path/to/x64/setup.exe' >&2
+            exit 127
+        fi
+        # The MSI image installs Office-wide startup integrations that can
+        # spend minutes probing unavailable Windows components under translated
+        # execution. Microsoft's /a mode leaves those add-ins and global
+        # templates unloaded while retaining the normal Word document UI.
+        # Explicit caller arguments opt out so /safe, documents, and other
+        # supported Word switches remain available for diagnosis.
+        if [ "$#" -eq 0 ]; then
+            set -- /a
+        fi
+        # Explorer owns Wine's virtual desktop and publishes its graphics
+        # driver to child processes. Launch Word through that owner so it
+        # cannot race the automatically-started explorer and create a blank
+        # no-driver window.
+        set -- "$wine" explorer.exe '/desktop=root,768x576' "$word_dos" "$@"
+        ;;
     msiexec|notepad|regedit|regsvr32|wineboot|winecfg|wineconsole|winefile|winemine|winepath)
         set -- "$wine" "$tool.exe" "$@"
         ;;
@@ -85,5 +242,18 @@ case "$tool" in
         exit 2
         ;;
 esac
+
+if [ "${wait_for_wine:-0}" -eq 1 ]; then
+    status=0
+    "$runner" "$@" || status=$?
+    # Click-to-Run hands installation from setup64.exe to a copied
+    # OfficeSetup.exe process. Keep the hosted X11 window alive until that
+    # child and every other process in this Wine server have exited.
+    "$runner" "$runtime/usr/bin/wineserver" -w || {
+        wait_status=$?
+        [ "$status" -ne 0 ] || status=$wait_status
+    }
+    exit "$status"
+fi
 
 exec "$runner" "$@"

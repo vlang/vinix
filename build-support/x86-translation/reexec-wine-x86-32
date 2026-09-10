@@ -1,0 +1,5 @@
+#!/bin/sh
+# Wine derives this private path from argv[0] when it starts Windows helper
+# processes. Re-enter through Vinix's native launcher instead of asking the
+# kernel to execute the i386 ELF directly.
+exec /usr/bin/wine32 "$@"
