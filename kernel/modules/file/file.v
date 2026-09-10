@@ -111,10 +111,6 @@ fn poll_revents(status int, requested i16) i16 {
 fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut t := proc.current_thread()
 
-	if nfds == 0 {
-		return 0, 0
-	}
-
 	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
 		t.masked_signals = *sigmask
@@ -169,11 +165,23 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 		fdlist << fd
 		fdnums << i
-		events << &resource_.event
+		resource_event := &resource_.event
+		if resource_event !in events {
+			events << resource_event
+		}
 	}
 
 	if ret != 0 {
 		return ret, 0
+	}
+	if tmo_p != unsafe { nil } && tmo_p.tv_sec == 0 && tmo_p.tv_nsec == 0 {
+		return 0, 0
+	}
+
+	// event.await has a fixed-size per-thread listener array.
+	needed_events := events.len + if tmo_p != unsafe { nil } { 1 } else { 0 }
+	if needed_events > proc.max_events {
+		return errno.err, errno.einval
 	}
 
 	mut timer := &time.Timer(unsafe { nil })
@@ -202,14 +210,18 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 			}
 		}
 
-		status := fdlist[which].handle.resource.status
-
-		mut fdd := unsafe { &fds[fdnums[which]] }
-
-		revents := poll_revents(status, fdd.events)
-		if revents != 0 {
-			fdd.revents = revents
-			ret++
+		// One resource may back several descriptors. Recheck every entry,
+		// both to count all ready FDs and to tolerate stale event wakeups.
+		for i, fd in fdlist {
+			status := fd.handle.resource.status
+			mut fdd := unsafe { &fds[fdnums[i]] }
+			revents := poll_revents(status, fdd.events)
+			if revents != 0 {
+				fdd.revents = revents
+				ret++
+			}
+		}
+		if ret != 0 {
 			break
 		}
 	}
@@ -264,6 +276,40 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 	}
 	if nfds != 0
 		&& !usercopy.copy_to_pagemap(pagemap, user_fds, unsafe { voidptr(&pollfds[0]) }, nfds * sizeof(PollFD)) {
+		return errno.err, errno.efault
+	}
+	return ret, 0
+}
+
+// Linux poll uses a millisecond timeout rather than a userspace timespec.
+pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms int) (u64, u64) {
+	if nfds > 4096 {
+		return errno.err, errno.einval
+	}
+	pagemap := proc.current_thread().process.pagemap
+	mut pollfds := []PollFD{len: int(nfds)}
+	defer {
+		unsafe { pollfds.free() }
+	}
+	mut fds_ptr := &PollFD(unsafe { nil })
+	if nfds != 0 {
+		fds_ptr = unsafe { &pollfds[0] }
+		if !usercopy.copy_from_user(voidptr(fds_ptr), user_fds, nfds * sizeof(PollFD)) {
+			return errno.err, errno.efault
+		}
+	}
+	mut timeout := time.TimeSpec{}
+	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
+	if timeout_ms >= 0 {
+		timeout.tv_sec = timeout_ms / 1000
+		timeout.tv_nsec = (timeout_ms % 1000) * 1000000
+		timeout_ptr = &timeout
+	}
+	ret, err := ppoll(fds_ptr, nfds, timeout_ptr, unsafe { nil })
+	if err != 0 {
+		return ret, err
+	}
+	if nfds != 0 && !usercopy.copy_to_pagemap(pagemap, user_fds, voidptr(fds_ptr), nfds * sizeof(PollFD)) {
 		return errno.err, errno.efault
 	}
 	return ret, 0
