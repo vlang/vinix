@@ -7,14 +7,32 @@
 sched_switch_context:
     // x0 = GPRState pointer, x1 = kernel_stack
 
-    // Restore ELR_EL1 (return PC) and SPSR_EL1 first
+    // Restore ELR_EL1 (return PC) first. Under VHE these EL1 register names
+    // access the corresponding EL2 host registers, which is exactly where the
+    // eventual eret takes its state from.
     ldr x2, [x0, #256]
     msr elr_el1, x2
+
+    // A saved mode of EL0t is exact and must remain EL0t. A non-zero mode
+    // denotes kernel context, but its exception level cannot be hard-coded:
+    // QEMU/OVMF enters Vinix at EL1 while Apple Silicon enters it as a VHE EL2
+    // host. Returning to EL1h from the latter is illegal when HCR_EL2.TGE is
+    // set, producing EC=0x0e at the first instruction of a new thread.
+    // Preserve every flag above M[3:0] and synthesize current-EL handler mode:
+    // CurrentEL is EL << 2, and the low bit selects SP_ELx.
     ldr x2, [x0, #264]
+    and x3, x2, #0xf
+    cbz x3, .write_spsr
+    mrs x3, CurrentEL
+    and x3, x3, #0xc
+    orr x3, x3, #1
+    bic x2, x2, #0xf
+    orr x2, x2, x3
+.write_spsr:
     msr spsr_el1, x2
 
     // Set the appropriate stack pointer based on target EL.
-    // Check SPSR.M[3:0]: 0 = EL0t (user), 5 = EL1h (kernel)
+    // Check saved SPSR.M[3:0]: 0 = EL0t; non-zero = kernel context.
     ldr x3, [x0, #264]         // pstate
     ands xzr, x3, #0xF
     b.ne .set_kernel_sp
@@ -39,7 +57,7 @@ sched_switch_context:
     b .restore_gprs
 
 .set_kernel_sp:
-    // Kernel thread (EL1h): set SP_EL1 directly.
+    // Kernel thread (EL1h under QEMU, EL2h under Apple VHE): set SP_ELx.
     // HVF workaround: eret may restore SP_EL0 instead of SP_EL1,
     // so set BOTH to the same value via SPSel trick.
     ldr x2, [x0, #248]
@@ -116,7 +134,8 @@ yield_dispatch:
     // PC = LR (return address -> resumes at caller after eret)
     str x30, [sp, #256]
 
-    // pstate = EL1h (0x5) -- tells sched_switch_context this is kernel context
+    // A non-zero saved mode marks this as kernel context. sched_switch_context
+    // replaces EL1h with the current EL's handler mode before every eret.
     mov x2, #0x5
     str x2, [sp, #264]
 

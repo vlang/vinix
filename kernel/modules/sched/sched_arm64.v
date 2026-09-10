@@ -468,7 +468,9 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		pc:     u64(pc) // elr_el1 = entry point
 		x0:     u64(arg) // first argument in x0
 		sp:     stack
-		pstate: 0x3c5 // EL1h, DAIF masked
+		// Kernel-context marker plus masked DAIF. The assembly restore maps
+		// EL1h to the current handler level (EL2h on Apple VHE).
+		pstate: 0x3c5
 	}
 
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))

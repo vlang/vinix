@@ -73,6 +73,10 @@ fn emit_fatal_line(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	fatal_put_hex(gpr_state.x30)
 	fatal_put_str(' sp=0x')
 	fatal_put_hex(gpr_state.sp)
+	fatal_put_str(' pstate=0x')
+	fatal_put_hex(gpr_state.pstate)
+	fatal_put_str(' el=0x')
+	fatal_put_hex(cpu.read_currentel())
 	fatal_put_str(' ***\n')
 	term.print(voidptr(&fatal_line[0]), u64(fatal_line_len))
 }
