@@ -17,6 +17,7 @@ import lib
 import strings
 import resource
 import term
+import usercopy
 
 pub const wnohang = 1
 
@@ -116,6 +117,19 @@ pub const sa_nocldwait = 1 << 5
 
 pub const sa_nodefer = 1 << 6
 
+// Only condition/status bits that userspace can normally change may cross the
+// sigreturn boundary. In particular, IOPL, NT, VM, VIF and VIP must never be
+// restored from an untrusted signal frame. IF is forced on so a forged frame
+// cannot pin a CPU with interrupts disabled.
+// CF, PF, AF, ZF, SF, TF, DF, OF, RF, AC and ID.
+const amd64_sigreturn_rflags_mask = u64(0x250dd5)
+
+const amd64_sigreturn_rflags_fixed = (u64(1) << 1) | (u64(1) << 9)
+
+const amd64_user_code_segment = u64(0x43)
+
+const amd64_user_data_segment = u64(0x3b)
+
 union SigVal {
 	sival_int int
 	sival_ptr voidptr
@@ -203,20 +217,51 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
+fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
+	user_limit := memory.user_address_limit()
+	return context.rip != 0 && context.rip < user_limit && context.rsp != 0
+		&& context.rsp < user_limit
+}
+
+fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {
+	context.cs = amd64_user_code_segment
+	context.ss = amd64_user_data_segment
+	context.ds = amd64_user_data_segment
+	context.es = amd64_user_data_segment
+	context.rflags = (context.rflags & amd64_sigreturn_rflags_mask) | amd64_sigreturn_rflags_fixed
+}
+
 @[noreturn]
-pub fn syscall_sigreturn(_ voidptr, context &cpulocal.GPRState, old_mask u64) {
+fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	asm volatile amd64 {
 		cli
 	}
 
-	t.gpr_state = *context
-	t.masked_signals = old_mask
+	t.gpr_state = context
+	// Vinix's amd64 signal bitmap uses the signal number as its bit index.
+	t.masked_signals = old_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
 
 	sched.yield(false)
 
 	for {}
+}
+
+pub fn syscall_sigreturn(_ voidptr, context_ptr u64, old_mask u64) (u64, u64) {
+	// Signal frames live in userspace and are attacker-controlled. Resolve the
+	// whole frame through the process pagemap before trusting any of it; a bad
+	// pointer must not turn into a kernel-mode page fault.
+	mut context := cpulocal.GPRState{}
+	if !usercopy.copy_from_user(voidptr(&context), context_ptr, sizeof(cpulocal.GPRState)) {
+		return errno.err, errno.efault
+	}
+	if !valid_sigreturn_context(&context) {
+		return errno.err, errno.einval
+	}
+	sanitize_sigreturn_context(mut context)
+
+	resume_sigreturn(context, old_mask)
 }
 
 pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {

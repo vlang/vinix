@@ -116,6 +116,11 @@ pub const sa_nocldwait = 1 << 5
 
 pub const sa_nodefer = 1 << 6
 
+// Preserve the userspace-visible condition and mitigation state, but clear
+// every exception-level, interrupt-mask, single-step and reserved bit. With
+// M[4:0] cleared, ERET can only return to AArch64 EL0t.
+const arm64_sigreturn_pstate_mask = u64(0xf3001000) // NZCV, TCO, DIT and SSBS.
+
 union SigVal {
 	sival_int int
 	sival_ptr voidptr
@@ -157,17 +162,31 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 // so this writes it straight into the exception frame the syscall path is about
 // to restore. x0 is returned as the syscall result because handle_svc stores it
 // over the frame's x0 slot on the way out.
+fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
+	user_limit := memory.user_address_limit()
+	return context.pc != 0 && context.pc < user_limit && context.sp != 0
+		&& context.sp < user_limit
+}
+
+fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {
+	context.pstate &= arm64_sigreturn_pstate_mask
+}
+
 pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_arg u64) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	cpu.interrupt_toggle(false)
 
 	mut frame := unsafe { &cpulocal.GPRState(gpr_state_ptr) }
+	mut restored := cpulocal.GPRState{}
+	mut restored_mask := u64(0)
 
 	if t.sigentry != 0 {
 		// Vinix/mlibc mode: context and mask passed as args (user x0, x1)
-		t.gpr_state = unsafe { *&cpulocal.GPRState(context_arg) }
-		t.masked_signals = old_mask_arg
+		if !usercopy.copy_from_user(voidptr(&restored), u64(context_arg), sizeof(cpulocal.GPRState)) {
+			return errno.err, errno.efault
+		}
+		restored_mask = old_mask_arg
 	} else {
 		// Linux/musl mode: read from the signal frame at the user SP. musl's
 		// __restore_rt enters here with SP pointing at the frame dispatch left.
@@ -183,7 +202,7 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		if !usercopy.copy_from_user(voidptr(&public_context), user_sp + 8, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
-		if !usercopy.copy_from_user(voidptr(&t.gpr_state), user_sp + 16, sizeof(cpulocal.GPRState)) {
+		if !usercopy.copy_from_user(voidptr(&restored), user_sp + 16, sizeof(cpulocal.GPRState)) {
 			return errno.err, errno.efault
 		}
 		// SA_SIGINFO handlers receive a real AArch64 ucontext and are allowed to
@@ -191,18 +210,26 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		// PC to its stack-overflow continuation. Restore those edits instead of
 		// blindly resuming the private snapshot and faulting forever.
 		if public_context != 0 {
-			if !usercopy.copy_from_user(voidptr(&t.gpr_state.x0), public_context + 184, 31 * sizeof(u64)) {
+			if !usercopy.copy_from_user(voidptr(&restored.x0), public_context + 184, 31 * sizeof(u64)) {
 				return errno.err, errno.efault
 			}
-			if !usercopy.copy_from_user(voidptr(&t.gpr_state.sp), public_context + 432, 3 * sizeof(u64)) {
+			if !usercopy.copy_from_user(voidptr(&restored.sp), public_context + 432, 3 * sizeof(u64)) {
 				return errno.err, errno.efault
 			}
 			if !usercopy.copy_from_user(voidptr(&prev_mask), public_context + 40, sizeof(u64)) {
 				return errno.err, errno.efault
 			}
 		}
-		t.masked_signals = prev_mask
+		restored_mask = prev_mask
 	}
+
+	if !valid_sigreturn_context(&restored) {
+		return errno.err, errno.einval
+	}
+	sanitize_sigreturn_context(mut restored)
+
+	t.gpr_state = restored
+	t.masked_signals = restored_mask & ~unblockable_mask()
 
 	t.on_sigaltstack = false
 
