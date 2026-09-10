@@ -22,6 +22,10 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	gdt.reload()
 	idt.reload()
 
+	// No userspace port I/O: place the bitmap beyond the inclusive TSS limit (0x67).
+	// A zero base would interpret the TSS itself as I/O permission bits.
+	cpu_local.tss.unused3 = 0
+	cpu_local.tss.iopb = u16(sizeof(cpulocal.TSS))
 	gdt.load_tss(voidptr(&cpu_local.tss))
 
 	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])

@@ -19,7 +19,8 @@ pub mut:
 	ist6    u64
 	ist7    u64
 	unused2 u64
-	iopb    u32
+	unused3 u16
+	iopb    u16
 }
 
 pub struct GPRState {
