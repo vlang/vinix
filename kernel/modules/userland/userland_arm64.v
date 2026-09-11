@@ -116,11 +116,6 @@ pub const sa_nocldwait = 1 << 5
 
 pub const sa_nodefer = 1 << 6
 
-// Preserve the userspace-visible condition and mitigation state, but clear
-// every exception-level, interrupt-mask, single-step and reserved bit. With
-// M[4:0] cleared, ERET can only return to AArch64 EL0t.
-const arm64_sigreturn_pstate_mask = u64(0xf3001000) // NZCV, TCO, DIT and SSBS.
-
 union SigVal {
 	sival_int int
 	sival_ptr voidptr
@@ -165,11 +160,13 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
 	user_limit := memory.user_address_limit()
 	return context.pc != 0 && context.pc < user_limit && context.sp != 0
-		&& context.sp < user_limit
+		&& context.sp < user_limit && context.sp & 0xf == 0
 }
 
 fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {
-	context.pstate &= arm64_sigreturn_pstate_mask
+	// The shared architecture mask excludes M[4:0], DAIF, single-step and every
+	// reserved bit. M[4:0] therefore remains EL0t after sanitization.
+	context.pstate &= cpu.pstate_user_mask
 }
 
 pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_arg u64) (u64, u64) {
@@ -183,6 +180,9 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 
 	if t.sigentry != 0 {
 		// Vinix/mlibc mode: context and mask passed as args (user x0, x1)
+		if u64(context_arg) & 0xf != 0 {
+			return errno.err, errno.einval
+		}
 		if !usercopy.copy_from_user(voidptr(&restored), u64(context_arg), sizeof(cpulocal.GPRState)) {
 			return errno.err, errno.efault
 		}
@@ -193,6 +193,9 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		// Frame layout: [prev_mask(8)] [ucontext address(8)]
 		//               [GPRState(sizeof)] [optional siginfo and ucontext]
 		user_sp := frame.sp
+		if user_sp & 0xf != 0 {
+			return errno.err, errno.einval
+		}
 
 		mut prev_mask := u64(0)
 		mut public_context := u64(0)
@@ -210,6 +213,9 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		// PC to its stack-overflow continuation. Restore those edits instead of
 		// blindly resuming the private snapshot and faulting forever.
 		if public_context != 0 {
+			if public_context & 0xf != 0 {
+				return errno.err, errno.einval
+			}
 			if !usercopy.copy_from_user(voidptr(&restored.x0), public_context + 184, 31 * sizeof(u64)) {
 				return errno.err, errno.efault
 			}

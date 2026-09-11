@@ -3,6 +3,44 @@ module cpu
 
 import x86.msr
 
+// Architectural RFLAGS bits. These names make privilege-boundary allowlists
+// auditable and prevent magic masks from hiding newly-restored control bits.
+pub const rflags_cf = u64(1) << 0
+
+pub const rflags_fixed = u64(1) << 1
+
+pub const rflags_pf = u64(1) << 2
+
+pub const rflags_af = u64(1) << 4
+
+pub const rflags_zf = u64(1) << 6
+
+pub const rflags_sf = u64(1) << 7
+
+pub const rflags_tf = u64(1) << 8
+
+pub const rflags_if = u64(1) << 9
+
+pub const rflags_df = u64(1) << 10
+
+pub const rflags_of = u64(1) << 11
+
+pub const rflags_iopl = u64(3) << 12
+
+pub const rflags_nt = u64(1) << 14
+
+pub const rflags_rf = u64(1) << 16
+
+pub const rflags_vm = u64(1) << 17
+
+pub const rflags_ac = u64(1) << 18
+
+pub const rflags_vif = u64(1) << 19
+
+pub const rflags_vip = u64(1) << 20
+
+pub const rflags_id = u64(1) << 21
+
 pub fn invlpg(addr u64) {
 	asm volatile amd64 {
 		invlpg [addr]

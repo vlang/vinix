@@ -678,7 +678,6 @@ To run without any acceleration, run with
 make run
 ```
 
-
 ```
   === Vinix aarch64 booting ===
   vinit → exceptions → term → vmm → timer → gic → sched

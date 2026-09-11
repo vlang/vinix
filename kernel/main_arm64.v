@@ -54,20 +54,20 @@ fn C.vinix_display_hotplug_choose_action(connected int, reboot_enabled int,
 @[_linker_section: '.requests']
 @[cinit]
 __global (
-	volatile dtb_req = limine.LimineDTBRequest{
+	volatile                       dtb_req = limine.LimineDTBRequest{
 		response: unsafe { nil }
 	}
-	enable_apple_gpu     = false
-	enable_fake_g17      = false
-	enable_apple_dcp     = false
+	enable_apple_gpu               = false
+	enable_fake_g17                = false
+	enable_apple_dcp               = false
 	// The SMC client is read-only and safely declines non-Apple device trees.
-	enable_apple_battery = true
-	enable_apple_display_hotplug = false
-	apple_display_coldplug_reboot = false
+	enable_apple_battery           = true
+	enable_apple_display_hotplug   = false
+	apple_display_coldplug_reboot  = false
 	apple_display_reboot_attempted = false
-	external_display_handoff = false
-	force_qemu_platform  = false
-	aic_timer_irq         = u32(3)
+	external_display_handoff       = false
+	force_qemu_platform            = false
+	aic_timer_irq                  = u32(3)
 )
 
 fn segfault_kill_process(gpr_state voidptr, status int) {
@@ -77,9 +77,7 @@ fn segfault_kill_process(gpr_state voidptr, status int) {
 
 fn apple_display_hotplug(connected bool) {
 	width, height := term.selected_framebuffer_dimensions()
-	action := C.vinix_display_hotplug_choose_action(int(connected),
-		int(apple_display_coldplug_reboot), int(apple_display_reboot_attempted), width,
-		height)
+	action := C.vinix_display_hotplug_choose_action(int(connected), int(apple_display_coldplug_reboot), int(apple_display_reboot_attempted), width, height)
 	if action == 2 {
 		apple_display_reboot_attempted = true
 		println('display: first post-boot Studio Display attach; rebooting once for firmware link training')
@@ -95,7 +93,8 @@ fn apple_display_hotplug(connected bool) {
 		// so a failed conduit cannot safely resume the running desktop.
 		println('display: PSCI reset failed after storage shutdown; powering off')
 		cpu.psci_call(cpu.psci_system_off)
-		for {}
+		for {
+		}
 	}
 	term.display_hotplug(connected)
 }
@@ -283,10 +282,7 @@ fn kmain_thread(qemu_platform bool) {
 	print('\n*** aarch64: Kernel initialisation complete ***\n')
 	print('*** Starting /sbin/init ***\n')
 
-	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
-		'/dev/console', '/dev/console', '/dev/console') or {
-		panic('Could not start init process')
-	}
+	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
 
 	sched.dequeue_and_die()
 }
@@ -383,12 +379,19 @@ fn configure_apple_bringup_from_cmdline() {
 		print('display: external GOP handoff active; native DCP probe disabled\n')
 	}
 
-	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s cold-attach=%s\n',
-		if enable_apple_gpu { c'enabled' } else { c'disabled' },
-		if enable_apple_dcp { c'enabled' } else { c'disabled' },
-		if enable_apple_battery { c'enabled' } else { c'disabled' },
-		if enable_apple_display_hotplug { c'enabled' } else { c'disabled' },
-		if apple_display_coldplug_reboot { c'firmware reboot' } else { c'disabled' })
+	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s cold-attach=%s\n', if enable_apple_gpu {
+		c'enabled'
+	} else {
+		c'disabled'
+	}, if enable_apple_dcp { c'enabled' } else { c'disabled' }, if enable_apple_battery {
+		c'enabled'
+	} else {
+		c'disabled'
+	}, if enable_apple_display_hotplug { c'enabled' } else { c'disabled' }, if apple_display_coldplug_reboot {
+		c'firmware reboot'
+	} else {
+		c'disabled'
+	})
 }
 
 // Power off at a chosen stage. On a machine with no console and no usable
@@ -405,7 +408,8 @@ fn boot_stage(stage u32) {
 		cpu.psci_call(cpu.psci_system_reset)
 		// Both conduits returned, so PSCI is unavailable: nothing more can be
 		// signalled from here.
-		for {}
+		for {
+		}
 	}
 }
 
@@ -474,7 +478,7 @@ fn early_cmdline_has_token(token string) bool {
 	}
 	text := unsafe { &u8(kernel_file.cmdline) }
 	mut start := 0
-	for index := 0; ; index++ {
+	for index := 0; true; index++ {
 		value := unsafe { text[index] }
 		if value != 0 && value !in [` `, `\t`, `\r`, `\n`] {
 			continue
@@ -519,7 +523,8 @@ fn kmain() {
 	if halt_at_stage == 0 {
 		cpu.psci_call(cpu.psci_system_off)
 		cpu.psci_call(cpu.psci_system_reset)
-		for {}
+		for {
+		}
 	}
 
 	// From here on a fault resets the machine instead of dying quietly, so the
@@ -535,7 +540,7 @@ fn kmain() {
 	// A deliberate null store should reboot the machine; if it does not, PSCI
 	// reset is unavailable here and a quiet machine means nothing.
 	if early_cmdline_contains('vinix.force_fault=1') {
-		fault_probe := unsafe { &u64(voidptr(0)) }
+		fault_probe := unsafe { &u64(nil) }
 		unsafe {
 			*fault_probe = 0
 		}
@@ -553,15 +558,15 @@ fn kmain() {
 	if halt_at_stage == 1 {
 		cpu.psci_call(cpu.psci_system_off)
 		cpu.psci_call(cpu.psci_system_reset)
-		for {}
+		for {
+		}
 	}
 
 	// Do not hard-stop on base revision mismatch. Some real-hardware boot
 	// chains may provide an older Limine build; continue and rely on feature
 	// checks for individual requests.
 	if limine_base_revision.revision != 0 {
-		C.printf(c'limine: base revision negotiation mismatch (value=%llu), continuing\n',
-			limine_base_revision.revision)
+		C.printf(c'limine: base revision negotiation mismatch (value=%llu), continuing\n', limine_base_revision.revision)
 	}
 
 	// Initialize the memory allocator.

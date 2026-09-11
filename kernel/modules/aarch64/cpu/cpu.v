@@ -3,6 +3,25 @@ module cpu
 
 fn C.read_current_sp() u64
 
+// Userspace-visible SPSR_EL1/PSTATE bits. Exception-level selection and DAIF
+// are deliberately absent from this set and therefore cannot cross sigreturn.
+pub const pstate_v = u64(1) << 28
+
+pub const pstate_c = u64(1) << 29
+
+pub const pstate_z = u64(1) << 30
+
+pub const pstate_n = u64(1) << 31
+
+pub const pstate_tco = u64(1) << 25
+
+pub const pstate_dit = u64(1) << 24
+
+pub const pstate_ssbs = u64(1) << 12
+
+pub const pstate_user_mask = pstate_n | pstate_z | pstate_c | pstate_v | pstate_tco |
+	pstate_dit | pstate_ssbs
+
 // Read system registers via MRS
 pub fn read_sctlr_el1() u64 {
 	mut ret := u64(0)

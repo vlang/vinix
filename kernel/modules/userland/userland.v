@@ -9,6 +9,7 @@ import file
 import proc
 import x86.cpu.local as cpulocal
 import x86.cpu
+import x86.gdt
 import katomic
 import event
 import event.eventstruct
@@ -121,14 +122,11 @@ pub const sa_nodefer = 1 << 6
 // sigreturn boundary. In particular, IOPL, NT, VM, VIF and VIP must never be
 // restored from an untrusted signal frame. IF is forced on so a forged frame
 // cannot pin a CPU with interrupts disabled.
-// CF, PF, AF, ZF, SF, TF, DF, OF, RF, AC and ID.
-const amd64_sigreturn_rflags_mask = u64(0x250dd5)
+const amd64_sigreturn_rflags_mask = cpu.rflags_cf | cpu.rflags_pf | cpu.rflags_af |
+	cpu.rflags_zf | cpu.rflags_sf | cpu.rflags_tf | cpu.rflags_df | cpu.rflags_of |
+	cpu.rflags_rf | cpu.rflags_id
 
-const amd64_sigreturn_rflags_fixed = (u64(1) << 1) | (u64(1) << 9)
-
-const amd64_user_code_segment = u64(0x43)
-
-const amd64_user_data_segment = u64(0x3b)
+const amd64_sigreturn_rflags_fixed = cpu.rflags_fixed | cpu.rflags_if
 
 union SigVal {
 	sival_int int
@@ -224,10 +222,10 @@ fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
 }
 
 fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {
-	context.cs = amd64_user_code_segment
-	context.ss = amd64_user_data_segment
-	context.ds = amd64_user_data_segment
-	context.es = amd64_user_data_segment
+	context.cs = u64(gdt.user_code_selector)
+	context.ss = u64(gdt.user_data_selector)
+	context.ds = u64(gdt.user_data_selector)
+	context.es = u64(gdt.user_data_selector)
 	context.rflags = (context.rflags & amd64_sigreturn_rflags_mask) | amd64_sigreturn_rflags_fixed
 }
 

@@ -3,6 +3,19 @@ module gdt
 
 import klock
 
+// Segment selectors are part of the architecture ABI: scheduler frames,
+// exception entry and sigreturn must all agree on them. Keep their numeric
+// values next to the GDT layout rather than repeating them at each boundary.
+pub const kernel_code_selector = u16(0x28)
+
+pub const kernel_data_selector = u16(0x30)
+
+pub const user_code_selector = u16(0x43)
+
+pub const user_data_selector = u16(0x3b)
+
+pub const tss_selector = u16(0x48)
+
 @[packed]
 struct GDTPointer {
 	size    u16
@@ -20,11 +33,11 @@ struct GDTEntry {
 }
 
 __global (
-	kernel_code_seg = u16(0x28)
-	kernel_data_seg = u16(0x30)
-	user_code_seg   = u16(0x43)
-	user_data_seg   = u16(0x3b)
-	tss_segment     = u16(0x48)
+	kernel_code_seg = kernel_code_selector
+	kernel_data_seg = kernel_data_selector
+	user_code_seg   = user_code_selector
+	user_data_seg   = user_data_selector
+	tss_segment     = tss_selector
 	gdt_pointer     GDTPointer
 	gdt_entries     [11]GDTEntry
 	gdt_lock        klock.Lock
