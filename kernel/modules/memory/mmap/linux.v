@@ -79,6 +79,22 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	source_handle_ref := global.handle_ref
 	source_handle_unref := global.handle_unref
 	source_offset := source.offset + i64(old_address - source.base)
+	mut source_options := MmapOptions{
+		lazy_file: global.lazy_file
+		segmented_file: global.segmented_file
+	}
+	if global.segmented_file {
+		source_relative := old_address - global.base
+		data_begin := global.file_data_start
+		data_end := data_begin + global.file_data_length
+		move_end := source_relative + new_length
+		overlap_begin := if data_begin > source_relative { data_begin } else { source_relative }
+		overlap_end := if data_end < move_end { data_end } else { move_end }
+		if overlap_end > overlap_begin {
+			source_options.file_data_start = overlap_begin - source_relative
+			source_options.file_data_length = overlap_end - overlap_begin
+		}
+	}
 	pagemap.l.release()
 
 	// Shrinking, or asking for what is already there, needs no new mapping.
@@ -110,7 +126,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		destination_offset = source_offset
 	}
 
-	destination := mmap_with_credit(pagemap, destination_hint, new_length, prot, destination_flags, source_resource, destination_offset, source_handle, source_handle_ref, source_handle_unref, old_length) or {
+	destination := mmap_with_credit(pagemap, destination_hint, new_length, prot, destination_flags, source_resource, destination_offset, source_handle, source_handle_ref, source_handle_unref, old_length, source_options) or {
 		return errno.err, errno.get()
 	}
 

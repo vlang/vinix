@@ -16,6 +16,7 @@ pub mut:
 }
 
 pub const et_dyn = 0x03
+pub const et_exec = 0x02
 
 pub const at_entry = 9
 pub const at_phdr = 3
@@ -64,12 +65,6 @@ pub fn initial_stack_top() u64 {
 pub fn initial_mmap_base() u64 {
 	return mmap_base + random_offset(arena_aslr_span, page_size)
 }
-
-// Keep ordinary binaries on the compact contiguous allocation path. Larger
-// segments are assembled from modest chunks so they do not depend on finding
-// hundreds of MiB of physically contiguous RAM after initramfs extraction.
-const contiguous_page_limit = u64(4096)
-const allocation_chunk_pages = u64(256)
 
 pub const abi_sysv = 0x00
 pub const arch_x86_64 = 0x3e
@@ -129,6 +124,20 @@ pub mut:
 	sh_entsize    u64
 }
 
+struct LoadedRange {
+	base   u64
+	length u64
+}
+
+fn read_exact(mut res resource.Resource, buf voidptr, offset u64, length u64) ! {
+	read := res.read(unsafe { nil }, buf, offset, length) or {
+		return error('elf: read failure')
+	}
+	if read != i64(length) {
+		return error('elf: truncated file')
+	}
+}
+
 // architecture reports the ELF machine without mapping any part of the file.
 // The ARM64 exec path uses this to hand x86-64 programs to the userspace
 // translator instead of jumping directly into foreign instructions.
@@ -136,7 +145,7 @@ pub fn architecture(_res &resource.Resource) !u16 {
 	mut res := unsafe { _res }
 	mut header := &Header{}
 
-	res.read(0, header, 0, sizeof(Header)) or { return error('') }
+	read_exact(mut res, header, 0, sizeof(Header))!
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
 	}
@@ -155,7 +164,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 
 	mut header := &Header{}
 
-	res.read(0, header, 0, sizeof(Header)) or { return error('') }
+	read_exact(mut res, header, 0, sizeof(Header))!
 
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
@@ -163,8 +172,15 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 
 	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
 		|| header.ident[ei_osabi] != abi_sysv
-		|| (header.machine != arch_x86_64 && header.machine != arch_aarch64) {
+		|| (header.machine != arch_x86_64 && header.machine != arch_aarch64)
+		|| (header.@type != et_exec && header.@type != et_dyn)
+		|| header.phdr_size != sizeof(ProgramHdr) {
 		return error('elf: Unsupported ELF file')
+	}
+	program_header_bytes := u64(header.ph_num) * sizeof(ProgramHdr)
+	if header.phoff > u64(res.stat.size)
+		|| program_header_bytes > u64(res.stat.size) - header.phoff {
+		return error('elf: truncated program header table')
 	}
 
 	// PIE/ET_DYN binaries have p_vaddr starting at 0. Loading at base=0
@@ -174,34 +190,67 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 	if base == 0 && header.@type == u16(et_dyn) {
 		base = pie_base + random_offset(image_aslr_span - pie_base, image_alignment)
 	}
+	if header.entry > u64(-1) - base {
+		return error('elf: entry address overflow')
+	}
 
 	mut auxval := Auxval{
 		at_entry: base + header.entry
-		at_phdr:  0
+		at_phdr: 0
 		at_phent: sizeof(ProgramHdr)
 		at_phnum: header.ph_num
-		at_base:  if base != 0 { base } else { u64(0) }
+		at_base: if base != 0 { base } else { u64(0) }
 	}
 
 	mut ld_path := ''
 	mut load_addr := u64(0)
 	mut load_addr_set := false
+	mut loaded_ranges := []LoadedRange{}
+	mut committed := false
+	defer {
+		if !committed {
+			for i := loaded_ranges.len; i > 0; i-- {
+				range := loaded_ranges[i - 1]
+				mmap.munmap(mut pagemap, voidptr(range.base), range.length) or {}
+			}
+			if ld_path != '' {
+				unsafe { ld_path.free() }
+			}
+		}
+		unsafe { loaded_ranges.free() }
+	}
 
 	for i := u64(0); i < header.ph_num; i++ {
 		mut phdr := &ProgramHdr{}
 
-		res.read(0, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr)) or {
-			return error('')
-		}
+		read_exact(mut res, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr))!
 
 		match phdr.p_type {
 			pt_interp {
+				if ld_path != '' {
+					return error('elf: multiple interpreters')
+				}
+				if phdr.p_filesz == 0 || phdr.p_filesz > 4096
+					|| phdr.p_offset > u64(res.stat.size)
+					|| phdr.p_filesz > u64(res.stat.size) - phdr.p_offset {
+					return error('elf: invalid interpreter path')
+				}
 				mut p := unsafe { malloc(phdr.p_filesz + 1) }
-				res.read(0, p, phdr.p_offset, phdr.p_filesz) or { return error('') }
+				if p == unsafe { nil } {
+					return error('elf: allocation failure')
+				}
+				read_exact(mut res, p, phdr.p_offset, phdr.p_filesz) or {
+					unsafe { free(p) }
+					return error('elf: invalid interpreter path')
+				}
+				unsafe { (&u8(p))[phdr.p_filesz] = 0 }
 				ld_path = unsafe { cstring_to_vstring(p) }
 				unsafe { free(p) }
 			}
 			pt_phdr {
+				if phdr.p_vaddr > u64(-1) - base {
+					return error('elf: PHDR address overflow')
+				}
 				auxval.at_phdr = base + phdr.p_vaddr
 			}
 			else {}
@@ -213,6 +262,16 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		if phdr.p_filesz > phdr.p_memsz {
 			return error('elf: LOAD segment filesz exceeds memsz')
 		}
+		if phdr.p_offset > u64(res.stat.size)
+			|| phdr.p_filesz > u64(res.stat.size) - phdr.p_offset {
+			return error('elf: LOAD segment exceeds file')
+		}
+		if phdr.p_memsz == 0 {
+			continue
+		}
+		if phdr.p_vaddr > u64(-1) - base || base + phdr.p_vaddr < phdr.p_offset {
+			return error('elf: LOAD address overflow')
+		}
 
 		// Track the first LOAD segment's effective base address
 		// (vaddr - file_offset), matching Linux's load_addr computation.
@@ -222,95 +281,53 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 			load_addr_set = true
 		}
 
-		misalign := phdr.p_vaddr & (page_size - 1)
-		page_count := lib.div_roundup(misalign + phdr.p_memsz, page_size)
+		if phdr.p_vaddr & (page_size - 1) != phdr.p_offset & (page_size - 1) {
+			return error('elf: incongruent LOAD segment')
+		}
+		segment_address := base + phdr.p_vaddr
+		misalign := segment_address & (page_size - 1)
+		if phdr.p_memsz > u64(-1) - misalign {
+			return error('elf: LOAD size overflow')
+		}
+		mapping_length := lib.align_up(misalign + phdr.p_memsz, page_size)
+		if mapping_length < misalign + phdr.p_memsz {
+			return error('elf: LOAD size overflow')
+		}
 
 		mut pf := 0
-		if phdr.p_flags & pf_r != 0 { pf |= mmap.prot_read }
-		if phdr.p_flags & pf_w != 0 { pf |= mmap.prot_write }
-		if phdr.p_flags & pf_x != 0 { pf |= mmap.prot_exec }
+		if phdr.p_flags & pf_r != 0 {
+			pf |= mmap.prot_read
+		}
+		if phdr.p_flags & pf_w != 0 {
+			pf |= mmap.prot_write
+		}
+		if phdr.p_flags & pf_x != 0 {
+			pf |= mmap.prot_exec
+		}
 
-		virt := lib.align_down(base + phdr.p_vaddr, page_size)
-		if page_count > contiguous_page_limit {
-			mut phys_pages := []u64{cap: int(page_count)}
-			mut first_page := u64(0)
-			file_begin := misalign
-			file_end := misalign + phdr.p_filesz
-
-			for first_page < page_count {
-				remaining := page_count - first_page
-				chunk_pages := if remaining > allocation_chunk_pages {
-					allocation_chunk_pages
-				} else {
-					remaining
-				}
-				chunk_addr := memory.pmm_alloc_nozero(chunk_pages)
-				if chunk_addr == 0 {
-					unsafe { phys_pages.free() }
-					return error('elf: Allocation failure')
-				}
-
-				chunk_size := chunk_pages * page_size
-				unsafe { C.memset(byteptr(chunk_addr) + higher_half, 0, chunk_size) }
-				for page := u64(0); page < chunk_pages; page++ {
-					phys_pages << u64(chunk_addr) + page * page_size
-				}
-
-				chunk_begin := first_page * page_size
-				chunk_end := chunk_begin + chunk_size
-				copy_begin := if chunk_begin > file_begin { chunk_begin } else { file_begin }
-				copy_end := if chunk_end < file_end { chunk_end } else { file_end }
-				if copy_begin < copy_end {
-					destination := unsafe {
-						byteptr(chunk_addr) + higher_half + copy_begin - chunk_begin
-					}
-					file_offset := phdr.p_offset + copy_begin - file_begin
-					res.read(0, destination, file_offset, copy_end - copy_begin) or {
-						unsafe { phys_pages.free() }
-						return error('')
-					}
-				}
-				first_page += chunk_pages
-			}
-
-			mmap.map_pages(mut pagemap, virt, phys_pages, pf, mmap.map_anonymous) or {
-				unsafe { phys_pages.free() }
-				return error('')
-			}
-			unsafe { phys_pages.free() }
-		} else {
-			// The file data is about to overwrite most executable segments. Avoid
-			// clearing that memory twice by initialising only bytes not populated
-			// from the ELF image.
-			addr := memory.pmm_alloc_nozero(page_count)
-			if addr == 0 {
-				return error('elf: Allocation failure')
-			}
-			allocation_size := page_count * page_size
-			mmap.map_range(mut pagemap, virt, u64(addr), allocation_size, pf, mmap.map_anonymous) or {
-				return error('')
-			}
-
-			buf := unsafe { byteptr(addr) + misalign + higher_half }
-			res.read(0, buf, phdr.p_offset, phdr.p_filesz) or { return error('') }
-			unsafe {
-				if misalign != 0 {
-					C.memset(byteptr(addr) + higher_half, 0, misalign)
-				}
-				tail := allocation_size - misalign - phdr.p_filesz
-				if tail != 0 {
-					C.memset(buf + phdr.p_filesz, 0, tail)
-				}
-			}
+		virt := lib.align_down(segment_address, page_size)
+		file_offset := i64(lib.align_down(phdr.p_offset, page_size))
+		file_backed_length := misalign + phdr.p_filesz
+		mmap.mmap_file_segment(pagemap, virt, mapping_length, pf, res, file_offset, 0, file_backed_length) or { return error('elf: unable to map LOAD segment') }
+		loaded_ranges << LoadedRange{
+			base: virt
+			length: mapping_length
 		}
 	}
 
 	// If no PT_PHDR segment was found, compute AT_PHDR from the first
 	// LOAD segment's base (like Linux's binfmt_elf.c). This works for both
 	// PIE (vaddr 0) and EXEC (vaddr 0x400000+) binaries.
+	if !load_addr_set {
+		return error('elf: no loadable segments')
+	}
 	if auxval.at_phdr == 0 {
+		if header.phoff > u64(-1) - load_addr {
+			return error('elf: PHDR address overflow')
+		}
 		auxval.at_phdr = load_addr + header.phoff
 	}
 
+	committed = true
 	return auxval, ld_path
 }

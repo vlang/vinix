@@ -19,8 +19,7 @@ pub const pstate_dit = u64(1) << 24
 
 pub const pstate_ssbs = u64(1) << 12
 
-pub const pstate_user_mask = pstate_n | pstate_z | pstate_c | pstate_v | pstate_tco |
-	pstate_dit | pstate_ssbs
+pub const pstate_user_mask = pstate_n | pstate_z | pstate_c | pstate_v | pstate_tco | pstate_dit | pstate_ssbs
 
 // Read system registers via MRS
 pub fn read_sctlr_el1() u64 {
@@ -459,6 +458,33 @@ pub fn dmb_ishld() {
 	}
 }
 
+// Publish bytes written through the data-cache alias before installing an
+// executable user mapping. ARM does not guarantee I/D cache coherence for
+// freshly generated or demand-loaded instructions without this sequence.
+pub fn sync_instruction_cache(address u64, length u64) {
+	end := address + length
+	for line := address; line < end; line += 64 {
+		asm volatile aarch64 {
+			dc cvau, line
+			; ; r (line)
+			; memory
+		}
+	}
+	dsb_ish()
+	for line := address; line < end; line += 64 {
+		asm volatile aarch64 {
+			ic ivau, line
+			; ; r (line)
+			; memory
+		}
+	}
+	asm volatile aarch64 {
+		dsb ish
+		isb
+		; ; ; memory
+	}
+}
+
 // Whole-TLB invalidation for switching the executing CPU to another pagemap.
 // A context switch only needs to affect this PE; broadcasting every switch
 // would needlessly evict unrelated processes running on the other CPUs.
@@ -577,7 +603,9 @@ pub fn init_fpu_globals() {
 }
 
 fn C.vinix_aarch64_fpu_enable()
+
 fn C.vinix_aarch64_fpu_save(state voidptr)
+
 fn C.vinix_aarch64_fpu_restore(state voidptr)
 
 fn save_fpu_state(state voidptr) {
@@ -601,9 +629,11 @@ pub const psci_system_off = u64(0x84000008)
 pub const psci_system_reset = u64(0x84000009)
 
 fn C.vinix_psci_hvc(function_id u64) u64
+
 fn C.vinix_psci_smc(function_id u64) u64
 
 fn C.vinix_current_el() u64
+
 fn C.vinix_set_sp_el1(value u64)
 
 pub fn current_el() u64 {

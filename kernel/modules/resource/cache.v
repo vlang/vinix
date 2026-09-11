@@ -1,5 +1,7 @@
 module resource
 
+import katomic
+
 // Optional capabilities keep stream/device resources and in-memory files from
 // needing dummy callbacks merely because disk-backed resources cache writes.
 pub interface SyncableResource {
@@ -67,6 +69,17 @@ pub fn release_mapping(mut res Resource, handle voidptr, page u64, physical void
 	if mut res is MappingReleaseResource {
 		res.release_mapping(handle, page, physical, flags)
 	}
+}
+
+// Mappings created directly by the ELF loader have no open-file Handle to
+// retain. Keep the underlying inode alive until their final global range is
+// destroyed, including after the executable has been unlinked.
+pub fn retain_resource(mut res Resource) {
+	katomic.inc(mut &res.refcount)
+}
+
+pub fn release_resource(mut res Resource) {
+	res.unref(unsafe { nil }) or {}
 }
 
 pub fn advise_resource(mut res Resource, handle voidptr, offset u64, length u64, advice int) ? {
